@@ -4,9 +4,10 @@
 use crate::{common::set_thread_nice_value, thread_manager::ThreadManager};
 use aptos_runtimes::spawn_rayon_thread_pool_with_start_hook;
 use rayon::ThreadPool;
+use std::sync::Arc;
 
 pub(crate) struct ThreadsPriorityThreadManager {
-    exe_threads: ThreadPool,
+    exe_threads: Arc<ThreadPool>,
     non_exe_threads: ThreadPool,
     high_pri_io_threads: ThreadPool,
     io_threads: ThreadPool,
@@ -16,11 +17,11 @@ pub(crate) struct ThreadsPriorityThreadManager {
 impl ThreadsPriorityThreadManager {
     pub(crate) fn new(num_exe_threads: usize) -> Self {
         // TODO(grao): Make priorities and thread numbers configurable.
-        let exe_threads = spawn_rayon_thread_pool_with_start_hook(
+        let exe_threads = Arc::new(spawn_rayon_thread_pool_with_start_hook(
             "exe".into(),
             Some(num_exe_threads),
             set_thread_nice_value(-20),
-        );
+        ));
 
         let non_exe_threads = spawn_rayon_thread_pool_with_start_hook(
             "non_exe".into(),
@@ -59,6 +60,10 @@ impl ThreadsPriorityThreadManager {
 impl<'a> ThreadManager<'a> for ThreadsPriorityThreadManager {
     fn get_exe_cpu_pool(&'a self) -> &'a ThreadPool {
         &self.exe_threads
+    }
+
+    fn get_exe_cpu_pool_arc(&self) -> Arc<ThreadPool> {
+        Arc::clone(&self.exe_threads)
     }
 
     fn get_non_exe_cpu_pool(&'a self) -> &'a ThreadPool {

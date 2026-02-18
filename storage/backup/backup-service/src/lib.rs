@@ -13,7 +13,7 @@ pub fn start_backup_service(address: SocketAddr, db: Arc<AptosDB>) -> Runtime {
     let backup_handler = db.get_backup_handler();
     let routes = get_routes(backup_handler);
 
-    let runtime = aptos_runtimes::spawn_named_runtime("backup".into(), None);
+    let runtime = aptos_runtimes::spawn_named_runtime("backup".into(), Some(4), Some(16));
 
     // Ensure that we actually bind to the socket first before spawning the
     // server tasks. This helps in tests to prevent races where a client attempts

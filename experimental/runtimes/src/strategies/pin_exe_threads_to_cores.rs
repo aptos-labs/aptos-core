@@ -8,9 +8,10 @@ use crate::{
 use aptos_runtimes::spawn_rayon_thread_pool_with_start_hook;
 use libc::CPU_SET;
 use rayon::ThreadPool;
+use std::sync::Arc;
 
 pub(crate) struct PinExeThreadsToCoresThreadManager {
-    exe_threads: ThreadPool,
+    exe_threads: Arc<ThreadPool>,
     non_exe_threads: ThreadPool,
     high_pri_io_threads: ThreadPool,
     io_threads: ThreadPool,
@@ -31,11 +32,11 @@ impl PinExeThreadsToCoresThreadManager {
             unsafe { CPU_SET(core_id.id, &mut non_exe_cpu_set) };
         }
 
-        let exe_threads = spawn_rayon_thread_pool_with_start_hook(
+        let exe_threads = Arc::new(spawn_rayon_thread_pool_with_start_hook(
             "exe".into(),
             Some(num_exe_cpu),
             pin_cpu_set(exe_cpu_set),
-        );
+        ));
 
         let non_exe_threads = spawn_rayon_thread_pool_with_start_hook(
             "non_exe".into(),
@@ -74,6 +75,10 @@ impl PinExeThreadsToCoresThreadManager {
 impl<'a> ThreadManager<'a> for PinExeThreadsToCoresThreadManager {
     fn get_exe_cpu_pool(&'a self) -> &'a ThreadPool {
         &self.exe_threads
+    }
+
+    fn get_exe_cpu_pool_arc(&self) -> Arc<ThreadPool> {
+        Arc::clone(&self.exe_threads)
     }
 
     fn get_non_exe_cpu_pool(&'a self) -> &'a ThreadPool {

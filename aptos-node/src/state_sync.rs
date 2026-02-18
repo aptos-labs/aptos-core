@@ -35,7 +35,7 @@ use aptos_time_service::TimeService;
 use aptos_types::waypoint::Waypoint;
 use aptos_vm::aptos_vm::AptosVMBlockExecutor;
 use std::sync::Arc;
-use tokio::runtime::Runtime;
+use tokio::runtime::Handle;
 
 /// Creates the event subscription service and two reconfiguration
 /// notification listeners (for mempool and consensus, respectively).
@@ -144,15 +144,19 @@ pub fn start_state_sync_and_get_notification_handles(
     let network_client = storage_network_interfaces.network_client;
     let network_service_events = storage_network_interfaces.network_service_events;
 
+    // Create a single state sync runtime
+    let state_sync_runtime = aptos_runtimes::spawn_named_runtime("state-sync".into(), Some(12), Some(32));
+    let runtime_handle = state_sync_runtime.handle();
+
     // Start the data client
     let peers_and_metadata = network_client.get_peers_and_metadata();
-    let (aptos_data_client, aptos_data_client_runtime) =
-        setup_aptos_data_client(node_config, network_client, db_rw.reader.clone())?;
+    let aptos_data_client =
+        setup_aptos_data_client(node_config, network_client, db_rw.reader.clone(), runtime_handle)?;
 
     // Start the data streaming service
     let state_sync_config = node_config.state_sync;
-    let (streaming_service_client, streaming_service_runtime) =
-        setup_data_streaming_service(state_sync_config, aptos_data_client.clone())?;
+    let streaming_service_client =
+        setup_data_streaming_service(state_sync_config, aptos_data_client.clone(), runtime_handle)?;
 
     // Create the chunk executor and persistent storage
     let chunk_executor = Arc::new(ChunkExecutor::<AptosVMBlockExecutor>::new(db_rw.clone()));
@@ -175,17 +179,18 @@ pub fn start_state_sync_and_get_notification_handles(
         aptos_storage_service_notifications::new_storage_service_notifier_listener_pair();
 
     // Start the state sync storage service
-    let storage_service_runtime = setup_state_sync_storage_service(
+    setup_state_sync_storage_service(
         state_sync_config,
         peers_and_metadata,
         network_service_events,
         &db_rw,
         storage_service_listener,
+        runtime_handle,
     )?;
 
     // Create the state sync driver factory
     let state_sync = DriverFactory::create_and_spawn_driver(
-        true,
+        Some(runtime_handle.clone()),
         node_config,
         waypoint,
         db_rw,
@@ -201,12 +206,7 @@ pub fn start_state_sync_and_get_notification_handles(
     );
 
     // Create a new state sync runtime handle
-    let state_sync_runtimes = StateSyncRuntimes::new(
-        aptos_data_client_runtime,
-        state_sync,
-        storage_service_runtime,
-        streaming_service_runtime,
-    );
+    let state_sync_runtimes = StateSyncRuntimes::new(state_sync_runtime, state_sync);
 
     Ok((
         aptos_data_client,
@@ -216,11 +216,12 @@ pub fn start_state_sync_and_get_notification_handles(
     ))
 }
 
-/// Sets up the data streaming service runtime
+/// Sets up the data streaming service on the given runtime handle
 fn setup_data_streaming_service(
     state_sync_config: StateSyncConfig,
     aptos_data_client: AptosDataClient,
-) -> anyhow::Result<(StreamingServiceClient, Runtime)> {
+    runtime_handle: &Handle,
+) -> anyhow::Result<StreamingServiceClient> {
     // Create the data streaming service
     let (streaming_service_client, streaming_service_listener) =
         new_streaming_service_client_listener_pair();
@@ -233,23 +234,20 @@ fn setup_data_streaming_service(
     );
 
     // Start the data streaming service
-    let streaming_service_runtime = aptos_runtimes::spawn_named_runtime("stream-serv".into(), None);
-    streaming_service_runtime.spawn(data_streaming_service.start_service());
+    runtime_handle.spawn(data_streaming_service.start_service());
 
-    Ok((streaming_service_client, streaming_service_runtime))
+    Ok(streaming_service_client)
 }
 
-/// Sets up the aptos data client runtime
+/// Sets up the aptos data client on the given runtime handle
 fn setup_aptos_data_client(
     node_config: &NodeConfig,
     network_client: NetworkClient<StorageServiceMessage>,
     storage: Arc<dyn DbReader>,
-) -> anyhow::Result<(AptosDataClient, Runtime)> {
+    runtime_handle: &Handle,
+) -> anyhow::Result<AptosDataClient> {
     // Create the storage service client
     let storage_service_client = StorageServiceClient::new(network_client);
-
-    // Create a new runtime for the data client
-    let aptos_data_client_runtime = aptos_runtimes::spawn_named_runtime("data-client".into(), None);
 
     // Create the data client and spawn the data poller
     let (aptos_data_client, data_summary_poller) = AptosDataClient::new(
@@ -258,24 +256,22 @@ fn setup_aptos_data_client(
         TimeService::real(),
         storage,
         storage_service_client,
-        Some(aptos_data_client_runtime.handle().clone()),
+        Some(runtime_handle.clone()),
     );
-    aptos_data_client_runtime.spawn(poller::start_poller(data_summary_poller));
+    runtime_handle.spawn(poller::start_poller(data_summary_poller));
 
-    Ok((aptos_data_client, aptos_data_client_runtime))
+    Ok(aptos_data_client)
 }
 
-/// Sets up the state sync storage service runtime
+/// Sets up the state sync storage service on the given runtime handle
 fn setup_state_sync_storage_service(
     config: StateSyncConfig,
     peers_and_metadata: Arc<PeersAndMetadata>,
     network_service_events: NetworkServiceEvents<StorageServiceMessage>,
     db_rw: &DbReaderWriter,
     storage_service_listener: StorageServiceNotificationListener,
-) -> anyhow::Result<Runtime> {
-    // Create a new state sync storage service runtime
-    let storage_service_runtime = aptos_runtimes::spawn_named_runtime("stor-server".into(), None);
-
+    runtime_handle: &Handle,
+) -> anyhow::Result<()> {
     // Spawn the state sync storage service servers on the runtime
     let storage_reader = StorageReader::new(
         config.storage_service,
@@ -284,14 +280,14 @@ fn setup_state_sync_storage_service(
     );
     let service = StorageServiceServer::new(
         config,
-        storage_service_runtime.handle().clone(),
+        runtime_handle.clone(),
         storage_reader,
         TimeService::real(),
         peers_and_metadata,
         StorageServiceNetworkEvents::new(network_service_events),
         storage_service_listener,
     );
-    storage_service_runtime.spawn(service.start());
+    runtime_handle.spawn(service.start());
 
-    Ok(storage_service_runtime)
+    Ok(())
 }

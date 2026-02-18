@@ -5,6 +5,7 @@ use crate::metrics::OTHER_TIMERS_SECONDS;
 use anyhow::anyhow;
 use aptos_crypto::{hash::CryptoHash, HashValue};
 use aptos_db_indexer_schemas::metadata::StateSnapshotProgress;
+use aptos_experimental_runtimes::thread_manager::THREAD_MANAGER;
 use aptos_infallible::Mutex;
 use aptos_jellyfish_merkle::{restore::JellyfishMerkleRestore, Key, TreeReader, TreeWriter, Value};
 use aptos_metrics_core::TimerHelper;
@@ -13,21 +14,11 @@ use aptos_types::{
     proof::SparseMerkleRangeProof, state_store::state_storage_usage::StateStorageUsage,
     transaction::Version,
 };
-use once_cell::sync::Lazy;
-use rayon::{ThreadPool, ThreadPoolBuilder};
 use serde::{Deserialize, Serialize};
 use std::{collections::HashMap, hash::Hash, str::FromStr, sync::Arc};
 
 #[cfg(test)]
 mod restore_test;
-
-pub static IO_POOL: Lazy<ThreadPool> = Lazy::new(|| {
-    ThreadPoolBuilder::new()
-        .num_threads(32)
-        .thread_name(|index| format!("jmt-io-{}", index))
-        .build()
-        .unwrap()
-});
 
 /// Key-Value batch that will be written into db atomically with other batches.
 pub type StateValueBatch<K, V> = HashMap<(K, Version), V>;
@@ -243,7 +234,7 @@ impl<K: Key + CryptoHash + Hash + Eq, V: Value> StateSnapshotReceiver<K, V>
             StateSnapshotRestoreMode::TreeOnly => tree_fn()?,
             StateSnapshotRestoreMode::Default => {
                 // We run kv_fn with TreeOnly to restore the usage of DB
-                let (r1, r2) = IO_POOL.join(kv_fn, tree_fn);
+                let (r1, r2) = THREAD_MANAGER.get_io_pool().join(kv_fn, tree_fn);
                 r1?;
                 r2?;
             },

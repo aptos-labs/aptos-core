@@ -100,7 +100,7 @@ pub fn bootstrap(
     rest_client: Option<aptos_rest_client::Client>,
     supported_currencies: HashSet<Currency>,
 ) -> anyhow::Result<tokio::runtime::Runtime> {
-    let runtime = aptos_runtimes::spawn_named_runtime("rosetta".into(), None);
+    let runtime = aptos_runtimes::spawn_named_runtime("rosetta".into(), Some(4), Some(4));
 
     debug!("Starting up Rosetta server with {:?}", api_config);
 

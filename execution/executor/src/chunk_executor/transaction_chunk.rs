@@ -7,7 +7,7 @@ use crate::{
 };
 use anyhow::Result;
 use aptos_executor_types::execution_output::ExecutionOutput;
-use aptos_experimental_runtimes::thread_manager::optimal_min_len;
+use aptos_experimental_runtimes::thread_manager::{optimal_min_len, THREAD_MANAGER};
 use aptos_metrics_core::TimerHelper;
 use aptos_storage_interface::state_store::{
     state::LedgerState, state_view::cached_state_view::CachedStateView,
@@ -20,19 +20,7 @@ use aptos_types::{
     transaction::{AuxiliaryInfo, PersistedAuxiliaryInfo, Transaction, TransactionOutput, Version},
 };
 use aptos_vm::VMBlockExecutor;
-use once_cell::sync::Lazy;
 use rayon::iter::{IndexedParallelIterator, IntoParallelIterator, ParallelIterator};
-use std::sync::Arc;
-
-pub static SIG_VERIFY_POOL: Lazy<Arc<rayon::ThreadPool>> = Lazy::new(|| {
-    Arc::new(
-        rayon::ThreadPoolBuilder::new()
-            .num_threads(8) // More than 8 threads doesn't seem to help much
-            .thread_name(|index| format!("chunk-sig-check-{}", index))
-            .build()
-            .unwrap(),
-    )
-});
 
 pub trait TransactionChunk {
     fn first_version(&self) -> Version;
@@ -88,7 +76,7 @@ impl TransactionChunk for ChunkToExecute {
             let _timer = CHUNK_OTHER_TIMERS.timer_with(&["sig_verify"]);
 
             let num_txns = transactions.len();
-            SIG_VERIFY_POOL.install(|| {
+            THREAD_MANAGER.get_non_exe_cpu_pool().install(|| {
                 transactions
                     .into_par_iter()
                     .with_min_len(optimal_min_len(num_txns, 32))

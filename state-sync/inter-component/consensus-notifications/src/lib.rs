@@ -626,6 +626,6 @@ mod tests {
     }
 
     fn create_runtime() -> Runtime {
-        aptos_runtimes::spawn_named_runtime("test".into(), None)
+        aptos_runtimes::spawn_named_runtime("test".into(), None, None)
     }
 }

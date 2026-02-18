@@ -15,11 +15,11 @@ use crate::{
         },
         use_case_history::UseCaseHistory,
     },
-    thread_pool::{IO_POOL, VALIDATION_POOL},
     QuorumStoreRequest, QuorumStoreResponse, SubmissionStatus,
 };
 use anyhow::Result;
 use aptos_config::{config::TransactionFilterConfig, network_id::PeerNetworkId};
+use aptos_experimental_runtimes::thread_manager::THREAD_MANAGER;
 use aptos_consensus_types::common::RejectedTransactionSummary;
 use aptos_crypto::HashValue;
 use aptos_infallible::{Mutex, RwLock};
@@ -332,7 +332,7 @@ where
         .expect("Failed to get latest state checkpoint view.");
 
     // Track latency: fetching seq number
-    let account_seq_numbers = IO_POOL.install(|| {
+    let account_seq_numbers = THREAD_MANAGER.get_io_pool().install(|| {
         transactions
             .par_iter()
             .map(|(t, _, _)| match t.replay_protector() {
@@ -487,7 +487,7 @@ fn validate_and_add_transactions<NetworkClient, TransactionValidator>(
     let vm_validation_timer = counters::PROCESS_TXN_BREAKDOWN_LATENCY
         .with_label_values(&[counters::VM_VALIDATION_LABEL])
         .start_timer();
-    let validation_results = VALIDATION_POOL.install(|| {
+    let validation_results = THREAD_MANAGER.get_non_exe_cpu_pool().install(|| {
         transactions
             .par_iter()
             .map(|t| {

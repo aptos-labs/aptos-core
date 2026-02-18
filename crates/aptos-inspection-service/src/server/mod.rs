@@ -72,6 +72,7 @@ pub fn start_inspection_service(
     let runtime = aptos_runtimes::spawn_named_runtime(
         "inspection".into(),
         node_config.inspection_service.num_threads,
+        Some(4),
     );
 
     // Spawn the inspection service

@@ -28,7 +28,7 @@ use aptos_consensus_types::{
 };
 use aptos_crypto::HashValue;
 use aptos_executor_types::{state_compute_result::StateComputeResult, BlockExecutorTrait};
-use aptos_experimental_runtimes::thread_manager::optimal_min_len;
+use aptos_experimental_runtimes::thread_manager::{optimal_min_len, THREAD_MANAGER};
 use aptos_infallible::Mutex;
 use aptos_logger::{error, info, trace, warn};
 use aptos_resource_viewer::module_view::CachedModuleView;
@@ -52,7 +52,6 @@ use aptos_types::{
 use futures::FutureExt;
 use move_core_types::account_address::AccountAddress;
 use move_vm_runtime::ModuleStorage;
-use once_cell::sync::Lazy;
 use rayon::prelude::*;
 use std::{
     future::Future,
@@ -61,16 +60,6 @@ use std::{
     time::{Duration, Instant},
 };
 use tokio::{select, sync::oneshot, task::AbortHandle};
-
-static SIG_VERIFY_POOL: Lazy<Arc<rayon::ThreadPool>> = Lazy::new(|| {
-    Arc::new(
-        rayon::ThreadPoolBuilder::new()
-            .num_threads(16)
-            .thread_name(|index| format!("signature-checker-{}", index))
-            .build()
-            .expect("Failed to create signature verification thread pool"),
-    )
-});
 
 /// Status to help synchornize the pipeline and sync_manager
 /// It is used to track the round of the block that could be pre-committed and sync manager decides
@@ -673,7 +662,9 @@ impl PipelineBuilder {
             .await;
 
         let sig_verification_start = Instant::now();
-        let sig_verified_txns: Vec<SignatureVerifiedTransaction> = SIG_VERIFY_POOL.install(|| {
+        let sig_verified_txns: Vec<SignatureVerifiedTransaction> = THREAD_MANAGER
+            .get_non_exe_cpu_pool()
+            .install(|| {
             let num_txns = input_txns.len();
             input_txns
                 .into_par_iter()

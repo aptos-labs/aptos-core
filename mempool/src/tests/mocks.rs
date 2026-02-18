@@ -78,7 +78,7 @@ impl MockSharedMempool {
     /// Creates a mock shared mempool and runtime
     pub fn new_with_runtime() -> Self {
         // Create a runtime
-        let runtime = aptos_runtimes::spawn_named_runtime("shared-mem".into(), None);
+        let runtime = aptos_runtimes::spawn_named_runtime("shared-mem".into(), None, None);
         let _entered_runtime = runtime.enter();
 
         // Create and return the shared mempool

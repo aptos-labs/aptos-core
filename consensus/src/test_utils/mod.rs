@@ -297,7 +297,7 @@ pub fn consensus_runtime() -> runtime::Runtime {
         ::aptos_logger::Logger::new().level(Level::Debug).init();
     }
 
-    aptos_runtimes::spawn_named_runtime("consensus".into(), None)
+    aptos_runtimes::spawn_named_runtime("consensus".into(), None, None)
 }
 
 pub fn timed_block_on<F>(runtime: &runtime::Runtime, f: F) -> <F as Future>::Output
