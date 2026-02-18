@@ -2,6 +2,7 @@
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 #![forbid(unsafe_code)]
+use base64::Engine as _;
 
 mod crypto_kv_storage;
 mod crypto_storage;
@@ -35,7 +36,7 @@ pub fn to_base64<S>(bytes: &[u8], serializer: S) -> Result<S::Ok, S::Error>
 where
     S: serde::Serializer,
 {
-    serializer.serialize_str(&base64::encode(bytes))
+    serializer.serialize_str(&base64::engine::general_purpose::STANDARD.encode(bytes))
 }
 
 pub fn from_base64<'de, D>(deserializer: D) -> Result<Vec<u8>, D::Error>
@@ -43,7 +44,7 @@ where
     D: serde::Deserializer<'de>,
 {
     let s: String = serde::Deserialize::deserialize(deserializer)?;
-    base64::decode(s).map_err(serde::de::Error::custom)
+    base64::engine::general_purpose::STANDARD.decode(s).map_err(serde::de::Error::custom)
 }
 
 #[cfg(test)]

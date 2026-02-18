@@ -4,6 +4,7 @@
 //! This module provides utility for reading and writing crypto keys
 //! in different formats used by the blockchain.
 
+use base64::Engine as _;
 use crate::{traits::ValidCryptoMaterialStringExt, ValidCryptoMaterial};
 use core::{
     fmt::{Display, Formatter},
@@ -57,7 +58,7 @@ impl EncodingType {
         Ok(match self {
             EncodingType::Hex => hex::encode_upper(key.to_bytes()).into_bytes(),
             EncodingType::BCS => bcs::to_bytes(key).map_err(|err| EncodingError::BCS(name, err))?,
-            EncodingType::Base64 => base64::encode(key.to_bytes()).into_bytes(),
+            EncodingType::Base64 => base64::engine::general_purpose::STANDARD.encode(key.to_bytes()).into_bytes(),
         })
     }
 
@@ -87,7 +88,7 @@ impl EncodingType {
             },
             EncodingType::Base64 => {
                 let string = String::from_utf8(data)?;
-                let bytes = base64::decode(string.trim())
+                let bytes = base64::engine::general_purpose::STANDARD.decode(string.trim())
                     .map_err(|err| EncodingError::UnableToParse(name, err.to_string()))?;
                 Key::try_from(bytes.as_slice()).map_err(|err| {
                     EncodingError::UnableToParse(name, format!("Failed to parse key {:?}", err))

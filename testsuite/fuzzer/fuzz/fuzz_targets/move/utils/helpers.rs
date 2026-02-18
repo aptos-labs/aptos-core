@@ -3,6 +3,7 @@
 
 #![allow(dead_code)]
 
+use base64::Engine as _;
 use move_binary_format::file_format::CompiledModule;
 use move_core_types::value::{MoveStructLayout, MoveTypeLayout};
 
@@ -79,5 +80,5 @@ pub(crate) fn compiled_module_serde(module: &CompiledModule) -> Result<(), ()> {
 }
 
 pub(crate) fn base64url_encode_str(data: &str) -> String {
-    base64::encode_config(data.as_bytes(), base64::URL_SAFE_NO_PAD)
+    base64::engine::general_purpose::URL_SAFE_NO_PAD.encode(data.as_bytes())
 }

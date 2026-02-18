@@ -5,6 +5,7 @@
 
 pub mod dev;
 
+use base64::Engine as _;
 use aptos_crypto::{
     ed25519::{Ed25519PrivateKey, Ed25519PublicKey, Ed25519Signature, ED25519_PRIVATE_KEY_LENGTH},
     PrivateKey,
@@ -305,7 +306,7 @@ impl Client {
     }
 
     pub fn import_ed25519_key(&self, name: &str, key: &Ed25519PrivateKey) -> Result<(), Error> {
-        let backup = base64::encode(serde_json::to_string(&KeyBackup::new(key))?);
+        let backup = base64::engine::general_purpose::STANDARD.encode(serde_json::to_string(&KeyBackup::new(key))?);
         let request = self
             .agent
             .post(&format!("{}/v1/transit/restore/{}", self.host, name));
@@ -429,9 +430,9 @@ impl Client {
         version: Option<u32>,
     ) -> Result<Ed25519Signature, Error> {
         let data = if let Some(version) = version {
-            json!({ "input": base64::encode(data), "key_version": version })
+            json!({ "input": base64::engine::general_purpose::STANDARD.encode(data), "key_version": version })
         } else {
-            json!({ "input": base64::encode(data) })
+            json!({ "input": base64::engine::general_purpose::STANDARD.encode(data) })
         };
 
         let request = self
@@ -628,7 +629,7 @@ pub fn process_transit_export_response(
             return Err(Error::NotFound("transit/".into(), name.into()));
         };
 
-        let composite_key = base64::decode(composite_key)?;
+        let composite_key = base64::engine::general_purpose::STANDARD.decode(composite_key)?;
         if let Some(composite_key) = composite_key.get(0..ED25519_PRIVATE_KEY_LENGTH) {
             Ok(Ed25519PrivateKey::try_from(composite_key)?)
         } else {
@@ -669,7 +670,7 @@ pub fn process_transit_read_response(
             for (version, value) in read_key.data.keys {
                 read_resp.push(ReadResponse::new(
                     value.creation_time,
-                    Ed25519PublicKey::try_from(base64::decode(&value.public_key)?.as_slice())?,
+                    Ed25519PublicKey::try_from(base64::engine::general_purpose::STANDARD.decode(&value.public_key)?.as_slice())?,
                     version,
                 ));
             }
@@ -706,7 +707,7 @@ pub fn process_transit_sign_response(resp: Response) -> Result<Ed25519Signature,
             .get(2)
             .ok_or_else(|| Error::SerializationError(signature.into()))?;
         Ok(Ed25519Signature::try_from(
-            base64::decode(signature)?.as_slice(),
+            base64::engine::general_purpose::STANDARD.decode(signature)?.as_slice(),
         )?)
     } else {
         Err(resp.into())
@@ -784,8 +785,8 @@ impl KeyBackup {
         let time_as_str = now.to_rfc3339();
 
         let info = KeyBackupInfo {
-            key: Some(base64::encode(key_bytes)),
-            public_key: Some(base64::encode(pub_key_bytes)),
+            key: Some(base64::engine::general_purpose::STANDARD.encode(key_bytes)),
+            public_key: Some(base64::engine::general_purpose::STANDARD.encode(pub_key_bytes)),
             creation_time: now.timestamp_subsec_millis(),
             time: time_as_str.clone(),
             ..Default::default()
