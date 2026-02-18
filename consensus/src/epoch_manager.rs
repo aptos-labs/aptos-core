@@ -1057,13 +1057,26 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
             .config
             .max_blocks_per_receiving_request(onchain_consensus_config.quorum_store_enabled());
 
-        // Create proxy consensus channels and spawn proxy RoundManager if enabled
+        // Resolve proxy validator set from on-chain config
+        let proxy_validator_indices = onchain_consensus_config.proxy_validator_indices();
+        let ordered_addresses = epoch_state.verifier.get_ordered_account_addresses();
+        let proxy_addresses: Vec<AccountAddress> = proxy_validator_indices
+            .iter()
+            .filter_map(|&idx| ordered_addresses.get(idx as usize).copied())
+            .collect();
+        let proxy_enabled = !proxy_addresses.is_empty();
+        let is_proxy_validator = proxy_enabled && proxy_addresses.contains(&self.author);
+
         info!(
             epoch = epoch,
-            enable_proxy_consensus = self.config.enable_proxy_consensus,
-            "Checking proxy consensus config"
+            proxy_enabled = proxy_enabled,
+            is_proxy_validator = is_proxy_validator,
+            proxy_count = proxy_addresses.len(),
+            "Checking proxy consensus config (on-chain)"
         );
-        let (proxy_event_tx, proxy_event_rx) = if self.config.enable_proxy_consensus {
+
+        let (proxy_event_tx, proxy_event_rx) = if proxy_enabled && is_proxy_validator {
+            // This node IS a proxy validator: spawn full proxy consensus
             let (primary_to_proxy_tx, primary_to_proxy_rx) =
                 tokio::sync::mpsc::unbounded_channel();
             let (proxy_to_primary_tx, proxy_to_primary_rx) =
@@ -1071,7 +1084,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
 
             info!(
                 epoch = epoch,
-                "Proxy consensus enabled, spawning proxy RoundManager"
+                "Proxy validator: spawning proxy RoundManager"
             );
 
             // Store clone of proxy_to_primary_tx for dispatching network OrderedProxyBlocksMsg
@@ -1091,6 +1104,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
                     payload_manager,
                     &onchain_randomness_config,
                     &onchain_jwk_consensus_config,
+                    &proxy_addresses,
                 );
 
             // Store the proxy RoundManager's event channels for routing incoming proxy messages
@@ -1105,7 +1119,25 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
             );
 
             (Some(primary_to_proxy_tx), Some(proxy_to_primary_rx))
+        } else if proxy_enabled {
+            // This node is NOT a proxy validator but proxy is enabled:
+            // Need proxy_ordered_blocks_tx to receive OrderedProxyBlocksMsg from proxies
+            let (_proxy_to_primary_tx, proxy_to_primary_rx) =
+                tokio::sync::mpsc::unbounded_channel();
+
+            info!(
+                epoch = epoch,
+                "Non-proxy primary: setting up OrderedProxyBlocks channel only"
+            );
+
+            self.proxy_ordered_blocks_tx = Some(_proxy_to_primary_tx);
+            self.proxy_round_manager_tx = None;
+            self.proxy_buffered_proposal_tx = None;
+            self.proxy_block_retrieval_tx = None;
+
+            (None, Some(proxy_to_primary_rx))
         } else {
+            // Proxy consensus disabled (no proxy validators configured)
             self.proxy_round_manager_tx = None;
             self.proxy_buffered_proposal_tx = None;
             self.proxy_ordered_blocks_tx = None;
@@ -1198,6 +1230,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
         payload_manager: Arc<dyn TPayloadManager>,
         onchain_randomness_config: &OnChainRandomnessConfig,
         onchain_jwk_consensus_config: &OnChainJWKConsensusConfig,
+        proxy_addresses: &[AccountAddress],
     ) -> (
         aptos_channel::Sender<(Author, Discriminant<VerifiedEvent>), (Author, VerifiedEvent)>,
         aptos_channel::Sender<Author, VerifiedEvent>,
@@ -1255,8 +1288,42 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
         }
         let safety_rules_container = Arc::new(Mutex::new(metrics_safety_rules));
 
-        // 3. Create NetworkSender in proxy_mode
+        // 3. Build proxy-only ValidatorVerifier for restricted proxy consensus
+        let proxy_verifier = {
+            let proxy_infos: Vec<_> = epoch_state
+                .verifier
+                .validator_infos
+                .iter()
+                .filter(|info| proxy_addresses.contains(&info.address))
+                .cloned()
+                .collect();
+            assert!(
+                !proxy_infos.is_empty(),
+                "proxy_addresses must map to at least one validator in the epoch"
+            );
+            ValidatorVerifier::new(proxy_infos)
+        };
+        let proxy_epoch_state = Arc::new(EpochState {
+            epoch: epoch_state.epoch,
+            verifier: proxy_verifier.into(),
+        });
+        info!(
+            epoch = epoch,
+            proxy_validators = proxy_epoch_state.verifier.len(),
+            proxy_quorum = %proxy_epoch_state.verifier.quorum_voting_power(),
+            "Built proxy-only ValidatorVerifier"
+        );
+
+        // Create proxy NetworkSender with proxy-only verifier (proposals/votes among proxies)
         let proxy_network_sender = Arc::new(NetworkSender::new_for_proxy(
+            self.author,
+            self.network_sender.clone(),
+            self.self_sender.clone(),
+            proxy_epoch_state.verifier.clone(),
+        ));
+
+        // Create broadcast NetworkSender with full verifier (OrderedProxyBlocksMsg to ALL)
+        let broadcast_network_sender = Arc::new(NetworkSender::new_for_proxy(
             self.author,
             self.network_sender.clone(),
             self.self_sender.clone(),
@@ -1265,11 +1332,11 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
 
         // 4. Create round-robin ProposerElection for proxy (no leader reputation).
         // Proxy blocks always have empty failed_authors since round-robin doesn't
-        // track failures.
-        let proposers = epoch_state
+        // track failures. Only proxy validators participate as leaders.
+        let proposers: Vec<_> = proxy_epoch_state
             .verifier
             .get_ordered_account_addresses_iter()
-            .collect::<Vec<_>>();
+            .collect();
         let proposer_election: Arc<dyn ProposerElection + Send + Sync> =
             Arc::new(RotatingProposer::new(proposers, 1));
 
@@ -1292,7 +1359,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
         let initial_primary_qc = Arc::new(recovery_data.root_quorum_cert().clone());
         let proxy_hooks = Arc::new(ProxyHooksImpl::new(
             proxy_to_primary_tx,
-            proxy_network_sender.clone(),
+            broadcast_network_sender,
             Some(initial_primary_qc),
         ));
 
@@ -1323,7 +1390,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
         let pipeline_backpressure_config = PipelineBackpressureConfig::new_no_backoff();
         let failures_tracker = Arc::new(Mutex::new(ExponentialWindowFailureTracker::new(
             100,
-            epoch_state.verifier.get_ordered_account_addresses(),
+            proxy_epoch_state.verifier.get_ordered_account_addresses(),
         )));
         let opt_qs_payload_param_provider = Arc::new(OptQSPullParamsProvider::new(
             self.config.quorum_store.enable_opt_quorum_store,
@@ -1397,7 +1464,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
 
         let proxy_block_store_clone = proxy_block_store.clone();
         let mut proxy_round_manager = RoundManager::new(
-            epoch_state.clone(),
+            proxy_epoch_state,
             proxy_block_store_clone,
             proxy_round_state,
             proposer_election,

@@ -378,7 +378,7 @@ impl NetworkLoadTest for ProxyPrimaryNetworkEmulation {
             swarm.validators().map(|v| v.peer_id()).collect()
         };
 
-        let netem = self.create_netem_chaos(all_validators);
+        let netem = self.create_netem_chaos(all_validators.clone());
         ctx.swarm
             .write()
             .await
@@ -386,7 +386,10 @@ impl NetworkLoadTest for ProxyPrimaryNetworkEmulation {
             .await?;
         info!("Injected proxy-primary geo-distributed network emulation");
 
-        Ok(LoadDestination::FullnodesOtherwiseValidators)
+        // Submit transactions only to proxy validators so they enter the fast proxy
+        // consensus path. Non-proxy validators would only commit via slower primary rounds.
+        let proxy_peers = all_validators[..self.num_proxy_validators].to_vec();
+        Ok(LoadDestination::Peers(proxy_peers))
     }
 
     async fn finish<'a>(&self, ctx: &mut NetworkContext<'a>) -> anyhow::Result<()> {

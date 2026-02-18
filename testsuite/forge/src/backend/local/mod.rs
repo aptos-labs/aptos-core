@@ -10,6 +10,7 @@ use aptos_config::config::{NodeConfig, OverrideNodeConfig};
 use aptos_framework::ReleaseBundle;
 use aptos_genesis::builder::{InitConfigFn, InitGenesisConfigFn, InitGenesisStakeFn};
 use aptos_infallible::Mutex;
+use aptos_sdk::types::on_chain_config::OnChainConsensusConfig;
 use rand::rngs::StdRng;
 use std::{
     collections::HashMap,
@@ -205,6 +206,27 @@ impl Factory for LocalFactory {
             }) as InitConfigFn
         });
 
+        // Bridge genesis_config_fn (helm config) into init_genesis_config for local swarm.
+        // This extracts on_chain_consensus_config from helm values and applies it to
+        // the GenesisConfiguration, so forge tests that set helm values also work locally.
+        let init_genesis_config: Option<InitGenesisConfigFn> =
+            _genesis_config_fn.map(|config_fn| {
+                Arc::new(move |genesis_config: &mut aptos_genesis::builder::GenesisConfiguration| {
+                    let mut helm_values = serde_yaml::Value::Mapping(Default::default());
+                    (config_fn)(&mut helm_values);
+                    if let Some(consensus_val) = helm_values
+                        .get("chain")
+                        .and_then(|c| c.get("on_chain_consensus_config"))
+                    {
+                        if let Ok(config) =
+                            serde_yaml::from_value::<OnChainConsensusConfig>(consensus_val.clone())
+                        {
+                            genesis_config.consensus_config = config;
+                        }
+                    }
+                }) as InitGenesisConfigFn
+            });
+
         // no guarding, as this code path is not used in parallel
         let guard = ActiveNodesGuard::grab(1, Arc::new(Mutex::new(0))).await;
 
@@ -218,7 +240,7 @@ impl Factory for LocalFactory {
                 init_config,
                 None,
                 None,
-                None,
+                init_genesis_config,
                 guard,
             )
             .await?;

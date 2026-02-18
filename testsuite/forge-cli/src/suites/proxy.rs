@@ -5,6 +5,9 @@
 
 use aptos_forge::{success_criteria::SuccessCriteria, ForgeConfig};
 use aptos_testcases::proxy_primary_test::{ProxyPrimaryHappyPathTest, ProxyPrimaryLoadTest};
+use aptos_sdk::types::on_chain_config::{
+    ConsensusAlgorithmConfig, OnChainConsensusConfig, ValidatorTxnConfig, DEFAULT_WINDOW_SIZE,
+};
 use std::{num::NonZeroUsize, sync::Arc, time::Duration};
 
 /// Get a proxy consensus test by name.
@@ -31,8 +34,19 @@ pub fn proxy_primary_happy_path_test() -> ForgeConfig {
     ForgeConfig::default()
         .with_initial_validator_count(NonZeroUsize::new(7).unwrap())
         .add_network_test(ProxyPrimaryHappyPathTest::new(4))
+        .with_genesis_helm_config_fn(Arc::new(|helm_values| {
+            // Set on-chain consensus config V6 with first 4 validators as proxy group
+            helm_values["chain"]["on_chain_consensus_config"] =
+                serde_yaml::to_value(OnChainConsensusConfig::V6 {
+                    alg: ConsensusAlgorithmConfig::default_for_genesis(),
+                    vtxn: ValidatorTxnConfig::default_for_genesis(),
+                    window_size: DEFAULT_WINDOW_SIZE,
+                    rand_check_enabled: true,
+                    proxy_validator_indices: vec![0, 1, 2, 3],
+                })
+                .expect("must serialize");
+        }))
         .with_validator_override_node_config_fn(Arc::new(|config, _| {
-            config.consensus.enable_proxy_consensus = true;
             // Proxy at 1s (matching original consensus default), primary at 10s
             // to ensure proxy accumulates multiple blocks per primary round.
             config.consensus.proxy_consensus_config.round_initial_timeout_ms = 1000;
@@ -53,8 +67,19 @@ fn proxy_primary_load_test() -> ForgeConfig {
     ForgeConfig::default()
         .with_initial_validator_count(NonZeroUsize::new(6).unwrap())
         .add_network_test(ProxyPrimaryLoadTest::new(2))
+        .with_genesis_helm_config_fn(Arc::new(|helm_values| {
+            // Set on-chain consensus config V6 with first 2 validators as proxy group
+            helm_values["chain"]["on_chain_consensus_config"] =
+                serde_yaml::to_value(OnChainConsensusConfig::V6 {
+                    alg: ConsensusAlgorithmConfig::default_for_genesis(),
+                    vtxn: ValidatorTxnConfig::default_for_genesis(),
+                    window_size: DEFAULT_WINDOW_SIZE,
+                    rand_check_enabled: true,
+                    proxy_validator_indices: vec![0, 1],
+                })
+                .expect("must serialize");
+        }))
         .with_validator_override_node_config_fn(Arc::new(|config, _| {
-            config.consensus.enable_proxy_consensus = true;
             config.consensus.proxy_consensus_config.round_initial_timeout_ms = 2000;
             config.consensus.round_initial_timeout_ms = 10000;
         }))
