@@ -268,6 +268,10 @@ impl Default for HotStateConfig {
 #[serde(default, deny_unknown_fields)]
 pub struct StorageConfig {
     pub backup_service_address: SocketAddr,
+    /// Number of worker threads for the backup service runtime.
+    /// Defaults to 2 if not specified.
+    #[serde(default = "StorageConfig::default_backup_service_runtime_threads")]
+    pub backup_service_runtime_threads: Option<usize>,
     /// Top level directory to store the RocksDB
     pub dir: PathBuf,
     /// Hot state configuration
@@ -449,6 +453,7 @@ impl Default for StorageConfig {
     fn default() -> StorageConfig {
         StorageConfig {
             backup_service_address: SocketAddr::new(IpAddr::V4(Ipv4Addr::LOCALHOST), 6186),
+            backup_service_runtime_threads: Self::default_backup_service_runtime_threads(),
             dir: PathBuf::from("db"),
             hot_state_config: HotStateConfig::default(),
             // The prune window must at least out live a RPC request because its sub requests are
@@ -471,6 +476,10 @@ impl Default for StorageConfig {
 }
 
 impl StorageConfig {
+    fn default_backup_service_runtime_threads() -> Option<usize> {
+        Some(2)
+    }
+
     pub fn dir(&self) -> PathBuf {
         if self.dir.is_relative() {
             self.data_dir.join(&self.dir)
