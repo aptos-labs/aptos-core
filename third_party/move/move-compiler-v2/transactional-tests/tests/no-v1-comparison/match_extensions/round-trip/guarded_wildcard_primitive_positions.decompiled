@@ -1,0 +1,32 @@
+//**** Cross-compiled for `move` syntax from `tests/no-v1-comparison/match_extensions/guarded_wildcard_primitive_positions.move`
+
+//# publish
+module 0xc0ffee::guarded_wildcard_primitive_positions {
+    enum E has drop {
+        V1 {
+            f: u8,
+        }
+        V2,
+    }
+    fun match_guarded(p0: E, p1: bool): u8 {
+        if (!((&p0 is V1) && p1)) return 0u8;
+        let E::V1{f: _v0} = p0;
+        1u8
+    }
+    public fun test_guard_false(): u8 {
+        match_guarded(E::V1{f: 7u8}, false)
+    }
+    public fun test_guard_other_variant(): u8 {
+        match_guarded(E::V2{}, true)
+    }
+    public fun test_guard_true(): u8 {
+        match_guarded(E::V1{f: 7u8}, true)
+    }
+}
+
+
+//# run 0xc0ffee::guarded_wildcard_primitive_positions::test_guard_true
+
+//# run 0xc0ffee::guarded_wildcard_primitive_positions::test_guard_false
+
+//# run 0xc0ffee::guarded_wildcard_primitive_positions::test_guard_other_variant

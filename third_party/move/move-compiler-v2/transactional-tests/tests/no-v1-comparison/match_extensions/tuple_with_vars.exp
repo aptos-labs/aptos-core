@@ -1,0 +1,12 @@
+processed 6 tasks
+task 0 lines 1-19:  publish [module 0xc0ffee::m {]
+task 1 lines 21-21:  run 0xc0ffee::m::tuple_var_binding --args 1u64 42u64
+return values: 142
+task 2 lines 23-23:  run 0xc0ffee::m::tuple_var_binding --args 2u64 7u64
+return values: 207
+task 3 lines 25-25:  run 0xc0ffee::m::tuple_var_binding --args 99u64 5u64
+return values: 5
+task 4 lines 27-27:  run 0xc0ffee::m::tuple_mixed_var --args 3u64 1u64
+return values: 30
+task 5 lines 29-29:  run 0xc0ffee::m::tuple_mixed_var --args 3u64 99u64
+return values: 3

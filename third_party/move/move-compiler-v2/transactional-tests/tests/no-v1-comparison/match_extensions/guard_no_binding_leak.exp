@@ -1,0 +1,27 @@
+processed 7 tasks
+task 0 lines 1-33:  publish [module 0xc0ffee::m {]
+warning: This assignment/binding to the left-hand-side variable `y` is unused. Consider removing this assignment/binding, or prefixing the left-hand-side variable with an underscore (e.g., `_y`), or renaming to `_`
+  ┌─ TEMPFILE:8:16
+  │
+8 │         match (x) {
+  │                ^
+
+warning: This assignment/binding to the left-hand-side variable `y` is unused. Consider removing this assignment/binding, or prefixing the left-hand-side variable with an underscore (e.g., `_y`), or renaming to `_`
+   ┌─ TEMPFILE:18:13
+   │
+18 │             (y, 1) if false => y,
+   │             ^^^^^^
+
+
+task 1 lines 35-35:  run 0xc0ffee::m::scalar_catch_all --args 1u8 2u8
+return values: 2
+task 2 lines 37-37:  run 0xc0ffee::m::scalar_catch_all --args 5u8 10u8
+return values: 10
+task 3 lines 39-39:  run 0xc0ffee::m::tuple_with_vars --args 10u64 20u64
+return values: 20
+task 4 lines 41-41:  run 0xc0ffee::m::tuple_with_vars --args 99u64 1u64
+return values: 1
+task 5 lines 43-43:  run 0xc0ffee::m::chained_guards --args 10u64 42u64
+return values: 42
+task 6 lines 45-45:  run 0xc0ffee::m::chained_guards --args 2000u64 42u64
+return values: 2000

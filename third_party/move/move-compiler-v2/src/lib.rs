@@ -398,8 +398,11 @@ pub fn env_check_and_transform_pipeline<'a, 'b>(options: &'a Options) -> EnvProc
     // matches to if-else statements. This runs before inlining to avoid repeated
     // transformation of inlined code, and after lint checks so that the lints get
     // access to the original pattern match structure.
-    env_pipeline.add("match checks and transforms", |env: &mut GlobalEnv| {
-        env_pipeline::match_checks_and_transforms::check_and_transform(env)
+    env_pipeline.add("match coverage checks", |env: &mut GlobalEnv| {
+        env_pipeline::match_coverage_checks::check(env)
+    });
+    env_pipeline.add("match transforms", |env: &mut GlobalEnv| {
+        env_pipeline::match_transforms::transform(env)
     });
 
     if options.experiment_on(Experiment::INLINING) {

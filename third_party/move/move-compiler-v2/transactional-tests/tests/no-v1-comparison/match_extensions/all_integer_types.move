@@ -91,9 +91,9 @@ module 0xc0ffee::m {
     }
 
     public fun test_i256(x: i256): i256 {
-        match (x) {
-            -1 => -1,
-            0 => 0,
+        match ((x, x)) {
+            (-1, -1) => -1,
+            (0, 0) => 0,
             _ => 7,
         }
     }

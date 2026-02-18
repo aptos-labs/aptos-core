@@ -1,0 +1,10 @@
+
+Diagnostics:
+error: unexpected token
+  ┌─ tests/more-v1/parser/match_neg_bytestring.move:4:13
+  │
+4 │             -b"hello" => b"bye",
+  │             ^
+  │             │
+  │             Unexpected '-'
+  │             Expected a variable or struct or variant name

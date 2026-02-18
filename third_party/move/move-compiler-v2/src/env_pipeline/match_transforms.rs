@@ -1,45 +1,19 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-//! Match exhaustiveness checking, unreachable arm detection, and primitive match transformation.
-//!
-//! This pass performs two tasks in a single traversal:
-//! 1. **Coverage check**: verifies that match expressions are exhaustive and that all arms are
-//!    reachable (no arm is shadowed by a previous arm).
-//! 2. **Primitive transform**: converts match expressions over primitive types (booleans, integers,
-//!    byte strings, and tuples of primitives) into if-else chains.
-//!    It also handles "mixed tuple" matches where a tuple discriminator contains both primitive and
-//!    non-primitive (enum/struct) elements.
-//!
-//! Both tasks happen inside `rewrite_match`: coverage is checked first, then the match is
-//! optionally transformed if it involves primitives.
-//!
-//! ## Coverage algorithm
-//!
-//! Coverage analysis uses the matrix-based algorithm from "Warnings for pattern matching"
-//! (Maranget, JFP 2007). The core idea is the *usefulness* predicate: a pattern vector `q`
-//! is useful w.r.t. a pattern matrix `P` if there exists a value matched by `q` that is
-//! not matched by any row in `P`.
-//!
-//! - **Exhaustiveness**: a wildcard `_` is useful against the full matrix implies the match
-//!   is not exhaustive. Witness patterns showing the missing values are collected and
-//!   reported.
-//! - **Reachability**: arm `i` is useful against arms `0..i` implies arm `i` is reachable.
-//!   Arms that are not useful are reported as unreachable.
-//!
-//! The algorithm recursively decomposes the pattern matrix column-by-column, specializing
-//! by each constructor. This avoids a cross-product explosion that would occur with value
-//! enumeration on deeply nested tuple patterns.
+//! Primitive match transformation: converts match expressions over primitive types
+//! (booleans, integers, byte strings, and tuples of primitives) into if-else chains.
+//! Also handles "mixed tuple" matches where a tuple discriminator contains both
+//! primitive and non-primitive (enum/struct) elements.
 
 use crate::env_pipeline::rewrite_target::{
     RewriteState, RewriteTarget, RewriteTargets, RewritingScope,
 };
-use itertools::Itertools;
 use move_model::{
     ast::{AbortKind, Exp, ExpData, MatchArm, Operation, Pattern, Value},
     exp_rewriter::ExpRewriterFunctions,
     metadata::LanguageVersion,
-    model::{GlobalEnv, NodeId, QualifiedId, StructId},
+    model::{GlobalEnv, Loc, NodeId},
     symbol::Symbol,
     ty::{PrimitiveType, Type},
     well_known,
@@ -50,16 +24,16 @@ use std::collections::BTreeSet;
 // ================================================================================================
 // Main Entry Point
 
-/// Check match coverage and transform primitive pattern matches in all target functions.
-pub fn check_and_transform(env: &mut GlobalEnv) {
-    let mut rewriter = MatchRewriter { env };
+/// Transform primitive pattern matches in all target functions.
+pub fn transform(env: &mut GlobalEnv) {
+    let mut transformer = MatchTransformer { env };
     let mut targets = RewriteTargets::create(env, RewritingScope::CompilationTarget);
     let todo: BTreeSet<_> = targets.keys().collect();
     for target in todo {
         if let RewriteTarget::MoveFun(func_id) = target {
-            let func_env = rewriter.env.get_function(func_id);
+            let func_env = transformer.env.get_function(func_id);
             if let Some(def) = func_env.get_def().cloned() {
-                let new_def = rewriter.rewrite_exp(def.clone());
+                let new_def = transformer.rewrite_exp(def.clone());
                 if !ExpData::ptr_eq(&new_def, &def) {
                     *targets.state_mut(&target) = RewriteState::Def(new_def);
                 }
@@ -70,23 +44,20 @@ pub fn check_and_transform(env: &mut GlobalEnv) {
 }
 
 // ================================================================================================
-// Rewriter (combines coverage check + primitive transformation)
+// Rewriter (primitive match transformation)
 
-struct MatchRewriter<'env> {
+struct MatchTransformer<'env> {
     env: &'env GlobalEnv,
 }
 
-impl ExpRewriterFunctions for MatchRewriter<'_> {
+impl ExpRewriterFunctions for MatchTransformer<'_> {
     fn rewrite_match(&mut self, id: NodeId, discriminator: &Exp, arms: &[MatchArm]) -> Option<Exp> {
-        // First, check match coverage (exhaustiveness and reachability).
-        analyze_match_coverage(self.env, discriminator.node_id(), arms);
-
-        // Then, transform primitive matches to if-else chains or combinations of match with guards.
-        // Matches over primitive types (and mixed tuples containing them) require
-        // language version 2.4+.
+        // Transform primitive matches to if-else chains or combinations of match with guards.
         let fully_transformable = is_match_fully_transformable(self.env, discriminator, arms);
         let mixed_tuple =
             !fully_transformable && is_mixed_tuple_match(self.env, discriminator, arms);
+        // Matches over primitive types (and mixed tuples containing them) require
+        // language version 2.4+.
         if (fully_transformable || mixed_tuple)
             && !check_primitive_match_version(self.env, discriminator)
         {
@@ -119,382 +90,6 @@ fn check_primitive_match_version(env: &GlobalEnv, discriminator: &Exp) -> bool {
          is not supported before language version 2.4",
     );
     false
-}
-
-// ================================================================================================
-// Coverage analysis: matrix algorithm
-
-/// A constructor appearing in patterns.
-#[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
-enum MConstructor {
-    Variant(QualifiedId<StructId>, Symbol),
-    Struct(QualifiedId<StructId>),
-    Bool(bool),
-    Number(BigInt),
-    ByteArray(Vec<u8>),
-    Tuple(usize),
-}
-
-/// A pattern in the matrix representation.
-#[derive(Clone, Debug)]
-enum MatPat {
-    /// Wildcard / variable — matches anything.
-    Wild,
-    /// Constructor applied to sub-patterns.
-    Ctor(MConstructor, Vec<MatPat>),
-}
-
-/// A witness pattern for displaying missing values.
-#[derive(Clone, Debug)]
-enum WitnessPat {
-    Wild,
-    Ctor(MConstructor, Vec<WitnessPat>),
-}
-
-/// Convert an AST `Pattern` to a `MatPat`.
-fn pattern_to_matpat(pat: &Pattern) -> MatPat {
-    match pat {
-        Pattern::Var(_, _) | Pattern::Wildcard(_) | Pattern::Error(_) => MatPat::Wild,
-        Pattern::Tuple(_, pats) => MatPat::Ctor(
-            MConstructor::Tuple(pats.len()),
-            pats.iter().map(pattern_to_matpat).collect(),
-        ),
-        Pattern::Struct(_, sid, variant, pats) => {
-            let ctor = if let Some(v) = variant {
-                MConstructor::Variant(sid.to_qualified_id(), *v)
-            } else {
-                MConstructor::Struct(sid.to_qualified_id())
-            };
-            MatPat::Ctor(ctor, pats.iter().map(pattern_to_matpat).collect())
-        },
-        Pattern::LiteralValue(_, val) => match val {
-            Value::Bool(b) => MatPat::Ctor(MConstructor::Bool(*b), vec![]),
-            Value::Number(n) => MatPat::Ctor(MConstructor::Number(n.clone()), vec![]),
-            Value::ByteArray(bytes) => MatPat::Ctor(MConstructor::ByteArray(bytes.clone()), vec![]),
-            _ => MatPat::Wild,
-        },
-    }
-}
-
-/// Number of sub-fields a constructor carries.
-fn constructor_arity(env: &GlobalEnv, ctor: &MConstructor) -> usize {
-    match ctor {
-        MConstructor::Variant(sid, v) => env.get_struct(*sid).get_fields_of_variant(*v).count(),
-        MConstructor::Struct(sid) => env.get_struct(*sid).get_fields().count(),
-        MConstructor::Bool(_) | MConstructor::Number(_) | MConstructor::ByteArray(_) => 0,
-        MConstructor::Tuple(n) => *n,
-    }
-}
-
-/// If the `seen` constructors form a *complete* set for their type, return all
-/// constructors of that type. Otherwise return `None`.
-fn all_constructors_if_complete(
-    env: &GlobalEnv,
-    seen: &BTreeSet<MConstructor>,
-) -> Option<Vec<MConstructor>> {
-    let first = seen.iter().next()?;
-    match first {
-        MConstructor::Bool(_) => {
-            let all = vec![MConstructor::Bool(false), MConstructor::Bool(true)];
-            all.iter().all(|c| seen.contains(c)).then_some(all)
-        },
-        MConstructor::Variant(sid, _) => {
-            let all: Vec<_> = env
-                .get_struct(*sid)
-                .get_variants()
-                .map(|v| MConstructor::Variant(*sid, v))
-                .collect();
-            all.iter().all(|c| seen.contains(c)).then_some(all)
-        },
-        MConstructor::Struct(_) | MConstructor::Tuple(_) => {
-            // Exactly one constructor — always complete.
-            Some(seen.iter().cloned().collect())
-        },
-        MConstructor::Number(_) | MConstructor::ByteArray(_) => None, // integers and byte arrays are never complete
-    }
-}
-
-/// Return a constructor of the type that is NOT in `seen`, for witness display.
-fn find_missing_constructor(
-    env: &GlobalEnv,
-    seen: &BTreeSet<MConstructor>,
-) -> Option<MConstructor> {
-    let first = seen.iter().next()?;
-    match first {
-        MConstructor::Bool(_) => [MConstructor::Bool(false), MConstructor::Bool(true)]
-            .into_iter()
-            .find(|c| !seen.contains(c)),
-        MConstructor::Variant(sid, _) => env
-            .get_struct(*sid)
-            .get_variants()
-            .map(|v| MConstructor::Variant(*sid, v))
-            .find(|c| !seen.contains(c)),
-        _ => None,
-    }
-}
-
-// ---- Matrix operations ------------------------------------------------------------------
-
-/// Specialize matrix by constructor `c`: keep rows whose head matches `c`, expand sub-patterns.
-fn specialize(matrix: &[Vec<MatPat>], ctor: &MConstructor, arity: usize) -> Vec<Vec<MatPat>> {
-    matrix
-        .iter()
-        .filter_map(|row| specialize_row(row, ctor, arity))
-        .collect()
-}
-
-fn specialize_row(row: &[MatPat], ctor: &MConstructor, arity: usize) -> Option<Vec<MatPat>> {
-    match &row[0] {
-        MatPat::Ctor(c, args) if c == ctor => {
-            let mut new_row = args.clone();
-            new_row.extend_from_slice(&row[1..]);
-            Some(new_row)
-        },
-        MatPat::Ctor(_, _) => None,
-        MatPat::Wild => {
-            let mut new_row = vec![MatPat::Wild; arity];
-            new_row.extend_from_slice(&row[1..]);
-            Some(new_row)
-        },
-    }
-}
-
-/// Default matrix: keep only wildcard rows, remove the first column.
-fn default_matrix(matrix: &[Vec<MatPat>]) -> Vec<Vec<MatPat>> {
-    matrix
-        .iter()
-        .filter_map(|row| {
-            if matches!(&row[0], MatPat::Wild) {
-                Some(row[1..].to_vec())
-            } else {
-                None
-            }
-        })
-        .collect()
-}
-
-// ---- Core usefulness check (short-circuits, for reachability) ---------------------------
-
-/// Returns `true` when `q` is useful w.r.t. `matrix` (standard Maranget algorithm).
-fn is_useful(env: &GlobalEnv, matrix: &[Vec<MatPat>], q: &[MatPat]) -> bool {
-    if q.is_empty() {
-        return matrix.is_empty();
-    }
-    let head_ctors: BTreeSet<MConstructor> = matrix
-        .iter()
-        .filter_map(|row| {
-            if let MatPat::Ctor(c, _) = &row[0] {
-                Some(c.clone())
-            } else {
-                None
-            }
-        })
-        .collect();
-
-    match &q[0] {
-        MatPat::Ctor(c, sub) => {
-            let arity = sub.len();
-            let spec = specialize(matrix, c, arity);
-            let mut new_q: Vec<MatPat> = sub.clone();
-            new_q.extend_from_slice(&q[1..]);
-            is_useful(env, &spec, &new_q)
-        },
-        MatPat::Wild => {
-            if let Some(all) = all_constructors_if_complete(env, &head_ctors) {
-                all.iter().any(|c| {
-                    let arity = constructor_arity(env, c);
-                    let spec = specialize(matrix, c, arity);
-                    let mut new_q = vec![MatPat::Wild; arity];
-                    new_q.extend_from_slice(&q[1..]);
-                    is_useful(env, &spec, &new_q)
-                })
-            } else {
-                let def = default_matrix(matrix);
-                is_useful(env, &def, &q[1..])
-            }
-        },
-    }
-}
-
-// ---- Witness collection (explores all branches, for exhaustiveness) ---------------------
-
-/// Collect every witness pattern-vector demonstrating that `q` is useful w.r.t. `matrix`.
-/// Returns an empty vec when `q` is not useful.
-fn collect_witnesses(
-    env: &GlobalEnv,
-    matrix: &[Vec<MatPat>],
-    q: &[MatPat],
-) -> Vec<Vec<WitnessPat>> {
-    if q.is_empty() {
-        return if matrix.is_empty() {
-            vec![vec![]] // one empty witness
-        } else {
-            vec![]
-        };
-    }
-    let head_ctors: BTreeSet<MConstructor> = matrix
-        .iter()
-        .filter_map(|row| {
-            if let MatPat::Ctor(c, _) = &row[0] {
-                Some(c.clone())
-            } else {
-                None
-            }
-        })
-        .collect();
-
-    match &q[0] {
-        MatPat::Ctor(c, sub) => {
-            let arity = sub.len();
-            let spec = specialize(matrix, c, arity);
-            let mut new_q: Vec<MatPat> = sub.clone();
-            new_q.extend_from_slice(&q[1..]);
-            collect_witnesses(env, &spec, &new_q)
-                .into_iter()
-                .map(|w| reconstruct_witness(c, arity, w))
-                .collect()
-        },
-        MatPat::Wild => {
-            let mut all_witnesses = Vec::new();
-            // Check each seen constructor (may have internal gaps).
-            for c in &head_ctors {
-                let arity = constructor_arity(env, c);
-                let spec = specialize(matrix, c, arity);
-                let mut new_q = vec![MatPat::Wild; arity];
-                new_q.extend_from_slice(&q[1..]);
-                for w in collect_witnesses(env, &spec, &new_q) {
-                    all_witnesses.push(reconstruct_witness(c, arity, w));
-                }
-            }
-            // Check unseen constructors via the default matrix.
-            if all_constructors_if_complete(env, &head_ctors).is_none() {
-                let def = default_matrix(matrix);
-                for w in collect_witnesses(env, &def, &q[1..]) {
-                    let head = match find_missing_constructor(env, &head_ctors) {
-                        Some(c) => {
-                            let a = constructor_arity(env, &c);
-                            WitnessPat::Ctor(c, vec![WitnessPat::Wild; a])
-                        },
-                        None => WitnessPat::Wild,
-                    };
-                    let mut full = vec![head];
-                    full.extend(w);
-                    all_witnesses.push(full);
-                }
-            }
-            all_witnesses
-        },
-    }
-}
-
-/// Wrap the first `arity` elements of a witness vector into a constructor.
-fn reconstruct_witness(
-    ctor: &MConstructor,
-    arity: usize,
-    witness: Vec<WitnessPat>,
-) -> Vec<WitnessPat> {
-    let (sub, rest) = witness.split_at(arity);
-    let mut out = vec![WitnessPat::Ctor(ctor.clone(), sub.to_vec())];
-    out.extend_from_slice(rest);
-    out
-}
-
-// ---- Entry point for coverage analysis --------------------------------------------------
-
-/// Analyze match coverage: check reachability of all arms and exhaustiveness.
-///
-/// Reachability is checked for every arm (guarded or not) against the matrix of
-/// preceding *unconditional* arms. A guarded arm does not consume values (the guard
-/// might be false), so it is not added to the matrix. An arm whose pattern is not
-/// useful against the unconditional matrix is unreachable regardless of any guard.
-///
-/// Exhaustiveness is checked using only unconditional arms, since guarded arms
-/// cannot guarantee coverage.
-fn analyze_match_coverage(env: &GlobalEnv, disc_node_id: NodeId, arms: &[MatchArm]) {
-    // Build the unconditional matrix incrementally for reachability checking.
-    let mut uncond_matrix: Vec<Vec<MatPat>> = Vec::new();
-    for arm in arms {
-        let mp = pattern_to_matpat(&arm.pattern);
-        let q = vec![mp.clone()];
-        if !is_useful(env, &uncond_matrix, &q) {
-            env.error(
-                &env.get_node_loc(arm.pattern.node_id()),
-                "unreachable pattern",
-            );
-        }
-        // Only unconditional arms consume values in the matrix.
-        if arm.condition.is_none() {
-            uncond_matrix.push(q);
-        }
-    }
-
-    // Exhaustiveness: check if a wildcard is still useful against the unconditional matrix.
-    let witnesses = collect_witnesses(env, &uncond_matrix, &[MatPat::Wild]);
-    if !witnesses.is_empty() {
-        env.error_with_notes(
-            &env.get_node_loc(disc_node_id),
-            "match not exhaustive",
-            witnesses
-                .iter()
-                .map(|w| {
-                    assert_eq!(w.len(), 1);
-                    format!("missing `{}`", display_witness_pat(env, &w[0]))
-                })
-                .collect(),
-        );
-    }
-}
-
-// ---- Witness display --------------------------------------------------------------------
-
-fn display_witness_pat(env: &GlobalEnv, w: &WitnessPat) -> String {
-    match w {
-        WitnessPat::Wild => "_".to_string(),
-        WitnessPat::Ctor(MConstructor::Bool(b), _) => format!("{}", b),
-        WitnessPat::Ctor(MConstructor::Number(n), _) => format!("{}", n),
-        WitnessPat::Ctor(MConstructor::ByteArray(bytes), _) => {
-            let hex: String = bytes.iter().map(|b| format!("{:02x}", b)).collect();
-            format!("x\"{}\"", hex)
-        },
-        WitnessPat::Ctor(MConstructor::Tuple(_), args) => {
-            let inner = args.iter().map(|a| display_witness_pat(env, a)).join(",");
-            format!("({})", inner)
-        },
-        WitnessPat::Ctor(MConstructor::Variant(sid, var), args) => {
-            display_witness_struct(env, *sid, Some(*var), args)
-        },
-        WitnessPat::Ctor(MConstructor::Struct(sid), args) => {
-            display_witness_struct(env, *sid, None, args)
-        },
-    }
-}
-
-fn display_witness_struct(
-    env: &GlobalEnv,
-    sid: QualifiedId<StructId>,
-    var: Option<Symbol>,
-    args: &[WitnessPat],
-) -> String {
-    let struct_env = env.get_struct(sid);
-    let mut s = struct_env.get_name().display(env.symbol_pool()).to_string();
-    if let Some(v) = var {
-        s.push_str(&format!("::{}", v.display(env.symbol_pool())));
-    }
-    // Display struct fields, or {..} if all wildcards.
-    if var.is_none() || !args.is_empty() {
-        if args.iter().all(|a| matches!(a, WitnessPat::Wild)) {
-            s.push_str("{..}");
-        } else {
-            let fields: Vec<String> = struct_env
-                .get_fields_optional_variant(var)
-                .map(|f| f.get_name().display(env.symbol_pool()).to_string())
-                .zip(args.iter())
-                .map(|(f, a)| format!("{}: {}", f, display_witness_pat(env, a)))
-                .collect();
-            s.push_str(&format!("{{{}}}", fields.join(", ")));
-        }
-    }
-    s
 }
 
 // ================================================================================================
@@ -556,6 +151,15 @@ fn is_catch_all_pattern(pat: &Pattern) -> bool {
     }
 }
 
+/// Check if a pattern binds any variables (at any nesting depth).
+fn pattern_has_vars(pat: &Pattern) -> bool {
+    match pat {
+        Pattern::Var(..) => true,
+        Pattern::Tuple(_, pats) => pats.iter().any(pattern_has_vars),
+        _ => false,
+    }
+}
+
 // ================================================================================================
 // Match to If-Else Transformation
 
@@ -568,44 +172,56 @@ fn generate_if_else_chain(
     arm_idx: usize,
 ) -> Exp {
     if arm_idx >= arms.len() {
-        // No more arms - generate abort for incomplete match
         return generate_abort(env, result_id);
     }
 
     let arm = &arms[arm_idx];
 
+    // Unguarded catch-all: terminal arm, just return body with bindings.
     if arm.condition.is_none() && is_catch_all_pattern(&arm.pattern) {
-        // Catch-all pattern - just return the body (with variable binding if needed)
         return maybe_bind_pattern(env, discriminator, &arm.pattern, &arm.body);
     }
 
-    // Generate condition for this arm
-    let condition = generate_arm_condition(env, discriminator, &arm.pattern, &arm.condition);
-
-    // Generate the body with pattern bindings
-    let then_branch = maybe_bind_pattern(env, discriminator, &arm.pattern, &arm.body);
-
-    // Generate else branch (remaining arms)
     let else_branch = generate_if_else_chain(env, result_id, discriminator, arms, arm_idx + 1);
-
-    // Create if-else expression
     let result_ty = env.get_node_type(result_id);
     let if_id = env.new_node(env.get_node_loc(result_id), result_ty);
+    let (condition, then_branch) = generate_arm_test(env, result_id, discriminator, arm);
 
     ExpData::IfElse(if_id, condition, then_branch, else_branch).into_exp()
 }
 
-/// Generate a boolean condition that tests if discriminator matches the pattern and guard.
-fn generate_arm_condition(
+/// Generate the condition and body expressions for a single match arm.
+///
+/// When a guard references pattern variables, the bindings are scoped
+/// separately around the guard and body so they don't leak into the else
+/// branch. Otherwise, the pattern condition and guard are combined directly.
+fn generate_arm_test(
     env: &GlobalEnv,
+    result_id: NodeId,
     discriminator: &Exp,
-    pattern: &Pattern,
-    guard: &Option<Exp>,
-) -> Exp {
-    let pattern_cond = generate_pattern_condition(env, discriminator, pattern);
+    arm: &MatchArm,
+) -> (Exp, Exp) {
+    // When a guard is present and the pattern binds variables, scope those
+    // bindings to the guard and body *separately*.
+    if let Some(guard) = &arm.condition {
+        if is_catch_all_pattern(&arm.pattern) || pattern_has_vars(&arm.pattern) {
+            let scoped_guard = maybe_bind_pattern(env, discriminator, &arm.pattern, guard);
+            let scoped_body = maybe_bind_pattern(env, discriminator, &arm.pattern, &arm.body);
+            let condition = if is_catch_all_pattern(&arm.pattern) {
+                scoped_guard
+            } else {
+                let pattern_cond = generate_pattern_condition(env, discriminator, &arm.pattern);
+                let bool_ty = Type::Primitive(PrimitiveType::Bool);
+                let and_id = env.new_node(env.get_node_loc(result_id), bool_ty);
+                ExpData::Call(and_id, Operation::And, vec![pattern_cond, scoped_guard]).into_exp()
+            };
+            return (condition, scoped_body);
+        }
+    }
 
-    // Combine pattern condition with guard (if present)
-    if let Some(guard_exp) = guard {
+    // Non-guarded or guarded without pattern variables: combine directly.
+    let pattern_cond = generate_pattern_condition(env, discriminator, &arm.pattern);
+    let condition = if let Some(guard_exp) = &arm.condition {
         let loc = env.get_node_loc(discriminator.node_id());
         let and_id = env.new_node(loc, Type::Primitive(PrimitiveType::Bool));
         ExpData::Call(and_id, Operation::And, vec![
@@ -615,7 +231,9 @@ fn generate_arm_condition(
         .into_exp()
     } else {
         pattern_cond
-    }
+    };
+    let body = maybe_bind_pattern(env, discriminator, &arm.pattern, &arm.body);
+    (condition, body)
 }
 
 /// Generate a boolean condition that tests if discriminator matches pattern.
@@ -645,14 +263,13 @@ fn generate_pattern_condition(env: &GlobalEnv, discriminator: &Exp, pattern: &Pa
             if let Type::Tuple(tys) = discriminator_ty {
                 generate_tuple_condition(env, discriminator, &tys, pats)
             } else {
-                // Type mismatch - return false
-                ExpData::Value(bool_id, Value::Bool(false)).into_exp()
+                ExpData::Invalid(bool_id).into_exp()
             }
         },
 
         Pattern::Struct(..) | Pattern::Error(_) => {
-            // Should not reach here for primitive matches
-            ExpData::Value(bool_id, Value::Bool(false)).into_exp()
+            // Precluded by is_match_fully_transformable / is_suitable_pattern.
+            ExpData::Invalid(bool_id).into_exp()
         },
     }
 }
@@ -725,17 +342,16 @@ fn generate_tuple_condition(
         }
 
         if let Pattern::LiteralValue(_, val) = pat {
-            // Get the temp variable for this index
-            let temp_pat = &temp_patterns[idx];
-            if let Pattern::Var(var_id, sym) = temp_pat {
-                // Generate: tmp_idx == val
-                let var_exp = ExpData::LocalVar(*var_id, *sym).into_exp();
-                let val_id = env.new_node(loc.clone(), tys[idx].clone());
-                let val_exp = ExpData::Value(val_id, val.clone()).into_exp();
-                let cmp_id = env.new_node(loc.clone(), bool_ty.clone());
-                conditions
-                    .push(ExpData::Call(cmp_id, Operation::Eq, vec![var_exp, val_exp]).into_exp());
-            }
+            // temp_patterns are always Pattern::Var (built above).
+            let Pattern::Var(var_id, sym) = &temp_patterns[idx] else {
+                unreachable!()
+            };
+            let var_exp = ExpData::LocalVar(*var_id, *sym).into_exp();
+            let val_id = env.new_node(loc.clone(), tys[idx].clone());
+            let val_exp = ExpData::Value(val_id, val.clone()).into_exp();
+            let cmp_id = env.new_node(loc.clone(), bool_ty.clone());
+            conditions
+                .push(ExpData::Call(cmp_id, Operation::Eq, vec![var_exp, val_exp]).into_exp());
         }
     }
 
@@ -779,17 +395,27 @@ fn maybe_bind_pattern(env: &GlobalEnv, discriminator: &Exp, pattern: &Pattern, b
             )
             .into_exp()
         },
-        Pattern::Tuple(_, pats) => {
+        Pattern::Tuple(tuple_id, pats) => {
             // Check if any sub-pattern has variables
             let has_vars = pats.iter().any(|p| matches!(p, Pattern::Var(..)));
             if has_vars {
-                // Need to bind tuple components
+                // Replace non-variable sub-patterns (literals, wildcards) with wildcards
+                // so the binding pattern only contains variables.  The literal checks
+                // are already handled by generate_pattern_condition.
+                let bind_pats: Vec<Pattern> = pats
+                    .iter()
+                    .map(|p| match p {
+                        Pattern::Var(..) => p.clone(),
+                        _ => Pattern::Wildcard(p.node_id()),
+                    })
+                    .collect();
+                let bind_pattern = Pattern::Tuple(*tuple_id, bind_pats);
                 let loc = env.get_node_loc(pattern.node_id());
                 let block_id = env.new_node(loc, env.get_node_type(body.node_id()));
 
                 ExpData::Block(
                     block_id,
-                    pattern.clone(),
+                    bind_pattern,
                     Some(discriminator.clone()),
                     body.clone(),
                 )
@@ -1067,36 +693,44 @@ fn transform_mixed_arm(
                 ExpData::Call(and_id, Operation::And, vec![acc, cond]).into_exp()
             });
 
-            // Combine with existing guard: prim_guard && original_guard
-            let new_condition = match (&prim_guard, &arm.condition) {
-                (Some(pg), Some(og)) => {
+            // Wrap the user's guard with primitive-position var bindings so they
+            // are in scope: { let y = $prim_0; guard }
+            let wrapped_user_guard = arm.condition.as_ref().map(|og| {
+                wrap_with_prim_bindings(
+                    env,
+                    &loc,
+                    elem_tys,
+                    primitive_positions,
+                    prim_temps,
+                    &var_bindings,
+                    og.clone(),
+                )
+            });
+
+            // Combine with existing guard: prim_guard && wrapped_user_guard
+            let new_condition = match (&prim_guard, &wrapped_user_guard) {
+                (Some(pg), Some(wg)) => {
                     let and_id = env.new_node(loc.clone(), bool_ty.clone());
                     Some(
-                        ExpData::Call(and_id, Operation::And, vec![pg.clone(), og.clone()])
+                        ExpData::Call(and_id, Operation::And, vec![pg.clone(), wg.clone()])
                             .into_exp(),
                     )
                 },
                 (Some(pg), None) => Some(pg.clone()),
-                (None, Some(og)) => Some(og.clone()),
+                (None, Some(wg)) => Some(wg.clone()),
                 (None, None) => None,
             };
 
-            // If there are var bindings at primitive positions, wrap the body
-            let new_body =
-                var_bindings
-                    .iter()
-                    .rev()
-                    .fold(arm.body.clone(), |body, (var_sym, seq)| {
-                        let pos = primitive_positions[*seq];
-                        let (prim_sym, _) = &prim_temps[*seq];
-                        let body_ty = env.get_node_type(body.node_id());
-                        let var_pat_id = env.new_node(loc.clone(), elem_tys[pos].clone());
-                        let pattern = Pattern::Var(var_pat_id, *var_sym);
-                        let prim_var_id = env.new_node(loc.clone(), elem_tys[pos].clone());
-                        let prim_ref = ExpData::LocalVar(prim_var_id, *prim_sym).into_exp();
-                        let block_id = env.new_node(loc.clone(), body_ty);
-                        ExpData::Block(block_id, pattern, Some(prim_ref), body).into_exp()
-                    });
+            // Wrap the body with primitive-position var bindings
+            let new_body = wrap_with_prim_bindings(
+                env,
+                &loc,
+                elem_tys,
+                primitive_positions,
+                prim_temps,
+                &var_bindings,
+                arm.body.clone(),
+            );
 
             MatchArm {
                 loc: arm.loc.clone(),
@@ -1117,4 +751,34 @@ fn transform_mixed_arm(
         },
         _ => arm.clone(),
     }
+}
+
+/// Wrap an expression with nested let-bindings for primitive-position variables.
+///
+/// For each `(var_sym, seq)` in `var_bindings`, generates:
+/// `{ let var_sym = $prim_seq; inner }`
+///
+/// Returns `inner` unchanged when `var_bindings` is empty.
+fn wrap_with_prim_bindings(
+    env: &GlobalEnv,
+    loc: &Loc,
+    elem_tys: &[Type],
+    primitive_positions: &[usize],
+    prim_temps: &[(Symbol, Exp)],
+    var_bindings: &[(Symbol, usize)],
+    inner: Exp,
+) -> Exp {
+    var_bindings
+        .iter()
+        .rev()
+        .fold(inner, |acc, (var_sym, seq)| {
+            let pos = primitive_positions[*seq];
+            let (prim_sym, _) = &prim_temps[*seq];
+            let var_pat_id = env.new_node(loc.clone(), elem_tys[pos].clone());
+            let pattern = Pattern::Var(var_pat_id, *var_sym);
+            let prim_var_id = env.new_node(loc.clone(), elem_tys[pos].clone());
+            let prim_ref = ExpData::LocalVar(prim_var_id, *prim_sym).into_exp();
+            let block_id = env.new_node(loc.clone(), env.get_node_type(acc.node_id()));
+            ExpData::Block(block_id, pattern, Some(prim_ref), acc).into_exp()
+        })
 }

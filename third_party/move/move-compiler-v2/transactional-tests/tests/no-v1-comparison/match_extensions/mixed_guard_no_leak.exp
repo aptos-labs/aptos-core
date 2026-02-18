@@ -1,0 +1,23 @@
+processed 5 tasks
+task 0 lines 1-50:  publish [module 0xc0ffee::m {]
+warning: This assignment/binding to the left-hand-side variable `y` is unused. Consider removing this assignment/binding, or prefixing the left-hand-side variable with an underscore (e.g., `_y`), or renaming to `_`
+   ┌─ TEMPFILE:12:13
+   │
+12 │             (Data::V1 { z }, y) if false => *z + y,
+   │             ^^^^^^^^^^^^^^^^^^^
+
+warning: This assignment/binding to the left-hand-side variable `y` is unused. Consider removing this assignment/binding, or prefixing the left-hand-side variable with an underscore (e.g., `_y`), or renaming to `_`
+   ┌─ TEMPFILE:19:13
+   │
+19 │             (Data::V1 { z }, y) if false => *z + y,
+   │             ^^^^^^^^^^^^^^^^^^^
+
+
+task 1 lines 52-52:  run 0xc0ffee::m::test_v1_fallthrough
+return values: 20
+task 2 lines 54-54:  run 0xc0ffee::m::test_v2_fallthrough
+return values: 20
+task 3 lines 56-56:  run 0xc0ffee::m::test_multi_v1
+return values: 20
+task 4 lines 58-58:  run 0xc0ffee::m::test_multi_v2
+return values: 23
