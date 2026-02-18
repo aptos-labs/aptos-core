@@ -169,14 +169,15 @@ pub trait BatchThresholdEncryption {
         decryption_key: &Self::DecryptionKey,
     ) -> Result<()>;
 
-    /// Take
+    /// Take a ciphertext, digest, and eval proofs as input and output a prepared ciphertext. This
+    /// can be done before reconstructing the decryption key.
     fn prepare_ct(
         ct: &Self::Ciphertext,
         digest: &Self::Digest,
         eval_proofs: &Self::EvalProofs,
     ) -> std::result::Result<Self::PreparedCiphertext, MissingEvalProofError>;
 
-    /// Decrypt a set of ciphertext using a decryption key and advice.
+    /// Decrypt a prepared ciphertext using the reconstructed decryption key.
     fn decrypt<P: Plaintext>(
         decryption_key: &Self::DecryptionKey,
         ct: &Self::PreparedCiphertext,
