@@ -141,7 +141,11 @@ impl<PCT: InnerCiphertext> Ciphertext<PCT> {
         self.bibe_ct.id()
     }
 
-    pub fn prepare(&self, digest: &Digest, eval_proofs: &EvalProofs) -> std::result::Result<PreparedCiphertext, MissingEvalProofError> {
+    pub fn prepare(
+        &self,
+        digest: &Digest,
+        eval_proofs: &EvalProofs,
+    ) -> std::result::Result<PreparedCiphertext, MissingEvalProofError> {
         Ok(PreparedCiphertext {
             vk: self.vk,
             bibe_ct: self.bibe_ct.prepare(digest, eval_proofs)?,

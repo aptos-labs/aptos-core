@@ -1,7 +1,8 @@
 // Copyright (c) Aptos Foundation
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 use aptos_batch_encryption::{
-    schemes::fptx::FPTX, shared::key_derivation::BIBEDecryptionKeyShare, tests::decrypt_all, traits::BatchThresholdEncryption
+    schemes::fptx::FPTX, shared::key_derivation::BIBEDecryptionKeyShare, tests::decrypt_all,
+    traits::BatchThresholdEncryption,
 };
 use aptos_crypto::arkworks::shamir::ShamirThresholdConfig;
 use ark_std::rand::{distributions::Alphanumeric, thread_rng, Rng as _};

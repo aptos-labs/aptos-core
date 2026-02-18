@@ -41,7 +41,11 @@ pub struct BIBESuccinctCiphertext {
 impl InnerCiphertext for BIBESuccinctCiphertext {
     type EncryptionKey = AugmentedEncryptionKey;
 
-    fn prepare(&self, digest: &Digest, eval_proofs: &EvalProofs) -> std::result::Result<PreparedBIBECiphertext, MissingEvalProofError> {
+    fn prepare(
+        &self,
+        digest: &Digest,
+        eval_proofs: &EvalProofs,
+    ) -> std::result::Result<PreparedBIBECiphertext, MissingEvalProofError> {
         let pf = eval_proofs
             .get(&self.id)
             .ok_or(MissingEvalProofError(self.id))?;

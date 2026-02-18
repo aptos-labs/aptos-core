@@ -1,7 +1,9 @@
 // Copyright (c) Aptos Foundation
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 use crate::{
-    errors::MissingEvalProofError, group::*, shared::{
+    errors::MissingEvalProofError,
+    group::*,
+    shared::{
         ciphertext::{CTDecrypt, CTEncrypt, PreparedCiphertext, StandardCiphertext},
         digest::{Digest, DigestKey, EvalProof, EvalProofs, EvalProofsPromise},
         encryption_key::EncryptionKey,
@@ -10,7 +12,8 @@ use crate::{
             self, BIBEDecryptionKey, BIBEDecryptionKeyShare, BIBEMasterSecretKeyShare,
             BIBEVerificationKey,
         },
-    }, traits::{AssociatedData, BatchThresholdEncryption, Plaintext}
+    },
+    traits::{AssociatedData, BatchThresholdEncryption, Plaintext},
 };
 use anyhow::{anyhow, Result};
 use aptos_dkg::pvss::{

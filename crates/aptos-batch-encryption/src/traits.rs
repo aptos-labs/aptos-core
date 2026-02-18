@@ -1,13 +1,12 @@
 // Copyright (c) Aptos Foundation
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
+use crate::errors::MissingEvalProofError;
 use anyhow::Result;
 use aptos_crypto::player::Player;
 use aptos_dkg::pvss::traits::TranscriptCore;
 use ark_std::rand::{CryptoRng, RngCore};
 use serde::{de::DeserializeOwned, Serialize};
 use std::hash::Hash;
-
-use crate::errors::MissingEvalProofError;
 
 pub trait BatchThresholdEncryption {
     type ThresholdConfig: aptos_crypto::TSecretSharingConfig;
@@ -25,9 +24,24 @@ pub trait BatchThresholdEncryption {
     /// but I think it makes sense not to expose the ID as part of the interface. (The round number
     /// must be exposed since it must be given as input to [`PublicKey::encrypt`], and must agree
     /// with the round number used when computing a decryption key.)
-    type Ciphertext: Serialize + DeserializeOwned + Eq + PartialEq + Serialize + Hash + Sized + Send + Sync;
+    type Ciphertext: Serialize
+        + DeserializeOwned
+        + Eq
+        + PartialEq
+        + Serialize
+        + Hash
+        + Sized
+        + Send
+        + Sync;
 
-    type PreparedCiphertext: Serialize + DeserializeOwned + Eq + PartialEq + Serialize + Sized + Send + Sync;
+    type PreparedCiphertext: Serialize
+        + DeserializeOwned
+        + Eq
+        + PartialEq
+        + Serialize
+        + Sized
+        + Send
+        + Sync;
 
     /// The round number used when generating a digest. For security to hold, validators must only
     /// generate a single decryption key corresponding to a round number.

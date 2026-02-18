@@ -29,13 +29,14 @@ pub trait InnerCiphertext:
 
     fn id(&self) -> Id;
 
-    fn prepare_individual(
+    fn prepare_individual(&self, digest: &Digest, eval_proof: &EvalProof)
+        -> PreparedBIBECiphertext;
+
+    fn prepare(
         &self,
         digest: &Digest,
-        eval_proof: &EvalProof,
-    ) -> PreparedBIBECiphertext;
-
-    fn prepare(&self, digest: &Digest, eval_proofs: &EvalProofs) -> std::result::Result<PreparedBIBECiphertext, MissingEvalProofError>;
+        eval_proofs: &EvalProofs,
+    ) -> std::result::Result<PreparedBIBECiphertext, MissingEvalProofError>;
 }
 
 #[derive(Clone, Serialize, Deserialize, Debug, Hash, Eq, PartialEq)]
@@ -100,7 +101,11 @@ impl InnerCiphertext for BIBECiphertext {
         self.id
     }
 
-    fn prepare(&self, digest: &Digest, eval_proofs: &EvalProofs) -> std::result::Result<PreparedBIBECiphertext, MissingEvalProofError> {
+    fn prepare(
+        &self,
+        digest: &Digest,
+        eval_proofs: &EvalProofs,
+    ) -> std::result::Result<PreparedBIBECiphertext, MissingEvalProofError> {
         let pf = eval_proofs
             .get(&self.id)
             .ok_or(MissingEvalProofError(self.id))?;

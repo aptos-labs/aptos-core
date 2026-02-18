@@ -48,8 +48,7 @@ fn smoke_with_setup<R: RngCore + CryptoRng>(
 
     ek.verify_decryption_key(&d, &dk).unwrap();
 
-    let decrypted_plaintext: String =
-        FPTX::decrypt(&dk, &ct.prepare(&d, &pfs).unwrap()).unwrap();
+    let decrypted_plaintext: String = FPTX::decrypt(&dk, &ct.prepare(&d, &pfs).unwrap()).unwrap();
 
     assert_eq!(decrypted_plaintext, plaintext);
 
