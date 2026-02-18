@@ -12,7 +12,7 @@ use crate::{
         secret_sharing::network_messages::SecretShareNetworkMessage,
     },
 };
-use aptos_prefix_consensus::{PrefixConsensusMsg, StrongPrefixConsensusMsg};
+use aptos_prefix_consensus::{PrefixConsensusMsg, SlotConsensusMsg, StrongPrefixConsensusMsg};
 use aptos_config::network_id::{NetworkId, PeerNetworkId};
 use aptos_consensus_types::{
     block_retrieval::{BlockRetrievalRequest, BlockRetrievalRequestV1, BlockRetrievalResponse},
@@ -109,6 +109,8 @@ pub enum ConsensusMsg {
     PrefixConsensusMsg(Box<PrefixConsensusMsg>),
     /// Strong Prefix Consensus message: multi-view protocol messages
     StrongPrefixConsensusMsg(Box<StrongPrefixConsensusMsg>),
+    /// Slot Consensus message: slot proposals and per-slot SPC messages
+    SlotConsensusMsg(Box<SlotConsensusMsg>),
 }
 
 /// Network type for consensus
@@ -145,6 +147,7 @@ impl ConsensusMsg {
             ConsensusMsg::SecretShareMsg(_) => "SecretShareMsg",
             ConsensusMsg::PrefixConsensusMsg(_) => "PrefixConsensusMsg",
             ConsensusMsg::StrongPrefixConsensusMsg(_) => "StrongPrefixConsensusMsg",
+            ConsensusMsg::SlotConsensusMsg(_) => "SlotConsensusMsg",
         }
     }
 }

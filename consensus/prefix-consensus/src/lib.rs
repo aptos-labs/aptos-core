@@ -45,6 +45,7 @@ pub mod network_interface;
 pub mod network_messages;
 mod protocol;
 pub mod signing;
+pub mod slot_types;
 pub mod strong_manager;
 pub mod strong_protocol;
 mod types;
@@ -80,6 +81,9 @@ pub use certificates::{
 };
 pub use inner_pc_impl::ThreeRoundPC;
 pub use inner_pc_trait::InnerPCAlgorithm;
+pub use slot_types::{
+    create_signed_slot_proposal, SlotConsensusMsg, SlotProposal, SlotProposalSignData,
+};
 pub use strong_manager::{DefaultStrongPCManager, StrongPrefixConsensusManager};
 pub use strong_protocol::{
     ChainBuildError, StrongPrefixConsensusProtocol, View1Decision, ViewDecision,

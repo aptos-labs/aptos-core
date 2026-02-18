@@ -869,7 +869,8 @@ impl NetworkTask {
                         | ConsensusMsg::EpochRetrievalRequest(_)
                         | ConsensusMsg::EpochChangeProof(_)
                         | ConsensusMsg::PrefixConsensusMsg(_)
-                        | ConsensusMsg::StrongPrefixConsensusMsg(_)) => {
+                        | ConsensusMsg::StrongPrefixConsensusMsg(_)
+                        | ConsensusMsg::SlotConsensusMsg(_)) => {
                             if let ConsensusMsg::ProposalMsg(proposal) = &consensus_msg {
                                 observe_block(
                                     proposal.proposal().timestamp_usecs(),
