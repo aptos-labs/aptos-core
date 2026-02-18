@@ -4,7 +4,10 @@
 use crate::pipeline::pipeline_builder::{PipelineBuilder, Tracker};
 use anyhow::{anyhow, Context};
 use aptos_batch_encryption::{
-    schemes::fptx_weighted::FPTXWeighted, traits::BatchThresholdEncryption,
+    errors::MissingEvalProofError,
+    schemes::fptx_weighted::FPTXWeighted,
+    shared::{ciphertext::PreparedCiphertext, ids::Id},
+    traits::BatchThresholdEncryption,
 };
 use aptos_consensus_types::{
     block::Block,
@@ -15,7 +18,8 @@ use aptos_logger::{error, info};
 use aptos_types::{
     decryption::{BlockTxnDecryptionKey, DecKeyMetadata},
     secret_sharing::{
-        Ciphertext, SecretShare, SecretShareConfig, SecretShareMetadata, SecretSharedKey,
+        Ciphertext, DecryptionKey, SecretShare, SecretShareConfig, SecretShareMetadata,
+        SecretSharedKey,
     },
     transaction::encrypted_payload::DecryptedPayload,
 };
@@ -143,6 +147,12 @@ impl PipelineBuilder {
             secret_share_config.digest_key(),
         );
 
+        let prepared_txn_ciphertexts: Vec<Result<PreparedCiphertext, MissingEvalProofError>> =
+            txn_ciphertexts
+                .into_par_iter()
+                .map(|ciphertext| FPTXWeighted::prepare_ct(&ciphertext, &digest, &proofs))
+                .collect();
+
         let maybe_decryption_key = secret_shared_key_rx
             .await
             .map_err(|_| anyhow!("secret_shared_key_rx dropped"))?;
@@ -154,17 +164,17 @@ impl PipelineBuilder {
             block.round(),
             decryption_key.metadata
         );
+
         let decrypted_txns: Vec<_> = encrypted_txns
             .into_par_iter()
-            .zip(txn_ciphertexts)
-            .map(|(mut txn, ciphertext)| {
-                let eval_proof = proofs.get(&ciphertext.id()).expect("must exist");
-                match FPTXWeighted::decrypt_individual::<DecryptedPayload>(
-                    &decryption_key.key,
-                    &ciphertext,
-                    &digest,
-                    &eval_proof,
-                ) {
+            .zip(prepared_txn_ciphertexts)
+            .map(|(mut txn, prepared_ciphertext_or_error)| {
+                let id: Id = prepared_ciphertext_or_error
+                    .as_ref()
+                    .map_or_else(|MissingEvalProofError(id)| *id, |ct| ct.id());
+                let eval_proof = proofs.get(&id).expect("must exist");
+
+                match do_final_decryption(&decryption_key.key, prepared_ciphertext_or_error) {
                     Ok(payload) => {
                         let (executable, nonce) = payload.unwrap();
                         txn.payload_mut()
@@ -178,8 +188,7 @@ impl PipelineBuilder {
                     Err(e) => {
                         error!(
                             "Failed to decrypt transaction with ciphertext id {:?}: {:?}",
-                            ciphertext.id(),
-                            e
+                            id, e
                         );
                         txn.payload_mut()
                             .as_encrypted_payload_mut()
@@ -213,4 +222,11 @@ impl PipelineBuilder {
             Some(Some(block_txn_dec_key)),
         ))
     }
+}
+
+fn do_final_decryption(
+    decryption_key: &DecryptionKey,
+    prepared_ciphertext_or_error: Result<PreparedCiphertext, MissingEvalProofError>,
+) -> anyhow::Result<DecryptedPayload> {
+    FPTXWeighted::decrypt(decryption_key, &prepared_ciphertext_or_error?)
 }

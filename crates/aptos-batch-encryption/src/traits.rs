@@ -1,5 +1,6 @@
 // Copyright (c) Aptos Foundation
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
+use crate::errors::MissingEvalProofError;
 use anyhow::Result;
 use aptos_crypto::player::Player;
 use aptos_dkg::pvss::traits::TranscriptCore;
@@ -23,21 +24,36 @@ pub trait BatchThresholdEncryption {
     /// but I think it makes sense not to expose the ID as part of the interface. (The round number
     /// must be exposed since it must be given as input to [`PublicKey::encrypt`], and must agree
     /// with the round number used when computing a decryption key.)
-    type Ciphertext: Serialize + DeserializeOwned + Eq + PartialEq + Serialize + Hash;
+    type Ciphertext: Serialize
+        + DeserializeOwned
+        + Eq
+        + PartialEq
+        + Serialize
+        + Hash
+        + Sized
+        + Send
+        + Sync;
 
-    type PreparedCiphertext: Serialize + DeserializeOwned + Eq + PartialEq + Serialize;
+    type PreparedCiphertext: Serialize
+        + DeserializeOwned
+        + Eq
+        + PartialEq
+        + Serialize
+        + Sized
+        + Send
+        + Sync;
 
     /// The round number used when generating a digest. For security to hold, validators must only
     /// generate a single decryption key corresponding to a round number.
     type Round;
 
     /// Internally, a KZG commitment to a set of IDs.
-    type Digest;
+    type Digest: Sized + Send + Sync;
 
     type EvalProofsPromise;
 
     /// The eval proofs required for decryption.
-    type EvalProofs;
+    type EvalProofs: Sized + Send + Sync;
 
     /// An individual eval proof.
     type EvalProof;
@@ -53,7 +69,7 @@ pub trait BatchThresholdEncryption {
     type DecryptionKeyShare: DecryptionKeyShare;
 
     /// A decryption key that has been reconstructed by a threshold of decryption key shares.
-    type DecryptionKey;
+    type DecryptionKey: Send + Sized + Sync;
     type Id: PartialEq + Eq;
 
     fn setup(
@@ -167,19 +183,25 @@ pub trait BatchThresholdEncryption {
         decryption_key: &Self::DecryptionKey,
     ) -> Result<()>;
 
-    fn prepare_cts(
-        cts: &[Self::Ciphertext],
+    /// Take a ciphertext, digest, and eval proofs as input and output a prepared ciphertext. This
+    /// can be done before reconstructing the decryption key.
+    fn prepare_ct(
+        ct: &Self::Ciphertext,
         digest: &Self::Digest,
         eval_proofs: &Self::EvalProofs,
-    ) -> Result<Vec<Self::PreparedCiphertext>>;
+    ) -> std::result::Result<Self::PreparedCiphertext, MissingEvalProofError>;
 
-    /// Decrypt a set of ciphertext using a decryption key and advice.
+    /// Decrypt a prepared ciphertext using the reconstructed decryption key.
     fn decrypt<P: Plaintext>(
         decryption_key: &Self::DecryptionKey,
-        cts: &[Self::PreparedCiphertext],
-    ) -> Result<Vec<P>>;
+        ct: &Self::PreparedCiphertext,
+    ) -> Result<P>;
 
-    fn decrypt_individual<P: Plaintext>(
+    /// Convenience method which performs both prepare and decrypt steps. As performing the steps
+    /// individually results in a lower critical-path latency, since `prepare` can be done before
+    /// reconstructing the decryption key, this should only be used during state sync for verifying
+    /// correct decryption.
+    fn decrypt_slow<P: Plaintext>(
         decryption_key: &Self::DecryptionKey,
         ct: &Self::Ciphertext,
         digest: &Self::Digest,
