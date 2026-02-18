@@ -2414,10 +2414,52 @@ impl AptosVM {
         events: &[(ContractEvent, Option<MoveTypeLayout>)],
         log_context: &AdapterLogSchema,
     ) -> Result<(), VMStatus> {
+        // Debug: Print all events
+        info!(
+            *log_context,
+            "[aptos_vm] Validating waypoint changeset. Total events: {}",
+            events.len()
+        );
+        for (idx, (event, _layout)) in events.iter().enumerate() {
+            let event_key = event.event_key();
+            let is_new_epoch = event.is_new_epoch_event();
+            let is_new_block = event_key == Some(&new_block_event_key());
+
+            // If this is a NewEpochEvent, try to deserialize and print the epoch value
+            let epoch_value_str = if is_new_epoch {
+                if let Ok(epoch_value) = bcs::from_bytes::<u64>(event.event_data()) {
+                    format!(" EPOCH_VALUE={}", epoch_value)
+                } else {
+                    " EPOCH_VALUE=<failed to deserialize>".to_string()
+                }
+            } else {
+                String::new()
+            };
+
+            info!(
+                *log_context,
+                "[aptos_vm] Event {}: key={:?}, is_new_epoch={}, is_new_block={}, type_tag={:?}{}",
+                idx,
+                event_key,
+                is_new_epoch,
+                is_new_block,
+                event.type_tag(),
+                epoch_value_str
+            );
+        }
+
         let has_new_block_event = events
             .iter()
             .any(|(e, _)| e.event_key() == Some(&new_block_event_key()));
         let has_new_epoch_event = events.iter().any(|(e, _)| e.is_new_epoch_event());
+
+        info!(
+            *log_context,
+            "[aptos_vm] Validation result: has_new_block_event={}, has_new_epoch_event={}",
+            has_new_block_event,
+            has_new_epoch_event
+        );
+
         if has_new_block_event && has_new_epoch_event {
             Ok(())
         } else {
@@ -2445,6 +2487,80 @@ impl AptosVM {
             Some(account_config::reserved_vm_address()),
             SessionId::genesis(genesis_id),
         )?;
+
+        // Debug: Print change set details
+        info!(
+            *log_context,
+            "[aptos_vm] Change set summary: resource_writes={}, aggregator_v1_writes={}, events={}",
+            change_set.resource_write_set().len(),
+            change_set.aggregator_v1_write_set().len(),
+            change_set.events().len()
+        );
+
+        // Print first few resource write operations
+        for (idx, (state_key, write_op)) in
+            change_set.resource_write_set().iter().enumerate().take(5)
+        {
+            info!(
+                *log_context,
+                "[aptos_vm] ResourceWriteOp {}: state_key={:?}, op={:?}", idx, state_key, write_op
+            );
+        }
+
+        // Check if Configuration resource is being modified
+        for (state_key, abstract_write_op) in change_set.resource_write_set().iter() {
+            let state_key_str = format!("{:?}", state_key);
+
+            // Check if this is the Configuration resource at @aptos_framework
+            if state_key_str.contains("0x1")
+                && state_key_str.contains("reconfiguration")
+                && state_key_str.contains("Configuration")
+            {
+                info!(
+                    *log_context,
+                    "[aptos_vm] *** FOUND Configuration resource write! state_key={:?}", state_key
+                );
+
+                // Try to extract the concrete WriteOp
+                if let Some(write_op) = abstract_write_op.try_as_concrete_write() {
+                    // Convert to persistable form to extract data
+                    use aptos_types::write_set::PersistedWriteOp;
+                    let persistable = write_op.to_persistable();
+
+                    let bytes_opt = match &persistable {
+                        PersistedWriteOp::Creation(data)
+                        | PersistedWriteOp::Modification(data)
+                        | PersistedWriteOp::CreationWithMetadata { data, .. }
+                        | PersistedWriteOp::ModificationWithMetadata { data, .. } => {
+                            Some(data.as_ref())
+                        },
+                        _ => None,
+                    };
+
+                    if let Some(bytes) = bytes_opt {
+                        info!(
+                            *log_context,
+                            "[aptos_vm] *** Configuration write data length: {} bytes",
+                            bytes.len()
+                        );
+                        // The epoch is a u64 at the beginning of the Configuration struct
+                        if bytes.len() >= 8 {
+                            let epoch_bytes: [u8; 8] = bytes[0..8].try_into().unwrap();
+                            let epoch = u64::from_le_bytes(epoch_bytes);
+                            info!(
+                                *log_context,
+                                "[aptos_vm] *** Configuration EPOCH VALUE IN WRITESET: {}", epoch
+                            );
+                        }
+                    } else {
+                        info!(
+                            *log_context,
+                            "[aptos_vm] *** Configuration WriteOp has no data (deletion?)"
+                        );
+                    }
+                }
+            }
+        }
 
         Self::validate_waypoint_change_set(change_set.events(), log_context)?;
         self.read_change_set(
