@@ -16,6 +16,9 @@ pub struct InternalIndexerDBConfig {
     pub event_v2_translation_ignores_below_version: u64,
     pub enable_statekeys: bool,
     pub batch_size: usize,
+    /// Number of worker threads for the internal indexer DB runtime.
+    /// Defaults to 2 if not specified.
+    pub runtime_threads: Option<usize>,
 }
 
 impl InternalIndexerDBConfig {
@@ -34,6 +37,7 @@ impl InternalIndexerDBConfig {
             event_v2_translation_ignores_below_version,
             enable_statekeys,
             batch_size,
+            runtime_threads: Some(2),
         }
     }
 
@@ -75,6 +79,7 @@ impl Default for InternalIndexerDBConfig {
             event_v2_translation_ignores_below_version: 0,
             enable_statekeys: false,
             batch_size: 10_000,
+            runtime_threads: Some(2),
         }
     }
 }
