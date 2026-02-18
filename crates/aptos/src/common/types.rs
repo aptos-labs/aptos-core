@@ -2216,6 +2216,7 @@ impl TransactionOptions {
         &self,
         session_path: &Path,
         payload: TransactionPayload,
+        profile_gas: bool,
     ) -> CliTypedResult<TransactionSummary> {
         let mut sess = Session::load(session_path)?;
 
@@ -2258,7 +2259,7 @@ impl TransactionOptions {
             sender_account.sign_with_transaction_builder(transaction_factory.payload(payload));
         let hash = transaction.committed_hash();
 
-        let (vm_status, txn_output) = sess.execute_transaction(transaction)?;
+        let (vm_status, txn_output) = sess.execute_transaction(transaction, profile_gas)?;
 
         let success = match txn_output.status() {
             TransactionStatus::Keep(exec_status) => Some(exec_status.is_success()),

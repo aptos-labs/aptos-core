@@ -8,6 +8,7 @@ use crate::{
 };
 use anyhow::Result;
 use aptos_crypto::HashValue;
+use aptos_gas_profiling::GasProfiler;
 use aptos_resource_viewer::{AnnotatedMoveValue, AptosValueAnnotator};
 use aptos_rest_client::{AptosBaseUrl, Client};
 use aptos_transaction_simulation::{
@@ -565,9 +566,14 @@ impl Session {
     /// After execution, selected parts of the transaction output get saved to a dedicated directory for inspection:
     /// - Write set changes
     /// - Emitted events
+    ///
+    /// If `profile_gas` is `true`, the transaction is executed with the gas profiler enabled.
+    /// A `gas-report` directory is generated under the transaction output directory containing
+    /// an HTML report with flamegraphs and detailed gas breakdowns.
     pub fn execute_transaction(
         &mut self,
         txn: SignedTransaction,
+        profile_gas: bool,
     ) -> Result<(VMStatus, TransactionOutput)> {
         let env = AptosEnvironment::new(&self.state_store);
         let vm = AptosVM::new(&env);
@@ -576,14 +582,41 @@ impl Session {
         let resolver = self.state_store.as_move_resolver();
         let code_storage = self.state_store.as_aptos_code_storage(&env);
 
-        let (vm_status, vm_output) = vm.execute_user_transaction(
-            &resolver,
-            &code_storage,
-            &txn,
-            &log_context,
-            &AuxiliaryInfo::new_timestamp_not_yet_assigned(0),
-        );
-        let txn_output = vm_output.try_materialize_into_transaction_output(&resolver)?;
+        // Execute the transaction, optionally with gas profiling.
+        let (vm_status, txn_output, gas_log) = if profile_gas {
+            let (vm_status, vm_output, gas_profiler) = vm
+                .execute_user_transaction_with_modified_gas_meter(
+                    &resolver,
+                    &code_storage,
+                    &txn,
+                    &log_context,
+                    |gas_meter| match txn.payload() {
+                        TransactionPayload::EntryFunction(entry_function) => {
+                            GasProfiler::new_function(
+                                gas_meter,
+                                entry_function.module().clone(),
+                                entry_function.function().to_owned(),
+                                entry_function.ty_args().to_vec(),
+                            )
+                        },
+                        _ => GasProfiler::new_script(gas_meter),
+                    },
+                    &AuxiliaryInfo::new_timestamp_not_yet_assigned(0),
+                )
+                .map_err(|e| anyhow::anyhow!("transaction execution failed: {:?}", e))?;
+            let txn_output = vm_output.try_materialize_into_transaction_output(&resolver)?;
+            (vm_status, txn_output, Some(gas_profiler.finish()))
+        } else {
+            let (vm_status, vm_output) = vm.execute_user_transaction(
+                &resolver,
+                &code_storage,
+                &txn,
+                &log_context,
+                &AuxiliaryInfo::new_timestamp_not_yet_assigned(0),
+            );
+            let txn_output = vm_output.try_materialize_into_transaction_output(&resolver)?;
+            (vm_status, txn_output, None)
+        };
 
         self.state_store.apply_write_set(txn_output.write_set())?;
 
@@ -642,6 +675,11 @@ impl Session {
 
         let write_set_path = output_path.join("write_set.json");
         save_write_set(&self.state_store, &write_set_path, txn_output.write_set())?;
+
+        // Generate gas profiling report if enabled.
+        if let Some(gas_log) = gas_log {
+            gas_log.generate_html_report(output_path.join("gas-report"), name)?;
+        }
 
         self.finish_op(true)?;
 
