@@ -21,7 +21,6 @@ use aptos_dkg::pvss::{
 };
 use ark_ff::UniformRand as _;
 use ark_std::rand::{rngs::StdRng, CryptoRng, RngCore, SeedableRng};
-use rayon::iter::{IntoParallelIterator, ParallelIterator as _};
 
 pub struct FPTXSuccinct {}
 
@@ -160,26 +159,19 @@ impl BatchThresholdEncryption for FPTXSuccinct {
         BIBEDecryptionKey::reconstruct(config, shares)
     }
 
-    fn prepare_cts(
-        cts: &[Self::Ciphertext],
+    fn prepare_ct(
+        ct: &Self::Ciphertext,
         digest: &Self::Digest,
         eval_proofs: &Self::EvalProofs,
-    ) -> Result<Vec<Self::PreparedCiphertext>> {
-        cts.into_par_iter()
-            .map(|ct| ct.prepare(digest, eval_proofs))
-            .collect::<anyhow::Result<Vec<Self::PreparedCiphertext>>>()
+    ) -> Result<Self::PreparedCiphertext> {
+        ct.prepare(digest, eval_proofs)
     }
 
     fn decrypt<'a, P: Plaintext>(
         decryption_key: &Self::DecryptionKey,
-        cts: &[Self::PreparedCiphertext],
-    ) -> anyhow::Result<Vec<P>> {
-        cts.into_par_iter()
-            .map(|ct| {
-                let plaintext: Result<P> = decryption_key.decrypt(ct);
-                plaintext
-            })
-            .collect::<anyhow::Result<Vec<P>>>()
+        ct: &Self::PreparedCiphertext,
+    ) -> anyhow::Result<P> {
+        decryption_key.decrypt(ct)
     }
 
     fn verify_decryption_key_share(
@@ -198,7 +190,7 @@ impl BatchThresholdEncryption for FPTXSuccinct {
         encryption_key.verify_decryption_key(digest, decryption_key)
     }
 
-    fn decrypt_individual<P: Plaintext>(
+    fn decrypt_slow<P: Plaintext>(
         decryption_key: &Self::DecryptionKey,
         ct: &Self::Ciphertext,
         digest: &Self::Digest,
