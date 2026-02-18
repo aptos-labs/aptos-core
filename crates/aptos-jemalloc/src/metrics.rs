@@ -12,12 +12,10 @@ const COLLECTION_INTERVAL: Duration = Duration::from_secs(30);
 /// This is `MALLCTL_ARENAS_ALL` from jemalloc's public API.
 const ARENAS_ALL: usize = 4096;
 
-static JEMALLOC_BYTES: Lazy<IntGaugeVec> = Lazy::new(|| {
-    register_int_gauge_vec!(
-        "aptos_jemalloc_bytes",
-        "jemalloc allocator statistics in bytes",
-        &["stat"]
-    )
+static JEMALLOC_STATS: Lazy<IntGaugeVec> = Lazy::new(|| {
+    register_int_gauge_vec!("aptos_jemalloc_stats", "jemalloc allocator statistics", &[
+        "stat"
+    ])
     .unwrap()
 });
 
@@ -54,7 +52,7 @@ fn collect_once() -> Result<(), Error> {
     jemalloc_ctl::epoch::advance()?;
 
     let gauge = |name: &str, val: usize| {
-        JEMALLOC_BYTES.set_with(&[name], val as i64);
+        JEMALLOC_STATS.set_with(&[name], val as i64);
     };
 
     // Global stats (bytes).
@@ -72,6 +70,10 @@ fn collect_once() -> Result<(), Error> {
         gauge("muzzy", read_arena_usize("pmuzzy")? * page_size);
         gauge("tcache", read_arena_usize("tcache_bytes")?);
     }
+
+    // Metadata THP: number of transparent huge pages backing jemalloc metadata.
+    let n_thp: usize = unsafe { jemalloc_ctl::raw::read(b"stats.metadata_thp\0") }?;
+    gauge("metadata_thp", n_thp);
 
     Ok(())
 }
