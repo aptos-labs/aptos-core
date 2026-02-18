@@ -356,6 +356,9 @@ pub struct RoundManager {
     // Optional hooks for proxy-specific behavior when this RoundManager runs proxy consensus.
     // None for primary RoundManager. Some(...) for proxy RoundManager.
     proxy_hooks: Option<Arc<dyn crate::proxy_hooks::ProxyConsensusHooks>>,
+    // Proxy-only ValidatorVerifier for verifying ordered proxy block signatures/QCs.
+    // Set on primary RoundManager when proxy consensus is enabled. None otherwise.
+    proxy_verifier: Option<Arc<ValidatorVerifier>>,
 }
 
 impl RoundManager {
@@ -380,6 +383,7 @@ impl RoundManager {
         opt_proposal_loopback_tx: aptos_channels::UnboundedSender<OptBlockData>,
         proxy_event_tx: Option<TokioMpsc::UnboundedSender<PrimaryToProxyEvent>>,
         proxy_hooks: Option<Arc<dyn crate::proxy_hooks::ProxyConsensusHooks>>,
+        proxy_verifier: Option<Arc<ValidatorVerifier>>,
     ) -> Self {
         // when decoupled execution is false,
         // the counter is still static.
@@ -421,6 +425,7 @@ impl RoundManager {
             proxy_event_tx,
             pending_proposal_event: None,
             proxy_hooks,
+            proxy_verifier,
         }
     }
 
@@ -2263,10 +2268,13 @@ impl RoundManager {
         let primary_block_from_proxy = PrimaryBlockFromProxy::from_ordered_msg(msg)
             .context("[RoundManager] Failed to parse ordered proxy blocks")?;
 
-        // Verify the proxy blocks (signature verification)
-        // TODO: Use proxy verifier instead of primary verifier in production
+        // Verify the proxy blocks using proxy-only verifier (proxy QCs are signed by proxy subset)
+        let verifier = self
+            .proxy_verifier
+            .as_ref()
+            .expect("[RoundManager] proxy_verifier must be set when receiving ordered proxy blocks");
         primary_block_from_proxy
-            .verify(&self.epoch_state.verifier)
+            .verify(verifier)
             .context("[RoundManager] Failed to verify ordered proxy blocks")?;
 
         info!(

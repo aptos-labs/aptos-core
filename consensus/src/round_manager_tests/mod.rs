@@ -481,6 +481,7 @@ impl NodeSetup {
             opt_proposal_loopback_tx,
             None, // proxy_event_tx
             None, // proxy_hooks
+            None, // proxy_verifier
         );
         block_on(round_manager.init(last_vote_sent));
         Self {

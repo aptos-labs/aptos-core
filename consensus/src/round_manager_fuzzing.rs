@@ -226,6 +226,7 @@ fn create_node_for_fuzzing() -> RoundManager {
         opt_proposal_loopback_tx,
         None, // proxy_event_tx
         None, // proxy_hooks
+        None, // proxy_verifier
     )
 }
 

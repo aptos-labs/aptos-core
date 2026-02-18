@@ -1075,6 +1075,31 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
             "Checking proxy consensus config (on-chain)"
         );
 
+        // Build proxy-only ValidatorVerifier for all primaries (needed to verify ordered proxy blocks)
+        let proxy_verifier: Option<Arc<ValidatorVerifier>> = if proxy_enabled {
+            let proxy_infos: Vec<_> = epoch_state
+                .verifier
+                .validator_infos
+                .iter()
+                .filter(|info| proxy_addresses.contains(&info.address))
+                .cloned()
+                .collect();
+            assert!(
+                !proxy_infos.is_empty(),
+                "proxy_addresses must map to at least one validator in the epoch"
+            );
+            let verifier = ValidatorVerifier::new(proxy_infos);
+            info!(
+                epoch = epoch,
+                proxy_validators = verifier.len(),
+                proxy_quorum = %verifier.quorum_voting_power(),
+                "Built proxy-only ValidatorVerifier"
+            );
+            Some(Arc::new(verifier))
+        } else {
+            None
+        };
+
         let (proxy_event_tx, proxy_event_rx) = if proxy_enabled && is_proxy_validator {
             // This node IS a proxy validator: spawn full proxy consensus
             let (primary_to_proxy_tx, primary_to_proxy_rx) =
@@ -1104,7 +1129,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
                     payload_manager,
                     &onchain_randomness_config,
                     &onchain_jwk_consensus_config,
-                    &proxy_addresses,
+                    proxy_verifier.clone().expect("proxy_verifier must exist when proxy_enabled"),
                 );
 
             // Store the proxy RoundManager's event channels for routing incoming proxy messages
@@ -1165,6 +1190,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
             opt_proposal_loopback_tx,
             proxy_event_tx,
             None, // proxy_hooks: None for primary RoundManager
+            proxy_verifier,
         );
 
         round_manager.init(last_vote).await;
@@ -1230,7 +1256,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
         payload_manager: Arc<dyn TPayloadManager>,
         onchain_randomness_config: &OnChainRandomnessConfig,
         onchain_jwk_consensus_config: &OnChainJWKConsensusConfig,
-        proxy_addresses: &[AccountAddress],
+        proxy_verifier: Arc<ValidatorVerifier>,
     ) -> (
         aptos_channel::Sender<(Author, Discriminant<VerifiedEvent>), (Author, VerifiedEvent)>,
         aptos_channel::Sender<Author, VerifiedEvent>,
@@ -1288,31 +1314,11 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
         }
         let safety_rules_container = Arc::new(Mutex::new(metrics_safety_rules));
 
-        // 3. Build proxy-only ValidatorVerifier for restricted proxy consensus
-        let proxy_verifier = {
-            let proxy_infos: Vec<_> = epoch_state
-                .verifier
-                .validator_infos
-                .iter()
-                .filter(|info| proxy_addresses.contains(&info.address))
-                .cloned()
-                .collect();
-            assert!(
-                !proxy_infos.is_empty(),
-                "proxy_addresses must map to at least one validator in the epoch"
-            );
-            ValidatorVerifier::new(proxy_infos)
-        };
+        // 3. Use pre-built proxy-only ValidatorVerifier for restricted proxy consensus
         let proxy_epoch_state = Arc::new(EpochState {
             epoch: epoch_state.epoch,
-            verifier: proxy_verifier.into(),
+            verifier: proxy_verifier.clone(),
         });
-        info!(
-            epoch = epoch,
-            proxy_validators = proxy_epoch_state.verifier.len(),
-            proxy_quorum = %proxy_epoch_state.verifier.quorum_voting_power(),
-            "Built proxy-only ValidatorVerifier"
-        );
 
         // Create proxy NetworkSender with proxy-only verifier (proposals/votes among proxies)
         let proxy_network_sender = Arc::new(NetworkSender::new_for_proxy(
@@ -1483,6 +1489,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
             proxy_opt_proposal_loopback_tx,
             None, // proxy_event_tx: None (this IS the proxy, it doesn't send to another proxy)
             Some(proxy_hooks.clone() as Arc<dyn crate::proxy_hooks::ProxyConsensusHooks>),
+            None, // proxy_verifier: None (proxy RM doesn't receive ordered proxy blocks)
         );
 
         info!(
