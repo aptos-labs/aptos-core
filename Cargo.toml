@@ -159,7 +159,6 @@ members = [
     "keyless/pepper/example-client-rust",
     "keyless/pepper/service",
     "mempool",
-    "network/benchmark",
     "network/builder",
     "network/discovery",
     "network/framework",
@@ -406,7 +405,6 @@ aptos-mvhashmap = { path = "aptos-move/mvhashmap" }
 aptos-native-interface = { path = "aptos-move/aptos-native-interface" }
 aptos-netcore = { path = "network/netcore" }
 aptos-network = { path = "network/framework" }
-aptos-network-benchmark = { path = "network/benchmark" }
 aptos-network-builder = { path = "network/builder" }
 aptos-network-checker = { path = "crates/aptos-network-checker" }
 aptos-network-discovery = { path = "network/discovery" }

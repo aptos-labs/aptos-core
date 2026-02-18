@@ -3362,25 +3362,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "aptos-network-benchmark"
-version = "0.1.0"
-dependencies = [
- "aptos-config",
- "aptos-logger",
- "aptos-metrics-core",
- "aptos-network",
- "aptos-time-service",
- "aptos-types",
- "async-channel 1.9.0",
- "bytes",
- "futures",
- "once_cell",
- "rand 0.7.3",
- "serde",
- "tokio",
-]
-
-[[package]]
 name = "aptos-network-builder"
 version = "0.1.0"
 dependencies = [
@@ -3514,7 +3495,6 @@ dependencies = [
  "aptos-mempool",
  "aptos-mempool-notifications",
  "aptos-network",
- "aptos-network-benchmark",
  "aptos-network-builder",
  "aptos-node-identity",
  "aptos-peer-monitoring-service-client",
