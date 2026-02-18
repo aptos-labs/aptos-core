@@ -399,6 +399,10 @@ BlockType:
       OptimisticProposal:
         NEWTYPE:
           TYPENAME: OptBlockBody
+    5:
+      ProxyBlock:
+        NEWTYPE:
+          TYPENAME: OptProxyBlockBody
 ChainId:
   NEWTYPESTRUCT: U8
 ChangeSet:
@@ -551,6 +555,26 @@ ConsensusMsg:
       SecretShareMsg:
         NEWTYPE:
           TYPENAME: SecretShareNetworkMessage
+    26:
+      ProxyProposalMsg:
+        NEWTYPE:
+          TYPENAME: ProxyProposalMsg
+    27:
+      OptProxyProposalMsg:
+        NEWTYPE:
+          TYPENAME: OptProxyProposalMsg
+    28:
+      ProxyVoteMsg:
+        NEWTYPE:
+          TYPENAME: ProxyVoteMsg
+    29:
+      ProxyOrderVoteMsg:
+        NEWTYPE:
+          TYPENAME: ProxyOrderVoteMsg
+    30:
+      OrderedProxyBlocksMsg:
+        NEWTYPE:
+          TYPENAME: OrderedProxyBlocksMsg
 ContractEvent:
   ENUM:
     0:
@@ -903,6 +927,39 @@ OptProposalMsg:
         TYPENAME: OptBlockData
     - sync_info:
         TYPENAME: SyncInfo
+OptProxyBlockBody:
+  ENUM:
+    0:
+      V0:
+        STRUCT:
+          - validator_txns:
+              SEQ:
+                TYPENAME: ValidatorTransaction
+          - payload:
+              TYPENAME: Payload
+          - author:
+              TYPENAME: AccountAddress
+          - grandparent_qc:
+              TYPENAME: QuorumCert
+          - primary_round: U64
+          - primary_qc:
+              OPTION:
+                TYPENAME: QuorumCert
+OptProxyBlockData:
+  STRUCT:
+    - epoch: U64
+    - round: U64
+    - timestamp_usecs: U64
+    - parent:
+        TYPENAME: BlockInfo
+    - block_body:
+        TYPENAME: OptProxyBlockBody
+OptProxyProposalMsg:
+  STRUCT:
+    - block_data:
+        TYPENAME: OptProxyBlockData
+    - sync_info:
+        TYPENAME: ProxySyncInfo
 OptQuorumStorePayload:
   ENUM:
     0:
@@ -936,6 +993,14 @@ OrderVoteMsg:
     - order_vote:
         TYPENAME: OrderVote
     - quorum_cert:
+        TYPENAME: QuorumCert
+OrderedProxyBlocksMsg:
+  STRUCT:
+    - proxy_blocks:
+        SEQ:
+          TYPENAME: Block
+    - primary_round: U64
+    - primary_qc:
         TYPENAME: QuorumCert
 PartialAuthenticatorAssertionResponse:
   STRUCT:
@@ -1043,6 +1108,39 @@ ProposalMsg:
         TYPENAME: Block
     - sync_info:
         TYPENAME: SyncInfo
+ProxyOrderVoteMsg:
+  STRUCT:
+    - order_vote:
+        TYPENAME: OrderVote
+    - quorum_cert:
+        TYPENAME: QuorumCert
+ProxyProposalMsg:
+  STRUCT:
+    - proposal:
+        TYPENAME: Block
+    - sync_info:
+        TYPENAME: ProxySyncInfo
+ProxySyncInfo:
+  STRUCT:
+    - highest_proxy_qc:
+        TYPENAME: QuorumCert
+    - highest_proxy_ordered_cert:
+        OPTION:
+          TYPENAME: WrappedLedgerInfo
+    - highest_proxy_timeout_cert:
+        OPTION:
+          TYPENAME: TwoChainTimeoutCertificate
+    - highest_primary_qc:
+        TYPENAME: QuorumCert
+    - highest_primary_tc:
+        OPTION:
+          TYPENAME: TwoChainTimeoutCertificate
+ProxyVoteMsg:
+  STRUCT:
+    - vote:
+        TYPENAME: Vote
+    - sync_info:
+        TYPENAME: ProxySyncInfo
 ProviderJWKs:
   STRUCT:
     - issuer: BYTES

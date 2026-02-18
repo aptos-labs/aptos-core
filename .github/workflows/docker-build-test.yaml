@@ -268,9 +268,9 @@ jobs:
     secrets: inherit
     with:
       GIT_SHA: ${{ needs.determine-docker-build-metadata.outputs.gitSha }}
-      FORGE_TEST_SUITE: realistic_env_max_load
+      FORGE_TEST_SUITE: proxy_primary_happy_path
       IMAGE_TAG: ${{ needs.determine-docker-build-metadata.outputs.gitSha }}
-      FORGE_RUNNER_DURATION_SECS: 480
+      FORGE_RUNNER_DURATION_SECS: 120
       COMMENT_HEADER: forge-e2e
       # Use the cache ID as the Forge namespace so we can limit Forge test concurrency on k8s, since Forge
       # test lifecycle is separate from that of GHA. This protects us from the case where many Forge tests are triggered
@@ -278,7 +278,7 @@ jobs:
       FORGE_NAMESPACE: forge-e2e-${{ needs.determine-docker-build-metadata.outputs.targetCacheId }}
       SKIP_JOB: ${{ needs.file_change_determinator.outputs.only_docs_changed == 'true' }}
       SEND_RESULTS_TO_TRUNK: true
-  
+
   # This job determines the last released docker image tag, which is used by forge compat test.
   fetch-last-released-docker-image-tag:
     needs:

@@ -2,7 +2,7 @@
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 use super::{GenesisConfig, Swarm, Version};
-use crate::{GenesisConfigFn, NodeConfigFn, Result};
+use crate::{GenesisConfigFn, NodeConfigFn, OverrideNodeConfigFn, Result};
 use rand::rngs::StdRng;
 use std::{num::NonZeroUsize, time::Duration};
 
@@ -23,5 +23,6 @@ pub trait Factory {
         genesis_config_fn: Option<GenesisConfigFn>,
         node_config_fn: Option<NodeConfigFn>,
         existing_db_tag: Option<String>,
+        override_node_config_fn: Option<OverrideNodeConfigFn>,
     ) -> Result<Box<dyn Swarm>>;
 }

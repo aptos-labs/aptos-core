@@ -416,6 +416,18 @@ impl Block {
         }
     }
 
+    pub fn new_from_opt_proxy(
+        opt_proxy_data: crate::proxy_block_data::OptProxyBlockData,
+        quorum_cert: QuorumCert,
+    ) -> Self {
+        let block_data = BlockData::new_from_opt_proxy(opt_proxy_data, quorum_cert);
+        Block {
+            id: block_data.hash(),
+            block_data,
+            signature: None,
+        }
+    }
+
     pub fn validator_txns(&self) -> Option<&Vec<ValidatorTransaction>> {
         self.block_data.validator_txns()
     }
@@ -448,7 +460,11 @@ impl Block {
                     || self.quorum_cert().verify(validator),
                 );
                 res1?;
-                res2
+                res2?;
+                if let Some(primary_proof) = proposal_ext.primary_proof() {
+                    primary_proof.verify(validator)?;
+                }
+                Ok(())
             },
             BlockType::OptimisticProposal(p) => {
                 // Note: Optimistic proposal is not signed by proposer unlike normal proposal
@@ -457,7 +473,11 @@ impl Block {
                     || self.quorum_cert().verify(validator),
                 );
                 res1?;
-                res2
+                res2?;
+                if let Some(primary_proof) = p.primary_proof() {
+                    primary_proof.verify(validator)?;
+                }
+                Ok(())
             },
             BlockType::DAGBlock { .. } => bail!("We should not accept DAG block from others"),
         }

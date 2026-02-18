@@ -34,6 +34,7 @@ mod pending_votes;
 mod pending_votes_test;
 pub mod persistent_liveness_storage;
 mod pipeline;
+pub(crate) mod proxy_hooks;
 pub mod quorum_store;
 mod rand;
 mod recovery_manager;

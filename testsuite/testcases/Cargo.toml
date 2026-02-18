@@ -17,6 +17,7 @@ anyhow = { workspace = true }
 aptos = { workspace = true, features = ["fuzzing"] }
 aptos-config = { workspace = true }
 aptos-forge = { workspace = true }
+aptos-inspection-service = { workspace = true }
 aptos-global-constants = { workspace = true }
 aptos-keygen = { workspace = true }
 aptos-logger = { workspace = true }

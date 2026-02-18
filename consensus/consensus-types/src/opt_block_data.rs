@@ -3,6 +3,7 @@
 
 use crate::{
     common::{Author, Payload, Round},
+    primary_consensus_proof::PrimaryConsensusProof,
     proposal_ext::OptBlockBody,
     quorum_cert::QuorumCert,
 };
@@ -48,6 +49,34 @@ impl OptBlockData {
                 payload,
                 author,
                 grandparent_qc,
+            },
+        }
+    }
+
+    pub fn new_proxy(
+        validator_txns: Vec<ValidatorTransaction>,
+        payload: Payload,
+        author: Author,
+        epoch: u64,
+        round: Round,
+        timestamp_usecs: u64,
+        parent: BlockInfo,
+        grandparent_qc: QuorumCert,
+        primary_round: Round,
+        primary_proof: Option<PrimaryConsensusProof>,
+    ) -> Self {
+        Self {
+            epoch,
+            round,
+            timestamp_usecs,
+            parent,
+            block_body: OptBlockBody::ProxyV0 {
+                validator_txns,
+                payload,
+                author,
+                grandparent_qc,
+                primary_round,
+                primary_proof,
             },
         }
     }
@@ -112,6 +141,21 @@ impl OptBlockData {
             self.timestamp_usecs() <= (current_ts.as_micros() as u64).saturating_add(TIMEBOUND),
             "Blocks must not be too far in the future"
         );
+
+        // Primary proof round must be >= primary_round - 1.
+        // With consecutive QCs: proof_round == primary_round - 1 (exact match).
+        // With TC gaps: proof_round > primary_round - 1 (primary had timeouts).
+        if let Some(primary_round) = self.primary_round() {
+            if let Some(primary_proof) = self.primary_proof() {
+                ensure!(
+                    primary_proof.proof_round() >= primary_round.saturating_sub(1),
+                    "Primary proof round {} must be >= primary_round - 1 = {}",
+                    primary_proof.proof_round(),
+                    primary_round.saturating_sub(1),
+                );
+            }
+        }
+
         Ok(())
     }
 }

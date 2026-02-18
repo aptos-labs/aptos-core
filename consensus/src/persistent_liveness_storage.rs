@@ -15,8 +15,11 @@ use aptos_crypto::HashValue;
 use aptos_logger::prelude::*;
 use aptos_storage_interface::DbReader;
 use aptos_types::{
-    block_info::Round, epoch_change::EpochChangeProof, ledger_info::LedgerInfoWithSignatures,
-    proof::TransactionAccumulatorSummary, transaction::Version,
+    block_info::Round,
+    epoch_change::EpochChangeProof,
+    ledger_info::LedgerInfoWithSignatures,
+    proof::TransactionAccumulatorSummary,
+    transaction::Version,
 };
 use std::{
     cmp::max,
@@ -296,6 +299,7 @@ impl LedgerRecoveryData {
     }
 }
 
+#[derive(Clone)]
 pub struct RootMetadata {
     pub accu_hash: HashValue,
     pub frozen_root_hashes: Vec<HashValue>,
@@ -420,6 +424,10 @@ impl RecoveryData {
 
     pub fn commit_root_block(&self) -> &Block {
         &self.root.commit_root_block
+    }
+
+    pub fn root_quorum_cert(&self) -> &QuorumCert {
+        &self.root.quorum_cert
     }
 
     pub fn last_vote(&self) -> Option<Vote> {
@@ -619,5 +627,101 @@ impl PersistentLivenessStorage for StorageWriteProxy {
 
     fn consensus_db(&self) -> Arc<ConsensusDB> {
         self.db.clone()
+    }
+}
+
+// =============================================================================
+// Proxy Consensus Liveness Storage (noop)
+// =============================================================================
+
+/// A liveness storage implementation for proxy consensus that doesn't persist anything.
+/// Proxy blocks are ephemeral — they are ordered and forwarded to primary consensus
+/// but never executed or committed. Safety is handled by ProxySafetyRules with its
+/// own separate persistent storage.
+pub struct ProxyLivenessStorage {
+    /// The epoch's ledger info used as the genesis root for the proxy block tree.
+    epoch_ledger_info: LedgerInfoWithSignatures,
+    /// Root metadata from the DB's accumulator state at the epoch boundary.
+    root_metadata: RootMetadata,
+}
+
+impl ProxyLivenessStorage {
+    pub fn new(epoch_ledger_info: LedgerInfoWithSignatures, root_metadata: RootMetadata) -> Self {
+        Self {
+            epoch_ledger_info,
+            root_metadata,
+        }
+    }
+
+    /// Create storage and extract recovery data for BlockStore initialization.
+    pub fn start_for_proxy(
+        epoch_ledger_info: LedgerInfoWithSignatures,
+        root_metadata: RootMetadata,
+        order_vote_enabled: bool,
+        window_size: Option<u64>,
+    ) -> (RecoveryData, Arc<Self>) {
+        let storage = Arc::new(Self::new(epoch_ledger_info, root_metadata));
+        let recovery_data = match storage.start(order_vote_enabled, window_size) {
+            LivenessStorageData::FullRecoveryData(recovery_data) => recovery_data,
+            _ => panic!("Proxy storage should always produce recovery data"),
+        };
+        (recovery_data, storage)
+    }
+}
+
+impl PersistentLivenessStorage for ProxyLivenessStorage {
+    fn save_tree(&self, _: Vec<Block>, _: Vec<QuorumCert>) -> Result<()> {
+        Ok(())
+    }
+
+    fn prune_tree(&self, _: Vec<HashValue>) -> Result<()> {
+        Ok(())
+    }
+
+    fn save_vote(&self, _: &Vote) -> Result<()> {
+        Ok(())
+    }
+
+    fn recover_from_ledger(&self) -> LedgerRecoveryData {
+        LedgerRecoveryData::new(self.epoch_ledger_info.clone())
+    }
+
+    fn start(&self, order_vote_enabled: bool, window_size: Option<u64>) -> LivenessStorageData {
+        match RecoveryData::new(
+            None,
+            self.recover_from_ledger(),
+            vec![],
+            self.root_metadata.clone(),
+            vec![],
+            None,
+            order_vote_enabled,
+            window_size,
+        ) {
+            Ok(recovery_data) => LivenessStorageData::FullRecoveryData(recovery_data),
+            Err(e) => {
+                panic!("Constructing proxy recovery data should never fail: {e}");
+            },
+        }
+    }
+
+    fn save_highest_2chain_timeout_cert(&self, _: &TwoChainTimeoutCertificate) -> Result<()> {
+        Ok(())
+    }
+
+    fn retrieve_epoch_change_proof(&self, _version: u64) -> Result<EpochChangeProof> {
+        // Return the epoch boundary LedgerInfo so the standard SafetyRules::initialize()
+        // flow can verify the proof and extract the current epoch's EpochState.
+        Ok(EpochChangeProof::new(
+            vec![self.epoch_ledger_info.clone()],
+            false,
+        ))
+    }
+
+    fn aptos_db(&self) -> Arc<dyn DbReader> {
+        unimplemented!("ProxyLivenessStorage does not provide aptos_db access")
+    }
+
+    fn consensus_db(&self) -> Arc<ConsensusDB> {
+        unimplemented!("ProxyLivenessStorage does not provide consensus_db access")
     }
 }

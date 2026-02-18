@@ -101,6 +101,9 @@ pub struct ConsensusConfig {
     pub enable_round_timeout_msg: bool,
     pub enable_optimistic_proposal_rx: bool,
     pub enable_optimistic_proposal_tx: bool,
+    // Proxy consensus configuration
+    pub enable_proxy_consensus: bool,
+    pub proxy_consensus_config: ProxyConsensusConfig,
 }
 
 /// Deprecated
@@ -108,6 +111,45 @@ pub struct ConsensusConfig {
 pub enum QcAggregatorType {
     #[default]
     NoDelay,
+}
+
+/// Configuration for proxy consensus.
+#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
+#[serde(default, deny_unknown_fields)]
+pub struct ProxyConsensusConfig {
+    /// Round timeout for proxy consensus in milliseconds
+    pub round_initial_timeout_ms: u64,
+    /// Timeout backoff exponent base
+    pub round_timeout_backoff_exponent_base: f64,
+    /// Maximum backoff exponent
+    pub round_timeout_backoff_max_exponent: usize,
+    /// Target number of proxy blocks with transactions per primary round.
+    /// After this many proxy blocks carry real txns, subsequent blocks are empty.
+    #[serde(alias = "max_proxy_blocks_per_primary_round")]
+    pub target_proxy_blocks_per_primary_round: u64,
+    /// Maximum transactions per proxy block (= primary max_sending_block_txns / target)
+    pub max_proxy_block_txns: u64,
+    /// Maximum transactions per proxy block after filtering
+    pub max_proxy_block_txns_after_filtering: u64,
+    /// Maximum proxy block size in bytes (= primary max_sending_block_bytes / target)
+    pub max_proxy_block_bytes: u64,
+}
+
+impl Default for ProxyConsensusConfig {
+    fn default() -> Self {
+        Self {
+            // Proxy runs fast: 100ms initial timeout
+            round_initial_timeout_ms: 100,
+            round_timeout_backoff_exponent_base: 1.2,
+            round_timeout_backoff_max_exponent: 4,
+            // Target ~10 proxy blocks with txns per primary round
+            target_proxy_blocks_per_primary_round: 10,
+            // Proxy block limits = primary limits / target
+            max_proxy_block_txns: 500,                  // 5000 / 10
+            max_proxy_block_txns_after_filtering: 180,  // 1800 / 10
+            max_proxy_block_bytes: 300 * 1024,          // 3MB / 10
+        }
+    }
 }
 
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
@@ -383,6 +425,8 @@ impl Default for ConsensusConfig {
             enable_round_timeout_msg: true,
             enable_optimistic_proposal_rx: true,
             enable_optimistic_proposal_tx: true,
+            enable_proxy_consensus: false,
+            proxy_consensus_config: ProxyConsensusConfig::default(),
         }
     }
 }

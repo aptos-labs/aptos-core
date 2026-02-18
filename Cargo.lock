@@ -994,6 +994,7 @@ dependencies = [
  "aptos-netcore",
  "aptos-network",
  "aptos-peer-monitoring-service-types",
+ "aptos-proxy-primary",
  "aptos-reliable-broadcast",
  "aptos-resource-viewer",
  "aptos-runtimes",
@@ -3780,6 +3781,22 @@ dependencies = [
 ]
 
 [[package]]
+name = "aptos-proxy-primary"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "aptos-config",
+ "aptos-consensus-types",
+ "aptos-crypto",
+ "aptos-infallible",
+ "aptos-logger",
+ "aptos-types",
+ "once_cell",
+ "prometheus",
+ "thiserror 1.0.69",
+]
+
+[[package]]
 name = "aptos-push-metrics"
 version = "0.1.0"
 dependencies = [
@@ -4498,6 +4515,7 @@ dependencies = [
  "aptos-config",
  "aptos-forge",
  "aptos-global-constants",
+ "aptos-inspection-service",
  "aptos-keygen",
  "aptos-logger",
  "aptos-release-builder",

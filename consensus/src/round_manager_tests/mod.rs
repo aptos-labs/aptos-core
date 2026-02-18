@@ -412,7 +412,7 @@ impl NodeSetup {
             mock_execution_client.clone(),
             10, // max pruned blocks in mem
             time_service.clone(),
-            10,
+            Some(10),
             payload_manager,
             false,
             window_size,
@@ -479,6 +479,8 @@ impl NodeSetup {
             None,
             Arc::new(MockPastProposalStatusTracker {}),
             opt_proposal_loopback_tx,
+            None, // proxy_event_tx
+            None, // proxy_hooks
         );
         block_on(round_manager.init(last_vote_sent));
         Self {

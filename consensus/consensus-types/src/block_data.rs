@@ -4,7 +4,9 @@
 use crate::{
     common::{Author, Payload, Round},
     opt_block_data::OptBlockData,
+    primary_consensus_proof::PrimaryConsensusProof,
     proposal_ext::{OptBlockBody, ProposalExt},
+    proxy_block_data::{OptProxyBlockBody, OptProxyBlockData},
     quorum_cert::QuorumCert,
     vote_data::VoteData,
 };
@@ -220,6 +222,32 @@ impl BlockData {
         matches!(self.block_type, BlockType::OptimisticProposal { .. })
     }
 
+    pub fn is_proxy_block(&self) -> bool {
+        match &self.block_type {
+            BlockType::ProposalExt(p) => p.primary_round().is_some(),
+            BlockType::OptimisticProposal(p) => p.primary_round().is_some(),
+            _ => false,
+        }
+    }
+
+    /// Returns the primary round for proxy blocks.
+    pub fn primary_round(&self) -> Option<Round> {
+        match &self.block_type {
+            BlockType::ProposalExt(p) => p.primary_round(),
+            BlockType::OptimisticProposal(p) => p.primary_round(),
+            _ => None,
+        }
+    }
+
+    /// Returns the primary consensus proof attached to proxy blocks (if any).
+    pub fn primary_proof(&self) -> Option<&PrimaryConsensusProof> {
+        match &self.block_type {
+            BlockType::ProposalExt(p) => p.primary_proof(),
+            BlockType::OptimisticProposal(p) => p.primary_proof(),
+            _ => None,
+        }
+    }
+
     /// the list of consecutive proposers from the immediately preceeding
     /// rounds that didn't produce a successful block
     pub fn failed_authors(&self) -> Option<&Vec<(Round, Author)>> {
@@ -415,6 +443,74 @@ impl BlockData {
             timestamp_usecs,
             quorum_cert,
             block_type: BlockType::OptimisticProposal(proposal_body),
+        }
+    }
+
+    /// Returns an instance of BlockData by converting the OptProxyBlockData to BlockData
+    /// and adding the parent QC. Creates an OptimisticProposal with OptBlockBody::ProxyV0.
+    pub fn new_from_opt_proxy(
+        opt_proxy_block_data: OptProxyBlockData,
+        quorum_cert: QuorumCert,
+    ) -> Self {
+        let OptProxyBlockData {
+            epoch,
+            round,
+            timestamp_usecs,
+            block_body,
+            ..
+        } = opt_proxy_block_data;
+        let OptProxyBlockBody::V0 {
+            validator_txns,
+            payload,
+            author,
+            grandparent_qc,
+            primary_round,
+            primary_proof,
+        } = block_body;
+        Self {
+            epoch,
+            round,
+            timestamp_usecs,
+            quorum_cert,
+            block_type: BlockType::OptimisticProposal(OptBlockBody::ProxyV0 {
+                validator_txns,
+                payload,
+                author,
+                grandparent_qc,
+                primary_round,
+                primary_proof,
+            }),
+        }
+    }
+
+    /// Creates a new proxy BlockData directly (not from OptProxyBlockData).
+    /// This is used when creating proxy block proposals with the full parent QC available.
+    /// Creates a ProposalExt::ProxyV0 block type.
+    pub fn new_from_proxy(
+        epoch: u64,
+        round: Round,
+        timestamp_usecs: u64,
+        quorum_cert: QuorumCert,
+        validator_txns: Vec<ValidatorTransaction>,
+        payload: Payload,
+        author: Author,
+        failed_authors: Vec<(Round, Author)>,
+        primary_round: Round,
+        primary_proof: Option<PrimaryConsensusProof>,
+    ) -> Self {
+        Self {
+            epoch,
+            round,
+            timestamp_usecs,
+            quorum_cert,
+            block_type: BlockType::ProposalExt(ProposalExt::ProxyV0 {
+                validator_txns,
+                payload,
+                author,
+                failed_authors,
+                primary_round,
+                primary_proof,
+            }),
         }
     }
 

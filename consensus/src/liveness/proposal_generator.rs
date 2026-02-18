@@ -33,7 +33,7 @@ use aptos_consensus_types::{
 };
 use aptos_crypto::{hash::CryptoHash, HashValue};
 use aptos_infallible::Mutex;
-use aptos_logger::{error, sample, sample::SampleRate, warn};
+use aptos_logger::{error, info, sample, sample::SampleRate, warn};
 use aptos_types::{
     block_info::BlockInfo, on_chain_config::ValidatorTxnConfig, validator_txn::ValidatorTransaction,
 };
@@ -555,6 +555,84 @@ impl ProposalGenerator {
         Ok(block)
     }
 
+    /// Generate a primary proposal using pre-aggregated proxy payload.
+    ///
+    /// Unlike `generate_proposal()`, this skips `payload_client.pull_payload()`.
+    /// The primary block carries only transactions aggregated from proxy blocks,
+    /// adding zero new transactions.
+    pub async fn generate_proposal_with_proxy_payload(
+        &self,
+        round: Round,
+        proposer_election: Arc<dyn ProposerElection + Send + Sync>,
+        proxy_validator_txns: Vec<ValidatorTransaction>,
+        proxy_payload: Payload,
+    ) -> anyhow::Result<BlockData> {
+        let hqc = self.ensure_highest_quorum_cert(round)?;
+
+        let (validator_txns, payload, timestamp) = if hqc.certified_block().has_reconfiguration() {
+            (
+                vec![],
+                Payload::empty(
+                    self.quorum_store_enabled,
+                    self.allow_batches_without_pos_in_proposal,
+                ),
+                hqc.certified_block().timestamp_usecs(),
+            )
+        } else {
+            // Track last_round_generated to prevent double proposals
+            {
+                let mut last_round_generated = self.last_round_generated.lock();
+                if *last_round_generated < round {
+                    *last_round_generated = round;
+                } else {
+                    bail!("Already proposed in the round {}", round);
+                }
+            }
+            let timestamp = self.time_service.get_current_timestamp();
+            (
+                proxy_validator_txns,
+                proxy_payload,
+                timestamp.as_micros() as u64,
+            )
+        };
+
+        let quorum_cert = hqc.as_ref().clone();
+        let failed_authors = self.compute_failed_authors(
+            round,
+            quorum_cert.certified_block().round(),
+            false,
+            proposer_election,
+        );
+
+        info!(
+            round = round,
+            "ProposalGenerator: creating primary proposal with proxy payload"
+        );
+
+        let block = if self.vtxn_config.enabled() {
+            BlockData::new_proposal_ext(
+                validator_txns,
+                payload,
+                self.author,
+                failed_authors,
+                round,
+                timestamp,
+                quorum_cert,
+            )
+        } else {
+            BlockData::new_proposal(
+                payload,
+                self.author,
+                failed_authors,
+                round,
+                timestamp,
+                quorum_cert,
+            )
+        };
+
+        Ok(block)
+    }
+
     async fn generate_proposal_inner(
         &self,
         round: Round,
@@ -685,14 +763,14 @@ impl ProposalGenerator {
         Ok((validator_txns, payload, timestamp.as_micros() as u64))
     }
 
-    pub async fn generate_opt_proposal(
+    /// Generate the payload for an optimistic proposal without creating the block.
+    /// Returns (validator_txns, payload, timestamp_usecs).
+    pub async fn generate_opt_proposal_payload(
         &self,
-        epoch: u64,
         round: Round,
-        parent: BlockInfo,
-        grandparent_qc: QuorumCert,
+        parent_id: HashValue,
         proposer_election: Arc<dyn ProposerElection + Send + Sync>,
-    ) -> anyhow::Result<OptBlockData> {
+    ) -> anyhow::Result<(Vec<ValidatorTransaction>, Payload, u64)> {
         let maybe_optqs_payload_pull_params = self.opt_qs_payload_param_provider.get_params();
 
         let hqc = self.ensure_highest_quorum_cert(round)?;
@@ -709,7 +787,7 @@ impl ProposalGenerator {
         } else {
             self.generate_proposal_inner(
                 round,
-                parent.id(),
+                parent_id,
                 proposer_election,
                 maybe_optqs_payload_pull_params,
             )
@@ -721,6 +799,21 @@ impl ProposalGenerator {
         } else {
             vec![]
         };
+
+        Ok((validator_txns, payload, timestamp))
+    }
+
+    pub async fn generate_opt_proposal(
+        &self,
+        epoch: u64,
+        round: Round,
+        parent: BlockInfo,
+        grandparent_qc: QuorumCert,
+        proposer_election: Arc<dyn ProposerElection + Send + Sync>,
+    ) -> anyhow::Result<OptBlockData> {
+        let (validator_txns, payload, timestamp) = self
+            .generate_opt_proposal_payload(round, parent.id(), proposer_election)
+            .await?;
 
         let block = OptBlockData::new(
             validator_txns,

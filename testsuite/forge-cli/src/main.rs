@@ -19,6 +19,7 @@ use suites::{
     multi_region::get_multi_region_test,
     netbench::get_netbench_test,
     pfn::get_pfn_test,
+    proxy::get_proxy_test,
     realistic_environment::get_realistic_env_test,
     state_sync::get_state_sync_test,
     ungrouped::{
@@ -463,6 +464,7 @@ fn get_test_suite(
         boxed!(|| get_multi_region_test(test_name)),
         boxed!(|| get_netbench_test(test_name)),
         boxed!(|| get_pfn_test(test_name, duration)),
+        boxed!(|| get_proxy_test(test_name, duration)),
         boxed!(|| get_realistic_env_test(test_name, duration, test_cmd)),
         boxed!(|| get_state_sync_test(test_name)),
         boxed!(|| get_dag_test(test_name, duration, test_cmd)),

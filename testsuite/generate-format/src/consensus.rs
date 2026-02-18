@@ -139,6 +139,16 @@ pub fn get_registry() -> Result<Registry> {
     tracer.trace_type::<aptos_consensus_types::common::Payload>(&samples)?;
     tracer.trace_type::<aptos_consensus_types::block_retrieval::BlockRetrievalRequest>(&samples)?;
 
+    // Proxy consensus types
+    tracer.trace_type::<aptos_consensus_types::proxy_sync_info::ProxySyncInfo>(&samples)?;
+    tracer.trace_type::<aptos_consensus_types::proxy_messages::ProxyProposalMsg>(&samples)?;
+    tracer.trace_type::<aptos_consensus_types::proxy_messages::OptProxyProposalMsg>(&samples)?;
+    tracer.trace_type::<aptos_consensus_types::proxy_messages::ProxyVoteMsg>(&samples)?;
+    tracer.trace_type::<aptos_consensus_types::proxy_messages::ProxyOrderVoteMsg>(&samples)?;
+    tracer.trace_type::<aptos_consensus_types::proxy_messages::OrderedProxyBlocksMsg>(&samples)?;
+    tracer.trace_type::<aptos_consensus_types::proxy_block_data::OptProxyBlockData>(&samples)?;
+    tracer.trace_type::<aptos_consensus_types::proxy_block_data::OptProxyBlockBody>(&samples)?;
+
     // aliases within StructTag
     tracer.ignore_aliases("StructTag", &["type_params"])?;
 

@@ -90,8 +90,8 @@ pub struct BlockStore {
     storage: Arc<dyn PersistentLivenessStorage>,
     /// Used to ensure that any block stored will have a timestamp < the local time
     time_service: Arc<dyn TimeService>,
-    // consistent with round type
-    vote_back_pressure_limit: Round,
+    // consistent with round type. None disables back pressure (used by proxy BlockStore).
+    vote_back_pressure_limit: Option<Round>,
     payload_manager: Arc<dyn TPayloadManager>,
     #[cfg(any(test, feature = "fuzzing"))]
     back_pressure_for_test: AtomicBool,
@@ -110,7 +110,7 @@ impl BlockStore {
         execution_client: Arc<dyn TExecutionClient>,
         max_pruned_blocks_in_mem: usize,
         time_service: Arc<dyn TimeService>,
-        vote_back_pressure_limit: Round,
+        vote_back_pressure_limit: Option<Round>,
         payload_manager: Arc<dyn TPayloadManager>,
         order_vote_enabled: bool,
         window_size: Option<u64>,
@@ -171,7 +171,7 @@ impl BlockStore {
         storage: Arc<dyn PersistentLivenessStorage>,
         max_pruned_blocks_in_mem: usize,
         time_service: Arc<dyn TimeService>,
-        vote_back_pressure_limit: Round,
+        vote_back_pressure_limit: Option<Round>,
         payload_manager: Arc<dyn TPayloadManager>,
         order_vote_enabled: bool,
         window_size: Option<u64>,
@@ -687,7 +687,9 @@ impl BlockReader for BlockStore {
         )
     }
 
-    /// Return if the consensus is backpressured
+    /// Return if the consensus is backpressured.
+    /// Returns false when back pressure is disabled (vote_back_pressure_limit is None),
+    /// e.g. for proxy BlockStore where commit_root never advances.
     fn vote_back_pressure(&self) -> bool {
         #[cfg(any(test, feature = "fuzzing"))]
         {
@@ -695,12 +697,16 @@ impl BlockReader for BlockStore {
                 return true;
             }
         }
+        let limit = match self.vote_back_pressure_limit {
+            Some(limit) => limit,
+            None => return false,
+        };
         let commit_round = self.commit_root().round();
         let ordered_round = self.ordered_root().round();
         counters::OP_COUNTERS
             .gauge("back_pressure")
             .set((ordered_round - commit_round) as i64);
-        ordered_round > self.vote_back_pressure_limit + commit_round
+        ordered_round > limit + commit_round
     }
 
     fn pipeline_pending_latency(&self, proposal_timestamp: Duration) -> Duration {

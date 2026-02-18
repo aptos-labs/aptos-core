@@ -52,6 +52,7 @@ members = [
     "config/global-constants",
     "consensus",
     "consensus/consensus-types",
+    "consensus/proxy_primary",
     "consensus/safety-rules",
     "crates/aptos",
     "crates/aptos-admin-service",
@@ -439,6 +440,7 @@ aptos-retrier = { path = "crates/aptos-retrier" }
 aptos-rocksdb-options = { path = "storage/rocksdb-options" }
 aptos-rosetta = { path = "crates/aptos-rosetta" }
 aptos-runtimes = { path = "crates/aptos-runtimes" }
+aptos-proxy-primary = { path = "consensus/proxy_primary" }
 aptos-safety-rules = { path = "consensus/safety-rules" }
 aptos-schemadb = { path = "storage/schemadb" }
 aptos-scratchpad = { path = "storage/scratchpad" }

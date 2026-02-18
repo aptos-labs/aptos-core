@@ -54,6 +54,8 @@ use crate::{
     round_manager::{RoundManager, UnverifiedEvent, VerifiedEvent},
     util::time_service::TimeService,
 };
+use crate::persistent_liveness_storage::ProxyLivenessStorage;
+use crate::proxy_hooks::{ProxyConsensusHooks, ProxyExecutionClient, ProxyHooksImpl};
 use anyhow::{anyhow, bail, ensure, Context};
 use aptos_bounded_executor::BoundedExecutor;
 use aptos_channels::{aptos_channel, message_queues::QueueStyle};
@@ -79,8 +81,9 @@ use aptos_logger::prelude::*;
 use aptos_mempool::QuorumStoreRequest;
 use aptos_network::{application::interface::NetworkClient, protocols::network::Event};
 use aptos_safety_rules::{
-    safety_rules_manager, Error, PersistentSafetyStorage, SafetyRulesManager,
+    safety_rules_manager, Error, PersistentSafetyStorage, SafetyRules, SafetyRulesManager,
 };
+use aptos_secure_storage::{InMemoryStorage, Storage};
 use aptos_types::{
     account_address::AccountAddress,
     dkg::{real_dkg::maybe_dk_from_bls_sk, DKGState, DKGTrait, DefaultDKG},
@@ -96,6 +99,7 @@ use aptos_types::{
     randomness::{RandKeys, WvufPP, WVUF},
     validator_signer::ValidatorSigner,
     validator_verifier::ValidatorVerifier,
+    waypoint::Waypoint,
 };
 use aptos_validator_transaction_pool::VTxnPoolState;
 use fail::fail_point;
@@ -181,6 +185,20 @@ pub struct EpochManager<P: OnChainConfigProvider> {
 
     consensus_txn_filter_config: BlockTransactionFilterConfig,
     quorum_store_txn_filter_config: BatchTransactionFilterConfig,
+    // Channel to dispatch incoming proxy messages (converted to standard VerifiedEvent) to proxy RoundManager
+    proxy_round_manager_tx: Option<
+        aptos_channel::Sender<(Author, Discriminant<VerifiedEvent>), (Author, VerifiedEvent)>,
+    >,
+    // Channel to dispatch proxy proposals (buffered proposal channel for proxy RoundManager)
+    proxy_buffered_proposal_tx: Option<
+        aptos_channel::Sender<Author, VerifiedEvent>,
+    >,
+    // Channel to dispatch OrderedProxyBlocksMsg from network to primary RoundManager
+    proxy_ordered_blocks_tx:
+        Option<tokio::sync::mpsc::UnboundedSender<aptos_proxy_primary::ProxyToPrimaryEvent>>,
+    // Channel to dispatch proxy block retrieval requests to proxy BlockStore
+    proxy_block_retrieval_tx:
+        Option<aptos_channel::Sender<AccountAddress, IncomingBlockRetrievalRequest>>,
 }
 
 impl<P: OnChainConfigProvider> EpochManager<P> {
@@ -257,6 +275,10 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
             key_storage,
             consensus_txn_filter_config,
             quorum_store_txn_filter_config,
+            proxy_round_manager_tx: None,
+            proxy_buffered_proposal_tx: None,
+            proxy_ordered_blocks_tx: None,
+            proxy_block_retrieval_tx: None,
         }
     }
 
@@ -634,6 +656,71 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
         tokio::spawn(task);
     }
 
+    fn spawn_proxy_block_retrieval_task(
+        &mut self,
+        epoch: u64,
+        block_store: Arc<BlockStore>,
+        max_blocks_allowed: u64,
+    ) {
+        let (request_tx, mut request_rx) = aptos_channel::new::<_, IncomingBlockRetrievalRequest>(
+            QueueStyle::KLAST,
+            self.config.internal_per_key_channel_size,
+            Some(&counters::BLOCK_RETRIEVAL_TASK_MSGS),
+        );
+        let task = async move {
+            info!(epoch = epoch, "Proxy block retrieval task starts");
+            while let Some(request) = request_rx.next().await {
+                match request.req {
+                    BlockRetrievalRequest::V1(v1) => {
+                        if v1.num_blocks() > max_blocks_allowed {
+                            warn!(
+                                "Ignore proxy block retrieval with too many blocks: {}",
+                                v1.num_blocks()
+                            );
+                            continue;
+                        }
+                        if let Err(e) = monitor!(
+                            "process_proxy_block_retrieval",
+                            block_store
+                                .process_block_retrieval(IncomingBlockRetrievalRequest {
+                                    req: BlockRetrievalRequest::V1(v1),
+                                    protocol: request.protocol,
+                                    response_sender: request.response_sender,
+                                })
+                                .await
+                        ) {
+                            warn!(epoch = epoch, error = ?e, kind = error_kind(&e));
+                        }
+                    },
+                    BlockRetrievalRequest::V2(v2) => {
+                        if v2.num_blocks() > max_blocks_allowed {
+                            warn!(
+                                "Ignore proxy block retrieval with too many blocks: {}",
+                                v2.num_blocks()
+                            );
+                            continue;
+                        }
+                        if let Err(e) = monitor!(
+                            "process_proxy_block_retrieval_v2",
+                            block_store
+                                .process_block_retrieval(IncomingBlockRetrievalRequest {
+                                    req: BlockRetrievalRequest::V2(v2),
+                                    protocol: request.protocol,
+                                    response_sender: request.response_sender,
+                                })
+                                .await
+                        ) {
+                            warn!(epoch = epoch, error = ?e, kind = error_kind(&e));
+                        }
+                    },
+                }
+            }
+            info!(epoch = epoch, "Proxy block retrieval task stops");
+        };
+        self.proxy_block_retrieval_tx = Some(request_tx);
+        tokio::spawn(task);
+    }
+
     async fn shutdown_current_processor(&mut self) {
         if let Some(close_tx) = self.round_manager_close_tx.take() {
             // Release the previous RoundManager, especially the SafetyRule client
@@ -670,6 +757,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
 
         // Shutdown the block retrieval task by dropping the sender
         self.block_retrieval_tx = None;
+        self.proxy_block_retrieval_tx = None;
         self.batch_retrieval_tx = None;
 
         if let Some(mut quorum_store_coordinator_tx) = self.quorum_store_coordinator_tx.take() {
@@ -877,7 +965,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
                 recovery_data.commit_root_block().round(),
             )
             .await;
-        let consensus_sk = consensus_key;
+        let consensus_sk = consensus_key.clone();
 
         let signer = Arc::new(ValidatorSigner::new(self.author, consensus_sk));
         let pipeline_builder = self.execution_client.pipeline_builder(signer);
@@ -890,8 +978,8 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
             self.execution_client.clone(),
             self.config.max_pruned_blocks_in_mem,
             Arc::clone(&self.time_service),
-            self.config.vote_back_pressure_limit,
-            payload_manager,
+            Some(self.config.vote_back_pressure_limit),
+            payload_manager.clone(),
             onchain_consensus_config.order_vote_enabled(),
             onchain_consensus_config.window_size(),
             self.pending_blocks.clone(),
@@ -920,7 +1008,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
         let proposal_generator = ProposalGenerator::new(
             self.author,
             block_store.clone(),
-            payload_client,
+            payload_client.clone(),
             self.time_service.clone(),
             Duration::from_millis(self.config.quorum_store_poll_time_ms),
             PayloadTxnsSize::new(
@@ -969,6 +1057,62 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
             .config
             .max_blocks_per_receiving_request(onchain_consensus_config.quorum_store_enabled());
 
+        // Create proxy consensus channels and spawn proxy RoundManager if enabled
+        info!(
+            epoch = epoch,
+            enable_proxy_consensus = self.config.enable_proxy_consensus,
+            "Checking proxy consensus config"
+        );
+        let (proxy_event_tx, proxy_event_rx) = if self.config.enable_proxy_consensus {
+            let (primary_to_proxy_tx, primary_to_proxy_rx) =
+                tokio::sync::mpsc::unbounded_channel();
+            let (proxy_to_primary_tx, proxy_to_primary_rx) =
+                tokio::sync::mpsc::unbounded_channel();
+
+            info!(
+                epoch = epoch,
+                "Proxy consensus enabled, spawning proxy RoundManager"
+            );
+
+            // Store clone of proxy_to_primary_tx for dispatching network OrderedProxyBlocksMsg
+            self.proxy_ordered_blocks_tx = Some(proxy_to_primary_tx.clone());
+
+            // Spawn the proxy RoundManager (second instance using standard Aptos BFT)
+            let (proxy_rm_tx, proxy_proposal_tx, proxy_block_store) = self
+                .spawn_proxy_consensus(
+                    epoch,
+                    epoch_state.clone(),
+                    network_sender.clone(),
+                    consensus_key.clone(),
+                    &onchain_consensus_config,
+                    primary_to_proxy_rx,
+                    proxy_to_primary_tx,
+                    payload_client,
+                    payload_manager,
+                    &onchain_randomness_config,
+                    &onchain_jwk_consensus_config,
+                );
+
+            // Store the proxy RoundManager's event channels for routing incoming proxy messages
+            self.proxy_round_manager_tx = Some(proxy_rm_tx);
+            self.proxy_buffered_proposal_tx = Some(proxy_proposal_tx);
+
+            // Spawn proxy block retrieval task bound to the proxy BlockStore
+            self.spawn_proxy_block_retrieval_task(
+                epoch,
+                proxy_block_store,
+                max_blocks_allowed,
+            );
+
+            (Some(primary_to_proxy_tx), Some(proxy_to_primary_rx))
+        } else {
+            self.proxy_round_manager_tx = None;
+            self.proxy_buffered_proposal_tx = None;
+            self.proxy_ordered_blocks_tx = None;
+            self.proxy_block_retrieval_tx = None;
+            (None, None)
+        };
+
         let mut round_manager = RoundManager::new(
             epoch_state,
             block_store.clone(),
@@ -987,6 +1131,8 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
             fast_rand_config,
             failures_tracker,
             opt_proposal_loopback_tx,
+            proxy_event_tx,
+            None, // proxy_hooks: None for primary RoundManager
         );
 
         round_manager.init(last_vote).await;
@@ -998,9 +1144,341 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
             buffered_proposal_rx,
             opt_proposal_loopback_rx,
             close_rx,
+            proxy_event_rx,
         ));
 
         self.spawn_block_retrieval_task(epoch, block_store, max_blocks_allowed);
+    }
+
+    /// Convert ProxySyncInfo to standard SyncInfo for the proxy RoundManager.
+    /// Uses `new_decoupled` to keep ordered cert and commit cert separate, since
+    /// the ordered cert has ACCUMULATOR_PLACEHOLDER_HASH (ordered-only) values
+    /// while the commit cert has real executed state from genesis.
+    fn proxy_sync_info_to_sync_info(
+        psi: &aptos_consensus_types::proxy_sync_info::ProxySyncInfo,
+    ) -> aptos_consensus_types::sync_info::SyncInfo {
+        let ordered_cert = psi
+            .highest_proxy_ordered_cert()
+            .cloned()
+            .unwrap_or_else(|| psi.highest_proxy_qc().clone().into_wrapped_ledger_info());
+        aptos_consensus_types::sync_info::SyncInfo::new_decoupled(
+            psi.highest_proxy_qc().clone(),
+            ordered_cert,
+            psi.highest_proxy_commit_cert().clone(),
+            psi.highest_proxy_timeout_cert().cloned(),
+        )
+    }
+
+    /// Spawn a second standard RoundManager instance for proxy consensus.
+    ///
+    /// This replaces the old hand-rolled ProxyRoundManager with a standard RoundManager
+    /// configured with:
+    /// - ProxyLivenessStorage (noop persistence)
+    /// - ProxySafetyRules (wrapped in MetricsSafetyRules)
+    /// - NetworkSender in proxy_mode (wraps standard msgs in proxy variants)
+    /// - ProxyHooksImpl (transforms proposals, forwards ordered blocks)
+    /// - No execution pipeline (pipeline_builder: None in BlockStore)
+    ///
+    /// Returns the aptos_channel Sender for routing incoming proxy messages.
+    #[allow(clippy::too_many_arguments)]
+    fn spawn_proxy_consensus(
+        &self,
+        epoch: u64,
+        epoch_state: Arc<EpochState>,
+        _primary_network_sender: Arc<NetworkSender>,
+        consensus_key: Arc<PrivateKey>,
+        onchain_consensus_config: &OnChainConsensusConfig,
+        primary_to_proxy_rx: tokio::sync::mpsc::UnboundedReceiver<
+            aptos_proxy_primary::PrimaryToProxyEvent,
+        >,
+        proxy_to_primary_tx: tokio::sync::mpsc::UnboundedSender<
+            aptos_proxy_primary::ProxyToPrimaryEvent,
+        >,
+        payload_client: Arc<dyn PayloadClient>,
+        payload_manager: Arc<dyn TPayloadManager>,
+        onchain_randomness_config: &OnChainRandomnessConfig,
+        onchain_jwk_consensus_config: &OnChainJWKConsensusConfig,
+    ) -> (
+        aptos_channel::Sender<(Author, Discriminant<VerifiedEvent>), (Author, VerifiedEvent)>,
+        aptos_channel::Sender<Author, VerifiedEvent>,
+        Arc<BlockStore>,
+    ) {
+        // 1. Create ProxyLivenessStorage with the epoch's ledger info
+        let latest_ledger_info = self
+            .storage
+            .aptos_db()
+            .get_latest_ledger_info()
+            .expect("Failed to get latest ledger info for proxy consensus");
+        let accumulator_summary = self
+            .storage
+            .aptos_db()
+            .get_accumulator_summary(latest_ledger_info.ledger_info().version())
+            .expect("Failed to get accumulator summary for proxy consensus");
+
+        // Create waypoint before moving latest_ledger_info into ProxyLivenessStorage
+        let waypoint = Waypoint::new_epoch_boundary(latest_ledger_info.ledger_info())
+            .expect("Failed to create waypoint for proxy safety rules");
+
+        let (recovery_data, proxy_storage) = ProxyLivenessStorage::start_for_proxy(
+            latest_ledger_info,
+            accumulator_summary.into(),
+            onchain_consensus_config.order_vote_enabled(),
+            onchain_consensus_config.window_size(),
+        );
+
+        // 2. Create proxy safety rules: standard SafetyRules with separate in-memory storage.
+        // Uses the same key pair as primary but completely independent voting state
+        // (separate highest_voted_round) to prevent cross-layer interference.
+        // Copy the consensus key via serialization (PrivateKey::Clone requires feature flag)
+        let proxy_consensus_key =
+            PrivateKey::try_from(consensus_key.to_bytes().as_slice())
+                .expect("Failed to copy consensus key for proxy safety rules");
+        let proxy_persistent_storage = PersistentSafetyStorage::initialize(
+            Storage::from(InMemoryStorage::new()),
+            self.author,
+            proxy_consensus_key,
+            waypoint,
+            true, // enable_cached_safety_data
+        );
+        let proxy_safety_rules =
+            SafetyRules::new(proxy_persistent_storage, true /* skip_sig_verify */);
+        let mut metrics_safety_rules = MetricsSafetyRules::new(
+            Box::new(proxy_safety_rules),
+            proxy_storage.clone(),
+        );
+        if let Err(e) = metrics_safety_rules.perform_initialize() {
+            warn!(
+                epoch = epoch,
+                error = ?e,
+                "Failed to initialize proxy safety rules"
+            );
+        }
+        let safety_rules_container = Arc::new(Mutex::new(metrics_safety_rules));
+
+        // 3. Create NetworkSender in proxy_mode
+        let proxy_network_sender = Arc::new(NetworkSender::new_for_proxy(
+            self.author,
+            self.network_sender.clone(),
+            self.self_sender.clone(),
+            epoch_state.verifier.clone(),
+        ));
+
+        // 4. Create round-robin ProposerElection for proxy (no leader reputation).
+        // Proxy blocks always have empty failed_authors since round-robin doesn't
+        // track failures.
+        let proposers = epoch_state
+            .verifier
+            .get_ordered_account_addresses_iter()
+            .collect::<Vec<_>>();
+        let proposer_election: Arc<dyn ProposerElection + Send + Sync> =
+            Arc::new(RotatingProposer::new(proposers, 1));
+
+        // 5. Create RoundState with proxy-specific timeout config and its own timeout channel
+        let proxy_config = &self.config.proxy_consensus_config;
+        let (proxy_timeout_tx, mut proxy_timeout_rx) =
+            aptos_channels::new(1_024, &counters::PENDING_ROUND_TIMEOUTS);
+        let proxy_time_interval = Box::new(ExponentialTimeInterval::new(
+            Duration::from_millis(proxy_config.round_initial_timeout_ms),
+            proxy_config.round_timeout_backoff_exponent_base,
+            proxy_config.round_timeout_backoff_max_exponent,
+        ));
+        let proxy_round_state =
+            RoundState::new(proxy_time_interval, self.time_service.clone(), proxy_timeout_tx);
+
+        // 6. Create ProxyHooksImpl (needed before BlockStore for ProxyExecutionClient)
+        // Bootstrap: initialize with the root QC (genesis QC certifying round 0) so the
+        // first proxy blocks can attach primary_proof and form a cutting point. Without this,
+        // primary waits for proxy ordered blocks while proxy can't find a cutting point.
+        let initial_primary_qc = Arc::new(recovery_data.root_quorum_cert().clone());
+        let proxy_hooks = Arc::new(ProxyHooksImpl::new(
+            proxy_to_primary_tx,
+            proxy_network_sender.clone(),
+            Some(initial_primary_qc),
+        ));
+
+        // 7. Create BlockStore with ProxyExecutionClient and pipeline_builder: None
+        let last_vote = recovery_data.last_vote();
+        let proxy_execution_client = Arc::new(
+            crate::proxy_hooks::ProxyExecutionClient::new(proxy_hooks.clone()),
+        );
+        let proxy_block_store = Arc::new(BlockStore::new(
+            proxy_storage.clone() as Arc<dyn PersistentLivenessStorage>,
+            recovery_data,
+            proxy_execution_client,
+            self.config.max_pruned_blocks_in_mem,
+            Arc::clone(&self.time_service),
+            None, // Proxy doesn't execute blocks, so commit_root never advances — disable back pressure
+            payload_manager,
+            onchain_consensus_config.order_vote_enabled(),
+            onchain_consensus_config.window_size(),
+            Arc::new(Mutex::new(PendingBlocks::new())),
+            None, // pipeline_builder: None - proxy doesn't execute blocks
+        ));
+
+        // 8. Create ProposalGenerator for proxy
+        // Proxy doesn't execute blocks, so chain health and pipeline backpressure
+        // are not applicable. Using the primary's configs can trigger spurious delays
+        // (e.g., chain health queries AptosDB which has no proxy data).
+        let chain_health_backoff_config = ChainHealthBackoffConfig::new_no_backoff();
+        let pipeline_backpressure_config = PipelineBackpressureConfig::new_no_backoff();
+        let failures_tracker = Arc::new(Mutex::new(ExponentialWindowFailureTracker::new(
+            100,
+            epoch_state.verifier.get_ordered_account_addresses(),
+        )));
+        let opt_qs_payload_param_provider = Arc::new(OptQSPullParamsProvider::new(
+            self.config.quorum_store.enable_opt_quorum_store,
+            self.config.quorum_store.opt_qs_minimum_batch_age_usecs,
+            failures_tracker.clone(),
+            self.config.quorum_store.enable_opt_qs_v2_payload_tx,
+        ));
+        // Wrap the shared payload client with budget tracking for proxy.
+        // The budget is system-wide: ProxyBudgetPayloadClient walks the proxy
+        // block chain to count non-empty blocks since the last cutting point.
+        let proxy_payload_client: Arc<dyn PayloadClient> =
+            Arc::new(crate::payload_client::ProxyBudgetPayloadClient::new(
+                payload_client,
+                proxy_block_store.clone(),
+                proxy_config.target_proxy_blocks_per_primary_round,
+                self.quorum_store_enabled,
+            ));
+
+        // Use proxy-specific block size limits (= primary limits / target)
+        let target = proxy_config.target_proxy_blocks_per_primary_round.max(1);
+        let proxy_proposal_generator = ProposalGenerator::new(
+            self.author,
+            proxy_block_store.clone(),
+            proxy_payload_client,
+            self.time_service.clone(),
+            Duration::from_millis(self.config.quorum_store_poll_time_ms),
+            aptos_consensus_types::utils::PayloadTxnsSize::new(
+                proxy_config.max_proxy_block_txns,
+                proxy_config.max_proxy_block_bytes,
+            ),
+            proxy_config.max_proxy_block_txns_after_filtering,
+            aptos_consensus_types::utils::PayloadTxnsSize::new(
+                self.config.max_sending_inline_txns / target,
+                self.config.max_sending_inline_bytes / target,
+            ),
+            onchain_consensus_config.max_failed_authors_to_store(),
+            self.config
+                .min_max_txns_in_block_after_filtering_from_backpressure,
+            None, // proxy blocks aren't executed, no gas limit needed
+            pipeline_backpressure_config,
+            chain_health_backoff_config,
+            self.quorum_store_enabled,
+            onchain_consensus_config.effective_validator_txn_config(),
+            self.config
+                .quorum_store
+                .allow_batches_without_pos_in_proposal,
+            opt_qs_payload_param_provider,
+        );
+
+        // 9. Create channels for the proxy RoundManager
+        let (proxy_rm_tx, proxy_rm_rx) = aptos_channel::new(
+            QueueStyle::KLAST,
+            self.config.internal_per_key_channel_size,
+            Some(&counters::ROUND_MANAGER_CHANNEL_MSGS),
+        );
+        let (proxy_buffered_proposal_tx, proxy_buffered_proposal_rx) = aptos_channel::new(
+            QueueStyle::KLAST,
+            self.config.internal_per_key_channel_size,
+            Some(&counters::ROUND_MANAGER_CHANNEL_MSGS),
+        );
+        let (proxy_opt_proposal_loopback_tx, proxy_opt_proposal_loopback_rx) =
+            aptos_channels::new_unbounded(&counters::OP_COUNTERS.gauge("proxy_opt_proposal_queue"));
+
+        // 10. Create the proxy RoundManager with proxy_hooks
+        let mut proxy_local_config = self.config.clone();
+        // Enforce proxy-specific block size limits on receiving side.
+        // process_proposal() validates payload size against these fields,
+        // so Byzantine proxy proposers with oversized payloads get rejected.
+        proxy_local_config.max_receiving_block_txns = proxy_config.max_proxy_block_txns;
+        proxy_local_config.max_receiving_block_bytes = proxy_config.max_proxy_block_bytes;
+
+        let proxy_block_store_clone = proxy_block_store.clone();
+        let mut proxy_round_manager = RoundManager::new(
+            epoch_state.clone(),
+            proxy_block_store_clone,
+            proxy_round_state,
+            proposer_election,
+            proxy_proposal_generator,
+            safety_rules_container,
+            proxy_network_sender,
+            proxy_storage as Arc<dyn PersistentLivenessStorage>,
+            onchain_consensus_config.clone(),
+            proxy_buffered_proposal_tx.clone(),
+            self.consensus_txn_filter_config.clone(),
+            proxy_local_config,
+            onchain_randomness_config.clone(),
+            onchain_jwk_consensus_config.clone(),
+            None, // fast_rand_config: None for proxy
+            failures_tracker,
+            proxy_opt_proposal_loopback_tx,
+            None, // proxy_event_tx: None (this IS the proxy, it doesn't send to another proxy)
+            Some(proxy_hooks.clone() as Arc<dyn crate::proxy_hooks::ProxyConsensusHooks>),
+        );
+
+        info!(
+            epoch = epoch,
+            author = %self.author,
+            "Proxy RoundManager created, spawning event loop"
+        );
+
+        // 11. Spawn task to forward primary QC/TC events to proxy hooks
+        let hooks_for_events: Arc<dyn ProxyConsensusHooks> = proxy_hooks;
+        tokio::spawn(async move {
+            let mut rx = primary_to_proxy_rx;
+            while let Some(event) = rx.recv().await {
+                match event {
+                    aptos_proxy_primary::PrimaryToProxyEvent::NewPrimaryQC(qc) => {
+                        hooks_for_events.update_primary_qc(qc);
+                    },
+                    aptos_proxy_primary::PrimaryToProxyEvent::NewPrimaryTC(tc) => {
+                        hooks_for_events.update_primary_tc(tc);
+                    },
+                    aptos_proxy_primary::PrimaryToProxyEvent::Shutdown => {
+                        info!("Proxy primary event handler received shutdown signal");
+                        break;
+                    },
+                }
+            }
+        });
+
+        // 12. Spawn task to forward proxy timeouts to proxy RoundManager event channel
+        let proxy_rm_tx_for_timeout = proxy_rm_tx.clone();
+        let proxy_author = self.author;
+        tokio::spawn(async move {
+            while let Some(round) = proxy_timeout_rx.next().await {
+                let event = VerifiedEvent::LocalTimeout(round);
+                if let Err(e) = proxy_rm_tx_for_timeout.push(
+                    (proxy_author, discriminant(&event)),
+                    (proxy_author, event),
+                ) {
+                    error!("Failed to send proxy timeout to proxy RoundManager: {:?}", e);
+                }
+            }
+        });
+
+        // 13. Initialize and spawn the proxy RoundManager
+        tokio::spawn(async move {
+            proxy_round_manager.init(last_vote).await;
+
+            let (close_tx, close_rx) = oneshot::channel();
+            // Keep close_tx alive until the proxy RM terminates (drop triggers shutdown)
+            let _close_tx = close_tx;
+
+            proxy_round_manager
+                .start(
+                    proxy_rm_rx,
+                    proxy_buffered_proposal_rx,
+                    proxy_opt_proposal_loopback_rx,
+                    close_rx,
+                    None, // No proxy-to-proxy event channel
+                )
+                .await;
+        });
+
+        (proxy_rm_tx, proxy_buffered_proposal_tx, proxy_block_store)
     }
 
     fn start_quorum_store(&mut self, quorum_store_builder: QuorumStoreBuilder) {
@@ -1690,6 +2168,182 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
                     self.process_epoch_retrieval(*request, peer_id)
                 )?;
             },
+            // Proxy consensus messages - convert to standard messages and route to proxy RoundManager
+            // All proxy messages are epoch-checked before dispatch to avoid routing stale
+            // messages from a previous epoch to the current proxy RoundManager.
+            ConsensusMsg::ProxyProposalMsg(msg) => {
+                if msg.epoch() != self.epoch() {
+                    monitor!(
+                        "process_different_epoch_proxy_msg",
+                        self.process_different_epoch(msg.epoch(), peer_id)
+                    )?;
+                    return Ok(None);
+                }
+                if let Some(ref mut tx) = self.proxy_buffered_proposal_tx {
+                    // Convert ProxyProposalMsg to standard ProposalMsg and route through buffered proposal channel
+                    let sync_info = Self::proxy_sync_info_to_sync_info(msg.sync_info());
+                    let proposal_msg = aptos_consensus_types::proposal_msg::ProposalMsg::new(
+                        msg.proposal().clone(),
+                        sync_info,
+                    );
+                    let event = VerifiedEvent::ProposalMsg(Box::new(proposal_msg));
+                    if let Err(e) = tx.push(peer_id, event) {
+                        warn!("Failed to send proxy proposal to proxy RoundManager: {:?}", e);
+                    }
+                } else {
+                    debug!("Received proxy proposal but proxy consensus is not enabled");
+                }
+            },
+            ConsensusMsg::OptProxyProposalMsg(msg) => {
+                if msg.epoch() != self.epoch() {
+                    monitor!(
+                        "process_different_epoch_proxy_msg",
+                        self.process_different_epoch(msg.epoch(), peer_id)
+                    )?;
+                    return Ok(None);
+                }
+                if let Some(ref mut tx) = self.proxy_buffered_proposal_tx {
+                    // Convert OptProxyProposalMsg → OptProposalMsg by converting ProxySyncInfo → SyncInfo.
+                    // The OptBlockData (with OptBlockBody::ProxyV0) flows through unchanged.
+                    let sync_info = Self::proxy_sync_info_to_sync_info(msg.sync_info());
+                    let opt_proposal_msg =
+                        aptos_consensus_types::opt_proposal_msg::OptProposalMsg::new(
+                            msg.take_block_data(),
+                            sync_info,
+                        );
+                    let event = VerifiedEvent::OptProposalMsg(Box::new(opt_proposal_msg));
+                    if let Err(e) = tx.push(peer_id, event) {
+                        warn!(
+                            "Failed to send opt proxy proposal to proxy RoundManager: {:?}",
+                            e
+                        );
+                    }
+                } else {
+                    debug!("Received opt proxy proposal but proxy consensus is not enabled");
+                }
+            },
+            ConsensusMsg::ProxyVoteMsg(msg) => {
+                if msg.epoch() != self.epoch() {
+                    monitor!(
+                        "process_different_epoch_proxy_msg",
+                        self.process_different_epoch(msg.epoch(), peer_id)
+                    )?;
+                    return Ok(None);
+                }
+                if let Some(ref mut tx) = self.proxy_round_manager_tx {
+                    // Convert ProxyVoteMsg to standard VoteMsg
+                    let sync_info = Self::proxy_sync_info_to_sync_info(msg.sync_info());
+                    let vote_msg = aptos_consensus_types::vote_msg::VoteMsg::new(
+                        msg.vote().clone(),
+                        sync_info,
+                    );
+                    let event = VerifiedEvent::VoteMsg(Box::new(vote_msg));
+                    if let Err(e) = tx.push(
+                        (peer_id, discriminant(&event)),
+                        (peer_id, event),
+                    ) {
+                        warn!("Failed to send proxy vote to proxy RoundManager: {:?}", e);
+                    }
+                } else {
+                    debug!("Received proxy vote but proxy consensus is not enabled");
+                }
+            },
+            ConsensusMsg::ProxyOrderVoteMsg(msg) => {
+                if msg.epoch() != self.epoch() {
+                    monitor!(
+                        "process_different_epoch_proxy_msg",
+                        self.process_different_epoch(msg.epoch(), peer_id)
+                    )?;
+                    return Ok(None);
+                }
+                if let Some(ref mut tx) = self.proxy_round_manager_tx {
+                    // Convert ProxyOrderVoteMsg to standard OrderVoteMsg
+                    let order_vote_msg = aptos_consensus_types::order_vote_msg::OrderVoteMsg::new(
+                        msg.order_vote().clone(),
+                        msg.quorum_cert().clone(),
+                    );
+                    let event = VerifiedEvent::OrderVoteMsg(Box::new(order_vote_msg));
+                    if let Err(e) = tx.push(
+                        (peer_id, discriminant(&event)),
+                        (peer_id, event),
+                    ) {
+                        warn!("Failed to send proxy order vote to proxy RoundManager: {:?}", e);
+                    }
+                } else {
+                    debug!("Received proxy order vote but proxy consensus is not enabled");
+                }
+            },
+            ConsensusMsg::ProxyRoundTimeoutMsg(msg) => {
+                if msg.round_timeout().epoch() != self.epoch() {
+                    monitor!(
+                        "process_different_epoch_proxy_msg",
+                        self.process_different_epoch(msg.round_timeout().epoch(), peer_id)
+                    )?;
+                    return Ok(None);
+                }
+                if let Some(ref mut tx) = self.proxy_round_manager_tx {
+                    // Unwrap the inner RoundTimeoutMsg and send to proxy RoundManager
+                    let round_timeout_msg = msg.into_round_timeout();
+                    let event = VerifiedEvent::RoundTimeoutMsg(Box::new(round_timeout_msg));
+                    if let Err(e) = tx.push(
+                        (peer_id, discriminant(&event)),
+                        (peer_id, event),
+                    ) {
+                        warn!("Failed to send proxy round timeout to proxy RoundManager: {:?}", e);
+                    }
+                } else {
+                    debug!("Received proxy round timeout but proxy consensus is not enabled");
+                }
+            },
+            ConsensusMsg::OrderedProxyBlocksMsg(msg) => {
+                if msg.epoch() != self.epoch() {
+                    monitor!(
+                        "process_different_epoch_proxy_msg",
+                        self.process_different_epoch(msg.epoch(), peer_id)
+                    )?;
+                    return Ok(None);
+                }
+                // Dispatch to primary RoundManager via the proxy event channel
+                if let Some(ref tx) = self.proxy_ordered_blocks_tx {
+                    debug!(
+                        "Dispatching OrderedProxyBlocksMsg with {} blocks for primary round {}",
+                        msg.proxy_blocks().len(),
+                        msg.primary_round()
+                    );
+                    let event =
+                        aptos_proxy_primary::ProxyToPrimaryEvent::OrderedProxyBlocks(*msg);
+                    if let Err(e) = tx.send(event) {
+                        warn!(
+                            "Failed to dispatch OrderedProxyBlocksMsg to RoundManager: {:?}",
+                            e
+                        );
+                    }
+                } else {
+                    debug!("Received OrderedProxyBlocksMsg but proxy consensus is not enabled");
+                }
+            },
+            ConsensusMsg::ProxySyncInfo(msg) => {
+                if msg.epoch() != self.epoch() {
+                    monitor!(
+                        "process_different_epoch_proxy_msg",
+                        self.process_different_epoch(msg.epoch(), peer_id)
+                    )?;
+                    return Ok(None);
+                }
+                if let Some(ref mut tx) = self.proxy_round_manager_tx {
+                    // Convert ProxySyncInfo to standard SyncInfo and route to proxy RoundManager
+                    let sync_info = Self::proxy_sync_info_to_sync_info(&msg);
+                    let event = VerifiedEvent::UnverifiedSyncInfo(Box::new(sync_info));
+                    if let Err(e) = tx.push(
+                        (peer_id, discriminant(&event)),
+                        (peer_id, event),
+                    ) {
+                        warn!("Failed to send proxy sync info to proxy RoundManager: {:?}", e);
+                    }
+                } else {
+                    debug!("Received proxy sync info but proxy consensus is not enabled");
+                }
+            },
             _ => {
                 bail!("[EpochManager] Unexpected messages: {:?}", msg);
             },
@@ -1850,6 +2504,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
                     request,
                     IncomingRpcRequest::DeprecatedBlockRetrieval(_)
                         | IncomingRpcRequest::BlockRetrieval(_)
+                        | IncomingRpcRequest::ProxyBlockRetrieval(_)
                 ));
             },
             _ => {},
@@ -1913,6 +2568,14 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
                     bail!("Secret share manager not started");
                 };
                 tx.push(peer_id, request)
+            },
+            IncomingRpcRequest::ProxyBlockRetrieval(request) => {
+                if let Some(tx) = &self.proxy_block_retrieval_tx {
+                    tx.push(peer_id, request)
+                } else {
+                    error!("Proxy round manager not started");
+                    Ok(())
+                }
             },
         }
     }
