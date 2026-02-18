@@ -22,7 +22,7 @@ use aptos_consensus_types::{
     pipelined_block::PipelinedBlock,
 };
 use aptos_infallible::Mutex;
-use aptos_logger::{info, spawn_named, warn};
+use aptos_logger::{error, info, spawn_named, warn};
 use aptos_network::{protocols::network::RpcError, ProtocolId};
 use aptos_reliable_broadcast::{DropGuard, ReliableBroadcast};
 use aptos_time_service::TimeService;
@@ -109,14 +109,14 @@ impl SecretShareManager {
         }
     }
 
-    async fn process_incoming_blocks(&mut self, blocks: OrderedBlocks) {
+    async fn process_incoming_blocks(&mut self, blocks: OrderedBlocks) -> anyhow::Result<()> {
         let rounds: Vec<u64> = blocks.ordered_blocks.iter().map(|b| b.round()).collect();
         info!(rounds = rounds, "Processing incoming blocks.");
 
         let mut share_requester_handles = Vec::new();
         let mut pending_secret_key_rounds = HashSet::new();
         for block in blocks.ordered_blocks.iter() {
-            let handle = self.process_incoming_block(block).await;
+            let handle = self.process_incoming_block(block).await?;
             share_requester_handles.push(handle);
             pending_secret_key_rounds.insert(block.round());
         }
@@ -127,14 +127,15 @@ impl SecretShareManager {
             pending_secret_key_rounds,
         );
         self.block_queue.push_back(queue_item);
+        Ok(())
     }
 
-    async fn process_incoming_block(&self, block: &PipelinedBlock) -> DropGuard {
+    async fn process_incoming_block(&self, block: &PipelinedBlock) -> anyhow::Result<DropGuard> {
         let futures = block.pipeline_futs().expect("pipeline must exist");
         let self_secret_share = futures
             .secret_sharing_derive_self_fut
             .await
-            .expect("Decryption share computation is expected to succeed")
+            .map_err(|_| anyhow::anyhow!("derive self failed"))?
             .expect("Must not be None");
         let metadata = self_secret_share.metadata().clone();
 
@@ -154,7 +155,7 @@ impl SecretShareManager {
         self.network_sender.broadcast_without_self(
             SecretShareMessage::Share(self_secret_share).into_network_message(),
         );
-        self.spawn_share_requester_task(metadata)
+        Ok(self.spawn_share_requester_task(metadata))
     }
 
     fn process_ready_blocks(&mut self, ready_blocks: Vec<OrderedBlocks>) {
@@ -353,7 +354,9 @@ impl SecretShareManager {
         while !self.stop {
             tokio::select! {
                 Some(blocks) = incoming_blocks.next() => {
-                    self.process_incoming_blocks(blocks).await;
+                    if let Err(e) = self.process_incoming_blocks(blocks).await {
+                        error!("error processing incoming blocks: {:?}", e);
+                    }
                 }
                 Some(reset) = reset_rx.next() => {
                     while matches!(incoming_blocks.try_next(), Ok(Some(_))) {}

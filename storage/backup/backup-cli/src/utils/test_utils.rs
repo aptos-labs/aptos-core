@@ -47,6 +47,10 @@ pub fn tmp_db_with_random_content() -> (
 
 pub fn start_local_backup_service(db: Arc<AptosDB>) -> (Runtime, u16) {
     let port = get_available_port();
-    let rt = start_backup_service(SocketAddr::new(IpAddr::V4(Ipv4Addr::LOCALHOST), port), db);
+    let rt = start_backup_service(
+        SocketAddr::new(IpAddr::V4(Ipv4Addr::LOCALHOST), port),
+        db,
+        None,
+    );
     (rt, port)
 }

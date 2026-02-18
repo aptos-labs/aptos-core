@@ -128,6 +128,7 @@ pub struct PipelineBuilder {
     validators: Arc<[AccountAddress]>,
     block_executor_onchain_config: BlockExecutorConfigFromOnchain,
     is_randomness_enabled: bool,
+    is_decryption_enabled: bool,
     signer: Arc<ValidatorSigner>,
     state_sync_notifier: Arc<dyn ConsensusNotificationSender>,
     payload_manager: Arc<dyn TPayloadManager>,
@@ -248,12 +249,14 @@ impl Drop for Tracker {
 }
 
 impl PipelineBuilder {
+    #[allow(clippy::too_many_arguments)]
     pub fn new(
         block_preparer: Arc<BlockPreparer>,
         executor: Arc<dyn BlockExecutorTrait>,
         validators: Arc<[AccountAddress]>,
         block_executor_onchain_config: BlockExecutorConfigFromOnchain,
         is_randomness_enabled: bool,
+        is_decryption_enabled: bool,
         signer: Arc<ValidatorSigner>,
         state_sync_notifier: Arc<dyn ConsensusNotificationSender>,
         payload_manager: Arc<dyn TPayloadManager>,
@@ -271,6 +274,7 @@ impl PipelineBuilder {
             validators,
             block_executor_onchain_config,
             is_randomness_enabled,
+            is_decryption_enabled,
             signer,
             state_sync_notifier,
             payload_manager,
@@ -449,7 +453,7 @@ impl PipelineBuilder {
             async move {
                 derived_self_key_share_rx
                     .await
-                    .map_err(|_| TaskError::from(anyhow!("commit proof tx cancelled")))
+                    .map_err(|_| TaskError::from(anyhow!("derived self key share tx cancelled")))
             },
             Some(&mut abort_handles),
         );
@@ -463,6 +467,7 @@ impl PipelineBuilder {
                 materialize_fut,
                 block.clone(),
                 self.signer.author(),
+                self.is_decryption_enabled,
                 self.secret_share_config.clone(),
                 derived_self_key_share_tx,
                 secret_shared_key_rx,

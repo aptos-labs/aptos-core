@@ -44,8 +44,8 @@ use aptos_types::{
     epoch_state::EpochState,
     ledger_info::{LedgerInfo, LedgerInfoWithSignatures},
     on_chain_config::{
-        OnChainConsensusConfig, OnChainJWKConsensusConfig, OnChainRandomnessConfig, ValidatorSet,
-        ValidatorTxnConfig, DEFAULT_ENABLED_WINDOW_SIZE,
+        OnChainChunkyDKGConfig, OnChainConsensusConfig, OnChainJWKConsensusConfig,
+        OnChainRandomnessConfig, ValidatorSet, ValidatorTxnConfig, DEFAULT_ENABLED_WINDOW_SIZE,
     },
     validator_info::ValidatorInfo,
     validator_signer::ValidatorSigner,
@@ -220,6 +220,7 @@ fn create_node_for_fuzzing() -> RoundManager {
         ConsensusConfig::default(),
         OnChainRandomnessConfig::default_enabled(),
         OnChainJWKConsensusConfig::default_enabled(),
+        OnChainChunkyDKGConfig::default_disabled(),
         None,
         Arc::new(MockPastProposalStatusTracker {}),
         opt_proposal_loopback_tx,
