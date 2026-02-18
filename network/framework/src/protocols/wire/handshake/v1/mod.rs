@@ -56,8 +56,8 @@ pub enum ProtocolId {
     PeerMonitoringServiceRpc = 10,
     ConsensusRpcCompressed = 11,
     ConsensusDirectSendCompressed = 12,
-    NetbenchDirectSend = 13,
-    NetbenchRpc = 14,
+    NetbenchDirectSend = 13, // Currently unused
+    NetbenchRpc = 14,        // Currently unused
     DKGDirectSendCompressed = 15,
     DKGDirectSendBcs = 16,
     DKGDirectSendJson = 17,

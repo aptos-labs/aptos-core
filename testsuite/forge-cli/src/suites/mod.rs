@@ -6,7 +6,6 @@ pub mod db;
 pub mod indexer;
 pub mod land_blocking;
 pub mod multi_region;
-pub mod netbench;
 pub mod pfn;
 pub mod realistic_environment;
 pub mod realistic_workloads;
