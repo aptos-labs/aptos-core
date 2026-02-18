@@ -10,7 +10,7 @@
 use crate::{
     range_proofs::traits::BatchedRangeProof, sigma_protocol, sigma_protocol::homomorphism,
 };
-use ark_ec::{AffineRepr, pairing::Pairing};
+use ark_ec::{pairing::Pairing, AffineRepr};
 use ark_ff::PrimeField;
 use ark_serialize::CanonicalSerialize;
 use merlin::Transcript;

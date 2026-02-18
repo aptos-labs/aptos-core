@@ -210,7 +210,7 @@ mod shplonked {
 
         let mut trs_verifier = merlin::Transcript::new(PCS_BATCH_DST);
         zk_pcs_verify(
-            &proof.opening,
+            &proof,
             &commitments_affine,
             &vk,
             &mut trs_verifier,

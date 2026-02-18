@@ -89,7 +89,7 @@ pub struct ZkPcsOpeningSigmaProofStatement<E: Pairing> {
 pub struct ZkPcsOpeningProof<E: Pairing> {
     pub(crate) eval_points: Vec<E::ScalarField>,
     pub(crate) W: E::G1Affine,
-    pub(crate) W_prime: E::G1Affine, 
+    pub(crate) W_prime: E::G1Affine,
     pub(crate) Y: E::G1Affine, // extra HKZG term
     pub(crate) sigma_proof: ZkPcsOpeningSigmaProof<E>,
     pub(crate) sigma_proof_statement: ZkPcsOpeningSigmaProofStatement<E>,
@@ -108,7 +108,6 @@ pub fn zk_pcs_open<E: Pairing, R: RngCore + CryptoRng>(
     trs: &mut merlin::Transcript,
     rng: &mut R,
 ) -> ZkPcsOpeningProof<E> {
-
     // Step 1
     assert!(
         srs.taus_1.len() >= 2,
@@ -135,11 +134,11 @@ pub fn zk_pcs_open<E: Pairing, R: RngCore + CryptoRng>(
     // Step 3
     // First construct Z_T TODO: optimise this
     let mut z_T = DensePolynomial::from_coefficients_vec(vec![E::ScalarField::ONE]);
-
     for x in eval_points.iter() {
         let factor = DensePolynomial::from_coefficients_vec(vec![-(*x), E::ScalarField::ONE]);
         z_T = &z_T * &factor;
     }
+    let z_T_dos = DOSPoly::from(z_T.clone());
 
     let f_i_minus_y_is: Vec<DensePolynomial<_>> = f_is
         .iter()
@@ -150,8 +149,6 @@ pub fn zk_pcs_open<E: Pairing, R: RngCore + CryptoRng>(
             term_poly
         })
         .collect();
-
-    let z_T_dos = DOSPoly::from(z_T.clone());
 
     let z_t_is: Vec<_> = eval_points
         .iter()
@@ -497,12 +494,6 @@ pub fn zk_pcs_verify<E: Pairing, R: RngCore + CryptoRng>(
 #[derive(Clone, Debug, PartialEq, Eq, CanonicalSerialize, CanonicalDeserialize)]
 pub struct ShplonkedCommitment<E: Pairing>(pub E::G1);
 
-/// Proof for the PCS trait: opening proof (includes sigma proof statement with com_y).
-#[derive(Clone, Debug, CanonicalSerialize, CanonicalDeserialize)]
-pub struct ShplonkedPcsProof<E: Pairing> {
-    pub opening: ZkPcsOpeningProof<E>,
-}
-
 impl<E> PolynomialCommitmentScheme for Shplonked<E>
 where
     E: Pairing,
@@ -510,7 +501,7 @@ where
     type Commitment = ShplonkedCommitment<E>;
     type CommitmentKey = Srs<E>;
     type Polynomial = DensePolynomial<E::ScalarField>;
-    type Proof = ShplonkedPcsProof<E>;
+    type Proof = ZkPcsOpeningProof<E>;
     type VerificationKey = Srs<E>;
     type WitnessField = E::ScalarField;
 
@@ -590,7 +581,7 @@ where
             trs,
             rng,
         );
-        ShplonkedPcsProof { opening }
+        opening
     }
 
     fn batch_open<R: RngCore + CryptoRng>(
@@ -624,7 +615,7 @@ where
             trs,
             rng,
         );
-        ShplonkedPcsProof { opening }
+        opening
     }
 
     fn verify(
@@ -641,16 +632,16 @@ where
             .copied()
             .ok_or_else(|| anyhow::anyhow!("Shplonked verify: expected one challenge point"))?;
         anyhow::ensure!(
-            proof.opening.eval_points.len() == 1 && proof.opening.eval_points[0] == point,
+            proof.eval_points.len() == 1 && proof.eval_points[0] == point,
             "challenge point does not match opening proof"
         );
         anyhow::ensure!(
-            proof.opening.sigma_proof_statement.y_sum == eval,
+            proof.sigma_proof_statement.y_sum == eval,
             "claimed eval does not match opening proof"
         );
         let mut rng = rand::thread_rng();
         let commitments = vec![com.0.into_affine()];
-        zk_pcs_verify(&proof.opening, &commitments, vk, trs, &mut rng)
+        zk_pcs_verify(&proof, &commitments, vk, trs, &mut rng)
     }
 
     fn random_witness<R: rand_core::RngCore + rand_core::CryptoRng>(

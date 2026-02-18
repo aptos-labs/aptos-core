@@ -352,7 +352,9 @@ where
             .collect();
 
         // Step 2: verifier challenge to aggregate degree bound proofs
-        q_k_com.iter().for_each(|c| trs.append_point(&c.0.into_affine()));
+        q_k_com
+            .iter()
+            .for_each(|c| trs.append_point(&c.0.into_affine()));
         let y_challenge: P::ScalarField = trs.challenge_scalar();
 
         // Step 3: Aggregate shifted q_k into \hat{q} and compute commitment
