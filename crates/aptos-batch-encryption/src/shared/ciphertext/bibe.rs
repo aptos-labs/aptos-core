@@ -6,7 +6,7 @@ use super::super::{
     symmetric::{self, OneTimePad, OneTimePaddedKey, SymmetricCiphertext, SymmetricKey},
 };
 use crate::{
-    errors::BatchEncryptionError,
+    errors::MissingEvalProofError,
     group::{Fr, G1Affine, G2Affine, G2Prepared, PairingOutput, PairingSetting},
     shared::{digest::EvalProof, encryption_key::EncryptionKey, ids::Id},
     traits::Plaintext,
@@ -33,9 +33,9 @@ pub trait InnerCiphertext:
         &self,
         digest: &Digest,
         eval_proof: &EvalProof,
-    ) -> Result<PreparedBIBECiphertext>;
+    ) -> PreparedBIBECiphertext;
 
-    fn prepare(&self, digest: &Digest, eval_proofs: &EvalProofs) -> Result<PreparedBIBECiphertext>;
+    fn prepare(&self, digest: &Digest, eval_proofs: &EvalProofs) -> std::result::Result<PreparedBIBECiphertext, MissingEvalProofError>;
 }
 
 #[derive(Clone, Serialize, Deserialize, Debug, Hash, Eq, PartialEq)]
@@ -49,6 +49,7 @@ pub struct BIBECiphertext {
 
 #[derive(Clone, Serialize, Deserialize, Debug, Eq, PartialEq)]
 pub struct PreparedBIBECiphertext {
+    pub id: Id,
     #[serde(serialize_with = "ark_se", deserialize_with = "ark_de")]
     pub(crate) pairing_output: PairingOutput,
     #[serde(serialize_with = "ark_se", deserialize_with = "ark_de")]
@@ -99,28 +100,29 @@ impl InnerCiphertext for BIBECiphertext {
         self.id
     }
 
-    fn prepare(&self, digest: &Digest, eval_proofs: &EvalProofs) -> Result<PreparedBIBECiphertext> {
+    fn prepare(&self, digest: &Digest, eval_proofs: &EvalProofs) -> std::result::Result<PreparedBIBECiphertext, MissingEvalProofError> {
         let pf = eval_proofs
             .get(&self.id)
-            .ok_or(BatchEncryptionError::UncomputedEvalProofError)?;
+            .ok_or(MissingEvalProofError(self.id))?;
 
-        self.prepare_individual(digest, &pf)
+        Ok(self.prepare_individual(digest, &pf))
     }
 
     fn prepare_individual(
         &self,
         digest: &Digest,
         eval_proof: &EvalProof,
-    ) -> Result<PreparedBIBECiphertext> {
+    ) -> PreparedBIBECiphertext {
         let pairing_output = PairingSetting::pairing(digest.as_g1(), self.ct_g2[0])
             + PairingSetting::pairing(**eval_proof, self.ct_g2[1]);
 
-        Ok(PreparedBIBECiphertext {
+        PreparedBIBECiphertext {
+            id: self.id,
             pairing_output,
             ct_g2: self.ct_g2[2].into(),
             padded_key: self.padded_key.clone(),
             symmetric_ciphertext: self.symmetric_ciphertext.clone(),
-        })
+        }
     }
 }
 

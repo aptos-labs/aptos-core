@@ -2,6 +2,8 @@
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 use thiserror::Error;
 
+use crate::shared::ids::Id;
+
 #[derive(Debug, Error)]
 pub enum BatchEncryptionError {
     #[error("Error during digest key initialization: {0}")]
@@ -28,13 +30,15 @@ pub enum BatchEncryptionError {
     DecryptionKeyShareVerifyError,
     #[error("Decryption key verification error")]
     DecryptionKeyVerifyError,
-    #[error("Tried to decrypt a ciphertext whose eval proof wasn't yet computed")]
-    UncomputedEvalProofError,
     #[error("Tried to compute eval proofs for an id set whose coefficients weren't computed yet")]
     EvalProofsWithUncomputedCoefficients,
     #[error("Hash2Curve failed: couldn't find a quadratic residue, or couldn't map to subgroup")]
     Hash2CurveFailure,
 }
+
+#[derive(Debug, Error)]
+#[error("Tried to decrypt a ciphertext whose eval proof wasn't yet computed")]
+pub struct MissingEvalProofError(pub Id);
 
 #[derive(Debug, Error)]
 pub enum CTVerifyError {

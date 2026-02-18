@@ -1,3 +1,7 @@
+// Copyright (c) Aptos Foundation
+// Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
+
+use crate::errors::MissingEvalProofError;
 use crate::traits::{BatchThresholdEncryption, Plaintext};
 use rayon::iter::IntoParallelIterator;
 use rayon::iter::ParallelIterator;
@@ -18,10 +22,10 @@ pub fn prepare_all<T: BatchThresholdEncryption, P: Plaintext>(
     cts: &[T::Ciphertext],
     digest: &T::Digest,
     eval_proofs: &T::EvalProofs,
-) -> anyhow::Result<Vec<T::PreparedCiphertext>> {
+) -> std::result::Result<Vec<T::PreparedCiphertext>, MissingEvalProofError> {
     cts.into_par_iter()
         .map(|ct| T::prepare_ct(ct, digest, eval_proofs))
-        .collect::<anyhow::Result<Vec<T::PreparedCiphertext>>>()
+        .collect::<std::result::Result<Vec<T::PreparedCiphertext>, MissingEvalProofError>>()
 }
 
 

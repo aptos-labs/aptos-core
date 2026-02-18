@@ -1,8 +1,7 @@
 // Copyright (c) Aptos Foundation
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 use crate::{
-    group::*,
-    shared::{
+    errors::MissingEvalProofError, group::*, shared::{
         ciphertext::{CTDecrypt, CTEncrypt, PreparedCiphertext, SuccinctCiphertext},
         digest::{Digest, DigestKey, EvalProof, EvalProofs, EvalProofsPromise},
         encryption_key::AugmentedEncryptionKey,
@@ -11,8 +10,7 @@ use crate::{
             self, BIBEDecryptionKey, BIBEDecryptionKeyShare, BIBEMasterSecretKeyShare,
             BIBEVerificationKey,
         },
-    },
-    traits::{AssociatedData, BatchThresholdEncryption, Plaintext},
+    }, traits::{AssociatedData, BatchThresholdEncryption, Plaintext}
 };
 use anyhow::{anyhow, Result};
 use aptos_dkg::pvss::{
@@ -163,7 +161,7 @@ impl BatchThresholdEncryption for FPTXSuccinct {
         ct: &Self::Ciphertext,
         digest: &Self::Digest,
         eval_proofs: &Self::EvalProofs,
-    ) -> Result<Self::PreparedCiphertext> {
+    ) -> std::result::Result<Self::PreparedCiphertext, MissingEvalProofError> {
         ct.prepare(digest, eval_proofs)
     }
 
@@ -196,6 +194,6 @@ impl BatchThresholdEncryption for FPTXSuccinct {
         digest: &Self::Digest,
         eval_proof: &Self::EvalProof,
     ) -> Result<P> {
-        decryption_key.decrypt(&ct.prepare_individual(digest, eval_proof)?)
+        decryption_key.decrypt(&ct.prepare_individual(digest, eval_proof))
     }
 }

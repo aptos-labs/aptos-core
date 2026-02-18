@@ -7,6 +7,8 @@ use ark_std::rand::{CryptoRng, RngCore};
 use serde::{de::DeserializeOwned, Serialize};
 use std::hash::Hash;
 
+use crate::errors::MissingEvalProofError;
+
 pub trait BatchThresholdEncryption {
     type ThresholdConfig: aptos_crypto::TSecretSharingConfig;
     type SubTranscript: TranscriptCore;
@@ -172,7 +174,7 @@ pub trait BatchThresholdEncryption {
         ct: &Self::Ciphertext,
         digest: &Self::Digest,
         eval_proofs: &Self::EvalProofs,
-    ) -> Result<Self::PreparedCiphertext>;
+    ) -> std::result::Result<Self::PreparedCiphertext, MissingEvalProofError>;
 
     /// Decrypt a set of ciphertext using a decryption key and advice.
     fn decrypt<P: Plaintext>(
