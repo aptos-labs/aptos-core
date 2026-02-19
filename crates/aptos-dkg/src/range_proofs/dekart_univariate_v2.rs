@@ -1004,7 +1004,9 @@ pub mod two_term_msm {
         }
     }
 
-    impl<C: CurveGroup> sigma_protocol::CurveGroupTrait<C> for Homomorphism<C> {
+    impl<C: CurveGroup> sigma_protocol::CurveGroupTrait for Homomorphism<C> {
+        type Group = C;
+
         fn dst(&self) -> Vec<u8> {
             b"DEKART_V2_SIGMA_PROTOCOL".to_vec()
         }

@@ -28,10 +28,9 @@ use std::fmt::Debug;
 
 const CNTXT: &[u8; 32] = b"SIGMA-PROTOCOL-TESTS-SOK-CONTEXT";
 
-pub fn test_sigma_protocol<C, H>(hom: H, witness: H::Domain)
+pub fn test_sigma_protocol<H>(hom: H, witness: H::Domain)
 where
-    C: CurveGroup,
-    H: sigma_protocol::CurveGroupTrait<C>,
+    H: sigma_protocol::CurveGroupTrait,
 {
     let mut rng = thread_rng();
 
@@ -146,8 +145,10 @@ mod schnorr {
     }
 
     impl<C: CurveGroup<ScalarField = Fp<P, N>>, const N: usize, P: FpConfig<N>>
-        sigma_protocol::CurveGroupTrait<C> for Schnorr<C>
+        sigma_protocol::CurveGroupTrait for Schnorr<C>
     {
+        type Group = C;
+
         fn dst(&self) -> Vec<u8> {
             b"SCHNORR_SIGMA_PROTOCOL_DST".to_vec()
         }
@@ -246,11 +247,11 @@ fn test_schnorr() {
 
     // ---- Bn254 ----
     let witness_bn = sample_field_element(&mut rng);
-    test_sigma_protocol::<<Bn254 as Pairing>::G1, _>(Schnorr::default(), witness_bn);
+    test_sigma_protocol::<Schnorr<<Bn254 as Pairing>::G1>>(Schnorr::default(), witness_bn);
 
     // ---- Bls12_381 ----
     let witness_bls = sample_field_element(&mut rng);
-    test_sigma_protocol::<<Bls12_381 as Pairing>::G1, _>(Schnorr::default(), witness_bls);
+    test_sigma_protocol::<Schnorr<<Bls12_381 as Pairing>::G1>>(Schnorr::default(), witness_bls);
 }
 
 #[test]
@@ -261,7 +262,10 @@ fn test_chaum_pedersen() {
 
     // ---- Bn254 ----
     let witness_bn = sample_field_element(&mut rng);
-    test_sigma_protocol::<<Bn254 as Pairing>::G1, _>(make_chaum_pedersen_instance(), witness_bn);
+    test_sigma_protocol::<ChaumPedersen<<Bn254 as Pairing>::G1>>(
+        make_chaum_pedersen_instance(),
+        witness_bn,
+    );
     test_imhomog_chaum_pedersen::<Bn254, _, _>(
         make_inhomogeneous_chaum_pedersen_instance(),
         witness_bn,
@@ -269,7 +273,7 @@ fn test_chaum_pedersen() {
 
     // ---- Bls12_381 ----
     let witness_bls = sample_field_element(&mut rng);
-    test_sigma_protocol::<<Bls12_381 as Pairing>::G1, _>(
+    test_sigma_protocol::<ChaumPedersen<<Bls12_381 as Pairing>::G1>>(
         make_chaum_pedersen_instance(),
         witness_bls,
     );

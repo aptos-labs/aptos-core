@@ -185,7 +185,9 @@ impl<'a, C: CurveGroup> fixed_base_msms::Trait for Homomorphism<'a, C> {
     }
 }
 
-impl<'a, C: CurveGroup> sigma_protocol::CurveGroupTrait<C> for Homomorphism<'a, C> {
+impl<'a, C: CurveGroup> sigma_protocol::CurveGroupTrait for Homomorphism<'a, C> {
+    type Group = C;
+
     fn dst(&self) -> Vec<u8> {
         DST.to_vec()
     }

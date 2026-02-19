@@ -9,4 +9,4 @@ pub mod proof;
 pub mod traits;
 
 pub use proof::{FirstProofItem, Proof};
-pub use traits::{Statement, CurveGroupTrait, Witness};
+pub use traits::{CurveGroupTrait, Statement, Witness};

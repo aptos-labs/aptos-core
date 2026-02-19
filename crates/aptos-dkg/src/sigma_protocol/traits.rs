@@ -20,14 +20,16 @@ use aptos_crypto::{
     },
     utils,
 };
-use ark_ec::CurveGroup;
-use ark_ff::{Field, Fp, FpConfig, PrimeField};
+use ark_ec::{CurveGroup, PrimeGroup};
+use ark_ff::{AdditiveGroup, Field, Fp, FpConfig, PrimeField};
 use ark_serialize::{CanonicalDeserialize, CanonicalSerialize};
 use rand_core::{CryptoRng, RngCore};
 use serde::Serialize;
 use std::{fmt::Debug, hash::Hash};
 
-pub trait Trait: homomorphism::Trait<Domain: Witness<Self::Scalar>, CodomainNormalized: Statement> + Sized {
+pub trait Trait:
+    homomorphism::Trait<Domain: Witness<Self::Scalar>, CodomainNormalized: Statement> + Sized
+{
     type Scalar: ark_ff::PrimeField; // CanonicalSerialize + CanonicalDeserialize + Clone + Debug + Eq;
 
     fn dst(&self) -> Vec<u8>;
@@ -39,29 +41,58 @@ pub trait Trait: homomorphism::Trait<Domain: Witness<Self::Scalar>, CodomainNorm
         cntxt: &Ct, // for SoK purposes
         rng: &mut R,
     ) -> (Proof<Self::Scalar, Self>, Self::CodomainNormalized);
-    
+
     fn verify<Ct: Serialize, R: RngCore + CryptoRng>(
         &self,
         public_statement: &Self::CodomainNormalized,
         proof: &Proof<Self::Scalar, Self>,
         cntxt: &Ct,
         rng: &mut R,
-    ) -> anyhow::Result<()>;    
+    ) -> anyhow::Result<()>;
+}
+
+impl<T: CurveGroupTrait> Trait for T {
+    type Scalar = T::Scalar;
+
+    fn dst(&self) -> Vec<u8> {
+        self.dst()
+    }
+
+    fn prove<Ct: Serialize, R: RngCore + CryptoRng>(
+        &self,
+        witness: &Self::Domain,
+        statement: Self::Codomain,
+        cntxt: &Ct, // for SoK purposes
+        rng: &mut R,
+    ) -> (Proof<Self::Scalar, Self>, Self::CodomainNormalized) {
+        self.prove(witness, statement, cntxt, rng)
+    }
+
+    fn verify<Ct: Serialize, R: RngCore + CryptoRng>(
+        &self,
+        public_statement: &Self::CodomainNormalized,
+        proof: &Proof<Self::Scalar, Self>,
+        cntxt: &Ct,
+        rng: &mut R,
+    ) -> anyhow::Result<()> {
+        self.verify(public_statement, proof, cntxt, None, rng)
+    }
 }
 
 // TODO: rename this to CurveGroupTrait
 // then make a more basic Trait
 // then make CurveGroupTrait automatically implement that
 // and then make a field hom implement the basic Trait
-pub trait CurveGroupTrait<C: CurveGroup>:
+pub trait CurveGroupTrait:
     fixed_base_msms::Trait<
-        Domain: Witness<C::ScalarField>,
-        Base = C::Affine,
-        MsmOutput = C,
-        Scalar = C::ScalarField,
+        Domain: Witness<<Self::Group as PrimeGroup>::ScalarField>,
+        Base = <Self::Group as CurveGroup>::Affine,
+        MsmOutput = Self::Group,
+        Scalar = <Self::Group as PrimeGroup>::ScalarField,
     > + Sized
     + CanonicalSerialize
 {
+    type Group: CurveGroup;
     /// Domain-separation tag (DST) used to ensure that all cryptographic hashes and
     /// transcript operations within the protocol are uniquely namespaced
     fn dst(&self) -> Vec<u8>;
@@ -83,7 +114,7 @@ pub trait CurveGroupTrait<C: CurveGroup>:
     fn verify<Ct: Serialize, H, R: RngCore + CryptoRng>(
         &self,
         public_statement: &Self::CodomainNormalized,
-        proof: &Proof<C::ScalarField, H>, // Would seem natural to set &Proof<E, Self>, but that ties the lifetime of H to that of Self, but we'd like it to be eg static
+        proof: &Proof<<Self as fixed_base_msms::Trait>::Scalar, H>, // Would seem natural to set &Proof<E, Self>, but that ties the lifetime of H to that of Self, but we'd like it to be eg static
         cntxt: &Ct,
         number_of_beta_powers: Option<usize>, // None => compute from public_statement (clones); Some(n) avoids clone when caller has length
         rng: &mut R,
@@ -103,7 +134,7 @@ pub trait CurveGroupTrait<C: CurveGroup>:
         );
 
         let msm_result = Self::msm_eval(msm_terms);
-        ensure!(msm_result == C::ZERO); // or MsmOutput::zero()
+        ensure!(msm_result == <Self::Group as AdditiveGroup>::ZERO); // or MsmOutput::zero()
 
         Ok(())
     }
@@ -116,14 +147,17 @@ pub trait CurveGroupTrait<C: CurveGroup>:
         cntxt: &Ct,
         number_of_beta_powers: Option<usize>, // None => compute from public_statement (clones); Some(n) avoids clone when caller has length
         rng: &mut R,
-    ) -> (C::ScalarField, Vec<C::ScalarField>)
+    ) -> (
+        <Self as fixed_base_msms::Trait>::Scalar,
+        Vec<<Self as fixed_base_msms::Trait>::Scalar>,
+    )
     where
         Ct: Serialize,
         // H: homomorphism::Trait<Domain = Self::Domain, Codomain = Self::Codomain>, // will probably need this if we use `FirstProofItem<F, H>` instead
     {
         let number_of_beta_powers =
             number_of_beta_powers.unwrap_or_else(|| public_statement.clone().into_iter().count()); // Would prefer not to have to clone this just to get a count
-        verifier_challenges_with_length::<_, C::ScalarField, _, _>(
+        verifier_challenges_with_length::<_, _, _, _>(
             cntxt,
             self,
             public_statement,
@@ -139,11 +173,11 @@ pub trait CurveGroupTrait<C: CurveGroup>:
     fn msm_terms_for_verify<Ct: Serialize, H, R: RngCore + CryptoRng>(
         &self,
         public_statement: &Self::CodomainNormalized,
-        proof: &Proof<C::ScalarField, H>,
+        proof: &Proof<<Self::Group as PrimeGroup>::ScalarField, H>,
         cntxt: &Ct,
         number_of_beta_powers: Option<usize>,
         rng: &mut R,
-    ) -> MsmInput<C::Affine, C::ScalarField>
+    ) -> MsmInput<<Self::Group as CurveGroup>::Affine, <Self::Group as PrimeGroup>::ScalarField>
     where
         H: homomorphism::Trait<
             Domain = Self::Domain,
@@ -181,18 +215,22 @@ pub trait CurveGroupTrait<C: CurveGroup>:
     /// added here because it's convenient (and slightly faster) to do that when the c factor is being added
     #[allow(non_snake_case)]
     fn merge_msm_terms(
-        msm_terms: Vec<MsmInput<C::Affine, C::ScalarField>>,
+        msm_terms: Vec<
+            MsmInput<<Self::Group as CurveGroup>::Affine, <Self::Group as PrimeGroup>::ScalarField>,
+        >,
         prover_first_message: &Self::CodomainNormalized,
         statement: &Self::CodomainNormalized,
-        powers_of_beta: &[C::ScalarField],
-        c: C::ScalarField,
-    ) -> MsmInput<C::Affine, C::ScalarField>
+        powers_of_beta: &[<Self::Group as PrimeGroup>::ScalarField],
+        c: <Self::Group as PrimeGroup>::ScalarField,
+    ) -> MsmInput<<Self::Group as CurveGroup>::Affine, <Self::Group as PrimeGroup>::ScalarField>
     where
-        C::Affine: Copy + Eq + Hash,
+        <Self::Group as CurveGroup>::Affine: Copy + Eq + Hash,
     {
         let n = msm_terms.len();
         // Per index: (term_i * β^i) ∪ (A_i, −β^i) ∪ (P_i, −c·β^i), then in the final line merge all with scale 1.
-        let term_inputs: Vec<MsmInput<C::Affine, C::ScalarField>> = msm_terms
+        let term_inputs: Vec<
+            MsmInput<<Self::Group as CurveGroup>::Affine, <Self::Group as PrimeGroup>::ScalarField>,
+        > = msm_terms
             .into_iter()
             .zip(prover_first_message.clone().into_iter())
             .zip(statement.clone().into_iter())
@@ -201,7 +239,7 @@ pub trait CurveGroupTrait<C: CurveGroup>:
                 let mut bases = term.bases().to_vec();
                 bases.push(A);
                 bases.push(P);
-                let mut scalars: Vec<C::ScalarField> =
+                let mut scalars: Vec<<Self::Group as PrimeGroup>::ScalarField> =
                     term.scalars().iter().map(|s| *s * beta_power).collect();
                 scalars.push(-beta_power);
                 scalars.push(-c * beta_power);
@@ -218,9 +256,16 @@ pub trait CurveGroupTrait<C: CurveGroup>:
             n,
             "merge_msm_terms: powers_of_beta iterator length mismatch"
         );
-        let refs: Vec<&MsmInput<C::Affine, C::ScalarField>> = term_inputs.iter().collect();
-        let ones: Vec<C::ScalarField> = (0..refs.len()).map(|_| C::ScalarField::ONE).collect();
-        merge_scaled_msm_terms::<C>(&refs, &ones)
+        let refs: Vec<
+            &MsmInput<
+                <Self::Group as CurveGroup>::Affine,
+                <Self::Group as PrimeGroup>::ScalarField,
+            >,
+        > = term_inputs.iter().collect();
+        let ones: Vec<<Self::Group as PrimeGroup>::ScalarField> = (0..refs.len())
+            .map(|_| <Self::Group as PrimeGroup>::ScalarField::ONE)
+            .collect();
+        merge_scaled_msm_terms::<Self::Group>(&refs, &ones)
     }
 }
 

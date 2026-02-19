@@ -396,7 +396,9 @@ impl<E: Pairing> fixed_base_msms::Trait for CommitmentHomomorphism<'_, E> {
     }
 }
 
-impl<'a, E: Pairing> sigma_protocol::CurveGroupTrait<E::G1> for CommitmentHomomorphism<'a, E> {
+impl<'a, E: Pairing> sigma_protocol::CurveGroupTrait for CommitmentHomomorphism<'a, E> {
+    type Group = E::G1;
+
     fn dst(&self) -> Vec<u8> {
         b"APTOS_HIDING_KZG_SIGMA_PROTOCOL_DST".to_vec()
     }

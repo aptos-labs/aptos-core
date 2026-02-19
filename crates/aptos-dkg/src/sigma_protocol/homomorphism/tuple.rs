@@ -12,7 +12,7 @@ use crate::{
 };
 use anyhow::ensure;
 use aptos_crypto::arkworks::msm::MsmInput;
-use ark_ec::{pairing::Pairing, CurveGroup};
+use ark_ec::pairing::Pairing;
 use ark_ff::Zero;
 use ark_serialize::{
     CanonicalDeserialize, CanonicalSerialize, Compress, Read, SerializationError, Valid,
@@ -241,12 +241,14 @@ where
     }
 }
 
-impl<C: CurveGroup, H1, H2> sigma_protocol::CurveGroupTrait<C> for TupleHomomorphism<H1, H2>
+impl<H1, H2> sigma_protocol::CurveGroupTrait for TupleHomomorphism<H1, H2>
 where
-    H1: sigma_protocol::CurveGroupTrait<C>,
-    H2: sigma_protocol::CurveGroupTrait<C>,
+    H1: sigma_protocol::CurveGroupTrait,
+    H2: sigma_protocol::CurveGroupTrait<Group = H1::Group>,
     H2: homomorphism::Trait<Domain = H1::Domain>,
 {
+    type Group = H1::Group;
+
     /// Concatenate the DSTs of the two homomorphisms, plus some
     /// additional metadata to ensure uniqueness.
     fn dst(&self) -> Vec<u8> {
@@ -263,8 +265,8 @@ where
 /// We need `E: Pairing` here because the sigma protocol needs to know which curves `H1` and `H2` are working over
 impl<E: Pairing, H1, H2> PairingTupleHomomorphism<E, H1, H2>
 where
-    H1: sigma_protocol::CurveGroupTrait<E::G1>,
-    H2: sigma_protocol::CurveGroupTrait<E::G2>,
+    H1: sigma_protocol::CurveGroupTrait<Group = E::G1>,
+    H2: sigma_protocol::CurveGroupTrait<Group = E::G2>,
     H2: fixed_base_msms::Trait<Domain = H1::Domain>,
 {
     fn dst(&self) -> Vec<u8> {
@@ -408,7 +410,7 @@ where
 }
 
 // TODO: mediocre idea for Shplonked: do another "custom" sigma protocol trait for:
-// a tuple with on the LHS an ordinary fixed-base-msms 
+// a tuple with on the LHS an ordinary fixed-base-msms
 // on the RHS, something that might be a homomorphism from F^k -> F
 // so maybe if we define a custom sigma protocol trait for such a hom
 // then the tuple version can be automatic just as above

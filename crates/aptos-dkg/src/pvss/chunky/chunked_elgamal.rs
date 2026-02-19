@@ -305,7 +305,9 @@ impl<'a, C: CurveGroup> fixed_base_msms::Trait for WeightedHomomorphism<'a, C> {
     }
 }
 
-impl<'a, C: CurveGroup> sigma_protocol::CurveGroupTrait<C> for WeightedHomomorphism<'a, C> {
+impl<'a, C: CurveGroup> sigma_protocol::CurveGroupTrait for WeightedHomomorphism<'a, C> {
+    type Group = C;
+
     fn dst(&self) -> Vec<u8> {
         let mut result = b"WEIGHTED_".to_vec();
         result.extend(DST);

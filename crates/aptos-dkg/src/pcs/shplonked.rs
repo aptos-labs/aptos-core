@@ -4,7 +4,7 @@
 // ZK-PCS (Shplonked) opening proof types and routines, extracted for use by range proofs.
 
 use crate::{
-    fiat_shamir::{PolynomialCommitmentScheme as _},
+    fiat_shamir::PolynomialCommitmentScheme as _,
     pcs::{
         traits::PolynomialCommitmentScheme,
         univariate_hiding_kzg::{self, Trapdoor},

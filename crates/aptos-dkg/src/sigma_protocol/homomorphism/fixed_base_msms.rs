@@ -6,7 +6,7 @@ use crate::{
     sigma_protocol::{homomorphism, homomorphism::EntrywiseMap, Witness},
 };
 use aptos_crypto::arkworks::msm::MsmInput;
-use ark_ec::CurveGroup;
+use ark_ec::PrimeGroup;
 use ark_ff::Zero;
 use ark_serialize::{CanonicalDeserialize, CanonicalSerialize};
 use std::{fmt::Debug, hash::Hash};
@@ -180,12 +180,14 @@ where
     }
 }
 
-impl<C: CurveGroup, H, LargerDomain> sigma_protocol::CurveGroupTrait<C>
+impl<H, LargerDomain> sigma_protocol::CurveGroupTrait
     for homomorphism::LiftHomomorphism<H, LargerDomain>
 where
-    H: sigma_protocol::CurveGroupTrait<C>,
-    LargerDomain: Witness<C::ScalarField>,
+    H: sigma_protocol::CurveGroupTrait,
+    LargerDomain: Witness<<H::Group as PrimeGroup>::ScalarField>,
 {
+    type Group = H::Group;
+
     fn dst(&self) -> Vec<u8> {
         homomorphism::domain_separate_dsts(b"Lift(", &[self.hom.dst()], b")")
     }
