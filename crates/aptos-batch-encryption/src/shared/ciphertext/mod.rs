@@ -5,7 +5,7 @@ use super::{
     key_derivation::BIBEDecryptionKey,
 };
 use crate::{
-    errors::{BatchEncryptionError, CTVerifyError},
+    errors::{BatchEncryptionError, CTVerifyError, MissingEvalProofError},
     shared::{ciphertext::bibe_succinct::BIBESuccinctCiphertext, digest::EvalProof, ids::Id},
     traits::{AssociatedData, Plaintext},
 };
@@ -38,6 +38,12 @@ pub struct PreparedCiphertext {
     vk: VerifyingKey,
     bibe_ct: PreparedBIBECiphertext,
     signature: Signature,
+}
+
+impl PreparedCiphertext {
+    pub fn id(&self) -> Id {
+        self.bibe_ct.id
+    }
 }
 
 impl<PCT: InnerCiphertext> Hash for Ciphertext<PCT> {
@@ -135,7 +141,11 @@ impl<PCT: InnerCiphertext> Ciphertext<PCT> {
         self.bibe_ct.id()
     }
 
-    pub fn prepare(&self, digest: &Digest, eval_proofs: &EvalProofs) -> Result<PreparedCiphertext> {
+    pub fn prepare(
+        &self,
+        digest: &Digest,
+        eval_proofs: &EvalProofs,
+    ) -> std::result::Result<PreparedCiphertext, MissingEvalProofError> {
         Ok(PreparedCiphertext {
             vk: self.vk,
             bibe_ct: self.bibe_ct.prepare(digest, eval_proofs)?,
@@ -147,12 +157,12 @@ impl<PCT: InnerCiphertext> Ciphertext<PCT> {
         &self,
         digest: &Digest,
         eval_proof: &EvalProof,
-    ) -> Result<PreparedCiphertext> {
-        Ok(PreparedCiphertext {
+    ) -> PreparedCiphertext {
+        PreparedCiphertext {
             vk: self.vk,
-            bibe_ct: self.bibe_ct.prepare_individual(digest, eval_proof)?,
+            bibe_ct: self.bibe_ct.prepare_individual(digest, eval_proof),
             signature: self.signature,
-        })
+        }
     }
 }
 

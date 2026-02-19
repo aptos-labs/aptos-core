@@ -169,7 +169,7 @@ impl DigestKey {
     }
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct EvalProofsPromise {
     pub digest: Digest,
     pub ids: IdSet<ComputedCoeffs>,
@@ -200,7 +200,7 @@ impl EvalProofsPromise {
     }
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct EvalProofs {
     pub computed_proofs: HashMap<Id, G1Affine>,
 }

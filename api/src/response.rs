@@ -157,6 +157,8 @@ macro_rules! generate_error_response {
                 #[oai(header = "X-Aptos-Oldest-Block-Height")] Option<u64>,
                 /// The cost of the call in terms of gas
                 #[oai(header = "X-Aptos-Gas-Used")] Option<u64>,
+                /// Per-epoch transaction encryption key (hex-encoded)
+                #[oai(header = "X-Aptos-Txn-Encryption-Key")] Option<String>,
             ),
             )*
         }
@@ -185,6 +187,7 @@ macro_rules! generate_error_response {
                     Some(ledger_info.block_height.into()),
                     Some(ledger_info.oldest_block_height.into()),
                     None,
+                    ledger_info.txn_encryption_key.clone(),
                 ))
             }
 
@@ -197,6 +200,7 @@ macro_rules! generate_error_response {
 
                 Self::from($enum_name::$name(
                     payload,
+                    None,
                     None,
                     None,
                     None,
@@ -229,6 +233,7 @@ macro_rules! generate_error_response {
                     ledger_info.map(|info| info.block_height.into()),
                     ledger_info.map(|info| info.oldest_block_height.into()),
                     None,
+                    ledger_info.and_then(|info| info.txn_encryption_key.clone()),
                 ))
             }
 
@@ -250,6 +255,7 @@ macro_rules! generate_error_response {
                     Some(ledger_info.block_height.into()),
                     Some(ledger_info.oldest_block_height.into()),
                     None,
+                    ledger_info.txn_encryption_key.clone(),
                 ))
             }
 
@@ -268,6 +274,7 @@ macro_rules! generate_error_response {
                     Some(ledger_info.block_height.into()),
                     Some(ledger_info.oldest_block_height.into()),
                     None,
+                    ledger_info.txn_encryption_key.clone(),
                 ))
             }
         }
@@ -288,6 +295,7 @@ macro_rules! generate_error_response {
                         _block_height,
                         _oldest_block_height,
                         _gas_used,
+                        _encryption_key,
                     ) => &mut *inner,
                     )*
                 }
@@ -346,6 +354,8 @@ macro_rules! generate_success_response {
                 /// pagination. Pass this to the `start` field of the endpoint
                 /// on the next call to get the next page of results.
                 #[oai(header = "X-Aptos-Cursor")] Option<String>,
+                /// Per-epoch transaction encryption key (hex-encoded)
+                #[oai(header = "X-Aptos-Txn-Encryption-Key")] Option<String>,
             ),
             )*
         }
@@ -387,6 +397,7 @@ macro_rules! generate_success_response {
                             ledger_info.oldest_block_height.into(),
                             None,
                             None,
+                            ledger_info.txn_encryption_key.clone(),
                         )
                     },
                     )*
@@ -510,7 +521,7 @@ macro_rules! generate_success_response {
             pub fn with_cursor(mut self, new_cursor: Option<aptos_types::state_store::state_key::StateKey>) -> Self {
                 match self {
                     $(
-                    [<$enum_name>]::$name(_, _, _, _, _, _, _, _, _, ref mut cursor) => {
+                    [<$enum_name>]::$name(_, _, _, _, _, _, _, _, _, ref mut cursor, _) => {
                         *cursor = new_cursor.map(|c| aptos_api_types::StateKeyWrapper::from(c).to_string());
                     }
                     )*
@@ -521,7 +532,7 @@ macro_rules! generate_success_response {
             pub fn with_gas_used(mut self, new_gas_used: Option<u64>) -> Self {
                 match self {
                     $(
-                    [<$enum_name>]::$name(_, _, _, _, _, _, _, _, ref mut gas_used, _) => {
+                    [<$enum_name>]::$name(_, _, _, _, _, _, _, _, ref mut gas_used, _, _) => {
                         *gas_used = new_gas_used;
                     }
                     )*

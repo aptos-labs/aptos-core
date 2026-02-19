@@ -260,6 +260,7 @@ mod test {
             oldest_block_height: 0,
             block_height: 0,
             cursor: None,
+            encryption_key: None,
         }
     }
 

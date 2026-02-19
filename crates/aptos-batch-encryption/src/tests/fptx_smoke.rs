@@ -48,15 +48,14 @@ fn smoke_with_setup<R: RngCore + CryptoRng>(
 
     ek.verify_decryption_key(&d, &dk).unwrap();
 
-    let decrypted_plaintexts: Vec<String> =
-        FPTX::decrypt(&dk, &[ct.prepare(&d, &pfs).unwrap()]).unwrap();
+    let decrypted_plaintext: String = FPTX::decrypt(&dk, &ct.prepare(&d, &pfs).unwrap()).unwrap();
 
-    assert_eq!(decrypted_plaintexts[0], plaintext);
+    assert_eq!(decrypted_plaintext, plaintext);
 
-    // Test individual decryption
+    // Test decryption verification
     let eval_proof = FPTX::eval_proof_for_ct(&pfs, &ct).unwrap();
     let individual_decrypted_plaintext: String =
-        FPTX::decrypt_individual(&dk, &ct, &d, &eval_proof).unwrap();
+        FPTX::decrypt_slow(&dk, &ct, &d, &eval_proof).unwrap();
     assert_eq!(individual_decrypted_plaintext, plaintext);
 }
 

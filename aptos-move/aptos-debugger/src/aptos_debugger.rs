@@ -168,10 +168,12 @@ impl AptosDebugger {
                             entry_func.ty_args().to_vec(),
                         )
                     },
-                    TransactionExecutableRef::Empty | TransactionExecutableRef::Encrypted => {
+                    TransactionExecutableRef::Empty => {
                         // TODO[Orderless]: Implement this
                         unimplemented!("not supported yet")
                     },
+                    // TODO(ibalajiarun)
+                    TransactionExecutableRef::Encrypted => unimplemented!("not supported"),
                 }
             },
             &auxiliary_info,
