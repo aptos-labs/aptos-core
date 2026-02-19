@@ -11,7 +11,7 @@ use crate::{
     state_kv_db::StateKvDb,
     utils::get_progress,
 };
-use aptos_schemadb::batch::SchemaBatch;
+use aptos_schemadb::{batch::SchemaBatch, ReadOptions};
 use aptos_storage_interface::Result;
 use aptos_types::transaction::Version;
 use std::sync::Arc;
@@ -36,10 +36,12 @@ impl StateKvMetadataPruner {
             let num_shards = self.state_kv_db.num_shards();
             // NOTE: This can be done in parallel if it becomes the bottleneck.
             for shard_id in 0..num_shards {
+                let mut read_opts = ReadOptions::default();
+                read_opts.fill_cache(false);
                 let mut iter = self
                     .state_kv_db
                     .db_shard(shard_id)
-                    .iter::<StaleStateValueIndexByKeyHashSchema>()?;
+                    .iter_with_opts::<StaleStateValueIndexByKeyHashSchema>(read_opts)?;
                 iter.seek(&current_progress)?;
                 for item in iter {
                     let (index, _) = item?;
@@ -49,10 +51,12 @@ impl StateKvMetadataPruner {
                 }
             }
         } else {
+            let mut read_opts = ReadOptions::default();
+            read_opts.fill_cache(false);
             let mut iter = self
                 .state_kv_db
                 .metadata_db()
-                .iter::<StaleStateValueIndexSchema>()?;
+                .iter_with_opts::<StaleStateValueIndexSchema>(read_opts)?;
             iter.seek(&current_progress)?;
             for item in iter {
                 let (index, _) = item?;

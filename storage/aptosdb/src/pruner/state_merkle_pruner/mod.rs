@@ -26,7 +26,7 @@ use aptos_experimental_runtimes::thread_manager::THREAD_MANAGER;
 use aptos_jellyfish_merkle::{node_type::NodeKey, StaleNodeIndex};
 use aptos_logger::info;
 use aptos_metrics_core::TimerHelper;
-use aptos_schemadb::{schema::KeyCodec, DB};
+use aptos_schemadb::{schema::KeyCodec, ReadOptions, DB};
 use aptos_storage_interface::Result;
 use aptos_types::transaction::{AtomicVersion, Version};
 use rayon::prelude::*;
@@ -196,7 +196,9 @@ where
         limit: usize,
     ) -> Result<(Vec<StaleNodeIndex>, Option<Version>)> {
         let mut indices = Vec::new();
-        let mut iter = state_merkle_db_shard.iter::<S>()?;
+        let mut read_opts = ReadOptions::default();
+        read_opts.fill_cache(false);
+        let mut iter = state_merkle_db_shard.iter_with_opts::<S>(read_opts)?;
         iter.seek(&StaleNodeIndex {
             stale_since_version: start_version,
             node_key: NodeKey::new_empty_path(0),
