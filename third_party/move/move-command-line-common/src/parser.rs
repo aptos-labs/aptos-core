@@ -201,8 +201,11 @@ impl<'a, I: Iterator<Item = (ValueToken, &'a str)>> Parser<'a, ValueToken, I> {
         Ok(match tok {
             ValueToken::Number if !matches!(self.peek_tok(), Some(ValueToken::ColonColon)) => {
                 if contents.starts_with('-') {
-                    let i = parse_i256(contents)?;
-                    ParsedValue::InferredNegNum(i)
+                    bail!(
+                        "negative integer literal `{}` requires a type suffix \
+                         (i8, i16, i32, i64, i128, or i256)",
+                        contents
+                    )
                 } else {
                     let u = parse_u256(contents)?;
                     ParsedValue::InferredNum(u)
@@ -510,7 +513,10 @@ mod tests {
         types::{ParsedStructType, ParsedType},
         values::ParsedValue,
     };
-    use move_core_types::{account_address::AccountAddress, int256::U256};
+    use move_core_types::{
+        account_address::AccountAddress,
+        int256::{I256, U256},
+    };
 
     #[allow(clippy::unreadable_literal)]
     #[test]
@@ -591,6 +597,24 @@ mod tests {
                 "x\"deadbeef\"",
                 V::Vector(vec![V::U8(0xDE), V::U8(0xAD), V::U8(0xBE), V::U8(0xEF)]),
             ),
+            // Signed integers
+            ("-1i8", V::I8(-1)),
+            ("0i8", V::I8(0)),
+            ("127i8", V::I8(127)),
+            ("-128i8", V::I8(-128)),
+            ("-1i16", V::I16(-1)),
+            ("0i16", V::I16(0)),
+            ("-1i32", V::I32(-1)),
+            ("0i32", V::I32(0)),
+            ("-1i64", V::I64(-1)),
+            ("0i64", V::I64(0)),
+            ("5i64", V::I64(5)),
+            ("-1i128", V::I128(-1)),
+            ("0i128", V::I128(0)),
+            ("-1i256", V::I256(I256::from(-1))),
+            ("0i256", V::I256(I256::from(0))),
+            ("-0x1i64", V::I64(-1)),
+            ("-0xFFi64", V::I64(-255)),
         ];
 
         for (s, expected) in cases {
@@ -603,6 +627,7 @@ mod tests {
         /// Test cases for the parser that should always fail.
         const PARSE_VALUE_NEGATIVE_TEST_CASES: &[&str] = &[
             "-3",
+            "-0",
             "0u42",
             "0u645",
             "0u64x",
@@ -645,6 +670,13 @@ mod tests {
             "",
             "0XFF",
             "0X0",
+            "128i8",
+            "-129i8",
+            "-6u64",
+            "-55e",
+            "--1u8",
+            "-",
+            "-x",
         ];
 
         for s in PARSE_VALUE_NEGATIVE_TEST_CASES {

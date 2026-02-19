@@ -161,18 +161,63 @@ impl Token for ValueToken {
     fn next_token(s: &str) -> anyhow::Result<Option<(Self, usize)>> {
         fn number_maybe_with_suffix(text: &str, num_text_len: usize) -> (ValueToken, usize) {
             let rest = &text[num_text_len..];
-            if rest.starts_with("u8") {
+            if rest.starts_with("u8") || rest.starts_with("i8") {
                 (ValueToken::NumberTyped, num_text_len + 2)
-            } else if rest.starts_with("u64") || rest.starts_with("u16") || rest.starts_with("u32")
+            } else if rest.starts_with("u64")
+                || rest.starts_with("u16")
+                || rest.starts_with("u32")
+                || rest.starts_with("i64")
+                || rest.starts_with("i16")
+                || rest.starts_with("i32")
             {
                 (ValueToken::NumberTyped, num_text_len + 3)
-            } else if rest.starts_with("u128") || rest.starts_with("u256") {
+            } else if rest.starts_with("u128")
+                || rest.starts_with("u256")
+                || rest.starts_with("i128")
+                || rest.starts_with("i256")
+            {
                 (ValueToken::NumberTyped, num_text_len + 4)
             } else {
                 // No typed suffix
                 (ValueToken::Number, num_text_len)
             }
         }
+
+        /// Consumes a numeric literal (decimal or `0x` hex) from `chars`, returning
+        /// the total token length including an optional type suffix.
+        /// `prefix_len` is the number of characters already consumed (e.g. 0 for a
+        /// positive number, 1 for a negative number where `-` was already consumed).
+        fn number_token(
+            s: &str,
+            chars: &mut std::iter::Peekable<std::str::Chars>,
+            first_digit: char,
+            prefix_len: usize,
+        ) -> anyhow::Result<(ValueToken, usize)> {
+            if first_digit == '0' && matches!(chars.peek(), Some('x')) {
+                chars.next().unwrap(); // consume 'x'
+                match chars.next() {
+                    Some(c) if c.is_ascii_hexdigit() => {
+                        // prefix + '0' + 'x' + first_hex_digit + remaining hex digits
+                        let len = prefix_len
+                            + 3
+                            + chars
+                                .take_while(|c| char::is_ascii_hexdigit(c) || *c == '_')
+                                .count();
+                        Ok(number_maybe_with_suffix(s, len))
+                    },
+                    _ => bail!("unrecognized token: {}", s),
+                }
+            } else {
+                // prefix + first_digit + remaining decimal digits
+                let len = prefix_len
+                    + 1
+                    + chars
+                        .take_while(|c| char::is_ascii_digit(c) || *c == '_')
+                        .count();
+                Ok(number_maybe_with_suffix(s, len))
+            }
+        }
+
         if s.starts_with("true") {
             return Ok(Some((Self::True, 4)));
         }
@@ -196,18 +241,7 @@ impl Token for ValueToken {
             ',' => (Self::Comma, 1),
             ':' if matches!(chars.peek(), Some(':')) => (Self::ColonColon, 2),
             ':' => (Self::Colon, 1),
-            '0' if matches!(chars.peek(), Some('x')) => {
-                chars.next().unwrap();
-                match chars.next() {
-                    Some(c) if c.is_ascii_hexdigit() => {
-                        let len = 3 + chars
-                            .take_while(|c| char::is_ascii_hexdigit(c) || *c == '_')
-                            .count();
-                        number_maybe_with_suffix(s, len)
-                    },
-                    _ => bail!("unrecognized token: {}", s),
-                }
-            },
+            '0' if matches!(chars.peek(), Some('x')) => number_token(s, &mut chars, '0', 0)?,
             'b' if matches!(chars.peek(), Some('"')) => {
                 chars.next().unwrap();
                 // b"
@@ -283,13 +317,11 @@ impl Token for ValueToken {
                 }
                 (ValueToken::Utf8String, len)
             },
-            c if c.is_ascii_digit() => {
-                // c + remaining
-                let len = 1 + chars
-                    .take_while(|c| char::is_ascii_digit(c) || *c == '_')
-                    .count();
-                number_maybe_with_suffix(s, len)
+            '-' if matches!(chars.peek(), Some(c) if c.is_ascii_digit()) => {
+                let first_digit = chars.next().unwrap();
+                number_token(s, &mut chars, first_digit, 1)?
             },
+            c if c.is_ascii_digit() => number_token(s, &mut chars, c, 0)?,
             c if c.is_ascii_whitespace() => {
                 // c + remaining
                 let len = 1 + chars.take_while(char::is_ascii_whitespace).count();
