@@ -17615,6 +17615,7 @@ dependencies = [
  "blake2-rfc",
  "diesel",
  "digest 0.9.0",
+ "env_logger",
  "ethers",
  "futures",
  "hex",

@@ -25,6 +25,8 @@ async fn test_consensus_only_with_txn_emitter() {
                 20,
             ),
         ]],
+        false,
+        None,
     )
     .await
     .unwrap();

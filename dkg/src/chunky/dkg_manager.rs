@@ -219,8 +219,7 @@ impl ChunkyDKGManager {
                         .map_err(|e|anyhow!("[ChunkyDKG] process_aggregated_subtranscript failed: {e}"))
                 },
                 certified_transcript = certified_subtrx_rx.select_next_some() => {
-                    self.process_certified_aggregated_subtranscript(certified_transcript)
-                        .await
+                    self.process_certified_aggregated_subtranscript(certified_transcript).await
                         .map_err(|e|anyhow!("[ChunkyDKG] process_certified_aggregated_subtranscript failed: {e}"))
                 },
                 dkg_txn = self.pull_notification_rx.select_next_some() => {
@@ -496,10 +495,12 @@ impl ChunkyDKGManager {
 
         counters::observe_chunky_dkg_stage(start_time, self.my_addr, "agg_subtrx_certified");
 
+        info!("deriving encryption key");
         // Derive encryption key from subtranscript + DigestKey
         let encryption_key_bytes =
             aggregated_subtranscript.derive_encryption_key_bytes(TEST_DIGEST_KEY.tau_g2)?;
 
+        info!("forming ceritified_transcript struct");
         let certified_transcript = CertifiedAggregatedChunkySubtranscript {
             metadata: DKGTranscriptMetadata {
                 epoch: self.epoch_state.epoch,
