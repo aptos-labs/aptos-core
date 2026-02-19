@@ -17,10 +17,12 @@ use aptos_storage_interface::{
 };
 use aptos_types::{
     account_address::AccountAddress,
-    account_config::{aptos_test_root_address, AccountResource},
+    account_config::{aptos_test_root_address, AccountResource, BlockResource, CORE_CODE_ADDRESS},
     block_metadata::BlockMetadata,
     chain_id::ChainId,
+    on_chain_config::ConfigurationResource,
     state_store::MoveResourceExt,
+    timestamp::TimestampResource,
     transaction::{
         authenticator::AuthenticationKey, EntryFunction, Transaction, TransactionPayload,
     },
@@ -44,7 +46,7 @@ use std::{
     io::{Read, Write},
     path::Path,
     sync::{
-        atomic::{AtomicUsize, Ordering},
+        atomic::{AtomicU64, AtomicUsize, Ordering},
         mpsc, Arc, Mutex,
     },
 };
@@ -101,50 +103,143 @@ fn get_genesis_validator_address(db: &DbReaderWriter) -> AccountAddress {
     validator_address()
 }
 
-pub(crate) fn create_block_metadata_transaction(epoch: u64, db: &DbReaderWriter) -> Transaction {
-    // Use incremental timestamps to avoid triggering epoch reconfigurations
-    // Large real timestamps cause immediate epoch changes since last_reconfiguration_time is small
-    use std::sync::atomic::{AtomicU64, Ordering};
-    static ROUND_COUNTER: AtomicU64 = AtomicU64::new(0);
-    static LAST_TIMESTAMP: AtomicU64 = AtomicU64::new(0);
-    static LAST_EPOCH: AtomicU64 = AtomicU64::new(0);
+/// Manages blockchain timestamps for the executor benchmark.
+///
+/// Derives all timestamps from the DB state instead of wall-clock time,
+/// preventing epoch reconfiguration issues when the benchmark is run long
+/// after the DB was created.
+pub struct BenchmarkTimestamp {
+    /// DB's CurrentTimeMicroseconds at construction time.
+    base_usecs: u64,
+    /// Incremented per block to produce strictly increasing timestamps.
+    next_offset: AtomicU64,
+    /// Current epoch from ConfigurationResource.
+    epoch: u64,
+}
 
-    // Check if epoch has changed and reset round counter if needed
-    let last_epoch = LAST_EPOCH.load(Ordering::SeqCst);
-    if last_epoch != epoch {
-        ROUND_COUNTER.store(0, Ordering::SeqCst);
-        LAST_EPOCH.store(epoch, Ordering::SeqCst);
+impl BenchmarkTimestamp {
+    /// Reads `TimestampResource` and `ConfigurationResource` from the DB
+    /// to initialize timestamp state.
+    pub fn from_db(db: &DbReaderWriter) -> Self {
+        let state_view = db.reader.latest_state_checkpoint_view().unwrap();
+
+        let ts = TimestampResource::fetch_move_resource(&state_view, &CORE_CODE_ADDRESS)
+            .expect("failed to read TimestampResource")
+            .expect("TimestampResource not found");
+
+        let config = ConfigurationResource::fetch_move_resource(&state_view, &CORE_CODE_ADDRESS)
+            .expect("failed to read ConfigurationResource")
+            .expect("ConfigurationResource not found");
+
+        info!(
+            "BenchmarkTimestamp::from_db: base_usecs={}, epoch={}",
+            ts.timestamp.microseconds,
+            config.epoch()
+        );
+
+        Self {
+            base_usecs: ts.timestamp.microseconds,
+            next_offset: AtomicU64::new(1),
+            epoch: config.epoch(),
+        }
     }
 
-    let round = ROUND_COUNTER.fetch_add(1, Ordering::SeqCst);
+    /// Returns a strictly increasing timestamp: `base_usecs + offset`.
+    /// Each call increments the offset by 1.
+    pub fn next_block_timestamp(&self) -> u64 {
+        let offset = self.next_offset.fetch_add(1, Ordering::SeqCst);
+        self.base_usecs + offset
+    }
 
-    // Get current real time to keep blockchain time close to real time for orderless transactions
-    let current_time_usecs = std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
-        .unwrap()
-        .as_micros() as u64;
+    pub fn epoch(&self) -> u64 {
+        self.epoch
+    }
 
-    // Ensure strictly increasing timestamps by comparing with last used timestamp
-    let last_timestamp = LAST_TIMESTAMP.load(Ordering::SeqCst);
-    let timestamp_usecs = if current_time_usecs > last_timestamp {
-        current_time_usecs
-    } else {
-        // If current time is not greater, increment by 1 microsecond to maintain strict ordering
-        last_timestamp + 1
-    };
+    /// Returns a transaction expiration timestamp in seconds.
+    /// Uses `base_usecs/1_000_000 + 60` (60-second window).
+    ///
+    /// This must be within `MAX_EXP_TIME_SECONDS_FOR_ORDERLESS_TXNS` (100s)
+    /// of the current blockchain time for orderless transactions, and well
+    /// beyond any benchmark duration for normal transactions. Since block
+    /// timestamps only advance by 1 microsecond per block, 60 seconds is
+    /// sufficient for both.
+    pub fn txn_expiration_timestamp_secs(&self) -> u64 {
+        self.base_usecs / 1_000_000 + 60
+    }
 
-    // Update the last timestamp atomically
-    LAST_TIMESTAMP.store(timestamp_usecs, Ordering::SeqCst);
-    info!("block metadata timestamp: {}", timestamp_usecs);
+    /// Reads `BlockResource` and `ConfigurationResource` from the DB,
+    /// computes a timestamp that triggers an epoch change
+    /// (`last_reconfig_time + epoch_interval + 1`), and returns a new
+    /// `BenchmarkTimestamp` with that timestamp as base along with the
+    /// epoch-change `BlockMetadata` transaction.
+    pub fn create_epoch_change_metadata(db: &DbReaderWriter) -> (Self, Transaction) {
+        let state_view = db.reader.latest_state_checkpoint_view().unwrap();
+
+        let block_resource = BlockResource::fetch_move_resource(&state_view, &CORE_CODE_ADDRESS)
+            .expect("failed to read BlockResource")
+            .expect("BlockResource not found");
+
+        let config = ConfigurationResource::fetch_move_resource(&state_view, &CORE_CODE_ADDRESS)
+            .expect("failed to read ConfigurationResource")
+            .expect("ConfigurationResource not found");
+
+        let epoch_interval = block_resource.epoch_interval();
+        let last_reconfig_time = config.last_reconfiguration_time_micros();
+        let epoch_change_timestamp = last_reconfig_time + epoch_interval + 1;
+
+        info!(
+            "create_epoch_change_metadata: last_reconfig_time={}, epoch_interval={}, \
+             epoch_change_timestamp={}, current_epoch={}",
+            last_reconfig_time,
+            epoch_interval,
+            epoch_change_timestamp,
+            config.epoch()
+        );
+
+        let txn = Transaction::BlockMetadata(BlockMetadata::new(
+            HashValue::random(),
+            config.epoch(),
+            0, // round 0 for epoch change block
+            get_genesis_validator_address(db),
+            vec![],
+            vec![],
+            epoch_change_timestamp,
+        ));
+
+        let ts = Self {
+            base_usecs: epoch_change_timestamp,
+            next_offset: AtomicU64::new(1),
+            epoch: config.epoch(), // Will become epoch+1 after the txn commits
+        };
+
+        (ts, txn)
+    }
+}
+
+pub(crate) fn create_block_metadata_transaction(
+    ts: &BenchmarkTimestamp,
+    db: &DbReaderWriter,
+) -> Transaction {
+    let timestamp_usecs = ts.next_block_timestamp();
+    // next_offset starts at 1, so the first timestamp is base+1, second is base+2, etc.
+    // Round is 0-indexed: round = (timestamp - base) - 1.
+    let round = timestamp_usecs - ts.base_usecs - 1;
+
+    info!(
+        "block metadata: epoch={}, round={}, timestamp={}",
+        ts.epoch(),
+        round,
+        timestamp_usecs
+    );
 
     Transaction::BlockMetadata(BlockMetadata::new(
         HashValue::random(),
-        epoch,                             // use provided epoch
-        round, // proper incrementing round number (resets on epoch change)
-        get_genesis_validator_address(db), // use actual validator from genesis
+        ts.epoch(),
+        round,
+        get_genesis_validator_address(db),
         vec![],
         vec![],
-        timestamp_usecs, // real time with strict ordering guarantee
+        timestamp_usecs,
     ))
 }
 
@@ -214,6 +309,9 @@ pub struct TransactionGenerator {
 
     /// Database reader-writer for accessing validator information
     db: DbReaderWriter,
+
+    /// Benchmark timestamp state derived from the DB
+    ts: Arc<BenchmarkTimestamp>,
 }
 
 impl TransactionGenerator {
@@ -296,6 +394,7 @@ impl TransactionGenerator {
         num_main_signer_accounts: Option<usize>,
         num_workers: usize,
         is_keyless: bool,
+        ts: Arc<BenchmarkTimestamp>,
     ) -> Self {
         let num_existing_accounts = TransactionGenerator::read_meta(&db_dir);
 
@@ -309,21 +408,20 @@ impl TransactionGenerator {
             }),
             num_existing_accounts,
             block_sender: Some(block_sender),
-            transaction_factory: Self::create_transaction_factory(),
+            transaction_factory: Self::create_transaction_factory(&ts),
             num_workers,
             worker_pool: ThreadPoolBuilder::new()
                 .num_threads(num_workers)
                 .build()
                 .unwrap(),
             db,
+            ts,
         }
     }
 
-    pub fn create_transaction_factory() -> TransactionFactory {
+    pub fn create_transaction_factory(ts: &BenchmarkTimestamp) -> TransactionFactory {
         TransactionFactory::new(ChainId::test())
-            // Use relative expiration: current time + 60 seconds
-            // This ensures transactions have reasonable expiration window regardless of blockchain time
-            .with_transaction_expiration_time(60)
+            .with_absolute_transaction_expiration_timestamp(ts.txn_expiration_timestamp_secs())
             .with_gas_unit_price(100)
     }
 
@@ -509,7 +607,8 @@ impl TransactionGenerator {
             bar.inc(transactions.len() as u64 - 1);
             if let Some(sender) = &self.block_sender {
                 // Add BlockMetadata transaction at the beginning of the block
-                let mut block_transactions = vec![create_block_metadata_transaction(1, &self.db)];
+                let mut block_transactions =
+                    vec![create_block_metadata_transaction(&self.ts, &self.db)];
                 block_transactions.extend(transactions);
                 sender.send(block_transactions).unwrap();
             }
@@ -819,7 +918,7 @@ impl TransactionGenerator {
         }
 
         let mut transactions = Vec::new();
-        transactions.push(create_block_metadata_transaction(1, &self.db));
+        transactions.push(create_block_metadata_transaction(&self.ts, &self.db));
 
         let init_size = transactions.len();
         for i in 0..block_size {
