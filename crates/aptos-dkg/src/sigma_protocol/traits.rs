@@ -49,6 +49,21 @@ pub trait Trait:
         cntxt: &Ct,
         rng: &mut R,
     ) -> anyhow::Result<()>;
+
+    /// Verify a component given an explicit Fiat–Shamir challenge (e.g. when this homomorphism
+    /// is used inside a tuple and the challenge was derived from the tuple's first message).
+    /// Default implementation returns an error; override for concrete homomorphism types.
+    fn verify_with_challenge<Ct: Serialize, R: RngCore + CryptoRng>(
+        &self,
+        _public_statement: &Self::CodomainNormalized,
+        _prover_commitment: &Self::CodomainNormalized,
+        _challenge: Self::Scalar,
+        _response: &Self::Domain,
+        _cntxt: &Ct,
+        _rng: &mut R,
+    ) -> anyhow::Result<()> {
+        anyhow::bail!("verify_with_challenge not implemented for this homomorphism")
+    }
 }
 
 impl<T: CurveGroupTrait> Trait for T {
@@ -76,6 +91,36 @@ impl<T: CurveGroupTrait> Trait for T {
         rng: &mut R,
     ) -> anyhow::Result<()> {
         self.verify(public_statement, proof, cntxt, None, rng)
+    }
+
+    fn verify_with_challenge<Ct: Serialize, R: RngCore + CryptoRng>(
+        &self,
+        public_statement: &Self::CodomainNormalized,
+        prover_commitment: &Self::CodomainNormalized,
+        challenge: Self::Scalar,
+        response: &Self::Domain,
+        _cntxt: &Ct,
+        rng: &mut R,
+    ) -> anyhow::Result<()> {
+        let number_of_beta_powers =
+            public_statement.clone().into_iter().count();
+        let powers_of_beta = if number_of_beta_powers > 1 {
+            let beta = sample_field_element(rng);
+            utils::powers(beta, number_of_beta_powers)
+        } else {
+            vec![<<Self as CurveGroupTrait>::Group as PrimeGroup>::ScalarField::ONE]
+        };
+        let msm_terms_for_prover_response = self.msm_terms(response);
+        let msm_terms = Self::merge_msm_terms(
+            msm_terms_for_prover_response.into_iter().collect(),
+            prover_commitment,
+            public_statement,
+            &powers_of_beta,
+            challenge,
+        );
+        let msm_result = Self::msm_eval(msm_terms);
+        ensure!(msm_result == <<Self as CurveGroupTrait>::Group as AdditiveGroup>::ZERO);
+        Ok(())
     }
 }
 

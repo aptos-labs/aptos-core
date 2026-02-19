@@ -7,7 +7,10 @@ use crate::{
     sigma_protocol::{
         homomorphism,
         homomorphism::{fixed_base_msms, EntrywiseMap},
-        traits::{prove_homomorphism, verifier_challenges_with_length},
+        traits::{
+            fiat_shamir_challenge_for_sigma_protocol, prove_homomorphism,
+            verifier_challenges_with_length,
+        },
         Proof, Trait as _,
     },
 };
@@ -301,6 +304,77 @@ where
             &[self.hom1.dst(), self.hom2.dst()],
             b")",
         )
+    }
+}
+
+impl<H1, H2> sigma_protocol::Trait for TupleHomomorphism<H1, H2>
+where
+    H1: sigma_protocol::Trait,
+    H2: sigma_protocol::Trait<Scalar = H1::Scalar>,
+    H2: homomorphism::Trait<Domain = H1::Domain>,
+    H1::Codomain: CanonicalSerialize + CanonicalDeserialize,
+    H2::Codomain: CanonicalSerialize + CanonicalDeserialize,
+{
+    type Scalar = H1::Scalar;
+
+    fn dst(&self) -> Vec<u8> {
+        homomorphism::domain_separate_dsts(
+            b"GenericTupleHomomorphism(",
+            &[self.hom1.dst(), self.hom2.dst()],
+            b")",
+        )
+    }
+
+    fn prove<Ct: Serialize, R: RngCore + CryptoRng>(
+        &self,
+        witness: &<Self as homomorphism::Trait>::Domain,
+        statement: <Self as homomorphism::Trait>::Codomain,
+        cntxt: &Ct, // for SoK purposes
+        rng: &mut R,
+    ) -> (
+        Proof<H1::Scalar, Self>,
+        <Self as homomorphism::Trait>::CodomainNormalized,
+    )
+    {
+        prove_homomorphism(self, witness, statement, cntxt, true, rng, &self.dst())
+    }
+
+    fn verify<Ct: Serialize, R: RngCore + CryptoRng>(
+        &self,
+        public_statement: &Self::CodomainNormalized,
+        proof: &Proof<Self::Scalar, Self>,
+        cntxt: &Ct,
+        rng: &mut R,
+    ) -> anyhow::Result<()> {
+        let prover_first_message = proof
+            .prover_commitment()
+            .expect("tuple proof must contain commitment for Fiat–Shamir");
+        let c = fiat_shamir_challenge_for_sigma_protocol::<_, Self::Scalar, _>(
+            cntxt,
+            self,
+            public_statement,
+            prover_first_message,
+            &self.dst(),
+        );
+        let (stmt1, stmt2) = (&public_statement.0, &public_statement.1);
+        let (commit1, commit2) = (&prover_first_message.0, &prover_first_message.1);
+        self.hom1.verify_with_challenge(
+            stmt1,
+            commit1,
+            c,
+            &proof.z,
+            cntxt,
+            rng,
+        )?;
+        self.hom2.verify_with_challenge(
+            stmt2,
+            commit2,
+            c,
+            &proof.z,
+            cntxt,
+            rng,
+        )?;
+        Ok(())
     }
 }
 
