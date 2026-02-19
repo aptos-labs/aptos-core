@@ -73,5 +73,6 @@ module aptos_framework::box_or_inline {
         let Dummy {} = value.destroy();
     }
 
+    #[test_only]
     struct Dummy has store {}
 }
