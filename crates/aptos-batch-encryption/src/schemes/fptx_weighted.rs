@@ -1,9 +1,7 @@
 // Copyright (c) Aptos Foundation
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 use crate::{
-    errors::{BatchEncryptionError, MissingEvalProofError},
-    group::*,
-    shared::{
+    errors::{BatchEncryptionError, MissingEvalProofError}, group::*, schemes::fptx::FPTX, shared::{
         ciphertext::{CTDecrypt, CTEncrypt, PreparedCiphertext, StandardCiphertext},
         digest::{Digest, DigestKey, EvalProof, EvalProofs, EvalProofsPromise},
         encryption_key::EncryptionKey,
@@ -12,10 +10,9 @@ use crate::{
             self, BIBEDecryptionKey, BIBEDecryptionKeyShareValue, BIBEMasterSecretKeyShare,
             BIBEVerificationKey,
         },
-    },
-    traits::{
+    }, traits::{
         AssociatedData, BatchThresholdEncryption, DecryptionKeyShare, Plaintext, VerificationKey,
-    },
+    }
 };
 use anyhow::{anyhow, Result};
 use aptos_crypto::{
@@ -320,7 +317,7 @@ impl BatchThresholdEncryption for FPTXWeighted {
         msg: &impl Plaintext,
         associated_data: &impl AssociatedData,
     ) -> anyhow::Result<Self::Ciphertext> {
-        ek.encrypt(rng, msg, associated_data)
+       FPTX::encrypt(ek, rng, msg, associated_data)
     }
 
     fn digest(
@@ -328,43 +325,39 @@ impl BatchThresholdEncryption for FPTXWeighted {
         cts: &[Self::Ciphertext],
         round: Self::Round,
     ) -> anyhow::Result<(Self::Digest, Self::EvalProofsPromise)> {
-        let mut ids: IdSet<UncomputedCoeffs> =
-            IdSet::from_slice(&cts.iter().map(|ct| ct.id()).collect::<Vec<Id>>())
-                .ok_or(anyhow!(""))?;
-
-        digest_key.digest(&mut ids, round)
+        FPTX::digest(digest_key, cts, round)
     }
 
     fn verify_ct(
         ct: &Self::Ciphertext,
         associated_data: &impl AssociatedData,
     ) -> anyhow::Result<()> {
-        ct.verify(associated_data)
+        FPTX::verify_ct(ct, associated_data)
     }
 
     fn ct_id(ct: &Self::Ciphertext) -> Self::Id {
-        ct.id()
+        FPTX::ct_id(ct)
     }
 
     fn eval_proofs_compute_all(
         proofs: &Self::EvalProofsPromise,
         digest_key: &DigestKey,
     ) -> Self::EvalProofs {
-        proofs.compute_all(digest_key)
+        FPTX::eval_proofs_compute_all(proofs, digest_key)
     }
 
     fn eval_proofs_compute_all_vzgg_multi_point_eval(
         proofs: &Self::EvalProofsPromise,
         digest_key: &DigestKey,
     ) -> Self::EvalProofs {
-        proofs.compute_all_vgzz_multi_point_eval(digest_key)
+        FPTX::eval_proofs_compute_all_vzgg_multi_point_eval(proofs, digest_key)
     }
 
     fn eval_proof_for_ct(
         proofs: &Self::EvalProofs,
         ct: &Self::Ciphertext,
     ) -> Option<Self::EvalProof> {
-        proofs.get(&ct.id())
+        FPTX::eval_proof_for_ct(proofs, ct)
     }
 
     fn derive_decryption_key_share(
@@ -386,14 +379,14 @@ impl BatchThresholdEncryption for FPTXWeighted {
         digest: &Self::Digest,
         eval_proofs: &Self::EvalProofs,
     ) -> std::result::Result<Self::PreparedCiphertext, MissingEvalProofError> {
-        ct.prepare(digest, eval_proofs)
+        FPTX::prepare_ct(ct, digest, eval_proofs)
     }
 
     fn decrypt<'a, P: Plaintext>(
         decryption_key: &Self::DecryptionKey,
         ct: &Self::PreparedCiphertext,
     ) -> anyhow::Result<P> {
-        decryption_key.decrypt(ct)
+        FPTX::decrypt(decryption_key, ct)
     }
 
     fn verify_decryption_key_share(
@@ -409,7 +402,7 @@ impl BatchThresholdEncryption for FPTXWeighted {
         digest: &Self::Digest,
         decryption_key: &Self::DecryptionKey,
     ) -> Result<()> {
-        encryption_key.verify_decryption_key(digest, decryption_key)
+        FPTX::verify_decryption_key(encryption_key, digest, decryption_key)
     }
 
     fn decrypt_slow<P: Plaintext>(
@@ -418,6 +411,6 @@ impl BatchThresholdEncryption for FPTXWeighted {
         digest: &Self::Digest,
         eval_proof: &Self::EvalProof,
     ) -> Result<P> {
-        decryption_key.decrypt(&ct.prepare_individual(digest, eval_proof))
+        FPTX::decrypt_slow(decryption_key, ct, digest, eval_proof)
     }
 }

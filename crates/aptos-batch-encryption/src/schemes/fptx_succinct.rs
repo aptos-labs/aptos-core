@@ -1,9 +1,7 @@
 // Copyright (c) Aptos Foundation
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 use crate::{
-    errors::MissingEvalProofError,
-    group::*,
-    shared::{
+    errors::MissingEvalProofError, group::*, schemes::fptx::FPTX, shared::{
         ciphertext::{CTDecrypt, CTEncrypt, PreparedCiphertext, SuccinctCiphertext},
         digest::{Digest, DigestKey, EvalProof, EvalProofs, EvalProofsPromise},
         encryption_key::AugmentedEncryptionKey,
@@ -12,8 +10,7 @@ use crate::{
             self, BIBEDecryptionKey, BIBEDecryptionKeyShare, BIBEMasterSecretKeyShare,
             BIBEVerificationKey,
         },
-    },
-    traits::{AssociatedData, BatchThresholdEncryption, Plaintext},
+    }, traits::{AssociatedData, BatchThresholdEncryption, Plaintext}
 };
 use anyhow::{anyhow, Result};
 use aptos_dkg::pvss::{
@@ -25,6 +22,8 @@ use ark_std::rand::{rngs::StdRng, CryptoRng, RngCore, SeedableRng};
 
 pub struct FPTXSuccinct {}
 
+/// The "succinct" version of FPTX which was described in the paper. Right now, this scheme is
+/// unused because it would require a modification to the PVSS.
 impl BatchThresholdEncryption for FPTXSuccinct {
     type Ciphertext = SuccinctCiphertext;
     type DecryptionKey = BIBEDecryptionKey;
@@ -129,14 +128,14 @@ impl BatchThresholdEncryption for FPTXSuccinct {
         proofs: &Self::EvalProofsPromise,
         digest_key: &DigestKey,
     ) -> Self::EvalProofs {
-        proofs.compute_all(digest_key)
+        FPTX::eval_proofs_compute_all(proofs, digest_key)
     }
 
     fn eval_proofs_compute_all_vzgg_multi_point_eval(
         proofs: &Self::EvalProofsPromise,
         digest_key: &DigestKey,
     ) -> Self::EvalProofs {
-        proofs.compute_all_vgzz_multi_point_eval(digest_key)
+        FPTX::eval_proofs_compute_all_vzgg_multi_point_eval(proofs, digest_key)
     }
 
     fn eval_proof_for_ct(
@@ -150,7 +149,7 @@ impl BatchThresholdEncryption for FPTXSuccinct {
         msk_share: &Self::MasterSecretKeyShare,
         digest: &Self::Digest,
     ) -> Result<Self::DecryptionKeyShare> {
-        msk_share.derive_decryption_key_share(digest)
+        FPTX::derive_decryption_key_share(msk_share, digest)
     }
 
     fn reconstruct_decryption_key(
@@ -172,7 +171,7 @@ impl BatchThresholdEncryption for FPTXSuccinct {
         decryption_key: &Self::DecryptionKey,
         ct: &Self::PreparedCiphertext,
     ) -> anyhow::Result<P> {
-        decryption_key.decrypt(ct)
+        FPTX::decrypt(decryption_key, ct)
     }
 
     fn verify_decryption_key_share(
