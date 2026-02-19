@@ -7,7 +7,7 @@ mod common;
 use crate::common::PACKAGE_NAME_DELIMITER;
 use camino::Utf8PathBuf;
 use cargo::Cargo;
-use clap::{command, Args, Parser, Subcommand};
+use clap::{Args, Parser, Subcommand};
 pub use common::SelectedPackageArgs;
 use determinator::Utf8Paths0;
 use log::{debug, trace};
