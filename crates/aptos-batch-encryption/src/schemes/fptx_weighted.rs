@@ -1,7 +1,10 @@
 // Copyright (c) Aptos Foundation
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 use crate::{
-    errors::{BatchEncryptionError, MissingEvalProofError}, group::*, schemes::fptx::FPTX, shared::{
+    errors::{BatchEncryptionError, MissingEvalProofError},
+    group::*,
+    schemes::fptx::FPTX,
+    shared::{
         ciphertext::{PreparedCiphertext, StandardCiphertext},
         digest::{Digest, DigestKey, EvalProof, EvalProofs, EvalProofsPromise},
         encryption_key::EncryptionKey,
@@ -10,9 +13,10 @@ use crate::{
             self, BIBEDecryptionKey, BIBEDecryptionKeyShareValue, BIBEMasterSecretKeyShare,
             BIBEVerificationKey,
         },
-    }, traits::{
+    },
+    traits::{
         AssociatedData, BatchThresholdEncryption, DecryptionKeyShare, Plaintext, VerificationKey,
-    }
+    },
 };
 use anyhow::Result;
 use aptos_crypto::{
@@ -317,7 +321,7 @@ impl BatchThresholdEncryption for FPTXWeighted {
         msg: &impl Plaintext,
         associated_data: &impl AssociatedData,
     ) -> anyhow::Result<Self::Ciphertext> {
-       FPTX::encrypt(ek, rng, msg, associated_data)
+        FPTX::encrypt(ek, rng, msg, associated_data)
     }
 
     fn digest(

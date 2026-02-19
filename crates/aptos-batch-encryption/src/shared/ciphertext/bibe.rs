@@ -59,7 +59,6 @@ pub struct PreparedBIBECiphertext {
     pub(crate) symmetric_ciphertext: SymmetricCiphertext,
 }
 
-
 pub trait BIBECTEncrypt {
     type CT: InnerCiphertext;
 
