@@ -250,7 +250,7 @@ pub(crate) mod tests {
 
     #[allow(unused)]
     pub(crate) fn digest_and_pfs_for_testing(dk: &DigestKey) -> (Digest, EvalProofsPromise) {
-        let mut ids = IdSet::with_capacity(dk.capacity()).unwrap();
+        let mut ids = IdSet::with_capacity(dk.capacity());
         let mut counter = Fr::zero();
 
         for _ in 0..dk.capacity() {
@@ -270,7 +270,7 @@ pub(crate) mod tests {
         let setup = DigestKey::new(&mut rng, batch_capacity, num_rounds * batch_capacity).unwrap();
 
         for current_batch_size in 1..=batch_capacity {
-            let mut ids = IdSet::with_capacity(batch_capacity).unwrap();
+            let mut ids = IdSet::with_capacity(batch_capacity);
             let mut counter = Fr::zero();
 
             for _ in 0..current_batch_size {

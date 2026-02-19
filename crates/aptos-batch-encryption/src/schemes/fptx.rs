@@ -15,7 +15,7 @@ use crate::{
     },
     traits::{AssociatedData, BatchThresholdEncryption, Plaintext},
 };
-use anyhow::{anyhow, Result};
+use anyhow::Result;
 use aptos_dkg::pvss::{
     traits::{Reconstructable as _, TranscriptCore},
     Player,
@@ -107,8 +107,7 @@ impl BatchThresholdEncryption for FPTX {
         round: Self::Round,
     ) -> anyhow::Result<(Self::Digest, Self::EvalProofsPromise)> {
         let mut ids: IdSet<UncomputedCoeffs> =
-            IdSet::from_slice(&cts.iter().map(|ct| ct.id()).collect::<Vec<Id>>())
-                .ok_or(anyhow!(""))?;
+            IdSet::from_slice(&cts.iter().map(|ct| ct.id()).collect::<Vec<Id>>());
 
         digest_key.digest(&mut ids, round)
     }

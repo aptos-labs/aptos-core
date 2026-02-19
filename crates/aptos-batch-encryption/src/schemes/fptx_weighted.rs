@@ -2,10 +2,10 @@
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 use crate::{
     errors::{BatchEncryptionError, MissingEvalProofError}, group::*, schemes::fptx::FPTX, shared::{
-        ciphertext::{CTDecrypt, CTEncrypt, PreparedCiphertext, StandardCiphertext},
+        ciphertext::{PreparedCiphertext, StandardCiphertext},
         digest::{Digest, DigestKey, EvalProof, EvalProofs, EvalProofsPromise},
         encryption_key::EncryptionKey,
-        ids::{Id, IdSet, UncomputedCoeffs},
+        ids::Id,
         key_derivation::{
             self, BIBEDecryptionKey, BIBEDecryptionKeyShareValue, BIBEMasterSecretKeyShare,
             BIBEVerificationKey,
@@ -14,7 +14,7 @@ use crate::{
         AssociatedData, BatchThresholdEncryption, DecryptionKeyShare, Plaintext, VerificationKey,
     }
 };
-use anyhow::{anyhow, Result};
+use anyhow::Result;
 use aptos_crypto::{
     arkworks::serialization::{ark_de, ark_se},
     weighted_config::WeightedConfigArkworks,

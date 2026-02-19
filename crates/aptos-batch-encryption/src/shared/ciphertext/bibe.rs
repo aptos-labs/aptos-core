@@ -218,7 +218,7 @@ pub mod tests {
         let tc = ShamirThresholdConfig::new(1, 1);
         let (ek, dk, _, msk_shares) = FPTX::setup_for_testing(rng.r#gen(), 8, 1, &tc).unwrap();
 
-        let mut ids = IdSet::with_capacity(dk.capacity()).unwrap();
+        let mut ids = IdSet::with_capacity(dk.capacity());
         let mut counter = Fr::zero();
 
         for _ in 0..dk.capacity() {

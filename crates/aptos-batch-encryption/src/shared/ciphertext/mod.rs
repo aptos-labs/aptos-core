@@ -203,7 +203,7 @@ pub mod tests {
         let associated_data = String::from("");
         let ct: StandardCiphertext = ek.encrypt(&mut rng, &plaintext, &associated_data).unwrap();
 
-        let mut ids = IdSet::with_capacity(dk.capacity()).unwrap();
+        let mut ids = IdSet::with_capacity(dk.capacity());
         ids.add(&ct.id());
 
         ids.compute_poly_coeffs();
@@ -235,7 +235,7 @@ pub mod tests {
         let associated_data = String::from("");
         let ct: SuccinctCiphertext = ek.encrypt(&mut rng, &plaintext, &associated_data).unwrap();
 
-        let mut ids = IdSet::with_capacity(dk.capacity()).unwrap();
+        let mut ids = IdSet::with_capacity(dk.capacity());
         ids.add(&ct.id());
 
         ids.compute_poly_coeffs();

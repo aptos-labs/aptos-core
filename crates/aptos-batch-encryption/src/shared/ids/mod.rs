@@ -60,21 +60,23 @@ pub struct ComputedCoeffs {
 }
 
 impl IdSet<UncomputedCoeffs> {
-    pub fn from_slice(ids: &[Id]) -> Option<Self> {
-        let mut result = Self::with_capacity(ids.len())?;
+    pub fn from_slice(ids: &[Id]) -> Self {
+        let mut result = Self::with_capacity(ids.len());
         for id in ids {
+            // Note: although add() can panic, it never should here b/c we initialized Self
+            // with capcity equal to ids.len().
             result.add(id);
         }
-        Some(result)
+        result
     }
 
-    pub fn with_capacity(capacity: usize) -> Option<Self> {
+    pub fn with_capacity(capacity: usize) -> Self {
         let capacity = capacity.next_power_of_two();
-        Some(Self {
+        Self {
             poly_roots: Vec::new(),
             capacity,
             poly_coeffs: UncomputedCoeffs,
-        })
+        }
     }
 
     pub fn capacity(&self) -> usize {
