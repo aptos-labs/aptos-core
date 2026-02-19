@@ -61,8 +61,8 @@ where
 /// component homomorphisms to the same input and returning their results
 /// as a tuple.
 ///
-/// In other words, for input `x: Domain`, this produces
-/// `(hom1(x), hom2(x))`. For technical reasons, we then put the output inside a wrapper.
+/// In other words, for input `x: Domain`, this produces `(hom1(x), hom2(x))`.
+/// For technical reasons, we then put the output inside a wrapper.
 impl<H1, H2> homomorphism::Trait for TupleHomomorphism<H1, H2>
 where
     H1: homomorphism::Trait,
@@ -260,7 +260,7 @@ where
 
 /// Slightly hacky implementation of a sigma protocol for `PairingTupleHomomorphism`
 ///
-/// We need `E: Pairing` here because the sigma_protocol needs to know which curves `H1` and `H2` are working over
+/// We need `E: Pairing` here because the sigma protocol needs to know which curves `H1` and `H2` are working over
 impl<E: Pairing, H1, H2> PairingTupleHomomorphism<E, H1, H2>
 where
     H1: sigma_protocol::Trait<E::G1>,
@@ -406,3 +406,9 @@ where
         (first_input, second_input)
     }
 }
+
+// TODO: mediocre idea for Shplonked: do another "custom" sigma protocol trait for:
+// a tuple with on the LHS an ordinary fixed-base-msms 
+// on the RHS, something that might be a homomorphism from F^k -> F
+// so maybe if we define a custom sigma protocol trait for such a hom
+// then the tuple version can be automatic just as above

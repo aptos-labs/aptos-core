@@ -192,7 +192,7 @@ where
 {
     fn append_sigma_protocol_ctxt<C: Serialize>(&mut self, ctxt: &C) {
         let ctxt_bytes = bcs::to_bytes(ctxt).expect("ctxt data serialization should succeed");
-        self.append_message(b"aux", ctxt_bytes.as_slice());
+        self.append_message(b"ctxt", ctxt_bytes.as_slice());
     }
 
     fn append_sigma_protocol_msm_bases(&mut self, hom: &H) {

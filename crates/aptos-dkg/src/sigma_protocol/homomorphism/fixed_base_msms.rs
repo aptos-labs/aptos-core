@@ -80,7 +80,7 @@ pub trait Trait:
 
     /// Applies `msm_eval` elementwise to a collection of MSM inputs.
     fn apply_msm(
-        &self, // TODO: remove this
+        &self, // TODO: might be able to get rid of this?
         msms: Self::CodomainShape<MsmInput<Self::Base, Self::Scalar>>,
     ) -> Self::CodomainShape<Self::MsmOutput>
     where

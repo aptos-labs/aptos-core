@@ -47,10 +47,9 @@ pub trait Trait<C: CurveGroup>:
         cntxt: &Ct, // for SoK purposes
         rng: &mut R,
     ) -> (
-        Proof<<Self as fixed_base_msms::Trait>::Scalar, Self>,
+        Proof<<Self as fixed_base_msms::Trait>::Scalar, Self>, // or C::ScalarField
         <Self as homomorphism::Trait>::CodomainNormalized,
     ) {
-        // or C::ScalarField
         prove_homomorphism(self, witness, statement, cntxt, true, rng, &self.dst())
     }
 
@@ -357,7 +356,7 @@ pub fn prove_homomorphism<Ct: Serialize, F: PrimeField, H: homomorphism::Trait, 
     witness: &H::Domain,
     statement: H::Codomain,
     cntxt: &Ct,
-    store_prover_commitment: bool, // true = store prover's commitment, false = store Fiat-Shamir challenge
+    store_prover_commitment: bool, // true = store prover's commitment, false = store Fiat-Shamir challenge instead
     rng: &mut R,
     dst: &[u8],
 ) -> (Proof<F, H>, H::CodomainNormalized)

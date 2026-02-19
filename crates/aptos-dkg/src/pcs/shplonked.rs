@@ -4,7 +4,7 @@
 // ZK-PCS (Shplonked) opening proof types and routines, extracted for use by range proofs.
 
 use crate::{
-    fiat_shamir::PolynomialCommitmentScheme as _,
+    fiat_shamir::{PolynomialCommitmentScheme as _},
     pcs::{
         traits::PolynomialCommitmentScheme,
         univariate_hiding_kzg::{self, Trapdoor},
@@ -410,6 +410,36 @@ pub fn zk_pcs_verify<E: Pairing, R: RngCore + CryptoRng>(
     if PairingOutput::<E>::zero() != result {
         return Err(anyhow::anyhow!("Expected zero during multi-pairing check"));
     }
+
+    verify_sigma_proof(
+        &sigma_proof_statement,
+        sigma_proof,
+        eval_points,
+        &z_T,
+        z,
+        gamma,
+        srs,
+        trs,
+        rng,
+    )
+}
+
+/// Verifies the sigma protocol part of the ZK-PCS opening proof (com_y commitment and V relation).
+#[allow(non_snake_case)]
+fn verify_sigma_proof<E: Pairing, R: RngCore + CryptoRng>(
+    statement: &ZkPcsOpeningSigmaProofStatement<E>,
+    sigma_proof: &ZkPcsOpeningSigmaProof<E>,
+    eval_points: &[E::ScalarField],
+    z_T: &DensePolynomial<E::ScalarField>,
+    z: E::ScalarField,
+    gamma: E::ScalarField,
+    srs: &Srs<E>,
+    trs: &mut merlin::Transcript,
+    rng: &mut R,
+) -> anyhow::Result<()> {
+    let com_y = statement.com_y;
+    let V = statement.V;
+    let y_sum = statement.y_sum;
 
     trs.append_point(&sigma_proof.r_com_y);
     trs.append_point(&sigma_proof.r_V);
