@@ -4,6 +4,9 @@
 #![allow(unexpected_cfgs)]
 #![forbid(unsafe_code)]
 
+#[cfg(any(feature = "testing", feature = "fuzzing"))]
+compile_error!("Testing features shouldn't be compiled for production aptos-node");
+
 mod consensus;
 mod indexer;
 mod logger;
@@ -246,11 +249,6 @@ pub fn start_and_report_ports(
     ensure_max_open_files_limit(
         config.storage.ensure_rlimit_nofile,
         config.storage.assert_rlimit_nofile,
-    );
-
-    assert!(
-        !cfg!(feature = "testing") && !cfg!(feature = "fuzzing"),
-        "Testing features shouldn't be compiled"
     );
 
     // Ensure failpoints are configured correctly

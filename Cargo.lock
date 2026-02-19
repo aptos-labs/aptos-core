@@ -916,7 +916,6 @@ name = "aptos-compression"
 version = "0.1.0"
 dependencies = [
  "aptos-crypto",
- "aptos-logger",
  "aptos-metrics-core",
  "aptos-types",
  "bcs 0.1.4",
