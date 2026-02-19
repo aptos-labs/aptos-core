@@ -32,6 +32,7 @@ pub fn create_account_authenticator(public_key: Ed25519PublicKey) -> AccountAuth
 }
 
 /// Creates and returns a list of transactions (3 encrypted and 5 plaintext)
+#[cfg(test)]
 pub fn create_encrypted_and_plaintext_transactions() -> Vec<SignedTransaction> {
     let mut transactions = vec![];
 
@@ -50,6 +51,7 @@ pub fn create_encrypted_and_plaintext_transactions() -> Vec<SignedTransaction> {
 }
 
 /// Creates and returns an encrypted transaction
+#[cfg(test)]
 pub fn create_encrypted_transaction() -> SignedTransaction {
     let encrypted_payload = EncryptedPayload::Encrypted {
         ciphertext: Ciphertext::random(),
@@ -65,6 +67,7 @@ pub fn create_encrypted_transaction() -> SignedTransaction {
 }
 
 /// Creates and returns an encrypted transaction in a failed decryption state
+#[cfg(test)]
 pub fn create_encrypted_transaction_failed_state() -> SignedTransaction {
     let encrypted_payload = EncryptedPayload::FailedDecryption {
         ciphertext: Ciphertext::random(),
@@ -81,6 +84,7 @@ pub fn create_encrypted_transaction_failed_state() -> SignedTransaction {
 }
 
 /// Creates and returns an encrypted transaction in a plaintext state
+#[cfg(test)]
 pub fn create_encrypted_transaction_plaintext_state() -> SignedTransaction {
     let encrypted_payload = EncryptedPayload::Decrypted {
         ciphertext: Ciphertext::random(),

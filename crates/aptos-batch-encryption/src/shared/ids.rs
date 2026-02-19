@@ -41,9 +41,7 @@ impl Id {
     }
 }
 
-/// A set of IDs that is encoded via arbitrary points. Evaluation proof computation is
-/// slower than [`FFTDomainIdSet`], but allows for creating IDs over a large space with
-/// low probability of collision.
+/// A set of IDs that is encoded via arbitrary roots.
 #[derive(PartialEq, Eq, Debug, Clone)]
 pub struct IdSet<Coeffs> {
     pub poly_roots: Vec<Fr>,

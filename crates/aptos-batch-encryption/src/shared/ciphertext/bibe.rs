@@ -59,23 +59,6 @@ pub struct PreparedBIBECiphertext {
     pub(crate) symmetric_ciphertext: SymmetricCiphertext,
 }
 
-#[cfg(test)]
-impl BIBECiphertext {
-    pub(crate) fn blank_for_testing() -> Self {
-        use ark_std::Zero;
-
-        BIBECiphertext {
-            id: Id::new(Fr::zero()),
-            ct_g2: [
-                G2Affine::generator(),
-                (G2Affine::generator() * Fr::from(2)).into(),
-                (G2Affine::generator() * Fr::from(3)).into(),
-            ],
-            padded_key: OneTimePaddedKey::blank_for_testing(),
-            symmetric_ciphertext: SymmetricCiphertext::blank_for_testing(),
-        }
-    }
-}
 
 pub trait BIBECTEncrypt {
     type CT: InnerCiphertext;
@@ -189,6 +172,24 @@ impl<P: Plaintext> BIBECTDecrypt<P> for BIBEDecryptionKey {
         let symmetric_key = otp.unpad_key(&ct.padded_key);
 
         symmetric_key.decrypt(&ct.symmetric_ciphertext)
+    }
+}
+
+#[cfg(test)]
+impl BIBECiphertext {
+    pub(crate) fn blank_for_testing() -> Self {
+        use ark_std::Zero;
+
+        BIBECiphertext {
+            id: Id::new(Fr::zero()),
+            ct_g2: [
+                G2Affine::generator(),
+                (G2Affine::generator() * Fr::from(2)).into(),
+                (G2Affine::generator() * Fr::from(3)).into(),
+            ],
+            padded_key: OneTimePaddedKey::blank_for_testing(),
+            symmetric_ciphertext: SymmetricCiphertext::blank_for_testing(),
+        }
     }
 }
 

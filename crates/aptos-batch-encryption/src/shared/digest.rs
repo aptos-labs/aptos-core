@@ -148,7 +148,6 @@ impl DigestKey {
     }
 
     fn verify_pf(&self, digest: &Digest, id: Id, pf: G1Affine) -> Result<()> {
-        // TODO use multipairing here?
         Ok((PairingSetting::pairing(
             pf,
             self.tau_g2 - G2Projective::from(G2Affine::generator() * id.x()),
