@@ -15,6 +15,7 @@ use aptos_dkg::{
             tuple::{PairingTupleHomomorphism, TupleHomomorphism},
             Trait as _,
         },
+        Trait as _,
     },
     Scalar,
 };

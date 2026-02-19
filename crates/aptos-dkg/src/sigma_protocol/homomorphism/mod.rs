@@ -7,6 +7,7 @@ use ark_serialize::{
 use std::fmt::Debug;
 
 pub mod fixed_base_msms;
+pub mod sum_hom;
 pub mod tuple;
 
 /// A `Homomorphism` represents a structure-preserving map between algebraic objects.

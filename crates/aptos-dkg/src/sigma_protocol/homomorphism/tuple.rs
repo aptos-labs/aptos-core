@@ -7,7 +7,7 @@ use crate::{
         homomorphism,
         homomorphism::{fixed_base_msms, EntrywiseMap},
         traits::{prove_homomorphism, verifier_challenges_with_length},
-        Proof,
+        Proof, Trait as _,
     },
 };
 use anyhow::ensure;
@@ -260,6 +260,63 @@ where
     }
 }
 
+impl<E: Pairing, H1, H2> sigma_protocol::Trait for PairingTupleHomomorphism<E, H1, H2>
+where
+    H1: sigma_protocol::CurveGroupTrait<Group = E::G1>,
+    H2: sigma_protocol::CurveGroupTrait<Group = E::G2>,
+    H2: fixed_base_msms::Trait<Domain = H1::Domain>,
+{
+    type Scalar = E::ScalarField;
+
+    fn dst(&self) -> Vec<u8> {
+        homomorphism::domain_separate_dsts(
+            b"PairingTupleHomomorphism(",
+            &[self.hom1.dst(), self.hom2.dst()],
+            b")",
+        )
+    }
+
+    fn prove<Ct: Serialize, R: RngCore + CryptoRng>(
+        &self,
+        witness: &<Self as homomorphism::Trait>::Domain,
+        statement: <Self as homomorphism::Trait>::Codomain,
+        cntxt: &Ct, // for SoK purposes
+        rng: &mut R,
+    ) -> (
+        Proof<H1::Scalar, Self>,
+        <Self as homomorphism::Trait>::CodomainNormalized,
+    ) {
+        prove_homomorphism(self, witness, statement, cntxt, true, rng, &self.dst())
+    }
+
+    // Probably not using this atm... but that's okay
+    #[allow(non_snake_case)]
+    fn verify<Ct: Serialize, R: RngCore + CryptoRng>(
+        &self,
+        public_statement: &Self::CodomainNormalized,
+        proof: &Proof<Self::Scalar, Self>,
+        cntxt: &Ct,
+        rng: &mut R,
+    ) -> anyhow::Result<()>
+// where
+    //     H: homomorphism::Trait<
+    //         Domain = <Self as homomorphism::Trait>::Domain,
+    //         CodomainNormalized = <Self as homomorphism::Trait>::CodomainNormalized,
+    //     >,
+    {
+        let (first_msm_terms, second_msm_terms) =
+            self.msm_terms_for_verify::<_, _, _>(public_statement, proof, cntxt, None, rng);
+
+        let first_msm_result = H1::msm_eval(first_msm_terms);
+        ensure!(first_msm_result == H1::MsmOutput::zero());
+
+        let second_msm_result = H2::msm_eval(second_msm_terms);
+        ensure!(second_msm_result == H2::MsmOutput::zero());
+
+        Ok(())
+    }
+}
+
 /// Slightly hacky implementation of a sigma protocol for `PairingTupleHomomorphism`
 ///
 /// We need `E: Pairing` here because the sigma protocol needs to know which curves `H1` and `H2` are working over
@@ -269,14 +326,6 @@ where
     H2: sigma_protocol::CurveGroupTrait<Group = E::G2>,
     H2: fixed_base_msms::Trait<Domain = H1::Domain>,
 {
-    fn dst(&self) -> Vec<u8> {
-        homomorphism::domain_separate_dsts(
-            b"PairingTupleHomomorphism(",
-            &[self.hom1.dst(), self.hom2.dst()],
-            b")",
-        )
-    }
-
     /// Returns the MSM terms for each homomorphism, combined into a tuple.
     fn msm_terms(
         &self,
@@ -307,46 +356,6 @@ where
     ) -> anyhow::Result<()> {
         let result = H2::msm_eval(input);
         ensure!(result == H2::MsmOutput::zero());
-        Ok(())
-    }
-
-    pub fn prove<Ct: Serialize, R: RngCore + CryptoRng>(
-        &self,
-        witness: &<Self as homomorphism::Trait>::Domain,
-        statement: <Self as homomorphism::Trait>::Codomain,
-        cntxt: &Ct, // for SoK purposes
-        rng: &mut R,
-    ) -> (
-        Proof<H1::Scalar, Self>,
-        <Self as homomorphism::Trait>::CodomainNormalized,
-    ) {
-        prove_homomorphism(self, witness, statement, cntxt, true, rng, &self.dst())
-    }
-
-    // Probably not using this atm
-    #[allow(non_snake_case)]
-    pub fn verify<Ct: Serialize, H, R: RngCore + CryptoRng>(
-        &self,
-        public_statement: &<Self as homomorphism::Trait>::CodomainNormalized,
-        proof: &Proof<H1::Scalar, H>, // Would like to set &Proof<E, Self>, but that ties the lifetime of H to that of Self, but we'd like it to be eg static
-        cntxt: &Ct,
-        rng: &mut R,
-    ) -> anyhow::Result<()>
-    where
-        H: homomorphism::Trait<
-            Domain = <Self as homomorphism::Trait>::Domain,
-            CodomainNormalized = <Self as homomorphism::Trait>::CodomainNormalized,
-        >,
-    {
-        let (first_msm_terms, second_msm_terms) =
-            self.msm_terms_for_verify::<_, H, _>(public_statement, proof, cntxt, None, rng);
-
-        let first_msm_result = H1::msm_eval(first_msm_terms);
-        ensure!(first_msm_result == H1::MsmOutput::zero());
-
-        let second_msm_result = H2::msm_eval(second_msm_terms);
-        ensure!(second_msm_result == H2::MsmOutput::zero());
-
         Ok(())
     }
 

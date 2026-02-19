@@ -31,6 +31,7 @@ use crate::{
             tuple::{PairingTupleHomomorphism, TupleCodomainShape},
             Trait as _, TrivialShape,
         },
+        Trait as _,
     },
     Scalar,
 };
