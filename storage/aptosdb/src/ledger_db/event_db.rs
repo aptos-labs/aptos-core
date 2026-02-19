@@ -20,7 +20,7 @@ use aptos_db_indexer_schemas::schema::{
 };
 use aptos_schemadb::{
     batch::{SchemaBatch, WriteBatch},
-    DB,
+    ReadOptions, DB,
 };
 use aptos_storage_interface::{AptosDbError, Result};
 use aptos_types::{
@@ -199,7 +199,13 @@ impl EventDb {
 
         let mut current_version = start;
 
-        for events in self.get_events_by_version_iter(start, (end - start) as usize)? {
+        let mut read_opts = ReadOptions::default();
+        read_opts.fill_cache(false);
+        let mut iter = self.db.iter_with_opts::<EventSchema>(read_opts)?;
+        iter.seek(&start)?;
+        let events_iter = EventsByVersionIter::new(iter, start, end);
+
+        for events in events_iter {
             let events = events?;
             ret.push(events.len());
 
