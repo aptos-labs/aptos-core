@@ -161,8 +161,8 @@ impl DataCollection {
                 base_experiments,
                 &[],
             );
-            if res.is_err() {
-                eprintln!("{} at: {}", res.unwrap_err(), version);
+            if let Err(err) = res {
+                eprintln!("{} at: {}", err, version);
                 return None;
             }
         }
