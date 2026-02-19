@@ -11,7 +11,7 @@ use crate::{
 };
 use aptos_crypto::{
     ed25519::{Ed25519PrivateKey, Ed25519Signature},
-    HashValue, PrivateKey, Uniform,
+    HashValue, PrivateKey, SigningKey, Uniform,
 };
 use aptos_rest_client::aptos_api_types::{ResourceGroup, TransactionOnChainData};
 use aptos_types::{
@@ -454,4 +454,185 @@ async fn test_fa_transfer_other_currency() {
     );
     assert_eq!(operation_3.amount.as_ref().unwrap().currency, native_coin());
     // TODO: Check fee
+}
+
+fn test_fee_payer_transaction(
+    sender: AccountAddress,
+    fee_payer: AccountAddress,
+    version: u64,
+    changes: WriteSet,
+    events: Vec<ContractEvent>,
+) -> TransactionOnChainData {
+    let sender_private_key = Ed25519PrivateKey::generate_for_testing();
+    let fee_payer_private_key = Ed25519PrivateKey::generate_for_testing();
+
+    let raw_txn = get_test_raw_transaction(
+        sender,
+        0,
+        None,
+        None,
+        Some(101),
+        None,
+    );
+
+    let sender_auth = aptos_types::transaction::authenticator::AccountAuthenticator::ed25519(
+        sender_private_key.public_key(),
+        sender_private_key.sign(&raw_txn).unwrap(),
+    );
+    let fee_payer_auth = aptos_types::transaction::authenticator::AccountAuthenticator::ed25519(
+        fee_payer_private_key.public_key(),
+        fee_payer_private_key.sign(&raw_txn).unwrap(),
+    );
+
+    TransactionOnChainData {
+        version,
+        transaction: aptos_types::transaction::Transaction::UserTransaction(
+            aptos_types::transaction::SignedTransaction::new_fee_payer(
+                raw_txn,
+                sender_auth,
+                vec![],
+                vec![],
+                fee_payer,
+                fee_payer_auth,
+            ),
+        ),
+        info: TransactionInfo::V0(TransactionInfoV0::new(
+            HashValue::random(),
+            HashValue::random(),
+            HashValue::random(),
+            None,
+            178,
+            ExecutionStatus::Success,
+            None,
+        )),
+        events,
+        accumulator_root_hash: Default::default(),
+        changes,
+    }
+}
+
+#[tokio::test]
+async fn test_fee_payer_transfer_attributes_fee_to_fee_payer() {
+    let context = test_rosetta_context().await;
+
+    let version = 0;
+    let amount = 50000;
+    let sender = AccountAddress::random();
+    let fee_payer = AccountAddress::random();
+    let receiver = AccountAddress::random();
+    let store_address = AccountAddress::random();
+    let receiver_store_address = AccountAddress::random();
+    let (changes, events) = transfer_fa_output(
+        sender,
+        APT_ADDRESS,
+        store_address,
+        amount * 2,
+        receiver,
+        receiver_store_address,
+        0,
+        amount,
+    );
+    let input = test_fee_payer_transaction(sender, fee_payer, version, changes, events);
+
+    let result = Transaction::from_transaction(&context, input).await;
+    let expected_txn = result.expect("Must succeed");
+    assert_eq!(3, expected_txn.operations.len(), "Ops: {:#?}", expected_txn);
+
+    let withdraw_op = expected_txn.operations.first().unwrap();
+    assert_eq!(
+        withdraw_op.operation_type,
+        OperationType::Withdraw.to_string()
+    );
+    assert_eq!(
+        withdraw_op
+            .account
+            .as_ref()
+            .unwrap()
+            .account_address()
+            .unwrap(),
+        sender
+    );
+
+    let deposit_op = expected_txn.operations.get(1).unwrap();
+    assert_eq!(
+        deposit_op.operation_type,
+        OperationType::Deposit.to_string()
+    );
+    assert_eq!(
+        deposit_op
+            .account
+            .as_ref()
+            .unwrap()
+            .account_address()
+            .unwrap(),
+        receiver
+    );
+
+    let fee_op = expected_txn.operations.get(2).unwrap();
+    assert_eq!(fee_op.operation_type, OperationType::Fee.to_string());
+    assert_eq!(
+        fee_op
+            .account
+            .as_ref()
+            .unwrap()
+            .account_address()
+            .unwrap(),
+        fee_payer,
+        "Fee should be attributed to the fee payer, not the sender"
+    );
+    assert_ne!(
+        fee_op
+            .account
+            .as_ref()
+            .unwrap()
+            .account_address()
+            .unwrap(),
+        sender,
+        "Fee must not be attributed to the sender when a fee payer is present"
+    );
+}
+
+#[tokio::test]
+async fn test_fee_payer_mint_attributes_fee_to_fee_payer() {
+    let context = test_rosetta_context().await;
+
+    let version = 0;
+    let amount = 100;
+    let sender = AccountAddress::random();
+    let fee_payer = AccountAddress::random();
+    let store_address = AccountAddress::random();
+    let (mint_changes, mint_events) = mint_fa_output(sender, APT_ADDRESS, store_address, 0, amount);
+    let input = test_fee_payer_transaction(sender, fee_payer, version, mint_changes, mint_events);
+
+    let result = Transaction::from_transaction(&context, input).await;
+    let expected_txn = result.expect("Must succeed");
+    assert_eq!(2, expected_txn.operations.len());
+
+    let deposit_op = expected_txn.operations.first().unwrap();
+    assert_eq!(
+        deposit_op.operation_type,
+        OperationType::Deposit.to_string()
+    );
+    assert_eq!(
+        deposit_op
+            .account
+            .as_ref()
+            .unwrap()
+            .account_address()
+            .unwrap(),
+        sender,
+    );
+
+    let fee_op = expected_txn.operations.get(1).unwrap();
+    assert_eq!(fee_op.operation_type, OperationType::Fee.to_string());
+    assert_eq!(
+        fee_op
+            .account
+            .as_ref()
+            .unwrap()
+            .account_address()
+            .unwrap(),
+        fee_payer,
+        "Fee should be attributed to the fee payer, not the sender"
+    );
 }
