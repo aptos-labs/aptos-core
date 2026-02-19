@@ -4,8 +4,8 @@
 
 Implementing Prefix Consensus protocols (from research paper "Prefix Consensus For Censorship Resistant BFT") within Aptos Core for leaderless, censorship-resistant consensus.
 
-**Current Phase**: Multi-Slot Consensus (Algorithm 4) — Phase 1 complete, Phase 2 next
-**Completed**: Basic Prefix Consensus, Strong Prefix Consensus (Phases 1-9), Stake-Weighted Quorum Refactoring, Multi-Slot Phase 1
+**Current Phase**: Multi-Slot Consensus (Algorithm 4) — Phases 1-2 complete, Phase 3 next
+**Completed**: Basic Prefix Consensus, Strong Prefix Consensus (Phases 1-9), Stake-Weighted Quorum Refactoring, Multi-Slot Phases 1-2
 
 ---
 
@@ -105,8 +105,8 @@ Execution Pipeline (unchanged):
 9. **SPC per slot**: Separate tokio task, channels for communication, graceful shutdown via close_tx/ack
 
 ### Implementation Phases
-1. Slot types + network messages (~300 LOC)
-2. Multi-slot ranking manager (~150 LOC)
+1. ~~Slot types + network messages (~300 LOC)~~ ✅
+2. ~~Multi-slot ranking manager (~150 LOC)~~ ✅
 3. Proposal buffer + slot state (~400 LOC)
 4. Block builder + PrefixConsensusBlock variant (~350 LOC)
 5. SlotManager core (~800 LOC)
@@ -122,8 +122,8 @@ Execution Pipeline (unchanged):
 ## Repository State
 
 - **Branch**: `prefix-consensus-prototype`
-- **HEAD**: Multi-Slot Phase 1 (SlotProposal types + network wiring)
-- **Tests**: 195/195 unit tests, 4/4 smoke tests
+- **HEAD**: Multi-Slot Phase 2 (MultiSlotRankingManager + cross-slot demotion)
+- **Tests**: 202/202 unit tests, 4/4 smoke tests
 - **Build**: Clean
 
 ### Repository Structure
@@ -144,7 +144,8 @@ consensus/prefix-consensus/src/
 ├── strong_manager.rs     - Strong PC orchestrator, generic over InnerPCAlgorithm (~1270 lines)
 ├── inner_pc_trait.rs     - InnerPCAlgorithm trait (~90 lines)
 ├── inner_pc_impl.rs      - ThreeRoundPC implementation (~400 lines)
-└── slot_types.rs         - SlotProposal, SlotConsensusMsg, signing (~230 lines) — Phase 1
+├── slot_types.rs         - SlotProposal, SlotConsensusMsg, signing (~230 lines) — Phase 1
+└── slot_ranking.rs       - MultiSlotRankingManager, cross-slot demotion (~80 lines) — Phase 2
 
 testsuite/smoke-test/src/consensus/
 ├── prefix_consensus/     - 2 basic PC smoke tests
@@ -157,6 +158,8 @@ testsuite/smoke-test/src/consensus/
 - `.plans/inner-pc-trait.md` — Inner PC Abstraction Trait (complete)
 - `.plans/multi-slot-consensus.md` — Multi-Slot Consensus Algorithm 4 (current)
 - `.plans/phase1-slot-types.md` — Phase 1: Slot types + network messages (complete)
+- `.plans/phase2-slot-ranking.md` — Phase 2: Multi-slot ranking manager (complete)
+- `.plans/phase12-verifiable-ranking.md` — Phase 12: Verifiable ranking with SPC-aware demotion (after end-to-end)
 
 ---
 
