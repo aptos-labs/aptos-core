@@ -978,6 +978,10 @@ impl Transaction {
 
             // For storage fee refund
             if let Some(user_txn) = maybe_user_txn {
+                let refund_recipient = user_txn
+                    .authenticator()
+                    .fee_payer_address()
+                    .unwrap_or_else(|| user_txn.sender());
                 let fee_events = get_fee_statement_from_event(&events)
                     .into_iter()
                     .filter(|event| event.storage_fee_refund() > 0);
@@ -985,7 +989,7 @@ impl Transaction {
                     operations.push(Operation::deposit(
                         operation_index,
                         Some(OperationStatusType::Success),
-                        AccountIdentifier::base_account(user_txn.sender()),
+                        AccountIdentifier::base_account(refund_recipient),
                         native_coin(),
                         event.storage_fee_refund(),
                     ));
@@ -1015,9 +1019,13 @@ impl Transaction {
 
         // Everything committed costs gas
         if let Some(txn) = maybe_user_txn {
+            let gas_payer = txn
+                .authenticator()
+                .fee_payer_address()
+                .unwrap_or_else(|| txn.sender());
             operations.push(Operation::gas_fee(
                 operation_index,
-                txn.sender(),
+                gas_payer,
                 txn_info.gas_used(),
                 txn.gas_unit_price(),
             ));
