@@ -574,8 +574,8 @@ async fn test_notifications_continuous_transactions_or_outputs_target() {
         }
 
         // Update the next expected version
-        let num_transactions = if transactions_with_proof.is_some() {
-            transactions_with_proof.unwrap().get_num_transactions() as u64
+        let num_transactions = if let Some(txns) = transactions_with_proof {
+            txns.get_num_transactions() as u64
         } else {
             outputs_with_proof.unwrap().get_num_outputs() as u64
         };
@@ -641,8 +641,8 @@ async fn test_notifications_continuous_transactions_or_outputs_multiple_streams(
         assert_eq!(Some(next_expected_version), first_version);
 
         // Update the next expected version
-        let num_transactions = if transactions_with_proof.is_some() {
-            transactions_with_proof.unwrap().get_num_transactions() as u64
+        let num_transactions = if let Some(txns) = transactions_with_proof {
+            txns.get_num_transactions() as u64
         } else {
             outputs_with_proof.unwrap().get_num_outputs() as u64
         };
