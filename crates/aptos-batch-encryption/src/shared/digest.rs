@@ -138,7 +138,7 @@ impl DigestKey {
 
             let digest = Digest {
                 digest_g1: G1Projective::msm(&self.tau_powers_g1[round], &coeffs)
-                    .unwrap()
+                    .expect("Sizes should always match up b/c of check above")
                     .into(),
                 round,
             };

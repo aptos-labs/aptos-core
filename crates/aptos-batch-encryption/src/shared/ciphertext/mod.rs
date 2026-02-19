@@ -103,6 +103,9 @@ impl<EK: BIBECTEncrypt> CTEncrypt<EK::CT> for EK {
 }
 
 impl<PCT: InnerCiphertext> Ciphertext<PCT> {
+
+    /// Only used for testing.
+    #[cfg(test)]
     pub fn random() -> Self {
         use ark_std::rand::thread_rng;
 
