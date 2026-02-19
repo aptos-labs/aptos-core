@@ -27,7 +27,33 @@ use rand_core::{CryptoRng, RngCore};
 use serde::Serialize;
 use std::{fmt::Debug, hash::Hash};
 
-pub trait Trait<C: CurveGroup>:
+pub trait Trait: homomorphism::Trait<Domain: Witness<Self::Scalar>, CodomainNormalized: Statement> + Sized {
+    type Scalar: ark_ff::PrimeField; // CanonicalSerialize + CanonicalDeserialize + Clone + Debug + Eq;
+
+    fn dst(&self) -> Vec<u8>;
+
+    fn prove<Ct: Serialize, R: RngCore + CryptoRng>(
+        &self,
+        witness: &Self::Domain,
+        statement: Self::Codomain,
+        cntxt: &Ct, // for SoK purposes
+        rng: &mut R,
+    ) -> (Proof<Self::Scalar, Self>, Self::CodomainNormalized);
+    
+    fn verify<Ct: Serialize, R: RngCore + CryptoRng>(
+        &self,
+        public_statement: &Self::CodomainNormalized,
+        proof: &Proof<Self::Scalar, Self>,
+        cntxt: &Ct,
+        rng: &mut R,
+    ) -> anyhow::Result<()>;    
+}
+
+// TODO: rename this to CurveGroupTrait
+// then make a more basic Trait
+// then make CurveGroupTrait automatically implement that
+// and then make a field hom implement the basic Trait
+pub trait CurveGroupTrait<C: CurveGroup>:
     fixed_base_msms::Trait<
         Domain: Witness<C::ScalarField>,
         Base = C::Affine,

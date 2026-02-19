@@ -180,10 +180,10 @@ where
     }
 }
 
-impl<C: CurveGroup, H, LargerDomain> sigma_protocol::Trait<C>
+impl<C: CurveGroup, H, LargerDomain> sigma_protocol::CurveGroupTrait<C>
     for homomorphism::LiftHomomorphism<H, LargerDomain>
 where
-    H: sigma_protocol::Trait<C>,
+    H: sigma_protocol::CurveGroupTrait<C>,
     LargerDomain: Witness<C::ScalarField>,
 {
     fn dst(&self) -> Vec<u8> {

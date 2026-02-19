@@ -31,7 +31,7 @@ const CNTXT: &[u8; 32] = b"SIGMA-PROTOCOL-TESTS-SOK-CONTEXT";
 pub fn test_sigma_protocol<C, H>(hom: H, witness: H::Domain)
 where
     C: CurveGroup,
-    H: sigma_protocol::Trait<C>,
+    H: sigma_protocol::CurveGroupTrait<C>,
 {
     let mut rng = thread_rng();
 
@@ -146,7 +146,7 @@ mod schnorr {
     }
 
     impl<C: CurveGroup<ScalarField = Fp<P, N>>, const N: usize, P: FpConfig<N>>
-        sigma_protocol::Trait<C> for Schnorr<C>
+        sigma_protocol::CurveGroupTrait<C> for Schnorr<C>
     {
         fn dst(&self) -> Vec<u8> {
             b"SCHNORR_SIGMA_PROTOCOL_DST".to_vec()

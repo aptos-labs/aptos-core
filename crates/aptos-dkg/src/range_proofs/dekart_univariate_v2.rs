@@ -10,7 +10,7 @@ use crate::{
     sigma_protocol::{
         self,
         homomorphism::{self, Trait as _},
-        Trait as _,
+        CurveGroupTrait as _,
     },
     utils, Scalar,
 };
@@ -1004,7 +1004,7 @@ pub mod two_term_msm {
         }
     }
 
-    impl<C: CurveGroup> sigma_protocol::Trait<C> for Homomorphism<C> {
+    impl<C: CurveGroup> sigma_protocol::CurveGroupTrait<C> for Homomorphism<C> {
         fn dst(&self) -> Vec<u8> {
             b"DEKART_V2_SIGMA_PROTOCOL".to_vec()
         }

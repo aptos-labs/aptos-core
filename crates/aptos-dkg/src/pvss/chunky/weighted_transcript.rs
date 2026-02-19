@@ -28,7 +28,7 @@ use crate::{
     sigma_protocol::{
         self,
         homomorphism::{tuple::TupleCodomainShape, Trait as _, TrivialShape},
-        traits::Trait as _,
+        traits::CurveGroupTrait as _,
     },
     Scalar,
 };

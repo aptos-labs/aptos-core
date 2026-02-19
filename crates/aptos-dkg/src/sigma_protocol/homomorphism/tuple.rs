@@ -241,10 +241,10 @@ where
     }
 }
 
-impl<C: CurveGroup, H1, H2> sigma_protocol::Trait<C> for TupleHomomorphism<H1, H2>
+impl<C: CurveGroup, H1, H2> sigma_protocol::CurveGroupTrait<C> for TupleHomomorphism<H1, H2>
 where
-    H1: sigma_protocol::Trait<C>,
-    H2: sigma_protocol::Trait<C>,
+    H1: sigma_protocol::CurveGroupTrait<C>,
+    H2: sigma_protocol::CurveGroupTrait<C>,
     H2: homomorphism::Trait<Domain = H1::Domain>,
 {
     /// Concatenate the DSTs of the two homomorphisms, plus some
@@ -263,8 +263,8 @@ where
 /// We need `E: Pairing` here because the sigma protocol needs to know which curves `H1` and `H2` are working over
 impl<E: Pairing, H1, H2> PairingTupleHomomorphism<E, H1, H2>
 where
-    H1: sigma_protocol::Trait<E::G1>,
-    H2: sigma_protocol::Trait<E::G2>,
+    H1: sigma_protocol::CurveGroupTrait<E::G1>,
+    H2: sigma_protocol::CurveGroupTrait<E::G2>,
     H2: fixed_base_msms::Trait<Domain = H1::Domain>,
 {
     fn dst(&self) -> Vec<u8> {
