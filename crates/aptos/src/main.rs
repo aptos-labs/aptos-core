@@ -9,13 +9,13 @@
 #[global_allocator]
 static ALLOC: jemallocator::Jemalloc = jemallocator::Jemalloc;
 
-use aptos::{move_tool, Tool};
+use aptos::Tool;
 use clap::Parser;
 use std::{process::exit, time::Duration};
 
 fn main() {
     // Register hooks.
-    move_tool::register_package_hooks();
+    aptos_move_cli::register_package_hooks();
 
     // Create a runtime.
     let runtime = tokio::runtime::Builder::new_multi_thread()

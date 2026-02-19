@@ -2,9 +2,10 @@
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 use crate::smoke_test_environment::SwarmBuilder;
-use aptos::{common::types::GasOptions, move_tool::MemberId, test::CliTestFramework};
+use aptos::{common::types::GasOptions, test::CliTestFramework};
 use aptos_forge::{NodeExt, Swarm, SwarmExt};
 use aptos_logger::info;
+use aptos_move_cli::MemberId;
 use aptos_types::on_chain_config::OnChainRandomnessConfig;
 use serde::{Deserialize, Serialize};
 use std::{collections::BTreeMap, str::FromStr, sync::Arc, time::Duration};

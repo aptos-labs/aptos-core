@@ -1,0 +1,15 @@
+error: post-condition does not hold
+  ┌─ <TEMPDIR>/prove_bad.move:3:16
+  │
+3 │     spec add { ensures result == a - b; }
+  │                ^^^^^^^^^^^^^^^^^^^^^^^^
+  │
+  =     at <TEMPDIR>/prove_bad.move:2: add
+  =         a = <val>
+  =         b = <val>
+  =         result = <val>
+  =     at <TEMPDIR>/prove_bad.move:3: add (spec)
+
+{
+  "Error": "Move Prover failed: exiting with verification errors"
+}

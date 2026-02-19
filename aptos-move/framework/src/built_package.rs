@@ -303,7 +303,14 @@ impl BuiltPackage {
 
             if let Some(model_options) = model.get_extension::<Options>() {
                 if model_options.experiment_on(Experiment::STOP_BEFORE_EXTENDED_CHECKS) {
-                    std::process::exit(if model.has_warnings() { 1 } else { 0 })
+                    if model.has_warnings() {
+                        bail!("exiting with warnings")
+                    }
+                    return Ok(BuiltPackage {
+                        options,
+                        package_path,
+                        package,
+                    });
                 }
             }
 
@@ -327,7 +334,14 @@ impl BuiltPackage {
                 if model_options.experiment_on(Experiment::FAIL_ON_WARNING) && has_target_warnings {
                     bail!("found warning(s), and `--fail-on-warning` is set")
                 } else if model_options.experiment_on(Experiment::STOP_AFTER_EXTENDED_CHECKS) {
-                    std::process::exit(if has_target_warnings { 1 } else { 0 })
+                    if has_target_warnings {
+                        bail!("exiting with context checking errors")
+                    }
+                    return Ok(BuiltPackage {
+                        options,
+                        package_path,
+                        package,
+                    });
                 }
             }
 

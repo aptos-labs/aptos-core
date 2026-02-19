@@ -7,10 +7,12 @@ use crate::{
 };
 use anyhow::Context;
 use aptos::{
-    account::fund::FundWithFaucet,
-    common::types::{CliCommand, MovePackageOptions, ScriptFunctionArguments, TransactionOptions},
+    account::fund::FundWithFaucet, common::types::CliCommand, create_move_env,
     governance::CompileScriptFunction,
-    move_tool::{CompileScript, RunScript},
+};
+use aptos_cli_common::{CliCommand as _, TransactionOptions};
+use aptos_move_cli::{
+    CompileScript, MovePackageOptions, RunScript, ScriptFunctionArguments, WithMoveEnv,
 };
 use aptos_protos::{
     indexer::v1::{raw_data_client::RawDataClient, GetTransactionsRequest},
@@ -196,12 +198,12 @@ impl ScriptTransactions {
 }
 
 fn create_compile_script_cmd(package_dir: PathBuf) -> CompileScript {
-    let mut move_package_dir = MovePackageOptions::default();
-    move_package_dir.package_dir = Some(package_dir);
-
     CompileScript {
         output_file: None,
-        move_options: move_package_dir,
+        move_options: MovePackageOptions {
+            package_dir: Some(package_dir),
+            ..Default::default()
+        },
     }
 }
 
@@ -216,7 +218,9 @@ fn create_run_script_cmd(script_path: PathBuf) -> RunScript {
             ..CompileScriptFunction::default()
         },
         script_function_args: ScriptFunctionArguments::default(),
+        env: Default::default(),
     }
+    .attach_env(create_move_env())
 }
 
 fn create_fund_cmd(amount: u64, account: &Account) -> FundWithFaucet {
