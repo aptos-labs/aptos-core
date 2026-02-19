@@ -48,22 +48,32 @@ pub trait Trait:
         proof: &Proof<Self::Scalar, Self>,
         cntxt: &Ct,
         rng: &mut R,
-    ) -> anyhow::Result<()>;
+    ) -> anyhow::Result<()> {
+        let prover_first_message = proof
+            .prover_commitment()
+            .expect("tuple proof must contain commitment for Fiat–Shamir");
+        let c = fiat_shamir_challenge_for_sigma_protocol::<_, Self::Scalar, _>(
+            cntxt,
+            self,
+            public_statement,
+            prover_first_message,
+            &self.dst(),
+        );
+        self.verify_with_challenge(public_statement, prover_first_message, c, &proof.z, cntxt, rng)
+    }
 
     /// Verify a component given an explicit Fiat–Shamir challenge (e.g. when this homomorphism
     /// is used inside a tuple and the challenge was derived from the tuple's first message).
     /// Default implementation returns an error; override for concrete homomorphism types.
     fn verify_with_challenge<Ct: Serialize, R: RngCore + CryptoRng>(
         &self,
-        _public_statement: &Self::CodomainNormalized,
-        _prover_commitment: &Self::CodomainNormalized,
-        _challenge: Self::Scalar,
-        _response: &Self::Domain,
-        _cntxt: &Ct,
-        _rng: &mut R,
-    ) -> anyhow::Result<()> {
-        anyhow::bail!("verify_with_challenge not implemented for this homomorphism")
-    }
+        public_statement: &Self::CodomainNormalized,
+        prover_commitment: &Self::CodomainNormalized,
+        challenge: Self::Scalar,
+        response: &Self::Domain,
+        cntxt: &Ct,
+        rng: &mut R,
+    ) -> anyhow::Result<()>;
 }
 
 impl<T: CurveGroupTrait> Trait for T {
