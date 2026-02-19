@@ -7,7 +7,7 @@ use crate::{
     sigma_protocol::{
         self,
         homomorphism::{
-            tuple::{TupleCodomainShape, TupleHomomorphism},
+            tuple::{TupleCodomainShape, CurveGroupTupleHomomorphism},
             LiftHomomorphism, TrivialShape,
         },
         FirstProofItem,
@@ -91,7 +91,7 @@ type LiftedWeightedChunkedElgamal<'a, C> = LiftHomomorphism<
 //  └──────────────┬────────────────────┘ ║        ╫        ║  └──────────────┬───────────────┘
 //                 │ ╔════════════════════╝        ╫        ╚═══════════════╗ │
 //       HKZG hom  │ ║                             ╫                        ║ │ Chunked ElGamal hom
-//                 │ ║                             ╫ TupleHomomorphism      ║ │
+//                 │ ║                             ╫ CrveGrpTplHomomorphism ║ │
 //                 ▼ ▼                             ╫                        ▼ ▼
 //   ┌──────────────────────────┐                  ╫         ┌──────────────────────────┐
 //   │ HKZG output (commitment) │                  ╫         │ Chunked ElGamal output   │
@@ -101,7 +101,7 @@ type LiftedWeightedChunkedElgamal<'a, C> = LiftHomomorphism<
 //                                                 ╫
 //                                                 ▼
 //                                  ┌──────────────────────────────────┐
-//                                  │   TupleHomomorphism output       │
+//                                  │   CrveGrpTplHomomorphism output  │
 //                                  │   (pair of HKZG image and        │
 //                                  │    Chunked ElGamal image)        │
 //                                  └──────────────────────────────────┘
@@ -120,8 +120,9 @@ type LiftedWeightedChunkedElgamal<'a, C> = LiftHomomorphism<
 // TODO: note here that we had to put a zero before z_{i,j}, because that's what DeKARTv2 is doing. So maybe
 // it would make more sense to say this is a tuple homomorphism consisting of (lifts of) the
 // DeKARTv2::commitment_homomorphism together with the chunked_elgamal::homomorphism.
-//pub type Homomorphism<'a, E> = TupleHomomorphism<LiftedHkzg<'a, E>, LiftedChunkedElgamal<'a, <E as Pairing>::G1>>;
-pub type WeightedHomomorphism<'a, E> = TupleHomomorphism<
+//pub type Homomorphism<'a, E> = CurveGroupTupleHomomorphism<LiftedHkzg<'a, E>, LiftedChunkedElgamal<'a, <E as Pairing>::G1>>;
+pub type WeightedHomomorphism<'a, E> = CurveGroupTupleHomomorphism<
+    <E as Pairing>::G1,
     LiftedHkzgWeighted<'a, E>,
     LiftedWeightedChunkedElgamal<'a, <E as Pairing>::G1>,
 >;
@@ -240,10 +241,11 @@ impl<'a, E: Pairing> WeightedHomomorphism<'a, E> {
             },
         };
 
-        // Combine the two lifted homomorphisms just constructed, into the required TupleHomomorphism
+        // Combine the two lifted homomorphisms just constructed, into the required CurveGroupTupleHomomorphism
         Self {
             hom1: lifted_hkzg,
             hom2: lifted_chunked_elgamal,
+            _group: std::marker::PhantomData::<E::G1>,
         }
     }
 }

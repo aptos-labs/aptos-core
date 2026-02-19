@@ -1,6 +1,7 @@
 // Copyright (c) Aptos Foundation
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
+use aptos_dkg::sigma_protocol::homomorphism::tuple::CurveGroupTupleHomomorphism;
 use aptos_crypto::arkworks::{
     msm::MsmInput,
     random::{sample_field_element, sample_field_elements},
@@ -12,7 +13,7 @@ use aptos_dkg::{
         homomorphism::{
             fixed_base_msms,
             fixed_base_msms::Trait as _,
-            tuple::{PairingTupleHomomorphism, TupleHomomorphism},
+            tuple::{PairingTupleHomomorphism},
             Trait as _,
         },
         Trait as _,
@@ -159,7 +160,7 @@ mod schnorr {
 mod chaum_pedersen {
     use super::{schnorr::*, *};
 
-    pub type ChaumPedersen<C> = TupleHomomorphism<Schnorr<C>, Schnorr<C>>;
+    pub type ChaumPedersen<C> = CurveGroupTupleHomomorphism<C, Schnorr<C>, Schnorr<C>>;
 
     // Implementing e.g. `Default` here would require a wrapper, but then `sigma_protocol::Trait` would have to get re-implemented...
     #[allow(non_snake_case)]
@@ -174,9 +175,10 @@ mod chaum_pedersen {
         let schnorr1 = Schnorr { G: G_1 };
         let schnorr2 = Schnorr { G: G_2 };
 
-        TupleHomomorphism {
+        CurveGroupTupleHomomorphism {
             hom1: schnorr1,
             hom2: schnorr2,
+            _group: std::marker::PhantomData::<C>
         }
     }
 

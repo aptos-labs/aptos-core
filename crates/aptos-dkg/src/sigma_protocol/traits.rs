@@ -30,7 +30,7 @@ use std::{fmt::Debug, hash::Hash};
 pub trait Trait:
     homomorphism::Trait<Domain: Witness<Self::Scalar>, CodomainNormalized: Statement> + Sized
 {
-    type Scalar: ark_ff::PrimeField; // CanonicalSerialize + CanonicalDeserialize + Clone + Debug + Eq;
+    type Scalar: PrimeField; // CanonicalSerialize + CanonicalDeserialize + Clone + Debug + Eq;
 
     fn dst(&self) -> Vec<u8>;
 

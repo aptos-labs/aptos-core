@@ -1,6 +1,7 @@
 // Copyright (c) Aptos Foundation
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
+use ark_ec::CurveGroup;
 use crate::{
     sigma_protocol,
     sigma_protocol::{
@@ -44,6 +45,21 @@ where
     pub hom2: H2,
 }
 
+// When we know that the two homomorphisms are both going to be fixed_base_msms with the same group, we can
+// perform certain optimizations in the verifier of the sigma protocol; hence we set up a separate struct
+// for this case
+#[derive(CanonicalSerialize, Debug, Clone, PartialEq, Eq)]
+pub struct CurveGroupTupleHomomorphism<C, H1, H2>
+where
+    C: CurveGroup,
+    H1: homomorphism::Trait,
+    H2: homomorphism::Trait<Domain = H1::Domain>,
+{
+    pub hom1: H1,
+    pub hom2: H2,
+    pub _group: std::marker::PhantomData<C>,
+}
+
 // We need to add `E: Pairing` because of the sigma protocol implementation below, Rust wouldn't allow that otherwise
 #[derive(CanonicalSerialize, Debug, Clone, PartialEq, Eq)]
 pub struct PairingTupleHomomorphism<E, H1, H2>
@@ -65,6 +81,30 @@ where
 /// For technical reasons, we then put the output inside a wrapper.
 impl<H1, H2> homomorphism::Trait for TupleHomomorphism<H1, H2>
 where
+    H1: homomorphism::Trait,
+    H2: homomorphism::Trait<Domain = H1::Domain>,
+    H1::Codomain: CanonicalSerialize + CanonicalDeserialize,
+    H2::Codomain: CanonicalSerialize + CanonicalDeserialize,
+{
+    type Codomain = TupleCodomainShape<H1::Codomain, H2::Codomain>;
+    type CodomainNormalized = TupleCodomainShape<H1::CodomainNormalized, H2::CodomainNormalized>;
+    type Domain = H1::Domain;
+
+    fn apply(&self, x: &Self::Domain) -> Self::Codomain {
+        TupleCodomainShape(self.hom1.apply(x), self.hom2.apply(x))
+    }
+
+    fn normalize(&self, value: Self::Codomain) -> Self::CodomainNormalized {
+        TupleCodomainShape(
+            H1::normalize(&self.hom1, value.0),
+            H2::normalize(&self.hom2, value.1),
+        )
+    }
+}
+
+impl<C, H1, H2> homomorphism::Trait for CurveGroupTupleHomomorphism<C, H1, H2>
+where
+    C: CurveGroup,
     H1: homomorphism::Trait,
     H2: homomorphism::Trait<Domain = H1::Domain>,
     H1::Codomain: CanonicalSerialize + CanonicalDeserialize,
@@ -195,32 +235,35 @@ where
     }
 }
 
-/// Implementation of `FixedBaseMsms` for a tuple of two homomorphisms.
+/// Implementation of `FixedBaseMsms` for a tuple of two homomorphisms over the same group.
 ///
 /// This allows combining two homomorphisms that share the same `Domain`.
-/// For simplicity, we currently require that the MSM types (Base, Scalar, MsmOutput) match;
-/// this ensures compatibility with batch verification in a Σ-protocol and may be relaxed in the future.
-/// For the moment, we **implicitly** assume that the two msm_eval methods are identical, but is probably
-/// not necessary through enums.
+/// Because they share the same group we **implicitly** assume that the two msm_eval methods
+/// are identical. // TODO: maybe derive it automatically?
 ///
 /// The codomain shapes of the two homomorphisms are combined using `TupleCodomainShape`.
-impl<H1, H2> fixed_base_msms::Trait for TupleHomomorphism<H1, H2>
+impl<C, H1, H2> fixed_base_msms::Trait for CurveGroupTupleHomomorphism<C, H1, H2>
 where
-    H1: fixed_base_msms::Trait,
+    C: CurveGroup,
+    H1: fixed_base_msms::Trait<
+        Base = C::Affine,
+        Scalar = C::ScalarField,
+        MsmOutput = C,    
+    >,
     H2: fixed_base_msms::Trait<
         Domain = H1::Domain,
-        Base = H1::Base,
-        Scalar = H1::Scalar,
-        MsmOutput = H1::MsmOutput,
+        Base = C::Affine,
+        Scalar = C::ScalarField,
+        MsmOutput = C,
     >,
 {
-    type Base = H1::Base;
+    type Base = C::Affine;
     type CodomainShape<T>
         = TupleCodomainShape<H1::CodomainShape<T>, H2::CodomainShape<T>>
     where
         T: CanonicalSerialize + CanonicalDeserialize + Clone + Debug + Eq;
-    type MsmOutput = H1::MsmOutput;
-    type Scalar = H1::Scalar;
+    type MsmOutput = C;
+    type Scalar = C::ScalarField;
 
     /// Returns the MSM terms for each homomorphism, combined into a tuple.
     fn msm_terms(
@@ -241,13 +284,14 @@ where
     }
 }
 
-impl<H1, H2> sigma_protocol::CurveGroupTrait for TupleHomomorphism<H1, H2>
+impl<C, H1, H2> sigma_protocol::CurveGroupTrait for CurveGroupTupleHomomorphism<C, H1, H2>
 where
-    H1: sigma_protocol::CurveGroupTrait,
-    H2: sigma_protocol::CurveGroupTrait<Group = H1::Group>,
+    C: CurveGroup,
+    H1: sigma_protocol::CurveGroupTrait<Group = C>,
+    H2: sigma_protocol::CurveGroupTrait<Group = C>,
     H2: homomorphism::Trait<Domain = H1::Domain>,
 {
-    type Group = H1::Group;
+    type Group = C;
 
     /// Concatenate the DSTs of the two homomorphisms, plus some
     /// additional metadata to ensure uniqueness.
@@ -317,8 +361,6 @@ where
     }
 }
 
-/// Slightly hacky implementation of a sigma protocol for `PairingTupleHomomorphism`
-///
 /// We need `E: Pairing` here because the sigma protocol needs to know which curves `H1` and `H2` are working over
 impl<E: Pairing, H1, H2> PairingTupleHomomorphism<E, H1, H2>
 where
@@ -417,9 +459,3 @@ where
         (first_input, second_input)
     }
 }
-
-// TODO: mediocre idea for Shplonked: do another "custom" sigma protocol trait for:
-// a tuple with on the LHS an ordinary fixed-base-msms
-// on the RHS, something that might be a homomorphism from F^k -> F
-// so maybe if we define a custom sigma protocol trait for such a hom
-// then the tuple version can be automatic just as above
