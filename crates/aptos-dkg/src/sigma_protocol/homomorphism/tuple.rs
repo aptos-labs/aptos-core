@@ -1,22 +1,18 @@
 // Copyright (c) Aptos Foundation
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
-use ark_ec::CurveGroup;
 use crate::{
     sigma_protocol,
     sigma_protocol::{
         homomorphism,
         homomorphism::{fixed_base_msms, EntrywiseMap},
-        traits::{
-            fiat_shamir_challenge_for_sigma_protocol, prove_homomorphism,
-            verifier_challenges_with_length,
-        },
+        traits::{prove_homomorphism, verifier_challenges_with_length},
         Proof, Trait as _,
     },
 };
 use anyhow::ensure;
 use aptos_crypto::arkworks::msm::MsmInput;
-use ark_ec::pairing::Pairing;
+use ark_ec::{pairing::Pairing, CurveGroup};
 use ark_ff::Zero;
 use ark_serialize::{
     CanonicalDeserialize, CanonicalSerialize, Compress, Read, SerializationError, Valid,
@@ -248,11 +244,7 @@ where
 impl<C, H1, H2> fixed_base_msms::Trait for CurveGroupTupleHomomorphism<C, H1, H2>
 where
     C: CurveGroup,
-    H1: fixed_base_msms::Trait<
-        Base = C::Affine,
-        Scalar = C::ScalarField,
-        MsmOutput = C,    
-    >,
+    H1: fixed_base_msms::Trait<Base = C::Affine, Scalar = C::ScalarField, MsmOutput = C>,
     H2: fixed_base_msms::Trait<
         Domain = H1::Domain,
         Base = C::Affine,
@@ -334,46 +326,25 @@ where
     ) -> (
         Proof<H1::Scalar, Self>,
         <Self as homomorphism::Trait>::CodomainNormalized,
-    )
-    {
+    ) {
         prove_homomorphism(self, witness, statement, cntxt, true, rng, &self.dst())
     }
 
-    fn verify<Ct: Serialize, R: RngCore + CryptoRng>(
+    fn verify_with_challenge<Ct: Serialize, R: RngCore + CryptoRng>(
         &self,
         public_statement: &Self::CodomainNormalized,
-        proof: &Proof<Self::Scalar, Self>,
+        prover_commitment: &Self::CodomainNormalized,
+        challenge: Self::Scalar,
+        response: &Self::Domain,
         cntxt: &Ct,
         rng: &mut R,
     ) -> anyhow::Result<()> {
-        let prover_first_message = proof
-            .prover_commitment()
-            .expect("tuple proof must contain commitment for Fiat–Shamir");
-        let c = fiat_shamir_challenge_for_sigma_protocol::<_, Self::Scalar, _>(
-            cntxt,
-            self,
-            public_statement,
-            prover_first_message,
-            &self.dst(),
-        );
         let (stmt1, stmt2) = (&public_statement.0, &public_statement.1);
-        let (commit1, commit2) = (&prover_first_message.0, &prover_first_message.1);
-        self.hom1.verify_with_challenge(
-            stmt1,
-            commit1,
-            c,
-            &proof.z,
-            cntxt,
-            rng,
-        )?;
-        self.hom2.verify_with_challenge(
-            stmt2,
-            commit2,
-            c,
-            &proof.z,
-            cntxt,
-            rng,
-        )?;
+        let (commit1, commit2) = (&prover_commitment.0, &prover_commitment.1);
+        self.hom1
+            .verify_with_challenge(stmt1, commit1, challenge, response, cntxt, rng)?;
+        self.hom2
+            .verify_with_challenge(stmt2, commit2, challenge, response, cntxt, rng)?;
         Ok(())
     }
 }
@@ -407,30 +378,45 @@ where
         prove_homomorphism(self, witness, statement, cntxt, true, rng, &self.dst())
     }
 
-    // Probably not using this atm... but that's okay
     #[allow(non_snake_case)]
-    fn verify<Ct: Serialize, R: RngCore + CryptoRng>(
+    fn verify_with_challenge<Ct: Serialize, R: RngCore + CryptoRng>(
         &self,
         public_statement: &Self::CodomainNormalized,
-        proof: &Proof<Self::Scalar, Self>,
-        cntxt: &Ct,
+        prover_commitment: &Self::CodomainNormalized,
+        challenge: Self::Scalar,
+        response: &Self::Domain,
+        _cntxt: &Ct,
         rng: &mut R,
-    ) -> anyhow::Result<()>
-// where
-    //     H: homomorphism::Trait<
-    //         Domain = <Self as homomorphism::Trait>::Domain,
-    //         CodomainNormalized = <Self as homomorphism::Trait>::CodomainNormalized,
-    //     >,
-    {
-        let (first_msm_terms, second_msm_terms) =
-            self.msm_terms_for_verify::<_, _, _>(public_statement, proof, cntxt, None, rng);
-
-        let first_msm_result = H1::msm_eval(first_msm_terms);
-        ensure!(first_msm_result == H1::MsmOutput::zero());
-
-        let second_msm_result = H2::msm_eval(second_msm_terms);
-        ensure!(second_msm_result == H2::MsmOutput::zero());
-
+    ) -> anyhow::Result<()> {
+        let len1 = public_statement.0.clone().into_iter().count();
+        let len2 = public_statement.1.clone().into_iter().count();
+        let n = len1 + len2;
+        let powers_of_beta = if n > 1 {
+            aptos_crypto::utils::powers(
+                aptos_crypto::arkworks::random::sample_field_element(rng),
+                n,
+            )
+        } else {
+            vec![<E::ScalarField as ark_ff::Field>::ONE]
+        };
+        let (first_powers_of_beta, second_powers_of_beta) = powers_of_beta.split_at(len1);
+        let (first_msm_terms_of_response, second_msm_terms_of_response) = self.msm_terms(response);
+        let first_input = H1::merge_msm_terms(
+            first_msm_terms_of_response.into_iter().collect(),
+            &prover_commitment.0,
+            &public_statement.0,
+            first_powers_of_beta,
+            challenge,
+        );
+        let second_input = H2::merge_msm_terms(
+            second_msm_terms_of_response.into_iter().collect(),
+            &prover_commitment.1,
+            &public_statement.1,
+            second_powers_of_beta,
+            challenge,
+        );
+        ensure!(H1::msm_eval(first_input) == H1::MsmOutput::zero());
+        ensure!(H2::msm_eval(second_input) == H2::MsmOutput::zero());
         Ok(())
     }
 }

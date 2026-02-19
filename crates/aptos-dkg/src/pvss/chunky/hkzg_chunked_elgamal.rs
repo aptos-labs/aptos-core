@@ -7,7 +7,7 @@ use crate::{
     sigma_protocol::{
         self,
         homomorphism::{
-            tuple::{TupleCodomainShape, CurveGroupTupleHomomorphism},
+            tuple::{CurveGroupTupleHomomorphism, TupleCodomainShape},
             LiftHomomorphism, TrivialShape,
         },
         FirstProofItem,

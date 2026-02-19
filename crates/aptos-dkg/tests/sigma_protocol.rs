@@ -1,7 +1,6 @@
 // Copyright (c) Aptos Foundation
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
-use aptos_dkg::sigma_protocol::homomorphism::tuple::CurveGroupTupleHomomorphism;
 use aptos_crypto::arkworks::{
     msm::MsmInput,
     random::{sample_field_element, sample_field_elements},
@@ -13,7 +12,7 @@ use aptos_dkg::{
         homomorphism::{
             fixed_base_msms,
             fixed_base_msms::Trait as _,
-            tuple::{PairingTupleHomomorphism},
+            tuple::{CurveGroupTupleHomomorphism, PairingTupleHomomorphism},
             Trait as _,
         },
         Trait as _,
@@ -178,7 +177,7 @@ mod chaum_pedersen {
         CurveGroupTupleHomomorphism {
             hom1: schnorr1,
             hom2: schnorr2,
-            _group: std::marker::PhantomData::<C>
+            _group: std::marker::PhantomData::<C>,
         }
     }
 

@@ -59,7 +59,14 @@ pub trait Trait:
             prover_first_message,
             &self.dst(),
         );
-        self.verify_with_challenge(public_statement, prover_first_message, c, &proof.z, cntxt, rng)
+        self.verify_with_challenge(
+            public_statement,
+            prover_first_message,
+            c,
+            &proof.z,
+            cntxt,
+            rng,
+        )
     }
 
     /// Verify a component given an explicit Fiat–Shamir challenge (e.g. when this homomorphism
@@ -112,8 +119,7 @@ impl<T: CurveGroupTrait> Trait for T {
         _cntxt: &Ct,
         rng: &mut R,
     ) -> anyhow::Result<()> {
-        let number_of_beta_powers =
-            public_statement.clone().into_iter().count();
+        let number_of_beta_powers = public_statement.clone().into_iter().count();
         let powers_of_beta = if number_of_beta_powers > 1 {
             let beta = sample_field_element(rng);
             utils::powers(beta, number_of_beta_powers)
