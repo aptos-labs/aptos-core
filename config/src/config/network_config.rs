@@ -129,6 +129,8 @@ pub struct NetworkConfig {
     pub ping_timeout_ms: u64,
     /// Number of failed healthcheck pings until a peer is marked unhealthy
     pub ping_failures_tolerated: u64,
+    /// Whether to disconnect from peers on health check failures
+    pub disconnect_on_health_check_failure: bool,
     /// Maximum number of outbound connections, limited by ConnectivityManager
     pub max_outbound_connections: usize,
     /// Maximum number of outbound connections, limited by PeerManager
@@ -172,6 +174,7 @@ impl NetworkConfig {
             ping_interval_ms: PING_INTERVAL_MS,
             ping_timeout_ms: PING_TIMEOUT_MS,
             ping_failures_tolerated: PING_FAILURES_TOLERATED,
+            disconnect_on_health_check_failure: false, // Disabled by default
             max_outbound_connections: MAX_FULLNODE_OUTBOUND_CONNECTIONS,
             max_inbound_connections: MAX_INBOUND_CONNECTIONS,
             max_message_size: MAX_MESSAGE_SIZE,

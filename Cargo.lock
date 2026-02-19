@@ -3670,6 +3670,7 @@ dependencies = [
 name = "aptos-peer-monitoring-service-client"
 version = "0.1.0"
 dependencies = [
+ "anyhow",
  "aptos-build-info",
  "aptos-channels",
  "aptos-config",
@@ -3683,7 +3684,9 @@ dependencies = [
  "aptos-peer-monitoring-service-types",
  "aptos-time-service",
  "aptos-types",
+ "async-trait",
  "bcs 0.1.4",
+ "bytes",
  "enum_dispatch",
  "futures",
  "maplit",
