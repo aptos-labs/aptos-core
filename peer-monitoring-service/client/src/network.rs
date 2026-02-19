@@ -7,9 +7,12 @@ use crate::{
 };
 use aptos_config::network_id::PeerNetworkId;
 use aptos_logger::{trace, warn};
-use aptos_network::application::{
-    interface::{NetworkClient, NetworkClientInterface},
-    storage::PeersAndMetadata,
+use aptos_network::{
+    application::{
+        interface::{NetworkClient, NetworkClientInterface},
+        storage::PeersAndMetadata,
+    },
+    peer::DisconnectReason,
 };
 use aptos_peer_monitoring_service_types::{
     request::PeerMonitoringServiceRequest, response::PeerMonitoringServiceResponse,
@@ -62,6 +65,18 @@ impl<NetworkClient: NetworkClientInterface<PeerMonitoringServiceMessage>>
     /// Returns the peers and metadata struct
     pub fn get_peers_and_metadata(&self) -> Arc<PeersAndMetadata> {
         self.network_client.get_peers_and_metadata()
+    }
+
+    /// Disconnects from the specified peer with the given reason
+    pub async fn disconnect_from_peer(
+        &self,
+        peer_network_id: PeerNetworkId,
+        disconnect_reason: DisconnectReason,
+    ) -> Result<(), Error> {
+        self.network_client
+            .disconnect_from_peer(peer_network_id, disconnect_reason)
+            .await
+            .map_err(|error| Error::NetworkError(error.to_string()))
     }
 }
 

@@ -108,6 +108,8 @@ pub struct HealthChecker<NetworkClient> {
     /// disconnecting from it. In the future, this can be replaced with a more general failure
     /// detection policy.
     ping_failures_tolerated: u64,
+    /// Whether to disconnect from peers on health check failures
+    disconnect_on_failure: bool,
     /// Counter incremented in each round of health checks
     round: u64,
     /// Set of peers we've seen in the previous polling cycle
@@ -123,6 +125,7 @@ impl<NetworkClient: NetworkClientInterface<HealthCheckerMsg> + Unpin> HealthChec
         ping_interval: Duration,
         ping_timeout: Duration,
         ping_failures_tolerated: u64,
+        disconnect_on_failure: bool,
     ) -> Self {
         HealthChecker {
             network_context,
@@ -132,6 +135,7 @@ impl<NetworkClient: NetworkClientInterface<HealthCheckerMsg> + Unpin> HealthChec
             ping_interval,
             ping_timeout,
             ping_failures_tolerated,
+            disconnect_on_failure,
             round: 0,
             known_peers: HashSet::new(),
         }
@@ -386,31 +390,41 @@ impl<NetworkClient: NetworkClientInterface<HealthCheckerMsg> + Unpin> HealthChec
                     .get_peer_failures(peer_id)
                     .unwrap_or(0);
                 if failures > self.ping_failures_tolerated {
-                    info!(
-                        NetworkSchema::new(&self.network_context).remote_peer(&peer_id),
-                        "{} Disconnecting from peer: {}",
-                        self.network_context,
-                        peer_id.short_str()
-                    );
-                    let peer_network_id =
-                        PeerNetworkId::new(self.network_context.network_id(), peer_id);
-                    if let Err(err) = timeout(
-                        Duration::from_millis(50),
-                        self.network_interface.disconnect_peer(
-                            peer_network_id,
-                            DisconnectReason::NetworkHealthCheckFailure,
-                        ),
-                    )
-                    .await
-                    {
-                        warn!(
-                            NetworkSchema::new(&self.network_context)
-                                .remote_peer(&peer_id),
-                            error = ?err,
-                            "{} Failed to disconnect from peer: {} with error: {:?}",
+                    // Only disconnect if the config flag is enabled
+                    if self.disconnect_on_failure {
+                        info!(
+                            NetworkSchema::new(&self.network_context).remote_peer(&peer_id),
+                            "{} Disconnecting from peer: {}",
                             self.network_context,
-                            peer_id.short_str(),
-                            err
+                            peer_id.short_str()
+                        );
+                        let peer_network_id =
+                            PeerNetworkId::new(self.network_context.network_id(), peer_id);
+                        if let Err(err) = timeout(
+                            Duration::from_millis(50),
+                            self.network_interface.disconnect_peer(
+                                peer_network_id,
+                                DisconnectReason::NetworkHealthCheckFailure,
+                            ),
+                        )
+                        .await
+                        {
+                            warn!(
+                                NetworkSchema::new(&self.network_context)
+                                    .remote_peer(&peer_id),
+                                error = ?err,
+                                "{} Failed to disconnect from peer: {} with error: {:?}",
+                                self.network_context,
+                                peer_id.short_str(),
+                                err
+                            );
+                        }
+                    } else {
+                        warn!(
+                            NetworkSchema::new(&self.network_context).remote_peer(&peer_id),
+                            "{} Too many ping failures for peer: {}, but disconnect is disabled",
+                            self.network_context,
+                            peer_id.short_str()
                         );
                     }
                 }

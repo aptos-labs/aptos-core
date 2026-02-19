@@ -6,14 +6,15 @@ use crate::{
         latency_info::LatencyInfoState, network_info::NetworkInfoState, node_info::NodeInfoState,
         request_tracker::RequestTracker,
     },
-    Error,
+    Error, PeerMonitoringServiceClient,
 };
 use aptos_config::{config::NodeConfig, network_id::PeerNetworkId};
 use aptos_infallible::RwLock;
-use aptos_network::application::metadata::PeerMetadata;
+use aptos_network::application::{interface::NetworkClient, metadata::PeerMetadata};
 use aptos_peer_monitoring_service_types::{
     request::{LatencyPingRequest, PeerMonitoringServiceRequest},
     response::PeerMonitoringServiceResponse,
+    PeerMonitoringServiceMessage,
 };
 use aptos_time_service::TimeService;
 use enum_dispatch::enum_dispatch;
@@ -109,6 +110,9 @@ pub enum PeerStateValue {
 impl PeerStateValue {
     pub fn new(
         node_config: NodeConfig,
+        peer_monitoring_client: PeerMonitoringServiceClient<
+            NetworkClient<PeerMonitoringServiceMessage>,
+        >,
         time_service: TimeService,
         peer_state_key: &PeerStateKey,
     ) -> Self {
@@ -116,7 +120,12 @@ impl PeerStateValue {
             PeerStateKey::LatencyInfo => {
                 let latency_monitoring_config =
                     node_config.peer_monitoring_service.latency_monitoring;
-                LatencyInfoState::new(latency_monitoring_config, time_service).into()
+                LatencyInfoState::new(
+                    latency_monitoring_config,
+                    peer_monitoring_client,
+                    time_service,
+                )
+                .into()
             },
             PeerStateKey::NetworkInfo => NetworkInfoState::new(node_config, time_service).into(),
             PeerStateKey::NodeInfo => {
