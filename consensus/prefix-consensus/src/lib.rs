@@ -46,6 +46,7 @@ pub mod network_messages;
 mod protocol;
 pub mod signing;
 pub mod slot_ranking;
+pub mod slot_state;
 pub mod slot_types;
 pub mod strong_manager;
 pub mod strong_protocol;
@@ -83,6 +84,7 @@ pub use certificates::{
 pub use inner_pc_impl::ThreeRoundPC;
 pub use inner_pc_trait::InnerPCAlgorithm;
 pub use slot_ranking::MultiSlotRankingManager;
+pub use slot_state::{ProposalBuffer, SlotPhase, SlotState};
 pub use slot_types::{
     create_signed_slot_proposal, SlotConsensusMsg, SlotProposal, SlotProposalSignData,
 };

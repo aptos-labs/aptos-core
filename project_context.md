@@ -4,8 +4,8 @@
 
 Implementing Prefix Consensus protocols (from research paper "Prefix Consensus For Censorship Resistant BFT") within Aptos Core for leaderless, censorship-resistant consensus.
 
-**Current Phase**: Multi-Slot Consensus (Algorithm 4) — Phases 1-2 complete, Phase 3 next
-**Completed**: Basic Prefix Consensus, Strong Prefix Consensus (Phases 1-9), Stake-Weighted Quorum Refactoring, Multi-Slot Phases 1-2
+**Current Phase**: Multi-Slot Consensus (Algorithm 4) — Phases 1-3 complete, Phase 4 next
+**Completed**: Basic Prefix Consensus, Strong Prefix Consensus (Phases 1-9), Stake-Weighted Quorum Refactoring, Multi-Slot Phases 1-3
 
 ---
 
@@ -78,7 +78,7 @@ Implementing Prefix Consensus protocols (from research paper "Prefix Consensus F
 
 ## Multi-Slot Consensus — Current Work
 
-**Plan**: `.plans/multi-slot-consensus.md` (11 phases, ~3900 LOC estimated)
+**Plan**: `.plans/multi-slot-consensus.md` (13 phases, ~4550 LOC estimated)
 **Goal**: Replace RoundManager with SlotManager, blockchain works end-to-end
 
 ### Architecture
@@ -107,23 +107,24 @@ Execution Pipeline (unchanged):
 ### Implementation Phases
 1. ~~Slot types + network messages (~300 LOC)~~ ✅
 2. ~~Multi-slot ranking manager (~150 LOC)~~ ✅
-3. Proposal buffer + slot state (~400 LOC)
+3. ~~Proposal buffer + slot state (~400 LOC)~~ ✅
 4. Block builder + PrefixConsensusBlock variant (~350 LOC)
 5. SlotManager core (~800 LOC)
 6. SPC integration refactor (~300 LOC)
-7. EpochManager integration (~400 LOC)
-8. BlockType integration across codebase (~400 LOC, grep-driven)
-9. Execution pipeline compatibility (~300 LOC, grep-driven)
-10. Smoke tests (~400 LOC)
-11. Documentation + cleanup (~100 LOC)
+7. Payload resolution: late buffering + fetch protocol (~350 LOC)
+8. EpochManager integration (~400 LOC)
+9. BlockType integration across codebase (~400 LOC, grep-driven)
+10. Execution pipeline compatibility (~300 LOC, grep-driven)
+11. Smoke tests (~400 LOC)
+12. Documentation + cleanup (~100 LOC)
 
 ---
 
 ## Repository State
 
 - **Branch**: `prefix-consensus-prototype`
-- **HEAD**: Multi-Slot Phase 2 (MultiSlotRankingManager + cross-slot demotion)
-- **Tests**: 202/202 unit tests, 4/4 smoke tests
+- **HEAD**: Multi-Slot Phase 3 (ProposalBuffer + SlotState)
+- **Tests**: 220/220 unit tests, 4/4 smoke tests
 - **Build**: Clean
 
 ### Repository Structure
@@ -145,7 +146,8 @@ consensus/prefix-consensus/src/
 ├── inner_pc_trait.rs     - InnerPCAlgorithm trait (~90 lines)
 ├── inner_pc_impl.rs      - ThreeRoundPC implementation (~400 lines)
 ├── slot_types.rs         - SlotProposal, SlotConsensusMsg, signing (~230 lines) — Phase 1
-└── slot_ranking.rs       - MultiSlotRankingManager, cross-slot demotion (~80 lines) — Phase 2
+├── slot_ranking.rs       - MultiSlotRankingManager, cross-slot demotion (~80 lines) — Phase 2
+└── slot_state.rs         - ProposalBuffer, SlotPhase, SlotState (~645 lines) — Phase 3
 
 testsuite/smoke-test/src/consensus/
 ├── prefix_consensus/     - 2 basic PC smoke tests
@@ -159,7 +161,9 @@ testsuite/smoke-test/src/consensus/
 - `.plans/multi-slot-consensus.md` — Multi-Slot Consensus Algorithm 4 (current)
 - `.plans/phase1-slot-types.md` — Phase 1: Slot types + network messages (complete)
 - `.plans/phase2-slot-ranking.md` — Phase 2: Multi-slot ranking manager (complete)
-- `.plans/phase12-verifiable-ranking.md` — Phase 12: Verifiable ranking with SPC-aware demotion (after end-to-end)
+- `.plans/phase3-slot-state.md` — Phase 3: Proposal buffer + slot state (complete)
+- `.plans/phase7-payload-resolution.md` — Phase 7: Payload resolution: late buffering + fetch
+- `.plans/phase12-verifiable-ranking.md` — Phase 13: Verifiable ranking with SPC-aware demotion (after end-to-end)
 
 ---
 
