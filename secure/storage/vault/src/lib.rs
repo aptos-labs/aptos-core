@@ -18,7 +18,6 @@ use std::{
     time::Duration,
 };
 use thiserror::Error;
-use ureq::Response;
 
 #[cfg(any(test, feature = "fuzzing"))]
 pub mod fuzzing;
@@ -27,14 +26,60 @@ pub mod fuzzing;
 /// Keys are trimmed in FIFO order.
 const MAX_NUM_KEY_VERSIONS: u32 = 4;
 
-/// Default request timeouts for vault operations.
-/// Note: there is a bug in ureq v 1.5.4 where it's not currently possible to set
-/// different timeouts for connections and operations. The connection timeout
-/// will override any other timeouts (including reads and writes). This has been
-/// fixed in ureq 2. Once we upgrade, we'll be able to have separate timeouts.
-/// Until then, the connection timeout is used for all operations.
 const DEFAULT_CONNECTION_TIMEOUT_MS: u64 = 1_000;
 const DEFAULT_RESPONSE_TIMEOUT_MS: u64 = 1_000;
+
+/// An HTTP response from Vault, decoupled from the underlying HTTP client.
+pub struct VaultResponse {
+    pub status: u16,
+    pub status_text: String,
+    pub body: String,
+}
+
+impl VaultResponse {
+    pub fn new(status: u16, status_text: &str, body: &str) -> Self {
+        Self {
+            status,
+            status_text: status_text.to_string(),
+            body: body.to_string(),
+        }
+    }
+
+    pub fn ok(&self) -> bool {
+        (200..300).contains(&self.status)
+    }
+}
+
+impl From<Result<ureq::Response, ureq::Error>> for VaultResponse {
+    fn from(result: Result<ureq::Response, ureq::Error>) -> Self {
+        match result {
+            Ok(resp) => {
+                let status = resp.status();
+                let status_text = resp.status_text().to_string();
+                let body = resp.into_string().unwrap_or_default();
+                VaultResponse {
+                    status,
+                    status_text,
+                    body,
+                }
+            },
+            Err(ureq::Error::Status(code, resp)) => {
+                let status_text = resp.status_text().to_string();
+                let body = resp.into_string().unwrap_or_default();
+                VaultResponse {
+                    status: code,
+                    status_text,
+                    body,
+                }
+            },
+            Err(ureq::Error::Transport(e)) => VaultResponse {
+                status: 0,
+                status_text: "Transport Error".to_string(),
+                body: e.to_string(),
+            },
+        }
+    }
+}
 
 #[derive(Debug, Error, PartialEq, Eq)]
 pub enum Error {
@@ -72,20 +117,12 @@ impl From<std::io::Error> for Error {
     }
 }
 
-impl From<ureq::Response> for Error {
-    fn from(resp: ureq::Response) -> Self {
-        if resp.synthetic() {
-            match resp.into_string() {
-                Ok(resp) => Error::SyntheticError(resp),
-                Err(error) => Error::InternalError(error.to_string()),
-            }
+impl From<VaultResponse> for Error {
+    fn from(resp: VaultResponse) -> Self {
+        if resp.status == 0 {
+            Error::SyntheticError(resp.body)
         } else {
-            let status = resp.status();
-            let status_text = resp.status_text().to_string();
-            match resp.into_string() {
-                Ok(body) => Error::HttpError(status, status_text, body),
-                Err(error) => Error::InternalError(error.to_string()),
-            }
+            Error::HttpError(resp.status, resp.status_text, resp.body)
         }
     }
 }
@@ -114,12 +151,6 @@ pub struct Client {
     agent: ureq::Agent,
     host: String,
     token: String,
-    tls_connector: Arc<native_tls::TlsConnector>,
-
-    /// Timeout for new socket connections to vault.
-    connection_timeout_ms: u64,
-    /// Timeout for generic vault responses (e.g., reads and writes).
-    response_timeout_ms: u64,
 }
 
 impl Client {
@@ -130,43 +161,60 @@ impl Client {
         connection_timeout_ms: Option<u64>,
         response_timeout_ms: Option<u64>,
     ) -> Self {
-        let mut tls_builder = native_tls::TlsConnector::builder();
-        tls_builder.min_protocol_version(Some(native_tls::Protocol::Tlsv12));
-        if let Some(certificate) = ca_certificate {
-            // First try the certificate as a PEM encoded cert, then as DER, and then panic.
-            let mut cert = native_tls::Certificate::from_pem(certificate.as_bytes());
-            if cert.is_err() {
-                cert = native_tls::Certificate::from_der(certificate.as_bytes());
-            }
-            tls_builder.add_root_certificate(cert.unwrap());
-        }
-        let tls_connector = Arc::new(tls_builder.build().unwrap());
-
         let connection_timeout_ms = connection_timeout_ms.unwrap_or(DEFAULT_CONNECTION_TIMEOUT_MS);
         let response_timeout_ms = response_timeout_ms.unwrap_or(DEFAULT_RESPONSE_TIMEOUT_MS);
 
+        let mut builder = ureq::AgentBuilder::new()
+            .timeout_connect(Duration::from_millis(connection_timeout_ms))
+            .timeout(Duration::from_millis(response_timeout_ms));
+
+        if let Some(certificate) = ca_certificate {
+            let certs = Self::parse_certificates(&certificate);
+            if !certs.is_empty() {
+                let mut root_store = rustls::RootCertStore::empty();
+                root_store.extend(webpki_roots::TLS_SERVER_ROOTS.iter().cloned());
+                for cert in certs {
+                    root_store.add(cert).expect("Failed to add CA certificate");
+                }
+                let tls_config = rustls::ClientConfig::builder()
+                    .with_root_certificates(root_store)
+                    .with_no_client_auth();
+                builder = builder.tls_config(Arc::new(tls_config));
+            }
+        }
+
         Self {
-            agent: ureq::Agent::new().set("connection", "keep-alive").build(),
+            agent: builder.build(),
             host,
             token,
-            tls_connector,
-            connection_timeout_ms,
-            response_timeout_ms,
         }
+    }
+
+    fn parse_certificates(pem_or_der: &str) -> Vec<rustls::pki_types::CertificateDer<'static>> {
+        let mut reader = std::io::BufReader::new(pem_or_der.as_bytes());
+        let pem_certs: Vec<_> = rustls_pemfile::certs(&mut reader)
+            .filter_map(|r| r.ok())
+            .collect();
+        if !pem_certs.is_empty() {
+            return pem_certs;
+        }
+        vec![rustls::pki_types::CertificateDer::from(
+            pem_or_der.as_bytes().to_vec(),
+        )]
     }
 
     pub fn delete_policy(&self, policy_name: &str) -> Result<(), Error> {
         let request = self
             .agent
             .delete(&format!("{}/v1/sys/policy/{}", self.host, policy_name));
-        let resp = self.upgrade_request(request).call();
+        let resp = VaultResponse::from(self.upgrade_request(request).call());
 
         process_generic_response(resp)
     }
 
     pub fn list_policies(&self) -> Result<Vec<String>, Error> {
         let request = self.agent.get(&format!("{}/v1/sys/policy", self.host));
-        let resp = self.upgrade_request(request).call();
+        let resp = VaultResponse::from(self.upgrade_request(request).call());
 
         process_policy_list_response(resp)
     }
@@ -176,7 +224,7 @@ impl Client {
         let request = self
             .agent
             .get(&format!("{}/v1/sys/policy/{}", self.host, policy_name));
-        let resp = self.upgrade_request(request).call();
+        let resp = VaultResponse::from(self.upgrade_request(request).call());
 
         process_policy_read_response(resp)
     }
@@ -188,7 +236,8 @@ impl Client {
         let request = self
             .agent
             .post(&format!("{}/v1/sys/policy/{}", self.host, policy_name));
-        let resp = self.upgrade_request(request).send_json(policy.try_into()?);
+        let json_value: serde_json::Value = policy.try_into().map_err(|e: serde_json::Error| Error::SerializationError(e.to_string()))?;
+        let resp = VaultResponse::from(self.upgrade_request(request).send_json(json_value));
 
         process_generic_response(resp)
     }
@@ -199,9 +248,10 @@ impl Client {
         let request = self
             .agent
             .post(&format!("{}/v1/auth/token/create", self.host));
-        let resp = self
-            .upgrade_request(request)
-            .send_json(json!({ "policies": policies }));
+        let resp = VaultResponse::from(
+            self.upgrade_request(request)
+                .send_json(json!({ "policies": policies })),
+        );
 
         process_token_create_response(resp)
     }
@@ -210,12 +260,12 @@ impl Client {
         let request = self
             .agent
             .post(&format!("{}/v1/auth/token/renew-self", self.host));
-        let mut request = self.upgrade_request(request);
-        let resp = if let Some(increment) = increment {
+        let request = self.upgrade_request(request);
+        let resp = VaultResponse::from(if let Some(increment) = increment {
             request.send_json(json!({ "increment": increment }))
         } else {
             request.call()
-        };
+        });
 
         process_token_renew_response(resp)
     }
@@ -224,8 +274,8 @@ impl Client {
         let request = self
             .agent
             .post(&format!("{}/v1/auth/token/revoke-self", self.host));
-        let mut request = self.upgrade_request(request);
-        let resp = request.call();
+        let request = self.upgrade_request(request);
+        let resp = VaultResponse::from(request.call());
 
         process_generic_response(resp)
     }
@@ -236,7 +286,7 @@ impl Client {
             "LIST",
             &format!("{}/v1/secret/metadata/{}", self.host, secret),
         );
-        let resp = self.upgrade_request(request).call();
+        let resp = VaultResponse::from(self.upgrade_request(request).call());
 
         process_secret_list_response(resp)
     }
@@ -246,7 +296,7 @@ impl Client {
         let request = self
             .agent
             .delete(&format!("{}/v1/secret/metadata/{}", self.host, secret));
-        let resp = self.upgrade_request(request).call();
+        let resp = VaultResponse::from(self.upgrade_request(request).call());
 
         process_generic_response(resp)
     }
@@ -256,7 +306,7 @@ impl Client {
         let request = self
             .agent
             .get(&format!("{}/v1/secret/data/{}", self.host, secret));
-        let resp = self.upgrade_request(request).call();
+        let resp = VaultResponse::from(self.upgrade_request(request).call());
 
         process_secret_read_response(secret, key, resp)
     }
@@ -265,9 +315,10 @@ impl Client {
         let request = self
             .agent
             .post(&format!("{}/v1/transit/keys/{}", self.host, name));
-        let resp = self
-            .upgrade_request(request)
-            .send_json(json!({ "type": "ed25519", "exportable": exportable }));
+        let resp = VaultResponse::from(
+            self.upgrade_request(request)
+                .send_json(json!({ "type": "ed25519", "exportable": exportable })),
+        );
 
         process_transit_create_response(name, resp)
     }
@@ -276,16 +327,17 @@ impl Client {
         let request = self
             .agent
             .post(&format!("{}/v1/transit/keys/{}/config", self.host, name));
-        let resp = self
-            .upgrade_request(request)
-            .send_json(json!({ "deletion_allowed": true }));
+        let resp = VaultResponse::from(
+            self.upgrade_request(request)
+                .send_json(json!({ "deletion_allowed": true })),
+        );
 
         process_generic_response(resp)?;
 
         let request = self
             .agent
             .delete(&format!("{}/v1/transit/keys/{}", self.host, name));
-        let resp = self.upgrade_request(request).call();
+        let resp = VaultResponse::from(self.upgrade_request(request).call());
 
         process_generic_response(resp)
     }
@@ -299,7 +351,7 @@ impl Client {
             "{}/v1/transit/export/signing-key/{}",
             self.host, name
         ));
-        let resp = self.upgrade_request(request).call();
+        let resp = VaultResponse::from(self.upgrade_request(request).call());
 
         process_transit_export_response(name, version, resp)
     }
@@ -309,9 +361,10 @@ impl Client {
         let request = self
             .agent
             .post(&format!("{}/v1/transit/restore/{}", self.host, name));
-        let resp = self
-            .upgrade_request(request)
-            .send_json(json!({ "backup": backup }));
+        let resp = VaultResponse::from(
+            self.upgrade_request(request)
+                .send_json(json!({ "backup": backup })),
+        );
 
         process_transit_restore_response(resp)
     }
@@ -320,7 +373,7 @@ impl Client {
         let request = self
             .agent
             .request("LIST", &format!("{}/v1/transit/keys", self.host));
-        let resp = self.upgrade_request(request).call();
+        let resp = VaultResponse::from(self.upgrade_request(request).call());
 
         process_transit_list_response(resp)
     }
@@ -332,7 +385,7 @@ impl Client {
         let request = self
             .agent
             .get(&format!("{}/v1/transit/keys/{}", self.host, name));
-        let resp = self.upgrade_request(request).call();
+        let resp = VaultResponse::from(self.upgrade_request(request).call());
 
         process_transit_read_response(name, resp)
     }
@@ -341,7 +394,7 @@ impl Client {
         let request = self
             .agent
             .post(&format!("{}/v1/transit/keys/{}/rotate", self.host, name));
-        let resp = self.upgrade_request(request).call();
+        let resp = VaultResponse::from(self.upgrade_request(request).call());
 
         process_generic_response(resp)
     }
@@ -399,9 +452,10 @@ impl Client {
         let request = self
             .agent
             .post(&format!("{}/v1/transit/keys/{}/trim", self.host, name));
-        let resp = self
-            .upgrade_request(request)
-            .send_json(json!({ "min_available_version": min_available_version }));
+        let resp = VaultResponse::from(
+            self.upgrade_request(request)
+                .send_json(json!({ "min_available_version": min_available_version })),
+        );
 
         process_generic_response(resp)
     }
@@ -415,9 +469,9 @@ impl Client {
         let request = self
             .agent
             .post(&format!("{}/v1/transit/keys/{}/config", self.host, name));
-        let resp = self.upgrade_request(request).send_json(
+        let resp = VaultResponse::from(self.upgrade_request(request).send_json(
             json!({ "min_encryption_version": min_version, "min_decryption_version": min_version }),
-        );
+        ));
 
         process_generic_response(resp)
     }
@@ -437,7 +491,7 @@ impl Client {
         let request = self
             .agent
             .post(&format!("{}/v1/transit/sign/{}", self.host, name));
-        let resp = self.upgrade_request(request).send_json(data);
+        let resp = VaultResponse::from(self.upgrade_request(request).send_json(data));
 
         process_transit_sign_response(resp)
     }
@@ -459,10 +513,10 @@ impl Client {
         let request = self
             .agent
             .put(&format!("{}/v1/secret/data/{}", self.host, secret));
-        let resp = self.upgrade_request(request).send_json(payload);
+        let resp = VaultResponse::from(self.upgrade_request(request).send_json(payload));
 
         if resp.ok() {
-            let resp: WriteSecretResponse = serde_json::from_str(&resp.into_string()?)?;
+            let resp: WriteSecretResponse = serde_json::from_str(&resp.body)?;
             Ok(resp.data.version)
         } else {
             Err(resp.into())
@@ -473,31 +527,24 @@ impl Client {
     /// queried without authentication.
     pub fn unsealed(&self) -> Result<bool, Error> {
         let request = self.agent.get(&format!("{}/v1/sys/seal-status", self.host));
-        let resp = self.upgrade_request_without_token(request).call();
+        let resp = VaultResponse::from(self.upgrade_request_without_token(request).call());
 
         process_unsealed_response(resp)
     }
 
     fn upgrade_request(&self, request: ureq::Request) -> ureq::Request {
-        let mut request = self.upgrade_request_without_token(request);
-        request.set("X-Vault-Token", &self.token);
-        request
+        self.upgrade_request_without_token(request)
+            .set("X-Vault-Token", &self.token)
     }
 
-    fn upgrade_request_without_token(&self, mut request: ureq::Request) -> ureq::Request {
-        request.timeout_connect(self.connection_timeout_ms);
-        request.timeout(Duration::from_millis(self.response_timeout_ms));
-        request.set_tls_connector(self.tls_connector.clone());
+    fn upgrade_request_without_token(&self, request: ureq::Request) -> ureq::Request {
         request
     }
 }
 
-/// Processes a generic response returned by a vault request. This function simply just checks
-/// that the response was not an error and calls response.into_string() to clear the ureq stream.
-pub fn process_generic_response(resp: Response) -> Result<(), Error> {
+/// Processes a generic response returned by a vault request.
+pub fn process_generic_response(resp: VaultResponse) -> Result<(), Error> {
     if resp.ok() {
-        // Explicitly clear buffer so the stream can be re-used.
-        resp.into_string()?;
         Ok(())
     } else {
         Err(resp.into())
@@ -505,43 +552,33 @@ pub fn process_generic_response(resp: Response) -> Result<(), Error> {
 }
 
 /// Processes the response returned by a policy list vault request.
-pub fn process_policy_list_response(resp: Response) -> Result<Vec<String>, Error> {
-    match resp.status() {
+pub fn process_policy_list_response(resp: VaultResponse) -> Result<Vec<String>, Error> {
+    match resp.status {
         200 => {
-            let policies: ListPoliciesResponse = serde_json::from_str(&resp.into_string()?)?;
+            let policies: ListPoliciesResponse = serde_json::from_str(&resp.body)?;
             Ok(policies.policies)
         },
-        // There are no policies.
-        404 => {
-            // Explicitly clear buffer so the stream can be re-used.
-            resp.into_string()?;
-            Ok(vec![])
-        },
+        404 => Ok(vec![]),
         _ => Err(resp.into()),
     }
 }
 
 /// Processes the response returned by a policy read vault request.
-pub fn process_policy_read_response(resp: Response) -> Result<Policy, Error> {
-    match resp.status() {
-        200 => Ok(Policy::try_from(resp.into_json()?)?),
+pub fn process_policy_read_response(resp: VaultResponse) -> Result<Policy, Error> {
+    match resp.status {
+        200 => Ok(Policy::try_from(serde_json::from_str::<Value>(&resp.body)?)?),
         _ => Err(resp.into()),
     }
 }
 
 /// Processes the response returned by a secret list vault request.
-pub fn process_secret_list_response(resp: Response) -> Result<Vec<String>, Error> {
-    match resp.status() {
+pub fn process_secret_list_response(resp: VaultResponse) -> Result<Vec<String>, Error> {
+    match resp.status {
         200 => {
-            let resp: ReadSecretListResponse = serde_json::from_str(&resp.into_string()?)?;
+            let resp: ReadSecretListResponse = serde_json::from_str(&resp.body)?;
             Ok(resp.data.keys)
         },
-        // There are no secrets.
-        404 => {
-            // Explicitly clear buffer so the stream can be re-used.
-            resp.into_string()?;
-            Ok(vec![])
-        },
+        404 => Ok(vec![]),
         _ => Err(resp.into()),
     }
 }
@@ -550,11 +587,11 @@ pub fn process_secret_list_response(resp: Response) -> Result<Vec<String>, Error
 pub fn process_secret_read_response(
     secret: &str,
     key: &str,
-    resp: Response,
+    resp: VaultResponse,
 ) -> Result<ReadResponse<Value>, Error> {
-    match resp.status() {
+    match resp.status {
         200 => {
-            let mut resp: ReadSecretResponse = serde_json::from_str(&resp.into_string()?)?;
+            let mut resp: ReadSecretResponse = serde_json::from_str(&resp.body)?;
             let data = &mut resp.data;
             let value = data
                 .data
@@ -564,19 +601,15 @@ pub fn process_secret_read_response(
             let version = data.metadata.version;
             Ok(ReadResponse::new(created_time, value, version))
         },
-        404 => {
-            // Explicitly clear buffer so the stream can be re-used.
-            resp.into_string()?;
-            Err(Error::NotFound(secret.into(), key.into()))
-        },
+        404 => Err(Error::NotFound(secret.into(), key.into())),
         _ => Err(resp.into()),
     }
 }
 
 /// Processes the response returned by a token create vault request.
-pub fn process_token_create_response(resp: Response) -> Result<String, Error> {
+pub fn process_token_create_response(resp: VaultResponse) -> Result<String, Error> {
     if resp.ok() {
-        let resp: CreateTokenResponse = serde_json::from_str(&resp.into_string()?)?;
+        let resp: CreateTokenResponse = serde_json::from_str(&resp.body)?;
         Ok(resp.auth.client_token)
     } else {
         Err(resp.into())
@@ -584,9 +617,9 @@ pub fn process_token_create_response(resp: Response) -> Result<String, Error> {
 }
 
 /// Processes the response returned by a token renew vault request.
-pub fn process_token_renew_response(resp: Response) -> Result<u32, Error> {
+pub fn process_token_renew_response(resp: VaultResponse) -> Result<u32, Error> {
     if resp.ok() {
-        let resp: RenewTokenResponse = serde_json::from_str(&resp.into_string()?)?;
+        let resp: RenewTokenResponse = serde_json::from_str(&resp.body)?;
         Ok(resp.auth.lease_duration)
     } else {
         Err(resp.into())
@@ -594,18 +627,10 @@ pub fn process_token_renew_response(resp: Response) -> Result<u32, Error> {
 }
 
 /// Processes the response returned by a transit key create vault request.
-pub fn process_transit_create_response(name: &str, resp: Response) -> Result<(), Error> {
-    match resp.status() {
-        200 | 204 => {
-            // Explicitly clear buffer so the stream can be re-used.
-            resp.into_string()?;
-            Ok(())
-        },
-        404 => {
-            // Explicitly clear buffer so the stream can be re-used.
-            resp.into_string()?;
-            Err(Error::NotFound("transit/".into(), name.into()))
-        },
+pub fn process_transit_create_response(name: &str, resp: VaultResponse) -> Result<(), Error> {
+    match resp.status {
+        200 | 204 => Ok(()),
+        404 => Err(Error::NotFound("transit/".into(), name.into())),
         _ => Err(resp.into()),
     }
 }
@@ -614,10 +639,10 @@ pub fn process_transit_create_response(name: &str, resp: Response) -> Result<(),
 pub fn process_transit_export_response(
     name: &str,
     version: Option<u32>,
-    resp: Response,
+    resp: VaultResponse,
 ) -> Result<Ed25519PrivateKey, Error> {
     if resp.ok() {
-        let export_key: ExportKeyResponse = serde_json::from_str(&resp.into_string()?)?;
+        let export_key: ExportKeyResponse = serde_json::from_str(&resp.body)?;
         let composite_key = if let Some(version) = version {
             let key = export_key.data.keys.iter().find(|(k, _v)| **k == version);
             let (_, key) = key.ok_or_else(|| Error::NotFound("transit/".into(), name.into()))?;
@@ -642,17 +667,13 @@ pub fn process_transit_export_response(
 }
 
 /// Processes the response returned by a transit key list vault request.
-pub fn process_transit_list_response(resp: Response) -> Result<Vec<String>, Error> {
-    match resp.status() {
+pub fn process_transit_list_response(resp: VaultResponse) -> Result<Vec<String>, Error> {
+    match resp.status {
         200 => {
-            let list_keys: ListKeysResponse = serde_json::from_str(&resp.into_string()?)?;
+            let list_keys: ListKeysResponse = serde_json::from_str(&resp.body)?;
             Ok(list_keys.data.keys)
         },
-        404 => {
-            // Explicitly clear buffer so the stream can be re-used.
-            resp.into_string()?;
-            Err(Error::NotFound("transit/".into(), "keys".into()))
-        },
+        404 => Err(Error::NotFound("transit/".into(), "keys".into())),
         _ => Err(resp.into()),
     }
 }
@@ -660,11 +681,11 @@ pub fn process_transit_list_response(resp: Response) -> Result<Vec<String>, Erro
 /// Processes the response returned by a transit key read vault request.
 pub fn process_transit_read_response(
     name: &str,
-    resp: Response,
+    resp: VaultResponse,
 ) -> Result<Vec<ReadResponse<Ed25519PublicKey>>, Error> {
-    match resp.status() {
+    match resp.status {
         200 => {
-            let read_key: ReadKeyResponse = serde_json::from_str(&resp.into_string()?)?;
+            let read_key: ReadKeyResponse = serde_json::from_str(&resp.body)?;
             let mut read_resp = Vec::new();
             for (version, value) in read_key.data.keys {
                 read_resp.push(ReadResponse::new(
@@ -675,31 +696,23 @@ pub fn process_transit_read_response(
             }
             Ok(read_resp)
         },
-        404 => {
-            // Explicitly clear buffer so the stream can be re-used.
-            resp.into_string()?;
-            Err(Error::NotFound("transit/".into(), name.into()))
-        },
+        404 => Err(Error::NotFound("transit/".into(), name.into())),
         _ => Err(resp.into()),
     }
 }
 
 /// Processes the response returned by a transit key restore vault request.
-pub fn process_transit_restore_response(resp: Response) -> Result<(), Error> {
-    match resp.status() {
-        204 => {
-            // Explicitly clear buffer so the stream can be re-used.
-            resp.into_string()?;
-            Ok(())
-        },
+pub fn process_transit_restore_response(resp: VaultResponse) -> Result<(), Error> {
+    match resp.status {
+        204 => Ok(()),
         _ => Err(resp.into()),
     }
 }
 
 /// Processes the response returned by a transit key sign vault request.
-pub fn process_transit_sign_response(resp: Response) -> Result<Ed25519Signature, Error> {
+pub fn process_transit_sign_response(resp: VaultResponse) -> Result<Ed25519Signature, Error> {
     if resp.ok() {
-        let signature: SignatureResponse = serde_json::from_str(&resp.into_string()?)?;
+        let signature: SignatureResponse = serde_json::from_str(&resp.body)?;
         let signature = &signature.data.signature;
         let signature_pieces: Vec<_> = signature.split(':').collect();
         let signature = signature_pieces
@@ -714,9 +727,9 @@ pub fn process_transit_sign_response(resp: Response) -> Result<Ed25519Signature,
 }
 
 /// Processes the response returned by a seal-status() vault request.
-pub fn process_unsealed_response(resp: Response) -> Result<bool, Error> {
+pub fn process_unsealed_response(resp: VaultResponse) -> Result<bool, Error> {
     if resp.ok() {
-        let resp: SealStatusResponse = serde_json::from_str(&resp.into_string()?)?;
+        let resp: SealStatusResponse = serde_json::from_str(&resp.body)?;
         Ok(!resp.sealed)
     } else {
         Err(resp.into())

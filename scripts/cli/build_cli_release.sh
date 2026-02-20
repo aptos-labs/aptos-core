@@ -55,6 +55,7 @@ fi
 echo "Building release $VERSION of $NAME for $OS-$PLATFORM_NAME on $ARCH"
 
 TARGET_FLAG=""
+FEATURE_FLAG=""
 OUTPUT_DIR="target/cli"
 
 # Static linking via musl eliminates GLIBC and OpenSSL runtime dependencies.
@@ -71,13 +72,14 @@ if [[ "$STATIC_LINK" == "true" ]]; then
   echo "Static build enabled, using target: $MUSL_TARGET"
   rustup target add "$MUSL_TARGET"
   TARGET_FLAG="--target $MUSL_TARGET"
+  FEATURE_FLAG="--no-default-features"
   OUTPUT_DIR="target/$MUSL_TARGET/cli"
 fi
 
 if [[ "$COMPATIBILITY_MODE" == "true" ]]; then
-  RUSTFLAGS="-C target-cpu=generic --cfg tokio_unstable -C target-feature=-sse4.2,-avx" cargo build -p "$CRATE_NAME" --profile cli $TARGET_FLAG
+  RUSTFLAGS="-C target-cpu=generic --cfg tokio_unstable -C target-feature=-sse4.2,-avx" cargo build -p "$CRATE_NAME" --profile cli $TARGET_FLAG $FEATURE_FLAG
 else
-  cargo build -p "$CRATE_NAME" --profile cli $TARGET_FLAG
+  cargo build -p "$CRATE_NAME" --profile cli $TARGET_FLAG $FEATURE_FLAG
 fi
 cd "$OUTPUT_DIR"
 

@@ -17,13 +17,15 @@ aptos-crypto = { workspace = true }
 aptos-types = { workspace = true, optional = true }
 base64 = { workspace = true }
 chrono = { workspace = true }
-native-tls = { workspace = true }
 once_cell = { workspace = true }
 proptest = { workspace = true, optional = true }
+rustls = { workspace = true }
+rustls-pemfile = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
 thiserror = { workspace = true }
 ureq = { workspace = true }
+webpki-roots = { workspace = true }
 
 [dev-dependencies]
 aptos-proptest-helpers = { workspace = true }

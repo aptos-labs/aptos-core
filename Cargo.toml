@@ -747,12 +747,13 @@ redis = { version = "0.22.3", features = [
 redis-test = { version = "0.1.1", features = ["aio"] }
 ref-cast = "1.0.6"
 regex = "1.9.3"
-reqwest = { version = "0.11.11", features = [
+reqwest = { version = "0.11.11", default-features = false, features = [
     "blocking",
     "cookies",
     "json",
     "multipart",
     "stream",
+    "rustls-tls-native-roots",
 ] }
 reqwest-middleware = "0.2.0"
 reqwest-retry = "0.2.1"
@@ -763,6 +764,8 @@ rocksdb = { version = "0.24.0", features = ["lz4"] }
 rsa = { version = "0.9.6" }
 rstack-self = { version = "0.3.0", features = ["dw"], default-features = false }
 rstest = "0.15.0"
+rustls = { version = "0.23", default-features = false, features = ["ring", "logging", "std", "tls12"] }
+rustls-pemfile = "2"
 rusty-fork = "0.3.0"
 rustversion = "1.0.14"
 scopeguard = "1.2.0"
@@ -835,10 +838,10 @@ tui = "0.19.0"
 typed-arena = "2.0.2"
 typenum = "1.17.0"
 uint = "0.9.4"
-ureq = { version = "1.5.4", features = [
+ureq = { version = "2.12", features = [
     "json",
-    "native-tls",
-], default-features = false }
+    "tls",
+] }
 url = { version = "2.4.0", features = ["serde"] }
 usdt = "0.6.0"
 uuid = { version = "1.0.0", features = ["v4", "serde"] }
@@ -848,6 +851,7 @@ warp = { version = "0.3.5", features = ["tls"] }
 warp-reverse-proxy = "1.0.0"
 wasm-bindgen = "0.2.100"
 wasm-bindgen-futures = "0.4.50"
+webpki-roots = "0.26"
 which = "4.2.5"
 whoami = "1.5.0"
 # This allows for zeroize 1.6 to be used. Version 1.2.0 of x25519-dalek locks zeroize to 1.3.
