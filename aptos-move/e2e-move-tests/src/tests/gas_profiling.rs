@@ -10,6 +10,7 @@
 //!   aptos-move/e2e-move-tests/gas-profiling/gas_profiling_report/index.html
 
 use crate::{assert_success, tests::common::test_dir_path, MoveHarness};
+use aptos_gas_profiling::HtmlReportOptions;
 use aptos_types::{
     account_address::AccountAddress,
     transaction::{EntryFunction, TransactionPayload},
@@ -71,7 +72,7 @@ fn test_gas_profiling_report() {
         )),
     );
 
-    // Generate the HTML report
+    // Generate the HTML report with default options (auto-load trace)
     let report_dir = Path::new("gas-profiling").join("gas_profiling_report");
     gas_log
         .generate_html_report(&report_dir, "Gas Profiling Test Report".to_string())
@@ -80,10 +81,33 @@ fn test_gas_profiling_report() {
     // Verify the HTML report
     let html = std::fs::read_to_string(report_dir.join("index.html")).expect("read report");
 
+    // Verify trace.html is generated
+    let trace_path = report_dir.join("assets").join("trace.html");
+    assert!(trace_path.exists(), "trace.html should be generated");
+    let trace_html = std::fs::read_to_string(&trace_path).expect("read trace.html");
+    assert!(
+        trace_html.contains("trace-dimensions"),
+        "trace.html should contain postMessage code"
+    );
+
+    // Verify style.css is generated
+    let style_path = report_dir.join("assets").join("style.css");
+    assert!(style_path.exists(), "style.css should be generated");
+
     // Structural checks
     assert!(html.contains("<h2>Summary</h2>"));
     assert!(html.contains("Flamegraphs"));
     assert!(html.contains("Cost Break-down"));
+
+    // Verify auto-load path: iframe should have src attribute (not lazy-loaded)
+    assert!(
+        html.contains(r#"<iframe id="trace-frame" src="assets/trace.html""#),
+        "With default threshold, trace should auto-load via iframe src"
+    );
+    assert!(
+        !html.contains("trace-is-large"),
+        "With default threshold, trace should not be marked as large"
+    );
 
     // Verify gas values from HTML are > 0
     let execution_gas = extract_summary_value(&html, "Execution Gas").unwrap();
@@ -106,4 +130,39 @@ fn test_gas_profiling_report() {
 
     // Verify events section exists (our transaction emits an event)
     assert!(html.contains("Events"), "Report should have Events section");
+
+    // Test lazy-load path with a very low threshold
+    let lazy_report_dir = Path::new("gas-profiling").join("gas_profiling_report_lazy");
+    gas_log
+        .generate_html_report_with_options(
+            &lazy_report_dir,
+            "Gas Profiling Test Report (Lazy)".to_string(),
+            HtmlReportOptions {
+                trace_lazy_load_threshold: 1, // Force lazy loading
+            },
+        )
+        .expect("Failed to generate lazy report");
+
+    let lazy_html =
+        std::fs::read_to_string(lazy_report_dir.join("index.html")).expect("read lazy report");
+
+    // Verify lazy-load path: should have Load Trace button
+    assert!(
+        lazy_html.contains("Load Trace"),
+        "With low threshold, should show Load Trace button"
+    );
+    assert!(
+        lazy_html.contains("Large trace"),
+        "With low threshold, should show large trace message"
+    );
+    assert!(
+        lazy_html.contains("lines)"),
+        "With low threshold, should include line count"
+    );
+
+    // Verify trace.html is also generated for lazy report
+    assert!(
+        lazy_report_dir.join("assets").join("trace.html").exists(),
+        "trace.html should be generated for lazy report"
+    );
 }

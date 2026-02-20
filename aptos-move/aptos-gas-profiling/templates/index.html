@@ -1,6 +1,3 @@
-<!-- Copyright © Aptos Foundation -->
-<!-- SPDX-License-Identifier: Apache-2.0 -->
-
 <!DOCTYPE html>
 <html lang="en">
 
@@ -8,235 +5,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{{title}}</title>
-    <style>
-        :root {
-            --accent: #2563eb;
-            --accent-light: #dbeafe;
-            --border: #e2e8f0;
-            --text-muted: #64748b;
-        }
-
-        body {
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-            background-color: #fff;
-            color: #1e293b;
-            line-height: 1.5;
-            font-size: 14px;
-        }
-
-        h1 {
-            border-bottom: 2px solid var(--accent);
-            padding-bottom: 8px;
-        }
-
-        table {
-            border-collapse: collapse;
-            margin: 2px 0;
-        }
-
-        table,
-        th,
-        td {
-            border: 1px solid var(--border);
-        }
-
-        th,
-        td {
-            padding: 3px 8px;
-        }
-
-        th {
-            background: linear-gradient(to bottom, #f8fafc, #f1f5f9);
-            font-weight: 600;
-        }
-
-        th.sortable {
-            cursor: pointer;
-            user-select: none;
-        }
-
-        th.sortable:hover {
-            background: linear-gradient(to bottom, #f1f5f9, #e2e8f0);
-        }
-
-        th.sortable::after {
-            content: ' ⇅';
-            font-size: 0.7em;
-            color: var(--text-muted);
-        }
-
-        th.sort-asc::after {
-            content: ' ▲';
-            color: var(--accent);
-        }
-
-        th.sort-desc::after {
-            content: ' ▼';
-            color: var(--accent);
-        }
-
-        /* Summary table category labels */
-        .category-label {
-            font-weight: 600;
-        }
-
-        tr:hover {
-            background: var(--accent-light);
-        }
-
-        details>summary:hover {
-            opacity: 0.85;
-        }
-
-        .table-wrapper {
-            display: inline-block;
-            margin-bottom: 12px;
-        }
-
-        .table-footer {
-            display: flex;
-            justify-content: flex-end;
-            margin-top: 2px;
-        }
-
-        h5 {
-            font-size: 0.95em;
-            font-weight: 600;
-            color: #475569;
-            margin: 12px 0 4px 0;
-        }
-
-        button {
-            font-family: inherit;
-            font-size: 0.85em;
-            padding: 4px 10px;
-            background: #f8fafc;
-            border: 1px solid var(--border);
-            border-radius: 4px;
-            cursor: pointer;
-            color: #1e293b;
-        }
-
-        button:hover {
-            background: #e2e8f0;
-        }
-
-        .info-tip {
-            font-size: 1em;
-            color: var(--text-muted);
-            cursor: help;
-        }
-
-        .copy-btn {
-            padding: 1px 6px;
-            font-size: 0.7em;
-            background: #f8fafc;
-            border: 1px solid var(--border);
-            border-radius: 3px;
-            cursor: pointer;
-            color: #1e293b;
-        }
-
-        .copy-btn:hover {
-            background: #e2e8f0;
-        }
-
-        h2 {
-            background: linear-gradient(to right, #e0e7ff, #f8fafc);
-            border-left: 3px solid var(--accent);
-            padding: 8px 12px;
-            margin-top: 30px;
-            font-size: 1.1em;
-        }
-
-        h3 {
-            background: #f8fafc;
-            border-left: 2px solid #94a3b8;
-            padding: 6px 10px;
-            font-size: 1em;
-            color: #475569;
-        }
-
-        h4 {
-            color: #475569;
-            font-size: 0.95em;
-            margin: 16px 0 6px 0;
-        }
-
-        code {
-            background: #f1f5f9;
-            padding: 1px 4px;
-            border-radius: 3px;
-            font-size: 0.9em;
-        }
-
-        footer {
-            margin-top: 40px;
-            padding-top: 16px;
-            border-top: 1px solid var(--border);
-            color: var(--text-muted);
-            font-size: 0.85em;
-        }
-
-        .flamegraph {
-            width: 100%;
-        }
-
-        details {
-            margin-bottom: 40px;
-        }
-
-        details>summary+* {
-            margin-top: 8px;
-        }
-
-        details>summary {
-            cursor: pointer;
-            list-style: none;
-        }
-
-        details>summary::-webkit-details-marker {
-            display: none;
-        }
-
-        details>summary>h2 {
-            display: flex;
-            align-items: center;
-            margin: 0;
-        }
-
-        details>summary>h2::before {
-            content: "▶ ";
-            font-size: 0.6em;
-            margin-right: 6px;
-            color: var(--accent);
-        }
-
-        details[open]>summary>h2::before {
-            content: "▼ ";
-        }
-
-        details>summary>h3 {
-            display: flex;
-            align-items: center;
-            margin: 0;
-        }
-
-        details>summary>h3::before {
-            content: "▶ ";
-            font-size: 0.6em;
-            margin-right: 6px;
-            color: #94a3b8;
-        }
-
-        details[open]>summary>h3::before {
-            content: "▼ ";
-        }
-
-        details.subsection {
-            margin-bottom: 20px;
-        }
-    </style>
+    <link rel="stylesheet" href="assets/style.css">
     <script>
         function copyTable(btn) {
             const table = btn.closest('.table-wrapper').querySelector('table');
@@ -247,6 +16,10 @@
             navigator.clipboard.writeText(text).then(() => {
                 const orig = btn.textContent;
                 btn.textContent = 'Copied!';
+                setTimeout(() => btn.textContent = orig, 1000);
+            }).catch(() => {
+                const orig = btn.textContent;
+                btn.textContent = 'Failed';
                 setTimeout(() => btn.textContent = orig, 1000);
             });
         }
@@ -275,7 +48,7 @@
             a.href = url;
             a.download = name + '.csv';
             a.click();
-            URL.revokeObjectURL(url);
+            setTimeout(() => URL.revokeObjectURL(url), 100);
         }
 
         function sortTable(th, colIndex) {
@@ -335,8 +108,8 @@
 
         function makeTablesSortable() {
             const tables = document.querySelectorAll('table');
-            tables.forEach((table, index) => {
-                if (index === 0) return; // skip summary
+            tables.forEach((table) => {
+                if (table.id === 'summary-table') return;
                 const headerRow = table.querySelector('tr');
                 if (!headerRow) return;
                 headerRow.querySelectorAll('th').forEach((th, colIndex) => {
@@ -348,9 +121,8 @@
 
         function wrapTablesWithCopyButton() {
             const tables = document.querySelectorAll('table');
-            tables.forEach((table, index) => {
-                // Skip summary table (first one)
-                if (index === 0) return;
+            tables.forEach((table) => {
+                if (table.id === 'summary-table') return;
                 if (table.parentElement.classList.contains('table-wrapper')) return;
 
                 const wrapper = document.createElement('div');
@@ -392,7 +164,7 @@
         <p>
             This summary corresponds to the <code>FeeStatement</code> event emitted by the transaction.
         </p>
-        <table>
+        <table id="summary-table">
             <tr>
                 <th>Category</th>
                 <th style="text-align: right">Cost</th>
@@ -728,8 +500,15 @@
                 frame.style.width = Math.min(traceDimensions.width, window.innerWidth - 40) + 'px';
             }
             window.addEventListener('message', function (event) {
+                // Only accept messages from our trace iframe
+                const frame = document.getElementById('trace-frame');
+                if (!frame || event.source !== frame.contentWindow) return;
+
                 if (event.data && event.data.type === 'trace-dimensions') {
-                    traceDimensions = { width: event.data.width, height: event.data.height };
+                    // Validate and sanitize dimensions
+                    const width = Math.max(0, Math.min(Number(event.data.width) || 0, 50000));
+                    const height = Math.max(0, Math.min(Number(event.data.height) || 0, 50000));
+                    traceDimensions = { width: width, height: height };
                     applyTraceDimensions();
                 }
             });
@@ -759,20 +538,19 @@
         <p>Large trace ({{trace-line-count}} lines)</p>
         <div id="trace-buttons">
             <button id="load-trace-btn" onclick="loadTrace()">Load Trace</button>
-            <button onclick="window.open('assets/trace.html', '_blank')" style="margin-left: 5px;">View Raw</button>
+            <button onclick="window.open('assets/trace.html', '_blank', 'noopener')" style="margin-left: 5px;">View Raw</button>
         </div>
         <div id="trace-container" style="display: none;">
-            <p><button onclick="window.open('assets/trace.html', '_blank')">View Raw</button></p>
+            <p><button onclick="window.open('assets/trace.html', '_blank', 'noopener')">View Raw</button></p>
             <iframe id="trace-frame" style="width: 100%; height: 400px; border: 1px solid black;"></iframe>
         </div>
         {{else}}
-        <p><button onclick="window.open('assets/trace.html', '_blank')">View Raw</button></p>
+        <p><button onclick="window.open('assets/trace.html', '_blank', 'noopener')">View Raw</button></p>
         <iframe id="trace-frame" src="assets/trace.html" style="width: 100%; border: 1px solid black;"></iframe>
         {{/if}}
     </details>
 
-    <footer
-        style="display: flex; justify-content: space-between; color: var(--text-muted); font-size: 0.85em; border-top: 1px solid var(--border); padding-top: 8px; margin-top: 16px;">
+    <footer>
         <span>Generated by the Aptos Gas Profiler{{#if git-rev}} ({{git-rev}}){{/if}}</span>
         <span>{{generated-at}}</span>
     </footer>

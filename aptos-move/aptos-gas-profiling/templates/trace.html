@@ -58,11 +58,14 @@
             window.addEventListener('load', function () {
                 requestAnimationFrame(function () {
                     const body = document.body;
+                    // Use same origin for postMessage; fall back to '*' for file:// protocol
+                    let targetOrigin = document.location.origin;
+                    if (targetOrigin === 'null') targetOrigin = '*';
                     window.parent.postMessage({
                         type: 'trace-dimensions',
                         width: body.scrollWidth,
                         height: body.scrollHeight
-                    }, '*');
+                    }, targetOrigin);
                 });
             });
         }
@@ -74,6 +77,11 @@
                 const btn = document.getElementById('copy-btn');
                 const orig = btn.textContent;
                 btn.textContent = 'Copied!';
+                setTimeout(function () { btn.textContent = orig; }, 1000);
+            }).catch(function () {
+                const btn = document.getElementById('copy-btn');
+                const orig = btn.textContent;
+                btn.textContent = 'Failed';
                 setTimeout(function () { btn.textContent = orig; }, 1000);
             });
         }

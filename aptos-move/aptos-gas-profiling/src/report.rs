@@ -15,9 +15,25 @@ use std::{
 
 const TEMPLATE: &str = include_str!("../templates/index.html");
 const TRACE_TEMPLATE: &str = include_str!("../templates/trace.html");
+const STYLE_CSS: &str = include_str!("../templates/style.css");
 
-/// Traces with more lines than this threshold will require a button click to load
-const TRACE_LAZY_LOAD_THRESHOLD: usize = 1000;
+/// Default threshold: traces with more lines than this will require a button click to load
+const DEFAULT_TRACE_LAZY_LOAD_THRESHOLD: usize = 1000;
+
+/// Options for HTML report generation
+#[derive(Debug, Clone)]
+pub struct HtmlReportOptions {
+    /// Traces with more lines than this threshold will require a button click to load
+    pub trace_lazy_load_threshold: usize,
+}
+
+impl Default for HtmlReportOptions {
+    fn default() -> Self {
+        Self {
+            trace_lazy_load_threshold: DEFAULT_TRACE_LAZY_LOAD_THRESHOLD,
+        }
+    }
+}
 
 fn ensure_dirs_exist(path: impl AsRef<Path>) -> Result<()> {
     if let Err(err) = fs::create_dir_all(&path) {
@@ -80,6 +96,15 @@ where
 
 impl TransactionGasLog {
     pub fn generate_html_report(&self, path: impl AsRef<Path>, header: String) -> Result<()> {
+        self.generate_html_report_with_options(path, header, HtmlReportOptions::default())
+    }
+
+    pub fn generate_html_report_with_options(
+        &self,
+        path: impl AsRef<Path>,
+        header: String,
+        options: HtmlReportOptions,
+    ) -> Result<()> {
         let mut data = Map::new();
         data.insert(
             "title".to_string(),
@@ -441,7 +466,7 @@ impl TransactionGasLog {
 
         // Check if trace is large enough to require lazy loading
         let trace_line_count = trace.lines().count();
-        if trace_line_count > TRACE_LAZY_LOAD_THRESHOLD {
+        if trace_line_count > options.trace_lazy_load_threshold {
             data.insert("trace-is-large".to_string(), Value::Bool(true));
             data.insert(
                 "trace-line-count".to_string(),
@@ -486,6 +511,7 @@ impl TransactionGasLog {
         trace_data.insert("trace-content".to_string(), json!(trace_content));
         let trace_html = handlebars.render_template(TRACE_TEMPLATE, &trace_data)?;
         fs::write(path_assets.join("trace.html"), trace_html)?;
+        fs::write(path_assets.join("style.css"), STYLE_CSS)?;
         fs::write(path_root.join("index.html"), html)?;
 
         Ok(())

@@ -13,3 +13,4 @@ mod unique_stack;
 
 pub use log::{FrameName, TransactionGasLog};
 pub use profiler::GasProfiler;
+pub use report::HtmlReportOptions;
