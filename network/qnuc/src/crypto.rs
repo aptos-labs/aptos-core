@@ -7,7 +7,7 @@
 //! - A datagram-oriented handshake (messages fit in a single UDP packet)
 //! - Per-packet encryption/decryption using the post-handshake Noise session
 
-use crate::error::{QuicLikeError, Result};
+use crate::error::{QnucError, Result};
 use aptos_crypto::{noise, x25519};
 
 /// Wraps a Noise IK handshake for UDP.
@@ -51,7 +51,7 @@ impl NoiseHandshake {
                 Some(payload),
                 &mut buffer,
             )
-            .map_err(|e| QuicLikeError::NoiseHandshake(format!("initiator build failed: {}", e)))?;
+            .map_err(|e| QnucError::NoiseHandshake(format!("initiator build failed: {}", e)))?;
 
         Ok((state, buffer))
     }
@@ -67,7 +67,7 @@ impl NoiseHandshake {
         let (remote_pub, handshake_state, received_payload) = self
             .noise_config
             .parse_client_init_message(prologue, message)
-            .map_err(|e| QuicLikeError::NoiseHandshake(format!("parse init failed: {}", e)))?;
+            .map_err(|e| QnucError::NoiseHandshake(format!("parse init failed: {}", e)))?;
 
         let payload_len = payload.map(|p| p.len()).unwrap_or(0);
         let resp_len = noise::handshake_resp_msg_len(payload_len);
@@ -78,7 +78,7 @@ impl NoiseHandshake {
             .noise_config
             .respond_to_client(&mut rng, handshake_state, payload, &mut response)
             .map_err(|e| {
-                QuicLikeError::NoiseHandshake(format!("responder build failed: {}", e))
+                QnucError::NoiseHandshake(format!("responder build failed: {}", e))
             })?;
 
         Ok((remote_pub, session, received_payload, response))
@@ -95,7 +95,7 @@ impl NoiseHandshake {
             .noise_config
             .finalize_connection(state, response)
             .map_err(|e| {
-                QuicLikeError::NoiseHandshake(format!("initiator finalize failed: {}", e))
+                QnucError::NoiseHandshake(format!("initiator finalize failed: {}", e))
             })?;
 
         Ok((payload, session))
@@ -119,7 +119,7 @@ impl DatagramCrypto {
         let tag = self
             .session
             .write_message_in_place(&mut buf)
-            .map_err(|e| QuicLikeError::NoiseEncrypt(format!("{}", e)))?;
+            .map_err(|e| QnucError::NoiseEncrypt(format!("{}", e)))?;
         buf.extend_from_slice(&tag);
         Ok(buf)
     }
@@ -131,7 +131,7 @@ impl DatagramCrypto {
         let plaintext = self
             .session
             .read_message_in_place(&mut buf)
-            .map_err(|e| QuicLikeError::NoiseDecrypt(format!("{}", e)))?;
+            .map_err(|e| QnucError::NoiseDecrypt(format!("{}", e)))?;
         Ok(plaintext.to_vec())
     }
 
@@ -162,7 +162,7 @@ mod tests {
         let initiator = NoiseHandshake::new(init_priv);
         let responder = NoiseHandshake::new(resp_priv);
 
-        let prologue = b"aptos-quic-like-udp-v1";
+        let prologue = b"aptos-qnuc-v1";
         let init_payload = b"hello from initiator";
 
         // Step 1: initiator builds message

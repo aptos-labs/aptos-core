@@ -22,5 +22,5 @@ pub mod stream;
 pub mod transport;
 
 pub use connection::Connection;
-pub use error::QuicLikeError;
-pub use transport::QuicLikeTransport;
+pub use error::QnucError;
+pub use transport::QnucTransport;

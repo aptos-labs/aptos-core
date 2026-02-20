@@ -4,7 +4,7 @@
 use thiserror::Error;
 
 #[derive(Debug, Error)]
-pub enum QuicLikeError {
+pub enum QnucError {
     #[error("IO error: {0}")]
     Io(#[from] std::io::Error),
 
@@ -39,4 +39,4 @@ pub enum QuicLikeError {
     AddressResolution(String),
 }
 
-pub type Result<T> = std::result::Result<T, QuicLikeError>;
+pub type Result<T> = std::result::Result<T, QnucError>;

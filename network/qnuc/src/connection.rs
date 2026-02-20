@@ -6,7 +6,7 @@
 
 use crate::{
     crypto::{DatagramCrypto, NoiseHandshake},
-    error::{QuicLikeError, Result},
+    error::{QnucError, Result},
     packet::{Packet, PacketHeader, PacketType},
     reliability::ReliabilityConfig,
     stream::Stream,
@@ -123,12 +123,12 @@ impl Connection {
             self.socket.recv_from(&mut recv_buf),
         )
         .await
-        .map_err(|_| QuicLikeError::ConnectionTimeout)?
-        .map_err(QuicLikeError::Io)?;
+        .map_err(|_| QnucError::ConnectionTimeout)?
+        .map_err(QnucError::Io)?;
 
         let resp_pkt = Packet::decode(&recv_buf[..n])?;
         if resp_pkt.header.packet_type != PacketType::HandshakeResp {
-            return Err(QuicLikeError::NoiseHandshake(
+            return Err(QnucError::NoiseHandshake(
                 "expected HandshakeResp".to_string(),
             ));
         }
@@ -176,7 +176,7 @@ impl Connection {
     /// Send a message on a given stream.
     pub async fn send_message(&mut self, stream_id: u64, message: &[u8]) -> Result<()> {
         if self.state != ConnectionState::Established {
-            return Err(QuicLikeError::ConnectionClosed);
+            return Err(QnucError::ConnectionClosed);
         }
 
         let stream = self.get_or_create_stream(stream_id);
@@ -184,14 +184,14 @@ impl Connection {
         let crypto = self
             .crypto
             .as_mut()
-            .ok_or(QuicLikeError::ConnectionClosed)?;
+            .ok_or(QnucError::ConnectionClosed)?;
 
         for (_seq, pkt_bytes) in packets {
             let encrypted = crypto.encrypt(&pkt_bytes)?;
             self.socket
                 .send_to(&encrypted, self.remote_addr)
                 .await
-                .map_err(QuicLikeError::Io)?;
+                .map_err(QnucError::Io)?;
         }
 
         self.last_activity = Instant::now();
@@ -209,7 +209,7 @@ impl Connection {
             let crypto = self
                 .crypto
                 .as_mut()
-                .ok_or(QuicLikeError::ConnectionClosed)?;
+                .ok_or(QnucError::ConnectionClosed)?;
             decrypted = crypto.decrypt(data)?;
             &decrypted[..]
         } else {
@@ -256,7 +256,7 @@ impl Connection {
         let crypto = self
             .crypto
             .as_mut()
-            .ok_or(QuicLikeError::ConnectionClosed)?;
+            .ok_or(QnucError::ConnectionClosed)?;
 
         let stream_ids: Vec<u64> = self.streams.keys().copied().collect();
         for sid in stream_ids {
@@ -266,7 +266,7 @@ impl Connection {
                 self.socket
                     .send_to(&encrypted, self.remote_addr)
                     .await
-                    .map_err(QuicLikeError::Io)?;
+                    .map_err(QnucError::Io)?;
             }
         }
 
@@ -282,7 +282,7 @@ impl Connection {
         let crypto = self
             .crypto
             .as_mut()
-            .ok_or(QuicLikeError::ConnectionClosed)?;
+            .ok_or(QnucError::ConnectionClosed)?;
 
         let stream_ids: Vec<u64> = self.streams.keys().copied().collect();
         for sid in stream_ids {
@@ -293,7 +293,7 @@ impl Connection {
                     self.socket
                         .send_to(&encrypted, self.remote_addr)
                         .await
-                        .map_err(QuicLikeError::Io)?;
+                        .map_err(QnucError::Io)?;
                 }
             }
         }
@@ -351,7 +351,7 @@ impl Connection {
 
     fn build_prologue(&self) -> Vec<u8> {
         let mut prologue = Vec::with_capacity(24);
-        prologue.extend_from_slice(b"aptos-quic-udp-v1");
+        prologue.extend_from_slice(b"aptos-qnuc-v1");
         prologue.extend_from_slice(&self.connection_id.to_be_bytes());
         prologue
     }
@@ -360,7 +360,7 @@ impl Connection {
         self.socket
             .send_to(data, self.remote_addr)
             .await
-            .map_err(QuicLikeError::Io)?;
+            .map_err(QnucError::Io)?;
         Ok(())
     }
 }

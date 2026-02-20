@@ -3773,7 +3773,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "aptos-quic-like-udp"
+name = "aptos-qnuc"
 version = "0.1.0"
 dependencies = [
  "anyhow",

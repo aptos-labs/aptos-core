@@ -14,7 +14,7 @@
 use criterion::{criterion_group, criterion_main, BenchmarkId, Criterion, Throughput};
 
 use aptos_crypto::{noise::NoiseConfig, x25519, Uniform};
-use aptos_quic_like_udp::{
+use aptos_qnuc::{
     connection::{Connection, ConnectionConfig},
     crypto::{DatagramCrypto, NoiseHandshake},
     packet::{Packet, PacketHeader, PacketType, SelectiveAck},

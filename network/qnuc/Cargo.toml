@@ -1,6 +1,6 @@
 [package]
-name = "aptos-quic-like-udp"
-description = "QUIC-like reliable ordered UDP transport with Noise encryption for Aptos"
+name = "aptos-qnuc"
+description = "QNUC: QUIC-like reliable ordered UDP transport with Noise encryption for Aptos"
 version = "0.1.0"
 
 # Workspace inherited keys

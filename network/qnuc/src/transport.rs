@@ -4,14 +4,14 @@
 //! Top-level transport that provides the public API for establishing
 //! QUIC-like UDP connections.
 //!
-//! This module provides `QuicLikeTransport` which manages:
+//! This module provides `QnucTransport` which manages:
 //! - Listening for incoming connections
 //! - Dialing out to remote peers
 //! - Running the connection event loop (ACKs, retransmissions, keepalives)
 
 use crate::{
     connection::{Connection, ConnectionConfig, ConnectionState},
-    error::{QuicLikeError, Result},
+    error::{QnucError, Result},
     packet::{Packet, PacketType},
 };
 use aptos_crypto::{x25519, ValidCryptoMaterial};
@@ -50,7 +50,7 @@ pub enum TransportEvent {
 }
 
 /// The main QUIC-like UDP transport.
-pub struct QuicLikeTransport {
+pub struct QnucTransport {
     /// Stored as bytes so we can reconstruct the key for each connection
     /// (x25519::PrivateKey does not implement Clone).
     local_private_key_bytes: Vec<u8>,
@@ -61,7 +61,7 @@ pub struct QuicLikeTransport {
     next_connection_id: Arc<Mutex<u64>>,
 }
 
-impl QuicLikeTransport {
+impl QnucTransport {
     /// Bind to a local address and create the transport.
     pub async fn bind(
         addr: SocketAddr,
@@ -70,7 +70,7 @@ impl QuicLikeTransport {
     ) -> Result<Self> {
         let public_key = private_key.public_key();
         let key_bytes = private_key.to_bytes();
-        let socket = UdpSocket::bind(addr).await.map_err(QuicLikeError::Io)?;
+        let socket = UdpSocket::bind(addr).await.map_err(QnucError::Io)?;
         Ok(Self {
             local_private_key_bytes: key_bytes,
             local_public_key: public_key,
@@ -88,7 +88,7 @@ impl QuicLikeTransport {
 
     /// Get the local address this transport is bound to.
     pub fn local_addr(&self) -> Result<SocketAddr> {
-        self.socket.local_addr().map_err(QuicLikeError::Io)
+        self.socket.local_addr().map_err(QnucError::Io)
     }
 
     pub fn local_public_key(&self) -> x25519::PublicKey {
@@ -112,7 +112,7 @@ impl QuicLikeTransport {
         // Create a dedicated socket for this outbound connection
         let dial_socket = UdpSocket::bind("0.0.0.0:0")
             .await
-            .map_err(QuicLikeError::Io)?;
+            .map_err(QnucError::Io)?;
         let dial_socket = Arc::new(dial_socket);
 
         let mut conn =
@@ -139,7 +139,7 @@ impl QuicLikeTransport {
         let mut connections = self.connections.lock().await;
         let conn = connections
             .get_mut(&remote_addr)
-            .ok_or(QuicLikeError::ConnectionClosed)?;
+            .ok_or(QnucError::ConnectionClosed)?;
         conn.send_message(stream_id, data).await
     }
 
@@ -235,7 +235,7 @@ impl QuicLikeTransport {
                 },
                 Ok(Err(e)) => {
                     aptos_logger::error!("Socket recv error: {}", e);
-                    return Err(QuicLikeError::Io(e));
+                    return Err(QnucError::Io(e));
                 },
                 Err(_) => {
                     // Timeout - run maintenance
@@ -296,7 +296,7 @@ mod tests {
     #[tokio::test]
     async fn test_transport_bind() {
         let (priv_key, _pub_key) = make_keypair([1u8; 32]);
-        let transport = QuicLikeTransport::bind(
+        let transport = QnucTransport::bind(
             "127.0.0.1:0".parse().unwrap(),
             priv_key,
             ConnectionConfig::default(),

@@ -12,7 +12,7 @@
 //! └─────────┴──────────┴──────────┴──────────┴───────────┴──────────┴─────────────────┘
 //! ```
 
-use crate::error::{QuicLikeError, Result};
+use crate::error::{QnucError, Result};
 use bytes::{Buf, BufMut, Bytes, BytesMut};
 
 pub const PROTOCOL_VERSION: u8 = 1;
@@ -47,7 +47,7 @@ pub enum PacketType {
 }
 
 impl TryFrom<u8> for PacketType {
-    type Error = QuicLikeError;
+    type Error = QnucError;
 
     fn try_from(value: u8) -> Result<Self> {
         match value {
@@ -58,7 +58,7 @@ impl TryFrom<u8> for PacketType {
             0x05 => Ok(Self::Close),
             0x06 => Ok(Self::Ping),
             0x07 => Ok(Self::Pong),
-            v => Err(QuicLikeError::InvalidPacket(format!(
+            v => Err(QnucError::InvalidPacket(format!(
                 "unknown packet type: 0x{:02x}",
                 v
             ))),
@@ -106,7 +106,7 @@ impl PacketHeader {
 
     pub fn decode(buf: &mut Bytes) -> Result<Self> {
         if buf.remaining() < HEADER_SIZE {
-            return Err(QuicLikeError::InvalidPacket(format!(
+            return Err(QnucError::InvalidPacket(format!(
                 "packet too small: {} < {}",
                 buf.remaining(),
                 HEADER_SIZE,
@@ -114,7 +114,7 @@ impl PacketHeader {
         }
         let version = buf.get_u8();
         if version != PROTOCOL_VERSION {
-            return Err(QuicLikeError::InvalidPacket(format!(
+            return Err(QnucError::InvalidPacket(format!(
                 "unsupported version: {}",
                 version
             )));
@@ -160,7 +160,7 @@ impl Packet {
         let header = PacketHeader::decode(&mut bytes)?;
         let payload_len = header.payload_length as usize;
         if bytes.remaining() < payload_len {
-            return Err(QuicLikeError::InvalidPacket(format!(
+            return Err(QnucError::InvalidPacket(format!(
                 "payload truncated: have {} need {}",
                 bytes.remaining(),
                 payload_len,
@@ -201,14 +201,14 @@ impl SelectiveAck {
     pub fn decode(data: &[u8]) -> Result<Self> {
         let mut buf = Bytes::copy_from_slice(data);
         if buf.remaining() < 10 {
-            return Err(QuicLikeError::InvalidPacket(
+            return Err(QnucError::InvalidPacket(
                 "ACK payload too small".to_string(),
             ));
         }
         let cumulative_ack = buf.get_u64();
         let count = buf.get_u16() as usize;
         if buf.remaining() < count * 8 {
-            return Err(QuicLikeError::InvalidPacket(
+            return Err(QnucError::InvalidPacket(
                 "ACK selective list truncated".to_string(),
             ));
         }
@@ -250,7 +250,7 @@ impl FragmentHeader {
 
     pub fn decode(buf: &mut Bytes) -> Result<Self> {
         if buf.remaining() < FRAGMENT_HEADER_SIZE {
-            return Err(QuicLikeError::InvalidPacket(
+            return Err(QnucError::InvalidPacket(
                 "fragment header truncated".to_string(),
             ));
         }

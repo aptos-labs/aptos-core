@@ -9,7 +9,7 @@
 //! - Send and receive buffers
 
 use crate::{
-    error::{QuicLikeError, Result},
+    error::{QnucError, Result},
     packet::{
         FragmentHeader, Packet, PacketHeader, PacketType, FRAGMENT_HEADER_SIZE,
         MAX_MESSAGE_SIZE, MAX_PACKET_PAYLOAD,
@@ -54,7 +54,7 @@ impl Stream {
     /// Returns a list of (sequence_number, encoded_packet_bytes).
     pub fn prepare_send(&mut self, message: &[u8]) -> Result<Vec<(u64, Vec<u8>)>> {
         if message.len() > MAX_MESSAGE_SIZE {
-            return Err(QuicLikeError::PayloadTooLarge {
+            return Err(QnucError::PayloadTooLarge {
                 size: message.len(),
                 max: MAX_MESSAGE_SIZE,
             });
@@ -129,7 +129,7 @@ impl Stream {
                     if let Some(data) = state.received.get(&idx) {
                         message.extend_from_slice(data);
                     } else {
-                        return Err(QuicLikeError::InvalidPacket(format!(
+                        return Err(QnucError::InvalidPacket(format!(
                             "missing fragment {} of message {}",
                             idx, fh.message_id,
                         )));
