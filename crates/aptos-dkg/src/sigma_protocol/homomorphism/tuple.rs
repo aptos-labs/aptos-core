@@ -336,14 +336,15 @@ where
         prover_commitment: &Self::CodomainNormalized,
         challenge: Self::Scalar,
         response: &Self::Domain,
+        _verifier_batch_size: Option<usize>, // not ideal, should be splitting it...
         rng: &mut R,
     ) -> anyhow::Result<()> {
         let (stmt1, stmt2) = (&public_statement.0, &public_statement.1);
         let (commit1, commit2) = (&prover_commitment.0, &prover_commitment.1);
         self.hom1
-            .verify_with_challenge(stmt1, commit1, challenge, response, rng)?;
+            .verify_with_challenge(stmt1, commit1, challenge, response, None, rng)?;
         self.hom2
-            .verify_with_challenge(stmt2, commit2, challenge, response, rng)?;
+            .verify_with_challenge(stmt2, commit2, challenge, response, None, rng)?;
         Ok(())
     }
 }
@@ -384,6 +385,7 @@ where
         prover_commitment: &Self::CodomainNormalized,
         challenge: Self::Scalar,
         response: &Self::Domain,
+        _verifier_batch_size: Option<usize>,
         rng: &mut R,
     ) -> anyhow::Result<()> {
         let len1 = public_statement.0.clone().into_iter().count();

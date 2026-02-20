@@ -203,6 +203,7 @@ impl<F: PrimeField> SigmaTrait for SumEvalsHom<F> {
         prover_commitment: &F,
         challenge: F,
         response: &ShplonkedSigmaWitness<F>,
+        _verifier_batch_size: Option<usize>,
         _rng: &mut R,
     ) -> anyhow::Result<()> {
         let sum_z = response.evals.iter().fold(F::zero(), |acc, x| acc + x);

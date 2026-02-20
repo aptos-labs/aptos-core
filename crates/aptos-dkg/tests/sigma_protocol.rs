@@ -58,7 +58,7 @@ fn test_imhomog_chaum_pedersen<
 
     let (proof, normalized_statement) = hom.prove(&witness, statement, CNTXT, &mut rng);
 
-    hom.verify(&normalized_statement, &proof, CNTXT, &mut rng)
+    hom.verify(&normalized_statement, &proof, CNTXT, None, &mut rng)
         .expect("Inhomogeneous Chaum-Pedersen sigma proof failed verification");
 }
 
@@ -74,7 +74,7 @@ fn test_imhomog_scalar_mul<'a, E>(
 
     let (proof, normalized_statement) = hom.prove(&witness, statement, CNTXT, &mut rng);
 
-    hom.verify(&normalized_statement, &proof, CNTXT, &mut rng)
+    hom.verify(&normalized_statement, &proof, CNTXT, None, &mut rng)
         .expect("Inhomogeneous chunked scalar mul sigma proof failed verification");
 }
 

@@ -44,11 +44,18 @@ pub trait Trait:
         prove_homomorphism(self, witness, statement, cntxt, true, rng, &self.dst())
     }
 
+    /// Verify a sigma protocol proof.
+    ///
+    /// `verifier_batch_size`: number of components used for verifier batching.
+    /// - `None`: infer from `public_statement` (may clone to count).
+    /// - `Some(n)`: use `n` directly; avoids cloning when the caller already has the count
+    ///   (e.g. when batching multiple proofs).
     fn verify<Ct: Serialize, R: RngCore + CryptoRng>(
         &self,
         public_statement: &Self::CodomainNormalized,
         proof: &Proof<Self::Scalar, Self>,
         cntxt: &Ct,
+        verifier_batch_size: Option<usize>,
         rng: &mut R,
     ) -> anyhow::Result<()> {
         let prover_first_message = proof
@@ -61,17 +68,27 @@ pub trait Trait:
             prover_first_message,
             &self.dst(),
         );
-        self.verify_with_challenge(public_statement, prover_first_message, c, &proof.z, rng)
+        self.verify_with_challenge(
+            public_statement,
+            prover_first_message,
+            c,
+            &proof.z,
+            verifier_batch_size,
+            rng,
+        )
     }
 
     /// Verify a component given an explicit Fiat–Shamir challenge (e.g. when this homomorphism
     /// is used inside a tuple and the challenge was derived from the tuple's first message).
+    ///
+    /// `verifier_batch_size`: same as in [`verify`](Self::verify); `None` = infer from statement.
     fn verify_with_challenge<R: RngCore + CryptoRng>(
         &self,
         public_statement: &Self::CodomainNormalized,
         prover_commitment: &Self::CodomainNormalized,
         challenge: Self::Scalar,
         response: &Self::Domain,
+        verifier_batch_size: Option<usize>,
         rng: &mut R,
     ) -> anyhow::Result<()>;
 }
@@ -89,9 +106,11 @@ impl<T: CurveGroupTrait> Trait for T {
         prover_commitment: &Self::CodomainNormalized,
         challenge: Self::Scalar,
         response: &Self::Domain,
+        verifier_batch_size: Option<usize>,
         rng: &mut R,
     ) -> anyhow::Result<()> {
-        let number_of_beta_powers = public_statement.clone().into_iter().count();
+        let number_of_beta_powers = verifier_batch_size
+            .unwrap_or_else(|| public_statement.clone().into_iter().count());
         let powers_of_beta = if number_of_beta_powers > 1 {
             let beta = sample_field_element(rng);
             utils::powers(beta, number_of_beta_powers)
@@ -136,7 +155,7 @@ pub trait CurveGroupTrait:
         public_statement: &Self::CodomainNormalized,
         proof: &Proof<<Self as fixed_base_msms::Trait>::Scalar, H>, // Would seem natural to set &Proof<E, Self>, but that ties the lifetime of H to that of Self, but we'd like it to be eg static
         cntxt: &Ct,
-        number_of_beta_powers: Option<usize>, // None => compute from public_statement (clones); Some(n) avoids clone when caller has length
+        verifier_batch_size: Option<usize>,
         rng: &mut R,
     ) -> anyhow::Result<()>
     where
@@ -149,7 +168,7 @@ pub trait CurveGroupTrait:
             public_statement,
             proof,
             cntxt,
-            number_of_beta_powers,
+            verifier_batch_size,
             rng,
         );
 
@@ -165,7 +184,7 @@ pub trait CurveGroupTrait:
         public_statement: &Self::CodomainNormalized,
         prover_first_message: &Self::CodomainNormalized, // TODO: this input will have to be modified for `compact` proofs; we just need something serializable, could pass `FirstProofItem<F, H>` instead
         cntxt: &Ct,
-        number_of_beta_powers: Option<usize>, // None => compute from public_statement (clones); Some(n) avoids clone when caller has length
+        verifier_batch_size: Option<usize>,
         rng: &mut R,
     ) -> (
         <Self as fixed_base_msms::Trait>::Scalar,
@@ -176,7 +195,7 @@ pub trait CurveGroupTrait:
         // H: homomorphism::Trait<Domain = Self::Domain, Codomain = Self::Codomain>, // will probably need this if we use `FirstProofItem<F, H>` instead
     {
         let number_of_beta_powers =
-            number_of_beta_powers.unwrap_or_else(|| public_statement.clone().into_iter().count()); // Would prefer not to have to clone this just to get a count
+            verifier_batch_size.unwrap_or_else(|| public_statement.clone().into_iter().count());
         verifier_challenges_with_length::<_, _, _, _>(
             cntxt,
             self,
@@ -195,7 +214,7 @@ pub trait CurveGroupTrait:
         public_statement: &Self::CodomainNormalized,
         proof: &Proof<<Self::Group as PrimeGroup>::ScalarField, H>,
         cntxt: &Ct,
-        number_of_beta_powers: Option<usize>,
+        verifier_batch_size: Option<usize>,
         rng: &mut R,
     ) -> MsmInput<<Self::Group as CurveGroup>::Affine, <Self::Group as PrimeGroup>::ScalarField>
     where
@@ -215,7 +234,7 @@ pub trait CurveGroupTrait:
             public_statement,
             prover_first_message,
             cntxt,
-            number_of_beta_powers,
+            verifier_batch_size,
             rng,
         );
 
