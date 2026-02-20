@@ -125,8 +125,17 @@ function install_clang {
   VERSION=${2:-21}
 
   if [[ "$PACKAGE_MANAGER" == "apt-get" ]]; then
-    "${PRE_COMMAND[@]}" apt-get install -y gnupg lsb-release software-properties-common wget
-    "${PRE_COMMAND[@]}" bash -c "$(wget -O - https://apt.llvm.org/llvm.sh)" llvm.sh "${VERSION}"
+    # Try installing from the existing apt cache first. This avoids failures
+    # when the LLVM rolling apt repository rotates out old .deb files that the
+    # cached package index still references.
+    if apt-cache show "clang-${VERSION}" &>/dev/null && \
+       "${PRE_COMMAND[@]}" apt-get install -y "clang-${VERSION}" "lldb-${VERSION}" "lld-${VERSION}" "clangd-${VERSION}"; then
+      echo "Installed clang-${VERSION} from apt cache."
+    else
+      echo "clang-${VERSION} not available via apt, falling back to llvm.sh"
+      "${PRE_COMMAND[@]}" apt-get install -y gnupg lsb-release software-properties-common wget
+      "${PRE_COMMAND[@]}" bash -c "$(wget -O - https://apt.llvm.org/llvm.sh)" llvm.sh "${VERSION}"
+    fi
     "${PRE_COMMAND[@]}" update-alternatives --install /usr/bin/clang clang "/usr/bin/clang-${VERSION}" 100
     "${PRE_COMMAND[@]}" update-alternatives --install /usr/bin/clang++ clang++ "/usr/bin/clang++-${VERSION}" 100
   else
