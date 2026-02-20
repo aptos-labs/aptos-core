@@ -6,14 +6,18 @@
 use crate::{
     fiat_shamir::PolynomialCommitmentScheme as _,
     pcs::{
+        shplonked_sigma::{self, ShplonkedSigmaWitness},
         traits::PolynomialCommitmentScheme,
         univariate_hiding_kzg::{self, Trapdoor},
     },
-    sigma_protocol::homomorphism::Trait as _,
+    sigma_protocol::{
+        homomorphism::{tuple::TupleCodomainShape, Trait as _, TrivialShape as CodomainShape},
+        FirstProofItem, Proof, Trait as SigmaTrait,
+    },
     Scalar,
 };
 use aptos_crypto::arkworks::{
-    random::{sample_field_element, sample_field_elements},
+    random::sample_field_element,
     srs::{SrsBasis, SrsType},
     GroupGenerators,
 };
@@ -93,6 +97,35 @@ pub struct ZkPcsOpeningProof<E: Pairing> {
     pub(crate) Y: E::G1Affine, // extra HKZG term
     pub(crate) sigma_proof: ZkPcsOpeningSigmaProof<E>,
     pub(crate) sigma_proof_statement: ZkPcsOpeningSigmaProofStatement<E>,
+}
+
+/// Computes weights alpha_i = gamma^{i-1} * Z_{T\\x_i}(z) for the sigma protocol (eval_points, z, gamma).
+#[allow(non_snake_case)]
+fn compute_alpha<E: Pairing>(
+    eval_points: &[E::ScalarField],
+    z: E::ScalarField,
+    gamma: E::ScalarField,
+) -> Vec<E::ScalarField> {
+    let mut z_T = DensePolynomial::from_coefficients_vec(vec![E::ScalarField::ONE]);
+    for x in eval_points.iter() {
+        let factor = DensePolynomial::from_coefficients_vec(vec![-(*x), E::ScalarField::ONE]);
+        z_T = &z_T * &factor;
+    }
+    let z_T_dos = DOSPoly::from(z_T);
+    let mut alphas = Vec::with_capacity(eval_points.len());
+    let mut gamma_i = E::ScalarField::ONE;
+    for x_i in eval_points.iter() {
+        let divisor = DOSPoly::from(DensePolynomial::from_coefficients_vec(vec![
+            -(*x_i),
+            E::ScalarField::ONE,
+        ]));
+        let (z_t_i_poly, remainder) = z_T_dos.divide_with_q_and_r(&divisor).unwrap();
+        debug_assert!(remainder.is_zero());
+        let z_t_i_val = DensePolynomial::from(z_t_i_poly).evaluate(&z);
+        alphas.push(gamma_i * z_t_i_val);
+        gamma_i *= gamma;
+    }
+    alphas
 }
 
 /// Opens at the given points; the opening proof includes the sigma proof statement (com_y, V, y_sum).
@@ -263,54 +296,51 @@ pub fn zk_pcs_open<E: Pairing, R: RngCore + CryptoRng>(
     // Y = [1]_1 · y_term − t · [τ]_1 (whitepaper)
     let Y = srs.taus_1[0] * y_term - srs.taus_1[1] * t;
 
-    let r_yi: Vec<E::ScalarField> = sample_field_elements(f_is.len(), rng);
-    let r_u: E::ScalarField = sample_field_element(rng);
-    let r_rho = sample_field_element(rng);
+    let y_sum: E::ScalarField = evals.iter().copied().sum();
 
-    let mut scalars = vec![r_rho];
-    scalars.extend(r_yi.iter().copied());
-    let mut bases = vec![srs.xi_1];
-    bases.extend(srs.taus_1.iter().cloned());
-    let r_com_y = E::G1::msm_unchecked(&bases, &scalars);
+    let witness = ShplonkedSigmaWitness {
+        rho,
+        evals: evals.clone(),
+        u,
+    };
+    let alpha = compute_alpha::<E>(&eval_points, z, gamma);
+    let com_y_hom = shplonked_sigma::com_y_hom(srs);
+    let v_hom = shplonked_sigma::VHom::from_srs(srs, alpha);
+    let com_y_v_hom = shplonked_sigma::ComYVHom::<E> {
+        hom1: com_y_hom,
+        hom2: v_hom,
+        _group: std::marker::PhantomData,
+    };
+    let sum_hom = shplonked_sigma::SumEvalsHom::<E::ScalarField>::default();
+    let full_hom = shplonked_sigma::ShplonkedSigmaHom::<E> {
+        hom1: com_y_v_hom,
+        hom2: sum_hom,
+    };
 
-    let mut r_sum_y = E::ScalarField::zero();
-    let mut gamma_i = E::ScalarField::ONE;
-    for (r_i, x_i) in r_yi.iter().zip(eval_points.iter()) {
-        let divisor = DOSPoly::from(DensePolynomial::from_coefficients_vec(vec![
-            -*x_i,
-            E::ScalarField::ONE,
-        ]));
-        let z_T_dos = DOSPoly::from(z_T.clone());
-        let (z_t_i_poly, remainder) = z_T_dos.divide_with_q_and_r(&divisor).unwrap();
-        debug_assert!(remainder.is_zero());
-        let z_t_i_val = DensePolynomial::from(z_t_i_poly).evaluate(&z);
-        r_sum_y += gamma_i * z_t_i_val * (*r_i);
-        gamma_i *= gamma;
-    }
+    let statement = TupleCodomainShape(
+        TupleCodomainShape(CodomainShape(com_y), CodomainShape(V)),
+        y_sum,
+    );
+    let mut sigma_ctx = Vec::new();
+    com_y
+        .into_affine()
+        .serialize_compressed(&mut sigma_ctx)
+        .expect("sigma ctx com_y");
+    gamma
+        .serialize_compressed(&mut sigma_ctx)
+        .expect("sigma ctx gamma");
+    z.serialize_compressed(&mut sigma_ctx).expect("sigma ctx z");
+    let (sigma_protocol_proof, _) = full_hom.prove(&witness, statement, &sigma_ctx, rng);
 
-    let r_V = srs.taus_1[0] * r_sum_y - srs.xi_1 * r_u;
+    let (r_com_y, r_V, r_y) = match &sigma_protocol_proof.first_proof_item {
+        FirstProofItem::Commitment(c) => (c.0 .0 .0, c.0 .1 .0, c.1),
+        FirstProofItem::Challenge(_) => panic!("expected commitment in sigma proof"),
+    };
+    let z_rho = sigma_protocol_proof.z.rho;
+    let z_yi = sigma_protocol_proof.z.evals;
+    let z_u = sigma_protocol_proof.z.u;
 
-    let r_y: E::ScalarField = r_yi.iter().copied().sum();
-
-    // Bind sigma first message to transcript so verifier derives the same c.
-    trs.append_point(&r_com_y.into_affine()); // TODO: batch this
-    trs.append_point(&r_V.into_affine());
-    let mut r_y_buf = Vec::new();
-    r_y.serialize_compressed(&mut r_y_buf)
-        .expect("sigma r_y serialization");
-    trs.append_message(b"sigma-first-r_y", &r_y_buf);
-
-    let c: E::ScalarField = trs.challenge_scalar();
-
-    let mut z_yi = Vec::with_capacity(f_is.len());
-    for (r_i, w_i) in r_yi.iter().zip(evals.iter()) {
-        z_yi.push(*r_i + c * w_i);
-    }
-    // r_V uses -r_u*[ξ]_1, V uses +u*[ξ]_1, so response for [ξ] must be -r_u + c*u
-    let z_u = c * u - r_u;
-    let z_rho = r_rho + c * rho;
-
-    let points_proj = vec![r_com_y, r_V, V, W, W_prime, Y];
+    let points_proj = vec![r_com_y.into_group(), r_V.into_group(), V, W, W_prime, Y];
     let affines = E::G1::normalize_batch(&points_proj);
     let [r_com_y, r_V, V, W, W_prime, Y]: [_; 6] = affines.try_into().expect("expected 6 points");
     let sigma_proof = ZkPcsOpeningSigmaProof {
@@ -321,8 +351,6 @@ pub fn zk_pcs_open<E: Pairing, R: RngCore + CryptoRng>(
         z_u,
         z_rho,
     };
-
-    let y_sum: E::ScalarField = evals.iter().copied().sum();
 
     let sigma_proof_statement = ZkPcsOpeningSigmaProofStatement {
         com_y: com_y.into_affine(),
@@ -362,7 +390,6 @@ pub fn zk_pcs_verify<E: Pairing, R: RngCore + CryptoRng>(
 
     let com_y = sigma_proof_statement.com_y;
     let V = sigma_proof_statement.V;
-    let y_sum = sigma_proof_statement.y_sum;
 
     trs.append_point(&com_y);
 
@@ -411,109 +438,52 @@ pub fn zk_pcs_verify<E: Pairing, R: RngCore + CryptoRng>(
         return Err(anyhow::anyhow!("Expected zero during multi-pairing check"));
     }
 
-    verify_sigma_proof(
-        &sigma_proof_statement,
-        sigma_proof,
-        eval_points,
-        &z_T,
-        z,
-        gamma,
-        srs,
-        trs,
-        rng,
-    )
-}
+    let alpha = compute_alpha::<E>(&eval_points, z, gamma);
+    let com_y_hom = shplonked_sigma::com_y_hom(srs);
+    let v_hom = shplonked_sigma::VHom::from_srs(srs, alpha);
+    let com_y_v_hom = shplonked_sigma::ComYVHom::<E> {
+        hom1: com_y_hom,
+        hom2: v_hom,
+        _group: std::marker::PhantomData,
+    };
+    let sum_hom = shplonked_sigma::SumEvalsHom::<E::ScalarField>::default();
+    let full_hom = shplonked_sigma::ShplonkedSigmaHom::<E> {
+        hom1: com_y_v_hom,
+        hom2: sum_hom,
+    };
 
-/// Verifies the sigma protocol part of the ZK-PCS opening proof (com_y commitment and V relation).
-#[allow(non_snake_case)]
-fn verify_sigma_proof<E: Pairing, R: RngCore + CryptoRng>(
-    statement: &ZkPcsOpeningSigmaProofStatement<E>,
-    sigma_proof: &ZkPcsOpeningSigmaProof<E>,
-    eval_points: &[E::ScalarField],
-    z_T: &DensePolynomial<E::ScalarField>,
-    z: E::ScalarField,
-    gamma: E::ScalarField,
-    srs: &Srs<E>,
-    trs: &mut merlin::Transcript,
-    rng: &mut R,
-) -> anyhow::Result<()> {
-    let com_y = statement.com_y;
-    let V = statement.V;
-    let y_sum = statement.y_sum;
+    let public_statement = TupleCodomainShape(
+        TupleCodomainShape(
+            CodomainShape(sigma_proof_statement.com_y),
+            CodomainShape(sigma_proof_statement.V),
+        ),
+        sigma_proof_statement.y_sum,
+    );
 
-    trs.append_point(&sigma_proof.r_com_y);
-    trs.append_point(&sigma_proof.r_V);
-    let mut r_y_buf = Vec::new();
-    sigma_proof
-        .r_y
-        .serialize_compressed(&mut r_y_buf)
-        .expect("sigma r_y serialization");
-    trs.append_message(b"sigma-first-r_y", &r_y_buf);
-    let c: E::ScalarField = trs.challenge_scalar();
+    let sigma_protocol_proof = Proof {
+        first_proof_item: FirstProofItem::Commitment(TupleCodomainShape(
+            TupleCodomainShape(
+                CodomainShape(sigma_proof.r_com_y),
+                CodomainShape(sigma_proof.r_V),
+            ),
+            sigma_proof.r_y,
+        )),
+        z: ShplonkedSigmaWitness {
+            rho: sigma_proof.z_rho,
+            evals: sigma_proof.z_yi.clone(),
+            u: sigma_proof.z_u,
+        },
+    };
 
-    let ZkPcsOpeningSigmaProof {
-        r_com_y,
-        r_V,
-        r_y,
-        z_yi,
-        z_u,
-        z_rho,
-    } = sigma_proof;
-
-    let mut scalars = vec![*z_rho];
-    scalars.extend(z_yi.iter().copied());
-    scalars.push(-E::ScalarField::one());
-    scalars.push(-c);
-
-    let mut bases = vec![srs.xi_1];
-    bases.extend(srs.taus_1.iter().take(z_yi.len()).copied());
-    bases.push(*r_com_y);
-    bases.push(com_y);
-
-    let beta: E::ScalarField = sample_field_element(rng);
-
-    let mut sum_y = E::ScalarField::zero();
-    let mut gamma_i = E::ScalarField::ONE;
-
-    for (s_i, x_i) in z_yi.iter().zip(eval_points.iter()) {
-        let divisor = DOSPoly::from(DensePolynomial::from_coefficients_vec(vec![
-            -*x_i,
-            E::ScalarField::ONE,
-        ]));
-        let z_T_dos = DOSPoly::from(z_T.clone());
-        let (z_t_i_poly, remainder) = z_T_dos.divide_with_q_and_r(&divisor).unwrap();
-        debug_assert!(remainder.is_zero());
-        let z_t_i_val = DensePolynomial::from(z_t_i_poly).evaluate(&z);
-        sum_y += gamma_i * z_t_i_val * (*s_i);
-        gamma_i *= gamma;
-    }
-
-    // V relation: sum_y*[1]_1 + z_u*xi_1 - r_V - c*V = 0; batch with beta
-    scalars.push(beta * sum_y);
-    scalars.push(beta * (*z_u));
-    scalars.push(-beta);
-    scalars.push(-c * beta);
-
-    bases.push(srs.taus_1[0]);
-    bases.push(srs.xi_1);
-    bases.push(*r_V);
-    bases.push(V);
-
-    // Sigma protocol (group homomorphism) check: response MSM must equal identity
-    let sigma_msm = E::G1::msm(&bases, &scalars)
-        .map_err(|e| anyhow::anyhow!("Sigma proof MSM failed: {:?}", e))?;
-    if sigma_msm != E::G1::zero() {
-        return Err(anyhow::anyhow!(
-            "Sigma proof group homomorphism check failed (expected identity)"
-        ));
-    }
-
-    let lhs_y: E::ScalarField = z_yi.iter().copied().sum();
-    let rhs_y = *r_y + y_sum * c;
-
-    anyhow::ensure!(lhs_y == rhs_y, "sigma proof y sum check failed");
-
-    Ok(())
+    let mut sigma_ctx = Vec::new();
+    com_y
+        .serialize_compressed(&mut sigma_ctx)
+        .expect("sigma ctx com_y");
+    gamma
+        .serialize_compressed(&mut sigma_ctx)
+        .expect("sigma ctx gamma");
+    z.serialize_compressed(&mut sigma_ctx).expect("sigma ctx z");
+    full_hom.verify(&public_statement, &sigma_protocol_proof, &sigma_ctx, rng)
 }
 
 // ---------------------------------------------------------------------------
