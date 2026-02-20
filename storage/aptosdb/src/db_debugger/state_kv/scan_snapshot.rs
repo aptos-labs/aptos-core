@@ -2,8 +2,7 @@
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 use crate::{
-    db_debugger::common::DbDir,
-    schema::{state_value::StateValueSchema, state_value_by_key_hash::StateValueByKeyHashSchema},
+    db_debugger::common::DbDir, schema::state_value_by_key_hash::StateValueByKeyHashSchema,
 };
 use aptos_crypto::hash::CryptoHash;
 use aptos_jellyfish_merkle::iterator::JellyfishMerkleIterator;
@@ -80,27 +79,12 @@ impl Cmd {
                             // We want `None` if the state_key changes in iteration.
                             read_opts.set_prefix_same_as_start(true);
 
-                            let enable_sharding = state_kv_db.enabled_sharding();
-
-                            let (value_version, value) = if enable_sharding {
+                            let (value_version, value) = {
                                 let mut iter = state_kv_db
                                     .db_shard(key.get_shard_id())
-                                    .iter::<StateValueByKeyHashSchema>()
+                                    .iter_with_opts::<StateValueByKeyHashSchema>(read_opts)
                                     .unwrap();
                                 iter.seek(&(key.hash(), key_version)).unwrap();
-                                iter.next()
-                                    .transpose()
-                                    .unwrap()
-                                    .and_then(|((_, version), value_opt)| {
-                                        value_opt.map(|value| (version, value))
-                                    })
-                                    .expect("Value must exist.")
-                            } else {
-                                let mut iter = state_kv_db
-                                    .db_shard(key.get_shard_id())
-                                    .iter::<StateValueSchema>()
-                                    .unwrap();
-                                iter.seek(&(key.clone(), key_version)).unwrap();
                                 iter.next()
                                     .transpose()
                                     .unwrap()

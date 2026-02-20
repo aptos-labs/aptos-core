@@ -8,7 +8,6 @@ use crate::{
     metrics::OTHER_TIMERS_SECONDS,
     schema::{
         db_metadata::{DbMetadataKey, DbMetadataSchema, DbMetadataValue},
-        state_value::StateValueSchema,
         state_value_by_key_hash::StateValueByKeyHashSchema,
     },
     utils::{
@@ -16,7 +15,7 @@ use crate::{
         ShardedStateKvSchemaBatch,
     },
 };
-use aptos_config::config::{RocksdbConfig, RocksdbConfigs, StorageDirPaths};
+use aptos_config::config::{RocksdbConfig, StorageDirPaths};
 use aptos_crypto::hash::CryptoHash;
 use aptos_experimental_runtimes::thread_manager::THREAD_MANAGER;
 use aptos_logger::prelude::info;
@@ -31,7 +30,6 @@ use aptos_types::{
     state_store::{state_key::StateKey, state_value::StateValue, NUM_STATE_SHARDS},
     transaction::Version,
 };
-use arr_macro::arr;
 use rayon::prelude::*;
 use std::{
     path::{Path, PathBuf},
@@ -47,36 +45,17 @@ pub struct StateKvDb {
     // TODO(HotState): no separate metadata db for hot state for now.
     #[allow(dead_code)] // TODO(HotState): can remove later.
     hot_state_kv_db_shards: Option<[Arc<DB>; NUM_STATE_SHARDS]>,
-    enabled_sharding: bool,
 }
 
 impl StateKvDb {
     pub(crate) fn new(
         db_paths: &StorageDirPaths,
-        rocksdb_configs: RocksdbConfigs,
+        state_kv_db_config: RocksdbConfig,
         env: Option<&Env>,
         block_cache: Option<&Cache>,
         readonly: bool,
-        ledger_db: Arc<DB>,
     ) -> Result<Self> {
-        let sharding = rocksdb_configs.enable_storage_sharding;
-        if !sharding {
-            info!("State K/V DB is not enabled!");
-            return Ok(Self {
-                state_kv_metadata_db: Arc::clone(&ledger_db),
-                state_kv_db_shards: arr![Arc::clone(&ledger_db); 16],
-                hot_state_kv_db_shards: None,
-                enabled_sharding: false,
-            });
-        }
-
-        Self::open_sharded(
-            db_paths,
-            rocksdb_configs.state_kv_db_config,
-            env,
-            block_cache,
-            readonly,
-        )
+        Self::open_sharded(db_paths, state_kv_db_config, env, block_cache, readonly)
     }
 
     pub(crate) fn open_sharded(
@@ -158,7 +137,6 @@ impl StateKvDb {
             state_kv_metadata_db,
             state_kv_db_shards,
             hot_state_kv_db_shards,
-            enabled_sharding: true,
         };
 
         if !readonly {
@@ -274,20 +252,8 @@ impl StateKvDb {
         Arc::clone(&self.state_kv_db_shards[shard_id])
     }
 
-    pub(crate) fn enabled_sharding(&self) -> bool {
-        self.enabled_sharding
-    }
-
     pub(crate) fn num_shards(&self) -> usize {
         NUM_STATE_SHARDS
-    }
-
-    pub(crate) fn hack_num_real_shards(&self) -> usize {
-        if self.enabled_sharding {
-            NUM_STATE_SHARDS
-        } else {
-            1
-        }
     }
 
     pub(crate) fn commit_single_shard(
@@ -380,24 +346,13 @@ impl StateKvDb {
 
         // We want `None` if the state_key changes in iteration.
         read_opts.set_prefix_same_as_start(true);
-        if !self.enabled_sharding() {
-            let mut iter = self
-                .db_shard(state_key.get_shard_id())
-                .iter_with_opts::<StateValueSchema>(read_opts)?;
-            iter.seek(&(state_key.clone(), version))?;
-            Ok(iter
-                .next()
-                .transpose()?
-                .and_then(|((_, version), value_opt)| value_opt.map(|value| (version, value))))
-        } else {
-            let mut iter = self
-                .db_shard(state_key.get_shard_id())
-                .iter_with_opts::<StateValueByKeyHashSchema>(read_opts)?;
-            iter.seek(&(state_key.hash(), version))?;
-            Ok(iter
-                .next()
-                .transpose()?
-                .and_then(|((_, version), value_opt)| value_opt.map(|value| (version, value))))
-        }
+        let mut iter = self
+            .db_shard(state_key.get_shard_id())
+            .iter_with_opts::<StateValueByKeyHashSchema>(read_opts)?;
+        iter.seek(&(state_key.hash(), version))?;
+        Ok(iter
+            .next()
+            .transpose()?
+            .and_then(|((_, version), value_opt)| value_opt.map(|value| (version, value))))
     }
 }

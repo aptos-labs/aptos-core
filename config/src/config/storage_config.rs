@@ -678,11 +678,6 @@ impl ConfigOptimizer for StorageConfig {
                 config.assert_rlimit_nofile = true;
                 modified_config = true;
             }
-            if (chain_id.is_testnet() || chain_id.is_mainnet())
-                && config_yaml["rocksdb_configs"]["enable_storage_sharding"].as_bool() != Some(true)
-            {
-                panic!("Storage sharding (AIP-97) is not enabled in node config. Please follow the guide to migration your node, and set storage.rocksdb_configs.enable_storage_sharding to true explicitly in your node config. https://aptoslabs.notion.site/DB-Sharding-Migration-Public-Full-Nodes-1978b846eb7280b29f17ceee7d480730");
-            }
             // TODO(HotState): Hot state root hash computation is off by default in Mainnet unless
             // explicitly enabled.
             if chain_id.is_mainnet()
@@ -745,13 +740,6 @@ impl ConfigSanitizer for StorageConfig {
         }
 
         if let Some(db_path_overrides) = config.db_path_overrides.as_ref() {
-            if !config.rocksdb_configs.enable_storage_sharding {
-                return Err(Error::ConfigSanitizerFailed(
-                    sanitizer_name,
-                    "db_path_overrides is allowed only if sharding is enabled.".to_string(),
-                ));
-            }
-
             if let Some(ledger_db_path) = db_path_overrides.ledger_db_path.as_ref() {
                 if !ledger_db_path.is_absolute() {
                     return Err(Error::ConfigSanitizerFailed(

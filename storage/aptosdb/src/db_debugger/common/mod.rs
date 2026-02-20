@@ -1,15 +1,11 @@
 // Copyright (c) Aptos Foundation
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
-use crate::{
-    db_debugger::ShardingConfig, ledger_db::LedgerDb, state_kv_db::StateKvDb,
-    state_merkle_db::StateMerkleDb,
-};
-use aptos_config::config::{RocksdbConfigs, StorageDirPaths};
+use crate::{ledger_db::LedgerDb, state_kv_db::StateKvDb, state_merkle_db::StateMerkleDb};
+use aptos_config::config::{RocksdbConfig, StorageDirPaths};
 use aptos_storage_interface::Result;
 use aptos_types::nibble::{nibble_path::NibblePath, Nibble};
 use clap::Parser;
-use core::default::Default;
 use std::path::{Path, PathBuf};
 
 pub const PAGE_SIZE: usize = 10;
@@ -19,9 +15,6 @@ pub struct DbDir {
     // TODO(grao): Support path override here.
     #[clap(long, value_parser)]
     db_dir: PathBuf,
-
-    #[clap(flatten)]
-    pub sharding_config: ShardingConfig,
 }
 
 impl DbDir {
@@ -30,10 +23,7 @@ impl DbDir {
         let block_cache = None;
         StateMerkleDb::new(
             &StorageDirPaths::from_path(&self.db_dir),
-            RocksdbConfigs {
-                enable_storage_sharding: self.sharding_config.enable_storage_sharding,
-                ..Default::default()
-            },
+            RocksdbConfig::default(),
             env,
             block_cache,
             /* read_only = */ false,
@@ -44,19 +34,14 @@ impl DbDir {
     }
 
     pub fn open_state_kv_db(&self) -> Result<StateKvDb> {
-        let leger_db = self.open_ledger_db()?;
         let env = None;
         let block_cache = None;
         StateKvDb::new(
             &StorageDirPaths::from_path(&self.db_dir),
-            RocksdbConfigs {
-                enable_storage_sharding: self.sharding_config.enable_storage_sharding,
-                ..Default::default()
-            },
+            RocksdbConfig::default(),
             env,
             block_cache,
             true,
-            leger_db.metadata_db_arc(),
         )
     }
 
@@ -65,10 +50,7 @@ impl DbDir {
         let block_cache = None;
         LedgerDb::new(
             self.db_dir.as_path(),
-            RocksdbConfigs {
-                enable_storage_sharding: self.sharding_config.enable_storage_sharding,
-                ..Default::default()
-            },
+            RocksdbConfig::default(),
             env,
             block_cache,
             true,

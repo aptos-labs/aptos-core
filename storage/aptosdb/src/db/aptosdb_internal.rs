@@ -22,14 +22,13 @@ use aptos_logger::prelude::*;
 use aptos_metrics_core::{IntGaugeVecHelper, TimerHelper};
 use aptos_resource_viewer::AptosValueAnnotator;
 use aptos_schemadb::{Cache, Env};
+#[cfg(test)]
+use aptos_storage_interface::Order;
 use aptos_storage_interface::{
     block_info::BlockInfo, db_ensure as ensure, db_other_bail as bail, AptosDbError, DbReader,
-    Order, Result,
+    Result,
 };
-use aptos_types::{
-    account_config::{new_block_event_key, NewBlockEvent},
-    transaction::Version,
-};
+use aptos_types::{account_config::NewBlockEvent, transaction::Version};
 use std::{
     cell::Cell,
     fmt::{Debug, Formatter},
@@ -49,7 +48,6 @@ impl AptosDB {
         buffered_state_target_items: usize,
         hack_for_tests: bool,
         empty_buffered_state_for_restore: bool,
-        skip_index_and_usage: bool,
         internal_indexer_db: Option<InternalIndexerDB>,
         hot_state_config: HotStateConfig,
     ) -> Self {
@@ -72,7 +70,7 @@ impl AptosDB {
             buffered_state_target_items,
             hack_for_tests,
             empty_buffered_state_for_restore,
-            skip_index_and_usage,
+            true, /* skip_usage */
             internal_indexer_db.clone(),
             hot_state_config,
         ));
@@ -98,7 +96,6 @@ impl AptosDB {
             pre_commit_lock: std::sync::Mutex::new(()),
             commit_lock: std::sync::Mutex::new(()),
             indexer: None,
-            skip_index_and_usage,
             update_subscriber: None,
         }
     }
@@ -148,7 +145,6 @@ impl AptosDB {
             buffered_state_target_items,
             readonly,
             empty_buffered_state_for_restore,
-            rocksdb_configs.enable_storage_sharding,
             internal_indexer_db,
             hot_state_config,
         );
@@ -242,16 +238,12 @@ impl AptosDB {
         buffered_state_target_items: usize,
         max_num_nodes_per_lru_cache_shard: usize,
         enable_indexer: bool,
-        enable_sharding: bool,
     ) -> Self {
         Self::open(
             StorageDirPaths::from_path(db_root_path),
             readonly,
             NO_OP_STORAGE_PRUNER_CONFIG, /* pruner */
-            RocksdbConfigs {
-                enable_storage_sharding: enable_sharding,
-                ..Default::default()
-            },
+            RocksdbConfigs::default(),
             enable_indexer,
             buffered_state_target_items,
             max_num_nodes_per_lru_cache_shard,
@@ -324,26 +316,12 @@ impl AptosDB {
     }
 
     pub(super) fn get_raw_block_info_by_height(&self, block_height: u64) -> Result<BlockInfo> {
-        if !self.skip_index_and_usage {
-            let (first_version, new_block_event) = self.event_store.get_event_by_key(
-                &new_block_event_key(),
-                block_height,
-                self.ensure_synced_version()?,
-            )?;
-            let new_block_event = bcs::from_bytes(new_block_event.event_data())?;
-            Ok(BlockInfo::from_new_block_event(
-                first_version,
-                &new_block_event,
-            ))
-        } else {
-            Ok(self
-                .ledger_db
-                .metadata_db()
-                .get_block_info(block_height)?
-                .ok_or_else(|| {
-                    AptosDbError::NotFound(format!("BlockInfo not found at height {block_height}"))
-                })?)
-        }
+        self.ledger_db
+            .metadata_db()
+            .get_block_info(block_height)?
+            .ok_or_else(|| {
+                AptosDbError::NotFound(format!("BlockInfo not found at height {block_height}"))
+            })
     }
 
     pub(super) fn get_raw_block_info_by_version(
@@ -356,28 +334,13 @@ impl AptosDB {
             "Requested version {version} > synced version {synced_version}",
         );
 
-        if !self.skip_index_and_usage {
-            let (first_version, event_index, block_height) = self
-                .event_store
-                .lookup_event_before_or_at_version(&new_block_event_key(), version)?
-                .ok_or_else(|| AptosDbError::NotFound("NewBlockEvent".to_string()))?;
-            let new_block_event = self
-                .event_store
-                .get_event_by_version_and_index(first_version, event_index)?;
-            let new_block_event = bcs::from_bytes(new_block_event.event_data())?;
-            Ok((
-                block_height,
-                BlockInfo::from_new_block_event(first_version, &new_block_event),
-            ))
-        } else {
-            let block_height = self
-                .ledger_db
-                .metadata_db()
-                .get_block_height_by_version(version)?;
+        let block_height = self
+            .ledger_db
+            .metadata_db()
+            .get_block_height_by_version(version)?;
 
-            let block_info = self.get_raw_block_info_by_height(block_height)?;
-            Ok((block_height, block_info))
-        }
+        let block_info = self.get_raw_block_info_by_height(block_height)?;
+        Ok((block_height, block_info))
     }
 
     pub(super) fn to_api_block_info(
@@ -473,6 +436,7 @@ where
 }
 
 // Convert requested range and order to a range in ascending order.
+#[cfg(test)]
 pub(super) fn get_first_seq_num_and_limit(
     order: Order,
     cursor: u64,

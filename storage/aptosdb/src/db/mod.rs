@@ -36,7 +36,6 @@ pub struct AptosDB {
     /// This is just to detect concurrent calls to `commit_ledger()`
     commit_lock: std::sync::Mutex<()>,
     indexer: Option<Indexer>,
-    skip_index_and_usage: bool,
     update_subscriber: Option<Sender<(Instant, Version)>>,
 }
 
@@ -114,23 +113,22 @@ impl AptosDB {
     ) -> Result<(LedgerDb, Option<StateMerkleDb>, StateMerkleDb, StateKvDb)> {
         let ledger_db = LedgerDb::new(
             db_paths.ledger_db_root_path(),
-            rocksdb_configs,
+            rocksdb_configs.ledger_db_config,
             env,
             block_cache,
             readonly,
         )?;
         let state_kv_db = StateKvDb::new(
             db_paths,
-            rocksdb_configs,
+            rocksdb_configs.state_kv_db_config,
             env,
             block_cache,
             readonly,
-            ledger_db.metadata_db_arc(),
         )?;
-        let hot_state_merkle_db = if !readonly && rocksdb_configs.enable_storage_sharding {
+        let hot_state_merkle_db = if !readonly {
             Some(StateMerkleDb::new(
                 db_paths,
-                rocksdb_configs,
+                rocksdb_configs.state_merkle_db_config,
                 env,
                 block_cache,
                 readonly,
@@ -143,7 +141,7 @@ impl AptosDB {
         };
         let state_merkle_db = StateMerkleDb::new(
             db_paths,
-            rocksdb_configs,
+            rocksdb_configs.state_merkle_db_config,
             env,
             block_cache,
             readonly,
@@ -169,29 +167,21 @@ impl AptosDB {
     }
 
     /// Creates new physical DB checkpoint in directory specified by `path`.
-    pub fn create_checkpoint(
-        db_path: impl AsRef<Path>,
-        cp_path: impl AsRef<Path>,
-        sharding: bool,
-    ) -> Result<()> {
+    pub fn create_checkpoint(db_path: impl AsRef<Path>, cp_path: impl AsRef<Path>) -> Result<()> {
         let start = Instant::now();
 
-        info!(sharding = sharding, "Creating checkpoint for AptosDB.");
+        info!("Creating checkpoint for AptosDB.");
 
-        LedgerDb::create_checkpoint(db_path.as_ref(), cp_path.as_ref(), sharding)?;
-        if sharding {
-            StateKvDb::create_checkpoint(db_path.as_ref(), cp_path.as_ref())?;
-            StateMerkleDb::create_checkpoint(
-                db_path.as_ref(),
-                cp_path.as_ref(),
-                sharding,
-                /* is_hot = */ true,
-            )?;
-        }
+        LedgerDb::create_checkpoint(db_path.as_ref(), cp_path.as_ref())?;
+        StateKvDb::create_checkpoint(db_path.as_ref(), cp_path.as_ref())?;
         StateMerkleDb::create_checkpoint(
             db_path.as_ref(),
             cp_path.as_ref(),
-            sharding,
+            /* is_hot = */ true,
+        )?;
+        StateMerkleDb::create_checkpoint(
+            db_path.as_ref(),
+            cp_path.as_ref(),
             /* is_hot = */ false,
         )?;
 

@@ -3,7 +3,6 @@
 
 use crate::{
     db::AptosDB,
-    db_debugger::ShardingConfig,
     schema::db_metadata::{DbMetadataKey, DbMetadataSchema, DbMetadataValue},
     state_store::StateStore,
     utils::truncation_helper::{
@@ -39,9 +38,6 @@ pub struct Cmd {
 
     #[clap(long, group = "backup")]
     opt_out_backup_checkpoint: bool,
-
-    #[clap(flatten)]
-    sharding_config: ShardingConfig,
 }
 
 impl Cmd {
@@ -54,20 +50,13 @@ impl Cmd {
             );
             println!("Creating backup at: {:?}", &backup_checkpoint_dir);
             fs::create_dir_all(&backup_checkpoint_dir)?;
-            AptosDB::create_checkpoint(
-                &self.db_dir,
-                backup_checkpoint_dir,
-                self.sharding_config.enable_storage_sharding,
-            )?;
+            AptosDB::create_checkpoint(&self.db_dir, backup_checkpoint_dir)?;
             println!("Done!");
         } else {
             println!("Opted out backup creation!.");
         }
 
-        let rocksdb_config = RocksdbConfigs {
-            enable_storage_sharding: self.sharding_config.enable_storage_sharding,
-            ..Default::default()
-        };
+        let rocksdb_config = RocksdbConfigs::default();
         let env = None;
         let block_cache = None;
         // TODO(HotState): handle hot state merkle db.
@@ -173,10 +162,9 @@ mod test {
             jellyfish_merkle_node::JellyfishMerkleNodeSchema, ledger_info::LedgerInfoSchema,
             stale_node_index::StaleNodeIndexSchema,
             stale_node_index_cross_epoch::StaleNodeIndexCrossEpochSchema,
-            stale_state_value_index::StaleStateValueIndexSchema,
             stale_state_value_index_by_key_hash::StaleStateValueIndexByKeyHashSchema,
-            state_value::StateValueSchema, state_value_by_key_hash::StateValueByKeyHashSchema,
-            transaction::TransactionSchema, transaction_accumulator::TransactionAccumulatorSchema,
+            state_value_by_key_hash::StateValueByKeyHashSchema, transaction::TransactionSchema,
+            transaction_accumulator::TransactionAccumulatorSchema,
             transaction_info::TransactionInfoSchema, version_data::VersionDataSchema,
             write_set::WriteSetSchema,
         },
@@ -194,14 +182,11 @@ mod test {
         fn test_truncation(input in arb_blocks_to_commit_with_block_nums(80, 120)) {
             use aptos_config::config::DEFAULT_MAX_NUM_NODES_PER_LRU_CACHE_SHARD;
             aptos_logger::Logger::new().init();
-            let sharding_config = ShardingConfig {
-                enable_storage_sharding: input.1,
-            };
             let tmp_dir = TempPath::new();
 
-            let db = if input.1 { AptosDB::new_for_test_with_sharding(&tmp_dir, DEFAULT_MAX_NUM_NODES_PER_LRU_CACHE_SHARD) } else { AptosDB::new_for_test(&tmp_dir) };
+            let db = AptosDB::new_for_test_with_sharding(&tmp_dir, DEFAULT_MAX_NUM_NODES_PER_LRU_CACHE_SHARD);
             let mut version = 0;
-            for (txns_to_commit, ledger_info_with_sigs) in input.0.iter() {
+            for (txns_to_commit, ledger_info_with_sigs) in input.iter() {
                 db.save_transactions_for_test(
                     txns_to_commit,
                     version,
@@ -225,12 +210,11 @@ mod test {
                 ledger_db_batch_size: 15,
                 opt_out_backup_checkpoint: true,
                 backup_checkpoint_dir: None,
-                sharding_config: sharding_config.clone(),
             };
 
             cmd.run().unwrap();
 
-            let db = if input.1 { AptosDB::new_for_test_with_sharding(&tmp_dir, DEFAULT_MAX_NUM_NODES_PER_LRU_CACHE_SHARD) } else { AptosDB::new_for_test(&tmp_dir) };
+            let db = AptosDB::new_for_test_with_sharding(&tmp_dir, DEFAULT_MAX_NUM_NODES_PER_LRU_CACHE_SHARD);
             let db_version = db.expect_synced_version();
             prop_assert!(db_version <= target_version);
             target_version = db_version;
@@ -255,10 +239,7 @@ mod test {
             // TODO(HotState): handle `_hot_state_merkle_db` here.
             let (ledger_db, _hot_state_merkle_db, state_merkle_db, state_kv_db) = AptosDB::open_dbs(
                 &StorageDirPaths::from_path(tmp_dir.path()),
-                RocksdbConfigs {
-                    enable_storage_sharding: input.1,
-                    ..Default::default()
-                },
+                RocksdbConfigs::default(),
                 env,
                 block_cache,
                 /*readonly=*/ false,
@@ -299,7 +280,7 @@ mod test {
             iter.seek_to_last();
             prop_assert_eq!(iter.next().transpose().unwrap().unwrap().0, epoch);
 
-            if sharding_config.enable_storage_sharding {
+            {
                 let mut iter = state_kv_db.metadata_db().iter::<StateValueByKeyHashSchema>().unwrap();
                 iter.seek_to_first();
                 for item in iter {
@@ -308,21 +289,6 @@ mod test {
                 }
 
                 let mut iter = state_kv_db.metadata_db().iter::<StaleStateValueIndexByKeyHashSchema>().unwrap();
-                iter.seek_to_first();
-                for item in iter {
-                    let version = item.unwrap().0.stale_since_version;
-                    prop_assert!(version <= target_version);
-                }
-
-            } else {
-                let mut iter = state_kv_db.metadata_db().iter::<StateValueSchema>().unwrap();
-                iter.seek_to_first();
-                for item in iter {
-                    let ((_, version), _) = item.unwrap();
-                    prop_assert!(version <= target_version);
-                }
-
-                let mut iter = state_kv_db.metadata_db().iter::<StaleStateValueIndexSchema>().unwrap();
                 iter.seek_to_first();
                 for item in iter {
                     let version = item.unwrap().0.stale_since_version;
@@ -351,7 +317,7 @@ mod test {
                 prop_assert!(version <= target_version);
             }
 
-            if sharding_config.enable_storage_sharding {
+            {
                 let state_merkle_db = Arc::new(state_merkle_db);
                 for i in 0..NUM_STATE_SHARDS {
                     let mut kv_shard_iter = state_kv_db.db_shard(i).iter::<StateValueByKeyHashSchema>().unwrap();
