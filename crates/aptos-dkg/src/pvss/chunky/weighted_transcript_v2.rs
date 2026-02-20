@@ -26,9 +26,12 @@ use crate::{
     },
     range_proofs::{dekart_univariate_v2, traits::BatchedRangeProof},
     sigma_protocol::{
-        self,
-        homomorphism::{tuple::TupleCodomainShape, Trait as _, TrivialShape},
-        Trait as _,
+        self, check_msm_eval_zero,
+        homomorphism::{
+            fixed_base_msms::Trait as MsmTrait, tuple::TupleCodomainShape, Trait as HomTrait,
+            TrivialShape,
+        },
+        verifier_challenges_with_length, CurveGroupTrait, Trait as _,
     },
     Scalar,
 };
@@ -154,28 +157,55 @@ impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>>
         let total_weight = sc.get_total_weight();
         // First component length: 1 (TrivialShape) + chunks (total_weight*num_chunks) + randomness (max_weight*num_chunks), matching WeightedCodomainShape::into_iter
         let first_len = 1 + total_weight * num_chunks + sc.get_max_weight() * num_chunks;
-        let (first_msm_terms, second_msm_terms) = hom.msm_terms_for_verify(
-            &TupleCodomainShape(
-                TupleCodomainShape(
-                    sigma_protocol::homomorphism::TrivialShape(
-                        self.sharing_proof.range_proof_commitment.0.into_affine(), // Because it's not affine by default. Should probably change that
-                    ),
-                    chunked_elgamal::WeightedCodomainShape {
-                        chunks: self.subtrs.Cs.clone(),
-                        randomness: self.subtrs.Rs.clone(),
-                    },
+        let public_statement = TupleCodomainShape(
+            TupleCodomainShape(
+                sigma_protocol::homomorphism::TrivialShape(
+                    self.sharing_proof.range_proof_commitment.0.into_affine(), // Because it's not affine by default. Should probably change that
                 ),
-                chunked_scalar_mul::CodomainShape(
-                    self.subtrs.Vs.iter().flatten().cloned().collect(),
-                ),
+                chunked_elgamal::WeightedCodomainShape {
+                    chunks: self.subtrs.Cs.clone(),
+                    randomness: self.subtrs.Rs.clone(),
+                },
             ),
-            &self.sharing_proof.SoK,
+            chunked_scalar_mul::CodomainShape(self.subtrs.Vs.iter().flatten().cloned().collect()),
+        );
+        let prover_first_message = self
+            .sharing_proof
+            .SoK
+            .prover_commitment()
+            .expect("SoK must contain commitment for Fiat–Shamir");
+        let (c, powers_of_beta) = verifier_challenges_with_length::<_, E::ScalarField, _, _>(
             &sok_cntxt,
-            Some((first_len, total_weight)),
+            &hom,
+            &public_statement,
+            prover_first_message,
+            &sigma_protocol::Trait::dst(&hom),
+            first_len + total_weight,
             rng,
         );
 
-        hom.check_first_msm_eval(first_msm_terms)?;
+        let first_terms = hom.hom1.msm_terms(&self.sharing_proof.SoK.z);
+        let first_msm_terms =
+            hkzg_chunked_elgamal_commit::HkzgElgamalHomomorphism::<E>::merge_msm_terms(
+                first_terms.into_iter().collect(),
+                &prover_first_message.0,
+                &public_statement.0,
+                &powers_of_beta[..first_len],
+                c,
+            );
+        check_msm_eval_zero(&hom.hom1, first_msm_terms)?;
+
+        let second_terms = hom.hom2.msm_terms(&self.sharing_proof.SoK.z);
+        let second_msm_terms = hkzg_chunked_elgamal_commit::LiftedCommitHomomorphism::<
+            'static,
+            E::G2,
+        >::merge_msm_terms(
+            second_terms.into_iter().collect(),
+            &prover_first_message.1,
+            &public_statement.1,
+            &powers_of_beta[first_len..],
+            c,
+        );
 
         let beta = sample_field_element(rng);
         let merged_g2 =

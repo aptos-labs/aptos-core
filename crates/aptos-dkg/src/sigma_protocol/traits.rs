@@ -306,6 +306,18 @@ pub trait CurveGroupTrait:
     }
 }
 
+/// Checks that the given MSM input evaluates to the group identity.
+/// Use when verifying one component of a tuple homomorphism component-wise.
+#[allow(non_snake_case)]
+pub fn check_msm_eval_zero<H: CurveGroupTrait>(
+    _hom: &H,
+    input: MsmInput<<H::Group as CurveGroup>::Affine, <H::Group as PrimeGroup>::ScalarField>,
+) -> anyhow::Result<()> {
+    let result = H::msm_eval(input);
+    ensure!(result == <H::Group as AdditiveGroup>::ZERO);
+    Ok(())
+}
+
 // Standard method to get `trait Statement = Canonical Serialize + ...`, because type aliases are experimental in Rust
 pub trait Statement: CanonicalSerialize + CanonicalDeserialize + Clone + Debug + Eq {}
 impl<T> Statement for T where T: CanonicalSerialize + CanonicalDeserialize + Clone + Debug + Eq {}

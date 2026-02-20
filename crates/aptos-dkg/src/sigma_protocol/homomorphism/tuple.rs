@@ -3,23 +3,15 @@
 
 use crate::{
     sigma_protocol,
-    sigma_protocol::{
-        homomorphism,
-        homomorphism::{fixed_base_msms, EntrywiseMap},
-        traits::verifier_challenges_with_length,
-        Proof,
-    },
+    sigma_protocol::homomorphism::{self, fixed_base_msms, EntrywiseMap},
 };
-use anyhow::ensure;
 use aptos_crypto::arkworks::msm::MsmInput;
-use ark_ec::{CurveGroup, PrimeGroup};
-use ark_ff::{PrimeField, Zero};
+use ark_ec::CurveGroup;
 use ark_serialize::{
     CanonicalDeserialize, CanonicalSerialize, Compress, Read, SerializationError, Valid,
 };
 use ark_std::io::Write;
 use rand_core::{CryptoRng, RngCore};
-use serde::Serialize;
 use std::fmt::Debug;
 
 /// `TupleHomomorphism` combines two homomorphisms with the same domain
@@ -82,17 +74,6 @@ where
     H2: homomorphism::Trait<Domain = H1::Domain>,
 {
     TupleCodomainShape(H1::normalize(hom1, value.0), H2::normalize(hom2, value.1))
-}
-
-fn tuple_statement_lengths<A, B>(stmt: &TupleCodomainShape<A, B>) -> (usize, usize)
-where
-    A: Clone + IntoIterator,
-    B: Clone + IntoIterator,
-{
-    (
-        stmt.0.clone().into_iter().count(), // TODO: cloning is not ideal here
-        stmt.1.clone().into_iter().count(),
-    )
 }
 
 /// Implements `Homomorphism` for `TupleHomomorphism` by applying both
@@ -326,109 +307,5 @@ where
         self.hom2
             .verify_with_challenge(stmt2, commit2, challenge, response, None, rng)?;
         Ok(())
-    }
-}
-
-/// Extension methods for `TupleHomomorphism` when both components implement `CurveGroupTrait`
-/// with the same scalar field (e.g. G1 and G2 of a pairing).
-impl<H1, H2, F> TupleHomomorphism<H1, H2>
-where
-    F: PrimeField,
-    H1: sigma_protocol::CurveGroupTrait<Group: PrimeGroup<ScalarField = F>>,
-    H2: sigma_protocol::CurveGroupTrait<Domain = H1::Domain, Group: PrimeGroup<ScalarField = F>>,
-{
-    /// Returns the MSM terms for each homomorphism, combined into a tuple.
-    fn msm_terms(
-        &self,
-        input: &H1::Domain,
-    ) -> (
-        H1::CodomainShape<MsmInput<H1::Base, F>>,
-        H2::CodomainShape<MsmInput<H2::Base, F>>,
-    ) {
-        let terms1 = self.hom1.msm_terms(input);
-        let terms2 = self.hom2.msm_terms(input);
-        (terms1, terms2)
-    }
-
-    /// Merges MSM terms for both components; shared by verify_with_challenge and msm_terms_for_verify.
-    fn merge_msm_terms_for_verify(
-        &self,
-        response: &H1::Domain,
-        prover_commitment: &TupleCodomainShape<H1::CodomainNormalized, H2::CodomainNormalized>,
-        public_statement: &TupleCodomainShape<H1::CodomainNormalized, H2::CodomainNormalized>,
-        challenge: F,
-        powers_of_beta: &[F],
-        len1: usize,
-    ) -> (MsmInput<H1::Base, F>, MsmInput<H2::Base, F>) {
-        let (first_powers, second_powers) = powers_of_beta.split_at(len1);
-        let (first_terms, second_terms) = self.msm_terms(response);
-        let first_input = H1::merge_msm_terms(
-            first_terms.into_iter().collect(),
-            &prover_commitment.0,
-            &public_statement.0,
-            first_powers,
-            challenge,
-        );
-        let second_input = H2::merge_msm_terms(
-            second_terms.into_iter().collect(),
-            &prover_commitment.1,
-            &public_statement.1,
-            second_powers,
-            challenge,
-        );
-        (first_input, second_input)
-    }
-
-    // TODO: maybe remove, see comment below
-    pub fn check_first_msm_eval(&self, input: MsmInput<H1::Base, F>) -> anyhow::Result<()> {
-        let result = H1::msm_eval(input);
-        ensure!(result == H1::MsmOutput::zero());
-        Ok(())
-    }
-
-    // TODO: Doesn't get used atm... so we're implicitly mixing different MSM code :-/
-    pub fn check_second_msm_eval(&self, input: MsmInput<H2::Base, F>) -> anyhow::Result<()> {
-        let result = H2::msm_eval(input);
-        ensure!(result == H2::MsmOutput::zero());
-        Ok(())
-    }
-
-    #[allow(non_snake_case)]
-    pub fn msm_terms_for_verify<Ct: Serialize, H, R: RngCore + CryptoRng>(
-        &self,
-        public_statement: &<Self as homomorphism::Trait>::CodomainNormalized,
-        proof: &Proof<F, H>,
-        cntxt: &Ct,
-        number_of_beta_powers: Option<(usize, usize)>, // (len1, len2); None => compute from statement (clones)
-        rng: &mut R,
-    ) -> (MsmInput<H1::Base, F>, MsmInput<H2::Base, F>)
-    where
-        H: homomorphism::Trait<
-            Domain = <Self as homomorphism::Trait>::Domain,
-            CodomainNormalized = <Self as homomorphism::Trait>::CodomainNormalized,
-        >,
-    {
-        let prover_first_message = proof
-            .prover_commitment()
-            .expect("Missing implementation - expected commitment, not challenge");
-        let (len1, len2) =
-            number_of_beta_powers.unwrap_or_else(|| tuple_statement_lengths(public_statement));
-        let (c, powers_of_beta) = verifier_challenges_with_length::<_, F, _, _>(
-            cntxt,
-            self,
-            public_statement,
-            prover_first_message,
-            &sigma_protocol::Trait::dst(self),
-            len1 + len2,
-            rng,
-        );
-        self.merge_msm_terms_for_verify(
-            &proof.z,
-            prover_first_message,
-            public_statement,
-            c,
-            &powers_of_beta,
-            len1,
-        )
     }
 }
