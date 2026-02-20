@@ -81,7 +81,7 @@ pub trait RangeProof<E: Pairing, B: BatchedRangeProof<E>> {
 #[allow(private_bounds)]
 pub trait SigmaProtocol<F: PrimeField, H: homomorphism::Trait>: ScalarProtocol<F> {
     /// Append the "context" of a sigma protocol, e.g. session identifiers
-    fn append_sigma_protocol_ctxt<C: Serialize>(&mut self, ctxt: &C);
+    fn append_sigma_protocol_cntxt<Ct: Serialize>(&mut self, cntxt: &Ct);
 
     /// Append the MSM bases of a sigma protocol.
     fn append_sigma_protocol_msm_bases(&mut self, hom: &H);
@@ -190,9 +190,9 @@ where
     H::Domain: sigma_protocol::Witness<F>,
     H::CodomainNormalized: sigma_protocol::Statement,
 {
-    fn append_sigma_protocol_ctxt<C: Serialize>(&mut self, ctxt: &C) {
-        let ctxt_bytes = bcs::to_bytes(ctxt).expect("ctxt data serialization should succeed");
-        self.append_message(b"ctxt", ctxt_bytes.as_slice());
+    fn append_sigma_protocol_cntxt<Ct: Serialize>(&mut self, cntxt: &Ct) {
+        let cntxt_bytes = bcs::to_bytes(cntxt).expect("cntxt data serialization should succeed");
+        self.append_message(b"cntxt", cntxt_bytes.as_slice());
     }
 
     fn append_sigma_protocol_msm_bases(&mut self, hom: &H) {

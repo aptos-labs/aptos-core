@@ -95,7 +95,7 @@ impl<T: CurveGroupTrait> Trait for T {
     type Scalar = T::Scalar;
 
     fn dst(&self) -> Vec<u8> {
-        self.dst()
+        CurveGroupTrait::dst(self) // `self.dst()` works but seems a bit too concise
     }
 
     fn verify_with_challenge<R: RngCore + CryptoRng>(
@@ -441,7 +441,7 @@ where
     let mut fs_t = merlin::Transcript::new(dst);
 
     // Append the "context" to the transcript
-    <merlin::Transcript as fiat_shamir::SigmaProtocol<F, H>>::append_sigma_protocol_ctxt(
+    <merlin::Transcript as fiat_shamir::SigmaProtocol<F, H>>::append_sigma_protocol_cntxt(
         &mut fs_t, cntxt,
     );
 
