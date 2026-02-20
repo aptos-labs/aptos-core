@@ -334,6 +334,15 @@ impl Committer {
                 continue;
             }
 
+            // If merged_state is too old for to_commit (persisted snapshot advanced
+            // while merge was deferred), wait for old views to drain so try_merge
+            // can advance merged_state.
+            while !self.merged_state.can_be_delta_base_of(&to_commit) {
+                if !self.try_merge() {
+                    std::thread::sleep(DEFERRED_MERGE_RETRY_INTERVAL);
+                }
+            }
+
             let committed_version = to_commit.next_version();
 
             // Build a layered view: delta(merged_state -> to_commit) over base DashMaps.
@@ -398,7 +407,9 @@ impl Committer {
                     );
                     self.handle_reset(state, ack);
                 },
-                Err(RecvTimeoutError::Timeout) => self.try_merge(),
+                Err(RecvTimeoutError::Timeout) => {
+                    self.try_merge();
+                },
                 Err(RecvTimeoutError::Disconnected) => return None,
             }
         };
@@ -441,15 +452,16 @@ impl Committer {
     /// a clean (no-delta) view. Readers who already cloned the old delta-bearing view are
     /// unaffected: the delta shadows changed keys, and unchanged keys agree between the delta's
     /// target and the updated DashMaps.
-    fn try_merge(&mut self) {
+    /// Returns `false` if blocked by lingering old views, `true` otherwise.
+    fn try_merge(&mut self) -> bool {
         self.old_views.retain(|v| v.strong_count() > 0);
         if !self.old_views.is_empty() {
-            return;
+            return false;
         }
 
         let target = self.committed.lock().state.clone();
         if self.merged_state.is_the_same(&target) {
-            return;
+            return true;
         }
 
         self.apply_delta_to_base(&target);
@@ -468,6 +480,7 @@ impl Committer {
             base: Arc::clone(&self.base),
         });
         Self::swap_view(&mut self.old_views, &mut self.committed.lock(), clean_view);
+        true
     }
 
     /// Apply the delta between `merged_state` and `target` to the base DashMaps.
@@ -859,6 +872,55 @@ mod tests {
         drop(r1_view);
         hot_state.wait_for_merge(2);
         assert_eq!(hot_state.merged_version.load(Ordering::Acquire), 2);
+    }
+
+    /// Regression test: the committer must not crash when `merged_state` lags behind
+    /// the `base_layer` of an incoming `to_commit`.
+    ///
+    /// In production, `State::update()` spawns new `MapLayer` shards with
+    /// `base_layer = persisted_snapshot.layer()`. When old readers prevent
+    /// `try_merge()` from advancing `merged_state`, and `persisted_snapshot`
+    /// has advanced, the committer's `merged_state` can be at a lower layer than
+    /// `to_commit.base_layer`. The fix makes the committer wait for merge before
+    /// building the delta.
+    ///
+    /// Timeline:
+    /// ```text
+    ///   r0 holds V0_clean ──► blocks all merges (merged_state stuck at S0)
+    ///   S1 committed (base_layer=0) ──► delta(S0→S1) OK
+    ///   S2 committed (base_layer=1) ──► delta(S0→S2) would crash without fix
+    ///   drop(r0) ──► merge to S1 proceeds, then delta(S1→S2) OK
+    /// ```
+    #[test]
+    fn test_commit_with_advanced_base_layer() {
+        let state0 = State::new_empty(TEST_CONFIG);
+        let hot_state = HotState::new(state0.clone(), TEST_CONFIG);
+
+        // Hold a view to block all merges (merged_state stays at S0).
+        let (held_view, _) = hot_state.get_committed();
+
+        // S1: spawned with root=S0, so base_layer = S0.layer = 0.
+        // Compatible with merged_state at S0.
+        let state1 = build_empty_descendant(&state0, &state0, 0);
+        hot_state.enqueue_commit(state1.clone());
+        wait_for_committed_version(&hot_state, 1);
+
+        // S2: spawned with root=S1, simulating persisted_snapshot advancing to S1.
+        // This gives base_layer = S1.layer = 1, incompatible with merged_state
+        // still at S0 (layer 0). Without the fix this panics.
+        let state2 = build_empty_descendant(&state1, &state1, 1);
+        hot_state.enqueue_commit(state2);
+
+        // Give the committer time to pick up S2 and hit the incompatible
+        // merged_state. Without the fix, this would panic.
+        std::thread::sleep(Duration::from_millis(100));
+
+        // Drop the held view so the committer can merge S0→S1, then process S2.
+        drop(held_view);
+
+        hot_state.wait_for_merge(2);
+        let (_, committed) = hot_state.get_committed();
+        assert_eq!(committed.next_version(), 2);
     }
 
     #[test]
