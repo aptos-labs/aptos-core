@@ -145,6 +145,14 @@ impl<K: ArcAsyncDrop, V: ArcAsyncDrop> MapLayer<K, V> {
         Arc::ptr_eq(&self.inner, &other.inner)
     }
 
+    /// Returns true if `base` can be used as the base layer for viewing layers up to `self`.
+    /// This is the non-panicking equivalent of the assertions in `into_layers_view_after`.
+    pub fn can_view_after(&self, base: &Self) -> bool {
+        self.is_family(base)
+            && base.inner.layer >= self.inner.base_layer
+            && base.inner.layer <= self.inner.layer
+    }
+
     pub fn is_descendant_of(&self, other: &Self) -> bool {
         if !self.is_family(other) {
             return false;
