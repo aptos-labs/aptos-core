@@ -203,7 +203,7 @@ mod tests {
     async fn test_qnuc_transport_listen() {
         let transport = QnucTransportLayer::new();
         let addr: NetworkAddress = "/ip4/127.0.0.1/udp/0".parse().unwrap();
-        let (listener, listen_addr) = transport.listen_on(addr).unwrap();
+        let (_listener, listen_addr) = transport.listen_on(addr).unwrap();
         let port = listen_addr.find_port().unwrap();
         assert_ne!(port, 0);
     }

@@ -137,7 +137,6 @@ impl AsyncWrite for QnucSocket {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use futures::io::{AsyncReadExt, AsyncWriteExt};
 
     #[tokio::test]
     async fn test_qnuc_socket_write_read() {
@@ -146,22 +145,18 @@ mod tests {
         let client = Arc::new(UdpSocket::bind("127.0.0.1:0").await.unwrap());
         let client_addr = client.local_addr().unwrap();
 
-        let mut client_sock = QnucSocket::new(client.clone(), server_addr, 1);
-        let mut server_sock = QnucSocket::new(server.clone(), client_addr, 1);
+        let mut client_sock = QnucSocket::new(client, server_addr, 1);
+        let mut server_sock = QnucSocket::new(server, client_addr, 1);
 
-        // Write from client
-        let written = futures::executor::block_on(async {
-            use futures::io::AsyncWriteExt;
-            client_sock.write(b"hello qnuc").await.unwrap()
-        });
+        use futures::io::{AsyncReadExt, AsyncWriteExt};
+
+        // Write from client side
+        let written = client_sock.write(b"hello qnuc").await.unwrap();
         assert_eq!(written, 10);
 
-        // Read from server
+        // Read from server side
         let mut buf = [0u8; 32];
-        let read = futures::executor::block_on(async {
-            use futures::io::AsyncReadExt;
-            server_sock.read(&mut buf).await.unwrap()
-        });
+        let read = server_sock.read(&mut buf).await.unwrap();
         assert_eq!(&buf[..read], b"hello qnuc");
     }
 }

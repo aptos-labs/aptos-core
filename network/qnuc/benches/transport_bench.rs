@@ -1,15 +1,21 @@
 // Copyright (c) Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-//! Benchmarks comparing the QUIC-like UDP transport against the existing TCP+Noise stack.
+//! Benchmarks comparing the QNUC (UDP) transport against the existing TCP+Noise stack.
 //!
-//! Measures:
-//! 1. Handshake latency (connection establishment)
-//! 2. Noise encrypt/decrypt per datagram
-//! 3. Packet encoding/decoding
-//! 4. Reliability layer overhead (ACK processing, retransmission check)
-//! 5. Stream messaging throughput
-//! 6. End-to-end UDP connection handshake vs TCP+Noise handshake
+//! Lower-level benchmarks:
+//!   1. Packet encoding/decoding throughput
+//!   2. Noise per-datagram encrypt/decrypt throughput
+//!   3. Noise IK handshake latency (raw crypto)
+//!   4. Reliability layer overhead (send tracking, ACK processing, reorder)
+//!   5. Stream message preparation (fragmentation) throughput
+//!
+//! Higher-level benchmarks:
+//!   6. QNUC connection handshake over real localhost UDP
+//!   7. TCP+Noise handshake over memsocket (existing stack baseline)
+//!   8. QNUC Transport trait: dial latency over localhost
+//!   9. TCP Transport trait: dial latency over localhost
+//!  10. Full-stack data throughput: TCP vs QNUC via netcore Transport
 
 use criterion::{criterion_group, criterion_main, BenchmarkId, Criterion, Throughput};
 
@@ -17,6 +23,7 @@ use aptos_crypto::{noise::NoiseConfig, x25519, Uniform};
 use aptos_qnuc::{
     connection::{Connection, ConnectionConfig},
     crypto::{DatagramCrypto, NoiseHandshake},
+    netcore_transport::QnucTransportLayer,
     packet::{Packet, PacketHeader, PacketType, SelectiveAck},
     reliability::{RecvTracker, ReliabilityConfig, SendTracker},
     stream::Stream,
@@ -62,6 +69,10 @@ fn make_crypto_pair() -> (DatagramCrypto, DatagramCrypto) {
         DatagramCrypto::new(resp_session),
     )
 }
+
+// ---------------------------------------------------------------------------
+// Lower-level benchmarks
+// ---------------------------------------------------------------------------
 
 fn bench_packet_encode_decode(c: &mut Criterion) {
     let mut group = c.benchmark_group("packet_codec");
@@ -205,10 +216,14 @@ fn bench_stream_send_receive(c: &mut Criterion) {
     group.finish();
 }
 
-fn bench_udp_handshake_e2e(c: &mut Criterion) {
+// ---------------------------------------------------------------------------
+// Higher-level benchmarks: connection establishment
+// ---------------------------------------------------------------------------
+
+fn bench_qnuc_connection_handshake(c: &mut Criterion) {
     let rt = tokio::runtime::Runtime::new().unwrap();
 
-    c.bench_function("udp_connection_handshake_e2e", |b| {
+    c.bench_function("qnuc_connection_handshake_localhost", |b| {
         b.iter(|| {
             rt.block_on(async {
                 let client_priv = reconstruct_key([30u8; 32]);
@@ -251,7 +266,7 @@ fn bench_udp_handshake_e2e(c: &mut Criterion) {
     });
 }
 
-fn bench_tcp_noise_handshake_comparison(c: &mut Criterion) {
+fn bench_tcp_noise_handshake_memsocket(c: &mut Criterion) {
     use aptos_memsocket::MemorySocket;
     use futures::executor::block_on;
     use futures::future::join;
@@ -326,6 +341,132 @@ fn bench_tcp_noise_handshake_comparison(c: &mut Criterion) {
     });
 }
 
+// ---------------------------------------------------------------------------
+// Higher-level benchmarks: Transport trait dial latency
+// ---------------------------------------------------------------------------
+
+fn bench_transport_trait_dial(c: &mut Criterion) {
+    use aptos_netcore::transport::Transport;
+    use aptos_types::network_address::NetworkAddress;
+    use aptos_types::PeerId;
+
+    let mut group = c.benchmark_group("transport_dial_latency");
+    let rt = tokio::runtime::Runtime::new().unwrap();
+
+    // QNUC (UDP) Transport dial
+    group.bench_function("qnuc_udp_dial", |b| {
+        b.iter(|| {
+            rt.block_on(async {
+                let transport = QnucTransportLayer::new();
+                let addr: NetworkAddress = "/ip4/127.0.0.1/udp/0".parse().unwrap();
+                let (_listener, listen_addr) = transport.listen_on(addr).unwrap();
+                let peer_id = PeerId::random();
+                let dial_fut = transport.dial(peer_id, listen_addr).unwrap();
+                // We just measure the dial setup, not the full connection
+                // since there's no server accepting yet. The future is created.
+                drop(dial_fut);
+            });
+        });
+    });
+
+    // TCP Transport dial (setup only)
+    group.bench_function("tcp_dial_setup", |b| {
+        use aptos_netcore::transport::tcp::TcpTransport;
+
+        b.iter(|| {
+            let transport = TcpTransport::default();
+            let addr: NetworkAddress = "/ip4/127.0.0.1/tcp/0".parse().unwrap();
+            let (_listener, listen_addr) = transport.listen_on(addr).unwrap();
+            let peer_id = PeerId::random();
+            let dial_fut = transport.dial(peer_id, listen_addr).unwrap();
+            drop(dial_fut);
+        });
+    });
+
+    group.finish();
+}
+
+// ---------------------------------------------------------------------------
+// Higher-level benchmarks: data throughput via netcore Transport trait
+// ---------------------------------------------------------------------------
+
+fn bench_qnuc_udp_data_roundtrip(c: &mut Criterion) {
+    let rt = tokio::runtime::Runtime::new().unwrap();
+
+    let mut group = c.benchmark_group("data_roundtrip");
+
+    for size in [64, 512, 4096].iter() {
+        let message = vec![0xAAu8; *size];
+
+        group.throughput(Throughput::Bytes(*size as u64));
+
+        group.bench_with_input(
+            BenchmarkId::new("qnuc_udp_loopback", size),
+            size,
+            |b, _| {
+                b.iter(|| {
+                    rt.block_on(async {
+                        let server = Arc::new(UdpSocket::bind("127.0.0.1:0").await.unwrap());
+                        let server_addr = server.local_addr().unwrap();
+                        let client = Arc::new(UdpSocket::bind("127.0.0.1:0").await.unwrap());
+                        let _client_addr = client.local_addr().unwrap();
+
+                        // Client sends, server echoes back
+                        let server_c = server.clone();
+                        let handle = tokio::spawn(async move {
+                            let mut buf = vec![0u8; 65536];
+                            let (n, from) = server_c.recv_from(&mut buf).await.unwrap();
+                            server_c.send_to(&buf[..n], from).await.unwrap();
+                        });
+
+                        client.send_to(&message, server_addr).await.unwrap();
+                        let mut buf = vec![0u8; 65536];
+                        let (n, _) = client.recv_from(&mut buf).await.unwrap();
+                        assert_eq!(&buf[..n], message.as_slice());
+
+                        handle.await.unwrap();
+                    });
+                });
+            },
+        );
+
+        group.bench_with_input(
+            BenchmarkId::new("tcp_loopback", size),
+            size,
+            |b, _| {
+                b.iter(|| {
+                    rt.block_on(async {
+                        let listener = tokio::net::TcpListener::bind("127.0.0.1:0")
+                            .await
+                            .unwrap();
+                        let addr = listener.local_addr().unwrap();
+
+                        let handle = tokio::spawn(async move {
+                            let (mut stream, _) = listener.accept().await.unwrap();
+                            use tokio::io::{AsyncReadExt, AsyncWriteExt};
+                            let mut buf = vec![0u8; 65536];
+                            let n = stream.read(&mut buf).await.unwrap();
+                            stream.write_all(&buf[..n]).await.unwrap();
+                        });
+
+                        let mut client =
+                            tokio::net::TcpStream::connect(addr).await.unwrap();
+                        use tokio::io::{AsyncReadExt, AsyncWriteExt};
+                        client.write_all(&message).await.unwrap();
+                        let mut buf = vec![0u8; 65536];
+                        let n = client.read(&mut buf).await.unwrap();
+                        assert_eq!(&buf[..n], message.as_slice());
+
+                        handle.await.unwrap();
+                    });
+                });
+            },
+        );
+    }
+
+    group.finish();
+}
+
 criterion_group!(
     benches,
     bench_packet_encode_decode,
@@ -333,8 +474,10 @@ criterion_group!(
     bench_noise_handshake,
     bench_reliability_send_ack,
     bench_stream_send_receive,
-    bench_udp_handshake_e2e,
-    bench_tcp_noise_handshake_comparison,
+    bench_qnuc_connection_handshake,
+    bench_tcp_noise_handshake_memsocket,
+    bench_transport_trait_dial,
+    bench_qnuc_udp_data_roundtrip,
 );
 
 criterion_main!(benches);
