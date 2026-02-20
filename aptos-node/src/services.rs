@@ -1,7 +1,7 @@
 // Copyright (c) Aptos Foundation
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
-use crate::{bootstrap_api, indexer, mpsc::Receiver, network::ApplicationNetworkInterfaces};
+use crate::{bootstrap_api, mpsc::Receiver, network::ApplicationNetworkInterfaces};
 use aptos_admin_service::AdminService;
 use aptos_build_info::build_information;
 use aptos_config::config::NodeConfig;
@@ -44,7 +44,7 @@ const INTRA_NODE_CHANNEL_BUFFER_SIZE: usize = 1;
 const DEFAULT_MAX_NUM_WORKER_THREADS: usize = 32;
 
 /// Bootstraps the API and the indexer. Returns the Mempool client
-/// receiver, and both the api and indexer runtimes.
+/// receiver, and the api and indexer runtimes.
 pub fn bootstrap_api_and_indexer(
     node_config: &NodeConfig,
     db_rw: DbReaderWriter,
@@ -55,7 +55,6 @@ pub fn bootstrap_api_and_indexer(
     indexer_grpc_port_tx: Option<oneshot::Sender<u16>>,
 ) -> anyhow::Result<(
     Receiver<MempoolClientRequest>,
-    Option<Runtime>,
     Option<Runtime>,
     Option<Runtime>,
     Option<Runtime>,
@@ -117,19 +116,10 @@ pub fn bootstrap_api_and_indexer(
         indexer_grpc_port_tx,
     );
 
-    // Create the indexer runtime
-    let indexer_runtime = indexer::bootstrap_indexer(
-        node_config,
-        chain_id,
-        db_rw.reader.clone(),
-        mempool_client_sender.clone(),
-    )?;
-
     Ok((
         mempool_client_receiver,
         api_runtime,
         indexer_table_info_runtime,
-        indexer_runtime,
         indexer_grpc,
         db_indexer_runtime,
         mempool_client_sender,

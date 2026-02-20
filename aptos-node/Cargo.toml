@@ -34,7 +34,6 @@ aptos-event-notifications = { workspace = true }
 aptos-executor = { workspace = true }
 aptos-framework = { workspace = true }
 aptos-genesis = { workspace = true }
-aptos-indexer = { workspace = true, optional = true }
 aptos-indexer-grpc-fullnode = { workspace = true }
 aptos-indexer-grpc-table-info = { workspace = true }
 aptos-infallible = { workspace = true }
@@ -92,7 +91,6 @@ check-vm-features = []
 consensus-only-perf-test = ["aptos-executor/consensus-only-perf-test", "aptos-mempool/consensus-only-perf-test", "aptos-db/consensus-only-perf-test"]
 default = []
 failpoints = ["fail/failpoints", "aptos-consensus/failpoints", "aptos-executor/failpoints", "aptos-mempool/failpoints", "aptos-api/failpoints", "aptos-config/failpoints"]
-indexer = ["aptos-indexer"]
 tokio-console = ["aptos-logger/tokio-console", "aptos-config/tokio-console"]
 smoke-test = ["aptos-jwk-consensus/smoke-test", "aptos-dkg-runtime/smoke-test"]
 
