@@ -5,10 +5,11 @@ use crate::{
     execution::execute_workload,
     overrides::OverrideConfig,
     state_view::{ReadSet, ReadSetCapturingStateView},
-    workload::{TransactionBlock, Workload},
+    workload::Workload,
 };
 use aptos_logger::error;
 use aptos_move_debugger::aptos_debugger::AptosDebugger;
+use aptos_move_testing_utils::TransactionBlock;
 use aptos_types::transaction::Version;
 use aptos_vm::{aptos_vm::AptosVMBlockExecutor, VMBlockExecutor};
 use std::{

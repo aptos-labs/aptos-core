@@ -7,6 +7,7 @@ use crate::{
 };
 use anyhow::Result;
 use aptos_framework::natives::code::PackageMetadata;
+use aptos_move_testing_utils::create_rest_client;
 use aptos_rest_client::Client;
 use aptos_transaction_simulation::InMemoryStateStore;
 use aptos_types::{on_chain_config::FeatureFlag, transaction::Version};
@@ -17,7 +18,6 @@ use std::{
     path::PathBuf,
     sync::{Arc, Mutex},
 };
-use url::Url;
 
 pub struct OnlineExecutor {
     debugger: Arc<dyn AptosValidatorInterface + Send>,
@@ -256,7 +256,7 @@ impl OnlineExecutor {
                                 .compared_compiled_package_cache
                                 .clone();
 
-                            let client = Client::new(Url::parse(&endpoint).unwrap());
+                            let client = create_rest_client(&endpoint, None).unwrap();
                             let debugger = Arc::new(RestDebuggerInterface::new(client));
                             executor.execute_and_compare(
                                 version,

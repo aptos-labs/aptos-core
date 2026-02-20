@@ -5,10 +5,10 @@ use crate::{
     commands::init_logger_and_metrics,
     runner::{BenchmarkRunner, ReplayBlock},
     state_view::ReadSet,
-    workload::TransactionBlock,
 };
 use anyhow::{anyhow, bail};
 use aptos_logger::Level;
+use aptos_move_testing_utils::load_blocks_from_file;
 use aptos_vm_environment::prod_configs::{
     set_async_runtime_checks, set_layout_caches, set_paranoid_type_checks,
 };
@@ -92,9 +92,7 @@ impl BenchmarkCommand {
             bail!("Number of repeats must be at least {}", MIN_NUM_REPEATS,);
         }
 
-        let txn_blocks_bytes = fs::read(PathBuf::from(&self.transactions_file)).await?;
-        let txn_blocks: Vec<TransactionBlock> = bcs::from_bytes(&txn_blocks_bytes)
-            .map_err(|err| anyhow!("Error when deserializing blocks of transactions: {:?}", err))?;
+        let txn_blocks = load_blocks_from_file(&PathBuf::from(&self.transactions_file)).await?;
 
         let inputs_read_set_bytes = fs::read(PathBuf::from(&self.inputs_file)).await?;
         let inputs_read_set: Vec<ReadSet> = bcs::from_bytes(&inputs_read_set_bytes)

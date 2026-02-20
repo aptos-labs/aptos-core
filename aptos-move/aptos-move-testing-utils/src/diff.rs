@@ -53,11 +53,13 @@ pub struct TransactionDiff {
 }
 
 impl TransactionDiff {
-    pub(crate) fn is_empty(&self) -> bool {
+    /// Checks if there are no differences between the transaction outputs.
+    pub fn is_empty(&self) -> bool {
         self.diffs.is_empty()
     }
 
-    pub(crate) fn println(&self) {
+    /// Prints the differences in a formatted, colored output.
+    pub fn println(&self) {
         if self.is_empty() {
             return;
         }
@@ -141,6 +143,7 @@ impl TransactionDiff {
 
 /// Builds [TransactionDiff]s for transaction outputs. The builder can be configured to ignore the
 /// differences in outputs sometimes.
+#[derive(Debug, Clone)]
 pub struct TransactionDiffBuilder {
     /// If true, differences related to the gas usage are ignored. These include:
     ///   - total gas used is not compared,
@@ -152,12 +155,43 @@ pub struct TransactionDiffBuilder {
     still_compare_gas_used: bool,
 }
 
+impl Default for TransactionDiffBuilder {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl TransactionDiffBuilder {
-    pub fn new(allow_different_gas_usage: bool, still_compare_gas_used: bool) -> Self {
+    /// Creates a new TransactionDiffBuilder with default settings.
+    ///
+    /// By default:
+    /// - Gas differences are compared
+    /// - All outputs are compared
+    pub fn new() -> Self {
         Self {
-            allow_different_gas_usage,
-            still_compare_gas_used,
+            allow_different_gas_usage: false,
+            still_compare_gas_used: true,
         }
+    }
+
+    /// Creates a builder that allows different gas usage (ignores gas-related differences).
+    pub fn with_gas_tolerance() -> Self {
+        Self {
+            allow_different_gas_usage: true,
+            still_compare_gas_used: false,
+        }
+    }
+
+    /// Sets whether to allow different gas usage.
+    pub fn allow_different_gas_usage(mut self, allow: bool) -> Self {
+        self.allow_different_gas_usage = allow;
+        self
+    }
+
+    /// Sets whether to still compare gas even when different gas usage is allowed.
+    pub fn still_compare_gas_used(mut self, compare: bool) -> Self {
+        self.still_compare_gas_used = compare;
+        self
     }
 
     /// Given a pair of transaction outputs, computes its [TransactionDiff] that includes the gas
@@ -361,7 +395,7 @@ mod tests {
             TransactionAuxiliaryData::None,
         );
 
-        let diff = TransactionDiffBuilder::new(false, true).build_from_outputs(
+        let diff = TransactionDiffBuilder::new().build_from_outputs(
             output_1.clone(),
             output_2.clone(),
             None,
@@ -369,8 +403,8 @@ mod tests {
         assert_eq!(diff.diffs.len(), 1);
         assert!(diff.diffs[0].clone() == Diff::GasUsed { left: 1, right: 2 });
 
-        let diff =
-            TransactionDiffBuilder::new(true, false).build_from_outputs(output_1, output_2, None);
+        let diff = TransactionDiffBuilder::with_gas_tolerance()
+            .build_from_outputs(output_1, output_2, None);
         assert!(diff.diffs.is_empty());
     }
 
@@ -391,11 +425,9 @@ mod tests {
             TransactionAuxiliaryData::None,
         );
 
-        let diff = TransactionDiffBuilder::new(false, false).build_from_outputs(
-            output_1.clone(),
-            output_2.clone(),
-            None,
-        );
+        let diff = TransactionDiffBuilder::new()
+            .still_compare_gas_used(false)
+            .build_from_outputs(output_1.clone(), output_2.clone(), None);
         assert_eq!(diff.diffs.len(), 1);
         assert!(
             diff.diffs[0].clone()
@@ -447,7 +479,7 @@ mod tests {
             },
         ];
 
-        let diffs = TransactionDiffBuilder::new(false, true).diff_events(events_1, events_2);
+        let diffs = TransactionDiffBuilder::new().diff_events(events_1, events_2);
         assert_eq!(diffs.len(), 3);
         assert!(diffs.iter().all(|diff| expected_diffs.contains(diff)));
     }
@@ -461,10 +493,10 @@ mod tests {
         let events_2 = vec![ContractEvent::new_v2(fee_statement_tag, vec![0, 1, 3]).unwrap()];
 
         let diffs =
-            TransactionDiffBuilder::new(true, false).diff_events(events_1.clone(), events_2);
+            TransactionDiffBuilder::with_gas_tolerance().diff_events(events_1.clone(), events_2);
         assert!(diffs.is_empty());
 
-        let diffs = TransactionDiffBuilder::new(true, false).diff_events(events_1, vec![]);
+        let diffs = TransactionDiffBuilder::with_gas_tolerance().diff_events(events_1, vec![]);
         assert_eq!(diffs.len(), 1);
     }
 
@@ -566,11 +598,7 @@ mod tests {
             },
         ];
 
-        let diffs = TransactionDiffBuilder::new(false, true).diff_write_sets(
-            write_set_1,
-            write_set_2,
-            None,
-        );
+        let diffs = TransactionDiffBuilder::new().diff_write_sets(write_set_1, write_set_2, None);
         assert_eq!(diffs.len(), 5);
         assert!(diffs.iter().all(|diff| expected_diffs.contains(diff)));
     }

@@ -3,14 +3,13 @@
 
 use aptos_logger::{Level, Logger};
 use aptos_move_debugger::aptos_debugger::AptosDebugger;
+use aptos_move_testing_utils::create_debugger;
 use aptos_push_metrics::MetricsPusher;
-use aptos_rest_client::{AptosBaseUrl, Client};
 pub use benchmark::BenchmarkCommand;
 use clap::Parser;
 pub use diff::DiffCommand;
 pub use download::DownloadCommand;
 pub use initialize::InitializeCommand;
-use url::Url;
 
 mod benchmark;
 mod diff;
@@ -29,13 +28,7 @@ pub(crate) fn build_debugger(
     rest_endpoint: String,
     api_key: Option<String>,
 ) -> anyhow::Result<AptosDebugger> {
-    let builder = Client::builder(AptosBaseUrl::Custom(Url::parse(&rest_endpoint)?));
-    let client = if let Some(api_key) = api_key {
-        builder.api_key(&api_key)?.build()
-    } else {
-        builder.build()
-    };
-    AptosDebugger::rest_client(client)
+    create_debugger(&rest_endpoint, api_key)
 }
 
 #[derive(Parser)]

@@ -4,6 +4,9 @@
 use aptos_framework::{
     natives::code::PackageMetadata, unzip_metadata_str, BuiltPackage, APTOS_PACKAGES,
 };
+use aptos_move_testing_utils::{
+    check_aptos_packages_availability, get_aptos_dir, is_aptos_package,
+};
 use aptos_transaction_simulation::InMemoryStateStore;
 use aptos_types::{
     account_address::AccountAddress,
@@ -19,9 +22,7 @@ use std::{
     fs::{File, OpenOptions},
     io::{BufRead, BufReader, BufWriter, Read, Write},
     path::{Path, PathBuf},
-    process::Command,
 };
-use tempfile::TempDir;
 
 mod data_collection;
 mod data_state_view;
@@ -41,16 +42,6 @@ use move_package::{
     },
 };
 pub use online_execution::*;
-
-const APTOS_PACKAGES_DIR_NAMES: [&str; 7] = [
-    "aptos-framework",
-    "move-stdlib",
-    "aptos-stdlib",
-    "aptos-token",
-    "aptos-token-objects",
-    "aptos-trading",
-    "aptos-experimental",
-];
 
 const STATE_DATA: &str = "state_data";
 const WRITE_SET_DATA: &str = "write_set_data";
@@ -275,97 +266,6 @@ impl DataManager {
         InMemoryStateStore::new_with_state_values(
             bcs::from_bytes::<BTreeMap<StateKey, StateValue>>(&buffer).unwrap(),
         )
-    }
-}
-
-fn is_aptos_package(package_name: &str) -> bool {
-    APTOS_PACKAGES.contains(&package_name)
-}
-
-fn get_aptos_dir(package_name: &str) -> Option<&str> {
-    if is_aptos_package(package_name) {
-        for i in 0..APTOS_PACKAGES.len() {
-            if APTOS_PACKAGES[i] == package_name {
-                return Some(APTOS_PACKAGES_DIR_NAMES[i]);
-            }
-        }
-    }
-    None
-}
-
-async fn download_aptos_packages(path: &Path, branch_opt: Option<String>) -> anyhow::Result<()> {
-    let git_url = "https://github.com/aptos-labs/aptos-core";
-    let tmp_dir = TempDir::new()?;
-    let branch = branch_opt.unwrap_or("main".to_string());
-    Command::new("git")
-        .args([
-            "clone",
-            "--branch",
-            &branch,
-            git_url,
-            tmp_dir.path().to_str().unwrap(),
-            "--depth",
-            "1",
-        ])
-        .output()
-        .map_err(|_| anyhow::anyhow!("Failed to clone Git repository"))?;
-    let source_framework_path = PathBuf::from(tmp_dir.path()).join("aptos-move/framework");
-    for package_name in APTOS_PACKAGES {
-        let source_framework_path =
-            source_framework_path.join(get_aptos_dir(package_name).unwrap());
-        let target_framework_path = PathBuf::from(path).join(get_aptos_dir(package_name).unwrap());
-        Command::new("cp")
-            .arg("-r")
-            .arg(source_framework_path)
-            .arg(target_framework_path)
-            .output()
-            .map_err(|_| anyhow::anyhow!("Failed to copy"))?;
-    }
-
-    Ok(())
-}
-
-fn check_aptos_packages_availability(path: PathBuf) -> bool {
-    if !path.exists() {
-        return false;
-    }
-    for package in APTOS_PACKAGES {
-        if !path.join(get_aptos_dir(package).unwrap()).exists() {
-            return false;
-        }
-    }
-    true
-}
-
-pub async fn prepare_aptos_packages(
-    path: PathBuf,
-    branch_opt: Option<String>,
-    force_override_framework: bool,
-) {
-    let mut download_flag = true;
-    if path.exists() {
-        if force_override_framework {
-            std::fs::remove_dir_all(path.clone()).unwrap();
-        } else {
-            let mut need_download = false;
-            for package_name in APTOS_PACKAGES {
-                let target_framework_path = path.clone().join(get_aptos_dir(package_name).unwrap());
-                if !target_framework_path.exists() {
-                    need_download = true;
-                    break;
-                }
-            }
-            if need_download {
-                std::fs::remove_dir_all(path.clone()).unwrap();
-            } else {
-                download_flag = false;
-            }
-        }
-    }
-    if download_flag {
-        println!("Downloading aptos packages...");
-        std::fs::create_dir_all(path.clone()).unwrap();
-        download_aptos_packages(&path, branch_opt).await.unwrap();
     }
 }
 

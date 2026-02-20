@@ -1,15 +1,12 @@
 // Copyright (c) Aptos Foundation
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
-use crate::{
-    commands::{build_debugger, RestAPI},
-    workload::TransactionBlock,
-};
-use anyhow::{anyhow, bail};
+use crate::commands::{build_debugger, RestAPI};
+use anyhow::bail;
+use aptos_move_testing_utils::{save_blocks_to_file, TransactionBlock};
 use aptos_types::transaction::{Transaction, Version};
 use clap::Parser;
 use std::path::PathBuf;
-use tokio::fs;
 
 #[derive(Parser)]
 #[command(about = "Downloads transactions and saves them locally")]
@@ -77,9 +74,7 @@ impl DownloadCommand {
             self.end_version,
         );
 
-        let bytes = bcs::to_bytes(&txn_blocks)
-            .map_err(|err| anyhow!("Error when serializing blocks of transactions: {:?}", err))?;
-        fs::write(PathBuf::from(&self.transactions_file), &bytes).await?;
+        save_blocks_to_file(&txn_blocks, &PathBuf::from(&self.transactions_file)).await?;
         Ok(())
     }
 }

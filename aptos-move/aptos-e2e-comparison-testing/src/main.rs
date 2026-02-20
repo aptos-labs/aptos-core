@@ -3,16 +3,14 @@
 
 use anyhow::Result;
 use aptos_comparison_testing::{
-    prepare_aptos_packages, DataCollection, Execution, ExecutionMode, OnlineExecutor,
-    APTOS_COMMONS, DISABLE_SPEC_CHECK,
+    DataCollection, Execution, ExecutionMode, OnlineExecutor, APTOS_COMMONS, DISABLE_SPEC_CHECK,
 };
-use aptos_rest_client::Client;
+use aptos_move_testing_utils::{create_rest_client, prepare_aptos_packages};
 use aptos_types::on_chain_config::FeatureFlag;
 use clap::{Parser, Subcommand};
 use itertools::Itertools;
 use move_core_types::account_address::AccountAddress;
 use std::{collections::BTreeSet, path::PathBuf};
-use url::Url;
 
 const BATCH_SIZE: u64 = 500;
 
@@ -181,7 +179,7 @@ async fn main() -> Result<()> {
                 .await;
             }
             let data_collector = DataCollection::new_with_rest_client(
-                Client::new(Url::parse(&endpoint)?),
+                create_rest_client(&endpoint, None)?,
                 output.clone(),
                 batch_size,
                 skip_failed_txns,
@@ -222,7 +220,7 @@ async fn main() -> Result<()> {
             )
             .await;
             let online = OnlineExecutor::new_with_rest_client(
-                Client::new(Url::parse(&endpoint)?),
+                create_rest_client(&endpoint, None)?,
                 output.clone(),
                 batch_size,
                 skip_failed_txns,

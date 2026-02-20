@@ -5,10 +5,10 @@ use crate::{
     commands::{build_debugger, init_logger_and_metrics, RestAPI},
     generator::InputOutputDiffGenerator,
     overrides::OverrideConfig,
-    workload::TransactionBlock,
 };
 use anyhow::anyhow;
 use aptos_logger::Level;
+use aptos_move_testing_utils::load_blocks_from_file;
 use aptos_types::on_chain_config::FeatureFlag;
 use clap::Parser;
 use std::path::PathBuf;
@@ -68,13 +68,7 @@ impl InitializeCommand {
     pub async fn initialize_inputs(self) -> anyhow::Result<()> {
         init_logger_and_metrics(self.log_level);
 
-        let bytes = fs::read(PathBuf::from(&self.transactions_file)).await?;
-        let txn_blocks: Vec<TransactionBlock> = bcs::from_bytes(&bytes).map_err(|err| {
-            anyhow!(
-                "Error when deserializing a block of transactions: {:?}",
-                err
-            )
-        })?;
+        let txn_blocks = load_blocks_from_file(&PathBuf::from(&self.transactions_file)).await?;
 
         // TODO:
         //   1. Override gas schedule, to track the costs of charging gas or tracking limits.

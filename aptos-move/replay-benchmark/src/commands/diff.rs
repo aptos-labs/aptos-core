@@ -2,14 +2,12 @@
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 use crate::{
-    commands::init_logger_and_metrics,
-    diff::TransactionDiffBuilder,
-    execution::execute_workload,
-    state_view::ReadSet,
-    workload::{TransactionBlock, Workload},
+    commands::init_logger_and_metrics, execution::execute_workload, state_view::ReadSet,
+    workload::Workload,
 };
 use anyhow::{anyhow, bail};
 use aptos_logger::Level;
+use aptos_move_testing_utils::{load_blocks_from_file, TransactionDiffBuilder};
 use aptos_types::transaction::TransactionOutput;
 use aptos_vm::{aptos_vm::AptosVMBlockExecutor, VMBlockExecutor};
 use clap::Parser;
@@ -50,9 +48,7 @@ impl DiffCommand {
     pub async fn diff_outputs(self) -> anyhow::Result<()> {
         init_logger_and_metrics(self.log_level);
 
-        let txn_blocks_bytes = fs::read(PathBuf::from(&self.transactions_file)).await?;
-        let txn_blocks: Vec<TransactionBlock> = bcs::from_bytes(&txn_blocks_bytes)
-            .map_err(|err| anyhow!("Error when deserializing blocks of transactions: {:?}", err))?;
+        let txn_blocks = load_blocks_from_file(&PathBuf::from(&self.transactions_file)).await?;
         if txn_blocks.is_empty() {
             bail!("There must be at least one transaction to execute");
         }
@@ -109,7 +105,9 @@ impl DiffCommand {
             .begin_version()
             .expect("Begin version must be set");
 
-        let diff_builder = TransactionDiffBuilder::new(self.allow_different_gas_usage, false);
+        let diff_builder = TransactionDiffBuilder::new()
+            .allow_different_gas_usage(self.allow_different_gas_usage)
+            .still_compare_gas_used(false);
         let mut diffs = Vec::with_capacity(outputs.len());
 
         println!(

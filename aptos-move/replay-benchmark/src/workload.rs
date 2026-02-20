@@ -2,16 +2,16 @@
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 use aptos_block_executor::txn_provider::default::DefaultTxnProvider;
+use aptos_move_testing_utils::TransactionBlock;
 use aptos_types::{
     block_executor::transaction_slice_metadata::TransactionSliceMetadata,
     transaction::{
         signature_verified_transaction::{
             into_signature_verified_block, SignatureVerifiedTransaction,
         },
-        AuxiliaryInfo, Transaction, Version,
+        AuxiliaryInfo, Version,
     },
 };
-use serde::{Deserialize, Serialize};
 
 /// A workload to benchmark. Contains signature verified transactions, and metadata specifying the
 /// start and end versions of these transactions.
@@ -21,15 +21,6 @@ pub(crate) struct Workload {
     /// Stores metadata for the version range of a block, corresponding to [begin, end) versions.
     /// It is always set to [TransactionSliceMetadata::Chunk].
     pub(crate) transaction_slice_metadata: TransactionSliceMetadata,
-}
-
-/// On-disk representation of a workload, saved to the local filesystem.
-#[derive(Serialize, Deserialize)]
-pub(crate) struct TransactionBlock {
-    /// The version of the first transaction in the block.
-    pub(crate) begin_version: Version,
-    /// Non-empty list of transactions in a block.
-    pub(crate) transactions: Vec<Transaction>,
 }
 
 impl From<TransactionBlock> for Workload {

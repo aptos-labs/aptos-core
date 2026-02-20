@@ -7,9 +7,11 @@ use crate::{
     DataManager, IndexReader, PackageInfo, TxnIndex, APTOS_COMMONS,
 };
 use anyhow::Result;
-use aptos_framework::APTOS_PACKAGES;
 use aptos_language_e2e_tests::executor::FakeExecutor;
-use aptos_replay_benchmark::diff::{Diff, TransactionDiffBuilder};
+use aptos_move_testing_utils::{
+    populate_state_with_aptos_packages, populate_state_with_packages, Diff, StateStorePackageInfo,
+    TransactionDiffBuilder,
+};
 use aptos_transaction_simulation::{InMemoryStateStore, SimulationStateStore};
 use aptos_types::{
     access_path::Path,
@@ -22,10 +24,7 @@ use aptos_types::{
 use aptos_validator_interface::AptosValidatorInterface;
 use clap::ValueEnum;
 use move_binary_format::file_format_common::VERSION_DEFAULT;
-use move_core_types::{
-    account_address::AccountAddress,
-    language_storage::{ModuleId, StructTag},
-};
+use move_core_types::language_storage::{ModuleId, StructTag};
 use std::{
     collections::{BTreeMap, HashMap},
     path::PathBuf,
@@ -37,29 +36,52 @@ fn add_packages_to_state_store(
     package_info: &PackageInfo,
     compiled_package_cache: &HashMap<PackageInfo, HashMap<ModuleId, Vec<u8>>>,
 ) {
-    if !compiled_package_cache.contains_key(package_info) {
-        return;
-    }
-    let compiled_package = compiled_package_cache.get(package_info).unwrap();
-    for (module_id, module_blob) in compiled_package {
-        state_store
-            .add_module_blob(module_id, module_blob.clone())
-            .expect("failed to add module blob, this should not happen");
-    }
+    // Convert HashMap keys from local PackageInfo to StateStorePackageInfo
+    let converted_cache: HashMap<StateStorePackageInfo, HashMap<ModuleId, Vec<u8>>> =
+        compiled_package_cache
+            .iter()
+            .map(|(k, v)| {
+                (
+                    StateStorePackageInfo {
+                        address: k.address,
+                        package_name: k.package_name.clone(),
+                        upgrade_number: k.upgrade_number,
+                    },
+                    v.clone(),
+                )
+            })
+            .collect();
+
+    let converted_info = StateStorePackageInfo {
+        address: package_info.address,
+        package_name: package_info.package_name.clone(),
+        upgrade_number: package_info.upgrade_number,
+    };
+
+    populate_state_with_packages(state_store, &converted_info, &converted_cache);
 }
 
 pub(crate) fn add_aptos_packages_to_state_store(
     state_store: &impl SimulationStateStore,
     compiled_package_map: &HashMap<PackageInfo, HashMap<ModuleId, Vec<u8>>>,
 ) {
-    for package in APTOS_PACKAGES {
-        let package_info = PackageInfo {
-            address: AccountAddress::ONE,
-            package_name: package.to_string(),
-            upgrade_number: None,
-        };
-        add_packages_to_state_store(state_store, &package_info, compiled_package_map);
-    }
+    // Convert HashMap keys from local PackageInfo to StateStorePackageInfo
+    let converted_cache: HashMap<StateStorePackageInfo, HashMap<ModuleId, Vec<u8>>> =
+        compiled_package_map
+            .iter()
+            .map(|(k, v)| {
+                (
+                    StateStorePackageInfo {
+                        address: k.address,
+                        package_name: k.package_name.clone(),
+                        upgrade_number: k.upgrade_number,
+                    },
+                    v.clone(),
+                )
+            })
+            .collect();
+
+    populate_state_with_aptos_packages(state_store, &converted_cache);
 }
 
 #[derive(ValueEnum, Clone, Copy, Debug, Default, Eq, PartialEq, PartialOrd)]
@@ -538,7 +560,9 @@ impl Execution {
                 ));
             },
             (Ok(res_1), Ok(res_2)) => {
-                let transaction_diff_builder = TransactionDiffBuilder::new(true, true);
+                let transaction_diff_builder = TransactionDiffBuilder::new()
+                    .allow_different_gas_usage(true)
+                    .still_compare_gas_used(true);
                 let transaction_diff =
                     transaction_diff_builder.build_from_outputs(res_1.clone(), res_2.clone(), None);
                 for diff in transaction_diff.diffs {
