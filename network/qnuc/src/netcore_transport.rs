@@ -1,5 +1,5 @@
 // Copyright (c) Aptos Foundation
-// SPDX-License-Identifier: Apache-2.0
+// Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 //! Implementation of the `aptos_netcore::transport::Transport` trait for QNUC,
 //! allowing QNUC to be used as a drop-in replacement for TCP in the

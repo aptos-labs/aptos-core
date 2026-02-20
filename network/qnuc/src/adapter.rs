@@ -1,5 +1,5 @@
 // Copyright (c) Aptos Foundation
-// SPDX-License-Identifier: Apache-2.0
+// Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 //! Adapter providing `futures::io::AsyncRead + AsyncWrite` over a QNUC connection
 //! on a single default stream (stream_id 0). This allows QNUC connections to be
