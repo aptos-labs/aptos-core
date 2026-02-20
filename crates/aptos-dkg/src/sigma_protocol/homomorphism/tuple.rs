@@ -7,12 +7,12 @@ use crate::{
         homomorphism,
         homomorphism::{fixed_base_msms, EntrywiseMap},
         traits::verifier_challenges_with_length,
-        Proof, Trait as _,
+        Proof,
     },
 };
 use anyhow::ensure;
 use aptos_crypto::arkworks::msm::MsmInput;
-use ark_ec::{pairing::Pairing, CurveGroup};
+use ark_ec::{CurveGroup, PrimeGroup};
 use ark_ff::{PrimeField, Zero};
 use ark_serialize::{
     CanonicalDeserialize, CanonicalSerialize, Compress, Read, SerializationError, Valid,
@@ -59,20 +59,6 @@ where
     pub _group: std::marker::PhantomData<C>,
 }
 
-// We need to add `E: Pairing` because of the sigma protocol implementation below, Rust wouldn't allow that otherwise
-// TODO: do we need this? is this better than TupleHomomorphism?
-#[derive(CanonicalSerialize, Debug, Clone, PartialEq, Eq)]
-pub struct PairingTupleHomomorphism<E, H1, H2>
-where
-    E: Pairing,
-    H1: homomorphism::Trait,
-    H2: homomorphism::Trait<Domain = H1::Domain>,
-{
-    pub hom1: H1,
-    pub hom2: H2,
-    pub _pairing: std::marker::PhantomData<E>,
-}
-
 /// Shared logic for tuple homomorphisms: apply both components and normalize.
 fn tuple_apply<H1, H2>(
     hom1: &H1,
@@ -109,14 +95,6 @@ where
     )
 }
 
-fn powers_of_beta<F: PrimeField, R: RngCore>(n: usize, rng: &mut R) -> Vec<F> {
-    if n > 1 {
-        aptos_crypto::utils::powers(aptos_crypto::arkworks::random::sample_field_element(rng), n)
-    } else {
-        vec![F::ONE]
-    }
-}
-
 /// Implements `Homomorphism` for `TupleHomomorphism` by applying both
 /// component homomorphisms to the same input and returning their results
 /// as a tuple.
@@ -146,27 +124,6 @@ where
 impl<C, H1, H2> homomorphism::Trait for CurveGroupTupleHomomorphism<C, H1, H2>
 where
     C: CurveGroup,
-    H1: homomorphism::Trait,
-    H2: homomorphism::Trait<Domain = H1::Domain>,
-    H1::Codomain: CanonicalSerialize + CanonicalDeserialize,
-    H2::Codomain: CanonicalSerialize + CanonicalDeserialize,
-{
-    type Codomain = TupleCodomainShape<H1::Codomain, H2::Codomain>;
-    type CodomainNormalized = TupleCodomainShape<H1::CodomainNormalized, H2::CodomainNormalized>;
-    type Domain = H1::Domain;
-
-    fn apply(&self, x: &Self::Domain) -> Self::Codomain {
-        tuple_apply(&self.hom1, &self.hom2, x)
-    }
-
-    fn normalize(&self, value: Self::Codomain) -> Self::CodomainNormalized {
-        tuple_normalize(&self.hom1, &self.hom2, value)
-    }
-}
-
-impl<E, H1, H2> homomorphism::Trait for PairingTupleHomomorphism<E, H1, H2>
-where
-    E: Pairing,
     H1: homomorphism::Trait,
     H2: homomorphism::Trait<Domain = H1::Domain>,
     H1::Codomain: CanonicalSerialize + CanonicalDeserialize,
@@ -372,62 +329,21 @@ where
     }
 }
 
-impl<E: Pairing, H1, H2> sigma_protocol::Trait for PairingTupleHomomorphism<E, H1, H2>
+/// Extension methods for `TupleHomomorphism` when both components implement `CurveGroupTrait`
+/// with the same scalar field (e.g. G1 and G2 of a pairing).
+impl<H1, H2, F> TupleHomomorphism<H1, H2>
 where
-    H1: sigma_protocol::CurveGroupTrait<Group = E::G1>,
-    H2: sigma_protocol::CurveGroupTrait<Group = E::G2>,
-    H2: fixed_base_msms::Trait<Domain = H1::Domain>,
-{
-    type Scalar = E::ScalarField;
-
-    fn dst(&self) -> Vec<u8> {
-        homomorphism::domain_separate_dsts(
-            b"PairingTupleHomomorphism(",
-            &[self.hom1.dst(), self.hom2.dst()],
-            b")",
-        )
-    }
-
-    #[allow(non_snake_case)]
-    fn verify_with_challenge<R: RngCore + CryptoRng>(
-        &self,
-        public_statement: &Self::CodomainNormalized,
-        prover_commitment: &Self::CodomainNormalized,
-        challenge: Self::Scalar,
-        response: &Self::Domain,
-        _verifier_batch_size: Option<usize>,
-        rng: &mut R,
-    ) -> anyhow::Result<()> {
-        let (len1, len2) = tuple_statement_lengths(public_statement);
-        let powers_of_beta = powers_of_beta::<E::ScalarField, _>(len1 + len2, rng);
-        let (first_input, second_input) = self.merge_msm_terms_for_verify(
-            response,
-            prover_commitment,
-            public_statement,
-            challenge,
-            &powers_of_beta,
-            len1,
-        );
-        ensure!(H1::msm_eval(first_input) == H1::MsmOutput::zero());
-        ensure!(H2::msm_eval(second_input) == H2::MsmOutput::zero());
-        Ok(())
-    }
-}
-
-/// We need `E: Pairing` here because the sigma protocol needs to know which curves `H1` and `H2` are working over
-impl<E: Pairing, H1, H2> PairingTupleHomomorphism<E, H1, H2>
-where
-    H1: sigma_protocol::CurveGroupTrait<Group = E::G1>,
-    H2: sigma_protocol::CurveGroupTrait<Group = E::G2>,
-    H2: fixed_base_msms::Trait<Domain = H1::Domain>,
+    F: PrimeField,
+    H1: sigma_protocol::CurveGroupTrait<Group: PrimeGroup<ScalarField = F>>,
+    H2: sigma_protocol::CurveGroupTrait<Domain = H1::Domain, Group: PrimeGroup<ScalarField = F>>,
 {
     /// Returns the MSM terms for each homomorphism, combined into a tuple.
     fn msm_terms(
         &self,
         input: &H1::Domain,
     ) -> (
-        H1::CodomainShape<MsmInput<H1::Base, H1::Scalar>>,
-        H2::CodomainShape<MsmInput<H2::Base, H2::Scalar>>,
+        H1::CodomainShape<MsmInput<H1::Base, F>>,
+        H2::CodomainShape<MsmInput<H2::Base, F>>,
     ) {
         let terms1 = self.hom1.msm_terms(input);
         let terms2 = self.hom2.msm_terms(input);
@@ -440,13 +356,10 @@ where
         response: &H1::Domain,
         prover_commitment: &TupleCodomainShape<H1::CodomainNormalized, H2::CodomainNormalized>,
         public_statement: &TupleCodomainShape<H1::CodomainNormalized, H2::CodomainNormalized>,
-        challenge: E::ScalarField,
-        powers_of_beta: &[E::ScalarField],
+        challenge: F,
+        powers_of_beta: &[F],
         len1: usize,
-    ) -> (
-        MsmInput<H1::Base, H1::Scalar>,
-        MsmInput<H2::Base, H2::Scalar>,
-    ) {
+    ) -> (MsmInput<H1::Base, F>, MsmInput<H2::Base, F>) {
         let (first_powers, second_powers) = powers_of_beta.split_at(len1);
         let (first_terms, second_terms) = self.msm_terms(response);
         let first_input = H1::merge_msm_terms(
@@ -467,20 +380,14 @@ where
     }
 
     // TODO: maybe remove, see comment below
-    pub fn check_first_msm_eval(
-        &self,
-        input: MsmInput<H1::Base, H1::Scalar>,
-    ) -> anyhow::Result<()> {
+    pub fn check_first_msm_eval(&self, input: MsmInput<H1::Base, F>) -> anyhow::Result<()> {
         let result = H1::msm_eval(input);
         ensure!(result == H1::MsmOutput::zero());
         Ok(())
     }
 
     // TODO: Doesn't get used atm... so we're implicitly mixing different MSM code :-/
-    pub fn check_second_msm_eval(
-        &self,
-        input: MsmInput<H2::Base, H2::Scalar>,
-    ) -> anyhow::Result<()> {
+    pub fn check_second_msm_eval(&self, input: MsmInput<H2::Base, F>) -> anyhow::Result<()> {
         let result = H2::msm_eval(input);
         ensure!(result == H2::MsmOutput::zero());
         Ok(())
@@ -490,14 +397,11 @@ where
     pub fn msm_terms_for_verify<Ct: Serialize, H, R: RngCore + CryptoRng>(
         &self,
         public_statement: &<Self as homomorphism::Trait>::CodomainNormalized,
-        proof: &Proof<H1::Scalar, H>,
+        proof: &Proof<F, H>,
         cntxt: &Ct,
         number_of_beta_powers: Option<(usize, usize)>, // (len1, len2); None => compute from statement (clones)
         rng: &mut R,
-    ) -> (
-        MsmInput<H1::Base, H1::Scalar>,
-        MsmInput<H2::Base, H2::Scalar>,
-    )
+    ) -> (MsmInput<H1::Base, F>, MsmInput<H2::Base, F>)
     where
         H: homomorphism::Trait<
             Domain = <Self as homomorphism::Trait>::Domain,
@@ -509,12 +413,12 @@ where
             .expect("Missing implementation - expected commitment, not challenge");
         let (len1, len2) =
             number_of_beta_powers.unwrap_or_else(|| tuple_statement_lengths(public_statement));
-        let (c, powers_of_beta) = verifier_challenges_with_length::<_, H1::Scalar, _, _>(
+        let (c, powers_of_beta) = verifier_challenges_with_length::<_, F, _, _>(
             cntxt,
             self,
             public_statement,
             prover_first_message,
-            &self.dst(),
+            &sigma_protocol::Trait::dst(self),
             len1 + len2,
             rng,
         );

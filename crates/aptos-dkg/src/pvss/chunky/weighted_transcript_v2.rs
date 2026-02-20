@@ -27,10 +27,7 @@ use crate::{
     range_proofs::{dekart_univariate_v2, traits::BatchedRangeProof},
     sigma_protocol::{
         self,
-        homomorphism::{
-            tuple::{PairingTupleHomomorphism, TupleCodomainShape},
-            Trait as _, TrivialShape,
-        },
+        homomorphism::{tuple::TupleCodomainShape, Trait as _, TrivialShape},
         Trait as _,
     },
     Scalar,
@@ -413,8 +410,7 @@ impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>> Transcr
         //   (2b) Compute its image (the public statement), so the range proof commitment and chunked_elgamal encryptions
         let statement = hom.apply(&witness); // hmm slightly inefficient that we're unchunking here, so might be better to set up a "small" hom just for this part
                                              //   (2c) Produce the SoK
-        let (SoK, normalized_statement) =
-            PairingTupleHomomorphism::prove(&hom, &witness, statement, &sok_cntxt, rng);
+        let (SoK, normalized_statement) = hom.prove(&witness, statement, &sok_cntxt, rng);
         let SoK = SoK.change_lifetime(); // Make sure the lifetime of the proof is not coupled to `hom` which has references
 
         // Destructure the "public statement" of the above sigma protocol

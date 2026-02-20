@@ -9,7 +9,7 @@ use crate::{
     sigma_protocol,
     sigma_protocol::{
         homomorphism::{
-            tuple::{PairingTupleHomomorphism, TupleCodomainShape},
+            tuple::{TupleCodomainShape, TupleHomomorphism},
             LiftHomomorphism,
         },
         FirstProofItem,
@@ -26,8 +26,7 @@ type LiftedCommitHomomorphism<'a, C> = LiftHomomorphism<
     HkzgWeightedElgamalWitness<<<C as CurveGroup>::Affine as AffineRepr>::ScalarField>,
 >;
 
-pub type Homomorphism<'a, E> = PairingTupleHomomorphism<
-    E,
+pub type Homomorphism<'a, E> = TupleHomomorphism<
     HkzgElgamalHomomorphism<'a, E>,
     LiftedCommitHomomorphism<'a, <E as Pairing>::G2>,
 >;
@@ -98,7 +97,6 @@ impl<'a, E: Pairing> Homomorphism<'a, E> {
         Self {
             hom1: hkzg_el_hom,
             hom2: lifted_commit_hom,
-            _pairing: std::marker::PhantomData,
         }
     }
 }

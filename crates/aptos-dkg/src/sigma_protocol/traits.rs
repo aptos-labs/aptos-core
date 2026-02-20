@@ -457,7 +457,7 @@ where
 }
 
 // We're keeping this separate because it only needs the homomorphism property rather than being a bunch of "fixed-base MSMS",
-// and moreover in this way it gets reused in the PairingTupleHomomorphism code which has a custom sigma protocol implementation
+// and moreover in this way it gets reused in the TupleHomomorphism (curve-group) code
 #[allow(non_snake_case)]
 pub fn prove_homomorphism<Ct: Serialize, F: PrimeField, H: homomorphism::Trait, R>(
     homomorphism: &H,

@@ -12,7 +12,7 @@ use aptos_dkg::{
         homomorphism::{
             fixed_base_msms,
             fixed_base_msms::Trait as _,
-            tuple::{CurveGroupTupleHomomorphism, PairingTupleHomomorphism},
+            tuple::{CurveGroupTupleHomomorphism, TupleHomomorphism},
             Trait as _,
         },
         Trait as _,
@@ -22,7 +22,7 @@ use aptos_dkg::{
 use ark_bls12_381::Bls12_381;
 use ark_bn254::Bn254;
 use ark_ec::{pairing::Pairing, CurveGroup, PrimeGroup};
-use ark_ff::{Fp, FpConfig};
+use ark_ff::{fields::models::fp::MontBackend, Fp, FpConfig};
 use ark_serialize::{CanonicalDeserialize, CanonicalSerialize};
 use rand::thread_rng;
 use std::fmt::Debug;
@@ -182,7 +182,7 @@ mod chaum_pedersen {
     }
 
     pub type InhomogChaumPedersen<E> =
-        PairingTupleHomomorphism<E, Schnorr<<E as Pairing>::G1>, Schnorr<<E as Pairing>::G2>>;
+        TupleHomomorphism<Schnorr<<E as Pairing>::G1>, Schnorr<<E as Pairing>::G2>>;
 
     #[allow(non_snake_case)]
     pub fn make_inhomogeneous_chaum_pedersen_instance<
@@ -196,10 +196,9 @@ mod chaum_pedersen {
         let schnorr1 = Schnorr { G: G_1 };
         let schnorr2 = Schnorr { G: G_2 };
 
-        PairingTupleHomomorphism {
+        TupleHomomorphism {
             hom1: schnorr1,
             hom2: schnorr2,
-            _pairing: std::marker::PhantomData,
         }
     }
 }
@@ -209,8 +208,7 @@ mod chunked_scalar_mul {
     use aptos_dkg::pvss::chunky::chunked_scalar_mul;
     use ark_ec::scalar_mul::BatchMulPreprocessing;
 
-    pub type InhomogChunkedScalarMul<'a, E> = PairingTupleHomomorphism<
-        E,
+    pub type InhomogChunkedScalarMul<'a, E> = TupleHomomorphism<
         chunked_scalar_mul::Homomorphism<'a, <E as Pairing>::G1>,
         chunked_scalar_mul::Homomorphism<'a, <E as Pairing>::G2>,
     >;
@@ -233,11 +231,7 @@ mod chunked_scalar_mul {
             ell: 16,
         };
 
-        PairingTupleHomomorphism {
-            hom1,
-            hom2,
-            _pairing: std::marker::PhantomData,
-        }
+        TupleHomomorphism { hom1, hom2 }
     }
 }
 
@@ -268,9 +262,13 @@ fn test_chaum_pedersen() {
         make_chaum_pedersen_instance(),
         witness_bn,
     );
-    test_imhomog_chaum_pedersen::<Bn254, _, _>(
-        make_inhomogeneous_chaum_pedersen_instance(),
-        witness_bn,
+    let hom_bn = make_inhomogeneous_chaum_pedersen_instance::<
+        Bn254,
+        4,
+        MontBackend<ark_bn254::FrConfig, 4>,
+    >();
+    test_imhomog_chaum_pedersen::<Bn254, 4, MontBackend<ark_bn254::FrConfig, 4>>(
+        hom_bn, witness_bn,
     );
 
     // ---- Bls12_381 ----
@@ -279,8 +277,13 @@ fn test_chaum_pedersen() {
         make_chaum_pedersen_instance(),
         witness_bls,
     );
-    test_imhomog_chaum_pedersen::<Bls12_381, _, _>(
-        make_inhomogeneous_chaum_pedersen_instance(),
+    let hom_bls = make_inhomogeneous_chaum_pedersen_instance::<
+        Bls12_381,
+        4,
+        MontBackend<ark_bls12_381::FrConfig, 4>,
+    >();
+    test_imhomog_chaum_pedersen::<Bls12_381, 4, MontBackend<ark_bls12_381::FrConfig, 4>>(
+        hom_bls,
         witness_bls,
     );
 }
