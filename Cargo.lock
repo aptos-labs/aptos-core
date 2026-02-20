@@ -3773,6 +3773,31 @@ dependencies = [
 ]
 
 [[package]]
+name = "aptos-quic-like-udp"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "aptos-config",
+ "aptos-crypto",
+ "aptos-infallible",
+ "aptos-logger",
+ "aptos-memsocket",
+ "aptos-metrics-core",
+ "aptos-netcore",
+ "aptos-network",
+ "aptos-types",
+ "bytes",
+ "criterion",
+ "futures",
+ "once_cell",
+ "parking_lot 0.12.1",
+ "rand 0.7.3",
+ "thiserror 1.0.69",
+ "tokio",
+ "tokio-util 0.7.10",
+]
+
+[[package]]
 name = "aptos-release-builder"
 version = "0.1.0"
 dependencies = [

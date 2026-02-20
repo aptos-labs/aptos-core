@@ -164,6 +164,7 @@ members = [
     "network/framework",
     "network/memsocket",
     "network/netcore",
+    "network/quic-like-udp",
     "peer-monitoring-service/client",
     "peer-monitoring-service/server",
     "peer-monitoring-service/types",
@@ -405,6 +406,7 @@ aptos-mvhashmap = { path = "aptos-move/mvhashmap" }
 aptos-native-interface = { path = "aptos-move/aptos-native-interface" }
 aptos-netcore = { path = "network/netcore" }
 aptos-network = { path = "network/framework" }
+aptos-quic-like-udp = { path = "network/quic-like-udp" }
 aptos-network-builder = { path = "network/builder" }
 aptos-network-checker = { path = "crates/aptos-network-checker" }
 aptos-network-discovery = { path = "network/discovery" }

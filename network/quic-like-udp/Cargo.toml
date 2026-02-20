@@ -1,0 +1,40 @@
+[package]
+name = "aptos-quic-like-udp"
+description = "QUIC-like reliable ordered UDP transport with Noise encryption for Aptos"
+version = "0.1.0"
+
+# Workspace inherited keys
+authors = { workspace = true }
+edition = { workspace = true }
+homepage = { workspace = true }
+license = { workspace = true }
+publish = { workspace = true }
+repository = { workspace = true }
+rust-version = { workspace = true }
+
+[dependencies]
+anyhow = { workspace = true }
+aptos-crypto = { workspace = true }
+aptos-infallible = { workspace = true }
+aptos-logger = { workspace = true }
+aptos-metrics-core = { workspace = true }
+aptos-types = { workspace = true }
+bytes = { workspace = true }
+futures = { workspace = true }
+once_cell = { workspace = true }
+parking_lot = { workspace = true }
+rand = { workspace = true }
+thiserror = { workspace = true }
+tokio = { workspace = true }
+
+[dev-dependencies]
+criterion = { workspace = true }
+aptos-config = { workspace = true, features = ["testing"] }
+aptos-memsocket = { workspace = true }
+aptos-netcore = { workspace = true }
+aptos-network = { workspace = true }
+tokio-util = { workspace = true }
+
+[[bench]]
+name = "transport_bench"
+harness = false
