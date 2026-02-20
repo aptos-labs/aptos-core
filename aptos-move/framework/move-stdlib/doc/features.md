@@ -637,7 +637,7 @@ We do not expect use from Move, so for now only for documentation purposes here
 
 <a id="0x1_features_ENCRYPTED_TRANSACTIONS"></a>
 
-Whether the monotonically increasing counter native function is enabled.
+Whether the encrypted mempool feature is enabled.
 
 
 <pre><code><b>const</b> <a href="features.md#0x1_features_ENCRYPTED_TRANSACTIONS">ENCRYPTED_TRANSACTIONS</a>: u64 = 108;
