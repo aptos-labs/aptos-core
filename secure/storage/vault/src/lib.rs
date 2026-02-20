@@ -169,6 +169,38 @@ impl Client {
             .timeout_connect(Duration::from_millis(connection_timeout_ms))
             .timeout(Duration::from_millis(response_timeout_ms));
 
+        builder = Self::configure_tls(builder, ca_certificate);
+
+        Self {
+            agent: builder.build(),
+            host,
+            token,
+        }
+    }
+
+    #[cfg(feature = "tls-native")]
+    fn configure_tls(
+        builder: ureq::AgentBuilder,
+        ca_certificate: Option<String>,
+    ) -> ureq::AgentBuilder {
+        let mut tls_builder = native_tls::TlsConnector::builder();
+        tls_builder.min_protocol_version(Some(native_tls::Protocol::Tlsv12));
+        if let Some(certificate) = ca_certificate {
+            let mut cert = native_tls::Certificate::from_pem(certificate.as_bytes());
+            if cert.is_err() {
+                cert = native_tls::Certificate::from_der(certificate.as_bytes());
+            }
+            tls_builder.add_root_certificate(cert.unwrap());
+        }
+        let connector = tls_builder.build().unwrap();
+        builder.tls_connector(Arc::new(connector))
+    }
+
+    #[cfg(all(feature = "tls-rustls", not(feature = "tls-native")))]
+    fn configure_tls(
+        builder: ureq::AgentBuilder,
+        ca_certificate: Option<String>,
+    ) -> ureq::AgentBuilder {
         if let Some(certificate) = ca_certificate {
             let certs = Self::parse_certificates(&certificate);
             if !certs.is_empty() {
@@ -180,17 +212,21 @@ impl Client {
                 let tls_config = rustls::ClientConfig::builder()
                     .with_root_certificates(root_store)
                     .with_no_client_auth();
-                builder = builder.tls_config(Arc::new(tls_config));
+                return builder.tls_config(Arc::new(tls_config));
             }
         }
-
-        Self {
-            agent: builder.build(),
-            host,
-            token,
-        }
+        builder
     }
 
+    #[cfg(not(any(feature = "tls-native", feature = "tls-rustls")))]
+    fn configure_tls(
+        builder: ureq::AgentBuilder,
+        _ca_certificate: Option<String>,
+    ) -> ureq::AgentBuilder {
+        builder
+    }
+
+    #[cfg(all(feature = "tls-rustls", not(feature = "tls-native")))]
     fn parse_certificates(pem_or_der: &str) -> Vec<rustls::pki_types::CertificateDer<'static>> {
         let mut reader = std::io::BufReader::new(pem_or_der.as_bytes());
         let pem_certs: Vec<_> = rustls_pemfile::certs(&mut reader)

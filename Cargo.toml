@@ -840,6 +840,7 @@ typenum = "1.17.0"
 uint = "0.9.4"
 ureq = { version = "2.12", features = [
     "json",
+    "native-tls",
     "tls",
 ] }
 url = { version = "2.4.0", features = ["serde"] }
