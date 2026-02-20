@@ -30,6 +30,7 @@ const DEFAULT_CONNECTION_TIMEOUT_MS: u64 = 1_000;
 const DEFAULT_RESPONSE_TIMEOUT_MS: u64 = 1_000;
 
 /// An HTTP response from Vault, decoupled from the underlying HTTP client.
+#[derive(Debug)]
 pub struct VaultResponse {
     pub status: u16,
     pub status_text: String,
