@@ -1897,24 +1897,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "aptos-fn-check-client"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "aptos-logger",
- "aptos-node-checker",
- "aptos-sdk",
- "clap 4.5.21",
- "env_logger",
- "futures",
- "gcp-bigquery-client",
- "reqwest 0.11.23",
- "serde",
- "serde_json",
- "tokio",
-]
-
-[[package]]
 name = "aptos-forge"
 version = "0.0.0"
 dependencies = [
@@ -3530,35 +3512,6 @@ dependencies = [
  "serde_yaml 0.8.26",
  "tokio",
  "ureq",
- "url",
-]
-
-[[package]]
-name = "aptos-node-checker"
-version = "0.1.1"
-dependencies = [
- "anyhow",
- "aptos-config",
- "aptos-crypto",
- "aptos-logger",
- "aptos-network-checker",
- "aptos-rest-client",
- "aptos-sdk",
- "aptos-transaction-emitter-lib",
- "aptos-transaction-workloads-lib",
- "async-trait",
- "clap 4.5.21",
- "futures",
- "once_cell",
- "poem",
- "poem-openapi",
- "prometheus-parse",
- "reqwest 0.11.23",
- "serde",
- "serde_json",
- "serde_yaml 0.8.26",
- "thiserror 1.0.69",
- "tokio",
  "url",
 ]
 
@@ -15315,18 +15268,6 @@ dependencies = [
  "serde_json",
  "time",
  "url",
-]
-
-[[package]]
-name = "prometheus-parse"
-version = "0.2.5"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "811031bea65e5a401fb2e1f37d802cca6601e204ac463809a3189352d13b78a5"
-dependencies = [
- "chrono",
- "itertools 0.12.1",
- "once_cell",
- "regex",
 ]
 
 [[package]]
