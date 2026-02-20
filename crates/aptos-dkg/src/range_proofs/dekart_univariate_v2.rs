@@ -10,7 +10,8 @@ use crate::{
     sigma_protocol::{
         self,
         homomorphism::{self, Trait as _},
-        CurveGroupTrait as _,
+        traits::Trait as _,
+        CurveGroupTrait,
     },
     utils, Scalar,
 };
@@ -697,11 +698,12 @@ impl<E: Pairing> traits::BatchedRangeProof<E> for Proof<E> {
         fiat_shamir::append_hat_f_commitment::<E>(&mut fs_t, &hatC);
 
         // Step 3
-        two_term_msm::Homomorphism::<E::G1> {
+        let hom = two_term_msm::Homomorphism::<E::G1> {
             base_1: *lagr_0,
             base_2: *xi_1,
-        }
-        .verify(
+        };
+        <two_term_msm::Homomorphism<E::G1> as CurveGroupTrait>::verify(
+            &hom,
             &(two_term_msm::CodomainShape((*hatC - comm.0).into_affine())),
             pi_PoK,
             &Self::DST,

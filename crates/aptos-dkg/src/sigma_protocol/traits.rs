@@ -40,7 +40,9 @@ pub trait Trait:
         statement: Self::Codomain,
         cntxt: &Ct, // for SoK purposes
         rng: &mut R,
-    ) -> (Proof<Self::Scalar, Self>, Self::CodomainNormalized);
+    ) -> (Proof<Self::Scalar, Self>, Self::CodomainNormalized) {
+        prove_homomorphism(self, witness, statement, cntxt, true, rng, &self.dst())
+    }
 
     fn verify<Ct: Serialize, R: RngCore + CryptoRng>(
         &self,
@@ -51,7 +53,7 @@ pub trait Trait:
     ) -> anyhow::Result<()> {
         let prover_first_message = proof
             .prover_commitment()
-            .expect("tuple proof must contain commitment for Fiat–Shamir");
+            .expect("tuple proof must contain commitment for Fiat–Shamir"); // TODO: code alternative version
         let c = fiat_shamir_challenge_for_sigma_protocol::<_, Self::Scalar, _>(
             cntxt,
             self,
@@ -59,26 +61,17 @@ pub trait Trait:
             prover_first_message,
             &self.dst(),
         );
-        self.verify_with_challenge(
-            public_statement,
-            prover_first_message,
-            c,
-            &proof.z,
-            cntxt,
-            rng,
-        )
+        self.verify_with_challenge(public_statement, prover_first_message, c, &proof.z, rng)
     }
 
     /// Verify a component given an explicit Fiat–Shamir challenge (e.g. when this homomorphism
     /// is used inside a tuple and the challenge was derived from the tuple's first message).
-    /// Default implementation returns an error; override for concrete homomorphism types.
-    fn verify_with_challenge<Ct: Serialize, R: RngCore + CryptoRng>(
+    fn verify_with_challenge<R: RngCore + CryptoRng>(
         &self,
         public_statement: &Self::CodomainNormalized,
         prover_commitment: &Self::CodomainNormalized,
         challenge: Self::Scalar,
         response: &Self::Domain,
-        cntxt: &Ct,
         rng: &mut R,
     ) -> anyhow::Result<()>;
 }
@@ -90,33 +83,12 @@ impl<T: CurveGroupTrait> Trait for T {
         self.dst()
     }
 
-    fn prove<Ct: Serialize, R: RngCore + CryptoRng>(
-        &self,
-        witness: &Self::Domain,
-        statement: Self::Codomain,
-        cntxt: &Ct, // for SoK purposes
-        rng: &mut R,
-    ) -> (Proof<Self::Scalar, Self>, Self::CodomainNormalized) {
-        self.prove(witness, statement, cntxt, rng)
-    }
-
-    fn verify<Ct: Serialize, R: RngCore + CryptoRng>(
-        &self,
-        public_statement: &Self::CodomainNormalized,
-        proof: &Proof<Self::Scalar, Self>,
-        cntxt: &Ct,
-        rng: &mut R,
-    ) -> anyhow::Result<()> {
-        self.verify(public_statement, proof, cntxt, None, rng)
-    }
-
-    fn verify_with_challenge<Ct: Serialize, R: RngCore + CryptoRng>(
+    fn verify_with_challenge<R: RngCore + CryptoRng>(
         &self,
         public_statement: &Self::CodomainNormalized,
         prover_commitment: &Self::CodomainNormalized,
         challenge: Self::Scalar,
         response: &Self::Domain,
-        _cntxt: &Ct,
         rng: &mut R,
     ) -> anyhow::Result<()> {
         let number_of_beta_powers = public_statement.clone().into_iter().count();
@@ -157,19 +129,6 @@ pub trait CurveGroupTrait:
     /// Domain-separation tag (DST) used to ensure that all cryptographic hashes and
     /// transcript operations within the protocol are uniquely namespaced
     fn dst(&self) -> Vec<u8>;
-
-    fn prove<Ct: Serialize, R: RngCore + CryptoRng>(
-        &self,
-        witness: &Self::Domain,
-        statement: Self::Codomain,
-        cntxt: &Ct, // for SoK purposes
-        rng: &mut R,
-    ) -> (
-        Proof<<Self as fixed_base_msms::Trait>::Scalar, Self>, // or C::ScalarField
-        <Self as homomorphism::Trait>::CodomainNormalized,
-    ) {
-        prove_homomorphism(self, witness, statement, cntxt, true, rng, &self.dst())
-    }
 
     #[allow(non_snake_case)]
     fn verify<Ct: Serialize, H, R: RngCore + CryptoRng>(
@@ -457,7 +416,7 @@ where
         &mut fs_t, cntxt,
     );
 
-    // Append the MSM bases to the transcript. (If the same hom is used for many proofs, maybe use a single transcript + a boolean to prevent it from repeating?)
+    // Append the homomorphism data (e.g. MSM bases) to the transcript. (If the same hom is used for many proofs, maybe use a single transcript + a boolean to prevent it from repeating?)
     <merlin::Transcript as fiat_shamir::SigmaProtocol<F, H>>::append_sigma_protocol_msm_bases(
         &mut fs_t, hom,
     );

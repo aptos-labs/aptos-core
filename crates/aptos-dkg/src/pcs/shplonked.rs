@@ -3,6 +3,9 @@
 
 // ZK-PCS (Shplonked) opening proof types and routines, extracted for use by range proofs.
 
+/// Domain separation tag for the Shplonked opening sigma protocol (Fiat–Shamir context).
+pub const SHPLONKED_SIGMA_DST: &[u8; 17] = b"ShplonkedSigmaDst";
+
 use crate::{
     fiat_shamir::PolynomialCommitmentScheme as _,
     pcs::{
@@ -217,6 +220,7 @@ pub fn zk_pcs_open<E: Pairing, R: RngCore + CryptoRng>(
             values: Scalar::vec_from_inner(h_poly.coeffs().to_vec()),
         })
         .0;
+    trs.append_point(&W.into_affine());
 
     // Step 4
     let z = trs.challenge_scalar();
@@ -254,6 +258,7 @@ pub fn zk_pcs_open<E: Pairing, R: RngCore + CryptoRng>(
             values: Scalar::vec_from_inner(Q_poly.coeffs.clone()),
         })
         .0;
+    trs.append_point(&W_prime.into_affine());
 
     let u: E::ScalarField = sample_field_element(rng);
 
@@ -321,16 +326,7 @@ pub fn zk_pcs_open<E: Pairing, R: RngCore + CryptoRng>(
         TupleCodomainShape(CodomainShape(com_y), CodomainShape(V)),
         y_sum,
     );
-    let mut sigma_ctx = Vec::new();
-    com_y
-        .into_affine()
-        .serialize_compressed(&mut sigma_ctx)
-        .expect("sigma ctx com_y");
-    gamma
-        .serialize_compressed(&mut sigma_ctx)
-        .expect("sigma ctx gamma");
-    z.serialize_compressed(&mut sigma_ctx).expect("sigma ctx z");
-    let (sigma_protocol_proof, _) = full_hom.prove(&witness, statement, &sigma_ctx, rng);
+    let (sigma_protocol_proof, _) = full_hom.prove(&witness, statement, SHPLONKED_SIGMA_DST, rng);
 
     let (r_com_y, r_V, r_y) = match &sigma_protocol_proof.first_proof_item {
         FirstProofItem::Commitment(c) => (c.0 .0 .0, c.0 .1 .0, c.1),
@@ -394,7 +390,9 @@ pub fn zk_pcs_verify<E: Pairing, R: RngCore + CryptoRng>(
     trs.append_point(&com_y);
 
     let gamma: E::ScalarField = trs.challenge_scalar();
+    trs.append_point(W);
     let z: E::ScalarField = trs.challenge_scalar();
+    trs.append_point(W_prime);
 
     let mut alphas = Vec::with_capacity(eval_points.len());
     let mut gamma_i = E::ScalarField::ONE;
@@ -475,15 +473,12 @@ pub fn zk_pcs_verify<E: Pairing, R: RngCore + CryptoRng>(
         },
     };
 
-    let mut sigma_ctx = Vec::new();
-    com_y
-        .serialize_compressed(&mut sigma_ctx)
-        .expect("sigma ctx com_y");
-    gamma
-        .serialize_compressed(&mut sigma_ctx)
-        .expect("sigma ctx gamma");
-    z.serialize_compressed(&mut sigma_ctx).expect("sigma ctx z");
-    full_hom.verify(&public_statement, &sigma_protocol_proof, &sigma_ctx, rng)
+    full_hom.verify(
+        &public_statement,
+        &sigma_protocol_proof,
+        SHPLONKED_SIGMA_DST,
+        rng,
+    )
 }
 
 // ---------------------------------------------------------------------------

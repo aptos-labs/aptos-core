@@ -330,21 +330,20 @@ where
         prove_homomorphism(self, witness, statement, cntxt, true, rng, &self.dst())
     }
 
-    fn verify_with_challenge<Ct: Serialize, R: RngCore + CryptoRng>(
+    fn verify_with_challenge<R: RngCore + CryptoRng>(
         &self,
         public_statement: &Self::CodomainNormalized,
         prover_commitment: &Self::CodomainNormalized,
         challenge: Self::Scalar,
         response: &Self::Domain,
-        cntxt: &Ct,
         rng: &mut R,
     ) -> anyhow::Result<()> {
         let (stmt1, stmt2) = (&public_statement.0, &public_statement.1);
         let (commit1, commit2) = (&prover_commitment.0, &prover_commitment.1);
         self.hom1
-            .verify_with_challenge(stmt1, commit1, challenge, response, cntxt, rng)?;
+            .verify_with_challenge(stmt1, commit1, challenge, response, rng)?;
         self.hom2
-            .verify_with_challenge(stmt2, commit2, challenge, response, cntxt, rng)?;
+            .verify_with_challenge(stmt2, commit2, challenge, response, rng)?;
         Ok(())
     }
 }
@@ -379,13 +378,12 @@ where
     }
 
     #[allow(non_snake_case)]
-    fn verify_with_challenge<Ct: Serialize, R: RngCore + CryptoRng>(
+    fn verify_with_challenge<R: RngCore + CryptoRng>(
         &self,
         public_statement: &Self::CodomainNormalized,
         prover_commitment: &Self::CodomainNormalized,
         challenge: Self::Scalar,
         response: &Self::Domain,
-        _cntxt: &Ct,
         rng: &mut R,
     ) -> anyhow::Result<()> {
         let len1 = public_statement.0.clone().into_iter().count();

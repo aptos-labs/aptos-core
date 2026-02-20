@@ -13,7 +13,7 @@ use crate::{
             self, fixed_base_msms, tuple::CurveGroupTupleHomomorphism, Trait as HomTrait,
             TrivialShape as CodomainShape,
         },
-        Proof, Trait as SigmaTrait, Witness,
+        Trait as SigmaTrait, Witness,
     },
     Scalar,
 };
@@ -22,7 +22,6 @@ use ark_ec::{pairing::Pairing, CurveGroup, VariableBaseMSM};
 use ark_ff::{PrimeField, Zero};
 use ark_serialize::{CanonicalDeserialize, CanonicalSerialize};
 use rand_core::{CryptoRng, RngCore};
-use serde::Serialize;
 use std::fmt::Debug;
 
 /// Witness for the Shplonked opening sigma protocol: (rho, evals, u) such that
@@ -183,7 +182,7 @@ impl<F: PrimeField> HomTrait for SumEvalsHom<F> {
     type Domain = ShplonkedSigmaWitness<F>;
 
     fn apply(&self, w: &Self::Domain) -> Self::Codomain {
-        w.evals.iter().fold(F::zero(), |a, x| a + x)
+        w.evals.iter().fold(F::zero(), |acc, x| acc + x)
     }
 
     fn normalize(&self, value: Self::Codomain) -> Self::CodomainNormalized {
@@ -198,40 +197,15 @@ impl<F: PrimeField> SigmaTrait for SumEvalsHom<F> {
         b"ShplonkedSigma_SumEvalsHom".to_vec()
     }
 
-    fn prove<Ct: Serialize, R: RngCore + CryptoRng>(
-        &self,
-        witness: &ShplonkedSigmaWitness<F>,
-        statement: F,
-        cntxt: &Ct,
-        rng: &mut R,
-    ) -> (Proof<F, Self>, F) {
-        let r = witness.rand(rng);
-        let commitment = self.apply(&r);
-        let c = crate::sigma_protocol::traits::fiat_shamir_challenge_for_sigma_protocol(
-            cntxt,
-            self,
-            &statement,
-            &commitment,
-            &self.dst(),
-        );
-        let z = witness.clone().scaled_add(&r, c);
-        let proof = Proof {
-            first_proof_item: sigma_protocol::FirstProofItem::Commitment(commitment),
-            z,
-        };
-        (proof, statement)
-    }
-
-    fn verify_with_challenge<Ct: Serialize, R: RngCore + CryptoRng>(
+    fn verify_with_challenge<R: RngCore + CryptoRng>(
         &self,
         public_statement: &F,
         prover_commitment: &F,
         challenge: F,
         response: &ShplonkedSigmaWitness<F>,
-        _cntxt: &Ct,
         _rng: &mut R,
     ) -> anyhow::Result<()> {
-        let sum_z = response.evals.iter().fold(F::zero(), |a, x| a + x);
+        let sum_z = response.evals.iter().fold(F::zero(), |acc, x| acc + x);
         let expected = *prover_commitment + challenge * public_statement;
         anyhow::ensure!(sum_z == expected, "SumEvalsHom sigma check failed");
         Ok(())
