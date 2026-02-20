@@ -824,7 +824,7 @@ install_lcov() {
             _sudo="$(sudo_if_needed)"
             # shellcheck disable=SC2086
             $_sudo apk --update add --no-cache \
-                -X http://dl-cdn.alpinelinux.org/alpine/edge/testing lcov
+                -X https://dl-cdn.alpinelinux.org/alpine/edge/testing lcov
             ;;
         apt-get|yum|dnf|brew)
             install_pkg lcov "$_pm"
@@ -1122,7 +1122,7 @@ install_allure() {
         rm -f "$_deb"
     elif [ "$PACKAGE_MANAGER" = "apk" ]; then
         apk --update add --no-cache \
-            -X http://dl-cdn.alpinelinux.org/alpine/edge/community openjdk11
+            -X https://dl-cdn.alpinelinux.org/alpine/edge/community openjdk11
     else
         log_warn "No automated Allure install method for $PACKAGE_MANAGER."
         log_warn "Install Allure manually: https://docs.qameta.io/allure/#_installing_a_commandline"
@@ -1665,9 +1665,10 @@ fi
 if [ "$INSTALL_INDIVIDUAL" = "true" ]; then
     log_step "========== Installing individual tools =========="
     for _pkg in $INSTALL_PACKAGES; do
-        # Prefer a dedicated installer function if one exists
         if type "install_${_pkg}" >/dev/null 2>&1; then
-            "install_${_pkg}"
+            # Pass $PACKAGE_MANAGER so functions like install_clang and
+            # install_lcov that expect it as $1 work correctly.
+            "install_${_pkg}" "$PACKAGE_MANAGER"
         else
             install_pkg "$_pkg" "$PACKAGE_MANAGER"
         fi
