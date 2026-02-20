@@ -404,8 +404,34 @@ impl<'a, S: StateView> MoveConverter<'a, S> {
             },
             // Deprecated.
             ModuleBundle(_) => bail!("Module bundle payload has been removed"),
-            EncryptedPayload(_) => {
-                bail!("Encrypted payload isn't supported yet")
+            EncryptedPayload(payload) => {
+                match payload {
+                    // TODO(ibalajiarun): return a proper encrypted payload representation in the API
+                    aptos_types::transaction::encrypted_payload::EncryptedPayload::Encrypted { .. }
+                    | aptos_types::transaction::encrypted_payload::EncryptedPayload::FailedDecryption { .. } => {
+                        TransactionPayload::ScriptPayload(ScriptPayload {
+                            code: MoveScriptBytecode { bytecode: HexEncodedBytes(vec![]), abi: None },
+                            type_arguments: vec![],
+                            arguments: vec![],
+                        })
+                    },
+                    aptos_types::transaction::encrypted_payload::EncryptedPayload::Decrypted { executable, ..} => {
+                        match executable {
+                            aptos_types::transaction::TransactionExecutable::EntryFunction(
+                                entry_function,
+                            ) => TransactionPayload::EntryFunctionPayload(
+                                try_into_entry_function_payload(entry_function)?,
+                            ),
+                            aptos_types::transaction::TransactionExecutable::Script(script) => {
+                                TransactionPayload::ScriptPayload(try_into_script_payload(script)?)
+                            },
+                            aptos_types::transaction::TransactionExecutable::Empty
+                            | aptos_types::transaction::TransactionExecutable::Encrypted => {
+                                bail!("Payload cannot be decrypted and empty/encrypted")
+                            },
+                        }
+                    },
+                }
             },
         };
         Ok(ret)
