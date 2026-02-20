@@ -103,17 +103,6 @@ impl<EK: BIBECTEncrypt> CTEncrypt<EK::CT> for EK {
 }
 
 impl<PCT: InnerCiphertext> Ciphertext<PCT> {
-    pub fn random() -> Self {
-        use ark_std::rand::thread_rng;
-
-        let mut rng = thread_rng();
-        let enc_key = PCT::EncryptionKey::for_testing();
-
-        enc_key
-            .encrypt(&mut rng, &String::from("random"), &String::from("data"))
-            .unwrap()
-    }
-
     pub fn verify(&self, associated_data: &impl AssociatedData) -> Result<()> {
         let hashed_id = Id::from_verifying_key(&self.vk);
 
@@ -172,6 +161,20 @@ impl<P: Plaintext> CTDecrypt<P> for BIBEDecryptionKey {
     }
 }
 
+impl<PCT: InnerCiphertext> Ciphertext<PCT> {
+    /// Only used for testing.
+    pub fn random() -> Self {
+        use ark_std::rand::thread_rng;
+
+        let mut rng = thread_rng();
+        let enc_key = PCT::EncryptionKey::for_testing();
+
+        enc_key
+            .encrypt(&mut rng, &String::from("random"), &String::from("data"))
+            .unwrap()
+    }
+}
+
 #[cfg(test)]
 pub mod tests {
 
@@ -203,7 +206,7 @@ pub mod tests {
         let associated_data = String::from("");
         let ct: StandardCiphertext = ek.encrypt(&mut rng, &plaintext, &associated_data).unwrap();
 
-        let mut ids = IdSet::with_capacity(dk.capacity()).unwrap();
+        let mut ids = IdSet::with_capacity(dk.capacity());
         ids.add(&ct.id());
 
         ids.compute_poly_coeffs();
@@ -235,7 +238,7 @@ pub mod tests {
         let associated_data = String::from("");
         let ct: SuccinctCiphertext = ek.encrypt(&mut rng, &plaintext, &associated_data).unwrap();
 
-        let mut ids = IdSet::with_capacity(dk.capacity()).unwrap();
+        let mut ids = IdSet::with_capacity(dk.capacity());
         ids.add(&ct.id());
 
         ids.compute_poly_coeffs();

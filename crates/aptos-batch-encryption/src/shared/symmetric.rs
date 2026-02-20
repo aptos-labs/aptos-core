@@ -88,7 +88,6 @@ impl SymmetricKey {
         use aes_gcm::KeyInit as _; // putting this in the global scope causes Hmac<Sha256> to be
                                    // ambiguous for some reason
 
-        // unwrap is safe here b/c the above array is of the correct size
         Self(Aes128Gcm::generate_key(rng))
     }
 

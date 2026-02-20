@@ -3,6 +3,7 @@
 use crate::{
     errors::MissingEvalProofError,
     group::*,
+    schemes::fptx::FPTX,
     shared::{
         ciphertext::{CTDecrypt, CTEncrypt, PreparedCiphertext, SuccinctCiphertext},
         digest::{Digest, DigestKey, EvalProof, EvalProofs, EvalProofsPromise},
@@ -15,7 +16,7 @@ use crate::{
     },
     traits::{AssociatedData, BatchThresholdEncryption, Plaintext},
 };
-use anyhow::{anyhow, Result};
+use anyhow::Result;
 use aptos_dkg::pvss::{
     traits::{Reconstructable as _, TranscriptCore},
     Player,
@@ -25,6 +26,8 @@ use ark_std::rand::{rngs::StdRng, CryptoRng, RngCore, SeedableRng};
 
 pub struct FPTXSuccinct {}
 
+/// The "succinct" version of FPTX which was described in the paper. Right now, this scheme is
+/// unused because it would require a modification to the PVSS.
 impl BatchThresholdEncryption for FPTXSuccinct {
     type Ciphertext = SuccinctCiphertext;
     type DecryptionKey = BIBEDecryptionKey;
@@ -108,8 +111,7 @@ impl BatchThresholdEncryption for FPTXSuccinct {
         round: Self::Round,
     ) -> anyhow::Result<(Self::Digest, Self::EvalProofsPromise)> {
         let mut ids: IdSet<UncomputedCoeffs> =
-            IdSet::from_slice(&cts.iter().map(|ct| ct.id()).collect::<Vec<Id>>())
-                .ok_or(anyhow!(""))?;
+            IdSet::from_slice(&cts.iter().map(|ct| ct.id()).collect::<Vec<Id>>());
 
         digest_key.digest(&mut ids, round)
     }
@@ -129,14 +131,14 @@ impl BatchThresholdEncryption for FPTXSuccinct {
         proofs: &Self::EvalProofsPromise,
         digest_key: &DigestKey,
     ) -> Self::EvalProofs {
-        proofs.compute_all(digest_key)
+        FPTX::eval_proofs_compute_all(proofs, digest_key)
     }
 
     fn eval_proofs_compute_all_vzgg_multi_point_eval(
         proofs: &Self::EvalProofsPromise,
         digest_key: &DigestKey,
     ) -> Self::EvalProofs {
-        proofs.compute_all_vgzz_multi_point_eval(digest_key)
+        FPTX::eval_proofs_compute_all_vzgg_multi_point_eval(proofs, digest_key)
     }
 
     fn eval_proof_for_ct(
@@ -150,7 +152,7 @@ impl BatchThresholdEncryption for FPTXSuccinct {
         msk_share: &Self::MasterSecretKeyShare,
         digest: &Self::Digest,
     ) -> Result<Self::DecryptionKeyShare> {
-        msk_share.derive_decryption_key_share(digest)
+        FPTX::derive_decryption_key_share(msk_share, digest)
     }
 
     fn reconstruct_decryption_key(
@@ -172,7 +174,7 @@ impl BatchThresholdEncryption for FPTXSuccinct {
         decryption_key: &Self::DecryptionKey,
         ct: &Self::PreparedCiphertext,
     ) -> anyhow::Result<P> {
-        decryption_key.decrypt(ct)
+        FPTX::decrypt(decryption_key, ct)
     }
 
     fn verify_decryption_key_share(
