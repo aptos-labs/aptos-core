@@ -933,6 +933,12 @@ impl Transaction {
             BlockEpilogue(_) => (TransactionType::BlockEpilogue, None, txn.info, vec![]),
         };
 
+        let gas_payer = maybe_user_txn.map(|txn| {
+            txn.authenticator()
+                .fee_payer_address()
+                .unwrap_or_else(|| txn.sender())
+        });
+
         // Operations must be sequential and operation index must always be in the same order
         // with no gaps
         let successful = txn_info.status().is_success();
@@ -977,11 +983,7 @@ impl Transaction {
             }
 
             // For storage fee refund
-            if let Some(user_txn) = maybe_user_txn {
-                let refund_recipient = user_txn
-                    .authenticator()
-                    .fee_payer_address()
-                    .unwrap_or_else(|| user_txn.sender());
+            if let Some(refund_recipient) = gas_payer {
                 let fee_events = get_fee_statement_from_event(&events)
                     .into_iter()
                     .filter(|event| event.storage_fee_refund() > 0);
@@ -1018,14 +1020,10 @@ impl Transaction {
         }
 
         // Everything committed costs gas
-        if let Some(txn) = maybe_user_txn {
-            let gas_payer = txn
-                .authenticator()
-                .fee_payer_address()
-                .unwrap_or_else(|| txn.sender());
+        if let Some((payer, txn)) = gas_payer.zip(maybe_user_txn) {
             operations.push(Operation::gas_fee(
                 operation_index,
-                gas_payer,
+                payer,
                 txn_info.gas_used(),
                 txn.gas_unit_price(),
             ));
