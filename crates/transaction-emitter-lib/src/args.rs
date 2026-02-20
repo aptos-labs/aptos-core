@@ -188,6 +188,9 @@ pub struct EmitArgs {
 
     #[clap(flatten)]
     pub account_type_args: AccountTypeArgs,
+
+    #[clap(long, default_value = "false")]
+    pub encrypt_transactions: bool,
 }
 
 #[derive(Clone, Debug, Default, Deserialize, Parser, Serialize)]

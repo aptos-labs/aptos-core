@@ -104,7 +104,8 @@ pub async fn emit_transactions_with_cluster(
             .txn_expiration_time_secs(args.txn_expiration_time_secs)
             .coordination_delay_between_instances(Duration::from_secs(
                 args.coordination_delay_between_instances.unwrap_or(0),
-            ));
+            ))
+            .encrypt_transactions(args.encrypt_transactions);
 
     if let Some(keyless_ephem_secret_key) = &args.account_type_args.keyless_ephem_secret_key {
         emit_job_request = emit_job_request
