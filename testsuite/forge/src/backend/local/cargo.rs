@@ -29,7 +29,6 @@ pub fn build_consensus_only_node() -> bool {
     option_env!("CONSENSUS_ONLY_PERF_TEST").is_some()
 }
 
-
 pub fn metadata() -> Result<Metadata> {
     let output = Command::new("cargo")
         .arg("metadata")
