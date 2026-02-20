@@ -131,16 +131,6 @@ impl<O: OutputLogger> MoveHarnessImpl<O> {
         }
     }
 
-    pub fn new_testnet() -> Self {
-        register_package_hooks(Box::new(AptosPackageHooks {}));
-        Self {
-            executor: FakeExecutorImpl::from_testnet_genesis(),
-            txn_seq_no: BTreeMap::default(),
-            default_gas_unit_price: DEFAULT_GAS_UNIT_PRICE,
-            max_gas_per_txn: Self::DEFAULT_MAX_GAS_PER_TXN,
-        }
-    }
-
     /// Creates a [`MoveHarness`] from a remote network state at the version specified by the
     /// transaction id, with support for a custom API key to access node APIs.
     ///
@@ -211,16 +201,6 @@ impl<O: OutputLogger> MoveHarnessImpl<O> {
             h.enable_features(vec![], vec![FeatureFlag::ENABLE_LAZY_LOADING]);
         }
         h
-    }
-
-    pub fn new_mainnet() -> Self {
-        register_package_hooks(Box::new(AptosPackageHooks {}));
-        Self {
-            executor: FakeExecutorImpl::from_mainnet_genesis(),
-            txn_seq_no: BTreeMap::default(),
-            default_gas_unit_price: DEFAULT_GAS_UNIT_PRICE,
-            max_gas_per_txn: Self::DEFAULT_MAX_GAS_PER_TXN,
-        }
     }
 
     pub fn store_and_fund_account(&mut self, acc: &Account, balance: u64, seq_num: u64) -> Account {

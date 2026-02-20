@@ -109,6 +109,7 @@ MOVE_CRATES="\
   -p move-vm-types\
   -p move-ast-generator-tests\
   -p move-asm\
+  -p move-docgen\
 "
 
 # This is a list of crates for integration testing.

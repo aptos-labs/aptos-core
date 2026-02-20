@@ -41,6 +41,8 @@ members = [
     "aptos-move/e2e-testsuite",
     "aptos-move/framework",
     "aptos-move/framework/cached-packages",
+    "aptos-move/framework/natives",
+    "aptos-move/framework/release-bundle",
     "aptos-move/framework/table-natives",
     "aptos-move/move-examples",
     "aptos-move/mvhashmap",
@@ -348,6 +350,8 @@ aptos-faucet-metrics-server = { path = "crates/aptos-faucet/metrics-server" }
 aptos-fallible = { path = "crates/fallible" }
 aptos-forge = { path = "testsuite/forge" }
 aptos-framework = { path = "aptos-move/framework" }
+aptos-framework-natives = { path = "aptos-move/framework/natives" }
+aptos-release-bundle = { path = "aptos-move/framework/release-bundle" }
 fuzzer = { path = "testsuite/fuzzer" }
 aptos-abstract-gas-usage = { path = "aptos-move/aptos-abstract-gas-usage" }
 aptos-gas-meter = { path = "aptos-move/aptos-gas-meter" }

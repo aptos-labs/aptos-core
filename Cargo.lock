@@ -806,6 +806,7 @@ version = "0.1.0"
 dependencies = [
  "aptos-framework",
  "aptos-package-builder",
+ "aptos-release-bundle",
  "aptos-types",
  "bcs 0.1.4",
  "move-core-types",
@@ -1990,38 +1991,22 @@ dependencies = [
  "anyhow",
  "aptos-aggregator",
  "aptos-crypto",
- "aptos-gas-algebra",
+ "aptos-framework-natives",
  "aptos-gas-meter",
  "aptos-gas-schedule",
  "aptos-move-stdlib",
- "aptos-native-interface",
+ "aptos-release-bundle",
  "aptos-sdk-builder",
  "aptos-types",
  "aptos-vm",
- "aptos-vm-types",
- "ark-bls12-381 0.5.0",
- "ark-bn254",
- "ark-ec 0.5.0",
- "ark-ff 0.5.0",
- "ark-serialize 0.5.0",
- "ark-std 0.5.0",
  "bcs 0.1.4",
- "better_any",
- "blake2-rfc",
- "bulletproofs",
- "byteorder",
  "claims",
  "clap 4.5.21",
  "codespan-reporting",
- "curve25519-dalek-ng",
- "either",
  "flate2",
- "hex",
  "itertools 0.13.0",
  "legacy-move-compiler",
- "libsecp256k1",
  "log",
- "merlin",
  "move-binary-format",
  "move-command-line-common",
  "move-compiler-v2",
@@ -2039,6 +2024,48 @@ dependencies = [
  "move-vm-types",
  "num-traits",
  "once_cell",
+ "serde",
+ "tempfile",
+ "toml 0.7.8",
+]
+
+[[package]]
+name = "aptos-framework-natives"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "aptos-aggregator",
+ "aptos-crypto",
+ "aptos-gas-algebra",
+ "aptos-gas-schedule",
+ "aptos-native-interface",
+ "aptos-types",
+ "aptos-vm-types",
+ "ark-bls12-381 0.5.0",
+ "ark-bn254",
+ "ark-ec 0.5.0",
+ "ark-ff 0.5.0",
+ "ark-serialize 0.5.0",
+ "ark-std 0.5.0",
+ "bcs 0.1.4",
+ "better_any",
+ "blake2-rfc",
+ "bulletproofs",
+ "byteorder",
+ "claims",
+ "curve25519-dalek-ng",
+ "either",
+ "flate2",
+ "hex",
+ "itertools 0.13.0",
+ "libsecp256k1",
+ "merlin",
+ "move-binary-format",
+ "move-core-types",
+ "move-vm-runtime",
+ "move-vm-types",
+ "num-traits",
+ "once_cell",
  "rand 0.7.3",
  "rand_core 0.5.1",
  "ripemd",
@@ -2049,9 +2076,7 @@ dependencies = [
  "sha3 0.9.1",
  "siphasher",
  "smallvec",
- "tempfile",
  "tiny-keccak",
- "toml 0.7.8",
  "triomphe",
 ]
 
@@ -3609,7 +3634,7 @@ name = "aptos-package-builder"
 version = "0.1.0"
 dependencies = [
  "anyhow",
- "aptos-framework",
+ "aptos-framework-natives",
  "itertools 0.13.0",
  "move-command-line-common",
  "move-package",
@@ -3810,6 +3835,21 @@ dependencies = [
 ]
 
 [[package]]
+name = "aptos-release-bundle"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "aptos-crypto",
+ "aptos-framework-natives",
+ "aptos-types",
+ "bcs 0.1.4",
+ "move-binary-format",
+ "move-core-types",
+ "move-model",
+ "serde",
+]
+
+[[package]]
 name = "aptos-reliable-broadcast"
 version = "0.1.0"
 dependencies = [
@@ -3836,6 +3876,7 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "aptos-block-executor",
+ "aptos-cached-packages",
  "aptos-crypto",
  "aptos-framework",
  "aptos-gas-schedule",
@@ -4886,7 +4927,7 @@ dependencies = [
  "aptos-crypto",
  "aptos-crypto-derive",
  "aptos-experimental-runtimes",
- "aptos-framework",
+ "aptos-framework-natives",
  "aptos-gas-algebra",
  "aptos-gas-meter",
  "aptos-gas-schedule",
@@ -4950,7 +4991,7 @@ dependencies = [
 name = "aptos-vm-environment"
 version = "0.0.1"
 dependencies = [
- "aptos-framework",
+ "aptos-framework-natives",
  "aptos-gas-algebra",
  "aptos-gas-schedule",
  "aptos-move-stdlib",
@@ -4978,9 +5019,9 @@ version = "0.1.0"
 dependencies = [
  "aptos-cached-packages",
  "aptos-crypto",
- "aptos-framework",
  "aptos-gas-schedule",
  "aptos-proptest-helpers",
+ "aptos-release-bundle",
  "aptos-types",
  "aptos-vm",
  "aptos-vm-types",

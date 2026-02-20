@@ -15,8 +15,8 @@ rust-version = { workspace = true }
 [dependencies]
 aptos-cached-packages =  { workspace = true }
 aptos-crypto = { workspace = true }
-aptos-framework =  { workspace = true }
-aptos-gas-schedule = { workspace = true } 
+aptos-gas-schedule = { workspace = true }
+aptos-release-bundle = { workspace = true }
 aptos-types = { workspace = true }
 aptos-vm = { workspace = true }
 aptos-vm-types = { workspace = true }

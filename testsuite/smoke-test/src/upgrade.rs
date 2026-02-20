@@ -36,7 +36,7 @@ async fn test_upgrade_flow() {
 
     let num_nodes = 5;
     let (mut env, _cli, _) = SwarmBuilder::new_local(num_nodes)
-        .with_aptos_testnet()
+        .with_aptos()
         .build_with_cli(0)
         .await;
 
