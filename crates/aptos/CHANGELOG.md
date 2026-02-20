@@ -7,6 +7,7 @@ All notable changes to the Aptos CLI will be captured in this file. This project
 ## [8.1.0]
 - Transaction Simulation Session: add gas profiler support
 - Transaction Simulation Session: add `new-block` and `advance-epoch` commands
+- Gas Profiler: major UI overhaul for HTML reports with sortable tables, CSV export, collapsible sections, and lazy-loaded execution traces
 
 ## [8.0.0]
 - [**Breaking Change**] (Breaking only for the localnet) Updated localnet indexer processors to aptos-indexer-processors-v2.3.0 and processor SDK to aptos-indexer-processor-sdk-v2.1.4. This removes the events processor and upgrades diesel to v2.3. Also updated Hasura metadata accordingly. This is breaking because old v1 tables are now gone (e.g. `events`).

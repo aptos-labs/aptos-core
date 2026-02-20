@@ -5,7 +5,7 @@ use crate::{
     log::{CallFrame, ExecutionAndIOCosts, ExecutionGasEvent, StorageFees},
     render::Render,
 };
-use inferno::flamegraph::{Options, TextTruncateDirection};
+use inferno::flamegraph::{color::BasicPalette, Options, Palette, TextTruncateDirection};
 use move_core_types::gas_algebra::InternalGas;
 use regex::Captures;
 
@@ -14,7 +14,8 @@ fn flamegraph_options(title: String) -> Options<'static> {
     let mut options = Options::default();
     options.flame_chart = true;
     options.text_truncate_direction = TextTruncateDirection::Right;
-    options.color_diffusion = true;
+    options.color_diffusion = false;
+    options.colors = Palette::Basic(BasicPalette::Aqua);
     options.title = title;
     options
 }
