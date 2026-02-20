@@ -57,7 +57,14 @@ impl From<Result<ureq::Response, ureq::Error>> for VaultResponse {
             Ok(resp) => {
                 let status = resp.status();
                 let status_text = resp.status_text().to_string();
-                let body = resp.into_string().unwrap_or_default();
+                let body = match resp.into_string() {
+                    Ok(b) => b,
+                    Err(e) => return VaultResponse {
+                        status: 0,
+                        status_text: "Body Read Error".to_string(),
+                        body: e.to_string(),
+                    },
+                };
                 VaultResponse {
                     status,
                     status_text,
@@ -66,7 +73,10 @@ impl From<Result<ureq::Response, ureq::Error>> for VaultResponse {
             },
             Err(ureq::Error::Status(code, resp)) => {
                 let status_text = resp.status_text().to_string();
-                let body = resp.into_string().unwrap_or_default();
+                let body = match resp.into_string() {
+                    Ok(b) => b,
+                    Err(e) => format!("(failed to read response body: {e})"),
+                };
                 VaultResponse {
                     status: code,
                     status_text,
@@ -121,7 +131,10 @@ impl From<std::io::Error> for Error {
 impl From<VaultResponse> for Error {
     fn from(resp: VaultResponse) -> Self {
         if resp.status == 0 {
-            Error::SyntheticError(resp.body)
+            Error::InternalError(format!(
+                "Transport error ({}): {}",
+                resp.status_text, resp.body
+            ))
         } else {
             Error::HttpError(resp.status, resp.status_text, resp.body)
         }

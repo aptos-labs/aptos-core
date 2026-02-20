@@ -61,6 +61,7 @@ impl From<serde_json::Error> for Error {
 /// repository. The tooling is intended to be used to exchange data in an authenticated fashion
 /// across multiple peers.
 pub struct Client {
+    agent: ureq::Agent,
     branch: String,
     owner: String,
     repository: String,
@@ -69,7 +70,12 @@ pub struct Client {
 
 impl Client {
     pub fn new(owner: String, repository: String, branch: String, token: String) -> Self {
+        let agent = ureq::AgentBuilder::new()
+            .timeout(std::time::Duration::from_millis(TIMEOUT))
+            .try_proxy_from_env(true)
+            .build();
         Self {
+            agent,
             branch,
             owner,
             repository,
@@ -86,7 +92,7 @@ impl Client {
             Err(e) => return Err(e),
         };
 
-        self.upgrade_request(ureq::delete(&self.post_url(path)))
+        self.upgrade_request(self.agent.delete(&self.post_url(path)))
             .send_json(
                 json!({ "branch": self.branch.to_string(), "message": "aptos-secure", "sha": hash }),
             )?;
@@ -110,7 +116,7 @@ impl Client {
     /// Retrieve a list of branches, this is effectively a status check on the repository
     pub fn get_branches(&self) -> Result<Vec<String>, Error> {
         let url = format!("{}/repos/{}/{}/branches", URL, self.owner, self.repository);
-        let resp = self.upgrade_request(ureq::get(&url)).call()?;
+        let resp = self.upgrade_request(self.agent.get(&url)).call()?;
 
         let resp = resp.into_string()?;
         let branches: Vec<Branch> = serde_json::from_str(&resp)?;
@@ -164,7 +170,7 @@ impl Client {
             Err(e) => return Err(e),
         };
 
-        self.upgrade_request(ureq::put(&self.post_url(path)))
+        self.upgrade_request(self.agent.put(&self.post_url(path)))
             .send_json(json)?;
 
         Ok(())
@@ -175,12 +181,11 @@ impl Client {
         request
             .set("Authorization", &format!("token {}", self.token))
             .set(ACCEPT_HEADER, ACCEPT_VALUE)
-            .timeout(std::time::Duration::from_millis(TIMEOUT))
     }
 
     /// Get can read files or directories, this makes it easier to use
     fn get_internal(&self, path: &str) -> Result<Vec<GetResponse>, Error> {
-        let resp = match self.upgrade_request(ureq::get(&self.get_url(path))).call() {
+        let resp = match self.upgrade_request(self.agent.get(&self.get_url(path))).call() {
             Ok(resp) => resp,
             Err(ureq::Error::Status(404, _)) => return Err(Error::NotFound(path.into())),
             Err(e) => return Err(e.into()),

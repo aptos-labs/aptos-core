@@ -98,7 +98,12 @@ jobs:
       - name: Verify no GLIBC or OpenSSL dependency
         run: |
           file target/x86_64-unknown-linux-musl/cli/aptos
-          ! ldd target/x86_64-unknown-linux-musl/cli/aptos 2>/dev/null || echo "Binary is statically linked"
+          if ldd target/x86_64-unknown-linux-musl/cli/aptos >/dev/null 2>&1; then
+            echo "Error: Binary is dynamically linked (ldd succeeded)"
+            exit 1
+          else
+            echo "Binary is statically linked (ldd failed as expected)"
+          fi
       - name: Upload Binary
         uses: actions/upload-artifact@v4
         with:
