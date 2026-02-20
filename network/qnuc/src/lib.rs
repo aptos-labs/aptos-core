@@ -13,14 +13,18 @@
 //! The design is inspired by QUIC but tailored for Aptos's validator-to-validator
 //! and validator-to-fullnode communication patterns.
 
+pub mod adapter;
 pub mod connection;
 pub mod crypto;
 pub mod error;
+pub mod netcore_transport;
 pub mod packet;
 pub mod reliability;
 pub mod stream;
 pub mod transport;
 
+pub use adapter::QnucSocket;
 pub use connection::Connection;
 pub use error::QnucError;
+pub use netcore_transport::QnucTransportLayer;
 pub use transport::QnucTransport;

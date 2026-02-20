@@ -18,6 +18,7 @@ aptos-crypto = { workspace = true }
 aptos-infallible = { workspace = true }
 aptos-logger = { workspace = true }
 aptos-metrics-core = { workspace = true }
+aptos-netcore = { workspace = true }
 aptos-types = { workspace = true }
 bytes = { workspace = true }
 futures = { workspace = true }
