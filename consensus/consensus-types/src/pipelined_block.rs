@@ -107,6 +107,7 @@ pub struct PipelineFutures {
     pub commit_ledger_fut: TaskFuture<CommitLedgerResult>,
     pub post_commit_fut: TaskFuture<PostCommitResult>,
     pub secret_sharing_derive_self_fut: TaskFuture<SecretShareResult>,
+    pub has_rand_txns_fut: TaskFuture<bool>,
 }
 
 impl PipelineFutures {
