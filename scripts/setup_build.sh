@@ -185,9 +185,6 @@ COMPONENT FLAGS
                               (Linux only).
             libdw             DWARF debug-info library for profiling and
                               backtraces (Linux only).
-            libudev           Device-event library needed by the hidapi crate
-                              for Aptos Ledger hardware wallet support
-                              (Linux only).
             cargo-sort        Sorts Cargo.toml dependency sections.
             cargo-machete     Detects unused crate dependencies.
             cargo-nextest     Faster test runner with better output.
@@ -256,7 +253,8 @@ MODIFIER FLAGS
           installer function (install_<NAME>), that function is called;
           otherwise the system package manager is used.
 
-    -k    Skip pre-commit hook installation.
+    -k    Skip pre-commit hook installation.  By default, libudev (Linux),
+          python3, and pre-commit are always installed regardless of flags.
 
     -v    Verbose mode.  Prints every shell command as it executes (set -x).
           Automatically enabled when stderr is not a terminal (e.g. in CI).
@@ -524,7 +522,7 @@ install_pkg() {
             ;;
         pacman)
             # shellcheck disable=SC2086
-            $_sudo pacman -Syu "$_pkg" --noconfirm || {
+            $_sudo pacman -S "$_pkg" --noconfirm --needed || {
                 log_error "pacman failed to install '$_pkg'."
                 log_error "Hint: run 'sudo pacman -Sy' and retry."
                 return 1
@@ -675,9 +673,12 @@ install_rustup_components_and_nightly() {
                 die "Failed to install fallback nightly toolchain (nightly-2023-06-01)." \
                     "This may indicate a corrupted rustup installation."
             # Rename to plain "nightly" (workaround for https://github.com/rust-lang/rustup/issues/1299)
-            if [ -d "$HOME/.rustup/toolchains/nightly-2023-06-01-x86_64-unknown-linux-gnu" ]; then
-                mv "$HOME/.rustup/toolchains/nightly-2023-06-01-x86_64-unknown-linux-gnu" \
-                   "$HOME/.rustup/toolchains/nightly-x86_64-unknown-linux-gnu"
+            _rustup_dir="${RUSTUP_HOME:-$HOME/.rustup}"
+            _host_triple="$(rustc -vV 2>/dev/null | sed -n 's/^host: //p')"
+            if [ -n "$_host_triple" ] && \
+               [ -d "${_rustup_dir}/toolchains/nightly-2023-06-01-${_host_triple}" ]; then
+                mv "${_rustup_dir}/toolchains/nightly-2023-06-01-${_host_triple}" \
+                   "${_rustup_dir}/toolchains/nightly-${_host_triple}"
             fi
         else
             log_error "Failed to install nightly toolchain. Manual installation required."
@@ -702,49 +703,54 @@ install_rustup_components_and_nightly() {
 # reproducible dependency resolution.
 # ============================================================================
 
+# Helper: check a cargo tool's version and reinstall if it doesn't match.
+# Usage: install_cargo_tool <command-name> <expected-version> <description>
+install_cargo_tool() {
+    _cmd="$1"
+    _expected="$2"
+    _desc="$3"
+
+    if command -v "$_cmd" >/dev/null 2>&1; then
+        _actual="$("$_cmd" --version 2>/dev/null || echo "")"
+        case "$_actual" in
+            *"$_expected"*)
+                log_info "$_cmd v${_expected} already installed"
+                return 0
+                ;;
+        esac
+        log_warn "$_cmd is installed but not v${_expected} (found: $_actual)"
+        log_info "Reinstalling $_cmd v${_expected}"
+    else
+        log_info "Installing $_cmd v${_expected} (${_desc})"
+    fi
+
+    cargo install "$_cmd" --locked --version "$_expected" || \
+        die "Failed to install $_cmd v${_expected}." \
+            "Ensure Rust is installed and cargo is in your PATH."
+}
+
 # cargo-sort: keeps [dependencies] sections in Cargo.toml alphabetically sorted
 install_cargo_sort() {
-    if command -v cargo-sort >/dev/null 2>&1; then
-        log_info "cargo-sort already installed"
-    else
-        log_info "Installing cargo-sort v${CARGO_SORT_VERSION} (sorts Cargo.toml dependency sections)"
-        cargo install cargo-sort --locked --version "${CARGO_SORT_VERSION}" || \
-            die "Failed to install cargo-sort." \
-                "Ensure Rust is installed and cargo is in your PATH."
-    fi
+    install_cargo_tool cargo-sort "$CARGO_SORT_VERSION" \
+        "sorts Cargo.toml dependency sections"
 }
 
 # cargo-machete: detects unused crate dependencies in Cargo.toml
 install_cargo_machete() {
-    if command -v cargo-machete >/dev/null 2>&1; then
-        log_info "cargo-machete already installed"
-    else
-        log_info "Installing cargo-machete v${CARGO_MACHETE_VERSION} (detects unused crate dependencies)"
-        cargo install cargo-machete --locked --version "${CARGO_MACHETE_VERSION}" || \
-            die "Failed to install cargo-machete."
-    fi
+    install_cargo_tool cargo-machete "$CARGO_MACHETE_VERSION" \
+        "detects unused crate dependencies"
 }
 
 # cargo-nextest: faster, more ergonomic Rust test runner
 install_cargo_nextest() {
-    if command -v cargo-nextest >/dev/null 2>&1; then
-        log_info "cargo-nextest already installed"
-    else
-        log_info "Installing cargo-nextest v${CARGO_NEXTEST_VERSION} (faster Rust test runner)"
-        cargo install cargo-nextest --locked --version "${CARGO_NEXTEST_VERSION}" || \
-            die "Failed to install cargo-nextest."
-    fi
+    install_cargo_tool cargo-nextest "$CARGO_NEXTEST_VERSION" \
+        "faster Rust test runner"
 }
 
 # grcov: collects and aggregates Rust code-coverage data
 install_grcov() {
-    if command -v grcov >/dev/null 2>&1; then
-        log_info "grcov already installed"
-    else
-        log_info "Installing grcov v${GRCOV_VERSION} (Rust code coverage)"
-        cargo install grcov --version="${GRCOV_VERSION}" --locked || \
-            die "Failed to install grcov v${GRCOV_VERSION}."
-    fi
+    install_cargo_tool grcov "$GRCOV_VERSION" \
+        "Rust code coverage"
 }
 
 # ============================================================================
@@ -755,7 +761,6 @@ install_grcov() {
 # ============================================================================
 
 install_protoc() {
-    INSTALL_PROTOC_DONE="true"
     log_step "Installing protoc (Protocol Buffers compiler) and Rust plugins"
 
     _skip_protoc=""
@@ -908,10 +913,13 @@ install_vault() {
 # ============================================================================
 
 install_helm() {
-    if command -v helm >/dev/null 2>&1; then
-        log_info "helm already installed"
-        return 0
-    fi
+    _current="$(helm version --short 2>/dev/null || echo "")"
+    case "$_current" in
+        *"v${HELM_VERSION}"*)
+            log_info "Helm ${HELM_VERSION} already installed"
+            return 0
+            ;;
+    esac
 
     log_info "Installing Helm v${HELM_VERSION} (Kubernetes package manager)"
 
@@ -1021,7 +1029,9 @@ install_awscli() {
     fi
 
     if [ "$PACKAGE_MANAGER" = "apk" ]; then
-        apk add --no-cache python3 py3-pip
+        _sudo="$(sudo_if_needed)"
+        # shellcheck disable=SC2086
+        $_sudo apk add --no-cache python3 py3-pip
         pip3 install --upgrade pip
         pip3 install awscli
         return 0
@@ -1121,7 +1131,8 @@ install_allure() {
         $_sudo dpkg -i "$_deb"
         rm -f "$_deb"
     elif [ "$PACKAGE_MANAGER" = "apk" ]; then
-        apk --update add --no-cache \
+        # shellcheck disable=SC2086
+        $_sudo apk --update add --no-cache \
             -X https://dl-cdn.alpinelinux.org/alpine/edge/community openjdk11
     else
         log_warn "No automated Allure install method for $PACKAGE_MANAGER."
@@ -1297,11 +1308,12 @@ install_nodejs() {
     if [ "$PACKAGE_MANAGER" = "apt-get" ]; then
         curl -fsSL "https://deb.nodesource.com/setup_${NODE_MAJOR_VERSION}.x" -o nodesource_setup.sh || \
             die "Failed to download NodeSource setup script for Node.js v${NODE_MAJOR_VERSION}."
+        # NodeSource setup script requires bash, not POSIX sh
         if [ -n "$_sudo" ]; then
             # shellcheck disable=SC2086
-            $_sudo -E sh nodesource_setup.sh
+            $_sudo -E bash nodesource_setup.sh
         else
-            sh nodesource_setup.sh
+            bash nodesource_setup.sh
         fi
         rm -f nodesource_setup.sh
     fi
@@ -1322,8 +1334,21 @@ install_pnpm() {
 # Profile / PATH Management
 # ============================================================================
 
+# Append a line to ~/.profile if it is not already present.
+# The line is also sourced into the current shell so paths are
+# available for the remainder of this script.
 add_to_profile() {
     _line="$1"
+    # Validate: only allow export and PATH assignments
+    case "$_line" in
+        export\ PATH=*|export\ CARGO_HOME=*|export\ DOTNET_ROOT=*|\
+        export\ Z3_EXE=*|export\ CVC5_EXE=*|export\ BOOGIE_EXE=*)
+            ;;
+        *)
+            log_warn "add_to_profile: refusing unexpected line: $_line"
+            return 1
+            ;;
+    esac
     eval "$_line"
     _found="$(grep -c "$_line" "${HOME}/.profile" 2>/dev/null || echo "0")"
     if [ "$_found" = "0" ]; then
@@ -1352,8 +1377,8 @@ update_path_and_profile() {
         add_to_profile "export PATH=\"${BIN_DIR}:${C_HOME}/bin:\$PATH\""
     fi
 
-    if [ "$INSTALL_PROTOC_DONE" = "true" ]; then
-        add_to_profile "export PATH=\$PATH:/usr/local/include"
+    if [ "$INSTALL_PROTOC_FLAG" = "true" ] || [ "$INSTALL_BUILD_TOOLS" = "true" ]; then
+        add_to_profile "export PATH=\"/usr/local/bin:\$PATH\""
     fi
 
     if [ "$INSTALL_PROVER" = "true" ]; then
@@ -1426,7 +1451,6 @@ INSTALL_PROFILE=false
 INSTALL_PROVER=false
 INSTALL_DOC=false
 INSTALL_PROTOC_FLAG=false
-INSTALL_PROTOC_DONE=false
 INSTALL_POSTGRES=false
 INSTALL_JSTS=false
 INSTALL_INDIVIDUAL=false
@@ -1476,12 +1500,14 @@ if [ "$VERBOSE" = "true" ]; then
     set -x
 fi
 
-# Default: install build tools when no component flag is given
+# Default: install build tools when no component flag is given.
+# Only component flags (-t, -o, -y, -d, -r, -P, -J, -i) prevent the default;
+# modifier flags (-p, -b, -n, -k, -v) do not.
 if [ "$INSTALL_BUILD_TOOLS" = "false" ] && \
    [ "$OPERATIONS" = "false" ] && \
-   [ "$INSTALL_PROFILE" = "false" ] && \
    [ "$INSTALL_PROVER" = "false" ] && \
    [ "$INSTALL_DOC" = "false" ] && \
+   [ "$INSTALL_PROTOC_FLAG" = "false" ] && \
    [ "$INSTALL_POSTGRES" = "false" ] && \
    [ "$INSTALL_JSTS" = "false" ] && \
    [ "$INSTALL_INDIVIDUAL" = "false" ]; then
@@ -1505,10 +1531,13 @@ fi
 # ============================================================================
 
 INSTALL_DIR="${HOME}/bin/"
+DOTNET_INSTALL_DIR="${HOME}/.dotnet/"
 if [ "$OPT_DIR" = "true" ]; then
     INSTALL_DIR="/opt/bin/"
+    DOTNET_INSTALL_DIR="/opt/dotnet/"
 fi
 mkdir -p "$INSTALL_DIR" 2>/dev/null || true
+export DOTNET_INSTALL_DIR
 
 # ============================================================================
 # Detect Package Manager
@@ -1552,14 +1581,6 @@ fi
 install_pkg curl "$PACKAGE_MANAGER"
 install_pkg unzip "$PACKAGE_MANAGER"
 install_pkg wget "$PACKAGE_MANAGER"
-
-# ============================================================================
-# Profile updates (-p)
-# ============================================================================
-
-if [ "$INSTALL_PROFILE" = "true" ]; then
-    update_path_and_profile
-fi
 
 # ============================================================================
 # Build Tools (-t)
@@ -1682,13 +1703,7 @@ fi
 if [ "$INSTALL_PROVER" = "true" ]; then
     log_step "========== Installing Move Prover tools =========="
 
-    DOTNET_INSTALL_DIR="${HOME}/.dotnet/"
-    if [ "$OPT_DIR" = "true" ]; then
-        DOTNET_INSTALL_DIR="/opt/dotnet/"
-        mkdir -p "$DOTNET_INSTALL_DIR" 2>/dev/null || true
-    fi
-    export DOTNET_INSTALL_DIR
-
+    mkdir -p "$DOTNET_INSTALL_DIR" 2>/dev/null || true
     install_pkg unzip "$PACKAGE_MANAGER"
     install_z3
     install_cvc5
@@ -1743,9 +1758,14 @@ if [ "$SKIP_PRE_COMMIT" = "false" ]; then
     if [ -n "$_pre_commit_pkg" ]; then
         install_pkg "$_pre_commit_pkg" "$PACKAGE_MANAGER"
     else
-        pip3 install pre-commit || \
-            log_warn "Failed to install pre-commit via pip3." \
-                     "You can install it manually: pip3 install pre-commit"
+        if [ "$(id -u)" = "0" ]; then
+            pip3 install pre-commit || \
+                log_warn "Failed to install pre-commit via pip3."
+        else
+            pip3 install --user pre-commit || \
+                log_warn "Failed to install pre-commit via pip3." \
+                         "You can install it manually: pip3 install --user pre-commit"
+        fi
     fi
 
     if command -v pre-commit >/dev/null 2>&1; then
@@ -1756,6 +1776,15 @@ if [ "$SKIP_PRE_COMMIT" = "false" ]; then
         log_warn "pre-commit not found in PATH after installation." \
                  "You may need to add ~/.local/bin to your PATH."
     fi
+fi
+
+# ============================================================================
+# Profile updates (-p) -- done after all tools are installed so that
+# flag state (e.g. INSTALL_PROTOC_FLAG, INSTALL_PROVER) is final.
+# ============================================================================
+
+if [ "$INSTALL_PROFILE" = "true" ]; then
+    update_path_and_profile
 fi
 
 # ============================================================================
