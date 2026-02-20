@@ -2,7 +2,7 @@
 remote_endpoint: https://fullnode.mainnet.aptoslabs.com
 # replace with below for actual release, compat test needs concrete URL above:
 # remote_endpoint: ~
-name: "vX.YY.Z"
+name: "v0.0.0"
 proposals:
   - name: proposal_1_upgrade_framework
     metadata:
