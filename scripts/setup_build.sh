@@ -21,35 +21,72 @@ set -e
 
 # ============================================================================
 # Tool Versions (pinned for reproducible builds)
+#
+# Every externally-downloaded tool is version-pinned here.  To upgrade a
+# tool, change its version constant and (if needed) update the download
+# URL pattern in the corresponding install_*() function.
 # ============================================================================
 
-# Node.js LTS major version -- used for JS/TS SDK development
-NODE_MAJOR_VERSION=20
+# -- Build tools --
 
-# ShellCheck -- static analysis for shell scripts (https://www.shellcheck.net/)
-SHELLCHECK_VERSION=0.7.1
+# Clang/LLVM -- C/C++ compiler used by Rust crates with native bindings
+# (https://apt.llvm.org/ for apt; system repos for others)
+CLANG_VERSION=21
+
+# cargo-sort -- keeps Cargo.toml [dependencies] sections alphabetically sorted
+# (https://crates.io/crates/cargo-sort)
+CARGO_SORT_VERSION=2.0.2
+
+# cargo-machete -- detects unused crate dependencies in Cargo.toml
+# (https://crates.io/crates/cargo-machete)
+CARGO_MACHETE_VERSION=0.9.1
+
+# cargo-nextest -- faster Rust test runner with better output and retries
+# (https://crates.io/crates/cargo-nextest)
+CARGO_NEXTEST_VERSION=0.9.128
 
 # grcov -- Rust source-code coverage aggregator (https://github.com/mozilla/grcov)
-GRCOV_VERSION=0.8.2
+GRCOV_VERSION=0.10.5
+
+# protoc -- Protocol Buffers compiler (https://github.com/protocolbuffers/protobuf)
+PROTOC_VERSION=29.3
+
+# -- Operations tools --
+
+# ShellCheck -- static analysis for shell scripts (https://www.shellcheck.net/)
+SHELLCHECK_VERSION=0.10.0
 
 # kubectl -- Kubernetes cluster CLI (https://kubernetes.io/docs/reference/kubectl/)
-KUBECTL_VERSION=1.18.6
+KUBECTL_VERSION=1.32.3
 
 # Terraform -- declarative infrastructure as code (https://www.terraform.io/)
-TERRAFORM_VERSION=0.12.26
+TERRAFORM_VERSION=1.10.5
 
 # Helm -- Kubernetes package manager (https://helm.sh/)
-HELM_VERSION=3.2.4
+HELM_VERSION=3.17.4
 
 # HashiCorp Vault -- secrets management (https://www.vaultproject.io/)
-VAULT_VERSION=1.5.0
+VAULT_VERSION=1.18.5
+
+# s5cmd -- high-performance S3 file manager (https://github.com/peak/s5cmd)
+S5CMD_VERSION=2.3.0
+
+# Allure -- test-reporting framework used in CI dashboards
+# (https://docs.qameta.io/allure/)  NOTE: pinned to diem fork release
+ALLURE_VERSION=2.15.pr1135
+
+# -- Move Prover tools --
 
 # Z3 -- SMT solver, primary backend for the Move Prover
 # (https://github.com/Z3Prover/z3)
+# NOTE: pinned to 4.11.2 because newer releases require glibc >= 2.35,
+# which would break CI containers on older distros.
 Z3_VERSION=4.11.2
 
 # cvc5 -- SMT solver, alternative backend for the Move Prover
 # (https://cvc5.github.io/)
+# NOTE: pinned to 0.0.3 because newer releases changed the binary
+# distribution format (zip archives instead of bare binaries).
 CVC5_VERSION=0.0.3
 
 # .NET SDK -- runtime needed to execute the Boogie verifier
@@ -58,15 +95,15 @@ DOTNET_VERSION=8.0
 
 # Boogie -- intermediate verification language used by the Move Prover
 # (https://github.com/boogie-org/boogie)
-BOOGIE_VERSION=3.5.1
+BOOGIE_VERSION=3.5.6
 
-# Allure -- test-reporting framework used in CI dashboards
-# (https://docs.qameta.io/allure/)
-ALLURE_VERSION=2.15.pr1135
+# -- JS/TS tools --
 
-# protoc -- Protocol Buffers compiler (note: the full version is 3.x;
-# only the minor.patch is tracked here, e.g. 21.4 means v3.21.4)
-PROTOC_VERSION=21.4
+# Node.js LTS major version -- used for JS/TS SDK development
+NODE_MAJOR_VERSION=22
+
+# pnpm -- fast, disk-efficient Node.js package manager (https://pnpm.io/)
+PNPM_VERSION=10.6.4
 
 # ============================================================================
 # Resolve script location and cd to repo root
@@ -197,7 +234,7 @@ COMPONENT FLAGS
 
     -J    Install JavaScript / TypeScript tools:
 
-            Node.js (v20)     JavaScript runtime.
+            Node.js (v22)     JavaScript runtime (LTS).
             pnpm              Fast, disk-efficient Node.js package manager.
 
 MODIFIER FLAGS
@@ -541,7 +578,7 @@ install_generic() {
 
 install_clang() {
     _pm="$1"
-    _version="${2:-21}"
+    _version="${2:-$CLANG_VERSION}"
 
     if [ "$_pm" = "apt-get" ]; then
         log_step "Installing Clang $_version from the LLVM apt repository"
@@ -670,8 +707,8 @@ install_cargo_sort() {
     if command -v cargo-sort >/dev/null 2>&1; then
         log_info "cargo-sort already installed"
     else
-        log_info "Installing cargo-sort (sorts Cargo.toml dependency sections)"
-        cargo install cargo-sort --locked --version 1.0.7 || \
+        log_info "Installing cargo-sort v${CARGO_SORT_VERSION} (sorts Cargo.toml dependency sections)"
+        cargo install cargo-sort --locked --version "${CARGO_SORT_VERSION}" || \
             die "Failed to install cargo-sort." \
                 "Ensure Rust is installed and cargo is in your PATH."
     fi
@@ -682,8 +719,8 @@ install_cargo_machete() {
     if command -v cargo-machete >/dev/null 2>&1; then
         log_info "cargo-machete already installed"
     else
-        log_info "Installing cargo-machete (detects unused crate dependencies)"
-        cargo install cargo-machete --locked --version 0.7.0 || \
+        log_info "Installing cargo-machete v${CARGO_MACHETE_VERSION} (detects unused crate dependencies)"
+        cargo install cargo-machete --locked --version "${CARGO_MACHETE_VERSION}" || \
             die "Failed to install cargo-machete."
     fi
 }
@@ -693,8 +730,8 @@ install_cargo_nextest() {
     if command -v cargo-nextest >/dev/null 2>&1; then
         log_info "cargo-nextest already installed"
     else
-        log_info "Installing cargo-nextest (faster Rust test runner)"
-        cargo install cargo-nextest --locked --version 0.9.85 || \
+        log_info "Installing cargo-nextest v${CARGO_NEXTEST_VERSION} (faster Rust test runner)"
+        cargo install cargo-nextest --locked --version "${CARGO_NEXTEST_VERSION}" || \
             die "Failed to install cargo-nextest."
     fi
 }
@@ -726,7 +763,7 @@ install_protoc() {
         _current="$("${INSTALL_DIR}protoc" --version 2>/dev/null || echo "")"
         case "$_current" in
             *"${PROTOC_VERSION}"*)
-                log_info "protoc 3.${PROTOC_VERSION} already installed"
+                log_info "protoc v${PROTOC_VERSION} already installed"
                 _skip_protoc="true"
                 ;;
         esac
@@ -940,11 +977,13 @@ install_terraform() {
 # ============================================================================
 
 install_kubectl() {
-    _current="$(kubectl version client --short=true 2>/dev/null | head -n 1 || echo "")"
-    if [ "$_current" = "Client Version: v${KUBECTL_VERSION}" ]; then
-        log_info "kubectl ${KUBECTL_VERSION} already installed"
-        return 0
-    fi
+    _current="$(kubectl version --client 2>/dev/null | head -n 1 || echo "")"
+    case "$_current" in
+        *"v${KUBECTL_VERSION}"*)
+            log_info "kubectl ${KUBECTL_VERSION} already installed"
+            return 0
+            ;;
+    esac
 
     log_info "Installing kubectl v${KUBECTL_VERSION} (Kubernetes CLI)"
 
@@ -958,10 +997,10 @@ install_kubectl() {
     _os="$(uname -s | tr '[:upper:]' '[:lower:]')"
 
     curl -sL -o "${INSTALL_DIR}/kubectl" \
-        "https://storage.googleapis.com/kubernetes-release/release/v${KUBECTL_VERSION}/bin/${_os}/${_machine}/kubectl" || \
+        "https://dl.k8s.io/release/v${KUBECTL_VERSION}/bin/${_os}/${_machine}/kubectl" || \
         die "Failed to download kubectl ${KUBECTL_VERSION} for ${_os}/${_machine}."
     chmod +x "${INSTALL_DIR}/kubectl"
-    kubectl version client --short=true 2>/dev/null | head -n 1 || true
+    kubectl version --client 2>/dev/null | head -n 1 || true
 }
 
 # ============================================================================
@@ -1022,7 +1061,7 @@ install_s5cmd() {
         return 0
     fi
 
-    log_info "Installing s5cmd (fast S3 file manager)"
+    log_info "Installing s5cmd v${S5CMD_VERSION} (fast S3 file manager)"
 
     if [ "$(uname -s)" = "Darwin" ]; then
         install_pkg peak/tap/s5cmd brew
@@ -1042,9 +1081,9 @@ install_s5cmd() {
         if [ -n "$_suffix" ]; then
             _tmpdir="$(mktemp -d)"
             curl -sL -o "${_tmpdir}/s5cmd.tar.gz" \
-                "https://github.com/peak/s5cmd/releases/download/v2.2.2/s5cmd_2.2.2_Linux-${_suffix}.tar.gz" || {
+                "https://github.com/peak/s5cmd/releases/download/v${S5CMD_VERSION}/s5cmd_${S5CMD_VERSION}_Linux-${_suffix}.tar.gz" || {
                 rm -rf "$_tmpdir"
-                die "Failed to download s5cmd for Linux/${_suffix}."
+                die "Failed to download s5cmd v${S5CMD_VERSION} for Linux/${_suffix}."
             }
             tar -C "$_tmpdir" -xzf "${_tmpdir}/s5cmd.tar.gz"
             mv "${_tmpdir}/s5cmd" "${INSTALL_DIR}/"
@@ -1273,9 +1312,9 @@ install_nodejs() {
 
 # pnpm -- fast, disk-efficient Node.js package manager
 install_pnpm() {
-    log_info "Installing pnpm v8.2.0 (Node.js package manager)"
+    log_info "Installing pnpm v${PNPM_VERSION} (Node.js package manager)"
     _shell_path="$(command -v sh)"
-    curl -fsSL https://get.pnpm.io/install.sh | PNPM_VERSION=8.2.0 SHELL="$_shell_path" sh - || \
+    curl -fsSL https://get.pnpm.io/install.sh | PNPM_VERSION="${PNPM_VERSION}" SHELL="$_shell_path" sh - || \
         log_warn "pnpm installation had issues -- you may need to install it manually"
 }
 
