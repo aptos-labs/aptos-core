@@ -21,6 +21,7 @@ use aptos_types::{
     chain_id::ChainId,
     contract_event::ContractEvent,
     event::{EventHandle, EventKey},
+    fee_statement::FeeStatement,
     move_utils::move_event_v2::MoveEventV2Type,
     on_chain_config::CurrentTimeMicroseconds,
     state_store::{state_key::StateKey, state_value::StateValueMetadata},
@@ -634,5 +635,172 @@ async fn test_fee_payer_mint_attributes_fee_to_fee_payer() {
             .unwrap(),
         fee_payer,
         "Fee should be attributed to the fee payer, not the sender"
+    );
+}
+
+#[tokio::test]
+async fn test_fee_payer_storage_refund_attributes_to_fee_payer() {
+    let context = test_rosetta_context().await;
+
+    let version = 0;
+    let amount = 100;
+    let storage_refund = 500u64;
+    let sender = AccountAddress::random();
+    let fee_payer = AccountAddress::random();
+    let store_address = AccountAddress::random();
+
+    let (mint_changes, mut mint_events) =
+        mint_fa_output(sender, APT_ADDRESS, store_address, 0, amount);
+
+    let fee_statement = FeeStatement::new(178, 100, 50, 28, storage_refund);
+    mint_events.push(
+        fee_statement
+            .create_event_v2()
+            .expect("Creating FeeStatement event should succeed"),
+    );
+
+    let input = test_fee_payer_transaction(sender, fee_payer, version, mint_changes, mint_events);
+
+    let result = Transaction::from_transaction(&context, input).await;
+    let expected_txn = result.expect("Must succeed");
+
+    assert_eq!(
+        3,
+        expected_txn.operations.len(),
+        "Expected deposit + storage refund deposit + fee, got: {:#?}",
+        expected_txn
+    );
+
+    let deposit_op = expected_txn.operations.first().unwrap();
+    assert_eq!(
+        deposit_op.operation_type,
+        OperationType::Deposit.to_string()
+    );
+    assert_eq!(
+        deposit_op
+            .account
+            .as_ref()
+            .unwrap()
+            .account_address()
+            .unwrap(),
+        sender,
+    );
+    assert_eq!(
+        deposit_op.amount.as_ref().unwrap().value,
+        format!("{}", amount)
+    );
+
+    let refund_op = expected_txn.operations.get(1).unwrap();
+    assert_eq!(
+        refund_op.operation_type,
+        OperationType::Deposit.to_string()
+    );
+    assert_eq!(
+        refund_op
+            .account
+            .as_ref()
+            .unwrap()
+            .account_address()
+            .unwrap(),
+        fee_payer,
+        "Storage fee refund should be attributed to the fee payer, not the sender"
+    );
+    assert_eq!(
+        refund_op.amount.as_ref().unwrap().value,
+        format!("{}", storage_refund)
+    );
+
+    let fee_op = expected_txn.operations.get(2).unwrap();
+    assert_eq!(fee_op.operation_type, OperationType::Fee.to_string());
+    assert_eq!(
+        fee_op
+            .account
+            .as_ref()
+            .unwrap()
+            .account_address()
+            .unwrap(),
+        fee_payer,
+        "Gas fee should be attributed to the fee payer, not the sender"
+    );
+}
+
+#[tokio::test]
+async fn test_no_fee_payer_storage_refund_attributes_to_sender() {
+    let context = test_rosetta_context().await;
+
+    let version = 0;
+    let amount = 100;
+    let storage_refund = 500u64;
+    let sender = AccountAddress::random();
+    let store_address = AccountAddress::random();
+
+    let (mint_changes, mut mint_events) =
+        mint_fa_output(sender, APT_ADDRESS, store_address, 0, amount);
+
+    let fee_statement = FeeStatement::new(178, 100, 50, 28, storage_refund);
+    mint_events.push(
+        fee_statement
+            .create_event_v2()
+            .expect("Creating FeeStatement event should succeed"),
+    );
+
+    let input = test_transaction(sender, version, mint_changes, mint_events);
+
+    let result = Transaction::from_transaction(&context, input).await;
+    let expected_txn = result.expect("Must succeed");
+
+    assert_eq!(
+        3,
+        expected_txn.operations.len(),
+        "Expected deposit + storage refund deposit + fee, got: {:#?}",
+        expected_txn
+    );
+
+    let deposit_op = expected_txn.operations.first().unwrap();
+    assert_eq!(
+        deposit_op.operation_type,
+        OperationType::Deposit.to_string()
+    );
+    assert_eq!(
+        deposit_op
+            .account
+            .as_ref()
+            .unwrap()
+            .account_address()
+            .unwrap(),
+        sender,
+    );
+
+    let refund_op = expected_txn.operations.get(1).unwrap();
+    assert_eq!(
+        refund_op.operation_type,
+        OperationType::Deposit.to_string()
+    );
+    assert_eq!(
+        refund_op
+            .account
+            .as_ref()
+            .unwrap()
+            .account_address()
+            .unwrap(),
+        sender,
+        "Storage fee refund should fall back to sender when no fee payer is present"
+    );
+    assert_eq!(
+        refund_op.amount.as_ref().unwrap().value,
+        format!("{}", storage_refund)
+    );
+
+    let fee_op = expected_txn.operations.get(2).unwrap();
+    assert_eq!(fee_op.operation_type, OperationType::Fee.to_string());
+    assert_eq!(
+        fee_op
+            .account
+            .as_ref()
+            .unwrap()
+            .account_address()
+            .unwrap(),
+        sender,
+        "Gas fee should fall back to sender when no fee payer is present"
     );
 }
