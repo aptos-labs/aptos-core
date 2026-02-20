@@ -973,6 +973,7 @@ if [[ "$PACKAGE_MANAGER" == "apt-get" ]]; then
   if [[ "$BATCH_MODE" == "false" ]]; then
     echo "Updating apt-get......"
   fi
+  "${PRE_COMMAND[@]}" rm -rf /var/lib/apt/lists/*
   "${PRE_COMMAND[@]}" apt-get update
   if [[ "$BATCH_MODE" == "false" ]]; then
     echo "Installing ca-certificates......"
