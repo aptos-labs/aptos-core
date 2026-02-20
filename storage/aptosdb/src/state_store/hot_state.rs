@@ -334,6 +334,15 @@ impl Committer {
                 continue;
             }
 
+            // If merged_state is too old for to_commit (persisted snapshot advanced
+            // while merge was deferred), wait for old views to drain so try_merge
+            // can advance merged_state.
+            while !self.merged_state.can_be_delta_base_of(&to_commit) {
+                if !self.try_merge() {
+                    std::thread::sleep(DEFERRED_MERGE_RETRY_INTERVAL);
+                }
+            }
+
             let committed_version = to_commit.next_version();
 
             // Build a layered view: delta(merged_state -> to_commit) over base DashMaps.
@@ -398,7 +407,9 @@ impl Committer {
                     );
                     self.handle_reset(state, ack);
                 },
-                Err(RecvTimeoutError::Timeout) => self.try_merge(),
+                Err(RecvTimeoutError::Timeout) => {
+                    self.try_merge();
+                },
                 Err(RecvTimeoutError::Disconnected) => return None,
             }
         };
@@ -441,15 +452,16 @@ impl Committer {
     /// a clean (no-delta) view. Readers who already cloned the old delta-bearing view are
     /// unaffected: the delta shadows changed keys, and unchanged keys agree between the delta's
     /// target and the updated DashMaps.
-    fn try_merge(&mut self) {
+    /// Returns `false` if blocked by lingering old views, `true` otherwise.
+    fn try_merge(&mut self) -> bool {
         self.old_views.retain(|v| v.strong_count() > 0);
         if !self.old_views.is_empty() {
-            return;
+            return false;
         }
 
         let target = self.committed.lock().state.clone();
         if self.merged_state.is_the_same(&target) {
-            return;
+            return true;
         }
 
         self.apply_delta_to_base(&target);
@@ -468,6 +480,7 @@ impl Committer {
             base: Arc::clone(&self.base),
         });
         Self::swap_view(&mut self.old_views, &mut self.committed.lock(), clean_view);
+        true
     }
 
     /// Apply the delta between `merged_state` and `target` to the base DashMaps.
