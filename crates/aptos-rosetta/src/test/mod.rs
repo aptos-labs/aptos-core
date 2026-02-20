@@ -467,14 +467,7 @@ fn test_fee_payer_transaction(
     let sender_private_key = Ed25519PrivateKey::generate_for_testing();
     let fee_payer_private_key = Ed25519PrivateKey::generate_for_testing();
 
-    let raw_txn = get_test_raw_transaction(
-        sender,
-        0,
-        None,
-        None,
-        Some(101),
-        None,
-    );
+    let raw_txn = get_test_raw_transaction(sender, 0, None, None, Some(101), None);
 
     let sender_auth = aptos_types::transaction::authenticator::AccountAuthenticator::ed25519(
         sender_private_key.public_key(),
@@ -572,22 +565,12 @@ async fn test_fee_payer_transfer_attributes_fee_to_fee_payer() {
     let fee_op = expected_txn.operations.get(2).unwrap();
     assert_eq!(fee_op.operation_type, OperationType::Fee.to_string());
     assert_eq!(
-        fee_op
-            .account
-            .as_ref()
-            .unwrap()
-            .account_address()
-            .unwrap(),
+        fee_op.account.as_ref().unwrap().account_address().unwrap(),
         fee_payer,
         "Fee should be attributed to the fee payer, not the sender"
     );
     assert_ne!(
-        fee_op
-            .account
-            .as_ref()
-            .unwrap()
-            .account_address()
-            .unwrap(),
+        fee_op.account.as_ref().unwrap().account_address().unwrap(),
         sender,
         "Fee must not be attributed to the sender when a fee payer is present"
     );
@@ -627,12 +610,7 @@ async fn test_fee_payer_mint_attributes_fee_to_fee_payer() {
     let fee_op = expected_txn.operations.get(1).unwrap();
     assert_eq!(fee_op.operation_type, OperationType::Fee.to_string());
     assert_eq!(
-        fee_op
-            .account
-            .as_ref()
-            .unwrap()
-            .account_address()
-            .unwrap(),
+        fee_op.account.as_ref().unwrap().account_address().unwrap(),
         fee_payer,
         "Fee should be attributed to the fee payer, not the sender"
     );
@@ -691,10 +669,7 @@ async fn test_fee_payer_storage_refund_attributes_to_fee_payer() {
     );
 
     let refund_op = expected_txn.operations.get(1).unwrap();
-    assert_eq!(
-        refund_op.operation_type,
-        OperationType::Deposit.to_string()
-    );
+    assert_eq!(refund_op.operation_type, OperationType::Deposit.to_string());
     assert_eq!(
         refund_op
             .account
@@ -713,12 +688,7 @@ async fn test_fee_payer_storage_refund_attributes_to_fee_payer() {
     let fee_op = expected_txn.operations.get(2).unwrap();
     assert_eq!(fee_op.operation_type, OperationType::Fee.to_string());
     assert_eq!(
-        fee_op
-            .account
-            .as_ref()
-            .unwrap()
-            .account_address()
-            .unwrap(),
+        fee_op.account.as_ref().unwrap().account_address().unwrap(),
         fee_payer,
         "Gas fee should be attributed to the fee payer, not the sender"
     );
@@ -772,10 +742,7 @@ async fn test_no_fee_payer_storage_refund_attributes_to_sender() {
     );
 
     let refund_op = expected_txn.operations.get(1).unwrap();
-    assert_eq!(
-        refund_op.operation_type,
-        OperationType::Deposit.to_string()
-    );
+    assert_eq!(refund_op.operation_type, OperationType::Deposit.to_string());
     assert_eq!(
         refund_op
             .account
@@ -794,12 +761,7 @@ async fn test_no_fee_payer_storage_refund_attributes_to_sender() {
     let fee_op = expected_txn.operations.get(2).unwrap();
     assert_eq!(fee_op.operation_type, OperationType::Fee.to_string());
     assert_eq!(
-        fee_op
-            .account
-            .as_ref()
-            .unwrap()
-            .account_address()
-            .unwrap(),
+        fee_op.account.as_ref().unwrap().account_address().unwrap(),
         sender,
         "Gas fee should fall back to sender when no fee payer is present"
     );
@@ -870,10 +832,7 @@ async fn test_storage_refund_exceeds_gas_fee() {
 
     // Operation 1: storage refund deposit to the fee payer (positive value)
     let refund_op = expected_txn.operations.get(1).unwrap();
-    assert_eq!(
-        refund_op.operation_type,
-        OperationType::Deposit.to_string()
-    );
+    assert_eq!(refund_op.operation_type, OperationType::Deposit.to_string());
     assert_eq!(
         refund_op
             .account
@@ -894,12 +853,7 @@ async fn test_storage_refund_exceeds_gas_fee() {
     let fee_op = expected_txn.operations.get(2).unwrap();
     assert_eq!(fee_op.operation_type, OperationType::Fee.to_string());
     assert_eq!(
-        fee_op
-            .account
-            .as_ref()
-            .unwrap()
-            .account_address()
-            .unwrap(),
+        fee_op.account.as_ref().unwrap().account_address().unwrap(),
         fee_payer,
         "Gas fee should be charged to the fee payer"
     );
