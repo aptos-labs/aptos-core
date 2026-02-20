@@ -868,7 +868,7 @@ module std::features {
         is_enabled(SLH_DSA_SHA2_128S_SIGNATURE)
     }
 
-    /// Whether the monotonically increasing counter native function is enabled.
+    /// Whether the encrypted mempool feature is enabled.
     const ENCRYPTED_TRANSACTIONS: u64 = 108;
 
     public fun get_encrypted_transactions_feature(): u64 {
