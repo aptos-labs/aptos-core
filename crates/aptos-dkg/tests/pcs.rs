@@ -196,7 +196,7 @@ mod shplonked {
             .zip(rs.iter())
             .map(|(p, r)| Shplonked::<Bn254>::commit(&ck, p.clone(), Some(*r)))
             .collect();
-        let commitments_affine: Vec<_> = commitments.iter().map(|c| c.0.into_affine()).collect();
+        let commitment_msms: Vec<_> = commitments.iter().map(|c| c.clone().into()).collect();
 
         let mut trs_prover = merlin::Transcript::new(PCS_BATCH_DST);
         let proof = Shplonked::<Bn254>::batch_open(
@@ -209,13 +209,7 @@ mod shplonked {
         );
 
         let mut trs_verifier = merlin::Transcript::new(PCS_BATCH_DST);
-        zk_pcs_verify(
-            &proof,
-            &commitments_affine,
-            &vk,
-            &mut trs_verifier,
-            &mut rng,
-        )
-        .expect("batch verify should succeed");
+        zk_pcs_verify(&proof, &commitment_msms, &vk, &mut trs_verifier, &mut rng)
+            .expect("batch verify should succeed");
     }
 }

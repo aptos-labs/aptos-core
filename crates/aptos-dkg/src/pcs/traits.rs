@@ -15,7 +15,10 @@ pub trait PolynomialCommitmentScheme {
     type Polynomial: Clone;
     type WitnessField: Copy + From<u64> + Debug + Eq; // So the domain of a polynomial is a Vec<WitnessField>
                                                       // For small fields, add ChallengeField here, which should probably have a from-WitnessField-property
-    type Commitment: Clone;
+    /// Commitment produced by the prover (e.g. a group element).
+    type Commitment: Clone + Into<Self::VerifierCommitment>;
+    /// Commitment representation accepted by the verifier (e.g. `MsmInput` so it can be merged into one MSM).
+    type VerifierCommitment: Clone;
     type Proof: Clone;
 
     fn setup<R: RngCore + CryptoRng>(
@@ -54,7 +57,7 @@ pub trait PolynomialCommitmentScheme {
 
     fn verify(
         vk: &Self::VerificationKey,
-        com: Self::Commitment,
+        com: impl Into<Self::VerifierCommitment>,
         challenge: Vec<Self::WitnessField>,
         eval: Self::WitnessField,
         proof: Self::Proof,

@@ -20,6 +20,7 @@ use crate::{
     Scalar,
 };
 use aptos_crypto::arkworks::{
+    msm::{merge_scaled_msm_terms, MsmInput},
     random::sample_field_element,
     srs::{SrsBasis, SrsType},
     GroupGenerators,
@@ -367,10 +368,11 @@ pub fn zk_pcs_open<E: Pairing, R: RngCore + CryptoRng>(
 
 /// Verifier derives gamma, z and c from the shared transcript (same trs as prover, or
 /// a fresh transcript with the same DST and prior content so challenges match).
+/// Commitments are given as MSM inputs so they can be combined into one MSM with the opening weights.
 #[allow(non_snake_case)]
 pub fn zk_pcs_verify<E: Pairing, R: RngCore + CryptoRng>(
     zk_pcs_opening_proof: &ZkPcsOpeningProof<E>,
-    commitments: &[E::G1Affine],
+    commitment_msms: &[MsmInput<E::G1Affine, E::ScalarField>],
     srs: &Srs<E>,
     trs: &mut merlin::Transcript,
     rng: &mut R,
@@ -416,7 +418,11 @@ pub fn zk_pcs_verify<E: Pairing, R: RngCore + CryptoRng>(
         gamma_i *= gamma;
     }
 
-    let sum_com = E::G1::msm_unchecked(commitments, &alphas);
+    let commitment_refs: Vec<&MsmInput<E::G1Affine, E::ScalarField>> =
+        commitment_msms.iter().collect();
+    let merged = merge_scaled_msm_terms::<E::G1>(&commitment_refs, &alphas);
+    let sum_com = E::G1::msm(merged.bases(), merged.scalars())
+        .expect("Shplonked verify: merged commitment MSM");
 
     let z_T_val = z_T.evaluate(&z);
 
@@ -490,6 +496,17 @@ pub fn zk_pcs_verify<E: Pairing, R: RngCore + CryptoRng>(
 #[derive(Clone, Debug, PartialEq, Eq, CanonicalSerialize, CanonicalDeserialize)]
 pub struct ShplonkedCommitment<E: Pairing>(pub E::G1);
 
+/// Verifier input: MSM representation so it can be merged into one big MSM in verify.
+pub type ShplonkedVerifierCommitment<E> =
+    MsmInput<<E as Pairing>::G1Affine, <E as Pairing>::ScalarField>;
+
+impl<E: Pairing> From<ShplonkedCommitment<E>> for ShplonkedVerifierCommitment<E> {
+    fn from(com: ShplonkedCommitment<E>) -> Self {
+        MsmInput::new(vec![com.0.into_affine()], vec![E::ScalarField::ONE])
+            .expect("single base and scalar")
+    }
+}
+
 impl<E> PolynomialCommitmentScheme for Shplonked<E>
 where
     E: Pairing,
@@ -499,6 +516,7 @@ where
     type Polynomial = DensePolynomial<E::ScalarField>;
     type Proof = ZkPcsOpeningProof<E>;
     type VerificationKey = Srs<E>;
+    type VerifierCommitment = ShplonkedVerifierCommitment<E>;
     type WitnessField = E::ScalarField;
 
     fn setup<R: rand_core::RngCore + rand_core::CryptoRng>(
@@ -616,7 +634,7 @@ where
 
     fn verify(
         vk: &Self::VerificationKey,
-        com: Self::Commitment,
+        com: impl Into<Self::VerifierCommitment>,
         challenge: Vec<Self::WitnessField>,
         eval: Self::WitnessField,
         proof: Self::Proof,
@@ -636,8 +654,8 @@ where
             "claimed eval does not match opening proof"
         );
         let mut rng = rand::thread_rng();
-        let commitments = vec![com.0.into_affine()];
-        zk_pcs_verify(&proof, &commitments, vk, trs, &mut rng)
+        let com_msm = com.into();
+        zk_pcs_verify(&proof, &[com_msm], vk, trs, &mut rng)
     }
 
     fn random_witness<R: rand_core::RngCore + rand_core::CryptoRng>(

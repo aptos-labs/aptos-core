@@ -73,6 +73,16 @@ impl<P: Pairing> Default for ZeromorphCommitment<P> {
     }
 }
 
+/// Verifier input type; same as commitment for Zeromorph (no MSM merging).
+#[derive(Clone, Debug, PartialEq, CanonicalSerialize, CanonicalDeserialize)]
+pub struct ZeromorphVerifierCommitment<P: Pairing>(pub ZeromorphCommitment<P>);
+
+impl<P: Pairing> From<ZeromorphCommitment<P>> for ZeromorphVerifierCommitment<P> {
+    fn from(c: ZeromorphCommitment<P>) -> Self {
+        Self(c)
+    }
+}
+
 #[derive(Clone, CanonicalSerialize, CanonicalDeserialize, Debug)]
 pub struct ZeromorphProof<P: Pairing> {
     pub pi: univariate_hiding_kzg::OpeningProof<P>,
@@ -555,6 +565,7 @@ where
     type Polynomial = DenseMultilinearExtension<P::ScalarField>;
     type Proof = ZeromorphProof<P>;
     type VerificationKey = ZeromorphVerifierKey<P>;
+    type VerifierCommitment = ZeromorphVerifierCommitment<P>;
     type WitnessField = P::ScalarField;
 
     fn polynomial_from_vec(vec: Vec<Self::WitnessField>) -> Self::Polynomial {
@@ -666,14 +677,15 @@ where
 
     fn verify(
         vk: &Self::VerificationKey,
-        com: Self::Commitment,
+        com: impl Into<Self::VerifierCommitment>,
         challenge: Vec<Self::WitnessField>,
         eval: Self::WitnessField,
         proof: Self::Proof,
         trs: &mut merlin::Transcript,
         batch: bool,
     ) -> anyhow::Result<()> {
-        Zeromorph::verify(&vk, &com, &challenge, &eval, &proof, trs, batch)
+        let com = com.into();
+        Zeromorph::verify(&vk, &com.0, &challenge, &eval, &proof, trs, batch)
     }
 
     fn random_witness<R: RngCore + CryptoRng>(rng: &mut R) -> Self::WitnessField {
