@@ -59,24 +59,6 @@ pub struct PreparedBIBECiphertext {
     pub(crate) symmetric_ciphertext: SymmetricCiphertext,
 }
 
-#[cfg(test)]
-impl BIBECiphertext {
-    pub(crate) fn blank_for_testing() -> Self {
-        use ark_std::Zero;
-
-        BIBECiphertext {
-            id: Id::new(Fr::zero()),
-            ct_g2: [
-                G2Affine::generator(),
-                (G2Affine::generator() * Fr::from(2)).into(),
-                (G2Affine::generator() * Fr::from(3)).into(),
-            ],
-            padded_key: OneTimePaddedKey::blank_for_testing(),
-            symmetric_ciphertext: SymmetricCiphertext::blank_for_testing(),
-        }
-    }
-}
-
 pub trait BIBECTEncrypt {
     type CT: InnerCiphertext;
 
@@ -193,6 +175,24 @@ impl<P: Plaintext> BIBECTDecrypt<P> for BIBEDecryptionKey {
 }
 
 #[cfg(test)]
+impl BIBECiphertext {
+    pub(crate) fn blank_for_testing() -> Self {
+        use ark_std::Zero;
+
+        BIBECiphertext {
+            id: Id::new(Fr::zero()),
+            ct_g2: [
+                G2Affine::generator(),
+                (G2Affine::generator() * Fr::from(2)).into(),
+                (G2Affine::generator() * Fr::from(3)).into(),
+            ],
+            padded_key: OneTimePaddedKey::blank_for_testing(),
+            symmetric_ciphertext: SymmetricCiphertext::blank_for_testing(),
+        }
+    }
+}
+
+#[cfg(test)]
 pub mod tests {
     use super::{BIBECTDecrypt, BIBECTEncrypt};
     use crate::{
@@ -218,7 +218,7 @@ pub mod tests {
         let tc = ShamirThresholdConfig::new(1, 1);
         let (ek, dk, _, msk_shares) = FPTX::setup_for_testing(rng.r#gen(), 8, 1, &tc).unwrap();
 
-        let mut ids = IdSet::with_capacity(dk.capacity()).unwrap();
+        let mut ids = IdSet::with_capacity(dk.capacity());
         let mut counter = Fr::zero();
 
         for _ in 0..dk.capacity() {

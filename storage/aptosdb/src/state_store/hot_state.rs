@@ -874,6 +874,55 @@ mod tests {
         assert_eq!(hot_state.merged_version.load(Ordering::Acquire), 2);
     }
 
+    /// Regression test: the committer must not crash when `merged_state` lags behind
+    /// the `base_layer` of an incoming `to_commit`.
+    ///
+    /// In production, `State::update()` spawns new `MapLayer` shards with
+    /// `base_layer = persisted_snapshot.layer()`. When old readers prevent
+    /// `try_merge()` from advancing `merged_state`, and `persisted_snapshot`
+    /// has advanced, the committer's `merged_state` can be at a lower layer than
+    /// `to_commit.base_layer`. The fix makes the committer wait for merge before
+    /// building the delta.
+    ///
+    /// Timeline:
+    /// ```text
+    ///   r0 holds V0_clean ──► blocks all merges (merged_state stuck at S0)
+    ///   S1 committed (base_layer=0) ──► delta(S0→S1) OK
+    ///   S2 committed (base_layer=1) ──► delta(S0→S2) would crash without fix
+    ///   drop(r0) ──► merge to S1 proceeds, then delta(S1→S2) OK
+    /// ```
+    #[test]
+    fn test_commit_with_advanced_base_layer() {
+        let state0 = State::new_empty(TEST_CONFIG);
+        let hot_state = HotState::new(state0.clone(), TEST_CONFIG);
+
+        // Hold a view to block all merges (merged_state stays at S0).
+        let (held_view, _) = hot_state.get_committed();
+
+        // S1: spawned with root=S0, so base_layer = S0.layer = 0.
+        // Compatible with merged_state at S0.
+        let state1 = build_empty_descendant(&state0, &state0, 0);
+        hot_state.enqueue_commit(state1.clone());
+        wait_for_committed_version(&hot_state, 1);
+
+        // S2: spawned with root=S1, simulating persisted_snapshot advancing to S1.
+        // This gives base_layer = S1.layer = 1, incompatible with merged_state
+        // still at S0 (layer 0). Without the fix this panics.
+        let state2 = build_empty_descendant(&state1, &state1, 1);
+        hot_state.enqueue_commit(state2);
+
+        // Give the committer time to pick up S2 and hit the incompatible
+        // merged_state. Without the fix, this would panic.
+        std::thread::sleep(Duration::from_millis(100));
+
+        // Drop the held view so the committer can merge S0→S1, then process S2.
+        drop(held_view);
+
+        hot_state.wait_for_merge(2);
+        let (_, committed) = hot_state.get_committed();
+        assert_eq!(committed.next_version(), 2);
+    }
+
     #[test]
     fn test_rapid_commits_with_lingering_reader() {
         let state0 = State::new_empty(TEST_CONFIG);
