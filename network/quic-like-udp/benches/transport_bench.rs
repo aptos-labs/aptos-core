@@ -5,15 +5,15 @@
 //!
 //! Measures:
 //! 1. Handshake latency (connection establishment)
-//! 2. Small message throughput (< 1 KB)
-//! 3. Large message throughput (1 MB)
-//! 4. Packet encoding/decoding
-//! 5. Noise encrypt/decrypt per datagram
-//! 6. Reliability layer overhead (ACK processing, retransmission check)
+//! 2. Noise encrypt/decrypt per datagram
+//! 3. Packet encoding/decoding
+//! 4. Reliability layer overhead (ACK processing, retransmission check)
+//! 5. Stream messaging throughput
+//! 6. End-to-end UDP connection handshake vs TCP+Noise handshake
 
 use criterion::{criterion_group, criterion_main, BenchmarkId, Criterion, Throughput};
 
-use aptos_crypto::{x25519, Uniform};
+use aptos_crypto::{noise::NoiseConfig, x25519, Uniform};
 use aptos_quic_like_udp::{
     connection::{Connection, ConnectionConfig},
     crypto::{DatagramCrypto, NoiseHandshake},
@@ -32,6 +32,11 @@ fn make_keypair(seed: [u8; 32]) -> (x25519::PrivateKey, x25519::PublicKey) {
     let priv_key = x25519::PrivateKey::generate(&mut rng);
     let pub_key = priv_key.public_key();
     (priv_key, pub_key)
+}
+
+fn reconstruct_key(seed: [u8; 32]) -> x25519::PrivateKey {
+    let mut rng = StdRng::from_seed(seed);
+    x25519::PrivateKey::generate(&mut rng)
 }
 
 fn make_crypto_pair() -> (DatagramCrypto, DatagramCrypto) {
@@ -103,9 +108,6 @@ fn bench_noise_encrypt_decrypt(c: &mut Criterion) {
             let (mut enc, mut dec) = make_crypto_pair();
             let ciphertext = enc.encrypt(&plaintext).unwrap();
             b.iter(|| {
-                // We need a fresh pair each iteration since nonces advance.
-                // For throughput measurement, we create the pair outside.
-                // This is an approximation.
                 let _ = dec.decrypt(&ciphertext);
             });
         });
@@ -116,12 +118,13 @@ fn bench_noise_encrypt_decrypt(c: &mut Criterion) {
 
 fn bench_noise_handshake(c: &mut Criterion) {
     c.bench_function("noise_ik_handshake", |b| {
-        let (init_priv, _) = make_keypair([10u8; 32]);
-        let (resp_priv, resp_pub) = make_keypair([20u8; 32]);
-
         b.iter(|| {
-            let initiator = NoiseHandshake::new(init_priv.clone());
-            let responder = NoiseHandshake::new(resp_priv.clone());
+            let init_priv = reconstruct_key([10u8; 32]);
+            let resp_priv = reconstruct_key([20u8; 32]);
+            let resp_pub = resp_priv.public_key();
+
+            let initiator = NoiseHandshake::new(init_priv);
+            let responder = NoiseHandshake::new(resp_priv);
 
             let prologue = b"bench-handshake";
             let (init_state, init_msg) = initiator
@@ -143,7 +146,7 @@ fn bench_reliability_send_ack(c: &mut Criterion) {
     group.bench_function("register_sent_100", |b| {
         b.iter(|| {
             let mut tracker = SendTracker::new(ReliabilityConfig::default());
-            for i in 0u64..100 {
+            for _i in 0u64..100 {
                 tracker.register_sent(vec![0u8; 100]);
             }
         });
@@ -168,7 +171,6 @@ fn bench_reliability_send_ack(c: &mut Criterion) {
     group.bench_function("recv_reorder_100", |b| {
         b.iter(|| {
             let mut tracker = RecvTracker::new();
-            // Deliver packets in reverse order
             for i in (0u64..100).rev() {
                 tracker.receive(i, vec![0u8; 100]);
             }
@@ -209,14 +211,14 @@ fn bench_udp_handshake_e2e(c: &mut Criterion) {
     c.bench_function("udp_connection_handshake_e2e", |b| {
         b.iter(|| {
             rt.block_on(async {
-                let (client_priv, _) = make_keypair([30u8; 32]);
-                let (server_priv, server_pub) = make_keypair([40u8; 32]);
+                let client_priv = reconstruct_key([30u8; 32]);
+                let server_priv = reconstruct_key([40u8; 32]);
+                let server_pub = server_priv.public_key();
 
                 let server_sock = Arc::new(UdpSocket::bind("127.0.0.1:0").await.unwrap());
                 let server_addr = server_sock.local_addr().unwrap();
                 let client_sock = Arc::new(UdpSocket::bind("127.0.0.1:0").await.unwrap());
 
-                let server_priv_c = server_priv.clone();
                 let server_sock_c = server_sock.clone();
 
                 let server_handle = tokio::spawn(async move {
@@ -229,7 +231,7 @@ fn bench_udp_handshake_e2e(c: &mut Criterion) {
                         server_sock_c,
                         ConnectionConfig::default(),
                     );
-                    conn.accept_inbound(&server_priv_c, &pkt).await.unwrap()
+                    conn.accept_inbound(server_priv, &pkt).await.unwrap()
                 });
 
                 let mut client_conn = Connection::new(
@@ -239,7 +241,7 @@ fn bench_udp_handshake_e2e(c: &mut Criterion) {
                     ConnectionConfig::default(),
                 );
                 client_conn
-                    .connect_outbound(&client_priv, server_pub)
+                    .connect_outbound(client_priv, server_pub)
                     .await
                     .unwrap();
 
@@ -251,17 +253,15 @@ fn bench_udp_handshake_e2e(c: &mut Criterion) {
 
 fn bench_tcp_noise_handshake_comparison(c: &mut Criterion) {
     use aptos_memsocket::MemorySocket;
-    use aptos_crypto::noise::NoiseConfig;
     use futures::executor::block_on;
     use futures::future::join;
 
     c.bench_function("tcp_noise_handshake_memsocket", |b| {
-        let (init_priv, _) = make_keypair([50u8; 32]);
-        let (resp_priv, resp_pub) = make_keypair([60u8; 32]);
+        let (_, resp_pub) = make_keypair([60u8; 32]);
 
         b.iter(|| {
-            let initiator = NoiseConfig::new(init_priv.clone());
-            let responder = NoiseConfig::new(resp_priv.clone());
+            let initiator = NoiseConfig::new(reconstruct_key([50u8; 32]));
+            let responder = NoiseConfig::new(reconstruct_key([60u8; 32]));
 
             let (dialer, listener) = MemorySocket::new_pair();
 
