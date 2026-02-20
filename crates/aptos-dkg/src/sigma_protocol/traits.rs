@@ -78,10 +78,8 @@ pub trait Trait:
         )
     }
 
-    /// Verify a component given an explicit Fiat–Shamir challenge (e.g. when this homomorphism
-    /// is used inside a tuple and the challenge was derived from the tuple's first message).
-    ///
-    /// `verifier_batch_size`: same as in [`verify`](Self::verify); `None` = infer from statement.
+    /// Verify the equations coming from the proof given an explicit Fiat–Shamir challenge
+    /// (derived from the proof's first message).
     fn verify_with_challenge<R: RngCore + CryptoRng>(
         &self,
         public_statement: &Self::CodomainNormalized,
@@ -109,8 +107,8 @@ impl<T: CurveGroupTrait> Trait for T {
         verifier_batch_size: Option<usize>,
         rng: &mut R,
     ) -> anyhow::Result<()> {
-        let number_of_beta_powers = verifier_batch_size
-            .unwrap_or_else(|| public_statement.clone().into_iter().count());
+        let number_of_beta_powers =
+            verifier_batch_size.unwrap_or_else(|| public_statement.clone().into_iter().count());
         let powers_of_beta = if number_of_beta_powers > 1 {
             let beta = sample_field_element(rng);
             utils::powers(beta, number_of_beta_powers)

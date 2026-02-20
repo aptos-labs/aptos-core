@@ -6,14 +6,14 @@ use crate::{
     sigma_protocol::{
         homomorphism,
         homomorphism::{fixed_base_msms, EntrywiseMap},
-        traits::{prove_homomorphism, verifier_challenges_with_length},
+        traits::verifier_challenges_with_length,
         Proof, Trait as _,
     },
 };
 use anyhow::ensure;
 use aptos_crypto::arkworks::msm::MsmInput;
 use ark_ec::{pairing::Pairing, CurveGroup};
-use ark_ff::Zero;
+use ark_ff::{PrimeField, Zero};
 use ark_serialize::{
     CanonicalDeserialize, CanonicalSerialize, Compress, Read, SerializationError, Valid,
 };
@@ -44,9 +44,9 @@ where
     pub hom2: H2,
 }
 
-// When we know that the two homomorphisms are both going to be fixed_base_msms with the same group, we can
-// perform certain optimizations in the verifier of the sigma protocol; hence we set up a separate struct
-// for this case
+// When we know that the two homomorphisms are both going to be `FixedBaseMsms` with the same curve group,
+// we can perform certain optimizations in the verifier of the sigma protocol; hence we set up a separate
+// struct for this case
 #[derive(CanonicalSerialize, Debug, Clone, PartialEq, Eq)]
 pub struct CurveGroupTupleHomomorphism<C, H1, H2>
 where
@@ -60,6 +60,7 @@ where
 }
 
 // We need to add `E: Pairing` because of the sigma protocol implementation below, Rust wouldn't allow that otherwise
+// TODO: do we need this? is this better than TupleHomomorphism?
 #[derive(CanonicalSerialize, Debug, Clone, PartialEq, Eq)]
 pub struct PairingTupleHomomorphism<E, H1, H2>
 where
@@ -70,6 +71,50 @@ where
     pub hom1: H1,
     pub hom2: H2,
     pub _pairing: std::marker::PhantomData<E>,
+}
+
+/// Shared logic for tuple homomorphisms: apply both components and normalize.
+fn tuple_apply<H1, H2>(
+    hom1: &H1,
+    hom2: &H2,
+    x: &H1::Domain,
+) -> TupleCodomainShape<H1::Codomain, H2::Codomain>
+where
+    H1: homomorphism::Trait,
+    H2: homomorphism::Trait<Domain = H1::Domain>,
+{
+    TupleCodomainShape(hom1.apply(x), hom2.apply(x))
+}
+
+fn tuple_normalize<H1, H2>(
+    hom1: &H1,
+    hom2: &H2,
+    value: TupleCodomainShape<H1::Codomain, H2::Codomain>,
+) -> TupleCodomainShape<H1::CodomainNormalized, H2::CodomainNormalized>
+where
+    H1: homomorphism::Trait,
+    H2: homomorphism::Trait<Domain = H1::Domain>,
+{
+    TupleCodomainShape(H1::normalize(hom1, value.0), H2::normalize(hom2, value.1))
+}
+
+fn tuple_statement_lengths<A, B>(stmt: &TupleCodomainShape<A, B>) -> (usize, usize)
+where
+    A: Clone + IntoIterator,
+    B: Clone + IntoIterator,
+{
+    (
+        stmt.0.clone().into_iter().count(), // TODO: cloning is not ideal here
+        stmt.1.clone().into_iter().count(),
+    )
+}
+
+fn powers_of_beta<F: PrimeField, R: RngCore>(n: usize, rng: &mut R) -> Vec<F> {
+    if n > 1 {
+        aptos_crypto::utils::powers(aptos_crypto::arkworks::random::sample_field_element(rng), n)
+    } else {
+        vec![F::ONE]
+    }
 }
 
 /// Implements `Homomorphism` for `TupleHomomorphism` by applying both
@@ -90,14 +135,11 @@ where
     type Domain = H1::Domain;
 
     fn apply(&self, x: &Self::Domain) -> Self::Codomain {
-        TupleCodomainShape(self.hom1.apply(x), self.hom2.apply(x))
+        tuple_apply(&self.hom1, &self.hom2, x)
     }
 
     fn normalize(&self, value: Self::Codomain) -> Self::CodomainNormalized {
-        TupleCodomainShape(
-            H1::normalize(&self.hom1, value.0),
-            H2::normalize(&self.hom2, value.1),
-        )
+        tuple_normalize(&self.hom1, &self.hom2, value)
     }
 }
 
@@ -114,14 +156,11 @@ where
     type Domain = H1::Domain;
 
     fn apply(&self, x: &Self::Domain) -> Self::Codomain {
-        TupleCodomainShape(self.hom1.apply(x), self.hom2.apply(x))
+        tuple_apply(&self.hom1, &self.hom2, x)
     }
 
     fn normalize(&self, value: Self::Codomain) -> Self::CodomainNormalized {
-        TupleCodomainShape(
-            H1::normalize(&self.hom1, value.0),
-            H2::normalize(&self.hom2, value.1),
-        )
+        tuple_normalize(&self.hom1, &self.hom2, value)
     }
 }
 
@@ -138,14 +177,11 @@ where
     type Domain = H1::Domain;
 
     fn apply(&self, x: &Self::Domain) -> Self::Codomain {
-        TupleCodomainShape(self.hom1.apply(x), self.hom2.apply(x))
+        tuple_apply(&self.hom1, &self.hom2, x)
     }
 
     fn normalize(&self, value: Self::Codomain) -> Self::CodomainNormalized {
-        TupleCodomainShape(
-            H1::normalize(&self.hom1, value.0),
-            H2::normalize(&self.hom2, value.1),
-        )
+        tuple_normalize(&self.hom1, &self.hom2, value)
     }
 }
 
@@ -317,19 +353,6 @@ where
         )
     }
 
-    fn prove<Ct: Serialize, R: RngCore + CryptoRng>(
-        &self,
-        witness: &<Self as homomorphism::Trait>::Domain,
-        statement: <Self as homomorphism::Trait>::Codomain,
-        cntxt: &Ct, // for SoK purposes
-        rng: &mut R,
-    ) -> (
-        Proof<H1::Scalar, Self>,
-        <Self as homomorphism::Trait>::CodomainNormalized,
-    ) {
-        prove_homomorphism(self, witness, statement, cntxt, true, rng, &self.dst())
-    }
-
     fn verify_with_challenge<R: RngCore + CryptoRng>(
         &self,
         public_statement: &Self::CodomainNormalized,
@@ -365,19 +388,6 @@ where
         )
     }
 
-    fn prove<Ct: Serialize, R: RngCore + CryptoRng>(
-        &self,
-        witness: &<Self as homomorphism::Trait>::Domain,
-        statement: <Self as homomorphism::Trait>::Codomain,
-        cntxt: &Ct, // for SoK purposes
-        rng: &mut R,
-    ) -> (
-        Proof<H1::Scalar, Self>,
-        <Self as homomorphism::Trait>::CodomainNormalized,
-    ) {
-        prove_homomorphism(self, witness, statement, cntxt, true, rng, &self.dst())
-    }
-
     #[allow(non_snake_case)]
     fn verify_with_challenge<R: RngCore + CryptoRng>(
         &self,
@@ -388,32 +398,15 @@ where
         _verifier_batch_size: Option<usize>,
         rng: &mut R,
     ) -> anyhow::Result<()> {
-        let len1 = public_statement.0.clone().into_iter().count();
-        let len2 = public_statement.1.clone().into_iter().count();
-        let n = len1 + len2;
-        let powers_of_beta = if n > 1 {
-            aptos_crypto::utils::powers(
-                aptos_crypto::arkworks::random::sample_field_element(rng),
-                n,
-            )
-        } else {
-            vec![<E::ScalarField as ark_ff::Field>::ONE]
-        };
-        let (first_powers_of_beta, second_powers_of_beta) = powers_of_beta.split_at(len1);
-        let (first_msm_terms_of_response, second_msm_terms_of_response) = self.msm_terms(response);
-        let first_input = H1::merge_msm_terms(
-            first_msm_terms_of_response.into_iter().collect(),
-            &prover_commitment.0,
-            &public_statement.0,
-            first_powers_of_beta,
+        let (len1, len2) = tuple_statement_lengths(public_statement);
+        let powers_of_beta = powers_of_beta::<E::ScalarField, _>(len1 + len2, rng);
+        let (first_input, second_input) = self.merge_msm_terms_for_verify(
+            response,
+            prover_commitment,
+            public_statement,
             challenge,
-        );
-        let second_input = H2::merge_msm_terms(
-            second_msm_terms_of_response.into_iter().collect(),
-            &prover_commitment.1,
-            &public_statement.1,
-            second_powers_of_beta,
-            challenge,
+            &powers_of_beta,
+            len1,
         );
         ensure!(H1::msm_eval(first_input) == H1::MsmOutput::zero());
         ensure!(H2::msm_eval(second_input) == H2::MsmOutput::zero());
@@ -439,6 +432,38 @@ where
         let terms1 = self.hom1.msm_terms(input);
         let terms2 = self.hom2.msm_terms(input);
         (terms1, terms2)
+    }
+
+    /// Merges MSM terms for both components; shared by verify_with_challenge and msm_terms_for_verify.
+    fn merge_msm_terms_for_verify(
+        &self,
+        response: &H1::Domain,
+        prover_commitment: &TupleCodomainShape<H1::CodomainNormalized, H2::CodomainNormalized>,
+        public_statement: &TupleCodomainShape<H1::CodomainNormalized, H2::CodomainNormalized>,
+        challenge: E::ScalarField,
+        powers_of_beta: &[E::ScalarField],
+        len1: usize,
+    ) -> (
+        MsmInput<H1::Base, H1::Scalar>,
+        MsmInput<H2::Base, H2::Scalar>,
+    ) {
+        let (first_powers, second_powers) = powers_of_beta.split_at(len1);
+        let (first_terms, second_terms) = self.msm_terms(response);
+        let first_input = H1::merge_msm_terms(
+            first_terms.into_iter().collect(),
+            &prover_commitment.0,
+            &public_statement.0,
+            first_powers,
+            challenge,
+        );
+        let second_input = H2::merge_msm_terms(
+            second_terms.into_iter().collect(),
+            &prover_commitment.1,
+            &public_statement.1,
+            second_powers,
+            challenge,
+        );
+        (first_input, second_input)
     }
 
     // TODO: maybe remove, see comment below
@@ -477,17 +502,13 @@ where
         H: homomorphism::Trait<
             Domain = <Self as homomorphism::Trait>::Domain,
             CodomainNormalized = <Self as homomorphism::Trait>::CodomainNormalized,
-        >, // need this?
+        >,
     {
         let prover_first_message = proof
             .prover_commitment()
             .expect("Missing implementation - expected commitment, not challenge");
-        let (len1, len2) = number_of_beta_powers.unwrap_or_else(|| {
-            (
-                public_statement.0.clone().into_iter().count(),
-                public_statement.1.clone().into_iter().count(),
-            )
-        });
+        let (len1, len2) =
+            number_of_beta_powers.unwrap_or_else(|| tuple_statement_lengths(public_statement));
         let (c, powers_of_beta) = verifier_challenges_with_length::<_, H1::Scalar, _, _>(
             cntxt,
             self,
@@ -497,25 +518,13 @@ where
             len1 + len2,
             rng,
         );
-        let (first_powers_of_beta, second_powers_of_beta) = powers_of_beta.split_at(len1);
-
-        let (first_msm_terms_of_response, second_msm_terms_of_response) = self.msm_terms(&proof.z);
-
-        let first_input = H1::merge_msm_terms(
-            first_msm_terms_of_response.into_iter().collect(),
-            &prover_first_message.0,
-            &public_statement.0,
-            first_powers_of_beta,
+        self.merge_msm_terms_for_verify(
+            &proof.z,
+            prover_first_message,
+            public_statement,
             c,
-        );
-        let second_input = H2::merge_msm_terms(
-            second_msm_terms_of_response.into_iter().collect(),
-            &prover_first_message.1,
-            &public_statement.1,
-            second_powers_of_beta,
-            c,
-        );
-
-        (first_input, second_input)
+            &powers_of_beta,
+            len1,
+        )
     }
 }
