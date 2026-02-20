@@ -43,9 +43,9 @@ const AC_SMP_CHANNEL_BUFFER_SIZE: usize = 1_024;
 const INTRA_NODE_CHANNEL_BUFFER_SIZE: usize = 1;
 const DEFAULT_MAX_NUM_WORKER_THREADS: usize = 32;
 
-/// Bootstraps the API and the indexer. Returns the Mempool client
-/// receiver, and the api and indexer runtimes.
-pub fn bootstrap_api_and_indexer(
+/// Bootstraps the API and transaction streaming services. Returns the
+/// Mempool client receiver, runtimes, and the Mempool client sender.
+pub fn bootstrap_api_and_streaming(
     node_config: &NodeConfig,
     db_rw: DbReaderWriter,
     chain_id: ChainId,

@@ -775,7 +775,7 @@ pub fn setup_environment_and_start_node(
         peers_and_metadata.clone(),
     );
 
-    // Bootstrap the API and indexer
+    // Bootstrap the API and transaction streaming services
     let (
         mempool_client_receiver,
         api_runtime,
@@ -783,7 +783,7 @@ pub fn setup_environment_and_start_node(
         indexer_grpc_runtime,
         internal_indexer_db_runtime,
         mempool_client_sender,
-    ) = services::bootstrap_api_and_indexer(
+    ) = services::bootstrap_api_and_streaming(
         &node_config,
         db_rw.clone(),
         chain_id,
