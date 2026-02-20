@@ -22,6 +22,7 @@ module aptos_framework::aptos_governance {
     use aptos_std::table::{Self, Table};
 
     use aptos_framework::account::{Self, SignerCapability, create_signer_with_capability};
+    use aptos_framework::chunky_dkg_config;
     use aptos_framework::coin;
     use aptos_framework::event::{Self, EventHandle};
     use aptos_framework::governance_proposal::{Self, GovernanceProposal};
@@ -661,7 +662,9 @@ module aptos_framework::aptos_governance {
     /// since such updates are applied whenever we enter an new epoch.
     public entry fun reconfigure(aptos_framework: &signer) {
         system_addresses::assert_aptos_framework(aptos_framework);
-        if (consensus_config::validator_txn_enabled() && randomness_config::enabled()) {
+        if (consensus_config::validator_txn_enabled() && chunky_dkg_config::enabled() && randomness_config::enabled()) {
+            reconfiguration_with_dkg::try_start_with_chunky_dkg();
+        } else if (consensus_config::validator_txn_enabled() && randomness_config::enabled()) {
             reconfiguration_with_dkg::try_start();
         } else {
             reconfiguration_with_dkg::finish(aptos_framework);
