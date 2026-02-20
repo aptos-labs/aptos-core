@@ -410,6 +410,7 @@ pub fn parse_coin_currency(
 
 #[cfg(test)]
 mod test {
+    use super::*;
     use crate::common::BlockHash;
     use aptos_types::chain_id::{ChainId, NamedChain};
     use std::str::FromStr;
@@ -454,5 +455,313 @@ mod test {
         for str in invalid_block_hashes {
             BlockHash::from_str(str).expect_err("Invalid block hash");
         }
+    }
+
+    // ---- Timestamp Tests ----
+
+    #[test]
+    fn test_get_timestamp_normal() {
+        // 1_700_000_000_000 ms = some time in 2023, way after Y2K
+        let usecs = 1_700_000_000_000_000u64; // microseconds
+        let result = get_timestamp(usecs);
+        assert_eq!(result, 1_700_000_000_000u64);
+    }
+
+    #[test]
+    fn test_get_timestamp_pre_y2k_clamped() {
+        // timestamp 0 (genesis) should clamp to Y2K
+        assert_eq!(get_timestamp(0), Y2K_MS);
+        // A very early timestamp should also clamp
+        assert_eq!(get_timestamp(1000), Y2K_MS);
+    }
+
+    #[test]
+    fn test_get_timestamp_exactly_y2k() {
+        // Exactly Y2K in microseconds
+        let y2k_usecs = Y2K_MS * 1000;
+        assert_eq!(get_timestamp(y2k_usecs), Y2K_MS);
+    }
+
+    #[test]
+    fn test_get_timestamp_just_after_y2k() {
+        let y2k_usecs = Y2K_MS * 1000 + 1000; // 1ms after Y2K
+        assert_eq!(get_timestamp(y2k_usecs), Y2K_MS + 1);
+    }
+
+    // ---- strip_hex_prefix Tests ----
+
+    #[test]
+    fn test_strip_hex_prefix_with_prefix() {
+        assert_eq!(strip_hex_prefix("0xabcdef"), "abcdef");
+        assert_eq!(strip_hex_prefix("0x1"), "1");
+        assert_eq!(strip_hex_prefix("0x"), "");
+    }
+
+    #[test]
+    fn test_strip_hex_prefix_without_prefix() {
+        assert_eq!(strip_hex_prefix("abcdef"), "abcdef");
+        assert_eq!(strip_hex_prefix(""), "");
+        assert_eq!(strip_hex_prefix("1234"), "1234");
+    }
+
+    // ---- BCS encode/decode Tests ----
+
+    #[test]
+    fn test_encode_decode_bcs_roundtrip() {
+        let value: u64 = 42;
+        let encoded = encode_bcs(&value).expect("Should encode");
+        let decoded: u64 = decode_bcs(&encoded, "u64").expect("Should decode");
+        assert_eq!(value, decoded);
+    }
+
+    #[test]
+    fn test_decode_bcs_invalid() {
+        let result = decode_bcs::<u64>("not_valid_hex", "u64");
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_encode_bcs_complex_type() {
+        let value = AccountAddress::ONE;
+        let encoded = encode_bcs(&value).expect("Should encode address");
+        let decoded: AccountAddress = decode_bcs(&encoded, "AccountAddress").expect("Should decode");
+        assert_eq!(value, decoded);
+    }
+
+    // ---- Currency Tests ----
+
+    #[test]
+    fn test_native_coin() {
+        let coin = native_coin();
+        assert_eq!(coin.symbol, "APT");
+        assert_eq!(coin.decimals, 8);
+        assert!(coin.metadata.is_some());
+        let metadata = coin.metadata.unwrap();
+        assert!(metadata.move_type.is_some());
+        assert!(metadata.fa_address.is_none());
+        assert!(metadata.move_type.unwrap().contains("AptosCoin"));
+    }
+
+    #[test]
+    fn test_native_coin_tag() {
+        let tag = native_coin_tag();
+        match tag {
+            TypeTag::Struct(s) => {
+                assert_eq!(s.address, AccountAddress::ONE);
+                assert_eq!(s.module.as_str(), "aptos_coin");
+                assert_eq!(s.name.as_str(), "AptosCoin");
+            },
+            _ => panic!("Expected struct tag"),
+        }
+    }
+
+    #[test]
+    fn test_is_native_coin() {
+        assert!(is_native_coin(AccountAddress::TEN));
+        assert!(!is_native_coin(AccountAddress::ONE));
+        assert!(!is_native_coin(AccountAddress::ZERO));
+    }
+
+    #[test]
+    fn test_usdc_currency() {
+        let usdc = usdc_currency();
+        assert_eq!(usdc.symbol, "USDC");
+        assert_eq!(usdc.decimals, 6);
+        let metadata = usdc.metadata.unwrap();
+        assert!(metadata.move_type.is_none());
+        assert!(metadata.fa_address.is_some());
+    }
+
+    #[test]
+    fn test_usdc_testnet_currency() {
+        let usdc = usdc_testnet_currency();
+        assert_eq!(usdc.symbol, "USDC");
+        assert_eq!(usdc.decimals, 6);
+        let metadata = usdc.metadata.unwrap();
+        assert!(metadata.move_type.is_none());
+        assert!(metadata.fa_address.is_some());
+        // Testnet address should differ from mainnet
+        assert_ne!(
+            usdc_testnet_currency().metadata.unwrap().fa_address,
+            usdc_currency().metadata.unwrap().fa_address
+        );
+    }
+
+    #[test]
+    fn test_find_coin_currency_match() {
+        let mut currencies = HashSet::new();
+        currencies.insert(native_coin());
+        let tag = native_coin_tag();
+        let result = find_coin_currency(&currencies, &tag);
+        assert!(result.is_some());
+        assert_eq!(result.unwrap(), native_coin());
+    }
+
+    #[test]
+    fn test_find_coin_currency_no_match() {
+        let currencies = HashSet::new();
+        let tag = native_coin_tag();
+        let result = find_coin_currency(&currencies, &tag);
+        assert!(result.is_none());
+    }
+
+    #[test]
+    fn test_find_fa_currency_native() {
+        let currencies = HashSet::new();
+        let result = find_fa_currency(&currencies, AccountAddress::TEN);
+        assert!(result.is_some());
+        assert_eq!(result.unwrap(), native_coin());
+    }
+
+    #[test]
+    fn test_find_fa_currency_usdc() {
+        let mut currencies = HashSet::new();
+        currencies.insert(usdc_currency());
+        let addr =
+            AccountAddress::from_str(USDC_ADDRESS).expect("Valid address");
+        let result = find_fa_currency(&currencies, addr);
+        assert!(result.is_some());
+        assert_eq!(result.unwrap().symbol, "USDC");
+    }
+
+    #[test]
+    fn test_find_fa_currency_unknown() {
+        let currencies = HashSet::new();
+        let result = find_fa_currency(&currencies, AccountAddress::ONE);
+        assert!(result.is_none());
+    }
+
+    // ---- check_network Tests ----
+
+    #[tokio::test]
+    async fn test_check_network_valid() {
+        let context = RosettaContext::new(None, ChainId::test(), None, HashSet::new()).await;
+        let network_id = NetworkIdentifier {
+            blockchain: BLOCKCHAIN.to_string(),
+            network: ChainId::test().to_string(),
+        };
+        assert!(check_network(network_id, &context).is_ok());
+    }
+
+    #[tokio::test]
+    async fn test_check_network_wrong_blockchain() {
+        let context = RosettaContext::new(None, ChainId::test(), None, HashSet::new()).await;
+        let network_id = NetworkIdentifier {
+            blockchain: "bitcoin".to_string(),
+            network: ChainId::test().to_string(),
+        };
+        assert!(check_network(network_id, &context).is_err());
+    }
+
+    #[tokio::test]
+    async fn test_check_network_wrong_chain_id() {
+        let context = RosettaContext::new(None, ChainId::test(), None, HashSet::new()).await;
+        let network_id = NetworkIdentifier {
+            blockchain: BLOCKCHAIN.to_string(),
+            network: "mainnet".to_string(),
+        };
+        assert!(check_network(network_id, &context).is_err());
+    }
+
+    #[tokio::test]
+    async fn test_check_network_invalid_chain_id() {
+        let context = RosettaContext::new(None, ChainId::test(), None, HashSet::new()).await;
+        let network_id = NetworkIdentifier {
+            blockchain: BLOCKCHAIN.to_string(),
+            network: "not_a_chain".to_string(),
+        };
+        assert!(check_network(network_id, &context).is_err());
+    }
+
+    // ---- to_hex_lower Tests ----
+
+    #[test]
+    fn test_to_hex_lower() {
+        let addr = AccountAddress::ONE;
+        let hex = to_hex_lower(&addr);
+        assert!(hex.contains('1'));
+        assert!(!hex.contains('A')); // Should be lowercase
+    }
+
+    // ---- parse_coin_currency Tests ----
+
+    #[tokio::test]
+    async fn test_parse_coin_currency_valid() {
+        let context = RosettaContext::new(None, ChainId::test(), None, HashSet::new()).await;
+        let struct_tag = StructTag {
+            address: AccountAddress::ONE,
+            module: ident_str!("aptos_coin").into(),
+            name: ident_str!("AptosCoin").into(),
+            type_args: vec![],
+        };
+        let result = parse_coin_currency(&context, &struct_tag);
+        assert!(result.is_ok());
+        assert_eq!(result.unwrap().symbol, "APT");
+    }
+
+    #[tokio::test]
+    async fn test_parse_coin_currency_invalid() {
+        let context = RosettaContext::new(None, ChainId::test(), None, HashSet::new()).await;
+        let struct_tag = StructTag {
+            address: AccountAddress::ONE,
+            module: ident_str!("unknown_coin").into(),
+            name: ident_str!("UnknownCoin").into(),
+            type_args: vec![],
+        };
+        let result = parse_coin_currency(&context, &struct_tag);
+        assert!(result.is_err());
+    }
+
+    // ---- BlockHash Display Tests ----
+
+    #[test]
+    fn test_block_hash_display() {
+        let hash = BlockHash::new(ChainId::test(), 42);
+        let display = hash.to_string();
+        assert!(display.contains("42"));
+    }
+
+    #[test]
+    fn test_block_hash_roundtrip_mainnet() {
+        let hash = BlockHash::new(ChainId::new(NamedChain::MAINNET.id()), 999);
+        let s = hash.to_string();
+        let parsed = BlockHash::from_str(&s).expect("Should parse");
+        assert_eq!(parsed, hash);
+    }
+
+    // ---- RosettaContext Tests ----
+
+    #[tokio::test]
+    async fn test_rosetta_context_always_includes_apt() {
+        let context = RosettaContext::new(None, ChainId::test(), None, HashSet::new()).await;
+        assert!(context.currencies.contains(&native_coin()));
+    }
+
+    #[tokio::test]
+    async fn test_rosetta_context_mainnet_includes_usdc() {
+        let mainnet_id = ChainId::new(NamedChain::MAINNET.id());
+        let context = RosettaContext::new(None, mainnet_id, None, HashSet::new()).await;
+        assert!(context.currencies.contains(&native_coin()));
+        assert!(context.currencies.contains(&usdc_currency()));
+    }
+
+    #[tokio::test]
+    async fn test_rosetta_context_testnet_includes_testnet_usdc() {
+        let testnet_id = ChainId::new(NamedChain::TESTNET.id());
+        let context = RosettaContext::new(None, testnet_id, None, HashSet::new()).await;
+        assert!(context.currencies.contains(&native_coin()));
+        assert!(context.currencies.contains(&usdc_testnet_currency()));
+    }
+
+    #[tokio::test]
+    async fn test_rosetta_context_offline_rest_client() {
+        let context = RosettaContext::new(None, ChainId::test(), None, HashSet::new()).await;
+        assert!(context.rest_client().is_err());
+    }
+
+    #[tokio::test]
+    async fn test_rosetta_context_offline_block_cache() {
+        let context = RosettaContext::new(None, ChainId::test(), None, HashSet::new()).await;
+        assert!(context.block_cache().is_err());
     }
 }

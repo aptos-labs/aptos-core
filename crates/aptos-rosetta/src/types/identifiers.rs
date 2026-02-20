@@ -607,4 +607,168 @@ mod test {
 
         assert!(stake.operator_address().is_err());
     }
+
+    // ---- NetworkIdentifier Tests ----
+
+    #[test]
+    fn test_network_identifier_from_chain_id() {
+        let chain_id = ChainId::test();
+        let network_id: NetworkIdentifier = chain_id.into();
+        assert_eq!(network_id.blockchain, "aptos");
+    }
+
+    #[test]
+    fn test_network_identifier_to_chain_id() {
+        let network_id = NetworkIdentifier {
+            blockchain: "aptos".to_string(),
+            network: "testnet".to_string(),
+        };
+        let chain_id: ChainId = (&network_id).try_into().expect("Valid chain ID");
+        // testnet chain id is 2
+        assert_eq!(chain_id, ChainId::new(2));
+    }
+
+    #[test]
+    fn test_network_identifier_to_chain_id_invalid() {
+        let network_id = NetworkIdentifier {
+            blockchain: "aptos".to_string(),
+            network: "not_real".to_string(),
+        };
+        let result: Result<ChainId, _> = (&network_id).try_into();
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_network_identifier_chain_id_method() {
+        let network_id = NetworkIdentifier {
+            blockchain: "aptos".to_string(),
+            network: "4".to_string(),
+        };
+        let chain_id = network_id.chain_id().expect("Should parse");
+        assert_eq!(chain_id, ChainId::new(4));
+    }
+
+    // ---- BlockIdentifier Tests ----
+
+    #[test]
+    fn test_block_identifier_from_block() {
+        use aptos_rest_client::aptos_api_types::BcsBlock;
+
+        let block = BcsBlock {
+            block_height: 42,
+            block_hash: Default::default(),
+            block_timestamp: 1000000,
+            first_version: 100,
+            last_version: 110,
+            transactions: None,
+        };
+        let chain_id = ChainId::test();
+        let id = BlockIdentifier::from_block(&block, chain_id);
+        assert_eq!(id.index, 42);
+        assert!(id.hash.contains("42"));
+    }
+
+    // ---- TransactionIdentifier Tests ----
+
+    #[test]
+    fn test_transaction_identifier_from_hash_value() {
+        let hash = aptos_crypto::HashValue::zero();
+        let txn_id: TransactionIdentifier = hash.into();
+        assert!(!txn_id.hash.is_empty());
+    }
+
+    // ---- PartialBlockIdentifier Tests ----
+
+    #[test]
+    fn test_partial_block_identifier_serialization() {
+        let pbi = PartialBlockIdentifier::latest();
+        let json = serde_json::to_string(&pbi).unwrap();
+        // Both fields should be skipped when None
+        assert!(!json.contains("index"));
+        assert!(!json.contains("hash"));
+    }
+
+    #[test]
+    fn test_partial_block_identifier_by_index_serialization() {
+        let pbi = PartialBlockIdentifier::block_index(5);
+        let json = serde_json::to_string(&pbi).unwrap();
+        assert!(json.contains("5"));
+    }
+
+    // ---- Delegated Sub-Account Tests ----
+
+    #[test]
+    fn test_delegated_sub_accounts() {
+        let pool = "0x1";
+        let total = SubAccountIdentifier::new_delegated_total_stake(pool);
+        assert!(total.is_total_stake());
+        assert!(total.metadata.is_some());
+
+        let active = SubAccountIdentifier::new_delegated_active_stake(pool);
+        assert!(active.is_delegator_active_stake());
+        assert!(!active.is_active_stake()); // Non-delegator active stake requires no metadata
+
+        let pending_inactive = SubAccountIdentifier::new_delegated_pending_inactive_stake(pool);
+        assert!(pending_inactive.is_delegator_pending_inactive_stake());
+
+        let inactive = SubAccountIdentifier::new_delegated_inactive_stake(pool);
+        assert!(inactive.is_delegator_inactive_stake());
+    }
+
+    #[test]
+    fn test_account_identifier_delegation_pool() {
+        let account = AccountAddress::ONE;
+        let pool_str = "0x2";
+        let id = AccountIdentifier {
+            address: format!("{:x}", account),
+            sub_account: Some(SubAccountIdentifier::new_delegated_active_stake(pool_str)),
+        };
+        assert!(id.is_delegator_active_stake());
+        assert!(!id.is_base_account());
+        let pool_addr = id.pool_address().unwrap();
+        assert!(pool_addr.is_some());
+    }
+
+    #[test]
+    fn test_account_identifier_commission_and_rewards() {
+        let account = AccountAddress::ONE;
+        let commission_id = AccountIdentifier {
+            address: format!("{:x}", account),
+            sub_account: Some(SubAccountIdentifier::new_commission()),
+        };
+        assert!(commission_id.is_commission());
+        assert!(!commission_id.is_rewards());
+
+        let rewards_id = AccountIdentifier {
+            address: format!("{:x}", account),
+            sub_account: Some(SubAccountIdentifier::new_rewards()),
+        };
+        assert!(rewards_id.is_rewards());
+        assert!(!rewards_id.is_commission());
+    }
+
+    #[test]
+    fn test_str_to_account_address_valid() {
+        let result = str_to_account_address("0x1");
+        assert!(result.is_ok());
+        assert_eq!(result.unwrap(), AccountAddress::ONE);
+    }
+
+    #[test]
+    fn test_str_to_account_address_invalid() {
+        let result = str_to_account_address("not_an_address");
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_pool_address_none_for_base_account() {
+        let id = AccountIdentifier::base_account(AccountAddress::ONE);
+        assert!(id.pool_address().unwrap().is_none());
+    }
+
+    #[test]
+    fn test_pool_address_none_for_stake_without_metadata() {
+        let id = AccountIdentifier::total_stake_account(AccountAddress::ONE);
+        assert!(id.pool_address().unwrap().is_none());
+    }
 }

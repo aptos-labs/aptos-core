@@ -568,3 +568,176 @@ pub struct TransactionIdentifierResponse {
     /// Hash of the transaction
     pub transaction_identifier: TransactionIdentifier,
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use aptos_types::chain_id::ChainId;
+
+    // ---- GasPricePriority Tests ----
+
+    #[test]
+    fn test_gas_price_priority_default() {
+        let priority = GasPricePriority::default();
+        assert_eq!(priority, GasPricePriority::Normal);
+    }
+
+    #[test]
+    fn test_gas_price_priority_display() {
+        assert_eq!(GasPricePriority::Low.to_string(), "low");
+        assert_eq!(GasPricePriority::Normal.to_string(), "normal");
+        assert_eq!(GasPricePriority::High.to_string(), "high");
+    }
+
+    #[test]
+    fn test_gas_price_priority_from_str() {
+        assert_eq!(GasPricePriority::from_str("low").unwrap(), GasPricePriority::Low);
+        assert_eq!(GasPricePriority::from_str("normal").unwrap(), GasPricePriority::Normal);
+        assert_eq!(GasPricePriority::from_str("high").unwrap(), GasPricePriority::High);
+        assert_eq!(GasPricePriority::from_str("HIGH").unwrap(), GasPricePriority::High);
+        assert_eq!(GasPricePriority::from_str(" low ").unwrap(), GasPricePriority::Low);
+    }
+
+    #[test]
+    fn test_gas_price_priority_from_str_invalid() {
+        assert!(GasPricePriority::from_str("medium").is_err());
+        assert!(GasPricePriority::from_str("").is_err());
+    }
+
+    #[test]
+    fn test_gas_price_priority_serialize_deserialize() {
+        let priority = GasPricePriority::High;
+        let json = serde_json::to_string(&priority).unwrap();
+        assert_eq!(json, "\"high\"");
+        let deserialized: GasPricePriority = serde_json::from_str(&json).unwrap();
+        assert_eq!(deserialized, GasPricePriority::High);
+    }
+
+    #[test]
+    fn test_gas_price_priority_as_str() {
+        assert_eq!(GasPricePriority::Low.as_str(), "low");
+        assert_eq!(GasPricePriority::Normal.as_str(), "normal");
+        assert_eq!(GasPricePriority::High.as_str(), "high");
+    }
+
+    // ---- BlockRequest Tests ----
+
+    #[test]
+    fn test_block_request_latest() {
+        let req = BlockRequest::latest(ChainId::test());
+        assert!(req.block_identifier.is_none());
+        assert_eq!(req.network_identifier.blockchain, "aptos");
+    }
+
+    #[test]
+    fn test_block_request_by_hash() {
+        let req = BlockRequest::by_hash(ChainId::test(), "testnet-42".to_string());
+        assert!(req.block_identifier.is_some());
+        let id = req.block_identifier.unwrap();
+        assert_eq!(id.hash.as_deref(), Some("testnet-42"));
+        assert!(id.index.is_none());
+    }
+
+    #[test]
+    fn test_block_request_by_index() {
+        let req = BlockRequest::by_index(ChainId::test(), 100);
+        assert!(req.block_identifier.is_some());
+        let id = req.block_identifier.unwrap();
+        assert_eq!(id.index, Some(100));
+        assert!(id.hash.is_none());
+    }
+
+    #[test]
+    fn test_block_request_with_empty_transactions() {
+        let req = BlockRequest::latest(ChainId::test()).with_empty_transactions();
+        assert!(req.metadata.is_some());
+        assert_eq!(req.metadata.unwrap().keep_empty_transactions, Some(true));
+    }
+
+    // ---- PartialBlockIdentifier Tests ----
+
+    #[test]
+    fn test_partial_block_identifier_latest() {
+        let pbi = PartialBlockIdentifier::latest();
+        assert!(pbi.index.is_none());
+        assert!(pbi.hash.is_none());
+    }
+
+    #[test]
+    fn test_partial_block_identifier_by_hash() {
+        let pbi = PartialBlockIdentifier::by_hash("abc".to_string());
+        assert!(pbi.index.is_none());
+        assert_eq!(pbi.hash.as_deref(), Some("abc"));
+    }
+
+    #[test]
+    fn test_partial_block_identifier_block_index() {
+        let pbi = PartialBlockIdentifier::block_index(42);
+        assert_eq!(pbi.index, Some(42));
+        assert!(pbi.hash.is_none());
+    }
+
+    // ---- Serialization Tests ----
+
+    #[test]
+    fn test_account_balance_request_serialization() {
+        let req = AccountBalanceRequest {
+            network_identifier: ChainId::test().into(),
+            account_identifier: AccountIdentifier::base_account(AccountAddress::ONE),
+            block_identifier: None,
+            currencies: None,
+        };
+        let json = serde_json::to_string(&req).unwrap();
+        assert!(json.contains("aptos"));
+        assert!(!json.contains("block_identifier")); // None should be skipped
+        assert!(!json.contains("currencies"));
+    }
+
+    #[test]
+    fn test_network_request_serialization() {
+        let req = NetworkRequest {
+            network_identifier: ChainId::test().into(),
+        };
+        let json = serde_json::to_string(&req).unwrap();
+        let deserialized: NetworkRequest = serde_json::from_str(&json).unwrap();
+        assert_eq!(deserialized.network_identifier.blockchain, "aptos");
+    }
+
+    #[test]
+    fn test_metadata_options_serialization() {
+        let opts = MetadataOptions {
+            internal_operation: InternalOperation::CreateAccount(crate::types::CreateAccount {
+                sender: AccountAddress::ONE,
+                new_account: AccountAddress::TWO,
+            }),
+            max_gas_amount: None,
+            gas_price_per_unit: None,
+            expiry_time_secs: None,
+            sequence_number: None,
+            public_keys: None,
+            gas_price_multiplier: None,
+            gas_price_priority: None,
+        };
+        let json = serde_json::to_string(&opts).unwrap();
+        assert!(json.contains("CreateAccount"));
+        // All None fields should be skipped
+        assert!(!json.contains("max_gas_amount"));
+    }
+
+    #[test]
+    fn test_preprocess_metadata_serialization() {
+        let meta = PreprocessMetadata {
+            expiry_time_secs: Some(1000u64.into()),
+            sequence_number: None,
+            max_gas_amount: Some(2000u64.into()),
+            gas_price: None,
+            public_keys: None,
+            gas_price_multiplier: None,
+            gas_price_priority: Some(GasPricePriority::High),
+        };
+        let json = serde_json::to_string(&meta).unwrap();
+        assert!(json.contains("high"));
+        assert!(json.contains("2000"));
+        assert!(!json.contains("sequence_number"));
+    }
+}

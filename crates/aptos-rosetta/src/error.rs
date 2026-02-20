@@ -368,3 +368,254 @@ impl Reply for ApiError {
         warp::reply::json(&self.into_error()).into_response()
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::collections::HashSet;
+
+    #[test]
+    fn test_error_codes_are_unique() {
+        let all_errors = ApiError::all();
+        let mut codes = HashSet::new();
+        for error in &all_errors {
+            assert!(
+                codes.insert(error.code()),
+                "Duplicate error code: {}",
+                error.code()
+            );
+        }
+    }
+
+    #[test]
+    fn test_all_errors_have_codes() {
+        let all_errors = ApiError::all();
+        for error in &all_errors {
+            assert!(error.code() > 0, "Error code must be > 0");
+            assert!(error.code() <= 35, "Unexpected error code: {}", error.code());
+        }
+    }
+
+    #[test]
+    fn test_all_errors_have_messages() {
+        let all_errors = ApiError::all();
+        for error in &all_errors {
+            let message = error.message();
+            assert!(!message.is_empty(), "Error message must not be empty");
+        }
+    }
+
+    #[test]
+    fn test_all_errors_return_500() {
+        let all_errors = ApiError::all();
+        for error in &all_errors {
+            assert_eq!(
+                error.status_code(),
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "All Rosetta errors must be 500"
+            );
+        }
+    }
+
+    #[test]
+    fn test_retriable_errors() {
+        // These specific errors should be retriable
+        assert!(ApiError::AccountNotFound(None).retriable());
+        assert!(ApiError::BlockNotFound(None).retriable());
+        assert!(ApiError::MempoolIsFull(None).retriable());
+        assert!(ApiError::GasEstimationFailed(None).retriable());
+        assert!(ApiError::CoinTypeFailedToBeFetched(None).retriable());
+
+        // These should NOT be retriable
+        assert!(!ApiError::TransactionIsPending.retriable());
+        assert!(!ApiError::NetworkIdentifierMismatch.retriable());
+        assert!(!ApiError::ChainIdMismatch.retriable());
+        assert!(!ApiError::DeserializationFailed(None).retriable());
+        assert!(!ApiError::InvalidSignatureType.retriable());
+        assert!(!ApiError::NodeIsOffline.retriable());
+        assert!(!ApiError::InternalError(None).retriable());
+        assert!(!ApiError::VmError(None).retriable());
+        assert!(!ApiError::VersionPruned(None).retriable());
+        assert!(!ApiError::BlockPruned(None).retriable());
+        assert!(!ApiError::InvalidInput(None).retriable());
+    }
+
+    #[test]
+    fn test_specific_error_codes() {
+        assert_eq!(ApiError::TransactionIsPending.code(), 1);
+        assert_eq!(ApiError::NetworkIdentifierMismatch.code(), 2);
+        assert_eq!(ApiError::ChainIdMismatch.code(), 3);
+        assert_eq!(ApiError::DeserializationFailed(None).code(), 4);
+        assert_eq!(ApiError::InvalidTransferOperations(None).code(), 5);
+        assert_eq!(ApiError::NodeIsOffline.code(), 14);
+        assert_eq!(ApiError::InternalError(None).code(), 17);
+        assert_eq!(ApiError::AccountNotFound(None).code(), 18);
+        assert_eq!(ApiError::BlockNotFound(None).code(), 25);
+        assert_eq!(ApiError::RejectedByFilter(None).code(), 35);
+    }
+
+    #[test]
+    fn test_error_details_present() {
+        let error = ApiError::DeserializationFailed(Some("bad data".to_string()));
+        let details = error.details();
+        assert!(details.is_some());
+        assert_eq!(details.unwrap().details, "bad data");
+    }
+
+    #[test]
+    fn test_error_details_none_for_simple_errors() {
+        let error = ApiError::TransactionIsPending;
+        assert!(error.details().is_none());
+
+        let error = ApiError::InvalidSignatureType;
+        assert!(error.details().is_none());
+
+        let error = ApiError::NodeIsOffline;
+        assert!(error.details().is_none());
+    }
+
+    #[test]
+    fn test_error_details_various_types() {
+        let error = ApiError::InvalidTransferOperations(Some("bad ops"));
+        let details = error.details();
+        assert_eq!(details.unwrap().details, "bad ops");
+
+        let error = ApiError::UnsupportedSignatureCount(Some(3));
+        let details = error.details();
+        assert_eq!(details.unwrap().details, "3");
+
+        let error = ApiError::MaxGasFeeTooLow(Some("fee too low".to_string()));
+        let details = error.details();
+        assert_eq!(details.unwrap().details, "fee too low");
+    }
+
+    #[test]
+    fn test_into_error_conversion() {
+        let api_error = ApiError::InternalError(Some("test error".to_string()));
+        let code = api_error.code();
+        let message = api_error.message().to_string();
+        let retriable = api_error.retriable();
+        let error: types::Error = api_error.into();
+
+        assert_eq!(error.code, code);
+        assert_eq!(error.message, message);
+        assert_eq!(error.retriable, retriable);
+        assert!(error.details.is_some());
+        assert_eq!(error.details.unwrap().details, "test error");
+    }
+
+    #[test]
+    fn test_into_error_no_details() {
+        let api_error = ApiError::NodeIsOffline;
+        let error: types::Error = api_error.into();
+        assert_eq!(error.code, 14);
+        assert!(!error.retriable);
+        assert!(error.details.is_none());
+    }
+
+    #[test]
+    fn test_deserialization_failed_helper() {
+        let error = ApiError::deserialization_failed("MyType");
+        assert_eq!(error.code(), 4);
+        match error {
+            ApiError::DeserializationFailed(Some(msg)) => assert_eq!(msg, "MyType"),
+            _ => panic!("Expected DeserializationFailed"),
+        }
+    }
+
+    #[test]
+    fn test_from_account_address_parse_error() {
+        let err = AccountAddressParseError::LeadingZeroXRequired;
+        let api_error: ApiError = err.into();
+        assert_eq!(api_error.code(), 4); // DeserializationFailed
+    }
+
+    #[test]
+    fn test_from_hex_error() {
+        let err = FromHexError::OddLength;
+        let api_error: ApiError = err.into();
+        assert_eq!(api_error.code(), 4); // DeserializationFailed
+    }
+
+    #[test]
+    fn test_from_bcs_error() {
+        let err = bcs::Error::Eof;
+        let api_error: ApiError = err.into();
+        assert_eq!(api_error.code(), 4); // DeserializationFailed
+    }
+
+    #[test]
+    fn test_from_anyhow_error() {
+        let err = anyhow::anyhow!("something went wrong");
+        let api_error: ApiError = err.into();
+        assert_eq!(api_error.code(), 17); // InternalError
+    }
+
+    #[test]
+    fn test_from_parse_int_error() {
+        let err = "not_a_number".parse::<u64>().unwrap_err();
+        let api_error: ApiError = err.into();
+        assert_eq!(api_error.code(), 4); // DeserializationFailed
+    }
+
+    #[test]
+    fn test_display_impl() {
+        let error = ApiError::NodeIsOffline;
+        let display = format!("{}", error);
+        assert_eq!(display, "NodeIsOffline");
+
+        let error = ApiError::InternalError(Some("details".to_string()));
+        let display = format!("{}", error);
+        assert!(display.contains("InternalError"));
+        assert!(display.contains("details"));
+    }
+
+    #[test]
+    fn test_error_is_std_error() {
+        let error = ApiError::NodeIsOffline;
+        let _: &dyn std::error::Error = &error;
+    }
+
+    #[test]
+    fn test_rest_error_api_mapping() {
+        use aptos_rest_client::{
+            aptos_api_types::{AptosError, AptosErrorCode},
+            error::{AptosErrorResponse, RestError},
+        };
+        use warp::http::StatusCode as WarpStatusCode;
+
+        let rest_error = RestError::Api(AptosErrorResponse {
+            error: AptosError {
+                message: "account gone".to_string(),
+                error_code: AptosErrorCode::AccountNotFound,
+                vm_error_code: None,
+            },
+            status_code: WarpStatusCode::NOT_FOUND,
+            state: None,
+        });
+        let api_error: ApiError = rest_error.into();
+        assert_eq!(api_error.code(), 18); // AccountNotFound
+        assert!(api_error.retriable());
+
+        let rest_error = RestError::Api(AptosErrorResponse {
+            error: AptosError {
+                message: "vm fail".to_string(),
+                error_code: AptosErrorCode::VmError,
+                vm_error_code: None,
+            },
+            status_code: WarpStatusCode::BAD_REQUEST,
+            state: None,
+        });
+        let api_error: ApiError = rest_error.into();
+        assert_eq!(api_error.code(), 31); // VmError
+    }
+
+    #[test]
+    fn test_rest_error_non_api_mapping() {
+        use aptos_rest_client::error::RestError;
+
+        let rest_error = RestError::Unknown(anyhow::anyhow!("unknown"));
+        let api_error: ApiError = rest_error.into();
+        assert_eq!(api_error.code(), 17); // InternalError
+    }
+}
