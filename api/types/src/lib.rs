@@ -36,8 +36,8 @@ pub use move_types::{
     verify_field_identifier, verify_function_identifier, verify_module_identifier, EntryFunctionId,
     HexEncodedBytes, MoveAbility, MoveFunction, MoveFunctionGenericTypeParam,
     MoveFunctionVisibility, MoveModule, MoveModuleBytecode, MoveModuleId, MoveResource,
-    MoveScriptBytecode, MoveStruct, MoveStructField, MoveStructTag, MoveType, MoveValue,
-    ResourceGroup, I128, I256, I64, MAX_RECURSIVE_TYPES_ALLOWED, U128, U256, U64,
+    MoveScriptBytecode, MoveStruct, MoveStructField, MoveStructTag, MoveStructVariant, MoveType,
+    MoveValue, ResourceGroup, I128, I256, I64, MAX_RECURSIVE_TYPES_ALLOWED, U128, U256, U64,
 };
 use serde::{Deserialize, Deserializer};
 pub use state::RawStateValueRequest;

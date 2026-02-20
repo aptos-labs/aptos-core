@@ -7,7 +7,7 @@ module abi::test {
 
     enum MyEnum has drop, store {
         This,
-        That
+        That { value: u64 }
     }
 
     #[event]

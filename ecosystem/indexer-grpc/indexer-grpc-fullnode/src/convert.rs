@@ -6,10 +6,10 @@ use aptos_api_types::{
     DeleteModule, DeleteResource, Ed25519Signature, EntryFunctionId, EntryFunctionPayload, Event,
     GenesisPayload, MoveAbility, MoveFunction, MoveFunctionGenericTypeParam,
     MoveFunctionVisibility, MoveModule, MoveModuleBytecode, MoveModuleId, MoveScriptBytecode,
-    MoveStruct, MoveStructField, MoveStructTag, MoveType, MultiEd25519Signature, MultiKeySignature,
-    MultisigPayload, MultisigTransactionPayload, PublicKey, ScriptPayload, Signature,
-    SingleKeySignature, Transaction, TransactionInfo, TransactionPayload, TransactionSignature,
-    WriteSet, WriteSetChange,
+    MoveStruct, MoveStructField, MoveStructTag, MoveStructVariant, MoveType, MultiEd25519Signature,
+    MultiKeySignature, MultisigPayload, MultisigTransactionPayload, PublicKey, ScriptPayload,
+    Signature, SingleKeySignature, Transaction, TransactionInfo, TransactionPayload,
+    TransactionSignature, WriteSet, WriteSetChange,
 };
 use aptos_bitvec::BitVec;
 use aptos_logger::warn;
@@ -55,6 +55,17 @@ pub fn convert_move_struct_field(msf: &MoveStructField) -> transaction::MoveStru
     }
 }
 
+pub fn convert_move_struct_variant(variant: &MoveStructVariant) -> transaction::MoveStructVariant {
+    transaction::MoveStructVariant {
+        name: variant.name.0.to_string(),
+        fields: variant
+            .fields
+            .iter()
+            .map(convert_move_struct_field)
+            .collect(),
+    }
+}
+
 pub fn convert_move_struct(move_struct: &MoveStruct) -> transaction::MoveStruct {
     transaction::MoveStruct {
         name: move_struct.name.0.to_string(),
@@ -71,6 +82,11 @@ pub fn convert_move_struct(move_struct: &MoveStruct) -> transaction::MoveStruct 
             .fields
             .iter()
             .map(convert_move_struct_field)
+            .collect(),
+        variants: move_struct
+            .variants
+            .iter()
+            .map(convert_move_struct_variant)
             .collect(),
     }
 }
