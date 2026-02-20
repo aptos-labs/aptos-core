@@ -404,7 +404,8 @@ resolve_pkg_name() {
         # PostgreSQL client development libraries (libpq)
         postgres-dev)
             case "$_pm" in
-                apt-get|apk) echo "libpq-dev" ;;
+                apt-get)     echo "libpq-dev" ;;
+                apk)         echo "postgresql-dev" ;;
                 pacman|yum)  echo "postgresql-libs" ;;
                 dnf)         echo "libpq-devel" ;;
                 brew)        echo "postgresql" ;;
@@ -487,10 +488,20 @@ install_pkg() {
         return 0
     fi
 
+    # Check if the package is already present.  command -v works for tools
+    # that install executables; the PM-specific queries catch library/dev
+    # packages (e.g. libssl-dev) that have no matching command name.
     if command -v "$_pkg" >/dev/null 2>&1; then
         log_info "$_pkg is already installed"
         return 0
     fi
+    case "$_pm" in
+        apt-get) dpkg -s "$_pkg" >/dev/null 2>&1 && { log_info "$_pkg is already installed"; return 0; } ;;
+        yum|dnf) rpm -q "$_pkg" >/dev/null 2>&1  && { log_info "$_pkg is already installed"; return 0; } ;;
+        pacman)  pacman -Qi "$_pkg" >/dev/null 2>&1 && { log_info "$_pkg is already installed"; return 0; } ;;
+        apk)     apk info -e "$_pkg" >/dev/null 2>&1 && { log_info "$_pkg is already installed"; return 0; } ;;
+        brew)    brew list "$_pkg" >/dev/null 2>&1  && { log_info "$_pkg is already installed"; return 0; } ;;
+    esac
 
     log_info "Installing $_pkg via $_pm"
     _sudo="$(sudo_if_needed)"
@@ -498,7 +509,7 @@ install_pkg() {
     case "$_pm" in
         apt-get)
             # shellcheck disable=SC2086
-            $_sudo apt-get install "$_pkg" --no-install-recommends -y || {
+            $_sudo apt-get install -y --no-install-recommends "$_pkg" || {
                 log_error "apt-get failed to install '$_pkg'."
                 log_error "Hint: run 'sudo apt-get update' and retry, or check the package name."
                 return 1
@@ -506,7 +517,7 @@ install_pkg() {
             ;;
         yum)
             # shellcheck disable=SC2086
-            $_sudo yum install "$_pkg" -y || {
+            $_sudo yum install -y "$_pkg" || {
                 log_error "yum failed to install '$_pkg'."
                 log_error "Hint: run 'sudo yum makecache' and retry."
                 return 1
@@ -514,7 +525,7 @@ install_pkg() {
             ;;
         dnf)
             # shellcheck disable=SC2086
-            $_sudo dnf install "$_pkg" -y || {
+            $_sudo dnf install -y "$_pkg" || {
                 log_error "dnf failed to install '$_pkg'."
                 log_error "Hint: run 'sudo dnf makecache' and retry."
                 return 1
@@ -763,9 +774,10 @@ install_grcov() {
 install_protoc() {
     log_step "Installing protoc (Protocol Buffers compiler) and Rust plugins"
 
+    # protoc is installed to /usr/local/bin, not INSTALL_DIR
     _skip_protoc=""
-    if command -v "${INSTALL_DIR}protoc" >/dev/null 2>&1; then
-        _current="$("${INSTALL_DIR}protoc" --version 2>/dev/null || echo "")"
+    if command -v protoc >/dev/null 2>&1; then
+        _current="$(protoc --version 2>/dev/null || echo "")"
         case "$_current" in
             *"${PROTOC_VERSION}"*)
                 log_info "protoc v${PROTOC_VERSION} already installed"
