@@ -22,6 +22,8 @@ use aptos_crypto::arkworks::{
     random::{sample_field_element, UniformRand},
     shamir::{Reconstructable, ShamirShare, ShamirThresholdConfig},
 };
+use ark_ff::PrimeField;
+
 pub use aptos_crypto::{
     blstrs as algebra,
     blstrs::{G1_PROJ_NUM_BYTES, G2_PROJ_NUM_BYTES, SCALAR_NUM_BYTES},
@@ -38,10 +40,9 @@ pub mod pcs;
 pub mod pvss;
 pub mod range_proofs;
 pub mod sigma_protocol;
-//pub mod sumcheck;
+pub mod sumcheck;
 pub mod utils;
 pub mod weighted_vuf;
-use ark_ff::PrimeField;
 
 /// A wrapper around `E::ScalarField` to prevent overlapping trait implementations.
 ///
