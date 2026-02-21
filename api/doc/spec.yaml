@@ -14089,7 +14089,7 @@ components:
           $ref: '#/components/schemas/IdentifierWrapper'
         fields:
           type: array
-          description: Fields associated with the variant.
+          description: Fields associated with the variant, if any.
           items:
             $ref: '#/components/schemas/MoveStructField'
     MoveType:
