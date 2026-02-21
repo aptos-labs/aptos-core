@@ -392,7 +392,7 @@ async fn create_driver_for_tests(
     // Create and spawn the driver
     let (driver_factory, commit_notification_sender) =
         DriverFactory::create_and_spawn_driver_internal(
-            false,
+            None,
             &node_config,
             waypoint,
             db_rw,

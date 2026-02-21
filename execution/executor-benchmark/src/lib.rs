@@ -21,7 +21,7 @@ use crate::{
     pipeline::Pipeline,
     transaction_committer::TransactionCommitter,
     transaction_executor::TransactionExecutor,
-    transaction_generator::{create_block_metadata_transaction, TransactionGenerator},
+    transaction_generator::{BenchmarkTimestamp, TransactionGenerator},
 };
 use aptos_api::context::Context;
 use aptos_config::config::{
@@ -308,6 +308,7 @@ where
     config.storage.dir = checkpoint_dir.as_ref().to_path_buf();
     storage_test_config.init_storage_config(&mut config);
     let db = init_db(&config);
+    let ts = Arc::new(BenchmarkTimestamp::from_db(&db));
     let root_account = TransactionGenerator::read_root_account(genesis_key, &db);
     let root_account = Arc::new(root_account);
 
@@ -372,6 +373,7 @@ where
                 // Initialization pipeline is temporary, so needs to be fully committed.
                 // No discards/aborts allowed during initialization, even if they are allowed later.
                 &PipelineConfig::default(),
+                Arc::clone(&ts),
             );
             // need to initialize all workers and finish with all transactions before we start the timer:
             InitializedBenchmarkWorkload::TransactionMix {
@@ -416,6 +418,7 @@ where
         Some(num_accounts_to_load),
         pipeline_config.num_generator_workers,
         is_keyless,
+        ts,
     );
 
     let mut overall_measuring = OverallMeasuring::start();
@@ -498,6 +501,7 @@ fn init_workload<V>(
     burner_accounts: Vec<LocalAccount>,
     db: DbReaderWriter,
     pipeline_config: &PipelineConfig,
+    ts: Arc<BenchmarkTimestamp>,
 ) -> (Box<dyn TransactionGeneratorCreator>, Arc<AtomicUsize>)
 where
     V: VMBlockExecutor + 'static,
@@ -512,13 +516,14 @@ where
     );
 
     let runtime = Runtime::new().unwrap();
-    let transaction_factory = TransactionGenerator::create_transaction_factory();
+    let transaction_factory = TransactionGenerator::create_transaction_factory(&ts);
     let phase = Arc::new(AtomicUsize::new(0));
     let phase_clone = phase.clone();
     let (txn_generator_creator, _address_pool, _account_pool) = runtime.block_on(async {
         let db_gen_init_transaction_executor = DbReliableTransactionSubmitter {
             db: db.clone(),
             block_sender,
+            ts,
         };
 
         let result = create_txn_generator_creator(
@@ -606,7 +611,8 @@ fn add_accounts_impl<V>(
 
     let executor = BlockExecutor::<V>::new(db.clone());
 
-    // First BlockMetadata transaction (epoch=0 to trigger epoch change)
+    // First BlockMetadata transaction: trigger epoch 0→1 transition using a
+    // timestamp derived from the DB's epoch_interval and last_reconfiguration_time.
     let executor1 = BlockExecutor::<V>::new(db.clone());
     let (pipeline1, block_sender1) = Pipeline::new(
         executor1,
@@ -617,15 +623,17 @@ fn add_accounts_impl<V>(
     );
 
     info!("Sending the first block metadata transaction to start a new epoch");
-    block_sender1
-        .send(vec![create_block_metadata_transaction(0, &db)])
-        .unwrap();
+    let epoch_change_block = BenchmarkTimestamp::epoch_change_block(&db);
+    block_sender1.send(epoch_change_block).unwrap();
     drop(block_sender1); // Close the sender to indicate no more transactions
 
     pipeline1.start_pipeline_processing();
     let _ = pipeline1.join();
 
     info!("Sent the first block metadata transaction to start a new epoch");
+
+    // Re-read DB state after epoch change to get the updated timestamp and epoch.
+    let ts = Arc::new(BenchmarkTimestamp::from_db(&db));
 
     // Now create the main pipeline for account creation
     let current_version = db.reader.get_latest_ledger_info_version().unwrap();
@@ -645,6 +653,7 @@ fn add_accounts_impl<V>(
         None,
         pipeline_config.num_generator_workers,
         is_keyless,
+        ts,
     );
 
     let start_time = Instant::now();
@@ -938,7 +947,7 @@ mod tests {
         pipeline::PipelineConfig,
         run_single_with_default_params,
         transaction_executor::BENCHMARKS_BLOCK_EXECUTOR_ONCHAIN_CONFIG,
-        transaction_generator::TransactionGenerator,
+        transaction_generator::{BenchmarkTimestamp, TransactionGenerator},
         BenchmarkWorkload, StorageTestConfig,
     };
     use aptos_config::config::NO_OP_STORAGE_PRUNER_CONFIG;
@@ -1031,7 +1040,8 @@ mod tests {
             let root_account = TransactionGenerator::read_root_account(genesis_key, &vm_db);
             let dst = LocalAccount::generate(&mut thread_rng());
 
-            let txn_factory = TransactionGenerator::create_transaction_factory();
+            let ts = BenchmarkTimestamp::from_db(&vm_db);
+            let txn_factory = TransactionGenerator::create_transaction_factory(&ts);
             let txn =
                 Transaction::UserTransaction(root_account.sign_with_transaction_builder(
                     txn_factory.payload(txn_payload_f(dst.address())),

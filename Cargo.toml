@@ -142,8 +142,6 @@ members = [
     "ecosystem/indexer-grpc/indexer-transaction-generator",
     "ecosystem/indexer-grpc/transaction-filter",
     "ecosystem/nft-metadata-crawler",
-    "ecosystem/node-checker",
-    "ecosystem/node-checker/fn-check-client",
     "execution/block-partitioner",
     "execution/executor",
     "execution/executor-benchmark",
@@ -159,7 +157,6 @@ members = [
     "keyless/pepper/example-client-rust",
     "keyless/pepper/service",
     "mempool",
-    "network/benchmark",
     "network/builder",
     "network/discovery",
     "network/framework",
@@ -278,7 +275,6 @@ default-members = [
     "crates/transaction-emitter",
     "aptos-move/framework",
     "storage/backup/backup-cli",
-    "ecosystem/node-checker",
 ]
 
 # All workspace members should inherit these keys
@@ -406,13 +402,11 @@ aptos-mvhashmap = { path = "aptos-move/mvhashmap" }
 aptos-native-interface = { path = "aptos-move/aptos-native-interface" }
 aptos-netcore = { path = "network/netcore" }
 aptos-network = { path = "network/framework" }
-aptos-network-benchmark = { path = "network/benchmark" }
 aptos-network-builder = { path = "network/builder" }
 aptos-network-checker = { path = "crates/aptos-network-checker" }
 aptos-network-discovery = { path = "network/discovery" }
 aptos-nft-metadata-crawler = { path = "ecosystem/nft-metadata-crawler" }
 aptos-node = { path = "aptos-node" }
-aptos-node-checker = { path = "ecosystem/node-checker" }
 aptos-node-identity = { path = "crates/aptos-node-identity" }
 aptos-node-resource-metrics = { path = "crates/node-resource-metrics" }
 aptos-num-variants = { path = "crates/num-variants" }
@@ -702,7 +696,7 @@ p256 = { version = "0.13.2" }
 prettydiff = "0.6.2"
 primitive-types = { version = "0.12.2" }
 signature = "2.1.0"
-slh-dsa = "0.2.0-rc.1"
+slh-dsa = "=0.2.0-rc.4"
 pairing = "0.23"
 parking_lot = "0.12.0"
 paste = "1.0.7"
@@ -730,7 +724,6 @@ proc-macro2 = "1.0.38"
 project-root = "0.2.2"
 prometheus = { version = "0.13.3", default-features = false }
 prometheus-http-query = "0.5.2"
-prometheus-parse = "0.2.4"
 proptest = "1.4.0"
 proptest-derive = "0.5.1"
 prost = { version = "0.13.4", features = ["no-recursion-limit"] }

@@ -35,9 +35,10 @@ impl<F: FftField, T: DomainCoeff<F> + Mul<F, Output = T>> Remainder<F> for [T] {
         if n < m {
             Vec::from(self)
         } else {
-            // TODO cleanup and make this code more self-explanatory
-            let domain = Radix2EvaluationDomain::new(2 * (n - m + 1)).unwrap();
-            let domain2 = Radix2EvaluationDomain::new(n + 1).unwrap();
+            let domain = Radix2EvaluationDomain::new(2 * (n - m + 1))
+                .expect("Should never panic unless the size is ridiculously large");
+            let domain2 = Radix2EvaluationDomain::new(n + 1)
+                .expect("Should never panic unless the size is ridiculously large");
 
             let mut f_rev = Vec::from(self);
             f_rev.reverse();
@@ -144,7 +145,7 @@ pub fn multi_point_eval_naive<
 
     powers
         .into_par_iter()
-        .map(|p| T::msm(f, &p).unwrap())
+        .map(|p| T::msm(f, &p).expect("Sizes should always agree by p's construction"))
         .collect()
 }
 

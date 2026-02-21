@@ -345,6 +345,7 @@ mod test {
                 oldest_ledger_version: U64::from(0),
                 oldest_block_height: U64::from(0),
                 block_height: U64::from(0),
+                txn_encryption_key: None,
             }
         }
 

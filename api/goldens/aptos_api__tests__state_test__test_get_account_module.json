@@ -132,7 +132,8 @@
             "name": "id",
             "type": "0x1::guid::ID"
           }
-        ]
+        ],
+        "variants": []
       },
       {
         "name": "ID",
@@ -154,7 +155,8 @@
             "name": "addr",
             "type": "address"
           }
-        ]
+        ],
+        "variants": []
       }
     ]
   }

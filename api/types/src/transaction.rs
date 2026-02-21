@@ -778,12 +778,13 @@ impl
                 timestamp: U64::from(timestamp),
                 quorum_certified_update: quorum_certified_update.into(),
             }),
-            aptos_types::validator_txn::ValidatorTransaction::ChunkyDKGResult(certified_subtrx) => {
+            aptos_types::validator_txn::ValidatorTransaction::ChunkyDKGResult(dkg_output) => {
                 Self::ChunkyDKGResult(ChunkyDKGResultTransaction {
                     info,
                     events,
                     timestamp: U64::from(timestamp),
-                    certified_subtrx: certified_subtrx.into(),
+                    certified_subtrx: dkg_output.certified_transcript.into(),
+                    encryption_key: HexEncodedBytes::from(dkg_output.encryption_key),
                 })
             },
         }
@@ -902,6 +903,7 @@ pub struct ChunkyDKGResultTransaction {
     pub events: Vec<Event>,
     pub timestamp: U64,
     pub certified_subtrx: ExportedCertifiedAggregatedChunkySubtranscript,
+    pub encryption_key: HexEncodedBytes,
 }
 
 /// A more API-friendly representation of the on-chain

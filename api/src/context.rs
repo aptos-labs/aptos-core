@@ -259,12 +259,18 @@ impl Context {
                 E::service_unavailable_with_code_no_info(e, AptosErrorCode::InternalError)
             })?;
 
+        let encryption_key_hex = self
+            .get_encryption_key(ledger_info.ledger_info().version())
+            .unwrap_or(None)
+            .map(hex::encode);
+
         Ok(LedgerInfo::new(
             &self.chain_id(),
             &ledger_info,
             oldest_version,
             oldest_block_height,
             newest_block_event.height(),
+            encryption_key_hex,
         ))
     }
 
@@ -342,6 +348,12 @@ impl Context {
                         })?;
                     let (oldest_version, oldest_block_height) =
                         self.get_oldest_version_and_block_height()?;
+
+                    let encryption_key_hex = self
+                        .get_encryption_key(latest_version)
+                        .unwrap_or(None)
+                        .map(hex::encode);
+
                     return Ok(LedgerInfo::new_ledger_info(
                         &self.chain_id(),
                         new_block_event.epoch(),
@@ -350,6 +362,7 @@ impl Context {
                         oldest_block_height,
                         new_block_event.height(),
                         new_block_event.proposed_time(),
+                        encryption_key_hex,
                     ));
                 } else {
                     // Indexer doesn't have data yet as DB is boostrapping.
@@ -369,6 +382,16 @@ impl Context {
 
     pub fn get_latest_ledger_info_with_signatures(&self) -> Result<LedgerInfoWithSignatures> {
         Ok(self.db.get_latest_ledger_info()?)
+    }
+
+    pub fn get_encryption_key(&self, version: Version) -> Result<Option<Vec<u8>>> {
+        if !self.node_config.api.allow_encrypted_txns_submission {
+            return Ok(None);
+        }
+        use aptos_types::decryption::PerEpochEncryptionKeyResource;
+        let resource: Option<PerEpochEncryptionKeyResource> =
+            self.get_resource(AccountAddress::ONE, version)?;
+        Ok(resource.and_then(|r| r.encryption_key))
     }
 
     pub fn get_state_value(&self, state_key: &StateKey, version: u64) -> Result<Option<Vec<u8>>> {

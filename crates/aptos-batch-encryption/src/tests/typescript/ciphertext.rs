@@ -50,7 +50,7 @@ fn test_bibe_ct_encrypt_decrypt_ts() {
     let tc = ShamirThresholdConfig::new(1, 1);
     let (ek, dk, _, msk_shares) = FPTX::setup_for_testing(rng.r#gen(), 8, 1, &tc).unwrap();
 
-    let mut ids = IdSet::with_capacity(dk.capacity()).unwrap();
+    let mut ids = IdSet::with_capacity(dk.capacity());
     let mut counter = Fr::zero();
 
     for _ in 0..dk.capacity() {
@@ -149,7 +149,7 @@ fn test_ct_encrypt_decrypt_ts() {
     let ct_bytes = run_ts("ciphertext_encrypt", &ek_bytes).unwrap();
     let ct: StandardCiphertext = bcs::from_bytes(&ct_bytes).unwrap();
 
-    let mut ids = IdSet::with_capacity(dk.capacity()).unwrap();
+    let mut ids = IdSet::with_capacity(dk.capacity());
     ids.add(&ct.id());
 
     ids.compute_poly_coeffs();

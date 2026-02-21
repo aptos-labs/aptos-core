@@ -4,8 +4,10 @@
 use crate::{
     abort_unless_feature_flag_enabled,
     natives::cryptography::algebra::{
-        AlgebraContext, HashToStructureSuite, Structure, E_TOO_MUCH_MEMORY_USED,
-        MEMORY_LIMIT_IN_BYTES, MOVE_ABORT_CODE_NOT_IMPLEMENTED,
+        AlgebraContext, HashToStructureSuite, Structure,
+        E_HASH_TO_STRUCTURE_BLS12381G1_HASH_FAILED, E_HASH_TO_STRUCTURE_BLS12381G1_MAPPER_FAILED,
+        E_HASH_TO_STRUCTURE_BLS12381G2_HASH_FAILED, E_HASH_TO_STRUCTURE_BLS12381G2_MAPPER_FAILED,
+        E_TOO_MUCH_MEMORY_USED, MEMORY_LIMIT_IN_BYTES, MOVE_ABORT_CODE_NOT_IMPLEMENTED,
     },
     store_element, structure_from_ty_arg,
 };
@@ -13,7 +15,7 @@ use aptos_gas_schedule::gas_params::natives::{aptos_framework::*, move_stdlib::*
 use aptos_native_interface::{
     safely_pop_arg, SafeNativeContext, SafeNativeError, SafeNativeResult,
 };
-use aptos_types::on_chain_config::{FeatureFlag, TimedFeatureFlag};
+use aptos_types::on_chain_config::FeatureFlag;
 use ark_ec::hashing::HashToCurve;
 use either::Either;
 use move_core_types::gas_algebra::{InternalGas, NumBytes};
@@ -52,20 +54,12 @@ fn suite_from_ty_arg(
     context: &SafeNativeContext,
     ty: &Type,
 ) -> SafeNativeResult<Option<HashToStructureSuite>> {
-    let result = context.type_to_type_tag(ty);
-    let type_tag =
-        if context.timed_feature_enabled(TimedFeatureFlag::FixCryptoAlgebraNativesResultHandling) {
-            if let Ok(type_tag) = result {
-                type_tag
-            } else {
-                return Err(SafeNativeError::abort_with_message(
-                    E_TYPE_TO_TYPE_TAG_CONVERSION_FAILED,
-                    "Conversion from type to type tag failed (too complex)",
-                ));
-            }
-        } else {
-            result.unwrap()
-        };
+    let type_tag = context.type_to_type_tag(ty).map_err(|_| {
+        SafeNativeError::abort_with_message(
+            E_TYPE_TO_TYPE_TAG_CONVERSION_FAILED,
+            "Conversion from type to type tag failed (too complex)",
+        )
+    })?;
     Ok(HashToStructureSuite::try_from(type_tag).ok())
 }
 
@@ -126,8 +120,19 @@ pub fn hash_to_internal(
                 ark_ff::fields::field_hashers::DefaultFieldHasher<sha2_0_10_6::Sha256, 128>,
                 ark_ec::hashing::curve_maps::wb::WBMap<ark_bls12_381::g1::Config>,
             >::new(dst)
-            .unwrap();
-            let new_element = <ark_bls12_381::G1Projective>::from(mapper.hash(msg).unwrap());
+            .map_err(|_e| {
+                SafeNativeError::abort_with_message(
+                    E_HASH_TO_STRUCTURE_BLS12381G1_MAPPER_FAILED,
+                    "BLS12381 G1 hash-to-curve mapper creation failed",
+                )
+            })?;
+            let new_element =
+                <ark_bls12_381::G1Projective>::from(mapper.hash(msg).map_err(|_e| {
+                    SafeNativeError::abort_with_message(
+                        E_HASH_TO_STRUCTURE_BLS12381G1_HASH_FAILED,
+                        "BLS12381 G1 hash-to-curve hash failed",
+                    )
+                })?);
             let new_handle = store_element!(context, new_element)?;
             Ok(smallvec![Value::u64(new_handle as u64)])
         },
@@ -145,8 +150,19 @@ pub fn hash_to_internal(
                 ark_ff::fields::field_hashers::DefaultFieldHasher<sha2_0_10_6::Sha256, 128>,
                 ark_ec::hashing::curve_maps::wb::WBMap<ark_bls12_381::g2::Config>,
             >::new(dst)
-            .unwrap();
-            let new_element = <ark_bls12_381::G2Projective>::from(mapper.hash(msg).unwrap());
+            .map_err(|_e| {
+                SafeNativeError::abort_with_message(
+                    E_HASH_TO_STRUCTURE_BLS12381G2_MAPPER_FAILED,
+                    "BLS12381 G2 hash-to-curve mapper creation failed",
+                )
+            })?;
+            let new_element =
+                <ark_bls12_381::G2Projective>::from(mapper.hash(msg).map_err(|_e| {
+                    SafeNativeError::abort_with_message(
+                        E_HASH_TO_STRUCTURE_BLS12381G2_HASH_FAILED,
+                        "BLS12381 G2 hash-to-curve hash failed",
+                    )
+                })?);
             let new_handle = store_element!(context, new_element)?;
             Ok(smallvec![Value::u64(new_handle as u64)])
         },

@@ -11,7 +11,7 @@ use aptos_crypto::{
 use aptos_gas_schedule::gas_params::natives::aptos_framework::*;
 use aptos_native_interface::{
     safely_pop_arg, safely_pop_vec_arg, RawSafeNative, SafeNativeBuilder, SafeNativeContext,
-    SafeNativeResult,
+    SafeNativeError, SafeNativeResult,
 };
 use move_binary_format::errors::PartialVMError;
 use move_core_types::{
@@ -27,6 +27,11 @@ use move_vm_types::{
 use rand_core::OsRng;
 use smallvec::{smallvec, SmallVec};
 use std::{collections::VecDeque, convert::TryFrom};
+
+/// Equivalent to `std::errors::internal(1)` in Move.
+const E_BLS12381_SIGN_COMPUTATION_FAILED: u64 = 0x0A_0001;
+/// Equivalent to `std::errors::internal(2)` in Move.
+const E_BLS12381_POP_SK_DESERIALIZATION_FAILED: u64 = 0x0A_0002;
 
 /// Pops a `Vec<T>` off the argument stack and converts it to a `Vec<Vec<u8>>` by reading the first
 /// field of `T`, which is a `Vec<u8>` field named `bytes`.
@@ -628,7 +633,12 @@ pub fn native_sign(
 ) -> SafeNativeResult<SmallVec<[Value; 1]>> {
     let msg = safely_pop_arg!(arguments, Vec<u8>);
     let sk_bytes = safely_pop_arg!(arguments, Vec<u8>);
-    let sk = PrivateKey::try_from(sk_bytes.as_slice()).unwrap();
+    let sk = PrivateKey::try_from(sk_bytes.as_slice()).map_err(|_e| {
+        SafeNativeError::abort_with_message(
+            E_BLS12381_SIGN_COMPUTATION_FAILED,
+            "BLS12381 sign computation failed",
+        )
+    })?;
     let sig = sk.sign_arbitrary_message(msg.as_slice());
     Ok(smallvec![Value::vector_u8(sig.to_bytes()),])
 }
@@ -640,7 +650,12 @@ pub fn native_generate_proof_of_possession(
     mut arguments: VecDeque<Value>,
 ) -> SafeNativeResult<SmallVec<[Value; 1]>> {
     let sk_bytes = safely_pop_arg!(arguments, Vec<u8>);
-    let sk = PrivateKey::try_from(sk_bytes.as_slice()).unwrap();
+    let sk = PrivateKey::try_from(sk_bytes.as_slice()).map_err(|_e| {
+        SafeNativeError::abort_with_message(
+            E_BLS12381_POP_SK_DESERIALIZATION_FAILED,
+            "BLS12381 proof-of-possession secret key deserialization failed",
+        )
+    })?;
     let pop = ProofOfPossession::create(&sk);
     Ok(smallvec![Value::vector_u8(pop.to_bytes()),])
 }

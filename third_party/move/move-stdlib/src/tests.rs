@@ -26,11 +26,11 @@ fn check_that_docs_are_updated() {
 
     let res = check_dirs_not_diff(&temp_dir, crate::move_stdlib_docs_full_path());
 
-    if res.is_err() {
+    if let Err(err) = res {
         assert!(
                 !read_bool_env_var(UB),
                 "Generated docs differ from the ones checked in {}. Call this test with env variable UB=1 to regenerate or remove old baseline files.",
-                res.unwrap_err()
+                err
             );
     }
 }

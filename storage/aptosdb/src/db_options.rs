@@ -222,6 +222,14 @@ fn convert_index_type(index_type: IndexType) -> BlockBasedIndexType {
     }
 }
 
+/// Disable pending compaction bytes based write stalling. This is for append-only DBs (ledger
+/// sub-DBs keyed by sequential version) where compaction is done entirely via trivial moves —
+/// the estimated pending compaction bytes is fictional and should not trigger stalls.
+fn with_no_compaction_stalling(cf_opts: &mut Options) {
+    cf_opts.set_soft_pending_compaction_bytes_limit(0);
+    cf_opts.set_hard_pending_compaction_bytes_limit(0);
+}
+
 fn with_state_key_extractor_processor(cf_name: ColumnFamilyName, cf_opts: &mut Options) {
     if cf_name == STATE_VALUE_CF_NAME
         || cf_name == STATE_VALUE_BY_KEY_HASH_CF_NAME
@@ -242,7 +250,11 @@ pub(super) fn gen_event_cfds(
     block_cache: Option<&Cache>,
 ) -> Vec<ColumnFamilyDescriptor> {
     let cfs = event_db_column_families();
-    gen_cfds(rocksdb_config, block_cache, cfs, |_, _| {})
+    gen_cfds(rocksdb_config, block_cache, cfs, |cf_name, cf_opts| {
+        if cf_name == EVENT_CF_NAME || cf_name == EVENT_ACCUMULATOR_CF_NAME {
+            with_no_compaction_stalling(cf_opts);
+        }
+    })
 }
 
 pub(super) fn gen_persisted_auxiliary_info_cfds(
@@ -250,7 +262,11 @@ pub(super) fn gen_persisted_auxiliary_info_cfds(
     block_cache: Option<&Cache>,
 ) -> Vec<ColumnFamilyDescriptor> {
     let cfs = persisted_auxiliary_info_db_column_families();
-    gen_cfds(rocksdb_config, block_cache, cfs, |_, _| {})
+    gen_cfds(rocksdb_config, block_cache, cfs, |cf_name, cf_opts| {
+        if cf_name == PERSISTED_AUXILIARY_INFO_CF_NAME {
+            with_no_compaction_stalling(cf_opts);
+        }
+    })
 }
 
 pub(super) fn gen_transaction_accumulator_cfds(
@@ -258,7 +274,13 @@ pub(super) fn gen_transaction_accumulator_cfds(
     block_cache: Option<&Cache>,
 ) -> Vec<ColumnFamilyDescriptor> {
     let cfs = transaction_accumulator_db_column_families();
-    gen_cfds(rocksdb_config, block_cache, cfs, |_, _| {})
+    gen_cfds(rocksdb_config, block_cache, cfs, |cf_name, cf_opts| {
+        if cf_name == TRANSACTION_ACCUMULATOR_CF_NAME
+            || cf_name == TRANSACTION_ACCUMULATOR_HASH_CF_NAME
+        {
+            with_no_compaction_stalling(cf_opts);
+        }
+    })
 }
 
 pub(super) fn gen_transaction_auxiliary_data_cfds(
@@ -266,14 +288,22 @@ pub(super) fn gen_transaction_auxiliary_data_cfds(
     block_cache: Option<&Cache>,
 ) -> Vec<ColumnFamilyDescriptor> {
     let cfs = transaction_auxiliary_data_db_column_families();
-    gen_cfds(rocksdb_config, block_cache, cfs, |_, _| {})
+    gen_cfds(rocksdb_config, block_cache, cfs, |cf_name, cf_opts| {
+        if cf_name == TRANSACTION_AUXILIARY_DATA_CF_NAME {
+            with_no_compaction_stalling(cf_opts);
+        }
+    })
 }
 pub(super) fn gen_transaction_cfds(
     rocksdb_config: &RocksdbConfig,
     block_cache: Option<&Cache>,
 ) -> Vec<ColumnFamilyDescriptor> {
     let cfs = transaction_db_column_families();
-    gen_cfds(rocksdb_config, block_cache, cfs, |_, _| {})
+    gen_cfds(rocksdb_config, block_cache, cfs, |cf_name, cf_opts| {
+        if cf_name == TRANSACTION_CF_NAME {
+            with_no_compaction_stalling(cf_opts);
+        }
+    })
 }
 
 pub(super) fn gen_transaction_info_cfds(
@@ -281,7 +311,11 @@ pub(super) fn gen_transaction_info_cfds(
     block_cache: Option<&Cache>,
 ) -> Vec<ColumnFamilyDescriptor> {
     let cfs = transaction_info_db_column_families();
-    gen_cfds(rocksdb_config, block_cache, cfs, |_, _| {})
+    gen_cfds(rocksdb_config, block_cache, cfs, |cf_name, cf_opts| {
+        if cf_name == TRANSACTION_INFO_CF_NAME {
+            with_no_compaction_stalling(cf_opts);
+        }
+    })
 }
 
 pub(super) fn gen_write_set_cfds(
@@ -289,7 +323,11 @@ pub(super) fn gen_write_set_cfds(
     block_cache: Option<&Cache>,
 ) -> Vec<ColumnFamilyDescriptor> {
     let cfs = write_set_db_column_families();
-    gen_cfds(rocksdb_config, block_cache, cfs, |_, _| {})
+    gen_cfds(rocksdb_config, block_cache, cfs, |cf_name, cf_opts| {
+        if cf_name == WRITE_SET_CF_NAME {
+            with_no_compaction_stalling(cf_opts);
+        }
+    })
 }
 
 pub(super) fn gen_ledger_metadata_cfds(

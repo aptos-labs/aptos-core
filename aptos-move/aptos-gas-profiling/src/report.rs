@@ -4,6 +4,7 @@
 use crate::{log::TransactionGasLog, render::Render};
 use anyhow::Result;
 use aptos_gas_algebra::{Fee, InternalGas};
+use chrono::Local;
 use handlebars::Handlebars;
 use serde_json::{json, Map, Value};
 use std::{
@@ -13,6 +14,26 @@ use std::{
 };
 
 const TEMPLATE: &str = include_str!("../templates/index.html");
+const TRACE_TEMPLATE: &str = include_str!("../templates/trace.html");
+const STYLE_CSS: &str = include_str!("../templates/style.css");
+
+/// Default threshold: traces with more lines than this will require a button click to load
+const DEFAULT_TRACE_LAZY_LOAD_THRESHOLD: usize = 1000;
+
+/// Options for HTML report generation
+#[derive(Debug, Clone)]
+pub struct HtmlReportOptions {
+    /// Traces with more lines than this threshold will require a button click to load
+    pub trace_lazy_load_threshold: usize,
+}
+
+impl Default for HtmlReportOptions {
+    fn default() -> Self {
+        Self {
+            trace_lazy_load_threshold: DEFAULT_TRACE_LAZY_LOAD_THRESHOLD,
+        }
+    }
+}
 
 fn ensure_dirs_exist(path: impl AsRef<Path>) -> Result<()> {
     if let Err(err) = fs::create_dir_all(&path) {
@@ -75,6 +96,15 @@ where
 
 impl TransactionGasLog {
     pub fn generate_html_report(&self, path: impl AsRef<Path>, header: String) -> Result<()> {
+        self.generate_html_report_with_options(path, header, HtmlReportOptions::default())
+    }
+
+    pub fn generate_html_report_with_options(
+        &self,
+        path: impl AsRef<Path>,
+        header: String,
+        options: HtmlReportOptions,
+    ) -> Result<()> {
         let mut data = Map::new();
         data.insert(
             "title".to_string(),
@@ -89,6 +119,22 @@ impl TransactionGasLog {
                 },
             ),
         );
+
+        // Timestamp (local timezone)
+        let timestamp = Local::now().format("%Y-%m-%d %H:%M:%S %Z").to_string();
+        data.insert("generated-at".to_string(), Value::String(timestamp));
+
+        // Git revision
+        let git_hash = aptos_build_info::get_git_hash();
+        if !git_hash.is_empty() {
+            // Show short hash (first 7 characters)
+            let short_hash = if git_hash.len() > 7 {
+                &git_hash[..7]
+            } else {
+                &git_hash
+            };
+            data.insert("git-rev".to_string(), Value::String(short_hash.to_string()));
+        }
 
         // Flamegraphs
         let graph_exec_io = self.exec_io.to_flamegraph("Execution & IO".to_string())?;
@@ -417,7 +463,16 @@ impl TransactionGasLog {
 
         let mut trace = String::new();
         render_table(&mut trace, &table, 4)?;
-        data.insert("trace".to_string(), Value::String(trace));
+
+        // Check if trace is large enough to require lazy loading
+        let trace_line_count = trace.lines().count();
+        if trace_line_count > options.trace_lazy_load_threshold {
+            data.insert("trace-is-large".to_string(), Value::Bool(true));
+            data.insert(
+                "trace-line-count".to_string(),
+                Value::String(trace_line_count.to_string()),
+            );
+        }
 
         // Rendering the html doc
         let mut handlebars = Handlebars::new();
@@ -437,6 +492,26 @@ impl TransactionGasLog {
         if let Some(graph_bytes) = graph_storage {
             fs::write(path_assets.join("storage.svg"), graph_bytes)?;
         }
+        // Write trace to a standalone HTML file for lazy loading via iframe
+        // When in iframe: styled with hover effects
+        // When opened directly: plain text appearance
+        let trace_content: String = trace
+            .lines()
+            .map(|line| {
+                let escaped = line
+                    .replace('&', "&amp;")
+                    .replace('<', "&lt;")
+                    .replace('>', "&gt;");
+                format!("<span class=\"line\">{}</span>", escaped)
+            })
+            .collect::<Vec<_>>()
+            .join("\n");
+
+        let mut trace_data = Map::new();
+        trace_data.insert("trace-content".to_string(), json!(trace_content));
+        let trace_html = handlebars.render_template(TRACE_TEMPLATE, &trace_data)?;
+        fs::write(path_assets.join("trace.html"), trace_html)?;
+        fs::write(path_assets.join("style.css"), STYLE_CSS)?;
         fs::write(path_root.join("index.html"), html)?;
 
         Ok(())

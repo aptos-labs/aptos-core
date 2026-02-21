@@ -509,21 +509,15 @@ pub async fn dispatch_transaction(
         ));
     }
 
-    if txn_options_ref.session.is_some() && txn_options_ref.profile_gas {
-        return Err(CliError::UnexpectedError(
-            "`--profile-gas` cannot be used with `--session yet`".to_string(),
-        ));
-    }
-
     if txn_options_ref.session.is_some() && txn_options_ref.benchmark {
         return Err(CliError::UnexpectedError(
-            "`--benchmark` cannot be used with `--session yet`".to_string(),
+            "`--benchmark` cannot be used with `--session`".to_string(),
         ));
     }
 
     if let Some(session_path) = &txn_options_ref.session {
         txn_options_ref
-            .simulate_using_session(session_path, payload)
+            .simulate_using_session(session_path, payload, txn_options_ref.profile_gas)
             .await
     } else if txn_options_ref.profile_gas {
         txn_options_ref.profile_gas(payload).await

@@ -1275,7 +1275,7 @@ fn parse_term(context: &mut Context) -> Result<Exp, Box<Diagnostic>> {
 
             if at_start_of_exp(context) {
                 let mut diag = unexpected_token_error(context.tokens, "the end of an expression");
-                diag.add_note("'break' with a value is not yet supported");
+                diag.add_note("`break` with a value is not yet supported");
                 return Err(diag);
             }
             Exp_::Break(label)
@@ -1999,6 +1999,7 @@ fn at_start_of_exp(context: &mut Context) -> bool {
             | Tok::AmpMut
             | Tok::Star
             | Tok::Exclaim
+            | Tok::Minus
             | Tok::LParen
             | Tok::LBrace
             | Tok::Abort
@@ -2294,6 +2295,7 @@ fn parse_binop_exp(context: &mut Context, lhs: Exp, min_prec: u32) -> Result<Exp
 // Parse a unary expression:
 //      UnaryExp =
 //          "!" <UnaryExp>
+//          | "-" <UnaryExp>
 //          | "&mut" <UnaryExp>
 //          | "&" <UnaryExp>
 //          | "*" <UnaryExp>

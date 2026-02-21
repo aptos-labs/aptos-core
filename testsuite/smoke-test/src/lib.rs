@@ -18,6 +18,8 @@ mod consensus_key_rotation;
 #[cfg(test)]
 mod consensus_observer;
 #[cfg(test)]
+mod decryption;
+#[cfg(test)]
 mod execution;
 #[cfg(test)]
 mod full_nodes;

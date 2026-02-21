@@ -24,6 +24,7 @@ Reconfiguration with DKG helper functions.
 <pre><code><b>use</b> <a href="chunky_dkg.md#0x1_chunky_dkg">0x1::chunky_dkg</a>;
 <b>use</b> <a href="chunky_dkg_config.md#0x1_chunky_dkg_config">0x1::chunky_dkg_config</a>;
 <b>use</b> <a href="consensus_config.md#0x1_consensus_config">0x1::consensus_config</a>;
+<b>use</b> <a href="decryption.md#0x1_decryption">0x1::decryption</a>;
 <b>use</b> <a href="dkg.md#0x1_dkg">0x1::dkg</a>;
 <b>use</b> <a href="execution_config.md#0x1_execution_config">0x1::execution_config</a>;
 <b>use</b> <a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features">0x1::features</a>;
@@ -161,6 +162,7 @@ Run the default reconfiguration to enter the new epoch.
     <a href="randomness_config_seqnum.md#0x1_randomness_config_seqnum_on_new_epoch">randomness_config_seqnum::on_new_epoch</a>(framework);
     <a href="randomness_config.md#0x1_randomness_config_on_new_epoch">randomness_config::on_new_epoch</a>(framework);
     <a href="randomness_api_v0_config.md#0x1_randomness_api_v0_config_on_new_epoch">randomness_api_v0_config::on_new_epoch</a>(framework);
+    <a href="decryption.md#0x1_decryption_on_new_epoch">decryption::on_new_epoch</a>(framework);
     <a href="reconfiguration.md#0x1_reconfiguration_reconfigure">reconfiguration::reconfigure</a>();
 }
 </code></pre>
@@ -241,11 +243,12 @@ have no in-progress session; otherwise finish(account) is invoked immediately.
 
 Complete the current Chunky DKG session with the given result.
 No-op if Chunky DKG is not enabled.
+Buffers the derived encryption key for the next epoch.
 finish(account) is invoked only when both DKG and Chunky DKG have no in-progress session
 (via maybe_finish_reconfig_with_chunky_dkg).
 
 
-<pre><code><b>fun</b> <a href="reconfiguration_with_dkg.md#0x1_reconfiguration_with_dkg_finish_with_chunky_dkg_result">finish_with_chunky_dkg_result</a>(<a href="account.md#0x1_account">account</a>: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, chunky_dkg_result: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;)
+<pre><code><b>fun</b> <a href="reconfiguration_with_dkg.md#0x1_reconfiguration_with_dkg_finish_with_chunky_dkg_result">finish_with_chunky_dkg_result</a>(<a href="account.md#0x1_account">account</a>: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, chunky_dkg_result: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;, encryption_key: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;)
 </code></pre>
 
 
@@ -255,13 +258,15 @@ finish(account) is invoked only when both DKG and Chunky DKG have no in-progress
 
 
 <pre><code><b>fun</b> <a href="reconfiguration_with_dkg.md#0x1_reconfiguration_with_dkg_finish_with_chunky_dkg_result">finish_with_chunky_dkg_result</a>(
-    <a href="account.md#0x1_account">account</a>: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, chunky_dkg_result: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;
+    <a href="account.md#0x1_account">account</a>: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, chunky_dkg_result: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;, encryption_key: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;
 ) {
     <b>if</b> (!<a href="chunky_dkg_config.md#0x1_chunky_dkg_config_enabled">chunky_dkg_config::enabled</a>()) {
         <b>return</b>;
     };
 
     <a href="chunky_dkg.md#0x1_chunky_dkg_finish">chunky_dkg::finish</a>(chunky_dkg_result);
+    <b>let</b> next_epoch = <a href="reconfiguration.md#0x1_reconfiguration_current_epoch">reconfiguration::current_epoch</a>() + 1;
+    <a href="decryption.md#0x1_decryption_set_for_next_epoch">decryption::set_for_next_epoch</a>(next_epoch, encryption_key);
     <a href="reconfiguration_with_dkg.md#0x1_reconfiguration_with_dkg_maybe_finish_reconfig_with_chunky_dkg">maybe_finish_reconfig_with_chunky_dkg</a>(<a href="account.md#0x1_account">account</a>);
 }
 </code></pre>
@@ -407,7 +412,7 @@ finish(account) is invoked only when both DKG and Chunky DKG have no in-progress
 ### Function `finish_with_chunky_dkg_result`
 
 
-<pre><code><b>fun</b> <a href="reconfiguration_with_dkg.md#0x1_reconfiguration_with_dkg_finish_with_chunky_dkg_result">finish_with_chunky_dkg_result</a>(<a href="account.md#0x1_account">account</a>: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, chunky_dkg_result: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;)
+<pre><code><b>fun</b> <a href="reconfiguration_with_dkg.md#0x1_reconfiguration_with_dkg_finish_with_chunky_dkg_result">finish_with_chunky_dkg_result</a>(<a href="account.md#0x1_account">account</a>: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, chunky_dkg_result: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;, encryption_key: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;)
 </code></pre>
 
 

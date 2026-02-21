@@ -13,7 +13,7 @@ use crate::emitter::{
         create_keyless_account_generator, create_private_key_account_generator,
     },
     stats::{DynamicStatsTracking, TxnStats},
-    submission_worker::SubmissionWorker,
+    submission_worker::{EncryptionKeyRotator, SubmissionWorker},
     transaction_executor::RestApiReliableTransactionSubmitter,
 };
 use again::RetryPolicy;
@@ -202,6 +202,8 @@ pub struct EmitJobRequest {
     epk_expiry_date_secs: Option<u64>,
 
     keyless_jwt: Option<String>,
+
+    encrypt_transactions: bool,
 }
 
 impl Default for EmitJobRequest {
@@ -237,6 +239,7 @@ impl Default for EmitJobRequest {
             proof_file_path: None,
             epk_expiry_date_secs: None,
             keyless_jwt: None,
+            encrypt_transactions: false,
         }
     }
 }
@@ -398,6 +401,11 @@ impl EmitJobRequest {
 
     pub fn skip_funding_accounts(mut self) -> Self {
         self.skip_funding_accounts = true;
+        self
+    }
+
+    pub fn encrypt_transactions(mut self, encrypt: bool) -> Self {
+        self.encrypt_transactions = encrypt;
         self
     }
 
@@ -754,6 +762,19 @@ impl TxnEmitter {
             num_accounts, num_accounts
         );
 
+        // Build init factory with its own independent (empty) encryption key
+        // so it never encrypts, regardless of what happens to the traffic factory.
+        let init_expiration_time =
+            (mode_params.txn_expiration_time_secs as f64 * req.init_expiration_multiplier) as u64;
+        let init_txn_factory = self
+            .txn_factory
+            .clone()
+            .without_encryption()
+            .with_max_gas_amount(req.get_init_max_gas_per_txn())
+            .with_gas_unit_price(req.get_init_gas_price())
+            .with_transaction_expiration_time(init_expiration_time);
+
+        // Build traffic factory (may encrypt)
         let txn_factory = self
             .txn_factory
             .clone()
@@ -761,13 +782,15 @@ impl TxnEmitter {
             .with_gas_unit_price(req.gas_price)
             .with_max_gas_amount(req.max_gas_per_txn);
 
-        let init_expiration_time =
-            (mode_params.txn_expiration_time_secs as f64 * req.init_expiration_multiplier) as u64;
-        let init_txn_factory = txn_factory
-            .clone()
-            .with_max_gas_amount(req.get_init_max_gas_per_txn())
-            .with_gas_unit_price(req.get_init_gas_price())
-            .with_transaction_expiration_time(init_expiration_time);
+        // Set the encryption key on the traffic factory upfront.
+        // init_txn_factory has its own independent Arc so it won't be affected.
+        let encrypt_transactions = req.encrypt_transactions;
+        if encrypt_transactions {
+            let state = self.rest_cli.get_ledger_information().await?.into_inner();
+            txn_factory
+                .update_encryption_key_state(state.epoch, state.encryption_key.as_deref())?;
+        }
+
         let init_retries: usize =
             usize::try_from(init_expiration_time / req.init_retry_interval.as_secs()).unwrap();
         let account_generator = match req.account_type {
@@ -867,6 +890,14 @@ impl TxnEmitter {
         // Creating workers is slow with many workers (TODO check why)
         // so we create them all first, before starting them - so they start at the right time for
         // traffic pattern to be correct.
+        let rotator = if encrypt_transactions {
+            Some(Arc::new(EncryptionKeyRotator::new(
+                txn_factory.encryption_key_handle(),
+            )))
+        } else {
+            None
+        };
+
         info!("Tx emitter creating workers");
         let mut submission_workers = Vec::with_capacity(num_accounts);
         let all_clients = Arc::new(req.rest_clients.clone());
@@ -890,6 +921,7 @@ impl TxnEmitter {
                 all_start_sleep_durations[worker_index],
                 check_account_sequence_only_once_for.contains(&worker_index),
                 self.from_rng(),
+                rotator.clone(),
             );
             submission_workers.push(worker);
         }

@@ -96,16 +96,27 @@ async fn test_abi(use_txn_payload_v2_format: bool, use_orderless_transactions: b
 
     assert_eq!(my_struct["is_event"], false);
 
-    // Confirm that MyEnum is considered an enum.
+    // Confirm that MyEnum is considered an enum with correct variants.
     let my_enum = structs
         .iter()
         .find(|s| s["name"].as_str().unwrap() == "MyEnum")
         .unwrap();
 
     assert_eq!(my_enum["is_enum"], true);
+    assert_eq!(my_enum["fields"].as_array().unwrap().len(), 0);
 
-    // Confirm that State is not considered an enum.
+    let variants = my_enum["variants"].as_array().unwrap();
+    assert_eq!(variants.len(), 2);
+    assert_eq!(variants[0]["name"], "This");
+    assert_eq!(variants[0]["fields"].as_array().unwrap().len(), 0);
+    assert_eq!(variants[1]["name"], "That");
+    assert_eq!(variants[1]["fields"].as_array().unwrap().len(), 1);
+    assert_eq!(variants[1]["fields"][0]["name"], "value");
+    assert_eq!(variants[1]["fields"][0]["type"], "u64");
+
+    // Confirm that State is not considered an enum and has no variants.
     assert_eq!(my_struct["is_enum"], false);
+    assert_eq!(my_struct["variants"].as_array().unwrap().len(), 0);
 
     let test_option = structs
         .iter()
@@ -121,4 +132,5 @@ async fn test_abi(use_txn_payload_v2_format: bool, use_orderless_transactions: b
     assert_eq!(option_structs[0]["fields"][0]["name"], "vec");
     assert_eq!(option_structs[0]["is_enum"], false);
     assert_eq!(option_structs[0]["fields"][0]["type"], "vector<T0>");
+    assert_eq!(option_structs[0]["variants"].as_array().unwrap().len(), 0);
 }

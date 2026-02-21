@@ -3,9 +3,9 @@
 // SPDX-License-Identifier: Apache-2.0
 
 // The below is to deal with a strange problem with derive(Dearbitrary), which creates warnings
-// of unused variables in derived code which cannot be turned off by applying the attribute
-// just at the type in question. (Here, MoveStructLayout.)
-#![allow(unused_variables)]
+// of unused variables and unused assignments in derived code which cannot be turned off by
+// applying the attribute just at the type in question. (Here, MoveStructLayout.)
+#![allow(unused_variables, unused_assignments)]
 
 use crate::{
     account_address::AccountAddress,

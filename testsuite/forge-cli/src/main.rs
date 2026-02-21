@@ -17,7 +17,6 @@ use suites::{
     indexer::get_indexer_test,
     land_blocking::get_land_blocking_test,
     multi_region::get_multi_region_test,
-    netbench::get_netbench_test,
     pfn::get_pfn_test,
     realistic_environment::get_realistic_env_test,
     state_sync::get_state_sync_test,
@@ -29,10 +28,6 @@ use suites::{
 use tokio::runtime::Runtime;
 
 mod suites;
-
-// Useful constants
-const KILOBYTE: usize = 1000;
-const MEGABYTE: usize = KILOBYTE * 1000;
 
 #[cfg(unix)]
 #[global_allocator]
@@ -461,7 +456,6 @@ fn get_test_suite(
         boxed!(|| get_land_blocking_test(test_name, duration, test_cmd))
             as Box<dyn Fn() -> Option<ForgeConfig>>,
         boxed!(|| get_multi_region_test(test_name)),
-        boxed!(|| get_netbench_test(test_name)),
         boxed!(|| get_pfn_test(test_name, duration)),
         boxed!(|| get_realistic_env_test(test_name, duration, test_cmd)),
         boxed!(|| get_state_sync_test(test_name)),

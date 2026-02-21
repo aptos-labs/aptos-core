@@ -26,6 +26,8 @@ use std::{collections::VecDeque, convert::TryFrom};
 pub mod abort_codes {
     pub const E_WRONG_PUBKEY_SIZE: u64 = 1;
     pub const E_WRONG_SIGNATURE_SIZE: u64 = 2;
+    /// Equivalent to `std::errors::internal(1)` in Move.
+    pub const E_ED25519_SIGN_COMPUTATION_FAILED: u64 = 0x0A_0001;
 }
 
 /***************************************************************************************************
@@ -205,7 +207,12 @@ fn native_test_only_sign_internal(
 ) -> SafeNativeResult<SmallVec<[Value; 1]>> {
     let msg_bytes = safely_pop_arg!(args, Vec<u8>);
     let sk_bytes = safely_pop_arg!(args, Vec<u8>);
-    let sk = Ed25519PrivateKey::try_from(sk_bytes.as_slice()).unwrap();
+    let sk = Ed25519PrivateKey::try_from(sk_bytes.as_slice()).map_err(|_e| {
+        SafeNativeError::abort_with_message(
+            abort_codes::E_ED25519_SIGN_COMPUTATION_FAILED,
+            "Ed25519 sign computation failed",
+        )
+    })?;
     let sig = sk.sign_arbitrary_message(msg_bytes.as_slice());
     Ok(smallvec![Value::vector_u8(sig.to_bytes())])
 }

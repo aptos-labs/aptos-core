@@ -55,6 +55,7 @@ diesel = { workspace = true, features = [
     "serde_json",
 ] }
 digest = { workspace = true }
+env_logger = { workspace = true }
 ethers = { workspace = true }
 hex = { workspace = true }
 hyper = { workspace = true }

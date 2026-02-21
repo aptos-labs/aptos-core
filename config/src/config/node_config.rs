@@ -6,9 +6,8 @@ use crate::{
     config::{
         consensus_observer_config::ConsensusObserverConfig, dkg_config::DKGConfig,
         internal_indexer_db_config::InternalIndexerDBConfig,
-        jwk_consensus_config::JWKConsensusConfig, netbench_config::NetbenchConfig,
-        node_config_loader::NodeConfigLoader, node_startup_config::NodeStartupConfig,
-        persistable_config::PersistableConfig,
+        jwk_consensus_config::JWKConsensusConfig, node_config_loader::NodeConfigLoader,
+        node_startup_config::NodeStartupConfig, persistable_config::PersistableConfig,
         transaction_filters_config::TransactionFiltersConfig, utils::RootPath, AdminServiceConfig,
         ApiConfig, BaseConfig, ConsensusConfig, Error, ExecutionConfig, IndexerConfig,
         IndexerGrpcConfig, InspectionServiceConfig, LoggerConfig, MempoolConfig, NetworkConfig,
@@ -70,8 +69,6 @@ pub struct NodeConfig {
     pub logger: LoggerConfig,
     #[serde(default)]
     pub mempool: MempoolConfig,
-    #[serde(default)]
-    pub netbench: Option<NetbenchConfig>,
     #[serde(default)]
     pub node_startup: NodeStartupConfig,
     #[serde(default)]
