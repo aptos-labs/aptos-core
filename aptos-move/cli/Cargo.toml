@@ -71,10 +71,10 @@ jemallocator = { workspace = true }
 
 [dev-dependencies]
 aptos-package-builder = { workspace = true }
-libc = { workspace = true }
 mockall = { workspace = true }
 move-prover-test-utils = { workspace = true }
 regex = { workspace = true }
+termcolor = { workspace = true }
 
 [features]
 default = []

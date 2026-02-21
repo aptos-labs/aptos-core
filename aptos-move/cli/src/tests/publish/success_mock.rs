@@ -31,7 +31,7 @@ fn publish_success_mock() {
     )]);
     let dir = pkg.path().to_str().unwrap();
 
-    let env = common::env_with_mock(|ctx| {
+    let (env, buffer) = common::env_with_mock(|ctx| {
         ctx.expect_submit_transaction()
             .returning(|_, _| Ok(fake_summary()));
     });
@@ -45,6 +45,7 @@ fn publish_success_mock() {
             "--assume-yes",
         ],
         env,
+        buffer,
     );
     common::check_baseline(file!(), &output);
 }

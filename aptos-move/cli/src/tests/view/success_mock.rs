@@ -5,7 +5,7 @@ use crate::tests::common;
 
 #[test]
 fn view_success_mock() {
-    let env = common::env_with_mock(|ctx| {
+    let (env, buffer) = common::env_with_mock(|ctx| {
         ctx.expect_view()
             .returning(|_, _| Ok(vec![serde_json::json!(42)]));
     });
@@ -21,6 +21,7 @@ fn view_success_mock() {
             "address:0x1",
         ],
         env,
+        buffer,
     );
     common::check_baseline(file!(), &output);
 }

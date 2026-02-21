@@ -5,9 +5,9 @@ error: post-condition does not hold
   │                ^^^^^^^^^^^^^^^^^^^^^^^^
   │
   =     at <TEMPDIR>/prove_bad.move:2: add
-  =         a = <val>
-  =         b = <val>
-  =         result = <val>
+  =         a = <redacted>
+  =         b = <redacted>
+  =         result = <redacted>
   =     at <TEMPDIR>/prove_bad.move:3: add (spec)
 
 {

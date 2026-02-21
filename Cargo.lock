@@ -3171,7 +3171,6 @@ dependencies = [
  "futures",
  "itertools 0.13.0",
  "legacy-move-compiler",
- "libc",
  "mockall 0.11.4",
  "move-asm",
  "move-binary-format",
@@ -3196,6 +3195,7 @@ dependencies = [
  "serde",
  "serde_json",
  "tempfile",
+ "termcolor",
  "tikv-jemallocator",
  "tokio",
  "toml 0.7.8",
@@ -12635,6 +12635,7 @@ dependencies = [
  "serde",
  "serde_bytes",
  "serde_json",
+ "termcolor",
  "thiserror 1.0.69",
 ]
 

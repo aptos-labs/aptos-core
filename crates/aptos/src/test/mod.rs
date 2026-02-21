@@ -836,6 +836,7 @@ impl CliTestFramework {
                 skip_fetch_latest_git_deps: false,
             },
             template: None,
+            env: Default::default(),
         }
         .execute()
         .await
@@ -854,6 +855,7 @@ impl CliTestFramework {
             included_artifacts_args: IncludedArtifactsArgs {
                 included_artifacts: included_artifacts.unwrap_or(IncludedArtifacts::Sparse),
             },
+            env: Default::default(),
         }
         .execute()
         .await
@@ -873,6 +875,7 @@ impl CliTestFramework {
             compute_coverage: false,
             dump_state: false,
             fail_fast: false,
+            env: Default::default(),
         }
         .execute()
         .await
@@ -924,6 +927,7 @@ impl CliTestFramework {
             output_dir: Some(output_dir),
             print_metadata: false,
             bytecode: true,
+            env: Default::default(),
         }
         .execute()
         .await

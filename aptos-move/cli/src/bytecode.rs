@@ -1,7 +1,7 @@
 // Copyright (c) Aptos Foundation
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
-use crate::tool_paths::get_revela_path;
+use crate::{tool_paths::get_revela_path, MoveEnv};
 use anyhow::Context;
 use aptos_cli_common::{
     check_if_file_exists, create_dir_if_not_exist, read_dir_files, read_from_file,
@@ -30,6 +30,7 @@ use std::{
     path::{Component, Path, PathBuf},
     process::Command,
     str,
+    sync::Arc,
 };
 use tempfile::NamedTempFile;
 
@@ -50,6 +51,9 @@ pub struct Disassemble {
     /// (Optional) Disassembler version to use
     #[arg(long, value_enum, default_value = "v2")]
     pub disassembler_version: DisassemblerVersion,
+
+    #[clap(skip)]
+    pub env: Arc<MoveEnv>,
 }
 
 /// Decompile the Move bytecode pointed to into Move source code.
@@ -64,6 +68,9 @@ pub struct Decompile {
     /// (Optional) Decompiler version to use
     #[arg(long, value_enum, default_value = "v2")]
     pub decompiler_version: DecompilerVersion,
+
+    #[clap(skip)]
+    pub env: Arc<MoveEnv>,
 }
 
 #[derive(Clone, Copy, Debug)]

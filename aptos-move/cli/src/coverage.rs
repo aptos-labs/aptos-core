@@ -1,7 +1,7 @@
 // Copyright (c) Aptos Foundation
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
-use crate::{fix_bytecode_version, move_types::MovePackageOptions};
+use crate::{fix_bytecode_version, move_types::MovePackageOptions, MoveEnv, WithMoveEnv};
 use aptos_cli_common::{CliCommand, CliError, CliResult, CliTypedResult};
 use aptos_framework::extended_checks;
 use async_trait::async_trait;
@@ -16,7 +16,7 @@ use move_coverage::{
 use move_disassembler::disassembler::Disassembler;
 use move_model::metadata::{CompilerVersion, LanguageVersion};
 use move_package::{compilation::compiled_package::CompiledPackage, BuildConfig, CompilerConfig};
-use std::path::PathBuf;
+use std::{path::PathBuf, sync::Arc};
 
 /// Options common to all coverage commands
 #[derive(Debug, Parser, Default)]
@@ -265,5 +265,11 @@ impl CoveragePackage {
             Self::Source(tool) => tool.execute_serialized_success().await,
             Self::Bytecode(tool) => tool.execute_serialized_success().await,
         }
+    }
+}
+
+impl WithMoveEnv for CoveragePackage {
+    fn attach_env(self, _env: Arc<MoveEnv>) -> Self {
+        self
     }
 }

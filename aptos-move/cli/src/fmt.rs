@@ -1,13 +1,14 @@
 // Copyright (c) Aptos Foundation
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
-use crate::tool_paths::get_movefmt_path;
+use crate::{tool_paths::get_movefmt_path, MoveEnv};
 use aptos_cli_common::{dir_default_to_current, CliCommand, CliError, CliTypedResult};
 use async_trait::async_trait;
 use clap::{Args, Parser};
 use move_command_line_common::files::find_move_filenames;
+use move_core_types::diag_writer::DiagWriter;
 use move_package::source_package::layout::SourcePackageLayout;
-use std::{collections::BTreeMap, fs, path::PathBuf, process::Command};
+use std::{collections::BTreeMap, fs, io::Write, path::PathBuf, process::Command, sync::Arc};
 
 /// Format the Move source code.
 #[derive(Debug, Parser)]
@@ -15,6 +16,9 @@ use std::{collections::BTreeMap, fs, path::PathBuf, process::Command};
 pub struct Fmt {
     #[clap(flatten)]
     pub command: FmtCommand,
+
+    #[clap(skip)]
+    pub env: Arc<MoveEnv>,
 }
 
 #[derive(clap::ValueEnum, Clone, Copy, Debug, Eq, PartialEq, PartialOrd)]
@@ -71,8 +75,9 @@ impl CliCommand<String> for Fmt {
         "Fmt"
     }
 
-    async fn execute(mut self) -> CliTypedResult<String> {
-        self.command.execute().await
+    async fn execute(self) -> CliTypedResult<String> {
+        let mut w = self.env.writer();
+        self.command.execute(&mut w).await
     }
 }
 
@@ -95,7 +100,7 @@ fn get_movefmt_binary_version() -> CliTypedResult<String> {
 }
 
 impl FmtCommand {
-    async fn execute(self) -> CliTypedResult<String> {
+    async fn execute(self, writer: &mut DiagWriter) -> CliTypedResult<String> {
         // Handle --version flag to show movefmt binary version
         if self.version {
             return get_movefmt_binary_version();
@@ -234,10 +239,12 @@ impl FmtCommand {
                     String::from_utf8(out.stderr).unwrap_or_default()
                 )));
             } else {
-                eprintln!("Formatting file: {}", file.display());
+                writeln!(writer, "Formatting file: {}", file.display())
+                    .map_err(|e| CliError::IO("writer".to_string(), e))?;
                 match String::from_utf8(out.stdout) {
                     Ok(output) => {
-                        eprint!("{}", output);
+                        write!(writer, "{}", output)
+                            .map_err(|e| CliError::IO("writer".to_string(), e))?;
                     },
                     Err(err) => {
                         return Err(CliError::UnexpectedError(format!(

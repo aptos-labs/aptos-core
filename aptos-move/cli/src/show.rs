@@ -2,13 +2,14 @@
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 use super::IncludedArtifactsArgs;
-use crate::move_types::MovePackageOptions;
+use crate::{move_types::MovePackageOptions, MoveEnv, WithMoveEnv};
 use anyhow::Context;
 use aptos_cli_common::{CliCommand, CliError, CliResult, CliTypedResult};
 use aptos_framework::{BuildOptions, BuiltPackage};
 use aptos_types::transaction::EntryABI;
 use async_trait::async_trait;
 use clap::{Parser, Subcommand};
+use std::sync::Arc;
 
 #[derive(Subcommand)]
 pub enum ShowTool {
@@ -19,6 +20,14 @@ impl ShowTool {
     pub async fn execute_serialized(self) -> CliResult {
         match self {
             Self::Abi(tool) => tool.execute_serialized().await,
+        }
+    }
+}
+
+impl WithMoveEnv for ShowTool {
+    fn attach_env(self, env: Arc<MoveEnv>) -> Self {
+        match self {
+            Self::Abi(tool) => Self::Abi(ShowAbi { env, ..tool }),
         }
     }
 }
@@ -45,6 +54,9 @@ pub struct ShowAbi {
 
     #[clap(flatten)]
     move_options: MovePackageOptions,
+
+    #[clap(skip)]
+    pub env: Arc<MoveEnv>,
 }
 
 #[async_trait]
@@ -63,8 +75,10 @@ impl CliCommand<Vec<EntryABI>> for ShowAbi {
                 .build_options(&self.move_options)?
         };
         // Build the package.
-        let package = BuiltPackage::build(self.move_options.get_package_path()?, build_options)
-            .map_err(|e| CliError::MoveCompilationError(format!("{:#}", e)))?;
+        let w = self.env.writer();
+        let package =
+            BuiltPackage::build_to(&w, self.move_options.get_package_path()?, build_options)
+                .map_err(|e| CliError::MoveCompilationError(format!("{:#}", e)))?;
 
         // Get ABIs from the package.
         let abis = package

@@ -204,6 +204,7 @@ fn create_compile_script_cmd(package_dir: PathBuf) -> CompileScript {
             package_dir: Some(package_dir),
             ..Default::default()
         },
+        env: Default::default(),
     }
 }
 

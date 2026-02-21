@@ -6,8 +6,8 @@
 //! Provides helpers to parse and execute CLI commands via clap, build temporary
 //! Move packages, and compare output against `.exp` baseline files.
 //!
-//! Stderr from the Move compiler (e.g. `BUILDING`, `INCLUDING DEPENDENCY`,
-//! diagnostics) is captured via fd-level redirection and included in baselines.
+//! Compiler output (e.g. `BUILDING`, `INCLUDING DEPENDENCY`, diagnostics) is
+//! captured via a buffer-backed `MoveEnv` writer and included in baselines.
 
 pub mod mock;
 
@@ -15,19 +15,17 @@ use crate::{MoveEnv, MoveTool};
 use aptos_cli_common::CliResult;
 use aptos_package_builder::PackageBuilder;
 use clap::Parser;
+use move_core_types::diag_writer::DiagWriter;
 use move_prover_test_utils::baseline_test::verify_or_update_baseline;
 use regex::Regex;
 use std::{
-    os::fd::AsRawFd,
     path::{Path, PathBuf},
     sync::{Arc, Mutex, Once},
 };
 use tempfile::TempDir;
+use termcolor::Buffer;
 
 static INIT_HOOKS: Once = Once::new();
-/// Serializes stderr capture across parallel tests. Since `dup2(fd, 2)` is
-/// process-global, only one test at a time may redirect stderr.
-static STDERR_LOCK: Mutex<()> = Mutex::new(());
 
 /// Lightweight wrapper so we can parse `MoveTool` from string args via clap.
 #[derive(Parser)]
@@ -43,14 +41,15 @@ pub struct CliOutput {
     pub stderr: String,
 }
 
-/// Parse CLI args, execute the command with a default `MoveEnv`, and return
-/// the `CliResult` together with captured stderr output.
+/// Parse CLI args, execute the command with a buffer-backed `MoveEnv`, and
+/// return the `CliResult` together with captured compiler output.
 pub fn run_cli(args: &[&str]) -> CliOutput {
-    run_cli_with_env(args, Arc::new(MoveEnv::default()))
+    let (writer, buffer) = DiagWriter::new_buffer();
+    run_cli_with_env(args, Arc::new(MoveEnv::default_with_writer(writer)), buffer)
 }
 
-/// Same as [`run_cli`] but with a custom `MoveEnv`.
-pub fn run_cli_with_env(args: &[&str], env: Arc<MoveEnv>) -> CliOutput {
+/// Same as [`run_cli`] but with a custom `MoveEnv` and buffer handle.
+pub fn run_cli_with_env(args: &[&str], env: Arc<MoveEnv>, buffer: Arc<Mutex<Buffer>>) -> CliOutput {
     INIT_HOOKS.call_once(crate::register_package_hooks);
 
     let cli = TestCli::try_parse_from(std::iter::once("test").chain(args.iter().copied()));
@@ -69,58 +68,11 @@ pub fn run_cli_with_env(args: &[&str], env: Arc<MoveEnv>) -> CliOutput {
         .build()
         .expect("failed to build tokio runtime");
 
-    let (result, stderr) = capture_stderr(|| runtime.block_on(cli.tool.execute(env)));
+    let result = runtime.block_on(cli.tool.execute(env.clone()));
+    let stderr =
+        String::from_utf8_lossy(buffer.lock().unwrap_or_else(|e| e.into_inner()).as_slice())
+            .to_string();
     CliOutput { result, stderr }
-}
-
-/// Capture everything written to fd 2 (stderr) during `f()`.
-///
-/// Redirects the stderr file descriptor to a temporary file, runs the
-/// closure, restores stderr, and returns the captured bytes as a string
-/// alongside the closure's return value.
-///
-/// A process-wide mutex serializes access because `dup2` is global.
-fn capture_stderr<F, R>(f: F) -> (R, String)
-where
-    F: FnOnce() -> R,
-{
-    let _guard = STDERR_LOCK.lock().unwrap_or_else(|e| e.into_inner());
-
-    // Flush any pending stderr output before redirecting
-    let _ = std::io::Write::flush(&mut std::io::stderr());
-
-    let tmp = tempfile::NamedTempFile::new().expect("failed to create temp file for stderr");
-    let tmp_fd = tmp.as_raw_fd();
-
-    unsafe {
-        // Save original stderr fd
-        let old_stderr = libc::dup(2);
-        assert!(old_stderr >= 0, "dup(2) failed");
-
-        // Redirect stderr to temp file
-        let rc = libc::dup2(tmp_fd, 2);
-        assert_eq!(rc, 2, "dup2 failed");
-
-        let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(f));
-
-        // Flush libc buffers and the Rust stderr handle
-        libc::fsync(2);
-        let _ = std::io::Write::flush(&mut std::io::stderr());
-
-        // Restore original stderr
-        let rc = libc::dup2(old_stderr, 2);
-        assert_eq!(rc, 2, "dup2 restore failed");
-        libc::close(old_stderr);
-
-        // Read captured output from the temp file (by path, to avoid fd sharing issues)
-        let captured = std::fs::read_to_string(tmp.path()).unwrap_or_default();
-
-        // Resume panic after restoring stderr
-        match result {
-            Ok(r) => (r, captured),
-            Err(payload) => std::panic::resume_unwind(payload),
-        }
-    }
 }
 
 /// Sanitize CLI output for baseline comparison.
@@ -138,13 +90,10 @@ pub fn sanitize_output(s: &str) -> String {
     let re_info = Regex::new(r"(?m)^\[INFO\].*\n?").expect("regex");
     let s = re_info.replace_all(&s, "");
 
-    // Remove "Compiling, may take a little while..." progress line
+    // Remove "Compiling, may take a little while..." progress line (non-deterministic
+    // depending on whether compilation actually fetches git deps).
     let re_compiling = Regex::new(r"(?m)^Compiling, may take a little while.*\n?").expect("regex");
     let s = re_compiling.replace_all(&s, "");
-
-    // Remove non-deterministic "Global logger has already been set" messages
-    let re_logger = Regex::new(r"(?m)^Global logger has already been set\n?").expect("regex");
-    let s = re_logger.replace_all(&s, "");
 
     // Replace temp-dir-style paths: /tmp/..., /var/..., /private/var/...
     let re_tmp = Regex::new(r#"(/private)?(/var|/tmp)(/[^\s,\]]+)*/"#).expect("regex");
@@ -235,8 +184,11 @@ pub fn make_package_with_framework(name: &str, sources: &[(&str, &str)]) -> Temp
 /// Build a `MoveEnv` with a mock `AptosContext` for testing network commands.
 ///
 /// The provided closure configures expectations on the mock before it is
-/// sealed inside the env. No debugger is available (returns error if used).
-pub fn env_with_mock(setup: impl FnOnce(&mut mock::MockAptosCtx)) -> Arc<MoveEnv> {
+/// sealed inside the env. Returns both the env and a buffer handle for
+/// reading captured output.
+pub fn env_with_mock(
+    setup: impl FnOnce(&mut mock::MockAptosCtx),
+) -> (Arc<MoveEnv>, Arc<Mutex<Buffer>>) {
     let mut ctx = mock::MockAptosCtx::new();
     setup(&mut ctx);
     let debugger_factory: Box<
@@ -244,7 +196,15 @@ pub fn env_with_mock(setup: impl FnOnce(&mut mock::MockAptosCtx)) -> Arc<MoveEnv
             + Send
             + Sync,
     > = Box::new(|_| Err(anyhow::anyhow!("debugger not available in tests")));
-    Arc::new(MoveEnv::new(Box::new(ctx), debugger_factory))
+    let (writer, buffer) = DiagWriter::new_buffer();
+    (
+        Arc::new(MoveEnv::new_with_writer(
+            Box::new(ctx),
+            debugger_factory,
+            writer,
+        )),
+        buffer,
+    )
 }
 
 /// Return the local path to the `aptos-framework` package, derived from

@@ -18,7 +18,7 @@ use crate::{
     sim::Sim,
     stored_package::CachedPackageRegistry,
     transactions::TxnOptions,
-    MoveEnv, ResourceAccountSeed,
+    MoveEnv, ResourceAccountSeed, WithMoveEnv,
 };
 use aptos_api_types::AptosErrorCode;
 use aptos_cli_common::{
@@ -135,74 +135,43 @@ pub enum MoveTool {
 impl MoveTool {
     pub async fn execute(self, env: Arc<MoveEnv>) -> CliResult {
         match self {
-            // Commands needing env: inject before dispatch
-            MoveTool::Publish(mut tool) => {
-                tool.env = env;
-                tool.execute_serialized().await
+            // Commands needing env: inject via attach_env before dispatch
+            MoveTool::Publish(tool) => tool.attach_env(env).execute_serialized().await,
+            MoveTool::CreateObjectAndPublishPackage(tool) => {
+                tool.attach_env(env).execute_serialized_success().await
             },
-            MoveTool::CreateObjectAndPublishPackage(mut tool) => {
-                tool.env = env;
-                tool.execute_serialized_success().await
+            MoveTool::UpgradeObjectPackage(tool) => {
+                tool.attach_env(env).execute_serialized_success().await
             },
-            MoveTool::UpgradeObjectPackage(mut tool) => {
-                tool.env = env;
-                tool.execute_serialized_success().await
+            MoveTool::DeployObject(tool) => tool.attach_env(env).execute_serialized().await,
+            MoveTool::UpgradeObject(tool) => tool.attach_env(env).execute_serialized().await,
+            MoveTool::ClearStagingArea(tool) => tool.attach_env(env).execute_serialized().await,
+            MoveTool::CreateResourceAccountAndPublishPackage(tool) => {
+                tool.attach_env(env).execute_serialized_success().await
             },
-            MoveTool::DeployObject(mut tool) => {
-                tool.env = env;
-                tool.execute_serialized().await
-            },
-            MoveTool::UpgradeObject(mut tool) => {
-                tool.env = env;
-                tool.execute_serialized().await
-            },
-            MoveTool::ClearStagingArea(mut tool) => {
-                tool.env = env;
-                tool.execute_serialized().await
-            },
-            MoveTool::CreateResourceAccountAndPublishPackage(mut tool) => {
-                tool.env = env;
-                tool.execute_serialized_success().await
-            },
-            MoveTool::Run(mut tool) => {
-                tool.env = env;
-                tool.execute_serialized().await
-            },
-            MoveTool::RunScript(mut tool) => {
-                tool.env = env;
-                tool.execute_serialized().await
-            },
-            MoveTool::Replay(mut tool) => {
-                tool.env = env;
-                tool.execute_serialized().await
-            },
-            MoveTool::Simulate(mut tool) => {
-                tool.env = env;
-                tool.execute_serialized().await
-            },
-            MoveTool::View(mut tool) => {
-                tool.env = env;
-                tool.execute_serialized().await
-            },
-            // Commands NOT needing env: dispatch directly
-            MoveTool::BuildPublishPayload(tool) => tool.execute_serialized().await,
-            MoveTool::Clean(tool) => tool.execute_serialized().await,
-            MoveTool::Compile(tool) => tool.execute_serialized().await,
-            MoveTool::CompileScript(tool) => tool.execute_serialized().await,
-            MoveTool::Coverage(tool) => tool.execute().await,
-            MoveTool::Disassemble(tool) => tool.execute_serialized().await,
-            MoveTool::Decompile(tool) => tool.execute_serialized().await,
-            MoveTool::Document(tool) => tool.execute_serialized().await,
-            MoveTool::Download(tool) => tool.execute_serialized().await,
-            MoveTool::Init(tool) => tool.execute_serialized_success().await,
-            MoveTool::List(tool) => tool.execute_serialized().await,
-            MoveTool::Prove(tool) => tool.execute_serialized().await,
-            MoveTool::Show(tool) => tool.execute_serialized().await,
-            MoveTool::Test(tool) => tool.execute_serialized().await,
-            MoveTool::VerifyPackage(tool) => tool.execute_serialized().await,
-            MoveTool::Fmt(tool) => tool.execute_serialized().await,
-            MoveTool::Lint(tool) => tool.execute_serialized().await,
-            MoveTool::Sim(tool) => tool.execute().await,
+            MoveTool::Run(tool) => tool.attach_env(env).execute_serialized().await,
+            MoveTool::RunScript(tool) => tool.attach_env(env).execute_serialized().await,
+            MoveTool::Replay(tool) => tool.attach_env(env).execute_serialized().await,
+            MoveTool::Simulate(tool) => tool.attach_env(env).execute_serialized().await,
+            MoveTool::View(tool) => tool.attach_env(env).execute_serialized().await,
+            MoveTool::BuildPublishPayload(tool) => tool.attach_env(env).execute_serialized().await,
+            MoveTool::Compile(tool) => tool.attach_env(env).execute_serialized().await,
+            MoveTool::CompileScript(tool) => tool.attach_env(env).execute_serialized().await,
+            MoveTool::Document(tool) => tool.attach_env(env).execute_serialized().await,
+            MoveTool::Lint(tool) => tool.attach_env(env).execute_serialized().await,
+            MoveTool::Show(tool) => tool.attach_env(env).execute_serialized().await,
+            MoveTool::VerifyPackage(tool) => tool.attach_env(env).execute_serialized().await,
+            MoveTool::Prove(tool) => tool.attach_env(env).execute_serialized().await,
+            MoveTool::Clean(tool) => tool.attach_env(env).execute_serialized().await,
+            MoveTool::Coverage(tool) => tool.attach_env(env).execute().await,
+            MoveTool::Disassemble(tool) => tool.attach_env(env).execute_serialized().await,
+            MoveTool::Decompile(tool) => tool.attach_env(env).execute_serialized().await,
+            MoveTool::Download(tool) => tool.attach_env(env).execute_serialized().await,
+            MoveTool::Init(tool) => tool.attach_env(env).execute_serialized_success().await,
+            MoveTool::List(tool) => tool.attach_env(env).execute_serialized().await,
+            MoveTool::Test(tool) => tool.attach_env(env).execute_serialized().await,
+            MoveTool::Fmt(tool) => tool.attach_env(env).execute_serialized().await,
+            MoveTool::Sim(tool) => tool.attach_env(env).execute().await,
         }
     }
 }
@@ -358,6 +327,9 @@ pub struct InitPackage {
 
     #[clap(flatten)]
     pub framework_package_args: FrameworkPackageArgs,
+
+    #[clap(skip)]
+    pub env: Arc<MoveEnv>,
 }
 
 #[async_trait]
@@ -431,6 +403,9 @@ pub struct CompilePackage {
     pub included_artifacts_args: IncludedArtifactsArgs,
     #[clap(flatten)]
     pub move_options: MovePackageOptions,
+
+    #[clap(skip)]
+    pub env: Arc<MoveEnv>,
 }
 
 #[async_trait]
@@ -448,12 +423,13 @@ impl CliCommand<Vec<String>> for CompilePackage {
                 .build_options(&self.move_options)?
         };
         let package_path = self.move_options.get_package_path()?;
+        let w = self.env.writer();
         if self.fetch_deps_only {
-            let config = BuiltPackage::create_build_config(&build_options)?;
-            BuiltPackage::prepare_resolution_graph(package_path, config)?;
+            let config = BuiltPackage::create_build_config(&mut w.clone(), &build_options)?;
+            BuiltPackage::prepare_resolution_graph(&mut w.clone(), package_path, config)?;
             return Ok(vec![]);
         }
-        let pack = BuiltPackage::build(self.move_options.get_package_path()?, build_options)
+        let pack = BuiltPackage::build_to(&w, self.move_options.get_package_path()?, build_options)
             .map_err(|e| CliError::MoveCompilationError(format!("{:#}", e)))?;
         if self.save_metadata {
             pack.extract_metadata_and_save()?;
@@ -477,6 +453,9 @@ pub struct CompileScript {
     pub output_file: Option<PathBuf>,
     #[clap(flatten)]
     pub move_options: MovePackageOptions,
+
+    #[clap(skip)]
+    pub env: Arc<MoveEnv>,
 }
 
 #[async_trait]
@@ -508,7 +487,8 @@ impl CompileScript {
             ..IncludedArtifacts::None.build_options(&self.move_options)?
         };
         let package_dir = self.move_options.get_package_path()?;
-        let pack = BuiltPackage::build(package_dir, build_options)
+        let w = self.env.writer();
+        let pack = BuiltPackage::build_to(&w, package_dir, build_options)
             .map_err(|e| CliError::MoveCompilationError(format!("{:#}", e)))?;
 
         let scripts_count = pack.script_count();
@@ -572,6 +552,9 @@ pub struct TestPackage {
     /// Fail-fast mode: stop running tests after the first failure.
     #[clap(long = "fail-fast")]
     pub fail_fast: bool,
+
+    #[clap(skip)]
+    pub env: Arc<MoveEnv>,
 }
 
 pub(crate) fn fix_bytecode_version(
@@ -695,6 +678,9 @@ pub struct ProvePackage {
 
     #[clap(flatten)]
     prover_options: ProverOptions,
+
+    #[clap(skip)]
+    pub env: Arc<MoveEnv>,
 }
 
 #[async_trait]
@@ -707,6 +693,7 @@ impl CliCommand<&'static str> for ProvePackage {
         let ProvePackage {
             move_options,
             prover_options,
+            env,
         } = self;
 
         let compiler_version = move_options
@@ -715,9 +702,11 @@ impl CliCommand<&'static str> for ProvePackage {
         let language_version = move_options
             .language_version
             .or_else(|| Some(LanguageVersion::latest_stable()));
+        let mut writer = env.writer();
 
         let result = task::spawn_blocking(move || {
-            prover_options.prove(
+            prover_options.prove_to(
+                &mut writer,
                 move_options.dev,
                 move_options.get_package_path()?.as_path(),
                 move_options.named_addresses(),
@@ -748,6 +737,9 @@ pub struct DocumentPackage {
 
     #[clap(flatten)]
     docgen_options: DocgenOptions,
+
+    #[clap(skip)]
+    pub env: Arc<MoveEnv>,
 }
 
 #[async_trait]
@@ -760,6 +752,7 @@ impl CliCommand<&'static str> for DocumentPackage {
         let DocumentPackage {
             move_options,
             docgen_options,
+            env,
         } = self;
         let build_options = BuildOptions {
             dev: move_options.dev,
@@ -784,7 +777,8 @@ impl CliCommand<&'static str> for DocumentPackage {
             known_attributes: extended_checks::get_all_attribute_names().clone(),
             ..BuildOptions::default()
         };
-        BuiltPackage::build(move_options.get_package_path()?, build_options)?;
+        let w = env.writer();
+        BuiltPackage::build_to(&w, move_options.get_package_path()?, build_options)?;
         Ok("succeeded")
     }
 }
@@ -839,13 +833,17 @@ pub struct BuildPublishPayload {
     /// JSON output file to write publication transaction to
     #[clap(long, value_parser)]
     pub(crate) json_output_file: PathBuf,
+
+    #[clap(skip)]
+    pub env: Arc<MoveEnv>,
 }
 
 impl TryInto<PackagePublicationData> for &PublishPackage {
     type Error = CliError;
 
     fn try_into(self) -> Result<PackagePublicationData, Self::Error> {
-        let package = build_package_options(&self.move_options, &self.included_artifacts_args)?;
+        let package =
+            build_package_options(&self.move_options, &self.included_artifacts_args, &self.env)?;
 
         let package_publication_data =
             create_package_publication_data(package, PublishType::AccountDeploy, None)?;
@@ -875,7 +873,8 @@ impl AsyncTryInto<ChunkedPublishPayloads> for &PublishPackage {
     type Error = CliError;
 
     async fn async_try_into(self) -> Result<ChunkedPublishPayloads, Self::Error> {
-        let package = build_package_options(&self.move_options, &self.included_artifacts_args)?;
+        let package =
+            build_package_options(&self.move_options, &self.included_artifacts_args, &self.env)?;
 
         let chunked_publish_payloads = create_chunked_publish_payloads(
             package,
@@ -1110,7 +1109,8 @@ impl CliCommand<String> for BuildPublishPayload {
         "BuildPublishPayload"
     }
 
-    async fn execute(self) -> CliTypedResult<String> {
+    async fn execute(mut self) -> CliTypedResult<String> {
+        self.publish_package.env = self.env.clone();
         let package_publication_data: PackagePublicationData =
             (&self.publish_package).try_into()?;
         // Extract entry function data from publication payload.
@@ -1210,7 +1210,11 @@ impl CliCommand<TransactionSummary> for CreateObjectAndPublishPackage {
             let mock_object_address = AccountAddress::from_hex_literal("0xcafe").unwrap();
             self.move_options
                 .add_named_address(self.address_name.clone(), mock_object_address.to_string());
-            let package = build_package_options(&self.move_options, &self.included_artifacts_args)?;
+            let package = build_package_options(
+                &self.move_options,
+                &self.included_artifacts_args,
+                &self.env,
+            )?;
             let mock_payloads = create_chunked_publish_payloads(
                 package,
                 PublishType::AccountDeploy,
@@ -1232,7 +1236,8 @@ impl CliCommand<TransactionSummary> for CreateObjectAndPublishPackage {
         self.move_options
             .add_named_address(self.address_name, object_address.to_string());
 
-        let package = build_package_options(&self.move_options, &self.included_artifacts_args)?;
+        let package =
+            build_package_options(&self.move_options, &self.included_artifacts_args, &self.env)?;
         let message = format!(
             "Do you want to publish this package at object address {}",
             object_address
@@ -1326,7 +1331,7 @@ impl CliCommand<TransactionSummary> for UpgradeObjectPackage {
 
     async fn execute(self) -> CliTypedResult<TransactionSummary> {
         let built_package =
-            build_package_options(&self.move_options, &self.included_artifacts_args)?;
+            build_package_options(&self.move_options, &self.included_artifacts_args, &self.env)?;
         let url = self
             .txn_options
             .rest_options
@@ -1464,7 +1469,11 @@ impl CliCommand<TransactionSummary> for DeployObjectCode {
             let mock_object_address = AccountAddress::from_hex_literal("0xcafe").unwrap();
             self.move_options
                 .add_named_address(self.address_name.clone(), mock_object_address.to_string());
-            let package = build_package_options(&self.move_options, &self.included_artifacts_args)?;
+            let package = build_package_options(
+                &self.move_options,
+                &self.included_artifacts_args,
+                &self.env,
+            )?;
             let mock_payloads: Vec<TransactionPayload> = create_chunked_publish_payloads(
                 package,
                 PublishType::AccountDeploy,
@@ -1486,7 +1495,8 @@ impl CliCommand<TransactionSummary> for DeployObjectCode {
         self.move_options
             .add_named_address(self.address_name, object_address.to_string());
 
-        let package = build_package_options(&self.move_options, &self.included_artifacts_args)?;
+        let package =
+            build_package_options(&self.move_options, &self.included_artifacts_args, &self.env)?;
         let message = format!(
             "Do you want to deploy this package at object address {}",
             object_address
@@ -1590,7 +1600,8 @@ impl CliCommand<TransactionSummary> for UpgradeCodeObject {
         self.move_options
             .add_named_address(self.address_name, self.object_address.to_string());
 
-        let package = build_package_options(&self.move_options, &self.included_artifacts_args)?;
+        let package =
+            build_package_options(&self.move_options, &self.included_artifacts_args, &self.env)?;
 
         // Get the `PackageRegistry` at the given code object address.
         let upgrade_policy = match &self.txn_options.session {
@@ -1715,11 +1726,13 @@ impl CliCommand<TransactionSummary> for UpgradeCodeObject {
 fn build_package_options(
     move_options: &MovePackageOptions,
     included_artifacts_args: &IncludedArtifactsArgs,
+    env: &MoveEnv,
 ) -> anyhow::Result<BuiltPackage> {
     let options = included_artifacts_args
         .included_artifacts
         .build_options(move_options)?;
-    BuiltPackage::build(move_options.get_package_path()?, options)
+    let w = env.writer();
+    BuiltPackage::build_to(&w, move_options.get_package_path()?, options)
 }
 
 async fn submit_chunked_publish_transactions(
@@ -1946,7 +1959,8 @@ impl CliCommand<TransactionSummary> for CreateResourceAccountAndPublishPackage {
         let options = included_artifacts_args
             .included_artifacts
             .build_options(&move_options)?;
-        let package = BuiltPackage::build(package_path, options)?;
+        let w = env.writer();
+        let package = BuiltPackage::build_to(&w, package_path, options)?;
         let compiled_units = package.extract_code();
 
         // Send the compiled module and metadata using the code::publish_package_txn.
@@ -2006,6 +2020,9 @@ pub struct DownloadPackage {
     /// Print metadata of the package
     #[clap(long)]
     pub print_metadata: bool,
+
+    #[clap(skip)]
+    pub env: Arc<MoveEnv>,
 }
 
 #[async_trait]
@@ -2072,6 +2089,9 @@ pub struct VerifyPackage {
     pub(crate) rest_options: RestOptions,
     #[clap(flatten)]
     pub(crate) profile_options: ProfileOptions,
+
+    #[clap(skip)]
+    pub env: Arc<MoveEnv>,
 }
 
 #[async_trait]
@@ -2090,7 +2110,8 @@ impl CliCommand<&'static str> for VerifyPackage {
             ),
             ..self.included_artifacts.build_options(&self.move_options)?
         };
-        let pack = BuiltPackage::build(self.move_options.get_package_path()?, build_options)
+        let w = self.env.writer();
+        let pack = BuiltPackage::build_to(&w, self.move_options.get_package_path()?, build_options)
             .map_err(|e| CliError::MoveCompilationError(format!("{:#}", e)))?;
         let compiled_metadata = pack.extract_metadata()?;
 
@@ -2135,6 +2156,9 @@ pub struct ListPackage {
     rest_options: RestOptions,
     #[clap(flatten)]
     pub(crate) profile_options: ProfileOptions,
+
+    #[clap(skip)]
+    pub env: Arc<MoveEnv>,
 }
 
 #[derive(ValueEnum, Clone, Copy, Debug)]
@@ -2193,6 +2217,9 @@ pub struct CleanPackage {
     pub(crate) move_options: MovePackageOptions,
     #[clap(flatten)]
     pub(crate) prompt_options: PromptOptions,
+
+    #[clap(skip)]
+    pub env: Arc<MoveEnv>,
 }
 
 #[async_trait]
@@ -3158,4 +3185,19 @@ impl_with_move_env!(
     ViewFunction,
     RunScript,
     Replay,
+    CompilePackage,
+    CompileScript,
+    ProvePackage,
+    DocumentPackage,
+    BuildPublishPayload,
+    VerifyPackage,
+    LintPackage,
+    InitPackage,
+    TestPackage,
+    DownloadPackage,
+    ListPackage,
+    CleanPackage,
+    Disassemble,
+    Decompile,
+    Fmt,
 );

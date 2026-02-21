@@ -46,7 +46,7 @@ use aptos_types::{
 use aptos_vm_types::output::VMOutput;
 use async_trait::async_trait;
 pub use commands::*;
-use move_core_types::vm_status::VMStatus;
+use move_core_types::{diag_writer::DiagWriter, vm_status::VMStatus};
 pub use move_types::{
     ArgWithTypeVec, ChunkedPublishOption, EntryFunctionArguments, LargePackagesModuleOption,
     MovePackageOptions, OverrideSizeCheckOption, ScriptFunctionArguments, TypeArgVec,
@@ -91,10 +91,24 @@ pub trait AptosContext: Send + Sync + 'static {
 ///
 /// The full Aptos CLI constructs this with real implementations. The standalone `move` binary
 /// uses `MoveEnv::default()` (no network components), so network commands give a clear error.
-#[derive(Default)]
+///
+/// The `writer` field provides a shared writer for compiler output. In production mode
+/// it writes to `StandardStream::stderr`; in test mode callers can supply a buffer-backed
+/// writer via [`DiagWriter::new_buffer`].
 pub struct MoveEnv {
     aptos_context: Option<Box<dyn AptosContext>>,
     debugger_factory: Option<MoveDebuggerFactory>,
+    writer: DiagWriter,
+}
+
+impl Default for MoveEnv {
+    fn default() -> Self {
+        Self {
+            aptos_context: None,
+            debugger_factory: None,
+            writer: DiagWriter::stderr(),
+        }
+    }
 }
 
 impl std::fmt::Debug for MoveEnv {
@@ -114,7 +128,35 @@ impl MoveEnv {
         Self {
             aptos_context: Some(aptos_context),
             debugger_factory: Some(debugger_factory),
+            writer: DiagWriter::stderr(),
         }
+    }
+
+    /// Like [`new`](Self::new) but with a caller-supplied writer.
+    pub fn new_with_writer(
+        aptos_context: Box<dyn AptosContext>,
+        debugger_factory: MoveDebuggerFactory,
+        writer: DiagWriter,
+    ) -> Self {
+        Self {
+            aptos_context: Some(aptos_context),
+            debugger_factory: Some(debugger_factory),
+            writer,
+        }
+    }
+
+    /// Create a `MoveEnv` with no network components and a caller-supplied writer.
+    pub fn default_with_writer(writer: DiagWriter) -> Self {
+        Self {
+            aptos_context: None,
+            debugger_factory: None,
+            writer,
+        }
+    }
+
+    /// Return a `DiagWriter` that can be passed to `BuiltPackage::build_to`.
+    pub fn writer(&self) -> DiagWriter {
+        self.writer.clone()
     }
 
     /// Get the AptosContext, or an error if not available (standalone mode).

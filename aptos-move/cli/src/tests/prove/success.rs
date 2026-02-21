@@ -27,6 +27,8 @@ fn prove_success() {
         "--package-dir",
         dir,
         "--skip-fetch-latest-git-deps",
+        "--stable-test-output",
+        "--for-test",
     ]);
     common::check_baseline(file!(), &output);
 }

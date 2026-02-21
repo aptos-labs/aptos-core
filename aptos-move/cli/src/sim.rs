@@ -1,14 +1,14 @@
 // Copyright (c) Aptos Foundation
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
-use crate::ReplayNetworkSelection;
+use crate::{MoveEnv, ReplayNetworkSelection, WithMoveEnv};
 use aptos_cli_common::{CliCommand, CliResult, CliTypedResult};
 use aptos_rest_client::Client;
 use aptos_transaction_simulation_session::{BlockTimestamp, Session};
 use async_trait::async_trait;
 use clap::{Parser, Subcommand};
 use move_core_types::{account_address::AccountAddress, language_storage::StructTag};
-use std::path::PathBuf;
+use std::{path::PathBuf, sync::Arc};
 
 /// Initializes a new simulation session
 #[derive(Debug, Parser)]
@@ -255,5 +255,11 @@ impl Sim {
             Sim::NewBlock(new_block) => new_block.execute_serialized().await,
             Sim::AdvanceEpoch(advance_epoch) => advance_epoch.execute_serialized().await,
         }
+    }
+}
+
+impl WithMoveEnv for Sim {
+    fn attach_env(self, _env: Arc<MoveEnv>) -> Self {
+        self
     }
 }

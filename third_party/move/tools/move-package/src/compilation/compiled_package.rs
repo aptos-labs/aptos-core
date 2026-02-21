@@ -1108,6 +1108,18 @@ pub fn build_and_report_no_exit_v2_driver(
     Ok((move_compiler_v2::make_files_source_text(&env), units, env))
 }
 
+/// Returns a compiler driver that reports errors to the given shared writer
+/// instead of creating its own `StandardStream::stderr()`.
+pub fn make_no_exit_v2_driver_to(
+    writer: &mut move_core_types::diag_writer::DiagWriter,
+) -> impl FnMut(move_compiler_v2::Options) -> CompilerDriverResult + '_ {
+    move |options| {
+        let mut emitter = options.error_emitter(writer);
+        let (env, units) = move_compiler_v2::run_move_compiler(emitter.as_mut(), options)?;
+        Ok((move_compiler_v2::make_files_source_text(&env), units, env))
+    }
+}
+
 /// Returns the deserialized module from the bytecode file
 fn get_module_in_package(pkg_name: Symbol, pkg_path: &str) -> Result<CompiledModule> {
     // Read the bytecode file

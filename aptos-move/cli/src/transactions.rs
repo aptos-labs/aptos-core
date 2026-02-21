@@ -4,17 +4,12 @@
 //! Transaction options and local simulation support for the `aptos move simulate` command.
 
 use crate::{local_simulation, MoveDebugger, MoveEnv};
-use aptos_api_types::ViewFunction;
 use aptos_cli_common::{
-    get_account_with_state, get_sequence_number, AccountType, CliConfig, CliError, CliTypedResult,
-    ConfigSearchMode, EncodingOptions, ExtractEd25519PublicKey, GasOptions, PrivateKeyInputOptions,
-    ProfileOptions, PromptOptions, RestOptions, TransactionSummary, ACCEPTED_CLOCK_SKEW_US,
-    US_IN_SECS,
+    get_account_with_state, CliError, CliTypedResult, EncodingOptions, GasOptions,
+    PrivateKeyInputOptions, ProfileOptions, PromptOptions, RestOptions, TransactionSummary,
+    ACCEPTED_CLOCK_SKEW_US, US_IN_SECS,
 };
-use aptos_crypto::{
-    ed25519::{Ed25519PrivateKey, Ed25519PublicKey},
-    hash::CryptoHash,
-};
+use aptos_crypto::{ed25519::Ed25519PrivateKey, hash::CryptoHash};
 use aptos_rest_client::Client;
 use aptos_sdk::{transaction_builder::TransactionFactory, types::LocalAccount};
 use aptos_types::{
@@ -85,31 +80,10 @@ pub(crate) struct TxnOptions {
     pub(crate) replay_protection_type: ReplayProtectionType,
 }
 
-#[allow(dead_code)]
 impl TxnOptions {
     /// Builds a rest client
     fn rest_client(&self) -> CliTypedResult<Client> {
         self.rest_options.client(&self.profile_options)
-    }
-
-    pub fn get_transaction_account_type(&self) -> CliTypedResult<AccountType> {
-        if self.private_key_options.has_key_or_file() {
-            Ok(AccountType::Local)
-        } else if let Some(profile) = CliConfig::load_profile(
-            self.profile_options.profile_name(),
-            ConfigSearchMode::CurrentDirAndParents,
-        )? {
-            if profile.private_key.is_some() {
-                Ok(AccountType::Local)
-            } else {
-                Ok(AccountType::HardwareWallet)
-            }
-        } else {
-            Err(CliError::CommandArgumentError(
-                "One of ['--private-key', '--private-key-file'] or a profile must be used"
-                    .to_string(),
-            ))
-        }
     }
 
     /// Retrieves the private key and the associated address
@@ -128,37 +102,6 @@ impl TxnOptions {
             &self.profile_options,
             self.sender_account,
         )
-    }
-
-    pub fn get_public_key_and_address(&self) -> CliTypedResult<(Ed25519PublicKey, AccountAddress)> {
-        self.private_key_options
-            .extract_ed25519_public_key_and_address(
-                self.encoding_options.encoding,
-                &self.profile_options,
-                self.sender_account,
-            )
-    }
-
-    pub fn sender_address(&self) -> CliTypedResult<AccountAddress> {
-        Ok(self.get_key_and_address()?.1)
-    }
-
-    pub fn get_public_key(&self) -> CliTypedResult<Ed25519PublicKey> {
-        self.private_key_options
-            .extract_public_key(self.encoding_options.encoding, &self.profile_options)
-    }
-
-    pub async fn sequence_number(&self, sender_address: AccountAddress) -> CliTypedResult<u64> {
-        let client = self.rest_client()?;
-        get_sequence_number(&client, sender_address).await
-    }
-
-    pub async fn view(&self, payload: ViewFunction) -> CliTypedResult<Vec<serde_json::Value>> {
-        let client = self.rest_client()?;
-        Ok(client
-            .view_bcs_with_json_response(&payload, None)
-            .await?
-            .into_inner())
     }
 
     pub async fn simulate_remotely(
@@ -344,55 +287,5 @@ impl TxnOptions {
             local_simulation::run_transaction_using_debugger,
         )
         .await
-    }
-
-    /// Benchmarks the transaction payload locally.
-    /// The transaction is executed multiple times, and the median value is calculated to improve
-    /// the accuracy of the measurement results.
-    pub async fn benchmark_locally(
-        &self,
-        payload: TransactionPayload,
-        env: &MoveEnv,
-    ) -> CliTypedResult<TransactionSummary> {
-        println!();
-        println!("Benchmarking transaction locally...");
-
-        self.simulate_using_debugger(
-            payload,
-            env,
-            local_simulation::benchmark_transaction_using_debugger,
-        )
-        .await
-    }
-
-    /// Simulates the transaction locally with the gas profiler enabled.
-    pub async fn profile_gas(
-        &self,
-        payload: TransactionPayload,
-        env: &MoveEnv,
-    ) -> CliTypedResult<TransactionSummary> {
-        println!();
-        println!("Simulating transaction locally using the gas profiler...");
-
-        self.simulate_using_debugger(payload, env, |debugger, version, txn, hash, aux_info| {
-            local_simulation::profile_transaction_using_debugger(
-                debugger, version, txn, hash, aux_info, false,
-            )
-        })
-        .await
-    }
-
-    pub async fn estimate_gas_price(&self) -> CliTypedResult<u64> {
-        let client = self.rest_client()?;
-        client
-            .estimate_gas_price()
-            .await
-            .map(|inner| inner.into_inner().gas_estimate)
-            .map_err(|err| {
-                CliError::UnexpectedError(format!(
-                    "Failed to retrieve gas price estimate {:?}",
-                    err
-                ))
-            })
     }
 }
