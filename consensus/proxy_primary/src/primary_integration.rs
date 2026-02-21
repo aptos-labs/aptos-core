@@ -71,25 +71,36 @@ impl PrimaryBlockFromProxy {
             }
         }
 
-        // Verify all blocks have the same primary_round
-        for block in &proxy_blocks {
-            let block_primary_round = block
-                .block_data()
-                .primary_round()
-                .ok_or_else(|| {
-                    ProxyConsensusError::InvalidProxyBlock("Block is not a proxy block".into())
-                })?;
-            if block_primary_round != primary_round {
+        // Verify primary_round is non-decreasing across blocks and all are <= message primary_round.
+        // Proof overwriting can cause batches where blocks span multiple primary rounds
+        // (intermediate cutting points may have been sent in previous batches).
+        // The proxy BFT guarantees block integrity; we just check structural consistency.
+        let mut prev_pr = 0;
+        for (i, block) in proxy_blocks.iter().enumerate() {
+            let block_pr = block.block_data().primary_round().ok_or_else(|| {
+                ProxyConsensusError::InvalidProxyBlock(format!(
+                    "Block {} is not a proxy block (missing primary_round)",
+                    i
+                ))
+            })?;
+            if block_pr < prev_pr {
                 return Err(ProxyConsensusError::InvalidPrimaryRound {
-                    expected: primary_round,
-                    got: block_primary_round,
+                    expected: prev_pr,
+                    got: block_pr,
                 });
             }
+            if block_pr > primary_round {
+                return Err(ProxyConsensusError::InvalidPrimaryRound {
+                    expected: primary_round,
+                    got: block_pr,
+                });
+            }
+            prev_pr = block_pr;
         }
 
         // Primary proof round must be >= primary_round - 1.
         // With consecutive QCs: proof_round == primary_round - 1 (exact match).
-        // With TC gaps: proof_round > primary_round - 1 (primary had timeouts).
+        // With overwritten proofs: proof_round > primary_round - 1 (jumped ahead).
         let min_expected_proof_round = primary_round.saturating_sub(1);
         if primary_proof.proof_round() < min_expected_proof_round {
             return Err(ProxyConsensusError::PrimaryProofRoundMismatch {
@@ -168,18 +179,23 @@ impl PrimaryBlockFromProxy {
     /// Verify the proxy blocks have valid signatures.
     ///
     /// This should be called before using the proxy blocks.
-    pub fn verify(&self, proxy_verifier: &ValidatorVerifier) -> Result<(), ProxyConsensusError> {
-        // Verify each block's signature
+    pub fn verify(
+        &self,
+        proxy_verifier: &ValidatorVerifier,
+        primary_verifier: &ValidatorVerifier,
+    ) -> Result<(), ProxyConsensusError> {
+        // Verify each proxy block's signature using proxy verifier for block signatures/QC
+        // and primary verifier for any embedded primary consensus proofs
         for block in &self.proxy_blocks {
             block
-                .validate_signature(proxy_verifier)
+                .validate_proxy_signature(proxy_verifier, primary_verifier)
                 .map_err(|e| ProxyConsensusError::InvalidProxyBlock(e.to_string()))?;
         }
 
-        // Verify primary proof (note: this should be verified with the full validator set,
-        // not just proxy verifier, but for phase 1 we use proxy verifier)
+        // Verify primary proof using full verifier
+        // (primary QC/TC is signed by all N validators, not just proxy subset)
         self.primary_proof
-            .verify(proxy_verifier)
+            .verify(primary_verifier)
             .map_err(|e| ProxyConsensusError::InvalidProxyBlock(e.to_string()))?;
 
         Ok(())

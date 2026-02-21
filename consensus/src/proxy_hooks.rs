@@ -41,7 +41,11 @@ use aptos_types::{
 };
 use async_trait::async_trait;
 use move_core_types::account_address::AccountAddress;
-use std::{sync::Arc, time::Duration};
+use std::sync::{
+    atomic::{AtomicBool, Ordering},
+    Arc,
+};
+use std::time::Duration;
 
 /// Tracks the proxy's view of primary consensus state.
 ///
@@ -148,6 +152,12 @@ pub struct ProxyHooksImpl {
     /// Network sender for broadcasting ordered blocks to all primaries.
     /// None only in unit tests where we don't have a real network stack.
     network: Option<Arc<crate::network::NetworkSender>>,
+    /// Shared flag indicating a primary proof is pending. Used by
+    /// ProxyBudgetPayloadClient to skip backpressure delay for cutting-point blocks.
+    has_pending_proof: Arc<AtomicBool>,
+    /// This validator's identity. Used to gate network broadcast: only the
+    /// proposer of the cutting-point block broadcasts to remote primaries.
+    self_author: Author,
 }
 
 impl ProxyHooksImpl {
@@ -155,11 +165,14 @@ impl ProxyHooksImpl {
         ordered_blocks_tx: tokio::sync::mpsc::UnboundedSender<ProxyToPrimaryEvent>,
         network: Arc<crate::network::NetworkSender>,
         initial_primary_qc: Option<Arc<QuorumCert>>,
+        has_pending_proof: Arc<AtomicBool>,
+        self_author: Author,
     ) -> Self {
         let (pending_proof, current_round, highest_round) = match initial_primary_qc {
             Some(qc) => {
                 let round = qc.certified_block().round();
                 let proof = Arc::new(PrimaryConsensusProof::QC((*qc).clone()));
+                has_pending_proof.store(true, Ordering::Release);
                 (Some(proof), round + 1, round)
             },
             None => (None, 1, 0),
@@ -173,6 +186,8 @@ impl ProxyHooksImpl {
             pending_ordered_blocks: Mutex::new(Vec::new()),
             ordered_blocks_tx,
             network: Some(network),
+            has_pending_proof,
+            self_author,
         }
     }
 
@@ -188,6 +203,7 @@ impl ProxyHooksImpl {
         let mut state = self.primary_state.lock();
         let primary_round = state.current_primary_round;
         let primary_proof = state.pending_primary_proof.take();
+        self.has_pending_proof.store(false, Ordering::Release);
         if let Some(ref proof) = primary_proof {
             let proof_round = proof.proof_round();
             if proof_round < primary_round.saturating_sub(1) {
@@ -233,6 +249,7 @@ impl ProxyHooksImpl {
             );
             state.highest_known_primary_proof_round = proof_round;
             state.pending_primary_proof = Some(Arc::new(proof));
+            self.has_pending_proof.store(true, Ordering::Release);
         } else {
             debug!(
                 proof_round = proof_round,
@@ -350,7 +367,11 @@ impl ProxyConsensusHooks for ProxyHooksImpl {
             );
         }
 
-        // Find the cutting point (at most one per batch — guaranteed by causality)
+        // Find the last cutting point. There may be multiple cutting points in a batch
+        // (the execution pipeline can batch multiple committed rounds), but we only need
+        // the last one — all blocks up to it go in a single OrderedProxyBlocksMsg.
+        // The from_ordered_msg validation allows non-decreasing primary_round values
+        // across blocks within the batch.
         let cut_idx = blocks
             .iter()
             .rposition(|b| b.block_data().primary_proof().is_some());
@@ -388,7 +409,7 @@ impl ProxyConsensusHooks for ProxyHooksImpl {
             *self.pending_ordered_blocks.lock() = after_cut;
         }
 
-        // Extract primary_round and primary_proof from the cutting-point block
+        // Extract primary_round, primary_proof, and author from the cutting-point block
         let cutting_block = blocks.last().expect("blocks is non-empty after prepend");
         let primary_round = cutting_block
             .block_data()
@@ -399,6 +420,7 @@ impl ProxyConsensusHooks for ProxyHooksImpl {
             .primary_proof()
             .cloned()
             .expect("cutting-point block must have primary_proof");
+        let cutting_block_author = cutting_block.author();
 
         proxy_metrics::PROXY_CONSENSUS_BLOCKS_ORDERED.inc_by(blocks.len() as u64);
 
@@ -415,14 +437,18 @@ impl ProxyConsensusHooks for ProxyHooksImpl {
             primary_proof,
         );
 
-        // Broadcast to all primaries via network
-        if let Some(network) = &self.network {
-            network
-                .broadcast_ordered_proxy_blocks(ordered_msg.clone())
-                .await;
+        // Only the proposer of the cutting-point block broadcasts to remote primaries.
+        // All validators still send via local channel so their own primary gets blocks
+        // instantly without waiting for a network round-trip.
+        if cutting_block_author == Some(self.self_author) {
+            if let Some(network) = &self.network {
+                network
+                    .broadcast_ordered_proxy_blocks(ordered_msg.clone())
+                    .await;
+            }
         }
 
-        // Also send via channel to local primary RoundManager
+        // Always send via local channel to own primary RoundManager
         let _ = self
             .ordered_blocks_tx
             .send(ProxyToPrimaryEvent::OrderedProxyBlocks(ordered_msg));
@@ -662,6 +688,7 @@ mod tests {
             None => (None, 1, 0),
         };
 
+        let has_pending_proof = Arc::new(AtomicBool::new(pending_proof.is_some()));
         (
             ProxyHooksImpl {
                 primary_state: aptos_infallible::Mutex::new(ProxyPrimaryState {
@@ -672,6 +699,8 @@ mod tests {
                 pending_ordered_blocks: aptos_infallible::Mutex::new(Vec::new()),
                 ordered_blocks_tx,
                 network: None,
+                has_pending_proof,
+                self_author: AccountAddress::ZERO,
             },
             ordered_blocks_rx,
         )

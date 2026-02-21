@@ -96,7 +96,8 @@ fn create_link_stats_table_with_peer_groups(
 // A map of "source" regions to a map of "destination" region to (bandwidth, latency)
 type LinkStatsTable = BTreeMap<String, BTreeMap<String, (u64, f64)>>;
 // A map of "source" regions to a tuple of (list of peers, map of "destination" region to (bandwidth, latency))
-type LinkStatsTableWithPeerGroups = Vec<(String, Vec<PeerId>, BTreeMap<String, (u64, f64)>)>;
+pub(crate) type LinkStatsTableWithPeerGroups =
+    Vec<(String, Vec<PeerId>, BTreeMap<String, (u64, f64)>)>;
 
 #[derive(Clone)]
 pub struct InterRegionNetEmConfig {
@@ -119,7 +120,7 @@ impl Default for InterRegionNetEmConfig {
 
 impl InterRegionNetEmConfig {
     // Creates GroupNetEm for inter-region network chaos
-    fn build(&self, peer_groups: &LinkStatsTableWithPeerGroups) -> Vec<GroupNetEm> {
+    pub(crate) fn build(&self, peer_groups: &LinkStatsTableWithPeerGroups) -> Vec<GroupNetEm> {
         let group_netems: Vec<GroupNetEm> = peer_groups
             .iter()
             .combinations(2)
@@ -165,12 +166,12 @@ impl InterRegionNetEmConfig {
 
 #[derive(Clone)]
 pub struct IntraRegionNetEmConfig {
-    bandwidth_rate_mbps: u64,
-    delay_latency_ms: u64,
-    delay_jitter_ms: u64,
-    delay_correlation_percentage: u64,
-    loss_percentage: u64,
-    loss_correlation_percentage: u64,
+    pub(crate) bandwidth_rate_mbps: u64,
+    pub(crate) delay_latency_ms: u64,
+    pub(crate) delay_jitter_ms: u64,
+    pub(crate) delay_correlation_percentage: u64,
+    pub(crate) loss_percentage: u64,
+    pub(crate) loss_correlation_percentage: u64,
 }
 
 impl Default for IntraRegionNetEmConfig {
@@ -187,7 +188,7 @@ impl Default for IntraRegionNetEmConfig {
 }
 
 impl IntraRegionNetEmConfig {
-    fn build(&self, peer_groups: LinkStatsTableWithPeerGroups) -> Vec<GroupNetEm> {
+    pub(crate) fn build(&self, peer_groups: LinkStatsTableWithPeerGroups) -> Vec<GroupNetEm> {
         let group_netems: Vec<GroupNetEm> = peer_groups
             .iter()
             .map(|(region, chunk, _)| {

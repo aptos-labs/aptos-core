@@ -1363,10 +1363,13 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
         // first proxy blocks can attach primary_proof and form a cutting point. Without this,
         // primary waits for proxy ordered blocks while proxy can't find a cutting point.
         let initial_primary_qc = Arc::new(recovery_data.root_quorum_cert().clone());
+        let has_pending_proof = Arc::new(std::sync::atomic::AtomicBool::new(false));
         let proxy_hooks = Arc::new(ProxyHooksImpl::new(
             proxy_to_primary_tx,
             broadcast_network_sender,
             Some(initial_primary_qc),
+            has_pending_proof.clone(),
+            self.author,
         ));
 
         // 7. Create BlockStore with ProxyExecutionClient and pipeline_builder: None
@@ -1413,6 +1416,8 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
                 proxy_block_store.clone(),
                 proxy_config.target_proxy_blocks_per_primary_round,
                 self.quorum_store_enabled,
+                proxy_config.round_initial_timeout_ms,
+                has_pending_proof,
             ));
 
         // Use proxy-specific block size limits (= primary limits / target)

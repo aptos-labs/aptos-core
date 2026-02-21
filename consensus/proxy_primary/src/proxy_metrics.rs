@@ -60,6 +60,15 @@ pub static PROXY_TXN_BUDGET_REMAINING: Lazy<IntGauge> = Lazy::new(|| {
     .unwrap()
 });
 
+/// Backpressure delay applied to proxy proposals in milliseconds
+pub static PROXY_BACKPRESSURE_DELAY_MS: Lazy<IntGauge> = Lazy::new(|| {
+    register_int_gauge!(
+        "aptos_proxy_backpressure_delay_ms",
+        "Current backpressure delay applied to proxy proposals in milliseconds"
+    )
+    .unwrap()
+});
+
 /// Total transactions aggregated from proxy blocks into primary blocks
 pub static PROXY_AGGREGATED_PAYLOAD_TXNS: Lazy<IntCounter> = Lazy::new(|| {
     register_int_counter!(

@@ -435,6 +435,25 @@ impl Block {
     /// Verifies that the proposal and the QC are correctly signed.
     /// If this is the genesis block, we skip these checks.
     pub fn validate_signature(&self, validator: &ValidatorVerifier) -> anyhow::Result<()> {
+        self.validate_signature_impl(validator, validator)
+    }
+
+    /// Verifies a proxy block's signatures, using `proxy_verifier` for block signatures/QC
+    /// and `primary_verifier` for any embedded primary consensus proofs (QC/TC from the
+    /// full validator set).
+    pub fn validate_proxy_signature(
+        &self,
+        proxy_verifier: &ValidatorVerifier,
+        primary_verifier: &ValidatorVerifier,
+    ) -> anyhow::Result<()> {
+        self.validate_signature_impl(proxy_verifier, primary_verifier)
+    }
+
+    fn validate_signature_impl(
+        &self,
+        validator: &ValidatorVerifier,
+        primary_proof_verifier: &ValidatorVerifier,
+    ) -> anyhow::Result<()> {
         match self.block_data.block_type() {
             BlockType::Genesis => bail!("We should not accept genesis from others"),
             BlockType::NilBlock { .. } => self.quorum_cert().verify(validator),
@@ -462,7 +481,7 @@ impl Block {
                 res1?;
                 res2?;
                 if let Some(primary_proof) = proposal_ext.primary_proof() {
-                    primary_proof.verify(validator)?;
+                    primary_proof.verify(primary_proof_verifier)?;
                 }
                 Ok(())
             },
@@ -475,7 +494,7 @@ impl Block {
                 res1?;
                 res2?;
                 if let Some(primary_proof) = p.primary_proof() {
-                    primary_proof.verify(validator)?;
+                    primary_proof.verify(primary_proof_verifier)?;
                 }
                 Ok(())
             },

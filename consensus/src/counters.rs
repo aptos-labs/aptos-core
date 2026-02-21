@@ -1467,3 +1467,12 @@ pub static OPTQS_LAST_CONSECUTIVE_SUCCESS_COUNT: Lazy<Histogram> = Lazy::new(|| 
         "The number of last consecutive successes capped at window length",
     )
 });
+
+/// Number of ordered proxy block batches successfully verified by primary consensus.
+pub static PROXY_BLOCKS_VERIFIED_BY_PRIMARY: Lazy<IntCounter> = Lazy::new(|| {
+    register_int_counter!(
+        "aptos_consensus_proxy_blocks_verified_by_primary",
+        "Number of ordered proxy block batches verified by primary consensus"
+    )
+    .unwrap()
+});

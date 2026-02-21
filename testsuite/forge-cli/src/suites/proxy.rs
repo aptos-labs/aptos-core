@@ -3,90 +3,131 @@
 
 //! Forge test suites for Proxy Primary Consensus.
 
-use aptos_forge::{success_criteria::SuccessCriteria, ForgeConfig};
-use aptos_testcases::proxy_primary_test::{ProxyPrimaryHappyPathTest, ProxyPrimaryLoadTest};
+use aptos_forge::{
+    success_criteria::{StateProgressThreshold, SuccessCriteria},
+    EmitJobMode, EmitJobRequest, ForgeConfig,
+};
 use aptos_sdk::types::on_chain_config::{
-    ConsensusAlgorithmConfig, OnChainConsensusConfig, ValidatorTxnConfig, DEFAULT_WINDOW_SIZE,
+    ConsensusAlgorithmConfig, OnChainConsensusConfig, OnChainExecutionConfig, ValidatorTxnConfig,
+    DEFAULT_WINDOW_SIZE,
+};
+use aptos_testcases::{
+    proxy_primary_test::{ProxyPrimaryNetworkEmulation, ProxyPrimaryTrafficTest},
+    CompositeNetworkTest,
 };
 use std::{num::NonZeroUsize, sync::Arc, time::Duration};
 
 /// Get a proxy consensus test by name.
-pub fn get_proxy_test(test_name: &str, _duration: Duration) -> Option<ForgeConfig> {
+pub fn get_proxy_test(test_name: &str) -> Option<ForgeConfig> {
     let test = match test_name {
-        "proxy_primary_happy_path" => proxy_primary_happy_path_test(),
-        "proxy_primary_load" => proxy_primary_load_test(),
+        "proxy_primary_test" => proxy_primary_remote_test(),
+        "proxy_primary_local_test" => proxy_primary_local_test(),
         _ => return None,
     };
     Some(test)
 }
 
-/// Basic happy path test for proxy primary consensus.
+/// Remote test: 7 validators (4 proxy + 3 primary-only), multi-region network emulation.
 ///
-/// 7 validators with realistic network topology:
-/// - 4 proxy validators co-located in EU (eu-west2, ~5ms intra-region)
-/// - 3 validators geo-distributed (eu-west6, us-east4, as-southeast1)
-/// - Inter-region latencies from real cloud measurements (8.5-106ms one-way)
-/// - 3% packet loss, 300 Mbps bandwidth cap between regions
-///
-/// Uses the same multi-region network emulation framework as the land
-/// blocking test (four_region_link_stats.csv).
-pub fn proxy_primary_happy_path_test() -> ForgeConfig {
+/// Network topology:
+/// - 4 proxy validators co-located in eu-west2 (~5ms intra-region)
+/// - 3 non-proxy validators geo-distributed (us-east4, as-northeast1, as-southeast1)
+/// - All traffic submitted to proxy validators only
+fn proxy_primary_remote_test() -> ForgeConfig {
+    let num_validators = 7;
+    let num_proxy: usize = 4;
+    let proxy_indices: Vec<u16> = (0..num_proxy as u16).collect();
+
     ForgeConfig::default()
-        .with_initial_validator_count(NonZeroUsize::new(7).unwrap())
-        .add_network_test(ProxyPrimaryHappyPathTest::new(4))
-        .with_genesis_helm_config_fn(Arc::new(|helm_values| {
-            // Set on-chain consensus config V6 with first 4 validators as proxy group
+        .with_initial_validator_count(NonZeroUsize::new(num_validators).unwrap())
+        .with_initial_fullnode_count(0)
+        .add_network_test(CompositeNetworkTest::new(
+            ProxyPrimaryNetworkEmulation::new(num_proxy),
+            ProxyPrimaryTrafficTest {
+                num_proxy_validators: num_proxy,
+                inner_traffic: EmitJobRequest::default()
+                    .mode(EmitJobMode::MaxLoad {
+                        mempool_backlog: 20000,
+                    })
+                    .init_gas_price_multiplier(20),
+                inner_success_criteria: SuccessCriteria::new(500),
+            },
+        ))
+        .with_genesis_helm_config_fn(Arc::new(move |helm_values| {
+            helm_values["chain"]["epoch_duration_secs"] = 300.into();
             helm_values["chain"]["on_chain_consensus_config"] =
                 serde_yaml::to_value(OnChainConsensusConfig::V6 {
                     alg: ConsensusAlgorithmConfig::default_for_genesis(),
                     vtxn: ValidatorTxnConfig::default_for_genesis(),
                     window_size: DEFAULT_WINDOW_SIZE,
                     rand_check_enabled: true,
-                    proxy_validator_indices: vec![0, 1, 2, 3],
+                    proxy_validator_indices: proxy_indices.clone(),
                 })
                 .expect("must serialize");
+            helm_values["chain"]["on_chain_execution_config"] =
+                serde_yaml::to_value(OnChainExecutionConfig::default_for_genesis())
+                    .expect("must serialize");
         }))
-        .with_validator_override_node_config_fn(Arc::new(|config, _| {
-            // Proxy at 1s (matching original consensus default), primary at 10s
-            // to ensure proxy accumulates multiple blocks per primary round.
-            config.consensus.proxy_consensus_config.round_initial_timeout_ms = 1000;
-            config.consensus.round_initial_timeout_ms = 10000;
-        }))
+        .with_emit_job(
+            EmitJobRequest::default()
+                .mode(EmitJobMode::ConstTps { tps: 100 })
+                .gas_price(5 * aptos_global_constants::GAS_UNIT_PRICE)
+                .latency_polling_interval(Duration::from_millis(100)),
+        )
         .with_success_criteria(
-            SuccessCriteria::new(10)
+            SuccessCriteria::new(50)
                 .add_no_restarts()
-                .add_wait_for_catchup_s(30),
+                .add_wait_for_catchup_s(120)
+                .add_chain_progress(StateProgressThreshold {
+                    max_non_epoch_no_progress_secs: 30.0,
+                    max_epoch_no_progress_secs: 30.0,
+                    max_non_epoch_round_gap: 8,
+                    max_epoch_round_gap: 8,
+                }),
         )
 }
 
-/// Load test for proxy primary consensus.
-///
-/// 6 validators: 2 proxy+primary, 4 primary-only.
-/// No network emulation (all local).
-fn proxy_primary_load_test() -> ForgeConfig {
+/// Local test: 4 validators (1 proxy), no network emulation (for debugging).
+fn proxy_primary_local_test() -> ForgeConfig {
+    let num_validators = 4;
+    let num_proxy: usize = 1;
+    let proxy_indices: Vec<u16> = (0..num_proxy as u16).collect();
+
     ForgeConfig::default()
-        .with_initial_validator_count(NonZeroUsize::new(6).unwrap())
-        .add_network_test(ProxyPrimaryLoadTest::new(2))
-        .with_genesis_helm_config_fn(Arc::new(|helm_values| {
-            // Set on-chain consensus config V6 with first 2 validators as proxy group
+        .with_initial_validator_count(NonZeroUsize::new(num_validators).unwrap())
+        .with_initial_fullnode_count(0)
+        .add_network_test(ProxyPrimaryTrafficTest {
+            num_proxy_validators: num_proxy,
+            inner_traffic: EmitJobRequest::default()
+                .mode(EmitJobMode::MaxLoad {
+                    mempool_backlog: 5000,
+                })
+                .init_gas_price_multiplier(20),
+            inner_success_criteria: SuccessCriteria::new(100),
+        })
+        .with_genesis_helm_config_fn(Arc::new(move |helm_values| {
+            helm_values["chain"]["epoch_duration_secs"] = 300.into();
             helm_values["chain"]["on_chain_consensus_config"] =
                 serde_yaml::to_value(OnChainConsensusConfig::V6 {
                     alg: ConsensusAlgorithmConfig::default_for_genesis(),
                     vtxn: ValidatorTxnConfig::default_for_genesis(),
                     window_size: DEFAULT_WINDOW_SIZE,
                     rand_check_enabled: true,
-                    proxy_validator_indices: vec![0, 1],
+                    proxy_validator_indices: proxy_indices.clone(),
                 })
                 .expect("must serialize");
+            helm_values["chain"]["on_chain_execution_config"] =
+                serde_yaml::to_value(OnChainExecutionConfig::default_for_genesis())
+                    .expect("must serialize");
         }))
-        .with_validator_override_node_config_fn(Arc::new(|config, _| {
-            config.consensus.proxy_consensus_config.round_initial_timeout_ms = 2000;
-            config.consensus.round_initial_timeout_ms = 10000;
-        }))
-        // Simple success criteria for local swarm (no Prometheus needed)
+        .with_emit_job(
+            EmitJobRequest::default()
+                .mode(EmitJobMode::ConstTps { tps: 100 })
+                .gas_price(5 * aptos_global_constants::GAS_UNIT_PRICE),
+        )
         .with_success_criteria(
-            SuccessCriteria::new(10) // Low TPS threshold for Phase 1 testing
+            SuccessCriteria::new(50)
                 .add_no_restarts()
-                .add_wait_for_catchup_s(30),
+                .add_wait_for_catchup_s(60),
         )
 }

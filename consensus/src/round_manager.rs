@@ -2274,7 +2274,7 @@ impl RoundManager {
             .as_ref()
             .expect("[RoundManager] proxy_verifier must be set when receiving ordered proxy blocks");
         primary_block_from_proxy
-            .verify(verifier)
+            .verify(verifier, &self.epoch_state.verifier)
             .context("[RoundManager] Failed to verify ordered proxy blocks")?;
 
         info!(
@@ -2400,27 +2400,17 @@ impl RoundManager {
         info!(epoch = self.epoch_state.epoch, "RoundManager started");
         let mut close_rx = close_rx.into_stream();
         loop {
-            // Drain redundant proxy events when we already have proxy blocks for this
-            // round.  The proxy broadcasts OrderedProxyBlocksMsg from every validator,
-            // so the channel fills at ~N msgs/second.  Without draining, the biased
-            // select would process these before consensus events, starving votes and
-            // timeouts and eventually deadlocking the primary.
-            if self.pending_proxy_blocks.is_some() {
-                if let Some(ref mut rx) = proxy_event_rx {
-                    let mut drained = 0u64;
-                    while rx.try_recv().is_ok() {
-                        drained += 1;
-                    }
-                    if drained > 0 {
-                        trace!("Drained {} redundant proxy events", drained);
-                    }
-                }
-            }
-
-            // Handle optional proxy events
+            // Handle optional proxy events. Each message is processed in order;
+            // duplicates (N validators broadcast per round) are rejected by the
+            // last_consumed_proxy_primary_round stale check inside
+            // process_ordered_proxy_blocks_msg. No skipping — every distinct
+            // primary_round must be processed to preserve safety.
             let proxy_event_future = async {
                 if let Some(ref mut rx) = proxy_event_rx {
-                    rx.recv().await
+                    match rx.recv().await {
+                        Some(ProxyToPrimaryEvent::OrderedProxyBlocks(msg)) => Some(msg),
+                        None => None,
+                    }
                 } else {
                     // Never completes if proxy is not enabled
                     std::future::pending().await
@@ -2551,15 +2541,12 @@ impl RoundManager {
                 // Handle proxy consensus events at lowest priority so votes/timeouts
                 // are never starved.  Guard ensures we only process when the primary
                 // actually needs proxy blocks (pending_proxy_blocks is None).
-                Some(proxy_event) = proxy_event_future, if self.pending_proxy_blocks.is_none() => {
-                    let result = match proxy_event {
-                        ProxyToPrimaryEvent::OrderedProxyBlocks(msg) => {
-                            monitor!(
-                                "process_ordered_proxy_blocks",
-                                self.process_ordered_proxy_blocks_msg(msg).await
-                            )
-                        }
-                    };
+                // Duplicates are rejected by last_consumed_proxy_primary_round.
+                Some(msg) = proxy_event_future, if self.pending_proxy_blocks.is_none() => {
+                    let result = monitor!(
+                        "process_ordered_proxy_blocks",
+                        self.process_ordered_proxy_blocks_msg(msg).await
+                    );
                     let round_state = self.round_state();
                     match result {
                         Ok(_) => trace!(RoundStateLogSchema::new(round_state)),
