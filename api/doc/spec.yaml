@@ -13950,6 +13950,7 @@ components:
       - abilities
       - generic_type_params
       - fields
+      - variants
       properties:
         name:
           $ref: '#/components/schemas/IdentifierWrapper'
@@ -13977,6 +13978,11 @@ components:
           description: Fields associated with the struct
           items:
             $ref: '#/components/schemas/MoveStructField'
+        variants:
+          type: array
+          description: Variants of the enum. Only populated when `is_enum` is true.
+          items:
+            $ref: '#/components/schemas/MoveStructVariant'
     MoveStructField:
       type: object
       description: Move struct field
@@ -14072,6 +14078,20 @@ components:
               creation_num: '0'
         self_address: '0x1'
         sequence_number: '0'
+    MoveStructVariant:
+      type: object
+      description: A single variant of a Move enum.
+      required:
+      - name
+      - fields
+      properties:
+        name:
+          $ref: '#/components/schemas/IdentifierWrapper'
+        fields:
+          type: array
+          description: Fields associated with the variant, if any.
+          items:
+            $ref: '#/components/schemas/MoveStructField'
     MoveType:
       type: string
       description: |
