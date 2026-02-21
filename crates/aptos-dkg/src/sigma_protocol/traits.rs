@@ -32,6 +32,12 @@ pub trait Trait:
 {
     type Scalar: PrimeField; // CanonicalSerialize + CanonicalDeserialize + Clone + Debug + Eq;
 
+    /// Shape of verifier batch size: mirrors the homomorphism structure.
+    /// - For a leaf (single MSM/codomain): `usize` (number of components).
+    /// - For a tuple (f, g): `(H1::VerifierBatchSize, H2::VerifierBatchSize)`.
+    /// E.g. for tuple(f, g) with f itself a tuple, use `Option<((usize, usize), usize)>`.
+    type VerifierBatchSize;
+
     fn dst(&self) -> Vec<u8>;
 
     fn prove<Ct: Serialize, R: RngCore + CryptoRng>(
@@ -46,16 +52,15 @@ pub trait Trait:
 
     /// Verify a sigma protocol proof.
     ///
-    /// `verifier_batch_size`: number of components used for verifier batching.
+    /// `verifier_batch_size`: per-component batch sizes, shape mirrors the homomorphism.
     /// - `None`: infer from `public_statement` (may clone to count).
-    /// - `Some(n)`: use `n` directly; avoids cloning when the caller already has the count
-    ///   (e.g. when batching multiple proofs).
+    /// - `Some(shape)`: use the given shape; avoids cloning when the caller already has it.
     fn verify<Ct: Serialize, R: RngCore + CryptoRng>(
         &self,
         public_statement: &Self::CodomainNormalized,
         proof: &Proof<Self::Scalar, Self>,
         cntxt: &Ct,
-        verifier_batch_size: Option<usize>,
+        verifier_batch_size: Option<Self::VerifierBatchSize>,
         rng: &mut R,
     ) -> anyhow::Result<()> {
         let prover_first_message = proof
@@ -86,13 +91,14 @@ pub trait Trait:
         prover_commitment: &Self::CodomainNormalized,
         challenge: Self::Scalar,
         response: &Self::Domain,
-        verifier_batch_size: Option<usize>,
+        verifier_batch_size: Option<Self::VerifierBatchSize>,
         rng: &mut R,
     ) -> anyhow::Result<()>;
 }
 
 impl<T: CurveGroupTrait> Trait for T {
     type Scalar = T::Scalar;
+    type VerifierBatchSize = usize;
 
     fn dst(&self) -> Vec<u8> {
         CurveGroupTrait::dst(self) // `self.dst()` works but seems a bit too concise
@@ -104,7 +110,7 @@ impl<T: CurveGroupTrait> Trait for T {
         prover_commitment: &Self::CodomainNormalized,
         challenge: Self::Scalar,
         response: &Self::Domain,
-        verifier_batch_size: Option<usize>,
+        verifier_batch_size: Option<Self::VerifierBatchSize>,
         rng: &mut R,
     ) -> anyhow::Result<()> {
         let number_of_beta_powers =

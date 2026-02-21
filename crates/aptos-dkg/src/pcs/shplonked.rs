@@ -483,7 +483,7 @@ pub fn zk_pcs_verify<E: Pairing, R: RngCore + CryptoRng>(
         &public_statement,
         &sigma_protocol_proof,
         SHPLONKED_SIGMA_DST,
-        Some(2), // two components in the public statement (com_y, V)
+        Some((2, 1)), // ((com_y, V), y_sum): 2 components in first tuple, 1 in second
         rng,
     )
 }

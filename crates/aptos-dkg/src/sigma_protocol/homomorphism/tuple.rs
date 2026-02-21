@@ -282,6 +282,9 @@ where
     H2::Codomain: CanonicalSerialize + CanonicalDeserialize,
 {
     type Scalar = H1::Scalar;
+    /// Batch size shape mirrors the tuple: (batch_size_for_hom1, batch_size_for_hom2).
+    /// E.g. for tuple(f, g) with f a tuple of two components, use `Option<((usize, usize), usize)>`.
+    type VerifierBatchSize = (H1::VerifierBatchSize, H2::VerifierBatchSize);
 
     fn dst(&self) -> Vec<u8> {
         homomorphism::domain_separate_dsts(
@@ -297,15 +300,18 @@ where
         prover_commitment: &Self::CodomainNormalized,
         challenge: Self::Scalar,
         response: &Self::Domain,
-        _verifier_batch_size: Option<usize>, // not ideal, should be splitting it...
+        verifier_batch_size: Option<Self::VerifierBatchSize>,
         rng: &mut R,
     ) -> anyhow::Result<()> {
         let (stmt1, stmt2) = (&public_statement.0, &public_statement.1);
         let (commit1, commit2) = (&prover_commitment.0, &prover_commitment.1);
+        let (bs1, bs2) = verifier_batch_size
+            .map(|(a, b)| (Some(a), Some(b)))
+            .unwrap_or((None, None));
         self.hom1
-            .verify_with_challenge(stmt1, commit1, challenge, response, None, rng)?;
+            .verify_with_challenge(stmt1, commit1, challenge, response, bs1, rng)?;
         self.hom2
-            .verify_with_challenge(stmt2, commit2, challenge, response, None, rng)?;
+            .verify_with_challenge(stmt2, commit2, challenge, response, bs2, rng)?;
         Ok(())
     }
 }

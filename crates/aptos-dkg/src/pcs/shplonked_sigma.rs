@@ -192,6 +192,7 @@ impl<F: PrimeField> HomTrait for SumEvalsHom<F> {
 
 impl<F: PrimeField> SigmaTrait for SumEvalsHom<F> {
     type Scalar = F;
+    type VerifierBatchSize = usize;
 
     fn dst(&self) -> Vec<u8> {
         b"ShplonkedSigma_SumEvalsHom".to_vec()
@@ -203,7 +204,7 @@ impl<F: PrimeField> SigmaTrait for SumEvalsHom<F> {
         prover_commitment: &F,
         challenge: F,
         response: &ShplonkedSigmaWitness<F>,
-        _verifier_batch_size: Option<usize>,
+        _verifier_batch_size: Option<Self::VerifierBatchSize>,
         _rng: &mut R,
     ) -> anyhow::Result<()> {
         let sum_z = response.evals.iter().fold(F::zero(), |acc, x| acc + x);
