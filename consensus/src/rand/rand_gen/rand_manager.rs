@@ -148,29 +148,29 @@ impl<S: TShare, D: TAugmentedData> RandManager<S, D> {
                 if let Some(futs) = block.pipeline_futs() {
                     let round = block.round();
                     let has_rand_txns = futs.has_rand_txns_fut.clone();
+                    let decision_tx = self.decision_tx.clone();
                     let shared_future = async move {
-                        match has_rand_txns.await {
+                        let has_rand = match has_rand_txns.await {
                             Ok(has_rand) => has_rand,
                             Err(e) => {
                                 warn!("has_rand_txns_fut failed for round {}: {e}, defaulting to needs_randomness=true", round);
                                 true
                             },
-                        }
-                    }
-                    .boxed()
-                    .shared();
-                    rand_store.set_rand_check_future(round, shared_future.clone());
-                    // Spawn a listener: if the block doesn't need randomness, send Skip
-                    // to unblock it before the share threshold is reached.
-                    let decision_tx = self.decision_tx.clone();
-                    tokio::spawn(async move {
-                        if !shared_future.await {
+                        };
+                        // If the block doesn't need randomness, send Skip to unblock it
+                        // before the share threshold is reached.
+                        if !has_rand {
                             let _ = decision_tx.unbounded_send(AggregationResult::Skip {
                                 round,
                                 path_type: PathType::Slow,
                             });
                         }
-                    });
+                        has_rand
+                    }
+                    .boxed()
+                    .shared();
+                    rand_store.set_rand_check_future(round, shared_future.clone());
+                    tokio::spawn(shared_future);
                 }
             }
         }

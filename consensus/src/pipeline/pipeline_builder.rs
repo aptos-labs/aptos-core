@@ -492,7 +492,7 @@ impl PipelineBuilder {
             Some(&mut abort_handles),
         );
         let rand_check_fut = spawn_shared_fut(
-            Self::rand_check(
+            Self::wait_for_rand(
                 has_rand_txns_fut.clone(),
                 rand_rx,
                 block.clone(),
@@ -788,7 +788,7 @@ impl PipelineBuilder {
 
     /// Precondition: rand_txns_check finishes
     /// What it does: waits for randomness if the block requires it
-    async fn rand_check(
+    async fn wait_for_rand(
         has_rand_txns_fut: TaskFuture<bool>,
         rand_rx: oneshot::Receiver<Option<Randomness>>,
         block: Arc<Block>,
