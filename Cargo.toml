@@ -142,8 +142,6 @@ members = [
     "ecosystem/indexer-grpc/indexer-transaction-generator",
     "ecosystem/indexer-grpc/transaction-filter",
     "ecosystem/nft-metadata-crawler",
-    "ecosystem/node-checker",
-    "ecosystem/node-checker/fn-check-client",
     "execution/block-partitioner",
     "execution/executor",
     "execution/executor-benchmark",
@@ -277,7 +275,6 @@ default-members = [
     "crates/transaction-emitter",
     "aptos-move/framework",
     "storage/backup/backup-cli",
-    "ecosystem/node-checker",
 ]
 
 # All workspace members should inherit these keys
@@ -410,7 +407,6 @@ aptos-network-checker = { path = "crates/aptos-network-checker" }
 aptos-network-discovery = { path = "network/discovery" }
 aptos-nft-metadata-crawler = { path = "ecosystem/nft-metadata-crawler" }
 aptos-node = { path = "aptos-node" }
-aptos-node-checker = { path = "ecosystem/node-checker" }
 aptos-node-identity = { path = "crates/aptos-node-identity" }
 aptos-node-resource-metrics = { path = "crates/node-resource-metrics" }
 aptos-num-variants = { path = "crates/num-variants" }
@@ -728,7 +724,6 @@ proc-macro2 = "1.0.38"
 project-root = "0.2.2"
 prometheus = { version = "0.13.3", default-features = false }
 prometheus-http-query = "0.5.2"
-prometheus-parse = "0.2.4"
 proptest = "1.4.0"
 proptest-derive = "0.5.1"
 prost = { version = "0.13.4", features = ["no-recursion-limit"] }
