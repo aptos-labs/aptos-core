@@ -362,6 +362,7 @@ impl PipelineBuilder {
         let has_rand_txns_fut = spawn_ready_fut(false);
         PipelineFutures {
             prepare_fut,
+            has_rand_txns_fut,
             rand_check_fut,
             execute_fut,
             ledger_update_fut,
@@ -372,7 +373,6 @@ impl PipelineBuilder {
             commit_ledger_fut,
             post_commit_fut,
             secret_sharing_derive_self_fut,
-            has_rand_txns_fut,
         }
     }
 
@@ -480,28 +480,27 @@ impl PipelineBuilder {
             Self::prepare(decryption_fut, self.block_preparer.clone(), block.clone()),
             Some(&mut abort_handles),
         );
-        let (has_rand_txns_tx, has_rand_txns_rx) = oneshot::channel::<bool>();
-        let rand_check_fut = spawn_shared_fut(
-            Self::rand_check(
+        let has_rand_txns_fut = spawn_shared_fut(
+            Self::rand_txns_check(
                 prepare_fut.clone(),
                 parent.execute_fut.clone(),
-                rand_rx,
                 self.executor.clone(),
                 block.clone(),
                 self.is_randomness_enabled,
-                self.rand_check_enabled,
                 self.module_cache.clone(),
-                has_rand_txns_tx,
             ),
             Some(&mut abort_handles),
         );
-        let has_rand_txns_fut: TaskFuture<bool> = async move {
-            has_rand_txns_rx
-                .await
-                .map_err(|_| TaskError::InternalError(Arc::new(anyhow!("has_rand_txns channel dropped"))))
-        }
-        .boxed()
-        .shared();
+        let rand_check_fut = spawn_shared_fut(
+            Self::rand_check(
+                has_rand_txns_fut.clone(),
+                rand_rx,
+                block.clone(),
+                self.is_randomness_enabled,
+                self.rand_check_enabled,
+            ),
+            Some(&mut abort_handles),
+        );
         let execute_fut = spawn_shared_fut(
             Self::execute(
                 prepare_fut.clone(),
@@ -606,6 +605,7 @@ impl PipelineBuilder {
 
         let all_fut = PipelineFutures {
             prepare_fut,
+            has_rand_txns_fut,
             rand_check_fut,
             execute_fut,
             ledger_update_fut,
@@ -616,7 +616,6 @@ impl PipelineBuilder {
             commit_ledger_fut,
             post_commit_fut,
             secret_sharing_derive_self_fut,
-            has_rand_txns_fut,
         };
         tokio::spawn(Self::monitor(
             block.epoch(),
@@ -699,26 +698,22 @@ impl PipelineBuilder {
     }
 
     /// Precondition: 1. prepare finishes, 2. parent block's execution phase finishes
-    /// What it does: decides if the block requires a randomness seed and return the value
-    async fn rand_check(
+    /// What it does: scans block transactions to determine if any require randomness
+    async fn rand_txns_check(
         prepare_fut: TaskFuture<PrepareResult>,
         parent_block_execute_fut: TaskFuture<ExecuteResult>,
-        rand_rx: oneshot::Receiver<Option<Randomness>>,
         executor: Arc<dyn BlockExecutorTrait>,
         block: Arc<Block>,
         is_randomness_enabled: bool,
-        rand_check_enabled: bool,
         module_cache: Arc<Mutex<Option<CachedModuleView<CachedStateView>>>>,
-        has_rand_txns_tx: oneshot::Sender<bool>,
-    ) -> TaskResult<RandResult> {
+    ) -> TaskResult<bool> {
         let mut tracker = Tracker::start_waiting("rand_check", &block);
         parent_block_execute_fut.await?;
         let (user_txns, _, _) = prepare_fut.await?;
 
         tracker.start_working();
         if !is_randomness_enabled {
-            let _ = has_rand_txns_tx.send(false);
-            return Ok((None, false));
+            return Ok(false);
         }
         let grand_parent_id = block.quorum_cert().parent_block().id();
         let parent_state_view = executor
@@ -774,10 +769,6 @@ impl PipelineBuilder {
                 }
             }
         }
-        // Send has_randomness early so rand_manager can decide to skip aggregation
-        // without waiting for the full rand_check_fut (which would deadlock).
-        let _ = has_rand_txns_tx.send(has_randomness);
-
         let label = if has_randomness {
             "has_rand"
         } else {
@@ -792,7 +783,22 @@ impl PipelineBuilder {
                 block.round()
             );
         }
-        drop(tracker);
+        Ok(has_randomness)
+    }
+
+    /// Precondition: rand_txns_check finishes
+    /// What it does: waits for randomness if the block requires it
+    async fn rand_check(
+        has_rand_txns_fut: TaskFuture<bool>,
+        rand_rx: oneshot::Receiver<Option<Randomness>>,
+        block: Arc<Block>,
+        is_randomness_enabled: bool,
+        rand_check_enabled: bool,
+    ) -> TaskResult<RandResult> {
+        if !is_randomness_enabled {
+            return Ok((None, false));
+        }
+        let has_randomness = has_rand_txns_fut.await?;
         // if rand check is enabled and no txn requires randomness, we skip waiting for randomness
         let mut tracker = Tracker::start_waiting("rand_gen", &block);
         tracker.start_working();
@@ -1210,6 +1216,7 @@ impl PipelineBuilder {
     async fn monitor(epoch: u64, round: Round, block_id: HashValue, all_futs: PipelineFutures) {
         let PipelineFutures {
             prepare_fut,
+            has_rand_txns_fut: _,
             rand_check_fut: _,
             execute_fut,
             ledger_update_fut,
@@ -1220,7 +1227,6 @@ impl PipelineBuilder {
             commit_ledger_fut,
             post_commit_fut: _,
             secret_sharing_derive_self_fut: _,
-            has_rand_txns_fut: _,
         } = all_futs;
         wait_and_log_error(prepare_fut, format!("{epoch} {round} {block_id} prepare")).await;
         wait_and_log_error(execute_fut, format!("{epoch} {round} {block_id} execute")).await;

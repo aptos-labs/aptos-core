@@ -68,9 +68,8 @@ pub struct RandManager<S: TShare, D: TAugmentedData> {
     // for randomness fast path
     fast_config: Option<RandConfig>,
 
-    // local channel for receiving "skip" signals when blocks don't need randomness
-    rand_skip_tx: UnboundedSender<Round>,
-    rand_skip_rx: UnboundedReceiver<Round>,
+    // sender for aggregation results, shared with rand_store and skip listeners
+    decision_tx: Sender<AggregationResult>,
 }
 
 impl<S: TShare, D: TAugmentedData> RandManager<S, D> {
@@ -104,7 +103,7 @@ impl<S: TShare, D: TAugmentedData> RandManager<S, D> {
             author,
             config.clone(),
             fast_config.clone(),
-            decision_tx,
+            decision_tx.clone(),
         )));
         let aug_data_store = AugDataStore::new(
             epoch_state.epoch,
@@ -113,8 +112,6 @@ impl<S: TShare, D: TAugmentedData> RandManager<S, D> {
             fast_config.clone(),
             db,
         );
-
-        let (rand_skip_tx, rand_skip_rx) = unbounded();
 
         Self {
             author,
@@ -133,8 +130,7 @@ impl<S: TShare, D: TAugmentedData> RandManager<S, D> {
 
             fast_config,
 
-            rand_skip_tx,
-            rand_skip_rx,
+            decision_tx,
         }
     }
 
@@ -156,7 +152,7 @@ impl<S: TShare, D: TAugmentedData> RandManager<S, D> {
                         match has_rand_txns.await {
                             Ok(has_rand) => has_rand,
                             Err(e) => {
-                                error!("has_rand_txns_fut failed for round {}: {e}, defaulting to needs_randomness=true", round);
+                                warn!("has_rand_txns_fut failed for round {}: {e}, defaulting to needs_randomness=true", round);
                                 true
                             },
                         }
@@ -164,12 +160,15 @@ impl<S: TShare, D: TAugmentedData> RandManager<S, D> {
                     .boxed()
                     .shared();
                     rand_store.set_rand_check_future(round, shared_future.clone());
-                    // Spawn a listener to set dummy randomness if the block doesn't need rand.
-                    // This ensures non-rand blocks are unblocked even before threshold is met.
-                    let skip_tx = self.rand_skip_tx.clone();
+                    // Spawn a listener: if the block doesn't need randomness, send Skip
+                    // to unblock it before the share threshold is reached.
+                    let decision_tx = self.decision_tx.clone();
                     tokio::spawn(async move {
                         if !shared_future.await {
-                            let _ = skip_tx.unbounded_send(round);
+                            let _ = decision_tx.unbounded_send(AggregationResult::Skip {
+                                round,
+                                path_type: PathType::Slow,
+                            });
                         }
                     });
                 }
@@ -232,7 +231,6 @@ impl<S: TShare, D: TAugmentedData> RandManager<S, D> {
             ResetSignal::TargetRound(round) => round,
         };
         self.block_queue = BlockQueue::new();
-        while matches!(self.rand_skip_rx.try_next(), Ok(Some(_))) {}
         self.rand_store.lock().reset(target_round);
         self.stop = matches!(signal, ResetSignal::Stop);
         let _ = tx.send(ResetAck::default());
@@ -439,13 +437,6 @@ impl<S: TShare, D: TAugmentedData> RandManager<S, D> {
                                 item.set_randomness(round, Randomness::default());
                             }
                         },
-                    }
-                }
-                Some(round) = self.rand_skip_rx.next() => {
-                    // Non-rand block: set dummy randomness so BlockQueue can dequeue it
-                    // before the share threshold is reached.
-                    if let Some(item) = self.block_queue.item_mut(round) {
-                        item.set_randomness(round, Randomness::default());
                     }
                 }
                 Some(request) = verified_msg_rx.next() => {
