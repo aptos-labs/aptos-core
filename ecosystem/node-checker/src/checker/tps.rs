@@ -60,7 +60,7 @@ pub struct TpsCheckerConfig {
     pub emit_workload_configs: EmitWorkloadArgs,
 
     // Ed25519PrivateKey, either on the CLI or from a file, for minting coins.
-    // We choose to take this in in the baseline config because we can't
+    // We choose to take this in the baseline config because we can't
     // securely transmit this at request time over the wire.
     #[serde(flatten)]
     pub coin_source_args: CoinSourceArgs,

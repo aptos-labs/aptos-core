@@ -251,7 +251,7 @@ def test_move_view(run_helper: RunHelper, test_name=None):
     if response["Result"] == None or response["Result"][0] != True:
         raise TestError("View function did not return correct result")
 
-    # Test view function with with big number arguments
+    # Test view function with big number arguments
     expected_u64 = 18446744073709551615
     expected_128 = 340282366920938463463374607431768211455
     expected_256 = (
