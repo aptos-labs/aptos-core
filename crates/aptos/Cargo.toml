@@ -15,29 +15,29 @@ rust-version = { workspace = true }
 [dependencies]
 anyhow = { workspace = true }
 aptos-api-types = { workspace = true }
-aptos-backup-cli = { workspace = true }
+aptos-backup-cli = { workspace = true, optional = true }
 aptos-bitvec = { workspace = true }
 aptos-build-info = { workspace = true }
 aptos-cached-packages = { workspace = true }
 aptos-cli-common = { workspace = true }
 aptos-config = { workspace = true }
 aptos-crypto = { workspace = true }
-aptos-faucet-core = { workspace = true }
+aptos-faucet-core = { workspace = true, optional = true }
 aptos-framework = { workspace = true }
 aptos-gas-profiling = { workspace = true }
 aptos-gas-schedule = { workspace = true }
 aptos-genesis = { workspace = true }
 aptos-github-client = { workspace = true }
 aptos-global-constants = { workspace = true }
-aptos-indexer-grpc-server-framework = { workspace = true }
-aptos-indexer-processor-sdk = { workspace = true }
+aptos-indexer-grpc-server-framework = { workspace = true, optional = true }
+aptos-indexer-processor-sdk = { workspace = true, optional = true }
 aptos-keygen = { workspace = true }
 aptos-ledger = { workspace = true }
-aptos-localnet = { workspace = true }
+aptos-localnet = { workspace = true, optional = true }
 aptos-logger = { workspace = true }
 aptos-move-debugger = { workspace = true }
 aptos-network-checker = { workspace = true }
-aptos-node = { workspace = true }
+aptos-node = { workspace = true, optional = true }
 aptos-rest-client = { workspace = true }
 aptos-sdk = { workspace = true }
 aptos-storage-interface = { workspace = true }
@@ -51,26 +51,26 @@ aptos-vm-environment = { workspace = true }
 aptos-vm-genesis = { workspace = true }
 aptos-vm-logging = { workspace = true }
 aptos-vm-types = { workspace = true }
-aptos-workspace-server = { workspace = true }
+aptos-workspace-server = { workspace = true, optional = true }
 async-trait = { workspace = true }
-backoff = { workspace = true }
+backoff = { workspace = true, optional = true }
 base64 = { workspace = true }
 bcs = { workspace = true }
-bollard = { workspace = true }
+bollard = { workspace = true, optional = true }
 chrono = { workspace = true }
 clap = { workspace = true, features = ["env", "unstable-styles", "wrap_help"] }
 clap_complete = { workspace = true }
 colored = { workspace = true }
-dashmap = { workspace = true }
-diesel = { workspace = true, features = ["postgres_backend"] }
-diesel-async = { workspace = true }
+dashmap = { workspace = true, optional = true }
+diesel = { workspace = true, features = ["postgres_backend"], optional = true }
+diesel-async = { workspace = true, optional = true }
 dirs = { workspace = true }
 futures = { workspace = true }
 hex = { workspace = true }
 indoc = { workspace = true }
 itertools = { workspace = true }
 legacy-move-compiler = { workspace = true }
-maplit = { workspace = true }
+maplit = { workspace = true, optional = true }
 move-asm = { workspace = true }
 move-binary-format = { workspace = true }
 move-bytecode-source-map = { workspace = true }
@@ -84,14 +84,14 @@ move-ir-types = { workspace = true }
 move-linter = { workspace = true }
 move-model = { workspace = true }
 move-package = { workspace = true }
-move-prover-boogie-backend = { workspace = true }
+move-prover-boogie-backend = { workspace = true, optional = true }
 move-symbol-pool = { workspace = true }
 move-unit-test = { workspace = true }
 move-vm-runtime = { workspace = true, features = ["testing"] }
 open = { workspace = true }
 pathsearch = { workspace = true }
-poem = { workspace = true }
-processor = { workspace = true }
+poem = { workspace = true, optional = true }
+processor = { workspace = true, optional = true }
 rand = { workspace = true }
 regex = { workspace = true }
 reqwest = { workspace = true }
@@ -102,24 +102,60 @@ self_update = { git = "https://github.com/banool/self_update.git", rev = "830615
 serde = { workspace = true }
 serde_json = { workspace = true }
 serde_yaml = { workspace = true }
-set_env = { workspace = true }
+set_env = { workspace = true, optional = true }
 tempfile = { workspace = true }
 thiserror = { workspace = true }
 tokio = { workspace = true }
 toml = { workspace = true }
 tracing = { workspace = true }
-tracing-subscriber = { workspace = true }
+tracing-subscriber = { workspace = true, optional = true }
 url = { workspace = true }
 
 [target.'cfg(unix)'.dependencies]
 jemallocator = { workspace = true }
 
 [features]
-default = []
+default = ["localnet", "backup", "prover-deps", "workspace"]
 fuzzing = []
 no-upload-proposal = []
 indexer = ["aptos-node/indexer"]
 cli-framework-test-move = []
+
+# Feature to enable localnet functionality (aptos node run-localnet)
+# Disabling this significantly speeds up builds as it removes heavy dependencies
+# like aptos-node, diesel, bollard, and indexer-related crates
+localnet = [
+    "dep:aptos-faucet-core",
+    "dep:aptos-indexer-grpc-server-framework",
+    "dep:aptos-indexer-processor-sdk",
+    "dep:aptos-localnet",
+    "dep:aptos-node",
+    "dep:backoff",
+    "dep:bollard",
+    "dep:dashmap",
+    "dep:diesel",
+    "dep:diesel-async",
+    "dep:maplit",
+    "dep:poem",
+    "dep:processor",
+    "dep:tracing-subscriber",
+]
+
+# Feature to enable backup/restore functionality (aptos node bootstrap-db)
+backup = [
+    "dep:aptos-backup-cli",
+]
+
+# Feature to enable prover dependency installation (aptos update prover-dependencies)
+prover-deps = [
+    "dep:move-prover-boogie-backend",
+    "dep:set_env",
+]
+
+# Feature to enable workspace functionality (hidden command)
+workspace = [
+    "dep:aptos-workspace-server",
+]
 
 [build-dependencies]
 shadow-rs = { workspace = true }
