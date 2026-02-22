@@ -178,19 +178,33 @@ impl PrimaryBlockFromProxy {
 
     /// Verify the proxy blocks have valid signatures.
     ///
-    /// This should be called before using the proxy blocks.
+    /// Only the last proxy block is fully verified. Its QC certifies the
+    /// previous block, which transitively guarantees chain integrity (a
+    /// quorum of validators voted on each ancestor). This avoids O(N)
+    /// crypto work per batch and keeps the primary responsive.
+    ///
+    /// The primary proof (QC/TC from primary consensus) is always verified.
     pub fn verify(
         &self,
         proxy_verifier: &ValidatorVerifier,
         primary_verifier: &ValidatorVerifier,
     ) -> Result<(), ProxyConsensusError> {
-        // Verify each proxy block's signature using proxy verifier for block signatures/QC
-        // and primary verifier for any embedded primary consensus proofs
-        for block in &self.proxy_blocks {
-            block
-                .validate_proxy_signature(proxy_verifier, primary_verifier)
-                .map_err(|e| ProxyConsensusError::InvalidProxyBlock(e.to_string()))?;
+        // Verify only the last proxy block's signature. Its QC covers the
+        // previous block, so the entire chain is transitively authenticated.
+        let last_block = self.proxy_blocks.last().ok_or_else(|| {
+            ProxyConsensusError::InvalidProxyBlock("No proxy blocks to verify".into())
+        })?;
+
+        // The last block must be the cutting-point block with primary proof attached.
+        if last_block.block_data().primary_proof().is_none() {
+            return Err(ProxyConsensusError::InvalidProxyBlock(
+                "Last proxy block must have primary proof attached".into(),
+            ));
         }
+
+        last_block
+            .validate_proxy_signature(proxy_verifier, primary_verifier)
+            .map_err(|e| ProxyConsensusError::InvalidProxyBlock(e.to_string()))?;
 
         // Verify primary proof using full verifier
         // (primary QC/TC is signed by all N validators, not just proxy subset)

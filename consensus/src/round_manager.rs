@@ -38,7 +38,7 @@ use aptos_config::config::{BlockTransactionFilterConfig, ConsensusConfig};
 use aptos_consensus_types::{
     block::Block,
     block_data::BlockType,
-    common::{Author, Round},
+    common::{Author, Payload, Round},
     opt_block_data::OptBlockData,
     opt_proposal_msg::OptProposalMsg,
     order_vote::OrderVote,
@@ -344,8 +344,10 @@ pub struct RoundManager {
     proposal_status_tracker: Arc<dyn TPastProposalStatusTracker>,
     pending_opt_proposals: BTreeMap<Round, OptBlockData>,
     opt_proposal_loopback_tx: aptos_channels::UnboundedSender<OptBlockData>,
-    // Proxy consensus integration: pending proxy blocks to be included in primary block
-    pending_proxy_blocks: Option<PrimaryBlockFromProxy>,
+    // Proxy consensus integration: accumulated proxy block batches to be included in
+    // the next primary proposal. Multiple OrderedProxyBlocksMsgs accumulate here and
+    // are drained into a single merged payload when spawning proposal generation.
+    pending_proxy_blocks: Vec<PrimaryBlockFromProxy>,
     // Highest primary_round consumed from proxy blocks. Used to reject stale/duplicate messages.
     last_consumed_proxy_primary_round: Round,
     // Channel to send events (QC/TC updates) to proxy consensus
@@ -420,7 +422,7 @@ impl RoundManager {
             proposal_status_tracker,
             pending_opt_proposals: BTreeMap::new(),
             opt_proposal_loopback_tx,
-            pending_proxy_blocks: None,
+            pending_proxy_blocks: Vec::new(),
             last_consumed_proxy_primary_round: 0,
             proxy_event_tx,
             pending_proposal_event: None,
@@ -531,12 +533,13 @@ impl RoundManager {
             // When proxy consensus is active, primary blocks should be formed from
             // proxy blocks. Defer proposal generation until proxy blocks arrive.
             if self.proxy_event_tx.is_some() {
-                if self.pending_proxy_blocks.is_some() {
+                if !self.pending_proxy_blocks.is_empty() {
                     // Proxy blocks already available (arrived before round event).
-                    // Generate proposal immediately.
+                    // Generate proposal immediately with all accumulated batches.
                     info!(
                         self.new_log(LogEvent::NewRound),
-                        "Proxy blocks available, generating proposal for round {}",
+                        "Proxy blocks available ({} batches), generating proposal for round {}",
+                        self.pending_proxy_blocks.len(),
                         new_round_event.round,
                     );
                     self.spawn_proposal_generation(new_round_event);
@@ -558,19 +561,35 @@ impl RoundManager {
     }
 
     /// Spawn the proposal generation task (used by process_new_round_event).
-    /// Consumes pending_proxy_blocks so the next round waits for fresh proxy blocks.
+    /// Drains all accumulated proxy block batches and merges their payloads into
+    /// a single proposal. Each primary block includes ALL proxy blocks since its
+    /// parent, covering every OrderedProxyBlocksMsg that arrived.
     fn spawn_proposal_generation(&mut self, new_round_event: NewRoundEvent) {
-        // Consume pending proxy blocks and aggregate their payload.
-        // Each primary proposal must wait for its own OrderedProxyBlocksMsg.
-        let proxy_payload = self.pending_proxy_blocks.take().map(|blocks| {
-            // Track consumed primary_round for stale message rejection
-            if blocks.primary_round() > self.last_consumed_proxy_primary_round {
-                self.last_consumed_proxy_primary_round = blocks.primary_round();
+        // Drain all accumulated proxy block batches and merge their payloads.
+        let proxy_payload = if !self.pending_proxy_blocks.is_empty() {
+            let batched = std::mem::take(&mut self.pending_proxy_blocks);
+            for blocks in &batched {
+                if blocks.primary_round() > self.last_consumed_proxy_primary_round {
+                    self.last_consumed_proxy_primary_round = blocks.primary_round();
+                }
             }
-            let vtxns = blocks.aggregate_validator_txns();
-            let payload = blocks.aggregate_payloads();
-            (vtxns, payload)
-        });
+            let mut all_vtxns = Vec::new();
+            let mut merged_payload: Option<Payload> = None;
+            for blocks in batched {
+                all_vtxns.extend(blocks.aggregate_validator_txns());
+                let p = blocks.aggregate_payloads();
+                if !p.is_empty() {
+                    merged_payload = Some(match merged_payload {
+                        Some(existing) => existing.extend(p),
+                        None => p,
+                    });
+                }
+            }
+            let payload = merged_payload.unwrap_or_else(|| Payload::empty(true, true));
+            Some((all_vtxns, payload))
+        } else {
+            None
+        };
         let epoch_state = self.epoch_state.clone();
         let network = self.network.clone();
         let sync_info = self.block_store.sync_info();
@@ -2285,18 +2304,23 @@ impl RoundManager {
             primary_block_from_proxy.aggregated_payload_hash(),
         );
 
-        // Store the pending proxy blocks
-        self.pending_proxy_blocks = Some(primary_block_from_proxy);
+        // Accumulate proxy blocks. Multiple batches may arrive between primary rounds;
+        // all will be drained and merged when the next proposal is generated.
+        let was_empty = self.pending_proxy_blocks.is_empty();
+        self.pending_proxy_blocks.push(primary_block_from_proxy);
 
-        // If we were deferring a proposal waiting for proxy blocks, trigger it now.
-        if let Some(event) = self.pending_proposal_event.take() {
-            info!(
-                self.new_log(LogEvent::NewRound),
-                "Proxy blocks arrived for primary round {}, generating deferred proposal for round {}",
-                primary_round,
-                event.round,
-            );
-            self.spawn_proposal_generation(event);
+        // Trigger deferred proposal only on the first message arrival.
+        // Subsequent messages accumulate and will be included in the same proposal.
+        if was_empty {
+            if let Some(event) = self.pending_proposal_event.take() {
+                info!(
+                    self.new_log(LogEvent::NewRound),
+                    "Proxy blocks arrived for primary round {}, generating deferred proposal for round {}",
+                    primary_round,
+                    event.round,
+                );
+                self.spawn_proposal_generation(event);
+            }
         }
 
         Ok(())
@@ -2539,10 +2563,10 @@ impl RoundManager {
                     }
                 },
                 // Handle proxy consensus events at lowest priority so votes/timeouts
-                // are never starved.  Guard ensures we only process when the primary
-                // actually needs proxy blocks (pending_proxy_blocks is None).
+                // are never starved. Messages accumulate in pending_proxy_blocks and
+                // are batched into the next primary proposal.
                 // Duplicates are rejected by last_consumed_proxy_primary_round.
-                Some(msg) = proxy_event_future, if self.pending_proxy_blocks.is_none() => {
+                Some(msg) = proxy_event_future => {
                     let result = monitor!(
                         "process_ordered_proxy_blocks",
                         self.process_ordered_proxy_blocks_msg(msg).await

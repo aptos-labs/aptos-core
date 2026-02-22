@@ -1427,7 +1427,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
             proxy_block_store.clone(),
             proxy_payload_client,
             self.time_service.clone(),
-            Duration::from_millis(self.config.quorum_store_poll_time_ms),
+            Duration::from_millis(30), // Proxy blocks are small & frequent; don't wait long for batching
             aptos_consensus_types::utils::PayloadTxnsSize::new(
                 proxy_config.max_proxy_block_txns,
                 proxy_config.max_proxy_block_bytes,
