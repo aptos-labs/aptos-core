@@ -1,0 +1,46 @@
+[package]
+name = "aptos-move-flow"
+description = "MoveFlow: agent support for Move"
+version = "0.1.0"
+
+authors = { workspace = true }
+edition = { workspace = true }
+homepage = { workspace = true }
+license = { workspace = true }
+publish = { workspace = true }
+repository = { workspace = true }
+rust-version = { workspace = true }
+
+[[bin]]
+name = "move-flow"
+path = "src/main.rs"
+
+[dependencies]
+anyhow = { workspace = true }
+aptos-framework = { workspace = true }
+clap = { workspace = true, features = ["derive"] }
+codespan-reporting = { workspace = true }
+legacy-move-compiler = { workspace = true }
+log = { workspace = true }
+move-command-line-common = { workspace = true }
+move-compiler-v2 = { workspace = true }
+move-ir-types = { workspace = true }
+move-model = { workspace = true }
+move-prover = { workspace = true }
+move-symbol-pool = { workspace = true }
+notify = { workspace = true }
+pathsearch = { workspace = true }
+rmcp = { workspace = true }
+serde = { workspace = true, features = ["derive"] }
+serde_json = { workspace = true }
+tempfile = { workspace = true }
+tera = { workspace = true }
+tokio = { workspace = true }
+walkdir = { workspace = true }
+
+[dev-dependencies]
+aptos-package-builder = { workspace = true }
+move-prover-test-utils = { workspace = true }
+regex = { workspace = true }
+rmcp = { workspace = true, features = ["client"] }
+tempfile = { workspace = true }
