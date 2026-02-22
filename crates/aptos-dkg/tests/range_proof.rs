@@ -4,7 +4,7 @@
 use aptos_crypto::arkworks::GroupGenerators;
 use aptos_dkg::{
     range_proofs::{
-        //        dekart_multivariate::Proof as DekartMultivariate,
+        dekart_multivariate::Proof as DekartMultivariate,
         dekart_univariate::Proof as UnivariateDeKART,
         dekart_univariate_v2::Proof as UnivariateDeKARTv2,
         traits::BatchedRangeProof,
@@ -107,6 +107,7 @@ fn assert_keys_serialization<E: Pairing, B: BatchedRangeProof<E>>(
 #[cfg(test)]
 const TEST_CASES: &[(usize, u8)] = &[
     // (n, \ell)
+    (1, 16),
     (3, 16),
     (7, 16),
     (4, 16),
@@ -150,31 +151,6 @@ where
     }
 }
 
-// /// Multivariate (Dekart) proof uses num_vars = log2((n+1).next_power_of_two()), so the verifier key
-// /// must match n. Use a fresh setup per (n, ell). Requires n >= 4 so SRS has enough tau powers for g_is (degree 4).
-// #[cfg(test)]
-// const TEST_CASES_MULTIVARIATE: &[(usize, u8)] = &[
-//     (4, 16),
-//     (7, 16),
-//     (8, 16),
-//     (16, 3),
-//     (16, 4),
-//     (16, 7),
-//     (16, 8),
-//     (16, 16),
-// ];
-
-// #[cfg(test)]
-// fn assert_correctness_for_multivariate_range_proof_and_curve<E>()
-// where
-//     E: Pairing,
-// {
-//     for &(n, ell) in TEST_CASES_MULTIVARIATE {
-//         let setups = make_single_curve_setup::<E, DekartMultivariate<E>>(n, ell);
-//         assert_range_proof_correctness::<E, DekartMultivariate<E>>(&setups, n, ell);
-//     }
-// }
-
 #[cfg(test)]
 fn assert_correctness_and_serialization_for_range_proof_and_curve<E, B>()
 where
@@ -190,26 +166,11 @@ where
     }
 }
 
-// #[cfg(test)]
-// fn assert_correctness_and_serialization_for_multivariate_range_proof_and_curve<E>()
-// where
-//     E: Pairing,
-// {
-//     for &(n, ell) in TEST_CASES_MULTIVARIATE {
-//         let setups = make_single_curve_setup::<E, DekartMultivariate<E>>(n, ell);
-//         assert_range_proof_correctness::<E, DekartMultivariate<E>>(&setups, n, ell);
-//         assert_keys_serialization::<E, DekartMultivariate<E>>(&setups);
-//     }
-// }
-
 #[cfg(test)]
 #[test]
 fn assert_correctness_of_all_range_proofs() {
     assert_correctness_for_range_proof_and_curve::<Bn254, UnivariateDeKART<Bn254>>();
     assert_correctness_for_range_proof_and_curve::<Bls12_381, UnivariateDeKART<Bls12_381>>();
-
-    // assert_correctness_for_multivariate_range_proof_and_curve::<Bn254>();
-    // assert_correctness_for_multivariate_range_proof_and_curve::<Bls12_381>();
 
     assert_correctness_and_serialization_for_range_proof_and_curve::<
         Bn254,
@@ -219,6 +180,13 @@ fn assert_correctness_of_all_range_proofs() {
         Bls12_381,
         UnivariateDeKARTv2<Bls12_381>,
     >();
-    // assert_correctness_and_serialization_for_multivariate_range_proof_and_curve::<Bn254>();
-    // assert_correctness_and_serialization_for_multivariate_range_proof_and_curve::<Bls12_381>();
+
+    assert_correctness_and_serialization_for_range_proof_and_curve::<
+        Bn254,
+        DekartMultivariate<Bn254>,
+    >();
+    assert_correctness_and_serialization_for_range_proof_and_curve::<
+        Bls12_381,
+        DekartMultivariate<Bls12_381>,
+    >();
 }

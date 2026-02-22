@@ -4,7 +4,7 @@
 use aptos_crypto::arkworks::GroupGenerators;
 use aptos_dkg::{
     range_proofs::{
-        //dekart_multivariate::Proof as DekartMultivariate,
+        dekart_multivariate::Proof as DekartMultivariate,
         dekart_univariate::Proof as UnivariateDeKART,
         dekart_univariate_v2::Proof as UnivariateDeKARTv2,
         traits::BatchedRangeProof,
@@ -23,7 +23,7 @@ use rand::{rngs::StdRng, SeedableRng};
 /// `crates/aptos-crypto/README.md` rely on it.
 const BROKEN_DEKART_RS_SCHEME_NAME: &str = "dekart-rs-broken";
 const DEKART_RS_SCHEME_NAME: &str = "dekart-rs";
-//const DEKART_MULTIVARIATE_SCHEME_NAME: &str = "dekart-multivar";
+const DEKART_MULTIVARIATE_SCHEME_NAME: &str = "dekart-multivar";
 const BN254: &str = "bn254";
 const BLS12_381: &str = "bls12-381";
 
@@ -45,6 +45,13 @@ fn bench_groups(c: &mut Criterion) {
     bench_range_proof::<Bls12_381, UnivariateDeKARTv2<Bls12_381>>(
         c,
         DEKART_RS_SCHEME_NAME,
+        BLS12_381,
+    );
+
+    bench_range_proof::<Bn254, DekartMultivariate<Bn254>>(c, DEKART_MULTIVARIATE_SCHEME_NAME, BN254);
+    bench_range_proof::<Bls12_381, DekartMultivariate<Bls12_381>>(
+        c,
+        DEKART_MULTIVARIATE_SCHEME_NAME,
         BLS12_381,
     );
 }
