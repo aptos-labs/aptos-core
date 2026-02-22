@@ -2,12 +2,39 @@
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 use super::IncludedArtifactsArgs;
-use crate::common::types::{CliCommand, CliError, CliResult, CliTypedResult, MovePackageOptions};
+use crate::common::{
+    types::{CliCommand, CliError, CliResult, CliTypedResult, MovePackageOptions},
+    utils::read_from_file,
+};
 use anyhow::Context;
+use aptos_api_types::{MoveModule, MoveModuleBytecode};
 use aptos_framework::{BuildOptions, BuiltPackage};
 use aptos_types::transaction::EntryABI;
 use async_trait::async_trait;
-use clap::{Parser, Subcommand};
+use clap::{Parser, Subcommand, ValueEnum};
+use serde::Serialize;
+use std::path::PathBuf;
+
+/// The format for displaying ABIs.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, ValueEnum)]
+#[clap(rename_all = "kebab-case")]
+pub enum AbiFormat {
+    /// The default ABI format.
+    #[default]
+    Default,
+    /// The Aptos REST API JSON ABI format.
+    AptosRest,
+}
+
+/// The output of the `show abi` command, which varies based on the format.
+#[derive(Debug, Serialize)]
+#[serde(untagged)]
+pub enum ShowAbiOutput {
+    /// The default ABI format, returning a list of entry ABIs.
+    Default(Vec<EntryABI>),
+    /// The Aptos REST API JSON ABI format, returning the module ABI.
+    AptosRest(Option<MoveModule>),
+}
 
 #[derive(Subcommand)]
 pub enum ShowTool {
@@ -39,6 +66,15 @@ pub struct ShowAbi {
     #[clap(long, num_args = 0..)]
     names: Vec<String>,
 
+    /// The path to a compiled bytecode file to show the ABIs for. For example, `coin.mv`.
+    /// This can only be used with the `--format` option set to `aptos-rest`.
+    #[clap(long, value_parser)]
+    bytecode_path: Option<PathBuf>,
+
+    /// The format to display the ABIs in.
+    #[clap(long, value_enum, default_value_t = AbiFormat::Default)]
+    format: AbiFormat,
+
     #[clap(flatten)]
     included_artifacts_args: IncludedArtifactsArgs,
 
@@ -47,12 +83,35 @@ pub struct ShowAbi {
 }
 
 #[async_trait]
-impl CliCommand<Vec<EntryABI>> for ShowAbi {
+impl CliCommand<ShowAbiOutput> for ShowAbi {
     fn command_name(&self) -> &'static str {
         "ShowAbi"
     }
 
-    async fn execute(self) -> CliTypedResult<Vec<EntryABI>> {
+    async fn execute(self) -> CliTypedResult<ShowAbiOutput> {
+        if self.format == AbiFormat::AptosRest {
+            if self.bytecode_path.is_none() {
+                return Err(CliError::CommandArgumentError(
+                    "The --bytecode-path option is required when --format is set to aptos-rest"
+                        .to_string(),
+                ));
+            }
+
+            let bytecode = read_from_file(self.bytecode_path.as_ref().unwrap())?;
+            let abi = MoveModuleBytecode::new(bytecode)
+                .try_parse_abi()
+                .map_err(|e| CliError::UnexpectedError(format!("{:#}", e)))?
+                .abi;
+            return Ok(ShowAbiOutput::AptosRest(abi));
+        }
+
+        if self.bytecode_path.is_some() && self.format == AbiFormat::Default {
+            return Err(CliError::CommandArgumentError(
+                "The --bytecode-path option is only allowed when --format is set to aptos-rest"
+                    .to_string(),
+            ));
+        }
+
         let build_options = BuildOptions {
             install_dir: self.move_options.output_dir.clone(),
             with_abis: true,
@@ -99,6 +158,6 @@ impl CliCommand<Vec<EntryABI>> for ShowAbi {
             })
             .collect();
 
-        Ok(abis)
+        Ok(ShowAbiOutput::Default(abis))
     }
 }
