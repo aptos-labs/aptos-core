@@ -434,6 +434,57 @@ pub fn read_line(input_name: &'static str) -> CliTypedResult<String> {
     Ok(input_buf)
 }
 
+/// Reads a passphrase from the user.
+/// Note: The passphrase will be visible as you type it.
+/// For automated use, set the APTOS_CLI_PASSPHRASE environment variable.
+pub fn read_passphrase(prompt: &str) -> CliTypedResult<String> {
+    use std::io::{self, Write};
+
+    // Check if we're in an interactive terminal
+    if atty::is(atty::Stream::Stdin) {
+        eprint!("{}", prompt);
+        io::stderr()
+            .flush()
+            .map_err(|e| CliError::IO("stderr".to_string(), e))?;
+    }
+
+    let mut passphrase = String::new();
+    io::stdin()
+        .read_line(&mut passphrase)
+        .map_err(|e| CliError::IO("passphrase".to_string(), e))?;
+
+    // Remove trailing newline
+    if passphrase.ends_with('\n') {
+        passphrase.pop();
+        if passphrase.ends_with('\r') {
+            passphrase.pop();
+        }
+    }
+
+    Ok(passphrase)
+}
+
+/// Prompts the user for a passphrase with confirmation for new passphrases.
+pub fn prompt_passphrase_with_confirmation(prompt: &str) -> CliTypedResult<String> {
+    let passphrase = read_passphrase(prompt)?;
+
+    if passphrase.is_empty() {
+        return Err(CliError::CommandArgumentError(
+            "Passphrase cannot be empty".to_string(),
+        ));
+    }
+
+    let confirm = read_passphrase("Confirm passphrase: ")?;
+
+    if passphrase != confirm {
+        return Err(CliError::CommandArgumentError(
+            "Passphrases do not match".to_string(),
+        ));
+    }
+
+    Ok(passphrase)
+}
+
 /// Lists the content of a directory
 pub fn read_dir_files(
     path: &Path,

@@ -660,6 +660,7 @@ jemalloc-sys = { package = "tikv-jemalloc-sys", version = "0.6.1" }
 json-patch = "0.2.6"
 jsonwebtoken = "8.1"
 jwt = "0.16.0"
+keyring = { version = "3", features = ["apple-native", "windows-native"] }
 lazy_static = "1.4.0"
 libc = "0.2.147"
 libfuzzer-sys = "0.4.6"
@@ -698,6 +699,7 @@ primitive-types = { version = "0.12.2" }
 signature = "2.1.0"
 slh-dsa = "=0.2.0-rc.4"
 pairing = "0.23"
+pbkdf2 = { version = "0.12.2", features = ["simple"] }
 parking_lot = "0.12.0"
 paste = "1.0.7"
 pathsearch = "0.2.0"

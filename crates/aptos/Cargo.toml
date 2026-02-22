@@ -12,7 +12,15 @@ publish = { workspace = true }
 repository = { workspace = true }
 rust-version = { workspace = true }
 
+[features]
+default = []
+fuzzing = []
+no-upload-proposal = []
+indexer = ["aptos-node/indexer"]
+cli-framework-test-move = []
+
 [dependencies]
+aes-gcm = { workspace = true }
 anyhow = { workspace = true }
 aptos-api-types = { workspace = true }
 aptos-backup-cli = { workspace = true }
@@ -53,6 +61,7 @@ aptos-vm-logging = { workspace = true }
 aptos-vm-types = { workspace = true }
 aptos-workspace-server = { workspace = true }
 async-trait = { workspace = true }
+atty = { workspace = true }
 backoff = { workspace = true }
 base64 = { workspace = true }
 bcs = { workspace = true }
@@ -90,6 +99,7 @@ move-unit-test = { workspace = true }
 move-vm-runtime = { workspace = true, features = ["testing"] }
 open = { workspace = true }
 pathsearch = { workspace = true }
+pbkdf2 = { workspace = true }
 poem = { workspace = true }
 processor = { workspace = true }
 rand = { workspace = true }
@@ -103,6 +113,7 @@ serde = { workspace = true }
 serde_json = { workspace = true }
 serde_yaml = { workspace = true }
 set_env = { workspace = true }
+sha2_0_10_6 = { workspace = true }
 tempfile = { workspace = true }
 thiserror = { workspace = true }
 tokio = { workspace = true }
@@ -111,15 +122,12 @@ tracing = { workspace = true }
 tracing-subscriber = { workspace = true }
 url = { workspace = true }
 
+# System keychain support for macOS and Windows only
+[target.'cfg(any(target_os = "macos", target_os = "windows"))'.dependencies]
+keyring = { workspace = true }
+
 [target.'cfg(unix)'.dependencies]
 jemallocator = { workspace = true }
-
-[features]
-default = []
-fuzzing = []
-no-upload-proposal = []
-indexer = ["aptos-node/indexer"]
-cli-framework-test-move = []
 
 [build-dependencies]
 shadow-rs = { workspace = true }
