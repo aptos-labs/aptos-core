@@ -1700,6 +1700,51 @@ async fn submit_chunked_publish_transactions(
 
     let (_, account_address) = txn_options.get_public_key_and_address()?;
 
+    // Pre-validate balance if max_gas is specified to provide a clearer error message
+    // before attempting to submit transactions
+    if let Some(max_gas) = txn_options.gas_options.max_gas {
+        if txn_options.session.is_none() {
+            let client = txn_options.rest_client()?;
+            let gas_unit_price = if let Some(price) = txn_options.gas_options.gas_unit_price {
+                price
+            } else {
+                client
+                    .estimate_gas_price()
+                    .await
+                    .map(|r| r.into_inner().gas_estimate)
+                    .unwrap_or(100) // Default to 100 if estimation fails
+            };
+
+            let balance = client
+                .view_apt_account_balance(account_address)
+                .await
+                .map(|r| r.into_inner())
+                .unwrap_or(0);
+
+            let required_per_txn = max_gas.saturating_mul(gas_unit_price);
+            if balance < required_per_txn {
+                let required_apt = required_per_txn as f64 / 100_000_000.0;
+                let balance_apt = balance as f64 / 100_000_000.0;
+                return Err(CliError::UnexpectedError(format!(
+                    "Insufficient balance for chunked publish.\n\
+                    Your account {} has {:.8} APT, but each transaction requires up to {:.8} APT \
+                    (max_gas {} × gas_unit_price {} = {} Octas).\n\
+                    To fix this, either:\n\
+                    - Fund your account with at least {:.8} APT, or\n\
+                    - Use a lower --max-gas value (your balance supports up to {} gas units at the current gas price)",
+                    account_address,
+                    balance_apt,
+                    required_apt,
+                    max_gas,
+                    gas_unit_price,
+                    required_per_txn,
+                    required_apt,
+                    if gas_unit_price > 0 { balance / gas_unit_price } else { 0 }
+                )));
+            }
+        }
+    }
+
     if !is_staging_area_empty(txn_options, large_packages_module_address).await? {
         let message = format!(
             "The resource {}::large_packages::StagingArea under account {} is not empty.\
