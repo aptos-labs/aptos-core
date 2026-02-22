@@ -10,10 +10,7 @@ use crate::{
     },
     Scalar,
 };
-use aptos_crypto::arkworks::{
-    self,
-    msm::{IsMsmInput, MsmInput},
-};
+use aptos_crypto::arkworks::{self, msm::MsmInput};
 use aptos_crypto_derive::SigmaProtocolWitness;
 use ark_ec::{scalar_mul::BatchMulPreprocessing, CurveGroup};
 use ark_ff::PrimeField;
@@ -152,15 +149,18 @@ impl<'a, C: CurveGroup> homomorphism::Trait for Homomorphism<'a, C> {
 }
 
 impl<'a, C: CurveGroup> fixed_base_msms::Trait for Homomorphism<'a, C> {
+    type Base = C::Affine;
     type CodomainShape<T>
         = CodomainShape<T>
     where
         T: CanonicalSerialize + CanonicalDeserialize + Clone + Debug + Eq;
-    type MsmInput = MsmInput<C::Affine, C::ScalarField>;
     type MsmOutput = C;
     type Scalar = C::ScalarField;
 
-    fn msm_terms(&self, input: &Self::Domain) -> Self::CodomainShape<Self::MsmInput> {
+    fn msm_terms(
+        &self,
+        input: &Self::Domain,
+    ) -> Self::CodomainShape<MsmInput<Self::Base, Self::Scalar>> {
         let mut terms = Vec::new();
 
         for chunks in &input.chunked_values {
@@ -176,18 +176,18 @@ impl<'a, C: CurveGroup> fixed_base_msms::Trait for Homomorphism<'a, C> {
         CodomainShape(terms)
     }
 
-    fn msm_eval(input: Self::MsmInput) -> Self::MsmOutput {
+    fn msm_eval(input: MsmInput<Self::Base, Self::Scalar>) -> Self::MsmOutput {
         C::msm(input.bases(), input.scalars()).expect("MSM failed in Schnorr") // TODO: custom MSM here, because only length 1 MSM except during verification
     }
 
-    fn batch_normalize(
-        msm_output: Vec<Self::MsmOutput>,
-    ) -> Vec<<Self::MsmInput as IsMsmInput>::Base> {
+    fn batch_normalize(msm_output: Vec<Self::MsmOutput>) -> Vec<Self::Base> {
         C::normalize_batch(&msm_output)
     }
 }
 
-impl<'a, C: CurveGroup> sigma_protocol::Trait<C> for Homomorphism<'a, C> {
+impl<'a, C: CurveGroup> sigma_protocol::CurveGroupTrait for Homomorphism<'a, C> {
+    type Group = C;
+
     fn dst(&self) -> Vec<u8> {
         DST.to_vec()
     }

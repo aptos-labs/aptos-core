@@ -26,7 +26,7 @@ pub use aptos_crypto::{
     blstrs as algebra,
     blstrs::{G1_PROJ_NUM_BYTES, G2_PROJ_NUM_BYTES, SCALAR_NUM_BYTES},
 };
-use ark_ff::{Fp, FpConfig};
+use ark_ff::{Fp, FpConfig, PrimeField};
 use ark_serialize::{CanonicalDeserialize, CanonicalSerialize};
 use more_asserts::{assert_ge, assert_le};
 use rand::Rng;
@@ -41,7 +41,6 @@ pub mod sigma_protocol;
 //pub mod sumcheck;
 pub mod utils;
 pub mod weighted_vuf;
-use ark_ff::PrimeField;
 
 /// A wrapper around `E::ScalarField` to prevent overlapping trait implementations.
 ///

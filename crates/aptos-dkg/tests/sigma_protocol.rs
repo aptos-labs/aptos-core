@@ -2,7 +2,7 @@
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 use aptos_crypto::arkworks::{
-    msm::{IsMsmInput, MsmInput},
+    msm::MsmInput,
     random::{sample_field_element, sample_field_elements},
 };
 use aptos_dkg::{
@@ -12,9 +12,10 @@ use aptos_dkg::{
         homomorphism::{
             fixed_base_msms,
             fixed_base_msms::Trait as _,
-            tuple::{PairingTupleHomomorphism, TupleHomomorphism},
+            tuple::{CurveGroupTupleHomomorphism, TupleHomomorphism},
             Trait as _,
         },
+        Trait as _,
     },
     Scalar,
 };
@@ -24,15 +25,13 @@ use ark_ec::{pairing::Pairing, CurveGroup, PrimeGroup};
 use ark_ff::{Fp, FpConfig};
 use ark_serialize::{CanonicalDeserialize, CanonicalSerialize};
 use rand::thread_rng;
-use std::fmt::Debug;
+use std::{fmt::Debug, marker::PhantomData};
 
 const CNTXT: &[u8; 32] = b"SIGMA-PROTOCOL-TESTS-SOK-CONTEXT";
 
-#[cfg(test)]
-pub fn test_sigma_protocol<C, H>(hom: H, witness: H::Domain)
+pub fn test_sigma_protocol<H>(hom: H, witness: H::Domain)
 where
-    C: CurveGroup,
-    H: sigma_protocol::Trait<C>,
+    H: sigma_protocol::CurveGroupTrait,
 {
     let mut rng = thread_rng();
 
@@ -40,7 +39,7 @@ where
 
     let (proof, normalized_statement) = hom.prove(&witness, statement, CNTXT, &mut rng);
 
-    hom.verify(&normalized_statement, &proof, CNTXT, &mut rng)
+    hom.verify(&normalized_statement, &proof, CNTXT, None, &mut rng)
         .expect("Sigma protocol proof failed verification");
 }
 
@@ -59,8 +58,8 @@ fn test_imhomog_chaum_pedersen<
 
     let (proof, normalized_statement) = hom.prove(&witness, statement, CNTXT, &mut rng);
 
-    hom.verify(&normalized_statement, &proof, CNTXT, &mut rng)
-        .expect("Inhomogeneous Chaum Pederson sigma proof failed verification");
+    hom.verify(&normalized_statement, &proof, CNTXT, None, &mut rng)
+        .expect("Inhomogeneous Chaum-Pedersen sigma proof failed verification");
 }
 
 fn test_imhomog_scalar_mul<'a, E>(
@@ -75,8 +74,8 @@ fn test_imhomog_scalar_mul<'a, E>(
 
     let (proof, normalized_statement) = hom.prove(&witness, statement, CNTXT, &mut rng);
 
-    hom.verify(&normalized_statement, &proof, CNTXT, &mut rng)
-        .expect("Inhomogeneous Chaum Pederson sigma proof failed verification");
+    hom.verify(&normalized_statement, &proof, CNTXT, None, &mut rng)
+        .expect("Inhomogeneous chunked scalar mul sigma proof failed verification");
 }
 
 mod schnorr {
@@ -117,37 +116,40 @@ mod schnorr {
     impl<C: CurveGroup<ScalarField = Fp<P, N>>, const N: usize, P: FpConfig<N>>
         fixed_base_msms::Trait for Schnorr<C>
     {
+        type Base = C::Affine;
         type CodomainShape<T>
             = CodomainShape<T>
         where
             T: CanonicalSerialize + CanonicalDeserialize + Clone + Debug + Eq;
-        type MsmInput = MsmInput<C::Affine, C::ScalarField>;
         type MsmOutput = C;
         type Scalar = C::ScalarField;
 
-        fn msm_terms(&self, input: &Self::Domain) -> Self::CodomainShape<Self::MsmInput> {
+        fn msm_terms(
+            &self,
+            input: &Self::Domain,
+        ) -> Self::CodomainShape<MsmInput<Self::Base, Self::Scalar>> {
             CodomainShape(MsmInput {
                 bases: vec![self.G],
                 scalars: vec![*input],
             })
         }
 
-        fn msm_eval(input: Self::MsmInput) -> Self::MsmOutput {
+        fn msm_eval(input: MsmInput<Self::Base, Self::Scalar>) -> Self::MsmOutput {
             // for the homomorphism we only need `input.bases()[0] * input.scalars()[0]`
             // but the verification needs a 3-term MSM... so we should really do a custom MSM which dispatches based on length TODO
             C::msm(input.bases(), input.scalars()).expect("MSM failed in Schnorr")
         }
 
-        fn batch_normalize(
-            msm_output: Vec<Self::MsmOutput>,
-        ) -> Vec<<Self::MsmInput as IsMsmInput>::Base> {
+        fn batch_normalize(msm_output: Vec<Self::MsmOutput>) -> Vec<Self::Base> {
             C::normalize_batch(&msm_output)
         }
     }
 
     impl<C: CurveGroup<ScalarField = Fp<P, N>>, const N: usize, P: FpConfig<N>>
-        sigma_protocol::Trait<C> for Schnorr<C>
+        sigma_protocol::CurveGroupTrait for Schnorr<C>
     {
+        type Group = C;
+
         fn dst(&self) -> Vec<u8> {
             b"SCHNORR_SIGMA_PROTOCOL_DST".to_vec()
         }
@@ -157,7 +159,7 @@ mod schnorr {
 mod chaum_pedersen {
     use super::{schnorr::*, *};
 
-    pub type ChaumPedersen<C> = TupleHomomorphism<Schnorr<C>, Schnorr<C>>;
+    pub type ChaumPedersen<C> = CurveGroupTupleHomomorphism<C, Schnorr<C>, Schnorr<C>>;
 
     // Implementing e.g. `Default` here would require a wrapper, but then `sigma_protocol::Trait` would have to get re-implemented...
     #[allow(non_snake_case)]
@@ -172,14 +174,15 @@ mod chaum_pedersen {
         let schnorr1 = Schnorr { G: G_1 };
         let schnorr2 = Schnorr { G: G_2 };
 
-        TupleHomomorphism {
+        CurveGroupTupleHomomorphism {
             hom1: schnorr1,
             hom2: schnorr2,
+            _group: PhantomData::<C>,
         }
     }
 
     pub type InhomogChaumPedersen<E> =
-        PairingTupleHomomorphism<E, Schnorr<<E as Pairing>::G1>, Schnorr<<E as Pairing>::G2>>;
+        TupleHomomorphism<Schnorr<<E as Pairing>::G1>, Schnorr<<E as Pairing>::G2>>;
 
     #[allow(non_snake_case)]
     pub fn make_inhomogeneous_chaum_pedersen_instance<
@@ -193,10 +196,9 @@ mod chaum_pedersen {
         let schnorr1 = Schnorr { G: G_1 };
         let schnorr2 = Schnorr { G: G_2 };
 
-        PairingTupleHomomorphism {
+        TupleHomomorphism {
             hom1: schnorr1,
             hom2: schnorr2,
-            _pairing: std::marker::PhantomData,
         }
     }
 }
@@ -206,8 +208,7 @@ mod chunked_scalar_mul {
     use aptos_dkg::pvss::chunky::chunked_scalar_mul;
     use ark_ec::scalar_mul::BatchMulPreprocessing;
 
-    pub type InhomogChunkedScalarMul<'a, E> = PairingTupleHomomorphism<
-        E,
+    pub type InhomogChunkedScalarMul<'a, E> = TupleHomomorphism<
         chunked_scalar_mul::Homomorphism<'a, <E as Pairing>::G1>,
         chunked_scalar_mul::Homomorphism<'a, <E as Pairing>::G2>,
     >;
@@ -230,11 +231,7 @@ mod chunked_scalar_mul {
             ell: 16,
         };
 
-        PairingTupleHomomorphism {
-            hom1,
-            hom2,
-            _pairing: std::marker::PhantomData,
-        }
+        TupleHomomorphism { hom1, hom2 }
     }
 }
 
@@ -246,11 +243,11 @@ fn test_schnorr() {
 
     // ---- Bn254 ----
     let witness_bn = sample_field_element(&mut rng);
-    test_sigma_protocol::<<Bn254 as Pairing>::G1, _>(Schnorr::default(), witness_bn);
+    test_sigma_protocol::<Schnorr<<Bn254 as Pairing>::G1>>(Schnorr::default(), witness_bn);
 
     // ---- Bls12_381 ----
     let witness_bls = sample_field_element(&mut rng);
-    test_sigma_protocol::<<Bls12_381 as Pairing>::G1, _>(Schnorr::default(), witness_bls);
+    test_sigma_protocol::<Schnorr<<Bls12_381 as Pairing>::G1>>(Schnorr::default(), witness_bls);
 }
 
 #[test]
@@ -261,33 +258,34 @@ fn test_chaum_pedersen() {
 
     // ---- Bn254 ----
     let witness_bn = sample_field_element(&mut rng);
-    test_sigma_protocol::<<Bn254 as Pairing>::G1, _>(make_chaum_pedersen_instance(), witness_bn);
-    test_imhomog_chaum_pedersen::<Bn254, _, _>(
-        make_inhomogeneous_chaum_pedersen_instance(),
+    test_sigma_protocol::<ChaumPedersen<<Bn254 as Pairing>::G1>>(
+        make_chaum_pedersen_instance(),
         witness_bn,
     );
+    let hom_bn = make_inhomogeneous_chaum_pedersen_instance::<Bn254, _, _>();
+    test_imhomog_chaum_pedersen::<Bn254, _, _>(hom_bn, witness_bn);
 
     // ---- Bls12_381 ----
     let witness_bls = sample_field_element(&mut rng);
-    test_sigma_protocol::<<Bls12_381 as Pairing>::G1, _>(
+    test_sigma_protocol::<ChaumPedersen<<Bls12_381 as Pairing>::G1>>(
         make_chaum_pedersen_instance(),
         witness_bls,
     );
-    test_imhomog_chaum_pedersen::<Bls12_381, _, _>(
-        make_inhomogeneous_chaum_pedersen_instance(),
-        witness_bls,
-    );
+    let hom_bls = make_inhomogeneous_chaum_pedersen_instance::<Bls12_381, _, _>();
+    test_imhomog_chaum_pedersen::<Bls12_381, _, _>(hom_bls, witness_bls);
+}
 
-    // TODO: move this to a separate test?
-    use crate::chunked_scalar_mul::make_inhomogeneous_scalar_mul;
+#[test]
+fn test_chunked_scalar_mul() {
     use aptos_dkg::pvss::chunky::{chunked_scalar_mul::Witness, chunks};
     use ark_bn254::Fr;
     use ark_ec::scalar_mul::BatchMulPreprocessing;
+    use chunked_scalar_mul::make_inhomogeneous_scalar_mul;
 
+    let mut rng = thread_rng();
     let ell = 16u8;
 
     let scalars = sample_field_elements(1, &mut rng);
-
     let chunked_values: Vec<Vec<Scalar<Fr>>> = scalars
         .iter()
         .map(|s| {
@@ -302,11 +300,10 @@ fn test_chaum_pedersen() {
         chunked_values: chunked_values.clone(),
     };
 
-    // Create tables for batch multiplication preprocessing
     let g_1 = <Bn254 as Pairing>::G1::generator().into_affine();
     let g_2 = <Bn254 as Pairing>::G2::generator().into_affine();
-    let table1 = BatchMulPreprocessing::new(g_1.into(), 256); // TODO: change 256?
-    let table2 = BatchMulPreprocessing::new(g_2.into(), 256); // TODO: change 256?
+    let table1 = BatchMulPreprocessing::new(g_1.into(), 256);
+    let table2 = BatchMulPreprocessing::new(g_2.into(), 256);
 
     let hom = make_inhomogeneous_scalar_mul::<Bn254>(&table1, &table2);
     test_imhomog_scalar_mul::<Bn254>(hom, witness);

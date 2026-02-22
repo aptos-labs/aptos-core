@@ -9,11 +9,7 @@ use crate::{
     sigma_protocol::homomorphism::{self, fixed_base_msms, EntrywiseMap},
     Scalar,
 };
-use aptos_crypto::arkworks::{
-    self,
-    msm::{IsMsmInput, MsmInput},
-    random::sample_field_element,
-};
+use aptos_crypto::arkworks::{self, msm::MsmInput, random::sample_field_element};
 use aptos_crypto_derive::SigmaProtocolWitness;
 use ark_ec::{AffineRepr, CurveGroup};
 use ark_ff::PrimeField;
@@ -256,15 +252,18 @@ pub fn chunks_vec_msm_terms<C: CurveGroup>(
 
 #[allow(non_snake_case)]
 impl<'a, C: CurveGroup> fixed_base_msms::Trait for WeightedHomomorphism<'a, C> {
+    type Base = C::Affine;
     type CodomainShape<T>
         = WeightedCodomainShape<T>
     where
         T: CanonicalSerialize + CanonicalDeserialize + Clone + Debug + Eq;
-    type MsmInput = MsmInput<C::Affine, C::ScalarField>;
     type MsmOutput = C;
     type Scalar = C::ScalarField;
 
-    fn msm_terms(&self, input: &Self::Domain) -> Self::CodomainShape<Self::MsmInput> {
+    fn msm_terms(
+        &self,
+        input: &Self::Domain,
+    ) -> Self::CodomainShape<MsmInput<Self::Base, Self::Scalar>> {
         // C_{i,j} = z_{i,j} * G_1 + r_j * ek[i]
         let Cs = input
             .plaintext_chunks
@@ -297,18 +296,18 @@ impl<'a, C: CurveGroup> fixed_base_msms::Trait for WeightedHomomorphism<'a, C> {
         }
     }
 
-    fn msm_eval(input: Self::MsmInput) -> Self::MsmOutput {
+    fn msm_eval(input: MsmInput<Self::Base, Self::Scalar>) -> Self::MsmOutput {
         C::msm(input.bases(), input.scalars()).expect("MSM failed in ChunkedElgamal")
     }
 
-    fn batch_normalize(
-        msm_output: Vec<Self::MsmOutput>,
-    ) -> Vec<<Self::MsmInput as IsMsmInput>::Base> {
+    fn batch_normalize(msm_output: Vec<Self::MsmOutput>) -> Vec<Self::Base> {
         C::normalize_batch(&msm_output)
     }
 }
 
-impl<'a, C: CurveGroup> sigma_protocol::Trait<C> for WeightedHomomorphism<'a, C> {
+impl<'a, C: CurveGroup> sigma_protocol::CurveGroupTrait for WeightedHomomorphism<'a, C> {
+    type Group = C;
+
     fn dst(&self) -> Vec<u8> {
         let mut result = b"WEIGHTED_".to_vec();
         result.extend(DST);

@@ -15,7 +15,7 @@ use anyhow::ensure;
 use aptos_crypto::arkworks::random::UniformRand;
 use aptos_crypto::{
     arkworks::{
-        msm::{IsMsmInput, MsmInput},
+        msm::MsmInput,
         random::{sample_field_element, unsafe_random_point},
         srs::{lagrange_basis, powers_of_tau, SrsBasis, SrsType},
         GroupGenerators,
@@ -356,15 +356,18 @@ impl<E: Pairing> homomorphism::Trait for CommitmentHomomorphism<'_, E> {
 }
 
 impl<E: Pairing> fixed_base_msms::Trait for CommitmentHomomorphism<'_, E> {
+    type Base = E::G1Affine;
     type CodomainShape<T>
         = CodomainShape<T>
     where
         T: CanonicalSerialize + CanonicalDeserialize + Clone + Debug + Eq;
-    type MsmInput = MsmInput<E::G1Affine, E::ScalarField>;
     type MsmOutput = E::G1;
     type Scalar = E::ScalarField;
 
-    fn msm_terms(&self, input: &Self::Domain) -> Self::CodomainShape<Self::MsmInput> {
+    fn msm_terms(
+        &self,
+        input: &Self::Domain,
+    ) -> Self::CodomainShape<MsmInput<Self::Base, Self::Scalar>> {
         assert!(
             self.msm_basis.len() >= input.values.len(),
             "Not enough Lagrange basis elements for univariate hiding KZG: required {}, got {}",
@@ -383,19 +386,19 @@ impl<E: Pairing> fixed_base_msms::Trait for CommitmentHomomorphism<'_, E> {
         CodomainShape(MsmInput { bases, scalars })
     }
 
-    fn msm_eval(input: Self::MsmInput) -> Self::MsmOutput {
-        E::G1::msm(input.bases(), &input.scalars())
+    fn msm_eval(input: MsmInput<Self::Base, Self::Scalar>) -> Self::MsmOutput {
+        E::G1::msm(input.bases(), input.scalars())
             .expect("MSM computation failed in univariate KZG")
     }
 
-    fn batch_normalize(
-        msm_output: Vec<Self::MsmOutput>,
-    ) -> Vec<<Self::MsmInput as IsMsmInput>::Base> {
+    fn batch_normalize(msm_output: Vec<Self::MsmOutput>) -> Vec<Self::Base> {
         E::G1::normalize_batch(&msm_output)
     }
 }
 
-impl<'a, E: Pairing> sigma_protocol::Trait<E::G1> for CommitmentHomomorphism<'a, E> {
+impl<'a, E: Pairing> sigma_protocol::CurveGroupTrait for CommitmentHomomorphism<'a, E> {
+    type Group = E::G1;
+
     fn dst(&self) -> Vec<u8> {
         b"APTOS_HIDING_KZG_SIGMA_PROTOCOL_DST".to_vec()
     }
