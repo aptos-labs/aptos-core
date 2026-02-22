@@ -13,6 +13,7 @@ mod prover_dependency_installer;
 mod revela;
 mod tool;
 mod update_helper;
+pub mod version_check;
 
 use crate::common::types::CliTypedResult;
 use anyhow::{anyhow, Context, Result};
