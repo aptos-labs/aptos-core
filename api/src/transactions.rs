@@ -1277,6 +1277,9 @@ impl TransactionsApi {
                                 entry_function,
                             )?;
                         },
+                        MultisigTransactionPayload::Script(script) => {
+                            TransactionsApi::validate_script_payload_format(ledger_info, script)?;
+                        },
                     }
                 }
             },
@@ -1296,13 +1299,6 @@ impl TransactionsApi {
             }) => match executable {
                 TransactionExecutable::Script(script) => {
                     TransactionsApi::validate_script(ledger_info, script)?;
-                    if extra_config.is_multisig() {
-                        return Err(SubmitTransactionError::bad_request_with_code(
-                            "Script transaction payload must not be a multisig transaction",
-                            AptosErrorCode::InvalidInput,
-                            ledger_info,
-                        ));
-                    }
                 },
                 TransactionExecutable::EntryFunction(entry_function) => {
                     TransactionsApi::validate_entry_function_payload_format(
@@ -1385,6 +1381,33 @@ impl TransactionsApi {
             let arg: MoveType = arg.into();
             arg.verify(0)
                 .context("Transaction entry function type arg invalid")
+                .map_err(|err| {
+                    SubmitTransactionError::bad_request_with_code(
+                        err,
+                        AptosErrorCode::InvalidInput,
+                        ledger_info,
+                    )
+                })?;
+        }
+        Ok(())
+    }
+
+    fn validate_script_payload_format(
+        ledger_info: &LedgerInfo,
+        script: &Script,
+    ) -> Result<(), SubmitTransactionError> {
+        if script.code().is_empty() {
+            return Err(SubmitTransactionError::bad_request_with_code(
+                "Script payload bytecode must not be empty",
+                AptosErrorCode::InvalidInput,
+                ledger_info,
+            ));
+        }
+
+        for arg in script.ty_args() {
+            let arg = MoveType::from(arg);
+            arg.verify(0)
+                .context("Transaction script function type arg invalid")
                 .map_err(|err| {
                     SubmitTransactionError::bad_request_with_code(
                         err,
@@ -1672,6 +1695,9 @@ impl TransactionsApi {
                                 entry_function.module(),
                                 &entry_function.function().into(),
                             )
+                        },
+                        MultisigTransactionPayload::Script(_) => {
+                            format!("Multisig::Script::{}", txn.committed_hash()).to_string()
                         },
                     }
                 } else {

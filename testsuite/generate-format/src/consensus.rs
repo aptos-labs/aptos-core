@@ -124,6 +124,7 @@ pub fn get_registry() -> Result<Registry> {
     tracer.trace_type::<aptos_types::keyless::EphemeralCertificate>(&samples)?;
     tracer.trace_type::<write_set::WriteOp>(&samples)?;
     tracer.trace_type::<PersistedStateValueMetadata>(&samples)?;
+    tracer.trace_type::<transaction::MultisigTransactionPayload>(&samples)?;
 
     tracer.trace_type::<StateKey>(&samples)?;
     tracer.trace_type::<aptos_consensus_types::proof_of_store::BatchInfoExt>(&samples)?;

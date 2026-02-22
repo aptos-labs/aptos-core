@@ -902,6 +902,10 @@ MultisigTransactionPayload:
       EntryFunction:
         NEWTYPE:
           TYPENAME: EntryFunction
+    1:
+      Script:
+        NEWTYPE:
+          TYPENAME: Script
 OneTimePaddedKey:
   NEWTYPESTRUCT:
     TUPLEARRAY:

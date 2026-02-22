@@ -602,6 +602,34 @@ impl TestContext {
         .await;
     }
 
+    pub async fn execute_multisig_transaction_with_script_payload(
+        &mut self,
+        owner: &mut LocalAccount,
+        multisig_account: AccountAddress,
+        bytecode_hex: &str,
+        type_args: &[&str],
+        args: &[&str],
+        expected_status_code: u16,
+    ) {
+        self.api_execute_txn_expecting(
+            owner,
+            json!({
+                "type": "multisig_payload",
+                "multisig_address": multisig_account.to_hex_literal(),
+                "transaction_payload": {
+                    "type": "script_payload",
+                    "code": {
+                        "bytecode": format!("0x{}", bytecode_hex),
+                    },
+                    "type_arguments": type_args,
+                    "arguments": args
+                }
+            }),
+            expected_status_code,
+        )
+        .await;
+    }
+
     pub fn get_indexer_reader(&self) -> Option<&Arc<dyn IndexerReader>> {
         self.context.get_indexer_reader()
     }
@@ -1200,6 +1228,34 @@ impl TestContext {
                 "transaction_payload": {
                     "type": "entry_function_payload",
                     "function": function,
+                    "type_arguments": type_args,
+                    "arguments": args
+                }
+            }),
+            expected_status_code,
+        )
+        .await
+    }
+
+    pub async fn simulate_multisig_script_transaction(
+        &mut self,
+        owner: &LocalAccount,
+        multisig_account: AccountAddress,
+        bytecode_hex: &str,
+        type_args: &[&str],
+        args: &[&str],
+        expected_status_code: u16,
+    ) -> Value {
+        self.simulate_transaction(
+            owner,
+            json!({
+                "type": "multisig_payload",
+                "multisig_address": multisig_account.to_hex_literal(),
+                "transaction_payload": {
+                    "type": "script_payload",
+                    "code": {
+                        "bytecode": format!("0x{}", bytecode_hex),
+                    },
                     "type_arguments": type_args,
                     "arguments": args
                 }
