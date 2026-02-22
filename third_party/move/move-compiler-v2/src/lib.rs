@@ -173,14 +173,92 @@ where
 /// to the model.
 pub fn run_move_compiler_for_analysis(
     error_writer: &mut impl WriteColor,
-    mut options: Options,
+    options: Options,
 ) -> anyhow::Result<GlobalEnv> {
-    options.whole_program = true; // will set `treat_everything_as_target`
+    let env = run_move_compiler_to_model(options)?;
+    let opts = env.get_extension::<Options>().unwrap_or_default();
+    let mut emitter = opts.error_emitter(error_writer);
+    emitter.report_diag(&env, opts.report_severity());
+    emitter.check_diag(&env, opts.report_severity(), "compilation errors")?;
+    Ok(env)
+}
+
+/// Run the full compiler pipeline for analysis, collecting all diagnostics
+/// in `GlobalEnv` without emitting them.
+///
+/// Unlike [`run_move_compiler_for_analysis`], this function does not require
+/// an error writer — diagnostics are stored in the returned environment and
+/// can be inspected programmatically via `env.has_errors()` / `env.diag_count()`.
+///
+/// Each pipeline phase checks for errors and returns early, so the caller
+/// always receives the model up to the first failing phase.
+pub fn run_move_compiler_to_model(mut options: Options) -> anyhow::Result<GlobalEnv> {
+    options.whole_program = true;
     options = options.set_experiment(Experiment::SPEC_REWRITE, true);
     options = options.set_experiment(Experiment::ATTACH_COMPILED_MODULE, true);
-    let mut emitter = options.error_emitter(error_writer);
-    let (env, _units) = run_move_compiler(emitter.as_mut(), options)?;
-    // Reset for subsequent analysis
+
+    // Type checking + AST transforms.
+    let mut env = run_checker_and_rewriters(options.clone())?;
+    if env.has_errors() {
+        env.treat_everything_as_target(false);
+        return Ok(env);
+    }
+
+    // Stackless bytecode generation.
+    let mut targets = run_stackless_bytecode_gen(&env);
+    if env.has_errors() {
+        env.treat_everything_as_target(false);
+        return Ok(env);
+    }
+
+    // Stackless bytecode checks.
+    run_stackless_bytecode_pipeline(
+        &env,
+        stackless_bytecode_check_pipeline(&options),
+        &mut targets,
+    );
+    if env.has_errors() {
+        env.treat_everything_as_target(false);
+        return Ok(env);
+    }
+
+    // AST optimization pipeline.
+    env_optimization_pipeline(&options).run(&mut env);
+    if env.has_errors() {
+        env.treat_everything_as_target(false);
+        return Ok(env);
+    }
+
+    // Regenerate stackless bytecode after AST optimizations.
+    let mut targets = run_stackless_bytecode_gen(&env);
+    if env.has_errors() {
+        env.treat_everything_as_target(false);
+        return Ok(env);
+    }
+
+    // Stackless bytecode optimization pipeline.
+    run_stackless_bytecode_pipeline(
+        &env,
+        stackless_bytecode_optimization_pipeline(&options),
+        &mut targets,
+    );
+    if env.has_errors() {
+        env.treat_everything_as_target(false);
+        return Ok(env);
+    }
+
+    // File format bytecode generation.
+    let modules_and_scripts = run_file_format_gen(&mut env, &targets);
+    if env.has_errors() {
+        env.treat_everything_as_target(false);
+        return Ok(env);
+    }
+
+    // Bytecode verification.
+    let annotated_units = annotate_units(modules_and_scripts);
+    run_bytecode_verifier(&annotated_units, &mut env);
+
+    env.set_compiler_v2(true);
     env.treat_everything_as_target(false);
     Ok(env)
 }

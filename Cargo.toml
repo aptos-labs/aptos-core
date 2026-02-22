@@ -39,6 +39,7 @@ members = [
     "aptos-move/e2e-move-tests",
     "aptos-move/e2e-tests",
     "aptos-move/e2e-testsuite",
+    "aptos-move/flow",
     "aptos-move/framework",
     "aptos-move/framework/cached-packages",
     "aptos-move/framework/natives",
@@ -401,6 +402,7 @@ aptos-metrics-core = { path = "crates/aptos-metrics-core" }
 aptos-move-cli = { path = "aptos-move/cli" }
 aptos-move-debugger = { path = "aptos-move/aptos-debugger" }
 aptos-move-examples = { path = "aptos-move/move-examples" }
+aptos-move-flow = { path = "aptos-move/flow" }
 aptos-move-e2e-benchmark = { path = "aptos-move/e2e-benchmark" }
 aptos-mvhashmap = { path = "aptos-move/mvhashmap" }
 aptos-native-interface = { path = "aptos-move/aptos-native-interface" }
@@ -684,6 +686,7 @@ more-asserts = "0.3.0"
 named-lock = "0.2.0"
 native-tls = "0.2.10"
 neptune = { version = "13.0.0", default-features = false }
+notify = "8.2.0"
 ntest = "0.9.3"
 num = "0.4.0"
 num-bigint = { version = "0.3.2", features = ["rand"] }
@@ -761,6 +764,7 @@ reqwest-retry = "0.2.1"
 ring = { version = "0.16.20", features = ["std"] }
 ripemd = "0.1.1"
 rlimit = "0.10.2"
+rmcp = { version = "0.16", features = ["server", "transport-io"] }
 rocksdb = { version = "0.24.0", features = ["lz4"] }
 rsa = { version = "0.9.6" }
 rstack-self = { version = "0.3.0", features = ["dw"], default-features = false }

@@ -30,11 +30,11 @@ use rand_core::OsRng;
 use smallvec::{smallvec, SmallVec};
 use std::{collections::VecDeque, convert::TryFrom};
 
+#[cfg(feature = "testing")]
 /// Equivalent to `std::errors::internal(1)` in Move.
-#[cfg(feature = "testing")]
 const E_BLS12381_SIGN_COMPUTATION_FAILED: u64 = 0x0A_0001;
-/// Equivalent to `std::errors::internal(2)` in Move.
 #[cfg(feature = "testing")]
+/// Equivalent to `std::errors::internal(2)` in Move.
 const E_BLS12381_POP_SK_DESERIALIZATION_FAILED: u64 = 0x0A_0002;
 
 /// Pops a `Vec<T>` off the argument stack and converts it to a `Vec<Vec<u8>>` by reading the first

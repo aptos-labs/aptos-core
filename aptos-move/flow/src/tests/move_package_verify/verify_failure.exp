@@ -1,0 +1,14 @@
+is_error: true
+verification failed:
+error: post-condition does not hold
+  ┌─ <TEMPDIR>/bad_spec.move:6:9
+  │
+6 │         ensures result == x + 1;
+  │         ^^^^^^^^^^^^^^^^^^^^^^^^
+  │
+  =     at <TEMPDIR>/bad_spec.move:2: double
+  =         x = 9223372036854775766
+  =     at <TEMPDIR>/bad_spec.move:3: double
+  =         result = 18446744073709551532
+  =     at <TEMPDIR>/bad_spec.move:4: double
+  =     at <TEMPDIR>/bad_spec.move:6: double (spec)

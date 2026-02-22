@@ -98,10 +98,17 @@ fn run_test_impl(
                 target_filter: None,
                 compiler_version,
                 language_version: LanguageVersion::default(),
+                with_bytecode: false,
             })
             .build_model()
             {
-                Ok(_) => "Built model".to_string(),
+                Ok(env) => {
+                    if env.has_errors() {
+                        "Model has errors".to_string()
+                    } else {
+                        "Built model".to_string()
+                    }
+                },
                 Err(error) => format!("{:#}\n", error),
             },
             (_, _) => {
