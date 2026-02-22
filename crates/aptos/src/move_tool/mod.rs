@@ -646,22 +646,27 @@ impl CliCommand<&'static str> for TestPackage {
 
         // Print coverage summary if --coverage is set
         if self.compute_coverage {
-            // TODO: config seems to be dead here.
-            config.test_mode = false;
-            let summary = SummaryCoverage {
-                summarize_functions: false,
-                output_csv: false,
-                filter: self.filter,
-                common: CoverageCommon::default(),
-                move_options: self.move_options,
-            };
-            summary.coverage()?;
+            if UnitTestResult::Success == result {
+                // TODO: config seems to be dead here.
+                config.test_mode = false;
+                let summary = SummaryCoverage {
+                    summarize_functions: false,
+                    output_csv: false,
+                    filter: self.filter,
+                    common: CoverageCommon::default(),
+                    move_options: self.move_options,
+                };
+                summary.coverage()?;
 
-            println!("Please use `aptos move coverage -h` for more detailed source or bytecode test coverage of this package");
+                println!("Please use `aptos move coverage -h` for more detailed source or bytecode test coverage of this package");
+            }
+            if UnitTestResult::NoTests == result {
+                println!("No tests found - coverage map not generated");
+            }
         }
 
         match result {
-            UnitTestResult::Success => Ok("Success"),
+            UnitTestResult::Success | UnitTestResult::NoTests => Ok("Success"),
             UnitTestResult::Failure => Err(CliError::MoveTestError),
         }
     }
