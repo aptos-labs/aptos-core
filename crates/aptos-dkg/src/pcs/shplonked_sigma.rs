@@ -2,7 +2,7 @@
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 // Sigma protocol for the Shplonked ZK-PCS opening proof: proves knowledge of (rho, evals, u)
-// such that com_y = commitment(rho, evals), V = taus_1[0]*sum(alpha_i*evals_i) + xi_1*u, and y_sum = sum(evals).
+// such that com_y = commitment(rho, evals), V = taus_1[0]*sum(alphas_i*evals_i) + xi_1*u, and y_sum = sum(evals).
 // Built from CurveGroupTupleHomomorphism (com_y, V) and SumHomomorphism (y_sum) via TupleHomomorphism.
 
 use crate::{
@@ -10,22 +10,26 @@ use crate::{
     sigma_protocol::{
         self,
         homomorphism::{
-            self, fixed_base_msms, tuple::CurveGroupTupleHomomorphism, Trait as HomTrait,
-            TrivialShape as CodomainShape,
+            self, fixed_base_msms, fixed_base_msms::Trait, tuple::CurveGroupTupleHomomorphism,
+            Trait as HomTrait, TrivialShape as CodomainShape,
         },
         Trait as SigmaTrait, Witness,
     },
     Scalar,
 };
-use aptos_crypto::arkworks::random::sample_field_element;
+use aptos_crypto::arkworks::{
+    msm::MsmInput,
+    random::{sample_field_element, sample_field_elements},
+};
 use ark_ec::{pairing::Pairing, CurveGroup, VariableBaseMSM};
 use ark_ff::{PrimeField, Zero};
 use ark_serialize::{CanonicalDeserialize, CanonicalSerialize};
+use homomorphism::tuple::TupleHomomorphism;
 use rand_core::{CryptoRng, RngCore};
-use std::fmt::Debug;
+use std::{fmt::Debug, marker::PhantomData};
 
 /// Witness for the Shplonked opening sigma protocol: (rho, evals, u) such that
-/// com_y = xi_1*rho + MSM(taus_1, evals), V = taus_1[0]*sum(alpha_i*evals_i) + xi_1*u, y_sum = sum(evals).
+/// com_y = xi_1*rho + MSM(taus_1, evals), V = taus_1[0]*sum(alphas_i*evals_i) + xi_1*u, y_sum = sum(evals).
 #[derive(Clone, Debug, PartialEq, Eq, CanonicalSerialize, CanonicalDeserialize)]
 pub struct ShplonkedSigmaWitness<F: PrimeField> {
     pub rho: F,
@@ -51,9 +55,7 @@ impl<F: PrimeField> Witness<F> for ShplonkedSigmaWitness<F> {
     fn rand<R: RngCore + CryptoRng>(&self, rng: &mut R) -> Self {
         Self {
             rho: sample_field_element(rng),
-            evals: (0..self.evals.len())
-                .map(|_| sample_field_element(rng))
-                .collect(),
+            evals: sample_field_elements(self.evals.len(), rng),
             u: sample_field_element(rng),
         }
     }
@@ -86,21 +88,22 @@ pub fn com_y_hom<'a, E: Pairing>(srs: &'a Srs<E>) -> ComYHom<'a, E> {
     }
 }
 
-/// Homomorphism for V: (rho, evals, u) -> tau_0*sum(alpha_i*evals_i) + xi_1*u.
-/// Parameterized by public weights alpha (derived from transcript). Owns bases for serialization.
+/// Homomorphism for V: (rho, evals, u) -> sum(alphas_i*evals_i) * tau_0 + u * xi_1.
+/// Parameterized by public weights alphas (derived from transcript and challenge points).
+/// Owns bases for serialization.
 #[derive(Clone, Debug, PartialEq, Eq, CanonicalSerialize, CanonicalDeserialize)]
 pub struct VHom<E: Pairing> {
     pub tau_0: E::G1Affine,
     pub xi_1: E::G1Affine,
-    pub alpha: Vec<E::ScalarField>,
+    pub alphas: Vec<E::ScalarField>,
 }
 
 impl<E: Pairing> VHom<E> {
-    pub fn from_srs(srs: &Srs<E>, alpha: Vec<E::ScalarField>) -> Self {
+    pub fn from_srs(srs: &Srs<E>, alphas: Vec<E::ScalarField>) -> Self {
         Self {
             tau_0: srs.taus_1[0],
             xi_1: srs.xi_1,
-            alpha,
+            alphas,
         }
     }
 }
@@ -111,13 +114,8 @@ impl<E: Pairing> HomTrait for VHom<E> {
     type Domain = ShplonkedSigmaWitness<E::ScalarField>;
 
     fn apply(&self, w: &Self::Domain) -> Self::Codomain {
-        let sum_y = w
-            .evals
-            .iter()
-            .zip(self.alpha.iter())
-            .map(|(y, a)| *a * y)
-            .fold(E::ScalarField::zero(), |a, b| a + b);
-        let out = self.tau_0 * sum_y + self.xi_1 * w.u;
+        let input = self.msm_terms(w).0;
+        let out = Self::msm_eval(input);
         CodomainShape(out)
     }
 
@@ -138,22 +136,25 @@ impl<E: Pairing> fixed_base_msms::Trait for VHom<E> {
     fn msm_terms(
         &self,
         w: &Self::Domain,
-    ) -> Self::CodomainShape<aptos_crypto::arkworks::msm::MsmInput<Self::Base, Self::Scalar>> {
+    ) -> Self::CodomainShape<MsmInput<Self::Base, Self::Scalar>> {
+        debug_assert_eq!(
+            w.evals.len(),
+            self.alphas.len(),
+            "evals and alphas must have the same length"
+        );
         let sum_y = w
             .evals
             .iter()
-            .zip(self.alpha.iter())
-            .map(|(y, a)| *a * y)
-            .fold(E::ScalarField::zero(), |a, b| a + b);
+            .zip(self.alphas.iter())
+            .map(|(y_i, alpha_i)| *alpha_i * y_i)
+            .fold(E::ScalarField::zero(), |acc, x| acc + x);
         let bases = vec![self.tau_0, self.xi_1];
         let scalars = vec![sum_y, w.u];
-        CodomainShape(aptos_crypto::arkworks::msm::MsmInput::new(bases, scalars).expect("VHom MSM"))
+        CodomainShape(MsmInput::new(bases, scalars).expect("VHom MSM"))
     }
 
-    fn msm_eval(
-        input: aptos_crypto::arkworks::msm::MsmInput<Self::Base, Self::Scalar>,
-    ) -> Self::MsmOutput {
-        E::G1::msm(input.bases(), input.scalars()).expect("VHom msm_eval")
+    fn msm_eval(input: MsmInput<Self::Base, Self::Scalar>) -> Self::MsmOutput {
+        E::G1::msm(input.bases(), input.scalars()).expect("VHom msm_eval") // TODO: not sure we should be doing this because size-2 MSMs in arkworks might not be faster than elementwise multiplication
     }
 
     fn batch_normalize(msm_output: Vec<Self::MsmOutput>) -> Vec<Self::Base> {
@@ -174,7 +175,7 @@ pub type ComYVHom<'a, E> = CurveGroupTupleHomomorphism<<E as Pairing>::G1, ComYH
 
 /// Homomorphism for y_sum: (rho, evals, u) -> sum(evals). Used as third component with TupleHomomorphism.
 #[derive(Clone, Debug, Default, PartialEq, Eq, CanonicalSerialize)]
-pub struct SumEvalsHom<F: PrimeField>(std::marker::PhantomData<F>);
+pub struct SumEvalsHom<F: PrimeField>(PhantomData<F>);
 
 impl<F: PrimeField> HomTrait for SumEvalsHom<F> {
     type Codomain = F;
@@ -215,7 +216,5 @@ impl<F: PrimeField> SigmaTrait for SumEvalsHom<F> {
 }
 
 /// Full sigma homomorphism: ((com_y, V), y_sum).
-pub type ShplonkedSigmaHom<'a, E> = homomorphism::tuple::TupleHomomorphism<
-    ComYVHom<'a, E>,
-    SumEvalsHom<<E as Pairing>::ScalarField>,
->;
+pub type ShplonkedSigmaHom<'a, E> =
+    TupleHomomorphism<ComYVHom<'a, E>, SumEvalsHom<<E as Pairing>::ScalarField>>;

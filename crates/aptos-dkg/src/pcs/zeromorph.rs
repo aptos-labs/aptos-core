@@ -653,6 +653,7 @@ where
         trs: &mut merlin::Transcript,
     ) -> Self::Proof {
         let rs = rs.expect("rs must be present");
+        debug_assert_eq!(rs.len(), polys.len(), "rs must have same length as polys");
 
         let gamma = trs.challenge_scalar();
         let gammas = powers(gamma, polys.len());
@@ -701,15 +702,6 @@ where
 
     fn scheme_name() -> &'static [u8] {
         b"Zeromorph"
-    }
-
-    fn default_num_point_dims_for_tests() -> u32 {
-        4
-    }
-
-    /// Multilinear: degree 1 per variable → `[1; n]` gives 2^n coefficients.
-    fn degree_bounds_for_test_point_dims(num_point_dims: u32) -> Vec<usize> {
-        vec![1; num_point_dims as usize]
     }
 }
 

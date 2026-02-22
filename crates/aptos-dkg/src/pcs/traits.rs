@@ -87,40 +87,28 @@ pub trait PolynomialCommitmentScheme {
     fn transcript_dst_for_batch_open() -> &'static [u8] {
         b"pcs_batch_open_test"
     }
-
-    /// Default number of point dimensions for generic tests (e.g. variables for multilinear, or 1 for univariate).
-    fn default_num_point_dims_for_tests() -> u32 {
-        1
-    }
-
-    /// Degree bounds for setup, given the number of point dimensions used in tests.
-    /// Must be consistent with `default_num_point_dims_for_tests()` so that polynomial size matches.
-    /// E.g. Zeromorph: `vec![1; num_point_dims]` (multilinear → 2^n coeffs); Shplonked: `vec![(1 << num_point_dims) - 1]` for univariate degree.
-    fn degree_bounds_for_test_point_dims(num_point_dims: u32) -> Vec<usize> {
-        vec![(1_usize << num_point_dims).saturating_sub(1)]
-    }
 }
 
 /// Generate a random polynomial from a set of size `len` consisting of values of bit-length `ell`.
 ///
 /// - `len` controls the number of values used to generate the polynomial.
-/// - `ell` controls the bit-length of each value (should be at most 64).
+/// - `ell`: if `Some(ell)`, each value is masked to `ell` bits (should be at most 64); if `None`, each coefficient is a full random element in the witness field via `random_witness`.
 pub fn random_poly<PCS: PolynomialCommitmentScheme, R: RngCore + CryptoRng>(
     rng: &mut R,
     len: u32, // limited to u32 only because higher wouldn't be too slow for most commitment schemes
-    ell: u8,
+    ell: Option<u8>,
 ) -> PCS::Polynomial {
-    // Sample `len` field elements, each constructed from an `ell`-bit integer
-    let ell_bit_values: Vec<PCS::WitnessField> = (0..len)
-        .map(|_| {
-            // Mask to `ell` bits by shifting away higher bits
-            let val = rng.next_u64() >> (64 - ell);
-            PCS::WitnessField::from(val)
+    let coeffs: Vec<PCS::WitnessField> = (0..len)
+        .map(|_| match ell {
+            None => PCS::random_witness(rng),
+            Some(ell_bits) => {
+                let val = rng.next_u64() >> (64 - ell_bits);
+                PCS::WitnessField::from(val)
+            },
         })
         .collect();
 
-    // Convert the value vector into a polynomial representation
-    PCS::polynomial_from_vec(ell_bit_values)
+    PCS::polynomial_from_vec(coeffs)
 }
 
 /// Generate a random evaluation point in FF^n.

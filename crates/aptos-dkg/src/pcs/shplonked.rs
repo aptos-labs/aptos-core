@@ -3,8 +3,7 @@
 
 // ZK-PCS (Shplonked) opening proof types and routines, extracted for use by range proofs.
 
-/// Domain separation tag for the Shplonked opening sigma protocol (Fiat–Shamir context).
-pub const SHPLONKED_SIGMA_DST: &[u8; 17] = b"ShplonkedSigmaDst";
+// WARNING: THIS CODE HAS NOT BEEN PROPERLY VETTED, ONLY USE FOR BENCHMARKING PURPOSES!!!!!
 
 use crate::{
     fiat_shamir::PolynomialCommitmentScheme as _,
@@ -36,6 +35,9 @@ use ark_poly::{
 };
 use ark_serialize::{CanonicalDeserialize, CanonicalSerialize};
 use rand::{CryptoRng, RngCore};
+
+/// Domain separation tag for the Shplonked opening sigma protocol (Fiat–Shamir context).
+pub const SHPLONKED_SIGMA_DST: &[u8; 19] = b"Shplonked_Sigma_Dst";
 
 #[derive(CanonicalSerialize, CanonicalDeserialize, Clone, Debug, PartialEq, Eq)]
 pub struct Srs<E: Pairing> {
@@ -483,7 +485,7 @@ pub fn zk_pcs_verify<E: Pairing, R: RngCore + CryptoRng>(
         &public_statement,
         &sigma_protocol_proof,
         SHPLONKED_SIGMA_DST,
-        Some((2, 1)), // ((com_y, V), y_sum): 2 components in first tuple, 1 in second
+        Some((2, 0)), // ((com_y, V), y_sum): 2 components in first tuple, 0 MSMs in second
         rng,
     )
 }
@@ -681,15 +683,6 @@ where
 
     fn scheme_name() -> &'static [u8] {
         b"Shplonked"
-    }
-
-    fn default_num_point_dims_for_tests() -> u32 {
-        1
-    }
-
-    /// Univariate degree bound 15 (16 coefficients) for tests.
-    fn degree_bounds_for_test_point_dims(_num_point_dims: u32) -> Vec<usize> {
-        vec![15]
     }
 }
 

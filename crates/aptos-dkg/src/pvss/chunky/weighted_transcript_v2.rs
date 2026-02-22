@@ -62,7 +62,7 @@ use serde::{Deserialize, Serialize};
 /// transcript operations within the protocol are uniquely namespaced
 pub const DST: &[u8; 42] = b"APTOS_WEIGHTED_CHUNKY_FIELD_PVSS_v2_FS_DST";
 
-/// Single-dealer weighted chunky PVSS transcript (v2).
+/// Weighted chunky PVSS transcript, does not use pairings in the verifier (only indirectly in the range proof).
 #[allow(non_snake_case)]
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
 pub struct Transcript<E: Pairing> {

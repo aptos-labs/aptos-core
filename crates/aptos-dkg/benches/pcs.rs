@@ -46,7 +46,7 @@ fn benchmark_commitment_scheme<PCS: PolynomialCommitmentScheme>(c: &mut Criterio
         // Measures the cost of committing to a polynomial
         group.bench_with_input(BenchmarkId::new("commit", len), &len, |b, &_len| {
             b.iter_batched(
-                || random_poly::<PCS, _>(&mut rng, len, 32),
+                || random_poly::<PCS, _>(&mut rng, len, Some(32)),
                 |poly| {
                     PCS::commit(&ck, poly, None);
                 },
@@ -61,7 +61,7 @@ fn benchmark_commitment_scheme<PCS: PolynomialCommitmentScheme>(c: &mut Criterio
         group.bench_with_input(BenchmarkId::new("open", len), &len, |b, &_len| {
             b.iter_batched(
                 || {
-                    let poly = random_poly::<PCS, _>(&mut rng, len, 32);
+                    let poly = random_poly::<PCS, _>(&mut rng, len, Some(32));
                     let challenge = random_point::<PCS, _>(&mut rng, num_vars);
                     let mut rng = rand::thread_rng();
                     let r = PCS::random_witness(&mut rng);
@@ -81,7 +81,7 @@ fn benchmark_commitment_scheme<PCS: PolynomialCommitmentScheme>(c: &mut Criterio
         group.bench_with_input(BenchmarkId::new("verify", len), &len, |b, &_len| {
             b.iter_batched(
                 || {
-                    let poly = random_poly::<PCS, _>(&mut rng, len, 32);
+                    let poly = random_poly::<PCS, _>(&mut rng, len, Some(32));
                     let challenge = random_point::<PCS, _>(&mut rng, num_vars);
                     let val = PCS::evaluate_point(&poly, &challenge);
                     let com = PCS::commit(&ck, poly.clone(), None);
