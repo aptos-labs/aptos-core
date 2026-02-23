@@ -160,10 +160,8 @@ impl<S: TShare, D: TAugmentedData> RandManager<S, D> {
                         // If the block doesn't need randomness, send Skip to unblock it
                         // before the share threshold is reached.
                         if !has_rand {
-                            let _ = decision_tx.unbounded_send(AggregationResult::Skip {
-                                round,
-                                path_type: PathType::Slow,
-                            });
+                            let _ = decision_tx
+                                .unbounded_send(AggregationResult::Skip { round });
                         }
                         has_rand
                     }
@@ -520,6 +518,13 @@ impl<S: TShare, D: TAugmentedData> RandManager<S, D> {
             }
             let maybe_ready_blocks = self.block_queue.dequeue_rand_ready_prefix();
             if !maybe_ready_blocks.is_empty() {
+                let mut rand_store = self.rand_store.lock();
+                for blocks in &maybe_ready_blocks {
+                    for block in &blocks.ordered_blocks {
+                        rand_store.remove_rand_check_future(block.round());
+                    }
+                }
+                drop(rand_store);
                 self.process_ready_blocks(maybe_ready_blocks);
             }
         }

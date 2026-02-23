@@ -24,10 +24,7 @@ pub enum AggregationResult {
         path_type: PathType,
     },
     /// The pipeline determined this block has no randomness transactions.
-    Skip {
-        round: Round,
-        path_type: PathType,
-    },
+    Skip { round: Round },
 }
 
 /// A cloneable future that resolves to whether a block needs randomness.
@@ -123,7 +120,6 @@ impl<S: TShare> ShareAggregator<S> {
                 if !rx.await {
                     let _ = result_tx.unbounded_send(AggregationResult::Skip {
                         round: rand_metadata.metadata.round,
-                        path_type,
                     });
                     return;
                 }
@@ -407,6 +403,10 @@ impl<S: TShare> RandStore<S> {
     /// Aggregation tasks will await this future before proceeding.
     pub fn set_rand_check_future(&mut self, round: Round, future: RandCheckFuture) {
         self.rand_check_futures.insert(round, future);
+    }
+
+    pub fn remove_rand_check_future(&mut self, round: Round) {
+        self.rand_check_futures.remove(&round);
     }
 
     /// This should only be called after the block is added, returns None if already decided
