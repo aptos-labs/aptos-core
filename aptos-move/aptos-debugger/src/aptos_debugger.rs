@@ -4,6 +4,7 @@
 use anyhow::{bail, format_err};
 use aptos_block_executor::txn_provider::{default::DefaultTxnProvider, TxnProvider};
 use aptos_gas_profiling::{GasProfiler, TransactionGasLog};
+use aptos_move_cli::{DynStateView, MoveDebugger};
 use aptos_rest_client::Client;
 use aptos_types::{
     account_address::AccountAddress,
@@ -29,6 +30,7 @@ use aptos_vm::{
 use aptos_vm_environment::environment::AptosEnvironment;
 use aptos_vm_logging::log_schema::AdapterLogSchema;
 use aptos_vm_types::{module_and_script_storage::AsAptosCodeStorage, output::VMOutput};
+use async_trait::async_trait;
 use itertools::Itertools;
 use std::{path::Path, sync::Arc, time::Instant};
 
@@ -465,6 +467,29 @@ fn print_transaction_stats(sig_verified_txns: &[SignatureVerifiedTransaction], v
         version,
         entry_functions
     );
+}
+
+#[async_trait]
+impl MoveDebugger for AptosDebugger {
+    fn state_view_at_version(&self, version: u64) -> DynStateView {
+        DynStateView::new(Box::new(self.state_view_at_version(version)))
+    }
+
+    fn execute_transaction_at_version_with_gas_profiler(
+        &self,
+        version: u64,
+        txn: SignedTransaction,
+        auxiliary_info: AuxiliaryInfo,
+    ) -> anyhow::Result<(VMStatus, VMOutput, TransactionGasLog)> {
+        self.execute_transaction_at_version_with_gas_profiler(version, txn, auxiliary_info)
+    }
+
+    async fn get_committed_transaction_at_version(
+        &self,
+        version: u64,
+    ) -> anyhow::Result<(Transaction, TransactionInfo, PersistedAuxiliaryInfo)> {
+        self.get_committed_transaction_at_version(version).await
+    }
 }
 
 fn is_reconfiguration(vm_output: &TransactionOutput) -> bool {

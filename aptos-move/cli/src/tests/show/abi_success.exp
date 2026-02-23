@@ -1,0 +1,22 @@
+BUILDING entry_mod
+{
+  "Result": [
+    {
+      "EntryFunction": {
+        "name": "do_something",
+        "module_name": {
+          "address": "000000000000000000000000000000000000000000000000000000000000cafe",
+          "name": "entry_mod"
+        },
+        "doc": "",
+        "ty_args": [],
+        "args": [
+          {
+            "name": "_x",
+            "type_tag": "u64"
+          }
+        ]
+      }
+    }
+  ]
+}

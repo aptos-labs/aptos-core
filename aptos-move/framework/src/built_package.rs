@@ -19,7 +19,7 @@ use aptos_types::{
 use clap::Parser;
 use codespan_reporting::{
     diagnostic::Severity,
-    term::termcolor::{Color, ColorChoice, ColorSpec, StandardStream, WriteColor},
+    term::termcolor::{Color, ColorSpec, WriteColor},
 };
 use itertools::Itertools;
 use legacy_move_compiler::{
@@ -29,13 +29,16 @@ use legacy_move_compiler::{
 use move_binary_format::{file_format_common, file_format_common::VERSION_DEFAULT, CompiledModule};
 use move_command_line_common::files::MOVE_COMPILED_EXTENSION;
 use move_compiler_v2::{external_checks::ExternalChecks, options::Options, Experiment};
-use move_core_types::{language_storage::ModuleId, metadata::Metadata};
+use move_core_types::{diag_writer::DiagWriter, language_storage::ModuleId, metadata::Metadata};
 use move_model::{
     metadata::{CompilerVersion, LanguageVersion},
     model::GlobalEnv,
 };
 use move_package::{
-    compilation::{compiled_package::CompiledPackage, package_layout::CompiledPackageLayout},
+    compilation::{
+        compiled_package::{make_no_exit_v2_driver_to, CompiledPackage},
+        package_layout::CompiledPackageLayout,
+    },
     resolution::resolution_graph::ResolvedGraph,
     source_package::{
         manifest_parser::{parse_move_manifest_string, parse_source_manifest},
@@ -46,7 +49,7 @@ use move_package::{
 use serde::{Deserialize, Serialize};
 use std::{
     collections::{BTreeMap, BTreeSet},
-    io::{stderr, Write},
+    io::Write,
     path::{Path, PathBuf},
     sync::Arc,
 };
@@ -233,19 +236,35 @@ pub fn build_model(
 impl BuiltPackage {
     /// Builds the package and on success delivers a `BuiltPackage`.
     ///
-    /// This function currently reports all Move compilation errors and warnings to stdout,
+    /// This function currently reports all Move compilation errors and warnings to stderr,
     /// and is not `Ok` if there was an error among those.
     pub fn build(package_path: PathBuf, options: BuildOptions) -> anyhow::Result<Self> {
-        let build_config = Self::create_build_config(&options)?;
-        let resolved_graph = Self::prepare_resolution_graph(package_path, build_config.clone())?;
-        BuiltPackage::build_with_external_checks(resolved_graph, options, build_config, vec![])
+        Self::build_to(&DiagWriter::stderr(), package_path, options)
     }
 
-    pub fn create_build_config(options: &BuildOptions) -> anyhow::Result<BuildConfig> {
+    /// Like [`build`](Self::build) but writes all compiler output to the given shared writer.
+    pub fn build_to(
+        writer: &DiagWriter,
+        package_path: PathBuf,
+        options: BuildOptions,
+    ) -> anyhow::Result<Self> {
+        let build_config = Self::create_build_config(&mut writer.clone(), &options)?;
+        let resolved_graph = Self::prepare_resolution_graph(
+            &mut writer.clone(),
+            package_path,
+            build_config.clone(),
+        )?;
+        Self::build_with_external_checks_to(writer, resolved_graph, options, build_config, vec![])
+    }
+
+    pub fn create_build_config(
+        writer: &mut DiagWriter,
+        options: &BuildOptions,
+    ) -> anyhow::Result<BuildConfig> {
         let bytecode_version = Some(options.inferred_bytecode_version());
         let compiler_version = options.compiler_version;
         let language_version = options.language_version;
-        Self::check_versions(&compiler_version, &language_version)?;
+        Self::check_versions(writer, &compiler_version, &language_version)?;
         let skip_attribute_checks = options.skip_attribute_checks;
         Ok(BuildConfig {
             dev_mode: options.dev,
@@ -273,11 +292,15 @@ impl BuiltPackage {
     }
 
     pub fn prepare_resolution_graph(
+        writer: &mut DiagWriter,
         package_path: PathBuf,
         build_config: BuildConfig,
     ) -> anyhow::Result<ResolvedGraph> {
-        eprintln!("Compiling, may take a little while to download git dependencies...");
-        build_config.resolution_graph_for_package(&package_path, &mut stderr())
+        writeln!(
+            writer,
+            "Compiling, may take a little while to download git dependencies..."
+        )?;
+        build_config.resolution_graph_for_package(&package_path, writer)
     }
 
     /// Same as `build` but allows to provide external checks to be made on Move code.
@@ -288,14 +311,35 @@ impl BuiltPackage {
         build_config: BuildConfig,
         external_checks: Vec<Arc<dyn ExternalChecks>>,
     ) -> anyhow::Result<Self> {
+        Self::build_with_external_checks_to(
+            &DiagWriter::stderr(),
+            resolved_graph,
+            options,
+            build_config,
+            external_checks,
+        )
+    }
+
+    /// Like [`build_with_external_checks`](Self::build_with_external_checks) but writes
+    /// compiler output to the given shared writer.
+    pub fn build_with_external_checks_to(
+        writer: &DiagWriter,
+        resolved_graph: ResolvedGraph,
+        options: BuildOptions,
+        build_config: BuildConfig,
+        external_checks: Vec<Arc<dyn ExternalChecks>>,
+    ) -> anyhow::Result<Self> {
         {
             let package_path = resolved_graph.root_package_path.clone();
             let bytecode_version = build_config.compiler_config.bytecode_version;
 
-            let (mut package, model_opt) = build_config.compile_package_no_exit(
+            let mut driver_writer = writer.clone();
+            let driver = make_no_exit_v2_driver_to(&mut driver_writer);
+            let (mut package, model_opt) = build_config.compile_package_no_exit_with_driver(
                 resolved_graph,
                 external_checks,
-                &mut stderr(),
+                &mut writer.clone(),
+                driver,
             )?;
 
             // Run extended checks as well derive runtime metadata
@@ -303,7 +347,14 @@ impl BuiltPackage {
 
             if let Some(model_options) = model.get_extension::<Options>() {
                 if model_options.experiment_on(Experiment::STOP_BEFORE_EXTENDED_CHECKS) {
-                    std::process::exit(if model.has_warnings() { 1 } else { 0 })
+                    if model.has_warnings() {
+                        bail!("exiting with warnings")
+                    }
+                    return Ok(BuiltPackage {
+                        options,
+                        package_path,
+                        package,
+                    });
                 }
             }
 
@@ -315,8 +366,7 @@ impl BuiltPackage {
                         model_options.experiment_on(Experiment::SKIP_BAILOUT_ON_EXTENDED_CHECKS)
                     })
             {
-                let mut error_writer = StandardStream::stderr(ColorChoice::Auto);
-                model.report_diag(&mut error_writer, Severity::Warning);
+                model.report_diag(&mut writer.clone(), Severity::Warning);
                 if model.has_errors() {
                     bail!("extended checks failed")
                 }
@@ -327,7 +377,14 @@ impl BuiltPackage {
                 if model_options.experiment_on(Experiment::FAIL_ON_WARNING) && has_target_warnings {
                     bail!("found warning(s), and `--fail-on-warning` is set")
                 } else if model_options.experiment_on(Experiment::STOP_AFTER_EXTENDED_CHECKS) {
-                    std::process::exit(if has_target_warnings { 1 } else { 0 })
+                    if has_target_warnings {
+                        bail!("exiting due to context checking diagnostics")
+                    }
+                    return Ok(BuiltPackage {
+                        options,
+                        package_path,
+                        package,
+                    });
                 }
             }
 
@@ -377,31 +434,31 @@ impl BuiltPackage {
 
     // Check versions and warn user if using unstable ones.
     fn check_versions(
+        writer: &mut DiagWriter,
         compiler_version: &Option<CompilerVersion>,
         language_version: &Option<LanguageVersion>,
     ) -> anyhow::Result<()> {
         let effective_compiler_version = compiler_version.unwrap_or_default();
         let effective_language_version = language_version.unwrap_or_default();
-        let mut error_writer = StandardStream::stderr(ColorChoice::Auto);
         if effective_compiler_version.unstable() {
-            error_writer.set_color(ColorSpec::new().set_fg(Some(Color::Yellow)))?;
+            writer.set_color(ColorSpec::new().set_fg(Some(Color::Yellow)))?;
             writeln!(
-                &mut error_writer,
+                writer,
                 "Warning: compiler version `{}` is experimental \
                 and should not be used in production",
                 effective_compiler_version
             )?;
-            error_writer.reset()?;
+            writer.reset()?;
         }
         if effective_language_version.unstable() {
-            error_writer.set_color(ColorSpec::new().set_fg(Some(Color::Yellow)))?;
+            writer.set_color(ColorSpec::new().set_fg(Some(Color::Yellow)))?;
             writeln!(
-                &mut error_writer,
+                writer,
                 "Warning: language version `{}` is experimental \
                 and should not be used in production",
                 effective_language_version
             )?;
-            error_writer.reset()?;
+            writer.reset()?;
         }
         effective_compiler_version.check_language_support(effective_language_version)?;
         Ok(())

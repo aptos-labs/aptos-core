@@ -1,10 +1,8 @@
 // Copyright (c) Aptos Foundation
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
-use crate::{
-    move_tool::{ArgWithType, FunctionArgType},
-    CliResult, Tool,
-};
+use crate::{CliResult, Tool};
+use aptos_move_cli::{ArgWithType, FunctionArgType};
 use clap::Parser;
 use std::str::FromStr;
 
@@ -114,9 +112,9 @@ async fn ensure_every_command_args_work() {
 #[tokio::test]
 async fn ensure_can_parse_args_with_urls() {
     let result = ArgWithType::from_str("string:https://aptoslabs.com").unwrap();
-    matches!(result._ty, FunctionArgType::String);
+    matches!(result.ty(), FunctionArgType::String);
     assert_eq!(
-        result.arg,
+        result.arg(),
         bcs::to_bytes(&"https://aptoslabs.com".to_string()).unwrap()
     );
 }
