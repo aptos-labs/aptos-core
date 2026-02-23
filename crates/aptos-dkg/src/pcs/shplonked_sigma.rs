@@ -76,11 +76,12 @@ pub type ComYHom<'a, E> = homomorphism::LiftHomomorphism<
     ShplonkedSigmaWitness<<E as Pairing>::ScalarField>,
 >;
 
-/// Builds the com_y homomorphism (lifted commitment) for the given SRS.
-pub fn com_y_hom<'a, E: Pairing>(srs: &'a Srs<E>) -> ComYHom<'a, E> {
+/// Builds the com_y homomorphism (lifted commitment) using only the first `taus_1.len()` bases.
+/// Pass a slice of length equal to evals (e.g. `&srs.taus_1[..evals.len()]`) to avoid binding the full SRS.
+pub fn com_y_hom<'a, E: Pairing>(taus_1: &'a [E::G1Affine], xi_1: E::G1Affine) -> ComYHom<'a, E> {
     let inner = univariate_hiding_kzg::CommitmentHomomorphism::<E> {
-        msm_basis: &srs.taus_1,
-        xi_1: srs.xi_1,
+        msm_basis: taus_1,
+        xi_1,
     };
     homomorphism::LiftHomomorphism {
         hom: inner,
@@ -99,10 +100,17 @@ pub struct VHom<E: Pairing> {
 }
 
 impl<E: Pairing> VHom<E> {
+    /// Build from SRS (uses only `taus_1[0]` and `xi_1`).
+    #[allow(dead_code)]
     pub fn from_srs(srs: &Srs<E>, alphas: Vec<E::ScalarField>) -> Self {
+        Self::new(srs.taus_1[0], srs.xi_1, alphas)
+    }
+
+    /// Build from the minimal bases needed: tau_0 and xi_1 (avoids passing the full SRS).
+    pub fn new(tau_0: E::G1Affine, xi_1: E::G1Affine, alphas: Vec<E::ScalarField>) -> Self {
         Self {
-            tau_0: srs.taus_1[0],
-            xi_1: srs.xi_1,
+            tau_0,
+            xi_1,
             alphas,
         }
     }

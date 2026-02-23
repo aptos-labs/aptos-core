@@ -308,8 +308,9 @@ where
         u,
     };
     let alpha = compute_alpha::<E>(&eval_points, z, gamma);
-    let com_y_hom = shplonked_sigma::com_y_hom(srs);
-    let v_hom = shplonked_sigma::VHom::from_srs(srs, alpha);
+    let n = evals.len();
+    let com_y_hom = shplonked_sigma::com_y_hom(&srs.taus_1[..n], srs.xi_1);
+    let v_hom = shplonked_sigma::VHom::new(srs.taus_1[0], srs.xi_1, alpha);
     let com_y_v_hom = shplonked_sigma::ComYVHom::<E> {
         hom1: com_y_hom,
         hom2: v_hom,
@@ -479,8 +480,9 @@ where
     #[cfg(feature = "pcs_verify_timing")]
     let start = Instant::now();
     let alpha = compute_alpha::<E>(&eval_points, z, gamma);
-    let com_y_hom = shplonked_sigma::com_y_hom(srs);
-    let v_hom = shplonked_sigma::VHom::from_srs(srs, alpha);
+    let n = eval_points.len();
+    let com_y_hom = shplonked_sigma::com_y_hom(&srs.taus_1[..n], srs.xi_1);
+    let v_hom = shplonked_sigma::VHom::new(srs.taus_1[0], srs.xi_1, alpha);
     let com_y_v_hom = shplonked_sigma::ComYVHom::<E> {
         hom1: com_y_hom,
         hom2: v_hom,
