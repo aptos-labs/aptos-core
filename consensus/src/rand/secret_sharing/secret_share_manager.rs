@@ -52,6 +52,7 @@ pub struct SecretShareManager {
     config: SecretShareConfig,
     reliable_broadcast: Arc<ReliableBroadcast<SecretShareMessage, ExponentialBackoff>>,
     network_sender: Arc<NetworkSender>,
+    secret_share_request_delay_ms: u64,
 
     // local channel received from dec_store
     decision_rx: Receiver<SecretSharedKey>,
@@ -100,6 +101,7 @@ impl SecretShareManager {
             config,
             reliable_broadcast,
             network_sender,
+            secret_share_request_delay_ms: rb_config.secret_share_request_delay_ms,
 
             decision_rx,
             outgoing_blocks,
@@ -246,9 +248,9 @@ impl SecretShareManager {
         ));
         let epoch_state = self.epoch_state.clone();
         let secret_share_store = self.secret_share_store.clone();
+        let request_delay_ms = self.secret_share_request_delay_ms;
         let task = async move {
-            // TODO(ibalajiarun): Make this configurable
-            tokio::time::sleep(Duration::from_millis(300)).await;
+            tokio::time::sleep(Duration::from_millis(request_delay_ms)).await;
             let maybe_existing_shares = secret_share_store.lock().get_all_shares_authors(&metadata);
             if let Some(existing_shares) = maybe_existing_shares {
                 let epoch = epoch_state.epoch;

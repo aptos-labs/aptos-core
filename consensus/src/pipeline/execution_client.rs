@@ -296,7 +296,7 @@ impl ExecutionProxyClient {
             secret_ready_block_tx,
             network_sender.clone(),
             self.bounded_executor.clone(),
-            &self.consensus_config.rand_rb_config,
+            &self.consensus_config.ss_rb_config,
         );
 
         tokio::spawn(secret_share_manager.start(
