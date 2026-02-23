@@ -131,21 +131,23 @@ impl SecretShareManager {
     }
 
     async fn process_incoming_block(&self, block: &PipelinedBlock) -> anyhow::Result<DropGuard> {
-        let futures = block.pipeline_futs().expect("pipeline must exist");
+        let futures = block
+            .pipeline_futs()
+            .ok_or_else(|| anyhow::anyhow!("pipeline futures not set for round {}", block.round()))?;
         let self_secret_share = futures
             .secret_sharing_derive_self_fut
             .await
             .map_err(|_| anyhow::anyhow!("derive self failed"))?
-            .expect("Must not be None");
+            .ok_or_else(|| {
+                anyhow::anyhow!("secret share derive returned None for round {}", block.round())
+            })?;
         let metadata = self_secret_share.metadata().clone();
 
         // Now acquire lock and update store
         {
             let mut secret_share_store = self.secret_share_store.lock();
             secret_share_store.update_highest_known_round(block.round());
-            secret_share_store
-                .add_self_share(self_secret_share.clone())
-                .expect("Add self dec share should succeed");
+            secret_share_store.add_self_share(self_secret_share.clone())?;
         }
 
         info!(LogSchema::new(LogEvent::BroadcastSecretShare)
@@ -262,9 +264,14 @@ impl SecretShareManager {
                     "[SecretShareManager] Start broadcasting share request for {}",
                     targets.len(),
                 );
-                rb.multicast(request, aggregate_state, targets)
-                    .await
-                    .expect("Broadcast cannot fail");
+                if let Err(e) = rb.multicast(request, aggregate_state, targets).await {
+                    warn!(
+                        epoch = epoch,
+                        round = metadata.round,
+                        "[SecretShareManager] Share request broadcast failed: {}", e,
+                    );
+                    return;
+                }
                 info!(
                     epoch = epoch,
                     round = metadata.round,
