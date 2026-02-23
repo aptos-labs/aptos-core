@@ -22,19 +22,22 @@ use aptos_crypto::arkworks::{
     msm::{merge_scaled_msm_terms, MsmInput},
     random::sample_field_element,
     srs::{SrsBasis, SrsType},
+    vanishing_poly,
     GroupGenerators,
 };
 use ark_ec::{
     pairing::{Pairing, PairingOutput},
     AffineRepr, CurveGroup, VariableBaseMSM,
 };
-use ark_ff::{Field, One, Zero};
+use ark_ff::{FftField, Field, One, Zero};
 use ark_poly::{
     univariate::{DenseOrSparsePolynomial as DOSPoly, DensePolynomial},
     DenseUVPolynomial, Polynomial,
 };
 use ark_serialize::{CanonicalDeserialize, CanonicalSerialize};
 use rand::{CryptoRng, RngCore};
+#[cfg(feature = "pcs_verify_timing")]
+use std::time::{Duration, Instant};
 
 /// Domain separation tag for the Shplonked opening sigma protocol (Fiat–Shamir context).
 pub const SHPLONKED_SIGMA_DST: &[u8; 19] = b"Shplonked_Sigma_Dst";
@@ -107,16 +110,11 @@ pub struct ZkPcsOpeningProof<E: Pairing> {
 
 /// Computes weights alpha_i = gamma^{i-1} * Z_{T\\x_i}(z) for the sigma protocol (eval_points, z, gamma).
 #[allow(non_snake_case)]
-fn compute_alpha<E: Pairing>(
-    eval_points: &[E::ScalarField],
-    z: E::ScalarField,
-    gamma: E::ScalarField,
-) -> Vec<E::ScalarField> {
-    let mut z_T = DensePolynomial::from_coefficients_vec(vec![E::ScalarField::ONE]);
-    for x in eval_points.iter() {
-        let factor = DensePolynomial::from_coefficients_vec(vec![-(*x), E::ScalarField::ONE]);
-        z_T = &z_T * &factor;
-    }
+fn compute_alpha<E: Pairing>(eval_points: &[E::ScalarField], z: E::ScalarField, gamma: E::ScalarField) -> Vec<E::ScalarField>
+where
+    E::ScalarField: FftField,
+{
+    let z_T = vanishing_poly::from_roots(eval_points);
     let z_T_dos = DOSPoly::from(z_T);
     let mut alphas = Vec::with_capacity(eval_points.len());
     let mut gamma_i = E::ScalarField::ONE;
@@ -146,7 +144,10 @@ pub fn zk_pcs_open<E: Pairing, R: RngCore + CryptoRng>(
     rs: Vec<E::ScalarField>,
     trs: &mut merlin::Transcript,
     rng: &mut R,
-) -> ZkPcsOpeningProof<E> {
+) -> ZkPcsOpeningProof<E>
+where
+    E::ScalarField: FftField,
+{
     // Step 1
     assert!(
         srs.taus_1.len() >= 2,
@@ -170,13 +171,8 @@ pub fn zk_pcs_open<E: Pairing, R: RngCore + CryptoRng>(
     // Step 2
     let gamma: E::ScalarField = trs.challenge_scalar();
 
-    // Step 3
-    // First construct Z_T TODO: optimise this
-    let mut z_T = DensePolynomial::from_coefficients_vec(vec![E::ScalarField::ONE]);
-    for x in eval_points.iter() {
-        let factor = DensePolynomial::from_coefficients_vec(vec![-(*x), E::ScalarField::ONE]);
-        z_T = &z_T * &factor;
-    }
+    // Step 3: Z_T = ∏ (X - x_i) via divide-and-conquer from_roots
+    let z_T = vanishing_poly::from_roots(&eval_points);
     let z_T_dos = DOSPoly::from(z_T.clone());
 
     let f_i_minus_y_is: Vec<DensePolynomial<_>> = f_is
@@ -378,7 +374,23 @@ pub fn zk_pcs_verify<E: Pairing, R: RngCore + CryptoRng>(
     srs: &Srs<E>,
     trs: &mut merlin::Transcript,
     rng: &mut R,
-) -> anyhow::Result<()> {
+) -> anyhow::Result<()>
+where
+    E::ScalarField: FftField,
+{
+    #[cfg(feature = "pcs_verify_timing")]
+    let mut cumulative = Duration::ZERO;
+    #[cfg(feature = "pcs_verify_timing")]
+    let mut print_cumulative = |name: &str, duration: Duration| {
+        cumulative += duration;
+        println!(
+            "  {:>10.2} ms  ({:>10.2} ms cum.)  [zk_pcs_verify] {}",
+            duration.as_secs_f64() * 1000.0,
+            cumulative.as_secs_f64() * 1000.0,
+            name
+        );
+    };
+
     let ZkPcsOpeningProof {
         eval_points,
         sigma_proof_statement,
@@ -391,22 +403,28 @@ pub fn zk_pcs_verify<E: Pairing, R: RngCore + CryptoRng>(
     let com_y = sigma_proof_statement.com_y;
     let V = sigma_proof_statement.V;
 
+    #[cfg(feature = "pcs_verify_timing")]
+    let start = Instant::now();
     trs.append_point(&com_y);
 
     let gamma: E::ScalarField = trs.challenge_scalar();
     trs.append_point(W);
     let z: E::ScalarField = trs.challenge_scalar();
     trs.append_point(W_prime);
+    #[cfg(feature = "pcs_verify_timing")]
+    print_cumulative("transcript (com_y, gamma, W, z, W_prime)", start.elapsed());
 
     let mut alphas = Vec::with_capacity(eval_points.len());
     let mut gamma_i = E::ScalarField::ONE;
 
-    let mut z_T = DensePolynomial::from_coefficients_vec(vec![E::ScalarField::ONE]);
-    for x in eval_points.iter() {
-        let factor = DensePolynomial::from_coefficients_vec(vec![-(*x), E::ScalarField::ONE]);
-        z_T = &z_T * &factor;
-    }
+    #[cfg(feature = "pcs_verify_timing")]
+    let start = Instant::now();
+    let z_T = vanishing_poly::from_roots(eval_points);
+    #[cfg(feature = "pcs_verify_timing")]
+    print_cumulative("build z_T polynomial", start.elapsed());
 
+    #[cfg(feature = "pcs_verify_timing")]
+    let start = Instant::now();
     for x_i in eval_points.iter() {
         let divisor = DOSPoly::from(DensePolynomial::from_coefficients_vec(vec![
             -*x_i,
@@ -419,13 +437,21 @@ pub fn zk_pcs_verify<E: Pairing, R: RngCore + CryptoRng>(
         alphas.push(gamma_i * z_t_i_val);
         gamma_i *= gamma;
     }
+    #[cfg(feature = "pcs_verify_timing")]
+    print_cumulative("build alphas (divide z_T, evaluate)", start.elapsed());
 
+    #[cfg(feature = "pcs_verify_timing")]
+    let start = Instant::now();
     let commitment_refs: Vec<&MsmInput<E::G1Affine, E::ScalarField>> =
         commitment_msms.iter().collect();
     let merged = merge_scaled_msm_terms::<E::G1>(&commitment_refs, &alphas);
     let sum_com = E::G1::msm(merged.bases(), merged.scalars())
         .expect("Shplonked verify: merged commitment MSM");
+    #[cfg(feature = "pcs_verify_timing")]
+    print_cumulative("merged commitment MSM", start.elapsed());
 
+    #[cfg(feature = "pcs_verify_timing")]
+    let start = Instant::now();
     let z_T_val = z_T.evaluate(&z);
 
     // Paper: F := Σ_i γ^{i-1}·Z_{T∖x_i}(z)·com_i − Z_T(z)·W − V
@@ -438,12 +464,20 @@ pub fn zk_pcs_verify<E: Pairing, R: RngCore + CryptoRng>(
         (-(*Y).into_group()).into_affine(),
     ];
     let g2_terms = vec![srs.g_2, srs.tau_2, srs.xi_2];
+    #[cfg(feature = "pcs_verify_timing")]
+    print_cumulative("z_T.evaluate + F + g1/g2_terms", start.elapsed());
 
+    #[cfg(feature = "pcs_verify_timing")]
+    let start = Instant::now();
     let result = E::multi_pairing(g1_terms, g2_terms);
+    #[cfg(feature = "pcs_verify_timing")]
+    print_cumulative("multi_pairing", start.elapsed());
     if PairingOutput::<E>::zero() != result {
         return Err(anyhow::anyhow!("Expected zero during multi-pairing check"));
     }
 
+    #[cfg(feature = "pcs_verify_timing")]
+    let start = Instant::now();
     let alpha = compute_alpha::<E>(&eval_points, z, gamma);
     let com_y_hom = shplonked_sigma::com_y_hom(srs);
     let v_hom = shplonked_sigma::VHom::from_srs(srs, alpha);
@@ -480,14 +514,21 @@ pub fn zk_pcs_verify<E: Pairing, R: RngCore + CryptoRng>(
             u: sigma_proof.z_u,
         },
     };
+    #[cfg(feature = "pcs_verify_timing")]
+    print_cumulative("compute_alpha + hom setup + proof packaging", start.elapsed());
 
-    full_hom.verify(
+    #[cfg(feature = "pcs_verify_timing")]
+    let start = Instant::now();
+    let result = full_hom.verify(
         &public_statement,
         &sigma_protocol_proof,
         SHPLONKED_SIGMA_DST,
         Some((2, 0)), // ((com_y, V), y_sum): 2 components in first tuple, 0 MSMs in second
         rng,
-    )
+    );
+    #[cfg(feature = "pcs_verify_timing")]
+    print_cumulative("full_hom.verify (sigma protocol)", start.elapsed());
+    result
 }
 
 // ---------------------------------------------------------------------------

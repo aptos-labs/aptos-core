@@ -34,6 +34,8 @@ use rand::{CryptoRng, RngCore};
 use std::fmt::Debug;
 use ark_poly::DenseMultilinearExtension;
 use std::iter::successors;
+#[cfg(feature = "range_proof_timing_multivariate")]
+use std::time::{Duration, Instant};
 
 #[allow(non_snake_case)]
 #[derive(CanonicalSerialize, CanonicalDeserialize, Clone, Debug, PartialEq, Eq)]
@@ -70,13 +72,15 @@ pub struct Proof<E: Pairing> {
     pub blinding_poly_proof: Option<two_term_msm::Proof<E::G1>>,
     pub asserted_sum: E::ScalarField,
     pub sumcheck_proof: Vec<ProverMsg<E::ScalarField>>,
-    pub g_opening_proof: ZkPcsOpeningProof<E>,
+    /// Single batched opening proof for f̂ and g_1..g_m (per spec Step 7: one uPCS.BatchVerify)
     pub zk_pcs_opening_proof: ZkPcsOpeningProof<E>,
     pub commitments: Vec<E::G1Affine>,
     pub g_commitments: Vec<E::G1Affine>,
     pub h_g: E::ScalarField,
     /// y_g = sum_i g_i(x_i), used in Step 5 check
     pub y_g: E::ScalarField,
+    /// Batched evaluation f̂(z) at the opening point z (so verifier can check y_sum == y_batched_at_z + y_g)
+    pub y_batched_at_z: E::ScalarField,
     pub evals: Vec<E::ScalarField>,
 }
 
@@ -175,6 +179,19 @@ impl<E: Pairing> traits::BatchedRangeProof<E> for Proof<E> {
         comm: &Self::Commitment,
         rng: &mut R,
     ) -> anyhow::Result<()> {
+        #[cfg(feature = "range_proof_timing_multivariate")]
+        let mut cumulative = Duration::ZERO;
+        #[cfg(feature = "range_proof_timing_multivariate")]
+        let mut print_cumulative = |name: &str, duration: Duration| {
+            cumulative += duration;
+            println!(
+                "{:>10.2} ms  ({:>10.2} ms cum.)  {}",
+                duration.as_secs_f64() * 1000.0,
+                cumulative.as_secs_f64() * 1000.0,
+                name
+            );
+        };
+
         // Number of variables for this instance (must match prover; can be less than vk max)
         let num_vars = (n + 1).next_power_of_two().ilog2() as usize;
         if num_vars > vk.poly_info.num_variables {
@@ -186,6 +203,8 @@ impl<E: Pairing> traits::BatchedRangeProof<E> for Proof<E> {
             );
         }
 
+        #[cfg(feature = "range_proof_timing_multivariate")]
+        let start = Instant::now();
         let mut trs = merlin::Transcript::new(b"dekart");
 
         // Replay transcript in same order as prover: C_beta (if any), C_fj, C_gi, H_g, then c, alpha, t
@@ -208,7 +227,11 @@ impl<E: Pairing> traits::BatchedRangeProof<E> for Proof<E> {
         let t: Vec<E::ScalarField> = (0..num_vars)
             .map(|_| trs.challenge_scalar::<E::ScalarField>())
             .collect();
+        #[cfg(feature = "range_proof_timing_multivariate")]
+        print_cumulative("transcript + challenges (c, alpha, t)", start.elapsed());
 
+        #[cfg(feature = "range_proof_timing_multivariate")]
+        let start = Instant::now();
         if let (Some(blinding_comm), Some(blinding_proof)) =
             (&self.blinding_poly_comm, &self.blinding_poly_proof)
         {
@@ -224,7 +247,11 @@ impl<E: Pairing> traits::BatchedRangeProof<E> for Proof<E> {
                 rng,
             )?;
         }
+        #[cfg(feature = "range_proof_timing_multivariate")]
+        print_cumulative("blinding two_term_msm verify", start.elapsed());
 
+        #[cfg(feature = "range_proof_timing_multivariate")]
+        let start = Instant::now();
         let poly_info_instance = crate::sumcheck::ml_sumcheck::data_structures::PolynomialInfo {
             num_variables: num_vars,
             max_multiplicands: vk.poly_info.max_multiplicands,
@@ -237,24 +264,14 @@ impl<E: Pairing> traits::BatchedRangeProof<E> for Proof<E> {
             &self.sumcheck_proof,
         )
         .map_err(|e| anyhow::anyhow!("sumcheck verify: {:?}", e))?;
+        #[cfg(feature = "range_proof_timing_multivariate")]
+        print_cumulative("sumcheck verify", start.elapsed());
 
-        // Advance transcript to match prover (prover drew last_rho here, then ran g opening)
+        // Advance transcript to match prover (prover drew last_rho here, then appended y_f, y_j, hat_c, z, then single batched open)
         let _last_rho: E::ScalarField = trs.challenge_scalar::<E::ScalarField>();
 
-        // Verify g opening using main transcript so it stays in sync with prover (prover ran zk_pcs_open for g before appending y_f)
-        let g_commitment_msms: Vec<MsmInput<E::G1Affine, E::ScalarField>> = self
-            .g_commitments
-            .iter()
-            .map(|&affine| MsmInput::new(vec![affine], vec![E::ScalarField::ONE]).expect("single term"))
-            .collect();
-        zk_pcs_verify(
-            &self.g_opening_proof,
-            &g_commitment_msms,
-            &vk.srs,
-            &mut trs,
-            rng,
-        )?;
-
+        #[cfg(feature = "range_proof_timing_multivariate")]
+        let start = Instant::now();
         // Step 5: (y_f - sum 2^{j-1} y_j + sum c^j y_j(1-y_j)) * eq_t(x) * vnsh_0(x) + alpha * y_g == h_m(x_m)
         // BinaryConstraintPolynomial uses (1 - eq_zero) with eq_zero = ∏ᵢ(1-xᵢ); vnsh_0 = 1 - eq_zero (vanishes at (0,...,0))
         let x = &subclaim.point;
@@ -288,6 +305,8 @@ impl<E: Pairing> traits::BatchedRangeProof<E> for Proof<E> {
                 "Step 5 check failed: lhs != h_m(x_m)"
             ));
         }
+        #[cfg(feature = "range_proof_timing_multivariate")]
+        print_cumulative("step5 scalar check (eq_t, vnsh_0, lhs)", start.elapsed());
 
         // Evals (y_f, y_1, ..., y_ell)
         for (i, y) in self.evals.iter().enumerate() {
@@ -309,6 +328,8 @@ impl<E: Pairing> traits::BatchedRangeProof<E> for Proof<E> {
             "Batched opening: transcript opening point z does not match proof.eval_points[0]"
         );
 
+        #[cfg(feature = "range_proof_timing_multivariate")]
+        let start = Instant::now();
         let combined_comm = {
             let mut bases = vec![comm.0.into_affine()];
             let mut scalars = vec![E::ScalarField::ONE];
@@ -320,12 +341,27 @@ impl<E: Pairing> traits::BatchedRangeProof<E> for Proof<E> {
             scalars.extend(hat_c_powers.iter().skip(1).copied());
             E::G1::msm(&bases, &scalars).expect("combined commitment MSM")
         };
+        #[cfg(feature = "range_proof_timing_multivariate")]
+        print_cumulative("combined_comm MSM", start.elapsed());
 
-        let commitment_msms = vec![MsmInput::new(
-            vec![combined_comm.into_affine()],
-            vec![E::ScalarField::ONE],
+        // Step 4d (spec): single uPCS.BatchVerify for f̂ and g_1..g_m (one zk_pcs_verify call)
+        let g_commitment_msms: Vec<MsmInput<E::G1Affine, E::ScalarField>> = self
+            .g_commitments
+            .iter()
+            .map(|&affine| MsmInput::new(vec![affine], vec![E::ScalarField::ONE]).expect("single term"))
+            .collect();
+        let commitment_msms: Vec<MsmInput<E::G1Affine, E::ScalarField>> = once(
+            MsmInput::new(
+                vec![combined_comm.into_affine()],
+                vec![E::ScalarField::ONE],
+            )
+            .expect("single term"),
         )
-        .expect("single term")];
+        .chain(g_commitment_msms)
+        .collect();
+
+        #[cfg(feature = "range_proof_timing_multivariate")]
+        let start = Instant::now();
         zk_pcs_verify(
             &self.zk_pcs_opening_proof,
             &commitment_msms,
@@ -333,6 +369,14 @@ impl<E: Pairing> traits::BatchedRangeProof<E> for Proof<E> {
             &mut trs,
             rng,
         )?;
+        #[cfg(feature = "range_proof_timing_multivariate")]
+        print_cumulative("zk_pcs_verify (batched f̂ + g)", start.elapsed());
+
+        // y_sum in the opening proof must equal y_batched_at_z (f̂(z)) + y_g (sum of g_i at rho_i)
+        anyhow::ensure!(
+            self.zk_pcs_opening_proof.sigma_proof_statement.y_sum == self.y_batched_at_z + self.y_g,
+            "Batched opening y_sum != y_batched_at_z + y_g"
+        );
 
         Ok(())
     }
@@ -522,18 +566,6 @@ where
         .collect();
     let y_g: E::ScalarField = g_evals.iter().sum();
 
-    let g_opening_proof = zk_pcs_open(
-        &srs,
-        4,
-        g_is,
-        g_comm.clone(),
-        rhos.clone(),
-        g_evals,
-        g_comm_randomnesses,
-        &mut trs,
-        rng,
-    );
-
     // Step 6: Evaluations y_f = f(x), y_j = f_j(x) at sumcheck point x = (rho_1,...,rho_n)
     let sumcheck_point: Vec<E::ScalarField> = rhos[0..num_vars as usize].to_vec();
     let f_poly = DenseMultilinearExtension::from_evaluations_vec(
@@ -584,7 +616,8 @@ where
             acc + coeff * z.pow([i as u64])
         });
 
-    let combined_comm = {
+    // Verifier will recompute this for the single batched zk_pcs_verify
+    let _combined_comm = {
         let mut bases = vec![comm.0.into_affine()];
         let mut scalars = vec![E::ScalarField::ONE];
         if let Some(ref cp) = comm_blinding_poly {
@@ -603,14 +636,24 @@ where
         batched_randomness += hat_c_powers[j + 1] * r_j;
     }
 
+    // Step 7 (spec): single batched opening proof for f̂ at z and g_i at rho_i (uPCS.BatchOpen)
+    let mut all_f_is = vec![batched_coeffs];
+    all_f_is.extend(g_is);
+    let eval_points: Vec<E::ScalarField> = once(z)
+        .chain(rhos.iter().copied())
+        .collect();
+    let mut all_evals = vec![y];
+    all_evals.extend(g_evals.iter().copied());
+    let mut all_rs = vec![batched_randomness];
+    all_rs.extend(g_comm_randomnesses.iter().copied());
     let zk_pcs_opening_proof = zk_pcs_open(
         &srs,
-        (size - 1) as u8,
-        vec![batched_coeffs],
-        vec![combined_comm],
-        vec![z],
-        vec![y],
-        vec![batched_randomness],
+        (size - 1).max(4) as u8,
+        all_f_is,
+        vec![], // commitments not used in open
+        eval_points,
+        all_evals,
+        all_rs,
         &mut trs,
         rng,
     );
@@ -624,12 +667,12 @@ where
         blinding_poly_proof: beta_sigma_proof,
         asserted_sum,
         sumcheck_proof: sumcheck_proof.0,
-        g_opening_proof,
         zk_pcs_opening_proof,
         commitments,
         g_commitments,
         h_g: _G,
         y_g,
+        y_batched_at_z: y,
         evals,
     }
 }
