@@ -526,7 +526,7 @@ bitvec = "1.0.1"
 blake2 = "0.10.4"
 blake2-rfc = "0.2.18"
 bls12_381 = "0.8.0"
-blst = "0.3.15"
+blst = "0.3.16"
 # The __private_bench feature exposes the Fp12 type which we need to implement a multi-threaded multi-pairing.
 blstrs = { version = "0.7.1", features = ["serde", "__private_bench"] }
 bollard = "0.15"
@@ -754,7 +754,7 @@ reqwest = { version = "0.11.11", features = [
 ] }
 reqwest-middleware = "0.2.0"
 reqwest-retry = "0.2.1"
-ring = { version = "0.16.20", features = ["std"] }
+ring = { version = "0.17.14", features = ["std"] }
 ripemd = "0.1.1"
 rlimit = "0.10.2"
 rocksdb = { version = "0.24.0", features = ["lz4"] }
