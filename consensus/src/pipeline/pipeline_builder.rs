@@ -487,6 +487,7 @@ impl PipelineBuilder {
                 self.executor.clone(),
                 block.clone(),
                 self.is_randomness_enabled,
+                self.rand_check_enabled,
                 self.module_cache.clone(),
             ),
             Some(&mut abort_handles),
@@ -705,6 +706,7 @@ impl PipelineBuilder {
         executor: Arc<dyn BlockExecutorTrait>,
         block: Arc<Block>,
         is_randomness_enabled: bool,
+        rand_check_enabled: bool,
         module_cache: Arc<Mutex<Option<CachedModuleView<CachedStateView>>>>,
     ) -> TaskResult<bool> {
         let mut tracker = Tracker::start_waiting("rand_check", &block);
@@ -714,6 +716,11 @@ impl PipelineBuilder {
         tracker.start_working();
         if !is_randomness_enabled {
             return Ok(false);
+        }
+        // When rand_check is disabled (e.g. rolling deployment), report all blocks as
+        // needing randomness so aggregation always runs and produces real randomness.
+        if !rand_check_enabled {
+            return Ok(true);
         }
         let grand_parent_id = block.quorum_cert().parent_block().id();
         let parent_state_view = executor
