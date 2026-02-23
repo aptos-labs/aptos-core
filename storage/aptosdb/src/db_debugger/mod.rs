@@ -14,12 +14,6 @@ mod watch;
 use aptos_storage_interface::Result;
 use clap::Parser;
 
-#[derive(Parser, Clone)]
-pub struct ShardingConfig {
-    #[clap(long)]
-    enable_storage_sharding: bool,
-}
-
 #[derive(Parser)]
 pub enum Cmd {
     #[clap(subcommand)]

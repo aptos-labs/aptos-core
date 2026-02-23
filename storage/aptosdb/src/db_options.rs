@@ -128,16 +128,6 @@ pub(super) fn skip_reporting_cf(cf_name: &str) -> bool {
     cf_name == DEFAULT_COLUMN_FAMILY_NAME || cf_name == DB_METADATA_CF_NAME
 }
 
-pub(super) fn state_kv_db_column_families() -> Vec<ColumnFamilyName> {
-    vec![
-        /* empty cf */ DEFAULT_COLUMN_FAMILY_NAME,
-        DB_METADATA_CF_NAME,
-        STALE_STATE_VALUE_INDEX_CF_NAME,
-        STATE_VALUE_CF_NAME,
-        STATE_VALUE_INDEX_CF_NAME,
-    ]
-}
-
 pub(super) fn state_kv_db_new_key_column_families() -> Vec<ColumnFamilyName> {
     vec![
         /* empty cf */ DEFAULT_COLUMN_FAMILY_NAME,

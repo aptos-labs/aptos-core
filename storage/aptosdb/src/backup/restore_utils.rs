@@ -242,17 +242,15 @@ pub(crate) fn save_transactions_impl(
         &mut ledger_db_batch.event_db_batches,
     )?;
 
-    if ledger_db.enable_storage_sharding() {
-        for (idx, txn_events) in events.iter().enumerate() {
-            for event in txn_events {
-                if let Some(event_key) = event.event_key() {
-                    if *event_key == new_block_event_key() {
-                        LedgerMetadataDb::put_block_info(
-                            first_version + idx as Version,
-                            event,
-                            &mut ledger_db_batch.ledger_metadata_db_batches,
-                        )?;
-                    }
+    for (idx, txn_events) in events.iter().enumerate() {
+        for event in txn_events {
+            if let Some(event_key) = event.event_key() {
+                if *event_key == new_block_event_key() {
+                    LedgerMetadataDb::put_block_info(
+                        first_version + idx as Version,
+                        event,
+                        &mut ledger_db_batch.ledger_metadata_db_batches,
+                    )?;
                 }
             }
         }
