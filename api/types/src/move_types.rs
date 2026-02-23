@@ -1106,6 +1106,10 @@ impl<'de> Deserialize<'de> for MoveModuleId {
 }
 
 /// A move struct
+//
+// Note: In a perfect world is_enum would not be necessary and instead we would use an
+// enum to represent regular struct vs enum. But for backwards compatibility we instead
+// have separate fields, `fields` for a regular struct and `variants` for an enum.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, Object)]
 pub struct MoveStruct {
     pub name: IdentifierWrapper,
@@ -1120,6 +1124,16 @@ pub struct MoveStruct {
     /// Generic types associated with the struct
     pub generic_type_params: Vec<MoveStructGenericTypeParam>,
     /// Fields associated with the struct
+    pub fields: Vec<MoveStructField>,
+    /// Variants of the enum. Only populated when `is_enum` is true.
+    pub variants: Vec<MoveStructVariant>,
+}
+
+/// A single variant of a Move enum.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, Object)]
+pub struct MoveStructVariant {
+    pub name: IdentifierWrapper,
+    /// Fields associated with the variant, if any.
     pub fields: Vec<MoveStructField>,
 }
 

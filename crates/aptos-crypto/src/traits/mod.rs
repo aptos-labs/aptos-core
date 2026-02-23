@@ -72,7 +72,7 @@ pub trait ValidCryptoMaterial:
     const AIP_80_PREFIX: &'static str;
 
     /// Convert the valid crypto material to bytes.
-    fn to_bytes(&self) -> Vec<u8>; // Using `Result<Vec<u8>>` and `.map_err(|_| CryptoMaterialError::SerializationError)` would be more consistent here??
+    fn to_bytes(&self) -> Vec<u8>; // Using `Result<Vec<u8>>` and `.map_err(|_| CryptoMaterialError::SerializationError)` would be more consistent here?
 }
 
 /// An extension to/from Strings for [`ValidCryptoMaterial`].

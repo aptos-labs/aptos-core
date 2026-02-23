@@ -10,7 +10,7 @@
 use crate::{
     range_proofs::traits::BatchedRangeProof, sigma_protocol, sigma_protocol::homomorphism,
 };
-use ark_ec::{pairing::Pairing, CurveGroup};
+use ark_ec::{pairing::Pairing, AffineRepr};
 use ark_ff::PrimeField;
 use ark_serialize::CanonicalSerialize;
 use merlin::Transcript;
@@ -81,7 +81,7 @@ pub trait RangeProof<E: Pairing, B: BatchedRangeProof<E>> {
 #[allow(private_bounds)]
 pub trait SigmaProtocol<F: PrimeField, H: homomorphism::Trait>: ScalarProtocol<F> {
     /// Append the "context" of a sigma protocol, e.g. session identifiers
-    fn append_sigma_protocol_ctxt<C: Serialize>(&mut self, ctxt: &C);
+    fn append_sigma_protocol_cntxt<Ct: Serialize>(&mut self, cntxt: &Ct);
 
     /// Append the MSM bases of a sigma protocol.
     fn append_sigma_protocol_msm_bases(&mut self, hom: &H);
@@ -103,7 +103,7 @@ pub trait SigmaProtocol<F: PrimeField, H: homomorphism::Trait>: ScalarProtocol<F
 pub trait PolynomialCommitmentScheme {
     fn append_sep(&mut self, dst: &[u8]);
 
-    fn append_point<C: CurveGroup>(&mut self, point: &C);
+    fn append_point<C: AffineRepr>(&mut self, point: &C);
 
     fn challenge_scalar<F: PrimeField>(&mut self) -> F;
 }
@@ -190,9 +190,9 @@ where
     H::Domain: sigma_protocol::Witness<F>,
     H::CodomainNormalized: sigma_protocol::Statement,
 {
-    fn append_sigma_protocol_ctxt<C: Serialize>(&mut self, ctxt: &C) {
-        let ctxt_bytes = bcs::to_bytes(ctxt).expect("ctxt data serialization should succeed");
-        self.append_message(b"aux", ctxt_bytes.as_slice());
+    fn append_sigma_protocol_cntxt<Ct: Serialize>(&mut self, cntxt: &Ct) {
+        let cntxt_bytes = bcs::to_bytes(cntxt).expect("cntxt data serialization should succeed");
+        self.append_message(b"cntxt", cntxt_bytes.as_slice());
     }
 
     fn append_sigma_protocol_msm_bases(&mut self, hom: &H) {
@@ -237,7 +237,7 @@ impl PolynomialCommitmentScheme for Transcript {
         self.append_message(b"dom-sep", dst);
     }
 
-    fn append_point<C: CurveGroup>(&mut self, point: &C) {
+    fn append_point<C: AffineRepr>(&mut self, point: &C) {
         let mut buf = Vec::new();
         point
             .serialize_compressed(&mut buf)

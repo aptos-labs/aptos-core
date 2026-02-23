@@ -396,6 +396,7 @@ message MoveStruct {
   repeated MoveAbility abilities = 3;
   repeated MoveStructGenericTypeParam generic_type_params = 4;
   repeated MoveStructField fields = 5;
+  repeated MoveStructVariant variants = 8;
 }
 
 message MoveStructGenericTypeParam {
@@ -406,6 +407,11 @@ message MoveStructGenericTypeParam {
 message MoveStructField {
   string name = 1;
   MoveType type = 2;
+}
+
+message MoveStructVariant {
+  string name = 1;
+  repeated MoveStructField fields = 2;
 }
 
 message MoveFunctionGenericTypeParam {

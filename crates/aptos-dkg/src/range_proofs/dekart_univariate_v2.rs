@@ -10,7 +10,8 @@ use crate::{
     sigma_protocol::{
         self,
         homomorphism::{self, Trait as _},
-        Trait as _,
+        traits::Trait as _,
+        CurveGroupTrait,
     },
     utils, Scalar,
 };
@@ -697,14 +698,16 @@ impl<E: Pairing> traits::BatchedRangeProof<E> for Proof<E> {
         fiat_shamir::append_hat_f_commitment::<E>(&mut fs_t, &hatC);
 
         // Step 3
-        two_term_msm::Homomorphism::<E::G1> {
+        let hom = two_term_msm::Homomorphism::<E::G1> {
             base_1: *lagr_0,
             base_2: *xi_1,
-        }
-        .verify(
+        };
+        <two_term_msm::Homomorphism<E::G1> as CurveGroupTrait>::verify(
+            &hom,
             &(two_term_msm::CodomainShape((*hatC - comm.0).into_affine())),
             pi_PoK,
             &Self::DST,
+            Some(1), // TrivialShape has one element
             rng,
         )?;
 
@@ -907,7 +910,7 @@ pub mod two_term_msm {
     // TODO: maybe fixed_base_msms should become a folder and put its code inside mod.rs? Then put this mod inside of that folder?
     use super::*;
     use crate::sigma_protocol::{homomorphism::fixed_base_msms, FirstProofItem};
-    use aptos_crypto::arkworks::{msm::IsMsmInput, random::UniformRand};
+    use aptos_crypto::arkworks::random::UniformRand;
     use aptos_crypto_derive::SigmaProtocolWitness;
     use ark_ec::AffineRepr;
     pub use sigma_protocol::homomorphism::TrivialShape as CodomainShape;
@@ -971,15 +974,18 @@ pub mod two_term_msm {
     }
 
     impl<C: CurveGroup> fixed_base_msms::Trait for Homomorphism<C> {
+        type Base = C::Affine;
         type CodomainShape<T>
             = CodomainShape<T>
         where
             T: CanonicalSerialize + CanonicalDeserialize + Clone + Eq + Debug;
-        type MsmInput = MsmInput<C::Affine, C::ScalarField>;
         type MsmOutput = C;
         type Scalar = C::ScalarField;
 
-        fn msm_terms(&self, input: &Self::Domain) -> Self::CodomainShape<Self::MsmInput> {
+        fn msm_terms(
+            &self,
+            input: &Self::Domain,
+        ) -> Self::CodomainShape<MsmInput<Self::Base, Self::Scalar>> {
             let mut scalars = Vec::with_capacity(2);
             scalars.push(input.poly_randomness.0);
             scalars.push(input.hiding_kzg_randomness.0);
@@ -991,18 +997,18 @@ pub mod two_term_msm {
             CodomainShape(MsmInput { bases, scalars })
         }
 
-        fn msm_eval(input: Self::MsmInput) -> Self::MsmOutput {
+        fn msm_eval(input: MsmInput<Self::Base, Self::Scalar>) -> Self::MsmOutput {
             C::msm(input.bases(), input.scalars()).expect("MSM failed in TwoTermMSM")
         }
 
-        fn batch_normalize(
-            msm_output: Vec<Self::MsmOutput>,
-        ) -> Vec<<Self::MsmInput as IsMsmInput>::Base> {
+        fn batch_normalize(msm_output: Vec<Self::MsmOutput>) -> Vec<Self::Base> {
             C::normalize_batch(&msm_output)
         }
     }
 
-    impl<C: CurveGroup> sigma_protocol::Trait<C> for Homomorphism<C> {
+    impl<C: CurveGroup> sigma_protocol::CurveGroupTrait for Homomorphism<C> {
+        type Group = C;
+
         fn dst(&self) -> Vec<u8> {
             b"DEKART_V2_SIGMA_PROTOCOL".to_vec()
         }

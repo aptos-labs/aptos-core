@@ -4439,6 +4439,9 @@ impl serde::Serialize for MoveStruct {
         if !self.fields.is_empty() {
             len += 1;
         }
+        if !self.variants.is_empty() {
+            len += 1;
+        }
         let mut struct_ser = serializer.serialize_struct("aptos.transaction.v1.MoveStruct", len)?;
         if !self.name.is_empty() {
             struct_ser.serialize_field("name", &self.name)?;
@@ -4465,6 +4468,9 @@ impl serde::Serialize for MoveStruct {
         if !self.fields.is_empty() {
             struct_ser.serialize_field("fields", &self.fields)?;
         }
+        if !self.variants.is_empty() {
+            struct_ser.serialize_field("variants", &self.variants)?;
+        }
         struct_ser.end()
     }
 }
@@ -4486,6 +4492,7 @@ impl<'de> serde::Deserialize<'de> for MoveStruct {
             "generic_type_params",
             "genericTypeParams",
             "fields",
+            "variants",
         ];
 
         #[allow(clippy::enum_variant_names)]
@@ -4497,6 +4504,7 @@ impl<'de> serde::Deserialize<'de> for MoveStruct {
             Abilities,
             GenericTypeParams,
             Fields,
+            Variants,
         }
         impl<'de> serde::Deserialize<'de> for GeneratedField {
             fn deserialize<D>(deserializer: D) -> std::result::Result<GeneratedField, D::Error>
@@ -4525,6 +4533,7 @@ impl<'de> serde::Deserialize<'de> for MoveStruct {
                             "abilities" => Ok(GeneratedField::Abilities),
                             "genericTypeParams" | "generic_type_params" => Ok(GeneratedField::GenericTypeParams),
                             "fields" => Ok(GeneratedField::Fields),
+                            "variants" => Ok(GeneratedField::Variants),
                             _ => Err(serde::de::Error::unknown_field(value, FIELDS)),
                         }
                     }
@@ -4551,6 +4560,7 @@ impl<'de> serde::Deserialize<'de> for MoveStruct {
                 let mut abilities__ = None;
                 let mut generic_type_params__ = None;
                 let mut fields__ = None;
+                let mut variants__ = None;
                 while let Some(k) = map.next_key()? {
                     match k {
                         GeneratedField::Name => {
@@ -4595,6 +4605,12 @@ impl<'de> serde::Deserialize<'de> for MoveStruct {
                             }
                             fields__ = Some(map.next_value()?);
                         }
+                        GeneratedField::Variants => {
+                            if variants__.is_some() {
+                                return Err(serde::de::Error::duplicate_field("variants"));
+                            }
+                            variants__ = Some(map.next_value()?);
+                        }
                     }
                 }
                 Ok(MoveStruct {
@@ -4605,6 +4621,7 @@ impl<'de> serde::Deserialize<'de> for MoveStruct {
                     abilities: abilities__.unwrap_or_default(),
                     generic_type_params: generic_type_params__.unwrap_or_default(),
                     fields: fields__.unwrap_or_default(),
+                    variants: variants__.unwrap_or_default(),
                 })
             }
         }
@@ -4973,6 +4990,114 @@ impl<'de> serde::Deserialize<'de> for MoveStructTag {
             }
         }
         deserializer.deserialize_struct("aptos.transaction.v1.MoveStructTag", FIELDS, GeneratedVisitor)
+    }
+}
+impl serde::Serialize for MoveStructVariant {
+    #[allow(deprecated)]
+    fn serialize<S>(&self, serializer: S) -> std::result::Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        use serde::ser::SerializeStruct;
+        let mut len = 0;
+        if !self.name.is_empty() {
+            len += 1;
+        }
+        if !self.fields.is_empty() {
+            len += 1;
+        }
+        let mut struct_ser = serializer.serialize_struct("aptos.transaction.v1.MoveStructVariant", len)?;
+        if !self.name.is_empty() {
+            struct_ser.serialize_field("name", &self.name)?;
+        }
+        if !self.fields.is_empty() {
+            struct_ser.serialize_field("fields", &self.fields)?;
+        }
+        struct_ser.end()
+    }
+}
+impl<'de> serde::Deserialize<'de> for MoveStructVariant {
+    #[allow(deprecated)]
+    fn deserialize<D>(deserializer: D) -> std::result::Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        const FIELDS: &[&str] = &[
+            "name",
+            "fields",
+        ];
+
+        #[allow(clippy::enum_variant_names)]
+        enum GeneratedField {
+            Name,
+            Fields,
+        }
+        impl<'de> serde::Deserialize<'de> for GeneratedField {
+            fn deserialize<D>(deserializer: D) -> std::result::Result<GeneratedField, D::Error>
+            where
+                D: serde::Deserializer<'de>,
+            {
+                struct GeneratedVisitor;
+
+                impl<'de> serde::de::Visitor<'de> for GeneratedVisitor {
+                    type Value = GeneratedField;
+
+                    fn expecting(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+                        write!(formatter, "expected one of: {:?}", &FIELDS)
+                    }
+
+                    #[allow(unused_variables)]
+                    fn visit_str<E>(self, value: &str) -> std::result::Result<GeneratedField, E>
+                    where
+                        E: serde::de::Error,
+                    {
+                        match value {
+                            "name" => Ok(GeneratedField::Name),
+                            "fields" => Ok(GeneratedField::Fields),
+                            _ => Err(serde::de::Error::unknown_field(value, FIELDS)),
+                        }
+                    }
+                }
+                deserializer.deserialize_identifier(GeneratedVisitor)
+            }
+        }
+        struct GeneratedVisitor;
+        impl<'de> serde::de::Visitor<'de> for GeneratedVisitor {
+            type Value = MoveStructVariant;
+
+            fn expecting(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+                formatter.write_str("struct aptos.transaction.v1.MoveStructVariant")
+            }
+
+            fn visit_map<V>(self, mut map: V) -> std::result::Result<MoveStructVariant, V::Error>
+                where
+                    V: serde::de::MapAccess<'de>,
+            {
+                let mut name__ = None;
+                let mut fields__ = None;
+                while let Some(k) = map.next_key()? {
+                    match k {
+                        GeneratedField::Name => {
+                            if name__.is_some() {
+                                return Err(serde::de::Error::duplicate_field("name"));
+                            }
+                            name__ = Some(map.next_value()?);
+                        }
+                        GeneratedField::Fields => {
+                            if fields__.is_some() {
+                                return Err(serde::de::Error::duplicate_field("fields"));
+                            }
+                            fields__ = Some(map.next_value()?);
+                        }
+                    }
+                }
+                Ok(MoveStructVariant {
+                    name: name__.unwrap_or_default(),
+                    fields: fields__.unwrap_or_default(),
+                })
+            }
+        }
+        deserializer.deserialize_struct("aptos.transaction.v1.MoveStructVariant", FIELDS, GeneratedVisitor)
     }
 }
 impl serde::Serialize for MoveType {

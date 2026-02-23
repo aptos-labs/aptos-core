@@ -7,10 +7,7 @@
 
 use crate::{
     arkworks,
-    arkworks::{
-        msm::{IsMsmInput, MsmInput},
-        random,
-    },
+    arkworks::{msm::MsmInput, random},
 };
 use anyhow::{bail, ensure, Context};
 use ark_ec::CurveGroup;

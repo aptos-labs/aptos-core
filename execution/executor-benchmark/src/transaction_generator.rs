@@ -457,6 +457,10 @@ impl TransactionGenerator {
         self.num_existing_accounts
     }
 
+    fn num_seed_accounts(num_new_accounts: usize) -> usize {
+        (num_new_accounts / 1000).clamp(1, 100_000)
+    }
+
     pub fn run_mint(
         &mut self,
         reader: Arc<dyn DbReader>,
@@ -467,13 +471,17 @@ impl TransactionGenerator {
         is_keyless: bool,
     ) {
         assert!(self.block_sender.is_some());
-        // Ensure that seed accounts have enough balance to transfer money to at least 10000 account with
-        // balance init_account_balance.
+        // Compute seed account balance based on the actual number of accounts
+        // each seed account needs to create, with 2x margin for gas fees and
+        // random distribution variance across seed accounts.
+        let num_seed_accounts = Self::num_seed_accounts(num_new_accounts);
+        let accounts_per_seed = num_new_accounts.div_ceil(num_seed_accounts);
+        let seed_account_balance = (init_account_balance as u128) * (accounts_per_seed as u128) * 2;
         self.create_seed_accounts(
             reader,
             num_new_accounts,
             block_size,
-            init_account_balance * 10_000,
+            seed_account_balance as u64,
             is_keyless,
         );
         self.create_and_fund_accounts(
@@ -565,7 +573,7 @@ impl TransactionGenerator {
     ) {
         // We don't store the # of existing seed accounts now. Thus here we just blindly re-create
         // and re-mint seed accounts here.
-        let num_seed_accounts = (num_new_accounts / 1000).clamp(1, 100000);
+        let num_seed_accounts = Self::num_seed_accounts(num_new_accounts);
         let seed_accounts_cache =
             Self::gen_seed_account_cache(reader.clone(), num_seed_accounts, is_keyless);
 
