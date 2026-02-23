@@ -310,6 +310,19 @@ pub struct Condition {
 }
 
 impl Condition {
+    /// Compares two conditions for structural equality, ignoring NodeIds in expressions.
+    pub fn structural_eq(&self, other: &Condition) -> bool {
+        self.kind == other.kind
+            && self.properties == other.properties
+            && self.exp.structural_eq(&other.exp)
+            && self.additional_exps.len() == other.additional_exps.len()
+            && self
+                .additional_exps
+                .iter()
+                .zip(other.additional_exps.iter())
+                .all(|(e1, e2)| e1.structural_eq(e2))
+    }
+
     /// Return all expressions in the condition, the primary one and the additional ones.
     pub fn all_exps(&self) -> impl Iterator<Item = &Exp> {
         std::iter::once(&self.exp).chain(self.additional_exps.iter())
@@ -352,6 +365,29 @@ pub struct Spec {
 }
 
 impl Spec {
+    /// Compares two specs for structural equality, ignoring NodeIds in expressions.
+    pub fn structural_eq(&self, other: &Spec) -> bool {
+        self.conditions.len() == other.conditions.len()
+            && self
+                .conditions
+                .iter()
+                .zip(other.conditions.iter())
+                .all(|(c1, c2)| c1.structural_eq(c2))
+            && self.properties == other.properties
+            && self.on_impl.len() == other.on_impl.len()
+            && self
+                .on_impl
+                .iter()
+                .zip(other.on_impl.iter())
+                .all(|((off1, s1), (off2, s2))| off1 == off2 && s1.structural_eq(s2))
+            && self.update_map.len() == other.update_map.len()
+            && self
+                .update_map
+                .iter()
+                .zip(other.update_map.iter())
+                .all(|((_, c1), (_, c2))| c1.structural_eq(c2))
+    }
+
     pub fn has_conditions(&self) -> bool {
         !self.conditions.is_empty()
     }
@@ -933,7 +969,14 @@ impl ExpData {
                         .iter()
                         .zip(r2.iter())
                         .all(|((p1, e1), (p2, e2))| p1.structural_eq(p2) && e1.structural_eq(e2))
-                    && t1 == t2
+                    && t1.len() == t2.len()
+                    && t1.iter().zip(t2.iter()).all(|(ts1, ts2)| {
+                        ts1.len() == ts2.len()
+                            && ts1
+                                .iter()
+                                .zip(ts2.iter())
+                                .all(|(e1, e2)| e1.structural_eq(e2))
+                    })
                     && match (c1, c2) {
                         (Some(c1), Some(c2)) => c1.structural_eq(c2),
                         (None, None) => true,
@@ -980,7 +1023,7 @@ impl ExpData {
             (Return(_, val1), Return(_, val2)) => val1.structural_eq(val2),
             (Mutate(_, l1, r1), Mutate(_, l2, r2)) => l1.structural_eq(l2) && r1.structural_eq(r2),
             (Assign(_, l1, r1), Assign(_, l2, r2)) => l1.structural_eq(l2) && r1.structural_eq(r2),
-            (SpecBlock(_, spec1), SpecBlock(_, spec2)) => spec1 == spec2,
+            (SpecBlock(_, spec1), SpecBlock(_, spec2)) => spec1.structural_eq(spec2),
             _ => false,
         }
     }

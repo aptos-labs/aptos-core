@@ -81,7 +81,7 @@ pub const DELEGATE_INVARIANTS_TO_CALLER_PRAGMA: &str = "delegate_invariants_to_c
 pub const UNROLL_PRAGMA: &str = "unroll";
 
 /// Pragma controlling which spec conditions are inferred.
-/// Values: `only_ensures` (skip aborts_if), `only_aborts` (skip ensures).
+/// Values: `none` (skip inference), `only_ensures` (skip aborts_if), `only_aborts` (skip ensures).
 /// Default (unset): infer both ensures and aborts_if.
 pub const INFERENCE_PRAGMA: &str = "inference";
 

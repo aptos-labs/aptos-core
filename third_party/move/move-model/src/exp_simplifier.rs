@@ -104,6 +104,7 @@ pub struct ExpSimplifier<'a, 'env, G: ExpGenerator<'env>> {
     inside_old: bool,
     /// Tracks the number of spec function unfold steps to prevent runaway recursion.
     spec_fun_unfold_depth: usize,
+    /// Binds the `'env` lifetime (used only in the `G: ExpGenerator<'env>` bound).
     _phantom: std::marker::PhantomData<&'env ()>,
 }
 
@@ -2072,35 +2073,43 @@ impl<'a, 'env, G: ExpGenerator<'env>> ExpSimplifier<'a, 'env, G> {
     /// the maximum value of the unsigned type domain. Returns true if either witness
     /// makes the body simplify to `true`.
     fn is_exists_trivially_true(&mut self, ranges: &[(Pattern, Exp)], body: &Exp) -> bool {
-        // Try zero witness
-        let mut zero_instantiated = body.clone();
+        // Try "low" witness: 0 for unsigned integers, false for bool
+        let mut low_instantiated = body.clone();
         for (pat, _) in ranges {
             if let Pattern::Var(pat_id, sym) = pat {
                 let ty = self.env().get_node_type(*pat_id);
                 if ty.is_unsigned_int() {
                     let zero = self.mk_num_const(&ty, BigInt::zero());
-                    zero_instantiated =
-                        substitute_local_var(self.env(), &zero_instantiated, *sym, &zero);
+                    low_instantiated =
+                        substitute_local_var(self.env(), &low_instantiated, *sym, &zero);
+                } else if ty.is_bool() {
+                    let val = self.mk_bool_const(false);
+                    low_instantiated =
+                        substitute_local_var(self.env(), &low_instantiated, *sym, &val);
                 } else {
                     return false;
                 }
             }
         }
-        let result = self.simplify(zero_instantiated);
+        let result = self.simplify(low_instantiated);
         if matches!(result.as_ref(), ExpData::Value(_, Value::Bool(true))) {
             return true;
         }
 
-        // Try max witness (for patterns like `exists x: u64: x + 1 > MAX_U64`)
-        let mut max_instantiated = body.clone();
+        // Try "high" witness: max value for unsigned integers, true for bool
+        let mut high_instantiated = body.clone();
         for (pat, _) in ranges {
             if let Pattern::Var(pat_id, sym) = pat {
                 let ty = self.env().get_node_type(*pat_id);
-                if let Type::Primitive(prim_ty) = &ty {
+                if ty.is_bool() {
+                    let val = self.mk_bool_const(true);
+                    high_instantiated =
+                        substitute_local_var(self.env(), &high_instantiated, *sym, &val);
+                } else if let Type::Primitive(prim_ty) = &ty {
                     if let Some(max_val) = prim_ty.get_max_value() {
                         let max_const = self.mk_num_const(&ty, max_val);
-                        max_instantiated =
-                            substitute_local_var(self.env(), &max_instantiated, *sym, &max_const);
+                        high_instantiated =
+                            substitute_local_var(self.env(), &high_instantiated, *sym, &max_const);
                     } else {
                         return false;
                     }
@@ -2109,7 +2118,7 @@ impl<'a, 'env, G: ExpGenerator<'env>> ExpSimplifier<'a, 'env, G> {
                 }
             }
         }
-        let result = self.simplify(max_instantiated);
+        let result = self.simplify(high_instantiated);
         matches!(result.as_ref(), ExpData::Value(_, Value::Bool(true)))
     }
 

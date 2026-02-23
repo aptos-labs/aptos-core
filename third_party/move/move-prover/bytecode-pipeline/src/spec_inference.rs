@@ -641,6 +641,8 @@ impl FunctionTargetProcessor for SpecInferenceProcessor {
                     update_spec(fun_env, &state, &mut analyzer);
                     // Emit modifies clauses for all captured globals
                     emit_modifies(fun_env, &state);
+                    // Check for inferred conditions referencing non-parameter temporaries
+                    check_bad_temps(fun_env);
                 } else {
                     // Entry state is empty but there may be non-empty WP states at intermediate
                     // offsets, indicating that weakest preconditions were lost during joins.
@@ -712,20 +714,6 @@ impl FunctionTargetProcessor for SpecInferenceProcessor {
                 if has_inferred {
                     // Print the entire function (signature + body + spec)
                     sourcifier.print_fun(fun.get_qualified_id(), fun.get_def());
-
-                    // Check for conditions referencing non-parameter temporaries
-                    let num_params = fun.get_parameter_count();
-                    let has_bad_temps = spec.conditions.iter().any(|c| {
-                        c.properties.contains_key(&inferred_sym)
-                            && !exp_only_references_params(&c.exp, num_params)
-                    });
-                    if has_bad_temps {
-                        env.diag(
-                            Severity::Bug,
-                            &fun.get_loc(),
-                            "inferred spec references non-parameter temporaries",
-                        );
-                    }
                 }
             }
         }
@@ -740,7 +728,12 @@ impl FunctionTargetProcessor for SpecInferenceProcessor {
 
 /// Checks if a function needs spec inference
 fn needs_inference(fun_env: &FunctionEnv) -> bool {
-    !fun_env.is_opaque()
+    if let Some(mode) = fun_env.get_symbol_pragma(INFERENCE_PRAGMA) {
+        let pool = fun_env.module_env.env.symbol_pool();
+        pool.string(mode).as_str() != "none"
+    } else {
+        true
+    }
 }
 
 /// Updates the function spec with inferred conditions from WPState
@@ -761,8 +754,8 @@ fn update_spec<'env>(
     let infer_aborts;
     if let Some(mode) = fun_env.get_symbol_pragma(INFERENCE_PRAGMA) {
         let mode_str = pool.string(mode);
-        infer_ensures = mode_str.as_str() != "only_aborts";
-        infer_aborts = mode_str.as_str() != "only_ensures";
+        infer_ensures = mode_str.as_str() != "only_aborts" && mode_str.as_str() != "none";
+        infer_aborts = mode_str.as_str() != "only_ensures" && mode_str.as_str() != "none";
     } else {
         infer_ensures = true;
         infer_aborts = true;
@@ -825,6 +818,25 @@ fn update_spec<'env>(
             aborts_conds
                 .iter()
                 .map(|e| mk_cond(ConditionKind::AbortsIf, e)),
+        );
+    }
+}
+
+/// Checks that all inferred conditions only reference parameter temporaries.
+/// If any condition references a non-parameter temporary, emits a Bug diagnostic.
+fn check_bad_temps(fun_env: &FunctionEnv) {
+    let env = fun_env.module_env.env;
+    let inferred_sym = env.symbol_pool().make(INFERRED_PROPERTY);
+    let num_params = fun_env.get_parameter_count();
+    let spec = fun_env.get_spec();
+    let has_bad_temps = spec.conditions.iter().any(|c| {
+        c.properties.contains_key(&inferred_sym) && !exp_only_references_params(&c.exp, num_params)
+    });
+    if has_bad_temps {
+        env.diag(
+            Severity::Bug,
+            &fun_env.get_loc(),
+            "inferred spec references non-parameter temporaries",
         );
     }
 }
@@ -2195,10 +2207,12 @@ impl<'env> TransferFunctions for SpecInferenceAnalyzer<'env> {
                             .collect();
                     },
 
+                    // Opaque calls: when inference is active, opaque calls appear as
+                    // Operation::Function (see spec_instrumentation), so these are no-ops.
+                    Operation::OpaqueCallBegin(_, _, _) | Operation::OpaqueCallEnd(_, _, _) => {},
+
                     // WP[...](Q) = Q  (verification IL; no effect on inference)
-                    Operation::OpaqueCallBegin(_, _, _)
-                    | Operation::OpaqueCallEnd(_, _, _)
-                    | Operation::IsParent(_, _)
+                    Operation::IsParent(_, _)
                     | Operation::UnpackRef
                     | Operation::PackRef
                     | Operation::UnpackRefDeep

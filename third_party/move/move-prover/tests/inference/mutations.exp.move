@@ -667,22 +667,214 @@ module 0x42::mutations {
 
 }
 /*
-Verification: exiting with condition generation errors
-error: old() in function specifications used by behavioral predicates (ensures_of/aborts_of) is not yet supported in the verification pipeline
-    ┌─ tests/inference/mutations.enriched.move:330:38
+Verification: exiting with compilation errors
+error: state label `at_14` is not defined; labels in memory accesses must reference a post-state label defined by a behavior predicate in the same spec
+    ┌─ tests/inference/mutations.enriched.move:497:64
     │
-330 │         ensures [inferred] result == old(r);
-    │                                      ^^^^^^
+497 │         ensures [inferred] global<Counter>(a2) == update_field(at_14@global<Counter>(a2), value, v2);
+    │                                                                ^^^^^^^^^^^^^^^^^^^^^^^^^
 
-error: old() in function specifications used by behavioral predicates (ensures_of/aborts_of) is not yet supported in the verification pipeline
-    ┌─ tests/inference/mutations.enriched.move:427:66
+error: state label `at_14` is not defined; labels in memory accesses must reference a post-state label defined by a behavior predicate in the same spec
+    ┌─ tests/inference/mutations.enriched.move:498:69
     │
-427 │         ensures [inferred] global<Counter>(addr) == update_field(old(global<Counter>(addr)), value, old(global<Counter>(addr)).value + 1);
-    │                                                                  ^^^^^^^^^^^^^^^^^^^^^^^^^^
+498 │         ensures [inferred = sathard] forall x: address: x != a1 ==> at_14@global<Counter>(x) == old(global<Counter>(x));
+    │                                                                     ^^^^^^^^^^^^^^^^^^^^^^^^
 
-error: old() in function specifications used by behavioral predicates (ensures_of/aborts_of) is not yet supported in the verification pipeline
-    ┌─ tests/inference/mutations.enriched.move:427:101
+error: state label `at_14` is not defined; labels in memory accesses must reference a post-state label defined by a behavior predicate in the same spec
+    ┌─ tests/inference/mutations.enriched.move:499:28
     │
-427 │         ensures [inferred] global<Counter>(addr) == update_field(old(global<Counter>(addr)), value, old(global<Counter>(addr)).value + 1);
-    │                                                                                                     ^^^^^^^^^^^^^^^^^^^^^^^^^^
+499 │         ensures [inferred] at_14@global<Counter>(a1) == update_field(old(global<Counter>(a1)), value, v1);
+    │                            ^^^^^^^^^^^^^^^^^^^^^^^^^
+
+error: state label `at_14` is not defined; labels in memory accesses must reference a post-state label defined by a behavior predicate in the same spec
+    ┌─ tests/inference/mutations.enriched.move:501:31
+    │
+501 │         aborts_if [inferred] !at_14@exists<Counter>(a1);
+    │                               ^^^^^^^^^^^^^^^^^^^^^^^^^
+
+error: state label `at_21` is not defined; labels in memory accesses must reference a post-state label defined by a behavior predicate in the same spec
+    ┌─ tests/inference/mutations.enriched.move:554:73
+    │
+554 │         ensures [inferred] cond ==> global<Counter>(a2) == update_field(at_21@global<Counter>(a2), value, v2);
+    │                                                                         ^^^^^^^^^^^^^^^^^^^^^^^^^
+
+error: state label `at_21` is not defined; labels in memory accesses must reference a post-state label defined by a behavior predicate in the same spec
+    ┌─ tests/inference/mutations.enriched.move:555:74
+    │
+555 │         ensures [inferred] !cond ==> global<Counter>(a1) == update_field(at_21@global<Counter>(a1), value, v2);
+    │                                                                          ^^^^^^^^^^^^^^^^^^^^^^^^^
+
+error: state label `at_21` is not defined; labels in memory accesses must reference a post-state label defined by a behavior predicate in the same spec
+    ┌─ tests/inference/mutations.enriched.move:556:69
+    │
+556 │         ensures [inferred] cond ==> (forall x: address: x != a1 ==> at_21@global<Counter>(x) == old(global<Counter>(x)));
+    │                                                                     ^^^^^^^^^^^^^^^^^^^^^^^^
+
+error: state label `at_21` is not defined; labels in memory accesses must reference a post-state label defined by a behavior predicate in the same spec
+    ┌─ tests/inference/mutations.enriched.move:557:37
+    │
+557 │         ensures [inferred] cond ==> at_21@global<Counter>(a1) == update_field(old(global<Counter>(a1)), value, v1);
+    │                                     ^^^^^^^^^^^^^^^^^^^^^^^^^
+
+error: state label `at_21` is not defined; labels in memory accesses must reference a post-state label defined by a behavior predicate in the same spec
+    ┌─ tests/inference/mutations.enriched.move:558:70
+    │
+558 │         ensures [inferred] !cond ==> (forall x: address: x != a2 ==> at_21@global<Counter>(x) == old(global<Counter>(x)));
+    │                                                                      ^^^^^^^^^^^^^^^^^^^^^^^^
+
+error: state label `at_21` is not defined; labels in memory accesses must reference a post-state label defined by a behavior predicate in the same spec
+    ┌─ tests/inference/mutations.enriched.move:559:38
+    │
+559 │         ensures [inferred] !cond ==> at_21@global<Counter>(a2) == update_field(old(global<Counter>(a2)), value, v1);
+    │                                      ^^^^^^^^^^^^^^^^^^^^^^^^^
+
+error: state label `at_21` is not defined; labels in memory accesses must reference a post-state label defined by a behavior predicate in the same spec
+    ┌─ tests/inference/mutations.enriched.move:562:39
+    │
+562 │         aborts_if [inferred] cond && !at_21@exists<Counter>(a1);
+    │                                       ^^^^^^^^^^^^^^^^^^^^^^^^^
+
+error: state label `at_21` is not defined; labels in memory accesses must reference a post-state label defined by a behavior predicate in the same spec
+    ┌─ tests/inference/mutations.enriched.move:563:40
+    │
+563 │         aborts_if [inferred] !cond && !at_21@exists<Counter>(a2);
+    │                                        ^^^^^^^^^^^^^^^^^^^^^^^^^
+
+error: state label `at_23` is not defined; labels in memory accesses must reference a post-state label defined by a behavior predicate in the same spec
+    ┌─ tests/inference/mutations.enriched.move:579:73
+    │
+579 │         ensures [inferred] cond ==> global<Counter>(a2) == update_field(at_23@global<Counter>(a2), value, at_23@global<Counter>(a2).value + v2);
+    │                                                                         ^^^^^^^^^^^^^^^^^^^^^^^^^
+
+error: state label `at_23` is not defined; labels in memory accesses must reference a post-state label defined by a behavior predicate in the same spec
+    ┌─ tests/inference/mutations.enriched.move:579:107
+    │
+579 │         ensures [inferred] cond ==> global<Counter>(a2) == update_field(at_23@global<Counter>(a2), value, at_23@global<Counter>(a2).value + v2);
+    │                                                                                                           ^^^^^^^^^^^^^^^^^^^^^^^^^
+
+error: state label `at_23` is not defined; labels in memory accesses must reference a post-state label defined by a behavior predicate in the same spec
+    ┌─ tests/inference/mutations.enriched.move:580:74
+    │
+580 │         ensures [inferred] !cond ==> global<Counter>(a1) == update_field(at_23@global<Counter>(a1), value, at_23@global<Counter>(a1).value + v2);
+    │                                                                          ^^^^^^^^^^^^^^^^^^^^^^^^^
+
+error: state label `at_23` is not defined; labels in memory accesses must reference a post-state label defined by a behavior predicate in the same spec
+    ┌─ tests/inference/mutations.enriched.move:580:108
+    │
+580 │         ensures [inferred] !cond ==> global<Counter>(a1) == update_field(at_23@global<Counter>(a1), value, at_23@global<Counter>(a1).value + v2);
+    │                                                                                                            ^^^^^^^^^^^^^^^^^^^^^^^^^
+
+error: state label `at_23` is not defined; labels in memory accesses must reference a post-state label defined by a behavior predicate in the same spec
+    ┌─ tests/inference/mutations.enriched.move:581:69
+    │
+581 │         ensures [inferred] cond ==> (forall x: address: x != a1 ==> at_23@global<Counter>(x) == old(global<Counter>(x)));
+    │                                                                     ^^^^^^^^^^^^^^^^^^^^^^^^
+
+error: state label `at_23` is not defined; labels in memory accesses must reference a post-state label defined by a behavior predicate in the same spec
+    ┌─ tests/inference/mutations.enriched.move:582:37
+    │
+582 │         ensures [inferred] cond ==> at_23@global<Counter>(a1) == update_field(old(global<Counter>(a1)), value, old(global<Counter>(a1)).value + v1);
+    │                                     ^^^^^^^^^^^^^^^^^^^^^^^^^
+
+error: state label `at_23` is not defined; labels in memory accesses must reference a post-state label defined by a behavior predicate in the same spec
+    ┌─ tests/inference/mutations.enriched.move:583:70
+    │
+583 │         ensures [inferred] !cond ==> (forall x: address: x != a2 ==> at_23@global<Counter>(x) == old(global<Counter>(x)));
+    │                                                                      ^^^^^^^^^^^^^^^^^^^^^^^^
+
+error: state label `at_23` is not defined; labels in memory accesses must reference a post-state label defined by a behavior predicate in the same spec
+    ┌─ tests/inference/mutations.enriched.move:584:38
+    │
+584 │         ensures [inferred] !cond ==> at_23@global<Counter>(a2) == update_field(old(global<Counter>(a2)), value, old(global<Counter>(a2)).value + v1);
+    │                                      ^^^^^^^^^^^^^^^^^^^^^^^^^
+
+error: state label `at_23` is not defined; labels in memory accesses must reference a post-state label defined by a behavior predicate in the same spec
+    ┌─ tests/inference/mutations.enriched.move:585:38
+    │
+585 │         aborts_if [inferred] cond && at_23@global<Counter>(a2).value + v2 > MAX_U64;
+    │                                      ^^^^^^^^^^^^^^^^^^^^^^^^^
+
+error: state label `at_23` is not defined; labels in memory accesses must reference a post-state label defined by a behavior predicate in the same spec
+    ┌─ tests/inference/mutations.enriched.move:587:39
+    │
+587 │         aborts_if [inferred] !cond && at_23@global<Counter>(a1).value + v2 > MAX_U64;
+    │                                       ^^^^^^^^^^^^^^^^^^^^^^^^^
+
+error: state label `at_23` is not defined; labels in memory accesses must reference a post-state label defined by a behavior predicate in the same spec
+    ┌─ tests/inference/mutations.enriched.move:590:39
+    │
+590 │         aborts_if [inferred] cond && !at_23@exists<Counter>(a1);
+    │                                       ^^^^^^^^^^^^^^^^^^^^^^^^^
+
+error: state label `at_23` is not defined; labels in memory accesses must reference a post-state label defined by a behavior predicate in the same spec
+    ┌─ tests/inference/mutations.enriched.move:592:40
+    │
+592 │         aborts_if [inferred] !cond && !at_23@exists<Counter>(a2);
+    │                                        ^^^^^^^^^^^^^^^^^^^^^^^^^
+
+error: state label `at_24` is not defined; labels in memory accesses must reference a post-state label defined by a behavior predicate in the same spec
+    ┌─ tests/inference/mutations.enriched.move:608:64
+    │
+608 │         ensures [inferred] global<Counter>(a3) == update_field(at_24@global<Counter>(a3), value, v3);
+    │                                                                ^^^^^^^^^^^^^^^^^^^^^^^^^
+
+error: state label `at_24` is not defined; labels in memory accesses must reference a post-state label defined by a behavior predicate in the same spec
+    ┌─ tests/inference/mutations.enriched.move:609:69
+    │
+609 │         ensures [inferred = sathard] forall x: address: x != a2 ==> at_24@global<Counter>(x) == at_18@global<Counter>(x);
+    │                                                                     ^^^^^^^^^^^^^^^^^^^^^^^^
+
+error: state label `at_18` is not defined; labels in memory accesses must reference a post-state label defined by a behavior predicate in the same spec
+    ┌─ tests/inference/mutations.enriched.move:609:97
+    │
+609 │         ensures [inferred = sathard] forall x: address: x != a2 ==> at_24@global<Counter>(x) == at_18@global<Counter>(x);
+    │                                                                                                 ^^^^^^^^^^^^^^^^^^^^^^^^
+
+error: state label `at_24` is not defined; labels in memory accesses must reference a post-state label defined by a behavior predicate in the same spec
+    ┌─ tests/inference/mutations.enriched.move:610:28
+    │
+610 │         ensures [inferred] at_24@global<Counter>(a2) == update_field(at_18@global<Counter>(a2), value, v2);
+    │                            ^^^^^^^^^^^^^^^^^^^^^^^^^
+
+error: state label `at_18` is not defined; labels in memory accesses must reference a post-state label defined by a behavior predicate in the same spec
+    ┌─ tests/inference/mutations.enriched.move:610:70
+    │
+610 │         ensures [inferred] at_24@global<Counter>(a2) == update_field(at_18@global<Counter>(a2), value, v2);
+    │                                                                      ^^^^^^^^^^^^^^^^^^^^^^^^^
+
+error: state label `at_18` is not defined; labels in memory accesses must reference a post-state label defined by a behavior predicate in the same spec
+    ┌─ tests/inference/mutations.enriched.move:611:69
+    │
+611 │         ensures [inferred = sathard] forall x: address: x != a1 ==> at_18@global<Counter>(x) == old(global<Counter>(x));
+    │                                                                     ^^^^^^^^^^^^^^^^^^^^^^^^
+
+error: state label `at_18` is not defined; labels in memory accesses must reference a post-state label defined by a behavior predicate in the same spec
+    ┌─ tests/inference/mutations.enriched.move:612:28
+    │
+612 │         ensures [inferred] at_18@global<Counter>(a1) == update_field(old(global<Counter>(a1)), value, v1);
+    │                            ^^^^^^^^^^^^^^^^^^^^^^^^^
+
+error: state label `at_24` is not defined; labels in memory accesses must reference a post-state label defined by a behavior predicate in the same spec
+    ┌─ tests/inference/mutations.enriched.move:614:31
+    │
+614 │         aborts_if [inferred] !at_24@exists<Counter>(a2);
+    │                               ^^^^^^^^^^^^^^^^^^^^^^^^^
+
+error: state label `at_18` is not defined; labels in memory accesses must reference a post-state label defined by a behavior predicate in the same spec
+    ┌─ tests/inference/mutations.enriched.move:615:31
+    │
+615 │         aborts_if [inferred] !at_18@exists<Counter>(a1);
+    │                               ^^^^^^^^^^^^^^^^^^^^^^^^^
+
+error: state label `at_13` is not defined; labels in memory accesses must reference a post-state label defined by a behavior predicate in the same spec
+    ┌─ tests/inference/mutations.enriched.move:631:28
+    │
+631 │         ensures [inferred] at_13@global<Counter>(a1) == update_field(old(global<Counter>(a1)), value, v);
+    │                            ^^^^^^^^^^^^^^^^^^^^^^^^^
+
+error: state label `at_13` is not defined; labels in memory accesses must reference a post-state label defined by a behavior predicate in the same spec
+    ┌─ tests/inference/mutations.enriched.move:633:31
+    │
+633 │         aborts_if [inferred] !at_13@exists<Counter>(a1);
+    │                               ^^^^^^^^^^^^^^^^^^^^^^^^^
 */
