@@ -297,6 +297,7 @@ impl ExecutionProxyClient {
             network_sender.clone(),
             self.bounded_executor.clone(),
             &self.consensus_config.ss_rb_config,
+            self.consensus_config.secret_share_request_delay_ms,
         );
 
         tokio::spawn(secret_share_manager.start(

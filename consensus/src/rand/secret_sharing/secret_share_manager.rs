@@ -72,6 +72,7 @@ impl SecretShareManager {
         network_sender: Arc<NetworkSender>,
         bounded_executor: BoundedExecutor,
         rb_config: &ReliableBroadcastConfig,
+        secret_share_request_delay_ms: u64,
     ) -> Self {
         let rb_backoff_policy = ExponentialBackoff::from_millis(rb_config.backoff_policy_base_ms)
             .factor(rb_config.backoff_policy_factor)
@@ -101,7 +102,7 @@ impl SecretShareManager {
             config,
             reliable_broadcast,
             network_sender,
-            secret_share_request_delay_ms: rb_config.secret_share_request_delay_ms,
+            secret_share_request_delay_ms,
 
             decision_rx,
             outgoing_blocks,
