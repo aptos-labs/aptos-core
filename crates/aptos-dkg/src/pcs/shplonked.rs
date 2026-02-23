@@ -13,8 +13,14 @@ use crate::{
         univariate_hiding_kzg::{self, Trapdoor},
     },
     sigma_protocol::{
-        homomorphism::{tuple::TupleCodomainShape, Trait as _, TrivialShape as CodomainShape},
-        FirstProofItem, Proof, Trait as SigmaTrait,
+        homomorphism::{
+            fixed_base_msms::Trait as FixedBaseMsmsTrait,
+            tuple::TupleCodomainShape,
+            Trait as _,
+            TrivialShape as CodomainShape,
+        },
+        traits::fiat_shamir_challenge_for_sigma_protocol,
+        CurveGroupTrait, FirstProofItem, Proof, Trait as SigmaTrait,
     },
     Scalar,
 };
@@ -446,10 +452,101 @@ where
     let commitment_refs: Vec<&MsmInput<E::G1Affine, E::ScalarField>> =
         commitment_msms.iter().collect();
     let merged = merge_scaled_msm_terms::<E::G1>(&commitment_refs, &alphas);
-    let sum_com = E::G1::msm(merged.bases(), merged.scalars())
-        .expect("Shplonked verify: merged commitment MSM");
     #[cfg(feature = "pcs_verify_timing")]
     print_cumulative("merged commitment MSM", start.elapsed());
+
+    #[cfg(feature = "pcs_verify_timing")]
+    let start = Instant::now();
+    let alpha = compute_alpha::<E>(&eval_points, z, gamma);
+    let n = eval_points.len();
+    let com_y_hom = shplonked_sigma::com_y_hom(&srs.taus_1[..n], srs.xi_1);
+    let v_hom = shplonked_sigma::VHom::new(srs.taus_1[0], srs.xi_1, alpha);
+    let com_y_v_hom = shplonked_sigma::ComYVHom::<E> {
+        hom1: com_y_hom,
+        hom2: v_hom,
+        _group: std::marker::PhantomData,
+    };
+    let sum_hom = shplonked_sigma::SumEvalsHom::<E::ScalarField>::default();
+    let full_hom = shplonked_sigma::ShplonkedSigmaHom::<E> {
+        hom1: com_y_v_hom,
+        hom2: sum_hom,
+    };
+
+    let public_statement = TupleCodomainShape(
+        TupleCodomainShape(
+            CodomainShape(sigma_proof_statement.com_y),
+            CodomainShape(sigma_proof_statement.V),
+        ),
+        sigma_proof_statement.y_sum,
+    );
+
+    let sigma_protocol_proof: Proof<
+        E::ScalarField,
+        shplonked_sigma::ShplonkedSigmaHom<E>,
+    > = Proof {
+        first_proof_item: FirstProofItem::Commitment(TupleCodomainShape(
+            TupleCodomainShape(
+                CodomainShape(sigma_proof.r_com_y),
+                CodomainShape(sigma_proof.r_V),
+            ),
+            sigma_proof.r_y,
+        )),
+        z: ShplonkedSigmaWitness {
+            rho: sigma_proof.z_rho,
+            evals: sigma_proof.z_yi.clone(),
+            u: sigma_proof.z_u,
+        },
+    };
+
+    let prover_commitment = sigma_protocol_proof
+        .prover_commitment()
+        .expect("Shplonked verify: tuple proof must contain commitment");
+    let c = fiat_shamir_challenge_for_sigma_protocol::<
+        _,
+        E::ScalarField,
+        _,
+    >(
+        SHPLONKED_SIGMA_DST,
+        &full_hom,
+        &public_statement,
+        prover_commitment,
+        &full_hom.dst(),
+    );
+
+    full_hom.hom2.verify_with_challenge(
+        &public_statement.1,
+        &prover_commitment.1,
+        c,
+        &sigma_protocol_proof.z,
+        None,
+        rng,
+    )?;
+
+    // Use full protocol challenge c for hom1's MSM (msm_terms_for_verify would recompute c from inner hom).
+    let (_, powers_of_beta) = full_hom.hom1.compute_verifier_challenges(
+        &public_statement.0,
+        &prover_commitment.0,
+        SHPLONKED_SIGMA_DST,
+        Some(2),
+        rng,
+    );
+    let msm_terms_response = full_hom.hom1.msm_terms(&sigma_protocol_proof.z);
+    let hom1_msm_terms = <shplonked_sigma::ComYVHom<E> as CurveGroupTrait>::merge_msm_terms(
+        msm_terms_response.into_iter().collect::<Vec<_>>(),
+        &prover_commitment.0,
+        &public_statement.0,
+        &powers_of_beta,
+        c,
+    );
+    let delta = sample_field_element(rng);
+    let merged_final = merge_scaled_msm_terms::<E::G1>(
+        &[&merged, &hom1_msm_terms],
+        &[E::ScalarField::ONE, delta],
+    );
+    let sum_com = E::G1::msm(merged_final.bases(), merged_final.scalars())
+        .expect("Shplonked verify: merged commitment MSM");
+    #[cfg(feature = "pcs_verify_timing")]
+    print_cumulative("compute_alpha + hom setup + sigma (hom2 verify + hom1 MSM merge)", start.elapsed());
 
     #[cfg(feature = "pcs_verify_timing")]
     let start = Instant::now();
@@ -477,60 +574,7 @@ where
         return Err(anyhow::anyhow!("Expected zero during multi-pairing check"));
     }
 
-    #[cfg(feature = "pcs_verify_timing")]
-    let start = Instant::now();
-    let alpha = compute_alpha::<E>(&eval_points, z, gamma);
-    let n = eval_points.len();
-    let com_y_hom = shplonked_sigma::com_y_hom(&srs.taus_1[..n], srs.xi_1);
-    let v_hom = shplonked_sigma::VHom::new(srs.taus_1[0], srs.xi_1, alpha);
-    let com_y_v_hom = shplonked_sigma::ComYVHom::<E> {
-        hom1: com_y_hom,
-        hom2: v_hom,
-        _group: std::marker::PhantomData,
-    };
-    let sum_hom = shplonked_sigma::SumEvalsHom::<E::ScalarField>::default();
-    let full_hom = shplonked_sigma::ShplonkedSigmaHom::<E> {
-        hom1: com_y_v_hom,
-        hom2: sum_hom,
-    };
-
-    let public_statement = TupleCodomainShape(
-        TupleCodomainShape(
-            CodomainShape(sigma_proof_statement.com_y),
-            CodomainShape(sigma_proof_statement.V),
-        ),
-        sigma_proof_statement.y_sum,
-    );
-
-    let sigma_protocol_proof = Proof {
-        first_proof_item: FirstProofItem::Commitment(TupleCodomainShape(
-            TupleCodomainShape(
-                CodomainShape(sigma_proof.r_com_y),
-                CodomainShape(sigma_proof.r_V),
-            ),
-            sigma_proof.r_y,
-        )),
-        z: ShplonkedSigmaWitness {
-            rho: sigma_proof.z_rho,
-            evals: sigma_proof.z_yi.clone(),
-            u: sigma_proof.z_u,
-        },
-    };
-    #[cfg(feature = "pcs_verify_timing")]
-    print_cumulative("compute_alpha + hom setup + proof packaging", start.elapsed());
-
-    #[cfg(feature = "pcs_verify_timing")]
-    let start = Instant::now();
-    let result = full_hom.verify(
-        &public_statement,
-        &sigma_protocol_proof,
-        SHPLONKED_SIGMA_DST,
-        Some((2, 0)), // ((com_y, V), y_sum): 2 components in first tuple, 0 MSMs in second
-        rng,
-    );
-    #[cfg(feature = "pcs_verify_timing")]
-    print_cumulative("full_hom.verify (sigma protocol)", start.elapsed());
-    result
+    Ok(())
 }
 
 // ---------------------------------------------------------------------------
