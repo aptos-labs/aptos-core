@@ -49,9 +49,13 @@ impl SecretShareAggregator {
             BlockStage::SECRET_SHARING_ADD_ENOUGH_SHARE,
         );
         let dec_config = secret_share_config.clone();
-        let self_share = self
-            .get_self_share()
-            .expect("Aggregated item should have self share");
+        let self_share = match self.get_self_share() {
+            Some(share) => share,
+            None => {
+                warn!("Aggregation threshold met but self share missing");
+                return Either::Left(self);
+            },
+        };
         tokio::task::spawn_blocking(move || {
             let maybe_key = SecretShare::aggregate(self.shares.values(), &dec_config);
             match maybe_key {
@@ -76,7 +80,7 @@ impl SecretShareAggregator {
         self.total_weight = self
             .shares
             .keys()
-            .map(|author| weights.get(author).expect("Author must exist for weight"))
+            .filter_map(|author| weights.get(author))
             .sum();
     }
 
@@ -161,7 +165,7 @@ impl SecretShareItem {
         let item = std::mem::replace(self, Self::new(Author::ONE));
         let share_weight = *share_weights
             .get(share.author())
-            .expect("Author must exist in weights");
+            .ok_or_else(|| anyhow::anyhow!("Author {} not found in weights", share.author()))?;
         let new_item = match item {
             SecretShareItem::PendingMetadata(mut share_aggregator) => {
                 let metadata = share.metadata.clone();
@@ -187,9 +191,7 @@ impl SecretShareItem {
                 share_aggregator, ..
             } => Some(share_aggregator.shares.keys().cloned().collect()),
             SecretShareItem::Decided { .. } => None,
-            SecretShareItem::PendingMetadata(_) => {
-                unreachable!("Should only be called after block is added")
-            },
+            SecretShareItem::PendingMetadata(_) => None,
         }
     }
 
@@ -235,7 +237,7 @@ impl SecretShareStore {
     }
 
     pub fn add_self_share(&mut self, share: SecretShare) -> anyhow::Result<()> {
-        assert!(
+        ensure!(
             self.self_author == share.author,
             "Only self shares can be added with metadata"
         );
