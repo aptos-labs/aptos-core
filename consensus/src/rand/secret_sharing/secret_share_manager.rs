@@ -116,9 +116,11 @@ impl SecretShareManager {
         let mut share_requester_handles = Vec::new();
         let mut pending_secret_key_rounds = HashSet::new();
         for block in blocks.ordered_blocks.iter() {
-            let handle = self.process_incoming_block(block).await?;
-            share_requester_handles.push(handle);
-            pending_secret_key_rounds.insert(block.round());
+            if block.secret_shared_key().is_none() {
+                let handle = self.process_incoming_block(block).await?;
+                share_requester_handles.push(handle);
+                pending_secret_key_rounds.insert(block.round());
+            }
         }
 
         let queue_item = QueueItem::new(
