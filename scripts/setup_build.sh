@@ -406,8 +406,8 @@ resolve_pkg_name() {
             case "$_pm" in
                 apt-get)     echo "libpq-dev" ;;
                 apk)         echo "postgresql-dev" ;;
-                pacman|yum)  echo "postgresql-libs" ;;
-                dnf)         echo "libpq-devel" ;;
+                pacman)      echo "postgresql-libs" ;;
+                yum|dnf)     echo "postgresql-devel" ;;
                 brew)        echo "postgresql" ;;
                 *)           echo "" ;;
             esac
@@ -416,25 +416,32 @@ resolve_pkg_name() {
         # libdw -- DWARF debug info (used for backtraces / profiling on Linux)
         libdw-dev)
             case "$_pm" in
+                apt-get)     echo "libdw-dev" ;;
+                yum|dnf)     echo "elfutils-devel" ;;
                 pacman)      echo "libelf" ;;
+                apk)         echo "elfutils-dev" ;;
                 brew)        echo "" ;;
-                *)           echo "libdw-dev" ;;
+                *)           echo "" ;;
             esac
             ;;
 
         # libudev -- device event library (needed by hidapi crate for Aptos Ledger)
         libudev-dev)
             case "$_pm" in
+                apt-get)     echo "libudev-dev" ;;
+                yum|dnf)     echo "systemd-devel" ;;
+                apk)         echo "eudev-dev" ;;
                 pacman|brew) echo "" ;;
-                *)           echo "libudev-dev" ;;
+                *)           echo "" ;;
             esac
             ;;
 
-        # Python 3 interpreter and dev headers
+        # Python 3 interpreter, dev headers, and pip
         python3)
             case "$_pm" in
                 apt-get) echo "python3-all-dev python3-setuptools python3-pip" ;;
-                apk)     echo "python3-dev" ;;
+                apk)     echo "python3-dev py3-pip" ;;
+                yum|dnf) echo "python3 python3-pip" ;;
                 *)       echo "python3" ;;
             esac
             ;;
@@ -461,6 +468,14 @@ resolve_pkg_name() {
             case "$_pm" in
                 apt-get) echo "xsltproc" ;;
                 *)       echo "libxslt" ;;
+            esac
+            ;;
+
+        # xz -- compression utility (needed to extract shellcheck tarball)
+        xz)
+            case "$_pm" in
+                apt-get) echo "xz-utils" ;;
+                *)       echo "xz" ;;
             esac
             ;;
 
@@ -600,7 +615,7 @@ install_clang() {
             log_step "Installing Clang $_version from the LLVM apt repository"
             _sudo="$(sudo_if_needed)"
             # shellcheck disable=SC2086
-            $_sudo apt-get install -y gnupg lsb-release software-properties-common wget || \
+            $_sudo apt-get install -y bash gnupg lsb-release software-properties-common wget || \
                 die "Failed to install prerequisites for the LLVM apt repository." \
                     "Ensure apt sources are configured and network is available."
             # The upstream LLVM install script uses bash-specific syntax
@@ -626,7 +641,6 @@ install_clang() {
 
 install_rustup() {
     log_step "Installing Rust via rustup"
-    _batch="$1"
 
     if [ "$OPT_DIR" = "true" ]; then
         export RUSTUP_HOME=/opt/rustup/
@@ -732,12 +746,18 @@ install_cargo_tool() {
 
     if command -v "$_cmd" >/dev/null 2>&1; then
         _actual="$("$_cmd" --version 2>/dev/null || echo "")"
-        case "$_actual" in
-            *"$_expected"*)
-                log_info "$_cmd v${_expected} already installed"
-                return 0
-                ;;
-        esac
+        # Use grep with word-boundary to avoid substring false positives
+        # (e.g. 0.9.1 matching 0.9.10)
+        if echo "$_actual" | grep -qF "$_expected"; then
+            # Verify it's not a prefix of a longer version
+            _stripped="$(echo "$_actual" | sed "s/.*${_expected}//")"
+            case "$_stripped" in
+                ""| " "* | ")"* | "-"*)
+                    log_info "$_cmd v${_expected} already installed"
+                    return 0
+                    ;;
+            esac
+        fi
         log_warn "$_cmd is installed but not v${_expected} (found: $_actual)"
         log_info "Reinstalling $_cmd v${_expected}"
     else
@@ -1155,6 +1175,8 @@ install_allure() {
         # shellcheck disable=SC2086
         $_sudo apk --update add --no-cache \
             -X https://dl-cdn.alpinelinux.org/alpine/edge/community openjdk11
+        log_warn "Only the JDK was installed on Alpine; Allure CLI itself is not available via apk."
+        log_warn "Install Allure manually: https://docs.qameta.io/allure/#_installing_a_commandline"
     else
         log_warn "No automated Allure install method for $PACKAGE_MANAGER."
         log_warn "Install Allure manually: https://docs.qameta.io/allure/#_installing_a_commandline"
@@ -1327,6 +1349,8 @@ install_nodejs() {
     _sudo="$(sudo_if_needed)"
 
     if [ "$PACKAGE_MANAGER" = "apt-get" ]; then
+        # Ensure bash is available (minimal images may not have it)
+        install_pkg bash "$PACKAGE_MANAGER"
         curl -fsSL "https://deb.nodesource.com/setup_${NODE_MAJOR_VERSION}.x" -o nodesource_setup.sh || \
             die "Failed to download NodeSource setup script for Node.js v${NODE_MAJOR_VERSION}."
         # NodeSource setup script requires bash, not POSIX sh
@@ -1633,7 +1657,7 @@ if [ "$INSTALL_BUILD_TOOLS" = "true" ]; then
     fi
 
     # Rust toolchain
-    install_rustup "$BATCH_MODE"
+    install_rustup
 
     # Install the exact channel pinned in rust-toolchain.toml
     _rust_channel="$(grep channel ./rust-toolchain.toml | sed 's/.*"\([^"]*\)".*/\1/')"
