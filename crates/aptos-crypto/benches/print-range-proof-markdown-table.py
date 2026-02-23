@@ -12,7 +12,8 @@ HEADER = [
 ]
 
 BP_NAME = "Bulletproofs"
-DE_NAME = "DeKART (BLS12-381)"
+DE_NAME = "univ DeKART (BLS12-381)"
+DE_MV_NAME = "multiv DeKART (BLS12-381)"
 
 BP_PROVE_ID = "range_prove"
 BP_VERIFY_ID = "range_verify"
@@ -129,6 +130,7 @@ def accumulate(rows):
     """
     bp = defaultdict(dict)
     de = defaultdict(dict)
+    de_mv = defaultdict(dict)
     ells_seen = set()
 
     for r in rows:
@@ -154,6 +156,15 @@ def accumulate(rows):
             elif ident == BP_VERIFY_ID:
                 bp[(n, ell)]["verify"] = mean_ns
 
+        elif "dekart-multivar" in group or "dekart_multivar" in group:
+            parsed = parse_param_dekart(param)
+            if not parsed: continue
+            n, ell = parsed
+            ells_seen.add(ell)
+            if ident == DE_PROVE_ID:
+                de_mv[(n, ell)]["prove"] = mean_ns
+            elif ident == DE_VERIFY_ID:
+                de_mv[(n, ell)]["verify"] = mean_ns
         elif group.startswith("dekart"):
             parsed = parse_param_dekart(param)
             if not parsed: continue
@@ -164,38 +175,37 @@ def accumulate(rows):
             elif ident == DE_VERIFY_ID:
                 de[(n, ell)]["verify"] = mean_ns
 
-    return bp, de, sorted(ells_seen)
+    return bp, de, de_mv, sorted(ells_seen)
 
-def make_rows_for_ell(bp_map, de_map, ell):
+def make_rows_for_ell(bp_map, de_map, de_mv_map, ell):
     """
-    Alternate rows: Bulletproofs (n asc) then DeKART (n asc).
-    DeKART ratios are computed vs Bulletproofs at the *next power of two* batch size:
-      compare DeKART n = 2^k - 1  against Bulletproofs n = 2^k.
-    Only include rows where each scheme has both prove & verify for its own n.
+    For each n (across all schemes), emit BP row, univ DeKART row, multiv DeKART row when present.
+    DeKART ratios are computed vs Bulletproofs at the *next power of two* batch size.
     """
-    # Collect valid ns per scheme for this ell
     bp_ns = sorted(n for (n,e),dv in bp_map.items() if e==ell and "prove" in dv and "verify" in dv)
     de_ns = sorted(n for (n,e),dv in de_map.items() if e==ell and "prove" in dv and "verify" in dv)
+    de_mv_ns = sorted(n for (n,e),dv in de_mv_map.items() if e==ell and "prove" in dv and "verify" in dv)
 
-    # Lookup tables in ms
     bp_vals = {}
     for n in bp_ns:
         dv = bp_map[(n, ell)]
         p = ns_to_ms(dv["prove"]); v = ns_to_ms(dv["verify"]); t = round(p+v, 2)
         bp_vals[n] = (p, v, t)
-
     de_vals = {}
     for n in de_ns:
         dv = de_map[(n, ell)]
         p = ns_to_ms(dv["prove"]); v = ns_to_ms(dv["verify"]); t = round(p+v, 2)
         de_vals[n] = (p, v, t)
+    de_mv_vals = {}
+    for n in de_mv_ns:
+        dv = de_mv_map[(n, ell)]
+        p = ns_to_ms(dv["prove"]); v = ns_to_ms(dv["verify"]); t = round(p+v, 2)
+        de_mv_vals[n] = (p, v, t)
 
-    # Alternate output
+    all_n = sorted(set(bp_ns) | set(de_ns) | set(de_mv_ns))
     out = []
-    i = j = 0
-    while i < len(bp_ns) or j < len(de_ns):
-        if i < len(bp_ns):
-            n = bp_ns[i]; i += 1
+    for n in all_n:
+        if n in bp_ns:
             bp_p, bp_v, bp_t = bp_vals[n]
             bp_size = bp_proof_size(n, ell)
             out.append({
@@ -207,10 +217,8 @@ def make_rows_for_ell(bp_map, de_map, ell):
                 "s_display": fmt_int(bp_size),
                 "s_render":  fmt_int(bp_size),
             })
-        if j < len(de_ns):
-            n = de_ns[j]; j += 1
+        if n in de_ns:
             de_p, de_v, de_t = de_vals[n]
-            # Baseline Bulletproofs = next power of two of (n+1)  (for 2^k-1 -> 2^k)
             baseline_n = next_pow2_ge(n + 1)
             de_size = de_proof_size(n, ell)
             if baseline_n in bp_vals:
@@ -221,20 +229,44 @@ def make_rows_for_ell(bp_map, de_map, ell):
                 p_disp, p_rend = decorate_dekart(de_p, rp)
                 v_disp, v_rend = decorate_dekart(de_v, rv)
                 t_disp, t_rend = decorate_dekart(de_t, rt)
-
-                # proof-size ratio: DeKART vs BP baseline, same direction & coloring as verify time
                 bp_size = bp_proof_size(baseline_n, ell)
                 rs = de_size / bp_size if bp_size else float("inf")
                 s_disp, s_rend = decorate_dekart_size(de_size, rs)
             else:
-                # No BP baseline available; print plain values
                 p_disp = p_rend = fmt_ms(de_p)
                 v_disp = v_rend = fmt_ms(de_v)
                 t_disp = t_rend = fmt_ms(de_t)
                 s_disp = s_rend = fmt_int(de_size)
-
             out.append({
                 "Scheme": DE_NAME,
+                "n": str(n),
+                "p_display": p_disp, "p_render": p_rend,
+                "v_display": v_disp, "v_render": v_rend,
+                "t_display": t_disp, "t_render": t_rend,
+                "s_display": s_disp, "s_render": s_rend,
+            })
+        if n in de_mv_ns:
+            de_p, de_v, de_t = de_mv_vals[n]
+            baseline_n = next_pow2_ge(n + 1)
+            de_size = de_proof_size(n, ell)
+            if baseline_n in bp_vals:
+                bp_p, bp_v, bp_t = bp_vals[baseline_n]
+                rp = bp_p / de_p if bp_p else float("inf")
+                rv = bp_v / de_v if bp_v else float("inf")
+                rt = bp_t / de_t if bp_t else float("inf")
+                p_disp, p_rend = decorate_dekart(de_p, rp)
+                v_disp, v_rend = decorate_dekart(de_v, rv)
+                t_disp, t_rend = decorate_dekart(de_t, rt)
+                bp_size = bp_proof_size(baseline_n, ell)
+                rs = de_size / bp_size if bp_size else float("inf")
+                s_disp, s_rend = decorate_dekart_size(de_size, rs)
+            else:
+                p_disp = p_rend = fmt_ms(de_p)
+                v_disp = v_rend = fmt_ms(de_v)
+                t_disp = t_rend = fmt_ms(de_t)
+                s_disp = s_rend = fmt_int(de_size)
+            out.append({
+                "Scheme": DE_MV_NAME,
                 "n": str(n),
                 "p_display": p_disp, "p_render": p_rend,
                 "v_display": v_disp, "v_render": v_rend,
@@ -303,11 +335,11 @@ def main():
     else:
         rows = list(read_rows(sys.stdin))
 
-    bp_map, de_map, ells = accumulate(rows)
+    bp_map, de_map, de_mv_map, ells = accumulate(rows)
 
     first = True
     for ell in ells:
-        tbl_rows = make_rows_for_ell(bp_map, de_map, ell)
+        tbl_rows = make_rows_for_ell(bp_map, de_map, de_mv_map, ell)
         if not tbl_rows:
             continue
         if not first:
