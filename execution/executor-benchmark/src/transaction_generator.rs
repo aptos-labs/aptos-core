@@ -33,7 +33,7 @@ use itertools::Itertools;
 use move_core_types::{ident_str, language_storage::ModuleId};
 use rand::{rngs::StdRng, seq::SliceRandom, thread_rng, Rng, SeedableRng};
 use rayon::{
-    iter::{IntoParallelRefIterator, ParallelIterator},
+    iter::{IntoParallelRefIterator, IntoParallelRefMutIterator, ParallelIterator},
     ThreadPool, ThreadPoolBuilder,
 };
 use serde::{Deserialize, Serialize};
@@ -330,14 +330,19 @@ impl TransactionGenerator {
         mut accounts: AccountCache,
         name: &str,
     ) -> AccountCache {
-        let mut updated = 0;
-        for account in &mut accounts.accounts {
-            let seq_num = get_sequence_number(account.address(), reader.clone());
-            if seq_num > 0 {
-                updated += 1;
-                account.set_sequence_number(seq_num);
-            }
-        }
+        let updated = AtomicUsize::new(0);
+        accounts
+            .accounts
+            .make_contiguous()
+            .par_iter_mut()
+            .for_each(|account| {
+                let seq_num = get_sequence_number(account.address(), Arc::clone(&reader));
+                if seq_num > 0 {
+                    updated.fetch_add(1, Ordering::Relaxed);
+                    account.set_sequence_number(seq_num);
+                }
+            });
+        let updated = updated.load(Ordering::Relaxed);
         if updated > 0 {
             println!(
                 "Updated {} seq numbers out of {} {} accounts",
