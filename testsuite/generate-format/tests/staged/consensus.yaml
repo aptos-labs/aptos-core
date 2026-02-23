@@ -994,37 +994,21 @@ Payload:
           SEQ:
             TYPENAME: SignedTransaction
     1:
-      InQuorumStore:
-        NEWTYPE:
-          TYPENAME: ProofWithData
+      DeprecatedInQuorumStore:
+        NEWTYPE: UNIT
     2:
-      InQuorumStoreWithLimit:
-        NEWTYPE:
-          TYPENAME: ProofWithDataWithTxnLimit
+      DeprecatedInQuorumStoreWithLimit:
+        NEWTYPE: UNIT
     3:
-      QuorumStoreInlineHybrid:
-        TUPLE:
-          - SEQ:
-              TUPLE:
-                - TYPENAME: BatchInfo
-                - SEQ:
-                    TYPENAME: SignedTransaction
-          - TYPENAME: ProofWithData
-          - OPTION: U64
+      DeprecatedQuorumStoreInlineHybrid:
+        NEWTYPE: UNIT
     4:
       OptQuorumStore:
         NEWTYPE:
           TYPENAME: OptQuorumStorePayload
     5:
-      QuorumStoreInlineHybridV2:
-        TUPLE:
-          - SEQ:
-              TUPLE:
-                - TYPENAME: BatchInfo
-                - SEQ:
-                    TYPENAME: SignedTransaction
-          - TYPENAME: ProofWithData
-          - TYPENAME: PayloadExecutionLimit
+      DeprecatedQuorumStoreInlineHybridV2:
+        NEWTYPE: UNIT
 PayloadExecutionLimit:
   ENUM:
     0:
@@ -1052,17 +1036,6 @@ ProofOfStoreMsg:
     - proofs:
         SEQ:
           TYPENAME: ProofOfStore
-ProofWithData:
-  STRUCT:
-    - proofs:
-        SEQ:
-          TYPENAME: ProofOfStore
-ProofWithDataWithTxnLimit:
-  STRUCT:
-    - proof_with_data:
-        TYPENAME: ProofWithData
-    - max_txns_to_execute:
-        OPTION: U64
 ProposalExt:
   ENUM:
     0:

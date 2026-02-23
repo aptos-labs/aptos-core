@@ -9,7 +9,8 @@ use crate::{
 use aptos_config::config::BlockTransactionFilterConfig;
 use aptos_consensus_types::{
     block::{block_test_utils::certificate_for_genesis, Block},
-    common::{Payload, ProofWithData},
+    common::Payload,
+    payload::{OptQuorumStorePayload, PayloadExecutionLimit},
     proof_of_store::BatchInfo,
 };
 use aptos_crypto::{
@@ -237,7 +238,12 @@ fn create_payload(
 ) -> Payload {
     if use_quorum_store_payloads {
         let inline_batch = (create_batch_info(transactions.len()), transactions);
-        Payload::QuorumStoreInlineHybrid(vec![inline_batch], ProofWithData::empty(), None)
+        Payload::OptQuorumStore(OptQuorumStorePayload::new(
+            vec![inline_batch].into(),
+            Vec::<BatchInfo>::new().into(),
+            Vec::new().into(),
+            PayloadExecutionLimit::None,
+        ))
     } else {
         Payload::DirectMempool(transactions)
     }
