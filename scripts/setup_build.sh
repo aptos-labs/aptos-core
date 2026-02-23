@@ -590,17 +590,26 @@ install_clang() {
     _version="${2:-$CLANG_VERSION}"
 
     if [ "$_pm" = "apt-get" ]; then
-        log_step "Installing Clang $_version from the LLVM apt repository"
+        # CI AMIs often ship with clang pre-installed.  The LLVM nightly apt
+        # repo frequently rotates out old .deb files, so re-running llvm.sh
+        # on a machine that already has the right version will fail.  Skip
+        # the install entirely when the expected version is already present.
+        if command -v "clang-${_version}" >/dev/null 2>&1; then
+            log_info "clang-${_version} is already installed -- skipping LLVM apt setup"
+        else
+            log_step "Installing Clang $_version from the LLVM apt repository"
+            _sudo="$(sudo_if_needed)"
+            # shellcheck disable=SC2086
+            $_sudo apt-get install -y gnupg lsb-release software-properties-common wget || \
+                die "Failed to install prerequisites for the LLVM apt repository." \
+                    "Ensure apt sources are configured and network is available."
+            # The upstream LLVM install script uses bash-specific syntax
+            # shellcheck disable=SC2086
+            $_sudo bash -c "$(wget -O - https://apt.llvm.org/llvm.sh)" llvm.sh "$_version" || \
+                die "Failed to run the LLVM apt setup script for Clang $_version." \
+                    "Check https://apt.llvm.org/ for supported distro/version combinations."
+        fi
         _sudo="$(sudo_if_needed)"
-        # shellcheck disable=SC2086
-        $_sudo apt-get install -y gnupg lsb-release software-properties-common wget || \
-            die "Failed to install prerequisites for the LLVM apt repository." \
-                "Ensure apt sources are configured and network is available."
-        # The upstream LLVM install script uses bash-specific syntax
-        # shellcheck disable=SC2086
-        $_sudo bash -c "$(wget -O - https://apt.llvm.org/llvm.sh)" llvm.sh "$_version" || \
-            die "Failed to run the LLVM apt setup script for Clang $_version." \
-                "Check https://apt.llvm.org/ for supported distro/version combinations."
         # shellcheck disable=SC2086
         $_sudo update-alternatives --install /usr/bin/clang clang "/usr/bin/clang-${_version}" 100
         # shellcheck disable=SC2086
@@ -1482,7 +1491,7 @@ for _arg in "$@"; do
     esac
 done
 
-while getopts "btoprvydaPJhi:nk" _opt; do
+while getopts "btoprvydPJhi:nk" _opt; do
     case "$_opt" in
         b) BATCH_MODE=true ;;
         t) INSTALL_BUILD_TOOLS=true ;;
