@@ -19,6 +19,25 @@
 
 set -e
 
+# Global temp-dir registry: functions register temp dirs here so the EXIT
+# trap can clean them up even if die() / set -e aborts the script early.
+_CLEANUP_DIRS=""
+# shellcheck disable=SC2317
+_cleanup_on_exit() {
+    # shellcheck disable=SC2086
+    for _d in $_CLEANUP_DIRS; do
+        rm -rf "$_d" 2>/dev/null
+    done
+}
+trap _cleanup_on_exit EXIT
+
+# Helper: create a temp dir and register it for automatic cleanup.
+make_tmp_dir() {
+    _td="$(mktemp -d)"
+    _CLEANUP_DIRS="$_CLEANUP_DIRS $_td"
+    echo "$_td"
+}
+
 # ============================================================================
 # Tool Versions (pinned for reproducible builds)
 #
@@ -131,9 +150,15 @@ else
 fi
 
 log_info()  { printf "${_CLR_GRN}[INFO]${_CLR_RST}  %s\n" "$*" >&2; }
-log_warn()  { printf "${_CLR_YEL}[WARN]${_CLR_RST}  %s\n" "$*" >&2; }
 log_error() { printf "${_CLR_RED}[ERROR]${_CLR_RST} %s\n" "$*" >&2; }
 log_step()  { printf "${_CLR_CYN}[STEP]${_CLR_RST}  %s\n" "$*" >&2; }
+
+# log_warn accepts multiple arguments; each is printed on its own line.
+log_warn() {
+    for _wline in "$@"; do
+        printf "${_CLR_YEL}[WARN]${_CLR_RST}  %s\n" "$_wline" >&2
+    done
+}
 
 # Print an error and exit.  Accepts multiple arguments; each is printed
 # on its own line so callers can provide context and remediation hints.
@@ -439,10 +464,11 @@ resolve_pkg_name() {
         # Python 3 interpreter, dev headers, and pip
         python3)
             case "$_pm" in
-                apt-get) echo "python3-all-dev python3-setuptools python3-pip" ;;
-                apk)     echo "python3-dev py3-pip" ;;
-                yum|dnf) echo "python3 python3-pip" ;;
-                *)       echo "python3" ;;
+                apt-get)     echo "python3-all-dev python3-setuptools python3-pip" ;;
+                apk)         echo "python3-dev py3-pip" ;;
+                yum|dnf)     echo "python3 python3-pip" ;;
+                pacman|brew) echo "python" ;;
+                *)           echo "python3" ;;
             esac
             ;;
 
@@ -825,7 +851,7 @@ install_protoc() {
                 ;;
         esac
 
-        _tmpdir="$(mktemp -d)"
+        _tmpdir="$(make_tmp_dir)"
         (
             cd "$_tmpdir" || exit 1
             _url="https://github.com/protocolbuffers/protobuf/releases/download/v${PROTOC_VERSION}/${_protoc_pkg}.zip"
@@ -906,7 +932,7 @@ install_shellcheck() {
 
     install_generic xz
     _machine="$(uname -m)"
-    _tmpdir="$(mktemp -d)"
+    _tmpdir="$(make_tmp_dir)"
     _url="https://github.com/koalaman/shellcheck/releases/download/v${SHELLCHECK_VERSION}/shellcheck-v${SHELLCHECK_VERSION}.linux.${_machine}.tar.xz"
     curl -sL -o "${_tmpdir}/out.xz" "$_url" || {
         rm -rf "$_tmpdir"
@@ -915,8 +941,8 @@ install_shellcheck() {
             "Check that the URL is reachable and the architecture (${_machine}) is correct."
     }
     tar -xf "${_tmpdir}/out.xz" -C "${_tmpdir}/"
-    cp "${_tmpdir}/shellcheck-v${SHELLCHECK_VERSION}/shellcheck" "${INSTALL_DIR}/shellcheck"
-    chmod +x "${INSTALL_DIR}/shellcheck"
+    cp "${_tmpdir}/shellcheck-v${SHELLCHECK_VERSION}/shellcheck" "${INSTALL_DIR}shellcheck"
+    chmod +x "${INSTALL_DIR}shellcheck"
     rm -rf "$_tmpdir"
 }
 
@@ -927,7 +953,7 @@ install_shellcheck() {
 install_vault() {
     log_info "Installing Vault v${VAULT_VERSION} (secrets management)"
 
-    _current="$("${INSTALL_DIR}/vault" --version 2>/dev/null || echo "")"
+    _current="$("${INSTALL_DIR}vault" --version 2>/dev/null || echo "")"
     if [ "$_current" = "Vault v${VAULT_VERSION}" ]; then
         log_info "Vault ${VAULT_VERSION} already installed"
         return 0
@@ -945,8 +971,8 @@ install_vault() {
     }
     unzip -qq -d "$INSTALL_DIR" "$_tmpfile"
     rm -f "$_tmpfile"
-    chmod +x "${INSTALL_DIR}/vault"
-    "${INSTALL_DIR}/vault" --version
+    chmod +x "${INSTALL_DIR}vault"
+    "${INSTALL_DIR}vault" --version
 }
 
 # ============================================================================
@@ -973,15 +999,15 @@ install_helm() {
     case "$_machine" in x86_64) _machine="amd64" ;; esac
     _os="$(uname -s | tr '[:upper:]' '[:lower:]')"
 
-    _tmpdir="$(mktemp -d)"
+    _tmpdir="$(make_tmp_dir)"
     curl -sL -o "${_tmpdir}/helm.tar.gz" \
         "https://get.helm.sh/helm-v${HELM_VERSION}-${_os}-${_machine}.tar.gz" || {
         rm -rf "$_tmpdir"
         die "Failed to download Helm ${HELM_VERSION} for ${_os}/${_machine}."
     }
     tar -zxf "${_tmpdir}/helm.tar.gz" -C "${_tmpdir}/"
-    cp "${_tmpdir}/${_os}-${_machine}/helm" "${INSTALL_DIR}/helm"
-    chmod +x "${INSTALL_DIR}/helm"
+    cp "${_tmpdir}/${_os}-${_machine}/helm" "${INSTALL_DIR}helm"
+    chmod +x "${INSTALL_DIR}helm"
     rm -rf "$_tmpdir"
 }
 
@@ -1017,7 +1043,7 @@ install_terraform() {
     }
     unzip -qq -d "${INSTALL_DIR}" "$_tmpfile"
     rm -f "$_tmpfile"
-    chmod +x "${INSTALL_DIR}/terraform"
+    chmod +x "${INSTALL_DIR}terraform"
     terraform --version
 }
 
@@ -1045,10 +1071,10 @@ install_kubectl() {
     case "$_machine" in x86_64) _machine="amd64" ;; esac
     _os="$(uname -s | tr '[:upper:]' '[:lower:]')"
 
-    curl -sL -o "${INSTALL_DIR}/kubectl" \
+    curl -sL -o "${INSTALL_DIR}kubectl" \
         "https://dl.k8s.io/release/v${KUBECTL_VERSION}/bin/${_os}/${_machine}/kubectl" || \
         die "Failed to download kubectl ${KUBECTL_VERSION} for ${_os}/${_machine}."
-    chmod +x "${INSTALL_DIR}/kubectl"
+    chmod +x "${INSTALL_DIR}kubectl"
     kubectl version --client 2>/dev/null | head -n 1 || true
 }
 
@@ -1081,7 +1107,7 @@ install_awscli() {
     _machine="$(uname -m)"
     _os="$(uname -s | tr '[:upper:]' '[:lower:]')"
 
-    _tmpdir="$(mktemp -d)"
+    _tmpdir="$(make_tmp_dir)"
     curl -sL -o "${_tmpdir}/aws.zip" \
         "https://awscli.amazonaws.com/awscli-exe-${_os}-${_machine}.zip" || {
         rm -rf "$_tmpdir"
@@ -1130,14 +1156,14 @@ install_s5cmd() {
         esac
 
         if [ -n "$_suffix" ]; then
-            _tmpdir="$(mktemp -d)"
+            _tmpdir="$(make_tmp_dir)"
             curl -sL -o "${_tmpdir}/s5cmd.tar.gz" \
                 "https://github.com/peak/s5cmd/releases/download/v${S5CMD_VERSION}/s5cmd_${S5CMD_VERSION}_Linux-${_suffix}.tar.gz" || {
                 rm -rf "$_tmpdir"
                 die "Failed to download s5cmd v${S5CMD_VERSION} for Linux/${_suffix}."
             }
             tar -C "$_tmpdir" -xzf "${_tmpdir}/s5cmd.tar.gz"
-            mv "${_tmpdir}/s5cmd" "${INSTALL_DIR}/"
+            mv "${_tmpdir}/s5cmd" "${INSTALL_DIR}"
             rm -rf "$_tmpdir"
             "${INSTALL_DIR}s5cmd" version
             return 0
@@ -1164,13 +1190,14 @@ install_allure() {
     if [ "$PACKAGE_MANAGER" = "apt-get" ]; then
         # shellcheck disable=SC2086
         $_sudo apt-get install default-jre -y --no-install-recommends
-        _deb="${HOME}/allure_${ALLURE_VERSION}-1_all.deb"
+        _tmpdir="$(make_tmp_dir)"
+        _deb="${_tmpdir}/allure_${ALLURE_VERSION}-1_all.deb"
         curl -sL -o "$_deb" \
             "https://github.com/diem/allure2/releases/download/${ALLURE_VERSION}/allure_${ALLURE_VERSION}-1_all.deb" || \
             die "Failed to download Allure .deb package."
         # shellcheck disable=SC2086
         $_sudo dpkg -i "$_deb"
-        rm -f "$_deb"
+        rm -rf "$_tmpdir"
     elif [ "$PACKAGE_MANAGER" = "apk" ]; then
         # shellcheck disable=SC2086
         $_sudo apk --update add --no-cache \
@@ -1220,7 +1247,7 @@ install_z3() {
             ;;
     esac
 
-    _tmpdir="$(mktemp -d)"
+    _tmpdir="$(make_tmp_dir)"
     (
         cd "$_tmpdir" || exit 1
         curl -LOs "https://github.com/Z3Prover/z3/releases/download/z3-${Z3_VERSION}/${_z3_pkg}.zip" || \
@@ -1261,15 +1288,21 @@ install_cvc5() {
             ;;
     esac
 
-    _tmpdir="$(mktemp -d)"
+    _tmpdir="$(make_tmp_dir)"
     (
         cd "$_tmpdir" || exit 1
         curl -LOs "https://github.com/cvc5/cvc5/releases/download/cvc5-${CVC5_VERSION}/${_cvc5_pkg}" || {
             log_warn "Failed to download cvc5 -- skipping"
             exit 0
         }
-        cp "$_cvc5_pkg" "${INSTALL_DIR}cvc5" || true
-        chmod +x "${INSTALL_DIR}cvc5" || true
+        cp "$_cvc5_pkg" "${INSTALL_DIR}cvc5" || {
+            log_error "Failed to copy cvc5 binary to ${INSTALL_DIR}"
+            exit 1
+        }
+        chmod +x "${INSTALL_DIR}cvc5" || {
+            log_error "Failed to make cvc5 executable"
+            exit 1
+        }
     )
     rm -rf "$_tmpdir"
 }
@@ -1279,8 +1312,8 @@ install_dotnet() {
     log_step "Installing .NET SDK ${DOTNET_VERSION} (runtime for Boogie verifier)"
     mkdir -p "${DOTNET_INSTALL_DIR}" 2>/dev/null || true
 
-    if [ -x "${DOTNET_INSTALL_DIR}/dotnet" ]; then
-        _count="$("${DOTNET_INSTALL_DIR}/dotnet" --list-sdks 2>/dev/null | grep -c "^${DOTNET_VERSION}" || echo "0")"
+    if [ -x "${DOTNET_INSTALL_DIR}dotnet" ]; then
+        _count="$("${DOTNET_INSTALL_DIR}dotnet" --list-sdks 2>/dev/null | grep -c "^${DOTNET_VERSION}" || echo "0")"
         if [ "$_count" != "0" ]; then
             log_info ".NET ${DOTNET_VERSION} already installed"
             return 0
@@ -1395,7 +1428,7 @@ add_to_profile() {
             ;;
     esac
     eval "$_line"
-    _found="$(grep -c "$_line" "${HOME}/.profile" 2>/dev/null || echo "0")"
+    _found="$(grep -Fxc -- "$_line" "${HOME}/.profile" 2>/dev/null || echo "0")"
     if [ "$_found" = "0" ]; then
         echo "$_line" >> "${HOME}/.profile"
     fi
@@ -1581,7 +1614,10 @@ if [ "$OPT_DIR" = "true" ]; then
     INSTALL_DIR="/opt/bin/"
     DOTNET_INSTALL_DIR="/opt/dotnet/"
 fi
-mkdir -p "$INSTALL_DIR" 2>/dev/null || true
+if ! mkdir -p "$INSTALL_DIR" 2>/dev/null; then
+    die "Failed to create install directory '$INSTALL_DIR'." \
+        "When using -n (/opt), you may need to run as root or use sudo."
+fi
 export DOTNET_INSTALL_DIR
 
 # ============================================================================
