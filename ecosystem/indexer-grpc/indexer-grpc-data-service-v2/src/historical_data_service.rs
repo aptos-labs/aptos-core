@@ -22,7 +22,7 @@ use std::{
 };
 use tokio::sync::mpsc::{channel, Receiver, Sender};
 use tonic::{Request, Status};
-use tracing::info;
+use tracing::{info, info_span, Instrument};
 
 const DEFAULT_MAX_NUM_TRANSACTIONS_PER_BATCH: usize = 10000;
 
@@ -67,7 +67,11 @@ impl HistoricalDataService {
                 let request_metadata = Arc::new(get_request_metadata(&request));
                 let request = request.into_inner();
                 let id = request_metadata.request_connection_id.clone();
-                info!("Received request: {request:?}.");
+                info!(
+                    stream_id = %id,
+                    starting_version = ?request.starting_version,
+                    "Received historical data service request"
+                );
 
                 if request.starting_version.is_none() {
                     let err = Err(Status::invalid_argument("Must provide starting_version."));
@@ -139,142 +143,159 @@ impl HistoricalDataService {
         request_metadata: Arc<IndexerGrpcRequestMetadata>,
         response_sender: tokio::sync::mpsc::Sender<Result<TransactionsResponse, Status>>,
     ) {
-        COUNTER
-            .with_label_values(&["historical_data_service_new_stream"])
-            .inc();
-        info!(stream_id = id, "Start streaming, starting_version: {starting_version}, ending_version: {ending_version:?}.");
-        self.connection_manager
-            .insert_active_stream(&id, starting_version, ending_version);
-        let mut next_version = starting_version;
-        let ending_version = ending_version.unwrap_or(u64::MAX);
-        let mut size_bytes = 0;
-        'out: loop {
+        let span = info_span!(
+            "historical_data_service.stream",
+            stream_id = %id,
+            starting_version = starting_version,
+            ending_version = ?ending_version,
+        );
+
+        async {
+            COUNTER
+                .with_label_values(&["historical_data_service_new_stream"])
+                .inc();
+            info!(
+                stream_id = %id,
+                "Start streaming, starting_version: {starting_version}, ending_version: {ending_version:?}."
+            );
             self.connection_manager
-                .update_stream_progress(&id, next_version, size_bytes);
-            if next_version >= ending_version {
-                break;
-            }
-
-            if !self.file_store_reader.can_serve(next_version).await {
-                info!(stream_id = id, "next_version {next_version} is larger or equal than file store version, terminate the stream.");
-                break;
-            }
-
-            // TODO(grao): Pick a better channel size here, and consider doing parallel fetching
-            // inside the `get_transaction_batch` call based on the channel size.
-            let (tx, mut rx) = channel(1);
-
-            let file_store_reader = self.file_store_reader.clone();
-            let filter = filter.clone();
-            tokio::spawn(async move {
-                file_store_reader
-                    .get_transaction_batch(
-                        next_version,
-                        /*retries=*/ 3,
-                        /*max_files=*/ None,
-                        filter,
-                        Some(ending_version),
-                        tx,
-                    )
-                    .await;
-            });
-
-            let mut close_to_latest = false;
-            while let Some((
-                transactions,
-                batch_size_bytes,
-                timestamp,
-                (first_processed_version, last_processed_version),
-            )) = rx.recv().await
-            {
-                next_version = last_processed_version + 1;
-                size_bytes += batch_size_bytes as u64;
-                let timestamp_since_epoch =
-                    Duration::new(timestamp.seconds as u64, timestamp.nanos as u32);
-                let now_since_epoch = SystemTime::now().duration_since(UNIX_EPOCH).unwrap();
-                let delta = now_since_epoch.saturating_sub(timestamp_since_epoch);
-
-                // TODO(grao): Double check if this threshold makes sense.
-                if delta < Duration::from_secs(60) {
-                    close_to_latest = true;
+                .insert_active_stream(&id, starting_version, ending_version);
+            let mut next_version = starting_version;
+            let ending_version = ending_version.unwrap_or(u64::MAX);
+            let mut size_bytes = 0;
+            'out: loop {
+                self.connection_manager
+                    .update_stream_progress(&id, next_version, size_bytes);
+                if next_version >= ending_version {
+                    break;
                 }
 
-                let responses = if !transactions.is_empty() {
-                    let mut current_version = first_processed_version;
-                    let mut responses: Vec<_> = transactions
-                        .chunks(max_num_transactions_per_batch)
-                        .map(|chunk| {
-                            let first_version = current_version;
-                            let last_version = chunk.last().unwrap().version;
-                            current_version = last_version + 1;
-                            TransactionsResponse {
-                                transactions: chunk.to_vec(),
-                                chain_id: Some(self.chain_id),
-                                processed_range: Some(ProcessedRange {
-                                    first_version,
-                                    last_version,
-                                }),
-                            }
-                        })
-                        .collect();
-                    responses
-                        .last_mut()
-                        .unwrap()
-                        .processed_range
-                        .as_mut()
-                        .unwrap()
-                        .last_version = last_processed_version;
-                    responses
-                } else {
-                    vec![TransactionsResponse {
-                        transactions: vec![],
-                        chain_id: Some(self.chain_id),
-                        processed_range: Some(ProcessedRange {
-                            first_version: first_processed_version,
-                            last_version: last_processed_version,
-                        }),
-                    }]
-                };
+                if !self.file_store_reader.can_serve(next_version).await {
+                    info!(
+                        stream_id = %id,
+                        "next_version {next_version} is larger or equal than file store version, terminate the stream."
+                    );
+                    break;
+                }
 
-                for response in responses {
-                    let _timer = TIMER
-                        .with_label_values(&["historical_data_service_send_batch"])
-                        .start_timer();
-                    // Record bytes ready to transfer after stripping for billing.
-                    let bytes_ready_to_transfer_after_stripping = response
-                        .transactions
-                        .iter()
-                        .map(|t| t.encoded_len())
-                        .sum::<usize>();
-                    BYTES_READY_TO_TRANSFER_FROM_SERVER_AFTER_STRIPPING
-                        .with_label_values(&request_metadata.get_label_values())
-                        .inc_by(bytes_ready_to_transfer_after_stripping as u64);
-                    if response_sender.send(Ok(response)).await.is_err() {
-                        // NOTE: We are not recalculating the version and size_bytes for the stream
-                        // progress since nobody cares about the accurate if client has dropped the
-                        // connection.
-                        info!(stream_id = id, "Client dropped.");
-                        COUNTER
-                            .with_label_values(&["historical_data_service_client_dropped"])
-                            .inc();
-                        break 'out;
+                // TODO(grao): Pick a better channel size here, and consider doing parallel fetching
+                // inside the `get_transaction_batch` call based on the channel size.
+                let (tx, mut rx) = channel(1);
+
+                let file_store_reader = self.file_store_reader.clone();
+                let filter = filter.clone();
+                tokio::spawn(async move {
+                    file_store_reader
+                        .get_transaction_batch(
+                            next_version,
+                            /*retries=*/ 3,
+                            /*max_files=*/ None,
+                            filter,
+                            Some(ending_version),
+                            tx,
+                        )
+                        .await;
+                });
+
+                let mut close_to_latest = false;
+                while let Some((
+                    transactions,
+                    batch_size_bytes,
+                    timestamp,
+                    (first_processed_version, last_processed_version),
+                )) = rx.recv().await
+                {
+                    next_version = last_processed_version + 1;
+                    size_bytes += batch_size_bytes as u64;
+                    let timestamp_since_epoch =
+                        Duration::new(timestamp.seconds as u64, timestamp.nanos as u32);
+                    let now_since_epoch = SystemTime::now().duration_since(UNIX_EPOCH).unwrap();
+                    let delta = now_since_epoch.saturating_sub(timestamp_since_epoch);
+
+                    // TODO(grao): Double check if this threshold makes sense.
+                    if delta < Duration::from_secs(60) {
+                        close_to_latest = true;
+                    }
+
+                    let responses = if !transactions.is_empty() {
+                        let mut current_version = first_processed_version;
+                        let mut responses: Vec<_> = transactions
+                            .chunks(max_num_transactions_per_batch)
+                            .map(|chunk| {
+                                let first_version = current_version;
+                                let last_version = chunk.last().unwrap().version;
+                                current_version = last_version + 1;
+                                TransactionsResponse {
+                                    transactions: chunk.to_vec(),
+                                    chain_id: Some(self.chain_id),
+                                    processed_range: Some(ProcessedRange {
+                                        first_version,
+                                        last_version,
+                                    }),
+                                }
+                            })
+                            .collect();
+                        responses
+                            .last_mut()
+                            .unwrap()
+                            .processed_range
+                            .as_mut()
+                            .unwrap()
+                            .last_version = last_processed_version;
+                        responses
+                    } else {
+                        vec![TransactionsResponse {
+                            transactions: vec![],
+                            chain_id: Some(self.chain_id),
+                            processed_range: Some(ProcessedRange {
+                                first_version: first_processed_version,
+                                last_version: last_processed_version,
+                            }),
+                        }]
+                    };
+
+                    for response in responses {
+                        let _timer = TIMER
+                            .with_label_values(&["historical_data_service_send_batch"])
+                            .start_timer();
+                        // Record bytes ready to transfer after stripping for billing.
+                        let bytes_ready_to_transfer_after_stripping = response
+                            .transactions
+                            .iter()
+                            .map(|t| t.encoded_len())
+                            .sum::<usize>();
+                        BYTES_READY_TO_TRANSFER_FROM_SERVER_AFTER_STRIPPING
+                            .with_label_values(&request_metadata.get_label_values())
+                            .inc_by(bytes_ready_to_transfer_after_stripping as u64);
+                        if response_sender.send(Ok(response)).await.is_err() {
+                            // NOTE: We are not recalculating the version and size_bytes for the stream
+                            // progress since nobody cares about the accurate if client has dropped the
+                            // connection.
+                            info!(stream_id = %id, "Client dropped.");
+                            COUNTER
+                                .with_label_values(&["historical_data_service_client_dropped"])
+                                .inc();
+                            break 'out;
+                        }
                     }
                 }
+                if close_to_latest {
+                    info!(
+                        stream_id = %id,
+                        "Stream is approaching to the latest transactions, terminate."
+                    );
+                    COUNTER
+                        .with_label_values(&["terminate_close_to_latest"])
+                        .inc();
+                    break;
+                }
             }
-            if close_to_latest {
-                info!(
-                    stream_id = id,
-                    "Stream is approaching to the latest transactions, terminate."
-                );
-                COUNTER
-                    .with_label_values(&["terminate_close_to_latest"])
-                    .inc();
-                break;
-            }
-        }
 
-        self.connection_manager
-            .update_stream_progress(&id, next_version, size_bytes);
-        self.connection_manager.remove_active_stream(&id);
+            self.connection_manager
+                .update_stream_progress(&id, next_version, size_bytes);
+            self.connection_manager.remove_active_stream(&id);
+        }
+        .instrument(span)
+        .await
     }
 }

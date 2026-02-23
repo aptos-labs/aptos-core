@@ -2,6 +2,7 @@
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 use crate::{data_manager::DataManager, metadata_manager::MetadataManager, metrics::COUNTER};
+use aptos_indexer_grpc_utils::trace_context::extract_or_create_trace_context;
 use aptos_protos::indexer::v1::{
     grpc_manager_server::GrpcManager, service_info::Info, GetDataServiceForRequestRequest,
     GetDataServiceForRequestResponse, GetTransactionsRequest, HeartbeatRequest, HeartbeatResponse,
@@ -10,6 +11,7 @@ use aptos_protos::indexer::v1::{
 use rand::{thread_rng, Rng};
 use std::sync::Arc;
 use tonic::{Request, Response, Status};
+use tracing::{info, info_span, warn, Instrument};
 
 const MAX_SIZE_BYTES_FROM_CACHE: usize = 20 * (1 << 20);
 
@@ -111,87 +113,152 @@ impl GrpcManager for GrpcManagerService {
         &self,
         request: Request<HeartbeatRequest>,
     ) -> Result<Response<HeartbeatResponse>, Status> {
-        let request = request.into_inner();
-        if let Some(service_info) = request.service_info {
-            if let Some(address) = service_info.address {
-                if let Some(info) = service_info.info {
-                    return self
-                        .handle_heartbeat(address, info)
-                        .await
-                        .map_err(|e| Status::internal(format!("Error handling heartbeat: {e}")));
+        let trace_ctx = extract_or_create_trace_context(
+            request.metadata(),
+            &tracing::Span::current(),
+        );
+        let span = info_span!(
+            "grpc_manager.heartbeat",
+            trace_id = %trace_ctx.trace_id,
+            parent_span_id = %trace_ctx.parent_span_id,
+            otel.kind = "server",
+        );
+
+        async {
+            let request = request.into_inner();
+            if let Some(service_info) = request.service_info {
+                if let Some(address) = service_info.address {
+                    if let Some(info) = service_info.info {
+                        return self
+                            .handle_heartbeat(address, info)
+                            .await
+                            .map_err(|e| Status::internal(format!("Error handling heartbeat: {e}")));
+                    }
                 }
             }
-        }
 
-        Err(Status::invalid_argument("Bad request."))
+            Err(Status::invalid_argument("Bad request."))
+        }
+        .instrument(span)
+        .await
     }
 
     async fn get_transactions(
         &self,
         request: Request<GetTransactionsRequest>,
     ) -> Result<Response<TransactionsResponse>, Status> {
-        let request = request.into_inner();
-        let transactions = self
-            .data_manager
-            .get_transactions(request.starting_version(), MAX_SIZE_BYTES_FROM_CACHE)
-            .await
-            .map_err(|e| Status::internal(format!("{e}")))?;
+        let trace_ctx = extract_or_create_trace_context(
+            request.metadata(),
+            &tracing::Span::current(),
+        );
+        let span = info_span!(
+            "grpc_manager.get_transactions",
+            trace_id = %trace_ctx.trace_id,
+            parent_span_id = %trace_ctx.parent_span_id,
+            otel.kind = "server",
+            starting_version = ?request.get_ref().starting_version,
+        );
 
-        Ok(Response::new(TransactionsResponse {
-            transactions,
-            chain_id: Some(self.chain_id),
-            // Not used.
-            processed_range: None,
-        }))
+        async {
+            let request = request.into_inner();
+            let transactions = self
+                .data_manager
+                .get_transactions(request.starting_version(), MAX_SIZE_BYTES_FROM_CACHE)
+                .await
+                .map_err(|e| Status::internal(format!("{e}")))?;
+
+            Ok(Response::new(TransactionsResponse {
+                transactions,
+                chain_id: Some(self.chain_id),
+                // Not used.
+                processed_range: None,
+            }))
+        }
+        .instrument(span)
+        .await
     }
 
     async fn get_data_service_for_request(
         &self,
         request: Request<GetDataServiceForRequestRequest>,
     ) -> Result<Response<GetDataServiceForRequestResponse>, Status> {
-        let request = request.into_inner();
+        let trace_ctx = extract_or_create_trace_context(
+            request.metadata(),
+            &tracing::Span::current(),
+        );
+        let span = info_span!(
+            "grpc_manager.get_data_service_for_request",
+            trace_id = %trace_ctx.trace_id,
+            parent_span_id = %trace_ctx.parent_span_id,
+            otel.kind = "server",
+        );
 
-        if request.user_request.is_none()
-            || request
-                .user_request
-                .as_ref()
-                .unwrap()
-                .starting_version
-                .is_none()
-        {
-            let candidates = self.metadata_manager.get_live_data_services_info();
-            if let Some(candidate) = candidates.iter().next() {
-                let data_service_address = candidate.0.clone();
-                return Ok(Response::new(GetDataServiceForRequestResponse {
-                    data_service_address,
-                }));
-            } else {
-                return Err(Status::internal(
-                    "Cannot find a data service instance to serve the provided request.",
-                ));
+        async {
+            let request = request.into_inner();
+
+            if request.user_request.is_none()
+                || request
+                    .user_request
+                    .as_ref()
+                    .unwrap()
+                    .starting_version
+                    .is_none()
+            {
+                let candidates = self.metadata_manager.get_live_data_services_info();
+                if let Some(candidate) = candidates.iter().next() {
+                    let data_service_address = candidate.0.clone();
+                    info!(
+                        data_service_address = %data_service_address,
+                        "Picked live data service (no starting_version specified)"
+                    );
+                    return Ok(Response::new(GetDataServiceForRequestResponse {
+                        data_service_address,
+                    }));
+                } else {
+                    warn!("No data service instance available to serve the request");
+                    return Err(Status::internal(
+                        "Cannot find a data service instance to serve the provided request.",
+                    ));
+                }
             }
+
+            let starting_version = request.user_request.unwrap().starting_version();
+
+            let data_service_address =
+                // TODO(grao): Use a simple strategy for now. Consider to make it smarter in the
+                // future.
+                if let Some(address) = self.pick_live_data_service(starting_version) {
+                    COUNTER.with_label_values(&["live_data_service_picked"]).inc();
+                    info!(
+                        data_service_address = %address,
+                        starting_version = starting_version,
+                        "Picked live data service"
+                    );
+                    address
+                } else if let Some(address) = self.pick_historical_data_service(starting_version).await {
+                    COUNTER.with_label_values(&["historical_data_service_picked"]).inc();
+                    info!(
+                        data_service_address = %address,
+                        starting_version = starting_version,
+                        "Picked historical data service"
+                    );
+                    address
+                } else {
+                    COUNTER.with_label_values(&["failed_to_pick_data_service"]).inc();
+                    warn!(
+                        starting_version = starting_version,
+                        "Failed to pick any data service"
+                    );
+                    return Err(Status::internal(
+                        "Cannot find a data service instance to serve the provided request.",
+                    ));
+                };
+
+            Ok(Response::new(GetDataServiceForRequestResponse {
+                data_service_address,
+            }))
         }
-
-        let starting_version = request.user_request.unwrap().starting_version();
-
-        let data_service_address =
-            // TODO(grao): Use a simple strategy for now. Consider to make it smarter in the
-            // future.
-            if let Some(address) = self.pick_live_data_service(starting_version) {
-                COUNTER.with_label_values(&["live_data_service_picked"]).inc();
-                address
-            } else if let Some(address) = self.pick_historical_data_service(starting_version).await {
-                COUNTER.with_label_values(&["historical_data_service_picked"]).inc();
-                address
-            } else {
-                COUNTER.with_label_values(&["failed_to_pick_data_service"]).inc();
-                return Err(Status::internal(
-                    "Cannot find a data service instance to serve the provided request.",
-                ));
-            };
-
-        Ok(Response::new(GetDataServiceForRequestResponse {
-            data_service_address,
-        }))
+        .instrument(span)
+        .await
     }
 }

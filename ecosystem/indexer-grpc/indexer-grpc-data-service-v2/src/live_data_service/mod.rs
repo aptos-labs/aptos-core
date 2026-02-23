@@ -23,7 +23,7 @@ use prost::Message;
 use std::{sync::Arc, time::Duration};
 use tokio::sync::mpsc::{Receiver, Sender};
 use tonic::{Request, Status};
-use tracing::info;
+use tracing::{info, info_span, Instrument};
 
 const MAX_BYTES_PER_BATCH: usize = 20 * (1 << 20);
 
@@ -82,7 +82,11 @@ impl<'a> LiveDataService<'a> {
                 let known_latest_version = self.get_known_latest_version();
                 let starting_version = request.starting_version.unwrap_or(known_latest_version);
 
-                info!("Received request: {request:?}.");
+                info!(
+                    stream_id = %id,
+                    starting_version = starting_version,
+                    "Received live data service request"
+                );
                 if starting_version > known_latest_version + 10000 {
                     let err = Err(Status::failed_precondition(
                         "starting_version cannot be set to a far future version.",
@@ -160,82 +164,99 @@ impl<'a> LiveDataService<'a> {
         request_metadata: Arc<IndexerGrpcRequestMetadata>,
         response_sender: tokio::sync::mpsc::Sender<Result<TransactionsResponse, Status>>,
     ) {
-        COUNTER
-            .with_label_values(&["live_data_service_new_stream"])
-            .inc();
-        info!(stream_id = id, "Start streaming, starting_version: {starting_version}, ending_version: {ending_version:?}.");
-        self.connection_manager
-            .insert_active_stream(&id, starting_version, ending_version);
-        let mut next_version = starting_version;
-        let mut size_bytes = 0;
-        let ending_version = ending_version.unwrap_or(u64::MAX);
-        loop {
-            if next_version >= ending_version {
-                break;
-            }
-            self.connection_manager
-                .update_stream_progress(&id, next_version, size_bytes);
-            let known_latest_version = self.get_known_latest_version();
-            if next_version > known_latest_version {
-                info!(stream_id = id, "next_version {next_version} is larger than known_latest_version {known_latest_version}");
-                tokio::time::sleep(Duration::from_millis(100)).await;
-                continue;
-            }
+        let span = info_span!(
+            "live_data_service.stream",
+            stream_id = %id,
+            starting_version = starting_version,
+            ending_version = ?ending_version,
+        );
 
-            if let Some((transactions, batch_size_bytes, last_processed_version)) = self
-                .in_memory_cache
-                .get_data(
-                    next_version,
-                    ending_version,
-                    max_num_transactions_per_batch,
-                    max_bytes_per_batch,
-                    &filter,
-                )
-                .await
-            {
-                let _timer = TIMER
-                    .with_label_values(&["live_data_service_send_batch"])
-                    .start_timer();
-                let response = TransactionsResponse {
-                    transactions,
-                    chain_id: Some(self.chain_id),
-                    processed_range: Some(ProcessedRange {
-                        first_version: next_version,
-                        last_version: last_processed_version,
-                    }),
-                };
-                // Record bytes ready to transfer after stripping for billing.
-                let bytes_ready_to_transfer_after_stripping = response
-                    .transactions
-                    .iter()
-                    .map(|t| t.encoded_len())
-                    .sum::<usize>();
-                BYTES_READY_TO_TRANSFER_FROM_SERVER_AFTER_STRIPPING
-                    .with_label_values(&request_metadata.get_label_values())
-                    .inc_by(bytes_ready_to_transfer_after_stripping as u64);
-                next_version = last_processed_version + 1;
-                size_bytes += batch_size_bytes as u64;
-                if response_sender.send(Ok(response)).await.is_err() {
-                    info!(stream_id = id, "Client dropped.");
+        async {
+            COUNTER
+                .with_label_values(&["live_data_service_new_stream"])
+                .inc();
+            info!(
+                stream_id = %id,
+                "Start streaming, starting_version: {starting_version}, ending_version: {ending_version:?}."
+            );
+            self.connection_manager
+                .insert_active_stream(&id, starting_version, ending_version);
+            let mut next_version = starting_version;
+            let mut size_bytes = 0;
+            let ending_version = ending_version.unwrap_or(u64::MAX);
+            loop {
+                if next_version >= ending_version {
+                    break;
+                }
+                self.connection_manager
+                    .update_stream_progress(&id, next_version, size_bytes);
+                let known_latest_version = self.get_known_latest_version();
+                if next_version > known_latest_version {
+                    info!(
+                        stream_id = %id,
+                        "next_version {next_version} is larger than known_latest_version {known_latest_version}"
+                    );
+                    tokio::time::sleep(Duration::from_millis(100)).await;
+                    continue;
+                }
+
+                if let Some((transactions, batch_size_bytes, last_processed_version)) = self
+                    .in_memory_cache
+                    .get_data(
+                        next_version,
+                        ending_version,
+                        max_num_transactions_per_batch,
+                        max_bytes_per_batch,
+                        &filter,
+                    )
+                    .await
+                {
+                    let _timer = TIMER
+                        .with_label_values(&["live_data_service_send_batch"])
+                        .start_timer();
+                    let response = TransactionsResponse {
+                        transactions,
+                        chain_id: Some(self.chain_id),
+                        processed_range: Some(ProcessedRange {
+                            first_version: next_version,
+                            last_version: last_processed_version,
+                        }),
+                    };
+                    // Record bytes ready to transfer after stripping for billing.
+                    let bytes_ready_to_transfer_after_stripping = response
+                        .transactions
+                        .iter()
+                        .map(|t| t.encoded_len())
+                        .sum::<usize>();
+                    BYTES_READY_TO_TRANSFER_FROM_SERVER_AFTER_STRIPPING
+                        .with_label_values(&request_metadata.get_label_values())
+                        .inc_by(bytes_ready_to_transfer_after_stripping as u64);
+                    next_version = last_processed_version + 1;
+                    size_bytes += batch_size_bytes as u64;
+                    if response_sender.send(Ok(response)).await.is_err() {
+                        info!(stream_id = %id, "Client dropped.");
+                        COUNTER
+                            .with_label_values(&["live_data_service_client_dropped"])
+                            .inc();
+                        break;
+                    }
+                } else {
+                    let err = Err(Status::not_found("Requested data is too old."));
+                    info!(stream_id = %id, "Client error: {err:?}.");
+                    let _ = response_sender.send(err).await;
                     COUNTER
-                        .with_label_values(&["live_data_service_client_dropped"])
+                        .with_label_values(&["terminate_requested_data_too_old"])
                         .inc();
                     break;
                 }
-            } else {
-                let err = Err(Status::not_found("Requested data is too old."));
-                info!(stream_id = id, "Client error: {err:?}.");
-                let _ = response_sender.send(err).await;
-                COUNTER
-                    .with_label_values(&["terminate_requested_data_too_old"])
-                    .inc();
-                break;
             }
-        }
 
-        self.connection_manager
-            .update_stream_progress(&id, next_version, size_bytes);
-        self.connection_manager.remove_active_stream(&id);
+            self.connection_manager
+                .update_stream_progress(&id, next_version, size_bytes);
+            self.connection_manager.remove_active_stream(&id);
+        }
+        .instrument(span)
+        .await
     }
 
     fn get_known_latest_version(&self) -> u64 {

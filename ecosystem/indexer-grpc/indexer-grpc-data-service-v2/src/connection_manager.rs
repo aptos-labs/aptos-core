@@ -19,7 +19,7 @@ use std::{
     time::{Duration, SystemTime},
 };
 use tonic::{codec::CompressionEncoding, transport::channel::Channel};
-use tracing::{info, warn};
+use tracing::{info, info_span, warn, Instrument};
 
 pub static MAX_HEARTBEAT_RETRIES: usize = 3;
 
@@ -247,57 +247,68 @@ impl ConnectionManager {
     }
 
     async fn heartbeat(&self, address: &str) -> Result<(), tonic::Status> {
-        info!("Sending heartbeat to GrpcManager {address}.");
-        let timestamp = Some(timestamp_now_proto());
-        let known_latest_version = Some(self.known_latest_version());
-        let stream_info = Some(StreamInfo {
-            active_streams: self.get_active_streams(),
-        });
+        let span = info_span!(
+            "data_service.heartbeat",
+            otel.kind = "client",
+            grpc_manager_address = address,
+            service_type = if self.is_live_data_service { "live" } else { "historical" },
+        );
 
-        let info = if self.is_live_data_service {
-            let min_servable_version = match LIVE_DATA_SERVICE.get() {
-                Some(svc) => Some(svc.get_min_servable_version().await),
-                None => None,
+        async {
+            info!("Sending heartbeat to GrpcManager {address}.");
+            let timestamp = Some(timestamp_now_proto());
+            let known_latest_version = Some(self.known_latest_version());
+            let stream_info = Some(StreamInfo {
+                active_streams: self.get_active_streams(),
+            });
+
+            let info = if self.is_live_data_service {
+                let min_servable_version = match LIVE_DATA_SERVICE.get() {
+                    Some(svc) => Some(svc.get_min_servable_version().await),
+                    None => None,
+                };
+                Some(Info::LiveDataServiceInfo(LiveDataServiceInfo {
+                    chain_id: self.chain_id,
+                    timestamp,
+                    known_latest_version,
+                    stream_info,
+                    min_servable_version,
+                }))
+            } else {
+                Some(Info::HistoricalDataServiceInfo(HistoricalDataServiceInfo {
+                    chain_id: self.chain_id,
+                    timestamp,
+                    known_latest_version,
+                    stream_info,
+                }))
             };
-            Some(Info::LiveDataServiceInfo(LiveDataServiceInfo {
-                chain_id: self.chain_id,
-                timestamp,
-                known_latest_version,
-                stream_info,
-                min_servable_version,
-            }))
-        } else {
-            Some(Info::HistoricalDataServiceInfo(HistoricalDataServiceInfo {
-                chain_id: self.chain_id,
-                timestamp,
-                known_latest_version,
-                stream_info,
-            }))
-        };
-        let service_info = ServiceInfo {
-            address: Some(self.self_advertised_address.clone()),
-            info,
-        };
-        let request = HeartbeatRequest {
-            service_info: Some(service_info),
-        };
-        let response = self
-            .grpc_manager_connections
-            .get(address)
-            // TODO(grao): Consider to not use unwrap here.
-            .unwrap()
-            .clone()
-            .heartbeat(request)
-            .await?
-            .into_inner();
-        if let Some(known_latest_version) = response.known_latest_version {
-            info!("Received known_latest_version ({known_latest_version}) from GrpcManager {address}.");
-            self.update_known_latest_version(known_latest_version);
-        } else {
-            warn!("HeartbeatResponse doesn't contain known_latest_version, GrpcManager address: {address}");
-        }
+            let service_info = ServiceInfo {
+                address: Some(self.self_advertised_address.clone()),
+                info,
+            };
+            let request = HeartbeatRequest {
+                service_info: Some(service_info),
+            };
+            let response = self
+                .grpc_manager_connections
+                .get(address)
+                // TODO(grao): Consider to not use unwrap here.
+                .unwrap()
+                .clone()
+                .heartbeat(request)
+                .await?
+                .into_inner();
+            if let Some(known_latest_version) = response.known_latest_version {
+                info!("Received known_latest_version ({known_latest_version}) from GrpcManager {address}.");
+                self.update_known_latest_version(known_latest_version);
+            } else {
+                warn!("HeartbeatResponse doesn't contain known_latest_version, GrpcManager address: {address}");
+            }
 
-        Ok(())
+            Ok(())
+        }
+        .instrument(span)
+        .await
     }
 
     fn create_client_from_address(address: &str) -> GrpcManagerClient<Channel> {
