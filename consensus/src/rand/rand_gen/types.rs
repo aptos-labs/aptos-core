@@ -151,7 +151,7 @@ impl TShare for Share {
 
         // Try batch verification: build proof and verify in one shot.
         // If any step fails, fall back to individual verification.
-        let batch_ok = Self::build_apks_and_proofs(&shares_vec, rand_config)
+        match Self::build_apks_and_proofs(&shares_vec, rand_config)
             .and_then(|apks_and_proofs| {
                 let proof = WVUF::aggregate_shares(&rand_config.wconfig, &apks_and_proofs);
                 let metadata_serialized = bcs::to_bytes(rand_metadata)
@@ -164,18 +164,16 @@ impl TShare for Share {
                     &proof,
                     THREAD_MANAGER.get_non_exe_cpu_pool(),
                 )
-            })
-            .is_ok();
-
-        if batch_ok {
-            return HashSet::new();
+            }) {
+            Ok(()) => return HashSet::new(),
+            Err(e) => {
+                // Batch verification failed; fall back to individual verification
+                warn!(
+                    "Batch verification failed for round {}, falling back to individual verification: {e}",
+                    rand_metadata.round
+                );
+            },
         }
-
-        // Batch verification failed; fall back to individual verification
-        warn!(
-            "Batch verification failed for round {}, falling back to individual verification",
-            rand_metadata.round
-        );
 
         let verification_results: Vec<bool> = THREAD_MANAGER.get_non_exe_cpu_pool().install(|| {
             shares_vec
