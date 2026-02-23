@@ -34,7 +34,7 @@ aptos-indexer = { workspace = true }
 aptos-indexer-grpc-table-info = { workspace = true }
 aptos-inspection-service = { workspace = true }
 aptos-keygen = { workspace = true }
-aptos-move-cli = { workspace = true }
+aptos-move-cli = { workspace = true, features = ["testing"] }
 aptos-move-debugger = { workspace = true }
 aptos-release-builder = { workspace = true }
 aptos-rest-client = { workspace = true }

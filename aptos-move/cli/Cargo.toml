@@ -30,7 +30,7 @@ aptos-sdk = { workspace = true }
 aptos-transaction-simulation = { workspace = true }
 aptos-transaction-simulation-session = { workspace = true }
 aptos-types = { workspace = true }
-aptos-vm = { workspace = true, features = ["testing"] }
+aptos-vm = { workspace = true }
 aptos-vm-environment = { workspace = true }
 aptos-vm-logging = { workspace = true }
 aptos-vm-types = { workspace = true }
@@ -78,4 +78,5 @@ termcolor = { workspace = true }
 
 [features]
 default = []
-binary = []
+binary = ["testing"]
+testing = ["aptos-vm/testing"]

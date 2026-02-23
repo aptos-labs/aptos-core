@@ -22,6 +22,7 @@ pub fn aptos_debug_natives(
     misc_gas_params: MiscGasParameters,
 ) -> NativeFunctionTable {
     // As a side effect, also configure for unit testing
+    #[cfg(feature = "testing")]
     natives::configure_for_unit_test();
     configure_extended_checks_for_unit_test();
     // Return all natives -- build with the 'testing' feature, therefore containing
