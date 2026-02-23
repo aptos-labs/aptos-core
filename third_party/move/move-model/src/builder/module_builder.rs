@@ -1550,14 +1550,15 @@ impl ModuleBuilder<'_, '_> {
         let mut behavior_predicates: Vec<(Option<MemoryLabel>, Option<MemoryLabel>, NodeId)> =
             Vec::new();
 
-        // Also collect labels used in Global/Exists memory access operations
-        let mut memory_access_labels: BTreeSet<MemoryLabel> = BTreeSet::new();
+        // Also collect labels used in Global/Exists memory access operations, with NodeId
+        // for error reporting
+        let mut memory_access_labels: Vec<(MemoryLabel, NodeId)> = Vec::new();
 
         self.update_spec(context, |spec| {
             fn collect_behavior_predicates(
                 exp: &Exp,
                 predicates: &mut Vec<(Option<MemoryLabel>, Option<MemoryLabel>, NodeId)>,
-                memory_labels: &mut BTreeSet<MemoryLabel>,
+                memory_labels: &mut Vec<(MemoryLabel, NodeId)>,
             ) {
                 exp.visit_pre_order(&mut |e| {
                     if let ExpData::Call(id, op, _) = e {
@@ -1568,7 +1569,7 @@ impl ModuleBuilder<'_, '_> {
                                 predicates.push((state.pre, state.post, *id));
                             },
                             Operation::Global(Some(label)) | Operation::Exists(Some(label)) => {
-                                memory_labels.insert(*label);
+                                memory_labels.push((*label, *id));
                             },
                             _ => {},
                         }
@@ -1598,6 +1599,7 @@ impl ModuleBuilder<'_, '_> {
             |label: MemoryLabel| -> Option<Symbol> { self.parent.env.get_memory_label_name(label) };
 
         // Build set of defined post-labels and used pre-labels
+        // TODO(#18762): Duplicate post-state labels are silently overwritten; should report an error.
         let mut defined_post_labels: BTreeMap<Symbol, Loc> = BTreeMap::new();
         let mut used_pre_labels: BTreeSet<Symbol> = BTreeSet::new();
         for (pre_label, post_label, node_id) in &behavior_predicates {
@@ -1610,7 +1612,7 @@ impl ModuleBuilder<'_, '_> {
             }
         }
         // Labels in Global/Exists memory accesses also count as references
-        for label in &memory_access_labels {
+        for (label, _) in &memory_access_labels {
             if let Some(name) = get_label_name(*label) {
                 used_pre_labels.insert(name);
             }
@@ -1629,6 +1631,22 @@ impl ModuleBuilder<'_, '_> {
                             "state label `{}` is not defined; \
                              pre-state labels must reference a post-state label defined by another behavior predicate in the same spec",
                             pre_name.display(symbol_pool)
+                        ),
+                    );
+                }
+            }
+        }
+        // Also validate labels from memory accesses
+        for (label, node_id) in &memory_access_labels {
+            if let Some(name) = get_label_name(*label) {
+                if !defined_post_labels.contains_key(&name) {
+                    let exp_loc = self.parent.env.get_node_loc(*node_id);
+                    self.parent.env.error(
+                        &exp_loc,
+                        &format!(
+                            "state label `{}` is not defined; \
+                             labels in memory accesses must reference a post-state label defined by a behavior predicate in the same spec",
+                            name.display(symbol_pool)
                         ),
                     );
                 }
