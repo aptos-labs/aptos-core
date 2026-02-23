@@ -67,6 +67,21 @@ pub enum BlockType {
         parent_block_id: HashValue,
         parents_bitvec: BitVec,
     },
+
+    /// A virtual block constructed from Strong Prefix Consensus output.
+    /// Local-only (never sent over network), like DAGBlock.
+    #[serde(skip_deserializing)]
+    PrefixConsensusBlock {
+        author: Author,
+        failed_authors: Vec<(Round, Author)>,
+        validator_txns: Vec<ValidatorTransaction>,
+        payload: Payload,
+        /// Authors of committed proposals, in ranking order (only non-⊥ entries)
+        authors: Vec<Author>,
+        /// Payload hashes of committed proposals, in ranking order (only non-⊥ entries)
+        proposal_hashes: Vec<HashValue>,
+        parent_block_id: HashValue,
+    },
 }
 
 #[derive(Deserialize, Serialize, Clone, Debug, PartialEq, Eq, CryptoHasher)]
@@ -136,9 +151,9 @@ impl CryptoHash for BlockData {
 impl BlockData {
     pub fn author(&self) -> Option<Author> {
         match &self.block_type {
-            BlockType::Proposal { author, .. } | BlockType::DAGBlock { author, .. } => {
-                Some(*author)
-            },
+            BlockType::Proposal { author, .. }
+            | BlockType::DAGBlock { author, .. }
+            | BlockType::PrefixConsensusBlock { author, .. } => Some(*author),
             BlockType::ProposalExt(p) => Some(*p.author()),
             BlockType::OptimisticProposal(p) => Some(*p.author()),
             _ => None,
@@ -156,6 +171,9 @@ impl BlockData {
     pub fn parent_id(&self) -> HashValue {
         if let BlockType::DAGBlock {
             parent_block_id, ..
+        }
+        | BlockType::PrefixConsensusBlock {
+            parent_block_id, ..
         } = self.block_type()
         {
             *parent_block_id
@@ -166,9 +184,9 @@ impl BlockData {
 
     pub fn payload(&self) -> Option<&Payload> {
         match &self.block_type {
-            BlockType::Proposal { payload, .. } | BlockType::DAGBlock { payload, .. } => {
-                Some(payload)
-            },
+            BlockType::Proposal { payload, .. }
+            | BlockType::DAGBlock { payload, .. }
+            | BlockType::PrefixConsensusBlock { payload, .. } => Some(payload),
             BlockType::ProposalExt(p) => p.payload(),
             BlockType::OptimisticProposal(p) => Some(p.payload()),
             _ => None,
@@ -180,7 +198,8 @@ impl BlockData {
             BlockType::ProposalExt(p) => p.validator_txns(),
             BlockType::OptimisticProposal(p) => p.validator_txns(),
             BlockType::Proposal { .. } | BlockType::NilBlock { .. } | BlockType::Genesis => None,
-            BlockType::DAGBlock { validator_txns, .. } => Some(validator_txns),
+            BlockType::DAGBlock { validator_txns, .. }
+            | BlockType::PrefixConsensusBlock { validator_txns, .. } => Some(validator_txns),
         }
     }
 
@@ -226,7 +245,8 @@ impl BlockData {
         match &self.block_type {
             BlockType::Proposal { failed_authors, .. }
             | BlockType::NilBlock { failed_authors, .. }
-            | BlockType::DAGBlock { failed_authors, .. } => Some(failed_authors),
+            | BlockType::DAGBlock { failed_authors, .. }
+            | BlockType::PrefixConsensusBlock { failed_authors, .. } => Some(failed_authors),
             BlockType::ProposalExt(p) => Some(p.failed_authors()),
             BlockType::OptimisticProposal(_) | BlockType::Genesis => None,
         }
@@ -351,6 +371,41 @@ impl BlockData {
                 node_digests,
                 parent_block_id,
                 parents_bitvec,
+            },
+        }
+    }
+
+    pub fn new_for_prefix_consensus(
+        epoch: u64,
+        round: Round,
+        timestamp_usecs: u64,
+        validator_txns: Vec<ValidatorTransaction>,
+        payload: Payload,
+        author: Author,
+        failed_authors: Vec<(Round, Author)>,
+        authors: Vec<Author>,
+        proposal_hashes: Vec<HashValue>,
+        parent_block_id: HashValue,
+    ) -> Self {
+        Self {
+            epoch,
+            round,
+            timestamp_usecs,
+            quorum_cert: QuorumCert::new(
+                VoteData::new(BlockInfo::empty(), BlockInfo::empty()),
+                LedgerInfoWithSignatures::new(
+                    LedgerInfo::new(BlockInfo::empty(), HashValue::zero()),
+                    AggregateSignature::new(BitVec::default(), None),
+                ),
+            ),
+            block_type: BlockType::PrefixConsensusBlock {
+                author,
+                validator_txns,
+                payload,
+                failed_authors,
+                authors,
+                proposal_hashes,
+                parent_block_id,
             },
         }
     }

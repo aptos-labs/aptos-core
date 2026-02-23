@@ -36,6 +36,7 @@
 //! - **Termination**: Every honest party eventually outputs
 //! - **Validity**: mcp({v_in_h}_{h∈H}) ⪯ v_low_i for any honest party i
 
+pub mod block_builder;
 pub mod certificates;
 mod certify;
 pub mod inner_pc_impl;
@@ -55,6 +56,7 @@ mod utils;
 mod verification;
 pub mod view_state;
 
+pub use block_builder::build_block_from_v_high;
 pub use certify::{qc1_certify, qc2_certify, qc3_certify};
 pub use manager::{DefaultPCManager, PrefixConsensusManager};
 pub use network_interface::{

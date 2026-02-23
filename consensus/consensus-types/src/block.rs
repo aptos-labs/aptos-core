@@ -344,6 +344,36 @@ impl Block {
         }
     }
 
+    pub fn new_for_prefix_consensus(
+        epoch: u64,
+        round: Round,
+        timestamp_usecs: u64,
+        validator_txns: Vec<ValidatorTransaction>,
+        payload: Payload,
+        author: Author,
+        authors: Vec<Author>,
+        proposal_hashes: Vec<HashValue>,
+        parent_block_id: HashValue,
+    ) -> Self {
+        let block_data = BlockData::new_for_prefix_consensus(
+            epoch,
+            round,
+            timestamp_usecs,
+            validator_txns,
+            payload,
+            author,
+            vec![], // failed_authors: no leader = no failed leader
+            authors,
+            proposal_hashes,
+            parent_block_id,
+        );
+        Self {
+            id: block_data.hash(),
+            block_data,
+            signature: None,
+        }
+    }
+
     pub fn new_proposal(
         payload: Payload,
         round: Round,
@@ -460,6 +490,9 @@ impl Block {
                 res2
             },
             BlockType::DAGBlock { .. } => bail!("We should not accept DAG block from others"),
+            BlockType::PrefixConsensusBlock { .. } => {
+                bail!("We should not accept PrefixConsensus block from others")
+            },
         }
     }
 
