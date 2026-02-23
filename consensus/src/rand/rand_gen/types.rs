@@ -151,20 +151,19 @@ impl TShare for Share {
 
         // Try batch verification: build proof and verify in one shot.
         // If any step fails, fall back to individual verification.
-        match Self::build_apks_and_proofs(&shares_vec, rand_config)
-            .and_then(|apks_and_proofs| {
-                let proof = WVUF::aggregate_shares(&rand_config.wconfig, &apks_and_proofs);
-                let metadata_serialized = bcs::to_bytes(rand_metadata)
-                    .map_err(|e| anyhow!("metadata serialization failed: {e}"))?;
-                WVUF::verify_proof(
-                    &rand_config.vuf_pp,
-                    rand_config.pk(),
-                    &rand_config.get_all_certified_apk(),
-                    metadata_serialized.as_slice(),
-                    &proof,
-                    THREAD_MANAGER.get_non_exe_cpu_pool(),
-                )
-            }) {
+        match Self::build_apks_and_proofs(&shares_vec, rand_config).and_then(|apks_and_proofs| {
+            let proof = WVUF::aggregate_shares(&rand_config.wconfig, &apks_and_proofs);
+            let metadata_serialized = bcs::to_bytes(rand_metadata)
+                .map_err(|e| anyhow!("metadata serialization failed: {e}"))?;
+            WVUF::verify_proof(
+                &rand_config.vuf_pp,
+                rand_config.pk(),
+                &rand_config.get_all_certified_apk(),
+                metadata_serialized.as_slice(),
+                &proof,
+                THREAD_MANAGER.get_non_exe_cpu_pool(),
+            )
+        }) {
             Ok(()) => return HashSet::new(),
             Err(e) => {
                 // Batch verification failed; fall back to individual verification
