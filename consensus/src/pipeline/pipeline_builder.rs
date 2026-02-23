@@ -492,16 +492,14 @@ impl PipelineBuilder {
             ),
             Some(&mut abort_handles),
         );
-        let rand_check_fut = spawn_shared_fut(
-            Self::wait_for_rand(
-                has_rand_txns_fut.clone(),
-                rand_rx,
-                block.clone(),
-                self.is_randomness_enabled,
-                self.rand_check_enabled,
-            ),
-            Some(&mut abort_handles),
-        );
+        let rand_check_fut = if self.is_randomness_enabled {
+            spawn_shared_fut(
+                Self::wait_for_rand(has_rand_txns_fut.clone(), rand_rx, block.clone()),
+                Some(&mut abort_handles),
+            )
+        } else {
+            spawn_ready_fut((None, false))
+        };
         let execute_fut = spawn_shared_fut(
             Self::execute(
                 prepare_fut.clone(),
@@ -727,7 +725,7 @@ impl PipelineBuilder {
             .state_view(block.parent_id())
             .map_err(anyhow::Error::from)?;
 
-        let mut has_randomness = false;
+        let mut need_randomness = false;
         // scope to drop the lock, compiler seems not able to figure out manual drop with async point
         {
             let mut cache_guard = module_cache.lock();
@@ -768,7 +766,7 @@ impl PipelineBuilder {
                             )
                             .is_some()
                             {
-                                has_randomness = true;
+                                need_randomness = true;
                                 break;
                             }
                         }
@@ -776,13 +774,13 @@ impl PipelineBuilder {
                 }
             }
         }
-        let label = if has_randomness {
+        let label = if need_randomness {
             "has_rand"
         } else {
             "no_rand"
         };
         counters::RAND_BLOCK.with_label_values(&[label]).inc();
-        if has_randomness {
+        if need_randomness {
             info!(
                 "[Pipeline] Block {} {} {} has randomness txn",
                 block.id(),
@@ -790,7 +788,7 @@ impl PipelineBuilder {
                 block.round()
             );
         }
-        Ok(has_randomness)
+        Ok(need_randomness)
     }
 
     /// Precondition: rand_txns_check finishes
@@ -799,24 +797,18 @@ impl PipelineBuilder {
         has_rand_txns_fut: TaskFuture<bool>,
         rand_rx: oneshot::Receiver<Option<Randomness>>,
         block: Arc<Block>,
-        is_randomness_enabled: bool,
-        rand_check_enabled: bool,
     ) -> TaskResult<RandResult> {
-        if !is_randomness_enabled {
-            return Ok((None, false));
-        }
-        let has_randomness = has_rand_txns_fut.await?;
-        // if rand check is enabled and no txn requires randomness, we skip waiting for randomness
+        let need_randomness = has_rand_txns_fut.await?;
         let mut tracker = Tracker::start_waiting("rand_gen", &block);
         tracker.start_working();
-        let maybe_rand = if rand_check_enabled && !has_randomness {
+        let maybe_rand = if !need_randomness {
             None
         } else {
             rand_rx
                 .await
                 .map_err(|_| anyhow!("randomness tx cancelled"))?
         };
-        Ok((Some(maybe_rand), has_randomness))
+        Ok((Some(maybe_rand), need_randomness))
     }
 
     /// Precondition: 1. prepare finishes, 2. parent block's phase finishes 3. randomness is available
@@ -837,7 +829,7 @@ impl PipelineBuilder {
         let onchain_execution_config =
             onchain_execution_config.with_block_gas_limit_override(block_gas_limit);
 
-        let (rand_result, _has_randomness) = rand_check.await?;
+        let (rand_result, _need_randomness) = rand_check.await?;
 
         tracker.start_working();
         let metadata_txn = match (rand_result, decryption_result) {
@@ -944,13 +936,13 @@ impl PipelineBuilder {
                 prev_epoch_end_timestamp
             };
         // check for randomness consistency
-        let (_, has_randomness) = rand_check.await?;
-        if !has_randomness {
+        let (_, need_randomness) = rand_check.await?;
+        if !need_randomness {
             let mut label = "consistent";
             for event in result.execution_output.subscribable_events.get(None) {
                 if event.type_tag() == RANDOMNESS_GENERATED_EVENT_MOVE_TYPE_TAG.deref() {
                     error!(
-                            "[Pipeline] Block {} {} {} generated randomness event without has_randomness being true!",
+                            "[Pipeline] Block {} {} {} generated randomness event without need_randomness being true!",
                             block.id(),
                             block.epoch(),
                             block.round()

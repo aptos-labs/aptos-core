@@ -150,8 +150,8 @@ impl<S: TShare, D: TAugmentedData> RandManager<S, D> {
                     let has_rand_txns = futs.has_rand_txns_fut.clone();
                     let decision_tx = self.decision_tx.clone();
                     let shared_future = async move {
-                        let has_rand = match has_rand_txns.await {
-                            Ok(has_rand) => has_rand,
+                        let need_rand = match has_rand_txns.await {
+                            Ok(need_rand) => need_rand,
                             Err(e) => {
                                 warn!("has_rand_txns_fut failed for round {}: {e}, defaulting to needs_randomness=true", round);
                                 true
@@ -159,11 +159,11 @@ impl<S: TShare, D: TAugmentedData> RandManager<S, D> {
                         };
                         // If the block doesn't need randomness, send Skip to unblock it
                         // before the share threshold is reached.
-                        if !has_rand {
+                        if !need_rand {
                             let _ = decision_tx
                                 .unbounded_send(AggregationResult::Skip { round });
                         }
-                        has_rand
+                        need_rand
                     }
                     .boxed()
                     .shared();
@@ -518,13 +518,6 @@ impl<S: TShare, D: TAugmentedData> RandManager<S, D> {
             }
             let maybe_ready_blocks = self.block_queue.dequeue_rand_ready_prefix();
             if !maybe_ready_blocks.is_empty() {
-                let mut rand_store = self.rand_store.lock();
-                for blocks in &maybe_ready_blocks {
-                    for block in &blocks.ordered_blocks {
-                        rand_store.remove_rand_check_future(block.round());
-                    }
-                }
-                drop(rand_store);
                 self.process_ready_blocks(maybe_ready_blocks);
             }
         }
