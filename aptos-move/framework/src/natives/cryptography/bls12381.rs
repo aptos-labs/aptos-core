@@ -9,9 +9,11 @@ use aptos_crypto::{
     SigningKey, Uniform,
 };
 use aptos_gas_schedule::gas_params::natives::aptos_framework::*;
+#[cfg(feature = "testing")]
+use aptos_native_interface::SafeNativeError;
 use aptos_native_interface::{
     safely_pop_arg, safely_pop_vec_arg, RawSafeNative, SafeNativeBuilder, SafeNativeContext,
-    SafeNativeError, SafeNativeResult,
+    SafeNativeResult,
 };
 use move_binary_format::errors::PartialVMError;
 use move_core_types::{
@@ -29,8 +31,10 @@ use smallvec::{smallvec, SmallVec};
 use std::{collections::VecDeque, convert::TryFrom};
 
 /// Equivalent to `std::errors::internal(1)` in Move.
+#[cfg(feature = "testing")]
 const E_BLS12381_SIGN_COMPUTATION_FAILED: u64 = 0x0A_0001;
 /// Equivalent to `std::errors::internal(2)` in Move.
+#[cfg(feature = "testing")]
 const E_BLS12381_POP_SK_DESERIALIZATION_FAILED: u64 = 0x0A_0002;
 
 /// Pops a `Vec<T>` off the argument stack and converts it to a `Vec<Vec<u8>>` by reading the first
