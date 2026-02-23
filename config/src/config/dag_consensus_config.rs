@@ -107,9 +107,6 @@ pub struct ReliableBroadcastConfig {
     pub backoff_policy_max_delay_ms: u64,
 
     pub rpc_timeout_ms: u64,
-
-    /// Delay in ms before broadcasting share requests (secret sharing only).
-    pub secret_share_request_delay_ms: u64,
 }
 
 impl Default for ReliableBroadcastConfig {
@@ -121,8 +118,6 @@ impl Default for ReliableBroadcastConfig {
             backoff_policy_max_delay_ms: 3000,
 
             rpc_timeout_ms: 1000,
-
-            secret_share_request_delay_ms: 300,
         }
     }
 }
