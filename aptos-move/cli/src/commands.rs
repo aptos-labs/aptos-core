@@ -2340,7 +2340,7 @@ impl CliCommand<Vec<serde_json::Value>> for ViewFunction {
     }
 
     async fn execute(self) -> CliTypedResult<Vec<serde_json::Value>> {
-        let request: aptos_rest_client::aptos_api_types::ViewRequest =
+        let request: aptos_rest_client::aptos_api_types::ViewFunction =
             self.entry_function_args.try_into()?;
         let ctx = self.env.aptos_context()?;
         ctx.view(&self.txn_options, request).await
@@ -2367,9 +2367,10 @@ impl CliCommand<TransactionSummary> for RunScript {
     }
 
     async fn execute(self) -> CliTypedResult<TransactionSummary> {
-        let (bytecode, _script_hash) = self
-            .compile_proposal_args
-            .compile("RunScript", self.txn_options.prompt_options)?;
+        let w = self.env.writer();
+        let (bytecode, _script_hash) =
+            self.compile_proposal_args
+                .compile(&w, "RunScript", self.txn_options.prompt_options)?;
 
         dispatch_transaction(
             self.script_function_args.create_script_payload(bytecode)?,

@@ -120,14 +120,28 @@ impl aptos_move_cli::AptosContext for RealAptosContext {
     async fn view(
         &self,
         options: &TransactionOptions,
-        request: aptos_rest_client::aptos_api_types::ViewRequest,
+        request: aptos_rest_client::aptos_api_types::ViewFunction,
     ) -> CliTypedResult<Vec<serde_json::Value>> {
-        let client = options.rest_client()?;
-        Ok(client
-            .view(&request, None)
-            .await
-            .map_err(|err| CliError::ApiError(err.to_string()))?
-            .into_inner())
+        match &options.session {
+            Some(session_path) => {
+                let mut sess = aptos_transaction_simulation_session::Session::load(session_path)?;
+                let output = sess.execute_view_function(
+                    request.module,
+                    request.function,
+                    request.ty_args,
+                    request.args,
+                )?;
+                Ok(output)
+            },
+            None => {
+                let client = options.rest_client()?;
+                Ok(client
+                    .view_bcs_with_json_response(&request, None)
+                    .await
+                    .map_err(|err| CliError::ApiError(err.to_string()))?
+                    .into_inner())
+            },
+        }
     }
 }
 

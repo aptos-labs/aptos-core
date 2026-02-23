@@ -9,7 +9,7 @@
 
 use crate::AptosContext;
 use aptos_cli_common::{CliTypedResult, TransactionOptions, TransactionSummary};
-use aptos_rest_client::aptos_api_types::ViewRequest;
+use aptos_rest_client::aptos_api_types::ViewFunction;
 use aptos_types::transaction::TransactionPayload;
 use async_trait::async_trait;
 use mockall::mock;
@@ -28,7 +28,7 @@ mock! {
         async fn view(
             &self,
             options: &TransactionOptions,
-            request: ViewRequest,
+            request: ViewFunction,
         ) -> CliTypedResult<Vec<serde_json::Value>>;
     }
 }

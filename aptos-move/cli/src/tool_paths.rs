@@ -3,8 +3,10 @@
 
 //! Tool path resolution for external binaries (revela, movefmt).
 //!
-//! In the full Aptos CLI, these are managed by the update system.
-//! In standalone mode, we search standard locations and PATH.
+//! In the full Aptos CLI, these are managed by the update system which installs
+//! them into `~/.local/bin` (Linux/macOS) or `~/.aptoscli/bin` (Windows).
+//! This module checks the environment variable, the aptos-managed install
+//! directory, and finally PATH.
 
 use anyhow::{anyhow, Result};
 use std::path::PathBuf;
@@ -14,23 +16,36 @@ const MOVEFMT_BINARY_NAME: &str = "movefmt";
 const REVELA_EXE_ENV: &str = "REVELA_EXE";
 const MOVEFMT_EXE_ENV: &str = "MOVEFMT_EXE";
 
+/// Returns the directory where `aptos update` installs additional binaries.
+fn get_additional_binaries_dir() -> PathBuf {
+    #[cfg(windows)]
+    {
+        let home_dir = std::env::var("USERPROFILE").unwrap_or_default();
+        PathBuf::from(home_dir).join(".aptoscli/bin")
+    }
+
+    #[cfg(not(windows))]
+    {
+        let home_dir = std::env::var("HOME").unwrap_or_default();
+        PathBuf::from(home_dir).join(".local/bin")
+    }
+}
+
 fn get_path(name: &str, exe_env: &str, binary_name: &str) -> Result<PathBuf> {
-    // Check environment variable first
+    // Check environment variable first.
     if let Ok(path) = std::env::var(exe_env) {
         return Ok(PathBuf::from(path));
     }
 
-    // Check PATH
-    if let Ok(output) = std::process::Command::new("which")
-        .arg(binary_name)
-        .output()
-    {
-        if output.status.success() {
-            let path_str = String::from_utf8_lossy(&output.stdout).trim().to_string();
-            if !path_str.is_empty() {
-                return Ok(PathBuf::from(path_str));
-            }
-        }
+    // Check the aptos-managed install directory (~/.local/bin or ~/.aptoscli/bin).
+    let path = get_additional_binaries_dir().join(binary_name);
+    if path.exists() && path.is_file() {
+        return Ok(path);
+    }
+
+    // Search PATH using a portable lookup (works on both Unix and Windows).
+    if let Some(path) = pathsearch::find_executable_in_path(binary_name) {
+        return Ok(path);
     }
 
     Err(anyhow!(

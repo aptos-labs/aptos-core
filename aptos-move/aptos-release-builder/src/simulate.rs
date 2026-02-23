@@ -56,6 +56,7 @@ use move_binary_format::{
     CompiledModule,
 };
 use move_core_types::{
+    diag_writer::DiagWriter,
     identifier::{IdentStr, Identifier},
     language_storage::ModuleId,
     value::MoveValue,
@@ -383,6 +384,7 @@ pub async fn simulate_multistep_proposal(
         )?;
 
         let (blob, hash) = compile_in_temp_dir(
+            &DiagWriter::stderr(),
             "script",
             path,
             &framework_package_args,

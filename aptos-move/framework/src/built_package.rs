@@ -378,7 +378,7 @@ impl BuiltPackage {
                     bail!("found warning(s), and `--fail-on-warning` is set")
                 } else if model_options.experiment_on(Experiment::STOP_AFTER_EXTENDED_CHECKS) {
                     if has_target_warnings {
-                        bail!("exiting with context checking errors")
+                        bail!("exiting due to context checking diagnostics")
                     }
                     return Ok(BuiltPackage {
                         options,

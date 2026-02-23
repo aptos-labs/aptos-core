@@ -41,7 +41,7 @@ use aptos_types::{
 use async_trait::async_trait;
 use clap::Parser;
 use move_core_types::{
-    ident_str, language_storage::ModuleId, parser::parse_type_tag,
+    diag_writer::DiagWriter, ident_str, language_storage::ModuleId, parser::parse_type_tag,
     transaction_argument::TransactionArgument,
 };
 use reqwest::Url;
@@ -228,9 +228,11 @@ impl CliCommand<VerifyProposalResponse> for VerifyProposal {
 
     async fn execute(mut self) -> CliTypedResult<VerifyProposalResponse> {
         // Compile local first to get the hash
-        let (_, hash) = self
-            .compile_proposal_args
-            .compile("SubmitProposal", self.prompt_options)?;
+        let (_, hash) = self.compile_proposal_args.compile(
+            &DiagWriter::stderr(),
+            "SubmitProposal",
+            self.prompt_options,
+        )?;
 
         // Retrieve the onchain proposal
         let client = self.rest_options.client(&self.profile)?;
@@ -315,9 +317,11 @@ pub struct SubmitProposalArgs {
 impl SubmitProposalArgs {
     /// Compile the proposal and return the script hash and metadata hash.
     pub async fn compile_proposals(&self) -> CliTypedResult<(HashValue, HashValue)> {
-        let (_bytecode, script_hash) = self
-            .compile_proposal_args
-            .compile("SubmitProposal", self.txn_options.prompt_options)?;
+        let (_bytecode, script_hash) = self.compile_proposal_args.compile(
+            &DiagWriter::stderr(),
+            "SubmitProposal",
+            self.txn_options.prompt_options,
+        )?;
 
         // Validate the proposal metadata
         let (metadata, metadata_hash) = self.get_metadata().await?;
@@ -785,9 +789,11 @@ impl CliCommand<TransactionSummary> for ExecuteProposal {
     }
 
     async fn execute(mut self) -> CliTypedResult<TransactionSummary> {
-        let (bytecode, _script_hash) = self
-            .compile_proposal_args
-            .compile("ExecuteProposal", self.txn_options.prompt_options)?;
+        let (bytecode, _script_hash) = self.compile_proposal_args.compile(
+            &DiagWriter::stderr(),
+            "ExecuteProposal",
+            self.txn_options.prompt_options,
+        )?;
         // TODO: Check hash so we don't do a failed roundtrip?
 
         let args = vec![TransactionArgument::U64(self.proposal_id)];
@@ -913,7 +919,11 @@ impl GenerateExecutionHash {
             },
             ..CompileScriptFunction::default()
         }
-        .compile("execution_hash", PromptOptions::yes())
+        .compile(
+            &DiagWriter::stderr(),
+            "execution_hash",
+            PromptOptions::yes(),
+        )
     }
 }
 

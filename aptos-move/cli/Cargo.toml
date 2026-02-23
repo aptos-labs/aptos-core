@@ -57,6 +57,7 @@ move-package = { workspace = true }
 move-symbol-pool = { workspace = true }
 move-unit-test = { workspace = true }
 move-vm-runtime = { workspace = true }
+pathsearch = { workspace = true }
 rand = { workspace = true }
 reqwest = { workspace = true }
 serde = { workspace = true }

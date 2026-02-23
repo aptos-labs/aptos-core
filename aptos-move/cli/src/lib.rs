@@ -83,7 +83,7 @@ pub trait AptosContext: Send + Sync + 'static {
     async fn view(
         &self,
         options: &TransactionOptions,
-        request: aptos_rest_client::aptos_api_types::ViewRequest,
+        request: aptos_rest_client::aptos_api_types::ViewFunction,
     ) -> CliTypedResult<Vec<serde_json::Value>>;
 }
 

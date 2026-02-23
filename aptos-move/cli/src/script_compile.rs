@@ -8,6 +8,7 @@ use aptos_cli_common::{CliError, CliTypedResult, PromptOptions};
 use aptos_crypto::HashValue;
 use aptos_framework::{BuildOptions, BuiltPackage};
 use clap::Parser;
+use move_core_types::diag_writer::DiagWriter;
 use move_model::metadata::{
     CompilerVersion, LanguageVersion, LATEST_STABLE_COMPILER_VERSION,
     LATEST_STABLE_LANGUAGE_VERSION,
@@ -52,6 +53,7 @@ pub struct CompileScriptFunction {
 impl CompileScriptFunction {
     pub fn compile(
         &self,
+        w: &DiagWriter,
         script_name: &str,
         prompt_options: PromptOptions,
     ) -> CliTypedResult<(Vec<u8>, HashValue)> {
@@ -87,6 +89,7 @@ impl CompileScriptFunction {
 
         // Compile script
         compile_in_temp_dir(
+            w,
             script_name,
             script_path,
             &self.framework_package_args,
@@ -101,6 +104,7 @@ impl CompileScriptFunction {
 }
 
 pub fn compile_in_temp_dir(
+    w: &DiagWriter,
     script_name: &str,
     script_path: &Path,
     framework_package_args: &FrameworkPackageArgs,
@@ -144,6 +148,7 @@ pub fn compile_in_temp_dir(
 
     // Compile the script
     compile_script(
+        w,
         framework_package_args.skip_fetch_latest_git_deps,
         package_dir,
         bytecode_version,
@@ -153,6 +158,7 @@ pub fn compile_in_temp_dir(
 }
 
 fn compile_script(
+    w: &DiagWriter,
     skip_fetch_latest_git_deps: bool,
     package_dir: &Path,
     bytecode_version: Option<u32>,
@@ -171,7 +177,7 @@ fn compile_script(
         ..BuildOptions::default()
     };
 
-    let pack = BuiltPackage::build(package_dir.to_path_buf(), build_options)
+    let pack = BuiltPackage::build_to(w, package_dir.to_path_buf(), build_options)
         .map_err(|e| CliError::MoveCompilationError(format!("{:#}", e)))?;
 
     let scripts_count = pack.script_count();

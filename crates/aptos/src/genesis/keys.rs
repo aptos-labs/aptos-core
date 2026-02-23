@@ -23,6 +23,7 @@ use aptos_types::{
 };
 use async_trait::async_trait;
 use clap::Parser;
+use move_core_types::diag_writer::DiagWriter;
 use std::path::{Path, PathBuf};
 
 const PRIVATE_KEYS_FILE: &str = "private-keys.yaml";
@@ -326,9 +327,11 @@ impl CliCommand<()> for GenerateAdminWriteSet {
 
     async fn execute(self) -> CliTypedResult<()> {
         check_if_file_exists(self.output_file.as_path(), self.prompt_options)?;
-        let (bytecode, _script_hash) = self
-            .compile_proposal_args
-            .compile("GenerateAdminWriteSet", self.prompt_options)?;
+        let (bytecode, _script_hash) = self.compile_proposal_args.compile(
+            &DiagWriter::stderr(),
+            "GenerateAdminWriteSet",
+            self.prompt_options,
+        )?;
 
         let txn = Transaction::GenesisTransaction(WriteSetPayload::Script {
             execute_as: self.execute_as,
