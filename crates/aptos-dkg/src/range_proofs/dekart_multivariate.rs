@@ -328,37 +328,27 @@ impl<E: Pairing> traits::BatchedRangeProof<E> for Proof<E> {
             "Batched opening: transcript opening point z does not match proof.eval_points[0]"
         );
 
-        #[cfg(feature = "range_proof_timing_multivariate")]
-        let start = Instant::now();
-        let combined_comm = {
-            let mut bases = vec![comm.0.into_affine()];
-            let mut scalars = vec![E::ScalarField::ONE];
-            if let Some(ref bc) = self.blinding_poly_comm {
-                bases.push(*bc);
-                scalars.push(E::ScalarField::ONE);
-            }
-            bases.extend(self.commitments.iter().copied());
-            scalars.extend(hat_c_powers.iter().skip(1).copied());
-            E::G1::msm(&bases, &scalars).expect("combined commitment MSM")
-        };
-        #[cfg(feature = "range_proof_timing_multivariate")]
-        print_cumulative("combined_comm MSM", start.elapsed());
+        // Step 4d (spec): single uPCS.BatchVerify for f̂ and g_1..g_m (one zk_pcs_verify call).
+        // Pass combined commitment as one MsmInput (comm + optional blinding + commitments*hat_c^i);
+        // zk_pcs_verify merges it with g_commitment_msms and does one batched MSM.
+        let mut combined_bases = vec![comm.0.into_affine()];
+        let mut combined_scalars = vec![E::ScalarField::ONE];
+        if let Some(ref bc) = self.blinding_poly_comm {
+            combined_bases.push(*bc);
+            combined_scalars.push(E::ScalarField::ONE);
+        }
+        combined_bases.extend(self.commitments.iter().copied());
+        combined_scalars.extend(hat_c_powers.iter().skip(1).copied());
+        let combined_comm_msm =
+            MsmInput::new(combined_bases, combined_scalars).expect("combined commitment MSM input");
 
-        // Step 4d (spec): single uPCS.BatchVerify for f̂ and g_1..g_m (one zk_pcs_verify call)
         let g_commitment_msms: Vec<MsmInput<E::G1Affine, E::ScalarField>> = self
             .g_commitments
             .iter()
             .map(|&affine| MsmInput::new(vec![affine], vec![E::ScalarField::ONE]).expect("single term"))
             .collect();
-        let commitment_msms: Vec<MsmInput<E::G1Affine, E::ScalarField>> = once(
-            MsmInput::new(
-                vec![combined_comm.into_affine()],
-                vec![E::ScalarField::ONE],
-            )
-            .expect("single term"),
-        )
-        .chain(g_commitment_msms)
-        .collect();
+        let commitment_msms: Vec<MsmInput<E::G1Affine, E::ScalarField>> =
+            once(combined_comm_msm).chain(g_commitment_msms).collect();
 
         #[cfg(feature = "range_proof_timing_multivariate")]
         let start = Instant::now();
