@@ -312,8 +312,10 @@ pub struct TransactionGenerator {
 
 impl TransactionGenerator {
     fn gen_account_cache(
-        generator: AccountGenerator,
+        root_seed: u64,
+        num_to_skip: u64,
         num_accounts: usize,
+        is_keyless: bool,
         name: &str,
     ) -> AccountCache {
         println!(
@@ -322,7 +324,7 @@ impl TransactionGenerator {
             num_accounts,
             name,
         );
-        AccountCache::new(generator, num_accounts)
+        AccountCache::generate_parallel(root_seed, num_to_skip, num_accounts, is_keyless)
     }
 
     pub fn resync_sequence_numbers(
@@ -358,8 +360,10 @@ impl TransactionGenerator {
         Self::resync_sequence_numbers(
             reader,
             Self::gen_account_cache(
-                AccountGenerator::new_for_user_accounts(num_to_skip as u64, is_keyless),
+                AccountGenerator::USER_ACCOUNTS_ROOT_SEED,
+                num_to_skip as u64,
                 num_accounts,
+                is_keyless,
                 "user",
             ),
             "user",
@@ -374,8 +378,10 @@ impl TransactionGenerator {
         Self::resync_sequence_numbers(
             reader,
             Self::gen_account_cache(
-                AccountGenerator::new_for_seed_accounts(is_keyless),
+                AccountGenerator::SEED_ACCOUNTS_ROOT_SEED,
+                0,
                 num_accounts,
+                is_keyless,
                 "seed",
             ),
             "seed",

@@ -4,6 +4,7 @@
 use crate::transaction_generator::get_progress_bar;
 use aptos_sdk::types::LocalAccount;
 use rand::{rngs::StdRng, RngCore, SeedableRng};
+use rayon::iter::{IntoParallelIterator, ParallelIterator};
 use std::{collections::VecDeque, sync::mpsc};
 
 type Seed = [u8; 32];
@@ -13,9 +14,9 @@ pub struct AccountGenerator {
 }
 
 impl AccountGenerator {
-    const MAX_ACCOUNT_GEN_PER_RNG: u64 = 40000;
-    const SEED_ACCOUNTS_ROOT_SEED: u64 = u64::MAX;
-    const USER_ACCOUNTS_ROOT_SEED: u64 = 0;
+    pub(crate) const MAX_ACCOUNT_GEN_PER_RNG: u64 = 40000;
+    pub(crate) const SEED_ACCOUNTS_ROOT_SEED: u64 = u64::MAX;
+    pub(crate) const USER_ACCOUNTS_ROOT_SEED: u64 = 0;
 
     pub fn new_for_seed_accounts(is_keyless: bool) -> Self {
         Self::new(Self::SEED_ACCOUNTS_ROOT_SEED, 0, is_keyless)
@@ -86,6 +87,73 @@ impl AccountCache {
         bar.finish();
         Self {
             accounts,
+            rng: StdRng::from_seed(Self::SEED),
+        }
+    }
+
+    /// Generates `num_accounts` accounts in parallel, producing the exact same
+    /// accounts as the sequential `AccountGenerator` + `AccountCache::new` path.
+    ///
+    /// Each 40k-account chunk uses an independent RNG, so chunks are generated
+    /// concurrently via rayon.
+    pub fn generate_parallel(
+        root_seed: u64,
+        num_to_skip: u64,
+        num_accounts: usize,
+        is_keyless: bool,
+    ) -> Self {
+        let bar = get_progress_bar(num_accounts);
+
+        // Walk the root RNG forward to the first chunk we need.
+        let mut root_rng = StdRng::seed_from_u64(root_seed);
+        let num_rngs_to_skip = num_to_skip / AccountGenerator::MAX_ACCOUNT_GEN_PER_RNG;
+        for _ in 0..num_rngs_to_skip {
+            root_rng.next_u64();
+        }
+        let first_chunk_skip = num_to_skip % AccountGenerator::MAX_ACCOUNT_GEN_PER_RNG;
+
+        // Build work items: (rng_seed, accounts_to_skip, accounts_to_generate).
+        let mut work_items: Vec<(u64, u64, usize)> = Vec::new();
+        let mut remaining = num_accounts;
+
+        // First chunk may be partial (some accounts already skipped within it).
+        let first_seed = root_rng.next_u64();
+        let first_capacity =
+            (AccountGenerator::MAX_ACCOUNT_GEN_PER_RNG - first_chunk_skip) as usize;
+        let first_count = remaining.min(first_capacity);
+        work_items.push((first_seed, first_chunk_skip, first_count));
+        remaining -= first_count;
+
+        while remaining > 0 {
+            let seed = root_rng.next_u64();
+            let count = remaining.min(AccountGenerator::MAX_ACCOUNT_GEN_PER_RNG as usize);
+            work_items.push((seed, 0, count));
+            remaining -= count;
+        }
+
+        // Generate all chunks in parallel — one rayon task per 40k chunk.
+        let accounts: Vec<LocalAccount> = work_items
+            .into_par_iter()
+            .flat_map(|(seed, skip, count)| {
+                let mut rng = StdRng::seed_from_u64(seed);
+                for _ in 0..skip {
+                    LocalAccount::generate_for_testing(&mut rng, is_keyless);
+                }
+                let chunk: Vec<LocalAccount> = (0..count)
+                    .map(|_| {
+                        let account = LocalAccount::generate_for_testing(&mut rng, is_keyless);
+                        bar.inc(1);
+                        account
+                    })
+                    .collect();
+                chunk
+            })
+            .collect();
+
+        bar.finish();
+
+        Self {
+            accounts: VecDeque::from(accounts),
             rng: StdRng::from_seed(Self::SEED),
         }
     }
