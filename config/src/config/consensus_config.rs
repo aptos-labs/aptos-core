@@ -133,6 +133,8 @@ pub struct ProxyConsensusConfig {
     pub max_proxy_block_txns_after_filtering: u64,
     /// Maximum proxy block size in bytes (= primary max_sending_block_bytes / target)
     pub max_proxy_block_bytes: u64,
+    /// Backpressure tuning parameters for adaptive proxy throttling.
+    pub backpressure: ProxyBackpressureConfig,
 }
 
 impl Default for ProxyConsensusConfig {
@@ -148,6 +150,44 @@ impl Default for ProxyConsensusConfig {
             max_proxy_block_txns: 500,                  // 5000 / 10
             max_proxy_block_txns_after_filtering: 180,  // 1800 / 10
             max_proxy_block_bytes: 300 * 1024,          // 3MB / 10
+            backpressure: ProxyBackpressureConfig::default(),
+        }
+    }
+}
+
+/// Backpressure configuration for proxy consensus adaptive throttling.
+///
+/// Controls how the proxy adjusts its throughput based on primary pipeline
+/// congestion. Thresholds determine when moderate vs heavy throttling kicks in,
+/// and delay caps bound the proportional delay calculations.
+#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
+#[serde(default, deny_unknown_fields)]
+pub struct ProxyBackpressureConfig {
+    /// Pipeline gap threshold for moderate congestion (reduce budget by 25%,
+    /// reduce per-block max_txns by 25%).
+    pub pipeline_moderate_gap: u64,
+    /// Pipeline gap threshold for heavy congestion (halve budget, halve
+    /// per-block max_txns).
+    pub pipeline_heavy_gap: u64,
+    /// Maximum pipeline gap used for proportional delay calculation.
+    /// Delay = round_timeout_ms * min(gap, max_pipeline_gap_for_delay) / max_pipeline_gap_for_delay.
+    pub max_pipeline_gap_for_delay: u64,
+    /// Minimum number of pending proxy batches at primary before batch-based
+    /// delay kicks in.
+    pub pending_batches_delay_threshold: u64,
+    /// Maximum pending batches used for proportional delay calculation.
+    /// Delay = round_timeout_ms * min(batches, max_pending_batches_for_delay) / max_pending_batches_for_delay.
+    pub max_pending_batches_for_delay: u64,
+}
+
+impl Default for ProxyBackpressureConfig {
+    fn default() -> Self {
+        Self {
+            pipeline_moderate_gap: 5,
+            pipeline_heavy_gap: 10,
+            max_pipeline_gap_for_delay: 20,
+            pending_batches_delay_threshold: 2,
+            max_pending_batches_for_delay: 5,
         }
     }
 }

@@ -24,4 +24,6 @@ pub mod proxy_metrics;
 
 pub use primary_integration::PrimaryBlockFromProxy;
 pub use proxy_error::ProxyConsensusError;
-pub use proxy_events::{PrimaryToProxyEvent, ProxyToPrimaryEvent};
+pub use proxy_events::{
+    AtomicPipelineState, PipelineBackpressureInfo, PrimaryToProxyEvent, ProxyToPrimaryEvent,
+};

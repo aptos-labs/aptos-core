@@ -1364,6 +1364,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
         // primary waits for proxy ordered blocks while proxy can't find a cutting point.
         let initial_primary_qc = Arc::new(recovery_data.root_quorum_cert().clone());
         let has_pending_proof = Arc::new(std::sync::atomic::AtomicBool::new(false));
+        let pipeline_state = Arc::new(aptos_proxy_primary::AtomicPipelineState::new());
         let proxy_hooks = Arc::new(ProxyHooksImpl::new(
             proxy_to_primary_tx,
             broadcast_network_sender,
@@ -1418,6 +1419,8 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
                 self.quorum_store_enabled,
                 proxy_config.round_initial_timeout_ms,
                 has_pending_proof,
+                pipeline_state.clone(),
+                proxy_config.backpressure.clone(),
             ));
 
         // Use proxy-specific block size limits (= primary limits / target)
@@ -1505,6 +1508,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
 
         // 11. Spawn task to forward primary QC/TC events to proxy hooks
         let hooks_for_events: Arc<dyn ProxyConsensusHooks> = proxy_hooks;
+        let pipeline_state_for_events = pipeline_state;
         tokio::spawn(async move {
             let mut rx = primary_to_proxy_rx;
             while let Some(event) = rx.recv().await {
@@ -1514,6 +1518,9 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
                     },
                     aptos_proxy_primary::PrimaryToProxyEvent::NewPrimaryTC(tc) => {
                         hooks_for_events.update_primary_tc(tc);
+                    },
+                    aptos_proxy_primary::PrimaryToProxyEvent::PipelineState(info) => {
+                        pipeline_state_for_events.store(&info);
                     },
                     aptos_proxy_primary::PrimaryToProxyEvent::Shutdown => {
                         info!("Proxy primary event handler received shutdown signal");

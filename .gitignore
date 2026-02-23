@@ -165,3 +165,4 @@ test-data/
 # Any test keys
 **/*.key
 **/*.pub
+consensus/proxy_primary/design/

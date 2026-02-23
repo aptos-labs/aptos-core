@@ -77,3 +77,30 @@ pub static PROXY_AGGREGATED_PAYLOAD_TXNS: Lazy<IntCounter> = Lazy::new(|| {
     )
     .unwrap()
 });
+
+/// Current aggregated payload size (txn count) for the latest primary proposal
+pub static PROXY_AGGREGATED_PAYLOAD_SIZE: Lazy<IntGauge> = Lazy::new(|| {
+    register_int_gauge!(
+        "aptos_proxy_aggregated_payload_size",
+        "Transaction count in the latest aggregated proxy payload for primary proposal"
+    )
+    .unwrap()
+});
+
+/// Primary pipeline pending round gap as seen by proxy
+pub static PROXY_PIPELINE_PENDING_GAP: Lazy<IntGauge> = Lazy::new(|| {
+    register_int_gauge!(
+        "aptos_proxy_pipeline_pending_gap",
+        "Primary pipeline ordered-commit round gap as seen by proxy"
+    )
+    .unwrap()
+});
+
+/// Number of unconsumed proxy batches pending at primary
+pub static PROXY_PENDING_BATCHES_AT_PRIMARY: Lazy<IntGauge> = Lazy::new(|| {
+    register_int_gauge!(
+        "aptos_proxy_pending_batches_at_primary",
+        "Number of unconsumed proxy block batches pending at primary"
+    )
+    .unwrap()
+});

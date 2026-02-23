@@ -57,7 +57,9 @@ use aptos_consensus_types::{
     wrapped_ledger_info::WrappedLedgerInfo,
 };
 use aptos_crypto::{hash::CryptoHash, HashValue};
-use aptos_proxy_primary::{PrimaryBlockFromProxy, PrimaryToProxyEvent, ProxyToPrimaryEvent};
+use aptos_proxy_primary::{
+    PipelineBackpressureInfo, PrimaryBlockFromProxy, PrimaryToProxyEvent, ProxyToPrimaryEvent,
+};
 use aptos_infallible::{checked, Mutex};
 use aptos_logger::prelude::*;
 #[cfg(test)]
@@ -586,6 +588,14 @@ impl RoundManager {
                 }
             }
             let payload = merged_payload.unwrap_or_else(|| Payload::empty(true, true));
+            let payload_len = payload.len();
+            let payload_size = payload.size();
+            info!(
+                "spawn_proposal_generation: merged proxy payload: {} txns, {} bytes, {} vtxns",
+                payload_len, payload_size, all_vtxns.len(),
+            );
+            aptos_proxy_primary::proxy_metrics::PROXY_AGGREGATED_PAYLOAD_SIZE
+                .set(payload_len as i64);
             Some((all_vtxns, payload))
         } else {
             None
@@ -2309,6 +2319,9 @@ impl RoundManager {
         let was_empty = self.pending_proxy_blocks.is_empty();
         self.pending_proxy_blocks.push(primary_block_from_proxy);
 
+        // Send pipeline state to proxy so it can adjust backpressure
+        self.send_pipeline_state_to_proxy();
+
         // Trigger deferred proposal only on the first message arrival.
         // Subsequent messages accumulate and will be included in the same proposal.
         if was_empty {
@@ -2345,6 +2358,8 @@ impl RoundManager {
                     qc.certified_block().round()
                 );
             }
+            // Piggyback pipeline state on every QC notification
+            self.send_pipeline_state_to_proxy();
         }
     }
 
@@ -2363,6 +2378,26 @@ impl RoundManager {
             } else {
                 info!("Notified proxy of new TC for round {}", tc.round());
             }
+        }
+    }
+
+    /// Send current pipeline state to proxy for backpressure decisions.
+    ///
+    /// Called after accumulating proxy blocks and when notifying proxy of QC/TC.
+    /// Uses try_send since this is advisory — dropping a message is fine.
+    fn send_pipeline_state_to_proxy(&self) {
+        if let Some(ref tx) = self.proxy_event_tx {
+            let commit_round = self.block_store.commit_root().round();
+            let ordered_round = self.block_store.ordered_root().round();
+            let info = PipelineBackpressureInfo {
+                pipeline_pending_round_gap: ordered_round.saturating_sub(commit_round),
+                pending_proxy_batches: self.pending_proxy_blocks.len() as u64,
+                primary_committed_round: commit_round,
+                primary_ordered_round: ordered_round,
+                timestamp_ms: aptos_infallible::duration_since_epoch().as_millis() as u64,
+            };
+            // Advisory — ok to drop if channel is full
+            let _ = tx.send(PrimaryToProxyEvent::PipelineState(info));
         }
     }
 

@@ -2,8 +2,11 @@
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 use crate::{block_storage::BlockReader, error::QuorumStoreError};
-use aptos_consensus_types::{common::Payload, payload_pull_params::PayloadPullParameters};
-use aptos_proxy_primary::proxy_metrics;
+use aptos_config::config::ProxyBackpressureConfig;
+use aptos_consensus_types::{
+    common::Payload, payload_pull_params::PayloadPullParameters, utils::PayloadTxnsSize,
+};
+use aptos_proxy_primary::{proxy_metrics, AtomicPipelineState};
 use aptos_types::validator_txn::ValidatorTransaction;
 use aptos_validator_transaction_pool::TransactionFilter;
 use std::sync::{
@@ -51,6 +54,11 @@ pub struct ProxyBudgetPayloadClient {
     /// Skip backpressure delay when true — cutting-point blocks should be
     /// ordered ASAP to unblock the primary pipeline.
     has_pending_proof: Arc<AtomicBool>,
+    /// Shared pipeline state from primary, updated atomically by the proxy event loop.
+    /// Used for adaptive backpressure decisions based on primary's actual congestion.
+    pipeline_state: Arc<AtomicPipelineState>,
+    /// Backpressure tuning parameters.
+    bp_config: ProxyBackpressureConfig,
 }
 
 impl ProxyBudgetPayloadClient {
@@ -61,6 +69,8 @@ impl ProxyBudgetPayloadClient {
         quorum_store_enabled: bool,
         round_timeout_ms: u64,
         has_pending_proof: Arc<AtomicBool>,
+        pipeline_state: Arc<AtomicPipelineState>,
+        bp_config: ProxyBackpressureConfig,
     ) -> Self {
         Self {
             inner,
@@ -69,6 +79,8 @@ impl ProxyBudgetPayloadClient {
             quorum_store_enabled,
             round_timeout_ms,
             has_pending_proof,
+            pipeline_state,
+            bp_config,
         }
     }
 
@@ -114,30 +126,100 @@ impl ProxyBudgetPayloadClient {
 impl PayloadClient for ProxyBudgetPayloadClient {
     async fn pull_payload(
         &self,
-        config: PayloadPullParameters,
+        mut config: PayloadPullParameters,
         validator_txn_filter: TransactionFilter,
     ) -> anyhow::Result<(Vec<ValidatorTransaction>, Payload), QuorumStoreError> {
         let (blocks_with_txns, total_blocks) = self.count_blocks_since_cutting_point();
-        proxy_metrics::PROXY_TXN_BUDGET_REMAINING
-            .set(self.target.saturating_sub(blocks_with_txns) as i64);
+        let pipeline_info = self.pipeline_state.load();
+        let has_pending = self.has_pending_proof.load(Ordering::Acquire);
+        let gap = pipeline_info.pipeline_pending_round_gap;
 
-        // Apply constant backpressure delay (half round timeout) when total
-        // blocks exceed target. Skip delay if a primary proof is pending —
-        // cutting-point blocks must be ordered ASAP to unblock the primary.
-        if total_blocks > self.target
-            && !self.has_pending_proof.load(Ordering::Acquire)
-        {
-            let delay_ms = self.round_timeout_ms / 2;
-            proxy_metrics::PROXY_BACKPRESSURE_DELAY_MS.set(delay_ms as i64);
-            tokio::time::sleep(Duration::from_millis(delay_ms)).await;
+        proxy_metrics::PROXY_PIPELINE_PENDING_GAP.set(gap as i64);
+        proxy_metrics::PROXY_PENDING_BATCHES_AT_PRIMARY
+            .set(pipeline_info.pending_proxy_batches as i64);
+        let batches = pipeline_info.pending_proxy_batches;
+
+        let bp = &self.bp_config;
+
+        // --- Adaptive budget: reduce target when primary pipeline is congested ---
+        let effective_target = if gap > bp.pipeline_heavy_gap {
+            // Heavy congestion: halve budget
+            (self.target / 2).max(1)
+        } else if gap > bp.pipeline_moderate_gap {
+            // Moderate congestion: reduce by 25%
+            (self.target * 3 / 4).max(1)
         } else {
-            proxy_metrics::PROXY_BACKPRESSURE_DELAY_MS.set(0);
+            self.target
+        };
+
+        proxy_metrics::PROXY_TXN_BUDGET_REMAINING
+            .set(effective_target.saturating_sub(blocks_with_txns) as i64);
+
+        // --- Adaptive delay: proportional to congestion level ---
+        // Skip ALL delays when a primary proof is pending — cutting-point blocks
+        // must be ordered ASAP to unblock the primary pipeline.
+        let delay_ms = if has_pending {
+            0u64
+        } else {
+            let mut delay = 0u64;
+
+            // Budget-based delay (existing): half round timeout when blocks > target
+            if total_blocks > effective_target {
+                delay = delay.max(self.round_timeout_ms / 2);
+            }
+
+            // Pipeline gap delay: proportional, kicks in at gap > 2
+            if gap > 2 {
+                let gap_delay = self
+                    .round_timeout_ms
+                    .saturating_mul(gap.min(bp.max_pipeline_gap_for_delay))
+                    / bp.max_pipeline_gap_for_delay;
+                delay = delay.max(gap_delay);
+            }
+
+            // Pending batches delay: primary has unconsumed batches
+            if batches >= bp.pending_batches_delay_threshold {
+                let batch_delay = self
+                    .round_timeout_ms
+                    .saturating_mul(batches.min(bp.max_pending_batches_for_delay))
+                    / bp.max_pending_batches_for_delay;
+                delay = delay.max(batch_delay);
+            }
+
+            delay
+        };
+
+        proxy_metrics::PROXY_BACKPRESSURE_DELAY_MS.set(delay_ms as i64);
+        if delay_ms > 0 {
+            tokio::time::sleep(Duration::from_millis(delay_ms)).await;
         }
 
-        if blocks_with_txns >= self.target {
-            // Budget exhausted: return empty so proxy keeps running for ordering
+        // --- Budget check: return empty if exhausted ---
+        if blocks_with_txns >= effective_target {
             return Ok((vec![], Payload::empty(self.quorum_store_enabled, true)));
         }
+
+        // --- Adaptive max_txns: reduce per-block size under congestion ---
+        if gap > bp.pipeline_heavy_gap {
+            // Heavy congestion: halve max_txns per block
+            let reduced = PayloadTxnsSize::new(
+                config.max_txns.count() / 2,
+                config.max_txns.size_in_bytes() / 2,
+            );
+            config.max_txns = config.max_txns.minimum(reduced);
+            config.max_txns_after_filtering /= 2;
+            config.soft_max_txns_after_filtering /= 2;
+        } else if gap > bp.pipeline_moderate_gap {
+            // Moderate congestion: reduce max_txns by 25%
+            let reduced = PayloadTxnsSize::new(
+                config.max_txns.count() * 3 / 4,
+                config.max_txns.size_in_bytes() * 3 / 4,
+            );
+            config.max_txns = config.max_txns.minimum(reduced);
+            config.max_txns_after_filtering = config.max_txns_after_filtering * 3 / 4;
+            config.soft_max_txns_after_filtering = config.soft_max_txns_after_filtering * 3 / 4;
+        }
+
         self.inner.pull_payload(config, validator_txn_filter).await
     }
 }
