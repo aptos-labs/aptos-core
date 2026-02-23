@@ -320,3 +320,8 @@ fn test_package_manager() {
     ]);
     run_tests_for_pkg("package_manager", named_address);
 }
+
+#[test]
+fn test_poker() {
+    test_common("poker");
+}
