@@ -34,11 +34,13 @@ aptos-vm = { workspace = true }
 aptos-vm-environment = { workspace = true }
 aptos-vm-logging = { workspace = true }
 aptos-vm-types = { workspace = true }
+async-recursion = { workspace = true }
 async-trait = { workspace = true }
 bcs = { workspace = true }
 clap = { workspace = true, features = ["env", "unstable-styles", "wrap_help"] }
 colored = { workspace = true }
 futures = { workspace = true }
+hex = { workspace = true }
 itertools = { workspace = true }
 legacy-move-compiler = { workspace = true }
 move-asm = { workspace = true }

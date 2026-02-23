@@ -935,8 +935,8 @@ fn test_public_struct_args_feature_disabled_then_enabled() {
         ],
     );
 
-    // Verify view function returns deserialization error as ErrorMessage
-    // (not MoveAbort, since FAILED_TO_DESERIALIZE_ARGUMENT is not an abort)
+    // Verify view function returns the same error as entry functions
+    // (not MoveAbort, since INVALID_MAIN_FUNCTION_SIGNATURE is not an abort)
     let aptos_types::transaction::ViewFunctionError::ErrorMessage(_, Some(status)) =
         view_result.values.unwrap_err()
     else {
@@ -944,8 +944,8 @@ fn test_public_struct_args_feature_disabled_then_enabled() {
     };
     assert_eq!(
         status,
-        StatusCode::FAILED_TO_DESERIALIZE_ARGUMENT,
-        "Expected FAILED_TO_DESERIALIZE_ARGUMENT for view function, got: {:?}",
+        StatusCode::INVALID_MAIN_FUNCTION_SIGNATURE,
+        "Expected INVALID_MAIN_FUNCTION_SIGNATURE for view function, got: {:?}",
         status
     );
 

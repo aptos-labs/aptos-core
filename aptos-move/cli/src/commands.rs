@@ -23,9 +23,10 @@ use crate::{
 use aptos_api_types::AptosErrorCode;
 use aptos_cli_common::{
     check_if_file_exists, create_dir_if_not_exist, dir_default_to_current, get_sequence_number,
-    load_account_arg, prompt_yes_with_override, write_to_file, CliCommand, CliConfig, CliError,
-    CliResult, CliTypedResult, ConfigSearchMode, MoveManifestAccountWrapper, ProfileOptions,
-    PromptOptions, RestOptions, SaveFile, TransactionOptions, TransactionSummary, GIT_IGNORE,
+    load_account_arg, parse_json_file, prompt_yes_with_override, write_to_file, CliCommand,
+    CliConfig, CliError, CliResult, CliTypedResult, ConfigSearchMode, MoveManifestAccountWrapper,
+    ProfileOptions, PromptOptions, RestOptions, SaveFile, TransactionOptions, TransactionSummary,
+    GIT_IGNORE,
 };
 use aptos_crypto::HashValue;
 use aptos_framework::{
@@ -65,7 +66,7 @@ use move_command_line_common::{address::NumericalAddress, env::MOVE_HOME};
 use move_core_types::{
     identifier::Identifier,
     int256::{I256, U256},
-    language_storage::{ModuleId, StructTag},
+    language_storage::{ModuleId, StructTag, MODULE_SEPARATOR},
 };
 use move_model::metadata::{CompilerVersion, LanguageVersion};
 use move_package::{source_package::layout::SourcePackageLayout, BuildConfig, CompilerConfig};
@@ -2273,8 +2274,13 @@ impl CliCommand<TransactionSummary> for RunFunction {
     }
 
     async fn execute(self) -> CliTypedResult<TransactionSummary> {
+        let entry_function = self
+            .entry_function_args
+            .parse_with_optional_client(|| self.txn_options.rest_client())
+            .await?;
+
         dispatch_transaction(
-            TransactionPayload::EntryFunction(self.entry_function_args.try_into()?),
+            TransactionPayload::EntryFunction(entry_function),
             &self.txn_options,
             &self.env,
         )
@@ -2311,7 +2317,12 @@ impl CliCommand<TransactionSummary> for Simulate {
     }
 
     async fn execute(self) -> CliTypedResult<TransactionSummary> {
-        let payload = TransactionPayload::EntryFunction(self.entry_function_args.try_into()?);
+        let entry_function = self
+            .entry_function_args
+            .parse_with_optional_client(|| self.txn_options.rest_client())
+            .await?;
+
+        let payload = TransactionPayload::EntryFunction(entry_function);
 
         if self.local {
             self.txn_options.simulate_locally(payload, &self.env).await
@@ -2340,10 +2351,34 @@ impl CliCommand<Vec<serde_json::Value>> for ViewFunction {
     }
 
     async fn execute(self) -> CliTypedResult<Vec<serde_json::Value>> {
-        let request: aptos_rest_client::aptos_api_types::ViewFunction =
-            self.entry_function_args.try_into()?;
+        let view_function = if let Some(json_path) = &self.entry_function_args.json_file {
+            // Parse the JSON file once and use it directly for both the has_struct check and the
+            // actual parsing, avoiding a redundant re-parse in the downstream callee.
+            let json_args = parse_json_file::<EntryFunctionArgumentsJSON>(json_path)?;
+
+            let parsed_arguments: EntryFunctionArguments = if json_args.has_struct_or_enum_args() {
+                // Need REST client for struct/enum parsing
+                let rest_client = self.txn_options.rest_client()?;
+                json_args.try_into_with_client(&rest_client).await?
+            } else {
+                // Only primitive types - use synchronous parsing (no REST needed)
+                json_args.try_into()?
+            };
+
+            let function_id: MemberId = (&parsed_arguments).try_into()?;
+            aptos_api_types::ViewFunction {
+                module: function_id.module_id,
+                function: function_id.member_id,
+                ty_args: parsed_arguments.type_arg_vec.try_into()?,
+                args: parsed_arguments.arg_vec.try_into()?,
+            }
+        } else {
+            // No JSON file - use synchronous parsing for command-line arguments
+            self.entry_function_args.try_into()?
+        };
+
         let ctx = self.env.aptos_context()?;
-        ctx.view(&self.txn_options, request).await
+        ctx.view(&self.txn_options, view_function).await
     }
 }
 
@@ -2577,7 +2612,7 @@ impl CliCommand<TransactionSummary> for Replay {
     }
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub enum FunctionArgType {
     Address,
     Bool,
@@ -2596,6 +2631,13 @@ pub enum FunctionArgType {
     I128,
     I256,
     Raw,
+    Struct {
+        type_tag: move_core_types::language_storage::StructTag,
+    },
+    Enum {
+        type_tag: move_core_types::language_storage::StructTag,
+        variant: String,
+    },
 }
 
 impl Display for FunctionArgType {
@@ -2618,6 +2660,10 @@ impl Display for FunctionArgType {
             FunctionArgType::I128 => write!(f, "i128"),
             FunctionArgType::I256 => write!(f, "i256"),
             FunctionArgType::Raw => write!(f, "raw"),
+            FunctionArgType::Struct { type_tag } => write!(f, "{}", type_tag.to_canonical_string()),
+            FunctionArgType::Enum { type_tag, variant } => {
+                write!(f, "{}::{}", type_tag.to_canonical_string(), variant)
+            },
         }
     }
 }
@@ -2705,6 +2751,14 @@ impl FunctionArgType {
                 .map_err(|err| CliError::UnableToParse("raw", err.to_string()))?
                 .inner()
                 .to_vec()),
+            FunctionArgType::Struct { .. } => Err(CliError::CommandArgumentError(
+                "Struct arguments must be parsed via JSON format with async module queries"
+                    .to_string(),
+            )),
+            FunctionArgType::Enum { .. } => Err(CliError::CommandArgumentError(
+                "Enum arguments must be parsed via JSON format with async module queries"
+                    .to_string(),
+            )),
         }
     }
 
@@ -2712,17 +2766,17 @@ impl FunctionArgType {
     pub fn parse_arg_json(&self, arg: &serde_json::Value) -> CliTypedResult<ArgWithType> {
         match arg {
             serde_json::Value::Bool(value) => Ok(ArgWithType {
-                _ty: *self,
+                _ty: self.clone(),
                 _vector_depth: 0,
                 arg: self.parse_arg_str(value.to_string().as_str())?,
             }),
             serde_json::Value::Number(value) => Ok(ArgWithType {
-                _ty: *self,
+                _ty: self.clone(),
                 _vector_depth: 0,
                 arg: self.parse_arg_str(value.to_string().as_str())?,
             }),
             serde_json::Value::String(value) => Ok(ArgWithType {
-                _ty: *self,
+                _ty: self.clone(),
                 _vector_depth: 0,
                 arg: self.parse_arg_str(value.as_str())?,
             }),
@@ -2751,7 +2805,7 @@ impl FunctionArgType {
                 }
                 // Default sub-argument depth is 0 for when no sub-arguments were looped over.
                 Ok(ArgWithType {
-                    _ty: *self,
+                    _ty: self.clone(),
                     _vector_depth: common_sub_arg_depth.unwrap_or(0) + 1,
                     arg: bcs,
                 })
@@ -2767,7 +2821,7 @@ impl FunctionArgType {
 }
 
 // TODO use from move_binary_format::file_format_common if it is made public.
-fn write_u64_as_uleb128(binary: &mut Vec<u8>, mut val: usize) {
+pub(crate) fn write_u64_as_uleb128(binary: &mut Vec<u8>, mut val: usize) {
     loop {
         let cur = val & 0x7F;
         if cur != val {
@@ -2863,7 +2917,7 @@ impl ArgWithType {
 
     /// Get the type of this argument
     pub fn ty(&self) -> FunctionArgType {
-        self._ty
+        self._ty.clone()
     }
 
     /// Get the encoded argument bytes
@@ -3014,6 +3068,11 @@ impl ArgWithType {
             FunctionArgType::I256 => self.bcs_value_to_json::<I256>(),
             FunctionArgType::Raw => serde_json::to_value(&self.arg)
                 .map_err(|err| CliError::UnexpectedError(err.to_string())),
+            FunctionArgType::Struct { .. } | FunctionArgType::Enum { .. } => {
+                // Struct/enum arguments are already BCS encoded, return as hex
+                serde_json::to_value(hex::encode(&self.arg))
+                    .map_err(|err| CliError::UnexpectedError(err.to_string()))
+            },
         }
         .map_err(|err| {
             CliError::UnexpectedError(format!("Failed to parse argument to JSON {}", err))
@@ -3060,7 +3119,7 @@ impl TryInto<TransactionArgument> for &ArgWithType {
     type Error = CliError;
 
     fn try_into(self) -> Result<TransactionArgument, Self::Error> {
-        if self._vector_depth > 0 && self._ty != FunctionArgType::U8 {
+        if self._vector_depth > 0 && !matches!(self._ty, FunctionArgType::U8) {
             return Err(CliError::UnexpectedError(
                 "Unable to parse non-u8 vector to transaction argument".to_string(),
             ));
@@ -3111,6 +3170,12 @@ impl TryInto<TransactionArgument> for &ArgWithType {
             FunctionArgType::I256 => Ok(TransactionArgument::I256(txn_arg_parser(
                 &self.arg, "i256",
             )?)),
+            FunctionArgType::Struct { .. } | FunctionArgType::Enum { .. } => {
+                Err(CliError::UnexpectedError(
+                    "Struct and enum arguments are not supported for script transactions"
+                        .to_string(),
+                ))
+            },
         }
     }
 }
@@ -3131,7 +3196,7 @@ pub struct MemberId {
 }
 
 fn parse_member_id(function_id: &str) -> CliTypedResult<MemberId> {
-    let ids: Vec<&str> = function_id.split_terminator("::").collect();
+    let ids: Vec<&str> = function_id.split_terminator(MODULE_SEPARATOR).collect();
     if ids.len() != 3 {
         return Err(CliError::CommandArgumentError(
             "FunctionId is not well formed.  Must be of the form <address>::<module>::<function>"
