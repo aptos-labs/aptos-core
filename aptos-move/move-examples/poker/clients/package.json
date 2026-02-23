@@ -1,0 +1,13 @@
+{
+  "name": "poker-clients",
+  "version": "1.0.0",
+  "description": "Table (TEE) and player clients for poker dapp",
+  "private": true,
+  "scripts": {
+    "table": "node table-client.js",
+    "player": "node player-client.js"
+  },
+  "dependencies": {
+    "@aptos-labs/ts-sdk": "^1.0.0"
+  }
+}
