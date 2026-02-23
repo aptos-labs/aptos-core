@@ -170,7 +170,9 @@ impl SecretShareManager {
         info!(rounds = rounds, "Processing secret share ready blocks.");
 
         for blocks in ready_blocks {
-            let _ = self.outgoing_blocks.unbounded_send(blocks);
+            if let Err(e) = self.outgoing_blocks.unbounded_send(blocks) {
+                error!("[SecretShareManager] Failed to send ready blocks downstream: {}", e);
+            }
         }
     }
 
@@ -368,7 +370,13 @@ impl SecretShareManager {
                     }
                 }
                 Some(reset) = reset_rx.next() => {
-                    while matches!(incoming_blocks.try_next(), Ok(Some(_))) {}
+                    let mut dropped = 0;
+                    while matches!(incoming_blocks.try_next(), Ok(Some(_))) {
+                        dropped += 1;
+                    }
+                    if dropped > 0 {
+                        info!("[SecretShareManager] Dropped {} incoming block batches during reset", dropped);
+                    }
                     self.process_reset(reset);
                 }
                 Some(secret_shared_key) = self.decision_rx.next() => {
