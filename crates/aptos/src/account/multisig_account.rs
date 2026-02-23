@@ -127,8 +127,13 @@ impl CliCommand<TransactionSummary> for CreateTransaction {
     }
 
     async fn execute(self) -> CliTypedResult<TransactionSummary> {
-        let multisig_transaction_payload_bytes =
-            to_bytes::<MultisigTransactionPayload>(&self.entry_function_args.try_into()?)?;
+        let entry_function = self
+            .entry_function_args
+            .parse_with_optional_client(|| self.txn_options.rest_client())
+            .await?;
+        let multisig_transaction_payload_bytes = to_bytes::<MultisigTransactionPayload>(
+            &MultisigTransactionPayload::EntryFunction(entry_function),
+        )?;
         let transaction_payload = if self.store_hash_only {
             aptos_stdlib::multisig_account_create_transaction_with_hash(
                 self.multisig_account.multisig_address,
@@ -189,10 +194,15 @@ impl CliCommand<serde_json::Value> for VerifyProposal {
             })
             .await?[0];
         // Get expected multisig transaction payload hash hex from provided entry function.
-        let expected_payload_hash = HashValue::sha3_256_of(
-            &to_bytes::<MultisigTransactionPayload>(&self.entry_function_args.try_into()?)?,
-        )
-        .to_hex_literal();
+        let entry_function = self
+            .entry_function_args
+            .parse_with_optional_client(|| self.txn_options.rest_client())
+            .await?;
+        let expected_payload_hash =
+            HashValue::sha3_256_of(&to_bytes::<MultisigTransactionPayload>(
+                &MultisigTransactionPayload::EntryFunction(entry_function),
+            )?)
+            .to_hex_literal();
         // Get on-chain payload hash. If full payload provided on-chain:
         let actual_payload_hash =
             if let Some(actual_payload) = view_json_option_str(&multisig_transaction["payload"])? {
@@ -331,11 +341,17 @@ impl CliCommand<TransactionSummary> for ExecuteWithPayload {
     }
 
     async fn execute(self) -> CliTypedResult<TransactionSummary> {
+        let entry_function = self
+            .entry_function_args
+            .parse_with_optional_client(|| self.execute.txn_options.rest_client())
+            .await?;
         self.execute
             .txn_options
             .submit_transaction(TransactionPayload::Multisig(Multisig {
                 multisig_address: self.execute.multisig_account.multisig_address,
-                transaction_payload: Some(self.entry_function_args.try_into()?),
+                transaction_payload: Some(MultisigTransactionPayload::EntryFunction(
+                    entry_function,
+                )),
             }))
             .await
             .map(|inner| inner.into())
