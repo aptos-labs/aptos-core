@@ -251,7 +251,11 @@ impl ConnectionManager {
             "data_service.heartbeat",
             otel.kind = "client",
             grpc_manager_address = address,
-            service_type = if self.is_live_data_service { "live" } else { "historical" },
+            service_type = if self.is_live_data_service {
+                "live"
+            } else {
+                "historical"
+            },
         );
 
         async {

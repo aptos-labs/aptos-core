@@ -62,8 +62,7 @@ pub fn parse_traceparent(traceparent: &str) -> Option<TraceContext> {
     if parts.len() != 4 {
         return None;
     }
-    let (version, trace_id, parent_span_id, trace_flags) =
-        (parts[0], parts[1], parts[2], parts[3]);
+    let (version, trace_id, parent_span_id, trace_flags) = (parts[0], parts[1], parts[2], parts[3]);
 
     if version.len() != 2
         || trace_id.len() != 32
@@ -132,8 +131,7 @@ pub fn record_trace_context_on_span(span: &Span, ctx: &TraceContext) {
 /// Extracts trace context from gRPC metadata and returns it, creating a new
 /// root context if none is present. Also records the fields on the given span.
 pub fn extract_or_create_trace_context(metadata: &MetadataMap, span: &Span) -> TraceContext {
-    let ctx =
-        extract_trace_context_from_metadata(metadata).unwrap_or_else(TraceContext::new_root);
+    let ctx = extract_trace_context_from_metadata(metadata).unwrap_or_else(TraceContext::new_root);
     record_trace_context_on_span(span, &ctx);
     ctx
 }

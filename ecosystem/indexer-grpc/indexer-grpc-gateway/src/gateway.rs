@@ -180,12 +180,8 @@ async fn get_data_service_url_inner(
     }
 
     let child_ctx = trace_ctx.new_child();
-    let response = call_grpc_manager(
-        &config.grpc_manager_address,
-        user_request,
-        &child_ctx,
-    )
-    .await?;
+    let response =
+        call_grpc_manager(&config.grpc_manager_address, user_request, &child_ctx).await?;
 
     let url = Url::from_str(&response.data_service_address).unwrap();
     let mut req = Request::from_parts(head, body);

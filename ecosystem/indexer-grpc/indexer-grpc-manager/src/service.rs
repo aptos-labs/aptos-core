@@ -113,10 +113,8 @@ impl GrpcManager for GrpcManagerService {
         &self,
         request: Request<HeartbeatRequest>,
     ) -> Result<Response<HeartbeatResponse>, Status> {
-        let trace_ctx = extract_or_create_trace_context(
-            request.metadata(),
-            &tracing::Span::current(),
-        );
+        let trace_ctx =
+            extract_or_create_trace_context(request.metadata(), &tracing::Span::current());
         let span = info_span!(
             "grpc_manager.heartbeat",
             trace_id = %trace_ctx.trace_id,
@@ -129,10 +127,9 @@ impl GrpcManager for GrpcManagerService {
             if let Some(service_info) = request.service_info {
                 if let Some(address) = service_info.address {
                     if let Some(info) = service_info.info {
-                        return self
-                            .handle_heartbeat(address, info)
-                            .await
-                            .map_err(|e| Status::internal(format!("Error handling heartbeat: {e}")));
+                        return self.handle_heartbeat(address, info).await.map_err(|e| {
+                            Status::internal(format!("Error handling heartbeat: {e}"))
+                        });
                     }
                 }
             }
@@ -147,10 +144,8 @@ impl GrpcManager for GrpcManagerService {
         &self,
         request: Request<GetTransactionsRequest>,
     ) -> Result<Response<TransactionsResponse>, Status> {
-        let trace_ctx = extract_or_create_trace_context(
-            request.metadata(),
-            &tracing::Span::current(),
-        );
+        let trace_ctx =
+            extract_or_create_trace_context(request.metadata(), &tracing::Span::current());
         let span = info_span!(
             "grpc_manager.get_transactions",
             trace_id = %trace_ctx.trace_id,
@@ -182,10 +177,8 @@ impl GrpcManager for GrpcManagerService {
         &self,
         request: Request<GetDataServiceForRequestRequest>,
     ) -> Result<Response<GetDataServiceForRequestResponse>, Status> {
-        let trace_ctx = extract_or_create_trace_context(
-            request.metadata(),
-            &tracing::Span::current(),
-        );
+        let trace_ctx =
+            extract_or_create_trace_context(request.metadata(), &tracing::Span::current());
         let span = info_span!(
             "grpc_manager.get_data_service_for_request",
             trace_id = %trace_ctx.trace_id,

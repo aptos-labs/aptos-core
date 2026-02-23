@@ -4,8 +4,7 @@
 use crate::{config::LIVE_DATA_SERVICE, connection_manager::ConnectionManager};
 use anyhow::Result;
 use aptos_indexer_grpc_utils::{
-    timestamp_now_proto,
-    trace_context::extract_or_create_trace_context,
+    timestamp_now_proto, trace_context::extract_or_create_trace_context,
 };
 use aptos_protos::indexer::v1::{
     data_service_server::DataService, ping_data_service_response::Info, raw_data_server::RawData,
@@ -48,10 +47,7 @@ impl DataService for DataServiceWrapperWrapper {
         &self,
         req: Request<GetTransactionsRequest>,
     ) -> Result<Response<Self::GetTransactionsStream>, Status> {
-        let trace_ctx = extract_or_create_trace_context(
-            req.metadata(),
-            &tracing::Span::current(),
-        );
+        let trace_ctx = extract_or_create_trace_context(req.metadata(), &tracing::Span::current());
         let span = info_span!(
             "data_service.get_transactions",
             trace_id = %trace_ctx.trace_id,
@@ -96,10 +92,7 @@ impl DataService for DataServiceWrapperWrapper {
         &self,
         req: Request<PingDataServiceRequest>,
     ) -> Result<Response<PingDataServiceResponse>, Status> {
-        let trace_ctx = extract_or_create_trace_context(
-            req.metadata(),
-            &tracing::Span::current(),
-        );
+        let trace_ctx = extract_or_create_trace_context(req.metadata(), &tracing::Span::current());
         let span = info_span!(
             "data_service.ping",
             trace_id = %trace_ctx.trace_id,
