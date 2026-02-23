@@ -63,7 +63,100 @@ module 0x42::function_calls {
         aborts_if [inferred] aborts_of<apply>(|arg0| callee(arg0), x);
     }
 
+
+    // ==================== Inference Pragma ====================
+
+    // Test pragma inference = "none" to explicitly disable inference
+    fun no_inference(x: u64): u64 {
+        x + 1
+    }
+    spec no_inference {
+        pragma inference = none;
+    }
+
+    // ==================== Recursive Functions ====================
+
+    // Recursive functions need pragma opaque for verification, but inference
+    // should still run on them (opaque no longer skips inference).
+    fun factorial(n: u64): u64 {
+        if (n == 0) {
+            1
+        } else {
+            n * factorial(n - 1)
+        }
+    }
+    spec factorial {
+        pragma opaque;
+        ensures [inferred] n == 0 ==> result == 1;
+        ensures [inferred] n != 0 ==> result == n * result_of<factorial>(n - 1);
+        aborts_if [inferred] n != 0 && n * result_of<factorial>(n - 1) > MAX_U64;
+        aborts_if [inferred] n != 0 && aborts_of<factorial>(n - 1);
+        aborts_if [inferred] n != 0 && n < 1;
+    }
+
+    // Caller of recursive function - should infer using behavioral predicates
+    fun test_factorial_call(n: u64): u64 {
+        factorial(n)
+    }
+    spec test_factorial_call(n: u64): u64 {
+        ensures [inferred] result == result_of<factorial>(n);
+        aborts_if [inferred] aborts_of<factorial>(n);
+    }
+
+
+    // Mutual recursion: is_even / is_odd
+    fun is_even(n: u64): bool {
+        if (n == 0) {
+            true
+        } else {
+            is_odd(n - 1)
+        }
+    }
+    spec is_even {
+        pragma opaque;
+        ensures [inferred] n == 0 ==> result == true;
+        ensures [inferred] n != 0 ==> result == result_of<is_odd>(n - 1);
+        aborts_if [inferred] n != 0 && aborts_of<is_odd>(n - 1);
+        aborts_if [inferred] n != 0 && n < 1;
+    }
+
+    fun is_odd(n: u64): bool {
+        if (n == 0) {
+            false
+        } else {
+            is_even(n - 1)
+        }
+    }
+    spec is_odd {
+        pragma opaque;
+        ensures [inferred] n == 0 ==> result == false;
+        ensures [inferred] n != 0 ==> result == result_of<is_even>(n - 1);
+        aborts_if [inferred] n != 0 && aborts_of<is_even>(n - 1);
+        aborts_if [inferred] n != 0 && n < 1;
+    }
+
+    // Caller of mutually recursive functions
+    fun test_parity(n: u64): bool {
+        if (is_even(n)) {
+            !is_odd(n)
+        } else {
+            is_odd(n)
+        }
+    }
+    spec test_parity(n: u64): bool {
+        ensures [inferred] result_of<is_even>(n)@at_5 ==> result == !at_5@result_of<is_odd>(n);
+        ensures [inferred] !result_of<is_even>(n)@at_5 ==> result == at_5@result_of<is_odd>(n);
+        aborts_if [inferred] at_5@aborts_of<is_odd>(n);
+        aborts_if [inferred] aborts_of<is_even>(n);
+    }
+
 }
+// TODO(#18762): opaque recursive functions produce expected boogie errors
+// in the verification step because Boogie doesn't generate procedure bodies for them.
 /*
-Verification: Succeeded.
+Verification: [internal] boogie exited with compilation errors:
+function_calls.enriched.bpl(5653,8): Error: call to undeclared procedure: $42_function_calls_is_even
+function_calls.enriched.bpl(5656,8): Error: call to undeclared procedure: $42_function_calls_is_odd
+function_calls.enriched.bpl(5701,8): Error: call to undeclared procedure: $42_function_calls_factorial
+3 name resolution errors detected in function_calls.enriched.bpl
 */

@@ -5918,6 +5918,8 @@ impl ExpTranslator<'_, '_, '_> {
 
     /// Injects a memory label into a Global(None) or Exists(None) operation
     /// within an ExpData::Call node.
+    // TODO(#18762): This does not handle BorrowGlobal from index ops, so `label@R[addr]`
+    // silently drops the label. Need to also match BorrowGlobal(ReferenceKind, _, None).
     fn inject_memory_label(exp: ExpData, label: GlobalId) -> ExpData {
         match exp {
             ExpData::Call(id, Operation::Global(None), args) => {
