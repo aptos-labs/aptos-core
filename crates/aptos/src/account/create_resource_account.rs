@@ -1,7 +1,9 @@
 // Copyright (c) Aptos Foundation
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
-use crate::common::types::{CliCommand, CliTypedResult, TransactionOptions, TransactionSummary};
+use crate::common::types::{
+    CliCommand, CliTypedResult, TransactionOptions, TransactionOptionsExt, TransactionSummary,
+};
 use aptos_cached_packages::aptos_stdlib::resource_account_create_resource_account;
 use aptos_move_cli::ResourceAccountSeed;
 use aptos_rest_client::{

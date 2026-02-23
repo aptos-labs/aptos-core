@@ -22,12 +22,7 @@ use aptos_ledger;
 use async_trait::async_trait;
 use clap::Parser;
 use reqwest::Url;
-use serde::{Deserialize, Serialize};
-use std::{
-    collections::BTreeMap,
-    fmt::{Display, Formatter},
-    str::FromStr,
-};
+use std::{collections::BTreeMap, str::FromStr};
 
 /// 1 APT (might not actually get that much, depending on the faucet)
 const NUM_DEFAULT_OCTAS: u64 = 100000000;
@@ -231,8 +226,9 @@ impl CliCommand<()> for InitTool {
                             .generate_ed25519_private_key()
                     }
                 } else {
-                    let stripped = strip_private_key_prefix(&input.to_string())?;
-                    Ed25519PrivateKey::from_encoded_string(&stripped).map_err(|err| {
+                    let input_string = input.to_string();
+                    let stripped = strip_private_key_prefix(&input_string)?;
+                    Ed25519PrivateKey::from_encoded_string(stripped).map_err(|err| {
                         CliError::UnableToParse("Ed25519PrivateKey", err.to_string())
                     })?
                 }
@@ -453,47 +449,5 @@ impl InitTool {
     }
 }
 
-/// A simplified list of all networks supported by the CLI
-///
-/// Any command using this, will be simpler to setup as profiles
-#[derive(Copy, Clone, Debug, Default, Serialize, Deserialize, Eq, PartialEq)]
-pub enum Network {
-    Mainnet,
-    Testnet,
-    #[default]
-    Devnet,
-    Local,
-    Custom,
-}
-
-impl Display for Network {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", match self {
-            Network::Mainnet => "mainnet",
-            Network::Testnet => "testnet",
-            Network::Devnet => "devnet",
-            Network::Local => "local",
-            Network::Custom => "custom",
-        })
-    }
-}
-
-impl FromStr for Network {
-    type Err = CliError;
-
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        Ok(match s.to_lowercase().trim() {
-            "mainnet" => Self::Mainnet,
-            "testnet" => Self::Testnet,
-            "devnet" => Self::Devnet,
-            "local" => Self::Local,
-            "custom" => Self::Custom,
-            str => {
-                return Err(CliError::CommandArgumentError(format!(
-                    "Invalid network {}.  Must be one of [devnet, testnet, mainnet, local, custom]",
-                    str
-                )));
-            },
-        })
-    }
-}
+// Re-export from aptos-cli-common so existing `use crate::common::init::Network` paths work.
+pub use aptos_cli_common::Network;

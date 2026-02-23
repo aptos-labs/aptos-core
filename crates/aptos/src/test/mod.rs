@@ -40,7 +40,6 @@ use crate::{
     },
     CliCommand,
 };
-use aptos_cli_common::CliCommand as _;
 use aptos_config::config::Peer;
 use aptos_crypto::{
     bls12381,
@@ -324,13 +323,11 @@ impl CliTestFramework {
                 },
                 json_file: None,
             },
-            txn_options: self.transaction_options(sender_index, gas_options).into(),
+            txn_options: self.transaction_options(sender_index, gas_options),
             env: self.move_env(),
         }
         .execute()
         .await
-        .map_err(Into::into)
-        .map(Into::into)
     }
 
     pub async fn show_validator_config(
@@ -618,13 +615,11 @@ impl CliTestFramework {
                 type_arg_vec: TypeArgVec { type_args: vec![] },
                 json_file: None,
             },
-            txn_options: self.transaction_options(owner_index, None).into(),
+            txn_options: self.transaction_options(owner_index, None),
             env: self.move_env(),
         }
         .execute()
         .await
-        .map_err(Into::into)
-        .map(Into::into)
     }
 
     pub async fn set_operator(
@@ -821,15 +816,11 @@ impl CliTestFramework {
         InitPackage {
             name,
             package_dir: Some(self.move_dir()),
-            named_addresses: Self::move_manifest_named_addresses(account_strs)
-                .into_iter()
-                .map(|(k, v)| (k, v.into()))
-                .collect(),
+            named_addresses: Self::move_manifest_named_addresses(account_strs),
             prompt_options: PromptOptions {
                 assume_yes: false,
                 assume_no: true,
-            }
-            .into(),
+            },
             framework_package_args: FrameworkPackageArgs {
                 framework_git_rev: None,
                 framework_local_dir: framework_dir,
@@ -840,7 +831,6 @@ impl CliTestFramework {
         }
         .execute()
         .await
-        .map_err(Into::into)
     }
 
     pub async fn compile_package(
@@ -859,7 +849,6 @@ impl CliTestFramework {
         }
         .execute()
         .await
-        .map_err(Into::into)
     }
 
     pub async fn test_package(
@@ -879,7 +868,6 @@ impl CliTestFramework {
         }
         .execute()
         .await
-        .map_err(Into::into)
     }
 
     pub async fn publish_package(
@@ -891,7 +879,7 @@ impl CliTestFramework {
     ) -> CliTypedResult<TransactionSummary> {
         PublishPackage {
             move_options: self.move_options(account_strs),
-            txn_options: self.transaction_options(index, gas_options).into(),
+            txn_options: self.transaction_options(index, gas_options),
             override_size_check_option: OverrideSizeCheckOption {
                 override_size_check: false,
             },
@@ -909,8 +897,6 @@ impl CliTestFramework {
         }
         .execute()
         .await
-        .map_err(Into::into)
-        .map(Into::into)
     }
 
     pub async fn download_package(
@@ -920,7 +906,7 @@ impl CliTestFramework {
         output_dir: PathBuf,
     ) -> CliTypedResult<&'static str> {
         DownloadPackage {
-            rest_options: self.rest_options().into(),
+            rest_options: self.rest_options(),
             profile_options: Default::default(),
             account: self.account_id(index),
             package,
@@ -931,7 +917,6 @@ impl CliTestFramework {
         }
         .execute()
         .await
-        .map_err(Into::into)
     }
 
     pub async fn run_function(
@@ -967,13 +952,11 @@ impl CliTestFramework {
                 },
                 json_file: None,
             },
-            txn_options: self.transaction_options(index, gas_options).into(),
+            txn_options: self.transaction_options(index, gas_options),
             env: self.move_env(),
         }
         .execute()
         .await
-        .map_err(Into::into)
-        .map(Into::into)
     }
 
     /// Runs the given script contents using the local aptos_framework directory.
@@ -1060,7 +1043,7 @@ impl CliTestFramework {
         .unwrap();
 
         RunScript {
-            txn_options: self.transaction_options(index, gas_options).into(),
+            txn_options: self.transaction_options(index, gas_options),
             compile_proposal_args: CompileScriptFunction {
                 script_path: Some(source_path),
                 compiled_script_path: None,
@@ -1076,8 +1059,6 @@ impl CliTestFramework {
         }
         .execute()
         .await
-        .map_err(Into::into)
-        .map(Into::into)
     }
 
     pub async fn run_script_with_script_path(
@@ -1088,7 +1069,7 @@ impl CliTestFramework {
         type_args: Vec<MoveType>,
     ) -> CliTypedResult<TransactionSummary> {
         RunScript {
-            txn_options: self.transaction_options(index, None).into(),
+            txn_options: self.transaction_options(index, None),
             compile_proposal_args: CompileScriptFunction {
                 script_path: Some(script_path.parse().unwrap()),
                 framework_package_args: FrameworkPackageArgs {
@@ -1107,8 +1088,6 @@ impl CliTestFramework {
         }
         .execute()
         .await
-        .map_err(Into::into)
-        .map(Into::into)
     }
 
     pub fn aptos_framework_dir() -> PathBuf {
@@ -1123,10 +1102,7 @@ impl CliTestFramework {
     pub fn move_options(&self, account_strs: BTreeMap<&str, &str>) -> MovePackageOptions {
         MovePackageOptions {
             dev: true,
-            named_addresses: Self::named_addresses(account_strs)
-                .into_iter()
-                .map(|(k, v)| (k, v.into()))
-                .collect(),
+            named_addresses: Self::named_addresses(account_strs),
             package_dir: Some(self.move_dir()),
             ..MovePackageOptions::new()
         }

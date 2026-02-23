@@ -4,7 +4,7 @@
 use crate::common::{
     types::{
         CliCommand, CliError, CliTypedResult, MultisigAccount, MultisigAccountWithSequenceNumber,
-        TransactionOptions, TransactionSummary,
+        TransactionOptions, TransactionOptionsExt, TransactionSummary,
     },
     utils::view_json_option_str,
 };

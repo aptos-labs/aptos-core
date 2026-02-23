@@ -10,7 +10,7 @@ use aptos::{
     account::fund::FundWithFaucet, common::types::CliCommand, create_move_env,
     governance::CompileScriptFunction,
 };
-use aptos_cli_common::{CliCommand as _, TransactionOptions};
+use aptos_cli_common::TransactionOptions;
 use aptos_move_cli::{
     CompileScript, MovePackageOptions, RunScript, ScriptFunctionArguments, WithMoveEnv,
 };

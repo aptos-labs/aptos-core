@@ -328,7 +328,7 @@ impl CliCommand<()> for GenerateAdminWriteSet {
         check_if_file_exists(self.output_file.as_path(), self.prompt_options)?;
         let (bytecode, _script_hash) = self
             .compile_proposal_args
-            .compile("GenerateAdminWriteSet", self.prompt_options.into())?;
+            .compile("GenerateAdminWriteSet", self.prompt_options)?;
 
         let txn = Transaction::GenesisTransaction(WriteSetPayload::Script {
             execute_as: self.execute_as,

@@ -9,7 +9,6 @@ use aptos::{
     governance::{ExecuteProposal, SubmitProposal, SubmitVote},
     stake::IncreaseLockup,
 };
-use aptos_cli_common::CliCommand as _;
 use aptos_crypto::ed25519::Ed25519PrivateKey;
 use aptos_genesis::keys::PrivateIdentity;
 use aptos_move_cli::{RunFunction, RunScript, WithMoveEnv};

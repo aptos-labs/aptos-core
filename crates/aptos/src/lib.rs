@@ -18,7 +18,7 @@ pub mod update;
 pub mod workspace;
 
 use crate::common::{
-    types::{CliCommand, CliResult, CliTypedResult},
+    types::{CliCommand, CliError, CliResult, CliTypedResult},
     utils::cli_build_information,
 };
 pub use aptos_context::RealAptosContext;
@@ -87,7 +87,15 @@ impl Tool {
             Node(tool) => tool.execute().await,
             Stake(tool) => tool.execute().await,
             Update(tool) => tool.execute().await,
-            Workspace(workspace) => workspace.execute_serialized_without_logger().await,
+            Workspace(workspace) => {
+                let start_time = std::time::Instant::now();
+                let result: CliTypedResult<()> = workspace
+                    .run()
+                    .await
+                    .map_err(|e| CliError::UnexpectedError(format!("{:#}", e)));
+                aptos_cli_common::to_common_success_result("Workspace", start_time, result, true)
+                    .await
+            },
         }
     }
 }

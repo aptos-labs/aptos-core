@@ -4,6 +4,8 @@
 //! Transaction options and local simulation support for the `aptos move simulate` command.
 
 use crate::{local_simulation, MoveDebugger, MoveEnv};
+// Re-export from aptos-cli-common to eliminate the duplicate definition.
+pub use aptos_cli_common::ReplayProtectionType;
 use aptos_cli_common::{
     get_account_with_state, CliError, CliTypedResult, EncodingOptions, GasOptions,
     PrivateKeyInputOptions, ProfileOptions, PromptOptions, RestOptions, TransactionSummary,
@@ -24,26 +26,7 @@ use aptos_types::{
 use aptos_vm_types::output::VMOutput;
 use clap::Parser;
 use move_core_types::vm_status::VMStatus;
-use std::{
-    fmt::Display,
-    time::{SystemTime, UNIX_EPOCH},
-};
-
-#[derive(Clone, Copy, Debug, Default, Parser, PartialEq, clap::ValueEnum)]
-pub enum ReplayProtectionType {
-    Nonce,
-    #[default]
-    Seqnum,
-}
-
-impl Display for ReplayProtectionType {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", match self {
-            ReplayProtectionType::Nonce => "nonce",
-            ReplayProtectionType::Seqnum => "seqnum",
-        })
-    }
-}
+use std::time::{SystemTime, UNIX_EPOCH};
 
 /// Transaction options for the `Simulate` and `Replay` commands.
 ///

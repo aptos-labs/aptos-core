@@ -10,7 +10,7 @@ use crate::{
     common::{
         types::{
             CliError, CliTypedResult, PoolAddressArgs, ProfileOptions, PromptOptions, RestOptions,
-            TransactionOptions, TransactionSummary,
+            TransactionOptions, TransactionOptionsExt, TransactionSummary,
         },
         utils::prompt_yes_with_override,
     },
@@ -230,7 +230,7 @@ impl CliCommand<VerifyProposalResponse> for VerifyProposal {
         // Compile local first to get the hash
         let (_, hash) = self
             .compile_proposal_args
-            .compile("SubmitProposal", self.prompt_options.into())?;
+            .compile("SubmitProposal", self.prompt_options)?;
 
         // Retrieve the onchain proposal
         let client = self.rest_options.client(&self.profile)?;
@@ -317,7 +317,7 @@ impl SubmitProposalArgs {
     pub async fn compile_proposals(&self) -> CliTypedResult<(HashValue, HashValue)> {
         let (_bytecode, script_hash) = self
             .compile_proposal_args
-            .compile("SubmitProposal", self.txn_options.prompt_options.into())?;
+            .compile("SubmitProposal", self.txn_options.prompt_options)?;
 
         // Validate the proposal metadata
         let (metadata, metadata_hash) = self.get_metadata().await?;
@@ -787,7 +787,7 @@ impl CliCommand<TransactionSummary> for ExecuteProposal {
     async fn execute(mut self) -> CliTypedResult<TransactionSummary> {
         let (bytecode, _script_hash) = self
             .compile_proposal_args
-            .compile("ExecuteProposal", self.txn_options.prompt_options.into())?;
+            .compile("ExecuteProposal", self.txn_options.prompt_options)?;
         // TODO: Check hash so we don't do a failed roundtrip?
 
         let args = vec![TransactionArgument::U64(self.proposal_id)];
@@ -913,8 +913,7 @@ impl GenerateExecutionHash {
             },
             ..CompileScriptFunction::default()
         }
-        .compile("execution_hash", PromptOptions::yes().into())
-        .map_err(|e| e.into())
+        .compile("execution_hash", PromptOptions::yes())
     }
 }
 
