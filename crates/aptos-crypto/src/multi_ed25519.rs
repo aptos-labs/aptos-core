@@ -189,11 +189,10 @@ impl Uniform for MultiEd25519PrivateKey {
         let num_of_keys = rng.gen_range(1, MAX_NUM_OF_KEYS + 1);
         let mut private_keys: Vec<Ed25519PrivateKey> = Vec::with_capacity(num_of_keys);
         for _ in 0..num_of_keys {
+            let mut bytes = [0u8; 32];
+            rng.fill_bytes(&mut bytes);
             private_keys.push(
-                Ed25519PrivateKey::try_from(
-                    &ed25519_dalek::SecretKey::generate(rng).to_bytes()[..],
-                )
-                .unwrap(),
+                Ed25519PrivateKey::try_from(&bytes[..]).unwrap(),
             );
         }
         let threshold = rng.gen_range(1, num_of_keys + 1) as u8;

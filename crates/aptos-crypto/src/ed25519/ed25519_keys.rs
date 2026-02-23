@@ -13,7 +13,7 @@ use crate::{
 use aptos_crypto_derive::{DeserializeKey, SerializeKey, SilentDebug, SilentDisplay};
 use core::convert::TryFrom;
 use curve25519_dalek::{edwards::CompressedEdwardsY, scalar::Scalar};
-use ed25519_dalek::ExpandedSecretKey;
+use ed25519_dalek::{SigningKey as DalekSigningKey, VerifyingKey as DalekVerifyingKey};
 #[cfg(any(test, feature = "fuzzing"))]
 use proptest::prelude::*;
 use serde::Serialize;
@@ -21,7 +21,7 @@ use std::fmt;
 
 /// An Ed25519 private key
 #[derive(DeserializeKey, SerializeKey, SilentDebug, SilentDisplay)]
-pub struct Ed25519PrivateKey(pub(crate) ed25519_dalek::SecretKey);
+pub struct Ed25519PrivateKey(pub(crate) DalekSigningKey);
 
 #[cfg(feature = "assert-private-keys-not-cloneable")]
 static_assertions::assert_not_impl_any!(Ed25519PrivateKey: Clone);
@@ -36,7 +36,7 @@ impl Clone for Ed25519PrivateKey {
 
 /// An Ed25519 public key
 #[derive(DeserializeKey, Clone, SerializeKey)]
-pub struct Ed25519PublicKey(pub(crate) ed25519_dalek::PublicKey);
+pub struct Ed25519PublicKey(pub(crate) DalekVerifyingKey);
 
 #[cfg(any(test, feature = "fuzzing"))]
 impl<'a> arbitrary::Arbitrary<'a> for Ed25519PublicKey {
@@ -60,31 +60,40 @@ impl Ed25519PrivateKey {
     fn from_bytes_unchecked(
         bytes: &[u8],
     ) -> std::result::Result<Ed25519PrivateKey, CryptoMaterialError> {
-        match ed25519_dalek::SecretKey::from_bytes(bytes) {
-            Ok(dalek_secret_key) => Ok(Ed25519PrivateKey(dalek_secret_key)),
-            Err(_) => Err(CryptoMaterialError::DeserializationError),
+        if bytes.len() != ED25519_PRIVATE_KEY_LENGTH {
+            return Err(CryptoMaterialError::DeserializationError);
         }
+        let bytes_array: [u8; ED25519_PRIVATE_KEY_LENGTH] = bytes
+            .try_into()
+            .map_err(|_| CryptoMaterialError::DeserializationError)?;
+        let signing_key = DalekSigningKey::from_bytes(&bytes_array);
+        Ok(Ed25519PrivateKey(signing_key))
     }
 
     /// Private function aimed at minimizing code duplication between sign
     /// methods of the SigningKey implementation. This should remain private.
     fn sign_arbitrary_message(&self, message: &[u8]) -> Ed25519Signature {
-        let secret_key: &ed25519_dalek::SecretKey = &self.0;
-        let public_key: Ed25519PublicKey = self.into();
-        let expanded_secret_key: ed25519_dalek::ExpandedSecretKey =
-            ed25519_dalek::ExpandedSecretKey::from(secret_key);
-        let sig = expanded_secret_key.sign(message.as_ref(), &public_key.0);
+        use ed25519_dalek::Signer;
+        let sig = self.0.sign(message);
         Ed25519Signature(sig)
     }
 
     /// Derive the actual scalar represented by the secret key.
     /// TODO: We are temporarily breaking the abstraction here and exposing the SK scalar. In the future, we should add traits for encryption inside aptos-crypto so that we can both sign and decrypt with an Ed25519PrivateKey.
     pub fn derive_scalar(&self) -> Scalar {
-        let expanded_bytes = ExpandedSecretKey::from(&self.0).to_bytes();
-        let bits = expanded_bytes[..32]
-            .try_into()
-            .expect("converting [u8; 64] to [u8; 32] should work");
-        Scalar::from_bits(bits).reduce()
+        // In ed25519-dalek v2, we need to use the hazmat feature to access the scalar
+        // For now, we'll compute it from the secret key bytes
+        let secret_bytes = self.0.to_bytes();
+        use sha2::{Digest, Sha512};
+        let mut hasher = Sha512::new();
+        hasher.update(&secret_bytes);
+        let hash = hasher.finalize();
+        let mut bits: [u8; 32] = [0u8; 32];
+        bits.copy_from_slice(&hash[..32]);
+        bits[0] &= 248;
+        bits[31] &= 127;
+        bits[31] |= 64;
+        Scalar::from_bytes_mod_order(bits)
     }
 }
 
@@ -104,8 +113,14 @@ impl Ed25519PublicKey {
     pub(crate) fn from_bytes_unchecked(
         bytes: &[u8],
     ) -> std::result::Result<Ed25519PublicKey, CryptoMaterialError> {
-        match ed25519_dalek::PublicKey::from_bytes(bytes) {
-            Ok(dalek_public_key) => Ok(Ed25519PublicKey(dalek_public_key)),
+        if bytes.len() != ED25519_PUBLIC_KEY_LENGTH {
+            return Err(CryptoMaterialError::DeserializationError);
+        }
+        let bytes_array: [u8; ED25519_PUBLIC_KEY_LENGTH] = bytes
+            .try_into()
+            .map_err(|_| CryptoMaterialError::DeserializationError)?;
+        match DalekVerifyingKey::from_bytes(&bytes_array) {
+            Ok(verifying_key) => Ok(Ed25519PublicKey(verifying_key)),
             Err(_) => Err(CryptoMaterialError::DeserializationError),
         }
     }
@@ -150,7 +165,8 @@ impl Ed25519PublicKey {
     /// Derive the actual curve point represented by the public key.
     pub fn to_compressed_edwards_y(&self) -> CompressedEdwardsY {
         let bytes = self.to_bytes();
-        CompressedEdwardsY::from_slice(bytes.as_slice())
+        CompressedEdwardsY::from_slice(&bytes)
+            .expect("Ed25519 public key should always be a valid CompressedEdwardsY")
     }
 }
 
@@ -187,7 +203,10 @@ impl Uniform for Ed25519PrivateKey {
     where
         R: ::rand::RngCore + ::rand::CryptoRng + ::rand_core::CryptoRng + ::rand_core::RngCore,
     {
-        Ed25519PrivateKey(ed25519_dalek::SecretKey::generate(rng))
+        let mut bytes = [0u8; 32];
+        rng.fill_bytes(&mut bytes);
+        let signing_key = DalekSigningKey::from_bytes(&bytes);
+        Ed25519PrivateKey(signing_key)
     }
 }
 
@@ -246,9 +265,8 @@ impl Genesis for Ed25519PrivateKey {
 // Implementing From<&PrivateKey<...>> allows to derive a public key in a more elegant fashion
 impl From<&Ed25519PrivateKey> for Ed25519PublicKey {
     fn from(private_key: &Ed25519PrivateKey) -> Self {
-        let secret: &ed25519_dalek::SecretKey = &private_key.0;
-        let public: ed25519_dalek::PublicKey = secret.into();
-        Ed25519PublicKey(public)
+        let verifying_key = private_key.0.verifying_key();
+        Ed25519PublicKey(verifying_key)
     }
 }
 

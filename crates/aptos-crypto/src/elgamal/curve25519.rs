@@ -13,7 +13,9 @@ impl ElGamalFriendlyGroup for Curve25519 {
     type Scalar = curve25519_dalek::scalar::Scalar;
 
     fn rand_scalar<R: CryptoRng + RngCore>(rng: &mut R) -> Self::Scalar {
-        Self::Scalar::random(rng)
+        let mut bytes = [0u8; 32];
+        rng.fill_bytes(&mut bytes);
+        Self::Scalar::from_bytes_mod_order(bytes)
     }
 
     fn generator_mul(scalar: &Self::Scalar) -> Self::Element {

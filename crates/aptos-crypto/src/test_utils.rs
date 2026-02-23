@@ -88,7 +88,7 @@ use curve25519_dalek::scalar::Scalar;
 #[cfg(any(test, feature = "fuzzing"))]
 use curve25519_dalek::traits::Identity;
 #[cfg(any(test, feature = "fuzzing"))]
-use digest::Digest;
+// use digest::Digest; // Already imported where needed
 #[cfg(any(test, feature = "fuzzing"))]
 use proptest::prelude::*;
 use rand::prelude::IteratorRandom;
@@ -143,12 +143,16 @@ pub fn small_order_pk_with_adversarial_message(
 
                 let msg_bytes = signing_message(msg).unwrap();
 
-                let mut h: Sha512 = Sha512::new();
+                use sha2::Digest;
+                let mut h = Sha512::new();
                 h.update(R.compress().as_bytes());
                 h.update(pk_bytes);
                 h.update(msg_bytes);
-
-                let k = Scalar::from_hash(h);
+                
+                let hash_output = h.finalize();
+                let mut hash_bytes = [0u8; 64];
+                hash_bytes.copy_from_slice(&hash_output);
+                let k = Scalar::from_bytes_mod_order_wide(&hash_bytes);
 
                 k * pk_point + (*R) == EdwardsPoint::identity()
             },
