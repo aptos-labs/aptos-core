@@ -14,24 +14,17 @@ use crate::{
     common::{
         init::{InitTool, Network},
         types::{
-            account_address_from_public_key, AccountAddressWrapper, ArgWithTypeVec,
-            AuthenticationKeyInputOptions, ChunkedPublishOption, CliError, CliTypedResult,
-            EncodingOptions, EntryFunctionArguments, FaucetOptions, GasOptions, KeyType,
-            LargePackagesModuleOption, MoveManifestAccountWrapper, MovePackageOptions,
-            OptionalPoolAddressArgs, OverrideSizeCheckOption, PoolAddressArgs,
+            account_address_from_public_key, AccountAddressWrapper, AuthenticationKeyInputOptions,
+            CliError, CliTypedResult, EncodingOptions, FaucetOptions, GasOptions, KeyType,
+            MoveManifestAccountWrapper, OptionalPoolAddressArgs, PoolAddressArgs,
             PrivateKeyInputOptions, PromptOptions, PublicKeyInputOptions, RestOptions, RngArgs,
-            SaveFile, ScriptFunctionArguments, TransactionOptions, TransactionSummary, TypeArgVec,
+            SaveFile, TransactionOptions, TransactionSummary,
         },
         utils::write_to_file,
     },
     governance::{
         CompileScriptFunction, ProposalSubmissionSummary, SubmitProposal, SubmitProposalArgs,
         SubmitVote, SubmitVoteArgs, VerifyProposal, VerifyProposalResponse,
-    },
-    move_tool::{
-        ArgWithType, CompilePackage, DownloadPackage, FrameworkPackageArgs, IncludedArtifacts,
-        IncludedArtifactsArgs, InitPackage, MemberId, PublishPackage, RunFunction, RunScript,
-        TestPackage,
     },
     node::{
         AnalyzeMode, AnalyzeValidatorPerformance, GetStakePool, InitializeValidator,
@@ -57,6 +50,13 @@ use aptos_framework::chunked_publish::CHUNK_SIZE_IN_BYTES;
 use aptos_genesis::config::HostAndPort;
 use aptos_keygen::KeyGen;
 use aptos_logger::warn;
+use aptos_move_cli::{
+    ArgWithType, ArgWithTypeVec, ChunkedPublishOption, CompilePackage, DownloadPackage,
+    EntryFunctionArguments, FrameworkPackageArgs, IncludedArtifacts, IncludedArtifactsArgs,
+    InitPackage, LargePackagesModuleOption, MemberId, MoveEnv, MovePackageOptions,
+    OverrideSizeCheckOption, PublishPackage, RunFunction, RunScript, ScriptFunctionArguments,
+    TestPackage, TypeArgVec,
+};
 use aptos_rest_client::{
     aptos_api_types::{MoveStructTag, MoveType},
     Transaction,
@@ -73,6 +73,7 @@ use std::{
     mem,
     path::PathBuf,
     str::FromStr,
+    sync::Arc,
     time::Duration,
 };
 use tempfile::TempDir;
@@ -323,6 +324,7 @@ impl CliTestFramework {
                 json_file: None,
             },
             txn_options: self.transaction_options(sender_index, gas_options),
+            env: self.move_env(),
         }
         .execute()
         .await
@@ -614,6 +616,7 @@ impl CliTestFramework {
                 json_file: None,
             },
             txn_options: self.transaction_options(owner_index, None),
+            env: self.move_env(),
         }
         .execute()
         .await
@@ -824,6 +827,7 @@ impl CliTestFramework {
                 skip_fetch_latest_git_deps: false,
             },
             template: None,
+            env: Default::default(),
         }
         .execute()
         .await
@@ -841,6 +845,7 @@ impl CliTestFramework {
             included_artifacts_args: IncludedArtifactsArgs {
                 included_artifacts: included_artifacts.unwrap_or(IncludedArtifacts::Sparse),
             },
+            env: Default::default(),
         }
         .execute()
         .await
@@ -859,6 +864,7 @@ impl CliTestFramework {
             compute_coverage: false,
             dump_state: false,
             fail_fast: false,
+            env: Default::default(),
         }
         .execute()
         .await
@@ -887,6 +893,7 @@ impl CliTestFramework {
                 },
                 chunk_size: CHUNK_SIZE_IN_BYTES,
             },
+            env: self.move_env(),
         }
         .execute()
         .await
@@ -906,6 +913,7 @@ impl CliTestFramework {
             output_dir: Some(output_dir),
             print_metadata: false,
             bytecode: true,
+            env: Default::default(),
         }
         .execute()
         .await
@@ -945,6 +953,7 @@ impl CliTestFramework {
                 json_file: None,
             },
             txn_options: self.transaction_options(index, gas_options),
+            env: self.move_env(),
         }
         .execute()
         .await
@@ -1046,6 +1055,7 @@ impl CliTestFramework {
                 arg_vec: ArgWithTypeVec { args: vec![] },
                 json_file: None,
             },
+            env: self.move_env(),
         }
         .execute()
         .await
@@ -1074,6 +1084,7 @@ impl CliTestFramework {
                 arg_vec: ArgWithTypeVec { args },
                 json_file: None,
             },
+            env: self.move_env(),
         }
         .execute()
         .await
@@ -1127,6 +1138,16 @@ impl CliTestFramework {
 
     pub fn rest_options(&self) -> RestOptions {
         RestOptions::new(Some(self.endpoint.clone()), None)
+    }
+
+    fn move_env(&self) -> Arc<MoveEnv> {
+        Arc::new(MoveEnv::new(
+            Box::new(crate::RealAptosContext),
+            Box::new(|client| {
+                use aptos_move_debugger::aptos_debugger::AptosDebugger;
+                Ok(Box::new(AptosDebugger::rest_client(client)?))
+            }),
+        ))
     }
 
     pub fn faucet_options(&self) -> FaucetOptions {

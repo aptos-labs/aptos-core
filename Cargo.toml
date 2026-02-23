@@ -34,6 +34,7 @@ members = [
     "aptos-move/aptos-vm-types",
     "aptos-move/aptos-workspace-server",
     "aptos-move/block-executor",
+    "aptos-move/cli",
     "aptos-move/e2e-benchmark",
     "aptos-move/e2e-move-tests",
     "aptos-move/e2e-tests",
@@ -395,6 +396,7 @@ aptos-mempool = { path = "mempool" }
 aptos-mempool-notifications = { path = "state-sync/inter-component/mempool-notifications" }
 aptos-memsocket = { path = "network/memsocket" }
 aptos-metrics-core = { path = "crates/aptos-metrics-core" }
+aptos-move-cli = { path = "aptos-move/cli" }
 aptos-move-debugger = { path = "aptos-move/aptos-debugger" }
 aptos-move-examples = { path = "aptos-move/move-examples" }
 aptos-move-e2e-benchmark = { path = "aptos-move/e2e-benchmark" }
