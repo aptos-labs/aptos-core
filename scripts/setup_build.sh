@@ -33,7 +33,8 @@ trap _cleanup_on_exit EXIT
 
 # Helper: create a temp dir and register it for automatic cleanup.
 make_tmp_dir() {
-    _td="$(mktemp -d)"
+    # Use -t for BSD/macOS mktemp compatibility (GNU mktemp also accepts it)
+    _td="$(mktemp -d -t setup_build.XXXXXX)"
     _CLEANUP_DIRS="$_CLEANUP_DIRS $_td"
     echo "$_td"
 }
@@ -1396,8 +1397,13 @@ install_nodejs() {
         rm -f nodesource_setup.sh
     fi
 
-    install_pkg nodejs "$PACKAGE_MANAGER"
-    install_pkg npm "$PACKAGE_MANAGER"
+    if [ "$PACKAGE_MANAGER" = "brew" ]; then
+        # Homebrew uses 'node' (not 'nodejs'), and npm is bundled with it
+        install_pkg node "$PACKAGE_MANAGER"
+    else
+        install_pkg nodejs "$PACKAGE_MANAGER"
+        install_pkg npm "$PACKAGE_MANAGER"
+    fi
 }
 
 # pnpm -- fast, disk-efficient Node.js package manager
