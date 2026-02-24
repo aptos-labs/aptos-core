@@ -199,7 +199,11 @@ where
     // Step 3: Z_T = ∏ (X - x_i) via divide-and-conquer from_roots
     let z_T = vanishing_poly::from_roots(&eval_points);
     let z_T_dos = DOSPoly::from(z_T.clone());
+    #[cfg(feature = "range_proof_timing_multivariate")]
+    print_open("z_T + z_T_dos (vanishing poly)", start.elapsed());
 
+    #[cfg(feature = "range_proof_timing_multivariate")]
+    let start = Instant::now();
     let f_i_minus_y_is: Vec<DensePolynomial<_>> = f_is
         .iter()
         .zip(evals.iter())
@@ -209,7 +213,11 @@ where
             term_poly
         })
         .collect();
+    #[cfg(feature = "range_proof_timing_multivariate")]
+    print_open("f_i_minus_y_is", start.elapsed());
 
+    #[cfg(feature = "range_proof_timing_multivariate")]
+    let start = Instant::now();
     let z_t_is: Vec<_> = eval_points
         .iter()
         .map(|x_i| {
@@ -222,7 +230,11 @@ where
             z_t_i
         })
         .collect();
+    #[cfg(feature = "range_proof_timing_multivariate")]
+    print_open("z_t_is (z_T / (X - x_i))", start.elapsed());
 
+    #[cfg(feature = "range_proof_timing_multivariate")]
+    let start = Instant::now();
     let mut f_poly = DensePolynomial::zero();
     let mut gamma_i = E::ScalarField::ONE;
 
@@ -233,10 +245,18 @@ where
         f_poly += &scaled;
         gamma_i *= gamma;
     }
+    #[cfg(feature = "range_proof_timing_multivariate")]
+    print_open("f_poly (gamma-weighted sum)", start.elapsed());
 
+    #[cfg(feature = "range_proof_timing_multivariate")]
+    let start = Instant::now();
     let (h_poly, remainder) = DOSPoly::from(f_poly).divide_with_q_and_r(&z_T_dos).unwrap();
     debug_assert!(remainder.is_zero());
+    #[cfg(feature = "range_proof_timing_multivariate")]
+    print_open("h_poly (f_poly / z_T)", start.elapsed());
 
+    #[cfg(feature = "range_proof_timing_multivariate")]
+    let start = Instant::now();
     let s = sample_field_element(rng);
     let W = hom
         .apply(&univariate_hiding_kzg::Witness {
@@ -246,15 +266,18 @@ where
         .0;
     trs.append_point(&W.into_affine());
     #[cfg(feature = "range_proof_timing_multivariate")]
-    print_open("z_T + f_i_minus_y_is + z_t_is + f_poly + h_poly + W", start.elapsed());
+    print_open("W (hom.apply h_poly) + transcript", start.elapsed());
 
     #[cfg(feature = "range_proof_timing_multivariate")]
     let start = Instant::now();
     // Step 4
     let z = trs.challenge_scalar();
-
     let z_T_val = z_T.evaluate(&z);
+    #[cfg(feature = "range_proof_timing_multivariate")]
+    print_open("z + z_T_val", start.elapsed());
 
+    #[cfg(feature = "range_proof_timing_multivariate")]
+    let start = Instant::now();
     let mut f_z_poly = DensePolynomial::<E::ScalarField>::zero();
     let mut gamma_i = E::ScalarField::ONE;
 
@@ -266,7 +289,11 @@ where
         f_z_poly += &scaled;
         gamma_i *= gamma;
     }
+    #[cfg(feature = "range_proof_timing_multivariate")]
+    print_open("f_z_poly (gamma-weighted sum at z)", start.elapsed());
 
+    #[cfg(feature = "range_proof_timing_multivariate")]
+    let start = Instant::now();
     let ZT_h_poly = h_poly.clone() * z_T_val;
     let L_poly = &f_z_poly - &ZT_h_poly;
 
@@ -278,7 +305,11 @@ where
     let (Q_dos, remainder) = L_dos.divide_with_q_and_r(&divisor).unwrap();
     debug_assert!(remainder.is_zero());
     let Q_poly: DensePolynomial<E::ScalarField> = Q_dos.into();
+    #[cfg(feature = "range_proof_timing_multivariate")]
+    print_open("Q (L_poly / (X - z))", start.elapsed());
 
+    #[cfg(feature = "range_proof_timing_multivariate")]
+    let start = Instant::now();
     let t = sample_field_element(rng);
     let W_prime = hom
         .apply(&univariate_hiding_kzg::Witness {
@@ -288,7 +319,7 @@ where
         .0;
     trs.append_point(&W_prime.into_affine());
     #[cfg(feature = "range_proof_timing_multivariate")]
-    print_open("z + z_T_val + f_z_poly + Q + W_prime", start.elapsed());
+    print_open("W_prime (hom.apply Q) + transcript", start.elapsed());
 
     #[cfg(feature = "range_proof_timing_multivariate")]
     let start = Instant::now();

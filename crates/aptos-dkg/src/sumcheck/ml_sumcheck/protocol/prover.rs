@@ -9,6 +9,8 @@ use ark_serialize::{CanonicalDeserialize, CanonicalSerialize};
 use ark_std::{cfg_iter_mut, vec::Vec};
 #[cfg(feature = "parallel")]
 use rayon::prelude::*;
+#[cfg(feature = "range_proof_timing_multivariate")]
+use std::time::Instant;
 
 /// Prover Message
 #[derive(Clone, CanonicalSerialize, CanonicalDeserialize)]
@@ -64,10 +66,14 @@ impl<F: Field> IPForMLSumcheck<F> {
     }
 
     /// Receive message from verifier, generate prover message, and proceed to next round
+    #[allow(unused_variables)]
     pub fn prove_round(
         prover_state: &mut ProverState<F>,
         v_msg: &Option<VerifierMsg<F>>,
+        timing: &mut Option<&mut dyn FnMut(&str, std::time::Duration)>,
     ) -> ProverMsg<F> {
+        #[cfg(feature = "range_proof_timing_multivariate")]
+        let start_fix = Instant::now();
         if let Some(msg) = v_msg {
             if prover_state.round == 0 {
                 panic!("first round should be prover first.");
@@ -85,6 +91,14 @@ impl<F: Field> IPForMLSumcheck<F> {
         } else if prover_state.round > 0 {
             panic!("verifier message is empty");
         }
+        #[cfg(feature = "range_proof_timing_multivariate")]
+        if let Some(f) = timing {
+            let round_idx = prover_state.round; // 0-based round we're about to compute
+            f(
+                &format!("sumcheck round {} fix_variables", round_idx),
+                start_fix.elapsed(),
+            );
+        }
 
         prover_state.round += 1;
 
@@ -94,139 +108,110 @@ impl<F: Field> IPForMLSumcheck<F> {
 
         let i = prover_state.round;
         let nv = prover_state.num_vars;
+        #[cfg(feature = "range_proof_timing_multivariate")]
+        let round_idx = i - 1;
 
         // Degree is 4
         let degree = 4;
 
-        #[cfg(not(feature = "parallel"))]
-        let zeros = vec![F::zero(); degree + 1];
-        #[cfg(feature = "parallel")]
-        let zeros = || vec![F::zero(); degree + 1];
+        // eq_t = ∏_j [ x_j·t_j + (1-x_j)(1-t_j) ]. For remaining vars only the b that matches
+        // the last (nv-i) coordinates of t gives non-zero product. So we use that single b only.
+        let one = F::one();
+        let two = F::from(2u64);
+        let mut b_star = 0usize;
+        for j in 0..(nv - i) {
+            if !prover_state.eq_point_original[i + j].is_zero() {
+                b_star |= 1 << j;
+            }
+        }
+        let b = b_star;
 
-        let fold_result =
-            ark_std::cfg_into_iter!(0..1 << (nv - i), 1 << 10).fold(zeros, |mut sum, b| {
-                let one = F::one();
-                let two = F::from(2u64);
+        #[cfg(feature = "range_proof_timing_multivariate")]
+        let start_fold = Instant::now();
 
-                // Linear term contribution: L(...,X,...) = l0 + X*(l1-l0)
-                let linear_contrib = if let Some(ref linear) = prover_state.linear_term {
-                    let l0 = linear[b << 1];
-                    let l1 = linear[(b << 1) + 1];
-                    (l0, l1)
-                } else {
-                    (F::zero(), F::zero())
-                };
+        let mut products_sum = vec![F::zero(); degree + 1];
 
-                for x in 0..=degree {
-                    let x_field = F::from(x as u64);
+        // Single b that matches the last (nv-i) coordinates of t; remaining eq_t factors are 1.
+        let linear_contrib = if let Some(ref linear) = prover_state.linear_term {
+            let l0 = linear[b << 1];
+            let l1 = linear[(b << 1) + 1];
+            (l0, l1)
+        } else {
+            (F::zero(), F::zero())
+        };
 
-                    // eq_t contribution
-                    let mut eq_val = one;
-                    for j in 0..i - 1 {
-                        let tj = prover_state.eq_point_original[j];
-                        let rj = prover_state.randomness[j];
-                        eq_val *= (one - tj) + rj * (two * tj - one);
-                    }
-                    let ti = prover_state.eq_point_original[i - 1];
-                    eq_val *= (one - ti) + x_field * (two * ti - one);
-                    for j in 0..(nv - i) {
-                        let tj = prover_state.eq_point_original[i + j];
-                        let xj = if (b >> j) & 1 == 1 { one } else { F::zero() };
-                        eq_val *= (one - tj) + xj * (two * tj - one);
-                    }
+        for x in 0..=degree {
+            let x_field = F::from(x as u64);
 
-                    // eq_{0,...,0}(x) = ∏ᵢ(1-xᵢ) contribution
-                    let mut eq_zero_val = one;
-                    for j in 0..i - 1 {
-                        eq_zero_val *= one - prover_state.randomness[j];
-                    }
-                    eq_zero_val *= one - x_field;
-                    for j in 0..(nv - i) {
-                        let xj = if (b >> j) & 1 == 1 { one } else { F::zero() };
-                        eq_zero_val *= one - xj;
-                    }
+            // eq_t: fixed vars + current var; remaining vars contribute 1 (b matches t)
+            let mut eq_val = one;
+            for j in 0..i - 1 {
+                let tj = prover_state.eq_point_original[j];
+                let rj = prover_state.randomness[j];
+                eq_val *= (one - tj) + rj * (two * tj - one);
+            }
+            let ti = prover_state.eq_point_original[i - 1];
+            eq_val *= (one - ti) + x_field * (two * ti - one);
 
-                    // Linear term (once per (b,x))
-                    let linear_val = linear_contrib.0 + x_field * (linear_contrib.1 - linear_contrib.0);
-                    let linear_term_val = linear_val * eq_val * (one - eq_zero_val);
-                    sum[x] += linear_term_val;
+            // eq_{0,...,0}(x) = ∏ᵢ(1-xᵢ)
+            let mut eq_zero_val = one;
+            for j in 0..i - 1 {
+                eq_zero_val *= one - prover_state.randomness[j];
+            }
+            eq_zero_val *= one - x_field;
+            for j in 0..(nv - i) {
+                let xj = if (b >> j) & 1 == 1 { one } else { F::zero() };
+                eq_zero_val *= one - xj;
+            }
+
+            let linear_val = linear_contrib.0 + x_field * (linear_contrib.1 - linear_contrib.0);
+            products_sum[x] += linear_val * eq_val * (one - eq_zero_val);
+        }
+
+        for (coefficient, poly) in &prover_state.constraints {
+            let p0 = poly[b << 1];
+            let p1 = poly[(b << 1) + 1];
+            let delta = p1 - p0;
+            let a0 = p0 * (one - p0);
+            let a1 = delta * (one - two * p0);
+            let a2 = -(delta * delta);
+
+            for x in 0..=degree {
+                let x_field = F::from(x as u64);
+
+                let mut eq_val = one;
+                for j in 0..i - 1 {
+                    let tj = prover_state.eq_point_original[j];
+                    let rj = prover_state.randomness[j];
+                    eq_val *= (one - tj) + rj * (two * tj - one);
                 }
+                let ti = prover_state.eq_point_original[i - 1];
+                eq_val *= (one - ti) + x_field * (two * ti - one);
 
-                // For each constraint cᵢ·Pᵢ(1-Pᵢ)
-                for (coefficient, poly) in &prover_state.constraints {
-                    let p0 = poly[b << 1];
-                    let p1 = poly[(b << 1) + 1];
-
-                    // P(X) = p0 + X(p1 - p0)
-                    let delta = p1 - p0;
-
-                    // P(X)(1-P(X)) coefficients: a0 + a1·X + a2·X²
-
-                    let a0 = p0 * (one - p0);
-                    let a1 = delta * (one - two * p0);
-                    let a2 = -(delta * delta);
-
-                    // Evaluate at X = 0, 1, 2, 3, 4
-                    for x in 0..=degree {
-                        let x_field = F::from(x as u64);
-
-                        // eq_t contribution
-                        let mut eq_val = one;
-
-                        // Fixed variables (rounds 1 to i-1)
-                        for j in 0..i - 1 {
-                            let tj = prover_state.eq_point_original[j];
-                            let rj = prover_state.randomness[j];
-                            eq_val *= (one - tj) + rj * (two * tj - one);
-                        }
-
-                        // Current variable X (round i)
-                        let ti = prover_state.eq_point_original[i - 1];
-                        eq_val *= (one - ti) + x_field * (two * ti - one);
-
-                        // Remaining variables (rounds i+1 to nv)
-                        for j in 0..(nv - i) {
-                            let tj = prover_state.eq_point_original[i + j];
-                            let xj = if (b >> j) & 1 == 1 { one } else { F::zero() };
-                            eq_val *= (one - tj) + xj * (two * tj - one);
-                        }
-                        let mut eq_zero_val = one;
-
-                        // Fixed variables: eq_{0,...,0} = ∏(1-xᵢ)
-                        for j in 0..i - 1 {
-                            eq_zero_val *= one - prover_state.randomness[j];
-                        }
-                        eq_zero_val *= one - x_field;
-
-                        // Remaining variables
-                        for j in 0..(nv - i) {
-                            let xj = if (b >> j) & 1 == 1 { one } else { F::zero() };
-                            eq_zero_val *= one - xj;
-                        }
-                        let binary_val = a0 + a1 * x_field + a2 * x_field * x_field;
-                        let binary_term = binary_val * eq_val * (one - eq_zero_val);
-                        sum[x] += *coefficient * binary_term;
-                    }
+                let mut eq_zero_val = one;
+                for j in 0..i - 1 {
+                    eq_zero_val *= one - prover_state.randomness[j];
                 }
-                sum
-            });
-
-        #[cfg(not(feature = "parallel"))]
-        let mut products_sum = fold_result;
-
-        #[cfg(feature = "parallel")]
-        let mut products_sum = fold_result.reduce(
-            || vec![F::zero(); degree + 1],
-            |mut overall, sublist| {
-                overall
-                    .iter_mut()
-                    .zip(sublist.iter())
-                    .for_each(|(f, s)| *f += s);
-                overall
-            },
-        );
+                eq_zero_val *= one - x_field;
+                for j in 0..(nv - i) {
+                    let xj = if (b >> j) & 1 == 1 { one } else { F::zero() };
+                    eq_zero_val *= one - xj;
+                }
+                let binary_val = a0 + a1 * x_field + a2 * x_field * x_field;
+                products_sum[x] += *coefficient * binary_val * eq_val * (one - eq_zero_val);
+            }
+        }
+        #[cfg(feature = "range_proof_timing_multivariate")]
+        if let Some(f) = timing {
+            f(
+                &format!("sumcheck round {} fold (hypercube sum)", round_idx),
+                start_fold.elapsed(),
+            );
+        }
 
         // Add α·g terms
+        #[cfg(feature = "range_proof_timing_multivariate")]
+        let start_g = Instant::now();
 
         // Contribution from fixed variables (constant term)
         // Contribution from fixed variables (constant term)
@@ -282,6 +267,13 @@ impl<F: Field> IPForMLSumcheck<F> {
             }
             let contribution = prover_state.alpha * num_current_remaining * g_i_val;
             products_sum[x] += contribution;
+        }
+        #[cfg(feature = "range_proof_timing_multivariate")]
+        if let Some(f) = timing {
+            f(
+                &format!("sumcheck round {} g_terms", round_idx),
+                start_g.elapsed(),
+            );
         }
 
         ProverMsg {
