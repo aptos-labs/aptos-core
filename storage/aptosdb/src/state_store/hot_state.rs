@@ -360,18 +360,7 @@ impl Committer {
             }
 
             self.try_merge();
-
-            GAUGE.set_with(&["hot_state_items"], self.base.len() as i64);
-            GAUGE.set_with(&["hot_state_key_bytes"], self.total_key_bytes as i64);
-            GAUGE.set_with(&["hot_state_value_bytes"], self.total_value_bytes as i64);
-            GAUGE.set_with(
-                &["hot_state_deferred_merge_old_views"],
-                self.old_views.len() as i64,
-            );
-            GAUGE.set_with(
-                &["hot_state_deferred_merge_version_lag"],
-                (committed_version - self.merged_state.next_version()) as i64,
-            );
+            self.update_deferred_merge_gauges(committed_version);
         }
 
         self.try_merge(); // flush any remaining deferred merge before exit
@@ -456,6 +445,7 @@ impl Committer {
     fn try_merge(&mut self) -> bool {
         self.old_views.retain(|v| v.strong_count() > 0);
         if !self.old_views.is_empty() {
+            self.update_deferred_merge_gauges(self.committed.lock().state.next_version());
             return false;
         }
 
@@ -480,7 +470,20 @@ impl Committer {
             base: Arc::clone(&self.base),
         });
         Self::swap_view(&mut self.old_views, &mut self.committed.lock(), clean_view);
+        self.update_deferred_merge_gauges(self.merged_state.next_version());
+
         true
+    }
+
+    fn update_deferred_merge_gauges(&self, committed_version: u64) {
+        GAUGE.set_with(
+            &["hot_state_deferred_merge_old_views"],
+            self.old_views.len() as i64,
+        );
+        GAUGE.set_with(
+            &["hot_state_deferred_merge_version_lag"],
+            (committed_version - self.merged_state.next_version()) as i64,
+        );
     }
 
     /// Apply the delta between `merged_state` and `target` to the base DashMaps.
@@ -524,6 +527,9 @@ impl Committer {
         COUNTER.inc_with_by(&["hot_state_insert"], n_insert);
         COUNTER.inc_with_by(&["hot_state_update"], n_update);
         COUNTER.inc_with_by(&["hot_state_evict"], n_evict);
+        GAUGE.set_with(&["hot_state_items"], self.base.len() as i64);
+        GAUGE.set_with(&["hot_state_key_bytes"], self.total_key_bytes as i64);
+        GAUGE.set_with(&["hot_state_value_bytes"], self.total_value_bytes as i64);
     }
 
     /// Traverses the entire map and checks if all the pointers are correctly linked.
