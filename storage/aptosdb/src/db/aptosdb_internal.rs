@@ -43,6 +43,7 @@ impl AptosDB {
         ledger_db: LedgerDb,
         hot_state_merkle_db: Option<StateMerkleDb>,
         state_merkle_db: StateMerkleDb,
+        hot_state_kv_db: Option<StateKvDb>,
         state_kv_db: StateKvDb,
         pruner_config: PrunerConfig,
         buffered_state_target_items: usize,
@@ -54,7 +55,9 @@ impl AptosDB {
         let ledger_db = Arc::new(ledger_db);
         let hot_state_merkle_db = hot_state_merkle_db.map(Arc::new);
         let state_merkle_db = Arc::new(state_merkle_db);
+        let hot_state_kv_db = hot_state_kv_db.map(Arc::new);
         let state_kv_db = Arc::new(state_kv_db);
+        // TODO(HotState): hook up `hot_state_kv_db` with a pruner.
         let state_pruner = StatePruner::new(
             hot_state_merkle_db.clone(),
             Arc::clone(&state_merkle_db),
@@ -65,6 +68,7 @@ impl AptosDB {
             Arc::clone(&ledger_db),
             hot_state_merkle_db,
             Arc::clone(&state_merkle_db),
+            hot_state_kv_db,
             Arc::clone(&state_kv_db),
             state_pruner,
             buffered_state_target_items,
@@ -126,20 +130,22 @@ impl AptosDB {
             /* estimated_entry_charge = */ 0,
         );
 
-        let (ledger_db, hot_state_merkle_db, state_merkle_db, state_kv_db) = Self::open_dbs(
-            db_paths,
-            rocksdb_configs,
-            Some(&env),
-            Some(&block_cache),
-            readonly,
-            max_num_nodes_per_lru_cache_shard,
-            hot_state_config.delete_on_restart,
-        )?;
+        let (ledger_db, hot_state_merkle_db, state_merkle_db, hot_state_kv_db, state_kv_db) =
+            Self::open_dbs(
+                db_paths,
+                rocksdb_configs,
+                Some(&env),
+                Some(&block_cache),
+                readonly,
+                max_num_nodes_per_lru_cache_shard,
+                hot_state_config.delete_on_restart,
+            )?;
 
         let mut myself = Self::new_with_dbs(
             ledger_db,
             hot_state_merkle_db,
             state_merkle_db,
+            hot_state_kv_db,
             state_kv_db,
             pruner_config,
             buffered_state_target_items,

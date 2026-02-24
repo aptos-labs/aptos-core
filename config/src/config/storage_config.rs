@@ -580,6 +580,12 @@ impl StorageDirPaths {
             .unwrap_or(&self.default_path)
     }
 
+    pub fn hot_state_kv_db_metadata_root_path(&self) -> &PathBuf {
+        self.hot_state_kv_db_paths
+            .metadata_path()
+            .unwrap_or(&self.default_path)
+    }
+
     pub fn hot_state_kv_db_shard_root_path(&self, shard_id: usize) -> &PathBuf {
         self.hot_state_kv_db_paths
             .shard_path(shard_id)
