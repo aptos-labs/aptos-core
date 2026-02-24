@@ -37,20 +37,8 @@ static ROCKSDB_PROPERTY_MAP: Lazy<HashMap<&str, String>> = Lazy::new(|| {
         "rocksdb.cur-size-active-mem-table",
         "rocksdb.cur-size-all-mem-tables",
         "rocksdb.size-all-mem-tables",
-        "rocksdb.num-entries-active-mem-table",
-        "rocksdb.num-entries-imm-mem-tables",
-        "rocksdb.num-deletes-active-mem-table",
-        "rocksdb.num-deletes-imm-mem-tables",
-        "rocksdb.estimate-num-keys",
         "rocksdb.estimate-table-readers-mem",
-        "rocksdb.is-file-deletions-enabled",
-        "rocksdb.num-snapshots",
-        "rocksdb.oldest-snapshot-time",
-        "rocksdb.num-live-versions",
-        "rocksdb.current-super-version-number",
         "rocksdb.estimate-live-data-size",
-        "rocksdb.min-log-number-to-keep",
-        "rocksdb.min-obsolete-sst-number-to-keep",
         "rocksdb.total-sst-files-size",
         "rocksdb.live-sst-files-size",
         "rocksdb.base-level",
@@ -61,7 +49,6 @@ static ROCKSDB_PROPERTY_MAP: Lazy<HashMap<&str, String>> = Lazy::new(|| {
         "rocksdb.is-write-stopped",
         "rocksdb.block-cache-capacity",
         "rocksdb.block-cache-usage",
-        "rocksdb.block-cache-pinned-usage",
     ]
     .iter()
     .map(|x| (*x, format!("aptos_{}", x.replace('.', "_"))))
@@ -165,8 +152,8 @@ impl RocksdbPropertyReporter {
                     "Updating rocksdb property failed."
                 );
             }
-            // report rocksdb properties each 10 seconds
-            const TIMEOUT_MS: u64 = if cfg!(test) { 10 } else { 10000 };
+            // report rocksdb properties each 60 seconds
+            const TIMEOUT_MS: u64 = if cfg!(test) { 10 } else { 60000 };
 
             match recv.recv_timeout(Duration::from_millis(TIMEOUT_MS)) {
                 Ok(_) => break,
