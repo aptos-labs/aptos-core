@@ -166,14 +166,22 @@ impl PayloadClient for ProxyBudgetPayloadClient {
         // --- Adaptive delay: proportional to congestion level ---
         // Skip ALL delays when a primary proof is pending — cutting-point blocks
         // must be ordered ASAP to unblock the primary pipeline.
+        //
+        // Delays are SUMMED (not max'd) so they compound under heavy congestion.
+        // With round_timeout=100ms:
+        //   - budget delay: 50ms when total_blocks > target
+        //   - gap delay: 0-100ms proportional to pipeline gap
+        //   - batch delay: 0-200ms proportional to pending batches (2x round_timeout)
+        // Max combined delay: ~350ms, which slows proxy to ~400ms/round (vs ~30ms base).
+        // This brings proxy batch production rate closer to primary's ~1-2s/round.
         let delay_ms = if has_pending {
             0u64
         } else {
             let mut delay = 0u64;
 
-            // Budget-based delay (existing): half round timeout when blocks > target
+            // Budget-based delay: half round timeout when blocks > target
             if total_blocks > effective_target {
-                delay = delay.max(self.round_timeout_ms / 2);
+                delay += self.round_timeout_ms / 2;
             }
 
             // Pipeline gap delay: proportional, kicks in at gap > 2
@@ -182,19 +190,21 @@ impl PayloadClient for ProxyBudgetPayloadClient {
                     .round_timeout_ms
                     .saturating_mul(gap.min(bp.max_pipeline_gap_for_delay))
                     / bp.max_pipeline_gap_for_delay;
-                delay = delay.max(gap_delay);
+                delay += gap_delay;
             }
 
             // Pending batches delay: proportional when primary has unconsumed batches.
-            // Replaces the previous hard stop which caused a death spiral — empty
-            // proxy blocks still get forwarded as batches, keeping the count high
-            // and starving the proxy of all transactions indefinitely.
+            // Uses 2x round_timeout ceiling so this alone can reach 200ms under heavy
+            // batch accumulation. This replaces the previous hard stop which caused a
+            // death spiral — empty proxy blocks still get forwarded as batches, keeping
+            // the count high and starving the proxy of all transactions indefinitely.
             if batches >= bp.pending_batches_delay_threshold {
                 let batch_delay = self
                     .round_timeout_ms
+                    .saturating_mul(2)
                     .saturating_mul(batches.min(bp.max_pending_batches_for_delay))
                     / bp.max_pending_batches_for_delay;
-                delay = delay.max(batch_delay);
+                delay += batch_delay;
             }
 
             delay
