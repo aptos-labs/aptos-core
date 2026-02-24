@@ -78,6 +78,67 @@ pub(crate) fn realistic_env_sweep_wrap(
         )
 }
 
+pub(crate) fn land_blocking_load_sweep_test() -> ForgeConfig {
+    let sweep = LoadVsPerfBenchmark {
+        test: Box::new(PerformanceBenchmark),
+        workloads: Workloads::TPS(vec![100, 250, 500, 750, 1000]),
+        criteria: [
+            (95, 0.9, 1.0, 1.2, 0),
+            (240, 0.9, 1.1, 1.2, 0),
+            (480, 1.0, 1.2, 1.5, 0),
+            (720, 1.0, 1.3, 1.8, 0),
+            (950, 1.2, 1.5, 2.0, 0),
+        ]
+        .into_iter()
+        .map(
+            |(min_tps, max_lat_p50, max_lat_p90, max_lat_p99, max_expired_tps)| {
+                SuccessCriteria::new(min_tps)
+                    .add_max_expired_tps(max_expired_tps as f64)
+                    .add_max_failed_submission_tps(0.0)
+                    .add_latency_threshold(max_lat_p50, LatencyType::P50)
+                    .add_latency_threshold(max_lat_p90, LatencyType::P90)
+                    .add_latency_threshold(max_lat_p99, LatencyType::P99)
+            },
+        )
+        .collect(),
+        background_traffic: background_traffic_for_sweep(5),
+    };
+    ForgeConfig::default()
+        .with_initial_validator_count(NonZeroUsize::new(7).unwrap())
+        .with_initial_fullnode_count(5)
+        .with_validator_override_node_config_fn(Arc::new(|config, _| {
+            config.execution.processed_transactions_detailed_counters = true;
+            // Devnet consensus config for high block rate
+            config.consensus.quorum_store.enable_opt_quorum_store = true;
+            config.consensus.quorum_store.opt_qs_minimum_batch_age_usecs = 500;
+            config.consensus.quorum_store.batch_generation_poll_interval_ms = 10;
+            config.consensus.quorum_store.batch_generation_min_non_empty_interval_ms = 20;
+            config.consensus.quorum_store.batch_generation_max_interval_ms = 100;
+            config.consensus.quorum_store.sender_max_total_txns = 200;
+            config.consensus.vote_back_pressure_limit = 150;
+            config.consensus.quorum_store_poll_time_ms = 5;
+            config.consensus.enable_optimistic_proposal_tx = true;
+            config.consensus.internal_per_key_channel_size = 20;
+            config.consensus.max_sending_block_txns = 300;
+            config.consensus.max_sending_block_txns_after_filtering = 200;
+            config.consensus.max_sending_opt_block_txns_after_filtering = 200;
+        }))
+        .add_network_test(sweep)
+        .with_emit_job(
+            EmitJobRequest::default().latency_polling_interval(Duration::from_millis(100)),
+        )
+        .with_genesis_helm_config_fn(Arc::new(|helm_values| {
+            // no epoch change.
+            helm_values["chain"]["epoch_duration_secs"] = (24 * 3600).into();
+        }))
+        .with_success_criteria(
+            SuccessCriteria::new(0)
+                .add_no_restarts()
+                .add_wait_for_catchup_s(60)
+                .add_chain_progress(RELIABLE_REAL_ENV_PROGRESS_THRESHOLD.clone()),
+        )
+}
+
 pub(crate) fn realistic_env_load_sweep_test() -> ForgeConfig {
     realistic_env_sweep_wrap(20, 10, LoadVsPerfBenchmark {
         test: Box::new(PerformanceBenchmark),
