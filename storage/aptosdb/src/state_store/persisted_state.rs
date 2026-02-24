@@ -65,6 +65,6 @@ impl PersistedState {
     pub fn hack_reset(&self, state_with_summary: StateWithSummary) {
         let (state, summary) = state_with_summary.into_inner();
         *self.summary.lock() = summary;
-        self.hot_state.set_commited(state);
+        self.hot_state.hack_reset(state);
     }
 }

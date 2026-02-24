@@ -43,7 +43,6 @@ pub struct ProcessorArgs {
             ProcessorName::AccountRestorationProcessor,
             ProcessorName::AccountTransactionsProcessor,
             ProcessorName::DefaultProcessor,
-            ProcessorName::EventsProcessor,
             ProcessorName::FungibleAssetProcessor,
             ProcessorName::ObjectsProcessor,
             ProcessorName::StakeProcessor,

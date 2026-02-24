@@ -1,0 +1,119 @@
+//# publish
+module 0x1::M
+struct Y has store
+  x: u64
+
+struct R has key
+  x: bool
+  y: Y
+
+public fun publish(l0: &signer)
+    move_loc l0
+    ld_false
+    ld_u64 0
+    pack Y
+    pack R
+    move_to R
+    ret
+
+public fun modify_x(l0: address) acquires R
+    ld_true
+    move_loc l0
+    mut_borrow_global R
+    mut_borrow_field R, x
+    write_ref
+    ret
+
+public fun verify_x(l0: address) acquires R
+    move_loc l0
+    borrow_global R
+    borrow_field R, x
+    read_ref
+    ld_true
+    eq
+    not
+    br_false l0
+    ld_u64 1000
+    abort
+l0: ret
+
+public fun modify_y_x(l0: address) acquires R
+    ld_u64 42
+    move_loc l0
+    mut_borrow_global R
+    mut_borrow_field R, y
+    mut_borrow_field Y, x
+    write_ref
+    ret
+
+public fun verify_y_x(l0: address) acquires R
+    move_loc l0
+    borrow_global R
+    borrow_field R, y
+    borrow_field Y, x
+    read_ref
+    ld_u64 42
+    eq
+    not
+    br_false l0
+    ld_u64 1001
+    abort
+l0: ret
+
+
+
+//# run --signers 0x1
+script
+use 0x1::M
+entry public fun main(l0: signer)
+    borrow_loc l0
+    call M::publish
+    ret
+
+
+
+//# run --signers 0x1
+script
+use 0x1::M
+use 0x1::signer
+entry public fun main(l0: signer)
+    borrow_loc l0
+    call signer::address_of
+    call M::modify_x
+    ret
+
+
+
+//# run --signers 0x1
+script
+use 0x1::M
+use 0x1::signer
+entry public fun main(l0: signer)
+    borrow_loc l0
+    call signer::address_of
+    call M::verify_x
+    ret
+
+
+
+//# run --signers 0x1
+script
+use 0x1::M
+use 0x1::signer
+entry public fun main(l0: signer)
+    borrow_loc l0
+    call signer::address_of
+    call M::modify_y_x
+    ret
+
+
+
+//# run --signers 0x1
+script
+use 0x1::M
+use 0x1::signer
+entry public fun main(l0: signer)
+    borrow_loc l0
+    call signer::address_of
+    call M::verify_y_x
+    ret

@@ -1,4 +1,4 @@
-//**** Cross-compiled for `masm` syntax from `tests/vm_test_harness/print_bytecode.mvir`
+//**** Cross-compiled for `masm` syntax from `tests/vm_test_harness/print_bytecode.masm`
 
 //# print-bytecode
 // Bytecode version v9

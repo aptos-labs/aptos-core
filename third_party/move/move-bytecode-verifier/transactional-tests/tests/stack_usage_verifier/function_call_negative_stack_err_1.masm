@@ -1,0 +1,21 @@
+//# publish
+module 0x1::Test
+public fun baz(l0: u64, l1: u64, l2: u64): u64
+    local l3: u64
+    move_loc l0
+    move_loc l1
+    add
+    move_loc l2
+    add
+    st_loc l3
+    move_loc l3
+    ret
+
+
+
+//# run
+script
+use 0x1::Test
+entry public fun main()
+    call Test::baz
+    ret

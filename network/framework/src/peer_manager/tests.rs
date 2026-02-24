@@ -23,7 +23,7 @@ use crate::{
 use anyhow::anyhow;
 use aptos_channels::{aptos_channel, message_queues::QueueStyle};
 use aptos_config::{
-    config::{PeerRole, MAX_INBOUND_CONNECTIONS},
+    config::{AccessControlPolicy, PeerRole, MAX_INBOUND_CONNECTIONS},
     network_id::{NetworkContext, NetworkId},
 };
 use aptos_memsocket::MemorySocket;
@@ -34,8 +34,9 @@ use aptos_time_service::TimeService;
 use aptos_types::{network_address::NetworkAddress, PeerId};
 use bytes::Bytes;
 use futures::{channel::oneshot, io::AsyncWriteExt, stream::StreamExt};
-use std::error::Error;
-use tokio::runtime::Handle;
+use maplit::hashset;
+use std::{collections::HashMap, error::Error};
+use tokio::runtime::{Handle, Runtime};
 use tokio_util::compat::{
     FuturesAsyncReadCompatExt, TokioAsyncReadCompatExt, TokioAsyncWriteCompatExt,
 };
@@ -115,6 +116,7 @@ fn build_test_peer_manager(
         constants::MAX_FRAME_SIZE,
         constants::MAX_MESSAGE_SIZE,
         MAX_INBOUND_CONNECTIONS,
+        None, /* access_control_policy */
     );
 
     (
@@ -247,7 +249,7 @@ fn create_connection<TSocket: transport::TSocket>(
 #[test]
 fn peer_manager_simultaneous_dial_two_inbound() {
     ::aptos_logger::Logger::init_for_testing();
-    let runtime = ::tokio::runtime::Runtime::new().unwrap();
+    let runtime = create_test_runtime();
 
     // Create a list of ordered PeerIds so we can ensure how PeerIds will be compared.
     let ids = ordered_peer_ids(2);
@@ -297,7 +299,7 @@ fn peer_manager_simultaneous_dial_two_inbound() {
 #[test]
 fn peer_manager_simultaneous_dial_inbound_outbound_remote_id_larger() {
     ::aptos_logger::Logger::init_for_testing();
-    let runtime = ::tokio::runtime::Runtime::new().unwrap();
+    let runtime = create_test_runtime();
 
     // Create a list of ordered PeerIds so we can ensure how PeerIds will be compared.
     let ids = ordered_peer_ids(2);
@@ -348,7 +350,7 @@ fn peer_manager_simultaneous_dial_inbound_outbound_remote_id_larger() {
 #[test]
 fn peer_manager_simultaneous_dial_inbound_outbound_own_id_larger() {
     ::aptos_logger::Logger::init_for_testing();
-    let runtime = ::tokio::runtime::Runtime::new().unwrap();
+    let runtime = create_test_runtime();
 
     // Create a list of ordered PeerIds so we can ensure how PeerIds will be compared.
     let ids = ordered_peer_ids(2);
@@ -399,7 +401,7 @@ fn peer_manager_simultaneous_dial_inbound_outbound_own_id_larger() {
 #[test]
 fn peer_manager_simultaneous_dial_outbound_inbound_remote_id_larger() {
     ::aptos_logger::Logger::init_for_testing();
-    let runtime = ::tokio::runtime::Runtime::new().unwrap();
+    let runtime = create_test_runtime();
 
     // Create a list of ordered PeerIds so we can ensure how PeerIds will be compared.
     let ids = ordered_peer_ids(2);
@@ -450,7 +452,7 @@ fn peer_manager_simultaneous_dial_outbound_inbound_remote_id_larger() {
 #[test]
 fn peer_manager_simultaneous_dial_outbound_inbound_own_id_larger() {
     ::aptos_logger::Logger::init_for_testing();
-    let runtime = ::tokio::runtime::Runtime::new().unwrap();
+    let runtime = create_test_runtime();
 
     // Create a list of ordered PeerIds so we can ensure how PeerIds will be compared.
     let ids = ordered_peer_ids(2);
@@ -501,7 +503,7 @@ fn peer_manager_simultaneous_dial_outbound_inbound_own_id_larger() {
 #[test]
 fn peer_manager_simultaneous_dial_two_outbound() {
     ::aptos_logger::Logger::init_for_testing();
-    let runtime = ::tokio::runtime::Runtime::new().unwrap();
+    let runtime = create_test_runtime();
 
     // Create a list of ordered PeerIds so we can ensure how PeerIds will be compared.
     let ids = ordered_peer_ids(2);
@@ -548,7 +550,7 @@ fn peer_manager_simultaneous_dial_two_outbound() {
 
 #[test]
 fn peer_manager_simultaneous_dial_disconnect_event() {
-    let runtime = ::tokio::runtime::Runtime::new().unwrap();
+    let runtime = create_test_runtime();
 
     // Create a list of ordered PeerIds so we can ensure how PeerIds will be compared.
     let ids = ordered_peer_ids(2);
@@ -592,7 +594,7 @@ fn peer_manager_simultaneous_dial_disconnect_event() {
 #[test]
 fn test_dial_disconnect() {
     ::aptos_logger::Logger::init_for_testing();
-    let runtime = ::tokio::runtime::Runtime::new().unwrap();
+    let runtime = create_test_runtime();
 
     // Create a list of ordered PeerIds so we can ensure how PeerIds will be compared.
     let ids = ordered_peer_ids(2);
@@ -671,4 +673,133 @@ fn add_peer_to_manager<TSocket: transport::TSocket>(
             ConnectionId::from(connection_id),
         ))
         .unwrap();
+}
+
+#[test]
+fn test_peer_manager_allow_list_accepts_allowed_peer() {
+    // Create the test runtime
+    let runtime = create_test_runtime();
+
+    // Create an allow list with a single allowed peer
+    let allowed_peer = PeerId::random();
+    let allow_list = hashset! {allowed_peer};
+    let access_control_policy = AccessControlPolicy::AllowList(allow_list);
+
+    // Create the peer manager with the allow list
+    let peer_manager = create_peer_manager_with_policy(&runtime, Some(access_control_policy));
+
+    // Check that the allowed peer is accepted
+    let result = peer_manager.check_peer_access_lists(&allowed_peer);
+    assert!(result.is_ok());
+}
+
+#[test]
+fn test_peer_manager_allow_list_rejects_non_allowed_peer() {
+    // Create the test runtime
+    let runtime = create_test_runtime();
+
+    // Create an allow list with a single allowed peer
+    let allowed_peer = PeerId::random();
+    let non_allowed_peer = PeerId::random();
+    let allow_list = hashset! {allowed_peer};
+    let access_control_policy = AccessControlPolicy::AllowList(allow_list);
+
+    // Create the peer manager with the allow list
+    let peer_manager = create_peer_manager_with_policy(&runtime, Some(access_control_policy));
+
+    // Try to check a non-allowed peer
+    let result = peer_manager.check_peer_access_lists(&non_allowed_peer);
+    assert!(result.is_err());
+}
+
+#[test]
+fn test_peer_manager_block_list_rejects_blocked_peer() {
+    // Create the test runtime
+    let runtime = create_test_runtime();
+
+    // Create a block list with a single blocked peer
+    let blocked_peer = PeerId::random();
+    let block_list = hashset! {blocked_peer};
+    let access_control_policy = AccessControlPolicy::BlockList(block_list);
+
+    // Create the peer manager with the block list
+    let peer_manager = create_peer_manager_with_policy(&runtime, Some(access_control_policy));
+
+    // Try to check a blocked peer
+    let result = peer_manager.check_peer_access_lists(&blocked_peer);
+    assert!(result.is_err());
+}
+
+#[test]
+fn test_peer_manager_block_list_accepts_non_blocked_peer() {
+    // Create the test runtime
+    let runtime = create_test_runtime();
+
+    // Create a block list with a single blocked peer
+    let blocked_peer = PeerId::random();
+    let non_blocked_peer = PeerId::random();
+    let block_list = hashset! {blocked_peer};
+    let access_control_policy = AccessControlPolicy::BlockList(block_list);
+
+    // Create the peer manager with the block list
+    let peer_manager = create_peer_manager_with_policy(&runtime, Some(access_control_policy));
+
+    // Check a non-blocked peer
+    let result = peer_manager.check_peer_access_lists(&non_blocked_peer);
+    assert!(result.is_ok());
+}
+
+#[test]
+fn test_peer_manager_no_policy_accepts_all_peers() {
+    // Create the test runtime
+    let runtime = create_test_runtime();
+
+    // Create the peer manager with no access control policy
+    let peer_manager = create_peer_manager_with_policy(&runtime, None);
+
+    // Any peer should be allowed when there's no policy
+    let random_peer1 = PeerId::random();
+    let random_peer2 = PeerId::random();
+    assert!(peer_manager.check_peer_access_lists(&random_peer1).is_ok());
+    assert!(peer_manager.check_peer_access_lists(&random_peer2).is_ok());
+}
+
+/// Creates a peer manager with the specified access control policy
+fn create_peer_manager_with_policy(
+    runtime: &Runtime,
+    policy: Option<AccessControlPolicy>,
+) -> PeerManager<
+    BoxedTransport<Connection<MemorySocket>, impl Error + Sync + Send + 'static>,
+    MemorySocket,
+> {
+    // Create the network channels
+    let (_, peer_manager_request_rx) =
+        aptos_channel::new(QueueStyle::FIFO, constants::NETWORK_CHANNEL_SIZE, None);
+    let (_, connection_reqs_rx) =
+        aptos_channel::new(QueueStyle::FIFO, constants::NETWORK_CHANNEL_SIZE, None);
+    let (conn_status_tx, _) = conn_notifs_channel::new();
+
+    // Create the peer manager
+    PeerManager::new(
+        runtime.handle().clone(),
+        TimeService::mock(),
+        build_test_transport(),
+        NetworkContext::mock_with_peer_id(PeerId::random()),
+        "/memory/0".parse().unwrap(),
+        PeersAndMetadata::new(&[NetworkId::Validator]),
+        peer_manager_request_rx,
+        connection_reqs_rx,
+        HashMap::new(),
+        vec![conn_status_tx],
+        constants::NETWORK_CHANNEL_SIZE,
+        constants::MAX_FRAME_SIZE,
+        constants::MAX_MESSAGE_SIZE,
+        MAX_INBOUND_CONNECTIONS,
+        policy.map(std::sync::Arc::new),
+    )
+}
+
+/// Creates a new tokio runtime for testing
+fn create_test_runtime() -> Runtime {
+    Runtime::new().unwrap()
 }

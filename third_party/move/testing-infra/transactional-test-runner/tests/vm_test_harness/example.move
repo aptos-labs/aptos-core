@@ -48,14 +48,15 @@ script {
 //#     --address 0x1
 //#     --resource 0x42::N::R<u64>
 
-//# run --signers 0x1 --syntax=mvir
+//# run --signers 0x1 --syntax=masm
 
-import 0x42.N;
-main(s: signer) {
-label b0:
-    _ = N.take(&s);
-    return;
-}
+script
+entry fun main(s: signer)
+b0:
+    borrow_loc s
+    call 0x42::N::take
+    pop
+    ret
 
 //# view
 //#     --address 0x1

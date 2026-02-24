@@ -1,0 +1,47 @@
+//# publish
+module 0x42::Tests
+public fun test<T0: copy + drop>(l0: T0)
+    local l1: vector<T0>
+    vec_pack <T0>, 0
+    st_loc l1
+    borrow_loc l1
+    vec_len <T0>
+    ld_u64 0
+    eq
+    not
+    br_false l0
+    ld_u64 42
+    abort
+l0: mut_borrow_loc l1
+    copy_loc l0
+    vec_push_back <T0>
+    mut_borrow_loc l1
+    copy_loc l0
+    vec_push_back <T0>
+    mut_borrow_loc l1
+    ld_u64 0
+    ld_u64 1
+    vec_swap <T0>
+    borrow_loc l1
+    ld_u64 0
+    vec_borrow <T0>
+    pop
+    mut_borrow_loc l1
+    ld_u64 0
+    vec_mut_borrow <T0>
+    pop
+    mut_borrow_loc l1
+    vec_pop_back <T0>
+    pop
+    mut_borrow_loc l1
+    vec_pop_back <T0>
+    pop
+    move_loc l1
+    vec_unpack <T0>, 0
+    ret
+
+
+
+//# run 0x42::Tests::test --type-args u64 --args 0
+
+//# run 0x42::Tests::test --type-args vector<u8> --args b"hello"

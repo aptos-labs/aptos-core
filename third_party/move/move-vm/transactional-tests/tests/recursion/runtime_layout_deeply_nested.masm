@@ -1,0 +1,127 @@
+//# publish
+module 0x42::M
+use 0x1::signer
+struct Box<T0> has store + key
+  x: T0
+
+struct Box3<T0> has store
+  x: Box<Box<T0>>
+
+struct Box7<T0> has store
+  x: Box3<Box3<T0>>
+
+struct Box15<T0> has store
+  x: Box7<Box7<T0>>
+
+struct Box31<T0> has store
+  x: Box15<Box15<T0>>
+
+struct Box63<T0> has store
+  x: Box31<Box31<T0>>
+
+struct Box127<T0> has store + key
+  x: Box63<Box63<T0>>
+
+struct Box255<T0> has store + key
+  x: Box127<Box127<T0>>
+
+public fun box3<T0>(l0: T0): Box3<T0>
+    move_loc l0
+    pack Box<T0>
+    pack Box<Box<T0>>
+    pack Box3<T0>
+    ret
+
+public fun box7<T0>(l0: T0): Box7<T0>
+    move_loc l0
+    call box3<T0>
+    call box3<Box3<T0>>
+    pack Box7<T0>
+    ret
+
+public fun box15<T0>(l0: T0): Box15<T0>
+    move_loc l0
+    call box7<T0>
+    call box7<Box7<T0>>
+    pack Box15<T0>
+    ret
+
+public fun box31<T0>(l0: T0): Box31<T0>
+    move_loc l0
+    call box15<T0>
+    call box15<Box15<T0>>
+    pack Box31<T0>
+    ret
+
+public fun box63<T0>(l0: T0): Box63<T0>
+    move_loc l0
+    call box31<T0>
+    call box31<Box31<T0>>
+    pack Box63<T0>
+    ret
+
+public fun box127<T0>(l0: T0): Box127<T0>
+    move_loc l0
+    call box63<T0>
+    call box63<Box63<T0>>
+    pack Box127<T0>
+    ret
+
+public fun box255<T0>(l0: T0): Box255<T0>
+    move_loc l0
+    call box127<T0>
+    call box127<Box127<T0>>
+    pack Box255<T0>
+    ret
+
+public fun publish_128(l0: &signer)
+    move_loc l0
+    ld_true
+    call box127<bool>
+    move_to Box127<bool>
+    ret
+
+public fun publish_256(l0: &signer)
+    move_loc l0
+    ld_true
+    call box255<bool>
+    move_to Box255<bool>
+    ret
+
+public fun publish_257(l0: &signer)
+    move_loc l0
+    ld_true
+    call box255<bool>
+    pack Box<Box255<bool>>
+    move_to Box<Box255<bool>>
+    ret
+
+
+
+//# run --signers 0x1
+script
+use 0x42::M
+entry public fun main(l0: signer)
+    borrow_loc l0
+    call M::publish_128
+    ret
+
+
+
+//# run --signers 0x2
+script
+use 0x42::M
+entry public fun main(l0: signer)
+    borrow_loc l0
+    call M::publish_256
+    ret
+
+
+
+//# run --signers 0x3
+script
+use 0x42::M
+entry public fun main(l0: signer)
+    borrow_loc l0
+    call M::publish_257
+    ret

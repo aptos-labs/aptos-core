@@ -1,0 +1,31 @@
+//# publish
+module 0x42::M
+struct R has store + key
+  f: bool
+
+struct X has store + key
+  f: bool
+
+fun t0(l0: &signer)
+    copy_loc l0
+    ld_false
+    pack X
+    move_to R
+    ret
+
+
+
+//# publish
+module 0x42::N
+struct R<T0> has store + key
+  f: T0
+
+struct X<T0> has store + key
+  f: T0
+
+fun t0(l0: &signer)
+    copy_loc l0
+    ld_false
+    pack R<bool>
+    move_to X<bool>
+    ret

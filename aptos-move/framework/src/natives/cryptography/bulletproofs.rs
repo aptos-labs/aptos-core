@@ -47,6 +47,29 @@ pub mod abort_codes {
     /// Abort code when the vector lengths of values and blinding factors do not match.
     /// NOTE: This must match the code in the Move implementation
     pub const NFE_VECTOR_LENGTHS_MISMATCH: u64 = 0x01_0005;
+
+    /// Invalid RistrettoPoint handle for verify range proof rand base.
+    pub const NFE_INVALID_POINT_VERIFY_RAND_BASE: u64 = 0x0A_0001;
+    /// Invalid RistrettoPoint handle for verify range proof val base.
+    pub const NFE_INVALID_POINT_VERIFY_VAL_BASE: u64 = 0x0A_0002;
+    /// Invalid RistrettoPoint handle for verify batch range proof rand base.
+    pub const NFE_INVALID_POINT_VERIFY_BATCH_RAND_BASE: u64 = 0x0A_0003;
+    /// Invalid RistrettoPoint handle for verify batch range proof val base.
+    pub const NFE_INVALID_POINT_VERIFY_BATCH_VAL_BASE: u64 = 0x0A_0004;
+    /// Invalid RistrettoPoint handle for prove range proof rand base.
+    pub const NFE_INVALID_POINT_PROVE_RAND_BASE: u64 = 0x0A_0005;
+    /// Invalid RistrettoPoint handle for prove range proof val base.
+    pub const NFE_INVALID_POINT_PROVE_VAL_BASE: u64 = 0x0A_0006;
+    /// Range proof prover (single) failed internally.
+    pub const NFE_PROVER_SINGLE_FAILED: u64 = 0x0A_0007;
+    /// Invalid RistrettoPoint handle for prove batch range proof rand base.
+    pub const NFE_INVALID_POINT_PROVE_BATCH_RAND_BASE: u64 = 0x0A_0008;
+    /// Invalid RistrettoPoint handle for prove batch range proof val base.
+    pub const NFE_INVALID_POINT_PROVE_BATCH_VAL_BASE: u64 = 0x0A_0009;
+    /// Range proof prover (batch) failed internally.
+    pub const NFE_PROVER_BATCH_FAILED: u64 = 0x0A_000A;
+    /// Unsupported (batch_size, bit_length) combination when charging verify gas.
+    pub const NFE_VERIFY_BATCH_BITS_UNSUPPORTED: u64 = 0x0A_000B;
 }
 
 /// The Bulletproofs library only seems to support proving [0, 2^{num_bits}) ranges where num_bits is
@@ -88,15 +111,31 @@ fn native_verify_range_proof(
     let comm_point = CompressedRistretto::from_slice(comm_bytes.as_slice());
 
     if !is_supported_number_of_bits(num_bits) {
-        return Err(SafeNativeError::abort(abort_codes::NFE_RANGE_NOT_SUPPORTED));
+        return Err(SafeNativeError::abort_with_message(
+            abort_codes::NFE_RANGE_NOT_SUPPORTED,
+            format!(
+                "Range of {} bits is not supported (must be 8, 16, 32, or 64)",
+                num_bits
+            ),
+        ));
     }
 
     let pg = {
         let point_context = context.extensions().get::<NativeRistrettoPointContext>();
         let point_data = point_context.point_data.borrow_mut();
 
-        let rand_base = point_data.get_point(&rand_base_handle);
-        let val_base = point_data.get_point(&val_base_handle);
+        let rand_base = point_data.get_point(&rand_base_handle).map_err(|_| {
+            SafeNativeError::abort_with_message(
+                abort_codes::NFE_INVALID_POINT_VERIFY_RAND_BASE,
+                "Invalid point for verify rand base",
+            )
+        })?;
+        let val_base = point_data.get_point(&val_base_handle).map_err(|_| {
+            SafeNativeError::abort_with_message(
+                abort_codes::NFE_INVALID_POINT_VERIFY_VAL_BASE,
+                "Invalid point for verify val base",
+            )
+        })?;
 
         // TODO(Perf): Is there a way to avoid this unnecessary cloning here?
         PedersenGens {
@@ -129,11 +168,21 @@ fn native_verify_batch_range_proof(
         .collect::<Vec<_>>();
 
     if !is_supported_number_of_bits(num_bits) {
-        return Err(SafeNativeError::abort(abort_codes::NFE_RANGE_NOT_SUPPORTED));
+        return Err(SafeNativeError::abort_with_message(
+            abort_codes::NFE_RANGE_NOT_SUPPORTED,
+            format!(
+                "Range of {} bits is not supported (must be 8, 16, 32, or 64)",
+                num_bits
+            ),
+        ));
     }
     if !is_supported_batch_size(comm_points.len()) {
-        return Err(SafeNativeError::abort(
+        return Err(SafeNativeError::abort_with_message(
             abort_codes::NFE_BATCH_SIZE_NOT_SUPPORTED,
+            format!(
+                "Batch size {} is not supported (must be 1, 2, 4, 8, or 16)",
+                comm_points.len()
+            ),
         ));
     }
 
@@ -141,8 +190,18 @@ fn native_verify_batch_range_proof(
         let point_context = context.extensions().get::<NativeRistrettoPointContext>();
         let point_data = point_context.point_data.borrow_mut();
 
-        let rand_base = point_data.get_point(&rand_base_handle);
-        let val_base = point_data.get_point(&val_base_handle);
+        let rand_base = point_data.get_point(&rand_base_handle).map_err(|_| {
+            SafeNativeError::abort_with_message(
+                abort_codes::NFE_INVALID_POINT_VERIFY_BATCH_RAND_BASE,
+                "Invalid point for verify batch rand base",
+            )
+        })?;
+        let val_base = point_data.get_point(&val_base_handle).map_err(|_| {
+            SafeNativeError::abort_with_message(
+                abort_codes::NFE_INVALID_POINT_VERIFY_BATCH_VAL_BASE,
+                "Invalid point for verify batch val base",
+            )
+        })?;
 
         // TODO(Perf): Is there a way to avoid this unnecessary cloning here?
         PedersenGens {
@@ -172,7 +231,13 @@ fn native_test_only_prove_range(
     let v = pop_scalar_from_bytes(&mut args)?;
 
     if !is_supported_number_of_bits(num_bits) {
-        return Err(SafeNativeError::abort(abort_codes::NFE_RANGE_NOT_SUPPORTED));
+        return Err(SafeNativeError::abort_with_message(
+            abort_codes::NFE_RANGE_NOT_SUPPORTED,
+            format!(
+                "Range of {} bits is not supported (must be 8, 16, 32, or 64)",
+                num_bits
+            ),
+        ));
     }
 
     // Make sure only the first 64 bits are set.
@@ -189,8 +254,18 @@ fn native_test_only_prove_range(
         let point_context = context.extensions().get::<NativeRistrettoPointContext>();
         let point_data = point_context.point_data.borrow_mut();
 
-        let rand_base = point_data.get_point(&rand_base_handle);
-        let val_base = point_data.get_point(&val_base_handle);
+        let rand_base = point_data.get_point(&rand_base_handle).map_err(|_| {
+            SafeNativeError::abort_with_message(
+                abort_codes::NFE_INVALID_POINT_PROVE_RAND_BASE,
+                "Invalid point for prove rand base",
+            )
+        })?;
+        let val_base = point_data.get_point(&val_base_handle).map_err(|_| {
+            SafeNativeError::abort_with_message(
+                abort_codes::NFE_INVALID_POINT_PROVE_VAL_BASE,
+                "Invalid point for prove val base",
+            )
+        })?;
 
         // TODO(Perf): Is there a way to avoid this unnecessary cloning here?
         PedersenGens {
@@ -208,7 +283,12 @@ fn native_test_only_prove_range(
         &v_blinding,
         num_bits,
     )
-    .expect("Bulletproofs prover failed unexpectedly");
+    .map_err(|_e| {
+        SafeNativeError::abort_with_message(
+            abort_codes::NFE_PROVER_SINGLE_FAILED,
+            "Bulletproofs prover single failed",
+        )
+    })?;
 
     Ok(smallvec![
         Value::vector_u8(proof.to_bytes()),
@@ -234,16 +314,31 @@ fn native_test_only_batch_prove_range(
     let vs = pop_scalars_from_bytes(&mut args)?;
 
     if !is_supported_number_of_bits(num_bits) {
-        return Err(SafeNativeError::abort(abort_codes::NFE_RANGE_NOT_SUPPORTED));
+        return Err(SafeNativeError::abort_with_message(
+            abort_codes::NFE_RANGE_NOT_SUPPORTED,
+            format!(
+                "Range of {} bits is not supported (must be 8, 16, 32, or 64)",
+                num_bits
+            ),
+        ));
     }
     if !is_supported_batch_size(vs.len()) {
-        return Err(SafeNativeError::abort(
+        return Err(SafeNativeError::abort_with_message(
             abort_codes::NFE_BATCH_SIZE_NOT_SUPPORTED,
+            format!(
+                "Batch size {} is not supported (must be 1, 2, 4, 8, or 16)",
+                vs.len()
+            ),
         ));
     }
     if vs.len() != v_blindings.len() {
-        return Err(SafeNativeError::abort(
+        return Err(SafeNativeError::abort_with_message(
             abort_codes::NFE_VECTOR_LENGTHS_MISMATCH,
+            format!(
+                "Number of committed values ({}) must equal number of blinding factors ({})",
+                vs.len(),
+                v_blindings.len()
+            ),
         ));
     }
 
@@ -267,8 +362,18 @@ fn native_test_only_batch_prove_range(
         let point_context = context.extensions().get::<NativeRistrettoPointContext>();
         let point_data = point_context.point_data.borrow_mut();
 
-        let rand_base = point_data.get_point(&rand_base_handle);
-        let val_base = point_data.get_point(&val_base_handle);
+        let rand_base = point_data.get_point(&rand_base_handle).map_err(|_| {
+            SafeNativeError::abort_with_message(
+                abort_codes::NFE_INVALID_POINT_PROVE_BATCH_RAND_BASE,
+                "Invalid point for prove batch rand base",
+            )
+        })?;
+        let val_base = point_data.get_point(&val_base_handle).map_err(|_| {
+            SafeNativeError::abort_with_message(
+                abort_codes::NFE_INVALID_POINT_PROVE_BATCH_VAL_BASE,
+                "Invalid point for prove batch val base",
+            )
+        })?;
 
         // TODO(Perf): Is there a way to avoid this unnecessary cloning here?
         PedersenGens {
@@ -286,7 +391,12 @@ fn native_test_only_batch_prove_range(
         &v_blindings,
         num_bits,
     )
-    .expect("Bulletproofs prover failed unexpectedly");
+    .map_err(|_e| {
+        SafeNativeError::abort_with_message(
+            abort_codes::NFE_PROVER_BATCH_FAILED,
+            "Bulletproofs prover batch failed",
+        )
+    })?;
 
     Ok(smallvec![
         Value::vector_u8(proof.to_bytes()),
@@ -409,7 +519,10 @@ fn charge_gas(
         (16, 16) => context.charge(BULLETPROOFS_VERIFY_BASE_BATCH_16_BITS_16),
         (16, 32) => context.charge(BULLETPROOFS_VERIFY_BASE_BATCH_16_BITS_32),
         (16, 64) => context.charge(BULLETPROOFS_VERIFY_BASE_BATCH_16_BITS_64),
-        _ => unreachable!(),
+        _ => Err(SafeNativeError::abort_with_message(
+            abort_codes::NFE_VERIFY_BATCH_BITS_UNSUPPORTED,
+            "Verify batch bits combination not supported",
+        )),
     }
 }
 

@@ -17,9 +17,9 @@ use std::collections::HashMap;
 pub fn dlog<C: CurveGroup>(
     G: C,
     H: C,
-    baby_table: &HashMap<Vec<u8>, u32>,
-    range_limit: u32,
-) -> Option<u32> {
+    baby_table: &HashMap<Vec<u8>, u64>,
+    range_limit: u64,
+) -> Option<u64> {
     let byte_size = G.compressed_size();
 
     let m = baby_table
@@ -50,9 +50,9 @@ pub fn dlog<C: CurveGroup>(
 pub fn dlog_vec<C: CurveGroup>(
     G: C,
     H_vec: &[C],
-    baby_table: &HashMap<Vec<u8>, u32>,
-    range_limit: u32,
-) -> Option<Vec<u32>> {
+    baby_table: &HashMap<Vec<u8>, u64>,
+    range_limit: u64,
+) -> Option<Vec<u64>> {
     let mut result = Vec::with_capacity(H_vec.len());
 
     for H in H_vec {

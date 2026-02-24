@@ -24,7 +24,7 @@ module 0x42::reference_conversion {
         let x = 42;
         let r = &mut x;
         *r = 43;
-        deref(/*freeze*/r)
+        deref(r)
     }
 }
 

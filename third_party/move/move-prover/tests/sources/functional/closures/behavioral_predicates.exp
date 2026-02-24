@@ -1,0 +1,150 @@
+Move prover returns: exiting with verification errors
+error: post-condition does not hold
+   ┌─ tests/sources/functional/closures/behavioral_predicates.move:38:9
+   │
+38 │         ensures result == x + 10; // error: post-condition does not hold
+   │         ^^^^^^^^^^^^^^^^^^^^^^^^^
+   │
+   =     at tests/sources/functional/closures/behavioral_predicates.move:34: test_ensures_of_fail
+   =         x = <redacted>
+   =     at tests/sources/functional/closures/behavioral_predicates.move:35: test_ensures_of_fail
+   =     at tests/sources/functional/closures/behavioral_predicates.move:18: apply
+   =         f = <redacted>
+   =         x = <redacted>
+   =     at tests/sources/functional/closures/behavioral_predicates.move:19: apply
+   =     at tests/sources/functional/closures/behavioral_predicates.move:35: test_ensures_of_fail
+   =         y = <redacted>
+   =         result = <redacted>
+   =     at tests/sources/functional/closures/behavioral_predicates.move:35: test_ensures_of_fail
+   =         result = <redacted>
+   =     at tests/sources/functional/closures/behavioral_predicates.move:20: apply
+   =         result = <redacted>
+   =     at tests/sources/functional/closures/behavioral_predicates.move:36: test_ensures_of_fail
+   =     at tests/sources/functional/closures/behavioral_predicates.move:38: test_ensures_of_fail (spec)
+
+error: post-condition does not hold
+    ┌─ tests/sources/functional/closures/behavioral_predicates.move:237:9
+    │
+237 │         ensures result == x + 2; // error: post-condition does not hold
+    │         ^^^^^^^^^^^^^^^^^^^^^^^^
+    │
+    =     at tests/sources/functional/closures/behavioral_predicates.move:233: test_wrong_ensures
+    =         x = <redacted>
+    =     at tests/sources/functional/closures/behavioral_predicates.move:234: test_wrong_ensures
+    =     at tests/sources/functional/closures/behavioral_predicates.move:18: apply
+    =         f = <redacted>
+    =         x = <redacted>
+    =     at tests/sources/functional/closures/behavioral_predicates.move:19: apply
+    =     at tests/sources/functional/closures/behavioral_predicates.move:234: test_wrong_ensures
+    =         y = <redacted>
+    =         result = <redacted>
+    =     at tests/sources/functional/closures/behavioral_predicates.move:234: test_wrong_ensures
+    =         result = <redacted>
+    =     at tests/sources/functional/closures/behavioral_predicates.move:20: apply
+    =         result = <redacted>
+    =     at tests/sources/functional/closures/behavioral_predicates.move:235: test_wrong_ensures
+    =     at tests/sources/functional/closures/behavioral_predicates.move:237: test_wrong_ensures (spec)
+
+error: post-condition does not hold
+    ┌─ tests/sources/functional/closures/behavioral_predicates.move:246:9
+    │
+246 │         ensures result > 100; // error: post-condition does not hold
+    │         ^^^^^^^^^^^^^^^^^^^^^
+    │
+    =     at tests/sources/functional/closures/behavioral_predicates.move:241: test_postcondition_too_strong
+    =         x = <redacted>
+    =     at tests/sources/functional/closures/behavioral_predicates.move:242: test_postcondition_too_strong
+    =     at tests/sources/functional/closures/behavioral_predicates.move:18: apply
+    =         f = <redacted>
+    =         x = <redacted>
+    =     at tests/sources/functional/closures/behavioral_predicates.move:19: apply
+    =     at tests/sources/functional/closures/behavioral_predicates.move:242: test_postcondition_too_strong
+    =         y = <redacted>
+    =         result = <redacted>
+    =     at tests/sources/functional/closures/behavioral_predicates.move:242: test_postcondition_too_strong
+    =         result = <redacted>
+    =     at tests/sources/functional/closures/behavioral_predicates.move:20: apply
+    =         result = <redacted>
+    =     at tests/sources/functional/closures/behavioral_predicates.move:243: test_postcondition_too_strong
+    =     at tests/sources/functional/closures/behavioral_predicates.move:245: test_postcondition_too_strong (spec)
+    =     at tests/sources/functional/closures/behavioral_predicates.move:246: test_postcondition_too_strong (spec)
+
+error: post-condition does not hold
+    ┌─ tests/sources/functional/closures/behavioral_predicates.move:254:9
+    │
+254 │         ensures result == x * y; // error: should be x + y
+    │         ^^^^^^^^^^^^^^^^^^^^^^^^
+    │
+    =     at tests/sources/functional/closures/behavioral_predicates.move:250: test_wrong_binary
+    =         x = <redacted>
+    =         y = <redacted>
+    =     at tests/sources/functional/closures/behavioral_predicates.move:251: test_wrong_binary
+    =     at tests/sources/functional/closures/behavioral_predicates.move:46: apply2
+    =         f = <redacted>
+    =         x = <redacted>
+    =         y = <redacted>
+    =     at tests/sources/functional/closures/behavioral_predicates.move:47: apply2
+    =     at tests/sources/functional/closures/behavioral_predicates.move:251: test_wrong_binary
+    =         a = <redacted>
+    =         b = <redacted>
+    =         result = <redacted>
+    =     at tests/sources/functional/closures/behavioral_predicates.move:251: test_wrong_binary
+    =         result = <redacted>
+    =     at tests/sources/functional/closures/behavioral_predicates.move:48: apply2
+    =         result = <redacted>
+    =     at tests/sources/functional/closures/behavioral_predicates.move:252: test_wrong_binary
+    =     at tests/sources/functional/closures/behavioral_predicates.move:254: test_wrong_binary (spec)
+
+error: post-condition does not hold
+    ┌─ tests/sources/functional/closures/behavioral_predicates.move:540:9
+    │
+540 │         ensures result == x + 10; // error: post-condition does not hold
+    │         ^^^^^^^^^^^^^^^^^^^^^^^^^
+    │
+    =     at tests/sources/functional/closures/behavioral_predicates.move:536: test_ensures_of_fail_opaque
+    =         x = <redacted>
+    =     at tests/sources/functional/closures/behavioral_predicates.move:537: test_ensures_of_fail_opaque
+    =         result = <redacted>
+    =     at tests/sources/functional/closures/behavioral_predicates.move:538: test_ensures_of_fail_opaque
+    =     at tests/sources/functional/closures/behavioral_predicates.move:540: test_ensures_of_fail_opaque (spec)
+
+error: post-condition does not hold
+    ┌─ tests/sources/functional/closures/behavioral_predicates.move:622:9
+    │
+622 │         ensures result == x + 2; // error: post-condition does not hold
+    │         ^^^^^^^^^^^^^^^^^^^^^^^^
+    │
+    =     at tests/sources/functional/closures/behavioral_predicates.move:618: test_wrong_ensures_opaque
+    =         x = <redacted>
+    =     at tests/sources/functional/closures/behavioral_predicates.move:619: test_wrong_ensures_opaque
+    =         result = <redacted>
+    =     at tests/sources/functional/closures/behavioral_predicates.move:620: test_wrong_ensures_opaque
+    =     at tests/sources/functional/closures/behavioral_predicates.move:622: test_wrong_ensures_opaque (spec)
+
+error: post-condition does not hold
+    ┌─ tests/sources/functional/closures/behavioral_predicates.move:631:9
+    │
+631 │         ensures result > 100; // error: post-condition does not hold
+    │         ^^^^^^^^^^^^^^^^^^^^^
+    │
+    =     at tests/sources/functional/closures/behavioral_predicates.move:626: test_postcondition_too_strong_opaque
+    =         x = <redacted>
+    =     at tests/sources/functional/closures/behavioral_predicates.move:627: test_postcondition_too_strong_opaque
+    =         result = <redacted>
+    =     at tests/sources/functional/closures/behavioral_predicates.move:628: test_postcondition_too_strong_opaque
+    =     at tests/sources/functional/closures/behavioral_predicates.move:630: test_postcondition_too_strong_opaque (spec)
+    =     at tests/sources/functional/closures/behavioral_predicates.move:631: test_postcondition_too_strong_opaque (spec)
+
+error: post-condition does not hold
+    ┌─ tests/sources/functional/closures/behavioral_predicates.move:639:9
+    │
+639 │         ensures result == x * y; // error: should be x + y
+    │         ^^^^^^^^^^^^^^^^^^^^^^^^
+    │
+    =     at tests/sources/functional/closures/behavioral_predicates.move:635: test_wrong_binary_opaque
+    =         x = <redacted>
+    =         y = <redacted>
+    =     at tests/sources/functional/closures/behavioral_predicates.move:636: test_wrong_binary_opaque
+    =         result = <redacted>
+    =     at tests/sources/functional/closures/behavioral_predicates.move:637: test_wrong_binary_opaque
+    =     at tests/sources/functional/closures/behavioral_predicates.move:639: test_wrong_binary_opaque (spec)

@@ -5,6 +5,7 @@
 
 use aptos_framework::{ReleaseOptions, ReleaseTarget};
 use clap::Parser;
+use std::path::PathBuf;
 
 #[derive(Parser)]
 #[clap(name = "aptos-framework", author, version, propagate_version = true)]
@@ -13,6 +14,8 @@ enum Commands {
     Release(StandardRelease),
     /// Allows to create a custom release package,
     Custom(CustomRelease),
+    /// Rebuilds cached packages (head.mrb and SDK builder files).
+    UpdateCachedPackages,
 }
 
 fn main() {
@@ -20,6 +23,7 @@ fn main() {
     let result = match cmd {
         Commands::Release(release) => release.execute(),
         Commands::Custom(custom) => custom.execute(),
+        Commands::UpdateCachedPackages => update_cached_packages(),
     };
     if let Err(e) = result {
         eprintln!("error: {:#}", e);
@@ -62,6 +66,12 @@ impl StandardRelease {
     fn execute(self) -> anyhow::Result<()> {
         self.target.create_release(!self.without_source_code, None)
     }
+}
+
+fn update_cached_packages() -> anyhow::Result<()> {
+    let crate_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+    let output = crate_dir.join("cached-packages/src/head.mrb");
+    ReleaseTarget::Head.create_release(true, Some(output))
 }
 
 #[test]

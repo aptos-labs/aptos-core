@@ -851,7 +851,7 @@ async fn test_encrypted_transactions_separated_with_batch_v2() {
     let (batch_coordinator_cmd_tx, mut batch_coordinator_cmd_rx) = TokioChannel(100);
 
     let config = QuorumStoreConfig {
-        enable_batch_v2: true,
+        enable_batch_v2_tx: true,
         ..Default::default()
     };
     let max_batch_bytes = config.sender_max_batch_bytes;
@@ -925,7 +925,7 @@ async fn test_encrypted_transactions_filtered_without_batch_v2() {
     let (batch_coordinator_cmd_tx, mut batch_coordinator_cmd_rx) = TokioChannel(100);
 
     let config = QuorumStoreConfig {
-        enable_batch_v2: false, // V2 disabled
+        enable_batch_v2_tx: false, // V2 disabled
         ..Default::default()
     };
     let max_batch_bytes = config.sender_max_batch_bytes;
@@ -989,7 +989,7 @@ async fn test_encrypted_transactions_with_gas_buckets() {
     let (batch_coordinator_cmd_tx, mut batch_coordinator_cmd_rx) = TokioChannel(100);
 
     let config = QuorumStoreConfig {
-        enable_batch_v2: true,
+        enable_batch_v2_tx: true,
         ..Default::default()
     };
     let max_batch_bytes = config.sender_max_batch_bytes;
@@ -1085,7 +1085,7 @@ async fn test_only_encrypted_transactions() {
     let (batch_coordinator_cmd_tx, mut batch_coordinator_cmd_rx) = TokioChannel(100);
 
     let config = QuorumStoreConfig {
-        enable_batch_v2: true,
+        enable_batch_v2_tx: true,
         ..Default::default()
     };
     let max_batch_bytes = config.sender_max_batch_bytes;
@@ -1123,6 +1123,74 @@ async fn test_only_encrypted_transactions() {
             for txn in result[0].txns() {
                 assert!(txn.is_encrypted_txn());
             }
+        } else {
+            panic!("Unexpected variant")
+        }
+    });
+
+    let result = batch_generator.handle_scheduled_pull(300).await;
+    batch_coordinator_cmd_tx
+        .send(BatchCoordinatorCommand::NewBatches(author, result))
+        .await
+        .unwrap();
+
+    timeout(Duration::from_millis(10_000), join_handle)
+        .await
+        .unwrap()
+        .unwrap();
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn test_oversized_transaction_skipped() {
+    let (quorum_store_to_mempool_tx, mut quorum_store_to_mempool_rx) = channel(1_024);
+    let (batch_coordinator_cmd_tx, mut batch_coordinator_cmd_rx) = TokioChannel(100);
+
+    let txn_size = 168;
+    // Set batch bytes limit smaller than a single transaction to trigger the oversized path
+    let config = QuorumStoreConfig {
+        sender_max_batch_bytes: txn_size - 1,
+        sender_max_total_bytes: txn_size * 10, // Allow mempool to return txns
+        ..Default::default()
+    };
+
+    let author = AccountAddress::random();
+    let mut batch_generator = BatchGenerator::new(
+        0,
+        author,
+        config,
+        Arc::new(MockQuorumStoreDB::new()),
+        Arc::new(MockBatchWriter::new()),
+        quorum_store_to_mempool_tx,
+        1000,
+    );
+
+    let join_handle = tokio::spawn(async move {
+        let signed_txns = create_vec_signed_transactions(3);
+        assert_eq!(signed_txns[0].txn_bytes_len(), txn_size);
+
+        // Return txns directly without size filtering to simulate oversized txns reaching batch generator
+        if let QuorumStoreRequest::GetBatchRequest(_, _, _, _, callback) = timeout(
+            Duration::from_millis(1_000),
+            quorum_store_to_mempool_rx.select_next_some(),
+        )
+        .await
+        .unwrap()
+        {
+            callback
+                .send(Ok(QuorumStoreResponse::GetBatchResponse(signed_txns)))
+                .unwrap();
+        } else {
+            panic!("Unexpected variant")
+        }
+
+        // All transactions should be skipped (no batches created) since each exceeds batch limit
+        let quorum_store_command = batch_coordinator_cmd_rx.recv().await.unwrap();
+        if let BatchCoordinatorCommand::NewBatches(_, result) = quorum_store_command {
+            assert_eq!(
+                result.len(),
+                0,
+                "Oversized transactions should be skipped, not batched"
+            );
         } else {
             panic!("Unexpected variant")
         }

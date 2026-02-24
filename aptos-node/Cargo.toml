@@ -34,7 +34,6 @@ aptos-event-notifications = { workspace = true }
 aptos-executor = { workspace = true }
 aptos-framework = { workspace = true }
 aptos-genesis = { workspace = true }
-aptos-indexer = { workspace = true, optional = true }
 aptos-indexer-grpc-fullnode = { workspace = true }
 aptos-indexer-grpc-table-info = { workspace = true }
 aptos-infallible = { workspace = true }
@@ -44,7 +43,6 @@ aptos-logger = { workspace = true, features = ["node-identity"] }
 aptos-mempool = { workspace = true }
 aptos-mempool-notifications = { workspace = true }
 aptos-network = { workspace = true }
-aptos-network-benchmark = { workspace = true }
 aptos-network-builder = { workspace = true }
 aptos-node-identity = { workspace = true }
 aptos-peer-monitoring-service-client = { workspace = true }
@@ -79,10 +77,9 @@ serde_json = { workspace = true }
 serde_yaml = { workspace = true }
 tokio = { workspace = true }
 ureq = { workspace = true }
-url = { workspace = true }
 
 [target.'cfg(unix)'.dependencies]
-jemallocator = { workspace = true }
+aptos-jemalloc = { workspace = true }
 
 [target.'cfg(target_os = "linux")'.dependencies]
 rstack-self = { workspace = true }
@@ -93,7 +90,6 @@ check-vm-features = []
 consensus-only-perf-test = ["aptos-executor/consensus-only-perf-test", "aptos-mempool/consensus-only-perf-test", "aptos-db/consensus-only-perf-test"]
 default = []
 failpoints = ["fail/failpoints", "aptos-consensus/failpoints", "aptos-executor/failpoints", "aptos-mempool/failpoints", "aptos-api/failpoints", "aptos-config/failpoints"]
-indexer = ["aptos-indexer"]
 tokio-console = ["aptos-logger/tokio-console", "aptos-config/tokio-console"]
 smoke-test = ["aptos-jwk-consensus/smoke-test", "aptos-dkg-runtime/smoke-test"]
 

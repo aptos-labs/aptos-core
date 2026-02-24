@@ -3,14 +3,14 @@
 
 use crate::pvss::{
     traits::{
-        transcript::{Transcript, WithMaxNumShares},
-        Convert, HasEncryptionPublicParams, Subtranscript,
+        transcript::{Transcript, TranscriptCore, WithMaxNumShares},
+        Convert, HasEncryptionPublicParams,
     },
     Player, ThresholdConfigBlstrs,
 };
 use aptos_crypto::{
     arkworks::shamir::Reconstructable,
-    traits::{self, SecretSharingConfig as _, ThresholdConfig as _},
+    traits::{self, TSecretSharingConfig as _, ThresholdConfig as _},
     weighted_config::{WeightedConfig, WeightedConfigArkworks},
     SigningKey, Uniform,
 };
@@ -49,15 +49,25 @@ pub struct DealingArgs<T: Transcript> {
 /// Useful in tests and benchmarks when wanting to quickly deal & verify a transcript.
 pub fn setup_dealing<T: Transcript, R: rand_core::RngCore + rand_core::CryptoRng>(
     sc: &T::SecretSharingConfig,
+    ell: Option<u8>,
     mut rng: &mut R,
 ) -> DealingArgs<T> {
     println!(
-        "Setting up dealing for {} PVSS, with {} (and some elliptic curve)",
+        "Setting up dealing for {} PVSS, with {} and bit-size {:?} (and some elliptic curve)",
         T::scheme_name(),
-        sc
+        sc,
+        ell
     );
 
-    let pp = T::PublicParameters::with_max_num_shares(sc.get_total_num_shares());
+    let pp = match ell {
+        None => {
+            T::PublicParameters::with_max_num_shares(sc.get_total_num_shares().try_into().unwrap())
+        },
+        Some(bit_size) => T::PublicParameters::with_max_num_shares_and_bit_size(
+            sc.get_total_num_shares().try_into().unwrap(),
+            bit_size,
+        ),
+    };
 
     let (ssks, spks, dks, eks, iss, s, dsk, dpk) =
         generate_keys_and_secrets::<T, R>(sc, &pp, &mut rng);
@@ -90,7 +100,7 @@ pub fn setup_dealing_weighted<
         sc
     );
 
-    let pp = T::PublicParameters::with_max_num_shares(sc.get_total_weight());
+    let pp = T::PublicParameters::with_max_num_shares(sc.get_total_weight().try_into().unwrap());
 
     let (ssks, spks, dks, eks, iss, s, dsk, dpk) =
         generate_keys_and_secrets::<T, R>(sc, &pp, &mut rng);
@@ -119,8 +129,8 @@ pub fn generate_keys_and_secrets<T: Transcript, R: rand_core::RngCore + rand_cor
     Vec<T::EncryptPubKey>,
     Vec<T::InputSecret>,
     T::InputSecret,
-    <T as Transcript>::DealtSecretKey,
-    <T as Transcript>::DealtPubKey,
+    <T as TranscriptCore>::DealtSecretKey,
+    <T as TranscriptCore>::DealtPubKey,
 ) {
     let ssks = (0..sc.get_total_num_players())
         .map(|_| T::SigningSecretKey::generate(rng))
@@ -272,6 +282,12 @@ pub fn get_weighted_configs_for_benchmarking<T: traits::ThresholdConfig>() -> Ve
 {
     let mut wcs = vec![];
 
+    // let weights = vec![
+    //     1, 1, 1
+    // ];
+    // let threshold = 1; // slow path
+    // wcs.push(WeightedConfig::<T>::new(threshold, weights.clone()).unwrap());
+
     // This one was produced mid-Nov 2025
     let weights = vec![
         0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1,
@@ -323,12 +339,12 @@ pub fn get_weighted_configs_for_benchmarking<T: traits::ThresholdConfig>() -> Ve
 }
 
 pub fn reconstruct_dealt_secret_key_randomly<R, T: Transcript>(
-    sc: &<T as Transcript>::SecretSharingConfig,
+    sc: &<T as TranscriptCore>::SecretSharingConfig,
     rng: &mut R,
-    dks: &Vec<<T as Transcript>::DecryptPrivKey>,
+    dks: &Vec<<T as TranscriptCore>::DecryptPrivKey>,
     trx: T,
     pp: &T::PublicParameters,
-) -> <T as Transcript>::DealtSecretKey
+) -> <T as TranscriptCore>::DealtSecretKey
 where
     R: rand_core::RngCore,
 {
@@ -348,13 +364,13 @@ where
     T::DealtSecretKey::reconstruct(sc, &players_and_shares).unwrap()
 }
 
-pub fn reconstruct_dealt_secret_key_randomly_subtranscript<R, T: Subtranscript>(
-    sc: &<T as Subtranscript>::SecretSharingConfig,
+pub fn reconstruct_dealt_secret_key_randomly_subtranscript<R, T: TranscriptCore>(
+    sc: &<T as TranscriptCore>::SecretSharingConfig,
     rng: &mut R,
-    dks: &Vec<<T as Subtranscript>::DecryptPrivKey>,
+    dks: &Vec<<T as TranscriptCore>::DecryptPrivKey>,
     trx: T,
-    pp: &<T as Subtranscript>::PublicParameters,
-) -> <T as Subtranscript>::DealtSecretKey
+    pp: &<T as TranscriptCore>::PublicParameters,
+) -> <T as TranscriptCore>::DealtSecretKey
 where
     R: rand_core::RngCore,
 {
@@ -371,5 +387,5 @@ where
         })
         .collect::<Vec<(Player, T::DealtSecretKeyShare)>>();
 
-    <T as Subtranscript>::DealtSecretKey::reconstruct(sc, &players_and_shares).unwrap()
+    <T as TranscriptCore>::DealtSecretKey::reconstruct(sc, &players_and_shares).unwrap()
 }

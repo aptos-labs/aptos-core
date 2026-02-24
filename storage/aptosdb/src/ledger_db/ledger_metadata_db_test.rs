@@ -236,7 +236,7 @@ fn test_block_api() {
     let mut batch = SchemaBatch::new();
     let proposer_1 = AccountAddress::random();
     let proposer_2 = AccountAddress::random();
-    let events = vec![
+    let events = [
         NewBlockEvent::new(
             AccountAddress::random(),
             0,

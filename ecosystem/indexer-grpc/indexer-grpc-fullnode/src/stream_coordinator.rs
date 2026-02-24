@@ -13,7 +13,7 @@ use aptos_indexer_grpc_utils::{
     constants::MESSAGE_SIZE_LIMIT,
     counters::{log_grpc_step_fullnode, IndexerGrpcStep},
 };
-use aptos_logger::{error, info, sample, sample::SampleRate};
+use aptos_logger::{error, info, sample, sample::SampleRate, warn};
 use aptos_protos::{
     internal::fullnode::v1::{
         transactions_from_node_response, TransactionsFromNodeResponse, TransactionsOutput,
@@ -37,6 +37,12 @@ use tokio::sync::mpsc;
 use tonic::Status;
 
 type EndVersion = u64;
+
+/// Checks if an error message indicates that the requested version has been pruned.
+fn is_pruned_error(err: &anyhow::Error) -> bool {
+    let err_str = err.to_string();
+    err_str.contains("is pruned")
+}
 
 const SERVICE_TYPE: &str = "indexer_fullnode";
 const MINIMUM_TASK_LOAD_SIZE_IN_BYTES: usize = 100_000;
@@ -102,7 +108,14 @@ impl IndexerStreamCoordinator {
         let fetching_start_time = std::time::Instant::now();
         // Stage 1: fetch transactions from storage.
         let sorted_transactions_from_storage_with_size =
-            self.fetch_transactions_from_storage().await;
+            match self.fetch_transactions_from_storage().await {
+                Ok(txns) => txns,
+                Err(status) => {
+                    // Send the error to the client via the channel.
+                    let _ = self.transactions_sender.send(Err(status.clone())).await;
+                    return vec![Err(status)];
+                },
+            };
         if sorted_transactions_from_storage_with_size.is_empty() {
             return vec![];
         }
@@ -239,7 +252,10 @@ impl IndexerStreamCoordinator {
 
     /// Fetches transactions from storage with each transaction's size.
     /// Results are transactions sorted by version.
-    async fn fetch_transactions_from_storage(&mut self) -> Vec<(TransactionOnChainData, usize)> {
+    /// Returns an error if the transactions cannot be fetched (e.g., if the version is pruned).
+    async fn fetch_transactions_from_storage(
+        &mut self,
+    ) -> Result<Vec<(TransactionOnChainData, usize)>, Status> {
         let batches = self.get_batches().await;
         let mut storage_fetch_tasks = vec![];
         let ledger_version = self.highest_known_version;
@@ -251,24 +267,33 @@ impl IndexerStreamCoordinator {
             storage_fetch_tasks.push(task);
         }
 
-        let transactions_from_storage =
-            match futures::future::try_join_all(storage_fetch_tasks).await {
-                Ok(res) => res,
-                Err(err) => panic!(
+        let task_results = match futures::future::try_join_all(storage_fetch_tasks).await {
+            Ok(res) => res,
+            Err(err) => {
+                return Err(Status::internal(format!(
                     "[Indexer Fullnode] Error fetching transaction batches: {:?}",
                     err
-                ),
-            };
+                )));
+            },
+        };
 
-        transactions_from_storage
+        // Check each task result for errors.
+        let mut transactions_from_storage = Vec::new();
+        for result in task_results {
+            match result {
+                Ok(txns) => transactions_from_storage.extend(txns),
+                Err(status) => return Err(status),
+            }
+        }
+
+        Ok(transactions_from_storage
             .into_iter()
-            .flatten()
             .sorted_by(|a, b| a.version.cmp(&b.version))
             .map(|txn| {
                 let size = bcs::serialized_size(&txn).expect("Unable to serialize txn");
                 (txn, size)
             })
-            .collect::<Vec<_>>()
+            .collect::<Vec<_>>())
     }
 
     /// Gets the last version of the batch if the entire batch is successful, otherwise return error
@@ -321,7 +346,7 @@ impl IndexerStreamCoordinator {
         context: Arc<Context>,
         ledger_version: u64,
         batch: TransactionBatchInfo,
-    ) -> Vec<TransactionOnChainData> {
+    ) -> Result<Vec<TransactionOnChainData>, Status> {
         let mut retries = 0;
         loop {
             match context.get_transactions(
@@ -329,9 +354,26 @@ impl IndexerStreamCoordinator {
                 batch.num_transactions_to_fetch,
                 ledger_version,
             ) {
-                Ok(raw_txns) => return raw_txns,
+                Ok(raw_txns) => return Ok(raw_txns),
                 Err(err) => {
                     UNABLE_TO_FETCH_TRANSACTION.inc();
+
+                    // Check if this is a pruning error - don't retry, return immediately.
+                    if is_pruned_error(&err) {
+                        warn!(
+                            starting_version = batch.start_version,
+                            num_transactions = batch.num_transactions_to_fetch,
+                            error = format!("{:?}", err),
+                            "[Indexer Fullnode] Requested version is pruned",
+                        );
+                        return Err(Status::out_of_range(format!(
+                            "Transaction data for version {} is not available. The data may have \
+                             been pruned. If this node uses fast sync, older transactions are not \
+                             available. Error: {}",
+                            batch.start_version, err
+                        )));
+                    }
+
                     retries += 1;
 
                     if retries >= DEFAULT_NUM_RETRIES {
@@ -341,10 +383,10 @@ impl IndexerStreamCoordinator {
                             error = format!("{:?}", err),
                             "Could not fetch transactions: retries exhausted",
                         );
-                        panic!(
+                        return Err(Status::internal(format!(
                             "Could not fetch {} transactions after {} retries, starting at {}: {:?}",
                             batch.num_transactions_to_fetch, retries, batch.start_version, err
-                        );
+                        )));
                     } else {
                         error!(
                             starting_version = batch.start_version,

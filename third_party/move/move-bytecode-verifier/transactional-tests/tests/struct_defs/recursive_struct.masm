@@ -1,0 +1,79 @@
+//# publish
+module 0x1::Cup
+struct Cup<T0>
+  f: T0
+
+public fun cup<T0>(l0: T0): Cup<T0>
+    move_loc l0
+    pack Cup<T0>
+    ret
+
+
+
+//# publish
+module 0x1::M0
+struct Foo
+  f: Foo
+
+
+
+//# publish
+module 0x1::M1
+use 0x1::Cup
+struct Foo
+  f: Cup::Cup<Foo>
+
+public fun foo(): Foo
+    call foo
+    call Cup::cup<Foo>
+    pack Foo
+    ret
+
+
+
+//# publish
+module 0x1::M2
+use 0x1::signer
+struct X
+  y: vector<Y>
+
+struct Y
+  x: vector<X>
+
+public fun ex(l0: &signer): bool
+    move_loc l0
+    call signer::address_of
+    exists X
+    ret
+
+public fun borrow(l0: &signer) acquires X
+    move_loc l0
+    call signer::address_of
+    borrow_global X
+    pop
+    ret
+
+
+
+//# publish
+module 0x1::M3
+use 0x1::Cup
+struct Foo
+  f: Cup::Cup<Foo>
+
+
+
+//# publish
+module 0x1::M3
+use 0x1::Cup
+struct A
+  b: B
+
+struct B
+  c: C
+
+struct C
+  d: vector<D>
+
+struct D
+  x: Cup::Cup<Cup::Cup<Cup::Cup<A>>>

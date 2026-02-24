@@ -34,7 +34,8 @@ pub const MAX_Z3_VERSION: Option<&str> = Some("4.11.2");
 pub const MIN_CVC5_VERSION: Option<&str> = Some("0.0.3");
 pub const MAX_CVC5_VERSION: Option<&str> = None;
 
-#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, clap::ValueEnum)]
+#[clap(rename_all = "PascalCase")]
 pub enum VectorTheory {
     BoogieArray,
     BoogieArrayIntern,
@@ -101,87 +102,104 @@ impl BorrowAggregate {
 }
 
 /// Boogie options.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, clap::Args)]
 #[serde(default, deny_unknown_fields)]
 pub struct BoogieOptions {
     /// Path to the boogie executable.
+    #[arg(skip)]
     pub boogie_exe: String,
     /// Use experimental boogie exe found via env var EXP_BOOGIE_EXE.
+    #[arg(long)]
     pub use_exp_boogie: bool,
     /// Path to the z3 executable.
+    #[arg(skip)]
     pub z3_exe: String,
     /// Whether to use cvc5.
+    #[arg(long)]
     pub use_cvc5: bool,
     /// Path to the cvc5 executable.
+    #[arg(skip)]
     pub cvc5_exe: String,
-    /// Whether to generate debug trace code.
-    pub debug_trace: bool,
     /// List of flags to pass on to boogie.
+    #[arg(skip)]
     pub boogie_flags: Vec<String>,
     /// Whether to use native array theory.
+    #[arg(skip)]
     pub use_smt_array_theory: bool,
     /// Whether to produce an SMT file for each verification problem.
+    #[arg(long)]
     pub generate_smt: bool,
     /// Whether native instead of stratified equality should be used.
+    #[arg(skip)]
     pub native_equality: bool,
-    /// A string determining the type of requires used for parameter type checks. Can be
-    /// `"requires"` or `"free requires`".
-    pub type_requires: String,
-    /// The depth until which stratified functions are expanded.
-    pub stratification_depth: usize,
-    /// A string to be used to inline a function of medium size. Can be empty or `{:inline}`.
-    pub aggressive_func_inline: String,
-    /// A string to be used to inline a function of small size. Can be empty or `{:inline}`.
-    pub func_inline: String,
     /// A bound to apply to the length of serialization results.
+    #[arg(skip)]
     pub serialize_bound: usize,
     /// How many times to call the prover backend for the verification problem. This is used for
     /// benchmarking.
+    #[arg(long, default_value_t = 1)]
     pub bench_repeat: usize,
-    /// Whether to use the sequence theory as the internal representation for $Vector type.
-    pub vector_using_sequences: bool,
     /// A seed for the prover.
+    #[arg(short = 'S', long = "seed", default_value_t = 1)]
     pub random_seed: usize,
     /// The number of cores to use for parallel processing of verification conditions.
+    #[arg(long = "cores", default_value_t = 4)]
     pub proc_cores: usize,
     /// The number of shards to split the verification problem into.
+    #[arg(skip)]
     pub shards: usize,
     /// If there are shards, specifies to only run the given shard. Shards are numbered
     /// starting at 1.
+    #[arg(skip)]
     pub only_shard: Option<usize>,
     /// A (soft) timeout for the solver, per verification condition, in seconds.
+    #[arg(short = 'T', long = "timeout", default_value_t = 40)]
     pub vc_timeout: usize,
     /// Whether allow local timeout overwrites the global one
+    #[arg(skip)]
     pub global_timeout_overwrite: bool,
     /// Whether Boogie output and log should be saved.
+    #[arg(short = 'k', long = "keep")]
     pub keep_artifacts: bool,
     /// Eager threshold for quantifier instantiation.
+    #[arg(long, default_value_t = 100)]
     pub eager_threshold: usize,
     /// Lazy threshold for quantifier instantiation.
+    #[arg(long, default_value_t = 100)]
     pub lazy_threshold: usize,
     /// Whether to use the new Boogie `{:debug ..}` attribute for tracking debug values.
+    #[arg(long)]
     pub stable_test_output: bool,
     /// Number of Boogie instances to be run concurrently.
+    #[arg(long, default_value_t = 1)]
     pub num_instances: usize,
     /// Whether to run Boogie instances sequentially.
+    #[arg(skip)]
     pub sequential_task: bool,
     /// A hard timeout for boogie execution; if the process does not terminate within
     /// this time frame, it will be killed. Zero for no timeout.
+    #[arg(skip)]
     pub hard_timeout_secs: u64,
     /// Whether to skip verification of type instantiations of functions. This may miss
     /// some verification conditions if different type instantiations can create
     /// different behavior via type reflection or storage access, but can speed up
     /// verification.
+    #[arg(skip)]
     pub skip_instance_check: bool,
     /// What vector theory to use.
+    #[arg(long, value_enum, default_value = "BoogieArray")]
     pub vector_theory: VectorTheory,
     /// Whether to generate a z3 trace file and where to put it.
+    #[arg(skip)]
     pub z3_trace_file: Option<String>,
     /// Options to define user-custom native funs.
+    #[arg(skip)]
     pub custom_natives: Option<CustomNativeOptions>,
     /// Number of iterations to unroll loops.
+    #[arg(skip)]
     pub loop_unroll: Option<u64>,
     /// Optional aggregate function names for native methods implementing mutable borrow semantics
+    #[arg(skip)]
     pub borrow_aggregates: Vec<BorrowAggregate>,
 }
 
@@ -196,16 +214,10 @@ impl Default for BoogieOptions {
             use_cvc5: false,
             cvc5_exe: read_env_var("CVC5_EXE"),
             boogie_flags: vec![],
-            debug_trace: false,
             use_smt_array_theory: false,
             generate_smt: false,
             native_equality: false,
-            type_requires: "free requires".to_owned(),
-            stratification_depth: 6,
-            aggressive_func_inline: "".to_owned(),
-            func_inline: "{:inline}".to_owned(),
             serialize_bound: 0,
-            vector_using_sequences: false,
             random_seed: 1,
             proc_cores: 4,
             shards: 1,

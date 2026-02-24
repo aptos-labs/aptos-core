@@ -7,7 +7,7 @@ module 0x42::test {
         _1: T1,
     }
     fun baz(p0: u64, p1: u64): u64 {
-        let Tup<u64,u64>{_0: _v0, _1: _v1} = Tup<u64,u64>{_0: p0, _1: p1};
+        let Tup<u64, u64>{_0: _v0, _1: _v1} = Tup<u64, u64>{_0: p0, _1: p1};
         _v0 - _v1
     }
     fun test_ok() {

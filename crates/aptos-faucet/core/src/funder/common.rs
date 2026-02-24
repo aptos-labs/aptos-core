@@ -1,24 +1,14 @@
 // Copyright (c) Aptos Foundation
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
-use crate::{
-    endpoints::{AptosTapError, AptosTapErrorCode},
-    middleware::NUM_OUTSTANDING_TRANSACTIONS,
-};
+use crate::endpoints::{AptosTapError, AptosTapErrorCode};
 use anyhow::{anyhow, Context, Result};
 use aptos_config::keys::ConfigKey;
-use aptos_logger::{
-    error, info,
-    prelude::{sample, SampleRate},
-    warn,
-};
+use aptos_logger::{info, warn};
 use aptos_sdk::{
     crypto::ed25519::Ed25519PrivateKey,
     rest_client::Client,
-    types::{
-        account_address::AccountAddress, chain_id::ChainId, transaction::SignedTransaction,
-        LocalAccount,
-    },
+    types::{account_address::AccountAddress, chain_id::ChainId, transaction::SignedTransaction},
 };
 use clap::Parser;
 use reqwest::Url;
@@ -34,9 +24,6 @@ use std::{
     time::{Duration, Instant},
 };
 use tokio::sync::RwLock;
-
-// Default max in mempool is 20.
-const MAX_NUM_OUTSTANDING_TRANSACTIONS: u64 = 15;
 
 const DEFAULT_KEY_FILE_PATH: &str = "/opt/aptos/etc/mint.key";
 
@@ -185,163 +172,9 @@ impl TransactionSubmissionConfig {
     }
 }
 
-struct NumOutstandingTransactionsResetter;
-
-impl Drop for NumOutstandingTransactionsResetter {
-    fn drop(&mut self) {
-        NUM_OUTSTANDING_TRANSACTIONS.set(0);
-    }
-}
-
-/// This function is responsible for updating our local record of the sequence
-/// numbers of the funder and receiver accounts.
-///
-/// Each asset has its own independent queue: HashMap<String, Vec<(AccountAddress, u64)>>.
-/// This ensures requests for different assets don't interfere with each other while maintaining
-/// FIFO ordering within each asset. For single-asset funders (like TransferFunder), use
-/// DEFAULT_ASSET_NAME. For multi-asset funders (like MintFunder), pass the specific asset name.
-pub async fn update_sequence_numbers(
-    client: &Client,
-    funder_account: &RwLock<LocalAccount>,
-    // Each asset has its own queue: HashMap<asset_name, Vec<(AccountAddress, u64)>>
-    outstanding_requests: &RwLock<HashMap<String, Vec<(AccountAddress, u64)>>>,
-    receiver_address: AccountAddress,
-    amount: u64,
-    wait_for_outstanding_txns_secs: u64,
-    asset_name: &str,
-) -> Result<(u64, Option<u64>), AptosTapError> {
-    let (mut funder_seq, mut receiver_seq) =
-        get_sequence_numbers(client, funder_account, receiver_address).await?;
-    let our_funder_seq = {
-        let funder_account = funder_account.write().await;
-
-        // If the onchain sequence_number is greater than what we have, update our
-        // sequence_numbers
-        if funder_seq > funder_account.sequence_number() {
-            funder_account.set_sequence_number(funder_seq);
-        }
-        funder_account.sequence_number()
-    };
-
-    let _resetter = NumOutstandingTransactionsResetter;
-
-    let mut set_outstanding = false;
-    let request_key = (receiver_address, amount);
-
-    // We shouldn't have too many outstanding txns
-    for _ in 0..(wait_for_outstanding_txns_secs * 2) {
-        if our_funder_seq < funder_seq + MAX_NUM_OUTSTANDING_TRANSACTIONS {
-            // Enforce a stronger ordering of priorities based upon the MintParams that arrived
-            // first. Then put the other folks to sleep to try again until the queue fills up.
-            if !set_outstanding {
-                let mut requests_map = outstanding_requests.write().await;
-                let queue = requests_map
-                    .entry(asset_name.to_string())
-                    .or_insert_with(Vec::new);
-                queue.push(request_key);
-                set_outstanding = true;
-            }
-
-            // Check if this request is at the front of the queue for this asset
-            let requests_map = outstanding_requests.read().await;
-            let is_at_front = if let Some(queue) = requests_map.get(asset_name) {
-                queue.first() == Some(&request_key)
-            } else {
-                false
-            };
-
-            if is_at_front {
-                // There might have been two requests with the same parameters, so we ensure that
-                // we only pop off one of them. We do a read lock first since that is cheap,
-                // followed by a write lock.
-                drop(requests_map);
-                let mut requests_map = outstanding_requests.write().await;
-                if let Some(queue) = requests_map.get_mut(asset_name) {
-                    if queue.first() == Some(&request_key) {
-                        queue.remove(0);
-                    }
-                }
-                break;
-            }
-            tokio::time::sleep(tokio::time::Duration::from_millis(1)).await;
-            continue;
-        }
-        let num_outstanding = our_funder_seq - funder_seq;
-
-        sample!(
-            SampleRate::Duration(Duration::from_secs(2)),
-            warn!(
-                "We have too many outstanding transactions: {}. Sleeping to let the system catchup.",
-                num_outstanding
-            );
-        );
-
-        // Report the number of outstanding transactions.
-        NUM_OUTSTANDING_TRANSACTIONS.set(num_outstanding as i64);
-
-        tokio::time::sleep(tokio::time::Duration::from_millis(500)).await;
-        (funder_seq, receiver_seq) =
-            get_sequence_numbers(client, funder_account, receiver_address).await?;
-    }
-
-    // If after 30 seconds we still have not caught up, we are likely unhealthy.
-    if our_funder_seq >= funder_seq + MAX_NUM_OUTSTANDING_TRANSACTIONS {
-        error!("We are unhealthy, transactions have likely expired.");
-        let funder_account = funder_account.write().await;
-        if funder_account.sequence_number() >= funder_seq + MAX_NUM_OUTSTANDING_TRANSACTIONS {
-            info!("Resetting the sequence number counter.");
-            funder_account.set_sequence_number(funder_seq);
-        } else {
-            info!("Someone else reset the sequence number counter ahead of us.");
-        }
-    }
-
-    // After this point we report 0 outstanding transactions. This happens by virtue
-    // of the NumOutstandingTransactionsResetter dropping out of scope. We do it this
-    // way instead of explicitly calling it here because if the caller hangs up part
-    // way through the request, the future for the request handler stops getting polled,
-    // meaning we'd never make it here. Leveraging Drop makes sure it always happens.
-
-    Ok((funder_seq, receiver_seq))
-}
-
-/// This function gets the sequence number for the funder account (sender)
-/// and the receiver account. It can return an error if the funder account
-/// does not exist.
-async fn get_sequence_numbers(
-    client: &Client,
-    funder_account: &RwLock<LocalAccount>,
-    receiver_address: AccountAddress,
-) -> Result<(u64, Option<u64>), AptosTapError> {
-    let funder_address = funder_account.read().await.address();
-    let f_request = client.get_account(funder_address);
-    let r_request = client.get_account(receiver_address);
-    let mut responses = futures::future::join_all([f_request, r_request]).await;
-
-    let receiver_seq_num = responses
-        .remove(1)
-        .as_ref()
-        .ok()
-        .map(|account| account.inner().sequence_number);
-
-    let funder_seq_num = responses
-        .remove(0)
-        .map_err(|e| {
-            AptosTapError::new(
-                format!("funder account {} not found: {:#}", funder_address, e),
-                AptosTapErrorCode::AccountDoesNotExist,
-            )
-        })?
-        .inner()
-        .sequence_number;
-
-    Ok((funder_seq_num, receiver_seq_num))
-}
-
 /// Submit a transaction, potentially wait for it depending on `wait_for_transactions`
 pub async fn submit_transaction(
     client: &Client,
-    faucet_account: &RwLock<LocalAccount>,
     signed_transaction: SignedTransaction,
     receiver_address: &AccountAddress,
     wait_for_transactions: bool,
@@ -374,8 +207,6 @@ pub async fn submit_transaction(
         )
     };
 
-    // If there was an issue submitting a transaction we should just reset
-    // our sequence numbers to what it was before.
     match result {
         Ok(_) => {
             info!(
@@ -386,7 +217,6 @@ pub async fn submit_transaction(
             Ok(signed_transaction)
         },
         Err(e) => {
-            faucet_account.write().await.decrement_sequence_number();
             warn!(
                 hash = signed_transaction.committed_hash(),
                 address = receiver_address,

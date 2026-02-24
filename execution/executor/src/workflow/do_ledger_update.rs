@@ -75,7 +75,7 @@ impl DoLedgerUpdate {
                     InMemoryEventAccumulator::from_leaves(&event_hashes).root_hash();
                 let write_set_hash = CryptoHash::hash(txn_output.write_set());
                 let txn_info = TransactionInfo::new(
-                    txn.hash(),
+                    txn.committed_hash(),
                     write_set_hash,
                     event_root_hash,
                     state_checkpoint_hash,

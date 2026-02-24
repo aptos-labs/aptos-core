@@ -1,0 +1,58 @@
+//# publish
+module 0x22::A
+struct G<T0> has drop + key
+  x: T0
+
+public fun store(l0: &signer)
+    move_loc l0
+    ld_u64 10
+    pack G<u64>
+    move_to G<u64>
+    ret
+
+public fun get(l0: address): G<u64>
+    move_loc l0
+    move_from G<u64>
+    ret
+
+public fun get_invalid(l0: &signer): G<u64>
+    move_loc l0
+    move_from G<u64>
+    ret
+
+
+
+//# run --signers 0x1
+script
+use 0x22::A
+entry public fun main(l0: signer)
+    borrow_loc l0
+    call A::store
+    ret
+
+
+
+//# run --signers 0x1
+script
+use 0x22::A
+use 0x1::signer
+entry public fun main(l0: signer)
+    local l1: address
+    borrow_loc l0
+    call signer::address_of
+    st_loc l1
+    move_loc l1
+    call A::get
+    pop
+    ret
+
+
+
+//# run --signers 0x1
+script
+use 0x22::A
+entry public fun main(l0: signer)
+    borrow_loc l0
+    call A::get_invalid
+    pop
+    ret

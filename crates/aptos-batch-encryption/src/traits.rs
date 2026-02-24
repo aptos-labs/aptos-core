@@ -1,43 +1,58 @@
 // Copyright (c) Aptos Foundation
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
+use crate::errors::MissingEvalProofError;
 use anyhow::Result;
 use aptos_crypto::player::Player;
-use aptos_dkg::pvss::traits::Subtranscript;
+use aptos_dkg::pvss::traits::TranscriptCore;
 use ark_std::rand::{CryptoRng, RngCore};
 use serde::{de::DeserializeOwned, Serialize};
 use std::hash::Hash;
 
 pub trait BatchThresholdEncryption {
-    type ThresholdConfig: aptos_crypto::SecretSharingConfig;
-    type SubTranscript: Subtranscript;
+    type ThresholdConfig: aptos_crypto::TSecretSharingConfig;
+    type SubTranscript: TranscriptCore;
 
-    /// An encryption key for the scheme. Allows for generating ciphertexts. If we want to actually
-    /// deploy this scheme, the functionality here will have to be implemented in the SDK.
+    /// An encryption key for the scheme. Allows for generating ciphertexts.
     type EncryptionKey;
 
     /// A digest key for the scheme. Allows for generating digests given a list of ciphertexts.
     /// Internally, this is a modified KZG setup.
     type DigestKey: Serialize + DeserializeOwned;
 
-    /// A ciphertext for the scheme. Internally, this is encrypted w.r.t. an ID and a round number,
-    /// but I think it makes sense not to expose the ID as part of the interface. (The round number
-    /// must be exposed since it must be given as input to [`PublicKey::encrypt`], and must agree
-    /// with the round number used when computing a decryption key.)
-    type Ciphertext: Serialize + DeserializeOwned + Eq + PartialEq + Serialize + Hash;
+    /// A ciphertext for the scheme.
+    type Ciphertext: Serialize
+        + DeserializeOwned
+        + Eq
+        + PartialEq
+        + Serialize
+        + Hash
+        + Sized
+        + Send
+        + Sync;
 
-    type PreparedCiphertext: Serialize + DeserializeOwned + Eq + PartialEq + Serialize;
+    /// A ciphertext may be "prepared" once a digest and an eval proof corresponding to the
+    /// ciphertext has been computed. Decrypting the resulting `PreparedCiphertext`
+    type PreparedCiphertext: Serialize
+        + DeserializeOwned
+        + Eq
+        + PartialEq
+        + Serialize
+        + Sized
+        + Send
+        + Sync;
 
     /// The round number used when generating a digest. For security to hold, validators must only
     /// generate a single decryption key corresponding to a round number.
     type Round;
 
-    /// Internally, a KZG commitment to a set of IDs.
-    type Digest;
+    /// The succinct commitment to the set of ciphertexts.
+    type Digest: Sized + Send + Sync;
 
+    /// A promise representing an uncomputed set of eval proofs.
     type EvalProofsPromise;
 
     /// The eval proofs required for decryption.
-    type EvalProofs;
+    type EvalProofs: Sized + Send + Sync;
 
     /// An individual eval proof.
     type EvalProof;
@@ -50,30 +65,38 @@ pub trait BatchThresholdEncryption {
     /// digest.
     type VerificationKey: VerificationKey;
 
+    /// A share of the decryption key.
     type DecryptionKeyShare: DecryptionKeyShare;
 
     /// A decryption key that has been reconstructed by a threshold of decryption key shares.
-    type DecryptionKey;
+    type DecryptionKey: Send + Sized + Sync;
     type Id: PartialEq + Eq;
 
+    /// Generates an (insecure) setup for the batch threshold encryption scheme. Consists of
+    /// an [`EncryptionKey`] which can be used to encrypt messages and to compute a digest from a list
+    /// of ciphertexts, along with a vector of shares of type [`MasterSecretKeyShare`], which share
+    /// the secret key according to the [`ThresholdConfig`] given as input. In production,
     fn setup(
         digest_key: &Self::DigestKey,
-        pvss_public_params: &<Self::SubTranscript as Subtranscript>::PublicParameters,
+        pvss_public_params: &<Self::SubTranscript as TranscriptCore>::PublicParameters,
         subtranscript: &Self::SubTranscript,
         threshold_config: &Self::ThresholdConfig,
         current_player: Player,
-        sk_share_decryption_key: &<Self::SubTranscript as Subtranscript>::DecryptPrivKey,
+        sk_share_decryption_key: &<Self::SubTranscript as TranscriptCore>::DecryptPrivKey,
     ) -> Result<(
         Self::EncryptionKey,
         Vec<Self::VerificationKey>,
         Self::MasterSecretKeyShare,
     )>;
 
-    /// Generates an (insecure) setup for the batch threshold encryption scheme. Consists of
-    /// a [`PublicKey`] which can be used to encrypt messages and to compute a digest from a list
-    /// of ciphertexts, along with a vector of shares of type [`MasterSecretKeyShare`], which share
-    /// the secret key according to the [`ThresholdConfig`] given as input. Eventually, this will
-    /// need to be replaced by a DKG.
+    fn extract_encryption_key(
+        digest_key: &Self::DigestKey,
+        subtranscript: &Self::SubTranscript,
+    ) -> Result<Self::EncryptionKey>;
+
+    /// Generates an (insecure) setup for the batch threshold encryption scheme. In production,
+    /// a DKG will be used to produce all parts of this setup except for [`DigestKey`], which will
+    /// be produced using a single-time trusted setup ceremony.
     fn setup_for_testing(
         seed: u64,
         max_batch_size: usize,
@@ -131,7 +154,7 @@ pub trait BatchThresholdEncryption {
         ct: &Self::Ciphertext,
     ) -> Option<Self::EvalProof>;
 
-    /// Derive a decryption key share given a [`SuccinctDigest`] and a round number, whose
+    /// Derive a decryption key share given a [`Digest`] and a round number, whose
     /// corresponding reconstructed decryption key will be able to decrypt any ciphertext encrypted
     /// to that round number and committed to by that digest.
     fn derive_decryption_key_share(
@@ -139,6 +162,8 @@ pub trait BatchThresholdEncryption {
         digest: &Self::Digest,
     ) -> Result<Self::DecryptionKeyShare>;
 
+    /// With respect to a verification key and a digest, verify that a decryption key share was
+    /// honestly derived.
     fn verify_decryption_key_share(
         verification_key: &Self::VerificationKey,
         digest: &Self::Digest,
@@ -152,21 +177,33 @@ pub trait BatchThresholdEncryption {
         config: &Self::ThresholdConfig,
     ) -> Result<Self::DecryptionKey>;
 
-    // TODO: verify decryption key?
+    /// With respect to the scheme's encryption key and a digest, verify that the decryption key
+    /// was honestly reconstructed from honestly-derived decryption key shares.
+    fn verify_decryption_key(
+        encryption_key: &Self::EncryptionKey,
+        digest: &Self::Digest,
+        decryption_key: &Self::DecryptionKey,
+    ) -> Result<()>;
 
-    fn prepare_cts(
-        cts: &[Self::Ciphertext],
+    /// Take a ciphertext, digest, and eval proofs as input and output a prepared ciphertext. This
+    /// can be done before reconstructing the decryption key.
+    fn prepare_ct(
+        ct: &Self::Ciphertext,
         digest: &Self::Digest,
         eval_proofs: &Self::EvalProofs,
-    ) -> Result<Vec<Self::PreparedCiphertext>>;
+    ) -> std::result::Result<Self::PreparedCiphertext, MissingEvalProofError>;
 
-    /// Decrypt a set of ciphertext using a decryption key and advice.
+    /// Decrypt a prepared ciphertext using the reconstructed decryption key.
     fn decrypt<P: Plaintext>(
         decryption_key: &Self::DecryptionKey,
-        cts: &[Self::PreparedCiphertext],
-    ) -> Result<Vec<P>>;
+        ct: &Self::PreparedCiphertext,
+    ) -> Result<P>;
 
-    fn decrypt_individual<P: Plaintext>(
+    /// Convenience method which performs both prepare and decrypt steps. As performing the steps
+    /// individually results in a lower critical-path latency, since `prepare` can be done before
+    /// reconstructing the decryption key, this should only be used during state sync for verifying
+    /// correct decryption.
+    fn decrypt_slow<P: Plaintext>(
         decryption_key: &Self::DecryptionKey,
         ct: &Self::Ciphertext,
         digest: &Self::Digest,

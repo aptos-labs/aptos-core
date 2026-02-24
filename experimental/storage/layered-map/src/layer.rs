@@ -118,10 +118,16 @@ impl<K: ArcAsyncDrop, V: ArcAsyncDrop> MapLayer<K, V> {
         self.inner.parent.upgrade().map(Self::new)
     }
 
-    pub fn into_layers_view_after(self, base_layer: MapLayer<K, V>) -> LayeredMap<K, V> {
-        assert!(base_layer.is_family(&self));
-        assert!(base_layer.inner.layer >= self.inner.base_layer);
-        assert!(base_layer.inner.layer <= self.inner.layer);
+    pub fn into_layers_view_after(self, base_layer: Self) -> LayeredMap<K, V> {
+        assert!(
+            self.can_view_after(&base_layer),
+            "incompatible layers: base(family={}, layer={}) top(family={}, layer={}, base_layer={})",
+            base_layer.inner.family,
+            base_layer.inner.layer,
+            self.inner.family,
+            self.inner.layer,
+            self.inner.base_layer,
+        );
 
         self.log_layer("view");
         base_layer.log_layer("as_view_base");
@@ -129,7 +135,7 @@ impl<K: ArcAsyncDrop, V: ArcAsyncDrop> MapLayer<K, V> {
         LayeredMap::new(base_layer, self)
     }
 
-    pub fn view_layers_after(&self, base_layer: &MapLayer<K, V>) -> LayeredMap<K, V> {
+    pub fn view_layers_after(&self, base_layer: &Self) -> LayeredMap<K, V> {
         self.clone().into_layers_view_after(base_layer.clone())
     }
 
@@ -145,8 +151,35 @@ impl<K: ArcAsyncDrop, V: ArcAsyncDrop> MapLayer<K, V> {
         Arc::ptr_eq(&self.inner, &other.inner)
     }
 
+    /// Returns true if `base` can be used as the base layer for viewing layers up to `self`.
+    pub fn can_view_after(&self, base: &Self) -> bool {
+        self.is_family(base)
+            && base.inner.layer >= self.inner.base_layer
+            && base.inner.layer <= self.inner.layer
+    }
+
     pub fn is_descendant_of(&self, other: &Self) -> bool {
-        self.is_family(other) && self.inner.layer >= other.inner.layer
+        if !self.is_family(other) {
+            return false;
+        }
+
+        // Walk up the parent chain from `self` to verify `other` is an actual ancestor,
+        // not merely a same-family node on a different fork.
+        let mut cur = Arc::clone(&self.inner);
+        loop {
+            if Arc::ptr_eq(&cur, &other.inner) {
+                return true;
+            }
+            if cur.layer <= other.inner.layer {
+                // Reached or passed the target layer without finding `other`.
+                return false;
+            }
+            match cur.parent.upgrade() {
+                Some(parent) => cur = parent,
+                // Parent has been dropped — `other` is not an ancestor.
+                None => return false,
+            }
+        }
     }
 
     pub(crate) fn layer(&self) -> u64 {

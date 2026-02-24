@@ -25,11 +25,9 @@ use crate::{
         Loc, ModuleId, MoveIrLoc, NamedConstantData, NamedConstantId, NodeId, Parameter, SchemaId,
         SpecFunId, SpecVarId, StructData, StructId, TypeParameter, TypeParameterKind,
     },
-    options::ModelBuilderOptions,
     pragmas::{
-        is_pragma_valid_for_block, is_property_valid_for_condition, CONDITION_ABSTRACT_PROP,
-        CONDITION_CONCRETE_PROP, CONDITION_DEACTIVATED_PROP, CONDITION_EXPORT_PROP,
-        CONDITION_INJECTED_PROP, OPAQUE_PRAGMA, VERIFY_PRAGMA,
+        is_pragma_valid_for_block, is_property_valid_for_condition, CONDITION_DEACTIVATED_PROP,
+        CONDITION_EXPORT_PROP, CONDITION_INJECTED_PROP,
     },
     symbol::{Symbol, SymbolPool},
     ty::{
@@ -1165,9 +1163,6 @@ impl ModuleBuilder<'_, '_> {
                 },
             }
         }
-
-        // Apply tweaks after all specs are analyzed
-        self.apply_tweaks(module_def);
     }
 
     pub(crate) fn def_ana_code_spec_block(
@@ -1505,7 +1500,8 @@ impl ModuleBuilder<'_, '_> {
 impl ModuleBuilder<'_, '_> {
     fn def_ana_spec_block(&mut self, context: &SpecBlockContext, block: &EA::SpecBlock) {
         let block_loc = self.parent.env.to_loc(&block.loc);
-        self.update_spec(context, move |spec| spec.loc = Some(block_loc));
+        let block_loc_for_spec = block_loc.clone();
+        self.update_spec(context, move |spec| spec.loc = Some(block_loc_for_spec));
 
         assert!(self.spec_block_lets.is_empty());
 
@@ -1525,8 +1521,161 @@ impl ModuleBuilder<'_, '_> {
             self.def_ana_spec_block_member(context, member)
         }
 
+        // Validate behavior predicate state labels
+        self.validate_behavior_state_labels(context, &block_loc);
+
         // clear the let bindings stored in the build.
         self.spec_block_lets.clear();
+    }
+
+    /// Validates state labels in behavior predicates within a spec block.
+    /// Checks that:
+    /// 1. Every pre-state label references a post-state label defined in the same spec
+    /// 2. There are no cycles in state label references
+    fn validate_behavior_state_labels(&mut self, context: &SpecBlockContext, loc: &Loc) {
+        use crate::ast::MemoryLabel;
+        use std::collections::{BTreeMap, BTreeSet};
+
+        // Each behavior predicate with state labels can have:
+        // - A pre-label: reads from this state (must be defined by another predicate's post-label)
+        // - A post-label: defines this state (other predicates can reference it as pre-label)
+
+        // Collect: (pre_label, post_label, node_id) for each predicate with state labels
+        let mut behavior_predicates: Vec<(Option<MemoryLabel>, Option<MemoryLabel>, NodeId)> =
+            Vec::new();
+
+        self.update_spec(context, |spec| {
+            fn collect_behavior_predicates(
+                exp: &Exp,
+                predicates: &mut Vec<(Option<MemoryLabel>, Option<MemoryLabel>, NodeId)>,
+            ) {
+                exp.visit_pre_order(&mut |e| {
+                    if let ExpData::Call(id, Operation::Behavior(_, state), _) = e {
+                        if state.pre.is_some() || state.post.is_some() {
+                            predicates.push((state.pre, state.post, *id));
+                        }
+                    }
+                    true
+                });
+            }
+
+            for cond in &spec.conditions {
+                collect_behavior_predicates(&cond.exp, &mut behavior_predicates);
+                for additional in &cond.additional_exps {
+                    collect_behavior_predicates(additional, &mut behavior_predicates);
+                }
+            }
+        });
+
+        // Helper to get symbol name for a memory label
+        let get_label_name =
+            |label: MemoryLabel| -> Option<Symbol> { self.parent.env.get_memory_label_name(label) };
+
+        // Build set of defined post-labels and used pre-labels
+        let mut defined_post_labels: BTreeMap<Symbol, Loc> = BTreeMap::new();
+        let mut used_pre_labels: BTreeSet<Symbol> = BTreeSet::new();
+        for (pre_label, post_label, node_id) in &behavior_predicates {
+            if let Some(post_name) = post_label.and_then(&get_label_name) {
+                let exp_loc = self.parent.env.get_node_loc(*node_id);
+                defined_post_labels.insert(post_name, exp_loc);
+            }
+            if let Some(pre_name) = pre_label.and_then(&get_label_name) {
+                used_pre_labels.insert(pre_name);
+            }
+        }
+
+        let symbol_pool = self.symbol_pool();
+
+        // Validate that all pre-labels reference defined post-labels
+        for (pre_label, _, node_id) in &behavior_predicates {
+            if let Some(pre_name) = pre_label.and_then(&get_label_name) {
+                if !defined_post_labels.contains_key(&pre_name) {
+                    let exp_loc = self.parent.env.get_node_loc(*node_id);
+                    self.parent.env.error(
+                        &exp_loc,
+                        &format!(
+                            "state label `{}` is not defined; \
+                             pre-state labels must reference a post-state label defined by another behavior predicate in the same spec",
+                            pre_name.display(symbol_pool)
+                        ),
+                    );
+                }
+            }
+        }
+
+        // Validate that all post-labels are referenced by some pre-label
+        for (post_label, post_loc) in &defined_post_labels {
+            if !used_pre_labels.contains(post_label) {
+                self.parent.env.error(
+                    post_loc,
+                    &format!(
+                        "state label `{}` is defined but never referenced; \
+                         every post-state label must be referenced by a pre-state label in another behavior predicate",
+                        post_label.display(symbol_pool)
+                    ),
+                );
+            }
+        }
+
+        // Check for cycles: build a dependency graph
+        // Each predicate that defines a post-label and uses a pre-label creates an edge:
+        // post_label_defined -> pre_label_used
+        // This means: to get the state of `post_label_defined`, we need the state of `pre_label_used`
+        let mut edges: BTreeMap<Symbol, BTreeSet<Symbol>> = BTreeMap::new();
+        for (pre_label, post_label, _) in &behavior_predicates {
+            let pre_name = pre_label.and_then(&get_label_name);
+            let post_name = post_label.and_then(&get_label_name);
+            if let (Some(pre), Some(post)) = (pre_name, post_name) {
+                // The predicate defines `post` and reads from `pre`
+                // So `post` depends on `pre`
+                edges.entry(post).or_default().insert(pre);
+            }
+        }
+
+        // Detect cycles using DFS
+        fn has_cycle(
+            node: Symbol,
+            edges: &BTreeMap<Symbol, BTreeSet<Symbol>>,
+            visiting: &mut BTreeSet<Symbol>,
+            visited: &mut BTreeSet<Symbol>,
+        ) -> Option<Vec<Symbol>> {
+            if visiting.contains(&node) {
+                return Some(vec![node]); // Found cycle
+            }
+            if visited.contains(&node) {
+                return None; // Already fully processed
+            }
+
+            visiting.insert(node);
+            if let Some(neighbors) = edges.get(&node) {
+                for &neighbor in neighbors {
+                    if let Some(mut cycle) = has_cycle(neighbor, edges, visiting, visited) {
+                        cycle.push(node);
+                        return Some(cycle);
+                    }
+                }
+            }
+            visiting.remove(&node);
+            visited.insert(node);
+            None
+        }
+
+        let mut visiting = BTreeSet::new();
+        let mut visited = BTreeSet::new();
+        for &start in edges.keys() {
+            if let Some(cycle) = has_cycle(start, &edges, &mut visiting, &mut visited) {
+                let cycle_str = cycle
+                    .iter()
+                    .rev()
+                    .map(|s| s.display(symbol_pool).to_string())
+                    .join(" -> ");
+                self.parent.env.error(
+                    loc,
+                    &format!("cyclic state label reference detected: {}", cycle_str),
+                );
+                break; // Report only one cycle
+            }
+        }
     }
 
     fn def_ana_spec_block_member(
@@ -3486,88 +3635,6 @@ impl ModuleBuilder<'_, '_> {
 }
 
 /// # Tweak application
-
-impl ModuleBuilder<'_, '_> {
-    /// Tweak the specifications at the AST level based on `ModuleBuilderOptions`.
-    fn apply_tweaks(&mut self, module_def: &EA::ModuleDefinition) {
-        self.tweak_pragma_opaque(module_def);
-    }
-
-    /// If the `ignore_pragma_opaque_*` options are set, the opaque pragma will be
-    /// removed from the function spec property bag according to the options.
-    fn tweak_pragma_opaque(&mut self, module_def: &EA::ModuleDefinition) {
-        let env = &self.parent.env;
-        let options = env
-            .get_extension::<ModelBuilderOptions>()
-            .unwrap_or_default();
-        if !(options.ignore_pragma_opaque_when_possible
-            || options.ignore_pragma_opaque_internal_only)
-        {
-            return;
-        }
-
-        for spec in &module_def.specs {
-            if matches!(spec.value.target.value, EA::SpecBlockTarget_::Schema(..)) {
-                continue;
-            }
-            if let Some(SpecBlockContext::Function(fun_name)) =
-                self.get_spec_block_context(&spec.value.target)
-            {
-                if let Some(spec) = self.fun_specs.get_mut(&fun_name.symbol) {
-                    // if the spec does not have "pragma opaque;" do nothing,
-                    let has_pragma_opaque = env
-                        .is_property_true(&spec.properties, OPAQUE_PRAGMA)
-                        .unwrap_or(false);
-                    if !has_pragma_opaque {
-                        continue;
-                    }
-
-                    // if the spec has `pragma verify = false;` do not remove its `opaque` mark
-                    let is_verified = env
-                        .is_property_true(&spec.properties, VERIFY_PRAGMA)
-                        .unwrap_or(true)
-                        && env
-                            .is_property_true(&self.module_spec.properties, VERIFY_PRAGMA)
-                            .unwrap_or(true);
-                    if !is_verified {
-                        continue;
-                    }
-
-                    // if the spec has `[concrete]` or `[abstract]` properties, do not remove its
-                    // `opaque` mark
-                    let has_opaque_prop = spec.any(|cond| {
-                        env.is_property_true(&cond.properties, CONDITION_CONCRETE_PROP)
-                            .unwrap_or(false)
-                            || env
-                                .is_property_true(&cond.properties, CONDITION_ABSTRACT_PROP)
-                                .unwrap_or(false)
-                    });
-                    if has_opaque_prop {
-                        continue;
-                    }
-
-                    // if the function may have unknown callers, respect the option
-                    // `ignore_pragma_opaque_internal_only`.
-                    let fun_entry = self.parent.fun_table.get(&fun_name).unwrap_or_else(|| {
-                        panic!(
-                            "Unable to find function `{}`",
-                            fun_name.display(self.parent.env)
-                        )
-                    });
-                    let has_unknown_caller = matches!(fun_entry.visibility, Visibility::Public)
-                        || fun_entry.kind == FunctionKind::Entry;
-                    if has_unknown_caller && options.ignore_pragma_opaque_internal_only {
-                        continue;
-                    }
-
-                    // everything is cleared, we can remove the `opaque` mark now
-                    let opaque_symbol = env.symbol_pool().make(OPAQUE_PRAGMA);
-                    spec.properties.remove(&opaque_symbol);
-                }
-            }
-        }
-    }
-}
 
 /// # Environment Population and finalization
 

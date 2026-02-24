@@ -42,11 +42,11 @@ module 0xcafe::vectors {
         let v = vector[1, 2, 3];
         let s = 2;
         {
-            let (v) = (&mut v);
+            let v = &mut v;
             let i = 0;
-            while (i < 0x1::vector::length<u64>(/*freeze*/v)) {
+            while (i < 0x1::vector::length<u64>(v)) {
                 {
-                    let (e) = (0x1::vector::borrow_mut<u64>(v, i));
+                    let e = 0x1::vector::borrow_mut<u64>(v, i);
                     *e = s;
                     s = s + 1
                 };

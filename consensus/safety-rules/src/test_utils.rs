@@ -79,7 +79,7 @@ pub fn make_proposal_with_qc(
     validator_signer: &ValidatorSigner,
 ) -> VoteProposal {
     make_proposal_with_qc_and_proof(
-        Payload::empty(false, true),
+        Payload::empty(false),
         round,
         empty_proof(),
         qc,

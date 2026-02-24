@@ -116,7 +116,7 @@ where
 
     /// Replays the trace performing type checks. If any checks fail, an error is returned.
     pub fn replay(mut self, trace: &Trace) -> VMResult<()> {
-        // If there is no type checks ar all: no need to replay the trace.
+        // If there are no type checks at all: no need to replay the trace.
         if !self.vm_config.paranoid_type_checks {
             debug_assert!(!self.vm_config.optimize_trusted_code);
             return Ok(());
@@ -279,10 +279,9 @@ where
                     let taken = cursor.consume_branch()?;
                     if taken {
                         frame.pc = *target;
-                    } else {
-                        frame.pc += 1;
+                        continue;
                     }
-                    continue;
+                    // Not-taken branch: fall through to post-execution checks.
                 },
                 Instruction::StLoc(idx) => {
                     // Store dummy value - these are not needed for type checks, as we only need to

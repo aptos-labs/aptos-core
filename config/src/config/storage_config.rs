@@ -232,7 +232,7 @@ impl Default for RocksdbConfigs {
             },
             enable_storage_sharding: true,
             high_priority_background_threads: 4,
-            low_priority_background_threads: 2,
+            low_priority_background_threads: 4,
             shared_block_cache_size: Self::DEFAULT_BLOCK_CACHE_SIZE,
         }
     }
@@ -268,6 +268,7 @@ impl Default for HotStateConfig {
 #[serde(default, deny_unknown_fields)]
 pub struct StorageConfig {
     pub backup_service_address: SocketAddr,
+    pub backup_service_runtime_threads: Option<usize>,
     /// Top level directory to store the RocksDB
     pub dir: PathBuf,
     /// Hot state configuration
@@ -320,6 +321,7 @@ pub const NO_OP_STORAGE_PRUNER_CONFIG: PrunerConfig = PrunerConfig {
         prune_window: 0,
         batch_size: 0,
     },
+    stale_node_cleanup_batch_size: 50_000,
 };
 
 #[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
@@ -376,12 +378,26 @@ impl From<EpochSnapshotPrunerConfig> for StateMerklePrunerConfig {
     }
 }
 
-#[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize, Default)]
+#[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(default, deny_unknown_fields)]
 pub struct PrunerConfig {
     pub ledger_pruner_config: LedgerPrunerConfig,
     pub state_merkle_pruner_config: StateMerklePrunerConfig,
     pub epoch_snapshot_pruner_config: EpochSnapshotPrunerConfig,
+    /// Batch size for the one-time leaked stale node cleanup that runs on startup.
+    /// Set to 0 to disable.
+    pub stale_node_cleanup_batch_size: usize,
+}
+
+impl Default for PrunerConfig {
+    fn default() -> Self {
+        Self {
+            ledger_pruner_config: LedgerPrunerConfig::default(),
+            state_merkle_pruner_config: StateMerklePrunerConfig::default(),
+            epoch_snapshot_pruner_config: EpochSnapshotPrunerConfig::default(),
+            stale_node_cleanup_batch_size: 50_000,
+        }
+    }
 }
 
 impl Default for LedgerPrunerConfig {
@@ -434,6 +450,7 @@ impl Default for StorageConfig {
     fn default() -> StorageConfig {
         StorageConfig {
             backup_service_address: SocketAddr::new(IpAddr::V4(Ipv4Addr::LOCALHOST), 6186),
+            backup_service_runtime_threads: Some(2),
             dir: PathBuf::from("db"),
             hot_state_config: HotStateConfig::default(),
             // The prune window must at least out live a RPC request because its sub requests are
@@ -661,11 +678,6 @@ impl ConfigOptimizer for StorageConfig {
                 config.assert_rlimit_nofile = true;
                 modified_config = true;
             }
-            if (chain_id.is_testnet() || chain_id.is_mainnet())
-                && config_yaml["rocksdb_configs"]["enable_storage_sharding"].as_bool() != Some(true)
-            {
-                panic!("Storage sharding (AIP-97) is not enabled in node config. Please follow the guide to migration your node, and set storage.rocksdb_configs.enable_storage_sharding to true explicitly in your node config. https://aptoslabs.notion.site/DB-Sharding-Migration-Public-Full-Nodes-1978b846eb7280b29f17ceee7d480730");
-            }
             // TODO(HotState): Hot state root hash computation is off by default in Mainnet unless
             // explicitly enabled.
             if chain_id.is_mainnet()
@@ -728,13 +740,6 @@ impl ConfigSanitizer for StorageConfig {
         }
 
         if let Some(db_path_overrides) = config.db_path_overrides.as_ref() {
-            if !config.rocksdb_configs.enable_storage_sharding {
-                return Err(Error::ConfigSanitizerFailed(
-                    sanitizer_name,
-                    "db_path_overrides is allowed only if sharding is enabled.".to_string(),
-                ));
-            }
-
             if let Some(ledger_db_path) = db_path_overrides.ledger_db_path.as_ref() {
                 if !ledger_db_path.is_absolute() {
                     return Err(Error::ConfigSanitizerFailed(

@@ -35,10 +35,8 @@ pub struct AggTranscriptProducer {
 }
 
 impl AggTranscriptProducer {
-    pub fn new(reliable_broadcast: ReliableBroadcast<DKGMessage, ExponentialBackoff>) -> Self {
-        Self {
-            reliable_broadcast: Arc::new(reliable_broadcast),
-        }
+    pub fn new(reliable_broadcast: Arc<ReliableBroadcast<DKGMessage, ExponentialBackoff>>) -> Self {
+        Self { reliable_broadcast }
     }
 }
 

@@ -1,0 +1,10 @@
+//# run
+script
+entry public fun main()
+    local l0: bool
+    ld_true
+    st_loc l0
+    move_loc l0
+    br_false l0
+    ret
+l0: ret

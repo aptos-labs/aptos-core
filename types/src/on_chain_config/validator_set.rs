@@ -71,7 +71,6 @@ impl ValidatorSet {
     pub fn active_validators(&self) -> Vec<AccountAddress> {
         self.active_validators
             .iter()
-            .cloned()
             .map(|v| v.account_address)
             .collect()
     }
@@ -79,7 +78,6 @@ impl ValidatorSet {
     pub fn pending_active_validators(&self) -> Vec<AccountAddress> {
         self.pending_active
             .iter()
-            .cloned()
             .map(|v| v.account_address)
             .collect()
     }
@@ -87,7 +85,6 @@ impl ValidatorSet {
     pub fn pending_inactive_validators(&self) -> Vec<AccountAddress> {
         self.pending_inactive
             .iter()
-            .cloned()
             .map(|v| v.account_address)
             .collect()
     }

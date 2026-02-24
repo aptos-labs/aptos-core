@@ -3,34 +3,32 @@
 
 use crate::{
     pvss::chunky::{
-        chunked_elgamal, chunked_scalar_mul, hkzg_chunked_elgamal,
+        chunked_elgamal_pp, chunked_scalar_mul, hkzg_chunked_elgamal,
         hkzg_chunked_elgamal::HkzgWeightedElgamalWitness,
     },
     sigma_protocol,
     sigma_protocol::{
         homomorphism::{
-            tuple::{PairingTupleHomomorphism, TupleCodomainShape},
+            tuple::{TupleCodomainShape, TupleHomomorphism},
             LiftHomomorphism,
         },
-        traits::FirstProofItem,
+        FirstProofItem,
     },
 };
 use aptos_crypto::{
-    arkworks::random::unsafe_random_points_group, weighted_config::WeightedConfigArkworks,
-    SecretSharingConfig,
+    arkworks::random::unsafe_random_points, weighted_config::WeightedConfigArkworks,
 };
-use ark_ec::{pairing::Pairing, AffineRepr, CurveGroup};
+use ark_ec::{pairing::Pairing, scalar_mul::BatchMulPreprocessing, AffineRepr, CurveGroup};
 
-type HkzgElgamalHomomorphism<'a, E> = hkzg_chunked_elgamal::WeightedHomomorphism<'a, E>;
-type LiftedCommitHomomorphism<C> = LiftHomomorphism<
-    chunked_scalar_mul::Homomorphism<C>,
+pub(crate) type HkzgElgamalHomomorphism<'a, E> = hkzg_chunked_elgamal::WeightedHomomorphism<'a, E>;
+pub(crate) type LiftedCommitHomomorphism<'a, C> = LiftHomomorphism<
+    chunked_scalar_mul::Homomorphism<'a, C>,
     HkzgWeightedElgamalWitness<<<C as CurveGroup>::Affine as AffineRepr>::ScalarField>,
 >;
 
-pub type Homomorphism<'a, E> = PairingTupleHomomorphism<
-    E,
+pub type Homomorphism<'a, E> = TupleHomomorphism<
     HkzgElgamalHomomorphism<'a, E>,
-    LiftedCommitHomomorphism<<E as Pairing>::G2>,
+    LiftedCommitHomomorphism<'a, <E as Pairing>::G2>,
 >;
 pub type Proof<'a, E> = sigma_protocol::Proof<<E as Pairing>::ScalarField, Homomorphism<'a, E>>;
 
@@ -48,21 +46,15 @@ impl<'a, E: Pairing> Proof<'a, E> {
             z,
         } = hkzg_chunked_elgamal::WeightedProof::generate(sc, number_of_chunks_per_share, rng);
         match first_proof_item {
-            FirstProofItem::Commitment(first_proof_item_inner) => {
-                Self {
-                    first_proof_item: FirstProofItem::Commitment(TupleCodomainShape(
-                        first_proof_item_inner,
-                        chunked_scalar_mul::CodomainShape::<E::G2>(
-                            (0..sc.get_total_num_players()) // TODO: make this stuff less complicated!!!
-                                .map(|i| {
-                                    let w = sc.get_player_weight(&sc.get_player(i)); // TODO: combine these functions...
-                                    unsafe_random_points_group(w, rng)
-                                })
-                                .collect(),
-                        ),
+            FirstProofItem::Commitment(first_proof_item_inner) => Self {
+                first_proof_item: FirstProofItem::Commitment(TupleCodomainShape(
+                    first_proof_item_inner,
+                    chunked_scalar_mul::CodomainShape(unsafe_random_points::<E::G2, _>(
+                        sc.get_total_weight(),
+                        rng,
                     )),
-                    z,
-                }
+                )),
+                z,
             },
             FirstProofItem::Challenge(_) => {
                 panic!("Unexpected Challenge variant!");
@@ -76,7 +68,8 @@ impl<'a, E: Pairing> Homomorphism<'a, E> {
     pub fn new(
         lagr_g1: &'a [E::G1Affine],
         xi_1: E::G1Affine,
-        pp: &'a chunked_elgamal::PublicParameters<E::G1>,
+        pp: &'a chunked_elgamal_pp::PublicParameters<E::G1>,
+        G2_table: &'a BatchMulPreprocessing<E::G2>,
         eks: &'a [E::G1Affine],
         base: E::G2Affine,
         ell: u8,
@@ -86,12 +79,16 @@ impl<'a, E: Pairing> Homomorphism<'a, E> {
             hkzg_chunked_elgamal::WeightedHomomorphism::<E>::new(lagr_g1, xi_1, pp, eks);
 
         // Set up the lifted commit homomorphism
-        let lifted_commit_hom = LiftedCommitHomomorphism::<E::G2> {
-            hom: chunked_scalar_mul::Homomorphism { base, ell },
+        let lifted_commit_hom = LiftedCommitHomomorphism::<'a, E::G2> {
+            hom: chunked_scalar_mul::Homomorphism {
+                base,
+                table: G2_table,
+                ell,
+            },
             // The projection map simply unchunks the chunks
             projection: |dom: &HkzgWeightedElgamalWitness<E::ScalarField>| {
                 chunked_scalar_mul::Witness {
-                    chunked_values: dom.chunked_plaintexts.clone(),
+                    chunked_values: dom.chunked_plaintexts.iter().flatten().cloned().collect(),
                 }
             },
         };
@@ -100,7 +97,6 @@ impl<'a, E: Pairing> Homomorphism<'a, E> {
         Self {
             hom1: hkzg_el_hom,
             hom2: lifted_commit_hom,
-            _pairing: std::marker::PhantomData,
         }
     }
 }

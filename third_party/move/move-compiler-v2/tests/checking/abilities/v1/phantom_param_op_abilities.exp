@@ -69,10 +69,10 @@ module 0x42::M {
         a: T,
     }
     fun f1(ref: &mut HasDrop<NoAbilities, u64>) {
-        *ref = HasDrop<NoAbilities,u64>{a: 1};
+        *ref = HasDrop<NoAbilities, u64>{a: 1};
     }
     fun f2() {
-        _ = HasDrop<NoAbilities,u64>{a: 1};
+        _ = HasDrop<NoAbilities, u64>{a: 1};
     }
     fun f3(_x: HasDrop<NoAbilities, u64>) {
     }
@@ -91,6 +91,6 @@ module 0x42::M {
         exists<HasKey<NoAbilities, u64>>(@0x0)
     }
     fun f8(): RequireStore<HasStore<NoAbilities, u64>> {
-        RequireStore<HasStore<NoAbilities, u64>>{a: HasStore<NoAbilities,u64>{a: 1}}
+        RequireStore<HasStore<NoAbilities, u64>>{a: HasStore<NoAbilities, u64>{a: 1}}
     }
 }

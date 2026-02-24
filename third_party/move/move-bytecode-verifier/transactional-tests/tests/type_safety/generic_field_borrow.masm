@@ -1,0 +1,14 @@
+//# publish
+module 0x1::M
+struct X has drop
+  v: u64
+
+struct S<T0> has drop
+  f: T0
+
+fun t(l0: S<X>): u64
+    borrow_loc l0
+    borrow_field S<X>, f
+    borrow_field X, v
+    read_ref
+    ret

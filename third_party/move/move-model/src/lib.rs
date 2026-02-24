@@ -97,7 +97,6 @@ pub fn run_model_builder_in_compiler_mode(
         ModelBuilderOptions {
             language_version,
             compile_for_testing: compile_test_code,
-            ..ModelBuilderOptions::default()
         },
         Flags::model_compilation()
             .set_warn_of_deprecation_use(warn_of_deprecation_use)
@@ -259,34 +258,20 @@ pub fn run_model_builder_with_options_and_compilation_flags<
 
     // Extract the module/script dependency closure
     let mut visited_modules = BTreeSet::new();
-    // Extract the module dependency closure for the vector module
-    let mut vector_and_its_dependencies = BTreeSet::new();
-    // Extract the module dependency closure for the std::cmp module
-    let mut cmp_and_its_dependencies = BTreeSet::new();
-    let mut seen_vector = false;
-    let mut seen_cmp = false;
+    // Extract the module dependency closures for the implicit modules.
+    let mut implicit_modules = [
+        ImplicitModuleDeps::new(well_known::VECTOR_MODULE),
+        ImplicitModuleDeps::new(well_known::CMP_MODULE),
+        ImplicitModuleDeps::new(well_known::STRING_MODULE),
+        ImplicitModuleDeps::new(well_known::STRING_UTILS_MODULE),
+    ];
     for (_, mident, mdef) in &expansion_ast.modules {
         let src_file_hash = mdef.loc.file_hash();
         if !dep_files.contains(&src_file_hash) {
             collect_related_modules_recursive(mident, &expansion_ast.modules, &mut visited_modules);
         }
-        if !seen_vector && is_vector(*mident) {
-            seen_vector = true;
-            // Collect the vector module and its dependencies.
-            collect_related_modules_recursive(
-                mident,
-                &expansion_ast.modules,
-                &mut vector_and_its_dependencies,
-            );
-        }
-        if !seen_cmp && is_cmp(*mident) {
-            seen_cmp = true;
-            // Collect the cmp module and its dependencies.
-            collect_related_modules_recursive(
-                mident,
-                &expansion_ast.modules,
-                &mut cmp_and_its_dependencies,
-            );
+        for implicit_module in &mut implicit_modules {
+            implicit_module.process(mident, &expansion_ast.modules);
         }
     }
     for sdef in expansion_ast.scripts.values() {
@@ -306,14 +291,14 @@ pub fn run_model_builder_with_options_and_compilation_flags<
     let expansion_ast = {
         let E::Program { modules, scripts } = expansion_ast;
         let modules = modules.filter_map(|mident, mut mdef| {
-            // For compiler v2, we need to always include the `vector` module and any of its dependencies,
+            // For compiler v2, we need to always include the implicit modules and any of their dependencies,
             // to handle cases of implicit usage.
             // E.g., index operation on a vector results in a call to `vector::borrow`.
-            // TODO(#15483): consider refactoring code to avoid this special case.
-            (vector_and_its_dependencies.contains(&mident.value)
-                // We also need to always include the `cmp` module and its dependencies,
-                // so that we can use interfaces offered by `cmp` to support comparison, Lt/Le/Gt/Ge, over non-integer types.
-                || cmp_and_its_dependencies.contains(&mident.value)
+            // E.g., comparison, Lt/Le/Gt/Ge, over non-integer types.
+            // E.g., the built-in macros may result in calls to `string` or `string_utils` functions.
+            (implicit_modules
+                .iter()
+                .any(|implicit_module| implicit_module.contains(&mident.value))
                 || visited_modules.contains(&mident.value))
             .then(|| {
                 mdef.is_source_module = true;
@@ -326,18 +311,6 @@ pub fn run_model_builder_with_options_and_compilation_flags<
     // The expansion AST will be type checked. No bytecode is attached.
     run_move_checker(&mut env, expansion_ast);
     Ok(env)
-}
-
-/// Is `module_ident` the `vector` module?
-fn is_vector(module_ident: ModuleIdent_) -> bool {
-    module_ident.address.into_addr_bytes().into_inner() == AccountAddress::ONE
-        && module_ident.module.0.value.as_str() == "vector"
-}
-
-/// Is `module_ident` the `0x1::cmp` module?
-fn is_cmp(module_ident: ModuleIdent_) -> bool {
-    module_ident.address.into_addr_bytes().into_inner() == AccountAddress::ONE
-        && module_ident.module.0.value.as_str() == well_known::CMP_MODULE
 }
 
 fn run_move_checker(env: &mut GlobalEnv, program: E::Program) {
@@ -462,6 +435,47 @@ fn check_and_update_friend_info(mut builder: ModelBuilder) {
                 friend_mod_name.display_full(env)
             ),
         );
+    }
+}
+
+/// Helper struct to collect the dependency closure of an implicit module
+struct ImplicitModuleDeps<'a> {
+    target_module_name: &'a str,
+    seen: bool,
+    dep_closure: BTreeSet<ModuleIdent_>,
+}
+
+impl<'a> ImplicitModuleDeps<'a> {
+    fn new(target_module_name: &'a str) -> Self {
+        Self {
+            target_module_name,
+            seen: false,
+            dep_closure: BTreeSet::new(),
+        }
+    }
+
+    /// Check if the given module is in the dependency closure of the target module.
+    fn contains(&self, module_ident: &ModuleIdent_) -> bool {
+        self.dep_closure.contains(module_ident)
+    }
+
+    /// Check if the given module matches the target module.
+    fn is_target_module(&self, module_ident: ModuleIdent_) -> bool {
+        module_ident.address.into_addr_bytes().into_inner() == AccountAddress::ONE
+            && module_ident.module.0.value.as_str() == self.target_module_name
+    }
+
+    /// Process a module, and if it matches the target module, collect its dependencies recursively.
+    fn process(
+        &mut self,
+        mident: &ModuleIdent_,
+        modules: &UniqueMap<ModuleIdent, E::ModuleDefinition>,
+    ) {
+        if !self.seen && self.is_target_module(*mident) {
+            self.seen = true;
+            // Collect the module and its dependencies.
+            collect_related_modules_recursive(mident, modules, &mut self.dep_closure);
+        }
     }
 }
 

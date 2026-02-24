@@ -18,7 +18,7 @@ use std::path::PathBuf;
 
 // NOTE: when changing, make sure to update QuorumStoreBackPressureConfig::backlog_txn_limit_count as well.
 const MAX_SENDING_BLOCK_TXNS_AFTER_FILTERING: u64 = 1800;
-const MAX_SENDING_OPT_BLOCK_TXNS_AFTER_FILTERING: u64 = 1000;
+const MAX_SENDING_OPT_BLOCK_TXNS_AFTER_FILTERING: u64 = 1300;
 const MAX_SENDING_BLOCK_TXNS: u64 = 5000;
 pub(crate) static MAX_RECEIVING_BLOCK_TXNS: Lazy<u64> =
     Lazy::new(|| 10000.max(2 * MAX_SENDING_BLOCK_TXNS));
@@ -98,9 +98,13 @@ pub struct ConsensusConfig {
     pub enable_pre_commit: bool,
     pub max_pending_rounds_in_commit_vote_cache: u64,
     pub optimistic_sig_verification: bool,
+    pub optimistic_rand_share_verification: bool,
     pub enable_round_timeout_msg: bool,
     pub enable_optimistic_proposal_rx: bool,
     pub enable_optimistic_proposal_tx: bool,
+    // Number of tokio worker theads to use for the Consensus runtime.
+    // If set to 0, it will be minimum of num_cpus/2 and DEFAULT_WORKER_THREADS.
+    pub num_tokio_worker_threads: u16,
 }
 
 /// Deprecated
@@ -155,7 +159,7 @@ impl Default for ExecutionBackpressureTxnLimitConfig {
                 min_block_time_ms_to_activate: 50,
                 min_blocks_to_activate: 4,
                 metric: ExecutionBackpressureMetric::Percentile(0.5),
-                target_block_time_ms: 90,
+                target_block_time_ms: 150,
             },
             min_calibrated_txns_per_block: 30,
         }
@@ -380,9 +384,11 @@ impl Default for ConsensusConfig {
             enable_pre_commit: true,
             max_pending_rounds_in_commit_vote_cache: 100,
             optimistic_sig_verification: true,
+            optimistic_rand_share_verification: true,
             enable_round_timeout_msg: true,
             enable_optimistic_proposal_rx: true,
             enable_optimistic_proposal_tx: true,
+            num_tokio_worker_threads: 0,
         }
     }
 }

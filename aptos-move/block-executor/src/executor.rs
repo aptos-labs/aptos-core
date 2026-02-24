@@ -2,7 +2,7 @@
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 use crate::{
-    captured_reads::CapturedReads,
+    captured_reads::{CapturedReads, SnapshotModuleView},
     code_cache_global::{add_module_write_to_module_cache, GlobalModuleCache},
     code_cache_global_manager::AptosModuleCacheManagerGuard,
     counters::{
@@ -165,6 +165,39 @@ where
                 )))
             },
         }
+    }
+
+    /// Verifies that all pre-written keys are present in the actual write set.
+    ///
+    /// Pre-write optimization populates the MVHashMap with expected writes before execution.
+    /// If the transaction doesn't actually write those keys (e.g., aborts early), speculative
+    /// reads by other transactions would see incorrect data. This verification ensures that
+    /// all pre-written keys were actually written, triggering fallback to sequential execution
+    /// if not.
+    fn verify_pre_writes(txn: &T, maybe_output: Option<&E::Output>) -> Result<(), PanicError> {
+        let pre_write_entries = T::pre_write_values(txn);
+        if pre_write_entries.is_empty() {
+            return Ok(()); // No pre-writes, nothing to verify
+        }
+
+        // If there are pre-writes, there must be output with matching writes
+        let output = maybe_output.ok_or_else(|| {
+            code_invariant_error(
+                "Pre-write verification failed: transaction with pre-writes produced no output",
+            )
+        })?;
+
+        let output_before_guard = output.before_materialization()?;
+        let resource_write_set = output_before_guard.resource_write_set();
+
+        for (key, _) in pre_write_entries {
+            if !resource_write_set.contains_key(&key) {
+                return Err(code_invariant_error(
+                    "Pre-write verification failed: transaction did not write expected key",
+                ));
+            }
+        }
+        Ok(())
     }
 
     fn process_resource_output_v2(
@@ -440,6 +473,11 @@ where
             return Ok(());
         }
 
+        // Verify that all pre-written keys were actually written by the transaction.
+        // If not, fallback to sequential execution to avoid speculative reads seeing
+        // incorrect pre-write values.
+        Self::verify_pre_writes(txn, maybe_output)?;
+
         // TODO: BlockSTMv2: use estimates for delayed field reads? (see V1 update on abort).
         Self::process_delayed_field_output(
             maybe_output,
@@ -485,7 +523,7 @@ where
                     incarnation,
                     TriompheArc::new(value),
                     None,
-                );
+                )?;
             }
             for (key, delta) in output_before_guard.aggregator_v1_delta_set().into_iter() {
                 prev_modified_aggregator_v1_keys.remove(&key);
@@ -574,6 +612,11 @@ where
         let (processed_output, _) =
             Self::process_execution_result(&execution_result, &mut read_set, idx_to_execute)?;
 
+        // Verify that all pre-written keys were actually written by the transaction.
+        // If not, fallback to sequential execution to avoid speculative reads seeing
+        // incorrect pre-write values.
+        Self::verify_pre_writes(txn, processed_output)?;
+
         let mut prev_modified_resource_keys = last_input_output
             .modified_resource_keys(idx_to_execute)
             .map_or_else(HashSet::new, |keys| keys.map(|(k, _)| k).collect());
@@ -656,7 +699,7 @@ where
                 }
                 versioned_cache
                     .data()
-                    .write(k, idx_to_execute, incarnation, v, maybe_layout);
+                    .write(k, idx_to_execute, incarnation, v, maybe_layout)?;
             }
 
             // Then, apply deltas.
@@ -1235,10 +1278,25 @@ where
             // Note that the trace may be empty (if block was small and executor decides not to
             // collect the trace and replay, or if the VM decides it is not profitable to do this
             // check for this particular transaction), so we check it in advance.
+
+            // Retrieve the read-set that was captured during execution. This contains the snapshot
+            // of all modules accessed at execution time. It is important to use this view so that
+            // replay does not see potentially different newer state.
+            let (read_set, _) = last_input_output.read_set(txn_idx).ok_or_else(|| {
+                code_invariant_error("Read set must be recorded for trace replay")
+            })?;
+
+            // Create a module view that resolves modules from the read-set snapshot, ensuring that
+            // the replay sees the same module versions as execution. This prevents race conditions
+            // where modules are published between execution and post-commit processing.
+            let snapshot_view =
+                SnapshotModuleView::new(&read_set, environment.runtime_environment());
+
             let result = {
                 counters::update_txn_trace_counters(&trace);
                 let _timer = TRACE_REPLAY_SECONDS.start_timer();
-                TypeChecker::new(&latest_view).replay(&trace)
+                // Use snapshot_view instead of latest_view to avoid module cache race.
+                TypeChecker::new(&snapshot_view).replay(&trace)
             };
 
             // In case of runtime type check errors, fallback to sequential execution. There errors
@@ -1724,7 +1782,7 @@ where
         );
 
         let block_limit_processor = ExplicitSyncWrapper::new(BlockGasLimitProcessor::new(
-            self.config.onchain.block_gas_limit_type.clone(),
+            self.config.onchain.block_gas_limit_type,
             self.config.onchain.block_gas_limit_override(),
             num_txns,
         ));
@@ -1739,6 +1797,20 @@ where
         // +1 for potential BlockEpilogue txn.
         let last_input_output = TxnLastInputOutput::new(num_txns + 1);
         let mut versioned_cache = MVHashMap::new();
+        if self.config.local.enable_pre_write {
+            for txn_idx in 0..num_txns {
+                let values = T::pre_write_values(signature_verified_block.get_txn(txn_idx));
+                for (k, v) in values {
+                    // pre-write doesn't need to use write_v2 because there's no dependencies.
+                    versioned_cache
+                        .data()
+                        .write(k, txn_idx, 0, triomphe::Arc::new(v), None)
+                        .map_err(|e| {
+                            error!("Pre-write failed for txn {}: {:?}", txn_idx, e);
+                        })?;
+                }
+            }
+        }
         let scheduler = SchedulerV2::new(num_txns, num_workers);
 
         let shared_sync_params: SharedSyncParams<'_, T, E, S> = SharedSyncParams {
@@ -1865,6 +1937,19 @@ where
         );
 
         let mut versioned_cache = MVHashMap::new();
+        if self.config.local.enable_pre_write {
+            for txn_idx in 0..signature_verified_block.num_txns() as u32 {
+                let values = T::pre_write_values(signature_verified_block.get_txn(txn_idx));
+                for (k, v) in values {
+                    versioned_cache
+                        .data()
+                        .write(k, txn_idx, 0, triomphe::Arc::new(v), None)
+                        .map_err(|e| {
+                            error!("Pre-write failed for txn {}: {:?}", txn_idx, e);
+                        })?;
+                }
+            }
+        }
         let start_shared_counter = gen_id_start_value(false);
         let shared_counter = AtomicU32::new(start_shared_counter);
 
@@ -1875,7 +1960,7 @@ where
 
         let num_workers = self.config.local.concurrency_level.min(num_txns / 2).max(2);
         let block_limit_processor = ExplicitSyncWrapper::new(BlockGasLimitProcessor::new(
-            self.config.onchain.block_gas_limit_type.clone(),
+            self.config.onchain.block_gas_limit_type,
             self.config.onchain.block_gas_limit_override(),
             num_txns + 1,
         ));
@@ -2207,7 +2292,7 @@ where
         let mut ret = Vec::with_capacity(num_txns + 1);
 
         let mut block_limit_processor = BlockGasLimitProcessor::<T>::new(
-            self.config.onchain.block_gas_limit_type.clone(),
+            self.config.onchain.block_gas_limit_type,
             self.config.onchain.block_gas_limit_override(),
             num_txns + 1,
         );

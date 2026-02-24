@@ -44,31 +44,34 @@ module aptos_experimental::pre_cancellation_tracker {
         account_order_id: AccountClientOrderId
     }
 
-    public(friend) fun new_pre_cancellation_tracker(expiration_time_secs: u64): PreCancellationTracker {
+    public(friend) fun new_pre_cancellation_tracker(
+        expiration_time_secs: u64
+    ): PreCancellationTracker {
         PreCancellationTracker::V1 {
             pre_cancellation_window_secs: expiration_time_secs,
             expiration_with_order_ids: order_book_utils::new_default_big_ordered_map(),
-            account_order_ids: order_book_utils::new_default_big_ordered_map(),
+            account_order_ids: order_book_utils::new_default_big_ordered_map()
         }
     }
 
     public(friend) fun pre_cancel_order_for_tracker(
-        tracker: &mut PreCancellationTracker,
-        account: address,
-        client_order_id: String
+        tracker: &mut PreCancellationTracker, account: address, client_order_id: String
     ) {
         garbage_collect(tracker);
         let account_order_id = new_account_client_order_id(account, client_order_id);
 
         // If the account_order_id already exists with a previously set expiration time,
         // we update the expiration time.
-        let prev_expiration_time = tracker.account_order_ids.remove_or_none(&account_order_id);
+        let prev_expiration_time =
+            tracker.account_order_ids.remove_or_none(&account_order_id);
         if (prev_expiration_time.is_some()) {
             // If the account_order_id already exists with a previously set expiration time,
             // we update the expiration time.
             let expiration_time = prev_expiration_time.destroy_some();
-            let order_id_with_expiration =
-                ExpirationAndOrderId { expiration_time, account_order_id };
+            let order_id_with_expiration = ExpirationAndOrderId {
+                expiration_time,
+                account_order_id
+            };
             // If the mapping exists, then we remove the order ID with its expiration time.
             tracker.expiration_with_order_ids.remove(&order_id_with_expiration);
         };
@@ -83,9 +86,7 @@ module aptos_experimental::pre_cancellation_tracker {
     }
 
     public(friend) fun is_pre_cancelled(
-        tracker: &mut PreCancellationTracker,
-        account: address,
-        client_order_id: String
+        tracker: &mut PreCancellationTracker, account: address, client_order_id: String
     ): bool {
         garbage_collect(tracker);
         let account_order_id = new_account_client_order_id(account, client_order_id);
@@ -97,8 +98,10 @@ module aptos_experimental::pre_cancellation_tracker {
                 // This is possible as garbage collection may not be able to garbage collect all expired orders
                 // in a single call.
                 tracker.account_order_ids.remove(&account_order_id);
-                let order_id_with_expiration =
-                    ExpirationAndOrderId { expiration_time, account_order_id };
+                let order_id_with_expiration = ExpirationAndOrderId {
+                    expiration_time,
+                    account_order_id
+                };
                 tracker.expiration_with_order_ids.remove(&order_id_with_expiration);
             } else {
                 return true; // Order ID already exists with a valid expiration time.
@@ -107,7 +110,9 @@ module aptos_experimental::pre_cancellation_tracker {
         return false
     }
 
-    public(friend) fun garbage_collect(tracker: &mut PreCancellationTracker) {
+    public(friend) fun garbage_collect(
+        tracker: &mut PreCancellationTracker
+    ) {
         let i = 0;
         let current_time = aptos_std::timestamp::now_seconds();
         while (i < MAX_ORDERS_GARBAGE_COLLECTED_PER_CALL
@@ -148,14 +153,18 @@ module aptos_experimental::pre_cancellation_tracker {
         let client_order_id = std::string::utf8(b"42");
 
         // Initially, order should not be pre-cancelled
-        let is_cancelled = is_pre_cancelled(&mut tracker, signer::address_of(account), client_order_id);
+        let is_cancelled =
+            is_pre_cancelled(&mut tracker, signer::address_of(account), client_order_id);
         assert!(!is_cancelled);
 
         // Pre-cancel the order
-        pre_cancel_order_for_tracker(&mut tracker, signer::address_of(account), client_order_id);
+        pre_cancel_order_for_tracker(
+            &mut tracker, signer::address_of(account), client_order_id
+        );
 
         // Now it should be marked as pre-cancelled
-        let is_cancelled = is_pre_cancelled(&mut tracker, signer::address_of(account), client_order_id);
+        let is_cancelled =
+            is_pre_cancelled(&mut tracker, signer::address_of(account), client_order_id);
         assert!(is_cancelled);
 
         destroy_tracker(tracker);
@@ -174,7 +183,9 @@ module aptos_experimental::pre_cancellation_tracker {
         let client_order_id = std::string::utf8(b"99");
 
         // Pre-cancel the order
-        pre_cancel_order_for_tracker(&mut tracker, signer::address_of(account), client_order_id);
+        pre_cancel_order_for_tracker(
+            &mut tracker, signer::address_of(account), client_order_id
+        );
         let initial_time = timestamp::now_seconds();
         timestamp::update_global_time_for_test_secs(initial_time + 5);
         // Should be considered pre-cancelled before expiration
@@ -182,7 +193,8 @@ module aptos_experimental::pre_cancellation_tracker {
         assert!(is_cancelled);
 
         // Wait for expiration
-        timestamp::update_global_time_for_test_secs(initial_time + expiration_window + 1);
+        timestamp::update_global_time_for_test_secs(initial_time + expiration_window
+            + 1);
 
         // Should be considered not pre-cancelled after expiration
         let is_cancelled = is_pre_cancelled(&mut tracker, addr, client_order_id);
@@ -214,14 +226,17 @@ module aptos_experimental::pre_cancellation_tracker {
 
         // Wait to let them expire
         let initial_time = timestamp::now_seconds();
-        timestamp::update_global_time_for_test_secs(initial_time + expiration_window + 1);
+        timestamp::update_global_time_for_test_secs(initial_time + expiration_window
+            + 1);
 
         let j = 0;
         // Before garbage collection, we should still have them in account_order_ids
         while (j < ids.length()) {
             let id = ids[j];
             assert!(
-                tracker.account_order_ids.contains(&new_account_client_order_id(addr, id))
+                tracker.account_order_ids.contains(
+                    &new_account_client_order_id(addr, id)
+                )
             );
             j += 1;
         };
@@ -234,7 +249,9 @@ module aptos_experimental::pre_cancellation_tracker {
         while (j < ids.length()) {
             let id = ids[j];
             assert!(
-                !tracker.account_order_ids.contains(&new_account_client_order_id(addr, id))
+                !tracker.account_order_ids.contains(
+                    &new_account_client_order_id(addr, id)
+                )
             );
             let is_cancelled = is_pre_cancelled(&mut tracker, addr, id);
             assert!(!is_cancelled, 200 + j);

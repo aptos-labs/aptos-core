@@ -34,7 +34,6 @@ const PROCESSOR_NAMES: &[ProcessorName] = {
     &[
         AccountTransactionsProcessor,
         DefaultProcessor,
-        EventsProcessor,
         FungibleAssetProcessor,
         ObjectsProcessor,
         StakeProcessor,

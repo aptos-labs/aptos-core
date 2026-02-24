@@ -1,0 +1,9 @@
+//# publish
+module 0x1::M
+struct Foo<T0>
+  x: T0
+
+fun exists_foo_u64(): bool
+    ld_const<address> 0
+    exists Foo<u64>
+    ret

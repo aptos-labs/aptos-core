@@ -1,0 +1,10 @@
+processed 9 tasks
+task 0 lines 3-119:  publish [module 0x42::test {]
+task 1 lines 122-122:  run 0x42::test::test_capture_some
+task 2 lines 124-124:  run 0x42::test::test_capture_none
+task 3 lines 126-126:  run 0x42::test::test_capture_and_extract
+task 4 lines 128-128:  run 0x42::test::test_capture_and_compare
+task 5 lines 130-130:  run 0x42::test::test_capture_generic_option
+task 6 lines 132-132:  run 0x42::test::test_pass_closure_with_captured_option
+task 7 lines 134-134:  run 0x42::test::test_multiple_closures_same_option
+task 8 lines 136-136:  run --signers 0x42 -- 0x42::test::test_use_resource_with_captured_option

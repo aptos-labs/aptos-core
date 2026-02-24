@@ -2,7 +2,7 @@
 // Copyright (c) The Move Contributors
 // SPDX-License-Identifier: Apache-2.0
 
-use move_cli::base::prove::ProverTest;
+use move_prover::package_prove::ProverTest;
 
 #[test]
 fn test_diem_framework() {

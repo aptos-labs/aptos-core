@@ -4,8 +4,10 @@
 use aptos_crypto::arkworks::GroupGenerators;
 use aptos_dkg::{
     range_proofs::{
+        //dekart_multivariate::Proof as DekartMultivariate,
         dekart_univariate::Proof as UnivariateDeKART,
-        dekart_univariate_v2::Proof as UnivariateDeKARTv2, traits::BatchedRangeProof,
+        dekart_univariate_v2::Proof as UnivariateDeKARTv2,
+        traits::BatchedRangeProof,
     },
     utils::test_utils::{self},
 };
@@ -15,7 +17,7 @@ use ark_ec::pairing::Pairing;
 use criterion::{
     criterion_group, criterion_main, measurement::WallTime, BenchmarkGroup, BenchmarkId, Criterion,
 };
-use rand::thread_rng;
+use rand::{rngs::StdRng, SeedableRng};
 
 /// WARNING: Do not change this, since our range proof benchmark instructions in
 /// `crates/aptos-crypto/README.md` rely on it.
@@ -29,7 +31,7 @@ const BLS12_381: &str = "bls12-381";
 const BATCH_SIZES: [usize; 11] = [1, 3, 7, 15, 31, 63, 127, 255, 511, 1023, 2047];
 
 /// WARNING: These are the relevant bit widths we want benchmarked to compare against Bulletproofs
-const BIT_WIDTHS: [usize; 4] = [8, 16, 32, 64];
+const BIT_WIDTHS: [u8; 4] = [8, 16, 32, 64];
 
 fn bench_groups(c: &mut Criterion) {
     bench_range_proof::<Bn254, UnivariateDeKART<Bn254>>(c, BROKEN_DEKART_RS_SCHEME_NAME, BN254);
@@ -55,9 +57,7 @@ fn bench_range_proof<E: Pairing, B: BatchedRangeProof<E>>(
 ) {
     let mut group = c.benchmark_group(format!("{}/{}", scheme_name, curve_name));
 
-    let l = std::env::var("L")
-        .ok()
-        .and_then(|s| s.parse::<usize>().ok());
+    let l = std::env::var("L").ok().and_then(|s| s.parse::<u8>().ok());
     let n = std::env::var("N")
         .ok()
         .and_then(|s| s.parse::<usize>().ok());
@@ -80,7 +80,7 @@ fn bench_range_proof<E: Pairing, B: BatchedRangeProof<E>>(
 
 fn bench_verify<E: Pairing, B: BatchedRangeProof<E>>(
     group: &mut BenchmarkGroup<WallTime>,
-    ell: usize,
+    ell: u8,
     n: usize,
 ) {
     group.bench_function(
@@ -88,16 +88,16 @@ fn bench_verify<E: Pairing, B: BatchedRangeProof<E>>(
         |b| {
             b.iter_with_setup(
                 || {
-                    let mut rng = thread_rng();
+                    let mut rng = StdRng::seed_from_u64(42); // TODO: hmm not ideal to put this here
                     let group_generators = GroupGenerators::default();
                     let (pk, vk) = B::setup(n, ell, group_generators, &mut rng);
                     let (values, comm, r) =
                         test_utils::range_proof_random_instance::<_, B, _>(&pk, n, ell, &mut rng);
                     let proof = B::prove(&pk, &values, ell, &comm, &r, &mut rng);
-                    (vk, n, ell, comm, proof)
+                    (vk, n, ell, comm, proof, rng)
                 },
-                |(vk, n, ell, comm, proof)| {
-                    proof.verify(&vk, n, ell, &comm).unwrap();
+                |(vk, n, ell, comm, proof, mut rng)| {
+                    proof.verify(&vk, n, ell, &comm, &mut rng).unwrap();
                 },
             )
         },
@@ -106,7 +106,7 @@ fn bench_verify<E: Pairing, B: BatchedRangeProof<E>>(
 
 fn bench_prove<E: Pairing, B: BatchedRangeProof<E>>(
     group: &mut BenchmarkGroup<WallTime>,
-    ell: usize,
+    ell: u8,
     n: usize,
 ) {
     group.bench_function(
@@ -114,15 +114,14 @@ fn bench_prove<E: Pairing, B: BatchedRangeProof<E>>(
         move |b| {
             b.iter_with_setup(
                 || {
-                    let mut rng = thread_rng();
+                    let mut rng = StdRng::seed_from_u64(42);
                     let group_generators = GroupGenerators::default();
                     let (pk, _) = B::setup(n, ell, group_generators, &mut rng);
                     let (values, comm, r) =
                         test_utils::range_proof_random_instance::<_, B, _>(&pk, n, ell, &mut rng);
-                    (pk, values, comm, r)
+                    (pk, values, comm, r, rng)
                 },
-                |(pk, values, comm, r)| {
-                    let mut rng = thread_rng();
+                |(pk, values, comm, r, mut rng)| {
                     let _proof = B::prove(&pk, &values, ell, &comm, &r, &mut rng);
                 },
             )

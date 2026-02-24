@@ -617,7 +617,8 @@ The testnet chain ID.
         deployer,
         <a href="confidential_asset.md#0x7_confidential_asset_FAController">FAController</a> {
             allow_list_enabled: <a href="../../aptos-framework/doc/chain_id.md#0x1_chain_id_get">chain_id::get</a>() == <a href="confidential_asset.md#0x7_confidential_asset_MAINNET_CHAIN_ID">MAINNET_CHAIN_ID</a>,
-            extend_ref: fa_controller_ctor_ref.generate_extend_ref()
+            // DO NOT CHANGE: using long syntax until framework change is released <b>to</b> mainnet
+            extend_ref: <a href="../../aptos-framework/doc/object.md#0x1_object_generate_extend_ref">object::generate_extend_ref</a>(fa_controller_ctor_ref)
         }
     );
 }
@@ -2304,7 +2305,7 @@ Returns an object for handling all the FA primary stores, and returns a signer f
 
 
 <pre><code><b>fun</b> <a href="confidential_asset.md#0x7_confidential_asset_get_fa_store_signer">get_fa_store_signer</a>(): <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a> <b>acquires</b> <a href="confidential_asset.md#0x7_confidential_asset_FAController">FAController</a> {
-    <b>borrow_global</b>&lt;<a href="confidential_asset.md#0x7_confidential_asset_FAController">FAController</a>&gt;(@aptos_experimental).extend_ref.generate_signer_for_extending()
+    <a href="../../aptos-framework/doc/object.md#0x1_object_generate_signer_for_extending">object::generate_signer_for_extending</a>(&<b>borrow_global</b>&lt;<a href="confidential_asset.md#0x7_confidential_asset_FAController">FAController</a>&gt;(@aptos_experimental).extend_ref)
 }
 </code></pre>
 
@@ -2329,7 +2330,7 @@ Returns the address that handles all the FA primary stores.
 
 
 <pre><code><b>fun</b> <a href="confidential_asset.md#0x7_confidential_asset_get_fa_store_address">get_fa_store_address</a>(): <b>address</b> <b>acquires</b> <a href="confidential_asset.md#0x7_confidential_asset_FAController">FAController</a> {
-    <b>borrow_global</b>&lt;<a href="confidential_asset.md#0x7_confidential_asset_FAController">FAController</a>&gt;(@aptos_experimental).extend_ref.address_from_extend_ref()
+    <a href="../../aptos-framework/doc/object.md#0x1_object_address_from_extend_ref">object::address_from_extend_ref</a>(&<b>borrow_global</b>&lt;<a href="confidential_asset.md#0x7_confidential_asset_FAController">FAController</a>&gt;(@aptos_experimental).extend_ref)
 }
 </code></pre>
 
@@ -2355,8 +2356,7 @@ Returns an object for handling the <code><a href="confidential_asset.md#0x7_conf
 
 <pre><code><b>fun</b> <a href="confidential_asset.md#0x7_confidential_asset_get_user_signer">get_user_signer</a>(user: &<a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, token: Object&lt;Metadata&gt;): <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a> {
     <b>let</b> user_ctor = &<a href="../../aptos-framework/doc/object.md#0x1_object_create_named_object">object::create_named_object</a>(user, <a href="confidential_asset.md#0x7_confidential_asset_construct_user_seed">construct_user_seed</a>(token));
-
-    user_ctor.generate_signer()
+    <a href="../../aptos-framework/doc/object.md#0x1_object_generate_signer">object::generate_signer</a>(user_ctor)
 }
 </code></pre>
 
@@ -2407,12 +2407,12 @@ Returns an object for handling the <code><a href="confidential_asset.md#0x7_conf
 
 <pre><code><b>fun</b> <a href="confidential_asset.md#0x7_confidential_asset_get_fa_config_signer">get_fa_config_signer</a>(token: Object&lt;Metadata&gt;): <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a> <b>acquires</b> <a href="confidential_asset.md#0x7_confidential_asset_FAController">FAController</a> {
     <b>let</b> fa_ext = &<b>borrow_global</b>&lt;<a href="confidential_asset.md#0x7_confidential_asset_FAController">FAController</a>&gt;(@aptos_experimental).extend_ref;
-    <b>let</b> fa_ext_signer = fa_ext.generate_signer_for_extending();
+    <b>let</b> fa_ext_signer = <a href="../../aptos-framework/doc/object.md#0x1_object_generate_signer_for_extending">object::generate_signer_for_extending</a>(fa_ext);
 
     <b>let</b> fa_ctor =
         &<a href="../../aptos-framework/doc/object.md#0x1_object_create_named_object">object::create_named_object</a>(&fa_ext_signer, <a href="confidential_asset.md#0x7_confidential_asset_construct_fa_seed">construct_fa_seed</a>(token));
 
-    fa_ctor.generate_signer()
+    <a href="../../aptos-framework/doc/object.md#0x1_object_generate_signer">object::generate_signer</a>(fa_ctor)
 }
 </code></pre>
 
@@ -2438,8 +2438,7 @@ Returns the address that handles primary FA store and <code><a href="confidentia
 
 <pre><code><b>fun</b> <a href="confidential_asset.md#0x7_confidential_asset_get_fa_config_address">get_fa_config_address</a>(token: Object&lt;Metadata&gt;): <b>address</b> <b>acquires</b> <a href="confidential_asset.md#0x7_confidential_asset_FAController">FAController</a> {
     <b>let</b> fa_ext = &<b>borrow_global</b>&lt;<a href="confidential_asset.md#0x7_confidential_asset_FAController">FAController</a>&gt;(@aptos_experimental).extend_ref;
-    <b>let</b> fa_ext_address = fa_ext.address_from_extend_ref();
-
+    <b>let</b> fa_ext_address = <a href="../../aptos-framework/doc/object.md#0x1_object_address_from_extend_ref">object::address_from_extend_ref</a>(fa_ext);
     <a href="../../aptos-framework/doc/object.md#0x1_object_create_object_address">object::create_object_address</a>(&fa_ext_address, <a href="confidential_asset.md#0x7_confidential_asset_construct_fa_seed">construct_fa_seed</a>(token))
 }
 </code></pre>
@@ -2470,7 +2469,7 @@ As all the <code><a href="confidential_asset.md#0x7_confidential_asset_Confident
         &<a href="../../aptos-framework/../aptos-stdlib/doc/string_utils.md#0x1_string_utils_format2">string_utils::format2</a>(
             &b"<a href="confidential_asset.md#0x7_confidential_asset">confidential_asset</a>::{}::token::{}::user",
             @aptos_experimental,
-            token.object_address()
+            <a href="../../aptos-framework/doc/object.md#0x1_object_object_address">object::object_address</a>(&token)
         )
     )
 }
@@ -2502,7 +2501,7 @@ As all the <code><a href="confidential_asset.md#0x7_confidential_asset_FAConfig"
         &<a href="../../aptos-framework/../aptos-stdlib/doc/string_utils.md#0x1_string_utils_format2">string_utils::format2</a>(
             &b"<a href="confidential_asset.md#0x7_confidential_asset">confidential_asset</a>::{}::token::{}::fa",
             @aptos_experimental,
-            token.object_address()
+            <a href="../../aptos-framework/doc/object.md#0x1_object_object_address">object::object_address</a>(&token)
         )
     )
 }

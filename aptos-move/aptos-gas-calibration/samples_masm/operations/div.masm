@@ -1,0 +1,165 @@
+module 0xcafe::OperationDiv
+entry public fun calibrate_div_x100()
+    local l0: u64
+    ld_u64 0
+    st_loc l0
+l1: copy_loc l0
+    ld_u64 10
+    lt
+    br_false l0
+    move_loc l0
+    ld_u64 1
+    add
+    st_loc l0
+    ld_u64 100
+    ld_u64 1
+    div
+    ld_u64 100
+    ld_u64 1
+    div
+    ld_u64 100
+    ld_u64 1
+    div
+    ld_u64 100
+    ld_u64 1
+    div
+    ld_u64 100
+    ld_u64 1
+    div
+    ld_u64 100
+    ld_u64 1
+    div
+    ld_u64 100
+    ld_u64 1
+    div
+    ld_u64 100
+    ld_u64 1
+    div
+    ld_u64 100
+    ld_u64 1
+    div
+    ld_u64 100
+    ld_u64 1
+    div
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    branch l1
+l0: ret
+
+entry public fun calibrate_div_x500()
+    local l0: u64
+    ld_u64 0
+    st_loc l0
+l1: copy_loc l0
+    ld_u64 50
+    lt
+    br_false l0
+    move_loc l0
+    ld_u64 1
+    add
+    st_loc l0
+    ld_u64 100
+    ld_u64 1
+    div
+    ld_u64 100
+    ld_u64 1
+    div
+    ld_u64 100
+    ld_u64 1
+    div
+    ld_u64 100
+    ld_u64 1
+    div
+    ld_u64 100
+    ld_u64 1
+    div
+    ld_u64 100
+    ld_u64 1
+    div
+    ld_u64 100
+    ld_u64 1
+    div
+    ld_u64 100
+    ld_u64 1
+    div
+    ld_u64 100
+    ld_u64 1
+    div
+    ld_u64 100
+    ld_u64 1
+    div
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    branch l1
+l0: ret
+
+entry public fun calibrate_div_x1000()
+    local l0: u64
+    ld_u64 0
+    st_loc l0
+l1: copy_loc l0
+    ld_u64 100
+    lt
+    br_false l0
+    move_loc l0
+    ld_u64 1
+    add
+    st_loc l0
+    ld_u64 100
+    ld_u64 1
+    div
+    ld_u64 100
+    ld_u64 1
+    div
+    ld_u64 100
+    ld_u64 1
+    div
+    ld_u64 100
+    ld_u64 1
+    div
+    ld_u64 100
+    ld_u64 1
+    div
+    ld_u64 100
+    ld_u64 1
+    div
+    ld_u64 100
+    ld_u64 1
+    div
+    ld_u64 100
+    ld_u64 1
+    div
+    ld_u64 100
+    ld_u64 1
+    div
+    ld_u64 100
+    ld_u64 1
+    div
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    pop
+    branch l1
+l0: ret

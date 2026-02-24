@@ -50,6 +50,7 @@ fn end_to_end() {
     let rt = start_backup_service(
         SocketAddr::new(IpAddr::V4(Ipv4Addr::LOCALHOST), port),
         src_db,
+        None,
     );
     let client = Arc::new(BackupServiceClient::new(format!(
         "http://localhost:{}",

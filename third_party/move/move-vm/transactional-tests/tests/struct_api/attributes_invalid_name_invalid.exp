@@ -1,0 +1,9 @@
+processed 1 task
+task 0 lines 1-11:  publish --print-bytecode [module 0x66::test_invalid_names]
+Error: Unable to publish module '0000000000000000000000000000000000000000000000000000000000000066::test_invalid_names'. Got VMError: {
+    major_status: INVALID_STRUCT_API_CODE,
+    sub_status: None,
+    location: 0x66::test_invalid_names,
+    indices: [(FunctionDefinition, 0)],
+    offsets: [],
+}

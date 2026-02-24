@@ -16,8 +16,8 @@ aptos-types = { workspace = true }
 bcs = { workspace = true }
 clap = { workspace = true }
 float-cmp = { workspace = true }
+move-asm = { workspace = true }
 move-binary-format = { workspace = true }
 move-core-types = { workspace = true }
-move-ir-compiler = { workspace = true }
 nalgebra = { workspace = true }
 walkdir = { workspace = true }

@@ -418,6 +418,8 @@ function $InRange(r: $Range, i: int): bool {
    r->lb <= i && i < r->ub
 }
 
+axiom (forall r: $Range, i:int:: r->lb <= i && i < r->ub ==> $InRange(r, i));
+
 function {:inline} $IsEqual'num'(x: int, y: int): bool {
     x == y
 }
@@ -491,7 +493,7 @@ datatype $Tuple8<T1, T2, T3, T4, T5, T6, T7, T8> {
 
 {%- for tuple in tuple_instances %}
 
-function {:inline} $IsValid'$tup{{tuple.arity}}'{{tuple.suffix}}''(t: $Tuple{{tuple.arity}}{% for e in tuple.elements %} {{e.name}}{% endfor %}): bool {
+function {:inline} $IsValid'$tup{{tuple.arity}}'{{tuple.suffix}}''(t: $Tuple{{tuple.arity}}{% for e in tuple.elements %} ({{e.name}}){% endfor %}): bool {
     {% for e in tuple.elements %}$IsValid'{{e.suffix}}'(t->${{loop.index0}}){% if not loop.last %} && {% endif %}{% endfor %}
 
 }

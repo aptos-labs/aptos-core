@@ -1,0 +1,78 @@
+//# publish
+module 0x1::m1
+struct Foo<T0, T1: copy>
+  x: T0
+  y: T1
+
+fun f<T0, T1>()
+    local l0: Foo<T0, T1>
+    ret
+
+
+
+//# publish
+module 0x1::m2
+struct Foo<T0, T1: copy>
+  x: T0
+  y: T1
+
+fun f<T0, T1>(l0: Foo<T0, T1>)
+    ret
+
+
+
+//# publish
+module 0x1::m3
+struct Foo<T0, T1: copy>
+  x: T0
+  y: T1
+
+struct Bar<T0>
+  x: Foo<T0, T0>
+
+
+
+//# publish
+module 0x1::m4
+struct Foo<T0, T1: copy>
+  x: T0
+  y: T1
+
+struct Bar<T0>
+  x: vector<Foo<T0, T0>>
+
+
+
+//# publish
+module 0x1::m5
+struct Foo<T0> has key
+  x: T0
+
+fun f<T0>()
+    exists Foo<T0>
+    pop
+    ret
+
+
+
+//# publish
+module 0x1::m6
+fun g<T0: copy>()
+    ret
+
+fun f<T0>()
+    call g<T0>
+    ret
+
+
+
+//# publish
+module 0x1::m7
+struct Foo<T0: copy> has copy
+  x: T0
+
+fun f<T0>()
+    vec_pack <T0>, 0
+    pack Foo<vector<T0>>
+    pop
+    ret

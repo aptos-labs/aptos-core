@@ -135,6 +135,11 @@ paths:
               deprecated: false
               schema:
                 type: string
+            X-APTOS-TXN-ENCRYPTION-KEY:
+              description: Per-epoch transaction encryption key (hex-encoded)
+              deprecated: false
+              schema:
+                type: string
         '400':
           description: ''
           content:
@@ -190,6 +195,11 @@ paths:
               schema:
                 type: integer
                 format: uint64
+            X-APTOS-TXN-ENCRYPTION-KEY:
+              description: Per-epoch transaction encryption key (hex-encoded)
+              deprecated: false
+              schema:
+                type: string
         '403':
           description: ''
           content:
@@ -245,6 +255,11 @@ paths:
               schema:
                 type: integer
                 format: uint64
+            X-APTOS-TXN-ENCRYPTION-KEY:
+              description: Per-epoch transaction encryption key (hex-encoded)
+              deprecated: false
+              schema:
+                type: string
         '404':
           description: ''
           content:
@@ -300,6 +315,11 @@ paths:
               schema:
                 type: integer
                 format: uint64
+            X-APTOS-TXN-ENCRYPTION-KEY:
+              description: Per-epoch transaction encryption key (hex-encoded)
+              deprecated: false
+              schema:
+                type: string
         '410':
           description: ''
           content:
@@ -355,6 +375,11 @@ paths:
               schema:
                 type: integer
                 format: uint64
+            X-APTOS-TXN-ENCRYPTION-KEY:
+              description: Per-epoch transaction encryption key (hex-encoded)
+              deprecated: false
+              schema:
+                type: string
         '500':
           description: ''
           content:
@@ -410,6 +435,11 @@ paths:
               schema:
                 type: integer
                 format: uint64
+            X-APTOS-TXN-ENCRYPTION-KEY:
+              description: Per-epoch transaction encryption key (hex-encoded)
+              deprecated: false
+              schema:
+                type: string
         '503':
           description: ''
           content:
@@ -465,6 +495,11 @@ paths:
               schema:
                 type: integer
                 format: uint64
+            X-APTOS-TXN-ENCRYPTION-KEY:
+              description: Per-epoch transaction encryption key (hex-encoded)
+              deprecated: false
+              schema:
+                type: string
       operationId: get_account
   /accounts/{address}/resources:
     get:
@@ -602,6 +637,11 @@ paths:
               deprecated: false
               schema:
                 type: string
+            X-APTOS-TXN-ENCRYPTION-KEY:
+              description: Per-epoch transaction encryption key (hex-encoded)
+              deprecated: false
+              schema:
+                type: string
         '400':
           description: ''
           content:
@@ -657,6 +697,11 @@ paths:
               schema:
                 type: integer
                 format: uint64
+            X-APTOS-TXN-ENCRYPTION-KEY:
+              description: Per-epoch transaction encryption key (hex-encoded)
+              deprecated: false
+              schema:
+                type: string
         '403':
           description: ''
           content:
@@ -712,6 +757,11 @@ paths:
               schema:
                 type: integer
                 format: uint64
+            X-APTOS-TXN-ENCRYPTION-KEY:
+              description: Per-epoch transaction encryption key (hex-encoded)
+              deprecated: false
+              schema:
+                type: string
         '404':
           description: ''
           content:
@@ -767,6 +817,11 @@ paths:
               schema:
                 type: integer
                 format: uint64
+            X-APTOS-TXN-ENCRYPTION-KEY:
+              description: Per-epoch transaction encryption key (hex-encoded)
+              deprecated: false
+              schema:
+                type: string
         '410':
           description: ''
           content:
@@ -822,6 +877,11 @@ paths:
               schema:
                 type: integer
                 format: uint64
+            X-APTOS-TXN-ENCRYPTION-KEY:
+              description: Per-epoch transaction encryption key (hex-encoded)
+              deprecated: false
+              schema:
+                type: string
         '500':
           description: ''
           content:
@@ -877,6 +937,11 @@ paths:
               schema:
                 type: integer
                 format: uint64
+            X-APTOS-TXN-ENCRYPTION-KEY:
+              description: Per-epoch transaction encryption key (hex-encoded)
+              deprecated: false
+              schema:
+                type: string
         '503':
           description: ''
           content:
@@ -932,6 +997,11 @@ paths:
               schema:
                 type: integer
                 format: uint64
+            X-APTOS-TXN-ENCRYPTION-KEY:
+              description: Per-epoch transaction encryption key (hex-encoded)
+              deprecated: false
+              schema:
+                type: string
       operationId: get_account_resources
   /accounts/{address}/balance/{asset_type}:
     get:
@@ -1050,6 +1120,11 @@ paths:
               deprecated: false
               schema:
                 type: string
+            X-APTOS-TXN-ENCRYPTION-KEY:
+              description: Per-epoch transaction encryption key (hex-encoded)
+              deprecated: false
+              schema:
+                type: string
         '400':
           description: ''
           content:
@@ -1105,6 +1180,11 @@ paths:
               schema:
                 type: integer
                 format: uint64
+            X-APTOS-TXN-ENCRYPTION-KEY:
+              description: Per-epoch transaction encryption key (hex-encoded)
+              deprecated: false
+              schema:
+                type: string
         '403':
           description: ''
           content:
@@ -1160,6 +1240,11 @@ paths:
               schema:
                 type: integer
                 format: uint64
+            X-APTOS-TXN-ENCRYPTION-KEY:
+              description: Per-epoch transaction encryption key (hex-encoded)
+              deprecated: false
+              schema:
+                type: string
         '404':
           description: ''
           content:
@@ -1215,6 +1300,11 @@ paths:
               schema:
                 type: integer
                 format: uint64
+            X-APTOS-TXN-ENCRYPTION-KEY:
+              description: Per-epoch transaction encryption key (hex-encoded)
+              deprecated: false
+              schema:
+                type: string
         '410':
           description: ''
           content:
@@ -1270,6 +1360,11 @@ paths:
               schema:
                 type: integer
                 format: uint64
+            X-APTOS-TXN-ENCRYPTION-KEY:
+              description: Per-epoch transaction encryption key (hex-encoded)
+              deprecated: false
+              schema:
+                type: string
         '500':
           description: ''
           content:
@@ -1325,6 +1420,11 @@ paths:
               schema:
                 type: integer
                 format: uint64
+            X-APTOS-TXN-ENCRYPTION-KEY:
+              description: Per-epoch transaction encryption key (hex-encoded)
+              deprecated: false
+              schema:
+                type: string
         '503':
           description: ''
           content:
@@ -1380,6 +1480,11 @@ paths:
               schema:
                 type: integer
                 format: uint64
+            X-APTOS-TXN-ENCRYPTION-KEY:
+              description: Per-epoch transaction encryption key (hex-encoded)
+              deprecated: false
+              schema:
+                type: string
       operationId: get_account_balance
   /accounts/{address}/modules:
     get:
@@ -1517,6 +1622,11 @@ paths:
               deprecated: false
               schema:
                 type: string
+            X-APTOS-TXN-ENCRYPTION-KEY:
+              description: Per-epoch transaction encryption key (hex-encoded)
+              deprecated: false
+              schema:
+                type: string
         '400':
           description: ''
           content:
@@ -1572,6 +1682,11 @@ paths:
               schema:
                 type: integer
                 format: uint64
+            X-APTOS-TXN-ENCRYPTION-KEY:
+              description: Per-epoch transaction encryption key (hex-encoded)
+              deprecated: false
+              schema:
+                type: string
         '403':
           description: ''
           content:
@@ -1627,6 +1742,11 @@ paths:
               schema:
                 type: integer
                 format: uint64
+            X-APTOS-TXN-ENCRYPTION-KEY:
+              description: Per-epoch transaction encryption key (hex-encoded)
+              deprecated: false
+              schema:
+                type: string
         '404':
           description: ''
           content:
@@ -1682,6 +1802,11 @@ paths:
               schema:
                 type: integer
                 format: uint64
+            X-APTOS-TXN-ENCRYPTION-KEY:
+              description: Per-epoch transaction encryption key (hex-encoded)
+              deprecated: false
+              schema:
+                type: string
         '410':
           description: ''
           content:
@@ -1737,6 +1862,11 @@ paths:
               schema:
                 type: integer
                 format: uint64
+            X-APTOS-TXN-ENCRYPTION-KEY:
+              description: Per-epoch transaction encryption key (hex-encoded)
+              deprecated: false
+              schema:
+                type: string
         '500':
           description: ''
           content:
@@ -1792,6 +1922,11 @@ paths:
               schema:
                 type: integer
                 format: uint64
+            X-APTOS-TXN-ENCRYPTION-KEY:
+              description: Per-epoch transaction encryption key (hex-encoded)
+              deprecated: false
+              schema:
+                type: string
         '503':
           description: ''
           content:
@@ -1847,6 +1982,11 @@ paths:
               schema:
                 type: integer
                 format: uint64
+            X-APTOS-TXN-ENCRYPTION-KEY:
+              description: Per-epoch transaction encryption key (hex-encoded)
+              deprecated: false
+              schema:
+                type: string
       operationId: get_account_modules
   /spec:
     get:
@@ -1981,6 +2121,11 @@ paths:
               deprecated: false
               schema:
                 type: string
+            X-APTOS-TXN-ENCRYPTION-KEY:
+              description: Per-epoch transaction encryption key (hex-encoded)
+              deprecated: false
+              schema:
+                type: string
         '503':
           description: ''
           content:
@@ -2036,6 +2181,11 @@ paths:
               schema:
                 type: integer
                 format: uint64
+            X-APTOS-TXN-ENCRYPTION-KEY:
+              description: Per-epoch transaction encryption key (hex-encoded)
+              deprecated: false
+              schema:
+                type: string
         '500':
           description: ''
           content:
@@ -2091,6 +2241,11 @@ paths:
               schema:
                 type: integer
                 format: uint64
+            X-APTOS-TXN-ENCRYPTION-KEY:
+              description: Per-epoch transaction encryption key (hex-encoded)
+              deprecated: false
+              schema:
+                type: string
       operationId: healthy
   /blocks/by_height/{block_height}:
     get:
@@ -2204,6 +2359,11 @@ paths:
               deprecated: false
               schema:
                 type: string
+            X-APTOS-TXN-ENCRYPTION-KEY:
+              description: Per-epoch transaction encryption key (hex-encoded)
+              deprecated: false
+              schema:
+                type: string
         '400':
           description: ''
           content:
@@ -2259,6 +2419,11 @@ paths:
               schema:
                 type: integer
                 format: uint64
+            X-APTOS-TXN-ENCRYPTION-KEY:
+              description: Per-epoch transaction encryption key (hex-encoded)
+              deprecated: false
+              schema:
+                type: string
         '403':
           description: ''
           content:
@@ -2314,6 +2479,11 @@ paths:
               schema:
                 type: integer
                 format: uint64
+            X-APTOS-TXN-ENCRYPTION-KEY:
+              description: Per-epoch transaction encryption key (hex-encoded)
+              deprecated: false
+              schema:
+                type: string
         '404':
           description: ''
           content:
@@ -2369,6 +2539,11 @@ paths:
               schema:
                 type: integer
                 format: uint64
+            X-APTOS-TXN-ENCRYPTION-KEY:
+              description: Per-epoch transaction encryption key (hex-encoded)
+              deprecated: false
+              schema:
+                type: string
         '410':
           description: ''
           content:
@@ -2424,6 +2599,11 @@ paths:
               schema:
                 type: integer
                 format: uint64
+            X-APTOS-TXN-ENCRYPTION-KEY:
+              description: Per-epoch transaction encryption key (hex-encoded)
+              deprecated: false
+              schema:
+                type: string
         '500':
           description: ''
           content:
@@ -2479,6 +2659,11 @@ paths:
               schema:
                 type: integer
                 format: uint64
+            X-APTOS-TXN-ENCRYPTION-KEY:
+              description: Per-epoch transaction encryption key (hex-encoded)
+              deprecated: false
+              schema:
+                type: string
         '503':
           description: ''
           content:
@@ -2534,6 +2719,11 @@ paths:
               schema:
                 type: integer
                 format: uint64
+            X-APTOS-TXN-ENCRYPTION-KEY:
+              description: Per-epoch transaction encryption key (hex-encoded)
+              deprecated: false
+              schema:
+                type: string
       operationId: get_block_by_height
   /blocks/by_version/{version}:
     get:
@@ -2647,6 +2837,11 @@ paths:
               deprecated: false
               schema:
                 type: string
+            X-APTOS-TXN-ENCRYPTION-KEY:
+              description: Per-epoch transaction encryption key (hex-encoded)
+              deprecated: false
+              schema:
+                type: string
         '400':
           description: ''
           content:
@@ -2702,6 +2897,11 @@ paths:
               schema:
                 type: integer
                 format: uint64
+            X-APTOS-TXN-ENCRYPTION-KEY:
+              description: Per-epoch transaction encryption key (hex-encoded)
+              deprecated: false
+              schema:
+                type: string
         '403':
           description: ''
           content:
@@ -2757,6 +2957,11 @@ paths:
               schema:
                 type: integer
                 format: uint64
+            X-APTOS-TXN-ENCRYPTION-KEY:
+              description: Per-epoch transaction encryption key (hex-encoded)
+              deprecated: false
+              schema:
+                type: string
         '404':
           description: ''
           content:
@@ -2812,6 +3017,11 @@ paths:
               schema:
                 type: integer
                 format: uint64
+            X-APTOS-TXN-ENCRYPTION-KEY:
+              description: Per-epoch transaction encryption key (hex-encoded)
+              deprecated: false
+              schema:
+                type: string
         '410':
           description: ''
           content:
@@ -2867,6 +3077,11 @@ paths:
               schema:
                 type: integer
                 format: uint64
+            X-APTOS-TXN-ENCRYPTION-KEY:
+              description: Per-epoch transaction encryption key (hex-encoded)
+              deprecated: false
+              schema:
+                type: string
         '500':
           description: ''
           content:
@@ -2922,6 +3137,11 @@ paths:
               schema:
                 type: integer
                 format: uint64
+            X-APTOS-TXN-ENCRYPTION-KEY:
+              description: Per-epoch transaction encryption key (hex-encoded)
+              deprecated: false
+              schema:
+                type: string
         '503':
           description: ''
           content:
@@ -2977,6 +3197,11 @@ paths:
               schema:
                 type: integer
                 format: uint64
+            X-APTOS-TXN-ENCRYPTION-KEY:
+              description: Per-epoch transaction encryption key (hex-encoded)
+              deprecated: false
+              schema:
+                type: string
       operationId: get_block_by_version
   /accounts/{address}/events/{creation_number}:
     get:
@@ -3113,6 +3338,11 @@ paths:
               deprecated: false
               schema:
                 type: string
+            X-APTOS-TXN-ENCRYPTION-KEY:
+              description: Per-epoch transaction encryption key (hex-encoded)
+              deprecated: false
+              schema:
+                type: string
         '400':
           description: ''
           content:
@@ -3168,6 +3398,11 @@ paths:
               schema:
                 type: integer
                 format: uint64
+            X-APTOS-TXN-ENCRYPTION-KEY:
+              description: Per-epoch transaction encryption key (hex-encoded)
+              deprecated: false
+              schema:
+                type: string
         '403':
           description: ''
           content:
@@ -3223,6 +3458,11 @@ paths:
               schema:
                 type: integer
                 format: uint64
+            X-APTOS-TXN-ENCRYPTION-KEY:
+              description: Per-epoch transaction encryption key (hex-encoded)
+              deprecated: false
+              schema:
+                type: string
         '404':
           description: ''
           content:
@@ -3278,6 +3518,11 @@ paths:
               schema:
                 type: integer
                 format: uint64
+            X-APTOS-TXN-ENCRYPTION-KEY:
+              description: Per-epoch transaction encryption key (hex-encoded)
+              deprecated: false
+              schema:
+                type: string
         '410':
           description: ''
           content:
@@ -3333,6 +3578,11 @@ paths:
               schema:
                 type: integer
                 format: uint64
+            X-APTOS-TXN-ENCRYPTION-KEY:
+              description: Per-epoch transaction encryption key (hex-encoded)
+              deprecated: false
+              schema:
+                type: string
         '500':
           description: ''
           content:
@@ -3388,6 +3638,11 @@ paths:
               schema:
                 type: integer
                 format: uint64
+            X-APTOS-TXN-ENCRYPTION-KEY:
+              description: Per-epoch transaction encryption key (hex-encoded)
+              deprecated: false
+              schema:
+                type: string
         '503':
           description: ''
           content:
@@ -3443,6 +3698,11 @@ paths:
               schema:
                 type: integer
                 format: uint64
+            X-APTOS-TXN-ENCRYPTION-KEY:
+              description: Per-epoch transaction encryption key (hex-encoded)
+              deprecated: false
+              schema:
+                type: string
       operationId: get_events_by_creation_number
   /accounts/{address}/events/{event_handle}/{field_name}:
     get:
@@ -3584,6 +3844,11 @@ paths:
               deprecated: false
               schema:
                 type: string
+            X-APTOS-TXN-ENCRYPTION-KEY:
+              description: Per-epoch transaction encryption key (hex-encoded)
+              deprecated: false
+              schema:
+                type: string
         '400':
           description: ''
           content:
@@ -3639,6 +3904,11 @@ paths:
               schema:
                 type: integer
                 format: uint64
+            X-APTOS-TXN-ENCRYPTION-KEY:
+              description: Per-epoch transaction encryption key (hex-encoded)
+              deprecated: false
+              schema:
+                type: string
         '403':
           description: ''
           content:
@@ -3694,6 +3964,11 @@ paths:
               schema:
                 type: integer
                 format: uint64
+            X-APTOS-TXN-ENCRYPTION-KEY:
+              description: Per-epoch transaction encryption key (hex-encoded)
+              deprecated: false
+              schema:
+                type: string
         '404':
           description: ''
           content:
@@ -3749,6 +4024,11 @@ paths:
               schema:
                 type: integer
                 format: uint64
+            X-APTOS-TXN-ENCRYPTION-KEY:
+              description: Per-epoch transaction encryption key (hex-encoded)
+              deprecated: false
+              schema:
+                type: string
         '410':
           description: ''
           content:
@@ -3804,6 +4084,11 @@ paths:
               schema:
                 type: integer
                 format: uint64
+            X-APTOS-TXN-ENCRYPTION-KEY:
+              description: Per-epoch transaction encryption key (hex-encoded)
+              deprecated: false
+              schema:
+                type: string
         '500':
           description: ''
           content:
@@ -3859,6 +4144,11 @@ paths:
               schema:
                 type: integer
                 format: uint64
+            X-APTOS-TXN-ENCRYPTION-KEY:
+              description: Per-epoch transaction encryption key (hex-encoded)
+              deprecated: false
+              schema:
+                type: string
         '503':
           description: ''
           content:
@@ -3914,6 +4204,11 @@ paths:
               schema:
                 type: integer
                 format: uint64
+            X-APTOS-TXN-ENCRYPTION-KEY:
+              description: Per-epoch transaction encryption key (hex-encoded)
+              deprecated: false
+              schema:
+                type: string
       operationId: get_events_by_event_handle
   /:
     get:
@@ -4000,6 +4295,11 @@ paths:
               deprecated: false
               schema:
                 type: string
+            X-APTOS-TXN-ENCRYPTION-KEY:
+              description: Per-epoch transaction encryption key (hex-encoded)
+              deprecated: false
+              schema:
+                type: string
         '400':
           description: ''
           content:
@@ -4055,6 +4355,11 @@ paths:
               schema:
                 type: integer
                 format: uint64
+            X-APTOS-TXN-ENCRYPTION-KEY:
+              description: Per-epoch transaction encryption key (hex-encoded)
+              deprecated: false
+              schema:
+                type: string
         '403':
           description: ''
           content:
@@ -4110,6 +4415,11 @@ paths:
               schema:
                 type: integer
                 format: uint64
+            X-APTOS-TXN-ENCRYPTION-KEY:
+              description: Per-epoch transaction encryption key (hex-encoded)
+              deprecated: false
+              schema:
+                type: string
         '500':
           description: ''
           content:
@@ -4165,6 +4475,11 @@ paths:
               schema:
                 type: integer
                 format: uint64
+            X-APTOS-TXN-ENCRYPTION-KEY:
+              description: Per-epoch transaction encryption key (hex-encoded)
+              deprecated: false
+              schema:
+                type: string
         '503':
           description: ''
           content:
@@ -4220,6 +4535,11 @@ paths:
               schema:
                 type: integer
                 format: uint64
+            X-APTOS-TXN-ENCRYPTION-KEY:
+              description: Per-epoch transaction encryption key (hex-encoded)
+              deprecated: false
+              schema:
+                type: string
       operationId: get_ledger_info
   /accounts/{address}/resource/{resource_type}:
     get:
@@ -4337,6 +4657,11 @@ paths:
               deprecated: false
               schema:
                 type: string
+            X-APTOS-TXN-ENCRYPTION-KEY:
+              description: Per-epoch transaction encryption key (hex-encoded)
+              deprecated: false
+              schema:
+                type: string
         '400':
           description: ''
           content:
@@ -4392,6 +4717,11 @@ paths:
               schema:
                 type: integer
                 format: uint64
+            X-APTOS-TXN-ENCRYPTION-KEY:
+              description: Per-epoch transaction encryption key (hex-encoded)
+              deprecated: false
+              schema:
+                type: string
         '403':
           description: ''
           content:
@@ -4447,6 +4777,11 @@ paths:
               schema:
                 type: integer
                 format: uint64
+            X-APTOS-TXN-ENCRYPTION-KEY:
+              description: Per-epoch transaction encryption key (hex-encoded)
+              deprecated: false
+              schema:
+                type: string
         '404':
           description: ''
           content:
@@ -4502,6 +4837,11 @@ paths:
               schema:
                 type: integer
                 format: uint64
+            X-APTOS-TXN-ENCRYPTION-KEY:
+              description: Per-epoch transaction encryption key (hex-encoded)
+              deprecated: false
+              schema:
+                type: string
         '410':
           description: ''
           content:
@@ -4557,6 +4897,11 @@ paths:
               schema:
                 type: integer
                 format: uint64
+            X-APTOS-TXN-ENCRYPTION-KEY:
+              description: Per-epoch transaction encryption key (hex-encoded)
+              deprecated: false
+              schema:
+                type: string
         '500':
           description: ''
           content:
@@ -4612,6 +4957,11 @@ paths:
               schema:
                 type: integer
                 format: uint64
+            X-APTOS-TXN-ENCRYPTION-KEY:
+              description: Per-epoch transaction encryption key (hex-encoded)
+              deprecated: false
+              schema:
+                type: string
         '503':
           description: ''
           content:
@@ -4667,6 +5017,11 @@ paths:
               schema:
                 type: integer
                 format: uint64
+            X-APTOS-TXN-ENCRYPTION-KEY:
+              description: Per-epoch transaction encryption key (hex-encoded)
+              deprecated: false
+              schema:
+                type: string
       operationId: get_account_resource
   /accounts/{address}/module/{module_name}:
     get:
@@ -4784,6 +5139,11 @@ paths:
               deprecated: false
               schema:
                 type: string
+            X-APTOS-TXN-ENCRYPTION-KEY:
+              description: Per-epoch transaction encryption key (hex-encoded)
+              deprecated: false
+              schema:
+                type: string
         '400':
           description: ''
           content:
@@ -4839,6 +5199,11 @@ paths:
               schema:
                 type: integer
                 format: uint64
+            X-APTOS-TXN-ENCRYPTION-KEY:
+              description: Per-epoch transaction encryption key (hex-encoded)
+              deprecated: false
+              schema:
+                type: string
         '403':
           description: ''
           content:
@@ -4894,6 +5259,11 @@ paths:
               schema:
                 type: integer
                 format: uint64
+            X-APTOS-TXN-ENCRYPTION-KEY:
+              description: Per-epoch transaction encryption key (hex-encoded)
+              deprecated: false
+              schema:
+                type: string
         '404':
           description: ''
           content:
@@ -4949,6 +5319,11 @@ paths:
               schema:
                 type: integer
                 format: uint64
+            X-APTOS-TXN-ENCRYPTION-KEY:
+              description: Per-epoch transaction encryption key (hex-encoded)
+              deprecated: false
+              schema:
+                type: string
         '410':
           description: ''
           content:
@@ -5004,6 +5379,11 @@ paths:
               schema:
                 type: integer
                 format: uint64
+            X-APTOS-TXN-ENCRYPTION-KEY:
+              description: Per-epoch transaction encryption key (hex-encoded)
+              deprecated: false
+              schema:
+                type: string
         '500':
           description: ''
           content:
@@ -5059,6 +5439,11 @@ paths:
               schema:
                 type: integer
                 format: uint64
+            X-APTOS-TXN-ENCRYPTION-KEY:
+              description: Per-epoch transaction encryption key (hex-encoded)
+              deprecated: false
+              schema:
+                type: string
         '503':
           description: ''
           content:
@@ -5114,6 +5499,11 @@ paths:
               schema:
                 type: integer
                 format: uint64
+            X-APTOS-TXN-ENCRYPTION-KEY:
+              description: Per-epoch transaction encryption key (hex-encoded)
+              deprecated: false
+              schema:
+                type: string
       operationId: get_account_module
   /tables/{table_handle}/item:
     post:
@@ -5234,6 +5624,11 @@ paths:
               deprecated: false
               schema:
                 type: string
+            X-APTOS-TXN-ENCRYPTION-KEY:
+              description: Per-epoch transaction encryption key (hex-encoded)
+              deprecated: false
+              schema:
+                type: string
         '400':
           description: ''
           content:
@@ -5289,6 +5684,11 @@ paths:
               schema:
                 type: integer
                 format: uint64
+            X-APTOS-TXN-ENCRYPTION-KEY:
+              description: Per-epoch transaction encryption key (hex-encoded)
+              deprecated: false
+              schema:
+                type: string
         '403':
           description: ''
           content:
@@ -5344,6 +5744,11 @@ paths:
               schema:
                 type: integer
                 format: uint64
+            X-APTOS-TXN-ENCRYPTION-KEY:
+              description: Per-epoch transaction encryption key (hex-encoded)
+              deprecated: false
+              schema:
+                type: string
         '404':
           description: ''
           content:
@@ -5399,6 +5804,11 @@ paths:
               schema:
                 type: integer
                 format: uint64
+            X-APTOS-TXN-ENCRYPTION-KEY:
+              description: Per-epoch transaction encryption key (hex-encoded)
+              deprecated: false
+              schema:
+                type: string
         '410':
           description: ''
           content:
@@ -5454,6 +5864,11 @@ paths:
               schema:
                 type: integer
                 format: uint64
+            X-APTOS-TXN-ENCRYPTION-KEY:
+              description: Per-epoch transaction encryption key (hex-encoded)
+              deprecated: false
+              schema:
+                type: string
         '500':
           description: ''
           content:
@@ -5509,6 +5924,11 @@ paths:
               schema:
                 type: integer
                 format: uint64
+            X-APTOS-TXN-ENCRYPTION-KEY:
+              description: Per-epoch transaction encryption key (hex-encoded)
+              deprecated: false
+              schema:
+                type: string
         '503':
           description: ''
           content:
@@ -5564,6 +5984,11 @@ paths:
               schema:
                 type: integer
                 format: uint64
+            X-APTOS-TXN-ENCRYPTION-KEY:
+              description: Per-epoch transaction encryption key (hex-encoded)
+              deprecated: false
+              schema:
+                type: string
       operationId: get_table_item
   /tables/{table_handle}/raw_item:
     post:
@@ -5682,6 +6107,11 @@ paths:
               deprecated: false
               schema:
                 type: string
+            X-APTOS-TXN-ENCRYPTION-KEY:
+              description: Per-epoch transaction encryption key (hex-encoded)
+              deprecated: false
+              schema:
+                type: string
         '400':
           description: ''
           content:
@@ -5737,6 +6167,11 @@ paths:
               schema:
                 type: integer
                 format: uint64
+            X-APTOS-TXN-ENCRYPTION-KEY:
+              description: Per-epoch transaction encryption key (hex-encoded)
+              deprecated: false
+              schema:
+                type: string
         '403':
           description: ''
           content:
@@ -5792,6 +6227,11 @@ paths:
               schema:
                 type: integer
                 format: uint64
+            X-APTOS-TXN-ENCRYPTION-KEY:
+              description: Per-epoch transaction encryption key (hex-encoded)
+              deprecated: false
+              schema:
+                type: string
         '404':
           description: ''
           content:
@@ -5847,6 +6287,11 @@ paths:
               schema:
                 type: integer
                 format: uint64
+            X-APTOS-TXN-ENCRYPTION-KEY:
+              description: Per-epoch transaction encryption key (hex-encoded)
+              deprecated: false
+              schema:
+                type: string
         '410':
           description: ''
           content:
@@ -5902,6 +6347,11 @@ paths:
               schema:
                 type: integer
                 format: uint64
+            X-APTOS-TXN-ENCRYPTION-KEY:
+              description: Per-epoch transaction encryption key (hex-encoded)
+              deprecated: false
+              schema:
+                type: string
         '500':
           description: ''
           content:
@@ -5957,6 +6407,11 @@ paths:
               schema:
                 type: integer
                 format: uint64
+            X-APTOS-TXN-ENCRYPTION-KEY:
+              description: Per-epoch transaction encryption key (hex-encoded)
+              deprecated: false
+              schema:
+                type: string
         '503':
           description: ''
           content:
@@ -6012,6 +6467,11 @@ paths:
               schema:
                 type: integer
                 format: uint64
+            X-APTOS-TXN-ENCRYPTION-KEY:
+              description: Per-epoch transaction encryption key (hex-encoded)
+              deprecated: false
+              schema:
+                type: string
       operationId: get_raw_table_item
   /transactions:
     get:
@@ -6128,6 +6588,11 @@ paths:
               deprecated: false
               schema:
                 type: string
+            X-APTOS-TXN-ENCRYPTION-KEY:
+              description: Per-epoch transaction encryption key (hex-encoded)
+              deprecated: false
+              schema:
+                type: string
         '400':
           description: ''
           content:
@@ -6183,6 +6648,11 @@ paths:
               schema:
                 type: integer
                 format: uint64
+            X-APTOS-TXN-ENCRYPTION-KEY:
+              description: Per-epoch transaction encryption key (hex-encoded)
+              deprecated: false
+              schema:
+                type: string
         '403':
           description: ''
           content:
@@ -6238,6 +6708,11 @@ paths:
               schema:
                 type: integer
                 format: uint64
+            X-APTOS-TXN-ENCRYPTION-KEY:
+              description: Per-epoch transaction encryption key (hex-encoded)
+              deprecated: false
+              schema:
+                type: string
         '404':
           description: ''
           content:
@@ -6293,6 +6768,11 @@ paths:
               schema:
                 type: integer
                 format: uint64
+            X-APTOS-TXN-ENCRYPTION-KEY:
+              description: Per-epoch transaction encryption key (hex-encoded)
+              deprecated: false
+              schema:
+                type: string
         '410':
           description: ''
           content:
@@ -6348,6 +6828,11 @@ paths:
               schema:
                 type: integer
                 format: uint64
+            X-APTOS-TXN-ENCRYPTION-KEY:
+              description: Per-epoch transaction encryption key (hex-encoded)
+              deprecated: false
+              schema:
+                type: string
         '500':
           description: ''
           content:
@@ -6403,6 +6888,11 @@ paths:
               schema:
                 type: integer
                 format: uint64
+            X-APTOS-TXN-ENCRYPTION-KEY:
+              description: Per-epoch transaction encryption key (hex-encoded)
+              deprecated: false
+              schema:
+                type: string
         '503':
           description: ''
           content:
@@ -6458,6 +6948,11 @@ paths:
               schema:
                 type: integer
                 format: uint64
+            X-APTOS-TXN-ENCRYPTION-KEY:
+              description: Per-epoch transaction encryption key (hex-encoded)
+              deprecated: false
+              schema:
+                type: string
       operationId: get_transactions
     post:
       tags:
@@ -6569,6 +7064,11 @@ paths:
               deprecated: false
               schema:
                 type: string
+            X-APTOS-TXN-ENCRYPTION-KEY:
+              description: Per-epoch transaction encryption key (hex-encoded)
+              deprecated: false
+              schema:
+                type: string
         '400':
           description: ''
           content:
@@ -6624,6 +7124,11 @@ paths:
               schema:
                 type: integer
                 format: uint64
+            X-APTOS-TXN-ENCRYPTION-KEY:
+              description: Per-epoch transaction encryption key (hex-encoded)
+              deprecated: false
+              schema:
+                type: string
         '403':
           description: ''
           content:
@@ -6679,6 +7184,11 @@ paths:
               schema:
                 type: integer
                 format: uint64
+            X-APTOS-TXN-ENCRYPTION-KEY:
+              description: Per-epoch transaction encryption key (hex-encoded)
+              deprecated: false
+              schema:
+                type: string
         '404':
           description: ''
           content:
@@ -6734,6 +7244,11 @@ paths:
               schema:
                 type: integer
                 format: uint64
+            X-APTOS-TXN-ENCRYPTION-KEY:
+              description: Per-epoch transaction encryption key (hex-encoded)
+              deprecated: false
+              schema:
+                type: string
         '413':
           description: ''
           content:
@@ -6789,6 +7304,11 @@ paths:
               schema:
                 type: integer
                 format: uint64
+            X-APTOS-TXN-ENCRYPTION-KEY:
+              description: Per-epoch transaction encryption key (hex-encoded)
+              deprecated: false
+              schema:
+                type: string
         '500':
           description: ''
           content:
@@ -6844,6 +7364,11 @@ paths:
               schema:
                 type: integer
                 format: uint64
+            X-APTOS-TXN-ENCRYPTION-KEY:
+              description: Per-epoch transaction encryption key (hex-encoded)
+              deprecated: false
+              schema:
+                type: string
         '503':
           description: ''
           content:
@@ -6899,6 +7424,11 @@ paths:
               schema:
                 type: integer
                 format: uint64
+            X-APTOS-TXN-ENCRYPTION-KEY:
+              description: Per-epoch transaction encryption key (hex-encoded)
+              deprecated: false
+              schema:
+                type: string
         '507':
           description: ''
           content:
@@ -6954,6 +7484,11 @@ paths:
               schema:
                 type: integer
                 format: uint64
+            X-APTOS-TXN-ENCRYPTION-KEY:
+              description: Per-epoch transaction encryption key (hex-encoded)
+              deprecated: false
+              schema:
+                type: string
       operationId: submit_transaction
   /transactions/by_hash/{txn_hash}:
     get:
@@ -7058,6 +7593,11 @@ paths:
               deprecated: false
               schema:
                 type: string
+            X-APTOS-TXN-ENCRYPTION-KEY:
+              description: Per-epoch transaction encryption key (hex-encoded)
+              deprecated: false
+              schema:
+                type: string
         '400':
           description: ''
           content:
@@ -7113,6 +7653,11 @@ paths:
               schema:
                 type: integer
                 format: uint64
+            X-APTOS-TXN-ENCRYPTION-KEY:
+              description: Per-epoch transaction encryption key (hex-encoded)
+              deprecated: false
+              schema:
+                type: string
         '403':
           description: ''
           content:
@@ -7168,6 +7713,11 @@ paths:
               schema:
                 type: integer
                 format: uint64
+            X-APTOS-TXN-ENCRYPTION-KEY:
+              description: Per-epoch transaction encryption key (hex-encoded)
+              deprecated: false
+              schema:
+                type: string
         '404':
           description: ''
           content:
@@ -7223,6 +7773,11 @@ paths:
               schema:
                 type: integer
                 format: uint64
+            X-APTOS-TXN-ENCRYPTION-KEY:
+              description: Per-epoch transaction encryption key (hex-encoded)
+              deprecated: false
+              schema:
+                type: string
         '410':
           description: ''
           content:
@@ -7278,6 +7833,11 @@ paths:
               schema:
                 type: integer
                 format: uint64
+            X-APTOS-TXN-ENCRYPTION-KEY:
+              description: Per-epoch transaction encryption key (hex-encoded)
+              deprecated: false
+              schema:
+                type: string
         '500':
           description: ''
           content:
@@ -7333,6 +7893,11 @@ paths:
               schema:
                 type: integer
                 format: uint64
+            X-APTOS-TXN-ENCRYPTION-KEY:
+              description: Per-epoch transaction encryption key (hex-encoded)
+              deprecated: false
+              schema:
+                type: string
         '503':
           description: ''
           content:
@@ -7388,6 +7953,11 @@ paths:
               schema:
                 type: integer
                 format: uint64
+            X-APTOS-TXN-ENCRYPTION-KEY:
+              description: Per-epoch transaction encryption key (hex-encoded)
+              deprecated: false
+              schema:
+                type: string
       operationId: get_transaction_by_hash
   /transactions/wait_by_hash/{txn_hash}:
     get:
@@ -7485,6 +8055,11 @@ paths:
               deprecated: false
               schema:
                 type: string
+            X-APTOS-TXN-ENCRYPTION-KEY:
+              description: Per-epoch transaction encryption key (hex-encoded)
+              deprecated: false
+              schema:
+                type: string
         '400':
           description: ''
           content:
@@ -7540,6 +8115,11 @@ paths:
               schema:
                 type: integer
                 format: uint64
+            X-APTOS-TXN-ENCRYPTION-KEY:
+              description: Per-epoch transaction encryption key (hex-encoded)
+              deprecated: false
+              schema:
+                type: string
         '403':
           description: ''
           content:
@@ -7595,6 +8175,11 @@ paths:
               schema:
                 type: integer
                 format: uint64
+            X-APTOS-TXN-ENCRYPTION-KEY:
+              description: Per-epoch transaction encryption key (hex-encoded)
+              deprecated: false
+              schema:
+                type: string
         '404':
           description: ''
           content:
@@ -7650,6 +8235,11 @@ paths:
               schema:
                 type: integer
                 format: uint64
+            X-APTOS-TXN-ENCRYPTION-KEY:
+              description: Per-epoch transaction encryption key (hex-encoded)
+              deprecated: false
+              schema:
+                type: string
         '410':
           description: ''
           content:
@@ -7705,6 +8295,11 @@ paths:
               schema:
                 type: integer
                 format: uint64
+            X-APTOS-TXN-ENCRYPTION-KEY:
+              description: Per-epoch transaction encryption key (hex-encoded)
+              deprecated: false
+              schema:
+                type: string
         '500':
           description: ''
           content:
@@ -7760,6 +8355,11 @@ paths:
               schema:
                 type: integer
                 format: uint64
+            X-APTOS-TXN-ENCRYPTION-KEY:
+              description: Per-epoch transaction encryption key (hex-encoded)
+              deprecated: false
+              schema:
+                type: string
         '503':
           description: ''
           content:
@@ -7815,6 +8415,11 @@ paths:
               schema:
                 type: integer
                 format: uint64
+            X-APTOS-TXN-ENCRYPTION-KEY:
+              description: Per-epoch transaction encryption key (hex-encoded)
+              deprecated: false
+              schema:
+                type: string
       operationId: wait_transaction_by_hash
   /transactions/by_version/{txn_version}:
     get:
@@ -7910,6 +8515,11 @@ paths:
               deprecated: false
               schema:
                 type: string
+            X-APTOS-TXN-ENCRYPTION-KEY:
+              description: Per-epoch transaction encryption key (hex-encoded)
+              deprecated: false
+              schema:
+                type: string
         '400':
           description: ''
           content:
@@ -7965,6 +8575,11 @@ paths:
               schema:
                 type: integer
                 format: uint64
+            X-APTOS-TXN-ENCRYPTION-KEY:
+              description: Per-epoch transaction encryption key (hex-encoded)
+              deprecated: false
+              schema:
+                type: string
         '403':
           description: ''
           content:
@@ -8020,6 +8635,11 @@ paths:
               schema:
                 type: integer
                 format: uint64
+            X-APTOS-TXN-ENCRYPTION-KEY:
+              description: Per-epoch transaction encryption key (hex-encoded)
+              deprecated: false
+              schema:
+                type: string
         '404':
           description: ''
           content:
@@ -8075,6 +8695,11 @@ paths:
               schema:
                 type: integer
                 format: uint64
+            X-APTOS-TXN-ENCRYPTION-KEY:
+              description: Per-epoch transaction encryption key (hex-encoded)
+              deprecated: false
+              schema:
+                type: string
         '410':
           description: ''
           content:
@@ -8130,6 +8755,11 @@ paths:
               schema:
                 type: integer
                 format: uint64
+            X-APTOS-TXN-ENCRYPTION-KEY:
+              description: Per-epoch transaction encryption key (hex-encoded)
+              deprecated: false
+              schema:
+                type: string
         '500':
           description: ''
           content:
@@ -8185,6 +8815,11 @@ paths:
               schema:
                 type: integer
                 format: uint64
+            X-APTOS-TXN-ENCRYPTION-KEY:
+              description: Per-epoch transaction encryption key (hex-encoded)
+              deprecated: false
+              schema:
+                type: string
         '503':
           description: ''
           content:
@@ -8240,6 +8875,11 @@ paths:
               schema:
                 type: integer
                 format: uint64
+            X-APTOS-TXN-ENCRYPTION-KEY:
+              description: Per-epoch transaction encryption key (hex-encoded)
+              deprecated: false
+              schema:
+                type: string
       operationId: get_transaction_by_version
   /transactions/auxiliary_info:
     get:
@@ -8351,6 +8991,11 @@ paths:
               deprecated: false
               schema:
                 type: string
+            X-APTOS-TXN-ENCRYPTION-KEY:
+              description: Per-epoch transaction encryption key (hex-encoded)
+              deprecated: false
+              schema:
+                type: string
         '400':
           description: ''
           content:
@@ -8406,6 +9051,11 @@ paths:
               schema:
                 type: integer
                 format: uint64
+            X-APTOS-TXN-ENCRYPTION-KEY:
+              description: Per-epoch transaction encryption key (hex-encoded)
+              deprecated: false
+              schema:
+                type: string
         '403':
           description: ''
           content:
@@ -8461,6 +9111,11 @@ paths:
               schema:
                 type: integer
                 format: uint64
+            X-APTOS-TXN-ENCRYPTION-KEY:
+              description: Per-epoch transaction encryption key (hex-encoded)
+              deprecated: false
+              schema:
+                type: string
         '404':
           description: ''
           content:
@@ -8516,6 +9171,11 @@ paths:
               schema:
                 type: integer
                 format: uint64
+            X-APTOS-TXN-ENCRYPTION-KEY:
+              description: Per-epoch transaction encryption key (hex-encoded)
+              deprecated: false
+              schema:
+                type: string
         '410':
           description: ''
           content:
@@ -8571,6 +9231,11 @@ paths:
               schema:
                 type: integer
                 format: uint64
+            X-APTOS-TXN-ENCRYPTION-KEY:
+              description: Per-epoch transaction encryption key (hex-encoded)
+              deprecated: false
+              schema:
+                type: string
         '500':
           description: ''
           content:
@@ -8626,6 +9291,11 @@ paths:
               schema:
                 type: integer
                 format: uint64
+            X-APTOS-TXN-ENCRYPTION-KEY:
+              description: Per-epoch transaction encryption key (hex-encoded)
+              deprecated: false
+              schema:
+                type: string
         '503':
           description: ''
           content:
@@ -8681,6 +9351,11 @@ paths:
               schema:
                 type: integer
                 format: uint64
+            X-APTOS-TXN-ENCRYPTION-KEY:
+              description: Per-epoch transaction encryption key (hex-encoded)
+              deprecated: false
+              schema:
+                type: string
       operationId: get_transactions_auxiliary_info
   /accounts/{address}/transactions:
     get:
@@ -8806,6 +9481,11 @@ paths:
               deprecated: false
               schema:
                 type: string
+            X-APTOS-TXN-ENCRYPTION-KEY:
+              description: Per-epoch transaction encryption key (hex-encoded)
+              deprecated: false
+              schema:
+                type: string
         '400':
           description: ''
           content:
@@ -8861,6 +9541,11 @@ paths:
               schema:
                 type: integer
                 format: uint64
+            X-APTOS-TXN-ENCRYPTION-KEY:
+              description: Per-epoch transaction encryption key (hex-encoded)
+              deprecated: false
+              schema:
+                type: string
         '403':
           description: ''
           content:
@@ -8916,6 +9601,11 @@ paths:
               schema:
                 type: integer
                 format: uint64
+            X-APTOS-TXN-ENCRYPTION-KEY:
+              description: Per-epoch transaction encryption key (hex-encoded)
+              deprecated: false
+              schema:
+                type: string
         '404':
           description: ''
           content:
@@ -8971,6 +9661,11 @@ paths:
               schema:
                 type: integer
                 format: uint64
+            X-APTOS-TXN-ENCRYPTION-KEY:
+              description: Per-epoch transaction encryption key (hex-encoded)
+              deprecated: false
+              schema:
+                type: string
         '410':
           description: ''
           content:
@@ -9026,6 +9721,11 @@ paths:
               schema:
                 type: integer
                 format: uint64
+            X-APTOS-TXN-ENCRYPTION-KEY:
+              description: Per-epoch transaction encryption key (hex-encoded)
+              deprecated: false
+              schema:
+                type: string
         '500':
           description: ''
           content:
@@ -9081,6 +9781,11 @@ paths:
               schema:
                 type: integer
                 format: uint64
+            X-APTOS-TXN-ENCRYPTION-KEY:
+              description: Per-epoch transaction encryption key (hex-encoded)
+              deprecated: false
+              schema:
+                type: string
         '503':
           description: ''
           content:
@@ -9136,6 +9841,11 @@ paths:
               schema:
                 type: integer
                 format: uint64
+            X-APTOS-TXN-ENCRYPTION-KEY:
+              description: Per-epoch transaction encryption key (hex-encoded)
+              deprecated: false
+              schema:
+                type: string
       operationId: get_account_transactions
   /accounts/{address}/transaction_summaries:
     get:
@@ -9280,6 +9990,11 @@ paths:
               deprecated: false
               schema:
                 type: string
+            X-APTOS-TXN-ENCRYPTION-KEY:
+              description: Per-epoch transaction encryption key (hex-encoded)
+              deprecated: false
+              schema:
+                type: string
         '400':
           description: ''
           content:
@@ -9335,6 +10050,11 @@ paths:
               schema:
                 type: integer
                 format: uint64
+            X-APTOS-TXN-ENCRYPTION-KEY:
+              description: Per-epoch transaction encryption key (hex-encoded)
+              deprecated: false
+              schema:
+                type: string
         '403':
           description: ''
           content:
@@ -9390,6 +10110,11 @@ paths:
               schema:
                 type: integer
                 format: uint64
+            X-APTOS-TXN-ENCRYPTION-KEY:
+              description: Per-epoch transaction encryption key (hex-encoded)
+              deprecated: false
+              schema:
+                type: string
         '404':
           description: ''
           content:
@@ -9445,6 +10170,11 @@ paths:
               schema:
                 type: integer
                 format: uint64
+            X-APTOS-TXN-ENCRYPTION-KEY:
+              description: Per-epoch transaction encryption key (hex-encoded)
+              deprecated: false
+              schema:
+                type: string
         '410':
           description: ''
           content:
@@ -9500,6 +10230,11 @@ paths:
               schema:
                 type: integer
                 format: uint64
+            X-APTOS-TXN-ENCRYPTION-KEY:
+              description: Per-epoch transaction encryption key (hex-encoded)
+              deprecated: false
+              schema:
+                type: string
         '500':
           description: ''
           content:
@@ -9555,6 +10290,11 @@ paths:
               schema:
                 type: integer
                 format: uint64
+            X-APTOS-TXN-ENCRYPTION-KEY:
+              description: Per-epoch transaction encryption key (hex-encoded)
+              deprecated: false
+              schema:
+                type: string
         '503':
           description: ''
           content:
@@ -9610,6 +10350,11 @@ paths:
               schema:
                 type: integer
                 format: uint64
+            X-APTOS-TXN-ENCRYPTION-KEY:
+              description: Per-epoch transaction encryption key (hex-encoded)
+              deprecated: false
+              schema:
+                type: string
       operationId: get_account_transaction_summaries
   /transactions/batch:
     post:
@@ -9728,6 +10473,11 @@ paths:
               deprecated: false
               schema:
                 type: string
+            X-APTOS-TXN-ENCRYPTION-KEY:
+              description: Per-epoch transaction encryption key (hex-encoded)
+              deprecated: false
+              schema:
+                type: string
         '206':
           description: ''
           content:
@@ -9804,6 +10554,11 @@ paths:
               deprecated: false
               schema:
                 type: string
+            X-APTOS-TXN-ENCRYPTION-KEY:
+              description: Per-epoch transaction encryption key (hex-encoded)
+              deprecated: false
+              schema:
+                type: string
         '400':
           description: ''
           content:
@@ -9859,6 +10614,11 @@ paths:
               schema:
                 type: integer
                 format: uint64
+            X-APTOS-TXN-ENCRYPTION-KEY:
+              description: Per-epoch transaction encryption key (hex-encoded)
+              deprecated: false
+              schema:
+                type: string
         '403':
           description: ''
           content:
@@ -9914,6 +10674,11 @@ paths:
               schema:
                 type: integer
                 format: uint64
+            X-APTOS-TXN-ENCRYPTION-KEY:
+              description: Per-epoch transaction encryption key (hex-encoded)
+              deprecated: false
+              schema:
+                type: string
         '404':
           description: ''
           content:
@@ -9969,6 +10734,11 @@ paths:
               schema:
                 type: integer
                 format: uint64
+            X-APTOS-TXN-ENCRYPTION-KEY:
+              description: Per-epoch transaction encryption key (hex-encoded)
+              deprecated: false
+              schema:
+                type: string
         '413':
           description: ''
           content:
@@ -10024,6 +10794,11 @@ paths:
               schema:
                 type: integer
                 format: uint64
+            X-APTOS-TXN-ENCRYPTION-KEY:
+              description: Per-epoch transaction encryption key (hex-encoded)
+              deprecated: false
+              schema:
+                type: string
         '500':
           description: ''
           content:
@@ -10079,6 +10854,11 @@ paths:
               schema:
                 type: integer
                 format: uint64
+            X-APTOS-TXN-ENCRYPTION-KEY:
+              description: Per-epoch transaction encryption key (hex-encoded)
+              deprecated: false
+              schema:
+                type: string
         '503':
           description: ''
           content:
@@ -10134,6 +10914,11 @@ paths:
               schema:
                 type: integer
                 format: uint64
+            X-APTOS-TXN-ENCRYPTION-KEY:
+              description: Per-epoch transaction encryption key (hex-encoded)
+              deprecated: false
+              schema:
+                type: string
         '507':
           description: ''
           content:
@@ -10189,6 +10974,11 @@ paths:
               schema:
                 type: integer
                 format: uint64
+            X-APTOS-TXN-ENCRYPTION-KEY:
+              description: Per-epoch transaction encryption key (hex-encoded)
+              deprecated: false
+              schema:
+                type: string
       operationId: submit_batch_transactions
   /transactions/simulate:
     post:
@@ -10329,6 +11119,11 @@ paths:
               deprecated: false
               schema:
                 type: string
+            X-APTOS-TXN-ENCRYPTION-KEY:
+              description: Per-epoch transaction encryption key (hex-encoded)
+              deprecated: false
+              schema:
+                type: string
         '400':
           description: ''
           content:
@@ -10384,6 +11179,11 @@ paths:
               schema:
                 type: integer
                 format: uint64
+            X-APTOS-TXN-ENCRYPTION-KEY:
+              description: Per-epoch transaction encryption key (hex-encoded)
+              deprecated: false
+              schema:
+                type: string
         '403':
           description: ''
           content:
@@ -10439,6 +11239,11 @@ paths:
               schema:
                 type: integer
                 format: uint64
+            X-APTOS-TXN-ENCRYPTION-KEY:
+              description: Per-epoch transaction encryption key (hex-encoded)
+              deprecated: false
+              schema:
+                type: string
         '404':
           description: ''
           content:
@@ -10494,6 +11299,11 @@ paths:
               schema:
                 type: integer
                 format: uint64
+            X-APTOS-TXN-ENCRYPTION-KEY:
+              description: Per-epoch transaction encryption key (hex-encoded)
+              deprecated: false
+              schema:
+                type: string
         '413':
           description: ''
           content:
@@ -10549,6 +11359,11 @@ paths:
               schema:
                 type: integer
                 format: uint64
+            X-APTOS-TXN-ENCRYPTION-KEY:
+              description: Per-epoch transaction encryption key (hex-encoded)
+              deprecated: false
+              schema:
+                type: string
         '500':
           description: ''
           content:
@@ -10604,6 +11419,11 @@ paths:
               schema:
                 type: integer
                 format: uint64
+            X-APTOS-TXN-ENCRYPTION-KEY:
+              description: Per-epoch transaction encryption key (hex-encoded)
+              deprecated: false
+              schema:
+                type: string
         '503':
           description: ''
           content:
@@ -10659,6 +11479,11 @@ paths:
               schema:
                 type: integer
                 format: uint64
+            X-APTOS-TXN-ENCRYPTION-KEY:
+              description: Per-epoch transaction encryption key (hex-encoded)
+              deprecated: false
+              schema:
+                type: string
         '507':
           description: ''
           content:
@@ -10714,6 +11539,11 @@ paths:
               schema:
                 type: integer
                 format: uint64
+            X-APTOS-TXN-ENCRYPTION-KEY:
+              description: Per-epoch transaction encryption key (hex-encoded)
+              deprecated: false
+              schema:
+                type: string
       operationId: simulate_transaction
   /transactions/encode_submission:
     post:
@@ -10820,6 +11650,11 @@ paths:
               deprecated: false
               schema:
                 type: string
+            X-APTOS-TXN-ENCRYPTION-KEY:
+              description: Per-epoch transaction encryption key (hex-encoded)
+              deprecated: false
+              schema:
+                type: string
         '400':
           description: ''
           content:
@@ -10875,6 +11710,11 @@ paths:
               schema:
                 type: integer
                 format: uint64
+            X-APTOS-TXN-ENCRYPTION-KEY:
+              description: Per-epoch transaction encryption key (hex-encoded)
+              deprecated: false
+              schema:
+                type: string
         '403':
           description: ''
           content:
@@ -10930,6 +11770,11 @@ paths:
               schema:
                 type: integer
                 format: uint64
+            X-APTOS-TXN-ENCRYPTION-KEY:
+              description: Per-epoch transaction encryption key (hex-encoded)
+              deprecated: false
+              schema:
+                type: string
         '500':
           description: ''
           content:
@@ -10985,6 +11830,11 @@ paths:
               schema:
                 type: integer
                 format: uint64
+            X-APTOS-TXN-ENCRYPTION-KEY:
+              description: Per-epoch transaction encryption key (hex-encoded)
+              deprecated: false
+              schema:
+                type: string
         '503':
           description: ''
           content:
@@ -11040,6 +11890,11 @@ paths:
               schema:
                 type: integer
                 format: uint64
+            X-APTOS-TXN-ENCRYPTION-KEY:
+              description: Per-epoch transaction encryption key (hex-encoded)
+              deprecated: false
+              schema:
+                type: string
       operationId: encode_submission
   /estimate_gas_price:
     get:
@@ -11135,6 +11990,11 @@ paths:
               deprecated: false
               schema:
                 type: string
+            X-APTOS-TXN-ENCRYPTION-KEY:
+              description: Per-epoch transaction encryption key (hex-encoded)
+              deprecated: false
+              schema:
+                type: string
         '400':
           description: ''
           content:
@@ -11190,6 +12050,11 @@ paths:
               schema:
                 type: integer
                 format: uint64
+            X-APTOS-TXN-ENCRYPTION-KEY:
+              description: Per-epoch transaction encryption key (hex-encoded)
+              deprecated: false
+              schema:
+                type: string
         '403':
           description: ''
           content:
@@ -11245,6 +12110,11 @@ paths:
               schema:
                 type: integer
                 format: uint64
+            X-APTOS-TXN-ENCRYPTION-KEY:
+              description: Per-epoch transaction encryption key (hex-encoded)
+              deprecated: false
+              schema:
+                type: string
         '500':
           description: ''
           content:
@@ -11300,6 +12170,11 @@ paths:
               schema:
                 type: integer
                 format: uint64
+            X-APTOS-TXN-ENCRYPTION-KEY:
+              description: Per-epoch transaction encryption key (hex-encoded)
+              deprecated: false
+              schema:
+                type: string
         '503':
           description: ''
           content:
@@ -11355,6 +12230,11 @@ paths:
               schema:
                 type: integer
                 format: uint64
+            X-APTOS-TXN-ENCRYPTION-KEY:
+              description: Per-epoch transaction encryption key (hex-encoded)
+              deprecated: false
+              schema:
+                type: string
       operationId: estimate_gas_price
   /view:
     post:
@@ -11469,6 +12349,11 @@ paths:
               deprecated: false
               schema:
                 type: string
+            X-APTOS-TXN-ENCRYPTION-KEY:
+              description: Per-epoch transaction encryption key (hex-encoded)
+              deprecated: false
+              schema:
+                type: string
         '400':
           description: ''
           content:
@@ -11524,6 +12409,11 @@ paths:
               schema:
                 type: integer
                 format: uint64
+            X-APTOS-TXN-ENCRYPTION-KEY:
+              description: Per-epoch transaction encryption key (hex-encoded)
+              deprecated: false
+              schema:
+                type: string
         '403':
           description: ''
           content:
@@ -11579,6 +12469,11 @@ paths:
               schema:
                 type: integer
                 format: uint64
+            X-APTOS-TXN-ENCRYPTION-KEY:
+              description: Per-epoch transaction encryption key (hex-encoded)
+              deprecated: false
+              schema:
+                type: string
         '404':
           description: ''
           content:
@@ -11634,6 +12529,11 @@ paths:
               schema:
                 type: integer
                 format: uint64
+            X-APTOS-TXN-ENCRYPTION-KEY:
+              description: Per-epoch transaction encryption key (hex-encoded)
+              deprecated: false
+              schema:
+                type: string
         '410':
           description: ''
           content:
@@ -11689,6 +12589,11 @@ paths:
               schema:
                 type: integer
                 format: uint64
+            X-APTOS-TXN-ENCRYPTION-KEY:
+              description: Per-epoch transaction encryption key (hex-encoded)
+              deprecated: false
+              schema:
+                type: string
         '500':
           description: ''
           content:
@@ -11744,6 +12649,11 @@ paths:
               schema:
                 type: integer
                 format: uint64
+            X-APTOS-TXN-ENCRYPTION-KEY:
+              description: Per-epoch transaction encryption key (hex-encoded)
+              deprecated: false
+              schema:
+                type: string
         '503':
           description: ''
           content:
@@ -11799,6 +12709,11 @@ paths:
               schema:
                 type: integer
                 format: uint64
+            X-APTOS-TXN-ENCRYPTION-KEY:
+              description: Per-epoch transaction encryption key (hex-encoded)
+              deprecated: false
+              schema:
+                type: string
       operationId: view
 components:
   schemas:
@@ -12087,17 +13002,26 @@ components:
       oneOf:
       - $ref: '#/components/schemas/BlockMetadataExtension_BlockMetadataExtensionEmpty'
       - $ref: '#/components/schemas/BlockMetadataExtension_BlockMetadataExtensionRandomness'
+      - $ref: '#/components/schemas/BlockMetadataExtension_BlockMetadataExtensionRandomnessAndDecKey'
       discriminator:
         propertyName: type
         mapping:
           v0: '#/components/schemas/BlockMetadataExtension_BlockMetadataExtensionEmpty'
           v1: '#/components/schemas/BlockMetadataExtension_BlockMetadataExtensionRandomness'
+          v2: '#/components/schemas/BlockMetadataExtension_BlockMetadataExtensionRandomnessAndDecKey'
     BlockMetadataExtensionEmpty:
       type: object
     BlockMetadataExtensionRandomness:
       type: object
       properties:
         randomness:
+          $ref: '#/components/schemas/HexEncodedBytes'
+    BlockMetadataExtensionRandomnessAndDecKey:
+      type: object
+      properties:
+        randomness:
+          $ref: '#/components/schemas/HexEncodedBytes'
+        decryption_key:
           $ref: '#/components/schemas/HexEncodedBytes'
     BlockMetadataExtension_BlockMetadataExtensionEmpty:
       allOf:
@@ -12123,6 +13047,18 @@ components:
             - v1
             example: v1
       - $ref: '#/components/schemas/BlockMetadataExtensionRandomness'
+    BlockMetadataExtension_BlockMetadataExtensionRandomnessAndDecKey:
+      allOf:
+      - type: object
+        required:
+        - type
+        properties:
+          type:
+            type: string
+            enum:
+            - v2
+            example: v2
+      - $ref: '#/components/schemas/BlockMetadataExtensionRandomnessAndDecKey'
     BlockMetadataTransaction:
       type: object
       description: |-
@@ -12213,6 +13149,58 @@ components:
 
               NOTE: `oai` does not support `flatten` together with `skip_serializing_if`.
             default: null
+    ChunkyDKGResultTransaction:
+      type: object
+      required:
+      - version
+      - hash
+      - state_change_hash
+      - event_root_hash
+      - gas_used
+      - success
+      - vm_status
+      - accumulator_root_hash
+      - changes
+      - events
+      - timestamp
+      - certified_subtrx
+      - encryption_key
+      properties:
+        version:
+          $ref: '#/components/schemas/U64'
+        hash:
+          $ref: '#/components/schemas/HashValue'
+        state_change_hash:
+          $ref: '#/components/schemas/HashValue'
+        event_root_hash:
+          $ref: '#/components/schemas/HashValue'
+        state_checkpoint_hash:
+          $ref: '#/components/schemas/HashValue'
+        gas_used:
+          $ref: '#/components/schemas/U64'
+        success:
+          type: boolean
+          description: Whether the transaction was successful
+        vm_status:
+          type: string
+          description: The VM status of the transaction, can tell useful information in a failure
+        accumulator_root_hash:
+          $ref: '#/components/schemas/HashValue'
+        changes:
+          type: array
+          description: Final state of resources changed by the transaction
+          items:
+            $ref: '#/components/schemas/WriteSetChange'
+        events:
+          type: array
+          items:
+            $ref: '#/components/schemas/Event'
+        timestamp:
+          $ref: '#/components/schemas/U64'
+        certified_subtrx:
+          $ref: '#/components/schemas/ExportedCertifiedAggregatedChunkySubtranscript'
+        encryption_key:
+          $ref: '#/components/schemas/HexEncodedBytes'
     DKGResultTransaction:
       type: object
       required:
@@ -12471,6 +13459,25 @@ components:
             format: uint64
         sig:
           $ref: '#/components/schemas/HexEncodedBytes'
+    ExportedCertifiedAggregatedChunkySubtranscript:
+      type: object
+      description: |-
+        A more API-friendly representation of the on-chain
+        `aptos_types::dkg::chunky_dkg::CertifiedAggregatedChunkySubtranscript`.
+      required:
+      - epoch
+      - author
+      - subtrx
+      - signature
+      properties:
+        epoch:
+          $ref: '#/components/schemas/U64'
+        author:
+          $ref: '#/components/schemas/Address'
+        subtrx:
+          $ref: '#/components/schemas/HexEncodedBytes'
+        signature:
+          $ref: '#/components/schemas/ExportedAggregateSignature'
     ExportedDKGTranscript:
       type: object
       required:
@@ -12728,6 +13735,9 @@ components:
           description: |-
             Git hash of the build of the API endpoint.  Can be used to determine the exact
             software version used by the API endpoint.
+        encryption_key:
+          type: string
+          description: Per-epoch transaction encryption key (hex-encoded)
     IndexedSignature:
       type: object
       required:
@@ -12940,6 +13950,7 @@ components:
       - abilities
       - generic_type_params
       - fields
+      - variants
       properties:
         name:
           $ref: '#/components/schemas/IdentifierWrapper'
@@ -12967,6 +13978,11 @@ components:
           description: Fields associated with the struct
           items:
             $ref: '#/components/schemas/MoveStructField'
+        variants:
+          type: array
+          description: Variants of the enum. Only populated when `is_enum` is true.
+          items:
+            $ref: '#/components/schemas/MoveStructVariant'
     MoveStructField:
       type: object
       description: Move struct field
@@ -13062,6 +14078,20 @@ components:
               creation_num: '0'
         self_address: '0x1'
         sequence_number: '0'
+    MoveStructVariant:
+      type: object
+      description: A single variant of a Move enum.
+      required:
+      - name
+      - fields
+      properties:
+        name:
+          $ref: '#/components/schemas/IdentifierWrapper'
+        fields:
+          type: array
+          description: Fields associated with the variant, if any.
+          items:
+            $ref: '#/components/schemas/MoveStructField'
     MoveType:
       type: string
       description: |
@@ -14070,11 +15100,25 @@ components:
       oneOf:
       - $ref: '#/components/schemas/ValidatorTransaction_JWKUpdateTransaction'
       - $ref: '#/components/schemas/ValidatorTransaction_DKGResultTransaction'
+      - $ref: '#/components/schemas/ValidatorTransaction_ChunkyDKGResultTransaction'
       discriminator:
         propertyName: validator_transaction_type
         mapping:
           observed_jwk_update: '#/components/schemas/ValidatorTransaction_JWKUpdateTransaction'
           dkg_result: '#/components/schemas/ValidatorTransaction_DKGResultTransaction'
+          chunky_d_k_g_result: '#/components/schemas/ValidatorTransaction_ChunkyDKGResultTransaction'
+    ValidatorTransaction_ChunkyDKGResultTransaction:
+      allOf:
+      - type: object
+        required:
+        - validator_transaction_type
+        properties:
+          validator_transaction_type:
+            type: string
+            enum:
+            - chunky_d_k_g_result
+            example: chunky_d_k_g_result
+      - $ref: '#/components/schemas/ChunkyDKGResultTransaction'
     ValidatorTransaction_DKGResultTransaction:
       allOf:
       - type: object

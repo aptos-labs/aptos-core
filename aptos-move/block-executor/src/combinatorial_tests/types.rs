@@ -419,6 +419,9 @@ pub(crate) enum MockTransaction<K, E> {
         incarnation_behaviors: Vec<MockIncarnation<K, E>>,
         /// If we are testing with deltas, are we testing delayed_fields? (or AggregatorV1).
         delta_test_kind: DeltaTestKind,
+        /// Keys and values that pre_write_values() should return. Used for testing pre-write
+        /// optimization where the executor pre-populates MVHashMap before execution.
+        pre_writes: Vec<(K, ValueType)>,
     },
     /// Skip the execution of trailing transactions.
     SkipRest(u64),
@@ -433,6 +436,7 @@ impl<K, E> MockTransaction<K, E> {
             incarnation_counter: Arc::new(AtomicUsize::new(0)),
             incarnation_behaviors: vec![behavior],
             delta_test_kind: DeltaTestKind::None,
+            pre_writes: vec![],
         }
     }
 
@@ -441,6 +445,7 @@ impl<K, E> MockTransaction<K, E> {
             incarnation_counter: Arc::new(AtomicUsize::new(0)),
             incarnation_behaviors: behaviors,
             delta_test_kind: DeltaTestKind::None,
+            pre_writes: vec![],
         }
     }
 
@@ -460,6 +465,13 @@ impl<K, E> MockTransaction<K, E> {
         } = &mut self
         {
             *delta_test_kind = DeltaTestKind::AggregatorV1;
+        }
+        self
+    }
+
+    pub(crate) fn with_pre_writes(mut self, new_pre_writes: Vec<(K, ValueType)>) -> Self {
+        if let Self::Write { pre_writes, .. } = &mut self {
+            *pre_writes = new_pre_writes;
         }
         self
     }
@@ -498,6 +510,13 @@ impl<
 
     fn state_checkpoint(_block_id: HashValue) -> Self {
         Self::StateCheckpoint
+    }
+
+    fn pre_write_values(&self) -> Vec<(Self::Key, Self::Value)> {
+        match self {
+            MockTransaction::Write { pre_writes, .. } => pre_writes.clone(),
+            _ => vec![],
+        }
     }
 }
 

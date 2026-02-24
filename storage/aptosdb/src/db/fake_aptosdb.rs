@@ -301,7 +301,7 @@ impl FakeAptosDB {
                 self.txn_info_by_version
                     .insert(ver, txn_to_commit.transaction_info().clone());
                 self.txn_version_by_hash
-                    .insert(txn_to_commit.transaction().hash(), ver);
+                    .insert(txn_to_commit.transaction().committed_hash(), ver);
 
                 // If it is a user transaction, also update the account sequence number
                 if let Some(user_txn) = txn_to_commit.transaction().try_as_signed_user_txn() {
@@ -657,18 +657,6 @@ impl DbReader for FakeAptosDB {
         })
     }
 
-    fn get_events(
-        &self,
-        event_key: &aptos_types::event::EventKey,
-        start: u64,
-        order: aptos_storage_interface::Order,
-        limit: u64,
-        ledger_version: Version,
-    ) -> Result<Vec<EventWithVersion>> {
-        self.inner
-            .get_events(event_key, start, order, limit, ledger_version)
-    }
-
     fn get_block_timestamp(&self, version: Version) -> Result<u64> {
         gauged_api("get_block_timestamp", || {
             ensure!(
@@ -709,16 +697,6 @@ impl DbReader for FakeAptosDB {
         self.inner.get_latest_epoch_state()
     }
 
-    fn get_prefixed_state_value_iterator(
-        &self,
-        key_prefix: &StateKeyPrefix,
-        cursor: Option<&StateKey>,
-        version: Version,
-    ) -> Result<Box<dyn Iterator<Item = Result<(StateKey, StateValue)>> + '_>> {
-        self.inner
-            .get_prefixed_state_value_iterator(key_prefix, cursor, version)
-    }
-
     fn get_latest_ledger_info_option(&self) -> Result<Option<LedgerInfoWithSignatures>> {
         self.inner.get_latest_ledger_info_option()
     }
@@ -738,34 +716,6 @@ impl DbReader for FakeAptosDB {
         next_version: Version,
     ) -> Result<Option<(Version, HashValue)>> {
         self.inner.get_state_snapshot_before(next_version)
-    }
-
-    fn get_account_ordered_transaction(
-        &self,
-        address: aptos_types::PeerId,
-        seq_num: u64,
-        include_events: bool,
-        ledger_version: Version,
-    ) -> Result<Option<TransactionWithProof>> {
-        self.inner
-            .get_account_ordered_transaction(address, seq_num, include_events, ledger_version)
-    }
-
-    fn get_account_ordered_transactions(
-        &self,
-        address: aptos_types::PeerId,
-        seq_num: u64,
-        limit: u64,
-        include_events: bool,
-        ledger_version: Version,
-    ) -> Result<aptos_types::transaction::AccountOrderedTransactionsWithProof> {
-        self.inner.get_account_ordered_transactions(
-            address,
-            seq_num,
-            limit,
-            include_events,
-            ledger_version,
-        )
     }
 
     fn get_account_transaction_summaries(
@@ -1072,7 +1022,7 @@ mod tests {
             // Verify transaction hash.
             assert_eq!(
                 txn_info.transaction_hash(),
-                txn_to_commit.transaction().hash()
+                txn_to_commit.transaction().committed_hash()
             );
 
             if !txn_to_commit.is_state_checkpoint() {
@@ -1083,7 +1033,7 @@ mod tests {
                     .unwrap();
                 let txn_with_proof = db
                     .get_transaction_by_hash(
-                        txn_to_commit.transaction().hash(),
+                        txn_to_commit.transaction().committed_hash(),
                         ledger_version,
                         true,
                     )
@@ -1091,8 +1041,8 @@ mod tests {
                     .unwrap();
 
                 assert_eq!(
-                    txn_with_proof.transaction.hash(),
-                    txn_to_commit.transaction().hash()
+                    txn_with_proof.transaction.committed_hash(),
+                    txn_to_commit.transaction().committed_hash()
                 );
 
                 verify_user_txn(
@@ -1160,7 +1110,7 @@ mod tests {
             sequence_number,
         );
 
-        let txn_hash = transaction_with_proof.transaction.hash();
+        let txn_hash = transaction_with_proof.transaction.committed_hash();
         ensure!(
             txn_hash
                 == transaction_with_proof
@@ -1225,7 +1175,7 @@ mod tests {
             );
 
             // Verify the transaction hashes match those of the transaction infos
-            let txn_hash = txn.hash();
+            let txn_hash = txn.committed_hash();
             ensure!(
                 txn_hash == txn_info.transaction_hash(),
                 "The transaction hash does not match the hash in transaction info. \

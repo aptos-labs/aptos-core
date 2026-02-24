@@ -1,0 +1,71 @@
+//# publish
+module 0x22::A
+struct C has drop
+  x: u64
+
+struct D has drop
+  x: u64
+
+struct A has drop
+  c: C
+
+public fun make_c(): C
+    ld_u64 0
+    pack C
+    ret
+
+public fun make_d(): D
+    ld_u64 0
+    pack D
+    ret
+
+public fun test_mutate()
+    local l0: A
+    local l1: &mut C
+    local l2: C
+    ld_u64 0
+    pack C
+    pack A
+    st_loc l0
+    mut_borrow_loc l0
+    mut_borrow_field A, c
+    st_loc l1
+    ld_u64 20
+    pack C
+    copy_loc l1
+    write_ref
+    ret
+
+public fun test_invalid_mutate()
+    local l0: A
+    local l1: &mut C
+    ld_u64 0
+    pack C
+    pack A
+    st_loc l0
+    mut_borrow_loc l0
+    mut_borrow_field A, c
+    st_loc l1
+    ld_u64 20
+    pack D
+    move_loc l1
+    write_ref
+    ret
+
+
+
+//# run --signers 0x1
+script
+use 0x22::A
+entry public fun main(l0: signer)
+    call A::test_mutate
+    ret
+
+
+
+//# run --signers 0x1
+script
+use 0x22::A
+entry public fun main(l0: signer)
+    call A::test_invalid_mutate
+    ret

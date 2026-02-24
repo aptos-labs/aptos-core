@@ -427,8 +427,12 @@ fn test_transaction_list_with_proof() {
         .unwrap_err();
 
     // Verify transaction hashes match but info root hash verification fails (ledger info expected zero root hash)
-    let transaction_list_proof =
-        create_single_transaction_info_proof(Some(transactions[0].hash()), None, None, None);
+    let transaction_list_proof = create_single_transaction_info_proof(
+        Some(transactions[0].committed_hash()),
+        None,
+        None,
+        None,
+    );
     let transaction_list_with_proof = TransactionListWithProof::new(
         transactions.clone(),
         Some(vec![vec![event.clone()]]),
@@ -449,7 +453,7 @@ fn test_transaction_list_with_proof() {
 
     // Construct a new transaction list with proof where the transaction info and event hashes match
     let transaction_list_proof = create_single_transaction_info_proof(
-        Some(transactions[0].hash()),
+        Some(transactions[0].committed_hash()),
         Some(event.hash()),
         None,
         None,
@@ -482,7 +486,7 @@ fn test_transaction_and_output_list_with_proof() {
         vec![],
         0,
     ));
-    let txn_hash = transaction.hash();
+    let txn_hash = transaction.committed_hash();
     let event = create_event();
     let event_root_hash = event.hash();
     let write_set = WriteSet::default();

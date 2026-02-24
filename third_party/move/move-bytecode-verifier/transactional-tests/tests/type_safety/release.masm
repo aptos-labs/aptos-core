@@ -1,0 +1,10 @@
+//# publish
+module 0x1::M
+struct Coin
+  value: u64
+
+fun t(): Coin
+    ld_u64 0
+    pack Coin
+    pop
+    ret

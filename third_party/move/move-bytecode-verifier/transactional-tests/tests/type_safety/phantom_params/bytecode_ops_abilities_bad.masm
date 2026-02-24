@@ -1,0 +1,113 @@
+//# publish
+module 0x1::M1
+struct NoAbilities
+  a: bool
+
+
+
+//# publish
+module 0x1::M2
+use 0x1::M1
+struct HasDrop<phantom T0, T1> has drop
+  a: bool
+
+fun f(l0: &mut HasDrop<M1::NoAbilities, M1::NoAbilities>)
+    ld_true
+    pack HasDrop<M1::NoAbilities, M1::NoAbilities>
+    move_loc l0
+    write_ref
+    ret
+
+
+
+//# publish
+module 0x1::M3
+use 0x1::M1
+struct HasDrop<phantom T0, T1> has drop
+  a: bool
+
+fun f()
+    ld_true
+    pack HasDrop<M1::NoAbilities, M1::NoAbilities>
+    pop
+    ret
+
+
+
+//# publish
+module 0x1::M4
+use 0x1::M1
+struct HasDrop<phantom T0, T1> has drop
+  a: bool
+
+fun f(l0: HasDrop<M1::NoAbilities, M1::NoAbilities>)
+    ret
+
+
+
+//# publish
+module 0x1::M5
+use 0x1::M1
+struct HasCopy<phantom T0, T1> has copy
+  a: bool
+
+fun f(l0: HasCopy<M1::NoAbilities, M1::NoAbilities>): (HasCopy<M1::NoAbilities, M1::NoAbilities>, HasCopy<M1::NoAbilities, M1::NoAbilities>)
+    copy_loc l0
+    move_loc l0
+    ret
+
+
+
+//# publish
+module 0x1::M6
+use 0x1::M1
+struct HasKey<phantom T0, T1> has key
+  a: bool
+
+fun f(l0: &signer, l1: HasKey<M1::NoAbilities, M1::NoAbilities>)
+    move_loc l0
+    move_loc l1
+    move_to HasKey<M1::NoAbilities, M1::NoAbilities>
+    ret
+
+
+
+//# publish
+module 0x1::M7
+use 0x1::M1
+struct HasKey<phantom T0, T1> has key
+  a: bool
+
+fun f(): HasKey<M1::NoAbilities, M1::NoAbilities> acquires HasKey
+    ld_const<address> 0
+    move_from HasKey<M1::NoAbilities, M1::NoAbilities>
+    ret
+
+
+
+//# publish
+module 0x1::M8
+use 0x1::M1
+struct HasKey<phantom T0, T1> has key
+  a: bool
+
+fun f(): bool
+    ld_const<address> 0
+    exists HasKey<M1::NoAbilities, M1::NoAbilities>
+    ret
+
+
+
+//# publish
+module 0x1::M9
+use 0x1::M1
+struct HasStore<phantom T0, T1> has store
+  a: bool
+
+struct RequireStore<T0: store>
+  a: bool
+
+fun f(): RequireStore<HasStore<M1::NoAbilities, M1::NoAbilities>>
+    ld_true
+    pack RequireStore<HasStore<M1::NoAbilities, M1::NoAbilities>>
+    ret

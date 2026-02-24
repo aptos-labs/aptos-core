@@ -33,6 +33,7 @@ use aptos_types::{
     },
     move_utils::as_move_value::AsMoveValue,
     on_chain_config::{
+        chunky_dkg_config::{ChunkyDKGConfigMoveStruct, OnChainChunkyDKGConfig},
         randomness_api_v0_config::{AllowCustomMaxGasFlag, RequiredGasDeposit},
         FeatureFlag, Features, GasScheduleV2, OnChainConsensusConfig, OnChainExecutionConfig,
         OnChainJWKConsensusConfig, OnChainRandomnessConfig, RandomnessConfigMoveStruct,
@@ -88,6 +89,9 @@ const RANDOMNESS_API_V0_CONFIG_MODULE_NAME: &str = "randomness_api_v0_config";
 const RANDOMNESS_CONFIG_SEQNUM_MODULE_NAME: &str = "randomness_config_seqnum";
 const RANDOMNESS_CONFIG_MODULE_NAME: &str = "randomness_config";
 const RANDOMNESS_MODULE_NAME: &str = "randomness";
+const CHUNKY_DKG_MODULE_NAME: &str = "chunky_dkg";
+const CHUNKY_DKG_CONFIG_MODULE_NAME: &str = "chunky_dkg_config";
+const DECRYPTION_MODULE_NAME: &str = "decryption";
 const ACCOUNT_ABSTRACTION_MODULE_NAME: &str = "account_abstraction";
 const RECONFIGURATION_STATE_MODULE_NAME: &str = "reconfiguration_state";
 
@@ -112,6 +116,7 @@ pub struct GenesisConfiguration {
     pub employee_vesting_period_duration: u64,
     pub initial_features_override: Option<Features>,
     pub randomness_config_override: Option<OnChainRandomnessConfig>,
+    pub chunky_dkg_config_override: Option<OnChainChunkyDKGConfig>,
     pub jwk_consensus_config_override: Option<OnChainJWKConsensusConfig>,
     pub initial_jwks: Vec<IssuerJWK>,
     pub keyless_groth16_vk: Option<Groth16VerificationKey>,
@@ -335,6 +340,18 @@ pub fn encode_genesis_change_set(
         randomness_config,
     );
     initialize_randomness_resources(&mut session, &module_storage, &mut traversal_context);
+    let chunky_dkg_config = genesis_config
+        .chunky_dkg_config_override
+        .clone()
+        .unwrap_or_else(OnChainChunkyDKGConfig::default_for_genesis);
+    initialize_chunky_dkg_config(
+        &mut session,
+        &module_storage,
+        &mut traversal_context,
+        chunky_dkg_config,
+    );
+    initialize_chunky_dkg(&mut session, &module_storage, &mut traversal_context);
+    initialize_decryption(&mut session, &module_storage, &mut traversal_context);
     initialize_on_chain_governance(
         &mut session,
         &module_storage,
@@ -715,6 +732,58 @@ fn initialize_randomness_resources(
     );
 }
 
+fn initialize_chunky_dkg_config(
+    session: &mut SessionExt<impl AptosMoveResolver>,
+    module_storage: &impl AptosModuleStorage,
+    traversal_context: &mut TraversalContext,
+    chunky_dkg_config: OnChainChunkyDKGConfig,
+) {
+    exec_function(
+        session,
+        module_storage,
+        traversal_context,
+        CHUNKY_DKG_CONFIG_MODULE_NAME,
+        "initialize",
+        vec![],
+        serialize_values(&vec![
+            MoveValue::Signer(CORE_CODE_ADDRESS),
+            ChunkyDKGConfigMoveStruct::from(chunky_dkg_config).as_move_value(),
+        ]),
+    );
+}
+
+fn initialize_chunky_dkg(
+    session: &mut SessionExt<impl AptosMoveResolver>,
+    module_storage: &impl AptosModuleStorage,
+    traversal_context: &mut TraversalContext,
+) {
+    exec_function(
+        session,
+        module_storage,
+        traversal_context,
+        CHUNKY_DKG_MODULE_NAME,
+        "initialize",
+        vec![],
+        serialize_values(&vec![MoveValue::Signer(CORE_CODE_ADDRESS)]),
+    );
+}
+
+fn initialize_decryption(
+    session: &mut SessionExt<impl AptosMoveResolver>,
+    module_storage: &impl AptosModuleStorage,
+    traversal_context: &mut TraversalContext,
+) {
+    exec_function(
+        session,
+        module_storage,
+        traversal_context,
+        DECRYPTION_MODULE_NAME,
+        "initialize",
+        vec![],
+        serialize_values(&vec![MoveValue::Signer(CORE_CODE_ADDRESS)]),
+    );
+}
+
 fn initialize_account_abstraction(
     session: &mut SessionExt<impl AptosMoveResolver>,
     module_storage: &impl AptosModuleStorage,
@@ -927,7 +996,7 @@ fn initialize_keyless_accounts(
         ]),
     );
 
-    if vk.is_some() {
+    if let Some(vk_value) = vk {
         exec_function(
             session,
             module_storage,
@@ -937,7 +1006,7 @@ fn initialize_keyless_accounts(
             vec![],
             serialize_values(&vec![
                 MoveValue::Signer(CORE_CODE_ADDRESS),
-                vk.unwrap().as_move_value(),
+                vk_value.as_move_value(),
             ]),
         );
     }
@@ -1438,6 +1507,7 @@ pub fn generate_test_genesis(
             employee_vesting_period_duration: 5 * 60, // 5 minutes
             initial_features_override: None,
             randomness_config_override: None,
+            chunky_dkg_config_override: None,
             jwk_consensus_config_override: None,
             initial_jwks: vec![],
             keyless_groth16_vk: None,
@@ -1490,6 +1560,7 @@ fn mainnet_genesis_config() -> GenesisConfiguration {
         employee_vesting_period_duration: 5 * 60, // 5 minutes
         initial_features_override: None,
         randomness_config_override: None,
+        chunky_dkg_config_override: None,
         jwk_consensus_config_override: None,
         initial_jwks: vec![],
         keyless_groth16_vk: None,

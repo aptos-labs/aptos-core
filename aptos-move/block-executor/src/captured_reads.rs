@@ -26,15 +26,27 @@ use aptos_types::{
     executable::ModulePath,
     state_store::{state_value::StateValueMetadata, TStateView},
     transaction::BlockExecutableTransaction as Transaction,
+    vm::modules::AptosModuleExtension,
     vm_status::StatusCode,
     write_set::TransactionWrite,
 };
 use aptos_vm_types::resolver::ResourceGroupSize;
+use bytes::Bytes;
 use derivative::Derivative;
-use move_binary_format::errors::{PartialVMError, PartialVMResult};
-use move_core_types::value::MoveTypeLayout;
+use move_binary_format::{
+    errors::{Location, PartialVMError, PartialVMResult, VMResult},
+    CompiledModule,
+};
+use move_core_types::{
+    account_address::AccountAddress, identifier::IdentStr, language_storage::ModuleId,
+    value::MoveTypeLayout,
+};
+use move_vm_runtime::{
+    LayoutCache, LayoutCacheEntry, Module, ModuleStorage, RuntimeEnvironment, StructKey,
+    WithRuntimeEnvironment,
+};
 use move_vm_types::{
-    code::{ModuleCode, SyncModuleCache, WithAddress, WithName, WithSize},
+    code::{ModuleCode, SyncModuleCache, WithAddress, WithBytes, WithName, WithSize},
     delayed_values::delayed_field_id::DelayedFieldID,
 };
 use std::{
@@ -1276,6 +1288,172 @@ where
         }
 
         ret
+    }
+}
+
+/// A module storage view that retrieves modules from a captured read-set snapshot.
+///
+/// This is used during trace replay to ensure modules are resolved from execution-time state, not
+/// from the current cache state (which may have been updated by subsequent transactions). This
+/// prevents race conditions where transaction A executes at time T1 with code state S1, commits,
+/// then transaction B publishes new modules (code state S2), and finally A's post-commit replay
+/// runs at time T3 - without this snapshot view, replay would incorrectly see code state S2 and
+/// not state S1.
+pub(crate) struct SnapshotModuleView<'a> {
+    /// Reference to the captured reads containing the module snapshot from execution time.
+    captured_module_reads:
+        &'a hashbrown::HashMap<ModuleId, ModuleRead<CompiledModule, Module, AptosModuleExtension>>,
+    /// Runtime environment for accessing VM config and other shared state.
+    runtime_environment: &'a RuntimeEnvironment,
+}
+
+impl<'a> SnapshotModuleView<'a> {
+    pub(crate) fn new<T: Transaction>(
+        captured_reads: &'a CapturedReads<
+            T,
+            ModuleId,
+            CompiledModule,
+            Module,
+            AptosModuleExtension,
+        >,
+        runtime_environment: &'a RuntimeEnvironment,
+    ) -> Self {
+        Self {
+            captured_module_reads: &captured_reads.module_reads,
+            runtime_environment,
+        }
+    }
+
+    fn get_module_read(
+        &self,
+        address: &AccountAddress,
+        module_name: &IdentStr,
+    ) -> VMResult<&ModuleRead<CompiledModule, Module, AptosModuleExtension>> {
+        self.captured_module_reads
+            .get(&(address, module_name))
+            .ok_or_else(|| {
+                // Module has to be in the read-set during execution.
+                PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
+                    .with_message(format!(
+                        "Module {}::{} does not exist in read-set snapshot",
+                        address.to_hex_literal(),
+                        module_name,
+                    ))
+                    .finish(Location::Undefined)
+            })
+    }
+}
+
+impl WithRuntimeEnvironment for SnapshotModuleView<'_> {
+    fn runtime_environment(&self) -> &RuntimeEnvironment {
+        self.runtime_environment
+    }
+}
+
+impl LayoutCache for SnapshotModuleView<'_> {
+    fn get_struct_layout(&self, _key: &StructKey) -> Option<LayoutCacheEntry> {
+        // No-op: no need for layouts in snapshot.
+        None
+    }
+
+    fn store_struct_layout(
+        &self,
+        _key: &StructKey,
+        _entry: LayoutCacheEntry,
+    ) -> PartialVMResult<()> {
+        // No-op: no need for layouts in snapshot.
+        Ok(())
+    }
+}
+
+impl ModuleStorage for SnapshotModuleView<'_> {
+    fn unmetered_check_module_exists(
+        &self,
+        address: &AccountAddress,
+        module_name: &IdentStr,
+    ) -> VMResult<bool> {
+        match self.get_module_read(address, module_name)? {
+            ModuleRead::GlobalCache(_) => Ok(true),
+            ModuleRead::PerBlockCache(code) => Ok(code.is_some()),
+        }
+    }
+
+    fn unmetered_get_module_bytes(
+        &self,
+        address: &AccountAddress,
+        module_name: &IdentStr,
+    ) -> VMResult<Option<Bytes>> {
+        match self.get_module_read(address, module_name)? {
+            ModuleRead::GlobalCache(code) => Ok(Some(code.extension().bytes().clone())),
+            ModuleRead::PerBlockCache(code) => {
+                Ok(code.as_ref().map(|(c, _)| c.extension().bytes().clone()))
+            },
+        }
+    }
+
+    fn unmetered_get_module_size(
+        &self,
+        address: &AccountAddress,
+        module_name: &IdentStr,
+    ) -> VMResult<Option<usize>> {
+        match self.get_module_read(address, module_name)? {
+            ModuleRead::GlobalCache(code) => Ok(Some(code.extension().bytes().len())),
+            ModuleRead::PerBlockCache(code) => {
+                Ok(code.as_ref().map(|(c, _)| c.extension().bytes().len()))
+            },
+        }
+    }
+
+    fn unmetered_get_deserialized_module(
+        &self,
+        address: &AccountAddress,
+        module_name: &IdentStr,
+    ) -> VMResult<Option<Arc<CompiledModule>>> {
+        match self.get_module_read(address, module_name)? {
+            ModuleRead::GlobalCache(code) => Ok(Some(code.code().deserialized().clone())),
+            ModuleRead::PerBlockCache(code) => {
+                Ok(code.as_ref().map(|(c, _)| c.code().deserialized().clone()))
+            },
+        }
+    }
+
+    fn unmetered_get_eagerly_verified_module(
+        &self,
+        _address: &AccountAddress,
+        _module_name: &IdentStr,
+    ) -> VMResult<Option<Arc<Module>>> {
+        // Snapshot module view does not need to support eagerly verified loading of modules
+        // because it is only used lazily.
+        Err(
+            PartialVMError::new_invariant_violation("Eager verification is not supported")
+                .finish(Location::Undefined),
+        )
+    }
+
+    fn unmetered_get_lazily_verified_module(
+        &self,
+        module_id: &ModuleId,
+    ) -> VMResult<Option<Arc<Module>>> {
+        let code = match self.get_module_read(module_id.address(), module_id.name())? {
+            ModuleRead::GlobalCache(code) => Some(code.code()),
+            ModuleRead::PerBlockCache(code) => code.as_ref().map(|(c, _)| c.code()),
+        };
+        match code {
+            None => Ok(None),
+            Some(code) => {
+                if code.is_verified() {
+                    Ok(Some(code.verified().clone()))
+                } else {
+                    // Should not happen: read-set records verification results.
+                    Err(PartialVMError::new_invariant_violation(format!(
+                        "Verified module {}::{} does not exist in read-set",
+                        module_id.address(),
+                        module_id.name()
+                    ))
+                    .finish(Location::Undefined))
+                }
+            },
+        }
     }
 }
 

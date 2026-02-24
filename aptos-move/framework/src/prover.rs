@@ -3,13 +3,10 @@
 
 use crate::build_model;
 use anyhow::bail;
-use codespan_reporting::{
-    diagnostic::Severity,
-    term::termcolor::{ColorChoice, StandardStream},
-};
+use codespan_reporting::diagnostic::Severity;
 use log::{info, LevelFilter};
 use move_compiler_v2::Experiment;
-use move_core_types::account_address::AccountAddress;
+use move_core_types::{account_address::AccountAddress, diag_writer::DiagWriter};
 use move_model::{
     metadata::{CompilerVersion, LanguageVersion},
     model::{GlobalEnv, VerificationScope},
@@ -49,10 +46,6 @@ pub struct ProverOptions {
     /// `CVC5_EXE` should point to the binary.
     #[clap(long)]
     pub cvc5: bool,
-
-    /// The depth until which stratified functions are expanded.
-    #[clap(long)]
-    pub stratification_depth: Option<usize>,
 
     /// A seed for the prover.
     #[clap(long)]
@@ -125,14 +118,45 @@ pub struct ProverOptions {
     #[clap(long = "skip-instance-check")]
     pub skip_instance_check: bool,
 
-    #[clap(skip)]
+    /// Internal flag: use a temp dir for boogie output so parallel invocations
+    /// don't interfere. Set automatically by test harnesses.
+    #[clap(long, hide = true)]
     pub for_test: bool,
 }
 
 impl ProverOptions {
-    /// Runs the move prover on the package.
+    /// Runs the move prover on the package, writing diagnostics to stderr.
     pub fn prove(
         self,
+        dev_mode: bool,
+        package_path: &Path,
+        named_addresses: BTreeMap<String, AccountAddress>,
+        bytecode_version: Option<u32>,
+        compiler_version: Option<CompilerVersion>,
+        language_version: Option<LanguageVersion>,
+        skip_attribute_checks: bool,
+        known_attributes: &BTreeSet<String>,
+        experiments: &[String],
+    ) -> anyhow::Result<()> {
+        let mut writer = DiagWriter::stderr();
+        self.prove_to(
+            &mut writer,
+            dev_mode,
+            package_path,
+            named_addresses,
+            bytecode_version,
+            compiler_version,
+            language_version,
+            skip_attribute_checks,
+            known_attributes,
+            experiments,
+        )
+    }
+
+    /// Runs the move prover on the package, writing diagnostics to the given writer.
+    pub fn prove_to(
+        self,
+        writer: &mut DiagWriter,
         dev_mode: bool,
         package_path: &Path,
         named_addresses: BTreeMap<String, AccountAddress>,
@@ -169,7 +193,6 @@ impl ProverOptions {
         )?;
         let mut options = self.convert_options(package_path)?;
         options.language_version = language_version;
-        options.model_builder.language_version = language_version.unwrap_or_default();
         // Need to ensure a distinct output.bpl file for concurrent execution. In non-test
         // mode, we actually want to use the static output.bpl for debugging purposes
         let _temp_holder = if for_test {
@@ -197,8 +220,7 @@ impl ProverOptions {
             // Special mode of benchmarking
             run_prover_benchmark(package_path, &mut model, options)?;
         } else {
-            let mut writer = StandardStream::stderr(ColorChoice::Auto);
-            move_prover::run_move_prover_with_model_v2(&mut model, &mut writer, options, now)?;
+            move_prover::run_move_prover_with_model_v2(&mut model, writer, options, now)?;
         }
         Ok(())
     }
@@ -246,9 +268,6 @@ impl ProverOptions {
                 use_cvc5: self.cvc5 || base_opts.backend.use_cvc5,
                 boogie_flags: vec![],
                 generate_smt: self.dump || base_opts.backend.generate_smt,
-                stratification_depth: self
-                    .stratification_depth
-                    .unwrap_or(base_opts.backend.stratification_depth),
                 proc_cores: self.proc_cores.unwrap_or(base_opts.backend.proc_cores),
                 shards: self.shards.unwrap_or(base_opts.backend.shards),
                 only_shard: self.only_shard.or(base_opts.backend.only_shard),

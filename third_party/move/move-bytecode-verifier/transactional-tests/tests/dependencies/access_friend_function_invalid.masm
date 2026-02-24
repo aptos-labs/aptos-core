@@ -1,0 +1,13 @@
+//# publish
+module 0x42::M
+friend fun foo()
+    ret
+
+
+
+//# publish
+module 0x42::N
+use 0x42::M
+fun foo()
+    call M::foo
+    ret

@@ -115,11 +115,11 @@ mod tests {
         let mut account = LocalAccount::new(address, ed25519_private_key, 0);
 
         let txn0 = context.create_user_account(&account).await;
-        context.commit_block(&vec![txn0]).await;
+        context.commit_block(&[txn0]).await;
         let txn1 = context.mint_user_account(&account).await;
-        context.commit_block(&vec![txn1]).await;
+        context.commit_block(&[txn1]).await;
         let txn2 = context.create_user_account(&other).await;
-        context.commit_block(&vec![txn2]).await;
+        context.commit_block(&[txn2]).await;
 
         let ed22519_txn = context.account_transfer(&mut account, &other, 5);
         let raw_txn = ed22519_txn.into_raw_transaction();
@@ -180,11 +180,11 @@ mod tests {
         let mut account = LocalAccount::new(address, ed25519_private_key, 0);
 
         let txn0 = context.create_user_account(&account).await;
-        context.commit_block(&vec![txn0]).await;
+        context.commit_block(&[txn0]).await;
         let txn1 = context.mint_user_account(&account).await;
-        context.commit_block(&vec![txn1]).await;
+        context.commit_block(&[txn1]).await;
         let txn2 = context.create_user_account(&other).await;
-        context.commit_block(&vec![txn2]).await;
+        context.commit_block(&[txn2]).await;
 
         let ed22519_txn = context.account_transfer(&mut account, &other, 5);
         let raw_txn = ed22519_txn.into_raw_transaction();

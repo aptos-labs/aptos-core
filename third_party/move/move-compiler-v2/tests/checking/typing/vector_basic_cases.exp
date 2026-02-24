@@ -3,6 +3,10 @@ module 0x42::Test {
     struct X {
         dummy_field: bool,
     }
+    private fun none() {
+        Vector<bool>();
+        Tuple()
+    }
     private fun many() {
         Vector<u8>(0, 1, 2);
         Vector<u64>(0, 1, 2);
@@ -11,10 +15,6 @@ module 0x42::Test {
         Vector<X>(pack Test::X(false), pack Test::X(false));
         Vector<vector<address>>(Vector<address>(), Vector<address>());
         Vector<vector<vector<address>>>(Vector<vector<address>>(Vector<address>(), Vector<address>()), Vector<vector<address>>());
-        Tuple()
-    }
-    private fun none() {
-        Vector<bool>();
         Tuple()
     }
     private fun one() {
@@ -33,6 +33,9 @@ module 0x42::Test {
 module 0x42::Test {
     struct X has drop {
     }
+    fun none() {
+        vector[];
+    }
     fun many() {
         vector[0u8, 1u8, 2u8];
         vector[0, 1, 2];
@@ -41,9 +44,6 @@ module 0x42::Test {
         vector[X{}, X{}];
         vector[vector[], vector[]];
         vector[vector[vector[], vector[]], vector[]];
-    }
-    fun none() {
-        vector[];
     }
     fun one() {
         vector[0u8];

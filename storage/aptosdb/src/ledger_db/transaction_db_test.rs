@@ -31,7 +31,7 @@ proptest! {
 
         let num_txns = txns.len();
         for (version, txn) in txns.into_iter().enumerate() {
-            let hash = txn.hash();
+            let hash = txn.committed_hash();
             prop_assert_eq!(transaction_db.get_transaction(version as Version).unwrap(), txn);
             prop_assert_eq!(transaction_db.get_transaction_version_by_hash(&hash, num_txns as Version).unwrap(), Some(version as Version));
             if version > 0 {

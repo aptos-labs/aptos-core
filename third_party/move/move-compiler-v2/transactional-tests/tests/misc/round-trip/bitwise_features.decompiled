@@ -41,7 +41,7 @@ module 0x42::TestFeatures {
             *_v5 = *_v5 | _v4;
             return ()
         };
-        *_v5 = *_v5 & (255u8 ^ _v4);
+        *_v5 = *_v5 & (MAX_U8 ^ _v4);
     }
     public fun test(p0: signer)
         acquires Features

@@ -53,15 +53,17 @@ use crate::pvss::{
 };
 use anyhow::bail;
 use aptos_crypto::{
-    arkworks::shamir::Reconstructable, SecretSharingConfig, SigningKey, Uniform,
+    arkworks::shamir::Reconstructable, SigningKey, TSecretSharingConfig, Uniform,
     ValidCryptoMaterial, VerifyingKey,
 };
 use num_traits::Zero;
+use rand_core::{CryptoRng, RngCore};
 use serde::{de::DeserializeOwned, Serialize};
 use std::{fmt::Debug, ops::AddAssign};
 
-// TODO: get rid of all the copy-paste here
-pub trait Subtranscript: Debug + ValidCryptoMaterial + Clone + PartialEq + Eq {
+/// Core trait for types that expose dealt key shares and decryption.
+/// Implemented by both the aggregatable "subtranscript" type and full [Transcript]s.
+pub trait TranscriptCore: Debug + ValidCryptoMaterial + Clone + PartialEq + Eq {
     type PublicParameters: HasEncryptionPublicParams
         + WithMaxNumShares
         + Default
@@ -71,7 +73,7 @@ pub trait Subtranscript: Debug + ValidCryptoMaterial + Clone + PartialEq + Eq {
         + Debug
         + PartialEq
         + Eq;
-    type SecretSharingConfig: SecretSharingConfig
+    type SecretSharingConfig: TSecretSharingConfig
         + DeserializeOwned
         + Serialize
         + Debug
@@ -95,7 +97,7 @@ pub trait Subtranscript: Debug + ValidCryptoMaterial + Clone + PartialEq + Eq {
             <Self::PublicParameters as HasEncryptionPublicParams>::EncryptionPublicParameters,
         >;
 
-    /// Returns the dealt pubkey shore of `player`.
+    /// Returns the dealt pubkey share of `player`.
     fn get_public_key_share(
         &self,
         sc: &Self::SecretSharingConfig,
@@ -123,49 +125,15 @@ pub trait Subtranscript: Debug + ValidCryptoMaterial + Clone + PartialEq + Eq {
 ///    reconstruct the secret (but no fewer can)
 /// 2. Weighted $w$-out-of-$W$ PVSS protocols where any players with combined weight $\ge w$ can
 ///    reconstruct the secret (but players with combined weight $< w$ cannot)
-pub trait Transcript: Debug + ValidCryptoMaterial + Clone + PartialEq + Eq {
+pub trait Transcript: TranscriptCore {
     type SigningSecretKey: Uniform + SigningKey<VerifyingKeyMaterial = Self::SigningPubKey>;
     type SigningPubKey: VerifyingKey<SigningKeyMaterial = Self::SigningSecretKey>;
-
-    type DealtSecretKey: PartialEq
-        + Reconstructable<Self::SecretSharingConfig, ShareValue = Self::DealtSecretKeyShare>;
 
     type InputSecret: Uniform
         + Zero
         + for<'a> AddAssign<&'a Self::InputSecret>
         + Convert<Self::DealtSecretKey, Self::PublicParameters>
         + Convert<Self::DealtPubKey, Self::PublicParameters>;
-
-    type PublicParameters: HasEncryptionPublicParams
-        + WithMaxNumShares
-        + Default
-        + ValidCryptoMaterial
-        + DeserializeOwned
-        + Serialize
-        + Debug
-        + PartialEq
-        + Eq;
-    type SecretSharingConfig: SecretSharingConfig
-        + DeserializeOwned
-        + Serialize
-        + Debug
-        + PartialEq
-        + Eq;
-    type DealtPubKeyShare: Debug + PartialEq + Clone;
-    type DealtSecretKeyShare: PartialEq + Clone;
-    type DealtPubKey: Serialize; // So it can get signed
-    type EncryptPubKey: Debug
-        + Clone
-        + ValidCryptoMaterial
-        + DeserializeOwned
-        + Serialize
-        + PartialEq
-        + Eq;
-    type DecryptPrivKey: Uniform
-        + Convert<
-            Self::EncryptPubKey,
-            <Self::PublicParameters as HasEncryptionPublicParams>::EncryptionPublicParameters,
-        >;
 
     /// Domain-separator tag (DST) for the Fiat-Shamir hashing used to derive randomness from the transcript.
     fn dst() -> Vec<u8>;
@@ -180,7 +148,7 @@ pub trait Transcript: Debug + ValidCryptoMaterial + Clone + PartialEq + Eq {
     /// The dealer will sign the transcript (or part of it; typically just a commitment to the dealt
     /// secret) together with his player ID in `dealer` and the auxiliary data in `aux` (which might
     /// be needed for the security of higher-level protocols; e.g., replay protection).
-    fn deal<A: Serialize + Clone, R: rand_core::RngCore + rand_core::CryptoRng>(
+    fn deal<A: Serialize + Clone, R: RngCore + CryptoRng>(
         sc: &Self::SecretSharingConfig,
         pp: &Self::PublicParameters,
         ssk: &Self::SigningSecretKey,
@@ -192,22 +160,6 @@ pub trait Transcript: Debug + ValidCryptoMaterial + Clone + PartialEq + Eq {
         rng: &mut R,
     ) -> Self;
 
-    /// Verifies the validity of the PVSS transcript: i.e., the transcripts correctly encrypts shares
-    /// of an `InputSecret` $s$ which has been $(t, n)$ secret-shared such that only $\ge t$ players
-    /// can reconstruct it as a `DealtSecret`.
-    ///
-    /// Additionally, verifies that the transcript was indeed aggregated from a set of players
-    /// identified by the public keys in `spks`, by verifying each player $i$'s signature on the
-    /// transcript and on `aux[i]`.
-    // fn verify<A: Serialize + Clone>(
-    //     &self,
-    //     sc: &Self::SecretSharingConfig,
-    //     pp: &Self::PublicParameters,
-    //     spks: &[Self::SigningPubKey],
-    //     eks: &[Self::EncryptPubKey],
-    //     sids: &[A],
-    // ) -> anyhow::Result<()>;
-
     /// Returns the set of player IDs who have contributed to this transcript.
     /// In other words, the transcript could have been dealt by one player, in which case
     /// the set is of size 1, or the transcript could have been obtained by aggregating `n`
@@ -216,76 +168,71 @@ pub trait Transcript: Debug + ValidCryptoMaterial + Clone + PartialEq + Eq {
 
     /// Generates a random looking transcript (but not a valid one).
     /// Useful for testing and benchmarking.
-    fn generate<R>(
+    fn generate<R: RngCore + CryptoRng>(
         sc: &Self::SecretSharingConfig,
         pp: &Self::PublicParameters,
         rng: &mut R,
-    ) -> Self
-    where
-        R: rand_core::RngCore + rand_core::CryptoRng;
-
-    /// Returns the dealt pubkey shore of `player`.
-    fn get_public_key_share(
-        &self,
-        sc: &Self::SecretSharingConfig,
-        player: &Player,
-    ) -> Self::DealtPubKeyShare;
-
-    /// Given a valid transcript, returns the `DealtPublicKey` of that transcript: i.e., the public
-    /// key associated with the secret key dealt in the transcript.
-    fn get_dealt_public_key(&self) -> Self::DealtPubKey;
-
-    /// Given a valid transcript, returns the decrypted `DealtSecretShare` for the player with ID
-    /// `player_id`.
-    fn decrypt_own_share(
-        &self,
-        sc: &Self::SecretSharingConfig,
-        player: &Player,
-        dk: &Self::DecryptPrivKey,
-        pp: &Self::PublicParameters,
-    ) -> (Self::DealtSecretKeyShare, Self::DealtPubKeyShare);
+    ) -> Self;
 }
 
+/// Trait for types that can be aggregated.
+/// Supports efficient intermediate aggregation in a separate associated type.
 pub trait Aggregatable: Sized {
-    // Rename this?
+    /// Config type for secret-sharing aggregation
     type SecretSharingConfig;
 
-    // Sized was needed for `Vec<Self>`
-    /// Aggregates two transcripts using a generic config type.
-    fn aggregate_with(
-        &mut self,
-        sc: &Self::SecretSharingConfig,
-        other: &Self,
-    ) -> anyhow::Result<()>;
+    /// The intermediate/projective aggregation type
+    type Aggregated: Aggregated<Self>;
 
-    /// Helper function for aggregating a vector of transcripts.
-    /// Used primarily for benchmarks and tests.
-    fn aggregate(sc: &Self::SecretSharingConfig, mut trxs: Vec<Self>) -> anyhow::Result<Self> {
-        if trxs.is_empty() {
-            bail!("Cannot aggregate empty vector of transcripts");
+    /// Convert into the intermediate/projective type for aggregation
+    fn to_aggregated(&self) -> Self::Aggregated;
+
+    /// Aggregate a vector of items into a single affine value
+    fn aggregate(sc: &Self::SecretSharingConfig, items: Vec<Self>) -> anyhow::Result<Self> {
+        if items.is_empty() {
+            bail!("Cannot aggregate empty vector");
         }
 
-        let (first, rest) = trxs.split_at_mut(1);
+        // Convert the first item into the intermediate type
+        let mut iter = items.into_iter();
+        let first = iter.next().unwrap();
+        let mut acc = first.to_aggregated();
 
-        for other in rest {
-            first[0].aggregate_with(sc, other)?;
+        // Aggregate the rest
+        for item in iter {
+            acc.aggregate_with(&sc, &item)?;
         }
 
-        // `first[0]` has accumulated everything, return it
-        trxs.truncate(1);
-        let trx = trxs.pop().unwrap();
-
-        Ok(trx)
+        // Convert back to affine/final type
+        Ok(acc.normalize())
     }
 }
 
+/// Trait for the intermediate aggregation type
+pub trait Aggregated<T: Aggregatable>: Sized {
+    /// Aggregate another item into this intermediate aggregation
+    fn aggregate_with(&mut self, sc: &T::SecretSharingConfig, other: &T) -> anyhow::Result<()>;
+
+    /// Convert the intermediate/projective aggregation back into the final affine type
+    fn normalize(self) -> T;
+}
+
 pub trait AggregatableTranscript:
-    Transcript + Aggregatable<SecretSharingConfig = <Self as Transcript>::SecretSharingConfig>
+    Transcript + Aggregatable<SecretSharingConfig = <Self as TranscriptCore>::SecretSharingConfig>
 {
-    // The signature here is slightly different from `NonAggregatableTranscript`, because our aggregatable PVSSs needs all of the session ids
+    /// Verifies the validity of the PVSS transcript: i.e., the transcripts correctly encrypts shares
+    /// of an `InputSecret` $s$ which has been $(t, n)$ secret-shared such that only $\ge t$ players
+    /// can reconstruct it as a `DealtSecret`.
+    ///
+    /// Additionally, verifies that the transcript was indeed aggregated from a set of players
+    /// identified by the public keys in `spks`, by verifying each player $i$'s signature on the
+    /// transcript and on `aux[i]`.
+    ///
+    /// The signature here is slightly different from [HasAggregatableSubtranscript], because our aggregatable
+    /// PVSSs needs all of the session ids, and don't need an rng
     fn verify<A: Serialize + Clone>(
         &self,
-        sc: &<Self as Transcript>::SecretSharingConfig,
+        sc: &<Self as TranscriptCore>::SecretSharingConfig,
         pp: &Self::PublicParameters,
         spks: &[Self::SigningPubKey],
         eks: &[Self::EncryptPubKey],
@@ -293,9 +240,11 @@ pub trait AggregatableTranscript:
     ) -> anyhow::Result<()>;
 }
 
+/// Transcript that has an aggregatable part with the same core interface as the transcript.
 pub trait HasAggregatableSubtranscript: Transcript {
+    /// The aggregatable subtranscript type; will delegate so must match this transcript's core associated types.
     type Subtranscript: Aggregatable
-        + Subtranscript<
+        + TranscriptCore<
             PublicParameters = Self::PublicParameters,
             SecretSharingConfig = Self::SecretSharingConfig,
             DealtPubKeyShare = Self::DealtPubKeyShare,
@@ -308,14 +257,56 @@ pub trait HasAggregatableSubtranscript: Transcript {
 
     fn get_subtranscript(&self) -> Self::Subtranscript;
 
-    fn verify<A: Serialize + Clone>(
+    fn verify<A: Serialize + Clone, R: RngCore + CryptoRng>(
         &self,
         sc: &Self::SecretSharingConfig,
         pp: &Self::PublicParameters,
         spks: &[Self::SigningPubKey],
         eks: &[Self::EncryptPubKey],
         sid: &A, // Note the different function signature heres
+        rng: &mut R,
     ) -> anyhow::Result<()>;
+}
+
+/// Macro to delegate `TranscriptCore` methods to a subtranscript field.
+#[macro_export]
+macro_rules! delegate_transcript_core_to_subtrs {
+    ($t:ty, $subfield:ident) => {
+        impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>>
+            traits::TranscriptCore for $t
+        {
+            type DealtPubKey = keys::DealtPubKey<E>;
+            type DealtPubKeyShare = Vec<keys::DealtPubKeyShare<E>>;
+            type DealtSecretKey = keys::DealtSecretKey<E::ScalarField>;
+            type DealtSecretKeyShare = Vec<keys::DealtSecretKeyShare<E::ScalarField>>;
+            type DecryptPrivKey = keys::DecryptPrivKey<E>;
+            type EncryptPubKey = keys::EncryptPubKey<E>;
+            type PublicParameters = PublicParameters<E>;
+            type SecretSharingConfig = SecretSharingConfig<E>;
+
+            fn get_public_key_share(
+                &self,
+                sc: &Self::SecretSharingConfig,
+                player: &Player,
+            ) -> Self::DealtPubKeyShare {
+                traits::TranscriptCore::get_public_key_share(&self.$subfield, sc, player)
+            }
+
+            fn get_dealt_public_key(&self) -> Self::DealtPubKey {
+                traits::TranscriptCore::get_dealt_public_key(&self.$subfield)
+            }
+
+            fn decrypt_own_share(
+                &self,
+                sc: &Self::SecretSharingConfig,
+                player: &Player,
+                dk: &Self::DecryptPrivKey,
+                pp: &Self::PublicParameters,
+            ) -> (Self::DealtSecretKeyShare, Self::DealtPubKeyShare) {
+                traits::TranscriptCore::decrypt_own_share(&self.$subfield, sc, player, dk, pp)
+            }
+        }
+    };
 }
 
 /// This traits defines testing-only and benchmarking-only interfaces.
@@ -333,8 +324,10 @@ pub trait MalleableTranscript: Transcript {
 
 /// This is needed instead of Default because `max_n` influences the public parameters of the DeKARTv2 range proof, and hence the public parameters of `chunky`
 pub trait WithMaxNumShares {
-    fn with_max_num_shares(n: usize) -> Self;
+    fn with_max_num_shares(n: u32) -> Self;
+
+    fn with_max_num_shares_and_bit_size(n: u32, ell: u8) -> Self;
 
     /// This is a modified function which might create public parameters that are fairly nonsensical, but which are sufficient for `generate()`
-    fn with_max_num_shares_for_generate(n: usize) -> Self;
+    fn with_max_num_shares_for_generate(n: u32) -> Self;
 }

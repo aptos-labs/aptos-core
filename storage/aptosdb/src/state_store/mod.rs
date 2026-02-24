@@ -6,14 +6,12 @@
 use crate::{
     ledger_db::LedgerDb,
     metrics::{OTHER_TIMERS_SECONDS, STATE_ITEMS, TOTAL_STATE_BYTES},
-    pruner::{StateKvPrunerManager, StateMerklePrunerManager},
+    pruner::{leaked_stale_node_cleaner, StateKvPrunerManager, StateMerklePrunerManager},
     schema::{
         db_metadata::{DbMetadataKey, DbMetadataSchema, DbMetadataValue},
         stale_node_index::StaleNodeIndexSchema,
         stale_node_index_cross_epoch::StaleNodeIndexCrossEpochSchema,
-        stale_state_value_index::StaleStateValueIndexSchema,
         stale_state_value_index_by_key_hash::StaleStateValueIndexByKeyHashSchema,
-        state_value::StateValueSchema,
         state_value_by_key_hash::StateValueByKeyHashSchema,
         version_data::VersionDataSchema,
     },
@@ -22,7 +20,6 @@ use crate::{
     state_restore::{StateSnapshotRestore, StateSnapshotRestoreMode, StateValueWriter},
     state_store::{buffered_state::BufferedState, persisted_state::PersistedState},
     utils::{
-        iterators::PrefixedStateValueIterator,
         truncation_helper::{
             find_tree_root_at_or_before, get_max_version_in_state_merkle_db, truncate_ledger_db,
             truncate_state_kv_db, truncate_state_merkle_db,
@@ -30,7 +27,7 @@ use crate::{
         ShardedStateKvSchemaBatch,
     },
 };
-use aptos_config::config::HotStateConfig;
+use aptos_config::config::{HotStateConfig, PrunerConfig};
 use aptos_crypto::{
     hash::{CryptoHash, CORRUPTION_SENTINEL, SPARSE_MERKLE_PLACEHOLDER_HASH},
     HashValue,
@@ -69,13 +66,10 @@ use aptos_storage_interface::{
 use aptos_types::{
     proof::{definition::LeafCount, SparseMerkleProofExt, SparseMerkleRangeProof},
     state_store::{
-        state_key::{prefix::StateKeyPrefix, StateKey},
+        state_key::StateKey,
         state_slot::StateSlot,
         state_storage_usage::StateStorageUsage,
-        state_value::{
-            StaleStateValueByKeyHashIndex, StaleStateValueIndex, StateValue,
-            StateValueChunkWithProof,
-        },
+        state_value::{StaleStateValueByKeyHashIndex, StateValue, StateValueChunkWithProof},
         NUM_STATE_SHARDS,
     },
     transaction::Version,
@@ -106,14 +100,58 @@ const MAX_WRITE_SETS_AFTER_SNAPSHOT: LeafCount = buffered_state::TARGET_SNAPSHOT
 
 pub const MAX_COMMIT_PROGRESS_DIFFERENCE: u64 = 1_000_000;
 
+pub(crate) struct StatePruner {
+    pub hot_state_merkle_pruner: Option<StateMerklePrunerManager<StaleNodeIndexSchema>>,
+    pub hot_epoch_snapshot_pruner: Option<StateMerklePrunerManager<StaleNodeIndexCrossEpochSchema>>,
+    pub state_merkle_pruner: StateMerklePrunerManager<StaleNodeIndexSchema>,
+    pub epoch_snapshot_pruner: StateMerklePrunerManager<StaleNodeIndexCrossEpochSchema>,
+    pub state_kv_pruner: StateKvPrunerManager,
+}
+
+impl StatePruner {
+    pub fn new(
+        hot_state_merkle_db: Option<Arc<StateMerkleDb>>,
+        state_merkle_db: Arc<StateMerkleDb>,
+        state_kv_db: Arc<StateKvDb>,
+        config: PrunerConfig,
+    ) -> Self {
+        let hot_state_merkle_pruner = hot_state_merkle_db.as_ref().map(|db| {
+            StateMerklePrunerManager::new(Arc::clone(db), config.state_merkle_pruner_config)
+        });
+        let hot_epoch_snapshot_pruner = hot_state_merkle_db.map(|db| {
+            StateMerklePrunerManager::new(db, config.epoch_snapshot_pruner_config.into())
+        });
+        let state_merkle_pruner = StateMerklePrunerManager::new(
+            Arc::clone(&state_merkle_db),
+            config.state_merkle_pruner_config,
+        );
+        let epoch_snapshot_pruner = StateMerklePrunerManager::new(
+            Arc::clone(&state_merkle_db),
+            config.epoch_snapshot_pruner_config.into(),
+        );
+        let state_kv_pruner = StateKvPrunerManager::new(state_kv_db, config.ledger_pruner_config);
+
+        leaked_stale_node_cleaner::maybe_start_cleaner(
+            state_merkle_db,
+            config.stale_node_cleanup_batch_size,
+        );
+
+        Self {
+            hot_state_merkle_pruner,
+            hot_epoch_snapshot_pruner,
+            state_merkle_pruner,
+            epoch_snapshot_pruner,
+            state_kv_pruner,
+        }
+    }
+}
+
 pub(crate) struct StateDb {
     pub ledger_db: Arc<LedgerDb>,
     pub hot_state_merkle_db: Option<Arc<StateMerkleDb>>,
     pub state_merkle_db: Arc<StateMerkleDb>,
     pub state_kv_db: Arc<StateKvDb>,
-    pub state_merkle_pruner: StateMerklePrunerManager<StaleNodeIndexSchema>,
-    pub epoch_snapshot_pruner: StateMerklePrunerManager<StaleNodeIndexCrossEpochSchema>,
-    pub state_kv_pruner: StateKvPrunerManager,
+    pub state_pruner: StatePruner,
     pub skip_usage: bool,
 }
 
@@ -190,14 +228,9 @@ impl DbReader for StateDb {
         use_hot_state: bool,
     ) -> Result<SparseMerkleProofExt> {
         let db = if use_hot_state {
-            if self.state_merkle_db.sharding_enabled() {
-                self.hot_state_merkle_db
-                    .as_ref()
-                    .ok_or(AptosDbError::HotStateError)?
-            } else {
-                // Unsharded unit tests still rely on this.
-                &self.state_merkle_db
-            }
+            self.hot_state_merkle_db
+                .as_ref()
+                .ok_or(AptosDbError::HotStateError)?
         } else {
             &self.state_merkle_db
         };
@@ -214,14 +247,9 @@ impl DbReader for StateDb {
         use_hot_state: bool,
     ) -> Result<(Option<StateValue>, SparseMerkleProofExt)> {
         let db = if use_hot_state {
-            if self.state_merkle_db.sharding_enabled() {
-                self.hot_state_merkle_db
-                    .as_ref()
-                    .ok_or(AptosDbError::HotStateError)?
-            } else {
-                // Unsharded unit tests still rely on this.
-                &self.state_merkle_db
-            }
+            self.hot_state_merkle_db
+                .as_ref()
+                .ok_or(AptosDbError::HotStateError)?
         } else {
             &self.state_merkle_db
         };
@@ -340,9 +368,7 @@ impl StateStore {
         hot_state_merkle_db: Option<Arc<StateMerkleDb>>,
         state_merkle_db: Arc<StateMerkleDb>,
         state_kv_db: Arc<StateKvDb>,
-        state_merkle_pruner: StateMerklePrunerManager<StaleNodeIndexSchema>,
-        epoch_snapshot_pruner: StateMerklePrunerManager<StaleNodeIndexCrossEpochSchema>,
-        state_kv_pruner: StateKvPrunerManager,
+        state_pruner: StatePruner,
         buffered_state_target_items: usize,
         hack_for_tests: bool,
         empty_buffered_state_for_restore: bool,
@@ -363,9 +389,7 @@ impl StateStore {
             hot_state_merkle_db,
             state_merkle_db,
             state_kv_db,
-            state_merkle_pruner,
-            epoch_snapshot_pruner,
-            state_kv_pruner,
+            state_pruner,
             skip_usage,
         });
         // TODO(HotState): probably fetch onchain config from storage.
@@ -508,28 +532,18 @@ impl StateStore {
         state_merkle_db: Arc<StateMerkleDb>,
         state_kv_db: Arc<StateKvDb>,
     ) -> Result<Option<Version>> {
-        use aptos_config::config::NO_OP_STORAGE_PRUNER_CONFIG;
-
-        let state_merkle_pruner = StateMerklePrunerManager::new(
+        let state_pruner = StatePruner::new(
+            hot_state_merkle_db.clone(),
             Arc::clone(&state_merkle_db),
-            NO_OP_STORAGE_PRUNER_CONFIG.state_merkle_pruner_config,
-        );
-        let epoch_snapshot_pruner = StateMerklePrunerManager::new(
-            Arc::clone(&state_merkle_db),
-            NO_OP_STORAGE_PRUNER_CONFIG.state_merkle_pruner_config,
-        );
-        let state_kv_pruner = StateKvPrunerManager::new(
             Arc::clone(&state_kv_db),
-            NO_OP_STORAGE_PRUNER_CONFIG.ledger_pruner_config,
+            aptos_config::config::NO_OP_STORAGE_PRUNER_CONFIG,
         );
         let state_db = Arc::new(StateDb {
             ledger_db,
             hot_state_merkle_db,
             state_merkle_db,
             state_kv_db,
-            state_merkle_pruner,
-            epoch_snapshot_pruner,
-            state_kv_pruner,
+            state_pruner,
             skip_usage: false,
         });
         let current_state = Arc::new(Mutex::new(LedgerStateWithSummary::new_empty(
@@ -726,25 +740,6 @@ impl StateStore {
         self.current_state.lock()
     }
 
-    /// Returns the key, value pairs for a particular state key prefix at desired version. This
-    /// API can be used to get all resources of an account by passing the account address as the
-    /// key prefix.
-    pub fn get_prefixed_state_value_iterator(
-        &self,
-        key_prefix: &StateKeyPrefix,
-        first_key_opt: Option<&StateKey>,
-        desired_version: Version,
-    ) -> Result<PrefixedStateValueIterator<'_>> {
-        // this can only handle non-sharded db scenario.
-        // For sharded db, should look at API side using internal indexer to handle this request
-        PrefixedStateValueIterator::new(
-            &self.state_kv_db,
-            key_prefix.clone(),
-            first_key_opt.cloned(),
-            desired_version,
-        )
-    }
-
     /// Gets the proof that proves a range of accounts.
     pub fn get_value_range_proof(
         &self,
@@ -827,17 +822,10 @@ impl StateStore {
                             .map(|write_op| (key, update.version, write_op))
                     })
                     .try_for_each(|(key, version, write_op)| {
-                        if self.state_kv_db.enabled_sharding() {
-                            batch.put::<StateValueByKeyHashSchema>(
-                                &(CryptoHash::hash(*key), version),
-                                &write_op.as_state_value_opt().cloned(),
-                            )
-                        } else {
-                            batch.put::<StateValueSchema>(
-                                &((*key).clone(), version),
-                                &write_op.as_state_value_opt().cloned(),
-                            )
-                        }
+                        batch.put::<StateValueByKeyHashSchema>(
+                            &(CryptoHash::hash(*key), version),
+                            &write_op.as_state_value_opt().cloned(),
+                        )
                     })
             })
     }
@@ -871,7 +859,6 @@ impl StateStore {
         Self::put_stale_state_value_index(
             state_update_refs,
             sharded_state_kv_batches,
-            self.state_kv_db.enabled_sharding(),
             state_reads,
             latest_state.usage().is_untracked() || current_state.version().is_none(), // ignore_state_cache_miss
         );
@@ -896,7 +883,6 @@ impl StateStore {
     fn put_stale_state_value_index(
         state_update_refs: &PerVersionStateUpdateRefs,
         sharded_state_kv_batches: &mut ShardedStateKvSchemaBatch,
-        enable_sharding: bool,
         sharded_state_cache: &ShardedStateCache,
         ignore_state_cache_miss: bool,
     ) {
@@ -917,7 +903,6 @@ impl StateStore {
                     cache,
                     updates,
                     batch,
-                    enable_sharding,
                     ignore_state_cache_miss,
                 );
             })
@@ -930,7 +915,6 @@ impl StateStore {
         cache: &StateCacheShard,
         updates: &[(&'kv StateKey, StateUpdateRef<'kv>)],
         batch: &mut NativeBatch,
-        enable_sharding: bool,
         ignore_state_cache_miss: bool,
     ) {
         let _timer = OTHER_TIMERS_SECONDS.timer_with(&[&format!("put_stale_kv_index__{shard_id}")]);
@@ -947,7 +931,7 @@ impl StateStore {
                 if update_to_cold.state_op.expect_as_write_op().is_delete() {
                     // This is a tombstone, can be pruned once this `version` goes out of
                     // the pruning window.
-                    Self::put_state_kv_index(batch, enable_sharding, version, version, key);
+                    Self::put_state_kv_index(batch, version, version, key);
                 }
 
                 // TODO(aldenhu): cache changes here, should consume it.
@@ -970,13 +954,7 @@ impl StateStore {
                 if old_entry.is_occupied() {
                     // The value at the old version can be pruned once the pruning window hits
                     // this `version`.
-                    Self::put_state_kv_index(
-                        batch,
-                        enable_sharding,
-                        version,
-                        old_entry.expect_value_version(),
-                        key,
-                    )
+                    Self::put_state_kv_index(batch, version, old_entry.expect_value_version(), key)
                 }
             }
         }
@@ -984,34 +962,20 @@ impl StateStore {
 
     fn put_state_kv_index(
         batch: &mut NativeBatch,
-        enable_sharding: bool,
         stale_since_version: Version,
         version: Version,
         key: &StateKey,
     ) {
-        if enable_sharding {
-            batch
-                .put::<StaleStateValueIndexByKeyHashSchema>(
-                    &StaleStateValueByKeyHashIndex {
-                        stale_since_version,
-                        version,
-                        state_key_hash: key.hash(),
-                    },
-                    &(),
-                )
-                .unwrap();
-        } else {
-            batch
-                .put::<StaleStateValueIndexSchema>(
-                    &StaleStateValueIndex {
-                        stale_since_version,
-                        version,
-                        state_key: (*key).clone(),
-                    },
-                    &(),
-                )
-                .unwrap();
-        }
+        batch
+            .put::<StaleStateValueIndexByKeyHashSchema>(
+                &StaleStateValueByKeyHashIndex {
+                    stale_since_version,
+                    version,
+                    state_key_hash: key.hash(),
+                },
+                &(),
+            )
+            .unwrap();
     }
 
     fn put_usage(state: &State, batch: &mut SchemaBatch) -> Result<()> {
@@ -1031,7 +995,6 @@ impl StateStore {
         &self,
         sharded_batch: &mut ShardedStateKvSchemaBatch,
         values: &StateValueBatch,
-        enable_sharding: bool,
     ) -> Result<()> {
         values.iter().for_each(|((key, version), value)| {
             let shard_id = key.get_shard_id();
@@ -1040,15 +1003,9 @@ impl StateStore {
                 "Invalid shard id: {}",
                 shard_id
             );
-            if enable_sharding {
-                sharded_batch[shard_id]
-                    .put::<StateValueByKeyHashSchema>(&(key.hash(), *version), value)
-                    .expect("Inserting into sharded schema batch should never fail");
-            } else {
-                sharded_batch[shard_id]
-                    .put::<StateValueSchema>(&(key.clone(), *version), value)
-                    .expect("Inserting into sharded schema batch should never fail");
-            }
+            sharded_batch[shard_id]
+                .put::<StateValueByKeyHashSchema>(&(key.hash(), *version), value)
+                .expect("Inserting into sharded schema batch should never fail");
         });
         Ok(())
     }
@@ -1181,17 +1138,15 @@ impl StateStore {
 
         let mut keys: Vec<aptos_jellyfish_merkle::node_type::NodeKey> =
             all_rows.into_iter().map(|(k, _v)| k).collect();
-        if self.state_merkle_db.sharding_enabled() {
-            for i in 0..NUM_STATE_SHARDS {
-                let mut iter =
-                    self.state_merkle_db
-                        .db_shard(i)
-                        .iter::<crate::schema::jellyfish_merkle_node::JellyfishMerkleNodeSchema>()?;
-                iter.seek_to_first();
+        for i in 0..NUM_STATE_SHARDS {
+            let mut iter =
+                self.state_merkle_db
+                    .db_shard(i)
+                    .iter::<crate::schema::jellyfish_merkle_node::JellyfishMerkleNodeSchema>()?;
+            iter.seek_to_first();
 
-                let all_rows = iter.collect::<Result<Vec<_>>>()?;
-                keys.extend(all_rows.into_iter().map(|(k, _v)| k).collect::<Vec<_>>());
-            }
+            let all_rows = iter.collect::<Result<Vec<_>>>()?;
+            keys.extend(all_rows.into_iter().map(|(k, _v)| k).collect::<Vec<_>>());
         }
         Ok(keys)
     }
@@ -1269,11 +1224,7 @@ impl StateValueWriter<StateKey, StateValue> for StateStore {
                 .unwrap()
                 .write_keys_to_indexer_db(&keys, version, progress)?;
         }
-        self.shard_state_value_batch(
-            &mut sharded_schema_batch,
-            node_batch,
-            self.state_kv_db.enabled_sharding(),
-        )?;
+        self.shard_state_value_batch(&mut sharded_schema_batch, node_batch)?;
         self.state_kv_db
             .commit(version, Some(batch), sharded_schema_batch)
     }

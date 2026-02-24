@@ -53,7 +53,6 @@ async fn test_proposal_generation_empty_tree() {
         ChainHealthBackoffConfig::new_no_backoff(),
         false,
         ValidatorTxnConfig::default_disabled(),
-        true,
         Arc::new(MockOptQSPayloadProvider {}),
     );
     let proposer_election = Arc::new(UnequivocalProposerElection::new(Arc::new(
@@ -100,7 +99,6 @@ async fn test_proposal_generation_parent() {
         ChainHealthBackoffConfig::new_no_backoff(),
         false,
         ValidatorTxnConfig::default_disabled(),
-        true,
         Arc::new(MockOptQSPayloadProvider {}),
     );
     let proposer_election = Arc::new(UnequivocalProposerElection::new(Arc::new(
@@ -177,7 +175,6 @@ async fn test_old_proposal_generation() {
         ChainHealthBackoffConfig::new_no_backoff(),
         false,
         ValidatorTxnConfig::default_disabled(),
-        true,
         Arc::new(MockOptQSPayloadProvider {}),
     );
     let proposer_election = Arc::new(UnequivocalProposerElection::new(Arc::new(
@@ -219,7 +216,6 @@ async fn test_correct_failed_authors() {
         ChainHealthBackoffConfig::new_no_backoff(),
         false,
         ValidatorTxnConfig::default_disabled(),
-        true,
         Arc::new(MockOptQSPayloadProvider {}),
     );
     let proposer_election = Arc::new(UnequivocalProposerElection::new(Arc::new(

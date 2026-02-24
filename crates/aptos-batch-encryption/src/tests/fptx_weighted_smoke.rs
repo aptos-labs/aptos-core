@@ -6,7 +6,8 @@ use crate::{
     traits::BatchThresholdEncryption,
 };
 use anyhow::Result;
-use aptos_crypto::{weighted_config::WeightedConfigArkworks, SecretSharingConfig as _};
+use aptos_crypto::{weighted_config::WeightedConfigArkworks, TSecretSharingConfig as _};
+use aptos_dkg::pvss::traits::transcript::Aggregatable;
 use ark_ec::AffineRepr as _;
 use ark_std::rand::{seq::SliceRandom, thread_rng, CryptoRng, Rng as _, RngCore};
 
@@ -24,7 +25,7 @@ fn weighted_smoke_with_setup<R: RngCore + CryptoRng>(
     let ct = FPTXWeighted::encrypt(&ek, rng, &plaintext, &associated_data).unwrap();
     FPTXWeighted::verify_ct(&ct, &associated_data).unwrap();
 
-    let (d, pfs_promise) = FPTXWeighted::digest(&dk, &vec![ct.clone()], 0).unwrap();
+    let (d, pfs_promise) = FPTXWeighted::digest(&dk, std::slice::from_ref(&ct), 0).unwrap();
     let pfs = FPTXWeighted::eval_proofs_compute_all(&pfs_promise, &dk);
 
     let dk_shares: Vec<<FPTXWeighted as BatchThresholdEncryption>::DecryptionKeyShare> = msk_shares
@@ -50,15 +51,15 @@ fn weighted_smoke_with_setup<R: RngCore + CryptoRng>(
 
     ek.verify_decryption_key(&d, &dk).unwrap();
 
-    let decrypted_plaintexts: Vec<String> =
-        FPTXWeighted::decrypt(&dk, &vec![ct.prepare(&d, &pfs).unwrap()]).unwrap();
+    let decrypted_plaintext: String =
+        FPTXWeighted::decrypt(&dk, &ct.prepare(&d, &pfs).unwrap()).unwrap();
 
-    assert_eq!(decrypted_plaintexts[0], plaintext);
+    assert_eq!(decrypted_plaintext, plaintext);
 
     // Test individual decryption
     let eval_proof = FPTXWeighted::eval_proof_for_ct(&pfs, &ct).unwrap();
     let individual_decrypted_plaintext: String =
-        FPTXWeighted::decrypt_individual(&dk, &ct, &d, &eval_proof).unwrap();
+        FPTXWeighted::decrypt_slow(&dk, &ct, &d, &eval_proof).unwrap();
     assert_eq!(individual_decrypted_plaintext, plaintext);
 }
 
@@ -80,7 +81,7 @@ use aptos_crypto::{SigningKey, Uniform};
 use aptos_dkg::pvss::{
     test_utils::NoAux,
     traits::{
-        transcript::{Aggregatable, HasAggregatableSubtranscript},
+        transcript::{HasAggregatableSubtranscript, TranscriptCore},
         Convert, HasEncryptionPublicParams, Transcript,
     },
 };
@@ -91,7 +92,7 @@ fn weighted_smoke_with_pvss() {
     let mut rng_aptos = rand::thread_rng();
 
     let tc = WeightedConfigArkworks::new(3, vec![1, 2, 5]).unwrap();
-    let pp = <T as Transcript>::PublicParameters::new_with_commitment_base(
+    let pp = <T as TranscriptCore>::PublicParameters::new_with_commitment_base(
         tc.get_total_weight(),
         aptos_dkg::pvss::chunky::DEFAULT_ELL_FOR_TESTING,
         tc.get_total_num_players(),
@@ -107,10 +108,10 @@ fn weighted_smoke_with_pvss() {
         .map(|ssk| ssk.verifying_key())
         .collect::<Vec<<T as Transcript>::SigningPubKey>>();
 
-    let dks: Vec<<T as Transcript>::DecryptPrivKey> = (0..tc.get_total_num_players())
-        .map(|_| <T as Transcript>::DecryptPrivKey::generate(&mut rng_aptos))
+    let dks: Vec<<T as TranscriptCore>::DecryptPrivKey> = (0..tc.get_total_num_players())
+        .map(|_| <T as TranscriptCore>::DecryptPrivKey::generate(&mut rng_aptos))
         .collect();
-    let eks: Vec<<T as Transcript>::EncryptPubKey> = dks
+    let eks: Vec<<T as TranscriptCore>::EncryptPubKey> = dks
         .iter()
         .map(|dk| dk.to(pp.get_encryption_public_params()))
         .collect();
@@ -139,10 +140,9 @@ fn weighted_smoke_with_pvss() {
         })
         .collect();
 
-    let mut subtranscript = subtrx_paths[0].clone();
-    for acc in &subtrx_paths[1..] {
-        subtranscript.aggregate_with(&tc, acc).unwrap();
-    }
+    // Do all aggregations in projective form, then normalize to affine
+    let subtranscript =
+        <T as HasAggregatableSubtranscript>::Subtranscript::aggregate(&tc, subtrx_paths).unwrap();
 
     let dk = DigestKey::new(&mut rng, 8, 1).unwrap();
 

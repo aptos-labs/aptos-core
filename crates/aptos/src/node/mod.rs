@@ -9,7 +9,8 @@ use crate::{
     common::{
         types::{
             CliCommand, CliError, CliResult, CliTypedResult, OptionalPoolAddressArgs,
-            PoolAddressArgs, ProfileOptions, RestOptions, TransactionOptions, TransactionSummary,
+            PoolAddressArgs, ProfileOptions, RestOptions, TransactionOptions,
+            TransactionOptionsExt, TransactionSummary,
         },
         utils::read_from_file,
     },

@@ -3,112 +3,229 @@
 
 use crate::{
     fiat_shamir,
-    sigma_protocol::homomorphism::{
-        self,
-        fixed_base_msms::{self},
+    sigma_protocol::{
+        homomorphism::{
+            self,
+            fixed_base_msms::{self},
+        },
+        FirstProofItem, Proof,
     },
     Scalar,
 };
 use anyhow::ensure;
 use aptos_crypto::{
-    arkworks::{msm::IsMsmInput, random::sample_field_element},
+    arkworks::{
+        msm::{merge_scaled_msm_terms, MsmInput},
+        random::sample_field_element,
+    },
     utils,
 };
-use ark_ec::CurveGroup;
-use ark_ff::{Field, Fp, FpConfig, PrimeField};
-use ark_serialize::{
-    CanonicalDeserialize, CanonicalSerialize, Compress, SerializationError, Valid, Validate,
-};
-use ark_std::{io::Read, UniformRand};
+use ark_ec::{CurveGroup, PrimeGroup};
+use ark_ff::{AdditiveGroup, Field, Fp, FpConfig, PrimeField};
+use ark_serialize::{CanonicalDeserialize, CanonicalSerialize};
 use rand_core::{CryptoRng, RngCore};
 use serde::Serialize;
-use std::{fmt::Debug, io::Write};
+use std::{fmt::Debug, hash::Hash};
 
-// `CurveGroup` is needed here because the code does `into_affine()`
-pub trait Trait<C: CurveGroup>:
-    fixed_base_msms::Trait<
-        Domain: Witness<C::ScalarField>,
-        MsmOutput = C,
-        Scalar = C::ScalarField,
-        MsmInput: IsMsmInput<Base = C::Affine>, // need to be a bit specific because this code multiplies scalars and does into_affine(), etc
-    > + Sized
-    + CanonicalSerialize
+pub trait Trait:
+    homomorphism::Trait<Domain: Witness<Self::Scalar>, CodomainNormalized: Statement> + Sized
 {
-    /// Domain-separation tag (DST) used to ensure that all cryptographic hashes and
-    /// transcript operations within the protocol are uniquely namespaced
+    type Scalar: PrimeField; // CanonicalSerialize + CanonicalDeserialize + Clone + Debug + Eq;
+
+    /// Shape of verifier batch size: mirrors the homomorphism structure.
+    /// - For a leaf (single MSM/codomain): `usize` (number of components).
+    /// - For a tuple (f, g): `(H1::VerifierBatchSize, H2::VerifierBatchSize)`.
+    /// E.g. for tuple(f, g) with f itself a tuple, use `Option<((usize, usize), usize)>`.
+    type VerifierBatchSize;
+
     fn dst(&self) -> Vec<u8>;
 
     fn prove<Ct: Serialize, R: RngCore + CryptoRng>(
         &self,
         witness: &Self::Domain,
-        statement: &Self::Codomain,
+        statement: Self::Codomain,
         cntxt: &Ct, // for SoK purposes
         rng: &mut R,
-    ) -> Proof<<Self as fixed_base_msms::Trait>::Scalar, Self> { // or C::ScalarField
+    ) -> (Proof<Self::Scalar, Self>, Self::CodomainNormalized) {
         prove_homomorphism(self, witness, statement, cntxt, true, rng, &self.dst())
     }
 
-    #[allow(non_snake_case)]
-    fn verify<Ct: Serialize, H>(
+    /// Verify a sigma protocol proof.
+    ///
+    /// `verifier_batch_size`: per-component batch sizes, shape mirrors the homomorphism.
+    /// - `None`: infer from `public_statement` (may clone to count).
+    /// - `Some(shape)`: use the given shape; avoids cloning when the caller already has it.
+    fn verify<Ct: Serialize, R: RngCore + CryptoRng>(
         &self,
-        public_statement: &Self::Codomain,
-        proof: &Proof<C::ScalarField, H>, // Would like to set &Proof<E, Self>, but that ties the lifetime of H to that of Self, but we'd like it to be eg static
+        public_statement: &Self::CodomainNormalized,
+        proof: &Proof<Self::Scalar, Self>,
         cntxt: &Ct,
-    ) -> anyhow::Result<()>
-    where
-        H: homomorphism::Trait<Domain = Self::Domain, Codomain = Self::Codomain>, // need this because `H` is technically different from `Self` due to lifetime changes
-    {
-        let msm_terms = self.msm_terms_for_verify::<_, H>(
-            public_statement,
-            proof,
-            cntxt,
-        );
-
-        let msm_result = Self::msm_eval(msm_terms);
-        ensure!(msm_result == C::ZERO); // or MsmOutput::zero()
-
-        Ok(())
-    }
-
-    #[allow(non_snake_case)]
-    fn compute_verifier_challenges<Ct>(
-        &self,
-        public_statement: &Self::Codomain,
-        prover_first_message: &Self::Codomain, // TODO: this input will have to be modified for `compact` proofs; we just need something serializable, could pass `FirstProofItem<F, H>` instead
-        cntxt: &Ct,
-        number_of_beta_powers: usize,
-    ) -> (C::ScalarField, Vec<C::ScalarField>)
-    where
-        Ct: Serialize,
-        // H: homomorphism::Trait<Domain = Self::Domain, Codomain = Self::Codomain>, // will probably need this if we use `FirstProofItem<F, H>` instead
-    {
-        // --- Fiat–Shamir challenge c ---
-        let c = fiat_shamir_challenge_for_sigma_protocol::<_, C::ScalarField, _>(
+        verifier_batch_size: Option<Self::VerifierBatchSize>,
+        rng: &mut R,
+    ) -> anyhow::Result<()> {
+        let prover_first_message = proof
+            .prover_commitment()
+            .expect("tuple proof must contain commitment for Fiat–Shamir"); // TODO: code alternative version
+        let c = fiat_shamir_challenge_for_sigma_protocol::<_, Self::Scalar, _>(
             cntxt,
             self,
             public_statement,
             prover_first_message,
             &self.dst(),
         );
+        self.verify_with_challenge(
+            public_statement,
+            prover_first_message,
+            c,
+            &proof.z,
+            verifier_batch_size,
+            rng,
+        )
+    }
 
-        // --- Random verifier challenge β ---
-        let mut rng = ark_std::rand::thread_rng(); // TODO: move this to trait!!
-        let beta = C::ScalarField::rand(&mut rng);
-        let powers_of_beta = utils::powers(beta, number_of_beta_powers);
+    /// Verify the equations coming from the proof given an explicit Fiat–Shamir challenge
+    /// (derived from the proof's first message).
+    fn verify_with_challenge<R: RngCore + CryptoRng>(
+        &self,
+        public_statement: &Self::CodomainNormalized,
+        prover_commitment: &Self::CodomainNormalized,
+        challenge: Self::Scalar,
+        response: &Self::Domain,
+        verifier_batch_size: Option<Self::VerifierBatchSize>,
+        rng: &mut R,
+    ) -> anyhow::Result<()>;
+}
 
-        (c, powers_of_beta)
+impl<T: CurveGroupTrait> Trait for T {
+    type Scalar = T::Scalar;
+    type VerifierBatchSize = usize;
+
+    fn dst(&self) -> Vec<u8> {
+        CurveGroupTrait::dst(self) // `self.dst()` works but seems a bit too concise
+    }
+
+    fn verify_with_challenge<R: RngCore + CryptoRng>(
+        &self,
+        public_statement: &Self::CodomainNormalized,
+        prover_commitment: &Self::CodomainNormalized,
+        challenge: Self::Scalar,
+        response: &Self::Domain,
+        verifier_batch_size: Option<Self::VerifierBatchSize>,
+        rng: &mut R,
+    ) -> anyhow::Result<()> {
+        let number_of_beta_powers =
+            verifier_batch_size.unwrap_or_else(|| public_statement.clone().into_iter().count());
+        let powers_of_beta = if number_of_beta_powers > 1 {
+            let beta = sample_field_element(rng);
+            utils::powers(beta, number_of_beta_powers)
+        } else {
+            vec![<<Self as CurveGroupTrait>::Group as PrimeGroup>::ScalarField::ONE]
+        };
+        let msm_terms_for_prover_response = self.msm_terms(response);
+        let msm_terms = Self::merge_msm_terms(
+            msm_terms_for_prover_response.into_iter().collect(),
+            prover_commitment,
+            public_statement,
+            &powers_of_beta,
+            challenge,
+        );
+        let msm_result = Self::msm_eval(msm_terms);
+        ensure!(msm_result == <<Self as CurveGroupTrait>::Group as AdditiveGroup>::ZERO);
+        Ok(())
+    }
+}
+
+// TODO: rename this to CurveGroupTrait
+// then make a more basic Trait
+// then make CurveGroupTrait automatically implement that
+// and then make a field hom implement the basic Trait
+pub trait CurveGroupTrait:
+    fixed_base_msms::Trait<
+        Domain: Witness<<Self::Group as PrimeGroup>::ScalarField>,
+        Base = <Self::Group as CurveGroup>::Affine,
+        MsmOutput = Self::Group,
+        Scalar = <Self::Group as PrimeGroup>::ScalarField,
+    > + Sized
+    + CanonicalSerialize
+{
+    type Group: CurveGroup;
+    /// Domain-separation tag (DST) used to ensure that all cryptographic hashes and
+    /// transcript operations within the protocol are uniquely namespaced
+    fn dst(&self) -> Vec<u8>;
+
+    #[allow(non_snake_case)]
+    fn verify<Ct: Serialize, H, R: RngCore + CryptoRng>(
+        &self,
+        public_statement: &Self::CodomainNormalized,
+        proof: &Proof<<Self as fixed_base_msms::Trait>::Scalar, H>, // Would seem natural to set &Proof<E, Self>, but that ties the lifetime of H to that of Self, but we'd like it to be eg static
+        cntxt: &Ct,
+        verifier_batch_size: Option<usize>,
+        rng: &mut R,
+    ) -> anyhow::Result<()>
+    where
+        H: homomorphism::Trait<
+            Domain = Self::Domain,
+            CodomainNormalized = Self::CodomainNormalized,
+        >, // need this because `H` is technically different from `Self` due to lifetime changes
+    {
+        let msm_terms = self.msm_terms_for_verify::<_, H, _>(
+            public_statement,
+            proof,
+            cntxt,
+            verifier_batch_size,
+            rng,
+        );
+
+        let msm_result = Self::msm_eval(msm_terms);
+        ensure!(msm_result == <Self::Group as AdditiveGroup>::ZERO); // or MsmOutput::zero()
+
+        Ok(())
+    }
+
+    #[allow(non_snake_case)]
+    fn compute_verifier_challenges<Ct, R: RngCore + CryptoRng>(
+        &self,
+        public_statement: &Self::CodomainNormalized,
+        prover_first_message: &Self::CodomainNormalized, // TODO: this input will have to be modified for `compact` proofs; we just need something serializable, could pass `FirstProofItem<F, H>` instead
+        cntxt: &Ct,
+        verifier_batch_size: Option<usize>,
+        rng: &mut R,
+    ) -> (
+        <Self as fixed_base_msms::Trait>::Scalar,
+        Vec<<Self as fixed_base_msms::Trait>::Scalar>,
+    )
+    where
+        Ct: Serialize,
+        // H: homomorphism::Trait<Domain = Self::Domain, Codomain = Self::Codomain>, // will probably need this if we use `FirstProofItem<F, H>` instead
+    {
+        let number_of_beta_powers =
+            verifier_batch_size.unwrap_or_else(|| public_statement.clone().into_iter().count());
+        verifier_challenges_with_length::<_, _, _, _>(
+            cntxt,
+            self,
+            public_statement,
+            prover_first_message,
+            &self.dst(),
+            number_of_beta_powers,
+            rng,
+        )
     }
 
     // Returns the MSM terms that `verify()` needs
     #[allow(non_snake_case)]
-    fn msm_terms_for_verify<Ct: Serialize, H>(
+    fn msm_terms_for_verify<Ct: Serialize, H, R: RngCore + CryptoRng>(
         &self,
-        public_statement: &Self::Codomain,
-        proof: &Proof<C::ScalarField, H>,
+        public_statement: &Self::CodomainNormalized,
+        proof: &Proof<<Self::Group as PrimeGroup>::ScalarField, H>,
         cntxt: &Ct,
-    ) -> Self::MsmInput
+        verifier_batch_size: Option<usize>,
+        rng: &mut R,
+    ) -> MsmInput<<Self::Group as CurveGroup>::Affine, <Self::Group as PrimeGroup>::ScalarField>
     where
-        H: homomorphism::Trait<Domain = Self::Domain, Codomain = Self::Codomain>, // Need this because the lifetime was changed
+        H: homomorphism::Trait<
+            Domain = Self::Domain,
+            CodomainNormalized = Self::CodomainNormalized,
+        >, // Need this because the lifetime was changed
     {
         let prover_first_message = match &proof.first_proof_item {
             FirstProofItem::Commitment(A) => A,
@@ -117,9 +234,13 @@ pub trait Trait<C: CurveGroup>:
             },
         };
 
-        let number_of_beta_powers = public_statement.clone().into_iter().count(); // TODO: maybe pass the into_iter version in merge_msm_terms?
-
-        let (c, powers_of_beta) = self.compute_verifier_challenges(public_statement, prover_first_message, cntxt, number_of_beta_powers);
+        let (c, powers_of_beta) = self.compute_verifier_challenges(
+            public_statement,
+            prover_first_message,
+            cntxt,
+            verifier_batch_size,
+            rng,
+        );
 
         let msm_terms_for_prover_response = self.msm_terms(&proof.z);
 
@@ -137,52 +258,75 @@ pub trait Trait<C: CurveGroup>:
     /// added here because it's convenient (and slightly faster) to do that when the c factor is being added
     #[allow(non_snake_case)]
     fn merge_msm_terms(
-        msm_terms: Vec<Self::MsmInput>,
-        prover_first_message: &Self::Codomain,
-        statement: &Self::Codomain,
-        powers_of_beta: &[C::ScalarField],
-        c: C::ScalarField,
-    ) -> Self::MsmInput
+        msm_terms: Vec<
+            MsmInput<<Self::Group as CurveGroup>::Affine, <Self::Group as PrimeGroup>::ScalarField>,
+        >,
+        prover_first_message: &Self::CodomainNormalized,
+        statement: &Self::CodomainNormalized,
+        powers_of_beta: &[<Self::Group as PrimeGroup>::ScalarField],
+        c: <Self::Group as PrimeGroup>::ScalarField,
+    ) -> MsmInput<<Self::Group as CurveGroup>::Affine, <Self::Group as PrimeGroup>::ScalarField>
+    where
+        <Self::Group as CurveGroup>::Affine: Copy + Eq + Hash,
     {
-        let mut final_basis = Vec::new();
-        let mut final_scalars = Vec::new();
-
-        // Collect all projective points to batch normalize
-        // TODO: remove this stuff... we may assume things are deserialised and hence essentially affine, so into_affine() should do
-        let mut all_points_to_normalize = Vec::new();
-        for (A, P) in prover_first_message.clone().into_iter()
+        let n = msm_terms.len();
+        // Per index: (term_i * β^i) ∪ (A_i, −β^i) ∪ (P_i, −c·β^i), then in the final line merge all with scale 1.
+        let term_inputs: Vec<
+            MsmInput<<Self::Group as CurveGroup>::Affine, <Self::Group as PrimeGroup>::ScalarField>,
+        > = msm_terms
+            .into_iter()
+            .zip(prover_first_message.clone().into_iter())
             .zip(statement.clone().into_iter())
-        {
-            all_points_to_normalize.push(A);
-            all_points_to_normalize.push(P);
-        }
-
-        let affine_points = C::normalize_batch(&all_points_to_normalize);
-        let mut affine_iter = affine_points.into_iter();
-
-        for (term, beta_power) in msm_terms.into_iter().zip(powers_of_beta) {
-            let mut bases = term.bases().to_vec();
-            let mut scalars = term.scalars().to_vec();
-
-            // Multiply scalars by βᶦ
-            for scalar in scalars.iter_mut() {
-                *scalar *= beta_power;
-            }
-
-            // Add prover + statement contributions
-            bases.push(affine_iter.next().unwrap()); // this is the element `A` from the prover's first message
-            bases.push(affine_iter.next().unwrap()); // this is the element `P` from the statement, but we'll need `P^c`
-
-            scalars.push(- (*beta_power));
-            scalars.push(-c * beta_power);
-
-            final_basis.extend(bases);
-            final_scalars.extend(scalars);
-        }
-
-        Self::MsmInput::new(final_basis, final_scalars).expect("Something went wrong constructing MSM input")
+            .zip(powers_of_beta.iter().copied())
+            .map(|(((term, A), P), beta_power)| {
+                let mut bases = term.bases().to_vec();
+                bases.push(A);
+                bases.push(P);
+                let mut scalars: Vec<<Self::Group as PrimeGroup>::ScalarField> =
+                    term.scalars().iter().map(|s| *s * beta_power).collect();
+                scalars.push(-beta_power);
+                scalars.push(-c * beta_power);
+                MsmInput::new(bases, scalars).expect("sigma protocol MSM term")
+            })
+            .collect();
+        debug_assert_eq!(
+            term_inputs.len(),
+            n,
+            "merge_msm_terms: msm_terms iterator length mismatch"
+        );
+        debug_assert_eq!(
+            powers_of_beta.len(),
+            n,
+            "merge_msm_terms: powers_of_beta iterator length mismatch"
+        );
+        let refs: Vec<
+            &MsmInput<
+                <Self::Group as CurveGroup>::Affine,
+                <Self::Group as PrimeGroup>::ScalarField,
+            >,
+        > = term_inputs.iter().collect();
+        let ones: Vec<<Self::Group as PrimeGroup>::ScalarField> = (0..refs.len())
+            .map(|_| <Self::Group as PrimeGroup>::ScalarField::ONE)
+            .collect();
+        merge_scaled_msm_terms::<Self::Group>(&refs, &ones)
     }
 }
+
+/// Checks that the given MSM input evaluates to the group identity.
+/// Use when verifying one component of a tuple homomorphism component-wise.
+#[allow(non_snake_case)]
+pub fn check_msm_eval_zero<H: CurveGroupTrait>(
+    _hom: &H,
+    input: MsmInput<<H::Group as CurveGroup>::Affine, <H::Group as PrimeGroup>::ScalarField>,
+) -> anyhow::Result<()> {
+    let result = H::msm_eval(input);
+    ensure!(result == <H::Group as AdditiveGroup>::ZERO);
+    Ok(())
+}
+
+// Standard method to get `trait Statement = Canonical Serialize + ...`, because type aliases are experimental in Rust
+pub trait Statement: CanonicalSerialize + CanonicalDeserialize + Clone + Debug + Eq {}
+impl<T> Statement for T where T: CanonicalSerialize + CanonicalDeserialize + Clone + Debug + Eq {}
 
 pub trait Witness<F: Field>: CanonicalSerialize + CanonicalDeserialize + Clone + Eq {
     /// Computes a scaled addition: `self + c * other`. Can take ownership because the
@@ -228,173 +372,42 @@ impl<F: PrimeField, W: Witness<F>> Witness<F> for Vec<W> {
     }
 }
 
-// Standard method to get `trait Statement = Canonical Serialize + ...`, because type aliases are experimental in Rust
-pub trait Statement: CanonicalSerialize + CanonicalDeserialize + Clone + Debug + Eq {}
-impl<T> Statement for T where T: CanonicalSerialize + CanonicalDeserialize + Clone + Debug + Eq {}
-
-/// The “first item” recorded in a Σ-proof, which is one of:
-/// - The first message of the protocol, which is the commitment from the prover. This leads to a more compact proof.
-/// - The second message of the protocol, which is the challenge from the verifier. This leads to a proof which is amenable to batch verification.
-/// TODO: Better name? In https://github.com/sigma-rs/sigma-proofs these would be called "compact" and "batchable" proofs
-#[derive(Clone, Debug, Eq)]
-pub enum FirstProofItem<F: PrimeField, H: homomorphism::Trait>
-where
-    H::Codomain: Statement,
-{
-    Commitment(H::Codomain),
-    Challenge(F), // In more generality, this should be H::Domain::Scalar
-}
-
-// Manual implementation of PartialEq is required here because deriving PartialEq would
-// automatically require `H` itself to implement PartialEq, which is undesirable.
-impl<F: PrimeField, H: homomorphism::Trait> PartialEq for FirstProofItem<F, H>
-where
-    H::Codomain: Statement,
-{
-    fn eq(&self, other: &Self) -> bool {
-        match (self, other) {
-            (FirstProofItem::Commitment(a), FirstProofItem::Commitment(b)) => a == b,
-            (FirstProofItem::Challenge(a), FirstProofItem::Challenge(b)) => a == b,
-            _ => false,
-        }
-    }
-}
-
-// The natural CanonicalSerialize/Deserialize implementations for `FirstProofItem`; we follow the usual approach for enums.
-// CanonicalDeserialize needs Valid.
-impl<F: PrimeField, H: homomorphism::Trait> Valid for FirstProofItem<F, H>
+/// Computes the Fiat–Shamir challenge and verifier β-powers for a Σ-protocol,
+/// with an explicit total length for the powers (e.g. `len1 + len2` for two-component protocols).
+/// Callers can split the returned `powers_of_beta` slice as needed.
+#[allow(non_snake_case)]
+pub fn verifier_challenges_with_length<
+    Ct: Serialize,
+    F: PrimeField,
+    H: homomorphism::Trait + CanonicalSerialize,
+    R: RngCore + CryptoRng,
+>(
+    cntxt: &Ct,
+    hom: &H,
+    public_statement: &H::CodomainNormalized,
+    prover_first_message: &H::CodomainNormalized,
+    dst: &[u8],
+    number_of_beta_powers: usize,
+    rng: &mut R,
+) -> (F, Vec<F>)
 where
     H::Domain: Witness<F>,
-    H::Codomain: Statement + Valid,
+    H::CodomainNormalized: Statement,
 {
-    fn check(&self) -> Result<(), SerializationError> {
-        match self {
-            FirstProofItem::Commitment(c) => c.check(),
-            FirstProofItem::Challenge(f) => f.check(),
-        }
-    }
-}
-
-impl<F: PrimeField, H: homomorphism::Trait> CanonicalSerialize for FirstProofItem<F, H>
-where
-    H::Domain: Witness<F>,
-    H::Codomain: Statement + CanonicalSerialize,
-{
-    fn serialize_with_mode<W: Write>(
-        &self,
-        mut writer: W,
-        compress: Compress,
-    ) -> Result<(), SerializationError> {
-        match self {
-            FirstProofItem::Commitment(c) => {
-                0u8.serialize_with_mode(writer.by_ref(), compress)?;
-                c.serialize_with_mode(writer, compress)
-            },
-            FirstProofItem::Challenge(f) => {
-                1u8.serialize_with_mode(writer.by_ref(), compress)?;
-                f.serialize_with_mode(writer, compress)
-            },
-        }
-    }
-
-    fn serialized_size(&self, compress: Compress) -> usize {
-        1 + match self {
-            FirstProofItem::Commitment(c) => c.serialized_size(compress),
-            FirstProofItem::Challenge(f) => f.serialized_size(compress),
-        }
-    }
-}
-
-impl<F: PrimeField, H: homomorphism::Trait> CanonicalDeserialize for FirstProofItem<F, H>
-where
-    H::Domain: Witness<F>,
-    H::Codomain: Statement + CanonicalDeserialize + Valid,
-{
-    fn deserialize_with_mode<R: Read>(
-        mut reader: R,
-        compress: Compress,
-        validate: Validate,
-    ) -> Result<Self, SerializationError> {
-        // Read the discriminant tag
-        let tag = u8::deserialize_with_mode(&mut reader, compress, validate)?;
-
-        let item = match tag {
-            0 => {
-                let c = H::Codomain::deserialize_with_mode(reader, compress, validate)?;
-                FirstProofItem::Commitment(c)
-            },
-            1 => {
-                let f = F::deserialize_with_mode(reader, compress, validate)?;
-                FirstProofItem::Challenge(f)
-            },
-            _ => return Err(SerializationError::InvalidData),
-        };
-
-        // Run validity check if requested
-        if validate == Validate::Yes {
-            item.check()?;
-        }
-
-        Ok(item)
-    }
-}
-
-#[derive(CanonicalSerialize, Debug, CanonicalDeserialize, Clone)]
-pub struct Proof<F: PrimeField, H: homomorphism::Trait>
-where
-    H::Domain: Witness<F>,
-    H::Codomain: Statement,
-{
-    /// The “first item” recorded in the proof, which can be either:
-    /// - the prover's commitment (H::Codomain)
-    /// - the verifier's challenge (E::ScalarField)
-    pub first_proof_item: FirstProofItem<F, H>,
-    /// Prover's second message (response)
-    pub z: H::Domain,
-}
-
-impl<F: PrimeField, H: homomorphism::Trait> Proof<F, H>
-where
-    H::Domain: Witness<F>,
-    H::Codomain: Statement,
-{
-    /// No-op (semantically): circumvents the fact that proofs inherit the homomorphism’s lifetime. This method should do nothing at runtime.
-    #[allow(non_snake_case)]
-    pub fn change_lifetime<H2>(self) -> Proof<F, H2>
-    where
-        H2: homomorphism::Trait<Domain = H::Domain, Codomain = H::Codomain>,
-    {
-        let first = match self.first_proof_item {
-            FirstProofItem::Commitment(A) => FirstProofItem::Commitment(A),
-            FirstProofItem::Challenge(c) => FirstProofItem::Challenge(c),
-        };
-
-        Proof {
-            first_proof_item: first,
-            z: self.z,
-        }
-    }
-}
-
-// Manual implementation of PartialEq and Eq is required here because deriving PartialEq/Eq would
-// automatically require `H` itself to implement PartialEq and Eq, which is undesirable.
-// Workaround would be to make `Proof` generic over `H::Domain` and `H::Codomain` instead of `H`
-impl<F: PrimeField, H: homomorphism::Trait> PartialEq for Proof<F, H>
-where
-    H::Domain: Witness<F>,
-    H::Codomain: Statement,
-{
-    fn eq(&self, other: &Self) -> bool {
-        self.first_proof_item == other.first_proof_item && self.z == other.z
-    }
-}
-
-// Empty because it simply asserts reflexivity
-impl<F: PrimeField, H: homomorphism::Trait> Eq for Proof<F, H>
-where
-    H::Domain: Witness<F>,
-    H::Codomain: Statement,
-{
+    let c = fiat_shamir_challenge_for_sigma_protocol::<_, F, _>(
+        cntxt,
+        hom,
+        public_statement,
+        prover_first_message,
+        dst,
+    );
+    let powers_of_beta = if number_of_beta_powers > 1 {
+        let beta = sample_field_element(rng);
+        utils::powers(beta, number_of_beta_powers)
+    } else {
+        vec![F::ONE]
+    };
+    (c, powers_of_beta)
 }
 
 /// Computes the Fiat–Shamir challenge for a Σ-protocol instance.
@@ -422,23 +435,23 @@ pub fn fiat_shamir_challenge_for_sigma_protocol<
 >(
     cntxt: &Ct,
     hom: &H,
-    statement: &H::Codomain,
-    prover_first_message: &H::Codomain,
+    statement: &H::CodomainNormalized,
+    prover_first_message: &H::CodomainNormalized,
     dst: &[u8],
 ) -> F
 where
     H::Domain: Witness<F>,
-    H::Codomain: Statement,
+    H::CodomainNormalized: Statement,
 {
     // Initialise the transcript
     let mut fs_t = merlin::Transcript::new(dst);
 
     // Append the "context" to the transcript
-    <merlin::Transcript as fiat_shamir::SigmaProtocol<F, H>>::append_sigma_protocol_ctxt(
+    <merlin::Transcript as fiat_shamir::SigmaProtocol<F, H>>::append_sigma_protocol_cntxt(
         &mut fs_t, cntxt,
     );
 
-    // Append the MSM bases to the transcript. (If the same hom is used for many proofs, maybe use a single transcript + a boolean to prevent it from repeating?)
+    // Append the homomorphism data (e.g. MSM bases) to the transcript. (If the same hom is used for many proofs, maybe use a single transcript + a boolean to prevent it from repeating?)
     <merlin::Transcript as fiat_shamir::SigmaProtocol<F, H>>::append_sigma_protocol_msm_bases(
         &mut fs_t, hom,
     );
@@ -446,7 +459,7 @@ where
     // Append the public statement (the image of the witness) to the transcript
     <merlin::Transcript as fiat_shamir::SigmaProtocol<F, H>>::append_sigma_protocol_public_statement(
         &mut fs_t,
-        statement,
+        &statement,
     );
 
     // Add the first prover message (the commitment) to the transcript
@@ -462,33 +475,35 @@ where
 }
 
 // We're keeping this separate because it only needs the homomorphism property rather than being a bunch of "fixed-base MSMS",
-// and moreover in this way it gets reused in the PairingTupleHomomorphism code which has a custom sigma protocol implementation
+// and moreover in this way it gets reused in the TupleHomomorphism (curve-group) code
 #[allow(non_snake_case)]
 pub fn prove_homomorphism<Ct: Serialize, F: PrimeField, H: homomorphism::Trait, R>(
     homomorphism: &H,
     witness: &H::Domain,
-    statement: &H::Codomain,
+    statement: H::Codomain,
     cntxt: &Ct,
-    store_prover_commitment: bool, // true = store prover's commitment, false = store Fiat-Shamir challenge
+    store_prover_commitment: bool, // true = store prover's commitment, false = store Fiat-Shamir challenge instead
     rng: &mut R,
     dst: &[u8],
-) -> Proof<F, H>
+) -> (Proof<F, H>, H::CodomainNormalized)
 where
     H::Domain: Witness<F>,
-    H::Codomain: Statement,
+    H::CodomainNormalized: Statement,
     R: RngCore + CryptoRng,
 {
     // Step 1: Sample randomness. Here the `witness` is only used to make sure that `r` has the right dimensions
     let r = witness.rand(rng);
 
     // Step 2: Compute commitment A = Ψ(r)
-    let A = homomorphism.apply(&r);
+    let A_proj = homomorphism.apply(&r);
+    let A = homomorphism.normalize(A_proj);
+    let normalized_statement = homomorphism.normalize(statement); // TODO: combine these two normalisations
 
     // Step 3: Obtain Fiat-Shamir challenge
     let c = fiat_shamir_challenge_for_sigma_protocol::<_, F, H>(
         cntxt,
         homomorphism,
-        statement,
+        &normalized_statement,
         &A,
         dst,
     );
@@ -503,8 +518,11 @@ where
         FirstProofItem::Challenge(c)
     };
 
-    Proof {
-        first_proof_item,
-        z,
-    }
+    (
+        Proof {
+            first_proof_item,
+            z,
+        },
+        normalized_statement,
+    )
 }

@@ -22,7 +22,10 @@ use crate::{
     ProtocolId,
 };
 use aptos_channels::{self, aptos_channel, message_queues::QueueStyle};
-use aptos_config::network_id::{NetworkContext, PeerNetworkId};
+use aptos_config::{
+    config::AccessControlPolicy,
+    network_id::{NetworkContext, PeerNetworkId},
+};
 use aptos_logger::prelude::*;
 use aptos_netcore::transport::{ConnectionOrigin, Transport};
 use aptos_short_hex_str::AsShortHexStr;
@@ -116,6 +119,8 @@ where
     max_message_size: usize,
     /// Inbound connection limit separate of outbound connections
     inbound_connection_limit: usize,
+    /// Access control policy for peer connections
+    access_control_policy: Option<Arc<AccessControlPolicy>>,
 }
 
 impl<TTransport, TSocket> PeerManager<TTransport, TSocket>
@@ -143,6 +148,7 @@ where
         max_frame_size: usize,
         max_message_size: usize,
         inbound_connection_limit: usize,
+        access_control_policy: Option<Arc<AccessControlPolicy>>,
     ) -> Self {
         let (transport_notifs_tx, transport_notifs_rx) = aptos_channels::new(
             channel_size,
@@ -184,6 +190,7 @@ where
             max_frame_size,
             max_message_size,
             inbound_connection_limit,
+            access_control_policy,
         }
     }
 
@@ -226,6 +233,32 @@ where
     /// Get the [`NetworkAddress`] we're listening for incoming connections on
     pub fn listen_addr(&self) -> &NetworkAddress {
         &self.listen_addr
+    }
+
+    /// Checks if a peer connection should be allowed based on the access control policy.
+    /// Returns successfully if the peer is allowed, otherwise returns an error with the reason.
+    fn check_peer_access_lists(&self, peer_id: &PeerId) -> Result<(), String> {
+        // Check if the peer is allowed based on the access control policy
+        if let Some(access_control_policy) = &self.access_control_policy {
+            if !access_control_policy.is_peer_allowed(peer_id) {
+                // Determine the error based on the policy type
+                let error = match access_control_policy.as_ref() {
+                    AccessControlPolicy::AllowList(_) => {
+                        format!(
+                            "Peer {} is not in the network allow list!",
+                            peer_id.short_str()
+                        )
+                    },
+                    AccessControlPolicy::BlockList(_) => {
+                        format!("Peer {} is in the network block list!", peer_id.short_str())
+                    },
+                };
+                return Err(error);
+            }
+        }
+
+        // Otherwise, allow all peers by default
+        Ok(())
     }
 
     /// Start listening on the set address and return a future which runs PeerManager
@@ -347,6 +380,18 @@ where
                 return;
             },
         };
+
+        // Check the allow/block lists
+        if let Err(error) = self.check_peer_access_lists(&conn.metadata.remote_peer_id) {
+            warn!(
+                NetworkSchema::new(&self.network_context)
+                    .connection_metadata_with_address(&conn.metadata),
+                "{} Connection rejected by allow/block list: {}", self.network_context, error
+            );
+            counters::connections_rejected(&self.network_context, conn.metadata.origin).inc();
+            self.disconnect(conn);
+            return;
+        }
 
         // Verify that we have not reached the max connection limit for unknown inbound peers
         if conn.metadata.origin == ConnectionOrigin::Inbound {

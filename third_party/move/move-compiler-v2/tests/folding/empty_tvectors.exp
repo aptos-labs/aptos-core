@@ -77,17 +77,17 @@ module 0x42::m {
     use std::vector;
     public entry fun init() {
         let _ = {
-            let (v) = (vector[]);
+            let v = vector[];
             let result = vector[];
             {
-                let (v) = (v);
+                let v = v;
                 0x1::vector::reverse<vector<u8>>(&mut v);
                 while (!0x1::vector::is_empty<vector<u8>>(&v)) {
                     let e = 0x1::vector::pop_back<vector<u8>>(&mut v);
                     {
-                        let (elem) = (e);
+                        let elem = e;
                         0x1::vector::push_back<0x1::string::String>(&mut result, {
-                            let (key) = (elem);
+                            let key = elem;
                             0x1::string::utf8(key)
                         })
                     };
@@ -96,17 +96,17 @@ module 0x42::m {
             result
         };
         let _ = {
-            let (v) = (vector[]);
+            let v = vector[];
             let result = vector[];
             {
-                let (v) = (v);
+                let v = v;
                 0x1::vector::reverse<u64>(&mut v);
                 while (!0x1::vector::is_empty<u64>(&v)) {
                     let e = 0x1::vector::pop_back<u64>(&mut v);
                     {
-                        let (elem) = (e);
+                        let elem = e;
                         0x1::vector::push_back<vector<u8>>(&mut result, {
-                            let (v) = (elem);
+                            let v = elem;
                             0x1::bcs::to_bytes<u64>(&v)
                         })
                     };

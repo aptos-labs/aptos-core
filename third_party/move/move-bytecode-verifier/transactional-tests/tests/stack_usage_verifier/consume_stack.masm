@@ -1,0 +1,16 @@
+//# publish
+module 0x1::M
+struct R has key
+  data: vector<u8>
+
+fun is_ok_(l0: &address, l1: &vector<u8>): bool
+    ld_true
+    ret
+
+public fun is_ok(l0: address): bool acquires R
+    borrow_loc l0
+    ld_const<address> 472
+    borrow_global R
+    borrow_field R, data
+    call is_ok_
+    ret

@@ -7,12 +7,12 @@ use ark_serialize::{CanonicalDeserialize, CanonicalSerialize};
 use rand::{CryptoRng, RngCore};
 
 pub trait BatchedRangeProof<E: Pairing>: Clone + CanonicalSerialize + CanonicalDeserialize {
-    type PublicStatement: CanonicalSerialize;
+    type PublicStatement: CanonicalSerialize; // Serialization is needed because this is often appended to a Fiat-Shamir transcript
     type ProverKey;
-    type VerificationKey: Clone + CanonicalSerialize; // Serialization is needed because this key is often appended to a Fiat-Shamir transcript
-    type Input: From<u64>; // TODO: slightly hacky. It's used in `range_proof_random_instance()` to generate (chunks of) inputs that have a certain bit size
+    type VerificationKey: Clone + CanonicalSerialize; // Serialization is needed because this is often appended to a Fiat-Shamir transcript
+    type Input: From<u64>; // Slightly hacky. It's used in `range_proof_random_instance()` to generate (chunks of) inputs that have a certain bit size
     type Commitment;
-    type CommitmentRandomness: Clone + UniformRand;
+    type CommitmentRandomness: UniformRand;
     type CommitmentKey;
 
     const DST: &[u8];
@@ -22,7 +22,7 @@ pub trait BatchedRangeProof<E: Pairing>: Clone + CanonicalSerialize + CanonicalD
     /// Setup generates the prover and verifier keys used in the batched range proof.
     fn setup<R: RngCore + CryptoRng>(
         max_n: usize,
-        max_ell: usize, // TODO: change this to u8?
+        max_ell: u8,
         group_generators: GroupGenerators<E>,
         rng: &mut R,
     ) -> (Self::ProverKey, Self::VerificationKey);
@@ -33,7 +33,7 @@ pub trait BatchedRangeProof<E: Pairing>: Clone + CanonicalSerialize + CanonicalD
         rng: &mut R,
     ) -> (Self::Commitment, Self::CommitmentRandomness) {
         let r = Self::CommitmentRandomness::rand(rng);
-        let comm = Self::commit_with_randomness(ck, values, &r.clone());
+        let comm = Self::commit_with_randomness(ck, values, &r);
         (comm, r)
     }
 
@@ -43,21 +43,22 @@ pub trait BatchedRangeProof<E: Pairing>: Clone + CanonicalSerialize + CanonicalD
         r: &Self::CommitmentRandomness,
     ) -> Self::Commitment;
 
-    fn prove<R: rand_core::RngCore + rand_core::CryptoRng>(
+    fn prove<R: RngCore + CryptoRng>(
         pk: &Self::ProverKey,
         values: &[Self::Input],
-        ell: usize, // TODO: change this to u8?
+        ell: u8,
         comm: &Self::Commitment,
         r: &Self::CommitmentRandomness,
         rng: &mut R,
     ) -> Self;
 
-    fn verify(
+    fn verify<R: RngCore + CryptoRng>(
         &self,
         vk: &Self::VerificationKey,
         n: usize,
-        ell: usize,
+        ell: u8,
         comm: &Self::Commitment,
+        rng: &mut R,
     ) -> anyhow::Result<()>;
 
     fn maul(&mut self);

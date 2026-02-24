@@ -29,8 +29,7 @@ use crate::{
 use fail::fail_point;
 use itertools::Itertools;
 use move_binary_format::{
-    errors,
-    errors::*,
+    errors::{self, *},
     file_format::{AccessKind, FunctionHandleIndex, FunctionInstantiationIndex, SignatureIndex},
 };
 use move_core_types::{
@@ -703,6 +702,45 @@ where
                     let callee = lazy_function
                         .as_resolved(self.loader, gas_meter, traversal_context)
                         .map_err(|e| set_err_info!(current_frame, e))?;
+                    let num_actual_params = callee.param_tys().len().checked_sub(mask.captured_count() as usize).ok_or_else(|| {
+                        let err = PartialVMError::new_invariant_violation(format!(
+                            "Number of parameters ({}) for function {} is smaller than the number of captured arguments ({})",
+                            callee.param_tys().len(),
+                            lazy_function.to_canonical_string(),
+                            mask.captured_count()
+                        ));
+                        set_err_info!(current_frame, err)
+                    })?;
+
+                    // Validate that the closure signature matches the signature of the loaded
+                    // callee and has the right number of parameter and return values.
+                    if let Type::Function { args, results, .. } =
+                        current_frame.single_type_at(sig_idx)
+                    {
+                        let num_expected_params = args.len();
+                        let num_expected_results = results.len();
+                        let num_actual_results = callee.return_tys().len();
+
+                        if num_expected_params != num_actual_params
+                            || num_expected_results != num_actual_results
+                        {
+                            return Err(set_err_info!(
+                                current_frame,
+                                closure_signature_mismatch_error(
+                                    &callee.name_as_pretty_string(),
+                                    num_expected_params,
+                                    num_actual_params,
+                                    num_expected_results,
+                                    num_actual_results
+                                )
+                            ));
+                        }
+                    } else {
+                        let err = PartialVMError::new_invariant_violation(
+                            "Expected function signature when calling a closure",
+                        );
+                        return Err(set_err_info!(current_frame, err));
+                    }
 
                     let fn_guard = VM_PROFILER.function_start(callee.as_ref());
 
@@ -721,7 +759,7 @@ where
                     let captured_vec = captured.collect::<Vec<_>>();
                     let arguments: Vec<&Value> = self
                         .operand_stack
-                        .last_n(callee.param_tys().len() - mask.captured_count() as usize)
+                        .last_n(num_actual_params)
                         .map_err(|e| set_err_info!(current_frame, e))?
                         .chain(captured_vec.iter())
                         .collect();
@@ -1069,19 +1107,22 @@ where
         if RTTCheck::should_perform_checks(&current_frame.function.function) {
             for i in (0..num_param_tys).rev() {
                 let expected_ty = &function.param_tys()[i];
-                if !mask.is_captured(i) {
+                let arg_ty = if !mask.is_captured(i) {
                     let ty = self.operand_stack.pop_ty()?;
                     // For param type to argument, use assignability
-                    if !ty_args.is_empty() {
+                    if ty_args.is_empty() {
+                        ty.paranoid_check_assignable(expected_ty)?;
+                    } else {
                         let expected_ty = ty_builder.create_ty_with_subst(expected_ty, ty_args)?;
                         ty.paranoid_check_assignable(&expected_ty)?;
-                    } else {
-                        ty.paranoid_check_assignable(expected_ty)?;
                     }
-                    arg_tys.push_front(ty);
+                    ty
+                } else if ty_args.is_empty() {
+                    expected_ty.clone()
                 } else {
-                    arg_tys.push_front(expected_ty.clone())
-                }
+                    ty_builder.create_ty_with_subst(expected_ty, ty_args)?
+                };
+                arg_tys.push_front(arg_ty);
             }
         }
 
@@ -1747,6 +1788,28 @@ where
     #[cold]
     fn get_internal_state(&self) -> ExecutionState {
         self.get_stack_frames(usize::MAX)
+    }
+
+    /// Check that the depth of captured closure values does not exceed the configured maximum.
+    ///
+    /// Closures can capture other closures, creating arbitrary nesting depth that is not visible
+    /// in the type system (all closures have the same function type regardless of what they capture).
+    /// This check ensures that deeply nested closure chains cannot be created, preventing potential
+    /// stack overflows or excessive resource consumption when operating on such values.
+    ///
+    /// The check uses `max_depth - 1` because the closure being packed adds one additional level
+    /// of nesting on top of its captured values.
+    fn check_depth_of_closure_captured_values(&self, captured: &[Value]) -> PartialVMResult<()> {
+        if !self.vm_config.enable_closure_depth_check {
+            return Ok(());
+        }
+        if let Some(max_depth) = self.vm_config.max_value_nest_depth {
+            let limit = max_depth.saturating_sub(1);
+            for v in captured.iter() {
+                v.check_depth_of_value(limit)?;
+            }
+        }
+        Ok(())
     }
 }
 
@@ -2429,23 +2492,44 @@ impl Frame {
                             .operand_stack
                             .push(Value::struct_(Struct::pack_variant(info.variant, args)))?;
                     },
-                    Instruction::Unpack(_sd_idx) => {
+                    Instruction::Unpack(sd_idx) => {
                         let struct_value = interpreter.operand_stack.pop_as::<Struct>()?;
                         gas_meter.charge_unpack(false, struct_value.field_views())?;
+
+                        let operand_stack_size_before = interpreter.operand_stack.value.len();
                         for value in struct_value.unpack()? {
                             interpreter.operand_stack.push(value)?;
+                        }
+                        let num_actual_fields =
+                            interpreter.operand_stack.value.len() - operand_stack_size_before;
+                        let num_expected_fields = self.field_count(*sd_idx) as usize;
+                        if num_expected_fields != num_actual_fields {
+                            return Err(stack_field_count_mismatch_error(
+                                num_expected_fields,
+                                num_actual_fields,
+                            ));
                         }
                     },
                     Instruction::UnpackVariant(sd_idx) => {
                         let struct_value = interpreter.operand_stack.pop_as::<Struct>()?;
-
                         gas_meter.charge_unpack_variant(false, struct_value.field_views())?;
 
                         let info = self.get_struct_variant_at(*sd_idx);
+                        let num_expected_fields = info.field_count as usize;
+
+                        let operand_stack_size_before = interpreter.operand_stack.value.len();
                         for value in struct_value.unpack_variant(info.variant, &|v| {
                             info.definition_struct_type.variant_name_for_message(v)
                         })? {
                             interpreter.operand_stack.push(value)?;
+                        }
+                        let num_actual_fields =
+                            interpreter.operand_stack.value.len() - operand_stack_size_before;
+                        if num_expected_fields != num_actual_fields {
+                            return Err(stack_field_count_mismatch_error(
+                                num_expected_fields,
+                                num_actual_fields,
+                            ));
                         }
                     },
                     Instruction::UnpackGeneric(si_idx) => {
@@ -2456,6 +2540,7 @@ impl Frame {
                         //       dropped immediately.
                         let ty_and_field_counts =
                             frame_cache.get_struct_fields_types(*si_idx, self)?;
+                        let num_expected_fields = ty_and_field_counts.len();
                         for (_, ty_count) in ty_and_field_counts {
                             gas_meter.charge_create_ty(*ty_count)?;
                         }
@@ -2465,8 +2550,18 @@ impl Frame {
 
                         let struct_ = interpreter.operand_stack.pop_as::<Struct>()?;
                         gas_meter.charge_unpack(true, struct_.field_views())?;
+
+                        let operand_stack_size_before = interpreter.operand_stack.value.len();
                         for value in struct_.unpack()? {
                             interpreter.operand_stack.push(value)?;
+                        }
+                        let num_actual_fields =
+                            interpreter.operand_stack.value.len() - operand_stack_size_before;
+                        if num_expected_fields != num_actual_fields {
+                            return Err(stack_field_count_mismatch_error(
+                                num_expected_fields,
+                                num_actual_fields,
+                            ));
                         }
                     },
                     Instruction::UnpackVariantGeneric(si_idx) => {
@@ -2483,10 +2578,21 @@ impl Frame {
                         gas_meter.charge_unpack_variant(true, struct_.field_views())?;
 
                         let info = self.get_struct_variant_instantiation_at(*si_idx);
+                        let num_expected_fields = info.field_count as usize;
+
+                        let operand_stack_size_before = interpreter.operand_stack.value.len();
                         for value in struct_.unpack_variant(info.variant, &|v| {
                             info.definition_struct_type.variant_name_for_message(v)
                         })? {
                             interpreter.operand_stack.push(value)?;
+                        }
+                        let num_actual_fields =
+                            interpreter.operand_stack.value.len() - operand_stack_size_before;
+                        if num_expected_fields != num_actual_fields {
+                            return Err(stack_field_count_mismatch_error(
+                                num_expected_fields,
+                                num_actual_fields,
+                            ));
                         }
                     },
                     Instruction::TestVariant(sd_idx) => {
@@ -2543,6 +2649,7 @@ impl Frame {
                             )?;
                         }
                         let captured = interpreter.operand_stack.popn(mask.captured_count())?;
+                        interpreter.check_depth_of_closure_captured_values(&captured)?;
                         let lazy_function = LazyLoadedFunction::new_resolved(
                             interpreter.layout_converter,
                             gas_meter,
@@ -2580,6 +2687,7 @@ impl Frame {
                         RTTCheck::check_pack_closure_visibility(&self.function, &function)?;
 
                         let captured = interpreter.operand_stack.popn(mask.captured_count())?;
+                        interpreter.check_depth_of_closure_captured_values(&captured)?;
                         let lazy_function = LazyLoadedFunction::new_resolved(
                             interpreter.layout_converter,
                             gas_meter,
@@ -3111,6 +3219,33 @@ fn stack_size_mismatch_error_for_function(
         function.name_as_pretty_string(),
         expected,
         actual
+    ));
+    err.with_sub_status(EPARANOID_FAILURE)
+}
+
+#[cold]
+fn stack_field_count_mismatch_error(
+    num_expected_fields: usize,
+    num_actual_fields: usize,
+) -> PartialVMError {
+    let err = PartialVMError::new_invariant_violation(format!(
+        "Stack size mismatch: expected {} fields to be unpacked, got {}",
+        num_expected_fields, num_actual_fields
+    ));
+    err.with_sub_status(EPARANOID_FAILURE)
+}
+
+#[cold]
+fn closure_signature_mismatch_error(
+    function_name: &str,
+    num_expected_params: usize,
+    num_actual_params: usize,
+    num_expected_results: usize,
+    num_actual_results: usize,
+) -> PartialVMError {
+    let err = PartialVMError::new_invariant_violation(format!(
+        "Closure signature mismatch for {}: expected ({} parameters, {} results), got ({} parameters, {} results)",
+        function_name, num_expected_params, num_expected_results, num_actual_params, num_actual_results
     ));
     err.with_sub_status(EPARANOID_FAILURE)
 }

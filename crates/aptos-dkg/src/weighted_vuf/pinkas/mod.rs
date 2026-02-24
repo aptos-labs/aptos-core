@@ -214,8 +214,9 @@ impl WeightedVUF for PinkasWUF {
         apks: &[Option<Self::AugmentedPubKeyShare>],
         msg: &[u8],
         proof: &Self::Proof,
+        thread_pool: &ThreadPool,
     ) -> anyhow::Result<()> {
-        if proof.len() >= apks.len() {
+        if proof.len() > apks.len() {
             bail!("Number of proof shares ({}) exceeds number of APKs ({}) when verifying aggregated WVUF proof", proof.len(), apks.len());
         }
 
@@ -223,13 +224,14 @@ impl WeightedVUF for PinkasWUF {
         let tau = random_scalar(&mut thread_rng());
         let taus = get_powers_of_tau(&tau, proof.len());
 
-        // [share_i^{\tau^i}]_{i \in [0, n)}
-        let shares = proof
-            .iter()
-            .map(|(_, share)| share)
-            .zip(taus.iter())
-            .map(|(share, tau)| share.mul(tau))
-            .collect::<Vec<G2Projective>>();
+        // [share_i^{\tau^i}]_{i \in [0, n)} -- parallelize the G2 scalar multiplications
+        let shares: Vec<G2Projective> = thread_pool.install(|| {
+            proof
+                .par_iter()
+                .zip(taus.par_iter())
+                .map(|((_, share), tau)| share.mul(tau))
+                .collect()
+        });
 
         let mut pis = Vec::with_capacity(proof.len());
         for (player, _) in proof {
@@ -253,9 +255,12 @@ impl WeightedVUF for PinkasWUF {
         let h = Self::hash_to_curve(msg);
         let sum_of_taus: Scalar = taus.iter().sum();
 
-        if multi_pairing(
+        let h_tau = h.mul(sum_of_taus);
+        if parallel_multi_pairing(
             pis.iter().chain([pp.g_neg].iter()),
-            shares.iter().chain([h.mul(sum_of_taus)].iter()),
+            shares.iter().chain([h_tau].iter()),
+            thread_pool,
+            MIN_MULTIPAIR_NUM_JOBS,
         ) != Gt::identity()
         {
             bail!("Multipairing check in batched aggregate verification failed");

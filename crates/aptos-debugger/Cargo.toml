@@ -23,4 +23,4 @@ clap = { workspace = true }
 tokio = { workspace = true }
 
 [target.'cfg(unix)'.dependencies]
-jemallocator = { workspace = true }
+aptos-jemalloc = { workspace = true }

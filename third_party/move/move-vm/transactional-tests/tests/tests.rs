@@ -35,7 +35,7 @@ struct TestConfig {
 
 /// Note that any config which has different output for a test directory *must* be added to the
 /// [SEPARATE_BASELINE] array below, so that a special output file `test.foo.exp` will be used for
-/// outputs comparison when running `test.move` or `test.mvir` for config "foo".
+/// outputs comparison when running `test.move` or `test.masm` for config "foo".
 static TEST_CONFIGS: Lazy<Vec<TestConfig>> = Lazy::new(|| {
     vec![
         TestConfig {
@@ -59,6 +59,7 @@ static TEST_CONFIGS: Lazy<Vec<TestConfig>> = Lazy::new(|| {
             include: &[
                 // Note: for functions values the difference between generated files are stack
                 // traces only (attached for in-place checks, set to None for async checks).
+                "/limits/",
                 "/function_values_safety/",
                 "/paranoid-tests/",
                 "/stack_size/",
@@ -77,6 +78,7 @@ static TEST_CONFIGS: Lazy<Vec<TestConfig>> = Lazy::new(|| {
                 VerifierConfig::unbounded().set_scope(VerificationScope::Nothing),
             ),
             include: &[
+                "/limits/",
                 "/function_values_safety/",
                 "/paranoid-tests/",
                 "/stack_size/",
@@ -105,6 +107,7 @@ static TEST_CONFIGS: Lazy<Vec<TestConfig>> = Lazy::new(|| {
                 "/stack_size/",
                 "/tracing/",
                 "/trusted_code/",
+                "/struct_api/",
             ],
             tracing: false,
         },
@@ -203,7 +206,7 @@ fn main() {
         .flatten()
         .filter_map(|e| {
             let p = e.path().display().to_string();
-            if p.ends_with(".move") || p.ends_with(".mvir") || p.ends_with(".masm") {
+            if p.ends_with(".move") || p.ends_with(".masm") {
                 Some(p)
             } else {
                 None

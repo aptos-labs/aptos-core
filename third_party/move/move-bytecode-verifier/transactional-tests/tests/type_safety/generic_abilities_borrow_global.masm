@@ -1,0 +1,12 @@
+//# publish
+module 0x1::M
+struct Foo<T0>
+  x: T0
+
+fun bar() acquires Foo
+    local l0: &Foo<u64>
+    local l1: Foo<u64>
+    ld_const<address> 256
+    borrow_global Foo<u64>
+    st_loc l0
+    ret

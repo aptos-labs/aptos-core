@@ -1,36 +1,36 @@
 // Copyright (c) Aptos Foundation
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 use crate::{
-    errors::BatchEncryptionError,
+    errors::{BatchEncryptionError, MissingEvalProofError},
     group::*,
+    schemes::fptx::FPTX,
     shared::{
-        ciphertext::{CTDecrypt, CTEncrypt, PreparedCiphertext, StandardCiphertext},
+        ciphertext::{PreparedCiphertext, StandardCiphertext},
         digest::{Digest, DigestKey, EvalProof, EvalProofs, EvalProofsPromise},
         encryption_key::EncryptionKey,
-        ids::{Id, IdSet, UncomputedCoeffs},
+        ids::Id,
         key_derivation::{
-            self, BIBEDecryptionKey, BIBEDecryptionKeyShareValue, BIBEMasterPublicKey,
-            BIBEMasterSecretKeyShare, BIBEVerificationKey,
+            self, BIBEDecryptionKey, BIBEDecryptionKeyShareValue, BIBEMasterSecretKeyShare,
+            BIBEVerificationKey,
         },
     },
     traits::{
         AssociatedData, BatchThresholdEncryption, DecryptionKeyShare, Plaintext, VerificationKey,
     },
 };
-use anyhow::{anyhow, Result};
+use anyhow::Result;
 use aptos_crypto::{
     arkworks::serialization::{ark_de, ark_se},
     weighted_config::WeightedConfigArkworks,
-    SecretSharingConfig as _,
+    TSecretSharingConfig as _,
 };
 use aptos_dkg::pvss::{
-    traits::{Reconstructable as _, Subtranscript},
+    traits::{Reconstructable as _, TranscriptCore},
     Player,
 };
 use ark_ec::AffineRepr;
 use ark_ff::UniformRand as _;
 use ark_std::rand::{rngs::StdRng, CryptoRng, RngCore, SeedableRng};
-use rayon::iter::{IntoParallelIterator, ParallelIterator as _};
 use serde::{Deserialize, Serialize};
 
 pub struct FPTXWeighted {}
@@ -180,7 +180,7 @@ fn gen_weighted_msk_shares<R: RngCore + CryptoRng>(
     rng: &mut R,
     tc: &WeightedConfigArkworks<Fr>,
 ) -> (
-    BIBEMasterPublicKey,
+    G2Affine,
     Vec<WeightedBIBEVerificationKey>,
     Vec<WeightedBIBEMasterSecretKeyShare>,
 ) {
@@ -228,11 +228,11 @@ impl BatchThresholdEncryption for FPTXWeighted {
 
     fn setup(
         digest_key: &Self::DigestKey,
-        pvss_public_params: &<Self::SubTranscript as Subtranscript>::PublicParameters,
+        pvss_public_params: &<Self::SubTranscript as TranscriptCore>::PublicParameters,
         subtranscript: &Self::SubTranscript,
         threshold_config: &Self::ThresholdConfig,
         current_player: Player,
-        msk_share_decryption_key: &<Self::SubTranscript as Subtranscript>::DecryptPrivKey,
+        msk_share_decryption_key: &<Self::SubTranscript as TranscriptCore>::DecryptPrivKey,
     ) -> Result<(
         Self::EncryptionKey,
         Vec<Self::VerificationKey>,
@@ -285,6 +285,14 @@ impl BatchThresholdEncryption for FPTXWeighted {
         Ok((ek, vks, msk_share))
     }
 
+    fn extract_encryption_key(
+        digest_key: &Self::DigestKey,
+        subtranscript: &Self::SubTranscript,
+    ) -> Result<Self::EncryptionKey> {
+        let mpk_g2: G2Affine = subtranscript.get_dealt_public_key().as_g2();
+        Ok(EncryptionKey::new(mpk_g2, digest_key.tau_g2))
+    }
+
     fn setup_for_testing(
         seed: u64,
         max_batch_size: usize,
@@ -302,7 +310,7 @@ impl BatchThresholdEncryption for FPTXWeighted {
         let msk = Fr::rand(&mut rng);
         let (mpk, vks, msk_shares) = gen_weighted_msk_shares(msk, &mut rng, threshold_config);
 
-        let ek = EncryptionKey::new(mpk.0, digest_key.tau_g2);
+        let ek = EncryptionKey::new(mpk, digest_key.tau_g2);
 
         Ok((ek, digest_key, vks, msk_shares))
     }
@@ -313,7 +321,7 @@ impl BatchThresholdEncryption for FPTXWeighted {
         msg: &impl Plaintext,
         associated_data: &impl AssociatedData,
     ) -> anyhow::Result<Self::Ciphertext> {
-        ek.encrypt(rng, msg, associated_data)
+        FPTX::encrypt(ek, rng, msg, associated_data)
     }
 
     fn digest(
@@ -321,43 +329,39 @@ impl BatchThresholdEncryption for FPTXWeighted {
         cts: &[Self::Ciphertext],
         round: Self::Round,
     ) -> anyhow::Result<(Self::Digest, Self::EvalProofsPromise)> {
-        let mut ids: IdSet<UncomputedCoeffs> =
-            IdSet::from_slice(&cts.iter().map(|ct| ct.id()).collect::<Vec<Id>>())
-                .ok_or(anyhow!(""))?;
-
-        digest_key.digest(&mut ids, round)
+        FPTX::digest(digest_key, cts, round)
     }
 
     fn verify_ct(
         ct: &Self::Ciphertext,
         associated_data: &impl AssociatedData,
     ) -> anyhow::Result<()> {
-        ct.verify(associated_data)
+        FPTX::verify_ct(ct, associated_data)
     }
 
     fn ct_id(ct: &Self::Ciphertext) -> Self::Id {
-        ct.id()
+        FPTX::ct_id(ct)
     }
 
     fn eval_proofs_compute_all(
         proofs: &Self::EvalProofsPromise,
         digest_key: &DigestKey,
     ) -> Self::EvalProofs {
-        proofs.compute_all(digest_key)
+        FPTX::eval_proofs_compute_all(proofs, digest_key)
     }
 
     fn eval_proofs_compute_all_vzgg_multi_point_eval(
         proofs: &Self::EvalProofsPromise,
         digest_key: &DigestKey,
     ) -> Self::EvalProofs {
-        proofs.compute_all_vgzz_multi_point_eval(digest_key)
+        FPTX::eval_proofs_compute_all_vzgg_multi_point_eval(proofs, digest_key)
     }
 
     fn eval_proof_for_ct(
         proofs: &Self::EvalProofs,
         ct: &Self::Ciphertext,
     ) -> Option<Self::EvalProof> {
-        proofs.get(&ct.id())
+        FPTX::eval_proof_for_ct(proofs, ct)
     }
 
     fn derive_decryption_key_share(
@@ -374,26 +378,19 @@ impl BatchThresholdEncryption for FPTXWeighted {
         BIBEDecryptionKey::reconstruct(config, shares)
     }
 
-    fn prepare_cts(
-        cts: &[Self::Ciphertext],
+    fn prepare_ct(
+        ct: &Self::Ciphertext,
         digest: &Self::Digest,
         eval_proofs: &Self::EvalProofs,
-    ) -> Result<Vec<Self::PreparedCiphertext>> {
-        cts.into_par_iter()
-            .map(|ct| ct.prepare(digest, eval_proofs))
-            .collect::<anyhow::Result<Vec<Self::PreparedCiphertext>>>()
+    ) -> std::result::Result<Self::PreparedCiphertext, MissingEvalProofError> {
+        FPTX::prepare_ct(ct, digest, eval_proofs)
     }
 
     fn decrypt<'a, P: Plaintext>(
         decryption_key: &Self::DecryptionKey,
-        cts: &[Self::PreparedCiphertext],
-    ) -> anyhow::Result<Vec<P>> {
-        cts.into_par_iter()
-            .map(|ct| {
-                let plaintext: Result<P> = decryption_key.decrypt(ct);
-                plaintext
-            })
-            .collect::<anyhow::Result<Vec<P>>>()
+        ct: &Self::PreparedCiphertext,
+    ) -> anyhow::Result<P> {
+        FPTX::decrypt(decryption_key, ct)
     }
 
     fn verify_decryption_key_share(
@@ -404,12 +401,20 @@ impl BatchThresholdEncryption for FPTXWeighted {
         verification_key.verify_decryption_key_share(digest, decryption_key_share)
     }
 
-    fn decrypt_individual<P: Plaintext>(
+    fn verify_decryption_key(
+        encryption_key: &Self::EncryptionKey,
+        digest: &Self::Digest,
+        decryption_key: &Self::DecryptionKey,
+    ) -> Result<()> {
+        FPTX::verify_decryption_key(encryption_key, digest, decryption_key)
+    }
+
+    fn decrypt_slow<P: Plaintext>(
         decryption_key: &Self::DecryptionKey,
         ct: &Self::Ciphertext,
         digest: &Self::Digest,
         eval_proof: &Self::EvalProof,
     ) -> Result<P> {
-        decryption_key.decrypt(&ct.prepare_individual(digest, eval_proof)?)
+        FPTX::decrypt_slow(decryption_key, ct, digest, eval_proof)
     }
 }

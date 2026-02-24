@@ -145,8 +145,6 @@ fn run_benchmark(
     };
     options.move_sources.append(&mut modules.to_vec());
     options.move_deps.append(&mut dep_dirs.to_vec());
-    options.skip_attribute_checks = true;
-
     if use_aptos_natives {
         options.backend.custom_natives =
             Some(move_prover_boogie_backend::options::CustomNativeOptions {

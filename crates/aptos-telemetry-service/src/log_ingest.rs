@@ -7,7 +7,7 @@ use crate::{
         CHAIN_ID_TAG_NAME, EPOCH_FIELD_NAME, PEER_ID_FIELD_NAME, PEER_ROLE_TAG_NAME,
         RUN_UUID_TAG_NAME,
     },
-    constants::MAX_CONTENT_LENGTH,
+    constants::{MAX_CONTENT_LENGTH, MAX_DECOMPRESSED_LENGTH},
     context::Context,
     debug, error,
     errors::{LogIngestError, ServiceError},
@@ -16,7 +16,7 @@ use crate::{
 };
 use flate2::bufread::GzDecoder;
 use reqwest::{header::CONTENT_ENCODING, StatusCode};
-use std::collections::HashMap;
+use std::{collections::HashMap, io::Read};
 use tokio::time::Instant;
 use warp::{filters::BoxedFilter, reject, reply, Buf, Filter, Rejection, Reply};
 
@@ -46,7 +46,31 @@ pub async fn handle_log_ingest(
 ) -> anyhow::Result<impl Reply, Rejection> {
     debug!("handling log ingest");
 
-    if let Some(blacklist) = &context.log_ingest_clients().blacklist {
+    // Apply rate limiting for unknown/untrusted nodes
+    let is_unknown = matches!(
+        claims.node_type,
+        NodeType::Unknown | NodeType::UnknownValidator | NodeType::UnknownFullNode
+    );
+    if is_unknown && !context.unknown_logs_rate_limiter().check_rate_limit().await {
+        debug!(
+            "rate limit exceeded for unknown node logs: peer_id={}",
+            claims.peer_id
+        );
+        return Err(reject::custom(ServiceError::too_many_requests(
+            LogIngestError::RateLimitExceeded.into(),
+        )));
+    }
+
+    // Standard log ingestion requires humio_ingest_config to be configured
+    let log_clients = context.log_ingest_clients().ok_or_else(|| {
+        error!("Standard log ingestion not configured - rejecting request");
+        reject::custom(ServiceError::new(
+            StatusCode::SERVICE_UNAVAILABLE,
+            LogIngestError::IngestionError.into(),
+        ))
+    })?;
+
+    if let Some(blacklist) = &log_clients.blacklist {
         if blacklist.contains(&claims.peer_id) {
             return Err(reject::custom(ServiceError::forbidden(
                 LogIngestError::Forbidden(claims.peer_id).into(),
@@ -56,15 +80,17 @@ pub async fn handle_log_ingest(
 
     let client = match claims.node_type {
         NodeType::Unknown | NodeType::UnknownValidator | NodeType::UnknownFullNode => {
-            &context.log_ingest_clients().unknown_logs_ingest_client
+            &log_clients.unknown_logs_ingest_client
         },
-        _ => &context.log_ingest_clients().known_logs_ingest_client,
+        _ => &log_clients.known_logs_ingest_client,
     };
 
     let log_messages: Vec<String> = if let Some(encoding) = encoding {
         if encoding.eq_ignore_ascii_case("gzip") {
             let decoder = GzDecoder::new(body.reader());
-            serde_json::from_reader(decoder).map_err(|e| {
+            // Limit decompressed size to prevent decompression bomb attacks
+            let limited_reader = decoder.take(MAX_DECOMPRESSED_LENGTH as u64);
+            serde_json::from_reader(limited_reader).map_err(|e| {
                 debug!("unable to decode and deserialize body: {}", e);
                 ServiceError::bad_request(LogIngestError::UnexpectedPayloadBody.into())
             })?

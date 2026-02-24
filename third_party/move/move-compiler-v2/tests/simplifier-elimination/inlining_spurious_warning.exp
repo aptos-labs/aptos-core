@@ -34,7 +34,7 @@ module 0x123::a {
 module 0x123::a {
     public fun bar() {
         {
-            let (x) = (false);
+            let x = false;
             if (!x) {
                 if (1 == 1) () else abort 14566554180833181696;
             }

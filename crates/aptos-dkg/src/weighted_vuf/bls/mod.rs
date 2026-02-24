@@ -159,6 +159,7 @@ impl WeightedVUF for BlsWUF {
         _apks: &[Option<Self::AugmentedPubKeyShare>],
         msg: &[u8],
         proof: &Self::Proof,
+        _thread_pool: &ThreadPool,
     ) -> anyhow::Result<()> {
         let hash = Self::hash_to_curve(msg);
 

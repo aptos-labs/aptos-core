@@ -17,12 +17,14 @@ ark-poly = { workspace = true }
 ark-serialize = { workspace = true }
 ark-std = { workspace = true }
 bcs = { workspace = true }
+# blake2 = { workspace = true }
 blst = { workspace = true }
 blstrs = { workspace = true }
 criterion = { workspace = true }
 derive_more = { workspace = true }
 ff = { workspace = true }
 group = { workspace = true }
+# hashbrown = { workspace = true }
 hex = { workspace = true }
 itertools = { workspace = true }
 merlin = { workspace = true }
@@ -45,6 +47,7 @@ num_cpus = { workspace = true }
 [features]
 assert-private-keys-not-cloneable = []
 fuzzing = []
+parallel = []
 range_proof_timing = []
 
 [[bench]]
@@ -61,6 +64,10 @@ harness = false
 
 [[bench]]
 name = "ldt"
+harness = false
+
+[[bench]]
+name = "msm"
 harness = false
 
 [[bench]]

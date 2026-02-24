@@ -5,7 +5,7 @@
 use crate::{
     ast::{
         AbortKind, AccessSpecifier, AccessSpecifierKind, Address, AddressSpecifier, BehaviorKind,
-        BehaviorTarget, Exp, ExpData, LambdaCaptureKind, MatchArm, ModuleName, Operation, Pattern,
+        BehaviorState, Exp, ExpData, LambdaCaptureKind, MatchArm, ModuleName, Operation, Pattern,
         QualifiedSymbol, QuantKind, ResourceSpecifier, RewriteResult, Spec, TempIndex, Value,
     },
     builder::{
@@ -19,8 +19,8 @@ use crate::{
         LanguageVersion,
     },
     model::{
-        FieldData, FieldId, FunctionKind, GlobalEnv, Loc, ModuleId, NodeId, Parameter, QualifiedId,
-        QualifiedInstId, SpecFunId, StructId, TypeParameter, TypeParameterKind,
+        FieldData, FieldId, FunctionKind, GlobalEnv, GlobalId, Loc, ModuleId, NodeId, Parameter,
+        QualifiedId, QualifiedInstId, SpecFunId, StructId, TypeParameter, TypeParameterKind,
     },
     symbol::{Symbol, SymbolPool},
     ty::{
@@ -28,10 +28,7 @@ use crate::{
         ReceiverFunctionInstance, ReferenceKind, Substitution, Type, TypeDisplayContext,
         TypeUnificationError, UnificationContext, Variance, WideningOrder, BOOL_TYPE,
     },
-    well_known::{
-        BORROW_MUT_NAME, BORROW_NAME, UNSPECIFIED_ABORT_CODE, VECTOR_FUNCS_WITH_BYTECODE_INSTRS,
-        VECTOR_MODULE,
-    },
+    well_known::{UNSPECIFIED_ABORT_CODE, VECTOR_FUNCS_WITH_BYTECODE_INSTRS, VECTOR_MODULE},
     FunId,
 };
 use codespan_reporting::diagnostic::Severity;
@@ -45,6 +42,7 @@ use move_core_types::{
     ability::{Ability, AbilitySet},
     account_address::AccountAddress,
     function::ClosureMask,
+    language_storage::{BORROW, BORROW_MUT},
 };
 use move_ir_types::{
     location::{sp, Spanned},
@@ -110,6 +108,9 @@ pub(crate) struct ExpTranslator<'env, 'translator, 'module_translator> {
     pub insert_freeze: bool,
     /// A stack of open loops and their optional label
     pub loop_stack: Vec<Option<PA::Label>>,
+    /// Map from state label names to their GlobalId, ensuring the same label name
+    /// always resolves to the same MemoryLabel across behavior predicates.
+    pub state_label_map: BTreeMap<Symbol, GlobalId>,
 }
 
 #[derive(Debug)]
@@ -181,6 +182,7 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
             placeholder_map: BTreeMap::new(),
             insert_freeze: true,
             loop_stack: vec![],
+            state_label_map: BTreeMap::new(),
         }
     }
 
@@ -2040,10 +2042,12 @@ impl ExpTranslator<'_, '_, '_> {
                 }
                 ExpData::Call(id, Operation::NoOp, vec![])
             },
-            EA::Exp_::Behavior(kind, _pre_label, fn_name, type_args, sp!(_, args), _post_label) => {
+            EA::Exp_::Behavior(kind, pre_label, fn_name, type_args, sp!(_, args), post_label) => {
                 self.translate_behavior_predicate(
                     &loc,
                     *kind,
+                    pre_label,
+                    post_label,
                     fn_name,
                     type_args,
                     args,
@@ -4159,11 +4163,7 @@ impl ExpTranslator<'_, '_, '_> {
             return call;
         } else {
             // To use index notation in vector module
-            let borrow_fun_name = if mutable {
-                BORROW_MUT_NAME
-            } else {
-                BORROW_NAME
-            };
+            let borrow_fun_name = if mutable { BORROW_MUT } else { BORROW };
             if let Some(borrow_symbol) = self
                 .parent
                 .parent
@@ -5746,6 +5746,8 @@ impl ExpTranslator<'_, '_, '_> {
         &mut self,
         loc: &Loc,
         kind: PA::BehaviorKind,
+        pre_label: &Option<PA::Label>,
+        post_label: &Option<PA::Label>,
         fn_name: &EA::ModuleAccess,
         type_args: &Option<Vec<EA::Type>>,
         args: &[EA::Exp],
@@ -5758,10 +5760,15 @@ impl ExpTranslator<'_, '_, '_> {
             PA::BehaviorKind::AbortsOf => BehaviorKind::AbortsOf,
             PA::BehaviorKind::EnsuresOf => BehaviorKind::EnsuresOf,
             PA::BehaviorKind::ModifiesOf => BehaviorKind::ModifiesOf,
+            PA::BehaviorKind::ResultOf => BehaviorKind::ResultOf,
         };
 
-        // Resolve the function name to a behavior target
-        let Some((target, expected_arg_types)) =
+        // Validate and translate state labels
+        let behavior_state =
+            self.translate_behavior_state_labels(loc, &model_kind, pre_label, post_label);
+
+        // Resolve the function name to a function expression (Closure or Temporary)
+        let Some((fun_exp, expected_arg_types)) =
             self.resolve_behavior_target(loc, fn_name, type_args, &model_kind)
         else {
             return self.new_error_exp();
@@ -5771,39 +5778,93 @@ impl ExpTranslator<'_, '_, '_> {
         let translated_args =
             self.translate_and_check_behavior_args(loc, args, &expected_arg_types, &model_kind);
 
-        // The result type of behavior predicates is bool
-        let result_ty = self.check_type(loc, &BOOL_TYPE, expected_type, context);
+        // Determine the result type based on the behavior kind
+        let fun_type = self.env().get_node_type(fun_exp.node_id());
+        let Some(computed_result_ty) =
+            self.compute_behavior_result_type(loc, &model_kind, &fun_type)
+        else {
+            return self.new_error_exp();
+        };
+        let result_ty = self.check_type(loc, &computed_result_ty, expected_type, context);
         let id = self.new_node_id_with_type_loc(&result_ty, loc);
 
-        // Set the type instantiation on the node for proper type resolution during finalize_types
-        if let BehaviorTarget::Function(qid) = &target {
-            self.set_node_instantiation(id, qid.inst.clone());
-        }
+        // Build args with function expression as first argument
+        let mut all_args = vec![fun_exp];
+        all_args.extend(translated_args);
 
-        // Labels are ignored for now (None, None)
         ExpData::Call(
             id,
-            Operation::Behavior(model_kind, None, target, None),
-            translated_args,
+            Operation::Behavior(model_kind, behavior_state),
+            all_args,
         )
     }
 
-    /// Resolves the target of a behavior predicate to either a parameter or a function.
-    /// Returns the BehaviorTarget and the expected argument types.
+    /// Validates and translates state labels for behavior predicates.
+    /// Returns a BehaviorState with the translated memory labels. Names are registered
+    /// in GlobalEnv for lookup during printing.
+    fn translate_behavior_state_labels(
+        &mut self,
+        loc: &Loc,
+        kind: &BehaviorKind,
+        pre_label: &Option<PA::Label>,
+        post_label: &Option<PA::Label>,
+    ) -> BehaviorState {
+        // Validate label usage based on behavior kind
+        // Only ensures_of and result_of can have both pre and post labels
+        // Other predicates (requires_of, aborts_of, modifies_of) should not have post labels
+        if !matches!(kind, BehaviorKind::EnsuresOf | BehaviorKind::ResultOf) && post_label.is_some()
+        {
+            self.error(
+                loc,
+                &format!(
+                    "only ensures_of and result_of can have a post-state label (@post), not {}",
+                    kind
+                ),
+            );
+        }
+
+        // Convert labels to memory labels and register names with GlobalEnv
+        let pre_name = pre_label
+            .as_ref()
+            .map(|l| self.symbol_pool().make(l.value().as_str()));
+        let post_name = post_label
+            .as_ref()
+            .map(|l| self.symbol_pool().make(l.value().as_str()));
+        let mut get_or_create_label = |sym: Symbol| -> GlobalId {
+            if let Some(&id) = self.state_label_map.get(&sym) {
+                id
+            } else {
+                let id = self.env().new_global_id();
+                self.state_label_map.insert(sym, id);
+                self.env().set_memory_label_name(id, sym);
+                id
+            }
+        };
+        let pre = pre_name.map(&mut get_or_create_label);
+        let post = post_name.map(&mut get_or_create_label);
+        BehaviorState::new(pre, post)
+    }
+
+    /// Resolves the target of a behavior predicate to either a local variable or a function.
+    /// Returns a function expression (Temporary for locals, Closure for functions) and
+    /// the expected argument types.
     fn resolve_behavior_target(
         &mut self,
         loc: &Loc,
         maccess: &EA::ModuleAccess,
         type_args: &Option<Vec<EA::Type>>,
         kind: &BehaviorKind,
-    ) -> Option<(BehaviorTarget, Vec<Type>)> {
+    ) -> Option<(Exp, Vec<Type>)> {
         match &maccess.value {
             EA::ModuleAccess_::Name(name) => {
-                // First try to resolve as a local parameter
+                // First try to resolve as a local variable/parameter
                 let sym = self.symbol_pool().make(name.value.as_str());
-                if let Some(entry) = self.lookup_local(sym, false) {
+                // Extract data from entry first to avoid borrow conflicts
+                let local_info = self
+                    .lookup_local(sym, false)
+                    .map(|entry| (entry.type_.clone(), entry.temp_index));
+                if let Some((entry_type, temp_index)) = local_info {
                     // Check if it's a function type
-                    let entry_type = entry.type_.clone();
                     let ty = self.subs.specialize(&entry_type);
                     if let Type::Fun(arg_ty, result_ty, _abilities) = &ty {
                         // Check that no type arguments are provided for function parameters
@@ -5819,7 +5880,15 @@ impl ExpTranslator<'_, '_, '_> {
                         }
                         let expected_types =
                             self.compute_behavior_arg_types(arg_ty, result_ty, kind);
-                        return Some((BehaviorTarget::Parameter(sym), expected_types));
+                        let id = self.new_node_id_with_type_loc(&ty, loc);
+                        let fun_exp = if let Some(temp_idx) = temp_index {
+                            // For function parameters with temp_index, use Temporary
+                            ExpData::Temporary(id, temp_idx).into_exp()
+                        } else {
+                            // For spec function parameters (no temp_index), use LocalVar
+                            ExpData::LocalVar(id, sym).into_exp()
+                        };
+                        return Some((fun_exp, expected_types));
                     } else {
                         self.error(
                             loc,
@@ -5844,13 +5913,14 @@ impl ExpTranslator<'_, '_, '_> {
     }
 
     /// Resolves a qualified function name for behavior predicates.
+    /// Returns a Closure expression for the function and the expected argument types.
     fn resolve_function_target(
         &mut self,
         loc: &Loc,
         global_sym: &QualifiedSymbol,
         type_args: &Option<Vec<EA::Type>>,
         kind: &BehaviorKind,
-    ) -> Option<(BehaviorTarget, Vec<Type>)> {
+    ) -> Option<(Exp, Vec<Type>)> {
         if let Some(entry) = self.parent.parent.fun_table.get(global_sym) {
             let module_id = entry.module_id;
             let fun_id = entry.fun_id;
@@ -5875,16 +5945,27 @@ impl ExpTranslator<'_, '_, '_> {
             let instantiated_result_type = result_type.instantiate(&instantiation);
 
             // Compute expected argument types based on behavior kind
-            let arg_ty = Type::tuple(param_types);
+            let arg_ty = Type::tuple(param_types.clone());
             let expected_types =
                 self.compute_behavior_arg_types(&arg_ty, &instantiated_result_type, kind);
 
-            let qid = QualifiedInstId {
-                module_id,
-                id: fun_id,
-                inst: instantiation,
-            };
-            Some((BehaviorTarget::Function(qid), expected_types))
+            // Create a function type for the closure
+            let fun_type = Type::Fun(
+                Box::new(Type::tuple(param_types)),
+                Box::new(instantiated_result_type),
+                AbilitySet::EMPTY,
+            );
+
+            // Create a Closure expression
+            let id = self.new_node_id_with_type_loc(&fun_type, loc);
+            self.set_node_instantiation(id, instantiation);
+            let fun_exp = ExpData::Call(
+                id,
+                Operation::Closure(module_id, fun_id, ClosureMask::empty()),
+                vec![],
+            )
+            .into_exp();
+            Some((fun_exp, expected_types))
         } else {
             self.error(
                 loc,
@@ -5905,14 +5986,20 @@ impl ExpTranslator<'_, '_, '_> {
         kind: &BehaviorKind,
     ) -> Vec<Type> {
         match kind {
-            BehaviorKind::RequiresOf | BehaviorKind::AbortsOf => {
-                // requires_of and aborts_of take input parameters
+            BehaviorKind::RequiresOf | BehaviorKind::AbortsOf | BehaviorKind::ResultOf => {
+                // requires_of, aborts_of, and result_of take only input parameters
                 arg_ty.clone().flatten()
             },
             BehaviorKind::EnsuresOf => {
-                // ensures_of takes input parameters + result
+                // ensures_of takes input parameters + result + modified mut ref values
                 let mut types = arg_ty.clone().flatten();
                 types.extend(result_ty.clone().flatten());
+                // Add mutable reference parameters as outputs (their modified values)
+                for ty in arg_ty.clone().flatten() {
+                    if ty.is_mutable_reference() {
+                        types.push(ty.skip_reference().clone());
+                    }
+                }
                 types
             },
             BehaviorKind::ModifiesOf => {
@@ -5921,6 +6008,53 @@ impl ExpTranslator<'_, '_, '_> {
                 vec![]
             },
         }
+    }
+
+    /// Computes the result type for a behavior predicate based on the kind.
+    /// - `ResultOf` returns the function's result type (including modified mut ref values)
+    /// - All other behavior predicates return bool
+    /// Returns `None` if the result type cannot be computed (e.g., result_of on void function).
+    fn compute_behavior_result_type(
+        &mut self,
+        loc: &Loc,
+        kind: &BehaviorKind,
+        fun_type: &Type,
+    ) -> Option<Type> {
+        if *kind != BehaviorKind::ResultOf {
+            return Some(BOOL_TYPE);
+        }
+
+        // For ResultOf, compute result type from function type
+        let Type::Fun(params, result, _abilities) = fun_type else {
+            // Should not happen if resolve_behavior_target succeeded
+            return Some(Type::Error);
+        };
+
+        // Compute result types: explicit results + modified mut ref values
+        let result_types: Vec<_> = result
+            .clone()
+            .flatten()
+            .into_iter()
+            .chain(
+                params
+                    .clone()
+                    .flatten()
+                    .into_iter()
+                    .filter(|ty| ty.is_mutable_reference())
+                    .map(|ty| ty.skip_reference().clone()),
+            )
+            .collect();
+
+        // Error only if there are NO outputs at all
+        if result_types.is_empty() {
+            self.error(
+                loc,
+                "`result_of` cannot be used with functions that have no outputs",
+            );
+            return None;
+        }
+
+        Some(Type::tuple(result_types))
     }
 
     /// Translates and type-checks behavior predicate arguments.

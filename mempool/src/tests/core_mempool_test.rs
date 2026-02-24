@@ -92,7 +92,7 @@ fn test_transaction_ordering_seqnos_and_nonces() {
     );
 
     // Expected transaction order in priority queue
-    let ordered_transactions = vec![
+    let ordered_transactions = [
         TestTransaction::new(0, ReplayProtector::Nonce(200), 7),
         TestTransaction::new(0, ReplayProtector::SequenceNumber(1), 5),
         TestTransaction::new(0, ReplayProtector::Nonce(150), 3),
@@ -574,7 +574,6 @@ fn test_reset_sequence_number_on_failure() {
     ];
     let hashes: Vec<_> = txns
         .iter()
-        .cloned()
         .map(|txn| txn.make_signed_transaction().committed_hash())
         .collect();
     // Add two transactions for account.

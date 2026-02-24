@@ -10,7 +10,6 @@ use super::{
 };
 use crate::{
     endpoints::{AptosTapError, AptosTapErrorCode, RejectionReason, RejectionReasonCode},
-    funder::common::update_sequence_numbers,
     middleware::TRANSFER_FUNDER_ACCOUNT_BALANCE,
 };
 use anyhow::{Context, Result};
@@ -30,7 +29,6 @@ use async_trait::async_trait;
 use reqwest::Url;
 use serde::{Deserialize, Serialize};
 use std::{collections::HashMap, str::FromStr, time::Duration};
-use tokio::sync::RwLock;
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct TransferFunderConfig {
@@ -83,8 +81,6 @@ impl TransferFunderConfig {
             self.transaction_submission_config.max_gas_amount,
             self.transaction_submission_config
                 .transaction_expiration_secs,
-            self.transaction_submission_config
-                .wait_for_outstanding_txns_secs,
             self.transaction_submission_config.wait_for_transactions,
         );
 
@@ -93,7 +89,7 @@ impl TransferFunderConfig {
 }
 
 pub struct TransferFunder {
-    faucet_account: RwLock<LocalAccount>,
+    faucet_account: LocalAccount,
 
     transaction_factory: TransactionFactory,
 
@@ -115,14 +111,6 @@ pub struct TransferFunder {
     /// from the gas_unit_price_manager.
     gas_unit_price_override: Option<u64>,
 
-    /// When recovering from being overloaded, this struct ensures we handle
-    /// requests in the order they came in. TransferFunder uses DEFAULT_ASSET_NAME for all requests
-    /// since it only handles a single asset. The queue format is Vec<(AccountAddress, u64)>.
-    outstanding_requests: RwLock<HashMap<String, Vec<(AccountAddress, u64)>>>,
-
-    /// Amount of time we'll wait for the seqnum to catch up before resetting it.
-    wait_for_outstanding_txns_secs: u64,
-
     /// If set, we won't return responses until the transaction is processed.
     wait_for_transactions: bool,
 }
@@ -140,17 +128,17 @@ impl TransferFunder {
         gas_unit_price_override: Option<u64>,
         max_gas_amount: u64,
         transaction_expiration_secs: u64,
-        wait_for_outstanding_txns_secs: u64,
         wait_for_transactions: bool,
     ) -> Self {
         let gas_unit_price_manager =
             GasUnitPriceManager::new(node_url.clone(), gas_unit_price_ttl_secs);
 
         Self {
-            faucet_account: RwLock::new(faucet_account),
+            faucet_account,
             transaction_factory: TransactionFactory::new(chain_id)
                 .with_max_gas_amount(max_gas_amount)
-                .with_transaction_expiration_time(transaction_expiration_secs),
+                .with_transaction_expiration_time(transaction_expiration_secs)
+                .with_use_replay_protection_nonce(true),
             node_url,
             node_api_key,
             node_additional_headers,
@@ -158,8 +146,6 @@ impl TransferFunder {
             amount_to_fund,
             gas_unit_price_manager,
             gas_unit_price_override,
-            outstanding_requests: RwLock::new(HashMap::new()),
-            wait_for_outstanding_txns_secs,
             wait_for_transactions,
         }
     }
@@ -217,13 +203,10 @@ impl TransferFunder {
 
         let signed_transaction = self
             .faucet_account
-            .write()
-            .await
             .sign_with_transaction_builder(transaction_builder);
 
         submit_transaction(
             client,
-            &self.faucet_account,
             signed_transaction,
             receiver_address,
             self.wait_for_transactions,
@@ -279,22 +262,10 @@ impl FunderTrait for TransferFunder {
         // Determine amount to fund.
         let amount = self.get_amount(amount, did_bypass_checkers);
 
-        // Update the sequence numbers of the accounts.
-        // TransferFunder always uses DEFAULT_ASSET_NAME since it only handles a single asset.
-        let (_funder_seq_num, receiver_seq_num) = update_sequence_numbers(
-            &client,
-            &self.faucet_account,
-            &self.outstanding_requests,
-            receiver_address,
-            amount,
-            self.wait_for_outstanding_txns_secs,
-            DEFAULT_ASSET_NAME,
-        )
-        .await?;
+        // Check if the receiver account already exists.
+        let receiver_exists = client.get_account(receiver_address).await.is_ok();
 
-        // When updating the sequence numbers, we expect that the receiver sequence
-        // number should be None, because the account should not exist yet.
-        if receiver_seq_num.is_some() {
+        if receiver_exists {
             return Err(AptosTapError::new(
                 "Account ineligible".to_string(),
                 AptosTapErrorCode::Rejected,
@@ -345,7 +316,7 @@ impl FunderTrait for TransferFunder {
 
     /// Assert funder account actually exists and has the minimum funds.
     async fn is_healthy(&self) -> FunderHealthMessage {
-        let account_address = self.faucet_account.read().await.address();
+        let account_address = self.faucet_account.address();
         let funder_balance = match self
             .get_api_client()
             .view_apt_account_balance(account_address)

@@ -3,7 +3,9 @@
 
 pub use aptos_gas_schedule::LATEST_GAS_FEATURE_VERSION;
 use aptos_gas_schedule::{
-    gas_feature_versions::{RELEASE_V1_15, RELEASE_V1_30, RELEASE_V1_34, RELEASE_V1_38},
+    gas_feature_versions::{
+        RELEASE_V1_15, RELEASE_V1_30, RELEASE_V1_34, RELEASE_V1_38, RELEASE_V1_41,
+    },
     AptosGasParameters,
 };
 use aptos_types::{
@@ -227,6 +229,7 @@ pub fn aptos_prod_vm_config(
     let enable_depth_checks = features.is_enabled(FeatureFlag::ENABLE_FUNCTION_VALUES);
     let enable_capture_option = !timed_features.is_enabled(TimedFeatureFlag::DisabledCaptureOption)
         || features.is_enabled(FeatureFlag::ENABLE_CAPTURE_OPTION);
+    let enable_closure_depth_check = timed_features.is_enabled(TimedFeatureFlag::ClosureDepthCheck);
 
     // Some feature gating was missed, so for native dynamic dispatch the feature is always on for
     // testnet after 1.38 release.
@@ -263,6 +266,9 @@ pub fn aptos_prod_vm_config(
         enable_framework_for_option,
         enable_function_caches_for_native_dynamic_dispatch,
         enable_debugging,
+        enable_closure_depth_check,
+        enable_struct_layout_local_cache: gas_feature_version >= RELEASE_V1_41,
+        check_depth_on_type_counts: gas_feature_version >= RELEASE_V1_41,
     };
 
     // Note: if max_value_nest_depth changed, make sure the constant is in-sync. Do not remove this

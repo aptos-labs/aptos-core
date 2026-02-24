@@ -39,11 +39,12 @@ aptos-vm-types = { workspace = true }
 bcs = { workspace = true }
 bytes = { workspace = true }
 goldenfile = { workspace = true }
+indoc = { workspace = true }
+move-asm = { workspace = true }
 move-binary-format = { workspace = true }
 move-command-line-common = { workspace = true }
 move-core-types = { workspace = true, features = ["fuzzing"] }
 move-coverage = { workspace = true }
-move-ir-compiler = { workspace = true }
 move-model = { workspace = true }
 move-vm-runtime = { workspace = true }
 move-vm-types = { workspace = true }

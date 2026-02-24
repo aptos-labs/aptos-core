@@ -1,0 +1,13 @@
+//# run
+script
+entry public fun main()
+    local l0: u64
+    local l1: &mut u64
+    local l2: u64
+    ld_u64 5
+    st_loc l0
+    mut_borrow_loc l0
+    st_loc l1
+    move_loc l0
+    st_loc l2
+    ret

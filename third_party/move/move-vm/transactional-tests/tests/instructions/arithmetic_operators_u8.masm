@@ -1,0 +1,481 @@
+//# run --verbose
+script
+entry public fun main()
+    ld_u8 0
+    ld_u8 0
+    add
+    ld_u8 0
+    eq
+    not
+    br_false l0
+    ld_u64 1000
+    abort
+l0: ld_u8 0
+    ld_u8 1
+    add
+    ld_u8 1
+    eq
+    not
+    br_false l1
+    ld_u64 1001
+    abort
+l1: ld_u8 1
+    ld_u8 1
+    add
+    ld_u8 2
+    eq
+    not
+    br_false l2
+    ld_u64 1002
+    abort
+l2: ld_u8 13
+    ld_u8 67
+    add
+    ld_u8 80
+    eq
+    not
+    br_false l3
+    ld_u64 1100
+    abort
+l3: ld_u8 100
+    ld_u8 10
+    add
+    ld_u8 110
+    eq
+    not
+    br_false l4
+    ld_u64 1101
+    abort
+l4: ld_u8 0
+    ld_u8 255
+    add
+    ld_u8 255
+    eq
+    not
+    br_false l5
+    ld_u64 1200
+    abort
+l5: ld_u8 1
+    ld_u8 254
+    add
+    ld_u8 255
+    eq
+    not
+    br_false l6
+    ld_u64 1201
+    abort
+l6: ld_u8 5
+    ld_u8 250
+    add
+    ld_u8 255
+    eq
+    not
+    br_false l7
+    ld_u64 1202
+    abort
+l7: ret
+
+
+
+//# run --verbose
+script
+entry public fun main()
+    ld_u8 1
+    ld_u8 255
+    add
+    pop
+    ret
+
+
+
+//# run --verbose
+script
+entry public fun main()
+    ld_u8 215
+    ld_u8 156
+    add
+    pop
+    ret
+
+
+
+//# run --verbose
+script
+entry public fun main()
+    ld_u8 0
+    ld_u8 0
+    sub
+    ld_u8 0
+    eq
+    not
+    br_false l0
+    ld_u64 2000
+    abort
+l0: ld_u8 1
+    ld_u8 0
+    sub
+    ld_u8 1
+    eq
+    not
+    br_false l1
+    ld_u64 2001
+    abort
+l1: ld_u8 1
+    ld_u8 1
+    sub
+    ld_u8 0
+    eq
+    not
+    br_false l2
+    ld_u64 2002
+    abort
+l2: ld_u8 52
+    ld_u8 13
+    sub
+    ld_u8 39
+    eq
+    not
+    br_false l3
+    ld_u64 2100
+    abort
+l3: ld_u8 100
+    ld_u8 10
+    sub
+    ld_u8 90
+    eq
+    not
+    br_false l4
+    ld_u64 2101
+    abort
+l4: ld_u8 255
+    ld_u8 255
+    sub
+    ld_u8 0
+    eq
+    not
+    br_false l5
+    ld_u64 2200
+    abort
+l5: ld_u8 5
+    ld_u8 1
+    sub
+    ld_u8 4
+    sub
+    ld_u8 0
+    eq
+    not
+    br_false l6
+    ld_u64 2201
+    abort
+l6: ret
+
+
+
+//# run --verbose
+script
+entry public fun main()
+    ld_u8 0
+    ld_u8 1
+    sub
+    pop
+    ret
+
+
+
+//# run --verbose
+script
+entry public fun main()
+    ld_u8 54
+    ld_u8 100
+    sub
+    pop
+    ret
+
+
+
+//# run --verbose
+script
+entry public fun main()
+    ld_u8 0
+    ld_u8 0
+    mul
+    ld_u8 0
+    eq
+    not
+    br_false l0
+    ld_u64 3000
+    abort
+l0: ld_u8 1
+    ld_u8 0
+    mul
+    ld_u8 0
+    eq
+    not
+    br_false l1
+    ld_u64 3001
+    abort
+l1: ld_u8 1
+    ld_u8 1
+    mul
+    ld_u8 1
+    eq
+    not
+    br_false l2
+    ld_u64 3002
+    abort
+l2: ld_u8 6
+    ld_u8 7
+    mul
+    ld_u8 42
+    eq
+    not
+    br_false l3
+    ld_u64 3100
+    abort
+l3: ld_u8 10
+    ld_u8 10
+    mul
+    ld_u8 100
+    eq
+    not
+    br_false l4
+    ld_u64 3101
+    abort
+l4: ld_u8 127
+    ld_u8 2
+    mul
+    ld_u8 254
+    eq
+    not
+    br_false l5
+    ld_u64 3200
+    abort
+l5: ret
+
+
+
+//# run --verbose
+script
+entry public fun main()
+    ld_u8 16
+    ld_u8 16
+    mul
+    pop
+    ret
+
+
+
+//# run --verbose
+script
+entry public fun main()
+    ld_u8 128
+    ld_u8 2
+    mul
+    pop
+    ret
+
+
+
+//# run --verbose
+script
+entry public fun main()
+    ld_u8 0
+    ld_u8 1
+    div
+    ld_u8 0
+    eq
+    not
+    br_false l0
+    ld_u64 4000
+    abort
+l0: ld_u8 1
+    ld_u8 1
+    div
+    ld_u8 1
+    eq
+    not
+    br_false l1
+    ld_u64 4001
+    abort
+l1: ld_u8 1
+    ld_u8 2
+    div
+    ld_u8 0
+    eq
+    not
+    br_false l2
+    ld_u64 4002
+    abort
+l2: ld_u8 6
+    ld_u8 3
+    div
+    ld_u8 2
+    eq
+    not
+    br_false l3
+    ld_u64 4100
+    abort
+l3: ld_u8 255
+    ld_u8 7
+    div
+    ld_u8 36
+    eq
+    not
+    br_false l4
+    ld_u64 4101
+    abort
+l4: ld_u8 254
+    ld_u8 255
+    div
+    ld_u8 0
+    eq
+    not
+    br_false l5
+    ld_u64 4200
+    abort
+l5: ld_u8 255
+    ld_u8 255
+    div
+    ld_u8 1
+    eq
+    not
+    br_false l6
+    ld_u64 4201
+    abort
+l6: ret
+
+
+
+//# run --verbose
+script
+entry public fun main()
+    ld_u8 0
+    ld_u8 0
+    div
+    pop
+    ret
+
+
+
+//# run --verbose
+script
+entry public fun main()
+    ld_u8 1
+    ld_u8 0
+    div
+    pop
+    ret
+
+
+
+//# run --verbose
+script
+entry public fun main()
+    ld_u8 255
+    ld_u8 0
+    div
+    pop
+    ret
+
+
+
+//# run --verbose
+script
+entry public fun main()
+    ld_u8 0
+    ld_u8 1
+    mod
+    ld_u8 0
+    eq
+    not
+    br_false l0
+    ld_u64 5000
+    abort
+l0: ld_u8 1
+    ld_u8 1
+    mod
+    ld_u8 0
+    eq
+    not
+    br_false l1
+    ld_u64 5001
+    abort
+l1: ld_u8 1
+    ld_u8 2
+    mod
+    ld_u8 1
+    eq
+    not
+    br_false l2
+    ld_u64 5002
+    abort
+l2: ld_u8 8
+    ld_u8 3
+    mod
+    ld_u8 2
+    eq
+    not
+    br_false l3
+    ld_u64 5100
+    abort
+l3: ld_u8 255
+    ld_u8 7
+    mod
+    ld_u8 3
+    eq
+    not
+    br_false l4
+    ld_u64 5101
+    abort
+l4: ld_u8 254
+    ld_u8 255
+    mod
+    ld_u8 254
+    eq
+    not
+    br_false l5
+    ld_u64 5200
+    abort
+l5: ld_u8 255
+    ld_u8 255
+    mod
+    ld_u8 0
+    eq
+    not
+    br_false l6
+    ld_u64 5201
+    abort
+l6: ret
+
+
+
+//# run --verbose
+script
+entry public fun main()
+    ld_u8 0
+    ld_u8 0
+    mod
+    pop
+    ret
+
+
+
+//# run --verbose
+script
+entry public fun main()
+    ld_u8 1
+    ld_u8 0
+    mod
+    pop
+    ret
+
+
+
+//# run --verbose
+script
+entry public fun main()
+    ld_u8 255
+    ld_u8 0
+    mod
+    pop
+    ret

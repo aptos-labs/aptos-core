@@ -25,6 +25,17 @@ pub enum TimedFeatureFlag {
 
     /// Fixes the bug that table natives double count the memory usage of the global values.
     FixTableNativesMemoryDoubleCounting,
+
+    /// Enables depth checking for captured values when packing closures.
+    /// This prevents deeply nested closure chains that could cause stack overflow.
+    ClosureDepthCheck,
+
+    /// Fixes handling of results in crypto algebra natives.
+    FixCryptoAlgebraNativesResultHandling,
+
+    /// Use the full transaction size (including authenticator) for gas checks
+    /// instead of just the raw transaction size.
+    UseFullTransactionSizeForGasCheck,
 }
 
 /// Representation of features that are gated by the block timestamps.
@@ -131,6 +142,43 @@ impl TimedFeatureFlag {
                 .with_timezone(&Utc),
             (FixTableNativesMemoryDoubleCounting, MAINNET) => Los_Angeles
                 .with_ymd_and_hms(2025, 10, 21, 10, 0, 0)
+                .unwrap()
+                .with_timezone(&Utc),
+
+            // Security fix: check depth of captured values when packing closures.
+            (ClosureDepthCheck, TESTNET) => Los_Angeles
+                .with_ymd_and_hms(2026, 2, 2, 22, 0, 0)
+                .unwrap()
+                .with_timezone(&Utc),
+            (ClosureDepthCheck, MAINNET) => Los_Angeles
+                .with_ymd_and_hms(2026, 2, 9, 12, 0, 0)
+                .unwrap()
+                .with_timezone(&Utc),
+
+            // For testing, time set to 1 hour after the beginning of time to test the old and new behaviors in tests.
+            (FixCryptoAlgebraNativesResultHandling, TESTING) => {
+                Utc.with_ymd_and_hms(1970, 1, 1, 1, 0, 0).unwrap()
+            },
+            (FixCryptoAlgebraNativesResultHandling, TESTNET) => Los_Angeles
+                .with_ymd_and_hms(2026, 2, 2, 22, 0, 0)
+                .unwrap()
+                .with_timezone(&Utc),
+            (FixCryptoAlgebraNativesResultHandling, MAINNET) => Los_Angeles
+                .with_ymd_and_hms(2026, 2, 9, 12, 0, 0)
+                .unwrap()
+                .with_timezone(&Utc),
+
+            // Note: This is needed to allow forge to undergo a gated transition as well.
+            (UseFullTransactionSizeForGasCheck, TESTING) => Los_Angeles
+                .with_ymd_and_hms(2026, 2, 16, 10, 0, 0)
+                .unwrap()
+                .with_timezone(&Utc),
+            (UseFullTransactionSizeForGasCheck, TESTNET) => Los_Angeles
+                .with_ymd_and_hms(2026, 2, 2, 22, 0, 0)
+                .unwrap()
+                .with_timezone(&Utc),
+            (UseFullTransactionSizeForGasCheck, MAINNET) => Los_Angeles
+                .with_ymd_and_hms(2026, 2, 9, 12, 0, 0)
                 .unwrap()
                 .with_timezone(&Utc),
 

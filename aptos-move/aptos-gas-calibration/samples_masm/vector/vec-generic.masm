@@ -1,0 +1,309 @@
+module 0xcafe::VecGeneric
+struct D has copy + drop
+  x: u64
+
+struct C<T0> has copy + drop
+  x: T0
+  y: u64
+
+struct E<T0> has copy + drop
+  x: T0
+  y: u64
+
+struct F<T0> has copy + drop
+  x: T0
+  y: u64
+
+struct G<T0> has copy + drop
+  x: T0
+  y: u64
+
+public fun make(): C<D>
+    local l0: D
+    ld_u64 0
+    pack D
+    st_loc l0
+    move_loc l0
+    ld_u64 0
+    pack C<D>
+    ret
+
+public fun calibrate_vec_len_generic_impl(l0: u64)
+    local l1: u64
+    local l2: C<D>
+    local l3: vector<C<D>>
+    ld_u64 0
+    st_loc l1
+    call make
+    st_loc l2
+    move_loc l2
+    vec_pack <C<D>>, 1
+    st_loc l3
+l1: copy_loc l1
+    copy_loc l0
+    lt
+    br_false l0
+    move_loc l1
+    ld_u64 1
+    add
+    st_loc l1
+    borrow_loc l3
+    call vec_len
+    branch l1
+l0: ret
+
+public fun calibrate_vec_len_generic_inlined_impl(l0: u64)
+    local l1: u64
+    local l2: C<D>
+    local l3: vector<C<D>>
+    ld_u64 0
+    st_loc l1
+    call make
+    st_loc l2
+    move_loc l2
+    vec_pack <C<D>>, 1
+    st_loc l3
+l1: copy_loc l1
+    copy_loc l0
+    lt
+    br_false l0
+    move_loc l1
+    ld_u64 1
+    add
+    st_loc l1
+    borrow_loc l3
+    vec_len <C<D>>
+    pop
+    branch l1
+l0: ret
+
+public fun vec_len(l0: &vector<C<D>>)
+    move_loc l0
+    vec_len <C<D>>
+    pop
+    ret
+
+entry public fun calibrate_vec_len_generic_1_x100()
+    ld_u64 10
+    call calibrate_vec_len_generic_impl
+    ret
+
+entry public fun calibrate_vec_len_generic_1_x500()
+    ld_u64 50
+    call calibrate_vec_len_generic_impl
+    ret
+
+entry public fun calibrate_vec_len_generic_1_x1000()
+    ld_u64 100
+    call calibrate_vec_len_generic_impl
+    ret
+
+entry public fun calibrate_vec_len_generic_inlined_1_x100()
+    ld_u64 10
+    call calibrate_vec_len_generic_inlined_impl
+    ret
+
+entry public fun calibrate_vec_len_generic_inlined_1_x500()
+    ld_u64 50
+    call calibrate_vec_len_generic_inlined_impl
+    ret
+
+entry public fun calibrate_vec_len_generic_inlined_1_x1000()
+    ld_u64 100
+    call calibrate_vec_len_generic_inlined_impl
+    ret
+
+public fun make_gen<T0>(l0: T0): C<T0>
+    move_loc l0
+    ld_u64 0
+    pack C<T0>
+    ret
+
+public fun calibrate_vec_len_generic_2_impl<T0: drop>(l0: u64, l1: T0)
+    local l2: u64
+    local l3: C<T0>
+    local l4: vector<C<T0>>
+    ld_u64 0
+    st_loc l2
+    move_loc l1
+    call make_gen<T0>
+    st_loc l3
+    move_loc l3
+    vec_pack <C<T0>>, 1
+    st_loc l4
+l1: copy_loc l2
+    copy_loc l0
+    lt
+    br_false l0
+    move_loc l2
+    ld_u64 1
+    add
+    st_loc l2
+    borrow_loc l4
+    call vec_len_gen<T0>
+    branch l1
+l0: ret
+
+public fun calibrate_vec_len_generic_inlined_2_impl<T0: drop>(l0: u64, l1: T0)
+    local l2: u64
+    local l3: C<T0>
+    local l4: vector<C<T0>>
+    ld_u64 0
+    st_loc l2
+    move_loc l1
+    call make_gen<T0>
+    st_loc l3
+    move_loc l3
+    vec_pack <C<T0>>, 1
+    st_loc l4
+l1: copy_loc l2
+    copy_loc l0
+    lt
+    br_false l0
+    move_loc l2
+    ld_u64 1
+    add
+    st_loc l2
+    borrow_loc l4
+    vec_len <C<T0>>
+    pop
+    branch l1
+l0: ret
+
+public fun vec_len_gen<T0>(l0: &vector<C<T0>>)
+    move_loc l0
+    vec_len <C<T0>>
+    pop
+    ret
+
+entry public fun calibrate_vec_len_generic_2_x100()
+    local l0: D
+    ld_u64 0
+    pack D
+    st_loc l0
+    ld_u64 10
+    move_loc l0
+    call calibrate_vec_len_generic_2_impl<D>
+    ret
+
+entry public fun calibrate_vec_len_generic_2_x500()
+    local l0: D
+    ld_u64 0
+    pack D
+    st_loc l0
+    ld_u64 50
+    move_loc l0
+    call calibrate_vec_len_generic_2_impl<D>
+    ret
+
+entry public fun calibrate_vec_len_generic_2_x1000()
+    local l0: D
+    ld_u64 0
+    pack D
+    st_loc l0
+    ld_u64 100
+    move_loc l0
+    call calibrate_vec_len_generic_2_impl<D>
+    ret
+
+entry public fun calibrate_vec_len_generic_inlined_2_x100()
+    local l0: D
+    ld_u64 0
+    pack D
+    st_loc l0
+    ld_u64 10
+    move_loc l0
+    call calibrate_vec_len_generic_inlined_2_impl<D>
+    ret
+
+entry public fun calibrate_vec_len_generic_inlined_2_x500()
+    local l0: D
+    ld_u64 0
+    pack D
+    st_loc l0
+    ld_u64 50
+    move_loc l0
+    call calibrate_vec_len_generic_inlined_2_impl<D>
+    ret
+
+entry public fun calibrate_vec_len_generic_inlined_2_x1000()
+    local l0: D
+    ld_u64 0
+    pack D
+    st_loc l0
+    ld_u64 100
+    move_loc l0
+    call calibrate_vec_len_generic_inlined_2_impl<D>
+    ret
+
+public fun calibrate_vec_len_generic_inlined_exterme_impl<T0: drop>(l0: u64, l1: T0)
+    local l2: u64
+    local l3: vector<C<E<F<G<T0>>>>>
+    local l4: G<T0>
+    local l5: F<G<T0>>
+    local l6: E<F<G<T0>>>
+    local l7: C<E<F<G<T0>>>>
+    ld_u64 0
+    st_loc l2
+    move_loc l1
+    ld_u64 0
+    pack G<T0>
+    st_loc l4
+    move_loc l4
+    ld_u64 0
+    pack F<G<T0>>
+    st_loc l5
+    move_loc l5
+    ld_u64 0
+    pack E<F<G<T0>>>
+    st_loc l6
+    move_loc l6
+    ld_u64 0
+    pack C<E<F<G<T0>>>>
+    st_loc l7
+    move_loc l7
+    vec_pack <C<E<F<G<T0>>>>>, 1
+    st_loc l3
+l1: copy_loc l2
+    copy_loc l0
+    lt
+    br_false l0
+    move_loc l2
+    ld_u64 1
+    add
+    st_loc l2
+    borrow_loc l3
+    vec_len <C<E<F<G<T0>>>>>
+    pop
+    branch l1
+l0: ret
+
+entry public fun calibrate_vec_len_generic_inlined_exterme_x100()
+    local l0: D
+    ld_u64 0
+    pack D
+    st_loc l0
+    ld_u64 10
+    move_loc l0
+    call calibrate_vec_len_generic_inlined_exterme_impl<D>
+    ret
+
+entry public fun calibrate_vec_len_generic_inlined_exterme_x500()
+    local l0: D
+    ld_u64 0
+    pack D
+    st_loc l0
+    ld_u64 50
+    move_loc l0
+    call calibrate_vec_len_generic_inlined_exterme_impl<D>
+    ret
+
+entry public fun calibrate_vec_len_generic_inlined_exterme_x1000()
+    local l0: D
+    ld_u64 0
+    pack D
+    st_loc l0
+    ld_u64 100
+    move_loc l0
+    call calibrate_vec_len_generic_inlined_exterme_impl<D>
+    ret

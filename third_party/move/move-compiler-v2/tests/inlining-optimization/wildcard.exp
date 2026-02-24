@@ -35,12 +35,12 @@ module 0x42::test {
         2: C,
     }
     fun proj_0<A, B: drop, C: drop>(self: S<A, B, C>): A {
-        let S<A,B,C>(x, _, _) = self;
+        let S<A, B, C>(x, _, _) = self;
         x
     }
     fun test_proj_0(): u8 {
-        let x = S<u8,address,bool>(42u8, @0x1, true);
-        proj_0<u8,address,bool>(x)
+        let x = S<u8, address, bool>(42u8, @0x1, true);
+        proj_0<u8, address, bool>(x)
     }
 }
 

@@ -11,7 +11,7 @@ use crate::{
     },
     utils::iterators::ExpectContinuousVersions,
 };
-use aptos_crypto::hash::{CryptoHash, HashValue};
+use aptos_crypto::hash::HashValue;
 use aptos_db_indexer_schemas::schema::ordered_transaction_by_account::OrderedTransactionByAccountSchema;
 use aptos_metrics_core::TimerHelper;
 use aptos_schemadb::{
@@ -145,7 +145,7 @@ impl TransactionDb {
             }
         }
 
-        let transaction_hash = transaction.hash();
+        let transaction_hash = transaction.committed_hash();
 
         if let Some(signed_txn) = transaction.try_as_signed_user_txn() {
             let txn_summary = IndexedTransactionSummary::V1 {

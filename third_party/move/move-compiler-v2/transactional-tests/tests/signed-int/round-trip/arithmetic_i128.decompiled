@@ -11,7 +11,7 @@ script {
 //# run --verbose
 script {
     fun main() {
-        let _v0 = 1i128 + 170141183460469231731687303715884105727i128;
+        let _v0 = 1i128 + MAX_I128;
     }
 }
 
@@ -19,7 +19,7 @@ script {
 //# run --verbose
 script {
     fun main() {
-        let _v0 = -1i128 + -170141183460469231731687303715884105728i128;
+        let _v0 = -1i128 + MIN_I128;
     }
 }
 
@@ -35,7 +35,7 @@ script {
 //# run --verbose
 script {
     fun main() {
-        let _v0 = -2i128 - 170141183460469231731687303715884105727i128;
+        let _v0 = -2i128 - MAX_I128;
     }
 }
 
@@ -67,7 +67,7 @@ script {
 //# run --verbose
 script {
     fun main() {
-        let _v0 = 170141183460469231731687303715884105727i128 * 2i128;
+        let _v0 = MAX_I128 * 2i128;
     }
 }
 
@@ -75,7 +75,7 @@ script {
 //# run --verbose
 script {
     fun main() {
-        let _v0 = -170141183460469231731687303715884105728i128 * -1i128;
+        let _v0 = MIN_I128 * -1i128;
     }
 }
 
@@ -99,7 +99,7 @@ script {
 //# run --verbose
 script {
     fun main() {
-        let _v0 = -170141183460469231731687303715884105728i128 / -1i128;
+        let _v0 = MIN_I128 / -1i128;
     }
 }
 
@@ -131,7 +131,7 @@ module 0xff::negate_i128 {
         assert!(_v0 == _v1, 14566554180833181696);
     }
     public fun test2() {
-        let _v0 = negate(-170141183460469231731687303715884105728i128);
+        let _v0 = negate(MIN_I128);
     }
 }
 

@@ -9,4 +9,4 @@ error: unexpected token
   │                      Unexpected '0'
   │                      Expected the end of an expression
   │
-  = 'break' with a value is not yet supported
+  = `break` with a value is not yet supported

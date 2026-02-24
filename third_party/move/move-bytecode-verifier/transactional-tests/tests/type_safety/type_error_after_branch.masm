@@ -1,0 +1,14 @@
+//# run
+script
+entry public fun main(l0: bool)
+    local l1: u64
+    move_loc l0
+    br_true l0
+    ld_u64 3
+    st_loc l1
+    branch l1
+l0: ld_u64 2
+    st_loc l1
+l1: ld_true
+    st_loc l1
+    ret

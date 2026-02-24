@@ -3,6 +3,7 @@
 
 use crate::{
     block_storage::tracing::{observe_block, BlockStage},
+    counters,
     rand::rand_gen::{
         rand_manager::Sender,
         types::{PathType, RandConfig, RandShare, TShare, FUTURE_ROUNDS_TO_ACCEPT},
@@ -38,8 +39,15 @@ impl<S: TShare> ShareAggregator<S> {
         }
     }
 
+    /// Attempt to aggregate shares if threshold is met.
+    ///
+    /// NOTE: This method is called while holding the `Mutex<RandStore>` lock.
+    /// `pre_aggregate_verify` below takes ~7ms on mainnet (150 validators), which blocks
+    /// all other share additions for any round during that time. A future improvement is to
+    /// move `pre_aggregate_verify` outside the lock into an async task with a failure recovery
+    /// path (e.g., an `Aggregating` state that retries on verification failure).
     pub fn try_aggregate(
-        self,
+        mut self,
         rand_config: &RandConfig,
         rand_metadata: FullRandMetadata,
         decision_tx: Sender<Randomness>,
@@ -47,6 +55,23 @@ impl<S: TShare> ShareAggregator<S> {
         if self.total_weight < rand_config.threshold() {
             return Either::Left(self);
         }
+
+        // Pre-verify shares before spawning to ensure aggregation will succeed.
+        let _verify_timer = counters::RAND_PRE_AGGREGATE_VERIFY_DURATION.start_timer();
+        let bad_authors =
+            S::pre_aggregate_verify(self.shares.values(), rand_config, &rand_metadata.metadata);
+        drop(_verify_timer);
+        for author in &bad_authors {
+            if self.shares.remove(author).is_some() {
+                self.total_weight = self
+                    .total_weight
+                    .saturating_sub(rand_config.get_peer_weight(author));
+            }
+        }
+        if self.total_weight < rand_config.threshold() {
+            return Either::Left(self);
+        }
+
         match self.path_type {
             PathType::Fast => {
                 observe_block(
@@ -67,11 +92,13 @@ impl<S: TShare> ShareAggregator<S> {
             .get_self_share()
             .expect("Aggregated item should have self share");
         tokio::task::spawn_blocking(move || {
+            let _agg_timer = counters::RAND_AGGREGATION_DURATION.start_timer();
             let maybe_randomness = S::aggregate(
                 self.shares.values(),
                 &rand_config,
                 rand_metadata.metadata.clone(),
             );
+            drop(_agg_timer);
             match maybe_randomness {
                 Ok(randomness) => {
                     let _ = decision_tx.unbounded_send(randomness);
@@ -349,7 +376,7 @@ mod tests {
     use aptos_consensus_types::common::Author;
     use aptos_crypto::{bls12381, HashValue, Uniform};
     use aptos_dkg::{
-        pvss::{traits::Transcript, Player, WeightedConfigBlstrs},
+        pvss::{traits::TranscriptCore, Player, WeightedConfigBlstrs},
         weighted_vuf::traits::WeightedVUF,
     };
     use aptos_types::{
@@ -440,6 +467,7 @@ mod tests {
                 .collect::<Vec<_>>();
             let vuf_pub_params = WvufPP::from(&dkg_pub_params.pvss_config.pp);
 
+            let aggregate_pk = transcript.main.get_dealt_public_key();
             let (ask, apk) = WVUF::augment_key_pair(&vuf_pub_params, sk.main, pk.main, &mut rng);
 
             let rand_keys = RandKeys::new(ask, apk, pk_shares, num_validators);
@@ -453,6 +481,8 @@ mod tests {
                 vuf_pub_params,
                 rand_keys,
                 weighted_config,
+                aggregate_pk,
+                false,
             );
 
             Self {

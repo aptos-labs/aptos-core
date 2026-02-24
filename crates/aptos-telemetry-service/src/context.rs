@@ -6,8 +6,9 @@ use crate::{
     challenge_cache::ChallengeCache,
     clients::{big_query::TableWriteClient, humio, prometheus_remote_write, victoria_metrics},
     peer_location::PeerLocation,
+    rate_limiter::{ContractRateLimiters, GlobalRateLimiter},
     types::common::EpochedPeerStore,
-    LogIngestConfig, MetricsEndpointsConfig,
+    LogIngestConfig, MetricsEndpointsConfig, UnknownTelemetryRateLimitConfig,
 };
 use aptos_crypto::{noise, x25519};
 use aptos_infallible::RwLock;
@@ -186,7 +187,15 @@ impl PeerStoreTuple {
 /// Container for a single custom contract configuration and its clients
 #[derive(Clone)]
 pub struct CustomContractInstance {
-    pub config: crate::OnChainAuthConfig,
+    /// On-chain auth configuration (optional).
+    /// When `None`, this is "open telemetry mode" - all nodes are treated as unknown.
+    pub config: Option<crate::OnChainAuthConfig>,
+    /// Static allowlist - addresses here are treated as "trusted" without on-chain verification.
+    /// Maps chain_id -> set of addresses.
+    pub static_allowlist: HashMap<ChainId, HashSet<PeerId>>,
+    /// Custom node type name for labeling telemetry from this contract.
+    /// Used in metrics labels as `node_type={node_type_name}`.
+    pub node_type_name: String,
     /// Whether to allow unknown/untrusted nodes to authenticate via this contract
     pub allow_unknown_nodes: bool,
     /// Metrics clients for trusted (allowlisted) nodes
@@ -198,6 +207,11 @@ pub struct CustomContractInstance {
     /// Logs client for untrusted/unknown nodes (falls back to logs_client if None)
     pub untrusted_logs_client: Option<LogIngestClient>,
     pub bigquery_client: Option<TableWriteClient>,
+    /// Per-peer identity mapping for metrics labeling.
+    /// Maps chain_id -> peer_id -> identity/common name.
+    pub peer_identities: HashMap<ChainId, HashMap<PeerId, String>>,
+    /// Optional set of peer IDs to block from this contract's telemetry ingestion.
+    pub blacklist_peers: Option<HashSet<PeerId>>,
 }
 
 impl CustomContractInstance {
@@ -220,6 +234,31 @@ impl CustomContractInstance {
                 .as_ref()
                 .or(self.logs_client.as_ref())
         }
+    }
+
+    /// Get the peer identity/common name for a given chain_id and peer_id.
+    /// Returns None if no identity is configured for this peer.
+    pub fn get_peer_identity(&self, chain_id: &ChainId, peer_id: &PeerId) -> Option<&String> {
+        self.peer_identities
+            .get(chain_id)
+            .and_then(|peers| peers.get(peer_id))
+    }
+
+    /// Check if a peer_id is blacklisted from this contract's telemetry ingestion.
+    pub fn is_peer_blacklisted(&self, peer_id: &PeerId) -> bool {
+        self.blacklist_peers
+            .as_ref()
+            .map(|bl| bl.contains(peer_id))
+            .unwrap_or(false)
+    }
+
+    /// Check if an address is in the static allowlist for a given chain.
+    /// Used to grant "trusted" status without on-chain verification.
+    pub fn is_in_static_allowlist(&self, chain_id: &ChainId, address: &PeerId) -> bool {
+        self.static_allowlist
+            .get(chain_id)
+            .map(|addrs| addrs.contains(address))
+            .unwrap_or(false)
     }
 }
 
@@ -300,6 +339,14 @@ pub struct Context {
     peer_locations: Arc<RwLock<HashMap<PeerId, PeerLocation>>>,
     allowlist_cache: AllowlistCache,
     challenge_cache: ChallengeCache,
+    /// Global rate limiter for unknown/untrusted standard nodes' metrics
+    unknown_metrics_rate_limiter: Arc<GlobalRateLimiter>,
+    /// Global rate limiter for unknown/untrusted standard nodes' logs
+    unknown_logs_rate_limiter: Arc<GlobalRateLimiter>,
+    /// Per-contract rate limiters for untrusted custom contract nodes' metrics
+    contract_metrics_rate_limiters: Arc<ContractRateLimiters>,
+    /// Per-contract rate limiters for untrusted custom contract nodes' logs
+    contract_logs_rate_limiters: Arc<ContractRateLimiters>,
 }
 
 impl Context {
@@ -311,6 +358,10 @@ impl Context {
         log_env_map: HashMap<ChainId, HashMap<PeerId, String>>,
         peer_identities: HashMap<ChainId, HashMap<PeerId, String>>,
         peer_locations: Arc<RwLock<HashMap<PeerId, PeerLocation>>>,
+        unknown_metrics_rate_limit_config: UnknownTelemetryRateLimitConfig,
+        unknown_logs_rate_limit_config: UnknownTelemetryRateLimitConfig,
+        contract_metrics_rate_limiters: Arc<ContractRateLimiters>,
+        contract_logs_rate_limiters: Arc<ContractRateLimiters>,
     ) -> Self {
         Self {
             noise_config: Arc::new(noise::NoiseConfig::new(private_key)),
@@ -324,6 +375,14 @@ impl Context {
             allowlist_cache: AllowlistCache::new(),
             // Challenge cache uses same TTL as CHALLENGE_TTL_SECS (300 seconds)
             challenge_cache: ChallengeCache::new(),
+            unknown_metrics_rate_limiter: Arc::new(GlobalRateLimiter::new(
+                unknown_metrics_rate_limit_config,
+            )),
+            unknown_logs_rate_limiter: Arc::new(GlobalRateLimiter::new(
+                unknown_logs_rate_limit_config,
+            )),
+            contract_metrics_rate_limiters,
+            contract_logs_rate_limiters,
         }
     }
 
@@ -343,17 +402,19 @@ impl Context {
         &self.jwt_service
     }
 
-    pub fn metrics_client(&self) -> &GroupedMetricsClients {
-        self.clients.victoria_metrics_clients.as_ref().unwrap()
+    /// Get standard node metrics clients (optional - not available in custom-contract-only mode)
+    pub fn metrics_client(&self) -> Option<&GroupedMetricsClients> {
+        self.clients.victoria_metrics_clients.as_ref()
     }
 
     #[cfg(test)]
-    pub fn metrics_client_mut(&mut self) -> &mut GroupedMetricsClients {
-        self.clients.victoria_metrics_clients.as_mut().unwrap()
+    pub fn metrics_client_mut(&mut self) -> Option<&mut GroupedMetricsClients> {
+        self.clients.victoria_metrics_clients.as_mut()
     }
 
-    pub fn log_ingest_clients(&self) -> &LogIngestClients {
-        self.clients.log_ingest_clients.as_ref().unwrap()
+    /// Get standard node log ingest clients (optional - not available in custom-contract-only mode)
+    pub fn log_ingest_clients(&self) -> Option<&LogIngestClients> {
+        self.clients.log_ingest_clients.as_ref()
     }
 
     pub(crate) fn bigquery_client(&self) -> Option<&TableWriteClient> {
@@ -407,5 +468,25 @@ impl Context {
     /// Get the challenge cache for custom contract authentication
     pub fn challenge_cache(&self) -> &ChallengeCache {
         &self.challenge_cache
+    }
+
+    /// Get the global rate limiter for unknown/untrusted standard nodes' metrics
+    pub fn unknown_metrics_rate_limiter(&self) -> &GlobalRateLimiter {
+        &self.unknown_metrics_rate_limiter
+    }
+
+    /// Get the global rate limiter for unknown/untrusted standard nodes' logs
+    pub fn unknown_logs_rate_limiter(&self) -> &GlobalRateLimiter {
+        &self.unknown_logs_rate_limiter
+    }
+
+    /// Get the per-contract rate limiters for untrusted custom contract nodes' metrics
+    pub fn contract_metrics_rate_limiters(&self) -> &ContractRateLimiters {
+        &self.contract_metrics_rate_limiters
+    }
+
+    /// Get the per-contract rate limiters for untrusted custom contract nodes' logs
+    pub fn contract_logs_rate_limiters(&self) -> &ContractRateLimiters {
+        &self.contract_logs_rate_limiters
     }
 }

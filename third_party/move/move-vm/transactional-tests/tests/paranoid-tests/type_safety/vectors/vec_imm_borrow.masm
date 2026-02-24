@@ -1,0 +1,31 @@
+//# run --signers 0x1
+script
+entry public fun main(l0: signer)
+    local l1: vector<u64>
+    ld_u64 1
+    vec_pack <u64>, 1
+    st_loc l1
+    borrow_loc l1
+    ld_u64 0
+    vec_borrow <u64>
+    pop
+    mut_borrow_loc l1
+    ld_u64 0
+    vec_borrow <u64>
+    pop
+    ret
+
+
+
+//# run --signers 0x1
+script
+entry public fun main(l0: signer)
+    local l1: vector<u64>
+    ld_u64 1
+    vec_pack <u64>, 1
+    st_loc l1
+    borrow_loc l1
+    ld_u64 0
+    vec_borrow <u32>
+    pop
+    ret

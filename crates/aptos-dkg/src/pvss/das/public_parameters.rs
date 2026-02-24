@@ -94,12 +94,16 @@ impl ValidCryptoMaterial for PublicParameters {
 }
 
 impl WithMaxNumShares for PublicParameters {
-    fn with_max_num_shares(_n: usize) -> Self {
+    fn with_max_num_shares(_n: u32) -> Self {
         Self::default()
     }
 
+    fn with_max_num_shares_and_bit_size(_n: u32, _ell: u8) -> Self {
+        panic!("This is the wrong PVSS for bit sizes")
+    }
+
     // Setup is fast enough
-    fn with_max_num_shares_for_generate(_n: usize) -> Self {
+    fn with_max_num_shares_for_generate(_n: u32) -> Self {
         Self::default()
     }
 }

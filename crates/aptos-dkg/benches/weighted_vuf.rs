@@ -6,14 +6,14 @@
 #![allow(clippy::extra_unused_type_parameters)]
 #![allow(clippy::needless_borrow)]
 
-use aptos_crypto::traits::SecretSharingConfig as _;
+use aptos_crypto::traits::TSecretSharingConfig as _;
 use aptos_dkg::{
     pvss::{
         das,
         dealt_secret_key::g1::DealtSecretKey,
         insecure_field,
         test_utils::{get_weighted_configs_for_benchmarking, setup_dealing, NoAux},
-        traits::Transcript,
+        traits::{Transcript, TranscriptCore},
         GenericWeighting, Player, WeightedConfigBlstrs,
     },
     utils::random::{random_g1_points, random_g2_points},
@@ -53,16 +53,16 @@ fn pinkas_wvuf_derive_eval_micro_benches(
         WeightedConfigBlstrs,
         PublicParameters,
         DealtSecretKey,
-        <das::WeightedTranscript as Transcript>::DealtPubKey,
-        Vec<<das::WeightedTranscript as Transcript>::DealtSecretKeyShare>,
-        Vec<<das::WeightedTranscript as Transcript>::DealtPubKeyShare>,
+        <das::WeightedTranscript as TranscriptCore>::DealtPubKey,
+        Vec<<das::WeightedTranscript as TranscriptCore>::DealtSecretKeyShare>,
+        Vec<<das::WeightedTranscript as TranscriptCore>::DealtPubKeyShare>,
         Vec<(
             Scalar,
-            <das::WeightedTranscript as Transcript>::DealtSecretKeyShare,
+            <das::WeightedTranscript as TranscriptCore>::DealtSecretKeyShare,
         )>,
         Vec<(
             RandomizedPKs,
-            <das::WeightedTranscript as Transcript>::DealtPubKeyShare,
+            <das::WeightedTranscript as TranscriptCore>::DealtPubKeyShare,
         )>,
         Vec<RandomizedPKs>,
     )>,
@@ -130,10 +130,10 @@ pub fn wvuf_benches<
 ) -> Vec<(
     WeightedConfigBlstrs,
     <WVUF as WeightedVUF>::PublicParameters,
-    <WT as Transcript>::DealtSecretKey,
-    <WT as Transcript>::DealtPubKey,
-    Vec<<WT as Transcript>::DealtSecretKeyShare>,
-    Vec<<WT as Transcript>::DealtPubKeyShare>,
+    <WT as TranscriptCore>::DealtSecretKey,
+    <WT as TranscriptCore>::DealtPubKey,
+    Vec<<WT as TranscriptCore>::DealtSecretKeyShare>,
+    Vec<<WT as TranscriptCore>::DealtPubKeyShare>,
     Vec<<WVUF as WeightedVUF>::AugmentedSecretKeyShare>,
     Vec<<WVUF as WeightedVUF>::AugmentedPubKeyShare>,
     Vec<<WVUF as WeightedVUF>::Delta>,
@@ -146,7 +146,7 @@ where
     let mut bench_cases = vec![];
     for wc in get_weighted_configs_for_benchmarking() {
         // TODO: use a lazy pattern to avoid this expensive dealing when no benchmarks are run
-        let d = setup_dealing::<WT, ThreadRng>(&wc, &mut rng);
+        let d = setup_dealing::<WT, ThreadRng>(&wc, None, &mut rng);
 
         println!(
             "Best-case subset size: {}",
@@ -295,17 +295,20 @@ where
                 &mut rng,
             );
 
-            wvuf_verify_proof::<WT, WVUF, ThreadRng>(
-                &wc,
-                &vuf_pp,
-                &pk,
-                &asks,
-                &apks,
-                group,
-                &mut rng,
-                pick_subset_fn,
-                &subset_type,
-            );
+            for num_threads in [1, 2, 4, 8, 16, 32] {
+                wvuf_verify_proof::<WT, WVUF, ThreadRng>(
+                    &wc,
+                    &vuf_pp,
+                    &pk,
+                    &asks,
+                    &apks,
+                    group,
+                    &mut rng,
+                    pick_subset_fn,
+                    &subset_type,
+                    num_threads,
+                );
+            }
 
             for num_threads in [1, 2, 4, 8, 16, 32] {
                 wvuf_derive_eval::<WT, WVUF, ThreadRng>(
@@ -708,11 +711,17 @@ fn wvuf_verify_proof<
     rng: &mut R,
     pick_subset_fn: fn(&WeightedConfigBlstrs, &mut R) -> Vec<Player>,
     subset_type: &String,
+    num_threads: usize,
 ) where
     WVUF::PublicParameters: for<'a> From<&'a WT::PublicParameters>,
 {
+    let pool = spawn_rayon_thread_pool("bench-wvuf".to_string(), Some(num_threads));
+
     group.bench_function(
-        format!("verify_proof/{}-subset/{}", subset_type, wc),
+        format!(
+            "verify_proof/{}-subset/{}-thread/{}",
+            subset_type, num_threads, wc
+        ),
         move |b| {
             b.iter_with_setup(
                 || {
@@ -725,7 +734,10 @@ fn wvuf_verify_proof<
                         .iter()
                         .map(|apk| Some(apk.clone()))
                         .collect::<Vec<Option<WVUF::AugmentedPubKeyShare>>>();
-                    assert!(WVUF::verify_proof(pp, pk, apks.as_slice(), BENCH_MSG, &proof).is_ok())
+                    assert!(
+                        WVUF::verify_proof(pp, pk, apks.as_slice(), BENCH_MSG, &proof, &pool)
+                            .is_ok()
+                    )
                 },
             )
         },

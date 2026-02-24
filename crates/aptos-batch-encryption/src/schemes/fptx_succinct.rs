@@ -1,7 +1,9 @@
 // Copyright (c) Aptos Foundation
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 use crate::{
+    errors::MissingEvalProofError,
     group::*,
+    schemes::fptx::FPTX,
     shared::{
         ciphertext::{CTDecrypt, CTEncrypt, PreparedCiphertext, SuccinctCiphertext},
         digest::{Digest, DigestKey, EvalProof, EvalProofs, EvalProofsPromise},
@@ -14,17 +16,18 @@ use crate::{
     },
     traits::{AssociatedData, BatchThresholdEncryption, Plaintext},
 };
-use anyhow::{anyhow, Result};
+use anyhow::Result;
 use aptos_dkg::pvss::{
-    traits::{Reconstructable as _, Subtranscript},
+    traits::{Reconstructable as _, TranscriptCore},
     Player,
 };
 use ark_ff::UniformRand as _;
 use ark_std::rand::{rngs::StdRng, CryptoRng, RngCore, SeedableRng};
-use rayon::iter::{IntoParallelIterator, ParallelIterator as _};
 
 pub struct FPTXSuccinct {}
 
+/// The "succinct" version of FPTX which was described in the paper. Right now, this scheme is
+/// unused because it would require a modification to the PVSS.
 impl BatchThresholdEncryption for FPTXSuccinct {
     type Ciphertext = SuccinctCiphertext;
     type DecryptionKey = BIBEDecryptionKey;
@@ -45,17 +48,25 @@ impl BatchThresholdEncryption for FPTXSuccinct {
 
     fn setup(
         _digest_key: &Self::DigestKey,
-        _pvss_public_params: &<Self::SubTranscript as Subtranscript>::PublicParameters,
+        _pvss_public_params: &<Self::SubTranscript as TranscriptCore>::PublicParameters,
         _subtranscript: &Self::SubTranscript,
         _tc: &Self::ThresholdConfig,
         _current_player: Player,
-        _msk_share_decryption_key: &<Self::SubTranscript as Subtranscript>::DecryptPrivKey,
+        _msk_share_decryption_key: &<Self::SubTranscript as TranscriptCore>::DecryptPrivKey,
     ) -> Result<(
         Self::EncryptionKey,
         Vec<Self::VerificationKey>,
         Self::MasterSecretKeyShare,
     )> {
         // we don't yet have a PVSS scheme that supports the succinct version of FPTX
+        unimplemented!()
+    }
+
+    fn extract_encryption_key(
+        _digest_key: &Self::DigestKey,
+        _subtranscript: &Self::SubTranscript,
+    ) -> Result<Self::EncryptionKey> {
+        // B/c unweighted chunky is being removed
         unimplemented!()
     }
 
@@ -77,7 +88,7 @@ impl BatchThresholdEncryption for FPTXSuccinct {
         let (mpk, vks, msk_shares) = key_derivation::gen_msk_shares(msk, &mut rng, tc);
 
         let ek = AugmentedEncryptionKey {
-            sig_mpk_g2: mpk.0,
+            sig_mpk_g2: mpk,
             tau_g2: digest_key.tau_g2,
             tau_mpk_g2: (digest_key.tau_g2 * msk).into(),
         };
@@ -100,8 +111,7 @@ impl BatchThresholdEncryption for FPTXSuccinct {
         round: Self::Round,
     ) -> anyhow::Result<(Self::Digest, Self::EvalProofsPromise)> {
         let mut ids: IdSet<UncomputedCoeffs> =
-            IdSet::from_slice(&cts.iter().map(|ct| ct.id()).collect::<Vec<Id>>())
-                .ok_or(anyhow!(""))?;
+            IdSet::from_slice(&cts.iter().map(|ct| ct.id()).collect::<Vec<Id>>());
 
         digest_key.digest(&mut ids, round)
     }
@@ -121,14 +131,14 @@ impl BatchThresholdEncryption for FPTXSuccinct {
         proofs: &Self::EvalProofsPromise,
         digest_key: &DigestKey,
     ) -> Self::EvalProofs {
-        proofs.compute_all(digest_key)
+        FPTX::eval_proofs_compute_all(proofs, digest_key)
     }
 
     fn eval_proofs_compute_all_vzgg_multi_point_eval(
         proofs: &Self::EvalProofsPromise,
         digest_key: &DigestKey,
     ) -> Self::EvalProofs {
-        proofs.compute_all_vgzz_multi_point_eval(digest_key)
+        FPTX::eval_proofs_compute_all_vzgg_multi_point_eval(proofs, digest_key)
     }
 
     fn eval_proof_for_ct(
@@ -142,7 +152,7 @@ impl BatchThresholdEncryption for FPTXSuccinct {
         msk_share: &Self::MasterSecretKeyShare,
         digest: &Self::Digest,
     ) -> Result<Self::DecryptionKeyShare> {
-        msk_share.derive_decryption_key_share(digest)
+        FPTX::derive_decryption_key_share(msk_share, digest)
     }
 
     fn reconstruct_decryption_key(
@@ -152,26 +162,19 @@ impl BatchThresholdEncryption for FPTXSuccinct {
         BIBEDecryptionKey::reconstruct(config, shares)
     }
 
-    fn prepare_cts(
-        cts: &[Self::Ciphertext],
+    fn prepare_ct(
+        ct: &Self::Ciphertext,
         digest: &Self::Digest,
         eval_proofs: &Self::EvalProofs,
-    ) -> Result<Vec<Self::PreparedCiphertext>> {
-        cts.into_par_iter()
-            .map(|ct| ct.prepare(digest, eval_proofs))
-            .collect::<anyhow::Result<Vec<Self::PreparedCiphertext>>>()
+    ) -> std::result::Result<Self::PreparedCiphertext, MissingEvalProofError> {
+        ct.prepare(digest, eval_proofs)
     }
 
     fn decrypt<'a, P: Plaintext>(
         decryption_key: &Self::DecryptionKey,
-        cts: &[Self::PreparedCiphertext],
-    ) -> anyhow::Result<Vec<P>> {
-        cts.into_par_iter()
-            .map(|ct| {
-                let plaintext: Result<P> = decryption_key.decrypt(ct);
-                plaintext
-            })
-            .collect::<anyhow::Result<Vec<P>>>()
+        ct: &Self::PreparedCiphertext,
+    ) -> anyhow::Result<P> {
+        FPTX::decrypt(decryption_key, ct)
     }
 
     fn verify_decryption_key_share(
@@ -182,12 +185,20 @@ impl BatchThresholdEncryption for FPTXSuccinct {
         verification_key_share.verify_decryption_key_share(digest, decryption_key_share)
     }
 
-    fn decrypt_individual<P: Plaintext>(
+    fn verify_decryption_key(
+        encryption_key: &Self::EncryptionKey,
+        digest: &Self::Digest,
+        decryption_key: &Self::DecryptionKey,
+    ) -> Result<()> {
+        encryption_key.verify_decryption_key(digest, decryption_key)
+    }
+
+    fn decrypt_slow<P: Plaintext>(
         decryption_key: &Self::DecryptionKey,
         ct: &Self::Ciphertext,
         digest: &Self::Digest,
         eval_proof: &Self::EvalProof,
     ) -> Result<P> {
-        decryption_key.decrypt(&ct.prepare_individual(digest, eval_proof)?)
+        decryption_key.decrypt(&ct.prepare_individual(digest, eval_proof))
     }
 }

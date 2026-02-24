@@ -1,5 +1,5 @@
 processed 3 tasks
-task 0 lines 1-51:  publish [module 0x1.M {]
+task 0 lines 1-34:  publish [module 0x1::M]
 Error: Unable to publish module '0000000000000000000000000000000000000000000000000000000000000001::M'. Got VMError: {
     major_status: LOOP_IN_INSTANTIATION_GRAPH,
     sub_status: None,
@@ -7,7 +7,7 @@ Error: Unable to publish module '00000000000000000000000000000000000000000000000
     indices: [],
     offsets: [],
 }
-task 1 lines 53-70:  publish [module 0x1.M2 {]
+task 1 lines 38-49:  publish [module 0x1::M2]
 Error: Unable to publish module '0000000000000000000000000000000000000000000000000000000000000001::M2'. Got VMError: {
     major_status: LOOP_IN_INSTANTIATION_GRAPH,
     sub_status: None,
@@ -15,7 +15,7 @@ Error: Unable to publish module '00000000000000000000000000000000000000000000000
     indices: [],
     offsets: [],
 }
-task 2 lines 72-122:  publish [module 0x1.M3 {]
+task 2 lines 53-86:  publish [module 0x1::M3]
 Error: Unable to publish module '0000000000000000000000000000000000000000000000000000000000000001::M3'. Got VMError: {
     major_status: LOOP_IN_INSTANTIATION_GRAPH,
     sub_status: None,

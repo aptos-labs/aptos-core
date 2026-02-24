@@ -6,6 +6,7 @@ use crate::quorum_store::{
 };
 use aptos_consensus_types::{
     common::{Payload, PayloadFilter},
+    payload::OptQuorumStorePayload,
     proof_of_store::{BatchInfo, BatchInfoExt, ProofOfStore},
     request_response::{GetPayloadCommand, GetPayloadRequest, GetPayloadResponse},
     utils::PayloadTxnsSize,
@@ -17,7 +18,7 @@ use std::{cmp::max, collections::HashSet};
 
 fn create_proof_manager() -> ProofManager {
     let batch_store = batch_store_for_test(5 * 1024 * 1024);
-    ProofManager::new(PeerId::random(), 10, 10, batch_store, true, true, 1)
+    ProofManager::new(PeerId::random(), 10, 10, batch_store, true, 1)
 }
 
 fn create_proof(
@@ -82,36 +83,26 @@ fn assert_payload_response(
     expected_block_gas_limit: Option<u64>,
 ) {
     match payload {
-        Payload::InQuorumStore(proofs) => {
-            assert_eq!(proofs.proofs.len(), expected.len());
-            for proof in proofs.proofs {
-                assert!(expected.contains(&proof.into()));
-            }
-        },
-        Payload::InQuorumStoreWithLimit(proofs) => {
-            assert_eq!(proofs.proof_with_data.proofs.len(), expected.len());
-            for proof in proofs.proof_with_data.proofs {
-                assert!(expected.contains(&proof.into()));
-            }
-            assert_eq!(proofs.max_txns_to_execute, max_txns_from_block_to_execute);
-        },
-        Payload::QuorumStoreInlineHybrid(_inline_batches, proofs, max_txns_to_execute) => {
-            assert_eq!(proofs.proofs.len(), expected.len());
-            for proof in proofs.proofs {
-                assert!(expected.contains(&proof.into()));
-            }
-            assert_eq!(max_txns_to_execute, max_txns_from_block_to_execute);
-        },
-        Payload::QuorumStoreInlineHybridV2(_inline_batches, proofs, execution_limits) => {
-            assert_eq!(proofs.proofs.len(), expected.len());
-            for proof in proofs.proofs {
-                assert!(expected.contains(&proof.into()));
-            }
-            assert_eq!(
-                execution_limits.max_txns_to_execute(),
-                max_txns_from_block_to_execute
-            );
-            assert_eq!(execution_limits.block_gas_limit(), expected_block_gas_limit);
+        Payload::OptQuorumStore(opt_qs) => match opt_qs {
+            OptQuorumStorePayload::V1(p) => {
+                let proofs = &p.proof_with_data().batch_summary;
+                assert_eq!(proofs.len(), expected.len());
+                for proof in proofs {
+                    let proof_ext: ProofOfStore<BatchInfoExt> = proof.clone().into();
+                    assert!(expected.contains(&proof_ext));
+                }
+                assert_eq!(p.max_txns_to_execute(), max_txns_from_block_to_execute);
+                assert_eq!(p.block_gas_limit(), expected_block_gas_limit);
+            },
+            OptQuorumStorePayload::V2(p) => {
+                let proofs = &p.proof_with_data().batch_summary;
+                assert_eq!(proofs.len(), expected.len());
+                for proof in proofs {
+                    assert!(expected.contains(proof));
+                }
+                assert_eq!(p.max_txns_to_execute(), max_txns_from_block_to_execute);
+                assert_eq!(p.block_gas_limit(), expected_block_gas_limit);
+            },
         },
         _ => panic!("Unexpected variant"),
     }
@@ -138,7 +129,7 @@ async fn test_block_request() {
     let proof = create_proof(PeerId::random(), 10, 1);
     proof_manager.receive_proofs(vec![proof.clone()]);
 
-    get_proposal_and_assert(&mut proof_manager, 100, &[], &vec![proof]).await;
+    get_proposal_and_assert(&mut proof_manager, 100, &[], &[proof]).await;
 }
 
 #[tokio::test]
@@ -157,7 +148,7 @@ async fn test_max_txns_from_block_to_execute() {
             Some(max_txns_from_block_to_execute),
             Some(block_gas_limit),
         ),
-        &vec![proof],
+        &[proof],
         Some(max_txns_from_block_to_execute),
         Some(block_gas_limit),
     );
@@ -171,7 +162,7 @@ async fn test_block_timestamp_expiration() {
     proof_manager.receive_proofs(vec![proof.clone()]);
 
     proof_manager.handle_commit_notification(1, vec![]);
-    get_proposal_and_assert(&mut proof_manager, 100, &[], &vec![proof]).await;
+    get_proposal_and_assert(&mut proof_manager, 100, &[], &[proof]).await;
 
     proof_manager.handle_commit_notification(20, vec![]);
     get_proposal_and_assert(&mut proof_manager, 100, &[], &[]).await;
@@ -188,7 +179,7 @@ async fn test_batch_commit() {
     proof_manager.receive_proofs(vec![proof1.clone()]);
 
     proof_manager.handle_commit_notification(1, vec![proof1.info().clone()]);
-    get_proposal_and_assert(&mut proof_manager, 100, &[], &vec![proof0]).await;
+    get_proposal_and_assert(&mut proof_manager, 100, &[], &[proof0]).await;
 }
 
 #[tokio::test]
@@ -242,14 +233,14 @@ async fn test_proposal_fairness() {
     get_proposal_and_assert(&mut proof_manager, 100, &[], &expected).await;
 
     // The first two proofs are taken fairly from each peer
-    get_proposal_and_assert(&mut proof_manager, 2, &[], &vec![
+    get_proposal_and_assert(&mut proof_manager, 2, &[], &[
         peer0_proofs[0].clone(),
         peer1_proof_0.clone(),
     ])
     .await;
 
     // The next two proofs are taken from the remaining peer
-    let filter = vec![peer0_proofs[0].clone(), peer1_proof_0.clone()];
+    let filter = [peer0_proofs[0].clone(), peer1_proof_0.clone()];
     let filter: Vec<_> = filter.iter().map(ProofOfStore::info).cloned().collect();
     get_proposal_and_assert(&mut proof_manager, 2, &filter, &peer0_proofs[1..3]).await;
 
@@ -285,7 +276,7 @@ async fn test_duplicate_batches_on_commit() {
     proof_manager.receive_proofs(vec![proof1.clone()]);
 
     // Only one copy of the batch exists
-    get_proposal_and_assert(&mut proof_manager, 10, &[], &vec![proof0.clone()]).await;
+    get_proposal_and_assert(&mut proof_manager, 10, &[], std::slice::from_ref(&proof0)).await;
 
     // Nothing goes wrong on commits
     proof_manager.handle_commit_notification(4, vec![batch.clone().into()]);
@@ -323,11 +314,11 @@ async fn test_duplicate_batches_on_expiration() {
     proof_manager.receive_proofs(vec![proof1.clone()]);
 
     // Only one copy of the batch exists
-    get_proposal_and_assert(&mut proof_manager, 10, &[], &vec![proof0.clone()]).await;
+    get_proposal_and_assert(&mut proof_manager, 10, &[], std::slice::from_ref(&proof0)).await;
 
     // Nothing goes wrong on expiration
     proof_manager.handle_commit_notification(5, vec![]);
-    get_proposal_and_assert(&mut proof_manager, 10, &[], &vec![proof0.clone()]).await;
+    get_proposal_and_assert(&mut proof_manager, 10, &[], std::slice::from_ref(&proof0)).await;
     proof_manager.handle_commit_notification(12, vec![]);
     get_proposal_and_assert(&mut proof_manager, 10, &[], &[]).await;
 }

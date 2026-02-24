@@ -150,10 +150,7 @@ pub fn new_test_context_inner(
     let validator_owner = validator_identity.account_address.unwrap();
     let (sender, recver) = channel::<(Instant, Version)>((Instant::now(), 0 as Version));
     let (db, db_rw) = if use_db_with_indexer {
-        let mut aptos_db = AptosDB::new_for_test_with_indexer(
-            &tmp_dir,
-            node_config.storage.rocksdb_configs.enable_storage_sharding,
-        );
+        let mut aptos_db = AptosDB::new_for_test_with_indexer(&tmp_dir);
         if node_config
             .indexer_db_config
             .is_internal_indexer_db_enabled()
@@ -627,7 +624,7 @@ impl TestContext {
                 ),
         );
         let txn2 = self.account_transfer_to(account, multisig_address, initial_balance);
-        self.commit_block(&vec![create_multisig_txn, txn2]).await;
+        self.commit_block(&[create_multisig_txn, txn2]).await;
         multisig_address
     }
 
@@ -651,7 +648,7 @@ impl TestContext {
         );
         let txn2 = self.account_transfer_to(account, account.address(), initial_balance);
 
-        self.commit_block(&vec![txn1, txn2]).await;
+        self.commit_block(&[txn1, txn2]).await;
     }
 
     pub async fn create_multisig_transaction(
@@ -671,7 +668,7 @@ impl TestContext {
                     self.use_orderless_transactions,
                 ),
         );
-        self.commit_block(&vec![txn]).await;
+        self.commit_block(&[txn]).await;
     }
 
     pub async fn approve_multisig_transaction(
@@ -691,7 +688,7 @@ impl TestContext {
                     self.use_orderless_transactions,
                 ),
         );
-        self.commit_block(&vec![txn]).await;
+        self.commit_block(&[txn]).await;
     }
 
     pub async fn reject_multisig_transaction(
@@ -711,7 +708,7 @@ impl TestContext {
                     self.use_orderless_transactions,
                 ),
         );
-        self.commit_block(&vec![txn]).await;
+        self.commit_block(&[txn]).await;
     }
 
     pub async fn create_multisig_transaction_with_payload_hash(
@@ -731,7 +728,7 @@ impl TestContext {
                     self.use_orderless_transactions,
                 ),
         );
-        self.commit_block(&vec![txn]).await;
+        self.commit_block(&[txn]).await;
     }
 
     pub fn account_transfer(

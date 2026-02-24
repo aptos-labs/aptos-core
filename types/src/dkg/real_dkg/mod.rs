@@ -3,8 +3,8 @@
 
 use crate::{
     dkg::{
-        real_dkg::rounding::DKGRounding, DKGSessionMetadata, DKGTrait, MayHaveRoundingSummary,
-        RoundingSummary,
+        randomness_dkg::{DKGSessionMetadata, DKGTrait, MayHaveRoundingSummary, RoundingSummary},
+        real_dkg::rounding::DKGRounding,
     },
     on_chain_config::OnChainRandomnessConfig,
     validator_verifier::{ValidatorConsensusInfo, ValidatorVerifier},
@@ -12,12 +12,13 @@ use crate::{
 use anyhow::{anyhow, bail, ensure, Context};
 #[cfg(any(test, feature = "testing"))]
 use aptos_crypto::Uniform;
-use aptos_crypto::{bls12381, bls12381::PrivateKey};
+use aptos_crypto::{arkworks::shamir::Reconstructable, bls12381, bls12381::PrivateKey};
 use aptos_dkg::{
     pvss,
     pvss::{
         traits::{
-            transcript::Aggregatable, AggregatableTranscript, Convert, Reconstructable, Transcript,
+            transcript::{Aggregatable, AggregatableTranscript, Aggregated, TranscriptCore},
+            Convert, Transcript,
         },
         Player,
     },
@@ -36,9 +37,9 @@ use std::{
 pub mod rounding;
 
 pub type WTrx = pvss::das::WeightedTranscript;
-pub type DkgPP = <WTrx as Transcript>::PublicParameters;
-pub type SSConfig = <WTrx as Transcript>::SecretSharingConfig;
-pub type EncPK = <WTrx as Transcript>::EncryptPubKey;
+pub type DkgPP = <WTrx as TranscriptCore>::PublicParameters;
+pub type SSConfig = <WTrx as TranscriptCore>::SecretSharingConfig;
+pub type EncPK = <WTrx as TranscriptCore>::EncryptPubKey;
 
 #[derive(Deserialize, Serialize, Clone, Debug)]
 pub struct DKGPvssConfig {
@@ -172,27 +173,27 @@ pub struct Transcripts {
 #[derive(Deserialize, Serialize, Clone, Debug)]
 pub struct DealtPubKeyShares {
     // dealt public key share for main path
-    pub main: <WTrx as Transcript>::DealtPubKeyShare,
+    pub main: <WTrx as TranscriptCore>::DealtPubKeyShare,
     // dealt public key share for fast path
-    pub fast: Option<<WTrx as Transcript>::DealtPubKeyShare>,
+    pub fast: Option<<WTrx as TranscriptCore>::DealtPubKeyShare>,
 }
 
 #[derive(Deserialize, Serialize, Clone, Debug)]
 pub struct DealtSecretKeyShares {
     // dealt secret key share for main path
-    pub main: <WTrx as Transcript>::DealtSecretKeyShare,
+    pub main: <WTrx as TranscriptCore>::DealtSecretKeyShare,
     // dealt secret key share for fast path
-    pub fast: Option<<WTrx as Transcript>::DealtSecretKeyShare>,
+    pub fast: Option<<WTrx as TranscriptCore>::DealtSecretKeyShare>,
 }
 
 impl DKGTrait for RealDKG {
     type DealerPrivateKey = <WTrx as Transcript>::SigningSecretKey;
     type DealerPublicKey = <WTrx as Transcript>::SigningPubKey;
     type DealtPubKeyShare = DealtPubKeyShares;
-    type DealtSecret = <WTrx as Transcript>::DealtSecretKey;
+    type DealtSecret = <WTrx as TranscriptCore>::DealtSecretKey;
     type DealtSecretShare = DealtSecretKeyShares;
     type InputSecret = <WTrx as Transcript>::InputSecret;
-    type NewValidatorDecryptKey = <WTrx as Transcript>::DecryptPrivKey;
+    type NewValidatorDecryptKey = <WTrx as TranscriptCore>::DecryptPrivKey;
     type PublicParams = RealDKGPublicParams;
     type Transcript = Transcripts;
 
@@ -405,17 +406,20 @@ impl DKGTrait for RealDKG {
         accumulator: &mut Self::Transcript,
         element: Self::Transcript,
     ) {
-        accumulator
-            .main
-            .aggregate_with(&params.pvss_config.wconfig, &element.main)
+        let mut agg = accumulator.main.to_aggregated();
+        agg.aggregate_with(&params.pvss_config.wconfig, &element.main)
             .expect("Transcript aggregation failed");
+        accumulator.main = agg.normalize(); // TODO: this should be updated
         if let (Some(acc), Some(ele), Some(config)) = (
             accumulator.fast.as_mut(),
             element.fast.as_ref(),
             params.pvss_config.fast_wconfig.as_ref(),
         ) {
-            acc.aggregate_with(config, ele)
+            let mut fast_agg = acc.to_aggregated();
+            fast_agg
+                .aggregate_with(config, ele)
                 .expect("Transcript aggregation failed");
+            *acc = fast_agg.normalize(); // TODO: this should be updated
         }
     }
 
@@ -476,7 +480,7 @@ impl DKGTrait for RealDKG {
             .into_iter()
             .map(|(x, y)| (Player { id: x as usize }, y.main))
             .collect();
-        let reconstructed_secret = <WTrx as Transcript>::DealtSecretKey::reconstruct(
+        let reconstructed_secret = <WTrx as TranscriptCore>::DealtSecretKey::reconstruct(
             &pub_params.pvss_config.wconfig,
             &player_share_pairs,
         )
@@ -491,7 +495,7 @@ impl DKGTrait for RealDKG {
                 .into_iter()
                 .map(|(x, y)| (Player { id: x as usize }, y.fast.unwrap()))
                 .collect();
-            let fast_reconstructed_secret = <WTrx as Transcript>::DealtSecretKey::reconstruct(
+            let fast_reconstructed_secret = <WTrx as TranscriptCore>::DealtSecretKey::reconstruct(
                 pub_params.pvss_config.fast_wconfig.as_ref().unwrap(),
                 &fast_player_share_pairs,
             )
@@ -596,9 +600,9 @@ impl RealDKG {
 }
 pub fn maybe_dk_from_bls_sk(
     sk: &PrivateKey,
-) -> anyhow::Result<<WTrx as Transcript>::DecryptPrivKey> {
+) -> anyhow::Result<<WTrx as TranscriptCore>::DecryptPrivKey> {
     let mut bytes = sk.to_bytes(); // in big-endian
     bytes.reverse();
-    <WTrx as Transcript>::DecryptPrivKey::try_from(bytes.as_slice())
+    <WTrx as TranscriptCore>::DecryptPrivKey::try_from(bytes.as_slice())
         .map_err(|e| anyhow!("dk_from_bls_sk failed with dk deserialization error: {e}"))
 }

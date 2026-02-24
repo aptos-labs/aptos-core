@@ -15,7 +15,7 @@ use anyhow::ensure;
 use aptos_crypto::arkworks::random::UniformRand;
 use aptos_crypto::{
     arkworks::{
-        msm::{IsMsmInput, MsmInput},
+        msm::MsmInput,
         random::{sample_field_element, unsafe_random_point},
         srs::{lagrange_basis, powers_of_tau, SrsBasis, SrsType},
         GroupGenerators,
@@ -27,7 +27,7 @@ use ark_ec::{
     pairing::{Pairing, PairingOutput},
     AdditiveGroup, CurveGroup, VariableBaseMSM,
 };
-use ark_ff::{Field, PrimeField};
+use ark_ff::{Field, PrimeField, Zero};
 use ark_poly::{
     polynomial::univariate::DensePolynomial, univariate::DenseOrSparsePolynomial, EvaluationDomain,
 };
@@ -105,7 +105,7 @@ pub fn setup<E: Pairing>(
     group_generators: GroupGenerators<E>,
     trapdoor: Trapdoor<E>,
 ) -> (VerificationKey<E>, CommitmentKey<E>) {
-    utils::assert_power_of_two(m);
+    utils::assert_power_of_two(m as u64);
 
     let GroupGenerators { g1, g2 } = group_generators;
     let Trapdoor { xi, tau } = trapdoor;
@@ -195,17 +195,20 @@ pub fn commit_with_randomness_and_offset<E: Pairing>(
 }
 
 impl<'a, E: Pairing> CommitmentHomomorphism<'a, E> {
+    /// Open the commitment at `(x, y)`. When `offset > 0`, the quotient is committed using
+    /// basis `[τ^offset, τ^{offset+1}, ...]` (for Zeromorph batched openings).
     pub fn open(
         ck: &CommitmentKey<E>,
-        f_vals: Vec<E::ScalarField>, // needs to be evaluations of a polynomial f OR its coefficients, depending on `ck.msm_basis`
+        f_vals: Vec<E::ScalarField>, // evaluations or coefficients, depending on `ck.msm_basis`
         rho: E::ScalarField,
         x: E::ScalarField,
         y: E::ScalarField,
         s: &CommitmentRandomness<E::ScalarField>,
+        offset: usize,
     ) -> OpeningProof<E> {
         let q_vals = match &ck.msm_basis {
             SrsBasis::Lagrange { .. } => {
-                // Lagrange basis expects f_vals to be evaluations, and we return q_vals with evaluations
+                // Lagrange basis expects `f_vals` to be evaluations, and we return `q_vals` with evaluations
                 // The `quotient_evaluations_batch()` function divides over `(theta_i - x)` for `theta_i` an m-th root of unity, hence:
                 if ck.roots_of_unity_in_eval_dom.contains(&x) {
                     panic!("x is not allowed to be a root of unity");
@@ -218,7 +221,7 @@ impl<'a, E: Pairing> CommitmentHomomorphism<'a, E> {
                 )
             },
             SrsBasis::PowersOfTau { .. } => {
-                // Powers-of-Tau expects f_vals to be coefficients, and we return q_vals with coefficients
+                // Powers-of-Tau expects `f_vals` to be coefficients, and we return `q_vals` with coefficients
                 // For some reason arkworks only implemented `divide_with_q_and_r()` for `DenseOrSparsePolynomial`
                 let f_dense = DensePolynomial { coeffs: f_vals };
                 let f = DenseOrSparsePolynomial::DPolynomial(Cow::Owned(f_dense));
@@ -226,13 +229,20 @@ impl<'a, E: Pairing> CommitmentHomomorphism<'a, E> {
                     coeffs: vec![-x, E::ScalarField::ONE],
                 };
                 let divisor = DenseOrSparsePolynomial::DPolynomial(Cow::Owned(divisor_dense));
-
-                let (q, _) = f.divide_with_q_and_r(&divisor).expect("Could not divide polynomial, but that shouldn't happen because the divisor is nonzero");
+                let (q, _) = f
+                    .divide_with_q_and_r(&divisor)
+                    .expect("division by (X - x) is nonzero");
                 q.coeffs
             },
         };
 
-        let pi_1 = commit_with_randomness(ck, &q_vals, s);
+        let pi_1 = if offset == 0 {
+            commit_with_randomness(ck, &q_vals, s)
+        } else {
+            let mut padded = vec![E::ScalarField::zero(); offset];
+            padded.extend(q_vals);
+            commit_with_randomness_and_offset(ck, &padded, s, offset)
+        };
 
         // For this small MSM, the direct approach seems to be faster than using `E::G1::msm()`
         let pi_2 = (ck.g1 * rho) - (ck.tau_1 - ck.g1 * x) * s.0;
@@ -259,6 +269,7 @@ impl<'a, E: Pairing> CommitmentHomomorphism<'a, E> {
         } = vk;
         let OpeningProof { pi_1, pi_2 } = pi;
 
+        // TODO: should probably work on affine / serialization here at some point
         let check = E::multi_pairing(vec![C.0 - one_1 * y, -pi_1.0, -pi_2], vec![
             one_2,
             (tau_2 - one_2 * x).into_affine(),
@@ -331,24 +342,32 @@ pub struct Witness<F: PrimeField> {
 
 impl<E: Pairing> homomorphism::Trait for CommitmentHomomorphism<'_, E> {
     type Codomain = CodomainShape<E::G1>;
+    type CodomainNormalized = CodomainShape<E::G1Affine>;
     type Domain = Witness<E::ScalarField>;
 
     fn apply(&self, input: &Self::Domain) -> Self::Codomain {
         // CommitmentHomomorphism::<'_, E>::normalize_output(self.apply_msm(self.msm_terms(input)))
         self.apply_msm(self.msm_terms(input))
     }
+
+    fn normalize(&self, value: Self::Codomain) -> Self::CodomainNormalized {
+        <CommitmentHomomorphism<E> as fixed_base_msms::Trait>::normalize_output(value)
+    }
 }
 
 impl<E: Pairing> fixed_base_msms::Trait for CommitmentHomomorphism<'_, E> {
+    type Base = E::G1Affine;
     type CodomainShape<T>
         = CodomainShape<T>
     where
         T: CanonicalSerialize + CanonicalDeserialize + Clone + Debug + Eq;
-    type MsmInput = MsmInput<E::G1Affine, E::ScalarField>;
     type MsmOutput = E::G1;
     type Scalar = E::ScalarField;
 
-    fn msm_terms(&self, input: &Self::Domain) -> Self::CodomainShape<Self::MsmInput> {
+    fn msm_terms(
+        &self,
+        input: &Self::Domain,
+    ) -> Self::CodomainShape<MsmInput<Self::Base, Self::Scalar>> {
         assert!(
             self.msm_basis.len() >= input.values.len(),
             "Not enough Lagrange basis elements for univariate hiding KZG: required {}, got {}",
@@ -367,13 +386,19 @@ impl<E: Pairing> fixed_base_msms::Trait for CommitmentHomomorphism<'_, E> {
         CodomainShape(MsmInput { bases, scalars })
     }
 
-    fn msm_eval(input: Self::MsmInput) -> Self::MsmOutput {
-        E::G1::msm(input.bases(), &input.scalars())
+    fn msm_eval(input: MsmInput<Self::Base, Self::Scalar>) -> Self::MsmOutput {
+        E::G1::msm(input.bases(), input.scalars())
             .expect("MSM computation failed in univariate KZG")
+    }
+
+    fn batch_normalize(msm_output: Vec<Self::MsmOutput>) -> Vec<Self::Base> {
+        E::G1::normalize_batch(&msm_output)
     }
 }
 
-impl<'a, E: Pairing> sigma_protocol::Trait<E::G1> for CommitmentHomomorphism<'a, E> {
+impl<'a, E: Pairing> sigma_protocol::CurveGroupTrait for CommitmentHomomorphism<'a, E> {
+    type Group = E::G1;
+
     fn dst(&self) -> Vec<u8> {
         b"APTOS_HIDING_KZG_SIGMA_PROTOCOL_DST".to_vec()
     }
@@ -388,6 +413,7 @@ mod tests {
     use rand::thread_rng;
 
     // TODO: Should set up a PCS trait, then make these tests generic?
+    // This test does not involve the `offset` parameter, but this is probably tested as part of Zeromorph
     fn assert_kzg_opening_correctness<E: Pairing>() {
         let mut rng = thread_rng();
         let group_data = GroupGenerators::default();
@@ -419,7 +445,7 @@ mod tests {
         let comm = super::commit_with_randomness(&ck, &f_evals, &rho);
 
         // Open at x, will fail when x is a root of unity but the odds of that should be negligible
-        let proof = CommitmentHomomorphism::<E>::open(&ck, f_evals, rho.0, x, y, &s);
+        let proof = CommitmentHomomorphism::<E>::open(&ck, f_evals, rho.0, x, y, &s, 0);
 
         // Verify proof
         let verification = CommitmentHomomorphism::<E>::verify(vk, comm, x, y, proof);

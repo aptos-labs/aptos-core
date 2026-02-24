@@ -8,14 +8,13 @@ RUN rm -f /etc/apt/apt.conf.d/docker-clean; echo 'Binary::apt::APT::Keep-Downloa
 
 RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
     --mount=type=cache,target=/var/lib/apt,sharing=locked \
-    sed -i 's|http://deb.debian.org/debian|http://cloudfront.debian.net/debian|g' /etc/apt/sources.list &&  \
     apt-get update && apt-get --no-install-recommends --allow-downgrades -y install \
         ca-certificates \
         curl \
         iproute2 \
-        libpq-dev \
-        libssl1.1 \
-        netcat \
+        libpq5 \
+        libssl3 \
+        netcat-openbsd \
         net-tools \
         tcpdump
 

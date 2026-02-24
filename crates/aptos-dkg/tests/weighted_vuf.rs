@@ -4,7 +4,7 @@
 #![allow(clippy::ptr_arg)]
 #![allow(clippy::needless_borrow)]
 
-use aptos_crypto::{blstrs::random_scalar, traits::SecretSharingConfig as _};
+use aptos_crypto::{blstrs::random_scalar, traits::TSecretSharingConfig as _};
 use aptos_dkg::{
     pvss::{
         self,
@@ -58,7 +58,7 @@ where
 {
     let wc = WeightedConfigBlstrs::new(10, vec![3, 5, 3, 4, 2, 1, 1, 7]).unwrap();
 
-    let d = test_utils::setup_dealing::<T, StdRng>(&wc, rng);
+    let d = test_utils::setup_dealing::<T, StdRng>(&wc, None, rng);
 
     let trx = T::deal(
         &wc,
@@ -162,7 +162,8 @@ fn wvuf_randomly_aggregate_verify_and_derive_eval<
     let proof = WVUF::aggregate_shares(&wc, &apks_and_proofs);
 
     // Make sure the aggregated proof is valid
-    WVUF::verify_proof(&vuf_pp, pk, &apks[..], msg, &proof)
+    let verify_pool = spawn_rayon_thread_pool("t-wvuf-vfy".to_string(), Some(4));
+    WVUF::verify_proof(&vuf_pp, pk, &apks[..], msg, &proof, &verify_pool)
         .expect("WVUF aggregated proof should verify");
 
     // Derive the VUF evaluation

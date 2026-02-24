@@ -1,9 +1,9 @@
 processed 1 task
 task 0 lines 3-25:  publish [module 0x42::m {]
 warning: Unused value of parameter `p0`. Consider removing the parameter, or prefixing with an underscore (e.g., `_p0`), or binding to `_`
-   ┌─ TEMPFILE:22:14
-   │
-22 │     fun some(p0: &mut R) {
-   │              ^^
+  ┌─ TEMPFILE:8:14
+  │
+8 │     fun some(p0: &mut R) {
+  │              ^^
 
 

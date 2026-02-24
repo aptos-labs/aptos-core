@@ -394,6 +394,14 @@ pub static BATCH_IN_PROGRESS_TIMEOUT: Lazy<IntCounter> = Lazy::new(|| {
     .unwrap()
 });
 
+pub static BATCH_GENERATOR_SKIPPED_OVERSIZED_TXN: Lazy<IntCounter> = Lazy::new(|| {
+    register_int_counter!(
+        "quorum_store_batch_generator_skipped_oversized_txn",
+        "Number of transactions skipped because they exceed sender_max_batch_bytes."
+    )
+    .unwrap()
+});
+
 pub static GAP_BETWEEN_BATCH_EXPIRATION_AND_CURRENT_TIME_WHEN_SAVE: Lazy<Histogram> = Lazy::new(
     || {
         register_histogram!(

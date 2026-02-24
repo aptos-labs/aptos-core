@@ -168,7 +168,7 @@ impl Default for MempoolConfig {
                 },
             ],
             enable_max_load_balancing_at_any_load: false,
-            orderless_txn_capacity_per_user: 1000,
+            orderless_txn_capacity_per_user: 5000,
         }
     }
 }

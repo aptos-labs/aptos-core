@@ -23,7 +23,7 @@ struct TestConfig {
 
 /// Note that any config which has different output for a test directory *must* be added to the
 /// [SEPARATE_BASELINE] array below, so that a special output file `test.foo.exp` will be used for
-/// outputs comparison when running `test.move` or `test.mvir` for config "foo".
+/// outputs comparison when running `test.move` or `test.masm` for config "foo".
 static TEST_CONFIGS: Lazy<Vec<TestConfig>> = Lazy::new(|| {
     vec![TestConfig {
         name: "baseline",
@@ -67,7 +67,7 @@ fn main() {
         .flatten()
         .filter_map(|e| {
             let p = e.path().display().to_string();
-            if p.ends_with(".move") || p.ends_with(".mvir") || p.ends_with(".masm") {
+            if p.ends_with(".move") || p.ends_with(".masm") {
                 Some(p)
             } else {
                 None

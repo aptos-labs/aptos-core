@@ -57,7 +57,10 @@ fn get_width_by_type(ty_arg: &Type, error_code_if_incorrect: u64) -> SafeNativeR
     match ty_arg {
         Type::U128 => Ok(16),
         Type::U64 => Ok(8),
-        _ => Err(SafeNativeError::abort(error_code_if_incorrect)),
+        _ => Err(SafeNativeError::abort_with_message(
+            error_code_if_incorrect,
+            "Unsupported type for aggregator (only u64 and u128 are supported)",
+        )),
     }
 }
 
@@ -70,7 +73,10 @@ fn pop_value_by_type(
     match ty_arg {
         Type::U128 => Ok(safely_pop_arg!(args, u128)),
         Type::U64 => Ok(safely_pop_arg!(args, u64) as u128),
-        _ => Err(SafeNativeError::abort(error_code_if_incorrect)),
+        _ => Err(SafeNativeError::abort_with_message(
+            error_code_if_incorrect,
+            "Unsupported type for aggregator value (only u64 and u128 are supported)",
+        )),
     }
 }
 
@@ -82,7 +88,10 @@ fn create_value_by_type(
     match value_ty {
         Type::U128 => Ok(Value::u128(value)),
         Type::U64 => Ok(Value::u64(u128_to_u64(value)?)),
-        _ => Err(SafeNativeError::abort(error_code_if_incorrect)),
+        _ => Err(SafeNativeError::abort_with_message(
+            error_code_if_incorrect,
+            "Unsupported type for aggregator operation (only u64 and u128 are supported)",
+        )),
     }
 }
 
@@ -496,7 +505,14 @@ fn native_create_derived_string(
         .charge(AGGREGATOR_V2_CREATE_SNAPSHOT_PER_BYTE * NumBytes::new(value_bytes.len() as u64))?;
 
     if value_bytes.len() > DERIVED_STRING_INPUT_MAX_LENGTH {
-        return Err(SafeNativeError::abort(EINPUT_STRING_LENGTH_TOO_LARGE));
+        return Err(SafeNativeError::abort_with_message(
+            EINPUT_STRING_LENGTH_TOO_LARGE,
+            format!(
+                "Derived snapshot cannot be constructed: input string length ({}) exceeds maximum {}",
+                value_bytes.len(),
+                DERIVED_STRING_INPUT_MAX_LENGTH
+            ),
+        ));
     }
 
     let derived_string_snapshot =
@@ -541,12 +557,16 @@ fn native_derive_string_concat(
         .map_err(SafeNativeError::InvariantViolation)?;
     context.charge(AGGREGATOR_V2_STRING_CONCAT_PER_BYTE * NumBytes::new(prefix.len() as u64))?;
 
-    if prefix
-        .len()
-        .checked_add(suffix.len())
-        .is_some_and(|v| v > DERIVED_STRING_INPUT_MAX_LENGTH)
+    if let Some(len) = prefix.len().checked_add(suffix.len())
+        && len > DERIVED_STRING_INPUT_MAX_LENGTH
     {
-        return Err(SafeNativeError::abort(EINPUT_STRING_LENGTH_TOO_LARGE));
+        return Err(SafeNativeError::abort_with_message(
+            EINPUT_STRING_LENGTH_TOO_LARGE,
+            format!(
+                "Derived snapshot cannot be constructed: prefix and suffix string lengths ({} + {} = {}) exceed maximum {}",
+                prefix.len(), suffix.len(), len, DERIVED_STRING_INPUT_MAX_LENGTH
+            ),
+        ));
     }
 
     let derived_string_snapshot = if let Some((resolver, mut delayed_field_data)) =

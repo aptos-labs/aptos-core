@@ -1,0 +1,16 @@
+//# publish
+module 0x1::M
+struct S<T0>
+  b: bool
+
+fun f<T0, T1, T2>()
+    call g<T1, T2, T0>
+    ret
+
+fun g<T0, T1, T2>()
+    call h<T0, T1, S<T2>>
+    ret
+
+fun h<T0, T1, T2>()
+    call f<T0, T1, T2>
+    ret

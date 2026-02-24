@@ -1,23 +1,33 @@
 //# publish
 module 0x66::incompatible_generic_function
 public fun foo<A>(): |A|A
+    ld_u64 0
+    abort
 
 //# publish --verbose
 module 0x66::incompatible_generic_function
 public fun foo<A>(): |A|u32
+    ld_u64 0
+    abort
 
 //# publish --verbose
 module 0x66::incompatible_generic_function
 public fun foo<A, B>(): |A|B
+    ld_u64 0
+    abort
 
 //# publish
 module 0x66::incompatible_generic_structure
 struct S<A>
     x: A
 public fun foo<A>(): |S<A>|A
+    ld_u64 0
+    abort
 
 //# publish --verbose
 module 0x66::incompatible_generic_structure
 struct S<A>
     x: A
 public fun foo<A, B>(): |S<B>|A
+    ld_u64 0
+    abort

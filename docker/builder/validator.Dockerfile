@@ -2,8 +2,6 @@
 
 FROM node-builder
 
-FROM tools-builder
-
 FROM debian-base AS validator
 
 RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
@@ -23,7 +21,7 @@ RUN addgroup --system --gid 6180 aptos && adduser --system --ingroup aptos --no-
 
 RUN mkdir -p /opt/aptos/etc
 COPY --link --from=node-builder /aptos/dist/aptos-node /usr/local/bin/
-COPY --link --from=tools-builder /aptos/dist/aptos-debugger /usr/local/bin/
+COPY --link --from=node-builder /aptos/dist/aptos-debugger /usr/local/bin/
 
 # Admission control
 EXPOSE 8000

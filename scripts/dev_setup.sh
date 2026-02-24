@@ -122,11 +122,19 @@ function install_build_essentials {
 
 function install_clang {
   PACKAGE_MANAGER=$1
-  VERSION=${2:-20}
+  VERSION=${2:-21}
 
   if [[ "$PACKAGE_MANAGER" == "apt-get" ]]; then
-    "${PRE_COMMAND[@]}" apt-get install -y gnupg lsb-release software-properties-common wget
-    "${PRE_COMMAND[@]}" bash -c "$(wget -O - https://apt.llvm.org/llvm.sh)" llvm.sh "${VERSION}"
+    # Skip installation entirely if the desired clang version is already
+    # present and functional.  CI AMIs ship with clang pre-installed and
+    # the LLVM nightly apt repo frequently rotates out old .deb files,
+    # which causes apt-get install/upgrade to 404.
+    if command -v "clang-${VERSION}" &>/dev/null; then
+      echo "clang-${VERSION} already installed, skipping."
+    else
+      "${PRE_COMMAND[@]}" apt-get install -y gnupg lsb-release software-properties-common wget
+      "${PRE_COMMAND[@]}" bash -c "$(wget -O - https://apt.llvm.org/llvm.sh)" llvm.sh "${VERSION}"
+    fi
     "${PRE_COMMAND[@]}" update-alternatives --install /usr/bin/clang clang "/usr/bin/clang-${VERSION}" 100
     "${PRE_COMMAND[@]}" update-alternatives --install /usr/bin/clang++ clang++ "/usr/bin/clang++-${VERSION}" 100
   else

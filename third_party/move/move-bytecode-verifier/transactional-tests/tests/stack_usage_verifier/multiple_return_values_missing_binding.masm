@@ -1,0 +1,53 @@
+//# publish
+module 0x1::Test
+struct T
+  b: bool
+
+public fun new(): T
+    ld_true
+    pack T
+    ret
+
+public fun test(l0: &u64, l1: T): (u64, T, bool)
+    move_loc l0
+    read_ref
+    move_loc l1
+    ld_false
+    ret
+
+public fun destroy(l0: T)
+    local l1: bool
+    move_loc l0
+    unpack T
+    st_loc l1
+    ret
+
+
+
+//# run
+script
+use 0x1::Test
+entry public fun main()
+    local l0: u64
+    local l1: Test::T
+    local l2: u64
+    local l3: Test::T
+    ld_u64 0
+    st_loc l0
+    call Test::new
+    st_loc l1
+    borrow_loc l0
+    move_loc l1
+    call Test::test
+    st_loc l3
+    st_loc l2
+    move_loc l2
+    ld_u64 0
+    eq
+    not
+    br_false l0
+    ld_u64 42
+    abort
+l0: move_loc l3
+    call Test::destroy
+    ret

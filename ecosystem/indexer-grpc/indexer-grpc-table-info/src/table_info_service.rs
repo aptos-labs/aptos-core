@@ -214,12 +214,14 @@ impl TableInfoService {
         // Wait for all the threads to finish.
         let mut raw_txns = vec![];
         for task in tasks {
-            raw_txns.push(task.await?);
+            let result = task.await?;
+            // Handle the Result from fetch_raw_txns_with_retries.
+            let txns = result.map_err(|status| anyhow::anyhow!(status.message().to_string()))?;
+            raw_txns.extend(txns);
         }
-        // Flatten the results and sort them.
+        // Sort the transactions.
         let result: Vec<TransactionOnChainData> = raw_txns
             .into_iter()
-            .flatten()
             .sorted_by_key(|txn| txn.version)
             .collect();
 

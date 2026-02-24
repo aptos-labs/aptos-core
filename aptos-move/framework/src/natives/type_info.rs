@@ -55,9 +55,9 @@ fn native_type_of(
     context.charge(TYPE_INFO_TYPE_OF_BASE)?;
 
     let type_tag = context.type_to_type_tag(&ty_args[0])?;
+    let type_tag_str = type_tag.to_canonical_string();
 
     if context.eval_gas(TYPE_INFO_TYPE_OF_PER_BYTE_IN_STR) > 0.into() {
-        let type_tag_str = type_tag.to_canonical_string();
         // Ideally, we would charge *before* the `type_to_type_tag()` and `type_tag.to_string()` calls above.
         // But there are other limits in place that prevent this native from being called with too much work.
         context
@@ -67,8 +67,9 @@ fn native_type_of(
     if let TypeTag::Struct(struct_tag) = type_tag {
         Ok(type_of_internal(&struct_tag).expect("type_of should never fail."))
     } else {
-        Err(SafeNativeError::abort(
+        Err(SafeNativeError::abort_with_message(
             super::status::NFE_EXPECTED_STRUCT_TYPE_TAG,
+            format!("Expected a struct type, found: {}", type_tag_str),
         ))
     }
 }

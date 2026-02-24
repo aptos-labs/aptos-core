@@ -194,7 +194,7 @@ impl<'a> TraceCursor<'a> {
         self.fingerprint_recorder.record(instr);
     }
 
-    /// Processes a conditional branch. Returns [None] if branch was not recorded.
+    /// Processes a conditional branch. Returns [Err] if branch was not recorded.
     #[inline(always)]
     pub(crate) fn consume_branch(&mut self) -> PartialVMResult<bool> {
         let i = self.branch_cursor;
@@ -208,7 +208,7 @@ impl<'a> TraceCursor<'a> {
         }
     }
 
-    /// Processes an entrypoint. Returns [None] if entrypoint call was not recorded.
+    /// Processes an entrypoint. Returns [Err] if entrypoint call was not recorded.
     #[inline(always)]
     pub(crate) fn consume_entrypoint(&mut self) -> PartialVMResult<&LoadedFunction> {
         let target = self
@@ -225,7 +225,7 @@ impl<'a> TraceCursor<'a> {
         }
     }
 
-    /// Processes a closure. Returns [None] if closure call was not recorded.
+    /// Processes a closure. Returns [Err] if closure call was not recorded.
     #[inline(always)]
     pub(crate) fn consume_closure_call(
         &mut self,

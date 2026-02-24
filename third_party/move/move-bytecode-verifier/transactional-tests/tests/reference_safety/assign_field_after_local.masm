@@ -1,0 +1,26 @@
+//# publish
+module 0x42::Tester
+struct T has drop
+  v: u64
+
+public fun new(l0: u64): T
+    move_loc l0
+    pack T
+    ret
+
+public fun replace(l0: &mut T)
+    local l1: &mut u64
+    local l2: T
+    copy_loc l0
+    mut_borrow_field T, v
+    st_loc l1
+    ld_u64 1
+    call new
+    st_loc l2
+    move_loc l2
+    move_loc l0
+    write_ref
+    ld_u64 10000
+    move_loc l1
+    write_ref
+    ret

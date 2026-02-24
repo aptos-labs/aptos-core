@@ -6,13 +6,13 @@
 
 use crate::{
     boogie_helpers::{
-        boogie_address, boogie_address_blob, boogie_bv_type, boogie_byte_blob,
-        boogie_choice_fun_name, boogie_declare_global, boogie_field_sel, boogie_inst_suffix,
-        boogie_modifies_memory_name, boogie_num_type_base, boogie_num_type_base_bv,
-        boogie_reflection_type_info, boogie_reflection_type_is_struct, boogie_reflection_type_name,
-        boogie_resource_memory_name, boogie_spec_fun_name, boogie_spec_var_name,
-        boogie_struct_name, boogie_struct_variant_name, boogie_type, boogie_type_suffix,
-        boogie_type_suffix_bv, boogie_value_blob, boogie_well_formed_expr,
+        boogie_address, boogie_address_blob, boogie_behavioral_eval_fun_name, boogie_bv_type,
+        boogie_byte_blob, boogie_choice_fun_name, boogie_closure_pack_name, boogie_declare_global,
+        boogie_field_sel, boogie_inst_suffix, boogie_modifies_memory_name, boogie_num_type_base,
+        boogie_num_type_base_bv, boogie_reflection_type_info, boogie_reflection_type_is_struct,
+        boogie_reflection_type_name, boogie_resource_memory_name, boogie_spec_fun_name,
+        boogie_spec_var_name, boogie_struct_name, boogie_struct_variant_name, boogie_type,
+        boogie_type_suffix, boogie_type_suffix_bv, boogie_value_blob, boogie_well_formed_expr,
         boogie_well_formed_expr_bv, MAX_TUPLE_SIZE,
     },
     options::BoogieOptions,
@@ -22,8 +22,8 @@ use itertools::Itertools;
 use log::{debug, info, warn};
 use move_model::{
     ast::{
-        Condition, ConditionKind, Exp, ExpData, MemoryLabel, Operation, Pattern, QuantKind,
-        SpecFunDecl, SpecVarDecl, TempIndex, Value,
+        BehaviorKind, Condition, ConditionKind, Exp, ExpData, MemoryLabel, Operation, Pattern,
+        QuantKind, SpecFunDecl, SpecVarDecl, TempIndex, Value,
     },
     code_writer::CodeWriter,
     emit, emitln,
@@ -541,7 +541,7 @@ impl SpecTranslator<'_> {
             }
             // Generate axioms from the spec block attached to the spec function
             // TODO(#16256): support general condition kinds, exploration use of `spec_translator` in `move_model`
-            self.generate_spec_function_axioms(fun, module_env, boogie_name, param_list);
+            self.generate_spec_function_axioms(fun, module_env, boogie_name.clone(), param_list);
         } else {
             emitln!(self.writer, " {");
             self.writer.indent();
@@ -640,6 +640,8 @@ impl SpecTranslator<'_> {
             );
 
             // Emit predicate function characterizing the choice.
+            // Note: This function is marked {:inline} so Boogie expands it at use sites,
+            // allowing Z3 to reason directly about the expanded constraints.
             emitln!(
                 new_spec_trans.writer,
                 "function {{:inline}} {}_pred({}): bool {{",
@@ -730,12 +732,24 @@ impl SpecTranslator<'_> {
                 emitln!(new_spec_trans.writer, "axiom");
             }
             new_spec_trans.writer.indent();
-            emitln!(
-                new_spec_trans.writer,
-                "(exists {}:: {}) ==> ",
-                mk_decl(&var_decl),
-                predicate
+
+            // Check if condition is a functional behavioral predicate (ensures_of).
+            // For ensures_of, existence is guaranteed since the predicate functionally
+            // determines the result, so we can skip the existence check.
+            let is_functional = matches!(
+                info.condition.as_ref(),
+                ExpData::Call(_, Operation::Behavior(BehaviorKind::EnsuresOf, ..), _)
             );
+
+            if !is_functional {
+                // General case: include existence check
+                emitln!(
+                    new_spec_trans.writer,
+                    "(exists {}:: {}) ==> ",
+                    mk_decl(&var_decl),
+                    predicate
+                );
+            }
             emitln!(
                 new_spec_trans.writer,
                 "(var {} := {}; {}",
@@ -1244,6 +1258,65 @@ impl SpecTranslator<'_> {
                     )
                 );
             },
+            Operation::Behavior(kind, _state) => {
+                // args[0] is the function expression (Temporary or Closure)
+                // args[1..] are the predicate arguments
+                if args.is_empty() {
+                    self.env.error(
+                        &self.env.get_node_loc(node_id),
+                        "bug: Operation::Behavior has no arguments",
+                    );
+                    return;
+                }
+                let fun_exp = &args[0];
+                let pred_args = &args[1..];
+
+                // Get the function type from the expression and instantiate
+                let fun_type = self.env.get_node_type(fun_exp.node_id());
+                let inst_fun_type = fun_type.instantiate(&self.type_inst);
+                let eval_fun_name =
+                    boogie_behavioral_eval_fun_name(self.env, &inst_fun_type, *kind);
+
+                emit!(self.writer, "{}(", eval_fun_name);
+                // Translate the function expression - Closure is only allowed here
+                match fun_exp.as_ref() {
+                    ExpData::Temporary(_, temp_idx) => {
+                        emit!(self.writer, "$t{}", temp_idx);
+                    },
+                    ExpData::LocalVar(_, name) => {
+                        // For spec function parameters
+                        emit!(self.writer, "{}", name.display(self.env.symbol_pool()));
+                    },
+                    ExpData::Call(closure_id, Operation::Closure(mid, fid, mask), closure_args) => {
+                        // Translate closure to a packed function value
+                        let inst = self.env.get_node_instantiation(*closure_id);
+                        let inst = Type::instantiate_slice(&inst, &self.type_inst);
+                        let fun_qid = mid.qualified_inst(*fid, inst);
+                        let ctor_name = boogie_closure_pack_name(self.env, &fun_qid, *mask);
+                        emit!(self.writer, "{}(", ctor_name);
+                        let mut first = true;
+                        for arg in closure_args {
+                            if !first {
+                                emit!(self.writer, ", ");
+                            }
+                            first = false;
+                            self.translate_exp(arg);
+                        }
+                        emit!(self.writer, ")");
+                    },
+                    _ => {
+                        self.env.error(
+                            &self.env.get_node_loc(fun_exp.node_id()),
+                            "bug: Operation::Behavior expects Temporary, LocalVar, or Closure as first arg",
+                        );
+                    },
+                }
+                for arg in pred_args {
+                    emit!(self.writer, ", ");
+                    self.translate_exp(arg);
+                }
+                emit!(self.writer, ")");
+            },
             Operation::MoveFunction(_, _)
             | Operation::BorrowGlobal(_)
             | Operation::Borrow(..)
@@ -1251,7 +1324,6 @@ impl SpecTranslator<'_> {
             | Operation::MoveTo
             | Operation::MoveFrom
             | Operation::Closure(..)
-            | Operation::Behavior(..)
             | Operation::Old => {
                 self.env.error(
                     &self.env.get_node_loc(node_id),
@@ -1963,7 +2035,7 @@ impl SpecTranslator<'_> {
             .filter(|(s, _)| *s != some_var)
             .map(|(s, ty)| (s, self.inst(ty.skip_reference())))
             .collect_vec();
-        let used_temps = range_and_body
+        let used_temps: Vec<(TempIndex, Type)> = range_and_body
             .used_temporaries_with_types(self.env)
             .into_iter()
             .collect_vec();

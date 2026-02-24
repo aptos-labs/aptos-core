@@ -63,15 +63,14 @@ impl QueueItem {
 
     pub fn set_secret_shared_key(&mut self, round: Round, key: SecretSharedKey) {
         let offset = self.offset(round);
+        // TODO(ibalajiarun): revisit the importance of this hashset
         if self.pending_secret_key_rounds.contains(&round) {
             observe_block(
                 self.blocks()[offset].timestamp_usecs(),
                 BlockStage::SECRET_SHARING_ADD_DECISION,
             );
             let block = &self.blocks_mut()[offset];
-            if let Some(tx) = block.pipeline_tx().lock().as_mut() {
-                tx.secret_shared_key_tx.take().map(|tx| tx.send(Some(key)));
-            }
+            block.set_decryption_key(key);
             self.pending_secret_key_rounds.remove(&round);
         }
     }

@@ -26,7 +26,7 @@ module 0x42::sort {
 module 0x42::sort {
     use std::vector;
     public fun incorrect_sort<T: copy>(arr: &mut vector<T>, a_less_b: |T, T|bool) {
-        let n = 0x1::vector::length<T>(/*freeze*/arr);
+        let n = 0x1::vector::length<T>(arr);
         incorrect_sort_recursive<T>(arr, 0, n - 1, a_less_b)
     }
     public fun incorrect_sort_recursive<T: copy>(arr: &mut vector<T>, low: u64, high: u64, a_less_b: |T, T|bool) {

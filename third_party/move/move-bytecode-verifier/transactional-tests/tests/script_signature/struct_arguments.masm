@@ -1,0 +1,21 @@
+//# publish
+module 0x42::M
+struct S
+  f: u64
+
+entry public fun foo(l0: S, l1: &S, l2: &mut S)
+    ld_u64 0
+    abort
+
+
+
+//# run --args 0 0 0
+script
+use 0x42::M
+entry public fun main(l0: M::S, l1: &M::S, l2: &mut M::S)
+    ld_u64 0
+    abort
+
+
+
+//# run 0x42::M::foo --args 0 0 0

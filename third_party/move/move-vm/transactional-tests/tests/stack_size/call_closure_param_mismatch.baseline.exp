@@ -1,0 +1,49 @@
+processed 5 tasks
+task 0 lines 1-42:  publish [module 0x3::trusted]
+Error: Unable to publish module '0000000000000000000000000000000000000000000000000000000000000003::trusted'. Got VMError: {
+    major_status: CALL_TYPE_MISMATCH_ERROR,
+    sub_status: None,
+    location: 0x3::trusted,
+    indices: [(FunctionDefinition, 3)],
+    offsets: [(FunctionDefinitionIndex(3), 3)],
+}
+task 1 lines 44-44:  run --verbose 0x3::trusted::call_closure_1_param
+Error: Function execution failed with VMError: {
+    message: Linker Error: Module 0000000000000000000000000000000000000000000000000000000000000003::trusted doesn't exist,
+    major_status: LINKER_ERROR,
+    sub_status: None,
+    location: undefined,
+    indices: [],
+    offsets: [],
+    exec_state: None,
+}
+task 2 lines 46-46:  run --verbose 0x3::trusted::call_closure_2_params
+Error: Function execution failed with VMError: {
+    message: Linker Error: Module 0000000000000000000000000000000000000000000000000000000000000003::trusted doesn't exist,
+    major_status: LINKER_ERROR,
+    sub_status: None,
+    location: undefined,
+    indices: [],
+    offsets: [],
+    exec_state: None,
+}
+task 3 lines 48-48:  run --verbose 0x3::trusted::call_closure_2_params_and_mask
+Error: Function execution failed with VMError: {
+    message: Linker Error: Module 0000000000000000000000000000000000000000000000000000000000000003::trusted doesn't exist,
+    major_status: LINKER_ERROR,
+    sub_status: None,
+    location: undefined,
+    indices: [],
+    offsets: [],
+    exec_state: None,
+}
+task 4 lines 50-50:  run --verbose 0x3::trusted::call_closure_3_params
+Error: Function execution failed with VMError: {
+    message: Linker Error: Module 0000000000000000000000000000000000000000000000000000000000000003::trusted doesn't exist,
+    major_status: LINKER_ERROR,
+    sub_status: None,
+    location: undefined,
+    indices: [],
+    offsets: [],
+    exec_state: None,
+}

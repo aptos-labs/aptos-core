@@ -9,11 +9,15 @@ use aptos_logger::prelude::*;
 use std::{net::SocketAddr, sync::Arc};
 use tokio::runtime::Runtime;
 
-pub fn start_backup_service(address: SocketAddr, db: Arc<AptosDB>) -> Runtime {
+pub fn start_backup_service(
+    address: SocketAddr,
+    db: Arc<AptosDB>,
+    num_runtime_threads: Option<usize>,
+) -> Runtime {
     let backup_handler = db.get_backup_handler();
     let routes = get_routes(backup_handler);
 
-    let runtime = aptos_runtimes::spawn_named_runtime("backup".into(), None);
+    let runtime = aptos_runtimes::spawn_named_runtime("backup".into(), num_runtime_threads);
 
     // Ensure that we actually bind to the socket first before spawning the
     // server tasks. This helps in tests to prevent races where a client attempts
@@ -48,7 +52,11 @@ mod tests {
         let tmpdir = TempPath::new();
         let db = Arc::new(AptosDB::new_for_test(&tmpdir));
         let port = get_available_port();
-        let _rt = start_backup_service(SocketAddr::new(IpAddr::V4(Ipv4Addr::LOCALHOST), port), db);
+        let _rt = start_backup_service(
+            SocketAddr::new(IpAddr::V4(Ipv4Addr::LOCALHOST), port),
+            db,
+            None,
+        );
 
         // Endpoint doesn't exist.
         let resp = get(format!("http://127.0.0.1:{}/", port)).unwrap();

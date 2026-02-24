@@ -1,0 +1,74 @@
+//# publish
+module 0x1::M
+use 0x1::signer
+struct Foo<T0> has store + key
+  x: T0
+
+fun foo(l0: &signer) acquires Foo
+    local l1: address
+    local l2: &mut Foo<u64>
+    local l3: Foo<u64>
+    copy_loc l0
+    call signer::address_of
+    st_loc l1
+    copy_loc l1
+    mut_borrow_global Foo<u64>
+    st_loc l2
+    move_loc l2
+    pop
+    copy_loc l1
+    exists Foo<u64>
+    pop
+    copy_loc l1
+    move_from Foo<u64>
+    st_loc l3
+    copy_loc l0
+    move_loc l3
+    move_to Foo<u64>
+    ret
+
+fun foo2<T0: store>(l0: &signer) acquires Foo
+    local l1: address
+    local l2: &mut Foo<T0>
+    local l3: Foo<T0>
+    copy_loc l0
+    call signer::address_of
+    st_loc l1
+    copy_loc l1
+    mut_borrow_global Foo<T0>
+    st_loc l2
+    move_loc l2
+    pop
+    copy_loc l1
+    exists Foo<T0>
+    pop
+    copy_loc l1
+    move_from Foo<T0>
+    st_loc l3
+    copy_loc l0
+    move_loc l3
+    move_to Foo<T0>
+    ret
+
+fun foo3<T0: store>(l0: &signer) acquires Foo
+    local l1: address
+    local l2: &mut Foo<Foo<T0>>
+    local l3: Foo<Foo<T0>>
+    copy_loc l0
+    call signer::address_of
+    st_loc l1
+    copy_loc l1
+    mut_borrow_global Foo<Foo<T0>>
+    st_loc l2
+    move_loc l2
+    pop
+    copy_loc l1
+    exists Foo<Foo<T0>>
+    pop
+    copy_loc l1
+    move_from Foo<Foo<T0>>
+    st_loc l3
+    copy_loc l0
+    move_loc l3
+    move_to Foo<Foo<T0>>
+    ret

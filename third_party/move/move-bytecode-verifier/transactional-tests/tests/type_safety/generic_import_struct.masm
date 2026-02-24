@@ -1,0 +1,27 @@
+//# publish
+module 0x1::M
+struct Foo<T0> has key
+  x: T0
+
+struct Bar<T0, T1: key, T2: copy + drop>
+  x: T2
+  y: T1
+  z: T0
+
+
+
+//# run
+script
+use 0x1::M
+entry public fun main()
+    local l0: M::Foo<u64>
+    ret
+
+
+
+//# run
+script
+use 0x1::M
+entry public fun main()
+    local l0: M::Bar<u64, M::Foo<u64>, bool>
+    ret

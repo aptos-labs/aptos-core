@@ -11,7 +11,9 @@ pub mod source_package;
 
 use crate::{
     compilation::{
-        build_plan::BuildPlan, compiled_package::CompiledPackage, model_builder::ModelBuilder,
+        build_plan::{BuildPlan, CompilerDriverResult},
+        compiled_package::CompiledPackage,
+        model_builder::ModelBuilder,
     },
     package_lock::PackageLock,
     resolution::resolution_graph::{ResolutionGraph, ResolvedGraph},
@@ -164,6 +166,27 @@ impl BuildConfig {
         let mutx = PackageLock::lock();
         let ret =
             BuildPlan::create(resolved_graph)?.compile_no_exit(&config, external_checks, writer);
+        mutx.unlock();
+        ret
+    }
+
+    /// Like [`compile_package_no_exit`](Self::compile_package_no_exit) but accepts a custom
+    /// compiler driver, allowing callers to control where compiler diagnostics are written.
+    pub fn compile_package_no_exit_with_driver<W: Write>(
+        self,
+        resolved_graph: ResolvedGraph,
+        external_checks: Vec<Arc<dyn ExternalChecks>>,
+        writer: &mut W,
+        driver: impl FnMut(move_compiler_v2::Options) -> CompilerDriverResult,
+    ) -> Result<(CompiledPackage, Option<model::GlobalEnv>)> {
+        let config = self.compiler_config.clone();
+        let mutx = PackageLock::lock();
+        let ret = BuildPlan::create(resolved_graph)?.compile_with_driver(
+            writer,
+            &config,
+            external_checks,
+            driver,
+        );
         mutx.unlock();
         ret
     }

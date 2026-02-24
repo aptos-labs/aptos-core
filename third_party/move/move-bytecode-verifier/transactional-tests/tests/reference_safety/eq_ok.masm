@@ -1,0 +1,61 @@
+//# publish
+module 0x1::Tester
+fun eqtest1()
+    local l0: u64
+    local l1: &mut u64
+    ld_u64 0
+    st_loc l0
+    mut_borrow_loc l0
+    st_loc l1
+    copy_loc l1
+    freeze_ref
+    copy_loc l1
+    freeze_ref
+    eq
+    pop
+    ret
+
+fun eqtest2()
+    local l0: u64
+    local l1: &mut u64
+    ld_u64 0
+    st_loc l0
+    mut_borrow_loc l0
+    st_loc l1
+    copy_loc l1
+    freeze_ref
+    move_loc l1
+    freeze_ref
+    eq
+    pop
+    ret
+
+fun neqtest1()
+    local l0: u64
+    local l1: &mut u64
+    ld_u64 0
+    st_loc l0
+    mut_borrow_loc l0
+    st_loc l1
+    copy_loc l1
+    freeze_ref
+    copy_loc l1
+    freeze_ref
+    neq
+    pop
+    ret
+
+fun neqtest2()
+    local l0: u64
+    local l1: &mut u64
+    ld_u64 0
+    st_loc l0
+    mut_borrow_loc l0
+    st_loc l1
+    copy_loc l1
+    freeze_ref
+    move_loc l1
+    freeze_ref
+    neq
+    pop
+    ret

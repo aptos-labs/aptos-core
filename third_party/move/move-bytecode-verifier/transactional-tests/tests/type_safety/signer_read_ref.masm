@@ -1,0 +1,6 @@
+//# publish
+module 0x42::M
+fun t(l0: &signer): signer
+    copy_loc l0
+    read_ref
+    ret

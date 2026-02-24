@@ -7,7 +7,7 @@
 
 //! PVSS scheme-independent testing
 #[cfg(test)]
-use aptos_crypto::SecretSharingConfig;
+use aptos_crypto::TSecretSharingConfig;
 use aptos_crypto::{
     blstrs::{random_scalar, G1_PROJ_NUM_BYTES, G2_PROJ_NUM_BYTES},
     weighted_config::WeightedConfigArkworks,
@@ -22,9 +22,8 @@ use aptos_dkg::pvss::{
         get_threshold_configs_for_benchmarking, get_weighted_configs_for_benchmarking,
         reconstruct_dealt_secret_key_randomly, NoAux,
     },
-    traits::{
-        transcript::{HasAggregatableSubtranscript, Transcript, WithMaxNumShares},
-        Subtranscript,
+    traits::transcript::{
+        Aggregated, HasAggregatableSubtranscript, Transcript, TranscriptCore, WithMaxNumShares,
     },
     GenericWeighting, ThresholdConfigBlstrs,
 };
@@ -185,14 +184,14 @@ fn print_transcript_size<T: Transcript>(size_type: &str, sc: &T::SecretSharingCo
 ///  3. Ensures the a sufficiently-large random subset of the players can recover the dealt secret
 #[cfg(test)]
 fn pvss_deal_verify_and_reconstruct<T: AggregatableTranscript>(
-    sc: &<T as Transcript>::SecretSharingConfig,
+    sc: &<T as TranscriptCore>::SecretSharingConfig,
     seed_bytes: [u8; 32],
 ) {
     // println!();
     // println!("Seed: {}", hex::encode(seed_bytes.as_slice()));
     let mut rng = StdRng::from_seed(seed_bytes);
 
-    let d = test_utils::setup_dealing::<T, StdRng>(sc, &mut rng);
+    let d = test_utils::setup_dealing::<T, StdRng>(sc, None, &mut rng);
 
     // Test dealing
     let trx = T::deal(
@@ -255,12 +254,14 @@ fn test_pvss_aggregate_subtranscript_and_decrypt<E: Pairing, T>(
         .collect();
 
     // Use the first player's transcript as the accumulator
-    let mut agg = all_trs[0].get_subtranscript();
+    let mut agg = all_trs[0].get_subtranscript().to_aggregated();
 
     // Aggregate all other transcripts into it
     for trs in all_trs.iter().skip(1) {
         agg.aggregate_with(&sc, &trs.get_subtranscript()).unwrap();
     }
+
+    let agg = agg.normalize();
 
     #[allow(unused_variables)]
     let final_share = agg.decrypt_own_share(sc, &sc.get_player(0), &d.dks[0], &d.pp);
@@ -278,7 +279,7 @@ fn nonaggregatable_pvss_deal_verify_and_reconstruct<T: HasAggregatableSubtranscr
     // println!("Seed: {}", hex::encode(seed_bytes.as_slice()));
     let mut rng = StdRng::from_seed(seed_bytes);
 
-    let d = test_utils::setup_dealing::<T, StdRng>(sc, &mut rng);
+    let d = test_utils::setup_dealing::<T, StdRng>(sc, None, &mut rng);
 
     // Test dealing
     let trx = T::deal(
@@ -292,7 +293,7 @@ fn nonaggregatable_pvss_deal_verify_and_reconstruct<T: HasAggregatableSubtranscr
         &sc.get_player(0),
         &mut rng,
     );
-    trx.verify(&sc, &d.pp, &[d.spks[0].clone()], &d.eks, &NoAux)
+    trx.verify(&sc, &d.pp, &[d.spks[0].clone()], &d.eks, &NoAux, &mut rng)
         .expect("PVSS transcript failed verification");
 
     // Test transcript (de)serialization
@@ -333,7 +334,7 @@ fn nonaggregatable_weighted_pvss_deal_verify_and_reconstruct<E: Pairing, T>(
         &sc.get_player(0),
         &mut rng,
     );
-    trx.verify(&sc, &d.pp, &[d.spks[0].clone()], &d.eks, &NoAux)
+    trx.verify(&sc, &d.pp, &[d.spks[0].clone()], &d.eks, &NoAux, &mut rng)
         .expect("PVSS transcript failed verification");
 
     // Test transcript (de)serialization
@@ -361,7 +362,7 @@ fn pvss_deal_verify_and_reconstruct_from_subtranscript<
     use aptos_dkg::pvss::test_utils::reconstruct_dealt_secret_key_randomly_subtranscript;
     let mut rng = StdRng::from_seed(seed_bytes);
 
-    let d = test_utils::setup_dealing::<T, StdRng>(sc, &mut rng);
+    let d = test_utils::setup_dealing::<T, StdRng>(sc, None, &mut rng);
 
     // Test dealing
     let trx = T::deal(
@@ -393,7 +394,9 @@ fn actual_transcript_size<T: Transcript>(sc: &T::SecretSharingConfig) -> usize {
 
     let trx = T::generate(
         &sc,
-        &T::PublicParameters::with_max_num_shares_for_generate(sc.get_total_num_shares()),
+        &T::PublicParameters::with_max_num_shares_for_generate(
+            sc.get_total_num_shares().try_into().unwrap(),
+        ),
         &mut rng,
     );
     let actual_size = trx.to_bytes().len();

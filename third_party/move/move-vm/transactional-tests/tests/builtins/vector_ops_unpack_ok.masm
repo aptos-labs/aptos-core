@@ -1,0 +1,61 @@
+//# run
+script
+entry public fun main()
+    local l0: vector<u64>
+    ld_u64 42
+    vec_pack <u64>, 1
+    st_loc l0
+    move_loc l0
+    vec_unpack <u64>, 1
+    pop
+    ret
+
+
+
+//# run
+script
+entry public fun main()
+    local l0: vector<u64>
+    ld_u64 42
+    ld_u64 43
+    vec_pack <u64>, 2
+    st_loc l0
+    move_loc l0
+    vec_unpack <u64>, 2
+    pop
+    pop
+    ret
+
+
+
+//# run
+script
+entry public fun main()
+    local l0: vector<u64>
+    ld_u64 42
+    vec_pack <u64>, 1
+    st_loc l0
+    mut_borrow_loc l0
+    ld_u64 43
+    vec_push_back <u64>
+    move_loc l0
+    vec_unpack <u64>, 2
+    pop
+    pop
+    ret
+
+
+
+//# run
+script
+entry public fun main()
+    local l0: vector<u64>
+    ld_u64 42
+    vec_pack <u64>, 1
+    st_loc l0
+    mut_borrow_loc l0
+    vec_pop_back <u64>
+    pop
+    move_loc l0
+    vec_unpack <u64>, 0
+    ret

@@ -5,24 +5,34 @@ module aptos_experimental::market_tests_common {
     use std::signer;
     use std::vector;
     use aptos_framework::timestamp;
-    use aptos_trading::order_book_types::{OrderId, good_till_cancelled, post_only, immediate_or_cancel};
+    use aptos_trading::order_book_types::{
+        OrderId,
+        good_till_cancelled,
+        post_only,
+        immediate_or_cancel
+    };
     use aptos_experimental::market_bulk_order;
     use aptos_experimental::clearinghouse_test;
     use aptos_experimental::clearinghouse_test::{
         test_market_callbacks,
         new_test_order_metadata,
         get_position_size,
-        test_market_callbacks_with_taker_cancelled
+        test_market_callbacks_with_taker_cancelled,
+        test_market_callbacks_with_stop_matching
     };
     use aptos_experimental::market_test_utils::{
         place_order_and_verify,
         place_taker_order_and_verify_fill,
         place_taker_order,
         verify_cancel_event,
-        verify_fills, verify_fills_with_bulk
+        verify_fills,
+        verify_fills_with_bulk
     };
     use aptos_experimental::event_utils;
-    use aptos_experimental::order_placement::{OrderMatchResult};
+    use aptos_experimental::order_placement::{
+        OrderMatchResult,
+        is_clearinghouse_stopped_matching
+    };
     use aptos_experimental::market_types::{new_market, new_market_config, Market};
 
     const PRE_CANCEL_WINDOW_SECS: u64 = 1; // 1 second
@@ -30,24 +40,28 @@ module aptos_experimental::market_tests_common {
 
     // Helper function to setup market and clearinghouse
     public fun setup_market_and_clearinghouse(
-        admin: &signer,
-        market_signer: &signer,
-        allow_self_matching: bool
+        admin: &signer, market_signer: &signer, allow_self_matching: bool
     ): Market<clearinghouse_test::TestOrderMetadata> {
         timestamp::set_time_has_started_for_testing(admin);
-        let market = new_market(
-            admin,
-            market_signer,
-            new_market_config(allow_self_matching, true, PRE_CANCEL_WINDOW_SECS, false, 0)
-        );
+        let market =
+            new_market(
+                admin,
+                market_signer,
+                new_market_config(
+                    allow_self_matching,
+                    true,
+                    PRE_CANCEL_WINDOW_SECS,
+                    false,
+                    0
+                )
+            );
         clearinghouse_test::initialize(admin);
         market
     }
 
     // Helper function to setup market with default settings (no self matching)
     public fun setup_market(
-        admin: &signer,
-        market_signer: &signer
+        admin: &signer, market_signer: &signer
     ): Market<clearinghouse_test::TestOrderMetadata> {
         setup_market_and_clearinghouse(admin, market_signer, false)
     }
@@ -60,15 +74,43 @@ module aptos_experimental::market_tests_common {
         size: u64,
         is_bid: bool,
         event_store: &mut event_utils::EventStore,
-        is_bulk: bool,
+        is_bulk: bool
     ): OrderId {
         if (is_bulk) {
             // Use bulk order placement for single order
-            let bid_prices = if (is_bid) { vector[price] } else { vector::empty<u64>() };
-            let bid_sizes = if (is_bid) { vector[size] } else { vector::empty<u64>() };
-            let ask_prices = if (!is_bid) { vector[price] } else { vector::empty<u64>() };
-            let ask_sizes = if (!is_bid) { vector[size] } else { vector::empty<u64>() };
-            let order_id_opt = place_bulk_order(market, maker, bid_prices, bid_sizes, ask_prices, ask_sizes);
+            let bid_prices =
+                if (is_bid) {
+                    vector[price]
+                } else {
+                    vector::empty<u64>()
+                };
+            let bid_sizes =
+                if (is_bid) {
+                    vector[size]
+                } else {
+                    vector::empty<u64>()
+                };
+            let ask_prices =
+                if (!is_bid) {
+                    vector[price]
+                } else {
+                    vector::empty<u64>()
+                };
+            let ask_sizes =
+                if (!is_bid) {
+                    vector[size]
+                } else {
+                    vector::empty<u64>()
+                };
+            let order_id_opt =
+                place_bulk_order(
+                    market,
+                    maker,
+                    bid_prices,
+                    bid_sizes,
+                    ask_prices,
+                    ask_sizes
+                );
             assert!(order_id_opt.is_some(), 1);
             order_id_opt.destroy_some()
         } else {
@@ -95,7 +137,7 @@ module aptos_experimental::market_tests_common {
         bid_prices: vector<u64>,
         bid_sizes: vector<u64>,
         ask_prices: vector<u64>,
-        ask_sizes: vector<u64>,
+        ask_sizes: vector<u64>
     ): Option<OrderId> {
         market_bulk_order::place_bulk_order(
             market,
@@ -175,17 +217,14 @@ module aptos_experimental::market_tests_common {
     }
 
     public fun verify_order_cleanup(
-        market: &Market<clearinghouse_test::TestOrderMetadata>,
-        order_id: OrderId,
+        market: &Market<clearinghouse_test::TestOrderMetadata>, order_id: OrderId
     ) {
-            assert!(!clearinghouse_test::order_exists(order_id));
-            assert!(market.get_remaining_size(order_id) == 0);
+        assert!(!clearinghouse_test::order_exists(order_id));
+        assert!(market.get_remaining_size(order_id) == 0);
     }
 
-    public fun verify_bulk_order_cleanup(
-        account: address,
-    ) {
-            assert!(!clearinghouse_test::bulk_order_exists(account));
+    public fun verify_bulk_order_cleanup(account: address) {
+        assert!(!clearinghouse_test::bulk_order_exists(account));
     }
 
     // Additional common test helper functions to eliminate duplication
@@ -201,58 +240,80 @@ module aptos_experimental::market_tests_common {
         let event_store = event_utils::new_event_store();
 
         let maker_order_id =
-            place_maker_order(market, maker, 1000, 2000000, true, &mut event_store, use_bulk);
+            place_maker_order(
+                market,
+                maker,
+                1000,
+                2000000,
+                true,
+                &mut event_store,
+                use_bulk
+            );
 
         // Order not filled yet, so size is 0
         verify_positions(maker_addr, taker_addr, 0, 0);
 
-        let (taker_order_id, _) = place_taker_order_and_verify_fill(
-            market,
-            taker,
-            1000,
-            1000000,
-            false,
-            good_till_cancelled(),
-            vector[1000000],
-            vector[1000],
-            maker_addr,
-            vector[maker_order_id],
-            vector[option::none()],
-            vector[2000000],
-            vector[2000000],
-            &mut event_store,
-            false,
-            option::none(),
-            new_test_order_metadata(1),
-            use_bulk,
-            &test_market_callbacks()
-        );
+        let (taker_order_id, _) =
+            place_taker_order_and_verify_fill(
+                market,
+                taker,
+                1000,
+                1000000,
+                false,
+                good_till_cancelled(),
+                vector[1000000],
+                vector[1000],
+                maker_addr,
+                vector[maker_order_id],
+                vector[option::none()],
+                vector[2000000],
+                vector[2000000],
+                &mut event_store,
+                false,
+                option::none(),
+                new_test_order_metadata(1),
+                use_bulk,
+                &test_market_callbacks()
+            );
         verify_positions(maker_addr, taker_addr, 1000000, 1000000);
-        verify_orders_cleanup(market, maker_order_id, taker_order_id, false, true);
-
-        let (taker_order_id2, _) = place_taker_order_and_verify_fill(
+        verify_orders_cleanup(
             market,
-            taker,
-            1000,
-            1000000,
+            maker_order_id,
+            taker_order_id,
             false,
-            good_till_cancelled(),
-            vector[1000000],
-            vector[1000],
-            maker_addr,
-            vector[maker_order_id],
-            vector[option::none()],
-            vector[2000000],
-            vector[1000000],
-            &mut event_store,
-            false,
-            option::none(),
-            new_test_order_metadata(1),
-            use_bulk,
-            &test_market_callbacks()
+            true
         );
+
+        let (taker_order_id2, _) =
+            place_taker_order_and_verify_fill(
+                market,
+                taker,
+                1000,
+                1000000,
+                false,
+                good_till_cancelled(),
+                vector[1000000],
+                vector[1000],
+                maker_addr,
+                vector[maker_order_id],
+                vector[option::none()],
+                vector[2000000],
+                vector[1000000],
+                &mut event_store,
+                false,
+                option::none(),
+                new_test_order_metadata(1),
+                use_bulk,
+                &test_market_callbacks()
+            );
         verify_positions(maker_addr, taker_addr, 2000000, 2000000);
-        verify_orders_cleanup(market, maker_order_id, taker_order_id2, true, true);
+        verify_orders_cleanup(
+            market,
+            maker_order_id,
+            taker_order_id2,
+            true,
+            true
+        );
     }
 
     public fun test_gtc_taker_partially_filled_helper(
@@ -267,37 +328,39 @@ module aptos_experimental::market_tests_common {
         let taker_addr = signer::address_of(taker);
         let event_store = event_utils::new_event_store();
 
-        let maker_order_id = place_maker_order(
-            &mut market,
-            maker,
-            1000,
-            1000000,
-            true,
-            &mut event_store,
-            is_bulk,
-        );
+        let maker_order_id =
+            place_maker_order(
+                &mut market,
+                maker,
+                1000,
+                1000000,
+                true,
+                &mut event_store,
+                is_bulk
+            );
 
-        let (_taker_order_id, _) = place_taker_order_and_verify_fill(
-            &mut market,
-            taker,
-            1000,
-            2000000,
-            false,
-            good_till_cancelled(),
-            vector[1000000],
-            vector[1000],
-            maker_addr,
-            vector[maker_order_id],
-            vector[option::none()],
-            vector[1000000],
-            vector[1000000],
-            &mut event_store,
-            false,
-            option::none(),
-            new_test_order_metadata(2),
-            is_bulk,
-            &test_market_callbacks()
-        );
+        let (_taker_order_id, _) =
+            place_taker_order_and_verify_fill(
+                &mut market,
+                taker,
+                1000,
+                2000000,
+                false,
+                good_till_cancelled(),
+                vector[1000000],
+                vector[1000],
+                maker_addr,
+                vector[maker_order_id],
+                vector[option::none()],
+                vector[1000000],
+                vector[1000000],
+                &mut event_store,
+                false,
+                option::none(),
+                new_test_order_metadata(2),
+                is_bulk,
+                &test_market_callbacks()
+            );
         verify_positions(maker_addr, taker_addr, 1000000, 1000000);
         if (is_bulk) {
             verify_bulk_order_cleanup(maker_addr);
@@ -319,31 +382,33 @@ module aptos_experimental::market_tests_common {
         let maker2_addr = signer::address_of(maker2);
         let event_store = event_utils::new_event_store();
 
-        let maker_order_id = place_maker_order(
-            &mut market,
-            maker1,
-            1000,
-            1000000,
-            true,
-            &mut event_store,
-            is_bulk
-        );
+        let maker_order_id =
+            place_maker_order(
+                &mut market,
+                maker1,
+                1000,
+                1000000,
+                true,
+                &mut event_store,
+                is_bulk
+            );
 
         // Place a post only order that should not match with the maker order
-        let maker2_order_id = place_order_and_verify(
-            &mut market,
-            maker2,
-            option::some(1100),
-            1000000,
-            false, // is_bid
-            post_only(), // order_type
-            &mut event_store,
-            false,
-            false,
-            new_test_order_metadata(1),
-            option::none(),
-            &test_market_callbacks()
-        );
+        let maker2_order_id =
+            place_order_and_verify(
+                &mut market,
+                maker2,
+                option::some(1100),
+                1000000,
+                false, // is_bid
+                post_only(), // order_type
+                &mut event_store,
+                false,
+                false,
+                new_test_order_metadata(1),
+                option::none(),
+                &test_market_callbacks()
+            );
 
         // Make sure no matches triggered by post only order
         verify_positions(maker1_addr, maker2_addr, 0, 0);
@@ -370,31 +435,33 @@ module aptos_experimental::market_tests_common {
         let maker_addr = signer::address_of(maker);
         let taker_addr = signer::address_of(taker);
 
-        let maker_order_id = place_maker_order(
-            &mut market,
-            maker,
-            1000,
-            1000000,
-            true,
-            &mut event_store,
-            is_bulk,
-        );
+        let maker_order_id =
+            place_maker_order(
+                &mut market,
+                maker,
+                1000,
+                1000000,
+                true,
+                &mut event_store,
+                is_bulk
+            );
 
         // Taker order which is marked as post only but will immediately match - this should fail
-        let taker_order_id = place_order_and_verify(
-            &mut market,
-            taker,
-            option::some(1000),
-            1000000,
-            false, // is_bid
-            post_only(), // order_type
-            &mut event_store,
-            true,
-            true,
-            new_test_order_metadata(1),
-            option::none(),
-            &test_market_callbacks()
-        );
+        let taker_order_id =
+            place_order_and_verify(
+                &mut market,
+                taker,
+                option::some(1000),
+                1000000,
+                false, // is_bid
+                post_only(), // order_type
+                &mut event_store,
+                true,
+                true,
+                new_test_order_metadata(1),
+                option::none(),
+                &test_market_callbacks()
+            );
 
         // Make sure no matches triggered by post only order
         verify_positions(maker_addr, taker_addr, 0, 0);
@@ -425,51 +492,55 @@ module aptos_experimental::market_tests_common {
         let maker_addr = signer::address_of(maker);
         let taker_addr = signer::address_of(taker);
 
-        let maker_order_id = place_maker_order(
-            &mut market,
-            maker,
-            1000,
-            1000000,
-            true,
-            &mut event_store,
-            is_bulk,
-        );
+        let maker_order_id =
+            place_maker_order(
+                &mut market,
+                maker,
+                1000,
+                1000000,
+                true,
+                &mut event_store,
+                is_bulk
+            );
 
         // Taker order will be immediately match in the same transaction
         let limit_price =
             if (is_market_order) {
                 1 // Market order has no price, use max to ensure it matches
-            } else {
-                1000
-            };
-        let (taker_order_id, _) = place_taker_order_and_verify_fill(
-            &mut market,
-            taker,
-            limit_price,
-            1000000,
-            false, // is_bid
-            immediate_or_cancel(), // order_type
-            vector[1000000],
-            vector[1000],
-            maker_addr,
-            vector[maker_order_id],
-            vector[option::none()],
-            vector[1000000],
-            vector[1000000],
-            &mut event_store,
-            false,
-            option::none(),
-            new_test_order_metadata(1),
-            is_bulk,
-            &test_market_callbacks()
-        );
+            } else { 1000 };
+        let (taker_order_id, _) =
+            place_taker_order_and_verify_fill(
+                &mut market,
+                taker,
+                limit_price,
+                1000000,
+                false, // is_bid
+                immediate_or_cancel(), // order_type
+                vector[1000000],
+                vector[1000],
+                maker_addr,
+                vector[maker_order_id],
+                vector[option::none()],
+                vector[1000000],
+                vector[1000000],
+                &mut event_store,
+                false,
+                option::none(),
+                new_test_order_metadata(1),
+                is_bulk,
+                &test_market_callbacks()
+            );
 
         verify_positions(maker_addr, taker_addr, 1000000, 1000000);
-        verify_orders_cleanup(&market, maker_order_id, taker_order_id, true, true);
+        verify_orders_cleanup(
+            &market,
+            maker_order_id,
+            taker_order_id,
+            true,
+            true
+        );
         market.destroy_market()
     }
-
-
 
     public fun test_order_partial_match(
         admin: &signer,
@@ -484,47 +555,53 @@ module aptos_experimental::market_tests_common {
         let maker_addr = signer::address_of(maker);
         let taker_addr = signer::address_of(taker);
 
-        let maker_order_id = place_maker_order(
-            &mut market,
-            maker,
-            1000,
-            1000000,
-            true,
-            &mut event_store,
-            is_bulk,
-        );
+        let maker_order_id =
+            place_maker_order(
+                &mut market,
+                maker,
+                1000,
+                1000000,
+                true,
+                &mut event_store,
+                is_bulk
+            );
 
         // Taker order is IOC, which will partially match and remaining will be cancelled
         let limit_price =
             if (is_market_order) {
                 1 // Market order has no price, use minimum to ensure it matches
-            } else {
-                1000
-            };
-        let (taker_order_id, _) = place_taker_order_and_verify_fill(
-            &mut market,
-            taker,
-            limit_price,
-            2000000,
-            false, // is_bid
-            immediate_or_cancel(), // order_type
-            vector[1000000],
-            vector[1000],
-            maker_addr,
-            vector[maker_order_id],
-            vector[option::none()],
-            vector[1000000],
-            vector[1000000],
-            &mut event_store,
-            true,
-            option::none(),
-            new_test_order_metadata(1),
-            is_bulk,
-            &test_market_callbacks()
-        );
+            } else { 1000 };
+        let (taker_order_id, _) =
+            place_taker_order_and_verify_fill(
+                &mut market,
+                taker,
+                limit_price,
+                2000000,
+                false, // is_bid
+                immediate_or_cancel(), // order_type
+                vector[1000000],
+                vector[1000],
+                maker_addr,
+                vector[maker_order_id],
+                vector[option::none()],
+                vector[1000000],
+                vector[1000000],
+                &mut event_store,
+                true,
+                option::none(),
+                new_test_order_metadata(1),
+                is_bulk,
+                &test_market_callbacks()
+            );
 
         verify_positions(maker_addr, taker_addr, 1000000, 1000000);
-        verify_orders_cleanup(&market, maker_order_id, taker_order_id, true, true);
+        verify_orders_cleanup(
+            &market,
+            maker_order_id,
+            taker_order_id,
+            true,
+            true
+        );
         market.destroy_market()
     }
 
@@ -541,15 +618,16 @@ module aptos_experimental::market_tests_common {
         let maker_addr = signer::address_of(maker);
         let taker_addr = signer::address_of(taker);
 
-        let maker_order_id = place_maker_order(
-            &mut market,
-            maker,
-            1000,
-            1000000, // 1 BTC
-            true,
-            &mut event_store,
-            is_bulk,
-        );
+        let maker_order_id =
+            place_maker_order(
+                &mut market,
+                maker,
+                1000,
+                1000000, // 1 BTC
+                true,
+                &mut event_store,
+                is_bulk
+            );
 
         // Taker order is IOC, which will not be matched and should be cancelled
         let limit_price =
@@ -558,20 +636,21 @@ module aptos_experimental::market_tests_common {
             } else {
                 option::some(1200) // Limit price for limit order
             };
-        let taker_order_id = place_order_and_verify(
-            &mut market,
-            taker,
-            limit_price,
-            1000000, // 1 BTC
-            false, // is_bid
-            immediate_or_cancel(), // order_type
-            &mut event_store,
-            true, // Despite it being a "taker", this order will not cross
-            true,
-            new_test_order_metadata(1),
-            option::none(),
-            &test_market_callbacks()
-        );
+        let taker_order_id =
+            place_order_and_verify(
+                &mut market,
+                taker,
+                limit_price,
+                1000000, // 1 BTC
+                false, // is_bid
+                immediate_or_cancel(), // order_type
+                &mut event_store,
+                true, // Despite it being a "taker", this order will not cross
+                true,
+                new_test_order_metadata(1),
+                option::none(),
+                &test_market_callbacks()
+            );
 
         // Make sure no matches triggered by post only order
         verify_positions(maker_addr, taker_addr, 0, 0);
@@ -602,40 +681,42 @@ module aptos_experimental::market_tests_common {
         let taker_addr = signer::address_of(taker);
         let event_store = event_utils::new_event_store();
 
-        let maker_order_id = place_maker_order(
-            &mut market,
-            maker,
-            1000,
-            2000000,
-            true,
-            &mut event_store,
-            is_bulk,
-        );
+        let maker_order_id =
+            place_maker_order(
+                &mut market,
+                maker,
+                1000,
+                2000000,
+                true,
+                &mut event_store,
+                is_bulk
+            );
 
         // Order not filled yet, so size is 0
         verify_positions(maker_addr, taker_addr, 0, 0);
 
-        let (taker_order_id, result) = place_taker_order_and_verify_fill(
-            &mut market,
-            taker,
-            1000,
-            1000000,
-            false,
-            good_till_cancelled(),
-            vector[500000], // Half of the taker order is filled and half is cancelled
-            vector[1000],
-            maker_addr,
-            vector[maker_order_id],
-            vector[option::none()],
-            vector[2000000],
-            vector[2000000],
-            &mut event_store,
-            true,
-            option::none(),
-            new_test_order_metadata(1),
-            is_bulk,
-            &test_market_callbacks_with_taker_cancelled()
-        );
+        let (taker_order_id, result) =
+            place_taker_order_and_verify_fill(
+                &mut market,
+                taker,
+                1000,
+                1000000,
+                false,
+                good_till_cancelled(),
+                vector[500000], // Half of the taker order is filled and half is cancelled
+                vector[1000],
+                maker_addr,
+                vector[maker_order_id],
+                vector[option::none()],
+                vector[2000000],
+                vector[2000000],
+                &mut event_store,
+                true,
+                option::none(),
+                new_test_order_metadata(1),
+                is_bulk,
+                &test_market_callbacks_with_taker_cancelled()
+            );
         // Make sure the taker was cancelled
         assert!(result.get_remaining_size_from_result() == 0);
         let cancel_reason = result.get_cancel_reason();
@@ -652,6 +733,65 @@ module aptos_experimental::market_tests_common {
         market.destroy_market()
     }
 
+    /// Test that when clearinghouse signals stop matching (without a taker cancellation reason),
+    /// the order returns ClearinghouseStoppedMatching as the cancellation reason.
+    public fun test_clearinghouse_stopped_matching_reason_helper(
+        admin: &signer,
+        market_signer: &signer,
+        maker: &signer,
+        taker: &signer
+    ) {
+        let market = setup_market(admin, market_signer);
+        let maker_addr = signer::address_of(maker);
+        let event_store = event_utils::new_event_store();
+
+        // Place a maker order smaller than taker's order
+        let maker_order_id =
+            place_maker_order(
+                &mut market,
+                maker,
+                1000,
+                500000, // Maker order is 500000
+                true,
+                &mut event_store,
+                false // not bulk
+            );
+
+        // Order not filled yet, so size is 0
+        verify_positions(maker_addr, signer::address_of(taker), 0, 0);
+
+        // Place taker order (1000000) larger than maker (500000)
+        // After matching 500000 with maker, clearinghouse signals stop matching
+        // Taker will have 500000 remaining
+        let (_taker_order_id, result) =
+            place_taker_order(
+                &mut market,
+                taker,
+                option::none(), // client_order_id
+                option::some(1000),
+                1000000, // Taker wants to buy 1000000
+                false,
+                good_till_cancelled(),
+                &mut event_store,
+                option::none(), // max_matches
+                new_test_order_metadata(1),
+                &test_market_callbacks_with_stop_matching()
+            );
+
+        // Verify the cancellation reason is ClearinghouseStoppedMatching
+        let cancel_reason = result.get_cancel_reason();
+        assert!(cancel_reason.is_some());
+        assert!(is_clearinghouse_stopped_matching(cancel_reason.destroy_some()));
+
+        // Taker has 500000 remaining (1000000 - 500000 filled)
+        assert!(result.get_remaining_size_from_result() == 500000);
+
+        // Maker order should be fully consumed
+        assert!(!clearinghouse_test::order_exists(maker_order_id));
+
+        market.destroy_market()
+    }
+
     public fun test_self_matching_not_allowed_helper(
         admin: &signer,
         market_signer: &signer,
@@ -664,43 +804,46 @@ module aptos_experimental::market_tests_common {
         let maker2_addr = signer::address_of(maker2);
         let event_store = event_utils::new_event_store();
 
-        let maker1_order_id = place_maker_order(
-            &mut market,
-            maker1,
-            1001,
-            2000000,
-            true,
-            &mut event_store,
-            is_bulk,
-        );
+        let maker1_order_id =
+            place_maker_order(
+                &mut market,
+                maker1,
+                1001,
+                2000000,
+                true,
+                &mut event_store,
+                is_bulk
+            );
 
-        let maker2_order_id = place_maker_order(
-            &mut market,
-            maker2,
-            1000,
-            2000000,
-            true,
-            &mut event_store,
-            is_bulk,
-        );
+        let maker2_order_id =
+            place_maker_order(
+                &mut market,
+                maker2,
+                1000,
+                2000000,
+                true,
+                &mut event_store,
+                is_bulk
+            );
 
         // Order not filled yet, so size is 0
         assert!(get_position_size(maker1_addr) == 0);
 
         // This should result in a self match order which should be cancelled and maker2 order should be filled
-        let (taker_order_id, _) = place_taker_order(
-            &mut market,
-            maker1,
-            option::none(),
-            option::some(1000),
-            1000000,
-            false,
-            good_till_cancelled(),
-            &mut event_store,
-            option::none(),
-            new_test_order_metadata(1),
-            &test_market_callbacks()
-        );
+        let (taker_order_id, _) =
+            place_taker_order(
+                &mut market,
+                maker1,
+                option::none(),
+                option::some(1000),
+                1000000,
+                false,
+                good_till_cancelled(),
+                &mut event_store,
+                option::none(),
+                new_test_order_metadata(1),
+                &test_market_callbacks()
+            );
 
         verify_cancel_event(
             &mut market,
@@ -771,43 +914,46 @@ module aptos_experimental::market_tests_common {
         let maker1_addr = signer::address_of(maker1);
         let event_store = event_utils::new_event_store();
 
-        let maker1_order_id = place_maker_order(
-            &mut market,
-            maker1,
-            1001,
-            2000000,
-            true,
-            &mut event_store,
-            is_bulk,
-        );
+        let maker1_order_id =
+            place_maker_order(
+                &mut market,
+                maker1,
+                1001,
+                2000000,
+                true,
+                &mut event_store,
+                is_bulk
+            );
 
-        let _ = place_maker_order(
-            &mut market,
-            maker2,
-            1000,
-            2000000,
-            true,
-            &mut event_store,
-            is_bulk,
-        );
+        let _ =
+            place_maker_order(
+                &mut market,
+                maker2,
+                1000,
+                2000000,
+                true,
+                &mut event_store,
+                is_bulk
+            );
 
         // Order not filled yet, so size is 0
         assert!(get_position_size(maker1_addr) == 0);
 
         // This should result in a self match order which should be matched against self.
-        let (taker_order_id, _) = place_taker_order(
-            &mut market,
-            maker1,
-            option::some(std::string::utf8(b"1")),
-            option::some(1000),
-            1000000,
-            false,
-            good_till_cancelled(),
-            &mut event_store,
-            option::none(),
-            new_test_order_metadata(1),
-            &test_market_callbacks()
-        );
+        let (taker_order_id, _) =
+            place_taker_order(
+                &mut market,
+                maker1,
+                option::some(std::string::utf8(b"1")),
+                option::some(1000),
+                1000000,
+                false,
+                good_till_cancelled(),
+                &mut event_store,
+                option::none(),
+                new_test_order_metadata(1),
+                &test_market_callbacks()
+            );
 
         if (is_bulk) {
             verify_fills_with_bulk(

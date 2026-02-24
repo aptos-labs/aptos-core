@@ -4,7 +4,7 @@
 use crate::{
     common::MAX_NUM_EPOCH_ENDING_LEDGER_INFO,
     db::{
-        aptosdb_internal::{error_if_too_many_requested, gauged_api, get_first_seq_num_and_limit},
+        aptosdb_internal::{error_if_too_many_requested, gauged_api},
         AptosDB,
     },
     pruner::PrunerManager,
@@ -16,15 +16,14 @@ use aptos_storage_interface::{
     state_store::{
         state::State, state_summary::StateSummary, state_view::hot_state_view::HotStateView,
     },
-    AptosDbError, BlockHeight, DbReader, LedgerSummary, Order, Result, MAX_REQUEST_LIMIT,
+    AptosDbError, BlockHeight, DbReader, LedgerSummary, Result, MAX_REQUEST_LIMIT,
 };
 use aptos_types::{
     account_address::AccountAddress,
-    account_config::{new_block_event_key, NewBlockEvent},
+    account_config::NewBlockEvent,
     contract_event::{ContractEvent, EventWithVersion},
     epoch_change::EpochChangeProof,
     epoch_state::EpochState,
-    event::EventKey,
     ledger_info::LedgerInfoWithSignatures,
     proof::{
         accumulator::InMemoryAccumulator, AccumulatorConsistencyProof, SparseMerkleProofExt,
@@ -33,17 +32,17 @@ use aptos_types::{
     },
     state_proof::StateProof,
     state_store::{
-        state_key::{prefix::StateKeyPrefix, StateKey},
+        state_key::StateKey,
         state_storage_usage::StateStorageUsage,
         state_value::{StateValue, StateValueChunkWithProof},
         table::{TableHandle, TableInfo},
     },
     transaction::{
-        AccountOrderedTransactionsWithProof, IndexedTransactionSummary, PersistedAuxiliaryInfo,
-        Transaction, TransactionAuxiliaryData, TransactionInfo, TransactionListWithAuxiliaryInfos,
-        TransactionListWithProof, TransactionListWithProofV2, TransactionOutput,
-        TransactionOutputListWithAuxiliaryInfos, TransactionOutputListWithProof,
-        TransactionOutputListWithProofV2, TransactionWithProof, Version,
+        IndexedTransactionSummary, PersistedAuxiliaryInfo, Transaction, TransactionAuxiliaryData,
+        TransactionInfo, TransactionListWithAuxiliaryInfos, TransactionListWithProof,
+        TransactionListWithProofV2, TransactionOutput, TransactionOutputListWithAuxiliaryInfos,
+        TransactionOutputListWithProof, TransactionOutputListWithProofV2, TransactionWithProof,
+        Version,
     },
     write_set::WriteSet,
 };
@@ -72,27 +71,6 @@ impl DbReader for AptosDB {
             let (ledger_info_with_sigs, more) =
                 Self::get_epoch_ending_ledger_infos(self, start_epoch, end_epoch)?;
             Ok(EpochChangeProof::new(ledger_info_with_sigs, more))
-        })
-    }
-
-    fn get_prefixed_state_value_iterator(
-        &self,
-        key_prefix: &StateKeyPrefix,
-        cursor: Option<&StateKey>,
-        version: Version,
-    ) -> Result<Box<dyn Iterator<Item = Result<(StateKey, StateValue)>> + '_>> {
-        gauged_api("get_prefixed_state_value_iterator", || {
-            ensure!(
-                !self.state_kv_db.enabled_sharding(),
-                "This API is not supported with sharded DB"
-            );
-            self.error_if_state_kv_pruned("StateValue", version)?;
-
-            Ok(Box::new(
-                self.state_store
-                    .get_prefixed_state_value_iterator(key_prefix, cursor, version)?,
-            )
-                as Box<dyn Iterator<Item = Result<(StateKey, StateValue)>>>)
         })
     }
 
@@ -137,60 +115,6 @@ impl DbReader for AptosDB {
     fn get_pre_committed_version(&self) -> Result<Option<Version>> {
         gauged_api("get_pre_committed_version", || {
             Ok(self.state_store.current_state_locked().version())
-        })
-    }
-
-    fn get_account_ordered_transaction(
-        &self,
-        address: AccountAddress,
-        seq_num: u64,
-        include_events: bool,
-        ledger_version: Version,
-    ) -> Result<Option<TransactionWithProof>> {
-        gauged_api("get_account_transaction", || {
-            ensure!(
-                !self.state_kv_db.enabled_sharding(),
-                "This API is not supported with sharded DB"
-            );
-            self.transaction_store
-                .get_account_ordered_transaction_version(address, seq_num, ledger_version)?
-                .map(|txn_version| {
-                    self.get_transaction_with_proof(txn_version, ledger_version, include_events)
-                })
-                .transpose()
-        })
-    }
-
-    fn get_account_ordered_transactions(
-        &self,
-        address: AccountAddress,
-        start_seq_num: u64,
-        limit: u64,
-        include_events: bool,
-        ledger_version: Version,
-    ) -> Result<AccountOrderedTransactionsWithProof> {
-        gauged_api("get_account_ordered_transactions", || {
-            ensure!(
-                !self.state_kv_db.enabled_sharding(),
-                "This API is not supported with sharded DB"
-            );
-            error_if_too_many_requested(limit, MAX_REQUEST_LIMIT)?;
-
-            let txns_with_proofs = self
-                .transaction_store
-                .get_account_ordered_transactions_iter(
-                    address,
-                    start_seq_num,
-                    limit,
-                    ledger_version,
-                )?
-                .map(|result| {
-                    let (_seq_num, txn_version) = result?;
-                    self.get_transaction_with_proof(txn_version, ledger_version, include_events)
-                })
-                .collect::<Result<Vec<_>>>()?;
-
-            Ok(AccountOrderedTransactionsWithProof::new(txns_with_proofs))
         })
     }
 
@@ -336,22 +260,6 @@ impl DbReader for AptosDB {
     fn get_first_viable_block(&self) -> Result<(Version, BlockHeight)> {
         gauged_api("get_first_viable_block", || {
             let min_version = self.ledger_pruner.get_min_viable_version();
-            if !self.skip_index_and_usage {
-                let (block_version, index, _seq_num) = self
-                    .event_store
-                    .lookup_event_at_or_after_version(&new_block_event_key(), min_version)?
-                    .ok_or_else(|| {
-                        AptosDbError::NotFound(format!(
-                            "NewBlockEvent at or after version {}",
-                            min_version
-                        ))
-                    })?;
-                let event = self
-                    .event_store
-                    .get_event_by_version_and_index(block_version, index)?;
-                return Ok((block_version, event.expect_new_block_event()?.height()));
-            }
-
             self.ledger_db
                 .metadata_db()
                 .get_block_height_at_or_after_version(min_version)
@@ -457,20 +365,6 @@ impl DbReader for AptosDB {
                 as Box<
                     dyn Iterator<Item = Result<PersistedAuxiliaryInfo>> + '_,
                 >)
-        })
-    }
-
-    /// TODO(bowu): Deprecate after internal index migration
-    fn get_events(
-        &self,
-        event_key: &EventKey,
-        start: u64,
-        order: Order,
-        limit: u64,
-        ledger_version: Version,
-    ) -> Result<Vec<EventWithVersion>> {
-        gauged_api("get_events", || {
-            self.get_events_by_event_key(event_key, start, order, limit, ledger_version)
         })
     }
 
@@ -742,15 +636,6 @@ impl DbReader for AptosDB {
     fn get_latest_block_events(&self, num_events: usize) -> Result<Vec<EventWithVersion>> {
         gauged_api("get_latest_block_events", || {
             let latest_version = self.get_synced_version()?;
-            if !self.skip_index_and_usage {
-                return self.get_events(
-                    &new_block_event_key(),
-                    u64::MAX,
-                    Order::Descending,
-                    num_events as u64,
-                    latest_version.unwrap_or(0),
-                );
-            }
 
             let db = self.ledger_db.metadata_db_arc();
             let mut iter = db.rev_iter::<BlockInfoSchema>()?;
@@ -926,6 +811,7 @@ impl DbReader for AptosDB {
             Ok(self
                 .state_store
                 .state_db
+                .state_pruner
                 .state_merkle_pruner
                 .is_pruner_enabled())
         })
@@ -936,6 +822,7 @@ impl DbReader for AptosDB {
             Ok(self
                 .state_store
                 .state_db
+                .state_pruner
                 .epoch_snapshot_pruner
                 .get_prune_window() as usize)
         })
@@ -1097,81 +984,6 @@ impl AptosDB {
             events,
             proof,
         })
-    }
-
-    /// TODO(bowu): Deprecate after internal index migration
-    pub(super) fn get_events_by_event_key(
-        &self,
-        event_key: &EventKey,
-        start_seq_num: u64,
-        order: Order,
-        limit: u64,
-        ledger_version: Version,
-    ) -> Result<Vec<EventWithVersion>> {
-        ensure!(
-            !self.state_kv_db.enabled_sharding(),
-            "This API is deprecated for sharded DB"
-        );
-        error_if_too_many_requested(limit, MAX_REQUEST_LIMIT)?;
-        let get_latest = order == Order::Descending && start_seq_num == u64::MAX;
-
-        let cursor = if get_latest {
-            // Caller wants the latest, figure out the latest seq_num.
-            // In the case of no events on that path, use 0 and expect empty result below.
-            self.event_store
-                .get_latest_sequence_number(ledger_version, event_key)?
-                .unwrap_or(0)
-        } else {
-            start_seq_num
-        };
-
-        // Convert requested range and order to a range in ascending order.
-        let (first_seq, real_limit) = get_first_seq_num_and_limit(order, cursor, limit)?;
-
-        // Query the index.
-        let mut event_indices = self.event_store.lookup_events_by_key(
-            event_key,
-            first_seq,
-            real_limit,
-            ledger_version,
-        )?;
-
-        // When descending, it's possible that user is asking for something beyond the latest
-        // sequence number, in which case we will consider it a bad request and return an empty
-        // list.
-        // For example, if the latest sequence number is 100, and the caller is asking for 110 to
-        // 90, we will get 90 to 100 from the index lookup above. Seeing that the last item
-        // is 100 instead of 110 tells us 110 is out of bound.
-        if order == Order::Descending {
-            if let Some((seq_num, _, _)) = event_indices.last() {
-                if *seq_num < cursor {
-                    event_indices = Vec::new();
-                }
-            }
-        }
-
-        let mut events_with_version = event_indices
-            .into_iter()
-            .map(|(seq, ver, idx)| {
-                let event = self.event_store.get_event_by_version_and_index(ver, idx)?;
-                let v0 = match &event {
-                    ContractEvent::V1(event) => event,
-                    ContractEvent::V2(_) => bail!("Unexpected module event"),
-                };
-                ensure!(
-                    seq == v0.sequence_number(),
-                    "Index broken, expected seq:{}, actual:{}",
-                    seq,
-                    v0.sequence_number()
-                );
-                Ok(EventWithVersion::new(ver, event))
-            })
-            .collect::<Result<Vec<_>>>()?;
-        if order == Order::Descending {
-            events_with_version.reverse();
-        }
-
-        Ok(events_with_version)
     }
 
     /// TODO(jill): deprecate Indexer once Indexer Async V2 is ready

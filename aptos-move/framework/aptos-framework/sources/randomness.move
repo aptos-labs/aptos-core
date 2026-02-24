@@ -25,42 +25,46 @@ module aptos_framework::randomness {
     /// `#[randomness]` annotation. Otherwise, malicious users can bias randomness result.
     const E_API_USE_IS_BIASIBLE: u64 = 1;
 
-    const MAX_U256: u256 = 115792089237316195423570985008687907853269984665640564039457584007913129639935;
+    const MAX_U256: u256 =
+        115792089237316195423570985008687907853269984665640564039457584007913129639935;
 
     /// 32-byte randomness seed unique to every block.
     /// This resource is updated in every block prologue.
     struct PerBlockRandomness has drop, key {
         epoch: u64,
         round: u64,
-        seed: Option<vector<u8>>,
+        seed: Option<vector<u8>>
     }
 
     #[event]
     /// Event emitted every time a public randomness API in this module is called.
-    struct RandomnessGeneratedEvent has store, drop {
-    }
+    struct RandomnessGeneratedEvent has store, drop {}
 
     /// Called in genesis.move.
     /// Must be called in tests to initialize the `PerBlockRandomness` resource.
     public fun initialize(framework: &signer) {
         system_addresses::assert_aptos_framework(framework);
         if (!exists<PerBlockRandomness>(@aptos_framework)) {
-            move_to(framework, PerBlockRandomness {
-                epoch: 0,
-                round: 0,
-                seed: option::none(),
-            });
+            move_to(
+                framework,
+                PerBlockRandomness { epoch: 0, round: 0, seed: option::none() }
+            );
         }
     }
 
     #[test_only]
-    public fun initialize_for_testing(framework: &signer) acquires  PerBlockRandomness {
+    public fun initialize_for_testing(framework: &signer) acquires PerBlockRandomness {
         initialize(framework);
         set_seed(x"0000000000000000000000000000000000000000000000000000000000000000");
     }
 
     /// Invoked in block prologues to update the block-level randomness seed.
-    public(friend) fun on_new_block(vm: &signer, epoch: u64, round: u64, seed_for_new_block: Option<vector<u8>>) acquires PerBlockRandomness {
+    public(friend) fun on_new_block(
+        vm: &signer,
+        epoch: u64,
+        round: u64,
+        seed_for_new_block: Option<vector<u8>>
+    ) acquires PerBlockRandomness {
         system_addresses::assert_vm(vm);
         if (exists<PerBlockRandomness>(@aptos_framework)) {
             let randomness = borrow_global_mut<PerBlockRandomness>(@aptos_framework);
@@ -302,7 +306,7 @@ module aptos_framework::randomness {
 
         let values = vector[];
 
-        if(n == 0) {
+        if (n == 0) {
             return vector[]
         };
 
@@ -353,17 +357,26 @@ module aptos_framework::randomness {
         let a_clone = a;
         let neg_b = m - b;
         let a_less = a < neg_b;
-        take_first(if (a_less) { a + b } else { a_clone - neg_b }, if (!a_less) { a_clone - neg_b } else { a + b })
+        take_first(
+            if (a_less) { a + b }
+            else {
+                a_clone - neg_b
+            },
+            if (!a_less) {
+                a_clone - neg_b
+            } else { a + b }
+        )
     }
 
-    fun take_first(x: u256, _y: u256 ): u256 { x }
+    fun take_first(x: u256, _y: u256): u256 {
+        x
+    }
 
     #[verify_only]
     fun safe_add_mod_for_verification(a: u256, b: u256, m: u256): u256 {
         let neg_b = m - b;
-        if (a < neg_b) {
-            a + b
-        } else {
+        if (a < neg_b) { a + b }
+        else {
             a - neg_b
         }
     }
@@ -384,13 +397,69 @@ module aptos_framework::randomness {
         assert!(2 == safe_add_mod(4, 3, 5), 1);
         assert!(7 == safe_add_mod(3, 4, 9), 1);
         assert!(7 == safe_add_mod(4, 3, 9), 1);
-        assert!(0xfffffffffffffffffffffffffffffffffffffffffffffffe == safe_add_mod(0xfffffffffffffffffffffffffffffffffffffffffffffffd, 0x000000000000000000000000000000000000000000000001, 0xffffffffffffffffffffffffffffffffffffffffffffffff), 1);
-        assert!(0xfffffffffffffffffffffffffffffffffffffffffffffffe == safe_add_mod(0x000000000000000000000000000000000000000000000001, 0xfffffffffffffffffffffffffffffffffffffffffffffffd, 0xffffffffffffffffffffffffffffffffffffffffffffffff), 1);
-        assert!(0x000000000000000000000000000000000000000000000000 == safe_add_mod(0xfffffffffffffffffffffffffffffffffffffffffffffffd, 0x000000000000000000000000000000000000000000000002, 0xffffffffffffffffffffffffffffffffffffffffffffffff), 1);
-        assert!(0x000000000000000000000000000000000000000000000000 == safe_add_mod(0x000000000000000000000000000000000000000000000002, 0xfffffffffffffffffffffffffffffffffffffffffffffffd, 0xffffffffffffffffffffffffffffffffffffffffffffffff), 1);
-        assert!(0x000000000000000000000000000000000000000000000001 == safe_add_mod(0xfffffffffffffffffffffffffffffffffffffffffffffffd, 0x000000000000000000000000000000000000000000000003, 0xffffffffffffffffffffffffffffffffffffffffffffffff), 1);
-        assert!(0x000000000000000000000000000000000000000000000001 == safe_add_mod(0x000000000000000000000000000000000000000000000003, 0xfffffffffffffffffffffffffffffffffffffffffffffffd, 0xffffffffffffffffffffffffffffffffffffffffffffffff), 1);
-        assert!(0xfffffffffffffffffffffffffffffffffffffffffffffffd == safe_add_mod(0xfffffffffffffffffffffffffffffffffffffffffffffffe, 0xfffffffffffffffffffffffffffffffffffffffffffffffe, 0xffffffffffffffffffffffffffffffffffffffffffffffff), 1);
+        assert!(
+            0xfffffffffffffffffffffffffffffffffffffffffffffffe
+                == safe_add_mod(
+                    0xfffffffffffffffffffffffffffffffffffffffffffffffd,
+                    0x000000000000000000000000000000000000000000000001,
+                    0xffffffffffffffffffffffffffffffffffffffffffffffff
+                ),
+            1
+        );
+        assert!(
+            0xfffffffffffffffffffffffffffffffffffffffffffffffe
+                == safe_add_mod(
+                    0x000000000000000000000000000000000000000000000001,
+                    0xfffffffffffffffffffffffffffffffffffffffffffffffd,
+                    0xffffffffffffffffffffffffffffffffffffffffffffffff
+                ),
+            1
+        );
+        assert!(
+            0x000000000000000000000000000000000000000000000000
+                == safe_add_mod(
+                    0xfffffffffffffffffffffffffffffffffffffffffffffffd,
+                    0x000000000000000000000000000000000000000000000002,
+                    0xffffffffffffffffffffffffffffffffffffffffffffffff
+                ),
+            1
+        );
+        assert!(
+            0x000000000000000000000000000000000000000000000000
+                == safe_add_mod(
+                    0x000000000000000000000000000000000000000000000002,
+                    0xfffffffffffffffffffffffffffffffffffffffffffffffd,
+                    0xffffffffffffffffffffffffffffffffffffffffffffffff
+                ),
+            1
+        );
+        assert!(
+            0x000000000000000000000000000000000000000000000001
+                == safe_add_mod(
+                    0xfffffffffffffffffffffffffffffffffffffffffffffffd,
+                    0x000000000000000000000000000000000000000000000003,
+                    0xffffffffffffffffffffffffffffffffffffffffffffffff
+                ),
+            1
+        );
+        assert!(
+            0x000000000000000000000000000000000000000000000001
+                == safe_add_mod(
+                    0x000000000000000000000000000000000000000000000003,
+                    0xfffffffffffffffffffffffffffffffffffffffffffffffd,
+                    0xffffffffffffffffffffffffffffffffffffffffffffffff
+                ),
+            1
+        );
+        assert!(
+            0xfffffffffffffffffffffffffffffffffffffffffffffffd
+                == safe_add_mod(
+                    0xfffffffffffffffffffffffffffffffffffffffffffffffe,
+                    0xfffffffffffffffffffffffffffffffffffffffffffffffe,
+                    0xffffffffffffffffffffffffffffffffffffffffffffffff
+                ),
+            1
+        );
     }
 
     #[test(fx = @aptos_framework)]
@@ -523,7 +592,7 @@ module aptos_framework::randomness {
 
         for (i in 0..n) {
             let bit = present.borrow(i);
-            if(*bit == false) {
+            if (*bit == false) {
                 return false
             };
         };
@@ -558,12 +627,12 @@ module aptos_framework::randomness {
         let permutations = table_with_length::new<vector<u64>, bool>();
 
         // This loop will not exit until all permutations are created
-        while(permutations.length() < num_permutations) {
+        while (permutations.length() < num_permutations) {
             let v = permutation(size);
             assert!(v.length() == size, 0);
             assert!(is_permutation(&v), 0);
 
-            if(permutations.contains(v) == false) {
+            if (permutations.contains(v) == false) {
                 permutations.add(v, true);
             }
         };

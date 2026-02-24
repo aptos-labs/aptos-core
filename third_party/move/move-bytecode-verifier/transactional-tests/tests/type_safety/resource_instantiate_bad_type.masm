@@ -1,0 +1,15 @@
+//# publish
+module 0x42::Test
+struct A
+  b: bool
+
+struct B
+  b: bool
+
+struct T
+  ft: B
+
+public fun t1(l0: A): T
+    move_loc l0
+    pack T
+    ret

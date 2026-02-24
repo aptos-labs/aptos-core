@@ -61,6 +61,7 @@ pub struct BlockExecutorLocalConfig {
     // (allow_fallback needs to be set)
     pub discard_failed_blocks: bool,
     pub module_cache_config: BlockExecutorModuleCacheLocalConfig,
+    pub enable_pre_write: bool,
 }
 
 impl BlockExecutorLocalConfig {
@@ -75,6 +76,7 @@ impl BlockExecutorLocalConfig {
             allow_fallback: true,
             discard_failed_blocks: false,
             module_cache_config: BlockExecutorModuleCacheLocalConfig::default(),
+            enable_pre_write: true,
         }
     }
 }

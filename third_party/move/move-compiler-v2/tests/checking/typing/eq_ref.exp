@@ -17,10 +17,10 @@ module 0x42::m {
 // -- Sourcified model before first bytecode pipeline
 module 0x42::m {
     fun mut_ref_to_mut_ref(x: u64, y: u64) {
-        /*freeze*/&mut x == /*freeze*/&mut y;
+        &mut x == &mut y;
     }
     fun mut_ref_to_ref(x: u64, y: u64) {
-        /*freeze*/&mut x == &y;
+        &mut x == &y;
     }
     fun ref_to_ref(x: u64, y: u64) {
         &x == &y;

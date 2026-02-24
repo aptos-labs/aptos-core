@@ -1,0 +1,32 @@
+//# publish
+module 0x1::M
+use 0x1::signer
+struct R has key
+  x: bool
+
+public fun test(l0: &signer) acquires R
+    local l1: bool
+    copy_loc l0
+    ld_false
+    pack R
+    move_to R
+    move_loc l0
+    call signer::address_of
+    move_from R
+    unpack R
+    st_loc l1
+    ret
+
+
+
+//# run --signers 0x1
+script
+use 0x1::M
+entry public fun main(l0: signer)
+    borrow_loc l0
+    call M::test
+    ret
+
+
+
+//# view --address 0x1 --resource 0x1::M::R

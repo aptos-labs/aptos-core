@@ -1,0 +1,27 @@
+//# publish
+module 0x22::a
+use 0x1::string
+public fun test()
+    local l0: vector<u8>
+    vec_pack <u8>, 0
+    st_loc l0
+    borrow_loc l0
+    call string::internal_check_utf8
+    pop
+    ret
+
+
+
+//# run 0x22::a::test
+
+//# run --signers 0x1
+script
+use 0x1::string
+entry public fun main(l0: signer)
+    local l1: vector<u8>
+    vec_pack <u8>, 0
+    st_loc l1
+    borrow_loc l1
+    call string::internal_check_utf8
+    pop
+    ret

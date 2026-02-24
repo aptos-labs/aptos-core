@@ -3,9 +3,9 @@
 
 use aptos_framework::extended_checks;
 use aptos_types::account_address::AccountAddress;
-use move_cli::base::prove::run_move_prover;
 use move_model::metadata::{CompilerVersion, LanguageVersion};
 use move_package::CompilerConfig;
+use move_prover::package_prove::run_move_prover;
 use std::{collections::BTreeMap, path::PathBuf};
 use tempfile::tempdir;
 

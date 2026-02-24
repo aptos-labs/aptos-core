@@ -174,7 +174,23 @@ impl LogEntry {
                         serde_json::Value::String(TruncatedLogString::from(d.to_string()).into())
                     },
                     Value::Serde(s) => match serde_json::to_value(s) {
-                        Ok(value) => value,
+                        Ok(value) => {
+                            // Check if the serialized JSON string is too long
+                            let json_string = match serde_json::to_string(&value) {
+                                Ok(s) => s,
+                                Err(_) => return, // Skip if we can't serialize
+                            };
+                            // Only truncate if the string representation exceeds the limit
+                            if json_string.len() > *RUST_LOG_FIELD_MAX_LEN {
+                                // Convert to truncated string to prevent excessive log size
+                                serde_json::Value::String(
+                                    TruncatedLogString::from(json_string).into(),
+                                )
+                            } else {
+                                // Keep original value to preserve JSON types (numbers, booleans, etc.)
+                                value
+                            }
+                        },
                         Err(e) => {
                             // Log and skip the value that can't be serialized
                             eprintln!("error serializing structured log: {} for key {:?}", e, key);

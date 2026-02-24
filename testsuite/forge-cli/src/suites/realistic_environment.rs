@@ -329,8 +329,6 @@ pub(crate) fn realistic_env_graceful_overload(duration: Duration) -> ForgeConfig
         )
         .with_validator_override_node_config_fn(Arc::new(|config, _| {
             config.execution.processed_transactions_detailed_counters = true;
-            // TODO(georgemitenkov): remove once features are added to default config.
-            config.execution.async_runtime_checks = true;
         }))
         .with_genesis_helm_config_fn(Arc::new(|helm_values| {
             helm_values["chain"]["epoch_duration_secs"] = 300.into();
@@ -464,8 +462,6 @@ pub(crate) fn realistic_env_max_load_test(
             config
                 .consensus_observer
                 .observer_fallback_sync_lag_threshold_ms = 45_000; // 45 seconds
-                                                                   // TODO(georgemitenkov): remove once features are added to default config.
-            config.execution.async_runtime_checks = true;
         }))
         // First start higher gas-fee traffic, to not cause issues with TxnEmitter setup - account creation
         .with_emit_job(
@@ -521,9 +517,6 @@ pub(crate) fn realistic_network_tuned_for_throughput_test() -> ForgeConfig {
                 if USE_CRAZY_MACHINES {
                     config.execution.concurrency_level = 48;
                 }
-
-                // TODO(georgemitenkov): remove once features are added to default config.
-                config.execution.async_runtime_checks = true;
             }))
             .with_genesis_helm_config_fn(Arc::new(move |helm_values| {
                 let mut on_chain_execution_config = OnChainExecutionConfig::default_for_genesis();

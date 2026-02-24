@@ -249,7 +249,7 @@ impl BatchGenerator {
         counters::CREATED_BATCHES_COUNT.inc();
         counters::num_txn_per_batch(bucket_start.to_string().as_str(), txns.len());
 
-        if self.config.enable_batch_v2 {
+        if self.config.enable_batch_v2_tx {
             Batch::new_v2(
                 batch_id,
                 txns,
@@ -310,6 +310,18 @@ impl BatchGenerator {
                 batches.push(batch);
                 *total_batches_remaining = total_batches_remaining.saturating_sub(1);
                 txns_remaining -= num_batch_txns;
+            } else {
+                // First transaction exceeds sender_max_batch_bytes - skip to avoid infinite loop
+                if let Some(txn) = txns.drain(0..1).next() {
+                    warn!(
+                        "Skipping transaction that exceeds sender_max_batch_bytes ({} bytes): sender={}, size={}",
+                        self.config.sender_max_batch_bytes,
+                        txn.sender(),
+                        txn.txn_bytes_len()
+                    );
+                    counters::BATCH_GENERATOR_SKIPPED_OVERSIZED_TXN.inc();
+                }
+                txns_remaining -= 1;
             }
         }
     }
@@ -336,7 +348,7 @@ impl BatchGenerator {
         let mut batches = vec![];
 
         // Only categorize and separate transactions when BatchV2 is enabled
-        if self.config.enable_batch_v2 {
+        if self.config.enable_batch_v2_tx {
             // Group transactions by their batch kind
             let mut txns_by_kind: HashMap<BatchKind, Vec<SignedTransaction>> = HashMap::new();
 
@@ -570,7 +582,7 @@ impl BatchGenerator {
                             self.batch_writer.persist(persist_requests);
                             counters::BATCH_CREATION_PERSIST_LATENCY.observe_duration(persist_start.elapsed());
 
-                            if self.config.enable_batch_v2 {
+                            if self.config.enable_batch_v2_tx {
                                 network_sender.broadcast_batch_msg_v2(batches).await;
                             } else {
                                 let batches = batches.into_iter().map(|batch| {

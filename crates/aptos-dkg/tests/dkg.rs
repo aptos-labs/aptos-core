@@ -1,12 +1,12 @@
 // Copyright (c) Aptos Foundation
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
-use aptos_crypto::{blstrs::random_scalar, hash::CryptoHash, traits::SecretSharingConfig as _};
+use aptos_crypto::{blstrs::random_scalar, hash::CryptoHash, traits::TSecretSharingConfig as _};
 use aptos_dkg::pvss::{
     das::{self, unweighted_protocol},
     insecure_field,
     test_utils::{self, reconstruct_dealt_secret_key_randomly, NoAux},
-    traits::transcript::AggregatableTranscript,
+    traits::{transcript::AggregatableTranscript, TranscriptCore},
     weighted::generic_weighting::GenericWeighting,
 };
 use rand::{rngs::StdRng, thread_rng};
@@ -25,7 +25,7 @@ fn test_dkg_all_unweighted() {
 #[test]
 fn test_dkg_all_weighted() {
     let mut rng = thread_rng();
-    let wcs = test_utils::get_weighted_configs_for_testing();
+    let wcs: Vec<_> = test_utils::get_weighted_configs_for_testing();
     let seed = random_scalar(&mut rng);
 
     aggregatable_dkg::<GenericWeighting<unweighted_protocol::Transcript>>(
@@ -36,17 +36,15 @@ fn test_dkg_all_weighted() {
     aggregatable_dkg::<das::WeightedTranscript>(wcs.last().unwrap(), seed.to_bytes_le());
 }
 
-use aptos_dkg::pvss::traits::Transcript;
-
 /// Deals `n` times, aggregates all transcripts, and attempts to reconstruct the secret dealt in this
 /// aggregated transcript.
 fn aggregatable_dkg<T: AggregatableTranscript + CryptoHash>(
-    sc: &<T as Transcript>::SecretSharingConfig,
+    sc: &<T as TranscriptCore>::SecretSharingConfig,
     seed_bytes: [u8; 32],
 ) {
     let mut rng = StdRng::from_seed(seed_bytes);
 
-    let d = test_utils::setup_dealing::<T, StdRng>(sc, &mut rng);
+    let d = test_utils::setup_dealing::<T, StdRng>(sc, None, &mut rng);
 
     let mut trxs = vec![];
 

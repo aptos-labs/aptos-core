@@ -11,7 +11,7 @@ script {
 //# run
 script {
     fun main() {
-        let _v0 = 1u8 + 255u8;
+        let _v0 = 1u8 + MAX_U8;
     }
 }
 
@@ -99,7 +99,7 @@ script {
 //# run
 script {
     fun main() {
-        let _v0 = 255u8 / 0u8;
+        let _v0 = MAX_U8 / 0u8;
     }
 }
 
@@ -131,6 +131,6 @@ script {
 //# run
 script {
     fun main() {
-        let _v0 = 255u8 % 0u8;
+        let _v0 = MAX_U8 % 0u8;
     }
 }

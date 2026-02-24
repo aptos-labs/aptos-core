@@ -575,10 +575,17 @@ impl QuorumStoreSender for NetworkSender {
                 Ok(BatchResponse::Batch(*batch))
             },
             ConsensusMsg::BatchResponseV2(maybe_batch) => {
-                if let BatchResponse::Batch(batch) = maybe_batch.as_ref() {
-                    batch.verify_with_digest(request_digest)?;
+                match maybe_batch.as_ref() {
+                    BatchResponse::Batch(batch) => {
+                        batch.verify_with_digest(request_digest)?;
+                    },
+                    BatchResponse::BatchV2(batch) => {
+                        batch.verify_with_digest(request_digest)?;
+                    },
+                    BatchResponse::NotFound(_) => {
+                        // Note: NotFound(ledger_info) is verified later with a ValidatorVerifier
+                    },
                 }
-                // Note BatchResponse::NotFound(ledger_info) is verified later with a ValidatorVerifier
                 Ok(*maybe_batch)
             },
             _ => Err(anyhow!("Invalid batch response")),
@@ -821,8 +828,11 @@ impl NetworkTask {
                         .inc();
                     match msg {
                         quorum_store_msg @ (ConsensusMsg::SignedBatchInfo(_)
+                        | ConsensusMsg::SignedBatchInfoMsgV2(_)
                         | ConsensusMsg::BatchMsg(_)
-                        | ConsensusMsg::ProofOfStoreMsg(_)) => {
+                        | ConsensusMsg::BatchMsgV2(_)
+                        | ConsensusMsg::ProofOfStoreMsg(_)
+                        | ConsensusMsg::ProofOfStoreMsgV2(_)) => {
                             Self::push_msg(
                                 peer_id,
                                 quorum_store_msg,

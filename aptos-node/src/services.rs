@@ -1,7 +1,7 @@
 // Copyright (c) Aptos Foundation
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
-use crate::{bootstrap_api, indexer, mpsc::Receiver, network::ApplicationNetworkInterfaces};
+use crate::{bootstrap_api, mpsc::Receiver, network::ApplicationNetworkInterfaces};
 use aptos_admin_service::AdminService;
 use aptos_build_info::build_information;
 use aptos_config::config::NodeConfig;
@@ -24,7 +24,6 @@ use aptos_mempool::{
 };
 use aptos_mempool_notifications::MempoolNotificationListener;
 use aptos_network::application::{interface::NetworkClientInterface, storage::PeersAndMetadata};
-use aptos_network_benchmark::{run_netbench_service, NetbenchMessage};
 use aptos_peer_monitoring_service_server::{
     network::PeerMonitoringServiceNetworkEvents, storage::StorageReader,
     PeerMonitoringServiceServer,
@@ -38,17 +37,15 @@ use aptos_types::{
 use aptos_validator_transaction_pool::VTxnPoolState;
 use futures::channel::{mpsc, mpsc::Sender, oneshot};
 use std::{sync::Arc, time::Instant};
-use tokio::{
-    runtime::{Handle, Runtime},
-    sync::watch::Receiver as WatchReceiver,
-};
+use tokio::{runtime::Runtime, sync::watch::Receiver as WatchReceiver};
 
 const AC_SMP_CHANNEL_BUFFER_SIZE: usize = 1_024;
 const INTRA_NODE_CHANNEL_BUFFER_SIZE: usize = 1;
+const DEFAULT_MAX_NUM_WORKER_THREADS: usize = 32;
 
-/// Bootstraps the API and the indexer. Returns the Mempool client
-/// receiver, and both the api and indexer runtimes.
-pub fn bootstrap_api_and_indexer(
+/// Bootstraps the API and transaction streaming services. Returns the
+/// Mempool client receiver, runtimes, and the Mempool client sender.
+pub fn bootstrap_api_and_streaming(
     node_config: &NodeConfig,
     db_rw: DbReaderWriter,
     chain_id: ChainId,
@@ -58,7 +55,6 @@ pub fn bootstrap_api_and_indexer(
     indexer_grpc_port_tx: Option<oneshot::Sender<u16>>,
 ) -> anyhow::Result<(
     Receiver<MempoolClientRequest>,
-    Option<Runtime>,
     Option<Runtime>,
     Option<Runtime>,
     Option<Runtime>,
@@ -120,19 +116,10 @@ pub fn bootstrap_api_and_indexer(
         indexer_grpc_port_tx,
     );
 
-    // Create the indexer runtime
-    let indexer_runtime = indexer::bootstrap_indexer(
-        node_config,
-        chain_id,
-        db_rw.reader.clone(),
-        mempool_client_sender.clone(),
-    )?;
-
     Ok((
         mempool_client_receiver,
         api_runtime,
         indexer_table_info_runtime,
-        indexer_runtime,
         indexer_grpc,
         db_indexer_runtime,
         mempool_client_sender,
@@ -155,6 +142,12 @@ pub fn start_consensus_runtime(
     let reconfig_subscription = consensus_reconfig_subscription
         .expect("Consensus requires a reconfiguration subscription!");
 
+    let num_worker_threads = if node_config.consensus.num_tokio_worker_threads == 0 {
+        (num_cpus::get() / 2).clamp(1, DEFAULT_MAX_NUM_WORKER_THREADS)
+    } else {
+        node_config.consensus.num_tokio_worker_threads as usize
+    };
+
     let consensus = aptos_consensus::consensus_provider::start_consensus(
         node_config,
         consensus_network_interfaces.network_client,
@@ -165,6 +158,7 @@ pub fn start_consensus_runtime(
         reconfig_subscription,
         vtxn_pool,
         consensus_publisher,
+        num_worker_threads,
     );
     debug!("Consensus started in {} ms", instant.elapsed().as_millis());
 
@@ -232,8 +226,10 @@ pub fn start_peer_monitoring_service(
     let network_service_events = network_interfaces.network_service_events;
 
     // Create a new runtime for the monitoring service
-    let peer_monitoring_service_runtime =
-        aptos_runtimes::spawn_named_runtime("peer-mon".into(), None);
+    let peer_monitoring_service_runtime = aptos_runtimes::spawn_named_runtime(
+        "peer-mon".into(),
+        node_config.peer_monitoring_service.num_threads,
+    );
 
     // Create and spawn the peer monitoring server
     let peer_monitoring_network_events =
@@ -264,20 +260,6 @@ pub fn start_peer_monitoring_service(
 
     // Return the runtime
     peer_monitoring_service_runtime
-}
-
-pub fn start_netbench_service(
-    node_config: &NodeConfig,
-    network_interfaces: ApplicationNetworkInterfaces<NetbenchMessage>,
-    runtime: &Handle,
-) {
-    let network_client = network_interfaces.network_client;
-    runtime.spawn(run_netbench_service(
-        node_config.clone(),
-        network_client,
-        network_interfaces.network_service_events,
-        TimeService::real(),
-    ));
 }
 
 /// Starts the telemetry service and grabs the build information

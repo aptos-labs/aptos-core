@@ -985,6 +985,7 @@ class MoveStruct(_message.Message):
         "abilities",
         "generic_type_params",
         "fields",
+        "variants",
     ]
     NAME_FIELD_NUMBER: _ClassVar[int]
     IS_NATIVE_FIELD_NUMBER: _ClassVar[int]
@@ -993,6 +994,7 @@ class MoveStruct(_message.Message):
     ABILITIES_FIELD_NUMBER: _ClassVar[int]
     GENERIC_TYPE_PARAMS_FIELD_NUMBER: _ClassVar[int]
     FIELDS_FIELD_NUMBER: _ClassVar[int]
+    VARIANTS_FIELD_NUMBER: _ClassVar[int]
     name: str
     is_native: bool
     is_event: bool
@@ -1002,6 +1004,7 @@ class MoveStruct(_message.Message):
         MoveStructGenericTypeParam
     ]
     fields: _containers.RepeatedCompositeFieldContainer[MoveStructField]
+    variants: _containers.RepeatedCompositeFieldContainer[MoveStructVariant]
     def __init__(
         self,
         name: _Optional[str] = ...,
@@ -1013,6 +1016,7 @@ class MoveStruct(_message.Message):
             _Iterable[_Union[MoveStructGenericTypeParam, _Mapping]]
         ] = ...,
         fields: _Optional[_Iterable[_Union[MoveStructField, _Mapping]]] = ...,
+        variants: _Optional[_Iterable[_Union[MoveStructVariant, _Mapping]]] = ...,
     ) -> None: ...
 
 class MoveStructGenericTypeParam(_message.Message):
@@ -1037,6 +1041,18 @@ class MoveStructField(_message.Message):
         self,
         name: _Optional[str] = ...,
         type: _Optional[_Union[MoveType, _Mapping]] = ...,
+    ) -> None: ...
+
+class MoveStructVariant(_message.Message):
+    __slots__ = ["name", "fields"]
+    NAME_FIELD_NUMBER: _ClassVar[int]
+    FIELDS_FIELD_NUMBER: _ClassVar[int]
+    name: str
+    fields: _containers.RepeatedCompositeFieldContainer[MoveStructField]
+    def __init__(
+        self,
+        name: _Optional[str] = ...,
+        fields: _Optional[_Iterable[_Union[MoveStructField, _Mapping]]] = ...,
     ) -> None: ...
 
 class MoveFunctionGenericTypeParam(_message.Message):

@@ -216,7 +216,8 @@ module aptos_experimental::confidential_asset {
             deployer,
             FAController {
                 allow_list_enabled: chain_id::get() == MAINNET_CHAIN_ID,
-                extend_ref: fa_controller_ctor_ref.generate_extend_ref()
+                // DO NOT CHANGE: using long syntax until framework change is released to mainnet
+                extend_ref: object::generate_extend_ref(fa_controller_ctor_ref)
             }
         );
     }
@@ -1064,19 +1065,18 @@ module aptos_experimental::confidential_asset {
 
     /// Returns an object for handling all the FA primary stores, and returns a signer for it.
     fun get_fa_store_signer(): signer acquires FAController {
-        borrow_global<FAController>(@aptos_experimental).extend_ref.generate_signer_for_extending()
+        object::generate_signer_for_extending(&borrow_global<FAController>(@aptos_experimental).extend_ref)
     }
 
     /// Returns the address that handles all the FA primary stores.
     fun get_fa_store_address(): address acquires FAController {
-        borrow_global<FAController>(@aptos_experimental).extend_ref.address_from_extend_ref()
+        object::address_from_extend_ref(&borrow_global<FAController>(@aptos_experimental).extend_ref)
     }
 
     /// Returns an object for handling the `ConfidentialAssetStore` and returns a signer for it.
     fun get_user_signer(user: &signer, token: Object<Metadata>): signer {
         let user_ctor = &object::create_named_object(user, construct_user_seed(token));
-
-        user_ctor.generate_signer()
+        object::generate_signer(user_ctor)
     }
 
     /// Returns the address that handles the user's `ConfidentialAssetStore` object for the specified user and token.
@@ -1087,19 +1087,18 @@ module aptos_experimental::confidential_asset {
     /// Returns an object for handling the `FAConfig`, and returns a signer for it.
     fun get_fa_config_signer(token: Object<Metadata>): signer acquires FAController {
         let fa_ext = &borrow_global<FAController>(@aptos_experimental).extend_ref;
-        let fa_ext_signer = fa_ext.generate_signer_for_extending();
+        let fa_ext_signer = object::generate_signer_for_extending(fa_ext);
 
         let fa_ctor =
             &object::create_named_object(&fa_ext_signer, construct_fa_seed(token));
 
-        fa_ctor.generate_signer()
+        object::generate_signer(fa_ctor)
     }
 
     /// Returns the address that handles primary FA store and `FAConfig` objects for the specified token.
     fun get_fa_config_address(token: Object<Metadata>): address acquires FAController {
         let fa_ext = &borrow_global<FAController>(@aptos_experimental).extend_ref;
-        let fa_ext_address = fa_ext.address_from_extend_ref();
-
+        let fa_ext_address = object::address_from_extend_ref(fa_ext);
         object::create_object_address(&fa_ext_address, construct_fa_seed(token))
     }
 
@@ -1110,7 +1109,7 @@ module aptos_experimental::confidential_asset {
             &string_utils::format2(
                 &b"confidential_asset::{}::token::{}::user",
                 @aptos_experimental,
-                token.object_address()
+                object::object_address(&token)
             )
         )
     }
@@ -1122,7 +1121,7 @@ module aptos_experimental::confidential_asset {
             &string_utils::format2(
                 &b"confidential_asset::{}::token::{}::fa",
                 @aptos_experimental,
-                token.object_address()
+                object::object_address(&token)
             )
         )
     }

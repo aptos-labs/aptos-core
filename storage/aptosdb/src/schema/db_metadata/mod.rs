@@ -69,6 +69,9 @@ pub enum DbMetadataKey {
     StateMerkleShardRestoreProgress(ShardId, Version),
     TransactionAuxiliaryDataPrunerProgress,
     PersistedAuxiliaryInfoPrunerProgress,
+    StaleNodeCleanupDone,
+    StaleNodeCleanupRegularProgress,
+    StaleNodeCleanupEpochProgress,
 }
 
 define_schema!(

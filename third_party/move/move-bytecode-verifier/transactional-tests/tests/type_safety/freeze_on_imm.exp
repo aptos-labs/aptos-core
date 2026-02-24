@@ -1,5 +1,5 @@
 processed 1 task
-task 0 lines 1-12:  run [main() {]
+task 0 lines 1-15:  run [script]
 Error: Script execution failed with VMError: {
     major_status: FREEZEREF_TYPE_MISMATCH_ERROR,
     sub_status: None,

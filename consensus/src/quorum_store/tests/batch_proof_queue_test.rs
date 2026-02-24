@@ -159,7 +159,7 @@ async fn test_proof_calculate_remaining_txns_and_proofs() {
     let now_in_usecs = aptos_infallible::duration_since_epoch().as_micros() as u64;
     let author_0 = PeerId::random();
     let author_1 = PeerId::random();
-    let txns = vec![
+    let txns = [
         TxnSummaryWithExpiration::new(
             PeerId::ONE,
             ReplayProtector::SequenceNumber(0),
@@ -186,7 +186,7 @@ async fn test_proof_calculate_remaining_txns_and_proofs() {
         ),
     ];
 
-    let author_0_batches = vec![
+    let author_0_batches = [
         proof_of_store(
             author_0,
             BatchId::new_for_test(0),
@@ -208,7 +208,7 @@ async fn test_proof_calculate_remaining_txns_and_proofs() {
         ),
     ];
 
-    let author_1_batches = vec![
+    let author_1_batches = [
         proof_of_store(
             author_1,
             BatchId::new_for_test(4),
@@ -437,7 +437,7 @@ async fn test_proof_pull_proofs_with_duplicates() {
     let mut proof_queue = BatchProofQueue::new(my_peer_id, batch_store, 1);
     let now_in_secs = aptos_infallible::duration_since_epoch().as_secs() as u64;
     let now_in_usecs = now_in_secs * 1_000_000;
-    let txns = vec![
+    let txns = [
         TxnSummaryWithExpiration::new(
             PeerId::ONE,
             ReplayProtector::SequenceNumber(0),
@@ -467,7 +467,7 @@ async fn test_proof_pull_proofs_with_duplicates() {
     let author_0 = PeerId::random();
     let author_1 = PeerId::random();
 
-    let author_0_batches = vec![
+    let author_0_batches = [
         proof_of_store(
             author_0,
             BatchId::new_for_test(0),
@@ -494,7 +494,7 @@ async fn test_proof_pull_proofs_with_duplicates() {
         ),
     ];
 
-    let author_1_batches = vec![
+    let author_1_batches = [
         proof_of_store(
             author_1,
             BatchId::new_for_test(4),

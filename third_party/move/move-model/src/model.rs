@@ -18,9 +18,9 @@
 use crate::{
     ast::{
         AccessSpecifier, AccessSpecifierKind, Address, AddressSpecifier, Attribute, ConditionKind,
-        Exp, ExpData, FriendDecl, GlobalInvariant, ModuleName, PropertyBag, PropertyValue,
-        ResourceSpecifier, Spec, SpecBlockInfo, SpecBlockTarget, SpecFunDecl, SpecVarDecl, UseDecl,
-        Value,
+        Exp, ExpData, FriendDecl, GlobalInvariant, MemoryLabel, ModuleName, PropertyBag,
+        PropertyValue, ResourceSpecifier, Spec, SpecBlockInfo, SpecBlockTarget, SpecFunDecl,
+        SpecVarDecl, UseDecl, Value,
     },
     code_writer::CodeWriter,
     emit, emitln,
@@ -491,9 +491,10 @@ impl QualifiedInstId<StructId> {
 /// # Verification Scope
 
 /// Defines what functions to verify.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub enum VerificationScope {
     /// Verify only public functions.
+    #[default]
     Public,
     /// Verify all functions.
     All,
@@ -503,12 +504,6 @@ pub enum VerificationScope {
     OnlyModule(String),
     /// Verify no functions
     None,
-}
-
-impl Default for VerificationScope {
-    fn default() -> Self {
-        Self::Public
-    }
 }
 
 impl VerificationScope {
@@ -607,6 +602,8 @@ pub struct GlobalEnv {
     pub cmp_types: RefCell<BTreeSet<Type>>,
     /// An estimate of each target Move function's size.
     pub function_size_estimate: RefCell<BTreeMap<QualifiedId<FunId>, FunctionSize>>,
+    /// Names associated with memory labels (state labels for behavior predicates).
+    pub(crate) memory_label_names: RefCell<BTreeMap<MemoryLabel, Symbol>>,
 }
 
 /// A helper type for implementing fmt::Display depending on GlobalEnv
@@ -670,6 +667,7 @@ impl GlobalEnv {
             generated_by_v2: false,
             cmp_types: RefCell::new(Default::default()),
             function_size_estimate: RefCell::new(Default::default()),
+            memory_label_names: RefCell::new(BTreeMap::new()),
         }
     }
 
@@ -802,6 +800,16 @@ impl GlobalEnv {
         let id = GlobalId::new(*counter);
         *counter += 1;
         id
+    }
+
+    /// Set the name for a memory label.
+    pub fn set_memory_label_name(&self, label: MemoryLabel, name: Symbol) {
+        self.memory_label_names.borrow_mut().insert(label, name);
+    }
+
+    /// Get the name for a memory label, if one exists.
+    pub fn get_memory_label_name(&self, label: MemoryLabel) -> Option<Symbol> {
+        self.memory_label_names.borrow().get(&label).copied()
     }
 
     /// Returns a reference to the symbol pool owned by this environment.
@@ -3835,8 +3843,7 @@ pub struct StructData {
     /// Invariant: when true, visibility is always friend.
     pub(crate) has_package_visibility: bool,
 
-    /// Whether this struct is empty when defined by the user
-    /// Note: by default set to false when created from compiled module since the info is not available
+    /// Whether this struct is empty (has no fields) when defined by the user
     pub is_empty_struct: bool,
 }
 
@@ -3883,7 +3890,7 @@ impl<'env> StructEnv<'env> {
         self.module_env.env
     }
 
-    /// Returns true if struct is empty when defined by the user
+    /// Returns whether the struct is empty (has no fields)
     pub fn is_empty_struct(&self) -> bool {
         self.data.is_empty_struct
     }

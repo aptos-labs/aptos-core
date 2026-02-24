@@ -311,6 +311,28 @@ BlockMetadataExt:
       V1:
         NEWTYPE:
           TYPENAME: BlockMetadataWithRandomness
+    2:
+      V2:
+        NEWTYPE:
+          TYPENAME: BlockMetadataWithRandAndDecKey
+BlockMetadataWithRandAndDecKey:
+  STRUCT:
+    - id:
+        TYPENAME: HashValue
+    - epoch: U64
+    - round: U64
+    - proposer:
+        TYPENAME: AccountAddress
+    - previous_block_votes_bitvec: BYTES
+    - failed_proposer_indices:
+        SEQ: U32
+    - timestamp_usecs: U64
+    - randomness:
+        OPTION:
+          TYPENAME: Randomness
+    - decryption_key:
+        OPTION:
+          TYPENAME: BlockTxnDecryptionKey
 BlockMetadataWithRandomness:
   STRUCT:
     - id:
@@ -367,6 +389,11 @@ BlockRetrievalStatus:
       NotEnoughBlocks: UNIT
     3:
       SucceededWithTarget: UNIT
+BlockTxnDecryptionKey:
+  STRUCT:
+    - metadata:
+        TYPENAME: DecKeyMetadata
+    - decryption_key: BYTES
 BlockType:
   ENUM:
     0:
@@ -399,6 +426,18 @@ BlockType:
       OptimisticProposal:
         NEWTYPE:
           TYPENAME: OptBlockBody
+CertifiedAggregatedChunkySubtranscript:
+  STRUCT:
+    - metadata:
+        TYPENAME: DKGTranscriptMetadata
+    - transcript_bytes: BYTES
+    - signature:
+        TYPENAME: AggregateSignature
+CertifiedChunkyDKGOutput:
+  STRUCT:
+    - certified_transcript:
+        TYPENAME: CertifiedAggregatedChunkySubtranscript
+    - encryption_key: BYTES
 ChainId:
   NEWTYPESTRUCT: U8
 ChangeSet:
@@ -588,6 +627,10 @@ DKGTranscriptMetadata:
     - epoch: U64
     - author:
         TYPENAME: AccountAddress
+DecKeyMetadata:
+  STRUCT:
+    - epoch: U64
+    - round: U64
 DeprecatedPayload:
   STRUCT:
     - dummy_value: U64
@@ -951,37 +994,21 @@ Payload:
           SEQ:
             TYPENAME: SignedTransaction
     1:
-      InQuorumStore:
-        NEWTYPE:
-          TYPENAME: ProofWithData
+      DeprecatedInQuorumStore:
+        NEWTYPE: UNIT
     2:
-      InQuorumStoreWithLimit:
-        NEWTYPE:
-          TYPENAME: ProofWithDataWithTxnLimit
+      DeprecatedInQuorumStoreWithLimit:
+        NEWTYPE: UNIT
     3:
-      QuorumStoreInlineHybrid:
-        TUPLE:
-          - SEQ:
-              TUPLE:
-                - TYPENAME: BatchInfo
-                - SEQ:
-                    TYPENAME: SignedTransaction
-          - TYPENAME: ProofWithData
-          - OPTION: U64
+      DeprecatedQuorumStoreInlineHybrid:
+        NEWTYPE: UNIT
     4:
       OptQuorumStore:
         NEWTYPE:
           TYPENAME: OptQuorumStorePayload
     5:
-      QuorumStoreInlineHybridV2:
-        TUPLE:
-          - SEQ:
-              TUPLE:
-                - TYPENAME: BatchInfo
-                - SEQ:
-                    TYPENAME: SignedTransaction
-          - TYPENAME: ProofWithData
-          - TYPENAME: PayloadExecutionLimit
+      DeprecatedQuorumStoreInlineHybridV2:
+        NEWTYPE: UNIT
 PayloadExecutionLimit:
   ENUM:
     0:
@@ -1009,17 +1036,6 @@ ProofOfStoreMsg:
     - proofs:
         SEQ:
           TYPENAME: ProofOfStore
-ProofWithData:
-  STRUCT:
-    - proofs:
-        SEQ:
-          TYPENAME: ProofOfStore
-ProofWithDataWithTxnLimit:
-  STRUCT:
-    - proof_with_data:
-        TYPENAME: ProofWithData
-    - max_txns_to_execute:
-        OPTION: U64
 ProposalExt:
   ENUM:
     0:
@@ -1383,6 +1399,8 @@ TransactionExecutable:
           TYPENAME: EntryFunction
     2:
       Empty: UNIT
+    3:
+      Encrypted: UNIT
 TransactionExtraConfig:
   ENUM:
     0:
@@ -1507,6 +1525,10 @@ ValidatorTransaction:
       ObservedJWKUpdate:
         NEWTYPE:
           TYPENAME: QuorumCertifiedUpdate
+    2:
+      ChunkyDKGResult:
+        NEWTYPE:
+          TYPENAME: CertifiedChunkyDKGOutput
 ValidatorVerifier:
   STRUCT:
     - validator_infos:

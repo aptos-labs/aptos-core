@@ -72,6 +72,21 @@ pub(crate) async fn handle_custom_event(
 ) -> anyhow::Result<impl Reply, Rejection> {
     validate_custom_event_body(&claims, &body)?;
 
+    // Apply rate limiting for unknown/untrusted nodes (use logs rate limiter since events are similar)
+    let is_unknown = matches!(
+        claims.node_type,
+        NodeType::Unknown | NodeType::UnknownValidator | NodeType::UnknownFullNode
+    );
+    if is_unknown && !context.unknown_logs_rate_limiter().check_rate_limit().await {
+        debug!(
+            "rate limit exceeded for unknown node events: peer_id={}",
+            claims.peer_id
+        );
+        return Err(reject::custom(ServiceError::too_many_requests(
+            CustomEventIngestError::RateLimitExceeded.into(),
+        )));
+    }
+
     let mut insert_request = TableDataInsertAllRequest::new();
 
     let client_ip = forwarded_for
@@ -79,40 +94,44 @@ pub(crate) async fn handle_custom_event(
         .and_then(|xff| xff.split(',').next())
         .unwrap_or("UNKNOWN");
 
-    let telemetry_event = &mut body.events[0];
-    telemetry_event
-        .params
-        .insert(IP_ADDRESS_KEY.into(), client_ip.into());
-
-    let event_params: Vec<serde_json::Value> = telemetry_event
-        .params
-        .iter()
-        .map(|(k, v)| {
-            json!({
-                "key": k,
-                "value": v
-            })
-        })
-        .collect();
-
     let duration =
         Duration::from_micros(body.timestamp_micros.as_str().parse::<u64>().map_err(|_| {
             ServiceError::bad_request(
-                CustomEventIngestError::InvalidTimestamp(body.timestamp_micros).into(),
+                CustomEventIngestError::InvalidTimestamp(body.timestamp_micros.clone()).into(),
             )
         })?);
 
-    let row = BigQueryRow {
-        event_identity: EventIdentity::from(claims),
-        event_name: telemetry_event.name.clone(),
-        event_timestamp: duration.as_secs(),
-        event_params,
-    };
+    let event_identity = EventIdentity::from(claims);
 
-    insert_request.add_row(None, &row).map_err(|e| {
-        error!("unable to create row: {}", e);
-        ServiceError::internal(CustomEventIngestError::from(e).into())
-    })?;
+    // Process all events in the batch (not just the first one)
+    for telemetry_event in &mut body.events {
+        telemetry_event
+            .params
+            .insert(IP_ADDRESS_KEY.into(), client_ip.into());
+
+        let event_params: Vec<serde_json::Value> = telemetry_event
+            .params
+            .iter()
+            .map(|(k, v)| {
+                json!({
+                    "key": k,
+                    "value": v
+                })
+            })
+            .collect();
+
+        let row = BigQueryRow {
+            event_identity: event_identity.clone(),
+            event_name: telemetry_event.name.clone(),
+            event_timestamp: duration.as_secs(),
+            event_params,
+        };
+
+        insert_request.add_row(None, &row).map_err(|e| {
+            error!("unable to create row: {}", e);
+            ServiceError::internal(CustomEventIngestError::from(e).into())
+        })?;
+    }
 
     let start_timer = Instant::now();
 
@@ -149,7 +168,7 @@ pub(crate) async fn handle_custom_event(
             }
         })?;
 
-    debug!("row inserted succeefully: {:?}", &row);
+    debug!("inserted {} events successfully", body.events.len());
 
     Ok(reply::with_status(reply::reply(), StatusCode::CREATED))
 }

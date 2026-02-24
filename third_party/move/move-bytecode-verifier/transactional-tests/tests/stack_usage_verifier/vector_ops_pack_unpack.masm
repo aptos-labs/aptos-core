@@ -1,0 +1,48 @@
+//# run
+script
+entry public fun main()
+    local l0: vector<bool>
+    ld_true
+    vec_pack <bool>, 0
+    st_loc l0
+    ret
+
+
+
+//# run
+script
+entry public fun main()
+    local l0: vector<bool>
+    vec_pack <bool>, 1
+    st_loc l0
+    ret
+
+
+
+//# run
+script
+entry public fun main()
+    local l0: vector<bool>
+    local l1: bool
+    ld_true
+    vec_pack <bool>, 1
+    st_loc l0
+    move_loc l0
+    vec_unpack <bool>, 2
+    st_loc l1
+    ret
+
+
+
+//# run
+script
+entry public fun main()
+    local l0: vector<bool>
+    local l1: bool
+    ld_true
+    vec_pack <bool>, 1
+    st_loc l0
+    move_loc l0
+    vec_unpack <bool>, 0
+    st_loc l1
+    ret

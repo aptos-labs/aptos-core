@@ -11,7 +11,7 @@ use crate::{
 };
 use aptos_bounded_executor::BoundedExecutor;
 use aptos_config::{
-    config::{BaseConfig, NodeConfig},
+    config::{BaseConfig, NodeConfig, PeerMonitoringServiceConfig},
     network_id::NetworkId,
 };
 use aptos_logger::prelude::*;
@@ -27,7 +27,7 @@ use aptos_peer_monitoring_service_types::{
 use aptos_time_service::{TimeService, TimeServiceTrait};
 use error::Error;
 use futures::stream::StreamExt;
-use std::{cmp::min, sync::Arc, time::Instant};
+use std::{cmp::min, collections::BTreeMap, sync::Arc, time::Instant};
 use tokio::runtime::Handle;
 
 mod error;
@@ -47,6 +47,7 @@ pub struct PeerMonitoringServiceServer<T> {
     base_config: BaseConfig,
     bounded_executor: BoundedExecutor,
     network_requests: PeerMonitoringServiceNetworkEvents,
+    peer_monitoring_service_config: PeerMonitoringServiceConfig,
     peers_and_metadata: Arc<PeersAndMetadata>,
     start_time: Instant,
     storage: T,
@@ -63,6 +64,7 @@ impl<T: StorageReaderInterface> PeerMonitoringServiceServer<T> {
         time_service: TimeService,
     ) -> Self {
         let base_config = node_config.base;
+        let peer_monitoring_service_config = node_config.peer_monitoring_service;
         let bounded_executor = BoundedExecutor::new(
             node_config.peer_monitoring_service.max_concurrent_requests as usize,
             executor,
@@ -72,6 +74,7 @@ impl<T: StorageReaderInterface> PeerMonitoringServiceServer<T> {
         Self {
             base_config,
             bounded_executor,
+            peer_monitoring_service_config,
             network_requests,
             peers_and_metadata,
             start_time,
@@ -98,6 +101,7 @@ impl<T: StorageReaderInterface> PeerMonitoringServiceServer<T> {
             // All handler methods are currently CPU-bound so we want
             // to spawn on the blocking thread pool.
             let base_config = self.base_config.clone();
+            let peer_monitoring_service_config = self.peer_monitoring_service_config;
             let peers_and_metadata = self.peers_and_metadata.clone();
             let start_time = self.start_time;
             let storage = self.storage.clone();
@@ -106,6 +110,7 @@ impl<T: StorageReaderInterface> PeerMonitoringServiceServer<T> {
                 .spawn_blocking(move || {
                     let response = Handler::new(
                         base_config,
+                        peer_monitoring_service_config,
                         peers_and_metadata,
                         start_time,
                         storage,
@@ -129,6 +134,7 @@ impl<T: StorageReaderInterface> PeerMonitoringServiceServer<T> {
 #[derive(Clone)]
 pub struct Handler<T> {
     base_config: BaseConfig,
+    peer_monitoring_service_config: PeerMonitoringServiceConfig,
     peers_and_metadata: Arc<PeersAndMetadata>,
     start_time: Instant,
     storage: T,
@@ -138,6 +144,7 @@ pub struct Handler<T> {
 impl<T: StorageReaderInterface> Handler<T> {
     pub fn new(
         base_config: BaseConfig,
+        peer_monitoring_service_config: PeerMonitoringServiceConfig,
         peers_and_metadata: Arc<PeersAndMetadata>,
         start_time: Instant,
         storage: T,
@@ -145,6 +152,7 @@ impl<T: StorageReaderInterface> Handler<T> {
     ) -> Self {
         Self {
             base_config,
+            peer_monitoring_service_config,
             peers_and_metadata,
             start_time,
             storage,
@@ -214,24 +222,34 @@ impl<T: StorageReaderInterface> Handler<T> {
         }
     }
 
+    /// Returns whether metadata sanitization is enabled
+    fn enable_metadata_sanitization(&self) -> bool {
+        self.peer_monitoring_service_config
+            .enable_metadata_sanitization
+    }
+
     fn get_network_information(&self) -> Result<PeerMonitoringServiceResponse, Error> {
-        // Get the connected peers
-        let connected_peers_and_metadata =
-            self.peers_and_metadata.get_connected_peers_and_metadata()?;
-        let connected_peers = connected_peers_and_metadata
-            .into_iter()
-            .map(|(peer, metadata)| {
-                let connection_metadata = metadata.get_connection_metadata();
-                (
-                    peer,
-                    ConnectionMetadata::new(
-                        connection_metadata.addr,
-                        connection_metadata.remote_peer_id,
-                        connection_metadata.role,
-                    ),
-                )
-            })
-            .collect();
+        // Only include connected peers if sanitization is disabled
+        let connected_peers = if self.enable_metadata_sanitization() {
+            BTreeMap::new()
+        } else {
+            let connected_peers_and_metadata =
+                self.peers_and_metadata.get_connected_peers_and_metadata()?;
+            connected_peers_and_metadata
+                .into_iter()
+                .map(|(peer, metadata)| {
+                    let connection_metadata = metadata.get_connection_metadata();
+                    (
+                        peer,
+                        ConnectionMetadata::new(
+                            connection_metadata.addr,
+                            connection_metadata.remote_peer_id,
+                            connection_metadata.role,
+                        ),
+                    )
+                })
+                .collect()
+        };
 
         // Get the distance from the validators
         let distance_from_validators =
@@ -257,8 +275,14 @@ impl<T: StorageReaderInterface> Handler<T> {
     }
 
     fn get_node_information(&self) -> Result<PeerMonitoringServiceResponse, Error> {
-        // Get the node information
-        let build_information = aptos_build_info::get_build_information();
+        // Only include build information if sanitization is disabled
+        let build_information = if self.enable_metadata_sanitization() {
+            BTreeMap::new()
+        } else {
+            aptos_build_info::get_build_information()
+        };
+
+        // Get the remaining node information
         let current_time: Instant = self.time_service.now();
         let uptime = current_time.duration_since(self.start_time);
         let (highest_synced_epoch, highest_synced_version) =

@@ -26,8 +26,82 @@ use move_vm_types::{
         struct_name_indexing::StructNameIndex,
     },
 };
-use std::sync::Arc;
+use std::{
+    hash::{Hash, Hasher},
+    sync::Arc,
+};
 use triomphe::Arc as TriompheArc;
+
+/// Owned key for [LocalSinglePassStructLayoutCache] representing a fully-instantiated struct.
+#[derive(Clone, Eq, PartialEq)]
+struct StructLayoutKey {
+    idx: StructNameIndex,
+    ty_args: Vec<Type>,
+}
+
+/// Borrowed key for [LocalSinglePassStructLayoutCache] lookups, avoiding `ty_args.to_vec()`
+/// allocation.
+#[derive(Eq, PartialEq)]
+struct StructLayoutKeyRef<'a> {
+    idx: StructNameIndex,
+    ty_args: &'a [Type],
+}
+
+impl hashbrown::Equivalent<StructLayoutKey> for StructLayoutKeyRef<'_> {
+    fn equivalent(&self, other: &StructLayoutKey) -> bool {
+        self.idx == other.idx && self.ty_args == other.ty_args.as_slice()
+    }
+}
+
+// Ensure hash is the same as for StructLayoutKeyRef.
+impl Hash for StructLayoutKey {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        self.idx.hash(state);
+        self.ty_args.hash(state);
+    }
+}
+
+// Ensure hash is the same as for StructLayoutKey.
+impl Hash for StructLayoutKeyRef<'_> {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        self.idx.hash(state);
+        self.ty_args.hash(state);
+    }
+}
+
+type StructLayoutMap = hashbrown::HashMap<StructLayoutKey, (Arc<MoveStructLayout>, bool)>;
+
+/// Cache for struct layouts constructed during a single layout construction pass.
+/// On cache hit, the `Arc<MoveStructLayout>` is shared (cheap clone), and the
+/// node count is not re-incremented, avoiding spurious `TOO_MANY_TYPE_NODES` errors.
+/// Invariant: this cache must be scoped to one traversal only (one top-level
+/// layout construction). Reusing it across passes could hide depth/cycle checks
+/// and keep cyclic layouts alive; discarding it after the pass avoids leaks.
+///
+/// Uses separate maps for runtime vs annotated layouts because enum variant
+/// fields are always processed with ANNOTATED=false, so a single map would
+/// return a non-annotated layout when an annotated one is expected.
+struct LocalSinglePassStructLayoutCache {
+    runtime: StructLayoutMap,
+    annotated: StructLayoutMap,
+}
+
+impl LocalSinglePassStructLayoutCache {
+    fn new() -> Self {
+        Self {
+            runtime: StructLayoutMap::new(),
+            annotated: StructLayoutMap::new(),
+        }
+    }
+
+    fn select<const ANNOTATED: bool>(&mut self) -> &mut StructLayoutMap {
+        if ANNOTATED {
+            &mut self.annotated
+        } else {
+            &mut self.runtime
+        }
+    }
+}
 
 /// Stores type layout as well as a flag if it contains any delayed fields.
 #[derive(Debug, Clone)]
@@ -233,6 +307,9 @@ where
         let _timer = VM_TIMER.timer_with_label("type_to_type_layout_with_delayed_fields");
 
         let mut count = 0;
+        // Keep the cache scoped to this single traversal; do not hoist it
+        // beyond this call (see invariant above).
+        let mut struct_layout_cache = LocalSinglePassStructLayoutCache::new();
         let (layout, contains_delayed_fields) = self.type_to_type_layout_impl::<ANNOTATED>(
             gas_meter,
             traversal_context,
@@ -241,6 +318,7 @@ where
             &mut count,
             1,
             check_option_type,
+            &mut struct_layout_cache,
         )?;
         Ok(LayoutWithDelayedFields {
             layout: TriompheArc::new(layout),
@@ -260,6 +338,7 @@ where
         count: &mut u64,
         depth: u64,
         check_option_type: bool,
+        struct_layout_cache: &mut LocalSinglePassStructLayoutCache,
     ) -> PartialVMResult<(MoveTypeLayout, bool)> {
         self.check_depth_and_increment_count(count, depth)?;
 
@@ -289,6 +368,7 @@ where
                     count,
                     depth + 1,
                     check_option_type,
+                    struct_layout_cache,
                 )
                 .map(|(elem_layout, contains_delayed_fields)| {
                     let vec_layout = MoveTypeLayout::Vector(Box::new(elem_layout));
@@ -303,6 +383,7 @@ where
                 count,
                 depth + 1,
                 check_option_type,
+                struct_layout_cache,
             )?,
             Type::StructInstantiation { idx, ty_args, .. } => self
                 .struct_to_type_layout::<ANNOTATED>(
@@ -314,6 +395,7 @@ where
                     count,
                     depth + 1,
                     check_option_type,
+                    struct_layout_cache,
                 )?,
             Type::Reference(_) | Type::MutableReference(_) | Type::TyParam(_) => {
                 return Err(
@@ -335,6 +417,7 @@ where
         count: &mut u64,
         depth: u64,
         check_option_type: bool,
+        struct_layout_cache: &mut LocalSinglePassStructLayoutCache,
     ) -> PartialVMResult<(Vec<MoveTypeLayout>, bool)> {
         let mut contains_delayed_fields = false;
         let layouts = tys
@@ -349,6 +432,7 @@ where
                         count,
                         depth,
                         check_option_type,
+                        struct_layout_cache,
                     )?;
                 contains_delayed_fields |= ty_contains_delayed_fields;
                 Ok(layout)
@@ -375,7 +459,25 @@ where
         count: &mut u64,
         depth: u64,
         check_option_type: bool,
+        struct_layout_cache: &mut LocalSinglePassStructLayoutCache,
     ) -> PartialVMResult<(MoveTypeLayout, bool)> {
+        let use_local_cache = self.vm_config().enable_struct_layout_local_cache;
+        // Check the per-construction-pass cache. On hit, return the shared Arc without
+        // re-constructing or re-counting nodes. Uses a borrowed key to avoid allocation.
+        let insert_into_cache = if use_local_cache {
+            if let Some((cached_layout, contains_delayed_fields)) = struct_layout_cache
+                .select::<ANNOTATED>()
+                .get(&StructLayoutKeyRef { idx: *idx, ty_args })
+            {
+                return Ok((
+                    MoveTypeLayout::Struct(cached_layout.clone()),
+                    *contains_delayed_fields,
+                ));
+            }
+            true
+        } else {
+            false
+        };
         let struct_definition = self.struct_definition_loader.load_struct_definition(
             gas_meter,
             traversal_context,
@@ -430,6 +532,7 @@ where
                                 count,
                                 depth + 1,
                                 check_option_type,
+                                struct_layout_cache,
                             )?;
                         variant_contains_delayed_fields |= delayed_fields;
                         if field_layout.is_empty() {
@@ -444,7 +547,7 @@ where
                         let struct_layout =
                             MoveStructLayout::with_types(struct_tag, vec![field_layout]);
                         return Ok((
-                            MoveTypeLayout::Struct(struct_layout),
+                            MoveTypeLayout::new_struct(struct_layout),
                             variant_contains_delayed_fields,
                         ));
                     }
@@ -464,6 +567,7 @@ where
                                 count,
                                 depth,
                                 check_option_type,
+                                struct_layout_cache,
                             )?;
                         variant_contains_delayed_fields |= variant_fields_contain_delayed_fields;
                         Ok(variant_field_layouts)
@@ -474,7 +578,7 @@ where
                 //   Have annotated layouts for variants. Currently, we just return the raw layout
                 //   for them.
                 let variant_layout =
-                    MoveTypeLayout::Struct(MoveStructLayout::RuntimeVariants(variant_layouts));
+                    MoveTypeLayout::new_struct(MoveStructLayout::RuntimeVariants(variant_layouts));
                 (variant_layout, variant_contains_delayed_fields)
             },
             // For structs, we additionally check if struct is a delayed field, and if so, mark the
@@ -491,11 +595,12 @@ where
                         count,
                         depth,
                         check_option_type,
+                        struct_layout_cache,
                     )?;
 
                 match (kind, fields_contain_delayed_fields) {
                     (None, fields_contain_delayed_fields) => {
-                        let struct_layout = MoveTypeLayout::Struct(
+                        let struct_layout = MoveTypeLayout::new_struct(
                             if ANNOTATED {
                                 let ty_tag_converter = TypeTagConverter::new(
                                     self.struct_definition_loader.runtime_environment(),
@@ -533,8 +638,9 @@ where
                         let layout = match &kind {
                             // For derived strings, replace the whole struct.
                             DerivedString => {
-                                let inner_layout =
-                                    MoveTypeLayout::Struct(MoveStructLayout::new(field_layouts));
+                                let inner_layout = MoveTypeLayout::new_struct(
+                                    MoveStructLayout::new(field_layouts),
+                                );
                                 MoveTypeLayout::Native(kind, Box::new(inner_layout))
                             },
                             // For aggregators and snapshots, we replace the layout of its first
@@ -545,7 +651,7 @@ where
                                         kind,
                                         Box::new(field_layout.clone()),
                                     );
-                                    MoveTypeLayout::Struct(MoveStructLayout::new(field_layouts))
+                                    MoveTypeLayout::new_struct(MoveStructLayout::new(field_layouts))
                                 },
                                 None => {
                                     let struct_name = self.get_struct_name(idx)?;
@@ -564,6 +670,20 @@ where
                 }
             },
         };
+
+        // Cache the constructed struct layout for reuse within this construction pass.
+        // The owned key (with ty_args.to_vec()) is only constructed here on cache miss.
+        if insert_into_cache {
+            if let MoveTypeLayout::Struct(arc_layout) = &result.0 {
+                struct_layout_cache.select::<ANNOTATED>().insert(
+                    StructLayoutKey {
+                        idx: *idx,
+                        ty_args: ty_args.to_vec(),
+                    },
+                    (arc_layout.clone(), result.1),
+                );
+            }
+        }
 
         Ok(result)
     }
@@ -757,9 +877,9 @@ mod tests {
 
         let layout_converter = LayoutConverter::new(&loader);
 
-        let runtime_layout = |fields| MoveTypeLayout::Struct(MoveStructLayout::Runtime(fields));
+        let runtime_layout = |fields| MoveTypeLayout::new_struct(MoveStructLayout::Runtime(fields));
         let annotated_layout = |name: &str, fields| {
-            MoveTypeLayout::Struct(MoveStructLayout::with_types(
+            MoveTypeLayout::new_struct(MoveStructLayout::with_types(
                 StructTag {
                     address: AccountAddress::ONE,
                     module: Identifier::from_str("foo").unwrap(),

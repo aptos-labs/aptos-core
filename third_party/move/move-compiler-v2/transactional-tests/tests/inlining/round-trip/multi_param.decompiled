@@ -7,7 +7,7 @@ module 0x42::Test {
         v: T1,
     }
     public fun test() {
-        let _v0 = Elem<u64,u64>{k: 1, v: 2};
+        let _v0 = Elem<u64, u64>{k: 1, v: 2};
         let _v1 = 0x1::vector::empty<Elem<u64, u64>>();
         0x1::vector::push_back<Elem<u64, u64>>(&mut _v1, _v0);
         let _v2 = _v1;

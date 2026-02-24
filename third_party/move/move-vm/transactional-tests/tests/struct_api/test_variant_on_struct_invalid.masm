@@ -1,0 +1,12 @@
+//# publish --print-bytecode
+module 0x66::test_test_variant_on_struct
+
+struct S
+    x: u64
+
+// Invalid: test_variant requires an enum; S is a regular struct.
+// The parameter check passes (&S is a valid &Struct reference), but
+// validate_variant_index then rejects because S has no declared variants.
+#[test_variant(0)] public fun test_variant$S$V(l0: &S): bool
+    ld_u64 0
+    ret

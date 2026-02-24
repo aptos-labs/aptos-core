@@ -191,3 +191,124 @@ fn big_signature_test() {
     .unwrap_err();
     assert_eq!(res.major_status(), StatusCode::TOO_MANY_TYPE_NODES);
 }
+
+#[test]
+fn vec_pack_two_type_parameters() {
+    // Create a module with vec_pack that has 2 type parameters instead of 1
+    let module = CompiledModule {
+        version: move_binary_format::file_format_common::VERSION_MAX,
+        module_handles: vec![ModuleHandle {
+            address: AddressIdentifierIndex(0),
+            name: IdentifierIndex(0),
+        }],
+        self_module_handle_idx: ModuleHandleIndex(0),
+        struct_handles: vec![],
+        signatures: vec![
+            Signature(vec![]),          // Empty signature for return type and locals
+            Signature(vec![U64, Bool]), // Signature with 2 type parameters (invalid for vec_pack)
+        ],
+        function_handles: vec![FunctionHandle {
+            module: ModuleHandleIndex(0),
+            name: IdentifierIndex(1),
+            return_: SignatureIndex(0),
+            parameters: SignatureIndex(0),
+            type_parameters: vec![],
+            access_specifiers: None,
+            attributes: vec![],
+        }],
+        field_handles: vec![],
+        friend_decls: vec![],
+        struct_def_instantiations: vec![],
+        function_instantiations: vec![],
+        field_instantiations: vec![],
+        identifiers: vec![Identifier::new("M").unwrap(), Identifier::new("f").unwrap()],
+        address_identifiers: vec![AccountAddress::new([0; AccountAddress::LENGTH])],
+        constant_pool: vec![],
+        metadata: vec![],
+        struct_defs: vec![],
+        function_defs: vec![FunctionDefinition {
+            function: FunctionHandleIndex(0),
+            visibility: Visibility::Public,
+            is_entry: false,
+            acquires_global_resources: vec![],
+            code: Some(CodeUnit {
+                locals: SignatureIndex(0),
+                code: vec![
+                    VecPack(SignatureIndex(1), 0), // vec_pack with 2 type parameters
+                    Pop,
+                    Ret,
+                ],
+            }),
+        }],
+        struct_variant_handles: vec![],
+        struct_variant_instantiations: vec![],
+        variant_field_handles: vec![],
+        variant_field_instantiations: vec![],
+    };
+
+    let result = verify_module(&module);
+    assert_eq!(
+        result.unwrap_err().major_status(),
+        StatusCode::NUMBER_OF_TYPE_ARGUMENTS_MISMATCH,
+    );
+}
+
+#[test]
+fn vec_pack_zero_type_parameters() {
+    // Create a module with vec_pack that has 0 type parameters instead of 1
+    let module = CompiledModule {
+        version: move_binary_format::file_format_common::VERSION_MAX,
+        module_handles: vec![ModuleHandle {
+            address: AddressIdentifierIndex(0),
+            name: IdentifierIndex(0),
+        }],
+        self_module_handle_idx: ModuleHandleIndex(0),
+        struct_handles: vec![],
+        signatures: vec![
+            Signature(vec![]), // Empty signature for return type, locals, and vec_pack type args
+        ],
+        function_handles: vec![FunctionHandle {
+            module: ModuleHandleIndex(0),
+            name: IdentifierIndex(1),
+            return_: SignatureIndex(0),
+            parameters: SignatureIndex(0),
+            type_parameters: vec![],
+            access_specifiers: None,
+            attributes: vec![],
+        }],
+        field_handles: vec![],
+        friend_decls: vec![],
+        struct_def_instantiations: vec![],
+        function_instantiations: vec![],
+        field_instantiations: vec![],
+        identifiers: vec![Identifier::new("M").unwrap(), Identifier::new("f").unwrap()],
+        address_identifiers: vec![AccountAddress::new([0; AccountAddress::LENGTH])],
+        constant_pool: vec![],
+        metadata: vec![],
+        struct_defs: vec![],
+        function_defs: vec![FunctionDefinition {
+            function: FunctionHandleIndex(0),
+            visibility: Visibility::Public,
+            is_entry: false,
+            acquires_global_resources: vec![],
+            code: Some(CodeUnit {
+                locals: SignatureIndex(0),
+                code: vec![
+                    VecPack(SignatureIndex(0), 0), // vec_pack with 0 type parameters
+                    Pop,
+                    Ret,
+                ],
+            }),
+        }],
+        struct_variant_handles: vec![],
+        struct_variant_instantiations: vec![],
+        variant_field_handles: vec![],
+        variant_field_instantiations: vec![],
+    };
+
+    let result = verify_module(&module);
+    assert_eq!(
+        result.unwrap_err().major_status(),
+        StatusCode::NUMBER_OF_TYPE_ARGUMENTS_MISMATCH,
+    );
+}

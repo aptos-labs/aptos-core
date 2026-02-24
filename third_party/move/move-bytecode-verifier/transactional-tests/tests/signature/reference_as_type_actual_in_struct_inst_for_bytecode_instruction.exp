@@ -1,5 +1,5 @@
 processed 9 tasks
-task 0 lines 1-13:  publish [module 0x1.M {]
+task 0 lines 1-11:  publish [module 0x1::M]
 Error: Unable to publish module '0000000000000000000000000000000000000000000000000000000000000001::M'. Got VMError: {
     major_status: INVALID_SIGNATURE_TOKEN,
     sub_status: None,
@@ -7,7 +7,7 @@ Error: Unable to publish module '00000000000000000000000000000000000000000000000
     indices: [(StructDefInstantiation, 0)],
     offsets: [],
 }
-task 1 lines 15-28:  publish [module 0x1.M {]
+task 1 lines 15-26:  publish [module 0x1::M]
 Error: Unable to publish module '0000000000000000000000000000000000000000000000000000000000000001::M'. Got VMError: {
     major_status: INVALID_SIGNATURE_TOKEN,
     sub_status: None,
@@ -15,7 +15,7 @@ Error: Unable to publish module '00000000000000000000000000000000000000000000000
     indices: [(StructDefInstantiation, 0)],
     offsets: [],
 }
-task 2 lines 30-42:  publish [module 0x1.M {]
+task 2 lines 30-40:  publish [module 0x1::M]
 Error: Unable to publish module '0000000000000000000000000000000000000000000000000000000000000001::M'. Got VMError: {
     major_status: INVALID_SIGNATURE_TOKEN,
     sub_status: None,
@@ -23,7 +23,7 @@ Error: Unable to publish module '00000000000000000000000000000000000000000000000
     indices: [(StructDefInstantiation, 0)],
     offsets: [],
 }
-task 3 lines 44-57:  publish [module 0x1.M {]
+task 3 lines 44-54:  publish [module 0x1::M]
 Error: Unable to publish module '0000000000000000000000000000000000000000000000000000000000000001::M'. Got VMError: {
     major_status: INVALID_SIGNATURE_TOKEN,
     sub_status: None,
@@ -31,7 +31,7 @@ Error: Unable to publish module '00000000000000000000000000000000000000000000000
     indices: [(StructDefInstantiation, 0)],
     offsets: [],
 }
-task 4 lines 59-70:  publish [module 0x1.M {]
+task 4 lines 58-68:  publish [module 0x1::M]
 Error: Unable to publish module '0000000000000000000000000000000000000000000000000000000000000001::M'. Got VMError: {
     major_status: INVALID_SIGNATURE_TOKEN,
     sub_status: None,
@@ -39,7 +39,7 @@ Error: Unable to publish module '00000000000000000000000000000000000000000000000
     indices: [(StructDefInstantiation, 0)],
     offsets: [],
 }
-task 5 lines 72-86:  publish [module 0x1.M {]
+task 5 lines 72-86:  publish [module 0x1::M]
 Error: Unable to publish module '0000000000000000000000000000000000000000000000000000000000000001::M'. Got VMError: {
     major_status: INVALID_SIGNATURE_TOKEN,
     sub_status: None,
@@ -47,7 +47,7 @@ Error: Unable to publish module '00000000000000000000000000000000000000000000000
     indices: [(StructDefInstantiation, 0)],
     offsets: [],
 }
-task 6 lines 88-100:  publish [module 0x1.M {]
+task 6 lines 90-101:  publish [module 0x1::M]
 Error: Unable to publish module '0000000000000000000000000000000000000000000000000000000000000001::M'. Got VMError: {
     major_status: INVALID_SIGNATURE_TOKEN,
     sub_status: None,
@@ -55,7 +55,7 @@ Error: Unable to publish module '00000000000000000000000000000000000000000000000
     indices: [(StructDefInstantiation, 0)],
     offsets: [],
 }
-task 7 lines 102-111:  publish [module 0x1.M {]
+task 7 lines 105-115:  publish [module 0x1::M]
 Error: Unable to publish module '0000000000000000000000000000000000000000000000000000000000000001::M'. Got VMError: {
     major_status: INVALID_SIGNATURE_TOKEN,
     sub_status: None,
@@ -63,7 +63,7 @@ Error: Unable to publish module '00000000000000000000000000000000000000000000000
     indices: [(Signature, 0)],
     offsets: [],
 }
-task 8 lines 113-122:  publish [module 0x1.M {]
+task 8 lines 119-129:  publish [module 0x1::M]
 Error: Unable to publish module '0000000000000000000000000000000000000000000000000000000000000001::M'. Got VMError: {
     major_status: INVALID_SIGNATURE_TOKEN,
     sub_status: None,

@@ -138,7 +138,8 @@ fn create_write_read_placeholder_struct() {
     // Write by txn 10.
     mvtbl
         .data()
-        .write(ap1.clone(), 10, 1, arc_value_for(10, 1), None);
+        .write(ap1.clone(), 10, 1, arc_value_for(10, 1), None)
+        .unwrap();
 
     // Reads that should go the DB return Err(Uninitialized)
     let r_db = mvtbl.data().fetch_data_no_record(&ap1, 9);
@@ -175,10 +176,12 @@ fn create_write_read_placeholder_struct() {
     // More writes.
     mvtbl
         .data()
-        .write(ap1.clone(), 12, 0, arc_value_for(12, 0), None);
+        .write(ap1.clone(), 12, 0, arc_value_for(12, 0), None)
+        .unwrap();
     mvtbl
         .data()
-        .write(ap1.clone(), 8, 3, arc_value_for(8, 3), None);
+        .write(ap1.clone(), 8, 3, arc_value_for(8, 3), None)
+        .unwrap();
 
     // Verify reads.
     let r_12 = mvtbl.data().fetch_data_no_record(&ap1, 15);
@@ -215,7 +218,8 @@ fn create_write_read_placeholder_struct() {
     mvtbl.data().remove(&ap1, 10);
     mvtbl
         .data()
-        .write(ap2.clone(), 10, 2, arc_value_for(10, 2), None);
+        .write(ap2.clone(), 10, 2, arc_value_for(10, 2), None)
+        .unwrap();
 
     // Read by txn 11 no longer observes entry from txn 10.
     let r_8 = mvtbl.data().fetch_data_no_record(&ap1, 11);
@@ -230,10 +234,12 @@ fn create_write_read_placeholder_struct() {
     // Reads, writes for ap2 and ap3.
     mvtbl
         .data()
-        .write(ap2.clone(), 5, 0, arc_value_for(5, 0), None);
+        .write(ap2.clone(), 5, 0, arc_value_for(5, 0), None)
+        .unwrap();
     mvtbl
         .data()
-        .write(ap3.clone(), 20, 4, arc_value_for(20, 4), None);
+        .write(ap3.clone(), 20, 4, arc_value_for(20, 4), None)
+        .unwrap();
     let r_5 = mvtbl.data().fetch_data_no_record(&ap2, 10);
     assert_eq!(
         Ok(Versioned(
@@ -283,7 +289,7 @@ fn create_write_read_placeholder_struct() {
     let val = arc_value_for(10, 3);
     // sub base sub_for for which should underflow.
     let sub_base = val.as_u128().unwrap().unwrap();
-    mvtbl.data().write(ap2.clone(), 10, 3, val, None);
+    mvtbl.data().write(ap2.clone(), 10, 3, val, None).unwrap();
     mvtbl
         .data()
         .add_delta(ap2.clone(), 30, delta_sub(30 + sub_base, u128::MAX));

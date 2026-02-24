@@ -43,6 +43,8 @@ on a proposal multiple times as long as the total voting power of these votes do
 -  [Function `has_entirely_voted`](#0x1_aptos_governance_has_entirely_voted)
 -  [Function `get_remaining_voting_power`](#0x1_aptos_governance_get_remaining_voting_power)
 -  [Function `assert_proposal_expiration`](#0x1_aptos_governance_assert_proposal_expiration)
+-  [Function `stake_pool_is_eligible_to_vote`](#0x1_aptos_governance_stake_pool_is_eligible_to_vote)
+-  [Function `is_proposal_expired`](#0x1_aptos_governance_is_proposal_expired)
 -  [Function `create_proposal`](#0x1_aptos_governance_create_proposal)
 -  [Function `create_proposal_v2`](#0x1_aptos_governance_create_proposal_v2)
 -  [Function `create_proposal_v2_impl`](#0x1_aptos_governance_create_proposal_v2_impl)
@@ -1238,10 +1240,10 @@ Note: a stake pool's voting power on a proposal could increase over time(e.g. re
         @aptos_framework,
         proposal_id
     );
-    <b>let</b> lockup_until = <a href="stake.md#0x1_stake_get_lockup_secs">stake::get_lockup_secs</a>(stake_pool);
     // The voter's <a href="stake.md#0x1_stake">stake</a> needs <b>to</b> be locked up at least <b>as</b> long <b>as</b> the proposal's expiration.
     // Also no one can vote on a expired proposal.
-    <b>if</b> (proposal_expiration &gt; lockup_until || <a href="timestamp.md#0x1_timestamp_now_seconds">timestamp::now_seconds</a>() &gt; proposal_expiration) {
+    <b>if</b> (!<a href="aptos_governance.md#0x1_aptos_governance_stake_pool_is_eligible_to_vote">stake_pool_is_eligible_to_vote</a>(stake_pool, proposal_expiration)
+        || <a href="aptos_governance.md#0x1_aptos_governance_is_proposal_expired">is_proposal_expired</a>(proposal_expiration)) {
         <b>return</b> 0
     };
 
@@ -1286,13 +1288,68 @@ Note: a stake pool's voting power on a proposal could increase over time(e.g. re
     );
     // The voter's <a href="stake.md#0x1_stake">stake</a> needs <b>to</b> be locked up at least <b>as</b> long <b>as</b> the proposal's expiration.
     <b>assert</b>!(
-        proposal_expiration &lt;= <a href="stake.md#0x1_stake_get_lockup_secs">stake::get_lockup_secs</a>(stake_pool),
+        <a href="aptos_governance.md#0x1_aptos_governance_stake_pool_is_eligible_to_vote">stake_pool_is_eligible_to_vote</a>(stake_pool, proposal_expiration),
         <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="aptos_governance.md#0x1_aptos_governance_EINSUFFICIENT_STAKE_LOCKUP">EINSUFFICIENT_STAKE_LOCKUP</a>),
     );
     <b>assert</b>!(
-        <a href="timestamp.md#0x1_timestamp_now_seconds">timestamp::now_seconds</a>() &lt;= proposal_expiration,
+        !<a href="aptos_governance.md#0x1_aptos_governance_is_proposal_expired">is_proposal_expired</a>(proposal_expiration),
         <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="aptos_governance.md#0x1_aptos_governance_EPROPOSAL_EXPIRED">EPROPOSAL_EXPIRED</a>),
     );
+}
+</code></pre>
+
+
+
+</details>
+
+<a id="0x1_aptos_governance_stake_pool_is_eligible_to_vote"></a>
+
+## Function `stake_pool_is_eligible_to_vote`
+
+
+
+<pre><code><b>fun</b> <a href="aptos_governance.md#0x1_aptos_governance_stake_pool_is_eligible_to_vote">stake_pool_is_eligible_to_vote</a>(stake_pool: <b>address</b>, proposal_expiration: u64): bool
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code>inline <b>fun</b> <a href="aptos_governance.md#0x1_aptos_governance_stake_pool_is_eligible_to_vote">stake_pool_is_eligible_to_vote</a>(
+    stake_pool: <b>address</b>, proposal_expiration: u64
+): bool {
+    // The voter's <a href="stake.md#0x1_stake">stake</a> needs <b>to</b> be locked up at least <b>as</b> long <b>as</b> the proposal's expiration.
+    // Also no one can vote on a expired proposal.
+    // Note the boundary condition must be strictly less than <b>to</b> avoid the edge case <b>where</b> the
+    // proposal expiration is equal <b>to</b> the lockup until.
+    proposal_expiration &lt; <a href="stake.md#0x1_stake_get_lockup_secs">stake::get_lockup_secs</a>(stake_pool)
+}
+</code></pre>
+
+
+
+</details>
+
+<a id="0x1_aptos_governance_is_proposal_expired"></a>
+
+## Function `is_proposal_expired`
+
+
+
+<pre><code><b>fun</b> <a href="aptos_governance.md#0x1_aptos_governance_is_proposal_expired">is_proposal_expired</a>(proposal_expiration: u64): bool
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code>inline <b>fun</b> <a href="aptos_governance.md#0x1_aptos_governance_is_proposal_expired">is_proposal_expired</a>(proposal_expiration: u64): bool {
+    // Expiration time is defined <b>as</b> the time since when the proposal is no longer eligible <b>to</b> be voted on.
+    <a href="timestamp.md#0x1_timestamp_now_seconds">timestamp::now_seconds</a>() &gt;= proposal_expiration
 }
 </code></pre>
 
@@ -1420,7 +1477,7 @@ Return proposal_id when a proposal is successfully created.
     <b>let</b> current_time = <a href="timestamp.md#0x1_timestamp_now_seconds">timestamp::now_seconds</a>();
     <b>let</b> proposal_expiration = current_time + governance_config.voting_duration_secs;
     <b>assert</b>!(
-        <a href="stake.md#0x1_stake_get_lockup_secs">stake::get_lockup_secs</a>(stake_pool) &gt;= proposal_expiration,
+        <a href="aptos_governance.md#0x1_aptos_governance_stake_pool_is_eligible_to_vote">stake_pool_is_eligible_to_vote</a>(stake_pool, proposal_expiration),
         <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="aptos_governance.md#0x1_aptos_governance_EINSUFFICIENT_STAKE_LOCKUP">EINSUFFICIENT_STAKE_LOCKUP</a>),
     );
 
@@ -2441,10 +2498,10 @@ Abort if structs have already been created.
     voting_forum_address: @aptos_framework
 };
 <b>aborts_if</b> !<b>exists</b>&lt;<a href="stake.md#0x1_stake_StakePool">stake::StakePool</a>&gt;(stake_pool);
-<b>aborts_if</b> spec_proposal_expiration &lt;= locked_until && !<b>exists</b>&lt;<a href="timestamp.md#0x1_timestamp_CurrentTimeMicroseconds">timestamp::CurrentTimeMicroseconds</a>&gt;(@aptos_framework);
+<b>aborts_if</b> !<b>exists</b>&lt;<a href="timestamp.md#0x1_timestamp_CurrentTimeMicroseconds">timestamp::CurrentTimeMicroseconds</a>&gt;(@aptos_framework);
 <b>let</b> spec_proposal_expiration = <a href="voting.md#0x1_voting_spec_get_proposal_expiration_secs">voting::spec_get_proposal_expiration_secs</a>&lt;GovernanceProposal&gt;(@aptos_framework, proposal_id);
 <b>let</b> locked_until = <b>global</b>&lt;<a href="stake.md#0x1_stake_StakePool">stake::StakePool</a>&gt;(stake_pool).locked_until_secs;
-<b>let</b> remain_zero_1_cond = (spec_proposal_expiration &gt; locked_until || <a href="timestamp.md#0x1_timestamp_spec_now_seconds">timestamp::spec_now_seconds</a>() &gt; spec_proposal_expiration);
+<b>let</b> remain_zero_1_cond = (spec_proposal_expiration &gt;= locked_until || <a href="timestamp.md#0x1_timestamp_spec_now_seconds">timestamp::spec_now_seconds</a>() &gt;= spec_proposal_expiration);
 <b>ensures</b> remain_zero_1_cond ==&gt; result == 0;
 <b>let</b> record_key = <a href="aptos_governance.md#0x1_aptos_governance_RecordKey">RecordKey</a> {
     stake_pool,
@@ -2476,7 +2533,7 @@ Abort if structs have already been created.
 <pre><code><b>fun</b> <a href="aptos_governance.md#0x1_aptos_governance_spec_get_remaining_voting_power">spec_get_remaining_voting_power</a>(stake_pool: <b>address</b>, proposal_id: u64): u64 {
    <b>let</b> spec_proposal_expiration = <a href="voting.md#0x1_voting_spec_get_proposal_expiration_secs">voting::spec_get_proposal_expiration_secs</a>&lt;GovernanceProposal&gt;(@aptos_framework, proposal_id);
    <b>let</b> locked_until = <b>global</b>&lt;<a href="stake.md#0x1_stake_StakePool">stake::StakePool</a>&gt;(stake_pool).locked_until_secs;
-   <b>let</b> remain_zero_1_cond = (spec_proposal_expiration &gt; locked_until || <a href="timestamp.md#0x1_timestamp_spec_now_seconds">timestamp::spec_now_seconds</a>() &gt; spec_proposal_expiration);
+   <b>let</b> remain_zero_1_cond = (spec_proposal_expiration &gt;= locked_until || <a href="timestamp.md#0x1_timestamp_spec_now_seconds">timestamp::spec_now_seconds</a>() &gt;= spec_proposal_expiration);
    <b>let</b> <a href="staking_config.md#0x1_staking_config">staking_config</a> = <b>global</b>&lt;<a href="staking_config.md#0x1_staking_config_StakingConfig">staking_config::StakingConfig</a>&gt;(@aptos_framework);
    <b>let</b> voting_records_v2 = <b>borrow_global</b>&lt;<a href="aptos_governance.md#0x1_aptos_governance_VotingRecordsV2">VotingRecordsV2</a>&gt;(@aptos_framework);
    <b>let</b> record_key = <a href="aptos_governance.md#0x1_aptos_governance_RecordKey">RecordKey</a> {
@@ -2548,9 +2605,9 @@ Abort if structs have already been created.
 <b>include</b> <a href="voting.md#0x1_voting_AbortsIfNotContainProposalID">voting::AbortsIfNotContainProposalID</a>&lt;GovernanceProposal&gt;{voting_forum_address: @aptos_framework};
 <b>let</b> proposal_expiration = <a href="voting.md#0x1_voting_spec_get_proposal_expiration_secs">voting::spec_get_proposal_expiration_secs</a>&lt;GovernanceProposal&gt;(@aptos_framework, proposal_id);
 <b>aborts_if</b> !<a href="stake.md#0x1_stake_stake_pool_exists">stake::stake_pool_exists</a>(stake_pool);
-<b>aborts_if</b> proposal_expiration &gt; <a href="stake.md#0x1_stake_spec_get_lockup_secs">stake::spec_get_lockup_secs</a>(stake_pool);
+<b>aborts_if</b> proposal_expiration &gt;= <a href="stake.md#0x1_stake_spec_get_lockup_secs">stake::spec_get_lockup_secs</a>(stake_pool);
 <b>aborts_if</b> !<b>exists</b>&lt;<a href="timestamp.md#0x1_timestamp_CurrentTimeMicroseconds">timestamp::CurrentTimeMicroseconds</a>&gt;(@aptos_framework);
-<b>aborts_if</b> <a href="timestamp.md#0x1_timestamp_now_seconds">timestamp::now_seconds</a>() &gt; proposal_expiration;
+<b>aborts_if</b> <a href="timestamp.md#0x1_timestamp_now_seconds">timestamp::now_seconds</a>() &gt;= proposal_expiration;
 </code></pre>
 
 
@@ -2641,7 +2698,7 @@ Address @aptos_framework must exist GovernanceEvents.
     <b>aborts_if</b> !<b>exists</b>&lt;<a href="timestamp.md#0x1_timestamp_CurrentTimeMicroseconds">timestamp::CurrentTimeMicroseconds</a>&gt;(@aptos_framework);
     <b>let</b> current_time = <a href="timestamp.md#0x1_timestamp_spec_now_seconds">timestamp::spec_now_seconds</a>();
     <b>let</b> proposal_expiration = current_time + governance_config.voting_duration_secs;
-    <b>aborts_if</b> stake_pool_res.locked_until_secs &lt; proposal_expiration;
+    <b>aborts_if</b> stake_pool_res.locked_until_secs &lt;= proposal_expiration;
     <b>include</b> <a href="aptos_governance.md#0x1_aptos_governance_CreateProposalMetadataAbortsIf">CreateProposalMetadataAbortsIf</a>;
     <b>let</b> addr = aptos_std::type_info::type_of&lt;AptosCoin&gt;().account_address;
     <b>aborts_if</b> !<b>exists</b>&lt;<a href="coin.md#0x1_coin_CoinInfo">coin::CoinInfo</a>&lt;AptosCoin&gt;&gt;(addr);
@@ -2794,10 +2851,10 @@ Address @aptos_framework must exist VotingRecordsV2 if partial_governance_voting
     should_pass: bool;
     voting_power: u64;
     <b>include</b> <a href="aptos_governance.md#0x1_aptos_governance_VotingGetDelegatedVoterAbortsIf">VotingGetDelegatedVoterAbortsIf</a> { sign: voter };
-    <b>aborts_if</b> spec_proposal_expiration &lt;= locked_until && !<b>exists</b>&lt;<a href="timestamp.md#0x1_timestamp_CurrentTimeMicroseconds">timestamp::CurrentTimeMicroseconds</a>&gt;(@aptos_framework);
+    <b>aborts_if</b> !<b>exists</b>&lt;<a href="timestamp.md#0x1_timestamp_CurrentTimeMicroseconds">timestamp::CurrentTimeMicroseconds</a>&gt;(@aptos_framework);
     <b>let</b> spec_proposal_expiration = <a href="voting.md#0x1_voting_spec_get_proposal_expiration_secs">voting::spec_get_proposal_expiration_secs</a>&lt;GovernanceProposal&gt;(@aptos_framework, proposal_id);
     <b>let</b> locked_until = <b>global</b>&lt;<a href="stake.md#0x1_stake_StakePool">stake::StakePool</a>&gt;(stake_pool).locked_until_secs;
-    <b>let</b> remain_zero_1_cond = (spec_proposal_expiration &gt; locked_until || <a href="timestamp.md#0x1_timestamp_spec_now_seconds">timestamp::spec_now_seconds</a>() &gt; spec_proposal_expiration);
+    <b>let</b> remain_zero_1_cond = (spec_proposal_expiration &gt;= locked_until || <a href="timestamp.md#0x1_timestamp_spec_now_seconds">timestamp::spec_now_seconds</a>() &gt;= spec_proposal_expiration);
     <b>let</b> record_key = <a href="aptos_governance.md#0x1_aptos_governance_RecordKey">RecordKey</a> {
         stake_pool,
         proposal_id,
@@ -2829,8 +2886,8 @@ Address @aptos_framework must exist VotingRecordsV2 if partial_governance_voting
     <b>aborts_if</b> !<a href="../../aptos-stdlib/doc/table.md#0x1_table_spec_contains">table::spec_contains</a>(voting_forum.proposals, proposal_id);
     <b>let</b> proposal_expiration = proposal.expiration_secs;
     <b>let</b> locked_until_secs = <b>global</b>&lt;<a href="stake.md#0x1_stake_StakePool">stake::StakePool</a>&gt;(stake_pool).locked_until_secs;
-    <b>aborts_if</b> proposal_expiration &gt; locked_until_secs;
-    <b>aborts_if</b> <a href="timestamp.md#0x1_timestamp_now_seconds">timestamp::now_seconds</a>() &gt; proposal_expiration;
+    <b>aborts_if</b> proposal_expiration &gt;= locked_until_secs;
+    <b>aborts_if</b> <a href="timestamp.md#0x1_timestamp_now_seconds">timestamp::now_seconds</a>() &gt;= proposal_expiration;
     <b>aborts_if</b> proposal.is_resolved;
     <b>aborts_if</b> !<a href="../../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_spec_internal_check_utf8">string::spec_internal_check_utf8</a>(<a href="voting.md#0x1_voting_IS_MULTI_STEP_PROPOSAL_IN_EXECUTION_KEY">voting::IS_MULTI_STEP_PROPOSAL_IN_EXECUTION_KEY</a>);
     <b>let</b> execution_key = utf8(<a href="voting.md#0x1_voting_IS_MULTI_STEP_PROPOSAL_IN_EXECUTION_KEY">voting::IS_MULTI_STEP_PROPOSAL_IN_EXECUTION_KEY</a>);
@@ -2847,7 +2904,7 @@ Address @aptos_framework must exist VotingRecordsV2 if partial_governance_voting
     <b>aborts_if</b> used_voting_power + real_voting_power &gt; <a href="aptos_governance.md#0x1_aptos_governance_MAX_U64">MAX_U64</a>;
     <b>aborts_if</b> !<b>exists</b>&lt;<a href="aptos_governance.md#0x1_aptos_governance_GovernanceEvents">GovernanceEvents</a>&gt;(@aptos_framework);
     <b>let</b> early_resolution_threshold = <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_borrow">option::borrow</a>(proposal.early_resolution_vote_threshold);
-    <b>let</b> is_voting_period_over = <a href="timestamp.md#0x1_timestamp_spec_now_seconds">timestamp::spec_now_seconds</a>() &gt; proposal_expiration;
+    <b>let</b> is_voting_period_over = <a href="timestamp.md#0x1_timestamp_spec_now_seconds">timestamp::spec_now_seconds</a>() &gt;= proposal_expiration;
     <b>let</b> new_proposal_yes_votes_0 = proposal.yes_votes + real_voting_power;
     <b>let</b> can_be_resolved_early_0 = <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_is_some">option::is_some</a>(proposal.early_resolution_vote_threshold) &&
                                 (new_proposal_yes_votes_0 &gt;= early_resolution_threshold ||

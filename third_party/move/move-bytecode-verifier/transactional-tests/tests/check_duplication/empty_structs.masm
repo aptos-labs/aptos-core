@@ -1,0 +1,3 @@
+//# publish
+module 0x1::EmptyStruct
+struct Empty

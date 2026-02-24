@@ -37,7 +37,10 @@ csv_file=`mktemp`
 echo "$csv_data" >$csv_file
 echo "Wrote CSV file to $csv_file..."
 
+# Change to criterion directory so Python script can find the benchmark folders
+cd $repo_root/target/criterion
 md_tables=`$scriptdir/print-pvss-markdown-table.py $csv_file`
+cd - &>/dev/null
 
 echo "$md_tables"
 

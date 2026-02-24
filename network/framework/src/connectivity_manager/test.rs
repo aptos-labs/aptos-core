@@ -8,7 +8,7 @@ use crate::{
 };
 use aptos_channels::{aptos_channel, message_queues::QueueStyle};
 use aptos_config::{
-    config::{Peer, PeerRole, PeerSet, HANDSHAKE_VERSION},
+    config::{AccessControlPolicy, Peer, PeerRole, PeerSet, HANDSHAKE_VERSION},
     network_id::NetworkId,
 };
 use aptos_crypto::{test_utils::TEST_SEED, x25519, Uniform};
@@ -18,7 +18,7 @@ use aptos_types::{account_address::AccountAddress, network_address::NetworkAddre
 use futures::{executor::block_on, future, SinkExt};
 use maplit::{hashmap, hashset};
 use rand::{rngs::StdRng, SeedableRng};
-use std::{io, str::FromStr};
+use std::{collections::HashSet, io, str::FromStr};
 use tokio_retry::strategy::FixedInterval;
 
 const MAX_TEST_CONNECTIONS: usize = 3;
@@ -105,6 +105,7 @@ impl TestHarness {
             Some(MAX_TEST_CONNECTIONS),
             true, /* mutual_authentication */
             true, /* enable_latency_aware_dialing */
+            None, /* access_control_policy */
         );
         let mock = Self {
             network_context,
@@ -905,6 +906,128 @@ async fn test_stale_peers_vfn_inbound() {
         connectivity_manager.close_stale_connections(),
         mock.expect_disconnect_fail(peer_id_2, connection_metadata_2.addr)
     );
+}
+
+#[tokio::test]
+async fn test_allow_list_filters_peers_to_dial() {
+    // Create test peers
+    let (peer_id_1, peer_1, _, _) = test_peer(AccountAddress::random());
+    let (peer_id_2, peer_2, _, _) = test_peer(AccountAddress::random());
+    let (peer_id_3, peer_3, _, _) = test_peer(AccountAddress::random());
+
+    // Create an allow list (with peer 1 and peer 2)
+    let allow_list = hashset! { peer_id_1, peer_id_2 };
+    let access_control_policy = Some(Arc::new(AccessControlPolicy::AllowList(allow_list)));
+
+    // Create a connectivity manager with the allow list
+    let seeds = hashmap! {
+        peer_id_1 => peer_1,
+        peer_id_2 => peer_2,
+        peer_id_3 => peer_3,
+    };
+    let mut connectivity_manager =
+        create_connectivity_manager_with_policy(seeds, access_control_policy);
+
+    // Get the peers to dial
+    let peers_to_dial = connectivity_manager.choose_peers_to_dial().await;
+    let peer_ids_to_dial: HashSet<_> = peers_to_dial.iter().map(|(id, _)| *id).collect();
+
+    // Verify that only peer 1 and peer 2 are in the list
+    assert_eq!(peer_ids_to_dial.len(), 2);
+    assert!(peer_ids_to_dial.contains(&peer_id_1) && peer_ids_to_dial.contains(&peer_id_2));
+    assert!(
+        !peer_ids_to_dial.contains(&peer_id_3),
+        "Peer 3 should not be in the dial list!"
+    );
+}
+
+#[tokio::test]
+async fn test_block_list_filters_peers_to_dial() {
+    // Create test peers
+    let (peer_id_1, peer_1, _, _) = test_peer(AccountAddress::random());
+    let (peer_id_2, peer_2, _, _) = test_peer(AccountAddress::random());
+    let (peer_id_3, peer_3, _, _) = test_peer(AccountAddress::random());
+
+    // Create a block list with peer 3
+    let block_list = hashset! { peer_id_3 };
+    let access_control_policy = Some(Arc::new(AccessControlPolicy::BlockList(block_list)));
+
+    // Create a connectivity manager with the block list
+    let seeds = hashmap! {
+        peer_id_1 => peer_1,
+        peer_id_2 => peer_2,
+        peer_id_3 => peer_3,
+    };
+    let mut connectivity_manager =
+        create_connectivity_manager_with_policy(seeds, access_control_policy);
+
+    // Get the peers to dial
+    let peers_to_dial = connectivity_manager.choose_peers_to_dial().await;
+    let peer_ids_to_dial: HashSet<_> = peers_to_dial.iter().map(|(id, _)| *id).collect();
+
+    // Verify that peer_3 is not in the list (it should be blocked)
+    assert_eq!(peer_ids_to_dial.len(), 2);
+    assert!(peer_ids_to_dial.contains(&peer_id_1) && peer_ids_to_dial.contains(&peer_id_2));
+    assert!(
+        !peer_ids_to_dial.contains(&peer_id_3),
+        "The blocked peer should not be in the dial list!"
+    );
+}
+
+#[tokio::test]
+async fn test_no_policy_dials_all_peers() {
+    // Create test peers
+    let (peer_id_1, peer_1, _, _) = test_peer(AccountAddress::random());
+    let (peer_id_2, peer_2, _, _) = test_peer(AccountAddress::random());
+    let (peer_id_3, peer_3, _, _) = test_peer(AccountAddress::random());
+
+    // Create connectivity manager with no access control policy
+    let seeds = hashmap! {
+        peer_id_1 => peer_1,
+        peer_id_2 => peer_2,
+        peer_id_3 => peer_3,
+    };
+    let mut connectivity_manager = create_connectivity_manager_with_policy(seeds, None);
+
+    // Get the peers to dial
+    let peers_to_dial = connectivity_manager.choose_peers_to_dial().await;
+    let peer_ids_to_dial: HashSet<_> = peers_to_dial.iter().map(|(id, _)| *id).collect();
+
+    // Verify that all peers can be dialed
+    assert_eq!(peer_ids_to_dial.len(), 3);
+    for peer_id in &[peer_id_1, peer_id_2, peer_id_3] {
+        assert!(peer_ids_to_dial.contains(peer_id));
+    }
+}
+
+/// Creates a connectivity manager with the given access control policy
+fn create_connectivity_manager_with_policy(
+    seeds: PeerSet,
+    access_control_policy: Option<Arc<AccessControlPolicy>>,
+) -> ConnectivityManager<FixedInterval> {
+    // Create the channels for the connectivity manager
+    let network_context = NetworkContext::mock();
+    let (connection_reqs_tx, _) = aptos_channel::new(QueueStyle::FIFO, 1, None);
+    let (_, connection_notifs_rx) = conn_notifs_channel::new();
+    let (_, conn_mgr_reqs_rx) = aptos_channels::new_test(0);
+
+    // Create the connectivity manager
+    ConnectivityManager::new(
+        network_context,
+        TimeService::mock(),
+        PeersAndMetadata::new(&[network_context.network_id()]),
+        seeds,
+        ConnectionRequestSender::new(connection_reqs_tx),
+        connection_notifs_rx,
+        conn_mgr_reqs_rx,
+        CONNECTIVITY_CHECK_INTERVAL,
+        FixedInterval::new(CONNECTION_DELAY),
+        MAX_CONNECTION_DELAY,
+        Some(MAX_TEST_CONNECTIONS),
+        true, /* mutual_authentication */
+        true, /* enable_latency_aware_dialing */
+        access_control_policy,
+    )
 }
 
 /// Verifies that the trusted peers match the expected set

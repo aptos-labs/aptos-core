@@ -93,7 +93,7 @@ pub(crate) mod delayed_field_mock_serialization {
     use move_vm_types::delayed_values::delayed_field_id::{DelayedFieldID, ExtractUniqueIndex};
 
     pub(crate) fn mock_layout() -> MoveTypeLayout {
-        MoveTypeLayout::Struct(MoveStructLayout::new(vec![]))
+        MoveTypeLayout::new_struct(MoveStructLayout::new(vec![]))
     }
 
     // ID is just the unique index as u128.

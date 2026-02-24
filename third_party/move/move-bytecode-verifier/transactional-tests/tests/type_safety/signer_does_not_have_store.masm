@@ -1,0 +1,11 @@
+//# publish
+module 0x42::M
+struct S<T0>
+  f: T0
+
+fun t(l0: &signer, l1: signer)
+    copy_loc l0
+    move_loc l1
+    pack S<signer>
+    move_to S<signer>
+    ret

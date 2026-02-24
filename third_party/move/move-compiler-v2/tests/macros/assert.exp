@@ -1,0 +1,195 @@
+// -- Model dump before first bytecode pipeline
+module 0x1::string_utils {
+    use std::string::{String};
+    public fun format1<T0>(_fmt: &vector<u8>,_a: T0): string::String {
+        Abort(0)
+    }
+    public fun format2<T0,T1>(_fmt: &vector<u8>,_a: T0,_b: T1): string::String {
+        Abort(0)
+    }
+    public fun format3<T0,T1,T2>(_fmt: &vector<u8>,_a: T0,_b: T1,_c: T2): string::String {
+        Abort(0)
+    }
+    public fun format4<T0,T1,T2,T3>(_fmt: &vector<u8>,_a: T0,_b: T1,_c: T2,_d: T3): string::String {
+        Abort(0)
+    }
+} // end 0x1::string_utils
+module 0x42::M {
+    private fun bar<T0>(cond: bool,a: T0) {
+        if cond {
+          Tuple()
+        } else {
+          Abort(14566554180833181696, string::into_bytes(string_utils::format1<T0>(Borrow(Immutable)([97, 32, 61, 32, 123, 123, 123, 125, 125, 125]), a)))
+        }
+    }
+    private fun foo1(cond: bool) {
+        if cond {
+          Tuple()
+        } else {
+          Abort(14566554180833181696)
+        }
+    }
+    private fun foo2(cond: bool,code: u64) {
+        if cond {
+          Tuple()
+        } else {
+          Abort(code)
+        }
+    }
+    private fun foo3(cond: bool,message: vector<u8>) {
+        if cond {
+          Tuple()
+        } else {
+          Abort(14566554180833181696, message)
+        }
+    }
+    private fun foo4<T0>(cond: bool,a: T0) {
+        if cond {
+          Tuple()
+        } else {
+          Abort(14566554180833181696, string::into_bytes(string_utils::format1<T0>(Borrow(Immutable)([97, 32, 61, 32, 123, 125]), a)))
+        }
+    }
+    private fun foo5<T0,T1>(cond: bool,a: T0,b: T1) {
+        if cond {
+          Tuple()
+        } else {
+          Abort(14566554180833181696, string::into_bytes(string_utils::format2<T0, T1>(Borrow(Immutable)([97, 32, 61, 32, 123, 125, 44, 32, 98, 32, 61, 32, 123, 125]), a, b)))
+        }
+    }
+    private fun foo6<T0,T1,T2>(cond: bool,a: T0,b: T1,c: T2) {
+        if cond {
+          Tuple()
+        } else {
+          Abort(14566554180833181696, string::into_bytes(string_utils::format3<T0, T1, T2>(Borrow(Immutable)([97, 32, 61, 32, 123, 125, 44, 32, 98, 32, 61, 32, 123, 125, 44, 32, 99, 32, 61, 32, 123, 125]), a, b, c)))
+        }
+    }
+    private fun foo7<T0,T1,T2,T3>(cond: bool,a: T0,b: T1,c: T2,d: T3) {
+        if cond {
+          Tuple()
+        } else {
+          Abort(14566554180833181696, string::into_bytes(string_utils::format4<T0, T1, T2, T3>(Borrow(Immutable)([97, 32, 61, 32, 123, 125, 44, 32, 98, 32, 61, 32, 123, 125, 44, 32, 99, 32, 61, 32, 123, 125, 44, 32, 100, 32, 61, 32, 123, 125]), a, b, c, d)))
+        }
+    }
+} // end 0x42::M
+
+// -- Sourcified model before first bytecode pipeline
+module 0x1::string_utils {
+    use std::string;
+    public fun format1<T0: drop>(_fmt: &vector<u8>, _a: T0): string::String {
+        abort 0
+    }
+    public fun format2<T0: drop, T1: drop>(_fmt: &vector<u8>, _a: T0, _b: T1): string::String {
+        abort 0
+    }
+    public fun format3<T0: drop, T1: drop, T2: drop>(_fmt: &vector<u8>, _a: T0, _b: T1, _c: T2): string::String {
+        abort 0
+    }
+    public fun format4<T0: drop, T1: drop, T2: drop, T3: drop>(_fmt: &vector<u8>, _a: T0, _b: T1, _c: T2, _d: T3): string::String {
+        abort 0
+    }
+}
+module 0x42::M {
+    fun bar<T0: drop>(cond: bool, a: T0) {
+        if (cond) () else abort 0x1::string::into_bytes(0x1::string_utils::format1<T0>(&vector[97u8, 32u8, 61u8, 32u8, 123u8, 123u8, 123u8, 125u8, 125u8, 125u8], a))
+    }
+    fun foo1(cond: bool) {
+        if (cond) () else abort 14566554180833181696
+    }
+    fun foo2(cond: bool, code: u64) {
+        if (cond) () else abort code
+    }
+    fun foo3(cond: bool, message: vector<u8>) {
+        if (cond) () else abort message
+    }
+    fun foo4<T0: drop>(cond: bool, a: T0) {
+        if (cond) () else abort 0x1::string::into_bytes(0x1::string_utils::format1<T0>(&vector[97u8, 32u8, 61u8, 32u8, 123u8, 125u8], a))
+    }
+    fun foo5<T0: drop, T1: drop>(cond: bool, a: T0, b: T1) {
+        if (cond) () else abort 0x1::string::into_bytes(0x1::string_utils::format2<T0, T1>(&vector[97u8, 32u8, 61u8, 32u8, 123u8, 125u8, 44u8, 32u8, 98u8, 32u8, 61u8, 32u8, 123u8, 125u8], a, b))
+    }
+    fun foo6<T0: drop, T1: drop, T2: drop>(cond: bool, a: T0, b: T1, c: T2) {
+        if (cond) () else abort 0x1::string::into_bytes(0x1::string_utils::format3<T0, T1, T2>(&vector[97u8, 32u8, 61u8, 32u8, 123u8, 125u8, 44u8, 32u8, 98u8, 32u8, 61u8, 32u8, 123u8, 125u8, 44u8, 32u8, 99u8, 32u8, 61u8, 32u8, 123u8, 125u8], a, b, c))
+    }
+    fun foo7<T0: drop, T1: drop, T2: drop, T3: drop>(cond: bool, a: T0, b: T1, c: T2, d: T3) {
+        if (cond) () else abort 0x1::string::into_bytes(0x1::string_utils::format4<T0, T1, T2, T3>(&vector[97u8, 32u8, 61u8, 32u8, 123u8, 125u8, 44u8, 32u8, 98u8, 32u8, 61u8, 32u8, 123u8, 125u8, 44u8, 32u8, 99u8, 32u8, 61u8, 32u8, 123u8, 125u8, 44u8, 32u8, 100u8, 32u8, 61u8, 32u8, 123u8, 125u8], a, b, c, d))
+    }
+}
+
+// -- Model dump before second bytecode pipeline
+module 0x1::string_utils {
+    use std::string::{String};
+    public fun format1<T0>(_fmt: &vector<u8>,_a: T0): string::String {
+        Abort(0)
+    }
+    public fun format2<T0,T1>(_fmt: &vector<u8>,_a: T0,_b: T1): string::String {
+        Abort(0)
+    }
+    public fun format3<T0,T1,T2>(_fmt: &vector<u8>,_a: T0,_b: T1,_c: T2): string::String {
+        Abort(0)
+    }
+    public fun format4<T0,T1,T2,T3>(_fmt: &vector<u8>,_a: T0,_b: T1,_c: T2,_d: T3): string::String {
+        Abort(0)
+    }
+} // end 0x1::string_utils
+module 0x42::M {
+    private fun bar<T0>(cond: bool,a: T0) {
+        if cond {
+          Tuple()
+        } else {
+          Abort(14566554180833181696, string::into_bytes(string_utils::format1<T0>(Borrow(Immutable)([97, 32, 61, 32, 123, 123, 123, 125, 125, 125]), a)))
+        }
+    }
+    private fun foo1(cond: bool) {
+        if cond {
+          Tuple()
+        } else {
+          Abort(14566554180833181696)
+        }
+    }
+    private fun foo2(cond: bool,code: u64) {
+        if cond {
+          Tuple()
+        } else {
+          Abort(code)
+        }
+    }
+    private fun foo3(cond: bool,message: vector<u8>) {
+        if cond {
+          Tuple()
+        } else {
+          Abort(14566554180833181696, message)
+        }
+    }
+    private fun foo4<T0>(cond: bool,a: T0) {
+        if cond {
+          Tuple()
+        } else {
+          Abort(14566554180833181696, string::into_bytes(string_utils::format1<T0>(Borrow(Immutable)([97, 32, 61, 32, 123, 125]), a)))
+        }
+    }
+    private fun foo5<T0,T1>(cond: bool,a: T0,b: T1) {
+        if cond {
+          Tuple()
+        } else {
+          Abort(14566554180833181696, string::into_bytes(string_utils::format2<T0, T1>(Borrow(Immutable)([97, 32, 61, 32, 123, 125, 44, 32, 98, 32, 61, 32, 123, 125]), a, b)))
+        }
+    }
+    private fun foo6<T0,T1,T2>(cond: bool,a: T0,b: T1,c: T2) {
+        if cond {
+          Tuple()
+        } else {
+          Abort(14566554180833181696, string::into_bytes(string_utils::format3<T0, T1, T2>(Borrow(Immutable)([97, 32, 61, 32, 123, 125, 44, 32, 98, 32, 61, 32, 123, 125, 44, 32, 99, 32, 61, 32, 123, 125]), a, b, c)))
+        }
+    }
+    private fun foo7<T0,T1,T2,T3>(cond: bool,a: T0,b: T1,c: T2,d: T3) {
+        if cond {
+          Tuple()
+        } else {
+          Abort(14566554180833181696, string::into_bytes(string_utils::format4<T0, T1, T2, T3>(Borrow(Immutable)([97, 32, 61, 32, 123, 125, 44, 32, 98, 32, 61, 32, 123, 125, 44, 32, 99, 32, 61, 32, 123, 125, 44, 32, 100, 32, 61, 32, 123, 125]), a, b, c, d)))
+        }
+    }
+} // end 0x42::M
+
+
+============ bytecode verification succeeded ========

@@ -10,6 +10,7 @@ use aptos_consensus_types::pipelined_block::PipelinedBlock;
 use aptos_types::{
     block_executor::config::BlockExecutorConfigFromOnchain, epoch_state::EpochState,
     ledger_info::LedgerInfoWithSignatures, on_chain_config::OnChainConsensusConfig,
+    secret_sharing::SecretShareConfig,
 };
 use std::{sync::Arc, time::Duration};
 
@@ -45,9 +46,11 @@ pub trait StateComputer: Send + Sync {
         block_executor_onchain_config: BlockExecutorConfigFromOnchain,
         transaction_deduper: Arc<dyn TransactionDeduper>,
         randomness_enabled: bool,
+        decryption_enabled: bool,
         consensus_onchain_config: OnChainConsensusConfig,
         persisted_auxiliary_info_version: u8,
         network_sender: Arc<NetworkSender>,
+        secret_share_config: Option<SecretShareConfig>,
     );
 
     // Reconfigure to clear epoch state at end of epoch.

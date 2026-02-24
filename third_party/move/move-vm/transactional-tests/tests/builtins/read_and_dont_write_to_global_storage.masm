@@ -1,0 +1,102 @@
+//# publish
+module 0x42::Test
+use 0x1::signer
+struct Config has copy + drop + store
+  b: bool
+
+struct T has store + key
+  config: Config
+
+public fun publish_config(l0: &signer, l1: bool)
+    move_loc l0
+    move_loc l1
+    pack Config
+    pack T
+    move_to T
+    ret
+
+public fun config(l0: address): Config acquires T
+    local l1: &T
+    move_loc l0
+    borrow_global T
+    st_loc l1
+    move_loc l1
+    borrow_field T, config
+    read_ref
+    ret
+
+public fun value(l0: &Config): bool
+    move_loc l0
+    borrow_field Config, b
+    read_ref
+    ret
+
+public fun set(l0: &signer, l1: bool) acquires T
+    local l2: &mut T
+    local l3: &mut Config
+    local l4: &mut bool
+    move_loc l0
+    call signer::address_of
+    mut_borrow_global T
+    st_loc l2
+    move_loc l2
+    mut_borrow_field T, config
+    st_loc l3
+    move_loc l3
+    mut_borrow_field Config, b
+    st_loc l4
+    move_loc l1
+    move_loc l4
+    write_ref
+    ret
+
+
+
+//# run --signers 0x1
+script
+use 0x42::Test
+use 0x1::signer
+entry public fun main(l0: signer)
+    local l1: address
+    local l2: Test::Config
+    local l3: Test::Config
+    borrow_loc l0
+    ld_false
+    call Test::publish_config
+    borrow_loc l0
+    call signer::address_of
+    st_loc l1
+    copy_loc l1
+    call Test::config
+    st_loc l2
+    borrow_loc l2
+    call Test::value
+    ld_false
+    eq
+    not
+    br_false l0
+    ld_u64 77
+    abort
+l0: borrow_loc l0
+    ld_true
+    call Test::set
+    borrow_loc l2
+    call Test::value
+    ld_false
+    eq
+    not
+    br_false l1
+    ld_u64 88
+    abort
+l1: move_loc l1
+    call Test::config
+    st_loc l3
+    borrow_loc l3
+    call Test::value
+    ld_true
+    eq
+    not
+    br_false l2
+    ld_u64 99
+    abort
+l2: ret

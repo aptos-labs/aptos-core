@@ -1,6 +1,7 @@
 // Copyright (c) Aptos Foundation
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 use crate::{
+    errors::MissingEvalProofError,
     group::*,
     shared::{
         ciphertext::{CTDecrypt, CTEncrypt, PreparedCiphertext, StandardCiphertext},
@@ -14,14 +15,13 @@ use crate::{
     },
     traits::{AssociatedData, BatchThresholdEncryption, Plaintext},
 };
-use anyhow::{anyhow, Result};
+use anyhow::Result;
 use aptos_dkg::pvss::{
-    traits::{Reconstructable as _, Subtranscript},
+    traits::{Reconstructable as _, TranscriptCore},
     Player,
 };
 use ark_ff::UniformRand as _;
 use ark_std::rand::{rngs::StdRng, CryptoRng, RngCore, SeedableRng};
-use rayon::iter::{IntoParallelIterator, ParallelIterator as _};
 
 pub struct FPTX {}
 
@@ -47,16 +47,24 @@ impl BatchThresholdEncryption for FPTX {
 
     fn setup(
         _digest_key: &Self::DigestKey,
-        _pvss_public_params: &<Self::SubTranscript as Subtranscript>::PublicParameters,
+        _pvss_public_params: &<Self::SubTranscript as TranscriptCore>::PublicParameters,
         _subtranscript: &Self::SubTranscript,
         _threshold_config: &Self::ThresholdConfig,
         _current_player: Player,
-        _msk_share_decryption_key: &<Self::SubTranscript as Subtranscript>::DecryptPrivKey,
+        _msk_share_decryption_key: &<Self::SubTranscript as TranscriptCore>::DecryptPrivKey,
     ) -> Result<(
         Self::EncryptionKey,
         Vec<Self::VerificationKey>,
         Self::MasterSecretKeyShare,
     )> {
+        // B/c unweighted chunky is being removed
+        unimplemented!()
+    }
+
+    fn extract_encryption_key(
+        _digest_key: &Self::DigestKey,
+        _subtranscript: &Self::SubTranscript,
+    ) -> Result<Self::EncryptionKey> {
         // B/c unweighted chunky is being removed
         unimplemented!()
     }
@@ -79,10 +87,7 @@ impl BatchThresholdEncryption for FPTX {
         let (mpk, vks, msk_shares) =
             key_derivation::gen_msk_shares(msk, &mut rng, threshold_config);
 
-        let ek = EncryptionKey {
-            sig_mpk_g2: mpk.0,
-            tau_g2: digest_key.tau_g2,
-        };
+        let ek = EncryptionKey::new(mpk, digest_key.tau_g2);
 
         Ok((ek, digest_key, vks, msk_shares))
     }
@@ -102,8 +107,7 @@ impl BatchThresholdEncryption for FPTX {
         round: Self::Round,
     ) -> anyhow::Result<(Self::Digest, Self::EvalProofsPromise)> {
         let mut ids: IdSet<UncomputedCoeffs> =
-            IdSet::from_slice(&cts.iter().map(|ct| ct.id()).collect::<Vec<Id>>())
-                .ok_or(anyhow!(""))?;
+            IdSet::from_slice(&cts.iter().map(|ct| ct.id()).collect::<Vec<Id>>());
 
         digest_key.digest(&mut ids, round)
     }
@@ -154,26 +158,19 @@ impl BatchThresholdEncryption for FPTX {
         BIBEDecryptionKey::reconstruct(config, shares)
     }
 
-    fn prepare_cts(
-        cts: &[Self::Ciphertext],
+    fn prepare_ct(
+        ct: &Self::Ciphertext,
         digest: &Self::Digest,
         eval_proofs: &Self::EvalProofs,
-    ) -> Result<Vec<Self::PreparedCiphertext>> {
-        cts.into_par_iter()
-            .map(|ct| ct.prepare(digest, eval_proofs))
-            .collect::<anyhow::Result<Vec<Self::PreparedCiphertext>>>()
+    ) -> std::result::Result<Self::PreparedCiphertext, MissingEvalProofError> {
+        ct.prepare(digest, eval_proofs)
     }
 
     fn decrypt<'a, P: Plaintext>(
         decryption_key: &Self::DecryptionKey,
-        cts: &[Self::PreparedCiphertext],
-    ) -> anyhow::Result<Vec<P>> {
-        cts.into_par_iter()
-            .map(|ct| {
-                let plaintext: Result<P> = decryption_key.decrypt(ct);
-                plaintext
-            })
-            .collect::<anyhow::Result<Vec<P>>>()
+        ct: &Self::PreparedCiphertext,
+    ) -> anyhow::Result<P> {
+        decryption_key.decrypt(ct)
     }
 
     fn verify_decryption_key_share(
@@ -184,12 +181,20 @@ impl BatchThresholdEncryption for FPTX {
         verification_key_share.verify_decryption_key_share(digest, decryption_key_share)
     }
 
-    fn decrypt_individual<P: Plaintext>(
+    fn verify_decryption_key(
+        encryption_key: &Self::EncryptionKey,
+        digest: &Self::Digest,
+        decryption_key: &Self::DecryptionKey,
+    ) -> Result<()> {
+        encryption_key.verify_decryption_key(digest, decryption_key)
+    }
+
+    fn decrypt_slow<P: Plaintext>(
         decryption_key: &Self::DecryptionKey,
         ct: &Self::Ciphertext,
         digest: &Self::Digest,
         eval_proof: &Self::EvalProof,
     ) -> Result<P> {
-        decryption_key.decrypt(&ct.prepare_individual(digest, eval_proof)?)
+        decryption_key.decrypt(&ct.prepare_individual(digest, eval_proof))
     }
 }

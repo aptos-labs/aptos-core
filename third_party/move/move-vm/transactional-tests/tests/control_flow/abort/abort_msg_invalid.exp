@@ -1,0 +1,12 @@
+processed 2 tasks
+task 0 lines 1-11:  publish [module 0x22::test]
+task 1 lines 13-13:  run --verbose 0x22::test::abort_instr --args 404u64
+Error: Function execution failed with VMError: {
+    message: Invalid UTF-8 string: invalid utf-8 sequence of 1 bytes from index 0,
+    major_status: INVALID_ABORT_MESSAGE,
+    sub_status: None,
+    location: 0x22::test,
+    indices: [],
+    offsets: [(FunctionDefinitionIndex(0), 2)],
+    exec_state: Some(ExecutionState { stack_trace: [] }),
+}

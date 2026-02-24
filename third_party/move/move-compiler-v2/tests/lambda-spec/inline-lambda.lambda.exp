@@ -108,57 +108,42 @@ module 0x42::Test {
     fun call_inline(y: u64) {
         let z = 3 + y;
         {
-            let (x) = (y);
+            let x = y;
             let y = lambda__1_inline_1_905__call_inline(x);
             let z' = lambda__1_inline_2_916__call_inline(z, x);
             let w = lambda__1_inline_3_927__call_inline(z, x);
-
-            /* spec {
-              assert Eq<bool>(y, Gt(x, 2));
-              assert Eq<bool>(y, Test::$inline___lambda__1_inline_1_905__call_inline(x));
-              assert Eq<bool>(z', Test::$inline___lambda__1_inline_2_916__call_inline(z, x));
-              assert Eq<bool>(w, Test::$inline___lambda__1_inline_3_927__call_inline(z, x));
-            }
-             */
-            ;
+            spec {
+                assert y == (x > 2);
+                assert y == inline___lambda__1_inline_1_905__call_inline(x);
+                assert z' == inline___lambda__1_inline_2_916__call_inline(z, x);
+                assert w == inline___lambda__1_inline_3_927__call_inline(z, x);
+            };
             y
         };
     }
     public fun test_apply(a1: u64, a2: u64) {
         let r1 = {
-            let (v) = (0);
-
-            /* spec {
-              assert Neq<u64>(v, 42);
-              assert Test::$inline___lambda__1_inline_1_267__test_apply(v);
-            }
-             */
-            ;
+            let v = 0;
+            spec {
+                assert v != 42;
+                assert inline___lambda__1_inline_1_267__test_apply(v);
+            };
             lambda__1_inline_1_267__test_apply(v)
         };
-
-        /* spec {
-          assert r1;
-        }
-         */
-        ;
+        spec {
+            assert r1;
+        };
         let r2 = {
-            let (v) = (0);
-
-            /* spec {
-              assert Neq<u64>(v, 42);
-              assert Test::$inline___lambda__1_inline_1_393__test_apply($t0, $t1, v);
-            }
-             */
-            ;
+            let v = 0;
+            spec {
+                assert v != 42;
+                assert inline___lambda__1_inline_1_393__test_apply(a1, a2, v);
+            };
             lambda__1_inline_1_393__test_apply(a1, a2, v)
         };
-
-        /* spec {
-          assert Not(r2);
-        }
-         */
-        ;
+        spec {
+            assert !r2;
+        };
     }
     fun lambda__1_inline_1_905__call_inline(x: u64): bool {
         x > 2
@@ -175,6 +160,11 @@ module 0x42::Test {
     fun lambda__1_inline_1_267__test_apply(v: u64): bool {
         v >= 0
     }
+
+    spec lambda__1_inline_1_267__test_apply(v: u64): bool {
+        ensures result == (v >= 0);
+    }
+
     fun lambda__1_inline_1_393__test_apply(a1: u64, a2: u64, v: u64): bool {
         v != a1 + a2
     }

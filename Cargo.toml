@@ -34,6 +34,7 @@ members = [
     "aptos-move/aptos-vm-types",
     "aptos-move/aptos-workspace-server",
     "aptos-move/block-executor",
+    "aptos-move/cli",
     "aptos-move/e2e-benchmark",
     "aptos-move/e2e-move-tests",
     "aptos-move/e2e-tests",
@@ -78,6 +79,7 @@ members = [
     "crates/aptos-in-memory-cache",
     "crates/aptos-infallible",
     "crates/aptos-inspection-service",
+    "crates/aptos-jemalloc",
     "crates/aptos-jwk-consensus",
     "crates/aptos-keygen",
     "crates/aptos-ledger",
@@ -91,7 +93,6 @@ members = [
     "crates/aptos-profiler",
     "crates/aptos-proptest-helpers",
     "crates/aptos-push-metrics",
-    "crates/aptos-rate-limiter",
     "crates/aptos-rest-client",
     "crates/aptos-retrier",
     "crates/aptos-rosetta",
@@ -110,7 +111,6 @@ members = [
     "crates/channel",
     "crates/crash-handler",
     "crates/fallible",
-    "crates/indexer",
     "crates/jwk-utils",
     "crates/node-resource-metrics",
     "crates/num-variants",
@@ -142,8 +142,6 @@ members = [
     "ecosystem/indexer-grpc/indexer-transaction-generator",
     "ecosystem/indexer-grpc/transaction-filter",
     "ecosystem/nft-metadata-crawler",
-    "ecosystem/node-checker",
-    "ecosystem/node-checker/fn-check-client",
     "execution/block-partitioner",
     "execution/executor",
     "execution/executor-benchmark",
@@ -159,7 +157,6 @@ members = [
     "keyless/pepper/example-client-rust",
     "keyless/pepper/service",
     "mempool",
-    "network/benchmark",
     "network/builder",
     "network/discovery",
     "network/framework",
@@ -222,7 +219,6 @@ members = [
     "third_party/move/move-ir-compiler/move-bytecode-source-map",
     "third_party/move/move-ir-compiler/move-ir-to-bytecode",
     "third_party/move/move-ir-compiler/move-ir-to-bytecode/syntax",
-    "third_party/move/move-ir-compiler/transactional-tests",
     "third_party/move/move-ir/types",
     "third_party/move/move-model",
     "third_party/move/move-model/bytecode",
@@ -232,9 +228,6 @@ members = [
     "third_party/move/move-prover/boogie-backend",
     "third_party/move/move-prover/bytecode-pipeline",
     "third_party/move/move-prover/lab",
-    "third_party/move/move-prover/move-abigen",
-    "third_party/move/move-prover/move-docgen",
-    "third_party/move/move-prover/move-errmapgen",
     "third_party/move/move-prover/test-utils",
     "third_party/move/move-symbol-pool",
     "third_party/move/move-vm/integration-tests",
@@ -245,13 +238,14 @@ members = [
     "third_party/move/move-vm/transactional-tests",
     "third_party/move/move-vm/types",
     "third_party/move/testing-infra/transactional-test-runner",
+    "third_party/move/tools/move-abigen",
     "third_party/move/tools/move-asm",
     "third_party/move/tools/move-bytecode-utils",
     "third_party/move/tools/move-bytecode-viewer",
-    "third_party/move/tools/move-cli",
     "third_party/move/tools/move-coverage",
     "third_party/move/tools/move-decompiler",
     "third_party/move/tools/move-disassembler",
+    "third_party/move/tools/move-docgen",
     "third_party/move/tools/move-linter",
     "third_party/move/tools/move-package",
     "third_party/move/tools/move-package-cache",
@@ -277,12 +271,10 @@ default-members = [
     "crates/aptos-debugger",
     "crates/aptos-faucet/service",
     "crates/aptos-keygen",
-    "crates/aptos-rate-limiter",
     "crates/aptos-rosetta",
     "crates/transaction-emitter",
     "aptos-move/framework",
     "storage/backup/backup-cli",
-    "ecosystem/node-checker",
 ]
 
 # All workspace members should inherit these keys
@@ -369,7 +361,6 @@ aptos-github-client = { path = "crates/aptos-github-client" }
 aptos-global-constants = { path = "config/global-constants" }
 aptos-id-generator = { path = "crates/aptos-id-generator" }
 aptos-in-memory-cache = { path = "crates/aptos-in-memory-cache" }
-aptos-indexer = { path = "crates/indexer" }
 aptos-indexer-grpc-cache-worker = { path = "ecosystem/indexer-grpc/indexer-grpc-cache-worker" }
 aptos-indexer-grpc-data-service = { path = "ecosystem/indexer-grpc/indexer-grpc-data-service" }
 aptos-indexer-grpc-data-service-v2 = { path = "ecosystem/indexer-grpc/indexer-grpc-data-service-v2" }
@@ -389,6 +380,7 @@ aptos-indexer-transaction-generator = { path = "ecosystem/indexer-grpc/indexer-t
 aptos-infallible = { path = "crates/aptos-infallible" }
 aptos-inspection-service = { path = "crates/aptos-inspection-service" }
 aptos-jellyfish-merkle = { path = "storage/jellyfish-merkle" }
+aptos-jemalloc = { path = "crates/aptos-jemalloc" }
 aptos-jwk-consensus = { path = "crates/aptos-jwk-consensus" }
 aptos-jwk-utils = { path = "crates/jwk-utils" }
 aptos-keygen = { path = "crates/aptos-keygen" }
@@ -402,6 +394,7 @@ aptos-mempool = { path = "mempool" }
 aptos-mempool-notifications = { path = "state-sync/inter-component/mempool-notifications" }
 aptos-memsocket = { path = "network/memsocket" }
 aptos-metrics-core = { path = "crates/aptos-metrics-core" }
+aptos-move-cli = { path = "aptos-move/cli" }
 aptos-move-debugger = { path = "aptos-move/aptos-debugger" }
 aptos-move-examples = { path = "aptos-move/move-examples" }
 aptos-move-e2e-benchmark = { path = "aptos-move/e2e-benchmark" }
@@ -409,13 +402,11 @@ aptos-mvhashmap = { path = "aptos-move/mvhashmap" }
 aptos-native-interface = { path = "aptos-move/aptos-native-interface" }
 aptos-netcore = { path = "network/netcore" }
 aptos-network = { path = "network/framework" }
-aptos-network-benchmark = { path = "network/benchmark" }
 aptos-network-builder = { path = "network/builder" }
 aptos-network-checker = { path = "crates/aptos-network-checker" }
 aptos-network-discovery = { path = "network/discovery" }
 aptos-nft-metadata-crawler = { path = "ecosystem/nft-metadata-crawler" }
 aptos-node = { path = "aptos-node" }
-aptos-node-checker = { path = "ecosystem/node-checker" }
 aptos-node-identity = { path = "crates/aptos-node-identity" }
 aptos-node-resource-metrics = { path = "crates/node-resource-metrics" }
 aptos-num-variants = { path = "crates/num-variants" }
@@ -432,7 +423,6 @@ aptos-proptest-helpers = { path = "crates/aptos-proptest-helpers" }
 aptos-protos = { path = "protos/rust" }
 aptos-proxy = { path = "crates/proxy" }
 aptos-push-metrics = { path = "crates/aptos-push-metrics" }
-aptos-rate-limiter = { path = "crates/aptos-rate-limiter" }
 aptos-release-builder = { path = "aptos-move/aptos-release-builder" }
 aptos-reliable-broadcast = { path = "crates/reliable-broadcast" }
 aptos-replay-benchmark = { path = "aptos-move/replay-benchmark" }
@@ -515,10 +505,10 @@ ark-relations = "0.5.0"
 ark-serialize = { version = "0.5.0", features = ["derive"] }
 ark-snark = { version = "0.5.0" }
 ark-std = { version = "0.5.0", features = ["getrandom"] }
-aptos-indexer-processor-sdk = { git = "https://github.com/aptos-labs/aptos-indexer-processor-sdk.git", tag = "aptos-indexer-processor-sdk-v2.1.2", features = [
+aptos-indexer-processor-sdk = { git = "https://github.com/aptos-labs/aptos-indexer-processor-sdk.git", tag = "aptos-indexer-processor-sdk-v2.1.4", features = [
     "postgres_partial",
 ] }
-aptos-moving-average = { git = "https://github.com/aptos-labs/aptos-indexer-processors.git", rev = "62beedc881d1b76632318ceb186ee9065236468e" }
+aptos-moving-average = { git = "https://github.com/aptos-labs/aptos-indexer-processor-sdk.git", tag = "aptos-indexer-processor-sdk-v2.1.4" }
 assert_approx_eq = "1.1.0"
 async-channel = "1.7.1"
 async-mutex = "1.4.0"
@@ -586,10 +576,8 @@ derivation-path = "0.2.0"
 derive_builder = "0.20.0"
 determinator = "0.12.0"
 derive_more = "0.99.11"
-diesel = { version = "2.2.0", features = ["uuid"] }
-# Use the crate version once this feature gets released on crates.io:
-# https://github.com/weiznich/diesel_async/commit/e165e8c96a6c540ebde2d6d7c52df5c5620a4bf1
-diesel-async = { git = "https://github.com/weiznich/diesel_async.git", rev = "e3beac66cd41ab53d78a10328bb72f272103e5d1", features = [
+diesel = { version = "~2.3", features = ["uuid"] }
+diesel-async = { version = "0.7.4", features = [
     "async-connection-wrapper",
     "postgres",
     "bb8",
@@ -708,7 +696,7 @@ p256 = { version = "0.13.2" }
 prettydiff = "0.6.2"
 primitive-types = { version = "0.12.2" }
 signature = "2.1.0"
-slh-dsa = "0.2.0-rc.1"
+slh-dsa = "=0.2.0-rc.4"
 pairing = "0.23"
 parking_lot = "0.12.0"
 paste = "1.0.7"
@@ -730,13 +718,12 @@ pretty = "0.10.0"
 pretty_assertions = "1.2.1"
 # We set default-features to false so we don't onboard the libpq dep. See more here:
 # https://github.com/aptos-labs/aptos-core/pull/12568
-processor = { git = "https://github.com/aptos-labs/aptos-indexer-processors-v2.git", tag = "aptos-indexer-processors-v2.1.5", default-features = false }
+processor = { git = "https://github.com/aptos-labs/aptos-indexer-processors-v2.git", tag = "aptos-indexer-processors-v2.3.0", default-features = false }
 procfs = "0.14.1"
 proc-macro2 = "1.0.38"
 project-root = "0.2.2"
 prometheus = { version = "0.13.3", default-features = false }
 prometheus-http-query = "0.5.2"
-prometheus-parse = "0.2.4"
 proptest = "1.4.0"
 proptest-derive = "0.5.1"
 prost = { version = "0.13.4", features = ["no-recursion-limit"] }
@@ -793,8 +780,8 @@ serde_json = { version = "1.0.81", features = [
 serde_repr = "0.1"
 serde_merge = "0.1.3"
 serde-name = "0.2.1"
-serde-generate = { git = "https://github.com/aptos-labs/serde-reflection", rev = "73b6bbf748334b71ff6d7d09d06a29e3062ca075" }
-serde-reflection = { git = "https://github.com/aptos-labs/serde-reflection", rev = "73b6bbf748334b71ff6d7d09d06a29e3062ca075" }
+serde-generate = { git = "https://github.com/aptos-labs/serde-reflection", rev = "9d2374af843a4562a194529b3cadb8518d7fcd65" }
+serde-reflection = { git = "https://github.com/aptos-labs/serde-reflection", rev = "9d2374af843a4562a194529b3cadb8518d7fcd65" }
 serde_with = "3.4.0"
 serde_yaml = "0.8.24"
 set_env = "1.3.4"
@@ -866,7 +853,7 @@ x25519-dalek = { git = "https://github.com/aptos-labs/x25519-dalek", rev = "b9cd
 z3tracer = "0.8.0"
 
 # MOVE DEPENDENCIES
-move-abigen = { path = "third_party/move/move-prover/move-abigen" }
+move-abigen = { path = "third_party/move/tools/move-abigen" }
 move-asm = { path = "third_party/move/tools/move-asm" }
 move-binary-format = { path = "third_party/move/move-binary-format" }
 move-borrow-graph = { path = "third_party/move/move-borrow-graph" }
@@ -876,16 +863,14 @@ move-bytecode-verifier = { path = "third_party/move/move-bytecode-verifier" }
 move-bytecode-verifier-invalid-mutations = { path = "third_party/move/move-bytecode-verifier/invalid-mutations" }
 move-bytecode-viewer = { path = "third_party/move/tools/move-bytecode-viewer" }
 move-bytecode-utils = { path = "third_party/move/tools/move-bytecode-utils" }
-move-cli = { path = "third_party/move/tools/move-cli" }
 move-command-line-common = { path = "third_party/move/move-command-line-common" }
 move-coverage = { path = "third_party/move/tools/move-coverage" }
 legacy-move-compiler = { path = "third_party/move/move-compiler-v2/legacy-move-compiler" }
 move-compiler-v2 = { path = "third_party/move/move-compiler-v2" }
 move-core-types = { path = "third_party/move/move-core/types" }
 move-decompiler = { path = "third_party/move/tools/move-decompiler" }
-move-docgen = { path = "third_party/move/move-prover/move-docgen" }
+move-docgen = { path = "third_party/move/tools/move-docgen" }
 move-disassembler = { path = "third_party/move/tools/move-disassembler" }
-move-errmapgen = { path = "third_party/move/move-prover/move-errmapgen" }
 move-ir-types = { path = "third_party/move/move-ir/types" }
 move-ir-compiler = { path = "third_party/move/move-ir-compiler" }
 move-ir-to-bytecode = { path = "third_party/move/move-ir-compiler/move-ir-to-bytecode" }
@@ -961,7 +946,7 @@ debug = true
 [patch.crates-io]
 # version 0.6 at commit 444eb13579c733089453806743b19f1ea2dce1c0 did not expose 'run_bench_with_bencher' as a public function, which we need
 dudect-bencher = { git = "https://github.com/aptos-labs/dudect-bencher", rev = "9515677c83c58884c1a8c764251753269d46fc0e" }
-serde-reflection = { git = "https://github.com/aptos-labs/serde-reflection", rev = "73b6bbf748334b71ff6d7d09d06a29e3062ca075" }
+serde-reflection = { git = "https://github.com/aptos-labs/serde-reflection", rev = "9d2374af843a4562a194529b3cadb8518d7fcd65" }
 merlin = { git = "https://github.com/aptos-labs/merlin" }
 futures = { git = "https://github.com/aptos-labs/futures-rs", branch = "backport" }
 futures-channel = { git = "https://github.com/aptos-labs/futures-rs", branch = "backport" }

@@ -775,6 +775,7 @@ impl Default for ReleaseConfig {
                     update_sequence: vec![ReleaseEntry::Framework(FrameworkReleaseConfig {
                         bytecode_version: VERSION_DEFAULT,
                         git_hash: None,
+                        packages: None,
                     })],
                 },
                 Proposal {

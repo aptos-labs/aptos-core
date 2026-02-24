@@ -3,8 +3,10 @@
 // SPDX-License-Identifier: Apache-2.0
 
 pub mod extensions;
+pub mod package_test;
 pub mod test_reporter;
 pub mod test_runner;
+pub mod test_validation;
 
 use crate::test_runner::TestRunner;
 use clap::*;

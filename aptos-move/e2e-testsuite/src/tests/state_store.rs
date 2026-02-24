@@ -9,9 +9,10 @@ use aptos_types::transaction::{
     ExecutionStatus, SignedTransaction, Transaction, TransactionStatus,
 };
 use claims::assert_matches;
+use indoc::formatdoc;
+use move_asm::assembler;
 use move_binary_format::CompiledModule;
 use move_bytecode_verifier::verify_module;
-use move_ir_compiler::Compiler;
 
 #[test]
 fn move_from_across_blocks() {
@@ -202,51 +203,58 @@ fn change_after_move() {
 }
 
 fn add_module(state_store: &impl SimulationStateStore, sender: &AccountData) -> CompiledModule {
-    let code = format!(
+    let code = formatdoc!(
         "
-        module 0x{}.M {{
-            import 0x1.signer;
-            struct T1 has key {{ v: u64 }}
+        module 0x{}::M
+        use 0x1::signer
+        struct T1 has key
+          v: u64
 
-            public borrow_t1(account: &signer) acquires T1 {{
-                let t1: &Self.T1;
-            label b0:
-                t1 = borrow_global<T1>(signer.address_of(move(account)));
-                return;
-            }}
+        public fun borrow_t1(l0: &signer) acquires T1
+            local l1: &T1
+            move_loc l0
+            call signer::address_of
+            borrow_global T1
+            st_loc l1
+            ret
 
-            public change_t1(account: &signer, v: u64) acquires T1 {{
-                let t1: &mut Self.T1;
-            label b0:
-                t1 = borrow_global_mut<T1>(signer.address_of(move(account)));
-                *&mut move(t1).T1::v = move(v);
-                return;
-            }}
+        public fun change_t1(l0: &signer, l1: u64) acquires T1
+            local l2: &mut T1
+            move_loc l0
+            call signer::address_of
+            mut_borrow_global T1
+            st_loc l2
+            move_loc l1
+            move_loc l2
+            mut_borrow_field T1, v
+            write_ref
+            ret
 
-            public remove_t1(account: &signer) acquires T1 {{
-                let v: u64;
-            label b0:
-                T1 {{ v }} = move_from<T1>(signer.address_of(move(account)));
-                return;
-            }}
+        public fun remove_t1(l0: &signer) acquires T1
+            local l1: u64
+            move_loc l0
+            call signer::address_of
+            move_from T1
+            unpack T1
+            st_loc l1
+            ret
 
-            public publish_t1(account: &signer) {{
-            label b0:
-                move_to<T1>(move(account), T1 {{ v: 3 }});
-                return;
-            }}
-        }}
+        public fun publish_t1(l0: &signer)
+            move_loc l0
+            ld_u64 3
+            pack T1
+            move_to T1
+            ret
         ",
         sender.address().to_hex(),
     );
 
     let framework_modules = aptos_cached_packages::head_release_bundle().compiled_modules();
-    let compiler = Compiler {
-        deps: framework_modules.iter().collect(),
-    };
-    let module = compiler
-        .into_compiled_module(code.as_str())
-        .expect("Module compilation failed");
+    let options = assembler::Options::default();
+    let module = assembler::assemble(&options, &code, framework_modules.iter())
+        .expect("Module assembly failed")
+        .left()
+        .expect("Expected module, got script");
     verify_module(&module).expect("Module must verify");
 
     let mut module_bytes = vec![];
@@ -265,15 +273,14 @@ fn add_resource_txn(
     seq_num: u64,
     extra_deps: Vec<CompiledModule>,
 ) -> SignedTransaction {
-    let program = format!(
+    let program = formatdoc!(
         "
-            import 0x{}.M;
-
-            main(account: signer) {{
-            label b0:
-                M.publish_t1(&account);
-                return;
-            }}
+        script
+        use 0x{}::M
+        entry public fun main(l0: signer)
+            borrow_loc l0
+            call M::publish_t1
+            ret
         ",
         sender.address().to_hex(),
     );
@@ -292,24 +299,23 @@ fn remove_resource_txn(
     seq_num: u64,
     extra_deps: Vec<CompiledModule>,
 ) -> SignedTransaction {
-    let program = format!(
+    let program = formatdoc!(
         "
-            import 0x{}.M;
-
-            main(account: signer) {{
-            label b0:
-                M.remove_t1(&account);
-                return;
-            }}
+        script
+        use 0x{}::M
+        entry public fun main(l0: signer)
+            borrow_loc l0
+            call M::remove_t1
+            ret
         ",
         sender.address().to_hex(),
     );
 
-    let module = compile_script(&program, extra_deps);
+    let script = compile_script(&program, extra_deps);
     sender
         .account()
         .transaction()
-        .script(module)
+        .script(script)
         .sequence_number(seq_num)
         .sign()
 }
@@ -319,24 +325,23 @@ fn borrow_resource_txn(
     seq_num: u64,
     extra_deps: Vec<CompiledModule>,
 ) -> SignedTransaction {
-    let program = format!(
+    let program = formatdoc!(
         "
-            import 0x{}.M;
-
-            main(account: signer) {{
-            label b0:
-                M.borrow_t1(&account);
-                return;
-            }}
+        script
+        use 0x{}::M
+        entry public fun main(l0: signer)
+            borrow_loc l0
+            call M::borrow_t1
+            ret
         ",
         sender.address().to_hex(),
     );
 
-    let module = compile_script(&program, extra_deps);
+    let script = compile_script(&program, extra_deps);
     sender
         .account()
         .transaction()
-        .script(module)
+        .script(script)
         .sequence_number(seq_num)
         .sign()
 }
@@ -346,24 +351,24 @@ fn change_resource_txn(
     seq_num: u64,
     extra_deps: Vec<CompiledModule>,
 ) -> SignedTransaction {
-    let program = format!(
+    let program = formatdoc!(
         "
-            import 0x{}.M;
-
-            main(account: signer) {{
-            label b0:
-                M.change_t1(&account, 20);
-                return;
-            }}
+        script
+        use 0x{}::M
+        entry public fun main(l0: signer)
+            borrow_loc l0
+            ld_u64 20
+            call M::change_t1
+            ret
         ",
         sender.address().to_hex(),
     );
 
-    let module = compile_script(&program, extra_deps);
+    let script = compile_script(&program, extra_deps);
     sender
         .account()
         .transaction()
-        .script(module)
+        .script(script)
         .sequence_number(seq_num)
         .sign()
 }

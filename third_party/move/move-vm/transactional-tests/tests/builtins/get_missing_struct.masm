@@ -1,0 +1,38 @@
+//# publish
+module 0x1::Token
+struct T has key
+  b: bool
+
+public fun new(): T
+    ld_true
+    pack T
+    ret
+
+public fun has(l0: address): bool
+    local l1: bool
+    move_loc l0
+    exists T
+    st_loc l1
+    move_loc l1
+    ret
+
+public fun test() acquires T
+    local l0: address
+    local l1: &mut T
+    ld_const<address> 1229782938247303440
+    st_loc l0
+    move_loc l0
+    mut_borrow_global T
+    st_loc l1
+    move_loc l1
+    pop
+    ret
+
+
+
+//# run --verbose
+script
+use 0x1::Token
+entry public fun main()
+    call Token::test
+    ret

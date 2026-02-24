@@ -1,0 +1,11 @@
+//# publish
+module 0x1::M
+struct Ex<T0>
+  flag: bool
+
+
+
+//# run --type-args 0x1::M::Ex<bool,u64>
+script
+entry public fun main<T0>()
+    ret

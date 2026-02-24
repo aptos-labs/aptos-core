@@ -1,0 +1,882 @@
+//# run
+script
+entry public fun main()
+    ld_u8 0
+    ld_u8 0
+    bit_and
+    ld_u8 0
+    eq
+    not
+    br_false l0
+    ld_u64 1000
+    abort
+l0: ld_u64 0
+    ld_u64 0
+    bit_and
+    ld_u64 0
+    eq
+    not
+    br_false l1
+    ld_u64 1001
+    abort
+l1: ld_u128 0
+    ld_u128 0
+    bit_and
+    ld_u128 0
+    eq
+    not
+    br_false l2
+    ld_u64 1002
+    abort
+l2: ld_u8 0
+    ld_u8 42
+    bit_and
+    ld_u8 0
+    eq
+    not
+    br_false l3
+    ld_u64 1003
+    abort
+l3: ld_u64 0
+    ld_u64 42
+    bit_and
+    ld_u64 0
+    eq
+    not
+    br_false l4
+    ld_u64 1004
+    abort
+l4: ld_u128 0
+    ld_u128 42
+    bit_and
+    ld_u128 0
+    eq
+    not
+    br_false l5
+    ld_u64 1005
+    abort
+l5: ld_u16 0
+    ld_u16 0
+    bit_and
+    ld_u16 0
+    eq
+    not
+    br_false l6
+    ld_u64 1000
+    abort
+l6: ld_u32 0
+    ld_u32 0
+    bit_and
+    ld_u32 0
+    eq
+    not
+    br_false l7
+    ld_u64 1001
+    abort
+l7: ld_u256 0
+    ld_u256 0
+    bit_and
+    ld_u256 0
+    eq
+    not
+    br_false l8
+    ld_u64 1002
+    abort
+l8: ld_u16 0
+    ld_u16 42
+    bit_and
+    ld_u16 0
+    eq
+    not
+    br_false l9
+    ld_u64 1003
+    abort
+l9: ld_u32 0
+    ld_u32 42
+    bit_and
+    ld_u32 0
+    eq
+    not
+    br_false l10
+    ld_u64 1004
+    abort
+l10: ld_u256 0
+    ld_u256 42
+    bit_and
+    ld_u256 0
+    eq
+    not
+    br_false l11
+    ld_u64 1005
+    abort
+l11: ld_u8 43
+    ld_u8 43
+    bit_and
+    ld_u8 43
+    eq
+    not
+    br_false l12
+    ld_u64 1100
+    abort
+l12: ld_u64 856776467654
+    ld_u64 856776467654
+    bit_and
+    ld_u64 856776467654
+    eq
+    not
+    br_false l13
+    ld_u64 1101
+    abort
+l13: ld_u128 4125423653474658754976595
+    ld_u128 4125423653474658754976595
+    bit_and
+    ld_u128 4125423653474658754976595
+    eq
+    not
+    br_false l14
+    ld_u64 1102
+    abort
+l14: ld_u16 43
+    ld_u16 43
+    bit_and
+    ld_u16 43
+    eq
+    not
+    br_false l15
+    ld_u64 1100
+    abort
+l15: ld_u32 42967295
+    ld_u32 42967295
+    bit_and
+    ld_u32 42967295
+    eq
+    not
+    br_false l16
+    ld_u64 1101
+    abort
+l16: ld_u256 4125423653474658754976595
+    ld_u256 4125423653474658754976595
+    bit_and
+    ld_u256 4125423653474658754976595
+    eq
+    not
+    br_false l17
+    ld_u64 1102
+    abort
+l17: ld_u8 255
+    ld_u8 255
+    bit_and
+    ld_u8 255
+    eq
+    not
+    br_false l18
+    ld_u64 1200
+    abort
+l18: ld_u64 18446744073709551615
+    ld_u64 18446744073709551615
+    bit_and
+    ld_u64 18446744073709551615
+    eq
+    not
+    br_false l19
+    ld_u64 1201
+    abort
+l19: ld_u128 340282366920938463463374607431768211455
+    ld_u128 340282366920938463463374607431768211455
+    bit_and
+    ld_u128 340282366920938463463374607431768211455
+    eq
+    not
+    br_false l20
+    ld_u64 1202
+    abort
+l20: ld_u16 65535
+    ld_u16 65535
+    bit_and
+    ld_u16 65535
+    eq
+    not
+    br_false l21
+    ld_u64 1200
+    abort
+l21: ld_u32 4294967295
+    ld_u32 4294967295
+    bit_and
+    ld_u32 4294967295
+    eq
+    not
+    br_false l22
+    ld_u64 1201
+    abort
+l22: ld_u256 115792089237316195423570985008687907853269984665640564039457584007913129639935
+    ld_u256 115792089237316195423570985008687907853269984665640564039457584007913129639935
+    bit_and
+    ld_u256 115792089237316195423570985008687907853269984665640564039457584007913129639935
+    eq
+    not
+    br_false l23
+    ld_u64 1202
+    abort
+l23: ld_u8 101
+    ld_u8 77
+    bit_and
+    ld_u8 69
+    eq
+    not
+    br_false l24
+    ld_u64 1300
+    abort
+l24: ld_u64 675437
+    ld_u64 14235
+    bit_and
+    ld_u64 1545
+    eq
+    not
+    br_false l25
+    ld_u64 1301
+    abort
+l25: ld_u128 534263574563786485434889
+    ld_u128 3141524387653489576893
+    bit_and
+    ld_u128 632665710869872675337
+    eq
+    not
+    br_false l26
+    ld_u64 1302
+    abort
+l26: ld_u16 101
+    ld_u16 77
+    bit_and
+    ld_u16 69
+    eq
+    not
+    br_false l27
+    ld_u64 1300
+    abort
+l27: ld_u32 65437
+    ld_u32 14235
+    bit_and
+    ld_u32 14233
+    eq
+    not
+    br_false l28
+    ld_u64 1301
+    abort
+l28: ld_u256 534263574563786485434889
+    ld_u256 3141524387653489576893
+    bit_and
+    ld_u256 632665710869872675337
+    eq
+    not
+    br_false l29
+    ld_u64 1302
+    abort
+l29: ret
+
+
+
+//# run
+script
+entry public fun main()
+    ld_u8 0
+    ld_u8 0
+    bit_or
+    ld_u8 0
+    eq
+    not
+    br_false l0
+    ld_u64 2000
+    abort
+l0: ld_u64 0
+    ld_u64 0
+    bit_or
+    ld_u64 0
+    eq
+    not
+    br_false l1
+    ld_u64 2001
+    abort
+l1: ld_u128 0
+    ld_u128 0
+    bit_or
+    ld_u128 0
+    eq
+    not
+    br_false l2
+    ld_u64 2002
+    abort
+l2: ld_u8 42
+    ld_u8 0
+    bit_or
+    ld_u8 42
+    eq
+    not
+    br_false l3
+    ld_u64 2003
+    abort
+l3: ld_u64 42
+    ld_u64 0
+    bit_or
+    ld_u64 42
+    eq
+    not
+    br_false l4
+    ld_u64 2004
+    abort
+l4: ld_u128 42
+    ld_u128 0
+    bit_or
+    ld_u128 42
+    eq
+    not
+    br_false l5
+    ld_u64 2005
+    abort
+l5: ld_u16 0
+    ld_u16 0
+    bit_or
+    ld_u16 0
+    eq
+    not
+    br_false l6
+    ld_u64 2000
+    abort
+l6: ld_u32 0
+    ld_u32 0
+    bit_or
+    ld_u32 0
+    eq
+    not
+    br_false l7
+    ld_u64 2001
+    abort
+l7: ld_u256 0
+    ld_u256 0
+    bit_or
+    ld_u256 0
+    eq
+    not
+    br_false l8
+    ld_u64 2002
+    abort
+l8: ld_u16 42
+    ld_u16 0
+    bit_or
+    ld_u16 42
+    eq
+    not
+    br_false l9
+    ld_u64 2003
+    abort
+l9: ld_u32 42
+    ld_u32 0
+    bit_or
+    ld_u32 42
+    eq
+    not
+    br_false l10
+    ld_u64 2004
+    abort
+l10: ld_u256 42
+    ld_u256 0
+    bit_or
+    ld_u256 42
+    eq
+    not
+    br_false l11
+    ld_u64 2005
+    abort
+l11: ld_u8 43
+    ld_u8 43
+    bit_or
+    ld_u8 43
+    eq
+    not
+    br_false l12
+    ld_u64 2100
+    abort
+l12: ld_u64 856776467654
+    ld_u64 856776467654
+    bit_or
+    ld_u64 856776467654
+    eq
+    not
+    br_false l13
+    ld_u64 2101
+    abort
+l13: ld_u128 4125423653474658754976595
+    ld_u128 4125423653474658754976595
+    bit_or
+    ld_u128 4125423653474658754976595
+    eq
+    not
+    br_false l14
+    ld_u64 2102
+    abort
+l14: ld_u16 43
+    ld_u16 43
+    bit_or
+    ld_u16 43
+    eq
+    not
+    br_false l15
+    ld_u64 2100
+    abort
+l15: ld_u32 85677646
+    ld_u32 85677646
+    bit_or
+    ld_u32 85677646
+    eq
+    not
+    br_false l16
+    ld_u64 2101
+    abort
+l16: ld_u256 4125423653474658754976595
+    ld_u256 4125423653474658754976595
+    bit_or
+    ld_u256 4125423653474658754976595
+    eq
+    not
+    br_false l17
+    ld_u64 2102
+    abort
+l17: ld_u8 255
+    ld_u8 255
+    bit_or
+    ld_u8 255
+    eq
+    not
+    br_false l18
+    ld_u64 2200
+    abort
+l18: ld_u64 18446744073709551615
+    ld_u64 18446744073709551615
+    bit_or
+    ld_u64 18446744073709551615
+    eq
+    not
+    br_false l19
+    ld_u64 2201
+    abort
+l19: ld_u128 340282366920938463463374607431768211455
+    ld_u128 340282366920938463463374607431768211455
+    bit_or
+    ld_u128 340282366920938463463374607431768211455
+    eq
+    not
+    br_false l20
+    ld_u64 2202
+    abort
+l20: ld_u16 65535
+    ld_u16 65535
+    bit_or
+    ld_u16 65535
+    eq
+    not
+    br_false l21
+    ld_u64 2200
+    abort
+l21: ld_u32 4294967295
+    ld_u32 4294967295
+    bit_or
+    ld_u32 4294967295
+    eq
+    not
+    br_false l22
+    ld_u64 2201
+    abort
+l22: ld_u256 115792089237316195423570985008687907853269984665640564039457584007913129639935
+    ld_u256 115792089237316195423570985008687907853269984665640564039457584007913129639935
+    bit_or
+    ld_u256 115792089237316195423570985008687907853269984665640564039457584007913129639935
+    eq
+    not
+    br_false l23
+    ld_u64 2202
+    abort
+l23: ld_u8 101
+    ld_u8 77
+    bit_or
+    ld_u8 109
+    eq
+    not
+    br_false l24
+    ld_u64 2300
+    abort
+l24: ld_u64 675437
+    ld_u64 14235
+    bit_or
+    ld_u64 688127
+    eq
+    not
+    br_false l25
+    ld_u64 2301
+    abort
+l25: ld_u128 534263574563786485434889
+    ld_u128 3141524387653489576893
+    bit_or
+    ld_u128 536772433240570102336445
+    eq
+    not
+    br_false l26
+    ld_u64 2302
+    abort
+l26: ld_u16 101
+    ld_u16 77
+    bit_or
+    ld_u16 109
+    eq
+    not
+    br_false l27
+    ld_u64 2300
+    abort
+l27: ld_u32 65437
+    ld_u32 14235
+    bit_or
+    ld_u32 65439
+    eq
+    not
+    br_false l28
+    ld_u64 2301
+    abort
+l28: ld_u256 534263574563786485434889
+    ld_u256 3141524387653489576893
+    bit_or
+    ld_u256 536772433240570102336445
+    eq
+    not
+    br_false l29
+    ld_u64 2302
+    abort
+l29: ret
+
+
+
+//# run
+script
+entry public fun main()
+    ld_u8 0
+    ld_u8 0
+    xor
+    ld_u8 0
+    eq
+    not
+    br_false l0
+    ld_u64 3000
+    abort
+l0: ld_u64 0
+    ld_u64 0
+    xor
+    ld_u64 0
+    eq
+    not
+    br_false l1
+    ld_u64 3001
+    abort
+l1: ld_u128 0
+    ld_u128 0
+    xor
+    ld_u128 0
+    eq
+    not
+    br_false l2
+    ld_u64 3002
+    abort
+l2: ld_u8 13
+    ld_u8 0
+    xor
+    ld_u8 13
+    eq
+    not
+    br_false l3
+    ld_u64 3003
+    abort
+l3: ld_u64 13
+    ld_u64 0
+    xor
+    ld_u64 13
+    eq
+    not
+    br_false l4
+    ld_u64 3004
+    abort
+l4: ld_u128 13
+    ld_u128 0
+    xor
+    ld_u128 13
+    eq
+    not
+    br_false l5
+    ld_u64 3005
+    abort
+l5: ld_u16 0
+    ld_u16 0
+    xor
+    ld_u16 0
+    eq
+    not
+    br_false l6
+    ld_u64 3000
+    abort
+l6: ld_u32 0
+    ld_u32 0
+    xor
+    ld_u32 0
+    eq
+    not
+    br_false l7
+    ld_u64 3001
+    abort
+l7: ld_u256 0
+    ld_u256 0
+    xor
+    ld_u256 0
+    eq
+    not
+    br_false l8
+    ld_u64 3002
+    abort
+l8: ld_u16 13
+    ld_u16 0
+    xor
+    ld_u16 13
+    eq
+    not
+    br_false l9
+    ld_u64 3003
+    abort
+l9: ld_u32 13
+    ld_u32 0
+    xor
+    ld_u32 13
+    eq
+    not
+    br_false l10
+    ld_u64 3004
+    abort
+l10: ld_u256 13
+    ld_u256 0
+    xor
+    ld_u256 13
+    eq
+    not
+    br_false l11
+    ld_u64 3005
+    abort
+l11: ld_u8 43
+    ld_u8 43
+    xor
+    ld_u8 0
+    eq
+    not
+    br_false l12
+    ld_u64 3100
+    abort
+l12: ld_u64 856776467654
+    ld_u64 856776467654
+    xor
+    ld_u64 0
+    eq
+    not
+    br_false l13
+    ld_u64 3101
+    abort
+l13: ld_u128 4125423653474658754976595
+    ld_u128 4125423653474658754976595
+    xor
+    ld_u128 0
+    eq
+    not
+    br_false l14
+    ld_u64 3102
+    abort
+l14: ld_u16 43
+    ld_u16 43
+    xor
+    ld_u16 0
+    eq
+    not
+    br_false l15
+    ld_u64 3100
+    abort
+l15: ld_u32 85677646
+    ld_u32 85677646
+    xor
+    ld_u32 0
+    eq
+    not
+    br_false l16
+    ld_u64 3101
+    abort
+l16: ld_u256 4125423653474658754976595
+    ld_u256 4125423653474658754976595
+    xor
+    ld_u256 0
+    eq
+    not
+    br_false l17
+    ld_u64 3102
+    abort
+l17: ld_u8 255
+    ld_u8 255
+    xor
+    ld_u8 0
+    eq
+    not
+    br_false l18
+    ld_u64 3200
+    abort
+l18: ld_u64 18446744073709551615
+    ld_u64 18446744073709551615
+    xor
+    ld_u64 0
+    eq
+    not
+    br_false l19
+    ld_u64 3201
+    abort
+l19: ld_u128 340282366920938463463374607431768211455
+    ld_u128 340282366920938463463374607431768211455
+    xor
+    ld_u128 0
+    eq
+    not
+    br_false l20
+    ld_u64 3202
+    abort
+l20: ld_u16 65535
+    ld_u16 65535
+    xor
+    ld_u16 0
+    eq
+    not
+    br_false l21
+    ld_u64 3200
+    abort
+l21: ld_u32 4294967295
+    ld_u32 4294967295
+    xor
+    ld_u32 0
+    eq
+    not
+    br_false l22
+    ld_u64 3201
+    abort
+l22: ld_u256 115792089237316195423570985008687907853269984665640564039457584007913129639935
+    ld_u256 115792089237316195423570985008687907853269984665640564039457584007913129639935
+    xor
+    ld_u256 0
+    eq
+    not
+    br_false l23
+    ld_u64 3202
+    abort
+l23: ld_u8 101
+    ld_u8 77
+    xor
+    ld_u8 40
+    eq
+    not
+    br_false l24
+    ld_u64 3300
+    abort
+l24: ld_u64 675437
+    ld_u64 14235
+    xor
+    ld_u64 686582
+    eq
+    not
+    br_false l25
+    ld_u64 3301
+    abort
+l25: ld_u128 534263574563786485434889
+    ld_u128 3141524387653489576893
+    xor
+    ld_u128 536139767529700229661108
+    eq
+    not
+    br_false l26
+    ld_u64 3302
+    abort
+l26: ld_u16 101
+    ld_u16 77
+    xor
+    ld_u16 40
+    eq
+    not
+    br_false l27
+    ld_u64 3300
+    abort
+l27: ld_u32 675437
+    ld_u32 14235
+    xor
+    ld_u32 686582
+    eq
+    not
+    br_false l28
+    ld_u64 3301
+    abort
+l28: ld_u256 534263574563786485434889
+    ld_u256 3141524387653489576893
+    xor
+    ld_u256 536139767529700229661108
+    eq
+    not
+    br_false l29
+    ld_u64 3302
+    abort
+l29: ld_u8 13
+    ld_u8 1
+    xor
+    ld_u8 12
+    eq
+    not
+    br_false l30
+    ld_u64 3400
+    abort
+l30: ld_u64 13
+    ld_u64 1
+    xor
+    ld_u64 12
+    eq
+    not
+    br_false l31
+    ld_u64 3401
+    abort
+l31: ld_u128 13
+    ld_u128 1
+    xor
+    ld_u128 12
+    eq
+    not
+    br_false l32
+    ld_u64 3402
+    abort
+l32: ld_u16 13
+    ld_u16 1
+    xor
+    ld_u16 12
+    eq
+    not
+    br_false l33
+    ld_u64 3400
+    abort
+l33: ld_u32 13
+    ld_u32 1
+    xor
+    ld_u32 12
+    eq
+    not
+    br_false l34
+    ld_u64 3401
+    abort
+l34: ld_u256 13
+    ld_u256 1
+    xor
+    ld_u256 12
+    eq
+    not
+    br_false l35
+    ld_u64 3402
+    abort
+l35: ret

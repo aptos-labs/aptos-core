@@ -101,8 +101,8 @@ impl VUF for Bls12381G1Bls {
 
         ensure!(
             multi_pairing(
-                vec![-output_g1, input_g1.into()].iter(),
-                vec![G2Projective::generator(), *pk_g2].iter()
+                [-output_g1, input_g1.into()].iter(),
+                [G2Projective::generator(), *pk_g2].iter()
             ) == Gt::identity(),
             "Bls12381G1Bls::verify failed with final check failure"
         );

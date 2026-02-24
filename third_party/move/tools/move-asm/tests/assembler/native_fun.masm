@@ -1,0 +1,10 @@
+//# publish --print-bytecode
+module 0x66::test
+
+native fun internal_helper(l0: u64): u64
+
+public native fun do_something(l0: u64, l1: bool): u64
+
+fun regular(l0: u64): u64
+    move_loc l0
+    ret

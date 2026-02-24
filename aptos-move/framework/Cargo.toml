@@ -85,7 +85,6 @@ aptos-crypto = { workspace = true, features = ["fuzzing"] }
 aptos-gas-meter = { workspace = true }
 aptos-vm = { workspace = true, features = ["testing"] }
 claims = { workspace = true }
-move-cli = { workspace = true }
 move-prover = { workspace = true }
 move-unit-test = { workspace = true }
 move-vm-types = { workspace = true, features = ["testing"] }

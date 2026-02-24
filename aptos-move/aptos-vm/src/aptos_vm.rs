@@ -42,8 +42,7 @@ use aptos_framework::natives::code::PublishRequest;
 use aptos_gas_algebra::{Gas, GasQuantity, NumBytes, Octa};
 use aptos_gas_meter::{AptosGasMeter, GasAlgebra, StandardGasAlgebra, StandardGasMeter};
 use aptos_gas_schedule::{
-    gas_feature_versions,
-    gas_feature_versions::{RELEASE_V1_10, RELEASE_V1_27, RELEASE_V1_38},
+    gas_feature_versions::{self, RELEASE_V1_10, RELEASE_V1_27, RELEASE_V1_38},
     AptosGasParameters, VMGasParameters,
 };
 use aptos_logger::{enabled, prelude::*, Level};
@@ -62,9 +61,10 @@ use aptos_types::{
         transaction_slice_metadata::TransactionSliceMetadata,
     },
     block_metadata::BlockMetadata,
-    block_metadata_ext::{BlockMetadataExt, BlockMetadataWithRandomness},
+    block_metadata_ext::BlockMetadataExt,
     chain_id::ChainId,
     contract_event::ContractEvent,
+    decryption::BlockTxnDecryptionKey,
     fee_statement::FeeStatement,
     function_info::FunctionInfo,
     move_utils::as_move_value::AsMoveValue,
@@ -163,6 +163,7 @@ static NUM_EXECUTION_SHARD: OnceCell<usize> = OnceCell::new();
 static NUM_PROOF_READING_THREADS: OnceCell<usize> = OnceCell::new();
 static DISCARD_FAILED_BLOCKS: OnceCell<bool> = OnceCell::new();
 static PROCESSED_TRANSACTIONS_DETAILED_COUNTERS: OnceCell<bool> = OnceCell::new();
+static ENABLE_PRE_WRITE: OnceCell<bool> = OnceCell::new();
 
 macro_rules! deprecated_module_bundle {
     () => {
@@ -350,7 +351,7 @@ impl AptosVM {
     }
 
     #[inline(always)]
-    fn timed_features(&self) -> &TimedFeatures {
+    pub(crate) fn timed_features(&self) -> &TimedFeatures {
         self.move_vm.env.timed_features()
     }
 
@@ -414,11 +415,21 @@ impl AptosVM {
                     true
                 },
                 Ok(TransactionExecutableRef::EntryFunction(f)) => {
-                    // If entry function is defined at special address - it is part of trusted code
-                    // and so no need to delay any checks (as there are none).
+                    // Perform in-place checks for entry functions at special addresses (e.g.,
+                    // framework code at 0x1) and not asynchronously.
+                    //
+                    // Rationale:
+                    // Special addresses contain trusted code. With the trusted code optimization,
+                    // type checks are disabled entirely, so async replay would only add overhead
+                    // (recording and replaying) without providing validation benefits. This is a
+                    // heuristic: if the entrypoint is trusted, most called functions are likely
+                    // trusted. While closures may call untrusted code, being conservative here
+                    // avoids unnecessary overhead in the common case.
                     !f.module().address().is_special()
                 },
-                Ok(TransactionExecutableRef::Empty) | Err(_) => false,
+                Ok(TransactionExecutableRef::Empty)
+                | Ok(TransactionExecutableRef::Encrypted)
+                | Err(_) => false,
             }
     }
 
@@ -451,6 +462,20 @@ impl AptosVM {
         match BLOCKSTM_V2_ENABLED.get() {
             Some(blockstm_v2_enabled) => *blockstm_v2_enabled,
             None => false,
+        }
+    }
+
+    /// Sets enable_pre_write flag when invoked the first time.
+    pub fn set_enable_pre_write_once(enable_pre_write: bool) {
+        // Only the first call succeeds, due to OnceCell semantics.
+        ENABLE_PRE_WRITE.set(enable_pre_write).ok();
+    }
+
+    /// Get the enable_pre_write flag if already set, otherwise return default (true)
+    pub fn get_enable_pre_write() -> bool {
+        match ENABLE_PRE_WRITE.get() {
+            Some(enable_pre_write) => *enable_pre_write,
+            None => true,
         }
     }
 
@@ -1072,7 +1097,17 @@ impl AptosVM {
                     )
                 })?;
             },
-
+            TransactionExecutableRef::Encrypted => {
+                // If the executable is still `Encrypted` here, it means that decryption
+                // failed. The transaction is kept on chain as aborted.
+                // TODO(ibalajiarun): Figure out better status code
+                let status_code = StatusCode::ABORTED;
+                let vm_status = VMStatus::Executed;
+                let txn_status =
+                    TransactionStatus::Keep(ExecutionStatus::MiscellaneousError(Some(status_code)));
+                let vm_output = VMOutput::empty_with_status(txn_status);
+                return Ok((vm_status, vm_output));
+            },
             // Not reachable as this function should only be invoked for entry or script
             // transaction payload.
             _ => unreachable!("Only scripts or entry functions are executed"),
@@ -1232,7 +1267,19 @@ impl AptosVM {
             TransactionExecutableRef::Script(_) => {
                 let s = VMStatus::error(
                     StatusCode::FEATURE_UNDER_GATING,
-                    Some("Multisig transaction does not support script payload".to_string()),
+                    Some(
+                        "Multisig transaction does not support script or encrypted payload"
+                            .to_string(),
+                    ),
+                );
+                return Ok((s, discarded_output(StatusCode::FEATURE_UNDER_GATING)));
+            },
+            TransactionExecutableRef::Encrypted => {
+                // TODO(ibalajiarun): Revisit this. I think this should lead to an abort due to failed
+                // decryption.
+                let s = VMStatus::error(
+                    StatusCode::FEATURE_UNDER_GATING,
+                    Some("Multisig transaction does not support encrypted payload".to_string()),
                 );
                 return Ok((s, discarded_output(StatusCode::FEATURE_UNDER_GATING)));
             },
@@ -1929,6 +1976,15 @@ impl AptosVM {
             }
         }
 
+        if transaction.payload().is_encrypted_variant()
+            && !self.features().is_encrypted_transactions_enabled()
+        {
+            return Err(VMStatus::error(
+                StatusCode::FEATURE_UNDER_GATING,
+                Some("Encrypted transactions are not yet supported".to_string()),
+            ));
+        }
+
         // The prologue MUST be run AFTER any validation. Otherwise you may run prologue and hit
         // SEQUENCE_NUMBER_TOO_NEW if there is more than one transaction from the same sender and
         // end up skipping validation.
@@ -2116,6 +2172,18 @@ impl AptosVM {
                 &mut traversal_context,
             )
         });
+        if txn.is_encrypted_txn() {
+            // Log the VM execution result for encrypted transactions.
+            info!(
+                "Encrypted user transaction executed. txn_hash={}, sender={}, status={:?}, gas_used={}, output_status={:?}, vm_status={:?}",
+                txn.committed_hash(),
+                txn.sender(),
+                vm_status,
+                gas_usage,
+                output.status(),
+                vm_status,
+            );
+        }
 
         // Whether user transaction succeeded or failed (e.g., abort in Move code or running out
         // of gas in epilogue), we record the trace of all executed instructions.
@@ -2140,7 +2208,7 @@ impl AptosVM {
         G: AptosGasMeter,
         F: FnOnce(u64, VMGasParameters, StorageGasParameters, bool, Gas, &'a C) -> G,
     {
-        let txn_metadata = TransactionMetadata::new(txn, auxiliary_info);
+        let txn_metadata = TransactionMetadata::new(txn, auxiliary_info, self.timed_features());
 
         let is_approved_gov_script = is_approved_gov_script(resolver, txn, &txn_metadata);
 
@@ -2487,40 +2555,56 @@ impl AptosVM {
             None,
         );
 
-        let block_metadata_with_randomness = match block_metadata_ext {
+        // Extract common fields and determine which function to call
+        let (function_name, args) = match block_metadata_ext {
             BlockMetadataExt::V0(_) => unreachable!(),
-            BlockMetadataExt::V1(v1) => v1,
+            BlockMetadataExt::V1(v1) => {
+                let args = vec![
+                    MoveValue::Signer(AccountAddress::ZERO), // Run as 0x0
+                    MoveValue::Address(AccountAddress::from_bytes(v1.id.to_vec()).unwrap()),
+                    MoveValue::U64(v1.epoch),
+                    MoveValue::U64(v1.round),
+                    MoveValue::Address(v1.proposer),
+                    v1.failed_proposer_indices
+                        .into_iter()
+                        .map(|i| i as u64)
+                        .collect::<Vec<_>>()
+                        .as_move_value(),
+                    v1.previous_block_votes_bitvec.as_move_value(),
+                    MoveValue::U64(v1.timestamp_usecs),
+                    v1.randomness
+                        .as_ref()
+                        .map(Randomness::randomness_cloned)
+                        .as_move_value(),
+                ];
+                (BLOCK_PROLOGUE_EXT, args)
+            },
+            BlockMetadataExt::V2(v2) => {
+                let args = vec![
+                    MoveValue::Signer(AccountAddress::ZERO), // Run as 0x0
+                    MoveValue::Address(AccountAddress::from_bytes(v2.id.to_vec()).unwrap()),
+                    MoveValue::U64(v2.epoch),
+                    MoveValue::U64(v2.round),
+                    MoveValue::Address(v2.proposer),
+                    v2.failed_proposer_indices
+                        .into_iter()
+                        .map(|i| i as u64)
+                        .collect::<Vec<_>>()
+                        .as_move_value(),
+                    v2.previous_block_votes_bitvec.as_move_value(),
+                    MoveValue::U64(v2.timestamp_usecs),
+                    v2.randomness
+                        .as_ref()
+                        .map(Randomness::randomness_cloned)
+                        .as_move_value(),
+                    v2.decryption_key
+                        .as_ref()
+                        .map(BlockTxnDecryptionKey::decryption_key_cloned)
+                        .as_move_value(),
+                ];
+                (BLOCK_PROLOGUE_EXT_V2, args)
+            },
         };
-
-        let BlockMetadataWithRandomness {
-            id,
-            epoch,
-            round,
-            proposer,
-            previous_block_votes_bitvec,
-            failed_proposer_indices,
-            timestamp_usecs,
-            randomness,
-        } = block_metadata_with_randomness;
-
-        let args = vec![
-            MoveValue::Signer(AccountAddress::ZERO), // Run as 0x0
-            MoveValue::Address(AccountAddress::from_bytes(id.to_vec()).unwrap()),
-            MoveValue::U64(epoch),
-            MoveValue::U64(round),
-            MoveValue::Address(proposer),
-            failed_proposer_indices
-                .into_iter()
-                .map(|i| i as u64)
-                .collect::<Vec<_>>()
-                .as_move_value(),
-            previous_block_votes_bitvec.as_move_value(),
-            MoveValue::U64(timestamp_usecs),
-            randomness
-                .as_ref()
-                .map(Randomness::randomness_cloned)
-                .as_move_value(),
-        ];
 
         let traversal_storage = TraversalStorage::new();
         let mut traversal_context = TraversalContext::new(&traversal_storage);
@@ -2528,7 +2612,7 @@ impl AptosVM {
         session
             .execute_function_bypass_visibility(
                 &BLOCK_MODULE,
-                BLOCK_PROLOGUE_EXT,
+                function_name,
                 vec![],
                 serialize_values(&args),
                 &mut gas_meter,
@@ -2537,7 +2621,7 @@ impl AptosVM {
             )
             .map(|_return_vals| ())
             .or_else(|e| {
-                expect_only_successful_execution(e, BLOCK_PROLOGUE_EXT.as_str(), log_context)
+                expect_only_successful_execution(e, function_name.as_str(), log_context)
             })?;
         SYSTEM_TRANSACTIONS_EXECUTED.inc();
 
@@ -3114,6 +3198,7 @@ impl VMBlockExecutor for AptosVMBlockExecutor {
                 allow_fallback: true,
                 discard_failed_blocks: AptosVM::get_discard_failed_blocks(),
                 module_cache_config: BlockExecutorModuleCacheLocalConfig::default(),
+                enable_pre_write: AptosVM::get_enable_pre_write(),
             },
             onchain: onchain_config,
         };
@@ -3226,9 +3311,12 @@ impl VMValidator for AptosVM {
             }
         }
 
-        if transaction.payload().is_encrypted_variant() {
+        if transaction.payload().is_encrypted_variant()
+            && !self.features().is_encrypted_transactions_enabled()
+        {
             return VMValidatorResult::error(StatusCode::FEATURE_UNDER_GATING);
         }
+
         let txn = match transaction.check_signature() {
             Ok(t) => t,
             _ => {
@@ -3236,7 +3324,7 @@ impl VMValidator for AptosVM {
             },
         };
         let auxiliary_info = AuxiliaryInfo::new_timestamp_not_yet_assigned(0);
-        let txn_data = TransactionMetadata::new(&txn, &auxiliary_info);
+        let txn_data = TransactionMetadata::new(&txn, &auxiliary_info, self.timed_features());
 
         let resolver = self.as_move_resolver(&state_view);
         let is_approved_gov_script = is_approved_gov_script(&resolver, &txn, &txn_data);
@@ -3300,6 +3388,15 @@ impl VMValidator for AptosVM {
         };
 
         TRANSACTIONS_VALIDATED.inc_with(&[counter_label]);
+
+        if txn.is_encrypted_txn() {
+            info!(
+                "Encrypted transaction detected. txn_hash={}, sender={}, result={:?}",
+                txn.committed_hash(),
+                txn.sender(),
+                result,
+            );
+        }
 
         result
     }

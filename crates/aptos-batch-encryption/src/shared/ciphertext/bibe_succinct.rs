@@ -8,7 +8,7 @@ use super::{
     PreparedBIBECiphertext,
 };
 use crate::{
-    errors::BatchEncryptionError,
+    errors::MissingEvalProofError,
     group::{Fr, G1Affine, G2Affine, PairingOutput, PairingSetting},
     shared::{
         ciphertext::bibe::{BIBECTEncrypt, InnerCiphertext},
@@ -41,27 +41,32 @@ pub struct BIBESuccinctCiphertext {
 impl InnerCiphertext for BIBESuccinctCiphertext {
     type EncryptionKey = AugmentedEncryptionKey;
 
-    fn prepare(&self, digest: &Digest, eval_proofs: &EvalProofs) -> Result<PreparedBIBECiphertext> {
+    fn prepare(
+        &self,
+        digest: &Digest,
+        eval_proofs: &EvalProofs,
+    ) -> std::result::Result<PreparedBIBECiphertext, MissingEvalProofError> {
         let pf = eval_proofs
             .get(&self.id)
-            .ok_or(BatchEncryptionError::UncomputedEvalProofError)?;
+            .ok_or(MissingEvalProofError(self.id))?;
 
-        self.prepare_individual(digest, &pf)
+        Ok(self.prepare_individual(digest, &pf))
     }
 
     fn prepare_individual(
         &self,
         _digest: &Digest,
         eval_proof: &EvalProof,
-    ) -> Result<PreparedBIBECiphertext> {
+    ) -> PreparedBIBECiphertext {
         let pairing_output = PairingSetting::pairing(**eval_proof, self.ct_g2[1]);
 
-        Ok(PreparedBIBECiphertext {
+        PreparedBIBECiphertext {
+            id: self.id,
             pairing_output,
             ct_g2: self.ct_g2[0].into(),
             padded_key: self.padded_key.clone(),
             symmetric_ciphertext: self.symmetric_ciphertext.clone(),
-        })
+        }
     }
 
     fn id(&self) -> Id {
@@ -141,9 +146,9 @@ pub mod tests {
         let msk = Fr::rand(&mut rng);
         let (mpk, _, msk_shares) = key_derivation::gen_msk_shares(msk, &mut rng, &tc);
 
-        let ek = AugmentedEncryptionKey::new(mpk.0, dk.tau_g2, (dk.tau_g2 * msk).into());
+        let ek = AugmentedEncryptionKey::new(mpk, dk.tau_g2, (dk.tau_g2 * msk).into());
 
-        let mut ids = IdSet::with_capacity(dk.capacity()).unwrap();
+        let mut ids = IdSet::with_capacity(dk.capacity());
         let mut counter = Fr::zero();
 
         for _ in 0..dk.capacity() {

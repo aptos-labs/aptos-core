@@ -17,7 +17,7 @@ use std::{
 };
 
 // Default execution concurrency level
-pub const DEFAULT_EXECUTION_CONCURRENCY_LEVEL: u16 = 32;
+pub const DEFAULT_EXECUTION_CONCURRENCY_LEVEL: u16 = 16;
 
 // Genesis constants
 const GENESIS_BLOB_FILENAME: &str = "genesis.blob";
@@ -57,6 +57,8 @@ pub struct ExecutionConfig {
     /// If enabled, runtime checks like paranoid type checks may be performed in parallel in post
     /// commit hook in Block-STM.
     pub async_runtime_checks: bool,
+    /// Enables pre-write optimization for parallel execution.
+    pub enable_pre_write: bool,
 }
 
 impl std::fmt::Debug for ExecutionConfig {
@@ -90,8 +92,8 @@ impl Default for ExecutionConfig {
             genesis_waypoint: None,
             blockstm_v2_enabled: false,
             layout_caches_enabled: true,
-            // TODO: consider setting to be true by default.
-            async_runtime_checks: false,
+            async_runtime_checks: true,
+            enable_pre_write: true,
         }
     }
 }

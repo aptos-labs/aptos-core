@@ -1,0 +1,48 @@
+//# publish
+module 0x42::M
+use 0x1::signer
+struct Foo has key
+  x: u128
+
+public fun foo(l0: &signer)
+    move_loc l0
+    ld_u128 100
+    pack Foo
+    move_to Foo
+    ret
+
+public fun bar(l0: &signer): u128 acquires Foo
+    local l1: u128
+    move_loc l0
+    call signer::address_of
+    move_from Foo
+    unpack Foo
+    st_loc l1
+    move_loc l1
+    ret
+
+
+
+//# run --signers 0x1
+script
+use 0x42::M
+entry public fun main(l0: signer)
+    borrow_loc l0
+    call M::foo
+    ret
+
+
+
+//# run --signers 0x1
+script
+use 0x42::M
+entry public fun main(l0: signer)
+    borrow_loc l0
+    call M::bar
+    ld_u128 100
+    eq
+    not
+    br_false l0
+    ld_u64 42
+    abort
+l0: ret

@@ -2,10 +2,14 @@
 // Copyright (c) The Move Contributors
 // SPDX-License-Identifier: Apache-2.0
 
+use codespan_reporting::term::termcolor::{ColorChoice, StandardStream};
 use legacy_move_compiler::shared::NumericalAddress;
-use log::LevelFilter;
 use move_command_line_common::files::{extension_equals, find_filenames, MOVE_EXTENSION};
-use std::{collections::BTreeMap, path::PathBuf};
+use std::{
+    collections::BTreeMap,
+    fs,
+    path::{Path, PathBuf},
+};
 
 #[cfg(test)]
 mod tests;
@@ -17,8 +21,6 @@ const MODULES_DIR: &str = "sources";
 const NURSERY_DIR: &str = "nursery";
 const DOCS_DIR: &str = "docs";
 const NURSERY_DOCS_DIR: &str = "nursery/docs";
-const ERRMAP_FILE: &str = "error_description.errmap";
-
 const REFERENCES_TEMPLATE: &str = "doc_templates/references.md";
 const OVERVIEW_TEMPLATE: &str = "doc_templates/overview.md";
 
@@ -48,10 +50,6 @@ pub fn move_stdlib_docs_full_path() -> String {
 
 pub fn move_nursery_docs_full_path() -> String {
     format!("{}/{}", env!("CARGO_MANIFEST_DIR"), NURSERY_DOCS_DIR)
-}
-
-pub fn move_stdlib_errmap_full_path() -> String {
-    format!("{}/{}", env!("CARGO_MANIFEST_DIR"), ERRMAP_FILE)
 }
 
 pub fn move_stdlib_files() -> Vec<String> {
@@ -86,25 +84,40 @@ pub fn build_doc(
     with_diagram: bool,
     named_addresses: BTreeMap<String, NumericalAddress>,
 ) {
-    let options = move_prover::cli::Options {
-        move_sources: sources.to_vec(),
-        move_deps: dep_paths,
-        move_named_address_values: move_prover::cli::named_addresses_for_options(&named_addresses),
-        verbosity_level: LevelFilter::Warn,
-        run_docgen: true,
-        docgen: move_docgen::DocgenOptions {
-            root_doc_templates: templates,
-            references_file,
-            doc_path: vec![doc_path.to_string()],
-            output_directory: output_path.to_string(),
-            include_dep_diagrams: with_diagram,
-            include_call_diagrams: with_diagram,
-            ..Default::default()
-        },
+    let named_address_mapping: Vec<String> = named_addresses
+        .iter()
+        .map(|(name, addr)| format!("{}={}", name, addr))
+        .collect();
+    let compiler_options = move_compiler_v2::Options {
+        sources: sources.to_vec(),
+        dependencies: dep_paths,
+        named_address_mapping,
+        skip_attribute_checks: true,
+        compile_verify_code: true,
         ..Default::default()
     };
-    options.setup_logging_for_test();
-    move_prover::run_move_prover_errors_to_stderr(options).unwrap();
+    let mut error_writer = StandardStream::stderr(ColorChoice::Auto);
+    let model =
+        move_compiler_v2::run_move_compiler_for_analysis(&mut error_writer, compiler_options)
+            .expect("model building failed");
+    let docgen_options = move_docgen::DocgenOptions {
+        root_doc_templates: templates,
+        references_file,
+        doc_path: vec![doc_path.to_string()],
+        output_directory: output_path.to_string(),
+        include_dep_diagrams: with_diagram,
+        include_call_diagrams: with_diagram,
+        ..Default::default()
+    };
+    let generator = move_docgen::Docgen::new(&model, &docgen_options);
+    for (file, content) in generator.r#gen() {
+        let path = PathBuf::from(&file);
+        fs::create_dir_all(path.parent().unwrap()).unwrap();
+        fs::write(Path::new(&file), content).unwrap();
+    }
+    if model.has_errors() {
+        panic!("documentation generation failed");
+    }
 }
 
 pub fn build_stdlib_doc(output_path: &str) {
@@ -137,29 +150,4 @@ pub fn build_nursery_doc(output_path: &str) {
         false,
         move_stdlib_named_addresses(),
     )
-}
-
-pub fn build_error_code_map(output_path: &str) {
-    let options = move_prover::cli::Options {
-        move_sources: crate::move_stdlib_files(),
-        move_deps: vec![],
-        verbosity_level: LevelFilter::Warn,
-        run_errmapgen: true,
-        move_named_address_values: move_prover::cli::named_addresses_for_options(
-            &move_stdlib_named_addresses(),
-        ),
-        errmapgen: move_errmapgen::ErrmapOptions {
-            output_file: output_path.to_string(),
-            ..Default::default()
-        },
-        ..Default::default()
-    };
-    options.setup_logging_for_test();
-    move_prover::run_move_prover_errors_to_stderr(options).unwrap();
-}
-
-const ERROR_DESCRIPTIONS: &[u8] = include_bytes!("../error_description.errmap");
-
-pub fn error_descriptions() -> &'static [u8] {
-    ERROR_DESCRIPTIONS
 }
