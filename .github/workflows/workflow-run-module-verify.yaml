@@ -49,13 +49,13 @@ jobs:
       - name: Install AWS CLI
         shell: bash
         run: |
-          scripts/dev_setup.sh -b -i awscli
+          scripts/setup_build.sh -b -i awscli
           echo "${HOME}/bin/" >> $GITHUB_PATH # default INSTALL_DIR to path
 
       - name: Install s5cmd
         shell: bash
         run: |
-          scripts/dev_setup.sh -b -i s5cmd
+          scripts/setup_build.sh -b -i s5cmd
           echo "${HOME}/bin/" >> $GITHUB_PATH # default INSTALL_DIR to path
 
       - name: Build CLI binaries in release mode

@@ -18,7 +18,7 @@ runs:
 
     - name: install related tools and prover dependencies
       shell: bash
-      run: scripts/dev_setup.sh -b -p -r -y -P -t
+      run: scripts/setup_build.sh -b -p -r -y -P -t
 
     - name: prepare move lang prover tooling.
       shell: bash
