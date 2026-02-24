@@ -12,6 +12,12 @@ publish = { workspace = true }
 repository = { workspace = true }
 rust-version = { workspace = true }
 
+[package.metadata.cargo-machete]
+ignored = ["ark-std", "serde_bytes"]
+
+[features]
+smoke-test = []
+
 [dependencies]
 anyhow = { workspace = true }
 aptos-bounded-executor = { workspace = true }
@@ -52,9 +58,3 @@ tokio-retry = { workspace = true }
 
 [dev-dependencies]
 aptos-types = { workspace = true, features = ["testing"] }
-
-[features]
-smoke-test = []
-
-[package.metadata.cargo-machete]
-ignored = ["ark-std", "serde_bytes"]

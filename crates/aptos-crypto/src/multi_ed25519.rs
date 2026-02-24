@@ -191,9 +191,7 @@ impl Uniform for MultiEd25519PrivateKey {
         for _ in 0..num_of_keys {
             let mut bytes = [0u8; 32];
             rng.fill_bytes(&mut bytes);
-            private_keys.push(
-                Ed25519PrivateKey::try_from(&bytes[..]).unwrap(),
-            );
+            private_keys.push(Ed25519PrivateKey::try_from(&bytes[..]).unwrap());
         }
         let threshold = rng.gen_range(1, num_of_keys + 1) as u8;
         MultiEd25519PrivateKey {

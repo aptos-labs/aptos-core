@@ -12,6 +12,12 @@ publish = { workspace = true }
 repository = { workspace = true }
 rust-version = { workspace = true }
 
+[package.metadata.cargo-machete]
+ignored = ["serde_bytes"]
+
+[features]
+fuzzing = ["proptest"]
+
 [dependencies]
 proptest = { workspace = true, optional = true }
 serde = { workspace = true }
@@ -22,9 +28,3 @@ bcs = { workspace = true }
 proptest = { workspace = true }
 proptest-derive = { workspace = true }
 serde_json = { workspace = true }
-
-[features]
-fuzzing = ["proptest"]
-
-[package.metadata.cargo-machete]
-ignored = ["serde_bytes"]

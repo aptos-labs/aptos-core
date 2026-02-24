@@ -12,6 +12,11 @@ publish = { workspace = true }
 repository = { workspace = true }
 rust-version = { workspace = true }
 
+[features]
+default = []
+fuzzing = ["aptos-consensus-types/fuzzing", "aptos-config/fuzzing", "proptest"]
+testing = ["aptos-secure-storage/testing"]
+
 [dependencies]
 aptos-config = { workspace = true }
 aptos-consensus-types = { workspace = true }
@@ -47,8 +52,3 @@ tempfile = { workspace = true }
 name = "safety_rules"
 harness = false
 required-features = ["testing"]
-
-[features]
-default = []
-fuzzing = ["aptos-consensus-types/fuzzing", "aptos-config/fuzzing", "proptest"]
-testing = ["aptos-secure-storage/testing"]

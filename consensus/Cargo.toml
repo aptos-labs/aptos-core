@@ -12,6 +12,21 @@ publish = { workspace = true }
 repository = { workspace = true }
 rust-version = { workspace = true }
 
+[package.metadata.cargo-machete]
+ignored = ["serde_bytes", "ark-std"]
+
+[features]
+default = []
+fuzzing = [
+    "aptos-consensus-types/fuzzing",
+    "aptos-config/fuzzing",
+    "aptos-crypto/fuzzing",
+    "aptos-mempool/fuzzing",
+    "aptos-types/fuzzing",
+    "aptos-safety-rules/testing",
+]
+failpoints = ["fail/failpoints"]
+
 [dependencies]
 anyhow = { workspace = true }
 aptos-batch-encryption = { workspace = true }
@@ -110,21 +125,6 @@ move-core-types = { workspace = true }
 proptest = { workspace = true }
 proptest-derive = { workspace = true }
 tempfile = { workspace = true }
-
-[features]
-default = []
-fuzzing = [
-    "aptos-consensus-types/fuzzing",
-    "aptos-config/fuzzing",
-    "aptos-crypto/fuzzing",
-    "aptos-mempool/fuzzing",
-    "aptos-types/fuzzing",
-    "aptos-safety-rules/testing",
-]
-failpoints = ["fail/failpoints"]
-
-[package.metadata.cargo-machete]
-ignored = ["serde_bytes", "ark-std"]
 
 [lints.clippy]
 unwrap_used = "deny"

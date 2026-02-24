@@ -9,6 +9,12 @@ license = "Apache-2.0"
 publish = false
 edition = { workspace = true }
 
+[lib]
+doctest = false
+
+[features]
+default = []
+
 [dependencies]
 anyhow = { workspace = true }
 clap = { workspace = true, features = ["derive"] }
@@ -24,12 +30,6 @@ libtest-mimic = { workspace = true }
 move-transactional-test-runner = { workspace = true }
 walkdir = { workspace = true }
 
-[features]
-default = []
-
 [[test]]
 name = "testsuite"
 harness = false
-
-[lib]
-doctest = false

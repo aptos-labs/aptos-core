@@ -12,6 +12,9 @@ publish = { workspace = true }
 repository = { workspace = true }
 rust-version = { workspace = true }
 
+[features]
+default = []
+
 [dependencies]
 anyhow = { workspace = true }
 aptos-types = { workspace = true }
@@ -30,6 +33,3 @@ aptos-cached-packages = { workspace = true }
 aptos-framework = { workspace = true }
 tempfile = { workspace = true }
 which = { workspace = true }
-
-[features]
-default = []

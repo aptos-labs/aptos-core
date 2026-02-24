@@ -12,6 +12,10 @@ publish = { workspace = true }
 repository = { workspace = true }
 rust-version = { workspace = true }
 
+[features]
+default = []
+fuzzing = ["proptest", "proptest-derive", "aptos-crypto/fuzzing", "aptos-types/fuzzing"]
+
 [dependencies]
 anyhow = { workspace = true }
 aptos-crypto = { workspace = true }
@@ -42,7 +46,3 @@ aptos-types = { workspace = true, features = ["fuzzing"] }
 proptest = { workspace = true }
 proptest-derive = { workspace = true }
 rand = { workspace = true }
-
-[features]
-default = []
-fuzzing = ["proptest", "proptest-derive", "aptos-crypto/fuzzing", "aptos-types/fuzzing"]

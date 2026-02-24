@@ -16,6 +16,11 @@ name = "move"
 path = "src/main.rs"
 required-features = ["binary"]
 
+[features]
+default = []
+binary = ["testing"]
+testing = ["aptos-vm/testing"]
+
 [dependencies]
 anyhow = { workspace = true }
 aptos-api-types = { workspace = true }
@@ -76,8 +81,3 @@ mockall = { workspace = true }
 move-prover-test-utils = { workspace = true }
 regex = { workspace = true }
 termcolor = { workspace = true }
-
-[features]
-default = []
-binary = ["testing"]
-testing = ["aptos-vm/testing"]

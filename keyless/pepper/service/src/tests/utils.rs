@@ -9,8 +9,9 @@ use crate::{
     vuf_keypair::{get_pepper_service_vuf_public_key_and_json, VUFKeypair},
 };
 use aptos_crypto::blstrs::scalar_from_uniform_be_bytes;
-use aptos_keyless_pepper_common::{vuf::slip_10::ed25519_dalek::Digest, PepperInput};
+use aptos_keyless_pepper_common::PepperInput;
 use aptos_time_service::TimeService;
+use sha3::Digest;
 use std::{sync::Arc, time::Duration};
 
 /// A mock implementation of the account recovery DB that does nothing

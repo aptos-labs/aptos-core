@@ -81,6 +81,12 @@ path = "fuzz_targets/move/aptosvm_publish_and_run_transactional.rs"
 test = false
 doc = false
 
+[[bin]]
+name = "u256_diff_fuzz"
+path = "fuzz_targets/u256_diff_fuzz.rs"
+test = false
+doc = false
+
 [features]
 consensus = ["dep:aptos-consensus"]
 
@@ -113,9 +119,3 @@ rayon = { workspace = true }
 ring = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
-
-[[bin]]
-name = "u256_diff_fuzz"
-path = "fuzz_targets/u256_diff_fuzz.rs"
-test = false
-doc = false

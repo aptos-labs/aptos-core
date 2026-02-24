@@ -12,6 +12,13 @@ publish = { workspace = true }
 repository = { workspace = true }
 rust-version = { workspace = true }
 
+[lib]
+doctest = false
+
+[features]
+default = []
+profiling = ["aptos-vm/profiling"]
+
 [dependencies]
 anyhow = { workspace = true }
 aptos-cached-packages = { workspace = true }
@@ -51,10 +58,3 @@ claims = { workspace = true }
 memory-stats = { workspace = true }
 test-case = { workspace = true }
 tokio = { workspace = true }
-
-[lib]
-doctest = false
-
-[features]
-default = []
-profiling = ["aptos-vm/profiling"]

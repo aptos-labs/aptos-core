@@ -12,6 +12,10 @@ publish = { workspace = true }
 repository = { workspace = true }
 rust-version = { workspace = true }
 
+[features]
+default = []
+testing = []
+
 [dependencies]
 aptos-types = { workspace = true }
 bcs = { workspace = true }
@@ -24,7 +28,3 @@ triomphe = { workspace = true }
 [dev-dependencies]
 once_cell = { workspace = true }
 test-case = { workspace = true }
-
-[features]
-default = []
-testing = []

@@ -12,6 +12,9 @@ publish = { workspace = true }
 repository = { workspace = true }
 rust-version = { workspace = true }
 
+[features]
+fuzzing = ["proptest", "aptos-types", "aptos-types/fuzzing"]
+
 [dependencies]
 aptos-crypto = { workspace = true }
 aptos-types = { workspace = true, optional = true }
@@ -29,6 +32,3 @@ ureq = { workspace = true }
 aptos-proptest-helpers = { workspace = true }
 aptos-types = { workspace = true, features = ["fuzzing"] }
 proptest = { workspace = true }
-
-[features]
-fuzzing = ["proptest", "aptos-types", "aptos-types/fuzzing"]

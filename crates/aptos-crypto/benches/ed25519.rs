@@ -12,7 +12,7 @@ use aptos_crypto::{
 use aptos_crypto_derive::{BCSCryptoHash, CryptoHasher};
 use criterion::{measurement::Measurement, BenchmarkGroup, Criterion, Throughput};
 use curve25519_dalek::{constants::ED25519_BASEPOINT_POINT, scalar::Scalar};
-use rand::{distributions, prelude::ThreadRng, thread_rng, Rng};
+use rand::{distributions, prelude::ThreadRng, thread_rng, Rng, RngCore};
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, CryptoHasher, BCSCryptoHash, Serialize, Deserialize)]
@@ -87,8 +87,12 @@ fn small_subgroup_check<M: Measurement>(g: &mut BenchmarkGroup<M>) {
     g.throughput(Throughput::Elements(1_u64));
     g.bench_function("small_subgroup_check", move |b| {
         b.iter_with_setup(
-            || Scalar::random(&mut csprng) * point,
-            |h| h.is_small_order(),
+            || {
+                let mut bytes = [0u8; 32];
+                csprng.fill_bytes(&mut bytes);
+                Scalar::from_bytes_mod_order(bytes) * point
+            },
+            |h: curve25519_dalek::edwards::EdwardsPoint| h.is_small_order(),
         )
     });
 }

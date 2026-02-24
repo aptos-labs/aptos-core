@@ -9,6 +9,18 @@ publish = false
 edition = { workspace = true }
 default-run = "main"
 
+[[bin]]
+name = "main"
+path  = "src/main.rs"
+
+[[bin]]
+name = "run-move"
+path = "src/bins/run_move.rs"
+
+[[bin]]
+name = "run-aptos-p2p"
+path = "src/bins/run_aptos_p2p.rs"
+
 [dependencies]
 anyhow = { workspace = true }
 clap = { workspace = true }
@@ -33,15 +45,3 @@ move-core-types = { workspace = true }
 move-vm-runtime = { workspace = true }
 move-vm-test-utils = { workspace = true }
 move-vm-types = { workspace = true }
-
-[[bin]]
-name = "main"
-path  = "src/main.rs"
-
-[[bin]]
-name = "run-move"
-path = "src/bins/run_move.rs"
-
-[[bin]]
-name = "run-aptos-p2p"
-path = "src/bins/run_aptos_p2p.rs"

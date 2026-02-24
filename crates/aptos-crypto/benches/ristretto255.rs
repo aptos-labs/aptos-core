@@ -12,8 +12,20 @@ use curve25519_dalek::{
     scalar::Scalar,
     traits::{Identity, VartimeMultiscalarMul},
 };
-use rand::{distributions::Uniform, prelude::ThreadRng, thread_rng, Rng};
+use rand::{distributions::Uniform, prelude::ThreadRng, thread_rng, Rng, RngCore};
 use std::ops::{Add, Mul, Neg, Sub};
+
+fn random_scalar(rng: &mut ThreadRng) -> Scalar {
+    let mut bytes = [0u8; 32];
+    rng.fill_bytes(&mut bytes);
+    Scalar::from_bytes_mod_order(bytes)
+}
+
+fn random_ristretto_point(rng: &mut ThreadRng) -> RistrettoPoint {
+    // Generate a random point by multiplying a random scalar with the basepoint
+    let scalar = random_scalar(rng);
+    RistrettoPoint::mul_base(&scalar)
+}
 
 fn benchmark_groups(c: &mut Criterion) {
     let mut group = c.benchmark_group("ristretto255");
@@ -38,7 +50,6 @@ fn benchmark_groups(c: &mut Criterion) {
     scalar_from_u128(&mut group);
     scalar_from_u64(&mut group);
     scalar_invert(&mut group);
-    scalar_is_canonical(&mut group);
     scalar_mul(&mut group);
     scalar_neg(&mut group);
     scalar_sub(&mut group);
@@ -60,15 +71,15 @@ fn multi_scalar_mul<M: Measurement>(g: &mut BenchmarkGroup<M>, n: usize) {
         b.iter_with_setup(
             || {
                 let points = (0..n)
-                    .map(|_| RistrettoPoint::random(&mut rng))
+                    .map(|_| random_ristretto_point(&mut rng))
                     .collect::<Vec<RistrettoPoint>>();
                 let scalars = (0..n)
-                    .map(|_| Scalar::random(&mut rng))
+                    .map(|_| random_scalar(&mut rng))
                     .collect::<Vec<Scalar>>();
 
                 (points, scalars)
             },
-            |(points, scalars)| {
+            |(points, scalars): (Vec<RistrettoPoint>, Vec<Scalar>)| {
                 RistrettoPoint::vartime_multiscalar_mul(
                     scalars.iter(),
                     points.iter().collect::<Vec<&RistrettoPoint>>(),
@@ -86,7 +97,7 @@ fn basepoint_mul<M: Measurement>(g: &mut BenchmarkGroup<M>) {
 
     g.throughput(Throughput::Elements(1));
     g.bench_function("basepoint_mul", move |b| {
-        b.iter_with_setup(|| Scalar::random(&mut rng), |a| basepoint.mul(&a))
+        b.iter_with_setup(|| random_scalar(&mut rng), |a| basepoint.mul(&a))
     });
 }
 
@@ -99,9 +110,9 @@ fn basepoint_double_mul<M: Measurement>(g: &mut BenchmarkGroup<M>) {
         b.iter_with_setup(
             || {
                 (
-                    RistrettoPoint::random(&mut rng),
-                    Scalar::random(&mut rng),
-                    Scalar::random(&mut rng),
+                    random_ristretto_point(&mut rng),
+                    random_scalar(&mut rng),
+                    random_scalar(&mut rng),
                 )
             },
             |(a_point, a, b)| {
@@ -119,11 +130,11 @@ fn point_add<M: Measurement>(g: &mut BenchmarkGroup<M>) {
         b.iter_with_setup(
             || {
                 (
-                    RistrettoPoint::random(&mut rng),
-                    RistrettoPoint::random(&mut rng),
+                    random_ristretto_point(&mut rng),
+                    random_ristretto_point(&mut rng),
                 )
             },
-            |(a_point, b_point)| a_point.add(&b_point),
+            |(a_point, b_point): (RistrettoPoint, RistrettoPoint)| a_point.add(&b_point),
         )
     });
 }
@@ -134,7 +145,7 @@ fn point_compress<M: Measurement>(g: &mut BenchmarkGroup<M>) {
     g.throughput(Throughput::Elements(1));
     g.bench_function("point_compress", move |b| {
         b.iter_with_setup(
-            || RistrettoPoint::random(&mut rng),
+            || random_ristretto_point(&mut rng),
             |point| point.compress(),
         )
     });
@@ -146,7 +157,7 @@ fn point_decompress<M: Measurement>(g: &mut BenchmarkGroup<M>) {
     g.throughput(Throughput::Elements(1));
     g.bench_function("point_decompress", move |b| {
         b.iter_with_setup(
-            || RistrettoPoint::random(&mut rng).compress().to_bytes(),
+            || random_ristretto_point(&mut rng).compress().to_bytes(),
             |bytes| CompressedRistretto(bytes).decompress(),
         )
     });
@@ -159,10 +170,10 @@ fn point_equals<M: Measurement>(g: &mut BenchmarkGroup<M>) {
     g.bench_function("point_equals", move |b| {
         b.iter_with_setup(
             || {
-                let a = RistrettoPoint::random(&mut rng);
+                let a = random_ristretto_point(&mut rng);
                 (a, a)
             },
-            |(a_point, b_point)| a_point.eq(&b_point),
+            |(a_point, b_point): (RistrettoPoint, RistrettoPoint)| a_point.eq(&b_point),
         )
     });
 }
@@ -191,8 +202,8 @@ fn point_mul<M: Measurement>(g: &mut BenchmarkGroup<M>) {
     g.throughput(Throughput::Elements(1));
     g.bench_function("point_mul", move |b| {
         b.iter_with_setup(
-            || (RistrettoPoint::random(&mut rng), Scalar::random(&mut rng)),
-            |(g, a)| g.mul(&a),
+            || (random_ristretto_point(&mut rng), random_scalar(&mut rng)),
+            |(g, a): (RistrettoPoint, Scalar)| g.mul(&a),
         )
     });
 }
@@ -202,7 +213,10 @@ fn point_neg<M: Measurement>(g: &mut BenchmarkGroup<M>) {
 
     g.throughput(Throughput::Elements(1));
     g.bench_function("point_neg", move |b| {
-        b.iter_with_setup(|| RistrettoPoint::random(&mut rng), |point| point.neg())
+        b.iter_with_setup(
+            || random_ristretto_point(&mut rng),
+            |point: RistrettoPoint| point.neg(),
+        )
     });
 }
 
@@ -214,11 +228,11 @@ fn point_sub<M: Measurement>(g: &mut BenchmarkGroup<M>) {
         b.iter_with_setup(
             || {
                 (
-                    RistrettoPoint::random(&mut rng),
-                    RistrettoPoint::random(&mut rng),
+                    random_ristretto_point(&mut rng),
+                    random_ristretto_point(&mut rng),
                 )
             },
-            |(a_point, b_point)| a_point.sub(&b_point),
+            |(a_point, b_point): (RistrettoPoint, RistrettoPoint)| a_point.sub(&b_point),
         )
     });
 }
@@ -229,7 +243,7 @@ fn scalar_add<M: Measurement>(g: &mut BenchmarkGroup<M>) {
     g.throughput(Throughput::Elements(1));
     g.bench_function("scalar_add", move |b| {
         b.iter_with_setup(
-            || (Scalar::random(&mut rng), Scalar::random(&mut rng)),
+            || (random_scalar(&mut rng), random_scalar(&mut rng)),
             // NOTE: Specifically moving 'b' in, just like the native Rust function does in Move
             |(a, b)| a.add(b),
         )
@@ -283,18 +297,11 @@ fn scalar_invert<M: Measurement>(g: &mut BenchmarkGroup<M>) {
 
     g.throughput(Throughput::Elements(1));
     g.bench_function("scalar_invert", move |b| {
-        b.iter_with_setup(|| Scalar::random(&mut rng), |a| a.invert())
+        b.iter_with_setup(|| random_scalar(&mut rng), |a| a.invert())
     });
 }
 
-fn scalar_is_canonical<M: Measurement>(g: &mut BenchmarkGroup<M>) {
-    let mut rng: ThreadRng = thread_rng();
-
-    g.throughput(Throughput::Elements(1));
-    g.bench_function("scalar_is_canonical", move |b| {
-        b.iter_with_setup(|| Scalar::random(&mut rng), |a| a.is_canonical())
-    });
-}
+// scalar_is_canonical benchmark removed - is_canonical() is now private in curve25519-dalek v4
 
 fn scalar_mul<M: Measurement>(g: &mut BenchmarkGroup<M>) {
     let mut rng: ThreadRng = thread_rng();
@@ -302,7 +309,7 @@ fn scalar_mul<M: Measurement>(g: &mut BenchmarkGroup<M>) {
     g.throughput(Throughput::Elements(1));
     g.bench_function("scalar_mul", move |b| {
         b.iter_with_setup(
-            || (Scalar::random(&mut rng), Scalar::random(&mut rng)),
+            || (random_scalar(&mut rng), random_scalar(&mut rng)),
             // NOTE: Specifically moving 'b' in, just like the native Rust function does in Move
             |(a, b)| a.mul(b),
         )
@@ -314,7 +321,7 @@ fn scalar_neg<M: Measurement>(g: &mut BenchmarkGroup<M>) {
 
     g.throughput(Throughput::Elements(1));
     g.bench_function("scalar_neg", move |b| {
-        b.iter_with_setup(|| Scalar::random(&mut rng), |a| a.neg())
+        b.iter_with_setup(|| random_scalar(&mut rng), |a| a.neg())
     });
 }
 
@@ -324,9 +331,18 @@ fn scalar_sub<M: Measurement>(g: &mut BenchmarkGroup<M>) {
     g.throughput(Throughput::Elements(1));
     g.bench_function("scalar_sub", move |b| {
         b.iter_with_setup(
-            || (Scalar::random(&mut rng), Scalar::random(&mut rng)),
+            || {
+                let mut bytes1 = [0u8; 32];
+                let mut bytes2 = [0u8; 32];
+                rng.fill_bytes(&mut bytes1);
+                rng.fill_bytes(&mut bytes2);
+                (
+                    Scalar::from_bytes_mod_order(bytes1),
+                    Scalar::from_bytes_mod_order(bytes2),
+                )
+            },
             // NOTE: Specifically moving 'b' in, just like the native Rust function does in Move
-            |(a, b)| a.sub(b),
+            |(a, b): (Scalar, Scalar)| a.sub(b),
         )
     });
 }

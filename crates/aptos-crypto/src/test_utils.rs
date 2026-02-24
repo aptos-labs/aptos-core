@@ -148,7 +148,7 @@ pub fn small_order_pk_with_adversarial_message(
                 h.update(R.compress().as_bytes());
                 h.update(pk_bytes);
                 h.update(msg_bytes);
-                
+
                 let hash_output = h.finalize();
                 let mut hash_bytes = [0u8; 64];
                 hash_bytes.copy_from_slice(&hash_output);

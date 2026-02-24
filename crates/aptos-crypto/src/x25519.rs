@@ -108,21 +108,21 @@ impl PrivateKey {
         if private_slice.len() != 32 {
             return Err(CryptoMaterialError::DeserializationError);
         }
-        
+
         // In ed25519-dalek v2, we need to compute the expanded key manually
         use sha2::{Digest, Sha512};
         let mut hasher = Sha512::new();
         hasher.update(private_slice);
         let hash = hasher.finalize();
-        
+
         let mut expanded_keypart = [0u8; 32];
         expanded_keypart.copy_from_slice(&hash[..32]);
-        
+
         // Apply ed25519 clamping
         expanded_keypart[0] &= 248;
         expanded_keypart[31] &= 127;
         expanded_keypart[31] |= 64;
-        
+
         let potential_x25519 = x25519::PrivateKey::from(expanded_keypart);
         Ok(potential_x25519)
     }

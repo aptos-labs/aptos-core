@@ -12,6 +12,10 @@ publish = { workspace = true }
 repository = { workspace = true }
 rust-version = { workspace = true }
 
+[features]
+default = []
+testing = ["aptos-global-constants/testing"]
+
 [dependencies]
 again = { workspace = true }
 anyhow = { workspace = true, features = ["backtrace"] }
@@ -69,7 +73,3 @@ uuid = { workspace = true }
 
 [dev-dependencies]
 serde_merge = { workspace = true }
-
-[features]
-default = []
-testing = ["aptos-global-constants/testing"]

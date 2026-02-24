@@ -86,7 +86,7 @@ impl Ed25519PrivateKey {
         let secret_bytes = self.0.to_bytes();
         use sha2::{Digest, Sha512};
         let mut hasher = Sha512::new();
-        hasher.update(&secret_bytes);
+        hasher.update(secret_bytes);
         let hash = hasher.finalize();
         let mut bits: [u8; 32] = [0u8; 32];
         bits.copy_from_slice(&hash[..32]);

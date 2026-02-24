@@ -11,6 +11,10 @@ publish = { workspace = true }
 repository = { workspace = true }
 rust-version = { workspace = true }
 
+[features]
+default = []
+profiling = ["e2e-move-tests/profiling"]
+
 [dependencies]
 anyhow = { workspace = true }
 aptos-cached-packages = { workspace = true }
@@ -30,7 +34,3 @@ e2e-move-tests = { path = "../e2e-move-tests" }
 rand = { workspace = true }
 serde_json = { workspace = true }
 tokio = { workspace = true }
-
-[features]
-default = []
-profiling = ["e2e-move-tests/profiling"]

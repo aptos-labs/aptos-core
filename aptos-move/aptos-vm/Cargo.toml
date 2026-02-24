@@ -12,6 +12,19 @@ publish = { workspace = true }
 repository = { workspace = true }
 rust-version = { workspace = true }
 
+[features]
+default = []
+fuzzing = [
+    "move-core-types/fuzzing",
+    "move-binary-format/fuzzing",
+    "move-vm-types/fuzzing",
+    "aptos-framework/fuzzing",
+    "aptos-types/fuzzing",
+]
+failpoints = ["fail/failpoints", "move-vm-runtime/failpoints"]
+profiling = ["move-vm-runtime/profiling"]
+testing = ["move-unit-test", "aptos-framework/testing"]
+
 [dependencies]
 anyhow = { workspace = true }
 aptos-aggregator = { workspace = true }
@@ -71,10 +84,3 @@ move-vm-types = { workspace = true, features = ["testing"] }
 proptest = { workspace = true }
 rand_core = { workspace = true }
 test-case = { workspace = true }
-
-[features]
-default = []
-fuzzing = ["move-core-types/fuzzing", "move-binary-format/fuzzing", "move-vm-types/fuzzing", "aptos-framework/fuzzing", "aptos-types/fuzzing"]
-failpoints = ["fail/failpoints", "move-vm-runtime/failpoints"]
-profiling = ["move-vm-runtime/profiling"]
-testing = ["move-unit-test", "aptos-framework/testing"]

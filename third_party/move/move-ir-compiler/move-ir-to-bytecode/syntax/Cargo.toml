@@ -9,6 +9,9 @@ license = "Apache-2.0"
 publish = false
 edition = { workspace = true }
 
+[features]
+default = []
+
 [dependencies]
 anyhow = { workspace = true }
 hex = { workspace = true }
@@ -16,6 +19,3 @@ move-command-line-common = { workspace = true }
 move-core-types = { workspace = true }
 move-ir-types = { workspace = true }
 move-symbol-pool = { workspace = true }
-
-[features]
-default = []

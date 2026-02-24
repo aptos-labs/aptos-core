@@ -12,6 +12,15 @@ publish = { workspace = true }
 repository = { workspace = true }
 rust-version = { workspace = true }
 
+[lib]
+# Allow Criterion benchmarks to take command line arguments
+# https://bheisler.github.io/criterion.rs/book/faq.html#cargo-bench-gives-unrecognized-option-errors-for-valid-command-line-options
+bench = false
+
+[features]
+fuzzing = ["aptos-types/fuzzing", "proptest"]
+bench = ["proptest", "criterion"]
+
 [dependencies]
 aptos-crypto = { workspace = true }
 aptos-drop-helper = { workspace = true }
@@ -38,16 +47,7 @@ rand = { workspace = true }
 [target.'cfg(unix)'.dev-dependencies]
 jemallocator = { workspace = true }
 
-[features]
-fuzzing = ["aptos-types/fuzzing", "proptest"]
-bench = ["proptest", "criterion"]
-
 [[bench]]
 name = "sparse_merkle"
 harness = false
 required-features = ["bench"]
-
-[lib]
-# Allow Criterion benchmarks to take command line arguments
-# https://bheisler.github.io/criterion.rs/book/faq.html#cargo-bench-gives-unrecognized-option-errors-for-valid-command-line-options
-bench = false

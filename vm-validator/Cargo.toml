@@ -12,6 +12,11 @@ publish = { workspace = true }
 repository = { workspace = true }
 rust-version = { workspace = true }
 
+[features]
+default = []
+failpoints = ["fail/failpoints"]
+fuzzing = ["aptos-types/fuzzing", "aptos-crypto/fuzzing", "aptos-db/fuzzing"]
+
 [dependencies]
 anyhow = { workspace = true }
 aptos-logger = { workspace = true }
@@ -35,8 +40,3 @@ aptos-types = { workspace = true, features = ["testing"] }
 aptos-vm-genesis = { workspace = true }
 move-vm-types = { workspace = true, features = ["testing"] }
 rand = { workspace = true }
-
-[features]
-default = []
-failpoints = ["fail/failpoints"]
-fuzzing = ["aptos-types/fuzzing", "aptos-crypto/fuzzing", "aptos-db/fuzzing"]

@@ -3,7 +3,7 @@
 
 use crate::{Deserialize, Serialize};
 use aptos_crypto::compat::Sha3_256;
-use ed25519_dalek::Digest;
+use digest::Digest;
 
 /// The schema used in the account recovery DB.
 #[derive(Debug, Serialize, Deserialize)]

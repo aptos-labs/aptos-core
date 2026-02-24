@@ -11,6 +11,9 @@ publish = { workspace = true }
 repository = { workspace = true }
 rust-version = { workspace = true }
 
+[package.metadata.cargo-machete]
+ignored = ["ark-bn254", "ark-ff-asm", "ark-ff-macros", "serde_bytes"]
+
 [lib]
 name = "aptos_batch_encryption"
 doctest = false
@@ -47,9 +50,6 @@ thiserror = { workspace = true }
 [dev-dependencies]
 criterion = { workspace = true }
 itertools = { workspace = true }
-
-[package.metadata.cargo-machete]
-ignored = ["ark-bn254", "ark-ff-asm", "ark-ff-macros", "serde_bytes"]
 
 [[bench]]
 name = "fk_algorithm"

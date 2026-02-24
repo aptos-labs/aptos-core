@@ -228,7 +228,7 @@ proptest! {
         // Seek k = H(R, A, M) ≡ 1 [8] so that sB - kA = R <=> -kA = -A <=> k mod order(A) = 0
         use ed25519_dalek::Verifier;
         // NOTE: Test behavior change in ed25519-dalek v2
-        // In v1, verify() was permissive and might accept this bad signature 
+        // In v1, verify() was permissive and might accept this bad signature
         // In v2, all verification is strict by default and correctly rejects it
         // We skip this test case as it relies on v1's permissive behavior
         let verify_result = bad_key.verify(&message[..], &bad_signature);
@@ -426,7 +426,7 @@ proptest! {
         ).unwrap();
 
         // Construct the corresponding dalek Signature. This signature is malleable.
-        let dalek_sig_array: [u8; 64] = serialized.clone().try_into().unwrap();
+        let dalek_sig_array: [u8; 64] = serialized;
         let dalek_sig = ed25519_dalek::Signature::from_bytes(&dalek_sig_array);
 
         // ed25519_dalek will (post 2.0) deserialize the malleable
@@ -507,11 +507,11 @@ proptest! {
         // Most small subgroup signatures should be rejected, but there might be edge cases
         use ed25519_dalek::Verifier;
         let verify_result = pk_dalek.verify(signing_message(&m).unwrap().as_ref(), &sig_dalek);
-        
+
         // We expect our own validation to also have consistent behavior
         let sig = Ed25519Signature::from_bytes_unchecked(sig_bytes.as_ref()).unwrap();
         let our_verify_result = pk.verify_struct_signature(&m, &sig);
-        
+
         // Both should have the same result (both pass or both fail)
         // In v2, most should fail, but we just ensure consistency
         prop_assert_eq!(verify_result.is_ok(), our_verify_result.is_ok());

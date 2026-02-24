@@ -12,6 +12,9 @@ publish = { workspace = true }
 repository = { workspace = true }
 rust-version = { workspace = true }
 
+[package.metadata.cargo-machete]
+ignored = ["bcs"]
+
 [dependencies]
 anyhow = { workspace = true }
 aptos-crypto = { workspace = true }
@@ -20,6 +23,7 @@ aptos-types = { workspace = true }
 bcs = { workspace = true } # needed for BCSCryptoHash
 blstrs = { workspace = true }
 derivation-path = { workspace = true }
+digest = { workspace = true }
 ed25519-dalek = { workspace = true }
 group = "0.13"
 hex = { workspace = true }
@@ -31,6 +35,3 @@ regex = { workspace = true }
 serde = { workspace = true }
 serde-big-array = { workspace = true }
 sha2_0_10_6 = { workspace = true }
-
-[package.metadata.cargo-machete]
-ignored = ["bcs"]

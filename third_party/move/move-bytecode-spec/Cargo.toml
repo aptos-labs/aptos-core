@@ -9,10 +9,10 @@ license = "Apache-2.0"
 publish = false
 edition = { workspace = true }
 
+[lib]
+proc-macro = true
+
 [dependencies]
 once_cell = { workspace = true }
 quote = { workspace = true }
 syn = { workspace = true }
-
-[lib]
-proc-macro = true

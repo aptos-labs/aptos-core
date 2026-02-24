@@ -9,12 +9,12 @@ license = "Apache-2.0"
 publish = false
 edition = { workspace = true }
 
+[features]
+fuzzing = ["move-binary-format/fuzzing"]
+
 [dev-dependencies]
 move-binary-format = { workspace = true, features = ["fuzzing"] }
 move-core-types = { workspace = true }
 proptest = { workspace = true }
 proptest-derive = { workspace = true }
 similar-asserts = "1.7.0"
-
-[features]
-fuzzing = ["move-binary-format/fuzzing"]

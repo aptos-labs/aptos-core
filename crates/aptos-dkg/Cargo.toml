@@ -4,6 +4,15 @@ version = "0.2.0"
 edition = { workspace = true }
 license = { workspace = true }
 
+[package.metadata.cargo-machete]
+ignored = ["serde_bytes"]
+
+[features]
+assert-private-keys-not-cloneable = []
+fuzzing = []
+parallel = []
+range_proof_timing = []
+
 [dependencies]
 anyhow = { workspace = true }
 aptos-crypto = { workspace = true }
@@ -44,12 +53,6 @@ static_assertions = { workspace = true }
 [dev-dependencies]
 num_cpus = { workspace = true }
 
-[features]
-assert-private-keys-not-cloneable = []
-fuzzing = []
-parallel = []
-range_proof_timing = []
-
 [[bench]]
 name = "bsgs"
 harness = false
@@ -89,6 +92,3 @@ harness = false
 [[bench]]
 name = "weighted_vuf"
 harness = false
-
-[package.metadata.cargo-machete]
-ignored = ["serde_bytes"]

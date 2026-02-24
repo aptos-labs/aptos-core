@@ -12,6 +12,17 @@ publish = { workspace = true }
 repository = { workspace = true }
 rust-version = { workspace = true }
 
+[features]
+default = []
+failpoints = ["fail/failpoints", "aptos-vm-validator/failpoints"]
+fuzzing = [
+    "proptest",
+    "aptos-types/fuzzing",
+    "aptos-storage-interface/fuzzing",
+    "aptos-config/fuzzing",
+]
+consensus-only-perf-test = []
+
 [dependencies]
 anyhow = { workspace = true }
 aptos-bounded-executor = { workspace = true }
@@ -59,9 +70,3 @@ aptos-time-service = { workspace = true, features = ["testing"] }
 aptos-transaction-filters = { workspace = true, features = ["fuzzing"] }
 enum_dispatch = { workspace = true }
 proptest = { workspace = true }
-
-[features]
-default = []
-failpoints = ["fail/failpoints", "aptos-vm-validator/failpoints"]
-fuzzing = ["proptest", "aptos-types/fuzzing", "aptos-storage-interface/fuzzing", "aptos-config/fuzzing"]
-consensus-only-perf-test = []
