@@ -317,15 +317,15 @@ Areas: `vm`, `framework`, `consensus`, `storage`, `api`, `network`, `types`, `cl
 
 ### System dependencies
 
-The VM snapshot includes all required system packages pre-installed. The update script (run automatically on VM startup) only refreshes Rust toolchains and cargo tools. If a fresh VM image is ever rebuilt from scratch, these apt packages are required: `lld`, `libssl-dev`, `libudev-dev`, `libdw-dev`, `libpq-dev`, `libstdc++-14-dev`, `build-essential`. Protoc 3.21.4 must be at `/usr/local/bin/protoc`.
+The update script runs `scripts/dev_setup.sh -b -k` on each VM startup to install/refresh all build tools (Rust toolchains, clang, protoc, cargo-sort, cargo-machete, cargo-nextest, grcov, etc.). Two extra packages (`libstdc++-14-dev`, `libpq-dev`) are installed separately since `dev_setup.sh` does not cover them by default.
 
 ### Key gotchas
 
-- **clang++ C++ headers**: The environment ships clang 18 which selects GCC 14 headers. `libstdc++-14-dev` must be installed or RocksDB (used by storage) will fail to compile with `'memory' file not found`.
+- **clang++ C++ headers**: `libstdc++-14-dev` must be installed or RocksDB will fail to compile with `'memory' file not found`. This happens because clang selects GCC 14 headers but only GCC 13 headers may be present.
 - **`cargo xclippy`** is a workspace-wide alias defined in `.cargo/config.toml`. It does **not** accept `-p <package>`. To lint a single package, use `cargo clippy -p <package>` with the appropriate allow/deny flags from the alias definition.
 - **`cargo +nightly fmt`** is used for formatting (not stable fmt). The nightly toolchain must have the `rustfmt` component.
-- **cargo-sort** (v1.0.7) and **cargo-machete** (v0.7.0) are needed for the full `./scripts/rust_lint.sh` pipeline.
 - **Localnet startup** takes ~60s for the first run (compilation is the bottleneck). Subsequent starts (with binary already built) are fast. Use `--no-txn-stream` to skip the transaction stream service which requires no additional dependencies.
+- The `-k` flag skips pre-commit hook installation in `dev_setup.sh` since cloud agents don't need git hooks.
 
 ### Running services
 
