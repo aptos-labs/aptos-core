@@ -94,7 +94,6 @@ jemallocator = { workspace = true }
 default = []
 fuzzing = []
 no-upload-proposal = []
-indexer = ["aptos-node/indexer"]
 cli-framework-test-move = []
 
 [build-dependencies]

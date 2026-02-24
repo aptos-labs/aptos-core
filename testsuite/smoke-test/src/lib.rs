@@ -28,8 +28,6 @@ mod fullnode;
 #[cfg(test)]
 mod genesis;
 #[cfg(test)]
-mod indexer;
-#[cfg(test)]
 mod inspection_service;
 #[cfg(test)]
 mod jwks;

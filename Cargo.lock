@@ -2203,38 +2203,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "aptos-indexer"
-version = "0.0.1"
-dependencies = [
- "anyhow",
- "aptos-api",
- "aptos-api-test-context",
- "aptos-api-types",
- "aptos-bitvec",
- "aptos-config",
- "aptos-logger",
- "aptos-mempool",
- "aptos-metrics-core",
- "aptos-runtimes",
- "aptos-storage-interface",
- "aptos-types",
- "async-trait",
- "bcs 0.1.4",
- "bigdecimal",
- "chrono",
- "diesel",
- "diesel_migrations",
- "field_count",
- "futures",
- "hex",
- "once_cell",
- "serde",
- "serde_json",
- "sha2 0.9.9",
- "tokio",
-]
-
-[[package]]
 name = "aptos-indexer-grpc-cache-worker"
 version = "1.0.0"
 dependencies = [
@@ -3530,7 +3498,6 @@ dependencies = [
  "aptos-executor",
  "aptos-framework",
  "aptos-genesis",
- "aptos-indexer",
  "aptos-indexer-grpc-fullnode",
  "aptos-indexer-grpc-table-info",
  "aptos-infallible",
@@ -3576,7 +3543,6 @@ dependencies = [
  "serde_yaml 0.8.26",
  "tokio",
  "ureq",
- "url",
 ]
 
 [[package]]
@@ -17613,7 +17579,6 @@ dependencies = [
  "aptos-gas-schedule",
  "aptos-genesis",
  "aptos-global-constants",
- "aptos-indexer",
  "aptos-indexer-grpc-table-info",
  "aptos-infallible",
  "aptos-inspection-service",
@@ -17637,7 +17602,6 @@ dependencies = [
  "base64 0.13.1",
  "bcs 0.1.4",
  "blake2-rfc",
- "diesel",
  "digest 0.9.0",
  "env_logger",
  "ethers",
