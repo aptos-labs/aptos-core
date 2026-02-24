@@ -45,6 +45,7 @@ use std::{
     sync::Arc,
     time::Duration,
 };
+use tokio::sync::mpsc::UnboundedSender as TokioUnboundedSender;
 use tokio::time::Sleep;
 
 /// How long to wait for the first-ranked certificate before starting the inner PC
@@ -118,6 +119,10 @@ pub struct StrongPrefixConsensusManager<NetworkSender, T: InnerPCAlgorithm> {
 
     // Input vector for View 1
     input_vector: PrefixVector,
+
+    // Optional channel to notify SlotManager of committed v_high.
+    // None when running standalone (e.g., smoke tests or EpochManager-managed SPC).
+    output_tx: Option<TokioUnboundedSender<(u64, PrefixVector)>>,
 }
 
 impl<NetworkSender: SubprotocolNetworkSender<StrongPrefixConsensusMsg>, T: InnerPCAlgorithm<Message = PrefixConsensusMsg>>
@@ -133,6 +138,7 @@ impl<NetworkSender: SubprotocolNetworkSender<StrongPrefixConsensusMsg>, T: Inner
         network_sender: NetworkSender,
         validator_signer: ValidatorSigner,
         validator_verifier: Arc<ValidatorVerifier>,
+        output_tx: Option<TokioUnboundedSender<(u64, PrefixVector)>>,
     ) -> Self {
         Self {
             party_id,
@@ -153,6 +159,14 @@ impl<NetworkSender: SubprotocolNetworkSender<StrongPrefixConsensusMsg>, T: Inner
             validator_signer,
             validator_verifier,
             input_vector,
+            output_tx,
+        }
+    }
+
+    /// Notify SlotManager (if connected) that SPC committed v_high.
+    fn send_output(&self, v_high: &PrefixVector) {
+        if let Some(tx) = &self.output_tx {
+            let _ = tx.send((self.slot, v_high.clone()));
         }
     }
 
@@ -552,7 +566,8 @@ impl<NetworkSender: SubprotocolNetworkSender<StrongPrefixConsensusMsg>, T: Inner
                 let v_high = commit.v_high.clone();
                 let msg = StrongPrefixConsensusMsg::Commit(Box::new(commit));
                 self.network_sender.broadcast(msg).await;
-                self.protocol.set_committed(v_high);
+                self.protocol.set_committed(v_high.clone());
+                self.send_output(&v_high);
                 self.write_output_file();
             }
             Err(ChainBuildError::MissingCert { hash }) => {
@@ -876,6 +891,7 @@ impl<NetworkSender: SubprotocolNetworkSender<StrongPrefixConsensusMsg>, T: Inner
                     party_id = %self.party_id,
                     "Received valid StrongPCCommit, protocol complete"
                 );
+                self.send_output(self.protocol.v_high().unwrap());
                 self.write_output_file();
             }
             Err(e) => {
@@ -1141,6 +1157,7 @@ mod tests {
             network.clone(),
             signers.remove(0),
             verifier,
+            None, // output_tx: not needed in unit tests
         );
         (manager, network)
     }

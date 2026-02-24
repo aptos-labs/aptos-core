@@ -2212,6 +2212,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
             network_sender,
             validator_signer,
             validators,
+            None, // output_tx: standalone SPC, not managed by SlotManager
         );
 
         // Create shutdown channel

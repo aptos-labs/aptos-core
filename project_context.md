@@ -4,8 +4,8 @@
 
 Implementing Prefix Consensus protocols (from research paper "Prefix Consensus For Censorship Resistant BFT") within Aptos Core for leaderless, censorship-resistant consensus.
 
-**Current Phase**: Multi-Slot Consensus (Algorithm 4) — Phases 1-5 complete, Phase 6 next
-**Completed**: Basic Prefix Consensus, Strong Prefix Consensus (Phases 1-9), Stake-Weighted Quorum Refactoring, Multi-Slot Phases 1-5
+**Current Phase**: Multi-Slot Consensus (Algorithm 4) — Phases 1-6 complete, Phase 7 next
+**Completed**: Basic Prefix Consensus, Strong Prefix Consensus (Phases 1-9), Stake-Weighted Quorum Refactoring, Multi-Slot Phases 1-6
 
 ---
 
@@ -110,7 +110,7 @@ Execution Pipeline (unchanged):
 3. ~~Proposal buffer + slot state (~400 LOC)~~ ✅
 4. ~~Block builder + PrefixConsensusBlock variant (~300 LOC)~~ ✅
 5. ~~SlotManager core (~800 LOC)~~ ✅
-6. SPC integration refactor (~300 LOC)
+6. ~~SPC integration refactor (~300 LOC)~~ ✅
 7. Payload resolution: late buffering + fetch protocol (~350 LOC)
 8. EpochManager integration (~400 LOC)
 9. BlockType integration across codebase (~400 LOC, grep-driven)
@@ -123,7 +123,7 @@ Execution Pipeline (unchanged):
 ## Repository State
 
 - **Branch**: `prefix-consensus-prototype`
-- **HEAD**: Multi-Slot Phase 5 (SlotManager core + network consolidation)
+- **HEAD**: Multi-Slot Phase 6 (SPC integration — SPCSpawner trait, RealSPCSpawner, output_tx channel)
 - **Tests**: 235/235 unit tests (226 prefix-consensus + 9 slot manager), 6/6 smoke tests
 - **Build**: Clean
 
@@ -142,7 +142,7 @@ consensus/prefix-consensus/src/
 ├── certificates.rs       - Certificates + StrongPCCommit (1348 lines)
 ├── view_state.rs         - RankingManager, ViewState, ViewOutput (695 lines)
 ├── strong_protocol.rs    - Strong PC state machine (918 lines)
-├── strong_manager.rs     - Strong PC orchestrator, generic over InnerPCAlgorithm (~1270 lines)
+├── strong_manager.rs     - Strong PC orchestrator, generic over InnerPCAlgorithm (~1290 lines)
 ├── inner_pc_trait.rs     - InnerPCAlgorithm trait (~90 lines)
 ├── inner_pc_impl.rs      - ThreeRoundPC implementation (~400 lines)
 ├── slot_types.rs         - SlotProposal, SlotConsensusMsg, signing (~230 lines) — Phase 1
@@ -152,7 +152,7 @@ consensus/prefix-consensus/src/
 
 consensus/src/prefix_consensus/
 ├── mod.rs                - Module declarations
-└── slot_manager.rs       - SlotManager orchestrator + 9 unit tests (~500 lines) — Phase 5
+└── slot_manager.rs       - SlotManager orchestrator, SPCSpawner trait, RealSPCSpawner + 9 unit tests (~600 lines) — Phases 5-6
 
 testsuite/smoke-test/src/consensus/
 ├── prefix_consensus/     - 2 basic PC smoke tests
@@ -169,6 +169,7 @@ testsuite/smoke-test/src/consensus/
 - `.plans/phase3-slot-state.md` — Phase 3: Proposal buffer + slot state (complete)
 - `.plans/phase4-block-builder.md` — Phase 4: Block builder + PrefixConsensusBlock (complete)
 - `.plans/phase5-slot-manager.md` — Phase 5: SlotManager core (complete)
+- `.plans/phase6-spc-integration.md` — Phase 6: SPC integration (complete)
 - `.plans/phase7-payload-resolution.md` — Phase 7: Payload resolution: late buffering + fetch
 - `.plans/phase12-verifiable-ranking.md` — Phase 13: Verifiable ranking with SPC-aware demotion (after end-to-end)
 
@@ -178,7 +179,7 @@ testsuite/smoke-test/src/consensus/
 
 ### Multi-Slot (deferred from current plan)
 - [ ] **v_low fast commit**: Commit from v_low when all entries non-⊥ (full prefix case)
-- [ ] **v_low early commit (general)**: Two blocks per slot — fast block from v_low, completion from v_high
+- [ ] **v_low early commit (general)**: Two blocks per slot — fast block from v_low, completion from v_high. Requires `InnerPCAlgorithm` to expose v_low at QC2 (before QC3/commit) so the strong manager can relay it through `output_tx` before v_high is known
 - [ ] **Slot pipelining**: Overlap proposal collection for slot s+1 while SPC for slot s runs
 - [ ] **QuorumStore integration**: Replace DirectMempool for production payload dissemination
 - [ ] **On-chain config**: Add PrefixConsensus variant to ConsensusAlgorithmConfig
@@ -191,6 +192,7 @@ testsuite/smoke-test/src/consensus/
 - [ ] **Empty view optimization**: Skip inner PC when no certificates at timeout
 - [x] **Collapse network bridges**: Replaced 3 bridges + 3 clients + 2 sender traits/adapters with generics
 - [ ] **Garbage collect on slot commit**: Clean up view_states, pc_states, pending_fetches, cert store
+- [ ] **Remove smoke test scaffolding**: `write_output_file()` (file-based output polling), `start_prefix_consensus()` / `start_strong_prefix_consensus()` (on-demand entry points in EpochManager), and associated helpers. Remove once smoke tests verify through the multi-slot execution pipeline
 
 ### Long Term
 - [ ] **Optimistic Variants**: 2-round good case (paper Appendix D)

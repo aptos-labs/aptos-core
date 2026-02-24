@@ -4,7 +4,7 @@
 //! SlotManager: main orchestrator for multi-slot prefix consensus (Algorithm 4).
 //!
 //! Runs one slot at a time: broadcasts proposals, collects them via [`SlotState`],
-//! spawns SPC (stubbed in Phase 5), builds blocks from v_high, wraps in
+//! spawns SPC via [`SPCSpawner`], builds blocks from v_high, wraps in
 //! [`OrderedBlocks`], sends to execution, updates ranking, and advances.
 
 use crate::{
@@ -35,10 +35,11 @@ use aptos_types::{
     validator_verifier::ValidatorVerifier,
 };
 use aptos_validator_transaction_pool as vtxn_pool;
+use futures::SinkExt;
 use std::{collections::HashMap, pin::Pin, sync::Arc, time::Duration};
 use tokio::{
     sync::{
-        mpsc::{self, UnboundedReceiver, UnboundedSender},
+        mpsc::{UnboundedReceiver, UnboundedSender},
         oneshot,
     },
     time::Sleep,
@@ -47,10 +48,126 @@ use tokio::{
 /// Default 2Δ timeout for proposal collection.
 const SLOT_PROPOSAL_TIMEOUT_MS: u64 = 300;
 
-/// Output from an SPC instance for a given slot.
-pub struct SPCOutput {
-    pub slot: u64,
-    pub v_high: PrefixVector,
+// ============================================================================
+// SPCSpawner trait: pluggable SPC creation for production vs. test
+// ============================================================================
+
+/// Handles returned by an SPC spawner for communicating with the running SPC task.
+pub struct SPCHandles {
+    /// Channel for forwarding incoming SPC network messages to the SPC task.
+    pub msg_tx: aptos_channels::UnboundedSender<(Author, StrongPrefixConsensusMsg)>,
+    /// Channel for receiving committed (slot, v_high) from the SPC task.
+    pub output_rx: UnboundedReceiver<(u64, PrefixVector)>,
+    /// Oneshot to signal the SPC task to shut down (with ack).
+    pub close_tx: futures::channel::oneshot::Sender<futures::channel::oneshot::Sender<()>>,
+}
+
+/// Trait for spawning SPC instances. Production uses `RealSPCSpawner` (real
+/// `DefaultStrongPCManager`), tests use `StubSPCSpawner` (immediate v_high).
+pub trait SPCSpawner: Send + Sync {
+    fn spawn_spc(
+        &self,
+        slot: u64,
+        input_vector: PrefixVector,
+        ranking: Vec<Author>,
+    ) -> SPCHandles;
+}
+
+// ============================================================================
+// RealSPCSpawner: production implementation using DefaultStrongPCManager
+// ============================================================================
+
+/// Production SPC spawner that creates a real [`DefaultStrongPCManager`] with
+/// network bridge, adapter, and output channel, then spawns it as a tokio task.
+///
+/// Holds per-epoch state (identity, keys, network client, validators) so that
+/// `spawn_spc` only needs per-slot parameters.
+pub struct RealSPCSpawner<NC> {
+    author: Author,
+    epoch: u64,
+    private_key: Arc<aptos_crypto::bls12381::PrivateKey>,
+    validator_verifier: Arc<ValidatorVerifier>,
+    consensus_network_client: crate::network_interface::ConsensusNetworkClient<NC>,
+}
+
+impl<NC> RealSPCSpawner<NC> {
+    pub fn new(
+        author: Author,
+        epoch: u64,
+        private_key: Arc<aptos_crypto::bls12381::PrivateKey>,
+        validator_verifier: Arc<ValidatorVerifier>,
+        consensus_network_client: crate::network_interface::ConsensusNetworkClient<NC>,
+    ) -> Self {
+        Self {
+            author,
+            epoch,
+            private_key,
+            validator_verifier,
+            consensus_network_client,
+        }
+    }
+}
+
+impl<NC> SPCSpawner for RealSPCSpawner<NC>
+where
+    NC: aptos_network::application::interface::NetworkClientInterface<
+            crate::network_interface::ConsensusMsg,
+        > + Send
+        + Sync
+        + 'static,
+{
+    fn spawn_spc(
+        &self,
+        slot: u64,
+        input_vector: PrefixVector,
+        ranking: Vec<Author>,
+    ) -> SPCHandles {
+        // Create message channel (aptos_channels for gauge tracking)
+        let (spc_tx, spc_rx) = aptos_channels::new_unbounded(
+            &crate::counters::OP_COUNTERS.gauge("spc_slot_channel_msgs"),
+        );
+
+        // Create output channel (SPC → SlotManager)
+        let (output_tx, output_rx) = tokio::sync::mpsc::unbounded_channel();
+
+        // Create close channel
+        let (close_tx, close_rx) = futures::channel::oneshot::channel();
+
+        // Create network bridge → client → sender adapter
+        let bridge = crate::network_interface::StrongConsensusNetworkBridge::new(
+            self.consensus_network_client.clone(),
+        );
+        let network_client =
+            aptos_prefix_consensus::StrongPrefixConsensusNetworkClient::new(bridge);
+        let network_sender = aptos_prefix_consensus::StrongNetworkSenderAdapter::new(
+            self.author,
+            network_client,
+            spc_tx.clone(),
+            self.validator_verifier.clone(),
+        );
+
+        // Create ValidatorSigner from stored Arc<PrivateKey> (cheap Arc clone).
+        let signer = ValidatorSigner::new(self.author, self.private_key.clone());
+        let manager = aptos_prefix_consensus::DefaultStrongPCManager::new(
+            self.author,
+            self.epoch,
+            slot,
+            ranking,
+            input_vector,
+            network_sender,
+            signer,
+            self.validator_verifier.clone(),
+            Some(output_tx),
+        );
+
+        tokio::spawn(manager.run(spc_rx, close_rx));
+
+        SPCHandles {
+            msg_tx: spc_tx,
+            output_rx,
+            close_tx,
+        }
+    }
 }
 
 /// Main orchestrator for multi-slot prefix consensus.
@@ -58,7 +175,7 @@ pub struct SPCOutput {
 /// Runs one slot at a time: broadcasts proposals, collects them via
 /// [`SlotState`], spawns SPC, builds blocks from v_high, wraps in
 /// [`OrderedBlocks`], sends to execution, updates ranking, and advances.
-pub struct SlotManager<NS: SubprotocolNetworkSender<SlotConsensusMsg>> {
+pub struct SlotManager<NS: SubprotocolNetworkSender<SlotConsensusMsg>, SP: SPCSpawner> {
     // Identity
     author: Author,
     epoch: u64,
@@ -70,9 +187,13 @@ pub struct SlotManager<NS: SubprotocolNetworkSender<SlotConsensusMsg>> {
     slot_states: HashMap<u64, SlotState>,
     ranking_manager: MultiSlotRankingManager,
 
-    // Per-slot SPC channels
-    spc_msg_tx: Option<UnboundedSender<(Author, StrongPrefixConsensusMsg)>>,
-    spc_output_rx: Option<UnboundedReceiver<SPCOutput>>,
+    // Per-slot SPC channels (set by run_spc, cleared by on_spc_v_high)
+    spc_msg_tx: Option<aptos_channels::UnboundedSender<(Author, StrongPrefixConsensusMsg)>>,
+    spc_output_rx: Option<UnboundedReceiver<(u64, PrefixVector)>>,
+    spc_close_tx: Option<futures::channel::oneshot::Sender<futures::channel::oneshot::Sender<()>>>,
+
+    // SPC spawner (production vs. test)
+    spc_spawner: SP,
 
     // Execution bridge
     execution_channel: UnboundedSender<OrderedBlocks>,
@@ -91,7 +212,7 @@ pub struct SlotManager<NS: SubprotocolNetworkSender<SlotConsensusMsg>> {
     proposal_timeout: Duration,
 }
 
-impl<NS: SubprotocolNetworkSender<SlotConsensusMsg>> SlotManager<NS> {
+impl<NS: SubprotocolNetworkSender<SlotConsensusMsg>, SP: SPCSpawner> SlotManager<NS, SP> {
     pub fn new(
         author: Author,
         epoch: u64,
@@ -102,6 +223,7 @@ impl<NS: SubprotocolNetworkSender<SlotConsensusMsg>> SlotManager<NS> {
         payload_client: Arc<dyn PayloadClient>,
         parent_block_info: BlockInfo,
         network_sender: NS,
+        spc_spawner: SP,
     ) -> Self {
         Self {
             author,
@@ -113,6 +235,8 @@ impl<NS: SubprotocolNetworkSender<SlotConsensusMsg>> SlotManager<NS> {
             ranking_manager,
             spc_msg_tx: None,
             spc_output_rx: None,
+            spc_close_tx: None,
+            spc_spawner,
             execution_channel,
             payload_client,
             parent_block_info,
@@ -171,8 +295,8 @@ impl<NS: SubprotocolNetworkSender<SlotConsensusMsg>> SlotManager<NS> {
                 } => {
                     self.slot_timer = timer_opt;
                     self.spc_output_rx = spc_rx_opt;
-                    if let Some(output) = output {
-                        self.on_spc_v_high(output).await;
+                    if let Some((slot, v_high)) = output {
+                        self.on_spc_v_high(slot, v_high).await;
                     }
                 }
 
@@ -185,7 +309,7 @@ impl<NS: SubprotocolNetworkSender<SlotConsensusMsg>> SlotManager<NS> {
                             self.process_proposal(author, *p).await;
                         }
                         SlotConsensusMsg::StrongPCMsg { slot, msg, .. } => {
-                            self.process_spc_message(author, slot, msg);
+                            self.process_spc_message(author, slot, msg).await;
                         }
                     }
                 }
@@ -333,7 +457,6 @@ impl<NS: SubprotocolNetworkSender<SlotConsensusMsg>> SlotManager<NS> {
 
     // ========================================================================
     // SPC: run_spc, on_spc_v_high, process_spc_message
-    // (stub — Phase 6 replaces run_spc with real StrongPrefixConsensusManager)
     // ========================================================================
 
     fn run_spc(&mut self, slot: u64) {
@@ -347,26 +470,18 @@ impl<NS: SubprotocolNetworkSender<SlotConsensusMsg>> SlotManager<NS> {
             .expect("input_vector set by prepare_spc_input")
             .clone();
 
-        // Create channels
-        let (spc_msg_tx, _spc_msg_rx) = mpsc::unbounded_channel();
-        let (spc_output_tx, spc_output_rx) = mpsc::unbounded_channel();
+        let handles = self.spc_spawner.spawn_spc(
+            slot,
+            input_vector,
+            self.ranking_manager.current_ranking().to_vec(),
+        );
 
-        // STUB: spawn task that immediately returns input_vector as v_high.
-        // Phase 6 replaces this with real StrongPrefixConsensusManager.
-        let slot_copy = slot;
-        tokio::spawn(async move {
-            let _ = spc_output_tx.send(SPCOutput {
-                slot: slot_copy,
-                v_high: input_vector,
-            });
-        });
-
-        self.spc_msg_tx = Some(spc_msg_tx);
-        self.spc_output_rx = Some(spc_output_rx);
+        self.spc_msg_tx = Some(handles.msg_tx);
+        self.spc_output_rx = Some(handles.output_rx);
+        self.spc_close_tx = Some(handles.close_tx);
     }
 
-    async fn on_spc_v_high(&mut self, spc_output: SPCOutput) {
-        let SPCOutput { slot, v_high } = spc_output;
+    async fn on_spc_v_high(&mut self, slot: u64, v_high: PrefixVector) {
         info!(
             epoch = self.epoch,
             slot = slot,
@@ -438,13 +553,14 @@ impl<NS: SubprotocolNetworkSender<SlotConsensusMsg>> SlotManager<NS> {
         // Clean up slot state and SPC channels
         self.spc_msg_tx.take();
         self.spc_output_rx.take();
+        self.spc_close_tx.take();
         self.slot_states.remove(&slot);
 
         // Advance to next slot
         self.start_new_slot(slot + 1).await;
     }
 
-    fn process_spc_message(
+    async fn process_spc_message(
         &mut self,
         author: Author,
         slot: u64,
@@ -459,8 +575,8 @@ impl<NS: SubprotocolNetworkSender<SlotConsensusMsg>> SlotManager<NS> {
             );
             return;
         }
-        if let Some(tx) = &self.spc_msg_tx {
-            let _ = tx.send((author, msg));
+        if let Some(tx) = &mut self.spc_msg_tx {
+            let _ = tx.send((author, msg)).await;
         }
     }
 
@@ -515,6 +631,31 @@ mod tests {
     // ========================================================================
     // Test infrastructure
     // ========================================================================
+
+    /// Stub SPC spawner for tests: immediately returns input_vector as v_high.
+    struct StubSPCSpawner;
+
+    impl SPCSpawner for StubSPCSpawner {
+        fn spawn_spc(
+            &self,
+            slot: u64,
+            input_vector: PrefixVector,
+            _ranking: Vec<Author>,
+        ) -> SPCHandles {
+            let (msg_tx, _msg_rx) = aptos_channels::new_unbounded_test();
+            let (output_tx, output_rx) = mpsc::unbounded_channel();
+            let (close_tx, _close_rx) = futures::channel::oneshot::channel();
+
+            // Immediately send input_vector as v_high
+            let _ = output_tx.send((slot, input_vector));
+
+            SPCHandles {
+                msg_tx,
+                output_rx,
+                close_tx,
+            }
+        }
+    }
 
     /// Mock network sender that records all broadcast messages.
     #[derive(Clone)]
@@ -574,7 +715,7 @@ mod tests {
         signers: &[ValidatorSigner],
         verifier: Arc<ValidatorVerifier>,
     ) -> (
-        SlotManager<MockSlotNetworkSender>,
+        SlotManager<MockSlotNetworkSender, StubSPCSpawner>,
         UnboundedReceiver<OrderedBlocks>,
         MockSlotNetworkSender,
     ) {
@@ -592,6 +733,7 @@ mod tests {
             Arc::new(MockPayloadClient),
             BlockInfo::empty(),
             network_sender.clone(),
+            StubSPCSpawner,
         );
 
         (manager, exec_rx, network_sender)
@@ -612,6 +754,7 @@ mod tests {
         assert!(manager.slot_states.is_empty());
         assert!(manager.spc_msg_tx.is_none());
         assert!(manager.spc_output_rx.is_none());
+        assert!(manager.spc_close_tx.is_none());
         assert!(manager.slot_timer.is_none());
     }
 
@@ -640,15 +783,10 @@ mod tests {
         }
 
         // All 4 proposals received → SPC should have been triggered
-        // SPC stub returns immediately → on_spc_v_high fires → block sent to execution
-        // Give the stub task a moment to deliver
-        tokio::task::yield_now().await;
-
-        // Check if SPC output was processed (it may need one more yield)
+        // StubSPCSpawner sends output synchronously → available immediately
         if manager.spc_output_rx.is_some() {
-            // Process the SPC output manually
-            let output = manager.spc_output_rx.as_mut().unwrap().recv().await.unwrap();
-            manager.on_spc_v_high(output).await;
+            let (slot, v_high) = manager.spc_output_rx.as_mut().unwrap().recv().await.unwrap();
+            manager.on_spc_v_high(slot, v_high).await;
         }
 
         // Block should have been sent to execution
@@ -671,12 +809,10 @@ mod tests {
         manager.start_new_slot(1).await;
 
         // With 1 validator, the own proposal is the only one needed
-        // SPC stub should fire immediately
-        tokio::task::yield_now().await;
-
+        // StubSPCSpawner sends output synchronously → available immediately
         if manager.spc_output_rx.is_some() {
-            let output = manager.spc_output_rx.as_mut().unwrap().recv().await.unwrap();
-            manager.on_spc_v_high(output).await;
+            let (slot, v_high) = manager.spc_output_rx.as_mut().unwrap().recv().await.unwrap();
+            manager.on_spc_v_high(slot, v_high).await;
         }
 
         // Block should be on exec channel
@@ -726,12 +862,11 @@ mod tests {
         // Fire timer to trigger SPC with partial proposals
         manager.slot_timer = None;
         manager.run_spc(1);
-        tokio::task::yield_now().await;
-        let output = manager.spc_output_rx.as_mut().unwrap().recv().await.unwrap();
+        let (slot, v_high) = manager.spc_output_rx.as_mut().unwrap().recv().await.unwrap();
 
         // v_high has length 4 (full ranking), entries for signers[2] and [3] are zero
-        assert_eq!(output.v_high.len(), 4);
-        manager.on_spc_v_high(output).await;
+        assert_eq!(v_high.len(), 4);
+        manager.on_spc_v_high(slot, v_high).await;
 
         // Consume the block
         let _block1 = exec_rx.try_recv().expect("Block 1");
@@ -755,10 +890,9 @@ mod tests {
         ).unwrap();
         manager.process_proposal(signers[1].author(), p).await;
 
-        tokio::task::yield_now().await;
         if manager.spc_output_rx.is_some() {
-            let output = manager.spc_output_rx.as_mut().unwrap().recv().await.unwrap();
-            manager.on_spc_v_high(output).await;
+            let (slot, v_high) = manager.spc_output_rx.as_mut().unwrap().recv().await.unwrap();
+            manager.on_spc_v_high(slot, v_high).await;
         }
 
         let ordered = exec_rx.try_recv().expect("Block on exec channel");
@@ -782,10 +916,9 @@ mod tests {
 
         // Run slot 1
         manager.start_new_slot(1).await;
-        tokio::task::yield_now().await;
         if manager.spc_output_rx.is_some() {
-            let output = manager.spc_output_rx.as_mut().unwrap().recv().await.unwrap();
-            manager.on_spc_v_high(output).await;
+            let (slot, v_high) = manager.spc_output_rx.as_mut().unwrap().recv().await.unwrap();
+            manager.on_spc_v_high(slot, v_high).await;
         }
         let _block1 = exec_rx.try_recv().unwrap();
 
@@ -793,11 +926,10 @@ mod tests {
         assert_ne!(manager.parent_block_info.id(), initial_parent.id());
         let parent_after_slot1 = manager.parent_block_info.clone();
 
-        // Run slot 2
-        tokio::task::yield_now().await;
+        // Run slot 2 (start_new_slot(2) was called by on_spc_v_high for slot 1)
         if manager.spc_output_rx.is_some() {
-            let output = manager.spc_output_rx.as_mut().unwrap().recv().await.unwrap();
-            manager.on_spc_v_high(output).await;
+            let (slot, v_high) = manager.spc_output_rx.as_mut().unwrap().recv().await.unwrap();
+            manager.on_spc_v_high(slot, v_high).await;
         }
         let _block2 = exec_rx.try_recv().unwrap();
 
@@ -852,9 +984,8 @@ mod tests {
         manager.start_new_slot(1).await;
         manager.slot_timer = None;
         manager.run_spc(1);
-        tokio::task::yield_now().await;
-        let output = manager.spc_output_rx.as_mut().unwrap().recv().await.unwrap();
-        manager.on_spc_v_high(output).await;
+        let (slot, v_high) = manager.spc_output_rx.as_mut().unwrap().recv().await.unwrap();
+        manager.on_spc_v_high(slot, v_high).await;
         let _block1 = exec_rx.try_recv().unwrap();
 
         // Now at slot 2 — the pre-buffered proposal should still be there
