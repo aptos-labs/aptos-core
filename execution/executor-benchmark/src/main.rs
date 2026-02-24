@@ -584,6 +584,14 @@ where
 }
 
 fn main() {
+    // Remap .text onto 2MB huge pages to reduce iTLB misses.
+    // Must happen before spawning threads.
+    #[cfg(target_os = "linux")]
+    match aptos_hugify::hugify_process_text() {
+        Ok(n) => eprintln!("hugify: remapped {n} x 2MB pages"),
+        Err(e) => panic!("hugify failed: {e}"),
+    }
+
     let opt = Opt::parse();
     aptos_logger::Logger::new().init();
     START_TIME.set(

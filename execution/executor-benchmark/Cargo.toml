@@ -74,6 +74,9 @@ tonic = { workspace = true }
 aptos-jemalloc = { workspace = true }
 aptos-profiler = { workspace = true }
 
+[target.'cfg(target_os = "linux")'.dependencies]
+aptos-hugify = { workspace = true }
+
 [dev-dependencies]
 aptos-temppath = { workspace = true }
 

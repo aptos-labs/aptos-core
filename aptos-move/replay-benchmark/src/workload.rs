@@ -8,7 +8,7 @@ use aptos_types::{
         signature_verified_transaction::{
             into_signature_verified_block, SignatureVerifiedTransaction,
         },
-        AuxiliaryInfo, Transaction, Version,
+        AuxiliaryInfo, PersistedAuxiliaryInfo, Transaction, Version,
     },
 };
 use serde::{Deserialize, Serialize};
@@ -30,6 +30,9 @@ pub(crate) struct TransactionBlock {
     pub(crate) begin_version: Version,
     /// Non-empty list of transactions in a block.
     pub(crate) transactions: Vec<Transaction>,
+    /// Persisted auxiliary info for each transaction, aligned with `transactions`.
+    #[serde(default = "Vec::new")]
+    pub(crate) persisted_auxiliary_infos: Vec<PersistedAuxiliaryInfo>,
 }
 
 impl From<TransactionBlock> for Workload {
@@ -41,7 +44,16 @@ impl From<TransactionBlock> for Workload {
             TransactionSliceMetadata::chunk(txn_block.begin_version, end);
 
         let signature_verified_txns = into_signature_verified_block(txn_block.transactions);
-        let txn_provider = DefaultTxnProvider::new_without_info(signature_verified_txns);
+        let txn_provider = if txn_block.persisted_auxiliary_infos.is_empty() {
+            DefaultTxnProvider::new_without_info(signature_verified_txns)
+        } else {
+            let auxiliary_infos = txn_block
+                .persisted_auxiliary_infos
+                .into_iter()
+                .map(|persisted_info| AuxiliaryInfo::new(persisted_info, None))
+                .collect::<Vec<_>>();
+            DefaultTxnProvider::new(signature_verified_txns, auxiliary_infos)
+        };
 
         Self {
             txn_provider,
