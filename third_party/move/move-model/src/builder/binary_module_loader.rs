@@ -8,8 +8,8 @@
 use crate::{
     ast::{
         AccessSpecifier as ASTAccessSpecifier, AccessSpecifierKind as ASTAccessSpecifierKind,
-        Address, AddressSpecifier as ASTAddressSpecifier, Attribute, ModuleName,
-        ResourceSpecifier as ASTResourceSpecifier,
+        Address, AddressSpecifier as ASTAddressSpecifier, Attribute, AttributeValue, ModuleName,
+        ResourceSpecifier as ASTResourceSpecifier, Value,
     },
     model::{
         FieldData, FieldId, FunId, FunctionData, FunctionKind, GlobalEnv, Loc, ModuleData,
@@ -37,7 +37,14 @@ use move_binary_format::{
     CompiledModule,
 };
 use move_bytecode_source_map::source_map::{SourceMap, SourceName};
-use move_core_types::{ability::AbilitySet, account_address::AccountAddress, language_storage};
+use move_core_types::{
+    ability::AbilitySet,
+    account_address::AccountAddress,
+    language_storage::{
+        self, BORROW, BORROW_MUT, PACK, PACK_VARIANT, TEST_VARIANT, UNPACK, UNPACK_VARIANT,
+    },
+};
+use num::BigInt;
 use std::collections::BTreeMap;
 
 /// Macro to abort the execution if `with_dep_closure` is specified while dependencies are missing.
@@ -318,6 +325,7 @@ impl<'a> BinaryModuleLoader<'a> {
                 new = true;
                 StructData {
                     abilities: handle_view.abilities(),
+                    is_empty_struct: false, // Default to false when created from a compiled module
                     ..StructData::new(struct_id.symbol(), loc.clone())
                 }
             });
@@ -459,25 +467,48 @@ impl<'a> BinaryModuleLoader<'a> {
 
         // add attributes to the function
         let mut attributes = vec![];
+        // Helper closure to add an attribute, optionally with a u16 value parameter
+        let mut add_attribute = |well_known_name: &str, value: Option<u16>| {
+            let node_id = self.env.new_node(loc.clone(), Type::Tuple(vec![]));
+            let sym = self.env.symbol_pool().make(well_known_name);
+            if let Some(v) = value {
+                let attribute_value =
+                    AttributeValue::Value(node_id, Value::Number(BigInt::from(v)));
+                attributes.push(Attribute::Assign(node_id, sym, attribute_value));
+            } else {
+                attributes.push(Attribute::Apply(node_id, sym, vec![]));
+            }
+        };
         for attr in handle_view.attributes() {
             match attr {
                 FunctionAttribute::Persistent => {
                     if !visibility.is_public() {
-                        let node_id = self.env.new_node(Loc::default(), Type::Tuple(vec![]));
-                        let sym = self
-                            .env
-                            .symbol_pool()
-                            .make(well_known::PERSISTENT_ATTRIBUTE);
-                        attributes.push(Attribute::Apply(node_id, sym, vec![]));
+                        add_attribute(well_known::PERSISTENT_ATTRIBUTE, None);
                     }
                 },
                 FunctionAttribute::ModuleLock => {
-                    let node_id = self.env.new_node(Loc::default(), Type::Tuple(vec![]));
-                    let sym = self
-                        .env
-                        .symbol_pool()
-                        .make(well_known::MODULE_LOCK_ATTRIBUTE);
-                    attributes.push(Attribute::Apply(node_id, sym, vec![]));
+                    add_attribute(well_known::MODULE_LOCK_ATTRIBUTE, None);
+                },
+                FunctionAttribute::Pack => {
+                    add_attribute(PACK, None);
+                },
+                FunctionAttribute::PackVariant(variant_index) => {
+                    add_attribute(PACK_VARIANT, Some(*variant_index));
+                },
+                FunctionAttribute::Unpack => {
+                    add_attribute(UNPACK, None);
+                },
+                FunctionAttribute::UnpackVariant(variant_index) => {
+                    add_attribute(UNPACK_VARIANT, Some(*variant_index));
+                },
+                FunctionAttribute::TestVariant(variant_index) => {
+                    add_attribute(TEST_VARIANT, Some(*variant_index));
+                },
+                FunctionAttribute::BorrowFieldImmutable(offset) => {
+                    add_attribute(BORROW, Some(*offset));
+                },
+                FunctionAttribute::BorrowFieldMutable(offset) => {
+                    add_attribute(BORROW_MUT, Some(*offset));
                 },
             }
         }

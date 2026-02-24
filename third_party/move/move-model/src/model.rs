@@ -3843,8 +3843,7 @@ pub struct StructData {
     /// Invariant: when true, visibility is always friend.
     pub(crate) has_package_visibility: bool,
 
-    /// Whether this struct is empty when defined by the user
-    /// Note: by default set to false when created from compiled module since the info is not available
+    /// Whether this struct is empty (has no fields) when defined by the user
     pub is_empty_struct: bool,
 }
 
@@ -3891,7 +3890,7 @@ impl<'env> StructEnv<'env> {
         self.module_env.env
     }
 
-    /// Returns true if struct is empty when defined by the user
+    /// Returns whether the struct is empty (has no fields)
     pub fn is_empty_struct(&self) -> bool {
         self.data.is_empty_struct
     }
