@@ -10,11 +10,12 @@ use aptos_metrics_core::{IntCounterVecHelper, IntGaugeVecHelper, TimerHelper};
 use aptos_storage_interface::state_store::{
     state::State, state_delta::StateDelta, state_view::hot_state_view::HotStateView,
 };
-use aptos_types::state_store::{
-    hot_state::THotStateSlot, state_key::StateKey, state_slot::StateSlot, NUM_STATE_SHARDS,
+use aptos_types::{
+    state_store::{
+        hot_state::THotStateSlot, state_key::StateKey, state_slot::StateSlot, NUM_STATE_SHARDS,
+    },
+    transaction::Version,
 };
-#[cfg(test)]
-use aptos_types::transaction::Version;
 use arr_macro::arr;
 use dashmap::{mapref::one::Ref, DashMap};
 #[cfg(test)]
