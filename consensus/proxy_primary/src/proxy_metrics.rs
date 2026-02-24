@@ -104,3 +104,48 @@ pub static PROXY_PENDING_BATCHES_AT_PRIMARY: Lazy<IntGauge> = Lazy::new(|| {
     )
     .unwrap()
 });
+
+/// Effective budget target after adaptive reduction
+pub static PROXY_EFFECTIVE_BUDGET_TARGET: Lazy<IntGauge> = Lazy::new(|| {
+    register_int_gauge!(
+        "aptos_proxy_effective_budget_target",
+        "Effective proxy block budget target after adaptive congestion reduction"
+    )
+    .unwrap()
+});
+
+/// Number of proxy blocks with transactions in current batch (since last cutting point)
+pub static PROXY_BLOCKS_WITH_TXNS: Lazy<IntGauge> = Lazy::new(|| {
+    register_int_gauge!(
+        "aptos_proxy_blocks_with_txns",
+        "Proxy blocks with non-empty payload in current batch"
+    )
+    .unwrap()
+});
+
+/// Total proxy blocks in current batch (since last cutting point)
+pub static PROXY_TOTAL_BLOCKS_IN_BATCH: Lazy<IntGauge> = Lazy::new(|| {
+    register_int_gauge!(
+        "aptos_proxy_total_blocks_in_batch",
+        "Total proxy blocks in current batch since last cutting point"
+    )
+    .unwrap()
+});
+
+/// Counter for proxy rounds that returned empty payload due to budget exhaustion
+pub static PROXY_EMPTY_PAYLOAD_BUDGET: Lazy<IntCounter> = Lazy::new(|| {
+    register_int_counter!(
+        "aptos_proxy_empty_payload_budget",
+        "Proxy rounds returning empty payload because budget was exhausted"
+    )
+    .unwrap()
+});
+
+/// Counter for proxy rounds that pulled real (non-empty) payload
+pub static PROXY_NONEMPTY_PAYLOAD_PULLED: Lazy<IntCounter> = Lazy::new(|| {
+    register_int_counter!(
+        "aptos_proxy_nonempty_payload_pulled",
+        "Proxy rounds that pulled real payload from inner client"
+    )
+    .unwrap()
+});

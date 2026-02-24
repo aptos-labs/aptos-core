@@ -3,6 +3,7 @@
 
 use crate::{block_storage::BlockReader, error::QuorumStoreError};
 use aptos_config::config::ProxyBackpressureConfig;
+use aptos_logger::info;
 use aptos_consensus_types::{
     common::Payload, payload_pull_params::PayloadPullParameters, utils::PayloadTxnsSize,
 };
@@ -10,7 +11,7 @@ use aptos_proxy_primary::{proxy_metrics, AtomicPipelineState};
 use aptos_types::validator_txn::ValidatorTransaction;
 use aptos_validator_transaction_pool::TransactionFilter;
 use std::sync::{
-    atomic::{AtomicBool, Ordering},
+    atomic::{AtomicBool, AtomicU64, Ordering},
     Arc,
 };
 use std::time::Duration;
@@ -59,6 +60,8 @@ pub struct ProxyBudgetPayloadClient {
     pipeline_state: Arc<AtomicPipelineState>,
     /// Backpressure tuning parameters.
     bp_config: ProxyBackpressureConfig,
+    /// Round counter for periodic logging (not consensus round, just invocation count).
+    pull_count: AtomicU64,
 }
 
 impl ProxyBudgetPayloadClient {
@@ -81,6 +84,7 @@ impl ProxyBudgetPayloadClient {
             has_pending_proof,
             pipeline_state,
             bp_config,
+            pull_count: AtomicU64::new(0),
         }
     }
 
@@ -129,6 +133,7 @@ impl PayloadClient for ProxyBudgetPayloadClient {
         mut config: PayloadPullParameters,
         validator_txn_filter: TransactionFilter,
     ) -> anyhow::Result<(Vec<ValidatorTransaction>, Payload), QuorumStoreError> {
+        let pull_num = self.pull_count.fetch_add(1, Ordering::Relaxed);
         let (blocks_with_txns, total_blocks) = self.count_blocks_since_cutting_point();
         let pipeline_info = self.pipeline_state.load();
         let has_pending = self.has_pending_proof.load(Ordering::Acquire);
@@ -137,21 +142,11 @@ impl PayloadClient for ProxyBudgetPayloadClient {
         proxy_metrics::PROXY_PIPELINE_PENDING_GAP.set(gap as i64);
         proxy_metrics::PROXY_PENDING_BATCHES_AT_PRIMARY
             .set(pipeline_info.pending_proxy_batches as i64);
+        proxy_metrics::PROXY_BLOCKS_WITH_TXNS.set(blocks_with_txns as i64);
+        proxy_metrics::PROXY_TOTAL_BLOCKS_IN_BATCH.set(total_blocks as i64);
         let batches = pipeline_info.pending_proxy_batches;
 
         let bp = &self.bp_config;
-
-        // --- Hard stop: return empty if primary has unconsumed batches ---
-        // The proxy produces batches much faster than primary can consume them.
-        // When the primary hasn't consumed existing batches, stop producing txns
-        // to prevent an unbounded backlog that causes transaction TTL expiry.
-        // Skip this check when a primary proof is pending — cutting-point blocks
-        // must be ordered ASAP.
-        if batches >= bp.pending_batches_delay_threshold && !has_pending {
-            proxy_metrics::PROXY_TXN_BUDGET_REMAINING.set(0);
-            proxy_metrics::PROXY_BACKPRESSURE_DELAY_MS.set(0);
-            return Ok((vec![], Payload::empty(self.quorum_store_enabled, true)));
-        }
 
         // --- Adaptive budget: reduce target when primary pipeline is congested ---
         let effective_target = if gap > bp.pipeline_heavy_gap {
@@ -166,6 +161,7 @@ impl PayloadClient for ProxyBudgetPayloadClient {
 
         proxy_metrics::PROXY_TXN_BUDGET_REMAINING
             .set(effective_target.saturating_sub(blocks_with_txns) as i64);
+        proxy_metrics::PROXY_EFFECTIVE_BUDGET_TARGET.set(effective_target as i64);
 
         // --- Adaptive delay: proportional to congestion level ---
         // Skip ALL delays when a primary proof is pending — cutting-point blocks
@@ -189,6 +185,18 @@ impl PayloadClient for ProxyBudgetPayloadClient {
                 delay = delay.max(gap_delay);
             }
 
+            // Pending batches delay: proportional when primary has unconsumed batches.
+            // Replaces the previous hard stop which caused a death spiral — empty
+            // proxy blocks still get forwarded as batches, keeping the count high
+            // and starving the proxy of all transactions indefinitely.
+            if batches >= bp.pending_batches_delay_threshold {
+                let batch_delay = self
+                    .round_timeout_ms
+                    .saturating_mul(batches.min(bp.max_pending_batches_for_delay))
+                    / bp.max_pending_batches_for_delay;
+                delay = delay.max(batch_delay);
+            }
+
             delay
         };
 
@@ -199,10 +207,28 @@ impl PayloadClient for ProxyBudgetPayloadClient {
 
         // --- Budget check: return empty if exhausted ---
         if blocks_with_txns >= effective_target {
+            proxy_metrics::PROXY_EMPTY_PAYLOAD_BUDGET.inc();
+            // Log every 50th pull to avoid flooding
+            if pull_num % 50 == 0 {
+                info!(
+                    pull_num = pull_num,
+                    decision = "EMPTY_BUDGET",
+                    blocks_with_txns = blocks_with_txns,
+                    total_blocks = total_blocks,
+                    effective_target = effective_target,
+                    base_target = self.target,
+                    gap = gap,
+                    batches = batches,
+                    has_pending = has_pending,
+                    delay_ms = delay_ms,
+                    "[ProxyBudget] returning empty payload (budget exhausted)"
+                );
+            }
             return Ok((vec![], Payload::empty(self.quorum_store_enabled, true)));
         }
 
         // --- Adaptive max_txns: reduce per-block size under congestion ---
+        let original_max_count = config.max_txns.count();
         if gap > bp.pipeline_heavy_gap {
             // Heavy congestion: halve max_txns per block
             let reduced = PayloadTxnsSize::new(
@@ -221,6 +247,26 @@ impl PayloadClient for ProxyBudgetPayloadClient {
             config.max_txns = config.max_txns.minimum(reduced);
             config.max_txns_after_filtering = config.max_txns_after_filtering * 3 / 4;
             config.soft_max_txns_after_filtering = config.soft_max_txns_after_filtering * 3 / 4;
+        }
+
+        proxy_metrics::PROXY_NONEMPTY_PAYLOAD_PULLED.inc();
+        // Log every 50th pull or first 10 pulls for debugging
+        if pull_num % 50 == 0 || pull_num < 10 {
+            info!(
+                pull_num = pull_num,
+                decision = "PULLING",
+                blocks_with_txns = blocks_with_txns,
+                total_blocks = total_blocks,
+                effective_target = effective_target,
+                base_target = self.target,
+                gap = gap,
+                batches = batches,
+                has_pending = has_pending,
+                delay_ms = delay_ms,
+                max_txns = config.max_txns.count(),
+                original_max_txns = original_max_count,
+                "[ProxyBudget] pulling payload from inner client"
+            );
         }
 
         self.inner.pull_payload(config, validator_txn_filter).await
