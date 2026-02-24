@@ -34,7 +34,8 @@ impl FlowSession {
     pub(crate) fn tool_names() -> Vec<String> {
         let router = Self::package_manifest_router()
             + Self::package_status_router()
-            + Self::package_verify_router();
+            + Self::package_verify_router()
+            + Self::package_spec_infer_router();
         router
             .list_all()
             .into_iter()
@@ -46,8 +47,14 @@ impl FlowSession {
         let package_cache = Arc::new(Mutex::new(BTreeMap::new()));
         let cache_ref = Arc::clone(&package_cache);
         let file_watcher = FileWatcher::new(Arc::new(move |key: &str| {
-            log::info!("invalidating cache for `{}`", key);
-            cache_ref.lock().unwrap().remove(key);
+            if cache_ref
+                .lock()
+                .expect("package_cache lock poisoned")
+                .remove(key)
+                .is_some()
+            {
+                log::info!("invalidating cache for `{}`", key);
+            }
         }))
         .expect("failed to create file watcher");
         Self {
@@ -57,7 +64,8 @@ impl FlowSession {
             file_watcher,
             tool_router: Self::package_manifest_router()
                 + Self::package_status_router()
-                + Self::package_verify_router(),
+                + Self::package_verify_router()
+                + Self::package_spec_infer_router(),
         }
     }
 
@@ -83,7 +91,10 @@ impl FlowSession {
     ) -> Result<Arc<Mutex<PackageData>>, rmcp::ErrorData> {
         let key = self.resolve_package_path(package_path);
         {
-            let cache = self.package_cache.lock().unwrap();
+            let cache = self
+                .package_cache
+                .lock()
+                .expect("package_cache lock poisoned");
             if let Some(data) = cache.get(&key) {
                 log::info!("cache hit for `{}`", key);
                 return Ok(Arc::clone(data));
@@ -134,7 +145,10 @@ impl FlowSession {
             return Ok(data);
         }
 
-        let mut cache = self.package_cache.lock().unwrap();
+        let mut cache = self
+            .package_cache
+            .lock()
+            .expect("package_cache lock poisoned");
         cache.insert(key, Arc::clone(&data));
         Ok(data)
     }
@@ -160,6 +174,6 @@ impl ServerHandler for FlowSession {
 
 /// Helper to convert any Serialize type into a CallToolResult with JSON text content
 pub(crate) fn into_call_tool_result<T: Serialize>(value: &T) -> CallToolResult {
-    let json = serde_json::to_string_pretty(value).unwrap();
+    let json = serde_json::to_string_pretty(value).expect("serde_json serialization failed");
     CallToolResult::success(vec![Content::text(json)])
 }

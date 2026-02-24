@@ -27,8 +27,8 @@
 use anyhow::Result;
 use legacy_move_compiler::{
     diagnostics::{
-        codes::Uncategorized, report_diagnostics_to_buffer, Diagnostic, Diagnostics,
-        FilesSourceText,
+        codes::{TypeSafety, Uncategorized},
+        report_diagnostics_to_buffer, Diagnostic, Diagnostics, FilesSourceText,
     },
     parser::{
         ast::{
@@ -105,9 +105,10 @@ pub fn run() -> Result<()> {
         log::info!("edit hook: `{}` is clean", path);
     } else {
         log::info!(
-            "edit hook: `{}` has diagnostics (has_errors={})",
+            "edit hook: `{}` has diagnostics (has_errors={}):\n{}",
             path,
-            result.has_errors
+            result.has_errors,
+            result.output
         );
         print!("{}", result.output);
     }
@@ -138,10 +139,12 @@ pub(crate) fn check(path: &str, source: &str) -> CheckResult {
     let text_diags = text_checks(source, file_hash);
     all_diags.extend(text_diags);
 
+    let has_errors = has_parse_errors || !all_diags.is_empty();
+
     if all_diags.is_empty() {
         return CheckResult {
             output: String::new(),
-            has_errors: false,
+            has_errors,
             has_parse_errors,
         };
     }
@@ -150,7 +153,7 @@ pub(crate) fn check(path: &str, source: &str) -> CheckResult {
     let output = String::from_utf8_lossy(&buf).to_string();
     CheckResult {
         output,
-        has_errors: true,
+        has_errors,
         has_parse_errors,
     }
 }
@@ -404,7 +407,7 @@ fn walk_spec_exp(exp: &Exp, ctx: &SpecContext, diags: &mut Diagnostics) {
                     for arg in &args.value {
                         if !is_simple_name(arg) {
                             diags.add(Diagnostic::new(
-                                Uncategorized::DeprecatedWillBeRemoved,
+                                TypeSafety::BuiltinOperation,
                                 (
                                     exp.loc,
                                     "`old(..)` in a loop invariant can only take a simple \
@@ -418,7 +421,7 @@ fn walk_spec_exp(exp: &Exp, ctx: &SpecContext, diags: &mut Diagnostics) {
                 },
                 SpecContext::Other => {
                     diags.add(Diagnostic::new(
-                        Uncategorized::DeprecatedWillBeRemoved,
+                        TypeSafety::BuiltinOperation,
                         (
                             exp.loc,
                             "`old(..)` is not allowed in this spec context; it can only be \
@@ -437,7 +440,7 @@ fn walk_spec_exp(exp: &Exp, ctx: &SpecContext, diags: &mut Diagnostics) {
         },
         Exp_::Dereference(inner) => {
             diags.add(Diagnostic::new(
-                Uncategorized::DeprecatedWillBeRemoved,
+                TypeSafety::BuiltinOperation,
                 (
                     exp.loc,
                     "dereference `*e` is not allowed in spec expressions",
@@ -449,7 +452,7 @@ fn walk_spec_exp(exp: &Exp, ctx: &SpecContext, diags: &mut Diagnostics) {
         },
         Exp_::Borrow(_, inner) => {
             diags.add(Diagnostic::new(
-                Uncategorized::DeprecatedWillBeRemoved,
+                TypeSafety::BuiltinOperation,
                 (exp.loc, "borrow `&e` is not allowed in spec expressions"),
                 std::iter::empty::<(Loc, String)>(),
                 std::iter::empty::<String>(),
@@ -528,7 +531,12 @@ pub(crate) fn find_movefmt() -> Option<PathBuf> {
 }
 
 /// Run movefmt on the file in-place. Silently skips if movefmt is unavailable.
+/// Set `MOVE_FLOW_NO_FMT=1` to suppress formatting (used by tests for
+/// deterministic baselines across platforms).
 pub(crate) fn format_file(path: &str) {
+    if std::env::var("MOVE_FLOW_NO_FMT").is_ok() {
+        return;
+    }
     let exe = match find_movefmt() {
         Some(e) => e,
         None => {

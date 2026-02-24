@@ -45,6 +45,21 @@ pub struct McpArgs {
 /// Start the MCP stdio server.
 pub async fn run(args: &McpArgs, global: &GlobalOpts) -> Result<()> {
     move_compiler_v2::logging::setup_logging(None);
+
+    // Bridge `tracing` events (used by rmcp) into the `log` framework so that
+    // flexi_logger captures transport-level diagnostics (e.g. "input stream
+    // terminated") in /tmp/flow.err.log.
+    let _ = tracing_log::LogTracer::init();
+
+    // Install a panic hook that logs panics before the default handler runs.
+    // This captures panics from any thread (file-watcher, spawn_blocking) in the
+    // log file with location info rather than silently crashing the process.
+    let default_hook = std::panic::take_hook();
+    std::panic::set_hook(Box::new(move |info| {
+        log::error!("panic: {}", info);
+        default_hook(info);
+    }));
+
     let session = FlowSession::new(args.clone(), global.clone());
     let service = session.serve(stdio()).await?;
     service.waiting().await?;
