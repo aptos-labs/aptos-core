@@ -923,12 +923,40 @@ impl StructArgParser {
                 bcs::to_bytes(&v).map_err(|e| CliError::BCS("fixed_point64", e))
             },
             _ => {
-                // Regular struct: parse as JSON object
-                let obj = value.as_object().ok_or_else(|| {
-                    CliError::UnableToParse("struct", format!("expected object, got {}", value))
-                })?;
+                // Could be a regular struct or a nested enum (e.g., a struct field, vector
+                // element, or Option<T> inner type that is itself an enum). Check on-chain.
+                let is_enum = self.is_enum_type(&tag).await?;
 
-                self.construct_struct_argument(&tag, obj, depth + 1).await
+                if is_enum {
+                    // Enum: expect {"VariantName": {fields...}}
+                    let obj = value.as_object().ok_or_else(|| {
+                        CliError::UnableToParse(
+                            "enum",
+                            format!(
+                                "expected {{\"VariantName\": {{fields}}}} for enum {}, got {}",
+                                tag.name, value
+                            ),
+                        )
+                    })?;
+                    if obj.len() == 1 {
+                        let (variant_name, variant_fields_value) = obj.iter().next().unwrap();
+                        if let Some(fields_obj) = variant_fields_value.as_object() {
+                            return self
+                                .construct_enum_argument(&tag, variant_name, fields_obj, depth + 1)
+                                .await;
+                        }
+                    }
+                    Err(CliError::CommandArgumentError(format!(
+                        "Invalid enum value for type {}. Expected {{\"VariantName\": {{fields}}}}, got {}",
+                        tag.name, value
+                    )))
+                } else {
+                    // Regular struct: parse as JSON object with named fields
+                    let obj = value.as_object().ok_or_else(|| {
+                        CliError::UnableToParse("struct", format!("expected object, got {}", value))
+                    })?;
+                    self.construct_struct_argument(&tag, obj, depth + 1).await
+                }
             },
         }
     }
