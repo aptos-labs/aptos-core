@@ -312,3 +312,36 @@ Example:
 ```
 
 Areas: `vm`, `framework`, `consensus`, `storage`, `api`, `network`, `types`, `cli`, `docs`, `test`
+
+## Cursor Cloud specific instructions
+
+### Environment prerequisites
+
+The VM is set up via `scripts/dev_setup.sh -b -t -r -k` which installs protoc, lld, clang-21, libudev-dev, and other build deps. One additional package must be installed manually: `libstdc++-14-dev` — clang-21 selects GCC 14 headers but only GCC 13 dev files are present by default on Ubuntu 24.04.
+
+### Key build/run commands
+
+All standard commands are documented in `CLAUDE.md`. Quick reference:
+
+- **Build CLI**: `cargo build -p aptos`
+- **Build node**: `cargo build -p aptos-node`
+- **Clippy**: `cargo xclippy` (workspace-wide). For single-package: use `cargo clippy -p <pkg>` with the same flags from `.cargo/config.toml` alias.
+- **Format check**: `cargo +nightly fmt --check`
+- **Tests**: `cargo test -p <package>`
+
+### Running a local testnet
+
+```bash
+./target/debug/aptos node run-local-testnet --force-restart --assume-yes --with-faucet --no-txn-stream
+```
+
+- REST API: `http://127.0.0.1:8080`
+- Faucet: `http://127.0.0.1:8081`
+- No Docker needed for basic testnet; `--no-txn-stream` avoids the Docker-dependent indexer pipeline.
+
+### Gotchas
+
+- **`cargo xclippy` does not accept `-p`**: The alias hardcodes `--workspace`. Use `cargo clippy -p <pkg> -- <flags>` for single-package clippy.
+- **RocksDB C++ header error**: If you see `fatal error: 'memory' file not found` during builds, run `sudo apt-get install -y libstdc++-14-dev`. This happens because clang-21 selects GCC 14 but its dev headers aren't installed by `dev_setup.sh`.
+- **`target-cpu=x86-64-v3`**: The `.cargo/config.toml` requires AVX2 support. The Cloud VM supports this.
+- **Move framework changes**: After editing Move source in `aptos-move/framework/`, always rebuild cached packages: `cargo build -p aptos-cached-packages`.
