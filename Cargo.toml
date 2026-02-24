@@ -105,6 +105,7 @@ members = [
     "crates/aptos-telemetry-service/e2e-test/test-client",
     "crates/aptos-temppath",
     "crates/aptos-time-service",
+    "crates/aptos-token-bucket",
     "crates/aptos-transaction-filters",
     "crates/aptos-warp-webserver",
     "crates/bounded-executor",
@@ -458,6 +459,7 @@ aptos-testcases = { path = "testsuite/testcases" }
 aptos-time-service = { path = "crates/aptos-time-service", features = [
     "async",
 ] }
+aptos-token-bucket = { path = "crates/aptos-token-bucket" }
 aptos-transaction-emitter-lib = { path = "crates/transaction-emitter-lib" }
 aptos-transaction-generator-lib = { path = "crates/transaction-generator-lib" }
 aptos-transaction-workloads-lib = { path = "crates/transaction-workloads-lib" }
