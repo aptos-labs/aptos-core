@@ -327,6 +327,10 @@ The update script runs `scripts/dev_setup.sh -b -k` on each VM startup to instal
 - **Localnet startup** takes ~60s for the first run (compilation is the bottleneck). Subsequent starts (with binary already built) are fast. Use `--no-txn-stream` to skip the transaction stream service which requires no additional dependencies.
 - The `-k` flag skips pre-commit hook installation in `dev_setup.sh` since cloud agents don't need git hooks.
 
+### CI lint gate
+
+`./scripts/rust_lint.sh` must pass in full before pushing PRs — it is a required CI check. Run it locally to catch issues early. It executes clippy (`cargo xclippy`), formatting (`cargo +nightly fmt --check`), dependency sorting (`cargo sort --grouped --workspace --check`), and unused-dependency detection (`cargo machete`). Use `./scripts/rust_lint.sh --check` for a check-only (non-modifying) run.
+
 ### Running services
 
 - **Localnet (validator + faucet)**: `cargo run -p aptos -- node run-localnet --force-restart --assume-yes --no-txn-stream`
