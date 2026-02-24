@@ -312,3 +312,25 @@ Example:
 ```
 
 Areas: `vm`, `framework`, `consensus`, `storage`, `api`, `network`, `types`, `cli`, `docs`, `test`
+
+## Cursor Cloud specific instructions
+
+### System dependencies
+
+The VM snapshot includes all required system packages pre-installed. The update script (run automatically on VM startup) only refreshes Rust toolchains and cargo tools. If a fresh VM image is ever rebuilt from scratch, these apt packages are required: `lld`, `libssl-dev`, `libudev-dev`, `libdw-dev`, `libpq-dev`, `libstdc++-14-dev`, `build-essential`. Protoc 3.21.4 must be at `/usr/local/bin/protoc`.
+
+### Key gotchas
+
+- **clang++ C++ headers**: The environment ships clang 18 which selects GCC 14 headers. `libstdc++-14-dev` must be installed or RocksDB (used by storage) will fail to compile with `'memory' file not found`.
+- **`cargo xclippy`** is a workspace-wide alias defined in `.cargo/config.toml`. It does **not** accept `-p <package>`. To lint a single package, use `cargo clippy -p <package>` with the appropriate allow/deny flags from the alias definition.
+- **`cargo +nightly fmt`** is used for formatting (not stable fmt). The nightly toolchain must have the `rustfmt` component.
+- **cargo-sort** (v1.0.7) and **cargo-machete** (v0.7.0) are needed for the full `./scripts/rust_lint.sh` pipeline.
+- **Localnet startup** takes ~60s for the first run (compilation is the bottleneck). Subsequent starts (with binary already built) are fast. Use `--no-txn-stream` to skip the transaction stream service which requires no additional dependencies.
+
+### Running services
+
+- **Localnet (validator + faucet)**: `cargo run -p aptos -- node run-localnet --force-restart --assume-yes --no-txn-stream`
+  - REST API: `http://127.0.0.1:8080`
+  - Faucet: `http://127.0.0.1:8081`
+  - Readiness: `http://127.0.0.1:8070`
+- See `CLAUDE.md` for build, test, and lint commands.
