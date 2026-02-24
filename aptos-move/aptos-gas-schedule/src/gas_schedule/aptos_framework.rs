@@ -300,6 +300,11 @@ crate::gas_schedule::macros::define_gas_parameters!(
         [util_from_bytes_base: InternalGas, "util.from_bytes.base", 1102],
         [util_from_bytes_per_byte: InternalGasPerByte, "util.from_bytes.per_byte", 18],
 
+        [aws_nitro_verify_attestation_base: InternalGas, "aws_nitro_utils.verify_attestation.base", 500_000],
+        [aws_nitro_verify_attestation_per_byte: InternalGasPerByte, "aws_nitro_utils.verify_attestation.per_byte", 50],
+        [aws_nitro_verify_and_parse_attestation_base: InternalGas, "aws_nitro_utils.verify_and_parse_attestation.base", 550_000],
+        [aws_nitro_verify_and_parse_attestation_per_byte: InternalGasPerByte, "aws_nitro_utils.verify_and_parse_attestation.per_byte", 50],
+
         [transaction_context_get_txn_hash_base: InternalGas, { 10.. => "transaction_context.get_txn_hash.base" }, 735],
         [transaction_context_get_script_hash_base: InternalGas, "transaction_context.get_script_hash.base", 735],
         // Based on SHA3-256's cost
