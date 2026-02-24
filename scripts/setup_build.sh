@@ -1746,7 +1746,7 @@ if [ "$OPERATIONS" = "true" ]; then
     # YAML linter for config file validation
     install_pkg yamllint "$PACKAGE_MANAGER"
     # Python 3 for scripts and tooling
-    install_pkg python3 "$PACKAGE_MANAGER"
+    install_generic python3
     # jq: lightweight JSON processor (used in shell scripts)
     install_pkg jq "$PACKAGE_MANAGER"
     # git: version control
