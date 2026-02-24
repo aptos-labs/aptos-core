@@ -10,6 +10,14 @@ use clap::Parser;
 aptos_jemalloc::setup_jemalloc!();
 
 fn main() {
+    // Remap .text onto 2MB huge pages to reduce iTLB misses.
+    // Must happen before spawning threads.
+    #[cfg(target_os = "linux")]
+    match aptos_hugify::hugify_process_text() {
+        Ok(n) => eprintln!("hugify: remapped {n} x 2MB pages"),
+        Err(e) => eprintln!("hugify: {e}"),
+    }
+
     // Check that we are not including any Move test natives
     aptos_vm::natives::assert_no_test_natives(ERROR_MSG_BAD_FEATURE_FLAGS);
 
