@@ -1,7 +1,9 @@
 // Copyright (c) Aptos Foundation
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
-use crate::{bootstrap_api, indexer, mpsc::Receiver, network::ApplicationNetworkInterfaces};
+#[cfg(any(feature = "api-v1", feature = "api-v2"))]
+use crate::bootstrap_api;
+use crate::{indexer, mpsc::Receiver, network::ApplicationNetworkInterfaces};
 use aptos_admin_service::AdminService;
 use aptos_build_info::build_information;
 use aptos_config::config::NodeConfig;
@@ -94,7 +96,8 @@ pub fn bootstrap_api_and_indexer(
         trait_object
     });
 
-    let api_runtime = if node_config.api.enabled {
+    #[cfg(any(feature = "api-v1", feature = "api-v2"))]
+    let api_runtime = if node_config.api.enabled || node_config.api_v2.enabled {
         Some(bootstrap_api(
             node_config,
             chain_id,
@@ -106,6 +109,8 @@ pub fn bootstrap_api_and_indexer(
     } else {
         None
     };
+    #[cfg(not(any(feature = "api-v1", feature = "api-v2")))]
+    let api_runtime: Option<tokio::runtime::Runtime> = None;
 
     // Creates the indexer grpc runtime
     let indexer_grpc = bootstrap_indexer_grpc(

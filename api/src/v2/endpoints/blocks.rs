@@ -1,0 +1,163 @@
+// Copyright (c) Aptos Foundation
+// Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
+
+use crate::v2::{
+    context::{spawn_blocking, V2Context},
+    error::{ErrorCode, V2Error},
+    types::{BlockParams, V2Response},
+};
+use aptos_api_types::{AsConverter, Block};
+use axum::{
+    extract::{Path, Query, State},
+    Json,
+};
+
+/// GET /v2/blocks/:height
+#[utoipa::path(
+    get,
+    path = "/v2/blocks/{height}",
+    tag = "Blocks",
+    params(
+        ("height" = u64, Path, description = "Block height"),
+        BlockParams,
+    ),
+    responses(
+        (status = 200, description = "Block details", body = Object),
+        (status = 404, description = "Block not found", body = V2Error),
+    )
+)]
+pub async fn get_block_by_height_handler(
+    State(ctx): State<V2Context>,
+    Path(height): Path<u64>,
+    Query(params): Query<BlockParams>,
+) -> Result<Json<V2Response<Block>>, V2Error> {
+    let ctx = ctx.clone();
+    spawn_blocking(move || {
+        let with_txns = params.with_transactions.unwrap_or(false);
+        let (bcs_block, ledger_info) = ctx.get_block_by_height(height, with_txns)?;
+        let block = render_block(&ctx, &ledger_info, bcs_block)?;
+        Ok(Json(V2Response::new(block, &ledger_info)))
+    })
+    .await
+}
+
+/// GET /v2/blocks/latest
+#[utoipa::path(
+    get,
+    path = "/v2/blocks/latest",
+    tag = "Blocks",
+    responses(
+        (status = 200, description = "Latest block details", body = Object),
+        (status = 500, description = "Internal error", body = V2Error),
+    )
+)]
+pub async fn get_latest_block_handler(
+    State(ctx): State<V2Context>,
+) -> Result<Json<V2Response<Block>>, V2Error> {
+    let ctx = ctx.clone();
+    spawn_blocking(move || {
+        let ledger_info = ctx.ledger_info()?;
+        let block_height: u64 = ledger_info.block_height.into();
+        let (bcs_block, ledger_info) = ctx.get_block_by_height(block_height, false)?;
+        let block = render_block(&ctx, &ledger_info, bcs_block)?;
+        Ok(Json(V2Response::new(block, &ledger_info)))
+    })
+    .await
+}
+
+/// GET /v2/blocks/by_version/:version -- get the block containing a specific version.
+#[utoipa::path(
+    get,
+    path = "/v2/blocks/by_version/{version}",
+    tag = "Blocks",
+    params(
+        ("version" = u64, Path, description = "Transaction version"),
+        BlockParams,
+    ),
+    responses(
+        (status = 200, description = "Block containing the version", body = Object),
+        (status = 404, description = "Block not found", body = V2Error),
+        (status = 410, description = "Version pruned", body = V2Error),
+    )
+)]
+pub async fn get_block_by_version_handler(
+    State(ctx): State<V2Context>,
+    Path(version): Path<u64>,
+    Query(params): Query<BlockParams>,
+) -> Result<Json<V2Response<Block>>, V2Error> {
+    let ctx = ctx.clone();
+    spawn_blocking(move || {
+        let with_txns = params.with_transactions.unwrap_or(false);
+        let ledger_info = ctx.ledger_info()?;
+
+        let bcs_block = ctx
+            .inner()
+            .get_block_by_version::<crate::response::BasicErrorWith404>(
+                version,
+                &ledger_info,
+                with_txns,
+            )
+            .map_err(|e| {
+                // Map the v1 error to v2 error
+                let msg = format!("{}", e);
+                if msg.contains("pruned") {
+                    V2Error::gone(ErrorCode::VersionPruned, msg)
+                } else {
+                    V2Error::not_found(ErrorCode::BlockNotFound, msg)
+                }
+            })?;
+
+        let block = render_block(&ctx, &ledger_info, bcs_block)?;
+        Ok(Json(V2Response::new(block, &ledger_info)))
+    })
+    .await
+}
+
+fn render_block(
+    ctx: &V2Context,
+    ledger_info: &aptos_api_types::LedgerInfo,
+    bcs_block: aptos_api_types::BcsBlock,
+) -> Result<Block, V2Error> {
+    let state_view = ctx.inner().latest_state_view().map_err(V2Error::internal)?;
+    let converter =
+        state_view.as_converter(ctx.inner().db.clone(), ctx.inner().indexer_reader.clone());
+
+    let (block_hash, block_timestamp, first_version, last_version, transactions) = (
+        bcs_block.block_hash,
+        bcs_block.block_timestamp,
+        bcs_block.first_version,
+        bcs_block.last_version,
+        bcs_block.transactions,
+    );
+
+    // Convert transactions if present
+    let txns = if let Some(txns_data) = transactions {
+        let rendered: Vec<aptos_api_types::Transaction> = txns_data
+            .into_iter()
+            .map(|txn_data| {
+                let timestamp = ctx
+                    .inner()
+                    .db
+                    .get_block_timestamp(txn_data.version)
+                    .map_err(V2Error::internal)?;
+                converter
+                    .try_into_onchain_transaction(timestamp, txn_data)
+                    .map_err(V2Error::internal)
+            })
+            .collect::<Result<Vec<_>, _>>()?;
+        Some(rendered)
+    } else {
+        None
+    };
+
+    let block_height: u64 = ledger_info.block_height.into();
+
+    Ok(Block {
+        block_height: block_height.into(),
+        block_hash: block_hash.into(),
+        block_timestamp: block_timestamp.into(),
+        first_version: first_version.into(),
+        last_version: last_version.into(),
+        transactions: txns,
+    })
+}

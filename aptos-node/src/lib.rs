@@ -22,6 +22,7 @@ mod tests;
 use crate::utils::ensure_max_open_files_limit;
 use anyhow::{anyhow, Context};
 use aptos_admin_service::AdminService;
+#[cfg(any(feature = "api-v1", feature = "api-v2"))]
 use aptos_api::bootstrap as bootstrap_api;
 use aptos_build_info::build_information;
 use aptos_config::config::{merge_node_config, NodeConfig, PersistableConfig};

@@ -1,0 +1,35 @@
+// Copyright (c) Aptos Foundation
+// Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
+
+//! Aptos REST API v2 (Axum-based).
+//!
+//! This module contains the v2 API implementation served at `/v2`.
+//! It wraps the existing v1 Context for shared DB/mempool access while
+//! providing a cleaner, framework-agnostic interface via Axum.
+
+pub mod batch;
+pub mod context;
+pub mod cursor;
+pub mod endpoints;
+pub mod error;
+pub mod extractors;
+pub mod metrics;
+pub mod middleware;
+pub mod openapi;
+pub mod proxy;
+pub mod router;
+#[cfg(test)]
+mod tests;
+pub mod tls;
+pub mod types;
+/// WebSocket types, broadcaster, and handler.
+/// The types and broadcaster submodules are shared by both WebSocket and SSE features.
+/// The handler itself (ws_handler) is only available with `api-v2-websocket`.
+#[cfg(any(feature = "api-v2-websocket", feature = "api-v2-sse"))]
+pub mod websocket;
+
+pub use context::V2Context;
+pub use error::{ErrorCode, V2Error};
+pub use proxy::V1Proxy;
+pub use router::{build_combined_router, build_v2_router};
+pub use types::{LedgerMetadata, V2Response};

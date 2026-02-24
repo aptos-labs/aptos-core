@@ -1,0 +1,156 @@
+// Copyright (c) Aptos Foundation
+// Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
+
+//! v2 API router construction.
+
+use super::{
+    batch,
+    context::V2Context,
+    endpoints::{
+        account_transactions, accounts, balance, blocks, events, gas_estimation, health, modules,
+        resources, simulate, tables, transactions, view,
+    },
+    middleware, openapi,
+    proxy::{self, V1Proxy},
+};
+#[cfg(feature = "api-v2-sse")]
+use super::endpoints::sse;
+#[cfg(feature = "api-v2-websocket")]
+use super::websocket;
+use axum::{
+    middleware as axum_middleware,
+    routing::{get, post},
+    Router,
+};
+use std::net::SocketAddr;
+
+/// Build the v2 Axum router with all endpoints and middleware.
+pub fn build_v2_router(ctx: V2Context) -> Router {
+    let content_length_limit = ctx.v2_config.content_length_limit as usize;
+    let request_timeout_ms = ctx.v2_config.request_timeout_ms;
+
+    let router = Router::new()
+        // Health & info
+        .route("/v2/health", get(health::health_handler))
+        .route("/v2/info", get(health::info_handler))
+        // Account info
+        .route("/v2/accounts/:address", get(accounts::get_account_handler))
+        // Balance
+        .route(
+            "/v2/accounts/:address/balance/*asset_type",
+            get(balance::get_balance_handler),
+        )
+        // Resources
+        .route(
+            "/v2/accounts/:address/resources",
+            get(resources::get_resources_handler),
+        )
+        .route(
+            "/v2/accounts/:address/resource/*resource_type",
+            get(resources::get_resource_handler),
+        )
+        // Modules
+        .route(
+            "/v2/accounts/:address/modules",
+            get(modules::get_modules_handler),
+        )
+        .route(
+            "/v2/accounts/:address/module/:module_name",
+            get(modules::get_module_handler),
+        )
+        // Transactions
+        .route(
+            "/v2/transactions",
+            get(transactions::list_transactions_handler)
+                .post(transactions::submit_transaction_handler),
+        )
+        .route(
+            "/v2/transactions/simulate",
+            post(simulate::simulate_transaction_handler),
+        )
+        .route(
+            "/v2/transactions/by_version/:version",
+            get(transactions::get_transaction_by_version_handler),
+        )
+        .route(
+            "/v2/transactions/:hash",
+            get(transactions::get_transaction_handler),
+        )
+        .route(
+            "/v2/transactions/:hash/wait",
+            get(transactions::wait_transaction_handler),
+        )
+        // Account transactions
+        .route(
+            "/v2/accounts/:address/transactions",
+            get(account_transactions::get_account_transactions_handler),
+        )
+        // Events
+        .route(
+            "/v2/accounts/:address/events/:creation_number",
+            get(events::get_events_handler),
+        )
+        // View
+        .route("/v2/view", post(view::view_handler))
+        // Gas estimation
+        .route(
+            "/v2/estimate_gas_price",
+            get(gas_estimation::estimate_gas_price_handler),
+        )
+        // Tables
+        .route(
+            "/v2/tables/:table_handle/item",
+            post(tables::get_table_item_handler),
+        )
+        // Blocks
+        .route("/v2/blocks/latest", get(blocks::get_latest_block_handler))
+        .route(
+            "/v2/blocks/by_version/:version",
+            get(blocks::get_block_by_version_handler),
+        )
+        .route(
+            "/v2/blocks/:height",
+            get(blocks::get_block_by_height_handler),
+        )
+        // Batch (JSON-RPC 2.0)
+        .route("/v2/batch", post(batch::batch_handler));
+
+    // SSE (Server-Sent Events) -- only compiled with the api-v2-sse feature
+    #[cfg(feature = "api-v2-sse")]
+    let router = router
+        .route("/v2/sse/blocks", get(sse::sse_blocks_handler))
+        .route("/v2/sse/events", get(sse::sse_events_handler));
+
+    // WebSocket -- only compiled with the api-v2-websocket feature
+    #[cfg(feature = "api-v2-websocket")]
+    let router = router.route("/v2/ws", get(websocket::ws_handler));
+
+    // OpenAPI spec + middleware
+    router
+        .route("/v2/spec.json", get(openapi::spec_json_handler))
+        .route("/v2/spec.yaml", get(openapi::spec_yaml_handler))
+        // Middleware stack (applied bottom-up: first listed = outermost)
+        .layer(axum_middleware::from_fn(middleware::request_id_layer))
+        .layer(axum_middleware::from_fn(middleware::logging_layer))
+        .layer(axum_middleware::from_fn(move |req, next| {
+            middleware::timeout_layer(request_timeout_ms, req, next)
+        }))
+        .layer(middleware::cors_layer())
+        .layer(middleware::compression_layer())
+        .layer(middleware::size_limit_layer(content_length_limit))
+        .with_state(ctx)
+}
+
+/// Build a combined router that serves v2 routes and proxies everything
+/// else to the internal Poem v1 server. Used for same-port co-hosting.
+pub fn build_combined_router(ctx: V2Context, poem_address: SocketAddr) -> Router {
+    let v2 = build_v2_router(ctx);
+    let v1_proxy = V1Proxy::new(poem_address);
+
+    // v2 routes take priority; anything unmatched falls through to the v1 proxy.
+    v2.fallback_service(
+        Router::new()
+            .fallback(proxy::v1_proxy_fallback)
+            .with_state(v1_proxy),
+    )
+}

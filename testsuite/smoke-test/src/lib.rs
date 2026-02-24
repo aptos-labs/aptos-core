@@ -46,6 +46,8 @@ mod randomness;
 #[cfg(test)]
 mod rest_api;
 #[cfg(test)]
+mod rest_api_v2;
+#[cfg(test)]
 mod rosetta;
 #[cfg(test)]
 mod slh_dsa;
