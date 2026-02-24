@@ -123,6 +123,9 @@ impl PrivateKey {
         expanded_keypart[31] &= 127;
         expanded_keypart[31] |= 64;
 
+        // Note: We apply the same clamping that x25519::PrivateKey::from() would apply internally.
+        // The x25519_dalek library doesn't expose a way to verify the bytes weren't modified,
+        // but since we're applying the standard clamping ourselves, this is safe.
         let potential_x25519 = x25519::PrivateKey::from(expanded_keypart);
         Ok(potential_x25519)
     }
