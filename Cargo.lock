@@ -1602,6 +1602,7 @@ dependencies = [
  "aptos-experimental-ptx-executor",
  "aptos-experimental-runtimes",
  "aptos-genesis",
+ "aptos-hugify",
  "aptos-indexer-grpc-fullnode",
  "aptos-indexer-grpc-table-info",
  "aptos-infallible",
@@ -2188,6 +2189,13 @@ dependencies = [
 [[package]]
 name = "aptos-global-constants"
 version = "0.1.0"
+
+[[package]]
+name = "aptos-hugify"
+version = "0.1.0"
+dependencies = [
+ "libc",
+]
 
 [[package]]
 name = "aptos-id-generator"
@@ -3498,6 +3506,7 @@ dependencies = [
  "aptos-executor",
  "aptos-framework",
  "aptos-genesis",
+ "aptos-hugify",
  "aptos-indexer-grpc-fullnode",
  "aptos-indexer-grpc-table-info",
  "aptos-infallible",
