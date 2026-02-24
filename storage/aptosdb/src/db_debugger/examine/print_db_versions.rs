@@ -36,16 +36,17 @@ impl Cmd {
         let rocksdb_config = RocksdbConfigs::default();
         let env = None;
         let block_cache = None;
-        // TODO(HotState): handle hot state merkle db.
-        let (ledger_db, _hot_state_merkle_db, state_merkle_db, state_kv_db) = AptosDB::open_dbs(
-            &StorageDirPaths::from_path(&self.db_dir),
-            rocksdb_config,
-            env,
-            block_cache,
-            /*readonly=*/ true,
-            /*max_num_nodes_per_lru_cache_shard=*/ 0,
-            /*reset_hot_state=*/ false,
-        )?;
+        // TODO(HotState): handle hot state merkle db and hot state kv db.
+        let (ledger_db, _hot_state_merkle_db, state_merkle_db, _hot_state_kv_db, state_kv_db) =
+            AptosDB::open_dbs(
+                &StorageDirPaths::from_path(&self.db_dir),
+                rocksdb_config,
+                env,
+                block_cache,
+                /*readonly=*/ true,
+                /*max_num_nodes_per_lru_cache_shard=*/ 0,
+                /*reset_hot_state=*/ false,
+            )?;
 
         println!(
             "Overall Progress: {:?}",

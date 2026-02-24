@@ -110,7 +110,13 @@ impl AptosDB {
         readonly: bool,
         max_num_nodes_per_lru_cache_shard: usize,
         reset_hot_state: bool,
-    ) -> Result<(LedgerDb, Option<StateMerkleDb>, StateMerkleDb, StateKvDb)> {
+    ) -> Result<(
+        LedgerDb,
+        Option<StateMerkleDb>,
+        StateMerkleDb,
+        Option<StateKvDb>,
+        StateKvDb,
+    )> {
         let ledger_db = LedgerDb::new(
             db_paths.ledger_db_root_path(),
             rocksdb_configs.ledger_db_config,
@@ -118,12 +124,27 @@ impl AptosDB {
             block_cache,
             readonly,
         )?;
+        let hot_state_kv_db = if !readonly {
+            Some(StateKvDb::new(
+                db_paths,
+                rocksdb_configs.state_kv_db_config,
+                env,
+                block_cache,
+                readonly,
+                /* is_hot = */ true,
+                reset_hot_state,
+            )?)
+        } else {
+            None
+        };
         let state_kv_db = StateKvDb::new(
             db_paths,
             rocksdb_configs.state_kv_db_config,
             env,
             block_cache,
             readonly,
+            /* is_hot = */ false,
+            /* delete_on_restart = */ false,
         )?;
         let hot_state_merkle_db = if !readonly {
             Some(StateMerkleDb::new(
@@ -150,7 +171,13 @@ impl AptosDB {
             /* delete_on_restart = */ false,
         )?;
 
-        Ok((ledger_db, hot_state_merkle_db, state_merkle_db, state_kv_db))
+        Ok((
+            ledger_db,
+            hot_state_merkle_db,
+            state_merkle_db,
+            hot_state_kv_db,
+            state_kv_db,
+        ))
     }
 
     pub fn add_version_update_subscriber(
@@ -173,7 +200,12 @@ impl AptosDB {
         info!("Creating checkpoint for AptosDB.");
 
         LedgerDb::create_checkpoint(db_path.as_ref(), cp_path.as_ref())?;
-        StateKvDb::create_checkpoint(db_path.as_ref(), cp_path.as_ref())?;
+        StateKvDb::create_checkpoint(db_path.as_ref(), cp_path.as_ref(), /* is_hot = */ true)?;
+        StateKvDb::create_checkpoint(
+            db_path.as_ref(),
+            cp_path.as_ref(),
+            /* is_hot = */ false,
+        )?;
         StateMerkleDb::create_checkpoint(
             db_path.as_ref(),
             cp_path.as_ref(),
