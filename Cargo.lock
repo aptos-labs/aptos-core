@@ -2190,6 +2190,13 @@ name = "aptos-global-constants"
 version = "0.1.0"
 
 [[package]]
+name = "aptos-hugify"
+version = "0.1.0"
+dependencies = [
+ "libc",
+]
+
+[[package]]
 name = "aptos-id-generator"
 version = "0.1.0"
 
@@ -3498,6 +3505,7 @@ dependencies = [
  "aptos-executor",
  "aptos-framework",
  "aptos-genesis",
+ "aptos-hugify",
  "aptos-indexer-grpc-fullnode",
  "aptos-indexer-grpc-table-info",
  "aptos-infallible",

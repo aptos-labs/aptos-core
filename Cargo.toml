@@ -79,6 +79,7 @@ members = [
     "crates/aptos-in-memory-cache",
     "crates/aptos-infallible",
     "crates/aptos-inspection-service",
+    "crates/aptos-hugify",
     "crates/aptos-jemalloc",
     "crates/aptos-jwk-consensus",
     "crates/aptos-keygen",
@@ -380,6 +381,7 @@ aptos-indexer-transaction-generator = { path = "ecosystem/indexer-grpc/indexer-t
 aptos-infallible = { path = "crates/aptos-infallible" }
 aptos-inspection-service = { path = "crates/aptos-inspection-service" }
 aptos-jellyfish-merkle = { path = "storage/jellyfish-merkle" }
+aptos-hugify = { path = "crates/aptos-hugify" }
 aptos-jemalloc = { path = "crates/aptos-jemalloc" }
 aptos-jwk-consensus = { path = "crates/aptos-jwk-consensus" }
 aptos-jwk-utils = { path = "crates/jwk-utils" }
