@@ -421,8 +421,8 @@ resolve_pkg_name() {
         pkg-config)
             case "$_pm" in
                 apt-get|dnf) echo "pkg-config" ;;
-                pacman)      echo "pkgconf" ;;
-                brew|apk|yum) echo "pkgconfig" ;;
+                pacman|apk)  echo "pkgconf" ;;
+                brew|yum)    echo "pkgconfig" ;;
                 *)           echo "pkg-config" ;;
             esac
             ;;
@@ -955,10 +955,12 @@ install_vault() {
     log_info "Installing Vault v${VAULT_VERSION} (secrets management)"
 
     _current="$("${INSTALL_DIR}vault" --version 2>/dev/null || echo "")"
-    if [ "$_current" = "Vault v${VAULT_VERSION}" ]; then
-        log_info "Vault ${VAULT_VERSION} already installed"
-        return 0
-    fi
+    case "$_current" in
+        *"${VAULT_VERSION}"*)
+            log_info "Vault ${VAULT_VERSION} already installed"
+            return 0
+            ;;
+    esac
 
     _machine="$(uname -m)"
     case "$_machine" in x86_64) _machine="amd64" ;; esac
@@ -1342,15 +1344,16 @@ install_dotnet() {
         esac
     fi
 
+    _tmpdir="$(make_tmp_dir)"
     wget --tries 10 --retry-connrefused --waitretry=5 \
-        https://dot.net/v1/dotnet-install.sh -O dotnet-install.sh || \
+        https://dot.net/v1/dotnet-install.sh -O "${_tmpdir}/dotnet-install.sh" || \
         die "Failed to download .NET install script." \
             "URL: https://dot.net/v1/dotnet-install.sh"
-    chmod +x dotnet-install.sh
-    ./dotnet-install.sh --channel "$DOTNET_VERSION" --install-dir "${DOTNET_INSTALL_DIR}" --version latest || \
+    chmod +x "${_tmpdir}/dotnet-install.sh"
+    "${_tmpdir}/dotnet-install.sh" --channel "$DOTNET_VERSION" --install-dir "${DOTNET_INSTALL_DIR}" --version latest || \
         die "Failed to install .NET SDK ${DOTNET_VERSION}." \
             "Check the .NET install log above for details."
-    rm -f dotnet-install.sh
+    rm -rf "$_tmpdir"
 }
 
 # Boogie -- intermediate verification language for the Move Prover
@@ -1702,7 +1705,7 @@ if [ "$INSTALL_BUILD_TOOLS" = "true" ]; then
     install_rustup
 
     # Install the exact channel pinned in rust-toolchain.toml
-    _rust_channel="$(grep channel ./rust-toolchain.toml | sed 's/.*"\([^"]*\)".*/\1/')"
+    _rust_channel="$(grep -E '^[[:space:]]*channel[[:space:]]*=' ./rust-toolchain.toml | sed 's/.*"\([^"]*\)".*/\1/')"
     if [ -z "$_rust_channel" ]; then
         die "Could not parse Rust channel from rust-toolchain.toml." \
             "Expected a line like: channel = \"1.XX.Y\""
