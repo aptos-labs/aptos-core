@@ -1,5 +1,9 @@
 // Copyright (c) Aptos Foundation
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
+//
+// To print per-phase prove timing for dekart-multivar, use the filter that matches the benchmark
+// name (group comes first: "dekart-multivar/.../prove/..."):
+//   N=1023 L=16 cargo bench -p aptos-dkg --bench range_proof --features "range_proof_timing_multivariate" -- 'dekart-multivar.*prove'
 
 use aptos_crypto::arkworks::GroupGenerators;
 use aptos_dkg::{

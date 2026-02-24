@@ -42,7 +42,7 @@ use ark_poly::{
 };
 use ark_serialize::{CanonicalDeserialize, CanonicalSerialize};
 use rand::{CryptoRng, RngCore};
-#[cfg(feature = "pcs_verify_timing")]
+#[cfg(any(feature = "pcs_verify_timing", feature = "range_proof_timing_multivariate"))]
 use std::time::{Duration, Instant};
 
 /// Domain separation tag for the Shplonked opening sigma protocol (Fiat–Shamir context).
@@ -154,6 +154,21 @@ pub fn zk_pcs_open<E: Pairing, R: RngCore + CryptoRng>(
 where
     E::ScalarField: FftField,
 {
+    #[cfg(feature = "range_proof_timing_multivariate")]
+    let mut cumulative = Duration::ZERO;
+    #[cfg(feature = "range_proof_timing_multivariate")]
+    let mut print_open = |name: &str, duration: Duration| {
+        cumulative += duration;
+        println!(
+            "  {:>10.2} ms  ({:>10.2} ms cum.)  [zk_pcs_open] {}",
+            duration.as_secs_f64() * 1000.0,
+            cumulative.as_secs_f64() * 1000.0,
+            name
+        );
+    };
+
+    #[cfg(feature = "range_proof_timing_multivariate")]
+    let start = Instant::now();
     // Step 1
     assert!(
         srs.taus_1.len() >= 2,
@@ -176,7 +191,11 @@ where
 
     // Step 2
     let gamma: E::ScalarField = trs.challenge_scalar();
+    #[cfg(feature = "range_proof_timing_multivariate")]
+    print_open("com_y (hom.apply evals) + transcript + gamma", start.elapsed());
 
+    #[cfg(feature = "range_proof_timing_multivariate")]
+    let start = Instant::now();
     // Step 3: Z_T = ∏ (X - x_i) via divide-and-conquer from_roots
     let z_T = vanishing_poly::from_roots(&eval_points);
     let z_T_dos = DOSPoly::from(z_T.clone());
@@ -226,7 +245,11 @@ where
         })
         .0;
     trs.append_point(&W.into_affine());
+    #[cfg(feature = "range_proof_timing_multivariate")]
+    print_open("z_T + f_i_minus_y_is + z_t_is + f_poly + h_poly + W", start.elapsed());
 
+    #[cfg(feature = "range_proof_timing_multivariate")]
+    let start = Instant::now();
     // Step 4
     let z = trs.challenge_scalar();
 
@@ -264,7 +287,11 @@ where
         })
         .0;
     trs.append_point(&W_prime.into_affine());
+    #[cfg(feature = "range_proof_timing_multivariate")]
+    print_open("z + z_T_val + f_z_poly + Q + W_prime", start.elapsed());
 
+    #[cfg(feature = "range_proof_timing_multivariate")]
+    let start = Instant::now();
     let u: E::ScalarField = sample_field_element(rng);
 
     let mut sum_y = E::ScalarField::zero();
@@ -307,7 +334,11 @@ where
     let Y = srs.taus_1[0] * y_term - srs.taus_1[1] * t;
 
     let y_sum: E::ScalarField = evals.iter().copied().sum();
+    #[cfg(feature = "range_proof_timing_multivariate")]
+    print_open("sum_y + V + sum_r + y_term + Y + y_sum", start.elapsed());
 
+    #[cfg(feature = "range_proof_timing_multivariate")]
+    let start = Instant::now();
     let witness = ShplonkedSigmaWitness {
         rho,
         evals: evals.clone(),
@@ -333,7 +364,11 @@ where
         y_sum,
     );
     let (sigma_protocol_proof, _) = full_hom.prove(&witness, statement, SHPLONKED_SIGMA_DST, rng);
+    #[cfg(feature = "range_proof_timing_multivariate")]
+    print_open("alpha + homs + full_hom.prove (sigma)", start.elapsed());
 
+    #[cfg(feature = "range_proof_timing_multivariate")]
+    let start = Instant::now();
     let (r_com_y, r_V, r_y) = match &sigma_protocol_proof.first_proof_item {
         FirstProofItem::Commitment(c) => (c.0 .0 .0, c.0 .1 .0, c.1),
         FirstProofItem::Challenge(_) => panic!("expected commitment in sigma proof"),
@@ -368,6 +403,8 @@ where
         Y,
         sigma_proof,
     };
+    #[cfg(feature = "range_proof_timing_multivariate")]
+    print_open("pack proof (r_com_y, r_V, sigma_proof, ...)", start.elapsed());
     proof
 }
 
@@ -497,7 +534,11 @@ where
             u: sigma_proof.z_u,
         },
     };
+    #[cfg(feature = "pcs_verify_timing")]
+    print_cumulative("compute_alpha + hom setup + proof packaging", start.elapsed());
 
+    #[cfg(feature = "pcs_verify_timing")]
+    let start = Instant::now();
     let prover_commitment = sigma_protocol_proof
         .prover_commitment()
         .expect("Shplonked verify: tuple proof must contain commitment");
@@ -521,7 +562,11 @@ where
         None,
         rng,
     )?;
+    #[cfg(feature = "pcs_verify_timing")]
+    print_cumulative("Fiat-Shamir challenge + hom2 verify", start.elapsed());
 
+    #[cfg(feature = "pcs_verify_timing")]
+    let start = Instant::now();
     // Use full protocol challenge c for hom1's MSM (msm_terms_for_verify would recompute c from inner hom).
     let (_, powers_of_beta) = full_hom.hom1.compute_verifier_challenges(
         &public_statement.0,
@@ -538,6 +583,11 @@ where
         &powers_of_beta,
         c,
     );
+    #[cfg(feature = "pcs_verify_timing")]
+    print_cumulative("hom1 verifier challenges + msm_terms + merge_msm_terms", start.elapsed());
+
+    #[cfg(feature = "pcs_verify_timing")]
+    let start = Instant::now();
     let delta = sample_field_element(rng);
     let merged_final = merge_scaled_msm_terms::<E::G1>(
         &[&merged, &hom1_msm_terms],
@@ -546,7 +596,7 @@ where
     let sum_com = E::G1::msm(merged_final.bases(), merged_final.scalars())
         .expect("Shplonked verify: merged commitment MSM");
     #[cfg(feature = "pcs_verify_timing")]
-    print_cumulative("compute_alpha + hom setup + sigma (hom2 verify + hom1 MSM merge)", start.elapsed());
+    print_cumulative("delta + merge_scaled_msm_terms + sum_com MSM", start.elapsed());
 
     #[cfg(feature = "pcs_verify_timing")]
     let start = Instant::now();
