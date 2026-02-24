@@ -59,7 +59,9 @@ pub(crate) const E_CONSTANTS_BLS12381FQ12_Q12_ORDER_LOADING_FAILED: u64 = 0x0A_0
 pub(crate) const E_CONSTANTS_BN254FQ12_Q12_ORDER_LOADING_FAILED: u64 = 0x0A_0005;
 pub(crate) const E_CASTING_BLS12381_R_SCALAR_LOADING_FAILED: u64 = 0x0A_0006;
 pub(crate) const E_SERIALIZATION_BLS12381GT_CONST_LOADING_FAILED: u64 = 0x0A_0007;
+#[cfg(feature = "testing")]
 pub(crate) const E_RAND_BLS12381GT_GT_GENERATOR_LOADING_FAILED: u64 = 0x0A_0008;
+#[cfg(feature = "testing")]
 pub(crate) const E_RAND_BN254GT_GT_GENERATOR_LOADING_FAILED: u64 = 0x0A_0009;
 pub(crate) const E_SCALAR_MUL_MSM_WINDOW_SIZE_FAILED: u64 = 0x0A_000A;
 pub(crate) const E_SCALAR_MUL_MSM_COMPUTATION_FAILED: u64 = 0x0A_000B;
@@ -67,6 +69,7 @@ pub(crate) const E_HASH_TO_STRUCTURE_BLS12381G1_MAPPER_FAILED: u64 = 0x0A_000C;
 pub(crate) const E_HASH_TO_STRUCTURE_BLS12381G1_HASH_FAILED: u64 = 0x0A_000D;
 pub(crate) const E_HASH_TO_STRUCTURE_BLS12381G2_MAPPER_FAILED: u64 = 0x0A_000E;
 pub(crate) const E_HASH_TO_STRUCTURE_BLS12381G2_HASH_FAILED: u64 = 0x0A_000F;
+#[cfg(feature = "testing")]
 pub(crate) const E_RAND_INSECURE_NOT_IMPLEMENTED: u64 = 0x0A_0010;
 
 /// This encodes an algebraic structure defined in `*_algebra.move`.
