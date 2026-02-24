@@ -39,7 +39,7 @@ macro_rules! setup_jemalloc {
               prof:true,lg_prof_sample:23,\
               percpu_arena:percpu,\
               hpa:true,metadata_thp:auto,\
-              background_thread:true,max_background_threads:4,\
+              max_background_threads:4,\
               dirty_decay_ms:30000,muzzy_decay_ms:120000,\
               lg_tcache_max:16,tcache_nslots_large:32"
             .as_ptr()
