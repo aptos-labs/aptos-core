@@ -23,7 +23,7 @@ use move_binary_format::{
 };
 use move_core_types::vm_status::StatusCode;
 use petgraph::{
-    algo::tarjan_scc,
+    algo::kosaraju_scc,
     graph::{EdgeIndex, NodeIndex},
     visit::EdgeRef,
     Graph,
@@ -359,7 +359,7 @@ impl<'a> InstantiationLoopChecker<'a> {
     /// that an input type can get "bigger" infinitely many times along the loop, also creating
     /// infinitely many types. This is precisely the kind of constructs we want to forbid.
     fn find_non_trivial_components(&self) -> Vec<(Vec<NodeIndex>, Vec<EdgeIndex>)> {
-        tarjan_scc(&self.graph)
+        kosaraju_scc(&self.graph)
             .into_iter()
             .filter_map(move |nodes| {
                 let node_set: HashSet<_> = nodes.iter().cloned().collect();

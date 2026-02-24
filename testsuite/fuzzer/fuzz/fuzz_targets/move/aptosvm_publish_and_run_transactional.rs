@@ -8,7 +8,7 @@ use aptos_language_e2e_tests::{account::Account, executor::FakeExecutor};
 use aptos_transaction_simulation::GENESIS_CHANGE_SET_HEAD;
 use aptos_types::{
     chain_id::ChainId,
-    on_chain_config::Features,
+    on_chain_config::{Features, TimedFeaturesBuilder},
     transaction::{
         EntryFunction, ExecutionStatus, Script, SignedTransaction, TransactionArgument,
         TransactionPayload, TransactionStatus,
@@ -97,8 +97,12 @@ fn run_case(input: RunnableStateWithOperations) -> Result<(), Corpus> {
     tdbg!("filtering modules");
     filter_modules(&input)?;
 
-    let verifier_config =
-        prod_configs::aptos_prod_verifier_config(LATEST_GAS_FEATURE_VERSION, &Features::default());
+    let timed_features = TimedFeaturesBuilder::enable_all().build();
+    let verifier_config = prod_configs::aptos_prod_verifier_config(
+        LATEST_GAS_FEATURE_VERSION,
+        &Features::default(),
+        &timed_features,
+    );
     let deserializer_config = DeserializerConfig::new(BYTECODE_VERSION, 255);
 
     let mut dep_modules: Vec<CompiledModule> = vec![];
