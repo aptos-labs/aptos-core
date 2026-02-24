@@ -3285,6 +3285,7 @@ dependencies = [
  "tempfile",
  "tera",
  "tokio",
+ "tracing-log",
  "walkdir",
 ]
 

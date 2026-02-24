@@ -63,7 +63,7 @@ impl FileWatcher {
                     // Collect affected keys under the state lock, then drop it
                     // before calling on_invalidate (which may acquire other locks).
                     let keys: HashSet<String> = {
-                        let st = cb_state.lock().unwrap();
+                        let st = cb_state.lock().expect("watch_state lock poisoned");
                         let mut keys = HashSet::new();
                         for path in &event.paths {
                             let path = canonicalize_or_keep(path);
@@ -79,7 +79,7 @@ impl FileWatcher {
                         keys
                     };
                     for key in &keys {
-                        log::info!("file change detected, invalidating `{}`", key);
+                        log::debug!("file change detected for `{}`", key);
                         on_invalidate(key);
                     }
                 }
@@ -122,8 +122,12 @@ impl FileWatcher {
                 true
             }
         });
-        let mut watcher = self.inner.watcher.lock().unwrap();
-        let mut state = self.inner.state.lock().unwrap();
+        let mut watcher = self
+            .inner
+            .watcher
+            .lock()
+            .expect("file_watcher lock poisoned");
+        let mut state = self.inner.state.lock().expect("watch_state lock poisoned");
         for dir in &dirs {
             if !state.dir_to_keys.contains_key(dir) {
                 log::debug!("watching directory `{}`", dir.display());
@@ -142,8 +146,12 @@ impl FileWatcher {
     ///
     /// Directories that no longer have any associated keys are unwatched.
     pub(crate) fn unwatch_package(&self, cache_key: &str) {
-        let mut state = self.inner.state.lock().unwrap();
-        let mut watcher = self.inner.watcher.lock().unwrap();
+        let mut state = self.inner.state.lock().expect("watch_state lock poisoned");
+        let mut watcher = self
+            .inner
+            .watcher
+            .lock()
+            .expect("file_watcher lock poisoned");
         state.dir_to_keys.retain(|dir, keys| {
             keys.remove(cache_key);
             if keys.is_empty() {

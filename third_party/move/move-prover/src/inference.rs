@@ -373,19 +373,30 @@ fn output_unified(env: &GlobalEnv, inferred_sym: Symbol, options: &Options) -> a
                 // Append inferred conditions inside the existing spec block,
                 // just before the line containing the closing `}`.
                 let block_end = spec_info.loc.span().end().to_usize();
+                let block_start = spec_info.loc.span().start().to_usize();
                 // Find the closing `}`, then find the start of its line
                 // so we insert before the line with `}`.
                 let brace_pos = source[..block_end]
                     .rfind('}')
                     .expect("spec block should have closing brace");
-                // Insert before the newline preceding the `}` line's indentation.
-                let insert_pos = source[..brace_pos]
-                    .rfind('\n')
-                    .map(|p| p + 1)
-                    .unwrap_or(brace_pos);
 
-                // Detect indentation from the spec block opening line.
-                let block_start = spec_info.loc.span().start().to_usize();
+                // Find the opening `{` to detect single-line blocks like `spec foo {}`.
+                let open_brace_pos = source[block_start..block_end]
+                    .find('{')
+                    .map(|p| block_start + p)
+                    .expect("spec block should have opening brace");
+                let is_single_line = !source[open_brace_pos..brace_pos].contains('\n');
+
+                let insert_pos = if is_single_line {
+                    // For single-line/empty blocks, insert right before the `}`.
+                    brace_pos
+                } else {
+                    // For multi-line blocks, insert before the line containing `}`.
+                    source[..brace_pos]
+                        .rfind('\n')
+                        .map(|p| p + 1)
+                        .unwrap_or(brace_pos)
+                };
                 let indent = detect_indent(&source, block_start);
                 let inner_indent = format!("{}    ", indent);
 
@@ -415,7 +426,15 @@ fn output_unified(env: &GlobalEnv, inferred_sym: Symbol, options: &Options) -> a
                     &original_prop_keys,
                 );
 
-                insertions.push((insert_pos, cond_text));
+                // For single-line blocks, wrap the conditions so the block expands:
+                //   `spec foo {}` -> `spec foo {\n    ...\n}`
+                let final_text = if is_single_line && !cond_text.is_empty() {
+                    format!("\n{}{}", cond_text, indent)
+                } else {
+                    cond_text
+                };
+
+                insertions.push((insert_pos, final_text));
             } else {
                 // No existing spec block: insert a full spec block after the function definition.
                 let fun_end = fun.get_loc().span().end().to_usize();

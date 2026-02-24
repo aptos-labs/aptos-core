@@ -2,10 +2,6 @@
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 use super::super::session::FlowSession;
-use codespan_reporting::{
-    diagnostic::Severity,
-    term::{emit, termcolor::NoColor, Config},
-};
 use rmcp::{
     handler::server::wrapper::Parameters,
     model::{CallToolResult, Content},
@@ -28,24 +24,15 @@ impl FlowSession {
         log::info!("move_package_status({})", params.package_path);
         let pkg = self.resolve_package(&params.package_path).await?;
         let data = pkg.lock().unwrap();
-        let env = data.env();
-        let has_errors = env.has_errors();
-        let mut messages = Vec::new();
-        env.report_diag_with_filter(
-            |files, diag| {
-                let mut buf = NoColor::new(Vec::new());
-                emit(&mut buf, &Config::default(), files, diag).expect("emit must not fail");
-                let text = String::from_utf8(buf.into_inner()).unwrap_or_default();
-                messages.push(text);
-            },
-            |d| d.severity >= Severity::Warning,
-        );
-        drop(data);
+        let has_errors = data.env().has_errors();
+        let (messages, source) = data.diagnostics();
         let content = if messages.is_empty() {
             "no errors or warnings".to_string()
         } else {
-            messages.join("\n")
+            format!("{}\n(from {})", messages.join("\n"), source)
         };
+        let num_messages = messages.len();
+        drop(data);
         let result = if has_errors {
             CallToolResult::error(vec![Content::text(content)])
         } else {
@@ -54,7 +41,7 @@ impl FlowSession {
         log::info!(
             "move_package_status: has_errors={}, {} message(s)",
             has_errors,
-            messages.len()
+            num_messages
         );
         Ok(result)
     }
