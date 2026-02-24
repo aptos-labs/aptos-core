@@ -176,7 +176,8 @@ pub struct ProxyBackpressureConfig {
     /// delay kicks in.
     pub pending_batches_delay_threshold: u64,
     /// Maximum pending batches used for proportional delay calculation.
-    /// Delay = round_timeout_ms * min(batches, max_pending_batches_for_delay) / max_pending_batches_for_delay.
+    /// Delay = 5 * round_timeout_ms * min(batches, max_pending_batches_for_delay) / max_pending_batches_for_delay.
+    /// With default=50 and round_timeout=100ms: batches=10→100ms, batches=25→250ms, batches=50+→500ms.
     pub max_pending_batches_for_delay: u64,
 }
 
@@ -187,7 +188,9 @@ impl Default for ProxyBackpressureConfig {
             pipeline_heavy_gap: 10,
             max_pipeline_gap_for_delay: 20,
             pending_batches_delay_threshold: 2,
-            max_pending_batches_for_delay: 5,
+            // Batches can grow to 500+ in practice. Using 50 gives a smooth ramp
+            // from 20ms (batches=2) to 500ms (batches=50+) with 5x round_timeout.
+            max_pending_batches_for_delay: 50,
         }
     }
 }

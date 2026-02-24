@@ -164,47 +164,50 @@ impl PayloadClient for ProxyBudgetPayloadClient {
         proxy_metrics::PROXY_EFFECTIVE_BUDGET_TARGET.set(effective_target as i64);
 
         // --- Adaptive delay: proportional to congestion level ---
-        // Skip ALL delays when a primary proof is pending — cutting-point blocks
-        // must be ordered ASAP to unblock the primary pipeline.
         //
-        // Delays are SUMMED (not max'd) so they compound under heavy congestion.
-        // With round_timeout=100ms:
-        //   - budget delay: 50ms when total_blocks > target
-        //   - gap delay: 0-100ms proportional to pipeline gap
-        //   - batch delay: 0-200ms proportional to pending batches (2x round_timeout)
-        // Max combined delay: ~350ms, which slows proxy to ~400ms/round (vs ~30ms base).
-        // This brings proxy batch production rate closer to primary's ~1-2s/round.
-        let delay_ms = if has_pending {
-            0u64
-        } else {
+        // Two categories of delay:
+        // 1. Batch delay: ALWAYS applied regardless of has_pending, because this is
+        //    the primary signal that proxy is overwhelming primary. Humio logs showed
+        //    has_pending=true ~68% of the time, completely defeating backpressure when
+        //    all delays were gated on !has_pending.
+        // 2. Budget/gap delays: only when !has_pending — cutting-point blocks should
+        //    be ordered quickly, but we still slow down based on batch accumulation.
+        //
+        // Batch delay uses 5x round_timeout ceiling (500ms at 100ms round_timeout)
+        // with max_pending_batches_for_delay=50, giving a smooth ramp:
+        //   batches=2: 20ms, batches=5: 50ms, batches=10: 100ms,
+        //   batches=25: 250ms, batches=50+: 500ms
+        let delay_ms = {
             let mut delay = 0u64;
 
-            // Budget-based delay: half round timeout when blocks > target
-            if total_blocks > effective_target {
-                delay += self.round_timeout_ms / 2;
-            }
-
-            // Pipeline gap delay: proportional, kicks in at gap > 2
-            if gap > 2 {
-                let gap_delay = self
-                    .round_timeout_ms
-                    .saturating_mul(gap.min(bp.max_pipeline_gap_for_delay))
-                    / bp.max_pipeline_gap_for_delay;
-                delay += gap_delay;
-            }
-
-            // Pending batches delay: proportional when primary has unconsumed batches.
-            // Uses 2x round_timeout ceiling so this alone can reach 200ms under heavy
-            // batch accumulation. This replaces the previous hard stop which caused a
-            // death spiral — empty proxy blocks still get forwarded as batches, keeping
-            // the count high and starving the proxy of all transactions indefinitely.
+            // Pending batches delay: ALWAYS applied (even when has_pending=true).
+            // This is the dominant backpressure signal. Uses 5x round_timeout ceiling
+            // so this alone can reach 500ms under heavy batch accumulation.
             if batches >= bp.pending_batches_delay_threshold {
                 let batch_delay = self
                     .round_timeout_ms
-                    .saturating_mul(2)
+                    .saturating_mul(5)
                     .saturating_mul(batches.min(bp.max_pending_batches_for_delay))
                     / bp.max_pending_batches_for_delay;
                 delay += batch_delay;
+            }
+
+            // Budget and gap delays: skip when has_pending to let cutting-point
+            // blocks order quickly.
+            if !has_pending {
+                // Budget-based delay: half round timeout when blocks > target
+                if total_blocks > effective_target {
+                    delay += self.round_timeout_ms / 2;
+                }
+
+                // Pipeline gap delay: proportional, kicks in at gap > 2
+                if gap > 2 {
+                    let gap_delay = self
+                        .round_timeout_ms
+                        .saturating_mul(gap.min(bp.max_pipeline_gap_for_delay))
+                        / bp.max_pipeline_gap_for_delay;
+                    delay += gap_delay;
+                }
             }
 
             delay
