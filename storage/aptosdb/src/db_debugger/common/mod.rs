@@ -41,7 +41,9 @@ impl DbDir {
             RocksdbConfig::default(),
             env,
             block_cache,
-            true,
+            /* read_only = */ true,
+            /* is_hot = */ false,
+            /* delete_on_restart = */ false,
         )
     }
 
