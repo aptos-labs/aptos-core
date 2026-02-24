@@ -23,7 +23,7 @@ impl Cmd {
         let env = None;
         let block_cache = None;
 
-        let (ledger_db, _, _, _) = AptosDB::open_dbs(
+        let (ledger_db, _, _, _, _) = AptosDB::open_dbs(
             &StorageDirPaths::from_path(&self.db_dir),
             rocksdb_config,
             env,
