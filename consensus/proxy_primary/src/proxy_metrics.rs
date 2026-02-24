@@ -149,3 +149,12 @@ pub static PROXY_NONEMPTY_PAYLOAD_PULLED: Lazy<IntCounter> = Lazy::new(|| {
     )
     .unwrap()
 });
+
+/// Effective max_txns after all adaptive reductions (gap-based + batch-based)
+pub static PROXY_EFFECTIVE_MAX_TXNS: Lazy<IntGauge> = Lazy::new(|| {
+    register_int_gauge!(
+        "aptos_proxy_effective_max_txns",
+        "Effective max_txns per proxy block after adaptive backpressure reductions"
+    )
+    .unwrap()
+});

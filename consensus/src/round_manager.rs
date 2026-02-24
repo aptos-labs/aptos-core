@@ -2314,6 +2314,18 @@ impl RoundManager {
             primary_block_from_proxy.aggregated_payload_hash(),
         );
 
+        // Skip empty batches — they inflate pending_proxy_batches without contributing
+        // txns, making the backpressure signal noisy. Still send pipeline state so proxy
+        // gets updated backpressure info.
+        if primary_block_from_proxy.total_txn_count() == 0 {
+            info!(
+                self.new_log(LogEvent::ReceiveNewCertificate),
+                "Skipping empty proxy batch for primary round {}", primary_round,
+            );
+            self.send_pipeline_state_to_proxy();
+            return Ok(());
+        }
+
         // Accumulate proxy blocks. Multiple batches may arrive between primary rounds;
         // all will be drained and merged when the next proposal is generated.
         let was_empty = self.pending_proxy_blocks.is_empty();

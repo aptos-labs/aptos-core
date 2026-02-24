@@ -146,10 +146,10 @@ impl Default for ProxyConsensusConfig {
             round_timeout_backoff_max_exponent: 4,
             // Target ~10 proxy blocks with txns per primary round
             target_proxy_blocks_per_primary_round: 10,
-            // Proxy block limits = primary limits / target
-            max_proxy_block_txns: 500,                  // 5000 / 10
-            max_proxy_block_txns_after_filtering: 180,  // 1800 / 10
-            max_proxy_block_bytes: 300 * 1024,          // 3MB / 10
+            // Proxy block limits: sized for 10k TPS at 100 blocks/s
+            max_proxy_block_txns: 100,                  // 100 txns × 100 blocks/s = 10k TPS
+            max_proxy_block_txns_after_filtering: 36,   // 100 × (1800/5000) ratio
+            max_proxy_block_bytes: 100 * 1024,          // 100KB headroom for 100 txns
             backpressure: ProxyBackpressureConfig::default(),
         }
     }
@@ -176,9 +176,13 @@ pub struct ProxyBackpressureConfig {
     /// delay kicks in.
     pub pending_batches_delay_threshold: u64,
     /// Maximum pending batches used for proportional delay calculation.
-    /// Delay = 5 * round_timeout_ms * min(batches, max_pending_batches_for_delay) / max_pending_batches_for_delay.
-    /// With default=50 and round_timeout=100ms: batches=10→100ms, batches=25→250ms, batches=50+→500ms.
+    /// Delay = round_timeout_ms * min(batches, max_pending_batches_for_delay) / max_pending_batches_for_delay.
+    /// With default=20 and round_timeout=100ms: batches=10→50ms, batches=20+→100ms.
     pub max_pending_batches_for_delay: u64,
+    /// Pending batches >= this → halve max_txns per block (moderate throttle).
+    pub batch_moderate_threshold: u64,
+    /// Pending batches >= this → quarter max_txns per block (heavy throttle).
+    pub batch_heavy_threshold: u64,
 }
 
 impl Default for ProxyBackpressureConfig {
@@ -187,10 +191,11 @@ impl Default for ProxyBackpressureConfig {
             pipeline_moderate_gap: 5,
             pipeline_heavy_gap: 10,
             max_pipeline_gap_for_delay: 20,
-            pending_batches_delay_threshold: 2,
-            // Batches can grow to 500+ in practice. Using 50 gives a smooth ramp
-            // from 20ms (batches=2) to 500ms (batches=50+) with 5x round_timeout.
-            max_pending_batches_for_delay: 50,
+            // Delay is emergency-only: fires at batches >= 10, max 100ms
+            pending_batches_delay_threshold: 10,
+            max_pending_batches_for_delay: 20,
+            batch_moderate_threshold: 5,
+            batch_heavy_threshold: 10,
         }
     }
 }

@@ -163,30 +163,24 @@ impl PayloadClient for ProxyBudgetPayloadClient {
             .set(effective_target.saturating_sub(blocks_with_txns) as i64);
         proxy_metrics::PROXY_EFFECTIVE_BUDGET_TARGET.set(effective_target as i64);
 
-        // --- Adaptive delay: proportional to congestion level ---
+        // --- Adaptive delay: emergency-only ---
         //
-        // Two categories of delay:
-        // 1. Batch delay: ALWAYS applied regardless of has_pending, because this is
-        //    the primary signal that proxy is overwhelming primary. Humio logs showed
-        //    has_pending=true ~68% of the time, completely defeating backpressure when
-        //    all delays were gated on !has_pending.
-        // 2. Budget/gap delays: only when !has_pending — cutting-point blocks should
-        //    be ordered quickly, but we still slow down based on batch accumulation.
+        // With max_proxy_block_txns=100, steady state is balanced (10k TPS).
+        // Delay is only needed when batches accumulate severely (>= 10).
+        // Uses 1x round_timeout ceiling (100ms max) to avoid killing block rate.
         //
-        // Batch delay uses 5x round_timeout ceiling (500ms at 100ms round_timeout)
-        // with max_pending_batches_for_delay=50, giving a smooth ramp:
-        //   batches=2: 20ms, batches=5: 50ms, batches=10: 100ms,
-        //   batches=25: 250ms, batches=50+: 500ms
+        // Two categories:
+        // 1. Batch delay: fires at batches >= 10 (emergency brake)
+        // 2. Budget/gap delays: only when !has_pending (cutting-point ordering)
         let delay_ms = {
             let mut delay = 0u64;
 
-            // Pending batches delay: ALWAYS applied (even when has_pending=true).
-            // This is the dominant backpressure signal. Uses 5x round_timeout ceiling
-            // so this alone can reach 500ms under heavy batch accumulation.
+            // Pending batches delay: emergency brake when batches >= 10.
+            // Uses 1x round_timeout ceiling so max delay = 100ms.
+            // Ramp: batches=10→50ms, batches=15→75ms, batches=20+→100ms.
             if batches >= bp.pending_batches_delay_threshold {
                 let batch_delay = self
                     .round_timeout_ms
-                    .saturating_mul(5)
                     .saturating_mul(batches.min(bp.max_pending_batches_for_delay))
                     / bp.max_pending_batches_for_delay;
                 delay += batch_delay;
@@ -242,8 +236,9 @@ impl PayloadClient for ProxyBudgetPayloadClient {
 
         // --- Adaptive max_txns: reduce per-block size under congestion ---
         let original_max_count = config.max_txns.count();
+
+        // Gap-based reduction (rarely fires — gap typically stays 0-2)
         if gap > bp.pipeline_heavy_gap {
-            // Heavy congestion: halve max_txns per block
             let reduced = PayloadTxnsSize::new(
                 config.max_txns.count() / 2,
                 config.max_txns.size_in_bytes() / 2,
@@ -252,7 +247,6 @@ impl PayloadClient for ProxyBudgetPayloadClient {
             config.max_txns_after_filtering /= 2;
             config.soft_max_txns_after_filtering /= 2;
         } else if gap > bp.pipeline_moderate_gap {
-            // Moderate congestion: reduce max_txns by 25%
             let reduced = PayloadTxnsSize::new(
                 config.max_txns.count() * 3 / 4,
                 config.max_txns.size_in_bytes() * 3 / 4,
@@ -262,6 +256,34 @@ impl PayloadClient for ProxyBudgetPayloadClient {
             config.soft_max_txns_after_filtering = config.soft_max_txns_after_filtering * 3 / 4;
         }
 
+        // Batch-based reduction: safety net when batches accumulate.
+        // Base max_txns=100 targets 10k TPS at 100 blocks/s. Only reduce
+        // further when primary is seriously falling behind.
+        if batches >= bp.batch_heavy_threshold {
+            // Emergency: quarter max_txns → 25 txns/block
+            let reduced = PayloadTxnsSize::new(
+                (config.max_txns.count() / 4).max(1),
+                (config.max_txns.size_in_bytes() / 4).max(1024),
+            );
+            config.max_txns = config.max_txns.minimum(reduced);
+            config.max_txns_after_filtering =
+                (config.max_txns_after_filtering / 4).max(1);
+            config.soft_max_txns_after_filtering =
+                (config.soft_max_txns_after_filtering / 4).max(1);
+        } else if batches >= bp.batch_moderate_threshold {
+            // Moderate: halve max_txns → 50 txns/block
+            let reduced = PayloadTxnsSize::new(
+                (config.max_txns.count() / 2).max(1),
+                (config.max_txns.size_in_bytes() / 2).max(1024),
+            );
+            config.max_txns = config.max_txns.minimum(reduced);
+            config.max_txns_after_filtering =
+                (config.max_txns_after_filtering / 2).max(1);
+            config.soft_max_txns_after_filtering =
+                (config.soft_max_txns_after_filtering / 2).max(1);
+        }
+
+        proxy_metrics::PROXY_EFFECTIVE_MAX_TXNS.set(config.max_txns.count() as i64);
         proxy_metrics::PROXY_NONEMPTY_PAYLOAD_PULLED.inc();
         // Log every 50th pull or first 10 pulls for debugging
         if pull_num % 50 == 0 || pull_num < 10 {
