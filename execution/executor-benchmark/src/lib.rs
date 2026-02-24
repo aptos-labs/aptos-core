@@ -76,14 +76,12 @@ const TABLE_INFO_DB_NAME: &str = "index_async_v2_db";
 #[derive(Clone, Copy, Debug)]
 pub struct StorageTestConfig {
     pub pruner_config: PrunerConfig,
-    pub enable_storage_sharding: bool,
     pub enable_indexer_grpc: bool,
 }
 
 impl StorageTestConfig {
     pub fn init_storage_config(&self, node_config: &mut NodeConfig) {
         node_config.storage.storage_pruner_config = self.pruner_config;
-        node_config.storage.rocksdb_configs.enable_storage_sharding = self.enable_storage_sharding;
         if self.enable_indexer_grpc {
             node_config.indexer_grpc.enabled = true;
             node_config.indexer_table_info.table_info_service_mode =
@@ -230,7 +228,6 @@ fn init_indexer_wrapper(
 fn create_checkpoint(
     source_dir: impl AsRef<Path>,
     checkpoint_dir: impl AsRef<Path>,
-    enable_storage_sharding: bool,
     enable_indexer_grpc: bool,
 ) {
     println!("Creating checkpoint for DBs.");
@@ -249,8 +246,7 @@ fn create_checkpoint(
             .expect("Table info db checkpoint creation fails.");
     }
 
-    AptosDB::create_checkpoint(source_dir, checkpoint_dir, enable_storage_sharding)
-        .expect("db checkpoint creation fails.");
+    AptosDB::create_checkpoint(source_dir, checkpoint_dir).expect("db checkpoint creation fails.");
 
     println!("Checkpoint for DBs is done.");
 }
@@ -300,7 +296,6 @@ where
     create_checkpoint(
         source_dir.as_ref(),
         checkpoint_dir.as_ref(),
-        storage_test_config.enable_storage_sharding,
         storage_test_config.enable_indexer_grpc,
     );
     let (mut config, genesis_key) =
@@ -567,7 +562,6 @@ pub fn add_accounts<V>(
     create_checkpoint(
         source_dir.as_ref(),
         checkpoint_dir.as_ref(),
-        storage_test_config.enable_storage_sharding,
         storage_test_config.enable_indexer_grpc,
     );
     add_accounts_impl::<V>(
@@ -885,7 +879,6 @@ pub fn run_single_with_default_params(
 
     let storage_test_config = StorageTestConfig {
         pruner_config: NO_OP_STORAGE_PRUNER_CONFIG, /* prune_window */
-        enable_storage_sharding: true,
         enable_indexer_grpc,
     };
 
@@ -1024,13 +1017,12 @@ mod tests {
 
         fs::create_dir_all(db_dir.as_ref()).unwrap();
 
-        bootstrap_with_genesis(&db_dir, false, features.clone());
+        bootstrap_with_genesis(&db_dir, features.clone());
 
         let (mut config, genesis_key) =
             aptos_genesis::test_utils::test_config_with_custom_features(features);
         config.storage.dir = db_dir.as_ref().to_path_buf();
         config.storage.storage_pruner_config = NO_OP_STORAGE_PRUNER_CONFIG;
-        config.storage.rocksdb_configs.enable_storage_sharding = false;
         config.indexer_grpc.enabled = false; // Disable indexer for tests
 
         let (txn, vm_result) = {
@@ -1197,7 +1189,6 @@ mod tests {
 
         let storage_test_config = StorageTestConfig {
             pruner_config: NO_OP_STORAGE_PRUNER_CONFIG,
-            enable_storage_sharding: false,
             enable_indexer_grpc: true,
         };
 

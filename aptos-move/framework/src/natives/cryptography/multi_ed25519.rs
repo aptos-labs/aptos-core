@@ -13,9 +13,11 @@ use aptos_crypto::{
 };
 use aptos_gas_algebra::{Arg, GasExpression};
 use aptos_gas_schedule::gas_params::natives::aptos_framework::*;
+#[cfg(feature = "testing")]
+use aptos_native_interface::SafeNativeError;
 use aptos_native_interface::{
     safely_assert_eq, safely_pop_arg, RawSafeNative, SafeNativeBuilder, SafeNativeContext,
-    SafeNativeError, SafeNativeResult,
+    SafeNativeResult,
 };
 use curve25519_dalek::edwards::CompressedEdwardsY;
 use move_core_types::gas_algebra::{NumArgs, NumBytes};
@@ -27,10 +29,13 @@ use smallvec::{smallvec, SmallVec};
 use std::{collections::VecDeque, convert::TryFrom};
 
 /// Equivalent to `std::errors::internal(1)` in Move.
+#[cfg(feature = "testing")]
 const E_MULTI_ED25519_SK_CREATE_FAILED: u64 = 0x0A_0001;
 /// Equivalent to `std::errors::internal(2)` in Move.
+#[cfg(feature = "testing")]
 const E_MULTI_ED25519_PK_CREATE_FAILED: u64 = 0x0A_0002;
 /// Equivalent to `std::errors::internal(3)` in Move.
+#[cfg(feature = "testing")]
 const E_MULTI_ED25519_SK_DESERIALIZATION_FAILED: u64 = 0x0A_0003;
 
 /// See `public_key_validate_v2_internal` comments in `multi_ed25519.move`.

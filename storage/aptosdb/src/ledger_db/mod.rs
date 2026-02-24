@@ -24,7 +24,7 @@ use crate::{
     },
     schema::db_metadata::{DbMetadataKey, DbMetadataSchema},
 };
-use aptos_config::config::{RocksdbConfig, RocksdbConfigs};
+use aptos_config::config::RocksdbConfig;
 use aptos_experimental_runtimes::thread_manager::THREAD_MANAGER;
 use aptos_logger::prelude::info;
 use aptos_rocksdb_options::gen_rocksdb_options;
@@ -115,27 +115,21 @@ pub struct LedgerDb {
     transaction_db: TransactionDb,
     transaction_info_db: TransactionInfoDb,
     write_set_db: WriteSetDb,
-    enable_storage_sharding: bool,
 }
 
 impl LedgerDb {
     pub(crate) fn new<P: AsRef<Path>>(
         db_root_path: P,
-        rocksdb_configs: RocksdbConfigs,
+        ledger_db_config: RocksdbConfig,
         env: Option<&Env>,
         block_cache: Option<&Cache>,
         readonly: bool,
     ) -> Result<Self> {
-        let sharding = rocksdb_configs.enable_storage_sharding;
-        let ledger_metadata_db_path = Self::metadata_db_path(db_root_path.as_ref(), sharding);
+        let ledger_metadata_db_path = Self::metadata_db_path(db_root_path.as_ref());
         let ledger_metadata_db = Arc::new(Self::open_rocksdb(
             ledger_metadata_db_path.clone(),
-            if sharding {
-                LEDGER_METADATA_DB_NAME
-            } else {
-                LEDGER_DB_NAME
-            },
-            &rocksdb_configs.ledger_db_config,
+            LEDGER_METADATA_DB_NAME,
+            &ledger_db_config,
             env,
             block_cache,
             readonly,
@@ -143,33 +137,8 @@ impl LedgerDb {
 
         info!(
             ledger_metadata_db_path = ledger_metadata_db_path,
-            sharding = sharding,
             "Opened ledger metadata db!"
         );
-
-        if !sharding {
-            info!("Individual ledger dbs are not enabled!");
-            return Ok(Self {
-                ledger_metadata_db: LedgerMetadataDb::new(Arc::clone(&ledger_metadata_db)),
-                event_db: EventDb::new(
-                    Arc::clone(&ledger_metadata_db),
-                    EventStore::new(Arc::clone(&ledger_metadata_db)),
-                ),
-                persisted_auxiliary_info_db: PersistedAuxiliaryInfoDb::new(Arc::clone(
-                    &ledger_metadata_db,
-                )),
-                transaction_accumulator_db: TransactionAccumulatorDb::new(Arc::clone(
-                    &ledger_metadata_db,
-                )),
-                transaction_auxiliary_data_db: TransactionAuxiliaryDataDb::new(Arc::clone(
-                    &ledger_metadata_db,
-                )),
-                transaction_db: TransactionDb::new(Arc::clone(&ledger_metadata_db)),
-                transaction_info_db: TransactionInfoDb::new(Arc::clone(&ledger_metadata_db)),
-                write_set_db: WriteSetDb::new(Arc::clone(&ledger_metadata_db)),
-                enable_storage_sharding: false,
-            });
-        }
 
         let ledger_db_folder = db_root_path.as_ref().join(LEDGER_DB_FOLDER_NAME);
 
@@ -186,7 +155,7 @@ impl LedgerDb {
                     Self::open_rocksdb(
                         ledger_db_folder.join(EVENT_DB_NAME),
                         EVENT_DB_NAME,
-                        &rocksdb_configs.ledger_db_config,
+                        &ledger_db_config,
                         env,
                         block_cache,
                         readonly,
@@ -203,7 +172,7 @@ impl LedgerDb {
                     Self::open_rocksdb(
                         ledger_db_folder.join(PERSISTED_AUXILIARY_INFO_DB_NAME),
                         PERSISTED_AUXILIARY_INFO_DB_NAME,
-                        &rocksdb_configs.ledger_db_config,
+                        &ledger_db_config,
                         env,
                         block_cache,
                         readonly,
@@ -216,7 +185,7 @@ impl LedgerDb {
                     Self::open_rocksdb(
                         ledger_db_folder.join(TRANSACTION_ACCUMULATOR_DB_NAME),
                         TRANSACTION_ACCUMULATOR_DB_NAME,
-                        &rocksdb_configs.ledger_db_config,
+                        &ledger_db_config,
                         env,
                         block_cache,
                         readonly,
@@ -229,7 +198,7 @@ impl LedgerDb {
                     Self::open_rocksdb(
                         ledger_db_folder.join(TRANSACTION_AUXILIARY_DATA_DB_NAME),
                         TRANSACTION_AUXILIARY_DATA_DB_NAME,
-                        &rocksdb_configs.ledger_db_config,
+                        &ledger_db_config,
                         env,
                         block_cache,
                         readonly,
@@ -242,7 +211,7 @@ impl LedgerDb {
                     Self::open_rocksdb(
                         ledger_db_folder.join(TRANSACTION_DB_NAME),
                         TRANSACTION_DB_NAME,
-                        &rocksdb_configs.ledger_db_config,
+                        &ledger_db_config,
                         env,
                         block_cache,
                         readonly,
@@ -255,7 +224,7 @@ impl LedgerDb {
                     Self::open_rocksdb(
                         ledger_db_folder.join(TRANSACTION_INFO_DB_NAME),
                         TRANSACTION_INFO_DB_NAME,
-                        &rocksdb_configs.ledger_db_config,
+                        &ledger_db_config,
                         env,
                         block_cache,
                         readonly,
@@ -268,7 +237,7 @@ impl LedgerDb {
                     Self::open_rocksdb(
                         ledger_db_folder.join(WRITE_SET_DB_NAME),
                         WRITE_SET_DB_NAME,
-                        &rocksdb_configs.ledger_db_config,
+                        &ledger_db_config,
                         env,
                         block_cache,
                         readonly,
@@ -289,12 +258,7 @@ impl LedgerDb {
             transaction_db: transaction_db.unwrap(),
             transaction_info_db: transaction_info_db.unwrap(),
             write_set_db: write_set_db.unwrap(),
-            enable_storage_sharding: true,
         })
-    }
-
-    pub(crate) fn enable_storage_sharding(&self) -> bool {
-        self.enable_storage_sharding
     }
 
     pub(crate) fn get_in_progress_state_kv_snapshot_version(&self) -> Result<Option<Version>> {
@@ -311,60 +275,46 @@ impl LedgerDb {
     pub(crate) fn create_checkpoint(
         db_root_path: impl AsRef<Path>,
         cp_root_path: impl AsRef<Path>,
-        sharding: bool,
     ) -> Result<()> {
-        let rocksdb_configs = RocksdbConfigs {
-            enable_storage_sharding: sharding,
-            ..Default::default()
-        };
-        let env = None;
-        let block_cache = None;
         let ledger_db = Self::new(
             db_root_path,
-            rocksdb_configs,
-            env,
-            block_cache,
+            RocksdbConfig::default(),
+            None,
+            None,
             /*readonly=*/ false,
         )?;
         let cp_ledger_db_folder = cp_root_path.as_ref().join(LEDGER_DB_FOLDER_NAME);
 
-        info!(
-            sharding = sharding,
-            "Creating ledger_db checkpoint at: {cp_ledger_db_folder:?}"
-        );
+        info!("Creating ledger_db checkpoint at: {cp_ledger_db_folder:?}");
 
         std::fs::remove_dir_all(&cp_ledger_db_folder).unwrap_or(());
-        if sharding {
-            std::fs::create_dir_all(&cp_ledger_db_folder).unwrap_or(());
-        }
+        std::fs::create_dir_all(&cp_ledger_db_folder).unwrap_or(());
 
         ledger_db
             .metadata_db()
-            .create_checkpoint(Self::metadata_db_path(cp_root_path.as_ref(), sharding))?;
+            .create_checkpoint(Self::metadata_db_path(cp_root_path.as_ref()))?;
 
-        if sharding {
-            ledger_db
-                .event_db()
-                .create_checkpoint(cp_ledger_db_folder.join(EVENT_DB_NAME))?;
-            ledger_db
-                .persisted_auxiliary_info_db()
-                .create_checkpoint(cp_ledger_db_folder.join(PERSISTED_AUXILIARY_INFO_DB_NAME))?;
-            ledger_db
-                .transaction_accumulator_db()
-                .create_checkpoint(cp_ledger_db_folder.join(TRANSACTION_ACCUMULATOR_DB_NAME))?;
-            ledger_db
-                .transaction_auxiliary_data_db()
-                .create_checkpoint(cp_ledger_db_folder.join(TRANSACTION_AUXILIARY_DATA_DB_NAME))?;
-            ledger_db
-                .transaction_db()
-                .create_checkpoint(cp_ledger_db_folder.join(TRANSACTION_DB_NAME))?;
-            ledger_db
-                .transaction_info_db()
-                .create_checkpoint(cp_ledger_db_folder.join(TRANSACTION_INFO_DB_NAME))?;
-            ledger_db
-                .write_set_db()
-                .create_checkpoint(cp_ledger_db_folder.join(WRITE_SET_DB_NAME))?;
-        }
+        ledger_db
+            .event_db()
+            .create_checkpoint(cp_ledger_db_folder.join(EVENT_DB_NAME))?;
+        ledger_db
+            .persisted_auxiliary_info_db()
+            .create_checkpoint(cp_ledger_db_folder.join(PERSISTED_AUXILIARY_INFO_DB_NAME))?;
+        ledger_db
+            .transaction_accumulator_db()
+            .create_checkpoint(cp_ledger_db_folder.join(TRANSACTION_ACCUMULATOR_DB_NAME))?;
+        ledger_db
+            .transaction_auxiliary_data_db()
+            .create_checkpoint(cp_ledger_db_folder.join(TRANSACTION_AUXILIARY_DATA_DB_NAME))?;
+        ledger_db
+            .transaction_db()
+            .create_checkpoint(cp_ledger_db_folder.join(TRANSACTION_DB_NAME))?;
+        ledger_db
+            .transaction_info_db()
+            .create_checkpoint(cp_ledger_db_folder.join(TRANSACTION_INFO_DB_NAME))?;
+        ledger_db
+            .write_set_db()
+            .create_checkpoint(cp_ledger_db_folder.join(WRITE_SET_DB_NAME))?;
 
         Ok(())
     }
@@ -519,13 +469,11 @@ impl LedgerDb {
         }
     }
 
-    fn metadata_db_path<P: AsRef<Path>>(db_root_path: P, sharding: bool) -> PathBuf {
-        let ledger_db_folder = db_root_path.as_ref().join(LEDGER_DB_FOLDER_NAME);
-        if sharding {
-            ledger_db_folder.join("metadata")
-        } else {
-            ledger_db_folder
-        }
+    fn metadata_db_path<P: AsRef<Path>>(db_root_path: P) -> PathBuf {
+        db_root_path
+            .as_ref()
+            .join(LEDGER_DB_FOLDER_NAME)
+            .join("metadata")
     }
 
     pub fn write_schemas(&self, schemas: LedgerDbSchemaBatches) -> Result<()> {

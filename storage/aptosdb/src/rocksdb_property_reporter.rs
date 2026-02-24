@@ -3,11 +3,10 @@
 
 use crate::{
     db_options::{
-        event_db_column_families, ledger_db_column_families, ledger_metadata_db_column_families,
-        skip_reporting_cf, state_kv_db_column_families, state_kv_db_new_key_column_families,
-        state_merkle_db_column_families, transaction_accumulator_db_column_families,
-        transaction_db_column_families, transaction_info_db_column_families,
-        write_set_db_column_families,
+        event_db_column_families, ledger_metadata_db_column_families, skip_reporting_cf,
+        state_kv_db_new_key_column_families, state_merkle_db_column_families,
+        transaction_accumulator_db_column_families, transaction_db_column_families,
+        transaction_info_db_column_families, write_set_db_column_families,
     },
     ledger_db::LedgerDb,
     metrics::{OTHER_TIMERS_SECONDS, ROCKSDB_PROPERTIES, ROCKSDB_SHARD_PROPERTIES},
@@ -38,20 +37,8 @@ static ROCKSDB_PROPERTY_MAP: Lazy<HashMap<&str, String>> = Lazy::new(|| {
         "rocksdb.cur-size-active-mem-table",
         "rocksdb.cur-size-all-mem-tables",
         "rocksdb.size-all-mem-tables",
-        "rocksdb.num-entries-active-mem-table",
-        "rocksdb.num-entries-imm-mem-tables",
-        "rocksdb.num-deletes-active-mem-table",
-        "rocksdb.num-deletes-imm-mem-tables",
-        "rocksdb.estimate-num-keys",
         "rocksdb.estimate-table-readers-mem",
-        "rocksdb.is-file-deletions-enabled",
-        "rocksdb.num-snapshots",
-        "rocksdb.oldest-snapshot-time",
-        "rocksdb.num-live-versions",
-        "rocksdb.current-super-version-number",
         "rocksdb.estimate-live-data-size",
-        "rocksdb.min-log-number-to-keep",
-        "rocksdb.min-obsolete-sst-number-to-keep",
         "rocksdb.total-sst-files-size",
         "rocksdb.live-sst-files-size",
         "rocksdb.base-level",
@@ -62,7 +49,6 @@ static ROCKSDB_PROPERTY_MAP: Lazy<HashMap<&str, String>> = Lazy::new(|| {
         "rocksdb.is-write-stopped",
         "rocksdb.block-cache-capacity",
         "rocksdb.block-cache-usage",
-        "rocksdb.block-cache-pinned-usage",
     ]
     .iter()
     .map(|x| (*x, format!("aptos_{}", x.replace('.', "_"))))
@@ -106,57 +92,41 @@ fn update_rocksdb_properties(
 ) -> Result<()> {
     let _timer = OTHER_TIMERS_SECONDS.timer_with(&["update_rocksdb_properties"]);
 
-    let enable_storage_sharding = state_kv_db.enabled_sharding();
+    for cf in ledger_metadata_db_column_families() {
+        set_property(cf, &ledger_db.metadata_db_arc())?;
+    }
 
-    if enable_storage_sharding {
-        for cf in ledger_metadata_db_column_families() {
-            set_property(cf, &ledger_db.metadata_db_arc())?;
-        }
+    for cf in write_set_db_column_families() {
+        set_property(cf, ledger_db.write_set_db_raw())?;
+    }
 
-        for cf in write_set_db_column_families() {
-            set_property(cf, ledger_db.write_set_db_raw())?;
-        }
+    for cf in transaction_info_db_column_families() {
+        set_property(cf, ledger_db.transaction_info_db_raw())?;
+    }
 
-        for cf in transaction_info_db_column_families() {
-            set_property(cf, ledger_db.transaction_info_db_raw())?;
-        }
+    for cf in transaction_db_column_families() {
+        set_property(cf, ledger_db.transaction_db_raw())?;
+    }
 
-        for cf in transaction_db_column_families() {
-            set_property(cf, ledger_db.transaction_db_raw())?;
-        }
+    for cf in event_db_column_families() {
+        set_property(cf, ledger_db.event_db_raw())?;
+    }
 
-        for cf in event_db_column_families() {
-            set_property(cf, ledger_db.event_db_raw())?;
-        }
+    for cf in transaction_accumulator_db_column_families() {
+        set_property(cf, ledger_db.transaction_accumulator_db_raw())?;
+    }
 
-        for cf in transaction_accumulator_db_column_families() {
-            set_property(cf, ledger_db.transaction_accumulator_db_raw())?;
-        }
-
-        if !state_kv_db.enabled_sharding() {
-            for cf in state_kv_db_column_families() {
-                set_property(cf, state_kv_db.metadata_db())?;
-            }
-        } else {
-            for cf in state_kv_db_new_key_column_families() {
-                set_property(cf, state_kv_db.metadata_db())?;
-                for shard in 0..NUM_STATE_SHARDS {
-                    set_shard_property(cf, state_kv_db.db_shard(shard), shard)?;
-                }
-            }
-        }
-    } else {
-        for cf in ledger_db_column_families() {
-            set_property(cf, &ledger_db.metadata_db_arc())?;
+    for cf in state_kv_db_new_key_column_families() {
+        set_property(cf, state_kv_db.metadata_db())?;
+        for shard in 0..NUM_STATE_SHARDS {
+            set_shard_property(cf, state_kv_db.db_shard(shard), shard)?;
         }
     }
 
     for cf_name in state_merkle_db_column_families() {
         set_property(cf_name, state_merkle_db.metadata_db())?;
-        if state_merkle_db.sharding_enabled() {
-            for shard in 0..NUM_STATE_SHARDS {
-                set_shard_property(cf_name, state_merkle_db.db_shard(shard), shard)?;
-            }
+        for shard in 0..NUM_STATE_SHARDS {
+            set_shard_property(cf_name, state_merkle_db.db_shard(shard), shard)?;
         }
     }
     Ok(())
@@ -182,8 +152,8 @@ impl RocksdbPropertyReporter {
                     "Updating rocksdb property failed."
                 );
             }
-            // report rocksdb properties each 10 seconds
-            const TIMEOUT_MS: u64 = if cfg!(test) { 10 } else { 10000 };
+            // report rocksdb properties each 60 seconds
+            const TIMEOUT_MS: u64 = if cfg!(test) { 10 } else { 60000 };
 
             match recv.recv_timeout(Duration::from_millis(TIMEOUT_MS)) {
                 Ok(_) => break,

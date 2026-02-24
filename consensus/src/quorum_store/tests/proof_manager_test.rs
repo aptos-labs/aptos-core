@@ -6,6 +6,7 @@ use crate::quorum_store::{
 };
 use aptos_consensus_types::{
     common::{Payload, PayloadFilter},
+    payload::OptQuorumStorePayload,
     proof_of_store::{BatchInfo, BatchInfoExt, ProofOfStore},
     request_response::{GetPayloadCommand, GetPayloadRequest, GetPayloadResponse},
     utils::PayloadTxnsSize,
@@ -83,7 +84,7 @@ fn assert_payload_response(
 ) {
     match payload {
         Payload::OptQuorumStore(opt_qs) => match opt_qs {
-            aptos_consensus_types::payload::OptQuorumStorePayload::V1(p) => {
+            OptQuorumStorePayload::V1(p) => {
                 let proofs = &p.proof_with_data().batch_summary;
                 assert_eq!(proofs.len(), expected.len());
                 for proof in proofs {
@@ -93,7 +94,7 @@ fn assert_payload_response(
                 assert_eq!(p.max_txns_to_execute(), max_txns_from_block_to_execute);
                 assert_eq!(p.block_gas_limit(), expected_block_gas_limit);
             },
-            aptos_consensus_types::payload::OptQuorumStorePayload::V2(p) => {
+            OptQuorumStorePayload::V2(p) => {
                 let proofs = &p.proof_with_data().batch_summary;
                 assert_eq!(proofs.len(), expected.len());
                 for proof in proofs {

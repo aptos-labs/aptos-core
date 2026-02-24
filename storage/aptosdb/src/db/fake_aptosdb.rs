@@ -657,18 +657,6 @@ impl DbReader for FakeAptosDB {
         })
     }
 
-    fn get_events(
-        &self,
-        event_key: &aptos_types::event::EventKey,
-        start: u64,
-        order: aptos_storage_interface::Order,
-        limit: u64,
-        ledger_version: Version,
-    ) -> Result<Vec<EventWithVersion>> {
-        self.inner
-            .get_events(event_key, start, order, limit, ledger_version)
-    }
-
     fn get_block_timestamp(&self, version: Version) -> Result<u64> {
         gauged_api("get_block_timestamp", || {
             ensure!(
@@ -709,16 +697,6 @@ impl DbReader for FakeAptosDB {
         self.inner.get_latest_epoch_state()
     }
 
-    fn get_prefixed_state_value_iterator(
-        &self,
-        key_prefix: &StateKeyPrefix,
-        cursor: Option<&StateKey>,
-        version: Version,
-    ) -> Result<Box<dyn Iterator<Item = Result<(StateKey, StateValue)>> + '_>> {
-        self.inner
-            .get_prefixed_state_value_iterator(key_prefix, cursor, version)
-    }
-
     fn get_latest_ledger_info_option(&self) -> Result<Option<LedgerInfoWithSignatures>> {
         self.inner.get_latest_ledger_info_option()
     }
@@ -738,34 +716,6 @@ impl DbReader for FakeAptosDB {
         next_version: Version,
     ) -> Result<Option<(Version, HashValue)>> {
         self.inner.get_state_snapshot_before(next_version)
-    }
-
-    fn get_account_ordered_transaction(
-        &self,
-        address: aptos_types::PeerId,
-        seq_num: u64,
-        include_events: bool,
-        ledger_version: Version,
-    ) -> Result<Option<TransactionWithProof>> {
-        self.inner
-            .get_account_ordered_transaction(address, seq_num, include_events, ledger_version)
-    }
-
-    fn get_account_ordered_transactions(
-        &self,
-        address: aptos_types::PeerId,
-        seq_num: u64,
-        limit: u64,
-        include_events: bool,
-        ledger_version: Version,
-    ) -> Result<aptos_types::transaction::AccountOrderedTransactionsWithProof> {
-        self.inner.get_account_ordered_transactions(
-            address,
-            seq_num,
-            limit,
-            include_events,
-            ledger_version,
-        )
     }
 
     fn get_account_transaction_summaries(

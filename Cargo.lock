@@ -332,7 +332,6 @@ dependencies = [
  "aptos-node",
  "aptos-rest-client",
  "aptos-sdk",
- "aptos-storage-interface",
  "aptos-telemetry",
  "aptos-temppath",
  "aptos-transaction-simulation",

@@ -37,7 +37,6 @@ pub(crate) struct StateKvPruner {
     progress: AtomicVersion,
 
     metadata_pruner: StateKvMetadataPruner,
-    // Non-empty iff sharding is enabled.
     shard_pruners: Vec<StateKvShardPruner>,
 }
 
@@ -61,8 +60,7 @@ impl DBPruner for StateKvPruner {
                 target_version = current_batch_target_version,
                 "Pruning state kv data."
             );
-            self.metadata_pruner
-                .prune(progress, current_batch_target_version)?;
+            self.metadata_pruner.prune(current_batch_target_version)?;
 
             THREAD_MANAGER.get_background_pool().install(|| {
                 self.shard_pruners.par_iter().try_for_each(|shard_pruner| {
@@ -121,20 +119,15 @@ impl StateKvPruner {
             "Created state kv metadata pruner, start catching up all shards."
         );
 
-        let shard_pruners = if state_kv_db.enabled_sharding() {
-            let num_shards = state_kv_db.num_shards();
-            let mut shard_pruners = Vec::with_capacity(num_shards);
-            for shard_id in 0..num_shards {
-                shard_pruners.push(StateKvShardPruner::new(
-                    shard_id,
-                    state_kv_db.db_shard_arc(shard_id),
-                    metadata_progress,
-                )?);
-            }
-            shard_pruners
-        } else {
-            Vec::new()
-        };
+        let num_shards = state_kv_db.num_shards();
+        let mut shard_pruners = Vec::with_capacity(num_shards);
+        for shard_id in 0..num_shards {
+            shard_pruners.push(StateKvShardPruner::new(
+                shard_id,
+                state_kv_db.db_shard_arc(shard_id),
+                metadata_progress,
+            )?);
+        }
 
         let pruner = StateKvPruner {
             target_version: AtomicVersion::new(metadata_progress),
