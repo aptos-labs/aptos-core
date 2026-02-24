@@ -81,13 +81,13 @@ pub(crate) fn realistic_env_sweep_wrap(
 pub(crate) fn land_blocking_load_sweep_test() -> ForgeConfig {
     let sweep = LoadVsPerfBenchmark {
         test: Box::new(PerformanceBenchmark),
-        workloads: Workloads::TPS(vec![1000, 1500, 2000, 2500, 3000]),
+        workloads: Workloads::TPS(vec![3000, 3500, 4000, 4500, 5000]),
         criteria: [
-            (950, 1.0, 1.2, 1.5, 0),
-            (1400, 1.0, 1.3, 1.8, 0),
-            (1900, 1.2, 1.5, 2.0, 0),
-            (2400, 1.2, 1.8, 2.5, 0),
             (2900, 1.4, 2.2, 3.0, 0),
+            (3350, 1.5, 2.5, 3.5, 0),
+            (3800, 1.8, 3.0, 4.0, 0),
+            (4300, 2.0, 3.5, 4.5, 0),
+            (4800, 2.5, 4.0, 5.0, 0),
         ]
         .into_iter()
         .map(
