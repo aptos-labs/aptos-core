@@ -18,7 +18,7 @@ pub(crate) fn get_land_blocking_test(
     _test_cmd: &TestCommand,
 ) -> Option<ForgeConfig> {
     let test = match test_name {
-        "land_blocking" | "land_blocking_load_sweep" => {
+        "land_blocking" | "realistic_env_max_load" | "land_blocking_load_sweep" => {
             land_blocking_load_sweep_test()
         },
         "compat" => compat(),
