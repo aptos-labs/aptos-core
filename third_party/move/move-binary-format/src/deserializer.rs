@@ -937,11 +937,7 @@ fn load_function_handle(
         None
     };
 
-    let attributes = if version >= VERSION_8 {
-        load_function_attributes(cursor)?
-    } else {
-        vec![]
-    };
+    let attributes = load_function_attributes(version, cursor)?;
 
     Ok(FunctionHandle {
         module,
@@ -1060,24 +1056,119 @@ fn load_signature_tokens(cursor: &mut VersionedCursor) -> BinaryLoaderResult<Vec
 }
 
 fn load_function_attributes(
+    bytecode_version: u32,
     cursor: &mut VersionedCursor,
 ) -> BinaryLoaderResult<Vec<FunctionAttribute>> {
+    if bytecode_version < VERSION_8 {
+        return Ok(vec![]);
+    }
     let count = read_uleb_internal(cursor, ATTRIBUTE_COUNT_MAX)?;
     let mut attributes = Vec::with_capacity(count);
     for _ in 0..count {
-        attributes.push(load_attribute(cursor)?);
+        attributes.push(load_attribute(bytecode_version, cursor)?);
     }
     Ok(attributes)
 }
 
-fn load_attribute(cursor: &mut VersionedCursor) -> BinaryLoaderResult<FunctionAttribute> {
+fn deserialize_function_attribute<E, F>(
+    bytecode_version: u32,
+    attr_loader: F,
+    attr_name: &str,
+    err_msg: E,
+    cursor: &mut VersionedCursor,
+) -> BinaryLoaderResult<FunctionAttribute>
+where
+    F: Fn(&mut VersionedCursor) -> BinaryLoaderResult<FunctionAttribute>,
+    E: Fn(&str) -> String,
+{
+    if bytecode_version < VERSION_10 {
+        Err(PartialVMError::new(StatusCode::MALFORMED).with_message(err_msg(attr_name)))
+    } else {
+        attr_loader(cursor)
+    }
+}
+
+fn load_attribute(
+    bytecode_version: u32,
+    cursor: &mut VersionedCursor,
+) -> BinaryLoaderResult<FunctionAttribute> {
     use SerializedFunctionAttribute::*;
-    Ok(
-        match SerializedFunctionAttribute::from_u8(load_u8(cursor)?)? {
-            PERSISTENT => FunctionAttribute::Persistent,
-            MODULE_LOCK => FunctionAttribute::ModuleLock,
-        },
-    )
+    if bytecode_version < VERSION_8 {
+        return Err(
+            PartialVMError::new(StatusCode::MALFORMED).with_message(format!(
+                "Attribute not supported in bytecode version {}",
+                bytecode_version
+            )),
+        );
+    }
+    let err_msg = |attr: &str| {
+        format!(
+            "Attribute {} not supported in bytecode version {}",
+            attr, bytecode_version
+        )
+    };
+
+    match SerializedFunctionAttribute::from_u8(load_u8(cursor)?)? {
+        PERSISTENT => Ok(FunctionAttribute::Persistent),
+        MODULE_LOCK => Ok(FunctionAttribute::ModuleLock),
+        PACK => deserialize_function_attribute(
+            bytecode_version,
+            |_cursor| Ok(FunctionAttribute::Pack),
+            "pack",
+            err_msg,
+            cursor,
+        ),
+        PACK_VARIANT => deserialize_function_attribute(
+            bytecode_version,
+            |cursor| Ok(FunctionAttribute::PackVariant(read_u16_internal(cursor)?)),
+            "pack_variant",
+            err_msg,
+            cursor,
+        ),
+        UNPACK => deserialize_function_attribute(
+            bytecode_version,
+            |_cursor| Ok(FunctionAttribute::Unpack),
+            "unpack",
+            err_msg,
+            cursor,
+        ),
+        UNPACK_VARIANT => deserialize_function_attribute(
+            bytecode_version,
+            |cursor| Ok(FunctionAttribute::UnpackVariant(read_u16_internal(cursor)?)),
+            "unpack_variant",
+            err_msg,
+            cursor,
+        ),
+        TEST_VARIANT => deserialize_function_attribute(
+            bytecode_version,
+            |cursor| Ok(FunctionAttribute::TestVariant(read_u16_internal(cursor)?)),
+            "test_variant",
+            err_msg,
+            cursor,
+        ),
+        BORROW_FIELD_IMMUTABLE => deserialize_function_attribute(
+            bytecode_version,
+            |cursor| {
+                Ok(FunctionAttribute::BorrowFieldImmutable(read_u16_internal(
+                    cursor,
+                )?))
+            },
+            "borrow",
+            err_msg,
+            cursor,
+        ),
+        BORROW_FIELD_MUTABLE => deserialize_function_attribute(
+            bytecode_version,
+            |cursor| {
+                Ok(FunctionAttribute::BorrowFieldMutable(read_u16_internal(
+                    cursor,
+                )?))
+            },
+            "borrow_mut",
+            err_msg,
+            cursor,
+        ),
+    }
 }
 
 fn load_access_specifiers(
@@ -2260,8 +2351,15 @@ impl SerializedFunctionAttribute {
         match value {
             0x1 => Ok(PERSISTENT),
             0x2 => Ok(MODULE_LOCK),
+            0x3 => Ok(PACK),
+            0x4 => Ok(PACK_VARIANT),
+            0x5 => Ok(UNPACK),
+            0x6 => Ok(UNPACK_VARIANT),
+            0x7 => Ok(TEST_VARIANT),
+            0x8 => Ok(BORROW_FIELD_IMMUTABLE),
+            0x9 => Ok(BORROW_FIELD_MUTABLE),
             _ => Err(PartialVMError::new(StatusCode::MALFORMED)
-                .with_message("malformed attribute".to_owned())),
+                .with_message(format!("malformed attribute: {}", value))),
         }
     }
 }

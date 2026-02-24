@@ -1,0 +1,13 @@
+//# publish --print-bytecode
+// Test that struct API functions for structs with '$' in name are still
+// rejected when the required attribute is missing.
+module 0x66::test_dollar_name_invalid
+
+struct Foo$Bar
+    x: u64
+
+// Invalid: matches naming pattern for pack but has NO #[pack] attribute
+public fun pack$Foo$Bar(l0: u64): Foo$Bar
+    move_loc l0
+    pack Foo$Bar
+    ret

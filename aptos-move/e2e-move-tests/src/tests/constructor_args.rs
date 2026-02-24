@@ -10,7 +10,7 @@ use aptos_types::{
 use move_core_types::{
     language_storage::{StructTag, TypeTag},
     parser::parse_struct_tag,
-    vm_status::StatusCode,
+    vm_status::{AbortLocation, StatusCode},
 };
 use serde::{Deserialize, Serialize};
 
@@ -115,9 +115,13 @@ fn fail_generic(ty_args: Vec<TypeTag>, tests: Vec<(&str, Vec<Vec<u8>>, Closure)>
     // Check in initial state, resource does not exist.
     assert!(!h.exists_resource(acc.address(), module_data()));
 
-    for (entry, args, err) in tests {
-        // Now send hi transaction, after that resource should exist and carry value
-        err(h.run_entry_function(&acc, str::parse(entry).unwrap(), ty_args.clone(), args));
+    for (entry, args, check) in tests {
+        assert!(check(h.run_entry_function(
+            &acc,
+            str::parse(entry).unwrap(),
+            ty_args.clone(),
+            args,
+        )));
     }
 }
 
@@ -233,6 +237,14 @@ fn constructor_args_bad() {
                 )
             }),
         ),
+        // Initialize the object so the next test can reach argument deserialization.
+        // Without this, Object<T> construction aborts with EOBJECT_DOES_NOT_EXIST
+        // before the invalid UTF-8 bytes in arg[1] are ever validated.
+        (
+            "0xcafe::test::initialize",
+            vec![],
+            Box::new(|e| matches!(e, TransactionStatus::Keep(ExecutionStatus::Success))),
+        ),
         (
             "0xcafe::test::pass_optional_vector_optional_string",
             vec![
@@ -241,12 +253,22 @@ fn constructor_args_bad() {
                 bcs::to_bytes(&1u64).unwrap(),
             ],
             Box::new(|e| {
-                matches!(
-                    e,
-                    TransactionStatus::Keep(ExecutionStatus::MiscellaneousError(Some(
-                        StatusCode::FAILED_TO_DESERIALIZE_ARGUMENT
-                    )))
-                )
+                // Invalid UTF-8 is caught inside the Move string module at runtime
+                // (0x1::string::EINVALID_UTF8 = 1).
+                if let TransactionStatus::Keep(ExecutionStatus::MoveAbort {
+                    location, code, ..
+                }) = e
+                {
+                    code == 1
+                        && matches!(
+                            location,
+                            AbortLocation::Module(m)
+                                if m.address() == &AccountAddress::ONE
+                                    && m.name().as_str() == "string"
+                        )
+                } else {
+                    false
+                }
             }),
         ),
         (

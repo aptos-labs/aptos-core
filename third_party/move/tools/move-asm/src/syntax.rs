@@ -585,17 +585,44 @@ impl AsmParser {
             self.advance()?;
             let attrs = self.list(
                 |parser| {
-                    let attr = if parser.is_soft_kw("persistent") {
-                        FunctionAttribute::Persistent
-                    } else if parser.is_soft_kw("module_lock") {
-                        FunctionAttribute::ModuleLock
-                    } else {
-                        return Err(error(
-                            parser.next_loc,
-                            "expected function attribute `persistent` or `module_lock`",
-                        ));
+                    // Helper to parse a u16 parameter after the attribute name (expects "(<num>)")
+                    let parse_u16_param = |parser: &mut AsmParser| -> AsmResult<u16> {
+                        parser.expect_special("(")?;
+                        let result = if let Token::Number(num) = &parser.next {
+                            let r = num.repr().as_u16();
+                            parser.advance()?;
+                            r
+                        } else {
+                            return Err(error(parser.next_loc, "expected number"));
+                        };
+                        parser.expect_special(")")?;
+                        Ok(result)
                     };
-                    parser.advance()?;
+
+                    let attr_name = parser.ident()?;
+                    let attr = match attr_name.as_str() {
+                        "persistent" => FunctionAttribute::Persistent,
+                        "module_lock" => FunctionAttribute::ModuleLock,
+                        "pack" => FunctionAttribute::Pack,
+                        "unpack" => FunctionAttribute::Unpack,
+                        "pack_variant" => FunctionAttribute::PackVariant(parse_u16_param(parser)?),
+                        "unpack_variant" => {
+                            FunctionAttribute::UnpackVariant(parse_u16_param(parser)?)
+                        },
+                        "test_variant" => FunctionAttribute::TestVariant(parse_u16_param(parser)?),
+                        "borrow" => {
+                            FunctionAttribute::BorrowFieldImmutable(parse_u16_param(parser)?)
+                        },
+                        "borrow_mut" => {
+                            FunctionAttribute::BorrowFieldMutable(parse_u16_param(parser)?)
+                        },
+                        _ => {
+                            return Err(error(
+                                parser.next_loc,
+                                format!("unknown function attribute '{}'", attr_name),
+                            ))
+                        },
+                    };
                     Ok(attr)
                 },
                 ",",

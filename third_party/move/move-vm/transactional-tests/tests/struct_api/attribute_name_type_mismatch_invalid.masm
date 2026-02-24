@@ -1,0 +1,12 @@
+//# publish --print-bytecode
+module 0x66::test_attribute_name_type_mismatch
+
+struct S
+    x: u64
+
+// Invalid: function name indicates "pack" (pack$S) but attribute says #[unpack].
+// The attribute type must match the name pattern.
+#[unpack] public fun pack$S(l0: u64): S
+    move_loc l0
+    pack S
+    ret

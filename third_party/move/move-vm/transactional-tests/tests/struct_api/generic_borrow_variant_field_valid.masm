@@ -1,0 +1,20 @@
+//# publish --print-bytecode
+module 0x66::test_generic_borrow_variant_field
+
+enum Option<T> has drop
+  Some
+    value: T
+  None
+
+// Valid: generic immutable borrow of a variant field (ImmBorrowVariantFieldGeneric)
+// Only Some has a field at offset 0, so the variant list is [Some].
+#[borrow(0)] public fun borrow$Option$0$0<T>(l0: &Option<T>): &T
+    move_loc l0
+    borrow_variant_field Option<T>, Some::value
+    ret
+
+// Valid: generic mutable borrow of a variant field (MutBorrowVariantFieldGeneric)
+#[borrow_mut(0)] public fun borrow_mut$Option$0$0<T>(l0: &mut Option<T>): &mut T
+    move_loc l0
+    mut_borrow_variant_field Option<T>, Some::value
+    ret

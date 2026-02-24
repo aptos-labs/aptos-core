@@ -1,0 +1,21 @@
+//# publish --print-bytecode
+module 0x66::test_unpack_valid
+
+struct S
+    x: u64
+    y: u64
+
+struct T
+    a: bool
+
+// Valid: unpack$S takes S and returns all fields via unpack (both u64 values on stack)
+#[unpack] public fun unpack$S(l0: S): (u64, u64)
+    move_loc l0
+    unpack S
+    ret
+
+// Valid: unpack$T takes T and returns all fields (one bool value on stack)
+#[unpack] public fun unpack$T(l0: T): bool
+    move_loc l0
+    unpack T
+    ret
