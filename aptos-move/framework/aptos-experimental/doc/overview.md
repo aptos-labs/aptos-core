@@ -20,6 +20,7 @@ This is the reference documentation of the Aptos experimental framework.
 -  [`0x7::confidential_proof`](confidential_proof.md#0x7_confidential_proof)
 -  [`0x7::dead_mans_switch_operations`](dead_mans_switch_operations.md#0x7_dead_mans_switch_operations)
 -  [`0x7::dead_mans_switch_tracker`](dead_mans_switch_tracker.md#0x7_dead_mans_switch_tracker)
+-  [`0x7::fast_native_computations`](fast_native_computations.md#0x7_fast_native_computations)
 -  [`0x7::helpers`](helpers.md#0x7_helpers)
 -  [`0x7::large_packages`](large_packages.md#0x7_large_packages)
 -  [`0x7::market_bulk_order`](market_bulk_order.md#0x7_market_bulk_order)
