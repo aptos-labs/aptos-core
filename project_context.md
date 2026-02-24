@@ -4,8 +4,8 @@
 
 Implementing Prefix Consensus protocols (from research paper "Prefix Consensus For Censorship Resistant BFT") within Aptos Core for leaderless, censorship-resistant consensus.
 
-**Current Phase**: Multi-Slot Consensus (Algorithm 4) — Phases 1-4 complete, Phase 5 next
-**Completed**: Basic Prefix Consensus, Strong Prefix Consensus (Phases 1-9), Stake-Weighted Quorum Refactoring, Multi-Slot Phases 1-4
+**Current Phase**: Multi-Slot Consensus (Algorithm 4) — Phases 1-5 complete, Phase 6 next
+**Completed**: Basic Prefix Consensus, Strong Prefix Consensus (Phases 1-9), Stake-Weighted Quorum Refactoring, Multi-Slot Phases 1-5
 
 ---
 
@@ -109,7 +109,7 @@ Execution Pipeline (unchanged):
 2. ~~Multi-slot ranking manager (~150 LOC)~~ ✅
 3. ~~Proposal buffer + slot state (~400 LOC)~~ ✅
 4. ~~Block builder + PrefixConsensusBlock variant (~300 LOC)~~ ✅
-5. SlotManager core (~800 LOC)
+5. ~~SlotManager core (~800 LOC)~~ ✅
 6. SPC integration refactor (~300 LOC)
 7. Payload resolution: late buffering + fetch protocol (~350 LOC)
 8. EpochManager integration (~400 LOC)
@@ -123,8 +123,8 @@ Execution Pipeline (unchanged):
 ## Repository State
 
 - **Branch**: `prefix-consensus-prototype`
-- **HEAD**: Multi-Slot Phase 4 (Block Builder + PrefixConsensusBlock)
-- **Tests**: 226/226 unit tests, 4/4 smoke tests
+- **HEAD**: Multi-Slot Phase 5 (SlotManager core + network consolidation)
+- **Tests**: 235/235 unit tests (226 prefix-consensus + 9 slot manager), 6/6 smoke tests
 - **Build**: Clean
 
 ### Repository Structure
@@ -133,7 +133,7 @@ consensus/prefix-consensus/src/
 ├── types.rs              - Vote/QC types + ViewProposal/CertFetch (1039 lines)
 ├── protocol.rs           - 3-round state machine (~585 lines)
 ├── manager.rs            - Basic PC orchestrator, generic over InnerPCAlgorithm (~430 lines)
-├── network_interface.rs  - Network adapters for basic + strong PC (~330 lines)
+├── network_interface.rs  - Generic network adapters (SubprotocolNetworkClient/Sender/Adapter) (~370 lines)
 ├── network_messages.rs   - PrefixConsensusMsg + StrongPrefixConsensusMsg (795 lines)
 ├── signing.rs            - BLS helpers + create_signed_vote* factories (~240 lines)
 ├── certify.rs            - QC formation with trie (220 lines)
@@ -150,6 +150,10 @@ consensus/prefix-consensus/src/
 ├── slot_state.rs         - ProposalBuffer, SlotPhase, SlotState (~645 lines) — Phase 3
 └── block_builder.rs      - build_block_from_v_high (~270 lines) — Phase 4
 
+consensus/src/prefix_consensus/
+├── mod.rs                - Module declarations
+└── slot_manager.rs       - SlotManager orchestrator + 9 unit tests (~500 lines) — Phase 5
+
 testsuite/smoke-test/src/consensus/
 ├── prefix_consensus/     - 2 basic PC smoke tests
 └── strong_prefix_consensus/ - 2 strong PC smoke tests
@@ -164,6 +168,7 @@ testsuite/smoke-test/src/consensus/
 - `.plans/phase2-slot-ranking.md` — Phase 2: Multi-slot ranking manager (complete)
 - `.plans/phase3-slot-state.md` — Phase 3: Proposal buffer + slot state (complete)
 - `.plans/phase4-block-builder.md` — Phase 4: Block builder + PrefixConsensusBlock (complete)
+- `.plans/phase5-slot-manager.md` — Phase 5: SlotManager core (complete)
 - `.plans/phase7-payload-resolution.md` — Phase 7: Payload resolution: late buffering + fetch
 - `.plans/phase12-verifiable-ranking.md` — Phase 13: Verifiable ranking with SPC-aware demotion (after end-to-end)
 
@@ -184,7 +189,7 @@ testsuite/smoke-test/src/consensus/
 - [ ] **StrongPCCommit chain cap**: Cap embedded certs if chains > 5
 - [ ] **Configurable view start timeout**: Make VIEW_START_TIMEOUT (300ms) configurable
 - [ ] **Empty view optimization**: Skip inner PC when no certificates at timeout
-- [ ] **Collapse network bridges**: Replace two separate bridges with one generic bridge
+- [x] **Collapse network bridges**: Replaced 3 bridges + 3 clients + 2 sender traits/adapters with generics
 - [ ] **Garbage collect on slot commit**: Clean up view_states, pc_states, pending_fetches, cert store
 
 ### Long Term

@@ -12,6 +12,7 @@
 
 use crate::{
     network_messages::{PrefixConsensusMsg, StrongPrefixConsensusMsg},
+    slot_types::SlotConsensusMsg,
     types::{Vote1, Vote2, Vote3},
 };
 use aptos_channels::UnboundedSender;
@@ -21,12 +22,17 @@ use aptos_logger::prelude::*;
 use aptos_network::application::{error::Error, interface::NetworkClientInterface};
 use aptos_types::{validator_verifier::ValidatorVerifier, PeerId};
 use futures::SinkExt;
-use std::sync::Arc;
+use serde::{Serialize, de::DeserializeOwned};
+use std::{marker::PhantomData, sync::Arc};
 
-/// Trait for sending Prefix Consensus messages over the network
+// =============================================================================
+// Sender traits
+// =============================================================================
+
+/// Trait for sending Prefix Consensus messages over the network.
 ///
-/// This trait abstracts the network layer, allowing the protocol to send votes
-/// without depending on specific network implementation details.
+/// Kept separate from `SubprotocolNetworkSender` because the basic PC protocol
+/// has three specific vote methods rather than a generic send/broadcast.
 #[async_trait::async_trait]
 pub trait PrefixConsensusNetworkSender: Send + Sync + Clone {
     /// Broadcast a Vote1 message to all validators
@@ -39,56 +45,80 @@ pub trait PrefixConsensusNetworkSender: Send + Sync + Clone {
     async fn broadcast_vote3(&self, vote: Vote3);
 }
 
-/// Trait for sending Strong Prefix Consensus messages over the network
-#[async_trait::async_trait]
-pub trait StrongPrefixConsensusNetworkSender: Send + Sync + Clone {
-    /// Broadcast a Strong PC message to all validators
-    async fn broadcast_strong_msg(&self, msg: StrongPrefixConsensusMsg);
-
-    /// Send a Strong PC message to a specific peer
-    async fn send_strong_msg(&self, peer: Author, msg: StrongPrefixConsensusMsg);
-}
-
-/// Network client wrapper for Prefix Consensus
+/// Generic trait for sending sub-protocol messages (Strong PC, Slot Consensus).
 ///
-/// Wraps the generic NetworkClient to provide Prefix Consensus-specific
-/// sending methods. Mirrors the pattern used by ConsensusNetworkClient.
-#[derive(Clone)]
-pub struct PrefixConsensusNetworkClient<NetworkClient> {
-    network_client: NetworkClient,
+/// Both Strong PC and Slot Consensus have the same two operations: broadcast to
+/// all validators and send to a specific peer. This trait unifies them.
+#[async_trait::async_trait]
+pub trait SubprotocolNetworkSender<M: Send + Sync + Clone>: Send + Sync + Clone {
+    /// Broadcast a message to all validators
+    async fn broadcast(&self, msg: M);
+
+    /// Send a message to a specific peer
+    async fn send_to(&self, peer: Author, msg: M);
 }
 
-impl<NetworkClient: NetworkClientInterface<PrefixConsensusMsg>>
-    PrefixConsensusNetworkClient<NetworkClient>
+// =============================================================================
+// Generic network client
+// =============================================================================
+
+/// Generic network client wrapper for prefix consensus sub-protocols.
+///
+/// Wraps the NetworkClient to provide sub-protocol-specific sending methods.
+/// Parameterized over the message type `M` and the underlying network client.
+pub struct SubprotocolNetworkClient<M, NetworkClient> {
+    network_client: NetworkClient,
+    _phantom: PhantomData<fn() -> M>,
+}
+
+// Manual Clone impl to avoid unnecessary M: Clone bound from derive
+impl<M, NetworkClient: Clone> Clone for SubprotocolNetworkClient<M, NetworkClient> {
+    fn clone(&self) -> Self {
+        Self {
+            network_client: self.network_client.clone(),
+            _phantom: PhantomData,
+        }
+    }
+}
+
+impl<M, NetworkClient> SubprotocolNetworkClient<M, NetworkClient>
+where
+    M: Serialize + DeserializeOwned + Send + Sync + Clone + 'static,
+    NetworkClient: NetworkClientInterface<M>,
 {
-    /// Returns a new prefix consensus network client
+    /// Returns a new sub-protocol network client
     pub fn new(network_client: NetworkClient) -> Self {
-        Self { network_client }
+        Self {
+            network_client,
+            _phantom: PhantomData,
+        }
     }
 
     /// Send a single message to the destination peer
-    pub fn send_to(&self, peer: PeerId, message: PrefixConsensusMsg) -> Result<(), Error> {
-        let peer_network_id = self.get_peer_network_id_for_peer(peer);
+    pub fn send_to(&self, peer: PeerId, message: M) -> Result<(), Error> {
+        let peer_network_id = PeerNetworkId::new(NetworkId::Validator, peer);
         self.network_client.send_to_peer(message, peer_network_id)
     }
 
     /// Send a single message to the destination peers
-    pub fn send_to_many(
-        &self,
-        peers: Vec<PeerId>,
-        message: PrefixConsensusMsg,
-    ) -> Result<(), Error> {
+    pub fn send_to_many(&self, peers: Vec<PeerId>, message: M) -> Result<(), Error> {
         let peer_network_ids: Vec<PeerNetworkId> = peers
             .into_iter()
-            .map(|peer| self.get_peer_network_id_for_peer(peer))
+            .map(|peer| PeerNetworkId::new(NetworkId::Validator, peer))
             .collect();
         self.network_client.send_to_peers(message, peer_network_ids)
     }
-
-    fn get_peer_network_id_for_peer(&self, peer: PeerId) -> PeerNetworkId {
-        PeerNetworkId::new(NetworkId::Validator, peer)
-    }
 }
+
+/// Type aliases for backward compatibility
+pub type PrefixConsensusNetworkClient<NC> = SubprotocolNetworkClient<PrefixConsensusMsg, NC>;
+pub type StrongPrefixConsensusNetworkClient<NC> =
+    SubprotocolNetworkClient<StrongPrefixConsensusMsg, NC>;
+pub type SlotConsensusNetworkClient<NC> = SubprotocolNetworkClient<SlotConsensusMsg, NC>;
+
+// =============================================================================
+// Prefix Consensus sender adapter (unique: 3 vote methods)
+// =============================================================================
 
 /// Network sender adapter for Prefix Consensus
 ///
@@ -195,64 +225,37 @@ where
 }
 
 // =============================================================================
-// Strong Prefix Consensus network types
+// Generic sender adapter (Strong PC + Slot Consensus)
 // =============================================================================
 
-/// Network client wrapper for Strong Prefix Consensus
+/// Generic sender adapter for sub-protocol messages.
 ///
-/// Same pattern as `PrefixConsensusNetworkClient` but for `StrongPrefixConsensusMsg`.
-#[derive(Clone)]
-pub struct StrongPrefixConsensusNetworkClient<NetworkClient> {
-    network_client: NetworkClient,
-}
-
-impl<NetworkClient: NetworkClientInterface<StrongPrefixConsensusMsg>>
-    StrongPrefixConsensusNetworkClient<NetworkClient>
-{
-    pub fn new(network_client: NetworkClient) -> Self {
-        Self { network_client }
-    }
-
-    pub fn send_to(
-        &self,
-        peer: PeerId,
-        message: StrongPrefixConsensusMsg,
-    ) -> Result<(), Error> {
-        let peer_network_id = PeerNetworkId::new(NetworkId::Validator, peer);
-        self.network_client.send_to_peer(message, peer_network_id)
-    }
-
-    pub fn send_to_many(
-        &self,
-        peers: Vec<PeerId>,
-        message: StrongPrefixConsensusMsg,
-    ) -> Result<(), Error> {
-        let peer_network_ids: Vec<PeerNetworkId> = peers
-            .into_iter()
-            .map(|peer| PeerNetworkId::new(NetworkId::Validator, peer))
-            .collect();
-        self.network_client
-            .send_to_peers(message, peer_network_ids)
-    }
-}
-
-/// Network sender adapter for Strong Prefix Consensus
-///
-/// Implements `StrongPrefixConsensusNetworkSender` using the Aptos network layer.
+/// Implements `SubprotocolNetworkSender<M>` using the Aptos network layer.
 /// Self-send goes through a channel; all other sends go through the network client.
-#[derive(Clone)]
-pub struct StrongNetworkSenderAdapter<NetworkClient> {
+pub struct SubprotocolSenderAdapter<M, NetworkClient> {
     author: Author,
-    network_client: StrongPrefixConsensusNetworkClient<NetworkClient>,
-    self_sender: UnboundedSender<(Author, StrongPrefixConsensusMsg)>,
+    network_client: SubprotocolNetworkClient<M, NetworkClient>,
+    self_sender: UnboundedSender<(Author, M)>,
     validators: Arc<ValidatorVerifier>,
 }
 
-impl<NetworkClient> StrongNetworkSenderAdapter<NetworkClient> {
+// Manual Clone impl to avoid unnecessary M: Clone bound from derive
+impl<M, NC: Clone> Clone for SubprotocolSenderAdapter<M, NC> {
+    fn clone(&self) -> Self {
+        Self {
+            author: self.author,
+            network_client: self.network_client.clone(),
+            self_sender: self.self_sender.clone(),
+            validators: self.validators.clone(),
+        }
+    }
+}
+
+impl<M, NetworkClient> SubprotocolSenderAdapter<M, NetworkClient> {
     pub fn new(
         author: Author,
-        network_client: StrongPrefixConsensusNetworkClient<NetworkClient>,
-        self_sender: UnboundedSender<(Author, StrongPrefixConsensusMsg)>,
+        network_client: SubprotocolNetworkClient<M, NetworkClient>,
+        self_sender: UnboundedSender<(Author, M)>,
         validators: Arc<ValidatorVerifier>,
     ) -> Self {
         Self {
@@ -272,19 +275,19 @@ impl<NetworkClient> StrongNetworkSenderAdapter<NetworkClient> {
 }
 
 #[async_trait::async_trait]
-impl<NetworkClient> StrongPrefixConsensusNetworkSender
-    for StrongNetworkSenderAdapter<NetworkClient>
+impl<M, NetworkClient> SubprotocolNetworkSender<M>
+    for SubprotocolSenderAdapter<M, NetworkClient>
 where
-    NetworkClient:
-        NetworkClientInterface<StrongPrefixConsensusMsg> + Send + Sync + Clone,
+    M: Serialize + DeserializeOwned + Send + Sync + Clone + 'static,
+    NetworkClient: NetworkClientInterface<M> + Send + Sync + Clone,
 {
-    async fn broadcast_strong_msg(&self, msg: StrongPrefixConsensusMsg) {
+    async fn broadcast(&self, msg: M) {
         // Send to self via channel
         let mut self_sender = self.self_sender.clone();
         if let Err(err) = self_sender.send((self.author, msg.clone())).await {
             error!(
                 error = ?err,
-                "Failed to send strong PC msg to self via channel"
+                "Failed to send sub-protocol msg to self via channel"
             );
         }
 
@@ -294,20 +297,20 @@ where
             if let Err(err) = self.network_client.send_to_many(others, msg) {
                 warn!(
                     error = ?err,
-                    "Failed to broadcast strong PC msg to other validators"
+                    "Failed to broadcast sub-protocol msg to other validators"
                 );
             }
         }
     }
 
-    async fn send_strong_msg(&self, peer: Author, msg: StrongPrefixConsensusMsg) {
+    async fn send_to(&self, peer: Author, msg: M) {
         if peer == self.author {
             // Self-send via channel
             let mut self_sender = self.self_sender.clone();
             if let Err(err) = self_sender.send((self.author, msg)).await {
                 error!(
                     error = ?err,
-                    "Failed to send strong PC msg to self via channel"
+                    "Failed to send sub-protocol msg to self via channel"
                 );
             }
         } else {
@@ -316,12 +319,17 @@ where
                 warn!(
                     error = ?err,
                     peer = %peer,
-                    "Failed to send strong PC msg to peer"
+                    "Failed to send sub-protocol msg to peer"
                 );
             }
         }
     }
 }
+
+/// Type aliases for backward compatibility
+pub type StrongNetworkSenderAdapter<NC> =
+    SubprotocolSenderAdapter<StrongPrefixConsensusMsg, NC>;
+pub type SlotNetworkSenderAdapter<NC> = SubprotocolSenderAdapter<SlotConsensusMsg, NC>;
 
 #[cfg(test)]
 mod tests {
@@ -360,5 +368,4 @@ mod tests {
         let (_signers, verifier) = create_test_validators(4);
         assert_eq!(verifier.len(), 4);
     }
-
 }

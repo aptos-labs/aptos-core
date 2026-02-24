@@ -23,7 +23,7 @@ use crate::{
     },
     inner_pc_impl::ThreeRoundPC,
     inner_pc_trait::InnerPCAlgorithm,
-    network_interface::StrongPrefixConsensusNetworkSender,
+    network_interface::SubprotocolNetworkSender,
     network_messages::{PrefixConsensusMsg, StrongPrefixConsensusMsg},
     strong_protocol::{
         ChainBuildError, StrongPrefixConsensusProtocol, View1Decision, ViewDecision,
@@ -120,7 +120,7 @@ pub struct StrongPrefixConsensusManager<NetworkSender, T: InnerPCAlgorithm> {
     input_vector: PrefixVector,
 }
 
-impl<NetworkSender: StrongPrefixConsensusNetworkSender, T: InnerPCAlgorithm<Message = PrefixConsensusMsg>>
+impl<NetworkSender: SubprotocolNetworkSender<StrongPrefixConsensusMsg>, T: InnerPCAlgorithm<Message = PrefixConsensusMsg>>
     StrongPrefixConsensusManager<NetworkSender, T>
 {
     /// Create a new Strong Prefix Consensus manager
@@ -276,7 +276,7 @@ impl<NetworkSender: StrongPrefixConsensusNetworkSender, T: InnerPCAlgorithm<Mess
         // Broadcast all outbound messages (may include Vote1, Vote2, Vote3 if cascading)
         for out_msg in outbound_msgs {
             let msg = StrongPrefixConsensusMsg::InnerPC { view: 1, msg: out_msg };
-            self.network_sender.broadcast_strong_msg(msg).await;
+            self.network_sender.broadcast(msg).await;
         }
 
         // If the inner PC completed during start (all rounds cascaded)
@@ -330,7 +330,7 @@ impl<NetworkSender: StrongPrefixConsensusNetworkSender, T: InnerPCAlgorithm<Mess
         // Broadcast proposal to other parties
         let proposal = ViewProposal::new(next_view, cert.clone(), self.epoch, self.slot);
         let msg = StrongPrefixConsensusMsg::Proposal(Box::new(proposal));
-        self.network_sender.broadcast_strong_msg(msg).await;
+        self.network_sender.broadcast(msg).await;
 
         // Add our own certificate to the next view's ViewState so it's available
         // when enter_view checks for the first-ranked cert.
@@ -466,7 +466,7 @@ impl<NetworkSender: StrongPrefixConsensusNetworkSender, T: InnerPCAlgorithm<Mess
 
                 for out_msg in outbound_msgs {
                     let msg = StrongPrefixConsensusMsg::InnerPC { view, msg: out_msg };
-                    self.network_sender.broadcast_strong_msg(msg).await;
+                    self.network_sender.broadcast(msg).await;
                 }
 
                 if let Some(pc_output) = output {
@@ -551,7 +551,7 @@ impl<NetworkSender: StrongPrefixConsensusNetworkSender, T: InnerPCAlgorithm<Mess
                 );
                 let v_high = commit.v_high.clone();
                 let msg = StrongPrefixConsensusMsg::Commit(Box::new(commit));
-                self.network_sender.broadcast_strong_msg(msg).await;
+                self.network_sender.broadcast(msg).await;
                 self.protocol.set_committed(v_high);
                 self.write_output_file();
             }
@@ -607,7 +607,7 @@ impl<NetworkSender: StrongPrefixConsensusNetworkSender, T: InnerPCAlgorithm<Mess
 
         // Broadcast
         let msg = StrongPrefixConsensusMsg::EmptyView(Box::new(empty_msg.clone()));
-        self.network_sender.broadcast_strong_msg(msg).await;
+        self.network_sender.broadcast(msg).await;
 
         // Add our own to the collector
         self.empty_view_collectors
@@ -724,7 +724,7 @@ impl<NetworkSender: StrongPrefixConsensusNetworkSender, T: InnerPCAlgorithm<Mess
             Ok((outbound_msgs, output)) => {
                 for out_msg in outbound_msgs {
                     let wrapped = StrongPrefixConsensusMsg::InnerPC { view, msg: out_msg };
-                    self.network_sender.broadcast_strong_msg(wrapped).await;
+                    self.network_sender.broadcast(wrapped).await;
                 }
                 if let Some(pc_output) = output {
                     self.finalize_view(view, pc_output).await;
@@ -909,7 +909,7 @@ impl<NetworkSender: StrongPrefixConsensusNetworkSender, T: InnerPCAlgorithm<Mess
 
         let req = CertFetchRequest::new(hash, self.epoch, self.slot);
         let msg = StrongPrefixConsensusMsg::FetchRequest(req);
-        self.network_sender.broadcast_strong_msg(msg).await;
+        self.network_sender.broadcast(msg).await;
     }
 
     /// Process a fetch request from another party
@@ -922,7 +922,7 @@ impl<NetworkSender: StrongPrefixConsensusNetworkSender, T: InnerPCAlgorithm<Mess
                 self.slot,
             );
             let msg = StrongPrefixConsensusMsg::FetchResponse(Box::new(resp));
-            self.network_sender.send_strong_msg(author, msg).await;
+            self.network_sender.send_to(author, msg).await;
         }
         // If we don't have it, don't reply (per design decision)
     }
@@ -1095,12 +1095,12 @@ mod tests {
     }
 
     #[async_trait::async_trait]
-    impl StrongPrefixConsensusNetworkSender for MockNetworkSender {
-        async fn broadcast_strong_msg(&self, msg: StrongPrefixConsensusMsg) {
+    impl SubprotocolNetworkSender<StrongPrefixConsensusMsg> for MockNetworkSender {
+        async fn broadcast(&self, msg: StrongPrefixConsensusMsg) {
             self.sent.lock().await.push(msg);
         }
 
-        async fn send_strong_msg(&self, _peer: Author, msg: StrongPrefixConsensusMsg) {
+        async fn send_to(&self, _peer: Author, msg: StrongPrefixConsensusMsg) {
             self.sent.lock().await.push(msg);
         }
     }
