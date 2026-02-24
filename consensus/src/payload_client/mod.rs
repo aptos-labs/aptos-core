@@ -141,13 +141,25 @@ impl PayloadClient for ProxyBudgetPayloadClient {
 
         let bp = &self.bp_config;
 
+        // --- Hard stop: return empty if primary has unconsumed batches ---
+        // The proxy produces batches much faster than primary can consume them.
+        // When the primary hasn't consumed existing batches, stop producing txns
+        // to prevent an unbounded backlog that causes transaction TTL expiry.
+        // Skip this check when a primary proof is pending — cutting-point blocks
+        // must be ordered ASAP.
+        if batches >= bp.pending_batches_delay_threshold && !has_pending {
+            proxy_metrics::PROXY_TXN_BUDGET_REMAINING.set(0);
+            proxy_metrics::PROXY_BACKPRESSURE_DELAY_MS.set(0);
+            return Ok((vec![], Payload::empty(self.quorum_store_enabled, true)));
+        }
+
         // --- Adaptive budget: reduce target when primary pipeline is congested ---
         let effective_target = if gap > bp.pipeline_heavy_gap {
-            // Heavy congestion: halve budget
-            (self.target / 2).max(1)
+            // Heavy congestion: minimize budget
+            1
         } else if gap > bp.pipeline_moderate_gap {
-            // Moderate congestion: reduce by 25%
-            (self.target * 3 / 4).max(1)
+            // Moderate congestion: reduce by 50%
+            (self.target / 2).max(1)
         } else {
             self.target
         };
@@ -175,15 +187,6 @@ impl PayloadClient for ProxyBudgetPayloadClient {
                     .saturating_mul(gap.min(bp.max_pipeline_gap_for_delay))
                     / bp.max_pipeline_gap_for_delay;
                 delay = delay.max(gap_delay);
-            }
-
-            // Pending batches delay: primary has unconsumed batches
-            if batches >= bp.pending_batches_delay_threshold {
-                let batch_delay = self
-                    .round_timeout_ms
-                    .saturating_mul(batches.min(bp.max_pending_batches_for_delay))
-                    / bp.max_pending_batches_for_delay;
-                delay = delay.max(batch_delay);
             }
 
             delay

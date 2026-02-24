@@ -589,27 +589,7 @@ impl ProposalGenerator {
                 }
             }
 
-            // Apply proposal delay from primary pipeline backpressure.
-            // This slows down primary proposal rate when the pipeline is congested,
-            // causing proxy batches to accumulate at primary, which feeds back via
-            // PipelineBackpressureInfo to throttle the proxy.
-            // Note: We do NOT truncate the proxy payload (safety constraint: all
-            // proxy-ordered blocks must be included in primary proposals).
-            let voting_power_ratio =
-                proposer_election.get_voting_power_participation_ratio(round);
             let timestamp = self.time_service.get_current_timestamp();
-            let (_, _, _, _, proposal_delay) = self
-                .calculate_max_block_sizes(voting_power_ratio, timestamp, round)
-                .await;
-            if !proposal_delay.is_zero() {
-                info!(
-                    round = round,
-                    delay_ms = proposal_delay.as_millis() as u64,
-                    "ProposalGenerator: applying pipeline backpressure delay to proxy proposal"
-                );
-                tokio::time::sleep(proposal_delay).await;
-            }
-
             (
                 proxy_validator_txns,
                 proxy_payload,
