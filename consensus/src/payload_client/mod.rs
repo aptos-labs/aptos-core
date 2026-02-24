@@ -11,10 +11,10 @@ use aptos_proxy_primary::{proxy_metrics, AtomicPipelineState};
 use aptos_types::validator_txn::ValidatorTransaction;
 use aptos_validator_transaction_pool::TransactionFilter;
 use std::sync::{
-    atomic::{AtomicBool, AtomicU64, Ordering},
+    atomic::{AtomicU64, Ordering},
     Arc,
 };
-use std::time::Duration;
+
 
 pub mod mixed;
 pub mod user;
@@ -31,30 +31,27 @@ pub trait PayloadClient: Send + Sync {
 
 /// Budget-aware payload client for proxy consensus.
 ///
-/// Wraps a real payload client (e.g. MixedPayloadClient) and enforces a
-/// system-wide budget on proxy blocks carrying transactions per primary round.
+/// Wraps two payload clients: a fast one (validator txns disabled) used most of
+/// the time, and a normal one (validator txns enabled) used every Nth pull.
+/// Forces `pending_ordering = true` to match devnet's QS fast path where the
+/// quorum store returns immediately without the 30ms NO_TXN_DELAY sleep.
 ///
-/// Instead of a per-validator counter, the budget is determined by walking the
-/// proxy block chain backwards from the highest QC block to the last cutting
-/// point (a block with `primary_proof`). This count is the same across all
-/// validators because they share the same certified chain view.
-///
-/// After `target` blocks with non-empty payloads in the current batch, returns
-/// empty payloads so proxy consensus keeps running for ordering without adding
-/// more transactions.
+/// The budget is determined by walking the proxy block chain backwards from the
+/// highest QC block to the last cutting point (a block with `primary_proof`).
+/// After `target` blocks with non-empty payloads, returns empty payloads so
+/// proxy consensus keeps running for ordering without adding more transactions.
 pub struct ProxyBudgetPayloadClient {
+    /// Fast path: validator txns disabled (used most pulls).
     inner: Arc<dyn PayloadClient>,
+    /// Normal path: validator txns enabled (used every Nth pull).
+    inner_with_vtxns: Arc<dyn PayloadClient>,
+    /// Pull validator txns every N blocks. 0 = never.
+    vtxn_pull_interval: u64,
     /// Proxy BlockStore for walking the chain to count blocks with txns.
     proxy_block_store: Arc<dyn BlockReader>,
     /// Target number of proxy blocks with transactions per primary round.
     target: u64,
     quorum_store_enabled: bool,
-    /// Proxy round timeout in ms; backpressure delay = round_timeout_ms / 2.
-    round_timeout_ms: u64,
-    /// Shared flag: true when a primary proof is pending in ProxyHooksImpl.
-    /// Skip backpressure delay when true — cutting-point blocks should be
-    /// ordered ASAP to unblock the primary pipeline.
-    has_pending_proof: Arc<AtomicBool>,
     /// Shared pipeline state from primary, updated atomically by the proxy event loop.
     /// Used for adaptive backpressure decisions based on primary's actual congestion.
     pipeline_state: Arc<AtomicPipelineState>,
@@ -67,21 +64,21 @@ pub struct ProxyBudgetPayloadClient {
 impl ProxyBudgetPayloadClient {
     pub fn new(
         inner: Arc<dyn PayloadClient>,
+        inner_with_vtxns: Arc<dyn PayloadClient>,
         proxy_block_store: Arc<dyn BlockReader>,
         target: u64,
         quorum_store_enabled: bool,
-        round_timeout_ms: u64,
-        has_pending_proof: Arc<AtomicBool>,
+        vtxn_pull_interval: u64,
         pipeline_state: Arc<AtomicPipelineState>,
         bp_config: ProxyBackpressureConfig,
     ) -> Self {
         Self {
             inner,
+            inner_with_vtxns,
             proxy_block_store,
             target,
             quorum_store_enabled,
-            round_timeout_ms,
-            has_pending_proof,
+            vtxn_pull_interval,
             pipeline_state,
             bp_config,
             pull_count: AtomicU64::new(0),
@@ -136,7 +133,6 @@ impl PayloadClient for ProxyBudgetPayloadClient {
         let pull_num = self.pull_count.fetch_add(1, Ordering::Relaxed);
         let (blocks_with_txns, total_blocks) = self.count_blocks_since_cutting_point();
         let pipeline_info = self.pipeline_state.load();
-        let has_pending = self.has_pending_proof.load(Ordering::Acquire);
         let gap = pipeline_info.pipeline_pending_round_gap;
 
         proxy_metrics::PROXY_PIPELINE_PENDING_GAP.set(gap as i64);
@@ -163,55 +159,6 @@ impl PayloadClient for ProxyBudgetPayloadClient {
             .set(effective_target.saturating_sub(blocks_with_txns) as i64);
         proxy_metrics::PROXY_EFFECTIVE_BUDGET_TARGET.set(effective_target as i64);
 
-        // --- Adaptive delay: emergency-only ---
-        //
-        // With max_proxy_block_txns=100, steady state is balanced (10k TPS).
-        // Delay is only needed when batches accumulate severely (>= 10).
-        // Uses 1x round_timeout ceiling (100ms max) to avoid killing block rate.
-        //
-        // Two categories:
-        // 1. Batch delay: fires at batches >= 10 (emergency brake)
-        // 2. Budget/gap delays: only when !has_pending (cutting-point ordering)
-        let delay_ms = {
-            let mut delay = 0u64;
-
-            // Pending batches delay: emergency brake when batches >= 10.
-            // Uses 1x round_timeout ceiling so max delay = 100ms.
-            // Ramp: batches=10→50ms, batches=15→75ms, batches=20+→100ms.
-            if batches >= bp.pending_batches_delay_threshold {
-                let batch_delay = self
-                    .round_timeout_ms
-                    .saturating_mul(batches.min(bp.max_pending_batches_for_delay))
-                    / bp.max_pending_batches_for_delay;
-                delay += batch_delay;
-            }
-
-            // Budget and gap delays: skip when has_pending to let cutting-point
-            // blocks order quickly.
-            if !has_pending {
-                // Budget-based delay: half round timeout when blocks > target
-                if total_blocks > effective_target {
-                    delay += self.round_timeout_ms / 2;
-                }
-
-                // Pipeline gap delay: proportional, kicks in at gap > 2
-                if gap > 2 {
-                    let gap_delay = self
-                        .round_timeout_ms
-                        .saturating_mul(gap.min(bp.max_pipeline_gap_for_delay))
-                        / bp.max_pipeline_gap_for_delay;
-                    delay += gap_delay;
-                }
-            }
-
-            delay
-        };
-
-        proxy_metrics::PROXY_BACKPRESSURE_DELAY_MS.set(delay_ms as i64);
-        if delay_ms > 0 {
-            tokio::time::sleep(Duration::from_millis(delay_ms)).await;
-        }
-
         // --- Budget check: return empty if exhausted ---
         if blocks_with_txns >= effective_target {
             proxy_metrics::PROXY_EMPTY_PAYLOAD_BUDGET.inc();
@@ -226,8 +173,6 @@ impl PayloadClient for ProxyBudgetPayloadClient {
                     base_target = self.target,
                     gap = gap,
                     batches = batches,
-                    has_pending = has_pending,
-                    delay_ms = delay_ms,
                     "[ProxyBudget] returning empty payload (budget exhausted)"
                 );
             }
@@ -257,10 +202,8 @@ impl PayloadClient for ProxyBudgetPayloadClient {
         }
 
         // Batch-based reduction: safety net when batches accumulate.
-        // Base max_txns=100 targets 10k TPS at 100 blocks/s. Only reduce
-        // further when primary is seriously falling behind.
         if batches >= bp.batch_heavy_threshold {
-            // Emergency: quarter max_txns → 25 txns/block
+            // Emergency: quarter max_txns
             let reduced = PayloadTxnsSize::new(
                 (config.max_txns.count() / 4).max(1),
                 (config.max_txns.size_in_bytes() / 4).max(1024),
@@ -271,7 +214,7 @@ impl PayloadClient for ProxyBudgetPayloadClient {
             config.soft_max_txns_after_filtering =
                 (config.soft_max_txns_after_filtering / 4).max(1);
         } else if batches >= bp.batch_moderate_threshold {
-            // Moderate: halve max_txns → 50 txns/block
+            // Moderate: halve max_txns
             let reduced = PayloadTxnsSize::new(
                 (config.max_txns.count() / 2).max(1),
                 (config.max_txns.size_in_bytes() / 2).max(1024),
@@ -282,6 +225,20 @@ impl PayloadClient for ProxyBudgetPayloadClient {
             config.soft_max_txns_after_filtering =
                 (config.soft_max_txns_after_filtering / 2).max(1);
         }
+
+        // Force devnet fast path: QS returns immediately (no 30ms NO_TXN_DELAY sleep)
+        config.pending_ordering = true;
+
+        // Pull validator txns periodically (every Nth block), skip on others for speed.
+        // Validator txn pool pull can take ~25ms when pool is empty; skipping it on most
+        // blocks keeps average payload pull time near 0ms.
+        let use_vtxns = self.vtxn_pull_interval > 0
+            && pull_num % self.vtxn_pull_interval == 0;
+        let client = if use_vtxns {
+            &self.inner_with_vtxns
+        } else {
+            &self.inner
+        };
 
         proxy_metrics::PROXY_EFFECTIVE_MAX_TXNS.set(config.max_txns.count() as i64);
         proxy_metrics::PROXY_NONEMPTY_PAYLOAD_PULLED.inc();
@@ -296,14 +253,13 @@ impl PayloadClient for ProxyBudgetPayloadClient {
                 base_target = self.target,
                 gap = gap,
                 batches = batches,
-                has_pending = has_pending,
-                delay_ms = delay_ms,
                 max_txns = config.max_txns.count(),
                 original_max_txns = original_max_count,
+                use_vtxns = use_vtxns,
                 "[ProxyBudget] pulling payload from inner client"
             );
         }
 
-        self.inner.pull_payload(config, validator_txn_filter).await
+        client.pull_payload(config, validator_txn_filter).await
     }
 }

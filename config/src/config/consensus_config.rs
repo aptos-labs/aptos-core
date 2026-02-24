@@ -127,12 +127,14 @@ pub struct ProxyConsensusConfig {
     /// After this many proxy blocks carry real txns, subsequent blocks are empty.
     #[serde(alias = "max_proxy_blocks_per_primary_round")]
     pub target_proxy_blocks_per_primary_round: u64,
-    /// Maximum transactions per proxy block (= primary max_sending_block_txns / target)
+    /// Maximum transactions per proxy block
     pub max_proxy_block_txns: u64,
     /// Maximum transactions per proxy block after filtering
     pub max_proxy_block_txns_after_filtering: u64,
-    /// Maximum proxy block size in bytes (= primary max_sending_block_bytes / target)
+    /// Maximum proxy block size in bytes
     pub max_proxy_block_bytes: u64,
+    /// Pull validator txns every N proxy blocks. 0 = never pull vtxns.
+    pub vtxn_pull_interval: u64,
     /// Backpressure tuning parameters for adaptive proxy throttling.
     pub backpressure: ProxyBackpressureConfig,
 }
@@ -146,10 +148,12 @@ impl Default for ProxyConsensusConfig {
             round_timeout_backoff_max_exponent: 4,
             // Target ~10 proxy blocks with txns per primary round
             target_proxy_blocks_per_primary_round: 10,
-            // Proxy block limits: sized for 10k TPS at 100 blocks/s
-            max_proxy_block_txns: 100,                  // 100 txns × 100 blocks/s = 10k TPS
-            max_proxy_block_txns_after_filtering: 36,   // 100 × (1800/5000) ratio
-            max_proxy_block_bytes: 100 * 1024,          // 100KB headroom for 100 txns
+            // Proxy per-block limits: match devnet primary consensus config
+            // (max_sending_block_txns=300, max_sending_block_txns_after_filtering=200).
+            max_proxy_block_txns: 300,
+            max_proxy_block_txns_after_filtering: 200,
+            max_proxy_block_bytes: 5 * 1024 * 1024,
+            vtxn_pull_interval: 10,                     // pull validator txns every 10th block
             backpressure: ProxyBackpressureConfig::default(),
         }
     }
@@ -158,27 +162,17 @@ impl Default for ProxyConsensusConfig {
 /// Backpressure configuration for proxy consensus adaptive throttling.
 ///
 /// Controls how the proxy adjusts its throughput based on primary pipeline
-/// congestion. Thresholds determine when moderate vs heavy throttling kicks in,
-/// and delay caps bound the proportional delay calculations.
+/// congestion via budget/max_txns reduction when the pipeline gap or pending
+/// batch count exceeds configured thresholds.
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 #[serde(default, deny_unknown_fields)]
 pub struct ProxyBackpressureConfig {
-    /// Pipeline gap threshold for moderate congestion (reduce budget by 25%,
+    /// Pipeline gap threshold for moderate congestion (reduce budget by 50%,
     /// reduce per-block max_txns by 25%).
     pub pipeline_moderate_gap: u64,
-    /// Pipeline gap threshold for heavy congestion (halve budget, halve
-    /// per-block max_txns).
+    /// Pipeline gap threshold for heavy congestion (minimize budget to 1,
+    /// halve per-block max_txns).
     pub pipeline_heavy_gap: u64,
-    /// Maximum pipeline gap used for proportional delay calculation.
-    /// Delay = round_timeout_ms * min(gap, max_pipeline_gap_for_delay) / max_pipeline_gap_for_delay.
-    pub max_pipeline_gap_for_delay: u64,
-    /// Minimum number of pending proxy batches at primary before batch-based
-    /// delay kicks in.
-    pub pending_batches_delay_threshold: u64,
-    /// Maximum pending batches used for proportional delay calculation.
-    /// Delay = round_timeout_ms * min(batches, max_pending_batches_for_delay) / max_pending_batches_for_delay.
-    /// With default=20 and round_timeout=100ms: batches=10→50ms, batches=20+→100ms.
-    pub max_pending_batches_for_delay: u64,
     /// Pending batches >= this → halve max_txns per block (moderate throttle).
     pub batch_moderate_threshold: u64,
     /// Pending batches >= this → quarter max_txns per block (heavy throttle).
@@ -188,14 +182,13 @@ pub struct ProxyBackpressureConfig {
 impl Default for ProxyBackpressureConfig {
     fn default() -> Self {
         Self {
-            pipeline_moderate_gap: 5,
-            pipeline_heavy_gap: 10,
-            max_pipeline_gap_for_delay: 20,
-            // Delay is emergency-only: fires at batches >= 10, max 100ms
-            pending_batches_delay_threshold: 10,
-            max_pending_batches_for_delay: 20,
-            batch_moderate_threshold: 5,
-            batch_heavy_threshold: 10,
+            // Gap thresholds must be high enough to avoid spurious throttling.
+            // In production, gap is 0-2. In debug builds, gap reaches 10-15 due
+            // to slow execution. These thresholds only fire in genuine emergencies.
+            pipeline_moderate_gap: 20,
+            pipeline_heavy_gap: 40,
+            batch_moderate_threshold: 20,
+            batch_heavy_threshold: 50,
         }
     }
 }

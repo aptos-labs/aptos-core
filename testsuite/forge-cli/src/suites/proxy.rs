@@ -27,6 +27,24 @@ pub fn get_proxy_test(test_name: &str) -> Option<ForgeConfig> {
     Some(test)
 }
 
+/// Apply devnet consensus config overrides to a validator node.
+/// These settings match the proven devnet config that achieves 3k+ TPS / 70 blocks/s.
+fn apply_devnet_consensus_config(config: &mut aptos_config::config::NodeConfig) {
+    config.consensus.quorum_store.enable_opt_quorum_store = true;
+    config.consensus.quorum_store.opt_qs_minimum_batch_age_usecs = 500;
+    config.consensus.quorum_store.batch_generation_poll_interval_ms = 10;
+    config.consensus.quorum_store.batch_generation_min_non_empty_interval_ms = 20;
+    config.consensus.quorum_store.batch_generation_max_interval_ms = 100;
+    config.consensus.quorum_store.sender_max_total_txns = 200;
+    config.consensus.vote_back_pressure_limit = 150;
+    config.consensus.quorum_store_poll_time_ms = 5;
+    config.consensus.enable_optimistic_proposal_tx = true;
+    config.consensus.internal_per_key_channel_size = 20;
+    config.consensus.max_sending_block_txns = 300;
+    config.consensus.max_sending_block_txns_after_filtering = 200;
+    config.consensus.max_sending_opt_block_txns_after_filtering = 200;
+}
+
 /// Remote test: 7 validators (4 proxy + 3 primary-only), multi-region network emulation.
 ///
 /// Network topology:
@@ -53,6 +71,9 @@ fn proxy_primary_remote_test() -> ForgeConfig {
                 inner_success_criteria: SuccessCriteria::new(500),
             },
         ))
+        .with_validator_override_node_config_fn(Arc::new(|config, _| {
+            apply_devnet_consensus_config(config);
+        }))
         .with_genesis_helm_config_fn(Arc::new(move |helm_values| {
             helm_values["chain"]["epoch_duration_secs"] = 300.into();
             helm_values["chain"]["on_chain_consensus_config"] =
@@ -70,12 +91,12 @@ fn proxy_primary_remote_test() -> ForgeConfig {
         }))
         .with_emit_job(
             EmitJobRequest::default()
-                .mode(EmitJobMode::ConstTps { tps: 100 })
+                .mode(EmitJobMode::ConstTps { tps: 3000 })
                 .gas_price(5 * aptos_global_constants::GAS_UNIT_PRICE)
                 .latency_polling_interval(Duration::from_millis(100)),
         )
         .with_success_criteria(
-            SuccessCriteria::new(50)
+            SuccessCriteria::new(2500)
                 .add_no_restarts()
                 .add_wait_for_catchup_s(120)
                 .add_chain_progress(StateProgressThreshold {
@@ -88,6 +109,9 @@ fn proxy_primary_remote_test() -> ForgeConfig {
 }
 
 /// Local test: 4 validators (1 proxy), no network emulation (for debugging).
+/// Uses same devnet consensus config as remote test. Debug-build TPS is limited
+/// by slow execution (~27 TPS observed), so criteria are relaxed. The remote
+/// test on forge (release builds) targets devnet-level performance.
 fn proxy_primary_local_test() -> ForgeConfig {
     let num_validators = 4;
     let num_proxy: usize = 1;
@@ -103,8 +127,25 @@ fn proxy_primary_local_test() -> ForgeConfig {
                     mempool_backlog: 5000,
                 })
                 .init_gas_price_multiplier(20),
-            inner_success_criteria: SuccessCriteria::new(100),
+            inner_success_criteria: SuccessCriteria::new(10),
         })
+        .with_validator_override_node_config_fn(Arc::new(|config, _| {
+            apply_devnet_consensus_config(config);
+            // Reduce proxy per-block txns for debug builds — 300 txns/block causes
+            // massive pipeline gap in unoptimized builds. Keep 50/36 for fast execution.
+            config
+                .consensus
+                .proxy_consensus_config
+                .max_proxy_block_txns = 50;
+            config
+                .consensus
+                .proxy_consensus_config
+                .max_proxy_block_txns_after_filtering = 36;
+            config
+                .consensus
+                .proxy_consensus_config
+                .max_proxy_block_bytes = 50 * 1024;
+        }))
         .with_genesis_helm_config_fn(Arc::new(move |helm_values| {
             helm_values["chain"]["epoch_duration_secs"] = 300.into();
             helm_values["chain"]["on_chain_consensus_config"] =
@@ -126,7 +167,7 @@ fn proxy_primary_local_test() -> ForgeConfig {
                 .gas_price(5 * aptos_global_constants::GAS_UNIT_PRICE),
         )
         .with_success_criteria(
-            SuccessCriteria::new(50)
+            SuccessCriteria::new(10)
                 .add_no_restarts()
                 .add_wait_for_catchup_s(60),
         )

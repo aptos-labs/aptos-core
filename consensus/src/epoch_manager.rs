@@ -94,7 +94,7 @@ use aptos_types::{
         Features, LeaderReputationType, OnChainConfigPayload, OnChainConfigProvider,
         OnChainConsensusConfig, OnChainExecutionConfig, OnChainJWKConsensusConfig,
         OnChainRandomnessConfig, ProposerElectionType, RandomnessConfigMoveStruct,
-        RandomnessConfigSeqNum, ValidatorSet,
+        RandomnessConfigSeqNum, ValidatorSet, ValidatorTxnConfig,
     },
     randomness::{RandKeys, WvufPP, WVUF},
     validator_signer::ValidatorSigner,
@@ -897,6 +897,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
         onchain_jwk_consensus_config: OnChainJWKConsensusConfig,
         network_sender: Arc<NetworkSender>,
         payload_client: Arc<dyn PayloadClient>,
+        proxy_fast_payload_client: Arc<dyn PayloadClient>,
         payload_manager: Arc<dyn TPayloadManager>,
         rand_config: Option<RandConfig>,
         fast_rand_config: Option<RandConfig>,
@@ -1126,6 +1127,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
                     primary_to_proxy_rx,
                     proxy_to_primary_tx,
                     payload_client,
+                    proxy_fast_payload_client,
                     payload_manager,
                     &onchain_randomness_config,
                     &onchain_jwk_consensus_config,
@@ -1253,6 +1255,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
             aptos_proxy_primary::ProxyToPrimaryEvent,
         >,
         payload_client: Arc<dyn PayloadClient>,
+        proxy_fast_payload_client: Arc<dyn PayloadClient>,
         payload_manager: Arc<dyn TPayloadManager>,
         onchain_randomness_config: &OnChainRandomnessConfig,
         onchain_jwk_consensus_config: &OnChainJWKConsensusConfig,
@@ -1408,17 +1411,17 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
             failures_tracker.clone(),
             self.config.quorum_store.enable_opt_qs_v2_payload_tx,
         ));
-        // Wrap the shared payload client with budget tracking for proxy.
-        // The budget is system-wide: ProxyBudgetPayloadClient walks the proxy
-        // block chain to count non-empty blocks since the last cutting point.
+        // Wrap payload clients with budget tracking for proxy.
+        // inner: proxy_fast_payload_client (vtxns disabled, fast path for most pulls)
+        // inner_with_vtxns: payload_client (vtxns enabled, used every Nth pull)
         let proxy_payload_client: Arc<dyn PayloadClient> =
             Arc::new(crate::payload_client::ProxyBudgetPayloadClient::new(
+                proxy_fast_payload_client,
                 payload_client,
                 proxy_block_store.clone(),
                 proxy_config.target_proxy_blocks_per_primary_round,
                 self.quorum_store_enabled,
-                proxy_config.round_initial_timeout_ms,
-                has_pending_proof,
+                proxy_config.vtxn_pull_interval,
                 pipeline_state.clone(),
                 proxy_config.backpressure.clone(),
             ));
@@ -1430,7 +1433,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
             proxy_block_store.clone(),
             proxy_payload_client,
             self.time_service.clone(),
-            Duration::from_millis(30), // Proxy blocks are small & frequent; don't wait long for batching
+            Duration::from_millis(5), // Match devnet quorum_store_poll_time_ms
             aptos_consensus_types::utils::PayloadTxnsSize::new(
                 proxy_config.max_proxy_block_txns,
                 proxy_config.max_proxy_block_bytes,
@@ -1830,7 +1833,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
             epoch_state.epoch, rand_config, fast_rand_config
         );
 
-        let (network_sender, payload_client, payload_manager) = self
+        let (network_sender, payload_client, proxy_fast_payload_client, payload_manager) = self
             .initialize_shared_component(
                 &epoch_state,
                 &consensus_config,
@@ -1883,6 +1886,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
                 jwk_consensus_config,
                 network_sender,
                 payload_client,
+                proxy_fast_payload_client,
                 payload_manager,
                 rand_config,
                 fast_rand_config,
@@ -1893,6 +1897,8 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
         }
     }
 
+    /// Returns (network_sender, payload_client, proxy_fast_payload_client, payload_manager).
+    /// The proxy_fast_payload_client has validator txns disabled for fast proxy pulls.
     async fn initialize_shared_component(
         &mut self,
         epoch_state: &EpochState,
@@ -1900,6 +1906,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
         consensus_key: Arc<PrivateKey>,
     ) -> (
         NetworkSender,
+        Arc<dyn PayloadClient>,
         Arc<dyn PayloadClient>,
         Arc<dyn TPayloadManager>,
     ) {
@@ -1916,15 +1923,24 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
             .await;
         let effective_vtxn_config = consensus_config.effective_validator_txn_config();
         debug!("effective_vtxn_config={:?}", effective_vtxn_config);
+        // Clone QS client for proxy before consuming it in the primary MixedPayloadClient
+        let qs_for_proxy = quorum_store_client.clone();
         let mixed_payload_client = MixedPayloadClient::new(
             effective_vtxn_config,
             Arc::new(self.vtxn_pool.clone()),
             Arc::new(quorum_store_client),
         );
+        // Proxy-fast client: validator txns disabled (V0 config → 0 count/0 bytes limits)
+        let proxy_fast_payload_client = MixedPayloadClient::new(
+            ValidatorTxnConfig::default_disabled(),
+            Arc::new(self.vtxn_pool.clone()),
+            Arc::new(qs_for_proxy),
+        );
         self.start_quorum_store(quorum_store_builder);
         (
             network_sender,
             Arc::new(mixed_payload_client),
+            Arc::new(proxy_fast_payload_client),
             payload_manager,
         )
     }
@@ -1939,6 +1955,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
         jwk_consensus_config: OnChainJWKConsensusConfig,
         network_sender: NetworkSender,
         payload_client: Arc<dyn PayloadClient>,
+        proxy_fast_payload_client: Arc<dyn PayloadClient>,
         payload_manager: Arc<dyn TPayloadManager>,
         rand_config: Option<RandConfig>,
         fast_rand_config: Option<RandConfig>,
@@ -1961,6 +1978,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
                     jwk_consensus_config,
                     Arc::new(network_sender),
                     payload_client,
+                    proxy_fast_payload_client,
                     payload_manager,
                     rand_config,
                     fast_rand_config,
