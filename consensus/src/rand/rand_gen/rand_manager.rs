@@ -10,7 +10,7 @@ use crate::{
         aug_data_store::AugDataStore,
         block_queue::{BlockQueue, QueueItem},
         network_messages::{RandMessage, RpcRequest},
-        rand_store::{AggregationResult, RandStore},
+        rand_store::{AggregationResult, RandCheckFuture, RandStore},
         reliable_broadcast_state::{
             AugDataCertBuilder, CertifiedAugDataAckState, ShareAggregateState,
         },
@@ -138,14 +138,15 @@ impl<S: TShare, D: TAugmentedData> RandManager<S, D> {
         let rounds: Vec<u64> = blocks.ordered_blocks.iter().map(|b| b.round()).collect();
         info!(rounds = rounds, "Processing incoming blocks.");
 
-        // Store rand_check futures from the pipeline into RandStore.
+        // Create rand_check shared futures from the pipeline's has_rand_txns_fut.
         // Uses has_rand_txns_fut which resolves early (before randomness aggregation)
         // to avoid deadlock: rand_check_fut waits for randomness, but aggregation
         // waits for rand_check_fut to know if randomness is needed.
-        {
-            let mut rand_store = self.rand_store.lock();
-            for block in &blocks.ordered_blocks {
-                if let Some(futs) = block.pipeline_futs() {
+        let broadcast_handles: Vec<_> = blocks
+            .ordered_blocks
+            .iter()
+            .map(|block| {
+                let rand_check_future = block.pipeline_futs().map(|futs| {
                     let round = block.round();
                     let has_rand_txns = futs.has_rand_txns_fut.clone();
                     let decision_tx = self.decision_tx.clone();
@@ -167,23 +168,22 @@ impl<S: TShare, D: TAugmentedData> RandManager<S, D> {
                     }
                     .boxed()
                     .shared();
-                    rand_store.set_rand_check_future(round, shared_future.clone());
-                    tokio::spawn(shared_future);
-                }
-            }
-        }
-
-        let broadcast_handles: Vec<_> = blocks
-            .ordered_blocks
-            .iter()
-            .map(|block| FullRandMetadata::from(block.block()))
-            .map(|metadata| self.process_incoming_metadata(metadata))
+                    tokio::spawn(shared_future.clone());
+                    shared_future
+                });
+                let metadata = FullRandMetadata::from(block.block());
+                self.process_incoming_metadata(metadata, rand_check_future)
+            })
             .collect();
         let queue_item = QueueItem::new(blocks, Some(broadcast_handles));
         self.block_queue.push_back(queue_item);
     }
 
-    fn process_incoming_metadata(&self, metadata: FullRandMetadata) -> DropGuard {
+    fn process_incoming_metadata(
+        &self,
+        metadata: FullRandMetadata,
+        rand_check_future: Option<RandCheckFuture>,
+    ) -> DropGuard {
         let self_share = S::generate(&self.config, metadata.metadata.clone());
         info!(LogSchema::new(LogEvent::BroadcastRandShare)
             .epoch(self.epoch_state.epoch)
@@ -203,7 +203,7 @@ impl<S: TShare, D: TAugmentedData> RandManager<S, D> {
                 .expect("Add self share for fast path should succeed");
         }
 
-        rand_store.add_rand_metadata(metadata.clone());
+        rand_store.add_rand_metadata(metadata.clone(), rand_check_future);
         self.network_sender
             .broadcast_without_self(RandMessage::<S, D>::Share(self_share).into_network_message());
         self.spawn_aggregate_shares_task(metadata.metadata)
