@@ -2188,27 +2188,47 @@ impl<'a> ExpSourcifier<'a> {
                     crate::ast::BehaviorKind::ModifiesOf => "modifies_of",
                     crate::ast::BehaviorKind::ResultOf => "result_of",
                 };
-                self.parenthesize(context_prio, Prio::Postfix, || {
-                    // Print pre-label if present
+                // Helper: prints `[pre@]kind<target>(args)[@post]`
+                let print_behavior_call = |target_str: &str| {
                     if let Some(pre) = &state.pre {
                         self.print_memory_label(pre);
                         emit!(self.wr(), "@");
                     }
-                    emit!(self.wr(), "{}", kind_str);
-                    // First argument is the target (function parameter or closure)
-                    // Special case: if it's a lambda that just forwards to a function,
-                    // print the function name directly instead of the lambda
-                    emit!(self.wr(), "<");
-                    self.print_behavior_target(&args[0]);
-                    emit!(self.wr(), ">");
-                    // Remaining arguments are the actual parameters
+                    emit!(self.wr(), "{}<{}>", kind_str, target_str);
                     self.print_exp_list("(", ")", &args[1..]);
-                    // Print post-label after arguments
                     if let Some(post) = &state.post {
                         emit!(self.wr(), "@");
                         self.print_memory_label(post);
                     }
-                })
+                };
+                if self.is_simple_behavior_target(&args[0]) {
+                    // Simple target (local var or plain closure): print
+                    // directly inside <...>.
+                    self.parenthesize(context_prio, Prio::Postfix, || {
+                        if let Some(pre) = &state.pre {
+                            self.print_memory_label(pre);
+                            emit!(self.wr(), "@");
+                        }
+                        emit!(self.wr(), "{}", kind_str);
+                        emit!(self.wr(), "<");
+                        self.print_behavior_target(&args[0]);
+                        emit!(self.wr(), ">");
+                        self.print_exp_list("(", ")", &args[1..]);
+                        if let Some(post) = &state.post {
+                            emit!(self.wr(), "@");
+                            self.print_memory_label(post);
+                        }
+                    })
+                } else {
+                    // Complex target (contains `@`, `.`, etc.): wrap in a
+                    // let-binding block so only a simple name appears inside
+                    // `<...>`, which is all the parser accepts.
+                    emit!(self.wr(), "{{ let __f = ");
+                    self.print_exp(Prio::General, false, &args[0]);
+                    emit!(self.wr(), "; ");
+                    print_behavior_call("__f");
+                    emit!(self.wr(), " }}");
+                }
             },
 
             // Operations that are less commonly used in user-written specs
@@ -2335,6 +2355,18 @@ impl<'a> ExpSourcifier<'a> {
     /// Print the target of a behavior predicate. If it's a simple function reference
     /// (a closure with no captures, or a lambda that just forwards to a function),
     /// print the function name directly. Otherwise, print the expression as-is.
+    /// Returns true if the expression can be printed directly inside `<...>` of
+    /// a behavior predicate (i.e. it produces a simple name).
+    fn is_simple_behavior_target(&self, exp: &Exp) -> bool {
+        match exp.as_ref() {
+            ExpData::Call(_, Operation::Closure(_, _, mask), args) => {
+                args.is_empty() && mask.captured_count() == 0
+            },
+            ExpData::LocalVar(..) | ExpData::Temporary(..) => true,
+            _ => false,
+        }
+    }
+
     fn print_behavior_target(&self, exp: &Exp) {
         use ExpData::*;
 

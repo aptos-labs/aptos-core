@@ -2,6 +2,10 @@
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 use super::McpArgs;
+use codespan_reporting::{
+    diagnostic::Severity,
+    term::{emit, termcolor::NoColor, Config},
+};
 use move_model::model::{FunId, GlobalEnv, ModuleId, QualifiedId};
 use std::path::Path;
 
@@ -49,7 +53,11 @@ pub(crate) struct PackageData {
     env: GlobalEnv,
     path: String,
     args: McpArgs,
-    verified: Option<(VerifiedScope, bool)>,
+    verified: Option<(VerifiedScope, bool, usize)>,
+    /// Pre-rendered diagnostic messages from the last stage that produced them.
+    diagnostics: Vec<String>,
+    /// Label of the stage that produced the diagnostics (e.g. "checking", "compiling", "verifying").
+    diagnostics_source: String,
 }
 
 // SAFETY: `GlobalEnv` is `!Send` because it uses `Rc` and `NonNull` internally for its
@@ -82,11 +90,15 @@ impl PackageData {
             args.experiments.clone(),
             false, // no bytecode needed for initial build
         )?;
+        let diagnostics = render_diagnostics(&env);
+        log_diagnostics(&diagnostics, "checking");
         Ok(Self {
             env,
             path: path.to_string_lossy().into_owned(),
             args: args.clone(),
             verified: None,
+            diagnostics,
+            diagnostics_source: "checking".to_string(),
         })
     }
 
@@ -130,16 +142,60 @@ impl PackageData {
             true, // with bytecode for prover
         )?;
         self.verified = None;
+        self.diagnostics = render_diagnostics(&self.env);
+        log_diagnostics(&self.diagnostics, "compiling");
+        self.diagnostics_source = "compiling".to_string();
         Ok(())
     }
 
     /// Returns the cached verification result, if any.
-    pub(crate) fn verified(&self) -> Option<(VerifiedScope, bool)> {
+    pub(crate) fn verified(&self) -> Option<(VerifiedScope, bool, usize)> {
         self.verified.clone()
     }
 
-    /// Store a verification result.
-    pub(crate) fn set_verified(&mut self, scope: VerifiedScope, success: bool) {
-        self.verified = Some((scope, success));
+    /// Store a verification result together with the vc timeout used.
+    pub(crate) fn set_verified(&mut self, scope: VerifiedScope, success: bool, timeout: usize) {
+        self.verified = Some((scope, success, timeout));
     }
+
+    /// Returns stored diagnostic messages and the source stage that produced them.
+    pub(crate) fn diagnostics(&self) -> (&[String], &str) {
+        (&self.diagnostics, &self.diagnostics_source)
+    }
+
+    /// Override diagnostics with output from a later stage (e.g. verifying, inferring).
+    pub(crate) fn set_diagnostics(&mut self, diagnostics: Vec<String>, source: &str) {
+        log_diagnostics(&diagnostics, source);
+        self.diagnostics = diagnostics;
+        self.diagnostics_source = source.to_string();
+    }
+}
+
+/// Log stored diagnostics at INFO level.
+fn log_diagnostics(diagnostics: &[String], source: &str) {
+    if diagnostics.is_empty() {
+        log::info!("stored diagnostics ({}): none", source);
+    } else {
+        log::info!(
+            "stored diagnostics ({}): {} message(s):\n{}",
+            source,
+            diagnostics.len(),
+            diagnostics.join("\n")
+        );
+    }
+}
+
+/// Render all diagnostics at Warning level or above from a `GlobalEnv`.
+fn render_diagnostics(env: &GlobalEnv) -> Vec<String> {
+    let mut messages = Vec::new();
+    env.report_diag_with_filter(
+        |files, diag| {
+            let mut buf = NoColor::new(Vec::new());
+            emit(&mut buf, &Config::default(), files, diag).expect("emit must not fail");
+            let text = String::from_utf8(buf.into_inner()).unwrap_or_default();
+            messages.push(text);
+        },
+        |d| d.severity >= Severity::Warning,
+    );
+    messages
 }

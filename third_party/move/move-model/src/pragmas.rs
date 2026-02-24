@@ -315,6 +315,10 @@ pub const CONDITION_INFERRED_VACUOUS: &str = "vacuous";
 /// that are hard for SAT/SMT solvers (exists in aborts_if, forall in ensures).
 pub const CONDITION_INFERRED_SATHARD: &str = "sathard";
 
+/// Symbol value for `inferred` property indicating conditions suggested by an
+/// AI agent (e.g. loop invariants that the WP engine cannot derive).
+pub const CONDITION_INFERRED_AGENT: &str = "agent";
+
 /// A property which can be attached to an aborts_with to indicate that it should act as check
 /// whether the function produces exactly the provided number of error codes.
 pub const CONDITION_CHECK_ABORT_CODES_PROP: &str = "check";

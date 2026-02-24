@@ -150,6 +150,41 @@ module 0x42::loops {
 
     // ==================== Nested Loops ====================
 
+    // ==================== Agent-Inferred Invariants ====================
+
+    // Loop with agent-inferred invariant
+    fun agent_invariant_loop(n: u64): u64 {
+        let sum = 0;
+        let i = 0;
+        while (i < n) {
+            i = i + 1;
+            sum = sum + i;
+        } spec {
+            invariant [inferred] i <= n;
+            invariant [inferred] sum == i * (i + 1) / 2;
+        };
+        sum
+    }
+
+    // ==================== Empty Spec Block ====================
+
+    // Empty spec block: conditions should be injected inside the braces.
+    fun empty_spec_block(n: u64): u64 {
+        let sum = 0;
+        let i = 0;
+        while (i < n) {
+            i = i + 1;
+            sum = sum + i;
+        } spec {
+            invariant i <= n;
+            invariant sum == i * (i + 1) / 2;
+        };
+        sum
+    }
+    spec empty_spec_block {}
+
+    // ==================== Nested Loops ====================
+
     // Simple nested loop counting iterations
     fun nested_count(m: u64, n: u64): u64 {
         let count = 0;

@@ -1,4 +1,4 @@
-warning[W00001]: DEPRECATED. will be removed
+error[E04003]: built-in operation not supported
   ┌─ old_loop_invariant.move:8:27
   │
 8 │                 invariant old(i + s) >= 0;

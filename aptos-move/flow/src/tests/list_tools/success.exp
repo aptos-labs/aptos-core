@@ -18,6 +18,29 @@
     }
   },
   {
+    "name": "move_package_spec_infer",
+    "description": "Low-level WP inference tool — not for direct use. Requires multi-phase workflow context (loop-invariant synthesis, simplification, verification) that is only available through subagent delegation.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "title": "MovePackageSpecInferParams",
+      "type": "object",
+      "properties": {
+        "package_path": {
+          "description": "Path to the Move package directory.",
+          "type": "string"
+        },
+        "filter": {
+          "description": "Optional filter: `module_name` or `module_name::function_name`.\nWhen omitted, all target modules are inferred.",
+          "type": "string",
+          "nullable": true
+        }
+      },
+      "required": [
+        "package_path"
+      ]
+    }
+  },
+  {
     "name": "move_package_status",
     "description": "Check a Move package for compilation errors and warnings",
     "inputSchema": {
@@ -37,7 +60,7 @@
   },
   {
     "name": "move_package_verify",
-    "description": "Run the Move Prover on a package to formally verify specifications. An optional filter can restrict verification to a single module (`module_name`) or function (`module_name::function_name`).",
+    "description": "Low-level prover tool — not for direct use. Requires phased verification workflow context (timeout handling, diagnostic interpretation) that is only available through subagent delegation.",
     "inputSchema": {
       "$schema": "https://json-schema.org/draft/2020-12/schema",
       "title": "MovePackageVerifyParams",
@@ -52,8 +75,16 @@
           "type": "string",
           "nullable": true
         },
+        "exclude": {
+          "description": "Optional list of targets to exclude from verification.\nEach entry follows the same format as `filter`: `module_name` or\n`module_name::function_name`. Exclusions take precedence over the filter scope.",
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "nullable": true
+        },
         "timeout": {
-          "description": "Solver timeout per verification condition, in seconds. Default: 40.",
+          "description": "Solver timeout per verification condition, in seconds. Default: 10. Maximum: 10.",
           "type": "integer",
           "format": "uint",
           "minimum": 0,
