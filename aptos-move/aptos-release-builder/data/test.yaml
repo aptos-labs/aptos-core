@@ -6,7 +6,7 @@ proposals:
     metadata:
       title: "Hard Supply Cap: 2.1 Billion APT"
       description: "This is part of change proposed in AIP 140, see details https://github.com/aptos-foundation/AIPs/blob/main/aips/aip-140.md"
-      source_code_url: ""
+      source_code_url: "https://github.com/aptos-labs/aptos-core"
       discussion_url: "https://x.com/Aptos/status/2024216329826230392"
     execution_mode: MultiStep
     update_sequence:
