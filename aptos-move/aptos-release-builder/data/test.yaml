@@ -1,0 +1,12 @@
+---
+remote_endpoint: ~
+proposals:
+  - name: framework
+    metadata:
+      title: "Hard Supply Cap: 2.1 Billion APT"
+      description: "This is part of change proposed in AIP 140, see details https://github.com/aptos-foundation/AIPs/blob/main/aips/aip-140.md"
+      source_code_url: ""
+      discussion_url: "https://x.com/Aptos/status/2024216329826230392"
+    execution_mode: MultiStep
+    update_sequence:
+      - RawScript: data/example_proposals/empty_multi_step.move
