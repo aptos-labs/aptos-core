@@ -3,7 +3,7 @@
 
 use crate::{
     block_storage::{
-        tracing::{observe_block, BlockStage},
+        tracing::{observe_block_with_type, BlockStage},
         BlockReader, BlockRetriever, BlockStore, NeedFetchResult,
     },
     counters::{
@@ -433,6 +433,15 @@ impl RoundManager {
         }
     }
 
+    /// Returns "proxy" if this RoundManager runs proxy consensus, "primary" otherwise.
+    fn consensus_type(&self) -> &'static str {
+        if self.proxy_hooks.is_some() {
+            "proxy"
+        } else {
+            "primary"
+        }
+    }
+
     // TODO: Evaluate if creating a block retriever is slow and cache this if needed.
     fn create_block_retriever(&self, author: Author) -> BlockRetriever {
         BlockRetriever::new(
@@ -718,7 +727,8 @@ impl RoundManager {
             grandparent_qc,
         );
 
-        observe_block(opt_block_data.timestamp_usecs(), BlockStage::OPT_PROPOSED);
+        // This is always a proxy opt proposal
+        observe_block_with_type(opt_block_data.timestamp_usecs(), BlockStage::OPT_PROPOSED, "proxy");
         info!(Self::new_log_with_round_epoch(
             LogEvent::OptPropose,
             round,
@@ -840,6 +850,7 @@ impl RoundManager {
         proxy_hooks: Option<Arc<dyn crate::proxy_hooks::ProxyConsensusHooks>>,
         proxy_payload: Option<(Vec<aptos_types::validator_txn::ValidatorTransaction>, aptos_consensus_types::common::Payload)>,
     ) -> anyhow::Result<ProposalMsg> {
+        let consensus_type = if proxy_hooks.is_some() { "proxy" } else { "primary" };
         let proposal = if let Some(hooks) = proxy_hooks {
             // Proxy RoundManager: transform proposal into proxy block format
             let original = proposal_generator
@@ -880,7 +891,7 @@ impl RoundManager {
         let signature = safety_rules.lock().sign_proposal(&proposal)?;
         let signed_proposal =
             Block::new_proposal_from_block_data_and_signature(proposal, signature);
-        observe_block(signed_proposal.timestamp_usecs(), BlockStage::SIGNED);
+        observe_block_with_type(signed_proposal.timestamp_usecs(), BlockStage::SIGNED, consensus_type);
         info!(
             Self::new_log_with_round_epoch(
                 LogEvent::Propose,
@@ -912,7 +923,8 @@ impl RoundManager {
                 proposer_election,
             )
             .await?;
-        observe_block(proposal.timestamp_usecs(), BlockStage::OPT_PROPOSED);
+        // Non-proxy opt proposal path — always primary
+        observe_block_with_type(proposal.timestamp_usecs(), BlockStage::OPT_PROPOSED, "primary");
         info!(Self::new_log_with_round_epoch(
             LogEvent::OptPropose,
             round,
@@ -929,9 +941,10 @@ impl RoundManager {
             Err(anyhow::anyhow!("Injected error in process_proposal_msg"))
         });
 
-        observe_block(
+        observe_block_with_type(
             proposal_msg.proposal().timestamp_usecs(),
             BlockStage::ROUND_MANAGER_RECEIVED,
+            self.consensus_type(),
         );
         info!(
             self.new_log(LogEvent::ReceiveProposal)
@@ -995,13 +1008,15 @@ impl RoundManager {
             ))
         });
 
-        observe_block(
+        observe_block_with_type(
             proposal_msg.block_data().timestamp_usecs(),
             BlockStage::ROUND_MANAGER_RECEIVED,
+            self.consensus_type(),
         );
-        observe_block(
+        observe_block_with_type(
             proposal_msg.block_data().timestamp_usecs(),
             BlockStage::ROUND_MANAGER_RECEIVED_OPT_PROPOSAL,
+            self.consensus_type(),
         );
         info!(
             self.new_log(LogEvent::ReceiveOptProposal),
@@ -1063,7 +1078,7 @@ impl RoundManager {
             hqc.certified_block().id()
         );
         let proposal = Block::new_from_opt(opt_block_data, hqc);
-        observe_block(proposal.timestamp_usecs(), BlockStage::PROCESS_OPT_PROPOSAL);
+        observe_block_with_type(proposal.timestamp_usecs(), BlockStage::PROCESS_OPT_PROPOSAL, self.consensus_type());
         info!(
             self.new_log(LogEvent::ProcessOptProposal),
             block_author = proposal.author(),
@@ -1442,9 +1457,9 @@ impl RoundManager {
             self.round_state.current_round_deadline(),
         );
 
-        observe_block(proposal.timestamp_usecs(), BlockStage::SYNCED);
+        observe_block_with_type(proposal.timestamp_usecs(), BlockStage::SYNCED, self.consensus_type());
         if proposal.is_opt_block() {
-            observe_block(proposal.timestamp_usecs(), BlockStage::SYNCED_OPT_BLOCK);
+            observe_block_with_type(proposal.timestamp_usecs(), BlockStage::SYNCED_OPT_BLOCK, self.consensus_type());
         }
 
         // Since processing proposal is delayed due to backpressure or payload availability, we add
@@ -1763,13 +1778,14 @@ impl RoundManager {
             block_arc.block()
         ))?;
         if !block_arc.block().is_nil_block() {
-            observe_block(block_arc.block().timestamp_usecs(), BlockStage::VOTED);
+            observe_block_with_type(block_arc.block().timestamp_usecs(), BlockStage::VOTED, self.consensus_type());
         }
 
         if block_arc.block().is_opt_block() {
-            observe_block(
+            observe_block_with_type(
                 block_arc.block().timestamp_usecs(),
                 BlockStage::VOTED_OPT_BLOCK,
+                self.consensus_type(),
             );
         }
 
@@ -1898,15 +1914,17 @@ impl RoundManager {
                 .create_order_vote(proposed_block.clone(), qc.clone())
                 .await?;
             if !proposed_block.block().is_nil_block() {
-                observe_block(
+                observe_block_with_type(
                     proposed_block.block().timestamp_usecs(),
                     BlockStage::ORDER_VOTED,
+                    self.consensus_type(),
                 );
             }
             if proposed_block.block().is_opt_block() {
-                observe_block(
+                observe_block_with_type(
                     proposed_block.block().timestamp_usecs(),
                     BlockStage::ORDER_VOTED_OPT_BLOCK,
+                    self.consensus_type(),
                 );
             }
             let order_vote_msg = OrderVoteMsg::new(order_vote, qc.as_ref().clone());
@@ -2017,9 +2035,10 @@ impl RoundManager {
         match result {
             VoteReceptionResult::NewQuorumCertificate(qc) => {
                 if !vote.is_timeout() {
-                    observe_block(
+                    observe_block_with_type(
                         qc.certified_block().timestamp_usecs(),
                         BlockStage::QC_AGGREGATED,
+                        self.consensus_type(),
                     );
                 }
                 QC_AGGREGATED_FROM_VOTES.inc();

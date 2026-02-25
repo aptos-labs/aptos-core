@@ -904,6 +904,17 @@ pub static BLOCK_TRACING: Lazy<HistogramVec> = Lazy::new(|| {
     .unwrap()
 });
 
+/// Traces block movement throughout the node, tagged by consensus type (proxy/primary)
+pub static BLOCK_TRACING_BY_CONSENSUS_TYPE: Lazy<HistogramVec> = Lazy::new(|| {
+    register_histogram_vec!(
+        "aptos_consensus_block_tracing_by_consensus_type",
+        "Histogram for different stages of a block, tagged by consensus type",
+        &["stage", "consensus_type"],
+        TRACING_BUCKETS.to_vec()
+    )
+    .unwrap()
+});
+
 /// Traces pipeline stages
 pub static PIPELINE_TRACING: Lazy<HistogramVec> = Lazy::new(|| {
     register_histogram_vec!(
