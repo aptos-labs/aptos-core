@@ -30,6 +30,12 @@ module struct_enum_tests::struct_enum_tests {
         name: String,
     }
 
+    /// A public struct with an enum field, for testing nested-enum-in-struct parsing
+    public struct ColoredPoint has copy, drop {
+        point: Point,
+        color: Color,
+    }
+
     // Test enums for enum transaction arguments
 
     /// A public enum for testing enum arguments - simple variants
@@ -260,5 +266,35 @@ module struct_enum_tests::struct_enum_tests {
         let opt3 = vector::borrow(&opts, 2);
         assert!(option::is_some(opt3), 221);
         assert!(*option::borrow(opt3) == 200, 222);
+    }
+
+    /// Test entry function that takes vector<Color> (nested enums in a vector)
+    public entry fun test_vector_of_enums(_account: &signer, colors: vector<Color>) {
+        use std::vector;
+
+        assert!(vector::length(&colors) == 3, 223);
+        let c0 = *vector::borrow(&colors, 0);
+        let c1 = *vector::borrow(&colors, 1);
+        let c2 = *vector::borrow(&colors, 2);
+        assert!(c0 is Color::Red, 224);
+        assert!(c1 is Color::Green, 225);
+        match (c2) {
+            Color::RGB { r, g, b } => {
+                assert!(r == 255 && g == 0 && b == 128, 226);
+            },
+            _ => abort 227,
+        }
+    }
+
+    /// Test entry function that takes a struct containing an enum field
+    public entry fun test_struct_with_enum_field(_account: &signer, cp: ColoredPoint) {
+        assert!(cp.point.x == 10 && cp.point.y == 20, 228);
+        assert!(cp.color is Color::RGB, 229);
+        match (cp.color) {
+            Color::RGB { r, g, b } => {
+                assert!(r == 255 && g == 0 && b == 128, 230);
+            },
+            _ => abort 231,
+        }
     }
 }

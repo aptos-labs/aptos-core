@@ -580,6 +580,85 @@ def test_vector_of_options(run_helper: RunHelper, test_name=None):
 
 
 @test_case
+def test_option_enum(run_helper: RunHelper, test_name=None):
+    """Test Option<Enum> where the inner type is an enum (nested enum parsing)."""
+    account_address = str(run_helper.get_account_info().account_address)
+
+    json_content = {
+        "function_id": "default::struct_enum_tests::test_option_enum",
+        "type_args": [],
+        "args": [
+            {
+                "type": f"0x1::option::Option<{account_address}::struct_enum_tests::Color>",
+                "value": {"Some": {"0": {"Green": {}}}}
+            }
+        ]
+    }
+
+    run_move_function_with_json(
+        run_helper,
+        test_name,
+        json_content,
+        "Failed to execute Move function with Option<Enum>"
+    )
+
+
+@test_case
+def test_vector_of_enums(run_helper: RunHelper, test_name=None):
+    """Test vector<Enum> where each element is an enum (nested enum parsing)."""
+    account_address = str(run_helper.get_account_info().account_address)
+
+    json_content = {
+        "function_id": "default::struct_enum_tests::test_vector_of_enums",
+        "type_args": [],
+        "args": [
+            {
+                "type": f"vector<{account_address}::struct_enum_tests::Color>",
+                "value": [
+                    {"Red": {}},
+                    {"Green": {}},
+                    {"RGB": {"r": "255", "g": "0", "b": "128"}}
+                ]
+            }
+        ]
+    }
+
+    run_move_function_with_json(
+        run_helper,
+        test_name,
+        json_content,
+        "Failed to execute Move function with vector<Enum>"
+    )
+
+
+@test_case
+def test_struct_with_enum_field(run_helper: RunHelper, test_name=None):
+    """Test a struct whose field is an enum (nested enum in struct field)."""
+    account_address = str(run_helper.get_account_info().account_address)
+
+    json_content = {
+        "function_id": "default::struct_enum_tests::test_struct_with_enum_field",
+        "type_args": [],
+        "args": [
+            {
+                "type": f"{account_address}::struct_enum_tests::ColoredPoint",
+                "value": {
+                    "point": {"x": "10", "y": "20"},
+                    "color": {"RGB": {"r": "255", "g": "0", "b": "128"}}
+                }
+            }
+        ]
+    }
+
+    run_move_function_with_json(
+        run_helper,
+        test_name,
+        json_content,
+        "Failed to execute Move function with struct containing enum field"
+    )
+
+
+@test_case
 def test_option_invalid_field_name_rejected(run_helper: RunHelper, test_name=None):
     """Test that Option::Some with wrong field name is rejected."""
     json_content = {
