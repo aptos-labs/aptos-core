@@ -11,6 +11,7 @@ use crate::{
         BadRequestError, BasicErrorWith404, BasicResponse, BasicResponseStatus, BasicResultWith404,
         InternalError,
     },
+    response_axum::{AptosErrorResponse, AptosResponse},
     ApiTags,
 };
 use anyhow::Context as AnyhowContext;
@@ -199,5 +200,54 @@ impl EventsApi {
                 BasicResponse::try_from_bcs((events, &latest_ledger_info, BasicResponseStatus::Ok))
             },
         }
+    }
+}
+
+/// Framework-agnostic business logic for listing events.
+/// Called by the Axum handler directly, bypassing the Poem bridge.
+pub fn list_events_inner(
+    context: &Arc<Context>,
+    latest_ledger_info: LedgerInfo,
+    accept_type: AcceptType,
+    page: Page,
+    event_key: EventKey,
+) -> Result<AptosResponse<Vec<VersionedEvent>>, AptosErrorResponse> {
+    let ledger_version = latest_ledger_info.version();
+    let events = context
+        .get_events(
+            &event_key,
+            page.start_option(),
+            page.limit::<AptosErrorResponse>(&latest_ledger_info)?,
+            ledger_version,
+        )
+        .context(format!("Failed to find events by key {}", event_key))
+        .map_err(|err| {
+            AptosErrorResponse::internal(
+                err,
+                AptosErrorCode::InternalError,
+                Some(&latest_ledger_info),
+            )
+        })?;
+
+    match accept_type {
+        AcceptType::Json => {
+            let events = context
+                .latest_state_view_poem::<AptosErrorResponse>(&latest_ledger_info)?
+                .as_converter(context.db.clone(), context.indexer_reader.clone())
+                .try_into_versioned_events(&events)
+                .context("Failed to convert events from storage into response")
+                .map_err(|err| {
+                    AptosErrorResponse::internal(
+                        err,
+                        AptosErrorCode::InternalError,
+                        Some(&latest_ledger_info),
+                    )
+                })?;
+
+            AptosResponse::try_from_json(events, &latest_ledger_info)
+        },
+        AcceptType::Bcs => {
+            AptosResponse::<Vec<VersionedEvent>>::try_from_bcs(events, &latest_ledger_info)
+        },
     }
 }
