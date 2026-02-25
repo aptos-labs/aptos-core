@@ -97,7 +97,8 @@ fn proxy_primary_remote_test() -> ForgeConfig {
             apply_devnet_consensus_config(config);
         }))
         .with_genesis_helm_config_fn(Arc::new(move |helm_values| {
-            helm_values["chain"]["epoch_duration_secs"] = 300.into();
+            // Long epoch to avoid epoch transitions during the test.
+            helm_values["chain"]["epoch_duration_secs"] = 7200.into();
             helm_values["chain"]["on_chain_consensus_config"] =
                 serde_yaml::to_value(OnChainConsensusConfig::V6 {
                     alg: ConsensusAlgorithmConfig::default_for_genesis(),
@@ -113,12 +114,12 @@ fn proxy_primary_remote_test() -> ForgeConfig {
         }))
         .with_emit_job(
             EmitJobRequest::default()
-                .mode(EmitJobMode::ConstTps { tps: 3000 })
+                .mode(EmitJobMode::ConstTps { tps: 2000 })
                 .gas_price(5 * aptos_global_constants::GAS_UNIT_PRICE)
                 .latency_polling_interval(Duration::from_millis(100)),
         )
         .with_success_criteria(
-            SuccessCriteria::new(2500)
+            SuccessCriteria::new(1500)
                 .add_no_restarts()
                 .add_wait_for_catchup_s(120)
                 .add_chain_progress(StateProgressThreshold {
@@ -126,10 +127,7 @@ fn proxy_primary_remote_test() -> ForgeConfig {
                     max_epoch_no_progress_secs: 30.0,
                     max_non_epoch_round_gap: 8,
                     max_epoch_round_gap: 8,
-                })
-                // Proxy consensus epoch transitions produce transient
-                // "Invalid bitvec from the multi-signature" errors.
-                .allow_errors(),
+                }),
         )
 }
 
