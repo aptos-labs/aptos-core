@@ -1491,17 +1491,17 @@ impl TestContext {
             pretty(&body)
         );
 
-        // HTTP header names are case-insensitive per RFC 7230.
-        // reqwest normalizes header names to lowercase internally.
+        // HTTP header lookups are case-insensitive per RFC 7230.
+        // Use the canonical constants for clarity.
         if self.expect_status_code < 300 {
             let ledger_info = self.get_latest_ledger_info();
             assert_eq!(
-                headers.get("x-aptos-chain-id").unwrap().to_str().unwrap(),
+                headers.get(X_APTOS_CHAIN_ID).unwrap().to_str().unwrap(),
                 "4"
             );
             assert_eq!(
                 headers
-                    .get("x-aptos-ledger-version")
+                    .get(X_APTOS_LEDGER_VERSION)
                     .unwrap()
                     .to_str()
                     .unwrap(),
@@ -1509,7 +1509,7 @@ impl TestContext {
             );
             assert_eq!(
                 headers
-                    .get("x-aptos-ledger-timestampusec")
+                    .get(X_APTOS_LEDGER_TIMESTAMP)
                     .unwrap()
                     .to_str()
                     .unwrap(),

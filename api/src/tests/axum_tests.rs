@@ -355,11 +355,15 @@ async fn test_axum_response_headers() {
     let context = new_test_context(current_function_name!());
     let (body, status, headers) = context.get_with_headers("/").await;
     assert_eq!(status.as_u16(), 200);
-    assert!(headers.get("x-aptos-chain-id").is_some());
-    assert!(headers.get("x-aptos-ledger-version").is_some());
-    assert!(headers.get("x-aptos-ledger-timestampusec").is_some());
-    assert!(headers.get("x-aptos-epoch").is_some());
-    assert!(headers.get("x-aptos-block-height").is_some());
+    assert!(headers.get(aptos_api_types::X_APTOS_CHAIN_ID).is_some());
+    assert!(headers
+        .get(aptos_api_types::X_APTOS_LEDGER_VERSION)
+        .is_some());
+    assert!(headers
+        .get(aptos_api_types::X_APTOS_LEDGER_TIMESTAMP)
+        .is_some());
+    assert!(headers.get(aptos_api_types::X_APTOS_EPOCH).is_some());
+    assert!(headers.get(aptos_api_types::X_APTOS_BLOCK_HEIGHT).is_some());
     assert!(body.get("chain_id").is_some());
 }
 
