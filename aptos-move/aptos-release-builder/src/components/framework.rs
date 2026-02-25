@@ -4,7 +4,7 @@
 use crate::{aptos_core_path, components::get_execution_hash};
 use anyhow::Result;
 use aptos_crypto::HashValue;
-use aptos_framework::{BuildOptions, BuiltPackage, ReleasePackage};
+use aptos_framework::{new_release_package, BuildOptions, BuiltPackage};
 use aptos_temppath::TempPath;
 use aptos_types::account_address::AccountAddress;
 use git2::Repository;
@@ -173,7 +173,7 @@ pub fn generate_upgrade_proposals(
             ..BuildOptions::default()
         };
         let package = BuiltPackage::build(package_path, options)?;
-        let release = ReleasePackage::new(package)?;
+        let release = new_release_package(package)?;
 
         if is_multi_step {
             // If we're generating a multi-step proposal

@@ -9,6 +9,7 @@ use aptos_crypto::{
     hash::HashValue,
     ValidCryptoMaterialStringExt,
 };
+use aptos_framework::ReleaseBundleExt;
 use aptos_gas_schedule::{InitialGasSchedule, TransactionGasParameters};
 use aptos_resource_viewer::AptosValueAnnotator;
 use aptos_transaction_simulation::{

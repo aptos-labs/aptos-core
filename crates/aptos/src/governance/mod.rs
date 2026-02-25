@@ -20,7 +20,7 @@ use crate::{
 use aptos_api_types::ViewFunction;
 use aptos_cached_packages::aptos_stdlib;
 use aptos_crypto::HashValue;
-use aptos_framework::{BuiltPackage, ReleasePackage};
+use aptos_framework::{new_release_package, BuiltPackage};
 use aptos_logger::warn;
 pub use aptos_move_cli::CompileScriptFunction;
 use aptos_move_cli::{FrameworkPackageArgs, IncludedArtifacts, MovePackageOptions};
@@ -856,7 +856,7 @@ impl CliCommand<()> for GenerateUpgradeProposal {
         let package_path = move_options.get_package_path()?;
         let options = included_artifacts.build_options(&move_options)?;
         let package = BuiltPackage::build(package_path, options)?;
-        let release = ReleasePackage::new(package)?;
+        let release = new_release_package(package)?;
 
         // If we're generating a single-step proposal on testnet
         if testnet && next_execution_hash.is_empty() {

@@ -65,8 +65,6 @@ mod transaction_filter;
 mod txn_broadcast;
 #[cfg(test)]
 mod txn_emitter;
-#[cfg(test)]
-mod upgrade;
 
 #[cfg(test)]
 mod smoke_test_environment;
