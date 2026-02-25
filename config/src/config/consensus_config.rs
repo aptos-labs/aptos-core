@@ -148,8 +148,9 @@ impl Default for ProxyConsensusConfig {
             round_timeout_backoff_max_exponent: 4,
             // Target ~10 proxy blocks with txns per primary round
             target_proxy_blocks_per_primary_round: 10,
-            // Proxy per-block limits: match devnet primary consensus config
-            // (max_sending_block_txns=300, max_sending_block_txns_after_filtering=200).
+            // Match devnet primary consensus config limits. At steady state with
+            // 3k TPS / ~70 proxy blocks/s, each block averages ~43 txns (well
+            // under the 300 cap). Budget + backpressure prevent runaway aggregation.
             max_proxy_block_txns: 300,
             max_proxy_block_txns_after_filtering: 200,
             max_proxy_block_bytes: 5 * 1024 * 1024,

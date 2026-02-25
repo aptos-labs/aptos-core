@@ -8,16 +8,14 @@
 //! This catches bugs where proxy block verification fails silently.
 
 use crate::{
-    create_buffered_load,
     multi_region_network_test::{
         IntraRegionNetEmConfig, InterRegionNetEmConfig, LinkStatsTableWithPeerGroups,
     },
-    LoadDestination, NetworkLoadTest, COOLDOWN_DURATION_FRACTION, WARMUP_DURATION_FRACTION,
+    LoadDestination, NetworkLoadTest,
 };
 use anyhow::ensure;
 use aptos_forge::{
-    success_criteria::{SuccessCriteria, SuccessCriteriaChecker},
-    EmitJobRequest, NetworkContext, NetworkContextSynchronizer, NetworkTest, Result, Swarm,
+    NetworkContext, NetworkContextSynchronizer, NetworkTest, Result, Swarm,
     SwarmChaos, SwarmNetEm, Test, TestReport,
 };
 use aptos_types::PeerId;
@@ -177,17 +175,14 @@ impl NetworkTest for ProxyPrimaryNetworkEmulation {
 // ProxyPrimaryTrafficTest
 // ---------------------------------------------------------------------------
 
-/// Traffic test that sends all transactions to proxy validators only.
+/// Traffic test that routes all transactions to proxy validators only.
 ///
-/// After the traffic phase, queries Prometheus for proxy and primary consensus
-/// metrics and verifies that proxy blocks were consumed by primary.
+/// Traffic is driven by the outer emit job (configured via `with_emit_job`);
+/// this test only handles routing, metric collection, and verification that
+/// proxy blocks were consumed by primary consensus.
 pub struct ProxyPrimaryTrafficTest {
     /// Number of proxy validators (first N validators by index).
     pub num_proxy_validators: usize,
-    /// Inner traffic configuration (MaxLoad).
-    pub inner_traffic: EmitJobRequest,
-    /// Success criteria for inner traffic TPS.
-    pub inner_success_criteria: SuccessCriteria,
 }
 
 impl Test for ProxyPrimaryTrafficTest {
@@ -312,38 +307,9 @@ impl NetworkLoadTest for ProxyPrimaryTrafficTest {
         report: &mut TestReport,
         duration: Duration,
     ) -> Result<()> {
-        let proxy_peer_ids = self.get_proxy_peer_ids(&swarm).await;
-        info!(
-            "Sending inner traffic to {} proxy validators: {:?}",
-            proxy_peer_ids.len(),
-            proxy_peer_ids
-        );
-
-        let stats_by_phase = create_buffered_load(
-            swarm.clone(),
-            &proxy_peer_ids,
-            self.inner_traffic.clone(),
-            duration,
-            WARMUP_DURATION_FRACTION,
-            COOLDOWN_DURATION_FRACTION,
-            None,
-            None,
-        )
-        .await?;
-
-        for phase_stats in &stats_by_phase {
-            report.report_txn_stats(
-                format!("{}: proxy traffic", self.name()),
-                &phase_stats.emitter_stats,
-            );
-            SuccessCriteriaChecker::check_core_for_success(
-                &self.inner_success_criteria,
-                report,
-                &phase_stats.emitter_stats.rate(),
-                None,
-                Some("proxy traffic".to_string()),
-            )?;
-        }
+        // Traffic is driven by the outer emit job (routed to proxy validators
+        // via setup()). We just wait, then collect metrics and verify.
+        tokio::time::sleep(duration).await;
 
         // Collect and report metrics
         self.report_metrics(&swarm, report).await;
