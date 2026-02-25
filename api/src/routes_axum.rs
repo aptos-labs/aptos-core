@@ -40,13 +40,27 @@ where
             Err(rejection) => Err(AptosErrorResponse::new(
                 StatusCode::BAD_REQUEST,
                 aptos_api_types::AptosError::new_with_error_code(
-                    format!("Invalid path parameters: {}", rejection),
-                    aptos_api_types::AptosErrorCode::InvalidInput,
+                    rejection.body_text(),
+                    aptos_api_types::AptosErrorCode::WebFrameworkError,
                 ),
                 None,
             )),
         }
     }
+}
+
+fn unsupported_content_type(content_type: &str) -> AptosErrorResponse {
+    AptosErrorResponse::new(
+        StatusCode::UNSUPPORTED_MEDIA_TYPE,
+        aptos_api_types::AptosError::new_with_error_code(
+            format!(
+                "the `Content-Type` requested by the client is not supported: {}",
+                content_type
+            ),
+            aptos_api_types::AptosErrorCode::WebFrameworkError,
+        ),
+        None,
+    )
 }
 
 // Instead of trying to convert between Poem and Axum response types,
@@ -987,7 +1001,7 @@ pub async fn submit_transaction_handler(
 
     let data = if content_type.contains("application/x.aptos.signed_transaction+bcs") {
         crate::transactions::SubmitTransactionPost::Bcs(crate::bcs_payload::Bcs(body.to_vec()))
-    } else {
+    } else if content_type.contains("application/json") || content_type.is_empty() {
         let req: aptos_api_types::SubmitTransactionRequest = serde_json::from_slice(&body)
             .map_err(|e| {
                 AptosErrorResponse::new(
@@ -1000,6 +1014,8 @@ pub async fn submit_transaction_handler(
                 )
             })?;
         crate::transactions::SubmitTransactionPost::Json(poem_openapi::payload::Json(req))
+    } else {
+        return Err(unsupported_content_type(content_type));
     };
     data.verify().map_err(|err| {
         AptosErrorResponse::bad_request(err, aptos_api_types::AptosErrorCode::InvalidInput, None)
@@ -1043,7 +1059,7 @@ pub async fn submit_transactions_batch_handler(
         crate::transactions::SubmitTransactionsBatchPost::Bcs(crate::bcs_payload::Bcs(
             body.to_vec(),
         ))
-    } else {
+    } else if content_type.contains("application/json") || content_type.is_empty() {
         let reqs: Vec<aptos_api_types::SubmitTransactionRequest> = serde_json::from_slice(&body)
             .map_err(|e| {
                 AptosErrorResponse::new(
@@ -1056,6 +1072,8 @@ pub async fn submit_transactions_batch_handler(
                 )
             })?;
         crate::transactions::SubmitTransactionsBatchPost::Json(poem_openapi::payload::Json(reqs))
+    } else {
+        return Err(unsupported_content_type(content_type));
     };
     data.verify().map_err(|err| {
         AptosErrorResponse::bad_request(err, aptos_api_types::AptosErrorCode::InvalidInput, None)
@@ -1092,7 +1110,7 @@ pub async fn simulate_transaction_handler(
 
     let data = if content_type.contains("application/x.aptos.signed_transaction+bcs") {
         crate::transactions::SubmitTransactionPost::Bcs(crate::bcs_payload::Bcs(body.to_vec()))
-    } else {
+    } else if content_type.contains("application/json") || content_type.is_empty() {
         let req: aptos_api_types::SubmitTransactionRequest = serde_json::from_slice(&body)
             .map_err(|e| {
                 AptosErrorResponse::new(
@@ -1105,6 +1123,8 @@ pub async fn simulate_transaction_handler(
                 )
             })?;
         crate::transactions::SubmitTransactionPost::Json(poem_openapi::payload::Json(req))
+    } else {
+        return Err(unsupported_content_type(content_type));
     };
     data.verify().map_err(|err| {
         AptosErrorResponse::bad_request(err, aptos_api_types::AptosErrorCode::InvalidInput, None)
@@ -1117,9 +1137,17 @@ pub async fn simulate_transaction_handler(
 pub async fn encode_submission_handler(
     State(context): Ctx,
     accept_type: AcceptType,
+    headers: HeaderMap,
     raw_body: Bytes,
 ) -> Result<Response, AptosErrorResponse> {
     use crate::context::api_spawn_blocking;
+    let content_type = headers
+        .get(CONTENT_TYPE)
+        .and_then(|v| v.to_str().ok())
+        .unwrap_or("application/json");
+    if !content_type.contains("application/json") && !content_type.is_empty() {
+        return Err(unsupported_content_type(content_type));
+    }
     let request: aptos_api_types::EncodeSubmissionRequest = serde_json::from_slice(&raw_body)
         .map_err(|e| {
             AptosErrorResponse::new(
