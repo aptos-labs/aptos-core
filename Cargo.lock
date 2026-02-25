@@ -8294,13 +8294,13 @@ dependencies = [
  "diesel_derives",
  "downcast-rs",
  "itoa",
- "num-bigint 0.3.3",
+ "num-bigint 0.4.6",
  "num-integer",
  "num-traits",
  "pq-sys",
  "r2d2",
  "serde_json",
- "uuid 1.11.0",
+ "uuid 0.8.2",
 ]
 
 [[package]]
