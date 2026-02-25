@@ -4,6 +4,7 @@ module aptos_framework::transaction_context {
     use std::option::Option;
     use std::string::String;
     use std::timestamp;
+    use aptos_framework::create_signer;
 
     /// Transaction context is only available in the user transaction prologue, execution, or epilogue phases.
     const ETRANSACTION_CONTEXT_NOT_AVAILABLE: u64 = 1;
@@ -65,6 +66,15 @@ module aptos_framework::transaction_context {
     /// created for to feature gate the `generate_unique_address` function.
     public fun generate_auid_address(): address {
         generate_unique_address()
+    }
+
+    /// Returns a signer that is globally unique.
+    /// Can be used to store resources in it, or to temporarily do things within the transaction.
+    /// Cannot be stored on-chain, if you need that - use an object instead - object::create_object.
+    public fun generate_unique_signer(): signer {
+        let auid = generate_auid_address();
+        let signer = create_signer::create_signer(auid);
+        signer
     }
 
     /// Returns the script hash of the current entry function.
