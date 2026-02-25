@@ -16,7 +16,6 @@ rust-version = { workspace = true }
 default = []
 fuzzing = []
 no-upload-proposal = []
-indexer = ["aptos-node/indexer"]
 cli-framework-test-move = []
 
 [dependencies]
