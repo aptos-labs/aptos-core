@@ -258,18 +258,8 @@ pub async fn get_ledger_info_handler(
     use crate::{context::api_spawn_blocking, response_axum::AptosResponse};
     use aptos_api_types::{IndexResponse, IndexResponseBcs};
 
-    context
-        .check_api_output_enabled::<AptosErrorResponse>("Get ledger info", &accept_type)
-        .map_err(|e| {
-            eprintln!("ERROR in check_api_output_enabled: {:?}", e);
-            e
-        })?;
-    let ledger_info = context
-        .get_latest_ledger_info::<AptosErrorResponse>()
-        .map_err(|e| {
-            eprintln!("ERROR in get_latest_ledger_info: {:?}", e);
-            e
-        })?;
+    context.check_api_output_enabled::<AptosErrorResponse>("Get ledger info", &accept_type)?;
+    let ledger_info = context.get_latest_ledger_info::<AptosErrorResponse>()?;
     let node_role = context.node_role();
     let encryption_key_hex = context
         .get_encryption_key(ledger_info.version())

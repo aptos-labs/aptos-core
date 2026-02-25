@@ -48,6 +48,7 @@ pub async fn logging_middleware(req: Request, next: Next) -> Response {
 
     let method = req.method().clone();
     let path = req.uri().path().to_string();
+    let path_for_metrics = path.clone();
     let referer = req
         .headers()
         .get(header::REFERER)
@@ -105,7 +106,7 @@ pub async fn logging_middleware(req: Request, next: Next) -> Response {
         .extensions()
         .get::<OperationId>()
         .map(|op| op.0.as_str())
-        .unwrap_or("operation_id_not_set");
+        .unwrap_or_else(|| path_for_metrics.as_str());
 
     HISTOGRAM
         .with_label_values(&[method.as_str(), operation_id, status.to_string().as_str()])
@@ -151,7 +152,7 @@ pub async fn post_size_limit_middleware(
     match content_length {
         None => {
             let error = AptosError::new_with_error_code(
-                "Missing Content-Length header",
+                "missing `Content-Length` header",
                 AptosErrorCode::WebFrameworkError,
             );
             let json = serde_json::to_vec(&error).unwrap_or_default();
