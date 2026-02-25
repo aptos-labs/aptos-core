@@ -103,13 +103,17 @@ from cases.struct_enum_args import (
     test_framework_fixed_point64,
     test_framework_string,
     test_mixed_framework_struct,
+    test_option_enum,
     test_option_invalid_field_name_rejected,
     test_option_legacy_format,
     test_option_variant_format,
     test_publish_struct_enum_module,
+    test_signed_integer_args,
     test_struct_argument_nested,
     test_struct_argument_simple,
     test_struct_unknown_field_rejected,
+    test_struct_with_enum_field,
+    test_vector_of_enums,
     test_vector_of_options,
     test_vector_of_strings,
     test_vector_of_structs,
@@ -309,6 +313,12 @@ async def run_tests(run_helper):
     test_vector_of_strings(run_helper)
     test_vector_of_structs(run_helper)
     test_vector_of_options(run_helper)
+    # Nested enum tests (enum inside Option, vector, or struct field)
+    test_option_enum(run_helper)
+    test_vector_of_enums(run_helper)
+    test_struct_with_enum_field(run_helper)
+    # Signed integer argument tests
+    test_signed_integer_args(run_helper)
 
     # Run stake subcommand group tests.
     """
@@ -433,14 +443,21 @@ async def main():
                 localnet_process.terminate()
                 return False
         else:
-            # Manual mode - verify it's already running
+            # Manual mode - verify both API and faucet are already running
             LOG.info("Using manually-started local testnet")
             try:
                 requests.get(f"http://{LOCALHOST}:{API_PORT}/v1", timeout=5)
-                LOG.info(f"Local testnet is running on port {API_PORT}")
+                LOG.info(f"Local testnet API is running on port {API_PORT}")
             except Exception as e:
                 LOG.error(f"Local testnet not running on port {API_PORT}: {e}")
                 LOG.error("Please start it first with: aptos node run-local-testnet --with-faucet")
+                return False
+            try:
+                requests.get(f"http://{LOCALHOST}:{FAUCET_PORT}/", timeout=5)
+                LOG.info(f"Local testnet faucet is running on port {FAUCET_PORT}")
+            except Exception as e:
+                LOG.error(f"Faucet not running on port {FAUCET_PORT}: {e}")
+                LOG.error("Please start with faucet: aptos node run-local-testnet --with-faucet")
                 return False
     else:
         # Use Docker

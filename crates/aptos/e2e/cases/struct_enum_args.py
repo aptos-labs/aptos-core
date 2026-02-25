@@ -133,7 +133,7 @@ def test_struct_argument_nested(run_helper: RunHelper, test_name=None):
 
 @test_case
 def test_option_variant_format(run_helper: RunHelper, test_name=None):
-    """Test Option<T> with new variant format: {"None": {}} and {"Some": {"0": value}}."""
+    """Test Option<T> with new variant format: {"None": {}} and {"Some": {"e": value}}."""
     # Test Option::Some
     json_content_some = {
         "function_id": "default::struct_enum_tests::test_option_some",
@@ -141,7 +141,7 @@ def test_option_variant_format(run_helper: RunHelper, test_name=None):
         "args": [
             {
                 "type": "0x1::option::Option<u64>",
-                "value": {"Some": {"0": "100"}}
+                "value": {"Some": {"e": "100"}}
             }
         ]
     }
@@ -563,9 +563,9 @@ def test_vector_of_options(run_helper: RunHelper, test_name=None):
             {
                 "type": "vector<0x1::option::Option<u64>>",
                 "value": [
-                    {"Some": {"0": "100"}},
+                    {"Some": {"e": "100"}},
                     {"None": {}},
-                    {"Some": {"0": "200"}}
+                    {"Some": {"e": "200"}}
                 ]
             }
         ]
@@ -590,7 +590,7 @@ def test_option_enum(run_helper: RunHelper, test_name=None):
         "args": [
             {
                 "type": f"0x1::option::Option<{account_address}::struct_enum_tests::Color>",
-                "value": {"Some": {"0": {"Green": {}}}}
+                "value": {"Some": {"e": {"Green": {}}}}
             }
         ]
     }
@@ -659,6 +659,30 @@ def test_struct_with_enum_field(run_helper: RunHelper, test_name=None):
 
 
 @test_case
+def test_signed_integer_args(run_helper: RunHelper, test_name=None):
+    """Test passing signed integer types (i8, i16, i32, i64, i128) via an enum variant's fields."""
+    account_address = str(run_helper.get_account_info().account_address)
+
+    json_content = {
+        "function_id": "default::struct_enum_tests::test_enum_signed_fields",
+        "type_args": [],
+        "args": [
+            {
+                "type": f"{account_address}::struct_enum_tests::SignedData",
+                "value": {"Values": {"a": "-42", "b": "-1000", "c": "-100000", "d": "-9000000000", "e": "-1"}}
+            }
+        ]
+    }
+
+    run_move_function_with_json(
+        run_helper,
+        test_name,
+        json_content,
+        "Failed to execute Move function with signed integer enum fields"
+    )
+
+
+@test_case
 def test_option_invalid_field_name_rejected(run_helper: RunHelper, test_name=None):
     """Test that Option::Some with wrong field name is rejected."""
     json_content = {
@@ -667,7 +691,7 @@ def test_option_invalid_field_name_rejected(run_helper: RunHelper, test_name=Non
         "args": [
             {
                 "type": "0x1::option::Option<u64>",
-                "value": {"Some": {"wrong": "100"}}  # Field should be "0", not "wrong"
+                "value": {"Some": {"wrong": "100"}}  # Field should be "e", not "wrong"
             }
         ]
     }
@@ -696,7 +720,7 @@ def test_option_invalid_field_name_rejected(run_helper: RunHelper, test_name=Non
 
         # Verify error message mentions field name
         combined_output = result.stdout + result.stderr
-        if "field must be named" not in combined_output.lower() and '"0"' not in combined_output:
+        if "field must be named" not in combined_output.lower() and '"e"' not in combined_output:
             raise TestError(f"Expected error about field name, got: {combined_output}")
 
     except subprocess.CalledProcessError as e:
