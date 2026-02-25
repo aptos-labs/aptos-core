@@ -1527,6 +1527,15 @@ where
                 }
 
                 scheduler.commit_hooks_unlock();
+
+                // Break to avoid spinning when the next txn is blocked by cold
+                // validation (commit_hooks_unlock re-arms because the txn is Executed,
+                // but start_commit will keep returning None until validation completes).
+                // When the txn isn't Executed or block is halted, the lock isn't re-armed
+                // and the break is equivalent to the loop exiting naturally.
+                // TODO: the wasteful locking and unlocking in the blocked case could be
+                // optimized out by recording into an extra atomic variable here.
+                break;
             }
 
             match scheduler.next_task(worker_id)? {

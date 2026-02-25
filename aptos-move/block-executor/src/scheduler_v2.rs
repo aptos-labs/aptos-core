@@ -1083,6 +1083,8 @@ impl SchedulerV2 {
             return Ok(None);
         }
 
+        let next_commit = self.next_to_commit_idx.load(Ordering::Relaxed);
+        let threshold = next_commit + self.num_workers as TxnIndex * 3 + 4;
         if let Some((
             txn_idx,
             incarnation,
@@ -1100,9 +1102,7 @@ impl SchedulerV2 {
                 // a txn with an index higher than the computed threshold, then the worker
                 // prioritizes other tasks, with additional benefit that when an incarnation
                 // aborts, its requirements become outdated and no need to be processed.
-                self.next_to_commit_idx.load(Ordering::Relaxed)
-                    + self.num_workers as TxnIndex * 3
-                    + 4,
+                threshold,
                 &self.txn_statuses,
             )?
         {
