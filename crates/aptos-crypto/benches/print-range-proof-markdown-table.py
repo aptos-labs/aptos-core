@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-import sys, csv, re, math
+import sys, csv, re, math, os, json
 from collections import defaultdict
 
 HEADER = [
@@ -21,7 +21,8 @@ DE_PROVE_ID = "prove"
 DE_VERIFY_ID = "verify"
 
 bp_re = re.compile(r"batch=(\d+)_bits=(\d+)")
-de_re = re.compile(r"ell=(\d+)_n=(\d+)")
+# Criterion may use / or _ in Parameter; proof_size is stored in criterion by the bench
+de_re = re.compile(r"ell=(\d+)[/_]n=(\d+)(?:[/_]proof_size=(\d+))?")
 
 
 def bp_proof_size(n, ell):
@@ -48,11 +49,59 @@ def parse_param_bulletproofs(param):
     return n, ell
 
 def parse_param_dekart(param):
-    m = de_re.fullmatch(param)
+    """Returns (n, ell, proof_size_or_none). proof_size is present when stored by criterion (prove bench)."""
+    m = de_re.search(param)  # search to allow extra text; fullmatch would require exact match
     if not m: return None
     ell = int(m.group(1))
     n = int(m.group(2))
-    return n, ell
+    proof_size = int(m.group(3)) if (m.lastindex is not None and m.lastindex >= 3 and m.group(3)) else None
+    return n, ell, proof_size
+
+
+def parse_proof_size_from_folder(folder_path):
+    """
+    Extract proof_size from benchmark.json in the folder.
+    folder_path should be relative to current directory (target/criterion).
+    """
+    for sub in ("base", "new"):
+        benchmark_json = os.path.join(folder_path, sub, "benchmark.json")
+        if os.path.exists(benchmark_json):
+            try:
+                with open(benchmark_json, "r") as f:
+                    data = json.load(f)
+                    if "function_id" in data:
+                        m = re.search(r"proof_size=(\d+)", data["function_id"])
+                        if m:
+                            return int(m.group(1))
+            except (json.JSONDecodeError, IOError, ValueError):
+                pass
+    return None
+
+
+def build_folder_map():
+    """
+    Build (group_prefix, n, ell) -> proof_size by scanning dekart* criterion folders
+    for prove_ell=*_n=*_proof_size=* subfolders. Call from target/criterion.
+    """
+    folder_map = {}
+    for entry in os.listdir("."):
+        if not os.path.isdir(entry):
+            continue
+        if not (entry.startswith("dekart-rs") or entry.startswith("dekart_multivar") or
+                "dekart-multivar" in entry or "dekart_multivar" in entry):
+            continue
+        group_path = os.path.join(".", entry)
+        for sub in os.listdir(group_path):
+            subpath = os.path.join(group_path, sub)
+            if not os.path.isdir(subpath) or not sub.startswith("prove_"):
+                continue
+            m = re.search(r"ell=(\d+)[/_]n=(\d+)[/_]proof_size=(\d+)", sub.replace("-", "_"))
+            if not m:
+                continue
+            ell, n, proof_size = int(m.group(1)), int(m.group(2)), int(m.group(3))
+            key = (entry, n, ell)
+            folder_map[key] = (os.path.join(entry, sub), proof_size)
+    return folder_map
 
 def ns_to_ms(ns):
     return round(float(ns) / 1e6, 2)
@@ -123,10 +172,12 @@ def next_pow2_ge(x: int) -> int:
         p <<= 1
     return p
 
-def accumulate(rows):
+def accumulate(rows, folder_map=None):
     """
-    Build dicts keyed by (n, ell) -> {"prove": ns, "verify": ns}
+    Build dicts keyed by (n, ell) -> {"prove": ns, "verify": ns, "proof_size": ...}
     separately for Bulletproofs and DeKART.
+    If folder_map is provided (from build_folder_map when run from target/criterion),
+    proof_size is filled from benchmark folders when not in CSV.
     """
     bp = defaultdict(dict)
     de = defaultdict(dict)
@@ -159,19 +210,31 @@ def accumulate(rows):
         elif "dekart-multivar" in group or "dekart_multivar" in group:
             parsed = parse_param_dekart(param)
             if not parsed: continue
-            n, ell = parsed
+            n, ell, proof_size = parsed
             ells_seen.add(ell)
             if ident == DE_PROVE_ID:
                 de_mv[(n, ell)]["prove"] = mean_ns
+                if proof_size is not None:
+                    de_mv[(n, ell)]["proof_size"] = proof_size
+                elif folder_map:
+                    key = (group.replace("/", "_"), n, ell)
+                    if key in folder_map:
+                        de_mv[(n, ell)]["proof_size"] = folder_map[key][1]
             elif ident == DE_VERIFY_ID:
                 de_mv[(n, ell)]["verify"] = mean_ns
         elif group.startswith("dekart"):
             parsed = parse_param_dekart(param)
             if not parsed: continue
-            n, ell = parsed
+            n, ell, proof_size = parsed
             ells_seen.add(ell)
             if ident == DE_PROVE_ID:
                 de[(n, ell)]["prove"] = mean_ns
+                if proof_size is not None:
+                    de[(n, ell)]["proof_size"] = proof_size
+                elif folder_map:
+                    key = (group.replace("/", "_"), n, ell)
+                    if key in folder_map:
+                        de[(n, ell)]["proof_size"] = folder_map[key][1]
             elif ident == DE_VERIFY_ID:
                 de[(n, ell)]["verify"] = mean_ns
 
@@ -220,7 +283,8 @@ def make_rows_for_ell(bp_map, de_map, de_mv_map, ell):
         if n in de_ns:
             de_p, de_v, de_t = de_vals[n]
             baseline_n = next_pow2_ge(n + 1)
-            de_size = de_proof_size(n, ell)
+            dv = de_map[(n, ell)]
+            de_size = dv.get("proof_size") or de_proof_size(n, ell)
             if baseline_n in bp_vals:
                 bp_p, bp_v, bp_t = bp_vals[baseline_n]
                 rp = bp_p / de_p if bp_p else float("inf")
@@ -248,7 +312,8 @@ def make_rows_for_ell(bp_map, de_map, de_mv_map, ell):
         if n in de_mv_ns:
             de_p, de_v, de_t = de_mv_vals[n]
             baseline_n = next_pow2_ge(n + 1)
-            de_size = de_proof_size(n, ell)
+            dv_mv = de_mv_map[(n, ell)]
+            de_size = dv_mv.get("proof_size") or de_proof_size(n, ell)
             if baseline_n in bp_vals:
                 bp_p, bp_v, bp_t = bp_vals[baseline_n]
                 rp = bp_p / de_p if bp_p else float("inf")
@@ -335,7 +400,9 @@ def main():
     else:
         rows = list(read_rows(sys.stdin))
 
-    bp_map, de_map, de_mv_map, ells = accumulate(rows)
+    # When run from target/criterion, proof_size can be read from benchmark folders
+    folder_map = build_folder_map()
+    bp_map, de_map, de_mv_map, ells = accumulate(rows, folder_map=folder_map)
 
     first = True
     for ell in ells:

@@ -34,7 +34,10 @@ csv_file=`mktemp`
 echo "$csv_data" >$csv_file
 echo "Wrote CSV file to $csv_file..."
 
+# Change to criterion directory so Python script can find benchmark folders (for proof_size from benchmark.json)
+cd $repo_root/target/criterion
 md_tables=`$scriptdir/print-range-proof-markdown-table.py $csv_file`
+cd - &>/dev/null
 
 echo "$md_tables"
 

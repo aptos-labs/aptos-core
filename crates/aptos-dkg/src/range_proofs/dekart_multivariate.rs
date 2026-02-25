@@ -443,10 +443,7 @@ where
 
     #[cfg(feature = "range_proof_timing_multivariate")]
     let start = Instant::now();
-    // Step 3: Sample masks β_j independently (no correlated randomness)
-    let betas: Vec<E::ScalarField> = sample_field_elements(ell as usize, rng);
-
-    // Step 4: construct the hat_f_js
+    // Step 3a: construct the hat_f_js
     let bits: Vec<Vec<bool>> = values
             .iter()
             .map(|z_val| {
@@ -456,28 +453,33 @@ where
                     .collect::<Vec<_>>()
             })
             .collect();
-        // This is copy-paste:
-        let hat_f_j_evals_without_r: Vec<Vec<bool>> = (0..ell as usize)
-            .map(|j| bits.iter().map(|row| row[j]).collect())
-            .collect(); // This is just transposing the bits matrix
-        let num_vars = (values.len() + 1).next_power_of_two().ilog2() as u8;
-        let size = 1 << num_vars;
-        let hat_f_j_evals: Vec<Vec<E::ScalarField>> = hat_f_j_evals_without_r
-            .iter()
-            .enumerate()
-            .map(|(j, col)| {
-                let mut evals: Vec<E::ScalarField> = once(betas[j])
-                    .chain(col.iter().map(|&b| E::ScalarField::from(b)))
-                    .collect();
-                evals.resize(size, E::ScalarField::ZERO);
-                evals
-            })
-            .collect();
+    // This is copy-paste:
+    let hat_f_j_evals_without_r: Vec<Vec<bool>> = (0..ell as usize)
+        .map(|j| bits.iter().map(|row| row[j]).collect())
+        .collect(); // This is just transposing the bits matrix
 
-        let hat_f_js: Vec<DenseMultilinearExtension::<E::ScalarField>> = hat_f_j_evals
-            .iter()
-            .map(|hat_f_j_eval| DenseMultilinearExtension::from_evaluations_vec(num_vars.into(), hat_f_j_eval.clone()))
-            .collect();
+    // Step 3b: Sample masks β_j independently (no correlated randomness)
+    let betas: Vec<E::ScalarField> = sample_field_elements(ell as usize, rng);
+
+    // Step 3c: Construct f_j
+    let num_vars = (values.len() + 1).next_power_of_two().ilog2() as u8;
+    let size = 1 << num_vars;
+    let hat_f_j_evals: Vec<Vec<E::ScalarField>> = hat_f_j_evals_without_r
+        .iter()
+        .enumerate()
+        .map(|(j, col)| {
+            let mut evals: Vec<E::ScalarField> = once(betas[j])
+                .chain(col.iter().map(|&b| E::ScalarField::from(b)))
+                .collect();
+            evals.resize(size, E::ScalarField::ZERO);
+            evals
+        })
+        .collect();
+
+    let hat_f_js: Vec<DenseMultilinearExtension::<E::ScalarField>> = hat_f_j_evals
+        .iter()
+        .map(|hat_f_j_eval| DenseMultilinearExtension::from_evaluations_vec(num_vars.into(), hat_f_j_eval.clone()))
+        .collect();
     #[cfg(feature = "range_proof_timing_multivariate")]
     print_cumulative("betas + bits + hat_f_j_evals + hat_f_js", start.elapsed());
 

@@ -18,6 +18,7 @@ use aptos_dkg::{
 use ark_bls12_381::Bls12_381;
 use ark_bn254::Bn254;
 use ark_ec::pairing::Pairing;
+use ark_serialize::CanonicalSerialize;
 use criterion::{
     criterion_group, criterion_main, measurement::WallTime, BenchmarkGroup, BenchmarkId, Criterion,
 };
@@ -33,10 +34,10 @@ const BLS12_381: &str = "bls12-381";
 
 /// WARNING: These are the relevant batch sizes we want benchmarked to compare against Bulletproofs
 //const BATCH_SIZES: [usize; 11] = [1, 3, 7, 15, 31, 63, 127, 255, 511, 1023, 2047];
-const BATCH_SIZES: [usize; 1] = [1048575]; //[1023, 16383, 131071]; // 1048575100000, 1000000];
+const BATCH_SIZES: [usize; 3] =  [1023, 16383, 131071]; //[1048575]; // 1048575100000, 1000000];
 
 /// WARNING: These are the relevant bit widths we want benchmarked to compare against Bulletproofs
-const BIT_WIDTHS: [u8; 1] = [16]; // [8, 16, 32, 64];
+const BIT_WIDTHS: [u8; 4] = [8, 16, 32, 64]; // [8, 16, 32, 64];
 
 fn bench_groups(c: &mut Criterion) {
     // bench_range_proof::<Bn254, UnivariateDeKART<Bn254>>(c, BROKEN_DEKART_RS_SCHEME_NAME, BN254);
@@ -121,8 +122,22 @@ fn bench_prove<E: Pairing, B: BatchedRangeProof<E>>(
     ell: u8,
     n: usize,
 ) {
+    let proof_size = {
+        let mut rng = StdRng::seed_from_u64(42);
+        let group_generators = GroupGenerators::default();
+        let (pk, _) = B::setup(n, ell, group_generators, &mut rng);
+        let (values, comm, r) =
+            test_utils::range_proof_random_instance::<_, B, _>(&pk, n, ell, &mut rng);
+        let proof = B::prove(&pk, &values, ell, &comm, &r, &mut rng);
+        let mut bytes = Vec::new();
+        proof
+            .serialize_compressed(&mut bytes)
+            .expect("proof serialization should succeed");
+        bytes.len()
+    };
+
     group.bench_function(
-        BenchmarkId::new("prove", format!("ell={ell}/n={n}")),
+        BenchmarkId::new("prove", format!("ell={ell}/n={n}/proof_size={proof_size}")),
         move |b| {
             b.iter_with_setup(
                 || {
