@@ -629,14 +629,14 @@ impl From<crate::transactions::SubmitTransactionError> for AptosErrorResponse {
 fn poem_error_response_to_axum(resp: poem::Response) -> AptosErrorResponse {
     let status_code = StatusCode::from_u16(resp.status().as_u16())
         .unwrap_or(StatusCode::INTERNAL_SERVER_ERROR);
-    // Use blocking body extraction since this is called from From impls (sync context).
-    // poem's Body::into_vec() is async, so we use a different approach.
-    let body_bytes = {
-        let body = resp.into_body();
-        // Extract bytes from the poem body. Since poem bodies for error responses
-        // are always fully buffered in memory, we can safely block on this.
-        futures::executor::block_on(body.into_vec()).unwrap_or_default()
-    };
+    // poem's Body for error responses is typically constructed from a JSON serialization
+    // and should be available synchronously. We use block_in_place to safely extract it
+    // from within a tokio runtime context.
+    let body_bytes = tokio::task::block_in_place(|| {
+        tokio::runtime::Handle::current()
+            .block_on(resp.into_body().into_vec())
+            .unwrap_or_default()
+    });
     let error: AptosError = serde_json::from_slice(&body_bytes).unwrap_or_else(|_| {
         AptosError::new_with_error_code(
             "Unknown error",
