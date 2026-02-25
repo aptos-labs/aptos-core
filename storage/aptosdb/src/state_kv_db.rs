@@ -55,9 +55,18 @@ fn metadata_db_name(is_hot: bool) -> &'static str {
 pub struct StateKvDb {
     state_kv_metadata_db: Arc<DB>,
     state_kv_db_shards: [Arc<DB>; NUM_STATE_SHARDS],
+    is_hot: bool,
 }
 
 impl StateKvDb {
+    fn db_tag(&self) -> &'static str {
+        if self.is_hot {
+            "hot"
+        } else {
+            "cold"
+        }
+    }
+
     pub(crate) fn new(
         db_paths: &StorageDirPaths,
         state_kv_db_config: RocksdbConfig,
@@ -146,6 +155,7 @@ impl StateKvDb {
         let state_kv_db = Self {
             state_kv_metadata_db,
             state_kv_db_shards,
+            is_hot,
         };
 
         if !readonly && !delete_on_restart {
@@ -167,9 +177,11 @@ impl StateKvDb {
         state_kv_metadata_batch: Option<SchemaBatch>,
         sharded_state_kv_batches: ShardedStateKvSchemaBatch,
     ) -> Result<()> {
-        let _timer = OTHER_TIMERS_SECONDS.timer_with(&["state_kv_db__commit"]);
+        let _timer =
+            OTHER_TIMERS_SECONDS.timer_with(&[&format!("{}__state_kv_db__commit", self.db_tag())]);
         {
-            let _timer = OTHER_TIMERS_SECONDS.timer_with(&["state_kv_db__commit_shards"]);
+            let _timer = OTHER_TIMERS_SECONDS
+                .timer_with(&[&format!("{}__state_kv_db__commit_shards", self.db_tag())]);
             THREAD_MANAGER.get_io_pool().scope(|s| {
                 let mut batches = sharded_state_kv_batches.into_iter();
                 for shard_id in 0..NUM_STATE_SHARDS {
@@ -187,7 +199,8 @@ impl StateKvDb {
             });
         }
         if let Some(batch) = state_kv_metadata_batch {
-            let _timer = OTHER_TIMERS_SECONDS.timer_with(&["state_kv_db__commit_metadata"]);
+            let _timer = OTHER_TIMERS_SECONDS
+                .timer_with(&[&format!("{}__state_kv_db__commit_metadata", self.db_tag())]);
             self.state_kv_metadata_db.write_schemas(batch)?;
         }
 
