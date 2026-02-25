@@ -14,8 +14,8 @@ use serde::{Deserialize, Serialize};
 
 #[derive(Deserialize, Serialize)]
 pub struct FailpointConf {
-    name: String,
-    actions: String,
+    pub name: String,
+    pub actions: String,
 }
 
 #[cfg(feature = "failpoints")]
