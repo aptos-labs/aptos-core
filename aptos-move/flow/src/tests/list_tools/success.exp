@@ -1,5 +1,28 @@
 [
   {
+    "name": "move_package_coverage",
+    "description": "Get uncovered source lines for a package. Uses existing coverage map if available, otherwise runs tests first. Use this to identify which code paths need test coverage.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "title": "MovePackageCoverageParams",
+      "description": "Parameters for `move_package_coverage` tool.",
+      "type": "object",
+      "properties": {
+        "package_path": {
+          "description": "Path to the Move package directory.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "package_path"
+      ]
+    },
+    "annotations": {
+      "readOnlyHint": false,
+      "destructiveHint": false
+    }
+  },
+  {
     "name": "move_package_manifest",
     "description": "Get information about the current Move package",
     "inputSchema": {
@@ -59,6 +82,34 @@
         "package_path": {
           "description": "Path to the Move package directory.",
           "type": "string"
+        }
+      },
+      "required": [
+        "package_path"
+      ]
+    },
+    "annotations": {
+      "readOnlyHint": false,
+      "destructiveHint": false
+    }
+  },
+  {
+    "name": "move_package_test",
+    "description": "Run Move unit tests for a package. Set establish_baseline=true to save current coverage as baseline (use before generating new tests). Without establish_baseline, returns lines newly covered since baseline. Returns newly_covered=null if no baseline exists — call with establish_baseline first.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "title": "MovePackageTestParams",
+      "description": "Parameters for `move_package_test` tool.",
+      "type": "object",
+      "properties": {
+        "package_path": {
+          "description": "Path to the Move package directory.",
+          "type": "string"
+        },
+        "establish_baseline": {
+          "description": "If true, save current coverage as baseline for future comparisons.\nUse this in the first test run before generating new tests.",
+          "type": "boolean",
+          "default": false
         }
       },
       "required": [

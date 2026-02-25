@@ -1,0 +1,9 @@
+{
+  "success": true,
+  "newly_covered": {
+    "<TEMPDIR>/example.move": [
+      3,
+      11
+    ]
+  }
+}

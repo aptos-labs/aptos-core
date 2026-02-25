@@ -116,6 +116,8 @@ cache entry is invalidated.
 |----------------------------|-----------------------------------------------------------------|
 | `move_package_status`      | Return errors and warnings as formatted diagnostics             |
 | `move_package_manifest`    | Return the package's source file paths and dependency paths     |
+| `move_package_test`        | Run unit tests and report coverage changes against a baseline   |
+| `move_package_coverage`    | Get uncovered source lines for a package                        |
 | `move_package_verify`      | Run the Move Prover on a package and return verification output |
 | `move_package_spec_infer`  | Run spec inference and inject inferred specs into source files  |
 

@@ -2,7 +2,7 @@
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 use super::{super::session::FlowSession, resolve_filter};
-use crate::hooks::source_check;
+use crate::{hooks::source_check, utilities::format_error_chain};
 use codespan_reporting::term::termcolor::NoColor;
 use move_prover::inference::InferenceOutput;
 use rmcp::{
@@ -56,7 +56,10 @@ impl FlowSession {
             if !data.has_bytecode() {
                 data.rebuild_with_bytecode().map_err(|e| {
                     rmcp::ErrorData::internal_error(
-                        format!("failed to rebuild with bytecode: {}", e),
+                        format!(
+                            "failed to rebuild with bytecode: {}",
+                            format_error_chain(&e)
+                        ),
                         None,
                     )
                 })?;

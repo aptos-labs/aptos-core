@@ -18,18 +18,26 @@ path = "src/main.rs"
 [dependencies]
 anyhow = { workspace = true }
 aptos-framework = { workspace = true }
+aptos-gas-schedule = { workspace = true }
+aptos-types = { workspace = true }
+aptos-vm = { workspace = true, features = ["testing"] }
 clap = { workspace = true, features = ["derive"] }
 codespan-reporting = { workspace = true }
 legacy-move-compiler = { workspace = true }
 log = { workspace = true }
 move-command-line-common = { workspace = true }
 move-compiler-v2 = { workspace = true }
+move-coverage = { workspace = true }
 move-ir-types = { workspace = true }
 move-model = { workspace = true }
+move-package = { workspace = true }
 move-prover = { workspace = true }
 move-symbol-pool = { workspace = true }
+move-unit-test = { workspace = true }
+move-vm-runtime = { workspace = true }
 notify = { workspace = true }
 pathsearch = { workspace = true }
+regex = { workspace = true }
 rmcp = { workspace = true }
 serde = { workspace = true, features = ["derive"] }
 serde_json = { workspace = true }
@@ -42,6 +50,5 @@ walkdir = { workspace = true }
 [dev-dependencies]
 aptos-package-builder = { workspace = true }
 move-prover-test-utils = { workspace = true }
-regex = { workspace = true }
 rmcp = { workspace = true, features = ["client"] }
 tempfile = { workspace = true }

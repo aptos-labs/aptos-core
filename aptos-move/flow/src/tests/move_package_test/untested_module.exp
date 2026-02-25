@@ -1,0 +1,11 @@
+{
+  "uncovered": {
+    "<TEMPDIR>/tested.move": [
+      6
+    ],
+    "<TEMPDIR>/untested.move": [
+      2,
+      3
+    ]
+  }
+}
