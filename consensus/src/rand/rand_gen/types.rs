@@ -28,7 +28,7 @@ use std::{collections::HashSet, fmt::Debug, sync::Arc};
 pub const NUM_THREADS_FOR_WVUF_DERIVATION: usize = 8;
 pub const FUTURE_ROUNDS_TO_ACCEPT: u64 = 200;
 
-#[derive(PartialEq)]
+#[derive(Clone, Copy, Debug, PartialEq)]
 pub enum PathType {
     Fast,
     Slow,

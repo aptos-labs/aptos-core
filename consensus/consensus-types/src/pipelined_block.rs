@@ -97,6 +97,7 @@ pub type SecretShareResult = Option<SecretShare>;
 #[derive(Clone)]
 pub struct PipelineFutures {
     pub prepare_fut: TaskFuture<PrepareResult>,
+    pub has_rand_txns_fut: TaskFuture<bool>,
     pub rand_check_fut: TaskFuture<RandResult>,
     pub execute_fut: TaskFuture<ExecuteResult>,
     pub ledger_update_fut: TaskFuture<LedgerUpdateResult>,

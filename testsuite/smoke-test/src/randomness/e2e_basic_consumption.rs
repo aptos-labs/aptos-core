@@ -13,6 +13,8 @@ use std::{collections::BTreeMap, str::FromStr, sync::Arc, time::Duration};
 /// Publish the `on-chain-dice` example module,
 /// run its function that consume on-chain randomness, and
 /// print out the random results.
+/// Also verifies that non-rand blocks progress without randomness verification cost
+/// (deferred aggregation).
 #[tokio::test]
 async fn e2e_basic_consumption() {
     let epoch_duration_secs = 20;
@@ -37,6 +39,22 @@ async fn e2e_basic_consumption() {
         .wait_for_all_nodes_to_catchup_to_epoch(2, Duration::from_secs(epoch_duration_secs * 2))
         .await
         .expect("Epoch 2 taking too long to arrive!");
+
+    // Verify chain progresses with non-rand blocks (before any randomness module is deployed).
+    info!("Verify chain progresses with non-rand blocks.");
+    let version_before = super::get_current_version(&rest_client).await;
+    tokio::time::sleep(Duration::from_secs(5)).await;
+    let version_after = super::get_current_version(&rest_client).await;
+    assert!(
+        version_after > version_before,
+        "Chain should progress with non-rand blocks. Before: {}, After: {}",
+        version_before,
+        version_after
+    );
+    info!(
+        "Chain progressed from version {} to {} with non-rand blocks.",
+        version_before, version_after
+    );
 
     let root_address = swarm.chain_info().root_account().address();
     info!("Root account: {}", root_address);
