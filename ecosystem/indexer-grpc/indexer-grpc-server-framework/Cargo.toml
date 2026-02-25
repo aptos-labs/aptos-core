@@ -19,12 +19,20 @@ async-trait = { workspace = true }
 backtrace = { workspace = true }
 clap = { workspace = true }
 figment = { workspace = true }
+http = "1"
+opentelemetry = { workspace = true }
+opentelemetry_sdk = { workspace = true }
+opentelemetry-otlp = { version = "0.31.0", default-features = false, features = ["trace", "http-proto", "reqwest-blocking-client"] }
+pin-project-lite = "0.2"
 prometheus = { workspace = true }
 serde = { workspace = true }
 tempfile = { workspace = true }
 tokio = { workspace = true }
 toml = { workspace = true }
+tower-layer = "0.3"
+tower-service = "0.3"
 tracing = { workspace = true }
+tracing-opentelemetry = { workspace = true }
 tracing-subscriber = { workspace = true }
 warp = { workspace = true }
 

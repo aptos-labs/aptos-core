@@ -10,6 +10,7 @@ use crate::{
     service::GrpcManagerService,
 };
 use anyhow::Result;
+use aptos_indexer_grpc_server_framework::tracing_middleware::OtelGrpcLayer;
 use aptos_protos::indexer::v1::grpc_manager_server::GrpcManagerServer;
 use std::{sync::Arc, time::Duration};
 use tokio::sync::{oneshot::channel, Mutex};
@@ -99,6 +100,7 @@ impl GrpcManager {
         .max_encoding_message_size(MAX_MESSAGE_SIZE)
         .max_decoding_message_size(MAX_MESSAGE_SIZE);
         let server = Server::builder()
+            .layer(OtelGrpcLayer)
             .http2_keepalive_interval(Some(HTTP2_PING_INTERVAL_DURATION))
             .http2_keepalive_timeout(Some(HTTP2_PING_TIMEOUT_DURATION))
             .add_service(service);

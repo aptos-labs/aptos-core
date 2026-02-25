@@ -10,6 +10,7 @@ use aptos_protos::indexer::v1::{
 use rand::{thread_rng, Rng};
 use std::sync::Arc;
 use tonic::{Request, Response, Status};
+use tracing::instrument;
 
 const MAX_SIZE_BYTES_FROM_CACHE: usize = 20 * (1 << 20);
 
@@ -107,6 +108,7 @@ impl GrpcManagerService {
 
 #[tonic::async_trait]
 impl GrpcManager for GrpcManagerService {
+    #[instrument(skip(self, request), fields(rpc.method = "heartbeat"))]
     async fn heartbeat(
         &self,
         request: Request<HeartbeatRequest>,
@@ -126,6 +128,7 @@ impl GrpcManager for GrpcManagerService {
         Err(Status::invalid_argument("Bad request."))
     }
 
+    #[instrument(skip(self, request), fields(rpc.method = "get_transactions"))]
     async fn get_transactions(
         &self,
         request: Request<GetTransactionsRequest>,
@@ -145,6 +148,7 @@ impl GrpcManager for GrpcManagerService {
         }))
     }
 
+    #[instrument(skip(self, request), fields(rpc.method = "get_data_service_for_request"))]
     async fn get_data_service_for_request(
         &self,
         request: Request<GetDataServiceForRequestRequest>,

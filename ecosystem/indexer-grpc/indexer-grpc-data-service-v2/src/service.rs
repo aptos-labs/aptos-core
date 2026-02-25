@@ -14,6 +14,8 @@ use std::{pin::Pin, sync::Arc};
 use tokio::sync::mpsc::{channel, Sender};
 use tokio_stream::wrappers::ReceiverStream;
 use tonic::{Request, Response, Status};
+use tracing::instrument;
+use tracing_opentelemetry::OpenTelemetrySpanExt;
 
 type ResponseStream = Pin<Box<dyn Stream<Item = Result<TransactionsResponse, Status>> + Send>>;
 
@@ -28,6 +30,7 @@ impl DataServiceWrapperWrapper {
     pub fn new(
         live_data_service: Option<DataServiceWrapper>,
         historical_data_service: Option<DataServiceWrapper>,
+        _checkpoint_interval_secs: u64,
     ) -> Self {
         Self {
             live_data_service,
@@ -40,6 +43,7 @@ impl DataServiceWrapperWrapper {
 impl DataService for DataServiceWrapperWrapper {
     type GetTransactionsStream = ResponseStream;
 
+    #[instrument(skip(self, req), fields(rpc.method = "get_transactions"))]
     async fn get_transactions(
         &self,
         req: Request<GetTransactionsRequest>,
@@ -102,12 +106,18 @@ impl RawData for DataServiceWrapperWrapper {
     }
 }
 
+/// Tuple sent through the channel: (request, response_sender, parent_otel_context).
+/// The OpenTelemetry context is captured from the gRPC handler span and forwarded
+/// so that the streaming thread can parent its spans under the same trace.
+pub type StreamRequest = (
+    Request<GetTransactionsRequest>,
+    Sender<Result<TransactionsResponse, Status>>,
+    opentelemetry::Context,
+);
+
 pub struct DataServiceWrapper {
     connection_manager: Arc<ConnectionManager>,
-    handler_tx: Sender<(
-        Request<GetTransactionsRequest>,
-        Sender<Result<TransactionsResponse, Status>>,
-    )>,
+    handler_tx: Sender<StreamRequest>,
     pub data_service_response_channel_size: usize,
     is_live_data_service: bool,
 }
@@ -115,10 +125,7 @@ pub struct DataServiceWrapper {
 impl DataServiceWrapper {
     pub fn new(
         connection_manager: Arc<ConnectionManager>,
-        handler_tx: Sender<(
-            Request<GetTransactionsRequest>,
-            Sender<Result<TransactionsResponse, Status>>,
-        )>,
+        handler_tx: Sender<StreamRequest>,
         data_service_response_channel_size: usize,
         is_live_data_service: bool,
     ) -> Self {
@@ -140,7 +147,8 @@ impl DataService for DataServiceWrapper {
         req: Request<GetTransactionsRequest>,
     ) -> Result<Response<Self::GetTransactionsStream>, Status> {
         let (tx, rx) = channel(self.data_service_response_channel_size);
-        self.handler_tx.send((req, tx)).await.unwrap();
+        let parent_cx = tracing::Span::current().context();
+        self.handler_tx.send((req, tx, parent_cx)).await.unwrap();
 
         let output_stream = ReceiverStream::new(rx);
         let response = Response::new(Box::pin(output_stream) as Self::GetTransactionsStream);

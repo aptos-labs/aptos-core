@@ -5,6 +5,7 @@ use crate::{
     config::HistoricalDataServiceConfig,
     connection_manager::ConnectionManager,
     metrics::{COUNTER, TIMER},
+    service::StreamRequest,
 };
 use aptos_indexer_grpc_utils::{
     constants::{get_request_metadata, IndexerGrpcRequestMetadata},
@@ -12,17 +13,18 @@ use aptos_indexer_grpc_utils::{
     file_store_operator_v2::file_store_reader::FileStoreReader,
     filter_utils,
 };
-use aptos_protos::indexer::v1::{GetTransactionsRequest, ProcessedRange, TransactionsResponse};
+use aptos_protos::indexer::v1::{ProcessedRange, TransactionsResponse};
 use aptos_transaction_filter::BooleanTransactionFilter;
 use futures::executor::block_on;
 use prost::Message;
 use std::{
     sync::Arc,
-    time::{Duration, SystemTime, UNIX_EPOCH},
+    time::{Duration, Instant, SystemTime, UNIX_EPOCH},
 };
-use tokio::sync::mpsc::{channel, Receiver, Sender};
-use tonic::{Request, Status};
+use tokio::sync::mpsc::{channel, Receiver};
+use tonic::Status;
 use tracing::info;
+use tracing_opentelemetry::OpenTelemetrySpanExt;
 
 const DEFAULT_MAX_NUM_TRANSACTIONS_PER_BATCH: usize = 10000;
 
@@ -31,6 +33,7 @@ pub struct HistoricalDataService {
     connection_manager: Arc<ConnectionManager>,
     file_store_reader: Arc<FileStoreReader>,
     max_transaction_filter_size_bytes: usize,
+    checkpoint_interval: Option<Duration>,
 }
 
 impl HistoricalDataService {
@@ -39,27 +42,28 @@ impl HistoricalDataService {
         config: HistoricalDataServiceConfig,
         connection_manager: Arc<ConnectionManager>,
         max_transaction_filter_size_bytes: usize,
+        checkpoint_interval_secs: u64,
     ) -> Self {
         let file_store = block_on(config.file_store_config.create_filestore());
         let file_store_reader = Arc::new(block_on(FileStoreReader::new(chain_id, file_store)));
+        let checkpoint_interval = if checkpoint_interval_secs > 0 {
+            Some(Duration::from_secs(checkpoint_interval_secs))
+        } else {
+            None
+        };
         Self {
             chain_id,
             connection_manager: connection_manager.clone(),
             file_store_reader,
             max_transaction_filter_size_bytes,
+            checkpoint_interval,
         }
     }
 
-    pub fn run(
-        &self,
-        mut handler_rx: Receiver<(
-            Request<GetTransactionsRequest>,
-            Sender<Result<TransactionsResponse, Status>>,
-        )>,
-    ) {
+    pub fn run(&self, mut handler_rx: Receiver<StreamRequest>) {
         info!("Running HistoricalDataService...");
         tokio_scoped::scope(|scope| {
-            while let Some((request, response_sender)) = handler_rx.blocking_recv() {
+            while let Some((request, response_sender, parent_cx)) = handler_rx.blocking_recv() {
                 COUNTER
                     .with_label_values(&["historical_data_service_receive_request"])
                     .inc();
@@ -118,6 +122,7 @@ impl HistoricalDataService {
                         filter,
                         request_metadata,
                         response_sender,
+                        parent_cx,
                     )
                     .await
                 });
@@ -138,16 +143,37 @@ impl HistoricalDataService {
         filter: Option<BooleanTransactionFilter>,
         request_metadata: Arc<IndexerGrpcRequestMetadata>,
         response_sender: tokio::sync::mpsc::Sender<Result<TransactionsResponse, Status>>,
+        parent_cx: opentelemetry::Context,
     ) {
         COUNTER
             .with_label_values(&["historical_data_service_new_stream"])
             .inc();
+
+        let stream_span = tracing::info_span!(
+            "historical_stream",
+            stream_id = %id,
+            stream.starting_version = starting_version,
+            stream.ending_version = ?ending_version,
+            stream.service_type = "historical",
+            stream.total_bytes_sent = tracing::field::Empty,
+            stream.final_version = tracing::field::Empty,
+            stream.termination_reason = tracing::field::Empty,
+        );
+        let _ = stream_span.set_parent(parent_cx);
+        let _stream_guard = stream_span.enter();
+
         info!(stream_id = id, "Start streaming, starting_version: {starting_version}, ending_version: {ending_version:?}.");
         self.connection_manager
             .insert_active_stream(&id, starting_version, ending_version);
         let mut next_version = starting_version;
         let ending_version = ending_version.unwrap_or(u64::MAX);
-        let mut size_bytes = 0;
+        let mut size_bytes: u64 = 0;
+
+        let mut last_checkpoint = Instant::now();
+        let mut batches_since_checkpoint: u64 = 0;
+        let mut bytes_since_checkpoint: u64 = 0;
+        let mut termination_reason = "ending_version_reached";
+
         'out: loop {
             self.connection_manager
                 .update_stream_progress(&id, next_version, size_bytes);
@@ -157,6 +183,7 @@ impl HistoricalDataService {
 
             if !self.file_store_reader.can_serve(next_version).await {
                 info!(stream_id = id, "next_version {next_version} is larger or equal than file store version, terminate the stream.");
+                termination_reason = "data_unavailable";
                 break;
             }
 
@@ -189,6 +216,26 @@ impl HistoricalDataService {
             {
                 next_version = last_processed_version + 1;
                 size_bytes += batch_size_bytes as u64;
+                batches_since_checkpoint += 1;
+                bytes_since_checkpoint += batch_size_bytes as u64;
+
+                if let Some(interval) = self.checkpoint_interval {
+                    if last_checkpoint.elapsed() >= interval {
+                        let _checkpoint = tracing::info_span!(
+                            "stream_checkpoint",
+                            stream_id = %id,
+                            current_version = next_version,
+                            total_bytes = size_bytes,
+                            batches_in_window = batches_since_checkpoint,
+                            bytes_in_window = bytes_since_checkpoint,
+                        )
+                        .entered();
+                        batches_since_checkpoint = 0;
+                        bytes_since_checkpoint = 0;
+                        last_checkpoint = Instant::now();
+                    }
+                }
+
                 let timestamp_since_epoch =
                     Duration::new(timestamp.seconds as u64, timestamp.nanos as u32);
                 let now_since_epoch = SystemTime::now().duration_since(UNIX_EPOCH).unwrap();
@@ -240,7 +287,6 @@ impl HistoricalDataService {
                     let _timer = TIMER
                         .with_label_values(&["historical_data_service_send_batch"])
                         .start_timer();
-                    // Record bytes ready to transfer after stripping for billing.
                     let bytes_ready_to_transfer_after_stripping = response
                         .transactions
                         .iter()
@@ -250,13 +296,11 @@ impl HistoricalDataService {
                         .with_label_values(&request_metadata.get_label_values())
                         .inc_by(bytes_ready_to_transfer_after_stripping as u64);
                     if response_sender.send(Ok(response)).await.is_err() {
-                        // NOTE: We are not recalculating the version and size_bytes for the stream
-                        // progress since nobody cares about the accurate if client has dropped the
-                        // connection.
                         info!(stream_id = id, "Client dropped.");
                         COUNTER
                             .with_label_values(&["historical_data_service_client_dropped"])
                             .inc();
+                        termination_reason = "client_dropped";
                         break 'out;
                     }
                 }
@@ -269,9 +313,14 @@ impl HistoricalDataService {
                 COUNTER
                     .with_label_values(&["terminate_close_to_latest"])
                     .inc();
+                termination_reason = "close_to_latest";
                 break;
             }
         }
+
+        stream_span.record("stream.total_bytes_sent", size_bytes);
+        stream_span.record("stream.final_version", next_version);
+        stream_span.record("stream.termination_reason", termination_reason);
 
         self.connection_manager
             .update_stream_progress(&id, next_version, size_bytes);
