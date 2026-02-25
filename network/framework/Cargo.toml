@@ -12,6 +12,31 @@ publish = { workspace = true }
 repository = { workspace = true }
 rust-version = { workspace = true }
 
+[package.metadata.cargo-machete]
+ignored = ["serde_bytes"]
+
+[features]
+default = []
+fuzzing = [
+    "aptos-bitvec/fuzzing",
+    "aptos-config/fuzzing",
+    "aptos-crypto/fuzzing",
+    "aptos-types/fuzzing",
+    "aptos-proptest-helpers",
+    "aptos-time-service/testing",
+    "aptos-types/fuzzing",
+    "aptos-memsocket/testing",
+    "aptos-netcore/fuzzing",
+    "proptest",
+    "proptest-derive",
+]
+testing = [
+    "aptos-config/testing",
+    "aptos-time-service/testing",
+    "aptos-memsocket/testing",
+    "aptos-netcore/testing",
+]
+
 [dependencies]
 anyhow = { workspace = true }
 aptos-bitvec = { workspace = true }
@@ -70,11 +95,3 @@ aptos-types = { workspace = true, features = ["fuzzing"] }
 proptest = { workspace = true }
 proptest-derive = { workspace = true }
 rand_core = { workspace = true }
-
-[features]
-default = []
-fuzzing = ["aptos-bitvec/fuzzing", "aptos-config/fuzzing", "aptos-crypto/fuzzing", "aptos-types/fuzzing", "aptos-proptest-helpers", "aptos-time-service/testing", "aptos-types/fuzzing", "aptos-memsocket/testing", "aptos-netcore/fuzzing", "proptest", "proptest-derive"]
-testing = ["aptos-config/testing", "aptos-time-service/testing", "aptos-memsocket/testing", "aptos-netcore/testing"]
-
-[package.metadata.cargo-machete]
-ignored = ["serde_bytes"]

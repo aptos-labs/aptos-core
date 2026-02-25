@@ -10,7 +10,8 @@ use anyhow::{bail, Result};
 use aptos_types::keyless::Pepper;
 use core::fmt;
 pub use derivation_path::{ChildIndex, DerivationPath};
-pub use ed25519_dalek::{PublicKey, SecretKey};
+// TODO: ed25519_dalek v2 renamed these types. Update downstream code accordingly.
+// pub use ed25519_dalek::{VerifyingKey as PublicKey, SigningKey as SecretKey};
 use hmac::{Hmac, Mac};
 use regex::Regex;
 use sha2_0_10_6::Sha512;

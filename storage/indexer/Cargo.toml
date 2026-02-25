@@ -12,6 +12,10 @@ publish = { workspace = true }
 repository = { workspace = true }
 rust-version = { workspace = true }
 
+[features]
+default = []
+fuzzing = ["aptos-types/fuzzing", "aptos-schemadb/fuzzing"]
+
 [dependencies]
 anyhow = { workspace = true }
 aptos-config = { workspace = true }
@@ -34,7 +38,3 @@ aptos-proptest-helpers = { workspace = true }
 aptos-schemadb = { workspace = true, features = ["fuzzing"] }
 aptos-types = { workspace = true, features = ["fuzzing"] }
 rand = { workspace = true }
-
-[features]
-default = []
-fuzzing = ["aptos-types/fuzzing", "aptos-schemadb/fuzzing"]

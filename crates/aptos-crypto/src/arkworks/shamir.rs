@@ -292,7 +292,7 @@ impl<F: FftField> ShamirThresholdConfig<F> {
     /// This method creates `n` shares of a secret using
     /// a `(t, n)` Shamir Secret Sharing scheme:
     /// 1. A random polynomial of degree `t-1` is given as input. We are deliberately generating
-    /// it outside of this file so it won't depend on the specific version of the `rand` crate.
+    ///    it outside of this file so it won't depend on the specific version of the `rand` crate.
     /// 2. The polynomial is evaluated over the `domain` using FFT to produce all evaluations,
     ///    which are subsequently trunked.
     pub fn share(&self, coeffs: &[F]) -> Vec<ShamirShare<F>> {

@@ -12,10 +12,14 @@ publish = { workspace = true }
 repository = { workspace = true }
 rust-version = { workspace = true }
 
+[features]
+default = []
+fuzzing = ["aptos-types/fuzzing", "move-core-types/fuzzing", "move-vm-types/fuzzing"]
+
 [dependencies]
-aptos-cached-packages =  { workspace = true }
+aptos-cached-packages = { workspace = true }
 aptos-crypto = { workspace = true }
-aptos-framework =  { workspace = true }
+aptos-framework = { workspace = true }
 aptos-gas-schedule = { workspace = true } 
 aptos-types = { workspace = true }
 aptos-vm = { workspace = true }
@@ -36,7 +40,3 @@ aptos-proptest-helpers = { workspace = true }
 move-core-types = { workspace = true }
 proptest = { workspace = true }
 proptest-derive = { workspace = true }
-
-[features]
-default = []
-fuzzing = ["aptos-types/fuzzing", "move-core-types/fuzzing", "move-vm-types/fuzzing"]

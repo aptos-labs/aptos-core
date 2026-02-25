@@ -5,3 +5,4 @@
 # It is recommended to check this file in to source control so that
 # everyone who runs the test benefits from these saved cases.
 cc ec13da969415616146d63ef5719c1b85edeaf577302acaedf74a9d9a6a713947 # shrinks to keypair = 20c93f42f85ddd35b05921dd19579d8d8e6d7d83003a93f1b319c14ba831871284203ef96d6c355e386860f9fe4b0bff9df8254c5866025c594ce57674111597b693
+cc f98260f0b476905fa312bb410d9ad78c5cfcb5147eb660db1f0ee0f612de161e # shrinks to idx = 0

@@ -12,6 +12,9 @@ publish = { workspace = true }
 repository = { workspace = true }
 rust-version = { workspace = true }
 
+[package.metadata.cargo-machete]
+ignored = ["serde_bytes", "wasm-bindgen-futures", "getrandom"]
+
 [lib]
 crate-type = ["cdylib", "rlib"]
 
@@ -30,6 +33,3 @@ wasm-bindgen-futures = { workspace = true }
 [dev-dependencies]
 aptos-types = { workspace = true }
 e2e-move-tests = { path = "../e2e-move-tests" }
-
-[package.metadata.cargo-machete]
-ignored = ["serde_bytes", "wasm-bindgen-futures", "getrandom"]

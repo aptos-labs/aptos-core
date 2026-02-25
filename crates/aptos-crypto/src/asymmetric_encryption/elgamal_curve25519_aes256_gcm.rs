@@ -101,6 +101,7 @@ impl AsymmetricEncryption for ElGamalCurve25519Aes256Gcm {
             "ElGamalCurve25519Aes256Gcm dec failed with invalid ciphertext length"
         );
         let c0 = CompressedEdwardsY::from_slice(&ciphertext[0..32])
+            .map_err(|_| anyhow!("ElGamalCurve25519Aes256Gcm dec failed with invalid c0 slice"))?
             .decompress()
             .ok_or_else(|| {
                 anyhow!("ElGamalCurve25519Aes256Gcm dec failed with invalid c0 element")
@@ -112,6 +113,7 @@ impl AsymmetricEncryption for ElGamalCurve25519Aes256Gcm {
         );
 
         let c1 = CompressedEdwardsY::from_slice(&ciphertext[32..64])
+            .map_err(|_| anyhow!("ElGamalCurve25519Aes256Gcm dec failed with invalid c1 slice"))?
             .decompress()
             .ok_or_else(|| {
                 anyhow!("ElGamalCurve25519Aes256Gcm dec failed with invalid c1 element")

@@ -12,6 +12,11 @@ publish = { workspace = true }
 repository = { workspace = true }
 rust-version = { workspace = true }
 
+[features]
+default = []
+fuzzing = ["aptos-memsocket/fuzzing", "aptos-types/fuzzing"]
+testing = ["aptos-memsocket/testing"]
+
 [dependencies]
 aptos-memsocket = { workspace = true }
 aptos-proxy = { workspace = true }
@@ -27,8 +32,3 @@ url = { workspace = true }
 [dev-dependencies]
 aptos-memsocket = { workspace = true }
 aptos-types = { workspace = true, features = ["fuzzing"] }
-
-[features]
-default = []
-fuzzing = ["aptos-memsocket/fuzzing", "aptos-types/fuzzing"]
-testing = ["aptos-memsocket/testing"]

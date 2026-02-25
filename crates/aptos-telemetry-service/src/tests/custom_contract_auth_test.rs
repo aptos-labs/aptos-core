@@ -16,15 +16,10 @@ use serde_json::json;
 /// Helper function to sign arbitrary bytes in tests
 fn sign_bytes(private_key: &Ed25519PrivateKey, message: &[u8]) -> Ed25519Signature {
     use ed25519_dalek::Signer;
-    // Use ed25519_dalek v1.x directly for signing in tests
+    // Use ed25519_dalek v2.x directly for signing in tests
     let secret_bytes: &[u8; 32] = &private_key.to_bytes();
-    let dalek_secret = ed25519_dalek::SecretKey::from_bytes(secret_bytes).unwrap();
-    let dalek_public = ed25519_dalek::PublicKey::from(&dalek_secret);
-    let dalek_keypair = ed25519_dalek::Keypair {
-        secret: dalek_secret,
-        public: dalek_public,
-    };
-    let dalek_signature = dalek_keypair.sign(message);
+    let dalek_signing_key = ed25519_dalek::SigningKey::from_bytes(secret_bytes);
+    let dalek_signature = dalek_signing_key.sign(message);
     Ed25519Signature::try_from(dalek_signature.to_bytes().as_ref()).unwrap()
 }
 

@@ -12,6 +12,10 @@ publish = { workspace = true }
 repository = { workspace = true }
 rust-version = { workspace = true }
 
+[[bin]]
+name = "aptos-release-builder"
+path = "src/main.rs"
+
 [dependencies]
 anyhow = { workspace = true }
 aptos = { workspace = true, features = [ "no-upload-proposal" ] }
@@ -59,7 +63,3 @@ strum_macros = { workspace = true }
 tokio = { workspace = true }
 url = { workspace = true }
 walkdir = { workspace = true }
-
-[[bin]]
-name = "aptos-release-builder"
-path = "src/main.rs"

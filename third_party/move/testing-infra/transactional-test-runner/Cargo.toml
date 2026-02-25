@@ -9,6 +9,10 @@ license = "Apache-2.0"
 publish = false
 edition = { workspace = true }
 
+[features]
+failpoints = ['move-vm-runtime/failpoints']
+fuzzing = ["arbitrary", "dearbitrary", "aptos-framework", "bcs"]
+
 [dependencies]
 anyhow = { workspace = true }
 aptos-framework = { workspace = true, optional = true }
@@ -50,7 +54,3 @@ difference = { workspace = true }
 [[test]]
 name = "tests"
 harness = false
-
-[features]
-failpoints = ['move-vm-runtime/failpoints']
-fuzzing = ["arbitrary", "dearbitrary", "aptos-framework", "bcs"]

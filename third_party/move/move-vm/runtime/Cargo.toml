@@ -8,6 +8,17 @@ homepage = "https://diem.com"
 license = "Apache-2.0"
 publish = false
 edition = { workspace = true }
+
+[features]
+default = ["inline-callstack"]
+profiling = ["move-vm-profiler/probe-profiler"]
+testing = []
+fuzzing = ["move-vm-types/fuzzing"]
+failpoints = ["fail/failpoints"]
+# Enable this features for tests that check bytecode verification.
+disable_verifier_cache = []
+force-inline = []
+inline-callstack = []
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
@@ -41,19 +52,6 @@ move-binary-format = { workspace = true, features = ["fuzzing"] }
 move-vm-types = { workspace = true, features = ["testing"] }
 smallbitvec = { workspace = true }
 test-case = { workspace = true }
-
-[features]
-default = [
-    "inline-callstack",
-]
-profiling = ["move-vm-profiler/probe-profiler"]
-testing = []
-fuzzing = ["move-vm-types/fuzzing"]
-failpoints = ["fail/failpoints"]
-# Enable this features for tests that check bytecode verification.
-disable_verifier_cache = []
-force-inline = []
-inline-callstack = []
 
 [lints.rust]
 unexpected_cfgs = { level = "warn", check-cfg = ['cfg(fuzzing)'] }

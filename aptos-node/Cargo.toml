@@ -12,6 +12,29 @@ publish = { workspace = true }
 repository = { workspace = true }
 rust-version = { workspace = true }
 
+[package.metadata.cargo-machete]
+ignored = ["aptos-crypto", "move-vm-types"]
+
+[features]
+assert-private-keys-not-cloneable = ["aptos-crypto/assert-private-keys-not-cloneable"]
+check-vm-features = []
+consensus-only-perf-test = [
+    "aptos-executor/consensus-only-perf-test",
+    "aptos-mempool/consensus-only-perf-test",
+    "aptos-db/consensus-only-perf-test",
+]
+default = []
+failpoints = [
+    "fail/failpoints",
+    "aptos-consensus/failpoints",
+    "aptos-executor/failpoints",
+    "aptos-mempool/failpoints",
+    "aptos-api/failpoints",
+    "aptos-config/failpoints",
+]
+tokio-console = ["aptos-logger/tokio-console", "aptos-config/tokio-console"]
+smoke-test = ["aptos-jwk-consensus/smoke-test", "aptos-dkg-runtime/smoke-test"]
+
 [dependencies]
 anyhow = { workspace = true }
 aptos-admin-service = { workspace = true }
@@ -78,20 +101,8 @@ serde_yaml = { workspace = true }
 tokio = { workspace = true }
 ureq = { workspace = true }
 
-[target.'cfg(unix)'.dependencies]
-aptos-jemalloc = { workspace = true }
-
 [target.'cfg(target_os = "linux")'.dependencies]
 rstack-self = { workspace = true }
 
-[features]
-assert-private-keys-not-cloneable = ["aptos-crypto/assert-private-keys-not-cloneable"]
-check-vm-features = []
-consensus-only-perf-test = ["aptos-executor/consensus-only-perf-test", "aptos-mempool/consensus-only-perf-test", "aptos-db/consensus-only-perf-test"]
-default = []
-failpoints = ["fail/failpoints", "aptos-consensus/failpoints", "aptos-executor/failpoints", "aptos-mempool/failpoints", "aptos-api/failpoints", "aptos-config/failpoints"]
-tokio-console = ["aptos-logger/tokio-console", "aptos-config/tokio-console"]
-smoke-test = ["aptos-jwk-consensus/smoke-test", "aptos-dkg-runtime/smoke-test"]
-
-[package.metadata.cargo-machete]
-ignored = ["aptos-crypto", "move-vm-types"]
+[target.'cfg(unix)'.dependencies]
+aptos-jemalloc = { workspace = true }

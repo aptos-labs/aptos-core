@@ -12,6 +12,11 @@ publish = { workspace = true }
 repository = { workspace = true }
 rust-version = { workspace = true }
 
+[features]
+default = []
+failpoints = ["fail/failpoints"]
+fuzzing = ["proptest", "aptos-types/fuzzing", "aptos-crypto/fuzzing"]
+
 [dependencies]
 anyhow = { workspace = true }
 aptos-bitvec = { workspace = true }
@@ -40,8 +45,3 @@ tokio = { workspace = true }
 aptos-types = { workspace = true, features = ["fuzzing"] }
 proptest = { workspace = true }
 serde_json = { workspace = true }
-
-[features]
-default = []
-failpoints = ["fail/failpoints"]
-fuzzing = ["proptest", "aptos-types/fuzzing", "aptos-crypto/fuzzing"]

@@ -7,6 +7,9 @@ license = "Apache-2.0"
 publish = false
 edition = { workspace = true }
 
+[features]
+default = []
+
 [dependencies]
 anyhow = { workspace = true }
 clap = { workspace = true, features = ["derive"] }
@@ -16,6 +19,3 @@ move-bytecode-source-map = { workspace = true }
 move-disassembler = { workspace = true }
 regex = { workspace = true }
 tui = { workspace = true }
-
-[features]
-default = []
