@@ -140,12 +140,13 @@ pub async fn info_handler(State(context): Ctx) -> impl IntoResponse {
     let mut info = HashMap::new();
     info.insert(
         "chain_id".to_string(),
-        serde_json::to_value(format!("{:?}", context.chain_id())).unwrap(),
+        serde_json::to_value(format!("{:?}", context.chain_id()))
+            .expect("chain_id serialization cannot fail"),
     );
     let node_type = NodeType::extract_from_config(&context.node_config);
     info.insert(
         "node_type".to_string(),
-        serde_json::to_value(node_type).unwrap(),
+        serde_json::to_value(node_type).expect("node_type serialization cannot fail"),
     );
     info.insert(
         "bootstrapping_mode".to_string(),
@@ -156,7 +157,7 @@ pub async fn info_handler(State(context): Ctx) -> impl IntoResponse {
                 .state_sync_driver
                 .bootstrapping_mode,
         )
-        .unwrap(),
+        .expect("bootstrapping_mode serialization cannot fail"),
     );
     info.insert(
         "continuous_syncing_mode".to_string(),
@@ -167,7 +168,7 @@ pub async fn info_handler(State(context): Ctx) -> impl IntoResponse {
                 .state_sync_driver
                 .continuous_syncing_mode,
         )
-        .unwrap(),
+        .expect("continuous_syncing_mode serialization cannot fail"),
     );
     info.insert(
         "new_storage_format".to_string(),
@@ -178,22 +179,25 @@ pub async fn info_handler(State(context): Ctx) -> impl IntoResponse {
                 .rocksdb_configs
                 .enable_storage_sharding,
         )
-        .unwrap(),
+        .expect("new_storage_format serialization cannot fail"),
     );
     info.insert(
         "internal_indexer_config".to_string(),
-        serde_json::to_value(&context.node_config.indexer_db_config).unwrap(),
+        serde_json::to_value(&context.node_config.indexer_db_config)
+            .expect("internal_indexer_config serialization cannot fail"),
     );
     if let Some(validator_network) = &context.node_config.validator_network {
         info.insert(
             "validator_network_peer_id".to_string(),
-            serde_json::to_value(validator_network.peer_id()).unwrap(),
+            serde_json::to_value(validator_network.peer_id())
+                .expect("validator_network_peer_id serialization cannot fail"),
         );
     }
     for fullnode_network in &context.node_config.full_node_networks {
         info.insert(
             format!("fullnode_network_peer_id_{}", fullnode_network.network_id),
-            serde_json::to_value(fullnode_network.peer_id()).unwrap(),
+            serde_json::to_value(fullnode_network.peer_id())
+                .expect("fullnode_network_peer_id serialization cannot fail"),
         );
     }
 

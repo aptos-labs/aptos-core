@@ -1463,6 +1463,14 @@ impl TestContext {
 
         let body_bytes = resp.bytes().await.expect("Failed to read response body");
         if body_bytes.is_empty() {
+            // Some status codes legitimately have no response body.
+            if status == 204 || status == 304 {
+                assert_eq!(
+                    self.expect_status_code, status,
+                    "\nresponse: <empty response body>"
+                );
+                return Value::Null;
+            }
             panic!(
                 "Empty response body from {} {} (status {})",
                 method, url, status
@@ -1483,6 +1491,8 @@ impl TestContext {
             pretty(&body)
         );
 
+        // HTTP header names are case-insensitive per RFC 7230.
+        // reqwest normalizes header names to lowercase internally.
         if self.expect_status_code < 300 {
             let ledger_info = self.get_latest_ledger_info();
             assert_eq!(

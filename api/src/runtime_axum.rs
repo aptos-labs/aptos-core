@@ -56,20 +56,17 @@ pub fn attach_axum_to_runtime(
         let cors = CorsLayer::new()
             .allow_credentials(true)
             .allow_methods(vec![Method::GET, Method::POST])
-            .allow_headers(vec![
-                axum::http::header::CONTENT_TYPE,
-                axum::http::header::ACCEPT,
-                axum::http::header::AUTHORIZATION,
-                axum::http::header::ORIGIN,
-            ])
+            .allow_headers(tower_http::cors::AllowHeaders::mirror_request())
             .allow_origin(tower_http::cors::AllowOrigin::mirror_request());
 
+        // Middleware layers execute in reverse order (last added = first executed).
+        // Target order (outer to inner): compression -> logging -> panic -> CORS -> size_limit -> routes
+        // This matches the Poem setup where logging is outermost.
         let app = build_full_router(context.clone(), spec_json, spec_yaml)
             .layer(cors)
-            .layer(middleware::from_fn(middleware_axum::logging_middleware))
-            .layer(CatchPanicLayer::custom(error_converter_axum::handle_panic));
+            .layer(CatchPanicLayer::custom(error_converter_axum::handle_panic))
+            .layer(middleware::from_fn(middleware_axum::logging_middleware));
 
-        // Apply compression if enabled
         let app = if config.api.compression_enabled {
             app.layer(CompressionLayer::new())
         } else {
