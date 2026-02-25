@@ -492,7 +492,6 @@ dependencies = [
  "serde",
  "serde_json",
  "tokio",
- "tower 0.5.3",
  "tower-http 0.6.8",
  "warp",
 ]
@@ -6021,7 +6020,7 @@ dependencies = [
  "rustversion",
  "serde",
  "sync_wrapper 0.1.2",
- "tower 0.4.13",
+ "tower",
  "tower-layer",
  "tower-service",
 ]
@@ -6054,7 +6053,7 @@ dependencies = [
  "serde_urlencoded",
  "sync_wrapper 1.0.1",
  "tokio",
- "tower 0.4.13",
+ "tower",
  "tower-layer",
  "tower-service",
  "tracing",
@@ -9929,7 +9928,7 @@ dependencies = [
  "serde_json",
  "tokio",
  "tonic 0.12.3",
- "tower 0.4.13",
+ "tower",
  "tower-layer",
  "tower-util",
  "tracing",
@@ -10228,7 +10227,7 @@ dependencies = [
  "tokio",
  "tokio-retry",
  "tonic 0.9.2",
- "tower 0.4.13",
+ "tower",
  "tracing",
 ]
 
@@ -10983,7 +10982,7 @@ dependencies = [
  "pin-project-lite",
  "socket2 0.5.5",
  "tokio",
- "tower 0.4.13",
+ "tower",
  "tower-service",
  "tracing",
 ]
@@ -11720,7 +11719,7 @@ dependencies = [
  "thiserror 1.0.69",
  "tokio",
  "tokio-util 0.6.10",
- "tower 0.4.13",
+ "tower",
  "tower-http 0.2.5",
  "tracing",
 ]
@@ -19116,7 +19115,7 @@ dependencies = [
  "tokio",
  "tokio-rustls 0.24.1",
  "tokio-stream",
- "tower 0.4.13",
+ "tower",
  "tower-layer",
  "tower-service",
  "tracing",
@@ -19144,7 +19143,7 @@ dependencies = [
  "prost 0.12.3",
  "tokio",
  "tokio-stream",
- "tower 0.4.13",
+ "tower",
  "tower-layer",
  "tower-service",
  "tracing",
@@ -19178,7 +19177,7 @@ dependencies = [
  "tokio",
  "tokio-rustls 0.26.0",
  "tokio-stream",
- "tower 0.4.13",
+ "tower",
  "tower-layer",
  "tower-service",
  "tracing",
@@ -19222,20 +19221,6 @@ dependencies = [
  "tower-layer",
  "tower-service",
  "tracing",
-]
-
-[[package]]
-name = "tower"
-version = "0.5.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ebe5ef63511595f1344e2d5cfa636d973292adc0eec1f0ad45fae9f0851ab1d4"
-dependencies = [
- "futures-core",
- "futures-util",
- "pin-project-lite",
- "sync_wrapper 1.0.1",
- "tower-layer",
- "tower-service",
 ]
 
 [[package]]
