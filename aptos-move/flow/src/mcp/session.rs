@@ -2,7 +2,7 @@
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 use super::{file_watcher::FileWatcher, package_data::PackageData, McpArgs};
-use crate::GlobalOpts;
+use crate::{utilities::format_error_chain, GlobalOpts};
 use rmcp::{
     handler::server::router::tool::ToolRouter,
     model::{CallToolResult, Content, Implementation, ServerCapabilities, ServerInfo},
@@ -26,6 +26,8 @@ pub(crate) struct FlowSession {
     package_cache: Arc<Mutex<BTreeMap<String, Arc<Mutex<PackageData>>>>>,
     file_watcher: FileWatcher,
     tool_router: ToolRouter<Self>,
+    /// Session-scoped temp directory, automatically deleted on drop.
+    temp_dir: Arc<tempfile::TempDir>,
 }
 
 impl FlowSession {
@@ -35,12 +37,25 @@ impl FlowSession {
         let router = Self::package_manifest_router()
             + Self::package_status_router()
             + Self::package_verify_router()
-            + Self::package_spec_infer_router();
+            + Self::package_spec_infer_router()
+            + Self::package_test_router();
         router
             .list_all()
             .into_iter()
             .map(|t| t.name.to_string())
             .collect()
+    }
+
+    pub(crate) fn args(&self) -> &McpArgs {
+        &self.args
+    }
+
+    pub(crate) fn file_watcher(&self) -> &FileWatcher {
+        &self.file_watcher
+    }
+
+    pub(crate) fn temp_dir(&self) -> &Path {
+        self.temp_dir.path()
     }
 
     pub(crate) fn new(args: McpArgs, global: GlobalOpts) -> Self {
@@ -57,6 +72,8 @@ impl FlowSession {
             }
         }))
         .expect("failed to create file watcher");
+        let temp_dir =
+            Arc::new(tempfile::TempDir::new().expect("failed to create session temp directory"));
         Self {
             global,
             args,
@@ -65,7 +82,9 @@ impl FlowSession {
             tool_router: Self::package_manifest_router()
                 + Self::package_status_router()
                 + Self::package_verify_router()
-                + Self::package_spec_infer_router(),
+                + Self::package_spec_infer_router()
+                + Self::package_test_router(),
+            temp_dir,
         }
     }
 
@@ -116,9 +135,10 @@ impl FlowSession {
                     rmcp::ErrorData::internal_error(format!("build task failed: {}", e), None)
                 })?
                 .map_err(|e| {
-                    log::info!("build failed for `{}`: {}", key, e);
+                    let msg = format_error_chain(&e);
+                    log::info!("build failed for `{}`: {}", key, msg);
                     rmcp::ErrorData::internal_error(
-                        format!("failed to build package `{}`: {}", key, e),
+                        format!("failed to build package `{}`: {}", key, msg),
                         None,
                     )
                 })?;
@@ -157,6 +177,14 @@ impl FlowSession {
 #[tool_handler]
 impl ServerHandler for FlowSession {
     fn get_info(&self) -> ServerInfo {
+        let mut instructions =
+            "MCP server for Move smart contract development on Aptos.".to_string();
+        if self.args.dev_mode {
+            instructions.push_str(
+                " Packages are compiled in dev mode \
+                 (dev-addresses and dev-dependencies are active).",
+            );
+        }
         ServerInfo {
             protocol_version: Default::default(),
             capabilities: ServerCapabilities::builder().enable_tools().build(),
@@ -165,7 +193,7 @@ impl ServerHandler for FlowSession {
                 version: env!("CARGO_PKG_VERSION").into(),
                 ..Default::default()
             },
-            instructions: Some("MCP server for Move smart contract development on Aptos.".into()),
+            instructions: Some(instructions),
         }
     }
 }

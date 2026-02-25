@@ -4,21 +4,46 @@
 pub(crate) mod file_watcher;
 mod package_data;
 pub(crate) mod session;
-mod tools;
+pub(crate) mod tools;
 
 use crate::GlobalOpts;
 use anyhow::Result;
+use aptos_framework::UPGRADE_POLICY_CUSTOM_FIELD;
 use clap::Parser;
 use legacy_move_compiler::shared::{parse_named_address, NumericalAddress};
 use move_model::metadata::LanguageVersion;
+use move_package::package_hooks::{register_package_hooks, PackageHooks};
+use move_symbol_pool::Symbol;
 use rmcp::{transport::stdio, ServiceExt};
 use session::FlowSession;
+
+/// Package hooks for move-flow MCP server.
+/// Registers Aptos-specific custom fields to suppress unknown field warnings.
+struct MoveFlowPackageHooks;
+
+impl PackageHooks for MoveFlowPackageHooks {
+    fn custom_package_info_fields(&self) -> Vec<String> {
+        vec![UPGRADE_POLICY_CUSTOM_FIELD.to_string()]
+    }
+
+    fn custom_dependency_key(&self) -> Option<String> {
+        None
+    }
+
+    fn resolve_custom_dependency(
+        &self,
+        _dep_name: Symbol,
+        _info: &move_package::source_package::parsed_manifest::CustomDepInfo,
+    ) -> anyhow::Result<()> {
+        anyhow::bail!("custom dependencies are not supported in move-flow")
+    }
+}
 
 /// Arguments for the `mcp` subcommand.
 #[derive(Parser, Debug, Clone)]
 pub struct McpArgs {
     /// Build in dev mode (enables dev-only dependencies and addresses).
-    #[arg(long)]
+    #[arg(long, default_value_t = true, action = clap::ArgAction::Set)]
     pub dev_mode: bool,
 
     /// Additional named addresses in the form `name=0xADDR`.
@@ -45,6 +70,9 @@ pub struct McpArgs {
 /// Start the MCP stdio server.
 pub async fn run(args: &McpArgs, global: &GlobalOpts) -> Result<()> {
     move_compiler_v2::logging::setup_logging(None);
+
+    // Register Aptos package hooks to recognize custom fields like upgrade_policy.
+    register_package_hooks(Box::new(MoveFlowPackageHooks));
 
     // Bridge `tracing` events (used by rmcp) into the `log` framework so that
     // flexi_logger captures transport-level diagnostics (e.g. "input stream

@@ -4,6 +4,7 @@
 mod package_manifest;
 mod package_spec_infer;
 mod package_status;
+pub(crate) mod package_test;
 mod package_verify;
 
 use super::package_data::VerifiedScope;

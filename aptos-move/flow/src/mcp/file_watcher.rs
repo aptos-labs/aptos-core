@@ -8,15 +8,19 @@
 //!
 //! The watcher callback resolves affected cache keys immediately and invokes
 //! a caller-provided invalidation callback (typically removing the entry from
-//! the package cache). There is no internal event queue, so no events can be
-//! lost regardless of load.
+//! the package cache). Events that arrive while the watcher is paused (see
+//! [`FileWatcher::pause`]) are silently dropped — this is used during test
+//! execution to prevent build artifacts from spuriously invalidating the cache.
 
 use move_command_line_common::env::MOVE_HOME;
 use notify::{RecommendedWatcher, RecursiveMode, Watcher};
 use std::{
     collections::{HashMap, HashSet},
     path::{Path, PathBuf},
-    sync::{Arc, Mutex},
+    sync::{
+        atomic::{AtomicUsize, Ordering},
+        Arc, Mutex,
+    },
 };
 
 /// Shared state accessed by both the watcher callback and the public API.
@@ -44,6 +48,8 @@ struct FileWatcherInner {
     watcher: Mutex<RecommendedWatcher>,
     /// Shared state: directory→keys mapping.
     state: Arc<Mutex<WatchState>>,
+    /// Number of active pause requests. Events are dropped when > 0.
+    pause_count: Arc<AtomicUsize>,
 }
 
 impl FileWatcher {
@@ -57,8 +63,13 @@ impl FileWatcher {
             dir_to_keys: HashMap::new(),
         }));
         let cb_state = Arc::clone(&state);
+        let pause_count = Arc::new(AtomicUsize::new(0));
+        let cb_pause_count = Arc::clone(&pause_count);
         let watcher = RecommendedWatcher::new(
             move |res: Result<notify::Event, notify::Error>| {
+                if cb_pause_count.load(Ordering::Acquire) > 0 {
+                    return;
+                }
                 if let Ok(event) = res {
                     // Collect affected keys under the state lock, then drop it
                     // before calling on_invalidate (which may acquire other locks).
@@ -90,8 +101,32 @@ impl FileWatcher {
             inner: Arc::new(FileWatcherInner {
                 watcher: Mutex::new(watcher),
                 state,
+                pause_count,
             }),
         })
+    }
+
+    /// Increment the pause ref-count. While > 0, all file-system events are dropped.
+    pub(crate) fn pause(&self) {
+        self.inner.pause_count.fetch_add(1, Ordering::Release);
+    }
+
+    /// Decrement the pause ref-count. Saturates at 0 to prevent underflow.
+    pub(crate) fn resume(&self) {
+        self.inner
+            .pause_count
+            .fetch_update(Ordering::Release, Ordering::Acquire, |n| {
+                Some(n.saturating_sub(1))
+            })
+            .ok();
+    }
+
+    /// Pause the watcher and return a guard that resumes on drop.
+    /// Preferred over manual `pause()`/`resume()` pairs in async code
+    /// where cancellation could skip the `resume()` call.
+    pub(crate) fn pause_guard(&self) -> PauseGuard {
+        self.pause();
+        PauseGuard(self.clone())
     }
 
     /// Register directory watches for a package.
@@ -161,6 +196,15 @@ impl FileWatcher {
                 true
             }
         });
+    }
+}
+
+/// RAII guard that resumes the file watcher on drop.
+pub(crate) struct PauseGuard(FileWatcher);
+
+impl Drop for PauseGuard {
+    fn drop(&mut self) {
+        self.0.resume();
     }
 }
 
@@ -271,6 +315,109 @@ mod tests {
             inv.is_empty(),
             "expected empty after unwatch, got {:?}",
             *inv
+        );
+    }
+
+    #[tokio::test]
+    async fn pause_guard_suppresses_events() {
+        let dir = TempDir::new().unwrap();
+        let file = dir.path().join("test.move");
+        fs::write(&file, "original").unwrap();
+
+        let (watcher, invalidated) = make_watcher();
+        watcher.watch_package("pkg1", dir.path(), &[file.to_string_lossy().into_owned()]);
+
+        let guard = watcher.pause_guard();
+        fs::write(&file, "modified").unwrap();
+        settle().await;
+
+        let inv = invalidated.lock().unwrap();
+        assert!(
+            inv.is_empty(),
+            "expected no events while paused, got {:?}",
+            *inv
+        );
+        drop(inv);
+
+        // Dropping the guard resumes the watcher.
+        drop(guard);
+    }
+
+    #[tokio::test]
+    async fn pause_guard_resumes_on_drop() {
+        let dir = TempDir::new().unwrap();
+        let file = dir.path().join("test.move");
+        fs::write(&file, "original").unwrap();
+
+        let (watcher, invalidated) = make_watcher();
+        watcher.watch_package("pkg1", dir.path(), &[file.to_string_lossy().into_owned()]);
+
+        {
+            let _guard = watcher.pause_guard();
+        } // guard dropped, watcher resumed
+
+        fs::write(&file, "modified").unwrap();
+        settle().await;
+
+        let inv = invalidated.lock().unwrap();
+        assert!(
+            inv.contains("pkg1"),
+            "expected pkg1 after guard drop, got {:?}",
+            *inv
+        );
+    }
+
+    #[tokio::test]
+    async fn nested_guards_require_all_drops() {
+        let dir = TempDir::new().unwrap();
+        let file = dir.path().join("test.move");
+        fs::write(&file, "original").unwrap();
+
+        let (watcher, invalidated) = make_watcher();
+        watcher.watch_package("pkg1", dir.path(), &[file.to_string_lossy().into_owned()]);
+
+        // Two guards — dropping one should not be enough.
+        let guard1 = watcher.pause_guard();
+        let guard2 = watcher.pause_guard();
+        drop(guard1);
+
+        fs::write(&file, "modified-1").unwrap();
+        settle().await;
+
+        {
+            let inv = invalidated.lock().unwrap();
+            assert!(
+                inv.is_empty(),
+                "expected still paused after one guard drop, got {:?}",
+                *inv
+            );
+        }
+
+        // Dropping second guard should re-enable.
+        drop(guard2);
+        fs::write(&file, "modified-2").unwrap();
+        settle().await;
+
+        let inv = invalidated.lock().unwrap();
+        assert!(
+            inv.contains("pkg1"),
+            "expected pkg1 after all guards dropped, got {:?}",
+            *inv
+        );
+    }
+
+    #[test]
+    fn resume_at_zero_does_not_underflow() {
+        let (watcher, _) = make_watcher();
+        // Should saturate at 0, not wrap around.
+        watcher.resume();
+        watcher.resume();
+        assert_eq!(
+            watcher
+                .inner
+                .pause_count
+                .load(std::sync::atomic::Ordering::Relaxed),
+            0
         );
     }
 }

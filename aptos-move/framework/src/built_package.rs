@@ -193,6 +193,8 @@ pub struct BuiltPackage {
 /// executed.
 pub fn build_model(
     dev_mode: bool,
+    test_mode: bool,
+    verify_mode: bool,
     package_path: &Path,
     additional_named_addresses: BTreeMap<String, AccountAddress>,
     target_filter: Option<String>,
@@ -206,6 +208,8 @@ pub fn build_model(
 ) -> anyhow::Result<GlobalEnv> {
     let build_config = make_model_build_config(
         dev_mode,
+        test_mode,
+        verify_mode,
         additional_named_addresses,
         bytecode_version,
         compiler_version,
@@ -234,6 +238,8 @@ pub fn build_model(
 /// Shared helper to build a `BuildConfig` for model construction.
 fn make_model_build_config(
     dev_mode: bool,
+    test_mode: bool,
+    verify_mode: bool,
     additional_named_addresses: BTreeMap<String, AccountAddress>,
     bytecode_version: Option<u32>,
     compiler_version: Option<CompilerVersion>,
@@ -258,7 +264,8 @@ fn make_model_build_config(
         generate_move_model: false,
         full_model_generation: false,
         install_dir: None,
-        test_mode: false,
+        test_mode,
+        verify_mode,
         override_std: None,
         force_recompilation: false,
         fetch_deps_only: false,
@@ -317,6 +324,7 @@ impl BuiltPackage {
             full_model_generation: options.check_test_code,
             install_dir: options.install_dir.clone(),
             test_mode: false,
+            verify_mode: false,
             override_std: options.override_std.clone(),
             force_recompilation: false,
             fetch_deps_only: false,

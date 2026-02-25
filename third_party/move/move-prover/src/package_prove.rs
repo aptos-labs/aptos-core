@@ -115,6 +115,11 @@ pub fn run_move_prover(
 ) -> anyhow::Result<()> {
     // Always run the prover in dev mode, so addresses get default assignments
     config.dev_mode = true;
+    // Prover needs #[verify_only] code (specifications).
+    // test_mode must be off: test_mode and verify_mode cannot both be true
+    // (causes name clashes in std::cmp).
+    config.verify_mode = true;
+    config.test_mode = false;
 
     if !options.move_sources.is_empty() {
         bail!(

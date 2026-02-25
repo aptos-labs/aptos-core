@@ -1,0 +1,8 @@
+{
+  "uncovered": {
+    "<TEMPDIR>/untested.move": [
+      2,
+      3
+    ]
+  }
+}
