@@ -2,6 +2,7 @@
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 mod account_abstraction_test;
+mod axum_tests;
 mod accounts_test;
 mod blocks_test;
 mod converter_test;
