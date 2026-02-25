@@ -103,6 +103,7 @@ from cases.struct_enum_args import (
     test_framework_fixed_point64,
     test_framework_string,
     test_mixed_framework_struct,
+    test_option_enum,
     test_option_invalid_field_name_rejected,
     test_option_legacy_format,
     test_option_variant_format,
@@ -110,6 +111,8 @@ from cases.struct_enum_args import (
     test_struct_argument_nested,
     test_struct_argument_simple,
     test_struct_unknown_field_rejected,
+    test_struct_with_enum_field,
+    test_vector_of_enums,
     test_vector_of_options,
     test_vector_of_strings,
     test_vector_of_structs,
@@ -309,6 +312,10 @@ async def run_tests(run_helper):
     test_vector_of_strings(run_helper)
     test_vector_of_structs(run_helper)
     test_vector_of_options(run_helper)
+    # Nested enum tests (enum inside Option, vector, or struct field)
+    test_option_enum(run_helper)
+    test_vector_of_enums(run_helper)
+    test_struct_with_enum_field(run_helper)
 
     # Run stake subcommand group tests.
     """

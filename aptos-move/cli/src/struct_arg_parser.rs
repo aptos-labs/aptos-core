@@ -5,15 +5,16 @@
 //!
 //! This module enables the Aptos CLI to accept public copy structs and enums as transaction
 //! arguments in JSON format, automatically encoding them to BCS without requiring manual encoding.
+//!
+//! ABI is parsed from the module bytecode returned by the REST API. Since the `abi` field
+//! in `MoveModuleBytecode` uses `#[serde(skip_deserializing)]`, it is always `None` after
+//! REST deserialization; instead, `try_parse_abi()` is called locally to derive the ABI
+//! from the `bytecode` field.
 
-use aptos_api_types::{MoveModuleBytecode, MoveStructField, MoveStructTag, MoveType};
+use aptos_api_types::{MoveModule, MoveModuleBytecode, MoveStructTag, MoveType};
 use aptos_cli_common::{load_account_arg, CliError, CliTypedResult};
 use aptos_rest_client::Client;
 use async_recursion::async_recursion;
-use move_binary_format::{
-    access::ModuleAccess,
-    file_format::{CompiledModule, StructDefinition, StructFieldInformation},
-};
 use move_core_types::{
     int256::{I256, U256},
     language_storage::{
@@ -29,26 +30,15 @@ use std::{collections::HashMap, str::FromStr, sync::RwLock};
 /// Prevents stack overflow and excessively complex arguments.
 const MAX_NESTING_DEPTH: u8 = 7;
 
-/// Cached module information including both bytecode and optionally deserialized representation.
-///
-/// The `compiled` field is lazily populated when first needed, avoiding repeated
-/// deserialization of the same module bytecode.
-struct CachedModule {
-    /// Raw module bytecode from chain
-    bytecode: MoveModuleBytecode,
-    /// Deserialized module (lazily computed on first access when ABI is unavailable)
-    compiled: Option<CompiledModule>,
-}
-
 /// Parser for struct and enum arguments that queries on-chain module metadata
 /// and encodes arguments to BCS format.
 ///
-/// Includes a module cache to avoid repeated fetches and deserialization of the same module.
+/// Includes a module ABI cache to avoid repeated REST API fetches for the same module.
 pub struct StructArgParser {
     rest_client: Client,
-    /// Cache of fetched modules with both bytecode and deserialized form.
-    /// Uses RwLock for thread-safe caching (required since parser is shared across async tasks).
-    module_cache: RwLock<HashMap<ModuleId, CachedModule>>,
+    /// Cache of module ABIs keyed by ModuleId.
+    /// Uses RwLock for thread-safe access (required since parser is shared across async tasks).
+    module_cache: RwLock<HashMap<ModuleId, MoveModule>>,
 }
 
 impl StructArgParser {
@@ -67,7 +57,7 @@ impl StructArgParser {
     /// - [] for None
     /// - [value] for Some(value)
     ///
-    /// Returns (variant_name, fields_map) where fields_map has "0" key for Some variant.
+    /// Returns (variant_name, fields_map) where fields_map has "e" key for Some variant.
     pub fn convert_option_array_to_enum_format(
         array: &[JsonValue],
     ) -> CliTypedResult<(&'static str, serde_json::Map<String, JsonValue>)> {
@@ -75,7 +65,7 @@ impl StructArgParser {
             Ok(("None", serde_json::Map::new()))
         } else if array.len() == 1 {
             let mut map = serde_json::Map::new();
-            map.insert("0".to_string(), array[0].clone());
+            map.insert("e".to_string(), array[0].clone());
             Ok(("Some", map))
         } else {
             Err(CliError::CommandArgumentError(format!(
@@ -85,207 +75,125 @@ impl StructArgParser {
         }
     }
 
-    /// Verify that a struct exists on-chain and retrieve its metadata.
+    /// Verify that a struct exists on-chain via ABI and cache the module ABI.
     ///
-    /// Uses a cache to avoid repeated fetches of the same module. This addresses
-    /// the review comment about repeated work between verify_struct_exists and
-    /// subsequent parsing which both need module bytecode.
+    /// Requires the module to expose ABI (i.e. published with metadata). If ABI is absent,
+    /// returns an error rather than falling back to bytecode deserialization.
+    ///
+    /// Uses a cache to avoid repeated REST API fetches of the same module.
     pub async fn verify_struct_exists(&self, struct_tag: &StructTag) -> CliTypedResult<()> {
         let module_id = ModuleId::new(struct_tag.address, struct_tag.module.clone());
 
-        // Check cache first (read lock for concurrent access).
-        // Returns either a cached MoveModuleBytecode (for deserialization without a network fetch)
-        // or None if the module isn't cached yet and must be fetched.
-        let cached_bytecode: Option<MoveModuleBytecode> = {
+        // Check cache first.
+        {
             let cache_read = self.module_cache.read().map_err(|e| {
                 CliError::CommandArgumentError(format!("Failed to acquire cache read lock: {}", e))
             })?;
-
-            if let Some(cached) = cache_read.get(&module_id) {
-                // Check compiled module first if available (has complete information)
-                if let Some(compiled) = &cached.compiled {
-                    let struct_exists = compiled.struct_defs.iter().any(|def| {
-                        let handle = ModuleAccess::struct_handle_at(compiled, def.struct_handle);
-                        ModuleAccess::identifier_at(compiled, handle.name).as_str()
-                            == struct_tag.name.as_str()
-                    });
-
-                    // Compiled module has complete info - return definitive answer
-                    if struct_exists {
-                        return Ok(());
-                    } else {
-                        return Err(CliError::CommandArgumentError(format!(
-                            "Struct {} not found in module {}::{}",
-                            struct_tag.name, struct_tag.address, struct_tag.module
-                        )));
-                    }
-                }
-
-                // No compiled module cached, check ABI if available
-                if let Some(abi) = &cached.bytecode.abi {
-                    let found_in_abi = abi
-                        .structs
-                        .iter()
-                        .any(|s| s.name.as_str() == struct_tag.name.as_str());
-
-                    if found_in_abi {
-                        // Found in ABI - definitely exists
-                        return Ok(());
-                    }
-                    // Not found in ABI, but ABI might be incomplete (e.g., doesn't include private structs).
-                    // Fall through to deserialize the cached bytecode for a definitive check.
-                }
-
-                // Module is cached but its compiled form is not yet available.
-                // Clone the bytecode so we can deserialize it after releasing the read lock,
-                // avoiding an unnecessary network re-fetch.
-                Some(cached.bytecode.clone())
-            } else {
-                // Module not in cache, need to fetch from network
-                None
-            }
-        }; // Release read lock
-
-        // Obtain the module bytecode: use the cached copy when available, otherwise fetch from chain.
-        let is_cached = cached_bytecode.is_some();
-        let module = if let Some(bytecode) = cached_bytecode {
-            bytecode
-        } else {
-            self.rest_client
-                .get_account_module(struct_tag.address, struct_tag.module.as_str())
-                .await
-                .map_err(|e| {
-                    CliError::CommandArgumentError(format!(
-                        "Failed to fetch module {}::{}: {}",
-                        struct_tag.address, struct_tag.module, e
-                    ))
-                })?
-                .into_inner()
-        };
-
-        // For freshly-fetched modules, check the ABI first as a fast path (avoids deserialization).
-        // For cached modules, the ABI was already checked in the block above and the struct wasn't
-        // found there, so skip straight to deserialization for a definitive check.
-        if !is_cached {
-            if let Some(abi) = &module.abi {
-                if abi
+            if let Some(abi) = cache_read.get(&module_id) {
+                return if abi
                     .structs
                     .iter()
                     .any(|s| s.name.as_str() == struct_tag.name.as_str())
                 {
-                    // Found in ABI of freshly-fetched module - cache without deserializing and return.
-                    self.module_cache
-                        .write()
-                        .map_err(|e| {
-                            CliError::CommandArgumentError(format!(
-                                "Failed to acquire cache write lock: {}",
-                                e
-                            ))
-                        })?
-                        .insert(module_id, CachedModule {
-                            bytecode: module,
-                            compiled: None,
-                        });
-                    return Ok(());
-                }
-                // Not found in ABI of fresh module — fall through to deserialization.
+                    Ok(())
+                } else {
+                    Err(CliError::CommandArgumentError(format!(
+                        "Struct {} not found in module {}::{}",
+                        struct_tag.name, struct_tag.address, struct_tag.module
+                    )))
+                };
             }
         }
 
-        // Deserialize the bytecode for a definitive struct-existence check.
-        // Reached when: (a) the module was cached but the struct wasn't in its ABI, or
-        // (b) the module was freshly fetched and has no ABI (or the ABI didn't have the struct).
-        let compiled_module = Self::deserialize_module(&module, struct_tag)?;
-        let struct_exists = compiled_module.struct_defs.iter().any(|def| {
-            let handle = ModuleAccess::struct_handle_at(&compiled_module, def.struct_handle);
-            ModuleAccess::identifier_at(&compiled_module, handle.name).as_str()
-                == struct_tag.name.as_str()
-        });
-        let compiled_opt = Some(compiled_module);
+        // Module not cached — fetch from REST API.
+        // Note: `MoveModuleBytecode.abi` uses `#[serde(skip_deserializing)]` so it is always
+        // `None` after REST deserialization. We call `try_parse_abi()` locally to derive the
+        // ABI from the bytecode field instead.
+        let module: MoveModuleBytecode = self
+            .rest_client
+            .get_account_module(struct_tag.address, struct_tag.module.as_str())
+            .await
+            .map_err(|e| {
+                CliError::CommandArgumentError(format!(
+                    "Failed to fetch module {}::{}: {}",
+                    struct_tag.address, struct_tag.module, e
+                ))
+            })?
+            .into_inner()
+            .try_parse_abi()
+            .map_err(|e| {
+                CliError::CommandArgumentError(format!(
+                    "Failed to parse ABI for module {}::{}: {}",
+                    struct_tag.address, struct_tag.module, e
+                ))
+            })?;
 
-        if !struct_exists {
+        let abi = module.abi.ok_or_else(|| {
+            CliError::CommandArgumentError(format!(
+                "Module {}::{} does not have valid ABI.",
+                struct_tag.address, struct_tag.module
+            ))
+        })?;
+
+        // Verify the struct exists in the ABI.
+        if !abi
+            .structs
+            .iter()
+            .any(|s| s.name.as_str() == struct_tag.name.as_str())
+        {
             return Err(CliError::CommandArgumentError(format!(
                 "Struct {} not found in module {}::{}",
                 struct_tag.name, struct_tag.address, struct_tag.module
             )));
         }
 
-        // Cache the result with deserialized module if we already have it
+        // Cache the ABI.
         self.module_cache
             .write()
             .map_err(|e| {
                 CliError::CommandArgumentError(format!("Failed to acquire cache write lock: {}", e))
             })?
-            .insert(module_id, CachedModule {
-                bytecode: module,
-                compiled: compiled_opt,
-            });
+            .insert(module_id, abi);
 
         Ok(())
     }
 
-    /// Get module from cache and ensure it's deserialized.
-    ///
-    /// Returns both the bytecode (for ABI access) and the compiled module.
-    /// Lazily deserializes the module if not already deserialized in cache.
+    /// Retrieve the cached ABI for the module containing `struct_tag`.
     ///
     /// # Precondition
-    /// `verify_struct_exists` must have been called first to ensure the module is cached.
-    fn get_cached_module(
-        &self,
-        struct_tag: &StructTag,
-    ) -> CliTypedResult<(MoveModuleBytecode, Option<CompiledModule>)> {
+    /// `verify_struct_exists` must have been called first to populate the cache.
+    fn get_cached_abi(&self, struct_tag: &StructTag) -> CliTypedResult<MoveModule> {
         let module_id = ModuleId::new(struct_tag.address, struct_tag.module.clone());
-
-        // Try read lock first for the common case where module is already deserialized
-        {
-            let cache_read = self.module_cache.read().map_err(|e| {
+        self.module_cache
+            .read()
+            .map_err(|e| {
                 CliError::CommandArgumentError(format!("Failed to acquire cache read lock: {}", e))
-            })?;
-
-            if let Some(cached) = cache_read.get(&module_id) {
-                if let Some(compiled) = &cached.compiled {
-                    // Already deserialized - return immediately
-                    return Ok((cached.bytecode.clone(), Some(compiled.clone())));
-                }
-                // If only ABI is present (compiled is None), continue to deserialization.
-                // Enums always need the compiled module for variant information.
-            } else {
-                return Err(CliError::CommandArgumentError(format!(
+            })?
+            .get(&module_id)
+            .cloned()
+            .ok_or_else(|| {
+                CliError::CommandArgumentError(format!(
                     "Module {}::{} not found in cache. verify_struct_exists must be called first.",
                     struct_tag.address, struct_tag.module
-                )));
-            }
-        } // Release read lock
+                ))
+            })
+    }
 
-        // Need to deserialize - acquire write lock
-        let mut cache_write = self.module_cache.write().map_err(|e| {
-            CliError::CommandArgumentError(format!("Failed to acquire cache write lock: {}", e))
-        })?;
-
-        // Double-check: another thread might have deserialized while we waited for write lock
-        if let Some(cached) = cache_write.get(&module_id) {
-            if let Some(compiled) = &cached.compiled {
-                return Ok((cached.bytecode.clone(), Some(compiled.clone())));
-            }
-
-            // Deserialize now
-            let compiled = Self::deserialize_module(&cached.bytecode, struct_tag)?;
-            let bytecode = cached.bytecode.clone();
-
-            // Update cache with deserialized module
-            cache_write.insert(module_id, CachedModule {
-                bytecode: bytecode.clone(),
-                compiled: Some(compiled.clone()),
-            });
-
-            Ok((bytecode, Some(compiled)))
-        } else {
-            Err(CliError::CommandArgumentError(format!(
-                "Module {}::{} disappeared from cache unexpectedly",
-                struct_tag.address, struct_tag.module
-            )))
-        }
+    /// Check if a StructTag is an enum using only the in-memory cache (no REST call).
+    ///
+    /// Returns `Some(true)` if the type is an enum, `Some(false)` if it is a struct, and
+    /// `None` if the module has not been cached yet (i.e. `verify_struct_exists` was not
+    /// called first).  Callers that need a definitive answer must call `verify_struct_exists`
+    /// before this method.
+    pub fn is_enum_from_cache(&self, struct_tag: &StructTag) -> Option<bool> {
+        let module_id = ModuleId::new(struct_tag.address, struct_tag.module.clone());
+        let cache = self.module_cache.read().ok()?;
+        let abi = cache.get(&module_id)?;
+        let struct_def = abi
+            .structs
+            .iter()
+            .find(|s| s.name.as_str() == struct_tag.name.as_str())?;
+        Some(struct_def.is_enum)
     }
 
     /// Check nesting depth limit to prevent stack overflow.
@@ -301,43 +209,33 @@ impl StructArgParser {
 
     /// Check if a StructTag represents an enum type (has variants).
     ///
-    /// This allows us to determine whether to attempt enum or struct parsing
-    /// without the overhead of a failed parsing attempt.
+    /// Uses the ABI `is_enum` flag directly — no bytecode deserialization required.
     ///
     /// # Precondition
     /// `verify_struct_exists` must have been called first to ensure the module is cached.
     ///
     /// # Returns
-    /// - `Ok(true)` if the type is an enum (has DeclaredVariants)
-    /// - `Ok(false)` if the type is a struct (has Declared fields)
-    /// - `Err` if the type is Native or not found
+    /// - `Ok(true)` if the type is an enum
+    /// - `Ok(false)` if the type is a struct
     pub async fn is_enum_type(&self, struct_tag: &StructTag) -> CliTypedResult<bool> {
-        // Verify the struct exists and is cached
         self.verify_struct_exists(struct_tag).await?;
-
-        let (_module, compiled_opt) = self.get_cached_module(struct_tag)?;
-        let compiled_module = compiled_opt.ok_or_else(|| {
-            CliError::CommandArgumentError(format!(
-                "Module {}::{} should have been deserialized but wasn't",
-                struct_tag.address, struct_tag.module
-            ))
-        })?;
-
-        let struct_def = Self::find_struct_def(&compiled_module, struct_tag)?;
-
-        match &struct_def.field_information {
-            StructFieldInformation::DeclaredVariants(_) => Ok(true),
-            StructFieldInformation::Declared(_) => Ok(false),
-            StructFieldInformation::Native => Err(CliError::CommandArgumentError(format!(
-                "Type {} is a native type and cannot be used as a transaction argument",
-                struct_tag.name
-            ))),
-        }
+        let abi = self.get_cached_abi(struct_tag)?;
+        let struct_def = abi
+            .structs
+            .iter()
+            .find(|s| s.name.as_str() == struct_tag.name.as_str())
+            .ok_or_else(|| {
+                CliError::CommandArgumentError(format!(
+                    "Type {} not found in ABI of module {}::{}",
+                    struct_tag.name, struct_tag.address, struct_tag.module
+                ))
+            })?;
+        Ok(struct_def.is_enum)
     }
 
     /// Parse Option<T> value which can be in two formats:
     /// 1. Legacy array format: [] for None, [value] for Some(value)
-    /// 2. New enum format: {"None": {}} or {"Some": {"0": value}}
+    /// 2. New enum format: {"None": {}} or {"Some": {"e": value}}
     ///
     /// This helper extracts repeated logic for Option handling that appears in
     /// multiple places (types.rs and parse_value_by_type).
@@ -359,7 +257,7 @@ impl StructArgParser {
             self.construct_enum_argument(struct_tag, variant, &fields_map, depth)
                 .await
         } else if value.is_object() {
-            // New enum format: {"None": {}} or {"Some": {"0": value}}
+            // New enum format: {"None": {}} or {"Some": {"e": value}}
             let obj = value.as_object().ok_or_else(|| {
                 CliError::CommandArgumentError(format!(
                     "Expected object for Option enum format, got: {}",
@@ -377,7 +275,7 @@ impl StructArgParser {
                 }
             }
             Err(CliError::CommandArgumentError(format!(
-                "Invalid Option format. Expected {{\"None\": {{}}}} or {{\"Some\": {{\"0\": value}}}}, got {}",
+                "Invalid Option format. Expected {{\"None\": {{}}}} or {{\"Some\": {{\"e\": value}}}}, got {}",
                 value
             )))
         } else {
@@ -388,53 +286,9 @@ impl StructArgParser {
         }
     }
 
-    /// Deserialize module bytecode to CompiledModule.
-    fn deserialize_module(
-        module: &MoveModuleBytecode,
-        struct_tag: &StructTag,
-    ) -> CliTypedResult<CompiledModule> {
-        CompiledModule::deserialize(module.bytecode.inner()).map_err(|e| {
-            CliError::CommandArgumentError(format!(
-                "Failed to deserialize module {}::{}: {}",
-                struct_tag.address, struct_tag.module, e
-            ))
-        })
-    }
-
-    /// Find struct/enum definition in compiled module by name.
-    fn find_struct_def<'a>(
-        compiled_module: &'a CompiledModule,
-        struct_tag: &StructTag,
-    ) -> CliTypedResult<&'a StructDefinition> {
-        compiled_module
-            .struct_defs
-            .iter()
-            .find(|def| {
-                let handle = ModuleAccess::struct_handle_at(compiled_module, def.struct_handle);
-                ModuleAccess::identifier_at(compiled_module, handle.name).as_str()
-                    == struct_tag.name.as_str()
-            })
-            .ok_or_else(|| {
-                CliError::CommandArgumentError(format!(
-                    "Type {} not found in module {}::{}",
-                    struct_tag.name, struct_tag.address, struct_tag.module
-                ))
-            })
-    }
-
     /// Construct a struct argument by parsing fields and encoding to BCS.
     ///
-    /// # Why REST API access is necessary
-    ///
-    /// Unlike primitive types where the BCS encoding rules are fixed and known at compile time,
-    /// struct/enum types require querying on-chain module bytecode to:
-    /// 1. Verify the type exists and is accessible (public visibility)
-    /// 2. Get field names, types, and order for correct BCS encoding
-    /// 3. Support generic type instantiation (e.g., Option<T>, vector<T>)
-    /// 4. Handle enum variant tags and field layouts
-    ///
-    /// The BCS encoding must exactly match the on-chain type definition, which can vary
-    /// between deployments and cannot be determined from the type string alone.
+    /// Uses the module ABI for field names and types. Only modules with ABI are supported.
     pub async fn construct_struct_argument(
         &self,
         struct_tag: &StructTag,
@@ -444,71 +298,32 @@ impl StructArgParser {
         // Check nesting depth limit
         Self::check_depth(depth, "Struct")?;
 
-        // Verify struct exists and cache module
+        // Verify struct exists and populate cache
         self.verify_struct_exists(struct_tag).await?;
 
-        // Get cached module (with lazy deserialization)
-        let (module, compiled_opt) = self.get_cached_module(struct_tag)?;
-
-        // Get struct field information - first try from ABI, fall back to deserialized bytecode
-        let fields = if let Some(abi) = &module.abi {
-            // Use ABI if available
-            let struct_def = abi
-                .structs
-                .iter()
-                .find(|s| s.name.as_str() == struct_tag.name.as_str())
-                .ok_or_else(|| {
-                    CliError::CommandArgumentError(format!(
-                        "Struct {} not found in module {}::{}",
-                        struct_tag.name, struct_tag.address, struct_tag.module
-                    ))
-                })?;
-
-            // Check if this is actually an enum (enums have empty fields in ABI due to TODO(#13806))
-            // If it's an enum, we must reject it here to avoid silently returning empty BCS bytes
-            if struct_def.is_enum {
-                return Err(CliError::CommandArgumentError(format!(
-                    "Type {} is an enum.",
-                    struct_tag.name
-                )));
-            }
-
-            struct_def.fields.clone()
-        } else {
-            // Use already-deserialized module from cache
-            let compiled_module = compiled_opt.ok_or_else(|| {
+        let abi = self.get_cached_abi(struct_tag)?;
+        let struct_def = abi
+            .structs
+            .iter()
+            .find(|s| s.name.as_str() == struct_tag.name.as_str())
+            .ok_or_else(|| {
                 CliError::CommandArgumentError(format!(
-                    "Module {}::{} should have been deserialized but wasn't",
-                    struct_tag.address, struct_tag.module
+                    "Struct {} not found in module {}::{}",
+                    struct_tag.name, struct_tag.address, struct_tag.module
                 ))
             })?;
 
-            // Find the struct definition
-            let struct_def = Self::find_struct_def(&compiled_module, struct_tag)?;
+        // Reject enums passed to the struct path.
+        if struct_def.is_enum {
+            return Err(CliError::CommandArgumentError(format!(
+                "Type {} is an enum.",
+                struct_tag.name
+            )));
+        }
 
-            // Extract fields from struct definition
-            match &struct_def.field_information {
-                StructFieldInformation::Declared(field_defs) => field_defs
-                    .iter()
-                    .map(|f| convert_field_to_move_struct_field(&compiled_module, f))
-                    .collect(),
-                StructFieldInformation::Native => {
-                    return Err(CliError::CommandArgumentError(format!(
-                        "Struct {} is a native struct and cannot be used as a transaction argument",
-                        struct_tag.name
-                    )));
-                },
-                StructFieldInformation::DeclaredVariants(_) => {
-                    return Err(CliError::CommandArgumentError(format!(
-                        "Struct {} is an enum. Use enum variant syntax instead.",
-                        struct_tag.name
-                    )));
-                },
-            }
-        };
+        let fields = &struct_def.fields;
 
-        // Validate that all provided fields exist in the struct definition
-        // This catches typos and malformed JSON that could produce unintended transactions
+        // Validate that all provided fields exist in the struct definition.
         let expected_field_names: std::collections::HashSet<&str> =
             fields.iter().map(|f| f.name.as_str()).collect();
 
@@ -524,10 +339,10 @@ impl StructArgParser {
             }
         }
 
-        // Parse and encode each field
+        // Parse and encode each field.
         let mut encoded_fields = Vec::new();
 
-        for field in &fields {
+        for field in fields {
             let field_name = field.name.as_str();
             let field_value = field_values.get(field_name).ok_or_else(|| {
                 CliError::CommandArgumentError(format!(
@@ -536,9 +351,7 @@ impl StructArgParser {
                 ))
             })?;
 
-            // Substitute type parameters if this is a generic struct
             let field_type = substitute_type_params(&field.typ, struct_tag)?;
-
             let encoded_value = self
                 .parse_value_by_type(&field_type, field_value, depth)
                 .await?;
@@ -549,6 +362,8 @@ impl StructArgParser {
     }
 
     /// Construct an enum argument by encoding variant index and fields.
+    ///
+    /// Uses the module ABI for variant names and field types. Only modules with ABI are supported.
     ///
     /// For backward compatibility, Option<T> is encoded as a vector:
     /// - None → vec[] (empty vector, length 0)
@@ -563,8 +378,8 @@ impl StructArgParser {
         // Check nesting depth limit
         Self::check_depth(depth, "Enum")?;
 
-        // Special handling for Option<T> for backward compatibility (uses vector encoding)
-        // Check full module path to ensure it's std::option::Option, not a custom enum named "Option"
+        // Special handling for Option<T> for backward compatibility (uses vector encoding).
+        // Check full module path to ensure it's std::option::Option, not a custom enum named "Option".
         if struct_tag.is_option() {
             // Convert field_values map to array for Option
             let fields_array = if field_values.is_empty() {
@@ -574,7 +389,7 @@ impl StructArgParser {
                     "Option::None should not have any fields".to_string(),
                 ));
             } else {
-                // For Option::Some, expect a single field named "0"
+                // For Option::Some, expect a single field named "e"
                 if field_values.len() != 1 {
                     return Err(CliError::CommandArgumentError(format!(
                         "Option::Some expects exactly 1 field, got {}",
@@ -582,11 +397,10 @@ impl StructArgParser {
                     )));
                 }
 
-                // Validate that the field name is "0"
-                let field_value = field_values.get("0").ok_or_else(|| {
+                let field_value = field_values.get("e").ok_or_else(|| {
                     let actual_field = field_values.keys().next().unwrap();
                     CliError::CommandArgumentError(format!(
-                        "Option::Some field must be named \"0\", got \"{}\"",
+                        "Option::Some field must be named \"e\", got \"{}\"",
                         actual_field
                     ))
                 })?;
@@ -598,40 +412,39 @@ impl StructArgParser {
                 .await;
         }
 
-        // Verify enum exists and get cached/deserialized module
+        // Verify enum exists and populate cache.
         self.verify_struct_exists(struct_tag).await?;
-        let (_module, compiled_opt) = self.get_cached_module(struct_tag)?;
-        let compiled_module = compiled_opt.ok_or_else(|| {
-            CliError::CommandArgumentError(format!(
-                "Module {}::{} should have been deserialized but wasn't",
-                struct_tag.address, struct_tag.module
-            ))
-        })?;
 
-        // Find the enum definition
-        let enum_def = Self::find_struct_def(&compiled_module, struct_tag)?;
+        let abi = self.get_cached_abi(struct_tag)?;
+        let struct_def = abi
+            .structs
+            .iter()
+            .find(|s| s.name.as_str() == struct_tag.name.as_str())
+            .ok_or_else(|| {
+                CliError::CommandArgumentError(format!(
+                    "Type {} not found in ABI of module {}::{}",
+                    struct_tag.name, struct_tag.address, struct_tag.module
+                ))
+            })?;
 
-        // Extract variant definitions
-        let variants = match &enum_def.field_information {
-            StructFieldInformation::DeclaredVariants(variants) => variants,
-            StructFieldInformation::Native => {
-                return Err(CliError::CommandArgumentError(format!(
-                    "Type {} is a native type and cannot be used as a transaction argument",
-                    struct_tag.name
-                )));
-            },
-            StructFieldInformation::Declared(_) => {
-                return Err(CliError::StructNotEnumError(struct_tag.name.to_string()));
-            },
-        };
+        if !struct_def.is_enum {
+            return Err(CliError::StructNotEnumError(struct_tag.name.to_string()));
+        }
 
-        // Find the variant by name and get its index
+        if struct_def.variants.is_empty() {
+            return Err(CliError::CommandArgumentError(format!(
+                "Enum {} has no variants in ABI. The node may not support enum ABI.",
+                struct_tag.name
+            )));
+        }
+
+        let variants = &struct_def.variants;
+
+        // Find the variant by name and get its index.
         let (variant_index, variant_def) = variants
             .iter()
             .enumerate()
-            .find(|(_, v)| {
-                ModuleAccess::identifier_at(&compiled_module, v.name).as_str() == variant
-            })
+            .find(|(_, v)| v.name.as_str() == variant)
             .ok_or_else(|| {
                 CliError::CommandArgumentError(format!(
                     "Variant '{}' not found in enum {}::{}::{}. Available variants: {}",
@@ -641,23 +454,19 @@ impl StructArgParser {
                     struct_tag.name,
                     variants
                         .iter()
-                        .map(|v| ModuleAccess::identifier_at(&compiled_module, v.name).as_str())
+                        .map(|v| v.name.as_str())
                         .collect::<Vec<_>>()
                         .join(", ")
                 ))
             })?;
 
-        // Start encoding: variant index (ULEB128) + fields
+        // Start encoding: variant index (ULEB128) + fields.
         let mut encoded = Vec::new();
         encode_uleb128(variant_index as u64, &mut encoded);
 
-        // Validate that all provided fields exist in the variant definition
-        // This catches typos and malformed JSON that could produce unintended transactions
-        let expected_field_names: std::collections::HashSet<&str> = variant_def
-            .fields
-            .iter()
-            .map(|f| ModuleAccess::identifier_at(&compiled_module, f.name).as_str())
-            .collect();
+        // Validate that all provided fields exist in the variant definition.
+        let expected_field_names: std::collections::HashSet<&str> =
+            variant_def.fields.iter().map(|f| f.name.as_str()).collect();
 
         for provided_field_name in field_values.keys() {
             if !expected_field_names.contains(provided_field_name.as_str()) {
@@ -672,24 +481,15 @@ impl StructArgParser {
             }
         }
 
-        // Parse and encode each field
-        for field_def in &variant_def.fields {
-            let field_name = ModuleAccess::identifier_at(&compiled_module, field_def.name);
-            let field_value = field_values.get(field_name.as_str()).ok_or_else(|| {
+        // Parse and encode each field.
+        for field in &variant_def.fields {
+            let field_value = field_values.get(field.name.as_str()).ok_or_else(|| {
                 CliError::CommandArgumentError(format!(
                     "Missing field '{}' for variant {}::{}",
-                    field_name, struct_tag.name, variant
+                    field.name, struct_tag.name, variant
                 ))
             })?;
-
-            // Convert field signature to MoveType
-            let field_type =
-                convert_signature_token_to_move_type(&compiled_module, &field_def.signature.0);
-
-            // Substitute type parameters if this is a generic enum
-            let field_type = substitute_type_params(&field_type, struct_tag)?;
-
-            // Encode the field value
+            let field_type = substitute_type_params(&field.typ, struct_tag)?;
             let encoded_value = self
                 .parse_value_by_type(&field_type, field_value, depth)
                 .await?;
@@ -860,7 +660,8 @@ impl StructArgParser {
     /// - String (0x1::string::String): UTF-8 string encoding
     /// - Object<T> (0x1::object::Object): Address wrapper
     /// - FixedPoint32/64: Numeric encoding
-    /// - Regular structs: Field-by-field parsing
+    /// - Regular structs: Field-by-field parsing via ABI
+    /// - Enums: Variant-index + field encoding via ABI
     #[async_recursion]
     async fn parse_struct(
         &self,
@@ -892,12 +693,6 @@ impl StructArgParser {
         // from generic struct handling:
         // - String (0x1::string::String): UTF-8 encoded string, not a generic struct
         // - Object (0x1::object::Object<T>): Address wrapper with phantom type parameter
-        //
-        // TODO: Consider a more systematic registration mechanism for special types
-        // as the framework evolves. Potential approaches:
-        // 1. Annotation-based: Mark special types in framework with #[special_parsing]
-        // 2. Plugin-based: Allow framework to register custom parsers
-        // 3. ABI extension: Add parsing hints to module ABI
         match qualified_name.as_str() {
             STRING_TYPE_STR => {
                 // String: parse as JSON string and BCS encode it
@@ -1129,95 +924,6 @@ fn parse_i256(value: &JsonValue) -> CliTypedResult<I256> {
     I256::from_str(s).map_err(|e| CliError::UnableToParse("i256", e.to_string()))
 }
 
-/// Convert FieldDefinition to MoveStructField using CompiledModule.
-fn convert_field_to_move_struct_field(
-    module: &CompiledModule,
-    field_def: &move_binary_format::file_format::FieldDefinition,
-) -> MoveStructField {
-    MoveStructField {
-        name: ModuleAccess::identifier_at(module, field_def.name)
-            .to_owned()
-            .into(),
-        typ: convert_signature_token_to_move_type(module, &field_def.signature.0),
-    }
-}
-
-/// Helper to create MoveStructTag from struct handle index and optional type arguments.
-fn create_move_struct_tag(
-    module: &CompiledModule,
-    idx: move_binary_format::file_format::StructHandleIndex,
-    type_args: &[move_binary_format::file_format::SignatureToken],
-) -> MoveStructTag {
-    let handle = ModuleAccess::struct_handle_at(module, idx);
-    let module_handle = ModuleAccess::module_handle_at(module, handle.module);
-    MoveStructTag {
-        address: (*ModuleAccess::address_identifier_at(module, module_handle.address)).into(),
-        module: ModuleAccess::identifier_at(module, module_handle.name)
-            .to_owned()
-            .into(),
-        name: ModuleAccess::identifier_at(module, handle.name)
-            .to_owned()
-            .into(),
-        generic_type_params: type_args
-            .iter()
-            .map(|t| convert_signature_token_to_move_type(module, t))
-            .collect(),
-    }
-}
-
-/// Convert SignatureToken to MoveType using CompiledModule for lookups.
-fn convert_signature_token_to_move_type(
-    module: &CompiledModule,
-    token: &move_binary_format::file_format::SignatureToken,
-) -> MoveType {
-    use move_binary_format::file_format::SignatureToken;
-
-    match token {
-        SignatureToken::Bool => MoveType::Bool,
-        SignatureToken::U8 => MoveType::U8,
-        SignatureToken::U16 => MoveType::U16,
-        SignatureToken::U32 => MoveType::U32,
-        SignatureToken::U64 => MoveType::U64,
-        SignatureToken::U128 => MoveType::U128,
-        SignatureToken::U256 => MoveType::U256,
-        SignatureToken::I8 => MoveType::I8,
-        SignatureToken::I16 => MoveType::I16,
-        SignatureToken::I32 => MoveType::I32,
-        SignatureToken::I64 => MoveType::I64,
-        SignatureToken::I128 => MoveType::I128,
-        SignatureToken::I256 => MoveType::I256,
-        SignatureToken::Address => MoveType::Address,
-        SignatureToken::Signer => MoveType::Signer,
-        SignatureToken::Vector(inner) => MoveType::Vector {
-            items: Box::new(convert_signature_token_to_move_type(module, inner)),
-        },
-        SignatureToken::Struct(idx) => MoveType::Struct(create_move_struct_tag(module, *idx, &[])),
-        SignatureToken::StructInstantiation(idx, type_args) => {
-            MoveType::Struct(create_move_struct_tag(module, *idx, type_args))
-        },
-        SignatureToken::TypeParameter(idx) => MoveType::GenericTypeParam { index: *idx },
-        SignatureToken::Reference(inner) => MoveType::Reference {
-            mutable: false,
-            to: Box::new(convert_signature_token_to_move_type(module, inner)),
-        },
-        SignatureToken::MutableReference(inner) => MoveType::Reference {
-            mutable: true,
-            to: Box::new(convert_signature_token_to_move_type(module, inner)),
-        },
-        SignatureToken::Function(args, results, abilities) => MoveType::Function {
-            args: args
-                .iter()
-                .map(|t| convert_signature_token_to_move_type(module, t))
-                .collect(),
-            results: results
-                .iter()
-                .map(|t| convert_signature_token_to_move_type(module, t))
-                .collect(),
-            abilities: *abilities,
-        },
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1307,7 +1013,7 @@ mod tests {
                 {
                     "type": "0x1::option::Option<u64>",
                     "value": {
-                        "Some": {"0": "100"}
+                        "Some": {"e": "100"}
                     }
                 }
             ]

@@ -291,7 +291,7 @@ impl TryFrom<&Vec<ArgWithTypeJSON>> for ArgWithTypeVec {
                 // TryFrom implementation. Use the async method instead.
                 return Err(CliError::CommandArgumentError(
                     "Struct and enum arguments require REST API access to fetch module bytecode. \
-                     Use the async method check_input_style_async() or try_into_with_client() instead."
+                     Use try_into_with_client() instead."
                         .to_string(),
                 ));
             }
@@ -370,66 +370,6 @@ impl EntryFunctionArguments {
         } else {
             Ok(self)
         }
-    }
-
-    /// Extended version of check_input_style that supports struct/enum arguments.
-    ///
-    /// This method is async because it may need to query the blockchain via REST API to:
-    /// - Fetch module bytecode for struct/enum type validation
-    /// - Verify that struct/enum types exist and are accessible
-    /// - Parse field definitions for proper BCS encoding
-    ///
-    /// Use this method when the JSON file might contain struct/enum arguments (types
-    /// containing `::` separator). For simple primitive arguments, the synchronous
-    /// `check_input_style()` method can be used instead.
-    pub async fn check_input_style_async(
-        self,
-        rest_client: &aptos_rest_client::Client,
-    ) -> CliTypedResult<EntryFunctionArguments> {
-        if let Some(json_path) = self.json_file {
-            let json_args = parse_json_file::<EntryFunctionArgumentsJSON>(&json_path)?;
-
-            // Check if there are struct/enum arguments
-            if json_args.has_struct_or_enum_args() {
-                // Parse with REST client for module bytecode access
-                Ok(json_args.try_into_with_client(rest_client).await?)
-            } else {
-                // Use synchronous parsing for backward compatibility with primitive types
-                Ok(json_args.try_into()?)
-            }
-        } else {
-            Ok(self)
-        }
-    }
-
-    /// Convert to EntryFunction with async support for struct/enum arguments.
-    pub async fn try_into_entry_function_async(
-        self,
-        rest_client: &aptos_rest_client::Client,
-    ) -> CliTypedResult<EntryFunction> {
-        let parsed_arguments = self.check_input_style_async(rest_client).await?;
-        let function_id: MemberId = (&parsed_arguments).try_into()?;
-        Ok(EntryFunction::new(
-            function_id.module_id,
-            function_id.member_id,
-            parsed_arguments.type_arg_vec.try_into()?,
-            parsed_arguments.arg_vec.try_into()?,
-        ))
-    }
-
-    /// Convert to ViewFunction with async support for struct/enum arguments.
-    pub async fn try_into_view_function_async(
-        self,
-        rest_client: &aptos_rest_client::Client,
-    ) -> CliTypedResult<ViewFunction> {
-        let view_function_args = self.check_input_style_async(rest_client).await?;
-        let function_id: MemberId = (&view_function_args).try_into()?;
-        Ok(ViewFunction {
-            module: function_id.module_id,
-            function: function_id.member_id,
-            ty_args: view_function_args.type_arg_vec.try_into()?,
-            args: view_function_args.arg_vec.try_into()?,
-        })
     }
 
     /// Parse entry function arguments, using async parsing only if needed.
@@ -676,19 +616,19 @@ impl EntryFunctionArgumentsJSON {
                         })?;
                         Self::parse_option_vector_format(parser, &struct_tag, array).await
                     } else if let Some(obj) = arg_json.value.as_object() {
-                        // Value is an object - could be enum variant or struct
-                        if obj.len() == 1 {
-                            let (potential_variant_name, variant_fields_value) =
-                                obj.iter().next().unwrap();
+                        // Option with object format: {"None": {}} or {"Some": {"e": value}}.
+                        // Handle before the general enum/struct path to avoid fetching Option's
+                        // ABI (Option is represented as a legacy struct in ABI, not an enum).
+                        if is_option {
+                            if obj.len() == 1 {
+                                let (variant_name, variant_fields_value) =
+                                    obj.iter().next().unwrap();
 
-                            if let Some(fields_obj) = variant_fields_value.as_object() {
-                                let is_enum = parser.is_enum_type(&struct_tag).await?;
-
-                                if is_enum {
+                                if let Some(fields_obj) = variant_fields_value.as_object() {
                                     let bcs_bytes = parser
                                         .construct_enum_argument(
                                             &struct_tag,
-                                            potential_variant_name,
+                                            variant_name,
                                             fields_obj,
                                             0,
                                         )
@@ -697,28 +637,70 @@ impl EntryFunctionArgumentsJSON {
                                     return Ok(ArgWithType {
                                         _ty: FunctionArgType::Enum {
                                             type_tag: struct_tag.clone(),
-                                            variant: potential_variant_name.to_string(),
+                                            variant: variant_name.to_string(),
                                         },
                                         _vector_depth: 0,
                                         arg: bcs_bytes,
                                     });
                                 }
-                                // Not an enum - fall through to struct parsing
                             }
+                            return Err(CliError::CommandArgumentError(format!(
+                                "Invalid Option format. \
+                                 Expected {{\"None\": {{}}}} or {{\"Some\": {{\"e\": value}}}}, \
+                                 got {}",
+                                arg_json.value
+                            )));
                         }
 
-                        // Parse as struct
-                        let bcs_bytes = parser
-                            .construct_struct_argument(&struct_tag, obj, 0)
-                            .await?;
-
-                        Ok(ArgWithType {
-                            _ty: FunctionArgType::Struct {
-                                type_tag: struct_tag.clone(),
+                        // Non-Option: try struct parsing first.
+                        // construct_struct_argument populates the ABI cache and also rejects
+                        // enum types, so if it succeeds we are done.  If it fails we inspect
+                        // the cache (no extra REST call) to decide whether to retry as an enum.
+                        match parser.construct_struct_argument(&struct_tag, obj, 0).await {
+                            Ok(bcs_bytes) => Ok(ArgWithType {
+                                _ty: FunctionArgType::Struct {
+                                    type_tag: struct_tag.clone(),
+                                },
+                                _vector_depth: 0,
+                                arg: bcs_bytes,
+                            }),
+                            Err(struct_err) => {
+                                // The ABI is now cached; check without an extra REST call.
+                                if parser.is_enum_from_cache(&struct_tag) == Some(true) {
+                                    // Type is an enum — it must be {"VariantName": {fields}}.
+                                    if obj.len() == 1 {
+                                        let (variant_name, variant_fields_value) =
+                                            obj.iter().next().unwrap();
+                                        if let Some(fields_obj) = variant_fields_value.as_object() {
+                                            let bcs_bytes = parser
+                                                .construct_enum_argument(
+                                                    &struct_tag,
+                                                    variant_name,
+                                                    fields_obj,
+                                                    0,
+                                                )
+                                                .await?;
+                                            return Ok(ArgWithType {
+                                                _ty: FunctionArgType::Enum {
+                                                    type_tag: struct_tag.clone(),
+                                                    variant: variant_name.to_string(),
+                                                },
+                                                _vector_depth: 0,
+                                                arg: bcs_bytes,
+                                            });
+                                        }
+                                    }
+                                    Err(CliError::CommandArgumentError(format!(
+                                        "Enum {} must be specified as \
+                                         {{\"VariantName\": {{fields}}}}",
+                                        struct_tag.name
+                                    )))
+                                } else {
+                                    // Not an enum — surface the original struct parse error.
+                                    Err(struct_err)
+                                }
                             },
-                            _vector_depth: 0,
-                            arg: bcs_bytes,
-                        })
+                        }
                     } else {
                         // Delegate to parse_value_by_type for framework types and others
                         let move_struct_tag = MoveStructTag::from(&struct_tag);
