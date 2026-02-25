@@ -11,6 +11,7 @@ module aptos_framework::aptos_coin {
     use aptos_framework::system_addresses;
 
     friend aptos_framework::genesis;
+    friend aptos_framework::stake;
 
     /// Account does not have mint capability
     const ENO_CAPABILITIES: u64 = 1;
@@ -20,7 +21,6 @@ module aptos_framework::aptos_coin {
     const EDELEGATION_NOT_FOUND: u64 = 3;
 
     /// Hard cap on total APT supply: 2.1 billion APT expressed in octas (8 decimal places).
-    /// Any mint that would push the circulating supply above this value will abort.
     const MAX_APT_SUPPLY: u128 = 210_000_000_000_000_000;
 
     struct AptosCoin has key {}
@@ -39,16 +39,30 @@ module aptos_framework::aptos_coin {
         inner: vector<DelegatedMintCapability>,
     }
 
+    /// Tracks how much new inflationary APT (staking rewards) can still be minted.
+    /// Set once at genesis end: remaining = MAX_APT_SUPPLY - genesis_supply.
+    /// Decremented on every staking reward payout; never increases.
+    ///
+    /// This resource is the sole enforcement point for the 2.1B supply cap.
+    /// Storage refunds and fee redistribution are explicitly excluded because they
+    /// return previously-burned tokens — they are net-neutral with respect to supply.
+    struct InflationBudget has key {
+        remaining: u128,
+    }
+
     /// Can only called during genesis to initialize the Aptos coin.
     public(friend) fun initialize(aptos_framework: &signer): (BurnCapability<AptosCoin>, MintCapability<AptosCoin>) {
         system_addresses::assert_aptos_framework(aptos_framework);
 
-        let (burn_cap, freeze_cap, mint_cap) = coin::initialize_with_supply_cap<AptosCoin>(
+        // Use parallelizable supply tracking (MAX_U128 aggregator limit).
+        // The supply cap is enforced via InflationBudget, not the aggregator limit, so
+        // that restorative mints (storage refunds, fee redistribution) are never blocked.
+        let (burn_cap, freeze_cap, mint_cap) = coin::initialize_with_parallelizable_supply<AptosCoin>(
             aptos_framework,
             string::utf8(b"Aptos Coin"),
             string::utf8(b"APT"),
             8, // decimals
-            MAX_APT_SUPPLY,
+            true, // monitor_supply
         );
 
         // Aptos framework needs mint cap to mint coins to initial validators. This will be revoked once the validators
@@ -57,6 +71,50 @@ module aptos_framework::aptos_coin {
 
         coin::destroy_freeze_cap(freeze_cap);
         (burn_cap, mint_cap)
+    }
+
+    /// Called at the end of genesis, after all initial validator accounts have been funded.
+    /// Locks in the inflation budget: how much more APT may ever be created via staking rewards.
+    ///
+    ///   inflation_budget = MAX_APT_SUPPLY − genesis_supply
+    ///
+    /// Once set, this budget only decreases (each epoch's rewards consume it). It is never
+    /// replenished by burns or refunds, which means storage refunds and fee redistribution
+    /// can always proceed without competing for the same headroom.
+    ///
+    /// If InflationBudget already exists (e.g. called twice in tests), this is a no-op.
+    public(friend) fun initialize_inflation_budget(aptos_framework: &signer) {
+        system_addresses::assert_aptos_framework(aptos_framework);
+        if (exists<InflationBudget>(@aptos_framework)) {
+            return
+        };
+        let genesis_supply = coin::supply<AptosCoin>().destroy_some();
+        let remaining = if (genesis_supply < MAX_APT_SUPPLY) {
+            MAX_APT_SUPPLY - genesis_supply
+        } else {
+            0
+        };
+        move_to(aptos_framework, InflationBudget { remaining });
+    }
+
+    /// Returns how many more octas of inflationary APT (staking rewards) may be minted.
+    /// Returns MAX_U128 when the InflationBudget resource has not been initialized yet
+    /// (e.g. during genesis or in isolated unit tests), indicating no cap is in effect.
+    public fun inflation_budget_remaining(): u128 acquires InflationBudget {
+        if (!exists<InflationBudget>(@aptos_framework)) {
+            return (340282366920938463463374607431768211455u128) // MAX_U128 — no cap yet
+        };
+        borrow_global<InflationBudget>(@aptos_framework).remaining
+    }
+
+    /// Consumes `amount` octas from the inflation budget.
+    /// Called exclusively by `stake::distribute_rewards` after minting epoch rewards.
+    public(friend) fun consume_inflation_budget(amount: u128) acquires InflationBudget {
+        if (!exists<InflationBudget>(@aptos_framework)) {
+            return // no-op during genesis / isolated tests
+        };
+        let budget = borrow_global_mut<InflationBudget>(@aptos_framework);
+        budget.remaining = budget.remaining - amount;
     }
 
     public fun has_mint_capability(account: &signer): bool {
@@ -82,8 +140,9 @@ module aptos_framework::aptos_coin {
         system_addresses::assert_aptos_framework(aptos_framework);
 
         // Mint the core resource account AptosCoin for gas so it can execute system transactions.
-        // Amount is chosen to be large enough for all test scenarios while staying under
-        // the MAX_APT_SUPPLY hard cap (210_000_000_000_000_000 octas = 2.1B APT).
+        // Amount is chosen to be large enough for all test scenarios while staying well under
+        // MAX_APT_SUPPLY (210_000_000_000_000_000 octas = 2.1B APT), leaving ~100M APT
+        // as inflation budget for test staking rewards.
         let coins = coin::mint<AptosCoin>(
             200_000_000_000_000_000,
             &mint_cap,

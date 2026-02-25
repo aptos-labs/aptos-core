@@ -2012,8 +2012,10 @@ module aptos_framework::stake {
     }
 
     /// Mint rewards corresponding to current epoch's `stake` and `num_successful_votes`.
-    /// Rewards are clamped to the remaining supply headroom so that reaching the hard APT
-    /// supply cap causes rewards to taper to zero rather than aborting the epoch transaction.
+    ///
+    /// Rewards are clamped to the remaining InflationBudget so that total APT supply never
+    /// exceeds the 2.1B hard cap. The cap is enforced only here — restorative mints (storage
+    /// refunds, fee redistribution) are not subject to this limit and will always succeed.
     fun distribute_rewards(
         stake: &mut Coin<AptosCoin>,
         num_successful_proposals: u64,
@@ -2033,14 +2035,17 @@ module aptos_framework::stake {
                 )
             } else { 0 };
         if (rewards_amount > 0) {
-            // Clamp to available headroom so we never breach the hard supply cap.
-            let headroom = coin::mint_headroom<AptosCoin>();
-            let actual_rewards = if ((rewards_amount as u128) > headroom) {
-                (headroom as u64)
+            // Clamp to remaining inflation budget. Invariant guaranteed by InflationBudget:
+            //   supply = genesis_supply + total_rewards - net_burned ≤ MAX_APT_SUPPLY
+            // (net_burned ≥ 0 since restorations ≤ burns, always)
+            let budget = aptos_coin::inflation_budget_remaining();
+            let actual_rewards = if ((rewards_amount as u128) > budget) {
+                (budget as u64)
             } else {
                 rewards_amount
             };
             if (actual_rewards > 0) {
+                aptos_coin::consume_inflation_budget(actual_rewards as u128);
                 let mint_cap =
                     &borrow_global<AptosCoinCapabilities>(@aptos_framework).mint_cap;
                 let rewards = coin::mint(actual_rewards, mint_cap);
