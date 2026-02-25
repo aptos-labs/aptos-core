@@ -904,9 +904,12 @@ pub async fn submit_transaction_handler(
     } else {
         let req: aptos_api_types::SubmitTransactionRequest = serde_json::from_slice(&body)
             .map_err(|e| {
-                AptosErrorResponse::bad_request(
-                    format!("Failed to parse request body: {}", e),
-                    aptos_api_types::AptosErrorCode::InvalidInput,
+                AptosErrorResponse::new(
+                    StatusCode::BAD_REQUEST,
+                    aptos_api_types::AptosError::new_with_error_code(
+                        format!("parse request payload error: {}", e),
+                        aptos_api_types::AptosErrorCode::WebFrameworkError,
+                    ),
                     None,
                 )
             })?;
@@ -957,9 +960,12 @@ pub async fn submit_transactions_batch_handler(
     } else {
         let reqs: Vec<aptos_api_types::SubmitTransactionRequest> = serde_json::from_slice(&body)
             .map_err(|e| {
-                AptosErrorResponse::bad_request(
-                    format!("Failed to parse request body: {}", e),
-                    aptos_api_types::AptosErrorCode::InvalidInput,
+                AptosErrorResponse::new(
+                    StatusCode::BAD_REQUEST,
+                    aptos_api_types::AptosError::new_with_error_code(
+                        format!("parse request payload error: {}", e),
+                        aptos_api_types::AptosErrorCode::WebFrameworkError,
+                    ),
                     None,
                 )
             })?;
@@ -1003,9 +1009,12 @@ pub async fn simulate_transaction_handler(
     } else {
         let req: aptos_api_types::SubmitTransactionRequest = serde_json::from_slice(&body)
             .map_err(|e| {
-                AptosErrorResponse::bad_request(
-                    format!("Failed to parse request body: {}", e),
-                    aptos_api_types::AptosErrorCode::InvalidInput,
+                AptosErrorResponse::new(
+                    StatusCode::BAD_REQUEST,
+                    aptos_api_types::AptosError::new_with_error_code(
+                        format!("parse request payload error: {}", e),
+                        aptos_api_types::AptosErrorCode::WebFrameworkError,
+                    ),
                     None,
                 )
             })?;
@@ -1071,9 +1080,12 @@ pub async fn view_function_handler(
     } else {
         let view_request: aptos_api_types::ViewRequest =
             serde_json::from_slice(&body).map_err(|e| {
-                AptosErrorResponse::bad_request(
-                    format!("Failed to parse view function request: {}", e),
-                    aptos_api_types::AptosErrorCode::InvalidInput,
+                AptosErrorResponse::new(
+                    StatusCode::BAD_REQUEST,
+                    aptos_api_types::AptosError::new_with_error_code(
+                        format!("parse request payload error: {}", e),
+                        aptos_api_types::AptosErrorCode::WebFrameworkError,
+                    ),
                     None,
                 )
             })?;
