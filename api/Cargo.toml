@@ -29,11 +29,13 @@ aptos-sdk = { workspace = true }
 aptos-storage-interface = { workspace = true }
 aptos-types = { workspace = true }
 aptos-vm = { workspace = true }
+axum = { workspace = true }
 bcs = { workspace = true }
 bytes = { workspace = true }
 fail = { workspace = true }
 futures = { workspace = true }
 hex = { workspace = true }
+http = "1"
 itertools = { workspace = true }
 mime = { workspace = true }
 mini-moka = { workspace = true }
@@ -48,6 +50,8 @@ rstest = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
 tokio = { workspace = true }
+tower = { workspace = true }
+tower-http = { workspace = true }
 
 [dev-dependencies]
 aptos-api-test-context = { workspace = true }

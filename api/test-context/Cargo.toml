@@ -39,6 +39,7 @@ goldenfile = { workspace = true }
 hyper = { workspace = true }
 rand = { workspace = true }
 regex = { workspace = true }
+reqwest = { workspace = true }
 serde_json = { workspace = true }
 tokio = { workspace = true }
 warp = { workspace = true }

@@ -828,6 +828,10 @@ tokio-scoped = { version = "0.2.0" }
 tokio-stream = { version = "0.1.14", features = ["fs"] }
 tokio-test = "0.4.1"
 tokio-util = { version = "0.7.2", features = ["compat", "codec"] }
+tower = { version = "0.5.2", features = ["util"] }
+tower-http = { version = "0.6.2", features = ["cors", "compression-full", "catch-panic"] }
+tower-layer = "0.3.3"
+tower-service = "0.3.3"
 toml = "0.7.4"
 tonic = { version = "0.12.3", features = [
     "tls-roots",
