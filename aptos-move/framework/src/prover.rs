@@ -181,6 +181,8 @@ impl ProverOptions {
         };
         let mut model = build_model(
             dev_mode,
+            false, // test_mode
+            true,  // verify_mode: prover needs #[verify_only] code
             package_path,
             named_addresses,
             self.filter.clone(),

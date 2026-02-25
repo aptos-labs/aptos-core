@@ -79,6 +79,8 @@ impl PackageData {
             .collect();
         let env = aptos_framework::build_model(
             args.dev_mode,
+            true,  // test_mode
+            false, // verify_mode
             path,
             named_addresses,
             args.target_filter.clone(),
@@ -130,6 +132,8 @@ impl PackageData {
             .collect();
         self.env = aptos_framework::build_model(
             self.args.dev_mode,
+            true,  // test_mode
+            false, // verify_mode
             self.path.as_ref(),
             named_addresses,
             self.args.target_filter.clone(),
