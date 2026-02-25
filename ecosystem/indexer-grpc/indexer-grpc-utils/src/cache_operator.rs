@@ -303,8 +303,7 @@ impl<T: redis::aio::ConnectionLike + Send + Clone> CacheOperator<T> {
             None,
         );
 
-        let redis_result: RedisResult<()> =
-            redis_pipeline.query_async::<_>(&mut self.conn).await;
+        let redis_result: RedisResult<()> = redis_pipeline.query_async::<_>(&mut self.conn).await;
 
         match redis_result {
             Ok(_) => Ok(()),
@@ -551,10 +550,7 @@ mod tests {
             .cmd("DEL")
             .arg(evicted_version.to_string())
             .ignore();
-        let cmds = vec![MockCmd::with_values(
-            redis_pipeline,
-            Ok(vec!["ok", "1"]),
-        )];
+        let cmds = vec![MockCmd::with_values(redis_pipeline, Ok(vec!["ok", "1"]))];
         let mock_connection = MockRedisConnection::new(cmds);
         let mut cache_operator: CacheOperator<MockRedisConnection> =
             CacheOperator::new(mock_connection, StorageFormat::Base64UncompressedProto);
