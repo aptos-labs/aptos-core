@@ -3,7 +3,6 @@ module 0xCAFE::public_struct_test {
     use std::option;
     use std::signer;
     use std::string::{Self, String};
-    use std::vector;
 
     /// Result resource to store test outcomes
     struct TestResult has key {
@@ -45,6 +44,13 @@ module 0xCAFE::public_struct_test {
         Rect { rect: Rectangle },
     }
 
+    /// A public struct whose field is a user-defined enum.
+    /// Exercises struct-with-enum-field JSON/BCS conversion.
+    public struct Labeled has copy, drop {
+        color: Color,
+        value: u64,
+    }
+
     /// Initialize the test result resource
     public entry fun initialize(sender: &signer) {
         move_to(sender, TestResult {
@@ -71,14 +77,7 @@ module 0xCAFE::public_struct_test {
     /// Entry function that takes a Data struct as argument
     public entry fun test_data(sender: &signer, d: Data) acquires TestResult {
         let result = borrow_global_mut<TestResult>(signer::address_of(sender));
-        let sum = 0u64;
-        let i = 0;
-        let len = vector::length(&d.values);
-        while (i < len) {
-            sum = sum + *vector::borrow(&d.values, i);
-            i = i + 1;
-        };
-        result.value = sum;
+        result.value = d.values.fold(0u64, |acc, v| acc + v);
         result.message = d.name;
     }
 
@@ -109,19 +108,34 @@ module 0xCAFE::public_struct_test {
         result.message = string::utf8(msg);
     }
 
+    /// Entry function that takes a Labeled struct (struct with a user-defined enum field).
+    public entry fun test_labeled(sender: &signer, l: Labeled) acquires TestResult {
+        let result = borrow_global_mut<TestResult>(signer::address_of(sender));
+        let tag = match (l.color) {
+            Color::Red => 1,
+            Color::Green => 2,
+            Color::Blue => 3,
+            Color::Custom { r, g, b } => (r as u64) + (g as u64) + (b as u64),
+        };
+        result.value = tag + l.value;
+        result.message = string::utf8(b"labeled_received");
+    }
+
     /// Entry function that takes a vector of Points
     public entry fun test_point_vector(sender: &signer, points: vector<Point>) acquires TestResult {
         let result = borrow_global_mut<TestResult>(signer::address_of(sender));
-        let sum = 0u64;
-        let i = 0;
-        let len = vector::length(&points);
-        while (i < len) {
-            let p = vector::borrow(&points, i);
-            sum = sum + p.x + p.y;
-            i = i + 1;
-        };
-        result.value = sum;
+        result.value = points.fold(0u64, |acc, p| acc + p.x + p.y);
         result.message = string::utf8(b"point_vector_received");
+    }
+
+    /// Entry function that takes a vector<vector<Point>> (nested vector).
+    /// Exercises an additional nesting level in both the BCS encoder and the pack invocation counter.
+    public entry fun test_nested_point_vector(sender: &signer, points: vector<vector<Point>>) acquires TestResult {
+        let result = borrow_global_mut<TestResult>(signer::address_of(sender));
+        result.value = points.fold(0u64, |outer_acc, inner| {
+            inner.fold(outer_acc, |acc, p| acc + p.x + p.y)
+        });
+        result.message = string::utf8(b"nested_point_vector_received");
     }
 
     /// Entry function using whitelisted String type - should always work
@@ -168,31 +182,32 @@ module 0xCAFE::public_struct_test {
     /// Entry function that takes a vector of Option<u64>
     public entry fun test_option_u64_vector(sender: &signer, opts: vector<option::Option<u64>>) acquires TestResult {
         let result = borrow_global_mut<TestResult>(signer::address_of(sender));
-        let sum = 0u64;
-        let i = 0;
-        let len = vector::length(&opts);
-        while (i < len) {
-            let opt = vector::borrow(&opts, i);
-            if (opt.is_some()) {
-                sum = sum + *opt.borrow();
-            };
-            i = i + 1;
-        };
-        result.value = sum;
+        result.value = opts.fold(0u64, |acc, opt| {
+            if (opt.is_some()) { acc + opt.destroy_some() } else { acc }
+        });
         result.message = string::utf8(b"option_u64_vector_received");
+    }
+
+    /// Entry function that takes a vector of Option<Point>.
+    /// Each Some(Point) costs 2 invocations (Option + Point); None costs 1 (Option only).
+    public entry fun test_option_point_vector(sender: &signer, opts: vector<option::Option<Point>>) acquires TestResult {
+        let result = borrow_global_mut<TestResult>(signer::address_of(sender));
+        result.value = opts.fold(0u64, |acc, opt| {
+            if (opt.is_some()) {
+                let p = opt.destroy_some();
+                acc + p.x + p.y
+            } else {
+                opt.destroy_none();
+                acc
+            }
+        });
+        result.message = string::utf8(b"option_point_vector_received");
     }
 
     /// Entry function that takes a vector of u64 primitives
     public entry fun test_u64_vector(sender: &signer, values: vector<u64>) acquires TestResult {
         let result = borrow_global_mut<TestResult>(signer::address_of(sender));
-        let sum = 0u64;
-        let i = 0;
-        let len = vector::length(&values);
-        while (i < len) {
-            sum = sum + *vector::borrow(&values, i);
-            i = i + 1;
-        };
-        result.value = sum;
+        result.value = values.fold(0u64, |acc, v| acc + v);
         result.message = string::utf8(b"u64_vector_received");
     }
 

@@ -5,373 +5,129 @@
 //!
 //! These tests verify the API correctly rejects invalid struct/enum arguments.
 
-use super::new_test_context_with_orderless_flags;
-use aptos_api_test_context::{current_function_name, TestContext};
+use super::setup_public_struct_test;
+use aptos_api_test_context::current_function_name;
 use rstest::rstest;
 use serde_json::json;
-use std::path::PathBuf;
 
-/// Test that wrong variant name is rejected
-#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
-#[rstest(
-    use_txn_payload_v2_format,
-    use_orderless_transactions,
-    case(false, false),
-    case(true, false),
-    case(true, true)
-)]
-async fn test_wrong_variant_name_rejected(
-    use_txn_payload_v2_format: bool,
-    use_orderless_transactions: bool,
-) {
-    let mut context = new_test_context_with_orderless_flags(
-        current_function_name!(),
-        use_txn_payload_v2_format,
-        use_orderless_transactions,
-    );
-    let mut account = context.create_account().await;
-    let account_addr = account.address();
-
-    // Publish valid package
-    let named_addresses = vec![("account".to_string(), account_addr)];
-    let txn = futures::executor::block_on(async move {
-        let path = PathBuf::from(std::env!("CARGO_MANIFEST_DIR"))
-            .join("src/tests/move/public_struct_enum_test");
-        TestContext::build_package_with_latest_language(path, named_addresses)
-    });
-    context.publish_package(&mut account, txn).await;
-
-    // Try to call with wrong variant name
-    let req = json!({
-        "sender": format!("0x{}", account_addr.to_hex()),
-        "sequence_number": account.sequence_number().to_string(),
-        "gas_unit_price": "100",
-        "max_gas_amount": "1000000",
-        "expiration_timestamp_secs": "9991638487317",
-        "payload": {
-            "type": "entry_function_payload",
-            "function": format!("0x{}::public_struct_test::test_color", account_addr.to_hex()),
-            "type_arguments": [],
-            "arguments": [json!({ "InvalidVariant": {} })]
-        }
-    });
-
-    let resp = context
-        .expect_status_code(400)
-        .post("/transactions/encode_submission", req)
-        .await;
-
-    assert!(resp["message"]
-        .as_str()
-        .unwrap()
-        .contains("Variant InvalidVariant not found"));
-}
-
-/// Test that missing required field is rejected
-#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
-#[rstest(
-    use_txn_payload_v2_format,
-    use_orderless_transactions,
-    case(false, false),
-    case(true, false),
-    case(true, true)
-)]
-async fn test_missing_required_field_rejected(
-    use_txn_payload_v2_format: bool,
-    use_orderless_transactions: bool,
-) {
-    let mut context = new_test_context_with_orderless_flags(
-        current_function_name!(),
-        use_txn_payload_v2_format,
-        use_orderless_transactions,
-    );
-    let mut account = context.create_account().await;
-    let account_addr = account.address();
-
-    // Publish valid package
-    let named_addresses = vec![("account".to_string(), account_addr)];
-    let txn = futures::executor::block_on(async move {
-        let path = PathBuf::from(std::env!("CARGO_MANIFEST_DIR"))
-            .join("src/tests/move/public_struct_enum_test");
-        TestContext::build_package_with_latest_language(path, named_addresses)
-    });
-    context.publish_package(&mut account, txn).await;
-
-    // Try to call with missing field in struct
-    let req = json!({
-        "sender": format!("0x{}", account_addr.to_hex()),
-        "sequence_number": account.sequence_number().to_string(),
-        "gas_unit_price": "100",
-        "max_gas_amount": "1000000",
-        "expiration_timestamp_secs": "9991638487317",
-        "payload": {
-            "type": "entry_function_payload",
-            "function": format!("0x{}::public_struct_test::test_point", account_addr.to_hex()),
-            "type_arguments": [],
-            "arguments": [json!({ "x": "10" })] // Missing "y" field
-        }
-    });
-
-    let resp = context
-        .expect_status_code(400)
-        .post("/transactions/encode_submission", req)
-        .await;
-
-    assert!(resp["message"]
-        .as_str()
-        .unwrap()
-        .contains("field y not found"));
-}
-
-/// Test that missing required field in enum variant is rejected
-#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
-#[rstest(
-    use_txn_payload_v2_format,
-    use_orderless_transactions,
-    case(false, false),
-    case(true, false),
-    case(true, true)
-)]
-async fn test_enum_variant_missing_field_rejected(
-    use_txn_payload_v2_format: bool,
-    use_orderless_transactions: bool,
-) {
-    let mut context = new_test_context_with_orderless_flags(
-        current_function_name!(),
-        use_txn_payload_v2_format,
-        use_orderless_transactions,
-    );
-    let mut account = context.create_account().await;
-    let account_addr = account.address();
-
-    // Publish valid package
-    let named_addresses = vec![("account".to_string(), account_addr)];
-    let txn = futures::executor::block_on(async move {
-        let path = PathBuf::from(std::env!("CARGO_MANIFEST_DIR"))
-            .join("src/tests/move/public_struct_enum_test");
-        TestContext::build_package_with_latest_language(path, named_addresses)
-    });
-    context.publish_package(&mut account, txn).await;
-
-    // Try to call with missing field in enum variant
-    let req = json!({
-        "sender": format!("0x{}", account_addr.to_hex()),
-        "sequence_number": account.sequence_number().to_string(),
-        "gas_unit_price": "100",
-        "max_gas_amount": "1000000",
-        "expiration_timestamp_secs": "9991638487317",
-        "payload": {
-            "type": "entry_function_payload",
-            "function": format!("0x{}::public_struct_test::test_color", account_addr.to_hex()),
-            "type_arguments": [],
-            "arguments": [json!({ "Custom": { "r": 100, "g": 50 } })] // Missing "b" field
-        }
-    });
-
-    let resp = context
-        .expect_status_code(400)
-        .post("/transactions/encode_submission", req)
-        .await;
-
-    assert!(resp["message"]
-        .as_str()
-        .unwrap()
-        .contains("field b not found"));
-}
-
-/// Test that multiple variants in enum value is rejected
-#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
-#[rstest(
-    use_txn_payload_v2_format,
-    use_orderless_transactions,
-    case(false, false),
-    case(true, false),
-    case(true, true)
-)]
-async fn test_multiple_enum_variants_rejected(
-    use_txn_payload_v2_format: bool,
-    use_orderless_transactions: bool,
-) {
-    let mut context = new_test_context_with_orderless_flags(
-        current_function_name!(),
-        use_txn_payload_v2_format,
-        use_orderless_transactions,
-    );
-    let mut account = context.create_account().await;
-    let account_addr = account.address();
-
-    // Publish valid package
-    let named_addresses = vec![("account".to_string(), account_addr)];
-    let txn = futures::executor::block_on(async move {
-        let path = PathBuf::from(std::env!("CARGO_MANIFEST_DIR"))
-            .join("src/tests/move/public_struct_enum_test");
-        TestContext::build_package_with_latest_language(path, named_addresses)
-    });
-    context.publish_package(&mut account, txn).await;
-
-    // Try to call with multiple variants specified
-    let req = json!({
-        "sender": format!("0x{}", account_addr.to_hex()),
-        "sequence_number": account.sequence_number().to_string(),
-        "gas_unit_price": "100",
-        "max_gas_amount": "1000000",
-        "expiration_timestamp_secs": "9991638487317",
-        "payload": {
-            "type": "entry_function_payload",
-            "function": format!("0x{}::public_struct_test::test_color", account_addr.to_hex()),
-            "type_arguments": [],
-            "arguments": [json!({ "Red": {}, "Blue": {} })] // Two variants
-        }
-    });
-
-    let resp = context
-        .expect_status_code(400)
-        .post("/transactions/encode_submission", req)
-        .await;
-
-    assert!(resp["message"]
-        .as_str()
-        .unwrap()
-        .contains("Enum value must have exactly one variant specified"));
-}
-
-/// Test that Option::Some with missing field in inner struct is rejected
-#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
-#[rstest(
-    use_txn_payload_v2_format,
-    use_orderless_transactions,
-    case(false, false),
-    case(true, false),
-    case(true, true)
-)]
-async fn test_option_some_missing_field_rejected(
-    use_txn_payload_v2_format: bool,
-    use_orderless_transactions: bool,
-) {
-    let mut context = new_test_context_with_orderless_flags(
-        current_function_name!(),
-        use_txn_payload_v2_format,
-        use_orderless_transactions,
-    );
-    let mut account = context.create_account().await;
-    let account_addr = account.address();
-
-    // Publish valid package
-    let named_addresses = vec![("account".to_string(), account_addr)];
-    let txn = futures::executor::block_on(async move {
-        let path = PathBuf::from(std::env!("CARGO_MANIFEST_DIR"))
-            .join("src/tests/move/public_struct_enum_test");
-        TestContext::build_package_with_latest_language(path, named_addresses)
-    });
-    context.publish_package(&mut account, txn).await;
-
-    // Try to call with Option::Some but missing field in Point
-    let req = json!({
-        "sender": format!("0x{}", account_addr.to_hex()),
-        "sequence_number": account.sequence_number().to_string(),
-        "gas_unit_price": "100",
-        "max_gas_amount": "1000000",
-        "expiration_timestamp_secs": "9991638487317",
-        "payload": {
-            "type": "entry_function_payload",
-            "function": format!("0x{}::public_struct_test::test_option_point", account_addr.to_hex()),
-            "type_arguments": [],
-            "arguments": [{ "vec": [{ "x": "10" }] }] // Missing y field in Point
-        }
-    });
-
-    let resp = context
-        .expect_status_code(400)
-        .post("/transactions/encode_submission", req)
-        .await;
-
-    assert!(resp["message"]
-        .as_str()
-        .unwrap()
-        .contains("field y not found"));
-}
-
-/// Test that Option::Some with invalid enum variant is rejected
-#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
-#[rstest(
-    use_txn_payload_v2_format,
-    use_orderless_transactions,
-    case(false, false),
-    case(true, false),
-    case(true, true)
-)]
-async fn test_option_some_invalid_enum_variant_rejected(
-    use_txn_payload_v2_format: bool,
-    use_orderless_transactions: bool,
-) {
-    let mut context = new_test_context_with_orderless_flags(
-        current_function_name!(),
-        use_txn_payload_v2_format,
-        use_orderless_transactions,
-    );
-    let mut account = context.create_account().await;
-    let account_addr = account.address();
-
-    // Publish valid package
-    let named_addresses = vec![("account".to_string(), account_addr)];
-    let txn = futures::executor::block_on(async move {
-        let path = PathBuf::from(std::env!("CARGO_MANIFEST_DIR"))
-            .join("src/tests/move/public_struct_enum_test");
-        TestContext::build_package_with_latest_language(path, named_addresses)
-    });
-    context.publish_package(&mut account, txn).await;
-
-    // Try to call with Option::Some but invalid Color variant
-    let req = json!({
-        "sender": format!("0x{}", account_addr.to_hex()),
-        "sequence_number": account.sequence_number().to_string(),
-        "gas_unit_price": "100",
-        "max_gas_amount": "1000000",
-        "expiration_timestamp_secs": "9991638487317",
-        "payload": {
-            "type": "entry_function_payload",
-            "function": format!("0x{}::public_struct_test::test_option_color", account_addr.to_hex()),
-            "type_arguments": [],
-            "arguments": [{ "vec": [{ "InvalidColor": {} }] }]
-        }
-    });
-
-    let resp = context
-        .expect_status_code(400)
-        .post("/transactions/encode_submission", req)
-        .await;
-
-    assert!(resp["message"]
-        .as_str()
-        .unwrap()
-        .contains("Variant InvalidColor not found"));
-}
-
-/// Test that Container<T> with non-public T is rejected
-/// Container has public visibility and copy ability, but T (PrivatePoint) is not public
+/// Test that malformed struct/enum arguments are rejected at encode time.
 ///
+/// Each case specifies an entry function, a bad argument, and the substring
+/// expected to appear in the 400 error message.
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+#[rstest(
+    use_txn_payload_v2_format,
+    use_orderless_transactions,
+    case(false, false),
+    case(true, false),
+    case(true, true)
+)]
+async fn test_invalid_args_rejected(
+    use_txn_payload_v2_format: bool,
+    use_orderless_transactions: bool,
+) {
+    let (context, account) = setup_public_struct_test(
+        current_function_name!(),
+        use_txn_payload_v2_format,
+        use_orderless_transactions,
+    )
+    .await;
+    let account_addr = account.address();
+    let seq = account.sequence_number().to_string();
+
+    // (entry function, bad arguments JSON, expected error substring)
+    let cases: &[(&str, serde_json::Value, &str)] = &[
+        (
+            "test_color",
+            json!([{ "InvalidVariant": {} }]),
+            "Variant InvalidVariant not found",
+        ),
+        (
+            "test_point",
+            json!([{ "x": "10" }]), // missing y
+            "field y not found",
+        ),
+        (
+            "test_color",
+            json!([{ "Custom": { "r": 100, "g": 50 } }]), // missing b
+            "field b not found",
+        ),
+        (
+            "test_color",
+            json!([{ "Red": {}, "Blue": {} }]), // two variants
+            "Enum value must have exactly one variant specified",
+        ),
+        (
+            "test_option_point",
+            json!([{ "vec": [{ "x": "10" }] }]), // missing y inside Option::Some
+            "field y not found",
+        ),
+        (
+            "test_option_color",
+            json!([{ "vec": [{ "InvalidColor": {} }] }]),
+            "Variant InvalidColor not found",
+        ),
+        // Unknown extra field in enum variant body → line 1119–1125 of convert.rs
+        (
+            "test_color",
+            json!([{ "Custom": { "r": 100, "g": 50, "b": 25, "extra": 99 } }]),
+            "Unknown fields",
+        ),
+        // Non-object value passed as enum → line 1072 of convert.rs
+        (
+            "test_color",
+            json!(["Red"]),
+            "Expecting a JSON Map for enum",
+        ),
+        // Non-object value for enum variant body → line 1104 of convert.rs
+        (
+            "test_color",
+            json!([{ "Red": "not_an_object" }]),
+            "Expecting a JSON Map for variant fields",
+        ),
+    ];
+
+    for (func, args, expected_err) in cases {
+        let req = json!({
+            "sender": format!("0x{}", account_addr.to_hex()),
+            "sequence_number": seq,
+            "gas_unit_price": "100",
+            "max_gas_amount": "1000000",
+            "expiration_timestamp_secs": "9991638487317",
+            "payload": {
+                "type": "entry_function_payload",
+                "function": format!("0x{}::public_struct_test::{}", account_addr.to_hex(), func),
+                "type_arguments": [],
+                "arguments": args
+            }
+        });
+
+        let resp = context
+            .expect_status_code(400)
+            .post("/transactions/encode_submission", req)
+            .await;
+
+        assert!(
+            resp["message"].as_str().unwrap().contains(expected_err),
+            "function '{}': expected error '{}', got: {}",
+            func,
+            expected_err,
+            resp["message"]
+        );
+    }
+}
+
+/// Test that Container<T> with non-public T is rejected.
+/// Container has public visibility and copy ability, but T (PrivatePoint) is not public,
+/// so the transaction fails with INVALID_MAIN_FUNCTION_SIGNATURE and is discarded.
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 #[rstest(use_orderless_transactions, case(false), case(true))]
 async fn test_generic_container_with_non_public_type_arg_rejected(
     use_orderless_transactions: bool,
 ) {
-    let use_txn_payload_v2_format = true;
-    let mut context = new_test_context_with_orderless_flags(
-        current_function_name!(),
-        use_txn_payload_v2_format,
-        use_orderless_transactions,
-    );
-    let mut account = context.create_account().await;
+    let (mut context, mut account) =
+        setup_public_struct_test(current_function_name!(), true, use_orderless_transactions).await;
     let account_addr = account.address();
-
-    // Publish valid package
-    let named_addresses = vec![("account".to_string(), account_addr)];
-    let txn = futures::executor::block_on(async move {
-        let path = PathBuf::from(std::env!("CARGO_MANIFEST_DIR"))
-            .join("src/tests/move/public_struct_enum_test");
-        TestContext::build_package_with_latest_language(path, named_addresses)
-    });
-    context.publish_package(&mut account, txn).await;
 
     // Try to call test_generic_container<PrivatePoint> with Container<PrivatePoint>
     // The VM should reject this because PrivatePoint is not public (no public pack function)
@@ -382,11 +138,7 @@ async fn test_generic_container_with_non_public_type_arg_rejected(
         "arguments": [{ "value": { "x": "10", "y": "20" } }]
     });
 
-    // Submit the transaction. It will fail with INVALID_MAIN_FUNCTION_SIGNATURE (error 1011).
-    // Although this is a Verification error that should normally be kept in the ledger with
-    // failed status, the transaction is actually DISCARDED due to the unwrap_or_discard! macro
-    // in execute_user_transaction_impl, which unconditionally discards
-    // all errors during validation phase, even those that should be kept.
+    // Submit the transaction — it fails with INVALID_MAIN_FUNCTION_SIGNATURE and is discarded.
     context.api_execute_txn(&mut account, payload).await;
 
     // Get all transactions to verify test_generic_container was NOT committed

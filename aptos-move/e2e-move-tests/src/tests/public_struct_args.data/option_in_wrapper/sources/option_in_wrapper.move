@@ -25,10 +25,10 @@ module 0xcafe::option_in_wrapper {
         assert!(std::option::is_none(&w.o), 0);
     }
 
-    /// View function: accepts Wrapper<Hero> and returns whether the inner Option is None.
-    /// Same validation/construction rules as the entry function above.
+    // View function: accepts Wrapper<Hero> and returns whether the inner Option is None.
+    // Same validation/construction rules as the entry function above.
     #[view]
-    public fun is_inner_none(w: Wrapper<Hero>): bool {
+    public fun check_none_view(w: Wrapper<Hero>): bool {
         std::option::is_none(&w.o)
     }
 }

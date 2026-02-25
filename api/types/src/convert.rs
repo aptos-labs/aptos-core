@@ -62,7 +62,7 @@ const OBJECT_STRUCT: &IdentStr = ident_str!("Object");
 /// Recursively substitute generic type parameters in a MoveType with actual type arguments.
 fn substitute_type_in_move_type(
     move_type: &crate::move_types::MoveType,
-    type_args: &[TypeTag],
+    type_args: &[crate::move_types::MoveType],
 ) -> Result<crate::move_types::MoveType> {
     use crate::move_types::MoveType;
 
@@ -75,7 +75,7 @@ fn substitute_type_in_move_type(
                 idx,
                 type_args.len()
             );
-            Ok(MoveType::from(&type_args[idx]))
+            Ok(type_args[idx].clone())
         },
         MoveType::Reference { mutable, to } => Ok(MoveType::Reference {
             mutable: *mutable,
@@ -93,10 +93,7 @@ fn substitute_type_in_move_type(
                 new_struct_tag.generic_type_params = struct_tag
                     .generic_type_params
                     .iter()
-                    .map(|ty| {
-                        // Recursively substitute in this MoveType
-                        substitute_type_in_move_type(ty, type_args)
-                    })
+                    .map(|ty| substitute_type_in_move_type(ty, type_args))
                     .collect::<Result<_>>()?;
                 Ok(MoveType::Struct(new_struct_tag))
             }
@@ -758,19 +755,12 @@ impl<'a, S: StateView> MoveConverter<'a, S> {
                     type_arguments.len()
                 );
 
-                // For generic entry functions, substitute type parameters before parsing arguments
+                // For generic entry functions, substitute type parameters before parsing arguments.
                 let args = if !type_arguments.is_empty() {
-                    // Convert type_arguments to TypeTags for substitution
-                    let type_tags: Vec<TypeTag> = type_arguments
-                        .iter()
-                        .map(|v| v.try_into())
-                        .collect::<Result<_>>()?;
-
-                    // Create instantiated function with generic parameters substituted
-                    let instantiated_func = self.instantiate_function_params(&func, &type_tags)?;
+                    let instantiated_func =
+                        self.instantiate_function_params(&func, &type_arguments)?;
                     self.try_into_vm_values(&instantiated_func, arguments.as_slice())?
                 } else {
-                    // No type arguments, use function as-is
                     self.try_into_vm_values(&func, arguments.as_slice())?
                 };
 
@@ -905,7 +895,7 @@ impl<'a, S: StateView> MoveConverter<'a, S> {
     fn instantiate_function_params(
         &self,
         func: &MoveFunction,
-        type_args: &[TypeTag],
+        type_args: &[MoveType],
     ) -> Result<MoveFunction> {
         // Substitute in all parameters
         let new_params = func
@@ -1104,7 +1094,7 @@ impl<'a, S: StateView> MoveConverter<'a, S> {
                 bail!("Expecting a JSON Map for variant fields.");
             };
 
-            let field_results = variant_layout
+            let fields = variant_layout
                 .fields
                 .iter()
                 .map(|field_layout| {
@@ -1125,10 +1115,7 @@ impl<'a, S: StateView> MoveConverter<'a, S> {
             }
 
             return Ok(move_core_types::value::MoveValue::Struct(
-                move_core_types::value::MoveStruct::RuntimeVariant(
-                    variant_index as u16,
-                    field_results,
-                ),
+                move_core_types::value::MoveStruct::RuntimeVariant(variant_index as u16, fields),
             ));
         }
 
