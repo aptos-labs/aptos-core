@@ -418,6 +418,7 @@ impl NodeSetup {
             window_size,
             Arc::new(Mutex::new(PendingBlocks::new())),
             None,
+            "primary",
         ));
         let block_store_clone = Arc::clone(&block_store);
         let callback = Box::new(

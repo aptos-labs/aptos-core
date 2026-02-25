@@ -5,7 +5,7 @@ use crate::{
     block_storage::{
         block_tree::BlockTree,
         pending_blocks::PendingBlocks,
-        tracing::{observe_block, BlockStage},
+        tracing::{observe_block_with_type, BlockStage},
         BlockReader,
     },
     counters,
@@ -54,13 +54,21 @@ mod block_store_test;
 #[path = "sync_manager.rs"]
 pub mod sync_manager;
 
-fn update_counters_for_ordered_blocks(ordered_blocks: &[Arc<PipelinedBlock>]) {
+fn update_counters_for_ordered_blocks(
+    ordered_blocks: &[Arc<PipelinedBlock>],
+    consensus_type: &'static str,
+) {
     for block in ordered_blocks {
-        observe_block(block.block().timestamp_usecs(), BlockStage::ORDERED);
+        observe_block_with_type(
+            block.block().timestamp_usecs(),
+            BlockStage::ORDERED,
+            consensus_type,
+        );
         if block.block().is_opt_block() {
-            observe_block(
+            observe_block_with_type(
                 block.block().timestamp_usecs(),
                 BlockStage::ORDERED_OPT_BLOCK,
+                consensus_type,
             );
         }
     }
@@ -101,6 +109,7 @@ pub struct BlockStore {
     pending_blocks: Arc<Mutex<PendingBlocks>>,
     pipeline_builder: Option<PipelineBuilder>,
     pre_commit_status: Option<Arc<Mutex<PreCommitStatus>>>,
+    consensus_type: &'static str,
 }
 
 impl BlockStore {
@@ -116,6 +125,7 @@ impl BlockStore {
         window_size: Option<u64>,
         pending_blocks: Arc<Mutex<PendingBlocks>>,
         pipeline_builder: Option<PipelineBuilder>,
+        consensus_type: &'static str,
     ) -> Self {
         let highest_2chain_tc = initial_data.highest_2chain_timeout_certificate();
         let (root, root_metadata, blocks, quorum_certs) = initial_data.take();
@@ -136,6 +146,7 @@ impl BlockStore {
             pending_blocks,
             pipeline_builder,
             None,
+            consensus_type,
         ));
         block_on(block_store.try_send_for_execution());
         block_store
@@ -178,6 +189,7 @@ impl BlockStore {
         pending_blocks: Arc<Mutex<PendingBlocks>>,
         pipeline_builder: Option<PipelineBuilder>,
         tree_to_replace: Option<Arc<RwLock<BlockTree>>>,
+        consensus_type: &'static str,
     ) -> Self {
         let (commit_root_block, window_root_block, root_qc, root_ordered_cert, root_commit_cert) = (
             root.commit_root_block,
@@ -277,6 +289,7 @@ impl BlockStore {
             pipeline_builder,
             window_size,
             pre_commit_status,
+            consensus_type,
         };
 
         for block in blocks {
@@ -339,7 +352,7 @@ impl BlockStore {
         self.inner
             .write()
             .insert_ordered_cert(finality_proof_clone.clone());
-        update_counters_for_ordered_blocks(&blocks_to_commit);
+        update_counters_for_ordered_blocks(&blocks_to_commit, self.consensus_type);
 
         self.execution_client
             .finalize_order(blocks_to_commit, finality_proof.clone())
@@ -388,6 +401,7 @@ impl BlockStore {
             self.pending_blocks.clone(),
             self.pipeline_builder.clone(),
             Some(self.inner.clone()),
+            self.consensus_type,
         )
         .await;
 
@@ -534,14 +548,16 @@ impl BlockStore {
                     qc.certified_block(),
                     pipelined_block.block_info()
                 );
-                observe_block(
+                observe_block_with_type(
                     pipelined_block.block().timestamp_usecs(),
                     BlockStage::QC_ADDED,
+                    self.consensus_type,
                 );
                 if pipelined_block.block().is_opt_block() {
-                    observe_block(
+                    observe_block_with_type(
                         pipelined_block.block().timestamp_usecs(),
                         BlockStage::QC_ADDED_OPT_BLOCK,
+                        self.consensus_type,
                     );
                 }
                 pipelined_block.set_qc(Arc::new(qc.clone()));

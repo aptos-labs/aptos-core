@@ -4,7 +4,7 @@
 #![allow(clippy::unwrap_used)]
 
 use crate::{
-    block_storage::tracing::{observe_block, BlockStage},
+    block_storage::tracing::{observe_block_with_type, BlockStage},
     quorum_store,
 };
 use aptos_consensus_types::{block::Block, pipelined_block::PipelinedBlock};
@@ -1332,13 +1332,13 @@ pub static FETCH_COMMIT_HISTORY_DURATION: Lazy<DurationHistogram> = Lazy::new(||
     )
 });
 
-pub fn update_counters_for_block(block: &Block) {
-    observe_block(block.timestamp_usecs(), BlockStage::COMMITTED);
+pub fn update_counters_for_block(block: &Block, consensus_type: &'static str) {
+    observe_block_with_type(block.timestamp_usecs(), BlockStage::COMMITTED, consensus_type);
     NUM_BYTES_PER_BLOCK.observe(block.payload().map_or(0, |payload| payload.size()) as f64);
     COMMITTED_BLOCKS_COUNT.inc();
     LAST_COMMITTED_ROUND.set(block.round() as i64);
     if block.is_opt_block() {
-        observe_block(block.timestamp_usecs(), BlockStage::COMMITTED_OPT_BLOCK);
+        observe_block_with_type(block.timestamp_usecs(), BlockStage::COMMITTED_OPT_BLOCK, consensus_type);
         COMMITTED_OPT_BLOCKS_COUNT.inc();
         LAST_COMMITTED_OPT_BLOCK_ROUND.set(block.round() as i64);
     }
@@ -1384,9 +1384,12 @@ pub fn update_counters_for_compute_result(compute_result: &StateComputeResult) {
 }
 
 /// Update various counters for committed blocks
-pub fn update_counters_for_committed_blocks(blocks_to_commit: &[Arc<PipelinedBlock>]) {
+pub fn update_counters_for_committed_blocks(
+    blocks_to_commit: &[Arc<PipelinedBlock>],
+    consensus_type: &'static str,
+) {
     for block in blocks_to_commit {
-        update_counters_for_block(block.block());
+        update_counters_for_block(block.block(), consensus_type);
         update_counters_for_compute_result(&block.compute_result());
     }
 }

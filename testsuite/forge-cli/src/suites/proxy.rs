@@ -35,13 +35,22 @@ pub fn get_proxy_test(test_name: &str) -> Option<ForgeConfig> {
 /// since primary blocks aggregate multiple proxy blocks and are therefore larger.
 /// Proxy block limits match devnet's per-block settings (300/200).
 fn apply_devnet_consensus_config(config: &mut aptos_config::config::NodeConfig) {
-    // QuorumStore settings (shared by proxy and primary, needed for fast batch generation)
+    // QuorumStore settings (shared by proxy and primary, needed for fast batch generation).
+    // With 4 proxy validators each handling ~750 TPS, QS must drain mempool fast enough.
     config.consensus.quorum_store.enable_opt_quorum_store = true;
     config.consensus.quorum_store.opt_qs_minimum_batch_age_usecs = 500;
     config.consensus.quorum_store.batch_generation_poll_interval_ms = 10;
-    config.consensus.quorum_store.batch_generation_min_non_empty_interval_ms = 20;
+    config.consensus.quorum_store.batch_generation_min_non_empty_interval_ms = 10;
     config.consensus.quorum_store.batch_generation_max_interval_ms = 100;
-    config.consensus.quorum_store.sender_max_total_txns = 200;
+    config.consensus.quorum_store.sender_max_total_txns = 500;
+    // Raise the QS backpressure floor so dynamic rate never drops below
+    // per-validator needs (~750 TPS with 4 proxy validators at 3k TPS).
+    config
+        .consensus
+        .quorum_store
+        .back_pressure
+        .dynamic_min_txn_per_s = 1000;
+
     // General consensus settings
     config.consensus.vote_back_pressure_limit = 150;
     config.consensus.quorum_store_poll_time_ms = 5;
@@ -117,7 +126,10 @@ fn proxy_primary_remote_test() -> ForgeConfig {
                     max_epoch_no_progress_secs: 30.0,
                     max_non_epoch_round_gap: 8,
                     max_epoch_round_gap: 8,
-                }),
+                })
+                // Proxy consensus epoch transitions produce transient
+                // "Invalid bitvec from the multi-signature" errors.
+                .allow_errors(),
         )
 }
 

@@ -985,6 +985,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
             onchain_consensus_config.window_size(),
             self.pending_blocks.clone(),
             Some(pipeline_builder),
+            "primary",
         ));
 
         let failures_tracker = Arc::new(Mutex::new(ExponentialWindowFailureTracker::new(
@@ -1393,6 +1394,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
             onchain_consensus_config.window_size(),
             Arc::new(Mutex::new(PendingBlocks::new())),
             None, // pipeline_builder: None - proxy doesn't execute blocks
+            "proxy",
         ));
 
         // 8. Create ProposalGenerator for proxy

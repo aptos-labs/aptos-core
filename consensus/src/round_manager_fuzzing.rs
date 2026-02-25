@@ -98,6 +98,7 @@ fn build_empty_store(
         DEFAULT_ENABLED_WINDOW_SIZE,
         Arc::new(Mutex::new(PendingBlocks::new())),
         None,
+        "primary",
     ))
 }
 
