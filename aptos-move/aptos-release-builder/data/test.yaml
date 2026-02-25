@@ -1,5 +1,6 @@
 ---
 remote_endpoint: ~
+name: "hard-supply-cap"
 proposals:
   - name: framework
     metadata:
