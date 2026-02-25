@@ -6,6 +6,7 @@ use crate::{
     context::{api_spawn_blocking, Context},
     generate_error_response, generate_success_response,
     response::{InternalError, ServiceUnavailableError},
+    response_axum::{AptosErrorResponse, AptosResponse},
     ApiTags,
 };
 use anyhow::Context as AnyhowContext;
@@ -201,4 +202,42 @@ impl BasicApi {
             &accept_type,
         ))
     }
+}
+
+/// Framework-agnostic business logic for the healthy endpoint.
+/// Called by the Axum handler directly, bypassing the Poem bridge.
+pub fn healthy_inner(
+    context: &Arc<Context>,
+    accept_type: &AcceptType,
+    duration_secs: Option<u32>,
+) -> Result<AptosResponse<HealthCheckSuccess>, AptosErrorResponse> {
+    let ledger_info = context.get_latest_ledger_info::<AptosErrorResponse>()?;
+
+    // If we have a duration, check that it's close to the current time, otherwise it's ok
+    if let Some(max_skew) = duration_secs {
+        let ledger_timestamp = Duration::from_micros(ledger_info.timestamp());
+        let skew_threshold = SystemTime::now()
+            .sub(Duration::from_secs(max_skew as u64))
+            .duration_since(UNIX_EPOCH)
+            .context("Failed to determine absolute unix time based on given duration")
+            .map_err(|err| {
+                AptosErrorResponse::internal(
+                    err,
+                    AptosErrorCode::InternalError,
+                    Some(&ledger_info),
+                )
+            })?;
+
+        if ledger_timestamp < skew_threshold {
+            return Err(AptosErrorResponse::service_unavailable(
+                format!(
+                    "The latest ledger info timestamp is {:?}, which is beyond the allowed skew ({}s).",
+                    ledger_timestamp, max_skew
+                ),
+                AptosErrorCode::HealthCheckFailed,
+                Some(&ledger_info),
+            ));
+        }
+    }
+    AptosResponse::try_from_rust_value(HealthCheckSuccess::new(), &ledger_info, accept_type)
 }
