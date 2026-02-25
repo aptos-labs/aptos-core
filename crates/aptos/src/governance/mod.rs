@@ -20,7 +20,7 @@ use crate::{
 use aptos_api_types::ViewFunction;
 use aptos_cached_packages::aptos_stdlib;
 use aptos_crypto::HashValue;
-use aptos_framework::{new_release_package, BuildOptions, BuiltPackage, ReleasePackage};
+use aptos_framework::{new_release_package, BuiltPackage};
 use aptos_logger::warn;
 pub use aptos_move_cli::CompileScriptFunction;
 use aptos_move_cli::{FrameworkPackageArgs, IncludedArtifacts, MovePackageOptions};

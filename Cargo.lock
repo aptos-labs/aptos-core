@@ -17616,7 +17616,6 @@ dependencies = [
  "aptos-faucet-core",
  "aptos-forge",
  "aptos-framework",
- "aptos-gas-algebra",
  "aptos-gas-schedule",
  "aptos-genesis",
  "aptos-global-constants",
@@ -17627,7 +17626,6 @@ dependencies = [
  "aptos-logger",
  "aptos-move-cli",
  "aptos-move-debugger",
- "aptos-release-builder",
  "aptos-rest-client",
  "aptos-rosetta",
  "aptos-schemadb",
@@ -17650,7 +17648,6 @@ dependencies = [
  "hex",
  "hyper 0.14.28",
  "itertools 0.13.0",
- "move-binary-format",
  "move-core-types",
  "num_cpus",
  "once_cell",
@@ -17662,8 +17659,6 @@ dependencies = [
  "serde_yaml 0.8.26",
  "tempfile",
  "tokio",
- "url",
- "walkdir",
 ]
 
 [[package]]
