@@ -1,7 +1,9 @@
 // Copyright (c) Aptos Foundation
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
-use crate::metrics::{COUNTER, GAUGE, OTHER_TIMERS_SECONDS};
+use crate::metrics::{
+    COUNTER, GAUGE, HOT_STATE_SHARD_GAUGE, OTHER_TIMERS_SECONDS, SHARD_NAME_BY_ID,
+};
 use anyhow::{ensure, Result};
 use aptos_config::config::HotStateConfig;
 use aptos_infallible::Mutex;
@@ -529,6 +531,47 @@ impl Committer {
         GAUGE.set_with(&["hot_state_items"], self.base.len() as i64);
         GAUGE.set_with(&["hot_state_key_bytes"], self.total_key_bytes as i64);
         GAUGE.set_with(&["hot_state_value_bytes"], self.total_value_bytes as i64);
+
+        self.report_age_metrics();
+    }
+
+    /// Reports per-shard MRU/LRU `hot_since_version` gauges and aggregate min/max across shards.
+    fn report_age_metrics(&self) {
+        let mut global_min_lru: Option<i64> = None;
+        let mut global_max_mru: Option<i64> = None;
+
+        for (shard_id, shard_label) in SHARD_NAME_BY_ID.iter().enumerate() {
+            let mru_version = self.heads[shard_id].as_ref().and_then(|k| {
+                self.base.shards[shard_id]
+                    .get(k)
+                    .and_then(|entry| entry.hot_since_version_opt())
+            });
+            let lru_version = self.tails[shard_id].as_ref().and_then(|k| {
+                self.base.shards[shard_id]
+                    .get(k)
+                    .and_then(|entry| entry.hot_since_version_opt())
+            });
+
+            if let Some(v) = mru_version {
+                let v = v as i64;
+                HOT_STATE_SHARD_GAUGE
+                    .with_label_values(&[*shard_label, "mru_hot_since_version"])
+                    .set(v);
+                global_max_mru = Some(global_max_mru.map_or(v, |cur| cur.max(v)));
+            }
+            if let Some(v) = lru_version {
+                let v = v as i64;
+                HOT_STATE_SHARD_GAUGE
+                    .with_label_values(&[*shard_label, "lru_hot_since_version"])
+                    .set(v);
+                global_min_lru = Some(global_min_lru.map_or(v, |cur| cur.min(v)));
+            }
+        }
+
+        if let (Some(max_mru), Some(min_lru)) = (global_max_mru, global_min_lru) {
+            GAUGE.set_with(&["hot_state_max_mru_hot_since_version"], max_mru);
+            GAUGE.set_with(&["hot_state_min_lru_hot_since_version"], min_lru);
+        }
     }
 
     /// Traverses the entire map and checks if all the pointers are correctly linked.
