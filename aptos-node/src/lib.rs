@@ -206,6 +206,7 @@ pub struct AptosHandle {
     _dkg_runtime: Option<Runtime>,
     _indexer_grpc_runtime: Option<Runtime>,
     _indexer_table_info_runtime: Option<Runtime>,
+    _inspection_service_runtime: Runtime,
     _jwk_consensus_runtime: Option<Runtime>,
     _mempool_runtime: Runtime,
     _network_runtimes: Vec<Runtime>,
@@ -769,7 +770,7 @@ pub fn setup_environment_and_start_node(
         )?;
 
     // Start the node inspection service
-    services::start_node_inspection_service(
+    let inspection_service_runtime = services::start_node_inspection_service(
         &node_config,
         aptos_data_client,
         peers_and_metadata.clone(),
@@ -859,6 +860,7 @@ pub fn setup_environment_and_start_node(
         _dkg_runtime: dkg_runtime,
         _indexer_grpc_runtime: indexer_grpc_runtime,
         _indexer_table_info_runtime: indexer_table_info_runtime,
+        _inspection_service_runtime: inspection_service_runtime,
         _jwk_consensus_runtime: jwk_consensus_runtime,
         _mempool_runtime: mempool_runtime,
         _network_runtimes: network_runtimes,

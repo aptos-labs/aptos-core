@@ -145,22 +145,29 @@ impl RocksdbPropertyReporter {
         state_kv_db: Arc<StateKvDb>,
     ) -> Self {
         let (send, recv) = mpsc::channel();
-        let join_handle = Some(thread::spawn(move || loop {
-            if let Err(e) = update_rocksdb_properties(&ledger_db, &state_merkle_db, &state_kv_db) {
-                warn!(
-                    error = ?e,
-                    "Updating rocksdb property failed."
-                );
-            }
-            // report rocksdb properties each 60 seconds
-            const TIMEOUT_MS: u64 = if cfg!(test) { 10 } else { 60000 };
+        let join_handle = Some(
+            thread::Builder::new()
+                .name("rocksdb-prop".into())
+                .spawn(move || loop {
+                    if let Err(e) =
+                        update_rocksdb_properties(&ledger_db, &state_merkle_db, &state_kv_db)
+                    {
+                        warn!(
+                            error = ?e,
+                            "Updating rocksdb property failed."
+                        );
+                    }
+                    // report rocksdb properties each 60 seconds
+                    const TIMEOUT_MS: u64 = if cfg!(test) { 10 } else { 60000 };
 
-            match recv.recv_timeout(Duration::from_millis(TIMEOUT_MS)) {
-                Ok(_) => break,
-                Err(mpsc::RecvTimeoutError::Timeout) => (),
-                Err(mpsc::RecvTimeoutError::Disconnected) => break,
-            }
-        }));
+                    match recv.recv_timeout(Duration::from_millis(TIMEOUT_MS)) {
+                        Ok(_) => break,
+                        Err(mpsc::RecvTimeoutError::Timeout) => (),
+                        Err(mpsc::RecvTimeoutError::Disconnected) => break,
+                    }
+                })
+                .expect("failed to spawn rocksdb-prop thread"),
+        );
         Self {
             sender: Mutex::new(send),
             join_handle,
