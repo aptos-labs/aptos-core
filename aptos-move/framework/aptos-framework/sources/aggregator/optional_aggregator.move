@@ -97,6 +97,15 @@ module aptos_framework::optional_aggregator {
         }
     }
 
+    /// Returns the overflow limit of the optional aggregator.
+    public fun read_limit(optional_aggregator: &OptionalAggregator): u128 {
+        if (optional_aggregator.aggregator.is_some()) {
+            aggregator::limit(optional_aggregator.aggregator.borrow())
+        } else {
+            limit(optional_aggregator.integer.borrow())
+        }
+    }
+
     /// Switches between parallelizable and non-parallelizable implementations.
     public fun switch(_optional_aggregator: &mut OptionalAggregator) {
         abort error::invalid_state(ESWITCH_DEPRECATED)

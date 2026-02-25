@@ -2012,6 +2012,8 @@ module aptos_framework::stake {
     }
 
     /// Mint rewards corresponding to current epoch's `stake` and `num_successful_votes`.
+    /// Rewards are clamped to the remaining supply headroom so that reaching the hard APT
+    /// supply cap causes rewards to taper to zero rather than aborting the epoch transaction.
     fun distribute_rewards(
         stake: &mut Coin<AptosCoin>,
         num_successful_proposals: u64,
@@ -2031,12 +2033,23 @@ module aptos_framework::stake {
                 )
             } else { 0 };
         if (rewards_amount > 0) {
-            let mint_cap =
-                &borrow_global<AptosCoinCapabilities>(@aptos_framework).mint_cap;
-            let rewards = coin::mint(rewards_amount, mint_cap);
-            coin::merge(stake, rewards);
-        };
-        rewards_amount
+            // Clamp to available headroom so we never breach the hard supply cap.
+            let headroom = coin::mint_headroom<AptosCoin>();
+            let actual_rewards = if ((rewards_amount as u128) > headroom) {
+                (headroom as u64)
+            } else {
+                rewards_amount
+            };
+            if (actual_rewards > 0) {
+                let mint_cap =
+                    &borrow_global<AptosCoinCapabilities>(@aptos_framework).mint_cap;
+                let rewards = coin::mint(actual_rewards, mint_cap);
+                coin::merge(stake, rewards);
+            };
+            actual_rewards
+        } else {
+            0
+        }
     }
 
     fun append<T>(v1: &mut vector<T>, v2: &mut vector<T>) {

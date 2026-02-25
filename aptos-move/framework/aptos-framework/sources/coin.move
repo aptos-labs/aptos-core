@@ -855,6 +855,21 @@ module aptos_framework::coin {
         }
     }
 
+    #[view]
+    /// Returns how many more coins of `CoinType` can be minted before the supply cap is reached.
+    /// Returns MAX_U128 if there is no supply tracking or the supply has no cap.
+    public fun mint_headroom<CoinType>(): u128 acquires CoinInfo {
+        let maybe_supply =
+            &borrow_global<CoinInfo<CoinType>>(coin_address<CoinType>()).supply;
+        if (maybe_supply.is_none()) {
+            return MAX_U128
+        };
+        let supply = maybe_supply.borrow();
+        let current = optional_aggregator::read(supply);
+        let cap = optional_aggregator::read_limit(supply);
+        cap - current
+    }
+
     //
     // Public functions
     //
