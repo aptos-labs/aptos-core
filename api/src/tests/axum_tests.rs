@@ -88,15 +88,24 @@ async fn test_axum_get_account() {
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
-async fn test_axum_get_account_not_found_or_default() {
+async fn test_axum_get_account_default_resource() {
     let context = new_test_context(current_function_name!());
-    // With the DEFAULT_ACCOUNT_RESOURCE feature, non-existent accounts may
-    // return a default account resource instead of 404.
-    let resp = context
-        .get("/accounts/0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef")
+    // The DEFAULT_ACCOUNT_RESOURCE feature returns a default account resource
+    // for non-existent accounts instead of 404.
+    let (status, _headers, body) = context
+        .get_raw(
+            "/accounts/0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef",
+            "",
+        )
         .await;
-    // Either returns valid account data or a 404
-    assert!(resp.get("sequence_number").is_some() || resp.get("message").is_some());
+    let resp: serde_json::Value = serde_json::from_slice(&body).unwrap_or_default();
+    // Depending on feature flags, either returns 200 with account data or 404
+    if status.as_u16() == 200 {
+        assert!(resp.get("sequence_number").is_some());
+    } else {
+        assert_eq!(status.as_u16(), 404);
+        assert!(resp.get("message").is_some());
+    }
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
@@ -196,7 +205,7 @@ async fn test_axum_get_transaction_by_version_not_found() {
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
-async fn test_axum_submit_and_get_transaction() {
+async fn test_axum_create_account_and_verify() {
     let mut context = new_test_context(current_function_name!());
     let account = context.create_account().await;
     let address = account.address();

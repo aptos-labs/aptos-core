@@ -167,7 +167,17 @@ impl<T: Serialize + Send> IntoResponse for AptosResponse<T> {
 
         let mut response = match self.body {
             AptosResponseBody::Json(body) => {
-                let json = serde_json::to_vec(&body).unwrap_or_default();
+                let json = match serde_json::to_vec(&body) {
+                    Ok(bytes) => bytes,
+                    Err(e) => {
+                        aptos_logger::error!("JSON serialization failed: {}", e);
+                        return (
+                            StatusCode::INTERNAL_SERVER_ERROR,
+                            [(header::CONTENT_TYPE, "application/json")],
+                            "{\"message\":\"Internal serialization error\",\"error_code\":\"internal_error\",\"vm_error_code\":null}".to_string(),
+                        ).into_response();
+                    },
+                };
                 (
                     self.status,
                     [(header::CONTENT_TYPE, "application/json")],
@@ -347,7 +357,14 @@ impl IntoResponse for AptosErrorResponse {
     fn into_response(self) -> Response {
         let headers = build_optional_ledger_headers(self.ledger_info.as_ref());
 
-        let json = serde_json::to_vec(&self.error).unwrap_or_default();
+        let json = serde_json::to_vec(&self.error).unwrap_or_else(|e| {
+            aptos_logger::error!("Error JSON serialization failed: {}", e);
+            format!(
+                "{{\"message\":\"{}\",\"error_code\":\"internal_error\",\"vm_error_code\":null}}",
+                self.error.message
+            )
+            .into_bytes()
+        });
         let mut response = (
             self.status,
             [(header::CONTENT_TYPE, "application/json")],

@@ -1287,6 +1287,7 @@ impl TestContext {
         reqwest::header::HeaderMap,
         bytes::Bytes,
     ) {
+        self.wait_for_internal_indexer_caught_up().await;
         let ApiSpecificConfig::V1(address) = self.api_specific_config;
         let url = format!(
             "http://{}{}{}{}",

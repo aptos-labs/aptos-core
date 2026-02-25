@@ -14,6 +14,8 @@ use std::{net::SocketAddr, sync::Arc};
 use tokio::{net::TcpListener, runtime::Handle};
 use tower_http::{catch_panic::CatchPanicLayer, compression::CompressionLayer, cors::CorsLayer};
 
+// TODO: Add TLS support (tls_cert_path / tls_key_path) matching the Poem runtime.
+// TODO: Add custom Path extractor rejection to return AptosError JSON format.
 pub fn attach_axum_to_runtime(
     runtime_handle: &Handle,
     context: Context,

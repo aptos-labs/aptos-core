@@ -31,17 +31,34 @@ async fn poem_to_axum_response(poem_resp: poem::Response) -> Response {
     let status = poem_resp.status();
     let headers = poem_resp.headers().clone();
     let body = poem_resp.into_body();
-    let body_bytes = body.into_vec().await.unwrap_or_default();
+    let body_bytes = match body.into_vec().await {
+        Ok(bytes) => bytes,
+        Err(e) => {
+            aptos_logger::error!("Failed to read Poem response body: {}", e);
+            let error = aptos_api_types::AptosError::new_with_error_code(
+                "Internal error reading response body",
+                aptos_api_types::AptosErrorCode::InternalError,
+            );
+            let json = serde_json::to_vec(&error).unwrap_or_default();
+            return (StatusCode::INTERNAL_SERVER_ERROR, json).into_response();
+        },
+    };
 
     let axum_status =
         StatusCode::from_u16(status.as_u16()).unwrap_or(StatusCode::INTERNAL_SERVER_ERROR);
 
     let mut builder = axum::http::Response::builder().status(axum_status);
     for (key, value) in headers.iter() {
-        if let Ok(name) = axum::http::header::HeaderName::from_bytes(key.as_str().as_bytes()) {
-            if let Ok(val) = axum::http::header::HeaderValue::from_bytes(value.as_bytes()) {
+        match (
+            axum::http::header::HeaderName::from_bytes(key.as_str().as_bytes()),
+            axum::http::header::HeaderValue::from_bytes(value.as_bytes()),
+        ) {
+            (Ok(name), Ok(val)) => {
                 builder = builder.header(name, val);
-            }
+            },
+            _ => {
+                aptos_logger::warn!("Dropping unconvertible header: {}", key);
+            },
         }
     }
 
@@ -590,11 +607,22 @@ pub async fn get_table_item_handler(
     accept_type: AcceptType,
     Path(table_handle): Path<aptos_api_types::Address>,
     Query(query): Query<LedgerVersionQuery>,
-    axum::Json(body): axum::Json<aptos_api_types::TableItemRequest>,
+    raw_body: Bytes,
 ) -> Result<Response, AptosErrorResponse> {
     use crate::context::api_spawn_blocking;
     use anyhow::Context as AnyhowContext;
     use aptos_api_types::VerifyInput;
+    let body: aptos_api_types::TableItemRequest =
+        serde_json::from_slice(&raw_body).map_err(|e| {
+            AptosErrorResponse::new(
+                StatusCode::BAD_REQUEST,
+                aptos_api_types::AptosError::new_with_error_code(
+                    format!("parse request payload error: {}", e),
+                    aptos_api_types::AptosErrorCode::WebFrameworkError,
+                ),
+                None,
+            )
+        })?;
     body.verify()
         .context("'table_item_request' invalid")
         .map_err(|err| {
@@ -620,8 +648,19 @@ pub async fn get_raw_table_item_handler(
     accept_type: AcceptType,
     Path(table_handle): Path<aptos_api_types::Address>,
     Query(query): Query<LedgerVersionQuery>,
-    axum::Json(body): axum::Json<aptos_api_types::RawTableItemRequest>,
+    raw_body: Bytes,
 ) -> Result<Response, AptosErrorResponse> {
+    let body: aptos_api_types::RawTableItemRequest =
+        serde_json::from_slice(&raw_body).map_err(|e| {
+            AptosErrorResponse::new(
+                StatusCode::BAD_REQUEST,
+                aptos_api_types::AptosError::new_with_error_code(
+                    format!("parse request payload error: {}", e),
+                    aptos_api_types::AptosErrorCode::WebFrameworkError,
+                ),
+                None,
+            )
+        })?;
     crate::failpoint::fail_point_poem::<AptosErrorResponse>("endpoint_get_table_item")?;
     if AcceptType::Json == accept_type {
         return Err(crate::response_axum::api_forbidden(
@@ -644,8 +683,19 @@ pub async fn get_raw_state_value_handler(
     State(context): Ctx,
     accept_type: AcceptType,
     Query(query): Query<LedgerVersionQuery>,
-    axum::Json(body): axum::Json<aptos_api_types::RawStateValueRequest>,
+    raw_body: Bytes,
 ) -> Result<Response, AptosErrorResponse> {
+    let body: aptos_api_types::RawStateValueRequest =
+        serde_json::from_slice(&raw_body).map_err(|e| {
+            AptosErrorResponse::new(
+                StatusCode::BAD_REQUEST,
+                aptos_api_types::AptosError::new_with_error_code(
+                    format!("parse request payload error: {}", e),
+                    aptos_api_types::AptosErrorCode::WebFrameworkError,
+                ),
+                None,
+            )
+        })?;
     crate::failpoint::fail_point_poem::<AptosErrorResponse>("endpoint_get_raw_state_value")?;
     if AcceptType::Json == accept_type {
         return Err(crate::response_axum::api_forbidden(
@@ -1031,9 +1081,20 @@ pub async fn simulate_transaction_handler(
 pub async fn encode_submission_handler(
     State(context): Ctx,
     accept_type: AcceptType,
-    axum::Json(request): axum::Json<aptos_api_types::EncodeSubmissionRequest>,
+    raw_body: Bytes,
 ) -> Result<Response, AptosErrorResponse> {
     use crate::context::api_spawn_blocking;
+    let request: aptos_api_types::EncodeSubmissionRequest = serde_json::from_slice(&raw_body)
+        .map_err(|e| {
+            AptosErrorResponse::new(
+                StatusCode::BAD_REQUEST,
+                aptos_api_types::AptosError::new_with_error_code(
+                    format!("parse request payload error: {}", e),
+                    aptos_api_types::AptosErrorCode::WebFrameworkError,
+                ),
+                None,
+            )
+        })?;
     crate::failpoint::fail_point_poem::<AptosErrorResponse>("endpoint_encode_submission")?;
     context.check_api_output_enabled::<AptosErrorResponse>("Encode submission", &accept_type)?;
     let txn_api = crate::transactions::TransactionsApi {
