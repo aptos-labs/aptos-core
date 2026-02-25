@@ -4,7 +4,7 @@
 use crate::{
     code_cache_global::GlobalModuleCache,
     counters::{
-        GLOBAL_LAYOUT_CACHE_NUM_NON_ENTRIES, GLOBAL_MODULE_CACHE_NUM_MODULES,
+        GLOBAL_LAYOUT_CACHE_NUM_ENTRIES, GLOBAL_MODULE_CACHE_NUM_MODULES,
         GLOBAL_MODULE_CACHE_SIZE_IN_BYTES, NUM_INTERNED_MODULE_IDS, NUM_INTERNED_TYPES,
         NUM_INTERNED_TYPE_VECS, STRUCT_NAME_INDEX_MAP_NUM_ENTRIES,
     },
@@ -103,7 +103,7 @@ where
     ) -> Result<(), VMStatus> {
         // If we execute non-consecutive sequence of transactions, we need to flush everything.
         if !transaction_slice_metadata.is_immediately_after(&self.transaction_slice_metadata) {
-            self.module_cache.flush();
+            self.module_cache.flush_all_caches();
             self.environment = None;
         }
         // Record the new metadata for this slice of transactions.
@@ -125,25 +125,17 @@ where
             }
 
             self.environment = Some(storage_environment);
-            self.module_cache.flush();
+            self.module_cache.flush_all_caches();
         }
 
         let environment = self.environment.as_ref().expect("Environment must be set");
         let runtime_environment = environment.runtime_environment();
         RuntimeEnvironment::log_verified_cache_size();
 
-        let struct_name_index_map_size = runtime_environment
+        let num_interned_struct_names = runtime_environment
             .struct_name_index_map_size()
             .map_err(|err| err.finish(Location::Undefined).into_vm_status())?;
-        STRUCT_NAME_INDEX_MAP_NUM_ENTRIES.set(struct_name_index_map_size as i64);
-
-        // If the environment caches too many struct names, flush type caches. Also flush module
-        // caches because they contain indices for struct names.
-        if struct_name_index_map_size > config.max_struct_name_index_map_num_entries {
-            runtime_environment.flush_all_caches();
-            self.module_cache.flush();
-        }
-
+        STRUCT_NAME_INDEX_MAP_NUM_ENTRIES.set(num_interned_struct_names as i64);
         let num_interned_tys = runtime_environment.ty_pool().num_interned_tys();
         NUM_INTERNED_TYPES.set(num_interned_tys as i64);
         let num_interned_ty_vecs = runtime_environment.ty_pool().num_interned_ty_vecs();
@@ -151,31 +143,31 @@ where
         let num_interned_module_ids = runtime_environment.module_id_pool().len();
         NUM_INTERNED_MODULE_IDS.set(num_interned_module_ids as i64);
 
-        if num_interned_tys > config.max_interned_tys
+        if num_interned_module_ids > config.max_interned_module_ids
+            || num_interned_struct_names > config.max_struct_name_index_map_num_entries
+            || num_interned_tys > config.max_interned_tys
             || num_interned_ty_vecs > config.max_interned_ty_vecs
         {
-            runtime_environment.ty_pool().flush();
-            self.module_cache.flush();
-        }
-
-        if num_interned_module_ids > config.max_interned_module_ids {
-            runtime_environment.module_id_pool().flush();
-            runtime_environment.struct_name_index_map().flush();
-            self.module_cache.flush();
+            // If there are too many interned entries in any of the cache, flush all caches.
+            // This is very important because some caches may store interned data from caches
+            // that are being flushed.
+            runtime_environment.flush_all_caches();
+            self.module_cache.flush_all_caches();
         }
 
         let module_cache_size_in_bytes = self.module_cache.size_in_bytes();
         GLOBAL_MODULE_CACHE_SIZE_IN_BYTES.set(module_cache_size_in_bytes as i64);
         GLOBAL_MODULE_CACHE_NUM_MODULES.set(self.module_cache.num_modules() as i64);
 
-        // If module cache stores too many modules, flush it as well.
+        // If module cache stores too many modules, flush it well (together with layouts).
         if module_cache_size_in_bytes > config.max_module_cache_size_in_bytes {
-            self.module_cache.flush();
+            self.module_cache.flush_all_caches();
         }
 
-        let num_non_generic_layout_entries = self.module_cache.num_cached_layouts();
-        GLOBAL_LAYOUT_CACHE_NUM_NON_ENTRIES.set(num_non_generic_layout_entries as i64);
-        if num_non_generic_layout_entries > config.max_layout_cache_size {
+        // If there are too many layouts: flush only them.
+        let num_layout_entries = self.module_cache.num_cached_layouts();
+        GLOBAL_LAYOUT_CACHE_NUM_ENTRIES.set(num_layout_entries as i64);
+        if num_layout_entries > config.max_layout_cache_size {
             self.module_cache.flush_layout_cache();
         }
 
@@ -698,7 +690,7 @@ mod test {
             .module_cache()
             .get(&tx_val_id)
             .expect("module present");
-        guard.module_cache_mut().flush();
+        guard.module_cache_mut().flush_all_caches();
         assert!(guard.module_cache().get(&tx_val_id).is_none());
 
         assert_ne!(guard.module_cache().size_in_bytes(), size_before);
