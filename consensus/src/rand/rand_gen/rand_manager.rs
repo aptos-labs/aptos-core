@@ -230,6 +230,10 @@ impl<S: TShare, D: TAugmentedData> RandManager<S, D> {
         };
         self.block_queue = BlockQueue::new();
         self.rand_store.lock().reset(target_round);
+        // Drain stale decision messages (Success/Skip) from previously spawned
+        // aggregation tasks and shared futures to prevent them from affecting
+        // new blocks that may arrive at the same rounds after reset.
+        while matches!(self.decision_rx.try_next(), Ok(Some(_))) {}
         self.stop = matches!(signal, ResetSignal::Stop);
         let _ = tx.send(ResetAck::default());
     }
