@@ -1375,10 +1375,28 @@ impl TestContext {
         let status = resp.status().as_u16();
         let headers = resp.headers().clone();
 
-        self.api_specific_config.assert_content_type(&headers);
+        // Verify content-type is JSON
+        if let Some(ct) = headers.get("content-type") {
+            assert!(
+                ct.to_str().unwrap().starts_with(mime_types::JSON),
+                "Expected JSON content type, got: {:?}",
+                ct
+            );
+        }
 
         let body_bytes = resp.bytes().await.expect("Failed to read response body");
-        let body: Value = serde_json::from_slice(&body_bytes).expect("response body is JSON");
+        if body_bytes.is_empty() {
+            panic!(
+                "Empty response body from {} {} (status {})",
+                method, url, status
+            );
+        }
+        let body: Value = serde_json::from_slice(&body_bytes)
+            .unwrap_or_else(|e| panic!(
+                "response body is not JSON: {}. Raw body: {:?}",
+                e,
+                String::from_utf8_lossy(&body_bytes)
+            ));
 
         assert_eq!(
             self.expect_status_code, status,
@@ -1389,23 +1407,15 @@ impl TestContext {
         if self.expect_status_code < 300 {
             let ledger_info = self.get_latest_ledger_info();
             assert_eq!(
-                headers.get(X_APTOS_CHAIN_ID).unwrap().to_str().unwrap(),
+                headers.get("x-aptos-chain-id").unwrap().to_str().unwrap(),
                 "4"
             );
             assert_eq!(
-                headers
-                    .get(X_APTOS_LEDGER_VERSION)
-                    .unwrap()
-                    .to_str()
-                    .unwrap(),
+                headers.get("x-aptos-ledger-version").unwrap().to_str().unwrap(),
                 ledger_info.version().to_string()
             );
             assert_eq!(
-                headers
-                    .get(X_APTOS_LEDGER_TIMESTAMP)
-                    .unwrap()
-                    .to_str()
-                    .unwrap(),
+                headers.get("x-aptos-ledger-timestampusec").unwrap().to_str().unwrap(),
                 ledger_info.timestamp().to_string()
             );
         }

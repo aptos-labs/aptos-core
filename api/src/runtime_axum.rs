@@ -12,17 +12,19 @@ use anyhow::{anyhow, Context as AnyhowContext};
 use aptos_config::config::NodeConfig;
 use axum::{
     extract::State,
-    http::Method,
+    http::{Method, StatusCode},
     middleware,
     routing::{get, post},
     Router,
 };
 use std::{net::SocketAddr, sync::Arc};
 use tokio::{net::TcpListener, runtime::Handle};
+use tower::{Layer, ServiceExt};
 use tower_http::{
     catch_panic::CatchPanicLayer,
     compression::CompressionLayer,
     cors::{Any, CorsLayer},
+    normalize_path::NormalizePathLayer,
 };
 
 pub fn attach_axum_to_runtime(
@@ -68,28 +70,29 @@ pub fn attach_axum_to_runtime(
         let cors = CorsLayer::new()
             .allow_credentials(true)
             .allow_methods(vec![Method::GET, Method::POST])
-            .allow_headers(Any)
-            .allow_origin(Any);
+            .allow_headers(vec![
+                axum::http::header::CONTENT_TYPE,
+                axum::http::header::ACCEPT,
+                axum::http::header::AUTHORIZATION,
+                axum::http::header::ORIGIN,
+            ])
+            .allow_origin(tower_http::cors::AllowOrigin::mirror_request());
 
-        let v1_router = build_v1_router(context.clone(), spec_json, spec_yaml);
-
-        let app = Router::new()
-            .route("/", get(routes_axum::root_handler))
-            .nest("/v1", v1_router)
+        let app = build_full_router(context.clone(), spec_json, spec_yaml)
             .layer(cors)
             .layer(middleware::from_fn(middleware_axum::logging_middleware))
             .layer(CatchPanicLayer::custom(error_converter_axum::handle_panic));
 
-        if config.api.compression_enabled {
-            let app = app.layer(CompressionLayer::new());
-            axum::serve(listener, app)
-                .await
-                .map_err(anyhow::Error::msg)
+        // Apply compression if enabled
+        let app = if config.api.compression_enabled {
+            app.layer(CompressionLayer::new())
         } else {
-            axum::serve(listener, app)
-                .await
-                .map_err(anyhow::Error::msg)
-        }
+            app
+        };
+
+        axum::serve(listener, app)
+            .await
+            .map_err(anyhow::Error::msg)
     });
 
     aptos_logger::info!("API server (Axum) is running at {}", actual_address);
@@ -97,130 +100,73 @@ pub fn attach_axum_to_runtime(
     Ok(actual_address)
 }
 
-fn build_v1_router(context: Arc<Context>, spec_json: String, spec_yaml: String) -> Router {
+fn build_full_router(context: Arc<Context>, spec_json: String, spec_yaml: String) -> Router {
     let size_limit = context.content_length_limit();
 
+    let spec_json_clone = spec_json.clone();
+    let spec_yaml_clone = spec_yaml.clone();
+
     Router::new()
-        // BasicApi
-        .route("/", get(routes_axum::get_ledger_info_handler))
-        .route("/spec", get(routes_axum::spec_handler))
-        .route("/info", get(routes_axum::info_handler))
-        .route("/-/healthy", get(routes_axum::healthy_handler))
-        // Spec endpoints
+        .route("/", get(routes_axum::root_handler))
+        // Both /v1 and /v1/ should return the ledger info
+        .route("/v1", get(routes_axum::get_ledger_info_handler))
+        .route("/v1/", get(routes_axum::get_ledger_info_handler))
+        .route("/v1/spec", get(routes_axum::spec_handler))
+        .route("/v1/info", get(routes_axum::info_handler))
+        .route("/v1/-/healthy", get(routes_axum::healthy_handler))
         .route(
-            "/spec.json",
-            get(routes_axum::spec_json_handler).with_state(spec_json),
+            "/v1/spec.json",
+            get(move || async move {
+                (
+                    StatusCode::OK,
+                    [(axum::http::header::CONTENT_TYPE, "application/json")],
+                    spec_json_clone,
+                )
+            }),
         )
         .route(
-            "/spec.yaml",
-            get(routes_axum::spec_yaml_handler).with_state(spec_yaml),
+            "/v1/spec.yaml",
+            get(move || async move {
+                (
+                    StatusCode::OK,
+                    [(axum::http::header::CONTENT_TYPE, "application/x-yaml")],
+                    spec_yaml_clone,
+                )
+            }),
         )
         // AccountsApi
-        .route("/accounts/:address", get(routes_axum::get_account_handler))
-        .route(
-            "/accounts/:address/resources",
-            get(routes_axum::get_account_resources_handler),
-        )
-        .route(
-            "/accounts/:address/balance/:asset_type",
-            get(routes_axum::get_account_balance_handler),
-        )
-        .route(
-            "/accounts/:address/modules",
-            get(routes_axum::get_account_modules_handler),
-        )
+        .route("/v1/accounts/:address", get(routes_axum::get_account_handler))
+        .route("/v1/accounts/:address/resources", get(routes_axum::get_account_resources_handler))
+        .route("/v1/accounts/:address/balance/:asset_type", get(routes_axum::get_account_balance_handler))
+        .route("/v1/accounts/:address/modules", get(routes_axum::get_account_modules_handler))
         // BlocksApi
-        .route(
-            "/blocks/by_height/:block_height",
-            get(routes_axum::get_block_by_height_handler),
-        )
-        .route(
-            "/blocks/by_version/:version",
-            get(routes_axum::get_block_by_version_handler),
-        )
+        .route("/v1/blocks/by_height/:block_height", get(routes_axum::get_block_by_height_handler))
+        .route("/v1/blocks/by_version/:version", get(routes_axum::get_block_by_version_handler))
         // EventsApi
-        .route(
-            "/accounts/:address/events/:creation_number",
-            get(routes_axum::get_events_by_creation_number_handler),
-        )
-        .route(
-            "/accounts/:address/events/:event_handle/:field_name",
-            get(routes_axum::get_events_by_event_handle_handler),
-        )
+        .route("/v1/accounts/:address/events/:creation_number", get(routes_axum::get_events_by_creation_number_handler))
+        .route("/v1/accounts/:address/events/:event_handle/:field_name", get(routes_axum::get_events_by_event_handle_handler))
         // StateApi
-        .route(
-            "/accounts/:address/resource/:resource_type",
-            get(routes_axum::get_account_resource_handler),
-        )
-        .route(
-            "/accounts/:address/module/:module_name",
-            get(routes_axum::get_account_module_handler),
-        )
-        .route(
-            "/tables/:table_handle/item",
-            post(routes_axum::get_table_item_handler),
-        )
-        .route(
-            "/tables/:table_handle/raw_item",
-            post(routes_axum::get_raw_table_item_handler),
-        )
-        .route(
-            "/experimental/state_values/raw",
-            post(routes_axum::get_raw_state_value_handler),
-        )
+        .route("/v1/accounts/:address/resource/:resource_type", get(routes_axum::get_account_resource_handler))
+        .route("/v1/accounts/:address/module/:module_name", get(routes_axum::get_account_module_handler))
+        .route("/v1/tables/:table_handle/item", post(routes_axum::get_table_item_handler))
+        .route("/v1/tables/:table_handle/raw_item", post(routes_axum::get_raw_table_item_handler))
+        .route("/v1/experimental/state_values/raw", post(routes_axum::get_raw_state_value_handler))
         // TransactionsApi
-        .route(
-            "/transactions",
-            get(routes_axum::get_transactions_handler)
-                .post(routes_axum::submit_transaction_handler),
-        )
-        .route(
-            "/transactions/by_hash/:txn_hash",
-            get(routes_axum::get_transaction_by_hash_handler),
-        )
-        .route(
-            "/transactions/wait_by_hash/:txn_hash",
-            get(routes_axum::wait_transaction_by_hash_handler),
-        )
-        .route(
-            "/transactions/by_version/:txn_version",
-            get(routes_axum::get_transaction_by_version_handler),
-        )
-        .route(
-            "/transactions/auxiliary_info",
-            get(routes_axum::get_transactions_auxiliary_info_handler),
-        )
-        .route(
-            "/accounts/:address/transactions",
-            get(routes_axum::get_accounts_transactions_handler),
-        )
-        .route(
-            "/accounts/:address/transaction_summaries",
-            get(routes_axum::get_accounts_transaction_summaries_handler),
-        )
-        .route(
-            "/transactions/batch",
-            post(routes_axum::submit_transactions_batch_handler),
-        )
-        .route(
-            "/transactions/simulate",
-            post(routes_axum::simulate_transaction_handler),
-        )
-        .route(
-            "/transactions/encode_submission",
-            post(routes_axum::encode_submission_handler),
-        )
-        .route(
-            "/estimate_gas_price",
-            get(routes_axum::estimate_gas_price_handler),
-        )
+        .route("/v1/transactions", get(routes_axum::get_transactions_handler).post(routes_axum::submit_transaction_handler))
+        .route("/v1/transactions/by_hash/:txn_hash", get(routes_axum::get_transaction_by_hash_handler))
+        .route("/v1/transactions/wait_by_hash/:txn_hash", get(routes_axum::wait_transaction_by_hash_handler))
+        .route("/v1/transactions/by_version/:txn_version", get(routes_axum::get_transaction_by_version_handler))
+        .route("/v1/transactions/auxiliary_info", get(routes_axum::get_transactions_auxiliary_info_handler))
+        .route("/v1/accounts/:address/transactions", get(routes_axum::get_accounts_transactions_handler))
+        .route("/v1/accounts/:address/transaction_summaries", get(routes_axum::get_accounts_transaction_summaries_handler))
+        .route("/v1/transactions/batch", post(routes_axum::submit_transactions_batch_handler))
+        .route("/v1/transactions/simulate", post(routes_axum::simulate_transaction_handler))
+        .route("/v1/transactions/encode_submission", post(routes_axum::encode_submission_handler))
+        .route("/v1/estimate_gas_price", get(routes_axum::estimate_gas_price_handler))
         // ViewFunctionApi
-        .route("/view", post(routes_axum::view_function_handler))
+        .route("/v1/view", post(routes_axum::view_function_handler))
         // Failpoints
-        .route(
-            "/set_failpoint",
-            get(routes_axum::set_failpoint_handler),
-        )
+        .route("/v1/set_failpoint", get(routes_axum::set_failpoint_handler))
         .with_state(context)
         .layer(middleware::from_fn(move |req, next| {
             middleware_axum::post_size_limit_middleware(size_limit, req, next)
