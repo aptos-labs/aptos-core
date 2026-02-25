@@ -317,14 +317,14 @@ Areas: `vm`, `framework`, `consensus`, `storage`, `api`, `network`, `types`, `cl
 
 ### System dependencies
 
-The update script runs `scripts/dev_setup.sh -b -k` on each VM startup to install/refresh all build tools (Rust toolchains, clang, protoc, cargo-sort, cargo-machete, cargo-nextest, grcov, etc.). Two extra packages (`libstdc++-14-dev`, `libpq-dev`) are installed separately since `dev_setup.sh` does not cover them by default.
+The VM’s startup/update script (managed by the Cursor Cloud environment, not this repo) runs `./scripts/dev_setup.sh -b -k` on each VM startup to install/refresh all build tools (Rust toolchains, clang, protoc, cargo-sort, cargo-machete, cargo-nextest, grcov, etc.). Two extra packages (`libstdc++-14-dev`, `libpq-dev`) are installed separately because this specific `./scripts/dev_setup.sh -b -k` invocation does not install them by default (they are only installed when `dev_setup.sh` is run with additional flags such as `-P` for PostgreSQL support).
 
 ### Key gotchas
 
 - **clang++ C++ headers**: `libstdc++-14-dev` must be installed or RocksDB will fail to compile with `'memory' file not found`. This happens because clang selects GCC 14 headers but only GCC 13 headers may be present.
 - **`cargo xclippy`** is a workspace-wide alias defined in `.cargo/config.toml`. It does **not** accept `-p <package>`. To lint a single package, use `cargo clippy -p <package>` with the appropriate allow/deny flags from the alias definition.
 - **`cargo +nightly fmt`** is used for formatting (not stable fmt). The nightly toolchain must have the `rustfmt` component.
-- **Localnet startup** takes ~60s for the first run (compilation is the bottleneck). Subsequent starts (with binary already built) are fast. Use `--no-txn-stream` to skip the transaction stream service which requires no additional dependencies.
+- **Localnet startup** takes ~60s for the first run (compilation is the bottleneck). Subsequent starts (with binary already built) are fast. Use `--no-txn-stream` to skip the transaction stream gRPC service, which is not required for basic local testing and slightly reduces resource usage.
 - The `-k` flag skips pre-commit hook installation in `dev_setup.sh` since cloud agents don't need git hooks.
 
 ### CI lint gate
