@@ -1287,9 +1287,7 @@ impl TestContext {
         reqwest::header::HeaderMap,
         bytes::Bytes,
     ) {
-        let address = match self.api_specific_config {
-            ApiSpecificConfig::V1(addr) => addr,
-        };
+        let ApiSpecificConfig::V1(address) = self.api_specific_config;
         let url = format!(
             "http://{}{}{}{}",
             address,
@@ -1334,9 +1332,8 @@ impl TestContext {
     }
 
     pub async fn reply(&self, req: warp::test::RequestBuilder) -> Response<Bytes> {
-        match self.api_specific_config {
-            ApiSpecificConfig::V1(address) => req.reply(&self.get_routes_with_poem(address)).await,
-        }
+        let ApiSpecificConfig::V1(address) = self.api_specific_config;
+        req.reply(&self.get_routes_with_poem(address)).await
     }
 
     pub fn get_routes_with_poem(
@@ -1390,9 +1387,7 @@ impl TestContext {
     ) -> (Value, reqwest::StatusCode, reqwest::header::HeaderMap) {
         self.wait_for_internal_indexer_caught_up().await;
 
-        let address = match self.api_specific_config {
-            ApiSpecificConfig::V1(addr) => addr,
-        };
+        let ApiSpecificConfig::V1(address) = self.api_specific_config;
         let url = format!(
             "http://{}{}{}",
             address,
@@ -1431,9 +1426,7 @@ impl TestContext {
     ) -> Value {
         self.wait_for_internal_indexer_caught_up().await;
 
-        let address = match self.api_specific_config {
-            ApiSpecificConfig::V1(addr) => addr,
-        };
+        let ApiSpecificConfig::V1(address) = self.api_specific_config;
         let url = format!(
             "http://{}{}{}",
             address,

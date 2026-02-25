@@ -1936,7 +1936,7 @@ fn override_gas_parameters(
     SignedTransaction::new_signed_transaction(raw_txn, signed_txn.authenticator())
 }
 
-enum GetByVersionResponse {
+pub(crate) enum GetByVersionResponse {
     VersionTooNew,
     VersionTooOld,
     Found(TransactionData),
