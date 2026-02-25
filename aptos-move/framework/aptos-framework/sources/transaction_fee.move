@@ -97,12 +97,26 @@ module aptos_framework::transaction_fee {
     }
 
     /// Mint refund in epilogue.
+    /// The refund is clamped to the available APT supply headroom so that a full supply cap
+    /// does not cause the epilogue (and the entire transaction) to abort. In practice, a
+    /// storage refund is returning previously-burned supply, so headroom should always be
+    /// sufficient; the clamp is a safety net for the rare case where staking rewards filled
+    /// the remaining headroom between the time the storage fee was paid and now.
     public(friend) fun mint_and_refund(
         account: address, refund: u64
     ) acquires AptosCoinMintCapability {
         let mint_cap = &borrow_global<AptosCoinMintCapability>(@aptos_framework).mint_cap;
-        let refund_coin = coin::mint(refund, mint_cap);
-        coin::deposit_for_gas_fee(account, refund_coin);
+        // Clamp to available headroom to never breach the hard supply cap.
+        let headroom = coin::mint_headroom<AptosCoin>();
+        let actual_refund = if ((refund as u128) > headroom) {
+            (headroom as u64)
+        } else {
+            refund
+        };
+        if (actual_refund > 0) {
+            let refund_coin = coin::mint(actual_refund, mint_cap);
+            coin::deposit_for_gas_fee(account, refund_coin);
+        };
     }
 
     /// Only called during genesis.
