@@ -26,8 +26,8 @@ pub struct IndexResponse {
     /// Git hash of the build of the API endpoint.  Can be used to determine the exact
     /// software version used by the API endpoint.
     pub git_hash: Option<String>,
-    /// Per-epoch transaction encryption key (hex-encoded)
-    #[serde(skip_serializing_if = "Option::is_none")]
+    /// Per-epoch transaction encryption key (hex-encoded).
+    /// Always included in JSON responses (as null when absent) for backward compatibility.
     pub encryption_key: Option<String>,
 }
 
