@@ -75,9 +75,19 @@ pub struct StateMerkleDb {
     version_caches: HashMap<Option<usize>, VersionedNodeCache>,
     // `None` means the cache is not enabled.
     lru_cache: Option<LruNodeCache>,
+    // Whether this is the hot state instance (vs cold/global).
+    is_hot: bool,
 }
 
 impl StateMerkleDb {
+    fn db_tag(&self) -> &'static str {
+        if self.is_hot {
+            "hot"
+        } else {
+            "cold"
+        }
+    }
+
     pub(crate) fn new(
         db_paths: &StorageDirPaths,
         state_merkle_db_config: RocksdbConfig,
@@ -308,7 +318,8 @@ impl StateMerkleDb {
         tree_update_batch: &TreeUpdateBatch<StateKey>,
         previous_epoch_ending_version: Option<Version>,
     ) -> Result<RawBatch> {
-        let _timer = OTHER_TIMERS_SECONDS.timer_with(&["create_jmt_commit_batch_for_shard"]);
+        let timer_name = format!("{}__create_jmt_commit_batch_for_shard", self.db_tag());
+        let _timer = OTHER_TIMERS_SECONDS.timer_with(&[&timer_name]);
 
         let mut batch = self.db(shard_id).new_native_batch();
 
@@ -423,7 +434,8 @@ impl StateMerkleDb {
         }
 
         let (shard_root_node, tree_update_batch) = {
-            let _timer = OTHER_TIMERS_SECONDS.timer_with(&["jmt_update"]);
+            let timer_name = format!("{}__jmt_update", self.db_tag());
+            let _timer = OTHER_TIMERS_SECONDS.timer_with(&[&timer_name]);
 
             self.batch_put_value_set_for_shard(
                 shard_id,
@@ -603,6 +615,7 @@ impl StateMerkleDb {
             state_merkle_db_shards,
             version_caches,
             lru_cache,
+            is_hot,
         };
 
         if !readonly {
@@ -794,8 +807,10 @@ impl TreeReader<StateKey> for StateMerkleDb {
             let node_opt = self
                 .db_by_key(node_key)
                 .get::<JellyfishMerkleNodeSchema>(node_key)?;
-            NODE_CACHE_SECONDS
-                .observe_with(&[tag, "cache_disabled"], start_time.elapsed().as_secs_f64());
+            NODE_CACHE_SECONDS.observe_with(
+                &[tag, "cache_disabled", self.db_tag()],
+                start_time.elapsed().as_secs_f64(),
+            );
             return Ok(node_opt);
         }
         if let Some(node_cache) = self
@@ -806,7 +821,7 @@ impl TreeReader<StateKey> for StateMerkleDb {
         {
             let node = node_cache.get(node_key).cloned();
             NODE_CACHE_SECONDS.observe_with(
-                &[tag, "versioned_cache_hit"],
+                &[tag, "versioned_cache_hit", self.db_tag()],
                 start_time.elapsed().as_secs_f64(),
             );
             return Ok(node);
@@ -814,8 +829,10 @@ impl TreeReader<StateKey> for StateMerkleDb {
 
         if let Some(lru_cache) = &self.lru_cache {
             if let Some(node) = lru_cache.get(node_key) {
-                NODE_CACHE_SECONDS
-                    .observe_with(&[tag, "lru_cache_hit"], start_time.elapsed().as_secs_f64());
+                NODE_CACHE_SECONDS.observe_with(
+                    &[tag, "lru_cache_hit", self.db_tag()],
+                    start_time.elapsed().as_secs_f64(),
+                );
                 return Ok(Some(node));
             }
         }
@@ -828,7 +845,10 @@ impl TreeReader<StateKey> for StateMerkleDb {
                 lru_cache.put(node_key.clone(), node.clone());
             }
         }
-        NODE_CACHE_SECONDS.observe_with(&[tag, "cache_miss"], start_time.elapsed().as_secs_f64());
+        NODE_CACHE_SECONDS.observe_with(
+            &[tag, "cache_miss", self.db_tag()],
+            start_time.elapsed().as_secs_f64(),
+        );
         Ok(node_opt)
     }
 
@@ -851,7 +871,8 @@ impl TreeReader<StateKey> for StateMerkleDb {
 
 impl TreeWriter<StateKey> for StateMerkleDb {
     fn write_node_batch(&self, node_batch: &NodeBatch) -> Result<()> {
-        let _timer = OTHER_TIMERS_SECONDS.timer_with(&["tree_writer_write_batch"]);
+        let timer_name = format!("{}__tree_writer_write_batch", self.db_tag());
+        let _timer = OTHER_TIMERS_SECONDS.timer_with(&[&timer_name]);
         // Get the top level batch and sharded batch from raw NodeBatch
         let mut top_level_batch = SchemaBatch::new();
         let mut jmt_shard_batches: Vec<SchemaBatch> = Vec::with_capacity(NUM_STATE_SHARDS);
