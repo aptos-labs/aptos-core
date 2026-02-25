@@ -23,6 +23,11 @@ module aptos_framework::aptos_coin {
     /// Hard cap on total APT supply: 2.1 billion APT expressed in octas (8 decimal places).
     const MAX_APT_SUPPLY: u128 = 210_000_000_000_000_000;
 
+    /// Sentinel value returned by `inflation_budget_remaining` when the InflationBudget resource
+    /// has not yet been initialized (during genesis or in isolated unit tests).
+    /// Signals that no inflation cap is in effect at that point.
+    const INFLATION_BUDGET_UNSET: u128 = 0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF;
+
     struct AptosCoin has key {}
 
     struct MintCapStore has key {
@@ -98,13 +103,13 @@ module aptos_framework::aptos_coin {
     }
 
     /// Returns how many more octas of inflationary APT (staking rewards) may be minted.
-    /// Returns MAX_U128 when the InflationBudget resource has not been initialized yet
-    /// (e.g. during genesis or in isolated unit tests), indicating no cap is in effect.
+    /// Returns INFLATION_BUDGET_UNSET when the InflationBudget resource has not been initialized
+    /// yet (e.g. during genesis or in isolated unit tests), indicating no cap is in effect.
     public fun inflation_budget_remaining(): u128 acquires InflationBudget {
         if (!exists<InflationBudget>(@aptos_framework)) {
-            return (340282366920938463463374607431768211455u128) // MAX_U128 — no cap yet
+            return INFLATION_BUDGET_UNSET
         };
-        borrow_global<InflationBudget>(@aptos_framework).remaining
+        InflationBudget[@aptos_framework].remaining
     }
 
     /// Consumes `amount` octas from the inflation budget.
@@ -113,7 +118,7 @@ module aptos_framework::aptos_coin {
         if (!exists<InflationBudget>(@aptos_framework)) {
             return // no-op during genesis / isolated tests
         };
-        let budget = borrow_global_mut<InflationBudget>(@aptos_framework);
+        let budget = &mut InflationBudget[@aptos_framework];
         budget.remaining = budget.remaining - amount;
     }
 

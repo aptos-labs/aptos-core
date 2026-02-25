@@ -2039,15 +2039,15 @@ module aptos_framework::stake {
             //   supply = genesis_supply + total_rewards - net_burned ≤ MAX_APT_SUPPLY
             // (net_burned ≥ 0 since restorations ≤ burns, always)
             let budget = aptos_coin::inflation_budget_remaining();
-            let actual_rewards = if ((rewards_amount as u128) > budget) {
-                (budget as u64)
-            } else {
-                rewards_amount
-            };
+            // Take min(rewards_amount, budget) then cast to u64.
+            // The result is always ≤ rewards_amount (u64), so the cast is always safe
+            // regardless of how large budget is as a u128.
+            let actual_rewards = (
+                if (budget < (rewards_amount as u128)) { budget } else { (rewards_amount as u128) }
+            ) as u64;
             if (actual_rewards > 0) {
                 aptos_coin::consume_inflation_budget(actual_rewards as u128);
-                let mint_cap =
-                    &borrow_global<AptosCoinCapabilities>(@aptos_framework).mint_cap;
+                let mint_cap = &AptosCoinCapabilities[@aptos_framework].mint_cap;
                 let rewards = coin::mint(actual_rewards, mint_cap);
                 coin::merge(stake, rewards);
             };

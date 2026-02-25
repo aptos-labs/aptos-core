@@ -855,21 +855,6 @@ module aptos_framework::coin {
         }
     }
 
-    #[view]
-    /// Returns how many more coins of `CoinType` can be minted before the supply cap is reached.
-    /// Returns MAX_U128 if there is no supply tracking or the supply has no cap.
-    public fun mint_headroom<CoinType>(): u128 acquires CoinInfo {
-        let maybe_supply =
-            &borrow_global<CoinInfo<CoinType>>(coin_address<CoinType>()).supply;
-        if (maybe_supply.is_none()) {
-            return MAX_U128
-        };
-        let supply = maybe_supply.borrow();
-        let current = optional_aggregator::read(supply);
-        let cap = optional_aggregator::read_limit(supply);
-        cap - current
-    }
-
     //
     // Public functions
     //
@@ -1022,7 +1007,6 @@ module aptos_framework::coin {
             decimals,
             monitor_supply,
             false,
-            option::none(),
         )
     }
 
@@ -1042,7 +1026,6 @@ module aptos_framework::coin {
             decimals,
             monitor_supply,
             true,
-            option::none(),
         )
     }
 
@@ -1053,7 +1036,6 @@ module aptos_framework::coin {
         decimals: u8,
         monitor_supply: bool,
         parallelizable: bool,
-        supply_limit: Option<u128>,
     ): (BurnCapability<CoinType>, FreezeCapability<CoinType>, MintCapability<CoinType>) acquires CoinInfo, CoinConversionMap {
         let account_addr = signer::address_of(account);
         assert_signer_has_permission<CoinType>(account);
@@ -1085,13 +1067,7 @@ module aptos_framework::coin {
             symbol,
             decimals,
             supply: if (monitor_supply) {
-                option::some(
-                    if (option::is_some(&supply_limit)) {
-                        optional_aggregator::new_with_limit(*option::borrow(&supply_limit))
-                    } else {
-                        optional_aggregator::new(parallelizable)
-                    }
-                )
+                option::some(optional_aggregator::new(parallelizable))
             } else {
                 option::none()
             }
@@ -1106,27 +1082,6 @@ module aptos_framework::coin {
     }
 
     /// Same as `initialize_with_parallelizable_supply` but enforces a hard cap on total supply.
-    /// Any mint that would push total supply above `max_supply` octas will abort.
-    /// Only callable by aptos_framework during genesis.
-    public(friend) fun initialize_with_supply_cap<CoinType>(
-        account: &signer,
-        name: string::String,
-        symbol: string::String,
-        decimals: u8,
-        max_supply: u128,
-    ): (BurnCapability<CoinType>, FreezeCapability<CoinType>, MintCapability<CoinType>) acquires CoinInfo, CoinConversionMap {
-        system_addresses::assert_aptos_framework(account);
-        initialize_internal(
-            account,
-            name,
-            symbol,
-            decimals,
-            true,  // monitor_supply
-            false, // parallelizable (not used when supply_limit is set)
-            option::some(max_supply),
-        )
-    }
-
     /// "Merges" the two given coins.  The coin passed in as `dst_coin` will have a value equal
     /// to the sum of the two tokens (`dst_coin` and `source_coin`).
     public fun merge<CoinType>(
