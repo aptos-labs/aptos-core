@@ -63,7 +63,7 @@ const fn default_http2_ping_timeout_secs() -> u64 {
 }
 
 const fn default_service_staleness_threshold_secs() -> u64 {
-    60
+    20
 }
 
 #[async_trait::async_trait]
