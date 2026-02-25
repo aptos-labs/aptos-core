@@ -562,16 +562,14 @@ async fn test_bcs_simulate_automated_account_creation(
         pretty(&resp)
     );
 
-    let txn = SignedTransaction::new_signed_transaction(
-        raw_txn,
-        TransactionAuthenticator::FeePayer {
+    let txn =
+        SignedTransaction::new_signed_transaction(raw_txn, TransactionAuthenticator::FeePayer {
             sender: AccountAuthenticator::NoAccountAuthenticator,
             secondary_signer_addresses: vec![],
             secondary_signers: vec![],
             fee_payer_address: AccountAddress::ZERO,
             fee_payer_signer: AccountAuthenticator::NoAccountAuthenticator,
-        },
-    );
+        });
     let body = bcs::to_bytes(&txn).unwrap();
     let resp = context
         .expect_status_code(200)

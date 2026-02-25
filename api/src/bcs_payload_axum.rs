@@ -1,6 +1,7 @@
 // Copyright (c) Aptos Foundation
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
+use crate::response_axum::AptosErrorResponse;
 use aptos_api_types::mime_types::BCS;
 use axum::{
     body::Bytes,
@@ -9,14 +10,13 @@ use axum::{
     response::{IntoResponse, Response},
 };
 
-use crate::response_axum::AptosErrorResponse;
-
 #[derive(Debug, Clone, Eq, PartialEq)]
 #[allow(dead_code)]
 pub struct BcsPayload(pub Vec<u8>);
 
 impl std::ops::Deref for BcsPayload {
     type Target = Vec<u8>;
+
     fn deref(&self) -> &Self::Target {
         &self.0
     }

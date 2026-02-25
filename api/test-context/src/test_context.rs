@@ -2,7 +2,7 @@
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 use super::{golden_output::GoldenOutputs, pretty};
-use aptos_api::{attach_axum_to_runtime, attach_poem_to_runtime, BasicError, Context};
+use aptos_api::{attach_axum_to_runtime, BasicError, Context};
 use aptos_api_types::{
     mime_types, HexEncodedBytes, TransactionOnChainData, X_APTOS_CHAIN_ID,
     X_APTOS_LEDGER_TIMESTAMP, X_APTOS_LEDGER_VERSION,

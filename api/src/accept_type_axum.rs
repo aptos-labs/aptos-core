@@ -1,14 +1,12 @@
 // Copyright (c) Aptos Foundation
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
-use crate::accept_type::AcceptType;
+use crate::{accept_type::AcceptType, response_axum::AptosErrorResponse};
 use aptos_api_types::mime_types::{BCS, JSON};
 use axum::{
     extract::FromRequestParts,
     http::{header::ACCEPT, request::Parts},
 };
-
-use crate::response_axum::AptosErrorResponse;
 
 #[axum::async_trait]
 impl<S: Send + Sync> FromRequestParts<S> for AcceptType {

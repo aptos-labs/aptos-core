@@ -45,7 +45,7 @@ async fn test_axum_spec() {
     let context = new_test_context(current_function_name!());
     let (status, _headers, body) = context.get_raw("/spec", "").await;
     assert_eq!(status.as_u16(), 200);
-    assert!(body.len() > 0);
+    assert!(!body.is_empty());
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
@@ -104,7 +104,7 @@ async fn test_axum_get_account_resources() {
     let context = new_test_context(current_function_name!());
     let resp = context.get("/accounts/0x1/resources").await;
     assert!(resp.is_array());
-    assert!(resp.as_array().unwrap().len() > 0);
+    assert!(!resp.as_array().unwrap().is_empty());
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
@@ -112,7 +112,7 @@ async fn test_axum_get_account_modules() {
     let context = new_test_context(current_function_name!());
     let resp = context.get("/accounts/0x1/modules").await;
     assert!(resp.is_array());
-    assert!(resp.as_array().unwrap().len() > 0);
+    assert!(!resp.as_array().unwrap().is_empty());
 }
 
 // ========================================================================
@@ -138,7 +138,7 @@ async fn test_axum_get_block_by_height_with_transactions() {
         .await;
     assert!(resp.get("transactions").is_some());
     let txns = resp["transactions"].as_array().unwrap();
-    assert!(txns.len() > 0);
+    assert!(!txns.is_empty());
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
@@ -300,7 +300,7 @@ async fn test_axum_view_function_invalid() {
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn test_axum_encode_submission() {
-    let mut context = new_test_context(current_function_name!());
+    let context = new_test_context(current_function_name!());
     let account = context.root_account().await;
     let request = json!({
         "sender": account.address(),

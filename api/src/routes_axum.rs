@@ -205,8 +205,7 @@ pub async fn healthy_handler(
     accept_type: AcceptType,
     Query(query): Query<HealthCheckQuery>,
 ) -> Result<Response, AptosErrorResponse> {
-    use crate::context::api_spawn_blocking;
-    use crate::response_axum::AptosResponse;
+    use crate::{context::api_spawn_blocking, response_axum::AptosResponse};
 
     let ctx = context.clone();
     let ledger_info =
@@ -256,8 +255,7 @@ pub async fn get_ledger_info_handler(
     State(context): Ctx,
     accept_type: AcceptType,
 ) -> Result<Response, AptosErrorResponse> {
-    use crate::context::api_spawn_blocking;
-    use crate::response_axum::AptosResponse;
+    use crate::{context::api_spawn_blocking, response_axum::AptosResponse};
     use aptos_api_types::{IndexResponse, IndexResponseBcs};
 
     context
@@ -440,8 +438,7 @@ pub async fn get_events_by_creation_number_handler(
     Path((address, creation_number)): Path<(aptos_api_types::Address, aptos_api_types::U64)>,
     Query(query): Query<EventPaginationQuery>,
 ) -> Result<Response, AptosErrorResponse> {
-    use crate::context::api_spawn_blocking;
-    use crate::page::Page;
+    use crate::{context::api_spawn_blocking, page::Page};
     use aptos_types::event::EventKey;
     crate::failpoint::fail_point_poem::<AptosErrorResponse>("endpoint_get_events_by_event_key")?;
     context
@@ -478,8 +475,7 @@ pub async fn get_events_by_event_handle_handler(
     )>,
     Query(query): Query<EventPaginationQuery>,
 ) -> Result<Response, AptosErrorResponse> {
-    use crate::context::api_spawn_blocking;
-    use crate::page::Page;
+    use crate::{context::api_spawn_blocking, page::Page};
     use anyhow::Context as AnyhowContext;
     use aptos_api_types::VerifyInputWithRecursion;
     event_handle
