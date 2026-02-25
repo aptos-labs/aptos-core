@@ -14,8 +14,6 @@ use std::{net::SocketAddr, sync::Arc};
 use tokio::{net::TcpListener, runtime::Handle};
 use tower_http::{catch_panic::CatchPanicLayer, compression::CompressionLayer, cors::CorsLayer};
 
-// TODO: Add TLS support (tls_cert_path / tls_key_path) matching the Poem runtime.
-// TODO: Add custom Path extractor rejection to return AptosError JSON format.
 pub fn attach_axum_to_runtime(
     runtime_handle: &Handle,
     context: Context,
@@ -35,6 +33,8 @@ pub fn attach_axum_to_runtime(
     if random_port {
         address.set_port(0);
     }
+
+    let tls_config = build_tls_config(&config)?;
 
     let listener = tokio::task::block_in_place(move || {
         runtime_handle.block_on(async move {
@@ -75,12 +75,79 @@ pub fn attach_axum_to_runtime(
             app
         };
 
-        axum::serve(listener, app).await.map_err(anyhow::Error::msg)
+        if let Some(tls) = tls_config {
+            let tls_acceptor = tokio_rustls::TlsAcceptor::from(Arc::new(tls));
+            loop {
+                let (stream, _addr) = match listener.accept().await {
+                    Ok(conn) => conn,
+                    Err(e) => {
+                        aptos_logger::error!("Failed to accept connection: {}", e);
+                        continue;
+                    },
+                };
+                let acceptor = tls_acceptor.clone();
+                let svc = app.clone();
+                tokio::spawn(async move {
+                    match acceptor.accept(stream).await {
+                        Ok(tls_stream) => {
+                            let io = hyper_util::rt::TokioIo::new(tls_stream);
+                            let svc =
+                                hyper_util::service::TowerToHyperService::new(svc.into_service());
+                            if let Err(e) = hyper_util::server::conn::auto::Builder::new(
+                                hyper_util::rt::TokioExecutor::new(),
+                            )
+                            .serve_connection(io, svc)
+                            .await
+                            {
+                                aptos_logger::error!("TLS connection error: {}", e);
+                            }
+                        },
+                        Err(e) => {
+                            aptos_logger::error!("TLS handshake failed: {}", e);
+                        },
+                    }
+                });
+            }
+        } else {
+            axum::serve(listener, app).await.map_err(anyhow::Error::msg)
+        }
     });
 
     aptos_logger::info!("API server (Axum) is running at {}", actual_address);
 
     Ok(actual_address)
+}
+
+fn build_tls_config(
+    config: &NodeConfig,
+) -> anyhow::Result<Option<tokio_rustls::rustls::ServerConfig>> {
+    match (&config.api.tls_cert_path, &config.api.tls_key_path) {
+        (Some(cert_path), Some(key_path)) => {
+            aptos_logger::info!("Using TLS for API");
+            let cert_pem = std::fs::read(cert_path)
+                .with_context(|| format!("Failed to read TLS cert from: {}", cert_path))?;
+            let key_pem = std::fs::read(key_path)
+                .with_context(|| format!("Failed to read TLS key from: {}", key_path))?;
+
+            let certs: Vec<_> = rustls_pemfile::certs(&mut &cert_pem[..])
+                .collect::<Result<_, _>>()
+                .context("Failed to parse TLS certificate PEM")?;
+            let key = rustls_pemfile::private_key(&mut &key_pem[..])
+                .context("Failed to parse TLS private key PEM")?
+                .context("No private key found in PEM file")?;
+
+            let tls_config = tokio_rustls::rustls::ServerConfig::builder()
+                .with_no_client_auth()
+                .with_single_cert(certs, key)
+                .context("Failed to build TLS ServerConfig")?;
+
+            Ok(Some(tls_config))
+        },
+        _ => {
+            aptos_logger::info!("Not using TLS for API");
+            Ok(None)
+        },
+    }
 }
 
 fn build_full_router(context: Arc<Context>, spec_json: String, spec_yaml: String) -> Router {

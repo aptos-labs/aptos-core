@@ -19,6 +19,36 @@ use std::sync::Arc;
 
 type Ctx = State<Arc<Context>>;
 
+/// A Path extractor wrapper that converts Axum's default `PathRejection`
+/// into the `AptosError` JSON format, ensuring consistent error responses.
+pub struct AptosPath<T>(pub T);
+
+#[axum::async_trait]
+impl<S, T> axum::extract::FromRequestParts<S> for AptosPath<T>
+where
+    T: serde::de::DeserializeOwned + Send,
+    S: Send + Sync,
+{
+    type Rejection = AptosErrorResponse;
+
+    async fn from_request_parts(
+        parts: &mut axum::http::request::Parts,
+        state: &S,
+    ) -> Result<Self, Self::Rejection> {
+        match Path::<T>::from_request_parts(parts, state).await {
+            Ok(Path(value)) => Ok(AptosPath(value)),
+            Err(rejection) => Err(AptosErrorResponse::new(
+                StatusCode::BAD_REQUEST,
+                aptos_api_types::AptosError::new_with_error_code(
+                    format!("Invalid path parameters: {}", rejection),
+                    aptos_api_types::AptosErrorCode::InvalidInput,
+                ),
+                None,
+            )),
+        }
+    }
+}
+
 // Instead of trying to convert between Poem and Axum response types,
 // we run the existing Poem handlers and convert the final Poem response
 // into a raw HTTP response that Axum can serve. This is the most robust
@@ -311,7 +341,7 @@ pub async fn get_ledger_info_handler(
 pub async fn get_account_handler(
     State(context): Ctx,
     accept_type: AcceptType,
-    Path(address): Path<aptos_api_types::Address>,
+    AptosPath(address): AptosPath<aptos_api_types::Address>,
     Query(query): Query<LedgerVersionQuery>,
 ) -> Result<Response, AptosErrorResponse> {
     use crate::context::api_spawn_blocking;
@@ -329,7 +359,7 @@ pub async fn get_account_handler(
 pub async fn get_account_resources_handler(
     State(context): Ctx,
     accept_type: AcceptType,
-    Path(address): Path<aptos_api_types::Address>,
+    AptosPath(address): AptosPath<aptos_api_types::Address>,
     Query(query): Query<ResourcePaginationQuery>,
 ) -> Result<Response, AptosErrorResponse> {
     use crate::context::api_spawn_blocking;
@@ -354,7 +384,10 @@ pub async fn get_account_resources_handler(
 pub async fn get_account_balance_handler(
     State(context): Ctx,
     accept_type: AcceptType,
-    Path((address, asset_type)): Path<(aptos_api_types::Address, aptos_api_types::AssetType)>,
+    AptosPath((address, asset_type)): AptosPath<(
+        aptos_api_types::Address,
+        aptos_api_types::AssetType,
+    )>,
     Query(query): Query<LedgerVersionQuery>,
 ) -> Result<Response, AptosErrorResponse> {
     use crate::context::api_spawn_blocking;
@@ -372,7 +405,7 @@ pub async fn get_account_balance_handler(
 pub async fn get_account_modules_handler(
     State(context): Ctx,
     accept_type: AcceptType,
-    Path(address): Path<aptos_api_types::Address>,
+    AptosPath(address): AptosPath<aptos_api_types::Address>,
     Query(query): Query<ResourcePaginationQuery>,
 ) -> Result<Response, AptosErrorResponse> {
     use crate::context::api_spawn_blocking;
@@ -398,7 +431,7 @@ pub async fn get_account_modules_handler(
 pub async fn get_block_by_height_handler(
     State(context): Ctx,
     accept_type: AcceptType,
-    Path(block_height): Path<u64>,
+    AptosPath(block_height): AptosPath<u64>,
     Query(query): Query<BlockQuery>,
 ) -> Result<Response, AptosErrorResponse> {
     use crate::context::api_spawn_blocking;
@@ -421,7 +454,7 @@ pub async fn get_block_by_height_handler(
 pub async fn get_block_by_version_handler(
     State(context): Ctx,
     accept_type: AcceptType,
-    Path(version): Path<u64>,
+    AptosPath(version): AptosPath<u64>,
     Query(query): Query<BlockQuery>,
 ) -> Result<Response, AptosErrorResponse> {
     use crate::context::api_spawn_blocking;
@@ -446,7 +479,10 @@ pub async fn get_block_by_version_handler(
 pub async fn get_events_by_creation_number_handler(
     State(context): Ctx,
     accept_type: AcceptType,
-    Path((address, creation_number)): Path<(aptos_api_types::Address, aptos_api_types::U64)>,
+    AptosPath((address, creation_number)): AptosPath<(
+        aptos_api_types::Address,
+        aptos_api_types::U64,
+    )>,
     Query(query): Query<EventPaginationQuery>,
 ) -> Result<Response, AptosErrorResponse> {
     use crate::{context::api_spawn_blocking, page::Page};
@@ -479,7 +515,7 @@ pub async fn get_events_by_creation_number_handler(
 pub async fn get_events_by_event_handle_handler(
     State(context): Ctx,
     accept_type: AcceptType,
-    Path((address, event_handle, field_name)): Path<(
+    AptosPath((address, event_handle, field_name)): AptosPath<(
         aptos_api_types::Address,
         aptos_api_types::MoveStructTag,
         aptos_api_types::IdentifierWrapper,
@@ -536,7 +572,7 @@ pub async fn get_events_by_event_handle_handler(
 pub async fn get_account_resource_handler(
     State(context): Ctx,
     accept_type: AcceptType,
-    Path((address, resource_type)): Path<(
+    AptosPath((address, resource_type)): AptosPath<(
         aptos_api_types::Address,
         aptos_api_types::MoveStructTag,
     )>,
@@ -574,7 +610,7 @@ pub async fn get_account_resource_handler(
 pub async fn get_account_module_handler(
     State(context): Ctx,
     accept_type: AcceptType,
-    Path((address, module_name)): Path<(
+    AptosPath((address, module_name)): AptosPath<(
         aptos_api_types::Address,
         aptos_api_types::IdentifierWrapper,
     )>,
@@ -605,7 +641,7 @@ pub async fn get_account_module_handler(
 pub async fn get_table_item_handler(
     State(context): Ctx,
     accept_type: AcceptType,
-    Path(table_handle): Path<aptos_api_types::Address>,
+    AptosPath(table_handle): AptosPath<aptos_api_types::Address>,
     Query(query): Query<LedgerVersionQuery>,
     raw_body: Bytes,
 ) -> Result<Response, AptosErrorResponse> {
@@ -646,7 +682,7 @@ pub async fn get_table_item_handler(
 pub async fn get_raw_table_item_handler(
     State(context): Ctx,
     accept_type: AcceptType,
-    Path(table_handle): Path<aptos_api_types::Address>,
+    AptosPath(table_handle): AptosPath<aptos_api_types::Address>,
     Query(query): Query<LedgerVersionQuery>,
     raw_body: Bytes,
 ) -> Result<Response, AptosErrorResponse> {
@@ -739,7 +775,7 @@ pub async fn get_transactions_handler(
 pub async fn get_transaction_by_hash_handler(
     State(context): Ctx,
     accept_type: AcceptType,
-    Path(txn_hash): Path<aptos_api_types::HashValue>,
+    AptosPath(txn_hash): AptosPath<aptos_api_types::HashValue>,
 ) -> Result<Response, AptosErrorResponse> {
     crate::failpoint::fail_point_poem::<AptosErrorResponse>("endpoint_transaction_by_hash")?;
     context
@@ -756,7 +792,7 @@ pub async fn get_transaction_by_hash_handler(
 pub async fn wait_transaction_by_hash_handler(
     State(context): Ctx,
     accept_type: AcceptType,
-    Path(txn_hash): Path<aptos_api_types::HashValue>,
+    AptosPath(txn_hash): AptosPath<aptos_api_types::HashValue>,
 ) -> Result<Response, AptosErrorResponse> {
     crate::failpoint::fail_point_poem::<AptosErrorResponse>("endpoint_wait_transaction_by_hash")?;
     context
@@ -820,7 +856,7 @@ pub async fn wait_transaction_by_hash_handler(
 pub async fn get_transaction_by_version_handler(
     State(context): Ctx,
     accept_type: AcceptType,
-    Path(txn_version): Path<aptos_api_types::U64>,
+    AptosPath(txn_version): AptosPath<aptos_api_types::U64>,
 ) -> Result<Response, AptosErrorResponse> {
     use crate::context::api_spawn_blocking;
     crate::failpoint::fail_point_poem::<AptosErrorResponse>("endpoint_transaction_by_version")?;
@@ -866,7 +902,7 @@ pub async fn get_transactions_auxiliary_info_handler(
 pub async fn get_accounts_transactions_handler(
     State(context): Ctx,
     accept_type: AcceptType,
-    Path(address): Path<aptos_api_types::Address>,
+    AptosPath(address): AptosPath<aptos_api_types::Address>,
     Query(query): Query<PaginationQuery>,
 ) -> Result<Response, AptosErrorResponse> {
     use crate::{context::api_spawn_blocking, page::Page};
@@ -891,7 +927,7 @@ pub async fn get_accounts_transactions_handler(
 pub async fn get_accounts_transaction_summaries_handler(
     State(context): Ctx,
     accept_type: AcceptType,
-    Path(address): Path<aptos_api_types::Address>,
+    AptosPath(address): AptosPath<aptos_api_types::Address>,
     Query(query): Query<TxnSummaryQuery>,
 ) -> Result<Response, AptosErrorResponse> {
     use crate::context::api_spawn_blocking;

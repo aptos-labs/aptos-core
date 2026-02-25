@@ -36,6 +36,7 @@ fail = { workspace = true }
 futures = { workspace = true }
 hex = { workspace = true }
 http = "1"
+hyper-util = { workspace = true }
 itertools = { workspace = true }
 mime = { workspace = true }
 mini-moka = { workspace = true }
@@ -47,9 +48,11 @@ poem = { workspace = true }
 poem-openapi = { workspace = true }
 regex = { workspace = true }
 rstest = { workspace = true }
+rustls-pemfile = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
 tokio = { workspace = true }
+tokio-rustls = { workspace = true }
 tower-http = { workspace = true }
 
 [dev-dependencies]
