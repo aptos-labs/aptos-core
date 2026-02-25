@@ -12,7 +12,7 @@ use crate::{
     VMStatus,
 };
 use move_binary_format::{
-    errors::{Location, PartialVMError, VMResult},
+    errors::{Location, PartialVMError, PartialVMResult, VMResult},
     file_format::FunctionDefinitionIndex,
     file_format_common::read_uleb128_as_u64,
 };
@@ -25,8 +25,8 @@ use move_core_types::{
 };
 use move_vm_metrics::{Timer, VM_TIMER};
 use move_vm_runtime::{
-    execution_tracing::NoOpTraceRecorder, module_traversal::TraversalContext, LoadedFunction,
-    LoadedFunctionOwner, Loader,
+    execution_tracing::NoOpTraceRecorder, module_traversal::TraversalContext, Function,
+    LoadedFunction, LoadedFunctionOwner, Loader, Module,
 };
 use move_vm_types::{
     gas::GasMeter,
@@ -42,12 +42,12 @@ use std::{
 /// Maximum number of pack function invocations allowed during struct/enum argument construction.
 /// Acts as a DoS protection against deeply nested or complex struct arguments when only
 /// whitelisted structs (e.g. `String`, `Object`) are permitted.
-const MAX_INVOCATIONS: u64 = 10;
+const MAX_PACK_INVOCATIONS: u64 = 10;
 
 /// Maximum number of pack function invocations when the `PUBLIC_STRUCT_ENUM_ARGS` feature is
 /// enabled, which allows arbitrary public copy structs/enums. The higher limit accommodates
 /// more complex argument structures while still bounding worst-case construction cost.
-const MAX_INVOCATIONS_WITH_PUBLIC_STRUCT_ARGS: u64 = 100;
+const MAX_PACK_INVOCATIONS_WITH_PUBLIC_STRUCT_ARGS: u64 = 100;
 
 pub(crate) struct FunctionId {
     module_id: ModuleId,
@@ -111,8 +111,7 @@ pub(crate) fn get_allowed_structs(
 
 /// Cache for loaded pack functions to avoid duplicate loading and gas charging.
 /// Maps "module_id::function_name" -> (Arc<Module>, Arc<Function>)
-type PackFunctionCache =
-    ahash::AHashMap<String, (Arc<move_vm_runtime::Module>, Arc<move_vm_runtime::Function>)>;
+type PackFunctionCache = ahash::AHashMap<String, (Arc<Module>, Arc<Function>)>;
 
 /// Creates a cache key for a pack function.
 fn make_pack_fn_cache_key(module_id: &ModuleId, function_name: &str) -> String {
@@ -167,31 +166,21 @@ pub(crate) fn validate_combine_signer_and_txn_args(
     }
 
     let allowed_structs = get_allowed_structs(are_struct_constructors_enabled);
-    let ty_builder = &loader.runtime_environment().vm_config().ty_builder;
 
-    // Create pack function cache to avoid duplicate loading and gas charging
+    // Create pack function cache shared between validation and construction.
     let mut pack_fn_cache = PackFunctionCache::new();
 
-    // Need to keep this here to ensure we return the historic correct error code for replay
-    // During validation, pack functions are loaded and cached
-    for ty in func.param_tys()[signer_param_cnt..].iter() {
-        let subst_res = ty_builder.create_ty_with_subst(ty, func.ty_args());
-        let ty = subst_res.map_err(|e| e.finish(Location::Undefined).into_vm_status())?;
-        let valid = is_valid_txn_arg(
-            loader,
-            gas_meter,
-            traversal_context,
-            &ty,
-            allowed_structs,
-            &mut pack_fn_cache,
-        );
-        if !valid {
-            return Err(VMStatus::error(
-                StatusCode::INVALID_MAIN_FUNCTION_SIGNATURE,
-                None,
-            ));
-        }
-    }
+    // Need to keep this here to ensure we return the historic correct error code for replay.
+    // Pass param_tys()[signer_param_cnt..] so that any signer in a non-leading position
+    // (e.g. `(signer, u64, signer)`) is included in the slice and fails is_valid_txn_arg,
+    // preserving the historical INVALID_MAIN_FUNCTION_SIGNATURE error for such cases.
+    validate_non_signer_param_tys(
+        loader,
+        &func.param_tys()[signer_param_cnt..],
+        func.ty_args(),
+        allowed_structs,
+    )
+    .map_err(|e| e.finish(Location::Undefined).into_vm_status())?;
 
     if (signer_param_cnt + args.len()) != func.param_tys().len() {
         return Err(VMStatus::error(
@@ -238,46 +227,52 @@ pub(crate) fn validate_combine_signer_and_txn_args(
     Ok(combined_args)
 }
 
-/// Returns true if the argument is valid (that is, it is a primitive type or a struct with a
-/// known constructor function). Otherwise, (for structs without constructors, signers or
-/// references) returns false. An error is returned in cases when a struct type is encountered and
-/// its name cannot be queried for some reason.
-///
-/// Pack functions for public structs/enums are loaded and cached during validation.
+/// Returns true if the argument type is valid as a transaction argument: primitives, vectors of
+/// valid types, whitelisted structs (String, Object, Option, ...), and public copy structs/enums
+/// with struct APIs. Pack functions and field types are not loaded here; they are validated lazily
+/// at construction time.
 pub(crate) fn is_valid_txn_arg<L: Loader>(
     loader: &L,
-    gas_meter: &mut impl GasMeter,
-    traversal_context: &mut TraversalContext,
     ty: &Type,
     allowed_structs: &ConstructorMap,
-    pack_fn_cache: &mut PackFunctionCache,
 ) -> bool {
     use move_vm_types::loaded_data::runtime_types::Type::*;
 
     match ty {
         Bool | U8 | U16 | U32 | U64 | U128 | U256 | I8 | I16 | I32 | I64 | I128 | I256
         | Address => true,
-        Vector(inner) => is_valid_txn_arg(
-            loader,
-            gas_meter,
-            traversal_context,
-            inner,
-            allowed_structs,
-            pack_fn_cache,
-        ),
+        Vector(inner) => is_valid_txn_arg(loader, inner, allowed_structs),
         Struct { .. } | StructInstantiation { .. } => {
-            is_allowed_struct(loader, ty, allowed_structs)
-                || is_public_copy_struct(
-                    loader,
-                    gas_meter,
-                    traversal_context,
-                    ty,
-                    allowed_structs,
-                    pack_fn_cache,
-                )
+            is_allowed_struct(loader, ty, allowed_structs) || is_public_struct_arg(loader, ty)
         },
         Signer | Reference(_) | MutableReference(_) | TyParam(_) | Function { .. } => false,
     }
+}
+
+/// Validates that all parameters in `param_tys` are valid transaction arguments.
+///
+/// Callers should pass `param_tys[signer_param_cnt..]` so that leading signers are
+/// already excluded. Any signer type that appears in the slice (i.e., in a non-leading
+/// position) fails `is_valid_txn_arg` and returns `INVALID_MAIN_FUNCTION_SIGNATURE`,
+/// preserving the historical error code for functions with non-leading signers.
+pub(crate) fn validate_non_signer_param_tys<L: Loader>(
+    loader: &L,
+    param_tys: &[Type],
+    ty_args: &[Type],
+    allowed_structs: &ConstructorMap,
+) -> PartialVMResult<()> {
+    let ty_builder = &loader.runtime_environment().vm_config().ty_builder;
+    for ty in param_tys.iter() {
+        let ty = ty_builder.create_ty_with_subst(ty, ty_args).map_err(|e| {
+            PartialVMError::new(e.finish(Location::Undefined).into_vm_status().status_code())
+        })?;
+        if !is_valid_txn_arg(loader, &ty, allowed_structs) {
+            return Err(PartialVMError::new(
+                StatusCode::INVALID_MAIN_FUNCTION_SIGNATURE,
+            ));
+        }
+    }
+    Ok(())
 }
 
 /// Checks if a struct is in the allowed structs list (whitelisted structs like String, Object,
@@ -302,68 +297,18 @@ fn is_allowed_struct<L: Loader>(loader: &L, ty: &Type, allowed_structs: &Constru
         })
 }
 
-/// Helper to recursively validate field types with optional type parameter substitution.
-/// Used for both struct fields and enum variant fields.
-fn validate_fields_recursively<L: Loader>(
-    loader: &L,
-    gas_meter: &mut impl GasMeter,
-    traversal_context: &mut TraversalContext,
-    fields: &[(Identifier, Type)],
-    ty_args: Option<&[Type]>,
-    allowed_structs: &ConstructorMap,
-    pack_fn_cache: &mut PackFunctionCache,
-) -> bool {
-    if let Some(ty_args) = ty_args {
-        // Generic: substitute type parameters with actual type arguments
-        let ty_builder = &loader.runtime_environment().vm_config().ty_builder;
-        for (_field_name, field_ty) in fields {
-            // Use ty_builder to perform type substitution (replaces TyParam with actual types)
-            let substituted_ty = match ty_builder.create_ty_with_subst(field_ty, ty_args) {
-                Ok(ty) => ty,
-                Err(_) => return false,
-            };
-
-            if !is_valid_txn_arg(
-                loader,
-                gas_meter,
-                traversal_context,
-                &substituted_ty,
-                allowed_structs,
-                pack_fn_cache,
-            ) {
-                return false;
-            }
-        }
-    } else {
-        // Non-generic: validate field types directly
-        for (_field_name, field_ty) in fields {
-            if !is_valid_txn_arg(
-                loader,
-                gas_meter,
-                traversal_context,
-                field_ty,
-                allowed_structs,
-                pack_fn_cache,
-            ) {
-                return false;
-            }
-        }
-    }
-    true
-}
-
-/// Checks if a struct/enum is public (has a public pack function) and has the copy ability.
-/// For structs: checks for public `pack$<struct_name>` function and caches it
-/// For enums: checks for at least one public `pack$<enum_name>$<variant>` function and caches it
-fn is_public_copy_struct<L: Loader>(
-    loader: &L,
-    gas_meter: &mut impl GasMeter,
-    traversal_context: &mut TraversalContext,
-    ty: &Type,
-    allowed_structs: &ConstructorMap,
-    pack_fn_cache: &mut PackFunctionCache,
-) -> bool {
-    // Check if public struct/enum arguments feature is enabled
+/// Checks if a struct/enum type may potentially be a valid public struct/enum argument.
+/// Only the feature flag is checked here, plus an early rejection of `key` structs (resources).
+/// Copy ability is NOT checked at this stage because doing so would incorrectly reject generic
+/// structs like Container<NoCopyData> at the type level even when the actual value
+/// (e.g. Empty variant) is safe to construct.
+///
+/// The definitive copy check is deferred to `construct_public_copy_struct`, which uses the
+/// struct definition's *declared* copy ability (not the instantiated type's ability). This
+/// ensures that:
+/// - Container<NoCopyData>::Empty succeeds (Container declares copy; no inner value to check).
+/// - Container<NoCopyData>::Value fails (NoCopyData field has no declared copy).
+fn is_public_struct_arg<L: Loader>(loader: &L, ty: &Type) -> bool {
     if !loader
         .runtime_environment()
         .vm_config()
@@ -371,146 +316,18 @@ fn is_public_copy_struct<L: Loader>(
     {
         return false;
     }
-
-    // First check if the struct has the copy ability
-    let has_copy = match ty.abilities() {
-        Ok(abilities) => abilities.has_copy(),
-        Err(_) => return false,
-    };
-
-    if !has_copy {
-        return false;
-    }
-
-    // Get the struct name and module ID
-    let (module_id, struct_name) = match loader.runtime_environment().get_struct_name(ty) {
-        Ok(Some((module_id, identifier))) => (module_id, identifier),
-        _ => return false,
-    };
-
-    // Load the struct definition to check if it's a struct or enum
-    let (struct_idx, ty_args) = match ty {
-        Type::Struct { idx, .. } => (*idx, None),
-        Type::StructInstantiation { idx, ty_args, .. } => (*idx, Some(ty_args.as_ref())),
-        _ => return false,
-    };
-
-    let struct_type = match loader.load_struct_definition(gas_meter, traversal_context, &struct_idx)
-    {
-        Ok(st) => st,
-        Err(_) => return false,
-    };
-
-    // Check based on whether it's a struct or enum
-    match &struct_type.layout {
-        StructLayout::Single(fields) => {
-            // For structs, load and cache pack$<struct_name> function
-            let pack_fn_name = make_struct_pack_fn_name(&struct_name);
-            if load_and_cache_pack_function(
-                loader,
-                gas_meter,
-                traversal_context,
-                &module_id,
-                &pack_fn_name,
-                pack_fn_cache,
-            )
-            .is_none()
-            {
-                return false;
-            }
-
-            // Recursively validate all field types
-            validate_fields_recursively(
-                loader,
-                gas_meter,
-                traversal_context,
-                fields,
-                ty_args.map(|v| &**v),
-                allowed_structs,
-                pack_fn_cache,
-            )
-        },
-        StructLayout::Variants(variants) => {
-            // For enums, ALL variants must have public pack functions
-            // Also validate all field types in all variants
-            for (variant_name, fields) in variants {
-                let pack_fn_name = make_variant_pack_fn_name(&struct_name, variant_name);
-                if load_and_cache_pack_function(
-                    loader,
-                    gas_meter,
-                    traversal_context,
-                    &module_id,
-                    &pack_fn_name,
-                    pack_fn_cache,
-                )
-                .is_none()
-                {
-                    // Missing pack function for this variant - not public
-                    return false;
-                }
-
-                // Validate all field types for this variant
-                if !validate_fields_recursively(
-                    loader,
-                    gas_meter,
-                    traversal_context,
-                    fields,
-                    ty_args.map(|v| &**v),
-                    allowed_structs,
-                    pack_fn_cache,
-                ) {
-                    return false;
-                }
-            }
-
-            true
-        },
-    }
+    // Reject key structs (resources) early — they live in global storage and are not
+    // valid as transaction arguments even if they also have copy.
+    !ty.abilities().is_ok_and(|a| a.has_key())
 }
 
 /// Loads a pack function and caches it, or returns the cached function if already loaded.
 /// Only charges gas once per unique function.
 /// Returns Some((module, function)) if the function exists and is public, None otherwise.
-fn load_and_cache_pack_function<L: Loader>(
-    loader: &L,
-    gas_meter: &mut impl GasMeter,
-    traversal_context: &mut TraversalContext,
-    module_id: &ModuleId,
-    function_name: &str,
-    cache: &mut PackFunctionCache,
-) -> Option<(Arc<move_vm_runtime::Module>, Arc<move_vm_runtime::Function>)> {
-    let cache_key = make_pack_fn_cache_key(module_id, function_name);
-
-    // Check cache first - no gas charged for cache hit
-    if let Some(cached) = cache.get(&cache_key) {
-        return Some(cached.clone());
-    }
-
-    // Not in cache, load it (charges gas once)
-    let func_name = match Identifier::new(function_name) {
-        Ok(name) => name,
-        Err(_) => return None,
-    };
-
-    match loader.load_function_definition(gas_meter, traversal_context, module_id, &func_name) {
-        Ok((module, function)) => {
-            if function.is_public() && function.is_pack_or_pack_variant() {
-                // Cache the loaded module and function for later use
-                cache.insert(cache_key, (module.clone(), function.clone()));
-                Some((module, function))
-            } else {
-                None
-            }
-        },
-        Err(_) => None,
-    }
-}
-
-/// Constructs a public copy struct or enum by calling its cached pack function.
-/// This is similar to validate_and_construct but for public copy structs/enums.
+/// Constructs a public copy struct or enum by calling its pack function.
 /// For structs: calls pack$<struct_name>
 /// For enums: reads variant index from BCS, then calls pack$<enum_name>$<variant_name>
-/// The pack function must have been previously loaded and cached during validation.
+/// The pack function is loaded on demand and cached for reuse within the same transaction.
 fn construct_public_copy_struct(
     session: &mut SessionExt<impl AptosMoveResolver>,
     loader: &impl Loader,
@@ -522,16 +339,16 @@ fn construct_public_copy_struct(
     allowed_structs: &ConstructorMap,
     cursor: &mut Cursor<&[u8]>,
     initial_cursor_len: usize,
-    max_invocations: &mut u64,
+    invocations_remaining: &mut u64,
     pack_fn_cache: &mut PackFunctionCache,
 ) -> Result<Vec<u8>, VMStatus> {
-    if *max_invocations == 0 {
+    if *invocations_remaining == 0 {
         return Err(VMStatus::error(
             StatusCode::FAILED_TO_DESERIALIZE_ARGUMENT,
             None,
         ));
     }
-    *max_invocations -= 1;
+    *invocations_remaining -= 1;
 
     // Check if public struct/enum arguments feature is enabled.
     // If not, this struct type is not acceptable as a transaction argument.
@@ -543,7 +360,7 @@ fn construct_public_copy_struct(
         return Err(invalid_signature());
     }
 
-    // Load the struct definition to check if it's a struct or enum
+    // Load the struct definition — needed both for the copy check and to determine layout.
     let struct_idx = match expected_type {
         Type::Struct { idx, .. } | Type::StructInstantiation { idx, .. } => *idx,
         _ => return Err(invalid_signature()),
@@ -557,6 +374,15 @@ fn construct_public_copy_struct(
                 Some(format!("Failed to load struct definition: {:?}", e)),
             )
         })?;
+
+    // Require copy using the struct's *declared* abilities (not the instantiated type's).
+    // This is intentional: Container<T> declares copy even when T lacks it, so
+    // Container<NoCopyData>::Empty is accepted (no inner value to construct). The NoCopyData
+    // field is checked when recursively constructing a Value variant. A struct whose definition
+    // itself lacks copy (like NoCopyData) is always rejected here.
+    if !struct_type.abilities.has_copy() {
+        return Err(invalid_signature());
+    }
 
     // Determine pack function name based on struct vs enum
     let pack_fn_name = match &struct_type.layout {
@@ -698,7 +524,7 @@ fn construct_public_copy_struct(
             allowed_structs,
             cursor,
             initial_cursor_len,
-            max_invocations,
+            invocations_remaining,
             &mut arg,
             pack_fn_cache,
         )?;
@@ -792,14 +618,14 @@ fn construct_arg(
             let mut cursor = Cursor::new(&arg[..]);
             let mut new_arg = vec![];
             // Increase invocation
-            let mut max_invocations = if loader
+            let mut invocations_remaining = if loader
                 .runtime_environment()
                 .vm_config()
                 .enable_public_struct_args
             {
-                MAX_INVOCATIONS_WITH_PUBLIC_STRUCT_ARGS
+                MAX_PACK_INVOCATIONS_WITH_PUBLIC_STRUCT_ARGS
             } else {
-                MAX_INVOCATIONS
+                MAX_PACK_INVOCATIONS
             };
             recursively_construct_arg(
                 session,
@@ -810,7 +636,7 @@ fn construct_arg(
                 allowed_structs,
                 &mut cursor,
                 initial_cursor_len,
-                &mut max_invocations,
+                &mut invocations_remaining,
                 &mut new_arg,
                 pack_fn_cache,
             )?;
@@ -851,7 +677,7 @@ pub(crate) fn recursively_construct_arg(
     allowed_structs: &ConstructorMap,
     cursor: &mut Cursor<&[u8]>,
     initial_cursor_len: usize,
-    max_invocations: &mut u64,
+    invocations_remaining: &mut u64,
     arg: &mut Vec<u8>,
     pack_fn_cache: &mut PackFunctionCache,
 ) -> Result<(), VMStatus> {
@@ -872,7 +698,7 @@ pub(crate) fn recursively_construct_arg(
                     allowed_structs,
                     cursor,
                     initial_cursor_len,
-                    max_invocations,
+                    invocations_remaining,
                     arg,
                     pack_fn_cache,
                 )?;
@@ -905,7 +731,7 @@ pub(crate) fn recursively_construct_arg(
                     allowed_structs,
                     cursor,
                     initial_cursor_len,
-                    max_invocations,
+                    invocations_remaining,
                     pack_fn_cache,
                 )?);
             } else {
@@ -922,7 +748,7 @@ pub(crate) fn recursively_construct_arg(
                     allowed_structs,
                     cursor,
                     initial_cursor_len,
-                    max_invocations,
+                    invocations_remaining,
                     pack_fn_cache,
                 )?);
             }
@@ -954,10 +780,10 @@ fn validate_and_construct(
     allowed_structs: &ConstructorMap,
     cursor: &mut Cursor<&[u8]>,
     initial_cursor_len: usize,
-    max_invocations: &mut u64,
+    invocations_remaining: &mut u64,
     pack_fn_cache: &mut PackFunctionCache,
 ) -> Result<Vec<u8>, VMStatus> {
-    if *max_invocations == 0 {
+    if *invocations_remaining == 0 {
         return Err(VMStatus::error(
             StatusCode::FAILED_TO_DESERIALIZE_ARGUMENT,
             None,
@@ -1004,7 +830,7 @@ fn validate_and_construct(
         return bcs::to_bytes(&arg)
             .map_err(|_| VMStatus::error(StatusCode::FAILED_TO_DESERIALIZE_ARGUMENT, None));
     } else {
-        *max_invocations -= 1;
+        *invocations_remaining -= 1;
     }
 
     let function = load_constructor_function(
@@ -1032,7 +858,7 @@ fn validate_and_construct(
             allowed_structs,
             cursor,
             initial_cursor_len,
-            max_invocations,
+            invocations_remaining,
             &mut arg,
             pack_fn_cache,
         )?;

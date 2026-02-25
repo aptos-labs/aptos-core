@@ -5,7 +5,7 @@
 //!
 //! This module tests the feature that allows public structs/enums with the `copy` ability
 //! to be passed as entry function arguments. When compiled with language version 2.4+,
-//! pack functions are automatically generated for public structs/enums with copy ability.
+//! pack functions are automatically generated for all public structs/enums.
 
 use crate::{assert_success, assert_vm_status, tests::common, MoveHarness};
 use aptos_framework::{BuildOptions, BuiltPackage};
@@ -41,6 +41,11 @@ fn get_test_result(h: &MoveHarness, addr: &AccountAddress) -> TestResult {
     )
     .map(|bytes| bcs::from_bytes(&bytes).unwrap())
     .unwrap()
+}
+
+fn assert_publish_fails(path: std::path::PathBuf) {
+    let result = BuiltPackage::build(path, BuildOptions::move_2().set_latest_language());
+    assert!(result.is_err(), "Expected compilation to fail");
 }
 
 /// Test that the module with public copy structs compiles and publishes
@@ -410,51 +415,26 @@ fn test_whitelisted_string_works() {
 // Negative Tests
 // ========================================================================================
 
-/// Test that private struct as entry function parameter is rejected.
-/// Private structs don't get pack functions generated, so they cannot be used as txn args.
+/// Test that invalid entry function parameter types are rejected at compile time:
+/// - private struct (extended checks require public visibility)
+/// - non-copy struct (extended checks require copy ability)
+/// - key struct (compiler rejects public structs with key ability)
 #[test]
-fn test_private_struct_rejected() {
-    let _h = setup_harness();
-
-    // Try to compile a package with private struct as entry function parameter.
-    // This should fail during compilation because no pack function is generated for private structs,
-    // making them invalid as entry function parameters.
-    let result = BuiltPackage::build(
-        common::test_dir_path("public_struct_args.data/negative_private"),
-        BuildOptions::move_2().set_latest_language(),
-    );
-
-    // The compilation should fail with an error about invalid entry function parameter
-    assert!(
-        result.is_err(),
-        "Expected private struct as entry function parameter to be rejected during compilation"
-    );
+fn test_invalid_entry_params_rejected_at_compile_time() {
+    assert_publish_fails(common::test_dir_path(
+        "public_struct_args.data/negative_private",
+    ));
+    assert_publish_fails(common::test_dir_path(
+        "public_struct_args.data/negative_nocopy",
+    ));
+    assert_publish_fails(common::test_dir_path(
+        "public_struct_args.data/negative_key",
+    ));
 }
 
-/// Test that non-copy struct as entry function parameter is rejected.
-/// Structs without copy ability don't get pack functions generated.
-#[test]
-fn test_no_copy_struct_rejected() {
-    let _h = setup_harness();
-
-    // Try to compile a package with non-copy struct as entry function parameter.
-    // This should fail during compilation because no pack function is generated for non-copy structs,
-    // making them invalid as entry function parameters.
-    let result = BuiltPackage::build(
-        common::test_dir_path("public_struct_args.data/negative_nocopy"),
-        BuildOptions::move_2().set_latest_language(),
-    );
-
-    // The compilation should fail with an error about invalid entry function parameter
-    assert!(
-        result.is_err(),
-        "Expected non-copy struct as entry function parameter to be rejected during compilation"
-    );
-}
-
-/// Test that generic container with private type argument is rejected at runtime.
-/// Container<T> is public with copy, but when T=PrivatePoint (private struct),
-/// the transaction should be rejected during validation.
+/// Test that generic container with private type argument is rejected at construction time.
+/// Container<T> is public with copy, so it passes validation. When T=PrivatePoint (private struct),
+/// construction fails because PrivatePoint has no public pack function.
 #[test]
 fn test_generic_container_with_private_type_arg_rejected() {
     let mut h = setup_harness();
@@ -485,8 +465,8 @@ fn test_generic_container_with_private_type_arg_rejected() {
         vec![container_value.simple_serialize().unwrap()],
     );
 
-    // The transaction should fail during validation because PrivatePoint is not a valid txn arg
-    // Expected error: INVALID_MAIN_FUNCTION_SIGNATURE because the struct doesn't have a pack function
+    // Container<PrivatePoint> passes validation (Container is public copy, fields not checked).
+    // Construction fails because PrivatePoint has no public pack function.
     assert_vm_status!(status, StatusCode::INVALID_MAIN_FUNCTION_SIGNATURE);
 }
 
@@ -861,14 +841,6 @@ fn test_option_with_private_type_none_allowed() {
         BuildOptions::move_2().set_latest_language(),
     ));
 
-    // Initialize state.
-    assert_success!(h.run_entry_function(
-        &acc,
-        str::parse("0xcafe::option_private_type::initialize").unwrap(),
-        vec![],
-        vec![],
-    ));
-
     // Calling with None is accepted: Option<Hero> passes VM validation, and None needs no
     // inner constructor.
     assert_success!(h.run_entry_function(
@@ -879,23 +851,260 @@ fn test_option_with_private_type_none_allowed() {
     ));
 }
 
-/// Test that user-defined non-phantom enum Container<Hero> is rejected when Hero is private.
-/// Unlike whitelisted Option<T>, user-defined public enums require all field types across all
-/// variants to be valid transaction arguments. Container<T> stores T in the Value variant,
-/// so Hero (private) makes the whole Container<Hero> invalid.
+/// Test that Option<NoCopyData> passes validation, None succeeds, but Some(NoCopyData{...})
+/// fails at construction time because NoCopyData lacks copy ability.
+/// Option is whitelisted so its type argument bypasses the copy check at pre-validation;
+/// the copy check is enforced at construction time when the inner value is actually built.
+/// None never triggers the inner type's constructor, so it always succeeds.
 #[test]
-fn test_user_enum_non_phantom_with_private_type_rejected() {
-    let _h = setup_harness();
+fn test_option_with_nocopy_type_none_allowed_some_rejected() {
+    let mut h = setup_harness();
+    let acc = h.new_account_at(AccountAddress::from_hex_literal("0xcafe").unwrap());
 
-    let result = BuiltPackage::build(
-        common::test_dir_path("public_struct_args.data/negative_phantom_option"),
+    // Option<NoCopyData> publishes successfully even though NoCopyData lacks copy.
+    assert_success!(h.publish_package_with_options(
+        &acc,
+        &common::test_dir_path("public_struct_args.data/option_private_type"),
         BuildOptions::move_2().set_latest_language(),
-    );
+    ));
 
-    assert!(
-        result.is_err(),
-        "Expected Container<Hero> with private Hero to be rejected during compilation"
+    // None succeeds: no inner NoCopyData value is constructed, so the copy check is never
+    // triggered.
+    assert_success!(h.run_entry_function(
+        &acc,
+        str::parse("0xcafe::option_private_type::accept_option_nocopy").unwrap(),
+        vec![],
+        vec![bcs::to_bytes(&Vec::<u8>::new()).unwrap()], // BCS for None (empty vec)
+    ));
+
+    // Some(NoCopyData{value: 42}) fails: NoCopyData lacks copy ability, so construct_public_copy_struct
+    // rejects it when attempting to build the inner value.
+    let some_nocopy = bcs::to_bytes(&vec![42u64]).unwrap(); // BCS for Some(NoCopyData{value:42})
+    let status = h.run_entry_function(
+        &acc,
+        str::parse("0xcafe::option_private_type::accept_option_nocopy").unwrap(),
+        vec![],
+        vec![some_nocopy],
     );
+    assert_vm_status!(status, StatusCode::INVALID_MAIN_FUNCTION_SIGNATURE);
+}
+
+/// View function equivalent of `test_option_with_nocopy_type_none_allowed_some_rejected`.
+/// Verifies the same construction rules apply on the view function path.
+#[test]
+fn test_option_with_nocopy_type_view_function() {
+    let mut h = setup_harness();
+    let acc = h.new_account_at(AccountAddress::from_hex_literal("0xcafe").unwrap());
+
+    assert_success!(h.publish_package_with_options(
+        &acc,
+        &common::test_dir_path("public_struct_args.data/option_private_type"),
+        BuildOptions::move_2().set_latest_language(),
+    ));
+
+    // None succeeds: no inner NoCopyData constructed.
+    let res = h.execute_view_function(
+        str::parse("0xcafe::option_private_type::is_option_nocopy_none").unwrap(),
+        vec![],
+        vec![bcs::to_bytes(&Vec::<u8>::new()).unwrap()], // BCS for None (empty vec)
+    );
+    assert!(res.values.is_ok());
+    let is_none: bool = bcs::from_bytes(&res.values.unwrap()[0]).unwrap();
+    assert!(is_none);
+
+    // Some(NoCopyData{value: 42}) fails: NoCopyData has no declared copy.
+    let some_nocopy = bcs::to_bytes(&vec![42u64]).unwrap();
+    let res = h.execute_view_function(
+        str::parse("0xcafe::option_private_type::is_option_nocopy_none").unwrap(),
+        vec![],
+        vec![some_nocopy],
+    );
+    assert!(res.values.is_err());
+}
+
+/// Test Container<Hero> variant behavior: publish succeeds, the field-free Empty variant can be
+/// passed, but the Value variant (which holds a private Hero) fails at construction time because
+/// Hero has no public pack function. Mirrors Option<PrivateStruct> semantics: None succeeds,
+/// Some(PrivateStruct{...}) fails with INVALID_MAIN_FUNCTION_SIGNATURE.
+#[test]
+fn test_user_enum_with_private_type_empty_succeeds_value_fails() {
+    let mut h = setup_harness();
+    let acc = h.new_account_at(AccountAddress::from_hex_literal("0xcafe").unwrap());
+
+    assert_success!(h.publish_package_with_options(
+        &acc,
+        &common::test_dir_path("public_struct_args.data/negative_phantom_option"),
+        BuildOptions::move_2().set_latest_language(),
+    ));
+
+    // Container<Hero>::Empty is variant index 1 (Value=0, Empty=1), no fields.
+    let empty = MoveValue::Struct(MoveStruct::RuntimeVariant(1, vec![]));
+    assert_success!(h.run_entry_function(
+        &acc,
+        str::parse("0xcafe::negative_phantom_option::test_container_hero").unwrap(),
+        vec![],
+        vec![empty.simple_serialize().unwrap()],
+    ));
+
+    // Container<Hero>::Value{data: Hero{health:1, level:2}} is variant index 0.
+    // Hero is private (no public pack function): construction fails with INVALID_MAIN_FUNCTION_SIGNATURE.
+    let hero = MoveValue::Struct(MoveStruct::Runtime(vec![
+        MoveValue::U64(1), // health
+        MoveValue::U64(2), // level
+    ]));
+    let value_variant = MoveValue::Struct(MoveStruct::RuntimeVariant(0, vec![hero]));
+    let status = h.run_entry_function(
+        &acc,
+        str::parse("0xcafe::negative_phantom_option::test_container_hero").unwrap(),
+        vec![],
+        vec![value_variant.simple_serialize().unwrap()],
+    );
+    assert_vm_status!(status, StatusCode::INVALID_MAIN_FUNCTION_SIGNATURE);
+}
+
+/// Test Container<NoCopyData> behavior per variant.
+///
+/// Container<T> declares copy, so the struct *definition* has copy. Construction is allowed,
+/// and validity is enforced per-variant at construction time — analogous to Option<T>:
+/// - Empty variant: no inner value constructed → succeeds.
+/// - Value variant: NoCopyData field must be constructed → NoCopyData has no declared copy
+///   → rejected with INVALID_MAIN_FUNCTION_SIGNATURE.
+#[test]
+fn test_container_with_nocopy_type_empty_succeeds_value_fails() {
+    let mut h = setup_harness();
+    let acc = h.new_account_at(AccountAddress::from_hex_literal("0xcafe").unwrap());
+
+    assert_success!(h.publish_package_with_options(
+        &acc,
+        &common::test_dir_path("public_struct_args.data/negative_phantom_option"),
+        BuildOptions::move_2().set_latest_language(),
+    ));
+
+    // Empty variant (index 1): Container defines copy → passes declared-copy check.
+    // No fields to construct → succeeds.
+    let empty = MoveValue::Struct(MoveStruct::RuntimeVariant(1, vec![]));
+    assert_success!(h.run_entry_function(
+        &acc,
+        str::parse("0xcafe::negative_phantom_option::test_container_nocopy").unwrap(),
+        vec![],
+        vec![empty.simple_serialize().unwrap()],
+    ));
+
+    // Value variant (index 0): NoCopyData field lacks declared copy → construction fails.
+    let nocopy = MoveValue::Struct(MoveStruct::Runtime(vec![MoveValue::U64(42)]));
+    let value_variant = MoveValue::Struct(MoveStruct::RuntimeVariant(0, vec![nocopy]));
+    let status = h.run_entry_function(
+        &acc,
+        str::parse("0xcafe::negative_phantom_option::test_container_nocopy").unwrap(),
+        vec![],
+        vec![value_variant.simple_serialize().unwrap()],
+    );
+    assert_vm_status!(status, StatusCode::INVALID_MAIN_FUNCTION_SIGNATURE);
+}
+
+/// View function equivalent of `test_container_with_nocopy_type_empty_succeeds_value_fails`.
+/// Verifies the same construction rules apply on the view function path.
+#[test]
+fn test_container_with_nocopy_type_view_function() {
+    let mut h = setup_harness();
+    let acc = h.new_account_at(AccountAddress::from_hex_literal("0xcafe").unwrap());
+
+    assert_success!(h.publish_package_with_options(
+        &acc,
+        &common::test_dir_path("public_struct_args.data/negative_phantom_option"),
+        BuildOptions::move_2().set_latest_language(),
+    ));
+
+    // Empty variant (index 1): Container declares copy, no fields → succeeds.
+    let empty = MoveValue::Struct(MoveStruct::RuntimeVariant(1, vec![]));
+    let res = h.execute_view_function(
+        str::parse("0xcafe::negative_phantom_option::check_container_nocopy").unwrap(),
+        vec![],
+        vec![empty.simple_serialize().unwrap()],
+    );
+    assert!(res.values.is_ok());
+
+    // Value variant (index 0): NoCopyData field has no declared copy → fails.
+    let nocopy = MoveValue::Struct(MoveStruct::Runtime(vec![MoveValue::U64(42)]));
+    let value_variant = MoveValue::Struct(MoveStruct::RuntimeVariant(0, vec![nocopy]));
+    let res = h.execute_view_function(
+        str::parse("0xcafe::negative_phantom_option::check_container_nocopy").unwrap(),
+        vec![],
+        vec![value_variant.simple_serialize().unwrap()],
+    );
+    assert!(res.values.is_err());
+}
+
+/// Test Option<CopyData<NoCopyData>> and Container<CopyData<NoCopyData>> where CopyData<T>
+/// declares copy but T = NoCopyData does not. Two layers of generic wrapping: the outer
+/// types (Option, Container, CopyData) all declare copy; only the innermost NoCopyData lacks
+/// it. Construction fails only when that innermost value must actually be built.
+///
+/// Option<CopyData<NoCopyData>>:
+///   - None  → succeeds (no CopyData or NoCopyData constructed)
+///   - Some  → fails   (CopyData passes declared-copy check; NoCopyData fails it)
+///
+/// Container<CopyData<NoCopyData>>:
+///   - Empty → succeeds (no CopyData or NoCopyData constructed)
+///   - Value → fails   (same reason as Some above)
+#[test]
+fn test_nested_no_copy_type_entry_function() {
+    let mut h = setup_harness();
+    let acc = h.new_account_at(AccountAddress::from_hex_literal("0xcafe").unwrap());
+
+    assert_success!(h.publish_package_with_options(
+        &acc,
+        &common::test_dir_path("public_struct_args.data/negative_phantom_option"),
+        BuildOptions::move_2().set_latest_language(),
+    ));
+
+    // --- Option<CopyData<NoCopyData>> ---
+
+    // None: no inner value constructed → succeeds.
+    assert_success!(h.run_entry_function(
+        &acc,
+        str::parse("0xcafe::negative_phantom_option::test_option_copy_wrapper_nocopy").unwrap(),
+        vec![],
+        vec![bcs::to_bytes(&Vec::<u8>::new()).unwrap()],
+    ));
+
+    // Some(CopyData{data: NoCopyData{value: 42}}):
+    //   CopyData declares copy → passes; NoCopyData has no declared copy → fails.
+    // BCS: Option<CopyData<NoCopyData>>::Some = [1, <CopyData BCS>]
+    //      CopyData{data: NoCopyData{value: 42}} BCS = NoCopyData BCS = u64 42 BCS
+    //      = bcs::to_bytes(&vec![42u64])
+    let some_copy_wrapper = bcs::to_bytes(&vec![42u64]).unwrap();
+    let status = h.run_entry_function(
+        &acc,
+        str::parse("0xcafe::negative_phantom_option::test_option_copy_wrapper_nocopy").unwrap(),
+        vec![],
+        vec![some_copy_wrapper],
+    );
+    assert_vm_status!(status, StatusCode::INVALID_MAIN_FUNCTION_SIGNATURE);
+
+    // --- Container<CopyData<NoCopyData>> ---
+
+    // Empty (variant index 1): no inner value constructed → succeeds.
+    let empty = MoveValue::Struct(MoveStruct::RuntimeVariant(1, vec![]));
+    assert_success!(h.run_entry_function(
+        &acc,
+        str::parse("0xcafe::negative_phantom_option::test_container_copy_wrapper_nocopy").unwrap(),
+        vec![],
+        vec![empty.simple_serialize().unwrap()],
+    ));
+
+    // Value{data: CopyData{data: NoCopyData{value: 42}}} (variant index 0):
+    //   CopyData passes; NoCopyData has no declared copy → fails.
+    let nocopy = MoveValue::Struct(MoveStruct::Runtime(vec![MoveValue::U64(42)]));
+    let copy_wrapper = MoveValue::Struct(MoveStruct::Runtime(vec![nocopy]));
+    let value_variant = MoveValue::Struct(MoveStruct::RuntimeVariant(0, vec![copy_wrapper]));
+    let status = h.run_entry_function(
+        &acc,
+        str::parse("0xcafe::negative_phantom_option::test_container_copy_wrapper_nocopy").unwrap(),
+        vec![],
+        vec![value_variant.simple_serialize().unwrap()],
+    );
+    assert_vm_status!(status, StatusCode::INVALID_MAIN_FUNCTION_SIGNATURE);
 }
 
 /// Test that Object<u64> is accepted (even with primitive type parameter).
@@ -1019,6 +1228,321 @@ fn test_user_enum_phantom_with_primitive_type_succeeds() {
     assert_eq!(result.value, 88); // value = 88
 }
 
+// ========================================================================================
+// Multiple Type Parameter Tests (Pair<T, U>)
+// ========================================================================================
+
+/// Test Pair<PublicPoint, PublicPoint>: both type arguments are valid public copy structs.
+/// Both fields are constructable, so the whole Pair is constructable. Expect success.
+#[test]
+fn test_pair_both_type_params_valid() {
+    let mut h = setup_harness();
+    let acc = h.new_account_at(AccountAddress::from_hex_literal("0xcafe").unwrap());
+
+    assert_success!(h.publish_package_with_options(
+        &acc,
+        &common::test_dir_path("public_struct_args.data/pair_type_params"),
+        BuildOptions::move_2().set_latest_language(),
+    ));
+
+    // Pair<PublicPoint, PublicPoint> { first: {x:10, y:20}, second: {x:30, y:40} }
+    let pair = MoveValue::Struct(MoveStruct::Runtime(vec![
+        MoveValue::Struct(MoveStruct::Runtime(vec![
+            MoveValue::U64(10),
+            MoveValue::U64(20),
+        ])),
+        MoveValue::Struct(MoveStruct::Runtime(vec![
+            MoveValue::U64(30),
+            MoveValue::U64(40),
+        ])),
+    ]));
+
+    assert_success!(h.run_entry_function(
+        &acc,
+        str::parse("0xcafe::pair_type_params::test_pair_both_valid").unwrap(),
+        vec![],
+        vec![pair.simple_serialize().unwrap()],
+    ));
+}
+
+/// Test Pair<PublicPoint, PrivateData>: first type argument is valid, second is private.
+/// Construction fails on the second field because PrivateData has no public pack function.
+#[test]
+fn test_pair_second_type_param_private() {
+    let mut h = setup_harness();
+    let acc = h.new_account_at(AccountAddress::from_hex_literal("0xcafe").unwrap());
+
+    assert_success!(h.publish_package_with_options(
+        &acc,
+        &common::test_dir_path("public_struct_args.data/pair_type_params"),
+        BuildOptions::move_2().set_latest_language(),
+    ));
+
+    // Pair<PublicPoint, PrivateData> { first: {x:10, y:20}, second: {value:99} }
+    let pair = MoveValue::Struct(MoveStruct::Runtime(vec![
+        MoveValue::Struct(MoveStruct::Runtime(vec![
+            MoveValue::U64(10),
+            MoveValue::U64(20),
+        ])),
+        MoveValue::Struct(MoveStruct::Runtime(vec![MoveValue::U64(99)])),
+    ]));
+
+    let status = h.run_entry_function(
+        &acc,
+        str::parse("0xcafe::pair_type_params::test_pair_second_invalid").unwrap(),
+        vec![],
+        vec![pair.simple_serialize().unwrap()],
+    );
+    assert_vm_status!(status, StatusCode::INVALID_MAIN_FUNCTION_SIGNATURE);
+}
+
+/// Test Pair<PrivateData, PublicPoint>: first type argument is private, second is valid.
+/// Construction fails immediately on the first field because PrivateData has no public pack function.
+#[test]
+fn test_pair_first_type_param_private() {
+    let mut h = setup_harness();
+    let acc = h.new_account_at(AccountAddress::from_hex_literal("0xcafe").unwrap());
+
+    assert_success!(h.publish_package_with_options(
+        &acc,
+        &common::test_dir_path("public_struct_args.data/pair_type_params"),
+        BuildOptions::move_2().set_latest_language(),
+    ));
+
+    // Pair<PrivateData, PublicPoint> { first: {value:99}, second: {x:10, y:20} }
+    let pair = MoveValue::Struct(MoveStruct::Runtime(vec![
+        MoveValue::Struct(MoveStruct::Runtime(vec![MoveValue::U64(99)])),
+        MoveValue::Struct(MoveStruct::Runtime(vec![
+            MoveValue::U64(10),
+            MoveValue::U64(20),
+        ])),
+    ]));
+
+    let status = h.run_entry_function(
+        &acc,
+        str::parse("0xcafe::pair_type_params::test_pair_first_invalid").unwrap(),
+        vec![],
+        vec![pair.simple_serialize().unwrap()],
+    );
+    assert_vm_status!(status, StatusCode::INVALID_MAIN_FUNCTION_SIGNATURE);
+}
+
+// ========================================================================================
+// vector<Option<Struct>> Tests
+// ========================================================================================
+
+/// Test a small vector<Option<Point>> with a mix of Some and None values.
+/// Verifies the end-to-end path for option vectors containing public structs.
+#[test]
+fn test_vector_option_struct_basic() {
+    let mut h = setup_harness();
+    let acc = h.new_account_at(AccountAddress::from_hex_literal("0xcafe").unwrap());
+
+    assert_success!(h.publish_package_with_options(
+        &acc,
+        &common::test_dir_path("public_struct_args.data/pack"),
+        BuildOptions::move_2().set_latest_language(),
+    ));
+
+    assert_success!(h.run_entry_function(
+        &acc,
+        str::parse("0xcafe::public_struct_test::initialize").unwrap(),
+        vec![],
+        vec![],
+    ));
+
+    // [Some(Point{1,2}), None, Some(Point{3,4})]
+    // Option<Point> uses vector-based BCS: Some(p) = [p], None = []
+    let opts = MoveValue::Vector(vec![
+        MoveValue::Vector(vec![MoveValue::Struct(MoveStruct::Runtime(vec![
+            MoveValue::U64(1),
+            MoveValue::U64(2),
+        ]))]),
+        MoveValue::Vector(vec![]),
+        MoveValue::Vector(vec![MoveValue::Struct(MoveStruct::Runtime(vec![
+            MoveValue::U64(3),
+            MoveValue::U64(4),
+        ]))]),
+    ]);
+
+    assert_success!(h.run_entry_function(
+        &acc,
+        str::parse("0xcafe::public_struct_test::test_option_point_vector").unwrap(),
+        vec![],
+        vec![opts.simple_serialize().unwrap()],
+    ));
+
+    let result = get_test_result(&h, acc.address());
+    assert_eq!(result.value, 10); // (1+2) + (3+4)
+    assert_eq!(
+        String::from_utf8(result.message).unwrap(),
+        "option_point_vector_received"
+    );
+}
+
+/// Test vector<Option<Point>> with exactly 50 Some(Point) elements.
+/// Each Some(Point) costs 2 invocations (1 for Option + 1 for Point).
+/// 50 × 2 = 100 invocations, exactly at the limit. Expect success.
+#[test]
+fn test_vector_option_struct_at_limit() {
+    let mut h = setup_harness();
+    let acc = h.new_account_at(AccountAddress::from_hex_literal("0xcafe").unwrap());
+
+    assert_success!(h.publish_package_with_options(
+        &acc,
+        &common::test_dir_path("public_struct_args.data/pack"),
+        BuildOptions::move_2().set_latest_language(),
+    ));
+
+    assert_success!(h.run_entry_function(
+        &acc,
+        str::parse("0xcafe::public_struct_test::initialize").unwrap(),
+        vec![],
+        vec![],
+    ));
+
+    // 50 × Some(Point{i, i}) — 50 × 2 = 100 invocations (exactly at the limit)
+    let opts = MoveValue::Vector(
+        (0u64..50)
+            .map(|i| {
+                MoveValue::Vector(vec![MoveValue::Struct(MoveStruct::Runtime(vec![
+                    MoveValue::U64(i),
+                    MoveValue::U64(i),
+                ]))])
+            })
+            .collect(),
+    );
+
+    assert_success!(h.run_entry_function(
+        &acc,
+        str::parse("0xcafe::public_struct_test::test_option_point_vector").unwrap(),
+        vec![],
+        vec![opts.simple_serialize().unwrap()],
+    ));
+
+    let result = get_test_result(&h, acc.address());
+    // sum of 2*i for i in 0..50 = 2 * (0+1+...+49) = 2 * 1225 = 2450
+    assert_eq!(result.value, 2450);
+    assert_eq!(
+        String::from_utf8(result.message).unwrap(),
+        "option_point_vector_received"
+    );
+}
+
+/// Test vector<Option<Point>> with 51 Some(Point) elements, which exceeds the limit.
+/// 51 × 2 = 102 invocations > 100. Expect failure.
+#[test]
+fn test_vector_option_struct_exceeds_limit() {
+    let mut h = setup_harness();
+    let acc = h.new_account_at(AccountAddress::from_hex_literal("0xcafe").unwrap());
+
+    assert_success!(h.publish_package_with_options(
+        &acc,
+        &common::test_dir_path("public_struct_args.data/pack"),
+        BuildOptions::move_2().set_latest_language(),
+    ));
+
+    assert_success!(h.run_entry_function(
+        &acc,
+        str::parse("0xcafe::public_struct_test::initialize").unwrap(),
+        vec![],
+        vec![],
+    ));
+
+    // 51 × Some(Point{1,1}) — 51 × 2 = 102 invocations > 100 limit
+    let opts = MoveValue::Vector(
+        (0..51)
+            .map(|_| {
+                MoveValue::Vector(vec![MoveValue::Struct(MoveStruct::Runtime(vec![
+                    MoveValue::U64(1),
+                    MoveValue::U64(1),
+                ]))])
+            })
+            .collect(),
+    );
+
+    let status = h.run_entry_function(
+        &acc,
+        str::parse("0xcafe::public_struct_test::test_option_point_vector").unwrap(),
+        vec![],
+        vec![opts.simple_serialize().unwrap()],
+    );
+    assert!(!status.status().unwrap().is_success());
+}
+
+// ========================================================================================
+// 3-Level Nesting Tests (Option<CopyData<CopyData<NoCopyData>>>)
+// ========================================================================================
+
+/// Test Option<CopyData<CopyData<NoCopyData>>> — three levels of generic wrapping.
+/// All outer types (Option, CopyData, CopyData) declare copy; only the innermost
+/// NoCopyData lacks it. The recursive validation must descend all three levels.
+///
+/// - None  → succeeds: no value constructed at any level.
+/// - Some(CopyData{CopyData{NoCopyData{7}}}) → fails at NoCopyData (no declared copy).
+#[test]
+fn test_triple_nested_nocopy_entry_function() {
+    let mut h = setup_harness();
+    let acc = h.new_account_at(AccountAddress::from_hex_literal("0xcafe").unwrap());
+
+    assert_success!(h.publish_package_with_options(
+        &acc,
+        &common::test_dir_path("public_struct_args.data/negative_phantom_option"),
+        BuildOptions::move_2().set_latest_language(),
+    ));
+
+    // None: BCS for empty vector (Option uses vector-based encoding)
+    assert_success!(h.run_entry_function(
+        &acc,
+        str::parse("0xcafe::negative_phantom_option::test_option_triple_nested_nocopy").unwrap(),
+        vec![],
+        vec![bcs::to_bytes(&Vec::<u8>::new()).unwrap()],
+    ));
+
+    // Some(CopyData{CopyData{NoCopyData{value:7}}}):
+    // Each CopyData<T> wrapper is a single-field struct transparent at BCS level.
+    // BCS = [1 (vec length)] ++ [7u64 as LE bytes] — same pattern as the 2-level test.
+    let some_triple = bcs::to_bytes(&vec![7u64]).unwrap();
+    let status = h.run_entry_function(
+        &acc,
+        str::parse("0xcafe::negative_phantom_option::test_option_triple_nested_nocopy").unwrap(),
+        vec![],
+        vec![some_triple],
+    );
+    assert_vm_status!(status, StatusCode::INVALID_MAIN_FUNCTION_SIGNATURE);
+}
+
+/// View function equivalent of `test_triple_nested_nocopy_entry_function`.
+/// Verifies the same 3-level construction rules apply on the view function path.
+#[test]
+fn test_triple_nested_nocopy_view_function() {
+    let mut h = setup_harness();
+    let acc = h.new_account_at(AccountAddress::from_hex_literal("0xcafe").unwrap());
+
+    assert_success!(h.publish_package_with_options(
+        &acc,
+        &common::test_dir_path("public_struct_args.data/negative_phantom_option"),
+        BuildOptions::move_2().set_latest_language(),
+    ));
+
+    // None: succeeds — no value constructed at any level.
+    let res = h.execute_view_function(
+        str::parse("0xcafe::negative_phantom_option::check_option_triple_nested_nocopy").unwrap(),
+        vec![],
+        vec![bcs::to_bytes(&Vec::<u8>::new()).unwrap()],
+    );
+    assert!(res.values.is_ok());
+
+    // Some(CopyData{CopyData{NoCopyData{7}}}): fails at NoCopyData construction.
+    let some_triple = bcs::to_bytes(&vec![7u64]).unwrap();
+    let res = h.execute_view_function(
+        str::parse("0xcafe::negative_phantom_option::check_option_triple_nested_nocopy").unwrap(),
+        vec![],
+        vec![some_triple],
+    );
+    assert!(res.values.is_err());
+}
+
 /// Tests that a public copy struct with an `Option<PrivateT>` field is a valid transaction
 /// argument type, illustrating the full flow from extended checker through execution.
 ///
@@ -1078,7 +1602,7 @@ fn test_option_in_public_struct() {
 
     // None: view function accepts it, construction succeeds, returns true.
     let res = h.execute_view_function(
-        str::parse("0xcafe::option_in_wrapper::is_inner_none").unwrap(),
+        str::parse("0xcafe::option_in_wrapper::check_none_view").unwrap(),
         vec![],
         vec![wrapper_none.simple_serialize().unwrap()],
     );
@@ -1088,7 +1612,7 @@ fn test_option_in_public_struct() {
 
     // Some(Hero): view function also fails at construction for the same reason.
     let res = h.execute_view_function(
-        str::parse("0xcafe::option_in_wrapper::is_inner_none").unwrap(),
+        str::parse("0xcafe::option_in_wrapper::check_none_view").unwrap(),
         vec![],
         vec![wrapper_some.simple_serialize().unwrap()],
     );

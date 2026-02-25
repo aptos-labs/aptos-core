@@ -30,6 +30,8 @@ mod webauthn_secp256r1_ecdsa;
 
 use aptos_api_test_context::{new_test_context_inner as super_new_test_context, TestContext};
 use aptos_config::config::{internal_indexer_db_config::InternalIndexerDBConfig, NodeConfig};
+use aptos_sdk::types::LocalAccount;
+use std::path::PathBuf;
 
 fn new_test_context(test_name: String) -> TestContext {
     new_test_context_with_config(test_name, NodeConfig::default(), false, false)
@@ -68,4 +70,28 @@ fn new_test_context_with_orderless_flags(
         use_txn_payload_v2_format,
         use_orderless_transactions,
     )
+}
+
+/// Creates a test context and publishes the `public_struct_enum_test` Move package under a
+/// fresh account, returning `(context, account)`.  Every test in
+/// `public_struct_enum_test.rs` and `public_struct_enum_negative_test.rs` starts with
+/// this same three-line setup.
+async fn setup_public_struct_test(
+    test_name: String,
+    use_txn_payload_v2_format: bool,
+    use_orderless_transactions: bool,
+) -> (TestContext, LocalAccount) {
+    let mut context = new_test_context_with_orderless_flags(
+        test_name,
+        use_txn_payload_v2_format,
+        use_orderless_transactions,
+    );
+    let mut account = context.create_account().await;
+    let account_addr = account.address();
+    let named_addresses = vec![("account".to_string(), account_addr)];
+    let path = PathBuf::from(std::env!("CARGO_MANIFEST_DIR"))
+        .join("src/tests/move/public_struct_enum_test");
+    let txn = TestContext::build_package_with_latest_language(path, named_addresses);
+    context.publish_package(&mut account, txn).await;
+    (context, account)
 }

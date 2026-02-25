@@ -3,7 +3,10 @@
 
 use crate::{
     move_vm_ext::{AptosMoveResolver, SessionExt},
-    verifier::{transaction_arg_validation, transaction_arg_validation::get_allowed_structs},
+    verifier::{
+        transaction_arg_validation,
+        transaction_arg_validation::{get_allowed_structs, validate_non_signer_param_tys},
+    },
 };
 use aptos_types::vm::module_metadata::RuntimeModuleMetadataV1;
 use move_binary_format::errors::{PartialVMError, PartialVMResult};
@@ -12,10 +15,7 @@ use move_vm_runtime::{
     module_traversal::{TraversalContext, TraversalStorage},
     LoadedFunction, Loader,
 };
-use move_vm_types::{
-    gas::{GasMeter, UnmeteredGasMeter},
-    loaded_data::runtime_types::Type,
-};
+use move_vm_types::gas::{GasMeter, UnmeteredGasMeter};
 
 /// Based on the function attributes in the module metadata, determine whether a
 /// function is a view function.
@@ -64,83 +64,25 @@ pub(crate) fn validate_view_function(
     }
 
     let allowed_structs = get_allowed_structs(struct_constructors_feature);
-    // Create a mutable pack function cache and pre-populate it by validating parameter types.
-    // This avoids repeated pack function loads during argument construction, especially for
-    // vectors of structs (e.g., vector<Point> with 100 elements would otherwise load the
-    // pack function 100 times, charging gas each time under lazy loading).
     let mut pack_fn_cache = ahash::AHashMap::new();
-    let ty_builder = &loader.runtime_environment().vm_config().ty_builder;
 
-    // Check lazy loading once so both the pre-validation and construction branches agree.
-    let is_lazy = loader.is_lazy_loading_enabled();
-    if is_lazy {
-        // Lazy loading: pack function loads are metered, so use the caller's gas meter.
-        for ty in func.param_tys().iter() {
-            let ty = ty_builder
-                .create_ty_with_subst(ty, func.ty_args())
-                .map_err(|e| {
-                    let vm_status = e
-                        .finish(move_binary_format::errors::Location::Undefined)
-                        .into_vm_status();
-                    PartialVMError::new(vm_status.status_code())
-                })?;
-            // Signer params are passed through as-is in view functions (see construct_arg),
-            // so skip them here — is_valid_txn_arg returns false for Signer but that is
-            // intentional only for entry functions.
-            if ty == Type::Signer {
-                continue;
-            }
-            if !transaction_arg_validation::is_valid_txn_arg(
-                loader,
-                gas_meter,
-                traversal_context,
-                &ty,
-                allowed_structs,
-                &mut pack_fn_cache,
-            ) {
-                return Err(
-                    PartialVMError::new(StatusCode::INVALID_MAIN_FUNCTION_SIGNATURE)
-                        .with_message("invalid argument type for view function".to_string()),
-                );
-            }
-        }
-    } else {
-        // Eager loading: argument construction uses UnmeteredGasMeter, so pre-validation
-        // must also be unmetered to avoid unexpected gas charges.
-        let eager_storage = TraversalStorage::new();
-        let mut eager_ctx = TraversalContext::new(&eager_storage);
-        for ty in func.param_tys().iter() {
-            let ty = ty_builder
-                .create_ty_with_subst(ty, func.ty_args())
-                .map_err(|e| {
-                    let vm_status = e
-                        .finish(move_binary_format::errors::Location::Undefined)
-                        .into_vm_status();
-                    PartialVMError::new(vm_status.status_code())
-                })?;
-            // Signer params are passed through as-is in view functions (see construct_arg),
-            // so skip them here — is_valid_txn_arg returns false for Signer but that is
-            // intentional only for entry functions.
-            if ty == Type::Signer {
-                continue;
-            }
-            if !transaction_arg_validation::is_valid_txn_arg(
-                loader,
-                &mut UnmeteredGasMeter,
-                &mut eager_ctx,
-                &ty,
-                allowed_structs,
-                &mut pack_fn_cache,
-            ) {
-                return Err(
-                    PartialVMError::new(StatusCode::INVALID_MAIN_FUNCTION_SIGNATURE)
-                        .with_message("invalid argument type for view function".to_string()),
-                );
-            }
-        }
-    }
+    // Count leading signer parameters and skip them for validation.
+    // construct_args handles signers directly (is_view = true), so they must not be
+    // passed to validate_non_signer_param_tys — is_valid_txn_arg returns false for
+    // signer types, which would incorrectly reject view functions with signer params.
+    let signer_param_cnt = func
+        .param_tys()
+        .iter()
+        .take_while(|ty| ty.is_signer_or_signer_ref())
+        .count();
+    validate_non_signer_param_tys(
+        loader,
+        &func.param_tys()[signer_param_cnt..],
+        func.ty_args(),
+        allowed_structs,
+    )?;
 
-    let result = if is_lazy {
+    let result = if loader.is_lazy_loading_enabled() {
         transaction_arg_validation::construct_args(
             session,
             loader,

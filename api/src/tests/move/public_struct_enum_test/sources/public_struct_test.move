@@ -51,14 +51,19 @@ module account::public_struct_test {
         y: u64,
     }
 
-    /// Entry function that takes a Point as argument
-    public entry fun test_point(sender: &signer, p: Point) acquires TestResult {
+    /// Lazily initialise the TestResult resource for `sender` if it does not yet exist.
+    fun init_result(sender: &signer) {
         if (!exists<TestResult>(std::signer::address_of(sender))) {
             move_to(sender, TestResult {
                 value: 0,
-                message: std::string::utf8(b"")
+                message: std::string::utf8(b""),
             });
         };
+    }
+
+    /// Entry function that takes a Point as argument
+    public entry fun test_point(sender: &signer, p: Point) acquires TestResult {
+        init_result(sender);
         let result = borrow_global_mut<TestResult>(std::signer::address_of(sender));
         result.value = p.x + p.y;
         result.message = std::string::utf8(b"point_received");
@@ -66,12 +71,7 @@ module account::public_struct_test {
 
     /// Entry function that takes a Rectangle as argument
     public entry fun test_rectangle(sender: &signer, r: Rectangle) acquires TestResult {
-        if (!exists<TestResult>(std::signer::address_of(sender))) {
-            move_to(sender, TestResult {
-                value: 0,
-                message: std::string::utf8(b"")
-            });
-        };
+        init_result(sender);
         let result = borrow_global_mut<TestResult>(std::signer::address_of(sender));
         result.value = r.top_left.x + r.top_left.y + r.bottom_right.x + r.bottom_right.y;
         result.message = std::string::utf8(b"rectangle_received");
@@ -79,32 +79,15 @@ module account::public_struct_test {
 
     /// Entry function that takes a Data struct as argument
     public entry fun test_data(sender: &signer, d: Data) acquires TestResult {
-        if (!exists<TestResult>(std::signer::address_of(sender))) {
-            move_to(sender, TestResult {
-                value: 0,
-                message: std::string::utf8(b"")
-            });
-        };
+        init_result(sender);
         let result = borrow_global_mut<TestResult>(std::signer::address_of(sender));
-        let sum = 0u64;
-        let i = 0;
-        let len = std::vector::length(&d.values);
-        while (i < len) {
-            sum = sum + *std::vector::borrow(&d.values, i);
-            i = i + 1;
-        };
-        result.value = sum;
+        result.value = d.values.fold(0u64, |acc, v| acc + v);
         result.message = d.name;
     }
 
     /// Entry function that takes a Color enum as argument
     public entry fun test_color(sender: &signer, c: Color) acquires TestResult {
-        if (!exists<TestResult>(std::signer::address_of(sender))) {
-            move_to(sender, TestResult {
-                value: 0,
-                message: std::string::utf8(b"")
-            });
-        };
+        init_result(sender);
         let result = borrow_global_mut<TestResult>(std::signer::address_of(sender));
         let (value, msg) = match (c) {
             Color::Red => (1, b"red"),
@@ -118,12 +101,7 @@ module account::public_struct_test {
 
     /// Entry function that takes a Shape enum as argument
     public entry fun test_shape(sender: &signer, s: Shape) acquires TestResult {
-        if (!exists<TestResult>(std::signer::address_of(sender))) {
-            move_to(sender, TestResult {
-                value: 0,
-                message: std::string::utf8(b"")
-            });
-        };
+        init_result(sender);
         let result = borrow_global_mut<TestResult>(std::signer::address_of(sender));
         let (value, msg) = match (s) {
             Shape::Circle { center, radius } => (center.x + center.y + radius, b"circle"),
@@ -138,33 +116,15 @@ module account::public_struct_test {
 
     /// Entry function that takes a vector of Points
     public entry fun test_point_vector(sender: &signer, points: vector<Point>) acquires TestResult {
-        if (!exists<TestResult>(std::signer::address_of(sender))) {
-            move_to(sender, TestResult {
-                value: 0,
-                message: std::string::utf8(b"")
-            });
-        };
+        init_result(sender);
         let result = borrow_global_mut<TestResult>(std::signer::address_of(sender));
-        let sum = 0u64;
-        let i = 0;
-        let len = std::vector::length(&points);
-        while (i < len) {
-            let p = std::vector::borrow(&points, i);
-            sum = sum + p.x + p.y;
-            i = i + 1;
-        };
-        result.value = sum;
+        result.value = points.fold(0u64, |acc, p| acc + p.x + p.y);
         result.message = std::string::utf8(b"point_vector_received");
     }
 
     /// Entry function using whitelisted String type - should always work
     public entry fun test_string(sender: &signer, s: String) acquires TestResult {
-        if (!exists<TestResult>(std::signer::address_of(sender))) {
-            move_to(sender, TestResult {
-                value: 0,
-                message: std::string::utf8(b"")
-            });
-        };
+        init_result(sender);
         let result = borrow_global_mut<TestResult>(std::signer::address_of(sender));
         result.value = std::string::length(&s);
         result.message = s;
@@ -172,12 +132,7 @@ module account::public_struct_test {
 
     /// Entry function that takes Option<Point>
     public entry fun test_option_point(sender: &signer, opt_point: std::option::Option<Point>) acquires TestResult {
-        if (!exists<TestResult>(std::signer::address_of(sender))) {
-            move_to(sender, TestResult {
-                value: 0,
-                message: std::string::utf8(b"")
-            });
-        };
+        init_result(sender);
         let result = borrow_global_mut<TestResult>(std::signer::address_of(sender));
         if (std::option::is_some(&opt_point)) {
             let p = std::option::destroy_some(opt_point);
@@ -192,12 +147,7 @@ module account::public_struct_test {
 
     /// Entry function that takes Option<Color>
     public entry fun test_option_color(sender: &signer, opt_color: std::option::Option<Color>) acquires TestResult {
-        if (!exists<TestResult>(std::signer::address_of(sender))) {
-            move_to(sender, TestResult {
-                value: 0,
-                message: std::string::utf8(b"")
-            });
-        };
+        init_result(sender);
         let result = borrow_global_mut<TestResult>(std::signer::address_of(sender));
         if (std::option::is_some(&opt_color)) {
             let color = std::option::destroy_some(opt_color);
@@ -218,12 +168,7 @@ module account::public_struct_test {
 
     /// Entry function that takes Container<Color> as argument
     public entry fun test_container_color(sender: &signer, container: Container<Color>) acquires TestResult {
-        if (!exists<TestResult>(std::signer::address_of(sender))) {
-            move_to(sender, TestResult {
-                value: 0,
-                message: std::string::utf8(b"")
-            });
-        };
+        init_result(sender);
         let result = borrow_global_mut<TestResult>(std::signer::address_of(sender));
         let (value, msg) = match (container.value) {
             Color::Red => (100, b"container_red"),
@@ -238,12 +183,7 @@ module account::public_struct_test {
     /// Generic entry function that takes Container<T> with any type T that has copy + drop
     /// This is used to test that Container with non-public type arguments is rejected
     public entry fun test_generic_container<T: copy + drop>(sender: &signer, _container: Container<T>) acquires TestResult {
-        if (!exists<TestResult>(std::signer::address_of(sender))) {
-            move_to(sender, TestResult {
-                value: 0,
-                message: std::string::utf8(b"")
-            });
-        };
+        init_result(sender);
         let result = borrow_global_mut<TestResult>(std::signer::address_of(sender));
         result.value = 999;
         result.message = std::string::utf8(b"generic_container_received");
@@ -253,5 +193,22 @@ module account::public_struct_test {
     public fun get_result(addr: address): (u64, String) acquires TestResult {
         let result = borrow_global<TestResult>(addr);
         (result.value, result.message)
+    }
+
+    /// View function that takes a Point struct argument
+    #[view]
+    public fun check_point(p: Point): u64 {
+        p.x + p.y
+    }
+
+    /// View function that takes a Color enum argument
+    #[view]
+    public fun check_color(c: Color): u64 {
+        match (c) {
+            Color::Red => 1,
+            Color::Green => 2,
+            Color::Blue => 3,
+            Color::Custom { r, g, b } => (r as u64) + (g as u64) + (b as u64),
+        }
     }
 }

@@ -251,13 +251,13 @@ impl ExtendedChecker<'_> {
         }
     }
 
-    /// Recursively checks if a type is valid as a transaction argument.
+    /// Checks if a type is valid as a transaction argument.
     /// Allowed types:
     /// - Primitives and type parameters
     /// - Immutable reference to signer (&signer)
     /// - Vectors of valid types
     /// - Whitelisted structs (String, Object, Option, FixedPoint32, FixedPoint64)
-    /// - Public structs/enums with copy ability where all fields are valid types
+    /// - Public structs/enums with copy ability
     /// Note that we don't check ability on type parameters, which means Option<T> can
     /// be a parameter to an entry function even when generic type T is not declared with copy ability.
     /// VM will reject it during argument validation.
@@ -284,7 +284,15 @@ impl ExtendedChecker<'_> {
                     self.is_public_copy_struct(qid, inst)
                 }
             },
-            _ => false,
+            // Tuples, function types, mutable/non-signer references, spec-only types,
+            // and internal type-checking temporaries are not valid transaction argument types.
+            Tuple(_)
+            | Fun(_, _, _)
+            | Reference(_, _)
+            | TypeDomain(_)
+            | ResourceDomain(_, _, _)
+            | Error
+            | Var(_) => false,
         }
     }
 
@@ -301,9 +309,11 @@ impl ExtendedChecker<'_> {
         )
     }
 
-    /// Checks if a struct is a public struct/enum with the copy ability, and all its
-    /// field types are valid transaction argument types.
-    fn is_public_copy_struct(&self, qid: QualifiedId<StructId>, inst: &[Type]) -> bool {
+    /// Checks if a struct/enum is public and has the copy ability.
+    /// Field type validity is intentionally not checked here — consistent with how whitelisted
+    /// types like Option<T> are treated. The VM enforces field validity at construction time
+    /// when it invokes the pack function and recursively constructs each argument.
+    fn is_public_copy_struct(&self, qid: QualifiedId<StructId>, _inst: &[Type]) -> bool {
         if !self
             .env
             .language_version()
@@ -322,15 +332,6 @@ impl ExtendedChecker<'_> {
         // Check if the struct has the copy ability
         if !struct_env.get_abilities().has_copy() {
             return false;
-        }
-
-        // Get all fields (for enums, this includes fields from all variants)
-        // and recursively check that all field types are valid
-        for field in struct_env.get_fields() {
-            let field_ty = field.get_type().instantiate(inst);
-            if !self.is_valid_txn_arg_type(&field_ty) {
-                return false;
-            }
         }
 
         true

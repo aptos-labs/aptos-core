@@ -91,10 +91,25 @@ pub struct Function {
     pub(crate) is_persistent: bool,
     pub(crate) has_module_reentrancy_lock: bool,
     pub(crate) is_trusted: bool,
-    pub(crate) is_pack_or_pack_variant: bool,
-    // This field is set when the function is a non-private struct/enum API for mutably borrowing a field.
-    // which will be used to bypass the runtime ref checks
-    pub(crate) borrow_field_mut_api_at_offset: Option<MemberCount>,
+    /// Non-`None` when the function is a compiler-synthesized struct/enum API that requires
+    /// special treatment during bytecode validation or execution.  At most one variant can apply
+    /// to any given function.
+    pub(crate) struct_api: Option<StructApiKind>,
+}
+
+/// Classifies the struct/enum API role of a compiler-synthesized function.
+///
+/// Exactly one of these roles is assigned to a function that carries a struct API attribute;
+/// ordinary functions leave `Function::struct_api` as `None`.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) enum StructApiKind {
+    /// Function packs a non-private struct or enum variant
+    /// (`FunctionAttribute::Pack` / `FunctionAttribute::PackVariant`).
+    Pack,
+    /// Function mutably borrows a field of a non-private struct or enum
+    /// (`FunctionAttribute::BorrowFieldMutable`).
+    /// The value is the zero-based field offset used to bypass the runtime ref-check.
+    BorrowFieldMut(MemberCount),
 }
 
 /// For loaded function representation, specifies the owner: a script or a module.
@@ -635,17 +650,24 @@ impl Debug for Function {
 }
 
 impl Function {
-    fn load_and_check_field_mut_attribute(
+    fn load_struct_api_kind(
         handle: &move_binary_format::file_format::FunctionHandle,
-    ) -> Option<u16> {
-        let mut borrow_field_mut_api_offset_opt = None;
-        for attr in &handle.attributes {
-            if let FunctionAttribute::BorrowFieldMutable(offset) = attr {
-                borrow_field_mut_api_offset_opt = Some(*offset);
-                break;
-            }
+    ) -> Option<StructApiKind> {
+        if handle.attributes.iter().any(|a| {
+            matches!(
+                a,
+                FunctionAttribute::Pack | FunctionAttribute::PackVariant(_)
+            )
+        }) {
+            return Some(StructApiKind::Pack);
         }
-        borrow_field_mut_api_offset_opt
+        handle.attributes.iter().find_map(|a| {
+            if let FunctionAttribute::BorrowFieldMutable(offset) = a {
+                Some(StructApiKind::BorrowFieldMut(*offset))
+            } else {
+                None
+            }
+        })
     }
 
     pub(crate) fn new(
@@ -700,8 +722,6 @@ impl Function {
             &handle.access_specifiers,
         )?;
 
-        let borrow_field_mut_api_at_offset = Self::load_and_check_field_mut_attribute(handle);
-
         Ok(Self {
             file_format_version: module.version(),
             index,
@@ -718,14 +738,9 @@ impl Function {
             param_tys,
             access_specifier,
             is_persistent: handle.attributes.contains(&FunctionAttribute::Persistent),
-            borrow_field_mut_api_at_offset,
             has_module_reentrancy_lock: handle.attributes.contains(&FunctionAttribute::ModuleLock),
             is_trusted,
-            is_pack_or_pack_variant: handle.attributes.contains(&FunctionAttribute::Pack)
-                || handle
-                    .attributes
-                    .iter()
-                    .any(|a| matches!(a, FunctionAttribute::PackVariant(_))),
+            struct_api: Self::load_struct_api_kind(handle),
         })
     }
 
@@ -773,7 +788,10 @@ impl Function {
     }
 
     pub fn borrow_field_mut_api_at_offset(&self) -> Option<MemberCount> {
-        self.borrow_field_mut_api_at_offset
+        match self.struct_api {
+            Some(StructApiKind::BorrowFieldMut(offset)) => Some(offset),
+            _ => None,
+        }
     }
 
     pub fn has_module_lock(&self) -> bool {
@@ -789,7 +807,7 @@ impl Function {
     }
 
     pub fn is_pack_or_pack_variant(&self) -> bool {
-        self.is_pack_or_pack_variant
+        matches!(self.struct_api, Some(StructApiKind::Pack))
     }
 
     pub fn is_friend(&self) -> bool {
