@@ -2,7 +2,7 @@
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 use super::{golden_output::GoldenOutputs, pretty};
-use aptos_api::{attach_poem_to_runtime, BasicError, Context};
+use aptos_api::{attach_axum_to_runtime, attach_poem_to_runtime, BasicError, Context};
 use aptos_api_types::{
     mime_types, HexEncodedBytes, TransactionOnChainData, X_APTOS_CHAIN_ID,
     X_APTOS_LEDGER_TIMESTAMP, X_APTOS_LEDGER_VERSION,
@@ -215,10 +215,10 @@ pub fn new_test_context_inner(
 
     // Configure the testing depending on which API version we're testing.
     let runtime_handle = tokio::runtime::Handle::current();
-    let poem_address =
-        attach_poem_to_runtime(&runtime_handle, context.clone(), &node_config, true, None)
-            .expect("Failed to attach poem to runtime");
-    let api_specific_config = ApiSpecificConfig::V1(poem_address);
+    let axum_address =
+        attach_axum_to_runtime(&runtime_handle, context.clone(), &node_config, true, None)
+            .expect("Failed to attach axum to runtime");
+    let api_specific_config = ApiSpecificConfig::V1(axum_address);
 
     TestContext::new(
         context,
@@ -1267,31 +1267,25 @@ impl TestContext {
     }
 
     pub async fn get(&self, path: &str) -> Value {
-        self.execute(
-            warp::test::request()
-                .method("GET")
-                .path(&self.prepend_path(path)),
-        )
-        .await
+        self.execute_reqwest("GET", path, None, None).await
     }
 
     pub async fn post(&self, path: &str, body: Value) -> Value {
-        self.execute(
-            warp::test::request()
-                .method("POST")
-                .path(&self.prepend_path(path))
-                .json(&body),
+        self.execute_reqwest(
+            "POST",
+            path,
+            Some(serde_json::to_vec(&body).unwrap()),
+            Some("application/json"),
         )
         .await
     }
 
     pub async fn post_bcs_txn(&self, path: &str, body: impl AsRef<[u8]>) -> Value {
-        self.execute(
-            warp::test::request()
-                .method("POST")
-                .path(&self.prepend_path(path))
-                .header(CONTENT_TYPE, mime_types::BCS_SIGNED_TRANSACTION)
-                .body(body),
+        self.execute_reqwest(
+            "POST",
+            path,
+            Some(body.as_ref().to_vec()),
+            Some(mime_types::BCS_SIGNED_TRANSACTION),
         )
         .await
     }
@@ -1302,8 +1296,6 @@ impl TestContext {
         }
     }
 
-    // Currently we still run our tests with warp.
-    // https://github.com/aptos-labs/aptos-core/issues/2966
     pub fn get_routes_with_poem(
         &self,
         poem_address: SocketAddr,
@@ -1339,6 +1331,81 @@ impl TestContext {
             );
             assert_eq!(
                 headers[X_APTOS_LEDGER_TIMESTAMP],
+                ledger_info.timestamp().to_string()
+            );
+        }
+
+        body
+    }
+
+    async fn execute_reqwest(
+        &self,
+        method: &str,
+        path: &str,
+        body: Option<Vec<u8>>,
+        content_type: Option<&str>,
+    ) -> Value {
+        self.wait_for_internal_indexer_caught_up().await;
+
+        let address = match self.api_specific_config {
+            ApiSpecificConfig::V1(addr) => addr,
+        };
+        let url = format!(
+            "http://{}{}{}",
+            address,
+            self.api_specific_config.get_api_base_path(),
+            path
+        );
+
+        let client = reqwest::Client::new();
+        let mut request = match method {
+            "GET" => client.get(&url),
+            "POST" => client.post(&url),
+            _ => panic!("Unsupported HTTP method: {}", method),
+        };
+
+        if let Some(ct) = content_type {
+            request = request.header("Content-Type", ct);
+        }
+        if let Some(body_bytes) = body {
+            request = request.body(body_bytes);
+        }
+
+        let resp = request.send().await.expect("Failed to send request");
+        let status = resp.status().as_u16();
+        let headers = resp.headers().clone();
+
+        self.api_specific_config.assert_content_type(&headers);
+
+        let body_bytes = resp.bytes().await.expect("Failed to read response body");
+        let body: Value = serde_json::from_slice(&body_bytes).expect("response body is JSON");
+
+        assert_eq!(
+            self.expect_status_code, status,
+            "\nresponse: {}",
+            pretty(&body)
+        );
+
+        if self.expect_status_code < 300 {
+            let ledger_info = self.get_latest_ledger_info();
+            assert_eq!(
+                headers.get(X_APTOS_CHAIN_ID).unwrap().to_str().unwrap(),
+                "4"
+            );
+            assert_eq!(
+                headers
+                    .get(X_APTOS_LEDGER_VERSION)
+                    .unwrap()
+                    .to_str()
+                    .unwrap(),
+                ledger_info.version().to_string()
+            );
+            assert_eq!(
+                headers
+                    .get(X_APTOS_LEDGER_TIMESTAMP)
+                    .unwrap()
+                    .to_str()
+                    .unwrap(),
                 ledger_info.timestamp().to_string()
             );
         }
