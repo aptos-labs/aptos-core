@@ -20,8 +20,7 @@ pub fn handle_panic(err: Box<dyn std::any::Any + Send + 'static>) -> Response {
 }
 
 pub async fn handle_404() -> Response {
-    let error =
-        AptosError::new_with_error_code("not found", AptosErrorCode::WebFrameworkError);
+    let error = AptosError::new_with_error_code("not found", AptosErrorCode::WebFrameworkError);
     let json = serde_json::to_vec(&error).unwrap_or_default();
     (
         StatusCode::NOT_FOUND,

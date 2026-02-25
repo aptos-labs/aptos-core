@@ -9,7 +9,6 @@ use aptos_logger::{
     warn, Schema,
 };
 use axum::{
-    body::Body,
     extract::Request,
     http::{header, Method, StatusCode},
     middleware::Next,
@@ -109,11 +108,7 @@ pub async fn logging_middleware(req: Request, next: Next) -> Response {
         .unwrap_or("operation_id_not_set");
 
     HISTOGRAM
-        .with_label_values(&[
-            method.as_str(),
-            operation_id,
-            status.to_string().as_str(),
-        ])
+        .with_label_values(&[method.as_str(), operation_id, status.to_string().as_str()])
         .observe(elapsed.as_secs_f64());
 
     REQUEST_SOURCE_CLIENT

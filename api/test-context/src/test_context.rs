@@ -1282,7 +1282,11 @@ impl TestContext {
         &self,
         path: &str,
         query_params: &str,
-    ) -> (reqwest::StatusCode, reqwest::header::HeaderMap, bytes::Bytes) {
+    ) -> (
+        reqwest::StatusCode,
+        reqwest::header::HeaderMap,
+        bytes::Bytes,
+    ) {
         let address = match self.api_specific_config {
             ApiSpecificConfig::V1(addr) => addr,
         };
@@ -1298,7 +1302,11 @@ impl TestContext {
             }
         );
         let client = reqwest::Client::new();
-        let resp = client.get(&url).send().await.expect("Failed to send request");
+        let resp = client
+            .get(&url)
+            .send()
+            .await
+            .expect("Failed to send request");
         let status = resp.status();
         let headers = resp.headers().clone();
         let body = resp.bytes().await.expect("Failed to read body");
@@ -1410,8 +1418,7 @@ impl TestContext {
         let status = resp.status();
         let headers = resp.headers().clone();
         let body_bytes = resp.bytes().await.expect("Failed to read response body");
-        let body: Value = serde_json::from_slice(&body_bytes)
-            .unwrap_or_else(|_| Value::Null);
+        let body: Value = serde_json::from_slice(&body_bytes).unwrap_or_else(|_| Value::Null);
         (body, status, headers)
     }
 
@@ -1468,15 +1475,17 @@ impl TestContext {
                 method, url, status
             );
         }
-        let body: Value = serde_json::from_slice(&body_bytes)
-            .unwrap_or_else(|e| panic!(
+        let body: Value = serde_json::from_slice(&body_bytes).unwrap_or_else(|e| {
+            panic!(
                 "response body is not JSON: {}. Raw body: {:?}",
                 e,
                 String::from_utf8_lossy(&body_bytes)
-            ));
+            )
+        });
 
         assert_eq!(
-            self.expect_status_code, status,
+            self.expect_status_code,
+            status,
             "\nresponse: {}",
             pretty(&body)
         );
@@ -1488,11 +1497,19 @@ impl TestContext {
                 "4"
             );
             assert_eq!(
-                headers.get("x-aptos-ledger-version").unwrap().to_str().unwrap(),
+                headers
+                    .get("x-aptos-ledger-version")
+                    .unwrap()
+                    .to_str()
+                    .unwrap(),
                 ledger_info.version().to_string()
             );
             assert_eq!(
-                headers.get("x-aptos-ledger-timestampusec").unwrap().to_str().unwrap(),
+                headers
+                    .get("x-aptos-ledger-timestampusec")
+                    .unwrap()
+                    .to_str()
+                    .unwrap(),
                 ledger_info.timestamp().to_string()
             );
         }

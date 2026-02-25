@@ -12,6 +12,7 @@ use axum::{
 use crate::response_axum::AptosErrorResponse;
 
 #[derive(Debug, Clone, Eq, PartialEq)]
+#[allow(dead_code)]
 pub struct BcsPayload(pub Vec<u8>);
 
 impl std::ops::Deref for BcsPayload {
@@ -25,7 +26,10 @@ impl std::ops::Deref for BcsPayload {
 impl<S: Send + Sync> FromRequest<S> for BcsPayload {
     type Rejection = AptosErrorResponse;
 
-    async fn from_request(req: Request<axum::body::Body>, state: &S) -> Result<Self, Self::Rejection> {
+    async fn from_request(
+        req: Request<axum::body::Body>,
+        state: &S,
+    ) -> Result<Self, Self::Rejection> {
         let bytes = Bytes::from_request(req, state).await.map_err(|e| {
             AptosErrorResponse::bad_request(
                 format!("Failed to read request body: {}", e),
@@ -39,11 +43,6 @@ impl<S: Send + Sync> FromRequest<S> for BcsPayload {
 
 impl IntoResponse for BcsPayload {
     fn into_response(self) -> Response {
-        (
-            StatusCode::OK,
-            [(header::CONTENT_TYPE, BCS)],
-            self.0,
-        )
-            .into_response()
+        (StatusCode::OK, [(header::CONTENT_TYPE, BCS)], self.0).into_response()
     }
 }

@@ -814,7 +814,10 @@ impl TransactionsApi {
         operation_id = "estimate_gas_price",
         tag = "ApiTags::Transactions"
     )]
-    pub(crate) async fn estimate_gas_price(&self, accept_type: AcceptType) -> BasicResult<GasEstimation> {
+    pub(crate) async fn estimate_gas_price(
+        &self,
+        accept_type: AcceptType,
+    ) -> BasicResult<GasEstimation> {
         fail_point_poem("endpoint_encode_submission")?;
         self.context
             .check_api_output_enabled("Estimate gas price", &accept_type)?;
@@ -851,7 +854,11 @@ impl TransactionsApi {
     const MAX_SIGNED_TRANSACTION_DEPTH: usize = 16;
 
     /// List all transactions paging by ledger version
-    pub(crate) fn list(&self, accept_type: &AcceptType, page: Page) -> BasicResultWith404<Vec<Transaction>> {
+    pub(crate) fn list(
+        &self,
+        accept_type: &AcceptType,
+        page: Page,
+    ) -> BasicResultWith404<Vec<Transaction>> {
         let latest_ledger_info = self.context.get_latest_ledger_info()?;
         let ledger_version = latest_ledger_info.version();
 

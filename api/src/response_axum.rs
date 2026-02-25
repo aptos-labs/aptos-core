@@ -1,7 +1,7 @@
 // Copyright (c) Aptos Foundation
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
-use crate::{accept_type::AcceptType, bcs_payload::Bcs};
+use crate::accept_type::AcceptType;
 use aptos_api_types::{AptosError, AptosErrorCode, LedgerInfo};
 use axum::{
     http::{header, StatusCode},
@@ -108,12 +108,11 @@ impl<T: Serialize + Send> AptosResponse<T> {
         mut self,
         cursor: Option<aptos_types::state_store::state_key::StateKey>,
     ) -> Self {
-        self.cursor = cursor.map(|c| {
-            aptos_api_types::StateKeyWrapper::from(c).to_string()
-        });
+        self.cursor = cursor.map(|c| aptos_api_types::StateKeyWrapper::from(c).to_string());
         self
     }
 
+    #[allow(clippy::result_large_err)]
     pub fn try_from_rust_value(
         value: T,
         ledger_info: &LedgerInfo,
@@ -137,10 +136,12 @@ impl<T: Serialize + Send> AptosResponse<T> {
         }
     }
 
+    #[allow(clippy::result_large_err)]
     pub fn try_from_json(value: T, ledger_info: &LedgerInfo) -> Result<Self, AptosErrorResponse> {
         Ok(Self::new_json(StatusCode::OK, value, ledger_info))
     }
 
+    #[allow(clippy::result_large_err)]
     pub fn try_from_bcs<B: Serialize>(
         value: B,
         ledger_info: &LedgerInfo,
@@ -151,6 +152,7 @@ impl<T: Serialize + Send> AptosResponse<T> {
         Ok(Self::new_bcs(StatusCode::OK, bytes, ledger_info))
     }
 
+    #[allow(clippy::result_large_err)]
     pub fn try_from_encoded(
         value: Vec<u8>,
         ledger_info: &LedgerInfo,
@@ -180,17 +182,12 @@ impl<T: Serialize + Send> IntoResponse for AptosResponse<T> {
                 )
                     .into_response()
             },
-            AptosResponseBody::Bcs(bytes) => {
-                (
-                    self.status,
-                    [(
-                        header::CONTENT_TYPE,
-                        aptos_api_types::mime_types::BCS,
-                    )],
-                    bytes,
-                )
-                    .into_response()
-            },
+            AptosResponseBody::Bcs(bytes) => (
+                self.status,
+                [(header::CONTENT_TYPE, aptos_api_types::mime_types::BCS)],
+                bytes,
+            )
+                .into_response(),
         };
 
         for (key, value) in headers {
@@ -214,11 +211,7 @@ pub struct AptosErrorResponse {
 }
 
 impl AptosErrorResponse {
-    pub fn new(
-        status: StatusCode,
-        error: AptosError,
-        ledger_info: Option<&LedgerInfo>,
-    ) -> Self {
+    pub fn new(status: StatusCode, error: AptosError, ledger_info: Option<&LedgerInfo>) -> Self {
         Self {
             status,
             error,
@@ -552,10 +545,7 @@ pub fn block_not_found_by_version(
     )
 }
 
-pub fn block_pruned_by_height(
-    block_height: u64,
-    ledger_info: &LedgerInfo,
-) -> AptosErrorResponse {
+pub fn block_pruned_by_height(block_height: u64, ledger_info: &LedgerInfo) -> AptosErrorResponse {
     AptosErrorResponse::gone(
         format!("Block({}) has been pruned", block_height),
         AptosErrorCode::BlockPruned,
@@ -627,8 +617,8 @@ impl From<crate::transactions::SubmitTransactionError> for AptosErrorResponse {
 }
 
 fn poem_error_response_to_axum(resp: poem::Response) -> AptosErrorResponse {
-    let status_code = StatusCode::from_u16(resp.status().as_u16())
-        .unwrap_or(StatusCode::INTERNAL_SERVER_ERROR);
+    let status_code =
+        StatusCode::from_u16(resp.status().as_u16()).unwrap_or(StatusCode::INTERNAL_SERVER_ERROR);
     // poem's Body for error responses is typically constructed from a JSON serialization
     // and should be available synchronously. We use block_in_place to safely extract it
     // from within a tokio runtime context.
@@ -638,10 +628,7 @@ fn poem_error_response_to_axum(resp: poem::Response) -> AptosErrorResponse {
             .unwrap_or_default()
     });
     let error: AptosError = serde_json::from_slice(&body_bytes).unwrap_or_else(|_| {
-        AptosError::new_with_error_code(
-            "Unknown error",
-            AptosErrorCode::InternalError,
-        )
+        AptosError::new_with_error_code("Unknown error", AptosErrorCode::InternalError)
     });
     AptosErrorResponse {
         status: status_code,
@@ -690,7 +677,12 @@ impl crate::response::BadRequestError for AptosErrorResponse {
         vm_status: aptos_types::vm_status::StatusCode,
         ledger_info: &LedgerInfo,
     ) -> Self {
-        AptosErrorResponse::bad_request_with_vm_status(err, error_code, vm_status, Some(ledger_info))
+        AptosErrorResponse::bad_request_with_vm_status(
+            err,
+            error_code,
+            vm_status,
+            Some(ledger_info),
+        )
     }
 
     fn bad_request_from_aptos_error(aptos_error: AptosError, ledger_info: &LedgerInfo) -> Self {
@@ -911,8 +903,7 @@ impl crate::response::ServiceUnavailableError for AptosErrorResponse {
         vm_status: aptos_types::vm_status::StatusCode,
         ledger_info: &LedgerInfo,
     ) -> Self {
-        let mut resp =
-            AptosErrorResponse::service_unavailable(err, error_code, Some(ledger_info));
+        let mut resp = AptosErrorResponse::service_unavailable(err, error_code, Some(ledger_info));
         resp.error = AptosError::new_with_vm_status(resp.error.message, error_code, vm_status);
         resp
     }
@@ -966,8 +957,7 @@ impl crate::response::PayloadTooLargeError for AptosErrorResponse {
         vm_status: aptos_types::vm_status::StatusCode,
         ledger_info: &LedgerInfo,
     ) -> Self {
-        let mut resp =
-            AptosErrorResponse::payload_too_large(err, error_code, Some(ledger_info));
+        let mut resp = AptosErrorResponse::payload_too_large(err, error_code, Some(ledger_info));
         resp.error = AptosError::new_with_vm_status(resp.error.message, error_code, vm_status);
         resp
     }
@@ -1007,8 +997,7 @@ impl crate::response::InsufficientStorageError for AptosErrorResponse {
         ledger_info: Option<&LedgerInfo>,
     ) -> Self {
         if let Some(vs) = vm_status {
-            let mut resp =
-                AptosErrorResponse::insufficient_storage(err, error_code, ledger_info);
+            let mut resp = AptosErrorResponse::insufficient_storage(err, error_code, ledger_info);
             resp.error = AptosError::new_with_vm_status(resp.error.message, error_code, vs);
             resp
         } else {
@@ -1022,8 +1011,7 @@ impl crate::response::InsufficientStorageError for AptosErrorResponse {
         vm_status: aptos_types::vm_status::StatusCode,
         ledger_info: &LedgerInfo,
     ) -> Self {
-        let mut resp =
-            AptosErrorResponse::insufficient_storage(err, error_code, Some(ledger_info));
+        let mut resp = AptosErrorResponse::insufficient_storage(err, error_code, Some(ledger_info));
         resp.error = AptosError::new_with_vm_status(resp.error.message, error_code, vm_status);
         resp
     }

@@ -245,22 +245,23 @@ async fn entry_function_payload(context: &mut TestContext) -> Vec<serde_json::Va
     // Patches the serde_json result is easier comparing to implement a customized serializer.
     fn patch(raw_txn_json: &mut serde_json::Value, use_txn_payload_v2_format: bool) {
         let args = if use_txn_payload_v2_format {
-            visit_json_field(raw_txn_json, &[
-                "raw_txn",
-                "payload",
-                "Payload",
-                "V1",
-                "executable",
-                "EntryFunction",
-                "args",
-            ])
+            visit_json_field(
+                raw_txn_json,
+                &[
+                    "raw_txn",
+                    "payload",
+                    "Payload",
+                    "V1",
+                    "executable",
+                    "EntryFunction",
+                    "args",
+                ],
+            )
         } else {
-            visit_json_field(raw_txn_json, &[
-                "raw_txn",
-                "payload",
-                "EntryFunction",
-                "args",
-            ])
+            visit_json_field(
+                raw_txn_json,
+                &["raw_txn", "payload", "EntryFunction", "args"],
+            )
         };
 
         let mut hex_args: Vec<serde_json::Value> = vec![];
@@ -306,30 +307,36 @@ async fn test_entry_function_payload() {
 async fn script_payload(context: &mut TestContext) -> Vec<serde_json::Value> {
     fn patch(raw_txn_json: &mut serde_json::Value, use_txn_payload_v2_format: bool) {
         let code = if use_txn_payload_v2_format {
-            visit_json_field(raw_txn_json, &[
-                "raw_txn",
-                "payload",
-                "Payload",
-                "V1",
-                "executable",
-                "Script",
-                "code",
-            ])
+            visit_json_field(
+                raw_txn_json,
+                &[
+                    "raw_txn",
+                    "payload",
+                    "Payload",
+                    "V1",
+                    "executable",
+                    "Script",
+                    "code",
+                ],
+            )
         } else {
             visit_json_field(raw_txn_json, &["raw_txn", "payload", "Script", "code"])
         };
         *code = byte_array_to_hex(code);
 
         let args = if use_txn_payload_v2_format {
-            visit_json_field(raw_txn_json, &[
-                "raw_txn",
-                "payload",
-                "Payload",
-                "V1",
-                "executable",
-                "Script",
-                "args",
-            ])
+            visit_json_field(
+                raw_txn_json,
+                &[
+                    "raw_txn",
+                    "payload",
+                    "Payload",
+                    "V1",
+                    "executable",
+                    "Script",
+                    "args",
+                ],
+            )
         } else {
             visit_json_field(raw_txn_json, &["raw_txn", "payload", "Script", "args"])
         };

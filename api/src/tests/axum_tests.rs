@@ -53,14 +53,12 @@ async fn test_axum_spec_json() {
     let context = new_test_context(current_function_name!());
     let (status, headers, body) = context.get_raw("/spec.json", "").await;
     assert_eq!(status.as_u16(), 200);
-    assert!(
-        headers
-            .get("content-type")
-            .unwrap()
-            .to_str()
-            .unwrap()
-            .contains("application/json")
-    );
+    assert!(headers
+        .get("content-type")
+        .unwrap()
+        .to_str()
+        .unwrap()
+        .contains("application/json"));
     let spec: serde_json::Value = serde_json::from_slice(&body).unwrap();
     assert!(spec.get("openapi").is_some() || spec.get("info").is_some());
 }
@@ -292,10 +290,7 @@ async fn test_axum_view_function_invalid() {
         "arguments": [],
         "type_arguments": [],
     });
-    let resp = context
-        .expect_status_code(400)
-        .post("/view", request)
-        .await;
+    let resp = context.expect_status_code(400).post("/view", request).await;
     assert!(resp.get("message").is_some());
 }
 

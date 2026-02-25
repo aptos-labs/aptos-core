@@ -191,12 +191,16 @@ async fn test_multisig_transaction_to_update_owners(
         .await;
 
     // There should be 4 owners now.
-    assert_owners(&context, multisig_account, vec![
-        owner_account_1.address(),
-        owner_account_2.address(),
-        owner_account_3.address(),
-        owner_account_4.address(),
-    ])
+    assert_owners(
+        &context,
+        multisig_account,
+        vec![
+            owner_account_1.address(),
+            owner_account_2.address(),
+            owner_account_3.address(),
+            owner_account_4.address(),
+        ],
+    )
     .await;
 
     let remove_owners_payload = bcs::to_bytes(&MultisigTransactionPayload::EntryFunction(
@@ -224,11 +228,15 @@ async fn test_multisig_transaction_to_update_owners(
         .execute_multisig_transaction(owner_account_1, multisig_account, 202)
         .await;
     // There should be 3 owners now that owner 4 has been kicked out.
-    assert_owners(&context, multisig_account, vec![
-        owner_account_1.address(),
-        owner_account_2.address(),
-        owner_account_3.address(),
-    ])
+    assert_owners(
+        &context,
+        multisig_account,
+        vec![
+            owner_account_1.address(),
+            owner_account_2.address(),
+            owner_account_3.address(),
+        ],
+    )
     .await;
 }
 
