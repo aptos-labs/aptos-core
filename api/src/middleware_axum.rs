@@ -48,7 +48,7 @@ pub async fn logging_middleware(req: Request, next: Next) -> Response {
 
     let method = req.method().clone();
     let path = req.uri().path().to_string();
-    let path_for_metrics = path.clone();
+    let route_pattern = normalize_path_for_metrics(&path);
     let referer = req
         .headers()
         .get(header::REFERER)
@@ -106,7 +106,7 @@ pub async fn logging_middleware(req: Request, next: Next) -> Response {
         .extensions()
         .get::<OperationId>()
         .map(|op| op.0.as_str())
-        .unwrap_or_else(|| path_for_metrics.as_str());
+        .unwrap_or_else(|| route_pattern.as_str());
 
     HISTOGRAM
         .with_label_values(&[method.as_str(), operation_id, status.to_string().as_str()])
@@ -190,6 +190,39 @@ fn determine_request_source_client(aptos_client: &Option<String>) -> &str {
         Some(capture) => capture.as_str(),
         None => REQUEST_SOURCE_CLIENT_UNKNOWN,
     }
+}
+
+/// Normalizes a raw request path into a stable route template for metrics labels.
+/// Replaces variable path segments (hex addresses, numeric IDs, hashes) with
+/// placeholders to prevent cardinality explosion in Prometheus metrics.
+fn normalize_path_for_metrics(path: &str) -> String {
+    static HEX_ADDR: Lazy<Regex> = Lazy::new(|| Regex::new(r"0x[0-9a-fA-F]+").unwrap());
+    static NUMERIC: Lazy<Regex> = Lazy::new(|| Regex::new(r"^[0-9]+$").unwrap());
+
+    let segments: Vec<&str> = path.split('/').collect();
+    let mut result = Vec::with_capacity(segments.len());
+
+    for (i, seg) in segments.iter().enumerate() {
+        if seg.is_empty() {
+            result.push(*seg);
+            continue;
+        }
+        if HEX_ADDR.is_match(seg) {
+            result.push(":address");
+        } else if NUMERIC.is_match(seg) {
+            // Numeric segments after known path prefixes get named placeholders
+            let prev = if i > 0 { segments[i - 1] } else { "" };
+            match prev {
+                "by_height" => result.push(":block_height"),
+                "by_version" => result.push(":version"),
+                "events" => result.push(":creation_number"),
+                _ => result.push(":id"),
+            }
+        } else {
+            result.push(seg);
+        }
+    }
+    result.join("/")
 }
 
 #[derive(Schema)]

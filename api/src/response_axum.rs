@@ -2,24 +2,17 @@
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 use crate::accept_type::AcceptType;
-use aptos_api_types::{AptosError, AptosErrorCode, LedgerInfo};
+use aptos_api_types::{
+    AptosError, AptosErrorCode, LedgerInfo, X_APTOS_BLOCK_HEIGHT, X_APTOS_CHAIN_ID, X_APTOS_CURSOR,
+    X_APTOS_EPOCH, X_APTOS_GAS_USED, X_APTOS_LEDGER_OLDEST_VERSION, X_APTOS_LEDGER_TIMESTAMP,
+    X_APTOS_LEDGER_VERSION, X_APTOS_OLDEST_BLOCK_HEIGHT, X_APTOS_TXN_ENCRYPTION_KEY,
+};
 use axum::{
     http::{header, StatusCode},
     response::{IntoResponse, Response},
 };
 use serde::Serialize;
 use std::fmt::Display;
-
-const X_APTOS_CHAIN_ID: &str = "X-Aptos-Chain-Id";
-const X_APTOS_LEDGER_VERSION: &str = "X-Aptos-Ledger-Version";
-const X_APTOS_LEDGER_OLDEST_VERSION: &str = "X-Aptos-Ledger-Oldest-Version";
-const X_APTOS_LEDGER_TIMESTAMP: &str = "X-Aptos-Ledger-TimestampUsec";
-const X_APTOS_EPOCH: &str = "X-Aptos-Epoch";
-const X_APTOS_BLOCK_HEIGHT: &str = "X-Aptos-Block-Height";
-const X_APTOS_OLDEST_BLOCK_HEIGHT: &str = "X-Aptos-Oldest-Block-Height";
-const X_APTOS_GAS_USED: &str = "X-Aptos-Gas-Used";
-const X_APTOS_CURSOR: &str = "X-Aptos-Cursor";
-const X_APTOS_TXN_ENCRYPTION_KEY: &str = "X-Aptos-Txn-Encryption-Key";
 
 fn build_ledger_headers(ledger_info: &LedgerInfo) -> Vec<(String, String)> {
     let mut headers = vec![
