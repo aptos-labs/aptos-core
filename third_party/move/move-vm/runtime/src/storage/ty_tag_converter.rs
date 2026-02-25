@@ -147,7 +147,7 @@ pub(crate) struct PricedStructTag {
 /// ```
 /// If thread 3 reads the tag of this enum, the read result is always **deterministic** for the
 /// fixed type parameters used by thread 3.
-pub(crate) struct TypeTagCache {
+pub struct TypeTagCache {
     cache: RwLock<HashMap<StructKey, PricedStructTag>>,
 }
 
@@ -162,6 +162,11 @@ impl TypeTagCache {
     /// Removes all entries from the cache.
     pub(crate) fn flush(&self) {
         self.cache.write().clear();
+    }
+
+    /// Returns the number of entries in the cache.
+    pub fn len(&self) -> usize {
+        self.cache.read().len()
     }
 
     /// Returns cached struct tag and its pseudo-gas cost if it exists, and [None] otherwise.

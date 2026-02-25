@@ -159,7 +159,7 @@ where
         GLOBAL_MODULE_CACHE_SIZE_IN_BYTES.set(module_cache_size_in_bytes as i64);
         GLOBAL_MODULE_CACHE_NUM_MODULES.set(self.module_cache.num_modules() as i64);
 
-        // If module cache stores too many modules, flush it well (together with layouts).
+        // If module cache stores too many modules, flush everything (including layouts).
         if module_cache_size_in_bytes > config.max_module_cache_size_in_bytes {
             self.module_cache.flush_all_caches();
         }
@@ -379,10 +379,13 @@ mod test {
         state_store::{state_key::StateKey, state_value::StateValue, MockStateView},
     };
     use claims::assert_ok;
-    use move_core_types::identifier::Identifier;
+    use move_core_types::{ability::AbilitySet, identifier::Identifier};
     use move_vm_types::{
-        code::{mock_verified_code, MockExtension},
-        loaded_data::runtime_types::StructIdentifier,
+        code::{mock_verified_code, MockDeserializedCode, MockExtension, MockVerifiedCode},
+        loaded_data::{
+            runtime_types::{AbilityInfo, StructIdentifier, Type},
+            struct_name_indexing::StructNameIndex,
+        },
     };
     use std::{
         collections::HashMap,
@@ -413,7 +416,10 @@ mod test {
         assert_eq!(guard.module_cache().num_modules(), 0);
     }
 
-    fn add_struct_identifier<K, D, V, E>(manager: &mut ModuleCacheManager<K, D, V, E>, name: &str)
+    fn add_struct_identifier<K, D, V, E>(
+        manager: &mut ModuleCacheManager<K, D, V, E>,
+        name: &str,
+    ) -> StructNameIndex
     where
         K: Hash + Eq + Clone,
         V: Deref<Target = Arc<D>>,
@@ -429,7 +435,36 @@ mod test {
                 module_id,
                 Identifier::new(name).unwrap()
             ))
-        );
+        )
+    }
+
+    fn add_module_identifier<K, D, V, E>(manager: &mut ModuleCacheManager<K, D, V, E>, name: &str)
+    where
+        K: Hash + Eq + Clone,
+        V: Deref<Target = Arc<D>>,
+        E: WithSize,
+    {
+        let runtime_environment = manager.environment.as_mut().unwrap().runtime_environment();
+        let module_id = ModuleId::new(AccountAddress::ZERO, Identifier::new(name).unwrap());
+        runtime_environment.module_id_pool().intern(module_id);
+    }
+
+    fn add_struct_tags<K, D, V, E>(
+        manager: &mut ModuleCacheManager<K, D, V, E>,
+        idx: StructNameIndex,
+    ) where
+        K: Hash + Eq + Clone,
+        V: Deref<Target = Arc<D>>,
+        E: WithSize,
+    {
+        let ty = Type::Struct {
+            idx,
+            ability: AbilityInfo::struct_(AbilitySet::EMPTY),
+        };
+        let runtime_environment = manager.environment.as_mut().unwrap().runtime_environment();
+        runtime_environment
+            .ty_to_ty_tag(&ty)
+            .expect("Conversion to type tag should succeed");
     }
 
     fn assert_struct_name_index_map_size_eq<K, D, V, E>(
@@ -447,6 +482,30 @@ mod test {
             .runtime_environment()
             .struct_name_index_map_size());
         assert_eq!(actual, expected);
+    }
+
+    fn assert_caches_empty<K, D, V, E>(
+        manager: &ModuleCacheManager<K, D, V, E>,
+        expected_num_interned_tys: usize,
+        expected_num_interned_ty_vecs: usize,
+    ) where
+        K: Hash + Eq + Clone,
+        V: Deref<Target = Arc<D>>,
+        E: WithSize,
+    {
+        assert_eq!(manager.module_cache.num_modules(), 0);
+        let runtime_environment = manager.environment.as_ref().unwrap().runtime_environment();
+        assert_eq!(runtime_environment.module_id_pool().len(), 0);
+        assert_eq!(runtime_environment.struct_name_index_map_size().unwrap(), 0);
+        assert_eq!(
+            runtime_environment.ty_pool().num_interned_tys(),
+            expected_num_interned_tys
+        );
+        assert_eq!(
+            runtime_environment.ty_pool().num_interned_ty_vecs(),
+            expected_num_interned_ty_vecs
+        );
+        assert_eq!(runtime_environment.ty_tag_cache().len(), 0);
     }
 
     fn state_view_with_changed_feature_flag(feature_flag: FeatureFlag) -> MockStateView<StateKey> {
@@ -608,6 +667,171 @@ mod test {
         assert!(manager.environment.is_some());
         assert_eq!(manager.module_cache.num_modules(), 0);
         assert_struct_name_index_map_size_eq(&manager, 0);
+    }
+
+    fn cache_manager_for_test() -> (
+        usize,
+        usize,
+        ModuleCacheManager<i32, MockDeserializedCode, MockVerifiedCode, MockExtension>,
+    ) {
+        let mut manager = ModuleCacheManager::new();
+        let state_view = MockStateView::empty();
+        let config = BlockExecutorModuleCacheLocalConfig {
+            prefetch_framework_code: false,
+            ..Default::default()
+        };
+        let metadata_1 = TransactionSliceMetadata::block_from_u64(0, 1);
+        assert_ok!(manager.check_ready(AptosEnvironment::new(&state_view), &config, metadata_1));
+
+        // Populate caches with 3 modules.
+        manager
+            .module_cache
+            .insert(0, mock_verified_code(0, MockExtension::new(8)));
+        manager
+            .module_cache
+            .insert(1, mock_verified_code(1, MockExtension::new(8)));
+        manager
+            .module_cache
+            .insert(2, mock_verified_code(2, MockExtension::new(8)));
+        assert_eq!(manager.module_cache.num_modules(), 3);
+
+        // 3 modules, 3 structs.
+        add_module_identifier(&mut manager, "foo");
+        add_module_identifier(&mut manager, "bar");
+        let idx = add_struct_identifier(&mut manager, "A");
+        add_struct_tags(&mut manager, idx);
+        let idx = add_struct_identifier(&mut manager, "B");
+        add_struct_tags(&mut manager, idx);
+        let idx = add_struct_identifier(&mut manager, "C");
+        add_struct_tags(&mut manager, idx);
+
+        let runtime_environment = manager.environment.as_mut().unwrap().runtime_environment();
+        let num_interned_tys_before = runtime_environment.ty_pool().num_interned_tys();
+        let num_interned_ty_vecs_before = runtime_environment.ty_pool().num_interned_ty_vecs();
+
+        // Add 3 types and 3 type vectors.
+        runtime_environment
+            .ty_pool()
+            .intern_ty_args(&[Type::Vector(triomphe::Arc::new(Type::Signer)), Type::U8]);
+        runtime_environment
+            .ty_pool()
+            .intern_ty_args(&[Type::U8, Type::Vector(triomphe::Arc::new(Type::Address))]);
+        runtime_environment.ty_pool().intern_ty_args(&[
+            Type::Signer,
+            Type::Vector(triomphe::Arc::new(Type::Vector(triomphe::Arc::new(
+                Type::Address,
+            )))),
+        ]);
+
+        assert_eq!(runtime_environment.module_id_pool().len(), 3);
+        assert_eq!(runtime_environment.struct_name_index_map_size().unwrap(), 3);
+        assert_eq!(
+            runtime_environment.ty_pool().num_interned_tys(),
+            num_interned_tys_before + 3
+        );
+        assert_eq!(
+            runtime_environment.ty_pool().num_interned_ty_vecs(),
+            num_interned_ty_vecs_before + 3
+        );
+        assert_eq!(runtime_environment.ty_tag_cache().len(), 3);
+
+        (
+            num_interned_tys_before,
+            num_interned_ty_vecs_before,
+            manager,
+        )
+    }
+
+    #[test]
+    fn test_too_many_module_ids_flushes_cache() {
+        let (num_interned_tys_before, num_interned_ty_vecs_before, mut manager) =
+            cache_manager_for_test();
+        let state_view = MockStateView::empty();
+        let metadata_2 = TransactionSliceMetadata::block_from_u64(1, 2);
+
+        assert_ok!(manager.check_ready(
+            AptosEnvironment::new(&state_view),
+            &BlockExecutorModuleCacheLocalConfig {
+                prefetch_framework_code: false,
+                max_interned_module_ids: 2,
+                ..Default::default()
+            },
+            metadata_2
+        ));
+        assert_caches_empty(
+            &manager,
+            num_interned_tys_before,
+            num_interned_ty_vecs_before,
+        );
+    }
+
+    #[test]
+    fn test_too_many_struct_names_flushes_cache() {
+        let (num_interned_tys_before, num_interned_ty_vecs_before, mut manager) =
+            cache_manager_for_test();
+        let state_view = MockStateView::empty();
+        let metadata_2 = TransactionSliceMetadata::block_from_u64(1, 2);
+
+        assert_ok!(manager.check_ready(
+            AptosEnvironment::new(&state_view),
+            &BlockExecutorModuleCacheLocalConfig {
+                prefetch_framework_code: false,
+                max_struct_name_index_map_num_entries: 2,
+                ..Default::default()
+            },
+            metadata_2
+        ));
+        assert_caches_empty(
+            &manager,
+            num_interned_tys_before,
+            num_interned_ty_vecs_before,
+        );
+    }
+
+    #[test]
+    fn test_too_many_interned_tys_flushes_cache() {
+        let (num_interned_tys_before, num_interned_ty_vecs_before, mut manager) =
+            cache_manager_for_test();
+        let state_view = MockStateView::empty();
+        let metadata_2 = TransactionSliceMetadata::block_from_u64(1, 2);
+
+        assert_ok!(manager.check_ready(
+            AptosEnvironment::new(&state_view),
+            &BlockExecutorModuleCacheLocalConfig {
+                prefetch_framework_code: false,
+                max_interned_tys: 2,
+                ..Default::default()
+            },
+            metadata_2
+        ));
+        assert_caches_empty(
+            &manager,
+            num_interned_tys_before,
+            num_interned_ty_vecs_before,
+        );
+    }
+
+    #[test]
+    fn test_too_many_interned_ty_vecs_flushes_cache() {
+        let (num_interned_tys_before, num_interned_ty_vecs_before, mut manager) =
+            cache_manager_for_test();
+        let state_view = MockStateView::empty();
+        let metadata_2 = TransactionSliceMetadata::block_from_u64(1, 2);
+
+        assert_ok!(manager.check_ready(
+            AptosEnvironment::new(&state_view),
+            &BlockExecutorModuleCacheLocalConfig {
+                prefetch_framework_code: false,
+                max_interned_ty_vecs: 2,
+                ..Default::default()
+            },
+            metadata_2
+        ));
+        assert_caches_empty(
+            &manager,
+            num_interned_tys_before,
+            num_interned_ty_vecs_before,
+        );
     }
 
     #[test]
