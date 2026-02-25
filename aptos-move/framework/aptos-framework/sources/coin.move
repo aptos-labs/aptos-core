@@ -1006,7 +1006,8 @@ module aptos_framework::coin {
             symbol,
             decimals,
             monitor_supply,
-            false
+            false,
+            option::none(),
         )
     }
 
@@ -1025,7 +1026,8 @@ module aptos_framework::coin {
             symbol,
             decimals,
             monitor_supply,
-            true
+            true,
+            option::none(),
         )
     }
 
@@ -1035,7 +1037,8 @@ module aptos_framework::coin {
         symbol: string::String,
         decimals: u8,
         monitor_supply: bool,
-        parallelizable: bool
+        parallelizable: bool,
+        supply_limit: Option<u128>,
     ): (BurnCapability<CoinType>, FreezeCapability<CoinType>, MintCapability<CoinType>) acquires CoinInfo, CoinConversionMap {
         let account_addr = signer::address_of(account);
         assert_signer_has_permission<CoinType>(account);
@@ -1067,7 +1070,13 @@ module aptos_framework::coin {
             symbol,
             decimals,
             supply: if (monitor_supply) {
-                option::some(optional_aggregator::new(parallelizable))
+                option::some(
+                    if (option::is_some(&supply_limit)) {
+                        optional_aggregator::new_with_limit(*option::borrow(&supply_limit))
+                    } else {
+                        optional_aggregator::new(parallelizable)
+                    }
+                )
             } else {
                 option::none()
             }
@@ -1078,6 +1087,28 @@ module aptos_framework::coin {
             BurnCapability<CoinType> {},
             FreezeCapability<CoinType> {},
             MintCapability<CoinType> {}
+        )
+    }
+
+    /// Same as `initialize_with_parallelizable_supply` but enforces a hard cap on total supply.
+    /// Any mint that would push total supply above `max_supply` octas will abort.
+    /// Only callable by aptos_framework during genesis.
+    public(friend) fun initialize_with_supply_cap<CoinType>(
+        account: &signer,
+        name: string::String,
+        symbol: string::String,
+        decimals: u8,
+        max_supply: u128,
+    ): (BurnCapability<CoinType>, FreezeCapability<CoinType>, MintCapability<CoinType>) acquires CoinInfo, CoinConversionMap {
+        system_addresses::assert_aptos_framework(account);
+        initialize_internal(
+            account,
+            name,
+            symbol,
+            decimals,
+            true,  // monitor_supply
+            false, // parallelizable (not used when supply_limit is set)
+            option::some(max_supply),
         )
     }
 

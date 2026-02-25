@@ -88,6 +88,15 @@ module aptos_framework::optional_aggregator {
         }
     }
 
+    /// Creates a new optional aggregator with a hard supply cap (non-parallelizable).
+    /// The aggregator will abort on any mint attempt that would exceed `limit`.
+    public(friend) fun new_with_limit(limit: u128): OptionalAggregator {
+        OptionalAggregator {
+            aggregator: option::none(),
+            integer: option::some(new_integer(limit)),
+        }
+    }
+
     /// Switches between parallelizable and non-parallelizable implementations.
     public fun switch(_optional_aggregator: &mut OptionalAggregator) {
         abort error::invalid_state(ESWITCH_DEPRECATED)

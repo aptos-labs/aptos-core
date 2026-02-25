@@ -19,6 +19,10 @@ module aptos_framework::aptos_coin {
     /// Cannot find delegation of mint capability to this account
     const EDELEGATION_NOT_FOUND: u64 = 3;
 
+    /// Hard cap on total APT supply: 2.1 billion APT expressed in octas (8 decimal places).
+    /// Any mint that would push the circulating supply above this value will abort.
+    const MAX_APT_SUPPLY: u128 = 210_000_000_000_000_000;
+
     struct AptosCoin has key {}
 
     struct MintCapStore has key {
@@ -39,12 +43,12 @@ module aptos_framework::aptos_coin {
     public(friend) fun initialize(aptos_framework: &signer): (BurnCapability<AptosCoin>, MintCapability<AptosCoin>) {
         system_addresses::assert_aptos_framework(aptos_framework);
 
-        let (burn_cap, freeze_cap, mint_cap) = coin::initialize_with_parallelizable_supply<AptosCoin>(
+        let (burn_cap, freeze_cap, mint_cap) = coin::initialize_with_supply_cap<AptosCoin>(
             aptos_framework,
             string::utf8(b"Aptos Coin"),
             string::utf8(b"APT"),
             8, // decimals
-            true, // monitor_supply
+            MAX_APT_SUPPLY,
         );
 
         // Aptos framework needs mint cap to mint coins to initial validators. This will be revoked once the validators
@@ -78,8 +82,10 @@ module aptos_framework::aptos_coin {
         system_addresses::assert_aptos_framework(aptos_framework);
 
         // Mint the core resource account AptosCoin for gas so it can execute system transactions.
+        // Amount is chosen to be large enough for all test scenarios while staying under
+        // the MAX_APT_SUPPLY hard cap (210_000_000_000_000_000 octas = 2.1B APT).
         let coins = coin::mint<AptosCoin>(
-            18446744073709551615,
+            200_000_000_000_000_000,
             &mint_cap,
         );
         coin::deposit<AptosCoin>(signer::address_of(core_resources), coins);
