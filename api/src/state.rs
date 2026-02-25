@@ -271,7 +271,7 @@ impl StateApi {
     ///
     /// JSON: Convert to MoveResource
     /// BCS: Leave it encoded as the resource
-    fn resource(
+    pub(crate) fn resource(
         &self,
         accept_type: &AcceptType,
         address: Address,

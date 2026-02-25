@@ -814,7 +814,7 @@ impl TransactionsApi {
         operation_id = "estimate_gas_price",
         tag = "ApiTags::Transactions"
     )]
-    async fn estimate_gas_price(&self, accept_type: AcceptType) -> BasicResult<GasEstimation> {
+    pub(crate) async fn estimate_gas_price(&self, accept_type: AcceptType) -> BasicResult<GasEstimation> {
         fail_point_poem("endpoint_encode_submission")?;
         self.context
             .check_api_output_enabled("Estimate gas price", &accept_type)?;
@@ -851,7 +851,7 @@ impl TransactionsApi {
     const MAX_SIGNED_TRANSACTION_DEPTH: usize = 16;
 
     /// List all transactions paging by ledger version
-    fn list(&self, accept_type: &AcceptType, page: Page) -> BasicResultWith404<Vec<Transaction>> {
+    pub(crate) fn list(&self, accept_type: &AcceptType, page: Page) -> BasicResultWith404<Vec<Transaction>> {
         let latest_ledger_info = self.context.get_latest_ledger_info()?;
         let ledger_version = latest_ledger_info.version();
 
@@ -890,7 +890,7 @@ impl TransactionsApi {
         }
     }
 
-    async fn wait_transaction_by_hash_inner(
+    pub(crate) async fn wait_transaction_by_hash_inner(
         &self,
         accept_type: &AcceptType,
         hash: HashValue,
@@ -939,7 +939,7 @@ impl TransactionsApi {
         }
     }
 
-    async fn get_transaction_by_hash_inner(
+    pub(crate) async fn get_transaction_by_hash_inner(
         &self,
         accept_type: &AcceptType,
         hash: HashValue,
@@ -977,7 +977,7 @@ impl TransactionsApi {
         .await
     }
 
-    fn get_transaction_by_version_inner(
+    pub(crate) fn get_transaction_by_version_inner(
         &self,
         accept_type: &AcceptType,
         version: U64,
@@ -1058,7 +1058,7 @@ impl TransactionsApi {
     }
 
     /// Retrieves a transaction by ledger version
-    fn get_by_version(
+    pub(crate) fn get_by_version(
         &self,
         version: u64,
         ledger_info: &LedgerInfo,
@@ -1112,7 +1112,7 @@ impl TransactionsApi {
     }
 
     /// List sequence number based transactions for an account
-    fn list_ordered_txns_by_account(
+    pub(crate) fn list_ordered_txns_by_account(
         &self,
         accept_type: &AcceptType,
         page: Page,
@@ -1144,7 +1144,7 @@ impl TransactionsApi {
     }
 
     /// List transaction summaries of committed transactions of an account
-    fn list_txn_summaries_by_account(
+    pub(crate) fn list_txn_summaries_by_account(
         &self,
         accept_type: &AcceptType,
         address: Address,
@@ -1213,7 +1213,7 @@ impl TransactionsApi {
     }
 
     /// Parses a single signed transaction
-    fn get_signed_transaction(
+    pub(crate) fn get_signed_transaction(
         &self,
         ledger_info: &LedgerInfo,
         data: SubmitTransactionPost,
@@ -1397,7 +1397,7 @@ impl TransactionsApi {
     }
 
     /// Parses a batch of signed transactions
-    fn get_signed_transactions_batch(
+    pub(crate) fn get_signed_transactions_batch(
         &self,
         ledger_info: &LedgerInfo,
         data: SubmitTransactionsBatchPost,
@@ -1498,7 +1498,7 @@ impl TransactionsApi {
     }
 
     /// Submits a single transaction
-    async fn create(
+    pub(crate) async fn create(
         &self,
         accept_type: &AcceptType,
         ledger_info: &LedgerInfo,
@@ -1568,7 +1568,7 @@ impl TransactionsApi {
     }
 
     /// Submits a batch of transactions
-    async fn create_batch(
+    pub(crate) async fn create_batch(
         &self,
         accept_type: &AcceptType,
         ledger_info: &LedgerInfo,
@@ -1844,7 +1844,7 @@ impl TransactionsApi {
         ))
     }
 
-    fn list_auxiliary_infos(
+    pub(crate) fn list_auxiliary_infos(
         &self,
         accept_type: &AcceptType,
         page: Page,

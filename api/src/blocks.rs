@@ -105,7 +105,7 @@ impl BlocksApi {
 }
 
 impl BlocksApi {
-    fn get_by_height(
+    pub(crate) fn get_by_height(
         &self,
         accept_type: AcceptType,
         block_height: u64,
@@ -121,7 +121,7 @@ impl BlocksApi {
         self.render_bcs_block(&accept_type, latest_ledger_info, bcs_block)
     }
 
-    fn get_by_version(
+    pub(crate) fn get_by_version(
         &self,
         accept_type: AcceptType,
         version: u64,

@@ -152,7 +152,7 @@ impl EventsApi {
 
 impl EventsApi {
     /// List events from an [`EventKey`]
-    fn list(
+    pub(crate) fn list(
         &self,
         latest_ledger_info: LedgerInfo,
         accept_type: AcceptType,

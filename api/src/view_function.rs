@@ -92,7 +92,7 @@ impl ViewFunctionApi {
     }
 }
 
-fn view_request(
+pub(crate) fn view_request(
     context: Arc<Context>,
     accept_type: AcceptType,
     request: ViewFunctionRequest,
