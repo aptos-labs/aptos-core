@@ -8,7 +8,7 @@ use crate::{
     service::{DataServiceWrapper, DataServiceWrapperWrapper},
 };
 use anyhow::Result;
-use aptos_indexer_grpc_server_framework::RunnableConfig;
+use aptos_indexer_grpc_server_framework::{tracing_middleware::OtelGrpcLayer, RunnableConfig};
 use aptos_indexer_grpc_utils::{
     config::IndexerGrpcFileStoreConfig, constants::DEFAULT_MAX_TRANSACTION_FILTER_SIZE_BYTES,
 };
@@ -93,6 +93,12 @@ pub struct IndexerGrpcDataServiceConfig {
     pub(crate) max_transaction_filter_size_bytes: usize,
     #[serde(default = "IndexerGrpcDataServiceConfig::default_data_service_response_channel_size")]
     pub data_service_response_channel_size: usize,
+    /// Interval in seconds between stream tracing checkpoint spans.
+    /// Set to 0 to disable checkpoint spans entirely.
+    #[serde(
+        default = "IndexerGrpcDataServiceConfig::default_stream_tracing_checkpoint_interval_secs"
+    )]
+    pub stream_tracing_checkpoint_interval_secs: u64,
 }
 
 impl IndexerGrpcDataServiceConfig {
@@ -102,6 +108,10 @@ impl IndexerGrpcDataServiceConfig {
 
     const fn default_max_transaction_filter_size_bytes() -> usize {
         DEFAULT_MAX_TRANSACTION_FILTER_SIZE_BYTES
+    }
+
+    const fn default_stream_tracing_checkpoint_interval_secs() -> u64 {
+        60
     }
 
     async fn create_live_data_service(
@@ -137,6 +147,7 @@ impl IndexerGrpcDataServiceConfig {
         let chain_id = self.chain_id;
         let config = self.live_data_service_config.clone();
         let max_transaction_filter_size_bytes = self.max_transaction_filter_size_bytes;
+        let checkpoint_interval_secs = self.stream_tracing_checkpoint_interval_secs;
         tasks.push(tokio::task::spawn_blocking(move || {
             LIVE_DATA_SERVICE
                 .get_or_init(|| {
@@ -145,6 +156,7 @@ impl IndexerGrpcDataServiceConfig {
                         config,
                         connection_manager,
                         max_transaction_filter_size_bytes,
+                        checkpoint_interval_secs,
                     )
                 })
                 .run(handler_rx);
@@ -187,6 +199,7 @@ impl IndexerGrpcDataServiceConfig {
         let chain_id = self.chain_id;
         let config = self.historical_data_service_config.clone();
         let max_transaction_filter_size_bytes = self.max_transaction_filter_size_bytes;
+        let checkpoint_interval_secs = self.stream_tracing_checkpoint_interval_secs;
         tasks.push(tokio::task::spawn_blocking(move || {
             HISTORICAL_DATA_SERVICE
                 .get_or_init(|| {
@@ -195,6 +208,7 @@ impl IndexerGrpcDataServiceConfig {
                         config,
                         connection_manager,
                         max_transaction_filter_size_bytes,
+                        checkpoint_interval_secs,
                     )
                 })
                 .run(handler_rx);
@@ -225,12 +239,14 @@ impl RunnableConfig for IndexerGrpcDataServiceConfig {
 
         let mut tasks = vec![];
 
+        let checkpoint_interval_secs = self.stream_tracing_checkpoint_interval_secs;
         let live_data_service = self.create_live_data_service(&mut tasks).await;
         let historical_data_service = self.create_historical_data_service(&mut tasks).await;
 
         let wrapper = Arc::new(DataServiceWrapperWrapper::new(
             live_data_service,
             historical_data_service,
+            checkpoint_interval_secs,
         ));
         let wrapper_service_raw =
             aptos_protos::indexer::v1::raw_data_server::RawDataServer::from_arc(wrapper.clone())
@@ -249,6 +265,7 @@ impl RunnableConfig for IndexerGrpcDataServiceConfig {
 
         let listen_address = self.service_config.listen_address;
         let mut server_builder = Server::builder()
+            .layer(OtelGrpcLayer)
             .http2_keepalive_interval(Some(HTTP2_PING_INTERVAL_DURATION))
             .http2_keepalive_timeout(Some(HTTP2_PING_TIMEOUT_DURATION));
         if let Some(config) = &self.service_config.tls_config {

@@ -1,6 +1,8 @@
 // Copyright (c) Aptos Foundation
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
+pub mod tracing_middleware;
+
 use anyhow::{Context, Result};
 #[cfg(target_os = "linux")]
 use aptos_system_utils::profiling::start_cpu_profiling;
@@ -16,7 +18,7 @@ use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use std::convert::Infallible;
 use std::{panic::PanicHookInfo, path::PathBuf, process};
 use tracing::error;
-use tracing_subscriber::EnvFilter;
+use tracing_subscriber::{layer::SubscriberExt, EnvFilter};
 use warp::{http::Response, reply::Reply, Filter};
 
 /// ServerArgs bootstraps a server with all common pieces. And then triggers the run method for
@@ -171,25 +173,111 @@ fn handle_panic(panic_info: &PanicHookInfo<'_>) {
 /// just logs to stdout. This can be overridden using the `make_writer` parameter.
 /// This can be helpful for custom logging, e.g. logging to different files based on
 /// the origin of the logging.
+///
+/// When `OTEL_EXPORTER_OTLP_ENDPOINT` is set, an OpenTelemetry tracing layer is added
+/// that exports spans via OTLP. The W3C TraceContext propagator is always registered
+/// so that incoming `traceparent` headers are parsed correctly.
 pub fn setup_logging(make_writer: Option<Box<dyn Fn() -> Box<dyn std::io::Write> + Send + Sync>>) {
     let env_filter = EnvFilter::try_from_default_env()
         .or_else(|_| EnvFilter::try_new("info"))
         .unwrap();
 
-    let subscriber = tracing_subscriber::fmt()
+    // Always register the W3C TraceContext propagator so that our middleware can
+    // extract `traceparent`/`tracestate` headers from incoming gRPC requests.
+    opentelemetry::global::set_text_map_propagator(
+        opentelemetry_sdk::propagation::TraceContextPropagator::new(),
+    );
+
+    if std::env::var("OTEL_EXPORTER_OTLP_ENDPOINT").is_ok() {
+        let otel_layer = match init_otel_tracing_layer() {
+            Ok(layer) => layer,
+            Err(e) => {
+                eprintln!("Failed to initialize OpenTelemetry tracing layer: {e:#}");
+                init_logging_without_otel(env_filter, make_writer);
+                return;
+            },
+        };
+
+        let fmt_layer = build_json_fmt_layer(make_writer);
+        let subscriber = tracing_subscriber::registry()
+            .with(env_filter)
+            .with(otel_layer)
+            .with(fmt_layer);
+        tracing::subscriber::set_global_default(subscriber)
+            .expect("Failed to set global tracing subscriber");
+    } else {
+        init_logging_without_otel(env_filter, make_writer);
+    }
+}
+
+fn init_logging_without_otel(
+    env_filter: EnvFilter,
+    make_writer: Option<Box<dyn Fn() -> Box<dyn std::io::Write> + Send + Sync>>,
+) {
+    let fmt_layer = build_json_fmt_layer(make_writer);
+    let subscriber = tracing_subscriber::registry()
+        .with(env_filter)
+        .with(fmt_layer);
+    tracing::subscriber::set_global_default(subscriber)
+        .expect("Failed to set global tracing subscriber");
+}
+
+fn build_json_fmt_layer<S>(
+    make_writer: Option<Box<dyn Fn() -> Box<dyn std::io::Write> + Send + Sync>>,
+) -> Box<dyn tracing_subscriber::Layer<S> + Send + Sync>
+where
+    S: tracing::Subscriber + for<'lookup> tracing_subscriber::registry::LookupSpan<'lookup>,
+{
+    let base = tracing_subscriber::fmt::layer()
         .json()
         .flatten_event(true)
         .with_file(true)
         .with_line_number(true)
         .with_thread_ids(true)
         .with_target(false)
-        .with_thread_names(true)
-        .with_env_filter(env_filter);
+        .with_thread_names(true);
 
     match make_writer {
-        Some(w) => subscriber.with_writer(w).init(),
-        None => subscriber.init(),
+        Some(w) => Box::new(base.with_writer(w)),
+        None => Box::new(base),
     }
+}
+
+fn init_otel_tracing_layer<
+    S: tracing::Subscriber + for<'lookup> tracing_subscriber::registry::LookupSpan<'lookup>,
+>() -> Result<tracing_opentelemetry::OpenTelemetryLayer<S, opentelemetry_sdk::trace::Tracer>> {
+    use opentelemetry::trace::TracerProvider;
+    use opentelemetry_otlp::WithExportConfig;
+
+    // Use HTTP/protobuf transport (port 4318) rather than gRPC (port 4317) to
+    // avoid pulling in a second copy of tonic that conflicts with the workspace's
+    // patched futures-core.
+    let base_endpoint = std::env::var("OTEL_EXPORTER_OTLP_ENDPOINT")
+        .unwrap_or_else(|_| "http://localhost:4318".to_string());
+    let traces_endpoint = format!("{}/v1/traces", base_endpoint.trim_end_matches('/'));
+
+    let exporter = opentelemetry_otlp::SpanExporter::builder()
+        .with_http()
+        .with_endpoint(&traces_endpoint)
+        .build()
+        .context("Failed to build OTLP span exporter")?;
+
+    let tracer_provider = opentelemetry_sdk::trace::SdkTracerProvider::builder()
+        .with_batch_exporter(exporter)
+        .with_resource(
+            opentelemetry_sdk::Resource::builder_empty()
+                .with_service_name(
+                    std::env::var("OTEL_SERVICE_NAME")
+                        .unwrap_or_else(|_| "indexer-grpc".to_string()),
+                )
+                .build(),
+        )
+        .build();
+
+    opentelemetry::global::set_tracer_provider(tracer_provider.clone());
+
+    let tracer = tracer_provider.tracer("indexer-grpc");
+    Ok(tracing_opentelemetry::layer().with_tracer(tracer))
 }
 
 /// Register readiness and liveness probes and set up metrics endpoint.
