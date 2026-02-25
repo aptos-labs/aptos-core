@@ -1270,6 +1270,41 @@ impl TestContext {
         self.execute_reqwest("GET", path, None, None).await
     }
 
+    pub async fn get_with_headers(
+        &self,
+        path: &str,
+    ) -> (Value, reqwest::StatusCode, reqwest::header::HeaderMap) {
+        self.execute_reqwest_with_headers("GET", path, None, None)
+            .await
+    }
+
+    pub async fn get_raw(
+        &self,
+        path: &str,
+        query_params: &str,
+    ) -> (reqwest::StatusCode, reqwest::header::HeaderMap, bytes::Bytes) {
+        let address = match self.api_specific_config {
+            ApiSpecificConfig::V1(addr) => addr,
+        };
+        let url = format!(
+            "http://{}{}{}{}",
+            address,
+            self.api_specific_config.get_api_base_path(),
+            path,
+            if query_params.is_empty() {
+                String::new()
+            } else {
+                format!("?{}", query_params)
+            }
+        );
+        let client = reqwest::Client::new();
+        let resp = client.get(&url).send().await.expect("Failed to send request");
+        let status = resp.status();
+        let headers = resp.headers().clone();
+        let body = resp.bytes().await.expect("Failed to read body");
+        (status, headers, body)
+    }
+
     pub async fn post(&self, path: &str, body: Value) -> Value {
         self.execute_reqwest(
             "POST",
@@ -1336,6 +1371,48 @@ impl TestContext {
         }
 
         body
+    }
+
+    async fn execute_reqwest_with_headers(
+        &self,
+        method: &str,
+        path: &str,
+        body: Option<Vec<u8>>,
+        content_type: Option<&str>,
+    ) -> (Value, reqwest::StatusCode, reqwest::header::HeaderMap) {
+        self.wait_for_internal_indexer_caught_up().await;
+
+        let address = match self.api_specific_config {
+            ApiSpecificConfig::V1(addr) => addr,
+        };
+        let url = format!(
+            "http://{}{}{}",
+            address,
+            self.api_specific_config.get_api_base_path(),
+            path
+        );
+
+        let client = reqwest::Client::new();
+        let mut request = match method {
+            "GET" => client.get(&url),
+            "POST" => client.post(&url),
+            _ => panic!("Unsupported HTTP method: {}", method),
+        };
+
+        if let Some(ct) = content_type {
+            request = request.header("Content-Type", ct);
+        }
+        if let Some(body_bytes) = body {
+            request = request.body(body_bytes);
+        }
+
+        let resp = request.send().await.expect("Failed to send request");
+        let status = resp.status();
+        let headers = resp.headers().clone();
+        let body_bytes = resp.bytes().await.expect("Failed to read response body");
+        let body: Value = serde_json::from_slice(&body_bytes)
+            .unwrap_or_else(|_| Value::Null);
+        (body, status, headers)
     }
 
     async fn execute_reqwest(
