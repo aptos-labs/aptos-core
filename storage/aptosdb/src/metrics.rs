@@ -137,7 +137,7 @@ make_thread_local_histogram_vec!(
     // metric description
     "Latency of node cache.",
     // metric labels (dimensions)
-    &["tag", "name"],
+    &["tag", "name", "db_type"],
     exponential_buckets(/*start=*/ 1e-9, /*factor=*/ 2.0, /*count=*/ 30).unwrap(),
 );
 
