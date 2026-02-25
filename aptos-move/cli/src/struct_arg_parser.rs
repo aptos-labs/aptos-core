@@ -356,7 +356,7 @@ impl StructArgParser {
                 ))
             })?;
             let (variant, fields_map) = Self::convert_option_array_to_enum_format(array)?;
-            self.construct_enum_argument(struct_tag, variant, &fields_map, depth + 1)
+            self.construct_enum_argument(struct_tag, variant, &fields_map, depth)
                 .await
         } else if value.is_object() {
             // New enum format: {"None": {}} or {"Some": {"0": value}}
@@ -372,7 +372,7 @@ impl StructArgParser {
                 })?;
                 if let Some(fields_obj) = variant_fields.as_object() {
                     return self
-                        .construct_enum_argument(struct_tag, variant_name, fields_obj, depth + 1)
+                        .construct_enum_argument(struct_tag, variant_name, fields_obj, depth)
                         .await;
                 }
             }
@@ -700,6 +700,12 @@ impl StructArgParser {
     }
 
     /// Construct an Option<T> argument using vector encoding for backward compatibility.
+    ///
+    /// Depth tracking: `depth` is the depth of the Option container itself. The inner
+    /// value is parsed at `depth + 1`, consistent with how `parse_vector` increments depth
+    /// for vector elements. This mirrors the pattern:
+    ///   - `parse_vector(depth)` → `parse_value_by_type(depth + 1)` for each element
+    ///   - `construct_option_argument_from_array(depth)` → `parse_value_by_type(depth + 1)` for Some value
     async fn construct_option_argument_from_array(
         &self,
         struct_tag: &StructTag,
@@ -742,7 +748,7 @@ impl StructArgParser {
                 encode_uleb128(1, &mut result); // Vector length = 1
 
                 let encoded_value = self
-                    .parse_value_by_type(&inner_type, &field_values[0], depth)
+                    .parse_value_by_type(&inner_type, &field_values[0], depth + 1)
                     .await?;
                 result.extend(encoded_value);
                 Ok(result)
