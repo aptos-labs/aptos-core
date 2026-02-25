@@ -347,7 +347,11 @@ impl<S: TShare> RandStore<S> {
             .rand_map
             .entry(round)
             .or_insert_with(|| RandItem::new(self.author, PathType::Slow));
-        rand_item.add_metadata(&self.rand_config, rand_metadata.clone(), rand_check_future.clone());
+        rand_item.add_metadata(
+            &self.rand_config,
+            rand_metadata.clone(),
+            rand_check_future.clone(),
+        );
         rand_item.try_aggregate(&self.rand_config, self.result_tx.clone());
         // fast path
         if let (Some(fast_rand_map), Some(fast_rand_config)) =
