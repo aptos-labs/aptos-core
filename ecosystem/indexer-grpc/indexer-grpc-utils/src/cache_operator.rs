@@ -304,7 +304,7 @@ impl<T: redis::aio::ConnectionLike + Send + Clone> CacheOperator<T> {
         );
 
         let redis_result: RedisResult<()> =
-            redis_pipeline.query_async::<_, _>(&mut self.conn).await;
+            redis_pipeline.query_async::<_>(&mut self.conn).await;
 
         match redis_result {
             Ok(_) => Ok(()),
@@ -538,17 +538,23 @@ mod tests {
         let mut buf = vec![];
         transactions[0].encode(&mut buf).unwrap();
         let encoded_proto_data = base64::encode(&buf);
+        let evicted_version = version - CACHE_SIZE_EVICTION_LOWER_BOUND;
         let mut redis_pipeline = redis::pipe();
         redis_pipeline
             .cmd("SET")
             .arg(version.to_string())
             .arg(encoded_proto_data)
             .arg("EX")
-            .arg(get_ttl_in_seconds(1));
+            .arg(get_ttl_in_seconds(1))
+            .ignore();
         redis_pipeline
             .cmd("DEL")
-            .arg(version - CACHE_SIZE_EVICTION_LOWER_BOUND);
-        let cmds = vec![MockCmd::new(redis_pipeline, Ok("ok"))];
+            .arg(evicted_version.to_string())
+            .ignore();
+        let cmds = vec![MockCmd::with_values(
+            redis_pipeline,
+            Ok(vec!["ok", "1"]),
+        )];
         let mock_connection = MockRedisConnection::new(cmds);
         let mut cache_operator: CacheOperator<MockRedisConnection> =
             CacheOperator::new(mock_connection, StorageFormat::Base64UncompressedProto);

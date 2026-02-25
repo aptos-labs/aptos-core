@@ -111,7 +111,7 @@ impl Worker {
         loop {
             let conn = self
                 .redis_client
-                .get_tokio_connection_manager()
+                .get_connection_manager()
                 .await
                 .context("Get redis connection failed.")?;
             let mut rpc_client = create_grpc_client(self.fullnode_grpc_address.clone()).await;
