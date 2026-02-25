@@ -17,6 +17,7 @@ path = "src/main.rs"
 required-features = ["binary"]
 
 [dependencies]
+ahash = { workspace = true }
 anyhow = { workspace = true }
 aptos-api-types = { workspace = true }
 aptos-cached-packages = { workspace = true }

@@ -46,6 +46,11 @@ module struct_enum_tests::struct_enum_tests {
         RGB { r: u8, g: u8, b: u8 },
     }
 
+    /// A public enum with signed integer fields, for testing signed integer parsing
+    public enum SignedData has copy, drop {
+        Values { a: i8, b: i16, c: i32, d: i64, e: i128 },
+    }
+
     /// A public enum with struct-containing variants
     public enum Shape has copy, drop {
         Circle { center: Point, radius: u64 },
@@ -283,6 +288,19 @@ module struct_enum_tests::struct_enum_tests {
                 assert!(r == 255 && g == 0 && b == 128, 226);
             },
             _ => abort 227,
+        }
+    }
+
+    /// Test entry function that takes a SignedData enum with signed integer fields
+    public entry fun test_enum_signed_fields(_account: &signer, data: SignedData) {
+        match (data) {
+            SignedData::Values { a, b, c, d, e } => {
+                assert!(a == -42i8, 300);
+                assert!(b == -1000i16, 301);
+                assert!(c == -100000i32, 302);
+                assert!(d == -9000000000i64, 303);
+                assert!(e == -1i128, 304);
+            }
         }
     }
 

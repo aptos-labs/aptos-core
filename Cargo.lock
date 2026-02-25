@@ -3128,6 +3128,7 @@ dependencies = [
 name = "aptos-move-cli"
 version = "1.0.0"
 dependencies = [
+ "ahash 0.8.12",
  "anyhow",
  "aptos-api-types",
  "aptos-cached-packages",

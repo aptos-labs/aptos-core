@@ -44,10 +44,14 @@ def test_publish_struct_enum_module(run_helper: RunHelper, test_name=None):
 
 def run_move_function_with_json(run_helper: RunHelper, test_name: str, json_content: dict, error_msg: str):
     """Helper to run Move function with JSON args file."""
-    with tempfile.NamedTemporaryFile(mode='w', suffix='.json', delete=False) as f:
+    with tempfile.NamedTemporaryFile(
+        mode='w', suffix='.json', delete=False,
+        dir=run_helper.host_working_directory,
+    ) as f:
         json.dump(json_content, f)
-        json_file = f.name
+        json_file_host = f.name
 
+    json_file = run_helper.host_to_container_path(json_file_host)
     try:
         response = run_helper.run_command(
             test_name,
@@ -73,7 +77,57 @@ def run_move_function_with_json(run_helper: RunHelper, test_name: str, json_cont
         raise TestError(error_msg) from e
     finally:
         # Clean up temp file to avoid filesystem debris
-        os.unlink(json_file)
+        os.unlink(json_file_host)
+
+
+def run_script_with_json(
+    run_helper: RunHelper,
+    test_name: str,
+    script_path: str,
+    json_content: dict,
+    error_msg: str,
+    compiled_script_path: str = None,
+):
+    """Helper to run a Move script with JSON args file via `aptos move run-script`.
+
+    Pass either `script_path` (source file, compiled on the fly with framework-only deps)
+    or `compiled_script_path` (pre-compiled bytecode, for scripts that use user-defined types).
+    """
+    with tempfile.NamedTemporaryFile(
+        mode='w', suffix='.json', delete=False,
+        dir=run_helper.host_working_directory,
+    ) as f:
+        json.dump(json_content, f)
+        json_file_host = f.name
+
+    json_file = run_helper.host_to_container_path(json_file_host)
+    try:
+        if compiled_script_path:
+            script_args = ["--compiled-script-path", compiled_script_path]
+        else:
+            script_args = ["--script-path", script_path]
+
+        response = run_helper.run_command(
+            test_name,
+            [
+                "aptos",
+                "move",
+                "run-script",
+            ] + script_args + [
+                "--json-file", json_file,
+                "--assume-yes",
+            ],
+            input="\n",
+        )
+
+        if '"success": true' not in response.stdout:
+            raise TestError(f"{error_msg}: Transaction did not execute successfully on-chain")
+    except TestError:
+        raise
+    except Exception as e:
+        raise TestError(error_msg) from e
+    finally:
+        os.unlink(json_file_host)
 
 
 # Struct argument tests
@@ -133,7 +187,7 @@ def test_struct_argument_nested(run_helper: RunHelper, test_name=None):
 
 @test_case
 def test_option_variant_format(run_helper: RunHelper, test_name=None):
-    """Test Option<T> with new variant format: {"None": {}} and {"Some": {"0": value}}."""
+    """Test Option<T> with new variant format: {"None": {}} and {"Some": {"e": value}}."""
     # Test Option::Some
     json_content_some = {
         "function_id": "default::struct_enum_tests::test_option_some",
@@ -141,7 +195,7 @@ def test_option_variant_format(run_helper: RunHelper, test_name=None):
         "args": [
             {
                 "type": "0x1::option::Option<u64>",
-                "value": {"Some": {"0": "100"}}
+                "value": {"Some": {"e": "100"}}
             }
         ]
     }
@@ -413,11 +467,15 @@ def test_struct_unknown_field_rejected(run_helper: RunHelper, test_name=None):
     }
 
     # This should fail with an error about unknown field
-    try:
-        with tempfile.NamedTemporaryFile(mode='w', suffix='.json', delete=False) as f:
-            json.dump(json_content, f)
-            json_file = f.name
+    with tempfile.NamedTemporaryFile(
+        mode='w', suffix='.json', delete=False,
+        dir=run_helper.host_working_directory,
+    ) as f:
+        json.dump(json_content, f)
+        json_file_host = f.name
 
+    json_file = run_helper.host_to_container_path(json_file_host)
+    try:
         result = run_helper.run_command(
             test_name,
             [
@@ -446,7 +504,7 @@ def test_struct_unknown_field_rejected(run_helper: RunHelper, test_name=None):
         if "Unknown field" not in combined_output:
             raise TestError(f"Expected error about unknown field, got: {combined_output}")
     finally:
-        os.unlink(json_file)
+        os.unlink(json_file_host)
 
 
 @test_case
@@ -466,11 +524,15 @@ def test_enum_unknown_field_rejected(run_helper: RunHelper, test_name=None):
     }
 
     # This should fail with an error about unknown field
-    try:
-        with tempfile.NamedTemporaryFile(mode='w', suffix='.json', delete=False) as f:
-            json.dump(json_content, f)
-            json_file = f.name
+    with tempfile.NamedTemporaryFile(
+        mode='w', suffix='.json', delete=False,
+        dir=run_helper.host_working_directory,
+    ) as f:
+        json.dump(json_content, f)
+        json_file_host = f.name
 
+    json_file = run_helper.host_to_container_path(json_file_host)
+    try:
         result = run_helper.run_command(
             test_name,
             [
@@ -499,7 +561,7 @@ def test_enum_unknown_field_rejected(run_helper: RunHelper, test_name=None):
         if "Unknown field" not in combined_output:
             raise TestError(f"Expected error about unknown field, got: {combined_output}")
     finally:
-        os.unlink(json_file)
+        os.unlink(json_file_host)
 
 
 # Vector type tests
@@ -563,9 +625,9 @@ def test_vector_of_options(run_helper: RunHelper, test_name=None):
             {
                 "type": "vector<0x1::option::Option<u64>>",
                 "value": [
-                    {"Some": {"0": "100"}},
+                    {"Some": {"e": "100"}},
                     {"None": {}},
-                    {"Some": {"0": "200"}}
+                    {"Some": {"e": "200"}}
                 ]
             }
         ]
@@ -590,7 +652,7 @@ def test_option_enum(run_helper: RunHelper, test_name=None):
         "args": [
             {
                 "type": f"0x1::option::Option<{account_address}::struct_enum_tests::Color>",
-                "value": {"Some": {"0": {"Green": {}}}}
+                "value": {"Some": {"e": {"Green": {}}}}
             }
         ]
     }
@@ -659,6 +721,30 @@ def test_struct_with_enum_field(run_helper: RunHelper, test_name=None):
 
 
 @test_case
+def test_signed_integer_args(run_helper: RunHelper, test_name=None):
+    """Test passing signed integer types (i8, i16, i32, i64, i128) via an enum variant's fields."""
+    account_address = str(run_helper.get_account_info().account_address)
+
+    json_content = {
+        "function_id": "default::struct_enum_tests::test_enum_signed_fields",
+        "type_args": [],
+        "args": [
+            {
+                "type": f"{account_address}::struct_enum_tests::SignedData",
+                "value": {"Values": {"a": "-42", "b": "-1000", "c": "-100000", "d": "-9000000000", "e": "-1"}}
+            }
+        ]
+    }
+
+    run_move_function_with_json(
+        run_helper,
+        test_name,
+        json_content,
+        "Failed to execute Move function with signed integer enum fields"
+    )
+
+
+@test_case
 def test_option_invalid_field_name_rejected(run_helper: RunHelper, test_name=None):
     """Test that Option::Some with wrong field name is rejected."""
     json_content = {
@@ -667,17 +753,21 @@ def test_option_invalid_field_name_rejected(run_helper: RunHelper, test_name=Non
         "args": [
             {
                 "type": "0x1::option::Option<u64>",
-                "value": {"Some": {"wrong": "100"}}  # Field should be "0", not "wrong"
+                "value": {"Some": {"wrong": "100"}}  # Field should be "e", not "wrong"
             }
         ]
     }
 
     # This should fail with an error about invalid field name
-    try:
-        with tempfile.NamedTemporaryFile(mode='w', suffix='.json', delete=False) as f:
-            json.dump(json_content, f)
-            json_file = f.name
+    with tempfile.NamedTemporaryFile(
+        mode='w', suffix='.json', delete=False,
+        dir=run_helper.host_working_directory,
+    ) as f:
+        json.dump(json_content, f)
+        json_file_host = f.name
 
+    json_file = run_helper.host_to_container_path(json_file_host)
+    try:
         result = run_helper.run_command(
             test_name,
             [
@@ -696,7 +786,7 @@ def test_option_invalid_field_name_rejected(run_helper: RunHelper, test_name=Non
 
         # Verify error message mentions field name
         combined_output = result.stdout + result.stderr
-        if "field must be named" not in combined_output.lower() and '"0"' not in combined_output:
+        if "field must be named" not in combined_output.lower() and '"e"' not in combined_output:
             raise TestError(f"Expected error about field name, got: {combined_output}")
 
     except subprocess.CalledProcessError as e:
@@ -706,4 +796,54 @@ def test_option_invalid_field_name_rejected(run_helper: RunHelper, test_name=Non
         if "field" not in combined_output.lower():
             raise TestError(f"Expected error about field name, got: {combined_output}")
     finally:
-        os.unlink(json_file)
+        os.unlink(json_file_host)
+
+
+# run-script tests
+
+@test_case
+def test_run_script_public_struct_arg(run_helper: RunHelper, test_name=None):
+    """Test run-script with a public struct (Point) argument supplied via --json-file.
+
+    Because Point is a user-defined type, the script must be compiled first via
+    `aptos move compile-script --package-dir` so that the struct_enum_tests dep is
+    resolved. The resulting bytecode is then passed to `run-script --compiled-script-path`.
+    The CLI's StructArgParser fetches the module ABI via REST to encode the struct value
+    to BCS — exercising the full create_script_payload_with_optional_client async path.
+    """
+    account_address = str(run_helper.get_account_info().account_address)
+    package_dir = "move/cli-e2e-tests/struct-enum-args"
+    compiled_script_path = f"{package_dir}/script.mv"
+
+    # Step 1: compile the script (requires struct_enum_tests module to already be published).
+    run_helper.run_command(
+        f"{test_name}_compile",
+        [
+            "aptos",
+            "move",
+            "compile-script",
+            "--package-dir", package_dir,
+            "--named-addresses", f"struct_enum_tests={account_address}",
+            "--language-version", "2.4",
+            "--output-file", compiled_script_path,
+        ],
+    )
+
+    # Step 2: run the compiled script with a Point struct arg via --json-file.
+    json_content = {
+        "type_args": [],
+        "args": [
+            {
+                "type": f"{account_address}::struct_enum_tests::Point",
+                "value": {"x": "10", "y": "20"}
+            }
+        ]
+    }
+    run_script_with_json(
+        run_helper,
+        test_name,
+        None,
+        json_content,
+        "Failed to run script with public struct Point argument via --json-file",
+        compiled_script_path=compiled_script_path,
+    )

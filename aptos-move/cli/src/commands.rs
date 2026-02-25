@@ -62,6 +62,7 @@ use async_trait::async_trait;
 use clap::{Parser, Subcommand, ValueEnum};
 use colored::Colorize;
 use itertools::Itertools;
+use move_binary_format::file_format_common::{write_u64_as_uleb128, BinaryData};
 use move_command_line_common::{address::NumericalAddress, env::MOVE_HOME};
 use move_core_types::{
     identifier::Identifier,
@@ -2407,12 +2408,12 @@ impl CliCommand<TransactionSummary> for RunScript {
             self.compile_proposal_args
                 .compile(&w, "RunScript", self.txn_options.prompt_options)?;
 
-        dispatch_transaction(
-            self.script_function_args.create_script_payload(bytecode)?,
-            &self.txn_options,
-            &self.env,
-        )
-        .await
+        let payload = self
+            .script_function_args
+            .create_script_payload_with_optional_client(bytecode, || self.txn_options.rest_client())
+            .await?;
+
+        dispatch_transaction(payload, &self.txn_options, &self.env).await
     }
 }
 
@@ -2662,7 +2663,11 @@ impl Display for FunctionArgType {
             FunctionArgType::Raw => write!(f, "raw"),
             FunctionArgType::Struct { type_tag } => write!(f, "{}", type_tag.to_canonical_string()),
             FunctionArgType::Enum { type_tag, variant } => {
-                write!(f, "{}::{}", type_tag.to_canonical_string(), variant)
+                if variant.is_empty() {
+                    write!(f, "{}", type_tag.to_canonical_string())
+                } else {
+                    write!(f, "{}::{}", type_tag.to_canonical_string(), variant)
+                }
             },
         }
     }
@@ -2752,12 +2757,10 @@ impl FunctionArgType {
                 .inner()
                 .to_vec()),
             FunctionArgType::Struct { .. } => Err(CliError::CommandArgumentError(
-                "Struct arguments must be parsed via JSON format with async module queries"
-                    .to_string(),
+                "Struct arguments must be parsed via JSON format".to_string(),
             )),
             FunctionArgType::Enum { .. } => Err(CliError::CommandArgumentError(
-                "Enum arguments must be parsed via JSON format with async module queries"
-                    .to_string(),
+                "Enum arguments must be parsed via JSON format".to_string(),
             )),
         }
     }
@@ -2781,16 +2784,17 @@ impl FunctionArgType {
                 arg: self.parse_arg_str(value.as_str())?,
             }),
             serde_json::Value::Array(_) => {
-                let mut bcs: Vec<u8> = vec![]; // BCS representation of argument.
+                let mut bcs = BinaryData::new(); // BCS representation of argument.
                 let mut common_sub_arg_depth = None;
                 // Prepend argument sequence length to BCS bytes vector.
-                write_u64_as_uleb128(&mut bcs, arg.as_array().unwrap().len());
+                write_u64_as_uleb128(&mut bcs, arg.as_array().unwrap().len() as u64)
+                    .map_err(|e| CliError::CommandArgumentError(e.to_string()))?;
                 // Loop over all of the vector's sub-arguments, which may also be vectors:
                 for sub_arg in arg.as_array().unwrap() {
                     let ArgWithType {
                         _ty: _,
                         _vector_depth: sub_arg_depth,
-                        arg: mut sub_arg_bcs,
+                        arg: sub_arg_bcs,
                     } = self.parse_arg_json(sub_arg)?;
                     // Verify all sub-arguments have same depth.
                     if let Some(check_depth) = common_sub_arg_depth {
@@ -2801,13 +2805,14 @@ impl FunctionArgType {
                         }
                     };
                     common_sub_arg_depth = Some(sub_arg_depth);
-                    bcs.append(&mut sub_arg_bcs); // Append sub-argument BCS.
+                    bcs.extend(&sub_arg_bcs) // Append sub-argument BCS.
+                        .map_err(|e| CliError::CommandArgumentError(e.to_string()))?;
                 }
                 // Default sub-argument depth is 0 for when no sub-arguments were looped over.
                 Ok(ArgWithType {
                     _ty: self.clone(),
                     _vector_depth: common_sub_arg_depth.unwrap_or(0) + 1,
-                    arg: bcs,
+                    arg: bcs.into_inner(),
                 })
             },
             serde_json::Value::Null => {
@@ -2816,20 +2821,6 @@ impl FunctionArgType {
             serde_json::Value::Object(_) => Err(CliError::CommandArgumentError(
                 "JSON object argument".to_string(),
             )),
-        }
-    }
-}
-
-// TODO use from move_binary_format::file_format_common if it is made public.
-pub(crate) fn write_u64_as_uleb128(binary: &mut Vec<u8>, mut val: usize) {
-    loop {
-        let cur = val & 0x7F;
-        if cur != val {
-            binary.push((cur | 0x80) as u8);
-            val >>= 7;
-        } else {
-            binary.push(cur as u8);
-            break;
         }
     }
 }
@@ -2881,6 +2872,11 @@ impl FromStr for FunctionArgType {
         }
     }
 }
+
+/// Maximum nesting depth for vectors (and struct/enum arguments).
+/// The limit is enforced both when encoding arguments (struct_arg_parser) and when
+/// decoding them for display (bcs_value_to_json). The two must stay in sync.
+pub(crate) const MAX_VECTOR_DEPTH: u8 = 7;
 
 /// A parseable arg with a type separated by a colon
 #[derive(Clone, Debug)]
@@ -3038,9 +3034,9 @@ impl ArgWithType {
                 &self.arg,
             )?)
             .map_err(|err| CliError::UnexpectedError(err.to_string())),
-            7 => serde_json::to_value(bcs::from_bytes::<Vec<Vec<Vec<Vec<Vec<Vec<Vec<T>>>>>>>>(
-                &self.arg,
-            )?)
+            MAX_VECTOR_DEPTH => serde_json::to_value(bcs::from_bytes::<
+                Vec<Vec<Vec<Vec<Vec<Vec<Vec<T>>>>>>>,
+            >(&self.arg)?)
             .map_err(|err| CliError::UnexpectedError(err.to_string())),
             depth => Err(CliError::UnexpectedError(format!(
                 "Vector of depth {depth} is overly nested"
@@ -3171,10 +3167,7 @@ impl TryInto<TransactionArgument> for &ArgWithType {
                 &self.arg, "i256",
             )?)),
             FunctionArgType::Struct { .. } | FunctionArgType::Enum { .. } => {
-                Err(CliError::UnexpectedError(
-                    "Struct and enum arguments are not supported for script transactions"
-                        .to_string(),
-                ))
+                Ok(TransactionArgument::Serialized(self.arg.clone()))
             },
         }
     }
