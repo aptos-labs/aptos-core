@@ -381,11 +381,19 @@ impl Spec {
                 .zip(other.on_impl.iter())
                 .all(|((off1, s1), (off2, s2))| off1 == off2 && s1.structural_eq(s2))
             && self.update_map.len() == other.update_map.len()
-            && self
-                .update_map
-                .iter()
-                .zip(other.update_map.iter())
-                .all(|((_, c1), (_, c2))| c1.structural_eq(c2))
+            && {
+                // `NodeId` keys are intentionally ignored in structural comparison, so pair
+                // conditions by structure rather than by `BTreeMap` key order.
+                let mut unmatched = other.update_map.values().collect_vec();
+                self.update_map.values().all(|c1| {
+                    if let Some(pos) = unmatched.iter().position(|c2| c1.structural_eq(c2)) {
+                        unmatched.swap_remove(pos);
+                        true
+                    } else {
+                        false
+                    }
+                })
+            }
     }
 
     pub fn has_conditions(&self) -> bool {
@@ -4246,11 +4254,24 @@ impl fmt::Display for AccessSpecifierKind {
 #[cfg(test)]
 mod tests {
     use crate::{
-        ast::{Address, Value},
+        ast::{Address, Condition, ConditionKind, ExpData, Spec, Value},
+        model::{Loc, NodeId},
         symbol::Symbol,
         AccountAddress,
     };
     use num::BigInt;
+    use std::collections::BTreeMap;
+
+    fn update_condition(exp_node_id: usize, val: bool) -> Condition {
+        Condition {
+            loc: Loc::default(),
+            kind: ConditionKind::Update,
+            properties: BTreeMap::new(),
+            exp: ExpData::Value(NodeId::new(exp_node_id), Value::Bool(val)).into_exp(),
+            additional_exps: vec![],
+        }
+    }
+
     #[test]
     fn test_value_equivalence() {
         // Some test values
@@ -4438,5 +4459,32 @@ mod tests {
         for val1 in &symbolic_examples {
             assert!(val1.equivalent(&((*val1).clone())) == Some(true));
         }
+    }
+
+    #[test]
+    fn test_spec_structural_eq_update_map_ignores_node_id_keys() {
+        let spec1 = Spec {
+            loc: None,
+            conditions: vec![],
+            properties: BTreeMap::new(),
+            on_impl: BTreeMap::new(),
+            update_map: BTreeMap::from([
+                (NodeId::new(1), update_condition(11, true)),
+                (NodeId::new(2), update_condition(22, false)),
+            ]),
+        };
+        let spec2 = Spec {
+            loc: None,
+            conditions: vec![],
+            properties: BTreeMap::new(),
+            on_impl: BTreeMap::new(),
+            update_map: BTreeMap::from([
+                (NodeId::new(100), update_condition(33, false)),
+                (NodeId::new(200), update_condition(44, true)),
+            ]),
+        };
+
+        assert!(spec1.structural_eq(&spec2));
+        assert!(spec2.structural_eq(&spec1));
     }
 }
