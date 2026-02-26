@@ -26,7 +26,6 @@ mod dkg_with_validator_down;
 mod dkg_with_validator_join_leave;
 mod e2e_basic_consumption;
 mod e2e_correctness;
-mod e2e_correctness_without_fast_path;
 mod enable_feature_0;
 mod enable_feature_1;
 mod enable_feature_2;

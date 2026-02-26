@@ -258,7 +258,6 @@ impl ChunkyDKG {
             &validator_stakes,
             secrecy_threshold,
             reconstruct_threshold,
-            None,
         );
 
         // Create WeightedConfigArkworks<Fr> from the computed weights
