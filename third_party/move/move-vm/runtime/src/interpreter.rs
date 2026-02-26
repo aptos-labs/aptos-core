@@ -3120,11 +3120,15 @@ impl Frame {
                         gas_meter.charge_simple_instr(S::Nop)?;
                     },
                     Instruction::VecPack(si, num) => {
-                        let (ty, ty_count) = if self.ty_builder.check_depth_on_type_counts_v2 {
-                            frame_cache.get_signature_index_type_for_vec_pack(*si, self)?
-                        } else {
-                            frame_cache.get_signature_index_type(*si, self)?
-                        };
+                        let (ty, ty_count, depth) =
+                            frame_cache.get_signature_index_type(*si, self)?;
+                        if self.ty_builder.check_depth_on_type_counts_v2 {
+                            // Account for new vector node.
+                            self.ty_builder.check_final_size_and_depth(
+                                u64::from(ty_count) + 1,
+                                depth as u64 + 1,
+                            )?;
+                        }
                         gas_meter.charge_create_ty(ty_count)?;
                         interpreter.ty_depth_checker.check_depth_of_type(
                             gas_meter,
@@ -3139,7 +3143,7 @@ impl Frame {
                     },
                     Instruction::VecLen(si) => {
                         let vec_ref = interpreter.operand_stack.pop_as::<VectorRef>()?;
-                        let (_, ty_count) = frame_cache.get_signature_index_type(*si, self)?;
+                        let (_, ty_count, _) = frame_cache.get_signature_index_type(*si, self)?;
                         gas_meter.charge_create_ty(ty_count)?;
                         gas_meter.charge_vec_len()?;
                         let value = vec_ref.len()?;
@@ -3148,7 +3152,7 @@ impl Frame {
                     Instruction::VecImmBorrow(si) => {
                         let idx = interpreter.operand_stack.pop_as::<u64>()? as usize;
                         let vec_ref = interpreter.operand_stack.pop_as::<VectorRef>()?;
-                        let (_, ty_count) = frame_cache.get_signature_index_type(*si, self)?;
+                        let (_, ty_count, _) = frame_cache.get_signature_index_type(*si, self)?;
                         gas_meter.charge_create_ty(ty_count)?;
                         gas_meter.charge_vec_borrow(false)?;
                         let elem = vec_ref.borrow_elem(idx)?;
@@ -3157,7 +3161,7 @@ impl Frame {
                     Instruction::VecMutBorrow(si) => {
                         let idx = interpreter.operand_stack.pop_as::<u64>()? as usize;
                         let vec_ref = interpreter.operand_stack.pop_as::<VectorRef>()?;
-                        let (_, ty_count) = frame_cache.get_signature_index_type(*si, self)?;
+                        let (_, ty_count, _) = frame_cache.get_signature_index_type(*si, self)?;
                         gas_meter.charge_create_ty(ty_count)?;
                         gas_meter.charge_vec_borrow(true)?;
                         let elem = vec_ref.borrow_elem(idx)?;
@@ -3166,14 +3170,14 @@ impl Frame {
                     Instruction::VecPushBack(si) => {
                         let elem = interpreter.operand_stack.pop()?;
                         let vec_ref = interpreter.operand_stack.pop_as::<VectorRef>()?;
-                        let (_, ty_count) = frame_cache.get_signature_index_type(*si, self)?;
+                        let (_, ty_count, _) = frame_cache.get_signature_index_type(*si, self)?;
                         gas_meter.charge_create_ty(ty_count)?;
                         gas_meter.charge_vec_push_back(&elem)?;
                         vec_ref.push_back(elem)?;
                     },
                     Instruction::VecPopBack(si) => {
                         let vec_ref = interpreter.operand_stack.pop_as::<VectorRef>()?;
-                        let (_, ty_count) = frame_cache.get_signature_index_type(*si, self)?;
+                        let (_, ty_count, _) = frame_cache.get_signature_index_type(*si, self)?;
                         gas_meter.charge_create_ty(ty_count)?;
                         let res = vec_ref.pop();
                         gas_meter.charge_vec_pop_back(res.as_ref().ok())?;
@@ -3181,7 +3185,7 @@ impl Frame {
                     },
                     Instruction::VecUnpack(si, num) => {
                         let vec_val = interpreter.operand_stack.pop_as::<Vector>()?;
-                        let (_, ty_count) = frame_cache.get_signature_index_type(*si, self)?;
+                        let (_, ty_count, _) = frame_cache.get_signature_index_type(*si, self)?;
                         gas_meter.charge_create_ty(ty_count)?;
                         gas_meter.charge_vec_unpack(NumArgs::new(*num), vec_val.elem_views())?;
                         let elements = vec_val.unpack(*num)?;
@@ -3193,7 +3197,7 @@ impl Frame {
                         let idx2 = interpreter.operand_stack.pop_as::<u64>()? as usize;
                         let idx1 = interpreter.operand_stack.pop_as::<u64>()? as usize;
                         let vec_ref = interpreter.operand_stack.pop_as::<VectorRef>()?;
-                        let (_, ty_count) = frame_cache.get_signature_index_type(*si, self)?;
+                        let (_, ty_count, _) = frame_cache.get_signature_index_type(*si, self)?;
                         gas_meter.charge_create_ty(ty_count)?;
                         gas_meter.charge_vec_swap()?;
                         vec_ref.swap(idx1, idx2)?;

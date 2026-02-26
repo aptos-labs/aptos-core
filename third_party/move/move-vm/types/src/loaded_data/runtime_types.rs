@@ -2015,70 +2015,46 @@ mod unit_tests {
 
     #[test]
     fn test_create_ref_ty() {
-        let max_ty_depth = 5;
-        let max_ty_size = 5;
+        let limit = 5;
 
-        for check_depth_on_type_counts_v2 in [true, false] {
-            let ty_builder =
-                TypeBuilder::with_limits(100, max_ty_depth, check_depth_on_type_counts_v2);
+        let ty_builder = TypeBuilder::with_limits(100, limit, true);
 
-            let mut depth = 1;
-            let mut ty = Type::Bool;
-            while depth < max_ty_depth {
-                ty = assert_ok!(ty_builder.create_ref_ty(&ty, false));
-                assert_matches!(ty, Type::Reference(_));
-                depth += 1;
-            }
-            assert_eq!(depth, max_ty_depth);
-
-            // If enabled, can construct 1-level deeper or larger type trees.
-            if check_depth_on_type_counts_v2 {
-                ty = assert_ok!(ty_builder.create_ref_ty(&ty, false));
-                assert_matches!(ty, Type::Reference(_));
-            }
-
-            let err = assert_err!(ty_builder.create_ref_ty(&ty, false));
-            assert_eq!(err.major_status(), StatusCode::VM_MAX_TYPE_DEPTH_REACHED);
-
-            let ty_builder =
-                TypeBuilder::with_limits(max_ty_size, 100, check_depth_on_type_counts_v2);
-            let err = assert_err!(ty_builder.create_ref_ty(&ty, false));
-            assert_eq!(err.major_status(), StatusCode::TOO_MANY_TYPE_NODES);
+        let mut depth = 1;
+        let mut ty = Type::Bool;
+        while depth < limit {
+            ty = assert_ok!(ty_builder.create_vec_ty(&ty));
+            depth += 1;
         }
+
+        let ref_ty = assert_ok!(ty_builder.create_ref_ty(&ty, false));
+        assert_matches!(ref_ty, Type::Reference(_));
+
+        let ty_builder = TypeBuilder::with_limits(limit, 100, true);
+
+        let ref_ty = assert_ok!(ty_builder.create_ref_ty(&ty, false));
+        assert_matches!(ref_ty, Type::Reference(_));
     }
 
     #[test]
     fn test_create_mut_ref_ty() {
-        let max_ty_depth = 5;
-        let max_ty_size = 5;
+        let limit = 5;
 
-        for check_depth_on_type_counts_v2 in [true, false] {
-            let ty_builder =
-                TypeBuilder::with_limits(100, max_ty_depth, check_depth_on_type_counts_v2);
+        let ty_builder = TypeBuilder::with_limits(100, limit, true);
 
-            let mut depth = 1;
-            let mut ty = Type::Bool;
-            while depth < max_ty_depth {
-                ty = assert_ok!(ty_builder.create_ref_ty(&ty, true));
-                assert_matches!(ty, Type::MutableReference(_));
-                depth += 1;
-            }
-            assert_eq!(depth, max_ty_depth);
-
-            // If enabled, can construct 1-level deeper or larger type trees.
-            if check_depth_on_type_counts_v2 {
-                ty = assert_ok!(ty_builder.create_ref_ty(&ty, true));
-                assert_matches!(ty, Type::MutableReference(_));
-            }
-
-            let err = assert_err!(ty_builder.create_ref_ty(&ty, true));
-            assert_eq!(err.major_status(), StatusCode::VM_MAX_TYPE_DEPTH_REACHED);
-
-            let ty_builder =
-                TypeBuilder::with_limits(max_ty_size, 100, check_depth_on_type_counts_v2);
-            let err = assert_err!(ty_builder.create_ref_ty(&ty, true));
-            assert_eq!(err.major_status(), StatusCode::TOO_MANY_TYPE_NODES);
+        let mut depth = 1;
+        let mut ty = Type::Bool;
+        while depth < limit {
+            ty = assert_ok!(ty_builder.create_vec_ty(&ty));
+            depth += 1;
         }
+
+        let ref_ty = assert_ok!(ty_builder.create_ref_ty(&ty, true));
+        assert_matches!(ref_ty, Type::MutableReference(_));
+
+        let ty_builder = TypeBuilder::with_limits(limit, 100, true);
+
+        let ref_ty = assert_ok!(ty_builder.create_ref_ty(&ty, true));
+        assert_matches!(ref_ty, Type::MutableReference(_));
     }
 
     #[test]
