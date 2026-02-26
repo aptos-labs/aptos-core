@@ -3,6 +3,7 @@
 
 use crate::{
     accept_type::AcceptType,
+    response_axum::{AptosErrorResponse, AptosResponse},
     accounts::Account,
     bcs_payload::Bcs,
     context::{api_spawn_blocking, Context, FunctionStats},
@@ -1912,6 +1913,27 @@ impl TransactionsApi {
                 ))
             },
         }
+    }
+}
+
+/// Inner implementation of estimate_gas_price that returns Axum-native types.
+/// Used by Axum handlers to avoid the poem_to_axum_response bridge.
+pub(crate) fn estimate_gas_price_inner(
+    context: &Arc<Context>,
+    accept_type: &AcceptType,
+) -> Result<AptosResponse<GasEstimation>, AptosErrorResponse> {
+    let ledger_info = context.get_latest_ledger_info::<AptosErrorResponse>()?;
+    let gas_estimation = context.estimate_gas_price::<AptosErrorResponse>(&ledger_info)?;
+    TransactionsApi::log_gas_estimation(&gas_estimation);
+
+    match accept_type {
+        AcceptType::Json => AptosResponse::try_from_json(gas_estimation, &ledger_info),
+        AcceptType::Bcs => {
+            let gas_estimation_bcs = GasEstimationBcs {
+                gas_estimate: gas_estimation.gas_estimate,
+            };
+            AptosResponse::try_from_bcs(gas_estimation_bcs, &ledger_info)
+        },
     }
 }
 

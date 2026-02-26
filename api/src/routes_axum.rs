@@ -1102,13 +1102,15 @@ pub async fn estimate_gas_price_handler(
     State(context): Ctx,
     accept_type: AcceptType,
 ) -> Result<Response, AptosErrorResponse> {
+    use crate::context::api_spawn_blocking;
     crate::failpoint::fail_point_poem::<AptosErrorResponse>("endpoint_estimate_gas_price")?;
     context.check_api_output_enabled::<AptosErrorResponse>("Estimate gas price", &accept_type)?;
-    let txn_api = crate::transactions::TransactionsApi {
-        context: context.clone(),
-    };
-    let resp = txn_api.estimate_gas_price(accept_type).await?;
-    Ok(poem_to_axum_response(poem::IntoResponse::into_response(resp)).await)
+    let context = context.clone();
+    let resp = api_spawn_blocking(move || {
+        crate::transactions::estimate_gas_price_inner(&context, &accept_type)
+    })
+    .await?;
+    Ok(resp.into_response())
 }
 
 // ---- ViewFunctionApi ----
