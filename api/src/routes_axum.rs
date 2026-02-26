@@ -708,11 +708,10 @@ pub async fn get_transactions_handler(
         query.limit,
         context.max_transactions_page_size(),
     );
-    let txn_api = crate::transactions::TransactionsApi {
-        context: context.clone(),
-    };
-    let resp = api_spawn_blocking(move || txn_api.list(&accept_type, page)).await?;
-    Ok(poem_to_axum_response(poem::IntoResponse::into_response(resp)).await)
+    let ctx = context.clone();
+    let at = accept_type.clone();
+    let resp = api_spawn_blocking(move || crate::transactions::list_inner(&ctx, &at, page)).await?;
+    Ok(resp.into_response())
 }
 
 pub async fn get_transaction_by_hash_handler(
@@ -807,14 +806,13 @@ pub async fn get_transaction_by_version_handler(
         "Get transactions by version",
         &accept_type,
     )?;
-    let txn_api = crate::transactions::TransactionsApi {
-        context: context.clone(),
-    };
+    let ctx = context.clone();
+    let at = accept_type.clone();
     let resp = api_spawn_blocking(move || {
-        txn_api.get_transaction_by_version_inner(&accept_type, txn_version)
+        crate::transactions::get_transaction_by_version_inner_axum(&ctx, &at, txn_version)
     })
     .await?;
-    Ok(poem_to_axum_response(poem::IntoResponse::into_response(resp)).await)
+    Ok(resp.into_response())
 }
 
 pub async fn get_transactions_auxiliary_info_handler(
@@ -835,11 +833,12 @@ pub async fn get_transactions_auxiliary_info_handler(
         query.limit,
         context.max_transactions_page_size(),
     );
-    let txn_api = crate::transactions::TransactionsApi {
-        context: context.clone(),
-    };
-    let resp = api_spawn_blocking(move || txn_api.list_auxiliary_infos(&accept_type, page)).await?;
-    Ok(poem_to_axum_response(poem::IntoResponse::into_response(resp)).await)
+    let ctx = context.clone();
+    let at = accept_type.clone();
+    let resp =
+        api_spawn_blocking(move || crate::transactions::list_auxiliary_infos_inner(&ctx, &at, page))
+            .await?;
+    Ok(resp.into_response())
 }
 
 pub async fn get_accounts_transactions_handler(
@@ -857,14 +856,13 @@ pub async fn get_accounts_transactions_handler(
         query.limit,
         context.max_transactions_page_size(),
     );
-    let txn_api = crate::transactions::TransactionsApi {
-        context: context.clone(),
-    };
+    let ctx = context.clone();
+    let at = accept_type.clone();
     let resp = api_spawn_blocking(move || {
-        txn_api.list_ordered_txns_by_account(&accept_type, page, address)
+        crate::transactions::list_ordered_txns_by_account_inner(&ctx, &at, page, address)
     })
     .await?;
-    Ok(poem_to_axum_response(poem::IntoResponse::into_response(resp)).await)
+    Ok(resp.into_response())
 }
 
 pub async fn get_accounts_transaction_summaries_handler(
@@ -887,14 +885,14 @@ pub async fn get_accounts_transaction_summaries_handler(
     } else {
         context.max_transactions_page_size()
     };
-    let txn_api = crate::transactions::TransactionsApi {
-        context: context.clone(),
-    };
+    let ctx = context.clone();
+    let at = accept_type.clone();
     let start_version = query.start_version;
     let end_version = query.end_version;
     let resp = api_spawn_blocking(move || {
-        txn_api.list_txn_summaries_by_account(
-            &accept_type,
+        crate::transactions::list_txn_summaries_by_account_inner(
+            &ctx,
+            &at,
             address,
             start_version,
             end_version,
@@ -902,7 +900,7 @@ pub async fn get_accounts_transaction_summaries_handler(
         )
     })
     .await?;
-    Ok(poem_to_axum_response(poem::IntoResponse::into_response(resp)).await)
+    Ok(resp.into_response())
 }
 
 pub async fn submit_transaction_handler(
@@ -1090,12 +1088,12 @@ pub async fn encode_submission_handler(
         })?;
     crate::failpoint::fail_point_poem::<AptosErrorResponse>("endpoint_encode_submission")?;
     context.check_api_output_enabled::<AptosErrorResponse>("Encode submission", &accept_type)?;
-    let txn_api = crate::transactions::TransactionsApi {
-        context: context.clone(),
-    };
+    let ctx = context.clone();
+    let at = accept_type.clone();
     let resp =
-        api_spawn_blocking(move || txn_api.get_signing_message(&accept_type, request)).await?;
-    Ok(poem_to_axum_response(poem::IntoResponse::into_response(resp)).await)
+        api_spawn_blocking(move || crate::transactions::get_signing_message_inner(&ctx, &at, request))
+            .await?;
+    Ok(resp.into_response())
 }
 
 pub async fn estimate_gas_price_handler(

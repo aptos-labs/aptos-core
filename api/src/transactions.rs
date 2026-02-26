@@ -1937,6 +1937,296 @@ pub(crate) fn estimate_gas_price_inner(
     }
 }
 
+/// Framework-agnostic inner for listing transactions. Returns Axum-native types.
+pub fn list_inner(
+    context: &Arc<Context>,
+    accept_type: &AcceptType,
+    page: Page,
+) -> Result<AptosResponse<Vec<Transaction>>, AptosErrorResponse> {
+    let latest_ledger_info = context.get_latest_ledger_info::<AptosErrorResponse>()?;
+    let ledger_version = latest_ledger_info.version();
+
+    let limit = page.limit::<AptosErrorResponse>(&latest_ledger_info)?;
+    let start_version =
+        page.compute_start::<AptosErrorResponse>(limit, ledger_version, &latest_ledger_info)?;
+    let data = context
+        .get_transactions(start_version, limit, ledger_version)
+        .context("Failed to read raw transactions from storage")
+        .map_err(|err| {
+            AptosErrorResponse::internal_with_code(
+                err,
+                AptosErrorCode::InternalError,
+                &latest_ledger_info,
+            )
+        })?;
+
+    match accept_type {
+        AcceptType::Json => {
+            let timestamp =
+                context.get_block_timestamp::<AptosErrorResponse>(&latest_ledger_info, start_version)?;
+            AptosResponse::try_from_json(
+                context.render_transactions_sequential::<AptosErrorResponse>(
+                    &latest_ledger_info,
+                    data,
+                    timestamp,
+                )?,
+                &latest_ledger_info,
+            )
+        },
+        AcceptType::Bcs => AptosResponse::try_from_bcs(data, &latest_ledger_info),
+    }
+}
+
+/// Framework-agnostic inner for get transaction by version. Returns Axum-native types.
+pub fn get_transaction_by_version_inner_axum(
+    context: &Arc<Context>,
+    accept_type: &AcceptType,
+    version: U64,
+) -> Result<AptosResponse<Transaction>, AptosErrorResponse> {
+    let ledger_info = context.get_latest_ledger_info::<AptosErrorResponse>()?;
+    let api = TransactionsApi {
+        context: context.clone(),
+    };
+    let txn_data = api
+        .get_by_version(version.0, &ledger_info)
+        .context(format!("Failed to get transaction by version {}", version))
+        .map_err(|err| {
+            AptosErrorResponse::internal_with_code(
+                err,
+                AptosErrorCode::InternalError,
+                &ledger_info,
+            )
+        })?;
+
+    match txn_data {
+        GetByVersionResponse::Found(txn_data) => match accept_type {
+            AcceptType::Bcs => AptosResponse::try_from_bcs(txn_data, &ledger_info),
+            AcceptType::Json => {
+                let state_view =
+                    context.latest_state_view_poem::<AptosErrorResponse>(&ledger_info)?;
+                let transaction = match txn_data {
+                    TransactionData::OnChain(txn) => {
+                        let timestamp =
+                            context.get_block_timestamp::<AptosErrorResponse>(&ledger_info, txn.version)?;
+                        state_view
+                            .as_converter(context.db.clone(), context.indexer_reader.clone())
+                            .try_into_onchain_transaction(timestamp, txn)
+                            .context("Failed to convert on chain transaction to Transaction")
+                            .map_err(|err| {
+                                AptosErrorResponse::internal_with_code(
+                                    err,
+                                    AptosErrorCode::InternalError,
+                                    &ledger_info,
+                                )
+                            })?
+                    },
+                    TransactionData::Pending(txn) => state_view
+                        .as_converter(context.db.clone(), context.indexer_reader.clone())
+                        .try_into_pending_transaction(*txn)
+                        .context("Failed to convert on pending transaction to Transaction")
+                        .map_err(|err| {
+                            AptosErrorResponse::internal_with_code(
+                                err,
+                                AptosErrorCode::InternalError,
+                                &ledger_info,
+                            )
+                        })?,
+                };
+                AptosResponse::try_from_json(transaction, &ledger_info)
+            },
+        },
+        GetByVersionResponse::VersionTooNew => {
+            Err(crate::response_axum::transaction_not_found_by_version(
+                version.0,
+                &ledger_info,
+            ))
+        },
+        GetByVersionResponse::VersionTooOld => Err(crate::response_axum::version_pruned(
+            version.0,
+            &ledger_info,
+        )),
+    }
+}
+
+/// Framework-agnostic inner for listing auxiliary infos. Returns Axum-native types.
+pub fn list_auxiliary_infos_inner(
+    context: &Arc<Context>,
+    accept_type: &AcceptType,
+    page: Page,
+) -> Result<AptosResponse<Vec<PersistedAuxiliaryInfo>>, AptosErrorResponse> {
+    let latest_ledger_info = context.get_latest_ledger_info::<AptosErrorResponse>()?;
+    let ledger_version = latest_ledger_info.ledger_version;
+
+    let limit = page.limit::<AptosErrorResponse>(&latest_ledger_info)?;
+    let start_version =
+        page.compute_start::<AptosErrorResponse>(limit, ledger_version.0, &latest_ledger_info)?;
+
+    let iterator = context
+        .db
+        .get_persisted_auxiliary_info_iterator(start_version, limit as usize)
+        .context("Failed to get auxiliary info iterator from storage")
+        .map_err(|err| {
+            AptosErrorResponse::internal_with_code(
+                err,
+                AptosErrorCode::InternalError,
+                &latest_ledger_info,
+            )
+        })?;
+
+    let mut raw_auxiliary_infos = Vec::new();
+    for result in iterator {
+        let raw_aux_info = result
+            .context("Failed to read auxiliary info from iterator")
+            .map_err(|err| {
+                AptosErrorResponse::internal_with_code(
+                    err,
+                    AptosErrorCode::InternalError,
+                    &latest_ledger_info,
+                )
+            })?;
+        raw_auxiliary_infos.push(raw_aux_info);
+    }
+
+    match accept_type {
+        AcceptType::Bcs => AptosResponse::try_from_bcs(raw_auxiliary_infos, &latest_ledger_info),
+        AcceptType::Json => {
+            let api_auxiliary_infos: Vec<PersistedAuxiliaryInfo> = raw_auxiliary_infos
+                .iter()
+                .map(|r| PersistedAuxiliaryInfo::from(*r))
+                .collect();
+            AptosResponse::try_from_json(api_auxiliary_infos, &latest_ledger_info)
+        },
+    }
+}
+
+/// Framework-agnostic inner for listing ordered transactions by account. Returns Axum-native types.
+pub fn list_ordered_txns_by_account_inner(
+    context: &Arc<Context>,
+    accept_type: &AcceptType,
+    page: Page,
+    address: Address,
+) -> Result<AptosResponse<Vec<Transaction>>, AptosErrorResponse> {
+    let account = Account::new(context.clone(), address, None, None, None)?;
+    let latest_ledger_info = account.latest_ledger_info;
+
+    let data = context.get_account_ordered_transactions::<AptosErrorResponse>(
+        address.into(),
+        page.start_option(),
+        page.limit::<AptosErrorResponse>(&latest_ledger_info)?,
+        account.ledger_version,
+        &latest_ledger_info,
+    )?;
+
+    match accept_type {
+        AcceptType::Json => AptosResponse::try_from_json(
+            context.render_transactions_non_sequential::<AptosErrorResponse>(
+                &latest_ledger_info,
+                data,
+            )?,
+            &latest_ledger_info,
+        ),
+        AcceptType::Bcs => AptosResponse::try_from_bcs(data, &latest_ledger_info),
+    }
+}
+
+/// Framework-agnostic inner for listing transaction summaries by account. Returns Axum-native types.
+pub fn list_txn_summaries_by_account_inner(
+    context: &Arc<Context>,
+    accept_type: &AcceptType,
+    address: Address,
+    start_version: Option<U64>,
+    end_version: Option<U64>,
+    limit: u16,
+) -> Result<AptosResponse<Vec<TransactionSummary>>, AptosErrorResponse> {
+    let (latest_ledger_info, ledger_version) = context
+        .get_latest_ledger_info_and_verify_lookup_version::<AptosErrorResponse>(None)?;
+
+    match context.get_account_transaction_summaries::<AptosErrorResponse>(
+        address.into(),
+        start_version.map(|v| v.into()),
+        end_version.map(|v| v.into()),
+        limit,
+        ledger_version,
+        &latest_ledger_info,
+    ) {
+        Ok(data) => match accept_type {
+            AcceptType::Json => AptosResponse::try_from_json(
+                context.render_transaction_summaries::<AptosErrorResponse>(
+                    &latest_ledger_info,
+                    data,
+                )?,
+                &latest_ledger_info,
+            ),
+            AcceptType::Bcs => AptosResponse::try_from_bcs(data, &latest_ledger_info),
+        },
+        Err(e) => {
+            error!("list_all_txn_summaries_by_account error: {:?}", e);
+            Err(e)
+        },
+    }
+}
+
+/// Framework-agnostic inner for get signing message. Returns Axum-native types.
+pub fn get_signing_message_inner(
+    context: &Arc<Context>,
+    accept_type: &AcceptType,
+    request: EncodeSubmissionRequest,
+) -> Result<AptosResponse<HexEncodedBytes>, AptosErrorResponse> {
+    if accept_type == &AcceptType::Bcs {
+        return Err(AptosErrorResponse::bad_request(
+            "BCS is not supported for encode submission",
+            AptosErrorCode::BcsNotSupported,
+            None,
+        ));
+    }
+
+    let ledger_info = context.get_latest_ledger_info::<AptosErrorResponse>()?;
+    let state_view = context.latest_state_view_poem::<AptosErrorResponse>(&ledger_info)?;
+    let raw_txn: RawTransaction = state_view
+        .as_converter(context.db.clone(), context.indexer_reader.clone())
+        .try_into_raw_transaction_poem(request.transaction, context.chain_id())
+        .context("The given transaction is invalid")
+        .map_err(|err| {
+            AptosErrorResponse::bad_request(
+                err,
+                AptosErrorCode::InvalidInput,
+                Some(&ledger_info),
+            )
+        })?;
+
+    let raw_message = match request.secondary_signers {
+        Some(secondary_signer_addresses) => signing_message(
+            &RawTransactionWithData::new_multi_agent(
+                raw_txn,
+                secondary_signer_addresses
+                    .into_iter()
+                    .map(|v| v.into())
+                    .collect(),
+            ),
+        )
+        .context("Invalid transaction to generate signing message")
+        .map_err(|err| {
+            AptosErrorResponse::bad_request(
+                err,
+                AptosErrorCode::InvalidInput,
+                Some(&ledger_info),
+            )
+        })?,
+        None => raw_txn
+            .signing_message()
+            .context("Invalid transaction to generate signing message")
+            .map_err(|err| {
+                AptosErrorResponse::bad_request(
+                    err,
+                    AptosErrorCode::InvalidInput,
+                    Some(&ledger_info),
+                )
+            })?,
+    };
+
+    AptosResponse::try_from_json(HexEncodedBytes::from(raw_message), &ledger_info)
+}
+
 fn override_gas_parameters(
     signed_txn: &SignedTransaction,
     max_gas_amount: Option<u64>,
