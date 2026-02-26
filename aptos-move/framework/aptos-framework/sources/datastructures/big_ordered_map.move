@@ -30,15 +30,15 @@
 /// That's why all functions returning iterators are prefixed with "internal_", to clarify nuances needed to make
 /// sure usage is correct.
 /// A set of inline utility methods is provided instead, to provide guaranteed valid usage to iterators.
-module aptos_std::big_ordered_map {
+module aptos_framework::big_ordered_map {
     use std::error;
     use std::vector;
     use std::option::{Self as option, Option};
     use std::bcs;
-    use aptos_std::ordered_map::{Self, OrderedMap};
     use aptos_std::cmp;
     use aptos_std::storage_slots_allocator::{Self, StorageSlotsAllocator, StoredSlot};
     use aptos_std::math64::{max, min};
+    use aptos_framework::ordered_map::{Self, OrderedMap};
 
     #[test_only]
     friend aptos_framework::big_ordered_map_test;
@@ -362,9 +362,11 @@ module aptos_std::big_ordered_map {
 
         assert!(!path_to_leaf.is_empty(), error::invalid_argument(EKEY_NOT_FOUND));
 
+        let old_leaf = self.remove_at(path_to_leaf, key);
+        assert!(old_leaf.is_some(), error::invalid_argument(EKEY_NOT_FOUND));
         let Child::Leaf {
             value,
-        } = self.remove_at(path_to_leaf, key);
+        } = old_leaf.destroy_some();
         value
     }
 
@@ -387,14 +389,16 @@ module aptos_std::big_ordered_map {
         };
 
         let path_to_leaf = self.find_leaf_path(key);
-
         if (path_to_leaf.is_empty()) {
             option::none()
         } else {
-            let Child::Leaf {
-                value,
-            } = self.remove_at(path_to_leaf, key);
-            option::some(value)
+            let old_leaf = self.remove_at(path_to_leaf, key);
+            old_leaf.map(|child| {
+                let Child::Leaf {
+                    value,
+                } = child;
+                value
+            })
         }
     }
 
@@ -893,10 +897,12 @@ module aptos_std::big_ordered_map {
         };
 
         assert!(!path_to_leaf.is_empty(), error::invalid_argument(EKEY_NOT_FOUND));
+        let old_leaf = map.remove_at_with_iter_hint(path_to_leaf, &key, option::some(child_iter));
+        assert!(old_leaf.is_some(), error::invalid_argument(EKEY_NOT_FOUND));
 
         let Child::Leaf {
             value,
-        } = map.remove_at(path_to_leaf, &key);
+        } = old_leaf.destroy_some();
         value
     }
 
@@ -1429,7 +1435,11 @@ module aptos_std::big_ordered_map {
         }
     }
 
-    fun remove_at<K: drop + copy + store, V: store>(self: &mut BigOrderedMap<K, V>, path_to_node: vector<u64>, key: &K): Child<V> {
+    inline fun remove_at<K: drop + copy + store, V: store>(self: &mut BigOrderedMap<K, V>, path_to_node: vector<u64>, key: &K): Option<Child<V>> {
+        self.remove_at_with_iter_hint(path_to_node, key, option::none())
+    }
+
+    fun remove_at_with_iter_hint<K: drop + copy + store, V: store>(self: &mut BigOrderedMap<K, V>, path_to_node: vector<u64>, key: &K, iter_hint: Option<ordered_map::IteratorPtr>): Option<Child<V>> {
         // Last node in the path is one where we need to remove the child from.
         let node_index = path_to_node.pop_back();
         let old_child = {
@@ -1441,7 +1451,22 @@ module aptos_std::big_ordered_map {
             let children = &mut node.children;
             let is_leaf = node.is_leaf;
 
-            let old_child = children.remove(key);
+            let old_child = if (iter_hint.is_some()) {
+                let iter_hint = iter_hint.destroy_some();
+                if (iter_hint.iter_is_end(children)) {
+                    option::none()
+                } else {
+                    assert!(iter_hint.iter_borrow_key(children) == key, error::invalid_argument(EINTERNAL_INVARIANT_BROKEN));
+                    option::some(iter_hint.iter_remove(children))
+                }
+            } else {
+                children.remove_or_none(key)
+            };
+            if (old_child.is_none()) {
+                // key not found, no need to rebalance
+                return old_child;
+            };
+
             if (node_index == ROOT_INDEX) {
                 // If current node is root, lower limit of max_degree/2 nodes doesn't apply.
                 // So we can adjust internally
@@ -1496,9 +1521,12 @@ module aptos_std::big_ordered_map {
 
             old_child
         };
-
         // Children size is below threshold, we need to rebalance with a neighbor on the same level.
+        self.process_rebalance_after_child_removal(node_index, path_to_node);
+        old_child
+    }
 
+    fun process_rebalance_after_child_removal<K: drop + copy + store, V: store>(self: &mut BigOrderedMap<K, V>, node_index: u64, path_to_node: vector<u64>) {
         // In order to work on multiple nodes at the same time, we cannot borrow_mut, and need to be
         // remove_and_reserve existing node.
         let (node_slot, node) = self.nodes.remove_and_reserve(node_index);
@@ -1555,7 +1583,7 @@ module aptos_std::big_ordered_map {
 
             self.nodes.fill_reserved_slot(node_slot, node);
             self.nodes.fill_reserved_slot(sibling_slot, sibling_node);
-            return old_child;
+            return;
         };
 
         // The sibling node doesn't have enough elements to borrow, merge with the sibling node.
@@ -1613,10 +1641,9 @@ module aptos_std::big_ordered_map {
         };
 
         assert!(!path_to_node.is_empty(), error::invalid_state(EINTERNAL_INVARIANT_BROKEN));
-        let slot_to_remove = self.remove_at(path_to_node, &key_to_remove).destroy_inner_child();
+        // we can destory_some() here, because inner node should always be present.
+        let slot_to_remove = self.remove_at(path_to_node, &key_to_remove).destroy_some().destroy_inner_child();
         self.nodes.free_reserved_slot(reserved_slot_to_remove, slot_to_remove);
-
-        old_child
     }
 
     // ===== spec ===========
@@ -1631,7 +1658,7 @@ module aptos_std::big_ordered_map {
         pragma opaque;
     }
 
-    spec remove_at {
+    spec remove_at_with_iter_hint {
         pragma opaque;
     }
 
