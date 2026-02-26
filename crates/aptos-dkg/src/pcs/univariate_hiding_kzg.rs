@@ -31,7 +31,9 @@ use ark_ff::{Field, PrimeField, Zero};
 use ark_poly::{
     polynomial::univariate::DensePolynomial, univariate::DenseOrSparsePolynomial, EvaluationDomain,
 };
-use ark_serialize::{CanonicalDeserialize, CanonicalSerialize};
+use ark_serialize::{
+    CanonicalDeserialize, CanonicalSerialize, Compress, SerializationError, Write,
+};
 use rand::{CryptoRng, RngCore};
 use sigma_protocol::homomorphism::TrivialShape as CodomainShape;
 use std::{borrow::Cow, fmt::Debug};
@@ -251,13 +253,13 @@ impl<'a, E: Pairing> CommitmentHomomorphism<'a, E> {
     }
 
     #[allow(non_snake_case)]
-    pub fn verify(
+    pub fn pairing_for_verify(
         vk: VerificationKey<E>,
         C: Commitment<E>,
         x: E::ScalarField,
         y: E::ScalarField,
         pi: OpeningProof<E>,
-    ) -> anyhow::Result<()> {
+    ) -> (Vec<E::G1Affine>, Vec<E::G2Affine>) {
         let VerificationKey {
             xi_2,
             tau_2,
@@ -269,12 +271,24 @@ impl<'a, E: Pairing> CommitmentHomomorphism<'a, E> {
         } = vk;
         let OpeningProof { pi_1, pi_2 } = pi;
 
-        // TODO: should probably work on affine / serialization here at some point
-        let check = E::multi_pairing(vec![C.0 - one_1 * y, -pi_1.0, -pi_2], vec![
+        (E::G1::normalize_batch(&vec![C.0 - one_1 * y, -pi_1.0, -pi_2]), vec![
             one_2,
             (tau_2 - one_2 * x).into_affine(),
             xi_2,
-        ]);
+        ])
+    }
+
+    #[allow(non_snake_case)]
+    pub fn verify(
+        vk: VerificationKey<E>,
+        C: Commitment<E>,
+        x: E::ScalarField,
+        y: E::ScalarField,
+        pi: OpeningProof<E>,
+    ) -> anyhow::Result<()> {
+        let (first_comp, second_comp) = Self::pairing_for_verify(vk, C, x, y, pi);
+        // TODO: should probably work on affine / serialization here at some point
+        let check = E::multi_pairing(first_comp, second_comp);
         ensure!(
             PairingOutput::<E>::ZERO == check,
             "Hiding KZG verification failed"
@@ -326,10 +340,32 @@ impl<'a, E: Pairing> CommitmentHomomorphism<'a, E> {
 /// The MSM evaluation is then performed using `E::G1::msm()`.
 ///
 /// TODO: Since this code is quite similar to that of ordinary KZG, it may be possible to reduce it a bit
-#[derive(CanonicalSerialize, Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct CommitmentHomomorphism<'a, E: Pairing> {
     pub msm_basis: &'a [E::G1Affine],
     pub xi_1: E::G1Affine,
+}
+
+// We do a custom CanonicalSerialize here because serializing a complete powers-of-tau basis for
+// Fiat-Shamir challenges is a bit expensive and only using [1]_1 and [tau]_1 is secure
+impl<'a, E: Pairing> CanonicalSerialize for CommitmentHomomorphism<'a, E> {
+    fn serialize_with_mode<W: Write>(
+        &self,
+        mut writer: W,
+        compress: Compress,
+    ) -> Result<(), SerializationError> {
+        self.xi_1.serialize_with_mode(&mut writer, compress)?;
+        for entry in self.msm_basis.iter().take(2) {
+            entry.serialize_with_mode(&mut writer, compress)?;
+        }
+        Ok(())
+    }
+
+    fn serialized_size(&self, compress: Compress) -> usize {
+        let basis_count = self.msm_basis.len().min(2);
+        let g1_size = self.xi_1.serialized_size(compress);
+        (1 + basis_count) * g1_size
+    }
 }
 
 #[derive(

@@ -4,6 +4,8 @@ set -e
 
 scriptdir=$(cd $(dirname $0); pwd -P)
 
+cargo criterion-means --help 2>&1 || { echo "ERROR: Run 'cargo install cargo-criterion-means'"; exit 1; }
+
 repo_root=$(readlink -f $scriptdir/../../../)
 #echo "Repo root: $repo_root"
 

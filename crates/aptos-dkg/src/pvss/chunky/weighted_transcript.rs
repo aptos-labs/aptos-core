@@ -110,18 +110,14 @@ impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>>
             <Self as traits::Transcript>::dst(),
         )?;
 
-        {
-            // Verify the range proof (still separate)
-            if let Err(err) = self.sharing_proof.range_proof.verify(
+        // Verify the range proof
+        let (g1_terms, g2_terms) = self.sharing_proof.range_proof.pairing_for_verify(
                 &pp.pk_range_proof.vk,
                 sc.get_total_weight() * num_chunks_per_scalar::<E::ScalarField>(pp.ell) as usize,
-                pp.ell,
-                &self.sharing_proof.range_proof_commitment,
-                rng,
-            ) {
-                bail!("Range proof batch verification failed: {:?}", err);
-            }
-        }
+            pp.ell,
+            &self.sharing_proof.range_proof_commitment,
+            rng,
+        )?;
 
         // PoK MSM terms (G1) and LDT MSM terms (G2) for merging into one pairing check
         let eks_inner: Vec<_> = eks.iter().map(|ek| ek.ek).collect();
@@ -213,11 +209,14 @@ impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>>
             .expect("Failed to compute merged G2 MSM in chunky");
 
         let res = E::multi_pairing(
-            [
-                combined_G1.into_affine(),
-                *pp.get_encryption_public_params().message_base(),
-            ],
-            [pp.get_commitment_base(), (-combined_G2).into_affine()],
+            g1_terms
+                .iter()
+                .copied()
+                .chain([combined_G1.into_affine(), *pp.get_encryption_public_params().message_base()]),
+            g2_terms
+                .iter()
+                .copied()
+                .chain([pp.get_commitment_base(), (-combined_G2).into_affine()]),
         );
         if PairingOutput::<E>::ZERO != res {
             return Err(anyhow::anyhow!("Expected zero during multi-pairing check"));

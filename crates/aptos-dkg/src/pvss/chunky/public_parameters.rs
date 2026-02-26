@@ -79,7 +79,7 @@ impl<E: Pairing> Clone for PublicParameters<E> {
             G_2: self.G_2,
             ell: self.ell,
             max_aggregation: self.max_aggregation,
-            dlog_table: Self::build_dlog_table(g, self.ell, self.max_aggregation),
+            dlog_table: Self::build_dlog_table(g, self.ell, self.max_aggregation, 0),
             G2_table: BatchMulPreprocessing::new(self.G_2.into(), self.max_num_shares as usize), // Recreate table because it doesn't allow for Copy/Clone? TODO: Fix this
             powers_of_radix: compute_powers_of_radix::<E>(self.ell),
         }
@@ -156,7 +156,7 @@ impl<'de, E: Pairing> Deserialize<'de> for PublicParameters<E> {
             G_2: serialized.G_2,
             ell: serialized.ell,
             max_aggregation: serialized.max_aggregation,
-            dlog_table: Self::build_dlog_table(G, serialized.ell, serialized.max_aggregation),
+            dlog_table: Self::build_dlog_table(G, serialized.ell, serialized.max_aggregation, 0),
             G2_table: BatchMulPreprocessing::new(
                 serialized.G_2.into(),
                 serialized.max_num_shares as usize,
@@ -176,8 +176,9 @@ impl<E: Pairing> PublicParameters<E> {
         G: E::G1,
         ell: u8,
         max_aggregation: usize,
+        extra_bits: u64,
     ) -> HashMap<Vec<u8>, u64> {
-        dlog::table::build::<E::G1>(G, 1u64 << ((ell as u64 + log2(max_aggregation) as u64) / 2))
+        dlog::table::build::<E::G1>(G, 1u64 << (extra_bits + ((ell as u64 + log2(max_aggregation) as u64) / 2)))
     }
 
     pub(crate) fn get_dlog_range_bound(&self) -> u64 {
@@ -260,7 +261,7 @@ impl<E: Pairing> PublicParameters<E> {
             G_2,
             ell,
             max_aggregation,
-            dlog_table: Self::build_dlog_table(G.into(), ell, max_aggregation),
+            dlog_table: Self::build_dlog_table(G.into(), ell, max_aggregation, 6),
             G2_table: BatchMulPreprocessing::new(G_2.into(), max_num_shares as usize),
             powers_of_radix: compute_powers_of_radix::<E>(ell),
         };

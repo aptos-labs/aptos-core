@@ -87,7 +87,7 @@ pub struct PublicStatement<E: Pairing> {
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct VerificationKey<E: Pairing> {
     max_ell: u8,
-    tau_1: E::G1,
+    tau_1: E::G1, // TODO: should make this stuff affine
     tau_2: E::G2,
     vanishing_com: E::G2, // commitment to deg-n vanishing polynomial (X^{n+1} - 1) / (X - 1) used to test h(X)
     powers_of_two: Vec<E::ScalarField>, // [1, 2, 4, ..., 2^{max_ell - 1}]
@@ -560,14 +560,14 @@ impl<E: Pairing> traits::BatchedRangeProof<E> for Proof<E> {
         }
     }
 
-    fn verify<R: RngCore + CryptoRng>(
+    fn pairing_for_verify<R: RngCore + CryptoRng>(
         &self,
         vk: &Self::VerificationKey,
         n: usize,
         ell: u8,
         comm: &Self::Commitment,
         _rng: &mut R,
-    ) -> anyhow::Result<()> {
+    ) -> anyhow::Result<(Vec<E::G1Affine>, Vec<E::G2Affine>)> {
         let mut fs_t = merlin::Transcript::new(Self::DST);
 
         assert!(
@@ -597,6 +597,7 @@ impl<E: Pairing> traits::BatchedRangeProof<E> for Proof<E> {
         );
 
         // Verify h(\tau)
+        // TODO: uhh I should also move this multi-pairing to the output... oh well this code is dead anyway
         let h_check = E::multi_pairing(
             (0..ell as usize)
                 .map(|j| self.c[j] * betas[j]) // E::G1
@@ -616,19 +617,29 @@ impl<E: Pairing> traits::BatchedRangeProof<E> for Proof<E> {
 
         // Compute MSM in G2: sum_j (alphas[j] * proof.c_hat[j])
         let g2_comb = VariableBaseMSM::msm(&self.c_hat, &alphas).unwrap();
-        let c_check = E::multi_pairing(
-            vec![
-                g1_comb,   // from MSM in G1
-                -vk.tau_1, // subtract tau_1
-            ],
-            vec![
-                vk.tau_2, // tau_2
-                g2_comb,  // from MSM in G2
-            ],
-        );
-        ensure!(PairingOutput::<E>::ZERO == c_check);
 
-        Ok(())
+
+        Ok((E::G1::normalize_batch(&vec![
+            g1_comb,   // from MSM in G1
+            -vk.tau_1, // subtract tau_1
+        ]), E::G2::normalize_batch(&vec![
+            vk.tau_2, // tau_2
+            g2_comb,  // from MSM in G2
+        ])))
+
+        // let c_check = E::multi_pairing(
+        //     vec![
+        //         g1_comb,   // from MSM in G1
+        //         -vk.tau_1, // subtract tau_1
+        //     ],
+        //     vec![
+        //         vk.tau_2, // tau_2
+        //         g2_comb,  // from MSM in G2
+        //     ],
+        // );
+        // ensure!(PairingOutput::<E>::ZERO == c_check);
+
+        // Ok(())
     }
 
     fn maul(&mut self) {

@@ -1,12 +1,14 @@
 // Copyright (c) Aptos Foundation
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
+use ark_ec::pairing::PairingOutput;
+use crate::pcs::shplonked::zk_pcs_pairing_for_verify;
 use crate::fiat_shamir::PolynomialCommitmentScheme;
 use ark_ff::AdditiveGroup;
 use crate::{
     Scalar,
     pcs::{
-        shplonked::{Srs, ZkPcsOpeningProof, zk_pcs_commit, zk_pcs_open, zk_pcs_verify},
+        shplonked::{Srs, ZkPcsOpeningProof, zk_pcs_commit, zk_pcs_open},
         univariate_hiding_kzg,
     },
     range_proofs::{dekart_univariate_v2::two_term_msm, traits},
@@ -171,14 +173,14 @@ impl<E: Pairing> traits::BatchedRangeProof<E> for Proof<E> {
         univariate_hiding_kzg::commit_with_randomness(ck, &coeffs, rho)
     }
 
-    fn verify<R: RngCore + CryptoRng>(
+    fn pairing_for_verify<R: RngCore + CryptoRng>(
         &self,
         vk: &Self::VerificationKey,
         n: usize,
         ell: u8,
         comm: &Self::Commitment,
         rng: &mut R,
-    ) -> anyhow::Result<()> {
+    ) -> anyhow::Result<(Vec<E::G1Affine>, Vec<E::G2Affine>)> {
         #[cfg(feature = "range_proof_timing_multivariate")]
         let mut cumulative = Duration::ZERO;
         #[cfg(feature = "range_proof_timing_multivariate")]
@@ -348,25 +350,23 @@ impl<E: Pairing> traits::BatchedRangeProof<E> for Proof<E> {
         let commitment_msms: Vec<MsmInput<E::G1Affine, E::ScalarField>> =
             once(combined_comm_msm).chain(g_commitment_msms).collect();
 
-        #[cfg(feature = "range_proof_timing_multivariate")]
-        let start = Instant::now();
-        zk_pcs_verify(
-            &self.zk_pcs_opening_proof,
-            &commitment_msms,
-            &vk.srs,
-            &mut trs,
-            rng,
-        )?;
-        #[cfg(feature = "range_proof_timing_multivariate")]
-        print_cumulative("zk_pcs_verify (batched f̂ + g)", start.elapsed());
-
         // y_sum in the opening proof must equal y_batched_at_z (f̂(z)) + y_g (sum of g_i at rho_i)
         anyhow::ensure!(
             self.zk_pcs_opening_proof.sigma_proof_statement.y_sum == self.y_batched_at_z + self.y_g,
             "Batched opening y_sum != y_batched_at_z + y_g"
         );
 
-        Ok(())
+        #[cfg(feature = "range_proof_timing_multivariate")]
+        let start = Instant::now();
+        let (g1_terms, g2_terms) = zk_pcs_pairing_for_verify(
+            &self.zk_pcs_opening_proof,
+            &commitment_msms,
+            &vk.srs,
+            &mut trs,
+            rng,
+        )?;
+
+        Ok((g1_terms, g2_terms))
     }
 
     #[allow(non_snake_case)]

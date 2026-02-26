@@ -3,6 +3,7 @@
 
 // This file implements the range proof described here: https://alinush.github.io/dekart
 
+use ark_ec::pairing::PairingOutput;
 use crate::{
     algebra::polynomials,
     pcs::univariate_hiding_kzg,
@@ -26,13 +27,15 @@ use aptos_crypto::arkworks::{
     GroupGenerators,
 };
 use ark_ec::{pairing::Pairing, CurveGroup, PrimeGroup, VariableBaseMSM};
-use ark_ff::{AdditiveGroup, Field, PrimeField};
+use ark_ff::{AdditiveGroup, Field, PrimeField, Zero};
 use ark_poly::{self, EvaluationDomain, Polynomial};
 use ark_serialize::{
     CanonicalDeserialize, CanonicalSerialize, Compress, Read, SerializationError, Valid, Validate,
 };
 use num_integer::Roots;
 use rand::{CryptoRng, RngCore};
+#[cfg(feature = "range_proof_timing_univariate_v2")]
+use std::time::{Duration, Instant};
 use std::{fmt::Debug, io::Write};
 
 // TODO: make an affine version of this
@@ -260,22 +263,51 @@ impl<E: Pairing> traits::BatchedRangeProof<E> for Proof<E> {
         group_generators: GroupGenerators<E>,
         rng: &mut R,
     ) -> (ProverKey<E>, VerificationKey<E>) {
+        #[cfg(feature = "range_proof_timing_univariate_v2")]
+        let setup_start = Instant::now();
+        #[cfg(feature = "range_proof_timing_univariate_v2")]
+        let mut cumulative = Duration::ZERO;
+        #[cfg(feature = "range_proof_timing_univariate_v2")]
+        let mut print_cumulative = |name: &str, duration: Duration| {
+            cumulative += duration;
+            println!(
+                "  {:>10.2} ms  ({:>10.2} ms cum.)  [dekart_univariate_v2 setup] {}",
+                duration.as_secs_f64() * 1000.0,
+                cumulative.as_secs_f64() * 1000.0,
+                name
+            );
+        };
+
         let num_omegas = max_n + 1;
         assert!(num_omegas.is_power_of_two());
 
+        #[cfg(feature = "range_proof_timing_univariate_v2")]
+        let start = Instant::now();
         // Generate trapdoor elements
         let trapdoor = univariate_hiding_kzg::Trapdoor::<E>::rand(rng);
         let xi_1_proj: E::G1 = group_generators.g1 * trapdoor.xi;
+        #[cfg(feature = "range_proof_timing_univariate_v2")]
+        print_cumulative("trapdoor + xi_1_proj", start.elapsed());
 
+        #[cfg(feature = "range_proof_timing_univariate_v2")]
+        let start = Instant::now();
         let (vk_hkzg, ck_S) = univariate_hiding_kzg::setup(
             max_n + 1,
             SrsType::Lagrange,
             group_generators.clone(),
             trapdoor,
         );
+        #[cfg(feature = "range_proof_timing_univariate_v2")]
+        print_cumulative("univariate_hiding_kzg::setup", start.elapsed());
 
+        #[cfg(feature = "range_proof_timing_univariate_v2")]
+        let start = Instant::now();
         let h_denom_eval = compute_h_denom_eval::<E>(&ck_S.roots_of_unity_in_eval_dom);
+        #[cfg(feature = "range_proof_timing_univariate_v2")]
+        print_cumulative("compute_h_denom_eval", start.elapsed());
 
+        #[cfg(feature = "range_proof_timing_univariate_v2")]
+        let start = Instant::now();
         let powers_of_two = arkworks::powers_of_two::<E::ScalarField>(max_ell.into());
 
         let prover_precomputed = ProverPrecomputed {
@@ -305,6 +337,14 @@ impl<E: Pairing> traits::BatchedRangeProof<E> for Proof<E> {
             max_n,
             prover_precomputed,
         };
+        #[cfg(feature = "range_proof_timing_univariate_v2")]
+        print_cumulative("powers_of_two + precomputed + vk/prk", start.elapsed());
+
+        #[cfg(feature = "range_proof_timing_univariate_v2")]
+        println!(
+            "  [dekart_univariate_v2 setup] TOTAL: {:.2} ms",
+            setup_start.elapsed().as_secs_f64() * 1000.0
+        );
 
         (prk, vk)
     }
@@ -333,8 +373,25 @@ impl<E: Pairing> traits::BatchedRangeProof<E> for Proof<E> {
     where
         R: rand_core::RngCore + rand_core::CryptoRng,
     {
+        #[cfg(feature = "range_proof_timing_univariate_v2")]
+        let prove_start = Instant::now();
+        #[cfg(feature = "range_proof_timing_univariate_v2")]
+        let mut cumulative = Duration::ZERO;
+        #[cfg(feature = "range_proof_timing_univariate_v2")]
+        let mut print_cumulative = |name: &str, duration: Duration| {
+            cumulative += duration;
+            println!(
+                "  {:>10.2} ms  ({:>10.2} ms cum.)  [dekart_univariate_v2 prove] {}",
+                duration.as_secs_f64() * 1000.0,
+                cumulative.as_secs_f64() * 1000.0,
+                name
+            );
+        };
+
         let mut fs_t = merlin::Transcript::new(Self::DST);
 
+        #[cfg(feature = "range_proof_timing_univariate_v2")]
+        let start = Instant::now();
         // Step 1a
         let ProverKey {
             vk,
@@ -388,7 +445,11 @@ impl<E: Pairing> traits::BatchedRangeProof<E> for Proof<E> {
             ell,
             comm: comm.clone(),
         });
+        #[cfg(feature = "range_proof_timing_univariate_v2")]
+        print_cumulative("unpack pk + append_initial_data", start.elapsed());
 
+        #[cfg(feature = "range_proof_timing_univariate_v2")]
+        let start = Instant::now();
         // Step 2a
         let r = sample_field_element(rng);
         let delta_rho = sample_field_element(rng);
@@ -396,7 +457,11 @@ impl<E: Pairing> traits::BatchedRangeProof<E> for Proof<E> {
 
         // Step 2b
         fiat_shamir::append_hat_f_commitment::<E>(&mut fs_t, &hatC);
+        #[cfg(feature = "range_proof_timing_univariate_v2")]
+        print_cumulative("hatC (r, delta_rho, hatC) + append_hat_f", start.elapsed());
 
+        #[cfg(feature = "range_proof_timing_univariate_v2")]
+        let start = Instant::now();
         // Step 3a
         let pi_PoK = two_term_msm::Homomorphism {
             base_1: lagr_g1[0],
@@ -415,7 +480,11 @@ impl<E: Pairing> traits::BatchedRangeProof<E> for Proof<E> {
 
         // Step 3b
         fiat_shamir::append_sigma_proof::<E>(&mut fs_t, &pi_PoK);
+        #[cfg(feature = "range_proof_timing_univariate_v2")]
+        print_cumulative("pi_PoK (two_term_msm prove) + append_sigma", start.elapsed());
 
+        #[cfg(feature = "range_proof_timing_univariate_v2")]
+        let start = Instant::now();
         // Step 4a
         let rs: Vec<E::ScalarField> = (0..ell).map(|_| sample_field_element(rng)).collect();
 
@@ -448,24 +517,35 @@ impl<E: Pairing> traits::BatchedRangeProof<E> for Proof<E> {
             msm_basis: lagr_g1,
             xi_1: *xi_1,
         };
-        let Cs: Vec<_> = f_js_evals
+        // f_j_evals[0] is blinding rs[j]; f_j_evals[1..] are 0/1. Compute commitment as xi_1*rho + lagr_g1[0]*f_j_evals[0] + msm_bool(lagr_g1[1..], bits).
+        let Cs: Vec<E::G1> = f_js_evals
             .iter()
             .zip(rhos.iter())
-            .map(|(f_j, &rho)| {
-                let hkzg_commit_input = univariate_hiding_kzg::Witness {
-                    hiding_randomness: Scalar(rho), // because univariate_hiding_kzg::CommitmentRandomness is an alias for Scalar... TODO: should maybe make a constructor method?
-                    values: Scalar::vec_from_inner_slice(f_j),
-                };
-                hkzg_commitment_hom.apply(&hkzg_commit_input).0
+            .map(|(f_j_evals, &rho)| {
+                let bits: Vec<bool> = f_j_evals[1..]
+                    .iter()
+                    .map(|e| !e.is_zero())
+                    .collect();
+                let sum = lagr_g1[0] * f_j_evals[0]
+                    + utils::msm_bool(&lagr_g1[1..], &bits);
+                *xi_1 * rho + sum
             })
             .collect();
 
         // Step 4b
         fiat_shamir::append_f_j_commitments::<E>(&mut fs_t, &Cs);
+        #[cfg(feature = "range_proof_timing_univariate_v2")]
+        print_cumulative("f_js_evals + rhos + Cs (hkzg commits) + append_f_j", start.elapsed());
 
+        #[cfg(feature = "range_proof_timing_univariate_v2")]
+        let start = Instant::now();
         // Step 6
         let (beta, betas) = fiat_shamir::get_beta_challenges::<E>(&mut fs_t, ell as usize);
+        #[cfg(feature = "range_proof_timing_univariate_v2")]
+        print_cumulative("get_beta_challenges", start.elapsed());
 
+        #[cfg(feature = "range_proof_timing_univariate_v2")]
+        let start = Instant::now();
         let hat_f_evals: Vec<E::ScalarField> = {
             let mut v = Vec::with_capacity(num_omegas);
             v.push(r);
@@ -473,16 +553,28 @@ impl<E: Pairing> traits::BatchedRangeProof<E> for Proof<E> {
             v.resize(num_omegas, E::ScalarField::ZERO);
             v
         };
+        #[cfg(feature = "range_proof_timing_univariate_v2")]
+        print_cumulative("hat_f_evals", start.elapsed());
 
+        #[cfg(feature = "range_proof_timing_univariate_v2")]
+        let start = Instant::now();
         let hat_f_coeffs = eval_dom.ifft(&hat_f_evals);
         debug_assert_eq!(hat_f_coeffs.len(), pk.max_n + 1);
+        #[cfg(feature = "range_proof_timing_univariate_v2")]
+        print_cumulative("hat_f_coeffs (ifft)", start.elapsed());
 
+        #[cfg(feature = "range_proof_timing_univariate_v2")]
+        let start = Instant::now();
         let diff_hat_f_evals: Vec<E::ScalarField> = {
             let mut result = polynomials::differentiate(&hat_f_coeffs);
             eval_dom.fft_in_place(&mut result);
             result
         };
+        #[cfg(feature = "range_proof_timing_univariate_v2")]
+        print_cumulative("diff_hat_f_evals (fft)", start.elapsed());
 
+        #[cfg(feature = "range_proof_timing_univariate_v2")]
+        let start = Instant::now();
         let f_j_coeffs: Vec<Vec<E::ScalarField>> = (0..ell as usize)
             .map(|j| {
                 let mut f_j = f_js_evals[j].clone();
@@ -492,7 +584,11 @@ impl<E: Pairing> traits::BatchedRangeProof<E> for Proof<E> {
                 f_j
             })
             .collect();
+        #[cfg(feature = "range_proof_timing_univariate_v2")]
+        print_cumulative("f_j_coeffs (ifft)", start.elapsed());
 
+        #[cfg(feature = "range_proof_timing_univariate_v2")]
+        let start = Instant::now();
         let diff_f_js_evals: Vec<Vec<E::ScalarField>> = f_js_evals
             .iter()
             .map(|f_j_eval| {
@@ -502,7 +598,11 @@ impl<E: Pairing> traits::BatchedRangeProof<E> for Proof<E> {
                 result
             })
             .collect();
+        #[cfg(feature = "range_proof_timing_univariate_v2")]
+        print_cumulative("diff_f_js_evals (ifft)", start.elapsed());
 
+        #[cfg(feature = "range_proof_timing_univariate_v2")]
+        let start = Instant::now();
         let h_evals: Vec<E::ScalarField> = {
             let mut result = Vec::with_capacity(num_omegas);
 
@@ -558,7 +658,11 @@ impl<E: Pairing> traits::BatchedRangeProof<E> for Proof<E> {
 
             result
         };
+        #[cfg(feature = "range_proof_timing_univariate_v2")]
+        print_cumulative("h_evals", start.elapsed());
 
+        #[cfg(feature = "range_proof_timing_univariate_v2")]
+        let start = Instant::now();
         let rho_h = sample_field_element(rng);
         let D = hkzg_commitment_hom
             .apply(&univariate_hiding_kzg::Witness {
@@ -568,7 +672,11 @@ impl<E: Pairing> traits::BatchedRangeProof<E> for Proof<E> {
             .0;
         // Step 7b
         fiat_shamir::append_h_commitment::<E>(&mut fs_t, &D);
+        #[cfg(feature = "range_proof_timing_univariate_v2")]
+        print_cumulative("D (hkzg commit to h_evals) + append_h", start.elapsed());
 
+        #[cfg(feature = "range_proof_timing_univariate_v2")]
+        let start = Instant::now();
         // Step 8
         let (mu, mu_h, mus) = fiat_shamir::get_mu_challenges::<E>(&mut fs_t, ell as usize);
 
@@ -583,7 +691,11 @@ impl<E: Pairing> traits::BatchedRangeProof<E> for Proof<E> {
                         .sum::<E::ScalarField>()
             })
             .collect();
+        #[cfg(feature = "range_proof_timing_univariate_v2")]
+        print_cumulative("get_mu_challenges + u_values", start.elapsed());
 
+        #[cfg(feature = "range_proof_timing_univariate_v2")]
+        let start = Instant::now();
         // Step 9
         let gamma =
             fiat_shamir::get_gamma_challenge::<E>(&mut fs_t, &ck_S.roots_of_unity_in_eval_dom);
@@ -610,7 +722,11 @@ impl<E: Pairing> traits::BatchedRangeProof<E> for Proof<E> {
                 poly.evaluate(&gamma)
             }) // Again, using Horner's here
             .collect();
+        #[cfg(feature = "range_proof_timing_univariate_v2")]
+        print_cumulative("gamma + a + a_h + a_js (evals at gamma)", start.elapsed());
 
+        #[cfg(feature = "range_proof_timing_univariate_v2")]
+        let start = Instant::now();
         // Step 10
         let s = sample_field_element(rng);
 
@@ -637,6 +753,14 @@ impl<E: Pairing> traits::BatchedRangeProof<E> for Proof<E> {
             &Scalar(s),
             0, // the `offset`
         );
+        #[cfg(feature = "range_proof_timing_univariate_v2")]
+        print_cumulative("rho_u + u_val + pi_gamma (hkzg open)", start.elapsed());
+
+        #[cfg(feature = "range_proof_timing_univariate_v2")]
+        println!(
+            "  [dekart_univariate_v2 prove] TOTAL: {:.2} ms",
+            prove_start.elapsed().as_secs_f64() * 1000.0
+        );
 
         Proof {
             hatC,
@@ -651,16 +775,33 @@ impl<E: Pairing> traits::BatchedRangeProof<E> for Proof<E> {
     }
 
     #[allow(non_snake_case)]
-    fn verify<R: RngCore + CryptoRng>(
+    fn pairing_for_verify<R: RngCore + CryptoRng>(
         &self,
         vk: &Self::VerificationKey,
         n: usize,
         ell: u8,
         comm: &Self::Commitment,
         rng: &mut R,
-    ) -> anyhow::Result<()> {
+    ) -> anyhow::Result<(Vec<E::G1Affine>, Vec<E::G2Affine>)> {
+        #[cfg(feature = "range_proof_timing_univariate_v2")]
+        let verify_start = Instant::now();
+        #[cfg(feature = "range_proof_timing_univariate_v2")]
+        let mut cumulative = Duration::ZERO;
+        #[cfg(feature = "range_proof_timing_univariate_v2")]
+        let mut print_cumulative = |name: &str, duration: Duration| {
+            cumulative += duration;
+            println!(
+                "  {:>10.2} ms  ({:>10.2} ms cum.)  [dekart_univariate_v2 verify] {}",
+                duration.as_secs_f64() * 1000.0,
+                cumulative.as_secs_f64() * 1000.0,
+                name
+            );
+        };
+
         let mut fs_t = merlin::Transcript::new(Self::DST);
 
+        #[cfg(feature = "range_proof_timing_univariate_v2")]
+        let start = Instant::now();
         // Step 1
         let VerificationKey {
             xi_1,
@@ -696,7 +837,11 @@ impl<E: Pairing> traits::BatchedRangeProof<E> for Proof<E> {
 
         // Step 2b
         fiat_shamir::append_hat_f_commitment::<E>(&mut fs_t, &hatC);
+        #[cfg(feature = "range_proof_timing_univariate_v2")]
+        print_cumulative("unpack + append_initial_data + append_hat_f", start.elapsed());
 
+        #[cfg(feature = "range_proof_timing_univariate_v2")]
+        let start = Instant::now();
         // Step 3
         let hom = two_term_msm::Homomorphism::<E::G1> {
             base_1: *lagr_0,
@@ -710,7 +855,11 @@ impl<E: Pairing> traits::BatchedRangeProof<E> for Proof<E> {
             Some(1), // TrivialShape has one element
             rng,
         )?;
+        #[cfg(feature = "range_proof_timing_univariate_v2")]
+        print_cumulative("two_term_msm verify", start.elapsed());
 
+        #[cfg(feature = "range_proof_timing_univariate_v2")]
+        let start = Instant::now();
         // Step 4a
         fiat_shamir::append_sigma_proof::<E>(&mut fs_t, &pi_PoK);
 
@@ -725,7 +874,11 @@ impl<E: Pairing> traits::BatchedRangeProof<E> for Proof<E> {
 
         // Step 7
         let (mu, mu_h, mu_js) = fiat_shamir::get_mu_challenges::<E>(&mut fs_t, ell as usize);
+        #[cfg(feature = "range_proof_timing_univariate_v2")]
+        print_cumulative("append_sigma + append_f_j + get_beta + append_h + get_mu", start.elapsed());
 
+        #[cfg(feature = "range_proof_timing_univariate_v2")]
+        let start = Instant::now();
         // Step 8
         let U_bases: Vec<E::G1Affine> = {
             let mut v = Vec::with_capacity(2 + Cs.len());
@@ -744,7 +897,11 @@ impl<E: Pairing> traits::BatchedRangeProof<E> for Proof<E> {
         };
 
         let U = E::G1::msm(&U_bases, &U_scalars).expect("Failed to compute MSM in DeKARTv2");
+        #[cfg(feature = "range_proof_timing_univariate_v2")]
+        print_cumulative("U_bases + U_scalars + MSM", start.elapsed());
 
+        #[cfg(feature = "range_proof_timing_univariate_v2")]
+        let start = Instant::now();
         // Step 9
         let gamma =
             fiat_shamir::get_gamma_challenge::<E>(&mut fs_t, &verifier_precomputed.roots_of_unity);
@@ -758,15 +915,11 @@ impl<E: Pairing> traits::BatchedRangeProof<E> for Proof<E> {
                 .map(|(&a_j, &mu_j)| a_j * mu_j)
                 .sum::<E::ScalarField>();
 
-        use sigma_protocol::homomorphism::TrivialShape as HkzgCommitment;
-        univariate_hiding_kzg::CommitmentHomomorphism::verify(
-            *vk_hkzg,
-            HkzgCommitment(U), // TODO: Ugh univariate_hiding_kzg::Commitment(U) does not work because it's a tuple struct, see https://github.com/rust-lang/rust/issues/17422; So make it a struct with one named field?
-            gamma,
-            a_u,
-            pi_gamma.clone(),
-        )?;
+        #[cfg(feature = "range_proof_timing_univariate_v2")]
+        print_cumulative("gamma + a_u + hkzg verify", start.elapsed());
 
+        #[cfg(feature = "range_proof_timing_univariate_v2")]
+        let start = Instant::now();
         // Step 11
         let num_omegas = verifier_precomputed.roots_of_unity.len();
 
@@ -800,8 +953,24 @@ impl<E: Pairing> traits::BatchedRangeProof<E> for Proof<E> {
         };
 
         anyhow::ensure!(LHS == RHS);
+        #[cfg(feature = "range_proof_timing_univariate_v2")]
+        print_cumulative("LHS/RHS (V_eval_gamma + sum1 + sum2) + ensure", start.elapsed());
 
-        Ok(())
+        #[cfg(feature = "range_proof_timing_univariate_v2")]
+        println!(
+            "  [dekart_univariate_v2 verify] TOTAL: {:.2} ms",
+            verify_start.elapsed().as_secs_f64() * 1000.0
+        );
+
+
+        use sigma_protocol::homomorphism::TrivialShape as HkzgCommitment;
+        Ok(univariate_hiding_kzg::CommitmentHomomorphism::pairing_for_verify(
+            *vk_hkzg,
+            HkzgCommitment(U), // TODO: Ugh univariate_hiding_kzg::Commitment(U) does not work because it's a tuple struct, see https://github.com/rust-lang/rust/issues/17422; So make it a struct with one named field?
+            gamma,
+            a_u,
+            pi_gamma.clone(),
+        ))
     }
 
     fn maul(&mut self) {

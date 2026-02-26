@@ -5,6 +5,7 @@
 
 // WARNING: THIS CODE HAS NOT BEEN PROPERLY VETTED, ONLY USE FOR BENCHMARKING PURPOSES!!!!!
 
+use ark_ff::AdditiveGroup;
 use crate::{
     fiat_shamir::PolynomialCommitmentScheme as _,
     pcs::{
@@ -439,17 +440,32 @@ where
     proof
 }
 
-/// Verifier derives gamma, z and c from the shared transcript (same trs as prover, or
-/// a fresh transcript with the same DST and prior content so challenges match).
-/// Commitments are given as MSM inputs so they can be combined into one MSM with the opening weights.
-#[allow(non_snake_case)]
 pub fn zk_pcs_verify<E: Pairing, R: RngCore + CryptoRng>(
     zk_pcs_opening_proof: &ZkPcsOpeningProof<E>,
     commitment_msms: &[MsmInput<E::G1Affine, E::ScalarField>],
     srs: &Srs<E>,
     trs: &mut merlin::Transcript,
     rng: &mut R,
-) -> anyhow::Result<()>
+) -> anyhow::Result<()> {
+    let (g1_terms, g2_terms) = zk_pcs_pairing_for_verify(zk_pcs_opening_proof, commitment_msms, srs, trs, rng)?;
+
+    let check = E::multi_pairing(g1_terms, g2_terms);
+    anyhow::ensure!(PairingOutput::<E>::ZERO == check);
+
+    Ok(())
+}
+
+/// Verifier derives gamma, z and c from the shared transcript (same trs as prover, or
+/// a fresh transcript with the same DST and prior content so challenges match).
+/// Commitments are given as MSM inputs so they can be combined into one MSM with the opening weights.
+#[allow(non_snake_case)]
+pub fn zk_pcs_pairing_for_verify<E: Pairing, R: RngCore + CryptoRng>(
+    zk_pcs_opening_proof: &ZkPcsOpeningProof<E>,
+    commitment_msms: &[MsmInput<E::G1Affine, E::ScalarField>],
+    srs: &Srs<E>,
+    trs: &mut merlin::Transcript,
+    rng: &mut R,
+) -> anyhow::Result<(Vec<E::G1Affine>, Vec<E::G2Affine>)>
 where
     E::ScalarField: FftField,
 {
@@ -637,25 +653,25 @@ where
     // Check: e(F + z·W', [1]_2) = e(W', [τ]_2) · e(Y, [ξ]_2)
     // So e(F+z·W', g_2) · e(−W', τ_2) · e(−Y, ξ_2) = identity
     let F = sum_com - (*W) * z_T_val - V;
-    let g1_terms = vec![
-        (F + (*W_prime) * z).into_affine(),
-        (-(*W_prime).into_group()).into_affine(),
-        (-(*Y).into_group()).into_affine(),
+    let g1_terms_proj = vec![
+        (F + (*W_prime) * z),
+        (-(*W_prime).into_group()),
+        (-(*Y).into_group()),
     ];
     let g2_terms = vec![srs.g_2, srs.tau_2, srs.xi_2];
-    #[cfg(feature = "pcs_verify_timing")]
-    print_cumulative("z_T.evaluate + F + g1/g2_terms", start.elapsed());
+    // #[cfg(feature = "pcs_verify_timing")]
+    // print_cumulative("z_T.evaluate + F + g1/g2_terms", start.elapsed());
 
-    #[cfg(feature = "pcs_verify_timing")]
-    let start = Instant::now();
-    let result = E::multi_pairing(g1_terms, g2_terms);
-    #[cfg(feature = "pcs_verify_timing")]
-    print_cumulative("multi_pairing", start.elapsed());
-    if PairingOutput::<E>::zero() != result {
-        return Err(anyhow::anyhow!("Expected zero during multi-pairing check"));
-    }
+    // #[cfg(feature = "pcs_verify_timing")]
+    // let start = Instant::now();
+    // let result = E::multi_pairing(g1_terms, g2_terms);
+    // #[cfg(feature = "pcs_verify_timing")]
+    // print_cumulative("multi_pairing", start.elapsed());
+    // if PairingOutput::<E>::zero() != result {
+    //     return Err(anyhow::anyhow!("Expected zero during multi-pairing check"));
+    // }
 
-    Ok(())
+    Ok((E::G1::normalize_batch(&g1_terms_proj), g2_terms))
 }
 
 // ---------------------------------------------------------------------------

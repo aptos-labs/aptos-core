@@ -5,7 +5,10 @@ use aptos_crypto::arkworks::{random::UniformRand, GroupGenerators};
 use ark_ec::pairing::Pairing;
 use ark_serialize::{CanonicalDeserialize, CanonicalSerialize};
 use rand::{CryptoRng, RngCore};
+use ark_ec::pairing::PairingOutput;
+use ark_ff::AdditiveGroup;
 
+// TODO: split this into `BatchedRangeProof` and `PairingBatchedRangeProof: BatchedRangeProof`? Or only do PairingBatchedRangeProof for now?
 pub trait BatchedRangeProof<E: Pairing>: Clone + CanonicalSerialize + CanonicalDeserialize {
     type PublicStatement: CanonicalSerialize; // Serialization is needed because this is often appended to a Fiat-Shamir transcript
     type ProverKey;
@@ -59,7 +62,22 @@ pub trait BatchedRangeProof<E: Pairing>: Clone + CanonicalSerialize + CanonicalD
         ell: u8,
         comm: &Self::Commitment,
         rng: &mut R,
-    ) -> anyhow::Result<()>;
+    ) -> anyhow::Result<()> {
+        let (g1_terms, g2_terms) = self.pairing_for_verify(vk, n, ell, comm, rng)?;
+        let check = E::multi_pairing(g1_terms, g2_terms);
+        anyhow::ensure!(PairingOutput::<E>::ZERO == check);
+
+        Ok(())
+    }
+
+    fn pairing_for_verify<R: RngCore + CryptoRng>(
+        &self,
+        vk: &Self::VerificationKey,
+        n: usize,
+        ell: u8,
+        comm: &Self::Commitment,
+        rng: &mut R,
+    ) -> anyhow::Result<(Vec<E::G1Affine>, Vec<E::G2Affine>)>;
 
     fn maul(&mut self);
 }

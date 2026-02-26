@@ -50,6 +50,7 @@ fuzzing = []
 parallel = []
 range_proof_timing = []
 range_proof_timing_multivariate = []  # per-component timing for dekart_multivariate verify()
+range_proof_timing_univariate_v2 = []  # per-component timing for dekart_univariate_v2 prove/verify/setup
 pcs_verify_timing = []  # per-component timing for zk_pcs_verify()
 
 [[bench]]
