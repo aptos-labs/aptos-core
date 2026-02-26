@@ -71,6 +71,24 @@ fn apply_devnet_consensus_config(config: &mut aptos_config::config::NodeConfig) 
         .proxy_consensus_config
         .max_proxy_block_txns_after_filtering = 200;
     config.consensus.proxy_consensus_config.max_proxy_block_bytes = 5 * 1024 * 1024;
+
+    // Proxy timeout tuning: default 100ms base causes ~15-65% of rounds to
+    // timeout at 70 rounds/s. 300ms gives more headroom while staying 3x
+    // faster than primary (1000ms).
+    config
+        .consensus
+        .proxy_consensus_config
+        .round_initial_timeout_ms = 300;
+    config
+        .consensus
+        .proxy_consensus_config
+        .round_timeout_backoff_max_exponent = 6;
+
+    // Disable mempool failover broadcast to prevent cross-proxy txn sharing.
+    // With QS enabled, each proxy validator should only batch transactions
+    // submitted directly to it. Failover gossip causes the same txn to appear
+    // in different QS batches from different validators → duplicate execution.
+    config.mempool.default_failovers = 0;
 }
 
 /// Remote test: 7 validators (4 proxy + 3 primary-only), multi-region network emulation.
