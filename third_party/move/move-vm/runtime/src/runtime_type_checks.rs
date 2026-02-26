@@ -139,6 +139,39 @@ fn verify_pack<'a>(
     operand_stack.push_ty(output_ty)
 }
 
+pub(crate) fn check_function_type_count_and_depth(
+    ty_builder: &TypeBuilder,
+    func: &LoadedFunction,
+    mask: ClosureMask,
+) -> PartialVMResult<()> {
+    // Abilities are not important for the depth / size checks.
+    create_function_type(ty_builder, func, mask, AbilitySet::PUBLIC_FUNCTIONS)?;
+    Ok(())
+}
+
+pub(crate) fn create_function_type(
+    ty_builder: &TypeBuilder,
+    func: &LoadedFunction,
+    mask: ClosureMask,
+    abilities: AbilitySet,
+) -> PartialVMResult<Type> {
+    let args = mask
+        .extract(func.param_tys(), false)
+        .into_iter()
+        .map(|curried| with_owned_instantiation(ty_builder, func, curried, Ok))
+        .collect::<PartialVMResult<Vec<_>>>()?;
+    let results = func
+        .return_tys()
+        .iter()
+        .map(|ret| with_owned_instantiation(ty_builder, func, ret, Ok))
+        .collect::<PartialVMResult<Vec<_>>>()?;
+    Ok(Type::Function {
+        args,
+        results,
+        abilities,
+    })
+}
+
 pub fn verify_pack_closure(
     ty_builder: &TypeBuilder,
     operand_stack: &mut Stack,
@@ -168,21 +201,7 @@ pub fn verify_pack_closure(
         })?
     }
     // Push result type onto stack
-    let args = mask
-        .extract(func.param_tys(), false)
-        .into_iter()
-        .map(|curried| with_owned_instantiation(ty_builder, func, curried, Ok))
-        .collect::<PartialVMResult<Vec<_>>>()?;
-    let results = func
-        .return_tys()
-        .iter()
-        .map(|ret| with_owned_instantiation(ty_builder, func, ret, Ok))
-        .collect::<PartialVMResult<Vec<_>>>()?;
-    operand_stack.push_ty(Type::Function {
-        args,
-        results,
-        abilities,
-    })?;
+    operand_stack.push_ty(create_function_type(ty_builder, func, mask, abilities)?)?;
 
     Ok(())
 }

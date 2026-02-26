@@ -17,8 +17,8 @@ use crate::{
     reentrancy_checker::{CallType, ReentrancyChecker},
     runtime_ref_checks::{FullRuntimeRefCheck, NoRuntimeRefCheck, RefCheckState, RuntimeRefCheck},
     runtime_type_checks::{
-        verify_pack_closure, FullRuntimeTypeCheck, NoRuntimeTypeCheck, RuntimeTypeCheck,
-        UntrustedOnlyRuntimeTypeCheck,
+        check_function_type_count_and_depth, verify_pack_closure, FullRuntimeTypeCheck,
+        NoRuntimeTypeCheck, RuntimeTypeCheck, UntrustedOnlyRuntimeTypeCheck,
     },
     storage::{
         loader::traits::Loader, ty_depth_checker::TypeDepthChecker,
@@ -2237,10 +2237,16 @@ impl Frame {
                     },
                     Instruction::LdConst(idx) => {
                         let constant = self.constant_at(*idx);
+                        let num_nodes = if self.ty_builder.check_depth_on_type_counts_v2 {
+                            let (num_nodes, depth) = constant.type_.num_nodes_with_depth();
+                            self.ty_builder
+                                .check_final_size_and_depth(num_nodes as u64, depth as u64)?;
+                            num_nodes
+                        } else {
+                            constant.type_.num_nodes()
+                        };
 
-                        gas_meter.charge_create_ty(NumTypeNodes::new(
-                            constant.type_.num_nodes() as u64,
-                        ))?;
+                        gas_meter.charge_create_ty(NumTypeNodes::new(num_nodes as u64))?;
                         gas_meter.charge_ld_const(NumBytes::new(constant.data.len() as u64))?;
 
                         let val = Value::deserialize_constant(constant).ok_or_else(|| {
@@ -2647,7 +2653,17 @@ impl Frame {
                                 &function,
                                 *mask,
                             )?;
+                        } else if trace_recorder.is_enabled() {
+                            // Otherwise, we run checks async: check the depth of the type.
+                            // This is wasteful but prevents async checks to fail on type
+                            // size limits.
+                            check_function_type_count_and_depth(
+                                self.ty_builder(),
+                                &function,
+                                *mask,
+                            )?;
                         }
+
                         let captured = interpreter.operand_stack.popn(mask.captured_count())?;
                         interpreter.check_depth_of_closure_captured_values(&captured)?;
                         let lazy_function = LazyLoadedFunction::new_resolved(
@@ -2703,6 +2719,15 @@ impl Frame {
                             verify_pack_closure(
                                 self.ty_builder(),
                                 &mut interpreter.operand_stack,
+                                &function,
+                                *mask,
+                            )?;
+                        } else if trace_recorder.is_enabled() {
+                            // Otherwise, we run checks async: check the depth of the type.
+                            // This is wasteful but prevents async checks to fail on type
+                            // size limits.
+                            check_function_type_count_and_depth(
+                                self.ty_builder(),
                                 &function,
                                 *mask,
                             )?;
@@ -3095,7 +3120,11 @@ impl Frame {
                         gas_meter.charge_simple_instr(S::Nop)?;
                     },
                     Instruction::VecPack(si, num) => {
-                        let (ty, ty_count) = frame_cache.get_signature_index_type(*si, self)?;
+                        let (ty, ty_count) = if self.ty_builder.check_depth_on_type_counts_v2 {
+                            frame_cache.get_signature_index_type_for_vec_pack(*si, self)?
+                        } else {
+                            frame_cache.get_signature_index_type(*si, self)?
+                        };
                         gas_meter.charge_create_ty(ty_count)?;
                         interpreter.ty_depth_checker.check_depth_of_type(
                             gas_meter,

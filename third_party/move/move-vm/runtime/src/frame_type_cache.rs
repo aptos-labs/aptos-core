@@ -217,6 +217,28 @@ impl FrameTypeCache {
         Ok((ty, *ty_count))
     }
 
+    /// Used when processing `vec_pack` instruction. In addition to construction of the element
+    /// type T, checks if the "final" type `vector<T>` is within size and depth limits.
+    pub(crate) fn get_signature_index_type_for_vec_pack(
+        &mut self,
+        idx: SignatureIndex,
+        frame: &Frame,
+    ) -> PartialVMResult<(&Type, NumTypeNodes)> {
+        let (ty, ty_count) = get_or_insert!(&mut self.single_sig_token_type, idx, {
+            let ty = frame.instantiate_single_type(idx)?;
+            let (count, depth) = ty.num_nodes_with_depth();
+
+            // Need to add extra 1 to element node counts and depth to account for vector node.
+            frame
+                .ty_builder
+                .check_final_size_and_depth(count as u64 + 1, depth as u64 + 1)?;
+
+            let ty_count = NumTypeNodes::new(ty.num_nodes() as u64);
+            (ty, ty_count)
+        });
+        Ok((ty, *ty_count))
+    }
+
     pub(crate) fn make_rc() -> Rc<RefCell<Self>> {
         Rc::new(RefCell::<Self>::new(Default::default()))
     }

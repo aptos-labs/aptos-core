@@ -26,6 +26,7 @@ use move_core_types::{
     identifier::{IdentStr, Identifier},
     language_storage::{ModuleId, StructTag, TypeTag},
     value::{MoveTypeLayout, MoveValue},
+    vm_status::StatusType,
 };
 use move_model::metadata::LanguageVersion;
 use move_resource_viewer::MoveValueAnnotator;
@@ -495,6 +496,14 @@ impl SimpleVMTestAdapter<'_> {
                 );
                 let trace = logger.finish();
                 let replay_result = TypeChecker::new(code_storage).replay(&trace);
+                if let Err(err) = &replay_result {
+                    if err.status_type() != StatusType::InvariantViolation {
+                        panic!(
+                            "Replay should never fail with non-invariant violation: {:?}",
+                            err
+                        );
+                    }
+                }
                 match replay_result.and(result) {
                     Ok(return_values) => (return_values, Some(trace)),
                     Err(err) => return (Err(err), Some(trace)),

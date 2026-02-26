@@ -473,7 +473,7 @@ mod tests {
 
     #[test]
     fn test_ty_to_ty_tag() {
-        let ty_builder = TypeBuilder::with_limits(10, 10);
+        let ty_builder = TypeBuilder::with_limits(10, 10, true);
 
         let runtime_environment = RuntimeEnvironment::new(vec![]);
         let ty_tag_converter = TypeTagConverter::new(&runtime_environment);
@@ -570,7 +570,7 @@ mod tests {
 
     #[test]
     fn test_ty_to_ty_tag_too_complex() {
-        let ty_builder = TypeBuilder::with_limits(10, 10);
+        let ty_builder = TypeBuilder::with_limits(10, 10, true);
 
         let vm_config = VMConfig {
             type_base_cost: 1,

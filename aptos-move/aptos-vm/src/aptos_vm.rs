@@ -2185,9 +2185,16 @@ impl AptosVM {
             );
         }
 
-        // Whether user transaction succeeded or failed (e.g., abort in Move code or running out
-        // of gas in epilogue), we record the trace of all executed instructions.
-        output.set_trace(trace_recorder.finish());
+        // Only if user transaction succeeded, record the trace of all executed instructions.
+        // If transaction did not succeed, its side effects are discarded and so there is no
+        // need to replay the trace for extra runtime checks.
+        if output
+            .status()
+            .as_kept_status()
+            .is_ok_and(|s| s.is_success())
+        {
+            output.set_trace(trace_recorder.finish());
+        }
 
         (vm_status, output)
     }

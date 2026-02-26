@@ -255,7 +255,7 @@ impl Environment {
                 )
             },
             Err(_) => {
-                let ty_builder = aptos_default_ty_builder();
+                let ty_builder = aptos_default_ty_builder(true);
                 (
                     NativeGasParameters::zeros(),
                     MiscGasParameters::zeros(),
