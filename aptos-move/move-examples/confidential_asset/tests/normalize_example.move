@@ -6,8 +6,6 @@ module confidential_asset_example::normalize_example {
 
     use aptos_experimental::confidential_asset;
     use aptos_experimental::confidential_asset_tests;
-    use aptos_experimental::confidential_balance;
-    use aptos_experimental::confidential_proof;
     use aptos_experimental::ristretto255_twisted_elgamal as twisted_elgamal;
 
     fun normalize(bob: &signer, token: Object<Metadata>) {
@@ -16,11 +14,10 @@ module confidential_asset_example::normalize_example {
         // It's a test-only function, so we don't need to worry about the security of the keypair.
         let (bob_dk, bob_ek) = twisted_elgamal::generate_twisted_elgamal_keypair();
 
-        let bob_ek_bytes = twisted_elgamal::pubkey_to_bytes(&bob_ek);
+        let bob_amount: u128 = 500;
 
-        let bob_amount = 500;
-
-        confidential_asset::register(bob, token, bob_ek_bytes);
+        let proof = confidential_asset::prove_registration(bob_addr, token, &bob_dk);
+        confidential_asset::register(bob, token, bob_ek, proof);
         confidential_asset::deposit(bob, token, (bob_amount as u64));
 
         // The rollover function is the only function that requires the actual balance to be normalized
@@ -35,28 +32,17 @@ module confidential_asset_example::normalize_example {
         // You will get an error if you try to rollover an unnormalized balance:
         // confidential_asset::rollover_pending_balance(bob, token);
 
-        let current_balance = confidential_balance::decompress(
-            &confidential_asset::get_available_balance(bob_addr, token)
-        );
-
-        let (
-            proof,
-            new_balance
-        ) = confidential_proof::prove_normalization(
+        let normalization_proof = confidential_asset::prove_normalization(
+            bob_addr,
+            token,
             &bob_dk,
-            &bob_ek,
             bob_amount,
-            &current_balance
         );
-
-        let (sigma_proof, zkrp_new_balance) = confidential_proof::serialize_normalization_proof(&proof);
 
         confidential_asset::normalize(
             bob,
             token,
-            confidential_balance::balance_to_bytes(&new_balance),
-            zkrp_new_balance,
-            sigma_proof
+            normalization_proof
         );
 
         assert!(confidential_asset::is_normalized(bob_addr, token));

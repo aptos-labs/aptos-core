@@ -1,468 +1,152 @@
 #[test_only]
 module aptos_experimental::confidential_proof_tests {
-    use aptos_std::ristretto255::CompressedRistretto;
-    use aptos_experimental::confidential_balance::{Self, get_num_pending_chunks, get_num_available_chunks};
-    use aptos_experimental::confidential_proof;
+    use std::signer;
+    use aptos_framework::account;
+    use aptos_experimental::confidential_asset;
+    use aptos_experimental::confidential_asset_tests;
     use aptos_experimental::ristretto255_twisted_elgamal::generate_twisted_elgamal_keypair;
-
-    struct WithdrawParameters has drop {
-        ek: CompressedRistretto,
-        amount: u64,
-        current_balance: confidential_balance::ConfidentialBalance,
-        new_balance: confidential_balance::ConfidentialBalance,
-        proof: confidential_proof::WithdrawalProof
-    }
-
-    struct TransferParameters has drop {
-        sender_ek: CompressedRistretto,
-        recipient_ek: CompressedRistretto,
-        amount: u64,
-        new_amount: u128,
-        current_balance: confidential_balance::ConfidentialBalance,
-        new_balance: confidential_balance::ConfidentialBalance,
-        sender_amount: confidential_balance::ConfidentialBalance,
-        recipient_amount: confidential_balance::ConfidentialBalance,
-        auditor_eks: vector<CompressedRistretto>,
-        auditor_amounts: vector<confidential_balance::ConfidentialBalance>,
-        proof: confidential_proof::TransferProof
-    }
-
-    struct NormalizationParameters has drop {
-        ek: CompressedRistretto,
-        amount: u128,
-        current_balance: confidential_balance::ConfidentialBalance,
-        new_balance: confidential_balance::ConfidentialBalance,
-        proof: confidential_proof::NormalizationProof
-    }
-
-    fun withdraw(): WithdrawParameters {
-        withdraw_with_params(150, 100, 50)
-    }
-
-    fun withdraw_with_params(
-        current_amount: u128, new_amount: u128, amount: u64
-    ): WithdrawParameters {
-        let (dk, ek) = generate_twisted_elgamal_keypair();
-
-        let current_balance_r = confidential_balance::generate_balance_randomness();
-
-        let current_balance =
-            confidential_balance::new_balance_from_amount(
-                current_amount, get_num_available_chunks(), &current_balance_r, &ek
-            );
-
-        let (proof, new_balance) =
-            confidential_proof::prove_withdrawal(
-                &dk, &ek, amount, new_amount, &current_balance
-            );
-
-        WithdrawParameters { ek, amount, current_balance, new_balance, proof }
-    }
-
-    fun transfer(): TransferParameters {
-        transfer_with_parameters(150, 100, 50)
-    }
-
-    fun transfer_with_parameters(
-        current_amount: u128, new_amount: u128, amount: u64
-    ): TransferParameters {
-        let (sender_dk, sender_ek) = generate_twisted_elgamal_keypair();
-        let (_, recipient_ek) = generate_twisted_elgamal_keypair();
-
-        let current_balance_r = confidential_balance::generate_balance_randomness();
-        let current_balance =
-            confidential_balance::new_balance_from_amount(
-                current_amount,
-                get_num_available_chunks(),
-                &current_balance_r,
-                &sender_ek
-            );
-
-        let (_, auditor_ek) = generate_twisted_elgamal_keypair();
-
-        let auditor_eks = vector[auditor_ek];
-
-        let (proof, new_balance, sender_amount, recipient_amount, auditor_amounts) =
-            confidential_proof::prove_transfer(
-                &sender_dk,
-                &sender_ek,
-                &recipient_ek,
-                amount,
-                new_amount,
-                &current_balance,
-                &auditor_eks
-            );
-
-        TransferParameters {
-            sender_ek,
-            recipient_ek,
-            amount,
-            new_amount,
-            current_balance,
-            new_balance,
-            sender_amount,
-            recipient_amount,
-            auditor_eks,
-            auditor_amounts,
-            proof
-        }
-    }
-
-    fun normalize(): NormalizationParameters {
-        let (dk, ek) = generate_twisted_elgamal_keypair();
-
-        let amount = 1 << 16;
-
-        let current_balance_r = confidential_balance::generate_balance_randomness();
-        let current_balance =
-            confidential_balance::new_balance_from_amount(
-                amount / 2, get_num_available_chunks(), &current_balance_r, &ek
-            );
-        confidential_balance::add_balances_mut(
-            &mut current_balance,
-            &confidential_balance::new_balance_from_amount(
-                amount / 2, get_num_available_chunks(), &current_balance_r, &ek
-            )
-        );
-
-        let (proof, new_balance) =
-            confidential_proof::prove_normalization(&dk, &ek, amount, &current_balance);
-
-        NormalizationParameters { ek, amount, current_balance, new_balance, proof }
-    }
 
     #[test]
     fun success_withdraw() {
-        let params = withdraw();
+        let aptos_fx = account::create_signer_for_test(@aptos_framework);
+        let ca_signer = account::create_signer_for_test(@aptos_experimental);
+        let fa_signer = account::create_signer_for_test(@0xfa);
+        let sender = account::create_signer_for_test(@0xa1);
+        let recipient = account::create_signer_for_test(@0xb0);
 
-        confidential_proof::verify_withdrawal_proof(
-            &params.ek,
-            params.amount,
-            &params.current_balance,
-            &params.new_balance,
-            &params.proof
+        let token = confidential_asset_tests::set_up_for_confidential_asset_test(
+            &ca_signer, &aptos_fx, &fa_signer, &sender, &recipient, 500, 0
+        );
+
+        let (dk, ek) = generate_twisted_elgamal_keypair();
+        let reg_proof = confidential_asset::prove_registration(signer::address_of(&sender), token, &dk);
+        confidential_asset::register(&sender, token, ek, reg_proof);
+
+        confidential_asset::deposit(&sender, token, 150);
+        confidential_asset::rollover_pending_balance(&sender, token);
+
+        let amount: u64 = 50;
+        let new_amount: u128 = 100;
+
+        let sender_addr = signer::address_of(&sender);
+        let proof = confidential_asset::prove_withdrawal(sender_addr, token, &dk, amount, new_amount);
+
+        let sender_ek = confidential_asset::get_encryption_key(sender_addr, token);
+        let current_balance = confidential_asset::get_available_balance(sender_addr, token);
+        let auditor_ek = confidential_asset::get_effective_auditor(token);
+
+        confidential_asset::assert_valid_withdrawal_proof(
+            &sender, token, &sender_ek, amount, &current_balance, &auditor_ek, proof
         );
     }
 
-    #[test]
-    #[expected_failure(abort_code = 0x010001, location = confidential_proof)]
-    fun fail_withdraw_if_wrong_amount() {
-        let params = withdraw();
-
-        confidential_proof::verify_withdrawal_proof(
-            &params.ek,
-            1000,
-            &params.current_balance,
-            &params.new_balance,
-            &params.proof
-        );
-    }
-
-    #[test]
-    #[expected_failure(abort_code = 0x010001, location = confidential_proof)]
-    fun fail_withdraw_if_wrong_current_balance() {
-        let params = withdraw();
-
-        confidential_proof::verify_withdrawal_proof(
-            &params.ek,
-            params.amount,
-            &confidential_balance::new_balance_from_amount(
-                1000,
-                get_num_available_chunks(),
-                &confidential_balance::generate_balance_randomness(),
-                &params.ek
-            ),
-            &params.new_balance,
-            &params.proof
-        );
-    }
-
-    #[test]
-    #[expected_failure(abort_code = 0x010001, location = confidential_proof)]
-    fun fail_withdraw_if_wrong_new_balance() {
-        let params = withdraw();
-
-        confidential_proof::verify_withdrawal_proof(
-            &params.ek,
-            params.amount,
-            &params.current_balance,
-            &confidential_balance::new_balance_from_amount(
-                1000,
-                get_num_available_chunks(),
-                &confidential_balance::generate_balance_randomness(),
-                &params.ek
-            ),
-            &params.proof
-        );
-    }
-
-    #[test]
-    #[expected_failure(abort_code = 0x010001, location = confidential_proof)]
-    fun fail_withdraw_if_negative_new_balance() {
-        // 0 - 1 = max_uint128
-        let max_uint128 = 340282366920938463463374607431768211455;
-        let params = withdraw_with_params(0, max_uint128 - 1, 1);
-
-        confidential_proof::verify_withdrawal_proof(
-            &params.ek,
-            params.amount,
-            &params.current_balance,
-            &params.new_balance,
-            &params.proof
-        );
-    }
+    // TODO: Rewrite `fail_withdraw_if_wrong_amount` as an SDK test
+    // TODO: Rewrite `fail_withdraw_if_wrong_current_balance` as an SDK test
+    // TODO: Rewrite `fail_withdraw_if_negative_new_balance` as an SDK test
+    // TODO: Rewrite `fail_withdraw_if_wrong_new_balance` as an SDK test
 
     #[test]
     fun success_transfer() {
-        let params = transfer();
+        let aptos_fx = account::create_signer_for_test(@aptos_framework);
+        let ca_signer = account::create_signer_for_test(@aptos_experimental);
+        let fa_signer = account::create_signer_for_test(@0xfa);
+        let sender = account::create_signer_for_test(@0xa1);
+        let recipient = account::create_signer_for_test(@0xb0);
 
-        confidential_proof::verify_transfer_proof(
-            &params.sender_ek,
-            &params.recipient_ek,
-            &params.current_balance,
-            &params.new_balance,
-            &params.sender_amount,
-            &params.recipient_amount,
-            &params.auditor_eks,
-            &params.auditor_amounts,
-            &params.proof
+        let token = confidential_asset_tests::set_up_for_confidential_asset_test(
+            &ca_signer, &aptos_fx, &fa_signer, &sender, &recipient, 500, 500
         );
-    }
 
-    #[test]
-    #[expected_failure(abort_code = 0x010001, location = confidential_proof)]
-    fun fail_transfer_if_wrong_sender_ek() {
-        let params = transfer();
+        let (sender_dk, sender_ek) = generate_twisted_elgamal_keypair();
+        let (_, _recipient_ek) = generate_twisted_elgamal_keypair();
 
-        confidential_proof::verify_transfer_proof(
-            &params.recipient_ek,
-            &params.recipient_ek,
-            &params.current_balance,
-            &params.new_balance,
-            &params.sender_amount,
-            &params.recipient_amount,
-            &params.auditor_eks,
-            &params.auditor_amounts,
-            &params.proof
-        );
-    }
+        let sender_addr = signer::address_of(&sender);
+        let recipient_addr = signer::address_of(&recipient);
 
-    #[test]
-    #[expected_failure(abort_code = 0x010001, location = confidential_proof)]
-    fun fail_transfer_if_wrong_recipient_ek() {
-        let params = transfer();
+        let reg_proof = confidential_asset::prove_registration(sender_addr, token, &sender_dk);
+        confidential_asset::register(&sender, token, sender_ek, reg_proof);
+        // Register recipient so prove_transfer can read their EK
+        let (recipient_dk, recipient_ek2) = generate_twisted_elgamal_keypair();
+        let reg_proof2 = confidential_asset::prove_registration(recipient_addr, token, &recipient_dk);
+        confidential_asset::register(&recipient, token, recipient_ek2, reg_proof2);
 
-        confidential_proof::verify_transfer_proof(
-            &params.sender_ek,
-            &params.sender_ek,
-            &params.current_balance,
-            &params.new_balance,
-            &params.sender_amount,
-            &params.recipient_amount,
-            &params.auditor_eks,
-            &params.auditor_amounts,
-            &params.proof
-        );
-    }
+        confidential_asset::deposit(&sender, token, 150);
+        confidential_asset::rollover_pending_balance(&sender, token);
 
-    #[test]
-    #[expected_failure(abort_code = 0x010001, location = confidential_proof)]
-    fun fail_transfer_if_wrong_current_balance() {
-        let params = transfer();
-
-        confidential_proof::verify_transfer_proof(
-            &params.sender_ek,
-            &params.recipient_ek,
-            &confidential_balance::new_balance_from_amount(
-                1000,
-                get_num_available_chunks(),
-                &confidential_balance::generate_balance_randomness(),
-                &params.sender_ek
-            ),
-            &params.new_balance,
-            &params.sender_amount,
-            &params.recipient_amount,
-            &params.auditor_eks,
-            &params.auditor_amounts,
-            &params.proof
-        );
-    }
-
-    #[test]
-    #[expected_failure(abort_code = 0x010001, location = confidential_proof)]
-    fun fail_transfer_if_negative_new_balance() {
-        // 0 - 1 = max_uint128
-        let max_uint128 = 340282366920938463463374607431768211455;
-        let params = transfer_with_parameters(0, max_uint128 - 1, 1);
-
-        confidential_proof::verify_transfer_proof(
-            &params.sender_ek,
-            &params.recipient_ek,
-            &params.current_balance,
-            &params.new_balance,
-            &params.sender_amount,
-            &params.recipient_amount,
-            &params.auditor_eks,
-            &params.auditor_amounts,
-            &params.proof
-        );
-    }
-
-    #[test]
-    #[expected_failure(abort_code = 0x010001, location = confidential_proof)]
-    fun fail_transfer_if_wrong_sender_amount() {
-        let params = transfer();
-
-        confidential_proof::verify_transfer_proof(
-            &params.sender_ek,
-            &params.recipient_ek,
-            &params.current_balance,
-            &params.new_balance,
-            &confidential_balance::new_balance_from_amount(
-                1000,
-                get_num_pending_chunks(),
-                &confidential_balance::generate_balance_randomness(),
-                &params.recipient_ek
-            ),
-            &params.recipient_amount,
-            &params.auditor_eks,
-            &params.auditor_amounts,
-            &params.proof
-        );
-    }
-
-    #[test]
-    #[expected_failure(abort_code = 0x010001, location = confidential_proof)]
-    fun fail_transfer_if_wrong_recipient_amount() {
-        let params = transfer();
-
-        confidential_proof::verify_transfer_proof(
-            &params.sender_ek,
-            &params.recipient_ek,
-            &params.current_balance,
-            &params.new_balance,
-            &params.sender_amount,
-            &confidential_balance::new_balance_from_amount(
-                1000,
-                get_num_pending_chunks(),
-                &confidential_balance::generate_balance_randomness(),
-                &params.recipient_ek
-            ),
-            &params.auditor_eks,
-            &params.auditor_amounts,
-            &params.proof
-        );
-    }
-
-    #[test]
-    #[expected_failure(abort_code = 0x010001, location = confidential_proof)]
-    fun fail_transfer_if_wrong_auditor_eks() {
-        let params = transfer();
+        let amount: u64 = 50;
+        let new_amount: u128 = 100;
 
         let (_, auditor_ek) = generate_twisted_elgamal_keypair();
         let auditor_eks = vector[auditor_ek];
 
-        confidential_proof::verify_transfer_proof(
-            &params.sender_ek,
-            &params.recipient_ek,
-            &params.current_balance,
-            &params.new_balance,
-            &params.sender_amount,
-            &params.recipient_amount,
-            &auditor_eks,
-            &params.auditor_amounts,
-            &params.proof
-        );
-    }
-
-    #[test]
-    #[expected_failure(abort_code = 0x010001, location = confidential_proof)]
-    fun fail_transfer_if_wrong_auditor_amounts() {
-        let params = transfer();
-
-        let (_, auditor_ek) = generate_twisted_elgamal_keypair();
-        let auditor_amount =
-            confidential_balance::new_balance_from_amount(
-                1000,
-                get_num_pending_chunks(),
-                &confidential_balance::generate_balance_randomness(),
-                &auditor_ek
+        let (proof, _test_auditor_amounts) =
+            confidential_asset::prove_transfer(
+                sender_addr, recipient_addr, token,
+                &sender_dk, amount, new_amount,
+                &auditor_eks,
             );
-        let auditor_amounts = vector[auditor_amount];
 
-        confidential_proof::verify_transfer_proof(
-            &params.sender_ek,
-            &params.recipient_ek,
-            &params.current_balance,
-            &params.new_balance,
-            &params.sender_amount,
-            &params.recipient_amount,
-            &params.auditor_eks,
-            &auditor_amounts,
-            &params.proof
+        let sender_ek_compressed = confidential_asset::get_encryption_key(sender_addr, token);
+        let recipient_ek_compressed = confidential_asset::get_encryption_key(recipient_addr, token);
+        let current_balance = confidential_asset::get_available_balance(sender_addr, token);
+
+        confidential_asset::assert_valid_transfer_proof(
+            &sender, recipient_addr, token,
+            &sender_ek_compressed, &recipient_ek_compressed,
+            &current_balance, &auditor_eks,
+            false, // has_effective_auditor: no on-chain auditor
+            1, // num_extra_auditors: the one auditor is user-chosen
+            proof
         );
     }
+
+    // TODO: Rewrite `fail_transfer_if_wrong_sender_ek` as an SDK test
+    // TODO: Rewrite `fail_transfer_if_wrong_recipient_ek` as an SDK test
+    // TODO: Rewrite `fail_transfer_if_wrong_current_balance` as an SDK test
+    // TODO: Rewrite `fail_transfer_if_negative_new_balance` as an SDK test
+    // TODO: Rewrite `fail_transfer_if_wrong_sender_amount` as an SDK test
+    // TODO: Rewrite `fail_transfer_if_wrong_recipient_amount` as an SDK test
+    // TODO: Rewrite `fail_transfer_if_wrong_auditor_eks` as an SDK test
+    // TODO: Rewrite `fail_transfer_if_wrong_auditor_amounts` as an SDK test
 
     #[test]
     fun success_normalize() {
-        let params = normalize();
+        let aptos_fx = account::create_signer_for_test(@aptos_framework);
+        let ca_signer = account::create_signer_for_test(@aptos_experimental);
+        let fa_signer = account::create_signer_for_test(@0xfa);
+        let sender = account::create_signer_for_test(@0xa1);
+        let recipient = account::create_signer_for_test(@0xb0);
 
-        confidential_proof::verify_normalization_proof(
-            &params.ek,
-            &params.current_balance,
-            &params.new_balance,
-            &params.proof
+        let max_chunk_value: u64 = 1 << 16 - 1;
+        let token = confidential_asset_tests::set_up_for_confidential_asset_test(
+            &ca_signer, &aptos_fx, &fa_signer, &sender, &recipient, 2 * max_chunk_value, 0
+        );
+
+        let (dk, ek) = generate_twisted_elgamal_keypair();
+        let sender_addr = signer::address_of(&sender);
+
+        let reg_proof = confidential_asset::prove_registration(sender_addr, token, &dk);
+        confidential_asset::register(&sender, token, ek, reg_proof);
+
+        // Deposit twice to create an un-normalized balance after rollover
+        confidential_asset::deposit(&sender, token, max_chunk_value);
+        confidential_asset::deposit(&sender, token, max_chunk_value);
+        confidential_asset::rollover_pending_balance(&sender, token);
+
+        let amount: u128 = (2 * max_chunk_value as u128);
+
+        let proof = confidential_asset::prove_normalization(sender_addr, token, &dk, amount);
+
+        let sender_ek = confidential_asset::get_encryption_key(sender_addr, token);
+        let current_balance = confidential_asset::get_available_balance(sender_addr, token);
+        let auditor_ek = confidential_asset::get_effective_auditor(token);
+
+        confidential_asset::assert_valid_normalization_proof(
+            &sender, token, &sender_ek, &current_balance, &auditor_ek, proof
         );
     }
 
-    #[test]
-    #[expected_failure(abort_code = 0x010001, location = confidential_proof)]
-    fun fail_normalize_if_wrong_ek() {
-        let params = normalize();
-
-        let (_, ek) = generate_twisted_elgamal_keypair();
-
-        confidential_proof::verify_normalization_proof(
-            &ek,
-            &params.current_balance,
-            &params.new_balance,
-            &params.proof
-        );
-    }
-
-    #[test]
-    #[expected_failure(abort_code = 0x010001, location = confidential_proof)]
-    fun fail_normalize_if_wrong_current_balance() {
-        let params = normalize();
-
-        confidential_proof::verify_normalization_proof(
-            &params.ek,
-            &confidential_balance::new_balance_from_amount(
-                1000,
-                get_num_available_chunks(),
-                &confidential_balance::generate_balance_randomness(),
-                &params.ek
-            ),
-            &params.new_balance,
-            &params.proof
-        );
-    }
-
-    #[test]
-    #[expected_failure(abort_code = 0x010001, location = confidential_proof)]
-    fun fail_normalize_if_wrong_new_balance() {
-        let params = normalize();
-
-        confidential_proof::verify_normalization_proof(
-            &params.ek,
-            &params.current_balance,
-            &confidential_balance::new_balance_from_amount(
-                1000,
-                get_num_available_chunks(),
-                &confidential_balance::generate_balance_randomness(),
-                &params.ek
-            ),
-            &params.proof
-        );
-    }
+    // TODO: Rewrite `fail_normalize_if_wrong_ek` as an SDK test
+    // TODO: Rewrite `fail_normalize_if_wrong_current_balance` as an SDK test
+    // TODO: Rewrite `fail_normalize_if_wrong_new_balance` as an SDK test
 }
