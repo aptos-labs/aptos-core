@@ -848,7 +848,10 @@ impl<'a, 'env, G: ExpGenerator<'env>> ExpSimplifier<'a, 'env, G> {
     fn simplify_by_type_bounds(&self, oper: &Operation, args: &[Exp]) -> Option<Exp> {
         // Try both orientations: const op expr, expr op const
         for (const_idx, expr_idx) in [(0, 1), (1, 0)] {
-            let c = get_num_const(&args[const_idx])?;
+            let c = match get_num_const(&args[const_idx]) {
+                Some(c) => c,
+                None => continue,
+            };
             let ty = self.env().get_node_type(args[expr_idx].as_ref().node_id());
             let prim = match &ty {
                 Type::Primitive(p) if ty.is_number() => p,
@@ -892,6 +895,16 @@ impl<'a, 'env, G: ExpGenerator<'env>> ExpSimplifier<'a, 'env, G> {
             };
             if let Some(b) = result {
                 return Some(self.mk_bool_const(b));
+            }
+            // Boundary pinch: expr <= min_val → expr == min_val.
+            // No value can be below min for a bounded integer type.
+            // This exposes bindings for the one-point rule in quantifiers
+            // (e.g., `x <= 0` for u64 becomes `x == 0`).
+            if matches!(op, Operation::Le) && *val == min {
+                let expr = &args[expr_idx];
+                return Some(
+                    self.mk_bool_call(Operation::Eq, vec![expr.clone(), args[const_idx].clone()]),
+                );
             }
         }
         None
@@ -2328,6 +2341,13 @@ fn is_monotone_increasing_in(
                 false
             }
         },
+        // if c then f(x) else g(x) where c is free of x and both branches are
+        // monotone increasing → monotone increasing. The condition picks a fixed
+        // branch independently of x, and that branch is monotone.
+        ExpData::IfElse(_, cond, then_e, else_e) if !cond.as_ref().free_vars().contains(&sym) => {
+            is_monotone_increasing_in(env, then_e, sym, is_unsigned_context)
+                && is_monotone_increasing_in(env, else_e, sym, is_unsigned_context)
+        },
         _ => false,
     }
 }
@@ -2705,16 +2725,19 @@ impl<'a, 'env, G: ExpGenerator<'env>> ExpRewriterFunctions for ExpSimplifier<'a,
             return Some(self.mk_bool_const(false));
         }
 
-        // 9. Unfold spec functions with all-constant arguments
+        // 9. Unfold spec functions: try one level of partial evaluation and keep
+        // the result only if the same function no longer appears (i.e., the
+        // recursive call was eliminated, typically by hitting a base case).
         if let Operation::SpecFunction(mid, fid, _) = oper {
-            if args
-                .iter()
-                .all(|a| matches!(a.as_ref(), ExpData::Value(..)))
-            {
-                if let Some(unfolded) = self.try_unfold_spec_fun(id, *mid, *fid, args) {
-                    self.spec_fun_unfold_depth += 1;
-                    let result = self.rewrite_exp(unfolded);
-                    self.spec_fun_unfold_depth -= 1;
+            if let Some(unfolded) = self.try_unfold_spec_fun(id, *mid, *fid, args) {
+                self.spec_fun_unfold_depth += 1;
+                let result = self.rewrite_exp(unfolded);
+                self.spec_fun_unfold_depth -= 1;
+                let still_contains_self = result.as_ref().any(&mut |e| {
+                    matches!(e, ExpData::Call(_, Operation::SpecFunction(m, f, _), _)
+                        if *m == *mid && *f == *fid)
+                });
+                if !still_contains_self {
                     return Some(result);
                 }
             }
@@ -4338,5 +4361,93 @@ mod tests {
         let product = mk_op(&env, num_ty.clone(), Operation::Mul, vec![x, x_plus_1]);
         let expr = mk_op(&env, num_ty, Operation::Div, vec![product, mk_num(&env, 2)]);
         assert!(is_monotone_increasing_in(&env, &expr, sym, true));
+    }
+
+    #[test]
+    fn test_is_monotone_if_else() {
+        // if (cond) x else 0 is monotone in x when cond is free of x
+        let env = test_env();
+        let u64_ty = Type::Primitive(PrimitiveType::U64);
+        let sym = env.symbol_pool().make("x");
+        let x = mk_local(&env, "x", u64_ty.clone());
+        let cond = mk_temp(&env, 0, BOOL_TYPE.clone());
+        let zero = mk_num(&env, 0);
+        let id = env.new_node(Loc::default(), u64_ty);
+        let ite = ExpData::IfElse(id, cond, x, zero).into_exp();
+        assert!(is_monotone_increasing_in(&env, &ite, sym, true));
+    }
+
+    #[test]
+    fn test_is_not_monotone_if_else_cond_depends_on_var() {
+        // if (x > 0) x else 0 is NOT recognized as monotone (cond mentions x)
+        let env = test_env();
+        let u64_ty = Type::Primitive(PrimitiveType::U64);
+        let sym = env.symbol_pool().make("x");
+        let x = mk_local(&env, "x", u64_ty.clone());
+        let cond = mk_bool_op(&env, Operation::Gt, vec![x.clone(), mk_num(&env, 0)]);
+        let zero = mk_num(&env, 0);
+        let id = env.new_node(Loc::default(), u64_ty);
+        let ite = ExpData::IfElse(id, cond, x, zero).into_exp();
+        assert!(!is_monotone_increasing_in(&env, &ite, sym, true));
+    }
+
+    // ---- Boundary pinch tests ----
+
+    #[test]
+    fn test_boundary_pinch_le_min_u64() {
+        // x: u64, x <= 0 should simplify to x == 0
+        let env = test_env();
+        let u64_ty = Type::Primitive(PrimitiveType::U64);
+        let t0 = mk_temp(&env, 0, u64_ty);
+        let zero = mk_num(&env, 0);
+        let e = mk_bool_op(&env, Operation::Le, vec![t0.clone(), zero]);
+        let mut g = test_gen(&env);
+        let mut s = ExpSimplifier::new(&mut g);
+        let result = s.simplify(e);
+        match result.as_ref() {
+            ExpData::Call(_, Operation::Eq, args) if args.len() == 2 => {
+                assert_is_temp(&args[0], 0);
+                assert_is_num(&args[1], 0);
+            },
+            other => panic!("expected Eq(t0, 0), got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn test_boundary_pinch_flipped_0_ge_u64() {
+        // x: u64, 0 >= x should simplify to x == 0 (flipped: 0 >= x means x <= 0)
+        let env = test_env();
+        let u64_ty = Type::Primitive(PrimitiveType::U64);
+        let t0 = mk_temp(&env, 0, u64_ty);
+        let zero = mk_num(&env, 0);
+        let e = mk_bool_op(&env, Operation::Ge, vec![zero, t0.clone()]);
+        let mut g = test_gen(&env);
+        let mut s = ExpSimplifier::new(&mut g);
+        let result = s.simplify(e);
+        match result.as_ref() {
+            ExpData::Call(_, Operation::Eq, args) if args.len() == 2 => {
+                assert_is_temp(&args[0], 0);
+                assert_is_num(&args[1], 0);
+            },
+            other => panic!("expected Eq(t0, 0), got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn test_boundary_pinch_does_not_fire_for_non_boundary() {
+        // x: u64, x <= 5 should NOT be converted to equality
+        let env = test_env();
+        let u64_ty = Type::Primitive(PrimitiveType::U64);
+        let t0 = mk_temp(&env, 0, u64_ty);
+        let five = mk_num(&env, 5);
+        let e = mk_bool_op(&env, Operation::Le, vec![t0.clone(), five]);
+        let mut g = test_gen(&env);
+        let mut s = ExpSimplifier::new(&mut g);
+        let result = s.simplify(e);
+        // Should remain Le, not become Eq
+        match result.as_ref() {
+            ExpData::Call(_, Operation::Le, _) => {},
+            other => panic!("expected Le to remain, got {:?}", other),
+        }
     }
 }
