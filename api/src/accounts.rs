@@ -140,7 +140,7 @@ impl Account {
                                 Some(&self.latest_ledger_info),
                             )
                         })?;
-                let state_value = self.context.get_state_value_poem::<AptosErrorResponse>(
+                let state_value = self.context.get_state_value_typed::<AptosErrorResponse>(
                     &StateKey::resource(&self.address.into(), &coin_store_type_tag).map_err(
                         |err| {
                             AptosErrorResponse::internal(
@@ -174,7 +174,7 @@ impl Account {
         };
         let primary_fungible_store_address =
             get_paired_fa_primary_store_address(self.address.into(), fa_metadata_address);
-        if let Some(data_blob) = self.context.get_state_value_poem::<AptosErrorResponse>(
+        if let Some(data_blob) = self.context.get_state_value_typed::<AptosErrorResponse>(
             &StateKey::resource_group(
                 &primary_fungible_store_address,
                 &ObjectGroupResource::struct_tag(),
@@ -235,7 +235,7 @@ impl Account {
                 )
             })?;
 
-        self.context.get_state_value_poem::<AptosErrorResponse>(
+        self.context.get_state_value_typed::<AptosErrorResponse>(
             &state_key,
             self.ledger_version,
             &self.latest_ledger_info,
@@ -280,7 +280,7 @@ impl Account {
             AcceptType::Json => {
                 let state_view = self
                     .context
-                    .latest_state_view_poem::<AptosErrorResponse>(&self.latest_ledger_info)?;
+                    .latest_state_view_typed::<AptosErrorResponse>(&self.latest_ledger_info)?;
                 let converter = state_view
                     .as_converter(self.context.db.clone(), self.context.indexer_reader.clone());
                 let converted_resources = converter

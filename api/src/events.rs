@@ -40,7 +40,7 @@ pub fn list_events_inner(
     match accept_type {
         AcceptType::Json => {
             let events = context
-                .latest_state_view_poem::<AptosErrorResponse>(&latest_ledger_info)?
+                .latest_state_view_typed::<AptosErrorResponse>(&latest_ledger_info)?
                 .as_converter(context.db.clone(), context.indexer_reader.clone())
                 .try_into_versioned_events(&events)
                 .context("Failed to convert events from storage into response")

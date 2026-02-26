@@ -274,7 +274,7 @@ impl TransactionsApi {
             AcceptType::Json => {
                 let state_view = self
                     .context
-                    .latest_state_view_poem::<AptosErrorResponse>(ledger_info)?;
+                    .latest_state_view_typed::<AptosErrorResponse>(ledger_info)?;
                 let transaction = match transaction_data {
                     TransactionData::OnChain(txn) => {
                         let timestamp = self
@@ -496,9 +496,9 @@ impl TransactionsApi {
             },
             SubmitTransactionPost::Json(data) => self
                 .context
-                .latest_state_view_poem::<AptosErrorResponse>(ledger_info)?
+                .latest_state_view_typed::<AptosErrorResponse>(ledger_info)?
                 .as_converter(self.context.db.clone(), self.context.indexer_reader.clone())
-                .try_into_signed_transaction_poem(data, self.context.chain_id())
+                .try_into_signed_transaction(data, self.context.chain_id())
                 .context("Failed to create SignedTransaction from SubmitTransactionRequest")
                 .map_err(|err| {
                     AptosErrorResponse::bad_request(
@@ -682,9 +682,9 @@ impl TransactionsApi {
                 .into_iter()
                 .enumerate()
                 .map(|(index, txn)| {
-                    self.context.latest_state_view_poem::<AptosErrorResponse>(ledger_info)?
+                    self.context.latest_state_view_typed::<AptosErrorResponse>(ledger_info)?
                         .as_converter(self.context.db.clone(), self.context.indexer_reader.clone())
-                        .try_into_signed_transaction_poem(txn, self.context.chain_id())
+                        .try_into_signed_transaction(txn, self.context.chain_id())
                         .context(format!("Failed to create SignedTransaction from SubmitTransactionRequest at position {}", index))
                         .map_err(|err| {
                             AptosErrorResponse::bad_request(
@@ -778,7 +778,7 @@ impl TransactionsApi {
 
                     let pending_txn = state_view
                             .as_converter(self.context.db.clone(), self.context.indexer_reader.clone())
-                            .try_into_pending_transaction_poem(txn)
+                            .try_into_pending_transaction_response(txn)
                             .context("Failed to build PendingTransaction from mempool response, even though it said the request was accepted")
                             .map_err(|err| AptosErrorResponse::internal(
                                 err,
@@ -891,7 +891,7 @@ impl TransactionsApi {
         // Simulate transaction
         let state_view = self
             .context
-            .latest_state_view_poem::<AptosErrorResponse>(&ledger_info)?;
+            .latest_state_view_typed::<AptosErrorResponse>(&ledger_info)?;
         let (vm_status, output) =
             AptosSimulationVM::create_vm_and_simulate_signed_transaction(&txn, &state_view);
         let version = ledger_info.version();
@@ -1051,10 +1051,10 @@ impl TransactionsApi {
             .get_latest_ledger_info::<AptosErrorResponse>()?;
         let state_view = self
             .context
-            .latest_state_view_poem::<AptosErrorResponse>(&ledger_info)?;
+            .latest_state_view_typed::<AptosErrorResponse>(&ledger_info)?;
         let raw_txn: RawTransaction = state_view
             .as_converter(self.context.db.clone(), self.context.indexer_reader.clone())
-            .try_into_raw_transaction_poem(request.transaction, self.context.chain_id())
+            .try_into_raw_transaction(request.transaction, self.context.chain_id())
             .context("The given transaction is invalid")
             .map_err(|err| {
                 AptosErrorResponse::bad_request(

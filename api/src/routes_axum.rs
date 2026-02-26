@@ -250,7 +250,7 @@ pub async fn get_account_handler(
     Query(query): Query<LedgerVersionQuery>,
 ) -> Result<Response, AptosErrorResponse> {
     use crate::context::api_spawn_blocking;
-    crate::failpoint::fail_point_poem::<AptosErrorResponse>("endpoint_get_account")?;
+    crate::failpoint::fail_point::<AptosErrorResponse>("endpoint_get_account")?;
     context.check_api_output_enabled::<AptosErrorResponse>("Get account", &accept_type)?;
     let at = accept_type.clone();
     let resp = api_spawn_blocking(move || {
@@ -270,7 +270,7 @@ pub async fn get_account_resources_handler(
 ) -> Result<Response, AptosErrorResponse> {
     use crate::context::api_spawn_blocking;
     use aptos_types::state_store::state_key::StateKey;
-    crate::failpoint::fail_point_poem::<AptosErrorResponse>("endpoint_get_account_resources")?;
+    crate::failpoint::fail_point::<AptosErrorResponse>("endpoint_get_account_resources")?;
     context
         .check_api_output_enabled::<AptosErrorResponse>("Get account resources", &accept_type)?;
     let at = accept_type.clone();
@@ -298,7 +298,7 @@ pub async fn get_account_balance_handler(
     Query(query): Query<LedgerVersionQuery>,
 ) -> Result<Response, AptosErrorResponse> {
     use crate::context::api_spawn_blocking;
-    crate::failpoint::fail_point_poem::<AptosErrorResponse>("endpoint_get_account_balance")?;
+    crate::failpoint::fail_point::<AptosErrorResponse>("endpoint_get_account_balance")?;
     context.check_api_output_enabled::<AptosErrorResponse>("Get account balance", &accept_type)?;
     let at = accept_type.clone();
     let resp = api_spawn_blocking(move || {
@@ -318,7 +318,7 @@ pub async fn get_account_modules_handler(
 ) -> Result<Response, AptosErrorResponse> {
     use crate::context::api_spawn_blocking;
     use aptos_types::state_store::state_key::StateKey;
-    crate::failpoint::fail_point_poem::<AptosErrorResponse>("endpoint_get_account_modules")?;
+    crate::failpoint::fail_point::<AptosErrorResponse>("endpoint_get_account_modules")?;
     context.check_api_output_enabled::<AptosErrorResponse>("Get account modules", &accept_type)?;
     let at = accept_type.clone();
     let resp = api_spawn_blocking(move || {
@@ -344,7 +344,7 @@ pub async fn get_block_by_height_handler(
     Query(query): Query<BlockQuery>,
 ) -> Result<Response, AptosErrorResponse> {
     use crate::context::api_spawn_blocking;
-    crate::failpoint::fail_point_poem::<AptosErrorResponse>("endpoint_get_block_by_height")?;
+    crate::failpoint::fail_point::<AptosErrorResponse>("endpoint_get_block_by_height")?;
     context.check_api_output_enabled::<AptosErrorResponse>("Get block by height", &accept_type)?;
     let ctx = context.clone();
     let at = accept_type.clone();
@@ -363,7 +363,7 @@ pub async fn get_block_by_version_handler(
     Query(query): Query<BlockQuery>,
 ) -> Result<Response, AptosErrorResponse> {
     use crate::context::api_spawn_blocking;
-    crate::failpoint::fail_point_poem::<AptosErrorResponse>("endpoint_get_block_by_version")?;
+    crate::failpoint::fail_point::<AptosErrorResponse>("endpoint_get_block_by_version")?;
     context.check_api_output_enabled::<AptosErrorResponse>("Get block by version", &accept_type)?;
     let ctx = context.clone();
     let at = accept_type.clone();
@@ -388,7 +388,7 @@ pub async fn get_events_by_creation_number_handler(
 ) -> Result<Response, AptosErrorResponse> {
     use crate::{context::api_spawn_blocking, page::Page};
     use aptos_types::event::EventKey;
-    crate::failpoint::fail_point_poem::<AptosErrorResponse>("endpoint_get_events_by_event_key")?;
+    crate::failpoint::fail_point::<AptosErrorResponse>("endpoint_get_events_by_event_key")?;
     context
         .check_api_output_enabled::<AptosErrorResponse>("Get events by event key", &accept_type)?;
     let page = Page::new(
@@ -444,7 +444,7 @@ pub async fn get_events_by_event_handle_handler(
                 None,
             )
         })?;
-    crate::failpoint::fail_point_poem::<AptosErrorResponse>("endpoint_get_events_by_event_handle")?;
+    crate::failpoint::fail_point::<AptosErrorResponse>("endpoint_get_events_by_event_handle")?;
     context.check_api_output_enabled::<AptosErrorResponse>(
         "Get events by event handle",
         &accept_type,
@@ -489,7 +489,7 @@ pub async fn get_account_resource_handler(
                 None,
             )
         })?;
-    crate::failpoint::fail_point_poem::<AptosErrorResponse>("endpoint_get_account_resource")?;
+    crate::failpoint::fail_point::<AptosErrorResponse>("endpoint_get_account_resource")?;
     context.check_api_output_enabled::<AptosErrorResponse>("Get account resource", &accept_type)?;
     let ctx = context.clone();
     let at = accept_type.clone();
@@ -521,7 +521,7 @@ pub async fn get_account_module_handler(
                 None,
             )
         })?;
-    crate::failpoint::fail_point_poem::<AptosErrorResponse>("endpoint_get_account_module")?;
+    crate::failpoint::fail_point::<AptosErrorResponse>("endpoint_get_account_module")?;
     context.check_api_output_enabled::<AptosErrorResponse>("Get account module", &accept_type)?;
     let ctx = context.clone();
     let at = accept_type.clone();
@@ -563,7 +563,7 @@ pub async fn get_table_item_handler(
                 None,
             )
         })?;
-    crate::failpoint::fail_point_poem::<AptosErrorResponse>("endpoint_get_table_item")?;
+    crate::failpoint::fail_point::<AptosErrorResponse>("endpoint_get_table_item")?;
     context.check_api_output_enabled::<AptosErrorResponse>("Get table item", &accept_type)?;
     let ctx = context.clone();
     let at = accept_type.clone();
@@ -593,7 +593,7 @@ pub async fn get_raw_table_item_handler(
                 None,
             )
         })?;
-    crate::failpoint::fail_point_poem::<AptosErrorResponse>("endpoint_get_table_item")?;
+    crate::failpoint::fail_point::<AptosErrorResponse>("endpoint_get_table_item")?;
     if AcceptType::Json == accept_type {
         return Err(crate::response_axum::api_forbidden(
             "Get raw table item",
@@ -629,7 +629,7 @@ pub async fn get_raw_state_value_handler(
                 None,
             )
         })?;
-    crate::failpoint::fail_point_poem::<AptosErrorResponse>("endpoint_get_raw_state_value")?;
+    crate::failpoint::fail_point::<AptosErrorResponse>("endpoint_get_raw_state_value")?;
     if AcceptType::Json == accept_type {
         return Err(crate::response_axum::api_forbidden(
             "Get raw state value",
@@ -655,7 +655,7 @@ pub async fn get_transactions_handler(
     Query(query): Query<PaginationQuery>,
 ) -> Result<Response, AptosErrorResponse> {
     use crate::{context::api_spawn_blocking, page::Page};
-    crate::failpoint::fail_point_poem::<AptosErrorResponse>("endpoint_get_transactions")?;
+    crate::failpoint::fail_point::<AptosErrorResponse>("endpoint_get_transactions")?;
     context.check_api_output_enabled::<AptosErrorResponse>("Get transactions", &accept_type)?;
     let page = Page::new(
         query.start.map(|v| v.0),
@@ -677,7 +677,7 @@ pub async fn get_transaction_by_hash_handler(
     accept_type: AcceptType,
     AptosPath(txn_hash): AptosPath<aptos_api_types::HashValue>,
 ) -> Result<Response, AptosErrorResponse> {
-    crate::failpoint::fail_point_poem::<AptosErrorResponse>("endpoint_transaction_by_hash")?;
+    crate::failpoint::fail_point::<AptosErrorResponse>("endpoint_transaction_by_hash")?;
     context
         .check_api_output_enabled::<AptosErrorResponse>("Get transactions by hash", &accept_type)?;
     let txn_api = crate::transactions::TransactionsApi {
@@ -694,7 +694,7 @@ pub async fn wait_transaction_by_hash_handler(
     accept_type: AcceptType,
     AptosPath(txn_hash): AptosPath<aptos_api_types::HashValue>,
 ) -> Result<Response, AptosErrorResponse> {
-    crate::failpoint::fail_point_poem::<AptosErrorResponse>("endpoint_wait_transaction_by_hash")?;
+    crate::failpoint::fail_point::<AptosErrorResponse>("endpoint_wait_transaction_by_hash")?;
     context
         .check_api_output_enabled::<AptosErrorResponse>("Get transactions by hash", &accept_type)?;
 
@@ -751,7 +751,7 @@ pub async fn get_transaction_by_version_handler(
     AptosPath(txn_version): AptosPath<aptos_api_types::U64>,
 ) -> Result<Response, AptosErrorResponse> {
     use crate::context::api_spawn_blocking;
-    crate::failpoint::fail_point_poem::<AptosErrorResponse>("endpoint_transaction_by_version")?;
+    crate::failpoint::fail_point::<AptosErrorResponse>("endpoint_transaction_by_version")?;
     context.check_api_output_enabled::<AptosErrorResponse>(
         "Get transactions by version",
         &accept_type,
@@ -772,9 +772,7 @@ pub async fn get_transactions_auxiliary_info_handler(
     Query(query): Query<TxnAuxInfoQuery>,
 ) -> Result<Response, AptosErrorResponse> {
     use crate::{context::api_spawn_blocking, page::Page};
-    crate::failpoint::fail_point_poem::<AptosErrorResponse>(
-        "endpoint_get_transactions_auxiliary_info",
-    )?;
+    crate::failpoint::fail_point::<AptosErrorResponse>("endpoint_get_transactions_auxiliary_info")?;
     context.check_api_output_enabled::<AptosErrorResponse>(
         "Get transactions auxiliary info",
         &accept_type,
@@ -801,7 +799,7 @@ pub async fn get_accounts_transactions_handler(
     Query(query): Query<PaginationQuery>,
 ) -> Result<Response, AptosErrorResponse> {
     use crate::{context::api_spawn_blocking, page::Page};
-    crate::failpoint::fail_point_poem::<AptosErrorResponse>("endpoint_get_accounts_transactions")?;
+    crate::failpoint::fail_point::<AptosErrorResponse>("endpoint_get_accounts_transactions")?;
     context
         .check_api_output_enabled::<AptosErrorResponse>("Get account transactions", &accept_type)?;
     let page = Page::new(
@@ -827,7 +825,7 @@ pub async fn get_accounts_transaction_summaries_handler(
 ) -> Result<Response, AptosErrorResponse> {
     use crate::context::api_spawn_blocking;
     use std::cmp::min;
-    crate::failpoint::fail_point_poem::<AptosErrorResponse>(
+    crate::failpoint::fail_point::<AptosErrorResponse>(
         "endpoint_get_accounts_transaction_summaries",
     )?;
     context.check_api_output_enabled::<AptosErrorResponse>(
@@ -858,7 +856,7 @@ pub async fn submit_transaction_handler(
     body: Bytes,
 ) -> Result<Response, AptosErrorResponse> {
     use aptos_api_types::VerifyInput;
-    crate::failpoint::fail_point_poem::<AptosErrorResponse>("endpoint_submit_transaction")?;
+    crate::failpoint::fail_point::<AptosErrorResponse>("endpoint_submit_transaction")?;
     if !context.node_config.api.transaction_submission_enabled {
         return Err(crate::response_axum::api_disabled("Submit transaction"));
     }
@@ -909,7 +907,7 @@ pub async fn submit_transactions_batch_handler(
     body: Bytes,
 ) -> Result<Response, AptosErrorResponse> {
     use aptos_api_types::VerifyInput;
-    crate::failpoint::fail_point_poem::<AptosErrorResponse>("endpoint_submit_transactions_batch")?;
+    crate::failpoint::fail_point::<AptosErrorResponse>("endpoint_submit_transactions_batch")?;
     if !context.node_config.api.transaction_submission_enabled {
         return Err(crate::response_axum::api_disabled(
             "Submit transactions batch",
@@ -965,7 +963,7 @@ pub async fn simulate_transaction_handler(
     body: Bytes,
 ) -> Result<Response, AptosErrorResponse> {
     use aptos_api_types::VerifyInput;
-    crate::failpoint::fail_point_poem::<AptosErrorResponse>("endpoint_simulate_transaction")?;
+    crate::failpoint::fail_point::<AptosErrorResponse>("endpoint_simulate_transaction")?;
     if !context.node_config.api.transaction_simulation_enabled {
         return Err(crate::response_axum::api_disabled("Simulate transaction"));
     }
@@ -1032,7 +1030,7 @@ pub async fn encode_submission_handler(
                 None,
             )
         })?;
-    crate::failpoint::fail_point_poem::<AptosErrorResponse>("endpoint_encode_submission")?;
+    crate::failpoint::fail_point::<AptosErrorResponse>("endpoint_encode_submission")?;
     context.check_api_output_enabled::<AptosErrorResponse>("Encode submission", &accept_type)?;
     let ctx = context.clone();
     let at = accept_type.clone();
@@ -1049,7 +1047,7 @@ pub async fn estimate_gas_price_handler(
     accept_type: AcceptType,
 ) -> Result<Response, AptosErrorResponse> {
     use crate::context::api_spawn_blocking;
-    crate::failpoint::fail_point_poem::<AptosErrorResponse>("endpoint_estimate_gas_price")?;
+    crate::failpoint::fail_point::<AptosErrorResponse>("endpoint_estimate_gas_price")?;
     context.check_api_output_enabled::<AptosErrorResponse>("Estimate gas price", &accept_type)?;
     let context = context.clone();
     let resp = api_spawn_blocking(move || {
@@ -1069,7 +1067,7 @@ pub async fn view_function_handler(
     body: Bytes,
 ) -> Result<Response, AptosErrorResponse> {
     use crate::context::api_spawn_blocking;
-    crate::failpoint::fail_point_poem::<AptosErrorResponse>("endpoint_view_function")?;
+    crate::failpoint::fail_point::<AptosErrorResponse>("endpoint_view_function")?;
     context.check_api_output_enabled::<AptosErrorResponse>("View function", &accept_type)?;
 
     let content_type = headers
