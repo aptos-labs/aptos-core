@@ -226,7 +226,7 @@ impl Context {
     // For use from external crates where they don't want to handle
     // the API response error types.
     pub fn get_latest_ledger_info_wrapped(&self) -> anyhow::Result<LedgerInfo> {
-        self.get_latest_ledger_info::<crate::response::BasicError>()
+        self.get_latest_ledger_info::<crate::response_axum::AptosErrorResponse>()
             .map_err(|e| e.into())
     }
 

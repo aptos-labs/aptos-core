@@ -43,10 +43,10 @@ pub fn bootstrap(
                 let context_cloned = context_cloned.clone();
                 tokio::task::spawn_blocking(move || {
                     if let Ok(latest_ledger_info) =
-                        context_cloned.get_latest_ledger_info::<crate::response::BasicError>()
+                        context_cloned.get_latest_ledger_info::<crate::response_axum::AptosErrorResponse>()
                     {
                         if let Ok(gas_estimation) = context_cloned
-                            .estimate_gas_price::<crate::response::BasicError>(&latest_ledger_info)
+                            .estimate_gas_price::<crate::response_axum::AptosErrorResponse>(&latest_ledger_info)
                         {
                             TransactionsApi::log_gas_estimation(&gas_estimation);
                         }

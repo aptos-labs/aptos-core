@@ -5,7 +5,6 @@ mod accept_type;
 mod accept_type_axum;
 mod accounts;
 mod basic;
-mod bcs_payload;
 mod bcs_payload_axum;
 mod blocks;
 pub mod context;
@@ -29,6 +28,6 @@ mod transactions;
 mod view_function;
 
 pub use context::Context;
-pub use response::BasicError;
+pub use response_axum::AptosErrorResponse as BasicError;
 pub use runtime::bootstrap;
 pub use runtime_axum::attach_axum_to_runtime;
