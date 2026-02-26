@@ -1023,8 +1023,7 @@ impl From<CompiledModule> for MoveModule {
                         || match def.visibility {
                             Visibility::Public | Visibility::Friend => true,
                             Visibility::Private => {
-                                let fhandle =
-                                    Bytecode::function_handle_at(&m, def.function);
+                                let fhandle = Bytecode::function_handle_at(&m, def.function);
                                 let name = Bytecode::identifier_at(&m, fhandle.name);
                                 m.function_is_view(name)
                             },
