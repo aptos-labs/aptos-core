@@ -150,7 +150,7 @@ pub fn new_test_context_inner(
     let validator_owner = validator_identity.account_address.unwrap();
     let (sender, recver) = channel::<(Instant, Version)>((Instant::now(), 0 as Version));
     let (db, db_rw) = if use_db_with_indexer {
-        let mut aptos_db = AptosDB::new_for_test_with_indexer(&tmp_dir);
+        let mut aptos_db = AptosDB::new_for_test(&tmp_dir);
         if node_config
             .indexer_db_config
             .is_internal_indexer_db_enabled()
@@ -170,7 +170,6 @@ pub fn new_test_context_inner(
                     .enable_storage_sharding,
                 ..Default::default()
             },
-            false, /* indexer */
             BUFFERED_STATE_TARGET_ITEMS_FOR_TEST,
             DEFAULT_MAX_NUM_NODES_PER_LRU_CACHE_SHARD,
             None,

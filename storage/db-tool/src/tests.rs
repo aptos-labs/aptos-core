@@ -464,7 +464,6 @@ mod dbtool_tests {
                 false,
                 NO_OP_STORAGE_PRUNER_CONFIG,
                 RocksdbConfigs::default(),
-                false,
                 BUFFERED_STATE_TARGET_ITEMS_FOR_TEST,
                 1000,
                 Some(internal_indexer_db.clone()),

@@ -849,7 +849,7 @@ impl DbReader for AptosDB {
 
     /// Returns whether the indexer DB has been enabled or not
     fn indexer_enabled(&self) -> bool {
-        self.indexer.is_some()
+        false
     }
 
     fn get_state_storage_usage(&self, version: Option<Version>) -> Result<StateStorageUsage> {
@@ -986,11 +986,7 @@ impl AptosDB {
         })
     }
 
-    /// TODO(jill): deprecate Indexer once Indexer Async V2 is ready
-    fn get_table_info_option(&self, handle: TableHandle) -> Result<Option<TableInfo>> {
-        match &self.indexer {
-            Some(indexer) => indexer.get_table_info(handle),
-            None => bail!("Indexer not enabled."),
-        }
+    fn get_table_info_option(&self, _handle: TableHandle) -> Result<Option<TableInfo>> {
+        bail!("Indexer not enabled.")
     }
 }
