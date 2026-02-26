@@ -32,7 +32,7 @@ module aptos_experimental::sigma_protocol_schnorr_example {
     use aptos_experimental::sigma_protocol_representation::new_representation;
     use aptos_experimental::sigma_protocol_representation_vec::{RepresentationVec, new_representation_vec};
     #[test_only]
-    use aptos_std::ristretto255::{point_mul, random_point, random_scalar, point_clone, point_compress};
+    use aptos_std::ristretto255::{random_point, random_scalar};
     #[test_only]
     use aptos_experimental::sigma_protocol_homomorphism::evaluate_psi;
     #[test_only]
@@ -136,11 +136,11 @@ module aptos_experimental::sigma_protocol_schnorr_example {
     fun random_statement_witness_pair(): (Statement, Witness) {
         let s = random_scalar();
         let _G = random_point(); // Move linter does not let us use G
-        let _Y = point_mul(&_G, &s); // Move linter does not let us use Y
+        let _Y = _G.point_mul(&s); // Move linter does not let us use Y
 
         let stmt = new_schnorr_statement(
-            point_compress(&_G), point_clone(&_G),
-            point_compress(&_Y), _Y,
+            _G.point_compress(), _G.point_clone(),
+            _Y.point_compress(), _Y,
         );
         let witn = new_schnorr_witness(s);
 
@@ -156,7 +156,7 @@ module aptos_experimental::sigma_protocol_schnorr_example {
         // Expected evaluation, computed by hand manually
         let _G = _X.get_point(IDX_G); // Move linter does not let us use G
         let s = w.get(IDX_s);
-        let expected_psi = vector[ point_mul(_G, s) ];
+        let expected_psi = vector[ _G.point_mul(s) ];
 
         // Actual evaluation, computed via our $\psi$ implementation
         // TODO(Ugly): Change `|_X, w| psi(_X, w)` to `psi` when public structs ship and allow this.
@@ -190,7 +190,7 @@ module aptos_experimental::sigma_protocol_schnorr_example {
                 new_session(b"session: test empty schnorr proof for random statement does not verify"),
                 |_X, w| psi(_X, w),
                 |_X| f(_X),
-                new_schnorr_statement(point_compress(&_G), _G, point_compress(&_Y), _Y)
+                new_schnorr_statement(_G.point_compress(), _G, _Y.point_compress(), _Y)
             ), 1);
     }
 

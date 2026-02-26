@@ -5,9 +5,8 @@ module aptos_experimental::confidential_asset {
     use std::error;
     use std::option::Option;
     use std::signer;
-    use std::vector;
     use aptos_std::ristretto255::{Self, CompressedRistretto, RistrettoPoint};
-    use aptos_std::ristretto255_bulletproofs::Self as bulletproofs;
+    use aptos_std::ristretto255_bulletproofs::{Self as bulletproofs, RangeProof};
     use aptos_std::string_utils;
     use aptos_framework::chain_id;
     use aptos_framework::event;
@@ -16,28 +15,23 @@ module aptos_experimental::confidential_asset {
     use aptos_framework::object::{Self, ExtendRef, Object};
     use aptos_framework::primary_fungible_store;
     use aptos_framework::system_addresses;
-    use aptos_experimental::confidential_balance::{get_num_pending_chunks, get_num_available_chunks,
-        ConfidentialBalance
-    };
-    use aptos_experimental::sigma_protocol_utils;
+    use aptos_experimental::sigma_protocol_utils::{deserialize_points, decompress_points, points_clone};
+    use aptos_experimental::confidential_pending_balance::{Self, PendingBalance, CompressedPendingBalance};
+    use aptos_experimental::confidential_available_balance::{Self, AvailableBalance, CompressedAvailableBalance};
     use aptos_experimental::sigma_protocol_key_rotation;
+    use aptos_experimental::sigma_protocol_registration;
+    use aptos_experimental::sigma_protocol_withdraw;
+    use aptos_experimental::sigma_protocol_transfer;
     use aptos_experimental::sigma_protocol_proof;
-
-    use aptos_experimental::confidential_balance;
-    use aptos_experimental::confidential_proof::{
-        Self,
-        NormalizationProof,
-        TransferProof,
-        WithdrawalProof
-    };
+    use aptos_experimental::confidential_proof;
     use aptos_experimental::ristretto255_twisted_elgamal;
 
     #[test_only]
     use aptos_std::ristretto255::Scalar;
+    #[test_only]
+    use aptos_experimental::sigma_protocol_utils::compress_points;
 
-    // ======
-    // Errors
-    // ======
+    // === Errors (2 out of 14) ===
 
     /// The range proof system does not support sufficient range.
     const E_RANGE_PROOF_SYSTEM_HAS_INSUFFICIENT_RANGE: u64 = 1;
@@ -72,15 +66,16 @@ module aptos_experimental::confidential_asset {
     /// No user has deposited this asset type yet into their confidential store.
     const E_NO_CONFIDENTIAL_ASSET_POOL_FOR_ASSET_TYPE: u64 = 11;
 
+    /// The number of auditor D-components in the proof does not match the expected auditor count.
+    const E_AUDITOR_COUNT_MISMATCH: u64 = 12;
+
     /// An internal error occurred: there is either a bug or a misconfiguration in the contract.
     const E_INTERNAL_ERROR: u64 = 999;
 
     /// #[test_only] The confidential asset module initialization failed.
     const E_INIT_MODULE_FAILED_FOR_DEVNET: u64 = 1000;
 
-    // =========
-    // Constants
-    // =========
+    // === Constants (3 out of 14) ===
 
     /// The maximum number of transactions can be aggregated on the pending balance before rollover is required.
     /// i.e., `ConfidentialStore::transfers_received` will never exceed this value.
@@ -92,138 +87,160 @@ module aptos_experimental::confidential_asset {
     /// The testnet chain ID.
     const TESTNET_CHAIN_ID: u8 = 2;
 
-    // =======
-    // Structs
-    // =======
+    // === Structs (4 out of 14) ===
+
+    /// A resource that represents the global configuration for the confidential asset protocol, "installed" during
+    /// `init_module` at @aptos_experimental.
+    enum GlobalConfig has key {
+        V1 {
+            /// Indicates whether the allow list is enabled. If `true`, only asset types from the allow list can be transferred.
+            /// This flag is managed by the governance module.
+            allow_list_enabled: bool,
+
+            /// The global auditor's encryption key. If set, all confidential transfers must include the auditor
+            /// as an additional party who can decrypt the transferred amount. Asset-specific auditors take
+            /// precedence over this global auditor. If neither is set, no auditor is required.
+            global_auditor_ek: Option<CompressedRistretto>,
+
+            /// Tracks how many times the global auditor EK has been installed or changed (not removed).
+            /// Starts at 0 and increments each time a new EK is set (None→Some or Some(old)→Some(new)).
+            global_auditor_epoch: u64,
+
+            /// Used to derive a signer that owns all the FAs' primary stores and `AssetConfig` objects.
+            extend_ref: ExtendRef
+        }
+    }
+
+    /// An object that represents the per-asset-type configuration.
+    enum AssetConfig has key {
+        V1 {
+            /// Indicates whether the asset type is allowed for confidential transfers, can be toggled by the governance
+            /// module. Withdrawals are always allowed, even when this is set to `false`.
+            /// If `GlobalConfig::allow_list_enabled` is `false`, all asset types are allowed, even if this is `false`.
+            allowed: bool,
+
+            /// The auditor's public key for the asset type. If the auditor is not set, this field is `None`.
+            /// Otherwise, each confidential transfer must include the auditor as an additional party,
+            /// alongside the recipient, who has access to the decrypted transferred amount.
+            ///
+            /// TODO(Feature): add support for multiple auditors here
+            auditor_ek: Option<CompressedRistretto>,
+
+            /// Tracks how many times the asset-specific auditor EK has been installed or changed (not removed).
+            /// Starts at 0 and increments each time a new EK is set (None→Some or Some(old)→Some(new)).
+            auditor_epoch: u64,
+        }
+    }
 
     /// An object that stores the encrypted balances for a specific confidential asset type and owning user.
     /// This should be thought of as a confidential variant of `aptos_framework::fungible_asset::FungibleStore`.
     ///
     /// e.g., for Alice's confidential APT, such an object will be created and stored at an Alice-specific and APT-specific
     ///   address. It will track Alice's confidential APT balance.
-    struct ConfidentialStore has key {
-        /// Indicates if incoming transfers are paused for this asset type, which is necessary to ensure the pending
-        /// balance does not change during a key rotation, which would invalidate that key rotation and leave the account
-        /// in an inconsistent state.
-        pause_incoming_transfers: bool,
+    enum ConfidentialStore has key {
+        V1 {
+            /// Indicates if incoming transfers are paused for this asset type, which is necessary to ensure the pending
+            /// balance does not change during a key rotation, which would invalidate that key rotation and leave the account
+            /// in an inconsistent state.
+            pause_incoming: bool,
 
-        /// A flag indicating whether the available balance is normalized. A normalized balance
-        /// ensures that all chunks fit within the defined 16-bit bounds. This ensures that, after, roll-over all chunks
-        /// remain 32-bit.
-        normalized: bool,
+            /// A flag indicating whether the available balance is normalized. A normalized balance
+            /// ensures that all chunks fit within the defined 16-bit bounds. This ensures that, after, roll-over all chunks
+            /// remain 32-bit.
+            normalized: bool,
 
-        /// The number of payments received so far, which gives an upper bound on the size of the pending balance chunks
-        /// and thus on the size of the available balance chunks, post roll-over.
-        transfers_received: u64,
+            /// The number of payments received so far, which gives an upper bound on the size of the pending balance chunks
+            /// and thus on the size of the available balance chunks, post roll-over.
+            transfers_received: u64,
 
-        /// Stores the user's pending balance, which is used for accepting incoming transfers.
-        /// Represented as four 16-bit chunks $(p_0 + 2^{16} \cdot p_1 + ... + (2^{16})^15 \cdot p_15)$ that can grow
-        /// up to 32 bits. All payments are accepted into this pending balance, which users should roll over into their
-        /// periodically as they run out of available balance (see `available_balance` field below).
-        ///
-        /// This separation helps protect against front-running attacks, where small incoming transfers could force
-        /// frequent regeneration of ZK proofs.
-        pending_balance: confidential_balance::CompressedConfidentialBalance,
+            /// Stores the user's pending balance, which is used for accepting incoming transfers.
+            /// Represented as four 16-bit chunks $(p_0 + 2^{16} \cdot p_1 + ... + (2^{16})^15 \cdot p_15)$ that can grow
+            /// up to 32 bits. All payments are accepted into this pending balance, which users should roll over into their
+            /// periodically as they run out of available balance (see `available_balance` field below).
+            ///
+            /// This separation helps protect against front-running attacks, where small incoming transfers could force
+            /// frequent regeneration of ZK proofs.
+            pending_balance: CompressedPendingBalance,
 
-        /// Represents the user's balance that is available for sending payments.
-        /// It consists of eight 16-bit chunks $(a_0 + 2^{16} \cdot a_1 + ... + (2^{16})^15 \cdot a_15)$, supporting a
-        /// 128-bit balance.
-        available_balance: confidential_balance::CompressedConfidentialBalance,
+            /// Represents the user's balance that is available for sending payments.
+            /// It consists of eight 16-bit chunks $(a_0 + 2^{16} \cdot a_1 + ... + (2^{16})^15 \cdot a_15)$, supporting a
+            /// 128-bit balance. Includes A components for auditor decryption (empty if no auditor).
+            available_balance: CompressedAvailableBalance,
 
-        /// The encryption key associated with the user's confidential asset account, different for each asset type.
-        ek: CompressedRistretto
+            /// The encryption key associated with the user's confidential asset account, different for each asset type.
+            ek: CompressedRistretto
+        }
     }
 
-    /// A resource that represents the controller for the primary FA stores and `FAConfig` objects, "installed" during
-    /// `init_module` at @aptos_experimental.
-    /// TODO(upgradeability): Should we make this into an enum to make it easier to upgrade it?
-    struct FAController has key {
-        /// Indicates whether the allow list is enabled. If `true`, only asset types from the allow list can be transferred.
-        /// This flag is managed by the governance module.
-        allow_list_enabled: bool,
-
-        // TODO: I think this is where we can add a global auditor?
-
-        /// Used to derive a signer that owns all the FAs' primary stores and `FAConfig` objects.
-        extend_ref: ExtendRef
-    }
-
-    /// An object that represents the configuration of an asset type.
-    ///
-    /// TODO(upgradeability): Should we make this into an enum to make it easier to upgrade it?
-    struct FAConfig has key {
-        /// Indicates whether the asset type is allowed for confidential transfers, can be toggled by the governance
-        /// module. Withdrawals are always allowed, even when this is set to `false`.
-        /// If `FAController::allow_list_enabled` is `false`, all asset types are allowed, even if this is `false`.
-        allowed: bool,
-
-        /// The auditor's public key for the asset type. If the auditor is not set, this field is `None`.
-        /// Otherwise, each confidential transfer must include the auditor as an additional party,
-        /// alongside the recipient, who has access to the decrypted transferred amount.
-        ///
-        /// TODO(feature): add global auditor EK too
-        /// TODO(feature): add support for multiple auditors here
-        auditor_ek: Option<CompressedRistretto>
-    }
-
-    // ======
-    // Events
-    // ======
+    // === Events (5 out of 14) ===
 
     #[event]
-    /// Emitted when someone brings confidential assets into the protocol via `deposit_to`: i.e., by depositing a fungible
+    /// Emitted when someone brings confidential assets into the protocol via `deposit`: i.e., by depositing a fungible
     /// asset into the "confidential pool" and minting a confidential asset as "proof" of this.
-    struct Deposited has drop, store {
-        from: address,
-        to: address,
-        amount: u64,
-        asset_type: Object<fungible_asset::Metadata>
+    enum Deposited has drop, store {
+        V1 {
+            addr: address,
+            amount: u64,
+            asset_type: Object<fungible_asset::Metadata>
+        }
     }
 
     #[event]
     /// Emitted when someone brings confidential assets out of the protocol via `withdraw_to`: i.e., by burning a confidential
     /// asset as "proof" of being allowed to withdraw a fungible asset from the "confidential pool."
-    struct Withdrawn has drop, store {
-        from: address,
-        to: address,
-        amount: u64,
-        asset_type: Object<fungible_asset::Metadata>
+    enum Withdrawn has drop, store {
+        V1 {
+            from: address,
+            to: address,
+            amount: u64,
+            asset_type: Object<fungible_asset::Metadata>
+        }
     }
 
     #[event]
     /// Emitted when confidential assets are transferred within the protocol between users' confidential balances.
     /// Note that a numeric amount is not included, as the whole point of the protocol is to avoid leaking it.
-    struct Transferred has drop, store {
-        from: address,
-        to: address,
-        asset_type: Object<fungible_asset::Metadata>
+    enum Transferred has drop, store {
+        V1 {
+            from: address,
+            to: address,
+            asset_type: Object<fungible_asset::Metadata>
+        }
     }
 
-    // =====================
-    // Module initialization
-    // =====================
+    // === Module initialization (6 out of 14) ===
 
     /// Called only once, when this module is first published on the blockchain.
     fun init_module(deployer: &signer) {
-        // TODO: Just asserting if my understanding is correct that `deployer == @aptos_experimental`
+        // This is me being overly cautious: I added it to double-check my understanding that the VM always passes
+        // the publishing account as deployer. It does, so the assert is redundant (it can never fail).
         assert!(signer::address_of(deployer) == @aptos_experimental, error::internal(E_INTERNAL_ERROR));
 
         assert!(
-            bulletproofs::get_max_range_bits()
-                >= confidential_proof::get_bulletproofs_num_bits(),
+            bulletproofs::get_max_range_bits() >= confidential_proof::get_bulletproofs_num_bits(),
             error::internal(E_RANGE_PROOF_SYSTEM_HAS_INSUFFICIENT_RANGE)
         );
 
         let deployer_address = signer::address_of(deployer);
+        let is_mainnet = chain_id::get() == MAINNET_CHAIN_ID;
 
         move_to(
             deployer,
-            FAController {
-                allow_list_enabled: chain_id::get() == MAINNET_CHAIN_ID,
+            GlobalConfig::V1 {
+                allow_list_enabled: is_mainnet,
+                global_auditor_ek: std::option::none(),
+                global_auditor_epoch: 0,
                 // DO NOT CHANGE: using long syntax until framework change is released to mainnet
                 extend_ref: object::generate_extend_ref(&object::create_object(deployer_address))
             }
         );
+
+        // On mainnet, allow APT by default
+        if (is_mainnet) {
+            let apt_metadata = object::address_to_object<fungible_asset::Metadata>(@aptos_fungible_asset);
+            let config_signer = get_asset_config_signer(apt_metadata);
+            move_to(&config_signer, AssetConfig::V1 { allowed: true, auditor_ek: std::option::none(), auditor_epoch: 0 });
+        };
     }
 
     /// Used to initialize the module for devnet and for tests in aptos-move/e2e-move-tests/
@@ -244,199 +261,373 @@ module aptos_experimental::confidential_asset {
         init_module(deployer)
     }
 
-    // =======================
-    // Public, entry functions
-    // =======================
+    // $$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$ //
+    //                                                    //
+    // *** SECURITY-SENSITIVE functions (7 out of 14) *** //
+    //         (bugs here could lead to stolen funds)     //
+    //                                                    //
+    // $$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$ //
 
     /// Registers an account for a specified asset type.
-    /// TODO: make it independent of the asset type. the "confidential store", if non existant, can be created at receiving time
-    /// TODO(Security): ZKPoK of DK
-    ///
-    /// Users are also responsible for generating a Twisted ElGamal key pair on their side.
-    public entry fun register(
-        sender: &signer, asset_type: Object<fungible_asset::Metadata>, ek: vector<u8>
-    ) acquires FAController, FAConfig {
+    /// Parses arguments and forwards to `register`; see that function for details.
+    public entry fun register_raw(
+        sender: &signer,
+        asset_type: Object<fungible_asset::Metadata>,
+        ek: vector<u8>,
+        sigma_proto_comm: vector<vector<u8>>,
+        sigma_proto_resp: vector<vector<u8>>
+    ) acquires GlobalConfig, AssetConfig {
         let ek = ristretto255::new_compressed_point_from_bytes(ek).extract();
+        let sigma = sigma_protocol_proof::new_proof_from_bytes(sigma_proto_comm, sigma_proto_resp);
+        let proof = RegistrationProof::V1 { sigma };
 
-        register_internal(sender, asset_type, ek);
+        register(sender, asset_type, ek, proof);
+    }
+
+    /// Registers an a confidential store for a specified asset type, encrypted under the given EK.
+    public fun register(
+        sender: &signer, asset_type:
+        Object<fungible_asset::Metadata>,
+        ek: CompressedRistretto,
+        proof: RegistrationProof
+    ) acquires GlobalConfig, AssetConfig {
+        assert!(is_confidentiality_enabled_for_asset_type(asset_type), error::invalid_argument(E_ASSET_TYPE_DISALLOWED));
+
+        assert!(
+            !has_confidential_store(signer::address_of(sender), asset_type),
+            error::already_exists(E_CONFIDENTIAL_STORE_ALREADY_REGISTERED)
+        );
+
+        // Makes sure the user knows their decryption key.
+        assert_valid_registration_proof(sender, asset_type, &ek, proof);
+
+        let ca_store = ConfidentialStore::V1 {
+            pause_incoming: false,
+            normalized: true,
+            transfers_received: 0,
+            pending_balance: confidential_pending_balance::new_zero_compressed(),
+            available_balance: confidential_available_balance::new_zero_compressed(),
+            ek
+        };
+
+        move_to(&get_confidential_store_signer(sender, asset_type), ca_store);
     }
 
     /// Brings tokens into the protocol, transferring the passed amount from the sender's primary FA store
-    /// to the pending balance of the recipient.
+    /// to the sender's own pending balance.
     /// The initial confidential balance is publicly visible, as entering the protocol requires a normal transfer.
     /// However, tokens within the protocol become obfuscated through confidential transfers, ensuring privacy in
     /// subsequent transactions.
-    /// TODO: grieving attack so remove
-    public entry fun deposit_to(
-        sender: &signer,
+    ///
+    /// For convenience, we sometimes refer to this operation as "veiling."
+    public entry fun deposit(
+        depositor: &signer,
         asset_type: Object<fungible_asset::Metadata>,
-        to: address,
         amount: u64
-    ) acquires ConfidentialStore, FAController, FAConfig {
-        deposit_to_internal(sender, asset_type, to, amount)
+    ) acquires ConfidentialStore, GlobalConfig, AssetConfig {
+        let addr = signer::address_of(depositor);
+
+        assert!(is_confidentiality_enabled_for_asset_type(asset_type), error::invalid_argument(E_ASSET_TYPE_DISALLOWED));
+        assert!(!incoming_transfers_paused(addr, asset_type), error::invalid_state(E_INCOMING_TRANSFERS_PAUSED));
+
+        // Note: This sets up the "confidential asset pool" for this asset type, if one is not already set up, such as
+        // when someone first veils this asset type for the first time.
+        let pool_fa_store = primary_fungible_store::ensure_primary_store_exists(
+            get_global_config_address(), asset_type
+        );
+
+        // Step 1: Transfer the asset from the user's account into the confidential asset pool
+        let depositor_fa_store = primary_fungible_store::primary_store(addr, asset_type);
+        dispatchable_fungible_asset::transfer(depositor, depositor_fa_store, pool_fa_store, amount);
+
+        // Step 2: "Mint" corresponding confidential assets for the depositor, and add them to their pending balance.
+        let ca_store = borrow_confidential_store_mut(addr, asset_type);
+
+        // Make sure the depositor has "room" in their pending balance for this deposit
+        assert!(
+            ca_store.transfers_received < MAX_TRANSFERS_BEFORE_ROLLOVER,
+            error::invalid_state(E_PENDING_BALANCE_MUST_BE_ROLLED_OVER)
+        );
+
+        ca_store.pending_balance.add_assign(&confidential_pending_balance::new_u64_no_randomness(amount));
+        ca_store.transfers_received += 1;
+
+        event::emit(Deposited::V1 { addr, amount, asset_type });
     }
 
-    /// The same as `deposit_to`, but the recipient is the sender.
-    public entry fun deposit(
-        sender: &signer, asset_type: Object<fungible_asset::Metadata>, amount: u64
-    ) acquires ConfidentialStore, FAController, FAConfig {
-        deposit_to_internal(
+    /// The same as `withdraw_to_raw`, but the recipient is the sender.
+    public entry fun withdraw_raw(
+        sender: &signer, asset_type: Object<fungible_asset::Metadata>, amount: u64,
+        new_balance_C: vector<vector<u8>>,
+        new_balance_D: vector<vector<u8>>,
+        new_balance_A: vector<vector<u8>>,
+        zkrp_new_balance: vector<u8>,
+        sigma_proto_comm: vector<vector<u8>>,
+        sigma_proto_resp: vector<vector<u8>>
+    ) acquires ConfidentialStore, GlobalConfig, AssetConfig {
+        withdraw_to_raw(
             sender,
             asset_type,
             signer::address_of(sender),
-            amount
+            amount,
+            new_balance_C,
+            new_balance_D,
+            new_balance_A,
+            zkrp_new_balance,
+            sigma_proto_comm,
+            sigma_proto_resp
         )
     }
 
     /// Brings tokens out of the protocol by transferring the specified amount from the sender's available balance to
     /// the recipient's primary FA store.
-    /// The withdrawn amount is publicly visible, as this process requires a normal transfer.
-    /// The sender provides their new normalized confidential balance, encrypted with fresh randomness to preserve privacy.
-    public entry fun withdraw_to(
+    /// Parses arguments and forwards to `withdraw_to`; see that function for details.
+    public entry fun withdraw_to_raw(
         sender: &signer,
         asset_type: Object<fungible_asset::Metadata>,
         to: address,
         amount: u64,
-        new_balance: vector<u8>,
+        new_balance_C: vector<vector<u8>>,
+        new_balance_D: vector<vector<u8>>,
+        new_balance_A: vector<vector<u8>>,
         zkrp_new_balance: vector<u8>,
-        sigma_proof: vector<u8>
-    ) acquires ConfidentialStore, FAController {
-        let new_balance =
-            confidential_balance::new_balance_from_bytes(new_balance, get_num_available_chunks()).extract();
-        let proof =
-            confidential_proof::deserialize_withdrawal_proof(sigma_proof, zkrp_new_balance)
-                .extract();
+        sigma_proto_comm: vector<vector<u8>>,
+        sigma_proto_resp: vector<vector<u8>>
+    ) acquires ConfidentialStore, GlobalConfig, AssetConfig {
+        let (new_P, compressed_P) = deserialize_points(new_balance_C);
+        let (new_R, compressed_R) = deserialize_points(new_balance_D);
+        let (new_R_aud, compressed_R_aud) = deserialize_points(new_balance_A);
+        let new_balance = confidential_available_balance::new_from_p_r_r_aud(new_P, new_R, new_R_aud);
+        let compressed_new_balance = confidential_available_balance::new_compressed_from_p_r_r_aud(
+            compressed_P, compressed_R, compressed_R_aud
+        );
+        let zkrp_new_balance = bulletproofs::range_proof_from_bytes(zkrp_new_balance);
+        let sigma = sigma_protocol_proof::new_proof_from_bytes(sigma_proto_comm, sigma_proto_resp);
+        let proof = WithdrawalProof::V1 { new_balance, compressed_new_balance, zkrp_new_balance, sigma };
 
-        withdraw_to_internal(sender, asset_type, to, amount, new_balance, proof);
+        withdraw_to(sender, asset_type, to, amount, proof);
     }
 
-    /// The same as `withdraw_to`, but the recipient is the sender.
-    public entry fun withdraw(
+    /// Brings tokens out of the protocol by transferring the specified amount from the sender's available balance to
+    /// the recipient's primary FA store.
+    /// The withdrawn amount is publicly visible, as this process requires a normal transfer.
+    /// The proof contains the sender's new normalized confidential balance, encrypted with fresh randomness.
+    /// Withdrawals are always allowed, regardless of whether the asset type is allow-listed.
+    public fun withdraw_to(
         sender: &signer,
         asset_type: Object<fungible_asset::Metadata>,
+        to: address,
         amount: u64,
-        new_balance: vector<u8>,
-        zkrp_new_balance: vector<u8>,
-        sigma_proof: vector<u8>
-    ) acquires ConfidentialStore, FAController {
-        withdraw_to(
+        proof: WithdrawalProof
+    ) acquires ConfidentialStore, GlobalConfig, AssetConfig {
+        let sender_addr = signer::address_of(sender);
+
+        // Read values before mutable borrow to avoid conflicting borrows of ConfidentialStore
+        let ek = get_encryption_key(sender_addr, asset_type);
+        let current_balance = get_available_balance(sender_addr, asset_type);
+        let auditor_ek = get_effective_auditor(asset_type);
+
+        let compressed_new_balance = assert_valid_withdrawal_proof(
             sender,
             asset_type,
-            signer::address_of(sender),
+            &ek,
             amount,
-            new_balance,
-            zkrp_new_balance,
-            sigma_proof
+            &current_balance,
+            &auditor_ek,
+            proof
+        );
+
+        let ca_store = borrow_confidential_store_mut(sender_addr, asset_type);
+        ca_store.normalized = true;
+        ca_store.available_balance = compressed_new_balance;
+
+        primary_fungible_store::transfer(&get_global_config_signer(), asset_type, to, amount);
+
+        event::emit(Withdrawn::V1 { from: sender_addr, to, amount, asset_type });
+    }
+
+    /// Transfers tokens from the sender's available balance to the recipient's pending balance.
+    /// Parses arguments and forwards to `confidential_transfer`; see that function for details.
+    ///
+    /// The `extra_auditor_eks` should contain only additional auditor EKs (not the global auditor,
+    /// which is fetched automatically by the contract).
+    ///
+    /// Only the D components are sent for the recipient and auditors, since they share the same
+    /// C components as the sender's amount (C_i = amount_i * G + r_i * H). This saves 128 bytes
+    /// per party (recipient + each auditor).
+    public entry fun confidential_transfer_raw(
+        sender: &signer,
+        asset_type: Object<fungible_asset::Metadata>,
+        to: address,
+        new_balance_C: vector<vector<u8>>,
+        new_balance_D: vector<vector<u8>>,
+        new_balance_A: vector<vector<u8>>,
+        sender_amount_C: vector<vector<u8>>,
+        sender_amount_D: vector<vector<u8>>,
+        recipient_amount_R: vector<vector<u8>>,
+        extra_auditor_eks: vector<vector<u8>>,
+        auditor_amount_Ds: vector<vector<vector<u8>>>,
+        zkrp_new_balance: vector<u8>,
+        zkrp_amount: vector<u8>,
+        sigma_proto_comm: vector<vector<u8>>,
+        sigma_proto_resp: vector<vector<u8>>
+    ) acquires ConfidentialStore, AssetConfig, GlobalConfig {
+        // Deserialize all point components, obtaining both decompressed and compressed forms in one pass
+        let (new_P, compressed_P) = deserialize_points(new_balance_C);
+        let (new_R, compressed_R) = deserialize_points(new_balance_D);
+        let (new_R_aud, compressed_R_aud) = deserialize_points(new_balance_A);
+        let new_balance = confidential_available_balance::new_from_p_r_r_aud(new_P, new_R, new_R_aud);
+        let compressed_new_balance = confidential_available_balance::new_compressed_from_p_r_r_aud(
+            compressed_P, compressed_R, compressed_R_aud
+        );
+
+        let (sender_P, compressed_sender_P) = deserialize_points(sender_amount_C);
+        let (sender_R, compressed_sender_R) = deserialize_points(sender_amount_D);
+        let sender_amount = confidential_pending_balance::new_from_p_and_r(sender_P, sender_R);
+        let compressed_sender_amount = confidential_pending_balance::new_compressed_from_p_and_r(
+            compressed_sender_P, compressed_sender_R
+        );
+
+        let (recipient_amount_R, compressed_recipient_amount_R) = deserialize_points(recipient_amount_R);
+
+        let extra_auditor_eks = extra_auditor_eks.map(|bytes| {
+            ristretto255::new_compressed_point_from_bytes(bytes).extract()
+        });
+
+        let decompressed_auditor_amount_Ds = vector[];
+        let compressed_auditor_Rs = vector[];
+        auditor_amount_Ds.for_each(|auditor_d| {
+            let (d, cd) = deserialize_points(auditor_d);
+            decompressed_auditor_amount_Ds.push_back(d);
+            compressed_auditor_Rs.push_back(cd);
+        });
+
+        let zkrp_new_balance = bulletproofs::range_proof_from_bytes(zkrp_new_balance);
+        let zkrp_transfer_amount = bulletproofs::range_proof_from_bytes(zkrp_amount);
+        let sigma = sigma_protocol_proof::new_proof_from_bytes(sigma_proto_comm, sigma_proto_resp);
+        let proof = TransferProof::V1 {
+            new_balance, compressed_new_balance,
+            sender_amount, compressed_sender_amount,
+            recipient_amount_R, compressed_recip_amount_R: compressed_recipient_amount_R,
+            auditor_amount_Ds: decompressed_auditor_amount_Ds, compressed_auditor_Rs,
+            zkrp_new_balance, zkrp_amount: zkrp_transfer_amount, sigma
+        };
+
+        confidential_transfer(
+            sender,
+            asset_type,
+            to,
+            extra_auditor_eks,
+            proof
         )
     }
 
     /// Transfers tokens from the sender's available balance to the recipient's pending balance.
     /// The function hides the transferred amount while keeping the sender and recipient addresses visible.
-    /// The sender encrypts the transferred amount with the recipient's encryption key and the function updates the
-    /// recipient's confidential balance homomorphically.
-    /// Additionally, the sender encrypts the transferred amount with the auditors' EKs, allowing auditors to decrypt
-    /// it on their side.
-    /// The sender provides their new normalized confidential balance, encrypted with fresh randomness to preserve privacy.
-    /// Warning: If the auditor feature is enabled, the sender must include the auditor as the first element in the
-    /// `auditor_eks` vector.
-    public entry fun confidential_transfer(
+    /// The proof contains: the sender's new balance, the transfer amount encrypted for sender/recipient/auditors,
+    /// and range proofs for the new balance and transfer amount.
+    /// The `extra_auditor_eks` should contain any additional auditor EKs beyond the global auditor
+    /// (which is fetched automatically by the contract).
+    public fun confidential_transfer(
         sender: &signer,
         asset_type: Object<fungible_asset::Metadata>,
         to: address,
-        new_balance: vector<u8>,
-        sender_amount: vector<u8>,
-        recipient_amount: vector<u8>,
-        auditor_eks: vector<u8>,
-        auditor_amounts: vector<u8>,
-        zkrp_new_balance: vector<u8>,
-        zkrp_transfer_amount: vector<u8>,
-        sigma_proof: vector<u8>
-    ) acquires ConfidentialStore, FAConfig, FAController {
-        let new_balance =
-            confidential_balance::new_balance_from_bytes(new_balance, get_num_available_chunks()).extract();
-        let sender_amount =
-            confidential_balance::new_balance_from_bytes(sender_amount, get_num_pending_chunks()).extract();
-        let recipient_amount =
-            confidential_balance::new_balance_from_bytes(recipient_amount, get_num_pending_chunks()).extract();
-        let auditor_eks = deserialize_auditor_eks(auditor_eks).extract();
-        let auditor_amounts = deserialize_auditor_amounts(auditor_amounts).extract();
-        let proof =
-            confidential_proof::deserialize_transfer_proof(
-                sigma_proof, zkrp_new_balance, zkrp_transfer_amount
-            ).extract();
+        extra_auditor_eks: vector<CompressedRistretto>,
+        proof: TransferProof
+    ) acquires ConfidentialStore, AssetConfig, GlobalConfig {
+        assert!(is_confidentiality_enabled_for_asset_type(asset_type), error::invalid_argument(E_ASSET_TYPE_DISALLOWED));
+        assert!(!incoming_transfers_paused(to, asset_type), error::invalid_state(E_INCOMING_TRANSFERS_PAUSED));
 
-        confidential_transfer_internal(
-            sender,
-            asset_type,
-            to,
-            new_balance,
-            sender_amount,
-            recipient_amount,
-            auditor_eks,
-            auditor_amounts,
-            proof
-        )
+        let from = signer::address_of(sender);
+
+        // Compute extra auditor count before appending effective auditor
+        let num_extra_auditors = extra_auditor_eks.length();
+
+        // Append effective auditor EK (asset-specific first, then global fallback) to extra_auditor_eks
+        let effective_auditor_ek = get_effective_auditor(asset_type);
+        let has_effective_auditor = effective_auditor_ek.is_some();
+        if (has_effective_auditor) {
+            extra_auditor_eks.push_back(effective_auditor_ek.extract());
+        };
+
+        // Read values before mutable borrow to avoid conflicting borrows of ConfidentialStore
+        let sender_ek = get_encryption_key(from, asset_type);
+        let recipient_ek = get_encryption_key(to, asset_type);
+        let sender_available_balance = get_available_balance(from, asset_type);
+
+        // Note: Sender's amount is not used: we pass it as an argument just for visibility, so that indexing can reliably
+        // pick it up for dapps that need to decrypt it quickly.
+        let (compressed_new_balance, _sender_amount, recipient_amount, _auditor_amounts) =
+            assert_valid_transfer_proof(
+                sender,
+                to,
+                asset_type,
+                &sender_ek,
+                &recipient_ek,
+                &sender_available_balance,
+                &extra_auditor_eks,
+                has_effective_auditor,
+                num_extra_auditors,
+                proof
+            );
+
+        // Update sender's confidential store
+        let sender_ca_store = borrow_confidential_store_mut(from, asset_type);
+        sender_ca_store.normalized = true;
+        sender_ca_store.available_balance = compressed_new_balance;
+
+        // Update recipient's confidential store
+        let recip_ca_store = borrow_confidential_store_mut(to, asset_type);
+        // Make sure the receiver has "room" in their pending balance for this transfer
+        assert!(
+            recip_ca_store.transfers_received < MAX_TRANSFERS_BEFORE_ROLLOVER,
+            error::invalid_state(E_PENDING_BALANCE_MUST_BE_ROLLED_OVER)
+        );
+        recip_ca_store.pending_balance.add_assign(&recipient_amount);
+        recip_ca_store.transfers_received += 1;
+
+        event::emit(Transferred::V1 { from, to, asset_type });
     }
 
     /// Rotates the encryption key for the user's confidential balance, updating it to a new encryption key.
-    /// Parses arguments and forwards to `rotate_encryption_key_internal`; see that function for details.
-    public entry fun rotate_encryption_key(
+    /// Parses arguments and forwards to `rotate_encryption_key`; see that function for details.
+    public entry fun rotate_encryption_key_raw(
         sender: &signer,
         asset_type: Object<fungible_asset::Metadata>,
         new_ek: vector<u8>,
         resume_incoming_transfers: bool,
-        new_D: vector<vector<u8>>, // part of the proof
+        new_R: vector<vector<u8>>, // part of the proof
         sigma_proto_comm: vector<vector<u8>>, // part of the proof
         sigma_proto_resp: vector<vector<u8>>, // part of the proof
     ) acquires ConfidentialStore {
         // Just parse stuff and forward to the more type-safe function
         let (new_ek, compressed_new_ek) = ristretto255::new_point_and_compressed_from_bytes(new_ek);
-        let (new_D, compressed_new_D) = sigma_protocol_utils::deserialize_points(new_D);
+        let (new_R, compressed_new_R) = deserialize_points(new_R);
         let sigma = sigma_protocol_proof::new_proof_from_bytes(
             sigma_proto_comm, sigma_proto_resp
         );
 
-        rotate_encryption_key_internal(
+        rotate_encryption_key(
             sender, asset_type, new_ek,
-            KeyRotationProof::V1 { compressed_new_ek, new_D, compressed_new_D, sigma },
+            KeyRotationProof::V1 { compressed_new_ek, new_R, compressed_new_R, sigma },
             resume_incoming_transfers
         );
     }
 
-    /// TODO: Move this up at some point
-    enum KeyRotationProof has drop {
-        V1 {
-            compressed_new_ek: CompressedRistretto,
-            new_D: vector<RistrettoPoint>,
-            compressed_new_D: vector<CompressedRistretto>,
-            sigma: sigma_protocol_proof::Proof,
-        }
-    }
-
-    /// TODO(Comment): add comments explaining the parameters
-    public fun rotate_encryption_key_internal(
+    public fun rotate_encryption_key(
         owner: &signer,
         asset_type: Object<fungible_asset::Metadata>,
         new_ek: RistrettoPoint,
         proof: KeyRotationProof,
         resume_incoming_transfers: bool,
     ) {
-        //
-        // Step 1: Safety-checks that (1) incoming transfers are paused and (2) pending balance is zero because it has
-        //         been rolled over
-        //
-
-        let ca_store = borrow_global_mut<ConfidentialStore>(
-            get_confidential_store_address(signer::address_of(owner), asset_type)
-        );
-
-        // (1) Assert incoming transfers are paused & unpause them after if flag is set maybe
-        assert!(ca_store.pause_incoming_transfers, error::invalid_state(E_INCOMING_TRANSFERS_NOT_PAUSED));
-
-        // (2) Assert that the pending balance is zero before rotating the key. The user must call `rollover_pending_balance`
-        // before rotating their key with `pause` set to `true`.
+        // Step 1: Assert (a) incoming transfers are paused & (b) pending balance is zero / has been rolled over
+        let ca_store = borrow_confidential_store_mut(signer::address_of(owner), asset_type);
+        // (a) Assert incoming transfers are paused & unpause them after, if flag is set.
+        assert!(ca_store.pause_incoming, error::invalid_state(E_INCOMING_TRANSFERS_NOT_PAUSED));
+        // (b) The user must have called `rollover_pending_balance` before rotating their key.
         assert!(
-            confidential_balance::is_zero_balance(&ca_store.pending_balance),
+            ca_store.pending_balance.is_zero(),
             error::invalid_state(E_PENDING_BALANCE_NOT_ZERO_BEFORE_KEY_ROTATION)
         );
         // Over-asserting invariants, in an abundance of caution.
@@ -445,166 +636,259 @@ module aptos_experimental::confidential_asset {
             error::invalid_state(E_PENDING_BALANCE_NOT_ZERO_BEFORE_KEY_ROTATION)
         );
 
-        //
-        // Step 2: Fetch old available balance and the old EK from on-chain
-        //
-
-        let compressed_H = ristretto255_twisted_elgamal::get_encryption_key_basepoint_compressed();
-        let compressed_old_ek = ca_store.ek;
-        let old_ek = ristretto255::point_decompress(&compressed_old_ek);
-        let compressed_old_D = *ca_store.available_balance.get_compressed_D();
-        let old_D = sigma_protocol_utils::decompress_points(&compressed_old_D);
-
-        //
-        // Step 3: Verify the Sigma protocol proof of correct re-encryption
-        //
-        let ss = sigma_protocol_key_rotation::new_session(owner, asset_type, get_num_available_chunks());
-        let KeyRotationProof::V1 { compressed_new_ek, new_D, compressed_new_D, sigma } =  proof;
-        // Note: Will check that compressed_old_D.length() == compressed_new_D.length() == num_chunks > 0
-        let stmt = sigma_protocol_key_rotation::new_key_rotation_statement(
-            // TODO(Perf): Can we avoid the expensive decompression of `H`? (May need a native function.)
-            compressed_H, ristretto255::point_decompress(&compressed_H),
-            compressed_old_ek, old_ek,
-            compressed_new_ek, new_ek,
-            compressed_old_D, old_D,
-            compressed_new_D, new_D,
-            get_num_available_chunks(),
+        // Step 2: Verify the $\Sigma$-protocol proof of correct re-encryption
+        let (compressed_new_ek, compressed_new_R) = assert_valid_key_rotation_proof(
+            owner, asset_type, new_ek, &ca_store.ek, &ca_store.available_balance, proof
         );
-        sigma_protocol_key_rotation::assert_verifies(&ss, &stmt, &sigma, get_num_available_chunks());
 
-        //
-        // Step 4: Install the new EK and the new re-encrypted available balance
-        //
+        // Step 3: Install the new EK and the new re-encrypted available balance
         ca_store.ek = compressed_new_ek;
-        // Note: The pending balance has been asserted to be zero. We're just updating the available balance.
-        // The C components stay the same (they don't depend on the EK); only D = r * EK changes.
-        ca_store.available_balance.set_compressed_D(compressed_new_D);
-
-        // Note: ca_store.pause_incoming_transfers is already set to `true`
+        // We're just updating the available balance's EK-dependant D-component & leaving the pending balance the same.
+        ca_store.available_balance.set_compressed_R(compressed_new_R);
         if (resume_incoming_transfers) {
-            ca_store.pause_incoming_transfers = false;
+            ca_store.pause_incoming = false;
         }
+    }
+
+    /// Adjusts each chunk to fit into defined 16-bit bounds to prevent overflows.
+    /// Parses arguments and forwards to `normalize`; see that function for details.
+    public entry fun normalize_raw(
+        sender: &signer,
+        asset_type: Object<fungible_asset::Metadata>,
+        new_balance_C: vector<vector<u8>>,
+        new_balance_D: vector<vector<u8>>,
+        new_balance_A: vector<vector<u8>>,
+        zkrp_new_balance: vector<u8>,
+        sigma_proto_comm: vector<vector<u8>>,
+        sigma_proto_resp: vector<vector<u8>>
+    ) acquires ConfidentialStore, AssetConfig, GlobalConfig {
+        let (new_P, compressed_P) = deserialize_points(new_balance_C);
+        let (new_R, compressed_R) = deserialize_points(new_balance_D);
+        let (new_R_aud, compressed_R_aud) = deserialize_points(new_balance_A);
+        let new_balance = confidential_available_balance::new_from_p_r_r_aud(new_P, new_R, new_R_aud);
+        let compressed_new_balance = confidential_available_balance::new_compressed_from_p_r_r_aud(
+            compressed_P, compressed_R, compressed_R_aud
+        );
+        let zkrp_new_balance = bulletproofs::range_proof_from_bytes(zkrp_new_balance);
+        let sigma = sigma_protocol_proof::new_proof_from_bytes(sigma_proto_comm, sigma_proto_resp);
+        let proof = NormalizationProof::V1 { new_balance, compressed_new_balance, zkrp_new_balance, sigma };
+
+        normalize(sender, asset_type, proof);
     }
 
     /// Adjusts each chunk to fit into defined 16-bit bounds to prevent overflows.
     /// Most functions perform implicit normalization by accepting a new normalized confidential balance as a parameter.
     /// However, explicit normalization is required before rolling over the pending balance, as multiple rolls may cause
     /// chunk overflows.
-    /// The sender provides their new normalized confidential balance, encrypted with fresh randomness to preserve privacy.
-    public entry fun normalize(
+    /// The proof contains the sender's new normalized confidential balance, encrypted with fresh randomness.
+    public fun normalize(
         sender: &signer,
         asset_type: Object<fungible_asset::Metadata>,
-        new_balance: vector<u8>,
-        zkrp_new_balance: vector<u8>,
-        sigma_proof: vector<u8>
-    ) acquires ConfidentialStore {
-        let new_balance =
-            confidential_balance::new_balance_from_bytes(new_balance, get_num_available_chunks()).extract();
-        let proof =
-            confidential_proof::deserialize_normalization_proof(
-                sigma_proof, zkrp_new_balance
-            ).extract();
+        proof: NormalizationProof
+    ) acquires ConfidentialStore, AssetConfig, GlobalConfig {
+        let user = signer::address_of(sender);
 
-        normalize_internal(sender, asset_type, new_balance, proof);
-    }
+        // Check normalized flag and read values before mutable borrow
+        assert!(!is_normalized(user, asset_type), error::invalid_state(E_ALREADY_NORMALIZED));
+        let ek = get_encryption_key(user, asset_type);
+        let current_balance = get_available_balance(user, asset_type);
+        let auditor_ek = get_effective_auditor(asset_type);
 
-    /// Pauses receiving incoming transfers for the specified account and asset type.
-    /// Needed for one scenario:
-    ///  1. Before rotating their encryption key, the owner must pause incoming transfers so as to be able to roll over
-    ///     their pending balance fully. Then, to rotate their encryption key, the owner needs to only re-encrypt their
-    ///     available balance ciphertext. Once done, the owner can unpause incoming transfers.
-    public entry fun pause_incoming_transactions(
-        owner: &signer, asset_type: Object<fungible_asset::Metadata>
-    ) acquires ConfidentialStore {
-        pause_incoming_transactions_internal(owner, asset_type);
-    }
+        let compressed_new_balance = assert_valid_normalization_proof(
+            sender,
+            asset_type,
+            &ek,
+            &current_balance,
+            &auditor_ek,
+            proof
+        );
 
-    /// Allows receiving incoming transfers for the specified account and asset type.
-    public entry fun resume_incoming_transactions(
-        owner: &signer, asset_type: Object<fungible_asset::Metadata>
-    ) acquires ConfidentialStore {
-        resume_incoming_transactions_internal(owner, asset_type);
+        let ca_store = borrow_confidential_store_mut(user, asset_type);
+        ca_store.available_balance = compressed_new_balance;
+        ca_store.normalized = true;
     }
 
     /// Adds the pending balance to the available balance for the specified asset type, resetting the pending balance to zero.
     /// This operation is needed when the owner wants to be able to send out tokens from their pending balance: the only
     /// way of doing so is to roll over these tokens into the available balance.
     public entry fun rollover_pending_balance(
-        sender: &signer, asset_type: Object<fungible_asset::Metadata>
+        sender: &signer,
+        asset_type: Object<fungible_asset::Metadata>
     ) acquires ConfidentialStore {
         rollover_pending_balance_internal(sender, asset_type);
     }
 
-    /// Before calling `rotate_encryption_key`, we need to rollover the pending balance and freeze the asset type to
-    /// prevent any new transfers from coming in.
-    public entry fun rollover_pending_balance_and_freeze(
-        sender: &signer, asset_type: Object<fungible_asset::Metadata>
+    /// Before calling `rotate_encryption_key_raw`, we need to rollover the pending balance and pause incoming transfers
+    /// for this asset type to prevent any new transfers from coming in.
+    public entry fun rollover_pending_balance_and_pause(
+        sender: &signer,
+        asset_type: Object<fungible_asset::Metadata>
     ) acquires ConfidentialStore {
         rollover_pending_balance(sender, asset_type);
-        pause_incoming_transactions(sender, asset_type);
+        set_incoming_transfers_paused(sender, asset_type, true);
     }
 
-    // ===========================
-    // Public governance functions
-    // ===========================
+    // ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ //
+    //                                             //
+    // ^^^ End of SECURITY-SENSITIVE functions ^^^ //
+    //                                             //
+    // ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ //
 
-    /// Enables the allow list, restricting confidential transfers to asset types on the allow list.
-    public fun enable_allow_listing(aptos_framework: &signer) acquires FAController {
+    // === Public, non-security-sensitive functions (8 out of 14) ===
+    //
+    // Note: These functions can be useful for external contracts that want to integrate with the Confidential Asset
+    // protocol.
+
+    /// Pauses or resumes incoming transfers for the specified account and asset type.
+    /// Pausing is needed before rotating the encryption key: the owner must pause incoming transfers so as to be able
+    /// to roll over their pending balance fully. Then, to rotate their encryption key, the owner needs to only re-encrypt
+    /// their available balance ciphertext. Once done, the owner can unpause incoming transfers.
+    public entry fun set_incoming_transfers_paused(
+        owner: &signer,
+        asset_type: Object<fungible_asset::Metadata>,
+        paused: bool
+    ) acquires ConfidentialStore {
+        borrow_confidential_store_mut(signer::address_of(owner), asset_type).pause_incoming = paused;
+    }
+
+    /// Implementation of the `rollover_pending_balance` entry function.
+    public fun rollover_pending_balance_internal(
+        sender: &signer,
+        asset_type: Object<fungible_asset::Metadata>
+    ) acquires ConfidentialStore {
+        let user = signer::address_of(sender);
+        let ca_store = borrow_confidential_store_mut(user, asset_type);
+
+        assert!(ca_store.normalized, error::invalid_state(E_NORMALIZATION_REQUIRED));
+
+        ca_store.available_balance.add_assign(&ca_store.pending_balance);
+        // A components remain stale — will be refreshed on normalize/withdraw/transfer
+
+        ca_store.normalized = false;
+        ca_store.transfers_received = 0;
+        ca_store.pending_balance = confidential_pending_balance::new_zero_compressed();
+    }
+
+    // ==================================================================== //
+    //     SECURITY-SENSITIVE public governance functions (9 out of 14)     //
+    //               (bugs here could lead to loss of privacy)              //
+    // ==================================================================== //
+
+    /// Enables or disables the allow list. When enabled, only asset types from the allow list can be transferred.
+    public fun set_allow_listing(aptos_framework: &signer, enabled: bool) acquires GlobalConfig {
         system_addresses::assert_aptos_framework(aptos_framework);
 
-        let fa_controller = borrow_global_mut<FAController>(@aptos_experimental);
-        fa_controller.allow_list_enabled = true;
+        borrow_global_mut<GlobalConfig>(@aptos_experimental).allow_list_enabled = enabled;
     }
 
-    /// Disables the allow list, allowing confidential transfers for all asset types.
-    public fun disable_allow_listing(aptos_framework: &signer) acquires FAController {
+    /// Enables or disables confidential transfers for the specified asset type.
+    public fun set_confidentiality_for_asset_type(
+        aptos_framework: &signer,
+        asset_type: Object<fungible_asset::Metadata>,
+        allowed: bool
+    ) acquires AssetConfig, GlobalConfig {
         system_addresses::assert_aptos_framework(aptos_framework);
 
-        let fa_controller = borrow_global_mut<FAController>(@aptos_experimental);
-        fa_controller.allow_list_enabled = false;
+        let asset_config = borrow_global_mut<AssetConfig>(get_asset_config_address_or_create(asset_type));
+        asset_config.allowed = allowed;
     }
 
-    /// Enables confidential transfers for the specified asset type.
-    public fun enable_confidentiality_for_asset_type(
-        aptos_framework: &signer, asset_type: Object<fungible_asset::Metadata>
-    ) acquires FAConfig, FAController {
-        system_addresses::assert_aptos_framework(aptos_framework);
-
-        let fa_config = borrow_global_mut<FAConfig>(get_fa_config_address_or_create(asset_type));
-        fa_config.allowed = true;
-    }
-
-    /// Disables confidential transfers for the specified asset type.
-    public fun disable_confidentiality_for_asset_type(
-        aptos_framework: &signer, asset_type: Object<fungible_asset::Metadata>
-    ) acquires FAConfig, FAController {
-        system_addresses::assert_aptos_framework(aptos_framework);
-
-        let fa_config = borrow_global_mut<FAConfig>(get_fa_config_address_or_create(asset_type));
-        fa_config.allowed = false;
-    }
-
-    /// Sets the auditor for the specified asset type.
+    /// Sets or removes the auditor for the specified asset type.
     ///
-    /// NOTE: Ensures that new_auditor_ek is a valid Ristretto255 point
-    /// TODO(Security): ZKPoK of DK?
+    /// Notes:
+    /// - Ensures that new_auditor_ek is a valid Ristretto255 point
+    /// - Ideally, this should require a ZKPoK of DK too. But, instead, we assume competent auditors.
+    ///
+    /// The `auditor_epoch` is incremented only when installing or changing the EK (not when removing):
+    /// - None → Some(ek): epoch increments (installing)
+    /// - Some(old) → Some(new) where old != new: epoch increments (changing)
+    /// - Some(old) → Some(old): epoch stays (no change)
+    /// - Some(_) → None: epoch stays (removing)
+    /// - None → None: epoch stays (no-op)
     public fun set_auditor_for_asset_type(
-        aptos_framework: &signer, asset_type: Object<fungible_asset::Metadata>, auditor_ek: vector<u8>
-    ) acquires FAConfig, FAController {
+        aptos_framework: &signer,
+        asset_type: Object<fungible_asset::Metadata>,
+        auditor_ek: Option<vector<u8>>
+    ) acquires AssetConfig, GlobalConfig {
         system_addresses::assert_aptos_framework(aptos_framework);
 
-        let fa_config = borrow_global_mut<FAConfig>(get_fa_config_address_or_create(asset_type));
-        fa_config.auditor_ek = std::option::some(ristretto255::new_compressed_point_from_bytes(auditor_ek).extract());
+        let asset_config = borrow_global_mut<AssetConfig>(get_asset_config_address_or_create(asset_type));
+
+        let new_ek = auditor_ek.map(|ek|
+            ristretto255::new_compressed_point_from_bytes(ek).extract()
+        );
+
+        // Increment epoch only when installing or changing the EK (not when removing)
+        let should_increment = if (new_ek.is_some()) {
+            if (asset_config.auditor_ek.is_some()) {
+                !new_ek.borrow().compressed_point_equals(asset_config.auditor_ek.borrow())
+            } else {
+                true // None → Some: installing
+            }
+        } else {
+            false // removing or no-op
+        };
+
+        if (should_increment) {
+            asset_config.auditor_epoch = asset_config.auditor_epoch + 1;
+        };
+
+        asset_config.auditor_ek = new_ek;
     }
 
-    /// Sets the global auditor for all asset types.
-    public fun set_auditor_globally(_aptos_framework: &signer, _auditor_ek: vector<u8>) {
-        // TODO: Implement
+    /// Sets or removes the global auditor for all asset types. The global auditor is used as a fallback when no
+    /// asset-specific auditor is set. (Ideally, this should require a ZKPoK of DK but we assume competent auditors.)
+    ///
+    /// The `global_auditor_epoch` is incremented only when installing or changing the EK (not when removing):
+    /// - None → Some(ek): epoch increments (installing)
+    /// - Some(old) → Some(new) where old != new: epoch increments (changing)
+    /// - Some(old) → Some(old): epoch stays (no change)
+    /// - Some(_) → None: epoch stays (removing)
+    /// - None → None: epoch stays (no-op)
+    public fun set_global_auditor(aptos_framework: &signer, auditor_ek: Option<vector<u8>>) acquires GlobalConfig {
+        system_addresses::assert_aptos_framework(aptos_framework);
+
+        let config = borrow_global_mut<GlobalConfig>(@aptos_experimental);
+
+        let new_ek = auditor_ek.map(|ek|
+            ristretto255::new_compressed_point_from_bytes(ek).extract()
+        );
+
+        // Increment epoch only when installing or changing the EK (not when removing)
+        let should_increment = if (new_ek.is_some()) {
+            if (config.global_auditor_ek.is_some()) {
+                !new_ek.borrow().compressed_point_equals(config.global_auditor_ek.borrow())
+            } else {
+                true // None → Some: installing
+            }
+        } else {
+            false // removing or no-op
+        };
+
+        if (should_increment) {
+            config.global_auditor_epoch = config.global_auditor_epoch + 1;
+        };
+
+        config.global_auditor_ek = new_ek;
     }
 
-    // =====================
-    // Public view functions
-    // =====================
+    // ============================================================== //
+    //     End of SECURITY-SENSITIVE public governance functions      //
+    // ============================================================== //
+
+    // === Public view functions (10 out of 14) ===
+
+    #[view]
+    /// Helper to get the number of available balance chunks.
+    public fun get_num_available_chunks(): u64 {
+        confidential_available_balance::get_num_chunks()
+    }
+
+    #[view]
+    /// Helper to get the number of pending balance chunks.
+    public fun get_num_pending_chunks(): u64 {
+        confidential_pending_balance::get_num_chunks()
+    }
 
     #[view]
     /// Checks if the user has a confidential store for the specified asset type.
@@ -617,58 +901,42 @@ module aptos_experimental::confidential_asset {
     #[view]
     /// Returns true if confidentiality is enabled for all assets or if the asset type is allowed for confidential
     /// transfers. Returns false otherwise.
-    public fun is_confidentiality_enabled_for_asset_type(asset_type: Object<fungible_asset::Metadata>): bool acquires FAController, FAConfig {
+    public fun is_confidentiality_enabled_for_asset_type(asset_type: Object<fungible_asset::Metadata>): bool acquires GlobalConfig, AssetConfig {
         if (!is_allow_listing_enabled()) {
             return true
         };
 
-        let fa_config_address = get_fa_config_address(asset_type);
+        let asset_config_address = get_asset_config_address(asset_type);
 
-        if (!exists<FAConfig>(fa_config_address)) {
+        if (!exists<AssetConfig>(asset_config_address)) {
             return false
         };
 
-        borrow_global<FAConfig>(fa_config_address).allowed
+        borrow_global<AssetConfig>(asset_config_address).allowed
     }
 
     #[view]
     /// Checks if allow listing is enabled.
     /// If the allow list is enabled, only asset types from the allow list can be transferred confidentially.
     /// Otherwise, all asset types are allowed.
-    public fun is_allow_listing_enabled(): bool acquires FAController {
-        borrow_global<FAController>(@aptos_experimental).allow_list_enabled
+    public fun is_allow_listing_enabled(): bool acquires GlobalConfig {
+        borrow_global<GlobalConfig>(@aptos_experimental).allow_list_enabled
     }
 
     #[view]
     /// Returns the pending balance of the user for the specified asset type.
     public fun get_pending_balance(
         owner: address, asset_type: Object<fungible_asset::Metadata>
-    ): confidential_balance::CompressedConfidentialBalance acquires ConfidentialStore {
-        assert!(
-            has_confidential_store(owner, asset_type),
-            error::not_found(E_CONFIDENTIAL_STORE_NOT_REGISTERED)
-        );
-
-        let ca_store =
-            borrow_global<ConfidentialStore>(get_confidential_store_address(owner, asset_type));
-
-        ca_store.pending_balance
+    ): CompressedPendingBalance acquires ConfidentialStore {
+        borrow_confidential_store(owner, asset_type).pending_balance
     }
 
     #[view]
     /// Returns the available balance of the user for the specified asset type.
     public fun get_available_balance(
         owner: address, asset_type: Object<fungible_asset::Metadata>
-    ): confidential_balance::CompressedConfidentialBalance acquires ConfidentialStore {
-        assert!(
-            has_confidential_store(owner, asset_type),
-            error::not_found(E_CONFIDENTIAL_STORE_NOT_REGISTERED)
-        );
-
-        let ca_store =
-            borrow_global<ConfidentialStore>(get_confidential_store_address(owner, asset_type));
-
-        ca_store.available_balance
+    ): CompressedAvailableBalance acquires ConfidentialStore {
+        borrow_confidential_store(owner, asset_type).available_balance
     }
 
     #[view]
@@ -676,12 +944,7 @@ module aptos_experimental::confidential_asset {
     public fun get_encryption_key(
         user: address, asset_type: Object<fungible_asset::Metadata>
     ): CompressedRistretto acquires ConfidentialStore {
-        assert!(
-            has_confidential_store(user, asset_type),
-            error::not_found(E_CONFIDENTIAL_STORE_NOT_REGISTERED)
-        );
-
-        borrow_global<ConfidentialStore>(get_confidential_store_address(user, asset_type)).ek
+        borrow_confidential_store(user, asset_type).ek
     }
 
     #[view]
@@ -689,23 +952,13 @@ module aptos_experimental::confidential_asset {
     public fun is_normalized(
         user: address, asset_type: Object<fungible_asset::Metadata>
     ): bool acquires ConfidentialStore {
-        assert!(
-            has_confidential_store(user, asset_type),
-            error::not_found(E_CONFIDENTIAL_STORE_NOT_REGISTERED)
-        );
-
-        borrow_global<ConfidentialStore>(get_confidential_store_address(user, asset_type)).normalized
+        borrow_confidential_store(user, asset_type).normalized
     }
 
     #[view]
     /// Checks if the user's incoming transfers are paused for the specified asset type.
     public fun incoming_transfers_paused(user: address, asset_type: Object<fungible_asset::Metadata>): bool acquires ConfidentialStore {
-        assert!(
-            has_confidential_store(user, asset_type),
-            error::not_found(E_CONFIDENTIAL_STORE_NOT_REGISTERED)
-        );
-
-        borrow_global<ConfidentialStore>(get_confidential_store_address(user, asset_type)).pause_incoming_transfers
+        borrow_confidential_store(user, asset_type).pause_incoming
     }
 
     #[view]
@@ -713,21 +966,79 @@ module aptos_experimental::confidential_asset {
     /// If the auditing feature is disabled for the asset type, the encryption key is set to `None`.
     public fun get_auditor_for_asset_type(
         asset_type: Object<fungible_asset::Metadata>
-    ): Option<CompressedRistretto> acquires FAConfig, FAController {
-        let fa_config_address = get_fa_config_address(asset_type);
+    ): Option<CompressedRistretto> acquires AssetConfig, GlobalConfig {
+        let asset_config_address = get_asset_config_address(asset_type);
 
-        if (!is_allow_listing_enabled() && !exists<FAConfig>(fa_config_address)) {
+        if (!is_allow_listing_enabled() && !exists<AssetConfig>(asset_config_address)) {
             return std::option::none();
         };
 
-        borrow_global<FAConfig>(fa_config_address).auditor_ek
+        borrow_global<AssetConfig>(asset_config_address).auditor_ek
+    }
+
+    #[view]
+    /// Returns the global auditor's encryption key, or `None` if no global auditor is set.
+    public fun get_global_auditor(): Option<CompressedRistretto> acquires GlobalConfig {
+        borrow_global<GlobalConfig>(@aptos_experimental).global_auditor_ek
+    }
+
+    #[view]
+    /// Returns the effective auditor for a given asset type, checking the asset-specific auditor first
+    /// and falling back to the global auditor.
+    public fun get_effective_auditor(
+        asset_type: Object<fungible_asset::Metadata>
+    ): Option<CompressedRistretto> acquires AssetConfig, GlobalConfig {
+        // 1. Check asset-specific auditor
+        let config_addr = get_asset_config_address(asset_type);
+        if (exists<AssetConfig>(config_addr)) {
+            let asset_auditor = borrow_global<AssetConfig>(config_addr).auditor_ek;
+            if (asset_auditor.is_some()) {
+                return asset_auditor
+            };
+        };
+        // 2. Fall back to global auditor
+        borrow_global<GlobalConfig>(@aptos_experimental).global_auditor_ek
+    }
+
+    #[view]
+    /// Returns the global auditor epoch counter.
+    public fun get_global_auditor_epoch(): u64 acquires GlobalConfig {
+        borrow_global<GlobalConfig>(@aptos_experimental).global_auditor_epoch
+    }
+
+    #[view]
+    /// Returns the auditor epoch counter for a specific asset type. Returns 0 if no `AssetConfig`
+    /// exists for this asset type (and allow-listing is disabled).
+    public fun get_auditor_epoch_for_asset_type(
+        asset_type: Object<fungible_asset::Metadata>
+    ): u64 acquires AssetConfig, GlobalConfig {
+        let asset_config_address = get_asset_config_address(asset_type);
+        if (!is_allow_listing_enabled() && !exists<AssetConfig>(asset_config_address)) {
+            return 0
+        };
+        borrow_global<AssetConfig>(asset_config_address).auditor_epoch
+    }
+
+    #[view]
+    /// Returns the effective auditor epoch: asset-specific epoch if the asset has an auditor,
+    /// otherwise global auditor epoch.
+    public fun get_effective_auditor_epoch(
+        asset_type: Object<fungible_asset::Metadata>
+    ): u64 acquires AssetConfig, GlobalConfig {
+        let config_addr = get_asset_config_address(asset_type);
+        if (exists<AssetConfig>(config_addr)) {
+            let ac = borrow_global<AssetConfig>(config_addr);
+            if (ac.auditor_ek.is_some()) {
+                return ac.auditor_epoch
+            };
+        };
+        borrow_global<GlobalConfig>(@aptos_experimental).global_auditor_epoch
     }
 
     #[view]
     /// Returns the circulating supply of the confidential asset.
-    /// TODO: rename to get_total_confidential_supply
-    public fun get_total_supply(asset_type: Object<fungible_asset::Metadata>): u64 acquires FAController {
-        let fa_store_address = get_fa_controller_address();
+    public fun get_total_confidential_supply(asset_type: Object<fungible_asset::Metadata>): u64 acquires GlobalConfig {
+        let fa_store_address = get_global_config_address();
         assert!(
             primary_fungible_store::primary_store_exists(fa_store_address, asset_type),
             error::not_found(E_NO_CONFIDENTIAL_ASSET_POOL_FOR_ASSET_TYPE)
@@ -741,343 +1052,37 @@ module aptos_experimental::confidential_asset {
     public fun get_num_transfers_received(
         user: address, asset_type: Object<fungible_asset::Metadata>
     ): u64 acquires ConfidentialStore {
-        assert!(
-            has_confidential_store(user, asset_type),
-            error::not_found(E_CONFIDENTIAL_STORE_NOT_REGISTERED)
-        );
-
-        borrow_global<ConfidentialStore>(get_confidential_store_address(user, asset_type)).transfers_received
+        borrow_confidential_store(user, asset_type).transfers_received
     }
 
-    // ===========================
-    // Public, non-entry functions
-    // ===========================
-    //
-    // Note: These function can be useful for external contracts that want to integrate with the Confidential Asset
-    // protocol.
-    //
-    // TODO(rename): The `_internal` suffix is somewhat of a misnomer. Should use `register` for this and `register_raw`
-    //   for the function that takes raw bytes
-    //
-
-    /// Implementation of the `register` entry function.
-    public fun register_internal(
-        sender: &signer, asset_type: Object<fungible_asset::Metadata>, ek: CompressedRistretto
-    ) acquires FAController, FAConfig {
-        assert!(is_confidentiality_enabled_for_asset_type(asset_type), error::invalid_argument(E_ASSET_TYPE_DISALLOWED));
-
-        let user = signer::address_of(sender);
-
-        assert!(
-            !has_confidential_store(user, asset_type),
-            error::already_exists(E_CONFIDENTIAL_STORE_ALREADY_REGISTERED)
-        );
-
-        let ca_store = ConfidentialStore {
-            pause_incoming_transfers: false,
-            normalized: true,
-            transfers_received: 0,
-            pending_balance: confidential_balance::new_compressed_zero_balance(get_num_pending_chunks()),
-            available_balance: confidential_balance::new_compressed_zero_balance(get_num_available_chunks()),
-            ek
-        };
-
-        move_to(&get_confidential_store_signer(sender, asset_type), ca_store);
+    #[view]
+    /// Returns the maximum number of transfers that can be accumulated in the pending balance before rollover is required.
+    public fun get_max_transfers_before_rollover(): u64 {
+        MAX_TRANSFERS_BEFORE_ROLLOVER
     }
 
-    /// Implementation of the `deposit_to` entry function.
-    /// For convenience, we often refer to this operation as "veiling."
-    /// TODO: remove ability to deposit to another's account
-    public fun deposit_to_internal(
-        depositor: &signer,
-        asset_type: Object<fungible_asset::Metadata>,
-        to: address,
-        amount: u64
-    ) acquires ConfidentialStore, FAController, FAConfig {
-        assert!(is_confidentiality_enabled_for_asset_type(asset_type), error::invalid_argument(E_ASSET_TYPE_DISALLOWED));
-        assert!(!incoming_transfers_paused(to, asset_type), error::invalid_state(E_INCOMING_TRANSFERS_PAUSED));
+    // === Private, internal functions (11 out of 14) ===
 
-        let depositor_addr = signer::address_of(depositor);
-
-        let depositor_fa_store = primary_fungible_store::primary_store(depositor_addr, asset_type);
-
-        // Note: This sets up the "confidential asset pool" for this asset type, if one is not already set up, such as
-        // when someone first veils this asset type for the first time.
-        let pool_fa_store =
-            primary_fungible_store::ensure_primary_store_exists(
-                get_fa_controller_address(), asset_type
-            );
-
-        //
-        // Step 1: Transfer the asset from the user's account into the confidential asset pool
-        //
-        dispatchable_fungible_asset::transfer(
-            depositor, depositor_fa_store, pool_fa_store, amount
-        );
-
-        //
-        // Step 2: "Mint" correspodning confidential assets for the depositor, and add them to their pending balance.
-        //
-        let depositor_ca_store =
-            borrow_global_mut<ConfidentialStore>(get_confidential_store_address(to, asset_type));
-
-        // Make sure the receiver has "room" in their pending balance for this deposit
-        assert!(
-            depositor_ca_store.transfers_received < MAX_TRANSFERS_BEFORE_ROLLOVER,
-            error::invalid_state(E_PENDING_BALANCE_MUST_BE_ROLLED_OVER)
-        );
-
-        let pending_balance =
-            confidential_balance::decompress(&depositor_ca_store.pending_balance);
-
-        confidential_balance::add_balances_mut(
-            &mut pending_balance,
-            &confidential_balance::new_pending_balance_u64_no_randomness(amount)
-        );
-
-        // Update the pending balance and increment the incoming transfers counter
-        depositor_ca_store.pending_balance = confidential_balance::compress(&pending_balance);
-        depositor_ca_store.transfers_received += 1;
-
-        event::emit(Deposited { from: depositor_addr, to, amount, asset_type });
+    /// Returns the address that handles primary FA store and `AssetConfig` objects for the specified asset type.
+    fun get_asset_config_address(asset_type: Object<fungible_asset::Metadata>): address acquires GlobalConfig {
+        let config_ext = &borrow_global<GlobalConfig>(@aptos_experimental).extend_ref;
+        let config_ext_address = object::address_from_extend_ref(config_ext);
+        object::create_object_address(&config_ext_address, construct_asset_config_seed(asset_type))
     }
 
-    /// Implementation of the `withdraw_to` entry function.
-    /// Withdrawals are always allowed, regardless of whether the asset type is allow-listed.
-    public fun withdraw_to_internal(
-        sender: &signer,
-        asset_type: Object<fungible_asset::Metadata>,
-        to: address,
-        amount: u64,
-        new_balance: ConfidentialBalance,
-        proof: WithdrawalProof
-    ) acquires ConfidentialStore, FAController {
-        let from = signer::address_of(sender);
-
-        let sender_ek = get_encryption_key(from, asset_type);
-
-        let ca_store =
-            borrow_global_mut<ConfidentialStore>(get_confidential_store_address(from, asset_type));
-        let current_balance =
-            confidential_balance::decompress(&ca_store.available_balance);
-
-        confidential_proof::verify_withdrawal_proof(
-            &sender_ek,
-            amount,
-            &current_balance,
-            &new_balance,
-            &proof
-        );
-
-        ca_store.normalized = true;
-        ca_store.available_balance = confidential_balance::compress(&new_balance);
-
-        primary_fungible_store::transfer(&get_fa_controller_signer(), asset_type, to, amount);
-
-        event::emit(Withdrawn { from: signer::address_of(sender), to, amount, asset_type });
-    }
-
-    /// Implementation of the `confidential_transfer` entry function.
-    public fun confidential_transfer_internal(
-        sender: &signer,
-        asset_type: Object<fungible_asset::Metadata>,
-        to: address,
-        new_balance: ConfidentialBalance,
-        sender_amount: ConfidentialBalance,
-        recipient_amount: ConfidentialBalance,
-        auditor_eks: vector<CompressedRistretto>,
-        auditor_amounts: vector<ConfidentialBalance>,
-        proof: TransferProof
-    ) acquires ConfidentialStore, FAConfig, FAController {
-        assert!(is_confidentiality_enabled_for_asset_type(asset_type), error::invalid_argument(E_ASSET_TYPE_DISALLOWED));
-        assert!(!incoming_transfers_paused(to, asset_type), error::invalid_state(E_INCOMING_TRANSFERS_PAUSED));
-        assert!(
-            validate_auditors(
-                asset_type,
-                &recipient_amount,
-                &auditor_eks,
-                &auditor_amounts,
-                &proof
-            ),
-            error::invalid_argument(E_INTERNAL_ERROR) // TODO: i removed the old code because validate_auditors() will be turned into fetch_auditor_eks()
-        );
-
-        // TODO: This will be removed when we build the more efficient $\Sigma$-protocol
-        assert!(
-            confidential_balance::balance_c_equals(&sender_amount, &recipient_amount),
-            error::internal(E_INTERNAL_ERROR)   // note: i removed the old error code
-        );
-
-        let from = signer::address_of(sender);
-
-        let sender_ek = get_encryption_key(from, asset_type);
-        let recipient_ek = get_encryption_key(to, asset_type);
-
-        let sender_ca_store =
-            borrow_global_mut<ConfidentialStore>(get_confidential_store_address(from, asset_type));
-
-        let sender_current_available_balance =
-            confidential_balance::decompress(&sender_ca_store.available_balance);
-
-        confidential_proof::verify_transfer_proof(
-            &sender_ek,
-            &recipient_ek,
-            &sender_current_available_balance,
-            &new_balance,
-            &sender_amount,
-            &recipient_amount,
-            &auditor_eks,
-            &auditor_amounts,
-            &proof
-        );
-
-        sender_ca_store.normalized = true;
-        sender_ca_store.available_balance = confidential_balance::compress(
-            &new_balance
-        );
-
-        // Cannot create multiple mutable references to the same type, so we need to drop it
-        let ConfidentialStore { .. } = sender_ca_store;
-
-        let recipient_ca_store =
-            borrow_global_mut<ConfidentialStore>(get_confidential_store_address(to, asset_type));
-
-        // Make sure the receiver has "room" in their pending balance for this transfer
-        assert!(
-            recipient_ca_store.transfers_received < MAX_TRANSFERS_BEFORE_ROLLOVER,
-            error::invalid_state(E_PENDING_BALANCE_MUST_BE_ROLLED_OVER)
-        );
-
-        let recipient_pending_balance =
-            confidential_balance::decompress(
-                &recipient_ca_store.pending_balance
-            );
-        confidential_balance::add_balances_mut(
-            &mut recipient_pending_balance, &recipient_amount
-        );
-
-        recipient_ca_store.transfers_received += 1;
-        recipient_ca_store.pending_balance = confidential_balance::compress(
-            &recipient_pending_balance
-        );
-
-        event::emit(Transferred { from, to, asset_type });
-    }
-
-    /// Implementation of the `normalize` entry function.
-    public fun normalize_internal(
-        sender: &signer,
-        asset_type: Object<fungible_asset::Metadata>,
-        new_balance: ConfidentialBalance,
-        proof: NormalizationProof
-    ) acquires ConfidentialStore {
-        let user = signer::address_of(sender);
-        let sender_ek = get_encryption_key(user, asset_type);
-
-        let ca_store =
-            borrow_global_mut<ConfidentialStore>(get_confidential_store_address(user, asset_type));
-
-        assert!(!ca_store.normalized, error::invalid_state(E_ALREADY_NORMALIZED));
-
-        let current_balance =
-            confidential_balance::decompress(&ca_store.available_balance);
-
-        confidential_proof::verify_normalization_proof(
-            &sender_ek,
-            &current_balance,
-            &new_balance,
-            &proof
-        );
-
-        ca_store.available_balance = confidential_balance::compress(&new_balance);
-        ca_store.normalized = true;
-    }
-
-    /// Implementation of the `rollover_pending_balance` entry function.
-    public fun rollover_pending_balance_internal(
-        sender: &signer, asset_type: Object<fungible_asset::Metadata>
-    ) acquires ConfidentialStore {
-        let user = signer::address_of(sender);
-
-        assert!(
-            has_confidential_store(user, asset_type),
-            error::not_found(E_CONFIDENTIAL_STORE_NOT_REGISTERED)
-        );
-
-        let ca_store =
-            borrow_global_mut<ConfidentialStore>(get_confidential_store_address(user, asset_type));
-
-        assert!(ca_store.normalized, error::invalid_state(E_NORMALIZATION_REQUIRED));
-
-        let available_balance =
-            confidential_balance::decompress(&ca_store.available_balance);
-        let pending_balance =
-            confidential_balance::decompress(&ca_store.pending_balance);
-
-        confidential_balance::add_balances_mut(&mut available_balance, &pending_balance);
-
-        ca_store.normalized = false;
-        ca_store.transfers_received = 0;
-        ca_store.available_balance = confidential_balance::compress(&available_balance);
-        ca_store.pending_balance = confidential_balance::new_compressed_zero_balance(get_num_pending_chunks());
-    }
-
-    /// Implementation of the `pause_incoming_transactions` entry function.
-    public fun pause_incoming_transactions_internal(
-        sender: &signer, asset_type: Object<fungible_asset::Metadata>
-    ) acquires ConfidentialStore {
-        let user = signer::address_of(sender);
-
-        assert!(
-            has_confidential_store(user, asset_type),
-            error::not_found(E_CONFIDENTIAL_STORE_NOT_REGISTERED)
-        );
-
-        let ca_store =
-            borrow_global_mut<ConfidentialStore>(get_confidential_store_address(user, asset_type));
-        ca_store.pause_incoming_transfers = true;
-    }
-
-    /// Implementation of the `resume_incoming_transactions` entry function.
-    public fun resume_incoming_transactions_internal(
-        sender: &signer, asset_type: Object<fungible_asset::Metadata>
-    ) acquires ConfidentialStore {
-        let user = signer::address_of(sender);
-
-        assert!(
-            has_confidential_store(user, asset_type),
-            error::not_found(E_CONFIDENTIAL_STORE_NOT_REGISTERED)
-        );
-
-        let ca_store =
-            borrow_global_mut<ConfidentialStore>(get_confidential_store_address(user, asset_type));
-        ca_store.pause_incoming_transfers = false;
-    }
-
-    // =================
-    // Private functions
-    // =================
-
-    /// Returns the address that handles primary FA store and `FAConfig` objects for the specified asset type.
-    fun get_fa_config_address(asset_type: Object<fungible_asset::Metadata>): address acquires FAController {
-        let fa_ext = &borrow_global<FAController>(@aptos_experimental).extend_ref;
-        let fa_ext_address = object::address_from_extend_ref(fa_ext);
-        object::create_object_address(&fa_ext_address, construct_fa_config_seed(asset_type))
-    }
-
-    /// Ensures that the `FAConfig` object exists for the specified asset type and returns its address.
+    /// Ensures that the `AssetConfig` object exists for the specified asset type and returns its address.
     /// If the object does not exist, creates it. Used only for internal purposes.
-    fun get_fa_config_address_or_create(asset_type: Object<fungible_asset::Metadata>): address acquires FAController {
-        let addr = get_fa_config_address(asset_type);
+    fun get_asset_config_address_or_create(asset_type: Object<fungible_asset::Metadata>): address acquires GlobalConfig {
+        let addr = get_asset_config_address(asset_type);
 
-        if (!exists<FAConfig>(addr)) {
-            let fa_config_signer = get_fa_config_signer(asset_type);
+        if (!exists<AssetConfig>(addr)) {
+            let asset_config_signer = get_asset_config_signer(asset_type);
 
             move_to(
-                &fa_config_signer,
+                &asset_config_signer,
                 // We disallow the asset type from being made confidential since this function is
                 // called in a lot of different contexts.
-                FAConfig { allowed: false, auditor_ek: std::option::none() }
+                AssetConfig::V1 { allowed: false, auditor_ek: std::option::none(), auditor_epoch: 0 }
             );
         };
 
@@ -1085,13 +1090,13 @@ module aptos_experimental::confidential_asset {
     }
 
     /// Returns an object for handling all the FA primary stores, and returns a signer for it.
-    fun get_fa_controller_signer(): signer acquires FAController {
-        object::generate_signer_for_extending(&borrow_global<FAController>(@aptos_experimental).extend_ref)
+    fun get_global_config_signer(): signer acquires GlobalConfig {
+        object::generate_signer_for_extending(&borrow_global<GlobalConfig>(@aptos_experimental).extend_ref)
     }
 
     /// Returns the address that handles all the FA primary stores.
-    fun get_fa_controller_address(): address acquires FAController {
-        object::address_from_extend_ref(&borrow_global<FAController>(@aptos_experimental).extend_ref)
+    fun get_global_config_address(): address acquires GlobalConfig {
+        object::address_from_extend_ref(&borrow_global<GlobalConfig>(@aptos_experimental).extend_ref)
     }
 
     /// Returns an object for handling the `ConfidentialStore` and returns a signer for it.
@@ -1104,15 +1109,27 @@ module aptos_experimental::confidential_asset {
         object::create_object_address(&user, construct_confidential_store_seed(asset_type))
     }
 
-    /// Returns an object for handling the `FAConfig`, and returns a signer for it.
-    fun get_fa_config_signer(asset_type: Object<fungible_asset::Metadata>): signer acquires FAController {
-        let fa_ext = &borrow_global<FAController>(@aptos_experimental).extend_ref;
-        let fa_ext_signer = object::generate_signer_for_extending(fa_ext);
+    /// Borrows the `ConfidentialStore` for the given user and asset type, asserting it exists.
+    inline fun borrow_confidential_store(user: address, asset_type: Object<fungible_asset::Metadata>): &ConfidentialStore {
+        assert!(has_confidential_store(user, asset_type), error::not_found(E_CONFIDENTIAL_STORE_NOT_REGISTERED));
+        borrow_global<ConfidentialStore>(get_confidential_store_address(user, asset_type))
+    }
 
-        let fa_ctor =
-            &object::create_named_object(&fa_ext_signer, construct_fa_config_seed(asset_type));
+    /// Mutably borrows the `ConfidentialStore` for the given user and asset type, asserting it exists.
+    inline fun borrow_confidential_store_mut(user: address, asset_type: Object<fungible_asset::Metadata>): &mut ConfidentialStore {
+        assert!(has_confidential_store(user, asset_type), error::not_found(E_CONFIDENTIAL_STORE_NOT_REGISTERED));
+        borrow_global_mut<ConfidentialStore>(get_confidential_store_address(user, asset_type))
+    }
 
-        object::generate_signer(fa_ctor)
+    /// Returns an object for handling the `AssetConfig`, and returns a signer for it.
+    fun get_asset_config_signer(asset_type: Object<fungible_asset::Metadata>): signer acquires GlobalConfig {
+        let config_ext = &borrow_global<GlobalConfig>(@aptos_experimental).extend_ref;
+        let config_ext_signer = object::generate_signer_for_extending(config_ext);
+
+        let config_ctor =
+            &object::create_named_object(&config_ext_signer, construct_asset_config_seed(asset_type));
+
+        object::generate_signer(config_ctor)
     }
 
     /// Constructs a unique seed for the user's `ConfidentialStore` object.
@@ -1120,119 +1137,27 @@ module aptos_experimental::confidential_asset {
     fun construct_confidential_store_seed(asset_type: Object<fungible_asset::Metadata>): vector<u8> {
         bcs::to_bytes(
             &string_utils::format2(
-                &b"confidential_asset::{}::asset_type::{}::user",
+                &b"confidential_asset::{}::asset_type::{}::ConfidentialStore",
                 @aptos_experimental,
                 object::object_address(&asset_type)
             )
         )
     }
 
-    /// Constructs a unique seed for the FA's `FAConfig` object.
-    /// As all the `FAConfig`'s have the same type, we need to differentiate them by the seed.
-    fun construct_fa_config_seed(asset_type: Object<fungible_asset::Metadata>): vector<u8> {
+    /// Constructs a unique seed for the `AssetConfig` object.
+    /// As all the `AssetConfig`'s have the same type, we need to differentiate them by the seed.
+    /// NOTE: The seed string is unchanged from the original to maintain address stability.
+    fun construct_asset_config_seed(asset_type: Object<fungible_asset::Metadata>): vector<u8> {
         bcs::to_bytes(
             &string_utils::format2(
-                &b"confidential_asset::{}::asset_type::{}::fa",
+                &b"confidential_asset::{}::asset_type::{}::AssetConfig",
                 @aptos_experimental,
                 object::object_address(&asset_type)
             )
         )
     }
 
-    /// Validates that the auditor-related fields in the confidential transfer are correct.
-    /// Returns `false` if the transfer amount is not the same as the auditor amounts.
-    /// Returns `false` if the number of auditors in the transfer proof and auditor lists do not match.
-    /// Returns `false` if the first auditor in the list and the asset-specific auditor do not match.
-    /// Note: If the asset-specific auditor is not set, the validation is successful for any list of auditors.
-    /// Otherwise, returns `true`.
-    fun validate_auditors(
-        asset_type: Object<fungible_asset::Metadata>,
-        transfer_amount: &ConfidentialBalance,
-        auditor_eks: &vector<CompressedRistretto>,
-        auditor_amounts: &vector<ConfidentialBalance>,
-        proof: &TransferProof
-    ): bool acquires FAConfig, FAController {
-        if (!auditor_amounts.all(|auditor_amount| {
-            confidential_balance::balance_c_equals(transfer_amount, auditor_amount)
-        })) {
-            return false
-        };
-
-        if (auditor_eks.length() != auditor_amounts.length()
-            || auditor_eks.length()
-                != confidential_proof::auditors_count_in_transfer_proof(proof)) {
-            return false
-        };
-
-        let asset_auditor_ek = get_auditor_for_asset_type(asset_type);
-        if (asset_auditor_ek.is_none()) {
-            return true
-        };
-
-        if (auditor_eks.length() == 0) {
-            return false
-        };
-
-        let asset_auditor_ek = ristretto255::point_decompress(&asset_auditor_ek.extract());
-        let first_auditor_ek = ristretto255::point_decompress(&auditor_eks[0]);
-
-        ristretto255::point_equals(&asset_auditor_ek, &first_auditor_ek)
-    }
-
-    /// Deserializes the auditor EKs from a byte array.
-    /// Returns `Some(vector<CompressedRistretto>)` if the deserialization is successful, otherwise `None`.
-    fun deserialize_auditor_eks(
-        auditor_eks_bytes: vector<u8>
-    ): Option<vector<CompressedRistretto>> {
-        if (auditor_eks_bytes.length() % 32 != 0) {
-            return std::option::none()
-        };
-
-        let auditors_count = auditor_eks_bytes.length() / 32;
-
-        let auditor_eks = vector::range(0, auditors_count).map(|i| {
-            ristretto255::new_compressed_point_from_bytes(
-                auditor_eks_bytes.slice(i * 32, (i + 1) * 32)
-            )
-        });
-
-        if (auditor_eks.any(|ek| ek.is_none())) {
-            return std::option::none()
-        };
-
-        std::option::some(auditor_eks.map(|ek| ek.extract()))
-    }
-
-    /// Deserializes the auditor amounts from a byte array.
-    /// Returns `Some(vector<ConfidentialBalance>)` if the deserialization is successful, otherwise `None`.
-    fun deserialize_auditor_amounts(
-        auditor_amounts_bytes: vector<u8>
-    ): Option<vector<ConfidentialBalance>> {
-        if (auditor_amounts_bytes.length() % 256 != 0) {
-            return std::option::none()
-        };
-
-        let auditors_count = auditor_amounts_bytes.length() / 256;
-
-        let auditor_amounts = vector::range(0, auditors_count).map(|i| {
-            confidential_balance::new_balance_from_bytes(
-                auditor_amounts_bytes.slice(i * 256, (i + 1) * 256),
-                get_num_pending_chunks()
-            )
-        });
-
-        if (auditor_amounts.any(|ek| ek.is_none())) {
-            return std::option::none()
-        };
-
-        std::option::some(
-            auditor_amounts.map(|balance| balance.extract())
-        )
-    }
-
-    // ===================
-    // Test-only functions
-    // ===================
+    // === Test-only functions (12 out of 14) ===
 
     #[test_only]
     public fun init_module_for_testing(deployer: &signer) {
@@ -1247,9 +1172,9 @@ module aptos_experimental::confidential_asset {
         amount: u64
     ): bool acquires ConfidentialStore {
         let pending_balance =
-            confidential_balance::decompress(&get_pending_balance(user, asset_type));
+            get_pending_balance(user, asset_type).decompress();
 
-        confidential_balance::check_decrypts_to(&pending_balance, user_dk, (amount as u128))
+        pending_balance.check_decrypts_to(user_dk, (amount as u128))
     }
 
     #[test_only]
@@ -1260,183 +1185,700 @@ module aptos_experimental::confidential_asset {
         amount: u128
     ): bool acquires ConfidentialStore {
         let available_balance =
-            confidential_balance::decompress(&get_available_balance(user, asset_type));
+            get_available_balance(user, asset_type).decompress();
 
-        confidential_balance::check_decrypts_to(&available_balance, user_dk, amount)
+        available_balance.check_decrypts_to(user_dk, amount)
     }
 
-    #[test_only]
-    /// TODO: why not just do bcs::to_bytes?
-    public fun serialize_auditor_eks(
-        auditor_eks: &vector<CompressedRistretto>
-    ): vector<u8> {
-        let auditor_eks_bytes = vector[];
+    // === Proof enums and verification functions (13 out of 14) ===
 
-        auditor_eks.for_each_ref(|auditor| {
-            auditor_eks_bytes.append(ristretto255::compressed_point_to_bytes(*auditor));
+    /// Proof of knowledge of the decryption key for registration.
+    /// Contains a $\Sigma$-protocol proof that $H = \mathsf{dk} \cdot \mathsf{ek}$.
+    enum RegistrationProof has drop {
+        V1 {
+            sigma: sigma_protocol_proof::Proof,
+        }
+    }
+
+    /// Represents the proof structure for validating a withdrawal operation.
+    /// Contains the sender's new normalized available balance, a range proof, and a
+    /// $\Sigma$-protocol proof for the $\mathcal{R}^{-}_\mathsf{withdraw}$ relation.
+    enum WithdrawalProof has drop {
+        V1 {
+            /// The sender's new normalized available balance, encrypted with fresh randomness.
+            new_balance: AvailableBalance,
+            /// The compressed form of `new_balance`, obtained at parse time to avoid recompression.
+            compressed_new_balance: CompressedAvailableBalance,
+            /// Range proof ensuring that the resulting balance chunks are normalized (i.e., within the 16-bit limit).
+            zkrp_new_balance: RangeProof,
+            /// $\Sigma$-protocol proof for the withdrawal relation.
+            sigma: sigma_protocol_proof::Proof,
+        }
+    }
+
+    /// Represents the proof structure for validating a transfer operation.
+    /// Contains the sender's new balance, the transfer amount encrypted for the sender,
+    /// D-only components for the recipient and auditors, range proofs, and a
+    /// $\Sigma$-protocol proof for the $\mathcal{R}^{-}_\mathsf{txfer}$ relation.
+    enum TransferProof has drop {
+        V1 {
+            /// The sender's new normalized available balance, encrypted with fresh randomness.
+            new_balance: AvailableBalance,
+            /// The compressed form of `new_balance`, obtained at parse time to avoid recompression.
+            compressed_new_balance: CompressedAvailableBalance,
+            /// The transfer amount encrypted with the sender's encryption key.
+            sender_amount: PendingBalance,
+            /// The compressed form of `sender_amount`, obtained at parse time to avoid recompression.
+            compressed_sender_amount: CompressedPendingBalance,
+            /// The D components of the transfer amount encrypted with the recipient's encryption key.
+            /// The C components are the same as `sender_amount`'s C components (structurally guaranteed).
+            recipient_amount_R: vector<RistrettoPoint>,
+            /// The compressed form of `recipient_R`, obtained at parse time to avoid recompression.
+            compressed_recip_amount_R: vector<CompressedRistretto>,
+            /// The D components of the transfer amount encrypted with each auditor's encryption key.
+            /// The C components are the same as `sender_amount`'s C components (structurally guaranteed).
+            auditor_amount_Ds: vector<vector<RistrettoPoint>>,
+            /// The compressed form of each auditor's D components, obtained at parse time to avoid recompression.
+            compressed_auditor_Rs: vector<vector<CompressedRistretto>>,
+            /// Range proof ensuring that the resulting balance chunks for the sender are normalized.
+            zkrp_new_balance: RangeProof,
+            /// Range proof ensuring that the transferred amount chunks are normalized.
+            zkrp_amount: RangeProof,
+            /// $\Sigma$-protocol proof for the transfer relation.
+            sigma: sigma_protocol_proof::Proof,
+        }
+    }
+
+    /// Represents the proof structure for validating a normalization operation.
+    /// Contains the user's new normalized available balance, a range proof, and a
+    /// $\Sigma$-protocol proof (reusing the withdrawal relation with $v = 0$).
+    enum NormalizationProof has drop {
+        V1 {
+            /// The user's new normalized available balance, encrypted with fresh randomness.
+            new_balance: AvailableBalance,
+            /// The compressed form of `new_balance`, obtained at parse time to avoid recompression.
+            compressed_new_balance: CompressedAvailableBalance,
+            /// Range proof ensuring that the resulting balance chunks are normalized (i.e., within the 16-bit limit).
+            zkrp_new_balance: RangeProof,
+            /// $\Sigma$-protocol proof for the normalization relation (withdrawal with $v = 0$).
+            sigma: sigma_protocol_proof::Proof,
+        }
+    }
+
+    /// Represents the proof structure for validating a key rotation operation.
+    /// Contains the new encryption key, the re-encrypted D components, and a $\Sigma$-protocol proof
+    /// that the re-encryption is correct.
+    enum KeyRotationProof has drop {
+        V1 {
+            compressed_new_ek: CompressedRistretto,
+            new_R: vector<RistrettoPoint>,
+            compressed_new_R: vector<CompressedRistretto>,
+            sigma: sigma_protocol_proof::Proof,
+        }
+    }
+
+    // $$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$ //
+    //                                                         //
+    // *** SECURITY-SENSITIVE proof verification functions *** //
+    //         (bugs here could lead to stolen funds)          //
+    //                                                         //
+    // $$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$ //
+
+    /// Asserts the registration proof of knowledge is valid via $\Sigma$-protocol verification.
+    public fun assert_valid_registration_proof(
+        sender: &signer,
+        asset_type: Object<fungible_asset::Metadata>,
+        ek: &CompressedRistretto,
+        proof: RegistrationProof
+    ) {
+        let RegistrationProof::V1 { sigma } = proof;
+        let compressed_H = ristretto255_twisted_elgamal::get_encryption_key_basepoint_compressed();
+        let stmt = sigma_protocol_registration::new_registration_statement(
+            compressed_H, compressed_H.point_decompress(),
+            *ek, ek.point_decompress(),
+        );
+        let session = sigma_protocol_registration::new_session(sender, asset_type);
+        sigma_protocol_registration::assert_verifies(&session, &stmt, &sigma);
+    }
+
+    /// Asserts the validity of the `withdraw` operation.
+    ///
+    /// Checks that the new balance chunks are each in [0, 2^16) via a range proof.
+    /// Verifies the $\Sigma$-protocol proof for the $\mathcal{R}^{-}_\mathsf{withdraw}$ relation.
+    /// Consumes the proof and returns the compressed new balance on success.
+    public fun assert_valid_withdrawal_proof(
+        sender: &signer,
+        asset_type: Object<fungible_asset::Metadata>,
+        ek: &CompressedRistretto,
+        amount: u64,
+        current_balance: &CompressedAvailableBalance,
+        compressed_auditor_ek: &Option<CompressedRistretto>,
+        proof: WithdrawalProof
+    ): CompressedAvailableBalance {
+        let WithdrawalProof::V1 { new_balance, compressed_new_balance, zkrp_new_balance, sigma } = proof;
+        confidential_proof::assert_valid_range_proof(new_balance.get_P(), &zkrp_new_balance);
+
+        // Build base points
+        let compressed_G = ristretto255::basepoint_compressed();
+        let _G = ristretto255::basepoint();
+        let compressed_H = ristretto255_twisted_elgamal::get_encryption_key_basepoint_compressed();
+        let _H = compressed_H.point_decompress();
+
+        let v = ristretto255::new_scalar_from_u64(amount);
+
+        let (aud_ek_compressed, compressed_new_R_aud, new_R_aud) = if (compressed_auditor_ek.is_some()) {
+            let aud_ek = *compressed_auditor_ek.borrow();
+            (std::option::some(aud_ek), *compressed_new_balance.get_compressed_R_aud(), points_clone(new_balance.get_R_aud()))
+        } else {
+            (std::option::none(), vector[], vector[])
+        };
+
+        let stmt = sigma_protocol_withdraw::new_withdrawal_statement(
+            compressed_G, _G,
+            compressed_H, _H,
+            *ek, ek.point_decompress(),
+            *current_balance.get_compressed_P(), decompress_points(current_balance.get_compressed_P()),
+            *current_balance.get_compressed_R(), decompress_points(current_balance.get_compressed_R()),
+            *compressed_new_balance.get_compressed_P(), points_clone(new_balance.get_P()),
+            *compressed_new_balance.get_compressed_R(), points_clone(new_balance.get_R()),
+            aud_ek_compressed, aud_ek_compressed.map(|p| p.point_decompress()),
+            compressed_new_R_aud, new_R_aud,
+            v,
+        );
+
+        let session = sigma_protocol_withdraw::new_session(sender, asset_type);
+        sigma_protocol_withdraw::assert_verifies_withdrawal(&session, &stmt, &sigma);
+        compressed_new_balance
+    }
+
+    /// Asserts the validity of the `confidential_transfer` operation.
+    ///
+    /// Checks that the new balance and transfer amount chunks are each in [0, 2^16) via range proofs.
+    /// Reconstructs full recipient and auditor balances from the sender_amount's C components and
+    /// the provided D-only components. This structurally guarantees that C components match across
+    /// all parties.
+    /// Verifies the $\Sigma$-protocol proof for the $\mathcal{R}^{-}_\mathsf{txfer}$ relation.
+    /// Consumes the proof and returns (new_balance, sender_amount, recipient_amount, auditor_amounts).
+    public fun assert_valid_transfer_proof(
+        sender: &signer,
+        recipient_addr: address,
+        asset_type: Object<fungible_asset::Metadata>,
+        sender_ek: &CompressedRistretto,
+        recip_ek: &CompressedRistretto,
+        old_balance: &CompressedAvailableBalance,
+        auditor_eks: &vector<CompressedRistretto>,
+        has_effective_auditor: bool,
+        num_extra_auditors: u64,
+        proof: TransferProof
+    ): (
+        CompressedAvailableBalance,
+        PendingBalance,
+        PendingBalance,
+        vector<PendingBalance>
+    ) {
+        let TransferProof::V1 {
+            new_balance, compressed_new_balance,
+            sender_amount, compressed_sender_amount,
+            recipient_amount_R, compressed_recip_amount_R,
+            auditor_amount_Ds, compressed_auditor_Rs,
+            zkrp_new_balance, zkrp_amount, sigma
+        } = proof;
+
+        // Verify the number of auditor D-components in the proof matches the expected auditor count
+        // (cheap check before expensive sigma verification)
+        assert!(
+            auditor_amount_Ds.length() == auditor_eks.length(),
+            error::invalid_argument(E_AUDITOR_COUNT_MISMATCH)
+        );
+
+        // Reconstruct full balances from sender_amount's C components and the D-only components.
+        // This structurally guarantees C component equality (no explicit check needed).
+        let sender_P = sender_amount.get_P();
+        let recipient_amount = confidential_pending_balance::new_from_p_and_r(
+            sender_P.map_ref(|c| c.point_clone()),
+            recipient_amount_R
+        );
+        let auditor_amounts = auditor_amount_Ds.map(|d| {
+            confidential_pending_balance::new_from_p_and_r(
+                sender_P.map_ref(|c| c.point_clone()), d
+            )
         });
 
-        auditor_eks_bytes
+        confidential_proof::assert_valid_range_proof(recipient_amount.get_P(), &zkrp_amount);
+        confidential_proof::assert_valid_range_proof(new_balance.get_P(), &zkrp_new_balance);
+
+        // Sigma protocol verification
+        let compressed_G = ristretto255::basepoint_compressed();
+        let _G = ristretto255::basepoint();
+        let compressed_H = ristretto255_twisted_elgamal::get_encryption_key_basepoint_compressed();
+        let _H = compressed_H.point_decompress();
+
+        // Effective auditor components (if any)
+        let (ek_eff_aud_opt, compressed_new_R_eff_aud, new_R_eff_aud,
+             compressed_amount_R_eff_aud, amount_R_eff_aud) =
+            if (has_effective_auditor) {
+                let eff_aud_ek = auditor_eks[auditor_eks.length() - 1];
+                (
+                    std::option::some(eff_aud_ek),
+                    *compressed_new_balance.get_compressed_R_aud(), points_clone(new_balance.get_R_aud()),
+                    compressed_auditor_Rs[compressed_auditor_Rs.length() - 1],
+                    points_clone(auditor_amounts[auditor_amounts.length() - 1].get_R()),
+                )
+            } else {
+                (std::option::none(), vector[], vector[], vector[], vector[])
+            };
+
+        // Extra auditor components (extras are at indices [0..num_extra) in the auditor vectors)
+        let compressed_ek_extra_auds = vector[];
+        let ek_extra_auds = vector[];
+        let compressed_amount_R_extra_auds = vector[];
+        let amount_R_extra_auds = vector[];
+        let i = 0;
+        while (i < num_extra_auditors) {
+            compressed_ek_extra_auds.push_back(auditor_eks[i]);
+            ek_extra_auds.push_back(auditor_eks[i].point_decompress());
+            compressed_amount_R_extra_auds.push_back(compressed_auditor_Rs[i]);
+            amount_R_extra_auds.push_back(points_clone(auditor_amounts[i].get_R()));
+            i = i + 1;
+        };
+
+        let stmt = sigma_protocol_transfer::new_transfer_statement(
+            compressed_G, _G,
+            compressed_H, _H,
+            *sender_ek, sender_ek.point_decompress(),
+            *recip_ek, recip_ek.point_decompress(),
+            *old_balance.get_compressed_P(), decompress_points(old_balance.get_compressed_P()),
+            *old_balance.get_compressed_R(), decompress_points(old_balance.get_compressed_R()),
+            *compressed_new_balance.get_compressed_P(), points_clone(new_balance.get_P()),
+            *compressed_new_balance.get_compressed_R(), points_clone(new_balance.get_R()),
+            *compressed_sender_amount.get_compressed_P(), points_clone(sender_amount.get_P()),
+            *compressed_sender_amount.get_compressed_R(), points_clone(sender_amount.get_R()),
+            compressed_recip_amount_R, points_clone(recipient_amount.get_R()),
+            ek_eff_aud_opt, ek_eff_aud_opt.map(|p| p.point_decompress()),
+            compressed_new_R_eff_aud, new_R_eff_aud,
+            compressed_amount_R_eff_aud, amount_R_eff_aud,
+            compressed_ek_extra_auds, ek_extra_auds,
+            compressed_amount_R_extra_auds, amount_R_extra_auds,
+        );
+
+        let session = sigma_protocol_transfer::new_session(
+            sender, recipient_addr, asset_type, has_effective_auditor, num_extra_auditors,
+        );
+        sigma_protocol_transfer::assert_verifies(&session, &stmt, &sigma);
+
+        (compressed_new_balance, sender_amount, recipient_amount, auditor_amounts)
+    }
+
+    /// Asserts the validity of the `normalize` operation.
+    ///
+    /// Checks that the new balance chunks are each in [0, 2^16) via a range proof.
+    /// Verifies the $\Sigma$-protocol proof for the normalization relation (withdrawal with $v = 0$).
+    /// Consumes the proof and returns the compressed new balance on success.
+    public fun assert_valid_normalization_proof(
+        sender: &signer,
+        asset_type: Object<fungible_asset::Metadata>,
+        ek: &CompressedRistretto,
+        current_balance: &CompressedAvailableBalance,
+        auditor_ek: &Option<CompressedRistretto>,
+        proof: NormalizationProof
+    ): CompressedAvailableBalance {
+        let NormalizationProof::V1 { new_balance, compressed_new_balance, zkrp_new_balance, sigma } = proof;
+
+        confidential_proof::assert_valid_range_proof(new_balance.get_P(), &zkrp_new_balance);
+
+        // Build base points
+        let compressed_G = ristretto255::basepoint_compressed();
+        let _G = ristretto255::basepoint();
+        let compressed_H = ristretto255_twisted_elgamal::get_encryption_key_basepoint_compressed();
+        let _H = compressed_H.point_decompress();
+
+        // Normalization is withdrawal with v = 0
+        let v = ristretto255::new_scalar_from_u64(0);
+
+        let (aud_ek_compressed, compressed_new_R_aud, new_R_aud) = if (auditor_ek.is_some()) {
+            let aud_ek = *auditor_ek.borrow();
+            (std::option::some(aud_ek), *compressed_new_balance.get_compressed_R_aud(), points_clone(new_balance.get_R_aud()))
+        } else {
+            (std::option::none(), vector[], vector[])
+        };
+
+        let stmt = sigma_protocol_withdraw::new_withdrawal_statement(
+            compressed_G, _G,
+            compressed_H, _H,
+            *ek, ek.point_decompress(),
+            *current_balance.get_compressed_P(), decompress_points(current_balance.get_compressed_P()),
+            *current_balance.get_compressed_R(), decompress_points(current_balance.get_compressed_R()),
+            *compressed_new_balance.get_compressed_P(), points_clone(new_balance.get_P()),
+            *compressed_new_balance.get_compressed_R(), points_clone(new_balance.get_R()),
+            aud_ek_compressed, aud_ek_compressed.map(|p| p.point_decompress()),
+            compressed_new_R_aud, new_R_aud,
+            v,
+        );
+
+        let session = sigma_protocol_withdraw::new_session(sender, asset_type);
+        sigma_protocol_withdraw::assert_verifies_normalization(&session, &stmt, &sigma);
+
+        compressed_new_balance
+    }
+
+    /// Asserts the validity of the key rotation proof via $\Sigma$-protocol verification.
+    /// Returns (compressed_new_ek, compressed_new_R) on success.
+    public fun assert_valid_key_rotation_proof(
+        owner: &signer,
+        asset_type: Object<fungible_asset::Metadata>,
+        new_ek: RistrettoPoint,
+        old_ek: &CompressedRistretto,
+        current_balance: &CompressedAvailableBalance,
+        proof: KeyRotationProof
+    ): (CompressedRistretto, vector<CompressedRistretto>) {
+        let KeyRotationProof::V1 { compressed_new_ek, new_R, compressed_new_R, sigma } = proof;
+
+        let compressed_H = ristretto255_twisted_elgamal::get_encryption_key_basepoint_compressed();
+
+        let stmt = sigma_protocol_key_rotation::new_key_rotation_statement(
+            compressed_H, compressed_H.point_decompress(),
+            *old_ek, old_ek.point_decompress(),
+            compressed_new_ek, new_ek,
+            *current_balance.get_compressed_R(), decompress_points(current_balance.get_compressed_R()),
+            compressed_new_R, new_R,
+        );
+
+        let session = sigma_protocol_key_rotation::new_session(owner, asset_type);
+        sigma_protocol_key_rotation::assert_verifies(&session, &stmt, &sigma);
+
+        (compressed_new_ek, compressed_new_R)
+    }
+
+    // $$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$ //
+    //                                                                //
+    // *** End of SECURITY-SENSITIVE proof verification functions *** //
+    //                                                                //
+    // $$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$ //
+
+    // === Test-only proof generation functions (14 out of 14) ===
+
+    #[test_only]
+    /// Generates a $\Sigma$-protocol proof for the R_dl relation.
+    public fun prove_registration(
+        sender_addr: address,
+        asset_type: Object<fungible_asset::Metadata>,
+        dk: &Scalar,
+    ): RegistrationProof {
+        let _H = ristretto255_twisted_elgamal::get_encryption_key_basepoint();
+        let compressed_H = ristretto255_twisted_elgamal::get_encryption_key_basepoint_compressed();
+        let ek = _H.point_mul(&dk.scalar_invert().extract());
+        let compressed_ek = ek.point_compress();
+        let sender = aptos_framework::account::create_signer_for_test(sender_addr);
+        let stmt = sigma_protocol_registration::new_registration_statement(
+            compressed_H, _H,
+            compressed_ek, ek,
+        );
+        let witn = sigma_protocol_registration::new_registration_witness(*dk);
+        let session = sigma_protocol_registration::new_session(&sender, asset_type);
+        let sigma = sigma_protocol_registration::prove(&session, &stmt, &witn);
+        RegistrationProof::V1 { sigma }
     }
 
     #[test_only]
-    /// TODO: why not just do bcs::to_bytes? SDK would have to replicate it.
-    public fun serialize_auditor_amounts(
-        auditor_amounts: &vector<ConfidentialBalance>
-    ): vector<u8> {
-        let auditor_amounts_bytes = vector[];
+    /// Generates a $\Sigma$-protocol proof for the R_withdraw relation.
+    public fun prove_withdrawal(
+        sender_addr: address,
+        asset_type: Object<fungible_asset::Metadata>,
+        sender_dk: &Scalar,
+        amount: u64,
+        new_amount: u128,
+    ): WithdrawalProof acquires ConfidentialStore, AssetConfig, GlobalConfig {
+        let compressed_G = ristretto255::basepoint_compressed();
+        let _G = ristretto255::basepoint();
+        let compressed_H = ristretto255_twisted_elgamal::get_encryption_key_basepoint_compressed();
+        let _H = compressed_H.point_decompress();
 
-        auditor_amounts.for_each_ref(|balance| {
-            auditor_amounts_bytes.append(confidential_balance::balance_to_bytes(balance));
+        let ek = get_encryption_key(sender_addr, asset_type);
+        let current_balance = get_available_balance(sender_addr, asset_type).decompress();
+        let aud_ek_compressed = get_effective_auditor(asset_type);
+        let sender = aptos_framework::account::create_signer_for_test(sender_addr);
+
+        let new_balance_r = confidential_available_balance::generate_balance_randomness();
+        let new_balance = confidential_available_balance::new_from_amount(
+            new_amount, &new_balance_r, &ek, &aud_ek_compressed
+        );
+
+        let new_balance_r_scalars = new_balance_r.scalars();
+        let new_a = confidential_available_balance::split_into_chunks(new_amount);
+        let zkrp_new_balance = confidential_proof::prove_range(&new_a, new_balance_r_scalars);
+
+        let v = ristretto255::new_scalar_from_u64(amount);
+
+        let (aud_ek_compressed, new_R_aud, compressed_new_R_aud) = if (aud_ek_compressed.is_some()) {
+            let aud_ek_compressed = *aud_ek_compressed.borrow();
+            (std::option::some(aud_ek_compressed), points_clone(new_balance.get_R_aud()), compress_points(new_balance.get_R_aud()))
+        } else {
+            (std::option::none(), vector[], vector[])
+        };
+
+        let stmt = sigma_protocol_withdraw::new_withdrawal_statement(
+            compressed_G, _G,
+            compressed_H, _H,
+            ek, ek.point_decompress(),
+            compress_points(current_balance.get_P()), points_clone(current_balance.get_P()),
+            compress_points(current_balance.get_R()), points_clone(current_balance.get_R()),
+            compress_points(new_balance.get_P()), points_clone(new_balance.get_P()),
+            compress_points(new_balance.get_R()), points_clone(new_balance.get_R()),
+            aud_ek_compressed, aud_ek_compressed.map(|p| p.point_decompress()),
+            compressed_new_R_aud, new_R_aud,
+            v,
+        );
+
+        let witn = sigma_protocol_withdraw::new_withdrawal_witness(
+            *sender_dk, new_a, *new_balance_r_scalars
+        );
+        let session = sigma_protocol_withdraw::new_session(&sender, asset_type);
+        let sigma = sigma_protocol_withdraw::prove_withdrawal(&session, &stmt, &witn);
+
+        let compressed_new_balance = new_balance.compress();
+        WithdrawalProof::V1 { new_balance, compressed_new_balance, zkrp_new_balance, sigma }
+    }
+
+    #[test_only]
+    /// Returns (TransferProof, test_auditor_amounts).
+    /// The second element is a separate copy of auditor amounts for test assertions
+    /// (since the original auditor amounts are consumed inside the proof).
+    /// `extra_auditor_eks` should not include the effective auditor (asset-specific or global),
+    /// which is read from chain and appended at the end (matching the on-chain order [...extra, effective]).
+    /// Generates a $\Sigma$-protocol proof for the R_txfer relation.
+    public fun prove_transfer(
+        sender_addr: address,
+        recipient_addr: address,
+        asset_type: Object<fungible_asset::Metadata>,
+        sender_dk: &Scalar,
+        amount: u64,
+        new_amount: u128,
+        extra_auditor_eks: &vector<CompressedRistretto>,
+    ): (TransferProof, vector<PendingBalance>) acquires ConfidentialStore, AssetConfig, GlobalConfig {
+        let compressed_G = ristretto255::basepoint_compressed();
+        let _G = ristretto255::basepoint();
+        let compressed_H = ristretto255_twisted_elgamal::get_encryption_key_basepoint_compressed();
+        let _H = compressed_H.point_decompress();
+
+        let sender_ek = get_encryption_key(sender_addr, asset_type);
+        let recipient_ek = get_encryption_key(recipient_addr, asset_type);
+        let current_balance = get_available_balance(sender_addr, asset_type).decompress();
+        let effective_auditor_ek = get_effective_auditor(asset_type);
+        let sender = aptos_framework::account::create_signer_for_test(sender_addr);
+
+        // Build combined auditor list: [...extra, effective (if set)]
+        let has_effective_auditor = effective_auditor_ek.is_some();
+        let num_extra_auditors = extra_auditor_eks.length();
+        let all_auditor_eks = *extra_auditor_eks;
+        if (has_effective_auditor) {
+            all_auditor_eks.push_back(effective_auditor_ek.extract());
+        };
+
+        let amount_r = confidential_pending_balance::generate_balance_randomness();
+        let new_balance_r = confidential_available_balance::generate_balance_randomness();
+
+        // Compute the auditor EK for the new_balance A component.
+        // We use the last auditor EK from the combined list, if any.
+        // In practice, this should be the effective auditor (asset-specific or global).
+        let new_balance_auditor_ek = if (all_auditor_eks.length() > 0) {
+            std::option::some(*all_auditor_eks.borrow(all_auditor_eks.length() - 1))
+        } else {
+            std::option::none()
+        };
+
+        let new_balance = confidential_available_balance::new_from_amount(
+            new_amount, &new_balance_r, &sender_ek, &new_balance_auditor_ek
+        );
+        let sender_amount = confidential_pending_balance::new_from_amount(
+            (amount as u128), &amount_r, &sender_ek
+        );
+        let recipient_amount = confidential_pending_balance::new_from_amount(
+            (amount as u128), &amount_r, &recipient_ek
+        );
+        let auditor_amounts = all_auditor_eks.map_ref(|ek| {
+            confidential_pending_balance::new_from_amount((amount as u128), &amount_r, ek)
+        });
+        // Create a separate set of auditor amounts for test assertions (same randomness, same amount).
+        let test_auditor_amounts = all_auditor_eks.map_ref(|ek| {
+            confidential_pending_balance::new_from_amount((amount as u128), &amount_r, ek)
         });
 
-        auditor_amounts_bytes
-    }
+        // Extract D-only components for recipient and auditors
+        let (_, recipient_R) = recipient_amount.into_p_and_r();
+        let auditor_Rs = auditor_amounts.map(|a| { let (_, d) = a.into_p_and_r(); d });
 
-    // =========================================
-    // Test-only proof generation wrapper functions
-    // =========================================
-    // These functions compute proofs and return serialized bytes that can be used
-    // to call the corresponding entry functions from Rust e2e tests.
+        let amount_r_scalars = amount_r.scalars();
+        let new_balance_r_scalars = new_balance_r.scalars();
 
-    #[test_only]
-    /// Generates the proof bytes needed to call `withdraw_to`.
-    /// Returns (new_balance_bytes, zkrp_new_balance_bytes, sigma_proof_bytes).
-    public fun generate_withdrawal_proof_bytes(
-        sender: address,
-        asset_type: Object<fungible_asset::Metadata>,
-        sender_dk_bytes: vector<u8>,
-        withdraw_amount: u64,
-        new_balance_amount: u128
-    ): (vector<u8>, vector<u8>, vector<u8>) acquires ConfidentialStore {
-        let sender_dk = ristretto255::new_scalar_from_bytes(sender_dk_bytes).extract();
-        let sender_ek = get_encryption_key(sender, asset_type);
-        let current_balance = confidential_balance::decompress(
-            &get_available_balance(sender, asset_type)
+        let new_a = confidential_available_balance::split_into_chunks(new_amount);
+        let v_chunks = confidential_pending_balance::split_into_chunks((amount as u128));
+        let zkrp_new_balance = confidential_proof::prove_range(&new_a, new_balance_r_scalars);
+        let zkrp_transfer_amount = confidential_proof::prove_range(&v_chunks, amount_r_scalars);
+
+        // Effective auditor components (if any)
+        let (ek_eff_aud_opt, compressed_new_R_eff_aud, new_R_eff_aud,
+             compressed_amount_R_eff_aud, amount_R_eff_aud) =
+            if (has_effective_auditor) {
+                let eff_aud_ek = *all_auditor_eks.borrow(all_auditor_eks.length() - 1);
+                let last_D = &auditor_Rs[auditor_Rs.length() - 1];
+                (
+                    std::option::some(eff_aud_ek),
+                    compress_points(new_balance.get_R_aud()), points_clone(new_balance.get_R_aud()),
+                    compress_points(last_D), last_D.map_ref(|d| d.point_clone()),
+                )
+            } else {
+                (std::option::none(), vector[], vector[], vector[], vector[])
+            };
+
+        // Extra auditor components (extras are at indices [0..num_extra) in the auditor vectors)
+        let compressed_ek_extra_auds = vector[];
+        let ek_extra_auds = vector[];
+        let compressed_amount_R_extra_auds = vector[];
+        let amount_R_extra_auds = vector[];
+        let i = 0;
+        while (i < num_extra_auditors) {
+            compressed_ek_extra_auds.push_back(all_auditor_eks[i]);
+            ek_extra_auds.push_back(all_auditor_eks[i].point_decompress());
+            compressed_amount_R_extra_auds.push_back(compress_points(&auditor_Rs[i]));
+            amount_R_extra_auds.push_back(auditor_Rs[i].map_ref(|d| d.point_clone()));
+            i = i + 1;
+        };
+
+        let stmt = sigma_protocol_transfer::new_transfer_statement(
+            compressed_G, _G,
+            compressed_H, _H,
+            sender_ek, sender_ek.point_decompress(),
+            recipient_ek, recipient_ek.point_decompress(),
+            compress_points(current_balance.get_P()), points_clone(current_balance.get_P()),
+            compress_points(current_balance.get_R()), points_clone(current_balance.get_R()),
+            compress_points(new_balance.get_P()), points_clone(new_balance.get_P()),
+            compress_points(new_balance.get_R()), points_clone(new_balance.get_R()),
+            compress_points(sender_amount.get_P()), points_clone(sender_amount.get_P()),
+            compress_points(sender_amount.get_R()), points_clone(sender_amount.get_R()),
+            compress_points(&recipient_R), recipient_R.map_ref(|d| d.point_clone()),
+            ek_eff_aud_opt, ek_eff_aud_opt.map(|p| p.point_decompress()),
+            compressed_new_R_eff_aud, new_R_eff_aud,
+            compressed_amount_R_eff_aud, amount_R_eff_aud,
+            compressed_ek_extra_auds, ek_extra_auds,
+            compressed_amount_R_extra_auds, amount_R_extra_auds,
         );
 
-        let (proof, new_balance) = confidential_proof::prove_withdrawal(
-            &sender_dk,
-            &sender_ek,
-            withdraw_amount,
-            new_balance_amount,
-            &current_balance
+        let witn = sigma_protocol_transfer::new_transfer_witness(
+            *sender_dk, new_a, *new_balance_r_scalars, v_chunks, *amount_r_scalars,
         );
-
-        let new_balance_bytes = confidential_balance::balance_to_bytes(&new_balance);
-        let (sigma_proof_bytes, zkrp_new_balance_bytes) =
-            confidential_proof::serialize_withdrawal_proof(&proof);
-
-        (new_balance_bytes, zkrp_new_balance_bytes, sigma_proof_bytes)
-    }
-
-    #[test_only]
-    /// Generates the proof bytes needed to call `confidential_transfer`.
-    /// Returns (new_balance_bytes, sender_amount_bytes, recipient_amount_bytes,
-    ///          zkrp_new_balance_bytes, zkrp_transfer_amount_bytes, sigma_proof_bytes).
-    public fun generate_transfer_proof_bytes(
-        sender: address,
-        recipient: address,
-        asset_type: Object<fungible_asset::Metadata>,
-        sender_dk_bytes: vector<u8>,
-        transfer_amount: u64,
-        new_balance_amount: u128
-    ): (vector<u8>, vector<u8>, vector<u8>, vector<u8>, vector<u8>, vector<u8>) acquires ConfidentialStore {
-        let sender_dk = ristretto255::new_scalar_from_bytes(sender_dk_bytes).extract();
-        let sender_ek = get_encryption_key(sender, asset_type);
-        let recipient_ek = get_encryption_key(recipient, asset_type);
-        let current_balance = confidential_balance::decompress(
-            &get_available_balance(sender, asset_type)
+        let session = sigma_protocol_transfer::new_session(
+            &sender, recipient_addr, asset_type, has_effective_auditor, num_extra_auditors,
         );
+        let sigma = sigma_protocol_transfer::prove(&session, &stmt, &witn);
 
-        let (proof, new_balance, sender_amount, recipient_amount, _auditor_amounts) =
-            confidential_proof::prove_transfer(
-                &sender_dk,
-                &sender_ek,
-                &recipient_ek,
-                transfer_amount,
-                new_balance_amount,
-                &current_balance,
-                &vector[] // no auditors for simplicity
-            );
-
-        let (sigma_proof_bytes, zkrp_new_balance_bytes, zkrp_transfer_amount_bytes) =
-            confidential_proof::serialize_transfer_proof(&proof);
+        // Compress all components for the proof struct (test-only, extra compressions are fine)
+        let compressed_new_balance = new_balance.compress();
+        let compressed_sender_amount = sender_amount.compress();
+        let compressed_recipient_R = recipient_R.map_ref(|d| d.point_compress());
+        let compressed_auditor_Rs = auditor_Rs.map_ref(|ds| compress_points(ds));
 
         (
-            confidential_balance::balance_to_bytes(&new_balance),
-            confidential_balance::balance_to_bytes(&sender_amount),
-            confidential_balance::balance_to_bytes(&recipient_amount),
-            zkrp_new_balance_bytes,
-            zkrp_transfer_amount_bytes,
-            sigma_proof_bytes
+            TransferProof::V1 {
+                new_balance, compressed_new_balance,
+                sender_amount, compressed_sender_amount,
+                recipient_amount_R: recipient_R, compressed_recip_amount_R: compressed_recipient_R,
+                auditor_amount_Ds: auditor_Rs, compressed_auditor_Rs,
+                zkrp_new_balance, zkrp_amount: zkrp_transfer_amount, sigma
+            },
+            test_auditor_amounts
         )
     }
 
     #[test_only]
-    /// Generates the `KeyRotationProof` needed to call the new `rotate_encryption_key_internal` function.
-    public fun generate_key_rotation_proof(
+    /// Generates a $\Sigma$-protocol proof for the normalization relation (withdrawal with $v = 0$).
+    public fun prove_normalization(
+        sender_addr: address,
+        asset_type: Object<fungible_asset::Metadata>,
+        sender_dk: &Scalar,
+        amount: u128,
+    ): NormalizationProof acquires ConfidentialStore, AssetConfig, GlobalConfig {
+        let compressed_G = ristretto255::basepoint_compressed();
+        let _G = ristretto255::basepoint();
+        let compressed_H = ristretto255_twisted_elgamal::get_encryption_key_basepoint_compressed();
+        let _H = compressed_H.point_decompress();
+
+        let ek = get_encryption_key(sender_addr, asset_type);
+        let current_balance = get_available_balance(sender_addr, asset_type);
+        let aud_ek_compressed = get_effective_auditor(asset_type);
+        let sender = aptos_framework::account::create_signer_for_test(sender_addr);
+
+        let new_balance_r = confidential_available_balance::generate_balance_randomness();
+        let new_balance = confidential_available_balance::new_from_amount(
+            amount, &new_balance_r, &ek, &aud_ek_compressed
+        );
+
+        let new_balance_r_scalars = new_balance_r.scalars();
+        let new_a = confidential_available_balance::split_into_chunks(amount);
+        let zkrp_new_balance = confidential_proof::prove_range(&new_a, new_balance_r_scalars);
+
+        let v = ristretto255::new_scalar_from_u64(0);
+
+        let (aud_ek_compressed, new_R_aud, compressed_new_R_aud) = if (aud_ek_compressed.is_some()) {
+            let aud_ek_compressed = *aud_ek_compressed.borrow();
+            (std::option::some(aud_ek_compressed), points_clone(new_balance.get_R_aud()), compress_points(new_balance.get_R_aud()))
+        } else {
+            (std::option::none(), vector[], vector[])
+        };
+
+        let stmt = sigma_protocol_withdraw::new_withdrawal_statement(
+            compressed_G, _G,
+            compressed_H, _H,
+            ek, ek.point_decompress(),
+            *current_balance.get_compressed_P(), decompress_points(current_balance.get_compressed_P()),
+            *current_balance.get_compressed_R(), decompress_points(current_balance.get_compressed_R()),
+            compress_points(new_balance.get_P()), points_clone(new_balance.get_P()),
+            compress_points(new_balance.get_R()), points_clone(new_balance.get_R()),
+            aud_ek_compressed, aud_ek_compressed.map(|p| p.point_decompress()),
+            compressed_new_R_aud, new_R_aud,
+            v,
+        );
+
+        let witn = sigma_protocol_withdraw::new_withdrawal_witness(
+            *sender_dk, new_a, *new_balance_r_scalars
+        );
+        let session = sigma_protocol_withdraw::new_session(&sender, asset_type);
+        let sigma = sigma_protocol_withdraw::prove_normalization(&session, &stmt, &witn);
+
+        let compressed_new_balance = new_balance.compress();
+        NormalizationProof::V1 { new_balance, compressed_new_balance, zkrp_new_balance, sigma }
+    }
+
+    #[test_only]
+    /// Generates the `KeyRotationProof` needed to call the `rotate_encryption_key` function.
+    public fun prove_key_rotation(
         owner_addr: address,
         asset_type: Object<fungible_asset::Metadata>,
         sender_dk: &Scalar,
         new_dk: &Scalar,
     ): KeyRotationProof acquires ConfidentialStore {
         let owner = aptos_framework::account::create_signer_for_test(owner_addr);
-        let num_chunks = get_num_available_chunks();
 
-        // Get old EK and available balance D components
+        // Get old EK and available balance
         let compressed_old_ek = get_encryption_key(owner_addr, asset_type);
-        let old_ek = ristretto255::point_decompress(&compressed_old_ek);
-
-        let compressed_old_D = *get_available_balance(owner_addr, asset_type).get_compressed_D();
-        let old_D = sigma_protocol_utils::decompress_points(&compressed_old_D);
+        let old_ek = compressed_old_ek.point_decompress();
+        let available_balance = get_available_balance(owner_addr, asset_type);
 
         // Build statement and witness using the helper
-        let (stmt, witn, compressed_new_ek, new_D, compressed_new_D) =
+        let (stmt, witn, compressed_new_ek, new_R, compressed_new_R) =
             sigma_protocol_key_rotation::compute_statement_and_witness_from_keys_and_old_ctxt(
                 sender_dk, new_dk,
                 compressed_old_ek, old_ek,
-                compressed_old_D, old_D,
-                num_chunks,
+                *available_balance.get_compressed_R(), decompress_points(available_balance.get_compressed_R()),
             );
 
         // Prove
-        let ss = sigma_protocol_key_rotation::new_session(&owner, asset_type, num_chunks);
+        let ss = sigma_protocol_key_rotation::new_session(&owner, asset_type);
 
         KeyRotationProof::V1 {
             compressed_new_ek,
-            new_D,
-            compressed_new_D,
+            new_R,
+            compressed_new_R,
             sigma: sigma_protocol_key_rotation::prove(&ss, &stmt, &witn),
         }
-    }
-
-    #[test_only]
-    /// Generates the proof bytes needed to call `normalize`.
-    /// Returns (new_balance_bytes, zkrp_new_balance_bytes, sigma_proof_bytes).
-    public fun generate_normalization_proof_bytes(
-        sender: address,
-        asset_type: Object<fungible_asset::Metadata>,
-        sender_dk_bytes: vector<u8>,
-        balance_amount: u128
-    ): (vector<u8>, vector<u8>, vector<u8>) acquires ConfidentialStore {
-        let sender_dk = ristretto255::new_scalar_from_bytes(sender_dk_bytes).extract();
-        let sender_ek = get_encryption_key(sender, asset_type);
-        let current_balance = confidential_balance::decompress(
-            &get_available_balance(sender, asset_type)
-        );
-
-        let (proof, new_balance) = confidential_proof::prove_normalization(
-            &sender_dk,
-            &sender_ek,
-            balance_amount,
-            &current_balance
-        );
-
-        let new_balance_bytes = confidential_balance::balance_to_bytes(&new_balance);
-        let (sigma_proof_bytes, zkrp_new_balance_bytes) =
-            confidential_proof::serialize_normalization_proof(&proof);
-
-        (new_balance_bytes, zkrp_new_balance_bytes, sigma_proof_bytes)
     }
 }

@@ -38,11 +38,11 @@ module aptos_experimental::ristretto255_twisted_elgamal {
     /// Derives an encryption key from a decryption key using the formula EK = DK^(-1) * H.
     /// Returns `Some(CompressedRistretto)` if the DK inversion succeeds, otherwise `None`.
     public fun pubkey_from_secret_key(dk: &Scalar): Option<CompressedRistretto> {
-        let dk_invert = ristretto255::scalar_invert(dk);
+        let dk_invert = dk.scalar_invert();
 
         if (dk_invert.is_some()) {
-            let point = ristretto255::point_mul(&ristretto255::hash_to_point_base(), &dk_invert.extract());
-            std::option::some(ristretto255::point_compress(&point))
+            let point = ristretto255::hash_to_point_base().point_mul(&dk_invert.extract());
+            std::option::some(point.point_compress())
         } else {
             std::option::none()
         }

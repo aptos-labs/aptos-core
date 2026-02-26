@@ -42,7 +42,7 @@ module aptos_experimental::sigma_protocol_pedeq_example {
     #[test_only]
     use aptos_experimental::sigma_protocol_homomorphism::evaluate_psi;
     #[test_only]
-    use aptos_std::ristretto255::{point_mul, random_point, random_scalar, point_add, point_compress};
+    use aptos_std::ristretto255::{random_point, random_scalar};
     #[test_only]
     use aptos_experimental::sigma_protocol;
     #[test_only]
@@ -165,17 +165,17 @@ module aptos_experimental::sigma_protocol_pedeq_example {
         let r_2 = random_scalar();
         let _G = random_point(); // Move linter does not let us use G
         let _H = random_point(); // Move linter does not let us use H
-        let v_G = point_mul(&_G, &v);
-        let r_1_H = point_mul(&_H, &r_1);
-        let r_2_H = point_mul(&_H, &r_2);
-        let _C_1 = point_add(&v_G, &r_1_H);  // Move linter does not let us use C_1
-        let _C_2 = point_add(&v_G, &r_2_H);  // Move linter does not let us use C_2
+        let v_G = _G.point_mul(&v);
+        let r_1_H = _H.point_mul(&r_1);
+        let r_2_H = _H.point_mul(&r_2);
+        let _C_1 = v_G.point_add(&r_1_H);  // Move linter does not let us use C_1
+        let _C_2 = v_G.point_add(&r_2_H);  // Move linter does not let us use C_2
 
         let stmt = new_pedeq_statement(
-            point_compress(&_G), _G,
-            point_compress(&_H), _H,
-            point_compress(&_C_1), _C_1,
-            point_compress(&_C_2), _C_2,
+            _G.point_compress(), _G,
+            _H.point_compress(), _H,
+            _C_1.point_compress(), _C_1,
+            _C_2.point_compress(), _C_2,
         );
         let witn = new_pedeq_witness(v, r_1, r_2);
 
@@ -195,13 +195,11 @@ module aptos_experimental::sigma_protocol_pedeq_example {
         let r_1 = w.get(IDX_r_1);
         let r_2 = w.get(IDX_r_2);
         let expected_psi = vector[
-            point_add(
-                &point_mul(_G, v),
-                &point_mul(_H, r_1)
+            _G.point_mul(v).point_add(
+                &_H.point_mul(r_1)
             ),
-            point_add(
-                &point_mul(_G, v),
-                &point_mul(_H, r_2)
+            _G.point_mul(v).point_add(
+                &_H.point_mul(r_2)
             )
         ];
 
@@ -240,10 +238,10 @@ module aptos_experimental::sigma_protocol_pedeq_example {
                 |_X, w| psi(_X, w),
                 |_X| f(_X),
                 new_pedeq_statement(
-                    point_compress(&_G), _G,
-                    point_compress(&_H), _H,
-                    point_compress(&_C_1), _C_1,
-                    point_compress(&_C_2), _C_2,
+                    _G.point_compress(), _G,
+                    _H.point_compress(), _H,
+                    _C_1.point_compress(), _C_1,
+                    _C_2.point_compress(), _C_2,
                 )
             ), 1);
     }

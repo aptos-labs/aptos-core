@@ -32,6 +32,11 @@ module aptos_experimental::sigma_protocol_representation_vec {
         self.get_representations().for_each_ref(|repr| lambda(repr))
     }
 
+    /// Maps each representation in the vector to a value of type `T`.
+    public inline fun map_ref<T>(self: &RepresentationVec, lambda: |&Representation| T): vector<T> {
+        self.get_representations().map_ref(|repr| lambda(repr))
+    }
+
     /// Multiply all representations by $e$ (i.e., multiply each `self.v[i].scalars` by $e$).
     public fun scale_all(self: &mut RepresentationVec, e: &Scalar) {
         self.v.for_each_mut(|repr| {
