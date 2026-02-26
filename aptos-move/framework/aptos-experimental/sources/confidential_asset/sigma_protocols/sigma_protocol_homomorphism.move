@@ -57,24 +57,12 @@ module aptos_experimental::sigma_protocol_homomorphism {
     public inline fun evaluate_psi(psi: Homomorphism,
                                    stmt: &Statement,
                                    witn: &Witness): vector<RistrettoPoint> {
-        let evals = vector[];
-
-        psi(stmt, witn).for_each_ref(|repr| {
-            evals.push_back(multi_scalar_mul(&repr.to_points(stmt), repr.get_scalars()));
-        });
-
-        evals
+        psi(stmt, witn).map_ref(|repr| multi_scalar_mul(&repr.to_points(stmt), repr.get_scalars()))
     }
 
     /// Returns $f(X) \in \mathbb{G}^m$ given the public statement $X$.
     public inline fun evaluate_f(f: TransformationFunction,
                                  stmt: &Statement): vector<RistrettoPoint> {
-        let evals = vector[];
-
-        f(stmt).for_each_ref(|repr| {
-            evals.push_back(multi_scalar_mul(&repr.to_points(stmt), repr.get_scalars()));
-        });
-
-        evals
+        f(stmt).map_ref(|repr| multi_scalar_mul(&repr.to_points(stmt), repr.get_scalars()))
     }
 }

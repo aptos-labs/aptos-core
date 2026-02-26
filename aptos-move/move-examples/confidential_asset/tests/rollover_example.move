@@ -16,11 +16,10 @@ module confidential_asset_example::rollover_example {
         // It's a test-only function, so we don't need to worry about the security of the keypair.
         let (bob_dk, bob_ek) = twisted_elgamal::generate_twisted_elgamal_keypair();
 
-        let bob_ek = twisted_elgamal::pubkey_to_bytes(&bob_ek);
-
         let bob_amount = 100;
 
-        confidential_asset::register(bob, token, bob_ek);
+        let proof = confidential_asset::prove_registration(bob_addr, token, &bob_dk);
+        confidential_asset::register(bob, token, bob_ek, proof);
         confidential_asset::deposit(bob, token, bob_amount);
 
         print(&utf8(b"Bob's pending balance is NOT zero:"));

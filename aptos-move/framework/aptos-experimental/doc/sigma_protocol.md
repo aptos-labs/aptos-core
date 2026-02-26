@@ -140,7 +140,7 @@ Returns true if it succeeds and false otherwise.
     // TODO(Perf): Could combine exponents for shared bases more aggresively? Or does the MSM <a href="../../aptos-framework/doc/code.md#0x1_code">code</a> do it implicitly?
 
     // Do the MSM and check it equals the (zero) identity
-    point_equals(&multi_scalar_mul(&bases, &scalars), &point_identity())
+    multi_scalar_mul(&bases, &scalars).point_equals(&point_identity())
 }
 </code></pre>
 

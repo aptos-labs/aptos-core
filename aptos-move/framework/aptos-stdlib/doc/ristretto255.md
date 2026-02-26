@@ -70,6 +70,7 @@ through point decompression
 -  [Function `point_clone`](#0x1_ristretto255_point_clone)
 -  [Function `point_compress`](#0x1_ristretto255_point_compress)
 -  [Function `point_to_bytes`](#0x1_ristretto255_point_to_bytes)
+-  [Function `points_to_bytes`](#0x1_ristretto255_points_to_bytes)
 -  [Function `point_mul`](#0x1_ristretto255_point_mul)
 -  [Function `point_mul_assign`](#0x1_ristretto255_point_mul_assign)
 -  [Function `basepoint_double_mul`](#0x1_ristretto255_basepoint_double_mul)
@@ -556,7 +557,7 @@ Like <code>hash_to_point_base_compressed</code> but returns a decompressed point
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="ristretto255.md#0x1_ristretto255_basepoint_H">basepoint_H</a>(): <a href="ristretto255.md#0x1_ristretto255_RistrettoPoint">RistrettoPoint</a> {
-    <a href="ristretto255.md#0x1_ristretto255_point_decompress">point_decompress</a>(&<a href="ristretto255.md#0x1_ristretto255_basepoint_H_compressed">basepoint_H_compressed</a>())
+    <a href="ristretto255.md#0x1_ristretto255_basepoint_H_compressed">basepoint_H_compressed</a>().<a href="ristretto255.md#0x1_ristretto255_point_decompress">point_decompress</a>()
 }
 </code></pre>
 
@@ -582,7 +583,7 @@ Should call <code>basepoint_H</code> instead.
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="ristretto255.md#0x1_ristretto255_hash_to_point_base">hash_to_point_base</a>(): <a href="ristretto255.md#0x1_ristretto255_RistrettoPoint">RistrettoPoint</a> {
-    <a href="ristretto255.md#0x1_ristretto255_point_decompress">point_decompress</a>(&<a href="ristretto255.md#0x1_ristretto255_basepoint_H_compressed">basepoint_H_compressed</a>())
+    <a href="ristretto255.md#0x1_ristretto255_basepoint_H_compressed">basepoint_H_compressed</a>().<a href="ristretto255.md#0x1_ristretto255_point_decompress">point_decompress</a>()
 }
 </code></pre>
 
@@ -627,7 +628,7 @@ Multiplies the basepoint (generator) of the Ristretto255 group by a scalar and r
 This call is much faster than <code><a href="ristretto255.md#0x1_ristretto255_point_mul">point_mul</a>(&<a href="ristretto255.md#0x1_ristretto255_basepoint">basepoint</a>(), &some_scalar)</code> because of precomputation tables.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="ristretto255.md#0x1_ristretto255_basepoint_mul">basepoint_mul</a>(a: &<a href="ristretto255.md#0x1_ristretto255_Scalar">ristretto255::Scalar</a>): <a href="ristretto255.md#0x1_ristretto255_RistrettoPoint">ristretto255::RistrettoPoint</a>
+<pre><code><b>public</b> <b>fun</b> <a href="ristretto255.md#0x1_ristretto255_basepoint_mul">basepoint_mul</a>(self: &<a href="ristretto255.md#0x1_ristretto255_Scalar">ristretto255::Scalar</a>): <a href="ristretto255.md#0x1_ristretto255_RistrettoPoint">ristretto255::RistrettoPoint</a>
 </code></pre>
 
 
@@ -636,9 +637,9 @@ This call is much faster than <code><a href="ristretto255.md#0x1_ristretto255_po
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="ristretto255.md#0x1_ristretto255_basepoint_mul">basepoint_mul</a>(a: &<a href="ristretto255.md#0x1_ristretto255_Scalar">Scalar</a>): <a href="ristretto255.md#0x1_ristretto255_RistrettoPoint">RistrettoPoint</a> {
+<pre><code><b>public</b> <b>fun</b> <a href="ristretto255.md#0x1_ristretto255_basepoint_mul">basepoint_mul</a>(self: &<a href="ristretto255.md#0x1_ristretto255_Scalar">Scalar</a>): <a href="ristretto255.md#0x1_ristretto255_RistrettoPoint">RistrettoPoint</a> {
     <a href="ristretto255.md#0x1_ristretto255_RistrettoPoint">RistrettoPoint</a> {
-        handle: <a href="ristretto255.md#0x1_ristretto255_basepoint_mul_internal">basepoint_mul_internal</a>(a.data)
+        handle: <a href="ristretto255.md#0x1_ristretto255_basepoint_mul_internal">basepoint_mul_internal</a>(self.data)
     }
 }
 </code></pre>
@@ -756,7 +757,7 @@ have tuples as the option's type.
 Given a compressed ristretto point <code>point</code>, returns the byte representation of that point
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="ristretto255.md#0x1_ristretto255_compressed_point_to_bytes">compressed_point_to_bytes</a>(point: <a href="ristretto255.md#0x1_ristretto255_CompressedRistretto">ristretto255::CompressedRistretto</a>): <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;
+<pre><code><b>public</b> <b>fun</b> <a href="ristretto255.md#0x1_ristretto255_compressed_point_to_bytes">compressed_point_to_bytes</a>(self: <a href="ristretto255.md#0x1_ristretto255_CompressedRistretto">ristretto255::CompressedRistretto</a>): <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;
 </code></pre>
 
 
@@ -765,8 +766,8 @@ Given a compressed ristretto point <code>point</code>, returns the byte represen
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="ristretto255.md#0x1_ristretto255_compressed_point_to_bytes">compressed_point_to_bytes</a>(point: <a href="ristretto255.md#0x1_ristretto255_CompressedRistretto">CompressedRistretto</a>): <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt; {
-    point.data
+<pre><code><b>public</b> <b>fun</b> <a href="ristretto255.md#0x1_ristretto255_compressed_point_to_bytes">compressed_point_to_bytes</a>(self: <a href="ristretto255.md#0x1_ristretto255_CompressedRistretto">CompressedRistretto</a>): <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt; {
+    self.data
 }
 </code></pre>
 
@@ -868,7 +869,7 @@ can be used to build a collision-resistant hash function that maps 64-byte messa
 Decompresses a CompressedRistretto from storage into a RistrettoPoint which can be used for fast arithmetic.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="ristretto255.md#0x1_ristretto255_point_decompress">point_decompress</a>(point: &<a href="ristretto255.md#0x1_ristretto255_CompressedRistretto">ristretto255::CompressedRistretto</a>): <a href="ristretto255.md#0x1_ristretto255_RistrettoPoint">ristretto255::RistrettoPoint</a>
+<pre><code><b>public</b> <b>fun</b> <a href="ristretto255.md#0x1_ristretto255_point_decompress">point_decompress</a>(self: &<a href="ristretto255.md#0x1_ristretto255_CompressedRistretto">ristretto255::CompressedRistretto</a>): <a href="ristretto255.md#0x1_ristretto255_RistrettoPoint">ristretto255::RistrettoPoint</a>
 </code></pre>
 
 
@@ -877,10 +878,10 @@ Decompresses a CompressedRistretto from storage into a RistrettoPoint which can 
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="ristretto255.md#0x1_ristretto255_point_decompress">point_decompress</a>(point: &<a href="ristretto255.md#0x1_ristretto255_CompressedRistretto">CompressedRistretto</a>): <a href="ristretto255.md#0x1_ristretto255_RistrettoPoint">RistrettoPoint</a> {
+<pre><code><b>public</b> <b>fun</b> <a href="ristretto255.md#0x1_ristretto255_point_decompress">point_decompress</a>(self: &<a href="ristretto255.md#0x1_ristretto255_CompressedRistretto">CompressedRistretto</a>): <a href="ristretto255.md#0x1_ristretto255_RistrettoPoint">RistrettoPoint</a> {
     // NOTE: Our <a href="ristretto255.md#0x1_ristretto255_CompressedRistretto">CompressedRistretto</a> <b>invariant</b> assures us that every <a href="ristretto255.md#0x1_ristretto255_CompressedRistretto">CompressedRistretto</a> in storage is a valid
     // point
-    <b>let</b> (handle, _) = <a href="ristretto255.md#0x1_ristretto255_point_decompress_internal">point_decompress_internal</a>(point.data);
+    <b>let</b> (handle, _) = <a href="ristretto255.md#0x1_ristretto255_point_decompress_internal">point_decompress_internal</a>(self.data);
     <a href="ristretto255.md#0x1_ristretto255_RistrettoPoint">RistrettoPoint</a> { handle }
 }
 </code></pre>
@@ -896,7 +897,7 @@ Decompresses a CompressedRistretto from storage into a RistrettoPoint which can 
 Clones a RistrettoPoint.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="ristretto255.md#0x1_ristretto255_point_clone">point_clone</a>(point: &<a href="ristretto255.md#0x1_ristretto255_RistrettoPoint">ristretto255::RistrettoPoint</a>): <a href="ristretto255.md#0x1_ristretto255_RistrettoPoint">ristretto255::RistrettoPoint</a>
+<pre><code><b>public</b> <b>fun</b> <a href="ristretto255.md#0x1_ristretto255_point_clone">point_clone</a>(self: &<a href="ristretto255.md#0x1_ristretto255_RistrettoPoint">ristretto255::RistrettoPoint</a>): <a href="ristretto255.md#0x1_ristretto255_RistrettoPoint">ristretto255::RistrettoPoint</a>
 </code></pre>
 
 
@@ -905,13 +906,13 @@ Clones a RistrettoPoint.
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="ristretto255.md#0x1_ristretto255_point_clone">point_clone</a>(point: &<a href="ristretto255.md#0x1_ristretto255_RistrettoPoint">RistrettoPoint</a>): <a href="ristretto255.md#0x1_ristretto255_RistrettoPoint">RistrettoPoint</a> {
+<pre><code><b>public</b> <b>fun</b> <a href="ristretto255.md#0x1_ristretto255_point_clone">point_clone</a>(self: &<a href="ristretto255.md#0x1_ristretto255_RistrettoPoint">RistrettoPoint</a>): <a href="ristretto255.md#0x1_ristretto255_RistrettoPoint">RistrettoPoint</a> {
     <b>if</b>(!<a href="../../move-stdlib/doc/features.md#0x1_features_bulletproofs_enabled">features::bulletproofs_enabled</a>()) {
         <b>abort</b>(std::error::invalid_state(<a href="ristretto255.md#0x1_ristretto255_E_NATIVE_FUN_NOT_AVAILABLE">E_NATIVE_FUN_NOT_AVAILABLE</a>))
     };
 
     <a href="ristretto255.md#0x1_ristretto255_RistrettoPoint">RistrettoPoint</a> {
-        handle: <a href="ristretto255.md#0x1_ristretto255_point_clone_internal">point_clone_internal</a>(point.handle)
+        handle: <a href="ristretto255.md#0x1_ristretto255_point_clone_internal">point_clone_internal</a>(self.handle)
     }
 }
 </code></pre>
@@ -927,7 +928,7 @@ Clones a RistrettoPoint.
 Compresses a RistrettoPoint to a CompressedRistretto which can be put in storage.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="ristretto255.md#0x1_ristretto255_point_compress">point_compress</a>(point: &<a href="ristretto255.md#0x1_ristretto255_RistrettoPoint">ristretto255::RistrettoPoint</a>): <a href="ristretto255.md#0x1_ristretto255_CompressedRistretto">ristretto255::CompressedRistretto</a>
+<pre><code><b>public</b> <b>fun</b> <a href="ristretto255.md#0x1_ristretto255_point_compress">point_compress</a>(self: &<a href="ristretto255.md#0x1_ristretto255_RistrettoPoint">ristretto255::RistrettoPoint</a>): <a href="ristretto255.md#0x1_ristretto255_CompressedRistretto">ristretto255::CompressedRistretto</a>
 </code></pre>
 
 
@@ -936,9 +937,9 @@ Compresses a RistrettoPoint to a CompressedRistretto which can be put in storage
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="ristretto255.md#0x1_ristretto255_point_compress">point_compress</a>(point: &<a href="ristretto255.md#0x1_ristretto255_RistrettoPoint">RistrettoPoint</a>): <a href="ristretto255.md#0x1_ristretto255_CompressedRistretto">CompressedRistretto</a> {
+<pre><code><b>public</b> <b>fun</b> <a href="ristretto255.md#0x1_ristretto255_point_compress">point_compress</a>(self: &<a href="ristretto255.md#0x1_ristretto255_RistrettoPoint">RistrettoPoint</a>): <a href="ristretto255.md#0x1_ristretto255_CompressedRistretto">CompressedRistretto</a> {
     <a href="ristretto255.md#0x1_ristretto255_CompressedRistretto">CompressedRistretto</a> {
-        data: <a href="ristretto255.md#0x1_ristretto255_point_compress_internal">point_compress_internal</a>(point)
+        data: <a href="ristretto255.md#0x1_ristretto255_point_compress_internal">point_compress_internal</a>(self)
     }
 }
 </code></pre>
@@ -956,7 +957,7 @@ To convert a RistrettoPoint 'p' to bytes, first compress it via <code>c = <a hre
 function on <code>c</code>.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="ristretto255.md#0x1_ristretto255_point_to_bytes">point_to_bytes</a>(point: &<a href="ristretto255.md#0x1_ristretto255_CompressedRistretto">ristretto255::CompressedRistretto</a>): <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;
+<pre><code><b>public</b> <b>fun</b> <a href="ristretto255.md#0x1_ristretto255_point_to_bytes">point_to_bytes</a>(self: &<a href="ristretto255.md#0x1_ristretto255_CompressedRistretto">ristretto255::CompressedRistretto</a>): <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;
 </code></pre>
 
 
@@ -965,8 +966,34 @@ function on <code>c</code>.
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="ristretto255.md#0x1_ristretto255_point_to_bytes">point_to_bytes</a>(point: &<a href="ristretto255.md#0x1_ristretto255_CompressedRistretto">CompressedRistretto</a>): <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt; {
-    point.data
+<pre><code><b>public</b> <b>fun</b> <a href="ristretto255.md#0x1_ristretto255_point_to_bytes">point_to_bytes</a>(self: &<a href="ristretto255.md#0x1_ristretto255_CompressedRistretto">CompressedRistretto</a>): <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt; {
+    self.data
+}
+</code></pre>
+
+
+
+</details>
+
+<a id="0x1_ristretto255_points_to_bytes"></a>
+
+## Function `points_to_bytes`
+
+Serializes a vector of <code><a href="ristretto255.md#0x1_ristretto255_RistrettoPoint">RistrettoPoint</a></code>s into a vector of byte vectors.
+Each point is compressed and then converted to bytes.
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="ristretto255.md#0x1_ristretto255_points_to_bytes">points_to_bytes</a>(points: &<a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="ristretto255.md#0x1_ristretto255_RistrettoPoint">ristretto255::RistrettoPoint</a>&gt;): <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;&gt;
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="ristretto255.md#0x1_ristretto255_points_to_bytes">points_to_bytes</a>(points: &<a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="ristretto255.md#0x1_ristretto255_RistrettoPoint">RistrettoPoint</a>&gt;): <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;&gt; {
+    points.map_ref(|p| <a href="ristretto255.md#0x1_ristretto255_point_compress_internal">point_compress_internal</a>(p))
 }
 </code></pre>
 
@@ -981,7 +1008,7 @@ function on <code>c</code>.
 Returns a * point.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="ristretto255.md#0x1_ristretto255_point_mul">point_mul</a>(point: &<a href="ristretto255.md#0x1_ristretto255_RistrettoPoint">ristretto255::RistrettoPoint</a>, a: &<a href="ristretto255.md#0x1_ristretto255_Scalar">ristretto255::Scalar</a>): <a href="ristretto255.md#0x1_ristretto255_RistrettoPoint">ristretto255::RistrettoPoint</a>
+<pre><code><b>public</b> <b>fun</b> <a href="ristretto255.md#0x1_ristretto255_point_mul">point_mul</a>(self: &<a href="ristretto255.md#0x1_ristretto255_RistrettoPoint">ristretto255::RistrettoPoint</a>, a: &<a href="ristretto255.md#0x1_ristretto255_Scalar">ristretto255::Scalar</a>): <a href="ristretto255.md#0x1_ristretto255_RistrettoPoint">ristretto255::RistrettoPoint</a>
 </code></pre>
 
 
@@ -990,9 +1017,9 @@ Returns a * point.
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="ristretto255.md#0x1_ristretto255_point_mul">point_mul</a>(point: &<a href="ristretto255.md#0x1_ristretto255_RistrettoPoint">RistrettoPoint</a>, a: &<a href="ristretto255.md#0x1_ristretto255_Scalar">Scalar</a>): <a href="ristretto255.md#0x1_ristretto255_RistrettoPoint">RistrettoPoint</a> {
+<pre><code><b>public</b> <b>fun</b> <a href="ristretto255.md#0x1_ristretto255_point_mul">point_mul</a>(self: &<a href="ristretto255.md#0x1_ristretto255_RistrettoPoint">RistrettoPoint</a>, a: &<a href="ristretto255.md#0x1_ristretto255_Scalar">Scalar</a>): <a href="ristretto255.md#0x1_ristretto255_RistrettoPoint">RistrettoPoint</a> {
     <a href="ristretto255.md#0x1_ristretto255_RistrettoPoint">RistrettoPoint</a> {
-        handle: <a href="ristretto255.md#0x1_ristretto255_point_mul_internal">point_mul_internal</a>(point, a.data, <b>false</b>)
+        handle: <a href="ristretto255.md#0x1_ristretto255_point_mul_internal">point_mul_internal</a>(self, a.data, <b>false</b>)
     }
 }
 </code></pre>
@@ -1008,7 +1035,7 @@ Returns a * point.
 Sets a *= point and returns 'a'.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="ristretto255.md#0x1_ristretto255_point_mul_assign">point_mul_assign</a>(point: &<b>mut</b> <a href="ristretto255.md#0x1_ristretto255_RistrettoPoint">ristretto255::RistrettoPoint</a>, a: &<a href="ristretto255.md#0x1_ristretto255_Scalar">ristretto255::Scalar</a>): &<b>mut</b> <a href="ristretto255.md#0x1_ristretto255_RistrettoPoint">ristretto255::RistrettoPoint</a>
+<pre><code><b>public</b> <b>fun</b> <a href="ristretto255.md#0x1_ristretto255_point_mul_assign">point_mul_assign</a>(self: &<b>mut</b> <a href="ristretto255.md#0x1_ristretto255_RistrettoPoint">ristretto255::RistrettoPoint</a>, a: &<a href="ristretto255.md#0x1_ristretto255_Scalar">ristretto255::Scalar</a>): &<b>mut</b> <a href="ristretto255.md#0x1_ristretto255_RistrettoPoint">ristretto255::RistrettoPoint</a>
 </code></pre>
 
 
@@ -1017,9 +1044,9 @@ Sets a *= point and returns 'a'.
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="ristretto255.md#0x1_ristretto255_point_mul_assign">point_mul_assign</a>(point: &<b>mut</b> <a href="ristretto255.md#0x1_ristretto255_RistrettoPoint">RistrettoPoint</a>, a: &<a href="ristretto255.md#0x1_ristretto255_Scalar">Scalar</a>): &<b>mut</b> <a href="ristretto255.md#0x1_ristretto255_RistrettoPoint">RistrettoPoint</a> {
-    <a href="ristretto255.md#0x1_ristretto255_point_mul_internal">point_mul_internal</a>(point, a.data, <b>true</b>);
-    point
+<pre><code><b>public</b> <b>fun</b> <a href="ristretto255.md#0x1_ristretto255_point_mul_assign">point_mul_assign</a>(self: &<b>mut</b> <a href="ristretto255.md#0x1_ristretto255_RistrettoPoint">RistrettoPoint</a>, a: &<a href="ristretto255.md#0x1_ristretto255_Scalar">Scalar</a>): &<b>mut</b> <a href="ristretto255.md#0x1_ristretto255_RistrettoPoint">RistrettoPoint</a> {
+    <a href="ristretto255.md#0x1_ristretto255_point_mul_internal">point_mul_internal</a>(self, a.data, <b>true</b>);
+    self
 }
 </code></pre>
 
@@ -1061,7 +1088,7 @@ Returns (a * a_base + b * base_point), where base_point is the Ristretto basepoi
 Returns a + b
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="ristretto255.md#0x1_ristretto255_point_add">point_add</a>(a: &<a href="ristretto255.md#0x1_ristretto255_RistrettoPoint">ristretto255::RistrettoPoint</a>, b: &<a href="ristretto255.md#0x1_ristretto255_RistrettoPoint">ristretto255::RistrettoPoint</a>): <a href="ristretto255.md#0x1_ristretto255_RistrettoPoint">ristretto255::RistrettoPoint</a>
+<pre><code><b>public</b> <b>fun</b> <a href="ristretto255.md#0x1_ristretto255_point_add">point_add</a>(self: &<a href="ristretto255.md#0x1_ristretto255_RistrettoPoint">ristretto255::RistrettoPoint</a>, b: &<a href="ristretto255.md#0x1_ristretto255_RistrettoPoint">ristretto255::RistrettoPoint</a>): <a href="ristretto255.md#0x1_ristretto255_RistrettoPoint">ristretto255::RistrettoPoint</a>
 </code></pre>
 
 
@@ -1070,9 +1097,9 @@ Returns a + b
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="ristretto255.md#0x1_ristretto255_point_add">point_add</a>(a: &<a href="ristretto255.md#0x1_ristretto255_RistrettoPoint">RistrettoPoint</a>, b: &<a href="ristretto255.md#0x1_ristretto255_RistrettoPoint">RistrettoPoint</a>): <a href="ristretto255.md#0x1_ristretto255_RistrettoPoint">RistrettoPoint</a> {
+<pre><code><b>public</b> <b>fun</b> <a href="ristretto255.md#0x1_ristretto255_point_add">point_add</a>(self: &<a href="ristretto255.md#0x1_ristretto255_RistrettoPoint">RistrettoPoint</a>, b: &<a href="ristretto255.md#0x1_ristretto255_RistrettoPoint">RistrettoPoint</a>): <a href="ristretto255.md#0x1_ristretto255_RistrettoPoint">RistrettoPoint</a> {
     <a href="ristretto255.md#0x1_ristretto255_RistrettoPoint">RistrettoPoint</a> {
-        handle: <a href="ristretto255.md#0x1_ristretto255_point_add_internal">point_add_internal</a>(a, b, <b>false</b>)
+        handle: <a href="ristretto255.md#0x1_ristretto255_point_add_internal">point_add_internal</a>(self, b, <b>false</b>)
     }
 }
 </code></pre>
@@ -1088,7 +1115,7 @@ Returns a + b
 Sets a += b and returns 'a'.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="ristretto255.md#0x1_ristretto255_point_add_assign">point_add_assign</a>(a: &<b>mut</b> <a href="ristretto255.md#0x1_ristretto255_RistrettoPoint">ristretto255::RistrettoPoint</a>, b: &<a href="ristretto255.md#0x1_ristretto255_RistrettoPoint">ristretto255::RistrettoPoint</a>): &<b>mut</b> <a href="ristretto255.md#0x1_ristretto255_RistrettoPoint">ristretto255::RistrettoPoint</a>
+<pre><code><b>public</b> <b>fun</b> <a href="ristretto255.md#0x1_ristretto255_point_add_assign">point_add_assign</a>(self: &<b>mut</b> <a href="ristretto255.md#0x1_ristretto255_RistrettoPoint">ristretto255::RistrettoPoint</a>, b: &<a href="ristretto255.md#0x1_ristretto255_RistrettoPoint">ristretto255::RistrettoPoint</a>): &<b>mut</b> <a href="ristretto255.md#0x1_ristretto255_RistrettoPoint">ristretto255::RistrettoPoint</a>
 </code></pre>
 
 
@@ -1097,9 +1124,9 @@ Sets a += b and returns 'a'.
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="ristretto255.md#0x1_ristretto255_point_add_assign">point_add_assign</a>(a: &<b>mut</b> <a href="ristretto255.md#0x1_ristretto255_RistrettoPoint">RistrettoPoint</a>, b: &<a href="ristretto255.md#0x1_ristretto255_RistrettoPoint">RistrettoPoint</a>): &<b>mut</b> <a href="ristretto255.md#0x1_ristretto255_RistrettoPoint">RistrettoPoint</a> {
-    <a href="ristretto255.md#0x1_ristretto255_point_add_internal">point_add_internal</a>(a, b, <b>true</b>);
-    a
+<pre><code><b>public</b> <b>fun</b> <a href="ristretto255.md#0x1_ristretto255_point_add_assign">point_add_assign</a>(self: &<b>mut</b> <a href="ristretto255.md#0x1_ristretto255_RistrettoPoint">RistrettoPoint</a>, b: &<a href="ristretto255.md#0x1_ristretto255_RistrettoPoint">RistrettoPoint</a>): &<b>mut</b> <a href="ristretto255.md#0x1_ristretto255_RistrettoPoint">RistrettoPoint</a> {
+    <a href="ristretto255.md#0x1_ristretto255_point_add_internal">point_add_internal</a>(self, b, <b>true</b>);
+    self
 }
 </code></pre>
 
@@ -1114,7 +1141,7 @@ Sets a += b and returns 'a'.
 Returns a - b
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="ristretto255.md#0x1_ristretto255_point_sub">point_sub</a>(a: &<a href="ristretto255.md#0x1_ristretto255_RistrettoPoint">ristretto255::RistrettoPoint</a>, b: &<a href="ristretto255.md#0x1_ristretto255_RistrettoPoint">ristretto255::RistrettoPoint</a>): <a href="ristretto255.md#0x1_ristretto255_RistrettoPoint">ristretto255::RistrettoPoint</a>
+<pre><code><b>public</b> <b>fun</b> <a href="ristretto255.md#0x1_ristretto255_point_sub">point_sub</a>(self: &<a href="ristretto255.md#0x1_ristretto255_RistrettoPoint">ristretto255::RistrettoPoint</a>, b: &<a href="ristretto255.md#0x1_ristretto255_RistrettoPoint">ristretto255::RistrettoPoint</a>): <a href="ristretto255.md#0x1_ristretto255_RistrettoPoint">ristretto255::RistrettoPoint</a>
 </code></pre>
 
 
@@ -1123,9 +1150,9 @@ Returns a - b
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="ristretto255.md#0x1_ristretto255_point_sub">point_sub</a>(a: &<a href="ristretto255.md#0x1_ristretto255_RistrettoPoint">RistrettoPoint</a>, b: &<a href="ristretto255.md#0x1_ristretto255_RistrettoPoint">RistrettoPoint</a>): <a href="ristretto255.md#0x1_ristretto255_RistrettoPoint">RistrettoPoint</a> {
+<pre><code><b>public</b> <b>fun</b> <a href="ristretto255.md#0x1_ristretto255_point_sub">point_sub</a>(self: &<a href="ristretto255.md#0x1_ristretto255_RistrettoPoint">RistrettoPoint</a>, b: &<a href="ristretto255.md#0x1_ristretto255_RistrettoPoint">RistrettoPoint</a>): <a href="ristretto255.md#0x1_ristretto255_RistrettoPoint">RistrettoPoint</a> {
     <a href="ristretto255.md#0x1_ristretto255_RistrettoPoint">RistrettoPoint</a> {
-        handle: <a href="ristretto255.md#0x1_ristretto255_point_sub_internal">point_sub_internal</a>(a, b, <b>false</b>)
+        handle: <a href="ristretto255.md#0x1_ristretto255_point_sub_internal">point_sub_internal</a>(self, b, <b>false</b>)
     }
 }
 </code></pre>
@@ -1141,7 +1168,7 @@ Returns a - b
 Sets a -= b and returns 'a'.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="ristretto255.md#0x1_ristretto255_point_sub_assign">point_sub_assign</a>(a: &<b>mut</b> <a href="ristretto255.md#0x1_ristretto255_RistrettoPoint">ristretto255::RistrettoPoint</a>, b: &<a href="ristretto255.md#0x1_ristretto255_RistrettoPoint">ristretto255::RistrettoPoint</a>): &<b>mut</b> <a href="ristretto255.md#0x1_ristretto255_RistrettoPoint">ristretto255::RistrettoPoint</a>
+<pre><code><b>public</b> <b>fun</b> <a href="ristretto255.md#0x1_ristretto255_point_sub_assign">point_sub_assign</a>(self: &<b>mut</b> <a href="ristretto255.md#0x1_ristretto255_RistrettoPoint">ristretto255::RistrettoPoint</a>, b: &<a href="ristretto255.md#0x1_ristretto255_RistrettoPoint">ristretto255::RistrettoPoint</a>): &<b>mut</b> <a href="ristretto255.md#0x1_ristretto255_RistrettoPoint">ristretto255::RistrettoPoint</a>
 </code></pre>
 
 
@@ -1150,9 +1177,9 @@ Sets a -= b and returns 'a'.
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="ristretto255.md#0x1_ristretto255_point_sub_assign">point_sub_assign</a>(a: &<b>mut</b> <a href="ristretto255.md#0x1_ristretto255_RistrettoPoint">RistrettoPoint</a>, b: &<a href="ristretto255.md#0x1_ristretto255_RistrettoPoint">RistrettoPoint</a>): &<b>mut</b> <a href="ristretto255.md#0x1_ristretto255_RistrettoPoint">RistrettoPoint</a> {
-    <a href="ristretto255.md#0x1_ristretto255_point_sub_internal">point_sub_internal</a>(a, b, <b>true</b>);
-    a
+<pre><code><b>public</b> <b>fun</b> <a href="ristretto255.md#0x1_ristretto255_point_sub_assign">point_sub_assign</a>(self: &<b>mut</b> <a href="ristretto255.md#0x1_ristretto255_RistrettoPoint">RistrettoPoint</a>, b: &<a href="ristretto255.md#0x1_ristretto255_RistrettoPoint">RistrettoPoint</a>): &<b>mut</b> <a href="ristretto255.md#0x1_ristretto255_RistrettoPoint">RistrettoPoint</a> {
+    <a href="ristretto255.md#0x1_ristretto255_point_sub_internal">point_sub_internal</a>(self, b, <b>true</b>);
+    self
 }
 </code></pre>
 
@@ -1167,7 +1194,7 @@ Sets a -= b and returns 'a'.
 Returns -a
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="ristretto255.md#0x1_ristretto255_point_neg">point_neg</a>(a: &<a href="ristretto255.md#0x1_ristretto255_RistrettoPoint">ristretto255::RistrettoPoint</a>): <a href="ristretto255.md#0x1_ristretto255_RistrettoPoint">ristretto255::RistrettoPoint</a>
+<pre><code><b>public</b> <b>fun</b> <a href="ristretto255.md#0x1_ristretto255_point_neg">point_neg</a>(self: &<a href="ristretto255.md#0x1_ristretto255_RistrettoPoint">ristretto255::RistrettoPoint</a>): <a href="ristretto255.md#0x1_ristretto255_RistrettoPoint">ristretto255::RistrettoPoint</a>
 </code></pre>
 
 
@@ -1176,9 +1203,9 @@ Returns -a
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="ristretto255.md#0x1_ristretto255_point_neg">point_neg</a>(a: &<a href="ristretto255.md#0x1_ristretto255_RistrettoPoint">RistrettoPoint</a>): <a href="ristretto255.md#0x1_ristretto255_RistrettoPoint">RistrettoPoint</a> {
+<pre><code><b>public</b> <b>fun</b> <a href="ristretto255.md#0x1_ristretto255_point_neg">point_neg</a>(self: &<a href="ristretto255.md#0x1_ristretto255_RistrettoPoint">RistrettoPoint</a>): <a href="ristretto255.md#0x1_ristretto255_RistrettoPoint">RistrettoPoint</a> {
     <a href="ristretto255.md#0x1_ristretto255_RistrettoPoint">RistrettoPoint</a> {
-        handle: <a href="ristretto255.md#0x1_ristretto255_point_neg_internal">point_neg_internal</a>(a, <b>false</b>)
+        handle: <a href="ristretto255.md#0x1_ristretto255_point_neg_internal">point_neg_internal</a>(self, <b>false</b>)
     }
 }
 </code></pre>
@@ -1194,7 +1221,7 @@ Returns -a
 Sets a = -a, and returns 'a'.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="ristretto255.md#0x1_ristretto255_point_neg_assign">point_neg_assign</a>(a: &<b>mut</b> <a href="ristretto255.md#0x1_ristretto255_RistrettoPoint">ristretto255::RistrettoPoint</a>): &<b>mut</b> <a href="ristretto255.md#0x1_ristretto255_RistrettoPoint">ristretto255::RistrettoPoint</a>
+<pre><code><b>public</b> <b>fun</b> <a href="ristretto255.md#0x1_ristretto255_point_neg_assign">point_neg_assign</a>(self: &<b>mut</b> <a href="ristretto255.md#0x1_ristretto255_RistrettoPoint">ristretto255::RistrettoPoint</a>): &<b>mut</b> <a href="ristretto255.md#0x1_ristretto255_RistrettoPoint">ristretto255::RistrettoPoint</a>
 </code></pre>
 
 
@@ -1203,9 +1230,9 @@ Sets a = -a, and returns 'a'.
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="ristretto255.md#0x1_ristretto255_point_neg_assign">point_neg_assign</a>(a: &<b>mut</b> <a href="ristretto255.md#0x1_ristretto255_RistrettoPoint">RistrettoPoint</a>): &<b>mut</b> <a href="ristretto255.md#0x1_ristretto255_RistrettoPoint">RistrettoPoint</a> {
-    <a href="ristretto255.md#0x1_ristretto255_point_neg_internal">point_neg_internal</a>(a, <b>true</b>);
-    a
+<pre><code><b>public</b> <b>fun</b> <a href="ristretto255.md#0x1_ristretto255_point_neg_assign">point_neg_assign</a>(self: &<b>mut</b> <a href="ristretto255.md#0x1_ristretto255_RistrettoPoint">RistrettoPoint</a>): &<b>mut</b> <a href="ristretto255.md#0x1_ristretto255_RistrettoPoint">RistrettoPoint</a> {
+    <a href="ristretto255.md#0x1_ristretto255_point_neg_internal">point_neg_internal</a>(self, <b>true</b>);
+    self
 }
 </code></pre>
 
@@ -1220,7 +1247,7 @@ Sets a = -a, and returns 'a'.
 Returns true if the two RistrettoPoints are the same points on the elliptic curve.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="ristretto255.md#0x1_ristretto255_point_equals">point_equals</a>(g: &<a href="ristretto255.md#0x1_ristretto255_RistrettoPoint">ristretto255::RistrettoPoint</a>, h: &<a href="ristretto255.md#0x1_ristretto255_RistrettoPoint">ristretto255::RistrettoPoint</a>): bool
+<pre><code><b>public</b> <b>fun</b> <a href="ristretto255.md#0x1_ristretto255_point_equals">point_equals</a>(self: &<a href="ristretto255.md#0x1_ristretto255_RistrettoPoint">ristretto255::RistrettoPoint</a>, h: &<a href="ristretto255.md#0x1_ristretto255_RistrettoPoint">ristretto255::RistrettoPoint</a>): bool
 </code></pre>
 
 
@@ -1229,7 +1256,7 @@ Returns true if the two RistrettoPoints are the same points on the elliptic curv
 <summary>Implementation</summary>
 
 
-<pre><code><b>native</b> <b>public</b> <b>fun</b> <a href="ristretto255.md#0x1_ristretto255_point_equals">point_equals</a>(g: &<a href="ristretto255.md#0x1_ristretto255_RistrettoPoint">RistrettoPoint</a>, h: &<a href="ristretto255.md#0x1_ristretto255_RistrettoPoint">RistrettoPoint</a>): bool;
+<pre><code><b>native</b> <b>public</b> <b>fun</b> <a href="ristretto255.md#0x1_ristretto255_point_equals">point_equals</a>(self: &<a href="ristretto255.md#0x1_ristretto255_RistrettoPoint">RistrettoPoint</a>, h: &<a href="ristretto255.md#0x1_ristretto255_RistrettoPoint">RistrettoPoint</a>): bool;
 </code></pre>
 
 
@@ -1244,7 +1271,7 @@ Returns true if the two compressed points are the same points on the elliptic cu
 Recall that serialization is canonical, so testing equality this way is correct.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="ristretto255.md#0x1_ristretto255_compressed_point_equals">compressed_point_equals</a>(lhs: &<a href="ristretto255.md#0x1_ristretto255_CompressedRistretto">ristretto255::CompressedRistretto</a>, rhs: &<a href="ristretto255.md#0x1_ristretto255_CompressedRistretto">ristretto255::CompressedRistretto</a>): bool
+<pre><code><b>public</b> <b>fun</b> <a href="ristretto255.md#0x1_ristretto255_compressed_point_equals">compressed_point_equals</a>(self: &<a href="ristretto255.md#0x1_ristretto255_CompressedRistretto">ristretto255::CompressedRistretto</a>, rhs: &<a href="ristretto255.md#0x1_ristretto255_CompressedRistretto">ristretto255::CompressedRistretto</a>): bool
 </code></pre>
 
 
@@ -1253,8 +1280,8 @@ Recall that serialization is canonical, so testing equality this way is correct.
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="ristretto255.md#0x1_ristretto255_compressed_point_equals">compressed_point_equals</a>(lhs: &<a href="ristretto255.md#0x1_ristretto255_CompressedRistretto">CompressedRistretto</a>, rhs: &<a href="ristretto255.md#0x1_ristretto255_CompressedRistretto">CompressedRistretto</a>): bool {
-    lhs.data == rhs.data
+<pre><code><b>public</b> <b>fun</b> <a href="ristretto255.md#0x1_ristretto255_compressed_point_equals">compressed_point_equals</a>(self: &<a href="ristretto255.md#0x1_ristretto255_CompressedRistretto">CompressedRistretto</a>, rhs: &<a href="ristretto255.md#0x1_ristretto255_CompressedRistretto">CompressedRistretto</a>): bool {
+    self.data == rhs.data
 }
 </code></pre>
 
@@ -1644,7 +1671,7 @@ Returns 0 as a Scalar.
 Returns true if the given Scalar equals 0.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="ristretto255.md#0x1_ristretto255_scalar_is_zero">scalar_is_zero</a>(s: &<a href="ristretto255.md#0x1_ristretto255_Scalar">ristretto255::Scalar</a>): bool
+<pre><code><b>public</b> <b>fun</b> <a href="ristretto255.md#0x1_ristretto255_scalar_is_zero">scalar_is_zero</a>(self: &<a href="ristretto255.md#0x1_ristretto255_Scalar">ristretto255::Scalar</a>): bool
 </code></pre>
 
 
@@ -1653,8 +1680,8 @@ Returns true if the given Scalar equals 0.
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="ristretto255.md#0x1_ristretto255_scalar_is_zero">scalar_is_zero</a>(s: &<a href="ristretto255.md#0x1_ristretto255_Scalar">Scalar</a>): bool {
-    s.data == x"0000000000000000000000000000000000000000000000000000000000000000"
+<pre><code><b>public</b> <b>fun</b> <a href="ristretto255.md#0x1_ristretto255_scalar_is_zero">scalar_is_zero</a>(self: &<a href="ristretto255.md#0x1_ristretto255_Scalar">Scalar</a>): bool {
+    self.data == x"0000000000000000000000000000000000000000000000000000000000000000"
 }
 </code></pre>
 
@@ -1696,7 +1723,7 @@ Returns 1 as a Scalar.
 Returns true if the given Scalar equals 1.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="ristretto255.md#0x1_ristretto255_scalar_is_one">scalar_is_one</a>(s: &<a href="ristretto255.md#0x1_ristretto255_Scalar">ristretto255::Scalar</a>): bool
+<pre><code><b>public</b> <b>fun</b> <a href="ristretto255.md#0x1_ristretto255_scalar_is_one">scalar_is_one</a>(self: &<a href="ristretto255.md#0x1_ristretto255_Scalar">ristretto255::Scalar</a>): bool
 </code></pre>
 
 
@@ -1705,8 +1732,8 @@ Returns true if the given Scalar equals 1.
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="ristretto255.md#0x1_ristretto255_scalar_is_one">scalar_is_one</a>(s: &<a href="ristretto255.md#0x1_ristretto255_Scalar">Scalar</a>): bool {
-    s.data == x"0100000000000000000000000000000000000000000000000000000000000000"
+<pre><code><b>public</b> <b>fun</b> <a href="ristretto255.md#0x1_ristretto255_scalar_is_one">scalar_is_one</a>(self: &<a href="ristretto255.md#0x1_ristretto255_Scalar">Scalar</a>): bool {
+    self.data == x"0100000000000000000000000000000000000000000000000000000000000000"
 }
 </code></pre>
 
@@ -1721,7 +1748,7 @@ Returns true if the given Scalar equals 1.
 Returns true if the two scalars are equal.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="ristretto255.md#0x1_ristretto255_scalar_equals">scalar_equals</a>(lhs: &<a href="ristretto255.md#0x1_ristretto255_Scalar">ristretto255::Scalar</a>, rhs: &<a href="ristretto255.md#0x1_ristretto255_Scalar">ristretto255::Scalar</a>): bool
+<pre><code><b>public</b> <b>fun</b> <a href="ristretto255.md#0x1_ristretto255_scalar_equals">scalar_equals</a>(self: &<a href="ristretto255.md#0x1_ristretto255_Scalar">ristretto255::Scalar</a>, rhs: &<a href="ristretto255.md#0x1_ristretto255_Scalar">ristretto255::Scalar</a>): bool
 </code></pre>
 
 
@@ -1730,8 +1757,8 @@ Returns true if the two scalars are equal.
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="ristretto255.md#0x1_ristretto255_scalar_equals">scalar_equals</a>(lhs: &<a href="ristretto255.md#0x1_ristretto255_Scalar">Scalar</a>, rhs: &<a href="ristretto255.md#0x1_ristretto255_Scalar">Scalar</a>): bool {
-    lhs.data == rhs.data
+<pre><code><b>public</b> <b>fun</b> <a href="ristretto255.md#0x1_ristretto255_scalar_equals">scalar_equals</a>(self: &<a href="ristretto255.md#0x1_ristretto255_Scalar">Scalar</a>, rhs: &<a href="ristretto255.md#0x1_ristretto255_Scalar">Scalar</a>): bool {
+    self.data == rhs.data
 }
 </code></pre>
 
@@ -1747,7 +1774,7 @@ Returns the inverse s^{-1} mod \ell of a scalar s.
 Returns None if s is zero.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="ristretto255.md#0x1_ristretto255_scalar_invert">scalar_invert</a>(s: &<a href="ristretto255.md#0x1_ristretto255_Scalar">ristretto255::Scalar</a>): <a href="../../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;<a href="ristretto255.md#0x1_ristretto255_Scalar">ristretto255::Scalar</a>&gt;
+<pre><code><b>public</b> <b>fun</b> <a href="ristretto255.md#0x1_ristretto255_scalar_invert">scalar_invert</a>(self: &<a href="ristretto255.md#0x1_ristretto255_Scalar">ristretto255::Scalar</a>): <a href="../../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;<a href="ristretto255.md#0x1_ristretto255_Scalar">ristretto255::Scalar</a>&gt;
 </code></pre>
 
 
@@ -1756,12 +1783,12 @@ Returns None if s is zero.
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="ristretto255.md#0x1_ristretto255_scalar_invert">scalar_invert</a>(s: &<a href="ristretto255.md#0x1_ristretto255_Scalar">Scalar</a>): Option&lt;<a href="ristretto255.md#0x1_ristretto255_Scalar">Scalar</a>&gt; {
-    <b>if</b> (<a href="ristretto255.md#0x1_ristretto255_scalar_is_zero">scalar_is_zero</a>(s)) {
+<pre><code><b>public</b> <b>fun</b> <a href="ristretto255.md#0x1_ristretto255_scalar_invert">scalar_invert</a>(self: &<a href="ristretto255.md#0x1_ristretto255_Scalar">Scalar</a>): Option&lt;<a href="ristretto255.md#0x1_ristretto255_Scalar">Scalar</a>&gt; {
+    <b>if</b> (self.<a href="ristretto255.md#0x1_ristretto255_scalar_is_zero">scalar_is_zero</a>()) {
         std::option::none&lt;<a href="ristretto255.md#0x1_ristretto255_Scalar">Scalar</a>&gt;()
     } <b>else</b> {
         std::option::some(<a href="ristretto255.md#0x1_ristretto255_Scalar">Scalar</a> {
-            data: <a href="ristretto255.md#0x1_ristretto255_scalar_invert_internal">scalar_invert_internal</a>(s.data)
+            data: <a href="ristretto255.md#0x1_ristretto255_scalar_invert_internal">scalar_invert_internal</a>(self.data)
         })
     }
 }
@@ -1778,7 +1805,7 @@ Returns None if s is zero.
 Returns the product of the two scalars.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="ristretto255.md#0x1_ristretto255_scalar_mul">scalar_mul</a>(a: &<a href="ristretto255.md#0x1_ristretto255_Scalar">ristretto255::Scalar</a>, b: &<a href="ristretto255.md#0x1_ristretto255_Scalar">ristretto255::Scalar</a>): <a href="ristretto255.md#0x1_ristretto255_Scalar">ristretto255::Scalar</a>
+<pre><code><b>public</b> <b>fun</b> <a href="ristretto255.md#0x1_ristretto255_scalar_mul">scalar_mul</a>(self: &<a href="ristretto255.md#0x1_ristretto255_Scalar">ristretto255::Scalar</a>, b: &<a href="ristretto255.md#0x1_ristretto255_Scalar">ristretto255::Scalar</a>): <a href="ristretto255.md#0x1_ristretto255_Scalar">ristretto255::Scalar</a>
 </code></pre>
 
 
@@ -1787,9 +1814,9 @@ Returns the product of the two scalars.
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="ristretto255.md#0x1_ristretto255_scalar_mul">scalar_mul</a>(a: &<a href="ristretto255.md#0x1_ristretto255_Scalar">Scalar</a>, b: &<a href="ristretto255.md#0x1_ristretto255_Scalar">Scalar</a>): <a href="ristretto255.md#0x1_ristretto255_Scalar">Scalar</a> {
+<pre><code><b>public</b> <b>fun</b> <a href="ristretto255.md#0x1_ristretto255_scalar_mul">scalar_mul</a>(self: &<a href="ristretto255.md#0x1_ristretto255_Scalar">Scalar</a>, b: &<a href="ristretto255.md#0x1_ristretto255_Scalar">Scalar</a>): <a href="ristretto255.md#0x1_ristretto255_Scalar">Scalar</a> {
     <a href="ristretto255.md#0x1_ristretto255_Scalar">Scalar</a> {
-        data: <a href="ristretto255.md#0x1_ristretto255_scalar_mul_internal">scalar_mul_internal</a>(a.data, b.data)
+        data: <a href="ristretto255.md#0x1_ristretto255_scalar_mul_internal">scalar_mul_internal</a>(self.data, b.data)
     }
 }
 </code></pre>
@@ -1806,7 +1833,7 @@ Computes the product of 'a' and 'b' and assigns the result to 'a'.
 Returns 'a'.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="ristretto255.md#0x1_ristretto255_scalar_mul_assign">scalar_mul_assign</a>(a: &<b>mut</b> <a href="ristretto255.md#0x1_ristretto255_Scalar">ristretto255::Scalar</a>, b: &<a href="ristretto255.md#0x1_ristretto255_Scalar">ristretto255::Scalar</a>): &<b>mut</b> <a href="ristretto255.md#0x1_ristretto255_Scalar">ristretto255::Scalar</a>
+<pre><code><b>public</b> <b>fun</b> <a href="ristretto255.md#0x1_ristretto255_scalar_mul_assign">scalar_mul_assign</a>(self: &<b>mut</b> <a href="ristretto255.md#0x1_ristretto255_Scalar">ristretto255::Scalar</a>, b: &<a href="ristretto255.md#0x1_ristretto255_Scalar">ristretto255::Scalar</a>): &<b>mut</b> <a href="ristretto255.md#0x1_ristretto255_Scalar">ristretto255::Scalar</a>
 </code></pre>
 
 
@@ -1815,9 +1842,9 @@ Returns 'a'.
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="ristretto255.md#0x1_ristretto255_scalar_mul_assign">scalar_mul_assign</a>(a: &<b>mut</b> <a href="ristretto255.md#0x1_ristretto255_Scalar">Scalar</a>, b: &<a href="ristretto255.md#0x1_ristretto255_Scalar">Scalar</a>): &<b>mut</b> <a href="ristretto255.md#0x1_ristretto255_Scalar">Scalar</a> {
-    a.data = <a href="ristretto255.md#0x1_ristretto255_scalar_mul">scalar_mul</a>(a, b).data;
-    a
+<pre><code><b>public</b> <b>fun</b> <a href="ristretto255.md#0x1_ristretto255_scalar_mul_assign">scalar_mul_assign</a>(self: &<b>mut</b> <a href="ristretto255.md#0x1_ristretto255_Scalar">Scalar</a>, b: &<a href="ristretto255.md#0x1_ristretto255_Scalar">Scalar</a>): &<b>mut</b> <a href="ristretto255.md#0x1_ristretto255_Scalar">Scalar</a> {
+    self.data = self.<a href="ristretto255.md#0x1_ristretto255_scalar_mul">scalar_mul</a>(b).data;
+    self
 }
 </code></pre>
 
@@ -1832,7 +1859,7 @@ Returns 'a'.
 Returns the sum of the two scalars.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="ristretto255.md#0x1_ristretto255_scalar_add">scalar_add</a>(a: &<a href="ristretto255.md#0x1_ristretto255_Scalar">ristretto255::Scalar</a>, b: &<a href="ristretto255.md#0x1_ristretto255_Scalar">ristretto255::Scalar</a>): <a href="ristretto255.md#0x1_ristretto255_Scalar">ristretto255::Scalar</a>
+<pre><code><b>public</b> <b>fun</b> <a href="ristretto255.md#0x1_ristretto255_scalar_add">scalar_add</a>(self: &<a href="ristretto255.md#0x1_ristretto255_Scalar">ristretto255::Scalar</a>, b: &<a href="ristretto255.md#0x1_ristretto255_Scalar">ristretto255::Scalar</a>): <a href="ristretto255.md#0x1_ristretto255_Scalar">ristretto255::Scalar</a>
 </code></pre>
 
 
@@ -1841,9 +1868,9 @@ Returns the sum of the two scalars.
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="ristretto255.md#0x1_ristretto255_scalar_add">scalar_add</a>(a: &<a href="ristretto255.md#0x1_ristretto255_Scalar">Scalar</a>, b: &<a href="ristretto255.md#0x1_ristretto255_Scalar">Scalar</a>): <a href="ristretto255.md#0x1_ristretto255_Scalar">Scalar</a> {
+<pre><code><b>public</b> <b>fun</b> <a href="ristretto255.md#0x1_ristretto255_scalar_add">scalar_add</a>(self: &<a href="ristretto255.md#0x1_ristretto255_Scalar">Scalar</a>, b: &<a href="ristretto255.md#0x1_ristretto255_Scalar">Scalar</a>): <a href="ristretto255.md#0x1_ristretto255_Scalar">Scalar</a> {
     <a href="ristretto255.md#0x1_ristretto255_Scalar">Scalar</a> {
-        data: <a href="ristretto255.md#0x1_ristretto255_scalar_add_internal">scalar_add_internal</a>(a.data, b.data)
+        data: <a href="ristretto255.md#0x1_ristretto255_scalar_add_internal">scalar_add_internal</a>(self.data, b.data)
     }
 }
 </code></pre>
@@ -1860,7 +1887,7 @@ Computes the sum of 'a' and 'b' and assigns the result to 'a'
 Returns 'a'.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="ristretto255.md#0x1_ristretto255_scalar_add_assign">scalar_add_assign</a>(a: &<b>mut</b> <a href="ristretto255.md#0x1_ristretto255_Scalar">ristretto255::Scalar</a>, b: &<a href="ristretto255.md#0x1_ristretto255_Scalar">ristretto255::Scalar</a>): &<b>mut</b> <a href="ristretto255.md#0x1_ristretto255_Scalar">ristretto255::Scalar</a>
+<pre><code><b>public</b> <b>fun</b> <a href="ristretto255.md#0x1_ristretto255_scalar_add_assign">scalar_add_assign</a>(self: &<b>mut</b> <a href="ristretto255.md#0x1_ristretto255_Scalar">ristretto255::Scalar</a>, b: &<a href="ristretto255.md#0x1_ristretto255_Scalar">ristretto255::Scalar</a>): &<b>mut</b> <a href="ristretto255.md#0x1_ristretto255_Scalar">ristretto255::Scalar</a>
 </code></pre>
 
 
@@ -1869,9 +1896,9 @@ Returns 'a'.
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="ristretto255.md#0x1_ristretto255_scalar_add_assign">scalar_add_assign</a>(a: &<b>mut</b> <a href="ristretto255.md#0x1_ristretto255_Scalar">Scalar</a>, b: &<a href="ristretto255.md#0x1_ristretto255_Scalar">Scalar</a>): &<b>mut</b> <a href="ristretto255.md#0x1_ristretto255_Scalar">Scalar</a> {
-    a.data = <a href="ristretto255.md#0x1_ristretto255_scalar_add">scalar_add</a>(a, b).data;
-    a
+<pre><code><b>public</b> <b>fun</b> <a href="ristretto255.md#0x1_ristretto255_scalar_add_assign">scalar_add_assign</a>(self: &<b>mut</b> <a href="ristretto255.md#0x1_ristretto255_Scalar">Scalar</a>, b: &<a href="ristretto255.md#0x1_ristretto255_Scalar">Scalar</a>): &<b>mut</b> <a href="ristretto255.md#0x1_ristretto255_Scalar">Scalar</a> {
+    self.data = self.<a href="ristretto255.md#0x1_ristretto255_scalar_add">scalar_add</a>(b).data;
+    self
 }
 </code></pre>
 
@@ -1886,7 +1913,7 @@ Returns 'a'.
 Returns the difference of the two scalars.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="ristretto255.md#0x1_ristretto255_scalar_sub">scalar_sub</a>(a: &<a href="ristretto255.md#0x1_ristretto255_Scalar">ristretto255::Scalar</a>, b: &<a href="ristretto255.md#0x1_ristretto255_Scalar">ristretto255::Scalar</a>): <a href="ristretto255.md#0x1_ristretto255_Scalar">ristretto255::Scalar</a>
+<pre><code><b>public</b> <b>fun</b> <a href="ristretto255.md#0x1_ristretto255_scalar_sub">scalar_sub</a>(self: &<a href="ristretto255.md#0x1_ristretto255_Scalar">ristretto255::Scalar</a>, b: &<a href="ristretto255.md#0x1_ristretto255_Scalar">ristretto255::Scalar</a>): <a href="ristretto255.md#0x1_ristretto255_Scalar">ristretto255::Scalar</a>
 </code></pre>
 
 
@@ -1895,9 +1922,9 @@ Returns the difference of the two scalars.
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="ristretto255.md#0x1_ristretto255_scalar_sub">scalar_sub</a>(a: &<a href="ristretto255.md#0x1_ristretto255_Scalar">Scalar</a>, b: &<a href="ristretto255.md#0x1_ristretto255_Scalar">Scalar</a>): <a href="ristretto255.md#0x1_ristretto255_Scalar">Scalar</a> {
+<pre><code><b>public</b> <b>fun</b> <a href="ristretto255.md#0x1_ristretto255_scalar_sub">scalar_sub</a>(self: &<a href="ristretto255.md#0x1_ristretto255_Scalar">Scalar</a>, b: &<a href="ristretto255.md#0x1_ristretto255_Scalar">Scalar</a>): <a href="ristretto255.md#0x1_ristretto255_Scalar">Scalar</a> {
     <a href="ristretto255.md#0x1_ristretto255_Scalar">Scalar</a> {
-        data: <a href="ristretto255.md#0x1_ristretto255_scalar_sub_internal">scalar_sub_internal</a>(a.data, b.data)
+        data: <a href="ristretto255.md#0x1_ristretto255_scalar_sub_internal">scalar_sub_internal</a>(self.data, b.data)
     }
 }
 </code></pre>
@@ -1914,7 +1941,7 @@ Subtracts 'b' from 'a' and assigns the result to 'a'.
 Returns 'a'.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="ristretto255.md#0x1_ristretto255_scalar_sub_assign">scalar_sub_assign</a>(a: &<b>mut</b> <a href="ristretto255.md#0x1_ristretto255_Scalar">ristretto255::Scalar</a>, b: &<a href="ristretto255.md#0x1_ristretto255_Scalar">ristretto255::Scalar</a>): &<b>mut</b> <a href="ristretto255.md#0x1_ristretto255_Scalar">ristretto255::Scalar</a>
+<pre><code><b>public</b> <b>fun</b> <a href="ristretto255.md#0x1_ristretto255_scalar_sub_assign">scalar_sub_assign</a>(self: &<b>mut</b> <a href="ristretto255.md#0x1_ristretto255_Scalar">ristretto255::Scalar</a>, b: &<a href="ristretto255.md#0x1_ristretto255_Scalar">ristretto255::Scalar</a>): &<b>mut</b> <a href="ristretto255.md#0x1_ristretto255_Scalar">ristretto255::Scalar</a>
 </code></pre>
 
 
@@ -1923,9 +1950,9 @@ Returns 'a'.
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="ristretto255.md#0x1_ristretto255_scalar_sub_assign">scalar_sub_assign</a>(a: &<b>mut</b> <a href="ristretto255.md#0x1_ristretto255_Scalar">Scalar</a>, b: &<a href="ristretto255.md#0x1_ristretto255_Scalar">Scalar</a>): &<b>mut</b> <a href="ristretto255.md#0x1_ristretto255_Scalar">Scalar</a> {
-    a.data = <a href="ristretto255.md#0x1_ristretto255_scalar_sub">scalar_sub</a>(a, b).data;
-    a
+<pre><code><b>public</b> <b>fun</b> <a href="ristretto255.md#0x1_ristretto255_scalar_sub_assign">scalar_sub_assign</a>(self: &<b>mut</b> <a href="ristretto255.md#0x1_ristretto255_Scalar">Scalar</a>, b: &<a href="ristretto255.md#0x1_ristretto255_Scalar">Scalar</a>): &<b>mut</b> <a href="ristretto255.md#0x1_ristretto255_Scalar">Scalar</a> {
+    self.data = self.<a href="ristretto255.md#0x1_ristretto255_scalar_sub">scalar_sub</a>(b).data;
+    self
 }
 </code></pre>
 
@@ -1940,7 +1967,7 @@ Returns 'a'.
 Returns the negation of 'a': i.e., $(0 - a) \mod \ell$.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="ristretto255.md#0x1_ristretto255_scalar_neg">scalar_neg</a>(a: &<a href="ristretto255.md#0x1_ristretto255_Scalar">ristretto255::Scalar</a>): <a href="ristretto255.md#0x1_ristretto255_Scalar">ristretto255::Scalar</a>
+<pre><code><b>public</b> <b>fun</b> <a href="ristretto255.md#0x1_ristretto255_scalar_neg">scalar_neg</a>(self: &<a href="ristretto255.md#0x1_ristretto255_Scalar">ristretto255::Scalar</a>): <a href="ristretto255.md#0x1_ristretto255_Scalar">ristretto255::Scalar</a>
 </code></pre>
 
 
@@ -1949,9 +1976,9 @@ Returns the negation of 'a': i.e., $(0 - a) \mod \ell$.
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="ristretto255.md#0x1_ristretto255_scalar_neg">scalar_neg</a>(a: &<a href="ristretto255.md#0x1_ristretto255_Scalar">Scalar</a>): <a href="ristretto255.md#0x1_ristretto255_Scalar">Scalar</a> {
+<pre><code><b>public</b> <b>fun</b> <a href="ristretto255.md#0x1_ristretto255_scalar_neg">scalar_neg</a>(self: &<a href="ristretto255.md#0x1_ristretto255_Scalar">Scalar</a>): <a href="ristretto255.md#0x1_ristretto255_Scalar">Scalar</a> {
     <a href="ristretto255.md#0x1_ristretto255_Scalar">Scalar</a> {
-        data: <a href="ristretto255.md#0x1_ristretto255_scalar_neg_internal">scalar_neg_internal</a>(a.data)
+        data: <a href="ristretto255.md#0x1_ristretto255_scalar_neg_internal">scalar_neg_internal</a>(self.data)
     }
 }
 </code></pre>
@@ -1968,7 +1995,7 @@ Replaces 'a' by its negation.
 Returns 'a'.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="ristretto255.md#0x1_ristretto255_scalar_neg_assign">scalar_neg_assign</a>(a: &<b>mut</b> <a href="ristretto255.md#0x1_ristretto255_Scalar">ristretto255::Scalar</a>): &<b>mut</b> <a href="ristretto255.md#0x1_ristretto255_Scalar">ristretto255::Scalar</a>
+<pre><code><b>public</b> <b>fun</b> <a href="ristretto255.md#0x1_ristretto255_scalar_neg_assign">scalar_neg_assign</a>(self: &<b>mut</b> <a href="ristretto255.md#0x1_ristretto255_Scalar">ristretto255::Scalar</a>): &<b>mut</b> <a href="ristretto255.md#0x1_ristretto255_Scalar">ristretto255::Scalar</a>
 </code></pre>
 
 
@@ -1977,9 +2004,9 @@ Returns 'a'.
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="ristretto255.md#0x1_ristretto255_scalar_neg_assign">scalar_neg_assign</a>(a: &<b>mut</b> <a href="ristretto255.md#0x1_ristretto255_Scalar">Scalar</a>): &<b>mut</b> <a href="ristretto255.md#0x1_ristretto255_Scalar">Scalar</a> {
-    a.data = <a href="ristretto255.md#0x1_ristretto255_scalar_neg">scalar_neg</a>(a).data;
-    a
+<pre><code><b>public</b> <b>fun</b> <a href="ristretto255.md#0x1_ristretto255_scalar_neg_assign">scalar_neg_assign</a>(self: &<b>mut</b> <a href="ristretto255.md#0x1_ristretto255_Scalar">Scalar</a>): &<b>mut</b> <a href="ristretto255.md#0x1_ristretto255_Scalar">Scalar</a> {
+    self.data = self.<a href="ristretto255.md#0x1_ristretto255_scalar_neg">scalar_neg</a>().data;
+    self
 }
 </code></pre>
 
@@ -1994,7 +2021,7 @@ Returns 'a'.
 Returns the byte-representation of the scalar.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="ristretto255.md#0x1_ristretto255_scalar_to_bytes">scalar_to_bytes</a>(s: &<a href="ristretto255.md#0x1_ristretto255_Scalar">ristretto255::Scalar</a>): <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;
+<pre><code><b>public</b> <b>fun</b> <a href="ristretto255.md#0x1_ristretto255_scalar_to_bytes">scalar_to_bytes</a>(self: &<a href="ristretto255.md#0x1_ristretto255_Scalar">ristretto255::Scalar</a>): <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;
 </code></pre>
 
 
@@ -2003,8 +2030,8 @@ Returns the byte-representation of the scalar.
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="ristretto255.md#0x1_ristretto255_scalar_to_bytes">scalar_to_bytes</a>(s: &<a href="ristretto255.md#0x1_ristretto255_Scalar">Scalar</a>): <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt; {
-    s.data
+<pre><code><b>public</b> <b>fun</b> <a href="ristretto255.md#0x1_ristretto255_scalar_to_bytes">scalar_to_bytes</a>(self: &<a href="ristretto255.md#0x1_ristretto255_Scalar">Scalar</a>): <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt; {
+    self.data
 }
 </code></pre>
 
@@ -2593,129 +2620,12 @@ WARNING: This function can only be called with P = RistrettoPoint and S = Scalar
 ## Specification
 
 
-
-<a id="0x1_ristretto255_spec_double_scalar_mul_internal"></a>
-
-
-<pre><code><b>fun</b> <a href="ristretto255.md#0x1_ristretto255_spec_double_scalar_mul_internal">spec_double_scalar_mul_internal</a>(point1: u64, point2: u64, scalar1: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;, scalar2: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): u64;
-</code></pre>
-
-
-
-
-<a id="0x1_ristretto255_spec_multi_scalar_mul_internal"></a>
-
-
-<pre><code><b>fun</b> <a href="ristretto255.md#0x1_ristretto255_spec_multi_scalar_mul_internal">spec_multi_scalar_mul_internal</a>&lt;P, S&gt;(points: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;P&gt;, scalars: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;S&gt;): u64;
-</code></pre>
-
-
-
-
-<a id="0x1_ristretto255_spec_scalar_is_canonical_internal"></a>
-
-
-<pre><code><b>fun</b> <a href="ristretto255.md#0x1_ristretto255_spec_scalar_is_canonical_internal">spec_scalar_is_canonical_internal</a>(s: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): bool;
-</code></pre>
-
-
-
-
-<a id="0x1_ristretto255_spec_scalar_from_u64_internal"></a>
-
-
-<pre><code><b>fun</b> <a href="ristretto255.md#0x1_ristretto255_spec_scalar_from_u64_internal">spec_scalar_from_u64_internal</a>(num: u64): <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;;
-</code></pre>
-
-
-
-
-<a id="0x1_ristretto255_spec_scalar_from_u128_internal"></a>
-
-
-<pre><code><b>fun</b> <a href="ristretto255.md#0x1_ristretto255_spec_scalar_from_u128_internal">spec_scalar_from_u128_internal</a>(num: u128): <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;;
-</code></pre>
-
-
-
-
-<a id="0x1_ristretto255_spec_scalar_reduced_from_32_bytes_internal"></a>
-
-
-<pre><code><b>fun</b> <a href="ristretto255.md#0x1_ristretto255_spec_scalar_reduced_from_32_bytes_internal">spec_scalar_reduced_from_32_bytes_internal</a>(bytes: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;;
-</code></pre>
-
-
-
-
-<a id="0x1_ristretto255_spec_scalar_uniform_from_64_bytes_internal"></a>
-
-
-<pre><code><b>fun</b> <a href="ristretto255.md#0x1_ristretto255_spec_scalar_uniform_from_64_bytes_internal">spec_scalar_uniform_from_64_bytes_internal</a>(bytes: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;;
-</code></pre>
-
-
-
-
-<a id="0x1_ristretto255_spec_scalar_invert_internal"></a>
-
-
-<pre><code><b>fun</b> <a href="ristretto255.md#0x1_ristretto255_spec_scalar_invert_internal">spec_scalar_invert_internal</a>(bytes: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;;
-</code></pre>
-
-
-
-
-<a id="0x1_ristretto255_spec_scalar_from_sha512_internal"></a>
-
-
-<pre><code><b>fun</b> <a href="ristretto255.md#0x1_ristretto255_spec_scalar_from_sha512_internal">spec_scalar_from_sha512_internal</a>(sha2_512_input: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;;
-</code></pre>
-
-
-
-
-<a id="0x1_ristretto255_spec_scalar_mul_internal"></a>
-
-
-<pre><code><b>fun</b> <a href="ristretto255.md#0x1_ristretto255_spec_scalar_mul_internal">spec_scalar_mul_internal</a>(a_bytes: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;, b_bytes: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;;
-</code></pre>
-
-
-
-
-<a id="0x1_ristretto255_spec_scalar_add_internal"></a>
-
-
-<pre><code><b>fun</b> <a href="ristretto255.md#0x1_ristretto255_spec_scalar_add_internal">spec_scalar_add_internal</a>(a_bytes: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;, b_bytes: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;;
-</code></pre>
-
-
-
-
-<a id="0x1_ristretto255_spec_scalar_sub_internal"></a>
-
-
-<pre><code><b>fun</b> <a href="ristretto255.md#0x1_ristretto255_spec_scalar_sub_internal">spec_scalar_sub_internal</a>(a_bytes: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;, b_bytes: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;;
-</code></pre>
-
-
-
-
-<a id="0x1_ristretto255_spec_scalar_neg_internal"></a>
-
-
-<pre><code><b>fun</b> <a href="ristretto255.md#0x1_ristretto255_spec_scalar_neg_internal">spec_scalar_neg_internal</a>(a_bytes: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;;
-</code></pre>
-
-
-
 <a id="@Specification_1_point_equals"></a>
 
 ### Function `point_equals`
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="ristretto255.md#0x1_ristretto255_point_equals">point_equals</a>(g: &<a href="ristretto255.md#0x1_ristretto255_RistrettoPoint">ristretto255::RistrettoPoint</a>, h: &<a href="ristretto255.md#0x1_ristretto255_RistrettoPoint">ristretto255::RistrettoPoint</a>): bool
+<pre><code><b>public</b> <b>fun</b> <a href="ristretto255.md#0x1_ristretto255_point_equals">point_equals</a>(self: &<a href="ristretto255.md#0x1_ristretto255_RistrettoPoint">ristretto255::RistrettoPoint</a>, h: &<a href="ristretto255.md#0x1_ristretto255_RistrettoPoint">ristretto255::RistrettoPoint</a>): bool
 </code></pre>
 
 
@@ -2921,13 +2831,13 @@ WARNING: This function can only be called with P = RistrettoPoint and S = Scalar
 ### Function `scalar_is_zero`
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="ristretto255.md#0x1_ristretto255_scalar_is_zero">scalar_is_zero</a>(s: &<a href="ristretto255.md#0x1_ristretto255_Scalar">ristretto255::Scalar</a>): bool
+<pre><code><b>public</b> <b>fun</b> <a href="ristretto255.md#0x1_ristretto255_scalar_is_zero">scalar_is_zero</a>(self: &<a href="ristretto255.md#0x1_ristretto255_Scalar">ristretto255::Scalar</a>): bool
 </code></pre>
 
 
 
 
-<pre><code><b>ensures</b> result == <a href="ristretto255.md#0x1_ristretto255_spec_scalar_is_zero">spec_scalar_is_zero</a>(s);
+<pre><code><b>ensures</b> result == <a href="ristretto255.md#0x1_ristretto255_spec_scalar_is_zero">spec_scalar_is_zero</a>(self);
 </code></pre>
 
 
@@ -2953,13 +2863,13 @@ WARNING: This function can only be called with P = RistrettoPoint and S = Scalar
 ### Function `scalar_is_one`
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="ristretto255.md#0x1_ristretto255_scalar_is_one">scalar_is_one</a>(s: &<a href="ristretto255.md#0x1_ristretto255_Scalar">ristretto255::Scalar</a>): bool
+<pre><code><b>public</b> <b>fun</b> <a href="ristretto255.md#0x1_ristretto255_scalar_is_one">scalar_is_one</a>(self: &<a href="ristretto255.md#0x1_ristretto255_Scalar">ristretto255::Scalar</a>): bool
 </code></pre>
 
 
 
 
-<pre><code><b>ensures</b> result == <a href="ristretto255.md#0x1_ristretto255_spec_scalar_is_one">spec_scalar_is_one</a>(s);
+<pre><code><b>ensures</b> result == <a href="ristretto255.md#0x1_ristretto255_spec_scalar_is_one">spec_scalar_is_one</a>(self);
 </code></pre>
 
 
@@ -2969,14 +2879,14 @@ WARNING: This function can only be called with P = RistrettoPoint and S = Scalar
 ### Function `scalar_equals`
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="ristretto255.md#0x1_ristretto255_scalar_equals">scalar_equals</a>(lhs: &<a href="ristretto255.md#0x1_ristretto255_Scalar">ristretto255::Scalar</a>, rhs: &<a href="ristretto255.md#0x1_ristretto255_Scalar">ristretto255::Scalar</a>): bool
+<pre><code><b>public</b> <b>fun</b> <a href="ristretto255.md#0x1_ristretto255_scalar_equals">scalar_equals</a>(self: &<a href="ristretto255.md#0x1_ristretto255_Scalar">ristretto255::Scalar</a>, rhs: &<a href="ristretto255.md#0x1_ristretto255_Scalar">ristretto255::Scalar</a>): bool
 </code></pre>
 
 
 
 
 <pre><code><b>aborts_if</b> <b>false</b>;
-<b>ensures</b> result == (lhs.data == rhs.data);
+<b>ensures</b> result == (self.data == rhs.data);
 </code></pre>
 
 
@@ -2986,15 +2896,15 @@ WARNING: This function can only be called with P = RistrettoPoint and S = Scalar
 ### Function `scalar_invert`
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="ristretto255.md#0x1_ristretto255_scalar_invert">scalar_invert</a>(s: &<a href="ristretto255.md#0x1_ristretto255_Scalar">ristretto255::Scalar</a>): <a href="../../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;<a href="ristretto255.md#0x1_ristretto255_Scalar">ristretto255::Scalar</a>&gt;
+<pre><code><b>public</b> <b>fun</b> <a href="ristretto255.md#0x1_ristretto255_scalar_invert">scalar_invert</a>(self: &<a href="ristretto255.md#0x1_ristretto255_Scalar">ristretto255::Scalar</a>): <a href="../../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;<a href="ristretto255.md#0x1_ristretto255_Scalar">ristretto255::Scalar</a>&gt;
 </code></pre>
 
 
 
 
 <pre><code><b>aborts_if</b> <b>false</b>;
-<b>ensures</b> <a href="ristretto255.md#0x1_ristretto255_spec_scalar_is_zero">spec_scalar_is_zero</a>(s) ==&gt; std::option::is_none(result);
-<b>ensures</b> !<a href="ristretto255.md#0x1_ristretto255_spec_scalar_is_zero">spec_scalar_is_zero</a>(s) ==&gt; (std::option::is_some(result) && std::option::borrow(result).data == <a href="ristretto255.md#0x1_ristretto255_spec_scalar_invert_internal">spec_scalar_invert_internal</a>(s.data));
+<b>ensures</b> <a href="ristretto255.md#0x1_ristretto255_spec_scalar_is_zero">spec_scalar_is_zero</a>(self) ==&gt; std::option::is_none(result);
+<b>ensures</b> !<a href="ristretto255.md#0x1_ristretto255_spec_scalar_is_zero">spec_scalar_is_zero</a>(self) ==&gt; (std::option::is_some(result) && std::option::borrow(result).data == <a href="ristretto255.md#0x1_ristretto255_spec_scalar_invert_internal">spec_scalar_invert_internal</a>(self.data));
 </code></pre>
 
 
@@ -3004,14 +2914,14 @@ WARNING: This function can only be called with P = RistrettoPoint and S = Scalar
 ### Function `scalar_mul`
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="ristretto255.md#0x1_ristretto255_scalar_mul">scalar_mul</a>(a: &<a href="ristretto255.md#0x1_ristretto255_Scalar">ristretto255::Scalar</a>, b: &<a href="ristretto255.md#0x1_ristretto255_Scalar">ristretto255::Scalar</a>): <a href="ristretto255.md#0x1_ristretto255_Scalar">ristretto255::Scalar</a>
+<pre><code><b>public</b> <b>fun</b> <a href="ristretto255.md#0x1_ristretto255_scalar_mul">scalar_mul</a>(self: &<a href="ristretto255.md#0x1_ristretto255_Scalar">ristretto255::Scalar</a>, b: &<a href="ristretto255.md#0x1_ristretto255_Scalar">ristretto255::Scalar</a>): <a href="ristretto255.md#0x1_ristretto255_Scalar">ristretto255::Scalar</a>
 </code></pre>
 
 
 
 
 <pre><code><b>aborts_if</b> <b>false</b>;
-<b>ensures</b> result.data == <a href="ristretto255.md#0x1_ristretto255_spec_scalar_mul_internal">spec_scalar_mul_internal</a>(a.data, b.data);
+<b>ensures</b> result.data == <a href="ristretto255.md#0x1_ristretto255_spec_scalar_mul_internal">spec_scalar_mul_internal</a>(self.data, b.data);
 </code></pre>
 
 
@@ -3021,14 +2931,14 @@ WARNING: This function can only be called with P = RistrettoPoint and S = Scalar
 ### Function `scalar_mul_assign`
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="ristretto255.md#0x1_ristretto255_scalar_mul_assign">scalar_mul_assign</a>(a: &<b>mut</b> <a href="ristretto255.md#0x1_ristretto255_Scalar">ristretto255::Scalar</a>, b: &<a href="ristretto255.md#0x1_ristretto255_Scalar">ristretto255::Scalar</a>): &<b>mut</b> <a href="ristretto255.md#0x1_ristretto255_Scalar">ristretto255::Scalar</a>
+<pre><code><b>public</b> <b>fun</b> <a href="ristretto255.md#0x1_ristretto255_scalar_mul_assign">scalar_mul_assign</a>(self: &<b>mut</b> <a href="ristretto255.md#0x1_ristretto255_Scalar">ristretto255::Scalar</a>, b: &<a href="ristretto255.md#0x1_ristretto255_Scalar">ristretto255::Scalar</a>): &<b>mut</b> <a href="ristretto255.md#0x1_ristretto255_Scalar">ristretto255::Scalar</a>
 </code></pre>
 
 
 
 
 <pre><code><b>aborts_if</b> <b>false</b>;
-<b>ensures</b> a.data == <a href="ristretto255.md#0x1_ristretto255_spec_scalar_mul_internal">spec_scalar_mul_internal</a>(<b>old</b>(a).data, b.data);
+<b>ensures</b> self.data == <a href="ristretto255.md#0x1_ristretto255_spec_scalar_mul_internal">spec_scalar_mul_internal</a>(<b>old</b>(self).data, b.data);
 </code></pre>
 
 
@@ -3038,14 +2948,14 @@ WARNING: This function can only be called with P = RistrettoPoint and S = Scalar
 ### Function `scalar_add`
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="ristretto255.md#0x1_ristretto255_scalar_add">scalar_add</a>(a: &<a href="ristretto255.md#0x1_ristretto255_Scalar">ristretto255::Scalar</a>, b: &<a href="ristretto255.md#0x1_ristretto255_Scalar">ristretto255::Scalar</a>): <a href="ristretto255.md#0x1_ristretto255_Scalar">ristretto255::Scalar</a>
+<pre><code><b>public</b> <b>fun</b> <a href="ristretto255.md#0x1_ristretto255_scalar_add">scalar_add</a>(self: &<a href="ristretto255.md#0x1_ristretto255_Scalar">ristretto255::Scalar</a>, b: &<a href="ristretto255.md#0x1_ristretto255_Scalar">ristretto255::Scalar</a>): <a href="ristretto255.md#0x1_ristretto255_Scalar">ristretto255::Scalar</a>
 </code></pre>
 
 
 
 
 <pre><code><b>aborts_if</b> <b>false</b>;
-<b>ensures</b> result.data == <a href="ristretto255.md#0x1_ristretto255_spec_scalar_add_internal">spec_scalar_add_internal</a>(a.data, b.data);
+<b>ensures</b> result.data == <a href="ristretto255.md#0x1_ristretto255_spec_scalar_add_internal">spec_scalar_add_internal</a>(self.data, b.data);
 </code></pre>
 
 
@@ -3055,14 +2965,14 @@ WARNING: This function can only be called with P = RistrettoPoint and S = Scalar
 ### Function `scalar_add_assign`
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="ristretto255.md#0x1_ristretto255_scalar_add_assign">scalar_add_assign</a>(a: &<b>mut</b> <a href="ristretto255.md#0x1_ristretto255_Scalar">ristretto255::Scalar</a>, b: &<a href="ristretto255.md#0x1_ristretto255_Scalar">ristretto255::Scalar</a>): &<b>mut</b> <a href="ristretto255.md#0x1_ristretto255_Scalar">ristretto255::Scalar</a>
+<pre><code><b>public</b> <b>fun</b> <a href="ristretto255.md#0x1_ristretto255_scalar_add_assign">scalar_add_assign</a>(self: &<b>mut</b> <a href="ristretto255.md#0x1_ristretto255_Scalar">ristretto255::Scalar</a>, b: &<a href="ristretto255.md#0x1_ristretto255_Scalar">ristretto255::Scalar</a>): &<b>mut</b> <a href="ristretto255.md#0x1_ristretto255_Scalar">ristretto255::Scalar</a>
 </code></pre>
 
 
 
 
 <pre><code><b>aborts_if</b> <b>false</b>;
-<b>ensures</b> a.data == <a href="ristretto255.md#0x1_ristretto255_spec_scalar_add_internal">spec_scalar_add_internal</a>(<b>old</b>(a).data, b.data);
+<b>ensures</b> self.data == <a href="ristretto255.md#0x1_ristretto255_spec_scalar_add_internal">spec_scalar_add_internal</a>(<b>old</b>(self).data, b.data);
 </code></pre>
 
 
@@ -3072,14 +2982,14 @@ WARNING: This function can only be called with P = RistrettoPoint and S = Scalar
 ### Function `scalar_sub`
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="ristretto255.md#0x1_ristretto255_scalar_sub">scalar_sub</a>(a: &<a href="ristretto255.md#0x1_ristretto255_Scalar">ristretto255::Scalar</a>, b: &<a href="ristretto255.md#0x1_ristretto255_Scalar">ristretto255::Scalar</a>): <a href="ristretto255.md#0x1_ristretto255_Scalar">ristretto255::Scalar</a>
+<pre><code><b>public</b> <b>fun</b> <a href="ristretto255.md#0x1_ristretto255_scalar_sub">scalar_sub</a>(self: &<a href="ristretto255.md#0x1_ristretto255_Scalar">ristretto255::Scalar</a>, b: &<a href="ristretto255.md#0x1_ristretto255_Scalar">ristretto255::Scalar</a>): <a href="ristretto255.md#0x1_ristretto255_Scalar">ristretto255::Scalar</a>
 </code></pre>
 
 
 
 
 <pre><code><b>aborts_if</b> <b>false</b>;
-<b>ensures</b> result.data == <a href="ristretto255.md#0x1_ristretto255_spec_scalar_sub_internal">spec_scalar_sub_internal</a>(a.data, b.data);
+<b>ensures</b> result.data == <a href="ristretto255.md#0x1_ristretto255_spec_scalar_sub_internal">spec_scalar_sub_internal</a>(self.data, b.data);
 </code></pre>
 
 
@@ -3089,14 +2999,14 @@ WARNING: This function can only be called with P = RistrettoPoint and S = Scalar
 ### Function `scalar_sub_assign`
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="ristretto255.md#0x1_ristretto255_scalar_sub_assign">scalar_sub_assign</a>(a: &<b>mut</b> <a href="ristretto255.md#0x1_ristretto255_Scalar">ristretto255::Scalar</a>, b: &<a href="ristretto255.md#0x1_ristretto255_Scalar">ristretto255::Scalar</a>): &<b>mut</b> <a href="ristretto255.md#0x1_ristretto255_Scalar">ristretto255::Scalar</a>
+<pre><code><b>public</b> <b>fun</b> <a href="ristretto255.md#0x1_ristretto255_scalar_sub_assign">scalar_sub_assign</a>(self: &<b>mut</b> <a href="ristretto255.md#0x1_ristretto255_Scalar">ristretto255::Scalar</a>, b: &<a href="ristretto255.md#0x1_ristretto255_Scalar">ristretto255::Scalar</a>): &<b>mut</b> <a href="ristretto255.md#0x1_ristretto255_Scalar">ristretto255::Scalar</a>
 </code></pre>
 
 
 
 
 <pre><code><b>aborts_if</b> <b>false</b>;
-<b>ensures</b> a.data == <a href="ristretto255.md#0x1_ristretto255_spec_scalar_sub_internal">spec_scalar_sub_internal</a>(<b>old</b>(a).data, b.data);
+<b>ensures</b> self.data == <a href="ristretto255.md#0x1_ristretto255_spec_scalar_sub_internal">spec_scalar_sub_internal</a>(<b>old</b>(self).data, b.data);
 </code></pre>
 
 
@@ -3106,7 +3016,7 @@ WARNING: This function can only be called with P = RistrettoPoint and S = Scalar
 ### Function `scalar_neg`
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="ristretto255.md#0x1_ristretto255_scalar_neg">scalar_neg</a>(a: &<a href="ristretto255.md#0x1_ristretto255_Scalar">ristretto255::Scalar</a>): <a href="ristretto255.md#0x1_ristretto255_Scalar">ristretto255::Scalar</a>
+<pre><code><b>public</b> <b>fun</b> <a href="ristretto255.md#0x1_ristretto255_scalar_neg">scalar_neg</a>(self: &<a href="ristretto255.md#0x1_ristretto255_Scalar">ristretto255::Scalar</a>): <a href="ristretto255.md#0x1_ristretto255_Scalar">ristretto255::Scalar</a>
 </code></pre>
 
 
@@ -3114,7 +3024,7 @@ WARNING: This function can only be called with P = RistrettoPoint and S = Scalar
 
 <pre><code><b>pragma</b> opaque;
 <b>aborts_if</b> <b>false</b>;
-<b>ensures</b> result.data == <a href="ristretto255.md#0x1_ristretto255_spec_scalar_neg_internal">spec_scalar_neg_internal</a>(a.data);
+<b>ensures</b> result.data == <a href="ristretto255.md#0x1_ristretto255_spec_scalar_neg_internal">spec_scalar_neg_internal</a>(self.data);
 </code></pre>
 
 
@@ -3124,14 +3034,14 @@ WARNING: This function can only be called with P = RistrettoPoint and S = Scalar
 ### Function `scalar_neg_assign`
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="ristretto255.md#0x1_ristretto255_scalar_neg_assign">scalar_neg_assign</a>(a: &<b>mut</b> <a href="ristretto255.md#0x1_ristretto255_Scalar">ristretto255::Scalar</a>): &<b>mut</b> <a href="ristretto255.md#0x1_ristretto255_Scalar">ristretto255::Scalar</a>
+<pre><code><b>public</b> <b>fun</b> <a href="ristretto255.md#0x1_ristretto255_scalar_neg_assign">scalar_neg_assign</a>(self: &<b>mut</b> <a href="ristretto255.md#0x1_ristretto255_Scalar">ristretto255::Scalar</a>): &<b>mut</b> <a href="ristretto255.md#0x1_ristretto255_Scalar">ristretto255::Scalar</a>
 </code></pre>
 
 
 
 
 <pre><code><b>aborts_if</b> <b>false</b>;
-<b>ensures</b> a.data == <a href="ristretto255.md#0x1_ristretto255_spec_scalar_neg_internal">spec_scalar_neg_internal</a>(<b>old</b>(a).data);
+<b>ensures</b> self.data == <a href="ristretto255.md#0x1_ristretto255_spec_scalar_neg_internal">spec_scalar_neg_internal</a>(<b>old</b>(self).data);
 </code></pre>
 
 
@@ -3141,14 +3051,14 @@ WARNING: This function can only be called with P = RistrettoPoint and S = Scalar
 ### Function `scalar_to_bytes`
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="ristretto255.md#0x1_ristretto255_scalar_to_bytes">scalar_to_bytes</a>(s: &<a href="ristretto255.md#0x1_ristretto255_Scalar">ristretto255::Scalar</a>): <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;
+<pre><code><b>public</b> <b>fun</b> <a href="ristretto255.md#0x1_ristretto255_scalar_to_bytes">scalar_to_bytes</a>(self: &<a href="ristretto255.md#0x1_ristretto255_Scalar">ristretto255::Scalar</a>): <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;
 </code></pre>
 
 
 
 
 <pre><code><b>aborts_if</b> <b>false</b>;
-<b>ensures</b> result == s.data;
+<b>ensures</b> result == self.data;
 </code></pre>
 
 
@@ -3185,6 +3095,123 @@ WARNING: This function can only be called with P = RistrettoPoint and S = Scalar
 
 
 <pre><code><b>fun</b> <a href="ristretto255.md#0x1_ristretto255_spec_point_is_canonical_internal">spec_point_is_canonical_internal</a>(bytes: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): bool;
+</code></pre>
+
+
+
+
+<a id="0x1_ristretto255_spec_double_scalar_mul_internal"></a>
+
+
+<pre><code><b>fun</b> <a href="ristretto255.md#0x1_ristretto255_spec_double_scalar_mul_internal">spec_double_scalar_mul_internal</a>(point1: u64, point2: u64, scalar1: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;, scalar2: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): u64;
+</code></pre>
+
+
+
+
+<a id="0x1_ristretto255_spec_multi_scalar_mul_internal"></a>
+
+
+<pre><code><b>fun</b> <a href="ristretto255.md#0x1_ristretto255_spec_multi_scalar_mul_internal">spec_multi_scalar_mul_internal</a>&lt;P, S&gt;(points: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;P&gt;, scalars: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;S&gt;): u64;
+</code></pre>
+
+
+
+
+<a id="0x1_ristretto255_spec_scalar_is_canonical_internal"></a>
+
+
+<pre><code><b>fun</b> <a href="ristretto255.md#0x1_ristretto255_spec_scalar_is_canonical_internal">spec_scalar_is_canonical_internal</a>(s: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): bool;
+</code></pre>
+
+
+
+
+<a id="0x1_ristretto255_spec_scalar_from_u64_internal"></a>
+
+
+<pre><code><b>fun</b> <a href="ristretto255.md#0x1_ristretto255_spec_scalar_from_u64_internal">spec_scalar_from_u64_internal</a>(num: u64): <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;;
+</code></pre>
+
+
+
+
+<a id="0x1_ristretto255_spec_scalar_from_u128_internal"></a>
+
+
+<pre><code><b>fun</b> <a href="ristretto255.md#0x1_ristretto255_spec_scalar_from_u128_internal">spec_scalar_from_u128_internal</a>(num: u128): <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;;
+</code></pre>
+
+
+
+
+<a id="0x1_ristretto255_spec_scalar_reduced_from_32_bytes_internal"></a>
+
+
+<pre><code><b>fun</b> <a href="ristretto255.md#0x1_ristretto255_spec_scalar_reduced_from_32_bytes_internal">spec_scalar_reduced_from_32_bytes_internal</a>(bytes: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;;
+</code></pre>
+
+
+
+
+<a id="0x1_ristretto255_spec_scalar_uniform_from_64_bytes_internal"></a>
+
+
+<pre><code><b>fun</b> <a href="ristretto255.md#0x1_ristretto255_spec_scalar_uniform_from_64_bytes_internal">spec_scalar_uniform_from_64_bytes_internal</a>(bytes: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;;
+</code></pre>
+
+
+
+
+<a id="0x1_ristretto255_spec_scalar_invert_internal"></a>
+
+
+<pre><code><b>fun</b> <a href="ristretto255.md#0x1_ristretto255_spec_scalar_invert_internal">spec_scalar_invert_internal</a>(bytes: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;;
+</code></pre>
+
+
+
+
+<a id="0x1_ristretto255_spec_scalar_from_sha512_internal"></a>
+
+
+<pre><code><b>fun</b> <a href="ristretto255.md#0x1_ristretto255_spec_scalar_from_sha512_internal">spec_scalar_from_sha512_internal</a>(sha2_512_input: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;;
+</code></pre>
+
+
+
+
+<a id="0x1_ristretto255_spec_scalar_mul_internal"></a>
+
+
+<pre><code><b>fun</b> <a href="ristretto255.md#0x1_ristretto255_spec_scalar_mul_internal">spec_scalar_mul_internal</a>(a_bytes: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;, b_bytes: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;;
+</code></pre>
+
+
+
+
+<a id="0x1_ristretto255_spec_scalar_add_internal"></a>
+
+
+<pre><code><b>fun</b> <a href="ristretto255.md#0x1_ristretto255_spec_scalar_add_internal">spec_scalar_add_internal</a>(a_bytes: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;, b_bytes: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;;
+</code></pre>
+
+
+
+
+<a id="0x1_ristretto255_spec_scalar_sub_internal"></a>
+
+
+<pre><code><b>fun</b> <a href="ristretto255.md#0x1_ristretto255_spec_scalar_sub_internal">spec_scalar_sub_internal</a>(a_bytes: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;, b_bytes: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;;
+</code></pre>
+
+
+
+
+<a id="0x1_ristretto255_spec_scalar_neg_internal"></a>
+
+
+<pre><code><b>fun</b> <a href="ristretto255.md#0x1_ristretto255_spec_scalar_neg_internal">spec_scalar_neg_internal</a>(a_bytes: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;;
 </code></pre>
 
 

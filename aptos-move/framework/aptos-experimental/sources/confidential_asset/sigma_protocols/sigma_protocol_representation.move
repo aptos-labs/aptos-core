@@ -1,7 +1,7 @@
 // TODO: Consider renaming to MSM / MSMs
 module aptos_experimental::sigma_protocol_representation {
     use std::error;
-    use aptos_std::ristretto255::{Scalar, scalar_mul_assign, RistrettoPoint, point_clone};
+    use aptos_std::ristretto255::{Scalar, RistrettoPoint};
     use aptos_experimental::sigma_protocol_statement::Statement;
 
     /// The number of points and scalars in a Representation needs to be the same.
@@ -30,13 +30,7 @@ module aptos_experimental::sigma_protocol_representation {
     /// Given a representation, which only stores locations of group elements within a public statement, returns the
     /// actual vector of group elements by "looking up" these elements in the public statement.
     public fun to_points(self: &Representation, stmt: &Statement): vector<RistrettoPoint> {
-        let bases = vector[];
-
-        self.point_idxs.for_each(|idx| {
-            bases.push_back(point_clone(stmt.get_point(idx)));
-        });
-
-        bases
+        self.point_idxs.map(|idx| stmt.get_point(idx).point_clone())
     }
 
     /// Returns the scalars in the representation.
@@ -47,36 +41,7 @@ module aptos_experimental::sigma_protocol_representation {
     /// Multiplies all the scalars in the representation by $e$.
     public fun scale(self: &mut Representation, e: &Scalar) {
         self.scalars.for_each_mut(|scalar| {
-            scalar_mul_assign(scalar, e);
+            scalar.scalar_mul_assign(e);
         });
     }
 }
-
-// Prize-winning stuff!
-
-    // public fun length(self: &Representation): u64 {
-    //     self.points_idxs.length()
-    // }
-
-    // public fun get_scalar(self: &Representation, i: u64): &Scalar {
-    //     &self.scalars[i]
-    // }
-
-    // public fun get_point_idx(self: &Representation, i: u64): u64 {
-    //     self.points_idxs[i]
-    // }
-
-    // Iterates through each Ristretto255 point and its scalar in the `Representation`. Recall that a `Representation`
-    // only stores the index of the Ristretto255 points w.r.t. the `Statement::points` vector, which is given as
-    // input here.
-    // public inline fun for_each(self: &Representation, stmt: &Statement, lambda: |&RistrettoPoint, &Scalar|) {
-    //     let len = self.length();
-    //     range(0, len).for_each(|i| {
-    //         lambda(
-    //             stmt.get_point(self.get_point_idx(i)),
-    //             self.get_scalar(i)
-    //         )
-    //     });
-    // }
-
-//}

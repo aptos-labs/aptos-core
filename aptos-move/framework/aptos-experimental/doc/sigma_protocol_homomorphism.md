@@ -135,13 +135,7 @@ Computes and returns $\psi(X, w) \in \mathbb{G}^m$ given the public statement $X
 <pre><code><b>public</b> inline <b>fun</b> <a href="sigma_protocol_homomorphism.md#0x7_sigma_protocol_homomorphism_evaluate_psi">evaluate_psi</a>(psi: <a href="sigma_protocol_homomorphism.md#0x7_sigma_protocol_homomorphism_Homomorphism">Homomorphism</a>,
                                stmt: &Statement,
                                witn: &Witness): <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;RistrettoPoint&gt; {
-    <b>let</b> evals = <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>[];
-
-    psi(stmt, witn).for_each_ref(|repr| {
-        evals.push_back(multi_scalar_mul(&repr.to_points(stmt), repr.get_scalars()));
-    });
-
-    evals
+    psi(stmt, witn).map_ref(|repr| multi_scalar_mul(&repr.to_points(stmt), repr.get_scalars()))
 }
 </code></pre>
 
@@ -167,13 +161,7 @@ Returns $f(X) \in \mathbb{G}^m$ given the public statement $X$.
 
 <pre><code><b>public</b> inline <b>fun</b> <a href="sigma_protocol_homomorphism.md#0x7_sigma_protocol_homomorphism_evaluate_f">evaluate_f</a>(f: <a href="sigma_protocol_homomorphism.md#0x7_sigma_protocol_homomorphism_TransformationFunction">TransformationFunction</a>,
                              stmt: &Statement): <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;RistrettoPoint&gt; {
-    <b>let</b> evals = <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>[];
-
-    f(stmt).for_each_ref(|repr| {
-        evals.push_back(multi_scalar_mul(&repr.to_points(stmt), repr.get_scalars()));
-    });
-
-    evals
+    f(stmt).map_ref(|repr| multi_scalar_mul(&repr.to_points(stmt), repr.get_scalars()))
 }
 </code></pre>
 

@@ -121,13 +121,7 @@ actual vector of group elements by "looking up" these elements in the public sta
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="sigma_protocol_representation.md#0x7_sigma_protocol_representation_to_points">to_points</a>(self: &<a href="sigma_protocol_representation.md#0x7_sigma_protocol_representation_Representation">Representation</a>, stmt: &Statement): <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;RistrettoPoint&gt; {
-    <b>let</b> bases = <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>[];
-
-    self.point_idxs.for_each(|idx| {
-        bases.push_back(point_clone(stmt.get_point(idx)));
-    });
-
-    bases
+    self.point_idxs.map(|idx| stmt.get_point(idx).point_clone())
 }
 </code></pre>
 
@@ -178,7 +172,7 @@ Multiplies all the scalars in the representation by $e$.
 
 <pre><code><b>public</b> <b>fun</b> <a href="sigma_protocol_representation.md#0x7_sigma_protocol_representation_scale">scale</a>(self: &<b>mut</b> <a href="sigma_protocol_representation.md#0x7_sigma_protocol_representation_Representation">Representation</a>, e: &Scalar) {
     self.scalars.for_each_mut(|scalar| {
-        scalar_mul_assign(scalar, e);
+        scalar.scalar_mul_assign(e);
     });
 }
 </code></pre>

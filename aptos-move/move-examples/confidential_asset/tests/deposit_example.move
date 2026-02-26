@@ -19,23 +19,24 @@ module confidential_asset_example::deposit_example {
         let (bob_dk, bob_ek) = twisted_elgamal::generate_twisted_elgamal_keypair();
         let (alice_dk, alice_ek) = twisted_elgamal::generate_twisted_elgamal_keypair();
 
-        let bob_ek = twisted_elgamal::pubkey_to_bytes(&bob_ek);
-        let alice_ek = twisted_elgamal::pubkey_to_bytes(&alice_ek);
+        let bob_proof = confidential_asset::prove_registration(bob_addr, token, &bob_dk);
+        confidential_asset::register(bob, token, bob_ek, bob_proof);
 
-        confidential_asset::register(bob, token, bob_ek);
-        confidential_asset::register(alice, token, alice_ek);
+        let alice_proof = confidential_asset::prove_registration(alice_addr, token, &alice_dk);
+        confidential_asset::register(alice, token, alice_ek, alice_proof);
 
-        print(&utf8(b"Bob's FA balance before the deposit is 500:"));
+        print(&utf8(b"Bob's FA balance before the deposit is 300:"));
         print(&primary_fungible_store::balance(bob_addr, token));
 
-        assert!(primary_fungible_store::balance(bob_addr, token) == 500);
+        assert!(primary_fungible_store::balance(bob_addr, token) == 300);
 
         let bob_amount = 100;
         let alice_amount = 200;
 
         // The balance is not hidden yet, because we explicitly pass the amount to the function.
+        // Each user deposits to their own confidential balance.
         confidential_asset::deposit(bob, token, bob_amount);
-        confidential_asset::deposit_to(bob, token, alice_addr, alice_amount);
+        confidential_asset::deposit(alice, token, alice_amount);
 
         print(&utf8(b"Bob's FA balance after the deposit is 200:"));
         print(&primary_fungible_store::balance(bob_addr, token));
@@ -76,9 +77,9 @@ module confidential_asset_example::deposit_example {
             &aptos_fx,
             &fa,
             &bob,
-            &bob,
-            500,
-            0
+            &alice,
+            300,
+            200
         );
 
         deposit(&bob, &alice, token);

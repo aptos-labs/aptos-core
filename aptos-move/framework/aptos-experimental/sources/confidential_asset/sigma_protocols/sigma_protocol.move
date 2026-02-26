@@ -1,6 +1,6 @@
 module aptos_experimental::sigma_protocol {
     use std::error;
-    use aptos_std::ristretto255::{point_identity, multi_scalar_mul, point_equals};
+    use aptos_std::ristretto255::{point_identity, multi_scalar_mul};
     use aptos_experimental::sigma_protocol_utils::{neg_scalars, points_clone};
     use aptos_experimental::sigma_protocol_proof::Proof;
     use aptos_experimental::sigma_protocol_statement::Statement;
@@ -203,7 +203,7 @@ module aptos_experimental::sigma_protocol {
         // TODO(Perf): Could combine exponents for shared bases more aggresively? Or does the MSM code do it implicitly?
 
         // Do the MSM and check it equals the (zero) identity
-        point_equals(&multi_scalar_mul(&bases, &scalars), &point_identity())
+        multi_scalar_mul(&bases, &scalars).point_equals(&point_identity())
     }
 
     //

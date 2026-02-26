@@ -10,6 +10,7 @@
 -  [Function `get_representations`](#0x7_sigma_protocol_representation_vec_get_representations)
 -  [Function `length`](#0x7_sigma_protocol_representation_vec_length)
 -  [Function `for_each_ref`](#0x7_sigma_protocol_representation_vec_for_each_ref)
+-  [Function `map_ref`](#0x7_sigma_protocol_representation_vec_map_ref)
 -  [Function `scale_all`](#0x7_sigma_protocol_representation_vec_scale_all)
 -  [Function `scale_each`](#0x7_sigma_protocol_representation_vec_scale_each)
 
@@ -146,6 +147,31 @@ Iterates through every representation in the vector.
 
 <pre><code><b>public</b> inline <b>fun</b> <a href="sigma_protocol_representation_vec.md#0x7_sigma_protocol_representation_vec_for_each_ref">for_each_ref</a>(self: &<a href="sigma_protocol_representation_vec.md#0x7_sigma_protocol_representation_vec_RepresentationVec">RepresentationVec</a>, lambda: |&Representation|) {
     self.<a href="sigma_protocol_representation_vec.md#0x7_sigma_protocol_representation_vec_get_representations">get_representations</a>().<a href="sigma_protocol_representation_vec.md#0x7_sigma_protocol_representation_vec_for_each_ref">for_each_ref</a>(|repr| lambda(repr))
+}
+</code></pre>
+
+
+
+</details>
+
+<a id="0x7_sigma_protocol_representation_vec_map_ref"></a>
+
+## Function `map_ref`
+
+Maps each representation in the vector to a value of type <code>T</code>.
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="sigma_protocol_representation_vec.md#0x7_sigma_protocol_representation_vec_map_ref">map_ref</a>&lt;T&gt;(self: &<a href="sigma_protocol_representation_vec.md#0x7_sigma_protocol_representation_vec_RepresentationVec">sigma_protocol_representation_vec::RepresentationVec</a>, lambda: |&<a href="sigma_protocol_representation.md#0x7_sigma_protocol_representation_Representation">sigma_protocol_representation::Representation</a>|T): <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;T&gt;
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> inline <b>fun</b> <a href="sigma_protocol_representation_vec.md#0x7_sigma_protocol_representation_vec_map_ref">map_ref</a>&lt;T&gt;(self: &<a href="sigma_protocol_representation_vec.md#0x7_sigma_protocol_representation_vec_RepresentationVec">RepresentationVec</a>, lambda: |&Representation| T): <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;T&gt; {
+    self.<a href="sigma_protocol_representation_vec.md#0x7_sigma_protocol_representation_vec_get_representations">get_representations</a>().<a href="sigma_protocol_representation_vec.md#0x7_sigma_protocol_representation_vec_map_ref">map_ref</a>(|repr| lambda(repr))
 }
 </code></pre>
 

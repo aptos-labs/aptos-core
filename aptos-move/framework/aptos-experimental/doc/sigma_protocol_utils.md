@@ -13,6 +13,7 @@
 -  [Function `deserialize_points`](#0x7_sigma_protocol_utils_deserialize_points)
 -  [Function `deserialize_scalars`](#0x7_sigma_protocol_utils_deserialize_scalars)
 -  [Function `decompress_points`](#0x7_sigma_protocol_utils_decompress_points)
+-  [Function `compress_points`](#0x7_sigma_protocol_utils_compress_points)
 -  [Function `add_vec_scalars`](#0x7_sigma_protocol_utils_add_vec_scalars)
 -  [Function `mul_scalars`](#0x7_sigma_protocol_utils_mul_scalars)
 -  [Function `neg_scalars`](#0x7_sigma_protocol_utils_neg_scalars)
@@ -61,7 +62,7 @@ Adds up two vectors of Ristretto255 points <code>a</code> and <code>b</code> ret
 
     <b>let</b> r = <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>[];
     a.enumerate_ref(|i, pt| {
-        r.push_back(point_add(pt, &b[i]));
+        r.push_back(pt.point_add(&b[i]));
     });
 
     r
@@ -89,12 +90,7 @@ Given a vector of Ristretto255 points <code>a</code> and a scalar <code>e</code>
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="sigma_protocol_utils.md#0x7_sigma_protocol_utils_mul_points">mul_points</a>(a: &<a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;RistrettoPoint&gt;, e: &Scalar): <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;RistrettoPoint&gt; {
-    <b>let</b> r = <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>[];
-    a.for_each_ref(|pt| {
-        r.push_back(point_mul(pt, e));
-    });
-
-    r
+    a.map_ref(|pt| pt.point_mul(e))
 }
 </code></pre>
 
@@ -124,7 +120,7 @@ Ensures two vectors of Ristretto255 points are equal.
 
     <b>let</b> i = 0;
     <b>while</b> (i &lt; m) {
-        <b>if</b> (!point_equals(&a[i], &b[i])) {
+        <b>if</b> (!a[i].point_equals(&b[i])) {
             <b>return</b> <b>false</b>
         };
 
@@ -156,14 +152,7 @@ Clones a vector of Ristretto255 points
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="sigma_protocol_utils.md#0x7_sigma_protocol_utils_points_clone">points_clone</a>(a: &<a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;RistrettoPoint&gt;): <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;RistrettoPoint&gt; {
-    <b>let</b> cloned = <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>[];
-
-    a.for_each_ref(|p| {
-        // TODO(Perf): Annoying limitation of our Ristretto255 <b>module</b>. (Should we "fix" it <b>as</b> per `<a href="../../aptos-framework/../aptos-stdlib/doc/crypto_algebra.md#0x1_crypto_algebra">crypto_algebra</a>`?)
-        cloned.push_back(point_clone(p));
-    });
-
-    cloned
+    a.map_ref(|p| p.point_clone())
 }
 </code></pre>
 
@@ -254,8 +243,33 @@ Decmpresses a vector of CompressedRistretto's
 
 <pre><code><b>public</b> <b>fun</b> <a href="sigma_protocol_utils.md#0x7_sigma_protocol_utils_decompress_points">decompress_points</a>(compressed: &<a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;CompressedRistretto&gt;): <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;RistrettoPoint&gt; {
     compressed.map_ref(|p| {
-        <a href="../../aptos-framework/../aptos-stdlib/doc/ristretto255.md#0x1_ristretto255_point_decompress">ristretto255::point_decompress</a>(p)
+        p.point_decompress()
     })
+}
+</code></pre>
+
+
+
+</details>
+
+<a id="0x7_sigma_protocol_utils_compress_points"></a>
+
+## Function `compress_points`
+
+Compresses a vector of Ristretto255 points.
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="sigma_protocol_utils.md#0x7_sigma_protocol_utils_compress_points">compress_points</a>(points: &<a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="../../aptos-framework/../aptos-stdlib/doc/ristretto255.md#0x1_ristretto255_RistrettoPoint">ristretto255::RistrettoPoint</a>&gt;): <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="../../aptos-framework/../aptos-stdlib/doc/ristretto255.md#0x1_ristretto255_CompressedRistretto">ristretto255::CompressedRistretto</a>&gt;
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="sigma_protocol_utils.md#0x7_sigma_protocol_utils_compress_points">compress_points</a>(points: &<a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;RistrettoPoint&gt;): <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;CompressedRistretto&gt; {
+    points.map_ref(|p| p.point_compress())
 }
 </code></pre>
 
@@ -284,7 +298,7 @@ Adds up two vectors of scalar points <code>a</code> and <code>b</code> returning
 
     <b>let</b> r = <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>[];
     a.enumerate_ref(|i, a_i| {
-        r.push_back(scalar_add(a_i, &b[i]));
+        r.push_back(a_i.scalar_add(&b[i]));
     });
 
     r
@@ -312,12 +326,7 @@ Given a vector of scalars <code>a</code> and a scalar <code>e</code>, returns a 
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="sigma_protocol_utils.md#0x7_sigma_protocol_utils_mul_scalars">mul_scalars</a>(a: &<a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;Scalar&gt;, e: &Scalar): <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;Scalar&gt; {
-    <b>let</b> r = <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>[];
-    a.for_each_ref(|s| {
-        r.push_back(scalar_mul(s, e));
-    });
-
-    r
+    a.map_ref(|s| s.scalar_mul(e))
 }
 </code></pre>
 
@@ -329,7 +338,7 @@ Given a vector of scalars <code>a</code> and a scalar <code>e</code>, returns a 
 
 ## Function `neg_scalars`
 
-Given a vector of scalars <code>a</code> and a scalar <code>e</code>, returns a new vector <code>c</code> where <code>c[i] = e * a[i]</code>.
+Negates a vector of scalars <code>a</code>, returns a new vector <code>c</code> where <code>c[i] = -a[i]</code>.
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="sigma_protocol_utils.md#0x7_sigma_protocol_utils_neg_scalars">neg_scalars</a>(a: &<a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="../../aptos-framework/../aptos-stdlib/doc/ristretto255.md#0x1_ristretto255_Scalar">ristretto255::Scalar</a>&gt;): <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="../../aptos-framework/../aptos-stdlib/doc/ristretto255.md#0x1_ristretto255_Scalar">ristretto255::Scalar</a>&gt;
@@ -342,12 +351,7 @@ Given a vector of scalars <code>a</code> and a scalar <code>e</code>, returns a 
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="sigma_protocol_utils.md#0x7_sigma_protocol_utils_neg_scalars">neg_scalars</a>(a: &<a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;Scalar&gt;): <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;Scalar&gt; {
-    <b>let</b> r = <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>[];
-    a.for_each_ref(|s| {
-        r.push_back(scalar_neg(s));
-    });
-
-    r
+    a.map_ref(|s| s.scalar_neg())
 }
 </code></pre>
 

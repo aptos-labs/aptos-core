@@ -1,14 +1,9 @@
 module aptos_experimental::sigma_protocol_witness {
     use aptos_std::ristretto255::Scalar;
     #[test_only]
-    use std::error;
-    #[test_only]
     use std::vector::range;
     #[test_only]
     use aptos_std::ristretto255::random_scalar;
-
-    /// One of our internal invariants was broken. There is likely a logical error in the code.
-    const E_INTERNAL_INVARIANT_FAILED: u64 = 0;
 
     /// A *secret witness* consists of a vector $w$ of $k$ scalars
     struct Witness has drop {
@@ -41,16 +36,6 @@ module aptos_experimental::sigma_protocol_witness {
     #[test_only]
     /// Returns a size-$k$ random witness. Useful when creating a ZKP during testing.
     public fun random(k: u64): Witness {
-        let w = vector[];
-
-        range(0, k).for_each(|_|
-            w.push_back(random_scalar())
-        );
-
-        assert!(w.length() == k, error::internal(E_INTERNAL_INVARIANT_FAILED));
-
-        new_secret_witness(
-            w
-        )
+        new_secret_witness(range(0, k).map(|_| random_scalar()))
     }
 }

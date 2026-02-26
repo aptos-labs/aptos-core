@@ -6,7 +6,6 @@
 
 
 -  [Struct `Witness`](#0x7_sigma_protocol_witness_Witness)
--  [Constants](#@Constants_0)
 -  [Function `new_secret_witness`](#0x7_sigma_protocol_witness_new_secret_witness)
 -  [Function `length`](#0x7_sigma_protocol_witness_length)
 -  [Function `get`](#0x7_sigma_protocol_witness_get)
@@ -45,21 +44,6 @@ A *secret witness* consists of a vector $w$ of $k$ scalars
 
 
 </details>
-
-<a id="@Constants_0"></a>
-
-## Constants
-
-
-<a id="0x7_sigma_protocol_witness_E_INTERNAL_INVARIANT_FAILED"></a>
-
-One of our internal invariants was broken. There is likely a logical error in the code.
-
-
-<pre><code><b>const</b> <a href="sigma_protocol_witness.md#0x7_sigma_protocol_witness_E_INTERNAL_INVARIANT_FAILED">E_INTERNAL_INVARIANT_FAILED</a>: u64 = 0;
-</code></pre>
-
-
 
 <a id="0x7_sigma_protocol_witness_new_secret_witness"></a>
 
