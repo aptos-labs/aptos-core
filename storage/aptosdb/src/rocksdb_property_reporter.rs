@@ -9,7 +9,9 @@ use crate::{
         transaction_info_db_column_families, write_set_db_column_families,
     },
     ledger_db::LedgerDb,
-    metrics::{OTHER_TIMERS_SECONDS, ROCKSDB_PROPERTIES, ROCKSDB_SHARD_PROPERTIES},
+    metrics::{
+        OTHER_TIMERS_SECONDS, ROCKSDB_PROPERTIES, ROCKSDB_SHARD_PROPERTIES, SHARD_NAME_BY_ID,
+    },
     state_kv_db::StateKvDb,
     state_merkle_db::StateMerkleDb,
 };
@@ -65,10 +67,6 @@ fn set_property(cf_name: &str, db: &DB) -> Result<()> {
     }
     Ok(())
 }
-
-const SHARD_NAME_BY_ID: [&str; NUM_STATE_SHARDS] = [
-    "0", "1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12", "13", "14", "15",
-];
 
 fn set_shard_property(cf_name: ColumnFamilyName, db: &DB, shard: usize) -> Result<()> {
     if !skip_reporting_cf(cf_name) {
