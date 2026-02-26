@@ -198,6 +198,7 @@ impl<T: StorageReaderInterface> Handler<T> {
             Error::TooManyInvalidRequests(error) => {
                 StorageServiceError::TooManyInvalidRequests(error)
             },
+            Error::TooManyRequests(error) => StorageServiceError::TooManyRequests(error),
             error => StorageServiceError::InternalError(error.to_string()),
         })
     }
