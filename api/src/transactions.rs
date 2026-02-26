@@ -2238,3 +2238,60 @@ pub(crate) enum GetByVersionResponse {
     VersionTooOld,
     Found(TransactionData),
 }
+
+pub async fn create_inner(
+    context: &Arc<Context>,
+    accept_type: &AcceptType,
+    ledger_info: &LedgerInfo,
+    txn: SignedTransaction,
+) -> Result<AptosResponse<PendingTransaction>, AptosErrorResponse> {
+    let txn_api = TransactionsApi {
+        context: context.clone(),
+    };
+    match txn_api.create_internal(txn.clone()).await {
+        Ok(()) => match accept_type {
+            AcceptType::Json => {
+                let state_view = context
+                    .latest_state_view()
+                    .context("Failed to read latest state checkpoint from DB")
+                    .map_err(|e| {
+                        AptosErrorResponse::internal(
+                            e,
+                            AptosErrorCode::InternalError,
+                            Some(ledger_info),
+                        )
+                    })?;
+                let pending_txn = state_view
+                    .as_converter(context.db.clone(), context.indexer_reader.clone())
+                    .try_into_pending_transaction_poem(txn)
+                    .context("Failed to build PendingTransaction from mempool response")
+                    .map_err(|err| {
+                        AptosErrorResponse::internal(
+                            err,
+                            AptosErrorCode::InternalError,
+                            Some(ledger_info),
+                        )
+                    })?;
+                AptosResponse::try_from_json_with_status((
+                    pending_txn,
+                    ledger_info,
+                    axum::http::StatusCode::ACCEPTED,
+                ))
+            },
+            AcceptType::Bcs => AptosResponse::try_from_bcs_with_status((
+                (),
+                ledger_info,
+                axum::http::StatusCode::ACCEPTED,
+            )),
+        },
+        Err(error) => Err(AptosErrorResponse::new(
+            match error.error_code {
+                AptosErrorCode::InternalError => axum::http::StatusCode::INTERNAL_SERVER_ERROR,
+                AptosErrorCode::MempoolIsFull => axum::http::StatusCode::INSUFFICIENT_STORAGE,
+                _ => axum::http::StatusCode::BAD_REQUEST,
+            },
+            error,
+            Some(ledger_info),
+        )),
+    }
+}

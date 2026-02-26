@@ -355,7 +355,7 @@ impl TryFrom<AnnotatedMoveClosure> for MoveStructValue {
 }
 
 /// An enum of the possible Move value types
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Deserialize)]
 pub enum MoveValue {
     /// A u8 Move type
     U8(u8),
@@ -379,6 +379,31 @@ pub enum MoveValue {
     Struct(MoveStructValue),
     /// A string Move type
     String(String),
+}
+
+impl Serialize for MoveValue {
+    fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        match &self {
+            MoveValue::U8(v) => v.serialize(serializer),
+            MoveValue::U16(v) => v.serialize(serializer),
+            MoveValue::U32(v) => v.serialize(serializer),
+            MoveValue::U64(v) => v.serialize(serializer),
+            MoveValue::U128(v) => v.serialize(serializer),
+            MoveValue::U256(v) => v.serialize(serializer),
+            MoveValue::I8(v) => v.serialize(serializer),
+            MoveValue::I16(v) => v.serialize(serializer),
+            MoveValue::I32(v) => v.serialize(serializer),
+            MoveValue::I64(v) => v.serialize(serializer),
+            MoveValue::I128(v) => v.serialize(serializer),
+            MoveValue::I256(v) => v.serialize(serializer),
+            MoveValue::Bool(v) => v.serialize(serializer),
+            MoveValue::Address(v) => v.serialize(serializer),
+            MoveValue::Vector(v) => v.serialize(serializer),
+            MoveValue::Bytes(v) => v.serialize(serializer),
+            MoveValue::Struct(v) => v.serialize(serializer),
+            MoveValue::String(v) => v.serialize(serializer),
+        }
+    }
 }
 
 impl MoveValue {

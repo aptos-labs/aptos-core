@@ -949,10 +949,9 @@ pub async fn submit_transaction_handler(
         AptosErrorResponse::bad_request(err, aptos_api_types::AptosErrorCode::InvalidInput, None)
     })?;
     let signed_txn = txn_api.get_signed_transaction(&ledger_info, data)?;
-    let resp = txn_api
-        .create(&accept_type, &ledger_info, signed_txn)
-        .await?;
-    Ok(poem_to_axum_response(poem::IntoResponse::into_response(resp)).await)
+    let resp =
+        crate::transactions::create_inner(&context, &accept_type, &ledger_info, signed_txn).await?;
+    Ok(resp.into_response())
 }
 
 pub async fn submit_transactions_batch_handler(
