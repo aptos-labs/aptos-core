@@ -25,7 +25,6 @@ use move_core_types::{
     identifier::Identifier,
     language_storage::{ModuleId, TypeTag},
 };
-use poem_openapi::types::ParseFromJSON;
 use rand::{distributions::Alphanumeric, thread_rng, Rng};
 use rstest::rstest;
 use serde_json::{json, Value};
@@ -36,9 +35,7 @@ use tokio::time::sleep;
 async fn test_deserialize_genesis_transaction() {
     let context = new_test_context(current_function_name!());
     let resp = context.get("/transactions/by_version/0").await;
-    // TODO: serde_json::from_value doesn't work here, either make it work
-    // or remove the ability to do that.
-    aptos_api_types::Transaction::parse_from_json(Some(resp)).unwrap();
+    serde_json::from_value::<aptos_api_types::Transaction>(resp).unwrap();
 }
 
 // Unstable due to framework changes

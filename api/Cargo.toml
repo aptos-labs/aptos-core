@@ -44,8 +44,6 @@ move-core-types = { workspace = true }
 num_cpus = { workspace = true }
 once_cell = { workspace = true }
 paste = { workspace = true }
-poem = { workspace = true }
-poem-openapi = { workspace = true }
 regex = { workspace = true }
 rstest = { workspace = true }
 rustls-pemfile = { workspace = true }

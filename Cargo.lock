@@ -483,8 +483,6 @@ dependencies = [
  "passkey-types",
  "paste",
  "percent-encoding",
- "poem",
- "poem-openapi",
  "proptest",
  "rand 0.7.3",
  "regex",

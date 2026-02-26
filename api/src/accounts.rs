@@ -440,9 +440,9 @@ impl Account {
         ),
         AptosErrorResponse,
     > {
-        let (ledger_info, requested_ledger_version, state_view) =
-            self.context
-                .state_view::<AptosErrorResponse>(Some(self.ledger_version))?;
+        let (ledger_info, requested_ledger_version, state_view) = self
+            .context
+            .state_view::<AptosErrorResponse>(Some(self.ledger_version))?;
 
         let bytes = state_view
             .as_converter(self.context.db.clone(), self.context.indexer_reader.clone())
@@ -453,11 +453,7 @@ impl Account {
                 self.address
             ))
             .map_err(|err| {
-                AptosErrorResponse::internal(
-                    err,
-                    AptosErrorCode::InternalError,
-                    Some(&ledger_info),
-                )
+                AptosErrorResponse::internal(err, AptosErrorCode::InternalError, Some(&ledger_info))
             })?
             .ok_or_else(|| {
                 resource_not_found::<AptosErrorResponse>(
@@ -473,12 +469,7 @@ impl Account {
             .move_struct_fields(resource_type, &bytes)
             .context("Failed to convert move structs from storage")
             .map_err(|err| {
-                AptosErrorResponse::internal(
-                    err,
-                    AptosErrorCode::InternalError,
-                    Some(&ledger_info),
-                )
+                AptosErrorResponse::internal(err, AptosErrorCode::InternalError, Some(&ledger_info))
             })
     }
 }
-

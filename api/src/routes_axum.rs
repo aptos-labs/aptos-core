@@ -680,8 +680,12 @@ pub async fn get_transaction_by_hash_handler(
     crate::failpoint::fail_point_poem::<AptosErrorResponse>("endpoint_transaction_by_hash")?;
     context
         .check_api_output_enabled::<AptosErrorResponse>("Get transactions by hash", &accept_type)?;
-    let txn_api = crate::transactions::TransactionsApi { context: context.clone() };
-    let resp = txn_api.get_transaction_by_hash_inner(&accept_type, txn_hash).await?;
+    let txn_api = crate::transactions::TransactionsApi {
+        context: context.clone(),
+    };
+    let resp = txn_api
+        .get_transaction_by_hash_inner(&accept_type, txn_hash)
+        .await?;
     Ok(resp.into_response())
 }
 
@@ -705,15 +709,21 @@ pub async fn wait_transaction_by_hash_handler(
         crate::metrics::WAIT_TRANSACTION_POLL_TIME
             .with_label_values(&["short"])
             .observe(0.0);
-        let txn_api = crate::transactions::TransactionsApi { context: context.clone() };
-        let resp = txn_api.get_transaction_by_hash_inner(&accept_type, txn_hash).await?;
+        let txn_api = crate::transactions::TransactionsApi {
+            context: context.clone(),
+        };
+        let resp = txn_api
+            .get_transaction_by_hash_inner(&accept_type, txn_hash)
+            .await?;
         return Ok(resp.into_response());
     }
 
     let start_time = std::time::Instant::now();
     crate::metrics::WAIT_TRANSACTION_GAUGE.inc();
 
-    let txn_api = crate::transactions::TransactionsApi { context: context.clone() };
+    let txn_api = crate::transactions::TransactionsApi {
+        context: context.clone(),
+    };
     let result = txn_api
         .wait_transaction_by_hash_inner(
             &accept_type,
@@ -886,7 +896,9 @@ pub async fn submit_transaction_handler(
         AptosErrorResponse::bad_request(err, aptos_api_types::AptosErrorCode::InvalidInput, None)
     })?;
     let signed_txn = txn_api.get_signed_transaction(&ledger_info, data)?;
-    let resp = txn_api.create(&accept_type, &ledger_info, signed_txn).await?;
+    let resp = txn_api
+        .create(&accept_type, &ledger_info, signed_txn)
+        .await?;
     Ok(resp.into_response())
 }
 
@@ -940,7 +952,9 @@ pub async fn submit_transactions_batch_handler(
         AptosErrorResponse::bad_request(err, aptos_api_types::AptosErrorCode::InvalidInput, None)
     })?;
     let signed_txns = txn_api.get_signed_transactions_batch(&ledger_info, data)?;
-    let resp = txn_api.create_batch(&accept_type, &ledger_info, signed_txns).await?;
+    let resp = txn_api
+        .create_batch(&accept_type, &ledger_info, signed_txns)
+        .await?;
     Ok(resp.into_response())
 }
 

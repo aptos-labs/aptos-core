@@ -108,11 +108,14 @@ impl TransactionsApi {
         accept_type: &AcceptType,
         page: Page,
     ) -> Result<AptosResponse<Vec<Transaction>>, AptosErrorResponse> {
-        let latest_ledger_info = self.context.get_latest_ledger_info::<AptosErrorResponse>()?;
+        let latest_ledger_info = self
+            .context
+            .get_latest_ledger_info::<AptosErrorResponse>()?;
         let ledger_version = latest_ledger_info.version();
 
         let limit = page.limit::<AptosErrorResponse>(&latest_ledger_info)?;
-        let start_version = page.compute_start::<AptosErrorResponse>(limit, ledger_version, &latest_ledger_info)?;
+        let start_version =
+            page.compute_start::<AptosErrorResponse>(limit, ledger_version, &latest_ledger_info)?;
         let data = self
             .context
             .get_transactions(start_version, limit, ledger_version)
@@ -127,21 +130,21 @@ impl TransactionsApi {
 
         match accept_type {
             AcceptType::Json => {
-                let timestamp = self
-                    .context
-                    .get_block_timestamp::<AptosErrorResponse>(&latest_ledger_info, start_version)?;
+                let timestamp = self.context.get_block_timestamp::<AptosErrorResponse>(
+                    &latest_ledger_info,
+                    start_version,
+                )?;
                 AptosResponse::try_from_json(
-                    self.context.render_transactions_sequential::<AptosErrorResponse>(
-                        &latest_ledger_info,
-                        data,
-                        timestamp,
-                    )?,
+                    self.context
+                        .render_transactions_sequential::<AptosErrorResponse>(
+                            &latest_ledger_info,
+                            data,
+                            timestamp,
+                        )?,
                     &latest_ledger_info,
                 )
             },
-            AcceptType::Bcs => {
-                AptosResponse::try_from_bcs(data, &latest_ledger_info)
-            },
+            AcceptType::Bcs => AptosResponse::try_from_bcs(data, &latest_ledger_info),
         }
     }
 
@@ -157,9 +160,10 @@ impl TransactionsApi {
             let context = self.context.clone();
             let accept_type = accept_type.clone();
 
-            let (internal_ledger_info_opt, storage_ledger_info) =
-                api_spawn_blocking(move || context.get_latest_internal_and_storage_ledger_info::<AptosErrorResponse>())
-                    .await?;
+            let (internal_ledger_info_opt, storage_ledger_info) = api_spawn_blocking(move || {
+                context.get_latest_internal_and_storage_ledger_info::<AptosErrorResponse>()
+            })
+            .await?;
             let storage_version = storage_ledger_info.ledger_version.into();
             let internal_ledger_version = internal_ledger_info_opt
                 .as_ref()
@@ -202,9 +206,10 @@ impl TransactionsApi {
         let context = self.context.clone();
         let accept_type = accept_type.clone();
 
-        let (internal_ledger_info_opt, storage_ledger_info) =
-            api_spawn_blocking(move || context.get_latest_internal_and_storage_ledger_info::<AptosErrorResponse>())
-                .await?;
+        let (internal_ledger_info_opt, storage_ledger_info) = api_spawn_blocking(move || {
+            context.get_latest_internal_and_storage_ledger_info::<AptosErrorResponse>()
+        })
+        .await?;
         let storage_version = storage_ledger_info.ledger_version.into();
         let internal_indexer_version = internal_ledger_info_opt
             .as_ref()
@@ -237,16 +242,14 @@ impl TransactionsApi {
         accept_type: &AcceptType,
         version: U64,
     ) -> Result<AptosResponse<Transaction>, AptosErrorResponse> {
-        let ledger_info = self.context.get_latest_ledger_info::<AptosErrorResponse>()?;
+        let ledger_info = self
+            .context
+            .get_latest_ledger_info::<AptosErrorResponse>()?;
         let txn_data = self
             .get_by_version(version.0, &ledger_info)
             .context(format!("Failed to get transaction by version {}", version))
             .map_err(|err| {
-                AptosErrorResponse::internal(
-                    err,
-                    AptosErrorCode::InternalError,
-                    Some(&ledger_info),
-                )
+                AptosErrorResponse::internal(err, AptosErrorCode::InternalError, Some(&ledger_info))
             })?;
 
         match txn_data {
@@ -269,11 +272,14 @@ impl TransactionsApi {
     ) -> Result<AptosResponse<Transaction>, AptosErrorResponse> {
         match accept_type {
             AcceptType::Json => {
-                let state_view = self.context.latest_state_view_poem::<AptosErrorResponse>(ledger_info)?;
+                let state_view = self
+                    .context
+                    .latest_state_view_poem::<AptosErrorResponse>(ledger_info)?;
                 let transaction = match transaction_data {
                     TransactionData::OnChain(txn) => {
-                        let timestamp =
-                            self.context.get_block_timestamp::<AptosErrorResponse>(ledger_info, txn.version)?;
+                        let timestamp = self
+                            .context
+                            .get_block_timestamp::<AptosErrorResponse>(ledger_info, txn.version)?;
                         state_view
                             .as_converter(
                                 self.context.db.clone(),
@@ -304,10 +310,7 @@ impl TransactionsApi {
 
                 AptosResponse::try_from_json(transaction, ledger_info)
             },
-            AcceptType::Bcs => AptosResponse::try_from_bcs(
-                transaction_data,
-                ledger_info,
-            ),
+            AcceptType::Bcs => AptosResponse::try_from_bcs(transaction_data, ledger_info),
         }
     }
 
@@ -377,22 +380,25 @@ impl TransactionsApi {
 
         let latest_ledger_info = account.latest_ledger_info;
         // TODO: Return more specific errors from within this function.
-        let data = self.context.get_account_ordered_transactions::<AptosErrorResponse>(
-            address.into(),
-            page.start_option(),
-            page.limit::<AptosErrorResponse>(&latest_ledger_info)?,
-            account.ledger_version,
-            &latest_ledger_info,
-        )?;
+        let data = self
+            .context
+            .get_account_ordered_transactions::<AptosErrorResponse>(
+                address.into(),
+                page.start_option(),
+                page.limit::<AptosErrorResponse>(&latest_ledger_info)?,
+                account.ledger_version,
+                &latest_ledger_info,
+            )?;
         match accept_type {
             AcceptType::Json => AptosResponse::try_from_json(
                 self.context
-                    .render_transactions_non_sequential::<AptosErrorResponse>(&latest_ledger_info, data)?,
+                    .render_transactions_non_sequential::<AptosErrorResponse>(
+                        &latest_ledger_info,
+                        data,
+                    )?,
                 &latest_ledger_info,
             ),
-            AcceptType::Bcs => {
-                AptosResponse::try_from_bcs(data, &latest_ledger_info)
-            },
+            AcceptType::Bcs => AptosResponse::try_from_bcs(data, &latest_ledger_info),
         }
     }
 
@@ -410,24 +416,26 @@ impl TransactionsApi {
             .get_latest_ledger_info_and_verify_lookup_version::<AptosErrorResponse>(None)?;
 
         // TODO: Return more specific errors from within this function.
-        match self.context.get_account_transaction_summaries::<AptosErrorResponse>(
-            address.into(),
-            start_version.map(|v| v.into()),
-            end_version.map(|v| v.into()),
-            limit,
-            ledger_version,
-            &latest_ledger_info,
-        ) {
+        match self
+            .context
+            .get_account_transaction_summaries::<AptosErrorResponse>(
+                address.into(),
+                start_version.map(|v| v.into()),
+                end_version.map(|v| v.into()),
+                limit,
+                ledger_version,
+                &latest_ledger_info,
+            ) {
             Ok(data) => match accept_type {
                 AcceptType::Json => AptosResponse::try_from_json(
                     self.context
-                        .render_transaction_summaries::<AptosErrorResponse>(&latest_ledger_info, data)?,
+                        .render_transaction_summaries::<AptosErrorResponse>(
+                            &latest_ledger_info,
+                            data,
+                        )?,
                     &latest_ledger_info,
                 ),
-                AcceptType::Bcs => AptosResponse::try_from_bcs(
-                    data,
-                    &latest_ledger_info,
-                ),
+                AcceptType::Bcs => AptosResponse::try_from_bcs(data, &latest_ledger_info),
             },
             Err(e) => {
                 error!("list_all_txn_summaries_by_account error: {:?}", e);
@@ -881,7 +889,9 @@ impl TransactionsApi {
         }
 
         // Simulate transaction
-        let state_view = self.context.latest_state_view_poem::<AptosErrorResponse>(&ledger_info)?;
+        let state_view = self
+            .context
+            .latest_state_view_poem::<AptosErrorResponse>(&ledger_info)?;
         let (vm_status, output) =
             AptosSimulationVM::create_vm_and_simulate_signed_transaction(&txn, &state_view);
         let version = ledger_info.version();
@@ -978,7 +988,10 @@ impl TransactionsApi {
             AcceptType::Json => {
                 let transactions = self
                     .context
-                    .render_transactions_non_sequential::<AptosErrorResponse>(&ledger_info, vec![simulated_txn])?;
+                    .render_transactions_non_sequential::<AptosErrorResponse>(
+                        &ledger_info,
+                        vec![simulated_txn],
+                    )?;
 
                 // Users can only make requests to simulate UserTransactions, so unpack
                 // the Vec<Transaction> into Vec<UserTransaction>.
@@ -1010,14 +1023,9 @@ impl TransactionsApi {
                         },
                     }
                 }
-                AptosResponse::try_from_json(
-                    user_transactions,
-                    &ledger_info,
-                )
+                AptosResponse::try_from_json(user_transactions, &ledger_info)
             },
-            AcceptType::Bcs => {
-                AptosResponse::try_from_bcs(simulated_txn, &ledger_info)
-            },
+            AcceptType::Bcs => AptosResponse::try_from_bcs(simulated_txn, &ledger_info),
         };
 
         result.map(|r| r.with_gas_used(Some(output.gas_used())))
@@ -1038,30 +1046,42 @@ impl TransactionsApi {
             ));
         }
 
-        let ledger_info = self.context.get_latest_ledger_info::<AptosErrorResponse>()?;
-        let state_view = self.context.latest_state_view_poem::<AptosErrorResponse>(&ledger_info)?;
+        let ledger_info = self
+            .context
+            .get_latest_ledger_info::<AptosErrorResponse>()?;
+        let state_view = self
+            .context
+            .latest_state_view_poem::<AptosErrorResponse>(&ledger_info)?;
         let raw_txn: RawTransaction = state_view
             .as_converter(self.context.db.clone(), self.context.indexer_reader.clone())
             .try_into_raw_transaction_poem(request.transaction, self.context.chain_id())
             .context("The given transaction is invalid")
             .map_err(|err| {
-                AptosErrorResponse::bad_request(err, AptosErrorCode::InvalidInput, Some(&ledger_info))
+                AptosErrorResponse::bad_request(
+                    err,
+                    AptosErrorCode::InvalidInput,
+                    Some(&ledger_info),
+                )
             })?;
 
         let raw_message = match request.secondary_signers {
-            Some(secondary_signer_addresses) => signing_message(
-                &RawTransactionWithData::new_multi_agent(
+            Some(secondary_signer_addresses) => {
+                signing_message(&RawTransactionWithData::new_multi_agent(
                     raw_txn,
                     secondary_signer_addresses
                         .into_iter()
                         .map(|v| v.into())
                         .collect(),
-                ),
-            )
-            .context("Invalid transaction to generate signing message")
-            .map_err(|err| {
-                AptosErrorResponse::bad_request(err, AptosErrorCode::InvalidInput, Some(&ledger_info))
-            })?,
+                ))
+                .context("Invalid transaction to generate signing message")
+                .map_err(|err| {
+                    AptosErrorResponse::bad_request(
+                        err,
+                        AptosErrorCode::InvalidInput,
+                        Some(&ledger_info),
+                    )
+                })?
+            },
             None => raw_txn
                 .signing_message()
                 .context("Invalid transaction to generate signing message")
@@ -1074,10 +1094,7 @@ impl TransactionsApi {
                 })?,
         };
 
-        AptosResponse::try_from_json(
-            HexEncodedBytes::from(raw_message),
-            &ledger_info,
-        )
+        AptosResponse::try_from_json(HexEncodedBytes::from(raw_message), &ledger_info)
     }
 
     pub(crate) fn list_auxiliary_infos(
@@ -1085,11 +1102,14 @@ impl TransactionsApi {
         accept_type: &AcceptType,
         page: Page,
     ) -> Result<AptosResponse<Vec<PersistedAuxiliaryInfo>>, AptosErrorResponse> {
-        let latest_ledger_info = self.context.get_latest_ledger_info::<AptosErrorResponse>()?;
+        let latest_ledger_info = self
+            .context
+            .get_latest_ledger_info::<AptosErrorResponse>()?;
         let ledger_version = latest_ledger_info.ledger_version;
 
         let limit = page.limit::<AptosErrorResponse>(&latest_ledger_info)?;
-        let start_version = page.compute_start::<AptosErrorResponse>(limit, ledger_version.0, &latest_ledger_info)?;
+        let start_version =
+            page.compute_start::<AptosErrorResponse>(limit, ledger_version.0, &latest_ledger_info)?;
 
         // Use iterator for more efficient batch retrieval
         let iterator = self
@@ -1126,17 +1146,11 @@ impl TransactionsApi {
                     .into_iter()
                     .map(PersistedAuxiliaryInfo::from)
                     .collect();
-                AptosResponse::try_from_json(
-                    api_auxiliary_infos,
-                    &latest_ledger_info,
-                )
+                AptosResponse::try_from_json(api_auxiliary_infos, &latest_ledger_info)
             },
             AcceptType::Bcs => {
                 // Use raw core types for BCS (backward compatible, versioned enum)
-                AptosResponse::try_from_bcs(
-                    raw_auxiliary_infos,
-                    &latest_ledger_info,
-                )
+                AptosResponse::try_from_bcs(raw_auxiliary_infos, &latest_ledger_info)
             },
         }
     }
@@ -1189,4 +1203,3 @@ pub(crate) enum GetByVersionResponse {
     VersionTooOld,
     Found(TransactionData),
 }
-
