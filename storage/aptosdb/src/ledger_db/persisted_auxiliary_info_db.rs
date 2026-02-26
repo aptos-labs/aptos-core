@@ -10,7 +10,7 @@ use crate::{
     utils::iterators::ExpectContinuousVersions,
 };
 use aptos_metrics_core::TimerHelper;
-use aptos_schemadb::{batch::SchemaBatch, DB};
+use aptos_schemadb::{batch::SchemaBatch, ReadOptions, DB};
 use aptos_storage_interface::Result;
 use aptos_types::transaction::{PersistedAuxiliaryInfo, Version};
 use std::{path::Path, sync::Arc};
@@ -60,7 +60,23 @@ impl PersistedAuxiliaryInfoDb {
         start_version: Version,
         num_persisted_auxiliary_info: usize,
     ) -> Result<Box<dyn Iterator<Item = Result<PersistedAuxiliaryInfo>> + '_>> {
-        let mut iter = self.db.iter::<PersistedAuxiliaryInfoSchema>()?;
+        self.get_persisted_auxiliary_info_iter_with_opts(
+            start_version,
+            num_persisted_auxiliary_info,
+            ReadOptions::default(),
+        )
+    }
+
+    /// Same as `get_persisted_auxiliary_info_iter`, but with custom `ReadOptions`.
+    pub(crate) fn get_persisted_auxiliary_info_iter_with_opts(
+        &self,
+        start_version: Version,
+        num_persisted_auxiliary_info: usize,
+        opts: ReadOptions,
+    ) -> Result<Box<dyn Iterator<Item = Result<PersistedAuxiliaryInfo>> + '_>> {
+        let mut iter = self
+            .db
+            .iter_with_opts::<PersistedAuxiliaryInfoSchema>(opts)?;
         iter.seek(&start_version)?;
         let mut iter = iter.peekable();
         let version = if let Some(item) = iter.peek() {

@@ -102,7 +102,21 @@ impl EventDb {
         start_version: Version,
         num_versions: usize,
     ) -> Result<EventsByVersionIter<'_>> {
-        let mut iter = self.db.iter::<EventSchema>()?;
+        self.get_events_by_version_iter_with_opts(
+            start_version,
+            num_versions,
+            ReadOptions::default(),
+        )
+    }
+
+    /// Same as `get_events_by_version_iter`, but with custom `ReadOptions`.
+    pub(crate) fn get_events_by_version_iter_with_opts(
+        &self,
+        start_version: Version,
+        num_versions: usize,
+        opts: ReadOptions,
+    ) -> Result<EventsByVersionIter<'_>> {
+        let mut iter = self.db.iter_with_opts::<EventSchema>(opts)?;
         iter.seek(&start_version)?;
 
         Ok(EventsByVersionIter::new(

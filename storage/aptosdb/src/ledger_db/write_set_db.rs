@@ -12,7 +12,7 @@ use crate::{
 use aptos_metrics_core::TimerHelper;
 use aptos_schemadb::{
     batch::{SchemaBatch, WriteBatch},
-    DB,
+    ReadOptions, DB,
 };
 use aptos_storage_interface::{db_ensure as ensure, AptosDbError, Result};
 use aptos_types::{
@@ -66,7 +66,17 @@ impl WriteSetDb {
         start_version: Version,
         num_transactions: usize,
     ) -> Result<impl Iterator<Item = Result<WriteSet>> + '_> {
-        let mut iter = self.db.iter::<WriteSetSchema>()?;
+        self.get_write_set_iter_with_opts(start_version, num_transactions, ReadOptions::default())
+    }
+
+    /// Same as `get_write_set_iter`, but with custom `ReadOptions`.
+    pub(crate) fn get_write_set_iter_with_opts(
+        &self,
+        start_version: Version,
+        num_transactions: usize,
+        opts: ReadOptions,
+    ) -> Result<impl Iterator<Item = Result<WriteSet>> + '_> {
+        let mut iter = self.db.iter_with_opts::<WriteSetSchema>(opts)?;
         iter.seek(&start_version)?;
         iter.expect_continuous_versions(start_version, num_transactions)
     }
