@@ -2295,3 +2295,381 @@ pub async fn create_inner(
         )),
     }
 }
+
+/// Framework-agnostic inner for get transaction by hash. Returns Axum-native types.
+pub async fn get_transaction_by_hash_inner(
+    context: &Arc<Context>,
+    accept_type: &AcceptType,
+    hash: HashValue,
+) -> Result<AptosResponse<Transaction>, AptosErrorResponse> {
+    let txn_api = TransactionsApi {
+        context: context.clone(),
+    };
+    let (internal_ledger_info_opt, storage_ledger_info) = api_spawn_blocking({
+        let context_clone = context.clone();
+        move || context_clone.get_latest_internal_and_storage_ledger_info::<AptosErrorResponse>()
+    })
+    .await?;
+    let storage_version = storage_ledger_info.ledger_version.into();
+    let internal_indexer_version = internal_ledger_info_opt
+        .as_ref()
+        .map(|info| info.ledger_version.into());
+    let latest_ledger_info = internal_ledger_info_opt.unwrap_or(storage_ledger_info);
+
+    let txn_data = txn_api
+        .get_by_hash(hash.into(), storage_version, internal_indexer_version)
+        .await
+        .context(format!("Failed to get transaction by hash {}", hash))
+        .map_err(|err| {
+            AptosErrorResponse::internal_with_code(
+                err,
+                AptosErrorCode::InternalError,
+                &latest_ledger_info,
+            )
+        })?
+        .context(format!("Failed to find transaction with hash: {}", hash))
+        .map_err(|_| crate::response_axum::transaction_not_found_by_hash(hash, &latest_ledger_info))?;
+
+    let context_for_convert = context.clone();
+    let accept_type_for_convert = accept_type.clone();
+    api_spawn_blocking(move || {
+        get_transaction_inner_axum(
+            &context_for_convert,
+            &accept_type_for_convert,
+            txn_data,
+            &latest_ledger_info,
+        )
+    })
+    .await
+}
+
+fn get_transaction_inner_axum(
+    context: &Arc<Context>,
+    accept_type: &AcceptType,
+    transaction_data: TransactionData,
+    ledger_info: &LedgerInfo,
+) -> Result<AptosResponse<Transaction>, AptosErrorResponse> {
+    match accept_type {
+        AcceptType::Json => {
+            let state_view =
+                context.latest_state_view_poem::<AptosErrorResponse>(ledger_info)?;
+            let transaction = match transaction_data {
+                TransactionData::OnChain(txn) => {
+                    let timestamp =
+                        context.get_block_timestamp::<AptosErrorResponse>(ledger_info, txn.version)?;
+                    state_view
+                        .as_converter(context.db.clone(), context.indexer_reader.clone())
+                        .try_into_onchain_transaction(timestamp, txn)
+                        .context("Failed to convert on chain transaction to Transaction")
+                        .map_err(|err| {
+                            AptosErrorResponse::internal_with_code(
+                                err,
+                                AptosErrorCode::InternalError,
+                                ledger_info,
+                            )
+                        })?
+                },
+                TransactionData::Pending(txn) => state_view
+                    .as_converter(context.db.clone(), context.indexer_reader.clone())
+                    .try_into_pending_transaction(*txn)
+                    .context("Failed to convert on pending transaction to Transaction")
+                    .map_err(|err| {
+                        AptosErrorResponse::internal_with_code(
+                            err,
+                            AptosErrorCode::InternalError,
+                            ledger_info,
+                        )
+                    })?,
+            };
+            AptosResponse::try_from_json(transaction, ledger_info)
+        },
+        AcceptType::Bcs => AptosResponse::try_from_bcs(transaction_data, ledger_info),
+    }
+}
+
+/// Framework-agnostic inner for wait transaction by hash. Returns Axum-native types.
+pub async fn wait_transaction_by_hash_inner(
+    context: &Arc<Context>,
+    accept_type: &AcceptType,
+    hash: HashValue,
+    timeout_ms: u64,
+    poll_interval_ms: u64,
+) -> Result<AptosResponse<Transaction>, AptosErrorResponse> {
+    let txn_api = TransactionsApi {
+        context: context.clone(),
+    };
+    let start_time = std::time::Instant::now();
+    loop {
+        let (internal_ledger_info_opt, storage_ledger_info) =
+            api_spawn_blocking({
+                let context_clone = context.clone();
+                move || {
+                    context_clone.get_latest_internal_and_storage_ledger_info::<AptosErrorResponse>()
+                }
+            })
+            .await?;
+        let storage_version = storage_ledger_info.ledger_version.into();
+        let internal_ledger_version = internal_ledger_info_opt
+            .as_ref()
+            .map(|info| info.ledger_version.into());
+        let latest_ledger_info = internal_ledger_info_opt.unwrap_or(storage_ledger_info);
+        let txn_data = txn_api
+            .get_by_hash(hash.into(), storage_version, internal_ledger_version)
+            .await
+            .context(format!("Failed to get transaction by hash {}", hash))
+            .map_err(|err| {
+                AptosErrorResponse::internal_with_code(
+                    err,
+                    AptosErrorCode::InternalError,
+                    &latest_ledger_info,
+                )
+            })?
+            .context(format!("Failed to find transaction with hash: {}", hash))
+            .map_err(|_| {
+                crate::response_axum::transaction_not_found_by_hash(hash, &latest_ledger_info)
+            })?;
+
+        if matches!(txn_data, TransactionData::Pending(_))
+            && (start_time.elapsed().as_millis() as u64) < timeout_ms
+        {
+            tokio::time::sleep(Duration::from_millis(poll_interval_ms)).await;
+            continue;
+        }
+
+        let context_for_convert = context.clone();
+        let accept_type_for_convert = accept_type.clone();
+        return api_spawn_blocking(move || {
+            get_transaction_inner_axum(
+                &context_for_convert,
+                &accept_type_for_convert,
+                txn_data,
+                &latest_ledger_info,
+            )
+        })
+        .await;
+    }
+}
+
+/// Framework-agnostic inner for create batch. Returns Axum-native types.
+pub async fn create_batch_inner(
+    context: &Arc<Context>,
+    accept_type: &AcceptType,
+    ledger_info: &LedgerInfo,
+    txns: Vec<SignedTransaction>,
+) -> Result<AptosResponse<TransactionsBatchSubmissionResult>, AptosErrorResponse> {
+    let txn_api = TransactionsApi {
+        context: context.clone(),
+    };
+    let mut txn_failures = Vec::new();
+    for (idx, txn) in txns.iter().enumerate() {
+        if let Err(error) = txn_api.create_internal(txn.clone()).await {
+            txn_failures.push(TransactionsBatchSingleSubmissionFailure {
+                error,
+                transaction_index: idx,
+            })
+        }
+    }
+
+    if txn_failures.is_empty() {
+        let result = TransactionsBatchSubmissionResult {
+            transaction_failures: txn_failures,
+        };
+        match accept_type {
+            AcceptType::Json => AptosResponse::try_from_json_with_status((
+                result,
+                ledger_info,
+                axum::http::StatusCode::ACCEPTED,
+            )),
+            AcceptType::Bcs => AptosResponse::try_from_bcs_with_status((
+                result,
+                ledger_info,
+                axum::http::StatusCode::ACCEPTED,
+            )),
+        }
+    } else if txn_failures.len() == txns.len() {
+        Err(AptosErrorResponse::bad_request(
+            "All transactions submitted were invalid.",
+            AptosErrorCode::InvalidInput,
+            Some(ledger_info),
+        ))
+    } else {
+        let result = TransactionsBatchSubmissionResult {
+            transaction_failures: txn_failures,
+        };
+        AptosResponse::try_from_rust_value_with_status((
+            result,
+            ledger_info,
+            axum::http::StatusCode::PARTIAL_CONTENT,
+            accept_type,
+        ))
+    }
+}
+
+/// Framework-agnostic inner for simulate. Returns Axum-native types. NOT async.
+pub fn simulate_inner(
+    context: &Arc<Context>,
+    accept_type: &AcceptType,
+    ledger_info: LedgerInfo,
+    txn: SignedTransaction,
+) -> Result<AptosResponse<Vec<UserTransaction>>, AptosErrorResponse> {
+    simulate_inner_impl(context, accept_type, &ledger_info, txn)
+}
+
+fn simulate_inner_impl(
+    context: &Arc<Context>,
+    accept_type: &AcceptType,
+    ledger_info: &LedgerInfo,
+    txn: SignedTransaction,
+) -> Result<AptosResponse<Vec<UserTransaction>>, AptosErrorResponse> {
+    if txn.verify_signature().is_ok() {
+        return Err(AptosErrorResponse::bad_request(
+            "Simulated transactions must not have a valid signature",
+            AptosErrorCode::InvalidInput,
+            Some(ledger_info),
+        ));
+    }
+
+    if txn
+        .raw_transaction_ref()
+        .payload_ref()
+        .is_encrypted_variant()
+    {
+        return Err(AptosErrorResponse::bad_request(
+            "Encrypted transactions cannot be simulated",
+            AptosErrorCode::InvalidInput,
+            Some(ledger_info),
+        ));
+    }
+
+    let state_view = context.latest_state_view_poem::<AptosErrorResponse>(ledger_info)?;
+    let (vm_status, output) =
+        AptosSimulationVM::create_vm_and_simulate_signed_transaction(&txn, &state_view);
+    let version = ledger_info.version();
+
+    let exe_status = ExecutionStatus::conmbine_vm_status_for_simulation(
+        output.auxiliary_data(),
+        output.status().clone(),
+    );
+
+    let stats_key = match txn.payload() {
+        TransactionPayload::Script(_) => format!("Script::{}", txn.committed_hash()),
+        TransactionPayload::ModuleBundle(_) => "ModuleBundle::unknown".to_string(),
+        TransactionPayload::EntryFunction(entry_function) => FunctionStats::function_to_key(
+            entry_function.module(),
+            &entry_function.function().into(),
+        ),
+        TransactionPayload::Multisig(multisig) => {
+            if let Some(MultisigTransactionPayload::EntryFunction(entry_function)) =
+                &multisig.transaction_payload
+            {
+                FunctionStats::function_to_key(
+                    entry_function.module(),
+                    &entry_function.function().into(),
+                )
+            } else {
+                "Multisig::unknown".to_string()
+            }
+        },
+        TransactionPayload::Payload(TransactionPayloadInner::V1 {
+            executable,
+            extra_config,
+        }) => {
+            let mut stats_key: String = "V2::".to_string();
+            if extra_config.is_multisig() {
+                stats_key += "Multisig::";
+            }
+            if extra_config.is_orderless() {
+                stats_key += "Orderless::";
+            }
+            match executable {
+                TransactionExecutable::Script(_) => {
+                    stats_key += format!("Script::{}", txn.committed_hash()).as_str();
+                },
+                TransactionExecutable::EntryFunction(entry_function) => {
+                    stats_key += FunctionStats::function_to_key(
+                        entry_function.module(),
+                        &entry_function.function().into(),
+                    )
+                    .as_str();
+                },
+                TransactionExecutable::Empty => stats_key += "unknown",
+                TransactionExecutable::Encrypted => stats_key += "unknown",
+            };
+            stats_key
+        },
+        TransactionPayload::EncryptedPayload(_) => unreachable!("Encrypted transactions must not be simulated"),
+    };
+    context
+        .simulate_txn_stats()
+        .increment(stats_key, output.gas_used());
+
+    let txn_inner = aptos_types::transaction::Transaction::UserTransaction(txn);
+    let zero_hash = aptos_crypto::HashValue::zero();
+    let info = aptos_types::transaction::TransactionInfo::new(
+        txn_inner.committed_hash(),
+        zero_hash,
+        zero_hash,
+        None,
+        output.gas_used(),
+        exe_status,
+        None,
+    );
+    let mut events = output.events().to_vec();
+    let _ = context.translate_v2_to_v1_events_for_simulation(&mut events);
+
+    let simulated_txn = TransactionOnChainData {
+        version,
+        transaction: txn_inner,
+        info,
+        events,
+        accumulator_root_hash: zero_hash,
+        changes: output.write_set().clone(),
+    };
+
+    let response = match accept_type {
+        AcceptType::Json => {
+            let transactions = context
+                .render_transactions_non_sequential::<AptosErrorResponse>(ledger_info, vec![simulated_txn])?;
+            let mut user_transactions = Vec::new();
+            for transaction in transactions.into_iter() {
+                match transaction {
+                    Transaction::UserTransaction(mut user_txn) => {
+                        match &vm_status {
+                            VMStatus::Error {
+                                message: Some(msg), ..
+                            }
+                            | VMStatus::ExecutionFailure {
+                                message: Some(msg), ..
+                            } => {
+                                user_txn.info.vm_status +=
+                                    format!("\nExecution failed with message: {}", msg).as_str();
+                            },
+                            _ => (),
+                        }
+                        user_transactions.push(user_txn);
+                    },
+                    _ => {
+                        return Err(AptosErrorResponse::internal_with_code(
+                            "Simulation transaction resulted in a non-UserTransaction",
+                            AptosErrorCode::InternalError,
+                            ledger_info,
+                        ));
+                    },
+                }
+            }
+            AptosResponse::try_from_json(user_transactions, ledger_info)?
+        },
+        AcceptType::Bcs => {
+            let bytes = bcs::to_bytes(&simulated_txn).map_err(|e| {
+                AptosErrorResponse::internal(e, AptosErrorCode::InternalError, Some(ledger_info))
+            })?;
+            AptosResponse::<Vec<UserTransaction>>::new_bcs(
+                axum::http::StatusCode::OK,
+                bytes,
+                ledger_info,
+            )
+        },
+    };
+
+    Ok(response.with_gas_used(Some(output.gas_used())))
+}
