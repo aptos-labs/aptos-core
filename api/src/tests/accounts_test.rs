@@ -2,7 +2,7 @@
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 use super::{new_test_context, new_test_context_with_orderless_flags};
-use aptos_api_test_context::{current_function_name, find_value, TestContext};
+use aptos_api_test_context::{current_function_name, find_value, ApiSpecificConfig, TestContext};
 use aptos_api_types::{MoveModuleBytecode, MoveResource, MoveStructTag, StateKeyWrapper};
 use aptos_cached_packages::aptos_stdlib;
 use aptos_sdk::types::APTOS_COIN_TYPE_STR;
@@ -530,6 +530,9 @@ async fn test_get_core_account_data_not_found() {
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn test_get_account_resources_with_pagination() {
     let context = new_test_context(current_function_name!());
+    context.wait_for_internal_indexer_caught_up().await;
+    let ApiSpecificConfig::V1(server_address) = context.api_specific_config;
+    let client = reqwest::Client::new();
     let address = "0x1";
 
     // Make a request with no limit. We'll use this full list of resources
@@ -538,13 +541,15 @@ async fn test_get_account_resources_with_pagination() {
     // be true if for some reason the account used in this test has more than
     // the default max page size for resources (1000 at the time of writing,
     // based on config/src/config/api_config.rs).
-    let req = warp::test::request()
-        .method("GET")
-        .path(&format!("/v1{}", account_resources(address)));
-    let resp = context.reply(req).await;
-    assert_eq!(resp.status(), 200);
-    assert!(!resp.headers().contains_key("X-Aptos-Cursor"));
-    let all_resources: Vec<MoveResource> = serde_json::from_slice(resp.body()).unwrap();
+    let resp = client
+        .get(format!("http://{}/v1{}", server_address, account_resources(address)))
+        .send()
+        .await
+        .unwrap();
+    assert_eq!(resp.status().as_u16(), 200);
+    assert!(!resp.headers().contains_key("x-aptos-cursor"));
+    let body = resp.bytes().await.unwrap();
+    let all_resources: Vec<MoveResource> = serde_json::from_slice(&body).unwrap();
     // We assert there are at least 10 resources. If there aren't, the rest of the
     // test will be wrong.
     assert!(all_resources.len() >= 10);
@@ -553,17 +558,23 @@ async fn test_get_account_resources_with_pagination() {
     // page of results. Assert we can deserialize the string representation
     // of the cursor returned in the header.
     // FIXME: Pagination seems to be off by one (change 4 to 5 below and see what happens).
-    let req = warp::test::request()
-        .method("GET")
-        .path(&format!("/v1{}?limit=4", account_resources(address)));
-    let resp = context.reply(req).await;
-    assert_eq!(resp.status(), 200);
+    let resp = client
+        .get(format!(
+            "http://{}/v1{}?limit=4",
+            server_address,
+            account_resources(address)
+        ))
+        .send()
+        .await
+        .unwrap();
+    assert_eq!(resp.status().as_u16(), 200);
     let cursor_header = resp
         .headers()
-        .get("X-Aptos-Cursor")
+        .get("x-aptos-cursor")
         .expect("Cursor header was missing");
     let cursor_header = StateKeyWrapper::from_str(cursor_header.to_str().unwrap()).unwrap();
-    let resources: Vec<MoveResource> = serde_json::from_slice(resp.body()).unwrap();
+    let body = resp.bytes().await.unwrap();
+    let resources: Vec<MoveResource> = serde_json::from_slice(&body).unwrap();
     println!("Returned {} resources:", resources.len());
     for r in resources
         .iter()
@@ -576,32 +587,36 @@ async fn test_get_account_resources_with_pagination() {
     assert_eq!(resources, all_resources[0..4].to_vec());
 
     // Make a request using the cursor. Assert the 5 results we get back are the next 5.
-    let req = warp::test::request().method("GET").path(&format!(
-        "/v1{}?limit=5&start={}",
-        account_resources(address),
-        cursor_header
-    ));
-    let resp = context.reply(req).await;
-    assert_eq!(resp.status(), 200);
+    let cursor_str = cursor_header.to_string();
+    let resp = client
+        .get(format!("http://{}/v1{}", server_address, account_resources(address)))
+        .query(&[("limit", "5"), ("start", &cursor_str)])
+        .send()
+        .await
+        .unwrap();
+    assert_eq!(resp.status().as_u16(), 200);
     let cursor_header = resp
         .headers()
-        .get("X-Aptos-Cursor")
+        .get("x-aptos-cursor")
         .expect("Cursor header was missing");
     let cursor_header = StateKeyWrapper::from_str(cursor_header.to_str().unwrap()).unwrap();
-    let resources: Vec<MoveResource> = serde_json::from_slice(resp.body()).unwrap();
+    let body = resp.bytes().await.unwrap();
+    let resources: Vec<MoveResource> = serde_json::from_slice(&body).unwrap();
     assert_eq!(resources.len(), 5);
     assert_eq!(resources, all_resources[4..9].to_vec());
 
     // Get the rest of the resources, assert there is no cursor now.
-    let req = warp::test::request().method("GET").path(&format!(
-        "/v1{}?limit=1000&start={}",
-        account_resources(address),
-        cursor_header
-    ));
-    let resp = context.reply(req).await;
-    assert_eq!(resp.status(), 200);
-    assert!(!resp.headers().contains_key("X-Aptos-Cursor"));
-    let resources: Vec<MoveResource> = serde_json::from_slice(resp.body()).unwrap();
+    let cursor_str = cursor_header.to_string();
+    let resp = client
+        .get(format!("http://{}/v1{}", server_address, account_resources(address)))
+        .query(&[("limit", "1000"), ("start", &cursor_str)])
+        .send()
+        .await
+        .unwrap();
+    assert_eq!(resp.status().as_u16(), 200);
+    assert!(!resp.headers().contains_key("x-aptos-cursor"));
+    let body = resp.bytes().await.unwrap();
+    let resources: Vec<MoveResource> = serde_json::from_slice(&body).unwrap();
     assert_eq!(resources.len(), all_resources.len() - 9);
     assert_eq!(resources, all_resources[9..].to_vec());
 }
@@ -610,6 +625,9 @@ async fn test_get_account_resources_with_pagination() {
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn test_get_account_modules_with_pagination() {
     let context = new_test_context(current_function_name!());
+    context.wait_for_internal_indexer_caught_up().await;
+    let ApiSpecificConfig::V1(server_address) = context.api_specific_config;
+    let client = reqwest::Client::new();
     let address = "0x1";
 
     // Make a request with no limit. We'll use this full list of modules
@@ -618,13 +636,15 @@ async fn test_get_account_modules_with_pagination() {
     // be true if for some reason the account used in this test has more than
     // the default max page size for modules (1000 at the time of writing,
     // based on config/src/config/api_config.rs).
-    let req = warp::test::request()
-        .method("GET")
-        .path(&format!("/v1{}", account_modules(address)));
-    let resp = context.reply(req).await;
-    assert_eq!(resp.status(), 200);
-    assert!(!resp.headers().contains_key("X-Aptos-Cursor"));
-    let all_modules: Vec<MoveModuleBytecode> = serde_json::from_slice(resp.body()).unwrap();
+    let resp = client
+        .get(format!("http://{}/v1{}", server_address, account_modules(address)))
+        .send()
+        .await
+        .unwrap();
+    assert_eq!(resp.status().as_u16(), 200);
+    assert!(!resp.headers().contains_key("x-aptos-cursor"));
+    let body = resp.bytes().await.unwrap();
+    let all_modules: Vec<MoveModuleBytecode> = serde_json::from_slice(&body).unwrap();
     // We assert there are at least 10 modules. If there aren't, the rest of the
     // test will be wrong.
     assert!(all_modules.len() >= 10);
@@ -632,47 +652,57 @@ async fn test_get_account_modules_with_pagination() {
     // Make a request, assert we get a cursor back in the header for the next
     // page of results. Assert we can deserialize the string representation
     // of the cursor returned in the header.
-    let req = warp::test::request()
-        .method("GET")
-        .path(&format!("/v1{}?limit=5", account_modules(address)));
-    let resp = context.reply(req).await;
-    assert_eq!(resp.status(), 200);
+    let resp = client
+        .get(format!(
+            "http://{}/v1{}?limit=5",
+            server_address,
+            account_modules(address)
+        ))
+        .send()
+        .await
+        .unwrap();
+    assert_eq!(resp.status().as_u16(), 200);
     let cursor_header = resp
         .headers()
-        .get("X-Aptos-Cursor")
+        .get("x-aptos-cursor")
         .expect("Cursor header was missing");
     let cursor_header = StateKeyWrapper::from_str(cursor_header.to_str().unwrap()).unwrap();
-    let modules: Vec<MoveModuleBytecode> = serde_json::from_slice(resp.body()).unwrap();
+    let body = resp.bytes().await.unwrap();
+    let modules: Vec<MoveModuleBytecode> = serde_json::from_slice(&body).unwrap();
     assert_eq!(modules.len(), 5);
     assert_eq!(modules, all_modules[0..5].to_vec());
 
     // Make a request using the cursor. Assert the 5 results we get back are the next 5.
-    let req = warp::test::request().method("GET").path(&format!(
-        "/v1{}?limit=5&start={}",
-        account_modules(address),
-        cursor_header
-    ));
-    let resp = context.reply(req).await;
-    assert_eq!(resp.status(), 200);
+    let cursor_str = cursor_header.to_string();
+    let resp = client
+        .get(format!("http://{}/v1{}", server_address, account_modules(address)))
+        .query(&[("limit", "5"), ("start", &cursor_str)])
+        .send()
+        .await
+        .unwrap();
+    assert_eq!(resp.status().as_u16(), 200);
     let cursor_header = resp
         .headers()
-        .get("X-Aptos-Cursor")
+        .get("x-aptos-cursor")
         .expect("Cursor header was missing");
     let cursor_header = StateKeyWrapper::from_str(cursor_header.to_str().unwrap()).unwrap();
-    let modules: Vec<MoveModuleBytecode> = serde_json::from_slice(resp.body()).unwrap();
+    let body = resp.bytes().await.unwrap();
+    let modules: Vec<MoveModuleBytecode> = serde_json::from_slice(&body).unwrap();
     assert_eq!(modules.len(), 5);
     assert_eq!(modules, all_modules[5..10].to_vec());
 
     // Get the rest of the modules, assert there is no cursor now.
-    let req = warp::test::request().method("GET").path(&format!(
-        "/v1{}?limit=1000&start={}",
-        account_modules(address),
-        cursor_header
-    ));
-    let resp = context.reply(req).await;
-    assert_eq!(resp.status(), 200);
-    assert!(!resp.headers().contains_key("X-Aptos-Cursor"));
-    let modules: Vec<MoveModuleBytecode> = serde_json::from_slice(resp.body()).unwrap();
+    let cursor_str = cursor_header.to_string();
+    let resp = client
+        .get(format!("http://{}/v1{}", server_address, account_modules(address)))
+        .query(&[("limit", "1000"), ("start", &cursor_str)])
+        .send()
+        .await
+        .unwrap();
+    assert_eq!(resp.status().as_u16(), 200);
+    assert!(!resp.headers().contains_key("x-aptos-cursor"));
+    let body = resp.bytes().await.unwrap();
+    let modules: Vec<MoveModuleBytecode> = serde_json::from_slice(&body).unwrap();
     assert_eq!(modules.len(), all_modules.len() - 10);
     assert_eq!(modules, all_modules[10..].to_vec());
 }
@@ -680,29 +710,46 @@ async fn test_get_account_modules_with_pagination() {
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn test_get_account_items_limit_params() {
     let context = new_test_context(current_function_name!());
+    context.wait_for_internal_indexer_caught_up().await;
+    let ApiSpecificConfig::V1(server_address) = context.api_specific_config;
+    let client = reqwest::Client::new();
     let address = "0x1";
 
     // Ensure limit=0 is rejected.
-    let req = warp::test::request()
-        .method("GET")
-        .path(&format!("/v1{}?limit=0", account_resources(address)));
-    let resp = context.reply(req).await;
-    assert_eq!(resp.status(), 400);
+    let resp = client
+        .get(format!(
+            "http://{}/v1{}?limit=0",
+            server_address,
+            account_resources(address)
+        ))
+        .send()
+        .await
+        .unwrap();
+    assert_eq!(resp.status().as_u16(), 400);
 
     // Ensure limit=0 is rejected.
-    let req = warp::test::request()
-        .method("GET")
-        .path(&format!("/v1{}?limit=0", account_modules(address)));
-    let resp = context.reply(req).await;
-    assert_eq!(resp.status(), 400);
+    let resp = client
+        .get(format!(
+            "http://{}/v1{}?limit=0",
+            server_address,
+            account_modules(address)
+        ))
+        .send()
+        .await
+        .unwrap();
+    assert_eq!(resp.status().as_u16(), 400);
 
     // Ensure garbage start param values are rejected.
-    let req = warp::test::request().method("GET").path(&format!(
-        "/v1{}?start=iwouldnotsurviveavibecheckrightnow",
-        account_modules(address)
-    ));
-    let resp = context.reply(req).await;
-    assert_eq!(resp.status(), 400);
+    let resp = client
+        .get(format!(
+            "http://{}/v1{}?start=iwouldnotsurviveavibecheckrightnow",
+            server_address,
+            account_modules(address)
+        ))
+        .send()
+        .await
+        .unwrap();
+    assert_eq!(resp.status().as_u16(), 400);
 }
 
 fn account_resources(address: &str) -> String {

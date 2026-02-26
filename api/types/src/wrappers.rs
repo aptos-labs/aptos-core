@@ -120,8 +120,20 @@ impl From<EventGuid> for EventKey {
 }
 
 /// This wraps the StateKey, serializing it as hex encoded bytes.
-#[derive(Debug, Serialize, Deserialize)]
+/// Uses custom deserialize to support query params and JSON string values via FromStr.
+#[derive(Debug, Serialize)]
 pub struct StateKeyWrapper(pub StateKey);
+
+impl<'de> Deserialize<'de> for StateKeyWrapper {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        use serde::de::Error;
+        let s = String::deserialize(deserializer)?;
+        s.parse().map_err(D::Error::custom)
+    }
+}
 
 impl fmt::Display for StateKeyWrapper {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
