@@ -708,9 +708,8 @@ pub fn account_inner(
     let account = Account::new(context.clone(), address, ledger_version, None, None)?;
     let li = &account.latest_ledger_info;
 
-    let state_key = StateKey::resource_typed::<AccountResource>(address.inner()).map_err(|e| {
-        AptosErrorResponse::internal(e, AptosErrorCode::InternalError, Some(li))
-    })?;
+    let state_key = StateKey::resource_typed::<AccountResource>(address.inner())
+        .map_err(|e| AptosErrorResponse::internal(e, AptosErrorCode::InternalError, Some(li)))?;
     let state_value_opt = context.get_state_value_poem::<AptosErrorResponse>(
         &state_key,
         account.ledger_version,
@@ -765,7 +764,13 @@ pub fn resources_inner(
     limit: Option<u16>,
     accept_type: &AcceptType,
 ) -> Result<AptosResponse<Vec<MoveResource>>, AptosErrorResponse> {
-    let account = Account::new(context.clone(), address, ledger_version, start.clone(), limit)?;
+    let account = Account::new(
+        context.clone(),
+        address,
+        ledger_version,
+        start.clone(),
+        limit,
+    )?;
     let li = &account.latest_ledger_info;
 
     let max_account_resources_page_size = context.max_account_resources_page_size();
@@ -789,8 +794,8 @@ pub fn resources_inner(
     match accept_type {
         AcceptType::Json => {
             let state_view = context.latest_state_view_poem::<AptosErrorResponse>(li)?;
-            let converter = state_view
-                .as_converter(context.db.clone(), context.indexer_reader.clone());
+            let converter =
+                state_view.as_converter(context.db.clone(), context.indexer_reader.clone());
             let converted_resources = converter
                 .try_into_resources(resources.iter().map(|(k, v)| (k.clone(), v.as_slice())))
                 .context("Failed to build move resource response from data in DB")
@@ -826,28 +831,18 @@ pub fn balance_inner(
                     .map_err(|err| {
                         AptosErrorResponse::internal(err, AptosErrorCode::InternalError, Some(li))
                     })?;
-            let state_value = context
-                .get_state_value_poem::<AptosErrorResponse>(
-                    &StateKey::resource(&address.into(), &coin_store_type_tag)
-                        .map_err(|err| {
-                            AptosErrorResponse::internal(
-                                err,
-                                AptosErrorCode::InternalError,
-                                Some(li),
-                            )
-                        })?,
-                    account.ledger_version,
-                    li,
-                )?;
+            let state_value = context.get_state_value_poem::<AptosErrorResponse>(
+                &StateKey::resource(&address.into(), &coin_store_type_tag).map_err(|err| {
+                    AptosErrorResponse::internal(err, AptosErrorCode::InternalError, Some(li))
+                })?,
+                account.ledger_version,
+                li,
+            )?;
             let coin_balance = match state_value {
                 None => 0,
                 Some(bytes) => bcs::from_bytes::<CoinStoreResourceUntyped>(&bytes)
                     .map_err(|err| {
-                        AptosErrorResponse::internal(
-                            err,
-                            AptosErrorCode::InternalError,
-                            Some(li),
-                        )
+                        AptosErrorResponse::internal(err, AptosErrorCode::InternalError, Some(li))
                     })?
                     .coin(),
             };
@@ -872,11 +867,7 @@ pub fn balance_inner(
             if let Some(fa_store) = object_group.group.get(&FungibleStoreResource::struct_tag()) {
                 let fa_store_resource = bcs::from_bytes::<FungibleStoreResource>(fa_store)
                     .map_err(|err| {
-                        AptosErrorResponse::internal(
-                            err,
-                            AptosErrorCode::InternalError,
-                            Some(li),
-                        )
+                        AptosErrorResponse::internal(err, AptosErrorCode::InternalError, Some(li))
                     })?;
                 if fa_store_resource.balance != 0 {
                     balance += fa_store_resource.balance();
@@ -884,15 +875,14 @@ pub fn balance_inner(
                     .group
                     .get(&ConcurrentFungibleBalanceResource::struct_tag())
                 {
-                    let concurrent_fa_balance_resource =
-                        bcs::from_bytes::<ConcurrentFungibleBalanceResource>(concurrent_fa_balance)
-                            .map_err(|err| {
-                                AptosErrorResponse::internal(
-                                    err,
-                                    AptosErrorCode::InternalError,
-                                    Some(li),
-                                )
-                            })?;
+                    let concurrent_fa_balance_resource = bcs::from_bytes::<
+                        ConcurrentFungibleBalanceResource,
+                    >(
+                        concurrent_fa_balance
+                    )
+                    .map_err(|err| {
+                        AptosErrorResponse::internal(err, AptosErrorCode::InternalError, Some(li))
+                    })?;
                     balance += concurrent_fa_balance_resource.balance();
                 }
             }
@@ -915,7 +905,13 @@ pub fn modules_inner(
     limit: Option<u16>,
     accept_type: &AcceptType,
 ) -> Result<AptosResponse<Vec<MoveModuleBytecode>>, AptosErrorResponse> {
-    let account = Account::new(context.clone(), address, ledger_version, start.clone(), limit)?;
+    let account = Account::new(
+        context.clone(),
+        address,
+        ledger_version,
+        start.clone(),
+        limit,
+    )?;
     let li = &account.latest_ledger_info;
 
     let max_account_modules_page_size = context.max_account_modules_page_size();

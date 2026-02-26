@@ -302,13 +302,12 @@ pub async fn get_account_handler(
     use crate::context::api_spawn_blocking;
     crate::failpoint::fail_point_poem::<AptosErrorResponse>("endpoint_get_account")?;
     context.check_api_output_enabled::<AptosErrorResponse>("Get account", &accept_type)?;
+    let at = accept_type.clone();
     let resp = api_spawn_blocking(move || {
-        let account =
-            crate::accounts::Account::new(context, address, query.ledger_version, None, None)?;
-        account.account(&accept_type)
+        crate::accounts::account_inner(context, address, query.ledger_version, &at)
     })
     .await?;
-    Ok(poem_to_axum_response(poem::IntoResponse::into_response(resp)).await)
+    Ok(resp.into_response())
 }
 
 pub async fn get_account_resources_handler(
@@ -322,18 +321,19 @@ pub async fn get_account_resources_handler(
     crate::failpoint::fail_point_poem::<AptosErrorResponse>("endpoint_get_account_resources")?;
     context
         .check_api_output_enabled::<AptosErrorResponse>("Get account resources", &accept_type)?;
+    let at = accept_type.clone();
     let resp = api_spawn_blocking(move || {
-        let account = crate::accounts::Account::new(
+        crate::accounts::resources_inner(
             context,
             address,
             query.ledger_version,
             query.start.map(StateKey::from),
             query.limit,
-        )?;
-        account.resources(&accept_type)
+            &at,
+        )
     })
     .await?;
-    Ok(poem_to_axum_response(poem::IntoResponse::into_response(resp)).await)
+    Ok(resp.into_response())
 }
 
 pub async fn get_account_balance_handler(
@@ -348,13 +348,12 @@ pub async fn get_account_balance_handler(
     use crate::context::api_spawn_blocking;
     crate::failpoint::fail_point_poem::<AptosErrorResponse>("endpoint_get_account_balance")?;
     context.check_api_output_enabled::<AptosErrorResponse>("Get account balance", &accept_type)?;
+    let at = accept_type.clone();
     let resp = api_spawn_blocking(move || {
-        let account =
-            crate::accounts::Account::new(context, address, query.ledger_version, None, None)?;
-        account.balance(asset_type, &accept_type)
+        crate::accounts::balance_inner(context, address, asset_type, query.ledger_version, &at)
     })
     .await?;
-    Ok(poem_to_axum_response(poem::IntoResponse::into_response(resp)).await)
+    Ok(resp.into_response())
 }
 
 pub async fn get_account_modules_handler(
@@ -367,18 +366,19 @@ pub async fn get_account_modules_handler(
     use aptos_types::state_store::state_key::StateKey;
     crate::failpoint::fail_point_poem::<AptosErrorResponse>("endpoint_get_account_modules")?;
     context.check_api_output_enabled::<AptosErrorResponse>("Get account modules", &accept_type)?;
+    let at = accept_type.clone();
     let resp = api_spawn_blocking(move || {
-        let account = crate::accounts::Account::new(
+        crate::accounts::modules_inner(
             context,
             address,
             query.ledger_version,
             query.start.map(StateKey::from),
             query.limit,
-        )?;
-        account.modules(&accept_type)
+            &at,
+        )
     })
     .await?;
-    Ok(poem_to_axum_response(poem::IntoResponse::into_response(resp)).await)
+    Ok(resp.into_response())
 }
 
 // ---- BlocksApi ----
@@ -835,9 +835,10 @@ pub async fn get_transactions_auxiliary_info_handler(
     );
     let ctx = context.clone();
     let at = accept_type.clone();
-    let resp =
-        api_spawn_blocking(move || crate::transactions::list_auxiliary_infos_inner(&ctx, &at, page))
-            .await?;
+    let resp = api_spawn_blocking(move || {
+        crate::transactions::list_auxiliary_infos_inner(&ctx, &at, page)
+    })
+    .await?;
     Ok(resp.into_response())
 }
 
@@ -1090,9 +1091,10 @@ pub async fn encode_submission_handler(
     context.check_api_output_enabled::<AptosErrorResponse>("Encode submission", &accept_type)?;
     let ctx = context.clone();
     let at = accept_type.clone();
-    let resp =
-        api_spawn_blocking(move || crate::transactions::get_signing_message_inner(&ctx, &at, request))
-            .await?;
+    let resp = api_spawn_blocking(move || {
+        crate::transactions::get_signing_message_inner(&ctx, &at, request)
+    })
+    .await?;
     Ok(resp.into_response())
 }
 

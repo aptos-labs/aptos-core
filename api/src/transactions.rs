@@ -1962,8 +1962,8 @@ pub fn list_inner(
 
     match accept_type {
         AcceptType::Json => {
-            let timestamp =
-                context.get_block_timestamp::<AptosErrorResponse>(&latest_ledger_info, start_version)?;
+            let timestamp = context
+                .get_block_timestamp::<AptosErrorResponse>(&latest_ledger_info, start_version)?;
             AptosResponse::try_from_json(
                 context.render_transactions_sequential::<AptosErrorResponse>(
                     &latest_ledger_info,
@@ -1991,11 +1991,7 @@ pub fn get_transaction_by_version_inner_axum(
         .get_by_version(version.0, &ledger_info)
         .context(format!("Failed to get transaction by version {}", version))
         .map_err(|err| {
-            AptosErrorResponse::internal_with_code(
-                err,
-                AptosErrorCode::InternalError,
-                &ledger_info,
-            )
+            AptosErrorResponse::internal_with_code(err, AptosErrorCode::InternalError, &ledger_info)
         })?;
 
     match txn_data {
@@ -2006,8 +2002,8 @@ pub fn get_transaction_by_version_inner_axum(
                     context.latest_state_view_poem::<AptosErrorResponse>(&ledger_info)?;
                 let transaction = match txn_data {
                     TransactionData::OnChain(txn) => {
-                        let timestamp =
-                            context.get_block_timestamp::<AptosErrorResponse>(&ledger_info, txn.version)?;
+                        let timestamp = context
+                            .get_block_timestamp::<AptosErrorResponse>(&ledger_info, txn.version)?;
                         state_view
                             .as_converter(context.db.clone(), context.indexer_reader.clone())
                             .try_into_onchain_transaction(timestamp, txn)
@@ -2035,12 +2031,9 @@ pub fn get_transaction_by_version_inner_axum(
                 AptosResponse::try_from_json(transaction, &ledger_info)
             },
         },
-        GetByVersionResponse::VersionTooNew => {
-            Err(crate::response_axum::transaction_not_found_by_version(
-                version.0,
-                &ledger_info,
-            ))
-        },
+        GetByVersionResponse::VersionTooNew => Err(
+            crate::response_axum::transaction_not_found_by_version(version.0, &ledger_info),
+        ),
         GetByVersionResponse::VersionTooOld => Err(crate::response_axum::version_pruned(
             version.0,
             &ledger_info,
@@ -2138,8 +2131,8 @@ pub fn list_txn_summaries_by_account_inner(
     end_version: Option<U64>,
     limit: u16,
 ) -> Result<AptosResponse<Vec<TransactionSummary>>, AptosErrorResponse> {
-    let (latest_ledger_info, ledger_version) = context
-        .get_latest_ledger_info_and_verify_lookup_version::<AptosErrorResponse>(None)?;
+    let (latest_ledger_info, ledger_version) =
+        context.get_latest_ledger_info_and_verify_lookup_version::<AptosErrorResponse>(None)?;
 
     match context.get_account_transaction_summaries::<AptosErrorResponse>(
         address.into(),
@@ -2187,11 +2180,7 @@ pub fn get_signing_message_inner(
         .try_into_raw_transaction_poem(request.transaction, context.chain_id())
         .context("The given transaction is invalid")
         .map_err(|err| {
-            AptosErrorResponse::bad_request(
-                err,
-                AptosErrorCode::InvalidInput,
-                Some(&ledger_info),
-            )
+            AptosErrorResponse::bad_request(err, AptosErrorCode::InvalidInput, Some(&ledger_info))
         })?;
 
     let raw_message = match request.secondary_signers {
@@ -2206,11 +2195,7 @@ pub fn get_signing_message_inner(
         )
         .context("Invalid transaction to generate signing message")
         .map_err(|err| {
-            AptosErrorResponse::bad_request(
-                err,
-                AptosErrorCode::InvalidInput,
-                Some(&ledger_info),
-            )
+            AptosErrorResponse::bad_request(err, AptosErrorCode::InvalidInput, Some(&ledger_info))
         })?,
         None => raw_txn
             .signing_message()
