@@ -177,6 +177,15 @@ fn test_dispatching() {
 }
 
 #[test]
+fn test_confidential_assets() {
+    let named_address = BTreeMap::from([(
+        String::from("confidential_asset_example"),
+        AccountAddress::from_hex_literal("0xf00d").unwrap(),
+    )]);
+    run_tests_for_pkg("confidential_asset", named_address);
+}
+
+#[test]
 fn test_fungible_asset() {
     let named_address = BTreeMap::from([
         (

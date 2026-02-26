@@ -8,8 +8,6 @@ module confidential_asset_example::transfer_example {
 
     use aptos_experimental::confidential_asset;
     use aptos_experimental::confidential_asset_tests;
-    use aptos_experimental::confidential_balance;
-    use aptos_experimental::confidential_proof;
     use aptos_experimental::ristretto255_twisted_elgamal as twisted_elgamal;
 
     fun transfer(bob: &signer, alice: &signer, token: Object<Metadata>) {
@@ -20,81 +18,43 @@ module confidential_asset_example::transfer_example {
         let (bob_dk, bob_ek) = twisted_elgamal::generate_twisted_elgamal_keypair();
         let (alice_dk, alice_ek) = twisted_elgamal::generate_twisted_elgamal_keypair();
 
-        // Note: If the asset-specific auditor is set, we need to include it in the `auditor_eks` vector as the FIRST element.
-        //
-        // let asset_auditor_ek = confidential_asset::get_auditor(token);
-        // let auditor_eks = vector[];
-        // if (asset_auditor_ek.is_some()) {
-        //     auditor_eks.push_back(asset_auditor_ek.extract());
-        // };
+        let bob_proof = confidential_asset::prove_registration(bob_addr, token, &bob_dk);
+        confidential_asset::register(bob, token, bob_ek, bob_proof);
 
-        let (_, auditor_ek) = twisted_elgamal::generate_twisted_elgamal_keypair();
-        let auditor_eks = vector[auditor_ek];
-
-        let bob_ek_bytes = twisted_elgamal::pubkey_to_bytes(&bob_ek);
-        let alice_ek_bytes = twisted_elgamal::pubkey_to_bytes(&alice_ek);
-
-        confidential_asset::register(bob, token, bob_ek_bytes);
-        confidential_asset::register(alice, token, alice_ek_bytes);
+        let alice_proof = confidential_asset::prove_registration(alice_addr, token, &alice_dk);
+        confidential_asset::register(alice, token, alice_ek, alice_proof);
 
         // Bob's current balance is 300, and he wants to transfer 50 to Alice, whose balance is zero.
-        let bob_current_amount = 300;
-        let bob_new_amount = 250;
-        let transfer_amount = 50;
-        let alice_current_amount = 0;
-        let alice_new_amount = 50;
+        let bob_current_amount: u128 = 300;
+        let bob_new_amount: u128 = 250;
+        let transfer_amount: u64 = 50;
+        let alice_new_amount: u64 = 50;
 
-        confidential_asset::deposit(bob, token, bob_current_amount);
+        confidential_asset::deposit(bob, token, (bob_current_amount as u64));
         confidential_asset::rollover_pending_balance(bob, token);
 
         print(&utf8(b"Bob's actual balance is 300"));
-        assert!(confidential_asset::check_available_balance_decrypts_to(bob_addr, token, &bob_dk, (bob_current_amount as u128)));
+        assert!(confidential_asset::check_available_balance_decrypts_to(bob_addr, token, &bob_dk, bob_current_amount));
 
         print(&utf8(b"Alice's pending balance is zero"));
-        assert!(confidential_asset::check_pending_balance_decrypts_to(alice_addr, token, &alice_dk, alice_current_amount));
+        assert!(confidential_asset::check_pending_balance_decrypts_to(alice_addr, token, &alice_dk, 0));
 
-        let current_balance = confidential_balance::decompress(
-            &confidential_asset::get_available_balance(bob_addr, token)
-        );
-
-        let (
-            proof,
-            // New balance is the balance after the transfer encrypted with the sender's encryption key.
-            // It will be set as the new actual balance for the sender.
-            new_balance,
-            // Transfer amount encrypted with the recipient's encryption key.
-            // It will be Homomorphically added to the recipient's pending balance.
-            transfer_amount,
-            // Transfer amount encrypted with the auditors' encryption keys.
-            // It won't be stored on-chain, but an auditor can decrypt the transfer amount with its dk.
-            auditor_amounts
-        ) = confidential_proof::prove_transfer(
+        let (proof, _test_auditor_amounts) = confidential_asset::prove_transfer(
+            bob_addr,
+            alice_addr,
+            token,
             &bob_dk,
-            &bob_ek,
-            &alice_ek,
             transfer_amount,
             bob_new_amount,
-            &current_balance,
-            &auditor_eks,
+            &vector[], // no extra auditors
         );
-
-        let (
-            sigma_proof,
-            zkrp_new_balance,
-            zkrp_transfer_amount
-        ) = confidential_proof::serialize_transfer_proof(&proof);
 
         confidential_asset::confidential_transfer(
             bob,
             token,
             alice_addr,
-            confidential_balance::balance_to_bytes(&new_balance),
-            confidential_balance::balance_to_bytes(&transfer_amount),
-            confidential_asset::serialize_auditor_eks(&auditor_eks),
-            confidential_asset::serialize_auditor_amounts(&auditor_amounts),
-            zkrp_new_balance,
-            zkrp_transfer_amount,
-            sigma_proof
+            vector[], // no extra auditor EKs
+            proof
         );
 
         print(&utf8(b"Bob's actual balance is 250"));
