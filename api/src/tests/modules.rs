@@ -44,24 +44,33 @@ async fn test_abi(use_txn_payload_v2_format: bool, use_orderless_transactions: b
         .map(|f| f["name"].as_str().unwrap())
         .collect();
 
-    // All entry (including private entry) and public functions should be in the ABI.
-    // Private (non-entry) functions should not be included.
+    // All entry (including private entry), view (including private view), and public
+    // functions should be in the ABI. Private functions that are neither entry nor
+    // view should not be included.
     assert_eq!(exposed_function_names, [
         "private_entry_function",
+        "private_view_function",
         "public_entry_function",
         "public_function",
-        "view_function",
+        "public_view_function",
     ]);
 
-    // Confirm that the view function is reported as a view function.
-    let view_function = exposed_functions
+    // Confirm that view functions are reported as view functions with correct visibility.
+    let public_view_function = exposed_functions
         .iter()
-        .find(|f| f["name"].as_str().unwrap() == "view_function")
+        .find(|f| f["name"].as_str().unwrap() == "public_view_function")
         .unwrap();
+    assert_eq!(public_view_function["is_view"], true);
+    assert_eq!(public_view_function["visibility"], "public");
 
-    assert_eq!(view_function["is_view"], true);
+    let private_view_function = exposed_functions
+        .iter()
+        .find(|f| f["name"].as_str().unwrap() == "private_view_function")
+        .unwrap();
+    assert_eq!(private_view_function["is_view"], true);
+    assert_eq!(private_view_function["visibility"], "private");
 
-    // Confirm that the other functions are not reported as view functions.
+    // Confirm that the non-view functions are not reported as view functions.
     for name in [
         "private_entry_function",
         "public_entry_function",

@@ -34,8 +34,13 @@ module abi::test {
     }
 
     #[view]
-    public fun view_function(value: u64): u64 {
+    public fun public_view_function(value: u64): u64 {
         value + 42
+    }
+
+    #[view]
+    fun private_view_function(value: u64): u64 {
+        value + 100
     }
 
     fun private_function(s: &signer, value: u64) {
