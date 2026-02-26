@@ -5887,7 +5887,7 @@ impl ExpTranslator<'_, '_, '_> {
     }
 
     /// Translates a labeled call expression (label@global<R>(addr) or label@exists<R>(addr)).
-    /// Resolves the name to a builtin (global or exists), translates the call, and injects
+    /// Strictly accepts only unqualified `global`/`exists`, translates the call, and injects
     /// the memory label into the resulting operation.
     fn translate_labeled_call(
         &mut self,
@@ -5900,12 +5900,21 @@ impl ExpTranslator<'_, '_, '_> {
         context: &ErrorMessageContext,
     ) -> ExpData {
         let mem_label = self.translate_state_label(label);
-        // Determine the builtin name
-        let name_str = match &name.value {
-            EA::ModuleAccess_::Name(n) => n.value.as_str().to_string(),
-            EA::ModuleAccess_::ModuleAccess(_, n, _) => n.value.as_str().to_string(),
+        // Labeled calls are only valid for unqualified `global` / `exists`.
+        let builtin_name = match &name.value {
+            EA::ModuleAccess_::Name(n)
+                if n.value.as_str() == "global" || n.value.as_str() == "exists" =>
+            {
+                self.symbol_pool().make(n.value.as_str())
+            },
+            _ => {
+                self.error(
+                    &self.to_loc(&name.loc),
+                    "labeled call must use unqualified `global` or `exists`",
+                );
+                return self.new_error_exp();
+            },
         };
-        let builtin_name = self.symbol_pool().make(&name_str);
         let args_refs: Vec<&EA::Exp> = args.iter().collect();
         let result = self.translate_call(
             loc,
