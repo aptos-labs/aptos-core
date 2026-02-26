@@ -4,7 +4,7 @@
 # cargo install cargo-sort
 # cargo install cargo-machete
 #
-# The best way to do this however is to run scripts/dev_setup.sh
+# The best way to do this however is to run scripts/setup_build.sh
 #
 # If you want to run this from anywhere in aptos-core, try adding the wrapper
 # script to your path:
