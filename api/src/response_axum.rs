@@ -703,13 +703,6 @@ impl From<crate::response::BasicErrorWith404> for AptosErrorResponse {
     }
 }
 
-impl From<crate::transactions::SubmitTransactionError> for AptosErrorResponse {
-    fn from(err: crate::transactions::SubmitTransactionError) -> Self {
-        let resp = poem::IntoResponse::into_response(err);
-        poem_error_response_to_axum(resp)
-    }
-}
-
 /// Convert an `AptosErrorResponse` into a Poem `BasicErrorWith404`.
 ///
 /// This is intentionally NOT a `From` impl to avoid creating type inference

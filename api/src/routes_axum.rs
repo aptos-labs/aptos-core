@@ -664,7 +664,11 @@ pub async fn get_transactions_handler(
     );
     let ctx = context.clone();
     let at = accept_type.clone();
-    let resp = api_spawn_blocking(move || crate::transactions::list_inner(&ctx, &at, page)).await?;
+    let resp = api_spawn_blocking(move || {
+        let api = crate::transactions::TransactionsApi { context: ctx };
+        api.list(&at, page)
+    })
+    .await?;
     Ok(resp.into_response())
 }
 
@@ -676,8 +680,8 @@ pub async fn get_transaction_by_hash_handler(
     crate::failpoint::fail_point_poem::<AptosErrorResponse>("endpoint_transaction_by_hash")?;
     context
         .check_api_output_enabled::<AptosErrorResponse>("Get transactions by hash", &accept_type)?;
-    let resp = crate::transactions::get_transaction_by_hash_inner(&context, &accept_type, txn_hash)
-        .await?;
+    let txn_api = crate::transactions::TransactionsApi { context: context.clone() };
+    let resp = txn_api.get_transaction_by_hash_inner(&accept_type, txn_hash).await?;
     Ok(resp.into_response())
 }
 
@@ -701,23 +705,23 @@ pub async fn wait_transaction_by_hash_handler(
         crate::metrics::WAIT_TRANSACTION_POLL_TIME
             .with_label_values(&["short"])
             .observe(0.0);
-        let resp =
-            crate::transactions::get_transaction_by_hash_inner(&context, &accept_type, txn_hash)
-                .await?;
+        let txn_api = crate::transactions::TransactionsApi { context: context.clone() };
+        let resp = txn_api.get_transaction_by_hash_inner(&accept_type, txn_hash).await?;
         return Ok(resp.into_response());
     }
 
     let start_time = std::time::Instant::now();
     crate::metrics::WAIT_TRANSACTION_GAUGE.inc();
 
-    let result = crate::transactions::wait_transaction_by_hash_inner(
-        &context,
-        &accept_type,
-        txn_hash,
-        context.node_config.api.wait_by_hash_timeout_ms,
-        context.node_config.api.wait_by_hash_poll_interval_ms,
-    )
-    .await;
+    let txn_api = crate::transactions::TransactionsApi { context: context.clone() };
+    let result = txn_api
+        .wait_transaction_by_hash_inner(
+            &accept_type,
+            txn_hash,
+            context.node_config.api.wait_by_hash_timeout_ms,
+            context.node_config.api.wait_by_hash_poll_interval_ms,
+        )
+        .await;
 
     crate::metrics::WAIT_TRANSACTION_GAUGE.dec();
     context
@@ -745,7 +749,8 @@ pub async fn get_transaction_by_version_handler(
     let ctx = context.clone();
     let at = accept_type.clone();
     let resp = api_spawn_blocking(move || {
-        crate::transactions::get_transaction_by_version_inner_axum(&ctx, &at, txn_version)
+        let api = crate::transactions::TransactionsApi { context: ctx };
+        api.get_transaction_by_version_inner(&at, txn_version)
     })
     .await?;
     Ok(resp.into_response())
@@ -772,7 +777,8 @@ pub async fn get_transactions_auxiliary_info_handler(
     let ctx = context.clone();
     let at = accept_type.clone();
     let resp = api_spawn_blocking(move || {
-        crate::transactions::list_auxiliary_infos_inner(&ctx, &at, page)
+        let api = crate::transactions::TransactionsApi { context: ctx };
+        api.list_auxiliary_infos(&at, page)
     })
     .await?;
     Ok(resp.into_response())
@@ -796,7 +802,8 @@ pub async fn get_accounts_transactions_handler(
     let ctx = context.clone();
     let at = accept_type.clone();
     let resp = api_spawn_blocking(move || {
-        crate::transactions::list_ordered_txns_by_account_inner(&ctx, &at, page, address)
+        let api = crate::transactions::TransactionsApi { context: ctx };
+        api.list_ordered_txns_by_account(&at, page, address)
     })
     .await?;
     Ok(resp.into_response())
@@ -827,14 +834,8 @@ pub async fn get_accounts_transaction_summaries_handler(
     let start_version = query.start_version;
     let end_version = query.end_version;
     let resp = api_spawn_blocking(move || {
-        crate::transactions::list_txn_summaries_by_account_inner(
-            &ctx,
-            &at,
-            address,
-            start_version,
-            end_version,
-            limit,
-        )
+        let api = crate::transactions::TransactionsApi { context: ctx };
+        api.list_txn_summaries_by_account(&at, address, start_version, end_version, limit)
     })
     .await?;
     Ok(resp.into_response())
@@ -885,8 +886,7 @@ pub async fn submit_transaction_handler(
         AptosErrorResponse::bad_request(err, aptos_api_types::AptosErrorCode::InvalidInput, None)
     })?;
     let signed_txn = txn_api.get_signed_transaction(&ledger_info, data)?;
-    let resp =
-        crate::transactions::create_inner(&context, &accept_type, &ledger_info, signed_txn).await?;
+    let resp = txn_api.create(&accept_type, &ledger_info, signed_txn).await?;
     Ok(resp.into_response())
 }
 
@@ -940,9 +940,7 @@ pub async fn submit_transactions_batch_handler(
         AptosErrorResponse::bad_request(err, aptos_api_types::AptosErrorCode::InvalidInput, None)
     })?;
     let signed_txns = txn_api.get_signed_transactions_batch(&ledger_info, data)?;
-    let resp =
-        crate::transactions::create_batch_inner(&context, &accept_type, &ledger_info, signed_txns)
-            .await?;
+    let resp = txn_api.create_batch(&accept_type, &ledger_info, signed_txns).await?;
     Ok(resp.into_response())
 }
 
@@ -991,8 +989,7 @@ pub async fn simulate_transaction_handler(
         AptosErrorResponse::bad_request(err, aptos_api_types::AptosErrorCode::InvalidInput, None)
     })?;
     let signed_txn = txn_api.get_signed_transaction(&ledger_info, data)?;
-    let resp =
-        crate::transactions::simulate_inner(&context, &accept_type, ledger_info, signed_txn)?;
+    let resp = txn_api.simulate(&accept_type, ledger_info, signed_txn)?;
     Ok(resp.into_response())
 }
 
@@ -1026,7 +1023,8 @@ pub async fn encode_submission_handler(
     let ctx = context.clone();
     let at = accept_type.clone();
     let resp = api_spawn_blocking(move || {
-        crate::transactions::get_signing_message_inner(&ctx, &at, request)
+        let api = crate::transactions::TransactionsApi { context: ctx };
+        api.get_signing_message(&at, request)
     })
     .await?;
     Ok(resp.into_response())
