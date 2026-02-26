@@ -13,7 +13,7 @@ use crate::{
     utils::{get_progress, iterators::EpochEndingLedgerInfoIter},
 };
 use anyhow::anyhow;
-use aptos_schemadb::{batch::SchemaBatch, DB};
+use aptos_schemadb::{batch::SchemaBatch, ReadOptions, DB};
 use aptos_storage_interface::{block_info::BlockInfo, db_ensure as ensure, AptosDbError, Result};
 use aptos_types::{
     account_config::NewBlockEvent, block_info::BlockHeight, contract_event::ContractEvent,
@@ -126,7 +126,21 @@ impl LedgerMetadataDb {
         start_epoch: u64,
         end_epoch: u64,
     ) -> Result<EpochEndingLedgerInfoIter<'_>> {
-        let mut iter = self.db.iter::<LedgerInfoSchema>()?;
+        self.get_epoch_ending_ledger_info_iter_with_opts(
+            start_epoch,
+            end_epoch,
+            ReadOptions::default(),
+        )
+    }
+
+    /// Same as `get_epoch_ending_ledger_info_iter`, but with custom `ReadOptions`.
+    pub(crate) fn get_epoch_ending_ledger_info_iter_with_opts(
+        &self,
+        start_epoch: u64,
+        end_epoch: u64,
+        opts: ReadOptions,
+    ) -> Result<EpochEndingLedgerInfoIter<'_>> {
+        let mut iter = self.db.iter_with_opts::<LedgerInfoSchema>(opts)?;
         iter.seek(&start_epoch)?;
         Ok(EpochEndingLedgerInfoIter::new(iter, start_epoch, end_epoch))
     }
