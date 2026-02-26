@@ -133,9 +133,7 @@ pub async fn root_handler() -> Html<&'static str> {
 }
 
 // ========================================================================
-// The handlers below delegate to the Poem-based API structs and convert
-// the poem::IntoResponse output to axum responses. This gives us perfect
-// behavioral compatibility during the migration.
+// Route handlers — each calls a framework-agnostic inner function.
 // ========================================================================
 
 // ---- BasicApi ----
