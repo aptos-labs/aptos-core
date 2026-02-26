@@ -615,7 +615,9 @@ impl<E: Pairing> traits::BatchedRangeProof<E> for Proof<E> {
         #[cfg(feature = "range_proof_timing_univariate_v2")]
         let start = Instant::now();
         let h_evals: Vec<E::ScalarField> = {
-            let mut result = Vec::with_capacity(num_omegas);
+            let ell_usize = ell as usize;
+            let two = E::ScalarField::from(2u64);
+            let pow2_j = &prover_precomputed.powers_of_two;
 
             let first_h_eval = {
                 let mut pow2 = E::ScalarField::ONE;
@@ -634,37 +636,29 @@ impl<E: Pairing> traits::BatchedRangeProof<E> for Proof<E> {
                 let numerator = beta * (r - sum_pow2_rs) + sum_betas_term;
                 numerator * num_omegas_inv
             };
+
+            let mut result = Vec::with_capacity(num_omegas);
             result.push(first_h_eval);
+            for i in 1..num_omegas {
+                result.push(beta * diff_hat_f_evals[i]);
+            }
+
+            // j-outer, i-inner: sequential access to diff_f_js_evals[j] and f_js_evals[j]
+            for j in 0..ell_usize {
+                let diff_f_j = &diff_f_js_evals[j];
+                let f_j = &f_js_evals[j];
+                let pow2 = pow2_j[j];
+                let beta_j = betas[j];
+                let coeff1 = beta * pow2;
+                for i in 1..num_omegas {
+                    let d = diff_f_j[i];
+                    result[i] -= coeff1 * d;
+                    result[i] += beta_j * d * (two * f_j[i] - E::ScalarField::ONE);
+                }
+            }
 
             for i in 1..num_omegas {
-                // First term: beta * diff_hat_f_evals[i]
-                let mut val = diff_hat_f_evals[i];
-
-                // Second term: -beta * sum_j 2^j * f_j_evals[j][i]
-                let sum1: E::ScalarField = diff_f_js_evals
-                    .iter()
-                    .enumerate()
-                    .map(|(j, diff_f_j)| E::ScalarField::from(1u64 << j) * diff_f_j[i])
-                    .sum();
-                val = (val - sum1) * beta;
-
-                // Third term: sum_j betas[j] * diff_f_j * (2*f_j - 1)
-                let sum2: E::ScalarField = diff_f_js_evals
-                    .iter()
-                    .zip(f_js_evals.iter())
-                    .enumerate()
-                    .map(|(j, (diff_f_j, f_j))| {
-                        betas[j]
-                            * diff_f_j[i]
-                            * (E::ScalarField::from(2u64) * f_j[i] - E::ScalarField::ONE)
-                    })
-                    .sum();
-                val += sum2;
-
-                // Divide by precomputed denominator
-                val *= prover_precomputed.h_denom_eval[i];
-
-                result.push(val);
+                result[i] *= prover_precomputed.h_denom_eval[i];
             }
 
             result
