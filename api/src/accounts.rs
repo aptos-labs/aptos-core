@@ -3,20 +3,18 @@
 
 use crate::{
     accept_type::AcceptType,
-    context::{api_spawn_blocking, Context},
-    failpoint::fail_point_poem,
+    context::Context,
     page::determine_limit,
     response::{
         account_not_found, resource_not_found, struct_field_not_found, BadRequestError,
         BasicErrorWith404, BasicResponse, BasicResponseStatus, BasicResultWith404, InternalError,
     },
     response_axum::{AptosErrorResponse, AptosResponse},
-    ApiTags,
 };
 use anyhow::Context as AnyhowContext;
 use aptos_api_types::{
     AccountData, Address, AptosErrorCode, AsConverter, AssetType, LedgerInfo, MoveModuleBytecode,
-    MoveModuleId, MoveResource, MoveStructTag, StateKeyWrapper, U64,
+    MoveModuleId, MoveResource, MoveStructTag, U64,
 };
 use aptos_sdk::types::{get_paired_fa_metadata_address, get_paired_fa_primary_store_address};
 use aptos_types::{
@@ -30,193 +28,7 @@ use aptos_types::{
 use move_core_types::{
     identifier::Identifier, language_storage::StructTag, move_resource::MoveStructType,
 };
-use poem_openapi::{
-    param::{Path, Query},
-    OpenApi,
-};
 use std::{collections::BTreeMap, convert::TryInto, str::FromStr, sync::Arc};
-
-/// API for accounts, their associated resources, and modules
-pub struct AccountsApi {
-    pub context: Arc<Context>,
-}
-
-#[OpenApi]
-impl AccountsApi {
-    /// Get account
-    ///
-    /// Return the authentication key and the sequence number for an account
-    /// address. Optionally, a ledger version can be specified. If the ledger
-    /// version is not specified in the request, the latest ledger version is used.
-    #[oai(
-        path = "/accounts/:address",
-        method = "get",
-        operation_id = "get_account",
-        tag = "ApiTags::Accounts"
-    )]
-    async fn get_account(
-        &self,
-        accept_type: AcceptType,
-        /// Address of account with or without a `0x` prefix
-        address: Path<Address>,
-        /// Ledger version to get state of account
-        ///
-        /// If not provided, it will be the latest version
-        ledger_version: Query<Option<U64>>,
-    ) -> BasicResultWith404<AccountData> {
-        fail_point_poem("endpoint_get_account")?;
-        self.context
-            .check_api_output_enabled("Get account", &accept_type)?;
-
-        let context = self.context.clone();
-        api_spawn_blocking(move || {
-            let account = Account::new(context, address.0, ledger_version.0, None, None)?;
-            account.account(&accept_type)
-        })
-        .await
-    }
-
-    /// Get account resources
-    ///
-    /// Retrieves all account resources for a given account and a specific ledger version.  If the
-    /// ledger version is not specified in the request, the latest ledger version is used.
-    ///
-    /// The Aptos nodes prune account state history, via a configurable time window.
-    /// If the requested ledger version has been pruned, the server responds with a 410.
-    #[oai(
-        path = "/accounts/:address/resources",
-        method = "get",
-        operation_id = "get_account_resources",
-        tag = "ApiTags::Accounts"
-    )]
-    async fn get_account_resources(
-        &self,
-        accept_type: AcceptType,
-        /// Address of account with or without a `0x` prefix
-        address: Path<Address>,
-        /// Ledger version to get state of account
-        ///
-        /// If not provided, it will be the latest version
-        ledger_version: Query<Option<U64>>,
-        /// Cursor specifying where to start for pagination
-        ///
-        /// This cursor cannot be derived manually client-side. Instead, you must
-        /// call this endpoint once without this query parameter specified, and
-        /// then use the cursor returned in the X-Aptos-Cursor header in the
-        /// response.
-        start: Query<Option<StateKeyWrapper>>,
-        /// Max number of account resources to retrieve
-        ///
-        /// If not provided, defaults to default page size.
-        limit: Query<Option<u16>>,
-    ) -> BasicResultWith404<Vec<MoveResource>> {
-        fail_point_poem("endpoint_get_account_resources")?;
-        self.context
-            .check_api_output_enabled("Get account resources", &accept_type)?;
-
-        let context = self.context.clone();
-        api_spawn_blocking(move || {
-            let account = Account::new(
-                context,
-                address.0,
-                ledger_version.0,
-                start.0.map(StateKey::from),
-                limit.0,
-            )?;
-            account.resources(&accept_type)
-        })
-        .await
-    }
-
-    /// Get account balance
-    ///
-    /// Retrieves account balance for coins / fungible asset (only for primary fungible asset store)
-    /// for a given account, asset type and a specific ledger version.  If the
-    /// ledger version is not specified in the request, the latest ledger version is used.
-    ///
-    /// The Aptos nodes prune account state history, via a configurable time window.
-    /// If the requested ledger version has been pruned, the server responds with a 410.
-    #[oai(
-        path = "/accounts/:address/balance/:asset_type",
-        method = "get",
-        operation_id = "get_account_balance",
-        tag = "ApiTags::Accounts"
-    )]
-    async fn get_account_balance(
-        &self,
-        accept_type: AcceptType,
-        /// Address of account with or without a `0x` prefix
-        address: Path<Address>,
-        asset_type: Path<AssetType>,
-        /// Ledger version to get state of account
-        ///
-        /// If not provided, it will be the latest version
-        ledger_version: Query<Option<U64>>,
-    ) -> BasicResultWith404<u64> {
-        fail_point_poem("endpoint_get_account_balance")?;
-        self.context
-            .check_api_output_enabled("Get account balance", &accept_type)?;
-
-        let context = self.context.clone();
-        api_spawn_blocking(move || {
-            let account = Account::new(context, address.0, ledger_version.0, None, None)?;
-            account.balance(asset_type.0, &accept_type)
-        })
-        .await
-    }
-
-    /// Get account modules
-    ///
-    /// Retrieves all account modules' bytecode for a given account at a specific ledger version.
-    /// If the ledger version is not specified in the request, the latest ledger version is used.
-    ///
-    /// The Aptos nodes prune account state history, via a configurable time window.
-    /// If the requested ledger version has been pruned, the server responds with a 410.
-    #[oai(
-        path = "/accounts/:address/modules",
-        method = "get",
-        operation_id = "get_account_modules",
-        tag = "ApiTags::Accounts"
-    )]
-    async fn get_account_modules(
-        &self,
-        accept_type: AcceptType,
-        /// Address of account with or without a `0x` prefix
-        address: Path<Address>,
-        /// Ledger version to get state of account
-        ///
-        /// If not provided, it will be the latest version
-        ledger_version: Query<Option<U64>>,
-        /// Cursor specifying where to start for pagination
-        ///
-        /// This cursor cannot be derived manually client-side. Instead, you must
-        /// call this endpoint once without this query parameter specified, and
-        /// then use the cursor returned in the X-Aptos-Cursor header in the
-        /// response.
-        start: Query<Option<StateKeyWrapper>>,
-        /// Max number of account modules to retrieve
-        ///
-        /// If not provided, defaults to default page size.
-        limit: Query<Option<u16>>,
-    ) -> BasicResultWith404<Vec<MoveModuleBytecode>> {
-        fail_point_poem("endpoint_get_account_modules")?;
-        self.context
-            .check_api_output_enabled("Get account modules", &accept_type)?;
-
-        let context = self.context.clone();
-        api_spawn_blocking(move || {
-            let account = Account::new(
-                context,
-                address.0,
-                ledger_version.0,
-                start.0.map(StateKey::from),
-                limit.0,
-            )?;
-            account.modules(&accept_type)
-        })
-        .await
-    }
-}
 
 /// A struct representing Account related lookups for resources and modules
 pub struct Account {

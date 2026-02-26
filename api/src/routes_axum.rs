@@ -862,7 +862,7 @@ pub async fn submit_transaction_handler(
         context.get_latest_ledger_info::<AptosErrorResponse>()?;
 
     let data = if content_type.contains("application/x.aptos.signed_transaction+bcs") {
-        crate::transactions::SubmitTransactionPost::Bcs(crate::bcs_payload::Bcs(body.to_vec()))
+        crate::transactions::SubmitTransactionPost::Bcs(body.to_vec())
     } else if content_type.contains("application/json") || content_type.is_empty() {
         let req: aptos_api_types::SubmitTransactionRequest = serde_json::from_slice(&body)
             .map_err(|e| {
@@ -875,7 +875,7 @@ pub async fn submit_transaction_handler(
                     None,
                 )
             })?;
-        crate::transactions::SubmitTransactionPost::Json(poem_openapi::payload::Json(req))
+        crate::transactions::SubmitTransactionPost::Json(req)
     } else {
         return Err(unsupported_content_type(content_type));
     };
@@ -917,9 +917,7 @@ pub async fn submit_transactions_batch_handler(
         context.get_latest_ledger_info::<AptosErrorResponse>()?;
 
     let data = if content_type.contains("application/x.aptos.signed_transaction+bcs") {
-        crate::transactions::SubmitTransactionsBatchPost::Bcs(crate::bcs_payload::Bcs(
-            body.to_vec(),
-        ))
+        crate::transactions::SubmitTransactionsBatchPost::Bcs(body.to_vec())
     } else if content_type.contains("application/json") || content_type.is_empty() {
         let reqs: Vec<aptos_api_types::SubmitTransactionRequest> = serde_json::from_slice(&body)
             .map_err(|e| {
@@ -932,7 +930,7 @@ pub async fn submit_transactions_batch_handler(
                     None,
                 )
             })?;
-        crate::transactions::SubmitTransactionsBatchPost::Json(poem_openapi::payload::Json(reqs))
+        crate::transactions::SubmitTransactionsBatchPost::Json(reqs)
     } else {
         return Err(unsupported_content_type(content_type));
     };
@@ -970,7 +968,7 @@ pub async fn simulate_transaction_handler(
         context.get_latest_ledger_info::<AptosErrorResponse>()?;
 
     let data = if content_type.contains("application/x.aptos.signed_transaction+bcs") {
-        crate::transactions::SubmitTransactionPost::Bcs(crate::bcs_payload::Bcs(body.to_vec()))
+        crate::transactions::SubmitTransactionPost::Bcs(body.to_vec())
     } else if content_type.contains("application/json") || content_type.is_empty() {
         let req: aptos_api_types::SubmitTransactionRequest = serde_json::from_slice(&body)
             .map_err(|e| {
@@ -983,7 +981,7 @@ pub async fn simulate_transaction_handler(
                     None,
                 )
             })?;
-        crate::transactions::SubmitTransactionPost::Json(poem_openapi::payload::Json(req))
+        crate::transactions::SubmitTransactionPost::Json(req)
     } else {
         return Err(unsupported_content_type(content_type));
     };
@@ -1066,7 +1064,7 @@ pub async fn view_function_handler(
         .unwrap_or("application/json");
 
     let request = if content_type.contains("application/x.aptos.view_function+bcs") {
-        crate::view_function::ViewFunctionRequest::Bcs(crate::bcs_payload::Bcs(body.to_vec()))
+        crate::view_function::ViewFunctionRequest::Bcs(body.to_vec())
     } else {
         let view_request: aptos_api_types::ViewRequest =
             serde_json::from_slice(&body).map_err(|e| {
@@ -1079,7 +1077,7 @@ pub async fn view_function_handler(
                     None,
                 )
             })?;
-        crate::view_function::ViewFunctionRequest::Json(poem_openapi::payload::Json(view_request))
+        crate::view_function::ViewFunctionRequest::Json(view_request)
     };
 
     let lv = query.ledger_version;

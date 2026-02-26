@@ -3,106 +3,17 @@
 
 use crate::{
     accept_type::AcceptType,
-    context::{api_spawn_blocking, Context},
-    failpoint::fail_point_poem,
+    context::Context,
     response::{BasicResponse, BasicResponseStatus, BasicResultWith404},
     response_axum::{AptosErrorResponse, AptosResponse},
-    ApiTags,
 };
 use aptos_api_types::{BcsBlock, Block, LedgerInfo};
-use poem_openapi::{
-    param::{Path, Query},
-    OpenApi,
-};
 use std::sync::Arc;
 
 /// API for block transactions and information
 #[derive(Clone)]
 pub struct BlocksApi {
     pub context: Arc<Context>,
-}
-
-#[OpenApi]
-impl BlocksApi {
-    /// Get blocks by height
-    ///
-    /// This endpoint allows you to get the transactions in a block
-    /// and the corresponding block information.
-    ///
-    /// Transactions are limited by max default transactions size.  If not all transactions
-    /// are present, the user will need to query for the rest of the transactions via the
-    /// get transactions API.
-    ///
-    /// If the block is pruned, it will return a 410
-    #[oai(
-        path = "/blocks/by_height/:block_height",
-        method = "get",
-        operation_id = "get_block_by_height",
-        tag = "ApiTags::Blocks"
-    )]
-    async fn get_block_by_height(
-        &self,
-        accept_type: AcceptType,
-        /// Block height to lookup.  Starts at 0
-        block_height: Path<u64>,
-        /// If set to true, include all transactions in the block
-        ///
-        /// If not provided, no transactions will be retrieved
-        with_transactions: Query<Option<bool>>,
-    ) -> BasicResultWith404<Block> {
-        fail_point_poem("endpoint_get_block_by_height")?;
-        self.context
-            .check_api_output_enabled("Get block by height", &accept_type)?;
-        let api = self.clone();
-        api_spawn_blocking(move || {
-            api.get_by_height(
-                accept_type,
-                block_height.0,
-                with_transactions.0.unwrap_or_default(),
-            )
-        })
-        .await
-    }
-
-    /// Get blocks by version
-    ///
-    /// This endpoint allows you to get the transactions in a block
-    /// and the corresponding block information given a version in the block.
-    ///
-    /// Transactions are limited by max default transactions size.  If not all transactions
-    /// are present, the user will need to query for the rest of the transactions via the
-    /// get transactions API.
-    ///
-    /// If the block has been pruned, it will return a 410
-    #[oai(
-        path = "/blocks/by_version/:version",
-        method = "get",
-        operation_id = "get_block_by_version",
-        tag = "ApiTags::Blocks"
-    )]
-    async fn get_block_by_version(
-        &self,
-        accept_type: AcceptType,
-        /// Ledger version to lookup block information for.
-        version: Path<u64>,
-        /// If set to true, include all transactions in the block
-        ///
-        /// If not provided, no transactions will be retrieved
-        with_transactions: Query<Option<bool>>,
-    ) -> BasicResultWith404<Block> {
-        fail_point_poem("endpoint_get_block_by_version")?;
-        self.context
-            .check_api_output_enabled("Get block by version", &accept_type)?;
-        let api = self.clone();
-        api_spawn_blocking(move || {
-            api.get_by_version(
-                accept_type,
-                version.0,
-                with_transactions.0.unwrap_or_default(),
-            )
-        })
-        .await
-    }
 }
 
 impl BlocksApi {

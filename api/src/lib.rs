@@ -1,8 +1,6 @@
 // Copyright (c) Aptos Foundation
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
-use poem_openapi::Tags;
-
 mod accept_type;
 mod accept_type_axum;
 mod accounts;
@@ -34,36 +32,7 @@ pub mod tests;
 mod transactions;
 mod view_function;
 
-/// API categories for the OpenAPI spec
-#[derive(Tags)]
-pub enum ApiTags {
-    /// Access to accounts, resources, and modules
-    Accounts,
-    /// Access to blocks
-    Blocks,
-
-    /// Access to events
-    Events,
-
-    /// Experimental APIs, no guarantees
-    Experimental,
-
-    /// General information
-    General,
-
-    /// Access to tables
-    Tables,
-
-    /// Access to transactions
-    Transactions,
-
-    /// View functions,
-    View,
-}
-
-// Note: Many of these exports are just for the test-context crate, which is
-// needed outside of the API, e.g. for fh-stream.
 pub use context::Context;
 pub use response::BasicError;
-pub use runtime::{attach_poem_to_runtime, bootstrap, get_api_service};
+pub use runtime::bootstrap;
 pub use runtime_axum::attach_axum_to_runtime;
