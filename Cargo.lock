@@ -496,7 +496,6 @@ dependencies = [
  "tokio",
  "tokio-rustls 0.26.0",
  "tower-http 0.6.8",
- "warp",
 ]
 
 [[package]]
@@ -526,14 +525,11 @@ dependencies = [
  "bcs 0.1.4",
  "bytes",
  "goldenfile",
- "hyper 0.14.28",
  "rand 0.7.3",
  "regex",
  "reqwest 0.11.23",
  "serde_json",
  "tokio",
- "warp",
- "warp-reverse-proxy",
 ]
 
 [[package]]
@@ -20086,20 +20082,6 @@ dependencies = [
  "tokio-util 0.7.10",
  "tower-service",
  "tracing",
-]
-
-[[package]]
-name = "warp-reverse-proxy"
-version = "1.0.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "948552bbb7a5fb4ba3169fd09b6c1ab53c1b2fdd82603295df550f7a1ec644c0"
-dependencies = [
- "hyper 0.14.28",
- "once_cell",
- "reqwest 0.11.23",
- "thiserror 1.0.69",
- "unicase",
- "warp",
 ]
 
 [[package]]

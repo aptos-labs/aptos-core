@@ -53,8 +53,6 @@ use aptos_types::{
 };
 use aptos_vm::aptos_vm::AptosVMBlockExecutor;
 use aptos_vm_validator::vm_validator::PooledVMValidator;
-use bytes::Bytes;
-use hyper::{HeaderMap, Response};
 use rand::{Rng, SeedableRng};
 use serde_json::{json, Value};
 use std::{
@@ -65,8 +63,6 @@ use std::{
     time::{Duration, Instant},
 };
 use tokio::sync::watch::channel;
-use warp::{http::header::CONTENT_TYPE, Filter, Rejection, Reply};
-use warp_reverse_proxy::reverse_proxy_filter;
 
 const TRANSFER_AMOUNT: u64 = 200_000_000;
 
@@ -80,15 +76,6 @@ impl ApiSpecificConfig {
     pub fn get_api_base_path(&self) -> String {
         match &self {
             ApiSpecificConfig::V1(_) => "/v1".to_string(),
-        }
-    }
-
-    pub fn assert_content_type(&self, headers: &HeaderMap) {
-        match &self {
-            ApiSpecificConfig::V1(_) => assert!(headers[CONTENT_TYPE]
-                .to_str()
-                .unwrap()
-                .starts_with(mime_types::JSON),),
         }
     }
 
@@ -1330,53 +1317,6 @@ impl TestContext {
             Some(mime_types::BCS_SIGNED_TRANSACTION),
         )
         .await
-    }
-
-    pub async fn reply(&self, req: warp::test::RequestBuilder) -> Response<Bytes> {
-        let ApiSpecificConfig::V1(address) = self.api_specific_config;
-        req.reply(&self.get_routes_with_poem(address)).await
-    }
-
-    pub fn get_routes_with_poem(
-        &self,
-        poem_address: SocketAddr,
-    ) -> impl Filter<Extract = (impl Reply + use<>,), Error = Rejection> + Clone + use<> {
-        warp::path!("v1" / ..).and(reverse_proxy_filter(
-            "v1".to_string(),
-            format!("http://{}/v1", poem_address),
-        ))
-    }
-
-    pub async fn execute(&self, req: warp::test::RequestBuilder) -> Value {
-        self.wait_for_internal_indexer_caught_up().await;
-        let resp = self.reply(req).await;
-
-        let headers = resp.headers();
-
-        self.api_specific_config.assert_content_type(headers);
-
-        let body = serde_json::from_slice(resp.body()).expect("response body is JSON");
-        assert_eq!(
-            self.expect_status_code,
-            resp.status(),
-            "\nresponse: {}",
-            pretty(&body)
-        );
-
-        if self.expect_status_code < 300 {
-            let ledger_info = self.get_latest_ledger_info();
-            assert_eq!(headers[X_APTOS_CHAIN_ID], "4");
-            assert_eq!(
-                headers[X_APTOS_LEDGER_VERSION],
-                ledger_info.version().to_string()
-            );
-            assert_eq!(
-                headers[X_APTOS_LEDGER_TIMESTAMP],
-                ledger_info.timestamp().to_string()
-            );
-        }
-
-        body
     }
 
     async fn execute_reqwest_with_headers(
