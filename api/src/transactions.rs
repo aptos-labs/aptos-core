@@ -409,7 +409,8 @@ impl TransactionsApi {
         address: Address,
     ) -> BasicResultWith404<Vec<Transaction>> {
         // Verify the account exists
-        let account = Account::new(self.context.clone(), address, None, None, None)?;
+        let account = Account::new(self.context.clone(), address, None, None, None)
+            .map_err(crate::response_axum::axum_error_to_poem_404)?;
 
         let latest_ledger_info = account.latest_ledger_info;
         // TODO: Return more specific errors from within this function.

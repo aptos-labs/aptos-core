@@ -710,6 +710,37 @@ impl From<crate::transactions::SubmitTransactionError> for AptosErrorResponse {
     }
 }
 
+/// Convert an `AptosErrorResponse` into a Poem `BasicErrorWith404`.
+///
+/// This is intentionally NOT a `From` impl to avoid creating type inference
+/// ambiguity in generic contexts where the compiler must choose between
+/// `From<AptosErrorResponse>` and the identity `From<BasicErrorWith404>`.
+pub fn axum_error_to_poem_404(err: AptosErrorResponse) -> crate::response::BasicErrorWith404 {
+    use crate::response::*;
+    type E = crate::response::BasicErrorWith404;
+    if let Some(ref li) = err.ledger_info {
+        match err.status.as_u16() {
+            400 => E::bad_request_from_aptos_error(err.error, li),
+            403 => E::forbidden_from_aptos_error(err.error, li),
+            404 => E::not_found_from_aptos_error(err.error, li),
+            410 => E::gone_from_aptos_error(err.error, li),
+            503 => E::service_unavailable_from_aptos_error(err.error, li),
+            _ => E::internal_from_aptos_error(err.error, li),
+        }
+    } else {
+        match err.status.as_u16() {
+            400 => E::bad_request_with_code_no_info(err.error.message, err.error.error_code),
+            403 => E::forbidden_with_code_no_info(err.error.message, err.error.error_code),
+            404 => E::not_found_with_code_no_info(err.error.message, err.error.error_code),
+            410 => E::gone_with_code_no_info(err.error.message, err.error.error_code),
+            503 => {
+                E::service_unavailable_with_code_no_info(err.error.message, err.error.error_code)
+            },
+            _ => E::internal_with_code_no_info(err.error.message, err.error.error_code),
+        }
+    }
+}
+
 fn poem_error_response_to_axum(resp: poem::Response) -> AptosErrorResponse {
     let status_code =
         StatusCode::from_u16(resp.status().as_u16()).unwrap_or(StatusCode::INTERNAL_SERVER_ERROR);

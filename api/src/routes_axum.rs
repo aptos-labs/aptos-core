@@ -254,7 +254,9 @@ pub async fn get_account_handler(
     context.check_api_output_enabled::<AptosErrorResponse>("Get account", &accept_type)?;
     let at = accept_type.clone();
     let resp = api_spawn_blocking(move || {
-        crate::accounts::account_inner(context, address, query.ledger_version, &at)
+        let account =
+            crate::accounts::Account::new(context, address, query.ledger_version, None, None)?;
+        account.account(&at)
     })
     .await?;
     Ok(resp.into_response())
@@ -273,14 +275,14 @@ pub async fn get_account_resources_handler(
         .check_api_output_enabled::<AptosErrorResponse>("Get account resources", &accept_type)?;
     let at = accept_type.clone();
     let resp = api_spawn_blocking(move || {
-        crate::accounts::resources_inner(
+        let account = crate::accounts::Account::new(
             context,
             address,
             query.ledger_version,
             query.start.map(StateKey::from),
             query.limit,
-            &at,
-        )
+        )?;
+        account.resources(&at)
     })
     .await?;
     Ok(resp.into_response())
@@ -300,7 +302,9 @@ pub async fn get_account_balance_handler(
     context.check_api_output_enabled::<AptosErrorResponse>("Get account balance", &accept_type)?;
     let at = accept_type.clone();
     let resp = api_spawn_blocking(move || {
-        crate::accounts::balance_inner(context, address, asset_type, query.ledger_version, &at)
+        let account =
+            crate::accounts::Account::new(context, address, query.ledger_version, None, None)?;
+        account.balance(asset_type, &at)
     })
     .await?;
     Ok(resp.into_response())
@@ -318,14 +322,14 @@ pub async fn get_account_modules_handler(
     context.check_api_output_enabled::<AptosErrorResponse>("Get account modules", &accept_type)?;
     let at = accept_type.clone();
     let resp = api_spawn_blocking(move || {
-        crate::accounts::modules_inner(
+        let account = crate::accounts::Account::new(
             context,
             address,
             query.ledger_version,
             query.start.map(StateKey::from),
             query.limit,
-            &at,
-        )
+        )?;
+        account.modules(&at)
     })
     .await?;
     Ok(resp.into_response())
