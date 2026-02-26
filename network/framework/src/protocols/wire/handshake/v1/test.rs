@@ -69,7 +69,7 @@ fn common_protocols() {
     let h1 = HandshakeMsg {
         chain_id,
         network_id,
-        supported_protocols,
+        supported_protocols: Arc::new(supported_protocols),
     };
 
     // Case 1: One intersecting protocol is found for common messaging protocol version.
@@ -81,7 +81,7 @@ fn common_protocols() {
     let h2 = HandshakeMsg {
         chain_id,
         network_id,
-        supported_protocols,
+        supported_protocols: Arc::new(supported_protocols),
     };
 
     assert_eq!(
@@ -96,7 +96,7 @@ fn common_protocols() {
     let h2 = HandshakeMsg {
         chain_id,
         network_id,
-        supported_protocols: BTreeMap::new(),
+        supported_protocols: Arc::new(BTreeMap::new()),
     };
     assert_eq!(
         h1.perform_handshake(&h2).unwrap_err(),
@@ -107,7 +107,7 @@ fn common_protocols() {
     let mut supported_protocols = BTreeMap::new();
     supported_protocols.insert(MessagingProtocolVersion::V1, ProtocolIdSet::empty());
     let h2 = HandshakeMsg {
-        supported_protocols,
+        supported_protocols: Arc::new(supported_protocols),
         chain_id,
         network_id,
     };

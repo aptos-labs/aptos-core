@@ -303,7 +303,7 @@ impl NetworkBuilder {
             .map(|conn_mgr_builder| conn_mgr_builder.conn_mgr_reqs_tx())
     }
 
-    pub fn listen_address(&self) -> NetworkAddress {
+    pub fn listen_address(&self) -> &NetworkAddress {
         self.peer_manager_builder.listen_address()
     }
 

@@ -72,7 +72,7 @@ pub fn choose_random_peers_by_ping_latency(
             &network_context,
             &unselected_peer_ids,
             num_remaining_peers,
-            discovered_peers.clone(),
+            discovered_peers,
         );
 
         // Extend the selected peers with the remaining peers
@@ -83,8 +83,10 @@ pub fn choose_random_peers_by_ping_latency(
     let selected_peer_ids =
         extend_with_random_peers(selected_peer_ids, &eligible_peer_ids, num_peers_to_choose);
 
-    // Return the selected peers
-    get_discovered_peers_for_ids(selected_peer_ids, discovered_peers)
+    // Filter the eligible_peers vec to return only the selected peers.
+    // This avoids re-acquiring the lock and cloning DiscoveredPeer from the
+    // shared DiscoveredPeerSet, since we already have owned copies.
+    filter_eligible_peers_by_ids(eligible_peers, &selected_peer_ids)
 }
 
 /// Returns true iff peers should be selected by ping latency. Note: this only
@@ -193,20 +195,17 @@ fn extend_with_random_peers(
     selected_peer_ids
 }
 
-/// Returns the discovered peer states for the given peer ids
-fn get_discovered_peers_for_ids(
-    peer_ids: HashSet<PeerId>,
-    discovered_peers: Arc<RwLock<DiscoveredPeerSet>>,
+/// Filters the eligible peers to return only those whose IDs are in the
+/// selected set. This avoids re-acquiring the lock on the shared
+/// `DiscoveredPeerSet` and cloning each `DiscoveredPeer` individually,
+/// since the caller already owns the eligible peers data.
+fn filter_eligible_peers_by_ids(
+    eligible_peers: Vec<(PeerId, DiscoveredPeer)>,
+    selected_peer_ids: &HashSet<PeerId>,
 ) -> Vec<(PeerId, DiscoveredPeer)> {
-    peer_ids
+    eligible_peers
         .into_iter()
-        .filter_map(|peer_id| {
-            discovered_peers
-                .read()
-                .peer_set
-                .get(&peer_id)
-                .map(|peer| (peer_id, peer.clone()))
-        })
+        .filter(|(peer_id, _)| selected_peer_ids.contains(peer_id))
         .collect()
 }
 
