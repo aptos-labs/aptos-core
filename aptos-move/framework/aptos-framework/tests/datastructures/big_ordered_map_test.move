@@ -1,8 +1,9 @@
 #[test_only]
 module aptos_framework::big_ordered_map_test {
-    use std::big_ordered_map::{new, new_from, new_with_config};
+    use aptos_framework::ordered_map;
+    use aptos_framework::ordered_map_test;
+    use aptos_framework::big_ordered_map::{new, new_from, new_with_config};
     use std::option;
-    use aptos_std::ordered_map;
 
     #[test]
     fun test_small_example() {
@@ -433,7 +434,7 @@ module aptos_framework::big_ordered_map_test {
     }
 
     #[test]
-    #[expected_failure(abort_code = 0x10002, location = aptos_std::ordered_map)] /// EKEY_NOT_FOUND
+    #[expected_failure(abort_code = 0x10002, location = aptos_std::big_ordered_map)] /// EKEY_NOT_FOUND
     fun test_abort_remove_missing_value_to_non_leaf() {
         let map = new_with_config(4, 4, false);
         map.add_all(vector_range(1, 10), vector_range(1, 10));
@@ -674,8 +675,8 @@ module aptos_framework::big_ordered_map_test {
         if (reuse_slots) {
             map.allocate_spare_slots(4);
         };
-        let data = ordered_map::large_dataset();
-        let shuffled_data = ordered_map::large_dataset_shuffled();
+        let data = ordered_map_test::large_dataset();
+        let shuffled_data = ordered_map_test::large_dataset_shuffled();
 
         let len = data.length();
         for (i in 0..len) {
@@ -720,6 +721,231 @@ module aptos_framework::big_ordered_map_test {
         };
 
         map.destroy_empty();
+    }
+
+    // Tests for remove_or_none
+
+    #[test]
+    fun test_remove_or_none_existing_key() {
+        let map = new_with_config(4, 3, false);
+        map.add_all(vector[1, 2, 3, 4, 5], vector[10, 20, 30, 40, 50]);
+
+        assert!(map.remove_or_none(&3) == option::some(30), 1);
+        assert!(!map.contains(&3), 2);
+        assert!(map.remove_or_none(&1) == option::some(10), 3);
+        assert!(!map.contains(&1), 4);
+        assert!(map.remove_or_none(&5) == option::some(50), 5);
+        assert!(!map.contains(&5), 6);
+
+        map.validate_map();
+        map.destroy(|_v| {});
+    }
+
+    #[test]
+    fun test_remove_or_none_missing_key() {
+        let map = new_with_config(4, 3, false);
+        map.add_all(vector[1, 2, 3], vector[10, 20, 30]);
+
+        assert!(map.remove_or_none(&0) == option::none(), 1);
+        assert!(map.remove_or_none(&4) == option::none(), 2);
+        assert!(map.remove_or_none(&10) == option::none(), 3);
+
+        // Removing a previously removed key also returns none
+        map.remove_or_none(&2);
+        assert!(map.remove_or_none(&2) == option::none(), 4);
+
+        map.destroy(|_v| {});
+    }
+
+    #[test]
+    fun test_remove_or_none_multi_node() {
+        let map = new_with_config(4, 4, false);
+        map.add_all(vector_range(1, 20), vector_range(1, 20));
+        map.validate_map();
+
+        assert!(map.remove_or_none(&1) == option::some(1), 1);    // front
+        assert!(map.remove_or_none(&19) == option::some(19), 2);  // back
+        assert!(map.remove_or_none(&10) == option::some(10), 3);  // middle
+        assert!(map.remove_or_none(&1) == option::none(), 1);    // missing front
+        assert!(map.remove_or_none(&19) == option::none(), 2);  // missing back
+        assert!(map.remove_or_none(&10) == option::none(), 3);  // missing middle
+        assert!(map.remove_or_none(&99) == option::none(), 4);    // missing
+
+        map.validate_map();
+        map.destroy(|_v| {});
+    }
+
+    // Tests for iter_modify
+
+    #[test]
+    fun test_iter_modify_basic() {
+        let map = new_with_config(4, 3, false);
+        map.add_all(vector[1, 2, 3, 4, 5], vector[10, 20, 30, 40, 50]);
+
+        let it = map.internal_find(&3);
+        assert!(!it.iter_is_end(&map), 1);
+        let _ = it.iter_modify(&mut map, |v| { *v += 100; true });
+        assert!(map.borrow(&3) == &130, 2);
+
+        let it = map.internal_find(&1);
+        let _ = it.iter_modify(&mut map, |v| { *v *= 2; true });
+        assert!(map.borrow(&1) == &20, 3);
+
+        map.destroy(|_v| {});
+    }
+
+    #[test]
+    fun test_iter_modify_returns_value() {
+        let map = new_with_config(4, 3, false);
+        map.add_all(vector[1, 2, 3], vector[10, 20, 30]);
+
+        let it = map.internal_find(&2);
+        let old_val = it.iter_modify(&mut map, |v| {
+            let old = *v;
+            *v = 99;
+            old
+        });
+        assert!(old_val == 20, 1);
+        assert!(map.borrow(&2) == &99, 2);
+
+        map.destroy(|_v| {});
+    }
+
+    #[test]
+    fun test_iter_modify_multi_node() {
+        let map = new_with_config(4, 4, false);
+        map.add_all(vector_range(1, 20), vector_range(1, 20));
+        map.validate_map();
+
+        for (i in 1..20) {
+            let it = map.internal_find(&i);
+            assert!(!it.iter_is_end(&map), i);
+            let _ = it.iter_modify(&mut map, |v| { *v += 100; true });
+        };
+
+        for (i in 1..20) {
+            assert!(*map.borrow(&i) == i + 100, i);
+        };
+
+        map.validate_map();
+        map.destroy(|_v| {});
+    }
+
+    #[test]
+    fun test_iter_modify_variable_size() {
+        let map = new_with_config(0, 0, false);
+        map.add(1u64, vector[10u64]);
+        map.add(2u64, vector[20u64, 21u64]);
+
+        // iter_modify works even with variable-size values, unlike borrow_mut
+        let it = map.internal_find(&1);
+        let _ = it.iter_modify(&mut map, |v| { v.push_back(11); true });
+        assert!(map.borrow(&1) == &vector[10, 11], 1);
+
+        let it = map.internal_find(&2);
+        let _ = it.iter_modify(&mut map, |v| { *v = vector[99]; true });
+        assert!(map.borrow(&2) == &vector[99], 2);
+
+        map.destroy(|_v| {});
+    }
+
+    #[test]
+    #[expected_failure(abort_code = 0x10003, location = aptos_framework::big_ordered_map)] /// EITER_OUT_OF_BOUNDS
+    fun test_abort_iter_modify_end_iter() {
+        let map = new_from(vector[1, 2, 3], vector[10, 20, 30]);
+        let _ = map.internal_new_end_iter().iter_modify(&mut map, |v| { *v += 1; true });
+        map.destroy_and_validate();
+    }
+
+    // Tests for iter_remove
+
+    #[test]
+    fun test_iter_remove_basic() {
+        let map = new_with_config(4, 3, false);
+        map.add_all(vector[1, 2, 3, 4, 5], vector[10, 20, 30, 40, 50]);
+
+        let it = map.internal_find_with_path(&3);
+        assert!(!it.iter_with_path_get_iter().iter_is_end(&map), 1);
+        let removed = it.iter_remove(&mut map);
+        assert!(removed == 30, 2);
+        assert!(!map.contains(&3), 3);
+
+        // Remove front
+        let it = map.internal_find_with_path(&1);
+        let removed = it.iter_remove(&mut map);
+        assert!(removed == 10, 4);
+        assert!(!map.contains(&1), 5);
+
+        // Remove back
+        let it = map.internal_find_with_path(&5);
+        let removed = it.iter_remove(&mut map);
+        assert!(removed == 50, 6);
+        assert!(!map.contains(&5), 7);
+
+        map.validate_map();
+        map.destroy(|_v| {});
+    }
+
+    #[test]
+    fun test_iter_remove_all_keys() {
+        let map = new_with_config(5, 5, true);
+        map.allocate_spare_slots(2);
+        let data = vector[1, 7, 5, 8, 4, 2, 6, 3, 9, 0];
+        map.add_all(data, data);
+        map.validate_map();
+
+        for (i in 0..10) {
+            let it = map.internal_find_with_path(&i);
+            assert!(!it.iter_with_path_get_iter().iter_is_end(&map), i);
+            let removed = it.iter_remove(&mut map);
+            assert!(removed == i, i);
+            map.validate_map();
+        };
+
+        map.destroy_empty();
+    }
+
+    #[test]
+    fun test_iter_remove_multi_node() {
+        let map = new_with_config(4, 4, false);
+        map.add_all(vector_range(1, 20), vector_range(1, 20));
+        map.validate_map();
+
+        // Remove odd-numbered keys across multiple nodes
+        for (i in 1..20) {
+            if (i % 2 == 1) {
+                let it = map.internal_find_with_path(&i);
+                assert!(!it.iter_with_path_get_iter().iter_is_end(&map));
+                let removed = it.iter_remove(&mut map);
+                assert!(removed == i);
+                assert!(!map.contains(&i));
+                map.validate_map();
+
+                // shouldn't be there any more
+                let it = map.internal_find_with_path(&i);
+                assert!(it.iter_with_path_get_iter().iter_is_end(&map));
+            };
+        };
+
+        // Even-numbered keys should still be present
+        for (i in 1..20) {
+            if (i % 2 == 0) {
+                assert!(map.contains(&i), i);
+            };
+        };
+
+        map.destroy(|_v| {});
+    }
+
+    #[test]
+    #[expected_failure(abort_code = 0x10003, location = aptos_framework::big_ordered_map)] /// EITER_OUT_OF_BOUNDS
+    fun test_abort_iter_remove_end_iter() {
+        let map = new_from(vector[1, 2, 3], vector[10, 20, 30]);
+        // Finding a missing key returns an end IteratorPtrWithPath
+        let it = map.internal_find_with_path(&99);
+        assert!(it.iter_with_path_get_iter().iter_is_end(&map), 0);
+        it.iter_remove(&mut map);
+        map.destroy_and_validate();
     }
 
     // Currently ignored long / more extensive tests.
