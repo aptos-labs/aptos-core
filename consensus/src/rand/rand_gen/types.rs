@@ -28,12 +28,6 @@ use std::{collections::HashSet, fmt::Debug, sync::Arc};
 pub const NUM_THREADS_FOR_WVUF_DERIVATION: usize = 8;
 pub const FUTURE_ROUNDS_TO_ACCEPT: u64 = 200;
 
-#[derive(Clone, Copy, Debug, PartialEq)]
-pub enum PathType {
-    Fast,
-    Slow,
-}
-
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub(super) struct MockShare;
 
@@ -234,7 +228,7 @@ impl Share {
 }
 
 impl TAugmentedData for AugmentedData {
-    fn generate(rand_config: &RandConfig, fast_rand_config: &Option<RandConfig>) -> AugData<Self>
+    fn generate(rand_config: &RandConfig) -> AugData<Self>
     where
         Self: Sized,
     {
@@ -243,19 +237,9 @@ impl TAugmentedData for AugmentedData {
             .add_certified_delta(&rand_config.author(), delta.clone())
             .expect("Add self delta should succeed");
 
-        let fast_delta = if let Some(fast_config) = fast_rand_config.as_ref() {
-            let fast_delta = fast_config.get_my_delta().clone();
-            fast_config
-                .add_certified_delta(&rand_config.author(), fast_delta.clone())
-                .expect("Add self delta for fast path should succeed");
-            Some(fast_delta)
-        } else {
-            None
-        };
-
         let data = AugmentedData {
             delta: delta.clone(),
-            fast_delta,
+            fast_delta: None,
         };
         AugData::new(rand_config.epoch(), rand_config.author(), data)
     }
@@ -263,40 +247,23 @@ impl TAugmentedData for AugmentedData {
     fn augment(
         &self,
         rand_config: &RandConfig,
-        fast_rand_config: &Option<RandConfig>,
         author: &Author,
     ) {
-        let AugmentedData { delta, fast_delta } = self;
+        let AugmentedData { delta, .. } = self;
         rand_config
             .add_certified_delta(author, delta.clone())
             .expect("Add delta should succeed");
-
-        if let (Some(config), Some(fast_delta)) = (fast_rand_config, fast_delta) {
-            config
-                .add_certified_delta(author, fast_delta.clone())
-                .expect("Add delta for fast path should succeed");
-        }
     }
 
     fn verify(
         &self,
         rand_config: &RandConfig,
-        fast_rand_config: &Option<RandConfig>,
         author: &Author,
     ) -> anyhow::Result<()> {
         rand_config
             .derive_apk(author, self.delta.clone())
             .map(|_| ())?;
-
-        ensure!(
-            self.fast_delta.is_some() == fast_rand_config.is_some(),
-            "Fast path delta should be present iff fast_rand_config is present."
-        );
-        if let (Some(config), Some(fast_delta)) = (fast_rand_config, self.fast_delta.as_ref()) {
-            config.derive_apk(author, fast_delta.clone()).map(|_| ())
-        } else {
-            Ok(())
-        }
+        Ok(())
     }
 }
 
@@ -330,7 +297,7 @@ impl TShare for MockShare {
 }
 
 impl TAugmentedData for MockAugData {
-    fn generate(rand_config: &RandConfig, _fast_rand_config: &Option<RandConfig>) -> AugData<Self>
+    fn generate(rand_config: &RandConfig) -> AugData<Self>
     where
         Self: Sized,
     {
@@ -340,7 +307,6 @@ impl TAugmentedData for MockAugData {
     fn augment(
         &self,
         _rand_config: &RandConfig,
-        _fast_rand_config: &Option<RandConfig>,
         _author: &Author,
     ) {
     }
@@ -348,7 +314,6 @@ impl TAugmentedData for MockAugData {
     fn verify(
         &self,
         _rand_config: &RandConfig,
-        _fast_rand_config: &Option<RandConfig>,
         _author: &Author,
     ) -> anyhow::Result<()> {
         Ok(())
@@ -394,21 +359,19 @@ pub trait TShare:
 pub trait TAugmentedData:
     Clone + Debug + PartialEq + Send + Sync + Serialize + DeserializeOwned + 'static
 {
-    fn generate(rand_config: &RandConfig, fast_rand_config: &Option<RandConfig>) -> AugData<Self>
+    fn generate(rand_config: &RandConfig) -> AugData<Self>
     where
         Self: Sized;
 
     fn augment(
         &self,
         rand_config: &RandConfig,
-        fast_rand_config: &Option<RandConfig>,
         author: &Author,
     );
 
     fn verify(
         &self,
         rand_config: &RandConfig,
-        fast_rand_config: &Option<RandConfig>,
         author: &Author,
     ) -> anyhow::Result<()>;
 }
@@ -500,52 +463,6 @@ impl RequestShare {
     }
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
-pub struct FastShare<S> {
-    pub share: RandShare<S>,
-}
-
-impl<S: TShare> FastShare<S> {
-    pub fn new(share: RandShare<S>) -> Self {
-        Self { share }
-    }
-
-    pub fn author(&self) -> &Author {
-        self.share.author()
-    }
-
-    pub fn rand_share(&self) -> RandShare<S> {
-        self.share.clone()
-    }
-
-    pub fn share(&self) -> &S {
-        self.share.share()
-    }
-
-    pub fn metadata(&self) -> &RandMetadata {
-        self.share.metadata()
-    }
-
-    pub fn round(&self) -> Round {
-        self.share.round()
-    }
-
-    pub fn epoch(&self) -> u64 {
-        self.share.epoch()
-    }
-
-    pub fn verify(&self, rand_config: &RandConfig) -> anyhow::Result<()> {
-        self.share.verify(rand_config)
-    }
-
-    pub fn optimistic_verify(&self, rand_config: &RandConfig) -> anyhow::Result<()> {
-        self.share.optimistic_verify(rand_config)
-    }
-
-    pub fn share_id(&self) -> ShareId {
-        self.share.share_id()
-    }
-}
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize, Hash, Eq)]
 pub struct AugDataId {
@@ -601,12 +518,11 @@ impl<D: TAugmentedData> AugData<D> {
     pub fn verify(
         &self,
         rand_config: &RandConfig,
-        fast_rand_config: &Option<RandConfig>,
         sender: Author,
     ) -> anyhow::Result<()> {
         ensure!(self.author == sender, "Invalid author");
         self.data
-            .verify(rand_config, fast_rand_config, &self.author)?;
+            .verify(rand_config, &self.author)?;
         Ok(())
     }
 }
@@ -1204,5 +1120,66 @@ mod tests {
             bad_authors.is_empty(),
             "Non-optimistic mode skips pre_aggregate_verify"
         );
+    }
+
+    /// Test that the key pair DB format change is backward compatible.
+    /// Old format: (AugKeyPair, Option<AugKeyPair>) where AugKeyPair = (ASK, APK)
+    /// New format: AugKeyPair = (ASK, APK)
+    /// The deserialization logic in epoch_manager.rs tries old format first,
+    /// then new format, then falls through to regenerate.
+    #[test]
+    fn test_key_pair_serialization_backward_compat() {
+        use aptos_types::randomness::{APK, ASK};
+
+        let ctx = MultiValidatorTestContext::new(vec![1, 1, 1, 1], false);
+        let keys = &ctx.rand_configs[0].keys;
+        let ask = keys.ask.clone();
+        let apk = keys.apk.clone();
+
+        type AugKeyPair = (ASK, APK);
+
+        let key_pair: AugKeyPair = (ask.clone(), apk.clone());
+
+        // Old format: (main_key_pair, fast_key_pair) where fast is Option
+        let old_bytes_with_fast =
+            bcs::to_bytes(&(key_pair.clone(), Some(key_pair.clone()))).unwrap();
+        let old_bytes_without_fast =
+            bcs::to_bytes(&(key_pair.clone(), Option::<AugKeyPair>::None)).unwrap();
+
+        // New format: just the key pair
+        let new_bytes = bcs::to_bytes(&key_pair).unwrap();
+
+        // Old format with fast=Some should deserialize via old path
+        let (main, _fast): (AugKeyPair, Option<AugKeyPair>) =
+            bcs::from_bytes(&old_bytes_with_fast).unwrap();
+        assert_eq!(bcs::to_bytes(&main.0).unwrap(), bcs::to_bytes(&ask).unwrap());
+        assert_eq!(bcs::to_bytes(&main.1).unwrap(), bcs::to_bytes(&apk).unwrap());
+
+        // Old format with fast=None should deserialize via old path
+        let (main, fast): (AugKeyPair, Option<AugKeyPair>) =
+            bcs::from_bytes(&old_bytes_without_fast).unwrap();
+        assert_eq!(bcs::to_bytes(&main.0).unwrap(), bcs::to_bytes(&ask).unwrap());
+        assert_eq!(bcs::to_bytes(&main.1).unwrap(), bcs::to_bytes(&apk).unwrap());
+        assert!(fast.is_none());
+
+        // New format should deserialize via new path
+        let recovered: AugKeyPair = bcs::from_bytes(&new_bytes).unwrap();
+        assert_eq!(
+            bcs::to_bytes(&recovered.0).unwrap(),
+            bcs::to_bytes(&ask).unwrap()
+        );
+        assert_eq!(
+            bcs::to_bytes(&recovered.1).unwrap(),
+            bcs::to_bytes(&apk).unwrap()
+        );
+
+        // New format should NOT deserialize as old format (ensures we need the fallback)
+        assert!(bcs::from_bytes::<(AugKeyPair, Option<AugKeyPair>)>(&new_bytes).is_err());
+
+        // Old format should NOT deserialize as new format (ensures ordering matters)
+        // Old-with-fast bytes contain extra data, so trying to parse as just AugKeyPair
+        // would either fail or silently consume only the prefix. BCS is strict, so it
+        // should fail on trailing bytes.
+        assert!(bcs::from_bytes::<AugKeyPair>(&old_bytes_with_fast).is_err());
     }
 }

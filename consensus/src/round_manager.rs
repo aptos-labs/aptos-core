@@ -29,12 +29,12 @@ use crate::{
     pending_votes::{VoteReceptionResult, VoteStatus},
     persistent_liveness_storage::PersistentLivenessStorage,
     quorum_store::types::BatchMsg,
-    rand::rand_gen::types::{FastShare, RandConfig, Share, TShare},
     util::is_vtxn_expected,
 };
 use anyhow::{bail, ensure, Context};
 use aptos_channels::aptos_channel;
 use aptos_config::config::{BlockTransactionFilterConfig, ConsensusConfig};
+use aptos_crypto::hash::CryptoHash;
 use aptos_consensus_types::{
     block::Block,
     block_data::BlockType,
@@ -55,7 +55,6 @@ use aptos_consensus_types::{
     vote_msg::VoteMsg,
     wrapped_ledger_info::WrappedLedgerInfo,
 };
-use aptos_crypto::{hash::CryptoHash, HashValue};
 use aptos_infallible::{checked, Mutex};
 use aptos_logger::prelude::*;
 #[cfg(test)]
@@ -69,16 +68,14 @@ use aptos_types::{
         OnChainChunkyDKGConfig, OnChainConsensusConfig, OnChainJWKConsensusConfig,
         OnChainRandomnessConfig, ValidatorTxnConfig,
     },
-    randomness::RandMetadata,
     validator_verifier::ValidatorVerifier,
     PeerId,
 };
 use fail::fail_point;
 use futures::{channel::oneshot, stream::FuturesUnordered, Future, FutureExt, SinkExt, StreamExt};
-use lru::LruCache;
 use serde::Serialize;
 use std::{
-    collections::BTreeMap, mem::Discriminant, num::NonZeroUsize, ops::Add, pin::Pin, sync::Arc,
+    collections::BTreeMap, mem::Discriminant, ops::Add, pin::Pin, sync::Arc,
     time::Duration,
 };
 use tokio::{
@@ -330,13 +327,8 @@ pub struct RoundManager {
     randomness_config: OnChainRandomnessConfig,
     jwk_consensus_config: OnChainJWKConsensusConfig,
     chunky_dkg_config: OnChainChunkyDKGConfig,
-    fast_rand_config: Option<RandConfig>,
     // Stores the order votes from all the rounds above highest_ordered_round
     pending_order_votes: PendingOrderVotes,
-    // Round manager broadcasts fast shares when forming a QC or when receiving a proposal.
-    // To avoid duplicate broadcasts for the same block, we keep track of blocks for
-    // which we recently broadcasted fast shares.
-    blocks_with_broadcasted_fast_shares: LruCache<HashValue, ()>,
     futures: FuturesUnordered<
         Pin<Box<dyn Future<Output = (anyhow::Result<()>, Block, Instant)> + Send>>,
     >,
@@ -363,7 +355,6 @@ impl RoundManager {
         randomness_config: OnChainRandomnessConfig,
         jwk_consensus_config: OnChainJWKConsensusConfig,
         chunky_dkg_config: OnChainChunkyDKGConfig,
-        fast_rand_config: Option<RandConfig>,
         proposal_status_tracker: Arc<dyn TPastProposalStatusTracker>,
         opt_proposal_loopback_tx: aptos_channels::UnboundedSender<OptBlockData>,
     ) -> Self {
@@ -394,11 +385,7 @@ impl RoundManager {
             randomness_config,
             jwk_consensus_config,
             chunky_dkg_config,
-            fast_rand_config,
             pending_order_votes: PendingOrderVotes::new(),
-            blocks_with_broadcasted_fast_shares: LruCache::new(
-                NonZeroUsize::new(5).expect("LRU capacity should be non-zero."),
-            ),
             futures: FuturesUnordered::new(),
             proposal_status_tracker,
             pending_opt_proposals: BTreeMap::new(),
@@ -1356,31 +1343,6 @@ impl RoundManager {
             }
         });
     }
-
-    async fn broadcast_fast_shares(&mut self, block_info: &BlockInfo) {
-        // generate and multicast randomness share for the fast path
-        if let Some(fast_config) = &self.fast_rand_config {
-            if !block_info.is_empty()
-                && !self
-                    .blocks_with_broadcasted_fast_shares
-                    .contains(&block_info.id())
-            {
-                let metadata = RandMetadata {
-                    epoch: block_info.epoch(),
-                    round: block_info.round(),
-                };
-                let self_share = Share::generate(fast_config, metadata);
-                let fast_share = FastShare::new(self_share);
-                info!(LogSchema::new(LogEvent::BroadcastRandShareFastPath)
-                    .epoch(fast_share.epoch())
-                    .round(fast_share.round()));
-                self.network.broadcast_fast_share(fast_share).await;
-                self.blocks_with_broadcasted_fast_shares
-                    .put(block_info.id(), ());
-            }
-        }
-    }
-
     async fn create_vote(&mut self, proposal: Block) -> anyhow::Result<Vote> {
         let vote = self
             .vote_block(proposal)
@@ -1420,9 +1382,6 @@ impl RoundManager {
         let vote = self.create_vote(proposal).await?;
         self.round_state.record_vote(vote.clone());
         let vote_msg = VoteMsg::new(vote.clone(), self.block_store.sync_info());
-
-        self.broadcast_fast_shares(vote.ledger_info().commit_info())
-            .await;
 
         if self.local_config.broadcast_vote {
             info!(self.new_log(LogEvent::Vote), "{}", vote);
@@ -1830,8 +1789,6 @@ impl RoundManager {
                             "Failed to broadcast order vote for QC {:?}. Error: {:?}",
                             qc, e
                         );
-                    } else {
-                        self.broadcast_fast_shares(qc.certified_block()).await;
                     }
                 }
                 Ok(())
