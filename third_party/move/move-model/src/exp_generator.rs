@@ -919,7 +919,13 @@ pub trait ExpGenerator<'env> {
                     selected_ty = ty.clone();
                 }
             }
-            let sym = selected_sym.expect("result_index in range");
+            let Some(sym) = selected_sym else {
+                // Keep translation recoverable if result metadata is inconsistent.
+                let index_exp = self.mk_num_const(BigInt::from(result_index));
+                let select_node = self.new_node(Type::Error, None);
+                return ExpData::Call(select_node, Operation::Index, vec![result_exp, index_exp])
+                    .into_exp();
+            };
             let tuple_pat_node = self.new_node(result_type.clone(), None);
             let pattern = Pattern::Tuple(tuple_pat_node, pat_elems);
             let body = self.mk_local_by_sym(sym, selected_ty.clone());

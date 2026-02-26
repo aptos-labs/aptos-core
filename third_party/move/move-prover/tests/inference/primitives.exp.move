@@ -239,7 +239,6 @@ module 0x42::primitives {
     }
     spec test_cast_u64(x: u8): u64 {
         ensures [inferred] result == (x as u64);
-        aborts_if [inferred] x > MAX_U64;
     }
 
 
@@ -249,7 +248,6 @@ module 0x42::primitives {
     }
     spec test_cast_u128(x: u64): u128 {
         ensures [inferred] result == (x as u128);
-        aborts_if [inferred] x > MAX_U128;
     }
 
 
@@ -259,7 +257,6 @@ module 0x42::primitives {
     }
     spec test_cast_u256(x: u64): u256 {
         ensures [inferred] result == (x as u256);
-        aborts_if [inferred] x > MAX_U256;
     }
 
 }
