@@ -10,6 +10,7 @@ use crate::{
         account_not_found, resource_not_found, struct_field_not_found, BadRequestError,
         BasicErrorWith404, BasicResponse, BasicResponseStatus, BasicResultWith404, InternalError,
     },
+    response_axum::{AptosErrorResponse, AptosResponse},
     ApiTags,
 };
 use anyhow::Context as AnyhowContext;
@@ -693,5 +694,274 @@ impl Account {
                     &ledger_info,
                 )
             })
+    }
+}
+
+/// Framework-agnostic business logic for the get account endpoint.
+/// Called by the Axum handler directly, bypassing the Poem bridge.
+pub fn account_inner(
+    context: Arc<Context>,
+    address: Address,
+    ledger_version: Option<U64>,
+    accept_type: &AcceptType,
+) -> Result<AptosResponse<AccountData>, AptosErrorResponse> {
+    let account = Account::new(context.clone(), address, ledger_version, None, None)?;
+    let li = &account.latest_ledger_info;
+
+    let state_key = StateKey::resource_typed::<AccountResource>(address.inner()).map_err(|e| {
+        AptosErrorResponse::internal(e, AptosErrorCode::InternalError, Some(li))
+    })?;
+    let state_value_opt = context.get_state_value_poem::<AptosErrorResponse>(
+        &state_key,
+        account.ledger_version,
+        li,
+    )?;
+
+    let account_resource = if let Some(state_value) = &state_value_opt {
+        let account_resource: AccountResource = bcs::from_bytes(state_value)
+            .context("Internal error deserializing response from DB")
+            .map_err(|err| {
+                AptosErrorResponse::internal(err, AptosErrorCode::InternalError, Some(li))
+            })?;
+        account_resource
+    } else {
+        let stateless_account_enabled = context
+            .feature_enabled(aptos_types::on_chain_config::FeatureFlag::DEFAULT_ACCOUNT_RESOURCE)
+            .context("Failed to check if stateless account is enabled")
+            .map_err(|_| {
+                AptosErrorResponse::internal(
+                    "Failed to check if stateless account is enabled",
+                    AptosErrorCode::InternalError,
+                    Some(li),
+                )
+            })?;
+        if stateless_account_enabled {
+            AccountResource::new_stateless(*address.inner())
+        } else {
+            return Err(crate::response_axum::account_not_found(
+                address,
+                account.ledger_version,
+                li,
+            ));
+        }
+    };
+
+    match accept_type {
+        AcceptType::Json => AptosResponse::try_from_json(account_resource.into(), li),
+        AcceptType::Bcs => AptosResponse::try_from_encoded(
+            state_value_opt.unwrap_or_else(|| bcs::to_bytes(&account_resource).unwrap()),
+            li,
+        ),
+    }
+}
+
+/// Framework-agnostic business logic for the get account resources endpoint.
+/// Called by the Axum handler directly, bypassing the Poem bridge.
+pub fn resources_inner(
+    context: Arc<Context>,
+    address: Address,
+    ledger_version: Option<U64>,
+    start: Option<StateKey>,
+    limit: Option<u16>,
+    accept_type: &AcceptType,
+) -> Result<AptosResponse<Vec<MoveResource>>, AptosErrorResponse> {
+    let account = Account::new(context.clone(), address, ledger_version, start.clone(), limit)?;
+    let li = &account.latest_ledger_info;
+
+    let max_account_resources_page_size = context.max_account_resources_page_size();
+    let (resources, next_state_key) = context
+        .get_resources_by_pagination(
+            address.into(),
+            start.as_ref(),
+            account.ledger_version,
+            determine_limit::<AptosErrorResponse>(
+                limit,
+                max_account_resources_page_size,
+                max_account_resources_page_size,
+                li,
+            )? as u64,
+        )
+        .context("Failed to get resources from storage")
+        .map_err(|err| {
+            AptosErrorResponse::internal(err, AptosErrorCode::InternalError, Some(li))
+        })?;
+
+    match accept_type {
+        AcceptType::Json => {
+            let state_view = context.latest_state_view_poem::<AptosErrorResponse>(li)?;
+            let converter = state_view
+                .as_converter(context.db.clone(), context.indexer_reader.clone());
+            let converted_resources = converter
+                .try_into_resources(resources.iter().map(|(k, v)| (k.clone(), v.as_slice())))
+                .context("Failed to build move resource response from data in DB")
+                .map_err(|err| {
+                    AptosErrorResponse::internal(err, AptosErrorCode::InternalError, Some(li))
+                })?;
+            AptosResponse::try_from_json(converted_resources, li)
+                .map(|v| v.with_cursor(next_state_key))
+        },
+        AcceptType::Bcs => {
+            let resources: BTreeMap<StructTag, Vec<u8>> = resources.into_iter().collect();
+            AptosResponse::try_from_bcs(resources, li).map(|v| v.with_cursor(next_state_key))
+        },
+    }
+}
+
+/// Framework-agnostic business logic for the get account balance endpoint.
+/// Called by the Axum handler directly, bypassing the Poem bridge.
+pub fn balance_inner(
+    context: Arc<Context>,
+    address: Address,
+    asset_type: AssetType,
+    ledger_version: Option<U64>,
+    accept_type: &AcceptType,
+) -> Result<AptosResponse<u64>, AptosErrorResponse> {
+    let account = Account::new(context.clone(), address, ledger_version, None, None)?;
+    let li = &account.latest_ledger_info;
+
+    let (fa_metadata_address, mut balance) = match asset_type {
+        AssetType::Coin(move_struct_tag) => {
+            let coin_store_type_tag =
+                StructTag::from_str(&format!("0x1::coin::CoinStore<{}>", move_struct_tag))
+                    .map_err(|err| {
+                        AptosErrorResponse::internal(err, AptosErrorCode::InternalError, Some(li))
+                    })?;
+            let state_value = context
+                .get_state_value_poem::<AptosErrorResponse>(
+                    &StateKey::resource(&address.into(), &coin_store_type_tag)
+                        .map_err(|err| {
+                            AptosErrorResponse::internal(
+                                err,
+                                AptosErrorCode::InternalError,
+                                Some(li),
+                            )
+                        })?,
+                    account.ledger_version,
+                    li,
+                )?;
+            let coin_balance = match state_value {
+                None => 0,
+                Some(bytes) => bcs::from_bytes::<CoinStoreResourceUntyped>(&bytes)
+                    .map_err(|err| {
+                        AptosErrorResponse::internal(
+                            err,
+                            AptosErrorCode::InternalError,
+                            Some(li),
+                        )
+                    })?
+                    .coin(),
+            };
+            (
+                get_paired_fa_metadata_address(&move_struct_tag),
+                coin_balance,
+            )
+        },
+        AssetType::FungibleAsset(fa_metadata_adddress) => (fa_metadata_adddress.into(), 0),
+    };
+    let primary_fungible_store_address =
+        get_paired_fa_primary_store_address(address.into(), fa_metadata_address);
+    if let Some(data_blob) = context.get_state_value_poem::<AptosErrorResponse>(
+        &StateKey::resource_group(
+            &primary_fungible_store_address,
+            &ObjectGroupResource::struct_tag(),
+        ),
+        account.ledger_version,
+        li,
+    )? {
+        if let Ok(object_group) = bcs::from_bytes::<ObjectGroupResource>(&data_blob) {
+            if let Some(fa_store) = object_group.group.get(&FungibleStoreResource::struct_tag()) {
+                let fa_store_resource = bcs::from_bytes::<FungibleStoreResource>(fa_store)
+                    .map_err(|err| {
+                        AptosErrorResponse::internal(
+                            err,
+                            AptosErrorCode::InternalError,
+                            Some(li),
+                        )
+                    })?;
+                if fa_store_resource.balance != 0 {
+                    balance += fa_store_resource.balance();
+                } else if let Some(concurrent_fa_balance) = object_group
+                    .group
+                    .get(&ConcurrentFungibleBalanceResource::struct_tag())
+                {
+                    let concurrent_fa_balance_resource =
+                        bcs::from_bytes::<ConcurrentFungibleBalanceResource>(concurrent_fa_balance)
+                            .map_err(|err| {
+                                AptosErrorResponse::internal(
+                                    err,
+                                    AptosErrorCode::InternalError,
+                                    Some(li),
+                                )
+                            })?;
+                    balance += concurrent_fa_balance_resource.balance();
+                }
+            }
+        }
+    }
+
+    match accept_type {
+        AcceptType::Json => AptosResponse::try_from_json(balance, li),
+        AcceptType::Bcs => AptosResponse::try_from_encoded(bcs::to_bytes(&balance).unwrap(), li),
+    }
+}
+
+/// Framework-agnostic business logic for the get account modules endpoint.
+/// Called by the Axum handler directly, bypassing the Poem bridge.
+pub fn modules_inner(
+    context: Arc<Context>,
+    address: Address,
+    ledger_version: Option<U64>,
+    start: Option<StateKey>,
+    limit: Option<u16>,
+    accept_type: &AcceptType,
+) -> Result<AptosResponse<Vec<MoveModuleBytecode>>, AptosErrorResponse> {
+    let account = Account::new(context.clone(), address, ledger_version, start.clone(), limit)?;
+    let li = &account.latest_ledger_info;
+
+    let max_account_modules_page_size = context.max_account_modules_page_size();
+    let (modules, next_state_key) = context
+        .get_modules_by_pagination(
+            address.into(),
+            start.as_ref(),
+            account.ledger_version,
+            determine_limit::<AptosErrorResponse>(
+                limit,
+                max_account_modules_page_size,
+                max_account_modules_page_size,
+                li,
+            )? as u64,
+        )
+        .context("Failed to get modules from storage")
+        .map_err(|err| {
+            AptosErrorResponse::internal(err, AptosErrorCode::InternalError, Some(li))
+        })?;
+
+    match accept_type {
+        AcceptType::Json => {
+            let mut converted_modules = Vec::new();
+            for (_, module) in modules {
+                converted_modules.push(
+                    MoveModuleBytecode::new(module.clone())
+                        .try_parse_abi()
+                        .context("Failed to parse move module ABI")
+                        .map_err(|err| {
+                            AptosErrorResponse::internal(
+                                err,
+                                AptosErrorCode::InternalError,
+                                Some(li),
+                            )
+                        })?,
+                );
+            }
+            AptosResponse::try_from_json(converted_modules, li)
+                .map(|v| v.with_cursor(next_state_key))
+        },
+        AcceptType::Bcs => {
+            let modules: BTreeMap<MoveModuleId, Vec<u8>> = modules
+                .into_iter()
+                .map(|(key, value)| (key.into(), value))
+                .collect();
+            AptosResponse::try_from_bcs(modules, li).map(|v| v.with_cursor(next_state_key))
+        },
     }
 }
