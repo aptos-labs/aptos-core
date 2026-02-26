@@ -270,47 +270,11 @@ pub async fn healthy_handler(
     accept_type: AcceptType,
     Query(query): Query<HealthCheckQuery>,
 ) -> Result<Response, AptosErrorResponse> {
-    use crate::{context::api_spawn_blocking, response_axum::AptosResponse};
-
+    use crate::context::api_spawn_blocking;
     let ctx = context.clone();
-    let ledger_info =
-        api_spawn_blocking(move || ctx.get_latest_ledger_info::<AptosErrorResponse>()).await?;
-
-    if let Some(max_skew) = query.duration_secs {
-        use anyhow::Context as AnyhowContext;
-        use std::{
-            ops::Sub,
-            time::{Duration, SystemTime, UNIX_EPOCH},
-        };
-        let ledger_timestamp = Duration::from_micros(ledger_info.timestamp());
-        let skew_threshold = SystemTime::now()
-            .sub(Duration::from_secs(max_skew as u64))
-            .duration_since(UNIX_EPOCH)
-            .context("Failed to determine absolute unix time based on given duration")
-            .map_err(|err| {
-                AptosErrorResponse::internal(
-                    err,
-                    aptos_api_types::AptosErrorCode::InternalError,
-                    Some(&ledger_info),
-                )
-            })?;
-
-        if ledger_timestamp < skew_threshold {
-            return Err(AptosErrorResponse::service_unavailable(
-                format!(
-                    "The latest ledger info timestamp is {:?}, which is beyond the allowed skew ({}s).",
-                    ledger_timestamp, max_skew
-                ),
-                aptos_api_types::AptosErrorCode::HealthCheckFailed,
-                Some(&ledger_info),
-            ));
-        }
-    }
-    let resp = AptosResponse::try_from_rust_value(
-        crate::basic::HealthCheckSuccess::new(),
-        &ledger_info,
-        &accept_type,
-    )?;
+    let at = accept_type.clone();
+    let dur = query.duration_secs;
+    let resp = api_spawn_blocking(move || crate::basic::healthy_inner(&ctx, &at, dur)).await?;
     Ok(resp.into_response())
 }
 
@@ -320,33 +284,10 @@ pub async fn get_ledger_info_handler(
     State(context): Ctx,
     accept_type: AcceptType,
 ) -> Result<Response, AptosErrorResponse> {
-    use crate::{context::api_spawn_blocking, response_axum::AptosResponse};
-    use aptos_api_types::{IndexResponse, IndexResponseBcs};
-
-    context.check_api_output_enabled::<AptosErrorResponse>("Get ledger info", &accept_type)?;
-    let ledger_info = context.get_latest_ledger_info::<AptosErrorResponse>()?;
-    let node_role = context.node_role();
-    let encryption_key_hex = context
-        .get_encryption_key(ledger_info.version())
-        .unwrap_or(None)
-        .map(hex::encode);
-
-    let resp = api_spawn_blocking(move || match accept_type {
-        AcceptType::Json => {
-            let index_response = IndexResponse::new(
-                ledger_info.clone(),
-                node_role,
-                Some(aptos_build_info::get_git_hash()),
-                encryption_key_hex,
-            );
-            AptosResponse::try_from_json(index_response, &ledger_info)
-        },
-        AcceptType::Bcs => {
-            let index_response = IndexResponseBcs::new(ledger_info.clone(), node_role);
-            AptosResponse::try_from_bcs(index_response, &ledger_info)
-        },
-    })
-    .await?;
+    use crate::context::api_spawn_blocking;
+    let ctx = context.clone();
+    let at = accept_type.clone();
+    let resp = api_spawn_blocking(move || crate::index::get_ledger_info_inner(&ctx, &at)).await?;
     Ok(resp.into_response())
 }
 
@@ -451,18 +392,14 @@ pub async fn get_block_by_height_handler(
     use crate::context::api_spawn_blocking;
     crate::failpoint::fail_point_poem::<AptosErrorResponse>("endpoint_get_block_by_height")?;
     context.check_api_output_enabled::<AptosErrorResponse>("Get block by height", &accept_type)?;
-    let blocks_api = crate::blocks::BlocksApi {
-        context: context.clone(),
-    };
+    let ctx = context.clone();
+    let at = accept_type.clone();
+    let with_txns = query.with_transactions.unwrap_or_default();
     let resp = api_spawn_blocking(move || {
-        blocks_api.get_by_height(
-            accept_type,
-            block_height,
-            query.with_transactions.unwrap_or_default(),
-        )
+        crate::blocks::get_block_by_height_inner(&ctx, &at, block_height, with_txns)
     })
     .await?;
-    Ok(poem_to_axum_response(poem::IntoResponse::into_response(resp)).await)
+    Ok(resp.into_response())
 }
 
 pub async fn get_block_by_version_handler(
@@ -474,18 +411,14 @@ pub async fn get_block_by_version_handler(
     use crate::context::api_spawn_blocking;
     crate::failpoint::fail_point_poem::<AptosErrorResponse>("endpoint_get_block_by_version")?;
     context.check_api_output_enabled::<AptosErrorResponse>("Get block by version", &accept_type)?;
-    let blocks_api = crate::blocks::BlocksApi {
-        context: context.clone(),
-    };
+    let ctx = context.clone();
+    let at = accept_type.clone();
+    let with_txns = query.with_transactions.unwrap_or_default();
     let resp = api_spawn_blocking(move || {
-        blocks_api.get_by_version(
-            accept_type,
-            version,
-            query.with_transactions.unwrap_or_default(),
-        )
+        crate::blocks::get_block_by_version_inner(&ctx, &at, version, with_txns)
     })
     .await?;
-    Ok(poem_to_axum_response(poem::IntoResponse::into_response(resp)).await)
+    Ok(resp.into_response())
 }
 
 // ---- EventsApi ----
@@ -509,21 +442,20 @@ pub async fn get_events_by_creation_number_handler(
         query.limit,
         context.max_events_page_size(),
     );
-    let events_api = crate::events::EventsApi {
-        context: context.clone(),
-    };
     let ctx = context.clone();
+    let at = accept_type.clone();
     let resp = api_spawn_blocking(move || {
         let account = crate::accounts::Account::new(ctx.clone(), address, None, None, None)?;
-        events_api.list(
+        crate::events::list_events_inner(
+            &ctx,
             account.latest_ledger_info,
-            accept_type,
+            at,
             page,
             EventKey::new(creation_number.0, address.into()),
         )
     })
     .await?;
-    Ok(poem_to_axum_response(poem::IntoResponse::into_response(resp)).await)
+    Ok(resp.into_response())
 }
 
 pub async fn get_events_by_event_handle_handler(
@@ -568,17 +500,15 @@ pub async fn get_events_by_event_handle_handler(
         query.limit,
         context.max_events_page_size(),
     );
-    let events_api = crate::events::EventsApi {
-        context: context.clone(),
-    };
     let ctx = context.clone();
+    let at = accept_type.clone();
     let resp = api_spawn_blocking(move || {
         let account = crate::accounts::Account::new(ctx.clone(), address, None, None, None)?;
         let key = account.find_event_key(event_handle, field_name.0)?;
-        events_api.list(account.latest_ledger_info, accept_type, page, key)
+        crate::events::list_events_inner(&ctx, account.latest_ledger_info, at, page, key)
     })
     .await?;
-    Ok(poem_to_axum_response(poem::IntoResponse::into_response(resp)).await)
+    Ok(resp.into_response())
 }
 
 // ---- StateApi ----

@@ -152,6 +152,74 @@ impl<T: Serialize + Send> AptosResponse<T> {
     ) -> Result<Self, AptosErrorResponse> {
         Ok(Self::new_bcs(StatusCode::OK, value, ledger_info))
     }
+
+    // Tuple-based constructors matching the Poem BasicResponse API signatures.
+    // The status parameter is accepted but only used for non-200 responses
+    // (e.g., 202 Accepted for transaction submission).
+
+    #[allow(clippy::result_large_err)]
+    pub fn try_from_json_with_status(
+        (value, ledger_info, status): (T, &LedgerInfo, StatusCode),
+    ) -> Result<Self, AptosErrorResponse> {
+        Ok(Self {
+            status,
+            body: AptosResponseBody::Json(value),
+            ledger_info: ledger_info.clone(),
+            gas_used: None,
+            cursor: None,
+        })
+    }
+
+    #[allow(clippy::result_large_err)]
+    pub fn try_from_bcs_with_status<B: Serialize>(
+        (value, ledger_info, status): (B, &LedgerInfo, StatusCode),
+    ) -> Result<Self, AptosErrorResponse> {
+        let bytes = bcs::to_bytes(&value).map_err(|e| {
+            AptosErrorResponse::internal(e, AptosErrorCode::InternalError, Some(ledger_info))
+        })?;
+        Ok(Self {
+            status,
+            body: AptosResponseBody::Bcs(bytes),
+            ledger_info: ledger_info.clone(),
+            gas_used: None,
+            cursor: None,
+        })
+    }
+
+    #[allow(clippy::result_large_err)]
+    pub fn try_from_encoded_with_status(
+        (value, ledger_info, status): (Vec<u8>, &LedgerInfo, StatusCode),
+    ) -> Result<Self, AptosErrorResponse> {
+        Ok(Self {
+            status,
+            body: AptosResponseBody::Bcs(value),
+            ledger_info: ledger_info.clone(),
+            gas_used: None,
+            cursor: None,
+        })
+    }
+
+    #[allow(clippy::result_large_err)]
+    pub fn try_from_rust_value_with_status(
+        (value, ledger_info, status, accept_type): (T, &LedgerInfo, StatusCode, &AcceptType),
+    ) -> Result<Self, AptosErrorResponse>
+    where
+        T: Serialize,
+    {
+        match accept_type {
+            AcceptType::Json => Self::try_from_json_with_status((value, ledger_info, status)),
+            AcceptType::Bcs => {
+                let bytes = bcs::to_bytes(&value).map_err(|e| {
+                    AptosErrorResponse::internal(
+                        e,
+                        AptosErrorCode::InternalError,
+                        Some(ledger_info),
+                    )
+                })?;
+                Self::try_from_encoded_with_status((bytes, ledger_info, status))
+            },
+        }
+    }
 }
 
 impl<T: Serialize + Send> IntoResponse for AptosResponse<T> {
@@ -386,6 +454,22 @@ impl IntoResponse for AptosErrorResponse {
 }
 
 pub type AptosResult<T> = Result<AptosResponse<T>, AptosErrorResponse>;
+
+// Compatibility type aliases mirroring the Poem response.rs types.
+// These allow business logic to be migrated file-by-file: just change
+// the imports from `crate::response::*` to `crate::response_axum::*`.
+pub type BasicResponse<T> = AptosResponse<T>;
+pub type BasicResult<T> = Result<AptosResponse<T>, AptosErrorResponse>;
+pub type BasicResultWith404<T> = Result<AptosResponse<T>, AptosErrorResponse>;
+
+pub const OK: StatusCode = StatusCode::OK;
+pub const ACCEPTED: StatusCode = StatusCode::ACCEPTED;
+pub const ACCEPTED_PARTIAL: StatusCode = StatusCode::PARTIAL_CONTENT;
+
+pub type SubmitTransactionResult<T> = Result<AptosResponse<T>, AptosErrorResponse>;
+pub type SubmitTransactionsBatchResult<T> = Result<AptosResponse<T>, AptosErrorResponse>;
+pub type SimulateTransactionResult<T> = Result<AptosResponse<T>, AptosErrorResponse>;
+pub type HealthCheckResult<T> = Result<AptosResponse<T>, AptosErrorResponse>;
 
 pub fn build_not_found(
     resource: &str,

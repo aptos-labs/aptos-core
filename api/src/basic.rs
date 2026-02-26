@@ -221,11 +221,7 @@ pub fn healthy_inner(
             .duration_since(UNIX_EPOCH)
             .context("Failed to determine absolute unix time based on given duration")
             .map_err(|err| {
-                AptosErrorResponse::internal(
-                    err,
-                    AptosErrorCode::InternalError,
-                    Some(&ledger_info),
-                )
+                AptosErrorResponse::internal(err, AptosErrorCode::InternalError, Some(&ledger_info))
             })?;
 
         if ledger_timestamp < skew_threshold {
