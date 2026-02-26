@@ -20,8 +20,38 @@
 
 use crate::{
     move_types::{MoveAbility, MoveStructValue},
-    Address, AssetType, EntryFunctionId, HashValue, HexEncodedBytes, IdentifierWrapper,
-    MoveModuleId, MoveStructTag, MoveType, StateKeyWrapper, I128, I256, I64, U128, U256, U64,
+    AccountData, Address, AptosError, AptosErrorCode, AssetType, Block, EntryFunctionId,
+    EventGuid, HashValue, HexEncodedBytes, IdentifierWrapper, IndexResponse, IndexResponseBcs,
+    LedgerInfo, MoveModuleId, MoveStructTag, MoveType, RawStateValueRequest, RawTableItemRequest,
+    StateKeyWrapper, TableItemRequest, ViewRequest, I128, I256, I64, U128, U256, U64,
+};
+use crate::transaction::{
+    AbstractSignature, AccountSignature, BlockMetadataExtension, BlockMetadataExtensionEmpty,
+    BlockMetadataExtensionRandomness, BlockMetadataExtensionRandomnessAndDecKey,
+    BlockMetadataTransaction, BlockEndInfo, BlockEpilogueTransaction, ChunkyDKGResultTransaction,
+    DecodedTableData, DeleteModule, DeleteResource, DeleteTableItem, DeletedTableData,
+    DeprecatedModuleBundlePayload, DirectWriteSet, DKGResultTransaction, Ed25519, Ed25519Signature,
+    EncodeSubmissionRequest, EntryFunctionPayload, Event,
+    ExportedCertifiedAggregatedChunkySubtranscript, ExportedDKGTranscript,
+    ExportedAggregateSignature, ExportedProviderJWKs, ExportedQuorumCertifiedUpdate,
+    FeePayerSignature, FederatedKeyless, GasEstimation, GasEstimationBcs, GenesisPayload,
+    GenesisTransaction, IndexedSignature, JWKUpdateTransaction, Keyless, KeylessSignature,
+    MultiAgentSignature, MultiEd25519Signature, MultiKeySignature, MultisigPayload,
+    MultisigTransactionPayload, NoAccountSignature, PendingTransaction, PersistedAuxiliaryInfo,
+    PublicKey, ReplayProtector, ScriptPayload, ScriptWriteSet, Secp256k1Ecdsa,
+    Secp256k1EcdsaSignature, Secp256r1Ecdsa, Signature, SingleKeySignature, SlhDsa_Sha2_128s,
+    SlhDsa_Sha2_128sSignature, StateCheckpointTransaction, SubmitTransactionRequest,
+    Transaction, TransactionId, TransactionInfo, TransactionPayload, TransactionSignature,
+    TransactionSigningMessage, TransactionSummary, TransactionsBatchSingleSubmissionFailure,
+    TransactionsBatchSubmissionResult, UserCreateSigningMessageRequest, UserTransaction,
+    UserTransactionRequest, UserTransactionRequestInner, ValidatorTransaction, VersionedEvent,
+    WebAuthn, WebAuthnSignature, WriteModule, WriteResource, WriteSet, WriteSetChange,
+    WriteSetPayload, WriteTableItem,
+};
+use crate::move_types::{
+    MoveFunction, MoveFunctionGenericTypeParam, MoveFunctionVisibility, MoveModule,
+    MoveModuleBytecode, MoveResource, MoveScriptBytecode, MoveStruct, MoveStructField,
+    MoveStructGenericTypeParam, MoveStructVariant, MoveValue,
 };
 use aptos_openapi::{impl_poem_parameter, impl_poem_type};
 use indoc::indoc;
@@ -359,6 +389,115 @@ impl_poem_type!(
     "})
     )
 );
+
+// Types that previously had PoemObject/Union/Enum derives - now use impl_poem_type
+// for ToJSON/ParseFromJSON (OpenAPI spec is served from static files)
+impl_poem_type!(IndexResponse, "object", ());
+impl_poem_type!(IndexResponseBcs, "object", ());
+impl_poem_type!(AccountData, "object", ());
+impl_poem_type!(LedgerInfo, "object", ());
+impl_poem_type!(TableItemRequest, "object", ());
+impl_poem_type!(RawTableItemRequest, "object", ());
+impl_poem_type!(Block, "object", ());
+impl_poem_type!(RawStateValueRequest, "object", ());
+impl_poem_type!(ViewRequest, "object", ());
+impl_poem_type!(EventGuid, "object", ());
+impl_poem_type!(MoveResource, "object", ());
+impl_poem_type!(MoveValue, "object", ());
+impl_poem_type!(MoveModule, "object", ());
+impl_poem_type!(MoveStruct, "object", ());
+impl_poem_type!(MoveStructVariant, "object", ());
+impl_poem_type!(MoveStructGenericTypeParam, "object", ());
+impl_poem_type!(MoveStructField, "object", ());
+impl_poem_type!(MoveFunction, "object", ());
+impl_poem_type!(MoveFunctionVisibility, "object", ());
+impl_poem_type!(MoveFunctionGenericTypeParam, "object", ());
+impl_poem_type!(MoveModuleBytecode, "object", ());
+impl_poem_type!(MoveScriptBytecode, "object", ());
+impl_poem_type!(AptosError, "object", ());
+impl_poem_type!(AptosErrorCode, "string", ());
+impl_poem_type!(TransactionSummary, "object", ());
+impl_poem_type!(ReplayProtector, "object", ());
+impl_poem_type!(Transaction, "object", ());
+impl_poem_type!(TransactionInfo, "object", ());
+impl_poem_type!(PendingTransaction, "object", ());
+impl_poem_type!(UserTransaction, "object", ());
+impl_poem_type!(StateCheckpointTransaction, "object", ());
+impl_poem_type!(BlockEndInfo, "object", ());
+impl_poem_type!(BlockEpilogueTransaction, "object", ());
+impl_poem_type!(SubmitTransactionRequest, "object", ());
+impl_poem_type!(TransactionsBatchSubmissionResult, "object", ());
+impl_poem_type!(TransactionsBatchSingleSubmissionFailure, "object", ());
+impl_poem_type!(UserTransactionRequestInner, "object", ());
+impl_poem_type!(UserTransactionRequest, "object", ());
+impl_poem_type!(UserCreateSigningMessageRequest, "object", ());
+impl_poem_type!(EncodeSubmissionRequest, "object", ());
+impl_poem_type!(GenesisTransaction, "object", ());
+impl_poem_type!(BlockMetadataTransaction, "object", ());
+impl_poem_type!(BlockMetadataExtensionEmpty, "object", ());
+impl_poem_type!(BlockMetadataExtensionRandomness, "object", ());
+impl_poem_type!(BlockMetadataExtensionRandomnessAndDecKey, "object", ());
+impl_poem_type!(BlockMetadataExtension, "object", ());
+impl_poem_type!(ValidatorTransaction, "object", ());
+impl_poem_type!(JWKUpdateTransaction, "object", ());
+impl_poem_type!(ExportedQuorumCertifiedUpdate, "object", ());
+impl_poem_type!(ExportedAggregateSignature, "object", ());
+impl_poem_type!(ExportedProviderJWKs, "object", ());
+impl_poem_type!(DKGResultTransaction, "object", ());
+impl_poem_type!(ExportedDKGTranscript, "object", ());
+impl_poem_type!(ChunkyDKGResultTransaction, "object", ());
+impl_poem_type!(ExportedCertifiedAggregatedChunkySubtranscript, "object", ());
+impl_poem_type!(Event, "object", ());
+impl_poem_type!(VersionedEvent, "object", ());
+impl_poem_type!(GenesisPayload, "object", ());
+impl_poem_type!(TransactionPayload, "object", ());
+impl_poem_type!(DeprecatedModuleBundlePayload, "object", ());
+impl_poem_type!(EntryFunctionPayload, "object", ());
+impl_poem_type!(ScriptPayload, "object", ());
+impl_poem_type!(MultisigTransactionPayload, "object", ());
+impl_poem_type!(MultisigPayload, "object", ());
+impl_poem_type!(WriteSetPayload, "object", ());
+impl_poem_type!(WriteSet, "object", ());
+impl_poem_type!(ScriptWriteSet, "object", ());
+impl_poem_type!(DirectWriteSet, "object", ());
+impl_poem_type!(WriteSetChange, "object", ());
+impl_poem_type!(DeleteModule, "object", ());
+impl_poem_type!(DeleteResource, "object", ());
+impl_poem_type!(DeleteTableItem, "object", ());
+impl_poem_type!(WriteModule, "object", ());
+impl_poem_type!(WriteResource, "object", ());
+impl_poem_type!(DecodedTableData, "object", ());
+impl_poem_type!(DeletedTableData, "object", ());
+impl_poem_type!(WriteTableItem, "object", ());
+impl_poem_type!(TransactionSignature, "object", ());
+impl_poem_type!(Ed25519Signature, "object", ());
+impl_poem_type!(MultiEd25519Signature, "object", ());
+impl_poem_type!(Secp256k1EcdsaSignature, "object", ());
+impl_poem_type!(SlhDsa_Sha2_128sSignature, "object", ());
+impl_poem_type!(WebAuthnSignature, "object", ());
+impl_poem_type!(KeylessSignature, "object", ());
+impl_poem_type!(Signature, "object", ());
+impl_poem_type!(Ed25519, "object", ());
+impl_poem_type!(Secp256k1Ecdsa, "object", ());
+impl_poem_type!(Secp256r1Ecdsa, "object", ());
+impl_poem_type!(SlhDsa_Sha2_128s, "object", ());
+impl_poem_type!(WebAuthn, "object", ());
+impl_poem_type!(Keyless, "object", ());
+impl_poem_type!(FederatedKeyless, "object", ());
+impl_poem_type!(PublicKey, "object", ());
+impl_poem_type!(SingleKeySignature, "object", ());
+impl_poem_type!(IndexedSignature, "object", ());
+impl_poem_type!(MultiKeySignature, "object", ());
+impl_poem_type!(NoAccountSignature, "object", ());
+impl_poem_type!(AbstractSignature, "object", ());
+impl_poem_type!(AccountSignature, "object", ());
+impl_poem_type!(MultiAgentSignature, "object", ());
+impl_poem_type!(FeePayerSignature, "object", ());
+impl_poem_type!(TransactionId, "object", ());
+impl_poem_type!(TransactionSigningMessage, "object", ());
+impl_poem_type!(GasEstimationBcs, "object", ());
+impl_poem_type!(GasEstimation, "object", ());
+impl_poem_type!(PersistedAuxiliaryInfo, "object", ());
 
 impl_poem_parameter!(
     Address,

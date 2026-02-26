@@ -3,11 +3,10 @@
 
 use crate::U64;
 use aptos_types::{chain_id::ChainId, ledger_info::LedgerInfoWithSignatures};
-use poem_openapi::Object as PoemObject;
 use serde::{Deserialize, Serialize};
 
 /// The Ledger information representing the current state of the chain
-#[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq, PoemObject)]
+#[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq)]
 pub struct LedgerInfo {
     /// Chain ID of the current chain
     pub chain_id: u8,

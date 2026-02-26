@@ -21,7 +21,6 @@ use move_core_types::{
     parser::{parse_struct_tag, parse_type_tag},
     transaction_argument::TransactionArgument,
 };
-use poem_openapi::{types::Type, Enum, Object, Union};
 use serde::{de::Error as _, Deserialize, Deserializer, Serialize, Serializer};
 use std::{
     collections::BTreeMap,
@@ -35,10 +34,9 @@ use std::{
 pub type ResourceGroup = BTreeMap<StructTag, Vec<u8>>;
 
 /// A parsed Move resource
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, Object)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct MoveResource {
     #[serde(rename = "type")]
-    #[oai(rename = "type")]
     pub typ: MoveStructTag,
     pub data: MoveStructValue,
 }
@@ -357,7 +355,7 @@ impl TryFrom<AnnotatedMoveClosure> for MoveStructValue {
 }
 
 /// An enum of the possible Move value types
-#[derive(Clone, Debug, PartialEq, Union)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub enum MoveValue {
     /// A u8 Move type
     U8(u8),
@@ -469,31 +467,6 @@ impl From<TransactionArgument> for MoveValue {
             TransactionArgument::Address(v) => MoveValue::Address(v.into()),
             TransactionArgument::U8Vector(bytes) => MoveValue::Bytes(HexEncodedBytes(bytes)),
             TransactionArgument::Serialized(bytes) => MoveValue::Bytes(HexEncodedBytes(bytes)),
-        }
-    }
-}
-
-impl Serialize for MoveValue {
-    fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
-        match &self {
-            MoveValue::U8(v) => v.serialize(serializer),
-            MoveValue::U16(v) => v.serialize(serializer),
-            MoveValue::U32(v) => v.serialize(serializer),
-            MoveValue::U64(v) => v.serialize(serializer),
-            MoveValue::U128(v) => v.serialize(serializer),
-            MoveValue::U256(v) => v.serialize(serializer),
-            MoveValue::I8(v) => v.serialize(serializer),
-            MoveValue::I16(v) => v.serialize(serializer),
-            MoveValue::I32(v) => v.serialize(serializer),
-            MoveValue::I64(v) => v.serialize(serializer),
-            MoveValue::I128(v) => v.serialize(serializer),
-            MoveValue::I256(v) => v.serialize(serializer),
-            MoveValue::Bool(v) => v.serialize(serializer),
-            MoveValue::Address(v) => v.serialize(serializer),
-            MoveValue::Vector(v) => v.serialize(serializer),
-            MoveValue::Bytes(v) => v.serialize(serializer),
-            MoveValue::Struct(v) => v.serialize(serializer),
-            MoveValue::String(v) => v.serialize(serializer),
         }
     }
 }
@@ -988,7 +961,7 @@ impl TryFrom<&MoveType> for TypeTag {
 }
 
 /// A Move module
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, Object)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct MoveModule {
     pub address: Address,
     pub name: IdentifierWrapper,
@@ -1110,7 +1083,7 @@ impl<'de> Deserialize<'de> for MoveModuleId {
 // Note: In a perfect world is_enum would not be necessary and instead we would use an
 // enum to represent regular struct vs enum. But for backwards compatibility we instead
 // have separate fields, `fields` for a regular struct and `variants` for an enum.
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, Object)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct MoveStruct {
     pub name: IdentifierWrapper,
     /// Whether the struct is a native struct of Move
@@ -1130,7 +1103,7 @@ pub struct MoveStruct {
 }
 
 /// A single variant of a Move enum.
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, Object)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct MoveStructVariant {
     pub name: IdentifierWrapper,
     /// Fields associated with the variant, if any.
@@ -1199,12 +1172,11 @@ impl<'de> Deserialize<'de> for MoveAbility {
 }
 
 /// Move generic type param
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, Object)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct MoveStructGenericTypeParam {
     /// Move abilities tied to the generic type param and associated with the type that uses it
     pub constraints: Vec<MoveAbility>,
     /// Whether the type is a phantom type
-    #[oai(skip)]
     pub is_phantom: bool,
 }
 
@@ -1222,16 +1194,15 @@ impl From<&StructTypeParameter> for MoveStructGenericTypeParam {
 }
 
 /// Move struct field
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, Object)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct MoveStructField {
     pub name: IdentifierWrapper,
     #[serde(rename = "type")]
-    #[oai(rename = "type")]
     pub typ: MoveType,
 }
 
 /// Move function
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, Object)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct MoveFunction {
     pub name: IdentifierWrapper,
     pub visibility: MoveFunctionVisibility,
@@ -1245,7 +1216,6 @@ pub struct MoveFunction {
     pub params: Vec<MoveType>,
     /// Return type of the function
     #[serde(rename = "return")]
-    #[oai(rename = "return")]
     pub return_: Vec<MoveType>,
 }
 
@@ -1273,9 +1243,8 @@ impl From<&CompiledScript> for MoveFunction {
 }
 
 /// Move function visibility
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, Enum)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
-#[oai(rename_all = "snake_case")]
 pub enum MoveFunctionVisibility {
     /// Visible only by this module
     Private,
@@ -1306,7 +1275,7 @@ impl From<MoveFunctionVisibility> for Visibility {
 }
 
 /// Move function generic type param
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, Object)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct MoveFunctionGenericTypeParam {
     /// Move abilities tied to the generic type param and associated with the function that uses it
     pub constraints: Vec<MoveAbility>,
@@ -1321,7 +1290,7 @@ impl From<&AbilitySet> for MoveFunctionGenericTypeParam {
 }
 
 /// Move module bytecode along with it's ABI
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, Object)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct MoveModuleBytecode {
     pub bytecode: HexEncodedBytes,
     // We don't need deserialize MoveModule as it should be serialized
@@ -1332,7 +1301,7 @@ pub struct MoveModuleBytecode {
 
 impl VerifyInput for MoveModuleBytecode {
     fn verify(&self) -> anyhow::Result<()> {
-        if self.bytecode.is_empty() {
+        if self.bytecode.inner().is_empty() {
             bail!("Move module bytecode is empty")
         }
 
@@ -1369,7 +1338,7 @@ impl From<Module> for MoveModuleBytecode {
 }
 
 /// Move script bytecode
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, Object)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct MoveScriptBytecode {
     pub bytecode: HexEncodedBytes,
     // We don't need deserialize MoveModule as it should be serialized
@@ -1380,7 +1349,7 @@ pub struct MoveScriptBytecode {
 
 impl VerifyInput for MoveScriptBytecode {
     fn verify(&self) -> anyhow::Result<()> {
-        if self.bytecode.is_empty() {
+        if self.bytecode.inner().is_empty() {
             bail!("Move script bytecode is empty")
         }
 

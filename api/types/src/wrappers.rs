@@ -14,7 +14,6 @@ use crate::{Address, VerifyInput, U64};
 use anyhow::{bail, Context};
 use aptos_types::{event::EventKey, state_store::state_key::StateKey};
 use move_core_types::identifier::{IdentStr, Identifier};
-use poem_openapi::Object;
 use serde::{Deserialize, Serialize};
 use std::{convert::From, fmt, ops::Deref, str::FromStr};
 
@@ -95,7 +94,7 @@ impl fmt::Display for IdentifierWrapper {
 // 1. To avoid implementing Poem derives on types outside of the API crate.
 // 2. To express the EventKey as types that already work in the API, such as
 //    Address and U64 instead of AccountAddress and u64.
-#[derive(Clone, Copy, Debug, Deserialize, Eq, Object, PartialEq, Serialize)]
+#[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
 pub struct EventGuid {
     pub creation_number: U64,
     pub account_address: Address,
