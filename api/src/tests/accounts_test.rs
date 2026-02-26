@@ -542,7 +542,11 @@ async fn test_get_account_resources_with_pagination() {
     // the default max page size for resources (1000 at the time of writing,
     // based on config/src/config/api_config.rs).
     let resp = client
-        .get(format!("http://{}/v1{}", server_address, account_resources(address)))
+        .get(format!(
+            "http://{}/v1{}",
+            server_address,
+            account_resources(address)
+        ))
         .send()
         .await
         .unwrap();
@@ -589,7 +593,11 @@ async fn test_get_account_resources_with_pagination() {
     // Make a request using the cursor. Assert the 5 results we get back are the next 5.
     let cursor_str = cursor_header.to_string();
     let resp = client
-        .get(format!("http://{}/v1{}", server_address, account_resources(address)))
+        .get(format!(
+            "http://{}/v1{}",
+            server_address,
+            account_resources(address)
+        ))
         .query(&[("limit", "5"), ("start", &cursor_str)])
         .send()
         .await
@@ -608,7 +616,11 @@ async fn test_get_account_resources_with_pagination() {
     // Get the rest of the resources, assert there is no cursor now.
     let cursor_str = cursor_header.to_string();
     let resp = client
-        .get(format!("http://{}/v1{}", server_address, account_resources(address)))
+        .get(format!(
+            "http://{}/v1{}",
+            server_address,
+            account_resources(address)
+        ))
         .query(&[("limit", "1000"), ("start", &cursor_str)])
         .send()
         .await
@@ -637,7 +649,11 @@ async fn test_get_account_modules_with_pagination() {
     // the default max page size for modules (1000 at the time of writing,
     // based on config/src/config/api_config.rs).
     let resp = client
-        .get(format!("http://{}/v1{}", server_address, account_modules(address)))
+        .get(format!(
+            "http://{}/v1{}",
+            server_address,
+            account_modules(address)
+        ))
         .send()
         .await
         .unwrap();
@@ -675,7 +691,11 @@ async fn test_get_account_modules_with_pagination() {
     // Make a request using the cursor. Assert the 5 results we get back are the next 5.
     let cursor_str = cursor_header.to_string();
     let resp = client
-        .get(format!("http://{}/v1{}", server_address, account_modules(address)))
+        .get(format!(
+            "http://{}/v1{}",
+            server_address,
+            account_modules(address)
+        ))
         .query(&[("limit", "5"), ("start", &cursor_str)])
         .send()
         .await
@@ -694,7 +714,11 @@ async fn test_get_account_modules_with_pagination() {
     // Get the rest of the modules, assert there is no cursor now.
     let cursor_str = cursor_header.to_string();
     let resp = client
-        .get(format!("http://{}/v1{}", server_address, account_modules(address)))
+        .get(format!(
+            "http://{}/v1{}",
+            server_address,
+            account_modules(address)
+        ))
         .query(&[("limit", "1000"), ("start", &cursor_str)])
         .send()
         .await

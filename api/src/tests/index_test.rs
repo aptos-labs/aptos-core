@@ -36,22 +36,29 @@ async fn test_return_bad_request_if_method_not_allowed() {
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn test_health_check() {
     let context = new_test_context(current_function_name!());
-    let resp = context
-        .reply(warp::test::request().method("GET").path("/v1/-/healthy"))
-        .await;
-    assert_eq!(resp.status(), 200)
+    let ApiSpecificConfig::V1(address) = context.api_specific_config;
+    let client = reqwest::Client::new();
+    let resp = client
+        .get(format!("http://{}/v1/-/healthy", address))
+        .send()
+        .await
+        .unwrap();
+    assert_eq!(resp.status().as_u16(), 200);
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn test_openapi_spec() {
     let context = new_test_context(current_function_name!());
+    let ApiSpecificConfig::V1(address) = context.api_specific_config;
+    let client = reqwest::Client::new();
     let paths = ["/spec.yaml", "/spec.json", "/spec"];
     for path in paths {
-        let req = warp::test::request()
-            .method("GET")
-            .path(&format!("/v1{}", path));
-        let resp = context.reply(req).await;
-        assert_eq!(resp.status(), 200);
+        let resp = client
+            .get(format!("http://{}/v1{}", address, path))
+            .send()
+            .await
+            .unwrap();
+        assert_eq!(resp.status().as_u16(), 200);
     }
 }
 
@@ -63,7 +70,10 @@ async fn test_cors() {
     let paths = ["/spec.yaml", "/spec", "/", "/transactions"];
     for path in paths {
         let resp = client
-            .request(reqwest::Method::OPTIONS, format!("http://{}/v1{}", address, path))
+            .request(
+                reqwest::Method::OPTIONS,
+                format!("http://{}/v1{}", address, path),
+            )
             .header("origin", "test")
             .header("Access-Control-Request-Headers", "Content-Type")
             .header("Access-Control-Request-Method", "POST")
@@ -84,7 +94,10 @@ async fn test_cors_forbidden() {
     let paths = ["/spec.yaml", "/spec", "/", "/transactions"];
     for path in paths {
         let resp = client
-            .request(reqwest::Method::OPTIONS, format!("http://{}/v1{}", address, path))
+            .request(
+                reqwest::Method::OPTIONS,
+                format!("http://{}/v1{}", address, path),
+            )
             .header("origin", "test")
             .header("Access-Control-Request-Headers", "Content-Type")
             .header("Access-Control-Request-Method", "PUT")

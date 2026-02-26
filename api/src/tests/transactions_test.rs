@@ -2143,7 +2143,10 @@ async fn test_create_signing_message_rejects_invalid_content_type(
     let aptos_api_test_context::ApiSpecificConfig::V1(address) = context.api_specific_config;
     let client = reqwest::Client::new();
     let resp = client
-        .post(format!("http://{}/v1/transactions/encode_submission", address))
+        .post(format!(
+            "http://{}/v1/transactions/encode_submission",
+            address
+        ))
         .header("content-type", "invalid")
         .body("text")
         .send()
@@ -2175,7 +2178,10 @@ async fn test_create_signing_message_rejects_invalid_json(
     let aptos_api_test_context::ApiSpecificConfig::V1(address) = context.api_specific_config;
     let client = reqwest::Client::new();
     let resp = client
-        .post(format!("http://{}/v1/transactions/encode_submission", address))
+        .post(format!(
+            "http://{}/v1/transactions/encode_submission",
+            address
+        ))
         .header("content-type", "application/json")
         .body("invalid json")
         .send()
@@ -2207,7 +2213,10 @@ async fn test_create_signing_message_rejects_no_content_length_request(
     let aptos_api_test_context::ApiSpecificConfig::V1(address) = context.api_specific_config;
     let client = reqwest::Client::new();
     let resp = client
-        .post(format!("http://{}/v1/transactions/encode_submission", address))
+        .post(format!(
+            "http://{}/v1/transactions/encode_submission",
+            address
+        ))
         .header("content-type", "application/json")
         .send()
         .await

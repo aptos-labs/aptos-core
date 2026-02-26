@@ -1,7 +1,7 @@
 // Copyright (c) Aptos Foundation
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
-use crate::{context::Context, error_converter_axum, middleware_axum, routes_axum, spec::get_spec};
+use crate::{context::Context, error_converter_axum, middleware_axum, routes_axum};
 use anyhow::{anyhow, Context as AnyhowContext};
 use aptos_config::config::NodeConfig;
 use axum::{
@@ -23,9 +23,8 @@ pub fn attach_axum_to_runtime(
 ) -> anyhow::Result<SocketAddr> {
     let context = Arc::new(context);
 
-    let api_service = crate::runtime::get_api_service(context.clone());
-    let spec_json = get_spec(&api_service, false);
-    let spec_yaml = get_spec(&api_service, true);
+    let spec_json = include_str!("../doc/spec.json").to_string();
+    let spec_yaml = include_str!("../doc/spec.yaml").to_string();
 
     let config = config.clone();
     let mut address = config.api.address;
