@@ -40,8 +40,9 @@ cargo build -p aptos-cached-packages   # REQUIRED: rebuild cached packages
 
 ### Development Setup
 ```bash
-./scripts/dev_setup.sh              # Install all build dependencies
-./scripts/dev_setup.sh -y           # Include Move Prover tools (z3, boogie)
+./scripts/setup_build.sh            # Install all build dependencies
+./scripts/setup_build.sh -y         # Include Move Prover tools (z3, boogie)
+./scripts/setup_build.sh --help     # Show all flags and options
 ```
 
 ## Architecture Overview
