@@ -34,6 +34,9 @@ use ark_serialize::{
 };
 use num_integer::Roots;
 use rand::{CryptoRng, RngCore};
+// With feature `range_proof_timing_univariate_v2`, timing is printed for setup/prove/verify/commit.
+// To see it: run the integration test with stdout shown, e.g.
+//   cargo test -p aptos-dkg --features range_proof_timing_univariate_v2 --test range_proof -- --nocapture
 #[cfg(feature = "range_proof_timing_univariate_v2")]
 use std::time::{Duration, Instant};
 use std::{fmt::Debug, io::Write};
@@ -355,10 +358,18 @@ impl<E: Pairing> traits::BatchedRangeProof<E> for Proof<E> {
         values: &[Self::Input],
         rho: &Self::CommitmentRandomness,
     ) -> Self::Commitment {
+        #[cfg(feature = "range_proof_timing_univariate_v2")]
+        let start = Instant::now();
         let mut values_shifted = vec![E::ScalarField::ZERO]; // start with 0,
         values_shifted.extend(values); // then append all values from the original vector
 
-        univariate_hiding_kzg::commit_with_randomness(ck_S, &values_shifted, rho)
+        let comm = univariate_hiding_kzg::commit_with_randomness(ck_S, &values_shifted, rho);
+        #[cfg(feature = "range_proof_timing_univariate_v2")]
+        println!(
+            "  {:>10.2} ms  [dekart_univariate_v2 commit_with_randomness]",
+            start.elapsed().as_secs_f64() * 1000.0
+        );
+        comm
     }
 
     #[allow(non_snake_case)]
@@ -916,7 +927,7 @@ impl<E: Pairing> traits::BatchedRangeProof<E> for Proof<E> {
                 .sum::<E::ScalarField>();
 
         #[cfg(feature = "range_proof_timing_univariate_v2")]
-        print_cumulative("gamma + a_u + hkzg verify", start.elapsed());
+        print_cumulative("gamma + a_u", start.elapsed());
 
         #[cfg(feature = "range_proof_timing_univariate_v2")]
         let start = Instant::now();
@@ -956,21 +967,24 @@ impl<E: Pairing> traits::BatchedRangeProof<E> for Proof<E> {
         #[cfg(feature = "range_proof_timing_univariate_v2")]
         print_cumulative("LHS/RHS (V_eval_gamma + sum1 + sum2) + ensure", start.elapsed());
 
-        #[cfg(feature = "range_proof_timing_univariate_v2")]
-        println!(
-            "  [dekart_univariate_v2 verify] TOTAL: {:.2} ms",
-            verify_start.elapsed().as_secs_f64() * 1000.0
-        );
-
-
         use sigma_protocol::homomorphism::TrivialShape as HkzgCommitment;
-        Ok(univariate_hiding_kzg::CommitmentHomomorphism::pairing_for_verify(
+        #[cfg(feature = "range_proof_timing_univariate_v2")]
+        let start = Instant::now();
+        let result = univariate_hiding_kzg::CommitmentHomomorphism::pairing_for_verify(
             *vk_hkzg,
             HkzgCommitment(U), // TODO: Ugh univariate_hiding_kzg::Commitment(U) does not work because it's a tuple struct, see https://github.com/rust-lang/rust/issues/17422; So make it a struct with one named field?
             gamma,
             a_u,
             pi_gamma.clone(),
-        ))
+        );
+        #[cfg(feature = "range_proof_timing_univariate_v2")]
+        print_cumulative("hkzg pairing_for_verify", start.elapsed());
+        #[cfg(feature = "range_proof_timing_univariate_v2")]
+        println!(
+            "  [dekart_univariate_v2 verify] TOTAL: {:.2} ms",
+            verify_start.elapsed().as_secs_f64() * 1000.0
+        );
+        Ok(result)
     }
 
     fn maul(&mut self) {
