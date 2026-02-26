@@ -16,8 +16,6 @@ use crate::sumcheck::ml_sumcheck::protocol::verifier::VerifierMsg;
 use ark_ff::Field;
 use ark_serialize::CanonicalSerialize;
 use ark_std::{marker::PhantomData, vec::Vec};
-#[cfg(feature = "range_proof_timing_multivariate")]
-use std::time::{Duration, Instant};
 
 pub mod data_structures;
 pub mod protocol;
@@ -37,7 +35,7 @@ impl<F: Field> MLSumcheck<F> {
         polynomial: &BinaryConstraintPolynomial<F>,
     ) -> Result<(Vec<ProverMsg<F>>, Vec<VerifierMsg<F>>), Error> {
         let mut fs_rng = Self::init_rng();
-        Self::prove_as_subprotocol(&mut fs_rng, polynomial, &mut None).map(|(proof, _, rhos)| (proof, rhos))
+        Self::prove_as_subprotocol(&mut fs_rng, polynomial).map(|(proof, _, rhos)| (proof, rhos))
     }
 
     /// Non-interactive verify using Fiat-Shamir
@@ -50,41 +48,19 @@ impl<F: Field> MLSumcheck<F> {
         Self::verify_as_subprotocol(&mut fs_rng, polynomial_info, asserted_sum, proof)
     }
 
-    /// Prove as subprotocol with external RNG.
-    /// When `timing` is `Some`, reports sub-phase durations (prover_init, each round's prove_round, feed+sample).
+    /// Prove as subprotocol with external RNG
     pub fn prove_as_subprotocol<RNG: FeedableRNG<Error = Error>>(
         fs_rng: &mut RNG,
         polynomial: &BinaryConstraintPolynomial<F>,
-        timing: &mut Option<&mut dyn FnMut(&str, std::time::Duration)>,
     ) -> Result<(Vec<ProverMsg<F>>, ProverState<F>, Vec<VerifierMsg<F>>), Error> {
-        #[cfg(feature = "range_proof_timing_multivariate")]
-        let start = Instant::now();
         let mut prover_state = IPForMLSumcheck::prover_init(polynomial);
-        #[cfg(feature = "range_proof_timing_multivariate")]
-        if let Some(f) = timing {
-            f("sumcheck prover_init", start.elapsed());
-        }
-
         let mut prover_messages = Vec::with_capacity(polynomial.num_variables);
         let mut verifier_messages = Vec::with_capacity(polynomial.num_variables);
         let mut verifier_msg = None;
 
-        for round in 0..polynomial.num_variables {
-            #[allow(unused_variables)]
-            let _ = round;
-            #[cfg(feature = "range_proof_timing_multivariate")]
-            let start = Instant::now();
-            let prover_msg = IPForMLSumcheck::prove_round(&mut prover_state, &verifier_msg, timing);
-            #[cfg(feature = "range_proof_timing_multivariate")]
-            if let Some(f) = timing {
-                f(
-                    &format!("sumcheck round {} prove_round (total)", round),
-                    start.elapsed(),
-                );
-            }
+        for _ in 0..polynomial.num_variables {
+            let prover_msg = IPForMLSumcheck::prove_round(&mut prover_state, &verifier_msg);
 
-            #[cfg(feature = "range_proof_timing_multivariate")]
-            let start = Instant::now();
             // Feed prover message to Fiat-Shamir RNG
             Self::feed_prover_msg(fs_rng, &prover_msg)?;
             prover_messages.push(prover_msg);
@@ -93,13 +69,6 @@ impl<F: Field> MLSumcheck<F> {
             }
 
             verifier_msg = Some(IPForMLSumcheck::sample_round(fs_rng));
-            #[cfg(feature = "range_proof_timing_multivariate")]
-            if let Some(f) = timing {
-                f(
-                    &format!("sumcheck round {} feed_prover_msg + sample_round", round),
-                    start.elapsed(),
-                );
-            }
         }
         // Sumcheck fix: include the final round's challenge so verifier_messages yields the full
         // point (r_0, ..., r_{n-1}). Callers (e.g. Dekart) use this as the sumcheck point; the

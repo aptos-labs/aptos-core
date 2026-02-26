@@ -225,8 +225,10 @@ impl<E: Pairing> traits::BatchedRangeProof<E> for Proof<E> {
 
         let c: E::ScalarField = trs.challenge_scalar::<E::ScalarField>();
         let alpha: E::ScalarField = trs.challenge_scalar::<E::ScalarField>();
-        // eq_point t in {0,1}^n (same as prover: bits from transcript)
-        let t: Vec<E::ScalarField> = challenge_eq_point_bits::<E>(&mut trs, num_vars);
+        // eq_point t (same order as prover: one challenge per sumcheck variable)
+        let t: Vec<E::ScalarField> = (0..num_vars)
+            .map(|_| trs.challenge_scalar::<E::ScalarField>())
+            .collect();
         #[cfg(feature = "range_proof_timing_multivariate")]
         print_cumulative("transcript + challenges (c, alpha, t)", start.elapsed());
 
@@ -754,27 +756,8 @@ where
     }
 }
 
-/// Draw eq_point t in {0,1}^n from the transcript (so sumcheck prover only needs one b).
-fn challenge_eq_point_bits<E: Pairing>(
-    trs: &mut merlin::Transcript,
-    num_vars: usize,
-) -> Vec<E::ScalarField> {
-    let num_bytes = (num_vars + 7) / 8;
-    let mut buf = vec![0u8; num_bytes];
-    trs.challenge_bytes(b"eq_point_t_bits", &mut buf);
-    (0..num_vars)
-        .map(|j| {
-            if (buf[j / 8] >> (j % 8)) & 1 == 1 {
-                E::ScalarField::ONE
-            } else {
-                E::ScalarField::ZERO
-            }
-        })
-        .collect()
-}
-
 /// Run sumcheck on the main transcript with linear term (f - sum 2^{j-1} f_j) and constraints c^j f_j(f_j-1).
-/// Draws eq_point t in {0,1}^n from trs, then runs MLSumcheck::prove_as_subprotocol with TranscriptRng.
+/// Draws eq_point t from trs, then runs MLSumcheck::prove_as_subprotocol with TranscriptRng.
 #[allow(clippy::type_complexity)]
 fn zkzc_send_polys<E: Pairing>(
     trs: &mut merlin::Transcript,
@@ -789,7 +772,9 @@ fn zkzc_send_polys<E: Pairing>(
 ) -> (Vec<ProverMsg<E::ScalarField>>, Vec<VerifierMsg<E::ScalarField>>) {
     #[cfg(feature = "range_proof_timing_multivariate")]
     let start = std::time::Instant::now();
-    let t = challenge_eq_point_bits::<E>(trs, num_vars as usize);
+    let t: Vec<E::ScalarField> = (0..num_vars)
+        .map(|_| trs.challenge_scalar::<E::ScalarField>())
+        .collect();
     let nv = num_vars as usize;
     let size = 1 << nv;
 
@@ -835,7 +820,7 @@ fn zkzc_send_polys<E: Pairing>(
     #[cfg(feature = "range_proof_timing_multivariate")]
     let start = std::time::Instant::now();
     let mut trng = TranscriptRng::<E::ScalarField>::new(trs);
-    let (prover_msgs, _state, verifier_msgs) = crate::sumcheck::ml_sumcheck::MLSumcheck::prove_as_subprotocol(&mut trng, &poly, &mut timing).expect("sumcheck prove failed");
+    let (prover_msgs, _state, verifier_msgs) = crate::sumcheck::ml_sumcheck::MLSumcheck::prove_as_subprotocol(&mut trng, &poly).expect("sumcheck prove failed");
     #[cfg(feature = "range_proof_timing_multivariate")]
     if let Some(ref mut f) = timing {
         f("zkzc_send_polys: MLSumcheck::prove_as_subprotocol", start.elapsed());
