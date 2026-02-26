@@ -38,7 +38,7 @@ use tokio::runtime::{Handle, Runtime};
 
 const VERSION: &str = include_str!("../doc/.version");
 
-/// Create a runtime and attach the Poem webserver to it.
+/// Create a runtime and attach the Axum webserver to it.
 pub fn bootstrap(
     config: &NodeConfig,
     chain_id: ChainId,
@@ -52,8 +52,14 @@ pub fn bootstrap(
 
     let context = Context::new(chain_id, db, mp_sender, config.clone(), indexer_reader);
 
-    attach_poem_to_runtime(runtime.handle(), context.clone(), config, false, port_tx)
-        .context("Failed to attach poem to runtime")?;
+    crate::runtime_axum::attach_axum_to_runtime(
+        runtime.handle(),
+        context.clone(),
+        config,
+        false,
+        port_tx,
+    )
+    .context("Failed to attach axum to runtime")?;
 
     let context_cloned = context.clone();
     if let Some(period_ms) = config.api.periodic_gas_estimation_ms {
