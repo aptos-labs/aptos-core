@@ -70,16 +70,21 @@ async fn simulate_aptos_transfer(
             request["replay_protection_nonce"] = json!(nonce.to_string());
         }
 
-        let req = warp::test::request()
-            .method("POST")
-            .path("/v1/transactions/simulate")
-            .json(&request);
-        let resp = context.expect_status_code(expected_status).reply(req).await;
+        let aptos_api_test_context::ApiSpecificConfig::V1(address) = context.api_specific_config;
+        let client = reqwest::Client::new();
+        let resp = client
+            .post(format!("http://{}/v1/transactions/simulate", address))
+            .header("content-type", "application/json")
+            .body(serde_json::to_vec(&request).unwrap())
+            .send()
+            .await
+            .expect("Failed to send request");
+        assert_eq!(resp.status().as_u16(), expected_status);
         // Assert the gas used header is present if expected.
         if assert_gas_used {
             assert!(
                 resp.headers()
-                    .get("X-Aptos-Gas-Used")
+                    .get("x-aptos-gas-used")
                     .unwrap()
                     .to_str()
                     .unwrap()
@@ -88,7 +93,7 @@ async fn simulate_aptos_transfer(
                     > 0
             );
         }
-        serde_json::from_slice(resp.body()).unwrap()
+        serde_json::from_slice(&resp.bytes().await.unwrap()).unwrap()
     } else {
         unreachable!("Simulation uses Ed25519 authenticator.");
     }

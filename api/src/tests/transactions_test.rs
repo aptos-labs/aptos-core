@@ -2059,14 +2059,18 @@ async fn test_submit_transaction_rejects_invalid_content_type(
         use_txn_payload_v2_format,
         use_orderless_transactions,
     );
-    let req = warp::test::request()
+    let aptos_api_test_context::ApiSpecificConfig::V1(address) = context.api_specific_config;
+    let client = reqwest::Client::new();
+    let resp = client
+        .post(format!("http://{}/v1/transactions", address))
         .header("content-type", "invalid")
-        .method("POST")
         .body("text")
-        .path(&build_path(""));
-
-    let resp = context.expect_status_code(415).execute(req).await;
-    context.check_golden_output(resp);
+        .send()
+        .await
+        .expect("Failed to send request");
+    assert_eq!(resp.status().as_u16(), 415);
+    let body: Value = serde_json::from_slice(&resp.bytes().await.unwrap()).unwrap_or(Value::Null);
+    context.check_golden_output(body);
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
@@ -2086,14 +2090,19 @@ async fn test_submit_transaction_rejects_invalid_json(
         use_txn_payload_v2_format,
         use_orderless_transactions,
     );
-    let req = warp::test::request()
+    context.wait_for_internal_indexer_caught_up().await;
+    let aptos_api_test_context::ApiSpecificConfig::V1(address) = context.api_specific_config;
+    let client = reqwest::Client::new();
+    let resp = client
+        .post(format!("http://{}/v1/transactions", address))
         .header("content-type", "application/json")
-        .method("POST")
         .body("invalid json")
-        .path(&build_path(""));
-
-    let resp = context.expect_status_code(400).execute(req).await;
-    context.check_golden_output(resp);
+        .send()
+        .await
+        .expect("Failed to send request");
+    assert_eq!(resp.status().as_u16(), 400);
+    let body: Value = serde_json::from_slice(&resp.bytes().await.unwrap()).unwrap_or(Value::Null);
+    context.check_golden_output(body);
 }
 
 #[ignore]
@@ -2130,14 +2139,19 @@ async fn test_create_signing_message_rejects_invalid_content_type(
         use_txn_payload_v2_format,
         use_orderless_transactions,
     );
-    let req = warp::test::request()
+    context.wait_for_internal_indexer_caught_up().await;
+    let aptos_api_test_context::ApiSpecificConfig::V1(address) = context.api_specific_config;
+    let client = reqwest::Client::new();
+    let resp = client
+        .post(format!("http://{}/v1/transactions/encode_submission", address))
         .header("content-type", "invalid")
-        .method("POST")
         .body("text")
-        .path(&build_path("/encode_submission"));
-
-    let resp = context.expect_status_code(415).execute(req).await;
-    context.check_golden_output(resp);
+        .send()
+        .await
+        .expect("Failed to send request");
+    assert_eq!(resp.status().as_u16(), 415);
+    let body: Value = serde_json::from_slice(&resp.bytes().await.unwrap()).unwrap_or(Value::Null);
+    context.check_golden_output(body);
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
@@ -2157,14 +2171,19 @@ async fn test_create_signing_message_rejects_invalid_json(
         use_txn_payload_v2_format,
         use_orderless_transactions,
     );
-    let req = warp::test::request()
+    context.wait_for_internal_indexer_caught_up().await;
+    let aptos_api_test_context::ApiSpecificConfig::V1(address) = context.api_specific_config;
+    let client = reqwest::Client::new();
+    let resp = client
+        .post(format!("http://{}/v1/transactions/encode_submission", address))
         .header("content-type", "application/json")
-        .method("POST")
         .body("invalid json")
-        .path(&build_path("/encode_submission"));
-
-    let resp = context.expect_status_code(400).execute(req).await;
-    context.check_golden_output(resp);
+        .send()
+        .await
+        .expect("Failed to send request");
+    assert_eq!(resp.status().as_u16(), 400);
+    let body: Value = serde_json::from_slice(&resp.bytes().await.unwrap()).unwrap_or(Value::Null);
+    context.check_golden_output(body);
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
@@ -2184,13 +2203,18 @@ async fn test_create_signing_message_rejects_no_content_length_request(
         use_txn_payload_v2_format,
         use_orderless_transactions,
     );
-    let req = warp::test::request()
+    context.wait_for_internal_indexer_caught_up().await;
+    let aptos_api_test_context::ApiSpecificConfig::V1(address) = context.api_specific_config;
+    let client = reqwest::Client::new();
+    let resp = client
+        .post(format!("http://{}/v1/transactions/encode_submission", address))
         .header("content-type", "application/json")
-        .method("POST")
-        .path(&build_path("/encode_submission"));
-
-    let resp = context.expect_status_code(411).execute(req).await;
-    context.check_golden_output(resp);
+        .send()
+        .await
+        .expect("Failed to send request");
+    assert_eq!(resp.status().as_u16(), 411);
+    let body: Value = serde_json::from_slice(&resp.bytes().await.unwrap()).unwrap_or(Value::Null);
+    context.check_golden_output(body);
 }
 
 // Note: in tests, the min gas unit price is 0
@@ -2800,11 +2824,6 @@ fn gen_string(len: u64) -> String {
         .map(|()| rng.sample(Alphanumeric))
         .take(len as usize)
         .collect()
-}
-
-// For use when not using the methods on `TestContext` directly.
-fn build_path(path: &str) -> String {
-    format!("/v1/transactions{}", path)
 }
 
 // Tests for the /transactions/auxiliary_info endpoint
