@@ -36,8 +36,9 @@ use crate::{
     },
     network_interface::{
         ConsensusMsg, ConsensusNetworkBridge, ConsensusNetworkClient,
-        StrongConsensusNetworkBridge,
+        SlotConsensusNetworkBridge, StrongConsensusNetworkBridge,
     },
+    prefix_consensus::slot_manager::{RealSPCSpawner, SlotManager},
     payload_client::{
         mixed::MixedPayloadClient, user::quorum_store_client::QuorumStoreClient, PayloadClient,
     },
@@ -195,6 +196,10 @@ pub struct EpochManager<P: OnChainConfigProvider> {
     // Strong Prefix Consensus channels
     strong_prefix_consensus_tx: Option<aptos_channels::UnboundedSender<(Author, aptos_prefix_consensus::StrongPrefixConsensusMsg)>>,
     strong_prefix_consensus_close_tx: Option<oneshot::Sender<oneshot::Sender<()>>>,
+
+    // Slot Manager (Multi-Slot Prefix Consensus) channels
+    slot_manager_tx: Option<aptos_channels::UnboundedSender<(Author, aptos_prefix_consensus::SlotConsensusMsg)>>,
+    slot_manager_close_tx: Option<oneshot::Sender<oneshot::Sender<()>>>,
 }
 
 impl<P: OnChainConfigProvider> EpochManager<P> {
@@ -275,6 +280,8 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
             prefix_consensus_close_tx: None,
             strong_prefix_consensus_tx: None,
             strong_prefix_consensus_close_tx: None,
+            slot_manager_tx: None,
+            slot_manager_close_tx: None,
         }
     }
 
@@ -710,6 +717,20 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
                 warn!(error = ?e, "Error stopping strong prefix consensus during epoch shutdown");
             }
         }
+
+        // Shutdown slot manager (multi-slot prefix consensus)
+        if let Some(close_tx) = self.slot_manager_close_tx.take() {
+            let (ack_tx, ack_rx) = oneshot::channel();
+            if close_tx.send(ack_tx).is_err() {
+                warn!("[EpochManager] Slot manager already stopped");
+            } else if tokio::time::timeout(Duration::from_secs(5), ack_rx)
+                .await
+                .is_err()
+            {
+                warn!("[EpochManager] Timeout waiting for slot manager shutdown");
+            }
+        }
+        self.slot_manager_tx = None;
     }
 
     async fn start_recovery_manager(
@@ -1320,7 +1341,24 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
             );
         self.secret_share_manager_tx = Some(secret_share_manager_tx);
 
-        if consensus_config.is_dag_enabled() {
+        if self.config.enable_prefix_consensus {
+            self.start_new_epoch_with_slot_manager(
+                epoch_state,
+                loaded_consensus_key.clone(),
+                consensus_config,
+                execution_config,
+                onchain_randomness_config,
+                jwk_consensus_config,
+                network_sender,
+                payload_client,
+                payload_manager,
+                rand_config,
+                fast_rand_config,
+                rand_msg_rx,
+                secret_share_manager_rx,
+            )
+            .await
+        } else if consensus_config.is_dag_enabled() {
             warn!("DAG doesn't support secret sharing");
             self.start_new_epoch_with_dag(
                 epoch_state,
@@ -1553,6 +1591,132 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
         tokio::spawn(bootstrapper.start(dag_rpc_rx, dag_shutdown_rx));
     }
 
+    async fn start_new_epoch_with_slot_manager(
+        &mut self,
+        epoch_state: Arc<EpochState>,
+        loaded_consensus_key: Arc<PrivateKey>,
+        onchain_consensus_config: OnChainConsensusConfig,
+        on_chain_execution_config: OnChainExecutionConfig,
+        onchain_randomness_config: OnChainRandomnessConfig,
+        _onchain_jwk_consensus_config: OnChainJWKConsensusConfig,
+        _network_sender: NetworkSender,
+        payload_client: Arc<dyn PayloadClient>,
+        payload_manager: Arc<dyn TPayloadManager>,
+        rand_config: Option<RandConfig>,
+        fast_rand_config: Option<RandConfig>,
+        rand_msg_rx: aptos_channel::Receiver<AccountAddress, IncomingRandGenRequest>,
+        secret_share_msg_rx: aptos_channel::Receiver<AccountAddress, IncomingSecretShareRequest>,
+    ) {
+        let epoch = epoch_state.epoch;
+        let signer = Arc::new(ValidatorSigner::new(
+            self.author,
+            loaded_consensus_key.clone(),
+        ));
+        let commit_signer = Arc::new(DagCommitSigner::new(signer.clone()));
+
+        assert!(
+            onchain_consensus_config.decoupled_execution(),
+            "decoupled execution must be enabled"
+        );
+        let highest_committed_round = self
+            .storage
+            .aptos_db()
+            .get_latest_ledger_info()
+            .expect("unable to get latest ledger info")
+            .commit_info()
+            .round();
+
+        self.execution_client
+            .start_epoch(
+                loaded_consensus_key.clone(),
+                epoch_state.clone(),
+                commit_signer,
+                payload_manager,
+                &onchain_consensus_config,
+                &on_chain_execution_config,
+                &onchain_randomness_config,
+                rand_config,
+                fast_rand_config,
+                rand_msg_rx,
+                secret_share_msg_rx,
+                highest_committed_round,
+            )
+            .await;
+
+        let execution_channel = self
+            .execution_client
+            .get_execution_channel()
+            .expect("execution channel must exist after start_epoch");
+
+        let parent_block_info = self
+            .storage
+            .aptos_db()
+            .get_latest_ledger_info()
+            .expect("unable to get latest ledger info")
+            .commit_info()
+            .clone();
+
+        // Create slot manager channels
+        let (slot_tx, slot_rx) = aptos_channels::new_unbounded(
+            &counters::OP_COUNTERS.gauge("slot_manager_channel_msgs"),
+        );
+        let (close_tx, close_rx) = oneshot::channel();
+
+        // Create network bridge for SlotConsensusMsg
+        let bridge = SlotConsensusNetworkBridge::new(self.network_sender.clone());
+        let slot_network_client =
+            aptos_prefix_consensus::SlotConsensusNetworkClient::new(bridge);
+        let slot_network_sender =
+            aptos_prefix_consensus::SlotNetworkSenderAdapter::new(
+                self.author,
+                slot_network_client,
+                slot_tx.clone(),
+                epoch_state.verifier.clone(),
+            );
+
+        // Create SPC spawner (uses ConsensusNetworkClient for SPC's own network bridge)
+        let spc_spawner = RealSPCSpawner::new(
+            self.author,
+            epoch,
+            loaded_consensus_key.clone(),
+            epoch_state.verifier.clone(),
+            self.network_sender.clone(),
+        );
+
+        // Create ranking manager from validator set
+        let ranking_manager = aptos_prefix_consensus::MultiSlotRankingManager::new(
+            epoch_state.verifier.get_ordered_account_addresses(),
+        );
+
+        let slot_signer = ValidatorSigner::new(
+            self.author,
+            loaded_consensus_key,
+        );
+        let slot_manager = SlotManager::new(
+            self.author,
+            epoch,
+            slot_signer,
+            epoch_state.verifier.clone(),
+            ranking_manager,
+            execution_channel,
+            payload_client,
+            parent_block_info,
+            slot_network_sender,
+            spc_spawner,
+        );
+
+        self.slot_manager_tx = Some(slot_tx);
+        self.slot_manager_close_tx = Some(close_tx);
+
+        info!(
+            epoch = epoch,
+            author = %self.author,
+            "Starting multi-slot prefix consensus (SlotManager)"
+        );
+
+        tokio::spawn(slot_manager.start(slot_rx, close_rx));
+    }
+
     fn enable_quorum_store(&mut self, onchain_config: &OnChainConsensusConfig) -> bool {
         fail_point!("consensus::start_new_epoch::disable_qs", |_| false);
         onchain_config.quorum_store_enabled()
@@ -1763,6 +1927,29 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
                         msg_epoch = msg_epoch,
                         local_epoch = self.epoch(),
                         "[EpochManager] StrongPrefixConsensusMsg epoch mismatch"
+                    );
+                }
+            },
+            ConsensusMsg::SlotConsensusMsg(msg) => {
+                let msg_epoch = msg.epoch();
+                if msg_epoch == self.epoch() {
+                    if let Some(tx) = &mut self.slot_manager_tx {
+                        tx.send((peer_id, *msg)).await.map_err(|e| {
+                            anyhow::anyhow!("Failed to send to slot_manager_tx: {:?}", e)
+                        })?;
+                    } else {
+                        warn!(
+                            remote_peer = peer_id,
+                            epoch = msg_epoch,
+                            "[EpochManager] Received SlotConsensusMsg but slot manager not running"
+                        );
+                    }
+                } else {
+                    warn!(
+                        remote_peer = peer_id,
+                        msg_epoch = msg_epoch,
+                        local_epoch = self.epoch(),
+                        "[EpochManager] SlotConsensusMsg epoch mismatch"
                     );
                 }
             },

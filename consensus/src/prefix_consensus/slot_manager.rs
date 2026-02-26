@@ -38,20 +38,14 @@ use aptos_types::{
     validator_verifier::ValidatorVerifier,
 };
 use aptos_validator_transaction_pool as vtxn_pool;
-use futures::SinkExt;
+use futures::{channel::oneshot, SinkExt, StreamExt};
 use std::{
     collections::{HashMap, HashSet},
     pin::Pin,
     sync::Arc,
     time::Duration,
 };
-use tokio::{
-    sync::{
-        mpsc::{UnboundedReceiver, UnboundedSender},
-        oneshot,
-    },
-    time::Sleep,
-};
+use tokio::time::Sleep;
 
 /// Default 2Δ timeout for proposal collection.
 const SLOT_PROPOSAL_TIMEOUT_MS: u64 = 300;
@@ -80,7 +74,7 @@ pub struct SPCHandles {
     /// Channel for forwarding incoming SPC network messages to the SPC task.
     pub msg_tx: aptos_channels::UnboundedSender<(Author, StrongPrefixConsensusMsg)>,
     /// Channel for receiving committed (slot, v_high) from the SPC task.
-    pub output_rx: UnboundedReceiver<(u64, PrefixVector)>,
+    pub output_rx: tokio::sync::mpsc::UnboundedReceiver<(u64, PrefixVector)>,
     /// Oneshot to signal the SPC task to shut down (with ack).
     pub close_tx: futures::channel::oneshot::Sender<futures::channel::oneshot::Sender<()>>,
 }
@@ -212,7 +206,7 @@ pub struct SlotManager<NS: SubprotocolNetworkSender<SlotConsensusMsg>, SP: SPCSp
 
     // Per-slot SPC channels (set by run_spc, cleared by on_spc_v_high)
     spc_msg_tx: Option<aptos_channels::UnboundedSender<(Author, StrongPrefixConsensusMsg)>>,
-    spc_output_rx: Option<UnboundedReceiver<(u64, PrefixVector)>>,
+    spc_output_rx: Option<tokio::sync::mpsc::UnboundedReceiver<(u64, PrefixVector)>>,
     spc_close_tx: Option<futures::channel::oneshot::Sender<futures::channel::oneshot::Sender<()>>>,
 
     // SPC spawner (production vs. test)
@@ -222,7 +216,7 @@ pub struct SlotManager<NS: SubprotocolNetworkSender<SlotConsensusMsg>, SP: SPCSp
     pending_commit: Option<PendingCommit>,
 
     // Execution bridge
-    execution_channel: UnboundedSender<OrderedBlocks>,
+    execution_channel: futures::channel::mpsc::UnboundedSender<OrderedBlocks>,
 
     // Payload
     payload_client: Arc<dyn PayloadClient>,
@@ -245,7 +239,7 @@ impl<NS: SubprotocolNetworkSender<SlotConsensusMsg>, SP: SPCSpawner> SlotManager
         validator_signer: ValidatorSigner,
         validator_verifier: Arc<ValidatorVerifier>,
         ranking_manager: MultiSlotRankingManager,
-        execution_channel: UnboundedSender<OrderedBlocks>,
+        execution_channel: futures::channel::mpsc::UnboundedSender<OrderedBlocks>,
         payload_client: Arc<dyn PayloadClient>,
         parent_block_info: BlockInfo,
         network_sender: NS,
@@ -276,7 +270,7 @@ impl<NS: SubprotocolNetworkSender<SlotConsensusMsg>, SP: SPCSpawner> SlotManager
     /// Main event loop. Consumes self, runs as a tokio task.
     pub async fn start(
         mut self,
-        mut message_rx: UnboundedReceiver<(Author, SlotConsensusMsg)>,
+        mut message_rx: aptos_channels::UnboundedReceiver<(Author, SlotConsensusMsg)>,
         mut close_rx: oneshot::Receiver<oneshot::Sender<()>>,
     ) {
         self.start_new_slot(1).await;
@@ -328,7 +322,7 @@ impl<NS: SubprotocolNetworkSender<SlotConsensusMsg>, SP: SPCSpawner> SlotManager
                 }
 
                 // Incoming messages
-                Some((author, msg)) = message_rx.recv() => {
+                Some((author, msg)) = message_rx.next() => {
                     self.slot_timer = timer_opt;
                     self.spc_output_rx = spc_rx_opt;
                     match msg {
@@ -604,7 +598,7 @@ impl<NS: SubprotocolNetworkSender<SlotConsensusMsg>, SP: SPCSpawner> SlotManager
         };
 
         // Send to execution
-        if let Err(e) = self.execution_channel.send(ordered) {
+        if let Err(e) = self.execution_channel.unbounded_send(ordered) {
             error!(
                 epoch = self.epoch,
                 slot = slot,
@@ -784,6 +778,7 @@ mod tests {
         validator_signer::ValidatorSigner,
         validator_verifier::{ValidatorConsensusInfo, ValidatorVerifier},
     };
+    use futures::channel::mpsc as futures_mpsc;
     use std::sync::Mutex;
     use tokio::sync::mpsc;
 
@@ -875,10 +870,10 @@ mod tests {
         verifier: Arc<ValidatorVerifier>,
     ) -> (
         SlotManager<MockSlotNetworkSender, StubSPCSpawner>,
-        UnboundedReceiver<OrderedBlocks>,
+        futures_mpsc::UnboundedReceiver<OrderedBlocks>,
         MockSlotNetworkSender,
     ) {
-        let (exec_tx, exec_rx) = mpsc::unbounded_channel();
+        let (exec_tx, exec_rx) = futures_mpsc::unbounded();
         let authors: Vec<Author> = signers.iter().map(|s| s.author()).collect();
         let network_sender = MockSlotNetworkSender::new();
 
@@ -950,7 +945,7 @@ mod tests {
         }
 
         // Block should have been sent to execution
-        let ordered = exec_rx.try_recv().expect("Block should be on execution channel");
+        let ordered = exec_rx.try_next().unwrap().expect("Block should be on execution channel");
         assert_eq!(ordered.ordered_blocks.len(), 1);
         let block = ordered.ordered_blocks[0].block();
         assert_eq!(block.epoch(), 1);
@@ -976,7 +971,7 @@ mod tests {
         }
 
         // Block should be on exec channel
-        let ordered = exec_rx.try_recv().expect("Block should be on execution channel");
+        let ordered = exec_rx.try_next().unwrap().expect("Block should be on execution channel");
         assert_eq!(ordered.ordered_blocks.len(), 1);
         assert_eq!(manager.current_slot, 2);
     }
@@ -1029,7 +1024,7 @@ mod tests {
         manager.on_spc_v_high(slot, v_high).await;
 
         // Consume the block
-        let _block1 = exec_rx.try_recv().expect("Block 1");
+        let _block1 = exec_rx.try_next().unwrap().expect("Block 1");
 
         // After slot 1: v_high.len() == 4, so ranking_manager.update(4) → no demotion
         // (full prefix, all 4 positions present even if some are ⊥)
@@ -1055,7 +1050,7 @@ mod tests {
             manager.on_spc_v_high(slot, v_high).await;
         }
 
-        let ordered = exec_rx.try_recv().expect("Block on exec channel");
+        let ordered = exec_rx.try_next().unwrap().expect("Block on exec channel");
         assert_eq!(ordered.ordered_blocks.len(), 1);
         let block = ordered.ordered_blocks[0].block();
         assert_eq!(block.epoch(), 1);
@@ -1080,7 +1075,7 @@ mod tests {
             let (slot, v_high) = manager.spc_output_rx.as_mut().unwrap().recv().await.unwrap();
             manager.on_spc_v_high(slot, v_high).await;
         }
-        let _block1 = exec_rx.try_recv().unwrap();
+        let _block1 = exec_rx.try_next().unwrap().unwrap();
 
         // Parent should have been updated
         assert_ne!(manager.parent_block_info.id(), initial_parent.id());
@@ -1091,7 +1086,7 @@ mod tests {
             let (slot, v_high) = manager.spc_output_rx.as_mut().unwrap().recv().await.unwrap();
             manager.on_spc_v_high(slot, v_high).await;
         }
-        let _block2 = exec_rx.try_recv().unwrap();
+        let _block2 = exec_rx.try_next().unwrap().unwrap();
 
         // Parent should have been updated again
         assert_ne!(manager.parent_block_info.id(), parent_after_slot1.id());
@@ -1102,9 +1097,9 @@ mod tests {
         let (signers, verifier) = create_validators(1);
         let (manager, _exec_rx, _ns) = build_test_manager(&signers, verifier);
 
-        let (msg_tx, msg_rx) = mpsc::unbounded_channel();
-        let (close_tx, close_rx) = oneshot::channel();
-        let (ack_tx, ack_rx) = oneshot::channel();
+        let (msg_tx, msg_rx) = aptos_channels::new_unbounded_test();
+        let (close_tx, close_rx) = futures::channel::oneshot::channel();
+        let (ack_tx, ack_rx) = futures::channel::oneshot::channel();
 
         let handle = tokio::spawn(manager.start(msg_rx, close_rx));
 
@@ -1146,7 +1141,7 @@ mod tests {
         manager.run_spc(1);
         let (slot, v_high) = manager.spc_output_rx.as_mut().unwrap().recv().await.unwrap();
         manager.on_spc_v_high(slot, v_high).await;
-        let _block1 = exec_rx.try_recv().unwrap();
+        let _block1 = exec_rx.try_next().unwrap().unwrap();
 
         // Now at slot 2 — the pre-buffered proposal should still be there
         assert_eq!(manager.current_slot, 2);

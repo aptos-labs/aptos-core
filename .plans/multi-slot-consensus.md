@@ -471,44 +471,34 @@ Ensures the SlotManager can always build a block from v_high, even when v_high c
 
 - [x] Unit tests: 11 new tests for late buffering, resolution, lookup, fetch message serialization, hash verification
 
-### Phase 8: EpochManager Integration (~400 LOC)
+### Phase 8: EpochManager Integration (~400 LOC) ✅
 
-**Modified file**: `consensus/src/epoch_manager.rs`
+**Detailed plan**: `.plans/phase8-epoch-manager-integration.md`
 
-- [ ] Add SlotManager channels:
-  ```rust
-  slot_manager_tx: Option<UnboundedSender<(Author, SlotConsensusMsg)>>,
-  slot_manager_close_tx: Option<oneshot::Sender<oneshot::Sender<()>>>,
-  ```
-- [ ] `start_slot_manager(&mut self, ...)` — similar to `start_round_manager()`:
-  - Initialize execution client for epoch
-  - Create PayloadClient and PayloadManager
-  - Create network bridge for SlotConsensusMsg
-  - Create SlotManager with all dependencies
-  - Spawn as tokio task
-- [ ] `stop_slot_manager(&mut self)` — graceful shutdown with ack
-- [ ] Modify `start_new_epoch()` / `start_new_epoch_with_jolteon()`:
-  ```rust
-  // Check local NodeConfig flag BEFORE the on-chain ConsensusAlgorithmConfig check
-  if self.config.enable_prefix_consensus {
-      self.start_slot_manager(...).await
-  } else if consensus_config.is_dag_enabled() {
-      self.start_new_epoch_with_dag(...).await
-  } else {
-      self.start_new_epoch_with_jolteon(...).await
-  }
-  ```
-  Note: local config takes priority over on-chain config for prototype. Production deployment would add a `PrefixConsensus` variant to `ConsensusAlgorithmConfig` in `types/src/on_chain_config/consensus_config.rs`.
-  **Important**: This check runs on EVERY epoch start (including epoch 1→2 transition triggered by DKG ~1.5s after startup). The `start_slot_manager()` call must work correctly on epoch transitions — the previous SlotManager is shut down by `shutdown_current_processor()`, and a new one is started with fresh recovery data from the new epoch. Same pattern as Strong PC smoke tests where `trigger_test_prefix_consensus()` is called on every epoch start.
-- [ ] Pass `parent_block_info` and `highest_committed_round` from recovery data to SlotManager constructor (same data available in `start_round_manager`)
-- [ ] Modify `shutdown_current_processor()` to stop SlotManager
-- [ ] Modify `check_epoch()` to route `SlotConsensusMsg` messages (verify epoch, forward to `slot_manager_tx`)
-- [ ] Add `SlotConsensusNetworkBridge` (wraps SlotConsensusMsg in ConsensusMsg, same pattern as `ConsensusNetworkBridge` and `StrongConsensusNetworkBridge`)
+Wires SlotManager into EpochManager so it starts automatically at epoch boundaries when `enable_prefix_consensus` config flag is set.
 
-**Modified file**: `config/src/config/consensus_config.rs` (local NodeConfig, NOT on-chain config)
-- [ ] Add `enable_prefix_consensus: bool` field to `ConsensusConfig` struct (default `false`)
-- [ ] This is the local node config file — does NOT touch `types/src/on_chain_config/consensus_config.rs`
-- [ ] No `ConsensusAlgorithmConfig` enum changes (avoids breaking on-chain serialization)
+**Pre-step: Channel type alignment** — Changed SlotManager from tokio channels to futures channels to match the execution pipeline and codebase convention:
+- [x] `execution_channel`: `tokio::sync::mpsc::UnboundedSender` → `futures::channel::mpsc::UnboundedSender`, `.send()` → `.unbounded_send()`
+- [x] `message_rx`: `tokio::sync::mpsc::UnboundedReceiver` → `aptos_channels::UnboundedReceiver`, `recv()` → `next()` (Stream)
+- [x] `close_rx`: unified on `futures::channel::oneshot`
+- [x] SPC output channel: kept as tokio (internal to SlotManager, doesn't cross EpochManager boundary)
+- [x] Tests updated: `futures_mpsc::unbounded()`, `try_next().unwrap()`, `aptos_channels::new_unbounded_test()`
+
+**Modified files**:
+- [x] `config/src/config/consensus_config.rs`: Added `enable_prefix_consensus: bool` (default `false`, `#[serde(default)]`)
+- [x] `consensus/src/prefix_consensus/slot_manager.rs`: Channel type migration (tokio → futures)
+- [x] `consensus/src/epoch_manager.rs`:
+  - Added `slot_manager_tx` and `slot_manager_close_tx` fields
+  - Added `start_new_epoch_with_slot_manager()` following DAG startup pattern: creates `DagCommitSigner`, calls `execution_client.start_epoch()`, constructs `SlotConsensusNetworkBridge` → `SlotNetworkSenderAdapter`, `RealSPCSpawner`, `MultiSlotRankingManager`, spawns SlotManager
+  - `enable_prefix_consensus` checked FIRST in `start_new_epoch()` (before DAG/Jolteon on-chain config)
+  - `SlotConsensusMsg` routing added to `check_epoch()` with epoch verification
+  - Shutdown with timeout added to `shutdown_current_processor()` (cascades to SPC tasks)
+
+**Key design decisions**:
+- Reuses `DagCommitSigner` for the execution pipeline's commit signer (no SafetyRules needed)
+- Skips `RecoveryData` — reads `parent_block_info` from `get_latest_ledger_info()` directly (same as DAG)
+- Local config flag takes priority over on-chain config for prototype
+- `SlotConsensusNetworkBridge` type alias already existed (network_interface.rs:426)
 
 ### Phase 9: BlockType Integration and Payload (~400 LOC, revised up from ~200)
 

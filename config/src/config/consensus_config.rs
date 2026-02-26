@@ -107,6 +107,10 @@ pub struct ConsensusConfig {
     /// Test-only: Input vector for strong prefix consensus smoke tests (hex-encoded hashes)
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub strong_prefix_consensus_test_input: Option<Vec<String>>,
+    /// Enable multi-slot prefix consensus (Algorithm 4) instead of Jolteon/DAG.
+    /// Local config flag — does NOT modify on-chain ConsensusAlgorithmConfig.
+    #[serde(default)]
+    pub enable_prefix_consensus: bool,
 }
 
 /// Deprecated
@@ -391,6 +395,7 @@ impl Default for ConsensusConfig {
             enable_optimistic_proposal_tx: true,
             prefix_consensus_test_input: None,
             strong_prefix_consensus_test_input: None,
+            enable_prefix_consensus: false,
         }
     }
 }

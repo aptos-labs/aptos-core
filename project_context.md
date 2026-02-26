@@ -4,8 +4,8 @@
 
 Implementing Prefix Consensus protocols (from research paper "Prefix Consensus For Censorship Resistant BFT") within Aptos Core for leaderless, censorship-resistant consensus.
 
-**Current Phase**: Multi-Slot Consensus (Algorithm 4) — Phases 1-7 complete, Phase 8 next
-**Completed**: Basic Prefix Consensus, Strong Prefix Consensus (Phases 1-9), Stake-Weighted Quorum Refactoring, Multi-Slot Phases 1-7
+**Current Phase**: Multi-Slot Consensus (Algorithm 4) — Phases 1-8 complete, Phase 9 next
+**Completed**: Basic Prefix Consensus, Strong Prefix Consensus (Phases 1-9), Stake-Weighted Quorum Refactoring, Multi-Slot Phases 1-8
 
 ---
 
@@ -112,7 +112,7 @@ Execution Pipeline (unchanged):
 5. ~~SlotManager core (~800 LOC)~~ ✅
 6. ~~SPC integration refactor (~300 LOC)~~ ✅
 7. ~~Payload resolution: late buffering + fetch protocol (~350 LOC)~~ ✅
-8. EpochManager integration (~400 LOC)
+8. ~~EpochManager integration (~400 LOC)~~ ✅
 9. BlockType integration across codebase (~400 LOC, grep-driven)
 10. Execution pipeline compatibility (~300 LOC, grep-driven)
 11. Smoke tests (~400 LOC)
@@ -123,7 +123,7 @@ Execution Pipeline (unchanged):
 ## Repository State
 
 - **Branch**: `prefix-consensus-prototype`
-- **HEAD**: Multi-Slot Phase 7 (Payload resolution — late buffering, fetch protocol, PendingCommit)
+- **HEAD**: Multi-Slot Phase 8 (EpochManager integration — config flag, startup, routing, shutdown)
 - **Tests**: 246/246 unit tests (237 prefix-consensus + 9 slot manager), 6/6 smoke tests
 - **Build**: Clean
 
