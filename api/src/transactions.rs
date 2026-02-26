@@ -2328,7 +2328,9 @@ pub async fn get_transaction_by_hash_inner(
             )
         })?
         .context(format!("Failed to find transaction with hash: {}", hash))
-        .map_err(|_| crate::response_axum::transaction_not_found_by_hash(hash, &latest_ledger_info))?;
+        .map_err(|_| {
+            crate::response_axum::transaction_not_found_by_hash(hash, &latest_ledger_info)
+        })?;
 
     let context_for_convert = context.clone();
     let accept_type_for_convert = accept_type.clone();
@@ -2351,12 +2353,11 @@ fn get_transaction_inner_axum(
 ) -> Result<AptosResponse<Transaction>, AptosErrorResponse> {
     match accept_type {
         AcceptType::Json => {
-            let state_view =
-                context.latest_state_view_poem::<AptosErrorResponse>(ledger_info)?;
+            let state_view = context.latest_state_view_poem::<AptosErrorResponse>(ledger_info)?;
             let transaction = match transaction_data {
                 TransactionData::OnChain(txn) => {
-                    let timestamp =
-                        context.get_block_timestamp::<AptosErrorResponse>(ledger_info, txn.version)?;
+                    let timestamp = context
+                        .get_block_timestamp::<AptosErrorResponse>(ledger_info, txn.version)?;
                     state_view
                         .as_converter(context.db.clone(), context.indexer_reader.clone())
                         .try_into_onchain_transaction(timestamp, txn)
@@ -2400,14 +2401,13 @@ pub async fn wait_transaction_by_hash_inner(
     };
     let start_time = std::time::Instant::now();
     loop {
-        let (internal_ledger_info_opt, storage_ledger_info) =
-            api_spawn_blocking({
-                let context_clone = context.clone();
-                move || {
-                    context_clone.get_latest_internal_and_storage_ledger_info::<AptosErrorResponse>()
-                }
-            })
-            .await?;
+        let (internal_ledger_info_opt, storage_ledger_info) = api_spawn_blocking({
+            let context_clone = context.clone();
+            move || {
+                context_clone.get_latest_internal_and_storage_ledger_info::<AptosErrorResponse>()
+            }
+        })
+        .await?;
         let storage_version = storage_ledger_info.ledger_version.into();
         let internal_ledger_version = internal_ledger_info_opt
             .as_ref()
@@ -2597,7 +2597,9 @@ fn simulate_inner_impl(
             };
             stats_key
         },
-        TransactionPayload::EncryptedPayload(_) => unreachable!("Encrypted transactions must not be simulated"),
+        TransactionPayload::EncryptedPayload(_) => {
+            unreachable!("Encrypted transactions must not be simulated")
+        },
     };
     context
         .simulate_txn_stats()
@@ -2629,7 +2631,9 @@ fn simulate_inner_impl(
     let response = match accept_type {
         AcceptType::Json => {
             let transactions = context
-                .render_transactions_non_sequential::<AptosErrorResponse>(ledger_info, vec![simulated_txn])?;
+                .render_transactions_non_sequential::<AptosErrorResponse>(ledger_info, vec![
+                    simulated_txn,
+                ])?;
             let mut user_transactions = Vec::new();
             for transaction in transactions.into_iter() {
                 match transaction {

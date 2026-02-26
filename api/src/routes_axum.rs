@@ -3,9 +3,9 @@
 
 //! Axum route handlers for the Aptos Node API.
 //!
-//! These handlers delegate to the existing Poem-based API structs and convert
-//! the Poem response types to Axum response types using the `IntoResponse` trait.
-//! This approach lets us reuse ALL existing business logic during migration.
+//! Each handler calls a framework-agnostic `_inner` function that returns
+//! `AptosResponse<T>` / `AptosErrorResponse`, then converts to an Axum `Response`.
+//! No Poem types are used in the request or response path.
 
 use crate::{accept_type::AcceptType, context::Context, response_axum::AptosErrorResponse};
 use axum::{
@@ -61,54 +61,6 @@ fn unsupported_content_type(content_type: &str) -> AptosErrorResponse {
         ),
         None,
     )
-}
-
-// Instead of trying to convert between Poem and Axum response types,
-// we run the existing Poem handlers and convert the final Poem response
-// into a raw HTTP response that Axum can serve. This is the most robust
-// approach since it reuses ALL existing logic with zero duplication.
-
-/// Wrapper that converts a poem::Response into an axum::Response.
-/// Since both are HTTP responses at the wire level, we can extract
-/// status + headers + body and reconstruct.
-async fn poem_to_axum_response(poem_resp: poem::Response) -> Response {
-    let status = poem_resp.status();
-    let headers = poem_resp.headers().clone();
-    let body = poem_resp.into_body();
-    let body_bytes = match body.into_vec().await {
-        Ok(bytes) => bytes,
-        Err(e) => {
-            aptos_logger::error!("Failed to read Poem response body: {}", e);
-            let error = aptos_api_types::AptosError::new_with_error_code(
-                "Internal error reading response body",
-                aptos_api_types::AptosErrorCode::InternalError,
-            );
-            let json = serde_json::to_vec(&error).unwrap_or_default();
-            return (StatusCode::INTERNAL_SERVER_ERROR, json).into_response();
-        },
-    };
-
-    let axum_status =
-        StatusCode::from_u16(status.as_u16()).unwrap_or(StatusCode::INTERNAL_SERVER_ERROR);
-
-    let mut builder = axum::http::Response::builder().status(axum_status);
-    for (key, value) in headers.iter() {
-        match (
-            axum::http::header::HeaderName::from_bytes(key.as_str().as_bytes()),
-            axum::http::header::HeaderValue::from_bytes(value.as_bytes()),
-        ) {
-            (Ok(name), Ok(val)) => {
-                builder = builder.header(name, val);
-            },
-            _ => {
-                aptos_logger::warn!("Dropping unconvertible header: {}", key);
-            },
-        }
-    }
-
-    builder
-        .body(axum::body::Body::from(body_bytes))
-        .unwrap_or_else(|_| (StatusCode::INTERNAL_SERVER_ERROR, "Internal error").into_response())
 }
 
 // ---- Query parameter types ----
@@ -722,13 +674,9 @@ pub async fn get_transaction_by_hash_handler(
     crate::failpoint::fail_point_poem::<AptosErrorResponse>("endpoint_transaction_by_hash")?;
     context
         .check_api_output_enabled::<AptosErrorResponse>("Get transactions by hash", &accept_type)?;
-    let txn_api = crate::transactions::TransactionsApi {
-        context: context.clone(),
-    };
-    let resp = txn_api
-        .get_transaction_by_hash_inner(&accept_type, txn_hash)
+    let resp = crate::transactions::get_transaction_by_hash_inner(&context, &accept_type, txn_hash)
         .await?;
-    Ok(poem_to_axum_response(poem::IntoResponse::into_response(resp)).await)
+    Ok(resp.into_response())
 }
 
 pub async fn wait_transaction_by_hash_handler(
@@ -739,52 +687,38 @@ pub async fn wait_transaction_by_hash_handler(
     crate::failpoint::fail_point_poem::<AptosErrorResponse>("endpoint_wait_transaction_by_hash")?;
     context
         .check_api_output_enabled::<AptosErrorResponse>("Get transactions by hash", &accept_type)?;
-    let txn_api = crate::transactions::TransactionsApi {
-        context: context.clone(),
-    };
 
-    if txn_api
-        .context
+    if context
         .wait_for_hash_active_connections
         .fetch_add(1, std::sync::atomic::Ordering::Relaxed)
-        >= txn_api
-            .context
-            .node_config
-            .api
-            .wait_by_hash_max_active_connections
+        >= context.node_config.api.wait_by_hash_max_active_connections
     {
-        txn_api
-            .context
+        context
             .wait_for_hash_active_connections
             .fetch_sub(1, std::sync::atomic::Ordering::Relaxed);
         crate::metrics::WAIT_TRANSACTION_POLL_TIME
             .with_label_values(&["short"])
             .observe(0.0);
-        let resp = txn_api
-            .get_transaction_by_hash_inner(&accept_type, txn_hash)
-            .await?;
-        return Ok(poem_to_axum_response(poem::IntoResponse::into_response(resp)).await);
+        let resp =
+            crate::transactions::get_transaction_by_hash_inner(&context, &accept_type, txn_hash)
+                .await?;
+        return Ok(resp.into_response());
     }
 
     let start_time = std::time::Instant::now();
     crate::metrics::WAIT_TRANSACTION_GAUGE.inc();
 
-    let result = txn_api
-        .wait_transaction_by_hash_inner(
-            &accept_type,
-            txn_hash,
-            txn_api.context.node_config.api.wait_by_hash_timeout_ms,
-            txn_api
-                .context
-                .node_config
-                .api
-                .wait_by_hash_poll_interval_ms,
-        )
-        .await;
+    let result = crate::transactions::wait_transaction_by_hash_inner(
+        &context,
+        &accept_type,
+        txn_hash,
+        context.node_config.api.wait_by_hash_timeout_ms,
+        context.node_config.api.wait_by_hash_poll_interval_ms,
+    )
+    .await;
 
     crate::metrics::WAIT_TRANSACTION_GAUGE.dec();
-    txn_api
-        .context
+    context
         .wait_for_hash_active_connections
         .fetch_sub(1, std::sync::atomic::Ordering::Relaxed);
     crate::metrics::WAIT_TRANSACTION_POLL_TIME
@@ -792,7 +726,7 @@ pub async fn wait_transaction_by_hash_handler(
         .observe(start_time.elapsed().as_secs_f64());
 
     let resp = result?;
-    Ok(poem_to_axum_response(poem::IntoResponse::into_response(resp)).await)
+    Ok(resp.into_response())
 }
 
 pub async fn get_transaction_by_version_handler(
@@ -1006,10 +940,10 @@ pub async fn submit_transactions_batch_handler(
         AptosErrorResponse::bad_request(err, aptos_api_types::AptosErrorCode::InvalidInput, None)
     })?;
     let signed_txns = txn_api.get_signed_transactions_batch(&ledger_info, data)?;
-    let resp = txn_api
-        .create_batch(&accept_type, &ledger_info, signed_txns)
-        .await?;
-    Ok(poem_to_axum_response(poem::IntoResponse::into_response(resp)).await)
+    let resp =
+        crate::transactions::create_batch_inner(&context, &accept_type, &ledger_info, signed_txns)
+            .await?;
+    Ok(resp.into_response())
 }
 
 pub async fn simulate_transaction_handler(
@@ -1057,8 +991,9 @@ pub async fn simulate_transaction_handler(
         AptosErrorResponse::bad_request(err, aptos_api_types::AptosErrorCode::InvalidInput, None)
     })?;
     let signed_txn = txn_api.get_signed_transaction(&ledger_info, data)?;
-    let resp = txn_api.simulate(&accept_type, ledger_info, signed_txn)?;
-    Ok(poem_to_axum_response(poem::IntoResponse::into_response(resp)).await)
+    let resp =
+        crate::transactions::simulate_inner(&context, &accept_type, ledger_info, signed_txn)?;
+    Ok(resp.into_response())
 }
 
 pub async fn encode_submission_handler(
