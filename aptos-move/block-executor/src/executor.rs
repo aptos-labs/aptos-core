@@ -16,7 +16,7 @@ use crate::{
     explicit_sync_wrapper::ExplicitSyncWrapper,
     limit_processor::BlockGasLimitProcessor,
     scheduler::{DependencyStatus, ExecutionTaskType, Scheduler, SchedulerTask, Wave},
-    scheduler_v2::{AbortManager, SchedulerV2, TaskKind},
+    scheduler_v2::{AbortManager, CommitResult, SchedulerV2, TaskKind},
     scheduler_wrapper::SchedulerWrapper,
     task::{
         AfterMaterializationOutput, BeforeMaterializationOutput, ExecutionStatus, ExecutorTask,
@@ -1512,30 +1512,35 @@ where
         loop {
             while scheduler.commit_hooks_try_lock() {
                 // Perform sequential commit hooks.
-                while let Some((txn_idx, incarnation)) = scheduler.start_commit()? {
-                    self.prepare_and_queue_commit_ready_txn(
-                        txn_idx,
-                        incarnation,
-                        num_txns,
-                        executor,
-                        block,
-                        num_workers as usize,
-                        runtime_environment,
-                        scheduler_wrapper,
-                        shared_sync_params,
-                    )?;
-                }
+                let blocked_by_validation = loop {
+                    match scheduler.start_commit()? {
+                        CommitResult::Ready(txn_idx, incarnation) => {
+                            self.prepare_and_queue_commit_ready_txn(
+                                txn_idx,
+                                incarnation,
+                                num_txns,
+                                executor,
+                                block,
+                                num_workers as usize,
+                                runtime_environment,
+                                scheduler_wrapper,
+                                shared_sync_params,
+                            )?;
+                        },
+                        CommitResult::BlockedByValidation => break true,
+                        CommitResult::None => break false,
+                    }
+                };
 
                 scheduler.commit_hooks_unlock();
 
-                // Break to avoid spinning when the next txn is blocked by cold
-                // validation (commit_hooks_unlock re-arms because the txn is Executed,
-                // but start_commit will keep returning None until validation completes).
-                // When the txn isn't Executed or block is halted, the lock isn't re-armed
-                // and the break is equivalent to the loop exiting naturally.
-                // TODO: the wasteful locking and unlocking in the blocked case could be
-                // optimized out by recording into an extra atomic variable here.
-                break;
+                // When blocked by cold validation, break out of the try_lock loop.
+                // Otherwise commit_hooks_unlock re-arms (the txn is Executed), and
+                // we'd spin: try_lock succeeds, start_commit returns
+                // BlockedByValidation, unlock re-arms, repeat.
+                if blocked_by_validation {
+                    break;
+                }
             }
 
             match scheduler.next_task(worker_id)? {
