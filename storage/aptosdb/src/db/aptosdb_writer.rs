@@ -614,7 +614,6 @@ impl AptosDB {
                 .state_pruner
                 .state_kv_pruner
                 .maybe_set_pruner_target_db_version(version);
-
         }
 
         // Once everything is successfully persisted, update the latest in-memory ledger info.

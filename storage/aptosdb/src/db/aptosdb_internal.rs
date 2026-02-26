@@ -14,8 +14,7 @@ use crate::{
     transaction_store::TransactionStore,
 };
 use aptos_config::config::{
-    HotStateConfig, PrunerConfig, RocksdbConfigs, StorageDirPaths,
-    NO_OP_STORAGE_PRUNER_CONFIG,
+    HotStateConfig, PrunerConfig, RocksdbConfigs, StorageDirPaths, NO_OP_STORAGE_PRUNER_CONFIG,
 };
 use aptos_db_indexer::db_indexer::InternalIndexerDB;
 use aptos_logger::prelude::*;
@@ -28,10 +27,11 @@ use aptos_storage_interface::{
     Result,
 };
 use aptos_types::{account_config::NewBlockEvent, transaction::Version};
+#[cfg(any(test, feature = "fuzzing", feature = "consensus-only-perf-test"))]
+use std::path::Path;
 use std::{
     cell::Cell,
     fmt::{Debug, Formatter},
-    path::Path,
     sync::Arc,
     time::Instant,
 };

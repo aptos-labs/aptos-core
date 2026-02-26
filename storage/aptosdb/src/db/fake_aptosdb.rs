@@ -903,14 +903,6 @@ impl DbReader for FakeAptosDB {
         self.inner.get_ledger_prune_window()
     }
 
-    fn get_table_info(&self, handle: table::TableHandle) -> Result<table::TableInfo> {
-        self.inner.get_table_info(handle)
-    }
-
-    fn indexer_enabled(&self) -> bool {
-        self.inner.indexer_enabled()
-    }
-
     fn get_state_storage_usage(&self, version: Option<Version>) -> Result<StateStorageUsage> {
         self.inner.get_state_storage_usage(version)
     }

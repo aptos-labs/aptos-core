@@ -173,8 +173,7 @@ mod tests {
         assert!(matches!(error, Error::ConfigSanitizerFailed(_, _)));
 
         // Enable the table info service
-        node_config.indexer_table_info.table_info_service_mode =
-            TableInfoServiceMode::IndexingOnly;
+        node_config.indexer_table_info.table_info_service_mode = TableInfoServiceMode::IndexingOnly;
 
         // Sanitize the config and verify that it now succeeds
         IndexerGrpcConfig::sanitize(&node_config, NodeType::Validator, Some(ChainId::mainnet()))
