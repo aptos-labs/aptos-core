@@ -139,6 +139,11 @@ pub struct ModelConfig {
     pub compiler_version: CompilerVersion,
     /// The language version used to build the model
     pub language_version: LanguageVersion,
+    /// If set, the full compiler pipeline including bytecode generation is run.
+    /// Required by the prover which operates on FileFormat bytecode.
+    /// When false (default for most uses), only the type checker and AST
+    /// transforms are executed.
+    pub with_bytecode: bool,
 }
 
 impl BuildConfig {
@@ -196,6 +201,14 @@ impl BuildConfig {
     // across all packages and build the Move model from that.
     // TODO: In the future we will need a better way to do this to support renaming in packages
     // where we want to support building a Move model.
+
+    /// Build the Move model for the package at `path`.
+    ///
+    /// Only fails on I/O errors; all compilation errors and warnings are stored
+    /// in the returned `GlobalEnv`. Use `env.check_errors(msg)?` at call sites
+    /// where compilation errors should be fatal.
+    ///
+    /// See [`ModelConfig::with_bytecode`] for the effect of that flag.
     pub fn move_model_for_package(
         self,
         path: &Path,

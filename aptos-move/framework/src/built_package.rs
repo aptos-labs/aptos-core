@@ -182,6 +182,15 @@ pub struct BuiltPackage {
     pub package: CompiledPackage,
 }
 
+/// Build the Move model and run Aptos extended checks.
+///
+/// Only fails on I/O errors or invalid package path. All compilation errors and warnings
+/// (including Aptos-specific diagnostics) are stored in the returned `GlobalEnv`.
+/// Use `env.check_errors(msg)?` at call sites where compilation errors should be fatal.
+///
+/// When `with_bytecode` is set, the full compiler pipeline (including bytecode generation)
+/// is run — required by the prover. Otherwise only type checking and AST transforms are
+/// executed.
 pub fn build_model(
     dev_mode: bool,
     package_path: &Path,
@@ -193,13 +202,55 @@ pub fn build_model(
     skip_attribute_checks: bool,
     known_attributes: BTreeSet<String>,
     experiments: Vec<String>,
+    with_bytecode: bool,
 ) -> anyhow::Result<GlobalEnv> {
+    let build_config = make_model_build_config(
+        dev_mode,
+        additional_named_addresses,
+        bytecode_version,
+        compiler_version,
+        language_version,
+        skip_attribute_checks,
+        known_attributes,
+        experiments,
+    )?;
+    let compiler_version = compiler_version.unwrap_or_default();
+    let language_version = language_version.unwrap_or_default();
+    let env = build_config.move_model_for_package(package_path, ModelConfig {
+        target_filter,
+        all_files_as_targets: false,
+        compiler_version,
+        language_version,
+        with_bytecode,
+    })?;
+    // Run Aptos-specific extended checks (require compiled bytecode, so only
+    // run when with_bytecode is set and there are no prior errors).
+    if with_bytecode && !env.has_errors() {
+        extended_checks::run_extended_checks(&env);
+    }
+    Ok(env)
+}
+
+/// Shared helper to build a `BuildConfig` for model construction.
+fn make_model_build_config(
+    dev_mode: bool,
+    additional_named_addresses: BTreeMap<String, AccountAddress>,
+    bytecode_version: Option<u32>,
+    compiler_version: Option<CompilerVersion>,
+    language_version: Option<LanguageVersion>,
+    skip_attribute_checks: bool,
+    known_attributes: BTreeSet<String>,
+    experiments: Vec<String>,
+) -> anyhow::Result<BuildConfig> {
     let bytecode_version = Some(
         language_version
             .unwrap_or_default()
             .infer_bytecode_version(bytecode_version),
     );
-    let build_config = BuildConfig {
+    let cv = compiler_version.unwrap_or_default();
+    let lv = language_version.unwrap_or_default();
+    cv.check_language_support(lv)?;
+    Ok(BuildConfig {
         dev_mode,
         additional_named_addresses,
         generate_abis: false,
@@ -221,15 +272,6 @@ pub fn build_model(
             experiments,
             print_errors: true,
         },
-    };
-    let compiler_version = compiler_version.unwrap_or_default();
-    let language_version = language_version.unwrap_or_default();
-    compiler_version.check_language_support(language_version)?;
-    build_config.move_model_for_package(package_path, ModelConfig {
-        target_filter,
-        all_files_as_targets: false,
-        compiler_version,
-        language_version,
     })
 }
 

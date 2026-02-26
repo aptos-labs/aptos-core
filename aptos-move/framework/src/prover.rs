@@ -190,7 +190,9 @@ impl ProverOptions {
             skip_attribute_checks,
             known_attributes.clone(),
             experiments_vec,
+            true, // with_bytecode: prover needs FileFormat bytecode
         )?;
+        model.check_errors("in compilation")?;
         let mut options = self.convert_options(package_path)?;
         options.language_version = language_version;
         // Need to ensure a distinct output.bpl file for concurrent execution. In non-test

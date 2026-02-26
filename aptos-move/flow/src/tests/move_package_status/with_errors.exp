@@ -1,0 +1,6 @@
+is_error: true
+error: cannot return `bool` from a function with result type `u64`
+  ┌─ <TEMPDIR>/broken.move:2:22
+  │
+2 │     fun foo(): u64 { true }
+  │                      ^^^^

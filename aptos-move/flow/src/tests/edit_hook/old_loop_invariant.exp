@@ -1,0 +1,5 @@
+warning[W00001]: DEPRECATED. will be removed
+  ┌─ old_loop_invariant.move:8:27
+  │
+8 │                 invariant old(i + s) >= 0;
+  │                           ^^^^^^^^^^ `old(..)` in a loop invariant can only take a simple parameter name as argument
