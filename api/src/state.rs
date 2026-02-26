@@ -604,9 +604,7 @@ pub fn resource_inner(
     let tag: StructTag = (&resource_type)
         .try_into()
         .context("Failed to parse given resource type")
-        .map_err(|err| {
-            AptosErrorResponse::bad_request(err, AptosErrorCode::InvalidInput, None)
-        })?;
+        .map_err(|err| AptosErrorResponse::bad_request(err, AptosErrorCode::InvalidInput, None))?;
 
     let (ledger_info, ledger_version, state_view) =
         context.state_view::<AptosErrorResponse>(ledger_version)?;
@@ -621,7 +619,9 @@ pub fn resource_inner(
         .map_err(|err| {
             AptosErrorResponse::internal(err, AptosErrorCode::InternalError, Some(&ledger_info))
         })?
-        .ok_or_else(|| resource_not_found::<AptosErrorResponse>(address, &tag, ledger_version, &ledger_info))?;
+        .ok_or_else(|| {
+            resource_not_found::<AptosErrorResponse>(address, &tag, ledger_version, &ledger_info)
+        })?;
 
     match accept_type {
         AcceptType::Json => {
@@ -659,13 +659,11 @@ pub fn module_inner(
         .get_state_value_bytes(&state_key)
         .context(format!("Failed to query DB to check for {:?}", state_key))
         .map_err(|err| {
-            AptosErrorResponse::internal(
-                err,
-                AptosErrorCode::InternalError,
-                Some(&ledger_info),
-            )
+            AptosErrorResponse::internal(err, AptosErrorCode::InternalError, Some(&ledger_info))
         })?
-        .ok_or_else(|| module_not_found::<AptosErrorResponse>(address, &name, ledger_version, &ledger_info))?;
+        .ok_or_else(|| {
+            module_not_found::<AptosErrorResponse>(address, &name, ledger_version, &ledger_info)
+        })?;
 
     match accept_type {
         AcceptType::Json => {
@@ -699,33 +697,24 @@ pub fn table_item_inner(
     let key_type = (&table_item_request.key_type)
         .try_into()
         .context("Failed to parse key_type")
-        .map_err(|err| {
-            AptosErrorResponse::bad_request(err, AptosErrorCode::InvalidInput, None)
-        })?;
+        .map_err(|err| AptosErrorResponse::bad_request(err, AptosErrorCode::InvalidInput, None))?;
     let key = table_item_request.key;
     let value_type = (&table_item_request.value_type)
         .try_into()
         .context("Failed to parse value_type")
-        .map_err(|err| {
-            AptosErrorResponse::bad_request(err, AptosErrorCode::InvalidInput, None)
-        })?;
+        .map_err(|err| AptosErrorResponse::bad_request(err, AptosErrorCode::InvalidInput, None))?;
 
     // Retrieve local state
     let (ledger_info, ledger_version, state_view) =
         context.state_view::<AptosErrorResponse>(ledger_version)?;
 
-    let converter =
-        state_view.as_converter(context.db.clone(), context.indexer_reader.clone());
+    let converter = state_view.as_converter(context.db.clone(), context.indexer_reader.clone());
 
     // Convert key to lookup version for DB
     let vm_key = converter
         .try_into_vm_value(&key_type, key.clone())
         .map_err(|err| {
-            AptosErrorResponse::bad_request(
-                err,
-                AptosErrorCode::InvalidInput,
-                Some(&ledger_info),
-            )
+            AptosErrorResponse::bad_request(err, AptosErrorCode::InvalidInput, Some(&ledger_info))
         })?;
     let raw_key = vm_key.undecorate().simple_serialize().ok_or_else(|| {
         AptosErrorResponse::bad_request(
@@ -744,11 +733,7 @@ pub fn table_item_inner(
             key
         ))
         .map_err(|err| {
-            AptosErrorResponse::internal(
-                err,
-                AptosErrorCode::InternalError,
-                Some(&ledger_info),
-            )
+            AptosErrorResponse::internal(err, AptosErrorCode::InternalError, Some(&ledger_info))
         })?
         .ok_or_else(|| {
             table_item_not_found::<AptosErrorResponse>(
@@ -800,11 +785,7 @@ pub fn raw_table_item_inner(
             table_item_request.key,
         ))
         .map_err(|err| {
-            AptosErrorResponse::internal(
-                err,
-                AptosErrorCode::InternalError,
-                Some(&ledger_info),
-            )
+            AptosErrorResponse::internal(err, AptosErrorCode::InternalError, Some(&ledger_info))
         })?
         .ok_or_else(|| {
             build_not_found::<_, AptosErrorResponse>(
@@ -845,21 +826,13 @@ pub fn raw_value_inner(
             request.key
         ))
         .map_err(|err| {
-            AptosErrorResponse::internal(
-                err,
-                AptosErrorCode::InternalError,
-                Some(&ledger_info),
-            )
+            AptosErrorResponse::internal(err, AptosErrorCode::InternalError, Some(&ledger_info))
         })?;
     let state_value = state_view
         .get_state_value(&state_key)
         .context(format!("Failed fetching state value. key: {}", request.key,))
         .map_err(|err| {
-            AptosErrorResponse::internal(
-                err,
-                AptosErrorCode::InternalError,
-                Some(&ledger_info),
-            )
+            AptosErrorResponse::internal(err, AptosErrorCode::InternalError, Some(&ledger_info))
         })?
         .ok_or_else(|| {
             build_not_found::<_, AptosErrorResponse>(
@@ -878,11 +851,7 @@ pub fn raw_value_inner(
             request.key
         ))
         .map_err(|err| {
-            AptosErrorResponse::internal(
-                err,
-                AptosErrorCode::InternalError,
-                Some(&ledger_info),
-            )
+            AptosErrorResponse::internal(err, AptosErrorCode::InternalError, Some(&ledger_info))
         })?;
 
     match accept_type {

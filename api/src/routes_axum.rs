@@ -538,17 +538,13 @@ pub async fn get_account_resource_handler(
     crate::failpoint::fail_point_poem::<AptosErrorResponse>("endpoint_get_account_resource")?;
     context.check_api_output_enabled::<AptosErrorResponse>("Get account resource", &accept_type)?;
     let ctx = context.clone();
+    let at = accept_type.clone();
+    let lv = query.ledger_version.map(|v| v.0);
     let resp = api_spawn_blocking(move || {
-        let state_api = crate::state::StateApi { context: ctx };
-        state_api.resource(
-            &accept_type,
-            address,
-            resource_type,
-            query.ledger_version.map(|v| v.0),
-        )
+        crate::state::resource_inner(&ctx, &at, address, resource_type, lv)
     })
     .await?;
-    Ok(poem_to_axum_response(poem::IntoResponse::into_response(resp)).await)
+    Ok(resp.into_response())
 }
 
 pub async fn get_account_module_handler(
@@ -574,12 +570,13 @@ pub async fn get_account_module_handler(
     crate::failpoint::fail_point_poem::<AptosErrorResponse>("endpoint_get_account_module")?;
     context.check_api_output_enabled::<AptosErrorResponse>("Get account module", &accept_type)?;
     let ctx = context.clone();
+    let at = accept_type.clone();
+    let lv = query.ledger_version;
     let resp = api_spawn_blocking(move || {
-        let state_api = crate::state::StateApi { context: ctx };
-        state_api.module(&accept_type, address, module_name, query.ledger_version)
+        crate::state::module_inner(&ctx, &at, address, module_name, lv.map(|v| v.0))
     })
     .await?;
-    Ok(poem_to_axum_response(poem::IntoResponse::into_response(resp)).await)
+    Ok(resp.into_response())
 }
 
 pub async fn get_table_item_handler(
@@ -615,12 +612,13 @@ pub async fn get_table_item_handler(
     crate::failpoint::fail_point_poem::<AptosErrorResponse>("endpoint_get_table_item")?;
     context.check_api_output_enabled::<AptosErrorResponse>("Get table item", &accept_type)?;
     let ctx = context.clone();
+    let at = accept_type.clone();
+    let lv = query.ledger_version;
     let resp = api_spawn_blocking(move || {
-        let state_api = crate::state::StateApi { context: ctx };
-        state_api.table_item(&accept_type, table_handle, body, query.ledger_version)
+        crate::state::table_item_inner(&ctx, &at, table_handle, body, lv.map(|v| v.0))
     })
     .await?;
-    Ok(poem_to_axum_response(poem::IntoResponse::into_response(resp)).await)
+    Ok(resp.into_response())
 }
 
 pub async fn get_raw_table_item_handler(
@@ -651,12 +649,13 @@ pub async fn get_raw_table_item_handler(
     context.check_api_output_enabled::<AptosErrorResponse>("Get raw table item", &accept_type)?;
     use crate::context::api_spawn_blocking;
     let ctx = context.clone();
+    let at = accept_type.clone();
+    let lv = query.ledger_version;
     let resp = api_spawn_blocking(move || {
-        let state_api = crate::state::StateApi { context: ctx };
-        state_api.raw_table_item(&accept_type, table_handle, body, query.ledger_version)
+        crate::state::raw_table_item_inner(&ctx, &at, table_handle, body, lv.map(|v| v.0))
     })
     .await?;
-    Ok(poem_to_axum_response(poem::IntoResponse::into_response(resp)).await)
+    Ok(resp.into_response())
 }
 
 pub async fn get_raw_state_value_handler(
@@ -686,12 +685,12 @@ pub async fn get_raw_state_value_handler(
     context.check_api_output_enabled::<AptosErrorResponse>("Get raw state value", &accept_type)?;
     use crate::context::api_spawn_blocking;
     let ctx = context.clone();
-    let resp = api_spawn_blocking(move || {
-        let state_api = crate::state::StateApi { context: ctx };
-        state_api.raw_value(&accept_type, body, query.ledger_version)
-    })
-    .await?;
-    Ok(poem_to_axum_response(poem::IntoResponse::into_response(resp)).await)
+    let at = accept_type.clone();
+    let lv = query.ledger_version;
+    let resp =
+        api_spawn_blocking(move || crate::state::raw_value_inner(&ctx, &at, body, lv.map(|v| v.0)))
+            .await?;
+    Ok(resp.into_response())
 }
 
 // ---- TransactionsApi ----
@@ -1147,12 +1146,12 @@ pub async fn view_function_handler(
         crate::view_function::ViewFunctionRequest::Json(poem_openapi::payload::Json(view_request))
     };
 
-    let ledger_version = poem_openapi::param::Query(query.ledger_version);
+    let lv = query.ledger_version;
     let resp = api_spawn_blocking(move || {
-        crate::view_function::view_request(context, accept_type, request, ledger_version)
+        crate::view_function::view_request_inner(context, accept_type, request, lv)
     })
     .await?;
-    Ok(poem_to_axum_response(poem::IntoResponse::into_response(resp)).await)
+    Ok(resp.into_response())
 }
 
 // ---- Failpoints ----

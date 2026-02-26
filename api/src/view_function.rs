@@ -254,11 +254,7 @@ pub fn view_request_inner(
     let state_view = context
         .state_view_at_version(requested_version)
         .map_err(|err| {
-            AptosErrorResponse::bad_request(
-                err,
-                AptosErrorCode::InternalError,
-                Some(&ledger_info),
-            )
+            AptosErrorResponse::bad_request(err, AptosErrorCode::InternalError, Some(&ledger_info))
         })?;
 
     let view_function: ViewFunction = match request {
@@ -338,11 +334,7 @@ pub fn view_request_inner(
             // Push the length of the return values
             let mut length = vec![];
             serialize_uleb128(&mut length, num_vals as u64).map_err(|err| {
-                AptosErrorResponse::internal(
-                    err,
-                    AptosErrorCode::InternalError,
-                    Some(&ledger_info),
-                )
+                AptosErrorResponse::internal(err, AptosErrorCode::InternalError, Some(&ledger_info))
             })?;
 
             // Combine all of the return values
