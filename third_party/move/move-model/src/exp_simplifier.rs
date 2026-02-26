@@ -26,7 +26,9 @@
 //!   and conjunction/disjunction pruning via implication between comparisons.
 //!
 //! **Arithmetic identities** (spec mode): `0 + a => a`, `a * 1 => a`, `a - a => 0`,
-//!   associative constant folding (`(x + c1) + c2 => x + (c1+c2)`).
+//!   associative constant folding (`(x + c1) + c2 => x + (c1+c2)`),
+//!   additive cancellation (`(e - x) + (x ± C) => e ± C`, `(e + x) - x => e`),
+//!   distribute-and-cancel (`(a - 1) * b + (b ± D) => a*b ± D`).
 //!
 //! **Constant folding**: Via `ConstantFolder` for fully-constant subexpressions,
 //!   MAX_U* operations folded to their numeric values, plus spec function unfolding
@@ -848,7 +850,10 @@ impl<'a, 'env, G: ExpGenerator<'env>> ExpSimplifier<'a, 'env, G> {
     fn simplify_by_type_bounds(&self, oper: &Operation, args: &[Exp]) -> Option<Exp> {
         // Try both orientations: const op expr, expr op const
         for (const_idx, expr_idx) in [(0, 1), (1, 0)] {
-            let c = get_num_const(&args[const_idx])?;
+            let c = match get_num_const(&args[const_idx]) {
+                Some(c) => c,
+                None => continue,
+            };
             let ty = self.env().get_node_type(args[expr_idx].as_ref().node_id());
             let prim = match &ty {
                 Type::Primitive(p) if ty.is_number() => p,
@@ -892,6 +897,16 @@ impl<'a, 'env, G: ExpGenerator<'env>> ExpSimplifier<'a, 'env, G> {
             };
             if let Some(b) = result {
                 return Some(self.mk_bool_const(b));
+            }
+            // Boundary pinch: expr <= min_val → expr == min_val.
+            // No value can be below min for a bounded integer type.
+            // This exposes bindings for the one-point rule in quantifiers
+            // (e.g., `x <= 0` for u64 becomes `x == 0`).
+            if matches!(op, Operation::Le) && *val == min {
+                let expr = &args[expr_idx];
+                return Some(
+                    self.mk_bool_call(Operation::Eq, vec![expr.clone(), args[const_idx].clone()]),
+                );
             }
         }
         None
@@ -1008,6 +1023,27 @@ impl<'a, 'env, G: ExpGenerator<'env>> ExpSimplifier<'a, 'env, G> {
                         None
                     }
                 } else {
+                    // (e - x) + y → e + offset when y = (x', offset) with x == x'
+                    if let ExpData::Call(_, Operation::Sub, inner) = args[0].as_ref() {
+                        let (y, offset) = extract_additive_offset(&args[1]);
+                        if inner[1].structural_eq(y) {
+                            return Some(self.mk_with_offset(&ty, inner[0].clone(), offset));
+                        }
+                    }
+                    // y + (e - x) → e + offset when y = (x', offset) with x == x'
+                    if let ExpData::Call(_, Operation::Sub, inner) = args[1].as_ref() {
+                        let (y, offset) = extract_additive_offset(&args[0]);
+                        if inner[1].structural_eq(y) {
+                            return Some(self.mk_with_offset(&ty, inner[0].clone(), offset));
+                        }
+                    }
+                    // (a - 1) * b + (b ± D) → a*b ± D  (distribute-and-cancel)
+                    if let Some(r) = self.try_distribute_cancel(&ty, &args[0], &args[1], -1) {
+                        return Some(r);
+                    }
+                    if let Some(r) = self.try_distribute_cancel(&ty, &args[1], &args[0], -1) {
+                        return Some(r);
+                    }
                     None
                 }
             },
@@ -1056,6 +1092,20 @@ impl<'a, 'env, G: ExpGenerator<'env>> ExpSimplifier<'a, 'env, G> {
                         None
                     }
                 } else {
+                    // (e + x) - y → e - offset when y = (x', offset) with x == x'
+                    if let ExpData::Call(_, Operation::Add, inner) = args[0].as_ref() {
+                        let (y, offset) = extract_additive_offset(&args[1]);
+                        if inner[1].structural_eq(y) {
+                            return Some(self.mk_with_offset(&ty, inner[0].clone(), -offset));
+                        }
+                        if inner[0].structural_eq(y) {
+                            return Some(self.mk_with_offset(&ty, inner[1].clone(), -offset));
+                        }
+                    }
+                    // (a + 1) * b - (b ± D) → a*b ∓ D  (distribute-and-cancel)
+                    if let Some(r) = self.try_distribute_cancel(&ty, &args[0], &args[1], 1) {
+                        return Some(r);
+                    }
                     None
                 }
             },
@@ -1105,6 +1155,73 @@ impl<'a, 'env, G: ExpGenerator<'env>> ExpSimplifier<'a, 'env, G> {
             },
             _ => None,
         }
+    }
+
+    /// Build `base + offset` or `base - |offset|` depending on sign, or just `base` if zero.
+    fn mk_with_offset(&self, ty: &Type, base: Exp, offset: BigInt) -> Exp {
+        if offset.is_zero() {
+            base
+        } else if offset > BigInt::zero() {
+            self.mk_call(ty, Operation::Add, vec![
+                base,
+                self.mk_num_const(ty, offset),
+            ])
+        } else {
+            self.mk_call(ty, Operation::Sub, vec![
+                base,
+                self.mk_num_const(ty, -offset),
+            ])
+        }
+    }
+
+    /// Try to simplify `mul_exp + other_exp` (for Add, `cancel_offset = -1`) or
+    /// `mul_exp - other_exp` (for Sub, `cancel_offset = 1`) by distributing a
+    /// constant offset from one Mul factor and canceling with the other operand.
+    ///
+    /// For Add: `(a - 1) * b + (b ± D)` → `a*b ± D`  (the `-b + b` cancels)
+    /// For Sub: `(a + 1) * b - (b ± D)` → `a*b ∓ D`  (the `+b - b` cancels)
+    fn try_distribute_cancel(
+        &self,
+        ty: &Type,
+        mul_exp: &Exp,
+        other_exp: &Exp,
+        cancel_offset: i64,
+    ) -> Option<Exp> {
+        if let ExpData::Call(_, Operation::Mul, factors) = mul_exp.as_ref() {
+            if factors.len() == 2 {
+                let (other_base, other_off) = extract_additive_offset(other_exp);
+                let target = BigInt::from(cancel_offset);
+                // Check factors[0] = (a ± C), factors[1] matches other_base
+                if factors[1].structural_eq(other_base) {
+                    let (a, foff) = extract_additive_offset(&factors[0]);
+                    if foff == target {
+                        let prod =
+                            self.mk_call(ty, Operation::Mul, vec![a.clone(), factors[1].clone()]);
+                        let final_off = if cancel_offset == -1 {
+                            other_off
+                        } else {
+                            -other_off
+                        };
+                        return Some(self.mk_with_offset(ty, prod, final_off));
+                    }
+                }
+                // Check factors[1] = (b ± C), factors[0] matches other_base
+                if factors[0].structural_eq(other_base) {
+                    let (b, foff) = extract_additive_offset(&factors[1]);
+                    if foff == target {
+                        let prod =
+                            self.mk_call(ty, Operation::Mul, vec![factors[0].clone(), b.clone()]);
+                        let final_off = if cancel_offset == -1 {
+                            other_off
+                        } else {
+                            -other_off
+                        };
+                        return Some(self.mk_with_offset(ty, prod, final_off));
+                    }
+                }
+            }
+        }
+        None
     }
 
     /// Check if the expression is known true/false via assumptions.
@@ -2289,8 +2406,10 @@ fn is_conjunct_upward_safe(
 /// - `x` itself → true
 /// - Expression not containing `x` → true (constant w.r.t. x)
 /// - `f(x) + g(x)` where both monotone → true
+/// - `f(x) - c` where c is free of x and f(x) monotone → true
 /// - `f(x) * g(x)` where both monotone → true (only when all values are known
 ///   non-negative, i.e. the type is unsigned or `is_unsigned_context` is set)
+/// - Spec function calls: inductively proven monotone for recursive functions
 ///
 /// When `is_unsigned_context` is true, all quantified variables are unsigned integers,
 /// so all arithmetic subexpressions involving them are non-negative. This allows treating
@@ -2301,14 +2420,46 @@ fn is_monotone_increasing_in(
     sym: Symbol,
     is_unsigned_context: bool,
 ) -> bool {
+    is_monotone_increasing_in_ext(env, exp, sym, is_unsigned_context, None)
+}
+
+/// Extended monotonicity check with an optional inductive hypothesis.
+///
+/// `assumed_monotone` is `Some((mid, fid, param_idx))` when we are checking the body
+/// of spec function `(mid, fid)` and assuming it is monotone in parameter `param_idx`
+/// (the inductive hypothesis for recursive calls).
+fn is_monotone_increasing_in_ext(
+    env: &GlobalEnv,
+    exp: &Exp,
+    sym: Symbol,
+    is_unsigned_context: bool,
+    assumed_monotone: Option<(ModuleId, SpecFunId, usize)>,
+) -> bool {
     if !exp.as_ref().free_vars().contains(&sym) {
         return true; // constant in sym
     }
     match exp.as_ref() {
         ExpData::LocalVar(_, s) if *s == sym => true,
         ExpData::Call(_, Operation::Add, args) if args.len() == 2 => {
-            is_monotone_increasing_in(env, &args[0], sym, is_unsigned_context)
-                && is_monotone_increasing_in(env, &args[1], sym, is_unsigned_context)
+            is_monotone_increasing_in_ext(env, &args[0], sym, is_unsigned_context, assumed_monotone)
+                && is_monotone_increasing_in_ext(
+                    env,
+                    &args[1],
+                    sym,
+                    is_unsigned_context,
+                    assumed_monotone,
+                )
+        },
+        // f(x) - c where c is free of x and f is monotone increasing → monotone increasing
+        ExpData::Call(_, Operation::Sub, args) if args.len() == 2 => {
+            !args[1].as_ref().free_vars().contains(&sym)
+                && is_monotone_increasing_in_ext(
+                    env,
+                    &args[0],
+                    sym,
+                    is_unsigned_context,
+                    assumed_monotone,
+                )
         },
         // f(x) * g(x) where both monotone → true, but only when values are non-negative
         // (signed values can be negative, breaking monotonicity of products).
@@ -2316,20 +2467,125 @@ fn is_monotone_increasing_in(
         // involving them is non-negative, even if the intermediate type is Num.
         ExpData::Call(id, Operation::Mul, args) if args.len() == 2 => {
             (env.get_node_type(*id).is_unsigned_int() || is_unsigned_context)
-                && is_monotone_increasing_in(env, &args[0], sym, is_unsigned_context)
-                && is_monotone_increasing_in(env, &args[1], sym, is_unsigned_context)
+                && is_monotone_increasing_in_ext(
+                    env,
+                    &args[0],
+                    sym,
+                    is_unsigned_context,
+                    assumed_monotone,
+                )
+                && is_monotone_increasing_in_ext(
+                    env,
+                    &args[1],
+                    sym,
+                    is_unsigned_context,
+                    assumed_monotone,
+                )
         },
         // f(x) / c where c > 0 and f is monotone increasing → monotone increasing
         ExpData::Call(_, Operation::Div, args) if args.len() == 2 => {
             if let Some(c) = get_num_const(&args[1]) {
                 c > &BigInt::zero()
-                    && is_monotone_increasing_in(env, &args[0], sym, is_unsigned_context)
+                    && is_monotone_increasing_in_ext(
+                        env,
+                        &args[0],
+                        sym,
+                        is_unsigned_context,
+                        assumed_monotone,
+                    )
             } else {
                 false
             }
         },
+        // if c then f(x) else g(x) where both branches are monotone increasing.
+        // Strictly sound when c is free of x (the condition picks a fixed branch
+        // independently of x). When c depends on x, this is an over-approximation
+        // that is safe: a false positive can only cause a missed simplification
+        // (the substituted witness may not satisfy the property), never an incorrect
+        // one. This relaxation is important for recursive spec function bodies like
+        // `if (n == 0) base else step(n)`.
+        ExpData::IfElse(_, _cond, then_e, else_e) => {
+            is_monotone_increasing_in_ext(env, then_e, sym, is_unsigned_context, assumed_monotone)
+                && is_monotone_increasing_in_ext(
+                    env,
+                    else_e,
+                    sym,
+                    is_unsigned_context,
+                    assumed_monotone,
+                )
+        },
+        // Spec function call: check monotonicity inductively.
+        // For each argument that depends on sym, both the argument itself must be monotone
+        // in sym and the function must be monotone in that parameter position.
+        ExpData::Call(_, Operation::SpecFunction(mid, fid, _), args) => {
+            // Find parameter positions whose arguments depend on sym
+            let dependent_params: Vec<usize> = args
+                .iter()
+                .enumerate()
+                .filter(|(_, a)| a.as_ref().free_vars().contains(&sym))
+                .map(|(i, _)| i)
+                .collect();
+            // All dependent arguments must be monotone in sym
+            if !dependent_params.iter().all(|&i| {
+                is_monotone_increasing_in_ext(
+                    env,
+                    &args[i],
+                    sym,
+                    is_unsigned_context,
+                    assumed_monotone,
+                )
+            }) {
+                return false;
+            }
+            // For each dependent parameter position, f must be monotone in that param
+            dependent_params.iter().all(|&param_idx| {
+                // If this matches the inductive hypothesis, accept
+                if assumed_monotone == Some((*mid, *fid, param_idx)) {
+                    true
+                } else {
+                    is_spec_fun_monotone_in_param(env, *mid, *fid, param_idx, is_unsigned_context)
+                }
+            })
+        },
         _ => false,
     }
+}
+
+/// Prove by induction that spec function `(mid, fid)` is monotone-increasing in
+/// parameter `param_idx`. Unfolds the function body and checks monotonicity with
+/// the inductive hypothesis that recursive self-calls are monotone in that parameter.
+fn is_spec_fun_monotone_in_param(
+    env: &GlobalEnv,
+    mid: ModuleId,
+    fid: SpecFunId,
+    param_idx: usize,
+    is_unsigned_context: bool,
+) -> bool {
+    let module = env.get_module(mid);
+    let decl = module.get_spec_fun(fid);
+    if decl.is_native || decl.uninterpreted || decl.body.is_none() {
+        return false;
+    }
+    if param_idx >= decl.params.len() {
+        return false;
+    }
+    let param_ty = &decl.params[param_idx].1;
+    // Parameter must be unsigned integer type (or Num in unsigned context)
+    if !(param_ty.is_unsigned_int()
+        || (is_unsigned_context && matches!(param_ty, Type::Primitive(PrimitiveType::Num))))
+    {
+        return false;
+    }
+    let param_sym = decl.params[param_idx].0;
+    let body = decl.body.as_ref().unwrap();
+    // Check body is monotone in param_sym, with IH: f is monotone in param_idx
+    is_monotone_increasing_in_ext(
+        env,
+        body,
+        param_sym,
+        is_unsigned_context,
+        Some((mid, fid, param_idx)),
+    )
 }
 
 /// Substitute all free occurrences of `LocalVar(sym)` with `replacement` in `exp`,
@@ -2705,16 +2961,19 @@ impl<'a, 'env, G: ExpGenerator<'env>> ExpRewriterFunctions for ExpSimplifier<'a,
             return Some(self.mk_bool_const(false));
         }
 
-        // 9. Unfold spec functions with all-constant arguments
+        // 9. Unfold spec functions: try one level of partial evaluation and keep
+        // the result only if the same function no longer appears (i.e., the
+        // recursive call was eliminated, typically by hitting a base case).
         if let Operation::SpecFunction(mid, fid, _) = oper {
-            if args
-                .iter()
-                .all(|a| matches!(a.as_ref(), ExpData::Value(..)))
-            {
-                if let Some(unfolded) = self.try_unfold_spec_fun(id, *mid, *fid, args) {
-                    self.spec_fun_unfold_depth += 1;
-                    let result = self.rewrite_exp(unfolded);
-                    self.spec_fun_unfold_depth -= 1;
+            if let Some(unfolded) = self.try_unfold_spec_fun(id, *mid, *fid, args) {
+                self.spec_fun_unfold_depth += 1;
+                let result = self.rewrite_exp(unfolded);
+                self.spec_fun_unfold_depth -= 1;
+                let still_contains_self = result.as_ref().any(&mut |e| {
+                    matches!(e, ExpData::Call(_, Operation::SpecFunction(m, f, _), _)
+                        if *m == *mid && *f == *fid)
+                });
+                if !still_contains_self {
                     return Some(result);
                 }
             }
@@ -2754,14 +3013,14 @@ impl<'a, 'env, G: ExpGenerator<'env>> ExpRewriterFunctions for ExpSimplifier<'a,
 mod tests {
     use super::*;
     use crate::{
-        ast::{Address, ModuleName, Spec},
+        ast::{Address, ModuleName, Spec, SpecFunDecl},
         exp_generator::FunExpGenerator,
-        model::{FunId, FunctionData, Loc, ModuleId},
+        model::{FunId, FunctionData, Loc, ModuleId, Parameter},
         ty::{PrimitiveType, Type, BOOL_TYPE},
     };
     use move_core_types::account_address::AccountAddress;
     use num::BigInt;
-    use std::collections::BTreeMap;
+    use std::{cell::RefCell, collections::BTreeMap};
 
     /// Creates a test `GlobalEnv` with a dummy module and function.
     fn test_env() -> GlobalEnv {
@@ -4007,13 +4266,24 @@ mod tests {
     }
 
     #[test]
-    fn test_is_monotone_increasing_sub_not_monotone() {
-        // x - c is NOT monotone increasing (in the conservative analysis)
+    fn test_is_monotone_increasing_sub_constant() {
+        // x - c is monotone increasing when c is free of x
         let env = test_env();
         let num_ty = Type::Primitive(PrimitiveType::U64);
         let sym = env.symbol_pool().make("x");
         let x = mk_local(&env, "x", num_ty.clone());
         let expr = mk_op(&env, num_ty, Operation::Sub, vec![x, mk_num(&env, 1)]);
+        assert!(is_monotone_increasing_in(&env, &expr, sym, false));
+    }
+
+    #[test]
+    fn test_is_monotone_increasing_sub_dependent_rhs() {
+        // x - x is NOT monotone increasing (rhs depends on x)
+        let env = test_env();
+        let num_ty = Type::Primitive(PrimitiveType::U64);
+        let sym = env.symbol_pool().make("x");
+        let x = mk_local(&env, "x", num_ty.clone());
+        let expr = mk_op(&env, num_ty, Operation::Sub, vec![x.clone(), x]);
         assert!(!is_monotone_increasing_in(&env, &expr, sym, false));
     }
 
@@ -4338,5 +4608,312 @@ mod tests {
         let product = mk_op(&env, num_ty.clone(), Operation::Mul, vec![x, x_plus_1]);
         let expr = mk_op(&env, num_ty, Operation::Div, vec![product, mk_num(&env, 2)]);
         assert!(is_monotone_increasing_in(&env, &expr, sym, true));
+    }
+
+    #[test]
+    fn test_is_monotone_if_else() {
+        // if (cond) x else 0 is monotone in x when cond is free of x
+        let env = test_env();
+        let u64_ty = Type::Primitive(PrimitiveType::U64);
+        let sym = env.symbol_pool().make("x");
+        let x = mk_local(&env, "x", u64_ty.clone());
+        let cond = mk_temp(&env, 0, BOOL_TYPE.clone());
+        let zero = mk_num(&env, 0);
+        let id = env.new_node(Loc::default(), u64_ty);
+        let ite = ExpData::IfElse(id, cond, x, zero).into_exp();
+        assert!(is_monotone_increasing_in(&env, &ite, sym, true));
+    }
+
+    #[test]
+    fn test_is_monotone_if_else_cond_depends_on_var() {
+        // if (x > 0) x else 0 is recognized as monotone (both branches are monotone)
+        let env = test_env();
+        let u64_ty = Type::Primitive(PrimitiveType::U64);
+        let sym = env.symbol_pool().make("x");
+        let x = mk_local(&env, "x", u64_ty.clone());
+        let cond = mk_bool_op(&env, Operation::Gt, vec![x.clone(), mk_num(&env, 0)]);
+        let zero = mk_num(&env, 0);
+        let id = env.new_node(Loc::default(), u64_ty);
+        let ite = ExpData::IfElse(id, cond, x, zero).into_exp();
+        assert!(is_monotone_increasing_in(&env, &ite, sym, true));
+    }
+
+    // ---- Spec function monotonicity tests ----
+
+    /// Adds a module with spec functions to an existing `GlobalEnv`.
+    /// Nodes and symbols for the spec function bodies must already be created in `env`.
+    fn add_spec_funs_to_env(env: &mut GlobalEnv, spec_funs: Vec<SpecFunDecl>) {
+        let loc = Loc::default();
+        let fun_name = env.symbol_pool().make("test_fun");
+        let fun_id = FunId::new(fun_name);
+        let mut function_data = BTreeMap::new();
+        function_data.insert(fun_id, FunctionData::new(fun_name, loc.clone()));
+        let addr = Address::Numerical(AccountAddress::ZERO);
+        let module_name = ModuleName::new(addr, env.symbol_pool().make("test_mod"));
+        env.add(
+            loc,
+            module_name,
+            vec![],          // attributes
+            vec![],          // use_decls
+            vec![],          // friend_decls
+            BTreeMap::new(), // named_constants
+            BTreeMap::new(), // struct_data
+            function_data,   // function_data
+            vec![],          // spec_vars
+            spec_funs,       // spec_funs
+            Spec::default(), // module_spec
+            vec![],          // spec_block_infos
+        );
+    }
+
+    /// Helper to create a SpecFunDecl with a body.
+    fn mk_spec_fun_decl(
+        env: &GlobalEnv,
+        name: &str,
+        params: Vec<(&str, Type)>,
+        result_type: Type,
+        body: Exp,
+    ) -> SpecFunDecl {
+        let params = params
+            .into_iter()
+            .map(|(n, ty)| Parameter(env.symbol_pool().make(n), ty, Loc::default()))
+            .collect();
+        SpecFunDecl {
+            loc: Loc::default(),
+            name: env.symbol_pool().make(name),
+            type_params: vec![],
+            params,
+            context_params: None,
+            result_type,
+            used_memory: BTreeSet::new(),
+            uninterpreted: false,
+            is_move_fun: false,
+            is_native: false,
+            body: Some(body),
+            callees: BTreeSet::new(),
+            is_recursive: RefCell::new(Some(true)),
+            insts_using_generic_type_reflection: RefCell::new(BTreeMap::new()),
+            spec: RefCell::new(Spec::default()),
+        }
+    }
+
+    #[test]
+    fn test_is_monotone_spec_fun_sum_up_to() {
+        // sum_up_to(n) = if (n == 0) 0 else sum_up_to(n - 1) + n
+        // Should be monotone increasing in n (param 0).
+        let mut env = GlobalEnv::new();
+        let num_ty = Type::Primitive(PrimitiveType::U64);
+        let n_sym = env.symbol_pool().make("n");
+        let n_node = env.new_node(Loc::default(), num_ty.clone());
+        let n = ExpData::LocalVar(n_node, n_sym).into_exp();
+        let zero = mk_num(&env, 0);
+        let cond = mk_bool_op(&env, Operation::Eq, vec![n.clone(), zero.clone()]);
+        // sum_up_to(n - 1): self-call with n - 1
+        let n_minus_1 = mk_op(&env, num_ty.clone(), Operation::Sub, vec![
+            n.clone(),
+            mk_num(&env, 1),
+        ]);
+        let mid = ModuleId::new(0);
+        let fid = SpecFunId::new(0);
+        let call_node = env.new_node(Loc::default(), num_ty.clone());
+        let self_call = ExpData::Call(call_node, Operation::SpecFunction(mid, fid, None), vec![
+            n_minus_1,
+        ])
+        .into_exp();
+        let step = mk_op(&env, num_ty.clone(), Operation::Add, vec![
+            self_call,
+            n.clone(),
+        ]);
+        let ite_node = env.new_node(Loc::default(), num_ty.clone());
+        let body = ExpData::IfElse(ite_node, cond, zero, step).into_exp();
+        let decl = mk_spec_fun_decl(&env, "sum_up_to", vec![("n", num_ty.clone())], num_ty, body);
+        add_spec_funs_to_env(&mut env, vec![decl]);
+        assert!(is_spec_fun_monotone_in_param(&env, mid, fid, 0, false));
+    }
+
+    #[test]
+    fn test_is_monotone_spec_fun_double_result() {
+        // double_result(r, n) = if (n == 0) r else double_result(r * 2, n - 1)
+        // Should be monotone increasing in r (param 0) in unsigned context.
+        let mut env = GlobalEnv::new();
+        let num_ty = Type::Primitive(PrimitiveType::U64);
+        let r_sym = env.symbol_pool().make("r");
+        let n_sym = env.symbol_pool().make("n");
+        let r_node = env.new_node(Loc::default(), num_ty.clone());
+        let n_node = env.new_node(Loc::default(), num_ty.clone());
+        let r = ExpData::LocalVar(r_node, r_sym).into_exp();
+        let n = ExpData::LocalVar(n_node, n_sym).into_exp();
+        let zero = mk_num(&env, 0);
+        let cond = mk_bool_op(&env, Operation::Eq, vec![n.clone(), zero]);
+        // double_result(r * 2, n - 1)
+        let r_times_2 = mk_op(&env, num_ty.clone(), Operation::Mul, vec![
+            r.clone(),
+            mk_num(&env, 2),
+        ]);
+        let n_minus_1 = mk_op(&env, num_ty.clone(), Operation::Sub, vec![
+            n.clone(),
+            mk_num(&env, 1),
+        ]);
+        let mid = ModuleId::new(0);
+        let fid = SpecFunId::new(0);
+        let call_node = env.new_node(Loc::default(), num_ty.clone());
+        let self_call = ExpData::Call(call_node, Operation::SpecFunction(mid, fid, None), vec![
+            r_times_2, n_minus_1,
+        ])
+        .into_exp();
+        let ite_node = env.new_node(Loc::default(), num_ty.clone());
+        let body = ExpData::IfElse(ite_node, cond, r, self_call).into_exp();
+        let decl = mk_spec_fun_decl(
+            &env,
+            "double_result",
+            vec![("r", num_ty.clone()), ("n", num_ty.clone())],
+            num_ty,
+            body,
+        );
+        add_spec_funs_to_env(&mut env, vec![decl]);
+        // Monotone in r (param 0) in unsigned context (needed for r * 2 monotonicity)
+        assert!(is_spec_fun_monotone_in_param(&env, mid, fid, 0, true));
+    }
+
+    #[test]
+    fn test_is_not_monotone_spec_fun_non_monotone() {
+        // f(n) = if (n == 0) 10 else f(n - 1) - n
+        // NOT monotone in n because the step subtracts n.
+        let mut env = GlobalEnv::new();
+        let num_ty = Type::Primitive(PrimitiveType::U64);
+        let n_sym = env.symbol_pool().make("n");
+        let n_node = env.new_node(Loc::default(), num_ty.clone());
+        let n = ExpData::LocalVar(n_node, n_sym).into_exp();
+        let zero = mk_num(&env, 0);
+        let ten = mk_num(&env, 10);
+        let cond = mk_bool_op(&env, Operation::Eq, vec![n.clone(), zero]);
+        let n_minus_1 = mk_op(&env, num_ty.clone(), Operation::Sub, vec![
+            n.clone(),
+            mk_num(&env, 1),
+        ]);
+        let mid = ModuleId::new(0);
+        let fid = SpecFunId::new(0);
+        let call_node = env.new_node(Loc::default(), num_ty.clone());
+        let self_call = ExpData::Call(call_node, Operation::SpecFunction(mid, fid, None), vec![
+            n_minus_1,
+        ])
+        .into_exp();
+        // f(n-1) - n: the subtracted term n depends on the parameter, so not monotone
+        let step = mk_op(&env, num_ty.clone(), Operation::Sub, vec![self_call, n]);
+        let ite_node = env.new_node(Loc::default(), num_ty.clone());
+        let body = ExpData::IfElse(ite_node, cond, ten, step).into_exp();
+        let decl = mk_spec_fun_decl(
+            &env,
+            "decreasing",
+            vec![("n", num_ty.clone())],
+            num_ty,
+            body,
+        );
+        add_spec_funs_to_env(&mut env, vec![decl]);
+        assert!(!is_spec_fun_monotone_in_param(&env, mid, fid, 0, false));
+    }
+
+    #[test]
+    fn test_is_monotone_spec_fun_call_in_expression() {
+        // Test that sum_up_to(x) + x is monotone in x when sum_up_to is monotone.
+        let mut env = GlobalEnv::new();
+        let num_ty = Type::Primitive(PrimitiveType::U64);
+        let n_sym = env.symbol_pool().make("n");
+        let n_node = env.new_node(Loc::default(), num_ty.clone());
+        let n = ExpData::LocalVar(n_node, n_sym).into_exp();
+        let zero = mk_num(&env, 0);
+        let cond = mk_bool_op(&env, Operation::Eq, vec![n.clone(), zero.clone()]);
+        let n_minus_1 = mk_op(&env, num_ty.clone(), Operation::Sub, vec![
+            n.clone(),
+            mk_num(&env, 1),
+        ]);
+        let mid = ModuleId::new(0);
+        let fid = SpecFunId::new(0);
+        let call_node = env.new_node(Loc::default(), num_ty.clone());
+        let self_call = ExpData::Call(call_node, Operation::SpecFunction(mid, fid, None), vec![
+            n_minus_1,
+        ])
+        .into_exp();
+        let step = mk_op(&env, num_ty.clone(), Operation::Add, vec![self_call, n]);
+        let ite_node = env.new_node(Loc::default(), num_ty.clone());
+        let body = ExpData::IfElse(ite_node, cond, zero, step).into_exp();
+        let decl = mk_spec_fun_decl(
+            &env,
+            "sum_up_to",
+            vec![("n", num_ty.clone())],
+            num_ty.clone(),
+            body,
+        );
+        add_spec_funs_to_env(&mut env, vec![decl]);
+        // Build expression: sum_up_to(x) + x
+        let x_sym = env.symbol_pool().make("x");
+        let x = mk_local(&env, "x", num_ty.clone());
+        let call_node2 = env.new_node(Loc::default(), num_ty.clone());
+        let call_expr = ExpData::Call(call_node2, Operation::SpecFunction(mid, fid, None), vec![
+            x.clone()
+        ])
+        .into_exp();
+        let sum_expr = mk_op(&env, num_ty, Operation::Add, vec![call_expr, x]);
+        assert!(is_monotone_increasing_in(&env, &sum_expr, x_sym, false));
+    }
+
+    // ---- Boundary pinch tests ----
+
+    #[test]
+    fn test_boundary_pinch_le_min_u64() {
+        // x: u64, x <= 0 should simplify to x == 0
+        let env = test_env();
+        let u64_ty = Type::Primitive(PrimitiveType::U64);
+        let t0 = mk_temp(&env, 0, u64_ty);
+        let zero = mk_num(&env, 0);
+        let e = mk_bool_op(&env, Operation::Le, vec![t0.clone(), zero]);
+        let mut g = test_gen(&env);
+        let mut s = ExpSimplifier::new(&mut g);
+        let result = s.simplify(e);
+        match result.as_ref() {
+            ExpData::Call(_, Operation::Eq, args) if args.len() == 2 => {
+                assert_is_temp(&args[0], 0);
+                assert_is_num(&args[1], 0);
+            },
+            other => panic!("expected Eq(t0, 0), got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn test_boundary_pinch_flipped_0_ge_u64() {
+        // x: u64, 0 >= x should simplify to x == 0 (flipped: 0 >= x means x <= 0)
+        let env = test_env();
+        let u64_ty = Type::Primitive(PrimitiveType::U64);
+        let t0 = mk_temp(&env, 0, u64_ty);
+        let zero = mk_num(&env, 0);
+        let e = mk_bool_op(&env, Operation::Ge, vec![zero, t0.clone()]);
+        let mut g = test_gen(&env);
+        let mut s = ExpSimplifier::new(&mut g);
+        let result = s.simplify(e);
+        match result.as_ref() {
+            ExpData::Call(_, Operation::Eq, args) if args.len() == 2 => {
+                assert_is_temp(&args[0], 0);
+                assert_is_num(&args[1], 0);
+            },
+            other => panic!("expected Eq(t0, 0), got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn test_boundary_pinch_does_not_fire_for_non_boundary() {
+        // x: u64, x <= 5 should NOT be converted to equality
+        let env = test_env();
+        let u64_ty = Type::Primitive(PrimitiveType::U64);
+        let t0 = mk_temp(&env, 0, u64_ty);
+        let five = mk_num(&env, 5);
+        let e = mk_bool_op(&env, Operation::Le, vec![t0.clone(), five]);
+        let mut g = test_gen(&env);
+        let mut s = ExpSimplifier::new(&mut g);
+        let result = s.simplify(e);
+        // Should remain Le, not become Eq
+        match result.as_ref() {
+            ExpData::Call(_, Operation::Le, _) => {},
+            other => panic!("expected Le to remain, got {:?}", other),
+        }
     }
 }

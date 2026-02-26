@@ -89,7 +89,7 @@ module 0x42::loops {
     spec double_n_times {
         pragma verify = false; // timeout
         ensures [inferred] r == old(r) * pow2(n);
-        aborts_if [inferred = sathard] exists x: u64: x < n && r * pow2(x) * 2 > MAX_U64;
+        aborts_if [inferred] n > 0 && r * pow2(n - 1) * 2 > MAX_U64;
     }
 
     // Ensures only: skip aborts inference
@@ -123,7 +123,7 @@ module 0x42::loops {
     spec double_n_times_aborts {
         pragma inference = only_aborts;
         pragma verify = false; // timeout
-        aborts_if [inferred = sathard] exists x: u64: x < n && r * pow2(x) * 2 > MAX_U64;
+        aborts_if [inferred] n > 0 && r * pow2(n - 1) * 2 > MAX_U64;
     }
 
     // ==================== Loop with Conditional ====================
@@ -225,7 +225,7 @@ module 0x42::loops {
     }
     spec nested_count(m: u64, n: u64): u64 {
         ensures [inferred] result == m * n;
-        aborts_if [inferred] n > 0 && (m > 0 && (m - 1) * n + (n - 1) > MAX_U64 - 1);
+        aborts_if [inferred] n > 0 && (m > 0 && m * n > MAX_U64);
     }
 
 }
