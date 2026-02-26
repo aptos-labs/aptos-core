@@ -1,0 +1,57 @@
+// -- Model dump before first bytecode pipeline
+module 0x42::m {
+    struct MyResource {
+        value: u64,
+    }
+    public fun test_borrow_global(addr: address): u64
+        acquires MyResource(*)
+     {
+        select m::MyResource.value<&MyResource>(BorrowGlobal(Immutable)<MyResource>(addr))
+    }
+    public fun test_borrow_global_mut(addr: address)
+        acquires MyResource(*)
+     {
+        select m::MyResource.value<&mut MyResource>(BorrowGlobal(Mutable)<MyResource>(addr)) = 100;
+        Tuple()
+    }
+    public fun test_exists(addr: address): bool {
+        exists<MyResource>(addr)
+    }
+    public fun test_move_from(addr: address): MyResource
+        acquires MyResource(*)
+     {
+        MoveFrom<MyResource>(addr)
+    }
+    public fun test_move_to(account: &signer) {
+        MoveTo<MyResource>(account, pack m::MyResource(42));
+        Tuple()
+    }
+} // end 0x42::m
+
+// -- Sourcified model before first bytecode pipeline
+module 0x42::m {
+    struct MyResource has drop, key {
+        value: u64,
+    }
+    public fun test_borrow_global(addr: address): u64
+        acquires MyResource
+    {
+        borrow_global<MyResource>(addr).value
+    }
+    public fun test_borrow_global_mut(addr: address)
+        acquires MyResource
+    {
+        borrow_global_mut<MyResource>(addr).value = 100;
+    }
+    public fun test_exists(addr: address): bool {
+        exists<MyResource>(addr)
+    }
+    public fun test_move_from(addr: address): MyResource
+        acquires MyResource
+    {
+        move_from<MyResource>(addr)
+    }
+    public fun test_move_to(account: &signer) {
+        move_to<MyResource>(account, MyResource{value: 42});
+    }
+}

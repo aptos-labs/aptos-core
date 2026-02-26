@@ -1,12 +1,12 @@
 
 Diagnostics:
-warning: package inline function `blah` cannot be called from all locations it is accessible
+warning: package inline function `blah` calls `n::foo` which may not be accessible when expanded
   ┌─ tests/visibility-checker/inline_with_warning_04.move:2:24
   │
 2 │     package inline fun blah(): u64 {
-  │                        ^^^^ if called from a location where `n::foo` is not accessible, such as from a module in this package that is not a friend of `0xdeadbeef::n`
+  │                        ^^^^ contains calls that may be inaccessible when expanded, such as from a module in this package that is not a friend of `0xdeadbeef::n`
 3 │         0xdeadbeef::n::foo()
-  │         -------------------- inline expansion calls friend function that may not be accessible in all locations that `m::blah` can be called
+  │         -------------------- friend function may not be accessible in all contexts where `blah` can be called
 
 // -- Model dump before first bytecode pipeline
 module 0xdeadbeef::n {

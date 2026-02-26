@@ -1,15 +1,15 @@
 
 Diagnostics:
-error: script function `main` cannot be used in Move code
+error: script function `main` cannot be called from Move code
   ┌─ tests/checking-lang-v2.2/lambda/script_uses_itself.move:2:9
   │
 2 │     fun main() {
-  │         ^^^^
+  │         ^^^^ script function
 3 │         let _f: || has drop = main;
-  │                               ---- used here
+  │                               ---- called here
 4 │         let _g: || has drop = || main();
-  │                                  ------ used here
+  │                                  ------ called here
 5 │         (main)();
-  │          ---- used here
+  │          ---- called here
 6 │         main();
-  │         ------ used here
+  │         ------ called here

@@ -1,0 +1,39 @@
+// -- Model dump before first bytecode pipeline
+module 0x42::m {
+    struct Pair {
+        x: u64,
+        y: u64,
+    }
+    private inline fun apply(p: Pair,f: |Pair|u64): u64 {
+        (f)(p)
+    }
+    public fun test(): u64 {
+        {
+          let p: Pair = pack m::Pair(10, 20);
+          {
+            let (p: Pair): (Pair) = Tuple(p);
+            {
+              let (m::Pair{ x, y }): (Pair) = Tuple(p);
+              Add<u64>(x, y)
+            }
+          }
+        }
+    }
+} // end 0x42::m
+
+// -- Sourcified model before first bytecode pipeline
+module 0x42::m {
+    struct Pair has copy, drop {
+        x: u64,
+        y: u64,
+    }
+    inline fun apply(p: Pair, f: |Pair|u64): u64 {
+        f(p)
+    }
+    public fun test(): u64 {
+        let p = Pair{x: 10, y: 20};
+        let p = p;
+        let Pair{x: x, y: y} = p;
+        x + y
+    }
+}

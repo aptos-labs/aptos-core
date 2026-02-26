@@ -1,0 +1,40 @@
+// -- Model dump before first bytecode pipeline
+module 0x42::m {
+    struct DeprecatedStruct {
+        x: u64,
+    }
+    private fun deprecated_func(): u64 {
+        3
+    }
+    private fun lint_skip_func(): u64 {
+        4
+    }
+    private fun persistent_func(): u64 {
+        5
+    }
+    public fun regular(): u64 {
+        1
+    }
+} // end 0x42::m
+
+// -- Sourcified model before first bytecode pipeline
+module 0x42::m {
+    struct DeprecatedStruct has drop {
+        x: u64,
+    }
+    #[deprecated]
+    fun deprecated_func(): u64 {
+        3
+    }
+    #[lint::skip]
+    fun lint_skip_func(): u64 {
+        4
+    }
+    #[persistent]
+    fun persistent_func(): u64 {
+        5
+    }
+    public fun regular(): u64 {
+        1
+    }
+}

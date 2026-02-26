@@ -1,0 +1,59 @@
+
+Diagnostics:
+warning: function `unused_fun` is unused. Remove it, or suppress warning with `#[test_only]` (if test-only), `#[verify_only]` (if verify-only), or `#[lint::skip(unused)]`.
+  ┌─ tests/checking/unused/truly_unused/unused_items.move:3:9
+  │
+3 │     fun unused_fun(): u64 {
+  │         ^^^^^^^^^^
+
+warning: constant `UNUSED_CONST` is unused. Remove it, or suppress warning with `#[test_only]` (if test-only), `#[verify_only]` (if verify-only), or `#[lint::skip(unused)]`.
+  ┌─ tests/checking/unused/truly_unused/unused_items.move:8:5
+  │
+8 │     const UNUSED_CONST: u64 = 100;
+  │     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: struct `UnusedStruct` is unused in current package. Remove it (if not published), or suppress warning with `#[test_only]` (if test-only), `#[verify_only]` (if verify-only), or `#[lint::skip(unused)]`.
+   ┌─ tests/checking/unused/truly_unused/unused_items.move:11:5
+   │
+11 │ ╭     struct UnusedStruct has drop {
+12 │ │         x: u64
+13 │ │     }
+   │ ╰─────^
+
+// -- Model dump before first bytecode pipeline
+module 0x42::m {
+    struct UnusedStruct {
+        x: u64,
+    }
+    struct UsedStruct {
+        value: u64,
+    }
+    public fun public_caller(): UsedStruct {
+        pack m::UsedStruct(m::used_helper())
+    }
+    private fun unused_fun(): u64 {
+        42
+    }
+    private fun used_helper(): u64 {
+        1
+    }
+} // end 0x42::m
+
+// -- Sourcified model before first bytecode pipeline
+module 0x42::m {
+    struct UnusedStruct has drop {
+        x: u64,
+    }
+    struct UsedStruct has drop {
+        value: u64,
+    }
+    public fun public_caller(): UsedStruct {
+        UsedStruct{value: used_helper()}
+    }
+    fun unused_fun(): u64 {
+        42
+    }
+    fun used_helper(): u64 {
+        1
+    }
+}

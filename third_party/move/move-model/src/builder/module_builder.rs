@@ -23,7 +23,7 @@ use crate::{
     model::{
         self, EqIgnoringLoc, FieldData, FieldId, FunId, FunctionData, FunctionKind, FunctionLoc,
         Loc, ModuleId, MoveIrLoc, NamedConstantData, NamedConstantId, NodeId, Parameter, SchemaId,
-        SpecFunId, SpecVarId, StructData, StructId, TypeParameter, TypeParameterKind,
+        SpecFunId, SpecVarId, StructData, StructId, TypeParameter, TypeParameterKind, UserId,
     },
     pragmas::{
         is_pragma_valid_for_block, is_property_valid_for_condition, CONDITION_DEACTIVATED_PROP,
@@ -499,6 +499,7 @@ impl ModuleBuilder<'_, '_> {
                 &format!("duplicate declaration of const `{}`", &name.value()),
             )
         }
+        let attributes = self.translate_attributes(&def.attributes);
         let mut et = ExpTranslator::new(self);
         et.set_translate_move_fun();
         let loc = et.to_loc(&def.loc);
@@ -508,6 +509,8 @@ impl ModuleBuilder<'_, '_> {
             ty,
             value: Value::Bool(false), // dummy value, actual will be assigned in def_ana
             visibility: EntryVisibility::SpecAndImpl,
+            users: BTreeSet::new(),
+            attributes,
         });
     }
 
@@ -1255,7 +1258,9 @@ impl ModuleBuilder<'_, '_> {
         };
         let value = {
             // Type check the constant.
+            let const_id = self.module_id.qualified(NamedConstantId::new(qsym.symbol));
             let mut et = ExpTranslator::new(self);
+            et.set_constant_use_context(UserId::Constant(const_id));
             et.set_translate_move_fun();
             let exp = et.translate_exp(&def.value, &ty).into_exp();
             et.finalize_types(true);
@@ -1456,11 +1461,12 @@ impl ModuleBuilder<'_, '_> {
             let params = entry.params.clone();
             let result_type = entry.result_type.clone();
             let spec_block_map = entry.inline_specs.clone();
-
+            let fun_qid = entry.module_id.qualified(entry.fun_id);
             let mut et = ExpTranslator::new(self);
             et.set_spec_block_map(spec_block_map);
             et.set_result_type(result_type.clone());
             et.set_fun_name(full_name.clone());
+            et.set_constant_use_context(UserId::Function(fun_qid));
             et.set_translate_move_fun();
             let loc = et.to_loc(&body.loc);
             for (pos, TypeParameter(name, kind, loc)) in type_params.iter().enumerate() {
@@ -3690,6 +3696,7 @@ impl ModuleBuilder<'_, '_> {
                 visibility: entry.visibility,
                 has_package_visibility: self.package_structs.contains(&entry.struct_id),
                 is_empty_struct: entry.is_empty_struct,
+                users: entry.users.clone(),
             };
             struct_data.insert(StructId::new(name.symbol), data);
             if entry.visibility != Visibility::Private
@@ -3769,12 +3776,16 @@ impl ModuleBuilder<'_, '_> {
                 value,
                 ty,
                 visibility: _,
+                users,
+                attributes,
             } = const_entry.clone();
             let data = NamedConstantData {
                 name: name.symbol,
                 loc,
                 type_: ty,
                 value,
+                attributes,
+                users,
             };
             named_constants.insert(NamedConstantId::new(name.symbol), data);
         }
