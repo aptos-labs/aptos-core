@@ -1,0 +1,6 @@
+{
+  "source_paths": [
+    "<TEMPDIR>/hello.move"
+  ],
+  "dep_paths": []
+}

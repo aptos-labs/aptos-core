@@ -1245,6 +1245,25 @@ impl GlobalEnv {
         self.error_count() > 0
     }
 
+    /// Returns `Err` if the environment contains any error diagnostics.
+    ///
+    /// Use this at call sites where compilation errors should be fatal, rather
+    /// than having the compiler pipeline bail internally. The diagnostics
+    /// remain stored in the `GlobalEnv` for later retrieval/rendering.
+    pub fn check_errors(&self, msg: &str) -> anyhow::Result<()> {
+        let n = self.error_count();
+        if n > 0 {
+            anyhow::bail!(
+                "exiting with {} {} {}",
+                n,
+                if n == 1 { "error" } else { "errors" },
+                msg
+            )
+        } else {
+            Ok(())
+        }
+    }
+
     /// Returns the number of diagnostics.
     pub fn diag_count(&self, min_severity: Severity) -> usize {
         self.diags

@@ -76,7 +76,7 @@ module 0x99::noexit_loops {
 }
 
 --- unable to recompile the decompiled code:
-exiting with context checking errors
+exiting with compilation errors
 error: cannot return nothing from a function with result type `u64`
    ┌─ noexit_loops.move:49:9
    │
