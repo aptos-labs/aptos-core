@@ -171,7 +171,7 @@ impl Default for RocksdbConfig {
             // families are updated at non-uniform frequencies.
             max_total_wal_size: 1u64 << 30,
             // This includes jobs for flush and compaction.
-            max_background_jobs: 4,
+            max_background_jobs: 16,
             // Not used. Only kept for backward compatibility.
             block_cache_size: 0,
             block_size: Self::DEFAULT_BLOCK_SIZE,
