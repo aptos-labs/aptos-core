@@ -466,11 +466,13 @@ impl<R: Clone + Ord> ColdValidationRequirements<R> {
     ///
     /// Returns Some(prev_min) when an update was performed (pending was empty at the
     /// time of the swap), None when skipped (pending was non-empty).
-    fn advance_min_unprocessed_idx(
-        &self,
-        active_reqs: &mut ActiveRequirements<R>,
-    ) -> Option<u32> {
-        let new_min = active_reqs.versions.keys().min().copied().unwrap_or(u32::MAX);
+    fn advance_min_unprocessed_idx(&self, active_reqs: &mut ActiveRequirements<R>) -> Option<u32> {
+        let new_min = active_reqs
+            .versions
+            .keys()
+            .min()
+            .copied()
+            .unwrap_or(u32::MAX);
         let pending_reqs = self.pending_requirements.lock();
         if pending_reqs.is_some() {
             return None;
