@@ -397,6 +397,10 @@ impl BufferManager {
         let request = self.create_new_request(ExecutionRequest {
             ordered_blocks: ordered_blocks.clone(),
         });
+        // TODO(prefix-consensus): PrefixConsensusBlock (like DAGBlock) has
+        // #[serde(skip_deserializing)], so consensus observer nodes cannot deserialize it.
+        // For production, either skip publishing for local-only block types or add a
+        // separate serialization path for observer mode.
         if let Some(consensus_publisher) = &self.consensus_publisher {
             let message = ConsensusObserverMessage::new_ordered_block_message(
                 ordered_blocks.clone(),

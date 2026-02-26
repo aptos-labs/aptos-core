@@ -606,6 +606,9 @@ impl Block {
             BlockType::OptimisticProposal(p) => {
                 p.grandparent_qc().ledger_info().get_voters_bitvec().clone()
             },
+            // TODO(prefix-consensus): PrefixConsensusBlock falls here and returns an empty
+            // bitvec from its dummy QC. For production, add an explicit arm that constructs
+            // a bitvec from the `authors` field (validators who contributed proposals).
             _ => self.quorum_cert().ledger_info().get_voters_bitvec().clone(),
         }
     }

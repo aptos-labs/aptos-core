@@ -500,50 +500,20 @@ Wires SlotManager into EpochManager so it starts automatically at epoch boundari
 - Local config flag takes priority over on-chain config for prototype
 - `SlotConsensusNetworkBridge` type alias already existed (network_interface.rs:426)
 
-### Phase 9: BlockType Integration and Payload (~400 LOC, revised up from ~200)
+### Phase 9+10: BlockType Integration + Execution Pipeline Audit ✅ (Merged)
 
-Adding a new `BlockType` variant touches more match sites than initially estimated. The `BlockType` enum is matched exhaustively in many places.
+**Scope revision**: Phase 4 already added the `PrefixConsensusBlock` variant and all match arms. The execution pipeline operates generically on `PipelinedBlock` without inspecting `BlockType`. Phases 9 and 10 were merged into a single audit-and-document phase (~16 LOC of TODO comments).
 
-**Modified file**: `consensus/consensus-types/src/block_data.rs`
-- [ ] Add `PrefixConsensusBlock` variant to `BlockType` enum (with `#[serde(skip_deserializing)]` like DAGBlock)
-- [ ] Update ALL match arms on `BlockType` throughout `block_data.rs`:
-  - `author()` (line ~138) → return `Some(author)` for new variant
-  - `parent_id()` (line ~157) → **CRITICAL**: This uses `if let DAGBlock { parent_block_id, .. }` with an else fallback to `self.quorum_cert.certified_block().id()`. Since PrefixConsensusBlock uses a dummy QuorumCert (BlockInfo::empty()), the fallback would return HashValue::zero(), silently breaking block chain integrity. Must extend the if-let to also match `BlockType::PrefixConsensusBlock { parent_block_id, .. }`
-  - `payload()` (line ~168) → Add PrefixConsensusBlock to the existing `Proposal | DAGBlock` combined arm that returns `Some(payload)`. Without this, PrefixConsensusBlock falls through to `_ => None` and the block appears to have no payload
-  - `validator_txns()` (line ~178) → return `Some(&validator_txns)` for new variant
-  - `failed_authors()` (line ~225) → return `Some(&failed_authors)` for new variant
-  - `is_reconfiguration_suffix()` → return false (not a nil/genesis block)
-  - Any other exhaustive matches (grep for `BlockType::` in `block_data.rs`)
+**Audit findings** (7 issues, 2 needed action, 5 non-issues):
+- [x] `previous_bitvec()` returns empty bitvec from dummy QC → added TODO comment in `block.rs:609`
+- [x] Consensus observer can't deserialize PrefixConsensusBlock → added TODO comment in `buffer_manager.rs:400`
+- [x] `verify_well_formed()` — NOT A PROBLEM: only called on network-received blocks
+- [x] `validate_signature()` — NOT A PROBLEM: correctly rejects local-only blocks from network
+- [x] `round_manager.rs` ProposalExt check — NOT A PROBLEM: Jolteon-specific, never runs with prefix consensus
+- [x] Payload Manager — NOT A PROBLEM: matches on `Payload` type, not `BlockType`
+- [x] `BlockStore` bypassed — NOT A PROBLEM: same pattern as DAG (direct to BufferManager)
 
-**Modified file**: `consensus/consensus-types/src/block.rs`
-- [ ] Add `new_for_prefix_consensus(epoch, round, timestamp_usecs, author, failed_authors, validator_txns, payload, authors, slot, proposal_hashes, parent_block_id) -> Self` constructor (following `new_for_dag()` pattern)
-- [ ] Update `verify_well_formed()` for new variant
-- [ ] Grep for ALL `BlockType::` matches across the `consensus-types` crate and add arms
-
-**Modified files**: Various files matching on `BlockType` (grep-driven)
-- [ ] Run `grep -r "BlockType::" consensus/` to find ALL match sites
-- [ ] Add `PrefixConsensusBlock` arm to each — most can mirror the `DAGBlock` arm
-- [ ] Key sites likely include: `block_data.rs`, `block.rs`, `pipelined_block.rs`, payload extraction, metrics, logging
-
-**Modified file**: `consensus/src/payload_manager/` (if needed)
-- [ ] `DirectMempoolPayloadManager::get_transactions()` should already handle `Payload::DirectMempool` regardless of `BlockType` (it matches on `Payload`, not `BlockType`)
-- [ ] Verify `notify_commit()` works correctly
-
-### Phase 10: Execution Pipeline Compatibility (~300 LOC, revised up from ~200)
-
-The execution pipeline may have assumptions that need updating. While DAG blocks prove the pipeline handles non-Jolteon blocks, there may be assertions or checks specific to existing block types.
-
-**Approach**: Grep-driven audit of all `BlockType` matches in execution and pipeline code.
-
-**Modified files** (as needed based on grep):
-- [ ] `consensus/src/pipeline/pipeline_builder.rs` — check for `BlockType` matches
-- [ ] `consensus/src/pipeline/buffer_manager.rs` — check for `BlockType` matches
-- [ ] `consensus/src/block_storage/` — check for `BlockType`-specific logic
-- [ ] `execution/executor/src/` — verify executor works with any valid `Payload`
-- [ ] Check for `QuorumCert` assumptions: our blocks use `QuorumCert::new(VoteData::new(BlockInfo::empty(), BlockInfo::empty()))` like DAG — verify nothing inspects these QCs expecting real data
-- [ ] Check for `failed_authors` expectations: our variant has an empty `failed_authors` vec
-
-The goal is for PrefixConsensusBlock to piggyback on DAGBlock's existing path through the pipeline wherever possible. Most pipeline code operates on `Block`/`PipelinedBlock` generically without inspecting `BlockType`.
+**Detailed plan**: `.plans/phase9-blocktype-integration.md`
 
 ### Phase 11: Smoke Tests (~400 LOC)
 

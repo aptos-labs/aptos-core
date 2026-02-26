@@ -4,8 +4,8 @@
 
 Implementing Prefix Consensus protocols (from research paper "Prefix Consensus For Censorship Resistant BFT") within Aptos Core for leaderless, censorship-resistant consensus.
 
-**Current Phase**: Multi-Slot Consensus (Algorithm 4) — Phases 1-8 complete, Phase 9 next
-**Completed**: Basic Prefix Consensus, Strong Prefix Consensus (Phases 1-9), Stake-Weighted Quorum Refactoring, Multi-Slot Phases 1-8
+**Current Phase**: Multi-Slot Consensus (Algorithm 4) — Phases 1-10 complete, Phase 11 next
+**Completed**: Basic Prefix Consensus, Strong Prefix Consensus (Phases 1-9), Stake-Weighted Quorum Refactoring, Multi-Slot Phases 1-10
 
 ---
 
@@ -113,8 +113,8 @@ Execution Pipeline (unchanged):
 6. ~~SPC integration refactor (~300 LOC)~~ ✅
 7. ~~Payload resolution: late buffering + fetch protocol (~350 LOC)~~ ✅
 8. ~~EpochManager integration (~400 LOC)~~ ✅
-9. BlockType integration across codebase (~400 LOC, grep-driven)
-10. Execution pipeline compatibility (~300 LOC, grep-driven)
+9. ~~BlockType integration + execution pipeline audit (merged with Phase 10)~~ ✅
+10. ~~(Merged into Phase 9)~~ ✅
 11. Smoke tests (~400 LOC)
 12. Documentation + cleanup (~100 LOC)
 
@@ -123,7 +123,7 @@ Execution Pipeline (unchanged):
 ## Repository State
 
 - **Branch**: `prefix-consensus-prototype`
-- **HEAD**: Multi-Slot Phase 8 (EpochManager integration — config flag, startup, routing, shutdown)
+- **HEAD**: Multi-Slot Phase 9+10 (BlockType integration + execution pipeline audit — merged, comments-only)
 - **Tests**: 246/246 unit tests (237 prefix-consensus + 9 slot manager), 6/6 smoke tests
 - **Build**: Clean
 
@@ -171,6 +171,8 @@ testsuite/smoke-test/src/consensus/
 - `.plans/phase5-slot-manager.md` — Phase 5: SlotManager core (complete)
 - `.plans/phase6-spc-integration.md` — Phase 6: SPC integration (complete)
 - `.plans/phase7-payload-resolution.md` — Phase 7: Payload resolution: late buffering + fetch
+- `.plans/phase8-epoch-manager-integration.md` — Phase 8: EpochManager integration (complete)
+- `.plans/phase9-blocktype-integration.md` — Phase 9+10: BlockType + execution pipeline audit (complete)
 - `.plans/phase12-verifiable-ranking.md` — Phase 13: Verifiable ranking with SPC-aware demotion (after end-to-end)
 
 ---
@@ -186,6 +188,8 @@ testsuite/smoke-test/src/consensus/
 - [ ] **State persistence**: Persist slot state for crash recovery without state sync
 - [ ] **Payload fetch optimization**: Replace broadcast-to-all fetch with single-peer-then-escalation (request one random peer first, broadcast only on timeout)
 - [ ] **Slot catch-up mechanism**: External mechanism to jump forward to later slots when behind (analogous to current consensus catch-up). Needed after full integration
+- [ ] **previous_bitvec for PrefixConsensusBlock**: Add explicit `BlockType::PrefixConsensusBlock` arm in `Block::previous_bitvec()` (`block.rs:603`) to construct bitvec from `authors` field instead of returning empty bitvec from dummy QC. Needed for on-chain reward calculations
+- [ ] **Consensus observer compatibility**: PrefixConsensusBlock has `#[serde(skip_deserializing)]` — consensus observer nodes can't deserialize it. Either skip publishing for local-only block types or add separate serialization path (`buffer_manager.rs:400`)
 
 ### Strong PC (deferred)
 - [ ] **Certificate fetching protocol**: Fetch by hash for Byzantine withholding
