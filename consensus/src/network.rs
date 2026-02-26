@@ -15,8 +15,7 @@ use crate::{
     quorum_store::types::{Batch, BatchMsg, BatchRequest, BatchResponse},
     rand::{
         rand_gen::{
-            network_messages::{RandGenMessage, RandMessage},
-            types::{AugmentedData, FastShare, Share},
+            network_messages::RandGenMessage,
         },
         secret_sharing::network_messages::SecretShareNetworkMessage,
     },
@@ -496,16 +495,6 @@ impl NetworkSender {
     pub async fn broadcast_commit_vote(&self, commit_vote_msg: CommitVote) {
         fail_point!("consensus::send::commit_vote", |_| ());
         let msg = ConsensusMsg::CommitVoteMsg(Box::new(commit_vote_msg));
-        self.broadcast(msg).await
-    }
-
-    pub async fn broadcast_fast_share(&self, share: FastShare<Share>) {
-        fail_point!("consensus::send::broadcast_share", |_| ());
-        let msg = tokio::task::spawn_blocking(|| {
-            RandMessage::<Share, AugmentedData>::FastShare(share).into_network_message()
-        })
-        .await
-        .expect("task cannot fail to execute");
         self.broadcast(msg).await
     }
 

@@ -3,7 +3,7 @@
 
 use crate::dkg::real_dkg::rounding::{
     is_valid_profile, total_weight_lower_bound, total_weight_upper_bound, DKGRounding,
-    DKGRoundingProfile, DEFAULT_FAST_PATH_SECRECY_THRESHOLD, DEFAULT_RECONSTRUCT_THRESHOLD,
+    DKGRoundingProfile, DEFAULT_RECONSTRUCT_THRESHOLD,
     DEFAULT_SECRECY_THRESHOLD,
 };
 use aptos_dkg::pvss::WeightedConfigBlstrs;
@@ -19,11 +19,10 @@ fn compute_mainnet_rounding() {
         &validator_stakes,
         *DEFAULT_SECRECY_THRESHOLD.deref(),
         *DEFAULT_RECONSTRUCT_THRESHOLD.deref(),
-        Some(*DEFAULT_FAST_PATH_SECRECY_THRESHOLD.deref()),
     );
     println!("mainnet rounding profile: {:?}", dkg_rounding.profile);
     // Result:
-    // mainnet rounding profile: total_weight: 414, secrecy_threshold_in_stake_ratio: 0.5, reconstruct_threshold_in_stake_ratio: 0.60478401144595166257, reconstruct_threshold_in_weights: 228, fast_reconstruct_threshold_in_stake_ratio: Some(0.7714506781126183292), fast_reconstruct_threshold_in_weights: Some(335), validator_weights: [7, 5, 6, 6, 5, 1, 6, 6, 1, 5, 6, 5, 1, 7, 1, 6, 6, 1, 2, 1, 6, 3, 2, 1, 1, 4, 3, 2, 5, 5, 5, 1, 1, 4, 1, 1, 1, 7, 5, 1, 1, 2, 6, 1, 6, 1, 3, 5, 5, 1, 5, 5, 3, 2, 5, 1, 6, 3, 6, 1, 1, 3, 1, 5, 1, 9, 1, 1, 1, 6, 1, 5, 7, 4, 6, 1, 5, 6, 5, 5, 3, 1, 6, 7, 6, 1, 3, 1, 1, 1, 1, 1, 1, 7, 2, 1, 6, 7, 1, 1, 1, 1, 5, 3, 1, 2, 3, 1, 1, 1, 1, 4, 1, 1, 1, 2, 1, 6, 7, 5, 1, 5, 1, 6, 1, 2, 3, 2, 2]
+    // mainnet rounding profile: total_weight: 414, secrecy_threshold_in_stake_ratio: 0.5, reconstruct_threshold_in_stake_ratio: 0.60478401144595166257, reconstruct_threshold_in_weights: 228, validator_weights: [7, 5, 6, 6, 5, 1, 6, 6, 1, 5, 6, 5, 1, 7, 1, 6, 6, 1, 2, 1, 6, 3, 2, 1, 1, 4, 3, 2, 5, 5, 5, 1, 1, 4, 1, 1, 1, 7, 5, 1, 1, 2, 6, 1, 6, 1, 3, 5, 5, 1, 5, 5, 3, 2, 5, 1, 6, 3, 6, 1, 1, 3, 1, 5, 1, 9, 1, 1, 1, 6, 1, 5, 7, 4, 6, 1, 5, 6, 5, 5, 3, 1, 6, 7, 6, 1, 3, 1, 1, 1, 1, 1, 1, 7, 2, 1, 6, 7, 1, 1, 1, 1, 5, 3, 1, 2, 3, 1, 1, 1, 1, 4, 1, 1, 1, 2, 1, 6, 7, 5, 1, 5, 1, 6, 1, 2, 3, 2, 2]
 
     let total_weight_min = total_weight_lower_bound(&validator_stakes);
     let total_weight_max = total_weight_upper_bound(
@@ -48,7 +47,6 @@ fn test_rounding_single_validator() {
         &validator_stakes,
         *DEFAULT_SECRECY_THRESHOLD.deref(),
         *DEFAULT_RECONSTRUCT_THRESHOLD.deref(),
-        Some(*DEFAULT_FAST_PATH_SECRECY_THRESHOLD.deref()),
     );
     let wconfig = WeightedConfigBlstrs::new(1, vec![1]).unwrap();
     assert_eq!(dkg_rounding.wconfig, wconfig);
@@ -65,7 +63,6 @@ fn test_rounding_equal_stakes() {
             &validator_stakes,
             *DEFAULT_SECRECY_THRESHOLD.deref(),
             *DEFAULT_RECONSTRUCT_THRESHOLD.deref(),
-            Some(*DEFAULT_FAST_PATH_SECRECY_THRESHOLD.deref()),
         );
         let wconfig = WeightedConfigBlstrs::new(
             (U64F64::from_num(validator_num) * *DEFAULT_SECRECY_THRESHOLD.deref())
@@ -93,7 +90,6 @@ fn test_rounding_small_stakes() {
             &validator_stakes,
             *DEFAULT_SECRECY_THRESHOLD.deref(),
             *DEFAULT_RECONSTRUCT_THRESHOLD.deref(),
-            Some(*DEFAULT_FAST_PATH_SECRECY_THRESHOLD.deref()),
         );
 
         let total_weight_min = total_weight_lower_bound(&validator_stakes);
@@ -128,7 +124,6 @@ fn test_rounding_uniform_distribution() {
             &validator_stakes,
             *DEFAULT_SECRECY_THRESHOLD.deref(),
             *DEFAULT_RECONSTRUCT_THRESHOLD.deref(),
-            Some(*DEFAULT_FAST_PATH_SECRECY_THRESHOLD.deref()),
         );
 
         let total_weight_min = total_weight_lower_bound(&validator_stakes);
@@ -176,7 +171,6 @@ fn test_rounding_zipf_distribution() {
             &validator_stakes,
             *DEFAULT_SECRECY_THRESHOLD.deref(),
             *DEFAULT_RECONSTRUCT_THRESHOLD.deref(),
-            Some(*DEFAULT_FAST_PATH_SECRECY_THRESHOLD.deref()),
         );
 
         let total_weight_min = total_weight_lower_bound(&validator_stakes);
@@ -334,7 +328,6 @@ fn test_infallible_rounding_with_mainnet() {
         &MAINNET_STAKES.to_vec(),
         *DEFAULT_SECRECY_THRESHOLD,
         *DEFAULT_RECONSTRUCT_THRESHOLD,
-        Some(*DEFAULT_FAST_PATH_SECRECY_THRESHOLD),
     );
     println!("profile={:?}", profile);
 }
@@ -351,13 +344,10 @@ fn test_infallible_rounding_brute_force() {
             let stake_total = U64F64::from_num(stakes.clone().into_iter().sum::<u64>());
             let stake_secrecy_threshold = stake_total * *DEFAULT_SECRECY_THRESHOLD;
             let stake_reconstruct_threshold = stake_total * *DEFAULT_RECONSTRUCT_THRESHOLD;
-            let fast_path_stake_secrecy_threshold =
-                stake_total * *DEFAULT_FAST_PATH_SECRECY_THRESHOLD;
             let profile = DKGRoundingProfile::infallible(
                 &stakes,
                 *DEFAULT_SECRECY_THRESHOLD,
                 *DEFAULT_RECONSTRUCT_THRESHOLD,
-                Some(*DEFAULT_FAST_PATH_SECRECY_THRESHOLD),
             );
             println!("n={}, stakes={:?}, profile={:?}", n, stakes, profile);
             let num_subsets: u64 = 1 << n;
@@ -381,11 +371,6 @@ fn test_infallible_rounding_brute_force() {
                 }
                 if stake_sub_total > stake_reconstruct_threshold
                     && weight_sub_total < profile.reconstruct_threshold_in_weights
-                {
-                    unreachable!();
-                }
-                if stake_sub_total <= fast_path_stake_secrecy_threshold
-                    && weight_sub_total >= profile.fast_reconstruct_threshold_in_weights.unwrap()
                 {
                     unreachable!();
                 }

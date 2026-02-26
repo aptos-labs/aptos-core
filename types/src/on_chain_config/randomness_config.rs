@@ -43,33 +43,6 @@ impl AsMoveAny for ConfigV1 {
 }
 
 #[derive(Clone, Debug, Deserialize, PartialEq, Eq, Serialize)]
-pub struct ConfigV2 {
-    pub secrecy_threshold: FixedPoint64MoveStruct,
-    pub reconstruction_threshold: FixedPoint64MoveStruct,
-    pub fast_path_secrecy_threshold: FixedPoint64MoveStruct,
-}
-
-impl Default for ConfigV2 {
-    fn default() -> Self {
-        Self {
-            secrecy_threshold: FixedPoint64MoveStruct::from_u64f64(
-                U64F64::from_num(1) / U64F64::from_num(2),
-            ),
-            reconstruction_threshold: FixedPoint64MoveStruct::from_u64f64(
-                U64F64::from_num(2) / U64F64::from_num(3),
-            ),
-            fast_path_secrecy_threshold: FixedPoint64MoveStruct::from_u64f64(
-                U64F64::from_num(2) / U64F64::from_num(3),
-            ),
-        }
-    }
-}
-
-impl AsMoveAny for ConfigV2 {
-    const MOVE_TYPE_NAME: &'static str = "0x1::randomness_config::ConfigV2";
-}
-
-#[derive(Clone, Debug, Deserialize, PartialEq, Eq, Serialize)]
 pub struct RandomnessConfigSeqNum {
     pub seq_num: u64,
 }
@@ -94,7 +67,6 @@ pub struct RandomnessConfigMoveStruct {
 pub enum OnChainRandomnessConfig {
     Off,
     V1(ConfigV1),
-    V2(ConfigV2),
 }
 
 impl OnChainRandomnessConfig {
@@ -111,27 +83,6 @@ impl OnChainRandomnessConfig {
         Self::V1(ConfigV1 {
             secrecy_threshold,
             reconstruction_threshold,
-        })
-    }
-
-    pub fn new_v2(
-        secrecy_threshold_in_percentage: u64,
-        reconstruct_threshold_in_percentage: u64,
-        fast_path_secrecy_threshold_in_percentage: u64,
-    ) -> Self {
-        let secrecy_threshold = FixedPoint64MoveStruct::from_u64f64(
-            U64F64::from_num(secrecy_threshold_in_percentage) / U64F64::from_num(100),
-        );
-        let reconstruction_threshold = FixedPoint64MoveStruct::from_u64f64(
-            U64F64::from_num(reconstruct_threshold_in_percentage) / U64F64::from_num(100),
-        );
-        let fast_path_secrecy_threshold = FixedPoint64MoveStruct::from_u64f64(
-            U64F64::from_num(fast_path_secrecy_threshold_in_percentage) / U64F64::from_num(100),
-        );
-        Self::V2(ConfigV2 {
-            secrecy_threshold,
-            reconstruction_threshold,
-            fast_path_secrecy_threshold,
         })
     }
 
@@ -164,11 +115,6 @@ impl TryFrom<RandomnessConfigMoveStruct> for OnChainRandomnessConfig {
                     .map_err(|e| anyhow!("unpack as v1 failed: {e}"))?;
                 Ok(Self::V1(v1))
             },
-            ConfigV2::MOVE_TYPE_NAME => {
-                let v2 = MoveAny::unpack(ConfigV2::MOVE_TYPE_NAME, variant)
-                    .map_err(|e| anyhow!("unpack as v2 failed: {e}"))?;
-                Ok(Self::V2(v2))
-            },
             _ => Err(anyhow!("unknown variant type")),
         }
     }
@@ -179,7 +125,6 @@ impl From<OnChainRandomnessConfig> for RandomnessConfigMoveStruct {
         let variant = match value {
             OnChainRandomnessConfig::Off => MoveAny::pack(ConfigOff::MOVE_TYPE_NAME, ConfigOff {}),
             OnChainRandomnessConfig::V1(v1) => MoveAny::pack(ConfigV1::MOVE_TYPE_NAME, v1),
-            OnChainRandomnessConfig::V2(v2) => MoveAny::pack(ConfigV2::MOVE_TYPE_NAME, v2),
         };
         Self { variant }
     }
@@ -206,15 +151,6 @@ impl OnChainRandomnessConfig {
         match self {
             Self::Off => false,
             Self::V1(_) => true,
-            Self::V2(_) => true,
-        }
-    }
-
-    pub fn fast_randomness_enabled(&self) -> bool {
-        match self {
-            Self::Off => false,
-            Self::V1(_) => false,
-            Self::V2(_) => true,
         }
     }
 
@@ -222,7 +158,6 @@ impl OnChainRandomnessConfig {
         match self {
             Self::Off => None,
             Self::V1(v1) => Some(v1.secrecy_threshold.as_u64f64()),
-            Self::V2(v2) => Some(v2.secrecy_threshold.as_u64f64()),
         }
     }
 
@@ -230,15 +165,6 @@ impl OnChainRandomnessConfig {
         match self {
             Self::Off => None,
             Self::V1(v1) => Some(v1.reconstruction_threshold.as_u64f64()),
-            Self::V2(v2) => Some(v2.reconstruction_threshold.as_u64f64()),
-        }
-    }
-
-    pub fn fast_path_secrecy_threshold(&self) -> Option<U64F64> {
-        match self {
-            Self::Off => None,
-            Self::V1(_) => None,
-            Self::V2(v2) => Some(v2.fast_path_secrecy_threshold.as_u64f64()),
         }
     }
 }
