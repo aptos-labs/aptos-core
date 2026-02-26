@@ -108,7 +108,7 @@ impl SlotProposal {
 
     /// Compute the hash of a payload via BCS serialization + SHA3-256.
     /// Payload does not implement CryptoHash, so we hash manually.
-    fn compute_payload_hash(payload: &Payload) -> HashValue {
+    pub fn compute_payload_hash(payload: &Payload) -> HashValue {
         let bytes = bcs::to_bytes(payload).expect("Payload BCS serialization should not fail");
         HashValue::sha3_256_of(&bytes)
     }
@@ -144,13 +144,47 @@ pub fn create_signed_slot_proposal(
 }
 
 // ============================================================================
+// Payload Fetch Types
+// ============================================================================
+
+/// Request for a missing payload identified by its hash.
+///
+/// Sent when v_high contains a hash for a proposal we never received.
+/// The responder looks up the payload in their proposal buffer and returns it.
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct PayloadFetchRequest {
+    pub slot: u64,
+    pub epoch: u64,
+    pub payload_hash: HashValue,
+}
+
+/// Response carrying a requested payload.
+///
+/// The receiver verifies `H(payload) == payload_hash` to prevent substitution.
+/// No BLS signature needed — the hash was committed by SPC via the original proposal.
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct PayloadFetchResponse {
+    pub slot: u64,
+    pub epoch: u64,
+    pub payload_hash: HashValue,
+    pub payload: Payload,
+}
+
+impl PayloadFetchResponse {
+    /// Verify that the carried payload matches the claimed hash.
+    pub fn verify_payload_hash(&self) -> bool {
+        SlotProposal::compute_payload_hash(&self.payload) == self.payload_hash
+    }
+}
+
+// ============================================================================
 // SlotConsensusMsg
 // ============================================================================
 
 /// Network message type for the multi-slot consensus protocol.
 ///
-/// Wraps both slot proposals (broadcast at the start of each slot) and
-/// per-slot Strong Prefix Consensus messages (routed to the SPC task for that slot).
+/// Wraps slot proposals, per-slot Strong Prefix Consensus messages, and
+/// payload fetch request/response messages for network routing.
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub enum SlotConsensusMsg {
     /// Validator's proposal for a slot (payload + BLS signature)
@@ -164,6 +198,12 @@ pub enum SlotConsensusMsg {
         epoch: u64,
         msg: StrongPrefixConsensusMsg,
     },
+
+    /// Request for a missing payload by hash (broadcast to all peers).
+    PayloadFetchRequest(PayloadFetchRequest),
+
+    /// Response carrying a requested payload (sent to requester).
+    PayloadFetchResponse(Box<PayloadFetchResponse>),
 }
 
 impl SlotConsensusMsg {
@@ -172,6 +212,8 @@ impl SlotConsensusMsg {
         match self {
             SlotConsensusMsg::SlotProposal(p) => p.epoch,
             SlotConsensusMsg::StrongPCMsg { epoch, .. } => *epoch,
+            SlotConsensusMsg::PayloadFetchRequest(req) => req.epoch,
+            SlotConsensusMsg::PayloadFetchResponse(resp) => resp.epoch,
         }
     }
 
@@ -180,6 +222,8 @@ impl SlotConsensusMsg {
         match self {
             SlotConsensusMsg::SlotProposal(p) => p.slot,
             SlotConsensusMsg::StrongPCMsg { slot, .. } => *slot,
+            SlotConsensusMsg::PayloadFetchRequest(req) => req.slot,
+            SlotConsensusMsg::PayloadFetchResponse(resp) => resp.slot,
         }
     }
 
@@ -188,6 +232,8 @@ impl SlotConsensusMsg {
         match self {
             SlotConsensusMsg::SlotProposal(p) => Some(p.author),
             SlotConsensusMsg::StrongPCMsg { msg, .. } => msg.author(),
+            SlotConsensusMsg::PayloadFetchRequest(_) => None,
+            SlotConsensusMsg::PayloadFetchResponse(_) => None,
         }
     }
 
@@ -196,6 +242,8 @@ impl SlotConsensusMsg {
         match self {
             SlotConsensusMsg::SlotProposal(_) => "SlotProposal",
             SlotConsensusMsg::StrongPCMsg { .. } => "StrongPCMsg",
+            SlotConsensusMsg::PayloadFetchRequest(_) => "PayloadFetchRequest",
+            SlotConsensusMsg::PayloadFetchResponse(_) => "PayloadFetchResponse",
         }
     }
 }
@@ -353,5 +401,61 @@ mod tests {
         assert_eq!(deserialized.epoch(), 1);
         assert_eq!(deserialized.slot(), 1);
         assert_eq!(deserialized.name(), "SlotProposal");
+    }
+
+    #[test]
+    fn test_payload_fetch_request_serialization() {
+        let req = PayloadFetchRequest {
+            slot: 5,
+            epoch: 3,
+            payload_hash: HashValue::random(),
+        };
+        let msg = SlotConsensusMsg::PayloadFetchRequest(req.clone());
+        assert_eq!(msg.epoch(), 3);
+        assert_eq!(msg.slot(), 5);
+        assert_eq!(msg.name(), "PayloadFetchRequest");
+
+        let bytes = bcs::to_bytes(&msg).expect("serialization failed");
+        let deserialized: SlotConsensusMsg =
+            bcs::from_bytes(&bytes).expect("deserialization failed");
+        assert_eq!(deserialized.epoch(), 3);
+        assert_eq!(deserialized.slot(), 5);
+        assert_eq!(deserialized.name(), "PayloadFetchRequest");
+    }
+
+    #[test]
+    fn test_payload_fetch_response_serialization() {
+        let payload = create_test_payload();
+        let payload_hash = SlotProposal::compute_payload_hash(&payload);
+        let resp = PayloadFetchResponse {
+            slot: 5,
+            epoch: 3,
+            payload_hash,
+            payload,
+        };
+        assert!(resp.verify_payload_hash());
+
+        let msg = SlotConsensusMsg::PayloadFetchResponse(Box::new(resp));
+        assert_eq!(msg.epoch(), 3);
+        assert_eq!(msg.slot(), 5);
+        assert_eq!(msg.name(), "PayloadFetchResponse");
+
+        let bytes = bcs::to_bytes(&msg).expect("serialization failed");
+        let deserialized: SlotConsensusMsg =
+            bcs::from_bytes(&bytes).expect("deserialization failed");
+        assert_eq!(deserialized.epoch(), 3);
+        assert_eq!(deserialized.slot(), 5);
+    }
+
+    #[test]
+    fn test_payload_fetch_response_wrong_hash() {
+        let payload = create_test_payload();
+        let resp = PayloadFetchResponse {
+            slot: 1,
+            epoch: 1,
+            payload_hash: HashValue::random(), // wrong hash
+            payload,
+        };
+        assert!(!resp.verify_payload_hash());
     }
 }

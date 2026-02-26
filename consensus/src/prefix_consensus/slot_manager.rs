@@ -25,7 +25,10 @@ use aptos_prefix_consensus::{
     build_block_from_v_high,
     slot_ranking::MultiSlotRankingManager,
     slot_state::SlotState,
-    slot_types::{SlotConsensusMsg, SlotProposal, create_signed_slot_proposal},
+    slot_types::{
+        PayloadFetchRequest, PayloadFetchResponse, SlotConsensusMsg, SlotProposal,
+        create_signed_slot_proposal,
+    },
 };
 use aptos_types::{
     aggregate_signature::AggregateSignature,
@@ -36,7 +39,12 @@ use aptos_types::{
 };
 use aptos_validator_transaction_pool as vtxn_pool;
 use futures::SinkExt;
-use std::{collections::HashMap, pin::Pin, sync::Arc, time::Duration};
+use std::{
+    collections::{HashMap, HashSet},
+    pin::Pin,
+    sync::Arc,
+    time::Duration,
+};
 use tokio::{
     sync::{
         mpsc::{UnboundedReceiver, UnboundedSender},
@@ -47,6 +55,21 @@ use tokio::{
 
 /// Default 2Δ timeout for proposal collection.
 const SLOT_PROPOSAL_TIMEOUT_MS: u64 = 300;
+
+// ============================================================================
+// PendingCommit: waiting for missing payloads before building block
+// ============================================================================
+
+/// State held when v_high has been received but some payloads are still missing.
+///
+/// The SlotManager stores this while waiting for late proposals or fetch responses
+/// to resolve all missing hashes. Once `missing` is empty, the block is built.
+struct PendingCommit {
+    slot: u64,
+    v_high: PrefixVector,
+    resolved: HashMap<HashValue, Payload>,
+    missing: HashSet<HashValue>,
+}
 
 // ============================================================================
 // SPCSpawner trait: pluggable SPC creation for production vs. test
@@ -195,6 +218,9 @@ pub struct SlotManager<NS: SubprotocolNetworkSender<SlotConsensusMsg>, SP: SPCSp
     // SPC spawner (production vs. test)
     spc_spawner: SP,
 
+    // Pending commit: waiting for missing payloads before block construction
+    pending_commit: Option<PendingCommit>,
+
     // Execution bridge
     execution_channel: UnboundedSender<OrderedBlocks>,
 
@@ -237,6 +263,7 @@ impl<NS: SubprotocolNetworkSender<SlotConsensusMsg>, SP: SPCSpawner> SlotManager
             spc_output_rx: None,
             spc_close_tx: None,
             spc_spawner,
+            pending_commit: None,
             execution_channel,
             payload_client,
             parent_block_info,
@@ -311,6 +338,12 @@ impl<NS: SubprotocolNetworkSender<SlotConsensusMsg>, SP: SPCSpawner> SlotManager
                         SlotConsensusMsg::StrongPCMsg { slot, msg, .. } => {
                             self.process_spc_message(author, slot, msg).await;
                         }
+                        SlotConsensusMsg::PayloadFetchRequest(req) => {
+                            self.process_payload_fetch_request(author, req).await;
+                        }
+                        SlotConsensusMsg::PayloadFetchResponse(resp) => {
+                            self.process_payload_fetch_response(*resp).await;
+                        }
                     }
                 }
             }
@@ -351,14 +384,10 @@ impl<NS: SubprotocolNetworkSender<SlotConsensusMsg>, SP: SPCSpawner> SlotManager
             .or_insert_with(|| SlotState::new(slot, n));
 
         // Insert own proposal directly (avoids unnecessary self-verification)
-        if let Err(e) = self
-            .slot_states
+        self.slot_states
             .get_mut(&slot)
             .expect("just inserted")
-            .insert_proposal(proposal.clone())
-        {
-            warn!(epoch = self.epoch, slot = slot, error = ?e, "Failed to insert own proposal");
-        }
+            .insert_proposal(proposal.clone());
 
         // Broadcast proposal (self-send arrives in event loop, ProposalBuffer rejects duplicate)
         self.network_sender
@@ -411,15 +440,9 @@ impl<NS: SubprotocolNetworkSender<SlotConsensusMsg>, SP: SPCSpawner> SlotManager
             .or_insert_with(|| SlotState::new(slot, n));
 
         let slot_state = self.slot_states.get_mut(&slot).expect("just inserted");
-        if let Err(e) = slot_state.insert_proposal(proposal) {
-            debug!(
-                epoch = self.epoch,
-                slot = slot,
-                error = ?e,
-                "Failed to insert proposal"
-            );
-            return;
-        }
+        let proposal_hash = proposal.payload_hash;
+        let proposal_payload = proposal.payload.clone();
+        slot_state.insert_proposal(proposal);
 
         // If all proposals received for current slot AND SPC not yet started.
         // The spc_msg_tx check guards against starting SPC twice: on_timer_expired
@@ -432,6 +455,10 @@ impl<NS: SubprotocolNetworkSender<SlotConsensusMsg>, SP: SPCSpawner> SlotManager
             self.slot_timer = None;
             self.run_spc(slot);
         }
+
+        // Check if this late proposal resolves a pending commit
+        self.try_resolve_pending(proposal_hash, proposal_payload)
+            .await;
     }
 
     fn on_timer_expired(&mut self, slot: u64) {
@@ -486,20 +513,63 @@ impl<NS: SubprotocolNetworkSender<SlotConsensusMsg>, SP: SPCSpawner> SlotManager
             epoch = self.epoch,
             slot = slot,
             v_high_len = v_high.len(),
-            "SPC completed, building block"
+            "SPC completed, resolving payloads"
         );
 
-        // Get payload_map from slot state.
-        // TODO(Phase 7): v_high may contain hashes for proposals we never received
-        // (other validators saw them and SPC committed them). Currently payload_map
-        // only has payloads from locally received proposals. Phase 7 adds payload
-        // resolution: check late-arriving proposals, then fetch missing payloads
-        // from peers by hash. See .plans/phase7-payload-resolution.md.
-        let payload_map = self
+        // Resolve payloads from primary payload_map + late proposals
+        let (resolved, missing) = self
             .slot_states
-            .get_mut(&slot)
-            .and_then(|s| s.take_payload_map())
-            .expect("payload_map missing — prepare_spc_input should have set it");
+            .get(&slot)
+            .expect("SlotState must exist when SPC completes")
+            .resolve_missing_payloads(&v_high);
+
+        if missing.is_empty() {
+            // Happy path: all payloads available
+            self.build_and_commit_block(slot, v_high, resolved).await;
+        } else {
+            info!(
+                epoch = self.epoch,
+                slot = slot,
+                missing_count = missing.len(),
+                "Missing payloads, broadcasting fetch requests"
+            );
+
+            // Store pending commit
+            let missing_set: HashSet<HashValue> = missing.iter().cloned().collect();
+            self.pending_commit = Some(PendingCommit {
+                slot,
+                v_high,
+                resolved,
+                missing: missing_set,
+            });
+
+            // Broadcast fetch requests for each missing hash
+            for hash in &missing {
+                self.network_sender
+                    .broadcast(SlotConsensusMsg::PayloadFetchRequest(
+                        PayloadFetchRequest {
+                            slot,
+                            epoch: self.epoch,
+                            payload_hash: *hash,
+                        },
+                    ))
+                    .await;
+            }
+        }
+    }
+
+    /// Build block from v_high and resolved payloads, send to execution, advance slot.
+    async fn build_and_commit_block(
+        &mut self,
+        slot: u64,
+        v_high: PrefixVector,
+        payload_map: HashMap<HashValue, Payload>,
+    ) {
+        info!(
+            epoch = self.epoch,
+            slot = slot,
+            "Building block from v_high"
+        );
 
         // Compute timestamp: max(parent + 1, now)
         let parent_ts = self.parent_block_info.timestamp_usecs();
@@ -550,10 +620,11 @@ impl<NS: SubprotocolNetworkSender<SlotConsensusMsg>, SP: SPCSpawner> SlotManager
         // If ℓ < n, the validator at position ℓ (first excluded) is demoted.
         self.ranking_manager.update(v_high.len());
 
-        // Clean up slot state and SPC channels
+        // Clean up slot state, SPC channels, and pending commit
         self.spc_msg_tx.take();
         self.spc_output_rx.take();
         self.spc_close_tx.take();
+        self.pending_commit = None;
         self.slot_states.remove(&slot);
 
         // Advance to next slot
@@ -577,6 +648,94 @@ impl<NS: SubprotocolNetworkSender<SlotConsensusMsg>, SP: SPCSpawner> SlotManager
         }
         if let Some(tx) = &mut self.spc_msg_tx {
             let _ = tx.send((author, msg)).await;
+        }
+    }
+
+    // ========================================================================
+    // Payload fetch: request handling, response handling, resolution
+    // ========================================================================
+
+    async fn process_payload_fetch_request(&mut self, requester: Author, req: PayloadFetchRequest) {
+        if req.epoch != self.epoch {
+            return;
+        }
+
+        // Look up the requested payload in the slot state (primary + late buffer)
+        let payload = self
+            .slot_states
+            .get(&req.slot)
+            .and_then(|s| s.lookup_payload(&req.payload_hash));
+
+        if let Some(payload) = payload {
+            self.network_sender
+                .send_to(
+                    requester,
+                    SlotConsensusMsg::PayloadFetchResponse(Box::new(PayloadFetchResponse {
+                        slot: req.slot,
+                        epoch: req.epoch,
+                        payload_hash: req.payload_hash,
+                        payload,
+                    })),
+                )
+                .await;
+        }
+    }
+
+    // TODO(production): A Byzantine node can send unsolicited PayloadFetchResponse
+    // messages, forcing us to compute H(payload) for each one. The cost is low
+    // (SHA3-256 over serialized payload), but for hardening we should check
+    // `pending_commit.missing.contains(&resp.payload_hash)` *before* computing
+    // the hash, so unsolicited responses are dropped at near-zero cost.
+    async fn process_payload_fetch_response(&mut self, resp: PayloadFetchResponse) {
+        if resp.epoch != self.epoch {
+            return;
+        }
+
+        // Verify payload integrity
+        if !resp.verify_payload_hash() {
+            warn!(
+                epoch = self.epoch,
+                slot = resp.slot,
+                "Payload fetch response hash mismatch, dropping"
+            );
+            return;
+        }
+
+        // Check if this resolves a pending commit
+        if let Some(pending) = &mut self.pending_commit {
+            if pending.slot == resp.slot && pending.missing.remove(&resp.payload_hash) {
+                pending.resolved.insert(resp.payload_hash, resp.payload);
+
+                if pending.missing.is_empty() {
+                    // All payloads resolved — build block
+                    let pending = self.pending_commit.take().unwrap();
+                    self.build_and_commit_block(pending.slot, pending.v_high, pending.resolved)
+                        .await;
+                }
+            }
+        }
+    }
+
+    /// Check if a newly resolved payload_hash resolves a pending commit.
+    ///
+    /// Called after a late proposal is inserted into the slot state. The payload
+    /// is passed directly to avoid a redundant HashMap lookup + clone.
+    async fn try_resolve_pending(&mut self, payload_hash: HashValue, payload: Payload) {
+        let should_commit = if let Some(pending) = &mut self.pending_commit {
+            if pending.missing.remove(&payload_hash) {
+                pending.resolved.insert(payload_hash, payload);
+                pending.missing.is_empty()
+            } else {
+                false
+            }
+        } else {
+            false
+        };
+
+        if should_commit {
+            let pending = self.pending_commit.take().unwrap();
+            self.build_and_commit_block(pending.slot, pending.v_high, pending.resolved)
+                .await;
         }
     }
 
@@ -755,6 +914,7 @@ mod tests {
         assert!(manager.spc_msg_tx.is_none());
         assert!(manager.spc_output_rx.is_none());
         assert!(manager.spc_close_tx.is_none());
+        assert!(manager.pending_commit.is_none());
         assert!(manager.slot_timer.is_none());
     }
 

@@ -22,9 +22,9 @@ use crate::{
     slot_types::SlotProposal,
     types::PrefixVector,
 };
-use anyhow::{bail, Result};
 use aptos_consensus_types::common::{Author, Payload};
 use aptos_crypto::HashValue;
+use aptos_logger::prelude::*;
 use std::collections::HashMap;
 
 // ============================================================================
@@ -151,6 +151,7 @@ pub struct SlotState {
     /// Set when transitioning to RunningSPC — the hash vector passed to SPC.
     input_vector: Option<PrefixVector>,
     /// Set when transitioning to RunningSPC — maps payload_hash → Payload for commit.
+    /// Late proposals (arriving during RunningSPC) are inserted directly into this map.
     payload_map: Option<HashMap<HashValue, Payload>>,
 }
 
@@ -181,20 +182,27 @@ impl SlotState {
         self.phase = phase;
     }
 
-    /// Insert a proposal. Only allowed in `CollectingProposals` phase.
+    /// Insert a proposal.
     ///
-    /// Returns `Ok(true)` if the buffer is now complete (all n proposals received),
-    /// `Ok(false)` if more proposals are still needed or if the proposal was a
-    /// duplicate. Returns `Err` if the slot is not in `CollectingProposals` phase.
-    pub fn insert_proposal(&mut self, proposal: SlotProposal) -> Result<bool> {
-        if self.phase != SlotPhase::CollectingProposals {
-            bail!(
-                "Cannot insert proposal in {:?} phase (slot {})",
-                self.phase,
-                self.slot,
-            );
+    /// - `CollectingProposals`: inserts into the proposal buffer.
+    ///   Returns `true` if the buffer is now complete (all n proposals received).
+    /// - `RunningSPC`: inserts payload into `payload_map` for v_high resolution.
+    ///   Returns `false`.
+    /// - `Committed`: silently ignored (slot is done). Returns `false`.
+    pub fn insert_proposal(&mut self, proposal: SlotProposal) -> bool {
+        match self.phase {
+            SlotPhase::CollectingProposals => self.proposal_buffer.insert(proposal),
+            SlotPhase::RunningSPC => {
+                // Insert late proposal's payload directly into payload_map
+                // so it's available for v_high resolution without a network fetch.
+                if let Some(ref mut map) = self.payload_map {
+                    map.entry(proposal.payload_hash)
+                        .or_insert(proposal.payload);
+                }
+                false
+            },
+            SlotPhase::Committed => false,
         }
-        Ok(self.proposal_buffer.insert(proposal))
     }
 
     /// Build the SPC input vector from collected proposals and transition to `RunningSPC`.
@@ -237,6 +245,58 @@ impl SlotState {
     /// after the block has been sent to execution.
     pub fn take_payload_map(&mut self) -> Option<HashMap<HashValue, Payload>> {
         self.payload_map.take()
+    }
+
+    /// Resolve payloads for all non-⊥ entries in v_high.
+    ///
+    /// Checks the `payload_map` which contains payloads from both pre-2Δ proposals
+    /// and late proposals (inserted directly during RunningSPC).
+    ///
+    /// Returns:
+    /// - `HashMap<HashValue, Payload>`: resolved payloads (hash → payload)
+    /// - `Vec<HashValue>`: hashes still missing (need network fetch)
+    pub fn resolve_missing_payloads(
+        &self,
+        v_high: &PrefixVector,
+    ) -> (HashMap<HashValue, Payload>, Vec<HashValue>) {
+        let mut resolved = HashMap::new();
+        let mut missing = Vec::new();
+        let payload_map = match &self.payload_map {
+            Some(map) => map,
+            None => {
+                error!(
+                    slot = self.slot,
+                    "resolve_missing_payloads called but payload_map is None \
+                     (prepare_spc_input was never called)"
+                );
+                return (resolved, missing);
+            },
+        };
+
+        for hash in v_high {
+            if *hash == HashValue::zero() {
+                continue;
+            }
+            if resolved.contains_key(hash) {
+                continue;
+            }
+            if let Some(payload) = payload_map.get(hash) {
+                resolved.insert(*hash, payload.clone());
+            } else {
+                missing.push(*hash);
+            }
+        }
+
+        (resolved, missing)
+    }
+
+    /// Look up a payload by hash from the payload_map.
+    ///
+    /// Used for resolving v_high entries and for handling fetch requests from peers.
+    pub fn lookup_payload(&self, hash: &HashValue) -> Option<Payload> {
+        self.payload_map
+            .as_ref()
+            .and_then(|map| map.get(hash).cloned())
     }
 
     /// Reference to the proposal buffer.
@@ -487,8 +547,7 @@ mod tests {
         // Insert proposals
         for signer in &signers {
             state
-                .insert_proposal(make_proposal(1, 1, signer, empty_payload()))
-                .unwrap();
+                .insert_proposal(make_proposal(1, 1, signer, empty_payload()));
         }
 
         // Transition to RunningSPC
@@ -502,7 +561,7 @@ mod tests {
     }
 
     #[test]
-    fn test_slot_state_insert_rejects_after_spc() {
+    fn test_slot_state_insert_buffers_late_during_spc() {
         let signers = create_signers(2);
         let mut state = SlotState::new(1, 2);
 
@@ -510,15 +569,17 @@ mod tests {
         let ranking: Vec<Author> = signers.iter().map(|s| s.author()).collect();
         state.prepare_spc_input(&ranking);
 
-        // Insertion should fail in RunningSPC phase
+        // Insertion during RunningSPC succeeds (payload goes into payload_map)
         let proposal = make_proposal(1, 1, &signers[0], empty_payload());
-        let result = state.insert_proposal(proposal);
-        assert!(result.is_err());
-        assert!(result.unwrap_err().to_string().contains("RunningSPC"));
+        let hash = proposal.payload_hash;
+        assert!(!state.insert_proposal(proposal)); // late proposals don't affect buffer completion
+
+        // Payload should be findable via lookup_payload
+        assert!(state.lookup_payload(&hash).is_some());
     }
 
     #[test]
-    fn test_slot_state_insert_rejects_after_committed() {
+    fn test_slot_state_insert_ignored_after_committed() {
         let signers = create_signers(2);
         let mut state = SlotState::new(1, 2);
 
@@ -526,11 +587,9 @@ mod tests {
         state.prepare_spc_input(&ranking);
         state.set_phase(SlotPhase::Committed);
 
-        // Insertion should fail in Committed phase
+        // Insertion in Committed phase is silently ignored
         let proposal = make_proposal(1, 1, &signers[0], empty_payload());
-        let result = state.insert_proposal(proposal);
-        assert!(result.is_err());
-        assert!(result.unwrap_err().to_string().contains("Committed"));
+        assert!(!state.insert_proposal(proposal));
     }
 
     #[test]
@@ -540,11 +599,9 @@ mod tests {
 
         // Insert 2 out of 3 proposals with distinct hashes
         state
-            .insert_proposal(make_proposal_with_distinct_hash(5, 1, signers[0].author()))
-            .unwrap();
+            .insert_proposal(make_proposal_with_distinct_hash(5, 1, signers[0].author()));
         state
-            .insert_proposal(make_proposal_with_distinct_hash(5, 1, signers[2].author()))
-            .unwrap();
+            .insert_proposal(make_proposal_with_distinct_hash(5, 1, signers[2].author()));
 
         assert!(state.input_vector().is_none());
         assert!(state.payload_map().is_none());
@@ -595,8 +652,7 @@ mod tests {
 
         for signer in &signers {
             state
-                .insert_proposal(make_proposal(1, 1, signer, empty_payload()))
-                .unwrap();
+                .insert_proposal(make_proposal(1, 1, signer, empty_payload()));
         }
 
         let ranking: Vec<Author> = signers.iter().map(|s| s.author()).collect();
@@ -631,14 +687,177 @@ mod tests {
 
         assert!(!state.has_all_proposals());
 
-        state
-            .insert_proposal(make_proposal(1, 1, &signers[0], empty_payload()))
-            .unwrap();
+        state.insert_proposal(make_proposal(1, 1, &signers[0], empty_payload()));
         assert!(!state.has_all_proposals());
 
-        state
-            .insert_proposal(make_proposal(1, 1, &signers[1], empty_payload()))
-            .unwrap();
+        state.insert_proposal(make_proposal(1, 1, &signers[1], empty_payload()));
         assert!(state.has_all_proposals());
+    }
+
+    // ==================== Late Proposal + Payload Resolution Tests ====================
+
+    #[test]
+    fn test_late_proposal_insert_during_committed_ignored() {
+        let signers = create_signers(2);
+        let mut state = SlotState::new(1, 2);
+
+        let ranking: Vec<Author> = signers.iter().map(|s| s.author()).collect();
+        state.prepare_spc_input(&ranking);
+        state.set_phase(SlotPhase::Committed);
+
+        let proposal = make_proposal(1, 1, &signers[0], empty_payload());
+        assert!(!state.insert_proposal(proposal));
+    }
+
+    #[test]
+    fn test_late_proposal_duplicate_hash_not_overwritten() {
+        let signers = create_signers(2);
+        let mut state = SlotState::new(1, 2);
+
+        let ranking: Vec<Author> = signers.iter().map(|s| s.author()).collect();
+        state.prepare_spc_input(&ranking);
+
+        // Insert a late proposal, then insert another with the same payload_hash.
+        // The second should not overwrite the first (HashMap::entry().or_insert).
+        let proposal = make_proposal_with_distinct_hash(1, 1, signers[0].author());
+        let hash = proposal.payload_hash;
+        state.insert_proposal(proposal);
+
+        // Payload map size before second insert
+        let size_before = state.payload_map().unwrap().len();
+
+        // Insert with same hash — or_insert means no overwrite
+        let mut dup = make_proposal_with_distinct_hash(1, 1, signers[1].author());
+        dup.payload_hash = hash; // force same hash
+        state.insert_proposal(dup);
+
+        assert_eq!(state.payload_map().unwrap().len(), size_before);
+        assert!(state.lookup_payload(&hash).is_some());
+    }
+
+    #[test]
+    fn test_resolve_all_from_payload_map() {
+        let signers = create_signers(3);
+        let mut state = SlotState::new(1, 3);
+
+        // Insert all 3 proposals before SPC
+        for signer in &signers {
+            state
+                .insert_proposal(make_proposal_with_distinct_hash(1, 1, signer.author()));
+        }
+
+        let ranking: Vec<Author> = signers.iter().map(|s| s.author()).collect();
+        state.prepare_spc_input(&ranking);
+
+        let v_high = state.input_vector().unwrap().clone();
+        let (resolved, missing) = state.resolve_missing_payloads(&v_high);
+
+        assert_eq!(resolved.len(), 3);
+        assert!(missing.is_empty());
+    }
+
+    #[test]
+    fn test_resolve_from_late_proposal() {
+        let signers = create_signers(3);
+        let mut state = SlotState::new(1, 3);
+
+        // Insert only signers[0] before SPC
+        state
+            .insert_proposal(make_proposal_with_distinct_hash(1, 1, signers[0].author()));
+
+        let ranking: Vec<Author> = signers.iter().map(|s| s.author()).collect();
+        state.prepare_spc_input(&ranking);
+
+        // signer[1] arrives late
+        let late_proposal = make_proposal_with_distinct_hash(1, 1, signers[1].author());
+        let late_hash = late_proposal.payload_hash;
+        state.insert_proposal(late_proposal);
+
+        // v_high contains signers[0]'s hash and the late hash
+        let v_high = vec![
+            state.input_vector().unwrap()[0], // signer[0] — in payload_map (pre-2Δ)
+            late_hash,                        // signer[1] — in payload_map (late insert)
+            HashValue::zero(),                // signer[2] — ⊥
+        ];
+
+        let (resolved, missing) = state.resolve_missing_payloads(&v_high);
+        assert_eq!(resolved.len(), 2);
+        assert!(resolved.contains_key(&late_hash));
+        assert!(missing.is_empty());
+    }
+
+    #[test]
+    fn test_resolve_some_missing() {
+        let signers = create_signers(3);
+        let mut state = SlotState::new(1, 3);
+
+        // Insert only signers[0] before SPC
+        state
+            .insert_proposal(make_proposal_with_distinct_hash(1, 1, signers[0].author()));
+
+        let ranking: Vec<Author> = signers.iter().map(|s| s.author()).collect();
+        state.prepare_spc_input(&ranking);
+
+        // v_high contains a hash we don't have
+        let unknown_hash = HashValue::random();
+        let v_high = vec![
+            state.input_vector().unwrap()[0], // signer[0] — in payload_map
+            unknown_hash,                     // unknown — not in any buffer
+            HashValue::zero(),                // ⊥
+        ];
+
+        let (resolved, missing) = state.resolve_missing_payloads(&v_high);
+        assert_eq!(resolved.len(), 1);
+        assert_eq!(missing.len(), 1);
+        assert_eq!(missing[0], unknown_hash);
+    }
+
+    #[test]
+    fn test_resolve_ignores_bot_entries() {
+        let signers = create_signers(3);
+        let mut state = SlotState::new(1, 3);
+
+        let ranking: Vec<Author> = signers.iter().map(|s| s.author()).collect();
+        state.prepare_spc_input(&ranking);
+
+        // v_high is all ⊥
+        let v_high = vec![HashValue::zero(); 3];
+        let (resolved, missing) = state.resolve_missing_payloads(&v_high);
+        assert!(resolved.is_empty());
+        assert!(missing.is_empty());
+    }
+
+    #[test]
+    fn test_lookup_payload_from_early_and_late() {
+        let signers = create_signers(3);
+        let mut state = SlotState::new(1, 3);
+
+        // Insert signer[0] before SPC
+        let early_proposal = make_proposal_with_distinct_hash(1, 1, signers[0].author());
+        let early_hash = early_proposal.payload_hash;
+        state.insert_proposal(early_proposal);
+
+        let ranking: Vec<Author> = signers.iter().map(|s| s.author()).collect();
+        state.prepare_spc_input(&ranking);
+
+        // Insert signer[1] as late proposal
+        let late_proposal = make_proposal_with_distinct_hash(1, 1, signers[1].author());
+        let late_hash = late_proposal.payload_hash;
+        state.insert_proposal(late_proposal);
+
+        // Both should be found via lookup_payload
+        assert!(state.lookup_payload(&early_hash).is_some());
+        assert!(state.lookup_payload(&late_hash).is_some());
+    }
+
+    #[test]
+    fn test_lookup_payload_not_found() {
+        let signers = create_signers(2);
+        let mut state = SlotState::new(1, 2);
+
+        let ranking: Vec<Author> = signers.iter().map(|s| s.author()).collect();
+        state.prepare_spc_input(&ranking);
+
+        assert!(state.lookup_payload(&HashValue::random()).is_none());
     }
 }

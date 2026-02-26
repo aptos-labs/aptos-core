@@ -443,7 +443,7 @@ The current `StrongPrefixConsensusManager` runs as a standalone task with its ow
 - [ ] Confirm slot field is already in signed vote data (Vote1/2/3 SignData includes `slot: u64` — added in Phase 3 of Strong PC). Cross-slot vote replay is already prevented.
 - [ ] Unit test: verify output_tx receives v_high after SPC completes
 
-### Phase 7: Payload Resolution — Late Buffering + Fetch Protocol (~350 LOC)
+### Phase 7: Payload Resolution — Late Buffering + Fetch Protocol (~350 LOC) ✅
 
 **Detailed plan**: `.plans/phase7-payload-resolution.md`
 
@@ -453,21 +453,23 @@ Ensures the SlotManager can always build a block from v_high, even when v_high c
 
 **Solution** (two layers):
 
-1. **Late proposal buffering** (common case): Proposals arriving after the 2Δ timer but during SPC are stored in a secondary buffer on `SlotState`. When v_high arrives, check this buffer first. Under near-synchronous conditions, most missing proposals arrive during SPC's multi-round execution, so this handles the common case with zero network overhead.
+1. **Late proposal buffering** (common case): Late proposals arriving during `RunningSPC` are inserted directly into `payload_map` on `SlotState` (simplified from original plan's separate `late_proposals` buffer — the payload needs to end up in `payload_map` anyway). When v_high arrives, `resolve_missing_payloads()` checks the unified map. Under near-synchronous conditions, most missing proposals arrive during SPC's multi-round execution, so this handles the common case with zero network overhead.
 
-2. **Payload fetch protocol** (async safety net): For payloads still missing after checking the late buffer, request them from peers by `payload_hash`. Follows the `CertFetchRequest`/`CertFetchResponse` pattern.
+2. **Payload fetch protocol** (async safety net): For payloads still missing after checking the payload map, broadcast `PayloadFetchRequest` to all peers by `payload_hash`. Store a `PendingCommit` while waiting. Responses are verified via `H(payload) == payload_hash`. Late proposals arriving during `PendingCommit` also check for resolution.
 
 **Modified files**:
-- [ ] `slot_types.rs`: Add `PayloadFetchRequest`, `PayloadFetchResponse` types; add variants to `SlotConsensusMsg`
-- [ ] `slot_state.rs`: Add `late_proposals` buffer to `SlotState`; change `insert_proposal()` to buffer (not reject) proposals during `RunningSPC` phase; add `resolve_missing_payloads()` method
-- [ ] SlotManager contract (built in Phase 5): `on_spc_v_high()` gains resolution step; new handlers for fetch request/response
+- [x] `slot_types.rs`: Added `PayloadFetchRequest`, `PayloadFetchResponse` types with `verify_payload_hash()`; added variants to `SlotConsensusMsg`; made `compute_payload_hash` public
+- [x] `slot_state.rs`: Changed `insert_proposal()` from `Result<bool>` to `bool` — buffers late proposals into `payload_map` during `RunningSPC`, silently ignores during `Committed`; added `resolve_missing_payloads()` and `lookup_payload()` methods
+- [x] `slot_manager.rs`: Added `PendingCommit` struct; refactored `on_spc_v_high()` into resolution + `build_and_commit_block()` helper; added `process_payload_fetch_request/response()` and `try_resolve_pending()` handlers
+- [x] `lib.rs`: Re-exported `PayloadFetchRequest`, `PayloadFetchResponse`
 
 **Key design decisions**:
 - Fetch messages are `SlotConsensusMsg` variants (not `StrongPrefixConsensusMsg`) — payload fetch is a slot-level concern, not SPC's
-- Graceful degradation: if a payload is truly unavailable after timeout escalation, skip it in the block rather than blocking slot progress
+- Wait indefinitely for missing payloads (no graceful degradation) — slot catch-up mechanism deferred to post-integration
 - Payload integrity: verify `H(payload) == payload_hash` on fetch response (hash was committed to by SPC)
+- TODO(production): check `pending_commit.missing.contains()` before computing hash to avoid unsolicited response amplification
 
-- [ ] Unit tests for late buffering, resolution, and fetch message serialization
+- [x] Unit tests: 11 new tests for late buffering, resolution, lookup, fetch message serialization, hash verification
 
 ### Phase 8: EpochManager Integration (~400 LOC)
 

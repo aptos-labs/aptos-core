@@ -4,8 +4,8 @@
 
 Implementing Prefix Consensus protocols (from research paper "Prefix Consensus For Censorship Resistant BFT") within Aptos Core for leaderless, censorship-resistant consensus.
 
-**Current Phase**: Multi-Slot Consensus (Algorithm 4) — Phases 1-6 complete, Phase 7 next
-**Completed**: Basic Prefix Consensus, Strong Prefix Consensus (Phases 1-9), Stake-Weighted Quorum Refactoring, Multi-Slot Phases 1-6
+**Current Phase**: Multi-Slot Consensus (Algorithm 4) — Phases 1-7 complete, Phase 8 next
+**Completed**: Basic Prefix Consensus, Strong Prefix Consensus (Phases 1-9), Stake-Weighted Quorum Refactoring, Multi-Slot Phases 1-7
 
 ---
 
@@ -111,7 +111,7 @@ Execution Pipeline (unchanged):
 4. ~~Block builder + PrefixConsensusBlock variant (~300 LOC)~~ ✅
 5. ~~SlotManager core (~800 LOC)~~ ✅
 6. ~~SPC integration refactor (~300 LOC)~~ ✅
-7. Payload resolution: late buffering + fetch protocol (~350 LOC)
+7. ~~Payload resolution: late buffering + fetch protocol (~350 LOC)~~ ✅
 8. EpochManager integration (~400 LOC)
 9. BlockType integration across codebase (~400 LOC, grep-driven)
 10. Execution pipeline compatibility (~300 LOC, grep-driven)
@@ -123,8 +123,8 @@ Execution Pipeline (unchanged):
 ## Repository State
 
 - **Branch**: `prefix-consensus-prototype`
-- **HEAD**: Multi-Slot Phase 6 (SPC integration — SPCSpawner trait, RealSPCSpawner, output_tx channel)
-- **Tests**: 235/235 unit tests (226 prefix-consensus + 9 slot manager), 6/6 smoke tests
+- **HEAD**: Multi-Slot Phase 7 (Payload resolution — late buffering, fetch protocol, PendingCommit)
+- **Tests**: 246/246 unit tests (237 prefix-consensus + 9 slot manager), 6/6 smoke tests
 - **Build**: Clean
 
 ### Repository Structure
@@ -184,6 +184,8 @@ testsuite/smoke-test/src/consensus/
 - [ ] **QuorumStore integration**: Replace DirectMempool for production payload dissemination
 - [ ] **On-chain config**: Add PrefixConsensus variant to ConsensusAlgorithmConfig
 - [ ] **State persistence**: Persist slot state for crash recovery without state sync
+- [ ] **Payload fetch optimization**: Replace broadcast-to-all fetch with single-peer-then-escalation (request one random peer first, broadcast only on timeout)
+- [ ] **Slot catch-up mechanism**: External mechanism to jump forward to later slots when behind (analogous to current consensus catch-up). Needed after full integration
 
 ### Strong PC (deferred)
 - [ ] **Certificate fetching protocol**: Fetch by hash for Byzantine withholding
