@@ -6,7 +6,6 @@ version = "1.0.0"
 std = "0x1"
 aptos_std = "0x1"
 aptos_framework = "0x1"
-aptos_token_objects = "0x4"
 aptos_trading = "0x5"
 
 [dependencies]
