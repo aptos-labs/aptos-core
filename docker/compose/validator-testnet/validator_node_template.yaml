@@ -1,6 +1,3 @@
-storage:
-  enable_indexer: true
-
 indexer_grpc:
   enabled: true
   address: 0.0.0.0:50051

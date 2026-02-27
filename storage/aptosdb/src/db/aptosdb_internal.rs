@@ -14,13 +14,11 @@ use crate::{
     transaction_store::TransactionStore,
 };
 use aptos_config::config::{
-    HotStateConfig, PrunerConfig, RocksdbConfig, RocksdbConfigs, StorageDirPaths,
-    NO_OP_STORAGE_PRUNER_CONFIG,
+    HotStateConfig, PrunerConfig, RocksdbConfigs, StorageDirPaths, NO_OP_STORAGE_PRUNER_CONFIG,
 };
-use aptos_db_indexer::{db_indexer::InternalIndexerDB, Indexer};
+use aptos_db_indexer::db_indexer::InternalIndexerDB;
 use aptos_logger::prelude::*;
 use aptos_metrics_core::{IntGaugeVecHelper, TimerHelper};
-use aptos_resource_viewer::AptosValueAnnotator;
 use aptos_schemadb::{Cache, Env};
 #[cfg(test)]
 use aptos_storage_interface::Order;
@@ -29,11 +27,11 @@ use aptos_storage_interface::{
     Result,
 };
 use aptos_types::{account_config::NewBlockEvent, transaction::Version};
+#[cfg(any(test, feature = "fuzzing", feature = "consensus-only-perf-test"))]
+use std::path::Path;
 use std::{
     cell::Cell,
     fmt::{Debug, Formatter},
-    iter::Iterator,
-    path::Path,
     sync::Arc,
     time::Instant,
 };
@@ -99,7 +97,6 @@ impl AptosDB {
             ),
             pre_commit_lock: std::sync::Mutex::new(()),
             commit_lock: std::sync::Mutex::new(()),
-            indexer: None,
             update_subscriber: None,
         }
     }
@@ -109,7 +106,6 @@ impl AptosDB {
         readonly: bool,
         pruner_config: PrunerConfig,
         rocksdb_configs: RocksdbConfigs,
-        enable_indexer: bool,
         buffered_state_target_items: usize,
         max_num_nodes_per_lru_cache_shard: usize,
         empty_buffered_state_for_restore: bool,
@@ -141,7 +137,7 @@ impl AptosDB {
                 hot_state_config.delete_on_restart,
             )?;
 
-        let mut myself = Self::new_with_dbs(
+        let myself = Self::new_with_dbs(
             ledger_db,
             hot_state_merkle_db,
             state_merkle_db,
@@ -186,55 +182,7 @@ impl AptosDB {
             }
         }
 
-        if !readonly && enable_indexer {
-            myself.open_indexer(
-                db_paths.default_root_path(),
-                rocksdb_configs.index_db_config,
-            )?;
-        }
-
         Ok(myself)
-    }
-
-    fn open_indexer(
-        &mut self,
-        db_root_path: impl AsRef<Path>,
-        rocksdb_config: RocksdbConfig,
-    ) -> Result<()> {
-        let indexer = Indexer::open(&db_root_path, rocksdb_config)?;
-        let ledger_next_version = self.get_synced_version()?.map_or(0, |v| v + 1);
-        info!(
-            indexer_next_version = indexer.next_version(),
-            ledger_next_version = ledger_next_version,
-            "Opened AptosDB Indexer.",
-        );
-
-        if indexer.next_version() < ledger_next_version {
-            use aptos_storage_interface::state_store::state_view::db_state_view::DbStateViewAtVersion;
-            let db: Arc<dyn DbReader> = self.state_store.clone();
-
-            let state_view = db.state_view_at_version(Some(ledger_next_version - 1))?;
-            let annotator = AptosValueAnnotator::new(&state_view);
-
-            const BATCH_SIZE: Version = 10000;
-            let mut next_version = indexer.next_version();
-            while next_version < ledger_next_version {
-                info!(next_version = next_version, "AptosDB Indexer catching up. ",);
-                let end_version = std::cmp::min(ledger_next_version, next_version + BATCH_SIZE);
-                let write_sets = self
-                    .ledger_db
-                    .write_set_db()
-                    .get_write_sets(next_version, end_version)?;
-                let write_sets_ref: Vec<_> = write_sets.iter().collect();
-                indexer.index_with_annotator(&annotator, next_version, &write_sets_ref)?;
-
-                next_version = end_version;
-            }
-        }
-        info!("AptosDB Indexer caught up.");
-
-        self.indexer = Some(indexer);
-        Ok(())
     }
 
     #[cfg(any(test, feature = "fuzzing", feature = "consensus-only-perf-test"))]
@@ -243,14 +191,12 @@ impl AptosDB {
         readonly: bool,
         buffered_state_target_items: usize,
         max_num_nodes_per_lru_cache_shard: usize,
-        enable_indexer: bool,
     ) -> Self {
         Self::open(
             StorageDirPaths::from_path(db_root_path),
             readonly,
             NO_OP_STORAGE_PRUNER_CONFIG, /* pruner */
             RocksdbConfigs::default(),
-            enable_indexer,
             buffered_state_target_items,
             max_num_nodes_per_lru_cache_shard,
             None,

@@ -266,11 +266,7 @@ impl SignerAndKeyPair {
 
 pub struct FakeDbReader {}
 
-impl aptos_storage_interface::DbReader for FakeDbReader {
-    fn indexer_enabled(&self) -> bool {
-        false
-    }
-}
+impl aptos_storage_interface::DbReader for FakeDbReader {}
 
 /**
  * Helpers

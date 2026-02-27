@@ -91,7 +91,6 @@ pub(crate) fn bootstrap_with_genesis(db_dir: impl AsRef<Path>, init_features: Fe
             false, /* readonly */
             NO_OP_STORAGE_PRUNER_CONFIG,
             rocksdb_configs,
-            false, /* enable_indexer */
             BUFFERED_STATE_TARGET_ITEMS,
             DEFAULT_MAX_NUM_NODES_PER_LRU_CACHE_SHARD,
             None, /* internal_indexer_db */

@@ -118,6 +118,7 @@ pub(crate) fn bootstrap_db(
 pub(crate) fn bootstrap_db(
     node_config: &NodeConfig,
 ) -> Result<(Arc<dyn DbReader>, DbReaderWriter, Option<Runtime>)> {
+    use aptos_config::config::HotStateConfig;
     use aptos_db::db::fake_aptosdb::FakeAptosDB;
 
     let aptos_db = AptosDB::open(
@@ -125,9 +126,10 @@ pub(crate) fn bootstrap_db(
         false, /* readonly */
         node_config.storage.storage_pruner_config,
         node_config.storage.rocksdb_configs,
-        node_config.storage.enable_indexer,
         node_config.storage.buffered_state_target_items,
         node_config.storage.max_num_nodes_per_lru_cache_shard,
+        None,
+        HotStateConfig::default(),
     )
     .map_err(|err| anyhow!("DB failed to open {}", err))?;
     let (aptos_db, db_rw) = DbReaderWriter::wrap(FakeAptosDB::new(aptos_db));
