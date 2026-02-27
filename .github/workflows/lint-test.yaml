@@ -169,7 +169,7 @@ jobs:
     needs: file_change_determinator
     runs-on: >-
       ${{ vars.USE_CUSTOM_APTOS_IMAGE_RUNNER == 'true' &&
-      '64cpu-aptos-image-ubuntu22-x64' || '64cpu-gh-ubuntu22-x64' }}
+      '96cpu-aptos-image-ubuntu22-x64' || '96cpu-gh-ubuntu22-x64' }}
     steps:
       - uses: actions/checkout@v4
         with:

@@ -14,5 +14,7 @@ self-hosted-runner:
     - 64cpu-gh-ubuntu22-x64
     - 64cpu-gh-ubuntu24-x64
     - 64cpu-aptos-image-ubuntu22-x64
+    - 96cpu-gh-ubuntu22-x64
+    - 96cpu-aptos-image-ubuntu22-x64
     # runs-on.com label kept for workflow-run-docker-rust-build.yaml
     - runs-on,cpu=64,family=c7,image=aptos-ubuntu-x64,run-id=${{ github.run_id }},spot=co,disk=large
