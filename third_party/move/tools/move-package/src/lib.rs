@@ -53,6 +53,10 @@ pub struct BuildConfig {
     #[clap(name = "test-mode", long = "test", global = true)]
     pub test_mode: bool,
 
+    /// Compile in 'verify' mode. The '#[verify_only]' code will be included.
+    #[clap(name = "verify-mode", long = "verify", global = true)]
+    pub verify_mode: bool,
+
     /// Whether to override the standard library with the given version.
     #[clap(long = "override-std", global = true, value_parser)]
     pub override_std: Option<StdVersion>,

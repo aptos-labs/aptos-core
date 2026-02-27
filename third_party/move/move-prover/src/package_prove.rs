@@ -115,6 +115,8 @@ pub fn run_move_prover(
 ) -> anyhow::Result<()> {
     // Always run the prover in dev mode, so addresses get default assignments
     config.dev_mode = true;
+    // Prover needs #[verify_only] code (specifications)
+    config.verify_mode = true;
 
     if !options.move_sources.is_empty() {
         bail!(
