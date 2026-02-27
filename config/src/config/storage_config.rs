@@ -220,7 +220,11 @@ impl Default for RocksdbConfigs {
     fn default() -> Self {
         Self {
             ledger_db_config: RocksdbConfig::default(),
-            state_merkle_db_config: RocksdbConfig::default(),
+            state_merkle_db_config: RocksdbConfig {
+                bloom_filter_bits: Some(10.0),
+                bloom_before_level: Some(2),
+                ..Default::default()
+            },
             state_kv_db_config: RocksdbConfig {
                 bloom_filter_bits: Some(10.0),
                 bloom_before_level: Some(2),
