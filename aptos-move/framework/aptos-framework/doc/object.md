@@ -144,7 +144,6 @@ make it so that a reference to a global object can be returned from a function.
 <b>use</b> <a href="../../aptos-stdlib/../move-stdlib/doc/bcs.md#0x1_bcs">0x1::bcs</a>;
 <b>use</b> <a href="create_signer.md#0x1_create_signer">0x1::create_signer</a>;
 <b>use</b> <a href="event.md#0x1_event">0x1::event</a>;
-<b>use</b> <a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features">0x1::features</a>;
 <b>use</b> <a href="../../aptos-stdlib/doc/from_bcs.md#0x1_from_bcs">0x1::from_bcs</a>;
 <b>use</b> <a href="guid.md#0x1_guid">0x1::guid</a>;
 <b>use</b> <a href="../../aptos-stdlib/../move-stdlib/doc/hash.md#0x1_hash">0x1::hash</a>;
@@ -1915,24 +1914,13 @@ Transfer to the destination address using a LinearTransferRef.
         <a href="object.md#0x1_object">object</a>.owner == self.owner,
         <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_permission_denied">error::permission_denied</a>(<a href="object.md#0x1_object_ENOT_OBJECT_OWNER">ENOT_OBJECT_OWNER</a>),
     );
-    <b>if</b> (std::features::module_event_migration_enabled()) {
-        <a href="event.md#0x1_event_emit">event::emit</a>(
-            <a href="object.md#0x1_object_Transfer">Transfer</a> {
-                <a href="object.md#0x1_object">object</a>: self.self,
-                from: <a href="object.md#0x1_object">object</a>.owner,
-                <b>to</b>,
-            },
-        );
-    } <b>else</b> {
-        <a href="event.md#0x1_event_emit_event">event::emit_event</a>(
-            &<b>mut</b> <a href="object.md#0x1_object">object</a>.transfer_events,
-            <a href="object.md#0x1_object_TransferEvent">TransferEvent</a> {
-                <a href="object.md#0x1_object">object</a>: self.self,
-                from: <a href="object.md#0x1_object">object</a>.owner,
-                <b>to</b>,
-            },
-        );
-    };
+    <a href="event.md#0x1_event_emit">event::emit</a>(
+        <a href="object.md#0x1_object_Transfer">Transfer</a> {
+            <a href="object.md#0x1_object">object</a>: self.self,
+            from: <a href="object.md#0x1_object">object</a>.owner,
+            <b>to</b>,
+        },
+    );
     <a href="object.md#0x1_object">object</a>.owner = <b>to</b>;
 }
 </code></pre>
@@ -2056,24 +2044,13 @@ hierarchy.
 <pre><code>inline <b>fun</b> <a href="object.md#0x1_object_transfer_raw_inner">transfer_raw_inner</a>(<a href="object.md#0x1_object">object</a>: <b>address</b>, <b>to</b>: <b>address</b>) {
     <b>let</b> object_core = <b>borrow_global_mut</b>&lt;<a href="object.md#0x1_object_ObjectCore">ObjectCore</a>&gt;(<a href="object.md#0x1_object">object</a>);
     <b>if</b> (object_core.owner != <b>to</b>) {
-        <b>if</b> (std::features::module_event_migration_enabled()) {
-            <a href="event.md#0x1_event_emit">event::emit</a>(
-                <a href="object.md#0x1_object_Transfer">Transfer</a> {
-                    <a href="object.md#0x1_object">object</a>,
-                    from: object_core.owner,
-                    <b>to</b>,
-                },
-            );
-        } <b>else</b> {
-            <a href="event.md#0x1_event_emit_event">event::emit_event</a>(
-                &<b>mut</b> object_core.transfer_events,
-                <a href="object.md#0x1_object_TransferEvent">TransferEvent</a> {
-                    <a href="object.md#0x1_object">object</a>,
-                    from: object_core.owner,
-                    <b>to</b>,
-                },
-            );
-        };
+        <a href="event.md#0x1_event_emit">event::emit</a>(
+            <a href="object.md#0x1_object_Transfer">Transfer</a> {
+                <a href="object.md#0x1_object">object</a>,
+                from: object_core.owner,
+                <b>to</b>,
+            },
+        );
         object_core.owner = <b>to</b>;
     };
 }

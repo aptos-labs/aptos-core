@@ -839,14 +839,7 @@ module aptos_framework::stake {
         let old_operator = stake_pool.operator_address;
         stake_pool.operator_address = new_operator;
 
-        if (std::features::module_event_migration_enabled()) {
-            event::emit(SetOperator { pool_address, old_operator, new_operator });
-        } else {
-            event::emit_event(
-                &mut stake_pool.set_operator_events,
-                SetOperatorEvent { pool_address, old_operator, new_operator }
-            );
-        };
+        event::emit(SetOperator { pool_address, old_operator, new_operator });
     }
 
     /// Allows an owner to change the delegated voter of the stake pool.
@@ -921,14 +914,7 @@ module aptos_framework::stake {
             voting_power <= maximum_stake, error::invalid_argument(ESTAKE_EXCEEDS_MAX)
         );
 
-        if (std::features::module_event_migration_enabled()) {
-            event::emit(AddStake { pool_address, amount_added: amount });
-        } else {
-            event::emit_event(
-                &mut stake_pool.add_stake_events,
-                AddStakeEvent { pool_address, amount_added: amount }
-            );
-        };
+        event::emit(AddStake { pool_address, amount_added: amount });
     }
 
     /// Move `amount` of coins from pending_inactive to active.
@@ -959,14 +945,7 @@ module aptos_framework::stake {
         let reactivated_coins = coin::extract(&mut stake_pool.pending_inactive, amount);
         coin::merge(&mut stake_pool.active, reactivated_coins);
 
-        if (std::features::module_event_migration_enabled()) {
-            event::emit(ReactivateStake { pool_address, amount });
-        } else {
-            event::emit_event(
-                &mut stake_pool.reactivate_stake_events,
-                ReactivateStakeEvent { pool_address, amount }
-            );
-        };
+        event::emit(ReactivateStake { pool_address, amount });
     }
 
     /// Rotate the consensus key of the validator, it'll take effect in next epoch.
@@ -1003,24 +982,13 @@ module aptos_framework::stake {
         );
         validator_info.consensus_pubkey = new_consensus_pubkey;
 
-        if (std::features::module_event_migration_enabled()) {
-            event::emit(
-                RotateConsensusKey {
-                    pool_address,
-                    old_consensus_pubkey,
-                    new_consensus_pubkey
-                }
-            );
-        } else {
-            event::emit_event(
-                &mut stake_pool.rotate_consensus_key_events,
-                RotateConsensusKeyEvent {
-                    pool_address,
-                    old_consensus_pubkey,
-                    new_consensus_pubkey
-                }
-            );
-        };
+        event::emit(
+            RotateConsensusKey {
+                pool_address,
+                old_consensus_pubkey,
+                new_consensus_pubkey
+            }
+        );
     }
 
     /// Update the network and full node addresses of the validator. This only takes effect in the next epoch.
@@ -1048,28 +1016,15 @@ module aptos_framework::stake {
         let old_fullnode_addresses = validator_info.fullnode_addresses;
         validator_info.fullnode_addresses = new_fullnode_addresses;
 
-        if (std::features::module_event_migration_enabled()) {
-            event::emit(
-                UpdateNetworkAndFullnodeAddresses {
-                    pool_address,
-                    old_network_addresses,
-                    new_network_addresses,
-                    old_fullnode_addresses,
-                    new_fullnode_addresses
-                }
-            );
-        } else {
-            event::emit_event(
-                &mut stake_pool.update_network_and_fullnode_addresses_events,
-                UpdateNetworkAndFullnodeAddressesEvent {
-                    pool_address,
-                    old_network_addresses,
-                    new_network_addresses,
-                    old_fullnode_addresses,
-                    new_fullnode_addresses
-                }
-            );
-        };
+        event::emit(
+            UpdateNetworkAndFullnodeAddresses {
+                pool_address,
+                old_network_addresses,
+                new_network_addresses,
+                old_fullnode_addresses,
+                new_fullnode_addresses
+            }
+        );
     }
 
     /// Similar to increase_lockup_with_cap but will use ownership capability from the signing account.
@@ -1099,24 +1054,13 @@ module aptos_framework::stake {
         );
         stake_pool.locked_until_secs = new_locked_until_secs;
 
-        if (std::features::module_event_migration_enabled()) {
-            event::emit(
-                IncreaseLockup {
-                    pool_address,
-                    old_locked_until_secs,
-                    new_locked_until_secs
-                }
-            );
-        } else {
-            event::emit_event(
-                &mut stake_pool.increase_lockup_events,
-                IncreaseLockupEvent {
-                    pool_address,
-                    old_locked_until_secs,
-                    new_locked_until_secs
-                }
-            );
-        }
+        event::emit(
+            IncreaseLockup {
+                pool_address,
+                old_locked_until_secs,
+                new_locked_until_secs
+            }
+        );
     }
 
     /// This can only called by the operator of the validator/staking pool.
@@ -1182,14 +1126,7 @@ module aptos_framework::stake {
             error::invalid_argument(EVALIDATOR_SET_TOO_LARGE)
         );
 
-        if (std::features::module_event_migration_enabled()) {
-            event::emit(JoinValidatorSet { pool_address });
-        } else {
-            event::emit_event(
-                &mut stake_pool.join_validator_set_events,
-                JoinValidatorSetEvent { pool_address }
-            );
-        }
+        event::emit(JoinValidatorSet { pool_address });
     }
 
     /// Similar to unlock_with_cap but will use ownership capability from the signing account.
@@ -1218,14 +1155,7 @@ module aptos_framework::stake {
         let unlocked_stake = coin::extract(&mut stake_pool.active, amount);
         coin::merge<AptosCoin>(&mut stake_pool.pending_inactive, unlocked_stake);
 
-        if (std::features::module_event_migration_enabled()) {
-            event::emit(UnlockStake { pool_address, amount_unlocked: amount });
-        } else {
-            event::emit_event(
-                &mut stake_pool.unlock_stake_events,
-                UnlockStakeEvent { pool_address, amount_unlocked: amount }
-            );
-        };
+        event::emit(UnlockStake { pool_address, amount_unlocked: amount });
     }
 
     /// Withdraw from `account`'s inactive stake.
@@ -1262,14 +1192,7 @@ module aptos_framework::stake {
         withdraw_amount = min(withdraw_amount, coin::value(&stake_pool.inactive));
         if (withdraw_amount == 0) return coin::zero<AptosCoin>();
 
-        if (std::features::module_event_migration_enabled()) {
-            event::emit(WithdrawStake { pool_address, amount_withdrawn: withdraw_amount });
-        } else {
-            event::emit_event(
-                &mut stake_pool.withdraw_stake_events,
-                WithdrawStakeEvent { pool_address, amount_withdrawn: withdraw_amount }
-            );
-        };
+        event::emit(WithdrawStake { pool_address, amount_withdrawn: withdraw_amount });
 
         coin::extract(&mut stake_pool.inactive, withdraw_amount)
     }
@@ -1331,14 +1254,7 @@ module aptos_framework::stake {
             );
             validator_set.pending_inactive.push_back(validator_info);
 
-            if (std::features::module_event_migration_enabled()) {
-                event::emit(LeaveValidatorSet { pool_address });
-            } else {
-                event::emit_event(
-                    &mut stake_pool.leave_validator_set_events,
-                    LeaveValidatorSetEvent { pool_address }
-                );
-            };
+            event::emit(LeaveValidatorSet { pool_address });
         };
     }
 
@@ -1965,14 +1881,7 @@ module aptos_framework::stake {
             );
         };
 
-        if (std::features::module_event_migration_enabled()) {
-            event::emit(DistributeRewards { pool_address, rewards_amount });
-        } else {
-            event::emit_event(
-                &mut stake_pool.distribute_rewards_events,
-                DistributeRewardsEvent { pool_address, rewards_amount }
-            );
-        };
+        event::emit(DistributeRewards { pool_address, rewards_amount });
     }
 
     /// Assuming we are in a middle of a reconfiguration (no matter it is immediate or async), get its start time.
