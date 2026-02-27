@@ -543,7 +543,7 @@ impl RoundManager {
         {
             // When proxy consensus is active, primary blocks should be formed from
             // proxy blocks. Defer proposal generation until proxy blocks arrive.
-            if self.proxy_event_tx.is_some() {
+            if self.proxy_verifier.is_some() {
                 if !self.pending_proxy_blocks.is_empty() {
                     // Proxy blocks already available (arrived before round event).
                     // Generate proposal immediately with all accumulated batches.
