@@ -26,7 +26,9 @@ jobs:
       (github.event_name == 'workflow_dispatch' && github.ref_name == 'main')
     # Note the tests run slowly due to instrutmentation. It takes CI 10 hrs
     timeout-minutes: 720
-    runs-on: runs-on,cpu=64,family=c7,disk=large,image=aptos-ubuntu-x64,run-id=${{ github.run_id }}
+    runs-on: >-
+      ${{ vars.USE_CUSTOM_APTOS_IMAGE_RUNNER == 'true' &&
+      '64cpu-aptos-image-ubuntu22-x64' || '64cpu-gh-ubuntu22-x64' }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -56,7 +58,9 @@ jobs:
       contains(github.event.pull_request.labels.*.name, 'CICD:run-coverage') ||
       (github.event_name == 'workflow_dispatch' && github.ref_name == 'main')
     timeout-minutes: 720 # incremented from 240 due to execution time limit hit in cron
-    runs-on: runs-on,cpu=64,family=c7,disk=large,image=aptos-ubuntu-x64,run-id=${{ github.run_id }}
+    runs-on: >-
+      ${{ vars.USE_CUSTOM_APTOS_IMAGE_RUNNER == 'true' &&
+      '64cpu-aptos-image-ubuntu22-x64' || '64cpu-gh-ubuntu22-x64' }}
     steps:
       - uses: actions/checkout@v4
         with:

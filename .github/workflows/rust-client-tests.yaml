@@ -31,7 +31,9 @@ jobs:
   run-tests-devnet:
     if: contains(github.event.pull_request.labels.*.name, 'CICD:non-required-tests')
     needs: [permission-check]
-    runs-on: runs-on,cpu=64,family=c7,disk=large,image=aptos-ubuntu-x64,run-id=${{ github.run_id }}
+    runs-on: >-
+      ${{ vars.USE_CUSTOM_APTOS_IMAGE_RUNNER == 'true' &&
+      '64cpu-aptos-image-ubuntu22-x64' || '64cpu-gh-ubuntu22-x64' }}
     steps:
       - uses: actions/checkout@v4
       - uses: aptos-labs/aptos-core/.github/actions/docker-setup@main
@@ -50,7 +52,9 @@ jobs:
   run-tests-testnet:
     if: contains(github.event.pull_request.labels.*.name, 'CICD:non-required-tests')
     needs: [permission-check]
-    runs-on: runs-on,cpu=64,family=c7,disk=large,image=aptos-ubuntu-x64,run-id=${{ github.run_id }}
+    runs-on: >-
+      ${{ vars.USE_CUSTOM_APTOS_IMAGE_RUNNER == 'true' &&
+      '64cpu-aptos-image-ubuntu22-x64' || '64cpu-gh-ubuntu22-x64' }}
     steps:
       - uses: actions/checkout@v4
       - uses: aptos-labs/aptos-core/.github/actions/docker-setup@main
@@ -69,7 +73,9 @@ jobs:
   run-tests-mainnet:
     if: contains(github.event.pull_request.labels.*.name, 'CICD:non-required-tests')
     needs: [permission-check]
-    runs-on: runs-on,cpu=64,family=c7,disk=large,image=aptos-ubuntu-x64,run-id=${{ github.run_id }}
+    runs-on: >-
+      ${{ vars.USE_CUSTOM_APTOS_IMAGE_RUNNER == 'true' &&
+      '64cpu-aptos-image-ubuntu22-x64' || '64cpu-gh-ubuntu22-x64' }}
     steps:
       - uses: actions/checkout@v4
       - uses: aptos-labs/aptos-core/.github/actions/docker-setup@main
