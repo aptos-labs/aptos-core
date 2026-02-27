@@ -653,8 +653,9 @@ spec aptos_framework::stake {
 
         include DistributeRewardsAbortsIf;
 
+        // distribute_rewards now returns freshly-minted Coin<AptosCoin> without merging into stake.
         ensures old(stake.value) > 0 ==>
-            result
+            result.value
                 == spec_rewards_amount(
                     old(stake.value),
                     num_successful_proposals,
@@ -662,19 +663,9 @@ spec aptos_framework::stake {
                     rewards_rate,
                     rewards_rate_denominator
                 );
-        ensures old(stake.value) > 0 ==>
-            stake.value
-                == old(stake.value)
-                    + spec_rewards_amount(
-                        old(stake.value),
-                        num_successful_proposals,
-                        num_total_proposals,
-                        rewards_rate,
-                        rewards_rate_denominator
-                    );
-        ensures old(stake.value) == 0 ==> result == 0;
-        ensures old(stake.value) == 0 ==>
-            stake.value == old(stake.value);
+        ensures old(stake.value) == 0 ==> result.value == 0;
+        // stake is not modified — caller is responsible for merging the returned coin.
+        ensures stake.value == old(stake.value);
     }
 
     spec schema DistributeRewardsAbortsIf {

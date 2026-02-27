@@ -168,3 +168,6 @@ test-data/
 # Any test keys
 **/*.key
 **/*.pub
+
+# Claude Code working notes (do not commit)
+**/CLAUDE.md

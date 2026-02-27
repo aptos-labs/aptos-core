@@ -43,6 +43,7 @@ rustflags = [
 ]
 
 [env]
+RUST_MIN_STACK = "67108864"
 CC_x86_64_unknown_linux_gnu = "clang"
 CXX_x86_64_unknown_linux_gnu = "clang++"
 CFLAGS_x86_64_unknown_linux_gnu = "-march=x86-64-v3"

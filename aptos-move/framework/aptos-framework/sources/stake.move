@@ -37,8 +37,10 @@ module aptos_framework::stake {
     use aptos_framework::staking_config::{Self, StakingConfig, StakingRewardsConfig};
     use aptos_framework::chain_status;
     use aptos_framework::permissioned_signer;
+    use aptos_framework::weighted_staking_reward;
 
     friend aptos_framework::block;
+    friend aptos_framework::delegation_pool;
     friend aptos_framework::genesis;
     friend aptos_framework::reconfiguration;
     friend aptos_framework::reconfiguration_with_dkg;
@@ -88,7 +90,6 @@ module aptos_framework::stake {
     const ENO_STAKE_PERMISSION: u64 = 28;
     /// Transaction fee is not fully distributed at epoch ending.
     const ETRANSACTION_FEE_NOT_FULLY_DISTRIBUTED: u64 = 29;
-
     /// Validator status enum. We can switch to proper enum later once Move supports it.
     const VALIDATOR_STATUS_PENDING_ACTIVE: u64 = 1;
     const VALIDATOR_STATUS_ACTIVE: u64 = 2;
@@ -1849,7 +1850,7 @@ module aptos_framework::stake {
                 + cur_validator_perf.failed_proposals;
         let (rewards_rate, rewards_rate_denominator) =
             staking_config::get_reward_rate(staking_config);
-        let rewards_active =
+        let active_reward_coins =
             distribute_rewards(
                 &mut stake_pool.active,
                 num_successful_proposals,
@@ -1857,7 +1858,15 @@ module aptos_framework::stake {
                 rewards_rate,
                 rewards_rate_denominator
             );
-        let rewards_pending_inactive =
+        let rewards_active = coin::value(&active_reward_coins);
+        // Route bonus portion to BonusPoolState; merge only base portion into active stake.
+        let active_base =
+            weighted_staking_reward::split_and_deposit_rewards(
+                pool_address, active_reward_coins
+            );
+        coin::merge(&mut stake_pool.active, active_base);
+
+        let pending_inactive_reward_coins =
             distribute_rewards(
                 &mut stake_pool.pending_inactive,
                 num_successful_proposals,
@@ -1865,6 +1874,13 @@ module aptos_framework::stake {
                 rewards_rate,
                 rewards_rate_denominator
             );
+        let rewards_pending_inactive = coin::value(&pending_inactive_reward_coins);
+        // Split pending_inactive rewards the same way to prevent gaming via always-unlocking.
+        let pending_inactive_base =
+            weighted_staking_reward::split_and_deposit_rewards(
+                pool_address, pending_inactive_reward_coins
+            );
+        coin::merge(&mut stake_pool.pending_inactive, pending_inactive_base);
         spec {
             assume rewards_active + rewards_pending_inactive <= MAX_U64;
         };
@@ -1942,13 +1958,14 @@ module aptos_framework::stake {
     }
 
     /// Mint rewards corresponding to current epoch's `stake` and `num_successful_votes`.
+    /// Returns the freshly-minted reward coins; the caller is responsible for depositing them.
     fun distribute_rewards(
         stake: &mut Coin<AptosCoin>,
         num_successful_proposals: u64,
         num_total_proposals: u64,
         rewards_rate: u64,
         rewards_rate_denominator: u64
-    ): u64 acquires AptosCoinCapabilities {
+    ): Coin<AptosCoin> acquires AptosCoinCapabilities {
         let stake_amount = coin::value(stake);
         let rewards_amount =
             if (stake_amount > 0) {
@@ -1963,10 +1980,10 @@ module aptos_framework::stake {
         if (rewards_amount > 0) {
             let mint_cap =
                 &borrow_global<AptosCoinCapabilities>(@aptos_framework).mint_cap;
-            let rewards = coin::mint(rewards_amount, mint_cap);
-            coin::merge(stake, rewards);
-        };
-        rewards_amount
+            coin::mint(rewards_amount, mint_cap)
+        } else {
+            coin::zero()
+        }
     }
 
     fun append<T>(v1: &mut vector<T>, v2: &mut vector<T>) {
@@ -2118,6 +2135,25 @@ module aptos_framework::stake {
     }
 
     #[test_only]
+    struct AptosCoinBurnCapForTest has key {
+        burn_cap: aptos_framework::coin::BurnCapability<AptosCoin>
+    }
+
+    #[test_only]
+    /// Mint test coins for bonus rewards (test-only helper)
+    public fun mint_coins_for_test(amount: u64): Coin<AptosCoin> acquires AptosCoinCapabilities {
+        let mint_cap = &borrow_global<AptosCoinCapabilities>(@aptos_framework).mint_cap;
+        coin::mint(amount, mint_cap)
+    }
+
+    #[test_only]
+    /// Burn test coins (test-only helper). Requires burn cap stored via initialize_for_test_custom.
+    public fun burn_coins_for_test(coins: Coin<AptosCoin>) acquires AptosCoinBurnCapForTest {
+        let burn_cap = &borrow_global<AptosCoinBurnCapForTest>(@aptos_framework).burn_cap;
+        coin::burn(coins, burn_cap);
+    }
+
+    #[test_only]
     public fun join_validator_set_for_test(
         pk: &bls12381::PublicKey,
         pop: &bls12381::ProofOfPossession,
@@ -2174,7 +2210,7 @@ module aptos_framework::stake {
         if (!exists<AptosCoinCapabilities>(@aptos_framework)) {
             let (burn_cap, mint_cap) = aptos_coin::initialize_for_test(aptos_framework);
             store_aptos_coin_mint_cap(aptos_framework, mint_cap);
-            coin::destroy_burn_cap<AptosCoin>(burn_cap);
+            move_to(aptos_framework, AptosCoinBurnCapForTest { burn_cap });
         };
 
         // In the test environment, the periodical_reward_rate_decrease feature is initially turned off.

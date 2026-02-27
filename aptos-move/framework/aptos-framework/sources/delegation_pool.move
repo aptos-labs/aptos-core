@@ -129,6 +129,7 @@ module aptos_framework::delegation_pool {
     use aptos_framework::stake::get_operator;
     use aptos_framework::staking_config;
     use aptos_framework::timestamp;
+    use aptos_framework::weighted_staking_reward;
 
     const MODULE_SALT: vector<u8> = b"aptos_framework::delegation_pool";
 
@@ -221,6 +222,15 @@ module aptos_framework::delegation_pool {
 
     /// Use delegator voting flow instead. Delegation pools can no longer specify a single delegated voter.
     const ECAN_NO_LONGER_SET_DELEGATED_VOTER: u64 = 29;
+
+    /// Only the pool owner can perform this operation.
+    const ENOT_OWNER: u64 = 30;
+
+    /// Cannot unlock stake while having an active lockup bucket position.
+    const ECANNOT_UNLOCK_WITH_BUCKET_POSITION: u64 = 31;
+
+    /// Insufficient shares to lock the requested amount in a lockup bucket.
+    const EINSUFFICIENT_SHARES_TO_LOCK: u64 = 32;
 
     const MAX_U64: u64 = 18446744073709551615;
 
@@ -900,6 +910,9 @@ module aptos_framework::delegation_pool {
 
         // save delegation pool ownership and resource account address (inner stake pool address) on `owner`
         move_to(owner, DelegationPoolOwnership { pool_address });
+
+        // Initialize weighted lockup bonus pool if the BonusConfig exists
+        weighted_staking_reward::try_initialize_bonus_pool(&stake_pool_signer);
 
         // All delegation pool enable partial governance voting by default once the feature flag is enabled.
         enable_partial_governance_voting(pool_address);
@@ -1708,6 +1721,332 @@ module aptos_framework::delegation_pool {
         );
     }
 
+    // ================================================================================================
+    // Lockup Bonus Reward Functions
+    // ================================================================================================
+
+    /// Enable lockup bonus rewards for this delegation pool (pool owner only).
+    /// This initializes the bonus pool state, allowing users to join lockup buckets.
+    /// Rewards remain 100% base until governance adjusts the base_share_bps parameter.
+    /// Enable lockup rewards for an existing delegation pool.
+    /// Permissionless: anyone can call this for any pool once BonusConfig is initialized.
+    /// Errors if BonusConfig not yet initialized or if already enabled for this pool.
+    public entry fun enable_lockup_rewards(pool_address: address) acquires DelegationPool {
+        assert_delegation_pool_exists(pool_address);
+        let pool = borrow_global<DelegationPool>(pool_address);
+        let pool_signer =
+            account::create_signer_with_capability(&pool.stake_pool_signer_cap);
+        weighted_staking_reward::try_initialize_bonus_pool(&pool_signer);
+    }
+
+    /// Join a lockup bucket to earn bonus rewards.
+    ///
+    /// Parameters:
+    /// - delegator: The delegator joining the lockup bucket
+    /// - pool_address: The delegation pool address
+    /// - bucket_id: Which bucket to join (0-3 for 15d, 30d, 60d, 90d)
+    /// - amount: Amount of APT coins worth of active stake to lock
+    ///
+    /// Note: Shares remain in the delegation pool but are also tracked in the lockup bucket.
+    public entry fun join_lockup_bucket(
+        delegator: &signer,
+        pool_address: address,
+        bucket_id: u64,
+        amount: u64
+    ) acquires DelegationPool {
+        check_stake_management_permission(delegator);
+        assert_delegation_pool_exists(pool_address);
+
+        let delegator_address = signer::address_of(delegator);
+        let pool = borrow_global<DelegationPool>(pool_address);
+
+        // Validate the user actually has this much active stake
+        let raw_shares =
+            amount_to_shares_to_redeem(&pool.active_shares, delegator_address, amount);
+        assert!(
+            raw_shares > 0,
+            error::invalid_argument(EINSUFFICIENT_SHARES_TO_LOCK)
+        );
+
+        weighted_staking_reward::join_bucket(
+            delegator,
+            pool_address,
+            bucket_id,
+            raw_shares
+        );
+    }
+
+    /// Upgrade to a longer bucket: settles complete cycles, then switches bucket.
+    /// Complete cycle rewards are paid directly to user wallet.
+    /// Partial cycle progress and remaining pending rewards are preserved — no burning.
+    public entry fun upgrade_lockup_bucket(
+        delegator: &signer, pool_address: address, new_bucket_id: u64
+    ) acquires DelegationPool, GovernanceRecords, BeneficiaryForOperator, NextCommissionPercentage {
+        check_stake_management_permission(delegator);
+        assert_delegation_pool_exists(pool_address);
+
+        synchronize_delegation_pool(pool_address);
+
+        let delegator_address = signer::address_of(delegator);
+        let complete_rewards =
+            weighted_staking_reward::upgrade_bucket(delegator, pool_address, new_bucket_id);
+
+        if (complete_rewards > 0) {
+            let bonus_coins =
+                weighted_staking_reward::extract_bonus_payment(pool_address, complete_rewards);
+            coin::deposit(delegator_address, bonus_coins);
+        };
+    }
+
+    /// Downgrade to a shorter bucket (burns incomplete cycle, restarts with fresh cycle).
+    /// User reduces commitment, so incomplete cycle rewards are burned.
+    /// Complete cycle rewards are paid directly to user wallet.
+    public entry fun downgrade_lockup_bucket(
+        delegator: &signer, pool_address: address, new_bucket_id: u64
+    ) acquires DelegationPool, GovernanceRecords, BeneficiaryForOperator, NextCommissionPercentage {
+        check_stake_management_permission(delegator);
+        assert_delegation_pool_exists(pool_address);
+
+        // Sync pool first to ensure latest rewards are calculated
+        synchronize_delegation_pool(pool_address);
+
+        let delegator_address = signer::address_of(delegator);
+
+        // Downgrade to shorter bucket (pays complete cycle rewards, burns incomplete)
+        let (complete_rewards, _burned) =
+            weighted_staking_reward::downgrade_bucket(
+                delegator, pool_address, new_bucket_id
+            );
+
+        // Extract bonus coins from pool and pay to user
+        if (complete_rewards > 0) {
+            let bonus_coins =
+                weighted_staking_reward::extract_bonus_payment(
+                    pool_address, complete_rewards
+                );
+            coin::deposit(delegator_address, bonus_coins);
+        };
+    }
+
+    /// Claim accumulated lockup bonus rewards.
+    /// Bonus is paid directly to user wallet (NOT converted to shares).
+    /// In auto-renewal model, users can claim all accumulated rewards anytime.
+    public entry fun claim_lockup_bonus(
+        delegator: &signer, pool_address: address
+    ) acquires DelegationPool, GovernanceRecords, BeneficiaryForOperator, NextCommissionPercentage {
+        check_stake_management_permission(delegator);
+        assert_delegation_pool_exists(pool_address);
+
+        // Sync pool first to ensure latest rewards are calculated
+        synchronize_delegation_pool(pool_address);
+
+        let delegator_address = signer::address_of(delegator);
+
+        // Claim bonus (updates debt in position)
+        let claimed = weighted_staking_reward::claim_bonus(delegator, pool_address);
+
+        // Extract bonus coins from pool and pay to user
+        if (claimed > 0) {
+            let bonus_coins =
+                weighted_staking_reward::extract_bonus_payment(pool_address, claimed);
+            coin::deposit(delegator_address, bonus_coins);
+        };
+    }
+
+    /// Exit lockup bucket and stop earning bonus rewards.
+    /// Complete cycle rewards: paid directly to wallet
+    /// Incomplete cycle rewards: burned (not redistributed)
+    public entry fun exit_lockup_bucket(
+        delegator: &signer, pool_address: address
+    ) acquires DelegationPool, GovernanceRecords, BeneficiaryForOperator, NextCommissionPercentage {
+        check_stake_management_permission(delegator);
+        assert_delegation_pool_exists(pool_address);
+
+        // Sync pool first
+        synchronize_delegation_pool(pool_address);
+
+        let delegator_address = signer::address_of(delegator);
+        let (_, position_shares, _, _, _) =
+            weighted_staking_reward::get_position(pool_address, delegator_address);
+
+        let (bonus_claimed, _bonus_burned, _shares) =
+            weighted_staking_reward::exit_bucket(
+                delegator, pool_address, position_shares
+            );
+
+        // Extract bonus coins from pool and pay to user
+        if (bonus_claimed > 0) {
+            let bonus_coins =
+                weighted_staking_reward::extract_bonus_payment(
+                    pool_address, bonus_claimed
+                );
+            coin::deposit(delegator_address, bonus_coins);
+        };
+    }
+
+    /// Add additional stake to an existing lockup position.
+    /// Exits the current position (complete cycle rewards paid, incomplete cycle burned),
+    /// stakes the additional amount, then re-joins the same bucket with the combined total.
+    /// The lockup cycle restarts from now.
+    public entry fun add_to_lockup(
+        delegator: &signer,
+        pool_address: address,
+        additional_amount: u64,
+    ) acquires DelegationPool, GovernanceRecords, BeneficiaryForOperator, NextCommissionPercentage, DelegationPoolAllowlisting {
+        check_stake_management_permission(delegator);
+        let delegator_address = signer::address_of(delegator);
+        assert_delegation_pool_exists(pool_address);
+
+        synchronize_delegation_pool(pool_address);
+
+        // Read current position before exiting
+        let (bucket_id, position_shares_raw, _, _, _) =
+            weighted_staking_reward::get_position(pool_address, delegator_address);
+
+        // Convert raw shares → coin amount at current share price
+        let pool = borrow_global<DelegationPool>(pool_address);
+        let original_coins = pool.active_shares.shares_to_amount(position_shares_raw);
+
+        // Exit existing position (pays complete cycles, burns incomplete)
+        exit_lockup_bucket(delegator, pool_address);
+
+        // Add additional stake into the pool
+        if (additional_amount > 0) {
+            add_stake(delegator, pool_address, additional_amount);
+        };
+
+        // Re-join the same bucket with original + additional amount, fresh cycle from now
+        join_lockup_bucket(delegator, pool_address, bucket_id, original_coins + additional_amount);
+    }
+
+    // ================================================================================================
+    // Convenience Functions - Combined Operations
+    // ================================================================================================
+
+    /// Convenience function: Add stake and immediately join a lockup bucket.
+    /// This combines add_stake() + join_lockup_bucket() into a single transaction.
+    ///
+    /// Parameters:
+    /// - delegator: The delegator adding stake
+    /// - pool_address: The delegation pool address
+    /// - amount: Amount of coins to stake (in APT)
+    /// - bucket_id: Which lockup bucket to join (0-6)
+    ///
+    /// This is equivalent to:
+    ///   1. add_stake(amount)
+    ///   2. join_lockup_bucket(shares = all new shares from step 1)
+    public entry fun add_stake_with_lockup(
+        delegator: &signer,
+        pool_address: address,
+        amount: u64,
+        bucket_id: u64
+    ) acquires DelegationPool, GovernanceRecords, BeneficiaryForOperator, NextCommissionPercentage, DelegationPoolAllowlisting {
+        check_stake_management_permission(delegator);
+        let delegator_address = signer::address_of(delegator);
+
+        // Short-circuit if amount is 0
+        if (amount == 0) { return };
+
+        assert_delegator_allowlisted(pool_address, delegator_address);
+        assert_delegation_pool_exists(pool_address);
+
+        // Synchronize before checking shares
+        synchronize_delegation_pool(pool_address);
+
+        // Get current shares (before adding stake)
+        let pool = borrow_global<DelegationPool>(pool_address);
+        let shares_before = pool.active_shares.shares(delegator_address);
+
+        // Add stake normally (this handles fees, events, etc.)
+        add_stake(delegator, pool_address, amount);
+
+        // Calculate new shares acquired (after fee)
+        let pool = borrow_global<DelegationPool>(pool_address);
+        let shares_after = pool.active_shares.shares(delegator_address);
+        let new_shares_raw = shares_after - shares_before;
+
+        if (new_shares_raw > 0) {
+            weighted_staking_reward::join_bucket(
+                delegator, pool_address, bucket_id, new_shares_raw
+            );
+        };
+    }
+
+    /// Convenience function: Exit lockup bucket and unlock stake.
+    /// This combines exit_lockup_bucket() + unlock() into a single transaction.
+    ///
+    /// Parameters:
+    /// - delegator: The delegator unlocking stake
+    /// - pool_address: The delegation pool address
+    /// - amount: Amount of coins to unlock (in APT)
+    ///
+    /// Behavior:
+    /// - Complete cycle rewards: paid directly to user wallet
+    /// - Incomplete cycle rewards: burned
+    /// - Then unlocks the requested stake amount
+    ///
+    /// Note: Bonus rewards are paid to wallet, NOT converted to shares.
+    public entry fun unlock_with_lockup(
+        delegator: &signer, pool_address: address, amount: u64
+    ) acquires DelegationPool, GovernanceRecords, BeneficiaryForOperator, NextCommissionPercentage {
+        check_stake_management_permission(delegator);
+        let delegator_address = signer::address_of(delegator);
+
+        // Short-circuit if amount is 0
+        if (amount == 0) { return };
+
+        assert_delegation_pool_exists(pool_address);
+
+        // Synchronize first
+        synchronize_delegation_pool(pool_address);
+
+        // Exit only the minimum bucket shares needed to cover the unlock amount.
+        // Non-bucket shares are consumed first; bucket shares are exited proportionally only if needed.
+        if (weighted_staking_reward::get_total_bucket_shares(pool_address, delegator_address) > 0) {
+            let pool = borrow_global<DelegationPool>(pool_address);
+            let current_shares_raw = get_delegator_active_shares(
+                pool, delegator_address
+            );
+            // bucket_shares_raw is in raw pool shares (already multiplied by SHARES_SCALING_FACTOR)
+            let bucket_shares_raw =
+                weighted_staking_reward::get_total_bucket_shares(
+                    pool_address, delegator_address
+                );
+            let non_bucket_shares_raw =
+                if (current_shares_raw >= bucket_shares_raw) {
+                    current_shares_raw - bucket_shares_raw
+                } else { 0u128 };
+            let unlock_shares_raw =
+                amount_to_shares_to_redeem(
+                    &pool.active_shares, delegator_address, amount
+                );
+
+            if (unlock_shares_raw > non_bucket_shares_raw) {
+                let needed_raw = unlock_shares_raw - non_bucket_shares_raw;
+                let exit_shares =
+                    if (needed_raw >= bucket_shares_raw) {
+                        bucket_shares_raw
+                    } else {
+                        needed_raw
+                    };
+                let (bonus_claimed, _bonus_burned, _) =
+                    weighted_staking_reward::exit_bucket(
+                        delegator, pool_address, exit_shares
+                    );
+                if (bonus_claimed > 0) {
+                    let bonus_coins =
+                        weighted_staking_reward::extract_bonus_payment(
+                            pool_address, bonus_claimed
+                        );
+                    coin::deposit(delegator_address, bonus_coins);
+                };
+            };
+        };
+
+        // Now unlock the requested amount
+        unlock(delegator, pool_address, amount);
+    }
+
     /// Return the unique observed lockup cycle where delegator `delegator_address` may have
     /// unlocking (or already unlocked) stake to be withdrawn from delegation pool `pool`.
     /// A bool is returned to signal if a pending withdrawal exists at all.
@@ -1823,6 +2162,26 @@ module aptos_framework::delegation_pool {
         let shares_to_redeem = amount_to_shares_to_redeem(&pool.active_shares, shareholder, coins_amount);
         // silently exit if not a shareholder otherwise redeem would fail with `ESHAREHOLDER_NOT_FOUND`
         if (shares_to_redeem == 0) return 0;
+
+        // SECURITY CHECK: Centralized enforcement of bucket commitment
+        // This is the SINGLE POINT OF CONTROL for ALL active share reductions
+        // Any operation that reduces active shares MUST go through this function
+        if (shareholder != NULL_SHAREHOLDER) {
+            let pool_address = get_pool_address(pool);
+            // bucket_shares_raw is already in raw pool shares (SHARES_SCALING_FACTOR applied internally).
+            let bucket_shares_raw =
+                weighted_staking_reward::get_total_bucket_shares(pool_address, shareholder);
+            if (bucket_shares_raw > 0) {
+                let current_shares = get_delegator_active_shares(pool, shareholder);
+
+                // Ensure remaining shares >= bucket commitment
+                // This prevents users from earning bucket rewards without actual stake
+                assert!(
+                    current_shares >= bucket_shares_raw + shares_to_redeem,
+                    error::invalid_state(ECANNOT_UNLOCK_WITH_BUCKET_POSITION)
+                );
+            }
+        };
 
         // Always update governance records before any change to the shares pool.
         let pool_address = get_pool_address(pool);
@@ -1964,14 +2323,31 @@ module aptos_framework::delegation_pool {
         // before buying shares for the operator for its entire commission fee
         // otherwise, operator's new shares would additionally appreciate from rewards it does not own
 
+        // Calculate total delegator rewards (after commission, before distribution).
+        // Bonus rewards have already been split off at mint time in stake.move via
+        // split_and_deposit_rewards, so the values here reflect base rewards only.
+        let base_active_rewards =
+            active - commission_active - pool.active_shares.total_coins();
+        let base_pending_inactive_rewards =
+            pending_inactive - commission_pending_inactive
+                - pending_inactive_shares_pool(pool).total_coins();
+
         // update total coins accumulated by `active` + `pending_active` shares
         // redeemed `add_stake` fees are restored and distributed to the rest of the pool as rewards
-        pool.active_shares.update_total_coins(active - commission_active);
+        let active_total = pool.active_shares.total_coins();
+        pool.active_shares.update_total_coins(active_total + base_active_rewards);
         // update total coins accumulated by `pending_inactive` shares at current observed lockup cycle
-        pending_inactive_shares_pool_mut(pool).update_total_coins(pending_inactive - commission_pending_inactive);
+        let pending_inactive_total = pending_inactive_shares_pool(pool).total_coins();
+        pending_inactive_shares_pool_mut(pool).update_total_coins(
+            pending_inactive_total + base_pending_inactive_rewards
+        );
 
         // reward operator its commission out of uncommitted active rewards (`add_stake` fees already excluded)
-        buy_in_active_shares(pool, beneficiary_for_operator(stake::get_operator(pool_address)), commission_active);
+        buy_in_active_shares(
+            pool,
+            beneficiary_for_operator(stake::get_operator(pool_address)),
+            commission_active
+        );
         // reward operator its commission out of uncommitted pending_inactive rewards
         buy_in_pending_inactive_shares(
             pool,
