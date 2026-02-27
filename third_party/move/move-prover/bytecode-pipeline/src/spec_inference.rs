@@ -285,8 +285,16 @@ impl AbstractDomain for WPState {
                     self.aborts.push(exp.clone());
                 }
             }
+        } else if self_is_abort_only {
+            // Both abort-only: union abort conditions from both paths
+            for exp in &other.aborts {
+                if !ensures_contains(&self.aborts, exp) {
+                    self.aborts.push(exp.clone());
+                }
+            }
         }
-        // If other is abort-only, skip it entirely (keep self as-is)
+        // else: other is abort-only but self has normal ensures — skip
+        // (abort conditions are already captured at the abort site)
 
         // For captured_mut_params: use union semantics (if captured on any path, it's captured)
         // This is correct because in backward analysis, if a param was written to on any path,
