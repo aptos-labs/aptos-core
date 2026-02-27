@@ -1,0 +1,20 @@
+Move prover returns: exiting with compilation errors
+warning: proof uses trusted assumption
+   ┌─ tests/sources/functional/proof_hints/assert_assume_use.move:28:13
+   │
+28 │             assume [trusted] x * x < 18446744073709551615;
+   │             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+error: `assume` in proof block requires `[trusted]` annotation
+   ┌─ tests/sources/functional/proof_hints/assert_assume_use.move:56:13
+   │
+56 │             assume x > 0;
+   │             ^^^^^^^^^^^^^
+
+error: proof block is only allowed in function spec blocks
+   ┌─ tests/sources/functional/proof_hints/assert_assume_use.move:67:9
+   │
+67 │ ╭         proof {
+68 │ │             assert true;
+69 │ │         }
+   │ ╰─────────^

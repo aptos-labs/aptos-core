@@ -367,7 +367,7 @@ fn walk_spec_block(block: &SpecBlock, diags: &mut Diagnostics) {
                     walk_spec_sequence(seq, &SpecContext::Other, diags);
                 }
             },
-            SpecBlockMember_::Pragma { .. } => {},
+            SpecBlockMember_::Pragma { .. } | SpecBlockMember_::Proof { .. } => {},
         }
     }
 }

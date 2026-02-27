@@ -348,6 +348,33 @@ pub enum PropertyValue {
     QualifiedSymbol(QualifiedSymbol),
 }
 
+// =================================================================================================
+/// # Proof Hints
+
+/// A proof hint command from a `proof { ... }` block in a spec.
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub enum ProofHint {
+    /// Expand the body of the named spec function in this verification context.
+    /// The optional depth controls recursive expansion (default 1).
+    Unfold(Loc, QualifiedSymbol, Option<usize>),
+    /// An auxiliary assertion (lemma) to prove before the main postconditions.
+    /// Also used for `use f(args)` which is syntax sugar for `assert f(args)`.
+    Assert(Loc, Exp),
+    /// Trusted assumption (emits a warning).
+    Assume(Loc, Exp),
+    /// Add E-matching triggers to a matched quantifier.
+    /// Fields: location, bound variable names+types (for matching),
+    /// trigger groups (to inject).
+    Trigger(Loc, Vec<(Symbol, Type)>, Vec<Vec<Exp>>),
+    /// Case-split the verification condition on this expression.
+    SplitOn(Loc, Exp),
+    /// Induction on a u64/u128/u256 parameter.
+    InductOn(Loc, Symbol),
+    /// Provide a witness for an existential quantifier.
+    /// Fields: location, the existential body with the witness substituted in.
+    Witness(Loc, Exp),
+}
+
 /// Specification and properties associated with a language item.
 #[derive(Debug, Clone, Default, PartialEq, Eq, Hash)]
 pub struct Spec {
@@ -362,6 +389,8 @@ pub struct Spec {
     pub on_impl: BTreeMap<CodeOffset, Spec>,
     /// The map to store ghost variable update statements inlined in the function body.
     pub update_map: BTreeMap<NodeId, Condition>,
+    /// Proof hints guiding the SMT solver.
+    pub proof_hints: Vec<ProofHint>,
 }
 
 impl Spec {
@@ -394,6 +423,7 @@ impl Spec {
                     }
                 })
             }
+            && self.proof_hints == other.proof_hints
     }
 
     pub fn has_conditions(&self) -> bool {
@@ -405,6 +435,7 @@ impl Spec {
             && self.on_impl.is_empty()
             && self.properties.is_empty()
             && self.update_map.is_empty()
+            && self.proof_hints.is_empty()
     }
 
     pub fn filter<P>(&self, pred: P) -> impl Iterator<Item = &Condition>
@@ -433,6 +464,30 @@ impl Spec {
         self.any(move |c| c.kind == kind)
     }
 
+    /// Returns an iterator over expressions contained in proof hints.
+    pub fn proof_hint_exps(&self) -> Vec<&Exp> {
+        let mut result = vec![];
+        for hint in &self.proof_hints {
+            match hint {
+                ProofHint::Assert(_, exp)
+                | ProofHint::Assume(_, exp)
+                | ProofHint::SplitOn(_, exp)
+                | ProofHint::Witness(_, exp) => {
+                    result.push(exp);
+                },
+                ProofHint::Trigger(_, _, trigger_groups) => {
+                    for group in trigger_groups {
+                        for exp in group {
+                            result.push(exp);
+                        }
+                    }
+                },
+                ProofHint::Unfold(..) | ProofHint::InductOn(..) => {},
+            }
+        }
+        result
+    }
+
     /// Returns the functions used (called or loaded as a function value) in this spec, along with
     /// the sites of the calls or loads.
     pub fn used_funs_with_uses(&self) -> BTreeMap<QualifiedId<FunId>, BTreeSet<NodeId>> {
@@ -444,6 +499,9 @@ impl Spec {
         }
         for on_impl in self.on_impl.values() {
             result.append(&mut on_impl.used_funs_with_uses())
+        }
+        for exp in self.proof_hint_exps() {
+            result.append(&mut exp.used_funs_with_uses())
         }
         result
     }
@@ -459,6 +517,9 @@ impl Spec {
         }
         for on_impl in self.on_impl.values() {
             result.append(&mut on_impl.called_funs_with_callsites())
+        }
+        for exp in self.proof_hint_exps() {
+            result.append(&mut exp.called_funs_with_callsites())
         }
         result
     }
@@ -1820,6 +1881,24 @@ impl ExpData {
         }
         for update in spec.update_map.values() {
             Self::visit_positions_cond_impl(update, visitor)?;
+        }
+        for hint in &spec.proof_hints {
+            match hint {
+                ProofHint::Assert(_, exp)
+                | ProofHint::Assume(_, exp)
+                | ProofHint::SplitOn(_, exp)
+                | ProofHint::Witness(_, exp) => {
+                    exp.visit_positions_impl(visitor)?;
+                },
+                ProofHint::Trigger(_, _, trigger_groups) => {
+                    for group in trigger_groups {
+                        for exp in group {
+                            exp.visit_positions_impl(visitor)?;
+                        }
+                    }
+                },
+                ProofHint::Unfold(..) | ProofHint::InductOn(..) => {},
+            }
         }
         Some(())
     }

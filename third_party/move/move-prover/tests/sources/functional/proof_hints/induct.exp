@@ -1,0 +1,12 @@
+Move prover returns: exiting with compilation errors
+error: induction variable must be an unsigned integer type (u64, u128, or u256)
+   ┌─ tests/sources/functional/proof_hints/induct.move:28:13
+   │
+28 │             induct on s;
+   │             ^^^^^^^^^^^^
+
+error: `z` is not a parameter of this function
+   ┌─ tests/sources/functional/proof_hints/induct.move:42:13
+   │
+42 │             induct on z;
+   │             ^^^^^^^^^^^^

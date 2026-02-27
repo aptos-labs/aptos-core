@@ -1,0 +1,12 @@
+Move prover returns: exiting with compilation errors
+error: trigger group 1 must mention all quantified variables, but does not mention `b`
+   ┌─ tests/sources/functional/proof_hints/trigger.move:32:13
+   │
+32 │             trigger forall a: u64, b: u64 with {marker(a)};
+   │             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: trigger does not contain a call to a spec function; arithmetic and logical expressions are interpreted by the SMT solver and will likely be ignored as E-matching triggers
+   ┌─ tests/sources/functional/proof_hints/trigger.move:46:13
+   │
+46 │             trigger forall y: u64 with {y + 1};
+   │             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^

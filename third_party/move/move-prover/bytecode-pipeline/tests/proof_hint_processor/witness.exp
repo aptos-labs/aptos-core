@@ -1,0 +1,74 @@
+============ initial translation from Move ================
+
+[variant baseline]
+fun TestWitness::test_witness_condition($t0|x: u64): u64 {
+     var $t1: u64
+  0: $t1 := move($t0)
+  1: return $t1
+}
+
+
+[variant baseline]
+fun TestWitness::test_witness_constant(): u64 {
+     var $t0: u64
+  0: $t0 := 42
+  1: return $t0
+}
+
+
+[variant baseline]
+fun TestWitness::test_witness_param($t0|x: u64): u64 {
+     var $t1: u64
+     var $t2: u64
+     var $t3: u64
+  0: $t1 := move($t0)
+  1: $t2 := 1
+  2: $t3 := +($t1, $t2)
+  3: return $t3
+}
+
+============ after pipeline `proof_hint_processor` ================
+
+[variant verification]
+fun TestWitness::test_witness_condition($t0|x: u64): u64 {
+     # VC: witness does not satisfy existential at tests/proof_hint_processor/witness.move:49:13+51
+  0: assert And(Gt($t0, 5), Eq<u64>($t0, $t0))
+  1: assume WellFormed($t0)
+  2: assume Gt($t0, 10)
+  3: label L1
+     # VC: post-condition does not hold at tests/proof_hint_processor/witness.move:46:9+42
+  4: assert exists y: u64: TypeDomain<u64>() where Gt(y, 5): Eq<u64>(y, $t0)
+  5: return $t0
+}
+
+
+[variant verification]
+fun TestWitness::test_witness_constant(): u64 {
+     var $t0: u64
+     # VC: witness does not satisfy existential at tests/proof_hint_processor/witness.move:18:13+41
+  0: assert Eq<u64>(42, 42)
+  1: $t0 := 42
+  2: label L1
+     # VC: post-condition does not hold at tests/proof_hint_processor/witness.move:15:9+31
+  3: assert exists x: u64: TypeDomain<u64>(): Eq<u64>(x, 42)
+  4: return $t0
+}
+
+
+[variant verification]
+fun TestWitness::test_witness_param($t0|x: u64): u64 {
+     var $t1: u64
+     var $t2: u64
+     var $t3: num
+     # VC: witness does not satisfy existential at tests/proof_hint_processor/witness.move:34:13+66
+  0: assert And(TestWitness::is_positive(Add($t0, 1)), Eq<u64>(Add($t0, 1), result0()))
+  1: assume WellFormed($t0)
+  2: $t1 := 1
+  3: $t2 := +($t0, $t1) on_abort goto 7 with $t3
+  4: label L1
+     # VC: post-condition does not hold at tests/proof_hint_processor/witness.move:31:9+53
+  5: assert exists y: u64: TypeDomain<u64>(): And(TestWitness::is_positive(y), Eq<u64>(y, $t2))
+  6: return $t2
+  7: label L2
+  8: abort($t3)
+}

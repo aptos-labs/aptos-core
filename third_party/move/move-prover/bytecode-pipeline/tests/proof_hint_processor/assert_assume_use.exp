@@ -1,0 +1,86 @@
+============ initial translation from Move ================
+
+[variant baseline]
+fun TestAssertAssumeUse::test_assert_assume($t0|x: u64): u64 {
+     var $t1: u64
+     var $t2: u64
+     var $t3: u64
+  0: $t1 := move($t0)
+  1: $t2 := 1
+  2: $t3 := +($t1, $t2)
+  3: return $t3
+}
+
+
+[variant baseline]
+fun TestAssertAssumeUse::test_generic_assert<#0>($t0|v: vector<#0>): vector<#0> {
+     var $t1: vector<#0>
+  0: $t1 := move($t0)
+  1: return $t1
+}
+
+
+[variant baseline]
+fun TestAssertAssumeUse::test_use($t0|a: u64, $t1|b: u64): u64 {
+     var $t2: u64
+     var $t3: u64
+     var $t4: u64
+  0: $t2 := move($t0)
+  1: $t3 := move($t1)
+  2: $t4 := +($t2, $t3)
+  3: return $t4
+}
+
+============ after pipeline `proof_hint_processor` ================
+
+[variant verification]
+fun TestAssertAssumeUse::test_assert_assume($t0|x: u64): u64 {
+     var $t1: u64
+     var $t2: u64
+     var $t3: num
+     # VC: proof hint assertion at tests/proof_hint_processor/assert_assume_use.move:19:13+21
+  0: assert TestAssertAssumeUse::helper(Add($t0, 1))
+  1: assume Lt($t0, 18446744073709551615)
+  2: assume WellFormed($t0)
+  3: $t1 := 1
+  4: $t2 := +($t0, $t1) on_abort goto 8 with $t3
+  5: label L1
+     # VC: post-condition does not hold at tests/proof_hint_processor/assert_assume_use.move:16:9+24
+  6: assert Eq<u64>($t2, Add($t0, 1))
+  7: return $t2
+  8: label L2
+  9: abort($t3)
+}
+
+
+[variant verification]
+fun TestAssertAssumeUse::test_generic_assert<#0>($t0|v: vector<#0>): vector<#0> {
+     # VC: proof hint assertion at tests/proof_hint_processor/assert_assume_use.move:53:13+22
+  0: assert TestAssertAssumeUse::is_nonempty<#0>($t0)
+  1: assume WellFormed($t0)
+  2: assume Gt(Len<#0>($t0), 0)
+  3: label L1
+     # VC: post-condition does not hold at tests/proof_hint_processor/assert_assume_use.move:50:9+20
+  4: assert Eq<vector<#0>>($t0, $t0)
+  5: return $t0
+}
+
+
+[variant verification]
+fun TestAssertAssumeUse::test_use($t0|a: u64, $t1|b: u64): u64 {
+     var $t2: u64
+     var $t3: num
+     # VC: proof hint assertion at tests/proof_hint_processor/assert_assume_use.move:36:13+19
+  0: assert TestAssertAssumeUse::add_comm($t0, $t1)
+  1: assume WellFormed($t0)
+  2: assume WellFormed($t1)
+  3: $t2 := +($t0, $t1) on_abort goto 7 with $t3
+  4: label L1
+     # VC: post-condition does not hold at tests/proof_hint_processor/assert_assume_use.move:33:9+24
+  5: assert Eq<u64>($t2, Add($t0, $t1))
+  6: return $t2
+  7: label L2
+  8: abort($t3)
+}
+
+============ Diagnostics ================

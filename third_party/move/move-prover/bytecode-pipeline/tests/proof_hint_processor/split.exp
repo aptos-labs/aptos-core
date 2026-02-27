@@ -1,0 +1,413 @@
+============ initial translation from Move ================
+
+[variant baseline]
+fun TestSplit::color_code($t0|c: 0x42::TestSplit::Color): u64 {
+     var $t1|$t2: &0x42::TestSplit::Color
+     var $t2: &0x42::TestSplit::Color
+     var $t3: &0x42::TestSplit::Color
+     var $t4: bool
+     var $t5: &0x42::TestSplit::Color
+     var $t6: 0x42::TestSplit::Color
+     var $t7: u64
+     var $t8: &0x42::TestSplit::Color
+     var $t9: bool
+     var $t10: &0x42::TestSplit::Color
+     var $t11: 0x42::TestSplit::Color
+     var $t12: u64
+     var $t13: &0x42::TestSplit::Color
+     var $t14: bool
+     var $t15: 0x42::TestSplit::Color
+     var $t16: u64
+     var $t17: u64
+  0: $t2 := borrow_local($t0)
+  1: $t1 := $t2
+  2: $t3 := copy($t1)
+  3: $t4 := test_variant 0x42::TestSplit::Color::Red($t3)
+  4: if ($t4) goto 5 else goto 12
+  5: label L1
+  6: $t5 := move($t1)
+  7: drop($t5)
+  8: $t6 := move($t0)
+  9: unpack_variant 0x42::TestSplit::Color::Red($t6)
+ 10: $t7 := 1
+ 11: return $t7
+ 12: label L0
+ 13: $t8 := copy($t1)
+ 14: $t9 := test_variant 0x42::TestSplit::Color::Green($t8)
+ 15: if ($t9) goto 16 else goto 23
+ 16: label L3
+ 17: $t10 := move($t1)
+ 18: drop($t10)
+ 19: $t11 := move($t0)
+ 20: unpack_variant 0x42::TestSplit::Color::Green($t11)
+ 21: $t12 := 2
+ 22: return $t12
+ 23: label L2
+ 24: $t13 := move($t1)
+ 25: $t14 := test_variant 0x42::TestSplit::Color::Blue($t13)
+ 26: if ($t14) goto 27 else goto 32
+ 27: label L5
+ 28: $t15 := move($t0)
+ 29: unpack_variant 0x42::TestSplit::Color::Blue($t15)
+ 30: $t16 := 3
+ 31: return $t16
+ 32: label L4
+ 33: $t17 := 14566554180833181697
+ 34: abort($t17)
+}
+
+
+[variant baseline]
+fun TestSplit::is_on($t0|t: 0x42::TestSplit::Toggle): bool {
+     var $t1|$t2: &0x42::TestSplit::Toggle
+     var $t2: &0x42::TestSplit::Toggle
+     var $t3: &0x42::TestSplit::Toggle
+     var $t4: bool
+     var $t5: &0x42::TestSplit::Toggle
+     var $t6: 0x42::TestSplit::Toggle
+     var $t7: bool
+     var $t8: &0x42::TestSplit::Toggle
+     var $t9: bool
+     var $t10: 0x42::TestSplit::Toggle
+     var $t11: bool
+     var $t12: u64
+  0: $t2 := borrow_local($t0)
+  1: $t1 := $t2
+  2: $t3 := copy($t1)
+  3: $t4 := test_variant 0x42::TestSplit::Toggle::On($t3)
+  4: if ($t4) goto 5 else goto 12
+  5: label L1
+  6: $t5 := move($t1)
+  7: drop($t5)
+  8: $t6 := move($t0)
+  9: unpack_variant 0x42::TestSplit::Toggle::On($t6)
+ 10: $t7 := true
+ 11: return $t7
+ 12: label L0
+ 13: $t8 := move($t1)
+ 14: $t9 := test_variant 0x42::TestSplit::Toggle::Off($t8)
+ 15: if ($t9) goto 16 else goto 21
+ 16: label L3
+ 17: $t10 := move($t0)
+ 18: unpack_variant 0x42::TestSplit::Toggle::Off($t10)
+ 19: $t11 := false
+ 20: return $t11
+ 21: label L2
+ 22: $t12 := 14566554180833181697
+ 23: abort($t12)
+}
+
+
+[variant baseline]
+fun TestSplit::test_split_bool($t0|a: u64, $t1|b: u64): u64 {
+     var $t2: u64
+     var $t3: u64
+     var $t4: bool
+     var $t5: u64
+     var $t6: u64
+     var $t7: u64
+     var $t8: u64
+     var $t9: u64
+     var $t10: u64
+  0: $t2 := copy($t0)
+  1: $t3 := copy($t1)
+  2: $t4 := >=($t2, $t3)
+  3: if ($t4) goto 4 else goto 9
+  4: label L1
+  5: $t5 := move($t0)
+  6: $t6 := move($t1)
+  7: $t7 := -($t5, $t6)
+  8: return $t7
+  9: label L0
+ 10: $t8 := move($t1)
+ 11: $t9 := move($t0)
+ 12: $t10 := -($t8, $t9)
+ 13: return $t10
+}
+
+============ after pipeline `proof_hint_processor` ================
+
+[variant verification[split_0]]
+fun TestSplit::color_code($t0|c: 0x42::TestSplit::Color): u64 {
+     var $t1|$t2: 0x42::TestSplit::Color
+     var $t2: bool
+     var $t3: num
+     var $t4: u64
+     var $t5: u64
+     var $t6: bool
+     var $t7: u64
+     var $t8: bool
+     var $t9: u64
+     var $t10: u64
+  0: assume test_variants TestSplit::Color::Red($t0)
+  1: assume WellFormed($t0)
+  2: $t2 := test_variant 0x42::TestSplit::Color::Red($t0)
+  3: if ($t2) goto 4 else goto 9
+  4: label L1
+  5: unpack_variant 0x42::TestSplit::Color::Red($t0) on_abort goto 32 with $t3
+  6: $t4 := 1
+  7: $t5 := move($t4)
+  8: goto 29
+  9: label L0
+ 10: $t6 := test_variant 0x42::TestSplit::Color::Green($t0)
+ 11: if ($t6) goto 12 else goto 17
+ 12: label L3
+ 13: unpack_variant 0x42::TestSplit::Color::Green($t0) on_abort goto 32 with $t3
+ 14: $t7 := 2
+ 15: $t5 := move($t7)
+ 16: goto 29
+ 17: label L2
+ 18: $t8 := test_variant 0x42::TestSplit::Color::Blue($t0)
+ 19: if ($t8) goto 20 else goto 25
+ 20: label L5
+ 21: unpack_variant 0x42::TestSplit::Color::Blue($t0) on_abort goto 32 with $t3
+ 22: $t9 := 3
+ 23: $t5 := move($t9)
+ 24: goto 29
+ 25: label L4
+ 26: $t10 := 14566554180833181697
+ 27: $t3 := move($t10)
+ 28: goto 32
+ 29: label L6
+     # VC: post-condition does not hold at tests/proof_hint_processor/split.move:34:9+35
+ 30: assert And(Ge($t5, 1), Le($t5, 3))
+ 31: return $t5
+ 32: label L7
+ 33: abort($t3)
+}
+
+
+[variant verification[split_1]]
+fun TestSplit::color_code($t0|c: 0x42::TestSplit::Color): u64 {
+     var $t1|$t2: 0x42::TestSplit::Color
+     var $t2: bool
+     var $t3: num
+     var $t4: u64
+     var $t5: u64
+     var $t6: bool
+     var $t7: u64
+     var $t8: bool
+     var $t9: u64
+     var $t10: u64
+  0: assume test_variants TestSplit::Color::Green($t0)
+  1: assume WellFormed($t0)
+  2: $t2 := test_variant 0x42::TestSplit::Color::Red($t0)
+  3: if ($t2) goto 4 else goto 9
+  4: label L1
+  5: unpack_variant 0x42::TestSplit::Color::Red($t0) on_abort goto 32 with $t3
+  6: $t4 := 1
+  7: $t5 := move($t4)
+  8: goto 29
+  9: label L0
+ 10: $t6 := test_variant 0x42::TestSplit::Color::Green($t0)
+ 11: if ($t6) goto 12 else goto 17
+ 12: label L3
+ 13: unpack_variant 0x42::TestSplit::Color::Green($t0) on_abort goto 32 with $t3
+ 14: $t7 := 2
+ 15: $t5 := move($t7)
+ 16: goto 29
+ 17: label L2
+ 18: $t8 := test_variant 0x42::TestSplit::Color::Blue($t0)
+ 19: if ($t8) goto 20 else goto 25
+ 20: label L5
+ 21: unpack_variant 0x42::TestSplit::Color::Blue($t0) on_abort goto 32 with $t3
+ 22: $t9 := 3
+ 23: $t5 := move($t9)
+ 24: goto 29
+ 25: label L4
+ 26: $t10 := 14566554180833181697
+ 27: $t3 := move($t10)
+ 28: goto 32
+ 29: label L6
+     # VC: post-condition does not hold at tests/proof_hint_processor/split.move:34:9+35
+ 30: assert And(Ge($t5, 1), Le($t5, 3))
+ 31: return $t5
+ 32: label L7
+ 33: abort($t3)
+}
+
+
+[variant verification[split_2]]
+fun TestSplit::color_code($t0|c: 0x42::TestSplit::Color): u64 {
+     var $t1|$t2: 0x42::TestSplit::Color
+     var $t2: bool
+     var $t3: num
+     var $t4: u64
+     var $t5: u64
+     var $t6: bool
+     var $t7: u64
+     var $t8: bool
+     var $t9: u64
+     var $t10: u64
+  0: assume test_variants TestSplit::Color::Blue($t0)
+  1: assume WellFormed($t0)
+  2: $t2 := test_variant 0x42::TestSplit::Color::Red($t0)
+  3: if ($t2) goto 4 else goto 9
+  4: label L1
+  5: unpack_variant 0x42::TestSplit::Color::Red($t0) on_abort goto 32 with $t3
+  6: $t4 := 1
+  7: $t5 := move($t4)
+  8: goto 29
+  9: label L0
+ 10: $t6 := test_variant 0x42::TestSplit::Color::Green($t0)
+ 11: if ($t6) goto 12 else goto 17
+ 12: label L3
+ 13: unpack_variant 0x42::TestSplit::Color::Green($t0) on_abort goto 32 with $t3
+ 14: $t7 := 2
+ 15: $t5 := move($t7)
+ 16: goto 29
+ 17: label L2
+ 18: $t8 := test_variant 0x42::TestSplit::Color::Blue($t0)
+ 19: if ($t8) goto 20 else goto 25
+ 20: label L5
+ 21: unpack_variant 0x42::TestSplit::Color::Blue($t0) on_abort goto 32 with $t3
+ 22: $t9 := 3
+ 23: $t5 := move($t9)
+ 24: goto 29
+ 25: label L4
+ 26: $t10 := 14566554180833181697
+ 27: $t3 := move($t10)
+ 28: goto 32
+ 29: label L6
+     # VC: post-condition does not hold at tests/proof_hint_processor/split.move:34:9+35
+ 30: assert And(Ge($t5, 1), Le($t5, 3))
+ 31: return $t5
+ 32: label L7
+ 33: abort($t3)
+}
+
+
+[variant verification[split_0]]
+fun TestSplit::is_on($t0|t: 0x42::TestSplit::Toggle): bool {
+     var $t1|$t2: 0x42::TestSplit::Toggle
+     var $t2: bool
+     var $t3: num
+     var $t4: bool
+     var $t5: bool
+     var $t6: bool
+     var $t7: bool
+     var $t8: u64
+  0: assume test_variants TestSplit::Toggle::On($t0)
+  1: assume WellFormed($t0)
+  2: $t2 := test_variant 0x42::TestSplit::Toggle::On($t0)
+  3: if ($t2) goto 4 else goto 9
+  4: label L1
+  5: unpack_variant 0x42::TestSplit::Toggle::On($t0) on_abort goto 24 with $t3
+  6: $t4 := true
+  7: $t5 := move($t4)
+  8: goto 21
+  9: label L0
+ 10: $t6 := test_variant 0x42::TestSplit::Toggle::Off($t0)
+ 11: if ($t6) goto 12 else goto 17
+ 12: label L3
+ 13: unpack_variant 0x42::TestSplit::Toggle::Off($t0) on_abort goto 24 with $t3
+ 14: $t7 := false
+ 15: $t5 := move($t7)
+ 16: goto 21
+ 17: label L2
+ 18: $t8 := 14566554180833181697
+ 19: $t3 := move($t8)
+ 20: goto 24
+ 21: label L4
+     # VC: post-condition does not hold at tests/proof_hint_processor/split.move:53:9+28
+ 22: assert Eq<bool>($t5, test_variants TestSplit::Toggle::On($t0))
+ 23: return $t5
+ 24: label L5
+ 25: abort($t3)
+}
+
+
+[variant verification[split_1]]
+fun TestSplit::is_on($t0|t: 0x42::TestSplit::Toggle): bool {
+     var $t1|$t2: 0x42::TestSplit::Toggle
+     var $t2: bool
+     var $t3: num
+     var $t4: bool
+     var $t5: bool
+     var $t6: bool
+     var $t7: bool
+     var $t8: u64
+  0: assume test_variants TestSplit::Toggle::Off($t0)
+  1: assume WellFormed($t0)
+  2: $t2 := test_variant 0x42::TestSplit::Toggle::On($t0)
+  3: if ($t2) goto 4 else goto 9
+  4: label L1
+  5: unpack_variant 0x42::TestSplit::Toggle::On($t0) on_abort goto 24 with $t3
+  6: $t4 := true
+  7: $t5 := move($t4)
+  8: goto 21
+  9: label L0
+ 10: $t6 := test_variant 0x42::TestSplit::Toggle::Off($t0)
+ 11: if ($t6) goto 12 else goto 17
+ 12: label L3
+ 13: unpack_variant 0x42::TestSplit::Toggle::Off($t0) on_abort goto 24 with $t3
+ 14: $t7 := false
+ 15: $t5 := move($t7)
+ 16: goto 21
+ 17: label L2
+ 18: $t8 := 14566554180833181697
+ 19: $t3 := move($t8)
+ 20: goto 24
+ 21: label L4
+     # VC: post-condition does not hold at tests/proof_hint_processor/split.move:53:9+28
+ 22: assert Eq<bool>($t5, test_variants TestSplit::Toggle::On($t0))
+ 23: return $t5
+ 24: label L5
+ 25: abort($t3)
+}
+
+
+[variant verification[split_0]]
+fun TestSplit::test_split_bool($t0|a: u64, $t1|b: u64): u64 {
+     var $t2: bool
+     var $t3: u64
+     var $t4: num
+  0: assume Not(Ge($t0, $t1))
+  1: assume WellFormed($t0)
+  2: assume WellFormed($t1)
+  3: $t2 := >=($t0, $t1)
+  4: if ($t2) goto 5 else goto 8
+  5: label L1
+  6: $t3 := -($t0, $t1) on_abort goto 13 with $t4
+  7: goto 10
+  8: label L0
+  9: $t3 := -($t1, $t0) on_abort goto 13 with $t4
+ 10: label L2
+     # VC: post-condition does not hold at tests/proof_hint_processor/split.move:14:9+55
+ 11: assert Eq<u64>($t3, if Ge($t0, $t1) {
+  Sub($t0, $t1)
+} else {
+  Sub($t1, $t0)
+})
+ 12: return $t3
+ 13: label L3
+ 14: abort($t4)
+}
+
+
+[variant verification[split_1]]
+fun TestSplit::test_split_bool($t0|a: u64, $t1|b: u64): u64 {
+     var $t2: bool
+     var $t3: u64
+     var $t4: num
+  0: assume Ge($t0, $t1)
+  1: assume WellFormed($t0)
+  2: assume WellFormed($t1)
+  3: $t2 := >=($t0, $t1)
+  4: if ($t2) goto 5 else goto 8
+  5: label L1
+  6: $t3 := -($t0, $t1) on_abort goto 13 with $t4
+  7: goto 10
+  8: label L0
+  9: $t3 := -($t1, $t0) on_abort goto 13 with $t4
+ 10: label L2
+     # VC: post-condition does not hold at tests/proof_hint_processor/split.move:14:9+55
+ 11: assert Eq<u64>($t3, if Ge($t0, $t1) {
+  Sub($t0, $t1)
+} else {
+  Sub($t1, $t0)
+})
+ 12: return $t3
+ 13: label L3
+ 14: abort($t4)
+}

@@ -66,8 +66,13 @@ When the prover reports a counterexample or error:
   Timeout resolution strategies (all preserve existing conditions):
   - Split complex `ensures` into multiple simpler clauses.
   - Replace quantifiers with concrete bounds.
+  - Add `proof { ... }` hint blocks to the function's spec block to guide the
+    solver — e.g. `assert` intermediate lemmas, `unfold` recursive spec
+    functions, `split on` a boolean to case-split, or `induct on` a parameter.
+    See the "Proof blocks" section in the spec language reference for all
+    available hints.
   - Add helper lemma functions that break a proof into smaller steps.
-  - Add explicit axioms to guide the solver. When you add an axiom, ensure quantifiers have 
+  - Add explicit axioms to guide the solver. When you add an axiom, ensure quantifiers have
     valid triggers. Move quantifiers support a disjunction of a conjunction of triggers.
   - Restructure expressions while preserving their meaning (e.g. factor out common
     sub-expressions into `let` bindings, reorder conjuncts).

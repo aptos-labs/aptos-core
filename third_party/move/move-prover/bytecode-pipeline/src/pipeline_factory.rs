@@ -12,7 +12,8 @@ use crate::{
     memory_instrumentation::MemoryInstrumentationProcessor, mono_analysis::MonoAnalysisProcessor,
     mut_ref_instrumentation::MutRefInstrumenter,
     number_operation_analysis::NumberOperationProcessor, options::ProverOptions,
-    spec_inference::SpecInferenceProcessor, spec_instrumentation::SpecInstrumentationProcessor,
+    proof_hint_processor::ProofHintProcessor, spec_inference::SpecInferenceProcessor,
+    spec_instrumentation::SpecInstrumentationProcessor,
     verification_analysis::VerificationAnalysisProcessor,
     well_formed_instrumentation::WellFormedInstrumentationProcessor,
 };
@@ -55,6 +56,8 @@ pub fn default_pipeline_with_options(options: &ProverOptions) -> FunctionTargetP
         GlobalInvariantInstrumentationProcessor::new(),
         WellFormedInstrumentationProcessor::new(),
         DataInvariantInstrumentationProcessor::new(),
+        // proof hints (after all instrumentation, so triggers can match injected quantifiers)
+        ProofHintProcessor::new(),
     ]);
 
     if options.inference {

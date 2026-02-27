@@ -1,0 +1,6 @@
+[package]
+name = "loops"
+version = "0.0.0"
+
+[addresses]
+loops = "0x42"

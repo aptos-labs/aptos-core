@@ -44,7 +44,7 @@ pub struct McpArgs {
 
 /// Start the MCP stdio server.
 pub async fn run(args: &McpArgs, global: &GlobalOpts) -> Result<()> {
-    move_compiler_v2::logging::setup_logging(None);
+    move_compiler_v2::logging::setup_logging_with_timestamps(None);
 
     // Bridge `tracing` events (used by rmcp) into the `log` framework so that
     // flexi_logger captures transport-level diagnostics (e.g. "input stream
@@ -59,6 +59,12 @@ pub async fn run(args: &McpArgs, global: &GlobalOpts) -> Result<()> {
         log::error!("panic: {}", info);
         default_hook(info);
     }));
+
+    log::info!(
+        "move-flow MCP server v{} starting (tools: {})",
+        env!("CARGO_PKG_VERSION"),
+        FlowSession::tool_names().join(", ")
+    );
 
     let session = FlowSession::new(args.clone(), global.clone());
     let service = session.serve(stdio()).await?;

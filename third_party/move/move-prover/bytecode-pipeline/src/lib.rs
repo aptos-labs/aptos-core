@@ -15,6 +15,7 @@ pub mod number_operation;
 pub mod number_operation_analysis;
 pub mod options;
 pub mod pipeline_factory;
+pub mod proof_hint_processor;
 pub mod spec_inference;
 pub mod spec_instrumentation;
 pub mod verification_analysis;

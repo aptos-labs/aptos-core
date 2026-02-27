@@ -1024,7 +1024,7 @@ impl<'a> Sourcifier<'a> {
     /// Prints a spec block for a function, including the repeated signature.
     pub fn print_fun_spec(&self, fun_env: &FunctionEnv) {
         let spec = fun_env.get_spec();
-        if spec.conditions.is_empty() && spec.properties.is_empty() {
+        if spec.conditions.is_empty() && spec.properties.is_empty() && spec.proof_hints.is_empty() {
             return;
         }
 
@@ -1049,6 +1049,9 @@ impl<'a> Sourcifier<'a> {
         let exp_sourcifier = ExpSourcifier::for_fun_spec(self, fun_env, tctx, self.amend);
         for cond in &spec.conditions {
             self.print_condition(cond, &exp_sourcifier);
+        }
+        if !spec.proof_hints.is_empty() {
+            self.print_proof_hints(&spec.proof_hints, &exp_sourcifier);
         }
         self.writer.unindent();
 
@@ -1106,7 +1109,7 @@ impl<'a> Sourcifier<'a> {
 
     /// Prints a spec block directly from a Spec object with the given header.
     pub fn print_spec(&self, spec: &Spec, header: &str, tctx: TypeDisplayContext) {
-        if spec.conditions.is_empty() && spec.properties.is_empty() {
+        if spec.conditions.is_empty() && spec.properties.is_empty() && spec.proof_hints.is_empty() {
             return;
         }
 
@@ -1119,10 +1122,85 @@ impl<'a> Sourcifier<'a> {
         for cond in &spec.conditions {
             self.print_condition(cond, &exp_sourcifier);
         }
+        if !spec.proof_hints.is_empty() {
+            self.print_proof_hints(&spec.proof_hints, &exp_sourcifier);
+        }
         self.writer.unindent();
 
         emitln!(self.writer, "}");
         emitln!(self.writer);
+    }
+
+    fn print_proof_hints(&self, hints: &[crate::ast::ProofHint], exp_sourcifier: &ExpSourcifier) {
+        use crate::ast::ProofHint;
+        emitln!(self.writer, "proof {{");
+        self.writer.indent();
+        for hint in hints {
+            match hint {
+                ProofHint::Unfold(_, qsym, depth) => {
+                    let env = exp_sourcifier.env();
+                    if let Some(d) = depth {
+                        emitln!(self.writer, "unfold {} depth {};", qsym.display(env), d);
+                    } else {
+                        emitln!(self.writer, "unfold {};", qsym.display(env));
+                    }
+                },
+                ProofHint::Assert(_, exp) => {
+                    emit!(self.writer, "assert ");
+                    exp_sourcifier.print_exp(Prio::General, false, exp);
+                    emitln!(self.writer, ";");
+                },
+                ProofHint::Assume(_, exp) => {
+                    emit!(self.writer, "assume [trusted] ");
+                    exp_sourcifier.print_exp(Prio::General, false, exp);
+                    emitln!(self.writer, ";");
+                },
+                ProofHint::Trigger(_, bind_vars, trigger_groups) => {
+                    let env = exp_sourcifier.env();
+                    emit!(self.writer, "trigger forall ");
+                    let mut comma = "";
+                    for (sym, ty) in bind_vars {
+                        let tctx = crate::ty::TypeDisplayContext::new(env);
+                        emit!(
+                            self.writer,
+                            "{}{}: {}",
+                            comma,
+                            sym.display(env.symbol_pool()),
+                            ty.display(&tctx),
+                        );
+                        comma = ", ";
+                    }
+                    emit!(self.writer, " with ");
+                    for group in trigger_groups {
+                        emit!(self.writer, "{{");
+                        let mut inner_comma = "";
+                        for exp in group {
+                            emit!(self.writer, "{}", inner_comma);
+                            exp_sourcifier.print_exp(Prio::General, false, exp);
+                            inner_comma = ", ";
+                        }
+                        emit!(self.writer, "}}");
+                    }
+                    emitln!(self.writer, ";");
+                },
+                ProofHint::SplitOn(_, exp) => {
+                    emit!(self.writer, "split on ");
+                    exp_sourcifier.print_exp(Prio::General, false, exp);
+                    emitln!(self.writer, ";");
+                },
+                ProofHint::InductOn(_, sym) => {
+                    let env = exp_sourcifier.env();
+                    emitln!(self.writer, "induct on {};", sym.display(env.symbol_pool()));
+                },
+                ProofHint::Witness(_, exp) => {
+                    emit!(self.writer, "assert /* witness */ ");
+                    exp_sourcifier.print_exp(Prio::General, false, exp);
+                    emitln!(self.writer, ";");
+                },
+            }
+        }
+        self.writer.unindent();
+        emitln!(self.writer, "}}");
     }
 }
 

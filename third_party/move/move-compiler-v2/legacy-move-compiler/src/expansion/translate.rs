@@ -2114,6 +2114,47 @@ fn spec_member(context: &mut Context, sp!(loc, pm): P::SpecBlockMember) -> E::Sp
                 .collect();
             EM::Pragma { properties }
         },
+        PM::Proof { hints } => {
+            let hints = hints
+                .into_iter()
+                .filter_map(|sp!(hloc, hint)| {
+                    let eh = match hint {
+                        P::ProofHint_::Unfold(chain, depth) => {
+                            let access = name_access_chain(context, Access::Term, chain, None)?;
+                            E::ProofHint_::Unfold(access, depth)
+                        },
+                        P::ProofHint_::Assert(pexp) => E::ProofHint_::Assert(exp_(context, pexp)),
+                        P::ProofHint_::Use(chain, pargs) => {
+                            let access = name_access_chain(context, Access::Term, chain, None)?;
+                            let args = pargs.into_iter().map(|e| exp_(context, e)).collect();
+                            E::ProofHint_::Use(access, args)
+                        },
+                        P::ProofHint_::Assume(pprops, pexp) => {
+                            let props = pprops
+                                .into_iter()
+                                .map(|p| pragma_property(context, p))
+                                .collect();
+                            E::ProofHint_::Assume(props, exp_(context, pexp))
+                        },
+                        P::ProofHint_::Trigger(binds, triggers) => {
+                            let eranges = bind_with_range_list(context, binds)?;
+                            let etriggers = triggers
+                                .into_iter()
+                                .map(|group| group.into_iter().map(|e| exp_(context, e)).collect())
+                                .collect();
+                            E::ProofHint_::Trigger(eranges, etriggers)
+                        },
+                        P::ProofHint_::SplitOn(pexp) => E::ProofHint_::SplitOn(exp_(context, pexp)),
+                        P::ProofHint_::InductOn(var) => E::ProofHint_::InductOn(var),
+                        P::ProofHint_::Witness(name, wexp, qexp) => {
+                            E::ProofHint_::Witness(name, exp_(context, wexp), exp_(context, qexp))
+                        },
+                    };
+                    Some(sp(hloc, eh))
+                })
+                .collect();
+            EM::Proof { hints }
+        },
     };
     sp(loc, em)
 }
@@ -3374,6 +3415,32 @@ fn unbound_names_spec_block_member(unbound: &mut UnboundNames, sp!(_, m_): &E::S
         | M::Include { .. }
         | M::Apply { .. }
         | M::Pragma { .. } => (),
+        M::Proof { hints } => {
+            for sp!(_, hint) in hints {
+                match hint {
+                    E::ProofHint_::Assert(exp)
+                    | E::ProofHint_::Assume(_, exp)
+                    | E::ProofHint_::SplitOn(exp) => {
+                        unbound_names_exp(unbound, exp);
+                    },
+                    E::ProofHint_::Use(_, args) => {
+                        args.iter().for_each(|e| unbound_names_exp(unbound, e));
+                    },
+                    E::ProofHint_::Trigger(_, trigger_groups) => {
+                        for group in trigger_groups {
+                            for e in group {
+                                unbound_names_exp(unbound, e);
+                            }
+                        }
+                    },
+                    E::ProofHint_::Witness(_, wexp, qexp) => {
+                        unbound_names_exp(unbound, wexp);
+                        unbound_names_exp(unbound, qexp);
+                    },
+                    E::ProofHint_::Unfold(..) | E::ProofHint_::InductOn(_) => (),
+                }
+            }
+        },
     }
 }
 

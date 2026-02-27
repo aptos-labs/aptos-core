@@ -1,0 +1,95 @@
+============ initial translation from Move ================
+
+[variant baseline]
+fun TestTrigger::test_generic_trigger<#0>($t0|b: 0x42::TestTrigger::Box<#0>): 0x42::TestTrigger::Box<#0> {
+     var $t1: 0x42::TestTrigger::Box<#0>
+  0: $t1 := move($t0)
+  1: return $t1
+}
+
+
+[variant baseline]
+fun TestTrigger::test_trigger($t0|x: u64): u64 {
+     var $t1: u64
+  0: $t1 := move($t0)
+  1: return $t1
+}
+
+
+[variant baseline]
+fun TestTrigger::test_trigger_global($t0|addr: address) {
+     var $t1|r: &mut 0x42::TestTrigger::R
+     var $t2: address
+     var $t3: &mut 0x42::TestTrigger::R
+     var $t4: &mut 0x42::TestTrigger::R
+     var $t5: &u64
+     var $t6: u64
+     var $t7: u64
+     var $t8: u64
+     var $t9: &mut 0x42::TestTrigger::R
+     var $t10: &mut u64
+  0: $t2 := move($t0)
+  1: $t3 := borrow_global<0x42::TestTrigger::R>($t2)
+  2: $t1 := $t3
+  3: $t4 := copy($t1)
+  4: $t5 := borrow_field<0x42::TestTrigger::R>.x($t4)
+  5: $t6 := read_ref($t5)
+  6: $t7 := 1
+  7: $t8 := +($t6, $t7)
+  8: $t9 := move($t1)
+  9: $t10 := borrow_field<0x42::TestTrigger::R>.x($t9)
+ 10: write_ref($t10, $t8)
+ 11: return ()
+}
+
+============ after pipeline `proof_hint_processor` ================
+
+[variant verification]
+fun TestTrigger::test_generic_trigger<#0>($t0|b: 0x42::TestTrigger::Box<#0>): 0x42::TestTrigger::Box<#0> {
+  0: assume WellFormed($t0)
+  1: label L1
+     # VC: post-condition does not hold at tests/proof_hint_processor/trigger.move:55:9+55
+  2: assert forall x: 0x42::TestTrigger::Box<#0>: TypeDomain<0x42::TestTrigger::Box<#0>>(){TestTrigger::box_value<#0>(x)}: Eq<#0>(TestTrigger::box_value<#0>(x), TestTrigger::box_value<#0>(x))
+  3: return $t0
+}
+
+
+[variant verification]
+fun TestTrigger::test_trigger($t0|x: u64): u64 {
+  0: assume WellFormed($t0)
+  1: label L1
+     # VC: post-condition does not hold at tests/proof_hint_processor/trigger.move:16:9+51
+  2: assert forall y: u64: TypeDomain<u64>(){TestTrigger::is_valid(y)}: Implies(TestTrigger::is_valid(y), TestTrigger::is_valid(y))
+  3: return $t0
+}
+
+
+[variant verification]
+fun TestTrigger::test_trigger_global($t0|addr: address) {
+     var $t1|r: &mut 0x42::TestTrigger::R
+     var $t2: &mut 0x42::TestTrigger::R
+     var $t3: num
+     var $t4: u64
+     var $t5: u64
+     var $t6: u64
+     var $t7: &mut u64
+  0: assume WellFormed($t0)
+  1: assume forall $rsc: 0x42::TestTrigger::R: ResourceDomain<0x42::TestTrigger::R>(): WellFormed($rsc)
+     # global invariant at tests/proof_hint_processor/trigger.move:31:9+57
+  2: assume forall a: address: TypeDomain<address>(){TestTrigger::r_value(a)}: Gt(select TestTrigger::R.x<0x42::TestTrigger::R>(global<0x42::TestTrigger::R>(a)), 0)
+  3: $t2 := borrow_global<0x42::TestTrigger::R>($t0) on_abort goto 14 with $t3
+  4: $t4 := get_field<0x42::TestTrigger::R>.x($t2)
+  5: $t5 := 1
+  6: $t6 := +($t4, $t5) on_abort goto 14 with $t3
+  7: $t7 := borrow_field<0x42::TestTrigger::R>.x($t2)
+  8: write_ref($t7, $t6)
+  9: write_back[Reference($t2).x (u64)]($t7)
+ 10: write_back[0x42::TestTrigger::R@]($t2)
+     # global invariant at tests/proof_hint_processor/trigger.move:31:9+57
+     # VC: global memory invariant does not hold at tests/proof_hint_processor/trigger.move:31:9+57
+ 11: assert forall a: address: TypeDomain<address>(){TestTrigger::r_value(a)}: Gt(select TestTrigger::R.x<0x42::TestTrigger::R>(global<0x42::TestTrigger::R>(a)), 0)
+ 12: label L1
+ 13: return ()
+ 14: label L2
+ 15: abort($t3)
+}

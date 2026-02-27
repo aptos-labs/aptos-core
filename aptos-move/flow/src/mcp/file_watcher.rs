@@ -79,7 +79,7 @@ impl FileWatcher {
                         keys
                     };
                     for key in &keys {
-                        log::debug!("file change detected for `{}`", key);
+                        log::trace!("file change detected for `{}`", key);
                         on_invalidate(key);
                     }
                 }
