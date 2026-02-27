@@ -265,7 +265,7 @@ impl<E: Pairing> traits::BatchedRangeProof<E> for Proof<E> {
         let bits: Vec<Vec<bool>> = zz
             .iter()
             .map(|z_val| {
-                utils::scalar_to_bits_le::<E>(z_val)
+                utils::scalar_to_bits_le::<E::ScalarField>(z_val)
                     .into_iter()
                     .take(ell as usize)
                     .collect::<Vec<_>>()

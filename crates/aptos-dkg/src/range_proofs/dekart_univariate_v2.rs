@@ -3,6 +3,7 @@
 
 // This file implements the range proof described here: https://alinush.github.io/dekart
 
+use super::scalars_to_bits;
 use crate::{
     algebra::polynomials,
     pcs::univariate_hiding_kzg,
@@ -502,18 +503,8 @@ impl<E: Pairing> traits::BatchedRangeProof<E> for Proof<E> {
         #[cfg(feature = "range_proof_timing_univariate_v2")]
         let start = Instant::now();
         // Step 4a (match multivariate: precompute bits, then f_j evals from them)
-        let bits: Vec<Vec<bool>> = values
-            .iter()
-            .map(|z_val| {
-                utils::scalar_to_bits_le::<E>(z_val)
-                    .into_iter()
-                    .take(ell as usize)
-                    .collect::<Vec<_>>()
-            })
-            .collect();
-        let f_j_evals_without_r: Vec<Vec<bool>> = (0..ell as usize)
-            .map(|j| bits.iter().map(|row| row[j]).collect())
-            .collect();
+        let bits = scalars_to_bits::scalars_to_bits_le(values, ell);
+        let f_j_evals_without_r = scalars_to_bits::transpose_bit_matrix(&bits);
 
         let rs: Vec<E::ScalarField> = (0..ell).map(|_| sample_field_element(rng)).collect();
 

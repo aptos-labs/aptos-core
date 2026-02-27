@@ -1,6 +1,7 @@
 // Copyright (c) Aptos Foundation
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
+use super::scalars_to_bits;
 use crate::{
     fiat_shamir::PolynomialCommitmentScheme,
     pcs::{
@@ -214,7 +215,7 @@ impl<E: Pairing> traits::BatchedRangeProof<E> for Proof<E> {
 
         #[cfg(feature = "range_proof_timing_multivariate")]
         let start = Instant::now();
-        let mut trs = merlin::Transcript::new(b"dekart");
+        let mut trs = merlin::Transcript::new(b"dekart_multivariate");
 
         // Replay transcript in same order as prover: C_beta (if any), C_fj, C_gi, H_g, then c, alpha, t
         if let Some(ref c) = self.blinding_poly_comm {
@@ -404,14 +405,11 @@ pub fn prove_impl<E: Pairing, R: RngCore + CryptoRng>(
     pk: &ProverKey<E>,
     values: &[E::ScalarField],
     ell: u8,
-    comm: &univariate_hiding_kzg::Commitment<E>,
+    _comm: &univariate_hiding_kzg::Commitment<E>,
     rho: &univariate_hiding_kzg::CommitmentRandomness<E::ScalarField>,
     rng: &mut R,
     use_blinding: bool,
-) -> Proof<E>
-where
-    E: Pairing,
-{
+) -> Proof<E> {
     #[cfg(feature = "range_proof_timing_multivariate")]
     let mut cumulative = Duration::ZERO;
     #[cfg(feature = "range_proof_timing_multivariate")]
@@ -425,7 +423,7 @@ where
         );
     };
 
-    let mut trs = merlin::Transcript::new(b"dekart");
+    let mut trs = merlin::Transcript::new(b"dekart_multivariate");
     let tau_powers = match &pk.ck.msm_basis {
         SrsBasis::PowersOfTau { tau_powers } => tau_powers,
         _ => panic!("Expected PowersOfTau SRS"),
@@ -456,20 +454,9 @@ where
 
     #[cfg(feature = "range_proof_timing_multivariate")]
     let start = Instant::now();
-    // Step 3a: construct the f_js (copy_paste)
-    let bits: Vec<Vec<bool>> = values
-        .iter()
-        .map(|z_val| {
-            utils::scalar_to_bits_le::<E>(z_val)
-                .into_iter()
-                .take(ell as usize)
-                .collect::<Vec<_>>()
-        })
-        .collect();
-    // This is copy-paste:
-    let f_j_evals_without_r: Vec<Vec<bool>> = (0..ell as usize)
-        .map(|j| bits.iter().map(|row| row[j]).collect())
-        .collect(); // This is just transposing the bits matrix
+    // Step 3a: construct the f_js
+    let bits = scalars_to_bits::scalars_to_bits_le(values, ell);
+    let f_j_evals_without_r = scalars_to_bits::transpose_bit_matrix(&bits);
 
     // Step 3b: Sample masks β_j independently (no correlated randomness)
     let betas: Vec<E::ScalarField> = sample_field_elements(ell as usize, rng);
@@ -508,11 +495,7 @@ where
     #[cfg(feature = "range_proof_timing_multivariate")]
     let start = Instant::now();
     // Step 3e: Commit to the f_js.
-    // Homomorphism does: xi_1*r + sum_{i=0..size-1} tau_powers[i]*values[i] and uses exactly
-    // msm_basis[..values.len()] = tau_powers[0..size]. So we must use tau_powers[1..size] (length
-    // size-1) in msm_bool, not tau_powers[1..] (which can be longer if SRS has more than size powers).
-    // Bits must be the tail of f_j_eval as 0/1, length size-1: either from f_j_eval[1..] or
-    // f_j_evals_without_r[j] padded to size-1.
+    // Homomorphism does: xi_1*r + sum_{i=0..size-1} tau_powers[i]*values[i]
     let f_j_comms: Vec<E::G1> = f_j_evals
         .iter()
         .zip(f_j_comms_randomness.iter())
@@ -521,7 +504,7 @@ where
             let bits = f_j_evals_without_r[j].clone();
             let sum = tau_powers[0] * f_j_eval[0]
                 + utils::msm_bool(&tau_powers[1..=values.len() as usize], &bits);
-            pk.ck.xi_1 * *r_i + sum
+            pk.ck.xi_1 * *r_i + sum // TODO: could turn this into a 3-term MSM, should be faster
         })
         .collect();
     #[cfg(feature = "range_proof_timing_multivariate")]
