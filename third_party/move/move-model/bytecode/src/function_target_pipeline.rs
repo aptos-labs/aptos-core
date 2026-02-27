@@ -32,6 +32,8 @@ pub enum VerificationFlavor {
     Regular,
     Instantiated(usize),
     Inconsistency(Box<VerificationFlavor>),
+    /// A split case variant. The usize is the case combination index.
+    Split(Box<VerificationFlavor>, usize),
 }
 
 impl std::fmt::Display for VerificationFlavor {
@@ -42,6 +44,14 @@ impl std::fmt::Display for VerificationFlavor {
                 write!(f, "instantiated_{}", index)
             },
             VerificationFlavor::Inconsistency(flavor) => write!(f, "inconsistency_{}", flavor),
+            VerificationFlavor::Split(flavor, index) => {
+                let base = flavor.to_string();
+                if base.is_empty() {
+                    write!(f, "split_{}", index)
+                } else {
+                    write!(f, "split_{}_{}", base, index)
+                }
+            },
         }
     }
 }
@@ -177,8 +187,14 @@ impl FunctionTargetsHolder {
         if func_env.is_inline() {
             return;
         }
-        let generator = StacklessBytecodeGenerator::new(func_env);
-        let data = generator.generate_function();
+        let data = if func_env.is_lemma() {
+            // Lemma functions have spec-only parameter types (e.g. `num`) that cannot
+            // go through StacklessBytecodeGenerator. Create empty data directly.
+            FunctionData::new_empty(func_env)
+        } else {
+            let generator = StacklessBytecodeGenerator::new(func_env);
+            generator.generate_function()
+        };
         self.targets
             .entry(func_env.get_qualified_id())
             .or_default()

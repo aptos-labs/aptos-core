@@ -379,6 +379,115 @@ pub enum PropertyValue {
     QualifiedSymbol(QualifiedSymbol),
 }
 
+// =================================================================================================
+/// # Proof Language
+
+/// A structured proof statement from a `proof { ... }` block in a spec.
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub enum Proof {
+    /// `let name = exp;` — introduce a local abbreviation.
+    Let(Loc, Symbol, Exp),
+    /// `if (cond) proof [else proof]` — conditional proof.
+    IfElse(Loc, Exp, Box<Proof>, Option<Box<Proof>>),
+    /// `{ proof_stmts }` — a block of proof statements.
+    Block(Loc, Vec<Proof>),
+    /// `assert exp;` — auxiliary assertion.
+    Assert(Loc, Exp),
+    /// `assume [trusted] exp;` — trusted assumption (emits a warning).
+    Assume(Loc, Exp),
+    /// `apply lemma(args);` — instantiate a lemma's requires/ensures.
+    Apply(Loc, QualifiedId<LemmaId>, Vec<Exp>),
+    /// `forall bindings [triggers] apply lemma(args);` — quantified lemma instantiation.
+    ForallApply(
+        Loc,
+        Vec<(Symbol, Type)>,
+        Vec<Vec<Exp>>,
+        QualifiedId<LemmaId>,
+        Vec<Exp>,
+    ),
+    /// `calc(e1 relop e2 relop ... en);` — calculational proof chain.
+    /// Each triple is (lhs, relop, rhs).
+    Calc(Loc, Vec<(Exp, Operation, Exp)>),
+    /// `post <proof_stmt>` — emit at return point instead of entry.
+    Post(Loc, Box<Proof>),
+    /// `split expr;` — case-split on boolean or enum, creating verification variants.
+    Split(Loc, Exp),
+}
+
+impl Proof {
+    /// Structural equality ignoring `Loc` fields, comparing expressions via `Exp::structural_eq`.
+    pub fn structural_eq(&self, other: &Proof) -> bool {
+        match (self, other) {
+            (Proof::Let(_, s1, e1), Proof::Let(_, s2, e2)) => s1 == s2 && e1.structural_eq(e2),
+            (Proof::IfElse(_, c1, t1, e1), Proof::IfElse(_, c2, t2, e2)) => {
+                c1.structural_eq(c2)
+                    && t1.structural_eq(t2)
+                    && match (e1, e2) {
+                        (Some(a), Some(b)) => a.structural_eq(b),
+                        (None, None) => true,
+                        _ => false,
+                    }
+            },
+            (Proof::Block(_, ss1), Proof::Block(_, ss2)) => {
+                ss1.len() == ss2.len() && ss1.iter().zip(ss2).all(|(a, b)| a.structural_eq(b))
+            },
+            (Proof::Assert(_, e1), Proof::Assert(_, e2)) => e1.structural_eq(e2),
+            (Proof::Assume(_, e1), Proof::Assume(_, e2)) => e1.structural_eq(e2),
+            (Proof::Apply(_, l1, a1), Proof::Apply(_, l2, a2)) => {
+                l1 == l2
+                    && a1.len() == a2.len()
+                    && a1.iter().zip(a2).all(|(x, y)| x.structural_eq(y))
+            },
+            (Proof::ForallApply(_, b1, t1, l1, a1), Proof::ForallApply(_, b2, t2, l2, a2)) => {
+                b1 == b2
+                    && t1.len() == t2.len()
+                    && t1.iter().zip(t2).all(|(ts1, ts2)| {
+                        ts1.len() == ts2.len()
+                            && ts1.iter().zip(ts2).all(|(x, y)| x.structural_eq(y))
+                    })
+                    && l1 == l2
+                    && a1.len() == a2.len()
+                    && a1.iter().zip(a2).all(|(x, y)| x.structural_eq(y))
+            },
+            (Proof::Calc(_, s1), Proof::Calc(_, s2)) => {
+                s1.len() == s2.len()
+                    && s1.iter().zip(s2).all(|((l1, o1, r1), (l2, o2, r2))| {
+                        l1.structural_eq(l2) && o1 == o2 && r1.structural_eq(r2)
+                    })
+            },
+            (Proof::Post(_, p1), Proof::Post(_, p2)) => p1.structural_eq(p2),
+            (Proof::Split(_, e1), Proof::Split(_, e2)) => e1.structural_eq(e2),
+            _ => false,
+        }
+    }
+}
+
+/// A lemma declaration.
+#[derive(Debug, Clone)]
+pub struct LemmaDecl {
+    pub loc: Loc,
+    pub name: Symbol,
+    pub type_params: Vec<TypeParameter>,
+    pub params: Vec<Parameter>,
+    pub conditions: Vec<Condition>,
+    pub properties: PropertyBag,
+    pub proof: Option<Proof>,
+}
+
+/// Id for lemma declarations.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub struct LemmaId(pub u16);
+
+impl LemmaId {
+    pub fn new(idx: usize) -> Self {
+        Self(idx as u16)
+    }
+
+    pub fn as_usize(self) -> usize {
+        self.0 as usize
+    }
+}
+
 /// Specification and properties associated with a language item.
 #[derive(Debug, Clone, Default, PartialEq, Eq, Hash)]
 pub struct Spec {
@@ -395,6 +504,8 @@ pub struct Spec {
     pub on_impl: BTreeMap<CodeOffset, Spec>,
     /// The map to store ghost variable update statements inlined in the function body.
     pub update_map: BTreeMap<NodeId, Condition>,
+    /// Structured proof guiding the SMT solver.
+    pub proof: Option<Proof>,
 }
 
 impl Spec {
@@ -427,6 +538,11 @@ impl Spec {
                     }
                 })
             }
+            && match (&self.proof, &other.proof) {
+                (Some(p1), Some(p2)) => p1.structural_eq(p2),
+                (None, None) => true,
+                _ => false,
+            }
     }
 
     pub fn has_conditions(&self) -> bool {
@@ -438,6 +554,7 @@ impl Spec {
             && self.on_impl.is_empty()
             && self.properties.is_empty()
             && self.update_map.is_empty()
+            && self.proof.is_none()
     }
 
     pub fn filter<P>(&self, pred: P) -> impl Iterator<Item = &Condition>
@@ -466,6 +583,15 @@ impl Spec {
         self.any(move |c| c.kind == kind)
     }
 
+    /// Returns expressions contained in the proof, if any.
+    pub fn proof_exps(&self) -> Vec<&Exp> {
+        let mut result = vec![];
+        if let Some(proof) = &self.proof {
+            collect_proof_exps(proof, &mut result);
+        }
+        result
+    }
+
     /// Returns the functions used (called or loaded as a function value) in this spec, along with
     /// the sites of the calls or loads.
     pub fn used_funs_with_uses(&self) -> BTreeMap<QualifiedId<FunId>, BTreeSet<NodeId>> {
@@ -477,6 +603,9 @@ impl Spec {
         }
         for on_impl in self.on_impl.values() {
             result.append(&mut on_impl.used_funs_with_uses())
+        }
+        for exp in self.proof_exps() {
+            result.append(&mut exp.used_funs_with_uses())
         }
         result
     }
@@ -492,6 +621,9 @@ impl Spec {
         }
         for on_impl in self.on_impl.values() {
             result.append(&mut on_impl.called_funs_with_callsites())
+        }
+        for exp in self.proof_exps() {
+            result.append(&mut exp.called_funs_with_callsites())
         }
         result
     }
@@ -539,6 +671,54 @@ impl Spec {
         };
         self.visit_post_order(&mut visitor);
         temps
+    }
+}
+
+/// Recursively collects all expressions from a proof tree.
+pub fn collect_proof_exps<'a>(proof: &'a Proof, result: &mut Vec<&'a Exp>) {
+    match proof {
+        Proof::Let(_, _, exp) | Proof::Assert(_, exp) | Proof::Assume(_, exp) => {
+            result.push(exp);
+        },
+        Proof::IfElse(_, cond, then_branch, else_branch) => {
+            result.push(cond);
+            collect_proof_exps(then_branch, result);
+            if let Some(eb) = else_branch {
+                collect_proof_exps(eb, result);
+            }
+        },
+        Proof::Block(_, stmts) => {
+            for s in stmts {
+                collect_proof_exps(s, result);
+            }
+        },
+        Proof::Apply(_, _, args) => {
+            for arg in args {
+                result.push(arg);
+            }
+        },
+        Proof::ForallApply(_, _, patterns, _, args) => {
+            for group in patterns {
+                for exp in group {
+                    result.push(exp);
+                }
+            }
+            for arg in args {
+                result.push(arg);
+            }
+        },
+        Proof::Calc(_, steps) => {
+            for (lhs, _, rhs) in steps {
+                result.push(lhs);
+                result.push(rhs);
+            }
+        },
+        Proof::Post(_, inner) => {
+            collect_proof_exps(inner, result);
+        },
+        Proof::Split(_, exp) => {
+            result.push(exp);
+        },
     }
 }
 
@@ -1874,6 +2054,60 @@ impl ExpData {
         }
         for update in spec.update_map.values() {
             Self::visit_positions_cond_impl(update, visitor)?;
+        }
+        if let Some(proof) = &spec.proof {
+            Self::visit_positions_proof_impl(proof, visitor)?;
+        }
+        Some(())
+    }
+
+    fn visit_positions_proof_impl<F>(proof: &Proof, visitor: &mut F) -> Option<()>
+    where
+        F: FnMut(VisitorPosition, &ExpData) -> Option<()>,
+    {
+        match proof {
+            Proof::Let(_, _, exp) | Proof::Assert(_, exp) | Proof::Assume(_, exp) => {
+                exp.visit_positions_impl(visitor)?;
+            },
+            Proof::IfElse(_, cond, then_branch, else_branch) => {
+                cond.visit_positions_impl(visitor)?;
+                Self::visit_positions_proof_impl(then_branch, visitor)?;
+                if let Some(eb) = else_branch {
+                    Self::visit_positions_proof_impl(eb, visitor)?;
+                }
+            },
+            Proof::Block(_, stmts) => {
+                for s in stmts {
+                    Self::visit_positions_proof_impl(s, visitor)?;
+                }
+            },
+            Proof::Apply(_, _, args) => {
+                for arg in args {
+                    arg.visit_positions_impl(visitor)?;
+                }
+            },
+            Proof::ForallApply(_, _, patterns, _, args) => {
+                for group in patterns {
+                    for exp in group {
+                        exp.visit_positions_impl(visitor)?;
+                    }
+                }
+                for arg in args {
+                    arg.visit_positions_impl(visitor)?;
+                }
+            },
+            Proof::Calc(_, steps) => {
+                for (lhs, _, rhs) in steps {
+                    lhs.visit_positions_impl(visitor)?;
+                    rhs.visit_positions_impl(visitor)?;
+                }
+            },
+            Proof::Post(_, inner) => {
+                Self::visit_positions_proof_impl(inner, visitor)?;
+            },
+            Proof::Split(_, exp) => {
+                exp.visit_positions_impl(visitor)?;
+            },
         }
         Some(())
     }
@@ -4555,6 +4789,7 @@ mod tests {
                 (NodeId::new(1), update_condition(11, true)),
                 (NodeId::new(2), update_condition(22, false)),
             ]),
+            proof: None,
         };
         let spec2 = Spec {
             loc: None,
@@ -4566,6 +4801,7 @@ mod tests {
                 (NodeId::new(100), update_condition(33, false)),
                 (NodeId::new(200), update_condition(44, true)),
             ]),
+            proof: None,
         };
 
         assert!(spec1.structural_eq(&spec2));

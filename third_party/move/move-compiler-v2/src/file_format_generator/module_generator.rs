@@ -263,8 +263,8 @@ impl ModuleGenerator {
 
         let acquires_map = ctx.generate_acquires_map(module_env);
         for fun_env in module_env.get_functions() {
-            // Do not need to generate code for inline functions
-            if fun_env.is_inline() {
+            // Do not need to generate code for inline or lemma functions
+            if fun_env.is_inline() || fun_env.is_lemma() {
                 continue;
             }
             assert!(compile_test_code || !fun_env.is_test_only());
@@ -1630,7 +1630,7 @@ impl ModuleContext<'_> {
     ) -> BTreeMap<FunId, BTreeSet<FunId>> {
         let mut called_functions_map = BTreeMap::new();
         for fun in module.get_functions() {
-            if fun.is_inline() {
+            if fun.is_inline() || fun.is_lemma() {
                 continue;
             }
             let mut called_functions = BTreeSet::new();
@@ -1655,7 +1655,7 @@ impl ModuleContext<'_> {
         // Compute map with direct usage of resources
         let mut usage_map = module
             .get_functions()
-            .filter(|f| !f.is_inline())
+            .filter(|f| !f.is_inline() && !f.is_lemma())
             .map(|f| (f.get_id(), self.get_direct_function_acquires(&f)))
             .collect::<BTreeMap<_, _>>();
         let called_functions_map = self.get_same_module_called_functions(module);
@@ -1664,7 +1664,7 @@ impl ModuleContext<'_> {
         loop {
             let mut changes = false;
             for fun in module.get_functions() {
-                if fun.is_inline() {
+                if fun.is_inline() || fun.is_lemma() {
                     continue;
                 }
                 let mut usage = usage_map[&fun.get_id()].clone();

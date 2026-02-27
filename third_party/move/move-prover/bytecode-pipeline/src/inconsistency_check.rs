@@ -50,7 +50,7 @@ impl FunctionTargetProcessor for InconsistencyCheckInstrumenter {
         data: FunctionData,
         _scc_opt: Option<&[FunctionEnv]>,
     ) -> FunctionData {
-        if fun_env.is_native() || fun_env.is_intrinsic() {
+        if fun_env.no_verified_bytecode() {
             // Nothing to do.
             return data;
         }

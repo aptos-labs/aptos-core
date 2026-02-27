@@ -379,7 +379,9 @@ fn walk_spec_block(block: &SpecBlock, diags: &mut Diagnostics) {
             },
             SpecBlockMember_::Pragma { .. }
             | SpecBlockMember_::ReadsOf { .. }
-            | SpecBlockMember_::Reads { .. } => {},
+            | SpecBlockMember_::Reads { .. }
+            | SpecBlockMember_::Proof { .. }
+            | SpecBlockMember_::Lemma { .. } => {},
         }
     }
 }

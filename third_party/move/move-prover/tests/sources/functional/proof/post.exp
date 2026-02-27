@@ -1,0 +1,13 @@
+Move prover returns: exiting with verification errors
+error: proof assertion not satisfied
+    ┌─ tests/sources/functional/proof/post.move:115:14
+    │
+115 │         post assert result > x;  // error: result == x, not > x
+    │              ^^^^^^^^^^^^^^^^^^
+    │
+    =     at tests/sources/functional/proof/post.move:109: identity
+    =         x = <redacted>
+    =     at tests/sources/functional/proof/post.move:110: identity
+    =         result = <redacted>
+    =     at tests/sources/functional/proof/post.move:111: identity
+    =     at tests/sources/functional/proof/post.move:115: identity (spec)

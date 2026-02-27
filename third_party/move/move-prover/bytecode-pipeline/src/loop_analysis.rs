@@ -38,7 +38,7 @@ impl FunctionTargetProcessor for LoopAnalysisProcessor {
         data: FunctionData,
         _scc_opt: Option<&[FunctionEnv]>,
     ) -> FunctionData {
-        if func_env.is_native() {
+        if !func_env.is_compiled() {
             return data;
         }
         match fat_loop::build_loop_info_for_spec(&FunctionTarget::new(func_env, &data)) {

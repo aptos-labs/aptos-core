@@ -1,0 +1,17 @@
+Move prover returns: exiting with verification errors
+warning: proof uses trusted assumption
+   ┌─ tests/sources/functional/proof/lemma_shortcut.move:31:9
+   │
+31 │         assume [trusted] true;
+   │         ^^^^^^^^^^^^^^^^^^^^^^
+
+error: post-condition does not hold
+   ┌─ tests/sources/functional/proof/lemma_shortcut.move:58:9
+   │
+58 │         ensures x + 1 == x;  // obviously false
+   │         ^^^^^^^^^^^^^^^^^^^
+   │
+   =     at tests/sources/functional/proof/lemma_shortcut.move:57: false_identity (spec)
+   =         x = <redacted>
+   =     at tests/sources/functional/proof/lemma_shortcut.move:59: false_identity (spec)
+   =     at tests/sources/functional/proof/lemma_shortcut.move:58: false_identity (spec)
