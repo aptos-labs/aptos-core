@@ -10,7 +10,8 @@ use crate::{
     },
     ledger_db::LedgerDb,
     metrics::{
-        OTHER_TIMERS_SECONDS, ROCKSDB_PROPERTIES, ROCKSDB_SHARD_PROPERTIES, SHARD_NAME_BY_ID,
+        OTHER_TIMERS_SECONDS, ROCKSDB_PROPERTIES, ROCKSDB_SHARD_PROPERTIES, ROCKSDB_TICKERS,
+        SHARD_NAME_BY_ID,
     },
     state_kv_db::StateKvDb,
     state_merkle_db::StateMerkleDb,
@@ -19,7 +20,7 @@ use anyhow::Result;
 use aptos_infallible::Mutex;
 use aptos_logger::prelude::*;
 use aptos_metrics_core::TimerHelper;
-use aptos_schemadb::{ColumnFamilyName, DB};
+use aptos_schemadb::{ColumnFamilyName, Ticker, DB};
 use aptos_types::state_store::NUM_STATE_SHARDS;
 use once_cell::sync::Lazy;
 use std::{
@@ -56,6 +57,46 @@ static ROCKSDB_PROPERTY_MAP: Lazy<HashMap<&str, String>> = Lazy::new(|| {
     .map(|x| (*x, format!("aptos_{}", x.replace('.', "_"))))
     .collect()
 });
+
+/// RocksDB tickers to report. These are per-DB cumulative counters (not per-CF).
+static ROCKSDB_TICKERS_TO_REPORT: &[(Ticker, &str)] = &[
+    (Ticker::StallMicros, "stall_micros"),
+    (Ticker::CompactReadBytes, "compact_read_bytes"),
+    (Ticker::CompactWriteBytes, "compact_write_bytes"),
+    (Ticker::FlushWriteBytes, "flush_write_bytes"),
+    (Ticker::BloomFilterUseful, "bloom_filter_useful"),
+    (
+        Ticker::BloomFilterFullPositive,
+        "bloom_filter_full_positive",
+    ),
+    (
+        Ticker::BloomFilterFullTruePositive,
+        "bloom_filter_full_true_positive",
+    ),
+    (
+        Ticker::BloomFilterPrefixChecked,
+        "bloom_filter_prefix_checked",
+    ),
+    (
+        Ticker::BloomFilterPrefixUseful,
+        "bloom_filter_prefix_useful",
+    ),
+    (
+        Ticker::BloomFilterPrefixTruePositive,
+        "bloom_filter_prefix_true_positive",
+    ),
+    (Ticker::BlockCacheHit, "block_cache_hit"),
+    (Ticker::BlockCacheMiss, "block_cache_miss"),
+];
+
+fn set_tickers(db: &DB) {
+    let db_name = db.name();
+    for (ticker, ticker_name) in ROCKSDB_TICKERS_TO_REPORT {
+        ROCKSDB_TICKERS
+            .with_label_values(&[db_name, ticker_name])
+            .set(db.get_ticker_count(*ticker) as i64);
+    }
+}
 
 fn set_property(cf_name: &str, db: &DB) -> Result<()> {
     if !skip_reporting_cf(cf_name) {
@@ -127,6 +168,25 @@ fn update_rocksdb_properties(
             set_shard_property(cf_name, state_merkle_db.db_shard(shard), shard)?;
         }
     }
+
+    // Report per-DB tickers (not per-CF — tickers are DB-level statistics).
+    set_tickers(&ledger_db.metadata_db_arc());
+    set_tickers(ledger_db.write_set_db_raw());
+    set_tickers(ledger_db.transaction_info_db_raw());
+    set_tickers(ledger_db.transaction_db_raw());
+    set_tickers(ledger_db.event_db_raw());
+    set_tickers(ledger_db.transaction_accumulator_db_raw());
+
+    set_tickers(state_kv_db.metadata_db());
+    for shard in 0..NUM_STATE_SHARDS {
+        set_tickers(state_kv_db.db_shard(shard));
+    }
+
+    set_tickers(state_merkle_db.metadata_db());
+    for shard in 0..NUM_STATE_SHARDS {
+        set_tickers(state_merkle_db.db_shard(shard));
+    }
+
     Ok(())
 }
 
