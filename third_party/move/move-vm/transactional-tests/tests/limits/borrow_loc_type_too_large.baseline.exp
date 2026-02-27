@@ -8,13 +8,15 @@ Error: Unable to publish module '00000000000000000000000000000000000000000000000
     indices: [],
     offsets: [],
 }
-task 2 lines 43-43:  run 0x22::test::entry_below_limit
-task 3 lines 45-45:  run 0x22::test::entry_at_limit
-task 4 lines 47-47:  run 0x23::test::entry_above_limit
+task 2 lines 43-43:  run --verbose 0x22::test::entry_below_limit
+task 3 lines 45-45:  run --verbose 0x22::test::entry_at_limit
+task 4 lines 47-47:  run --verbose 0x23::test::entry_above_limit
 Error: Function execution failed with VMError: {
+    message: Linker Error: Module 0000000000000000000000000000000000000000000000000000000000000023::test doesn't exist,
     major_status: LINKER_ERROR,
     sub_status: None,
     location: undefined,
     indices: [],
     offsets: [],
+    exec_state: None,
 }

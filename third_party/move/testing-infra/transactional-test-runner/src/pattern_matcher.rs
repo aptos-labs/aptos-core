@@ -70,7 +70,7 @@ fn parse_line_to_regex(line: &str) -> Option<Regex> {
                     current_segment.clear();
                 }
                 in_pattern = true;
-            }
+            },
             (']', Some(&']'), true) => {
                 // Pattern ends here.
                 chars.next();
@@ -81,7 +81,7 @@ fn parse_line_to_regex(line: &str) -> Option<Regex> {
                 regex_pattern.push_str(pattern);
                 current_segment.clear();
                 in_pattern = false;
-            }
+            },
             _ => current_segment.push(ch),
         }
     }

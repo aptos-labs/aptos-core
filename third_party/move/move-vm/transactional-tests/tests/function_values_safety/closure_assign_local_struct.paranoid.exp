@@ -8,5 +8,5 @@ Error: Script execution failed with VMError: {
     location: script,
     indices: [],
     offsets: [(FunctionDefinitionIndex(0), 3)],
-    exec_state: Some(ExecutionState { stack_trace: [] }),
+    exec_state: [[.*]],
 }
