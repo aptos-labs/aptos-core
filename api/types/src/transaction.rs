@@ -54,10 +54,8 @@ static DUMMY_SEQUENCE_NUMBER: Lazy<U64> = Lazy::new(|| U64::from(0));
 
 // Warning: Do not add a docstring to a field that uses a type in `derives.rs`,
 // it will result in a change to the type representation. Read more about this
-// issue here: https://github.com/poem-web/poem/issues/385.
 
 // TODO: Add read_only / write_only (and their all variants) where appropriate.
-// TODO: Investigate the use of discriminator_name, see https://github.com/poem-web/poem/issues/329.
 
 /// Transaction data
 ///

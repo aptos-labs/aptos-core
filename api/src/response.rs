@@ -42,7 +42,7 @@ pub trait AptosErrorResponse {
 /// error type using that code. These traits are helpful for defining what
 /// error types an internal function can return. For example, the failpoint
 /// function can return an internal error, so its signature would look like:
-/// fn fail_point_poem<E: InternalError>(name: &str) -> anyhow::Result<(), E>
+/// fn fail_point<E: InternalError>(name: &str) -> anyhow::Result<(), E>
 /// This should be invoked just once, taking in every status that we use
 /// throughout the entire API. Every one of these traits requires that the
 /// implementor also implements AptosErrorResponse, which saves functions from

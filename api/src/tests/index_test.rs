@@ -12,7 +12,6 @@ async fn test_get_index() {
     context.check_golden_output(resp);
 }
 
-// TODO: Un-ignore this pending https://github.com/poem-web/poem/issues/343.
 #[ignore]
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn test_returns_not_found_for_the_invalid_path() {
@@ -21,7 +20,6 @@ async fn test_returns_not_found_for_the_invalid_path() {
     context.check_golden_output(resp);
 }
 
-// TODO: Un-ignore this pending https://github.com/poem-web/poem/issues/343.
 #[ignore]
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn test_return_bad_request_if_method_not_allowed() {

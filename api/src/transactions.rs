@@ -1157,7 +1157,7 @@ impl TransactionsApi {
 }
 
 /// Inner implementation of estimate_gas_price that returns Axum-native types.
-/// Used by Axum handlers to avoid the poem_to_axum_response bridge.
+
 pub(crate) fn estimate_gas_price_inner(
     context: &Arc<Context>,
     accept_type: &AcceptType,
