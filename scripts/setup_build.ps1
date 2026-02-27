@@ -352,8 +352,18 @@ function Install-Python {
     Write-Step "Installing Python"
     Install-WinGetPackage -Id "Python.Python.3.11" -Name "Python 3.11"
     Reload-Path
-    if (Get-Command python -ErrorAction SilentlyContinue) {
-        python -m pip install --upgrade pip 2>$null
+    # On Windows the Microsoft Store "python" app alias can intercept the
+    # command even when the real Python is installed.  Check for the actual
+    # executable rather than the alias.
+    $realPython = Get-Command python.exe -ErrorAction SilentlyContinue |
+        Where-Object { $_.Source -notmatch 'WindowsApps' } |
+        Select-Object -First 1
+    if ($realPython) {
+        try { & $realPython.Source -m pip install --upgrade pip 2>$null }
+        catch { Write-Warn "pip upgrade failed (non-fatal): $_" }
+    } else {
+        Write-Warn "python not found in PATH after install (Microsoft Store alias may be in the way)."
+        Write-Warn "Disable the 'python' app execution alias in Settings > Apps > Advanced app settings."
     }
 }
 
