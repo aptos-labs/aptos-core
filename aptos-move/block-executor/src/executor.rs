@@ -2606,7 +2606,9 @@ where
                 .environment()
                 .runtime_environment()
                 .flush_all_caches();
-            module_cache_manager_guard.module_cache_mut().flush();
+            module_cache_manager_guard
+                .module_cache_mut()
+                .flush_all_caches();
 
             info!("parallel execution requiring fallback");
         }
