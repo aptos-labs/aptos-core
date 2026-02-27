@@ -7,7 +7,6 @@ use crate::config::{
 };
 use aptos_secure_storage::{KVStorage, Storage};
 use aptos_types::{chain_id::ChainId, waypoint::Waypoint};
-use poem_openapi::Enum as PoemEnum;
 use serde::{Deserialize, Serialize};
 use std::{fmt, fs, path::PathBuf, str::FromStr};
 use thiserror::Error;
@@ -123,9 +122,8 @@ impl WaypointConfig {
     }
 }
 
-#[derive(Clone, Copy, Deserialize, Eq, PartialEq, PoemEnum, Serialize)]
+#[derive(Clone, Copy, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(rename_all = "snake_case")]
-#[oai(rename_all = "snake_case")]
 pub enum RoleType {
     Validator,
     FullNode,
