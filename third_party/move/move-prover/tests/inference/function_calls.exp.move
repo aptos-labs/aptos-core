@@ -154,9 +154,5 @@ module 0x42::function_calls {
 // TODO(#18762): opaque recursive functions produce expected boogie errors
 // in the verification step because Boogie doesn't generate procedure bodies for them.
 /*
-Verification: [internal] boogie exited with compilation errors:
-function_calls.enriched.bpl(5653,8): Error: call to undeclared procedure: $42_function_calls_is_even
-function_calls.enriched.bpl(5656,8): Error: call to undeclared procedure: $42_function_calls_is_odd
-function_calls.enriched.bpl(5701,8): Error: call to undeclared procedure: $42_function_calls_factorial
-3 name resolution errors detected in function_calls.enriched.bpl
+Verification: Succeeded.
 */

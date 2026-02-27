@@ -328,13 +328,13 @@ module 0x42::state_labels {
 // boogie errors.
 /*
 Verification: [internal] boogie exited with compilation errors:
-state_labels.enriched.bpl(6318,22): Error: cannot refer to a global variable in this context: $42_state_labels_Resource_$memory
-state_labels.enriched.bpl(6322,38): Error: cannot refer to a global variable in this context: $42_state_labels_Resource_$memory
-state_labels.enriched.bpl(6343,22): Error: cannot refer to a global variable in this context: $42_state_labels_Resource_$memory
-state_labels.enriched.bpl(6347,60): Error: cannot refer to a global variable in this context: $42_state_labels_Resource_$memory
-state_labels.enriched.bpl(6347,120): Error: cannot refer to a global variable in this context: $42_state_labels_Resource_$memory
-state_labels.enriched.bpl(6368,21): Error: cannot refer to a global variable in this context: $42_state_labels_Resource_$memory
-state_labels.enriched.bpl(6372,21): Error: cannot refer to a global variable in this context: $42_state_labels_Resource_$memory
-state_labels.enriched.bpl(6372,137): Error: cannot refer to a global variable in this context: $42_state_labels_Resource_$memory
+state_labels.enriched.bpl(6182,22): Error: cannot refer to a global variable in this context: $42_state_labels_Resource_$memory
+state_labels.enriched.bpl(6186,38): Error: cannot refer to a global variable in this context: $42_state_labels_Resource_$memory
+state_labels.enriched.bpl(6207,22): Error: cannot refer to a global variable in this context: $42_state_labels_Resource_$memory
+state_labels.enriched.bpl(6211,60): Error: cannot refer to a global variable in this context: $42_state_labels_Resource_$memory
+state_labels.enriched.bpl(6211,120): Error: cannot refer to a global variable in this context: $42_state_labels_Resource_$memory
+state_labels.enriched.bpl(6232,21): Error: cannot refer to a global variable in this context: $42_state_labels_Resource_$memory
+state_labels.enriched.bpl(6236,21): Error: cannot refer to a global variable in this context: $42_state_labels_Resource_$memory
+state_labels.enriched.bpl(6236,137): Error: cannot refer to a global variable in this context: $42_state_labels_Resource_$memory
 8 name resolution errors detected in state_labels.enriched.bpl
 */

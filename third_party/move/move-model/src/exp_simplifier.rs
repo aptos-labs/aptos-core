@@ -45,6 +45,7 @@
 //! - Antisymmetry normalization: `x <= m && x >= m => x == m` to expose one-point bindings
 //! - Unused variable elimination: drop quantified variables not appearing in the body
 //! - Antecedent-only elimination (forall): `forall x: A(x) ==> Q => Q` when `x` only in `A`
+//!     and `exists x: A(x)` is verified satisfiable by witness instantiation
 //! - Independent splitting (exists): `exists x, y: A(x) && B(y) => (exists x: A(x)) && (exists y: B(y))`
 //! - Absorb inner exists: `exists x: A(x) && (exists y: B(x,y)) => exists x, y: A(x) && B(x,y)`
 //! - Upper-bound witness (exists): `exists x: x <= e && P(x) => P(e)` when P is monotone
@@ -99,6 +100,8 @@ pub struct ExpSimplifier<'a, 'env, G: ExpGenerator<'env>> {
     substitutions: BTreeMap<RewriteTarget, Exp>,
     /// Tracks scopes of bound variables for shadowing detection.
     shadowed: Vec<BTreeSet<Symbol>>,
+    /// Whether we simplify in spec mode. In this mode we have unbounded signed arithmetic and
+    /// non-pure functions are not called, hence more simplifcations are possible.
     spec_mode: bool,
     /// Whether we are currently inside an `old(..)` expression.
     /// Substitutions are suppressed in this context since temporaries
@@ -971,6 +974,12 @@ impl<'a, 'env, G: ExpGenerator<'env>> ExpSimplifier<'a, 'env, G> {
     }
 
     /// Simplify arithmetic operations using algebraic identities (spec mode only).
+    ///
+    /// These rewrites assume unbounded (mathematical) integer semantics and are
+    /// unsound for bounded types (u8–u256) at runtime where overflow / underflow
+    /// changes observable behavior.  For example, `a - a => 0` may mask an
+    /// arithmetic abort, and `(x + c1) + c2 => x + (c1+c2)` can change which
+    /// intermediate operation overflows.
     fn simplify_arithmetic(&self, id: NodeId, oper: &Operation, args: &[Exp]) -> Option<Exp> {
         if !self.spec_mode || args.len() != 2 {
             return None;
@@ -1282,6 +1291,14 @@ impl<'a, 'env, G: ExpGenerator<'env>> ExpSimplifier<'a, 'env, G> {
     ) -> Exp {
         let mut ranges = ranges;
 
+        // Normalize the where clause into the body:
+        // `forall x where p: q` ≡ `forall x: p ==> q`
+        let body = if let Some(c) = cond {
+            self.mk_implies(c, body)
+        } else {
+            body
+        };
+
         // Step 1: Flatten nested foralls.
         let mut body = self.flatten_nested_quant(QuantKind::Forall, &mut ranges, &body);
 
@@ -1358,9 +1375,9 @@ impl<'a, 'env, G: ExpGenerator<'env>> ExpSimplifier<'a, 'env, G> {
 
         // Step 4: Antecedent-only variable elimination.
         // For `forall x: A(x) ==> Q` where x appears in A but not in Q:
-        // equivalent to `(exists x: A(x)) ==> Q`. Since type domains are non-empty
-        // and typical antecedents like `x <= n` are satisfiable (x=0 works),
-        // this simplifies to just Q. Remove such variables and their antecedent.
+        // equivalent to `(exists x: A(x)) ==> Q`. If the antecedent is satisfiable,
+        // this simplifies to just Q. Satisfiability is verified by witness
+        // instantiation via `is_exists_trivially_true`.
         if !ranges.is_empty() {
             if let ExpData::Call(_, Operation::Implies, args) = body.as_ref() {
                 if args.len() == 2 {
@@ -1388,38 +1405,60 @@ impl<'a, 'env, G: ExpGenerator<'env>> ExpSimplifier<'a, 'env, G> {
                         safe
                     };
                     if !antecedent_only.is_empty() {
-                        ranges.retain(|(pat, _)| {
-                            if let Pattern::Var(_, sym) = pat {
-                                !antecedent_only.contains(sym)
-                            } else {
-                                true
-                            }
-                        });
-                        if ranges.is_empty() {
-                            // All variables were antecedent-only: return just the consequent
-                            return args[1].clone();
-                        }
-                        // Remove eliminated variables from antecedent conjuncts
-                        let antecedent_free_needed: std::collections::BTreeSet<Symbol> =
-                            quant_symbols(&ranges).into_iter().collect();
-                        let conjuncts = flatten_conjunction_owned(&args[0]);
-                        let filtered: Vec<Exp> = conjuncts
+                        // Soundness guard: verify `exists <elim_vars>: A(vars)` is
+                        // satisfiable by witness instantiation before eliminating.
+                        let elim_ranges: Vec<(Pattern, Exp)> = ranges
+                            .iter()
+                            .filter(|(pat, _)| {
+                                matches!(pat, Pattern::Var(_, sym) if antecedent_only.contains(sym))
+                            })
+                            .cloned()
+                            .collect();
+                        let elim_conjuncts: Vec<Exp> = flatten_conjunction_owned(&args[0])
                             .into_iter()
                             .filter(|c| {
                                 let fv = c.as_ref().free_vars();
-                                // Keep conjuncts that reference remaining variables
-                                antecedent_free_needed.iter().any(|s| fv.contains(s))
+                                antecedent_only.iter().any(|s| fv.contains(s))
                             })
                             .collect();
-                        body = if filtered.is_empty() {
-                            args[1].clone()
-                        } else {
-                            let new_ant = filtered
+                        let antecedent_body = elim_conjuncts
+                            .into_iter()
+                            .reduce(|a, b| self.mk_and(a, b))
+                            .unwrap_or_else(|| self.mk_bool_const(true));
+                        if self.is_exists_trivially_true(&elim_ranges, &antecedent_body) {
+                            ranges.retain(|(pat, _)| {
+                                if let Pattern::Var(_, sym) = pat {
+                                    !antecedent_only.contains(sym)
+                                } else {
+                                    true
+                                }
+                            });
+                            if ranges.is_empty() {
+                                // All variables were antecedent-only: return just the consequent
+                                return args[1].clone();
+                            }
+                            // Remove eliminated variables from antecedent conjuncts
+                            let antecedent_free_needed: std::collections::BTreeSet<Symbol> =
+                                quant_symbols(&ranges).into_iter().collect();
+                            let conjuncts = flatten_conjunction_owned(&args[0]);
+                            let filtered: Vec<Exp> = conjuncts
                                 .into_iter()
-                                .reduce(|a, b| self.mk_and(a, b))
-                                .unwrap();
-                            self.mk_implies(new_ant, args[1].clone())
-                        };
+                                .filter(|c| {
+                                    let fv = c.as_ref().free_vars();
+                                    // Keep conjuncts that reference remaining variables
+                                    antecedent_free_needed.iter().any(|s| fv.contains(s))
+                                })
+                                .collect();
+                            body = if filtered.is_empty() {
+                                args[1].clone()
+                            } else {
+                                let new_ant = filtered
+                                    .into_iter()
+                                    .reduce(|a, b| self.mk_and(a, b))
+                                    .unwrap();
+                                self.mk_implies(new_ant, args[1].clone())
+                            };
+                        }
                     }
                 }
             }
@@ -1430,8 +1469,8 @@ impl<'a, 'env, G: ExpGenerator<'env>> ExpSimplifier<'a, 'env, G> {
             return body;
         }
 
-        // Rebuild the quantifier
-        ExpData::Quant(id, QuantKind::Forall, ranges, triggers, cond, body).into_exp()
+        // Rebuild the quantifier (cond was normalized into body above)
+        ExpData::Quant(id, QuantKind::Forall, ranges, triggers, None, body).into_exp()
     }
 
     /// Simplify an exists quantifier expression.
@@ -1453,6 +1492,14 @@ impl<'a, 'env, G: ExpGenerator<'env>> ExpSimplifier<'a, 'env, G> {
         body: Exp,
     ) -> Exp {
         let mut ranges = ranges;
+
+        // Normalize the where clause into the body:
+        // `exists x where p: q` ≡ `exists x: p && q`
+        let body = if let Some(c) = cond {
+            self.mk_and(c, body)
+        } else {
+            body
+        };
 
         // Step 1: Flatten nested exists.
         let mut body = self.flatten_nested_quant(QuantKind::Exists, &mut ranges, &body);
@@ -1705,14 +1752,14 @@ impl<'a, 'env, G: ExpGenerator<'env>> ExpSimplifier<'a, 'env, G> {
         // Step 6: Witness instantiation for trivially satisfiable exists.
         // If all quantified variables have unsigned integer types, try instantiating
         // with 0 (the minimum value). If the body simplifies to `true`, the exists
-        // is trivially satisfiable. For example, `exists x: u64: x <= m` is always
-        // true since x=0 works for any u64 m.
+        // is trivially satisfiable.
+        // For example, `exists x: u64: x <= m` is always true since x=0 works.
         if self.is_exists_trivially_true(&ranges, &body) {
             return self.mk_bool_const(true);
         }
 
-        // Rebuild the quantifier
-        ExpData::Quant(id, QuantKind::Exists, ranges, triggers, cond, body).into_exp()
+        // Rebuild the quantifier (cond was normalized into body above)
+        ExpData::Quant(id, QuantKind::Exists, ranges, triggers, None, body).into_exp()
     }
 
     /// Try to eliminate an exists quantifier by substituting upper-bound witnesses.
@@ -2185,24 +2232,48 @@ impl<'a, 'env, G: ExpGenerator<'env>> ExpSimplifier<'a, 'env, G> {
         found
     }
 
+    /// Extract low and high witness values for a quantified variable, respecting
+    /// range bounds. For `x in lo..hi`, uses `lo` and `hi-1` as witnesses.
+    /// For unbounded type domains, uses `0`/`max` for unsigned ints and `false`/`true`
+    /// for bools. Returns `None` if the type is not supported for witness instantiation.
+    fn quant_witness_values(&mut self, pat_id: NodeId, range_exp: &Exp) -> Option<(Exp, Exp)> {
+        if let ExpData::Call(_, Operation::Range, args) = range_exp.as_ref() {
+            if args.len() == 2 {
+                // Bounded range: lo..hi. Use lo as low witness, hi-1 as high witness.
+                // We use lo for both since hi-1 requires arithmetic; lo is sufficient
+                // for soundness and hi bound isn't easily computable as a constant.
+                return Some((args[0].clone(), args[0].clone()));
+            }
+        }
+        // Unbounded (type domain or other): use type extremes
+        let ty = self.env().get_node_type(pat_id);
+        if ty.is_unsigned_int() {
+            let low = self.mk_num_const(&ty, BigInt::zero());
+            if let Type::Primitive(prim_ty) = &ty {
+                if let Some(max_val) = prim_ty.get_max_value() {
+                    let high = self.mk_num_const(&ty, max_val);
+                    return Some((low, high));
+                }
+            }
+            None
+        } else if ty.is_bool() {
+            Some((self.mk_bool_const(false), self.mk_bool_const(true)))
+        } else {
+            None
+        }
+    }
+
     /// Check if an exists quantifier is trivially satisfiable by witness instantiation.
-    /// Tries substituting all quantified variables with 0 (minimum) and then with
-    /// the maximum value of the unsigned type domain. Returns true if either witness
-    /// makes the body simplify to `true`.
+    /// Tries substituting all quantified variables with low and high witness values
+    /// from their ranges. Returns true if either witness makes the body simplify to `true`.
     fn is_exists_trivially_true(&mut self, ranges: &[(Pattern, Exp)], body: &Exp) -> bool {
-        // Try "low" witness: 0 for unsigned integers, false for bool
+        // Try "low" witness
         let mut low_instantiated = body.clone();
-        for (pat, _) in ranges {
+        for (pat, range_exp) in ranges {
             if let Pattern::Var(pat_id, sym) = pat {
-                let ty = self.env().get_node_type(*pat_id);
-                if ty.is_unsigned_int() {
-                    let zero = self.mk_num_const(&ty, BigInt::zero());
+                if let Some((low, _)) = self.quant_witness_values(*pat_id, range_exp) {
                     low_instantiated =
-                        substitute_local_var(self.env(), &low_instantiated, *sym, &zero);
-                } else if ty.is_bool() {
-                    let val = self.mk_bool_const(false);
-                    low_instantiated =
-                        substitute_local_var(self.env(), &low_instantiated, *sym, &val);
+                        substitute_local_var(self.env(), &low_instantiated, *sym, &low);
                 } else {
                     return false;
                 }
@@ -2213,23 +2284,13 @@ impl<'a, 'env, G: ExpGenerator<'env>> ExpSimplifier<'a, 'env, G> {
             return true;
         }
 
-        // Try "high" witness: max value for unsigned integers, true for bool
+        // Try "high" witness
         let mut high_instantiated = body.clone();
-        for (pat, _) in ranges {
+        for (pat, range_exp) in ranges {
             if let Pattern::Var(pat_id, sym) = pat {
-                let ty = self.env().get_node_type(*pat_id);
-                if ty.is_bool() {
-                    let val = self.mk_bool_const(true);
+                if let Some((_, high)) = self.quant_witness_values(*pat_id, range_exp) {
                     high_instantiated =
-                        substitute_local_var(self.env(), &high_instantiated, *sym, &val);
-                } else if let Type::Primitive(prim_ty) = &ty {
-                    if let Some(max_val) = prim_ty.get_max_value() {
-                        let max_const = self.mk_num_const(&ty, max_val);
-                        high_instantiated =
-                            substitute_local_var(self.env(), &high_instantiated, *sym, &max_const);
-                    } else {
-                        return false;
-                    }
+                        substitute_local_var(self.env(), &high_instantiated, *sym, &high);
                 } else {
                     return false;
                 }
@@ -2240,16 +2301,25 @@ impl<'a, 'env, G: ExpGenerator<'env>> ExpSimplifier<'a, 'env, G> {
     }
 
     /// Check if a forall expression is provably false by instantiating all quantified
-    /// variables with 0 (the minimum of unsigned type domains). If the body evaluates
+    /// variables with the low witness value from their range. If the body evaluates
     /// to `false`, the forall is exactly `false` and carries no information.
     pub fn is_forall_provably_false(&mut self, exp: &Exp) -> bool {
-        if let ExpData::Quant(_, QuantKind::Forall, ranges, _, _, body) = exp.as_ref() {
-            let mut instantiated = body.clone();
-            for (pat, _) in ranges {
-                if let Pattern::Var(_, sym) = pat {
-                    let u64_ty = Type::new_prim(PrimitiveType::U64);
-                    let zero = self.mk_num_const(&u64_ty, BigInt::zero());
-                    instantiated = substitute_local_var(self.env(), &instantiated, *sym, &zero);
+        if let ExpData::Quant(_, QuantKind::Forall, ranges, _, cond, body) = exp.as_ref() {
+            // Normalize the where clause into the body:
+            // `forall x where p: q` ≡ `forall x: p ==> q`
+            let body = if let Some(c) = cond {
+                self.mk_implies(c.clone(), body.clone())
+            } else {
+                body.clone()
+            };
+            let mut instantiated = body;
+            for (pat, range_exp) in ranges {
+                if let Pattern::Var(pat_id, sym) = pat {
+                    if let Some((low, _)) = self.quant_witness_values(*pat_id, range_exp) {
+                        instantiated = substitute_local_var(self.env(), &instantiated, *sym, &low);
+                    } else {
+                        return false;
+                    }
                 }
             }
             let result = self.simplify(instantiated);
@@ -4047,6 +4117,39 @@ mod tests {
         assert_is_temp(&result, 1);
     }
 
+    #[test]
+    fn test_forall_antecedent_only_unsatisfiable_not_eliminated() {
+        // forall x: u64, y: u64. (x > y && y > x) ==> false
+        // This is vacuously true (antecedent is unsatisfiable), so the
+        // simplifier must NOT reduce it to `false` by dropping the antecedent.
+        let env = test_env();
+        let u64_ty = Type::Primitive(PrimitiveType::U64);
+        let x = mk_local(&env, "x", u64_ty.clone());
+        let y = mk_local(&env, "y", u64_ty.clone());
+        let x_gt_y = mk_bool_op(&env, Operation::Gt, vec![x.clone(), y.clone()]);
+        let y_gt_x = mk_bool_op(&env, Operation::Gt, vec![y, x]);
+        let antecedent = mk_bool_op(&env, Operation::And, vec![x_gt_y, y_gt_x]);
+        let body = mk_bool_op(&env, Operation::Implies, vec![
+            antecedent,
+            mk_bool(&env, false),
+        ]);
+        let quant = mk_quant(
+            &env,
+            QuantKind::Forall,
+            vec![("x", u64_ty.clone()), ("y", u64_ty)],
+            body,
+        );
+        let mut g = test_gen(&env);
+        let mut s = ExpSimplifier::new(&mut g);
+        let result = s.simplify(quant);
+        // Must NOT simplify to `false`. The quantifier should be preserved or
+        // simplified to `true`, but never to just the consequent `false`.
+        assert!(
+            !is_bool_const(&result, false),
+            "antecedent-only elimination must not reduce vacuously-true forall to false"
+        );
+    }
+
     // ---- Exists simplification tests ----
 
     #[test]
@@ -4915,5 +5018,96 @@ mod tests {
             ExpData::Call(_, Operation::Le, _) => {},
             other => panic!("expected Le to remain, got {:?}", other),
         }
+    }
+
+    // ---- Range-bounded quantifier witness tests ----
+
+    /// Creates a quantifier with a bounded range `lo..hi` for the variable.
+    fn mk_quant_with_range(
+        env: &GlobalEnv,
+        kind: QuantKind,
+        name: &str,
+        ty: Type,
+        lo: Exp,
+        hi: Exp,
+        body: Exp,
+    ) -> Exp {
+        let pool = env.symbol_pool();
+        let sym = pool.make(name);
+        let pat_id = env.new_node(Loc::default(), ty);
+        let range_id = env.new_node(Loc::default(), Type::Primitive(PrimitiveType::Range));
+        let range = ExpData::Call(range_id, Operation::Range, vec![lo, hi]).into_exp();
+        let ranges = vec![(Pattern::Var(pat_id, sym), range)];
+        let id = env.new_node(Loc::default(), BOOL_TYPE.clone());
+        ExpData::Quant(id, kind, ranges, vec![], None, body).into_exp()
+    }
+
+    #[test]
+    fn test_forall_provably_false_respects_range() {
+        // forall i in 1..10: i == 0 → should NOT be provably false
+        // because i=0 is outside the range, and i=1 gives false but i is constrained to 1..10
+        // Actually with range, the witness is i=1 (the lower bound), and (1 == 0) is false.
+        // But this IS a valid counterexample since 1 is in the range.
+        // So this should be provably false.
+        let env = test_env();
+        let u64_ty = Type::Primitive(PrimitiveType::U64);
+        let x = mk_local(&env, "x", u64_ty.clone());
+        let body = mk_bool_op(&env, Operation::Eq, vec![x, mk_num(&env, 0)]);
+        let quant = mk_quant_with_range(
+            &env,
+            QuantKind::Forall,
+            "x",
+            u64_ty,
+            mk_num(&env, 1),
+            mk_num(&env, 10),
+            body,
+        );
+        let mut g = test_gen(&env);
+        let mut s = ExpSimplifier::new(&mut g);
+        assert!(s.is_forall_provably_false(&quant));
+    }
+
+    #[test]
+    fn test_forall_provably_false_range_not_falsified() {
+        // forall i in 1..10: i >= 1 → should NOT be provably false
+        // because i=1 gives (1 >= 1) = true
+        let env = test_env();
+        let u64_ty = Type::Primitive(PrimitiveType::U64);
+        let x = mk_local(&env, "x", u64_ty.clone());
+        let body = mk_bool_op(&env, Operation::Ge, vec![x, mk_num(&env, 1)]);
+        let quant = mk_quant_with_range(
+            &env,
+            QuantKind::Forall,
+            "x",
+            u64_ty,
+            mk_num(&env, 1),
+            mk_num(&env, 10),
+            body,
+        );
+        let mut g = test_gen(&env);
+        let mut s = ExpSimplifier::new(&mut g);
+        assert!(!s.is_forall_provably_false(&quant));
+    }
+
+    #[test]
+    fn test_exists_range_bounded_witness() {
+        // exists i in 5..10: i == 5 → true (low witness i=5 satisfies)
+        let env = test_env();
+        let u64_ty = Type::Primitive(PrimitiveType::U64);
+        let x = mk_local(&env, "x", u64_ty.clone());
+        let body = mk_bool_op(&env, Operation::Eq, vec![x, mk_num(&env, 5)]);
+        let quant = mk_quant_with_range(
+            &env,
+            QuantKind::Exists,
+            "x",
+            u64_ty,
+            mk_num(&env, 5),
+            mk_num(&env, 10),
+            body,
+        );
+        let mut g = test_gen(&env);
+        let mut s = ExpSimplifier::new(&mut g);
+        let result = s.simplify(quant);
+        assert_is_bool(&result, true);
     }
 }

@@ -148,9 +148,14 @@ pub struct WPState {
     pub ensures: Vec<Exp>,
     /// The aborts conditions - under what conditions the function can abort
     pub aborts: Vec<Exp>,
-    /// Code offset this state originated from (for edge tracking during joins).
+    /// Whether this state originated from a normal return (Ret instruction).
+    /// This is `false` for abort-only or unreachable (Stop) paths. Used to
+    /// distinguish functions with no return values (empty ensures but normal return)
+    /// from abort-only states (empty ensures, no normal return).
+    pub is_normal_return: bool,
+    /// Predecessor block ID this state originated from (for edge tracking during joins).
     /// Used to identify which branch edge a state came from.
-    pub origin_offset: Option<CodeOffset>,
+    pub origin_block: Option<BlockId>,
     /// Post-state label: memory state after operations at this point.
     /// In backward analysis, this represents the state that successor operations see.
     pub post: MemoryLabel,
@@ -174,7 +179,8 @@ impl WPState {
         Self {
             ensures: vec![],
             aborts: vec![],
-            origin_offset: None,
+            is_normal_return: false,
+            origin_block: None,
             post,
             captured_mut_params: BTreeSet::new(),
             captured_globals: BTreeSet::new(),
@@ -187,7 +193,8 @@ impl WPState {
         Self {
             ensures: vec![],
             aborts: vec![exp],
-            origin_offset: None,
+            is_normal_return: false,
+            origin_block: None,
             post,
             captured_mut_params: BTreeSet::new(),
             captured_globals: BTreeSet::new(),
@@ -200,7 +207,8 @@ impl WPState {
         Self {
             ensures: self.ensures.iter().map(&mut f).collect(),
             aborts: self.aborts.iter().map(&mut f).collect(),
-            origin_offset: self.origin_offset,
+            is_normal_return: self.is_normal_return,
+            origin_block: self.origin_block,
             post: self.post,
             captured_mut_params: self.captured_mut_params.clone(),
             captured_globals: self.captured_globals.clone(),
@@ -215,7 +223,7 @@ impl WPState {
 
     /// Clear origin tracking (used after joins to avoid stale tracking)
     fn clear_origin(&mut self) {
-        self.origin_offset = None;
+        self.origin_block = None;
     }
 
     /// Add an ensures condition if a structurally equivalent one doesn't already exist
@@ -260,22 +268,24 @@ impl AbstractDomain for WPState {
         let old_aborts_len = self.aborts.len();
         let old_captured_len = self.captured_mut_params.len();
 
-        // Abort-only states (empty ensures) come from user-written `abort` statements
-        // or `Stop` in loop bodies. In these cases the abort conditions are already
-        // captured analytically in the transfer function. Skip abort-only states to
-        // avoid:
+        // Abort-only states come from user-written `abort` statements or `Stop` in
+        // loop bodies. In these cases the abort conditions are already captured
+        // analytically in the transfer function. Skip abort-only states to avoid:
         // - ensures intersection removing ensures from the normal return path
         // - `aborts: true` creating spurious path-conditional aborts at Branch joins
         //
-        // Note: Abort handler blocks (from `on_abort goto`) are neutralized before
+        // Note: We use `is_normal_return` instead of `ensures.is_empty()` because
+        // functions with no return values have empty ensures on normal return paths.
+        // Abort handler blocks (from `on_abort goto`) are neutralized before
         // analysis and never reach this point.
-        let self_is_abort_only = self.ensures.is_empty();
-        let other_is_abort_only = other.ensures.is_empty();
+        let self_is_abort_only = !self.is_normal_return;
+        let other_is_abort_only = !other.is_normal_return;
 
         if self_is_abort_only && !other_is_abort_only {
             // Current is abort-only; adopt incoming state wholesale
             self.ensures = other.ensures.clone();
             self.aborts = other.aborts.clone();
+            self.is_normal_return = true;
         } else if !other_is_abort_only {
             // Both have ensures (both return normally): standard join
             self.ensures
@@ -285,8 +295,16 @@ impl AbstractDomain for WPState {
                     self.aborts.push(exp.clone());
                 }
             }
+        } else if self_is_abort_only {
+            // Both abort-only: union abort conditions from both paths
+            for exp in &other.aborts {
+                if !ensures_contains(&self.aborts, exp) {
+                    self.aborts.push(exp.clone());
+                }
+            }
         }
-        // If other is abort-only, skip it entirely (keep self as-is)
+        // else: other is abort-only but self has normal ensures — skip
+        // (abort conditions are already captured at the abort site)
 
         // For captured_mut_params: use union semantics (if captured on any path, it's captured)
         // This is correct because in backward analysis, if a param was written to on any path,
@@ -457,10 +475,10 @@ fn combine_complementary_aborts(aborts: &[Exp]) -> Vec<Exp> {
 struct BranchInfo {
     /// The condition temporary
     cond_temp: TempIndex,
-    /// Code offset of the true branch target
-    true_target_offset: CodeOffset,
-    /// Code offset of the false branch target
-    false_target_offset: CodeOffset,
+    /// Block ID of the true branch target
+    true_target_block: BlockId,
+    /// Block ID of the false branch target
+    false_target_block: BlockId,
 }
 
 // =================================================================================================
@@ -1205,7 +1223,8 @@ fn simplify_state<'env>(generator: &mut impl ExpGenerator<'env>, state: &WPState
     WPState {
         ensures: simplified_ensures,
         aborts: simplified_aborts,
-        origin_offset: state.origin_offset,
+        is_normal_return: state.is_normal_return,
+        origin_block: state.origin_block,
         post: state.post,
         captured_mut_params: state.captured_mut_params.clone(),
         captured_globals: state.captured_globals.clone(),
@@ -1433,13 +1452,10 @@ impl<'env> TransferFunctions for SpecInferenceAnalyzer<'env> {
                 // Base case for backward analysis: compute the ensures conditions
                 // Creates one ensures per return value that references a parameter
                 *state = self.mk_return_ensures(vals);
-                // Track origin for path-conditional join handling
-                state.origin_offset = Some(offset);
             },
             Bytecode::Abort(_, _, _) => {
                 // Abort sets the aborts condition to true
                 *state = WPState::with_aborts(self.mk_bool_const(true), self.at_end_label);
-                state.origin_offset = Some(offset);
             },
             Bytecode::Assign(_, dest, src, _) => {
                 // WP[x := e](Q) = Q[x ↦ e]
@@ -2230,7 +2246,6 @@ impl<'env> TransferFunctions for SpecInferenceAnalyzer<'env> {
                     // WP[stop](Q) = true  (unreachable; no conditions propagate)
                     Operation::Stop => {
                         *state = WPState::new(state.post);
-                        state.origin_offset = Some(offset);
                     },
                 }
             },
@@ -2374,16 +2389,6 @@ impl<'env> DataflowAnalysis for SpecInferenceAnalyzer<'env> {
                 .unwrap_or_else(|| initial_state.clone());
             let post = self.execute_block(block_id, pre, instrs, cfg);
 
-            // Compute predecessor block's last code offset for is_parent classification.
-            let pred_last_offset = {
-                let range = cfg.code_range(block_id);
-                if range.is_empty() {
-                    None
-                } else {
-                    Some((range.end - 1) as CodeOffset)
-                }
-            };
-
             // Propagate postcondition to successor blocks
             for next_block_id in cfg.successors(block_id) {
                 let branch_info =
@@ -2396,19 +2401,17 @@ impl<'env> DataflowAnalysis for SpecInferenceAnalyzer<'env> {
                             &mut next_block_res.pre,
                             &post,
                             branch_info,
-                            pred_last_offset,
+                            Some(block_id),
                         );
                     },
                     None => {
                         // First state arriving at this block.
-                        // Record the predecessor offset so path_aware_join can
+                        // Record the predecessor block ID so path_aware_join can
                         // determine which branch side the already-stored state
                         // came from when the second side arrives.
                         let mut initial_post = post.clone();
                         if branch_info.is_some() {
-                            if let Some(offset) = pred_last_offset {
-                                initial_post.origin_offset = Some(offset);
-                            }
+                            initial_post.origin_block = Some(block_id);
                         }
                         state_map.insert(*next_block_id, BlockState {
                             pre: initial_post,
@@ -3091,7 +3094,8 @@ impl<'env> SpecInferenceAnalyzer<'env> {
         WPState {
             ensures,
             aborts,
-            origin_offset: state.origin_offset,
+            is_normal_return: state.is_normal_return,
+            origin_block: state.origin_block,
             post: new_post,
             captured_mut_params: state.captured_mut_params.clone(),
             captured_globals: state.captured_globals.clone(),
@@ -3299,7 +3303,8 @@ impl<'env> SpecInferenceAnalyzer<'env> {
         WPState {
             ensures,
             aborts: vec![],
-            origin_offset: None, // Will be set by execute()
+            is_normal_return: true,
+            origin_block: None,
             post: self.at_end_label,
             captured_mut_params: BTreeSet::new(),
             captured_globals: BTreeSet::new(),
@@ -4169,8 +4174,8 @@ impl<'env> SpecInferenceAnalyzer<'env> {
 
             return Some(BranchInfo {
                 cond_temp: *cond_temp,
-                true_target_offset: true_offset,
-                false_target_offset: false_offset,
+                true_target_block: cfg.enclosing_block(true_offset),
+                false_target_block: cfg.enclosing_block(false_offset),
             });
         }
         None
@@ -4186,7 +4191,7 @@ impl<'env> SpecInferenceAnalyzer<'env> {
         current: &mut WPState,
         incoming: &WPState,
         branch_info: Option<BranchInfo>,
-        incoming_pred_offset: Option<CodeOffset>,
+        incoming_pred_block: Option<BlockId>,
     ) -> JoinResult {
         // Substitute labels in incoming state to match current state's post label.
         // This ensures that expressions from both branches use the same memory labels
@@ -4207,32 +4212,23 @@ impl<'env> SpecInferenceAnalyzer<'env> {
             return current.join(incoming);
         };
 
-        // Determine which state came from which branch by checking which target
-        // is closer to (but <= ) the offset
-        let classify_offset = |offset: CodeOffset| -> Option<bool> {
-            if branch.true_target_offset <= offset && branch.false_target_offset <= offset {
-                // Both targets are at or before this offset - pick the closer one
-                if branch.true_target_offset > branch.false_target_offset {
-                    Some(true) // true branch is closer (higher offset)
-                } else if branch.false_target_offset > branch.true_target_offset {
-                    Some(false) // false branch is closer
-                } else {
-                    None // Same offset, can't determine
-                }
-            } else if branch.true_target_offset <= offset {
-                Some(true) // Only true branch is at or before
-            } else if branch.false_target_offset <= offset {
-                Some(false) // Only false branch is at or before
+        // Classify a predecessor block ID as the true or false branch target.
+        // Compare predecessor block IDs against the branch target block IDs.
+        let classify_block = |block: BlockId| -> Option<bool> {
+            if block == branch.true_target_block {
+                Some(true)
+            } else if block == branch.false_target_block {
+                Some(false)
             } else {
-                None // Neither applies
+                None
             }
         };
 
         // Determine which branch side each state came from.
-        // `current.origin_offset` was set when the first state arrived at this block.
-        // `incoming_pred_offset` is the predecessor block's last offset for the second state.
-        let current_is_true = current.origin_offset.and_then(&classify_offset);
-        let incoming_is_true = incoming_pred_offset.and_then(&classify_offset);
+        // `current.origin_block` was set when the first state arrived at this block.
+        // `incoming_pred_block` is the predecessor block ID for the second state.
+        let current_is_true = current.origin_block.and_then(&classify_block);
+        let incoming_is_true = incoming_pred_block.and_then(&classify_block);
 
         match (current_is_true, incoming_is_true) {
             (Some(c), Some(i)) if c != i => {
@@ -4405,6 +4401,11 @@ impl<'env> SpecInferenceAnalyzer<'env> {
             current.captured_globals.insert(idx);
         }
         let captured_globals_changed = current.captured_globals.len() != old_captured_globals_len;
+
+        // Propagate normal-return status: if either side is a normal return, the result is too
+        if incoming.is_normal_return && !current.is_normal_return {
+            current.is_normal_return = true;
+        }
 
         // Clear origin after merge since we've combined paths
         current.clear_origin();
