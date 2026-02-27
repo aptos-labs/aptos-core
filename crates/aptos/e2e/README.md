@@ -100,9 +100,9 @@ Example test pattern:
 @test_case
 def test_account_create_flags(run_helper: RunHelper, test_name=None):
     help_text = run_help_command(
-        run_helper.cli_path,
+        run_helper,
         ["account", "create"],
-        run_helper.host_working_directory
+        test_name,
     )
     verify_flags_present(help_text, EXPECTED_FLAGS)
 ```
