@@ -22,7 +22,7 @@
 //! returned by each function and its callers is enforced at compile time.
 //! See generate_error_traits and its invocations for more on this topic.
 
-use aptos_api_types::{Address, AptosErrorCode, HashValue, LedgerInfo};
+use aptos_api_types::{Address, AptosErrorCode, LedgerInfo};
 use move_core_types::{
     identifier::{IdentStr, Identifier},
     language_storage::StructTag,
@@ -143,49 +143,11 @@ pub fn bcs_api_disabled<S: Display, E: ForbiddenError>(identifier: S) -> E {
     )
 }
 
-pub fn api_disabled<S: Display, E: ForbiddenError>(identifier: S) -> E {
-    E::forbidden_with_code_no_info(
-        format!("{} is disabled on this endpoint", identifier),
-        AptosErrorCode::ApiDisabled,
-    )
-}
-
-pub fn api_forbidden<S: Display, E: ForbiddenError>(identifier: S, extra_help: S) -> E {
-    E::forbidden_with_code_no_info(
-        format!("{} is not allowed. {}", identifier, extra_help),
-        AptosErrorCode::ApiDisabled,
-    )
-}
-
 pub fn version_not_found<E: NotFoundError>(ledger_version: u64, ledger_info: &LedgerInfo) -> E {
     build_not_found(
         "Ledger version",
         format!("Ledger version({})", ledger_version),
         AptosErrorCode::VersionNotFound,
-        ledger_info,
-    )
-}
-
-pub fn transaction_not_found_by_version<E: NotFoundError>(
-    ledger_version: u64,
-    ledger_info: &LedgerInfo,
-) -> E {
-    build_not_found(
-        "Transaction",
-        format!("Ledger version({})", ledger_version),
-        AptosErrorCode::TransactionNotFound,
-        ledger_info,
-    )
-}
-
-pub fn transaction_not_found_by_hash<E: NotFoundError>(
-    hash: HashValue,
-    ledger_info: &LedgerInfo,
-) -> E {
-    build_not_found(
-        "Transaction",
-        format!("Transaction hash({})", hash),
-        AptosErrorCode::TransactionNotFound,
         ledger_info,
     )
 }

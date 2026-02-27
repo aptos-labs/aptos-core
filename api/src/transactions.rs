@@ -1177,27 +1177,6 @@ pub(crate) fn estimate_gas_price_inner(
     }
 }
 
-fn override_gas_parameters(
-    signed_txn: &SignedTransaction,
-    max_gas_amount: Option<u64>,
-    gas_unit_price: Option<u64>,
-) -> SignedTransaction {
-    let payload = signed_txn.payload();
-
-    let raw_txn = RawTransaction::new(
-        signed_txn.sender(),
-        signed_txn.sequence_number(),
-        payload.clone(),
-        max_gas_amount.unwrap_or_else(|| signed_txn.max_gas_amount()),
-        gas_unit_price.unwrap_or_else(|| signed_txn.gas_unit_price()),
-        signed_txn.expiration_timestamp_secs(),
-        signed_txn.chain_id(),
-    );
-
-    // TODO: Check that signature is null, this would just be helpful for downstream use
-    SignedTransaction::new_signed_transaction(raw_txn, signed_txn.authenticator())
-}
-
 pub(crate) enum GetByVersionResponse {
     VersionTooNew,
     VersionTooOld,

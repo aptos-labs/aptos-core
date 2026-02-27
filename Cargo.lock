@@ -3639,11 +3639,6 @@ name = "aptos-openapi-spec-generator"
 version = "0.1.0"
 dependencies = [
  "anyhow",
- "aptos-api",
- "aptos-config",
- "aptos-mempool",
- "aptos-storage-interface",
- "aptos-types",
  "clap 4.5.21",
 ]
 

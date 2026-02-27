@@ -12,6 +12,12 @@ publish = { workspace = true }
 repository = { workspace = true }
 rust-version = { workspace = true }
 
+[package.metadata.cargo-machete]
+ignored = ["mime"]
+
+[features]
+failpoints = ["fail/failpoints"]
+
 [dependencies]
 anyhow = { workspace = true }
 aptos-api-types = { workspace = true }
@@ -69,9 +75,3 @@ proptest = { workspace = true }
 rand = { workspace = true }
 regex = { workspace = true }
 reqwest = { workspace = true }
-
-[features]
-failpoints = ["fail/failpoints"]
-
-[package.metadata.cargo-machete]
-ignored = ["mime"]
