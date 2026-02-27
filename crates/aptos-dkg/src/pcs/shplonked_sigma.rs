@@ -32,9 +32,9 @@ use std::{fmt::Debug, marker::PhantomData};
 /// com_y = xi_1*rho + MSM(taus_1, evals), V = taus_1[0]*sum(alphas_i*evals_i) + xi_1*u, y_sum = sum(evals).
 #[derive(Clone, Debug, PartialEq, Eq, CanonicalSerialize, CanonicalDeserialize)]
 pub struct ShplonkedSigmaWitness<F: PrimeField> {
-    pub rho: F,
+    pub c_y_hid_randomness: F,
     pub evals: Vec<F>,
-    pub u: F,
+    pub com_evals_randomness: F,
 }
 
 impl<F: PrimeField> Witness<F> for ShplonkedSigmaWitness<F> {
@@ -46,17 +46,17 @@ impl<F: PrimeField> Witness<F> for ShplonkedSigmaWitness<F> {
             .map(|(a, b)| a + c * b)
             .collect();
         Self {
-            rho: self.rho + c * other.rho,
+            c_y_hid_randomness: self.c_y_hid_randomness + c * other.c_y_hid_randomness,
             evals,
-            u: self.u + c * other.u,
+            com_evals_randomness: self.com_evals_randomness + c * other.com_evals_randomness,
         }
     }
 
     fn rand<R: RngCore + CryptoRng>(&self, rng: &mut R) -> Self {
         Self {
-            rho: sample_field_element(rng),
+            c_y_hid_randomness: sample_field_element(rng),
             evals: sample_field_elements(self.evals.len(), rng),
-            u: sample_field_element(rng),
+            com_evals_randomness: sample_field_element(rng),
         }
     }
 }
@@ -65,7 +65,7 @@ fn project_to_kzg_witness<F: PrimeField>(
     w: &ShplonkedSigmaWitness<F>,
 ) -> univariate_hiding_kzg::Witness<F> {
     univariate_hiding_kzg::Witness {
-        hiding_randomness: Scalar(w.rho),
+        hiding_randomness: Scalar(w.c_y_hid_randomness),
         values: Scalar::vec_from_inner(w.evals.clone()),
     }
 }
@@ -157,7 +157,7 @@ impl<E: Pairing> fixed_base_msms::Trait for VHom<E> {
             .map(|(y_i, alpha_i)| *alpha_i * y_i)
             .fold(E::ScalarField::zero(), |acc, x| acc + x);
         let bases = vec![self.tau_0, self.xi_1];
-        let scalars = vec![sum_y, w.u];
+        let scalars = vec![sum_y, w.com_evals_randomness];
         CodomainShape(MsmInput::new(bases, scalars).expect("VHom MSM"))
     }
 
