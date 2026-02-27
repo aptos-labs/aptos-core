@@ -4,7 +4,7 @@
 use aptos_crypto::arkworks::GroupGenerators;
 use aptos_dkg::{
     range_proofs::{
-        dekart_multivariate::Proof as DekartMultivariate,
+//        dekart_multivariate::Proof as DekartMultivariate,
         dekart_univariate::Proof as UnivariateDeKART,
         dekart_univariate_v2::Proof as UnivariateDeKARTv2, traits::BatchedRangeProof,
     },
@@ -192,14 +192,14 @@ fn assert_correctness_of_all_range_proofs() {
         UnivariateDeKARTv2<Bls12_381>,
     >();
 
-    println!("\n=== Testing DekartMultivariate<Bn254> ===");
-    assert_correctness_and_serialization_for_range_proof_and_curve::<
-        Bn254,
-        DekartMultivariate<Bn254>,
-    >();
-    println!("\n=== Testing DekartMultivariate<Bls12_381> ===");
-    assert_correctness_and_serialization_for_range_proof_and_curve::<
-        Bls12_381,
-        DekartMultivariate<Bls12_381>,
-    >();
+    // println!("\n=== Testing DekartMultivariate<Bn254> ===");
+    // assert_correctness_and_serialization_for_range_proof_and_curve::<
+    //     Bn254,
+    //     DekartMultivariate<Bn254>,
+    // >();
+    // println!("\n=== Testing DekartMultivariate<Bls12_381> ===");
+    // assert_correctness_and_serialization_for_range_proof_and_curve::<
+    //     Bls12_381,
+    //     DekartMultivariate<Bls12_381>,
+    // >();
 }

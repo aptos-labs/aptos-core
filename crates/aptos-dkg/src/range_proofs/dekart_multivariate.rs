@@ -1,6 +1,8 @@
 // Copyright (c) Aptos Foundation
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
+use crate::pcs::shplonked;
+use crate::pcs::zeromorph::{Zeromorph, ZeromorphProverKey};
 use super::scalars_to_bits;
 use crate::{
     fiat_shamir::PolynomialCommitmentScheme,
@@ -666,13 +668,13 @@ pub fn prove_impl<E: Pairing, R: RngCore + CryptoRng>(
         }
     }
 
-    let z: E::ScalarField = trs.challenge_scalar();
-    let y: E::ScalarField = batched_evals
-        .iter()
-        .enumerate()
-        .fold(E::ScalarField::ZERO, |acc, (i, &coeff)| {
-            acc + coeff * z.pow([i as u64])
-        });
+    // let z: E::ScalarField = trs.challenge_scalar();
+    // let y: E::ScalarField = batched_evals
+    //     .iter()
+    //     .enumerate()
+    //     .fold(E::ScalarField::ZERO, |acc, (i, &coeff)| {
+    //         acc + coeff * z.pow([i as u64])
+    //     });
 
     // TODO: not used??????????
     // Verifier will recompute this for the single batched zk_pcs_verify
@@ -696,6 +698,41 @@ pub fn prove_impl<E: Pairing, R: RngCore + CryptoRng>(
     for (j, &r_j) in f_j_comms_randomness.iter().enumerate() {
         batched_randomness += hat_c_powers[j + 1] * r_j;
     }
+
+    let batched_poly = DenseMultilinearExtension::from_evaluations_vec(num_vars.into(), batched_evals.clone());
+    let mut batched_eval = y_f;
+    for (j, y_j) in y_js.iter().enumerate() {
+        batched_eval += hat_c_powers[j + 1] * y_j;
+    }
+
+    let zeromorph_pp = ZeromorphProverKey::<E> {
+        hiding_kzg_pp: pk.ck.clone(),
+        open_offset: 0,
+    };
+    let batched_opening = Zeromorph::open_to_batched_instance(
+        &zeromorph_pp,
+        &batched_poly,
+        &xs,
+        batched_eval,
+        Scalar(batched_randomness),
+        rng,
+        &mut trs,
+    );
+
+    // Step 7
+    let hat_g = batched_opening.0.f_coeffs;
+    let hat_x = batched_opening.0.x;
+
+    let batched_opening_proof = shplonked::zk_pcs_open(
+        &srs,
+        0, // I don't know what this is
+        hat_g,
+        vec![],
+        hat_x,
+        batched_eval,
+        batched_randomness,
+    );
+
     #[cfg(feature = "range_proof_timing_multivariate")]
     print_cumulative(
         "batched_coeffs + z + y + combined_comm + batched_randomness",

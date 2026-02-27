@@ -202,10 +202,10 @@ impl<'a, E: Pairing> CommitmentHomomorphism<'a, E> {
     pub fn open(
         ck: &CommitmentKey<E>,
         f_vals: Vec<E::ScalarField>, // evaluations or coefficients, depending on `ck.msm_basis`
-        rho: E::ScalarField,
+        rho: E::ScalarField, // commitment randomness of f
         x: E::ScalarField,
         y: E::ScalarField,
-        s: &CommitmentRandomness<E::ScalarField>,
+        s: &CommitmentRandomness<E::ScalarField>, // commitment randomness of the quotient
         offset: usize,
     ) -> OpeningProof<E> {
         let q_vals = match &ck.msm_basis {

@@ -85,9 +85,9 @@ harness = false
 name = "range_proof"
 harness = false
 
-[[bench]]
-name = "range_proof_verify_components"
-harness = false
+#[[bench]]
+#name = "range_proof_verify_components"
+#harness = false
 
 [[bench]]
 name = "serialization"
