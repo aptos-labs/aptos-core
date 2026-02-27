@@ -9,6 +9,20 @@ use anyhow::{Context, Result};
 use clap::Parser;
 use std::path::PathBuf;
 
+fn shell_single_quote(value: &str) -> String {
+    let mut quoted = String::with_capacity(value.len() + 2);
+    quoted.push('\'');
+    for ch in value.chars() {
+        if ch == '\'' {
+            quoted.push_str("'\\''");
+        } else {
+            quoted.push(ch);
+        }
+    }
+    quoted.push('\'');
+    quoted
+}
+
 /// Arguments for the `plugin` subcommand.
 #[derive(Parser, Debug, serde::Serialize)]
 pub struct PluginArgs {
@@ -53,7 +67,7 @@ pub fn run(args: &PluginArgs, global: &GlobalOpts) -> Result<()> {
     let exec_cmd = match &args.log {
         Some(log_path) => format!(
             "set -f; set -- ${{MOVE_FLOW_ARGS:-mcp}}; exec \"${{MOVE_FLOW:-move-flow}}\" \"$@\" 2>>{}",
-            log_path.display()
+            shell_single_quote(&log_path.to_string_lossy())
         ),
         None => "set -f; set -- ${MOVE_FLOW_ARGS:-mcp}; exec \"${MOVE_FLOW:-move-flow}\" \"$@\"".to_string(),
     };
@@ -164,5 +178,48 @@ mod tests {
         );
         assert_eq!(server_config["command"], "sh");
         assert_eq!(server_config["args"], expected_args);
+    }
+
+    #[test]
+    fn test_generate_claude_with_log_path_shell_quoted() {
+        let content_root = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+        let output_dir = TempDir::new().unwrap();
+        let log_path = output_dir
+            .path()
+            .join("logs")
+            .join("stderr $x `cmd` 'q'.log");
+
+        let global = GlobalOpts {
+            platform: Platform::Claude,
+            content_dir: Some(content_root),
+        };
+        let args = PluginArgs {
+            output_dir: output_dir.path().to_path_buf(),
+            initial_verification_timeout: 5,
+            max_verification_timeout: 10,
+            default_verification_attempts: 3,
+            log: Some(log_path.clone()),
+        };
+
+        run(&args, &global).expect("generate should succeed");
+
+        let mcp_content = std::fs::read_to_string(output_dir.path().join(".mcp.json")).unwrap();
+        let mcp_json: serde_json::Value = serde_json::from_str(&mcp_content).unwrap();
+        let server_config = &mcp_json["mcpServers"]["move-flow"];
+        let expected_args = serde_json::json!([
+            "-c",
+            format!(
+                "set -f; set -- ${{MOVE_FLOW_ARGS:-mcp}}; exec \"${{MOVE_FLOW:-move-flow}}\" \"$@\" 2>>{}",
+                shell_single_quote(&log_path.to_string_lossy())
+            )
+        ]);
+
+        assert_eq!(server_config["command"], "sh");
+        assert_eq!(server_config["args"], expected_args);
+    }
+
+    #[test]
+    fn test_shell_single_quote_escapes_single_quotes() {
+        assert_eq!(shell_single_quote("a'b"), "'a'\\''b'");
     }
 }
