@@ -1080,21 +1080,11 @@ module aptos_framework::account {
         );
         address_map.add(new_auth_key, originating_addr);
 
-        if (std::features::module_event_migration_enabled()) {
-            event::emit(KeyRotation {
-                account: originating_addr,
-                old_authentication_key: account_resource.authentication_key,
-                new_authentication_key: new_auth_key_vector,
-            });
-        } else {
-            event::emit_event<KeyRotationEvent>(
-                &mut account_resource.key_rotation_events,
-                KeyRotationEvent {
-                    old_authentication_key: account_resource.authentication_key,
-                    new_authentication_key: new_auth_key_vector,
-                }
-            );
-        };
+        event::emit(KeyRotation {
+            account: originating_addr,
+            old_authentication_key: account_resource.authentication_key,
+            new_authentication_key: new_auth_key_vector,
+        });
 
         // Update the account resource's authentication key.
         account_resource.authentication_key = new_auth_key_vector;
@@ -1210,24 +1200,13 @@ module aptos_framework::account {
     /// Coin management methods.
     ///////////////////////////////////////////////////////////////////////////
 
-    public(friend) fun register_coin<CoinType>(account_addr: address) acquires Account {
-        if (std::features::module_event_migration_enabled()) {
-            event::emit(
-                CoinRegister {
-                    account: account_addr,
-                    type_info: type_info::type_of<CoinType>(),
-                },
-            );
-        } else {
-            ensure_resource_exists(account_addr);
-            let account = &mut Account[account_addr];
-            event::emit_event<CoinRegisterEvent>(
-                &mut account.coin_register_events,
-                CoinRegisterEvent {
-                    type_info: type_info::type_of<CoinType>(),
-                },
-            );
-        }
+    public(friend) fun register_coin<CoinType>(account_addr: address) {
+        event::emit(
+            CoinRegister {
+                account: account_addr,
+                type_info: type_info::type_of<CoinType>(),
+            },
+        );
     }
 
     ///////////////////////////////////////////////////////////////////////////

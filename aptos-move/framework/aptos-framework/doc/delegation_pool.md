@@ -3126,28 +3126,15 @@ Vote on a proposal with a voter's voting power. To successfully vote, the follow
     <b>let</b> pool_signer = <a href="delegation_pool.md#0x1_delegation_pool_retrieve_stake_pool_owner">retrieve_stake_pool_owner</a>(<b>borrow_global</b>&lt;<a href="delegation_pool.md#0x1_delegation_pool_DelegationPool">DelegationPool</a>&gt;(pool_address));
     <a href="aptos_governance.md#0x1_aptos_governance_partial_vote">aptos_governance::partial_vote</a>(&pool_signer, pool_address, proposal_id, voting_power, should_pass);
 
-    <b>if</b> (<a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features_module_event_migration_enabled">features::module_event_migration_enabled</a>()) {
-        <a href="event.md#0x1_event_emit">event::emit</a>(
-            <a href="delegation_pool.md#0x1_delegation_pool_Vote">Vote</a> {
-                voter: voter_address,
-                proposal_id,
-                <a href="delegation_pool.md#0x1_delegation_pool">delegation_pool</a>: pool_address,
-                num_votes: voting_power,
-                should_pass,
-            }
-        );
-    } <b>else</b> {
-        <a href="event.md#0x1_event_emit_event">event::emit_event</a>(
-            &<b>mut</b> governance_records.vote_events,
-            <a href="delegation_pool.md#0x1_delegation_pool_VoteEvent">VoteEvent</a> {
-                voter: voter_address,
-                proposal_id,
-                <a href="delegation_pool.md#0x1_delegation_pool">delegation_pool</a>: pool_address,
-                num_votes: voting_power,
-                should_pass,
-            }
-        );
-    };
+    <a href="event.md#0x1_event_emit">event::emit</a>(
+        <a href="delegation_pool.md#0x1_delegation_pool_Vote">Vote</a> {
+            voter: voter_address,
+            proposal_id,
+            <a href="delegation_pool.md#0x1_delegation_pool">delegation_pool</a>: pool_address,
+            num_votes: voting_power,
+            should_pass,
+        }
+    );
 }
 </code></pre>
 
@@ -3204,26 +3191,13 @@ voting power in THIS delegation pool must be not less than the minimum required 
         is_multi_step_proposal,
     );
 
-    <b>let</b> governance_records = <b>borrow_global_mut</b>&lt;<a href="delegation_pool.md#0x1_delegation_pool_GovernanceRecords">GovernanceRecords</a>&gt;(pool_address);
-
-    <b>if</b> (<a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features_module_event_migration_enabled">features::module_event_migration_enabled</a>()) {
-        <a href="event.md#0x1_event_emit">event::emit</a>(
-            <a href="delegation_pool.md#0x1_delegation_pool_CreateProposal">CreateProposal</a> {
-                proposal_id,
-                voter: voter_addr,
-                <a href="delegation_pool.md#0x1_delegation_pool">delegation_pool</a>: pool_address,
-            }
-        );
-    } <b>else</b> {
-        <a href="event.md#0x1_event_emit_event">event::emit_event</a>(
-            &<b>mut</b> governance_records.create_proposal_events,
-            <a href="delegation_pool.md#0x1_delegation_pool_CreateProposalEvent">CreateProposalEvent</a> {
-                proposal_id,
-                voter: voter_addr,
-                <a href="delegation_pool.md#0x1_delegation_pool">delegation_pool</a>: pool_address,
-            }
-        );
-    };
+    <a href="event.md#0x1_event_emit">event::emit</a>(
+        <a href="delegation_pool.md#0x1_delegation_pool_CreateProposal">CreateProposal</a> {
+            proposal_id,
+            voter: voter_addr,
+            <a href="delegation_pool.md#0x1_delegation_pool">delegation_pool</a>: pool_address,
+        }
+    );
 }
 </code></pre>
 
@@ -4152,19 +4126,11 @@ this change won't take effects until the next lockup period.
         new_delegated_votes.active_shares_next_lockup += active_shares;
     };
 
-    <b>if</b> (<a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features_module_event_migration_enabled">features::module_event_migration_enabled</a>()) {
-        <a href="event.md#0x1_event_emit">event::emit</a>(<a href="delegation_pool.md#0x1_delegation_pool_DelegateVotingPower">DelegateVotingPower</a> {
-            pool_address,
-            delegator: delegator_address,
-            voter: new_voter,
-        })
-    } <b>else</b> {
-        <a href="event.md#0x1_event_emit_event">event::emit_event</a>(&<b>mut</b> governance_records.delegate_voting_power_events, <a href="delegation_pool.md#0x1_delegation_pool_DelegateVotingPowerEvent">DelegateVotingPowerEvent</a> {
-            pool_address,
-            delegator: delegator_address,
-            voter: new_voter,
-        });
-    };
+    <a href="event.md#0x1_event_emit">event::emit</a>(<a href="delegation_pool.md#0x1_delegation_pool_DelegateVotingPower">DelegateVotingPower</a> {
+        pool_address,
+        delegator: delegator_address,
+        voter: new_voter,
+    });
 }
 </code></pre>
 
@@ -4412,26 +4378,14 @@ Add <code>amount</code> of coins to the delegation pool <code>pool_address</code
     // in order <b>to</b> appreciate all shares on the active pool atomically
     <a href="delegation_pool.md#0x1_delegation_pool_buy_in_active_shares">buy_in_active_shares</a>(pool, <a href="delegation_pool.md#0x1_delegation_pool_NULL_SHAREHOLDER">NULL_SHAREHOLDER</a>, add_stake_fee);
 
-    <b>if</b> (<a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features_module_event_migration_enabled">features::module_event_migration_enabled</a>()) {
-        <a href="event.md#0x1_event_emit">event::emit</a>(
-            <a href="delegation_pool.md#0x1_delegation_pool_AddStake">AddStake</a> {
-                pool_address,
-                delegator_address,
-                amount_added: amount,
-                add_stake_fee,
-            },
-        );
-    } <b>else</b> {
-        <a href="event.md#0x1_event_emit_event">event::emit_event</a>(
-            &<b>mut</b> pool.add_stake_events,
-            <a href="delegation_pool.md#0x1_delegation_pool_AddStakeEvent">AddStakeEvent</a> {
-                pool_address,
-                delegator_address,
-                amount_added: amount,
-                add_stake_fee,
-            },
-        );
-    };
+    <a href="event.md#0x1_event_emit">event::emit</a>(
+        <a href="delegation_pool.md#0x1_delegation_pool_AddStake">AddStake</a> {
+            pool_address,
+            delegator_address,
+            amount_added: amount,
+            add_stake_fee,
+        },
+    );
 }
 </code></pre>
 
@@ -4517,24 +4471,13 @@ at most how much active stake there is on the stake pool.
     <a href="delegation_pool.md#0x1_delegation_pool_buy_in_pending_inactive_shares">buy_in_pending_inactive_shares</a>(pool, delegator_address, amount);
     <a href="delegation_pool.md#0x1_delegation_pool_assert_min_pending_inactive_balance">assert_min_pending_inactive_balance</a>(pool, delegator_address);
 
-    <b>if</b> (<a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features_module_event_migration_enabled">features::module_event_migration_enabled</a>()) {
-        <a href="event.md#0x1_event_emit">event::emit</a>(
-            <a href="delegation_pool.md#0x1_delegation_pool_UnlockStake">UnlockStake</a> {
-                pool_address,
-                delegator_address,
-                amount_unlocked: amount,
-            },
-        );
-    } <b>else</b> {
-        <a href="event.md#0x1_event_emit_event">event::emit_event</a>(
-            &<b>mut</b> pool.unlock_stake_events,
-            <a href="delegation_pool.md#0x1_delegation_pool_UnlockStakeEvent">UnlockStakeEvent</a> {
-                pool_address,
-                delegator_address,
-                amount_unlocked: amount,
-            },
-        );
-    };
+    <a href="event.md#0x1_event_emit">event::emit</a>(
+        <a href="delegation_pool.md#0x1_delegation_pool_UnlockStake">UnlockStake</a> {
+            pool_address,
+            delegator_address,
+            amount_unlocked: amount,
+        },
+    );
 }
 </code></pre>
 
@@ -4588,24 +4531,13 @@ Move <code>amount</code> of coins from pending_inactive to active.
     <a href="delegation_pool.md#0x1_delegation_pool_buy_in_active_shares">buy_in_active_shares</a>(pool, delegator_address, amount);
     <a href="delegation_pool.md#0x1_delegation_pool_assert_min_active_balance">assert_min_active_balance</a>(pool, delegator_address);
 
-    <b>if</b> (<a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features_module_event_migration_enabled">features::module_event_migration_enabled</a>()) {
-        <a href="event.md#0x1_event_emit">event::emit</a>(
-            <a href="delegation_pool.md#0x1_delegation_pool_ReactivateStake">ReactivateStake</a> {
-                pool_address,
-                delegator_address,
-                amount_reactivated: amount,
-            },
-        );
-    } <b>else</b> {
-        <a href="event.md#0x1_event_emit_event">event::emit_event</a>(
-            &<b>mut</b> pool.reactivate_stake_events,
-            <a href="delegation_pool.md#0x1_delegation_pool_ReactivateStakeEvent">ReactivateStakeEvent</a> {
-                pool_address,
-                delegator_address,
-                amount_reactivated: amount,
-            },
-        );
-    };
+    <a href="event.md#0x1_event_emit">event::emit</a>(
+        <a href="delegation_pool.md#0x1_delegation_pool_ReactivateStake">ReactivateStake</a> {
+            pool_address,
+            delegator_address,
+            amount_reactivated: amount,
+        },
+    );
 }
 </code></pre>
 
@@ -4714,24 +4646,13 @@ Withdraw <code>amount</code> of owned inactive stake from the delegation pool at
     <b>let</b> (_, inactive, _, _) = <a href="stake.md#0x1_stake_get_stake">stake::get_stake</a>(pool_address);
     pool.total_coins_inactive = inactive;
 
-    <b>if</b> (<a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features_module_event_migration_enabled">features::module_event_migration_enabled</a>()) {
-        <a href="event.md#0x1_event_emit">event::emit</a>(
-            <a href="delegation_pool.md#0x1_delegation_pool_WithdrawStake">WithdrawStake</a> {
-                pool_address,
-                delegator_address,
-                amount_withdrawn: amount,
-            },
-        );
-    } <b>else</b> {
-        <a href="event.md#0x1_event_emit_event">event::emit_event</a>(
-            &<b>mut</b> pool.withdraw_stake_events,
-            <a href="delegation_pool.md#0x1_delegation_pool_WithdrawStakeEvent">WithdrawStakeEvent</a> {
-                pool_address,
-                delegator_address,
-                amount_withdrawn: amount,
-            },
-        );
-    };
+    <a href="event.md#0x1_event_emit">event::emit</a>(
+        <a href="delegation_pool.md#0x1_delegation_pool_WithdrawStake">WithdrawStake</a> {
+            pool_address,
+            delegator_address,
+            amount_withdrawn: amount,
+        },
+    );
 }
 </code></pre>
 

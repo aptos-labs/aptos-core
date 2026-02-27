@@ -141,13 +141,11 @@ module aptos_framework::reconfiguration {
         };
         config_ref.epoch += 1;
 
-        if (std::features::module_event_migration_enabled()) {
-            event::emit(
-                NewEpoch {
-                    epoch: config_ref.epoch,
-                },
-            );
-        };
+        event::emit(
+            NewEpoch {
+                epoch: config_ref.epoch,
+            },
+        );
         event::emit_event<NewEpochEvent>(
             &mut config_ref.events,
             NewEpochEvent {
@@ -173,13 +171,11 @@ module aptos_framework::reconfiguration {
         assert!(config_ref.epoch == 0 && config_ref.last_reconfiguration_time == 0, error::invalid_state(ECONFIGURATION));
         config_ref.epoch = 1;
 
-        if (std::features::module_event_migration_enabled()) {
-            event::emit(
-                NewEpoch {
-                    epoch: config_ref.epoch,
-                },
-            );
-        };
+        event::emit(
+            NewEpoch {
+                epoch: config_ref.epoch,
+            },
+        );
         event::emit_event<NewEpochEvent>(
             &mut config_ref.events,
             NewEpochEvent {
