@@ -170,7 +170,14 @@ impl HasMultiExp for G1Projective {
 }
 
 pub(crate) fn msm_bool<G: AffineRepr>(bases: &[G], scalars: &[bool]) -> G::Group {
-    assert_eq!(bases.len(), scalars.len());
+    // Bases and scalars must have the same length for multi-scalar multiplication.
+    debug_assert_eq!(
+        bases.len(),
+        scalars.len(),
+        "bases and scalars must have the same length for MSM (got {} bases, {} scalars)",
+        bases.len(),
+        scalars.len()
+    );
 
     let mut acc = G::Group::zero();
     for (base, &bit) in bases.iter().zip(scalars) {

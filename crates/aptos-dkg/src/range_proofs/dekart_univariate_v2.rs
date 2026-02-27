@@ -501,29 +501,32 @@ impl<E: Pairing> traits::BatchedRangeProof<E> for Proof<E> {
 
         #[cfg(feature = "range_proof_timing_univariate_v2")]
         let start = Instant::now();
-        // Step 4a
+        // Step 4a (match multivariate: precompute bits, then f_j evals from them)
+        let bits: Vec<Vec<bool>> = values
+            .iter()
+            .map(|z_val| {
+                utils::scalar_to_bits_le::<E>(z_val)
+                    .into_iter()
+                    .take(ell as usize)
+                    .collect::<Vec<_>>()
+            })
+            .collect();
+        let f_j_evals_without_r: Vec<Vec<bool>> = (0..ell as usize)
+            .map(|j| bits.iter().map(|row| row[j]).collect())
+            .collect();
+
         let rs: Vec<E::ScalarField> = (0..ell).map(|_| sample_field_element(rng)).collect();
 
-        let f_js_evals: Vec<Vec<E::ScalarField>> = {
-            let mut f_js_evals = vec![Vec::with_capacity(num_omegas); ell as usize];
-
-            for j in 0..ell as usize {
-                f_js_evals[j].push(rs[j]);
-            }
-
-            for &val in values.iter() {
-                let bits = utils::scalar_to_bits_le::<E>(&val);
-                for j in 0..ell as usize {
-                    f_js_evals[j].push(E::ScalarField::from(bits[j]));
-                }
-            }
-
-            for f_j in &mut f_js_evals {
-                f_j.resize(num_omegas, E::ScalarField::ZERO);
-            }
-
-            f_js_evals
-        };
+        let f_js_evals: Vec<Vec<E::ScalarField>> = f_j_evals_without_r
+            .iter()
+            .enumerate()
+            .map(|(j, col)| {
+                let mut evals: Vec<E::ScalarField> = vec![rs[j]];
+                evals.extend(col.iter().map(|&b| E::ScalarField::from(b)));
+                evals.resize(num_omegas, E::ScalarField::ZERO);
+                evals
+            })
+            .collect();
 
         let rhos: Vec<E::ScalarField> = std::iter::repeat_with(|| sample_field_element(rng))
             .take(ell as usize)
@@ -533,13 +536,14 @@ impl<E: Pairing> traits::BatchedRangeProof<E> for Proof<E> {
             msm_basis: lagr_g1,
             xi_1: *xi_1,
         };
-        // f_j_evals[0] is blinding rs[j]; f_j_evals[1..] are 0/1. Compute commitment as xi_1*rho + lagr_g1[0]*f_j_evals[0] + msm_bool(lagr_g1[1..], bits).
+        // f_j_evals[0] is blinding rs[j]; f_j_evals[1..(1+n)] are 0/1 from f_j_evals_without_r[j]. Compute commitment as xi_1*rho + lagr_g1[0]*f_j_evals[0] + msm_bool(lagr_g1[1..(1+n)], bits).
         let Cs: Vec<E::G1> = f_js_evals
             .iter()
             .zip(rhos.iter())
-            .map(|(f_j_evals, &rho)| {
-                let bits: Vec<bool> = f_j_evals[1..].iter().map(|e| !e.is_zero()).collect();
-                let sum = lagr_g1[0] * f_j_evals[0] + utils::msm_bool(&lagr_g1[1..], &bits);
+            .enumerate()
+            .map(|(j, (f_j_evals, &rho))| {
+                let bits = &f_j_evals_without_r[j];
+                let sum = lagr_g1[0] * f_j_evals[0] + utils::msm_bool(&lagr_g1[1..(1 + n)], bits);
                 *xi_1 * rho + sum // TODO: could turn this into a 3-term MSM, should be faster
             })
             .collect();

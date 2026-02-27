@@ -507,14 +507,21 @@ where
 
     #[cfg(feature = "range_proof_timing_multivariate")]
     let start = Instant::now();
-    // Step 3e: Commit to the f_js (xi_1*rho + tau_powers[0]*hat_f_j_eval[0] + msm_bool(tau_powers[1..], bits))
+    // Step 3e: Commit to the f_js.
+    // Homomorphism does: xi_1*r + sum_{i=0..size-1} tau_powers[i]*values[i] and uses exactly
+    // msm_basis[..values.len()] = tau_powers[0..size]. So we must use tau_powers[1..size] (length
+    // size-1) in msm_bool, not tau_powers[1..] (which can be longer if SRS has more than size powers).
+    // Bits must be the tail of f_j_eval as 0/1, length size-1: either from f_j_eval[1..] or
+    // f_j_evals_without_r[j] padded to size-1.
     let f_j_comms: Vec<E::G1> = f_j_evals
         .iter()
         .zip(f_j_comms_randomness.iter())
-        .map(|(hat_f_j_eval, r_i)| {
-            let bits: Vec<bool> = hat_f_j_eval[1..].iter().map(|e| !e.is_zero()).collect();
-            let sum = tau_powers[0] * hat_f_j_eval[0] + utils::msm_bool(&tau_powers[1..], &bits);
-            pk.ck.xi_1 * *r_i + sum // TODO: could turn this into a 3-term MSM, should be faster
+        .enumerate()
+        .map(|(j, (f_j_eval, r_i))| {
+            let bits = f_j_evals_without_r[j].clone();
+            let sum = tau_powers[0] * f_j_eval[0]
+                + utils::msm_bool(&tau_powers[1..=values.len() as usize], &bits);
+            pk.ck.xi_1 * *r_i + sum
         })
         .collect();
     #[cfg(feature = "range_proof_timing_multivariate")]
