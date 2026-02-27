@@ -1,4 +1,18 @@
 self-hosted-runner:
   # Labels of self-hosted runners in array of string
   labels:
-    - runs-on,cpu=64,family=c7,disk=large,image=aptos-ubuntu-x64,run-id=${{ github.run_id }}
+    - 2cpu-gh-ubuntu22-x64
+    - 2cpu-gh-ubuntu22-x64-staticip
+    - 2cpu-gh-ubuntu24-x64
+    - 4cpu-gh-ubuntu22-x64
+    - 4cpu-gh-ubuntu22-x64-staticip
+    - 4cpu-gh-ubuntu24-x64
+    - 16cpu-gh-ubuntu22-x64
+    - 16cpu-gh-ubuntu24-x64
+    - 32cpu-gh-ubuntu22-x64
+    - 32cpu-aptos-image-ubuntu22-x64
+    - 64cpu-gh-ubuntu22-x64
+    - 64cpu-gh-ubuntu24-x64
+    - 64cpu-aptos-image-ubuntu22-x64
+    # runs-on.com label kept for workflow-run-docker-rust-build.yaml
+    - runs-on,cpu=64,family=c7,image=aptos-ubuntu-x64,run-id=${{ github.run_id }},spot=co,disk=large
