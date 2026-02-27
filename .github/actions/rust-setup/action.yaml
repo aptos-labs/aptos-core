@@ -18,7 +18,7 @@ runs:
   steps:
     - if: ${{inputs.macos != 'true'}}
       name: Linux - Setup dependencies
-      run: sudo apt-get update && sudo apt-get install build-essential ca-certificates clang curl git libpq-dev libssl-dev pkg-config lsof lld --no-install-recommends --assume-yes
+      run: sudo apt-get update && sudo apt-get install build-essential ca-certificates clang curl git libdw-dev libpq-dev libssl-dev libudev-dev pkg-config lsof lld --no-install-recommends --assume-yes
       shell: bash
 
     - uses: dsherret/rust-toolchain-file@v1
