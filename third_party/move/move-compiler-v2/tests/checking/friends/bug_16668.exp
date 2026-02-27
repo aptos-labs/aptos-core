@@ -1,21 +1,21 @@
 
 Diagnostics:
-warning: public inline function `outer` cannot be called from all locations it is accessible
+warning: public inline function `outer` calls `m::package_inner` which may not be accessible when expanded
   ┌─ tests/checking/friends/bug_16668.move:6:23
   │
 6 │     public inline fun outer(): u64 {
-  │                       ^^^^^ if called from a location where `m::package_inner` is not accessible
+  │                       ^^^^^ contains calls that may be inaccessible when expanded
 7 │         package_inner() + package_inner()
-  │         --------------- inline expansion calls package function that may not be accessible in all locations that `m::outer` can be called
+  │         --------------- package function may not be accessible in all contexts where `outer` can be called
 
-warning: public inline function `outer_2` cannot be called from all locations it is accessible
+warning: public inline function `outer_2` calls `m::package_inner` which may not be accessible when expanded
    ┌─ tests/checking/friends/bug_16668.move:10:23
    │
  7 │         package_inner() + package_inner()
-   │         --------------- inline expansion calls package function that may not be accessible in all locations that `m::outer_2` can be called
+   │         --------------- package function may not be accessible in all contexts where `outer_2` can be called
    ·
 10 │     public inline fun outer_2(): u64 {
-   │                       ^^^^^^^ if called from a location where `m::package_inner` is not accessible
+   │                       ^^^^^^^ contains calls that may be inaccessible when expanded
 11 │         outer() + outer()
    │         ------- from a call inlined at this callsite
 

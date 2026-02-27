@@ -7,7 +7,7 @@ use crate::{
     sigma_protocol::{
         self,
         homomorphism::{
-            tuple::{TupleCodomainShape, TupleHomomorphism},
+            tuple::{CurveGroupTupleHomomorphism, TupleCodomainShape},
             LiftHomomorphism, TrivialShape,
         },
         FirstProofItem,
@@ -26,6 +26,7 @@ use aptos_crypto_derive::SigmaProtocolWitness;
 use ark_ec::{pairing::Pairing, AdditiveGroup, AffineRepr, CurveGroup};
 use ark_ff::PrimeField;
 use ark_serialize::{CanonicalDeserialize, CanonicalSerialize};
+use std::marker::PhantomData;
 
 /// Witness data for the `chunked_elgamal_field` PVSS protocol.
 ///
@@ -78,21 +79,21 @@ type LiftedWeightedChunkedElgamal<'a, C> = LiftHomomorphism<
 //                                 │ elgamal_randomness            │
 //                                 └───────────────┬───────────────┘
 //                                                 │
-//              ┌────────────────────────────────┬─╫─┬──────────────────────────┐
-//              │                                ║ ╫ ║                          │
-// projection_1 │         lifted HKZG hom ╔══════╝ ╫ ╚══════╗ lifted Chunked    │ projection_2
-//              │                         ║        ╫        ║ ElGamal hom       │
-//              ▼                         ║        ╫        ║                   ▼
-//  ┌───────────────────────────────────┐ ║        ╫        ║  ┌──────────────────────────────┐
-//  │ univariate_hiding_kzg::Witness<E> │ ║        ╫        ║  │ chunked_elgamal::Witness<E>  │
-//  │-----------------------------------│ ║        ╫        ║  │------------------------------│
-//  │ hkzg_randomness                   │ ║        ╫        ║  │ chunked_plaintexts           │
-//  │ flattened_chunked_plaintexts      │ ║        ╫        ║  │ elgamal_randomness           │
-//  └──────────────┬────────────────────┘ ║        ╫        ║  └──────────────┬───────────────┘
-//                 │ ╔════════════════════╝        ╫        ╚═══════════════╗ │
-//       HKZG hom  │ ║                             ╫                        ║ │ Chunked ElGamal hom
-//                 │ ║                             ╫ TupleHomomorphism      ║ │
-//                 ▼ ▼                             ╫                        ▼ ▼
+//              ┌────────────────────────────────┬─╫─┬──-----────────────────────────┐
+//              │                                ║ ╫ ║                               │
+// projection_1 │         lifted HKZG hom ╔══════╝ ╫ ╚══════╗      lifted Chunked    │ projection_2
+//              │                         ║        ╫        ║      ElGamal hom       │
+//              ▼                         ║        ╫        ║                        ▼
+//  ┌───────────────────────────────────┐ ║        ╫        ║       ┌──────────────────────────────┐
+//  │ univariate_hiding_kzg::Witness<E> │ ║        ╫        ║       │ chunked_elgamal::Witness<E>  │
+//  │-----------------------------------│ ║        ╫        ║       │------------------------------│
+//  │ hkzg_randomness                   │ ║        ╫        ║       │ chunked_plaintexts           │
+//  │ flattened_chunked_plaintexts      │ ║        ╫        ║       │ elgamal_randomness           │
+//  └──────────────┬────────────────────┘ ║        ╫        ║       └──────────────┬───────────────┘
+//                 │ ╔════════════════════╝        ╫        ╚═=====══════════════╗ │
+//       HKZG hom  │ ║                             ╫                             ║ │ Chunked ElGamal hom
+//                 │ ║                             ╫ CurveGroupTupleHomomorphism ║ │
+//                 ▼ ▼                             ╫                             ▼ ▼
 //   ┌──────────────────────────┐                  ╫         ┌──────────────────────────┐
 //   │ HKZG output (commitment) │                  ╫         │ Chunked ElGamal output   │
 //   └──────────────┬───────────┘                  ╫         └──────────────┬───────────┘
@@ -100,11 +101,11 @@ type LiftedWeightedChunkedElgamal<'a, C> = LiftHomomorphism<
 //                  └─────────────────────────────►╫◄───────────────────────┘
 //                                                 ╫
 //                                                 ▼
-//                                  ┌──────────────────────────────────┐
-//                                  │   TupleHomomorphism output       │
-//                                  │   (pair of HKZG image and        │
-//                                  │    Chunked ElGamal image)        │
-//                                  └──────────────────────────────────┘
+//                                ┌─────────────────────────────────────┐
+//                                │ CurveGroupTupleHomomorphism output  │
+//                                │     (pair of HKZG image and         │
+//                                │      Chunked ElGamal image)         │
+//                                └─────────────────────────────────────┘
 //
 //
 // In other words, the tuple homomorphism is roughly given as follows:
@@ -120,8 +121,9 @@ type LiftedWeightedChunkedElgamal<'a, C> = LiftHomomorphism<
 // TODO: note here that we had to put a zero before z_{i,j}, because that's what DeKARTv2 is doing. So maybe
 // it would make more sense to say this is a tuple homomorphism consisting of (lifts of) the
 // DeKARTv2::commitment_homomorphism together with the chunked_elgamal::homomorphism.
-//pub type Homomorphism<'a, E> = TupleHomomorphism<LiftedHkzg<'a, E>, LiftedChunkedElgamal<'a, <E as Pairing>::G1>>;
-pub type WeightedHomomorphism<'a, E> = TupleHomomorphism<
+//pub type Homomorphism<'a, E> = CurveGroupTupleHomomorphism<LiftedHkzg<'a, E>, LiftedChunkedElgamal<'a, <E as Pairing>::G1>>;
+pub type WeightedHomomorphism<'a, E> = CurveGroupTupleHomomorphism<
+    <E as Pairing>::G1,
     LiftedHkzgWeighted<'a, E>,
     LiftedWeightedChunkedElgamal<'a, <E as Pairing>::G1>,
 >;
@@ -240,10 +242,11 @@ impl<'a, E: Pairing> WeightedHomomorphism<'a, E> {
             },
         };
 
-        // Combine the two lifted homomorphisms just constructed, into the required TupleHomomorphism
+        // Combine the two lifted homomorphisms just constructed, into the required CurveGroupTupleHomomorphism
         Self {
             hom1: lifted_hkzg,
             hom2: lifted_chunked_elgamal,
+            _group: PhantomData::<E::G1>,
         }
     }
 }

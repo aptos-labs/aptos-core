@@ -1,12 +1,12 @@
 
 Diagnostics:
-warning: friend inline function `bar` cannot be called from all locations it is accessible
+warning: friend inline function `bar` calls `m::foo` which may not be accessible when expanded
    ┌─ tests/visibility-checker/inline_with_warning_05.move:12:31
    │
 12 │     public(friend) inline fun bar(): u64 {
-   │                               ^^^ if called from a location where `m::foo` is not accessible, such as from a module that is a friend of `0xc0ffee::n` but not a friend of `0xc0ffee::m`
+   │                               ^^^ contains calls that may be inaccessible when expanded, e.g., if called from a non-friend of `0xc0ffee::m`
 13 │         0xc0ffee::m::foo() + 0xc0ffee::m::foo()
-   │         ------------------ inline expansion calls friend function that may not be accessible in all locations that `n::bar` can be called
+   │         ------------------ friend function may not be accessible in all contexts where `bar` can be called
 
 // -- Model dump before first bytecode pipeline
 module 0xc0ffee::m {

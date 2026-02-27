@@ -23,6 +23,8 @@ pub async fn generate_traffic(
     duration: Duration,
     gas_price: u64,
     transaction_mix_per_phase: Vec<Vec<(TransactionType, usize)>>,
+    encrypt_transactions: bool,
+    mode: Option<EmitJobMode>,
 ) -> Result<TxnStats> {
     ensure!(gas_price > 0, "gas_price is required to be non zero");
     let rng = SeedableRng::from_rng(OsRng)?;
@@ -35,6 +37,16 @@ pub async fn generate_traffic(
         AccountType::Local,
     )
     .await?;
+    let emit_job_request = if encrypt_transactions {
+        emit_job_request.encrypt_transactions(true)
+    } else {
+        emit_job_request
+    };
+    let emit_job_request = if let Some(mode) = mode {
+        emit_job_request.mode(mode)
+    } else {
+        emit_job_request
+    };
     let transaction_factory =
         TransactionFactory::new(swarm.chain_info().chain_id).with_gas_unit_price(gas_price);
     let rest_cli = swarm.validators().next().unwrap().rest_client();
@@ -173,6 +185,8 @@ async fn test_txn_emmitter() {
         Duration::from_secs(20),
         100,
         TRANSACTION_MIX_PER_PHASE.to_vec(),
+        false,
+        None,
     )
     .await
     .unwrap();
@@ -244,6 +258,8 @@ async fn test_txn_emmitter_with_high_pending_latency() {
             },
             1,
         )]],
+        false,
+        None,
     )
     .await
     .unwrap();

@@ -109,11 +109,6 @@ pub struct Options {
            default_value=bool_to_str(warn_of_deprecation_use_in_aptos_libs_env_var()))]
     pub warn_of_deprecation_use_in_aptos_libs: bool,
 
-    /// Show warnings about unused functions, fields, constants, etc.
-    /// Note that the current value of this constant is "Wunused"
-    #[clap(long = cli::WARN_UNUSED_FLAG, default_value="false")]
-    pub warn_unused: bool,
-
     /// Whether to compile everything, including dependencies.
     #[clap(long)]
     pub whole_program: bool,
@@ -239,13 +234,6 @@ impl Options {
     pub fn set_warn_of_deprecation_use_in_aptos_libs(self, value: bool) -> Self {
         Self {
             warn_of_deprecation_use_in_aptos_libs: value,
-            ..self
-        }
-    }
-
-    pub fn set_warn_unused(self, value: bool) -> Self {
-        Self {
-            warn_unused: value,
             ..self
         }
     }

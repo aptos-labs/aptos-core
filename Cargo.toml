@@ -34,12 +34,16 @@ members = [
     "aptos-move/aptos-vm-types",
     "aptos-move/aptos-workspace-server",
     "aptos-move/block-executor",
+    "aptos-move/cli",
     "aptos-move/e2e-benchmark",
     "aptos-move/e2e-move-tests",
     "aptos-move/e2e-tests",
     "aptos-move/e2e-testsuite",
+    "aptos-move/flow",
     "aptos-move/framework",
     "aptos-move/framework/cached-packages",
+    "aptos-move/framework/natives",
+    "aptos-move/framework/release-bundle",
     "aptos-move/framework/table-natives",
     "aptos-move/move-examples",
     "aptos-move/mvhashmap",
@@ -104,13 +108,13 @@ members = [
     "crates/aptos-telemetry-service/e2e-test/test-client",
     "crates/aptos-temppath",
     "crates/aptos-time-service",
+    "crates/aptos-token-bucket",
     "crates/aptos-transaction-filters",
     "crates/aptos-warp-webserver",
     "crates/bounded-executor",
     "crates/channel",
     "crates/crash-handler",
     "crates/fallible",
-    "crates/indexer",
     "crates/jwk-utils",
     "crates/node-resource-metrics",
     "crates/num-variants",
@@ -142,8 +146,6 @@ members = [
     "ecosystem/indexer-grpc/indexer-transaction-generator",
     "ecosystem/indexer-grpc/transaction-filter",
     "ecosystem/nft-metadata-crawler",
-    "ecosystem/node-checker",
-    "ecosystem/node-checker/fn-check-client",
     "execution/block-partitioner",
     "execution/executor",
     "execution/executor-benchmark",
@@ -159,7 +161,6 @@ members = [
     "keyless/pepper/example-client-rust",
     "keyless/pepper/service",
     "mempool",
-    "network/benchmark",
     "network/builder",
     "network/discovery",
     "network/framework",
@@ -278,7 +279,6 @@ default-members = [
     "crates/transaction-emitter",
     "aptos-move/framework",
     "storage/backup/backup-cli",
-    "ecosystem/node-checker",
 ]
 
 # All workspace members should inherit these keys
@@ -352,6 +352,8 @@ aptos-faucet-metrics-server = { path = "crates/aptos-faucet/metrics-server" }
 aptos-fallible = { path = "crates/fallible" }
 aptos-forge = { path = "testsuite/forge" }
 aptos-framework = { path = "aptos-move/framework" }
+aptos-framework-natives = { path = "aptos-move/framework/natives" }
+aptos-release-bundle = { path = "aptos-move/framework/release-bundle" }
 fuzzer = { path = "testsuite/fuzzer" }
 aptos-abstract-gas-usage = { path = "aptos-move/aptos-abstract-gas-usage" }
 aptos-gas-meter = { path = "aptos-move/aptos-gas-meter" }
@@ -365,7 +367,6 @@ aptos-github-client = { path = "crates/aptos-github-client" }
 aptos-global-constants = { path = "config/global-constants" }
 aptos-id-generator = { path = "crates/aptos-id-generator" }
 aptos-in-memory-cache = { path = "crates/aptos-in-memory-cache" }
-aptos-indexer = { path = "crates/indexer" }
 aptos-indexer-grpc-cache-worker = { path = "ecosystem/indexer-grpc/indexer-grpc-cache-worker" }
 aptos-indexer-grpc-data-service = { path = "ecosystem/indexer-grpc/indexer-grpc-data-service" }
 aptos-indexer-grpc-data-service-v2 = { path = "ecosystem/indexer-grpc/indexer-grpc-data-service-v2" }
@@ -399,20 +400,20 @@ aptos-mempool = { path = "mempool" }
 aptos-mempool-notifications = { path = "state-sync/inter-component/mempool-notifications" }
 aptos-memsocket = { path = "network/memsocket" }
 aptos-metrics-core = { path = "crates/aptos-metrics-core" }
+aptos-move-cli = { path = "aptos-move/cli" }
 aptos-move-debugger = { path = "aptos-move/aptos-debugger" }
 aptos-move-examples = { path = "aptos-move/move-examples" }
+aptos-move-flow = { path = "aptos-move/flow" }
 aptos-move-e2e-benchmark = { path = "aptos-move/e2e-benchmark" }
 aptos-mvhashmap = { path = "aptos-move/mvhashmap" }
 aptos-native-interface = { path = "aptos-move/aptos-native-interface" }
 aptos-netcore = { path = "network/netcore" }
 aptos-network = { path = "network/framework" }
-aptos-network-benchmark = { path = "network/benchmark" }
 aptos-network-builder = { path = "network/builder" }
 aptos-network-checker = { path = "crates/aptos-network-checker" }
 aptos-network-discovery = { path = "network/discovery" }
 aptos-nft-metadata-crawler = { path = "ecosystem/nft-metadata-crawler" }
 aptos-node = { path = "aptos-node" }
-aptos-node-checker = { path = "ecosystem/node-checker" }
 aptos-node-identity = { path = "crates/aptos-node-identity" }
 aptos-node-resource-metrics = { path = "crates/node-resource-metrics" }
 aptos-num-variants = { path = "crates/num-variants" }
@@ -464,6 +465,7 @@ aptos-testcases = { path = "testsuite/testcases" }
 aptos-time-service = { path = "crates/aptos-time-service", features = [
     "async",
 ] }
+aptos-token-bucket = { path = "crates/aptos-token-bucket" }
 aptos-transaction-emitter-lib = { path = "crates/transaction-emitter-lib" }
 aptos-transaction-generator-lib = { path = "crates/transaction-generator-lib" }
 aptos-transaction-workloads-lib = { path = "crates/transaction-workloads-lib" }
@@ -686,6 +688,7 @@ more-asserts = "0.3.0"
 named-lock = "0.2.0"
 native-tls = "0.2.10"
 neptune = { version = "13.0.0", default-features = false }
+notify = "8.2.0"
 ntest = "0.9.3"
 num = "0.4.0"
 num-bigint = { version = "0.3.2", features = ["rand"] }
@@ -702,7 +705,7 @@ p256 = { version = "0.13.2" }
 prettydiff = "0.6.2"
 primitive-types = { version = "0.12.2" }
 signature = "2.1.0"
-slh-dsa = "0.2.0-rc.1"
+slh-dsa = "=0.2.0-rc.4"
 pairing = "0.23"
 parking_lot = "0.12.0"
 paste = "1.0.7"
@@ -730,7 +733,6 @@ proc-macro2 = "1.0.38"
 project-root = "0.2.2"
 prometheus = { version = "0.13.3", default-features = false }
 prometheus-http-query = "0.5.2"
-prometheus-parse = "0.2.4"
 proptest = "1.4.0"
 proptest-derive = "0.5.1"
 prost = { version = "0.13.4", features = ["no-recursion-limit"] }
@@ -764,6 +766,7 @@ reqwest-retry = "0.2.1"
 ring = { version = "0.16.20", features = ["std"] }
 ripemd = "0.1.1"
 rlimit = "0.10.2"
+rmcp = { version = "0.16", features = ["server", "transport-io"] }
 rocksdb = { version = "0.24.0", features = ["lz4"] }
 rsa = { version = "0.9.6" }
 rstack-self = { version = "0.3.0", features = ["dw"], default-features = false }

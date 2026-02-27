@@ -1,7 +1,6 @@
 // Copyright (c) Aptos Foundation
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
-use crate::services::start_netbench_service;
 use aptos_channels::{self, aptos_channel, message_queues::QueueStyle};
 use aptos_config::{
     config::{NetworkConfig, NodeConfig},
@@ -27,7 +26,6 @@ use aptos_network::{
     },
     ProtocolId,
 };
-use aptos_network_benchmark::NetbenchMessage;
 use aptos_network_builder::builder::NetworkBuilder;
 use aptos_peer_monitoring_service_types::PeerMonitoringServiceMessage;
 use aptos_storage_service_types::StorageServiceMessage;
@@ -188,32 +186,6 @@ pub fn consensus_observer_network_configuration(
     NetworkApplicationConfig::new(network_client_config, network_service_config)
 }
 
-/// Returns the network application config for the netbench client and server
-pub fn netbench_network_configuration(
-    node_config: &NodeConfig,
-) -> Option<NetworkApplicationConfig> {
-    let cfg = node_config.netbench?;
-    if !cfg.enabled {
-        return None;
-    }
-    let direct_send_protocols = vec![ProtocolId::NetbenchDirectSend];
-    let rpc_protocols = vec![ProtocolId::NetbenchRpc];
-    let network_client_config =
-        NetworkClientConfig::new(direct_send_protocols.clone(), rpc_protocols.clone());
-    let max_network_channel_size = cfg.max_network_channel_size as usize;
-    let network_service_config = NetworkServiceConfig::new(
-        direct_send_protocols,
-        rpc_protocols,
-        aptos_channel::Config::new(max_network_channel_size)
-            .queue_style(QueueStyle::FIFO)
-            .counters(&aptos_network_benchmark::PENDING_NETBENCH_NETWORK_EVENTS),
-    );
-    Some(NetworkApplicationConfig::new(
-        network_client_config,
-        network_service_config,
-    ))
-}
-
 /// Extracts all network configs from the given node config
 fn extract_network_configs(node_config: &NodeConfig) -> Vec<NetworkConfig> {
     let mut network_configs: Vec<NetworkConfig> = node_config.full_node_networks.to_vec();
@@ -271,7 +243,6 @@ pub fn setup_networks_and_get_interfaces(
     let mut mempool_network_handles = vec![];
     let mut peer_monitoring_service_network_handles = vec![];
     let mut storage_service_network_handles = vec![];
-    let mut netbench_handles = Vec::<ApplicationNetworkHandle<NetbenchMessage>>::new();
     for network_config in network_configs.into_iter() {
         // Create a network runtime for the config
         let runtime = create_network_runtime(&network_config);
@@ -387,18 +358,6 @@ pub fn setup_networks_and_get_interfaces(
         );
         storage_service_network_handles.push(storage_service_network_handle);
 
-        // Register the network benchmark test service
-        if let Some(app_config) = netbench_network_configuration(node_config) {
-            let netbench_handle = register_client_and_service_with_network(
-                &mut network_builder,
-                network_id,
-                &network_config,
-                app_config,
-                true,
-            );
-            netbench_handles.push(netbench_handle);
-        }
-
         // Build and start the network on the runtime
         network_builder.build(runtime.handle().clone());
         network_builder.start();
@@ -429,19 +388,6 @@ pub fn setup_networks_and_get_interfaces(
         storage_service_network_handles,
         peers_and_metadata.clone(),
     );
-
-    if !netbench_handles.is_empty() {
-        let netbench_interfaces = create_network_interfaces(
-            netbench_handles,
-            netbench_network_configuration(node_config).unwrap(),
-            peers_and_metadata,
-        );
-        let netbench_service_threads = node_config.netbench.unwrap().netbench_service_threads;
-        let netbench_runtime =
-            aptos_runtimes::spawn_named_runtime("benchmark".into(), netbench_service_threads);
-        start_netbench_service(node_config, netbench_interfaces, netbench_runtime.handle());
-        network_runtimes.push(netbench_runtime);
-    }
 
     (
         network_runtimes,

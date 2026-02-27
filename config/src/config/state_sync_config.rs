@@ -30,13 +30,31 @@ const MAX_TRANSACTION_OUTPUT_CHUNK_SIZE: u64 = 3000;
 const MAX_CONCURRENT_REQUESTS: u64 = 6;
 const MAX_CONCURRENT_STATE_REQUESTS: u64 = 6;
 
-#[derive(Clone, Copy, Debug, Default, Deserialize, PartialEq, Eq, Serialize)]
+// The default number of threads for the state sync runtime
+const DEFAULT_STATE_SYNC_RUNTIME_THREADS: usize = 16;
+
+#[derive(Clone, Copy, Debug, Deserialize, PartialEq, Eq, Serialize)]
 #[serde(default, deny_unknown_fields)]
 pub struct StateSyncConfig {
     pub data_streaming_service: DataStreamingServiceConfig,
     pub aptos_data_client: AptosDataClientConfig,
     pub state_sync_driver: StateSyncDriverConfig,
     pub storage_service: StorageServiceConfig,
+    /// Number of worker threads for the shared state sync runtime.
+    /// Defaults to 16. Set to `None` to use the tokio default (num_cpus).
+    pub num_runtime_threads: Option<usize>,
+}
+
+impl Default for StateSyncConfig {
+    fn default() -> Self {
+        Self {
+            data_streaming_service: DataStreamingServiceConfig::default(),
+            aptos_data_client: AptosDataClientConfig::default(),
+            state_sync_driver: StateSyncDriverConfig::default(),
+            storage_service: StorageServiceConfig::default(),
+            num_runtime_threads: Some(DEFAULT_STATE_SYNC_RUNTIME_THREADS),
+        }
+    }
 }
 
 /// The bootstrapping mode determines how the node will bootstrap to the latest

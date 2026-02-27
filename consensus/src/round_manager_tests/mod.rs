@@ -70,8 +70,8 @@ use aptos_types::{
     epoch_state::EpochState,
     ledger_info::LedgerInfo,
     on_chain_config::{
-        ConsensusAlgorithmConfig, OnChainConsensusConfig, OnChainJWKConsensusConfig,
-        OnChainRandomnessConfig,
+        ConsensusAlgorithmConfig, OnChainChunkyDKGConfig, OnChainConsensusConfig,
+        OnChainJWKConsensusConfig, OnChainRandomnessConfig,
     },
     transaction::SignedTransaction,
     validator_signer::ValidatorSigner,
@@ -399,7 +399,6 @@ impl NodeSetup {
                 None,
                 vec![],
                 hashmap![],
-                false,
             ))
         } else {
             Arc::new(DirectMempoolPayloadManager::new())
@@ -475,6 +474,7 @@ impl NodeSetup {
             local_config,
             onchain_randomness_config.clone(),
             onchain_jwk_consensus_config.clone(),
+            OnChainChunkyDKGConfig::default_disabled(),
             None,
             Arc::new(MockPastProposalStatusTracker {}),
             opt_proposal_loopback_tx,

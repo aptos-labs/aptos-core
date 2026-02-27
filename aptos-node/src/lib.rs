@@ -4,8 +4,10 @@
 #![allow(unexpected_cfgs)]
 #![forbid(unsafe_code)]
 
+#[cfg(any(feature = "testing", feature = "fuzzing"))]
+compile_error!("Testing features shouldn't be compiled for production aptos-node");
+
 mod consensus;
-mod indexer;
 mod logger;
 mod network;
 mod services;
@@ -25,7 +27,7 @@ use aptos_config::config::{merge_node_config, NodeConfig, PersistableConfig};
 use aptos_framework::ReleaseBundle;
 use aptos_genesis::builder::GenesisConfiguration;
 use aptos_logger::{prelude::*, telemetry_log_writer::TelemetryLog, Level, LoggerFilterUpdater};
-use aptos_state_sync_driver::driver_factory::StateSyncRuntimes;
+use aptos_state_sync_driver::driver_factory::StateSyncRuntime;
 use aptos_types::{
     chain_id::ChainId, keyless::Groth16VerificationKey, on_chain_config::OnChainJWKConsensusConfig,
 };
@@ -203,13 +205,13 @@ pub struct AptosHandle {
     _consensus_runtime: Option<Runtime>,
     _dkg_runtime: Option<Runtime>,
     _indexer_grpc_runtime: Option<Runtime>,
-    _indexer_runtime: Option<Runtime>,
     _indexer_table_info_runtime: Option<Runtime>,
+    _inspection_service_runtime: Runtime,
     _jwk_consensus_runtime: Option<Runtime>,
     _mempool_runtime: Runtime,
     _network_runtimes: Vec<Runtime>,
     _peer_monitoring_service_runtime: Runtime,
-    _state_sync_runtimes: StateSyncRuntimes,
+    _state_sync_runtime: StateSyncRuntime,
     _telemetry_runtime: Option<Runtime>,
     _indexer_db_runtime: Option<Runtime>,
 }
@@ -246,11 +248,6 @@ pub fn start_and_report_ports(
     ensure_max_open_files_limit(
         config.storage.ensure_rlimit_nofile,
         config.storage.assert_rlimit_nofile,
-    );
-
-    assert!(
-        !cfg!(feature = "testing") && !cfg!(feature = "fuzzing"),
-        "Testing features shouldn't be compiled"
     );
 
     // Ensure failpoints are configured correctly
@@ -763,7 +760,7 @@ pub fn setup_environment_and_start_node(
     );
 
     // Start state sync and get the notification endpoints for mempool and consensus
-    let (aptos_data_client, state_sync_runtimes, mempool_listener, consensus_notifier) =
+    let (aptos_data_client, state_sync_runtime, mempool_listener, consensus_notifier) =
         state_sync::start_state_sync_and_get_notification_handles(
             &node_config,
             storage_service_network_interfaces,
@@ -773,22 +770,21 @@ pub fn setup_environment_and_start_node(
         )?;
 
     // Start the node inspection service
-    services::start_node_inspection_service(
+    let inspection_service_runtime = services::start_node_inspection_service(
         &node_config,
         aptos_data_client,
         peers_and_metadata.clone(),
     );
 
-    // Bootstrap the API and indexer
+    // Bootstrap the API and transaction streaming services
     let (
         mempool_client_receiver,
         api_runtime,
         indexer_table_info_runtime,
-        indexer_runtime,
         indexer_grpc_runtime,
         internal_indexer_db_runtime,
         mempool_client_sender,
-    ) = services::bootstrap_api_and_indexer(
+    ) = services::bootstrap_api_and_streaming(
         &node_config,
         db_rw.clone(),
         chain_id,
@@ -827,7 +823,7 @@ pub fn setup_environment_and_start_node(
 
     // Wait until state sync has been initialized
     debug!("Waiting until state sync is initialized!");
-    state_sync_runtimes.block_until_initialized();
+    state_sync_runtime.block_until_initialized();
     debug!("State sync initialization complete.");
 
     // Create the consensus observer and publisher (if enabled)
@@ -863,13 +859,13 @@ pub fn setup_environment_and_start_node(
         _consensus_runtime: consensus_runtime,
         _dkg_runtime: dkg_runtime,
         _indexer_grpc_runtime: indexer_grpc_runtime,
-        _indexer_runtime: indexer_runtime,
         _indexer_table_info_runtime: indexer_table_info_runtime,
+        _inspection_service_runtime: inspection_service_runtime,
         _jwk_consensus_runtime: jwk_consensus_runtime,
         _mempool_runtime: mempool_runtime,
         _network_runtimes: network_runtimes,
         _peer_monitoring_service_runtime: peer_monitoring_service_runtime,
-        _state_sync_runtimes: state_sync_runtimes,
+        _state_sync_runtime: state_sync_runtime,
         _telemetry_runtime: telemetry_runtime,
         _indexer_db_runtime: internal_indexer_db_runtime,
     })

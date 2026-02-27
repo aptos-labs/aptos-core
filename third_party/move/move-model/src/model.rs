@@ -487,6 +487,14 @@ impl QualifiedInstId<StructId> {
     }
 }
 
+/// Represents different types of users for a struct or constant.
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
+pub enum UserId {
+    Function(QualifiedId<FunId>),
+    Struct(QualifiedId<StructId>),
+    Constant(QualifiedId<NamedConstantId>),
+}
+
 // =================================================================================================
 /// # Verification Scope
 
@@ -1235,6 +1243,25 @@ impl GlobalEnv {
     /// Returns true if diagnostics have error severity or worse.
     pub fn has_errors(&self) -> bool {
         self.error_count() > 0
+    }
+
+    /// Returns `Err` if the environment contains any error diagnostics.
+    ///
+    /// Use this at call sites where compilation errors should be fatal, rather
+    /// than having the compiler pipeline bail internally. The diagnostics
+    /// remain stored in the `GlobalEnv` for later retrieval/rendering.
+    pub fn check_errors(&self, msg: &str) -> anyhow::Result<()> {
+        let n = self.error_count();
+        if n > 0 {
+            anyhow::bail!(
+                "exiting with {} {} {}",
+                n,
+                if n == 1 { "error" } else { "errors" },
+                msg
+            )
+        } else {
+            Ok(())
+        }
     }
 
     /// Returns the number of diagnostics.
@@ -2002,6 +2029,7 @@ impl GlobalEnv {
             visibility: Visibility::Private,
             has_package_visibility: false,
             is_empty_struct: false,
+            users: BTreeSet::new(),
         }
     }
 
@@ -2146,6 +2174,15 @@ impl GlobalEnv {
             .get_mut(&fun.id)
             .unwrap();
         data.acquired_structs = Some(acquires)
+    }
+
+    /// Adds a user to a struct's user set.
+    pub fn add_struct_user(&mut self, struct_id: QualifiedId<StructId>, user_id: UserId) {
+        if let Some(module_data) = self.module_data.get_mut(struct_id.module_id.to_usize()) {
+            if let Some(struct_data) = module_data.struct_data.get_mut(&struct_id.id) {
+                struct_data.users.insert(user_id);
+            }
+        }
     }
 
     /// Adds a new function definition.
@@ -3843,9 +3880,11 @@ pub struct StructData {
     /// Invariant: when true, visibility is always friend.
     pub(crate) has_package_visibility: bool,
 
-    /// Whether this struct is empty when defined by the user
-    /// Note: by default set to false when created from compiled module since the info is not available
+    /// Whether this struct is empty (has no fields) when defined by the user
     pub is_empty_struct: bool,
+
+    /// All users of this struct
+    pub(crate) users: BTreeSet<UserId>,
 }
 
 impl StructData {
@@ -3865,6 +3904,7 @@ impl StructData {
             visibility: Visibility::Private,
             has_package_visibility: false,
             is_empty_struct: false,
+            users: BTreeSet::new(),
         }
     }
 }
@@ -3891,7 +3931,7 @@ impl<'env> StructEnv<'env> {
         self.module_env.env
     }
 
-    /// Returns true if struct is empty when defined by the user
+    /// Returns whether the struct is empty (has no fields)
     pub fn is_empty_struct(&self) -> bool {
         self.data.is_empty_struct
     }
@@ -3965,7 +4005,7 @@ impl<'env> StructEnv<'env> {
         self.has_attribute(|a| {
             let s = self.symbol_pool().string(a.name());
             well_known::is_test_only_attribute_name(s.as_str())
-        })
+        }) || self.module_env.is_test_only()
     }
 
     /// Checks whether this item is only used in verification.
@@ -3973,7 +4013,12 @@ impl<'env> StructEnv<'env> {
         self.has_attribute(|a| {
             let s = self.symbol_pool().string(a.name());
             well_known::is_verify_only_attribute_name(s.as_str())
-        })
+        }) || self.module_env.is_verify_only()
+    }
+
+    /// Checks whether this struct or its module is test-only or verify-only.
+    pub fn is_test_or_verify_only(&self) -> bool {
+        self.is_test_only() || self.is_verify_only()
     }
 
     /// Get documentation associated with this struct.
@@ -4240,6 +4285,11 @@ impl<'env> StructEnv<'env> {
     pub fn has_package_visibility(&self) -> bool {
         self.data.has_package_visibility
     }
+
+    /// Returns all users of this struct
+    pub fn get_users(&self) -> &BTreeSet<UserId> {
+        &self.data.users
+    }
 }
 
 // =================================================================================================
@@ -4367,6 +4417,12 @@ pub struct NamedConstantData {
 
     /// The value of this constant, if known.
     pub(crate) value: Value,
+
+    /// Attributes attached to this constant.
+    pub(crate) attributes: Vec<Attribute>,
+
+    /// All users of this constant
+    pub(crate) users: BTreeSet<UserId>,
 }
 
 #[derive(Debug)]
@@ -4415,6 +4471,47 @@ impl NamedConstantEnv<'_> {
             used_modules: self.module_env.get_used_modules(false),
             ..TypeDisplayContext::new(self.module_env.env)
         }
+    }
+
+    /// Returns the users that reference this constant.
+    pub fn get_users(&self) -> &BTreeSet<UserId> {
+        &self.data.users
+    }
+
+    /// Returns the attributes of this constant.
+    pub fn get_attributes(&self) -> &[Attribute] {
+        &self.data.attributes
+    }
+
+    /// Checks whether the constant has an attribute.
+    pub fn has_attribute(&self, pred: impl Fn(&Attribute) -> bool) -> bool {
+        Attribute::has(&self.data.attributes, pred)
+    }
+
+    /// Returns the symbol pool.
+    pub fn symbol_pool(&self) -> &SymbolPool {
+        self.module_env.symbol_pool()
+    }
+
+    /// Checks whether this item is only used in tests.
+    pub fn is_test_only(&self) -> bool {
+        self.has_attribute(|a| {
+            let s = self.symbol_pool().string(a.name());
+            well_known::is_test_only_attribute_name(s.as_str())
+        }) || self.module_env.is_test_only()
+    }
+
+    /// Checks whether this item is only used in verification.
+    pub fn is_verify_only(&self) -> bool {
+        self.has_attribute(|a| {
+            let s = self.symbol_pool().string(a.name());
+            well_known::is_verify_only_attribute_name(s.as_str())
+        }) || self.module_env.is_verify_only()
+    }
+
+    /// Checks whether this struct or its module is test-only or verify-only.
+    pub fn is_test_or_verify_only(&self) -> bool {
+        self.is_test_only() || self.is_verify_only()
     }
 }
 
@@ -4774,7 +4871,7 @@ impl<'env> FunctionEnv<'env> {
         self.has_attribute(|a| {
             let s = self.symbol_pool().string(a.name());
             well_known::is_test_only_attribute_name(s.as_str())
-        })
+        }) || self.module_env.is_test_only()
     }
 
     /// Checks whether this item is only used in verification.
@@ -4782,7 +4879,12 @@ impl<'env> FunctionEnv<'env> {
         self.has_attribute(|a| {
             let s = self.symbol_pool().string(a.name());
             well_known::is_verify_only_attribute_name(s.as_str())
-        })
+        }) || self.module_env.is_verify_only()
+    }
+
+    /// Checks whether this function or its module is test-only or verify-only.
+    pub fn is_test_or_verify_only(&self) -> bool {
+        self.is_test_only() || self.is_verify_only()
     }
 
     /// Returns the location of the specification block of this function. If the function has
@@ -5373,7 +5475,7 @@ impl<'env> FunctionEnv<'env> {
 
         while let Some(fnc) = reachable_funcs.pop_front() {
             if let Some(def) = fnc.get_def() {
-                def.struct_usage(self.module_env.env, &mut set);
+                set.extend(def.struct_usage(self.module_env.env, true));
             }
             for callee in fnc.get_used_functions().expect("call info available") {
                 let f = self.module_env.env.get_function(*callee);

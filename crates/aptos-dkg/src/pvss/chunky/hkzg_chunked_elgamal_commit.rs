@@ -9,7 +9,7 @@ use crate::{
     sigma_protocol,
     sigma_protocol::{
         homomorphism::{
-            tuple::{PairingTupleHomomorphism, TupleCodomainShape},
+            tuple::{TupleCodomainShape, TupleHomomorphism},
             LiftHomomorphism,
         },
         FirstProofItem,
@@ -20,14 +20,13 @@ use aptos_crypto::{
 };
 use ark_ec::{pairing::Pairing, scalar_mul::BatchMulPreprocessing, AffineRepr, CurveGroup};
 
-type HkzgElgamalHomomorphism<'a, E> = hkzg_chunked_elgamal::WeightedHomomorphism<'a, E>;
-type LiftedCommitHomomorphism<'a, C> = LiftHomomorphism<
+pub(crate) type HkzgElgamalHomomorphism<'a, E> = hkzg_chunked_elgamal::WeightedHomomorphism<'a, E>;
+pub(crate) type LiftedCommitHomomorphism<'a, C> = LiftHomomorphism<
     chunked_scalar_mul::Homomorphism<'a, C>,
     HkzgWeightedElgamalWitness<<<C as CurveGroup>::Affine as AffineRepr>::ScalarField>,
 >;
 
-pub type Homomorphism<'a, E> = PairingTupleHomomorphism<
-    E,
+pub type Homomorphism<'a, E> = TupleHomomorphism<
     HkzgElgamalHomomorphism<'a, E>,
     LiftedCommitHomomorphism<'a, <E as Pairing>::G2>,
 >;
@@ -98,7 +97,6 @@ impl<'a, E: Pairing> Homomorphism<'a, E> {
         Self {
             hom1: hkzg_el_hom,
             hom2: lifted_commit_hom,
-            _pairing: std::marker::PhantomData,
         }
     }
 }

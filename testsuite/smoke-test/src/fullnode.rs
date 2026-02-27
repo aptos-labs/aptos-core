@@ -108,7 +108,6 @@ async fn wait_for_account_balance(client: &RestClient, address: AccountAddress) 
 }
 
 fn enable_internal_indexer(node_config: &mut NodeConfig) {
-    node_config.storage.rocksdb_configs.enable_storage_sharding = true;
     node_config.indexer_db_config.enable_event = true;
     node_config.indexer_db_config.enable_transaction = true;
     node_config.indexer_db_config.enable_statekeys = true;
@@ -135,7 +134,6 @@ async fn test_internal_indexer_with_fast_sync() {
     let ledger_info = validator_client.get_ledger_information().await.unwrap();
     println!("ledger_info: {:?}", ledger_info);
     let mut vfn_config = NodeConfig::get_default_vfn_config();
-    vfn_config.storage.rocksdb_configs.enable_storage_sharding = true;
     vfn_config.state_sync.state_sync_driver.bootstrapping_mode =
         BootstrappingMode::DownloadLatestStates;
     vfn_config

@@ -4,11 +4,11 @@
 #![deny(unsafe_code)]
 
 pub mod account;
+mod aptos_context;
 pub mod common;
 pub mod config;
 pub mod genesis;
 pub mod governance;
-pub mod move_tool;
 pub mod node;
 pub mod op;
 pub mod stake;
@@ -18,13 +18,27 @@ pub mod update;
 pub mod workspace;
 
 use crate::common::{
-    types::{CliCommand, CliResult, CliTypedResult},
+    types::{CliCommand, CliError, CliResult, CliTypedResult},
     utils::cli_build_information,
 };
+pub use aptos_context::RealAptosContext;
+use aptos_move_cli::MoveEnv;
+use aptos_move_debugger::aptos_debugger::AptosDebugger;
 use aptos_workspace_server::WorkspaceCommand;
 use async_trait::async_trait;
 use clap::Parser;
-use std::collections::BTreeMap;
+use std::{collections::BTreeMap, sync::Arc};
+
+/// Create a fully wired `MoveEnv` with `RealAptosContext` and debugger support.
+///
+/// Use this when constructing move CLI commands (e.g., `RunScript`, `RunFunction`)
+/// outside the main CLI dispatch.
+pub fn create_move_env() -> Arc<MoveEnv> {
+    Arc::new(MoveEnv::new(
+        Box::new(RealAptosContext),
+        Box::new(|client| Ok(Box::new(AptosDebugger::rest_client(client)?))),
+    ))
+}
 
 /// Command Line Interface (CLI) for developing and interacting with the Aptos blockchain
 #[derive(Parser)]
@@ -43,7 +57,7 @@ pub enum Tool {
     #[clap(subcommand)]
     Key(op::key::KeyTool),
     #[clap(subcommand)]
-    Move(move_tool::MoveTool),
+    Move(aptos_move_cli::MoveTool),
     #[clap(subcommand)]
     Multisig(account::MultisigAccountTool),
     #[clap(subcommand)]
@@ -68,12 +82,20 @@ impl Tool {
             // TODO: Replace entirely with config init
             Init(tool) => tool.execute_serialized_success().await,
             Key(tool) => tool.execute().await,
-            Move(tool) => tool.execute().await,
+            Move(tool) => tool.execute(create_move_env()).await,
             Multisig(tool) => tool.execute().await,
             Node(tool) => tool.execute().await,
             Stake(tool) => tool.execute().await,
             Update(tool) => tool.execute().await,
-            Workspace(workspace) => workspace.execute_serialized_without_logger().await,
+            Workspace(workspace) => {
+                let start_time = std::time::Instant::now();
+                let result: CliTypedResult<()> = workspace
+                    .run()
+                    .await
+                    .map_err(|e| CliError::UnexpectedError(format!("{:#}", e)));
+                aptos_cli_common::to_common_success_result("Workspace", start_time, result, true)
+                    .await
+            },
         }
     }
 }

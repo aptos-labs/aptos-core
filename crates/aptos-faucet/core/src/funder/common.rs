@@ -7,7 +7,7 @@ use aptos_config::keys::ConfigKey;
 use aptos_logger::{info, warn};
 use aptos_sdk::{
     crypto::ed25519::Ed25519PrivateKey,
-    rest_client::Client,
+    rest_client::{AptosBaseUrl, Client},
     types::{account_address::AccountAddress, chain_id::ChainId, transaction::SignedTransaction},
 };
 use clap::Parser;
@@ -238,9 +238,26 @@ pub struct GasUnitPriceManager {
 }
 
 impl GasUnitPriceManager {
-    pub fn new(node_url: Url, cache_ttl: Duration) -> Self {
+    pub fn new(
+        node_url: Url,
+        cache_ttl: Duration,
+        api_key: Option<String>,
+        additional_headers: Option<&HashMap<String, String>>,
+    ) -> Self {
+        let mut builder = Client::builder(AptosBaseUrl::Custom(node_url));
+
+        if let Some(api_key) = api_key {
+            builder = builder.api_key(&api_key).expect("Failed to set API key");
+        }
+
+        if let Some(headers) = additional_headers {
+            for (key, value) in headers {
+                builder = builder.header(key, value).expect("Failed to set header");
+            }
+        }
+
         Self {
-            api_client: aptos_sdk::rest_client::Client::new(node_url),
+            api_client: builder.build(),
             gas_unit_price: AtomicU64::new(0),
             last_updated: Arc::new(RwLock::new(None)),
             cache_ttl,

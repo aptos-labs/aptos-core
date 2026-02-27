@@ -420,10 +420,13 @@ pub(crate) fn run_multisig_prologue(
                 bcs::to_bytes::<Vec<u8>>(&vec![]).map_err(|_| unreachable_error.clone())?
             }
         },
-        TransactionExecutableRef::Script(_) => {
+        TransactionExecutableRef::Script(_) | TransactionExecutableRef::Encrypted => {
             return Err(VMStatus::error(
                 StatusCode::FEATURE_UNDER_GATING,
-                Some("Script payload not supported for multisig transactions".to_string()),
+                Some(
+                    "Script or encrypted payload not supported for multisig transactions"
+                        .to_string(),
+                ),
             ));
         },
     };

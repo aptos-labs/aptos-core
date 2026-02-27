@@ -26,6 +26,8 @@ use std::{
     ops::{AddAssign, Mul},
 };
 
+// WARNING: This scheme is deprecated, probably not ZK, do not use
+
 pub const DST: &[u8; 42] = b"APTOS_UNIVARIATE_DEKART_V1_RANGE_PROOF_DST";
 
 #[derive(CanonicalSerialize, CanonicalDeserialize, Debug, Clone, PartialEq, Eq)]

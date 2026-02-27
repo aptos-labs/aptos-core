@@ -10,7 +10,7 @@ use crate::{
         aug_data_store::AugDataStore,
         block_queue::{BlockQueue, QueueItem},
         network_messages::{RandMessage, RpcRequest},
-        rand_store::RandStore,
+        rand_store::{AggregationResult, RandCheckFuture, RandStore},
         reliable_broadcast_state::{
             AugDataCertBuilder, CertifiedAugDataAckState, ShareAggregateState,
         },
@@ -56,8 +56,8 @@ pub struct RandManager<S: TShare, D: TAugmentedData> {
     reliable_broadcast: Arc<ReliableBroadcast<RandMessage<S, D>, ExponentialBackoff>>,
     network_sender: Arc<NetworkSender>,
 
-    // local channel received from rand_store
-    decision_rx: Receiver<Randomness>,
+    // local channel received from rand_store for aggregation results
+    decision_rx: Receiver<AggregationResult>,
     // downstream channels
     outgoing_blocks: Sender<OrderedBlocks>,
     // local state
@@ -67,6 +67,9 @@ pub struct RandManager<S: TShare, D: TAugmentedData> {
 
     // for randomness fast path
     fast_config: Option<RandConfig>,
+
+    // sender for aggregation results, shared with rand_store and skip listeners
+    decision_tx: Sender<AggregationResult>,
 }
 
 impl<S: TShare, D: TAugmentedData> RandManager<S, D> {
@@ -100,7 +103,7 @@ impl<S: TShare, D: TAugmentedData> RandManager<S, D> {
             author,
             config.clone(),
             fast_config.clone(),
-            decision_tx,
+            decision_tx.clone(),
         )));
         let aug_data_store = AugDataStore::new(
             epoch_state.epoch,
@@ -126,23 +129,61 @@ impl<S: TShare, D: TAugmentedData> RandManager<S, D> {
             block_queue: BlockQueue::new(),
 
             fast_config,
+
+            decision_tx,
         }
     }
 
     fn process_incoming_blocks(&mut self, blocks: OrderedBlocks) {
         let rounds: Vec<u64> = blocks.ordered_blocks.iter().map(|b| b.round()).collect();
         info!(rounds = rounds, "Processing incoming blocks.");
+
+        // Create rand_check shared futures from the pipeline's has_rand_txns_fut.
+        // Uses has_rand_txns_fut which resolves early (before randomness aggregation)
+        // to avoid deadlock: rand_check_fut waits for randomness, but aggregation
+        // waits for rand_check_fut to know if randomness is needed.
         let broadcast_handles: Vec<_> = blocks
             .ordered_blocks
             .iter()
-            .map(|block| FullRandMetadata::from(block.block()))
-            .map(|metadata| self.process_incoming_metadata(metadata))
+            .map(|block| {
+                let rand_check_future = block.pipeline_futs().map(|futs| {
+                    let round = block.round();
+                    let has_rand_txns = futs.has_rand_txns_fut.clone();
+                    let decision_tx = self.decision_tx.clone();
+                    let shared_future = async move {
+                        let need_rand = match has_rand_txns.await {
+                            Ok(need_rand) => need_rand,
+                            Err(e) => {
+                                warn!("has_rand_txns_fut failed for round {}: {e}, defaulting to needs_randomness=true", round);
+                                true
+                            },
+                        };
+                        // If the block doesn't need randomness, send Skip to unblock it
+                        // before the share threshold is reached.
+                        if !need_rand {
+                            let _ = decision_tx
+                                .unbounded_send(AggregationResult::Skip { round });
+                        }
+                        need_rand
+                    }
+                    .boxed()
+                    .shared();
+                    tokio::spawn(shared_future.clone());
+                    shared_future
+                });
+                let metadata = FullRandMetadata::from(block.block());
+                self.process_incoming_metadata(metadata, rand_check_future)
+            })
             .collect();
         let queue_item = QueueItem::new(blocks, Some(broadcast_handles));
         self.block_queue.push_back(queue_item);
     }
 
-    fn process_incoming_metadata(&self, metadata: FullRandMetadata) -> DropGuard {
+    fn process_incoming_metadata(
+        &self,
+        metadata: FullRandMetadata,
+        rand_check_future: Option<RandCheckFuture>,
+    ) -> DropGuard {
         let self_share = S::generate(&self.config, metadata.metadata.clone());
         info!(LogSchema::new(LogEvent::BroadcastRandShare)
             .epoch(self.epoch_state.epoch)
@@ -162,7 +203,7 @@ impl<S: TShare, D: TAugmentedData> RandManager<S, D> {
                 .expect("Add self share for fast path should succeed");
         }
 
-        rand_store.add_rand_metadata(metadata.clone());
+        rand_store.add_rand_metadata(metadata.clone(), rand_check_future);
         self.network_sender
             .broadcast_without_self(RandMessage::<S, D>::Share(self_share).into_network_message());
         self.spawn_aggregate_shares_task(metadata.metadata)
@@ -189,6 +230,10 @@ impl<S: TShare, D: TAugmentedData> RandManager<S, D> {
         };
         self.block_queue = BlockQueue::new();
         self.rand_store.lock().reset(target_round);
+        // Drain stale decision messages (Success/Skip) from previously spawned
+        // aggregation tasks and shared futures to prevent them from affecting
+        // new blocks that may arrive at the same rounds after reset.
+        while matches!(self.decision_rx.try_next(), Ok(Some(_))) {}
         self.stop = matches!(signal, ResetSignal::Stop);
         let _ = tx.send(ResetAck::default());
     }
@@ -384,8 +429,17 @@ impl<S: TShare, D: TAugmentedData> RandManager<S, D> {
                     while matches!(incoming_blocks.try_next(), Ok(Some(_))) {}
                     self.process_reset(reset);
                 }
-                Some(randomness) = self.decision_rx.next()  => {
-                    self.process_randomness(randomness);
+                Some(result) = self.decision_rx.next() => {
+                    match result {
+                        AggregationResult::Success { randomness, .. } => {
+                            self.process_randomness(randomness);
+                        },
+                        AggregationResult::Skip { round, .. } => {
+                            if let Some(item) = self.block_queue.item_mut(round) {
+                                item.set_randomness(round, Randomness::default());
+                            }
+                        },
+                    }
                 }
                 Some(request) = verified_msg_rx.next() => {
                     let RpcRequest {

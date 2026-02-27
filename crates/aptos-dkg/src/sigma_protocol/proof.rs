@@ -27,7 +27,17 @@ where
     H::Domain: Witness<F>,
     H::CodomainNormalized: Statement,
 {
-    /// No-op (semantically): circumvents the fact that proofs inherit the homomorphism’s lifetime. This method should do nothing at runtime.
+    /// Reference to the prover's first message (commitment) when the proof stores a commitment.
+    /// Returns `None` when the first proof item is the challenge (non-batchable proof). (Obviously
+    /// it can be recomputed in this setting)
+    pub fn prover_commitment(&self) -> Option<&H::CodomainNormalized> {
+        match &self.first_proof_item {
+            FirstProofItem::Commitment(a) => Some(a),
+            FirstProofItem::Challenge(_) => None,
+        }
+    }
+
+    /// No-op (semantically): circumvents the fact that proofs inherit the homomorphism's lifetime. This method should do nothing at runtime.
     #[allow(non_snake_case)]
     pub fn change_lifetime<H2>(self) -> Proof<F, H2>
     where

@@ -732,7 +732,44 @@ impl<'env> BoogieTranslator<'env> {
             } else {
                 format!("{result_str} := ")
             };
-            emitln!(self.writer, "call {}{}({});", call_prefix, fun_name, args);
+            if fun_env.is_opaque() {
+                // Opaque functions have no Boogie procedure body.
+                // Use behavioral predicates to model the call semantics.
+                let bp_args = params
+                    .iter()
+                    .enumerate()
+                    .map(|(pos, ty)| {
+                        if ty.is_mutable_reference() {
+                            format!("$Dereference(p{})", pos)
+                        } else {
+                            format!("p{}", pos)
+                        }
+                    })
+                    .join(", ");
+                let bp_fun_args = if bp_args.is_empty() {
+                    "fun".to_string()
+                } else {
+                    format!("fun, {}", bp_args)
+                };
+                let aborts_name =
+                    boogie_behavioral_eval_fun_name(self.env, fun_type, BehaviorKind::AbortsOf);
+                let result_of_name =
+                    boogie_behavioral_eval_fun_name(self.env, fun_type, BehaviorKind::ResultOf);
+                let explicit_results = results.clone().flatten();
+                self.emit_behavioral_predicate_body(
+                    &aborts_name,
+                    &bp_fun_args,
+                    &result_of_name,
+                    &result_of_name,
+                    &bp_fun_args,
+                    &result_locals,
+                    &explicit_results,
+                    &params,
+                    memory,
+                );
+            } else {
+                emitln!(self.writer, "call {}{}({});", call_prefix, fun_name, args);
+            }
             if is_only {
                 // Single variant: no closing needed
             } else {
@@ -794,143 +831,25 @@ impl<'env> BoogieTranslator<'env> {
                 BehaviorKind::AbortsOf,
                 &[],
             );
-            emitln!(self.writer, "if ({}({})) {{", aborts_name, bp_args);
-            self.writer.indent();
-            emitln!(self.writer, "$abort_flag := true;");
-            self.writer.unindent();
-            emitln!(self.writer, "} else {");
-            self.writer.indent();
-
             // Always use deterministic result functions for function parameters.
             // This ensures that `choose y where ensures_of<f>(x, y)` in specs
             // produces the same value as the runtime call `f(x)`.
-            //
-            // For mutable reference outputs, we need to wrap the result value in a mutation
-            // since the return type is $Mutation T but the result function returns T.
+            let result_fun_name =
+                boogie_behavioral_result_fun_name(self.env, &info.fun, info.param_sym, &[], false);
+            let multi_result_fun_name =
+                boogie_behavioral_result_fun_name(self.env, &info.fun, info.param_sym, &[], true);
             let explicit_results = results.clone().flatten();
-            let explicit_result_count = explicit_results.len();
-            let mut_ref_param_indices: Vec<usize> = params
-                .iter()
-                .enumerate()
-                .filter(|(_, p)| p.is_mutable_reference())
-                .map(|(idx, _)| idx)
-                .collect();
-            // Find the first mutable reference parameter (used as base for child mutations)
-            let first_mut_ref_param = mut_ref_param_indices.first().copied();
-
-            if !result_locals.is_empty() {
-                if result_locals.len() == 1 {
-                    // Single result: use ensures_of_result function directly
-                    let result_fun_name = boogie_behavioral_result_fun_name(
-                        self.env,
-                        &info.fun,
-                        info.param_sym,
-                        &[],
-                        false,
-                    );
-                    let result_local = &result_locals[0];
-                    if explicit_result_count == 1 {
-                        // Explicit result: check if it's a mutable reference
-                        if explicit_results[0].is_mutable_reference() {
-                            // Explicit mutable reference result: wrap in $ChildMutation
-                            // Use the first mutable reference param as base, or p0 as fallback
-                            let base_param = first_mut_ref_param.unwrap_or(0);
-                            emitln!(
-                                self.writer,
-                                "{} := $ChildMutation(p{}, -1, {}({}));",
-                                result_local,
-                                base_param,
-                                result_fun_name,
-                                bp_args
-                            );
-                        } else {
-                            // Non-reference result: assign directly
-                            emitln!(
-                                self.writer,
-                                "{} := {}({});",
-                                result_local,
-                                result_fun_name,
-                                bp_args
-                            );
-                        }
-                    } else {
-                        // Mutable reference param output: wrap in $UpdateMutation
-                        let param_idx = mut_ref_param_indices[0];
-                        emitln!(
-                            self.writer,
-                            "{} := $UpdateMutation(p{}, {}({}));",
-                            result_local,
-                            param_idx,
-                            result_fun_name,
-                            bp_args
-                        );
-                    }
-                } else {
-                    // Multiple results: use ensures_of_results function returning a tuple
-                    let result_fun_name = boogie_behavioral_result_fun_name(
-                        self.env,
-                        &info.fun,
-                        info.param_sym,
-                        &[],
-                        true,
-                    );
-                    // Bind the tuple result to a temporary and extract each component
-                    emitln!(
-                        self.writer,
-                        "// Extract results from tuple-returning behavioral function"
-                    );
-                    for (i, result_local) in result_locals.iter().enumerate() {
-                        if i < explicit_result_count {
-                            // Explicit result: check if it's a mutable reference
-                            if explicit_results[i].is_mutable_reference() {
-                                // Explicit mutable reference result: wrap in $ChildMutation
-                                let base_param = first_mut_ref_param.unwrap_or(0);
-                                emitln!(
-                                    self.writer,
-                                    "{} := $ChildMutation(p{}, -1, {}({})->${});",
-                                    result_local,
-                                    base_param,
-                                    result_fun_name,
-                                    bp_args,
-                                    i
-                                );
-                            } else {
-                                // Non-reference result: extract directly from tuple
-                                emitln!(
-                                    self.writer,
-                                    "{} := {}({})->${};",
-                                    result_local,
-                                    result_fun_name,
-                                    bp_args,
-                                    i
-                                );
-                            }
-                        } else {
-                            // Mutable reference param output: wrap in $UpdateMutation
-                            let mut_ref_idx = i - explicit_result_count;
-                            let param_idx = mut_ref_param_indices[mut_ref_idx];
-                            emitln!(
-                                self.writer,
-                                "{} := $UpdateMutation(p{}, {}({})->${});",
-                                result_local,
-                                param_idx,
-                                result_fun_name,
-                                bp_args,
-                                i
-                            );
-                        }
-                    }
-                }
-            }
-
-            // Havoc memory since the function could modify anything.
-            // TODO: When modifies_of is supported, only havoc if no modifies_of is specified.
-            for mem in memory {
-                emitln!(self.writer, "havoc {};", mem)
-            }
-
-            self.writer.unindent();
-            emitln!(self.writer, "}");
+            self.emit_behavioral_predicate_body(
+                &aborts_name,
+                &bp_args,
+                &result_fun_name,
+                &multi_result_fun_name,
+                &bp_args,
+                &result_locals,
+                &explicit_results,
+                &params,
+                memory,
+            );
             if is_only {
                 // Single variant: no outer block to close
             } else {
@@ -942,6 +861,126 @@ impl<'env> BoogieTranslator<'env> {
                 }
             }
         }
+        self.writer.unindent();
+        emitln!(self.writer, "}");
+    }
+
+    /// Emit behavioral predicate call body: aborts_of check, result_of assignment,
+    /// and memory havoc. Used by both opaque closure variants and function parameter
+    /// variants in the `$apply` procedure.
+    #[allow(clippy::too_many_arguments)]
+    fn emit_behavioral_predicate_body(
+        &self,
+        aborts_name: &str,
+        bp_args: &str,
+        result_fun_name: &str,
+        multi_result_fun_name: &str,
+        result_bp_args: &str,
+        result_locals: &[String],
+        explicit_results: &[Type],
+        params: &[Type],
+        memory: &[String],
+    ) {
+        let explicit_result_count = explicit_results.len();
+        let mut_ref_param_indices: Vec<usize> = params
+            .iter()
+            .enumerate()
+            .filter(|(_, p)| p.is_mutable_reference())
+            .map(|(idx, _)| idx)
+            .collect();
+        let first_mut_ref_param = mut_ref_param_indices.first().copied();
+
+        // Check abort condition
+        emitln!(self.writer, "if ({}({})) {{", aborts_name, bp_args);
+        self.writer.indent();
+        emitln!(self.writer, "$abort_flag := true;");
+        self.writer.unindent();
+        emitln!(self.writer, "} else {");
+        self.writer.indent();
+
+        // Assign results using result_of function
+        if !result_locals.is_empty() {
+            if result_locals.len() == 1 {
+                let result_local = &result_locals[0];
+                if explicit_result_count == 1 {
+                    if explicit_results[0].is_mutable_reference() {
+                        let base_param = first_mut_ref_param.unwrap_or(0);
+                        emitln!(
+                            self.writer,
+                            "{} := $ChildMutation(p{}, -1, {}({}));",
+                            result_local,
+                            base_param,
+                            result_fun_name,
+                            result_bp_args
+                        );
+                    } else {
+                        emitln!(
+                            self.writer,
+                            "{} := {}({});",
+                            result_local,
+                            result_fun_name,
+                            result_bp_args
+                        );
+                    }
+                } else {
+                    // Mutable reference param output: wrap in $UpdateMutation
+                    let param_idx = mut_ref_param_indices[0];
+                    emitln!(
+                        self.writer,
+                        "{} := $UpdateMutation(p{}, {}({}));",
+                        result_local,
+                        param_idx,
+                        result_fun_name,
+                        result_bp_args
+                    );
+                }
+            } else {
+                // Multiple results: use tuple projection
+                for (i, result_local) in result_locals.iter().enumerate() {
+                    if i < explicit_result_count {
+                        if explicit_results[i].is_mutable_reference() {
+                            let base_param = first_mut_ref_param.unwrap_or(0);
+                            emitln!(
+                                self.writer,
+                                "{} := $ChildMutation(p{}, -1, {}({})->${});",
+                                result_local,
+                                base_param,
+                                multi_result_fun_name,
+                                result_bp_args,
+                                i
+                            );
+                        } else {
+                            emitln!(
+                                self.writer,
+                                "{} := {}({})->${};",
+                                result_local,
+                                multi_result_fun_name,
+                                result_bp_args,
+                                i
+                            );
+                        }
+                    } else {
+                        let mut_ref_idx = i - explicit_result_count;
+                        let param_idx = mut_ref_param_indices[mut_ref_idx];
+                        emitln!(
+                            self.writer,
+                            "{} := $UpdateMutation(p{}, {}({})->${});",
+                            result_local,
+                            param_idx,
+                            multi_result_fun_name,
+                            result_bp_args,
+                            i
+                        );
+                    }
+                }
+            }
+        }
+
+        // Havoc memory since the function could modify anything
+        for mem in memory {
+            emitln!(self.writer, "havoc {};", mem)
+        }
+
         self.writer.unindent();
         emitln!(self.writer, "}");
     }

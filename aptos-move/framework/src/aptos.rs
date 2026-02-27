@@ -4,9 +4,10 @@
 #![forbid(unsafe_code)]
 
 use crate::{
-    docgen::DocgenOptions, path_in_crate, release_builder::RELEASE_BUNDLE_EXTENSION,
-    release_bundle::ReleaseBundle, BuildOptions, ReleaseOptions,
+    docgen::DocgenOptions, path_in_crate, release_builder::RELEASE_BUNDLE_EXTENSION, BuildOptions,
+    ReleaseOptions,
 };
+use aptos_release_bundle::ReleaseBundle;
 use clap::ValueEnum;
 use move_command_line_common::address::NumericalAddress;
 use once_cell::sync::Lazy;

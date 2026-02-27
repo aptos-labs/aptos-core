@@ -1375,7 +1375,8 @@ impl Type {
         env: &'env GlobalEnv,
     ) -> Option<(StructEnv<'env>, &'env [Type])> {
         if let Type::Struct(module_idx, struct_idx, params) = self {
-            Some((env.get_module(*module_idx).into_struct(*struct_idx), params))
+            env.get_module_opt(*module_idx)
+                .map(|module_env| (module_env.into_struct(*struct_idx), params.as_slice()))
         } else {
             None
         }

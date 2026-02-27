@@ -1,0 +1,12 @@
+//# publish --print-bytecode
+module 0x66::test_borrow_no_return
+
+struct S
+    x: u64
+
+// Invalid: borrow$S$0 must return exactly one reference value (&u64); returning nothing is rejected
+#[borrow(0)] public fun borrow$S$0(l0: &S)
+    move_loc l0
+    borrow_field S, x
+    pop
+    ret

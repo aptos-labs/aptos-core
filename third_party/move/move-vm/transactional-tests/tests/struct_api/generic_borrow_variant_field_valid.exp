@@ -1,0 +1,25 @@
+processed 1 task
+task 0 lines 1-20:  publish --print-bytecode [module 0x66::test_generic_borrow_variant_field]
+
+== BEGIN Bytecode ==
+// Bytecode version v9
+module 0x66::test_generic_borrow_variant_field
+enum Option<T0> has drop
+  Some
+    value: T0
+  None
+
+// Function definition at index 0
+#[borrow(0)] public fun borrow$Option$0$0<T0>(l0: &Option<T0>): &T0
+    move_loc l0
+    borrow_variant_field Option<T0>, Some::value
+    ret
+
+// Function definition at index 1
+#[borrow_mut(0)] public fun borrow_mut$Option$0$0<T0>(l0: &mut Option<T0>): &mut T0
+    move_loc l0
+    mut_borrow_variant_field Option<T0>, Some::value
+    ret
+
+
+== END Bytecode ==

@@ -1,7 +1,7 @@
 // Copyright (c) Aptos Foundation
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
-use crate::{db_access::DbAccessUtil, transaction_generator::create_block_metadata_transaction};
+use crate::{db_access::DbAccessUtil, transaction_generator::BenchmarkTimestamp};
 use anyhow::Result;
 use aptos_storage_interface::{
     state_store::state_view::db_state_view::LatestDbStateCheckpointView, DbReaderWriter,
@@ -16,13 +16,14 @@ use aptos_types::{
 use async_trait::async_trait;
 use std::{
     collections::HashMap,
-    sync::{atomic::AtomicUsize, mpsc},
+    sync::{atomic::AtomicUsize, mpsc, Arc},
     time::{Duration, Instant},
 };
 
 pub struct DbReliableTransactionSubmitter {
     pub db: DbReaderWriter,
     pub block_sender: mpsc::SyncSender<Vec<Transaction>>,
+    pub ts: Arc<BenchmarkTimestamp>,
 }
 
 #[async_trait]
@@ -50,7 +51,7 @@ impl ReliableTransactionSubmitter for DbReliableTransactionSubmitter {
         _state: &CounterState,
     ) -> Result<()> {
         let mut block = Vec::new();
-        block.push(create_block_metadata_transaction(1, &self.db));
+        block.push(self.ts.next_block_metadata_txn(&self.db));
         block.extend(
             txns.iter()
                 .map(|t| Transaction::UserTransaction(t.clone()))

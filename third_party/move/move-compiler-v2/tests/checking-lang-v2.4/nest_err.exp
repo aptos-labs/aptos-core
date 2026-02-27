@@ -1,17 +1,17 @@
 
 Diagnostics:
-error: Invalid operation: pack of `m::Inner` can only be done within the defining module `0xc0ffee::m`
+error: Invalid operation: pack on `m::Inner` can only be done within module `0xc0ffee::m`
    ┌─ tests/checking-lang-v2.4/nest_err.move:24:9
    │
 24 │     fun test() {
    │         ^^^^
 25 │         let x = Wrapper(Inner::V1(22, 23));
-   │                         ----------------- packed here
+   │                         ----------------- pack here
 
-error: Invalid operation: pack of `m::Inner2` can only be done within the defining module `0xc0ffee::m` or friend modules
+error: Invalid operation: pack on `m::Inner2` can only be done within module `0xc0ffee::m` or friend modules
    ┌─ tests/checking-lang-v2.4/nest_err.move:28:9
    │
 28 │     fun test2() {
    │         ^^^^^
 29 │         let x = Wrapper2(Inner2::V1(22, 23));
-   │                          ------------------ packed here
+   │                          ------------------ pack here

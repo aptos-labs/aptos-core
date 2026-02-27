@@ -19,8 +19,9 @@ use crate::{
         LanguageVersion,
     },
     model::{
-        FieldData, FieldId, FunctionKind, GlobalEnv, GlobalId, Loc, ModuleId, NodeId, Parameter,
-        QualifiedId, QualifiedInstId, SpecFunId, StructId, TypeParameter, TypeParameterKind,
+        FieldData, FieldId, FunId, FunctionKind, GlobalEnv, GlobalId, Loc, ModuleId, NodeId,
+        Parameter, QualifiedId, QualifiedInstId, SpecFunId, StructId, TypeParameter,
+        TypeParameterKind, UserId,
     },
     symbol::{Symbol, SymbolPool},
     ty::{
@@ -28,11 +29,7 @@ use crate::{
         ReceiverFunctionInstance, ReferenceKind, Substitution, Type, TypeDisplayContext,
         TypeUnificationError, UnificationContext, Variance, WideningOrder, BOOL_TYPE,
     },
-    well_known::{
-        BORROW_MUT_NAME, BORROW_NAME, UNSPECIFIED_ABORT_CODE, VECTOR_FUNCS_WITH_BYTECODE_INSTRS,
-        VECTOR_MODULE,
-    },
-    FunId,
+    well_known::{UNSPECIFIED_ABORT_CODE, VECTOR_FUNCS_WITH_BYTECODE_INSTRS, VECTOR_MODULE},
 };
 use codespan_reporting::diagnostic::Severity;
 use itertools::Itertools;
@@ -45,6 +42,7 @@ use move_core_types::{
     ability::{Ability, AbilitySet},
     account_address::AccountAddress,
     function::ClosureMask,
+    language_storage::{BORROW, BORROW_MUT},
 };
 use move_ir_types::{
     location::{sp, Spanned},
@@ -73,6 +71,9 @@ pub(crate) struct ExpTranslator<'env, 'translator, 'module_translator> {
     pub local_table: LinkedList<BTreeMap<Symbol, LocalVarEntry>>,
     /// The name of the function this expression is associated with, if there is one.
     pub fun_name: Option<QualifiedSymbol>,
+    /// Context for tracking constant usage. When set, user of the constant
+    /// being translated will be recorded in it.
+    pub constant_use_context: Option<UserId>,
     /// Whether we are translating an inline function body.
     pub fun_is_inline: bool,
     /// The result type of the function this expression is associated with.
@@ -168,6 +169,7 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
             fun_ptrs_table: BTreeMap::new(),
             local_table: LinkedList::new(),
             fun_name: None,
+            constant_use_context: None,
             fun_is_inline: false,
             result_type: None,
             lambda_result_type_stack: vec![],
@@ -238,6 +240,10 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
             .map(|e| e.kind == FunctionKind::Inline)
             .unwrap_or_default();
         self.fun_name = Some(name)
+    }
+
+    pub fn set_constant_use_context(&mut self, context: UserId) {
+        self.constant_use_context = Some(context)
     }
 
     pub fn set_result_type(&mut self, ty: Type) {
@@ -4006,10 +4012,31 @@ impl ExpTranslator<'_, '_, '_> {
             );
             self.new_error_exp()
         } else {
+            // Record constant usage.
+            // Why tracking constants on the fly:
+            // - they are replaced by values after translation!
+            if let Some(user_id) = &self.constant_use_context {
+                self.track_constant_usage(loc, sym, user_id.clone());
+            }
             let ConstEntry { ty, value, .. } = entry;
             let ty = self.check_type(loc, &ty, expected_type, context);
             let id = self.new_node_id_with_type_loc(&ty, loc);
             ExpData::Value(id, value)
+        }
+    }
+
+    fn track_constant_usage(&mut self, loc: &Loc, const_sym: &QualifiedSymbol, user_id: UserId) {
+        if let Some(const_entry) = self.parent.parent.const_table.get_mut(const_sym) {
+            const_entry.users.insert(user_id);
+        } else {
+            self.parent.parent.env.diag(
+                Severity::Bug,
+                loc,
+                &format!(
+                    "constant `{}` not found in const_table while tracking usage",
+                    const_sym.display(self.parent.parent.env)
+                ),
+            );
         }
     }
 
@@ -4165,11 +4192,7 @@ impl ExpTranslator<'_, '_, '_> {
             return call;
         } else {
             // To use index notation in vector module
-            let borrow_fun_name = if mutable {
-                BORROW_MUT_NAME
-            } else {
-                BORROW_NAME
-            };
+            let borrow_fun_name = if mutable { BORROW_MUT } else { BORROW };
             if let Some(borrow_symbol) = self
                 .parent
                 .parent

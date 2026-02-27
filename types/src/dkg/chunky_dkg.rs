@@ -13,24 +13,30 @@ use crate::{
     validator_verifier::{ValidatorConsensusInfo, ValidatorConsensusInfoMoveStruct},
 };
 use anyhow::Result;
-use aptos_batch_encryption::group::{Fr, Pairing};
-use aptos_crypto::{bls12381, weighted_config::WeightedConfigArkworks};
+use aptos_batch_encryption::{
+    group::{Fr, G2Affine, Pairing},
+    shared::{digest::DigestKey, encryption_key::EncryptionKey},
+};
+use aptos_crypto::{bls12381, weighted_config::WeightedConfigArkworks, TSecretSharingConfig};
+use aptos_crypto_derive::{BCSCryptoHash, CryptoHasher};
 use aptos_dkg::pvss::{
     chunky::{
-        EncryptPubKey, InputSecret, PublicParameters, SignedWeightedTranscript,
+        DecryptPrivKey, EncryptPubKey, InputSecret, PublicParameters, SignedWeightedTranscript,
         WeightedSubtranscript,
     },
-    traits::transcript::{
-        Aggregatable, HasAggregatableSubtranscript, Transcript, WithMaxNumShares,
+    traits::{
+        transcript::{Aggregatable, HasAggregatableSubtranscript, Transcript},
+        TranscriptCore,
     },
     Player,
 };
+use ark_ec::AffineRepr;
 use move_core_types::{
     account_address::AccountAddress, ident_str, identifier::IdentStr, language_storage::TypeTag,
     move_resource::MoveStructType,
 };
 use once_cell::sync::Lazy;
-use rand::{CryptoRng, RngCore};
+use rand::{rngs::StdRng, CryptoRng, RngCore, SeedableRng};
 use serde::{Deserialize, Serialize};
 use std::fmt::{Debug, Formatter};
 
@@ -40,8 +46,33 @@ pub type DealerPrivateKey = bls12381::PrivateKey;
 pub type DealerPublicKey = bls12381::PublicKey;
 pub type ChunkyDKGThresholdConfig = WeightedConfigArkworks<Fr>;
 pub type ChunkyEncryptPubKey = EncryptPubKey<Pairing>;
+pub type ChunkyDecryptPrivKey = DecryptPrivKey<Pairing>;
 pub type ChunkyDKGPublicParameters = PublicParameters<Pairing>;
 pub type ChunkyInputSecret = InputSecret<Fr>;
+/// Shared test DigestKey for encryption key derivation.
+/// TODO(ibalajiarun): Replace with proper trusted setup for production.
+pub static TEST_DIGEST_KEY: Lazy<DigestKey> = Lazy::new(|| {
+    use ark_std::rand::SeedableRng;
+    let mut rng = ark_std::rand::rngs::StdRng::seed_from_u64(100u64);
+    DigestKey::new(&mut rng, 32, 200).expect("DigestKey creation should not fail")
+});
+
+/// An aggregated transcript with the list of dealers who contributed to it.
+#[derive(Clone, Debug, Serialize, Deserialize, CryptoHasher, BCSCryptoHash)]
+pub struct AggregatedSubtranscript {
+    pub subtranscript: ChunkySubtranscript,
+    pub dealers: Vec<Player>,
+}
+
+impl AggregatedSubtranscript {
+    /// Derive the encryption key bytes from this transcript using the given tau_g2.
+    pub fn derive_encryption_key_bytes(&self, tau_g2: G2Affine) -> Result<Vec<u8>> {
+        let mpk_g2 = self.subtranscript.get_dealt_public_key().as_g2();
+        let encryption_key = EncryptionKey::new(mpk_g2, tau_g2);
+        bcs::to_bytes(&encryption_key)
+            .map_err(|e| anyhow::anyhow!("encryption key serialization error: {e}"))
+    }
+}
 
 /// Chunky DKG transcript and its metadata.
 /// Similar to DKGTranscript but for Chunky DKG with ChunkyTranscript.
@@ -119,7 +150,7 @@ impl ChunkyDKGSessionMetadata {
     }
 }
 
-/// Reflection of `0x1::dkg::DKGStartEvent` in rust for Chunky DKG.
+/// Reflection of `0x1::chunky_dkg::ChunkyDKGStartEvent` in rust for Chunky DKG.
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct ChunkyDKGStartEvent {
     pub session_metadata: ChunkyDKGSessionMetadata,
@@ -222,6 +253,7 @@ impl ChunkyDKG {
             .collect();
 
         // Use the same rounding logic as RealDKG to compute weights
+        // TODO(ibalajiarun): Just compute profile instead of doing Blss things with DKGRounding
         let DKGRounding { profile, .. } = DKGRounding::new(
             &validator_stakes,
             secrecy_threshold,
@@ -243,9 +275,17 @@ impl ChunkyDKG {
         // Create PublicParameters<Pairing> with max_num_shares based on total weight
         // TODO(ibalajiarun): Modify PublicParameters to take in u64 weights.
         let total_weight: u32 = profile.validator_weights.iter().sum::<u64>() as u32;
-        // TODO(ibalajiarun): This instantiation of PublicParameters is temporary. It will be instantiated properly
-        // in a future PR.
-        let public_parameters = PublicParameters::with_max_num_shares(total_weight);
+
+        // TODO(ibalajiarun): Replace seed for public parameters with a trusted setup
+        let seed = dkg_session_metadata.dealer_epoch;
+        let mut rng_aptos = StdRng::seed_from_u64(seed);
+        let public_parameters = PublicParameters::new_with_commitment_base(
+            total_weight as usize,
+            aptos_dkg::pvss::chunky::DEFAULT_ELL_FOR_TESTING,
+            threshold_config.get_total_num_players(),
+            G2Affine::generator(),
+            &mut rng_aptos,
+        );
 
         ChunkyDKGConfig {
             threshold_config,
@@ -255,6 +295,11 @@ impl ChunkyDKG {
         }
     }
 }
+
+/// Wrapper so that transcript bytes can be used with verify_multi_signatures (requires CryptoHash).
+/// BCS(TranscriptBytesForSigning(bytes)) equals BCS(bytes), so the hash matches what was signed.
+#[derive(Clone, Serialize, Deserialize, CryptoHasher, BCSCryptoHash)]
+pub struct TranscriptBytesForSigning(#[serde(with = "serde_bytes")] pub Vec<u8>);
 
 /// A validated aggregated transcript with metadata, similar to DKGTranscript but for Chunky DKG.
 #[derive(Clone, Serialize, Deserialize, PartialEq, Eq)]
@@ -272,6 +317,14 @@ impl std::fmt::Debug for CertifiedAggregatedChunkySubtranscript {
             .field("transcript_bytes_len", &self.transcript_bytes.len())
             .finish()
     }
+}
+
+/// Output of Chunky DKG: the certified transcript + derived encryption key.
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
+pub struct CertifiedChunkyDKGOutput {
+    pub certified_transcript: CertifiedAggregatedChunkySubtranscript,
+    #[serde(with = "serde_bytes")]
+    pub encryption_key: Vec<u8>,
 }
 
 /// Reflection of Move type `0x1::dkg::DKGSessionState`.
@@ -309,6 +362,6 @@ impl ChunkyDKGState {
 }
 
 impl OnChainConfig for ChunkyDKGState {
-    const MODULE_IDENTIFIER: &'static str = "dkg";
+    const MODULE_IDENTIFIER: &'static str = "chunky_dkg";
     const TYPE_IDENTIFIER: &'static str = "ChunkyDKGState";
 }

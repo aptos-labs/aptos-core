@@ -250,6 +250,11 @@ CertifiedAggregatedChunkySubtranscript:
     - transcript_bytes: BYTES
     - signature:
         TYPENAME: AggregateSignature
+CertifiedChunkyDKGOutput:
+  STRUCT:
+    - certified_transcript:
+        TYPENAME: CertifiedAggregatedChunkySubtranscript
+    - encryption_key: BYTES
 ChainId:
   NEWTYPESTRUCT: U8
 ChangeSet:
@@ -829,6 +834,8 @@ TransactionExecutable:
           TYPENAME: EntryFunction
     2:
       Empty: UNIT
+    3:
+      Encrypted: UNIT
 TransactionExtraConfig:
   ENUM:
     0:
@@ -931,7 +938,7 @@ ValidatorTransaction:
     2:
       ChunkyDKGResult:
         NEWTYPE:
-          TYPENAME: CertifiedAggregatedChunkySubtranscript
+          TYPENAME: CertifiedChunkyDKGOutput
 WriteOp:
   ENUM:
     0:

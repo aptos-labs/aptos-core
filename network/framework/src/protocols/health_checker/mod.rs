@@ -23,7 +23,6 @@ use crate::{
     counters,
     logging::NetworkSchema,
     peer::DisconnectReason,
-    peer_manager::ConnectionNotification,
     protocols::{
         health_checker::interface::HealthCheckNetworkInterface,
         network::{
@@ -47,13 +46,15 @@ use futures::{
 };
 use rand::{rngs::SmallRng, Rng, SeedableRng};
 use serde::{Deserialize, Serialize};
-use std::time::Duration;
+use std::{collections::HashSet, time::Duration};
 use tokio::time::timeout;
 
 pub mod builder;
 mod interface;
 #[cfg(test)]
 mod test;
+
+// TODO: remove the health checker and replace it with the peer monitoring service
 
 /// The interface from Network to HealthChecker layer.
 ///
@@ -109,9 +110,8 @@ pub struct HealthChecker<NetworkClient> {
     ping_failures_tolerated: u64,
     /// Counter incremented in each round of health checks
     round: u64,
-
-    /// This should normally be None and is only used in testing to inject test events.
-    connection_events_injection: Option<tokio::sync::mpsc::Receiver<ConnectionNotification>>,
+    /// Set of peers we've seen in the previous polling cycle
+    known_peers: HashSet<PeerId>,
 }
 
 impl<NetworkClient: NetworkClientInterface<HealthCheckerMsg> + Unpin> HealthChecker<NetworkClient> {
@@ -133,17 +133,63 @@ impl<NetworkClient: NetworkClientInterface<HealthCheckerMsg> + Unpin> HealthChec
             ping_timeout,
             ping_failures_tolerated,
             round: 0,
-            connection_events_injection: None,
+            known_peers: HashSet::new(),
         }
     }
 
-    #[cfg(test)]
-    /// Set source of mock connection events for testing.
-    pub fn set_connection_source(
-        &mut self,
-        connection_events: tokio::sync::mpsc::Receiver<ConnectionNotification>,
-    ) {
-        self.connection_events_injection = Some(connection_events);
+    /// Detects new and lost peers by comparing current connected peers
+    /// with the previously known set. Updates health data accordingly.
+    fn detect_peer_changes(&mut self) {
+        // Get current connected peers for our network
+        let peers_and_metadata = self.network_interface.get_peers_and_metadata();
+        let current_peers = match peers_and_metadata.get_connected_peers_and_metadata() {
+            Ok(peers_and_metadata) => {
+                let self_network_id = self.network_context.network_id();
+
+                // Filter peers for our network and extract peer IDs
+                peers_and_metadata
+                    .into_iter()
+                    .filter(|(peer_network_id, _)| peer_network_id.network_id() == self_network_id)
+                    .map(|(peer_network_id, _)| peer_network_id.peer_id())
+                    .collect::<HashSet<_>>()
+            },
+            Err(e) => {
+                warn!(
+                    NetworkSchema::new(&self.network_context),
+                    error = ?e,
+                    "{} Failed to get connected peers: {}",
+                    self.network_context,
+                    e
+                );
+                return;
+            },
+        };
+
+        // Detect new peers
+        for peer_id in current_peers.difference(&self.known_peers) {
+            info!(
+                NetworkSchema::new(&self.network_context).remote_peer(peer_id),
+                "{} New peer detected: {}",
+                self.network_context,
+                peer_id.short_str()
+            );
+            self.network_interface
+                .create_peer_and_health_data(*peer_id, self.round);
+        }
+
+        // Detect lost peers
+        for peer_id in self.known_peers.difference(&current_peers) {
+            info!(
+                NetworkSchema::new(&self.network_context).remote_peer(peer_id),
+                "{} Lost peer detected: {}",
+                self.network_context,
+                peer_id.short_str()
+            );
+            self.network_interface.remove_peer_and_health_data(peer_id);
+        }
+
+        // Update known peers for next cycle
+        self.known_peers = current_peers;
     }
 
     /// testing_connection_events should be None except in unit test code
@@ -157,14 +203,8 @@ impl<NetworkClient: NetworkClientInterface<HealthCheckerMsg> + Unpin> HealthChec
         let ticker = self.time_service.interval(self.ping_interval);
         tokio::pin!(ticker);
 
-        let connection_events = self
-            .connection_events_injection
-            .take()
-            .unwrap_or_else(|| self.network_interface.get_peers_and_metadata().subscribe());
-        let mut connection_events =
-            tokio_stream::wrappers::ReceiverStream::new(connection_events).fuse();
-
-        let self_network_id = self.network_context.network_id();
+        // Initialize the known peers set and health data
+        self.detect_peer_changes();
 
         loop {
             futures::select! {
@@ -206,28 +246,12 @@ impl<NetworkClient: NetworkClientInterface<HealthCheckerMsg> + Unpin> HealthChec
                         }
                     }
                 }
-                conn_event = connection_events.select_next_some() => {
-                    match conn_event {
-                        ConnectionNotification::NewPeer(metadata, network_id) => {
-                            // PeersAndMetadata is a global singleton across all networks; filter connect/disconnect events to the NetworkId that this HealthChecker instance is watching
-                            if network_id == self_network_id {
-                                self.network_interface.create_peer_and_health_data(
-                                    metadata.remote_peer_id, self.round
-                                );
-                            }
-                        }
-                        ConnectionNotification::LostPeer(metadata, network_id) => {
-                            // PeersAndMetadata is a global singleton across all networks; filter connect/disconnect events to the NetworkId that this HealthChecker instance is watching
-                            if network_id == self_network_id {
-                                self.network_interface.remove_peer_and_health_data(
-                                    &metadata.remote_peer_id
-                                );
-                            }
-                        }
-                    }
-                }
                 _ = ticker.select_next_some() => {
                     self.round += 1;
+
+                    // Detect peer changes
+                    self.detect_peer_changes();
+
                     let connected = self.network_interface.connected_peers();
                     if connected.is_empty() {
                         trace!(

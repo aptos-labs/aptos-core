@@ -13,7 +13,7 @@ use crate::{
     intrinsics::IntrinsicDecl,
     model::{
         FieldData, FunId, FunctionKind, GlobalEnv, Loc, ModuleId, Parameter, QualifiedId,
-        QualifiedInstId, SpecFunId, SpecVarId, StructId, TypeParameter,
+        QualifiedInstId, SpecFunId, SpecVarId, StructId, TypeParameter, UserId,
     },
     symbol::Symbol,
     ty::{Constraint, Type, TypeDisplayContext},
@@ -130,6 +130,8 @@ pub(crate) struct StructEntry {
     pub is_empty_struct: bool,
     pub is_native: bool,
     pub visibility: Visibility,
+    /// Users of this struct
+    pub users: BTreeSet<UserId>,
 }
 
 #[derive(Debug, Clone)]
@@ -217,6 +219,8 @@ pub(crate) struct ConstEntry {
     pub ty: Type,
     pub value: Value,
     pub visibility: EntryVisibility,
+    pub users: BTreeSet<UserId>,
+    pub attributes: Vec<Attribute>,
 }
 
 impl<'env> ModelBuilder<'env> {
@@ -391,6 +395,7 @@ impl<'env> ModelBuilder<'env> {
             is_empty_struct: false,
             is_native,
             visibility,
+            users: BTreeSet::new(),
         };
         self.struct_table.insert(name.clone(), entry);
         self.reverse_struct_table

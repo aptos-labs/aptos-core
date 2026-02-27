@@ -26,7 +26,7 @@ use aptos_experimental_runtimes::thread_manager::THREAD_MANAGER;
 use aptos_jellyfish_merkle::{node_type::NodeKey, StaleNodeIndex};
 use aptos_logger::info;
 use aptos_metrics_core::TimerHelper;
-use aptos_schemadb::{schema::KeyCodec, DB};
+use aptos_schemadb::{schema::KeyCodec, ReadOptions, DB};
 use aptos_storage_interface::Result;
 use aptos_types::transaction::{AtomicVersion, Version};
 use rayon::prelude::*;
@@ -134,20 +134,15 @@ where
             S::name(),
         );
 
-        let shard_pruners = if state_merkle_db.sharding_enabled() {
-            let num_shards = state_merkle_db.num_shards();
-            let mut shard_pruners = Vec::with_capacity(num_shards);
-            for shard_id in 0..num_shards {
-                shard_pruners.push(StateMerkleShardPruner::new(
-                    shard_id,
-                    state_merkle_db.db_shard_arc(shard_id),
-                    metadata_progress,
-                )?);
-            }
-            shard_pruners
-        } else {
-            Vec::new()
-        };
+        let num_shards = state_merkle_db.num_shards();
+        let mut shard_pruners = Vec::with_capacity(num_shards);
+        for shard_id in 0..num_shards {
+            shard_pruners.push(StateMerkleShardPruner::new(
+                shard_id,
+                state_merkle_db.db_shard_arc(shard_id),
+                metadata_progress,
+            )?);
+        }
 
         let pruner = StateMerklePruner {
             target_version: AtomicVersion::new(metadata_progress),
@@ -196,7 +191,9 @@ where
         limit: usize,
     ) -> Result<(Vec<StaleNodeIndex>, Option<Version>)> {
         let mut indices = Vec::new();
-        let mut iter = state_merkle_db_shard.iter::<S>()?;
+        let mut read_opts = ReadOptions::default();
+        read_opts.fill_cache(false);
+        let mut iter = state_merkle_db_shard.iter_with_opts::<S>(read_opts)?;
         iter.seek(&StaleNodeIndex {
             stale_since_version: start_version,
             node_key: NodeKey::new_empty_path(0),

@@ -14,7 +14,7 @@ use crate::{
     utils::truncation_helper::{get_state_merkle_commit_progress, truncate_state_merkle_db_shards},
     versioned_node_cache::VersionedNodeCache,
 };
-use aptos_config::config::{RocksdbConfig, RocksdbConfigs, StorageDirPaths};
+use aptos_config::config::{RocksdbConfig, StorageDirPaths};
 use aptos_crypto::HashValue;
 use aptos_experimental_runtimes::thread_manager::THREAD_MANAGER;
 use aptos_jellyfish_merkle::{
@@ -36,7 +36,6 @@ use aptos_types::{
     state_store::{state_key::StateKey, NUM_STATE_SHARDS},
     transaction::Version,
 };
-use arr_macro::arr;
 use rayon::prelude::*;
 use std::{
     collections::HashMap,
@@ -45,8 +44,6 @@ use std::{
     sync::Arc,
     time::Instant,
 };
-
-pub const STATE_MERKLE_DB_NAME: &str = "state_merkle_db";
 
 fn db_folder_name(is_hot: bool) -> &'static str {
     if is_hot {
@@ -74,17 +71,25 @@ pub struct StateMerkleDb {
     state_merkle_metadata_db: Arc<DB>,
     // Stores sharded part of tree nodes.
     state_merkle_db_shards: [Arc<DB>; NUM_STATE_SHARDS],
-    enable_sharding: bool,
     // shard_id -> cache.
     version_caches: HashMap<Option<usize>, VersionedNodeCache>,
     // `None` means the cache is not enabled.
     lru_cache: Option<LruNodeCache>,
+    is_hot: bool,
 }
 
 impl StateMerkleDb {
+    fn db_tag(&self) -> &'static str {
+        if self.is_hot {
+            "hot"
+        } else {
+            "cold"
+        }
+    }
+
     pub(crate) fn new(
         db_paths: &StorageDirPaths,
-        rocksdb_configs: RocksdbConfigs,
+        state_merkle_db_config: RocksdbConfig,
         env: Option<&Env>,
         block_cache: Option<&Cache>,
         readonly: bool,
@@ -99,37 +104,12 @@ impl StateMerkleDb {
             "Only hot state can be cleared on restart"
         );
 
-        let sharding = rocksdb_configs.enable_storage_sharding;
-        let state_merkle_db_config = rocksdb_configs.state_merkle_db_config;
-
         let mut version_caches = HashMap::with_capacity(NUM_STATE_SHARDS + 1);
         version_caches.insert(None, VersionedNodeCache::new());
         for i in 0..NUM_STATE_SHARDS {
             version_caches.insert(Some(i), VersionedNodeCache::new());
         }
         let lru_cache = NonZeroUsize::new(max_nodes_per_lru_cache_shard).map(LruNodeCache::new);
-
-        if !sharding {
-            assert!(!is_hot, "Hot state not supported for unsharded db.");
-            info!("Sharded state merkle DB is not enabled!");
-            let state_merkle_db_path = db_paths.default_root_path().join(STATE_MERKLE_DB_NAME);
-            let db = Arc::new(Self::open_db(
-                state_merkle_db_path,
-                STATE_MERKLE_DB_NAME,
-                &state_merkle_db_config,
-                env,
-                block_cache,
-                readonly,
-                delete_on_restart,
-            )?);
-            return Ok(Self {
-                state_merkle_metadata_db: Arc::clone(&db),
-                state_merkle_db_shards: arr![Arc::clone(&db); 16],
-                enable_sharding: false,
-                version_caches,
-                lru_cache,
-            });
-        }
 
         Self::open(
             db_paths,
@@ -192,17 +172,12 @@ impl StateMerkleDb {
     pub(crate) fn create_checkpoint(
         db_root_path: impl AsRef<Path>,
         cp_root_path: impl AsRef<Path>,
-        sharding: bool,
         is_hot: bool,
     ) -> Result<()> {
-        let rocksdb_configs = RocksdbConfigs {
-            enable_storage_sharding: sharding,
-            ..Default::default()
-        };
         // TODO(grao): Support path override here.
         let state_merkle_db = Self::new(
             &StorageDirPaths::from_path(db_root_path),
-            rocksdb_configs,
+            RocksdbConfig::default(),
             /*env=*/ None,
             /*block_cache=*/ None,
             /*readonly=*/ false,
@@ -215,28 +190,16 @@ impl StateMerkleDb {
         info!("Creating state_merkle_db checkpoint at: {cp_state_merkle_db_path:?}");
 
         std::fs::remove_dir_all(&cp_state_merkle_db_path).unwrap_or(());
-        if sharding {
-            std::fs::create_dir_all(&cp_state_merkle_db_path).unwrap_or(());
-        }
+        std::fs::create_dir_all(&cp_state_merkle_db_path).unwrap_or(());
 
         state_merkle_db
             .metadata_db()
-            .create_checkpoint(Self::metadata_db_path(
-                cp_root_path.as_ref(),
-                sharding,
-                is_hot,
-            ))?;
+            .create_checkpoint(Self::metadata_db_path(cp_root_path.as_ref(), is_hot))?;
 
-        if sharding {
-            for shard_id in 0..NUM_STATE_SHARDS {
-                state_merkle_db
-                    .db_shard(shard_id)
-                    .create_checkpoint(Self::db_shard_path(
-                        cp_root_path.as_ref(),
-                        shard_id,
-                        is_hot,
-                    ))?;
-            }
+        for shard_id in 0..NUM_STATE_SHARDS {
+            state_merkle_db
+                .db_shard(shard_id)
+                .create_checkpoint(Self::db_shard_path(cp_root_path.as_ref(), shard_id, is_hot))?;
         }
 
         Ok(())
@@ -354,7 +317,10 @@ impl StateMerkleDb {
         tree_update_batch: &TreeUpdateBatch<StateKey>,
         previous_epoch_ending_version: Option<Version>,
     ) -> Result<RawBatch> {
-        let _timer = OTHER_TIMERS_SECONDS.timer_with(&["create_jmt_commit_batch_for_shard"]);
+        let _timer = OTHER_TIMERS_SECONDS.timer_with(&[&format!(
+            "{}__create_jmt_commit_batch_for_shard",
+            self.db_tag()
+        )]);
 
         let mut batch = self.db(shard_id).new_native_batch();
 
@@ -469,7 +435,8 @@ impl StateMerkleDb {
         }
 
         let (shard_root_node, tree_update_batch) = {
-            let _timer = OTHER_TIMERS_SECONDS.timer_with(&["jmt_update"]);
+            let _timer =
+                OTHER_TIMERS_SECONDS.timer_with(&[&format!("{}__jmt_update", self.db_tag())]);
 
             self.batch_put_value_set_for_shard(
                 shard_id,
@@ -549,10 +516,6 @@ impl StateMerkleDb {
         JellyfishMerkleTree::new(self).get_shard_persisted_versions(root_persisted_version)
     }
 
-    pub(crate) fn sharding_enabled(&self) -> bool {
-        self.enable_sharding
-    }
-
     pub(crate) fn cache_enabled(&self) -> bool {
         self.lru_cache.is_some()
     }
@@ -576,14 +539,6 @@ impl StateMerkleDb {
 
     pub(crate) fn num_shards(&self) -> usize {
         NUM_STATE_SHARDS
-    }
-
-    pub(crate) fn hack_num_real_shards(&self) -> usize {
-        if self.enable_sharding {
-            NUM_STATE_SHARDS
-        } else {
-            1
-        }
     }
 
     fn db_by_key(&self, node_key: &NodeKey) -> &DB {
@@ -611,7 +566,6 @@ impl StateMerkleDb {
             } else {
                 db_paths.state_merkle_db_metadata_root_path()
             },
-            /*sharding=*/ true,
             is_hot,
         );
 
@@ -660,9 +614,9 @@ impl StateMerkleDb {
         let state_merkle_db = Self {
             state_merkle_metadata_db,
             state_merkle_db_shards,
-            enable_sharding: true,
             version_caches,
             lru_cache,
+            is_hot,
         };
 
         if !readonly {
@@ -745,16 +699,11 @@ impl StateMerkleDb {
             .join(Path::new(&shard_sub_path))
     }
 
-    fn metadata_db_path<P: AsRef<Path>>(db_root_path: P, sharding: bool, is_hot: bool) -> PathBuf {
-        if sharding {
-            db_root_path
-                .as_ref()
-                .join(db_folder_name(is_hot))
-                .join("metadata")
-        } else {
-            assert!(!is_hot, "Hot state not supported for unsharded db.");
-            db_root_path.as_ref().join(STATE_MERKLE_DB_NAME)
-        }
+    fn metadata_db_path<P: AsRef<Path>>(db_root_path: P, is_hot: bool) -> PathBuf {
+        db_root_path
+            .as_ref()
+            .join(db_folder_name(is_hot))
+            .join("metadata")
     }
 
     /// Finds the rightmost leaf by scanning the entire DB.
@@ -766,8 +715,8 @@ impl StateMerkleDb {
         let mut ret = None;
 
         // traverse all shards in a naive way
-        let shards = 0..self.hack_num_real_shards();
-        let start_num_of_nibbles = if self.enable_sharding { 1 } else { 0 };
+        let shards = 0..self.num_shards();
+        let start_num_of_nibbles = 1;
         for shard_id in shards.rev() {
             let shard_db = self.state_merkle_db_shards[shard_id].clone();
             let mut shard_iter = shard_db.iter::<JellyfishMerkleNodeSchema>()?;
@@ -859,8 +808,10 @@ impl TreeReader<StateKey> for StateMerkleDb {
             let node_opt = self
                 .db_by_key(node_key)
                 .get::<JellyfishMerkleNodeSchema>(node_key)?;
-            NODE_CACHE_SECONDS
-                .observe_with(&[tag, "cache_disabled"], start_time.elapsed().as_secs_f64());
+            NODE_CACHE_SECONDS.observe_with(
+                &[tag, "cache_disabled", self.db_tag()],
+                start_time.elapsed().as_secs_f64(),
+            );
             return Ok(node_opt);
         }
         if let Some(node_cache) = self
@@ -871,7 +822,7 @@ impl TreeReader<StateKey> for StateMerkleDb {
         {
             let node = node_cache.get(node_key).cloned();
             NODE_CACHE_SECONDS.observe_with(
-                &[tag, "versioned_cache_hit"],
+                &[tag, "versioned_cache_hit", self.db_tag()],
                 start_time.elapsed().as_secs_f64(),
             );
             return Ok(node);
@@ -879,8 +830,10 @@ impl TreeReader<StateKey> for StateMerkleDb {
 
         if let Some(lru_cache) = &self.lru_cache {
             if let Some(node) = lru_cache.get(node_key) {
-                NODE_CACHE_SECONDS
-                    .observe_with(&[tag, "lru_cache_hit"], start_time.elapsed().as_secs_f64());
+                NODE_CACHE_SECONDS.observe_with(
+                    &[tag, "lru_cache_hit", self.db_tag()],
+                    start_time.elapsed().as_secs_f64(),
+                );
                 return Ok(Some(node));
             }
         }
@@ -893,13 +846,16 @@ impl TreeReader<StateKey> for StateMerkleDb {
                 lru_cache.put(node_key.clone(), node.clone());
             }
         }
-        NODE_CACHE_SECONDS.observe_with(&[tag, "cache_miss"], start_time.elapsed().as_secs_f64());
+        NODE_CACHE_SECONDS.observe_with(
+            &[tag, "cache_miss", self.db_tag()],
+            start_time.elapsed().as_secs_f64(),
+        );
         Ok(node_opt)
     }
 
     fn get_rightmost_leaf(&self, version: Version) -> Result<Option<(NodeKey, LeafNode)>> {
         let ret = None;
-        let shards = 0..self.hack_num_real_shards();
+        let shards = 0..NUM_STATE_SHARDS;
 
         // Search from right to left to find the first leaf node.
         for shard_id in shards.rev() {
@@ -916,7 +872,8 @@ impl TreeReader<StateKey> for StateMerkleDb {
 
 impl TreeWriter<StateKey> for StateMerkleDb {
     fn write_node_batch(&self, node_batch: &NodeBatch) -> Result<()> {
-        let _timer = OTHER_TIMERS_SECONDS.timer_with(&["tree_writer_write_batch"]);
+        let _timer = OTHER_TIMERS_SECONDS
+            .timer_with(&[&format!("{}__tree_writer_write_batch", self.db_tag())]);
         // Get the top level batch and sharded batch from raw NodeBatch
         let mut top_level_batch = SchemaBatch::new();
         let mut jmt_shard_batches: Vec<SchemaBatch> = Vec::with_capacity(NUM_STATE_SHARDS);

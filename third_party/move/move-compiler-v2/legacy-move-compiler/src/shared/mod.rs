@@ -974,8 +974,13 @@ pub mod known_attributes {
 
         fn expected_positions(&self) -> &'static BTreeSet<AttributePosition> {
             static ALLOW_POSITIONS: Lazy<BTreeSet<AttributePosition>> = Lazy::new(|| {
-                IntoIterator::into_iter([AttributePosition::Module, AttributePosition::Function])
-                    .collect()
+                IntoIterator::into_iter([
+                    AttributePosition::Module,
+                    AttributePosition::Function,
+                    AttributePosition::Struct,
+                    AttributePosition::Constant,
+                ])
+                .collect()
             });
             match self {
                 Self::Allow => &ALLOW_POSITIONS,

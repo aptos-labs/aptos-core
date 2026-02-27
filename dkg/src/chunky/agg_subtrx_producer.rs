@@ -1,11 +1,7 @@
 // Copyright (c) Aptos Foundation
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
-use crate::{
-    chunky::types::{AggregatedSubtranscript, ChunkyDKGTranscriptRequest},
-    counters,
-    types::DKGMessage,
-};
+use crate::{chunky::types::ChunkyDKGTranscriptRequest, counters, types::DKGMessage};
 use anyhow::{anyhow, ensure, Context};
 use aptos_channels::aptos_channel;
 use aptos_consensus_types::common::Author;
@@ -19,8 +15,8 @@ use aptos_reliable_broadcast::{BroadcastStatus, ReliableBroadcast};
 use aptos_types::{
     dkg::{
         chunky_dkg::{
-            ChunkyDKGConfig, ChunkyDKGTranscript, ChunkySubtranscript, ChunkyTranscript,
-            DealerPublicKey,
+            AggregatedSubtranscript, ChunkyDKGConfig, ChunkyDKGTranscript, ChunkySubtranscript,
+            ChunkyTranscript, DealerPublicKey,
         },
         DKGTranscriptMetadata,
     },

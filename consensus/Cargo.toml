@@ -51,6 +51,7 @@ aptos-transaction-filters = { workspace = true }
 aptos-types = { workspace = true }
 aptos-validator-transaction-pool = { workspace = true }
 aptos-vm = { workspace = true }
+ark-std = { workspace = true }
 async-trait = { workspace = true }
 bcs = { workspace = true }
 byteorder = { workspace = true }
@@ -123,7 +124,7 @@ fuzzing = [
 failpoints = ["fail/failpoints"]
 
 [package.metadata.cargo-machete]
-ignored = ["serde_bytes"]
+ignored = ["serde_bytes", "ark-std"]
 
 [lints.clippy]
 unwrap_used = "deny"

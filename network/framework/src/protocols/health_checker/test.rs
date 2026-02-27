@@ -3,10 +3,9 @@
 
 use super::*;
 use crate::{
-    application::{interface::NetworkClient, storage::PeersAndMetadata},
+    application::{interface::NetworkClient, metadata::ConnectionState, storage::PeersAndMetadata},
     peer_manager::{
-        self, ConnectionRequest, ConnectionRequestSender, PeerManagerRequest,
-        PeerManagerRequestSender,
+        ConnectionRequest, ConnectionRequestSender, PeerManagerRequest, PeerManagerRequestSender,
     },
     protocols::{
         network::{NetworkSender, NewNetworkEvents, NewNetworkSender, ReceivedMessage},
@@ -33,7 +32,6 @@ struct TestHarness {
     peer_mgr_reqs_rx: aptos_channel::Receiver<(PeerId, ProtocolId), PeerManagerRequest>,
     peer_mgr_notifs_tx: aptos_channel::Sender<(PeerId, ProtocolId), ReceivedMessage>,
     connection_reqs_rx: aptos_channel::Receiver<PeerId, ConnectionRequest>,
-    connection_notifs_tx: tokio::sync::mpsc::Sender<ConnectionNotification>,
     peers_and_metadata: Arc<PeersAndMetadata>,
 }
 
@@ -49,7 +47,6 @@ impl TestHarness {
             aptos_channel::new(QueueStyle::FIFO, 1, None);
         let (peer_mgr_notifs_tx, peer_mgr_notifs_rx) =
             aptos_channel::new(QueueStyle::FIFO, 1, None);
-        let (connection_notifs_tx, connection_notifs_rx) = tokio::sync::mpsc::channel(10);
 
         let network_sender = NetworkSender::new(
             PeerManagerRequestSender::new(peer_mgr_reqs_tx),
@@ -66,7 +63,7 @@ impl TestHarness {
             peers_and_metadata.clone(),
         );
 
-        let mut health_checker = HealthChecker::new(
+        let health_checker = HealthChecker::new(
             network_context,
             mock_time.clone(),
             HealthCheckNetworkInterface::new(network_client, hc_network_rx),
@@ -74,7 +71,6 @@ impl TestHarness {
             PING_TIMEOUT,
             ping_failures_tolerated,
         );
-        health_checker.set_connection_source(connection_notifs_rx);
 
         (
             Self {
@@ -82,7 +78,6 @@ impl TestHarness {
                 peer_mgr_reqs_rx,
                 peer_mgr_notifs_tx,
                 connection_reqs_rx,
-                connection_notifs_tx,
                 peers_and_metadata,
             },
             health_checker,
@@ -169,18 +164,9 @@ impl TestHarness {
         res_tx.send(Ok(())).unwrap();
     }
 
-    async fn send_new_peer_notification(&mut self, peer_id: PeerId) {
+    /// Inserts a connected peer into PeersAndMetadata
+    fn insert_connected_peer(&self, peer_id: PeerId) {
         let network_context = NetworkContext::mock();
-        let notif = peer_manager::ConnectionNotification::NewPeer(
-            ConnectionMetadata::mock(peer_id),
-            network_context.network_id(),
-        );
-        self.connection_notifs_tx.send(notif).await.unwrap();
-
-        // hacky `yield` to let thread on other side run, fast enough to make the test not suck, long enough it should almost always work
-        tokio::time::sleep(Duration::from_millis(10)).await;
-
-        // Insert a new connection metadata into the peers and metadata
         let mut connection_metadata = ConnectionMetadata::mock(peer_id);
         connection_metadata.application_protocols =
             ProtocolIdSet::from_iter(vec![HealthCheckerRpc]);
@@ -190,6 +176,28 @@ impl TestHarness {
                 connection_metadata,
             )
             .unwrap();
+    }
+
+    /// Marks a peer as disconnecting in PeersAndMetadata so it no longer appears connected
+    fn disconnect_peer_in_metadata(&self, peer_id: PeerId) {
+        let network_context = NetworkContext::mock();
+        self.peers_and_metadata
+            .update_connection_state(
+                PeerNetworkId::new(network_context.network_id(), peer_id),
+                ConnectionState::Disconnecting,
+            )
+            .unwrap();
+    }
+
+    /// Inserts a new connected peer and triggers a ping to detect it
+    async fn send_new_peer_notification(&mut self, peer_id: PeerId) {
+        self.insert_connected_peer(peer_id);
+
+        // Trigger a timer tick to detect the new peer
+        self.trigger_ping().await;
+
+        // hacky `yield` to let thread on other side run, fast enough to make the test not suck, long enough it should almost always work
+        tokio::time::sleep(Duration::from_millis(10)).await;
     }
 }
 
@@ -336,4 +344,214 @@ async fn outbound_failure_strict() {
         harness.expect_disconnect(peer_id).await;
     };
     future::join(health_checker.start(), test).await;
+}
+
+#[tokio::test]
+async fn detect_peer_changes_no_peers() {
+    let (_harness, mut health_checker) = TestHarness::new_strict();
+
+    // Detect peer changes
+    health_checker.detect_peer_changes();
+
+    // Verify that there are no known or connected peers
+    assert!(health_checker.known_peers.is_empty());
+    assert!(health_checker
+        .network_interface
+        .connected_peers()
+        .is_empty());
+}
+
+#[tokio::test]
+async fn detect_peer_changes_new_peer_detected() {
+    let (harness, mut health_checker) = TestHarness::new_strict();
+
+    // Insert a new connected peer into the harness
+    let peer_id = PeerId::new([0x42; PeerId::LENGTH]);
+    harness.insert_connected_peer(peer_id);
+
+    // Detect peer changes
+    health_checker.detect_peer_changes();
+
+    // The new peer should be in known peers and have health data created
+    assert_eq!(health_checker.known_peers.len(), 1);
+    assert!(health_checker.known_peers.contains(&peer_id));
+    assert_eq!(health_checker.network_interface.connected_peers().len(), 1);
+    assert_eq!(
+        health_checker.network_interface.get_peer_failures(peer_id),
+        Some(0)
+    );
+}
+
+#[tokio::test]
+async fn detect_peer_changes_lost_peer_detected() {
+    let (harness, mut health_checker) = TestHarness::new_strict();
+
+    // First, detect the peer as new
+    let peer_id = PeerId::new([0x42; PeerId::LENGTH]);
+    harness.insert_connected_peer(peer_id);
+    health_checker.detect_peer_changes();
+    assert!(health_checker.known_peers.contains(&peer_id));
+
+    // Now disconnect the peer and detect again
+    harness.disconnect_peer_in_metadata(peer_id);
+    health_checker.detect_peer_changes();
+
+    // The peer should be removed from known peers and health data
+    assert!(health_checker.known_peers.is_empty());
+    assert!(health_checker
+        .network_interface
+        .connected_peers()
+        .is_empty());
+    assert_eq!(
+        health_checker.network_interface.get_peer_failures(peer_id),
+        None
+    );
+}
+
+#[tokio::test]
+async fn detect_peer_changes_multiple_new_peers() {
+    let (harness, mut health_checker) = TestHarness::new_strict();
+
+    // Insert multiple new connected peers into the harness
+    let peer_a = PeerId::new([0x01; PeerId::LENGTH]);
+    let peer_b = PeerId::new([0x02; PeerId::LENGTH]);
+    let peer_c = PeerId::new([0x03; PeerId::LENGTH]);
+    harness.insert_connected_peer(peer_a);
+    harness.insert_connected_peer(peer_b);
+    harness.insert_connected_peer(peer_c);
+
+    // Detect peer changes
+    health_checker.detect_peer_changes();
+
+    // All new peers should be in known peers and have health data created
+    assert_eq!(health_checker.known_peers.len(), 3);
+    assert!(health_checker.known_peers.contains(&peer_a));
+    assert!(health_checker.known_peers.contains(&peer_b));
+    assert!(health_checker.known_peers.contains(&peer_c));
+    assert_eq!(health_checker.network_interface.connected_peers().len(), 3);
+}
+
+#[tokio::test]
+async fn detect_peer_changes_simultaneous_new_and_lost() {
+    let (harness, mut health_checker) = TestHarness::new_strict();
+
+    // Start with peer_a and peer_b connected
+    let peer_a = PeerId::new([0x01; PeerId::LENGTH]);
+    let peer_b = PeerId::new([0x02; PeerId::LENGTH]);
+    harness.insert_connected_peer(peer_a);
+    harness.insert_connected_peer(peer_b);
+    health_checker.detect_peer_changes();
+    assert_eq!(health_checker.known_peers.len(), 2);
+
+    // Now disconnect peer_a and add peer_c
+    let peer_c = PeerId::new([0x03; PeerId::LENGTH]);
+    harness.disconnect_peer_in_metadata(peer_a);
+    harness.insert_connected_peer(peer_c);
+    health_checker.detect_peer_changes();
+
+    // peer_a should be gone, peer_b should remain, peer_c should be new
+    assert_eq!(health_checker.known_peers.len(), 2);
+    assert!(!health_checker.known_peers.contains(&peer_a));
+    assert!(health_checker.known_peers.contains(&peer_b));
+    assert!(health_checker.known_peers.contains(&peer_c));
+
+    // Health data should reflect the changes
+    assert_eq!(
+        health_checker.network_interface.get_peer_failures(peer_a),
+        None
+    );
+    assert_eq!(
+        health_checker.network_interface.get_peer_failures(peer_b),
+        Some(0)
+    );
+    assert_eq!(
+        health_checker.network_interface.get_peer_failures(peer_c),
+        Some(0)
+    );
+}
+
+#[tokio::test]
+async fn detect_peer_changes_stable_peers_preserve_health_data() {
+    let (harness, mut health_checker) = TestHarness::new_strict();
+
+    // Start with a peer connected
+    let peer_id = PeerId::new([0x42; PeerId::LENGTH]);
+    harness.insert_connected_peer(peer_id);
+    health_checker.detect_peer_changes();
+
+    // Simulate some failures for the peer
+    health_checker
+        .network_interface
+        .increment_peer_round_failure(peer_id, 0);
+    health_checker
+        .network_interface
+        .increment_peer_round_failure(peer_id, 0);
+    assert_eq!(
+        health_checker.network_interface.get_peer_failures(peer_id),
+        Some(2)
+    );
+
+    // Detect changes again with the same peer still connected
+    health_checker.detect_peer_changes();
+
+    // The peer should still be known and health data (failures) should be preserved
+    assert!(health_checker.known_peers.contains(&peer_id));
+    assert_eq!(
+        health_checker.network_interface.get_peer_failures(peer_id),
+        Some(2)
+    );
+}
+
+#[tokio::test]
+async fn detect_peer_changes_idempotent_when_no_changes() {
+    let (harness, mut health_checker) = TestHarness::new_strict();
+
+    // Start with a peer connected
+    let peer_id = PeerId::new([0x42; PeerId::LENGTH]);
+    harness.insert_connected_peer(peer_id);
+
+    // Detect peer changes multiple times
+    health_checker.detect_peer_changes();
+    health_checker.detect_peer_changes();
+    health_checker.detect_peer_changes();
+
+    // Should still have exactly one peer with zero failures
+    assert_eq!(health_checker.known_peers.len(), 1);
+    assert!(health_checker.known_peers.contains(&peer_id));
+    assert_eq!(
+        health_checker.network_interface.get_peer_failures(peer_id),
+        Some(0)
+    );
+}
+
+#[tokio::test]
+async fn detect_peer_changes_records_correct_round() {
+    let (harness, mut health_checker) = TestHarness::new_strict();
+
+    // Advance the round
+    health_checker.round = 5;
+
+    // Insert a new connected peer and detect changes to create health data for it
+    let peer_id = PeerId::new([0x42; PeerId::LENGTH]);
+    harness.insert_connected_peer(peer_id);
+    health_checker.detect_peer_changes();
+
+    // The health data should use the current round.
+    // Incrementing failures for an older round should be ignored.
+    health_checker
+        .network_interface
+        .increment_peer_round_failure(peer_id, 3);
+    assert_eq!(
+        health_checker.network_interface.get_peer_failures(peer_id),
+        Some(0)
+    );
+
+    // Incrementing failures for the current round should succeed.
+    health_checker
+        .network_interface
+        .increment_peer_round_failure(peer_id, 5);
+    assert_eq!(
+        health_checker.network_interface.get_peer_failures(peer_id),
+        Some(1)
+    );
 }

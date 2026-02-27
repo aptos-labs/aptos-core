@@ -16,7 +16,7 @@ use aptos_db_indexer_schemas::{
     schema::indexer_metadata::InternalIndexerMetadataSchema,
 };
 use aptos_logger::info;
-use aptos_schemadb::batch::SchemaBatch;
+use aptos_schemadb::{batch::SchemaBatch, ReadOptions};
 use aptos_storage_interface::{db_ensure as ensure, AptosDbError, Result};
 use aptos_types::transaction::{Transaction, Version};
 use std::sync::Arc;
@@ -111,10 +111,12 @@ impl TransactionPruner {
     ) -> Result<Vec<(Version, Transaction)>> {
         ensure!(end >= start, "{} must be >= {}", end, start);
 
+        let mut read_opts = ReadOptions::default();
+        read_opts.fill_cache(false);
         let mut iter = self
             .ledger_db
             .transaction_db_raw()
-            .iter::<TransactionSchema>()?;
+            .iter_with_opts::<TransactionSchema>(read_opts)?;
         iter.seek(&start)?;
 
         // The capacity is capped by the max number of txns we prune in a single batch. It's a

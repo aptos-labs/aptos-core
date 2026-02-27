@@ -24,6 +24,7 @@ pub mod rewrite_target;
 pub mod seqs_in_binop_checker;
 pub mod spec_checker;
 pub mod spec_rewriter;
+pub mod struct_usage_collector;
 pub mod unused_params_checker;
 
 /// Represents a pipeline of processors working on the global environment.

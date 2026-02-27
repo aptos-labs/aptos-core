@@ -1,7 +1,7 @@
 // Copyright (c) Aptos Foundation
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
-use aptos_framework::ReleaseBundle;
+use aptos_release_bundle::ReleaseBundle;
 use once_cell::sync::Lazy;
 
 pub mod aptos_framework_sdk_builder;

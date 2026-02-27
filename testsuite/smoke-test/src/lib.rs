@@ -18,6 +18,8 @@ mod consensus_key_rotation;
 #[cfg(test)]
 mod consensus_observer;
 #[cfg(test)]
+mod decryption;
+#[cfg(test)]
 mod execution;
 #[cfg(test)]
 mod full_nodes;
@@ -25,8 +27,6 @@ mod full_nodes;
 mod fullnode;
 #[cfg(test)]
 mod genesis;
-#[cfg(test)]
-mod indexer;
 #[cfg(test)]
 mod inspection_service;
 #[cfg(test)]
@@ -65,8 +65,6 @@ mod transaction_filter;
 mod txn_broadcast;
 #[cfg(test)]
 mod txn_emitter;
-#[cfg(test)]
-mod upgrade;
 
 #[cfg(test)]
 mod smoke_test_environment;

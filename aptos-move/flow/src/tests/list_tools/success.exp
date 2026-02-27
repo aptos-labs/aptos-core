@@ -1,0 +1,68 @@
+[
+  {
+    "name": "move_package_manifest",
+    "description": "Get information about the current Move package",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "title": "MovePackageManifestParams",
+      "type": "object",
+      "properties": {
+        "package_path": {
+          "description": "Path to the Move package directory.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "package_path"
+      ]
+    }
+  },
+  {
+    "name": "move_package_status",
+    "description": "Check a Move package for compilation errors and warnings",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "title": "MovePackageStatusParams",
+      "type": "object",
+      "properties": {
+        "package_path": {
+          "description": "Path to the Move package directory.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "package_path"
+      ]
+    }
+  },
+  {
+    "name": "move_package_verify",
+    "description": "Run the Move Prover on a package to formally verify specifications. An optional filter can restrict verification to a single module (`module_name`) or function (`module_name::function_name`).",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "title": "MovePackageVerifyParams",
+      "type": "object",
+      "properties": {
+        "package_path": {
+          "description": "Path to the Move package directory.",
+          "type": "string"
+        },
+        "filter": {
+          "description": "Optional filter: `module_name` or `module_name::function_name`.\nWhen omitted, all target modules are verified.",
+          "type": "string",
+          "nullable": true
+        },
+        "timeout": {
+          "description": "Solver timeout per verification condition, in seconds. Default: 40.",
+          "type": "integer",
+          "format": "uint",
+          "minimum": 0,
+          "nullable": true
+        }
+      },
+      "required": [
+        "package_path"
+      ]
+    }
+  }
+]

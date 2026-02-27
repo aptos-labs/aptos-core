@@ -1,0 +1,155 @@
+
+Diagnostics:
+warning: function `spec_helper` is unused. Remove it, or suppress warning with `#[test_only]` (if test-only), `#[verify_only]` (if verify-only), or `#[lint::skip(unused)]`.
+  ┌─ tests/checking/unused/harmless_false_positives/spec_usage.move:5:9
+  │
+5 │     fun spec_helper(): u64 {
+  │         ^^^^^^^^^^^
+
+warning: constant `SPEC_CONST` is unused. Remove it, or suppress warning with `#[test_only]` (if test-only), `#[verify_only]` (if verify-only), or `#[lint::skip(unused)]`.
+  ┌─ tests/checking/unused/harmless_false_positives/spec_usage.move:9:5
+  │
+9 │     const SPEC_CONST: u64 = 100;
+  │     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: struct `SpecStruct` is unused in current package. Remove it (if not published), or suppress warning with `#[test_only]` (if test-only), `#[verify_only]` (if verify-only), or `#[lint::skip(unused)]`.
+   ┌─ tests/checking/unused/harmless_false_positives/spec_usage.move:11:5
+   │
+11 │ ╭     struct SpecStruct has key {
+12 │ │         x: u64
+13 │ │     }
+   │ ╰─────^
+
+warning: constant `INVARIANT_BOUND` is unused. Remove it, or suppress warning with `#[test_only]` (if test-only), `#[verify_only]` (if verify-only), or `#[lint::skip(unused)]`.
+   ┌─ tests/checking/unused/harmless_false_positives/spec_usage.move:31:5
+   │
+31 │     const INVARIANT_BOUND: u64 = 1000;
+   │     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: constant `SPEC_FUN_CONST` is unused. Remove it, or suppress warning with `#[test_only]` (if test-only), `#[verify_only]` (if verify-only), or `#[lint::skip(unused)]`.
+   ┌─ tests/checking/unused/harmless_false_positives/spec_usage.move:48:5
+   │
+48 │     const SPEC_FUN_CONST: u64 = 50;
+   │     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: function `helper_for_spec` is unused. Remove it, or suppress warning with `#[test_only]` (if test-only), `#[verify_only]` (if verify-only), or `#[lint::skip(unused)]`.
+   ┌─ tests/checking/unused/harmless_false_positives/spec_usage.move:55:9
+   │
+55 │     fun helper_for_spec(): u64 {
+   │         ^^^^^^^^^^^^^^^
+
+// -- Model dump before first bytecode pipeline
+module 0x42::m {
+    spec {
+      invariant Implies(exists<0x42::m::SpecStruct>(0x42), Gt(select m::SpecStruct.x<0x42::m::SpecStruct>(global<0x42::m::SpecStruct>(0x42)), 0));
+    }
+
+    struct InvariantStruct {
+        value: u64,
+    }
+    spec {
+      invariant Lt(select m::InvariantStruct.value(), 1000);
+    }
+
+    struct SpecFunStruct {
+        data: u64,
+    }
+    struct SpecStruct {
+        x: u64,
+    }
+    public fun do_something(): u64 {
+        1
+    }
+    spec {
+      ensures Eq<u64>(result0(), Sub(m::$spec_helper(), 41));
+      ensures Lt(result0(), 100);
+    }
+
+    private fun helper_for_spec(): u64 {
+        999
+    }
+    public fun make_invariant_struct(): InvariantStruct {
+        pack m::InvariantStruct(10)
+    }
+    public fun make_spec_fun_struct(): SpecFunStruct {
+        pack m::SpecFunStruct(5)
+    }
+    spec {
+      ensures m::spec_validate(result0());
+    }
+
+    private fun spec_helper(): u64 {
+        42
+    }
+    public fun validated_operation(x: u64): u64 {
+        Mul<u64>(x, 2)
+    }
+    spec {
+      ensures Eq<u64>(result0(), Sub(Add(m::spec_compute($t0), $t0), 50));
+    }
+
+    spec fun spec_compute(x: u64): u64 {
+        Add(Add(x, 50), m::$helper_for_spec())
+    }
+    spec fun spec_validate(s: SpecFunStruct): bool {
+        Gt(select m::SpecFunStruct.data<0x42::m::SpecFunStruct>(s), 0)
+    }
+    spec fun $helper_for_spec(): u64 {
+        999
+    }
+    spec fun $spec_helper(): u64 {
+        42
+    }
+} // end 0x42::m
+
+// -- Sourcified model before first bytecode pipeline
+module 0x42::m {
+    struct InvariantStruct has drop {
+        value: u64,
+    }
+
+    spec InvariantStruct {
+        invariant value < 1000;
+    }
+
+    struct SpecFunStruct has drop {
+        data: u64,
+    }
+    struct SpecStruct has key {
+        x: u64,
+    }
+    public fun do_something(): u64 {
+        1
+    }
+
+    spec do_something(): u64 {
+        ensures result == spec_helper() - 41;
+        ensures result < 100;
+    }
+
+    fun helper_for_spec(): u64 {
+        999
+    }
+    public fun make_invariant_struct(): InvariantStruct {
+        InvariantStruct{value: 10}
+    }
+    public fun make_spec_fun_struct(): SpecFunStruct {
+        SpecFunStruct{data: 5}
+    }
+
+    spec make_spec_fun_struct(): SpecFunStruct {
+        ensures spec_validate(result);
+    }
+
+    fun spec_helper(): u64 {
+        42
+    }
+    public fun validated_operation(x: u64): u64 {
+        x * 2
+    }
+
+    spec validated_operation(x: u64): u64 {
+        ensures result == spec_compute(x) + x - 50;
+    }
+
+}

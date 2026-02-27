@@ -70,9 +70,7 @@ impl QueueItem {
                 BlockStage::SECRET_SHARING_ADD_DECISION,
             );
             let block = &self.blocks_mut()[offset];
-            if let Some(tx) = block.pipeline_tx().lock().as_mut() {
-                tx.secret_shared_key_tx.take().map(|tx| tx.send(Some(key)));
-            }
+            block.set_decryption_key(key);
             self.pending_secret_key_rounds.remove(&round);
         }
     }

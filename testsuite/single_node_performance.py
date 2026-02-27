@@ -103,11 +103,6 @@ else:
     BUILD_FLAG = "--release"
     BUILD_FOLDER = "target/release"
 
-if os.environ.get("PROD_DB_FLAGS"):
-    DB_CONFIG_FLAGS = ""
-else:
-    DB_CONFIG_FLAGS = "--enable-storage-sharding"
-
 if os.environ.get("DISABLE_FA_APT"):
     FEATURE_FLAGS = ""
     FA_MIGRATION_COMPLETE = False
@@ -682,7 +677,7 @@ with tempfile.TemporaryDirectory() as tmpdirname:
 
     execute_command(f"cargo build {BUILD_FLAG} --package aptos-executor-benchmark")
     print(f"Warmup - creating DB with {NUM_ACCOUNTS} accounts")
-    create_db_command = f"PUSH_METRICS_NAMESPACE=benchmark-create-db RUST_BACKTRACE=1 {BUILD_FOLDER}/aptos-executor-benchmark --block-executor-type aptos-vm-with-block-stm --block-size {MAX_BLOCK_SIZE} --execution-threads {NUMBER_OF_EXECUTION_THREADS} {DB_CONFIG_FLAGS} {DB_PRUNER_FLAGS} create-db {FEATURE_FLAGS} --data-dir {tmpdirname}/db --num-accounts {NUM_ACCOUNTS}"
+    create_db_command = f"PUSH_METRICS_NAMESPACE=benchmark-create-db RUST_BACKTRACE=1 {BUILD_FOLDER}/aptos-executor-benchmark --block-executor-type aptos-vm-with-block-stm --block-size {MAX_BLOCK_SIZE} --execution-threads {NUMBER_OF_EXECUTION_THREADS} {DB_PRUNER_FLAGS} create-db {FEATURE_FLAGS} --data-dir {tmpdirname}/db --num-accounts {NUM_ACCOUNTS}"
     output = execute_command(create_db_command)
 
     results = []
@@ -815,7 +810,7 @@ with tempfile.TemporaryDirectory() as tmpdirname:
         else:
             additional_dst_pool_accounts = 2 * MAX_BLOCK_SIZE * NUM_BLOCKS
 
-        common_command_suffix = f"{executor_type_str} {pipeline_extra_args_str} --block-size {cur_block_size} {DB_CONFIG_FLAGS} {DB_PRUNER_FLAGS} run-executor {FEATURE_FLAGS} {workload_args_str} --module-working-set-size {test.key.module_working_set_size} --main-signer-accounts {MAIN_SIGNER_ACCOUNTS} --additional-dst-pool-accounts {additional_dst_pool_accounts} --data-dir {tmpdirname}/db  --checkpoint-dir {tmpdirname}/cp"
+        common_command_suffix = f"{executor_type_str} {pipeline_extra_args_str} --block-size {cur_block_size} {DB_PRUNER_FLAGS} run-executor {FEATURE_FLAGS} {workload_args_str} --module-working-set-size {test.key.module_working_set_size} --main-signer-accounts {MAIN_SIGNER_ACCOUNTS} --additional-dst-pool-accounts {additional_dst_pool_accounts} --data-dir {tmpdirname}/db  --checkpoint-dir {tmpdirname}/cp"
 
         number_of_threads_results = {}
 

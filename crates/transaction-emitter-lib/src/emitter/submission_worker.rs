@@ -10,13 +10,14 @@ use crate::{
 };
 use aptos_crypto::HashValue;
 use aptos_logger::{sample, sample::SampleRate};
-use aptos_rest_client::Client as RestClient;
+use aptos_rest_client::{error::RestError, Client as RestClient, State};
 use aptos_sdk::{
     move_types::account_address::AccountAddress,
+    transaction_builder::EncryptionKeyState,
     types::{transaction::SignedTransaction, vm_status::StatusCode, LocalAccount},
 };
 use aptos_transaction_generator_lib::TransactionGenerator;
-use aptos_types::transaction::ReplayProtector;
+use aptos_types::{secret_sharing::EncryptionKey, transaction::ReplayProtector};
 use core::{
     cmp::{max, min},
     result::Result::{Err, Ok},
@@ -30,12 +31,37 @@ use rand::seq::IteratorRandom;
 use std::{
     borrow::Borrow,
     collections::{HashMap, HashSet},
-    sync::{atomic::AtomicU64, Arc},
+    sync::{atomic::AtomicU64, Arc, RwLock},
     time::Instant,
 };
 use tokio::time::{sleep, sleep_until};
 
 const ALLOWED_EARLY: Duration = Duration::from_micros(500);
+
+pub struct EncryptionKeyRotator {
+    state: Arc<RwLock<EncryptionKeyState>>,
+}
+
+impl EncryptionKeyRotator {
+    pub fn new(state: Arc<RwLock<EncryptionKeyState>>) -> Self {
+        Self { state }
+    }
+
+    pub fn observe_state(&self, state: &State) {
+        let epoch = state.epoch;
+        let mut guard = self.state.write().unwrap();
+        if epoch <= guard.epoch {
+            return;
+        }
+        guard.epoch = epoch;
+        if let Some(ref key_bytes) = state.encryption_key {
+            if let Ok(key) = bcs::from_bytes::<EncryptionKey>(key_bytes) {
+                guard.key = Some(key);
+                info!("Rotated encryption key for epoch {}", epoch);
+            }
+        }
+    }
+}
 
 pub struct SubmissionWorker {
     pub(crate) accounts: Vec<Arc<LocalAccount>>,
@@ -49,6 +75,7 @@ pub struct SubmissionWorker {
     start_sleep_duration: Duration,
     skip_latency_stats: bool,
     rng: ::rand::rngs::StdRng,
+    rotator: Option<Arc<EncryptionKeyRotator>>,
 }
 
 impl SubmissionWorker {
@@ -63,6 +90,7 @@ impl SubmissionWorker {
         start_sleep_duration: Duration,
         skip_latency_stats: bool,
         rng: ::rand::rngs::StdRng,
+        rotator: Option<Arc<EncryptionKeyRotator>>,
     ) -> Self {
         let accounts = accounts.into_iter().map(Arc::new).collect();
         Self {
@@ -76,6 +104,7 @@ impl SubmissionWorker {
             start_sleep_duration,
             skip_latency_stats,
             rng,
+            rotator,
         }
     }
 
@@ -147,6 +176,7 @@ impl SubmissionWorker {
 
                 let txn_offset_time = Arc::new(AtomicU64::new(0));
 
+                let rotator = self.rotator.clone();
                 join_all(
                     requests
                         .chunks(self.params.max_submit_batch_size)
@@ -157,6 +187,7 @@ impl SubmissionWorker {
                                 loop_start_time,
                                 txn_offset_time.clone(),
                                 loop_stats,
+                                rotator.as_deref(),
                             )
                         }),
                 )
@@ -486,12 +517,13 @@ fn count_committed_expired_stats(
     )
 }
 
-pub async fn submit_transactions(
+pub(crate) async fn submit_transactions(
     client: &RestClient,
     txns: &[SignedTransaction],
     loop_start_time: Instant,
     txn_offset_time: Arc<AtomicU64>,
     stats: &StatsAccumulator,
+    rotator: Option<&EncryptionKeyRotator>,
 ) {
     let cur_time = Instant::now();
     let offset = cur_time - loop_start_time;
@@ -508,6 +540,13 @@ pub async fn submit_transactions(
             stats
                 .failed_submission
                 .fetch_add(txns.len() as u64, Ordering::Relaxed);
+            if let Some(rotator) = rotator {
+                if let RestError::Api(ref api_err) = e {
+                    if let Some(ref state) = api_err.state {
+                        rotator.observe_state(state);
+                    }
+                }
+            }
             sample!(
                 SampleRate::Duration(Duration::from_secs(60)),
                 warn!(
@@ -518,6 +557,9 @@ pub async fn submit_transactions(
             );
         },
         Ok(v) => {
+            if let Some(rotator) = rotator {
+                rotator.observe_state(v.state());
+            }
             let failures = v.into_inner().transaction_failures;
 
             stats
@@ -580,5 +622,5 @@ pub async fn submit_transactions(
                 });
             }
         },
-    };
+    }
 }

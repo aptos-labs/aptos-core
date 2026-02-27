@@ -38,12 +38,11 @@ use aptos_block_executor::{
     txn_provider::{default::DefaultTxnProvider, TxnProvider},
 };
 use aptos_crypto::HashValue;
-use aptos_framework::natives::code::PublishRequest;
+use aptos_framework_natives::code::PublishRequest;
 use aptos_gas_algebra::{Gas, GasQuantity, NumBytes, Octa};
 use aptos_gas_meter::{AptosGasMeter, GasAlgebra, StandardGasAlgebra, StandardGasMeter};
 use aptos_gas_schedule::{
-    gas_feature_versions,
-    gas_feature_versions::{RELEASE_V1_10, RELEASE_V1_27, RELEASE_V1_38},
+    gas_feature_versions::{self, RELEASE_V1_10, RELEASE_V1_27, RELEASE_V1_38},
     AptosGasParameters, VMGasParameters,
 };
 use aptos_logger::{enabled, prelude::*, Level};
@@ -428,7 +427,9 @@ impl AptosVM {
                     // avoids unnecessary overhead in the common case.
                     !f.module().address().is_special()
                 },
-                Ok(TransactionExecutableRef::Empty) | Err(_) => false,
+                Ok(TransactionExecutableRef::Empty)
+                | Ok(TransactionExecutableRef::Encrypted)
+                | Err(_) => false,
             }
     }
 
@@ -1096,7 +1097,17 @@ impl AptosVM {
                     )
                 })?;
             },
-
+            TransactionExecutableRef::Encrypted => {
+                // If the executable is still `Encrypted` here, it means that decryption
+                // failed. The transaction is kept on chain as aborted.
+                // TODO(ibalajiarun): Figure out better status code
+                let status_code = StatusCode::ABORTED;
+                let vm_status = VMStatus::Executed;
+                let txn_status =
+                    TransactionStatus::Keep(ExecutionStatus::MiscellaneousError(Some(status_code)));
+                let vm_output = VMOutput::empty_with_status(txn_status);
+                return Ok((vm_status, vm_output));
+            },
             // Not reachable as this function should only be invoked for entry or script
             // transaction payload.
             _ => unreachable!("Only scripts or entry functions are executed"),
@@ -1256,7 +1267,19 @@ impl AptosVM {
             TransactionExecutableRef::Script(_) => {
                 let s = VMStatus::error(
                     StatusCode::FEATURE_UNDER_GATING,
-                    Some("Multisig transaction does not support script payload".to_string()),
+                    Some(
+                        "Multisig transaction does not support script or encrypted payload"
+                            .to_string(),
+                    ),
+                );
+                return Ok((s, discarded_output(StatusCode::FEATURE_UNDER_GATING)));
+            },
+            TransactionExecutableRef::Encrypted => {
+                // TODO(ibalajiarun): Revisit this. I think this should lead to an abort due to failed
+                // decryption.
+                let s = VMStatus::error(
+                    StatusCode::FEATURE_UNDER_GATING,
+                    Some("Multisig transaction does not support encrypted payload".to_string()),
                 );
                 return Ok((s, discarded_output(StatusCode::FEATURE_UNDER_GATING)));
             },
@@ -1953,6 +1976,15 @@ impl AptosVM {
             }
         }
 
+        if transaction.payload().is_encrypted_variant()
+            && !self.features().is_encrypted_transactions_enabled()
+        {
+            return Err(VMStatus::error(
+                StatusCode::FEATURE_UNDER_GATING,
+                Some("Encrypted transactions are not yet supported".to_string()),
+            ));
+        }
+
         // The prologue MUST be run AFTER any validation. Otherwise you may run prologue and hit
         // SEQUENCE_NUMBER_TOO_NEW if there is more than one transaction from the same sender and
         // end up skipping validation.
@@ -2140,6 +2172,18 @@ impl AptosVM {
                 &mut traversal_context,
             )
         });
+        if txn.is_encrypted_txn() {
+            // Log the VM execution result for encrypted transactions.
+            info!(
+                "Encrypted user transaction executed. txn_hash={}, sender={}, status={:?}, gas_used={}, output_status={:?}, vm_status={:?}",
+                txn.committed_hash(),
+                txn.sender(),
+                vm_status,
+                gas_usage,
+                output.status(),
+                vm_status,
+            );
+        }
 
         // Whether user transaction succeeded or failed (e.g., abort in Move code or running out
         // of gas in epilogue), we record the trace of all executed instructions.
@@ -3267,9 +3311,12 @@ impl VMValidator for AptosVM {
             }
         }
 
-        if transaction.payload().is_encrypted_variant() {
+        if transaction.payload().is_encrypted_variant()
+            && !self.features().is_encrypted_transactions_enabled()
+        {
             return VMValidatorResult::error(StatusCode::FEATURE_UNDER_GATING);
         }
+
         let txn = match transaction.check_signature() {
             Ok(t) => t,
             _ => {
@@ -3341,6 +3388,15 @@ impl VMValidator for AptosVM {
         };
 
         TRANSACTIONS_VALIDATED.inc_with(&[counter_label]);
+
+        if txn.is_encrypted_txn() {
+            info!(
+                "Encrypted transaction detected. txn_hash={}, sender={}, result={:?}",
+                txn.committed_hash(),
+                txn.sender(),
+                result,
+            );
+        }
 
         result
     }

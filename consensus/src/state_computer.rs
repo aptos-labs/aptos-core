@@ -44,9 +44,11 @@ struct MutableState {
     block_executor_onchain_config: BlockExecutorConfigFromOnchain,
     transaction_deduper: Arc<dyn TransactionDeduper>,
     is_randomness_enabled: bool,
+    is_decryption_enabled: bool,
     consensus_onchain_config: OnChainConsensusConfig,
     persisted_auxiliary_info_version: u8,
     network_sender: Arc<NetworkSender>,
+    secret_share_config: Option<SecretShareConfig>,
 }
 
 /// Basic communication with the Execution module;
@@ -59,7 +61,6 @@ pub struct ExecutionProxy {
     txn_filter_config: Arc<BlockTransactionFilterConfig>,
     state: RwLock<Option<MutableState>>,
     enable_pre_commit: bool,
-    secret_share_config: Option<SecretShareConfig>,
 }
 
 impl ExecutionProxy {
@@ -69,7 +70,6 @@ impl ExecutionProxy {
         state_sync_notifier: Arc<dyn ConsensusNotificationSender>,
         txn_filter_config: BlockTransactionFilterConfig,
         enable_pre_commit: bool,
-        secret_share_config: Option<SecretShareConfig>,
     ) -> Self {
         Self {
             executor,
@@ -79,7 +79,6 @@ impl ExecutionProxy {
             txn_filter_config: Arc::new(txn_filter_config),
             state: RwLock::new(None),
             enable_pre_commit,
-            secret_share_config,
         }
     }
 
@@ -91,9 +90,11 @@ impl ExecutionProxy {
             block_executor_onchain_config,
             transaction_deduper,
             is_randomness_enabled,
+            is_decryption_enabled,
             consensus_onchain_config,
             persisted_auxiliary_info_version,
             network_sender,
+            secret_share_config,
         } = self
             .state
             .read()
@@ -113,6 +114,7 @@ impl ExecutionProxy {
             validators,
             block_executor_onchain_config,
             is_randomness_enabled,
+            is_decryption_enabled,
             commit_signer,
             self.state_sync_notifier.clone(),
             payload_manager,
@@ -121,7 +123,7 @@ impl ExecutionProxy {
             &consensus_onchain_config,
             persisted_auxiliary_info_version,
             network_sender,
-            self.secret_share_config.clone(),
+            secret_share_config,
         )
     }
 }
@@ -240,9 +242,11 @@ impl StateComputer for ExecutionProxy {
         block_executor_onchain_config: BlockExecutorConfigFromOnchain,
         transaction_deduper: Arc<dyn TransactionDeduper>,
         randomness_enabled: bool,
+        decryption_enabled: bool,
         consensus_onchain_config: OnChainConsensusConfig,
         persisted_auxiliary_info_version: u8,
         network_sender: Arc<NetworkSender>,
+        secret_share_config: Option<SecretShareConfig>,
     ) {
         *self.state.write() = Some(MutableState {
             validators: epoch_state
@@ -255,9 +259,11 @@ impl StateComputer for ExecutionProxy {
             block_executor_onchain_config,
             transaction_deduper,
             is_randomness_enabled: randomness_enabled,
+            is_decryption_enabled: decryption_enabled,
             consensus_onchain_config,
             persisted_auxiliary_info_version,
             network_sender,
+            secret_share_config,
         });
     }
 

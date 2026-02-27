@@ -7,9 +7,9 @@ use crate::{
         missing_transcript_fetcher::MissingTranscriptFetcher,
         subtrx_cert_producer,
         types::{
-            AggregatedSubtranscript, CertifiedAggregatedSubtranscript, MissingTranscriptRequest,
-            MissingTranscriptResponse,
+            CertifiedAggregatedSubtranscript, MissingTranscriptRequest, MissingTranscriptResponse,
         },
+        TEST_DIGEST_KEY,
     },
     counters,
     network::{IncomingRpcRequest, NetworkSender, RpcResponseSender},
@@ -29,10 +29,10 @@ use aptos_reliable_broadcast::ReliableBroadcast;
 use aptos_types::{
     dkg::{
         chunky_dkg::{
-            CertifiedAggregatedChunkySubtranscript, ChunkyDKG, ChunkyDKGConfig,
-            ChunkyDKGSessionMetadata, ChunkyDKGSessionState, ChunkyDKGStartEvent,
-            ChunkyDKGTranscript, ChunkyInputSecret, ChunkySubtranscript, ChunkyTranscript,
-            DealerPrivateKey, DealerPublicKey,
+            AggregatedSubtranscript, CertifiedAggregatedChunkySubtranscript,
+            CertifiedChunkyDKGOutput, ChunkyDKG, ChunkyDKGConfig, ChunkyDKGSessionMetadata,
+            ChunkyDKGSessionState, ChunkyDKGStartEvent, ChunkyDKGTranscript, ChunkyInputSecret,
+            ChunkySubtranscript, ChunkyTranscript, DealerPrivateKey, DealerPublicKey,
         },
         DKGTranscriptMetadata,
     },
@@ -219,8 +219,7 @@ impl ChunkyDKGManager {
                         .map_err(|e|anyhow!("[ChunkyDKG] process_aggregated_subtranscript failed: {e}"))
                 },
                 certified_transcript = certified_subtrx_rx.select_next_some() => {
-                    self.process_certified_aggregated_subtranscript(certified_transcript)
-                        .await
+                    self.process_certified_aggregated_subtranscript(certified_transcript).await
                         .map_err(|e|anyhow!("[ChunkyDKG] process_certified_aggregated_subtranscript failed: {e}"))
                 },
                 dkg_txn = self.pull_notification_rx.select_next_some() => {
@@ -496,7 +495,13 @@ impl ChunkyDKGManager {
 
         counters::observe_chunky_dkg_stage(start_time, self.my_addr, "agg_subtrx_certified");
 
-        let txn = ValidatorTransaction::ChunkyDKGResult(CertifiedAggregatedChunkySubtranscript {
+        info!("deriving encryption key");
+        // Derive encryption key from subtranscript + DigestKey
+        let encryption_key_bytes =
+            aggregated_subtranscript.derive_encryption_key_bytes(TEST_DIGEST_KEY.tau_g2)?;
+
+        info!("forming ceritified_transcript struct");
+        let certified_transcript = CertifiedAggregatedChunkySubtranscript {
             metadata: DKGTranscriptMetadata {
                 epoch: self.epoch_state.epoch,
                 author: self.my_addr,
@@ -504,6 +509,11 @@ impl ChunkyDKGManager {
             transcript_bytes: bcs::to_bytes(&aggregated_subtranscript)
                 .map_err(|e| anyhow!("transcript serialization error: {e}"))?,
             signature: aggregate_signature,
+        };
+
+        let txn = ValidatorTransaction::ChunkyDKGResult(CertifiedChunkyDKGOutput {
+            certified_transcript,
+            encryption_key: encryption_key_bytes,
         });
         // TODO(ibalajiarun): Derive Topic from txn
         let vtxn_guard = self.vtxn_pool.put(

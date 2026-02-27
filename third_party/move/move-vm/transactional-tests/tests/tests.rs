@@ -107,6 +107,7 @@ static TEST_CONFIGS: Lazy<Vec<TestConfig>> = Lazy::new(|| {
                 "/stack_size/",
                 "/tracing/",
                 "/trusted_code/",
+                "/struct_api/",
             ],
             tracing: false,
         },

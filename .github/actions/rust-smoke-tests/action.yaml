@@ -20,10 +20,8 @@ runs:
       # Prebuild the aptos-node binary so that tests don't start before the node is built.
       # Also, prebuild the aptos-node binary as a separate step to avoid feature unification issues.
       # Note: --test-threads is intentionally set to reduce resource contention in ci jobs. Increasing this, increases job failures and retries.
-      run: cargo build --locked --package=aptos-node --features=failpoints,indexer --release && LOCAL_SWARM_NODE_RELEASE=1 cargo nextest run --release --profile smoke-test --package smoke-test
+      run: cargo build --locked --package=aptos-node --features=failpoints --release && LOCAL_SWARM_NODE_RELEASE=1 cargo nextest run --release --profile smoke-test --package smoke-test
       shell: bash
-      env:
-        INDEXER_DATABASE_URL: postgresql://postgres@localhost/postgres
 
     # We always try to create the artifact, but it only creates on flaky or failed smoke tests -- when the directories are empty.
     - name: Upload smoke test logs for failed and flaky tests

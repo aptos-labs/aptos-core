@@ -32,12 +32,12 @@ impl AptosVM {
                 session_id,
                 jwk_update,
             ),
-            ValidatorTransaction::ChunkyDKGResult(subtranscript) => self.process_chunky_dkg_result(
+            ValidatorTransaction::ChunkyDKGResult(dkg_output) => self.process_chunky_dkg_result(
                 resolver,
                 module_storage,
                 log_context,
                 session_id,
-                subtranscript,
+                dkg_output,
             ),
         }
     }

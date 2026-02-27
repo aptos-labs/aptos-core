@@ -664,7 +664,7 @@ fn commit_state_buffer(
         persisted_state.set(snapshot);
 
         let hot_state = persisted_state.get_hot_state();
-        hot_state.wait_for_commit(next_version);
+        hot_state.wait_for_merge(next_version);
 
         (0..NUM_STATE_SHARDS).into_par_iter().for_each(|shard_id| {
             let all_entries = hot_state.get_all_entries(shard_id);

@@ -149,7 +149,9 @@ pub fn run_move_prover(
         target_filter: target_filter.clone(),
         compiler_version,
         language_version,
+        with_bytecode: true, // prover needs FileFormat bytecode
     })?;
+    model.check_errors("in compilation")?;
     let _temp_dir_holder = if for_test {
         // Need to ensure a distinct output.bpl file for concurrent execution. In non-test
         // mode, we actually want to use the static output.bpl for debugging purposes

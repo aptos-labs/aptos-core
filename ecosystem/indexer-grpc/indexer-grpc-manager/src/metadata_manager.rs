@@ -134,6 +134,7 @@ pub(crate) struct MetadataManager {
     known_latest_version: AtomicU64,
     // NOTE: We assume the master is statically configured for now.
     master_address: Mutex<Option<GrpcAddress>>,
+    service_staleness_threshold: Duration,
 }
 
 impl MetadataManager {
@@ -143,6 +144,7 @@ impl MetadataManager {
         grpc_manager_addresses: Vec<GrpcAddress>,
         fullnode_addresses: Vec<GrpcAddress>,
         master_address: Option<GrpcAddress>,
+        service_staleness_threshold: Duration,
     ) -> Self {
         let grpc_managers = DashMap::new();
         for address in grpc_manager_addresses {
@@ -161,6 +163,7 @@ impl MetadataManager {
             historical_data_services: DashMap::new(),
             known_latest_version: AtomicU64::new(0),
             master_address: Mutex::new(master_address),
+            service_staleness_threshold,
         }
     }
 
@@ -219,7 +222,7 @@ impl MetadataManager {
                     let unreachable = live_data_service.recent_states.back().is_some_and(|s| {
                         Self::is_stale_timestamp(
                             s.timestamp.unwrap_or_default(),
-                            Duration::from_secs(60),
+                            self.service_staleness_threshold,
                         )
                     });
                     if unreachable {
@@ -256,7 +259,7 @@ impl MetadataManager {
                             .is_some_and(|s| {
                                 Self::is_stale_timestamp(
                                     s.timestamp.unwrap_or_default(),
-                                    Duration::from_secs(60),
+                                    self.service_staleness_threshold,
                                 )
                             });
                     if unreachable {

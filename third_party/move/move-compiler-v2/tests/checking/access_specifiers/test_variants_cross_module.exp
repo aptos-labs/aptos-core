@@ -1,0 +1,10 @@
+
+Diagnostics:
+error: Invalid operation: variant test on `inner::PrivateEnum` can only be done within module `0x42::inner`
+   ┌─ tests/checking/access_specifiers/test_variants_cross_module.move:16:16
+   │
+16 │     public fun test_private_enum(): bool {
+   │                ^^^^^^^^^^^^^^^^^
+17 │         let e = inner::get_enum();
+18 │         e is inner::PrivateEnum::A  // Error: testing private enum variant
+   │         -------------------------- variant test here

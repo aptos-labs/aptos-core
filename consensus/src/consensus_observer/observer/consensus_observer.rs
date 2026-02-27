@@ -1065,7 +1065,13 @@ impl ConsensusObserver {
     async fn wait_for_epoch_start(&mut self) {
         // Wait for the epoch state to update
         let block_payloads = self.observer_block_data.lock().get_block_payloads();
-        let (payload_manager, consensus_config, execution_config, randomness_config) = self
+        let (
+            payload_manager,
+            consensus_config,
+            execution_config,
+            randomness_config,
+            chunky_dkg_config,
+        ) = self
             .observer_epoch_state
             .wait_for_epoch_start(block_payloads)
             .await;
@@ -1092,6 +1098,8 @@ impl ConsensusObserver {
                 &consensus_config,
                 &execution_config,
                 &randomness_config,
+                &chunky_dkg_config,
+                None,
                 None,
                 None,
                 rand_msg_rx,

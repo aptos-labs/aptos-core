@@ -88,8 +88,9 @@ fn test_new_initialized_configs() {
     // Create the state sync driver factory
     let chunk_executor = Arc::new(ChunkExecutor::<AptosVMBlockExecutor>::new(db_rw.clone()));
     let metadata_storage = PersistentMetadataStorage::new(tmp_dir.path());
+    let runtime = aptos_runtimes::spawn_named_runtime("state-sync".into(), Some(2));
     let _ = DriverFactory::create_and_spawn_driver(
-        true,
+        Some(runtime.handle().clone()),
         &node_config,
         node_config.base.waypoint.waypoint(),
         db_rw,

@@ -15,11 +15,11 @@ use std::hint::black_box;
 /// - Commit
 /// - Open (prove an evaluation)
 /// - Verify (verify the opening proof)
-fn benchmark_commitment_scheme<CS: PolynomialCommitmentScheme>(c: &mut Criterion) {
+fn benchmark_commitment_scheme<PCS: PolynomialCommitmentScheme>(c: &mut Criterion) {
     // Create a benchmark group labeled with the scheme name
     let mut group = c.benchmark_group(format!(
         "commitment_scheme/{}",
-        String::from_utf8_lossy(CS::scheme_name())
+        String::from_utf8_lossy(PCS::scheme_name())
     ));
 
     // Polynomial sizes to benchmark (powers of two); corresponds to rounding up [1_000, 10_000, 100_000, 1_000_000]
@@ -37,7 +37,7 @@ fn benchmark_commitment_scheme<CS: PolynomialCommitmentScheme>(c: &mut Criterion
         // --------------------------------------------------
         // This is intentionally done once per size and excluded from benchmarks; becomes quite slow for large `num_vars`
         println!("Computing setup...");
-        let (ck, vk) = CS::setup(vec![1; num_vars as usize], &mut rng);
+        let (ck, vk) = PCS::setup(vec![1; num_vars as usize], &mut rng);
         println!("Finished setup");
 
         // ------------------------------------------
@@ -46,9 +46,9 @@ fn benchmark_commitment_scheme<CS: PolynomialCommitmentScheme>(c: &mut Criterion
         // Measures the cost of committing to a polynomial
         group.bench_with_input(BenchmarkId::new("commit", len), &len, |b, &_len| {
             b.iter_batched(
-                || random_poly::<CS, _>(&mut rng, len, 32),
+                || random_poly::<PCS, _>(&mut rng, len, Some(32)),
                 |poly| {
-                    CS::commit(&ck, poly, None);
+                    PCS::commit(&ck, poly, None);
                 },
                 BatchSize::LargeInput,
             );
@@ -61,15 +61,15 @@ fn benchmark_commitment_scheme<CS: PolynomialCommitmentScheme>(c: &mut Criterion
         group.bench_with_input(BenchmarkId::new("open", len), &len, |b, &_len| {
             b.iter_batched(
                 || {
-                    let poly = random_poly::<CS, _>(&mut rng, len, 32);
-                    let challenge = random_point::<CS, _>(&mut rng, num_vars);
+                    let poly = random_poly::<PCS, _>(&mut rng, len, Some(32));
+                    let challenge = random_point::<PCS, _>(&mut rng, num_vars);
                     let mut rng = rand::thread_rng();
-                    let r = CS::random_witness(&mut rng);
+                    let r = PCS::random_witness(&mut rng);
                     let trs = merlin::Transcript::new(b"pcs-bench");
                     (poly, challenge, Some(r), rng, trs)
                 },
                 |(poly, challenge, r, mut rng, mut trs)| {
-                    CS::open(&ck, poly, challenge, r, &mut rng, &mut trs);
+                    PCS::open(&ck, poly, challenge, r, &mut rng, &mut trs);
                 },
                 BatchSize::LargeInput,
             );
@@ -81,14 +81,14 @@ fn benchmark_commitment_scheme<CS: PolynomialCommitmentScheme>(c: &mut Criterion
         group.bench_with_input(BenchmarkId::new("verify", len), &len, |b, &_len| {
             b.iter_batched(
                 || {
-                    let poly = random_poly::<CS, _>(&mut rng, len, 32);
-                    let challenge = random_point::<CS, _>(&mut rng, num_vars);
-                    let val = CS::evaluate_point(&poly, &challenge);
-                    let com = CS::commit(&ck, poly.clone(), None);
+                    let poly = random_poly::<PCS, _>(&mut rng, len, Some(32));
+                    let challenge = random_point::<PCS, _>(&mut rng, num_vars);
+                    let val = PCS::evaluate_point(&poly, &challenge);
+                    let com = PCS::commit(&ck, poly.clone(), None);
                     let mut rng = rand::thread_rng();
-                    let r = CS::random_witness(&mut rng);
+                    let r = PCS::random_witness(&mut rng);
                     let mut trs = merlin::Transcript::new(b"pcs-bench");
-                    let proof = CS::open(
+                    let proof = PCS::open(
                         &ck,
                         poly.clone(),
                         challenge.clone(),
@@ -99,7 +99,8 @@ fn benchmark_commitment_scheme<CS: PolynomialCommitmentScheme>(c: &mut Criterion
                     (challenge, val, com, proof, trs)
                 },
                 |(challenge, val, com, proof, mut trs)| {
-                    let _ = CS::verify(black_box(&vk), com, challenge, val, proof, &mut trs);
+                    let _ =
+                        PCS::verify(black_box(&vk), com, challenge, val, proof, &mut trs, false);
                 },
                 BatchSize::LargeInput,
             );

@@ -260,7 +260,17 @@ fn test_new_genesis() {
                 new_block_event_key(),
                 0,
                 TypeTag::Struct(Box::new(NewBlockEvent::struct_tag())),
-                vec![],
+                bcs::to_bytes(&NewBlockEvent::new(
+                    AccountAddress::ZERO,
+                    0,      /* epoch */
+                    0,      /* round */
+                    0,      /* height */
+                    vec![], /* previous_block_votes_bitvec */
+                    AccountAddress::ZERO,
+                    vec![], /* failed_proposer_indices */
+                    0,      /* timestamp */
+                ))
+                .unwrap(),
             )
             .expect("Should always be able to create a new block event"),
         ],
