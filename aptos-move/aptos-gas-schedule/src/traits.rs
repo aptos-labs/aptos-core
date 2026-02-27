@@ -22,6 +22,16 @@ pub trait ToOnChainGasSchedule {
     fn to_on_chain_gas_schedule(&self, feature_version: u64) -> Vec<(String, u64)>;
 }
 
+/// Constructs an initial gas parameter from a raw `u64`, applying a multiplier where appropriate.
+///
+/// Implemented for all gas parameter types used in this crate:
+/// - Gas cost types apply [`crate::scaling::GAS_COST_MULTIPLIER`].
+/// - Storage fee types apply [`crate::scaling::STORAGE_FEE_MULTIPLIER`].
+/// - Limit, quota, and unit-conversion types pass the value through unchanged.
+pub trait InitialGasParam: Sized {
+    fn from_raw(raw: u64) -> Self;
+}
+
 /// A trait for defining an initial value to be used in the genesis.
 pub trait InitialGasSchedule: Sized {
     /// Returns the initial value of this type, which is used in the genesis.

@@ -27,9 +27,12 @@
 //! which can be then used in gas expressions once imported.
 
 mod gas_schedule;
+mod scaling;
 mod traits;
 mod ver;
 
 pub use gas_schedule::*;
-pub use traits::{FromOnChainGasSchedule, InitialGasSchedule, ToOnChainGasSchedule};
+pub use traits::{
+    FromOnChainGasSchedule, InitialGasParam, InitialGasSchedule, ToOnChainGasSchedule,
+};
 pub use ver::{gas_feature_versions, LATEST_GAS_FEATURE_VERSION};
