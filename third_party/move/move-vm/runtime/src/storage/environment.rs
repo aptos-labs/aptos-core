@@ -310,7 +310,7 @@ impl RuntimeEnvironment {
 
     /// Returns the type tag cache used by this environment to store already constructed struct
     /// tags.
-    pub(crate) fn ty_tag_cache(&self) -> &TypeTagCache {
+    pub fn ty_tag_cache(&self) -> &TypeTagCache {
         &self.ty_tag_cache
     }
 
