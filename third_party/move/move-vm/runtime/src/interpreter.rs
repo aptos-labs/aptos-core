@@ -2238,7 +2238,7 @@ impl Frame {
                     Instruction::LdConst(idx) => {
                         let constant = self.constant_at(*idx);
                         let num_nodes = if self.ty_builder.check_depth_on_type_counts_v2 {
-                            let (num_nodes, depth) = constant.type_.num_nodes_with_depth();
+                            let (num_nodes, depth) = constant.type_.num_nodes_with_max_depth();
                             self.ty_builder
                                 .check_final_size_and_depth(num_nodes as u64, depth as u64)?;
                             num_nodes

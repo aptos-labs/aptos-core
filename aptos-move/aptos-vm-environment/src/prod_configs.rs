@@ -130,7 +130,7 @@ pub fn aptos_prod_ty_builder(
             check_depth_on_type_counts_v2,
         )
     } else {
-        aptos_default_ty_builder(check_depth_on_type_counts_v2)
+        aptos_default_ty_builder(false)
     }
 }
 

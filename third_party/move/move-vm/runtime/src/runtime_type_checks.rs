@@ -144,6 +144,9 @@ pub(crate) fn check_function_type_count_and_depth(
     func: &LoadedFunction,
     mask: ClosureMask,
 ) -> PartialVMResult<()> {
+    // Creates function type which implicitly performs count and depth checks via the TypeBuilder,
+    // and then throws away the created type. The TypeBuilder enforces size and depth limits during
+    // type construction, so any violations will be caught and returned as errors.
     // Abilities are not important for the depth / size checks.
     create_function_type(ty_builder, func, mask, AbilitySet::PUBLIC_FUNCTIONS)?;
     Ok(())

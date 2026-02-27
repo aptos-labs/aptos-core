@@ -866,7 +866,7 @@ impl Type {
     ///      Its depth is 2.
     ///   - `Foo<u64, Bar<u8, bool>>` has 5 nodes with depth of 3.
     #[cfg_attr(feature = "force-inline", inline(always))]
-    pub fn num_nodes_with_depth(&self) -> (usize, usize) {
+    pub fn num_nodes_with_max_depth(&self) -> (usize, usize) {
         self.preorder_traversal_with_depth()
             .fold((0, 0), |(count, max_depth), (_, depth)| {
                 (count + 1, max_depth.max(depth))
@@ -896,7 +896,7 @@ impl Type {
                                 idx
                             ))
                         })?;
-                        *entry.insert(ty.num_nodes_with_depth())
+                        *entry.insert(ty.num_nodes_with_max_depth())
                     },
                 })
             };
@@ -1013,7 +1013,7 @@ pub struct TypeBuilder {
     max_ty_size: u64,
     // Maximum depth (in terms of number of nodes) a fully-instantiated type has.
     max_ty_depth: u64,
-    // Gates changes to type construction algorthm:
+    // Gates changes to type construction algorithm:
     //   - Reference nodes are not counted towards the final node count and depth.
     pub check_depth_on_type_counts_v2: bool,
     ref_ty_count_decrement: u64,

@@ -1331,7 +1331,7 @@ impl SignatureToken {
         self.preorder_traversal().count()
     }
 
-    pub fn num_nodes_with_depth(&self) -> (usize, usize) {
+    pub fn num_nodes_with_max_depth(&self) -> (usize, usize) {
         self.preorder_traversal_with_depth()
             .fold((0, 0), |(count, max_depth), (_, depth)| {
                 (count + 1, max_depth.max(depth))

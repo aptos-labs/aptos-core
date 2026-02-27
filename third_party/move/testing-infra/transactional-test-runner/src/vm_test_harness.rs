@@ -497,6 +497,10 @@ impl SimpleVMTestAdapter<'_> {
                 let trace = logger.finish();
                 let replay_result = TypeChecker::new(code_storage).replay(&trace);
                 if let Err(err) = &replay_result {
+                    // Replay validates that the execution trace is well-typed. If replay fails,
+                    // it should only be due to invariant violations (e.g., type mismatches in the trace).
+                    // Any other error type indicates an unexpected failure in the replay mechanism itself,
+                    // which we want to catch immediately during testing.
                     if err.status_type() != StatusType::InvariantViolation {
                         panic!(
                             "Replay should never fail with non-invariant violation: {:?}",
