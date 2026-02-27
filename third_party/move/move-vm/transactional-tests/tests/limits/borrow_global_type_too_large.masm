@@ -35,8 +35,8 @@ public fun entry_above_limit()
     pop
     ret
 
-//# run 0x22::test::entry_below_limit --signers 0x22
+//# run --verbose 0x22::test::entry_below_limit --signers 0x22
 
-//# run 0x22::test::entry_at_limit --signers 0x22
+//# run --verbose 0x22::test::entry_at_limit --signers 0x22
 
-//# run 0x22::test::entry_above_limit
+//# run --verbose 0x22::test::entry_above_limit

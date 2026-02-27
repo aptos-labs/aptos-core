@@ -167,6 +167,12 @@ const SEPARATE_BASELINE: &[&str] = &[
     "/trusted_code/",
 ];
 
+/// Mapping of config names to canonical baseline names.
+///
+/// When a config name appears as a key here, the corresponding value (canonical baseline)
+/// will be used instead. This allows multiple configs to share the same baseline file.
+const SAME_BASELINE: &[(&str, &str)] = &[("async-paranoid", "paranoid")];
+
 fn get_config_by_name(name: &str) -> TestConfig {
     TEST_CONFIGS
         .iter()
@@ -175,10 +181,23 @@ fn get_config_by_name(name: &str) -> TestConfig {
         .unwrap_or_else(|| panic!("undeclared test config `{}`", name))
 }
 
+/// Resolves the baseline config name for a given config.
+///
+/// If the config is in SAME_BASELINE, returns the canonical baseline name.
+/// Otherwise, returns the original config name.
+fn resolve_baseline_config(config_name: &str) -> &str {
+    SAME_BASELINE
+        .iter()
+        .find(|(src, _)| *src == config_name)
+        .map(|(_, canonical)| *canonical)
+        .unwrap_or(config_name)
+}
+
 fn run(path: &Path, config: TestConfig) -> datatest_stable::Result<()> {
     let p = path.to_str().unwrap_or_default();
     let exp_suffix = if SEPARATE_BASELINE.iter().any(|s| p.contains(s)) {
-        Some(format!("{}.exp", config.name))
+        let baseline_config = resolve_baseline_config(config.name);
+        Some(format!("{}.exp", baseline_config))
     } else {
         None
     };

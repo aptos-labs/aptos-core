@@ -1,3 +1,0 @@
-processed 2 tasks
-task 0 lines 1-11:  publish [module 0x22::test]
-task 1 lines 13-13:  run --verbose 0x22::test::entry

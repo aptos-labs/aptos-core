@@ -1,5 +1,0 @@
-processed 4 tasks
-task 0 lines 1-5:  publish [module 0x66::incompatible_function_ability_since_public]
-task 1 lines 7-11:  publish --verbose [module 0x66::incompatible_function_ability_since_public]
-task 2 lines 13-17:  publish --verbose [module 0x66::incompatible_function_ability2_since_public]
-task 3 lines 19-23:  publish --verbose [module 0x66::incompatible_function_ability2_since_public]

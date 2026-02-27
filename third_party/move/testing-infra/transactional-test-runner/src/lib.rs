@@ -5,6 +5,7 @@
 #![forbid(unsafe_code)]
 
 pub mod framework;
+pub mod pattern_matcher;
 pub mod tasks;
 pub mod templates;
 #[cfg(feature = "fuzzing")]

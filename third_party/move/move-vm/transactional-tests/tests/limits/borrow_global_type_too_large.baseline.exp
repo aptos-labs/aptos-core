@@ -1,12 +1,14 @@
 processed 4 tasks
 task 0 lines 1-36:  publish [module 0x22::test]
-task 1 lines 38-38:  run 0x22::test::entry_below_limit --signers 0x22
-task 2 lines 40-40:  run 0x22::test::entry_at_limit --signers 0x22
-task 3 lines 42-42:  run 0x22::test::entry_above_limit
+task 1 lines 38-38:  run --verbose 0x22::test::entry_below_limit --signers 0x22
+task 2 lines 40-40:  run --verbose 0x22::test::entry_at_limit --signers 0x22
+task 3 lines 42-42:  run --verbose 0x22::test::entry_above_limit
 Error: Function execution failed with VMError: {
+    message: Type depth is larger than maximum 20.Failed to instantiate a type vector<vector<vector<vector<vector<vector<vector<vector<vector<vector<vector<vector<vector<vector<vector<vector<vector<vector<vector<u8>>>>>>>>>>>>>>>>>>> with type arguments [],
     major_status: VM_MAX_TYPE_DEPTH_REACHED,
     sub_status: None,
     location: 0x22::test,
     indices: [],
     offsets: [(FunctionDefinitionIndex(2), 1)],
+    exec_state: Some(ExecutionState { stack_trace: [] }),
 }

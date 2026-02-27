@@ -1,7 +1,0 @@
-processed 4 tasks
-task 0 lines 1-7:  publish [module 0x3::trusted]
-task 1 lines 9-29:  publish [module 0x33::untrusted]
-task 2 lines 32-32:  run --verbose 0x33::untrusted::sum_10_20_30
-return values: 60
-task 3 lines 34-34:  run --verbose 0x33::untrusted::sum_10_20_30_closure
-return values: 60

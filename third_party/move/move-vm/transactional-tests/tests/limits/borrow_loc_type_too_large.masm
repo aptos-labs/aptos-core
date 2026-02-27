@@ -40,8 +40,8 @@ public fun entry_above_limit()
     pop
     ret
 
-//# run 0x22::test::entry_below_limit
+//# run --verbose 0x22::test::entry_below_limit
 
-//# run 0x22::test::entry_at_limit
+//# run --verbose 0x22::test::entry_at_limit
 
-//# run 0x23::test::entry_above_limit
+//# run --verbose 0x23::test::entry_above_limit

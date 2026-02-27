@@ -5,6 +5,7 @@
 #![forbid(unsafe_code)]
 
 use crate::{
+    pattern_matcher,
     tasks::{
         taskify, InitCommand, PrintBytecodeCommand, PrintBytecodeInputChoice, PublishCommand,
         RunCommand, SyntaxChoice, TaskCommand, TaskInput, ViewCommand,
@@ -1177,7 +1178,7 @@ fn handle_expected_output(
         .unwrap()
         .replace("\r\n", "\n")
         .replace('\r', "\n");
-    if output != expected_output {
+    if !pattern_matcher::output_matches(output, &expected_output) {
         let msg = format!(
             "Expected errors differ from actual errors (for `{}`):\n{}",
             test_path.display(),

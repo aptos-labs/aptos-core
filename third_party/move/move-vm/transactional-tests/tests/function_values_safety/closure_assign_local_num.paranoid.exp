@@ -9,7 +9,7 @@ Error: Script execution failed with VMError: {
     location: script,
     indices: [],
     offsets: [(FunctionDefinitionIndex(0), 3)],
-    exec_state: Some(ExecutionState { stack_trace: [] }),
+    exec_state: [[.*]],
 }
 task 3 lines 67-79:  publish [module 0x66::helpers_u8_u16]
 task 4 lines 81-101:  run --verbose [script]
@@ -21,7 +21,7 @@ Error: Script execution failed with VMError: {
     location: script,
     indices: [],
     offsets: [(FunctionDefinitionIndex(0), 3)],
-    exec_state: Some(ExecutionState { stack_trace: [] }),
+    exec_state: [[.*]],
 }
 task 6 lines 130-142:  publish [module 0x66::helpers_u8_u32]
 task 7 lines 144-164:  run --verbose [script]
@@ -33,7 +33,7 @@ Error: Script execution failed with VMError: {
     location: script,
     indices: [],
     offsets: [(FunctionDefinitionIndex(0), 3)],
-    exec_state: Some(ExecutionState { stack_trace: [] }),
+    exec_state: [[.*]],
 }
 task 9 lines 193-205:  publish [module 0x66::helpers_u8_u64]
 task 10 lines 207-227:  run --verbose [script]
@@ -45,7 +45,7 @@ Error: Script execution failed with VMError: {
     location: script,
     indices: [],
     offsets: [(FunctionDefinitionIndex(0), 3)],
-    exec_state: Some(ExecutionState { stack_trace: [] }),
+    exec_state: [[.*]],
 }
 task 12 lines 256-268:  publish [module 0x66::helpers_u8_u128]
 task 13 lines 270-290:  run --verbose [script]
@@ -57,7 +57,7 @@ Error: Script execution failed with VMError: {
     location: script,
     indices: [],
     offsets: [(FunctionDefinitionIndex(0), 3)],
-    exec_state: Some(ExecutionState { stack_trace: [] }),
+    exec_state: [[.*]],
 }
 task 15 lines 319-331:  publish [module 0x66::helpers_u8_u256]
 task 16 lines 333-353:  run --verbose [script]
@@ -69,7 +69,7 @@ Error: Script execution failed with VMError: {
     location: script,
     indices: [],
     offsets: [(FunctionDefinitionIndex(0), 3)],
-    exec_state: Some(ExecutionState { stack_trace: [] }),
+    exec_state: [[.*]],
 }
 task 18 lines 384-396:  publish [module 0x66::helpers_u16_u8]
 task 19 lines 398-418:  run --verbose [script]
@@ -81,7 +81,7 @@ Error: Script execution failed with VMError: {
     location: script,
     indices: [],
     offsets: [(FunctionDefinitionIndex(0), 3)],
-    exec_state: Some(ExecutionState { stack_trace: [] }),
+    exec_state: [[.*]],
 }
 task 21 lines 447-459:  publish [module 0x66::helpers_u16_u16]
 task 22 lines 461-481:  run --verbose [script]
@@ -93,7 +93,7 @@ Error: Script execution failed with VMError: {
     location: script,
     indices: [],
     offsets: [(FunctionDefinitionIndex(0), 3)],
-    exec_state: Some(ExecutionState { stack_trace: [] }),
+    exec_state: [[.*]],
 }
 task 24 lines 510-522:  publish [module 0x66::helpers_u16_u32]
 task 25 lines 524-544:  run --verbose [script]
@@ -105,7 +105,7 @@ Error: Script execution failed with VMError: {
     location: script,
     indices: [],
     offsets: [(FunctionDefinitionIndex(0), 3)],
-    exec_state: Some(ExecutionState { stack_trace: [] }),
+    exec_state: [[.*]],
 }
 task 27 lines 573-585:  publish [module 0x66::helpers_u16_u64]
 task 28 lines 587-607:  run --verbose [script]
@@ -117,7 +117,7 @@ Error: Script execution failed with VMError: {
     location: script,
     indices: [],
     offsets: [(FunctionDefinitionIndex(0), 3)],
-    exec_state: Some(ExecutionState { stack_trace: [] }),
+    exec_state: [[.*]],
 }
 task 30 lines 636-648:  publish [module 0x66::helpers_u16_u128]
 task 31 lines 650-670:  run --verbose [script]
@@ -129,7 +129,7 @@ Error: Script execution failed with VMError: {
     location: script,
     indices: [],
     offsets: [(FunctionDefinitionIndex(0), 3)],
-    exec_state: Some(ExecutionState { stack_trace: [] }),
+    exec_state: [[.*]],
 }
 task 33 lines 699-711:  publish [module 0x66::helpers_u16_u256]
 task 34 lines 713-733:  run --verbose [script]
@@ -141,7 +141,7 @@ Error: Script execution failed with VMError: {
     location: script,
     indices: [],
     offsets: [(FunctionDefinitionIndex(0), 3)],
-    exec_state: Some(ExecutionState { stack_trace: [] }),
+    exec_state: [[.*]],
 }
 task 36 lines 764-776:  publish [module 0x66::helpers_u32_u8]
 task 37 lines 778-798:  run --verbose [script]
@@ -153,7 +153,7 @@ Error: Script execution failed with VMError: {
     location: script,
     indices: [],
     offsets: [(FunctionDefinitionIndex(0), 3)],
-    exec_state: Some(ExecutionState { stack_trace: [] }),
+    exec_state: [[.*]],
 }
 task 39 lines 827-839:  publish [module 0x66::helpers_u32_u16]
 task 40 lines 841-861:  run --verbose [script]
@@ -165,7 +165,7 @@ Error: Script execution failed with VMError: {
     location: script,
     indices: [],
     offsets: [(FunctionDefinitionIndex(0), 3)],
-    exec_state: Some(ExecutionState { stack_trace: [] }),
+    exec_state: [[.*]],
 }
 task 42 lines 890-902:  publish [module 0x66::helpers_u32_u32]
 task 43 lines 904-924:  run --verbose [script]
@@ -177,7 +177,7 @@ Error: Script execution failed with VMError: {
     location: script,
     indices: [],
     offsets: [(FunctionDefinitionIndex(0), 3)],
-    exec_state: Some(ExecutionState { stack_trace: [] }),
+    exec_state: [[.*]],
 }
 task 45 lines 953-965:  publish [module 0x66::helpers_u32_u64]
 task 46 lines 967-987:  run --verbose [script]
@@ -189,7 +189,7 @@ Error: Script execution failed with VMError: {
     location: script,
     indices: [],
     offsets: [(FunctionDefinitionIndex(0), 3)],
-    exec_state: Some(ExecutionState { stack_trace: [] }),
+    exec_state: [[.*]],
 }
 task 48 lines 1016-1028:  publish [module 0x66::helpers_u32_u128]
 task 49 lines 1030-1050:  run --verbose [script]
@@ -201,7 +201,7 @@ Error: Script execution failed with VMError: {
     location: script,
     indices: [],
     offsets: [(FunctionDefinitionIndex(0), 3)],
-    exec_state: Some(ExecutionState { stack_trace: [] }),
+    exec_state: [[.*]],
 }
 task 51 lines 1079-1091:  publish [module 0x66::helpers_u32_u256]
 task 52 lines 1093-1113:  run --verbose [script]
@@ -213,7 +213,7 @@ Error: Script execution failed with VMError: {
     location: script,
     indices: [],
     offsets: [(FunctionDefinitionIndex(0), 3)],
-    exec_state: Some(ExecutionState { stack_trace: [] }),
+    exec_state: [[.*]],
 }
 task 54 lines 1144-1156:  publish [module 0x66::helpers_u64_u8]
 task 55 lines 1158-1178:  run --verbose [script]
@@ -225,7 +225,7 @@ Error: Script execution failed with VMError: {
     location: script,
     indices: [],
     offsets: [(FunctionDefinitionIndex(0), 3)],
-    exec_state: Some(ExecutionState { stack_trace: [] }),
+    exec_state: [[.*]],
 }
 task 57 lines 1207-1219:  publish [module 0x66::helpers_u64_u16]
 task 58 lines 1221-1241:  run --verbose [script]
@@ -237,7 +237,7 @@ Error: Script execution failed with VMError: {
     location: script,
     indices: [],
     offsets: [(FunctionDefinitionIndex(0), 3)],
-    exec_state: Some(ExecutionState { stack_trace: [] }),
+    exec_state: [[.*]],
 }
 task 60 lines 1270-1282:  publish [module 0x66::helpers_u64_u32]
 task 61 lines 1284-1304:  run --verbose [script]
@@ -249,7 +249,7 @@ Error: Script execution failed with VMError: {
     location: script,
     indices: [],
     offsets: [(FunctionDefinitionIndex(0), 3)],
-    exec_state: Some(ExecutionState { stack_trace: [] }),
+    exec_state: [[.*]],
 }
 task 63 lines 1333-1345:  publish [module 0x66::helpers_u64_u64]
 task 64 lines 1347-1367:  run --verbose [script]
@@ -261,7 +261,7 @@ Error: Script execution failed with VMError: {
     location: script,
     indices: [],
     offsets: [(FunctionDefinitionIndex(0), 3)],
-    exec_state: Some(ExecutionState { stack_trace: [] }),
+    exec_state: [[.*]],
 }
 task 66 lines 1396-1408:  publish [module 0x66::helpers_u64_u128]
 task 67 lines 1410-1430:  run --verbose [script]
@@ -273,7 +273,7 @@ Error: Script execution failed with VMError: {
     location: script,
     indices: [],
     offsets: [(FunctionDefinitionIndex(0), 3)],
-    exec_state: Some(ExecutionState { stack_trace: [] }),
+    exec_state: [[.*]],
 }
 task 69 lines 1459-1471:  publish [module 0x66::helpers_u64_u256]
 task 70 lines 1473-1493:  run --verbose [script]
@@ -285,7 +285,7 @@ Error: Script execution failed with VMError: {
     location: script,
     indices: [],
     offsets: [(FunctionDefinitionIndex(0), 3)],
-    exec_state: Some(ExecutionState { stack_trace: [] }),
+    exec_state: [[.*]],
 }
 task 72 lines 1524-1536:  publish [module 0x66::helpers_u128_u8]
 task 73 lines 1538-1558:  run --verbose [script]
@@ -297,7 +297,7 @@ Error: Script execution failed with VMError: {
     location: script,
     indices: [],
     offsets: [(FunctionDefinitionIndex(0), 3)],
-    exec_state: Some(ExecutionState { stack_trace: [] }),
+    exec_state: [[.*]],
 }
 task 75 lines 1587-1599:  publish [module 0x66::helpers_u128_u16]
 task 76 lines 1601-1621:  run --verbose [script]
@@ -309,7 +309,7 @@ Error: Script execution failed with VMError: {
     location: script,
     indices: [],
     offsets: [(FunctionDefinitionIndex(0), 3)],
-    exec_state: Some(ExecutionState { stack_trace: [] }),
+    exec_state: [[.*]],
 }
 task 78 lines 1650-1662:  publish [module 0x66::helpers_u128_u32]
 task 79 lines 1664-1684:  run --verbose [script]
@@ -321,7 +321,7 @@ Error: Script execution failed with VMError: {
     location: script,
     indices: [],
     offsets: [(FunctionDefinitionIndex(0), 3)],
-    exec_state: Some(ExecutionState { stack_trace: [] }),
+    exec_state: [[.*]],
 }
 task 81 lines 1713-1725:  publish [module 0x66::helpers_u128_u64]
 task 82 lines 1727-1747:  run --verbose [script]
@@ -333,7 +333,7 @@ Error: Script execution failed with VMError: {
     location: script,
     indices: [],
     offsets: [(FunctionDefinitionIndex(0), 3)],
-    exec_state: Some(ExecutionState { stack_trace: [] }),
+    exec_state: [[.*]],
 }
 task 84 lines 1776-1788:  publish [module 0x66::helpers_u128_u128]
 task 85 lines 1790-1810:  run --verbose [script]
@@ -345,7 +345,7 @@ Error: Script execution failed with VMError: {
     location: script,
     indices: [],
     offsets: [(FunctionDefinitionIndex(0), 3)],
-    exec_state: Some(ExecutionState { stack_trace: [] }),
+    exec_state: [[.*]],
 }
 task 87 lines 1839-1851:  publish [module 0x66::helpers_u128_u256]
 task 88 lines 1853-1873:  run --verbose [script]
@@ -357,7 +357,7 @@ Error: Script execution failed with VMError: {
     location: script,
     indices: [],
     offsets: [(FunctionDefinitionIndex(0), 3)],
-    exec_state: Some(ExecutionState { stack_trace: [] }),
+    exec_state: [[.*]],
 }
 task 90 lines 1904-1916:  publish [module 0x66::helpers_u256_u8]
 task 91 lines 1918-1938:  run --verbose [script]
@@ -369,7 +369,7 @@ Error: Script execution failed with VMError: {
     location: script,
     indices: [],
     offsets: [(FunctionDefinitionIndex(0), 3)],
-    exec_state: Some(ExecutionState { stack_trace: [] }),
+    exec_state: [[.*]],
 }
 task 93 lines 1967-1979:  publish [module 0x66::helpers_u256_u16]
 task 94 lines 1981-2001:  run --verbose [script]
@@ -381,7 +381,7 @@ Error: Script execution failed with VMError: {
     location: script,
     indices: [],
     offsets: [(FunctionDefinitionIndex(0), 3)],
-    exec_state: Some(ExecutionState { stack_trace: [] }),
+    exec_state: [[.*]],
 }
 task 96 lines 2030-2042:  publish [module 0x66::helpers_u256_u32]
 task 97 lines 2044-2064:  run --verbose [script]
@@ -393,7 +393,7 @@ Error: Script execution failed with VMError: {
     location: script,
     indices: [],
     offsets: [(FunctionDefinitionIndex(0), 3)],
-    exec_state: Some(ExecutionState { stack_trace: [] }),
+    exec_state: [[.*]],
 }
 task 99 lines 2093-2105:  publish [module 0x66::helpers_u256_u64]
 task 100 lines 2107-2127:  run --verbose [script]
@@ -405,7 +405,7 @@ Error: Script execution failed with VMError: {
     location: script,
     indices: [],
     offsets: [(FunctionDefinitionIndex(0), 3)],
-    exec_state: Some(ExecutionState { stack_trace: [] }),
+    exec_state: [[.*]],
 }
 task 102 lines 2156-2168:  publish [module 0x66::helpers_u256_u128]
 task 103 lines 2170-2190:  run --verbose [script]
@@ -417,7 +417,7 @@ Error: Script execution failed with VMError: {
     location: script,
     indices: [],
     offsets: [(FunctionDefinitionIndex(0), 3)],
-    exec_state: Some(ExecutionState { stack_trace: [] }),
+    exec_state: [[.*]],
 }
 task 105 lines 2219-2231:  publish [module 0x66::helpers_u256_u256]
 task 106 lines 2233-2253:  run --verbose [script]
@@ -429,5 +429,5 @@ Error: Script execution failed with VMError: {
     location: script,
     indices: [],
     offsets: [(FunctionDefinitionIndex(0), 3)],
-    exec_state: Some(ExecutionState { stack_trace: [] }),
+    exec_state: [[.*]],
 }
