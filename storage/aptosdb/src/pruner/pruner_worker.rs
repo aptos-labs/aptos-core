@@ -9,7 +9,7 @@ use aptos_logger::{
 use aptos_types::transaction::Version;
 use std::{
     sync::{
-        atomic::{AtomicBool, Ordering},
+        mpsc::{self, Receiver, SyncSender, TryRecvError},
         Arc,
     },
     thread::{sleep, JoinHandle},
@@ -23,88 +23,76 @@ pub struct PrunerWorker {
     worker_name: String,
     /// The thread to run pruner.
     worker_thread: Option<JoinHandle<()>>,
-
-    inner: Arc<PrunerWorkerInner>,
-}
-
-pub struct PrunerWorkerInner {
-    /// The worker will sleep for this period of time after pruning each batch.
-    pruning_time_interval_in_ms: u64,
     /// The pruner.
     pruner: Arc<dyn DBPruner>,
-    /// A threshold to control how many items we prune for each batch.
-    batch_size: usize,
-    /// Indicates whether the pruning loop should be running. Will only be set to true on pruner
-    /// destruction.
-    quit_worker: AtomicBool,
+    /// Sending `()` wakes the worker. Dropping the sender signals quit.
+    wake_sender: Option<SyncSender<()>>,
 }
 
-impl PrunerWorkerInner {
-    fn new(pruner: Arc<dyn DBPruner>, batch_size: usize) -> Arc<Self> {
-        Arc::new(Self {
-            pruning_time_interval_in_ms: if cfg!(test) { 100 } else { 1 },
+impl PrunerWorker {
+    pub(crate) fn new(pruner: Arc<dyn DBPruner>, batch_size: usize, name: &str) -> Self {
+        let (wake_sender, wake_receiver) = mpsc::sync_channel(1);
+        let pruner_clone = Arc::clone(&pruner);
+
+        let worker_thread = std::thread::Builder::new()
+            .name(format!("{name}_pruner"))
+            .spawn(move || Self::work(pruner_clone, batch_size, wake_receiver))
+            .expect("Creating pruner thread should succeed.");
+
+        Self {
+            worker_name: name.into(),
+            worker_thread: Some(worker_thread),
             pruner,
-            batch_size,
-            quit_worker: AtomicBool::new(false),
-        })
+            wake_sender: Some(wake_sender),
+        }
     }
 
-    // Loop that does the real pruning job.
-    fn work(&self) {
-        while !self.quit_worker.load(Ordering::SeqCst) {
-            let pruner_result = self.pruner.prune(self.batch_size);
+    pub fn set_target_db_version(&self, target_db_version: Version) {
+        if target_db_version > self.pruner.target_version() {
+            self.pruner.set_target_version(target_db_version);
+            // Wake the worker. If the channel buffer is full, the worker is already
+            // active and will see the new target on its next `is_pruning_pending` check.
+            if let Some(ref sender) = self.wake_sender {
+                let _ = sender.try_send(());
+            }
+        }
+    }
+
+    #[allow(dead_code)]
+    pub fn is_pruning_pending(&self) -> bool {
+        self.pruner.is_pruning_pending()
+    }
+
+    fn work(pruner: Arc<dyn DBPruner>, batch_size: usize, wake_receiver: Receiver<()>) {
+        loop {
+            // Check for quit (channel closed) before doing more work.
+            if matches!(wake_receiver.try_recv(), Err(TryRecvError::Disconnected)) {
+                break;
+            }
+            let pruner_result = pruner.prune(batch_size);
             if pruner_result.is_err() {
                 sample!(
                     SampleRate::Duration(Duration::from_secs(1)),
                     error!(error = ?pruner_result.err().unwrap(),
                         "Pruner has error.")
                 );
-                sleep(Duration::from_millis(self.pruning_time_interval_in_ms));
+                sleep(Duration::from_millis(100));
                 continue;
             }
-            if !self.pruner.is_pruning_pending() {
-                sleep(Duration::from_millis(self.pruning_time_interval_in_ms));
+            if !pruner.is_pruning_pending() {
+                // Block until notified of new work or channel is closed (quit).
+                if wake_receiver.recv().is_err() {
+                    break;
+                }
             }
         }
-    }
-
-    fn stop_pruning(&self) {
-        self.quit_worker.store(true, Ordering::SeqCst);
-    }
-}
-
-impl PrunerWorker {
-    pub(crate) fn new(pruner: Arc<dyn DBPruner>, batch_size: usize, name: &str) -> Self {
-        let inner = PrunerWorkerInner::new(pruner, batch_size);
-        let inner_cloned = Arc::clone(&inner);
-
-        let worker_thread = std::thread::Builder::new()
-            .name(format!("{name}_pruner"))
-            .spawn(move || inner_cloned.work())
-            .expect("Creating pruner thread should succeed.");
-
-        Self {
-            worker_name: name.into(),
-            worker_thread: Some(worker_thread),
-            inner,
-        }
-    }
-
-    pub fn set_target_db_version(&self, target_db_version: Version) {
-        if target_db_version > self.inner.pruner.target_version() {
-            self.inner.pruner.set_target_version(target_db_version);
-        }
-    }
-
-    #[allow(dead_code)]
-    pub fn is_pruning_pending(&self) -> bool {
-        self.inner.pruner.is_pruning_pending()
     }
 }
 
 impl Drop for PrunerWorker {
     fn drop(&mut self) {
-        self.inner.stop_pruning();
+        // Close the channel to signal the worker to quit.
+        self.wake_sender.take();
         self.worker_thread
             .take()
             .unwrap_or_else(|| panic!("Pruner worker ({}) thread must exist.", self.worker_name))
