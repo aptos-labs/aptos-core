@@ -24,11 +24,14 @@ use crate::{
     },
     utils, Scalar,
 };
-use aptos_crypto::arkworks::{
-    msm::MsmInput,
-    random::{sample_field_element, sample_field_elements},
-    srs::{SrsBasis, SrsType},
-    GroupGenerators,
+use aptos_crypto::{
+    arkworks::{
+        msm::MsmInput,
+        random::{sample_field_element, sample_field_elements},
+        srs::{SrsBasis, SrsType},
+        GroupGenerators,
+    },
+    utils::powers,
 };
 use ark_ec::{
     pairing::{Pairing, PairingOutput},
@@ -42,10 +45,7 @@ use ark_serialize::{CanonicalDeserialize, CanonicalSerialize};
 use rand::{CryptoRng, RngCore};
 #[cfg(feature = "range_proof_timing_multivariate")]
 use std::time::{Duration, Instant};
-use std::{
-    fmt::Debug,
-    iter::{once, successors},
-};
+use std::{fmt::Debug, iter::once};
 
 #[allow(non_snake_case)]
 #[derive(CanonicalSerialize, CanonicalDeserialize, Clone, Debug, PartialEq, Eq)]
@@ -328,10 +328,7 @@ impl<E: Pairing> traits::BatchedRangeProof<E> for Proof<E> {
         }
         let hat_c: E::ScalarField = trs.challenge_scalar();
 
-        let hat_c_powers: Vec<E::ScalarField> =
-            successors(Some(E::ScalarField::ONE), |p| Some(*p * hat_c))
-                .take(ell as usize + 1)
-                .collect();
+        let hat_c_powers = powers(hat_c, ell as usize + 1);
 
         // Prover drew the opening point z before zk_pcs_open; consume it so transcript matches.
         let z: E::ScalarField = trs.challenge_scalar();
@@ -496,7 +493,7 @@ pub fn prove_impl<E: Pairing, R: RngCore + CryptoRng>(
     let start = Instant::now();
     // Step 3e: Commit to the f_js.
     // Homomorphism does: xi_1*r + sum_{i=0..size-1} tau_powers[i]*values[i]
-    let f_j_comms: Vec<E::G1> = f_j_evals
+    let f_j_comms_proj: Vec<E::G1> = f_j_evals
         .iter()
         .zip(f_j_comms_randomness.iter())
         .enumerate()
@@ -507,14 +504,15 @@ pub fn prove_impl<E: Pairing, R: RngCore + CryptoRng>(
             pk.ck.xi_1 * *r_i + sum // TODO: could turn this into a 3-term MSM, should be faster
         })
         .collect();
+    let f_j_comms = E::G1::normalize_batch(&f_j_comms_proj);
     #[cfg(feature = "range_proof_timing_multivariate")]
     print_cumulative("hat_f_j commitments (hom.apply loop)", start.elapsed());
 
     #[cfg(feature = "range_proof_timing_multivariate")]
     let start = Instant::now();
     // Step 3f:
-    f_j_comms.iter().for_each(|hat_f_j_comm: &E::G1| {
-        trs.append_point(&hat_f_j_comm.into_affine());
+    f_j_comms.iter().for_each(|f_j_comm| {
+        trs.append_point(f_j_comm);
     });
     #[cfg(feature = "range_proof_timing_multivariate")]
     print_cumulative("transcript append hat_f_j_comms", start.elapsed());
@@ -534,24 +532,26 @@ pub fn prove_impl<E: Pairing, R: RngCore + CryptoRng>(
 
     #[cfg(feature = "range_proof_timing_multivariate")]
     let start = Instant::now();
-    let (g_is, g_comm, g_comm_randomnesses, _G): (
+    let (g_is, g_comm_proj, g_comm_randomnesses, H_g): (
         Vec<Vec<E::ScalarField>>,
         Vec<E::G1>,
         Vec<E::ScalarField>,
         E::ScalarField,
     ) = zksc_send_mask(&srs, 4, num_vars, rng);
+    let g_j_comms = E::G1::normalize_batch(&g_comm_proj);
+
     #[cfg(feature = "range_proof_timing_multivariate")]
     print_cumulative("zksc_send_mask (g_is, g_comm, G)", start.elapsed());
 
     #[cfg(feature = "range_proof_timing_multivariate")]
     let start = Instant::now();
-    // Step 4b:
-    g_comm.iter().for_each(|g_i_comm: &E::G1| {
-        trs.append_point(&g_i_comm.into_affine());
+    // Step 4b: // TODO: maybe combine with 3f
+    g_j_comms.iter().for_each(|g_j_comm| {
+        trs.append_point(g_j_comm);
     });
     {
         let mut buf = Vec::new();
-        _G.serialize_compressed(&mut buf).expect("serialize H_g");
+        H_g.serialize_compressed(&mut buf).expect("serialize H_g");
         trs.append_message(b"H_g", &buf);
     }
     #[cfg(feature = "range_proof_timing_multivariate")]
@@ -610,6 +610,7 @@ pub fn prove_impl<E: Pairing, R: RngCore + CryptoRng>(
         .into_iter()
         .map(|msg| msg.randomness)
         .collect();
+    debug_assert_eq!(xs.len(), num_vars as usize);
 
     // move this?
     let g_evals: Vec<E::ScalarField> = g_is
@@ -625,27 +626,21 @@ pub fn prove_impl<E: Pairing, R: RngCore + CryptoRng>(
     // Step 6: Evaluations y_f = f(x), y_j = f_j(x) at sumcheck point x = (x_1,...,x_n)
 
     // Step 6a:
-    debug_assert_eq!(xs.len(), num_vars as usize);
-
-    let sumcheck_point: Vec<E::ScalarField> = xs.to_vec();
-
     let f_poly = DenseMultilinearExtension::from_evaluations_vec(num_vars.into(), f_evals.clone());
-    let y_f = f_poly.evaluate(&sumcheck_point);
+    let y_f = f_poly.evaluate(&xs);
 
     // Step 6b:
     debug_assert_eq!(f_js.len(), ell as usize);
-    let y_evals: Vec<E::ScalarField> = f_js
-        .iter()
-        .map(|f_j| f_j.evaluate(&sumcheck_point))
-        .collect();
+    let y_js: Vec<E::ScalarField> = f_js.iter().map(|f_j| f_j.evaluate(&xs)).collect();
 
     // Step 6c:
+    // TODO: fix this
     {
         let mut buf = Vec::new();
         y_f.serialize_compressed(&mut buf).expect("serialize y_f");
         trs.append_message(b"y_f", &buf);
     }
-    for (j, y_j) in y_evals.iter().enumerate() {
+    for (j, y_j) in y_js.iter().enumerate() {
         let mut buf = Vec::new();
         y_j.serialize_compressed(&mut buf).expect("serialize y_j");
         let label = format!("y_{}", j + 1);
@@ -660,26 +655,19 @@ pub fn prove_impl<E: Pairing, R: RngCore + CryptoRng>(
 
     #[cfg(feature = "range_proof_timing_multivariate")]
     let start = Instant::now();
+    // Step 6e:
     // Batched polynomial f̂ = f + sum_j hat_c^j f_j (coefficient form for univariate opening)
-    let mut base_coeffs = vec![E::ScalarField::ZERO; size];
-    base_coeffs[0] = beta;
-    for (i, &z_i) in values.iter().enumerate() {
-        base_coeffs[i + 1] = z_i;
-    }
-    let hat_c_powers: Vec<E::ScalarField> =
-        successors(Some(E::ScalarField::ONE), |p| Some(*p * hat_c))
-            .take(ell as usize + 1)
-            .collect();
-    let mut batched_coeffs = base_coeffs.clone();
+    let hat_c_powers = powers(hat_c, ell as usize + 1);
+    let mut batched_evals = f_evals.clone();
     for j in 0..ell as usize {
         let cj = hat_c_powers[j + 1];
-        for (i, b) in batched_coeffs.iter_mut().enumerate() {
+        for (i, b) in batched_evals.iter_mut().enumerate() {
             *b += cj * f_j_evals[j][i];
         }
     }
 
     let z: E::ScalarField = trs.challenge_scalar();
-    let y: E::ScalarField = batched_coeffs
+    let y: E::ScalarField = batched_evals
         .iter()
         .enumerate()
         .fold(E::ScalarField::ZERO, |acc, (i, &coeff)| {
@@ -717,7 +705,7 @@ pub fn prove_impl<E: Pairing, R: RngCore + CryptoRng>(
     #[cfg(feature = "range_proof_timing_multivariate")]
     let start = Instant::now();
     // Step 7 (spec): single batched opening proof for f̂ at z and g_i at rho_i (uPCS.BatchOpen)
-    let mut all_f_is = vec![batched_coeffs];
+    let mut all_f_is = vec![batched_evals];
     all_f_is.extend(g_is);
     let eval_points: Vec<E::ScalarField> = once(z).chain(xs.iter().copied()).collect();
     let mut all_evals = vec![y];
@@ -746,9 +734,9 @@ pub fn prove_impl<E: Pairing, R: RngCore + CryptoRng>(
     #[cfg(feature = "range_proof_timing_multivariate")]
     print_cumulative("zk_pcs_open (batched opening)", start.elapsed());
 
-    let commitments: Vec<E::G1Affine> = f_j_comms.iter().map(|g| g.into_affine()).collect();
-    let g_commitments: Vec<E::G1Affine> = g_comm.iter().map(|g| g.into_affine()).collect();
-    let evals = once(y_f).chain(y_evals).collect();
+    let commitments: Vec<E::G1Affine> = f_j_comms_proj.iter().map(|g| g.into_affine()).collect();
+    let g_commitments: Vec<E::G1Affine> = g_comm_proj.iter().map(|g| g.into_affine()).collect();
+    let evals = once(y_f).chain(y_js).collect();
 
     Proof {
         blinding_poly_comm: comm_blinding_poly.map(|c| c.into_affine()),
@@ -758,7 +746,7 @@ pub fn prove_impl<E: Pairing, R: RngCore + CryptoRng>(
         zk_pcs_opening_proof,
         commitments,
         g_commitments,
-        h_g: _G,
+        h_g: H_g,
         y_g,
         y_batched_at_z: y,
         evals,
