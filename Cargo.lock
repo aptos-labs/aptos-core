@@ -4569,6 +4569,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "aptos-token-bucket"
+version = "0.1.0"
+dependencies = [
+ "aptos-infallible",
+ "aptos-time-service",
+]
+
+[[package]]
 name = "aptos-transaction-benchmarks"
 version = "0.1.0"
 dependencies = [
