@@ -1,0 +1,10 @@
+processed 3 tasks
+task 1 lines 3-8:  publish [module alice::pattern {]
+task 2 lines 10-15:  run --signers alice [script {]
+Error: Script execution failed with VMError: {
+    major_status: NUMBER_OF_ARGUMENTS_MISMATCH,
+    sub_status: [[.*]],
+    location: [[.*]],
+    indices: [[.*]],
+    offsets: [[.*]],
+}

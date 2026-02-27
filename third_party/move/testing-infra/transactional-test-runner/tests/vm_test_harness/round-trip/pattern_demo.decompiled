@@ -1,0 +1,19 @@
+//**** Cross-compiled for `move` syntax from `tests/vm_test_harness/pattern_demo.move`
+
+//# init --addresses Alice=0x42
+
+//# publish
+module 0x42::Demo {
+    public fun greet(): u64 {
+        42
+    }
+}
+
+
+//# run --signers Alice
+script {
+    use 0x42::Demo;
+    fun main() {
+        assert!(Demo::greet() == 42, 1);
+    }
+}
