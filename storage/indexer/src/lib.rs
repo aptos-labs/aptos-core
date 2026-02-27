@@ -67,7 +67,7 @@ impl Indexer {
             db_path,
             "index_db",
             column_families(),
-            &gen_rocksdb_options(&rocksdb_config, env, false),
+            gen_rocksdb_options(&rocksdb_config, env, false),
         )?;
 
         let next_version = db

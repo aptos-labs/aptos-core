@@ -414,14 +414,14 @@ impl LedgerDb {
     ) -> Result<DB> {
         let db = if readonly {
             DB::open_cf_readonly(
-                &gen_rocksdb_options(db_config, env, true),
+                gen_rocksdb_options(db_config, env, true),
                 path.clone(),
                 name,
                 Self::gen_cfds_by_name(db_config, block_cache, name),
             )?
         } else {
             DB::open_cf(
-                &gen_rocksdb_options(db_config, env, false),
+                gen_rocksdb_options(db_config, env, false),
                 path.clone(),
                 name,
                 Self::gen_cfds_by_name(db_config, block_cache, name),

@@ -39,7 +39,7 @@ impl RandDb {
         opts.create_if_missing(true);
         opts.create_missing_column_families(true);
         let db = Arc::new(
-            DB::open(path.clone(), RAND_DB_NAME, column_families, &opts)
+            DB::open(path.clone(), RAND_DB_NAME, column_families, opts)
                 .expect("RandDB open failed; unable to continue"),
         );
 
