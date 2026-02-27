@@ -16,9 +16,7 @@ permissions:
 
 jobs:
   update-fuzzer-data:
-    runs-on: >-
-      ${{ vars.USE_CUSTOM_APTOS_IMAGE_RUNNER == 'true' &&
-      '32cpu-aptos-image-ubuntu22-x64' || '16cpu-gh-ubuntu22-x64' }}
+    runs-on: runs-on,cpu=16,family=m6id,disk=large,image=aptos-ubuntu-x64,run-id=${{ github.run_id }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
