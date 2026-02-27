@@ -233,6 +233,22 @@ function Safe-Download {
 }
 
 # ============================================================================
+# Native command helper
+# ============================================================================
+
+function Invoke-Native {
+    # Run a native command without letting stderr output trigger
+    # PowerShell's ErrorActionPreference = Stop.  Many tools (cargo,
+    # rustup, pip) write progress/info to stderr which PowerShell
+    # treats as a terminating error under $ErrorActionPreference='Stop'.
+    param([string]$Command, [string[]]$Arguments)
+    $prevPref = $ErrorActionPreference
+    $ErrorActionPreference = 'Continue'
+    try { & $Command @Arguments }
+    finally { $ErrorActionPreference = $prevPref }
+}
+
+# ============================================================================
 # Build Tool Installers
 # ============================================================================
 
@@ -266,11 +282,11 @@ function Install-Rustup {
     Reload-Path
     if (Get-Command rustup -ErrorAction SilentlyContinue) {
         Write-Info "Configuring Rust toolchain..."
-        rustup update
-        rustup component add rustfmt
-        rustup component add clippy
-        rustup toolchain install nightly
-        rustup component add rustfmt --toolchain nightly
+        Invoke-Native rustup update
+        Invoke-Native rustup component add rustfmt
+        Invoke-Native rustup component add clippy
+        Invoke-Native rustup toolchain install nightly
+        Invoke-Native rustup component add rustfmt --toolchain nightly
     } else {
         Write-Warn "rustup not found in PATH after install. You may need to restart your shell."
     }
@@ -282,13 +298,13 @@ function Install-CargoPlugins {
         Write-Warn "cargo not found -- skipping Cargo plugin installation"
         return
     }
-    cargo install protoc-gen-prost --locked 2>$null
-    cargo install protoc-gen-prost-serde --locked 2>$null
-    cargo install protoc-gen-prost-crate --locked 2>$null
-    cargo install grcov --version $GRCOV_VERSION --locked 2>$null
-    cargo install cargo-sort --version $CARGO_SORT_VERSION --locked 2>$null
-    cargo install cargo-machete --version $CARGO_MACHETE_VERSION --locked 2>$null
-    cargo install cargo-nextest --version $CARGO_NEXTEST_VERSION --locked 2>$null
+    Invoke-Native cargo install protoc-gen-prost --locked
+    Invoke-Native cargo install protoc-gen-prost-serde --locked
+    Invoke-Native cargo install protoc-gen-prost-crate --locked
+    Invoke-Native cargo install grcov --version $GRCOV_VERSION --locked
+    Invoke-Native cargo install cargo-sort --version $CARGO_SORT_VERSION --locked
+    Invoke-Native cargo install cargo-machete --version $CARGO_MACHETE_VERSION --locked
+    Invoke-Native cargo install cargo-nextest --version $CARGO_NEXTEST_VERSION --locked
 }
 
 function Install-Protoc {
@@ -415,7 +431,7 @@ function Install-Boogie {
         Write-Warn "dotnet not found -- cannot install Boogie"
         return
     }
-    dotnet tool install --global Boogie --version $BOOGIE_VERSION
+    Invoke-Native dotnet tool install --global Boogie --version $BOOGIE_VERSION
     $boogieExe = Join-Path $env:USERPROFILE ".dotnet\tools\boogie.exe"
     [Environment]::SetEnvironmentVariable("BOOGIE_EXE", $boogieExe, "User")
     $env:BOOGIE_EXE = $boogieExe
