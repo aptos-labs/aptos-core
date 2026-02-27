@@ -1,0 +1,411 @@
+============ initial translation from Move ================
+
+[variant baseline]
+fun TestSplit::abs_diff($t0|a: u64, $t1|b: u64): u64 {
+     var $t2: u64
+     var $t3: u64
+     var $t4: bool
+     var $t5: u64
+     var $t6: u64
+     var $t7: u64
+     var $t8: u64
+     var $t9: u64
+     var $t10: u64
+  0: $t2 := copy($t0)
+  1: $t3 := copy($t1)
+  2: $t4 := >=($t2, $t3)
+  3: if ($t4) goto 4 else goto 9
+  4: label L1
+  5: $t5 := move($t0)
+  6: $t6 := move($t1)
+  7: $t7 := -($t5, $t6)
+  8: return $t7
+  9: label L0
+ 10: $t8 := move($t1)
+ 11: $t9 := move($t0)
+ 12: $t10 := -($t8, $t9)
+ 13: return $t10
+}
+
+
+[variant baseline]
+fun TestSplit::color_code($t0|c: 0x42::TestSplit::Color): u64 {
+     var $t1|$t2: &0x42::TestSplit::Color
+     var $t2: &0x42::TestSplit::Color
+     var $t3: &0x42::TestSplit::Color
+     var $t4: bool
+     var $t5: &0x42::TestSplit::Color
+     var $t6: 0x42::TestSplit::Color
+     var $t7: u64
+     var $t8: &0x42::TestSplit::Color
+     var $t9: bool
+     var $t10: &0x42::TestSplit::Color
+     var $t11: 0x42::TestSplit::Color
+     var $t12: u64
+     var $t13: &0x42::TestSplit::Color
+     var $t14: bool
+     var $t15: 0x42::TestSplit::Color
+     var $t16: u64
+     var $t17: u64
+  0: $t2 := borrow_local($t0)
+  1: $t1 := $t2
+  2: $t3 := copy($t1)
+  3: $t4 := test_variant 0x42::TestSplit::Color::Red($t3)
+  4: if ($t4) goto 5 else goto 12
+  5: label L1
+  6: $t5 := move($t1)
+  7: drop($t5)
+  8: $t6 := move($t0)
+  9: unpack_variant 0x42::TestSplit::Color::Red($t6)
+ 10: $t7 := 1
+ 11: return $t7
+ 12: label L0
+ 13: $t8 := copy($t1)
+ 14: $t9 := test_variant 0x42::TestSplit::Color::Green($t8)
+ 15: if ($t9) goto 16 else goto 23
+ 16: label L3
+ 17: $t10 := move($t1)
+ 18: drop($t10)
+ 19: $t11 := move($t0)
+ 20: unpack_variant 0x42::TestSplit::Color::Green($t11)
+ 21: $t12 := 2
+ 22: return $t12
+ 23: label L2
+ 24: $t13 := move($t1)
+ 25: $t14 := test_variant 0x42::TestSplit::Color::Blue($t13)
+ 26: if ($t14) goto 27 else goto 32
+ 27: label L5
+ 28: $t15 := move($t0)
+ 29: unpack_variant 0x42::TestSplit::Color::Blue($t15)
+ 30: $t16 := 3
+ 31: return $t16
+ 32: label L4
+ 33: $t17 := 14566554180833181697
+ 34: abort($t17)
+}
+
+============ after pipeline `proofs` ================
+
+[variant baseline]
+fun TestSplit::abs_diff($t0|a: u64, $t1|b: u64): u64 {
+     var $t2: bool
+     var $t3: u64
+     var $t4: num
+  0: $t2 := >=($t0, $t1)
+  1: if ($t2) goto 2 else goto 5
+  2: label L1
+  3: $t3 := -($t0, $t1) on_abort goto 9 with $t4
+  4: goto 7
+  5: label L0
+  6: $t3 := -($t1, $t0) on_abort goto 9 with $t4
+  7: label L2
+  8: return $t3
+  9: label L3
+ 10: abort($t4)
+}
+
+
+[variant verification[split_0]]
+fun TestSplit::abs_diff($t0|a: u64, $t1|b: u64): u64 {
+     var $t2: bool
+     var $t3: u64
+     var $t4: num
+  0: assume Ge($t0, $t1)
+  1: $t2 := >=($t0, $t1)
+  2: if ($t2) goto 3 else goto 6
+  3: label L1
+  4: $t3 := -($t0, $t1) on_abort goto 11 with $t4
+  5: goto 8
+  6: label L0
+  7: $t3 := -($t1, $t0) on_abort goto 11 with $t4
+  8: label L2
+     # VC: post-condition does not hold at tests/spec_instrumentation/proofs/split.move:14:9+55
+  9: assert Eq<u64>($t3, if Ge($t0, $t1) {
+  Sub($t0, $t1)
+} else {
+  Sub($t1, $t0)
+})
+ 10: return $t3
+ 11: label L3
+ 12: abort($t4)
+}
+
+
+[variant verification[split_1]]
+fun TestSplit::abs_diff($t0|a: u64, $t1|b: u64): u64 {
+     var $t2: bool
+     var $t3: u64
+     var $t4: num
+  0: assume Not(Ge($t0, $t1))
+  1: $t2 := >=($t0, $t1)
+  2: if ($t2) goto 3 else goto 6
+  3: label L1
+  4: $t3 := -($t0, $t1) on_abort goto 11 with $t4
+  5: goto 8
+  6: label L0
+  7: $t3 := -($t1, $t0) on_abort goto 11 with $t4
+  8: label L2
+     # VC: post-condition does not hold at tests/spec_instrumentation/proofs/split.move:14:9+55
+  9: assert Eq<u64>($t3, if Ge($t0, $t1) {
+  Sub($t0, $t1)
+} else {
+  Sub($t1, $t0)
+})
+ 10: return $t3
+ 11: label L3
+ 12: abort($t4)
+}
+
+
+[variant baseline]
+fun TestSplit::color_code($t0|c: 0x42::TestSplit::Color): u64 {
+     var $t1|$t2: 0x42::TestSplit::Color [unused]
+     var $t2: bool
+     var $t3: num
+     var $t4: u64
+     var $t5: u64
+     var $t6: bool
+     var $t7: u64
+     var $t8: bool
+     var $t9: u64
+     var $t10: u64
+  0: $t2 := test_variant 0x42::TestSplit::Color::Red($t0)
+  1: if ($t2) goto 2 else goto 7
+  2: label L1
+  3: unpack_variant 0x42::TestSplit::Color::Red($t0) on_abort goto 29 with $t3
+  4: $t4 := 1
+  5: $t5 := move($t4)
+  6: goto 27
+  7: label L0
+  8: $t6 := test_variant 0x42::TestSplit::Color::Green($t0)
+  9: if ($t6) goto 10 else goto 15
+ 10: label L3
+ 11: unpack_variant 0x42::TestSplit::Color::Green($t0) on_abort goto 29 with $t3
+ 12: $t7 := 2
+ 13: $t5 := move($t7)
+ 14: goto 27
+ 15: label L2
+ 16: $t8 := test_variant 0x42::TestSplit::Color::Blue($t0)
+ 17: if ($t8) goto 18 else goto 23
+ 18: label L5
+ 19: unpack_variant 0x42::TestSplit::Color::Blue($t0) on_abort goto 29 with $t3
+ 20: $t9 := 3
+ 21: $t5 := move($t9)
+ 22: goto 27
+ 23: label L4
+ 24: $t10 := 14566554180833181697
+ 25: $t3 := move($t10)
+ 26: goto 29
+ 27: label L6
+ 28: return $t5
+ 29: label L7
+ 30: abort($t3)
+}
+
+
+[variant verification[split_0]]
+fun TestSplit::color_code($t0|c: 0x42::TestSplit::Color): u64 {
+     var $t1|$t2: 0x42::TestSplit::Color
+     var $t2: bool
+     var $t3: num
+     var $t4: u64
+     var $t5: u64
+     var $t6: bool
+     var $t7: u64
+     var $t8: bool
+     var $t9: u64
+     var $t10: u64
+  0: assume test_variants TestSplit::Color::Red($t0)
+  1: $t2 := test_variant 0x42::TestSplit::Color::Red($t0)
+  2: if ($t2) goto 3 else goto 8
+  3: label L1
+  4: unpack_variant 0x42::TestSplit::Color::Red($t0) on_abort goto 32 with $t3
+  5: $t4 := 1
+  6: $t5 := move($t4)
+  7: goto 28
+  8: label L0
+  9: $t6 := test_variant 0x42::TestSplit::Color::Green($t0)
+ 10: if ($t6) goto 11 else goto 16
+ 11: label L3
+ 12: unpack_variant 0x42::TestSplit::Color::Green($t0) on_abort goto 32 with $t3
+ 13: $t7 := 2
+ 14: $t5 := move($t7)
+ 15: goto 28
+ 16: label L2
+ 17: $t8 := test_variant 0x42::TestSplit::Color::Blue($t0)
+ 18: if ($t8) goto 19 else goto 24
+ 19: label L5
+ 20: unpack_variant 0x42::TestSplit::Color::Blue($t0) on_abort goto 32 with $t3
+ 21: $t9 := 3
+ 22: $t5 := move($t9)
+ 23: goto 28
+ 24: label L4
+ 25: $t10 := 14566554180833181697
+ 26: $t3 := move($t10)
+ 27: goto 32
+ 28: label L6
+     # VC: post-condition does not hold at tests/spec_instrumentation/proofs/split.move:36:9+20
+ 29: assert Ge($t5, 1)
+     # VC: post-condition does not hold at tests/spec_instrumentation/proofs/split.move:37:9+20
+ 30: assert Le($t5, 3)
+ 31: return $t5
+ 32: label L7
+ 33: abort($t3)
+}
+
+
+[variant verification[split_1]]
+fun TestSplit::color_code($t0|c: 0x42::TestSplit::Color): u64 {
+     var $t1|$t2: 0x42::TestSplit::Color
+     var $t2: bool
+     var $t3: num
+     var $t4: u64
+     var $t5: u64
+     var $t6: bool
+     var $t7: u64
+     var $t8: bool
+     var $t9: u64
+     var $t10: u64
+  0: assume test_variants TestSplit::Color::Green($t0)
+  1: $t2 := test_variant 0x42::TestSplit::Color::Red($t0)
+  2: if ($t2) goto 3 else goto 8
+  3: label L1
+  4: unpack_variant 0x42::TestSplit::Color::Red($t0) on_abort goto 32 with $t3
+  5: $t4 := 1
+  6: $t5 := move($t4)
+  7: goto 28
+  8: label L0
+  9: $t6 := test_variant 0x42::TestSplit::Color::Green($t0)
+ 10: if ($t6) goto 11 else goto 16
+ 11: label L3
+ 12: unpack_variant 0x42::TestSplit::Color::Green($t0) on_abort goto 32 with $t3
+ 13: $t7 := 2
+ 14: $t5 := move($t7)
+ 15: goto 28
+ 16: label L2
+ 17: $t8 := test_variant 0x42::TestSplit::Color::Blue($t0)
+ 18: if ($t8) goto 19 else goto 24
+ 19: label L5
+ 20: unpack_variant 0x42::TestSplit::Color::Blue($t0) on_abort goto 32 with $t3
+ 21: $t9 := 3
+ 22: $t5 := move($t9)
+ 23: goto 28
+ 24: label L4
+ 25: $t10 := 14566554180833181697
+ 26: $t3 := move($t10)
+ 27: goto 32
+ 28: label L6
+     # VC: post-condition does not hold at tests/spec_instrumentation/proofs/split.move:36:9+20
+ 29: assert Ge($t5, 1)
+     # VC: post-condition does not hold at tests/spec_instrumentation/proofs/split.move:37:9+20
+ 30: assert Le($t5, 3)
+ 31: return $t5
+ 32: label L7
+ 33: abort($t3)
+}
+
+
+[variant verification[split_2]]
+fun TestSplit::color_code($t0|c: 0x42::TestSplit::Color): u64 {
+     var $t1|$t2: 0x42::TestSplit::Color
+     var $t2: bool
+     var $t3: num
+     var $t4: u64
+     var $t5: u64
+     var $t6: bool
+     var $t7: u64
+     var $t8: bool
+     var $t9: u64
+     var $t10: u64
+  0: assume test_variants TestSplit::Color::Blue($t0)
+  1: $t2 := test_variant 0x42::TestSplit::Color::Red($t0)
+  2: if ($t2) goto 3 else goto 8
+  3: label L1
+  4: unpack_variant 0x42::TestSplit::Color::Red($t0) on_abort goto 32 with $t3
+  5: $t4 := 1
+  6: $t5 := move($t4)
+  7: goto 28
+  8: label L0
+  9: $t6 := test_variant 0x42::TestSplit::Color::Green($t0)
+ 10: if ($t6) goto 11 else goto 16
+ 11: label L3
+ 12: unpack_variant 0x42::TestSplit::Color::Green($t0) on_abort goto 32 with $t3
+ 13: $t7 := 2
+ 14: $t5 := move($t7)
+ 15: goto 28
+ 16: label L2
+ 17: $t8 := test_variant 0x42::TestSplit::Color::Blue($t0)
+ 18: if ($t8) goto 19 else goto 24
+ 19: label L5
+ 20: unpack_variant 0x42::TestSplit::Color::Blue($t0) on_abort goto 32 with $t3
+ 21: $t9 := 3
+ 22: $t5 := move($t9)
+ 23: goto 28
+ 24: label L4
+ 25: $t10 := 14566554180833181697
+ 26: $t3 := move($t10)
+ 27: goto 32
+ 28: label L6
+     # VC: post-condition does not hold at tests/spec_instrumentation/proofs/split.move:36:9+20
+ 29: assert Ge($t5, 1)
+     # VC: post-condition does not hold at tests/spec_instrumentation/proofs/split.move:37:9+20
+ 30: assert Le($t5, 3)
+ 31: return $t5
+ 32: label L7
+ 33: abort($t3)
+}
+
+
+
+==== spec-instrumenter input specs ====
+
+fun TestSplit::abs_diff[baseline]
+spec {
+  ensures Eq<u64>(result0(), if Ge($t0, $t1) {
+  Sub($t0, $t1)
+} else {
+  Sub($t1, $t0)
+});
+}
+
+fun TestSplit::abs_diff[verification[split_0]]
+spec {
+  ensures Eq<u64>(result0(), if Ge($t0, $t1) {
+  Sub($t0, $t1)
+} else {
+  Sub($t1, $t0)
+});
+}
+
+fun TestSplit::abs_diff[verification[split_1]]
+spec {
+  ensures Eq<u64>(result0(), if Ge($t0, $t1) {
+  Sub($t0, $t1)
+} else {
+  Sub($t1, $t0)
+});
+}
+
+fun TestSplit::color_code[baseline]
+spec {
+  ensures Ge(result0(), 1);
+  ensures Le(result0(), 3);
+}
+
+fun TestSplit::color_code[verification[split_0]]
+spec {
+  ensures Ge(result0(), 1);
+  ensures Le(result0(), 3);
+}
+
+fun TestSplit::color_code[verification[split_1]]
+spec {
+  ensures Ge(result0(), 1);
+  ensures Le(result0(), 3);
+}
+
+fun TestSplit::color_code[verification[split_2]]
+spec {
+  ensures Ge(result0(), 1);
+  ensures Le(result0(), 3);
+}

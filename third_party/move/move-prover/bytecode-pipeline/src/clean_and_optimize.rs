@@ -37,7 +37,7 @@ impl FunctionTargetProcessor for CleanAndOptimizeProcessor {
         mut data: FunctionData,
         _scc_opt: Option<&[FunctionEnv]>,
     ) -> FunctionData {
-        if func_env.is_native() {
+        if !func_env.is_compiled() {
             // Nothing to do
             return data;
         }

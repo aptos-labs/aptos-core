@@ -18,9 +18,9 @@
 use crate::{
     ast::{
         AccessSpecifier, AccessSpecifierKind, Address, AddressSpecifier, Attribute, ConditionKind,
-        Exp, ExpData, FriendDecl, GlobalInvariant, MemoryLabel, ModuleName, PropertyBag,
-        PropertyValue, ResourceSpecifier, Spec, SpecBlockInfo, SpecBlockTarget, SpecFunDecl,
-        SpecVarDecl, UseDecl, Value,
+        Exp, ExpData, FriendDecl, GlobalInvariant, LemmaDecl, LemmaId, MemoryLabel, ModuleName,
+        PropertyBag, PropertyValue, ResourceSpecifier, Spec, SpecBlockInfo, SpecBlockTarget,
+        SpecFunDecl, SpecVarDecl, UseDecl, Value,
     },
     code_writer::CodeWriter,
     emit, emitln,
@@ -1618,6 +1618,7 @@ impl GlobalEnv {
         function_data: BTreeMap<FunId, FunctionData>,
         spec_vars: Vec<SpecVarDecl>,
         spec_funs: Vec<SpecFunDecl>,
+        lemma_decls: Vec<LemmaDecl>,
         module_spec: Spec,
         spec_block_infos: Vec<SpecBlockInfo>,
     ) -> ModuleId {
@@ -1643,6 +1644,17 @@ impl GlobalEnv {
             .map(|(i, v)| (SpecFunId::new(i), v))
             .collect();
 
+        let lemma_table: BTreeMap<Symbol, LemmaId> = lemma_decls
+            .iter()
+            .enumerate()
+            .map(|(i, ld)| (ld.name, LemmaId::new(i)))
+            .collect();
+        let lemmas: BTreeMap<LemmaId, LemmaDecl> = lemma_decls
+            .into_iter()
+            .enumerate()
+            .map(|(i, ld)| (LemmaId::new(i), ld))
+            .collect();
+
         let id = ModuleId(self.module_data.len() as RawIndex);
         let used_modules = use_decls.iter().filter_map(|ud| ud.module_id).collect();
         self.module_data.push(ModuleData {
@@ -1657,6 +1669,8 @@ impl GlobalEnv {
             function_idx_to_id: Default::default(),
             spec_vars,
             spec_funs,
+            lemmas,
+            lemma_table,
             module_spec: RefCell::new(module_spec),
             loc,
             attributes,
@@ -1796,6 +1810,28 @@ impl GlobalEnv {
                 fun_data.called_funs = Some(called_funs);
             }
         }
+
+        // Assign synthetic def_idx to lemma functions for Boogie debug tracking.
+        // Lemma functions are not compiled, so they lack a FunctionDefinitionIndex.
+        // We give them synthetic indices starting after the last compiled function,
+        // so `boogie_debug_track` can emit $track_local calls and the model extractor
+        // can resolve them back via `try_get_function_id`.
+        let next_idx = module.function_defs.len() as u16;
+        let mod_data = &mut self.module_data[module_id.0 as usize];
+        let lemma_funs: Vec<_> = mod_data
+            .function_data
+            .iter()
+            .filter(|(_, data)| data.kind == FunctionKind::Lemma)
+            .map(|(fun_id, _)| *fun_id)
+            .collect();
+        for (i, fun_id) in lemma_funs.iter().enumerate() {
+            let def_idx = FunctionDefinitionIndex(next_idx + i as u16);
+            if let Some(fun_data) = mod_data.function_data.get_mut(fun_id) {
+                fun_data.def_idx = Some(def_idx);
+            }
+            mod_data.function_idx_to_id.insert(def_idx, *fun_id);
+        }
+
         let used_modules = self.get_used_modules_from_bytecode(&module);
         let friend_modules = self.get_friend_modules_from_bytecode(&module);
 
@@ -3135,6 +3171,12 @@ pub struct ModuleData {
 
     /// Holds the set of modules declared as friend.
     pub(crate) friend_modules: BTreeSet<ModuleId>,
+
+    /// Lemma declarations.
+    pub(crate) lemmas: BTreeMap<LemmaId, LemmaDecl>,
+
+    /// Lemma name to id lookup.
+    pub(crate) lemma_table: BTreeMap<Symbol, LemmaId>,
 }
 
 impl ModuleData {
@@ -3160,6 +3202,8 @@ impl ModuleData {
             used_modules: Default::default(),
             used_modules_including_specs: RefCell::new(None),
             friend_modules: Default::default(),
+            lemmas: Default::default(),
+            lemma_table: Default::default(),
         }
     }
 }
@@ -3742,6 +3786,24 @@ impl<'env> ModuleEnv<'env> {
     /// Gets spec fun by id.
     pub fn get_spec_fun(&self, id: SpecFunId) -> &SpecFunDecl {
         self.data.spec_funs.get(&id).expect("spec fun id defined")
+    }
+
+    /// Returns lemma declarations of this module.
+    pub fn get_lemmas(&'env self) -> impl Iterator<Item = (&'env LemmaId, &'env LemmaDecl)> {
+        self.data.lemmas.iter()
+    }
+
+    /// Gets a lemma by id.
+    pub fn get_lemma(&self, id: LemmaId) -> &LemmaDecl {
+        self.data.lemmas.get(&id).expect("lemma id defined")
+    }
+
+    /// Finds a lemma by name.
+    pub fn find_lemma_by_name(&self, name: Symbol) -> Option<(LemmaId, &LemmaDecl)> {
+        self.data
+            .lemma_table
+            .get(&name)
+            .map(|id| (*id, self.data.lemmas.get(id).expect("lemma id defined")))
     }
 
     /// Gets module specification.
@@ -4772,6 +4834,7 @@ pub enum FunctionKind {
     Regular,
     Inline,
     Entry,
+    Lemma,
 }
 
 #[derive(Debug, Clone)]
@@ -5076,6 +5139,27 @@ impl<'env> FunctionEnv<'env> {
     /// Return true if the function is an inline function
     pub fn is_inline(&self) -> bool {
         self.data.kind == FunctionKind::Inline
+    }
+
+    /// Return true if this is a lemma function (synthesized from a lemma declaration).
+    pub fn is_lemma(&self) -> bool {
+        self.data.kind == FunctionKind::Lemma
+    }
+
+    /// Returns true if this function is compiled from source to bytecode.
+    /// Returns false for native, inline, and lemma functions:
+    /// native has no source, inline is expanded at call sites,
+    /// and lemma has synthetic stub code but is not compiled.
+    pub fn is_compiled(&self) -> bool {
+        !self.is_native() && !self.is_inline() && !self.is_lemma()
+    }
+
+    /// Returns true if this function has no verified bytecode, meaning it should
+    /// be skipped by prover pipeline processors that analyze or instrument code.
+    /// This includes non-compiled functions (native, inline, lemma) and intrinsic
+    /// functions (which have opaque semantics defined by the prover).
+    pub fn no_verified_bytecode(&self) -> bool {
+        !self.is_compiled() || self.is_intrinsic()
     }
 
     /// Returns kind of this function.
@@ -5579,6 +5663,7 @@ impl<'env> FunctionEnv<'env> {
             FunctionKind::Regular => "",
             FunctionKind::Inline => " inline",
             FunctionKind::Entry => " entry",
+            FunctionKind::Lemma => " lemma",
         });
         if self.is_native() {
             s.push_str(" native")
@@ -5613,7 +5698,7 @@ impl<'env> FunctionEnv<'env> {
     }
 
     fn definition_view(&'env self) -> Option<FunctionDefinitionView<'env, CompiledModule>> {
-        if self.is_inline() {
+        if self.is_inline() || self.is_lemma() {
             return None;
         }
         let module = self.module_env.data.compiled_module.as_ref()?;

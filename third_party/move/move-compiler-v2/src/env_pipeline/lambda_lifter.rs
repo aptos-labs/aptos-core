@@ -93,7 +93,9 @@ pub fn lift_lambdas(options: LambdaLiftingOptions, env: &mut GlobalEnv) {
         let mut updated_funs = BTreeMap::new();
         let mut new_funs = vec![];
         for fun in module.get_functions() {
-            if fun.is_inline() && !options.include_inline_functions || fun.is_native_or_intrinsic()
+            if fun.is_inline() && !options.include_inline_functions
+                || fun.is_native_or_intrinsic()
+                || fun.is_lemma()
             {
                 continue;
             }

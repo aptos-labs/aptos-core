@@ -19,6 +19,22 @@ public fun Test::test_pack(): 0x42::Test::R {
 
 ============ after pipeline `data_invariant_instrumentation` ================
 
+[variant baseline]
+public fun Test::test_pack(): 0x42::Test::R {
+     var $t0|s: 0x42::Test::S [unused]
+     var $t1: u64
+     var $t2: 0x42::Test::S
+     var $t3: u64
+     var $t4: 0x42::Test::R
+  0: $t1 := 1
+  1: $t2 := pack 0x42::Test::S($t1)
+  2: $t3 := 3
+  3: $t4 := pack 0x42::Test::R($t3, $t2)
+  4: label L1
+  5: return $t4
+}
+
+
 [variant verification]
 public fun Test::test_pack(): 0x42::Test::R {
      var $t0|s: 0x42::Test::S

@@ -568,8 +568,8 @@ fn get_custom_annotation_or_none(
                 || fun_env.is_intrinsic_of(INTRINSIC_FUN_MAP_BORROW_MUT_WITH_DEFAULT)
             {
                 Some(summarize_custom_borrow(IndexEdgeKind::Table, &[0], &[0]))
-            } else if fun_env.is_native_or_intrinsic() {
-                // non-borrow related native/intrinsic has no borrow semantics
+            } else if fun_env.no_verified_bytecode() {
+                // functions without verified bytecode have no borrow semantics
                 Some(BorrowAnnotation::default())
             } else {
                 // this is a normal function and we can summarize its borrow semantics

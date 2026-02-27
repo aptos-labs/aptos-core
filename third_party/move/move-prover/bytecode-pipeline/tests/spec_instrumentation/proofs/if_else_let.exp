@@ -1,0 +1,135 @@
+============ initial translation from Move ================
+
+[variant baseline]
+fun TestIfElseLet::test_if_else($t0|x: u64): u64 {
+     var $t1: u64
+     var $t2: u64
+     var $t3: bool
+     var $t4: u64
+     var $t5: u64
+  0: $t1 := copy($t0)
+  1: $t2 := 10
+  2: $t3 := >($t1, $t2)
+  3: if ($t3) goto 4 else goto 7
+  4: label L1
+  5: $t4 := move($t0)
+  6: return $t4
+  7: label L0
+  8: $t5 := 10
+  9: return $t5
+}
+
+
+[variant baseline]
+fun TestIfElseLet::test_let($t0|x: u64): u64 {
+     var $t1: u64
+     var $t2: u64
+     var $t3: u64
+  0: $t1 := move($t0)
+  1: $t2 := 1
+  2: $t3 := +($t1, $t2)
+  3: return $t3
+}
+
+============ after pipeline `proofs` ================
+
+[variant baseline]
+fun TestIfElseLet::test_if_else($t0|x: u64): u64 {
+     var $t1: u64
+     var $t2: bool
+     var $t3: u64
+     var $t4: u64
+  0: $t1 := 10
+  1: $t2 := >($t0, $t1)
+  2: if ($t2) goto 3 else goto 6
+  3: label L1
+  4: $t3 := move($t0)
+  5: goto 9
+  6: label L0
+  7: $t4 := 10
+  8: $t3 := move($t4)
+  9: label L2
+ 10: return $t3
+}
+
+
+[variant verification]
+fun TestIfElseLet::test_if_else($t0|x: u64): u64 {
+     var $t1: u64
+     var $t2: bool
+     var $t3: u64
+     var $t4: u64
+     # VC: proof assertion at tests/spec_instrumentation/proofs/if_else_let.move:17:13+15
+  0: assert Implies(Gt($t0, 10), Ge($t0, 10))
+     # VC: proof assertion at tests/spec_instrumentation/proofs/if_else_let.move:19:13+16
+  1: assert Implies(Not(Gt($t0, 10)), Ge(10, 10))
+  2: $t1 := 10
+  3: $t2 := >($t0, $t1)
+  4: if ($t2) goto 5 else goto 8
+  5: label L1
+  6: $t3 := move($t0)
+  7: goto 11
+  8: label L0
+  9: $t4 := 10
+ 10: $t3 := move($t4)
+ 11: label L2
+     # VC: post-condition does not hold at tests/spec_instrumentation/proofs/if_else_let.move:14:9+21
+ 12: assert Ge($t3, 10)
+ 13: return $t3
+}
+
+
+[variant baseline]
+fun TestIfElseLet::test_let($t0|x: u64): u64 {
+     var $t1: u64
+     var $t2: u64
+     var $t3: num
+  0: $t1 := 1
+  1: $t2 := +($t0, $t1) on_abort goto 4 with $t3
+  2: label L1
+  3: return $t2
+  4: label L2
+  5: abort($t3)
+}
+
+
+[variant verification]
+fun TestIfElseLet::test_let($t0|x: u64): u64 {
+     var $t1: u64
+     var $t2: u64
+     var $t3: num
+  0: $t1 := 1
+  1: $t2 := +($t0, $t1) on_abort goto 6 with $t3
+  2: label L1
+     # VC: proof assertion at tests/spec_instrumentation/proofs/if_else_let.move:33:14+19
+  3: assert Eq<num>(Add($t0, 1), $t2)
+     # VC: post-condition does not hold at tests/spec_instrumentation/proofs/if_else_let.move:30:9+24
+  4: assert Eq<u64>($t2, Add($t0, 1))
+  5: return $t2
+  6: label L2
+  7: abort($t3)
+}
+
+
+
+==== spec-instrumenter input specs ====
+
+fun TestIfElseLet::test_if_else[baseline]
+spec {
+  ensures Ge(result0(), 10);
+}
+
+fun TestIfElseLet::test_if_else[verification]
+spec {
+  ensures Ge(result0(), 10);
+}
+
+fun TestIfElseLet::test_let[baseline]
+spec {
+  ensures Eq<u64>(result0(), Add($t0, 1));
+}
+
+fun TestIfElseLet::test_let[verification]
+spec {
+  ensures Eq<u64>(result0(), Add($t0, 1));
+}

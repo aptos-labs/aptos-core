@@ -27,7 +27,7 @@ impl FunctionTargetProcessor for MutRefInstrumenter {
         data: FunctionData,
         _scc_opt: Option<&[FunctionEnv]>,
     ) -> FunctionData {
-        if fun_env.is_native() {
+        if !fun_env.is_compiled() {
             return data;
         }
 

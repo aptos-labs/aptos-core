@@ -1,0 +1,187 @@
+============ initial translation from Move ================
+
+[variant baseline]
+fun TestPost::double($t0|x: u64): u64 {
+     var $t1: u64
+     var $t2: u64
+     var $t3: u64
+  0: $t1 := copy($t0)
+  1: $t2 := move($t0)
+  2: $t3 := +($t1, $t2)
+  3: return $t3
+}
+
+
+[variant baseline]
+fun TestPost::max($t0|a: u64, $t1|b: u64): u64 {
+     var $t2: u64
+     var $t3: u64
+     var $t4: bool
+     var $t5: u64
+     var $t6: u64
+  0: $t2 := copy($t0)
+  1: $t3 := copy($t1)
+  2: $t4 := >=($t2, $t3)
+  3: if ($t4) goto 4 else goto 7
+  4: label L1
+  5: $t5 := move($t0)
+  6: return $t5
+  7: label L0
+  8: $t6 := move($t1)
+  9: return $t6
+}
+
+
+[variant baseline]
+fun TestPost::scale($t0|x: u64, $t1|factor: u64): u64 {
+     var $t2: u64
+     var $t3: u64
+     var $t4: u64
+  0: $t2 := move($t0)
+  1: $t3 := move($t1)
+  2: $t4 := *($t2, $t3)
+  3: return $t4
+}
+
+============ after pipeline `proofs` ================
+
+[variant baseline]
+fun TestPost::double($t0|x: u64): u64 {
+     var $t1: u64
+     var $t2: num
+  0: assume Le(Add($t0, $t0), 18446744073709551615)
+  1: $t1 := +($t0, $t0) on_abort goto 4 with $t2
+  2: label L1
+  3: return $t1
+  4: label L2
+  5: abort($t2)
+}
+
+
+[variant verification]
+fun TestPost::double($t0|x: u64): u64 {
+     var $t1: u64
+     var $t2: num
+  0: assume Le(Add($t0, $t0), 18446744073709551615)
+     # VC: proof assertion at tests/spec_instrumentation/proofs/post.move:17:9+22
+  1: assert Eq<num>(Add($t0, $t0), Mul(2, $t0))
+  2: $t1 := +($t0, $t0) on_abort goto 7 with $t2
+  3: label L1
+     # VC: proof assertion at tests/spec_instrumentation/proofs/post.move:18:14+23
+  4: assert Eq<u64>($t1, Add($t0, $t0))
+     # VC: post-condition does not hold at tests/spec_instrumentation/proofs/post.move:15:9+24
+  5: assert Eq<u64>($t1, Mul(2, $t0))
+  6: return $t1
+  7: label L2
+  8: abort($t2)
+}
+
+
+[variant baseline]
+fun TestPost::max($t0|a: u64, $t1|b: u64): u64 {
+     var $t2: bool
+     var $t3: u64
+  0: $t2 := >=($t0, $t1)
+  1: if ($t2) goto 2 else goto 5
+  2: label L1
+  3: $t3 := move($t0)
+  4: goto 7
+  5: label L0
+  6: $t3 := move($t1)
+  7: label L2
+  8: return $t3
+}
+
+
+[variant verification]
+fun TestPost::max($t0|a: u64, $t1|b: u64): u64 {
+     var $t2: bool
+     var $t3: u64
+  0: $t2 := >=($t0, $t1)
+  1: if ($t2) goto 2 else goto 5
+  2: label L1
+  3: $t3 := move($t0)
+  4: goto 7
+  5: label L0
+  6: $t3 := move($t1)
+  7: label L2
+     # VC: proof assertion at tests/spec_instrumentation/proofs/post.move:46:18+19
+  8: assert Implies(Ge($t0, $t1), Eq<u64>($t3, $t0))
+     # VC: proof assertion at tests/spec_instrumentation/proofs/post.move:48:18+19
+  9: assert Implies(Not(Ge($t0, $t1)), Eq<u64>($t3, $t1))
+     # VC: post-condition does not hold at tests/spec_instrumentation/proofs/post.move:42:9+20
+ 10: assert Ge($t3, $t0)
+     # VC: post-condition does not hold at tests/spec_instrumentation/proofs/post.move:43:9+20
+ 11: assert Ge($t3, $t1)
+ 12: return $t3
+}
+
+
+[variant baseline]
+fun TestPost::scale($t0|x: u64, $t1|factor: u64): u64 {
+     var $t2: u64
+     var $t3: num
+  0: assume Le(Mul($t0, $t1), 18446744073709551615)
+  1: $t2 := *($t0, $t1) on_abort goto 4 with $t3
+  2: label L1
+  3: return $t2
+  4: label L2
+  5: abort($t3)
+}
+
+
+[variant verification]
+fun TestPost::scale($t0|x: u64, $t1|factor: u64): u64 {
+     var $t2: u64
+     var $t3: num
+  0: assume Le(Mul($t0, $t1), 18446744073709551615)
+  1: $t2 := *($t0, $t1) on_abort goto 6 with $t3
+  2: label L1
+     # VC: proof assertion at tests/spec_instrumentation/proofs/post.move:32:14+26
+  3: assert Eq<u64>($t2, Mul($t0, $t1))
+     # VC: post-condition does not hold at tests/spec_instrumentation/proofs/post.move:29:9+29
+  4: assert Eq<u64>($t2, Mul($t0, $t1))
+  5: return $t2
+  6: label L2
+  7: abort($t3)
+}
+
+
+
+==== spec-instrumenter input specs ====
+
+fun TestPost::double[baseline]
+spec {
+  requires Le(Add($t0, $t0), 18446744073709551615);
+  ensures Eq<u64>(result0(), Mul(2, $t0));
+}
+
+fun TestPost::double[verification]
+spec {
+  requires Le(Add($t0, $t0), 18446744073709551615);
+  ensures Eq<u64>(result0(), Mul(2, $t0));
+}
+
+fun TestPost::max[baseline]
+spec {
+  ensures Ge(result0(), $t0);
+  ensures Ge(result0(), $t1);
+}
+
+fun TestPost::max[verification]
+spec {
+  ensures Ge(result0(), $t0);
+  ensures Ge(result0(), $t1);
+}
+
+fun TestPost::scale[baseline]
+spec {
+  requires Le(Mul($t0, $t1), 18446744073709551615);
+  ensures Eq<u64>(result0(), Mul($t0, $t1));
+}
+
+fun TestPost::scale[verification]
+spec {
+  requires Le(Mul($t0, $t1), 18446744073709551615);
+  ensures Eq<u64>(result0(), Mul($t0, $t1));
+}

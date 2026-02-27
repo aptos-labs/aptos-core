@@ -1,0 +1,47 @@
+============ initial translation from Move ================
+
+[variant baseline]
+fun TestSplitErrors::test_split_invalid($t0|x: u64): u64 {
+     var $t1: u64
+  0: $t1 := move($t0)
+  1: return $t1
+}
+
+============ after pipeline `proofs` ================
+
+[variant baseline]
+fun TestSplitErrors::test_split_invalid($t0|x: u64): u64 {
+  0: label L1
+  1: return $t0
+}
+
+
+[variant verification]
+fun TestSplitErrors::test_split_invalid($t0|x: u64): u64 {
+  0: nop
+  1: label L1
+     # VC: post-condition does not hold at tests/spec_instrumentation/proofs/split_errors.move:12:9+20
+  2: assert Eq<u64>($t0, $t0)
+  3: return $t0
+}
+
+
+
+==== spec-instrumenter input specs ====
+
+fun TestSplitErrors::test_split_invalid[baseline]
+spec {
+  ensures Eq<u64>(result0(), $t0);
+}
+
+fun TestSplitErrors::test_split_invalid[verification]
+spec {
+  ensures Eq<u64>(result0(), $t0);
+}
+
+============ Diagnostics ================
+error: `split` expression must be of type `bool` or an enum type
+   ┌─ tests/spec_instrumentation/proofs/split_errors.move:14:15
+   │
+14 │         split x;
+   │               ^

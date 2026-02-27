@@ -53,6 +53,7 @@ pub(crate) struct PackageData {
     env: GlobalEnv,
     path: String,
     args: McpArgs,
+    built_with_bytecode: bool,
     verified: Option<(VerifiedScope, bool, usize)>,
     /// Pre-rendered diagnostic messages from the last stage that produced them.
     diagnostics: Vec<String>,
@@ -71,12 +72,17 @@ impl PackageData {
     ///
     /// Only fails on I/O errors or invalid package path. All compilation errors and
     /// warnings are stored in the returned `GlobalEnv`.
-    pub(crate) fn init(path: &Path, args: &McpArgs) -> anyhow::Result<Self> {
+    pub(crate) fn init(path: &Path, args: &McpArgs, with_bytecode: bool) -> anyhow::Result<Self> {
         let named_addresses = args
             .named_addresses
             .iter()
             .map(|(name, addr)| (name.clone(), addr.into_inner()))
             .collect();
+        let source = if with_bytecode {
+            "compiling"
+        } else {
+            "checking"
+        };
         let env = aptos_framework::build_model(
             args.dev_mode,
             path,
@@ -84,21 +90,22 @@ impl PackageData {
             args.target_filter.clone(),
             args.bytecode_version,
             None,
-            args.language_version,
+            Some(args.language_version),
             false,
             aptos_framework::extended_checks::get_all_attribute_names().clone(),
             args.experiments.clone(),
-            false, // no bytecode needed for initial build
+            with_bytecode,
         )?;
         let diagnostics = render_diagnostics(&env);
-        log_diagnostics(&diagnostics, "checking");
+        log_diagnostics(&diagnostics, source);
         Ok(Self {
             env,
             path: path.to_string_lossy().into_owned(),
             args: args.clone(),
+            built_with_bytecode: with_bytecode,
             verified: None,
             diagnostics,
-            diagnostics_source: "checking".to_string(),
+            diagnostics_source: source.to_string(),
         })
     }
 
@@ -112,11 +119,9 @@ impl PackageData {
         &mut self.env
     }
 
-    /// Returns true if any target module has compiled bytecode attached.
-    pub(crate) fn has_bytecode(&self) -> bool {
-        self.env
-            .get_modules()
-            .any(|m| m.is_target() && m.get_verified_module().is_some())
+    /// Returns true if this model was built with bytecode generation enabled.
+    pub(crate) fn built_with_bytecode(&self) -> bool {
+        self.built_with_bytecode
     }
 
     /// Rebuild the model with bytecode generation enabled (required by the prover).
@@ -135,12 +140,13 @@ impl PackageData {
             self.args.target_filter.clone(),
             self.args.bytecode_version,
             None,
-            self.args.language_version,
+            Some(self.args.language_version),
             false,
             aptos_framework::extended_checks::get_all_attribute_names().clone(),
             self.args.experiments.clone(),
             true, // with bytecode for prover
         )?;
+        self.built_with_bytecode = true;
         self.verified = None;
         self.diagnostics = render_diagnostics(&self.env);
         log_diagnostics(&self.diagnostics, "compiling");
@@ -186,7 +192,7 @@ fn log_diagnostics(diagnostics: &[String], source: &str) {
 }
 
 /// Render all diagnostics at Warning level or above from a `GlobalEnv`.
-fn render_diagnostics(env: &GlobalEnv) -> Vec<String> {
+pub(crate) fn render_diagnostics(env: &GlobalEnv) -> Vec<String> {
     let mut messages = Vec::new();
     env.report_diag_with_filter(
         |files, diag| {

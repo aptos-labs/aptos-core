@@ -7,8 +7,8 @@ error: post-condition does not hold
   │         ^^^^^^^^^^^^^^^^^^^^^^^^
   │
   =     at <TEMPDIR>/bad_spec.move:2: double
-  =         x = 9223372036854775766
+  =         x = <redacted>
   =     at <TEMPDIR>/bad_spec.move:3: double
-  =         result = 18446744073709551532
+  =         result = <redacted>
   =     at <TEMPDIR>/bad_spec.move:4: double
   =     at <TEMPDIR>/bad_spec.move:6: double (spec)

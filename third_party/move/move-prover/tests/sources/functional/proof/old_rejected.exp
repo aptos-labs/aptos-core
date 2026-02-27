@@ -1,0 +1,6 @@
+Move prover returns: exiting with compilation errors
+error: `old(..)` expression not allowed in this context
+   ┌─ tests/sources/functional/proof/old_rejected.move:21:16
+   │
+21 │         assert old(c.value) + 1 <= MAX_U64; // error: old() not allowed
+   │                ^^^^^^^^^^^^

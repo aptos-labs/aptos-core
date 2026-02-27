@@ -2114,8 +2114,100 @@ fn spec_member(context: &mut Context, sp!(loc, pm): P::SpecBlockMember) -> E::Sp
                 .collect();
             EM::Pragma { properties }
         },
+        PM::Proof { body } => {
+            let body = translate_proof(context, body);
+            EM::Proof { body }
+        },
+        PM::Lemma {
+            name,
+            signature,
+            spec_members,
+            proof,
+        } => {
+            let (old_aliases, signature) = function_signature(context, signature);
+            let spec_members = spec_members
+                .into_iter()
+                .map(|m| spec_member(context, m))
+                .collect();
+            let proof = proof.map(|p| translate_proof(context, p));
+            context.set_to_outer_scope(old_aliases);
+            EM::Lemma {
+                name,
+                signature,
+                spec_members,
+                proof,
+            }
+        },
     };
     sp(loc, em)
+}
+
+/// Recursively translate a parser proof to an expansion proof.
+fn translate_proof(context: &mut Context, sp!(loc, proof_): P::Proof) -> E::Proof {
+    let ep = match proof_ {
+        P::Proof_::Let(name, pexp) => E::Proof_::Let(name, exp_(context, pexp)),
+        P::Proof_::IfElse(cond, then_branch, else_branch) => E::Proof_::IfElse(
+            exp_(context, cond),
+            Box::new(translate_proof(context, *then_branch)),
+            else_branch.map(|eb| Box::new(translate_proof(context, *eb))),
+        ),
+        P::Proof_::Block(stmts) => E::Proof_::Block(
+            stmts
+                .into_iter()
+                .map(|s| translate_proof(context, s))
+                .collect(),
+        ),
+        P::Proof_::Assert(pexp) => E::Proof_::Assert(exp_(context, pexp)),
+        P::Proof_::Assume(pprops, pexp) => {
+            let props = pprops
+                .into_iter()
+                .map(|p| pragma_property(context, p))
+                .collect();
+            E::Proof_::Assume(props, exp_(context, pexp))
+        },
+        P::Proof_::Apply(chain, pargs) => {
+            let access = name_access_chain(context, Access::Term, chain, None);
+            match access {
+                Some(access) => {
+                    let args = pargs.into_iter().map(|e| exp_(context, e)).collect();
+                    E::Proof_::Apply(access, args)
+                },
+                None => E::Proof_::Block(vec![]), // error already reported
+            }
+        },
+        P::Proof_::ForallApply {
+            bindings,
+            patterns,
+            lemma,
+            args,
+        } => {
+            let ebindings = bind_with_range_list(context, bindings);
+            let epatterns = patterns
+                .into_iter()
+                .map(|group| group.into_iter().map(|e| exp_(context, e)).collect())
+                .collect();
+            let elemma = name_access_chain(context, Access::Term, lemma, None);
+            let eargs = args.into_iter().map(|e| exp_(context, e)).collect();
+            match (ebindings, elemma) {
+                (Some(ebindings), Some(elemma)) => E::Proof_::ForallApply {
+                    bindings: ebindings,
+                    patterns: epatterns,
+                    lemma: elemma,
+                    args: eargs,
+                },
+                _ => E::Proof_::Block(vec![]), // error already reported
+            }
+        },
+        P::Proof_::Calc(steps) => E::Proof_::Calc(
+            steps
+                .into_iter()
+                .map(|(pexp, op)| (exp_(context, pexp), op))
+                .collect(),
+        ),
+        P::Proof_::Post(inner) => E::Proof_::Post(Box::new(translate_proof(context, *inner))),
+        P::Proof_::Split(pexp) => E::Proof_::Split(exp_(context, pexp)),
+    };
+    sp(loc, ep)
 }
 
 fn pragma_property(context: &mut Context, sp!(loc, pp_): P::PragmaProperty) -> E::PragmaProperty {
@@ -3374,6 +3466,54 @@ fn unbound_names_spec_block_member(unbound: &mut UnboundNames, sp!(_, m_): &E::S
         | M::Include { .. }
         | M::Apply { .. }
         | M::Pragma { .. } => (),
+        M::Proof { body } => unbound_names_proof(unbound, body),
+        M::Lemma {
+            spec_members,
+            proof,
+            ..
+        } => {
+            for m in spec_members {
+                unbound_names_spec_block_member(unbound, m);
+            }
+            if let Some(p) = proof {
+                unbound_names_proof(unbound, p);
+            }
+        },
+    }
+}
+
+fn unbound_names_proof(unbound: &mut UnboundNames, sp!(_, proof_): &E::Proof) {
+    match proof_ {
+        E::Proof_::Let(_, e) | E::Proof_::Assert(e) => unbound_names_exp(unbound, e),
+        E::Proof_::Assume(_, e) => unbound_names_exp(unbound, e),
+        E::Proof_::IfElse(cond, then_branch, else_branch) => {
+            unbound_names_exp(unbound, cond);
+            unbound_names_proof(unbound, then_branch);
+            if let Some(eb) = else_branch {
+                unbound_names_proof(unbound, eb);
+            }
+        },
+        E::Proof_::Block(stmts) => {
+            for s in stmts {
+                unbound_names_proof(unbound, s);
+            }
+        },
+        E::Proof_::Apply(_, args) => args.iter().for_each(|e| unbound_names_exp(unbound, e)),
+        E::Proof_::ForallApply { args, patterns, .. } => {
+            for group in patterns {
+                for e in group {
+                    unbound_names_exp(unbound, e);
+                }
+            }
+            args.iter().for_each(|e| unbound_names_exp(unbound, e));
+        },
+        E::Proof_::Calc(steps) => {
+            for (e, _) in steps {
+                unbound_names_exp(unbound, e);
+            }
+        },
+        E::Proof_::Post(inner) => unbound_names_proof(unbound, inner),
+        E::Proof_::Split(e) => unbound_names_exp(unbound, e),
     }
 }
 

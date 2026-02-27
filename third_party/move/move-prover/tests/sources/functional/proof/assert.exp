@@ -1,0 +1,15 @@
+Move prover returns: exiting with verification errors
+error: proof assertion not satisfied
+   ┌─ tests/sources/functional/proof/assert.move:59:14
+   │
+59 │         post assert result > 100;  // error: x could be 0, so result == 1
+   │              ^^^^^^^^^^^^^^^^^^^^
+   │
+   =     at tests/sources/functional/proof/assert.move:52: successor
+   =     at tests/sources/functional/proof/assert.move:56: successor (spec)
+   =     at tests/sources/functional/proof/assert.move:52: successor
+   =         x = <redacted>
+   =     at tests/sources/functional/proof/assert.move:53: successor
+   =         result = <redacted>
+   =     at tests/sources/functional/proof/assert.move:54: successor
+   =     at tests/sources/functional/proof/assert.move:59: successor (spec)

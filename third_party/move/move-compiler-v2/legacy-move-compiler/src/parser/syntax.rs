@@ -3880,8 +3880,13 @@ fn parse_module(
                     )?)
                 },
                 Tok::Spec => {
-                    match context.tokens.lookahead() {
-                        Ok(Tok::Fun) | Ok(Tok::Native) => {
+                    let lookahead = context.tokens.lookahead_content();
+                    // `spec lemma <name>` is a lemma declaration.
+                    // `spec lemma { ... }` is a spec block for a function named "lemma".
+                    let is_lemma = matches!(&lookahead, Ok((Tok::Identifier, s)) if s == "lemma")
+                        && matches!(context.tokens.lookahead2(), Ok((_, Tok::Identifier)));
+                    match lookahead {
+                        Ok((Tok::Fun, _)) | Ok((Tok::Native, _)) => {
                             context.tokens.match_doc_comments();
                             let start_loc = context.tokens.start_loc();
                             context.tokens.advance()?;
@@ -3898,6 +3903,17 @@ fn parse_module(
                                 start_loc,
                                 attributes,
                                 parse_spec_function,
+                            )?)
+                        },
+                        _ if is_lemma => {
+                            context.tokens.match_doc_comments();
+                            let start_loc = context.tokens.start_loc();
+                            context.tokens.advance()?; // consume `spec`
+                            ModuleMember::Spec(singleton_module_spec_block(
+                                context,
+                                start_loc,
+                                attributes,
+                                parse_lemma,
                             )?)
                         },
                         _ => {
@@ -4099,7 +4115,7 @@ fn parse_spec_block(
         _ => {
             return Err(unexpected_token_error(
                 context.tokens,
-                "one of `module`, `struct`, `fun`, `schema`, or `{`",
+                "one of `module`, `struct`, `fun`, `schema`, a name, or `{`",
             ));
         },
     };
@@ -4123,6 +4139,16 @@ fn parse_spec_block(
         members.push(parse_spec_block_member(context)?);
     }
     consume_token(context.tokens, Tok::RBrace)?;
+    // Parse optional trailing proof block: `} proof { ... }`
+    if context.tokens.peek() == Tok::Identifier && context.tokens.content() == "proof" {
+        require_language_version(
+            context,
+            current_token_loc(context.tokens),
+            LanguageVersion::V2_4,
+            "proof blocks are",
+        );
+        members.push(parse_proof_block(context)?);
+    }
     Ok(spanned(
         context.tokens.file_hash(),
         start_loc,
@@ -4187,6 +4213,7 @@ fn parse_spec_block_member(context: &mut Context) -> Result<SpecBlockMember, Box
             "include" => parse_spec_include(context),
             "apply" => parse_spec_apply(context),
             "pragma" => parse_spec_pragma(context),
+            "lemma" => parse_lemma(context),
             "global" | "local" => parse_spec_variable(context),
             "update" => parse_spec_update(context),
             _ => {
@@ -4706,6 +4733,349 @@ fn parse_spec_property(context: &mut Context) -> Result<PragmaProperty, Box<Diag
         context.tokens.previous_end_loc(),
         PragmaProperty_ { name, value },
     ))
+}
+
+// Parse a proof block:
+//    ProofBlock = "proof" "{" ProofStmt* "}"
+//    ProofStmt  = "let" <Name> "=" <Exp> ";"
+//               | "if" "(" <Exp> ")" <ProofBody> ["else" <ProofBody>]
+//               | "{" ProofStmt* "}"
+//               | "assert" <Exp> ";"
+//               | "assume" <ConditionProperties> <Exp> ";"
+//               | "apply" <NameAccessChain> "(" Comma<Exp> ")" ";"
+//               | "forall" <QuantBindings> [<TriggerSets>] "apply" <NameAccessChain> "(" Comma<Exp> ")" ";"
+//               | "calc" "(" <Exp> { <RelOp> <Exp> } ")" ";"
+fn parse_proof_block(context: &mut Context) -> Result<SpecBlockMember, Box<Diagnostic>> {
+    let start_loc = context.tokens.start_loc();
+    consume_identifier(context.tokens, "proof")?;
+    let body = parse_proof_block_body(context)?;
+    Ok(spanned(
+        context.tokens.file_hash(),
+        start_loc,
+        context.tokens.previous_end_loc(),
+        SpecBlockMember_::Proof { body },
+    ))
+}
+
+/// Parses `"{" ProofStmt* "}"` and returns a `Proof_::Block`.
+fn parse_proof_block_body(context: &mut Context) -> Result<Proof, Box<Diagnostic>> {
+    let start_loc = context.tokens.start_loc();
+    consume_token(context.tokens, Tok::LBrace)?;
+    let mut stmts = vec![];
+    while context.tokens.peek() != Tok::RBrace {
+        stmts.push(parse_proof_stmt(context)?);
+    }
+    consume_token(context.tokens, Tok::RBrace)?;
+    Ok(spanned(
+        context.tokens.file_hash(),
+        start_loc,
+        context.tokens.previous_end_loc(),
+        Proof_::Block(stmts),
+    ))
+}
+
+/// Parses a single proof statement.
+fn parse_proof_stmt(context: &mut Context) -> Result<Proof, Box<Diagnostic>> {
+    let start_loc = context.tokens.start_loc();
+    let proof_ = match context.tokens.peek() {
+        Tok::LBrace => {
+            // Nested block
+            return parse_proof_block_body(context);
+        },
+        Tok::Let => {
+            // let name = exp;
+            context.tokens.advance()?;
+            let name = parse_identifier(context)?;
+            consume_token(context.tokens, Tok::Equal)?;
+            let exp = parse_exp(context)?;
+            consume_token(context.tokens, Tok::Semicolon)?;
+            Proof_::Let(name, exp)
+        },
+        Tok::If => {
+            // if (cond) proof_body [else proof_body]
+            context.tokens.advance()?;
+            consume_token(context.tokens, Tok::LParen)?;
+            let cond = parse_exp(context)?;
+            consume_token(context.tokens, Tok::RParen)?;
+            let then_branch = parse_proof_body(context)?;
+            let else_branch = if context.tokens.peek() == Tok::Else {
+                context.tokens.advance()?;
+                Some(Box::new(parse_proof_body(context)?))
+            } else {
+                None
+            };
+            Proof_::IfElse(cond, Box::new(then_branch), else_branch)
+        },
+        Tok::Identifier => match context.tokens.content() {
+            "assert" => {
+                context.tokens.advance()?;
+                let exp = parse_exp(context)?;
+                consume_token(context.tokens, Tok::Semicolon)?;
+                Proof_::Assert(exp)
+            },
+            "assume" => {
+                context.tokens.advance()?;
+                let properties = parse_condition_properties(context)?;
+                let exp = parse_exp(context)?;
+                consume_token(context.tokens, Tok::Semicolon)?;
+                Proof_::Assume(properties, exp)
+            },
+            "forall" => {
+                // forall bindings [triggers] use lemma(args);
+                context.tokens.advance()?;
+                let bindings_start = context.tokens.start_loc();
+                let binds = parse_list(
+                    context,
+                    |context| {
+                        if context.tokens.peek() == Tok::Comma {
+                            context.tokens.advance()?;
+                            Ok(true)
+                        } else {
+                            Ok(false)
+                        }
+                    },
+                    parse_quant_binding,
+                )?;
+                let bindings = spanned(
+                    context.tokens.file_hash(),
+                    bindings_start,
+                    context.tokens.previous_end_loc(),
+                    binds,
+                );
+                // Optional trigger groups: {e1, e2} {e3}
+                let patterns = if context.tokens.peek() == Tok::LBrace {
+                    parse_list(
+                        context,
+                        |context| Ok(context.tokens.peek() == Tok::LBrace),
+                        |context| {
+                            parse_comma_list(
+                                context,
+                                Tok::LBrace,
+                                Tok::RBrace,
+                                parse_exp,
+                                "a trigger expression",
+                            )
+                        },
+                    )?
+                } else {
+                    vec![]
+                };
+                // "apply" lemma(args);
+                consume_identifier(context.tokens, "apply")?;
+                let lemma = parse_name_access_chain(context, false, || "a lemma name")?;
+                let args = parse_comma_list(
+                    context,
+                    Tok::LParen,
+                    Tok::RParen,
+                    parse_exp,
+                    "a call argument expression",
+                )?;
+                consume_token(context.tokens, Tok::Semicolon)?;
+                Proof_::ForallApply {
+                    bindings,
+                    patterns,
+                    lemma,
+                    args,
+                }
+            },
+            "calc" => {
+                // calc(e1 relop e2 relop ... en);
+                // Expressions are parsed up to (but not including) relational
+                // operators, so `x + 3` works without parentheses.
+                context.tokens.advance()?;
+                consume_token(context.tokens, Tok::LParen)?;
+                let mut steps = vec![];
+                // Parse first expression (stop before relops, precedence > 5)
+                let first_exp = {
+                    let lhs = parse_unary_exp(context)?;
+                    parse_binop_exp(context, lhs, 6)?
+                };
+                steps.push((first_exp, None));
+                // Parse remaining relop expr pairs
+                while is_relop(context.tokens.peek()) {
+                    let op_start = context.tokens.start_loc();
+                    let op_ = parse_relop(context.tokens.peek());
+                    context.tokens.advance()?;
+                    let op = spanned(
+                        context.tokens.file_hash(),
+                        op_start,
+                        context.tokens.previous_end_loc(),
+                        op_,
+                    );
+                    let exp = {
+                        let lhs = parse_unary_exp(context)?;
+                        parse_binop_exp(context, lhs, 6)?
+                    };
+                    // Set relop on previous step
+                    if let Some(last) = steps.last_mut() {
+                        last.1 = Some(op);
+                    }
+                    steps.push((exp, None));
+                }
+                consume_token(context.tokens, Tok::RParen)?;
+                consume_token(context.tokens, Tok::Semicolon)?;
+                Proof_::Calc(steps)
+            },
+            "apply" => {
+                context.tokens.advance()?;
+                let name = parse_name_access_chain(context, false, || "a lemma name")?;
+                let args = parse_comma_list(
+                    context,
+                    Tok::LParen,
+                    Tok::RParen,
+                    parse_exp,
+                    "a call argument expression",
+                )?;
+                consume_token(context.tokens, Tok::Semicolon)?;
+                Proof_::Apply(name, args)
+            },
+            "post" => {
+                context.tokens.advance()?;
+                let inner = parse_proof_stmt(context)?;
+                Proof_::Post(Box::new(inner))
+            },
+            "split" => {
+                context.tokens.advance()?;
+                let exp = parse_exp(context)?;
+                consume_token(context.tokens, Tok::Semicolon)?;
+                Proof_::Split(exp)
+            },
+            _ => {
+                return Err(unexpected_token_error(
+                    context.tokens,
+                    "one of `let`, `if`, `assert`, `assume`, `apply`, `forall`, `calc`, `post`, `split`, or `{`",
+                ));
+            },
+        },
+        _ => {
+            return Err(unexpected_token_error(
+                context.tokens,
+                "one of `let`, `if`, `assert`, `assume`, `apply`, `forall`, `calc`, `post`, `split`, or `{`",
+            ));
+        },
+    };
+    Ok(spanned(
+        context.tokens.file_hash(),
+        start_loc,
+        context.tokens.previous_end_loc(),
+        proof_,
+    ))
+}
+
+/// Parses a proof body: either a block `{ ... }` or a single statement.
+fn parse_proof_body(context: &mut Context) -> Result<Proof, Box<Diagnostic>> {
+    if context.tokens.peek() == Tok::LBrace {
+        parse_proof_block_body(context)
+    } else {
+        parse_proof_stmt(context)
+    }
+}
+
+/// Returns true if the token is a relational operator for calc blocks.
+fn is_relop(tok: Tok) -> bool {
+    matches!(
+        tok,
+        Tok::EqualEqual
+            | Tok::ExclaimEqual
+            | Tok::Less
+            | Tok::Greater
+            | Tok::LessEqual
+            | Tok::GreaterEqual
+    )
+}
+
+/// Maps a token to a BinOp_ for relational operators.
+fn parse_relop(tok: Tok) -> BinOp_ {
+    match tok {
+        Tok::EqualEqual => BinOp_::Eq,
+        Tok::ExclaimEqual => BinOp_::Neq,
+        Tok::Less => BinOp_::Lt,
+        Tok::Greater => BinOp_::Gt,
+        Tok::LessEqual => BinOp_::Le,
+        Tok::GreaterEqual => BinOp_::Ge,
+        _ => unreachable!(),
+    }
+}
+
+// Parse a lemma declaration:
+//    Lemma = "lemma" <Name> <OptionalTypeParameters> "(" Comma<Parameter> ")"
+//            "{" <SpecConditions> "}" ["proof" "{" ProofStmt* "}"]
+fn parse_lemma(context: &mut Context) -> Result<SpecBlockMember, Box<Diagnostic>> {
+    let start_loc = context.tokens.start_loc();
+    require_language_version(
+        context,
+        current_token_loc(context.tokens),
+        LanguageVersion::V2_4,
+        "lemma declarations are",
+    );
+    consume_identifier(context.tokens, "lemma")?;
+    let name = FunctionName(parse_identifier(context)?);
+    let type_parameters = parse_optional_type_parameters(context)?;
+    let parameters = parse_comma_list(
+        context,
+        Tok::LParen,
+        Tok::RParen,
+        parse_parameter,
+        "a function parameter",
+    )?;
+    // Lemma has no return type (unit)
+    let return_type = sp(
+        make_loc(
+            context.tokens.file_hash(),
+            context.tokens.start_loc(),
+            context.tokens.start_loc(),
+        ),
+        Type_::Unit,
+    );
+    let signature = FunctionSignature {
+        type_parameters,
+        parameters,
+        return_type,
+    };
+    // Parse spec body: { requires/ensures/pragma }
+    consume_token(context.tokens, Tok::LBrace)?;
+    let mut spec_members = vec![];
+    while context.tokens.peek() != Tok::RBrace {
+        spec_members.push(parse_lemma_spec_member(context)?);
+    }
+    consume_token(context.tokens, Tok::RBrace)?;
+    // Optional proof block
+    let proof = if context.tokens.peek() == Tok::Identifier && context.tokens.content() == "proof" {
+        consume_identifier(context.tokens, "proof")?;
+        Some(parse_proof_block_body(context)?)
+    } else {
+        None
+    };
+    Ok(spanned(
+        context.tokens.file_hash(),
+        start_loc,
+        context.tokens.previous_end_loc(),
+        SpecBlockMember_::Lemma {
+            name,
+            signature,
+            spec_members,
+            proof,
+        },
+    ))
+}
+
+/// Parses a spec member inside a lemma spec block (only requires, ensures, pragma).
+fn parse_lemma_spec_member(context: &mut Context) -> Result<SpecBlockMember, Box<Diagnostic>> {
+    context.tokens.match_doc_comments();
+    match context.tokens.peek() {
+        Tok::Identifier => match context.tokens.content() {
+            "requires" | "ensures" => parse_condition(context),
+            "pragma" => parse_spec_pragma(context),
+            _ => Err(unexpected_token_error(
+                context.tokens,
+                "one of `requires`, `ensures`, or `pragma`",
+            )),
+        },
+        _ => Err(unexpected_token_error(
+            context.tokens,
+            "one of `requires`, `ensures`, or `pragma`",
+        )),
+    }
 }
 
 /// Creates a module spec block for a single member.

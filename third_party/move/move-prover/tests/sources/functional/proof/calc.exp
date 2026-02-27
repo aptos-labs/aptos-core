@@ -1,0 +1,15 @@
+Move prover returns: exiting with verification errors
+error: calc step not satisfied
+   ┌─ tests/sources/functional/proof/calc.move:72:9
+   │
+72 │ ╭         calc(
+73 │ │             x + 1 + 1
+74 │ │             == x + 3  // error: should be x + 2
+75 │ │         );
+   │ ╰──────────^
+   │
+   =     at tests/sources/functional/proof/calc.move:65: add_two
+   =     at tests/sources/functional/proof/calc.move:69: add_two (spec)
+   =     at tests/sources/functional/proof/calc.move:65: add_two
+   =         x = <redacted>
+   =     at tests/sources/functional/proof/calc.move:72: add_two (spec)

@@ -1,0 +1,75 @@
+Move prover returns: exiting with verification errors
+warning: proof uses trusted assumption
+   ┌─ tests/sources/functional/proof/lemma.move:37:13
+   │
+37 │             assume [trusted] true;
+   │             ^^^^^^^^^^^^^^^^^^^^^^
+
+warning: proof uses trusted assumption
+   ┌─ tests/sources/functional/proof/lemma.move:59:13
+   │
+59 │             assume [trusted] true;
+   │             ^^^^^^^^^^^^^^^^^^^^^^
+
+warning: proof uses trusted assumption
+    ┌─ tests/sources/functional/proof/lemma.move:163:13
+    │
+163 │             assume [trusted] true;
+    │             ^^^^^^^^^^^^^^^^^^^^^^
+
+warning: proof uses trusted assumption
+    ┌─ tests/sources/functional/proof/lemma.move:202:13
+    │
+202 │             assume [trusted] true;
+    │             ^^^^^^^^^^^^^^^^^^^^^^
+
+error: post-condition does not hold
+    ┌─ tests/sources/functional/proof/lemma.move:151:13
+    │
+151 │             ensures x + 1 == x;  // obviously false
+    │             ^^^^^^^^^^^^^^^^^^^
+    │
+    =     at tests/sources/functional/proof/lemma.move:150: bad_claim (spec)
+    =         x = <redacted>
+    =     at tests/sources/functional/proof/lemma.move:152: bad_claim (spec)
+    =     at tests/sources/functional/proof/lemma.move:151: bad_claim (spec)
+
+error: lemma requirement not satisfied
+    ┌─ tests/sources/functional/proof/lemma.move:173:9
+    │
+173 │         apply needs_positive(x);  // error: x might be 0
+    │         ^^^^^^^^^^^^^^^^^^^^^^^^
+    │
+    =     at tests/sources/functional/proof/lemma.move:167: might_be_zero
+    =         x = <redacted>
+    =     at tests/sources/functional/proof/lemma.move:173: might_be_zero (spec)
+
+error: post-condition does not hold
+    ┌─ tests/sources/functional/proof/lemma.move:184:13
+    │
+184 │             ensures sum(n) <= n;  // false for n >= 3
+    │             ^^^^^^^^^^^^^^^^^^^^
+    │
+    =     at tests/sources/functional/proof/lemma.move:182: sum_upper_bound (spec)
+    =     at tests/sources/functional/proof/lemma.move:183: sum_upper_bound (spec)
+    =     at tests/sources/functional/proof/lemma.move:182: sum_upper_bound (spec)
+    =         n = <redacted>
+    =     at tests/sources/functional/proof/lemma.move:187: sum_upper_bound (spec)
+    =     at tests/sources/functional/proof/lemma.move:182: sum_upper_bound (spec)
+    =     at tests/sources/functional/proof/lemma.move:189: sum_upper_bound (spec)
+    =     at tests/sources/functional/proof/lemma.move:184: sum_upper_bound (spec)
+
+error: post-condition does not hold
+    ┌─ tests/sources/functional/proof/lemma.move:207:13
+    │
+207 │             ensures x >= 1;  // false for x == 0
+    │             ^^^^^^^^^^^^^^^
+    │
+    =     at tests/sources/functional/proof/lemma.move:205: strong_claim (spec)
+    =     at tests/sources/functional/proof/lemma.move:206: strong_claim (spec)
+    =     at tests/sources/functional/proof/lemma.move:205: strong_claim (spec)
+    =         x = <redacted>
+    =     at tests/sources/functional/proof/lemma.move:209: strong_claim (spec)
+    =     at tests/sources/functional/proof/lemma.move:205: strong_claim (spec)
+    =     at tests/sources/functional/proof/lemma.move:211: strong_claim (spec)
+    =     at tests/sources/functional/proof/lemma.move:207: strong_claim (spec)

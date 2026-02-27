@@ -3113,6 +3113,7 @@ mod tests {
             function_data,   // function_data
             vec![],          // spec_vars
             vec![],          // spec_funs
+            vec![],          // lemma_decls
             Spec::default(), // module_spec
             vec![],          // spec_block_infos
         );
@@ -4764,6 +4765,7 @@ mod tests {
             function_data,   // function_data
             vec![],          // spec_vars
             spec_funs,       // spec_funs
+            vec![],          // lemma_decls
             Spec::default(), // module_spec
             vec![],          // spec_block_infos
         );

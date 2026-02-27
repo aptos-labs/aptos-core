@@ -1024,7 +1024,7 @@ impl<'a> Sourcifier<'a> {
     /// Prints a spec block for a function, including the repeated signature.
     pub fn print_fun_spec(&self, fun_env: &FunctionEnv) {
         let spec = fun_env.get_spec();
-        if spec.conditions.is_empty() && spec.properties.is_empty() {
+        if spec.conditions.is_empty() && spec.properties.is_empty() && spec.proof.is_none() {
             return;
         }
 
@@ -1049,6 +1049,9 @@ impl<'a> Sourcifier<'a> {
         let exp_sourcifier = ExpSourcifier::for_fun_spec(self, fun_env, tctx, self.amend);
         for cond in &spec.conditions {
             self.print_condition(cond, &exp_sourcifier);
+        }
+        if let Some(proof) = &spec.proof {
+            self.print_proof(proof, &exp_sourcifier);
         }
         self.writer.unindent();
 
@@ -1106,7 +1109,7 @@ impl<'a> Sourcifier<'a> {
 
     /// Prints a spec block directly from a Spec object with the given header.
     pub fn print_spec(&self, spec: &Spec, header: &str, tctx: TypeDisplayContext) {
-        if spec.conditions.is_empty() && spec.properties.is_empty() {
+        if spec.conditions.is_empty() && spec.properties.is_empty() && spec.proof.is_none() {
             return;
         }
 
@@ -1119,10 +1122,134 @@ impl<'a> Sourcifier<'a> {
         for cond in &spec.conditions {
             self.print_condition(cond, &exp_sourcifier);
         }
+        if let Some(proof) = &spec.proof {
+            self.print_proof(proof, &exp_sourcifier);
+        }
         self.writer.unindent();
 
         emitln!(self.writer, "}");
         emitln!(self.writer);
+    }
+
+    fn print_proof(&self, proof: &crate::ast::Proof, exp_sourcifier: &ExpSourcifier) {
+        emitln!(self.writer, "proof {{");
+        self.writer.indent();
+        self.print_proof_body(proof, exp_sourcifier);
+        self.writer.unindent();
+        emitln!(self.writer, "}}");
+    }
+
+    fn print_proof_body(&self, proof: &crate::ast::Proof, exp_sourcifier: &ExpSourcifier) {
+        use crate::ast::Proof;
+        match proof {
+            Proof::Let(_, sym, exp) => {
+                let env = exp_sourcifier.env();
+                emit!(self.writer, "let {} = ", sym.display(env.symbol_pool()));
+                exp_sourcifier.print_exp(Prio::General, false, exp);
+                emitln!(self.writer, ";");
+            },
+            Proof::IfElse(_, cond, then_branch, else_branch) => {
+                emit!(self.writer, "if (");
+                exp_sourcifier.print_exp(Prio::General, false, cond);
+                emitln!(self.writer, ") {{");
+                self.writer.indent();
+                self.print_proof_body(then_branch, exp_sourcifier);
+                self.writer.unindent();
+                if let Some(eb) = else_branch {
+                    emitln!(self.writer, "}} else {{");
+                    self.writer.indent();
+                    self.print_proof_body(eb, exp_sourcifier);
+                    self.writer.unindent();
+                }
+                emitln!(self.writer, "}}");
+            },
+            Proof::Block(_, stmts) => {
+                for stmt in stmts {
+                    self.print_proof_body(stmt, exp_sourcifier);
+                }
+            },
+            Proof::Assert(_, exp) => {
+                emit!(self.writer, "assert ");
+                exp_sourcifier.print_exp(Prio::General, false, exp);
+                emitln!(self.writer, ";");
+            },
+            Proof::Assume(_, exp) => {
+                emit!(self.writer, "assume [trusted] ");
+                exp_sourcifier.print_exp(Prio::General, false, exp);
+                emitln!(self.writer, ";");
+            },
+            Proof::Apply(_, _lemma_qid, args) => {
+                emit!(self.writer, "apply ...(");
+                let mut comma = "";
+                for arg in args {
+                    emit!(self.writer, "{}", comma);
+                    exp_sourcifier.print_exp(Prio::General, false, arg);
+                    comma = ", ";
+                }
+                emitln!(self.writer, ");");
+            },
+            Proof::ForallApply(_, binds, _patterns, _lemma_qid, args) => {
+                let env = exp_sourcifier.env();
+                emit!(self.writer, "forall ");
+                let mut comma = "";
+                for (sym, ty) in binds {
+                    let tctx = crate::ty::TypeDisplayContext::new(env);
+                    emit!(
+                        self.writer,
+                        "{}{}: {}",
+                        comma,
+                        sym.display(env.symbol_pool()),
+                        ty.display(&tctx),
+                    );
+                    comma = ", ";
+                }
+                emit!(self.writer, " apply ...(");
+                comma = "";
+                for arg in args {
+                    emit!(self.writer, "{}", comma);
+                    exp_sourcifier.print_exp(Prio::General, false, arg);
+                    comma = ", ";
+                }
+                emitln!(self.writer, ");");
+            },
+            Proof::Calc(_, steps) => {
+                emit!(self.writer, "calc(");
+                let mut first = true;
+                for (lhs, op, _rhs) in steps {
+                    if !first {
+                        emit!(self.writer, " ");
+                        exp_sourcifier.print_exp(Prio::General, false, lhs);
+                    } else {
+                        exp_sourcifier.print_exp(Prio::General, false, lhs);
+                        first = false;
+                    }
+                    let op_str = match op {
+                        crate::ast::Operation::Eq => "==",
+                        crate::ast::Operation::Neq => "!=",
+                        crate::ast::Operation::Lt => "<",
+                        crate::ast::Operation::Gt => ">",
+                        crate::ast::Operation::Le => "<=",
+                        crate::ast::Operation::Ge => ">=",
+                        _ => "==",
+                    };
+                    emit!(self.writer, " {} ", op_str);
+                }
+                // Print the last rhs
+                if let Some((_, _, rhs)) = steps.last() {
+                    exp_sourcifier.print_exp(Prio::General, false, rhs);
+                }
+                emitln!(self.writer, ");");
+            },
+            Proof::Post(_, inner) => {
+                emit!(self.writer, "post ");
+                self.print_proof_body(inner, exp_sourcifier);
+            },
+            Proof::Split(_, exp) => {
+                emit!(self.writer, "split ");
+                exp_sourcifier.print_exp(Prio::General, false, exp);
+                emitln!(self.writer, ";");
+            },
+        }
     }
 }
 

@@ -5,12 +5,12 @@
 use crate::{
     ast::{
         AccessSpecifier, Address, Attribute, AttributeValue, Condition, ConditionKind, Exp,
-        ExpData, FriendDecl, ModuleName, Operation, Pattern, PropertyBag, PropertyValue,
-        QualifiedSymbol, Spec, SpecBlockInfo, SpecBlockTarget, SpecFunDecl, SpecVarDecl, TempIndex,
-        UseDecl, Value,
+        ExpData, FriendDecl, LemmaDecl, LemmaId, ModuleName, Operation, Pattern, Proof,
+        PropertyBag, PropertyValue, QualifiedSymbol, Spec, SpecBlockInfo, SpecBlockTarget,
+        SpecFunDecl, SpecVarDecl, TempIndex, UseDecl, Value,
     },
     builder::{
-        exp_builder::ExpTranslator,
+        exp_builder::{ExpTranslator, OldExpStatus},
         model_builder::{
             ConstEntry, EntryVisibility, FunEntry, LocalVarEntry, ModelBuilder,
             SpecOrBuiltinFunEntry, StructLayout, StructVariant,
@@ -98,6 +98,10 @@ pub(crate) struct ModuleBuilder<'env, 'translator> {
     /// Let bindings for the current spec block, characterized by a boolean indicating whether
     /// post state is active and the node id of the original expression of the let.
     pub spec_block_lets: BTreeMap<Symbol, (bool, NodeId)>,
+    /// Translated lemma declarations.
+    pub lemmas: Vec<LemmaDecl>,
+    /// Map from lemma name to index in `lemmas` vec (used for resolution during proof analysis).
+    pub lemma_name_to_idx: BTreeMap<Symbol, usize>,
 }
 
 /// A value which we pass in to spec block analyzers, describing the resolved target of the spec
@@ -173,6 +177,8 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
             module_spec: Spec::default(),
             spec_block_infos: Default::default(),
             spec_block_lets: BTreeMap::new(),
+            lemmas: Vec::new(),
+            lemma_name_to_idx: BTreeMap::new(),
         }
     }
 
@@ -767,6 +773,9 @@ impl ModuleBuilder<'_, '_> {
                 type_parameters.iter().map(|(n, a)| (n, a)),
                 type_,
             ),
+            Lemma {
+                name, signature, ..
+            } => self.decl_ana_lemma(&loc, name, signature),
             _ => {},
         }
     }
@@ -823,6 +832,55 @@ impl ModuleBuilder<'_, '_> {
             spec: RefCell::new(Default::default()),
         };
         self.spec_funs.push(fun_decl);
+    }
+
+    /// Declaration-phase analysis for a lemma: register name, signature, and skeleton.
+    /// This mirrors `decl_ana_spec_fun` so that lemma names are available during `def_ana`.
+    fn decl_ana_lemma(
+        &mut self,
+        loc: &Loc,
+        name: &PA::FunctionName,
+        signature: &EA::FunctionSignature,
+    ) {
+        let lemma_sym = self.symbol_pool().make(name.0.value.as_str());
+        let (type_params, params, result_type) = self.decl_ana_signature(signature, true);
+
+        if !result_type.is_unit() {
+            self.parent.error(loc, "lemma must have unit return type");
+        }
+
+        // Register in fun_table so condition analysis can find parameters.
+        let lemma_qsym = self.qualified_by_module(lemma_sym);
+        let fun_id = FunId::new(lemma_sym);
+        let fun_entry = FunEntry {
+            loc: loc.clone(),
+            name_loc: loc.clone(),
+            result_type_loc: loc.clone(),
+            module_id: self.module_id,
+            fun_id,
+            visibility: Visibility::Private,
+            is_native: false,
+            kind: FunctionKind::Lemma,
+            type_params: type_params.clone(),
+            params: params.clone(),
+            result_type: Type::unit(),
+            attributes: vec![],
+            inline_specs: BTreeMap::new(),
+        };
+        self.parent.fun_table.insert(lemma_qsym, fun_entry);
+
+        // Register the lemma skeleton (without conditions or proof).
+        let idx = self.lemmas.len();
+        self.lemma_name_to_idx.insert(lemma_sym, idx);
+        self.lemmas.push(LemmaDecl {
+            loc: loc.clone(),
+            name: lemma_sym,
+            type_params,
+            params,
+            conditions: vec![],
+            properties: Default::default(),
+            proof: None,
+        });
     }
 
     fn decl_ana_signature(
@@ -1784,6 +1842,505 @@ impl ModuleBuilder<'_, '_> {
                 is_global: false, ..
             } => { /* nothing to do right now */ },
             Update { lhs, rhs } => self.def_ana_global_var_update(loc, context, lhs, rhs),
+            Proof { body } => self.def_ana_proof_block(loc, context, body),
+            Lemma {
+                name,
+                signature,
+                spec_members,
+                proof,
+            } => self.def_ana_lemma(loc, context, name, signature, spec_members, proof),
+        }
+    }
+
+    fn def_ana_proof_block(&mut self, loc: &Loc, context: &SpecBlockContext, proof: &EA::Proof) {
+        // Proof blocks are only allowed in function-level spec blocks.
+        if !matches!(
+            context,
+            SpecBlockContext::Function(_) | SpecBlockContext::FunctionCodeV2(..)
+        ) {
+            self.parent
+                .error(loc, "proof block is only allowed in function spec blocks");
+            return;
+        }
+        let mut proof_locals = vec![];
+        if let Some(model_proof) =
+            self.def_ana_proof(context, proof, &mut proof_locals, false, false)
+        {
+            self.update_spec(context, |spec| spec.proof = Some(model_proof));
+        }
+    }
+
+    /// Recursively translates a parser proof to a model proof.
+    /// `proof_locals` accumulates let-bound variables for scoping within blocks.
+    /// `in_post` is true when inside a `post` wrapper (to detect nested `post post`).
+    /// `is_lemma` is true when analyzing a lemma proof (where `post` is not allowed).
+    fn def_ana_proof(
+        &mut self,
+        context: &SpecBlockContext,
+        proof: &EA::Proof,
+        proof_locals: &mut Vec<(Loc, Symbol, Type)>,
+        in_post: bool,
+        is_lemma: bool,
+    ) -> Option<Proof> {
+        let proof_loc = self.parent.to_loc(&proof.loc);
+        match &proof.value {
+            EA::Proof_::Let(name, exp) => {
+                let sym = self.symbol_pool().make(name.value.as_str());
+                let kind = if in_post {
+                    ConditionKind::Ensures
+                } else {
+                    ConditionKind::Assume
+                };
+                let mut et = self.exp_translator_for_context(&proof_loc, context, &kind);
+                if !in_post {
+                    et.old_status = OldExpStatus::NotSupported;
+                }
+                add_proof_locals(&mut et, proof_locals);
+                let (_, translated) = et.translate_exp_free(exp);
+                let translated = translated.into_exp();
+                let ty = et.get_node_type(translated.node_id());
+                et.finalize_types(true);
+                proof_locals.push((proof_loc.clone(), sym, ty));
+                Some(Proof::Let(proof_loc, sym, translated))
+            },
+            EA::Proof_::IfElse(cond, then_branch, else_branch) => {
+                let kind = if in_post {
+                    ConditionKind::Ensures
+                } else {
+                    ConditionKind::Assert
+                };
+                let mut et = self.exp_translator_for_context(&proof_loc, context, &kind);
+                if !in_post {
+                    et.old_status = OldExpStatus::NotSupported;
+                }
+                add_proof_locals(&mut et, proof_locals);
+                let cond_exp = et.translate_exp(cond, &BOOL_TYPE).into_exp();
+                et.finalize_types(true);
+                let then_proof =
+                    self.def_ana_proof(context, then_branch, proof_locals, in_post, is_lemma)?;
+                let else_proof = match else_branch {
+                    Some(eb) => Some(Box::new(self.def_ana_proof(
+                        context,
+                        eb,
+                        proof_locals,
+                        in_post,
+                        is_lemma,
+                    )?)),
+                    None => None,
+                };
+                Some(Proof::IfElse(
+                    proof_loc,
+                    cond_exp,
+                    Box::new(then_proof),
+                    else_proof,
+                ))
+            },
+            EA::Proof_::Block(stmts) => {
+                let mut model_stmts = vec![];
+                let saved_len = proof_locals.len();
+                for s in stmts {
+                    if let Some(ms) =
+                        self.def_ana_proof(context, s, proof_locals, in_post, is_lemma)
+                    {
+                        model_stmts.push(ms);
+                    }
+                }
+                // Let bindings are block-scoped.
+                proof_locals.truncate(saved_len);
+                Some(Proof::Block(proof_loc, model_stmts))
+            },
+            EA::Proof_::Assert(exp) => {
+                let kind = if in_post {
+                    ConditionKind::Ensures
+                } else {
+                    ConditionKind::Assert
+                };
+                let mut et = self.exp_translator_for_context(&proof_loc, context, &kind);
+                if !in_post {
+                    et.old_status = OldExpStatus::NotSupported;
+                }
+                add_proof_locals(&mut et, proof_locals);
+                let translated = et.translate_exp(exp, &BOOL_TYPE).into_exp();
+                et.finalize_types(true);
+                Some(Proof::Assert(proof_loc, translated))
+            },
+            EA::Proof_::Assume(properties, exp) => {
+                let has_trusted = properties
+                    .iter()
+                    .any(|p| p.value.name.value.as_str() == "trusted");
+                if !has_trusted {
+                    self.parent.error(
+                        &proof_loc,
+                        "`assume` in proof block requires `[trusted]` annotation",
+                    );
+                    return None;
+                }
+                let kind = ConditionKind::Assume;
+                let mut et = self.exp_translator_for_context(&proof_loc, context, &kind);
+                et.old_status = OldExpStatus::NotSupported;
+                add_proof_locals(&mut et, proof_locals);
+                let translated = et.translate_exp(exp, &BOOL_TYPE).into_exp();
+                et.finalize_types(true);
+                self.parent.env.diag(
+                    Severity::Warning,
+                    &proof_loc,
+                    "proof uses trusted assumption",
+                );
+                Some(Proof::Assume(proof_loc, translated))
+            },
+            EA::Proof_::Apply(maccess, args) => self.def_ana_proof_apply(
+                &proof_loc,
+                context,
+                proof,
+                maccess,
+                args,
+                proof_locals,
+                in_post,
+            ),
+            EA::Proof_::ForallApply {
+                bindings,
+                patterns,
+                lemma,
+                args,
+            } => self.def_ana_proof_forall_apply(
+                &proof_loc,
+                context,
+                bindings,
+                patterns,
+                lemma,
+                args,
+                proof_locals,
+                in_post,
+            ),
+            EA::Proof_::Calc(steps) => {
+                let kind = ConditionKind::Assert;
+                let mut expanded = vec![];
+                let mut prev_exp: Option<Exp> = None;
+                let mut prev_op: Option<Operation> = None;
+                for (exp, op) in steps {
+                    let mut et = self.exp_translator_for_context(&proof_loc, context, &kind);
+                    et.old_status = OldExpStatus::NotSupported;
+                    add_proof_locals(&mut et, proof_locals);
+                    let (_, translated) = et.translate_exp_free(exp);
+                    let translated = translated.into_exp();
+                    et.finalize_types(true);
+                    if let (Some(lhs), Some(relop)) = (prev_exp.take(), prev_op.take()) {
+                        expanded.push((lhs, relop, translated.clone()));
+                    }
+                    prev_exp = Some(translated);
+                    prev_op = op.as_ref().map(|spanned| match &spanned.value {
+                        PA::BinOp_::Eq => Operation::Eq,
+                        PA::BinOp_::Neq => Operation::Neq,
+                        PA::BinOp_::Lt => Operation::Lt,
+                        PA::BinOp_::Gt => Operation::Gt,
+                        PA::BinOp_::Le => Operation::Le,
+                        PA::BinOp_::Ge => Operation::Ge,
+                        _ => Operation::Eq,
+                    });
+                }
+                Some(Proof::Calc(proof_loc, expanded))
+            },
+            EA::Proof_::Post(inner) => {
+                if is_lemma {
+                    self.parent.error(
+                        &proof_loc,
+                        "`post` is not allowed in lemma proofs (lemmas have no return value)",
+                    );
+                    return None;
+                }
+                if in_post {
+                    self.parent
+                        .error(&proof_loc, "nested `post` is not allowed");
+                    return None;
+                }
+                let inner_proof =
+                    self.def_ana_proof(context, inner, proof_locals, true, is_lemma)?;
+                Some(Proof::Post(proof_loc, Box::new(inner_proof)))
+            },
+            EA::Proof_::Split(exp) => {
+                let kind = ConditionKind::Assume;
+                let mut et = self.exp_translator_for_context(&proof_loc, context, &kind);
+                et.old_status = OldExpStatus::NotSupported;
+                add_proof_locals(&mut et, proof_locals);
+                let (_, translated) = et.translate_exp_free(exp);
+                let translated = translated.into_exp();
+                et.finalize_types(true);
+                // Type validation (bool or enum) is deferred to spec instrumentation
+                // because the full struct env is not yet available during model building.
+                Some(Proof::Split(proof_loc, translated))
+            },
+        }
+    }
+
+    /// Analyze an `apply lemma(args)` proof statement.
+    fn def_ana_proof_apply(
+        &mut self,
+        proof_loc: &Loc,
+        context: &SpecBlockContext,
+        proof: &EA::Proof,
+        maccess: &EA::ModuleAccess,
+        args: &[EA::Exp],
+        proof_locals: &[(Loc, Symbol, Type)],
+        in_post: bool,
+    ) -> Option<Proof> {
+        use crate::model::QualifiedId;
+
+        // Try to resolve as a lemma in this module.
+        let lemma_sym = match &maccess.value {
+            EA::ModuleAccess_::Name(name) => Some(self.symbol_pool().make(name.value.as_str())),
+            EA::ModuleAccess_::ModuleAccess(_, name, _) => {
+                Some(self.symbol_pool().make(name.value.as_str()))
+            },
+        };
+
+        if let Some(sym) = lemma_sym {
+            if let Some(&idx) = self.lemma_name_to_idx.get(&sym) {
+                // Resolved as a lemma. Translate arguments.
+                let lemma = &self.lemmas[idx];
+                let lemma_params = lemma.params.clone();
+                let kind = if in_post {
+                    ConditionKind::Ensures
+                } else {
+                    ConditionKind::Assume
+                };
+                let mut et = self.exp_translator_for_context(proof_loc, context, &kind);
+                if !in_post {
+                    et.old_status = OldExpStatus::NotSupported;
+                }
+                add_proof_locals(&mut et, proof_locals);
+                let translated_args: Vec<Exp> = args
+                    .iter()
+                    .enumerate()
+                    .map(|(i, a)| {
+                        let expected_ty = lemma_params
+                            .get(i)
+                            .map(|p| &p.1)
+                            .cloned()
+                            .unwrap_or(Type::Error);
+                        et.translate_exp(a, &expected_ty).into_exp()
+                    })
+                    .collect();
+                et.finalize_types(true);
+                let lemma_qid = QualifiedId {
+                    module_id: self.module_id,
+                    id: LemmaId::new(idx),
+                };
+                return Some(Proof::Apply(proof_loc.clone(), lemma_qid, translated_args));
+            }
+        }
+
+        // Not a lemma — fall back to translating as a spec function call assertion.
+        let args_loc = if let Some(last) = args.last() {
+            last.loc
+        } else {
+            maccess.loc
+        };
+        let call_exp = sp(
+            proof.loc,
+            EA::Exp_::Call(
+                maccess.clone(),
+                PA::CallKind::Regular,
+                None,
+                sp(args_loc, args.to_vec()),
+            ),
+        );
+        let kind = if in_post {
+            ConditionKind::Ensures
+        } else {
+            ConditionKind::Assume
+        };
+        let mut et = self.exp_translator_for_context(proof_loc, context, &kind);
+        if !in_post {
+            et.old_status = OldExpStatus::NotSupported;
+        }
+        add_proof_locals(&mut et, proof_locals);
+        let translated = et.translate_exp(&call_exp, &BOOL_TYPE).into_exp();
+        et.finalize_types(true);
+        Some(Proof::Assert(proof_loc.clone(), translated))
+    }
+
+    /// Analyze a `forall bindings [triggers] apply lemma(args)` proof statement.
+    fn def_ana_proof_forall_apply(
+        &mut self,
+        proof_loc: &Loc,
+        context: &SpecBlockContext,
+        _bindings: &EA::LValueWithRangeList,
+        _patterns: &[Vec<EA::Exp>],
+        lemma_access: &EA::ModuleAccess,
+        args: &[EA::Exp],
+        proof_locals: &[(Loc, Symbol, Type)],
+        in_post: bool,
+    ) -> Option<Proof> {
+        use crate::model::QualifiedId;
+
+        // Resolve lemma.
+        let lemma_sym = match &lemma_access.value {
+            EA::ModuleAccess_::Name(name) => Some(self.symbol_pool().make(name.value.as_str())),
+            EA::ModuleAccess_::ModuleAccess(_, name, _) => {
+                Some(self.symbol_pool().make(name.value.as_str()))
+            },
+        };
+
+        let (idx, lemma_params) = if let Some(sym) = lemma_sym {
+            if let Some(&idx) = self.lemma_name_to_idx.get(&sym) {
+                let params = self.lemmas[idx].params.clone();
+                (idx, params)
+            } else {
+                self.parent.error(
+                    proof_loc,
+                    &format!("`{}` is not a lemma", sym.display(self.symbol_pool())),
+                );
+                return None;
+            }
+        } else {
+            self.parent.error(proof_loc, "cannot resolve lemma name");
+            return None;
+        };
+
+        // For now, translate forall...apply as a quantified assumption without trigger support.
+        // The bindings define the quantifier variables, and the lemma is instantiated with args.
+        let kind = if in_post {
+            ConditionKind::Ensures
+        } else {
+            ConditionKind::Assume
+        };
+        let mut et = self.exp_translator_for_context(proof_loc, context, &kind);
+        if !in_post {
+            et.old_status = OldExpStatus::NotSupported;
+        }
+        add_proof_locals(&mut et, proof_locals);
+
+        // Translate quantifier bindings.
+        let mut bind_vars = vec![];
+        for range in &_bindings.value {
+            let (ref bind, ref range_exp) = range.value;
+            if let EA::LValue_::Var(maccess, _) = &bind.value {
+                let name = match &maccess.value {
+                    EA::ModuleAccess_::Name(n) => n,
+                    _ => {
+                        et.error(proof_loc, "expected simple name in forall binding");
+                        return None;
+                    },
+                };
+                let sym = et.symbol_pool().make(name.value.as_str());
+                let (_, range_translated) = et.translate_exp_free(range_exp);
+                let range_ty = et.get_node_type(range_translated.node_id());
+                // For `x: T` style bindings, the range type is TypeDomain(T), element type is T
+                let elem_ty = if let Type::TypeDomain(inner) = &range_ty {
+                    *inner.clone()
+                } else {
+                    range_ty
+                };
+                bind_vars.push((sym, elem_ty));
+            }
+        }
+        // Define quantifier locals in translator scope for arg translation.
+        et.enter_scope();
+        for (sym, ty) in &bind_vars {
+            et.define_local(proof_loc, *sym, ty.clone(), None, None);
+        }
+
+        // Translate patterns (trigger groups).
+        let translated_patterns: Vec<Vec<Exp>> = _patterns
+            .iter()
+            .map(|group| {
+                group
+                    .iter()
+                    .map(|e| {
+                        let (_, te) = et.translate_exp_free(e);
+                        te.into_exp()
+                    })
+                    .collect()
+            })
+            .collect();
+
+        // Translate args.
+        let translated_args: Vec<Exp> = args
+            .iter()
+            .enumerate()
+            .map(|(i, a)| {
+                let expected_ty = lemma_params
+                    .get(i)
+                    .map(|p| &p.1)
+                    .cloned()
+                    .unwrap_or(Type::Error);
+                et.translate_exp(a, &expected_ty).into_exp()
+            })
+            .collect();
+        et.finalize_types(true);
+
+        let lemma_qid = QualifiedId {
+            module_id: self.module_id,
+            id: LemmaId::new(idx),
+        };
+        Some(Proof::ForallApply(
+            proof_loc.clone(),
+            bind_vars,
+            translated_patterns,
+            lemma_qid,
+            translated_args,
+        ))
+    }
+
+    /// Definition-phase analysis for a lemma: analyze conditions and defer proof body.
+    /// The name, signature, and skeleton were already registered in `decl_ana_lemma`.
+    fn def_ana_lemma(
+        &mut self,
+        loc: &Loc,
+        context: &SpecBlockContext,
+        name: &PA::FunctionName,
+        _signature: &EA::FunctionSignature,
+        spec_members: &[EA::SpecBlockMember],
+        proof: &Option<EA::Proof>,
+    ) {
+        // Lemmas are only allowed in module-level spec blocks.
+        if !matches!(context, SpecBlockContext::Module) {
+            self.parent.error(
+                loc,
+                "lemma declarations are only allowed in module spec blocks",
+            );
+            return;
+        }
+
+        let lemma_sym = self.symbol_pool().make(name.0.value.as_str());
+        let idx = self.lemma_name_to_idx[&lemma_sym];
+
+        // Create a function-like context for analyzing conditions.
+        let lemma_qsym = self.qualified_by_module(lemma_sym);
+        let lemma_context = SpecBlockContext::Function(lemma_qsym.clone());
+
+        // Analyze spec conditions (requires/ensures) using the standard method.
+        for member in spec_members {
+            self.def_ana_spec_block_member(&lemma_context, member);
+        }
+
+        // Collect the conditions and properties from the spec built by the condition analysis.
+        let (conditions, properties) = self
+            .fun_specs
+            .get(&lemma_sym)
+            .map(|spec| (spec.conditions.clone(), spec.properties.clone()))
+            .unwrap_or_default();
+
+        // Store conditions into the existing skeleton.
+        self.lemmas[idx].conditions = conditions;
+        self.lemmas[idx].properties = properties;
+
+        // Translate proof body. All lemma names are already registered from decl_ana,
+        // so mutual recursion works without deferral.
+        if let Some(p) = proof {
+            let mut proof_locals = vec![];
+            let model_proof = self.def_ana_proof(&lemma_context, p, &mut proof_locals, false, true);
+            self.lemmas[idx].proof = model_proof;
+        }
+    }
+}
+
+/// Adds accumulated proof-local let bindings to an ExpTranslator's scope.
+fn add_proof_locals(et: &mut ExpTranslator, proof_locals: &[(Loc, Symbol, Type)]) {
+    if !proof_locals.is_empty() {
+        et.enter_scope();
+        for (ploc, name, ty) in proof_locals {
+            et.define_local(ploc, *name, ty.clone(), None, None);
         }
     }
 }
@@ -3762,6 +4319,11 @@ impl ModuleBuilder<'_, '_> {
             if entry.module_id != self.module_id {
                 continue;
             }
+            // Skip lemma entries — they were added to fun_table for name resolution
+            // during condition analysis but are handled separately below.
+            if entry.kind == FunctionKind::Lemma {
+                continue;
+            }
             // If the function is from a script, its return value must be unit.
             if self.module_name.is_script() && !entry.result_type.is_unit() {
                 self.parent.error(
@@ -3809,6 +4371,47 @@ impl ModuleBuilder<'_, '_> {
             function_data.insert(fun_id, data);
         }
 
+        // Create synthetic FunctionData entries for lemma declarations so they are visible
+        // to the prover pipeline via `get_functions()`. They have `def: None` and
+        // `kind: FunctionKind::Lemma`, and their spec conditions come from the LemmaDecl.
+        for lemma in &self.lemmas {
+            let fun_id = FunId::new(lemma.name);
+            let spec = Spec {
+                loc: Some(lemma.loc.clone()),
+                conditions: lemma.conditions.clone(),
+                properties: lemma.properties.clone(),
+                proof: lemma.proof.clone(),
+                ..Default::default()
+            };
+            let data = FunctionData {
+                name: lemma.name,
+                loc: FunctionLoc::from_single(lemma.loc.clone()),
+                def_idx: None,
+                handle_idx: None,
+                visibility: Visibility::Private,
+                has_package_visibility: false,
+                is_native: false,
+                kind: FunctionKind::Lemma,
+                attributes: vec![],
+                type_params: lemma.type_params.clone(),
+                params: lemma.params.clone(),
+                result_type: Type::unit(),
+                access_specifiers: None,
+                acquired_structs: None,
+                spec: spec.into(),
+                def: None,
+                called_funs: Some(Default::default()),
+                calling_funs: RefCell::default(),
+                transitive_closure_of_called_funs: RefCell::default(),
+                used_funs: Some(Default::default()),
+                using_funs: RefCell::default(),
+                transitive_closure_of_used_funs: RefCell::default(),
+                used_functions_with_transitive_inline: RefCell::default(),
+                used_structs: RefCell::default(),
+            };
+            function_data.insert(fun_id, data);
+        }
+
         let mut named_constants: BTreeMap<NamedConstantId, NamedConstantData> = Default::default();
         for (name, const_entry) in &self.parent.const_table {
             if name.module_name != self.module_name {
@@ -3845,6 +4448,7 @@ impl ModuleBuilder<'_, '_> {
             function_data,
             std::mem::take(&mut self.spec_vars),
             std::mem::take(&mut self.spec_funs),
+            std::mem::take(&mut self.lemmas),
             std::mem::take(&mut self.module_spec),
             std::mem::take(&mut self.spec_block_infos),
         );

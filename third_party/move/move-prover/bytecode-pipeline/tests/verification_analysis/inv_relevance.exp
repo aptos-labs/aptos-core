@@ -114,7 +114,7 @@ invariant applicability: [
 
 verification analysis: [
   InvRelevance::inner: verified + inlined
-  InvRelevance::outer_T: verified
-  InvRelevance::outer_bool: verified
-  InvRelevance::outer_u64: verified
+  InvRelevance::outer_T: verified + inlined
+  InvRelevance::outer_bool: verified + inlined
+  InvRelevance::outer_u64: verified + inlined
 ]

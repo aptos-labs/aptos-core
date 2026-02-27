@@ -1,0 +1,143 @@
+============ initial translation from Move ================
+
+[variant baseline]
+fun TestCalc::add_three($t0|x: u64): u64 {
+     var $t1: u64
+     var $t2: u64
+     var $t3: u64
+     var $t4: u64
+     var $t5: u64
+     var $t6: u64
+     var $t7: u64
+  0: $t1 := move($t0)
+  1: $t2 := 1
+  2: $t3 := +($t1, $t2)
+  3: $t4 := 1
+  4: $t5 := +($t3, $t4)
+  5: $t6 := 1
+  6: $t7 := +($t5, $t6)
+  7: return $t7
+}
+
+
+[variant baseline]
+fun TestCalc::half($t0|x: u64): u64 {
+     var $t1: u64
+     var $t2: u64
+     var $t3: u64
+  0: $t1 := move($t0)
+  1: $t2 := 2
+  2: $t3 := /($t1, $t2)
+  3: return $t3
+}
+
+============ after pipeline `proofs` ================
+
+[variant baseline]
+fun TestCalc::add_three($t0|x: u64): u64 {
+     var $t1: u64
+     var $t2: u64
+     var $t3: num
+     var $t4: u64
+     var $t5: u64
+     var $t6: u64
+     var $t7: u64
+  0: assume Le(Add($t0, 3), 18446744073709551615)
+  1: $t1 := 1
+  2: $t2 := +($t0, $t1) on_abort goto 9 with $t3
+  3: $t4 := 1
+  4: $t5 := +($t2, $t4) on_abort goto 9 with $t3
+  5: $t6 := 1
+  6: $t7 := +($t5, $t6) on_abort goto 9 with $t3
+  7: label L1
+  8: return $t7
+  9: label L2
+ 10: abort($t3)
+}
+
+
+[variant verification]
+fun TestCalc::add_three($t0|x: u64): u64 {
+     var $t1: u64
+     var $t2: u64
+     var $t3: num
+     var $t4: u64
+     var $t5: u64
+     var $t6: u64
+     var $t7: u64
+  0: assume Le(Add($t0, 3), 18446744073709551615)
+     # VC: calc step at tests/spec_instrumentation/proofs/calc.move:17:9+88
+  1: assert Eq(Add(Add(Add($t0, 1), 1), 1), Add(Add($t0, 2), 1))
+     # VC: calc step at tests/spec_instrumentation/proofs/calc.move:17:9+88
+  2: assert Eq(Add(Add($t0, 2), 1), Add($t0, 3))
+  3: $t1 := 1
+  4: $t2 := +($t0, $t1) on_abort goto 12 with $t3
+  5: $t4 := 1
+  6: $t5 := +($t2, $t4) on_abort goto 12 with $t3
+  7: $t6 := 1
+  8: $t7 := +($t5, $t6) on_abort goto 12 with $t3
+  9: label L1
+     # VC: post-condition does not hold at tests/spec_instrumentation/proofs/calc.move:15:9+24
+ 10: assert Eq<u64>($t7, Add($t0, 3))
+ 11: return $t7
+ 12: label L2
+ 13: abort($t3)
+}
+
+
+[variant baseline]
+fun TestCalc::half($t0|x: u64): u64 {
+     var $t1: u64
+     var $t2: u64
+     var $t3: num
+  0: $t1 := 2
+  1: $t2 := /($t0, $t1) on_abort goto 4 with $t3
+  2: label L1
+  3: return $t2
+  4: label L2
+  5: abort($t3)
+}
+
+
+[variant verification]
+fun TestCalc::half($t0|x: u64): u64 {
+     var $t1: u64
+     var $t2: u64
+     var $t3: num
+     # VC: calc step at tests/spec_instrumentation/proofs/calc.move:33:9+51
+  0: assert Le(Div($t0, 2), $t0)
+  1: $t1 := 2
+  2: $t2 := /($t0, $t1) on_abort goto 6 with $t3
+  3: label L1
+     # VC: post-condition does not hold at tests/spec_instrumentation/proofs/calc.move:31:9+20
+  4: assert Le($t2, $t0)
+  5: return $t2
+  6: label L2
+  7: abort($t3)
+}
+
+
+
+==== spec-instrumenter input specs ====
+
+fun TestCalc::add_three[baseline]
+spec {
+  requires Le(Add($t0, 3), 18446744073709551615);
+  ensures Eq<u64>(result0(), Add($t0, 3));
+}
+
+fun TestCalc::add_three[verification]
+spec {
+  requires Le(Add($t0, 3), 18446744073709551615);
+  ensures Eq<u64>(result0(), Add($t0, 3));
+}
+
+fun TestCalc::half[baseline]
+spec {
+  ensures Le(result0(), $t0);
+}
+
+fun TestCalc::half[verification]
+spec {
+  ensures Le(result0(), $t0);
+}

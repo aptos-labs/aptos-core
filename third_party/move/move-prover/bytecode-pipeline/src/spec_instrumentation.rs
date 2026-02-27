@@ -12,7 +12,8 @@ use move_model::{
     exp_generator::ExpGenerator,
     model::{FunId, FunctionEnv, GlobalEnv, Loc, ModuleId, QualifiedId, QualifiedInstId, StructId},
     pragmas::{ABORTS_IF_IS_PARTIAL_PRAGMA, EMITS_IS_PARTIAL_PRAGMA, EMITS_IS_STRICT_PRAGMA},
-    spec_translator::{SpecTranslator, TranslatedSpec},
+    spec_translator::{ProofAction, SpecTranslator, TranslatedSpec},
+    symbol::Symbol,
     ty::{ReferenceKind, Type, TypeDisplayContext, BOOL_TYPE, NUM_TYPE},
 };
 use move_stackless_bytecode::{
@@ -44,103 +45,8 @@ const EMITS_FAILS_MESSAGE: &str = "function does not emit the expected event";
 const EMITS_NOT_COVERED: &str = "emitted event not covered by any of the `emits` clauses";
 const CHOICE_WITNESS_FAILS_MESSAGE: &str = "choice expression requires a witness to exist";
 
-fn modify_check_fails_message(
-    env: &GlobalEnv,
-    mem: QualifiedId<StructId>,
-    targs: &[Type],
-) -> String {
-    let targs_str = if targs.is_empty() {
-        "".to_string()
-    } else {
-        let tctx = TypeDisplayContext::new(env);
-        format!(
-            "<{}>",
-            targs
-                .iter()
-                .map(|ty| ty.display(&tctx).to_string())
-                .join(", ")
-        )
-    };
-    let module_env = env.get_module(mem.module_id);
-    format!(
-        "caller does not have permission to modify `{}::{}{}` at given address",
-        module_env.get_name().display(env),
-        module_env
-            .get_struct(mem.id)
-            .get_name()
-            .display(env.symbol_pool()),
-        targs_str
-    )
-}
-
-/// Checks if an expression uses memory operations or behavioral predicates.
-/// This is used to determine if a choice expression needs a well-formedness assertion.
-fn uses_memory_or_behavior(exp: &Exp) -> bool {
-    use ast::Operation;
-    let mut uses_memory = false;
-    exp.visit_pre_order(&mut |e| {
-        if let ExpData::Call(_, op, _) = e {
-            match op {
-                Operation::Global(_)
-                | Operation::Exists(_)
-                | Operation::CanModify
-                | Operation::ResourceDomain
-                | Operation::Behavior(..) => {
-                    uses_memory = true;
-                    return false; // stop traversal
-                },
-                _ => {},
-            }
-        }
-        !uses_memory // continue only if we haven't found memory ops
-    });
-    uses_memory
-}
-
-/// For choice expressions that involve memory or behavioral predicates,
-/// return the existential well-formedness check.
-/// Converts `choose y: T where pred(y)` to `exists y: T :: pred(y)`.
-///
-/// We only emit this for choices involving state/memory because:
-/// 1. The SMT solver may not be able to prove simple mathematical existentials
-///    like `exists i: u64 :: i > 0` due to quantifier handling
-/// 2. The fix is specifically needed for behavioral predicates and stateful choices
-///    where Z3 ignores the conditional choice axiom
-fn extract_choice_exists_check(env: &GlobalEnv, exp: &Exp) -> Option<Exp> {
-    if let ExpData::Quant(node_id, kind, ranges, triggers, condition, body) = exp.as_ref() {
-        if kind.is_choice() {
-            // Only emit well-formedness assertion for choices involving memory/state
-            // Pure mathematical choices don't need this and may cause false positives
-            if !uses_memory_or_behavior(body)
-                && condition
-                    .as_ref()
-                    .is_none_or(|c| !uses_memory_or_behavior(c))
-            {
-                return None;
-            }
-            // Create exists with same structure but QuantKind::Exists
-            let exists_id = env.new_node(env.get_node_loc(*node_id), BOOL_TYPE.clone());
-            if let Some(inst) = env.get_node_instantiation_opt(*node_id) {
-                env.set_node_instantiation(exists_id, inst);
-            }
-            return Some(
-                ExpData::Quant(
-                    exists_id,
-                    QuantKind::Exists,
-                    ranges.clone(),
-                    triggers.clone(),
-                    condition.clone(),
-                    body.clone(),
-                )
-                .into_exp(),
-            );
-        }
-    }
-    None
-}
-
-//  ================================================================================================
-/// # Spec Instrumenter
+// ================================================================================================
+// # Spec Instrumenter
 
 pub struct SpecInstrumentationProcessor {}
 
@@ -179,18 +85,33 @@ impl FunctionTargetProcessor for SpecInstrumentationProcessor {
             // out of this data and into the clone.
             let mut verification_data =
                 data.fork(FunctionVariant::Verification(VerificationFlavor::Regular));
-            verification_data =
+            let (instrumented, split_points) =
                 Instrumenter::run(&options, targets, fun_env, verification_data, scc_opt);
-            targets.insert_target_data(
-                &fun_env.get_qualified_id(),
-                verification_data.variant.clone(),
-                verification_data,
-            );
+            verification_data = instrumented;
+
+            if split_points.is_empty() {
+                // No splits — insert the single verification variant.
+                targets.insert_target_data(
+                    &fun_env.get_qualified_id(),
+                    verification_data.variant.clone(),
+                    verification_data,
+                );
+            } else {
+                // Expand splits into multiple verification variants.
+                Self::expand_splits(
+                    fun_env.module_env.env,
+                    targets,
+                    fun_env,
+                    verification_data,
+                    &split_points,
+                );
+            }
         }
 
         // Instrument baseline variant only if it is inlined.
         if is_inlined {
-            Instrumenter::run(&options, targets, fun_env, data, scc_opt)
+            let (data, _) = Instrumenter::run(&options, targets, fun_env, data, scc_opt);
+            data
         } else {
             // Clear code but keep function data stub.
             // TODO(refactoring): the stub is currently still needed because boogie_wrapper
@@ -221,7 +142,7 @@ impl FunctionTargetProcessor for SpecInstrumentationProcessor {
                 continue;
             }
             for ref fun in module.get_functions() {
-                if fun.is_inline() {
+                if !fun.is_compiled() {
                     continue;
                 }
                 for (variant, target) in targets.get_targets(fun) {
@@ -243,6 +164,142 @@ impl FunctionTargetProcessor for SpecInstrumentationProcessor {
     }
 }
 
+/// Maximum number of split combinations before we emit an error.
+const MAX_SPLIT_COMBINATIONS: usize = 1024;
+
+impl SpecInstrumentationProcessor {
+    /// Expand split points into multiple verification variants.
+    /// Each split point on a bool expression creates 2 cases; on an enum, N cases
+    /// (one per variant). The total combinations is the product of all case counts.
+    fn expand_splits(
+        env: &GlobalEnv,
+        targets: &mut FunctionTargetsHolder,
+        fun_env: &FunctionEnv,
+        verification_data: FunctionData,
+        split_points: &[(usize, Exp)],
+    ) {
+        // Determine the number of cases for each split point, validating types.
+        let mut has_error = false;
+        let case_counts: Vec<usize> = split_points
+            .iter()
+            .map(|(_, exp)| {
+                let ty = env.get_node_type(exp.node_id());
+                if ty == BOOL_TYPE {
+                    2
+                } else if let Some((struct_env, _)) = ty.get_struct(env) {
+                    if struct_env.has_variants() {
+                        struct_env.get_variants().count()
+                    } else {
+                        env.error(
+                            &env.get_node_loc(exp.node_id()),
+                            "`split` expression must be of type `bool` or an enum type",
+                        );
+                        has_error = true;
+                        2
+                    }
+                } else {
+                    env.error(
+                        &env.get_node_loc(exp.node_id()),
+                        "`split` expression must be of type `bool` or an enum type",
+                    );
+                    has_error = true;
+                    2
+                }
+            })
+            .collect();
+
+        if has_error {
+            // Insert the original variant to avoid cascading errors.
+            targets.insert_target_data(
+                &fun_env.get_qualified_id(),
+                verification_data.variant.clone(),
+                verification_data,
+            );
+            return;
+        }
+
+        let total: usize = case_counts.iter().product();
+        if total > MAX_SPLIT_COMBINATIONS {
+            env.error(
+                &fun_env.get_loc(),
+                &format!(
+                    "split produces {} verification variants, exceeding the limit of {}",
+                    total, MAX_SPLIT_COMBINATIONS
+                ),
+            );
+            // Fall back: insert the original (with Nop placeholders) as single variant.
+            targets.insert_target_data(
+                &fun_env.get_qualified_id(),
+                verification_data.variant.clone(),
+                verification_data,
+            );
+            return;
+        }
+
+        let original_flavor = match &verification_data.variant {
+            FunctionVariant::Verification(f) => f.clone(),
+            _ => VerificationFlavor::Regular,
+        };
+
+        for combo in 0..total {
+            let new_flavor = VerificationFlavor::Split(Box::new(original_flavor.clone()), combo);
+            let new_variant = FunctionVariant::Verification(new_flavor);
+            let mut forked = verification_data.fork(new_variant.clone());
+
+            // For each split point, replace the Nop at that offset with the
+            // appropriate Assume.
+            let mut remainder = combo;
+            for (i, (offset, exp)) in split_points.iter().enumerate() {
+                let case_idx = remainder % case_counts[i];
+                remainder /= case_counts[i];
+
+                let ty = env.get_node_type(exp.node_id());
+                let assume_exp = if ty == BOOL_TYPE {
+                    if case_idx == 0 {
+                        // true case: assume the expression
+                        exp.clone()
+                    } else {
+                        // false case: assume !expression
+                        let not_node =
+                            env.new_node(env.get_node_loc(exp.node_id()), BOOL_TYPE.clone());
+                        ExpData::Call(not_node, ast::Operation::Not, vec![exp.clone()]).into_exp()
+                    }
+                } else if let Some((struct_env, inst)) = ty.get_struct(env) {
+                    // Enum case: assume TestVariants for variant at case_idx
+                    let variant_sym: Symbol = struct_env
+                        .get_variants()
+                        .nth(case_idx)
+                        .expect("variant exists");
+                    let test_node =
+                        env.new_node(env.get_node_loc(exp.node_id()), BOOL_TYPE.clone());
+                    env.set_node_instantiation(test_node, inst.to_vec());
+                    ExpData::Call(
+                        test_node,
+                        ast::Operation::TestVariants(
+                            struct_env.module_env.get_id(),
+                            struct_env.get_id(),
+                            vec![variant_sym],
+                        ),
+                        vec![exp.clone()],
+                    )
+                    .into_exp()
+                } else {
+                    // Fallback (shouldn't happen): just assume the expression
+                    exp.clone()
+                };
+
+                // Replace the Nop at offset with Prop(Assume, assume_exp)
+                if let Some(Bytecode::Nop(attr_id)) = forked.code.get(*offset) {
+                    let attr_id = *attr_id;
+                    forked.code[*offset] = Bytecode::Prop(attr_id, PropKind::Assume, assume_exp);
+                }
+            }
+
+            targets.insert_target_data(&fun_env.get_qualified_id(), new_variant, forked);
+        }
+    }
+}
+
 struct Instrumenter<'a> {
     options: &'a ProverOptions,
     builder: FunctionDataBuilder<'a>,
@@ -253,17 +310,21 @@ struct Instrumenter<'a> {
     abort_label: Label,
     can_abort: bool,
     mem_info: &'a BTreeSet<QualifiedInstId<StructId>>,
+    /// Map from bytecode offset to split expression (for `split` proof items).
+    split_points: Vec<(usize, Exp)>,
 }
 
+// =================================================================================================
+// # Core Instrumentation
+
 impl<'a> Instrumenter<'a> {
-    #[allow(clippy::needless_collect)]
     fn run(
         options: &'a ProverOptions,
         targets: &mut FunctionTargetsHolder,
         fun_env: &FunctionEnv<'a>,
         data: FunctionData,
         scc_opt: Option<&[FunctionEnv]>,
-    ) -> FunctionData {
+    ) -> (FunctionData, Vec<(usize, Exp)>) {
         // Pre-collect properties in the original function data
         let props: Vec<_> = data
             .code
@@ -350,8 +411,12 @@ impl<'a> Instrumenter<'a> {
             abort_label,
             can_abort: false,
             mem_info: &mem_info,
+            split_points: vec![],
         };
         instrumenter.instrument(&spec, &inlined_props);
+
+        // Extract split points before consuming the instrumenter.
+        let split_points = std::mem::take(&mut instrumenter.split_points);
 
         // Run copy propagation (reaching definitions) and then assignment
         // elimination (live vars). This cleans up some redundancy created by
@@ -360,7 +425,10 @@ impl<'a> Instrumenter<'a> {
         let reach_def = ReachingDefProcessor::new();
         let live_vars = LiveVarAnalysisProcessor::new_no_annotate();
         data = reach_def.process(targets, fun_env, data, scc_opt);
-        live_vars.process(targets, fun_env, data, scc_opt)
+        (
+            live_vars.process(targets, fun_env, data, scc_opt),
+            split_points,
+        )
     }
 
     fn is_verified(&self) -> bool {
@@ -443,7 +511,25 @@ impl<'a> Instrumenter<'a> {
             }
         }
 
-        // Instrument and generate new code
+        // Peel leading TraceLocal instructions from old_code and emit them before pre_proof
+        // so that pre-proof assertion errors can display model values in counter-examples.
+        let mut old_code = old_code.into_iter();
+        let mut pre_proof_emitted = false;
+        for bc in old_code.by_ref() {
+            if matches!(&bc, Call(_, _, Operation::TraceLocal(_), _, _)) {
+                self.builder.emit(bc);
+            } else {
+                // First non-trace instruction: emit pre_proof, then this instruction.
+                self.emit_proof_actions(&spec.pre_proof, spec);
+                pre_proof_emitted = true;
+                self.instrument_bytecode(spec, inlined_props, bc);
+                break;
+            }
+        }
+        if !pre_proof_emitted {
+            self.emit_proof_actions(&spec.pre_proof, spec);
+        }
+        // Continue with remaining old_code.
         for bc in old_code {
             self.instrument_bytecode(spec, inlined_props, bc);
         }
@@ -787,7 +873,12 @@ impl<'a> Instrumenter<'a> {
             self.generate_opaque_call(dests, mid, fid, targs, srcs, aa, false);
         }
     }
+}
 
+// =================================================================================================
+// # Spec Condition Emission
+
+impl<'a> Instrumenter<'a> {
     fn emit_save_for_old(&mut self, vars: &BTreeMap<TempIndex, TempIndex>) {
         use Bytecode::*;
         for (idx, saved_idx) in vars {
@@ -916,8 +1007,7 @@ impl<'a> Instrumenter<'a> {
             .iter()
             .filter(|(_, is_post, ..)| *is_post == post_state);
         for (loc, _, _, exp) in lets {
-            let env = self.builder.global_env();
-            if let Some(exists_check) = extract_choice_exists_check(env, exp) {
+            if let Some(exists_check) = self.extract_choice_exists_check(exp) {
                 self.builder
                     .set_loc_and_vc_info(loc.clone(), CHOICE_WITNESS_FAILS_MESSAGE);
                 self.builder
@@ -973,6 +1063,95 @@ impl<'a> Instrumenter<'a> {
         }
     }
 
+    /// Checks if an expression uses memory operations or behavioral predicates.
+    fn uses_memory_or_behavior(exp: &Exp) -> bool {
+        use ast::Operation;
+        let mut uses_memory = false;
+        exp.visit_pre_order(&mut |e| {
+            if let ExpData::Call(
+                _,
+                Operation::Global(_)
+                | Operation::Exists(_)
+                | Operation::CanModify
+                | Operation::ResourceDomain
+                | Operation::Behavior(..),
+                _,
+            ) = e
+            {
+                uses_memory = true;
+                return false; // stop traversal
+            }
+            !uses_memory // continue only if we haven't found memory ops
+        });
+        uses_memory
+    }
+
+    /// Extract an exists-check from a choice expression for well-formedness assertions.
+    fn extract_choice_exists_check(&self, exp: &Exp) -> Option<Exp> {
+        let env = self.builder.global_env();
+        if let ExpData::Quant(node_id, kind, ranges, triggers, condition, body) = exp.as_ref()
+            && kind.is_choice()
+        {
+            if !Self::uses_memory_or_behavior(body)
+                && condition
+                    .as_ref()
+                    .is_none_or(|c| !Self::uses_memory_or_behavior(c))
+            {
+                return None;
+            }
+            let exists_id = env.new_node(env.get_node_loc(*node_id), BOOL_TYPE.clone());
+            if let Some(inst) = env.get_node_instantiation_opt(*node_id) {
+                env.set_node_instantiation(exists_id, inst);
+            }
+            return Some(
+                ExpData::Quant(
+                    exists_id,
+                    QuantKind::Exists,
+                    ranges.clone(),
+                    triggers.clone(),
+                    condition.clone(),
+                    body.clone(),
+                )
+                .into_exp(),
+            );
+        }
+        None
+    }
+
+    fn modify_check_fails_message(
+        env: &GlobalEnv,
+        mem: QualifiedId<StructId>,
+        targs: &[Type],
+    ) -> String {
+        let targs_str = if targs.is_empty() {
+            "".to_string()
+        } else {
+            let tctx = TypeDisplayContext::new(env);
+            format!(
+                "<{}>",
+                targs
+                    .iter()
+                    .map(|ty| ty.display(&tctx).to_string())
+                    .join(", ")
+            )
+        };
+        let module_env = env.get_module(mem.module_id);
+        format!(
+            "caller does not have permission to modify `{}::{}{}` at given address",
+            module_env.get_name().display(env),
+            module_env
+                .get_struct(mem.id)
+                .get_name()
+                .display(env.symbol_pool()),
+            targs_str
+        )
+    }
+}
+
+// =================================================================================================
+// # Block Generation
+
+impl<'a> Instrumenter<'a> {
     fn generate_abort_block(&mut self, spec: &TranslatedSpec) {
         use Bytecode::*;
         // Set the location to the function and emit label.
@@ -1096,6 +1275,9 @@ impl<'a> Instrumenter<'a> {
                 self.builder.emit_with(|id| Prop(id, Assert, exp))
             }
 
+            // Emit return-point proof actions (`post`-prefixed proof statements).
+            self.emit_proof_actions(&spec.post_proof, spec);
+
             // Emit all post-conditions which must hold as we do not abort.
             for (loc, cond) in &spec.post {
                 self.emit_traces(spec, cond);
@@ -1165,7 +1347,7 @@ impl<'a> Instrumenter<'a> {
                 let (mid, sid, inst) = resource_type.require_struct();
                 self.builder.set_loc_and_vc_info(
                     loc.clone(),
-                    &modify_check_fails_message(env, mid.qualified(sid), inst),
+                    &Self::modify_check_fails_message(env, mid.qualified(sid), inst),
                 );
             } else {
                 self.builder.set_loc(loc.clone());
@@ -1195,16 +1377,46 @@ impl<'a> Instrumenter<'a> {
     }
 }
 
+// =================================================================================================
+// # Proof Emission
+
+impl<'a> Instrumenter<'a> {
+    /// Emit bytecode for a flat list of proof actions.
+    fn emit_proof_actions(&mut self, actions: &[(Loc, ProofAction)], spec: &TranslatedSpec) {
+        use Bytecode::*;
+        for (loc, action) in actions {
+            match action {
+                ProofAction::Assert(exp, msg) => {
+                    self.emit_traces(spec, exp);
+                    self.builder.set_loc_and_vc_info(loc.clone(), msg);
+                    self.builder
+                        .emit_with(|id| Prop(id, PropKind::Assert, exp.clone()));
+                },
+                ProofAction::Assume(exp) => {
+                    self.builder.set_loc(loc.clone());
+                    self.builder
+                        .emit_with(|id| Prop(id, PropKind::Assume, exp.clone()));
+                },
+                ProofAction::Split(exp) => {
+                    self.builder.set_loc(loc.clone());
+                    let offset = self.builder.data.code.len();
+                    self.builder.emit_with(Bytecode::Nop);
+                    self.split_points.push((offset, exp.clone()));
+                },
+            }
+        }
+    }
+}
+
 //  ================================================================================================
 /// # Modifies Checker
-
 /// Check modifies annotations. This is depending on usage analysis and is therefore
 /// invoked here from the initialize trait function of this processor.
 fn check_modifies(env: &GlobalEnv, targets: &FunctionTargetsHolder) {
     for module_env in env.get_modules() {
         if module_env.is_target() {
             for fun_env in module_env.get_functions() {
-                if !fun_env.is_inline() {
+                if fun_env.is_compiled() {
                     check_caller_callee_modifies_relation(env, targets, &fun_env);
                     check_opaque_modifies_completeness(env, targets, &fun_env);
                 }
@@ -1227,7 +1439,8 @@ fn check_caller_callee_modifies_relation(
         .expect(COMPILED_MODULE_AVAILABLE)
     {
         let callee_fun_env = env.get_function(*callee);
-        if callee_fun_env.is_native() || callee_fun_env.is_intrinsic() {
+        if callee_fun_env.is_native() || callee_fun_env.is_intrinsic() || callee_fun_env.is_lemma()
+        {
             continue;
         }
         let callee_func_target = targets.get_target(&callee_fun_env, &FunctionVariant::Baseline);

@@ -7,18 +7,21 @@
 
 use crate::{
     ast::{
-        Condition, ConditionKind, Exp, ExpData, GlobalInvariant, MemoryLabel, Operation,
-        RewriteResult, Spec, TempIndex, TraceKind,
+        Condition, ConditionKind, Exp, ExpData, GlobalInvariant, MemoryLabel, Operation, Pattern,
+        Proof, QuantKind, RewriteResult, Spec, TempIndex, TraceKind,
     },
     exp_generator::ExpGenerator,
-    exp_rewriter::ExpRewriterFunctions,
-    model::{FunctionEnv, GlobalId, Loc, NodeId, QualifiedInstId, SpecVarId, StructId},
+    exp_rewriter::{ExpRewriter, ExpRewriterFunctions, RewriteTarget},
+    model::{
+        FunctionEnv, GlobalEnv, GlobalId, Loc, NodeId, Parameter, QualifiedId, QualifiedInstId,
+        SpecVarId, StructId,
+    },
     pragmas::{
         ABORTS_IF_IS_STRICT_PRAGMA, CONDITION_ABSTRACT_PROP, CONDITION_CONCRETE_PROP,
         CONDITION_EXPORT_PROP, CONDITION_INJECTED_PROP,
     },
     symbol::Symbol,
-    ty::{PrimitiveType, Type},
+    ty::{PrimitiveType, Type, BOOL_TYPE},
 };
 use codespan_reporting::diagnostic::Severity;
 use itertools::Itertools;
@@ -52,6 +55,19 @@ pub struct SpecTranslator<'a, 'b, T: ExpGenerator<'a>> {
     in_old: bool,
 }
 
+/// A flattened proof action produced by translating a structured `Proof` tree.
+/// Each action has already had its expressions rewritten (old(), result, params, etc.)
+/// and been guarded with any path conditions from enclosing `if/else` proof blocks.
+#[derive(Debug, Clone)]
+pub enum ProofAction {
+    /// Assert an expression with a VC error message.
+    Assert(Exp, String),
+    /// Assume an expression (e.g., lemma ensures, trusted assumption).
+    Assume(Exp),
+    /// Case-split on a boolean/enum, creating verification variants.
+    Split(Exp),
+}
+
 /// Represents a translated spec.
 #[derive(Default)]
 pub struct TranslatedSpec {
@@ -68,6 +84,8 @@ pub struct TranslatedSpec {
     pub invariants: Vec<(Loc, GlobalId, Exp)>,
     pub lets: Vec<(Loc, bool, TempIndex, Exp)>,
     pub updates: Vec<(Loc, Exp, Exp)>,
+    pub pre_proof: Vec<(Loc, ProofAction)>,
+    pub post_proof: Vec<(Loc, ProofAction)>,
 }
 
 impl TranslatedSpec {
@@ -447,6 +465,14 @@ impl<'a, 'b, T: ExpGenerator<'a>> SpecTranslator<'a, 'b, T> {
             self.result.post.push((cond.loc.clone(), exp));
         }
 
+        // Translate proof block for verification context: flatten into pre_proof/post_proof.
+        if !for_call {
+            if let Some(proof) = spec.proof.clone() {
+                self.in_post_state = false;
+                self.translate_proof(&proof, None);
+            }
+        }
+
         // Translate emits.
         for cond in spec.filter_kind(ConditionKind::Emits).filter(is_applicable) {
             self.in_post_state = true;
@@ -570,6 +596,266 @@ impl<'a, 'b, T: ExpGenerator<'a>> SpecTranslator<'a, 'b, T> {
             .saved_memory
             .entry(qid)
             .or_insert_with(|| builder.global_env().new_global_id())
+    }
+
+    /// Walks a `Proof` tree, rewrites all embedded expressions via `translate_exp`,
+    /// and flattens the tree into `result.pre_proof` / `result.post_proof` vectors.
+    /// Path conditions from enclosing `if/else` blocks are accumulated and applied
+    /// as `Implies` guards on each leaf action.
+    fn translate_proof(&mut self, proof: &Proof, path_cond: Option<Exp>) {
+        match proof {
+            Proof::Let(loc, sym, exp) => {
+                let exp = self.translate_exp(exp, false);
+                let ty = self.builder.global_env().get_node_type(exp.node_id());
+                let temp = self.builder.add_local(ty.skip_reference().clone());
+                self.let_locals.insert(*sym, temp);
+                self.result
+                    .lets
+                    .push((loc.clone(), self.in_post_state, temp, exp));
+                // No proof action emitted for Let — it's already in result.lets.
+            },
+            Proof::Assert(loc, exp) => {
+                let exp = self.translate_exp(exp, false);
+                let guarded = self.guard_proof_exp(exp, &path_cond);
+                self.push_proof_action(
+                    loc.clone(),
+                    ProofAction::Assert(guarded, "proof assertion not satisfied".to_string()),
+                );
+            },
+            Proof::Assume(loc, exp) => {
+                let exp = self.translate_exp(exp, false);
+                let guarded = self.guard_proof_exp(exp, &path_cond);
+                self.push_proof_action(loc.clone(), ProofAction::Assume(guarded));
+            },
+            Proof::Split(loc, exp) => {
+                let exp = self.translate_exp(exp, false);
+                let guarded = self.guard_proof_exp(exp, &path_cond);
+                self.push_proof_action(loc.clone(), ProofAction::Split(guarded));
+            },
+            Proof::IfElse(_loc, cond, then_p, else_p) => {
+                let cond = self.translate_exp(cond, false);
+                let then_cond = match &path_cond {
+                    Some(pc) => self
+                        .builder
+                        .mk_bool_call(Operation::And, vec![pc.clone(), cond.clone()]),
+                    None => cond.clone(),
+                };
+                self.translate_proof(then_p, Some(then_cond));
+                if let Some(eb) = else_p {
+                    let not_cond = self.builder.mk_not(cond);
+                    let else_cond = match &path_cond {
+                        Some(pc) => self
+                            .builder
+                            .mk_bool_call(Operation::And, vec![pc.clone(), not_cond]),
+                        None => not_cond,
+                    };
+                    self.translate_proof(eb, Some(else_cond));
+                }
+            },
+            Proof::Block(_loc, stmts) => {
+                let saved_let_locals = self.let_locals.clone();
+                for stmt in stmts {
+                    self.translate_proof(stmt, path_cond.clone());
+                }
+                self.let_locals = saved_let_locals;
+            },
+            Proof::Post(_loc, inner) => {
+                let saved = self.in_post_state;
+                self.in_post_state = true;
+                self.translate_proof(inner, path_cond);
+                self.in_post_state = saved;
+            },
+            Proof::Apply(loc, qid, args) => {
+                let args: Vec<Exp> = args.iter().map(|a| self.translate_exp(a, false)).collect();
+                self.expand_lemma_apply(loc, *qid, &args, &path_cond);
+            },
+            Proof::ForallApply(loc, binds, pats, qid, args) => {
+                let args: Vec<Exp> = args.iter().map(|a| self.translate_exp(a, false)).collect();
+                let pats: Vec<Vec<Exp>> = pats
+                    .iter()
+                    .map(|pat_vec| {
+                        pat_vec
+                            .iter()
+                            .map(|p| self.translate_exp(p, false))
+                            .collect()
+                    })
+                    .collect();
+                self.expand_forall_lemma_apply(loc, binds, &pats, *qid, &args, &path_cond);
+            },
+            Proof::Calc(loc, steps) => {
+                let env = self.builder.global_env();
+                for (lhs, op, rhs) in steps {
+                    let lhs = self.translate_exp(lhs, false);
+                    let rhs = self.translate_exp(rhs, false);
+                    let cmp_node_id = env.new_node(loc.clone(), BOOL_TYPE.clone());
+                    let cmp_exp = ExpData::Call(cmp_node_id, op.clone(), vec![lhs, rhs]).into_exp();
+                    let guarded = self.guard_proof_exp(cmp_exp, &path_cond);
+                    self.push_proof_action(
+                        loc.clone(),
+                        ProofAction::Assert(guarded, "calc step not satisfied".to_string()),
+                    );
+                }
+            },
+        }
+    }
+
+    /// Push a proof action to the appropriate vector based on `in_post_state`.
+    fn push_proof_action(&mut self, loc: Loc, action: ProofAction) {
+        if self.in_post_state {
+            self.result.post_proof.push((loc, action));
+        } else {
+            self.result.pre_proof.push((loc, action));
+        }
+    }
+
+    /// If there's a path condition, wrap `exp` as `path_cond ==> exp`.
+    fn guard_proof_exp(&self, exp: Exp, path_cond: &Option<Exp>) -> Exp {
+        match path_cond {
+            Some(cond) => self
+                .builder
+                .mk_bool_call(Operation::Implies, vec![cond.clone(), exp]),
+            None => exp,
+        }
+    }
+
+    /// Substitute lemma parameters with argument expressions in a condition expression.
+    fn substitute_lemma_params(
+        env: &GlobalEnv,
+        params: &[Parameter],
+        args: &[Exp],
+        exp: &Exp,
+    ) -> Exp {
+        let mut replacer = |_node_id: NodeId, target: RewriteTarget| -> Option<Exp> {
+            match target {
+                RewriteTarget::LocalVar(sym) => {
+                    for (i, Parameter(param_name, _, _)) in params.iter().enumerate() {
+                        if sym == *param_name {
+                            return args.get(i).cloned();
+                        }
+                    }
+                    None
+                },
+                RewriteTarget::Temporary(idx) => args.get(idx).cloned(),
+            }
+        };
+        ExpRewriter::new(env, &mut replacer).rewrite_exp(exp.clone())
+    }
+
+    /// Expand `apply lemma(args)`: assert each requires, assume each ensures.
+    fn expand_lemma_apply(
+        &mut self,
+        loc: &Loc,
+        qid: QualifiedId<crate::ast::LemmaId>,
+        args: &[Exp],
+        path_cond: &Option<Exp>,
+    ) {
+        // Clone lemma data upfront to avoid borrow conflict with &mut self.
+        let env = self.builder.global_env();
+        let module_env = env.get_module(qid.module_id);
+        let lemma = module_env.get_lemma(qid.id);
+        let params = lemma.params.clone();
+        let conditions = lemma.conditions.clone();
+
+        for cond in &conditions {
+            let env = self.builder.global_env();
+            let subst_exp = Self::substitute_lemma_params(env, &params, args, &cond.exp);
+            match &cond.kind {
+                ConditionKind::Requires => {
+                    let guarded = self.guard_proof_exp(subst_exp, path_cond);
+                    self.push_proof_action(
+                        loc.clone(),
+                        ProofAction::Assert(guarded, "lemma requirement not satisfied".to_string()),
+                    );
+                },
+                ConditionKind::Ensures => {
+                    let guarded = self.guard_proof_exp(subst_exp, path_cond);
+                    self.push_proof_action(loc.clone(), ProofAction::Assume(guarded));
+                },
+                _ => {},
+            }
+        }
+    }
+
+    /// Expand `forall binds [triggers] apply lemma(args)`:
+    /// Build `assume forall binds :: {triggers} (conj(requires) ==> conj(ensures))`
+    fn expand_forall_lemma_apply(
+        &mut self,
+        loc: &Loc,
+        binds: &[(Symbol, Type)],
+        patterns: &[Vec<Exp>],
+        qid: QualifiedId<crate::ast::LemmaId>,
+        args: &[Exp],
+        path_cond: &Option<Exp>,
+    ) {
+        // Clone lemma data upfront to avoid borrow conflict.
+        let env = self.builder.global_env();
+        let module_env = env.get_module(qid.module_id);
+        let lemma = module_env.get_lemma(qid.id);
+        let params = lemma.params.clone();
+        let conditions = lemma.conditions.clone();
+
+        let env = self.builder.global_env();
+
+        // Build substituted requires and ensures conjunctions.
+        let requires: Vec<Exp> = conditions
+            .iter()
+            .filter(|c| matches!(c.kind, ConditionKind::Requires))
+            .map(|c| Self::substitute_lemma_params(env, &params, args, &c.exp))
+            .collect();
+        let ensures: Vec<Exp> = conditions
+            .iter()
+            .filter(|c| matches!(c.kind, ConditionKind::Ensures))
+            .map(|c| Self::substitute_lemma_params(env, &params, args, &c.exp))
+            .collect();
+
+        // Build: conj(requires) ==> conj(ensures)
+        let req_conj = self
+            .builder
+            .mk_join_bool(Operation::And, requires.into_iter());
+        let ens_conj = self
+            .builder
+            .mk_join_bool(Operation::And, ensures.into_iter());
+        let body = if let Some(req) = req_conj {
+            if let Some(ens) = ens_conj {
+                self.builder
+                    .mk_bool_call(Operation::Implies, vec![req, ens])
+            } else {
+                return; // no ensures, nothing to assume
+            }
+        } else if let Some(ens) = ens_conj {
+            ens
+        } else {
+            return;
+        };
+
+        // Build quantifier ranges.
+        let env = self.builder.global_env();
+        let ranges: Vec<(Pattern, Exp)> = binds
+            .iter()
+            .map(|(sym, ty)| {
+                let var_node_id = env.new_node(loc.clone(), Type::TypeDomain(Box::new(ty.clone())));
+                let range_exp =
+                    ExpData::Call(var_node_id, Operation::TypeDomain, vec![]).into_exp();
+                let pat_node_id = env.new_node(loc.clone(), ty.clone());
+                let pat = Pattern::Var(pat_node_id, *sym);
+                (pat, range_exp)
+            })
+            .collect();
+
+        // Build forall expression.
+        let quant_node_id = env.new_node(loc.clone(), BOOL_TYPE.clone());
+        let quant_exp = ExpData::Quant(
+            quant_node_id,
+            QuantKind::Forall,
+            ranges,
+            patterns.to_vec(),
+            None,
+            body,
+        )
+        .into_exp();
+
+        let guarded = self.guard_proof_exp(quant_exp, path_cond);
+        self.push_proof_action(loc.clone(), ProofAction::Assume(guarded));
     }
 
     fn save_param(&mut self, idx: TempIndex) -> TempIndex {

@@ -680,5 +680,53 @@ fn spec_block_member(context: &mut Context, sp!(_, sbm_): &E::SpecBlockMember) {
             }
         },
         M::Variable { .. } => (),
+        M::Proof { body } => proof_exps(context, body),
+        M::Lemma {
+            spec_members,
+            proof,
+            ..
+        } => {
+            for m in spec_members {
+                spec_block_member(context, m);
+            }
+            if let Some(p) = proof {
+                proof_exps(context, p);
+            }
+        },
+    }
+}
+
+fn proof_exps(context: &mut Context, sp!(_, proof_): &E::Proof) {
+    match proof_ {
+        E::Proof_::Let(_, e) | E::Proof_::Assert(e) => exp(context, e),
+        E::Proof_::Assume(_, e) => exp(context, e),
+        E::Proof_::IfElse(cond, then_branch, else_branch) => {
+            exp(context, cond);
+            proof_exps(context, then_branch);
+            if let Some(eb) = else_branch {
+                proof_exps(context, eb);
+            }
+        },
+        E::Proof_::Block(stmts) => {
+            for s in stmts {
+                proof_exps(context, s);
+            }
+        },
+        E::Proof_::Apply(_, args) => args.iter().for_each(|e| exp(context, e)),
+        E::Proof_::ForallApply { args, patterns, .. } => {
+            for group in patterns {
+                for e in group {
+                    exp(context, e);
+                }
+            }
+            args.iter().for_each(|e| exp(context, e));
+        },
+        E::Proof_::Calc(steps) => {
+            for (e, _) in steps {
+                exp(context, e);
+            }
+        },
+        E::Proof_::Post(inner) => proof_exps(context, inner),
+        E::Proof_::Split(e) => exp(context, e),
     }
 }

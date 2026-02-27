@@ -12,6 +12,7 @@ use crate::{
     GlobalOpts, Platform,
 };
 use aptos_package_builder::PackageBuilder;
+use move_model::metadata::LanguageVersion;
 use move_prover_test_utils::baseline_test::verify_or_update_baseline;
 use regex::Regex;
 use rmcp::{
@@ -49,7 +50,7 @@ pub async fn make_client() -> rmcp::service::RunningService<rmcp::RoleClient, ()
         named_addresses: vec![],
         target_filter: None,
         bytecode_version: None,
-        language_version: None,
+        language_version: LanguageVersion::latest(),
         experiments: vec![],
     };
     let global = GlobalOpts {

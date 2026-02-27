@@ -1,0 +1,411 @@
+============ initial translation from Move ================
+
+[variant baseline]
+fun TestLemma::add_bounded($t0|x: u64, $t1|y: u64): u64 {
+     var $t2: u64
+     var $t3: u64
+     var $t4: u64
+  0: $t2 := move($t0)
+  1: $t3 := move($t1)
+  2: $t4 := +($t2, $t3)
+  3: return $t4
+}
+
+
+[variant baseline]
+fun TestLemma::double_max($t0|a: u64, $t1|b: u64): u64 {
+     var $t2: u64
+     var $t3: u64
+     var $t4: u64
+  0: $t2 := move($t0)
+  1: $t3 := move($t1)
+  2: $t4 := +($t2, $t3)
+  3: return $t4
+}
+
+
+[variant baseline]
+fun TestLemma::first_exists<#0>($t0|v: &vector<#0>): bool {
+     var $t1: &vector<#0>
+     var $t2: bool
+  0: assume Gt(Len<#0>($t0), 0)
+  1: $t1 := move($t0)
+  2: drop($t1)
+  3: $t2 := true
+  4: return $t2
+}
+
+
+[variant baseline]
+fun TestLemma::has_elements<#0>($t0|v: &vector<#0>): bool {
+     var $t1: &vector<#0>
+     var $t2: bool
+  0: assume Gt(Len<#0>($t0), 0)
+  1: $t1 := move($t0)
+  2: drop($t1)
+  3: $t2 := true
+  4: return $t2
+}
+
+
+[variant baseline]
+fun TestLemma::small_product($t0|x: u64, $t1|y: u64): u64 {
+     var $t2: u64
+     var $t3: u64
+     var $t4: u64
+  0: $t2 := move($t0)
+  1: $t3 := move($t1)
+  2: $t4 := *($t2, $t3)
+  3: return $t4
+}
+
+
+[variant baseline]
+fun TestLemma::sum_to($t0|n: u64): u64 {
+     var $t1: u64
+     var $t2: u64
+     var $t3: bool
+     var $t4: u64
+     var $t5: u64
+     var $t6: u64
+     var $t7: u64
+     var $t8: u64
+     var $t9: u64
+     var $t10: u64
+  0: $t1 := copy($t0)
+  1: $t2 := 0
+  2: $t3 := ==($t1, $t2)
+  3: if ($t3) goto 4 else goto 7
+  4: label L1
+  5: $t4 := 0
+  6: return $t4
+  7: label L0
+  8: $t5 := copy($t0)
+  9: $t6 := move($t0)
+ 10: $t7 := 1
+ 11: $t8 := -($t6, $t7)
+ 12: $t9 := TestLemma::sum_to($t8)
+ 13: $t10 := +($t5, $t9)
+ 14: return $t10
+}
+
+============ after pipeline `proofs` ================
+
+[variant baseline]
+fun TestLemma::add_bounded($t0|x: u64, $t1|y: u64): u64 {
+     var $t2: u64
+     var $t3: num
+  0: assume Le($t0, 50)
+  1: assume Le($t1, 50)
+  2: $t2 := +($t0, $t1) on_abort goto 5 with $t3
+  3: label L1
+  4: return $t2
+  5: label L2
+  6: abort($t3)
+}
+
+
+[variant verification]
+fun TestLemma::add_bounded($t0|x: u64, $t1|y: u64): u64 {
+     var $t2: u64
+     var $t3: num
+  0: assume Le($t0, 50)
+  1: assume Le($t1, 50)
+     # VC: lemma requires at tests/spec_instrumentation/proofs/lemma.move:134:9+28
+  2: assert Le($t0, 50)
+     # VC: lemma requires at tests/spec_instrumentation/proofs/lemma.move:134:9+28
+  3: assert Le($t1, 50)
+  4: assume Le(Add($t0, $t1), 100)
+  5: $t2 := +($t0, $t1) on_abort goto 9 with $t3
+  6: label L1
+     # VC: post-condition does not hold at tests/spec_instrumentation/proofs/lemma.move:132:9+22
+  7: assert Le($t2, 100)
+  8: return $t2
+  9: label L2
+ 10: abort($t3)
+}
+
+
+[variant baseline]
+fun TestLemma::double_max($t0|a: u64, $t1|b: u64): u64 {
+     var $t2: u64
+     var $t3: num
+  0: assume Le($t0, $t1)
+  1: assume Le(Mul(2, $t1), 18446744073709551615)
+  2: $t2 := +($t0, $t1) on_abort goto 5 with $t3
+  3: label L1
+  4: return $t2
+  5: label L2
+  6: abort($t3)
+}
+
+
+[variant verification]
+fun TestLemma::double_max($t0|a: u64, $t1|b: u64): u64 {
+     var $t2: u64
+     var $t3: num
+  0: assume Le($t0, $t1)
+  1: assume Le(Mul(2, $t1), 18446744073709551615)
+     # VC: lemma requires at tests/spec_instrumentation/proofs/lemma.move:45:9+23
+  2: assert Le($t0, $t1)
+  3: assume Le(Add($t0, $t1), Mul(2, $t1))
+  4: $t2 := +($t0, $t1) on_abort goto 8 with $t3
+  5: label L1
+     # VC: post-condition does not hold at tests/spec_instrumentation/proofs/lemma.move:43:9+24
+  6: assert Le($t2, Mul(2, $t1))
+  7: return $t2
+  8: label L2
+  9: abort($t3)
+}
+
+
+[variant baseline]
+fun TestLemma::first_exists<#0>($t0|v: vector<#0>): bool {
+     var $t1: bool
+  0: assume Gt(Len<#0>($t0), 0)
+  1: assume Gt(Len<#0>($t0), 0)
+  2: $t1 := true
+  3: label L1
+  4: return $t1
+}
+
+
+[variant verification]
+fun TestLemma::first_exists<#0>($t0|v: vector<#0>): bool {
+     var $t1: bool
+  0: assume Gt(Len<#0>($t0), 0)
+     # VC: lemma requires at tests/spec_instrumentation/proofs/lemma.move:68:9+32
+  1: assert Gt(Len<#0>($t0), 0)
+  2: assume Ge(Len<#0>($t0), 1)
+  3: assume Gt(Len<#0>($t0), 0)
+  4: $t1 := true
+  5: label L1
+     # VC: post-condition does not hold at tests/spec_instrumentation/proofs/lemma.move:66:9+23
+  6: assert Eq<bool>($t1, true)
+  7: return $t1
+}
+
+
+[variant baseline]
+fun TestLemma::has_elements<#0>($t0|v: vector<#0>): bool {
+     var $t1: bool
+  0: assume Gt(Len<#0>($t0), 0)
+  1: assume Gt(Len<#0>($t0), 0)
+  2: $t1 := true
+  3: label L1
+  4: return $t1
+}
+
+
+[variant verification]
+fun TestLemma::has_elements<#0>($t0|v: vector<#0>): bool {
+     var $t1: bool
+  0: assume Gt(Len<#0>($t0), 0)
+  1: assume forall w: vector<#0>: TypeDomain(){TestLemma::all_positive<#0>(w, Len<#0>(w))}: Implies(Gt(Len<#0>(w), 0), TestLemma::all_positive<#0>(w, Len<#0>(w)))
+  2: assume Gt(Len<#0>($t0), 0)
+  3: $t1 := true
+  4: label L1
+     # VC: post-condition does not hold at tests/spec_instrumentation/proofs/lemma.move:118:9+23
+  5: assert Eq<bool>($t1, true)
+  6: return $t1
+}
+
+
+[variant baseline]
+fun TestLemma::small_product($t0|x: u64, $t1|y: u64): u64 {
+     var $t2: u64
+     var $t3: num
+  0: assume Le($t0, 100)
+  1: assume Le($t1, 100)
+  2: $t2 := *($t0, $t1) on_abort goto 5 with $t3
+  3: label L1
+  4: return $t2
+  5: label L2
+  6: abort($t3)
+}
+
+
+[variant verification]
+fun TestLemma::small_product($t0|x: u64, $t1|y: u64): u64 {
+     var $t2: u64
+     var $t3: num
+  0: assume Le($t0, 100)
+  1: assume Le($t1, 100)
+     # VC: lemma requires at tests/spec_instrumentation/proofs/lemma.move:26:9+22
+  2: assert Le($t0, 100)
+     # VC: lemma requires at tests/spec_instrumentation/proofs/lemma.move:26:9+22
+  3: assert Le($t1, 100)
+  4: assume Le(Mul($t0, $t1), 10000)
+  5: $t2 := *($t0, $t1) on_abort goto 9 with $t3
+  6: label L1
+     # VC: post-condition does not hold at tests/spec_instrumentation/proofs/lemma.move:24:9+24
+  7: assert Le($t2, 10000)
+  8: return $t2
+  9: label L2
+ 10: abort($t3)
+}
+
+
+[variant baseline]
+fun TestLemma::sum_to($t0|n: u64): u64 {
+     var $t1: u64
+     var $t2: bool
+     var $t3: u64
+     var $t4: u64
+     var $t5: u64
+     var $t6: u64
+     var $t7: num
+     var $t8: u64
+  0: $t1 := 0
+  1: $t2 := ==($t0, $t1)
+  2: if ($t2) goto 3 else goto 7
+  3: label L1
+  4: $t3 := 0
+  5: $t4 := move($t3)
+  6: goto 12
+  7: label L0
+  8: $t5 := 1
+  9: $t6 := -($t0, $t5) on_abort goto 14 with $t7
+ 10: $t8 := TestLemma::sum_to($t6) on_abort goto 14 with $t7
+ 11: $t4 := +($t0, $t8) on_abort goto 14 with $t7
+ 12: label L2
+ 13: return $t4
+ 14: label L3
+ 15: abort($t7)
+}
+
+
+[variant verification]
+fun TestLemma::sum_to($t0|n: u64): u64 {
+     var $t1: u64
+     var $t2: bool
+     var $t3: u64
+     var $t4: u64
+     var $t5: u64
+     var $t6: u64
+     var $t7: num
+     var $t8: u64
+  0: assume forall x: num: TypeDomain(){TestLemma::sum(x)}: Implies(Ge(x, 0), Ge(TestLemma::sum(x), 0))
+  1: $t1 := 0
+  2: $t2 := ==($t0, $t1)
+  3: if ($t2) goto 4 else goto 8
+  4: label L1
+  5: $t3 := 0
+  6: $t4 := move($t3)
+  7: goto 13
+  8: label L0
+  9: $t5 := 1
+ 10: $t6 := -($t0, $t5) on_abort goto 17 with $t7
+ 11: $t8 := TestLemma::sum_to($t6) on_abort goto 17 with $t7
+ 12: $t4 := +($t0, $t8) on_abort goto 17 with $t7
+ 13: label L2
+     # VC: function does not abort under this condition at tests/spec_instrumentation/proofs/lemma.move:90:9+27
+ 14: assert Not(Gt(TestLemma::sum[]($t0), 18446744073709551615))
+     # VC: post-condition does not hold at tests/spec_instrumentation/proofs/lemma.move:91:9+25
+ 15: assert Eq<u64>($t4, TestLemma::sum($t0))
+ 16: return $t4
+ 17: label L3
+     # VC: abort not covered by any of the `aborts_if` clauses at tests/spec_instrumentation/proofs/lemma.move:89:5+155
+ 18: assert Gt(TestLemma::sum[]($t0), 18446744073709551615)
+ 19: abort($t7)
+}
+
+
+
+==== spec-instrumenter input specs ====
+
+fun TestLemma::add_bounded[baseline]
+spec {
+  requires Le($t0, 50);
+  requires Le($t1, 50);
+  ensures Le(result0(), 100);
+}
+
+fun TestLemma::add_bounded[verification]
+spec {
+  requires Le($t0, 50);
+  requires Le($t1, 50);
+  ensures Le(result0(), 100);
+}
+
+fun TestLemma::double_max[baseline]
+spec {
+  requires Le($t0, $t1);
+  requires Le(Mul(2, $t1), 18446744073709551615);
+  ensures Le(result0(), Mul(2, $t1));
+}
+
+fun TestLemma::double_max[verification]
+spec {
+  requires Le($t0, $t1);
+  requires Le(Mul(2, $t1), 18446744073709551615);
+  ensures Le(result0(), Mul(2, $t1));
+}
+
+fun TestLemma::first_exists[baseline]
+spec {
+  requires Gt(Len<#0>($t0), 0);
+  ensures Eq<bool>(result0(), true);
+}
+0 -> spec {
+  assume Gt(Len<#0>($t0), 0);
+}
+
+
+fun TestLemma::first_exists[verification]
+spec {
+  requires Gt(Len<#0>($t0), 0);
+  ensures Eq<bool>(result0(), true);
+}
+0 -> spec {
+  assume Gt(Len<#0>($t0), 0);
+}
+
+
+fun TestLemma::has_elements[baseline]
+spec {
+  requires Gt(Len<#0>($t0), 0);
+  ensures Eq<bool>(result0(), true);
+}
+0 -> spec {
+  assume Gt(Len<#0>($t0), 0);
+}
+
+
+fun TestLemma::has_elements[verification]
+spec {
+  requires Gt(Len<#0>($t0), 0);
+  ensures Eq<bool>(result0(), true);
+}
+0 -> spec {
+  assume Gt(Len<#0>($t0), 0);
+}
+
+
+fun TestLemma::small_product[baseline]
+spec {
+  requires Le($t0, 100);
+  requires Le($t1, 100);
+  ensures Le(result0(), 10000);
+}
+
+fun TestLemma::small_product[verification]
+spec {
+  requires Le($t0, 100);
+  requires Le($t1, 100);
+  ensures Le(result0(), 10000);
+}
+
+fun TestLemma::sum_to[baseline]
+spec {
+  aborts_if Gt(TestLemma::sum($t0), 18446744073709551615);
+  ensures Eq<u64>(result0(), TestLemma::sum($t0));
+}
+
+fun TestLemma::sum_to[verification]
+spec {
+  aborts_if Gt(TestLemma::sum($t0), 18446744073709551615);
+  ensures Eq<u64>(result0(), TestLemma::sum($t0));
+}
+
+============ Diagnostics ================
