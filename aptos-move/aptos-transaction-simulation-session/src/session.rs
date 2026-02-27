@@ -687,21 +687,47 @@ impl Session {
     }
 
     /// Executes a view function and returns the output values.
+    ///
+    /// If `profile_gas` is `true`, the view function is executed with the gas profiler enabled.
+    /// A `gas-report` directory is generated under the output directory containing
+    /// an HTML report with flamegraphs and detailed gas breakdowns.
     pub fn execute_view_function(
         &mut self,
         module_id: ModuleId,
         function_name: Identifier,
         ty_args: Vec<TypeTag>,
         args: Vec<Vec<u8>>,
+        profile_gas: bool,
     ) -> Result<Vec<serde_json::Value>> {
-        let output = AptosVM::execute_view_function(
-            &self.state_store,
-            module_id.clone(),
-            function_name.clone(),
-            ty_args.clone(),
-            args,
-            u64::MAX,
-        );
+        let (output, gas_log) = if profile_gas {
+            let (output, gas_profiler) = AptosVM::execute_view_function_with_modified_gas_meter(
+                &self.state_store,
+                module_id.clone(),
+                function_name.clone(),
+                ty_args.clone(),
+                args,
+                u64::MAX,
+                |gas_meter| {
+                    GasProfiler::new_function(
+                        gas_meter,
+                        module_id.clone(),
+                        function_name.clone(),
+                        ty_args.clone(),
+                    )
+                },
+            );
+            (output, gas_profiler.map(|p| p.finish()))
+        } else {
+            let output = AptosVM::execute_view_function(
+                &self.state_store,
+                module_id.clone(),
+                function_name.clone(),
+                ty_args.clone(),
+                args,
+                u64::MAX,
+            );
+            (output, None)
+        };
 
         let (summary, res) = match output.values {
             Ok(values) => {
@@ -736,17 +762,20 @@ impl Session {
             },
         };
 
-        let summary_path = self
+        let name = format!("{}::{}", format_module_id(&module_id), function_name);
+
+        let output_path = self
             .path
-            .join(format!(
-                "[{}] view {}::{}",
-                self.config.ops,
-                format_module_id(&module_id),
-                function_name
-            ))
-            .join("summary.json");
-        std::fs::create_dir_all(summary_path.parent().unwrap())?;
+            .join(format!("[{}] view {}", self.config.ops, name,));
+        std::fs::create_dir_all(&output_path)?;
+
+        let summary_path = output_path.join("summary.json");
         std::fs::write(summary_path, serde_json::to_string_pretty(&summary)?)?;
+
+        // Generate gas profiling report if enabled.
+        if let Some(gas_log) = gas_log {
+            gas_log.generate_html_report(output_path.join("gas-report"), name)?;
+        }
 
         self.finish_op(false)?;
 
