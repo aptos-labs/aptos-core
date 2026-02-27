@@ -3420,7 +3420,6 @@ dependencies = [
  "thiserror 1.0.69",
  "tokio",
  "tokio-retry",
- "tokio-stream",
  "tokio-util 0.7.10",
 ]
 
