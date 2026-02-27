@@ -35,8 +35,7 @@ impl<F: PrimeField> RngCore for TranscriptRng<'_, F> {
     }
 
     fn fill_bytes(&mut self, dest: &mut [u8]) {
-        self.transcript
-            .challenge_bytes(b"sumcheck_round", dest);
+        self.transcript.challenge_bytes(b"sumcheck_round", dest);
     }
 
     fn try_fill_bytes(&mut self, dest: &mut [u8]) -> Result<(), ark_std::rand::Error> {
@@ -54,7 +53,8 @@ impl<F: PrimeField> FeedableRNG for TranscriptRng<'_, F> {
 
     fn feed<M: CanonicalSerialize>(&mut self, msg: &M) -> Result<(), Self::Error> {
         let mut buf = Vec::new();
-        msg.serialize_compressed(&mut buf).map_err(|_| super::Error::SerializationError)?;
+        msg.serialize_compressed(&mut buf)
+            .map_err(|_| super::Error::SerializationError)?;
         self.transcript.append_message(b"sumcheck_prover_msg", &buf);
         Ok(())
     }

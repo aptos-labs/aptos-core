@@ -178,7 +178,10 @@ impl<E: Pairing> PublicParameters<E> {
         max_aggregation: usize,
         extra_bits: u64,
     ) -> HashMap<Vec<u8>, u64> {
-        dlog::table::build::<E::G1>(G, 1u64 << (extra_bits + ((ell as u64 + log2(max_aggregation) as u64) / 2)))
+        dlog::table::build::<E::G1>(
+            G,
+            1u64 << (extra_bits + ((ell as u64 + log2(max_aggregation) as u64) / 2)),
+        )
     }
 
     pub(crate) fn get_dlog_range_bound(&self) -> u64 {

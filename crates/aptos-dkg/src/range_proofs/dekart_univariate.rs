@@ -618,14 +618,16 @@ impl<E: Pairing> traits::BatchedRangeProof<E> for Proof<E> {
         // Compute MSM in G2: sum_j (alphas[j] * proof.c_hat[j])
         let g2_comb = VariableBaseMSM::msm(&self.c_hat, &alphas).unwrap();
 
-
-        Ok((E::G1::normalize_batch(&vec![
-            g1_comb,   // from MSM in G1
-            -vk.tau_1, // subtract tau_1
-        ]), E::G2::normalize_batch(&vec![
-            vk.tau_2, // tau_2
-            g2_comb,  // from MSM in G2
-        ])))
+        Ok((
+            E::G1::normalize_batch(&vec![
+                g1_comb,   // from MSM in G1
+                -vk.tau_1, // subtract tau_1
+            ]),
+            E::G2::normalize_batch(&vec![
+                vk.tau_2, // tau_2
+                g2_comb,  // from MSM in G2
+            ]),
+        ))
 
         // let c_check = E::multi_pairing(
         //     vec![

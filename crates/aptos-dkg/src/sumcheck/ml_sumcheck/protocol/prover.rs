@@ -147,7 +147,8 @@ impl<F: Field> IPForMLSumcheck<F> {
                     }
 
                     // Linear term (once per (b,x))
-                    let linear_val = linear_contrib.0 + x_field * (linear_contrib.1 - linear_contrib.0);
+                    let linear_val =
+                        linear_contrib.0 + x_field * (linear_contrib.1 - linear_contrib.0);
                     let linear_term_val = linear_val * eq_val * (one - eq_zero_val);
                     sum[x] += linear_term_val;
                 }

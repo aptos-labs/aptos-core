@@ -5,7 +5,6 @@
 
 // WARNING: THIS CODE HAS NOT BEEN PROPERLY VETTED, ONLY USE FOR BENCHMARKING PURPOSES!!!!!
 
-use ark_ff::AdditiveGroup;
 use crate::{
     fiat_shamir::PolynomialCommitmentScheme as _,
     pcs::{
@@ -15,9 +14,7 @@ use crate::{
     },
     sigma_protocol::{
         homomorphism::{
-            fixed_base_msms::Trait as FixedBaseMsmsTrait,
-            tuple::TupleCodomainShape,
-            Trait as _,
+            fixed_base_msms::Trait as FixedBaseMsmsTrait, tuple::TupleCodomainShape, Trait as _,
             TrivialShape as CodomainShape,
         },
         traits::fiat_shamir_challenge_for_sigma_protocol,
@@ -29,21 +26,23 @@ use aptos_crypto::arkworks::{
     msm::{merge_scaled_msm_terms, MsmInput},
     random::sample_field_element,
     srs::{SrsBasis, SrsType},
-    vanishing_poly,
-    GroupGenerators,
+    vanishing_poly, GroupGenerators,
 };
 use ark_ec::{
     pairing::{Pairing, PairingOutput},
     AffineRepr, CurveGroup, VariableBaseMSM,
 };
-use ark_ff::{FftField, Field, One, Zero};
+use ark_ff::{AdditiveGroup, FftField, Field, One, Zero};
 use ark_poly::{
     univariate::{DenseOrSparsePolynomial as DOSPoly, DensePolynomial},
     DenseUVPolynomial, Polynomial,
 };
 use ark_serialize::{CanonicalDeserialize, CanonicalSerialize};
 use rand::{CryptoRng, RngCore};
-#[cfg(any(feature = "pcs_verify_timing", feature = "range_proof_timing_multivariate"))]
+#[cfg(any(
+    feature = "pcs_verify_timing",
+    feature = "range_proof_timing_multivariate"
+))]
 use std::time::{Duration, Instant};
 
 /// Domain separation tag for the Shplonked opening sigma protocol (Fiat–Shamir context).
@@ -117,7 +116,11 @@ pub struct ZkPcsOpeningProof<E: Pairing> {
 
 /// Computes weights alpha_i = gamma^{i-1} * Z_{T\\x_i}(z) for the sigma protocol (eval_points, z, gamma).
 #[allow(non_snake_case)]
-fn compute_alpha<E: Pairing>(eval_points: &[E::ScalarField], z: E::ScalarField, gamma: E::ScalarField) -> Vec<E::ScalarField>
+fn compute_alpha<E: Pairing>(
+    eval_points: &[E::ScalarField],
+    z: E::ScalarField,
+    gamma: E::ScalarField,
+) -> Vec<E::ScalarField>
 where
     E::ScalarField: FftField,
 {
@@ -193,7 +196,10 @@ where
     // Step 2
     let gamma: E::ScalarField = trs.challenge_scalar();
     #[cfg(feature = "range_proof_timing_multivariate")]
-    print_open("com_y (hom.apply evals) + transcript + gamma", start.elapsed());
+    print_open(
+        "com_y (hom.apply evals) + transcript + gamma",
+        start.elapsed(),
+    );
 
     #[cfg(feature = "range_proof_timing_multivariate")]
     let start = Instant::now();
@@ -436,7 +442,10 @@ where
         sigma_proof,
     };
     #[cfg(feature = "range_proof_timing_multivariate")]
-    print_open("pack proof (r_com_y, r_V, sigma_proof, ...)", start.elapsed());
+    print_open(
+        "pack proof (r_com_y, r_V, sigma_proof, ...)",
+        start.elapsed(),
+    );
     proof
 }
 
@@ -447,7 +456,8 @@ pub fn zk_pcs_verify<E: Pairing, R: RngCore + CryptoRng>(
     trs: &mut merlin::Transcript,
     rng: &mut R,
 ) -> anyhow::Result<()> {
-    let (g1_terms, g2_terms) = zk_pcs_pairing_for_verify(zk_pcs_opening_proof, commitment_msms, srs, trs, rng)?;
+    let (g1_terms, g2_terms) =
+        zk_pcs_pairing_for_verify(zk_pcs_opening_proof, commitment_msms, srs, trs, rng)?;
 
     let check = E::multi_pairing(g1_terms, g2_terms);
     anyhow::ensure!(PairingOutput::<E>::ZERO == check);
@@ -564,36 +574,33 @@ where
         sigma_proof_statement.y_sum,
     );
 
-    let sigma_protocol_proof: Proof<
-        E::ScalarField,
-        shplonked_sigma::ShplonkedSigmaHom<E>,
-    > = Proof {
-        first_proof_item: FirstProofItem::Commitment(TupleCodomainShape(
-            TupleCodomainShape(
-                CodomainShape(sigma_proof.r_com_y),
-                CodomainShape(sigma_proof.r_V),
-            ),
-            sigma_proof.r_y,
-        )),
-        z: ShplonkedSigmaWitness {
-            rho: sigma_proof.z_rho,
-            evals: sigma_proof.z_yi.clone(),
-            u: sigma_proof.z_u,
-        },
-    };
+    let sigma_protocol_proof: Proof<E::ScalarField, shplonked_sigma::ShplonkedSigmaHom<E>> =
+        Proof {
+            first_proof_item: FirstProofItem::Commitment(TupleCodomainShape(
+                TupleCodomainShape(
+                    CodomainShape(sigma_proof.r_com_y),
+                    CodomainShape(sigma_proof.r_V),
+                ),
+                sigma_proof.r_y,
+            )),
+            z: ShplonkedSigmaWitness {
+                rho: sigma_proof.z_rho,
+                evals: sigma_proof.z_yi.clone(),
+                u: sigma_proof.z_u,
+            },
+        };
     #[cfg(feature = "pcs_verify_timing")]
-    print_cumulative("compute_alpha + hom setup + proof packaging", start.elapsed());
+    print_cumulative(
+        "compute_alpha + hom setup + proof packaging",
+        start.elapsed(),
+    );
 
     #[cfg(feature = "pcs_verify_timing")]
     let start = Instant::now();
     let prover_commitment = sigma_protocol_proof
         .prover_commitment()
         .expect("Shplonked verify: tuple proof must contain commitment");
-    let c = fiat_shamir_challenge_for_sigma_protocol::<
-        _,
-        E::ScalarField,
-        _,
-    >(
+    let c = fiat_shamir_challenge_for_sigma_protocol::<_, E::ScalarField, _>(
         SHPLONKED_SIGMA_DST,
         &full_hom,
         &public_statement,
@@ -631,19 +638,23 @@ where
         c,
     );
     #[cfg(feature = "pcs_verify_timing")]
-    print_cumulative("hom1 verifier challenges + msm_terms + merge_msm_terms", start.elapsed());
+    print_cumulative(
+        "hom1 verifier challenges + msm_terms + merge_msm_terms",
+        start.elapsed(),
+    );
 
     #[cfg(feature = "pcs_verify_timing")]
     let start = Instant::now();
     let delta = sample_field_element(rng);
-    let merged_final = merge_scaled_msm_terms::<E::G1>(
-        &[&merged, &hom1_msm_terms],
-        &[E::ScalarField::ONE, delta],
-    );
+    let merged_final =
+        merge_scaled_msm_terms::<E::G1>(&[&merged, &hom1_msm_terms], &[E::ScalarField::ONE, delta]);
     let sum_com = E::G1::msm(merged_final.bases(), merged_final.scalars())
         .expect("Shplonked verify: merged commitment MSM");
     #[cfg(feature = "pcs_verify_timing")]
-    print_cumulative("delta + merge_scaled_msm_terms + sum_com MSM", start.elapsed());
+    print_cumulative(
+        "delta + merge_scaled_msm_terms + sum_com MSM",
+        start.elapsed(),
+    );
 
     #[cfg(feature = "pcs_verify_timing")]
     let start = Instant::now();

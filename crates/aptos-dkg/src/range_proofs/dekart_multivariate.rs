@@ -1,43 +1,50 @@
 // Copyright (c) Aptos Foundation
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
-use ark_ec::pairing::PairingOutput;
-use crate::pcs::shplonked::zk_pcs_pairing_for_verify;
-use crate::fiat_shamir::PolynomialCommitmentScheme;
-use ark_ff::AdditiveGroup;
 use crate::{
-    Scalar,
+    fiat_shamir::PolynomialCommitmentScheme,
     pcs::{
-        shplonked::{Srs, ZkPcsOpeningProof, zk_pcs_commit, zk_pcs_open},
+        shplonked::{
+            zk_pcs_commit, zk_pcs_open, zk_pcs_pairing_for_verify, Srs, ZkPcsOpeningProof,
+        },
         univariate_hiding_kzg,
     },
     range_proofs::{dekart_univariate_v2::two_term_msm, traits},
-    sigma_protocol::{homomorphism::Trait as _, Trait as _},
-    sumcheck::{ml_sumcheck::protocol::verifier::VerifierMsg, rng::TranscriptRng},
-    utils,
+    sigma_protocol::{
+        homomorphism::{Trait as _, TrivialShape},
+        Trait as _,
+    },
+    sumcheck::{
+        ml_sumcheck::{
+            protocol::{prover::ProverMsg, verifier::VerifierMsg},
+            MLSumcheck,
+        },
+        rng::TranscriptRng,
+    },
+    utils, Scalar,
 };
-use aptos_crypto::arkworks::srs::SrsBasis;
 use aptos_crypto::arkworks::{
     msm::MsmInput,
     random::{sample_field_element, sample_field_elements},
-    srs::SrsType,
+    srs::{SrsBasis, SrsType},
     GroupGenerators,
 };
-use crate::sigma_protocol::homomorphism::TrivialShape;
-use crate::sumcheck::ml_sumcheck::protocol::prover::ProverMsg;
-use ark_poly::univariate::DensePolynomial;
-use ark_poly::DenseUVPolynomial;
-use ark_ec::{pairing::Pairing, AffineRepr, CurveGroup, PrimeGroup, VariableBaseMSM};
-use ark_ff::Field;
-use ark_poly::Polynomial;
+use ark_ec::{
+    pairing::{Pairing, PairingOutput},
+    AffineRepr, CurveGroup, PrimeGroup, VariableBaseMSM,
+};
+use ark_ff::{AdditiveGroup, Field, Zero};
+use ark_poly::{
+    univariate::DensePolynomial, DenseMultilinearExtension, DenseUVPolynomial, Polynomial,
+};
 use ark_serialize::{CanonicalDeserialize, CanonicalSerialize};
-use std::iter::once;
 use rand::{CryptoRng, RngCore};
-use std::fmt::Debug;
-use ark_poly::DenseMultilinearExtension;
-use std::iter::successors;
 #[cfg(feature = "range_proof_timing_multivariate")]
 use std::time::{Duration, Instant};
+use std::{
+    fmt::Debug,
+    iter::{once, successors},
+};
 
 #[allow(non_snake_case)]
 #[derive(CanonicalSerialize, CanonicalDeserialize, Clone, Debug, PartialEq, Eq)]
@@ -220,7 +227,9 @@ impl<E: Pairing> traits::BatchedRangeProof<E> for Proof<E> {
             trs.append_point(g);
         }
         let mut buf = Vec::new();
-        self.h_g.serialize_compressed(&mut buf).expect("serialize h_g");
+        self.h_g
+            .serialize_compressed(&mut buf)
+            .expect("serialize h_g");
         trs.append_message(b"H_g", &buf);
 
         let c: E::ScalarField = trs.challenge_scalar::<E::ScalarField>();
@@ -269,9 +278,6 @@ impl<E: Pairing> traits::BatchedRangeProof<E> for Proof<E> {
         #[cfg(feature = "range_proof_timing_multivariate")]
         print_cumulative("sumcheck verify", start.elapsed());
 
-        // Advance transcript to match prover (prover drew last_rho here, then appended y_f, y_j, hat_c, z, then single batched open)
-        let _last_rho: E::ScalarField = trs.challenge_scalar::<E::ScalarField>();
-
         #[cfg(feature = "range_proof_timing_multivariate")]
         let start = Instant::now();
         // Step 5: (y_f - sum 2^{j-1} y_j + sum c^j y_j(1-y_j)) * eq_t(x) * vnsh_0(x) + alpha * y_g == h_m(x_m)
@@ -303,9 +309,7 @@ impl<E: Pairing> traits::BatchedRangeProof<E> for Proof<E> {
         }
         let lhs = sum_weighted_y * eq_t_x * vnsh_0_x + alpha * self.y_g;
         if lhs != subclaim.expected_evaluation {
-            return Err(anyhow::anyhow!(
-                "Step 5 check failed: lhs != h_m(x_m)"
-            ));
+            return Err(anyhow::anyhow!("Step 5 check failed: lhs != h_m(x_m)"));
         }
         #[cfg(feature = "range_proof_timing_multivariate")]
         print_cumulative("step5 scalar check (eq_t, vnsh_0, lhs)", start.elapsed());
@@ -314,7 +318,12 @@ impl<E: Pairing> traits::BatchedRangeProof<E> for Proof<E> {
         for (i, y) in self.evals.iter().enumerate() {
             buf.clear();
             y.serialize_compressed(&mut buf).expect("serialize eval");
-            trs.append_message(if i == 0 { b"y_f" } else { b"y_j" }, &buf);
+            if i == 0 {
+                trs.append_message(b"y_f", &buf);
+            } else {
+                let label = format!("y_{}", i);
+                trs.append_message(label.as_bytes(), &buf);
+            }
         }
         let hat_c: E::ScalarField = trs.challenge_scalar();
 
@@ -347,12 +356,14 @@ impl<E: Pairing> traits::BatchedRangeProof<E> for Proof<E> {
         let g_commitment_msms: Vec<MsmInput<E::G1Affine, E::ScalarField>> = self
             .g_commitments
             .iter()
-            .map(|&affine| MsmInput::new(vec![affine], vec![E::ScalarField::ONE]).expect("single term"))
+            .map(|&affine| {
+                MsmInput::new(vec![affine], vec![E::ScalarField::ONE]).expect("single term")
+            })
             .collect();
         let commitment_msms: Vec<MsmInput<E::G1Affine, E::ScalarField>> =
             once(combined_comm_msm).chain(g_commitment_msms).collect();
 
-        // y_sum in the opening proof must equal y_batched_at_z (f̂(z)) + y_g (sum of g_i at rho_i)
+        // y_sum in the opening proof must equal y_batched_at_z (f̂(z)) + y_g (sum of g_i at x_i)
         anyhow::ensure!(
             self.zk_pcs_opening_proof.sigma_proof_statement.y_sum == self.y_batched_at_z + self.y_g,
             "Batched opening y_sum != y_batched_at_z + y_g"
@@ -445,18 +456,18 @@ where
 
     #[cfg(feature = "range_proof_timing_multivariate")]
     let start = Instant::now();
-    // Step 3a: construct the hat_f_js
+    // Step 3a: construct the f_js (copy_paste)
     let bits: Vec<Vec<bool>> = values
-            .iter()
-            .map(|z_val| {
-                utils::scalar_to_bits_le::<E>(z_val)
-                    .into_iter()
-                    .take(ell as usize)
-                    .collect::<Vec<_>>()
-            })
-            .collect();
+        .iter()
+        .map(|z_val| {
+            utils::scalar_to_bits_le::<E>(z_val)
+                .into_iter()
+                .take(ell as usize)
+                .collect::<Vec<_>>()
+        })
+        .collect();
     // This is copy-paste:
-    let hat_f_j_evals_without_r: Vec<Vec<bool>> = (0..ell as usize)
+    let f_j_evals_without_r: Vec<Vec<bool>> = (0..ell as usize)
         .map(|j| bits.iter().map(|row| row[j]).collect())
         .collect(); // This is just transposing the bits matrix
 
@@ -466,48 +477,44 @@ where
     // Step 3c: Construct f_j
     let num_vars = (values.len() + 1).next_power_of_two().ilog2() as u8;
     let size = 1 << num_vars;
-    let hat_f_j_evals: Vec<Vec<E::ScalarField>> = hat_f_j_evals_without_r
+    let f_j_evals: Vec<Vec<E::ScalarField>> = f_j_evals_without_r
         .iter()
         .enumerate()
         .map(|(j, col)| {
             let mut evals: Vec<E::ScalarField> = once(betas[j])
                 .chain(col.iter().map(|&b| E::ScalarField::from(b)))
                 .collect();
-            evals.resize(size, E::ScalarField::ZERO);
+            evals.resize(size, E::ScalarField::ZERO); // This is needed for `DenseMultilinearExtension::from_evaluations_vec`
             evals
         })
         .collect();
 
-    let hat_f_js: Vec<DenseMultilinearExtension::<E::ScalarField>> = hat_f_j_evals
+    let f_js: Vec<DenseMultilinearExtension<E::ScalarField>> = f_j_evals
         .iter()
-        .map(|hat_f_j_eval| DenseMultilinearExtension::from_evaluations_vec(num_vars.into(), hat_f_j_eval.clone()))
+        .map(|f_j_eval| {
+            DenseMultilinearExtension::from_evaluations_vec(num_vars.into(), f_j_eval.clone())
+        })
         .collect();
     #[cfg(feature = "range_proof_timing_multivariate")]
     print_cumulative("betas + bits + hat_f_j_evals + hat_f_js", start.elapsed());
 
     #[cfg(feature = "range_proof_timing_multivariate")]
     let start = Instant::now();
-    let hat_f_j_comms_randomness = sample_field_elements(hat_f_js.len(), rng);
+    // Step 3d:
+    let f_j_comms_randomness: Vec<E::ScalarField> = sample_field_elements(f_js.len(), rng);
     #[cfg(feature = "range_proof_timing_multivariate")]
     print_cumulative("hat_f_j_comms_randomness (sample)", start.elapsed());
 
     #[cfg(feature = "range_proof_timing_multivariate")]
     let start = Instant::now();
-    // Step 5: Commit to the hat_f_js using Zeromorph
-    let hom: univariate_hiding_kzg::CommitmentHomomorphism<'_, E> =
-        univariate_hiding_kzg::CommitmentHomomorphism {
-            msm_basis: &tau_powers,
-            xi_1: pk.ck.xi_1,
-        };
-    let hat_f_j_comms: Vec<_> = hat_f_j_evals
+    // Step 3e: Commit to the f_js (xi_1*rho + tau_powers[0]*hat_f_j_eval[0] + msm_bool(tau_powers[1..], bits))
+    let f_j_comms: Vec<E::G1> = f_j_evals
         .iter()
-        .zip(hat_f_j_comms_randomness.iter())
+        .zip(f_j_comms_randomness.iter())
         .map(|(hat_f_j_eval, r_i)| {
-            hom.apply(&univariate_hiding_kzg::Witness {
-                hiding_randomness: Scalar(*r_i),
-                values: Scalar::vec_from_inner(hat_f_j_eval.clone()),
-            })
-            .0
+            let bits: Vec<bool> = hat_f_j_eval[1..].iter().map(|e| !e.is_zero()).collect();
+            let sum = tau_powers[0] * hat_f_j_eval[0] + utils::msm_bool(&tau_powers[1..], &bits);
+            pk.ck.xi_1 * *r_i + sum // TODO: could turn this into a 3-term MSM, should be faster
         })
         .collect();
     #[cfg(feature = "range_proof_timing_multivariate")]
@@ -515,17 +522,16 @@ where
 
     #[cfg(feature = "range_proof_timing_multivariate")]
     let start = Instant::now();
-    hat_f_j_comms
-        .iter()
-        .for_each(|hat_f_j_comm: &E::G1| {
-            trs.append_point(&hat_f_j_comm.into_affine());
-        });
+    // Step 3f:
+    f_j_comms.iter().for_each(|hat_f_j_comm: &E::G1| {
+        trs.append_point(&hat_f_j_comm.into_affine());
+    });
     #[cfg(feature = "range_proof_timing_multivariate")]
     print_cumulative("transcript append hat_f_j_comms", start.elapsed());
 
     #[cfg(feature = "range_proof_timing_multivariate")]
     let start = Instant::now();
-    // Step 7:
+    // Step 4a:
     let srs = Srs {
         taus_1: tau_powers.clone(),
         xi_1: pk.ck.xi_1,
@@ -549,11 +555,10 @@ where
 
     #[cfg(feature = "range_proof_timing_multivariate")]
     let start = Instant::now();
-    g_comm
-        .iter()
-        .for_each(|g_i_comm: &E::G1| {
-            trs.append_point(&g_i_comm.into_affine());
-        });
+    // Step 4b:
+    g_comm.iter().for_each(|g_i_comm: &E::G1| {
+        trs.append_point(&g_i_comm.into_affine());
+    });
     {
         let mut buf = Vec::new();
         _G.serialize_compressed(&mut buf).expect("serialize H_g");
@@ -581,6 +586,7 @@ where
     #[cfg(feature = "range_proof_timing_multivariate")]
     print_cumulative("transcript challenges (c, alpha)", start.elapsed());
 
+    // TODO: define hat(f) hier ipv in zkzc_send_polys()
     #[cfg(feature = "range_proof_timing_multivariate")]
     let start = Instant::now();
     let sumcheck_proof = zkzc_send_polys::<E>(
@@ -591,7 +597,7 @@ where
         c,
         alpha,
         &f_evals,
-        &hat_f_j_evals,
+        &f_j_evals,
         #[cfg(feature = "range_proof_timing_multivariate")]
         Some(&mut print_cumulative),
         #[cfg(not(feature = "range_proof_timing_multivariate"))]
@@ -605,39 +611,45 @@ where
     // Sumcheck proves the hypercube sum of h = [L + Σ c^j f_j(1-f_j)]*eq_t*(1-eq_zero) + α*g (eq_zero = ∏(1-xᵢ)).
     // The verifier checks proof[0].evaluations[0]+proof[0].evaluations[1] == asserted_sum, so we must
     // send the actual sum (extract_sum), not α*H_g.
-    let asserted_sum =
-        crate::sumcheck::ml_sumcheck::MLSumcheck::<E::ScalarField>::extract_sum(&sumcheck_proof.0);
+    let asserted_sum = MLSumcheck::<E::ScalarField>::extract_sum(&sumcheck_proof.0);
 
     // Sumcheck point: use all round challenges from verifier_messages (see sumcheck fix: we now
     // include the final round's challenge so the point matches the verifier's subclaim.point).
-    let rhos: Vec<E::ScalarField> = sumcheck_proof
+    let xs: Vec<E::ScalarField> = sumcheck_proof
         .1
         .into_iter()
         .map(|msg| msg.randomness)
         .collect();
-    // Advance transcript to match verifier (verifier draws last_rho after sumcheck)
-    let _last_rho: E::ScalarField = trs.challenge_scalar();
+
+    // move this?
     let g_evals: Vec<E::ScalarField> = g_is
         .iter()
-        .zip(rhos.iter())
-        .map(|(g_i_coeffs, rho)| {
+        .zip(xs.iter())
+        .map(|(g_i_coeffs, x)| {
             let poly = DensePolynomial::from_coefficients_vec(g_i_coeffs.clone());
-            poly.evaluate(rho)
+            poly.evaluate(x)
         })
         .collect();
     let y_g: E::ScalarField = g_evals.iter().sum();
 
-    // Step 6: Evaluations y_f = f(x), y_j = f_j(x) at sumcheck point x = (rho_1,...,rho_n)
-    let sumcheck_point: Vec<E::ScalarField> = rhos[0..num_vars as usize].to_vec();
-    let f_poly = DenseMultilinearExtension::from_evaluations_vec(
-        num_vars.into(),
-        f_evals.clone(),
-    );
+    // Step 6: Evaluations y_f = f(x), y_j = f_j(x) at sumcheck point x = (x_1,...,x_n)
+
+    // Step 6a:
+    debug_assert_eq!(xs.len(), num_vars as usize);
+
+    let sumcheck_point: Vec<E::ScalarField> = xs.to_vec();
+
+    let f_poly = DenseMultilinearExtension::from_evaluations_vec(num_vars.into(), f_evals.clone());
     let y_f = f_poly.evaluate(&sumcheck_point);
-    let y_evals: Vec<E::ScalarField> = (0..ell as usize)
-        .map(|j| hat_f_js[j].evaluate(&sumcheck_point))
+
+    // Step 6b:
+    debug_assert_eq!(f_js.len(), ell as usize);
+    let y_evals: Vec<E::ScalarField> = f_js
+        .iter()
+        .map(|f_j| f_j.evaluate(&sumcheck_point))
         .collect();
 
+    // Step 6c:
     {
         let mut buf = Vec::new();
         y_f.serialize_compressed(&mut buf).expect("serialize y_f");
@@ -646,12 +658,15 @@ where
     for (j, y_j) in y_evals.iter().enumerate() {
         let mut buf = Vec::new();
         y_j.serialize_compressed(&mut buf).expect("serialize y_j");
-        trs.append_message(b"y_j", &buf);
-        let _ = j;
+        let label = format!("y_{}", j + 1);
+        trs.append_message(label.as_bytes(), &buf);
     }
     let hat_c: E::ScalarField = trs.challenge_scalar();
     #[cfg(feature = "range_proof_timing_multivariate")]
-    print_cumulative("asserted_sum + rhos + g_evals + y_g + sumcheck_point + y_f + y_evals + hat_c", start.elapsed());
+    print_cumulative(
+        "asserted_sum + xs + g_evals + y_g + sumcheck_point + y_f + y_evals + hat_c",
+        start.elapsed(),
+    );
 
     #[cfg(feature = "range_proof_timing_multivariate")]
     let start = Instant::now();
@@ -669,7 +684,7 @@ where
     for j in 0..ell as usize {
         let cj = hat_c_powers[j + 1];
         for (i, b) in batched_coeffs.iter_mut().enumerate() {
-            *b += cj * hat_f_j_evals[j][i];
+            *b += cj * f_j_evals[j][i];
         }
     }
 
@@ -700,26 +715,30 @@ where
     // TODO: waar is zeromorph???
 
     let mut batched_randomness = rho.0 + comm_blinding_poly_rand.unwrap_or(E::ScalarField::ZERO);
-    for (j, &r_j) in hat_f_j_comms_randomness.iter().enumerate() {
+    for (j, &r_j) in f_j_comms_randomness.iter().enumerate() {
         batched_randomness += hat_c_powers[j + 1] * r_j;
     }
     #[cfg(feature = "range_proof_timing_multivariate")]
-    print_cumulative("batched_coeffs + z + y + combined_comm + batched_randomness", start.elapsed());
+    print_cumulative(
+        "batched_coeffs + z + y + combined_comm + batched_randomness",
+        start.elapsed(),
+    );
 
     #[cfg(feature = "range_proof_timing_multivariate")]
     let start = Instant::now();
     // Step 7 (spec): single batched opening proof for f̂ at z and g_i at rho_i (uPCS.BatchOpen)
     let mut all_f_is = vec![batched_coeffs];
     all_f_is.extend(g_is);
-    let eval_points: Vec<E::ScalarField> = once(z)
-        .chain(rhos.iter().copied())
-        .collect();
+    let eval_points: Vec<E::ScalarField> = once(z).chain(xs.iter().copied()).collect();
     let mut all_evals = vec![y];
     all_evals.extend(g_evals.iter().copied());
     let mut all_rs = vec![batched_randomness];
     all_rs.extend(g_comm_randomnesses.iter().copied());
     #[cfg(feature = "range_proof_timing_multivariate")]
-    print_cumulative("zk_pcs_open inputs (all_f_is, eval_points, all_evals, all_rs)", start.elapsed());
+    print_cumulative(
+        "zk_pcs_open inputs (all_f_is, eval_points, all_evals, all_rs)",
+        start.elapsed(),
+    );
 
     #[cfg(feature = "range_proof_timing_multivariate")]
     let start = Instant::now();
@@ -737,7 +756,7 @@ where
     #[cfg(feature = "range_proof_timing_multivariate")]
     print_cumulative("zk_pcs_open (batched opening)", start.elapsed());
 
-    let commitments: Vec<E::G1Affine> = hat_f_j_comms.iter().map(|g| g.into_affine()).collect();
+    let commitments: Vec<E::G1Affine> = f_j_comms.iter().map(|g| g.into_affine()).collect();
     let g_commitments: Vec<E::G1Affine> = g_comm.iter().map(|g| g.into_affine()).collect();
     let evals = once(y_f).chain(y_evals).collect();
 
@@ -769,7 +788,10 @@ fn zkzc_send_polys<E: Pairing>(
     f_evals: &[E::ScalarField],
     hat_f_j_evals: &[Vec<E::ScalarField>],
     mut timing: Option<&mut dyn FnMut(&str, std::time::Duration)>,
-) -> (Vec<ProverMsg<E::ScalarField>>, Vec<VerifierMsg<E::ScalarField>>) {
+) -> (
+    Vec<ProverMsg<E::ScalarField>>,
+    Vec<VerifierMsg<E::ScalarField>>,
+) {
     #[cfg(feature = "range_proof_timing_multivariate")]
     let start = std::time::Instant::now();
     let t: Vec<E::ScalarField> = (0..num_vars)
@@ -797,33 +819,35 @@ fn zkzc_send_polys<E: Pairing>(
     #[cfg(feature = "range_proof_timing_multivariate")]
     let start = std::time::Instant::now();
     let mut poly = crate::sumcheck::ml_sumcheck::data_structures::BinaryConstraintPolynomial::new(
-        nv,
-        t,
-        alpha,
-        g_is,
+        nv, t, alpha, g_is,
     );
     poly.set_linear_term(linear_term);
     let mut c_j = c;
     for j in 0..ell {
-        let f_hat_j = DenseMultilinearExtension::from_evaluations_vec(
-            nv,
-            hat_f_j_evals[j].clone(),
-        );
+        let f_hat_j = DenseMultilinearExtension::from_evaluations_vec(nv, hat_f_j_evals[j].clone());
         poly.add_constraint(c_j, f_hat_j);
         c_j *= c;
     }
     #[cfg(feature = "range_proof_timing_multivariate")]
     if let Some(ref mut f) = timing {
-        f("zkzc_send_polys: BinaryConstraintPolynomial build + add_constraint", start.elapsed());
+        f(
+            "zkzc_send_polys: BinaryConstraintPolynomial build + add_constraint",
+            start.elapsed(),
+        );
     }
 
     #[cfg(feature = "range_proof_timing_multivariate")]
     let start = std::time::Instant::now();
     let mut trng = TranscriptRng::<E::ScalarField>::new(trs);
-    let (prover_msgs, _state, verifier_msgs) = crate::sumcheck::ml_sumcheck::MLSumcheck::prove_as_subprotocol(&mut trng, &poly).expect("sumcheck prove failed");
+    let (prover_msgs, _state, verifier_msgs) =
+        crate::sumcheck::ml_sumcheck::MLSumcheck::prove_as_subprotocol(&mut trng, &poly)
+            .expect("sumcheck prove failed");
     #[cfg(feature = "range_proof_timing_multivariate")]
     if let Some(ref mut f) = timing {
-        f("zkzc_send_polys: MLSumcheck::prove_as_subprotocol", start.elapsed());
+        f(
+            "zkzc_send_polys: MLSumcheck::prove_as_subprotocol",
+            start.elapsed(),
+        );
     }
     (prover_msgs, verifier_msgs)
 }
@@ -954,21 +978,26 @@ fn zkzc_send_polys<E: Pairing>(
 fn zksc_blind<E: Pairing, R: RngCore + CryptoRng>(
     last_msm_elt: E::G1Affine,
     xi_1: E::G1Affine,
-    rng: &mut R,    
-) -> (E::ScalarField, E::G1, E::ScalarField, two_term_msm::Proof<E::G1>) {
+    rng: &mut R,
+) -> (
+    E::ScalarField,
+    E::G1,
+    E::ScalarField,
+    two_term_msm::Proof<E::G1>,
+) {
     // Step 1: Sample `beta`
     let beta = sample_field_element(rng);
 
     // Step 2: Commit to `beta \cdot eq_(1,..., 1)` using a simplified version of Zeromorph
     let hom = two_term_msm::Homomorphism {
-            base_1: last_msm_elt,
-            base_2: xi_1,
-        };
+        base_1: last_msm_elt,
+        base_2: xi_1,
+    };
     let rho = sample_field_element(rng);
     let witness = two_term_msm::Witness {
-                poly_randomness: Scalar(beta),
-                hiding_kzg_randomness: Scalar(rho),
-            };
+        poly_randomness: Scalar(beta),
+        hiding_kzg_randomness: Scalar(rho),
+    };
     let blinding_poly_comm = hom.apply(&witness);
 
     // Step 3: Prove knowledge of `beta`
@@ -982,7 +1011,12 @@ fn zksc_send_mask<E: Pairing, R: RngCore + CryptoRng>(
     d: u8,
     num_vars: u8,
     rng: &mut R,
-) -> (Vec<Vec<E::ScalarField>>, Vec<E::G1>, Vec<E::ScalarField>, E::ScalarField) {
+) -> (
+    Vec<Vec<E::ScalarField>>,
+    Vec<E::G1>,
+    Vec<E::ScalarField>,
+    E::ScalarField,
+) {
     // Step (1): Sample the g_i
     let g_is: Vec<_> = (0..num_vars)
         .map(|_| sample_field_elements((d + 1).into(), rng))
@@ -1001,13 +1035,10 @@ fn zksc_send_mask<E: Pairing, R: RngCore + CryptoRng>(
     }
 
     let two = E::ScalarField::from(2u64);
-    let total_sum =
-        two.pow([num_vars as u64]) * sum_c
-        + two.pow([(num_vars - 1) as u64]) * sum_b;
+    let total_sum = two.pow([num_vars as u64]) * sum_c + two.pow([(num_vars - 1) as u64]) * sum_b;
 
     (g_is, g_comm, r_is, total_sum)
 }
-
 
 // /// Samples a specific kind of random polynomial `g`, then evaluates it at all points in {0,1}^num_vars and returns the polynomial, this sum and a commitment
 // fn send_mask<E: Pairing, R: RngCore + CryptoRng>(ck: ZeromorphProverKey<E>, d: u8, num_vars: u8, rng: &mut R) -> (SparsePolynomial<E::ScalarField, SparseTerm>, E::G1, E::ScalarField) {
@@ -1051,7 +1082,6 @@ fn zksc_send_mask<E: Pairing, R: RngCore + CryptoRng>(
 
 //     (g, sum, comm)
 // }
-
 
 // pub mod blinding_check {
 //     // TODO: maybe fixed_base_msms should become a folder and put its code inside mod.rs? Then put this mod inside of that folder?
@@ -1140,7 +1170,7 @@ fn zksc_send_mask<E: Pairing, R: RngCore + CryptoRng>(
 //     /// Prover Message
 //     #[derive(Clone, CanonicalSerialize)]
 //     pub struct ProverMsg<F: Field> {
-//         /// evaluations on P(0), P(1), P(2), ... 
+//         /// evaluations on P(0), P(1), P(2), ...
 //         pub(crate) evaluations: Vec<F>,
 //     }
 
@@ -1162,8 +1192,6 @@ fn zksc_send_mask<E: Pairing, R: RngCore + CryptoRng>(
 //         pub round: usize,
 //     }
 
-
-
 // }
 
 #[cfg(test)]
@@ -1182,8 +1210,12 @@ mod tests {
         // Setup: max_n = 4 so size = 8 (SRS supports degree-4 g), num_vars = 3; max_ell = 8.
         let max_n = 4;
         let max_ell = 8u8;
-        let (pk, vk) =
-            <Proof<E> as traits::BatchedRangeProof<E>>::setup(max_n, max_ell, group_generators, &mut rng);
+        let (pk, vk) = <Proof<E> as traits::BatchedRangeProof<E>>::setup(
+            max_n,
+            max_ell,
+            group_generators,
+            &mut rng,
+        );
 
         // Four values so (4+1).next_power_of_two() = 8, num_vars = 3, matching vk.
         let values: Vec<ark_bn254::Fr> = vec![

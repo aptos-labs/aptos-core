@@ -5,7 +5,10 @@ use ark_bls12_381::Bls12_381;
 use ark_bn254::Bn254;
 use ark_ec::{pairing::Pairing, CurveGroup, VariableBaseMSM};
 use ark_ff::{UniformRand, Zero};
-use ark_std::{rand::thread_rng, rand::RngCore, One};
+use ark_std::{
+    rand::{thread_rng, RngCore},
+    One,
+};
 use criterion::{criterion_group, criterion_main, Criterion};
 
 fn bench_two_term_msm<E: Pairing>(c: &mut Criterion, curve_name: &str) {
@@ -46,34 +49,30 @@ fn bench_binary_scalar_msm<E: Pairing>(c: &mut Criterion, curve_name: &str) {
     let mut rng = thread_rng();
     let n = BINARY_MSM_N;
 
-    let bases: Vec<E::G1Affine> = (0..n).map(|_| E::G1::rand(&mut rng).into_affine()).collect();
+    let bases: Vec<E::G1Affine> = (0..n)
+        .map(|_| E::G1::rand(&mut rng).into_affine())
+        .collect();
     let scalars: Vec<E::ScalarField> = (0..n)
         .map(|_| E::ScalarField::from((rng.next_u32() % 2) as u64))
         .collect();
 
     // 1. E::G1 MSM with random binary scalars
-    c.bench_function(
-        &format!("binary_msm_n{n}_msm {}", curve_name),
-        |b| {
-            b.iter(|| {
-                let _ = E::G1::msm(&bases, &scalars).expect("MSM failed");
-            });
-        },
-    );
+    c.bench_function(&format!("binary_msm_n{n}_msm {}", curve_name), |b| {
+        b.iter(|| {
+            let _ = E::G1::msm(&bases, &scalars).expect("MSM failed");
+        });
+    });
 
     // 2. Manual: s1*g1 + s2*g2 + ... (all terms, including s_i = 0)
-    c.bench_function(
-        &format!("binary_msm_n{n}_manual {}", curve_name),
-        |b| {
-            b.iter(|| {
-                let mut sum = E::G1::zero();
-                for i in 0..n {
-                    sum += bases[i] * scalars[i];
-                }
-                let _ = sum;
-            });
-        },
-    );
+    c.bench_function(&format!("binary_msm_n{n}_manual {}", curve_name), |b| {
+        b.iter(|| {
+            let mut sum = E::G1::zero();
+            for i in 0..n {
+                sum += bases[i] * scalars[i];
+            }
+            let _ = sum;
+        });
+    });
 
     // 3. Manual but filter out s_i = 0 (only add when scalar is non-zero)
     c.bench_function(

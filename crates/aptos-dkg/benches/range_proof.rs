@@ -10,8 +10,7 @@ use aptos_dkg::{
     range_proofs::{
         dekart_multivariate::Proof as DekartMultivariate,
         dekart_univariate::Proof as UnivariateDeKART,
-        dekart_univariate_v2::Proof as UnivariateDeKARTv2,
-        traits::BatchedRangeProof,
+        dekart_univariate_v2::Proof as UnivariateDeKARTv2, traits::BatchedRangeProof,
     },
     utils::test_utils::{self},
 };
@@ -34,7 +33,7 @@ const BLS12_381: &str = "bls12-381";
 
 /// WARNING: These are the relevant batch sizes we want benchmarked to compare against Bulletproofs
 //const BATCH_SIZES: [usize; 11] = [1, 3, 7, 15, 31, 63, 127, 255, 511, 1023, 2047];
-const BATCH_SIZES: [usize; 3] =  [1023, 16383, 131071]; //[1048575]; // 1048575100000, 1000000];
+const BATCH_SIZES: [usize; 3] = [1023, 16383, 131071]; //[1048575]; // 1048575100000, 1000000];
 
 /// WARNING: These are the relevant bit widths we want benchmarked to compare against Bulletproofs
 const BIT_WIDTHS: [u8; 4] = [8, 16, 32, 64]; // [8, 16, 32, 64];

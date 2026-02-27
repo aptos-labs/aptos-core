@@ -3,7 +3,6 @@
 
 // This file implements the range proof described here: https://alinush.github.io/dekart
 
-use ark_ec::pairing::PairingOutput;
 use crate::{
     algebra::polynomials,
     pcs::univariate_hiding_kzg,
@@ -26,7 +25,10 @@ use aptos_crypto::arkworks::{
     srs::{SrsBasis, SrsType},
     GroupGenerators,
 };
-use ark_ec::{pairing::Pairing, CurveGroup, PrimeGroup, VariableBaseMSM};
+use ark_ec::{
+    pairing::{Pairing, PairingOutput},
+    CurveGroup, PrimeGroup, VariableBaseMSM,
+};
 use ark_ff::{AdditiveGroup, Field, PrimeField, Zero};
 use ark_poly::{self, EvaluationDomain, Polynomial};
 use ark_serialize::{
@@ -492,7 +494,10 @@ impl<E: Pairing> traits::BatchedRangeProof<E> for Proof<E> {
         // Step 3b
         fiat_shamir::append_sigma_proof::<E>(&mut fs_t, &pi_PoK);
         #[cfg(feature = "range_proof_timing_univariate_v2")]
-        print_cumulative("pi_PoK (two_term_msm prove) + append_sigma", start.elapsed());
+        print_cumulative(
+            "pi_PoK (two_term_msm prove) + append_sigma",
+            start.elapsed(),
+        );
 
         #[cfg(feature = "range_proof_timing_univariate_v2")]
         let start = Instant::now();
@@ -533,20 +538,19 @@ impl<E: Pairing> traits::BatchedRangeProof<E> for Proof<E> {
             .iter()
             .zip(rhos.iter())
             .map(|(f_j_evals, &rho)| {
-                let bits: Vec<bool> = f_j_evals[1..]
-                    .iter()
-                    .map(|e| !e.is_zero())
-                    .collect();
-                let sum = lagr_g1[0] * f_j_evals[0]
-                    + utils::msm_bool(&lagr_g1[1..], &bits);
-                *xi_1 * rho + sum
+                let bits: Vec<bool> = f_j_evals[1..].iter().map(|e| !e.is_zero()).collect();
+                let sum = lagr_g1[0] * f_j_evals[0] + utils::msm_bool(&lagr_g1[1..], &bits);
+                *xi_1 * rho + sum // TODO: could turn this into a 3-term MSM, should be faster
             })
             .collect();
 
         // Step 4b
         fiat_shamir::append_f_j_commitments::<E>(&mut fs_t, &Cs);
         #[cfg(feature = "range_proof_timing_univariate_v2")]
-        print_cumulative("f_js_evals + rhos + Cs (hkzg commits) + append_f_j", start.elapsed());
+        print_cumulative(
+            "f_js_evals + rhos + Cs (hkzg commits) + append_f_j",
+            start.elapsed(),
+        );
 
         #[cfg(feature = "range_proof_timing_univariate_v2")]
         let start = Instant::now();
@@ -843,7 +847,10 @@ impl<E: Pairing> traits::BatchedRangeProof<E> for Proof<E> {
         // Step 2b
         fiat_shamir::append_hat_f_commitment::<E>(&mut fs_t, &hatC);
         #[cfg(feature = "range_proof_timing_univariate_v2")]
-        print_cumulative("unpack + append_initial_data + append_hat_f", start.elapsed());
+        print_cumulative(
+            "unpack + append_initial_data + append_hat_f",
+            start.elapsed(),
+        );
 
         #[cfg(feature = "range_proof_timing_univariate_v2")]
         let start = Instant::now();
@@ -880,7 +887,10 @@ impl<E: Pairing> traits::BatchedRangeProof<E> for Proof<E> {
         // Step 7
         let (mu, mu_h, mu_js) = fiat_shamir::get_mu_challenges::<E>(&mut fs_t, ell as usize);
         #[cfg(feature = "range_proof_timing_univariate_v2")]
-        print_cumulative("append_sigma + append_f_j + get_beta + append_h + get_mu", start.elapsed());
+        print_cumulative(
+            "append_sigma + append_f_j + get_beta + append_h + get_mu",
+            start.elapsed(),
+        );
 
         #[cfg(feature = "range_proof_timing_univariate_v2")]
         let start = Instant::now();
@@ -959,7 +969,10 @@ impl<E: Pairing> traits::BatchedRangeProof<E> for Proof<E> {
 
         anyhow::ensure!(LHS == RHS);
         #[cfg(feature = "range_proof_timing_univariate_v2")]
-        print_cumulative("LHS/RHS (V_eval_gamma + sum1 + sum2) + ensure", start.elapsed());
+        print_cumulative(
+            "LHS/RHS (V_eval_gamma + sum1 + sum2) + ensure",
+            start.elapsed(),
+        );
 
         use sigma_protocol::homomorphism::TrivialShape as HkzgCommitment;
         #[cfg(feature = "range_proof_timing_univariate_v2")]
