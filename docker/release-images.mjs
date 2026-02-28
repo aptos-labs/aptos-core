@@ -2,7 +2,9 @@
 
 // This script releases the main aptos docker images to docker hub.
 // It does so by copying the images from aptos GCP artifact registry to docker hub.
-// It also copies the release tags to GCP Artifact Registry and AWS ECR.
+// It also copies the release tags to GCP Artifact Registry.
+//
+// NOTE: AWS ECR publishing has been disabled. The ECR code is kept as reference below.
 //
 // Usually it's run in CI, but you can also run it locally in emergency situations, assuming you have the right credentials.
 // Before you run this locally, check one more time whether you can trigger a CI build instead which is usually easier and safer.
@@ -15,21 +17,19 @@
 // 1. Tools:
 //  - docker
 //  - gcloud
-//  - aws cli
 //  - node (node.js)
 //  - crane - https://github.com/google/go-containerregistry/tree/main/cmd/crane#installation
 //  - pnpm - https://pnpm.io/installation
 // 2. docker login - with authorization to push to the `aptoslabs` org
 // 3. gcloud auth configure-docker us-docker.pkg.dev
 // 4. gcloud auth login --update-adc
-// 5. AWS CLI credentials configured
 //
 // Once you have all prerequisites fulfilled, you can run this script via:
-// GIT_SHA=${{ github.sha }} GCP_DOCKER_ARTIFACT_REPO="${{ vars.GCP_DOCKER_ARTIFACT_REPO }}" AWS_ACCOUNT_ID="${{ secrets.AWS_ECR_ACCOUNT_NUM }}" IMAGE_TAG_PREFIX="${{ inputs.image_tag_prefix }}" ./docker/release_images.sh --wait-for-image-seconds=1800
+// GIT_SHA=${{ github.sha }} GCP_DOCKER_ARTIFACT_REPO="${{ vars.GCP_DOCKER_ARTIFACT_REPO }}" IMAGE_TAG_PREFIX="${{ inputs.image_tag_prefix }}" ./docker/release_images.sh --wait-for-image-seconds=1800
 //
 //
 // You can also run this script locally with the DRY_RUN flag to test it out:
-// IMAGE_TAG_PREFIX=devnet AWS_ACCOUNT_ID=bla GCP_DOCKER_ARTIFACT_REPO=bla GIT_SHA=bla ./docker/release-images.mjs --wait-for-image-seconds=3600 --dry-run
+// IMAGE_TAG_PREFIX=devnet GCP_DOCKER_ARTIFACT_REPO=bla GIT_SHA=bla ./docker/release-images.mjs --wait-for-image-seconds=3600 --dry-run
 //
 // You can also run unittests by running docker/__tests__/release-images.test.js
 
@@ -74,8 +74,9 @@ const IMAGES_TO_RELEASE = {
 };
 
 async function main() {
-  const REQUIRED_ARGS = ["GIT_SHA", "GCP_DOCKER_ARTIFACT_REPO", "AWS_ACCOUNT_ID", "IMAGE_TAG_PREFIX"];
-  const OPTIONAL_ARGS = ["WAIT_FOR_IMAGE_SECONDS", "DRY_RUN"];
+  const REQUIRED_ARGS = ["GIT_SHA", "GCP_DOCKER_ARTIFACT_REPO", "IMAGE_TAG_PREFIX"];
+  // AWS_ACCOUNT_ID is no longer required since ECR publishing is disabled
+  const OPTIONAL_ARGS = ["WAIT_FOR_IMAGE_SECONDS", "DRY_RUN", "AWS_ACCOUNT_ID"];
   const BOOLEAN_ARGS = ["PROFILE_RELEASE"];
 
   const parsedArgs = parseArgsFromFlagOrEnv(REQUIRED_ARGS, OPTIONAL_ARGS, BOOLEAN_ARGS);
@@ -85,11 +86,13 @@ async function main() {
   const craneVersion = await $`${crane} version`;
   console.log(`INFO: crane version: ${craneVersion}`);
 
-  const AWS_ECR = `${parsedArgs.AWS_ACCOUNT_ID}.dkr.ecr.us-west-2.amazonaws.com/aptos`;
+  // NOTE: AWS ECR publishing is disabled. Keeping code as reference:
+  // const AWS_ECR = `${parsedArgs.AWS_ACCOUNT_ID}.dkr.ecr.us-west-2.amazonaws.com/aptos`;
   const GCP_ARTIFACT_REPO = parsedArgs.GCP_DOCKER_ARTIFACT_REPO;
   const DOCKERHUB = "docker.io/aptoslabs";
 
-  const INTERNAL_TARGET_REGISTRIES = [GCP_ARTIFACT_REPO, AWS_ECR];
+  // ECR removed from target registries (was: [GCP_ARTIFACT_REPO, AWS_ECR])
+  const INTERNAL_TARGET_REGISTRIES = [GCP_ARTIFACT_REPO];
 
   const ALL_TARGET_REGISTRIES = [...INTERNAL_TARGET_REGISTRIES, DOCKERHUB];
 
