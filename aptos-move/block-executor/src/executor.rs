@@ -873,9 +873,8 @@ where
             update_transaction_on_abort::<T, E>(txn_idx, last_input_output, versioned_cache);
             scheduler.finish_abort(txn_idx, incarnation)
         } else {
-            scheduler.finish_validation(txn_idx, validation_wave);
-
             if valid {
+                scheduler.finish_validation(txn_idx, validation_wave);
                 scheduler.queueing_commits_arm();
             }
 
