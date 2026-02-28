@@ -44,10 +44,12 @@ pub(crate) struct FrameTypeCache {
     ///    size of its defining struct)
     field_instantiation:
         BTreeMap<FieldInstantiationIndex, ((Type, NumTypeNodes), (Type, NumTypeNodes))>,
-    /// Same as above, bot for variant field instantiations
+    /// Same as above, but for variant field instantiations
     variant_field_instantiation:
         BTreeMap<VariantFieldInstantiationIndex, ((Type, NumTypeNodes), (Type, NumTypeNodes))>,
-    single_sig_token_type: BTreeMap<SignatureIndex, (Type, NumTypeNodes)>,
+    /// Maps signature index to a tuple of (Type, NumTypeNodes, depth) for single signature tokens.
+    /// This cache stores instantiated types for signatures with a single type parameter.
+    single_sig_token_type: BTreeMap<SignatureIndex, (Type, NumTypeNodes, usize)>,
     /// Stores a variant for each individual instruction in the
     /// function's bytecode. We keep the size of the variant to be
     /// small. The caches are indexed by the index of the given
@@ -204,17 +206,21 @@ impl FrameTypeCache {
     }
 
     // note(inline): do not inline, increases size a lot, might even decrease the performance
+    /// Returns a tuple of (Type, NumTypeNodes, depth) for the signature at the given index.
+    /// The Type is the instantiated type, NumTypeNodes is the node count for gas metering,
+    /// and depth is the maximum depth of the type tree.
     pub(crate) fn get_signature_index_type(
         &mut self,
         idx: SignatureIndex,
         frame: &Frame,
-    ) -> PartialVMResult<(&Type, NumTypeNodes)> {
-        let (ty, ty_count) = get_or_insert!(&mut self.single_sig_token_type, idx, {
+    ) -> PartialVMResult<(&Type, NumTypeNodes, usize)> {
+        let (ty, ty_count, depth) = get_or_insert!(&mut self.single_sig_token_type, idx, {
             let ty = frame.instantiate_single_type(idx)?;
-            let ty_count = NumTypeNodes::new(ty.num_nodes() as u64);
-            (ty, ty_count)
+            let (ty_count, depth) = ty.num_nodes_with_max_depth();
+            let ty_count = NumTypeNodes::new(ty_count as u64);
+            (ty, ty_count, depth)
         });
-        Ok((ty, *ty_count))
+        Ok((ty, *ty_count, *depth))
     }
 
     pub(crate) fn make_rc() -> Rc<RefCell<Self>> {

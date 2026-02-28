@@ -1,0 +1,20 @@
+//# publish
+module 0x22::test
+
+fun make_vec<T>(): vector<T>
+    vec_pack <T>, 0
+    ret
+
+public fun entry_below_limit()
+    call make_vec<vector<vector<vector<vector<vector<vector<vector<vector<vector<vector<vector<vector<vector<vector<vector<vector<vector<vector<u8>>>>>>>>>>>>>>>>>>>
+    pop
+    ret
+
+public fun entry_above_limit()
+    call make_vec<vector<vector<vector<vector<vector<vector<vector<vector<vector<vector<vector<vector<vector<vector<vector<vector<vector<vector<vector<u8>>>>>>>>>>>>>>>>>>>>
+    pop
+    ret
+
+//# run 0x22::test::entry_below_limit
+
+//# run 0x22::test::entry_above_limit

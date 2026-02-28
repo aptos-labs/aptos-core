@@ -87,7 +87,7 @@ impl Default for VMConfig {
             type_base_cost: 0,
             type_byte_cost: 0,
             delayed_field_optimization_enabled: false,
-            ty_builder: TypeBuilder::with_limits(128, 20),
+            ty_builder: TypeBuilder::with_limits(128, 20, true),
             enable_function_caches: true,
             enable_lazy_loading: true,
             enable_depth_checks: true,
