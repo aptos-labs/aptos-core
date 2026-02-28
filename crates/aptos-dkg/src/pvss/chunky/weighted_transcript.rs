@@ -5,12 +5,11 @@
 
 use crate::{
     delegate_transcript_core_to_subtrs,
-    pcs::univariate_hiding_kzg,
     pvss::{
         chunky::{
             chunked_elgamal::{self, num_chunks_per_scalar},
-            chunks,
-            hkzg_chunked_elgamal::{self, HkzgWeightedElgamalWitness},
+            hkzg_chunked_elgamal,
+            hkzg_chunked_elgamal::ChunkedWitnessData,
             input_secret::InputSecret,
             keys,
             public_parameters::PublicParameters,
@@ -30,17 +29,13 @@ use crate::{
         homomorphism::{tuple::TupleCodomainShape, Trait as _, TrivialShape},
         traits::{CurveGroupTrait as _, Trait},
     },
-    Scalar,
 };
 use anyhow::bail;
 use aptos_crypto::{
     arkworks::{
         self,
         msm::{self, MsmInput},
-        random::{
-            sample_field_element, sample_field_elements, unsafe_random_point,
-            unsafe_random_point_group, unsafe_random_points, UniformRand,
-        },
+        random::{sample_field_element, unsafe_random_point_group},
         scrape::LowDegreeTest,
         serialization::{ark_de, ark_se},
         srs::SrsBasis,
@@ -55,7 +50,6 @@ use ark_ec::{
     CurveGroup, VariableBaseMSM,
 };
 use ark_ff::{AdditiveGroup, Field, Fp, FpConfig};
-use ark_poly::EvaluationDomain;
 use ark_serialize::{CanonicalDeserialize, CanonicalSerialize};
 use rand_core::{CryptoRng, RngCore};
 use serde::{Deserialize, Serialize};
@@ -161,8 +155,7 @@ impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>>
             true,
             &sc.get_threshold_config().domain,
         );
-        let mut Vs_flat: Vec<E::G2Affine> = self.subtrs.Vs.iter().flatten().copied().collect();
-        Vs_flat.push(self.subtrs.V0);
+        let Vs_flat = self.subtrs.vs_flat();
 
         let beta = sample_field_element(rng);
         let powers_of_beta = utils::powers(beta, sc.get_total_weight() + 1);
@@ -298,27 +291,16 @@ impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>> traits:
         // Initialize the PVSS SoK context
         let sok_cntxt = SokContext::new(spk.clone(), session_id, dealer.id, Self::dst());
 
-        // Generate the Shamir secret sharing polynomial
-        let mut f = vec![*s.get_secret_a()]; // constant term of polynomial
-        f.extend(sample_field_elements::<E::ScalarField, _>(
-            sc.get_threshold_weight() - 1,
-            rng,
-        )); // these are the remaining coefficients; total degree is `t - 1`, so the reconstruction threshold is `t`
-
-        // Generate its `n` evaluations (shares) by doing an FFT over the whole domain, then truncating
-        let mut f_evals = sc.get_threshold_config().domain.fft(&f);
-        f_evals.truncate(sc.get_total_weight());
-        debug_assert_eq!(f_evals.len(), sc.get_total_weight());
+        let (f, mut f_evals) = sc
+            .get_threshold_config()
+            .sample_polynomial_and_evals(*s.get_secret_a(), rng);
 
         // Encrypt the chunked shares and generate the sharing proof
         let (Cs, Rs, sharing_proof) =
             Self::encrypt_chunked_shares(&f_evals, eks, pp, sc, sok_cntxt, rng);
 
-        // Add constant term for the `\mathbb{G}_2` commitment (we're doing this **after** the previous step
-        // because we're now mutating `f_evals` by enlarging it; this is an unimportant technicality however,
-        // it has no impact on computational complexity whatsoever as we could simply modify the `commit_to_scalars()`
-        // function to take another input)
-        f_evals.push(f[0]); // or *s.get_secret_a()
+        // Add constant term for the G₂ commitment (f(0) = a0)
+        f_evals.push(f[0]);
 
         // Commit to polynomial evaluations + constant term using batch_mul
         //let G_2 = pp.get_commitment_base();
@@ -362,24 +344,9 @@ impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>> traits:
     ) -> Self {
         let num_chunks_per_share = num_chunks_per_scalar::<E::ScalarField>(pp.ell) as usize;
 
-        let V0 = unsafe_random_point::<E::G2, _>(rng);
-        let Vs_flat = unsafe_random_points::<E::G2, _>(sc.get_total_weight(), rng);
-        let Vs = sc.group_by_player(&Vs_flat);
-        let Cs: Vec<Vec<Vec<E::G1Affine>>> = (0..sc.get_total_num_players())
-            .map(|i| {
-                let w = sc.get_player_weight(&sc.get_player(i));
-                (0..w)
-                    .map(|_| unsafe_random_points::<E::G1, _>(num_chunks_per_share, rng))
-                    .collect()
-            })
-            .collect();
-        let Rs: Vec<Vec<E::G1Affine>> = (0..sc.get_max_weight())
-            .map(|_| unsafe_random_points::<E::G1, _>(num_chunks_per_share, rng))
-            .collect();
-
         Transcript {
             dealer: sc.get_player(0),
-            subtrs: Subtranscript { V0, Vs, Cs, Rs },
+            subtrs: Subtranscript::random_bases(sc, num_chunks_per_share, rng),
             sharing_proof: SharingProof {
                 range_proof_commitment: sigma_protocol::homomorphism::TrivialShape(
                     unsafe_random_point_group::<E::G1, _>(rng),
@@ -411,40 +378,12 @@ impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>> Transcr
         Vec<Vec<E::G1Affine>>,
         SharingProof<E>,
     ) {
-        // Generate the required randomness
-        let hkzg_randomness = univariate_hiding_kzg::CommitmentRandomness::rand(rng);
-        let elgamal_randomness = Scalar::vecvec_from_inner(
-            (0..sc.get_max_weight())
-                .map(|_| {
-                    chunked_elgamal::correlated_randomness(
-                        rng,
-                        1 << pp.ell as u64,
-                        num_chunks_per_scalar::<E::ScalarField>(pp.ell),
-                        &E::ScalarField::ZERO,
-                    )
-                })
-                .collect(),
-        );
+        let ChunkedWitnessData {
+            witness,
+            f_evals_chunked_flat,
+        } = hkzg_chunked_elgamal::prepare_chunked_witness(f_evals, pp, sc, rng);
 
-        // Chunk and flatten the shares
-        let f_evals_chunked: Vec<Vec<E::ScalarField>> = f_evals
-            .iter()
-            .map(|f_eval| chunks::scalar_to_le_chunks(pp.ell, f_eval))
-            .collect();
-        // Flatten it now (for use in the range proof) before `f_evals_chunked` is consumed in the next step
-        let f_evals_chunked_flat: Vec<E::ScalarField> =
-            f_evals_chunked.iter().flatten().copied().collect();
-        // Separately, gather the chunks by weight
-        let f_evals_weighted = sc.group_by_player(&f_evals_chunked);
-
-        // Now generate the encrypted shares and range proof commitment, together with its SoK, so:
-        // (1) Set up the witness
-        let witness = HkzgWeightedElgamalWitness {
-            hkzg_randomness,
-            chunked_plaintexts: Scalar::vecvecvec_from_inner(f_evals_weighted),
-            elgamal_randomness,
-        };
-        // (2) Compute its image under the corresponding homomorphism, and produce an SoK
+        // Compute image under the homomorphism and produce the SoK
         //   (2a) Set up the tuple homomorphism
         let eks_inner: Vec<_> = eks.iter().map(|ek| ek.ek).collect(); // TODO: this is a bit ugly
         let lagr_g1: &[E::G1Affine] = match &pp.pk_range_proof.ck_S.msm_basis {
@@ -486,7 +425,7 @@ impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>> Transcr
             &f_evals_chunked_flat,
             pp.ell,
             &TrivialShape(range_proof_commitment.0.into()), // TODO: fix this
-            &hkzg_randomness,
+            &witness.hkzg_randomness,
             rng,
         );
 

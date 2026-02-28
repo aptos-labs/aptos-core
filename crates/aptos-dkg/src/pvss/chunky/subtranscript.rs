@@ -7,7 +7,10 @@ use crate::{
     Scalar,
 };
 use aptos_crypto::{
-    arkworks::serialization::{ark_de, ark_se},
+    arkworks::{
+        random::{unsafe_random_point, unsafe_random_points},
+        serialization::{ark_de, ark_se},
+    },
     player::Player,
     weighted_config::WeightedConfigArkworks,
     CryptoMaterialError, TSecretSharingConfig, ValidCryptoMaterial,
@@ -15,6 +18,7 @@ use aptos_crypto::{
 use ark_ec::{pairing::Pairing, CurveGroup};
 use ark_ff::{Fp, FpConfig};
 use ark_serialize::{CanonicalDeserialize, CanonicalSerialize};
+use rand_core::{CryptoRng, RngCore};
 use serde::{Deserialize, Serialize};
 
 // TODO: not sure we need both CanonicalSerialize and Serialize here?
@@ -49,6 +53,46 @@ pub struct SubtranscriptProjective<P: Pairing> {
     pub Cs_proj: Vec<Vec<Vec<P::G1>>>,
     /// Second chunked ElGamal component (in projective form)
     pub Rs_proj: Vec<Vec<P::G1>>,
+}
+
+impl<P: Pairing> Subtranscript<P> {
+    /// Generates a subtranscript with random (V0, Vs, Cs, Rs) for use in `generate()` of
+    /// weighted chunky transcripts. `Vs` is built as `sc.group_by_player(&Vs_flat)` so the
+    /// layout matches the rest of the codebase.
+    #[allow(non_snake_case)]
+    pub fn random_bases<R: RngCore + CryptoRng>(
+        sc: &WeightedConfigArkworks<P::ScalarField>,
+        num_chunks_per_share: usize,
+        rng: &mut R,
+    ) -> Self {
+        let V0 = unsafe_random_point::<P::G2, _>(rng);
+        let Vs_flat = unsafe_random_points::<P::G2, _>(sc.get_total_weight(), rng);
+        let Vs = sc.group_by_player(&Vs_flat);
+
+        let Cs: Vec<Vec<Vec<P::G1Affine>>> = (0..sc.get_total_num_players())
+            .map(|i| {
+                let w = sc.get_player_weight(&sc.get_player(i));
+                (0..w)
+                    .map(|_| unsafe_random_points::<P::G1, _>(num_chunks_per_share, rng))
+                    .collect()
+            })
+            .collect();
+
+        let Rs: Vec<Vec<P::G1Affine>> = (0..sc.get_max_weight())
+            .map(|_| unsafe_random_points::<P::G1, _>(num_chunks_per_share, rng))
+            .collect();
+
+        Self { V0, Vs, Cs, Rs }
+    }
+
+    /// Builds the vector used as input to the SCRAPE low-degree test: all share
+    /// commitments in player/share order, then the dealt public key `V0`.
+    #[allow(non_snake_case)]
+    pub fn vs_flat(&self) -> Vec<P::G2Affine> {
+        let mut vs: Vec<P::G2Affine> = self.Vs.iter().flatten().copied().collect();
+        vs.push(self.V0);
+        vs
+    }
 }
 
 impl<P: Pairing> ValidCryptoMaterial for Subtranscript<P> {

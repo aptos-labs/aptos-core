@@ -3,7 +3,9 @@
 
 use crate::{
     pcs::univariate_hiding_kzg,
-    pvss::chunky::{chunked_elgamal, chunked_elgamal_pp},
+    pvss::chunky::{
+        chunked_elgamal, chunked_elgamal_pp, chunks, public_parameters::PublicParameters,
+    },
     sigma_protocol::{
         self,
         homomorphism::{
@@ -26,7 +28,8 @@ use aptos_crypto_derive::SigmaProtocolWitness;
 use ark_ec::{pairing::Pairing, AdditiveGroup, AffineRepr, CurveGroup};
 use ark_ff::PrimeField;
 use ark_serialize::{CanonicalDeserialize, CanonicalSerialize};
-use std::marker::PhantomData;
+use rand_core::{CryptoRng, RngCore};
+use std::{iter::repeat_with, marker::PhantomData};
 
 /// Witness data for the `chunked_elgamal_field` PVSS protocol.
 ///
@@ -49,6 +52,60 @@ pub struct HkzgWeightedElgamalWitness<F: PrimeField> {
     pub hkzg_randomness: univariate_hiding_kzg::CommitmentRandomness<F>,
     pub chunked_plaintexts: Vec<Vec<Vec<Scalar<F>>>>, // For each player, plaintexts z_i, which are chunked z_{i,j}
     pub elgamal_randomness: Vec<Vec<Scalar<F>>>, // For at most max_weight, for each chunk, a blinding factor
+}
+
+/// Prepared data for the chunked ElGamal + range proof witness.
+pub struct ChunkedWitnessData<E: Pairing> {
+    pub witness: HkzgWeightedElgamalWitness<E::ScalarField>,
+    /// Flattened chunked shares for the range proof (length `W * m`);
+    /// this data is already in the witness but we flatten it here for convenience.
+    pub f_evals_chunked_flat: Vec<E::ScalarField>,
+}
+
+/// Prepares the chunked witness and flattened chunked values used by both
+/// v1 and v2 `encrypt_chunked_shares`. Callers then run their specific
+/// homomorphism and SoK, then feed `f_evals_chunked_flat` and `witness.hkzg_randomness`
+/// into the DeKART range proof.
+#[allow(non_snake_case)]
+pub fn prepare_chunked_witness<E: Pairing, R: RngCore + CryptoRng>(
+    f_evals: &[E::ScalarField],
+    pp: &PublicParameters<E>,
+    sc: &WeightedConfigArkworks<E::ScalarField>,
+    rng: &mut R,
+) -> ChunkedWitnessData<E> {
+    let hkzg_randomness: univariate_hiding_kzg::CommitmentRandomness<E::ScalarField> =
+        Scalar(sample_field_element(rng));
+    let elgamal_randomness = Scalar::vecvec_from_inner(
+        repeat_with(|| {
+            chunked_elgamal::correlated_randomness(
+                rng,
+                1 << pp.ell as u64,
+                chunked_elgamal::num_chunks_per_scalar::<E::ScalarField>(pp.ell),
+                &<E::ScalarField as ark_ff::AdditiveGroup>::ZERO,
+            )
+        })
+        .take(sc.get_max_weight())
+        .collect(),
+    );
+
+    let f_evals_chunked: Vec<Vec<E::ScalarField>> = f_evals
+        .iter()
+        .map(|f_eval| chunks::scalar_to_le_chunks(pp.ell, f_eval))
+        .collect();
+    let f_evals_chunked_flat: Vec<E::ScalarField> =
+        f_evals_chunked.iter().flatten().copied().collect();
+    let f_evals_weighted = sc.group_by_player(&f_evals_chunked);
+
+    let witness = HkzgWeightedElgamalWitness {
+        hkzg_randomness,
+        chunked_plaintexts: Scalar::vecvecvec_from_inner(f_evals_weighted),
+        elgamal_randomness,
+    };
+
+    ChunkedWitnessData {
+        witness,
+        f_evals_chunked_flat,
+    }
 }
 
 /// The two components described earlier — (1) generating HKZG randomness for the DeKARTv2 proof

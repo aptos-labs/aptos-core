@@ -585,10 +585,7 @@ pub fn batch_open_generalized<
         hom2: sum_hom,
     };
     let statement = TupleCodomainShape(
-        TupleCodomainShape(
-            CodomainShape(com_y_hid.into_group()),
-            CodomainShape(C_eval),
-        ),
+        TupleCodomainShape(CodomainShape(com_y_hid.into_group()), CodomainShape(C_eval)),
         phi_y,
     );
     let (sigma_protocol_proof, _) = full_hom.prove(&witness, statement, SHPLONKED_SIGMA_DST, rng);
@@ -827,9 +824,8 @@ where
     );
     // Spec Step 5a: C_f = ∑_i c^{i-1} Z_{S\S_i}(x)·C_i − Z_S(x)·π_1 + c^n·C_PoK.
     // π_2 was computed for C = ∑·C_i − Z_S·π_1 (no C_PoK), so we use that commitment in the pairing.
-    let commitment_to_f =
-        E::G1::msm(merged_minus_pi1.bases(), merged_minus_pi1.scalars())
-            .expect("batch verify: commitment to f MSM");
+    let commitment_to_f = E::G1::msm(merged_minus_pi1.bases(), merged_minus_pi1.scalars())
+        .expect("batch verify: commitment to f MSM");
 
     // f(x) = ∑_i c^{i-1} Z_{S\S_i}(x) f̃_i(x): from revealed y_rev and sigma response z_yi.
     let c_powers = powers(c, n);
