@@ -475,7 +475,6 @@ impl NodeSetup {
             onchain_randomness_config.clone(),
             onchain_jwk_consensus_config.clone(),
             OnChainChunkyDKGConfig::default_disabled(),
-            None,
             Arc::new(MockPastProposalStatusTracker {}),
             opt_proposal_loopback_tx,
         );

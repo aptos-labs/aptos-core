@@ -823,7 +823,6 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
         payload_client: Arc<dyn PayloadClient>,
         payload_manager: Arc<dyn TPayloadManager>,
         rand_config: Option<RandConfig>,
-        fast_rand_config: Option<RandConfig>,
         secret_sharing_config: Option<SecretShareConfig>,
         rand_msg_rx: aptos_channel::Receiver<AccountAddress, IncomingRandGenRequest>,
         secret_sharing_msg_rx: aptos_channel::Receiver<AccountAddress, IncomingSecretShareRequest>,
@@ -885,7 +884,6 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
                 &onchain_randomness_config,
                 &onchain_chunky_dkg_config,
                 rand_config,
-                fast_rand_config.clone(),
                 secret_sharing_config.clone(),
                 rand_msg_rx,
                 secret_sharing_msg_rx,
@@ -997,7 +995,6 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
             onchain_randomness_config,
             onchain_jwk_consensus_config,
             onchain_chunky_dkg_config,
-            fast_rand_config,
             failures_tracker,
             opt_proposal_loopback_tx,
         );
@@ -1041,7 +1038,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
         onchain_randomness_config: &OnChainRandomnessConfig,
         maybe_dkg_state: anyhow::Result<DKGState>,
         consensus_config: &OnChainConsensusConfig,
-    ) -> Result<(RandConfig, Option<RandConfig>), NoRandomnessReason> {
+    ) -> Result<RandConfig, NoRandomnessReason> {
         if !consensus_config.is_vtxn_enabled() {
             return Err(NoRandomnessReason::VTxnDisabled);
         }
@@ -1085,12 +1082,6 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
         )
         .map_err(NoRandomnessReason::SecretShareDecryptionFailed)?;
 
-        let fast_randomness_is_enabled = onchain_randomness_config.fast_randomness_enabled()
-            && sk.fast.is_some()
-            && pk.fast.is_some()
-            && transcript.fast.is_some()
-            && dkg_pub_params.pvss_config.fast_wconfig.is_some();
-
         let pk_shares = (0..new_epoch_state.verifier.len())
             .map(|id| {
                 transcript
@@ -1101,17 +1092,37 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
 
         // Get aggregate public keys from the transcript for batch verification
         let aggregate_pk_main = transcript.main.get_dealt_public_key();
-        let aggregate_pk_fast = transcript.fast.as_ref().map(|t| t.get_dealt_public_key());
 
-        // Recover existing augmented key pair or generate a new one
-        let (augmented_key_pair, fast_augmented_key_pair) = if let Some((_, key_pair)) = self
+        // Recover existing augmented key pair or generate a new one.
+        // Try to deserialize as old format ((ASK,APK), Option<(ASK,APK)>) first,
+        // then as new format (ASK, APK), and fall through to regenerate if both fail.
+        let augmented_key_pair = if let Some((_, key_pair)) = self
             .rand_storage
             .get_key_pair_bytes()
             .map_err(NoRandomnessReason::RandDbNotAvailable)?
             .filter(|(epoch, _)| *epoch == new_epoch)
         {
-            info!(epoch = new_epoch, "Recovering existing augmented key");
-            bcs::from_bytes(&key_pair).map_err(NoRandomnessReason::KeyPairDeserializationError)?
+            type AugKeyPair = (<WVUF as WeightedVUF>::AugmentedSecretKeyShare, <WVUF as WeightedVUF>::AugmentedPubKeyShare);
+            if let Ok((main_key_pair, _fast_key_pair)) = bcs::from_bytes::<(AugKeyPair, Option<AugKeyPair>)>(&key_pair) {
+                info!(epoch = new_epoch, "Recovering existing augmented key (old format)");
+                main_key_pair
+            } else if let Ok(key_pair) = bcs::from_bytes::<AugKeyPair>(&key_pair) {
+                info!(epoch = new_epoch, "Recovering existing augmented key (new format)");
+                key_pair
+            } else {
+                warn!(epoch = new_epoch, "Failed to deserialize key pair, regenerating");
+                let mut rng =
+                    StdRng::from_rng(thread_rng()).map_err(NoRandomnessReason::RngCreationError)?;
+                let augmented_key_pair = WVUF::augment_key_pair(&vuf_pp, sk.main, pk.main, &mut rng);
+                self.rand_storage
+                    .save_key_pair_bytes(
+                        new_epoch,
+                        bcs::to_bytes(&augmented_key_pair)
+                            .map_err(NoRandomnessReason::KeyPairSerializationError)?,
+                    )
+                    .map_err(NoRandomnessReason::KeyPairPersistError)?;
+                augmented_key_pair
+            }
         } else {
             info!(
                 epoch = new_epoch_state.epoch,
@@ -1120,23 +1131,14 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
             let mut rng =
                 StdRng::from_rng(thread_rng()).map_err(NoRandomnessReason::RngCreationError)?;
             let augmented_key_pair = WVUF::augment_key_pair(&vuf_pp, sk.main, pk.main, &mut rng);
-            let fast_augmented_key_pair = if fast_randomness_is_enabled {
-                if let (Some(sk), Some(pk)) = (sk.fast, pk.fast) {
-                    Some(WVUF::augment_key_pair(&vuf_pp, sk, pk, &mut rng))
-                } else {
-                    None
-                }
-            } else {
-                None
-            };
             self.rand_storage
                 .save_key_pair_bytes(
                     new_epoch,
-                    bcs::to_bytes(&(augmented_key_pair.clone(), fast_augmented_key_pair.clone()))
+                    bcs::to_bytes(&augmented_key_pair)
                         .map_err(NoRandomnessReason::KeyPairSerializationError)?,
                 )
                 .map_err(NoRandomnessReason::KeyPairPersistError)?;
-            (augmented_key_pair, fast_augmented_key_pair)
+            augmented_key_pair
         };
 
         let (ask, apk) = augmented_key_pair;
@@ -1153,34 +1155,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
             aggregate_pk_main,
             self.config.optimistic_rand_share_verification,
         );
-
-        let fast_rand_config = if let (Some((ask, apk)), Some(trx), Some(wconfig)) = (
-            fast_augmented_key_pair,
-            transcript.fast.as_ref(),
-            dkg_pub_params.pvss_config.fast_wconfig.as_ref(),
-        ) {
-            let pk_shares = (0..new_epoch_state.verifier.len())
-                .map(|id| trx.get_public_key_share(wconfig, &Player { id }))
-                .collect::<Vec<_>>();
-
-            let fast_keys = RandKeys::new(ask, apk, pk_shares, new_epoch_state.verifier.len());
-            let fast_wconfig = wconfig.clone();
-
-            Some(RandConfig::new(
-                self.author,
-                new_epoch,
-                new_epoch_state.verifier.clone(),
-                vuf_pp,
-                fast_keys,
-                fast_wconfig,
-                aggregate_pk_fast.expect("Fast PK must exist when fast path is enabled"),
-                self.config.optimistic_rand_share_verification,
-            ))
-        } else {
-            None
-        };
-
-        Ok((rand_config, fast_rand_config))
+        Ok(rand_config)
     }
 
     fn try_get_secret_share_config_for_epoch(
@@ -1331,8 +1306,8 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
             &consensus_config,
         );
 
-        let (rand_config, fast_rand_config) = match rand_configs {
-            Ok((rand_config, fast_rand_config)) => (Some(rand_config), fast_rand_config),
+        let rand_config = match rand_configs {
+            Ok(rand_config) => Some(rand_config),
             Err(reason) => {
                 if onchain_randomness_config.randomness_enabled() {
                     if epoch_state.epoch > 2 {
@@ -1347,7 +1322,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
                         );
                     }
                 }
-                (None, None)
+                None
             },
         };
 
@@ -1372,8 +1347,8 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
         };
 
         info!(
-            "[Randomness] start_new_epoch: epoch={}, rand_config={:?}, fast_rand_config={:?}",
-            epoch_state.epoch, rand_config, fast_rand_config
+            "[Randomness] start_new_epoch: epoch={}, rand_config={:?}",
+            epoch_state.epoch, rand_config
         );
 
         let (network_sender, payload_client, payload_manager) = self
@@ -1415,7 +1390,6 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
                 payload_client,
                 payload_manager,
                 rand_config,
-                fast_rand_config,
                 rand_msg_rx,
                 secret_share_manager_rx,
             )
@@ -1433,7 +1407,6 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
                 payload_client,
                 payload_manager,
                 rand_config,
-                fast_rand_config,
                 secret_sharing_config,
                 rand_msg_rx,
                 secret_share_manager_rx,
@@ -1492,7 +1465,6 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
         payload_client: Arc<dyn PayloadClient>,
         payload_manager: Arc<dyn TPayloadManager>,
         rand_config: Option<RandConfig>,
-        fast_rand_config: Option<RandConfig>,
         secret_sharing_config: Option<SecretShareConfig>,
         rand_msg_rx: aptos_channel::Receiver<AccountAddress, IncomingRandGenRequest>,
         secret_share_msg_rx: aptos_channel::Receiver<AccountAddress, IncomingSecretShareRequest>,
@@ -1516,7 +1488,6 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
                     payload_client,
                     payload_manager,
                     rand_config,
-                    fast_rand_config,
                     secret_sharing_config,
                     rand_msg_rx,
                     secret_share_msg_rx,
@@ -1550,7 +1521,6 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
         payload_client: Arc<dyn PayloadClient>,
         payload_manager: Arc<dyn TPayloadManager>,
         rand_config: Option<RandConfig>,
-        fast_rand_config: Option<RandConfig>,
         rand_msg_rx: aptos_channel::Receiver<AccountAddress, IncomingRandGenRequest>,
         secret_share_msg_rx: aptos_channel::Receiver<AccountAddress, IncomingSecretShareRequest>,
     ) {
@@ -1584,7 +1554,6 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
                 &onchain_randomness_config,
                 &onchain_chunky_dkg_config,
                 rand_config,
-                fast_rand_config,
                 None,
                 rand_msg_rx,
                 secret_share_msg_rx,

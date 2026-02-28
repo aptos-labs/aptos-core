@@ -8,7 +8,7 @@ use aptos_reliable_broadcast::BroadcastStatus;
 use aptos_types::{
     dkg::{real_dkg::RealDKG, DKGSessionMetadata, DKGTrait, DKGTranscript, DKGTranscriptMetadata},
     epoch_state::EpochState,
-    on_chain_config::{OnChainRandomnessConfig, RandomnessConfigV2},
+    on_chain_config::OnChainRandomnessConfig,
     validator_verifier::{
         ValidatorConsensusInfo, ValidatorConsensusInfoMoveStruct, ValidatorVerifier,
     },
@@ -42,8 +42,7 @@ fn test_transcript_aggregation_state() {
         .map(ValidatorConsensusInfoMoveStruct::from)
         .collect::<Vec<_>>();
     let verifier = ValidatorVerifier::new(validator_infos.clone());
-    // Use V2 config to enable fast path, needed for testing inconsistent fast/main secrets.
-    let randomness_config = OnChainRandomnessConfig::V2(RandomnessConfigV2::default());
+    let randomness_config = OnChainRandomnessConfig::default_enabled();
     let pub_params = RealDKG::new_public_params(&DKGSessionMetadata {
         dealer_epoch: 999,
         randomness_config: randomness_config.into(),
@@ -116,23 +115,6 @@ fn test_transcript_aggregation_state() {
             author: addrs[0],
         },
         transcript_bytes: bad_trx_0_bytes,
-    });
-    assert!(result.is_err());
-
-    // Transcript where fast-path secret and main-path secret do not match should be rejected.
-    let bad_trx_2 = RealDKG::generate_transcript_for_inconsistent_secrets(
-        &mut rng,
-        &pub_params,
-        2,
-        &private_keys[2],
-        &public_keys[2],
-    );
-    let result = trx_agg_state.add(addrs[2], DKGTranscript {
-        metadata: DKGTranscriptMetadata {
-            epoch: 999,
-            author: addrs[2],
-        },
-        transcript_bytes: bcs::to_bytes(&bad_trx_2).unwrap(),
     });
     assert!(result.is_err());
 
