@@ -668,7 +668,7 @@ impl MockClient {
                 protocol_id,
                 request_id: 42,
                 priority: 0,
-                raw_request: request_data.clone(),
+                raw_request: request_data.clone().into(),
             }),
             sender: PeerNetworkId::new(network_id, peer_id),
             receive_timestamp_micros: 0,

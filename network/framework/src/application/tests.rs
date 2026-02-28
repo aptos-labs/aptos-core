@@ -1170,7 +1170,7 @@ async fn wait_for_network_event(
                             protocol_id: outbound_rpc_request.protocol_id,
                             request_id: 0,
                             priority: 0,
-                            raw_request: outbound_rpc_request.data.into(),
+                            raw_request: outbound_rpc_request.data.clone(),
                         }),
                         sender: PeerNetworkId::new(expected_network_id, peer_id),
                         receive_timestamp_micros: 0,
@@ -1189,7 +1189,7 @@ async fn wait_for_network_event(
                         message: NetworkMessage::DirectSendMsg(DirectSendMsg{
                             protocol_id: message.protocol_id,
                             priority: 0,
-                            raw_msg: message.mdata.into(),
+                            raw_msg: message.mdata.clone(),
                         }),
                         sender: PeerNetworkId::new(expected_network_id, peer_id),
                         receive_timestamp_micros: 0,

@@ -263,7 +263,7 @@ impl InboundRpcs {
                         let rpc_response = RpcResponse {
                             request_id,
                             priority,
-                            raw_response: Vec::from(response_bytes.as_ref()),
+                            raw_response: response_bytes, // Zero-copy: Bytes is reference-counted
                         };
                         Ok((rpc_response, protocol_id))
                     },
@@ -494,7 +494,7 @@ impl OutboundRpcs {
             protocol_id,
             request_id,
             priority: Priority::default(),
-            raw_request: Vec::from(request_data.as_ref()),
+            raw_request: request_data, // Zero-copy: Bytes is reference-counted
         });
         write_reqs_tx.push((), message)?;
 
@@ -518,7 +518,7 @@ impl OutboundRpcs {
             .map(|result| {
                 // Flatten errors.
                 match result {
-                    Ok(Ok(response)) => Ok(Bytes::from(response.raw_response)),
+                    Ok(Ok(response)) => Ok(response.raw_response), // Zero-copy: already Bytes
                     Ok(Err(oneshot::Canceled)) => Err(RpcError::UnexpectedResponseChannelCancel),
                     Err(timeout::Elapsed) => Err(RpcError::TimedOut),
                 }

@@ -621,7 +621,7 @@ where
                 let message = NetworkMessage::DirectSendMsg(DirectSendMsg {
                     protocol_id,
                     priority: Priority::default(),
-                    raw_msg: Vec::from(message.mdata.as_ref()),
+                    raw_msg: message.mdata, // Zero-copy: Bytes is reference-counted
                 });
 
                 match write_reqs_tx.push((), message) {

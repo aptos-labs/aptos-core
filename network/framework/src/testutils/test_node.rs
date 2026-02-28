@@ -313,7 +313,7 @@ pub trait TestNode: ApplicationNode + Sync {
                         protocol_id: msg.protocol_id,
                         request_id: 0,
                         priority: 0,
-                        raw_request: msg.data.into(),
+                        raw_request: msg.data.clone(),
                     }),
                     sender: self.peer_network_id(network_id),
                     receive_timestamp_micros: 0,
@@ -326,7 +326,7 @@ pub trait TestNode: ApplicationNode + Sync {
                     message: NetworkMessage::DirectSendMsg(DirectSendMsg {
                         protocol_id: msg.protocol_id,
                         priority: 0,
-                        raw_msg: msg.mdata.into(),
+                        raw_msg: msg.mdata.clone(),
                     }),
                     sender: self.peer_network_id(network_id),
                     receive_timestamp_micros: 0,

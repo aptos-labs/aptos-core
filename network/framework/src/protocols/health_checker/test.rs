@@ -142,7 +142,7 @@ impl TestHarness {
                         protocol_id,
                         request_id: 0,
                         priority: 0,
-                        raw_request: data,
+                        raw_request: data.into(),
                     }),
                     sender: PeerNetworkId::new(NetworkId::Validator, peer_id),
                     receive_timestamp_micros: 0,

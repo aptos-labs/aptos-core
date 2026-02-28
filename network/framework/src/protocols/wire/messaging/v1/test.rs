@@ -8,9 +8,10 @@ use crate::{
 };
 use aptos_memsocket::MemorySocket;
 use bcs::test_helpers::assert_canonical_encode_decode;
+use bytes::Bytes;
 use futures::{executor::block_on, future, sink::SinkExt, stream::StreamExt};
 use futures_util::stream::select;
-use proptest::{collection::vec, prelude::*};
+use proptest::collection::vec;
 
 // Ensure serialization of ProtocolId enum takes 1 byte.
 #[test]
@@ -36,7 +37,7 @@ fn rpc_request() -> bcs::Result<()> {
         request_id: 25,
         protocol_id: ProtocolId::ConsensusRpcBcs,
         priority: 0,
-        raw_request: [0, 1, 2, 3].to_vec(),
+        raw_request: Bytes::from(vec![0u8, 1, 2, 3]),
     };
     assert_eq!(
         bcs::to_bytes(&rpc_request)?,
@@ -55,7 +56,7 @@ fn stream_message() {
     let message = NetworkMessage::DirectSendMsg(DirectSendMsg {
         protocol_id: ProtocolId::MempoolDirectSend,
         priority: 0,
-        raw_msg: Vec::from("hello world"),
+        raw_msg: Bytes::from("hello world"),
     });
     let stream_header = StreamHeader {
         request_id: 42,
@@ -68,7 +69,7 @@ fn stream_message() {
     let stream_fragment = StreamFragment {
         request_id: 42,
         fragment_id: 254,
-        raw_data: vec![11, 22, 33],
+        raw_data: Bytes::from(vec![11u8, 22, 33]),
     };
     assert_eq!(bcs::to_bytes(&stream_fragment).unwrap(), vec![
         42, 0, 0, 0, 254, 3, 11, 22, 33
@@ -80,7 +81,7 @@ fn aptosnet_wire_test_vectors() {
     let message = MultiplexMessage::Message(NetworkMessage::DirectSendMsg(DirectSendMsg {
         protocol_id: ProtocolId::MempoolDirectSend,
         priority: 0,
-        raw_msg: Vec::from("hello world"),
+        raw_msg: Bytes::from("hello world"),
     }));
     let message_bytes = [
         // [0, 0, 0, 16] -> frame length
@@ -127,7 +128,7 @@ fn send_fails_when_larger_than_frame_limit() {
     let message = MultiplexMessage::Message(NetworkMessage::DirectSendMsg(DirectSendMsg {
         protocol_id: ProtocolId::ConsensusRpcBcs,
         priority: 0,
-        raw_msg: vec![0; 123],
+        raw_msg: Bytes::from(vec![0u8; 123]),
     }));
     block_on(message_tx.send(&message)).unwrap_err();
 }
@@ -143,7 +144,7 @@ fn recv_fails_when_larger_than_frame_limit() {
     let message = MultiplexMessage::Message(NetworkMessage::DirectSendMsg(DirectSendMsg {
         protocol_id: ProtocolId::ConsensusRpcBcs,
         priority: 0,
-        raw_msg: vec![0; 80],
+        raw_msg: Bytes::from(vec![0u8; 80]),
     }));
     let f_send = message_tx.send(&message);
     let f_recv = message_rx.next();
@@ -157,7 +158,7 @@ fn arb_rpc_request(max_frame_size: usize) -> impl Strategy<Value = RpcRequest> {
         any::<ProtocolId>(),
         any::<RequestId>(),
         any::<Priority>(),
-        (0..max_frame_size).prop_map(|size| vec![0u8; size]),
+        (0..max_frame_size).prop_map(|size| Bytes::from(vec![0u8; size])),
     )
         .prop_map(
             |(protocol_id, request_id, priority, raw_request)| RpcRequest {
@@ -173,7 +174,7 @@ fn arb_rpc_response(max_frame_size: usize) -> impl Strategy<Value = RpcResponse>
     (
         any::<RequestId>(),
         any::<Priority>(),
-        (0..max_frame_size).prop_map(|size| vec![0u8; size]),
+        (0..max_frame_size).prop_map(|size| Bytes::from(vec![0u8; size])),
     )
         .prop_map(|(request_id, priority, raw_response)| RpcResponse {
             request_id,
@@ -186,7 +187,7 @@ fn arb_direct_send_msg(max_frame_size: usize) -> impl Strategy<Value = DirectSen
     let args = (
         any::<ProtocolId>(),
         any::<Priority>(),
-        (0..max_frame_size).prop_map(|size| vec![0u8; size]),
+        (0..max_frame_size).prop_map(|size| Bytes::from(vec![0u8; size])),
     );
     args.prop_map(|(protocol_id, priority, raw_msg)| DirectSendMsg {
         protocol_id,

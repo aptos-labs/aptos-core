@@ -220,7 +220,7 @@ fn peer_send_message() {
     let recv_msg = MultiplexMessage::Message(NetworkMessage::DirectSendMsg(DirectSendMsg {
         protocol_id: PROTOCOL,
         priority: 0,
-        raw_msg: Vec::from("hello world"),
+        raw_msg: Bytes::from("hello world"),
     }));
 
     let client = async {
@@ -270,12 +270,12 @@ fn peer_recv_message() {
     let send_msg = MultiplexMessage::Message(NetworkMessage::DirectSendMsg(DirectSendMsg {
         protocol_id: PROTOCOL,
         priority: 0,
-        raw_msg: Vec::from("hello world"),
+        raw_msg: Bytes::from("hello world"),
     }));
     let recv_msg = NetworkMessage::DirectSendMsg(DirectSendMsg {
         protocol_id: PROTOCOL,
         priority: 0,
-        raw_msg: Vec::from("hello world"),
+        raw_msg: Bytes::from("hello world"),
     });
 
     let client = async move {
@@ -349,7 +349,7 @@ fn peers_send_message_concurrent() {
             NetworkMessage::DirectSendMsg(DirectSendMsg {
                 protocol_id: PROTOCOL,
                 priority: 0,
-                raw_msg: msg_b.mdata.into(),
+                raw_msg: msg_b.mdata.clone(),
             })
         );
         assert_eq!(
@@ -357,7 +357,7 @@ fn peers_send_message_concurrent() {
             NetworkMessage::DirectSendMsg(DirectSendMsg {
                 protocol_id: PROTOCOL,
                 priority: 0,
-                raw_msg: msg_a.mdata.into(),
+                raw_msg: msg_a.mdata.clone(),
             })
         );
 
@@ -399,12 +399,12 @@ fn peer_recv_rpc() {
         request_id: 123,
         protocol_id: PROTOCOL,
         priority: 0,
-        raw_request: Vec::from("hello world"),
+        raw_request: Bytes::from("hello world"),
     }));
     let resp_msg = MultiplexMessage::Message(NetworkMessage::RpcResponse(RpcResponse {
         request_id: 123,
         priority: 0,
-        raw_response: Vec::from("goodbye world"),
+        raw_response: Bytes::from("goodbye world"),
     }));
 
     let client = async move {
@@ -434,7 +434,7 @@ fn peer_recv_rpc() {
                     protocol_id: PROTOCOL,
                     request_id: 123,
                     priority: 0,
-                    raw_request: Vec::from("hello world"),
+                    raw_request: Bytes::from("hello world"),
                 })
             );
 
@@ -470,12 +470,12 @@ fn peer_recv_rpc_concurrent() {
         request_id: 123,
         protocol_id: PROTOCOL,
         priority: 0,
-        raw_request: Vec::from("hello world"),
+        raw_request: Bytes::from("hello world"),
     }));
     let resp_msg = MultiplexMessage::Message(NetworkMessage::RpcResponse(RpcResponse {
         request_id: 123,
         priority: 0,
-        raw_response: Vec::from("goodbye world"),
+        raw_response: Bytes::from("goodbye world"),
     }));
 
     let client = async move {
@@ -501,7 +501,7 @@ fn peer_recv_rpc_concurrent() {
             let received = prot_rx.next().await.unwrap();
             match &received.message {
                 NetworkMessage::RpcRequest(req) => {
-                    assert_eq!(Vec::from("hello world"), req.raw_request);
+                    assert_eq!(Bytes::from("hello world"), req.raw_request);
                     let arcsender = received.rpc_replier.unwrap();
                     let sender = Arc::into_inner(arcsender).unwrap();
                     res_txs.push(sender)
@@ -537,7 +537,7 @@ fn peer_recv_rpc_timeout() {
         request_id: 123,
         protocol_id: PROTOCOL,
         priority: 0,
-        raw_request: Vec::from("hello world"),
+        raw_request: Bytes::from("hello world"),
     }));
 
     let test = async move {
@@ -550,7 +550,7 @@ fn peer_recv_rpc_timeout() {
         // Pull out the request completion handle.
         let mut res_tx = match &received.message {
             NetworkMessage::RpcRequest(req) => {
-                assert_eq!(Vec::from("hello world"), req.raw_request);
+                assert_eq!(Bytes::from("hello world"), req.raw_request);
                 let arcsender = received.rpc_replier.unwrap();
                 Arc::into_inner(arcsender).unwrap()
             },
@@ -594,7 +594,7 @@ fn peer_recv_rpc_cancel() {
         request_id: 123,
         protocol_id: PROTOCOL,
         priority: 0,
-        raw_request: Vec::from("hello world"),
+        raw_request: Bytes::from("hello world"),
     }));
 
     let test = async move {
@@ -607,7 +607,7 @@ fn peer_recv_rpc_cancel() {
         // Pull out the request completion handle.
         let res_tx = match &received.message {
             NetworkMessage::RpcRequest(req) => {
-                assert_eq!(Vec::from("hello world"), req.raw_request);
+                assert_eq!(Bytes::from("hello world"), req.raw_request);
                 let arcsender = received.rpc_replier.unwrap();
                 Arc::into_inner(arcsender).unwrap()
             },
@@ -668,7 +668,7 @@ fn peer_send_rpc() {
 
             assert_eq!(received.protocol_id, PROTOCOL);
             assert_eq!(received.priority, 0);
-            assert_eq!(received.raw_request, b"hello world");
+            assert_eq!(received.raw_request.as_ref(), b"hello world");
 
             assert!(
                 request_ids.insert(received.request_id),
@@ -679,7 +679,7 @@ fn peer_send_rpc() {
             let response = MultiplexMessage::Message(NetworkMessage::RpcResponse(RpcResponse {
                 request_id: received.request_id,
                 priority: 0,
-                raw_response: Vec::from(&b"goodbye world"[..]),
+                raw_response: Bytes::from("goodbye world"),
             }));
 
             // Server should send the rpc request.
@@ -738,7 +738,7 @@ fn peer_send_rpc_concurrent() {
 
             assert_eq!(received.protocol_id, PROTOCOL);
             assert_eq!(received.priority, 0);
-            assert_eq!(received.raw_request, b"hello world");
+            assert_eq!(received.raw_request.as_ref(), b"hello world");
 
             assert!(
                 request_ids.insert(received.request_id),
@@ -749,7 +749,7 @@ fn peer_send_rpc_concurrent() {
             let response = MultiplexMessage::Message(NetworkMessage::RpcResponse(RpcResponse {
                 request_id: received.request_id,
                 priority: 0,
-                raw_response: Vec::from(&b"goodbye world"[..]),
+                raw_response: Bytes::from("goodbye world"),
             }));
 
             // Server should send the rpc request.
@@ -794,7 +794,7 @@ fn peer_send_rpc_cancel() {
 
         assert_eq!(received.protocol_id, PROTOCOL);
         assert_eq!(received.priority, 0);
-        assert_eq!(received.raw_request, b"hello world");
+        assert_eq!(received.raw_request.as_ref(), b"hello world");
 
         // Request should still be live. Ok(_) means the sender is not dropped.
         // Ok(None) means there is no response yet.
@@ -807,7 +807,7 @@ fn peer_send_rpc_cancel() {
         let response = MultiplexMessage::Message(NetworkMessage::RpcResponse(RpcResponse {
             request_id: received.request_id,
             priority: 0,
-            raw_response: Vec::from(&b"goodbye world"[..]),
+            raw_response: Bytes::from("goodbye world"),
         }));
         server_sink.send(&response).await.unwrap();
 
@@ -856,7 +856,7 @@ fn peer_send_rpc_timeout() {
 
         assert_eq!(received.protocol_id, PROTOCOL);
         assert_eq!(received.priority, 0);
-        assert_eq!(received.raw_request, b"hello world");
+        assert_eq!(received.raw_request.as_ref(), b"hello world");
 
         // Request should still be live. Ok(_) means the sender is not dropped.
         // Ok(None) means there is no response yet.
@@ -872,7 +872,7 @@ fn peer_send_rpc_timeout() {
         let response = MultiplexMessage::Message(NetworkMessage::RpcResponse(RpcResponse {
             request_id: received.request_id,
             priority: 0,
-            raw_response: Vec::from(&b"goodbye world"[..]),
+            raw_response: Bytes::from("goodbye world"),
         }));
         server_sink.send(&response).await.unwrap();
 
@@ -1000,7 +1000,7 @@ fn peers_send_multiplex() {
             NetworkMessage::DirectSendMsg(DirectSendMsg {
                 protocol_id: PROTOCOL,
                 priority: 0,
-                raw_msg: msg_b.mdata.into(),
+                raw_msg: msg_b.mdata.clone(),
             })
         );
         assert_eq!(
@@ -1008,7 +1008,7 @@ fn peers_send_multiplex() {
             NetworkMessage::DirectSendMsg(DirectSendMsg {
                 protocol_id: PROTOCOL,
                 priority: 0,
-                raw_msg: msg_a.mdata.into(),
+                raw_msg: msg_a.mdata.clone(),
             })
         );
 
