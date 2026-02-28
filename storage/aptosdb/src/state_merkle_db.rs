@@ -130,6 +130,18 @@ impl StateMerkleDb {
         top_levels_batch: impl IntoRawBatch,
         batches_for_shards: Vec<impl IntoRawBatch + Send>,
     ) -> Result<()> {
+        self.commit_no_progress(top_levels_batch, batches_for_shards)?;
+        info!(version = version, "Committed StateMerkleDb.");
+        Ok(())
+    }
+
+    /// Like `commit`, but does not log progress. Used by fast sync / restore and
+    /// the `TreeWriter` impl.
+    pub(crate) fn commit_no_progress(
+        &self,
+        top_levels_batch: impl IntoRawBatch,
+        batches_for_shards: Vec<impl IntoRawBatch + Send>,
+    ) -> Result<()> {
         ensure!(
             batches_for_shards.len() == NUM_STATE_SHARDS,
             "Shard count mismatch."
@@ -147,26 +159,8 @@ impl StateMerkleDb {
                 })
         });
 
-        self.commit_top_levels(version, top_levels_batch)
-    }
-
-    /// Only used by fast sync / restore.
-    pub(crate) fn commit_no_progress(
-        &self,
-        top_level_batch: SchemaBatch,
-        batches_for_shards: Vec<SchemaBatch>,
-    ) -> Result<()> {
-        ensure!(
-            batches_for_shards.len() == NUM_STATE_SHARDS,
-            "Shard count mismatch."
-        );
-        let mut batches = batches_for_shards.into_iter();
-        for shard_id in 0..NUM_STATE_SHARDS {
-            let state_merkle_batch = batches.next().unwrap();
-            self.state_merkle_db_shards[shard_id].write_schemas(state_merkle_batch)?;
-        }
-
-        self.state_merkle_metadata_db.write_schemas(top_level_batch)
+        self.state_merkle_metadata_db
+            .write_schemas(top_levels_batch)
     }
 
     pub(crate) fn create_checkpoint(
