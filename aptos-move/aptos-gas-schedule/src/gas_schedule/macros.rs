@@ -78,7 +78,7 @@ macro_rules! define_gas_parameters {
         impl $crate::traits::InitialGasSchedule for $params_name {
             fn initial() -> Self {
                 Self {
-                    $($name: $initial.into()),*
+                    $($name: <$ty as $crate::traits::InitialGasParam>::from_raw($initial)),*
                 }
             }
         }
