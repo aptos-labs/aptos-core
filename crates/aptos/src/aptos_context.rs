@@ -130,6 +130,7 @@ impl aptos_move_cli::AptosContext for RealAptosContext {
                     request.function,
                     request.ty_args,
                     request.args,
+                    options.profile_gas,
                 )?;
                 Ok(output)
             },
