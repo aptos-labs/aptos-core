@@ -5221,9 +5221,12 @@ dependencies = [
 
 [[package]]
 name = "arc-swap"
-version = "1.6.0"
+version = "1.8.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "bddcadddf5e9015d310179a59bb28c4d4b9920ad0f11e8e14dbadf654890c9a6"
+checksum = "f9f3647c145568cec02c42054e07bdf9a5a698e15b466fb2341bfc393cd24aa5"
+dependencies = [
+ "rustversion",
+]
 
 [[package]]
 name = "ark-bls12-381"
@@ -5325,7 +5328,7 @@ dependencies = [
  "fnv",
  "hashbrown 0.15.3",
  "itertools 0.13.0",
- "num-bigint 0.4.4",
+ "num-bigint 0.4.6",
  "num-integer",
  "num-traits",
  "rayon",
@@ -5345,7 +5348,7 @@ dependencies = [
  "derivative",
  "digest 0.10.7",
  "itertools 0.10.5",
- "num-bigint 0.4.4",
+ "num-bigint 0.4.6",
  "num-traits",
  "paste",
  "rustc_version",
@@ -5365,7 +5368,7 @@ dependencies = [
  "digest 0.10.7",
  "educe",
  "itertools 0.13.0",
- "num-bigint 0.4.4",
+ "num-bigint 0.4.6",
  "num-traits",
  "paste",
  "rayon",
@@ -5397,7 +5400,7 @@ version = "0.4.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7abe79b0e4288889c4574159ab790824d0033b9fdcb2a112a3182fac2e514565"
 dependencies = [
- "num-bigint 0.4.4",
+ "num-bigint 0.4.6",
  "num-traits",
  "proc-macro2",
  "quote",
@@ -5409,7 +5412,7 @@ name = "ark-ff-macros"
 version = "0.5.0"
 source = "git+https://github.com/aptos-labs/algebra?branch=fix-fft-parallelism-cutoff#2cacd5efad67bce331aec780b6fcfa4a45f44306"
 dependencies = [
- "num-bigint 0.4.4",
+ "num-bigint 0.4.6",
  "num-traits",
  "proc-macro2",
  "quote",
@@ -5481,7 +5484,7 @@ dependencies = [
  "ark-serialize-derive 0.4.2",
  "ark-std 0.4.0",
  "digest 0.10.7",
- "num-bigint 0.4.4",
+ "num-bigint 0.4.6",
 ]
 
 [[package]]
@@ -5493,7 +5496,7 @@ dependencies = [
  "ark-std 0.5.0",
  "arrayvec 0.7.4",
  "digest 0.10.7",
- "num-bigint 0.4.4",
+ "num-bigint 0.4.6",
  "rayon",
 ]
 
@@ -6117,6 +6120,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "backon"
+version = "1.6.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "cffb0e931875b666fc4fcb20fee52e9bbd1ef836fd9e9e04ec21555f9f85f7ef"
+dependencies = [
+ "fastrand 2.3.0",
+]
+
+[[package]]
 name = "backtrace"
 version = "0.3.69"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -6276,7 +6288,7 @@ checksum = "c06619be423ea5bb86c95f087d5707942791a08a85530df0db2209a3ecfb8bc9"
 dependencies = [
  "autocfg",
  "libm",
- "num-bigint 0.4.4",
+ "num-bigint 0.4.6",
  "num-integer",
  "num-traits",
  "serde",
@@ -6762,15 +6774,15 @@ dependencies = [
 
 [[package]]
 name = "captcha"
-version = "0.0.9"
+version = "1.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "db21780337b425f968a2c3efa842eeaa4fe53d2bcb1eb27d2877460a862fb0ab"
+checksum = "ae9afd180651081c88cd709f87e16a55ba85a3e3c573355b2de84aa8b4e8f468"
 dependencies = [
  "base64 0.13.1",
  "hound",
  "image",
  "lodepng",
- "rand 0.8.5",
+ "rand 0.9.1",
  "serde_json",
 ]
 
@@ -8093,22 +8105,20 @@ dependencies = [
 
 [[package]]
 name = "deadpool"
-version = "0.9.5"
+version = "0.12.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "421fe0f90f2ab22016f32a9881be5134fdd71c65298917084b0c7477cbc3856e"
+checksum = "5ed5957ff93768adf7a65ab167a17835c3d2c3c50d084fe305174c112f468e2f"
 dependencies = [
- "async-trait",
  "deadpool-runtime",
  "num_cpus",
- "retain_mut",
  "tokio",
 ]
 
 [[package]]
 name = "deadpool-redis"
-version = "0.11.1"
+version = "0.18.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2b8bde44cbfdf17ae5baa45c9f43073b320f1a19955389315629304a23909ad2"
+checksum = "bfae6799b68a735270e4344ee3e834365f707c72da09c9a8bb89b45cc3351395"
 dependencies = [
  "deadpool",
  "redis",
@@ -8354,13 +8364,13 @@ dependencies = [
  "diesel_derives",
  "downcast-rs",
  "itoa",
- "num-bigint 0.4.4",
+ "num-bigint 0.4.6",
  "num-integer",
  "num-traits",
  "pq-sys",
  "r2d2",
  "serde_json",
- "uuid 1.11.0",
+ "uuid 0.8.2",
 ]
 
 [[package]]
@@ -13766,7 +13776,7 @@ version = "0.4.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b05180d69e3da0e530ba2a1dae5110317e49e3b7f3d41be227dc5f92e49ee7af"
 dependencies = [
- "num-bigint 0.4.4",
+ "num-bigint 0.4.6",
  "num-complex 0.4.4",
  "num-integer",
  "num-iter",
@@ -13799,11 +13809,10 @@ dependencies = [
 
 [[package]]
 name = "num-bigint"
-version = "0.4.4"
+version = "0.4.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "608e7659b5c3d7cba262d894801b9ec9d00de989e8a82bd4bef91d08da45cdc0"
+checksum = "a5e44f723f1133c9deac646763579fdb3ac745e418f2a7af9cd0c431da1f20b9"
 dependencies = [
- "autocfg",
  "num-integer",
  "num-traits",
 ]
@@ -13872,11 +13881,10 @@ dependencies = [
 
 [[package]]
 name = "num-integer"
-version = "0.1.45"
+version = "0.1.46"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "225d3389fb3509a24c93f5c29eb6bde2586b98d9f016636dff58d7c6f7569cd9"
+checksum = "7969661fd2958a5cb096e56c8e1ad0444ac2bbcd0061bd28660485a44879858f"
 dependencies = [
- "autocfg",
  "num-traits",
 ]
 
@@ -13910,7 +13918,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "0638a1c9d0a3c0914158145bc76cff373a75a627e6ecbfb71cbe6f453a5a19b0"
 dependencies = [
  "autocfg",
- "num-bigint 0.4.4",
+ "num-bigint 0.4.6",
  "num-integer",
  "num-traits",
 ]
@@ -14337,7 +14345,7 @@ dependencies = [
  "hashbrown 0.14.3",
  "lz4_flex",
  "num 0.4.1",
- "num-bigint 0.4.4",
+ "num-bigint 0.4.6",
  "paste",
  "seq-macro",
  "thrift",
@@ -16085,21 +16093,25 @@ dependencies = [
 
 [[package]]
 name = "redis"
-version = "0.22.3"
+version = "0.27.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "aa8455fa3621f6b41c514946de66ea0531f57ca017b2e6c7cc368035ea5b46df"
+checksum = "09d8f99a4090c89cc489a94833c901ead69bfbf3877b4867d5482e321ee875bc"
 dependencies = [
  "arc-swap",
  "async-trait",
+ "backon",
  "bytes",
  "combine",
  "futures",
  "futures-util",
+ "itertools 0.13.0",
  "itoa",
+ "num-bigint 0.4.6",
  "percent-encoding",
  "pin-project-lite",
  "ryu",
  "sha1_smol",
+ "socket2 0.5.5",
  "tokio",
  "tokio-util 0.7.10",
  "url",
@@ -16107,9 +16119,9 @@ dependencies = [
 
 [[package]]
 name = "redis-test"
-version = "0.1.1"
+version = "0.6.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7e9ceb100979db7292de8a3d4ecdde659cccc85133303ea0741e1618a5bd73df"
+checksum = "45c7f734af2b89bb22c6e7ee45507adc698e127a90ae2f5c4054eeda54202912"
 dependencies = [
  "futures",
  "redis",
@@ -16348,12 +16360,6 @@ dependencies = [
  "tracing",
  "wasm-timer",
 ]
-
-[[package]]
-name = "retain_mut"
-version = "0.1.9"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4389f1d5789befaf6029ebd9f7dac4af7f7e3d61b69d4f30e2ac02b57e7712b0"
 
 [[package]]
 name = "retry-policies"
@@ -17713,7 +17719,7 @@ version = "0.6.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "adc4e5204eb1910f40f9cfa375f6f05b68c3abac4b6fd879c8ff5e7ae8a0a085"
 dependencies = [
- "num-bigint 0.4.4",
+ "num-bigint 0.4.6",
  "num-traits",
  "thiserror 1.0.69",
  "time",

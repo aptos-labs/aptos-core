@@ -746,12 +746,12 @@ rand_core = "0.5.1"
 random_word = "0.3.0"
 rapidhash = "1.4.0"
 rayon = "1.5.2"
-redis = { version = "0.22.3", features = [
+redis = { version = "0.27.6", features = [
     "tokio-comp",
     "script",
     "connection-manager",
 ] }
-redis-test = { version = "0.1.1", features = ["aio"] }
+redis-test = { version = "0.6.0", features = ["aio"] }
 ref-cast = "1.0.6"
 regex = "1.9.3"
 reqwest = { version = "0.11.11", features = [

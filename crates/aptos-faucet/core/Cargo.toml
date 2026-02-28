@@ -20,9 +20,9 @@ aptos-logger = { workspace = true }
 aptos-metrics-core  = { workspace = true }
 aptos-sdk = { workspace = true }
 async-trait = { workspace = true }
-captcha = { version = "0.0.9" }
+captcha = { version = "1.0.0" }
 clap = { workspace = true }
-deadpool-redis = { version = "0.11.1", features = ["rt_tokio_1"], default-features = false }
+deadpool-redis = { version = "0.18.0" }
 enum_dispatch = { workspace = true }
 firebase-token = { workspace = true }
 futures = { workspace = true }
