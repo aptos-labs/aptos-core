@@ -3,6 +3,7 @@
 
 pub mod account_minter;
 pub mod local_account_generator;
+pub mod metrics;
 pub mod stats;
 pub mod submission_worker;
 pub mod transaction_executor;
@@ -12,6 +13,7 @@ use crate::emitter::{
     local_account_generator::{
         create_keyless_account_generator, create_private_key_account_generator,
     },
+    metrics::update_tps_gauges,
     stats::{DynamicStatsTracking, TxnStats},
     submission_worker::{EncryptionKeyRotator, SubmissionWorker},
     transaction_executor::RestApiReliableTransactionSubmitter,
@@ -707,11 +709,16 @@ impl EmitJob {
                     .map(|p| &p[cur_phase])
                     .unwrap_or(&default_stats);
             prev_stats = Some(stats);
+
+            // Update Prometheus TPS gauges
+            let rate = delta.rate();
+            update_tps_gauges(rate.committed, rate.submitted);
+
             info!(
                 "[{:?}s stat] phase {}: {}",
                 window.as_secs(),
                 cur_phase,
-                delta.rate()
+                rate
             );
         }
     }

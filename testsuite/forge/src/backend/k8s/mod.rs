@@ -2,6 +2,7 @@
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 use crate::{
+    metrics::{record_cluster_spinup_phase, ClusterPhase},
     Factory, GenesisConfig, GenesisConfigFn, NodeConfigFn, Result, Swarm, Version,
     INDEXER_GRPC_DOCKER_IMAGE_REPO, VALIDATOR_DOCKER_IMAGE_REPO,
 };
@@ -10,7 +11,11 @@ use futures::{future, FutureExt};
 use log::info;
 use rand::rngs::StdRng;
 use serde_json::json;
-use std::{convert::TryInto, num::NonZeroUsize, time::Duration};
+use std::{
+    convert::TryInto,
+    num::NonZeroUsize,
+    time::{Duration, Instant},
+};
 
 pub mod chaos;
 pub mod chaos_schema;
@@ -116,6 +121,9 @@ impl Factory for K8sFactory {
         node_config_fn: Option<NodeConfigFn>,
         existing_db_tag: Option<String>,
     ) -> Result<Box<dyn Swarm>> {
+        let total_start = Instant::now();
+        let namespace = &self.kube_namespace;
+
         let genesis_modules_path = match genesis_config {
             Some(config) => match config {
                 GenesisConfig::Bundle(_) => {
@@ -144,8 +152,18 @@ impl Factory for K8sFactory {
             let new_era = None; // TODO: get the actual era
             (new_era, validators, fullnodes)
         } else {
-            // clear the cluster of resources
-            delete_k8s_resources(kube_client.clone(), &self.kube_namespace).await?;
+            // Cleanup phase: clear the cluster of resources
+            let cleanup_start = Instant::now();
+            let cleanup_result =
+                delete_k8s_resources(kube_client.clone(), &self.kube_namespace).await;
+            record_cluster_spinup_phase(
+                namespace,
+                ClusterPhase::Cleanup,
+                cleanup_start,
+                cleanup_result.is_ok(),
+            );
+            cleanup_result?;
+
             // create the forge-management configmap before installing anything
             create_management_configmap(self.kube_namespace.clone(), self.keep, cleanup_duration)
                 .await?;
@@ -172,9 +190,11 @@ impl Factory for K8sFactory {
                 &new_era, &self.kube_namespace
             );
 
-            // try installing testnet resources, but clean up if it fails
+            // Testnet install phase
+            let testnet_install_start = Instant::now();
+            let testnet_namespace = self.kube_namespace.clone();
             let deploy_testnet_fut = async {
-                install_testnet_resources(
+                let result = install_testnet_resources(
                     new_era.clone(),
                     self.kube_namespace.clone(),
                     num_validators.get(),
@@ -190,37 +210,61 @@ impl Factory for K8sFactory {
                     node_config_fn,
                     false,
                 )
-                .await
+                .await;
+                record_cluster_spinup_phase(
+                    &testnet_namespace,
+                    ClusterPhase::TestnetInstall,
+                    testnet_install_start,
+                    result.is_ok(),
+                );
+                result
             }
             .boxed();
 
-            let deploy_indexer_fut = async {
-            if self.enable_indexer {
-                // NOTE: by default, use a deploy profile and no additional configuration values
-                let config = serde_json::from_value(json!({
-                    "profile": self.deployer_profile.clone(),
-                    "era": new_era.clone(),
-                    "namespace": self.kube_namespace.clone(),
-                    "indexer-grpc-values": {
-                        "indexerGrpcImage": format!("{}:{}", INDEXER_GRPC_DOCKER_IMAGE_REPO, init_version),
-                        "fullnodeConfig": {
-                            "image": format!("{}:{}", VALIDATOR_DOCKER_IMAGE_REPO, init_version),
-                        }
-                    },
-                }))?;
+            // Indexer deploy phase (if enabled)
+            let indexer_deploy_start = Instant::now();
+            let indexer_namespace = self.kube_namespace.clone();
+            let enable_indexer = self.enable_indexer;
+            let indexer_era = new_era.clone();
+            let indexer_profile = self.deployer_profile.clone();
+            let indexer_kube_namespace = self.kube_namespace.clone();
+            let indexer_init_version = format!("{}", init_version);
+            let indexer_kube_client = kube_client.clone();
+            let deploy_indexer_fut = async move {
+                if enable_indexer {
+                    // NOTE: by default, use a deploy profile and no additional configuration values
+                    let config = serde_json::from_value(json!({
+                        "profile": indexer_profile,
+                        "era": indexer_era,
+                        "namespace": indexer_kube_namespace,
+                        "indexer-grpc-values": {
+                            "indexerGrpcImage": format!("{}:{}", INDEXER_GRPC_DOCKER_IMAGE_REPO, indexer_init_version),
+                            "fullnodeConfig": {
+                                "image": format!("{}:{}", VALIDATOR_DOCKER_IMAGE_REPO, indexer_init_version),
+                            }
+                        },
+                    }))?;
 
-                let indexer_deployer = ForgeDeployerManager::new(
-                    kube_client.clone(),
-                    self.kube_namespace.clone(),
-                    FORGE_INDEXER_DEPLOYER_DOCKER_IMAGE_REPO.to_string(),
-                    None,
-                );
-                indexer_deployer.start(config).await?;
-                indexer_deployer.wait_completed().await
+                    let indexer_deployer = ForgeDeployerManager::new(
+                        indexer_kube_client,
+                        indexer_kube_namespace.clone(),
+                        FORGE_INDEXER_DEPLOYER_DOCKER_IMAGE_REPO.to_string(),
+                        None,
+                    );
+                    indexer_deployer.start(config).await?;
+                    let result = indexer_deployer.wait_completed().await;
+                    record_cluster_spinup_phase(
+                        &indexer_namespace,
+                        ClusterPhase::IndexerDeploy,
+                        indexer_deploy_start,
+                        result.is_ok(),
+                    );
+                    result
                 } else {
                     Ok(())
                 }
-            }.boxed();
+            }
+            .boxed();
 
             // join on testnet and indexer deployment futures, handling the output from the testnet
             // deployment
@@ -236,7 +280,9 @@ impl Factory for K8sFactory {
             (Some(new_era), validators, fullnodes)
         };
 
-        let swarm = K8sSwarm::new(
+        // Health check phase: K8sSwarm::new includes health checks
+        let health_check_start = Instant::now();
+        let swarm_result = K8sSwarm::new(
             &self.root_key,
             &self.image_tag,
             &self.upgrade_image_tag,
@@ -248,8 +294,19 @@ impl Factory for K8sFactory {
             self.use_port_forward,
             self.enable_indexer,
         )
-        .await
-        .unwrap();
+        .await;
+        record_cluster_spinup_phase(
+            namespace,
+            ClusterPhase::HealthCheck,
+            health_check_start,
+            swarm_result.is_ok(),
+        );
+
+        let swarm = swarm_result?;
+
+        // Record total spin-up time
+        record_cluster_spinup_phase(namespace, ClusterPhase::Total, total_start, true);
+
         Ok(Box::new(swarm))
     }
 }
