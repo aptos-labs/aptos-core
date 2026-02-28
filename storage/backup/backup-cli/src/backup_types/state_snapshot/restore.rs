@@ -30,7 +30,7 @@ use aptos_storage_interface::StateSnapshotReceiver;
 use aptos_types::{
     access_path::Path,
     ledger_info::LedgerInfoWithSignatures,
-    on_chain_config::Features,
+    on_chain_config::{Features, TimedFeaturesBuilder},
     proof::TransactionInfoWithProof,
     state_store::{
         state_key::{inner::StateKeyInner, StateKey},
@@ -234,7 +234,9 @@ impl StateSnapshotRestoreController {
         // TODO: Instead of using default features, fetch them from the state.
         let features = Features::default();
 
-        let config = aptos_prod_verifier_config(LATEST_GAS_FEATURE_VERSION, &features);
+        let timed_features = TimedFeaturesBuilder::enable_all().build();
+        let config =
+            aptos_prod_verifier_config(LATEST_GAS_FEATURE_VERSION, &features, &timed_features);
         for (key, value) in blob {
             if let StateKeyInner::AccessPath(p) = key.inner() {
                 if let Path::Code(module_id) = p.get_path() {
