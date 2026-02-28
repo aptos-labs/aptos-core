@@ -6641,6 +6641,21 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c3ac9f8b63eca6fd385229b3675f6cc0dc5c8a5c8a54a59d4f52ffd670d87b0c"
 
 [[package]]
+name = "bytecode-stats"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "clap 4.5.21",
+ "csv",
+ "futures",
+ "move-binary-format",
+ "move-core-types",
+ "rayon",
+ "serde",
+ "tokio",
+]
+
+[[package]]
 name = "bytecode-verifier-tests"
 version = "0.1.0"
 dependencies = [

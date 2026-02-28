@@ -1,0 +1,16 @@
+[package]
+name = "bytecode-stats"
+version = "0.1.0"
+edition = "2021"
+publish = false
+
+[dependencies]
+anyhow = { workspace = true }
+clap = { workspace = true }
+csv = { workspace = true }
+futures = { workspace = true }
+move-binary-format = { workspace = true }
+move-core-types = { workspace = true }
+rayon = { workspace = true }
+serde = { workspace = true }
+tokio = { workspace = true }
