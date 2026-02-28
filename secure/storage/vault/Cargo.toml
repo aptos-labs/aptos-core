@@ -17,13 +17,16 @@ aptos-crypto = { workspace = true }
 aptos-types = { workspace = true, optional = true }
 base64 = { workspace = true }
 chrono = { workspace = true }
-native-tls = { workspace = true }
+native-tls = { workspace = true, optional = true }
 once_cell = { workspace = true }
 proptest = { workspace = true, optional = true }
+rustls = { workspace = true, optional = true }
+rustls-pemfile = { workspace = true, optional = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
 thiserror = { workspace = true }
 ureq = { workspace = true }
+webpki-roots = { workspace = true, optional = true }
 
 [dev-dependencies]
 aptos-proptest-helpers = { workspace = true }
@@ -31,4 +34,7 @@ aptos-types = { workspace = true, features = ["fuzzing"] }
 proptest = { workspace = true }
 
 [features]
+default = ["tls-native"]
 fuzzing = ["proptest", "aptos-types", "aptos-types/fuzzing"]
+tls-native = ["native-tls"]
+tls-rustls = ["rustls", "rustls-pemfile", "webpki-roots"]

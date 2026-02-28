@@ -23,6 +23,7 @@ PLATFORM_NAME="$1"
 EXPECTED_VERSION="$2"
 SKIP_CHECKS="$3"
 COMPATIBILITY_MODE="$4"
+STATIC_LINK="$5"
 
 # Grab system information
 ARCH=$(uname -m)
@@ -52,16 +53,39 @@ else
 fi
 
 echo "Building release $VERSION of $NAME for $OS-$PLATFORM_NAME on $ARCH"
-if [[ "$COMPATIBILITY_MODE" == "true" ]]; then
-  RUSTFLAGS="-C target-cpu=generic --cfg tokio_unstable -C target-feature=-sse4.2,-avx" cargo build -p "$CRATE_NAME" --profile cli
-else
-  cargo build -p "$CRATE_NAME" --profile cli
+
+TARGET_FLAG=""
+FEATURE_FLAG=""
+OUTPUT_DIR="target/cli"
+
+# Static linking via musl eliminates GLIBC and OpenSSL runtime dependencies.
+if [[ "$STATIC_LINK" == "true" ]]; then
+  case "$ARCH" in
+    x86_64)  MUSL_TARGET="x86_64-unknown-linux-musl" ;;
+    aarch64) MUSL_TARGET="aarch64-unknown-linux-musl" ;;
+    *)
+      echo "Unsupported architecture for static linking: $ARCH"
+      exit 4
+      ;;
+  esac
+
+  echo "Static build enabled, using target: $MUSL_TARGET"
+  rustup target add "$MUSL_TARGET"
+  TARGET_FLAG="--target $MUSL_TARGET"
+  FEATURE_FLAG="--no-default-features"
+  OUTPUT_DIR="target/$MUSL_TARGET/cli"
 fi
-cd target/cli/
+
+if [[ "$COMPATIBILITY_MODE" == "true" ]]; then
+  RUSTFLAGS="-C target-cpu=generic --cfg tokio_unstable -C target-feature=-sse4.2,-avx" cargo build -p "$CRATE_NAME" --profile cli $TARGET_FLAG $FEATURE_FLAG
+else
+  cargo build -p "$CRATE_NAME" --profile cli $TARGET_FLAG $FEATURE_FLAG
+fi
+cd "$OUTPUT_DIR"
 
 # Compress the CLI
 ZIP_NAME="$NAME-$VERSION-$PLATFORM_NAME-$ARCH.zip"
 
 echo "Zipping release: $ZIP_NAME"
 zip "$ZIP_NAME" "$CRATE_NAME"
-mv "$ZIP_NAME" ../..
+mv "$ZIP_NAME" "$OLDPWD"

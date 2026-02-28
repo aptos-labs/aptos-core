@@ -590,7 +590,7 @@ where
 
             match env::var("ENABLE_KEYLESS_DEFAULT") {
                 Ok(val) if val.as_str() == "1" => {
-                    let response = ureq::get("https://api.devnet.aptoslabs.com/v1/accounts/0x1/resource/0x1::keyless_account::Groth16VerificationKey").call();
+                    let response = ureq::get("https://api.devnet.aptoslabs.com/v1/accounts/0x1/resource/0x1::keyless_account::Groth16VerificationKey").call().unwrap_or_else(|e| panic!("Failed to fetch keyless VK: {e}"));
                     let json: Value = response.into_json().expect("Failed to parse JSON");
                     configure_keyless_with_vk(genesis_config, json).unwrap();
                 },
@@ -598,7 +598,7 @@ where
             };
 
             if let Ok(url) = env::var("INSTALL_KEYLESS_GROTH16_VK_FROM_URL") {
-                let response = ureq::get(&url).call();
+                let response = ureq::get(&url).call().unwrap_or_else(|e| panic!("Failed to fetch keyless VK from {url}: {e}"));
                 let json: Value = response.into_json().expect("Failed to parse JSON");
                 configure_keyless_with_vk(genesis_config, json).unwrap();
             };
