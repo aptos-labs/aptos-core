@@ -3,7 +3,10 @@
 
 use crate::{
     move_vm_ext::{AptosMoveResolver, SessionExt},
-    verifier::{transaction_arg_validation, transaction_arg_validation::get_allowed_structs},
+    verifier::{
+        transaction_arg_validation,
+        transaction_arg_validation::{get_allowed_structs, validate_non_signer_param_tys},
+    },
 };
 use aptos_types::vm::module_metadata::RuntimeModuleMetadataV1;
 use move_binary_format::errors::{PartialVMError, PartialVMResult};
@@ -61,6 +64,24 @@ pub(crate) fn validate_view_function(
     }
 
     let allowed_structs = get_allowed_structs(struct_constructors_feature);
+    let mut pack_fn_cache = ahash::AHashMap::new();
+
+    // Count leading signer parameters and skip them for validation.
+    // construct_args handles signers directly (is_view = true), so they must not be
+    // passed to validate_non_signer_param_tys — is_valid_txn_arg returns false for
+    // signer types, which would incorrectly reject view functions with signer params.
+    let signer_param_cnt = func
+        .param_tys()
+        .iter()
+        .take_while(|ty| ty.is_signer_or_signer_ref())
+        .count();
+    validate_non_signer_param_tys(
+        loader,
+        &func.param_tys()[signer_param_cnt..],
+        func.ty_args(),
+        allowed_structs,
+    )?;
+
     let result = if loader.is_lazy_loading_enabled() {
         transaction_arg_validation::construct_args(
             session,
@@ -72,6 +93,7 @@ pub(crate) fn validate_view_function(
             func.ty_args(),
             allowed_structs,
             true,
+            &mut pack_fn_cache,
         )
     } else {
         let traversal_storage = TraversalStorage::new();
@@ -86,6 +108,7 @@ pub(crate) fn validate_view_function(
             func.ty_args(),
             allowed_structs,
             true,
+            &mut pack_fn_cache,
         )
     };
     result.map_err(|e| PartialVMError::new(e.status_code()))

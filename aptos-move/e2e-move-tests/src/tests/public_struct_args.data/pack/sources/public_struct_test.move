@@ -1,0 +1,189 @@
+/// Module to test public structs and enums with copy ability as transaction arguments
+module 0xCAFE::public_struct_test {
+    use std::option;
+    use std::signer;
+    use std::string::{Self, String};
+
+    /// Result resource to store test outcomes
+    struct TestResult has key {
+        value: u64,
+        message: String,
+    }
+
+    /// A public struct with copy ability - should be allowed as txn arg
+    /// Note: At runtime, this needs a pack$Point function in bytecode to work.
+    /// For this test, we're testing the compile-time validation.
+    public struct Point has copy, drop {
+        x: u64,
+        y: u64,
+    }
+
+    /// A public struct with nested public copy struct
+    public struct Rectangle has copy, drop {
+        top_left: Point,
+        bottom_right: Point,
+    }
+
+    /// A public struct with vector of primitives
+    public struct Data has copy, drop {
+        values: vector<u64>,
+        name: String,
+    }
+
+    /// A public enum with copy ability - should be allowed as txn arg
+    public enum Color has copy, drop {
+        Red,
+        Green,
+        Blue,
+        Custom { r: u8, g: u8, b: u8 },
+    }
+
+    /// A public enum with struct fields
+    public enum Shape has copy, drop {
+        Circle { center: Point, radius: u64 },
+        Rect { rect: Rectangle },
+    }
+
+    /// Initialize the test result resource
+    public entry fun initialize(sender: &signer) {
+        move_to(sender, TestResult {
+            value: 0,
+            message: string::utf8(b"")
+        });
+    }
+
+    /// Entry function that takes a Point as argument
+    /// This should compile but may fail at runtime if no pack function exists
+    public entry fun test_point(sender: &signer, p: Point) acquires TestResult {
+        let result = borrow_global_mut<TestResult>(signer::address_of(sender));
+        result.value = p.x + p.y;
+        result.message = string::utf8(b"point_received");
+    }
+
+    /// Entry function that takes a Rectangle as argument
+    public entry fun test_rectangle(sender: &signer, r: Rectangle) acquires TestResult {
+        let result = borrow_global_mut<TestResult>(signer::address_of(sender));
+        result.value = r.top_left.x + r.top_left.y + r.bottom_right.x + r.bottom_right.y;
+        result.message = string::utf8(b"rectangle_received");
+    }
+
+    /// Entry function that takes a Data struct as argument
+    public entry fun test_data(sender: &signer, d: Data) acquires TestResult {
+        let result = borrow_global_mut<TestResult>(signer::address_of(sender));
+        result.value = d.values.fold(0u64, |acc, v| acc + v);
+        result.message = d.name;
+    }
+
+    /// Entry function that takes a Color enum as argument
+    public entry fun test_color(sender: &signer, c: Color) acquires TestResult {
+        let result = borrow_global_mut<TestResult>(signer::address_of(sender));
+        let (value, msg) = match (c) {
+            Color::Red => (1, b"red"),
+            Color::Green => (2, b"green"),
+            Color::Blue => (3, b"blue"),
+            Color::Custom { r, g, b } => ((r as u64) + (g as u64) + (b as u64), b"custom"),
+        };
+        result.value = value;
+        result.message = string::utf8(msg);
+    }
+
+    /// Entry function that takes a Shape enum as argument
+    public entry fun test_shape(sender: &signer, s: Shape) acquires TestResult {
+        let result = borrow_global_mut<TestResult>(signer::address_of(sender));
+        let (value, msg) = match (s) {
+            Shape::Circle { center, radius } => (center.x + center.y + radius, b"circle"),
+            Shape::Rect { rect } => (
+                rect.top_left.x + rect.top_left.y + rect.bottom_right.x + rect.bottom_right.y,
+                b"rect"
+            ),
+        };
+        result.value = value;
+        result.message = string::utf8(msg);
+    }
+
+    /// Entry function that takes a vector of Points
+    public entry fun test_point_vector(sender: &signer, points: vector<Point>) acquires TestResult {
+        let result = borrow_global_mut<TestResult>(signer::address_of(sender));
+        result.value = points.fold(0u64, |acc, p| acc + p.x + p.y);
+        result.message = string::utf8(b"point_vector_received");
+    }
+
+    /// Entry function using whitelisted String type - should always work
+    public entry fun test_string(sender: &signer, s: String) acquires TestResult {
+        let result = borrow_global_mut<TestResult>(signer::address_of(sender));
+        result.value = string::length(&s);
+        result.message = s;
+    }
+
+    /// Entry function that takes Option<Point>
+    public entry fun test_option_point(sender: &signer, opt_point: option::Option<Point>) acquires TestResult {
+        let result = borrow_global_mut<TestResult>(signer::address_of(sender));
+        if (opt_point.is_some()) {
+            let p = opt_point.destroy_some();
+            result.value = p.x + p.y;
+            result.message = string::utf8(b"some_point");
+        } else {
+            opt_point.destroy_none();
+            result.value = 0;
+            result.message = string::utf8(b"none_point");
+        }
+    }
+
+    /// Entry function that takes Option<Color>
+    public entry fun test_option_color(sender: &signer, opt_color: option::Option<Color>) acquires TestResult {
+        let result = borrow_global_mut<TestResult>(signer::address_of(sender));
+        if (opt_color.is_some()) {
+            let color = opt_color.destroy_some();
+            let (value, msg) = match (color) {
+                Color::Red => (1, b"some_red"),
+                Color::Green => (2, b"some_green"),
+                Color::Blue => (3, b"some_blue"),
+                Color::Custom { r, g, b } => ((r as u64) + (g as u64) + (b as u64), b"some_custom"),
+            };
+            result.value = value;
+            result.message = string::utf8(msg);
+        } else {
+            opt_color.destroy_none();
+            result.value = 0;
+            result.message = string::utf8(b"none_color");
+        }
+    }
+
+    /// Entry function that takes a vector of Option<u64>
+    public entry fun test_option_u64_vector(sender: &signer, opts: vector<option::Option<u64>>) acquires TestResult {
+        let result = borrow_global_mut<TestResult>(signer::address_of(sender));
+        result.value = opts.fold(0u64, |acc, opt| {
+            if (opt.is_some()) { acc + opt.destroy_some() } else { acc }
+        });
+        result.message = string::utf8(b"option_u64_vector_received");
+    }
+
+    /// Entry function that takes a vector of Option<Point>.
+    /// Each Some(Point) costs 2 invocations (Option + Point); None costs 1 (Option only).
+    public entry fun test_option_point_vector(sender: &signer, opts: vector<option::Option<Point>>) acquires TestResult {
+        let result = borrow_global_mut<TestResult>(signer::address_of(sender));
+        result.value = opts.fold(0u64, |acc, opt| {
+            if (opt.is_some()) {
+                let p = opt.destroy_some();
+                acc + p.x + p.y
+            } else {
+                opt.destroy_none();
+                acc
+            }
+        });
+        result.message = string::utf8(b"option_point_vector_received");
+    }
+
+    /// Entry function that takes a vector of u64 primitives
+    public entry fun test_u64_vector(sender: &signer, values: vector<u64>) acquires TestResult {
+        let result = borrow_global_mut<TestResult>(signer::address_of(sender));
+        result.value = values.fold(0u64, |acc, v| acc + v);
+        result.message = string::utf8(b"u64_vector_received");
+    }
+
+    #[view]
+    public fun get_result(addr: address): (u64, String) acquires TestResult {
+        let result = borrow_global<TestResult>(addr);
+        (result.value, result.message)
+    }
+}

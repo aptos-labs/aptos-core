@@ -137,9 +137,9 @@ impl Script {
             param_tys,
             access_specifier: AccessSpecifier::Any,
             is_persistent: false,
-            borrow_field_mut_api_at_offset: None,
             has_module_reentrancy_lock: false,
             is_trusted: false,
+            struct_api: None,
         });
 
         let single_signature_token_map = load_single_signatures_for_script(&script, &struct_names)?;
