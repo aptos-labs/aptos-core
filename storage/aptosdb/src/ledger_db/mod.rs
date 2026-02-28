@@ -341,6 +341,10 @@ impl LedgerDb {
         &self.ledger_metadata_db
     }
 
+    pub(crate) fn metadata_db_raw(&self) -> &DB {
+        self.ledger_metadata_db.db()
+    }
+
     // TODO(grao): Remove this after sharding migration.
     pub(crate) fn metadata_db_arc(&self) -> Arc<DB> {
         self.ledger_metadata_db.db_arc()
@@ -414,14 +418,14 @@ impl LedgerDb {
     ) -> Result<DB> {
         let db = if readonly {
             DB::open_cf_readonly(
-                &gen_rocksdb_options(db_config, env, true),
+                gen_rocksdb_options(db_config, env, true),
                 path.clone(),
                 name,
                 Self::gen_cfds_by_name(db_config, block_cache, name),
             )?
         } else {
             DB::open_cf(
-                &gen_rocksdb_options(db_config, env, false),
+                gen_rocksdb_options(db_config, env, false),
                 path.clone(),
                 name,
                 Self::gen_cfds_by_name(db_config, block_cache, name),
