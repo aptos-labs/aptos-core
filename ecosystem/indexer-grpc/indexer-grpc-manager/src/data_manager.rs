@@ -93,18 +93,15 @@ impl Cache {
         &self,
         start_version: u64,
         max_size_bytes: usize,
-        update_file_store_version: bool,
     ) -> Vec<Transaction> {
-        if !update_file_store_version {
             trace!(
-            "Requesting version {start_version} from cache, update_file_store_version = {update_file_store_version}.",
+            "Requesting version {start_version} from cache.",
         );
             trace!(
                 "Current data range in cache: [{}, {}).",
                 self.start_version,
                 self.start_version + self.transactions.len() as u64
             );
-        }
         if start_version < self.start_version {
             return vec![];
         }
@@ -124,21 +121,11 @@ impl Cache {
                 break;
             }
         }
-        if update_file_store_version {
-            if !transactions.is_empty() {
-                let old_version = self
-                    .file_store_version
-                    .fetch_add(transactions.len() as u64, Ordering::SeqCst);
-                let new_version = old_version + transactions.len() as u64;
-                FILE_STORE_VERSION_IN_CACHE.set(new_version as i64);
-                info!("Updated file_store_version in cache to {new_version}.");
-            }
-        } else {
+
             trace!(
                 "Returned {} transactions from Cache, total {size_bytes} bytes.",
                 transactions.len()
             );
-        }
         transactions
     }
 }
@@ -334,7 +321,6 @@ impl DataManager {
                 .get_transactions_from_cache(
                     start_version,
                     max_size_bytes_from_cache,
-                    /*update_file_store_version=*/ false,
                 )
                 .await);
         }
@@ -371,16 +357,25 @@ impl DataManager {
         }
     }
 
+
+    /// Refreshes the file_store_version in cache by reading the version from the disk metadata file.
+    /// This ensures GC only evicts data that has been persisted to the file store.
+    pub(crate) async fn refresh_file_store_version(&self) {
+        let cache = self.cache.read().await;
+        self.update_file_store_version_in_cache(&cache, /*version_can_go_backward=*/ false)
+            .await;
+    }
+
+
     pub(crate) async fn get_transactions_from_cache(
         &self,
         start_version: u64,
         max_size: usize,
-        update_file_store_version: bool,
     ) -> Vec<Transaction> {
         self.cache
             .read()
             .await
-            .get_transactions(start_version, max_size, update_file_store_version)
+            .get_transactions(start_version, max_size)
     }
 
     pub(crate) async fn get_file_store_version(&self) -> u64 {
