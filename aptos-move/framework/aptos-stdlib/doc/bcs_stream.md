@@ -135,7 +135,8 @@ Constructs a new BCSStream instance from the provided byte array.
 
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="bcs_stream.md#0x1_bcs_stream_has_remaining">has_remaining</a>(stream: &<b>mut</b> <a href="bcs_stream.md#0x1_bcs_stream_BCSStream">bcs_stream::BCSStream</a>): bool
+<pre><code>#[lint::skip(#[needless_mutable_reference])]
+<b>public</b> <b>fun</b> <a href="bcs_stream.md#0x1_bcs_stream_has_remaining">has_remaining</a>(stream: &<b>mut</b> <a href="bcs_stream.md#0x1_bcs_stream_BCSStream">bcs_stream::BCSStream</a>): bool
 </code></pre>
 
 
