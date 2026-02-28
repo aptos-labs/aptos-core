@@ -36,6 +36,10 @@ pub enum TimedFeatureFlag {
     /// Use the full transaction size (including authenticator) for gas checks
     /// instead of just the raw transaction size.
     UseFullTransactionSizeForGasCheck,
+
+    /// Enables strict bounds in the production verifier config for struct definitions,
+    /// struct variants, fields in struct, function definitions, and basic blocks in script.
+    EnableStrictBoundsInProdConfig,
 }
 
 /// Representation of features that are gated by the block timestamps.
@@ -179,6 +183,15 @@ impl TimedFeatureFlag {
                 .with_timezone(&Utc),
             (UseFullTransactionSizeForGasCheck, MAINNET) => Los_Angeles
                 .with_ymd_and_hms(2026, 2, 5, 10, 0, 0)
+                .unwrap()
+                .with_timezone(&Utc),
+
+            (EnableStrictBoundsInProdConfig, TESTNET) => Los_Angeles
+                .with_ymd_and_hms(2026, 2, 25, 10, 0, 0)
+                .unwrap()
+                .with_timezone(&Utc),
+            (EnableStrictBoundsInProdConfig, MAINNET) => Los_Angeles
+                .with_ymd_and_hms(2026, 2, 27, 10, 0, 0)
                 .unwrap()
                 .with_timezone(&Utc),
 
