@@ -149,6 +149,20 @@ impl<'a> FunctionGenerator<'a> {
                 code: vec![],
             };
             let target = ctx.targets.get_target(&fun_env, &FunctionVariant::Baseline);
+
+            // Capture stackless bytecode stats if PRINT_CODE_SIZE_STATS is set
+            let print_stats = std::env::var("PRINT_CODE_SIZE_STATS").is_ok()
+                && target.module_env().is_primary_target();
+            let (stackless_instruction_count, stackless_locals_count, func_name) = if print_stats {
+                (
+                    target.get_bytecode().len(),
+                    target.get_local_count(),
+                    target.func_env.get_full_name_str(),
+                )
+            } else {
+                (0, 0, "".to_owned())
+            };
+
             let mut code = fun_gen.gen_code(&FunctionContext {
                 module: ctx.clone(),
                 fun: target,
@@ -173,6 +187,22 @@ impl<'a> FunctionGenerator<'a> {
                 // Remap the spec blocks to the new code offsets.
                 fun_gen.remap_spec_blocks(&transformed_code_chunk.original_offsets);
             }
+
+            // Print code size stats if requested
+            if print_stats {
+                let file_format_instruction_count = code.code.len();
+                let file_format_locals_count = fun_gen.locals.len();
+
+                eprintln!(
+                    "\"{}\",{},{},{},{}",
+                    func_name,
+                    stackless_instruction_count,
+                    file_format_instruction_count,
+                    stackless_locals_count,
+                    file_format_locals_count
+                );
+            }
+
             if !fun_gen.spec_blocks.is_empty() {
                 fun_env.get_mut_spec().on_impl = fun_gen.spec_blocks;
             }
