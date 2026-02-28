@@ -2669,7 +2669,7 @@ where
 
             // All logs from the parallel execution should be cleared and not reported.
             // Clear by re-initializing the speculative logs.
-            init_speculative_logs(signature_verified_block.num_txns() + 1);
+            init_speculative_logs(signature_verified_block.num_txns());
 
             // Flush all caches to re-run from the "clean" state.
             module_cache_manager_guard
