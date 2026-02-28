@@ -97,6 +97,12 @@ module aptos_framework::transaction_fee {
     }
 
     /// Mint refund in epilogue.
+    ///
+    /// Storage refunds are restorative mints — they return APT that was burned when storage
+    /// was originally allocated. They are net-neutral with respect to supply and are not
+    /// subject to the inflation budget cap enforced in stake::distribute_rewards. No clamping
+    /// is needed: the InflationBudget invariant guarantees supply ≤ MAX_APT_SUPPLY because
+    /// total_restored ≤ total_burned (you cannot refund more than was paid).
     public(friend) fun mint_and_refund(
         account: address, refund: u64
     ) acquires AptosCoinMintCapability {

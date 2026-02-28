@@ -2012,6 +2012,10 @@ module aptos_framework::stake {
     }
 
     /// Mint rewards corresponding to current epoch's `stake` and `num_successful_votes`.
+    ///
+    /// Rewards are clamped to the remaining InflationBudget so that total APT supply never
+    /// exceeds the 2.1B hard cap. The cap is enforced only here — restorative mints (storage
+    /// refunds, fee redistribution) are not subject to this limit and will always succeed.
     fun distribute_rewards(
         stake: &mut Coin<AptosCoin>,
         num_successful_proposals: u64,
@@ -2031,12 +2035,26 @@ module aptos_framework::stake {
                 )
             } else { 0 };
         if (rewards_amount > 0) {
-            let mint_cap =
-                &borrow_global<AptosCoinCapabilities>(@aptos_framework).mint_cap;
-            let rewards = coin::mint(rewards_amount, mint_cap);
-            coin::merge(stake, rewards);
-        };
-        rewards_amount
+            // Clamp to remaining inflation budget. Invariant guaranteed by InflationBudget:
+            //   supply = genesis_supply + total_rewards - net_burned ≤ MAX_APT_SUPPLY
+            // (net_burned ≥ 0 since restorations ≤ burns, always)
+            let budget = aptos_coin::inflation_budget_remaining();
+            // Take min(rewards_amount, budget) then cast to u64.
+            // The result is always ≤ rewards_amount (u64), so the cast is always safe
+            // regardless of how large budget is as a u128.
+            let actual_rewards = (
+                if (budget < (rewards_amount as u128)) { budget } else { (rewards_amount as u128) }
+            ) as u64;
+            if (actual_rewards > 0) {
+                aptos_coin::consume_inflation_budget(actual_rewards as u128);
+                let mint_cap = &AptosCoinCapabilities[@aptos_framework].mint_cap;
+                let rewards = coin::mint(actual_rewards, mint_cap);
+                coin::merge(stake, rewards);
+            };
+            actual_rewards
+        } else {
+            0
+        }
     }
 
     fun append<T>(v1: &mut vector<T>, v2: &mut vector<T>) {
