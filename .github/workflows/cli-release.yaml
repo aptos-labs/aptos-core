@@ -27,9 +27,42 @@ on:
 
 
 jobs:
+  # Validate the release version input before starting any builds
+  validate-version:
+    name: "Validate release version format"
+    runs-on: ubuntu-latest
+    steps:
+      - name: Validate version format
+        run: |
+          VERSION="${{ inputs.release_version }}"
+          
+          # Check that version doesn't have 'v' prefix (common mistake)
+          if [[ "$VERSION" =~ ^v ]]; then
+            echo "::error::Version should not start with 'v'. Got '$VERSION', expected format: '1.2.3'"
+            echo "The workflow will automatically add the 'v' prefix when creating the tag 'aptos-cli-v$VERSION'"
+            exit 1
+          fi
+          
+          # Check that version doesn't have 'aptos-cli-' prefix (common mistake)
+          if [[ "$VERSION" =~ ^aptos-cli- ]]; then
+            echo "::error::Version should not include 'aptos-cli-' prefix. Got '$VERSION', expected format: '1.2.3'"
+            echo "The workflow will automatically create the tag 'aptos-cli-v{version}'"
+            exit 1
+          fi
+          
+          # Validate semver format: major.minor.patch (e.g., 1.2.3, 10.20.30)
+          if ! [[ "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "::error::Version must be in semver format (major.minor.patch). Got '$VERSION', expected format like '1.2.3' or '7.14.2'"
+            exit 1
+          fi
+          
+          echo "✓ Version format validated: $VERSION"
+          echo "Release will create tag: aptos-cli-v$VERSION"
+
   # TODO: Deprecated, please use "Linux" instead as it's more straightforwardly named
   build-ubuntu22-binary:
     name: "Build Ubuntu 22.04 binary"
+    needs: validate-version
     runs-on: ubuntu-22.04
     steps:
       - uses: actions/checkout@v4
@@ -47,6 +80,7 @@ jobs:
   # Add one for 24.04 to be clear
   build-ubuntu24-binary:
     name: "Build Ubuntu 24.04 binary"
+    needs: validate-version
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
@@ -66,6 +100,7 @@ jobs:
   # TODO: Possibly find a way to support a baseline GLIBC rather than just whatever is on 22.04
   build-linux-binary:
     name: "Build Linux binary"
+    needs: validate-version
     runs-on: ubuntu-22.04
     steps:
       - uses: actions/checkout@v4
@@ -83,6 +118,7 @@ jobs:
   # Generic linux arm should be the older version, more likely compatible
   build-linux-arm-binary:
     name: "Build Linux ARM binary"
+    needs: validate-version
     runs-on: ubuntu-22.04-arm
     steps:
       - uses: actions/checkout@v4
@@ -99,6 +135,7 @@ jobs:
 
   build-macos-x86_64-binary:
     name: "Build MacOS x86_64 binary"
+    needs: validate-version
     runs-on: macos-15-intel
     steps:
       - uses: actions/checkout@v4
@@ -115,6 +152,7 @@ jobs:
 
   build-macos-arm-binary:
     name: "Build MacOS ARM binary"
+    needs: validate-version
     runs-on: macos-latest
     steps:
       - uses: actions/checkout@v4
@@ -131,6 +169,7 @@ jobs:
 
   build-windows-binary:
     name: "Build Windows binary"
+    needs: validate-version
     runs-on: windows-2025
     steps:
       - uses: actions/checkout@v4
