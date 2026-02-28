@@ -88,6 +88,8 @@ pub enum CliError {
     SimulationError(String),
     #[error("Coverage failed with status: {0}")]
     CoverageError(String),
+    #[error("Type {0} is a struct, not an enum. Use struct syntax instead.")]
+    StructNotEnumError(String),
 }
 
 impl CliError {
@@ -109,6 +111,7 @@ impl CliError {
             CliError::UnexpectedError(_) => "UnexpectedError",
             CliError::SimulationError(_) => "SimulationError",
             CliError::CoverageError(_) => "CoverageError",
+            CliError::StructNotEnumError(_) => "StructNotEnumError",
         }
     }
 }

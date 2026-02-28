@@ -14,7 +14,7 @@ use aptos_cli_common::{
 use aptos_framework::chunked_publish::{
     default_large_packages_module_address, CHUNK_SIZE_IN_BYTES,
 };
-use aptos_rest_client::aptos_api_types::{EntryFunctionId, MoveType, ViewRequest};
+use aptos_rest_client::aptos_api_types::{EntryFunctionId, MoveStructTag, MoveType, ViewRequest};
 use aptos_transaction_simulation::SimulationStateStore;
 use aptos_transaction_simulation_session::Session;
 use aptos_types::{
@@ -25,7 +25,10 @@ use aptos_types::{
 };
 use clap::Parser;
 use move_compiler_v2::Experiment;
-use move_core_types::{account_address::AccountAddress, language_storage::TypeTag};
+use move_core_types::{
+    account_address::AccountAddress,
+    language_storage::{StructTag, TypeTag, MODULE_SEPARATOR},
+};
 use move_model::metadata::{
     CompilerVersion, LanguageVersion, LATEST_STABLE_COMPILER_VERSION,
     LATEST_STABLE_LANGUAGE_VERSION,
@@ -281,6 +284,17 @@ impl TryFrom<&Vec<ArgWithTypeJSON>> for ArgWithTypeVec {
     fn try_from(value: &Vec<ArgWithTypeJSON>) -> Result<Self, Self::Error> {
         let mut args = vec![];
         for arg_json_ref in value {
+            // Detect struct/enum types by checking if arg_type contains MODULE_SEPARATOR
+            if arg_json_ref.arg_type.contains(MODULE_SEPARATOR) {
+                // Struct/enum types require REST API calls to fetch on-chain module bytecode
+                // for type validation and field parsing. This cannot be done in synchronous
+                // TryFrom implementation. Use the async method instead.
+                return Err(CliError::CommandArgumentError(
+                    "Struct and enum arguments require REST API access to fetch module bytecode. \
+                     Use try_into_with_client() instead."
+                        .to_string(),
+                ));
+            }
             let function_arg_type = FunctionArgType::from_str(&arg_json_ref.arg_type)?;
             args.push(function_arg_type.parse_arg_json(&arg_json_ref.value)?);
         }
@@ -355,6 +369,45 @@ impl EntryFunctionArguments {
             Ok(parse_json_file::<EntryFunctionArgumentsJSON>(&json_path)?.try_into()?)
         } else {
             Ok(self)
+        }
+    }
+
+    /// Parse entry function arguments, using async parsing only if needed.
+    ///
+    /// This consolidates the common pattern of checking if json_file is present and
+    /// conditionally using async or sync parsing. The get_client closure is only
+    /// called if async parsing is actually needed (when json_file contains struct/enum arguments).
+    ///
+    /// For JSON files with only primitive arguments, synchronous parsing is used to avoid
+    /// requiring REST API access, preserving backward compatibility and offline workflows.
+    pub async fn parse_with_optional_client<F>(self, get_client: F) -> CliTypedResult<EntryFunction>
+    where
+        F: FnOnce() -> CliTypedResult<aptos_rest_client::Client>,
+    {
+        if let Some(json_path) = &self.json_file {
+            // Parse the JSON file once and use it directly for both the has_struct check and the
+            // actual parsing, avoiding a redundant re-parse in the downstream callee.
+            let json_args = parse_json_file::<EntryFunctionArgumentsJSON>(json_path)?;
+
+            let parsed_arguments: EntryFunctionArguments = if json_args.has_struct_or_enum_args() {
+                // Need REST client for struct/enum parsing
+                let rest_client = get_client()?;
+                json_args.try_into_with_client(&rest_client).await?
+            } else {
+                // Only primitive types - use synchronous parsing (no REST needed)
+                json_args.try_into()?
+            };
+
+            let function_id: MemberId = (&parsed_arguments).try_into()?;
+            Ok(EntryFunction::new(
+                function_id.module_id,
+                function_id.member_id,
+                parsed_arguments.type_arg_vec.try_into()?,
+                parsed_arguments.arg_vec.try_into()?,
+            ))
+        } else {
+            // No JSON file - use synchronous parsing for command-line arguments
+            self.try_into()
         }
     }
 }
@@ -473,10 +526,274 @@ pub struct EntryFunctionArgumentsJSON {
     pub args: Vec<ArgWithTypeJSON>,
 }
 
+impl EntryFunctionArgumentsJSON {
+    /// Check if any arguments are struct/enum types (contain MODULE_SEPARATOR)
+    pub fn has_struct_or_enum_args(&self) -> bool {
+        self.args
+            .iter()
+            .any(|arg| arg.arg_type.contains(MODULE_SEPARATOR))
+    }
+
+    /// Convert to EntryFunctionArguments with async support for struct/enum types.
+    pub async fn try_into_with_client(
+        self,
+        rest_client: &aptos_rest_client::Client,
+    ) -> Result<EntryFunctionArguments, CliError> {
+        let args = self.parse_arguments(rest_client).await?;
+
+        Ok(EntryFunctionArguments {
+            function_id: Some(MemberId::from_str(&self.function_id)?),
+            type_arg_vec: TypeArgVec::try_from(&self.type_args)?,
+            arg_vec: ArgWithTypeVec { args },
+            json_file: None,
+        })
+    }
+
+    /// Parse all arguments from JSON to ArgWithType.
+    async fn parse_arguments(
+        &self,
+        rest_client: &aptos_rest_client::Client,
+    ) -> Result<Vec<ArgWithType>, CliError> {
+        use crate::struct_arg_parser::StructArgParser;
+
+        let parser = StructArgParser::new(rest_client.clone());
+        let mut args = vec![];
+
+        for arg_json in &self.args {
+            let parsed_arg = Self::parse_single_argument(&parser, arg_json).await?;
+            args.push(parsed_arg);
+        }
+
+        Ok(args)
+    }
+
+    /// Parse Option<T> in legacy vector format: [] for None, [value] for Some.
+    async fn parse_option_vector_format(
+        parser: &crate::struct_arg_parser::StructArgParser,
+        struct_tag: &StructTag,
+        array: &[serde_json::Value],
+    ) -> Result<ArgWithType, CliError> {
+        use crate::struct_arg_parser::StructArgParser;
+
+        let (variant, fields) = StructArgParser::convert_option_array_to_enum_format(array)?;
+
+        let bcs_bytes = parser
+            .construct_enum_argument(struct_tag, variant, &fields, 0)
+            .await?;
+
+        Ok(ArgWithType {
+            _ty: FunctionArgType::Enum {
+                type_tag: struct_tag.clone(),
+                variant: variant.to_string(),
+            },
+            _vector_depth: 0,
+            arg: bcs_bytes,
+        })
+    }
+
+    /// Parse a single argument from JSON to ArgWithType.
+    async fn parse_single_argument(
+        parser: &crate::struct_arg_parser::StructArgParser,
+        arg_json: &ArgWithTypeJSON,
+    ) -> Result<ArgWithType, CliError> {
+        if arg_json.arg_type.contains(MODULE_SEPARATOR) {
+            // Type contains "::" - could be struct/enum or a vector containing struct/enum
+            let type_tag = TypeTag::from_str(&arg_json.arg_type)
+                .map_err(|e| CliError::UnableToParse("type", e.to_string()))?;
+
+            match type_tag {
+                TypeTag::Struct(boxed_struct_tag) => {
+                    let struct_tag = *boxed_struct_tag;
+                    let is_option = struct_tag.is_option();
+
+                    if is_option && arg_json.value.is_array() {
+                        // Option<T> with legacy vector format
+                        let array = arg_json.value.as_array().ok_or_else(|| {
+                            CliError::CommandArgumentError(format!(
+                                "Expected array value for Option type, got: {}",
+                                arg_json.value
+                            ))
+                        })?;
+                        Self::parse_option_vector_format(parser, &struct_tag, array).await
+                    } else if let Some(obj) = arg_json.value.as_object() {
+                        // Option with object format: {"None": {}} or {"Some": {"e": value}}.
+                        // Handle before the general enum/struct path to avoid fetching Option's
+                        // ABI (Option is represented as a legacy struct in ABI, not an enum).
+                        if is_option {
+                            if obj.len() == 1 {
+                                let (variant_name, variant_fields_value) =
+                                    obj.iter().next().unwrap();
+
+                                if let Some(fields_obj) = variant_fields_value.as_object() {
+                                    let bcs_bytes = parser
+                                        .construct_enum_argument(
+                                            &struct_tag,
+                                            variant_name,
+                                            fields_obj,
+                                            0,
+                                        )
+                                        .await?;
+
+                                    return Ok(ArgWithType {
+                                        _ty: FunctionArgType::Enum {
+                                            type_tag: struct_tag.clone(),
+                                            variant: variant_name.to_string(),
+                                        },
+                                        _vector_depth: 0,
+                                        arg: bcs_bytes,
+                                    });
+                                }
+                            }
+                            return Err(CliError::CommandArgumentError(format!(
+                                "Invalid Option format. \
+                                 Expected {{\"None\": {{}}}} or {{\"Some\": {{\"e\": value}}}}, \
+                                 got {}",
+                                arg_json.value
+                            )));
+                        }
+
+                        // Non-Option: try struct parsing first.
+                        // construct_struct_argument populates the ABI cache and also rejects
+                        // enum types, so if it succeeds we are done.  If it fails we inspect
+                        // the cache (no extra REST call) to decide whether to retry as an enum.
+                        match parser.construct_struct_argument(&struct_tag, obj, 0).await {
+                            Ok(bcs_bytes) => Ok(ArgWithType {
+                                _ty: FunctionArgType::Struct {
+                                    type_tag: struct_tag.clone(),
+                                },
+                                _vector_depth: 0,
+                                arg: bcs_bytes,
+                            }),
+                            Err(struct_err) => {
+                                // The ABI is now cached; check without an extra REST call.
+                                if parser.is_enum_from_cache(&struct_tag) == Some(true) {
+                                    // Type is an enum — it must be {"VariantName": {fields}}.
+                                    if obj.len() == 1 {
+                                        let (variant_name, variant_fields_value) =
+                                            obj.iter().next().unwrap();
+                                        if let Some(fields_obj) = variant_fields_value.as_object() {
+                                            let bcs_bytes = parser
+                                                .construct_enum_argument(
+                                                    &struct_tag,
+                                                    variant_name,
+                                                    fields_obj,
+                                                    0,
+                                                )
+                                                .await?;
+                                            return Ok(ArgWithType {
+                                                _ty: FunctionArgType::Enum {
+                                                    type_tag: struct_tag.clone(),
+                                                    variant: variant_name.to_string(),
+                                                },
+                                                _vector_depth: 0,
+                                                arg: bcs_bytes,
+                                            });
+                                        }
+                                    }
+                                    Err(CliError::CommandArgumentError(format!(
+                                        "Enum {} must be specified as \
+                                         {{\"VariantName\": {{fields}}}}",
+                                        struct_tag.name
+                                    )))
+                                } else {
+                                    // Not an enum — surface the original struct parse error.
+                                    Err(struct_err)
+                                }
+                            },
+                        }
+                    } else {
+                        // Delegate to parse_value_by_type for framework types and others
+                        let move_struct_tag = MoveStructTag::from(&struct_tag);
+                        let move_type = MoveType::Struct(move_struct_tag);
+                        let bcs_bytes = parser
+                            .parse_value_by_type(&move_type, &arg_json.value, 0)
+                            .await?;
+
+                        Ok(ArgWithType {
+                            _ty: FunctionArgType::Struct {
+                                type_tag: struct_tag.clone(),
+                            },
+                            _vector_depth: 0,
+                            arg: bcs_bytes,
+                        })
+                    }
+                },
+                _ => {
+                    // Not a struct - vector of structs or similar
+                    let move_type = MoveType::from(&type_tag);
+                    let bcs_bytes = parser
+                        .parse_value_by_type(&move_type, &arg_json.value, 0)
+                        .await?;
+
+                    let vector_depth = Self::count_vector_depth(&type_tag);
+                    let base_type = Self::get_base_function_arg_type(&type_tag)?;
+
+                    Ok(ArgWithType {
+                        _ty: base_type,
+                        _vector_depth: vector_depth,
+                        arg: bcs_bytes,
+                    })
+                },
+            }
+        } else {
+            // Parse as primitive type (no "::")
+            let function_arg_type = FunctionArgType::from_str(&arg_json.arg_type)?;
+            function_arg_type.parse_arg_json(&arg_json.value)
+        }
+    }
+
+    /// Count vector nesting depth for a TypeTag.
+    fn count_vector_depth(type_tag: &TypeTag) -> u8 {
+        match type_tag {
+            TypeTag::Vector(inner) => 1 + Self::count_vector_depth(inner),
+            _ => 0,
+        }
+    }
+
+    /// Extract the base FunctionArgType from a TypeTag (unwrapping vectors).
+    fn get_base_function_arg_type(type_tag: &TypeTag) -> CliTypedResult<FunctionArgType> {
+        match type_tag {
+            TypeTag::Vector(inner) => Self::get_base_function_arg_type(inner),
+            TypeTag::Bool => Ok(FunctionArgType::Bool),
+            TypeTag::U8 => Ok(FunctionArgType::U8),
+            TypeTag::U16 => Ok(FunctionArgType::U16),
+            TypeTag::U32 => Ok(FunctionArgType::U32),
+            TypeTag::U64 => Ok(FunctionArgType::U64),
+            TypeTag::U128 => Ok(FunctionArgType::U128),
+            TypeTag::U256 => Ok(FunctionArgType::U256),
+            TypeTag::Address => Ok(FunctionArgType::Address),
+            TypeTag::Signer => Err(CliError::CommandArgumentError(
+                "Signer type not allowed in transaction arguments".to_string(),
+            )),
+            TypeTag::Struct(struct_tag) => Ok(FunctionArgType::Struct {
+                type_tag: *struct_tag.clone(),
+            }),
+            TypeTag::I8 => Ok(FunctionArgType::I8),
+            TypeTag::I16 => Ok(FunctionArgType::I16),
+            TypeTag::I32 => Ok(FunctionArgType::I32),
+            TypeTag::I64 => Ok(FunctionArgType::I64),
+            TypeTag::I128 => Ok(FunctionArgType::I128),
+            TypeTag::I256 => Ok(FunctionArgType::I256),
+            TypeTag::Function(_) => Err(CliError::CommandArgumentError(
+                "Function types not allowed in transaction arguments".to_string(),
+            )),
+        }
+    }
+}
+
 impl TryInto<EntryFunctionArguments> for EntryFunctionArgumentsJSON {
     type Error = CliError;
 
     fn try_into(self) -> Result<EntryFunctionArguments, Self::Error> {
+        // Check if there are any struct/enum arguments
+        if self.has_struct_or_enum_args() {
+            return Err(CliError::CommandArgumentError(
+                "Struct and enum arguments require async processing with REST client. \
+                 Use the async method try_into_with_client() instead."
+                    .to_string(),
+            ));
+        }
+
         Ok(EntryFunctionArguments {
             function_id: Some(MemberId::from_str(&self.function_id)?),
             type_arg_vec: TypeArgVec::try_from(&self.type_args)?,
