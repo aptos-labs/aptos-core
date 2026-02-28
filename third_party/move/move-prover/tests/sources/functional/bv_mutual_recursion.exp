@@ -1,0 +1,34 @@
+Move prover returns: exiting with verification errors
+error: post-condition does not hold
+   ┌─ tests/sources/functional/bv_mutual_recursion.move:32:9
+   │
+32 │         ensures result == (x & (0xF0F0F0F0F0F0F0F0 as u64));
+   │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   │
+   =     at tests/sources/functional/bv_mutual_recursion.move:12: bv_mask_a
+   =         x = <redacted>
+   =         flag = <redacted>
+   =     at tests/sources/functional/bv_mutual_recursion.move:13: bv_mask_a
+   =     at tests/sources/functional/bv_mutual_recursion.move:16: bv_mask_a
+   =     at tests/sources/functional/bv_mutual_recursion.move:13: bv_mask_a
+   =         result = <redacted>
+   =     at tests/sources/functional/bv_mutual_recursion.move:18: bv_mask_a
+   =     at tests/sources/functional/bv_mutual_recursion.move:31: bv_mask_a (spec)
+   =     at tests/sources/functional/bv_mutual_recursion.move:32: bv_mask_a (spec)
+
+error: post-condition does not hold
+   ┌─ tests/sources/functional/bv_mutual_recursion.move:40:9
+   │
+40 │         ensures result == (x & (0x0F0F0F0F0F0F0F0F as u64));
+   │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   │
+   =     at tests/sources/functional/bv_mutual_recursion.move:20: bv_mask_b
+   =         x = <redacted>
+   =         flag = <redacted>
+   =     at tests/sources/functional/bv_mutual_recursion.move:21: bv_mask_b
+   =     at tests/sources/functional/bv_mutual_recursion.move:24: bv_mask_b
+   =     at tests/sources/functional/bv_mutual_recursion.move:21: bv_mask_b
+   =         result = <redacted>
+   =     at tests/sources/functional/bv_mutual_recursion.move:26: bv_mask_b
+   =     at tests/sources/functional/bv_mutual_recursion.move:39: bv_mask_b (spec)
+   =     at tests/sources/functional/bv_mutual_recursion.move:40: bv_mask_b (spec)
