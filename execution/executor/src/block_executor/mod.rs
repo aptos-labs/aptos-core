@@ -330,7 +330,29 @@ where
             })?;
         }
 
-        Ok(block.output.expect_complete_result())
+        let result = block.output.expect_complete_result();
+        info!(
+            "block {} txn_info_hashes: {:?}",
+            block_id, result.ledger_update_output.transaction_info_hashes
+        );
+        info!(
+            "block {} root: {}, parent root: {}",
+            block_id,
+            result
+                .ledger_update_output
+                .transaction_accumulator
+                .root_hash,
+            result.ledger_update_output.parent_accumulator.root_hash,
+        );
+        info!(
+            "block {} infos: {:?}",
+            block_id, result.ledger_update_output.transaction_infos
+        );
+        info!(
+            "block {} end_info: {:?}",
+            block_id, result.execution_output.block_end_info
+        );
+        Ok(result)
     }
 
     fn pre_commit_block(&self, block_id: HashValue) -> ExecutorResult<()> {
