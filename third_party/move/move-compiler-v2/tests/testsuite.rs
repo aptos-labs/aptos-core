@@ -354,6 +354,16 @@ const TEST_CONFIGS: Lazy<BTreeMap<&str, TestConfig>> = Lazy::new(|| {
             ]),
             ..config()
         },
+        // Reaching definition tests
+        TestConfig {
+            name: "reaching-def",
+            runner: |p| run_test(p, get_config_by_name("reaching-def")),
+            include: vec!["/reaching-def/"],
+            stop_after: StopAfter::FirstBytecodePipeline(Some("ReachingDefProcessor")),
+            dump_bytecode: DumpLevel::AllStages,
+            dump_bytecode_filter: Some(vec![INITIAL_BYTECODE_STAGE, "ReachingDefProcessor"]),
+            ..config().exp(Experiment::REACHING_DEF_ANALYSIS)
+        },
         // Reference safety tests (with optimizations on)
         TestConfig {
             name: "reference-safety",

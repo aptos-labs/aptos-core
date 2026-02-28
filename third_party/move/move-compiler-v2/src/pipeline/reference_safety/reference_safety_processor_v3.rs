@@ -21,7 +21,7 @@
 
 use crate::pipeline::{
     livevar_analysis_processor::{LiveVarAnnotation, LiveVarInfoAtCodeOffset},
-    reference_safety::{LifetimeAnnotation, LifetimeInfo, LifetimeInfoAtCodeOffset},
+    reference_safety::{LifetimeAnnotation, LifetimeInfo, LifetimeInfoAtCodeOffset, Object},
 };
 use codespan_reporting::diagnostic::Severity;
 use itertools::Itertools;
@@ -1181,6 +1181,40 @@ impl LifetimeInfo for LifetimeState {
 
     fn display(&self, target: &FunctionTarget) -> Option<String> {
         Some(self.display(target).to_string())
+    }
+
+    /// Get all objects which are referenced by the given `temp` before a given program point
+    /// If ``temp`` is not a reference, an empty set is returned.
+    fn referenced_objects(&self, temp: TempIndex) -> BTreeSet<Object> {
+        let mut result = BTreeSet::new();
+
+        // Get the reference id for the temp
+        let abs_val = self.locals[temp];
+        let AbstractValue::Reference(ref_id) = abs_val else {
+            return BTreeSet::new();
+        };
+
+        let mut todo = vec![ref_id];
+        let mut done = BTreeSet::new();
+        // recursively traverse the borrow graph to get ancestors
+        while let Some(next) = todo.pop() {
+            done.insert(next);
+            for (_loc, parent, path, _strong) in self.borrow_graph.in_edges(next) {
+                match path.first() {
+                    Some(Label::Local(parent_local)) => {
+                        result.insert(Object::Local(*parent_local));
+                    },
+                    Some(Label::Global(struct_id)) => {
+                        result.insert(Object::Global(*struct_id));
+                    },
+                    _ => {},
+                }
+                if !done.contains(&parent) {
+                    todo.push(parent)
+                }
+            }
+        }
+        result
     }
 }
 

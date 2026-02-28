@@ -254,6 +254,11 @@ pub static EXPERIMENTS: Lazy<BTreeMap<String, Experiment>> = Lazy::new(|| {
             default: Given(false),
         },
         Experiment {
+            name: Experiment::REACHING_DEF_ANALYSIS.to_string(),
+            description: "Whether to run reaching definition analysis.".to_string(),
+            default: Given(false),
+        },
+        Experiment {
             name: Experiment::FLUSH_WRITES_OPTIMIZATION.to_string(),
             description: "Whether to run flush writes processor and optimization".to_string(),
             default: Inherited(Experiment::OPTIMIZE.to_string()),
@@ -358,6 +363,7 @@ impl Experiment {
     pub const OPTIMIZE_WAITING_FOR_COMPARE_TESTS: &'static str =
         "optimize-waiting-for-compare-tests";
     pub const PEEPHOLE_OPTIMIZATION: &'static str = "peephole-optimization";
+    pub const REACHING_DEF_ANALYSIS: &'static str = "reaching-def-analysis";
     pub const RECURSIVE_TYPE_CHECK: &'static str = "recursive-type-check";
     pub const REFERENCE_SAFETY: &'static str = "reference-safety";
     pub const REFERENCE_SAFETY_V3: &'static str = "reference-safety-v3";
