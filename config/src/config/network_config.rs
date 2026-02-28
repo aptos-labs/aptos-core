@@ -144,6 +144,15 @@ pub struct NetworkConfig {
     /// Access control policy for peer connections. If not specified, all
     /// peers are allowed. Otherwise, the specified policy is enforced.
     pub access_control_policy: Option<AccessControlPolicy>,
+    /// Maximum number of connections allowed per peer. Default is 1 for backward compatibility.
+    /// Setting this higher allows multiple TCP connections to the same peer for increased
+    /// throughput and reduced head-of-line blocking.
+    pub max_connections_per_peer: usize,
+    /// Whether to actively dial peers to establish additional connections up to max_connections_per_peer.
+    /// When false (default), the node will only accept incoming connections but won't actively dial
+    /// for additional connections beyond the first one. This allows for safe rollout of multi-connection
+    /// support by first enabling passive acceptance before enabling active dialing.
+    pub enable_active_multi_connection_dialing: bool,
 }
 
 impl Default for NetworkConfig {
@@ -185,6 +194,8 @@ impl NetworkConfig {
             max_parallel_deserialization_tasks: None,
             enable_latency_aware_dialing: true,
             access_control_policy: None,
+            max_connections_per_peer: 5, // Enable for CI testing
+            enable_active_multi_connection_dialing: true, // Enable for CI testing
         };
 
         // Configure the number of parallel deserialization tasks
