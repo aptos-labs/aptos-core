@@ -59,8 +59,9 @@ where
                 b.iter_with_setup(
                     // setup: generate fresh batch of scalars and points
                     || {
-                        let xs: Vec<u64> =
-                            (0..num_samples).map(|_| rng.gen_range(0, range_limit)).collect();
+                        let xs: Vec<u64> = (0..num_samples)
+                            .map(|_| rng.gen_range(0, range_limit))
+                            .collect();
                         let Hs: Vec<E::G1> =
                             xs.iter().map(|&x| G * E::ScalarField::from(x)).collect();
                         (xs, Hs)
@@ -107,14 +108,9 @@ where
                         (x, H)
                     },
                     |(x, H)| {
-                        let recovered = bsgs::dlog_with_batch_size(
-                            G,
-                            H,
-                            &baby_table,
-                            range_limit,
-                            batch_size,
-                        )
-                        .expect("Discrete log not found");
+                        let recovered =
+                            bsgs::dlog_with_batch_size(G, H, &baby_table, range_limit, batch_size)
+                                .expect("Discrete log not found");
                         assert_eq!(recovered, x);
                     },
                 );
@@ -211,7 +207,7 @@ where
 
 fn criterion_benchmark(c: &mut Criterion) {
     use ark_bls12_381::Bls12_381;
-//    use ark_bn254::Bn254;
+    //    use ark_bn254::Bn254;
 
     // bench_dlog::<Bn254>(c, "bn254");
     // bench_dlog_batch_size::<Bn254>(c, "bn254");

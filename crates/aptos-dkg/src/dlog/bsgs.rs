@@ -1,6 +1,23 @@
 // Copyright (c) Aptos Foundation
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
+//! Baby-step giant-step (BSGS) discrete log over a range.
+//!
+//! We recover x such that H = x*G, with 0 <= x < range_limit. The baby-step table holds
+//! compressed points j*G for j in [0, m). The giant-step loop computes H - i*m*G for i in [0, n),
+//! serializes each point, and looks it up in the baby table; a match gives x = i*m + j.
+//! Here n = ceil(range_limit / m). Tuning m ≈ sqrt(range_limit) is common in the literature as it
+//! balances time and memory, but we leave it as a parameter to the algorithm.
+//!
+//! We use a batch size for serialization in the giant-step loop. This is a trade-off between
+//! the overhead of serializing and deserializing each point, and the overhead of calling
+//! `normalize_batch` for each point. We use a default batch size of 2048, but this can be tuned
+//! via benchmarks.
+//!
+//! We use a threshold for the batch size below which we use the original one-at-a-time algorithm
+//! (serialize each projective point without batch normalizing). Above it we use batch normalize + serialize.
+//! This threshold is also the result of benchmarks.
+
 use ark_ec::CurveGroup;
 use ark_serialize::CanonicalSerialize;
 use std::collections::HashMap;
@@ -35,7 +52,13 @@ pub fn dlog<C: CurveGroup>(
     baby_table: &HashMap<Vec<u8>, u64>,
     range_limit: u64,
 ) -> Option<u64> {
-    dlog_with_batch_size(G, H, baby_table, range_limit, DEFAULT_BSGS_SERIALIZATION_BATCH_SIZE)
+    dlog_with_batch_size(
+        G,
+        H,
+        baby_table,
+        range_limit,
+        DEFAULT_BSGS_SERIALIZATION_BATCH_SIZE,
+    )
 }
 
 /// Same as `dlog` but with configurable serialization batch size for the giant-step loop.
@@ -51,12 +74,14 @@ pub fn dlog_with_batch_size<C: CurveGroup>(
 ) -> Option<u64> {
     let byte_size = G.compressed_size();
 
+    // Baby-step table size m; giant-step count n = ceil(range_limit / m).
     let m = baby_table
         .len()
         .try_into()
         .expect("Table seems rather large");
     let n = range_limit.div_ceil(m);
 
+    // Precompute -m*G so each giant step is one addition: gamma += G_neg_m.
     let G_neg_m = G * -C::ScalarField::from(m);
 
     let batch_size = batch_size.max(1);
@@ -68,6 +93,7 @@ pub fn dlog_with_batch_size<C: CurveGroup>(
         for i in 0..n {
             gamma.serialize_compressed(&mut buf[..]).unwrap();
             if let Some(&j) = baby_table.get(&buf[..]) {
+                // x = i*m + j: giant-step index i, baby-step index j
                 return Some(i * m + j);
             }
             gamma += G_neg_m;
@@ -82,6 +108,7 @@ pub fn dlog_with_batch_size<C: CurveGroup>(
     for chunk_start in (0..n).step_by(batch_size) {
         let actual_batch = (n - chunk_start).min(batch_size as u64) as usize;
 
+        // Giant steps for this chunk: gamma = H - (chunk_start + j)*m*G for j = 0..actual_batch
         batch.clear();
         let mut gamma = H + G_neg_m * C::ScalarField::from(chunk_start);
         for _ in 0..actual_batch {
@@ -102,7 +129,8 @@ pub fn dlog_with_batch_size<C: CurveGroup>(
 }
 
 /// Compute discrete logs for multiple targets. Uses batched-across-targets when
-/// `H_vec.len() >= BSGS_VEC_BATCHED_MIN_TARGETS` (faster); otherwise one `dlog` per target.
+/// `H_vec.len() >= BSGS_VEC_BATCHED_MIN_TARGETS` (fewer normalize_batch calls); otherwise
+/// one `dlog` per target (lower overhead for 1–3 targets).
 #[allow(non_snake_case)]
 pub fn dlog_vec<C: CurveGroup>(
     G: C,
@@ -145,6 +173,11 @@ pub fn dlog_vec_batched<C: CurveGroup>(
 }
 
 /// Batched-across-targets dlog with configurable giant-step batch size.
+///
+/// For each chunk of giant steps we build one batch containing points for all targets
+/// (layout: target 0's points, then target 1's, …), call `normalize_batch` once, then
+/// serialize and lookup. This yields ceil(n / batch_size) normalize_batch calls instead of
+/// v * ceil(n / batch_size) when calling `dlog` per target.
 #[allow(non_snake_case)]
 pub fn dlog_vec_batched_with_batch_size<C: CurveGroup>(
     G: C,
@@ -168,6 +201,7 @@ pub fn dlog_vec_batched_with_batch_size<C: CurveGroup>(
     let v = H_vec.len();
 
     let mut result: Vec<Option<u64>> = vec![None; v];
+    // Batch holds v * actual_batch points: [target0_step0..target0_stepK, target1_step0.., ...]
     let mut batch = Vec::with_capacity(v * batch_size.min(n as usize));
     let mut buf = vec![0u8; byte_size];
 
@@ -175,6 +209,7 @@ pub fn dlog_vec_batched_with_batch_size<C: CurveGroup>(
         let actual_batch = (n - chunk_start).min(batch_size as u64) as usize;
         batch.clear();
 
+        // Append giant-step points for each target in order (target 0, then 1, …)
         for H in H_vec {
             let mut gamma = *H + G_neg_m * C::ScalarField::from(chunk_start);
             for _ in 0..actual_batch {
@@ -184,9 +219,10 @@ pub fn dlog_vec_batched_with_batch_size<C: CurveGroup>(
         }
 
         let normalized = C::normalize_batch(&batch);
-        for (v, res) in result.iter_mut().enumerate() {
+        // normalized[idx] corresponds to target (idx / actual_batch), step (idx % actual_batch)
+        for (target_idx, res) in result.iter_mut().enumerate() {
             for j in 0..actual_batch {
-                let idx = v * actual_batch + j;
+                let idx = target_idx * actual_batch + j;
                 normalized[idx].serialize_compressed(&mut buf[..]).unwrap();
                 if let Some(&baby_j) = baby_table.get(&buf[..]) {
                     *res = Some((chunk_start + j as u64) * m + baby_j);
@@ -205,6 +241,7 @@ mod tests {
     use ark_bn254::G1Projective;
     use ark_ec::PrimeGroup;
 
+    /// Exhaustive check: recover dlog for every x in [0, range_limit) with a small table.
     #[allow(non_snake_case)]
     #[test]
     fn test_bsgs_bn254_exhaustive() {
@@ -224,6 +261,8 @@ mod tests {
         }
     }
 
+    /// dlog_vec and dlog_vec_batched must agree for 1, 4, and 16 targets (covers both
+    /// the per-target and batched paths in dlog_vec).
     #[allow(non_snake_case)]
     #[test]
     fn test_dlog_vec_batched_matches_dlog_vec() {
@@ -232,14 +271,19 @@ mod tests {
         let baby_table = dlog::table::build::<G1Projective>(G, 1 << 6);
 
         for num_targets in [1, 4, 16] {
-            let xs: Vec<u64> = (0..num_targets).map(|i| (i as u64) * 17 % range_limit).collect();
-            let Hs: Vec<G1Projective> =
-                xs.iter().map(|&x| G * ark_bn254::Fr::from(x)).collect();
+            let xs: Vec<u64> = (0..num_targets)
+                .map(|i| (i as u64) * 17 % range_limit)
+                .collect();
+            let Hs: Vec<G1Projective> = xs.iter().map(|&x| G * ark_bn254::Fr::from(x)).collect();
 
             let expected = dlog_vec(G, &Hs, &baby_table, range_limit).expect("dlog_vec failed");
             let batched = dlog_vec_batched(G, &Hs, &baby_table, range_limit)
                 .expect("dlog_vec_batched failed");
-            assert_eq!(expected, batched, "dlog_vec vs dlog_vec_batched for num_targets={}", num_targets);
+            assert_eq!(
+                expected, batched,
+                "dlog_vec vs dlog_vec_batched for num_targets={}",
+                num_targets
+            );
         }
     }
 }
