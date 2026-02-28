@@ -117,6 +117,7 @@ pub enum Protocol {
     Dns4(DnsName),
     Dns6(DnsName),
     Tcp(u16),
+    Udp(u16),
     Memory(u16),
     // human-readable x25519::PublicKey is lower-case hex encoded
     NoiseIK(x25519::PublicKey),
@@ -238,7 +239,7 @@ fn is_network_layer(p: Option<&Protocol>) -> bool {
 fn is_transport_layer(p: Option<&Protocol>) -> bool {
     use Protocol::*;
 
-    matches!(p, Some(Tcp(_)))
+    matches!(p, Some(Tcp(_)) | Some(Udp(_)))
 }
 
 fn is_session_layer(p: Option<&Protocol>, allow_empty: bool) -> bool {
@@ -389,7 +390,7 @@ impl NetworkAddress {
     /// Retrieves the port from the network address
     pub fn find_port(&self) -> Option<u16> {
         self.0.iter().find_map(|proto| match proto {
-            Protocol::Tcp(port) => Some(*port),
+            Protocol::Tcp(port) | Protocol::Udp(port) => Some(*port),
             _ => None,
         })
     }
@@ -473,7 +474,15 @@ impl ToSocketAddrs for NetworkAddress {
     fn to_socket_addrs(&self) -> Result<Self::Iter, std::io::Error> {
         if let Some(((ipaddr, port), _)) = parse_ip_tcp(self.as_slice()) {
             Ok(vec![SocketAddr::new(ipaddr, port)].into_iter())
+        } else if let Some(((ipaddr, port), _)) = parse_ip_udp(self.as_slice()) {
+            Ok(vec![SocketAddr::new(ipaddr, port)].into_iter())
         } else if let Some(((ip_filter, dns_name, port), _)) = parse_dns_tcp(self.as_slice()) {
+            format!("{}:{}", dns_name, port).to_socket_addrs().map(|v| {
+                v.filter(|addr| ip_filter.matches(addr.ip()))
+                    .collect::<Vec<_>>()
+                    .into_iter()
+            })
+        } else if let Some(((ip_filter, dns_name, port), _)) = parse_dns_udp(self.as_slice()) {
             format!("{}:{}", dns_name, port).to_socket_addrs().map(|v| {
                 v.filter(|addr| ip_filter.matches(addr.ip()))
                     .collect::<Vec<_>>()
@@ -605,6 +614,7 @@ impl fmt::Display for Protocol {
             Dns4(domain) => write!(f, "/dns4/{}", domain),
             Dns6(domain) => write!(f, "/dns6/{}", domain),
             Tcp(port) => write!(f, "/tcp/{}", port),
+            Udp(port) => write!(f, "/udp/{}", port),
             Memory(port) => write!(f, "/memory/{}", port),
             NoiseIK(pubkey) => write!(
                 f,
@@ -639,6 +649,7 @@ impl Protocol {
             "dns4" => Protocol::Dns4(parse_one(args)?),
             "dns6" => Protocol::Dns6(parse_one(args)?),
             "tcp" => Protocol::Tcp(parse_one(args)?),
+            "udp" => Protocol::Udp(parse_one(args)?),
             "memory" => Protocol::Memory(parse_one(args)?),
             "noise-ik" => Protocol::NoiseIK(x25519::PublicKey::from_encoded_string(
                 args.next().ok_or(ParseError::UnexpectedEnd)?,
@@ -820,6 +831,42 @@ pub fn parse_dns_tcp(protos: &[Protocol]) -> Option<((IpFilter, &DnsName, u16), 
     }
 }
 
+/// parse the `&[Protocol]` into the `"/ip4/<addr>/udp/<port>"` or
+/// `"/ip6/<addr>/udp/<port>"` prefix and unparsed `&[Protocol]` suffix.
+pub fn parse_ip_udp(protos: &[Protocol]) -> Option<((IpAddr, u16), &[Protocol])> {
+    use Protocol::*;
+
+    if protos.len() < 2 {
+        return None;
+    }
+
+    let (prefix, suffix) = protos.split_at(2);
+    match prefix {
+        [Ip4(ip), Udp(port)] => Some(((IpAddr::V4(*ip), *port), suffix)),
+        [Ip6(ip), Udp(port)] => Some(((IpAddr::V6(*ip), *port), suffix)),
+        _ => None,
+    }
+}
+
+/// parse the `&[Protocol]` into the `"/dns/<domain>/udp/<port>"`,
+/// `"/dns4/<domain>/udp/<port>"`, or `"/dns6/<domain>/udp/<port>"` prefix and
+/// unparsed `&[Protocol]` suffix.
+pub fn parse_dns_udp(protos: &[Protocol]) -> Option<((IpFilter, &DnsName, u16), &[Protocol])> {
+    use Protocol::*;
+
+    if protos.len() < 2 {
+        return None;
+    }
+
+    let (prefix, suffix) = protos.split_at(2);
+    match prefix {
+        [Dns(name), Udp(port)] => Some(((IpFilter::Any, name, *port), suffix)),
+        [Dns4(name), Udp(port)] => Some(((IpFilter::OnlyIp4, name, *port), suffix)),
+        [Dns6(name), Udp(port)] => Some(((IpFilter::OnlyIp6, name, *port), suffix)),
+        _ => None,
+    }
+}
+
 pub fn parse_tcp(protos: &[Protocol]) -> Option<((String, u16), &[Protocol])> {
     use Protocol::*;
 
@@ -869,6 +916,8 @@ fn parse_aptosnet_protos(protos: &[Protocol]) -> Option<&[Protocol]> {
     let transport_suffix = parse_ip_tcp(protos)
         .map(|x| x.1)
         .or_else(|| parse_dns_tcp(protos).map(|x| x.1))
+        .or_else(|| parse_ip_udp(protos).map(|x| x.1))
+        .or_else(|| parse_dns_udp(protos).map(|x| x.1))
         .or_else(|| {
             if cfg!(test) {
                 parse_memory(protos).map(|x| x.1)
