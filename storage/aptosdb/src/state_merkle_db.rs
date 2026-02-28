@@ -160,11 +160,17 @@ impl StateMerkleDb {
             batches_for_shards.len() == NUM_STATE_SHARDS,
             "Shard count mismatch."
         );
-        let mut batches = batches_for_shards.into_iter();
-        for shard_id in 0..NUM_STATE_SHARDS {
-            let state_merkle_batch = batches.next().unwrap();
-            self.state_merkle_db_shards[shard_id].write_schemas(state_merkle_batch)?;
-        }
+        THREAD_MANAGER.get_io_pool().scope(|s| {
+            for (shard_id, state_merkle_batch) in batches_for_shards.into_iter().enumerate() {
+                s.spawn(move |_| {
+                    self.state_merkle_db_shards[shard_id]
+                        .write_schemas(state_merkle_batch)
+                        .unwrap_or_else(|err| {
+                            panic!("Failed to commit state merkle shard {shard_id}: {err}")
+                        });
+                });
+            }
+        });
 
         self.state_merkle_metadata_db.write_schemas(top_level_batch)
     }
