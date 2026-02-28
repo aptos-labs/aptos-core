@@ -881,6 +881,7 @@ class K8sForgeRunner(ForgeRunner):
             UPGRADE_IMAGE_TAG=context.upgrade_image_tag,
             FORGE_IMAGE=forge_image_full,
             FORGE_NAMESPACE=context.forge_namespace,
+            FORGE_CHAIN_NAME=context.forge_chain_name,
             FORGE_ARGS=" ".join(context.forge_args),
             FORGE_TRIGGERED_BY=forge_triggered_by,
             FORGE_TEST_SUITE=sanitize_k8s_resource_name(context.forge_test_suite),
@@ -890,6 +891,8 @@ class K8sForgeRunner(ForgeRunner):
             VALIDATOR_NODE_SELECTOR=validator_node_selector,
             KUBECONFIG=MULTIREGION_KUBECONFIG_PATH,
             MULTIREGION_KUBECONFIG_DIR=MULTIREGION_KUBECONFIG_DIR,
+            GITHUB_HEAD_REF=os.getenv("GITHUB_HEAD_REF", ""),
+            GITHUB_REF_NAME=os.getenv("GITHUB_REF_NAME", ""),
         )
 
         log.info(f"rendered_forge_test_runner: {rendered}")
