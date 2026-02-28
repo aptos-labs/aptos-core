@@ -57,9 +57,18 @@ pub fn setup_logging(level: Option<LevelFilter>) {
     setup_logging_for_testing(level)
 }
 
+/// Configures logging with `HH:MM:SS` timestamps on every line.
+/// Intended for long-running processes (e.g. the MCP server) where wall-clock
+/// context is useful.
+pub fn setup_logging_with_timestamps(level: Option<LevelFilter>) {
+    if let Some(logger) = configure_logger(level, true) {
+        let _ = logger.start();
+    }
+}
+
 /// Configures logging for testing. Can be called multiple times.
 pub fn setup_logging_for_testing(level: Option<LevelFilter>) {
-    if let Some(logger) = configure_logger(level) {
+    if let Some(logger) = configure_logger(level, false) {
         // Will produce error if a logger is already installed, which we ignore. Its either this same logger
         // already installed, or some outer code overriding the logger.
         let _ = logger.start();
@@ -67,7 +76,7 @@ pub fn setup_logging_for_testing(level: Option<LevelFilter>) {
 }
 
 #[allow(clippy::unnecessary_unwrap)]
-fn configure_logger(level: Option<LevelFilter>) -> Option<Logger> {
+fn configure_logger(level: Option<LevelFilter>, with_timestamps: bool) -> Option<Logger> {
     let var = env::var(MVC_LOG_VAR);
     let (spec, fname) = if var.is_err() && level.is_some() {
         (
@@ -104,15 +113,28 @@ fn configure_logger(level: Option<LevelFilter>) -> Option<Logger> {
     };
     Some(
         if let Some(fname) = fname {
+            let fmt = if with_timestamps {
+                format_record_file_ts as FormatFn
+            } else {
+                format_record_file
+            };
             Logger::with(spec)
-                .format(format_record_file)
+                .format(fmt)
                 .log_to_file(FileSpec::try_from(fname).expect("file name"))
                 .append()
         } else {
-            Logger::with(spec).format(format_record_colored)
+            let fmt = if with_timestamps {
+                format_record_colored_ts as FormatFn
+            } else {
+                format_record_colored
+            };
+            Logger::with(spec).format(fmt)
         },
     )
 }
+
+/// Type alias matching the signature expected by `Logger::format`.
+type FormatFn = fn(&mut dyn std::io::Write, &mut DeferredNow, &Record) -> Result<(), std::io::Error>;
 
 fn format_record_file(
     w: &mut dyn std::io::Write,
@@ -122,6 +144,21 @@ fn format_record_file(
     write!(
         w,
         "[{} {}] {}",
+        record.level(),
+        record.module_path().unwrap_or_default(),
+        &record.args()
+    )
+}
+
+fn format_record_file_ts(
+    w: &mut dyn std::io::Write,
+    now: &mut DeferredNow,
+    record: &Record,
+) -> Result<(), std::io::Error> {
+    write!(
+        w,
+        "[{} {} {}] {}",
+        now.format("%H:%M:%S"),
         record.level(),
         record.module_path().unwrap_or_default(),
         &record.args()
@@ -141,4 +178,19 @@ fn format_record_colored(
         Level::Trace => "TRACE".normal(),
     };
     write!(w, "[{}] {}", level_color, &record.args())
+}
+
+fn format_record_colored_ts(
+    w: &mut dyn std::io::Write,
+    now: &mut DeferredNow,
+    record: &Record,
+) -> Result<(), std::io::Error> {
+    let level_color = match record.level() {
+        Level::Error => "ERROR".red().bold(),
+        Level::Warn => "WARN".yellow().bold(),
+        Level::Info => "INFO".green().bold(),
+        Level::Debug => "DEBUG".cyan().bold(),
+        Level::Trace => "TRACE".normal(),
+    };
+    write!(w, "[{} {}] {}", now.format("%H:%M:%S"), level_color, &record.args())
 }

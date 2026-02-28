@@ -1,0 +1,6 @@
+Move prover returns: exiting with compilation errors
+error: `proof_hint_unfold::nonexistent_function` is not a spec function
+   ┌─ tests/sources/functional/proof_hints/unfold.move:65:20
+   │
+65 │             unfold nonexistent_function;
+   │                    ^^^^^^^^^^^^^^^^^^^^

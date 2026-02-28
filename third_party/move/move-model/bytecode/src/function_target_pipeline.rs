@@ -32,6 +32,10 @@ pub enum VerificationFlavor {
     Regular,
     Instantiated(usize),
     Inconsistency(Box<VerificationFlavor>),
+    /// A split case variant. The usize is the case combination index (bit flags).
+    Split(Box<VerificationFlavor>, usize),
+    /// An induction variant. The bool is false for base case, true for step case.
+    Induct(Box<VerificationFlavor>, bool),
 }
 
 impl std::fmt::Display for VerificationFlavor {
@@ -42,6 +46,9 @@ impl std::fmt::Display for VerificationFlavor {
                 write!(f, "instantiated_{}", index)
             },
             VerificationFlavor::Inconsistency(flavor) => write!(f, "inconsistency_{}", flavor),
+            VerificationFlavor::Split(_, index) => write!(f, "split_{}", index),
+            VerificationFlavor::Induct(_, false) => write!(f, "induct_base"),
+            VerificationFlavor::Induct(_, true) => write!(f, "induct_step"),
         }
     }
 }

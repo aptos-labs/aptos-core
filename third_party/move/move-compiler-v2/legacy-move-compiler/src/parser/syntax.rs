@@ -4187,6 +4187,7 @@ fn parse_spec_block_member(context: &mut Context) -> Result<SpecBlockMember, Box
             "include" => parse_spec_include(context),
             "apply" => parse_spec_apply(context),
             "pragma" => parse_spec_pragma(context),
+            "proof" => parse_proof_block(context),
             "global" | "local" => parse_spec_variable(context),
             "update" => parse_spec_update(context),
             _ => {
@@ -4705,6 +4706,185 @@ fn parse_spec_property(context: &mut Context) -> Result<PragmaProperty, Box<Diag
         start_loc,
         context.tokens.previous_end_loc(),
         PragmaProperty_ { name, value },
+    ))
+}
+
+// Parse a proof block:
+//    ProofBlock = "proof" "{" ProofHint* "}"
+//    ProofHint  = "unfold" <NameAccessChain> ";"
+//               | "assert" <Exp> ";"
+//               | "use" <NameAccessChain> "(" Comma<Exp> ")" ";"
+//               | "assume" <ConditionProperties> <Exp> ";"
+//               | "trigger" "forall" <QuantBindings> "with" <TriggerSets> ";"
+//               | "split" "on" <Exp> ";"
+//               | "induct" "on" <Var> ";"
+fn parse_proof_block(context: &mut Context) -> Result<SpecBlockMember, Box<Diagnostic>> {
+    let start_loc = context.tokens.start_loc();
+    consume_identifier(context.tokens, "proof")?;
+    consume_token(context.tokens, Tok::LBrace)?;
+    let mut hints = vec![];
+    while context.tokens.peek() != Tok::RBrace {
+        let hint_start = context.tokens.start_loc();
+        let hint_ = match context.tokens.peek() {
+            Tok::Identifier => match context.tokens.content() {
+                "unfold" => {
+                    context.tokens.advance()?;
+                    let name = parse_name_access_chain(context, false, || "a spec function name")?;
+                    // Parse optional `depth N`
+                    let depth = if context.tokens.peek() == Tok::Identifier
+                        && context.tokens.content() == "depth"
+                    {
+                        context.tokens.advance()?;
+                        let depth_val = match context.tokens.peek() {
+                            Tok::NumValue => {
+                                let s = context.tokens.content().to_string();
+                                context.tokens.advance()?;
+                                s.parse::<usize>().ok()
+                            },
+                            _ => None,
+                        };
+                        if depth_val.is_none() || depth_val == Some(0) {
+                            return Err(unexpected_token_error(
+                                context.tokens,
+                                "a positive integer depth value",
+                            ));
+                        }
+                        depth_val
+                    } else {
+                        None
+                    };
+                    consume_token(context.tokens, Tok::Semicolon)?;
+                    ProofHint_::Unfold(name, depth)
+                },
+                "assert" => {
+                    context.tokens.advance()?;
+                    let exp = parse_exp(context)?;
+                    consume_token(context.tokens, Tok::Semicolon)?;
+                    ProofHint_::Assert(exp)
+                },
+                "assume" => {
+                    context.tokens.advance()?;
+                    let properties = parse_condition_properties(context)?;
+                    let exp = parse_exp(context)?;
+                    consume_token(context.tokens, Tok::Semicolon)?;
+                    ProofHint_::Assume(properties, exp)
+                },
+                "trigger" => {
+                    context.tokens.advance()?;
+                    consume_identifier(context.tokens, "forall")?;
+                    // Parse quantifier bindings: x: T, y: U
+                    let bindings_start = context.tokens.start_loc();
+                    let binds = parse_list(
+                        context,
+                        |context| {
+                            if context.tokens.peek() == Tok::Comma {
+                                context.tokens.advance()?;
+                                Ok(true)
+                            } else {
+                                Ok(false)
+                            }
+                        },
+                        parse_quant_binding,
+                    )?;
+                    let binds_with_range_list = spanned(
+                        context.tokens.file_hash(),
+                        bindings_start,
+                        context.tokens.previous_end_loc(),
+                        binds,
+                    );
+                    // Parse "with" keyword followed by trigger groups
+                    consume_identifier(context.tokens, "with")?;
+                    let triggers = parse_list(
+                        context,
+                        |context| {
+                            if context.tokens.peek() == Tok::LBrace {
+                                Ok(true)
+                            } else {
+                                Ok(false)
+                            }
+                        },
+                        |context| {
+                            parse_comma_list(
+                                context,
+                                Tok::LBrace,
+                                Tok::RBrace,
+                                parse_exp,
+                                "a trigger expression",
+                            )
+                        },
+                    )?;
+                    consume_token(context.tokens, Tok::Semicolon)?;
+                    ProofHint_::Trigger(binds_with_range_list, triggers)
+                },
+                "split" => {
+                    context.tokens.advance()?;
+                    consume_identifier(context.tokens, "on")?;
+                    let exp = parse_exp(context)?;
+                    consume_token(context.tokens, Tok::Semicolon)?;
+                    ProofHint_::SplitOn(exp)
+                },
+                "induct" => {
+                    context.tokens.advance()?;
+                    consume_identifier(context.tokens, "on")?;
+                    let name = parse_identifier(context)?;
+                    consume_token(context.tokens, Tok::Semicolon)?;
+                    ProofHint_::InductOn(Var(name))
+                },
+                "witness" => {
+                    // witness x = val in <exists_exp>;
+                    context.tokens.advance()?;
+                    let name = parse_identifier(context)?;
+                    consume_token(context.tokens, Tok::Equal)?;
+                    let witness_exp = parse_exp(context)?;
+                    consume_identifier(context.tokens, "in")?;
+                    let quant_exp = parse_exp(context)?;
+                    consume_token(context.tokens, Tok::Semicolon)?;
+                    ProofHint_::Witness(name, witness_exp, quant_exp)
+                },
+                _ => {
+                    return Err(unexpected_token_error(
+                        context.tokens,
+                        "one of `unfold`, `assert`, `assume`, `use`, `trigger`, `split`, \
+                         `induct`, or `witness`",
+                    ));
+                },
+            },
+            // `use` is a keyword token, handle separately
+            Tok::Use => {
+                context.tokens.advance()?;
+                let name = parse_name_access_chain(context, false, || "a spec function name")?;
+                let args = parse_comma_list(
+                    context,
+                    Tok::LParen,
+                    Tok::RParen,
+                    parse_exp,
+                    "a call argument expression",
+                )?;
+                consume_token(context.tokens, Tok::Semicolon)?;
+                ProofHint_::Use(name, args)
+            },
+            _ => {
+                return Err(unexpected_token_error(
+                    context.tokens,
+                    "one of `unfold`, `assert`, `assume`, `use`, `trigger`, `split`, \
+                     `induct`, or `witness`",
+                ));
+            },
+        };
+        let hint_end = context.tokens.previous_end_loc();
+        hints.push(spanned(
+            context.tokens.file_hash(),
+            hint_start,
+            hint_end,
+            hint_,
+        ));
+    }
+    consume_token(context.tokens, Tok::RBrace)?;
+    Ok(spanned(
+        context.tokens.file_hash(),
+        start_loc,
+        context.tokens.previous_end_loc(),
+        SpecBlockMember_::Proof { hints },
     ))
 }
 

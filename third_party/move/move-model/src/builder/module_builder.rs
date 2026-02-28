@@ -5,9 +5,9 @@
 use crate::{
     ast::{
         AccessSpecifier, Address, Attribute, AttributeValue, Condition, ConditionKind, Exp,
-        ExpData, FriendDecl, ModuleName, Operation, Pattern, PropertyBag, PropertyValue,
-        QualifiedSymbol, Spec, SpecBlockInfo, SpecBlockTarget, SpecFunDecl, SpecVarDecl, TempIndex,
-        UseDecl, Value,
+        ExpData, FriendDecl, ModuleName, Operation, Pattern, ProofHint, PropertyBag, PropertyValue,
+        QualifiedSymbol, QuantKind, Spec, SpecBlockInfo, SpecBlockTarget, SpecFunDecl, SpecVarDecl,
+        TempIndex, UseDecl, Value,
     },
     builder::{
         exp_builder::ExpTranslator,
@@ -1784,6 +1784,394 @@ impl ModuleBuilder<'_, '_> {
                 is_global: false, ..
             } => { /* nothing to do right now */ },
             Update { lhs, rhs } => self.def_ana_global_var_update(loc, context, lhs, rhs),
+            Proof { hints } => self.def_ana_proof_block(loc, context, hints),
+        }
+    }
+
+    fn def_ana_proof_block(
+        &mut self,
+        loc: &Loc,
+        context: &SpecBlockContext,
+        hints: &[EA::ProofHint],
+    ) {
+        // Proof blocks are only allowed in function-level spec blocks.
+        if !matches!(
+            context,
+            SpecBlockContext::Function(_) | SpecBlockContext::FunctionCodeV2(..)
+        ) {
+            self.parent
+                .error(loc, "proof block is only allowed in function spec blocks");
+            return;
+        }
+        for hint_spanned in hints {
+            let hint_loc = self.parent.to_loc(&hint_spanned.loc);
+            let model_hint = match &hint_spanned.value {
+                EA::ProofHint_::Unfold(maccess, depth) => {
+                    let qsym = self.module_access_to_qualified(maccess);
+                    // Check that the symbol refers to a spec function
+                    if self.parent.spec_fun_table.contains_key(&qsym) {
+                        Some(ProofHint::Unfold(hint_loc, qsym, *depth))
+                    } else {
+                        self.parent.error(
+                            &self.parent.to_loc(&maccess.loc),
+                            &format!(
+                                "`{}` is not a spec function",
+                                qsym.display(&self.parent.env)
+                            ),
+                        );
+                        None
+                    }
+                },
+                EA::ProofHint_::Assert(exp) => {
+                    let kind = ConditionKind::Ensures; // allow old() and result
+                    let mut et = self.exp_translator_for_context(&hint_loc, context, &kind);
+                    let translated = et.translate_exp(exp, &BOOL_TYPE).into_exp();
+                    et.finalize_types(true);
+                    Some(ProofHint::Assert(hint_loc, translated))
+                },
+                EA::ProofHint_::Use(maccess, args) => {
+                    // Build a synthetic call expression `f(args)` and translate it.
+                    // This is semantically equivalent to `assert f(args)` but the
+                    // intent is to instantiate a universally quantified axiom/lemma.
+                    let args_loc = if let Some(last) = args.last() {
+                        last.loc
+                    } else {
+                        maccess.loc
+                    };
+                    let call_exp = sp(
+                        hint_spanned.loc,
+                        EA::Exp_::Call(
+                            maccess.clone(),
+                            PA::CallKind::Regular,
+                            None,
+                            sp(args_loc, args.clone()),
+                        ),
+                    );
+                    let kind = ConditionKind::Ensures;
+                    let mut et = self.exp_translator_for_context(&hint_loc, context, &kind);
+                    let translated = et.translate_exp(&call_exp, &BOOL_TYPE).into_exp();
+                    et.finalize_types(true);
+                    Some(ProofHint::Assert(hint_loc, translated))
+                },
+                EA::ProofHint_::Assume(properties, exp) => {
+                    // Check for [trusted] annotation
+                    let has_trusted = properties
+                        .iter()
+                        .any(|p| p.value.name.value.as_str() == "trusted");
+                    if !has_trusted {
+                        self.parent.error(
+                            &hint_loc,
+                            "`assume` in proof block requires `[trusted]` annotation",
+                        );
+                        return;
+                    }
+                    let kind = ConditionKind::Ensures;
+                    let mut et = self.exp_translator_for_context(&hint_loc, context, &kind);
+                    let translated = et.translate_exp(exp, &BOOL_TYPE).into_exp();
+                    et.finalize_types(true);
+                    self.parent.env.diag(
+                        Severity::Warning,
+                        &hint_loc,
+                        "proof uses trusted assumption",
+                    );
+                    Some(ProofHint::Assume(hint_loc, translated))
+                },
+                EA::ProofHint_::Trigger(binds, triggers) => {
+                    self.def_ana_proof_trigger(&hint_loc, context, binds, triggers)
+                },
+                EA::ProofHint_::SplitOn(exp) => {
+                    // Type checking deferred: bool expressions cause boolean
+                    // case splitting; enum types create per-variant splitting.
+                    // Invalid types are reported by the proof hint processor.
+                    let kind = ConditionKind::Ensures;
+                    let mut et = self.exp_translator_for_context(&hint_loc, context, &kind);
+                    let (_, translated) = et.translate_exp_free(exp);
+                    let translated = translated.into_exp();
+                    et.finalize_types(true);
+                    Some(ProofHint::SplitOn(hint_loc, translated))
+                },
+                EA::ProofHint_::InductOn(var) => {
+                    self.def_ana_proof_induct_on(&hint_loc, context, var)
+                },
+                EA::ProofHint_::Witness(name, witness_exp, quant_exp) => {
+                    self.def_ana_proof_witness(&hint_loc, context, name, witness_exp, quant_exp)
+                },
+            };
+            if let Some(hint) = model_hint {
+                self.update_spec(context, |spec| spec.proof_hints.push(hint));
+            }
+        }
+    }
+
+    /// Analyze a `trigger forall x: T with {exprs};` proof hint.
+    fn def_ana_proof_trigger(
+        &mut self,
+        hint_loc: &Loc,
+        context: &SpecBlockContext,
+        binds: &EA::LValueWithRangeList,
+        triggers: &[Vec<EA::Exp>],
+    ) -> Option<ProofHint> {
+        // Extract the binding variable names and their types from the LValueWithRangeList.
+        // The bindings should be simple `x: T` style (TypeDomain ranges from `parse_quant_binding`).
+        let mut bind_vars: Vec<(Symbol, Type)> = vec![];
+        let kind = ConditionKind::Ensures;
+        for bind_entry in &binds.value {
+            let (ref lv, ref range) = bind_entry.value;
+            // The range should be a type domain call (from `x: T` syntax).
+            // Extract the variable name from the LValue.
+            let var_sym = match &lv.value {
+                EA::LValue_::Var(maccess, _) => match &maccess.value {
+                    EA::ModuleAccess_::Name(name) => self.symbol_pool().make(name.value.as_str()),
+                    _ => {
+                        self.parent
+                            .error(hint_loc, "trigger binding must be a simple variable");
+                        return None;
+                    },
+                },
+                _ => {
+                    self.parent
+                        .error(hint_loc, "trigger binding must be a simple variable");
+                    return None;
+                },
+            };
+            // Translate the range expression to get its type.
+            let mut et = self.exp_translator_for_context(hint_loc, context, &kind);
+            let (range_ty, _) = et.translate_exp_free(range);
+            et.finalize_types(true);
+            // The type of the binding variable is the element type of the domain.
+            let var_ty = if let Type::TypeDomain(ty) = range_ty {
+                *ty
+            } else {
+                self.parent
+                    .error(hint_loc, "trigger binding must use `x: T` syntax");
+                return None;
+            };
+            bind_vars.push((var_sym, var_ty));
+        }
+
+        // Note: we do NOT validate here that a matching quantifier exists. The trigger
+        // may target a quantifier from a global update invariant that is only injected
+        // later by GlobalInvariantInstrumentationProcessor. The Boogie backend checks
+        // for unmatched triggers after all instrumentation is complete.
+
+        // Translate the trigger expressions in the quantifier's scope.
+        // We create an expression translator, define the quantifier's bound variables,
+        // then translate each trigger expression (type-free, like quantifier triggers).
+        let mut translated_triggers = vec![];
+        for group in triggers {
+            let mut translated_group = vec![];
+            for exp in group {
+                let mut et = self.exp_translator_for_context(hint_loc, context, &kind);
+                // Enter a scope and define the bound variables from the trigger binding.
+                et.enter_scope();
+                for (sym, ty) in &bind_vars {
+                    et.define_local(hint_loc, *sym, ty.clone(), None, None);
+                }
+                let translated = et.translate_exp_free(exp).1.into_exp();
+                et.finalize_types(true);
+                translated_group.push(translated);
+            }
+            translated_triggers.push(translated_group);
+        }
+
+        // Validate trigger expressions.
+        for (group_idx, group) in translated_triggers.iter().enumerate() {
+            // Check 1: each trigger group must mention all bound variables.
+            let mut mentioned = BTreeSet::new();
+            for exp in group {
+                exp.visit_post_order(&mut |e| {
+                    if let ExpData::LocalVar(_, sym) = e {
+                        mentioned.insert(*sym);
+                    }
+                    true
+                });
+            }
+            for (sym, _) in &bind_vars {
+                if !mentioned.contains(sym) {
+                    self.parent.error(
+                        hint_loc,
+                        &format!(
+                            "trigger group {} must mention all quantified variables, \
+                             but does not mention `{}`",
+                            group_idx + 1,
+                            sym.display(self.symbol_pool()),
+                        ),
+                    );
+                    return None;
+                }
+            }
+
+            // Check 2: each trigger group should contain at least one uninterpreted
+            // function call (spec function). Arithmetic, logical, and comparison
+            // operations are interpreted by the SMT solver and will be silently
+            // ignored as E-matching triggers.
+            let mut has_spec_fun = false;
+            for exp in group {
+                exp.visit_post_order(&mut |e| {
+                    if let ExpData::Call(_, Operation::SpecFunction(..), _) = e {
+                        has_spec_fun = true;
+                    }
+                    true
+                });
+            }
+            if !has_spec_fun {
+                self.parent.env.diag(
+                    Severity::Warning,
+                    hint_loc,
+                    "trigger does not contain a call to a spec function; \
+                     arithmetic and logical expressions are interpreted by the SMT \
+                     solver and will likely be ignored as E-matching triggers",
+                );
+            }
+        }
+
+        Some(ProofHint::Trigger(
+            hint_loc.clone(),
+            bind_vars,
+            translated_triggers,
+        ))
+    }
+
+    /// Analyze an `induct on <var>;` proof hint.
+    fn def_ana_proof_induct_on(
+        &mut self,
+        hint_loc: &Loc,
+        context: &SpecBlockContext,
+        var: &PA::Var,
+    ) -> Option<ProofHint> {
+        // Resolve the variable to a function parameter.
+        let var_sym = self.symbol_pool().make(var.0.value.as_str());
+        let fun_name = match context {
+            SpecBlockContext::Function(name) | SpecBlockContext::FunctionCodeV2(name, ..) => name,
+            _ => {
+                self.parent
+                    .error(hint_loc, "`induct on` requires a function context");
+                return None;
+            },
+        };
+        let entry = self
+            .parent
+            .fun_table
+            .get(fun_name)
+            .expect("invalid spec block context")
+            .clone();
+        let param = entry.params.iter().find(|p| p.0 == var_sym);
+        match param {
+            Some(Parameter(_, ty, _)) => {
+                // Check that the type is u64, u128, or u256.
+                match ty {
+                    Type::Primitive(PrimitiveType::U64)
+                    | Type::Primitive(PrimitiveType::U128)
+                    | Type::Primitive(PrimitiveType::U256) => {
+                        Some(ProofHint::InductOn(hint_loc.clone(), var_sym))
+                    },
+                    _ => {
+                        self.parent.error(
+                            hint_loc,
+                            "induction variable must be an unsigned integer type \
+                             (u64, u128, or u256)",
+                        );
+                        None
+                    },
+                }
+            },
+            None => {
+                self.parent.error(
+                    hint_loc,
+                    &format!(
+                        "`{}` is not a parameter of this function",
+                        var_sym.display(self.symbol_pool())
+                    ),
+                );
+                None
+            },
+        }
+    }
+
+    /// Analyze a `witness x = val in exists x: T: body;` proof hint.
+    ///
+    /// Translates the existential quantifier, extracts the bound variable,
+    /// substitutes the witness expression for it in the body, and emits
+    /// the result as an `Assert` on the substituted body.
+    fn def_ana_proof_witness(
+        &mut self,
+        hint_loc: &Loc,
+        context: &SpecBlockContext,
+        name: &Name,
+        witness_exp: &EA::Exp,
+        quant_exp: &EA::Exp,
+    ) -> Option<ProofHint> {
+        let kind = ConditionKind::Ensures;
+        // Translate the quantifier expression.
+        let mut et = self.exp_translator_for_context(hint_loc, context, &kind);
+        let translated_quant = et.translate_exp(quant_exp, &BOOL_TYPE).into_exp();
+        et.finalize_types(true);
+
+        // The translated expression must be an exists quantifier.
+        if let ExpData::Quant(_, QuantKind::Exists, ranges, _, condition, body) =
+            translated_quant.as_ref()
+        {
+            // Find the bound variable matching `name`.
+            let var_sym = self.symbol_pool().make(name.value.as_str());
+            let matching_range = ranges.iter().find(|(pat, _)| {
+                if let Pattern::Var(_, sym) = pat {
+                    *sym == var_sym
+                } else {
+                    false
+                }
+            });
+            let (pat, _range_exp) = match matching_range {
+                Some(r) => r,
+                None => {
+                    self.parent.error(
+                        hint_loc,
+                        &format!(
+                            "witness variable `{}` not found in the existential quantifier",
+                            name
+                        ),
+                    );
+                    return None;
+                },
+            };
+            let var_ty = self.parent.env.get_node_type(pat.node_id());
+
+            // Translate the witness expression with the expected type.
+            let mut et2 = self.exp_translator_for_context(hint_loc, context, &kind);
+            let translated_witness = et2.translate_exp(witness_exp, &var_ty).into_exp();
+            et2.finalize_types(true);
+
+            // Build the body with the condition folded in (if any).
+            let full_body = if let Some(cond) = condition {
+                // body under condition: cond ==> body  is asserted,
+                // but for witness we want cond && body to be true,
+                // so we substitute and assert cond[x:=witness] && body[x:=witness].
+                let env = &self.parent.env;
+                let node_id = env.new_node(hint_loc.clone(), BOOL_TYPE.clone());
+                ExpData::Call(node_id, Operation::And, vec![cond.clone(), body.clone()]).into_exp()
+            } else {
+                body.clone()
+            };
+
+            // Substitute the witness variable in the body.
+            let env = &self.parent.env;
+            let witness_clone = translated_witness.clone();
+            let mut replacer = |_node_id: NodeId, target: RewriteTarget| -> Option<Exp> {
+                if let RewriteTarget::LocalVar(s) = target {
+                    if s == var_sym {
+                        return Some(witness_clone.clone());
+                    }
+                }
+                None
+            };
+            let substituted = ExpRewriter::new(env, &mut replacer).rewrite_exp(full_body);
+
+            Some(ProofHint::Witness(hint_loc.clone(), substituted))
+        } else {
+            self.parent.error(
+                hint_loc,
+                "the expression after `in` must be an existential quantifier (`exists`)",
+            );
+            None
         }
     }
 }

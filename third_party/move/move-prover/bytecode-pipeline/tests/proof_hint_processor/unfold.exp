@@ -1,0 +1,269 @@
+============ initial translation from Move ================
+
+[variant baseline]
+fun TestUnfold::test_depth_1($t0|n: u64): u64 {
+     var $t1: u64
+     var $t2: u64
+     var $t3: bool
+     var $t4: u64
+     var $t5: u64
+  0: $t1 := copy($t0)
+  1: $t2 := 0
+  2: $t3 := ==($t1, $t2)
+  3: if ($t3) goto 4 else goto 7
+  4: label L1
+  5: $t4 := 0
+  6: return $t4
+  7: label L0
+  8: $t5 := move($t0)
+  9: return $t5
+}
+
+
+[variant baseline]
+fun TestUnfold::test_depth_2($t0|n: u64): u64 {
+     var $t1|$t3: u64
+     var $t2: u64
+     var $t3: u64
+     var $t4: bool
+     var $t5: u64
+     var $t6: u64
+     var $t7: u64
+     var $t8: u64
+     var $t9: bool
+     var $t10: u64
+     var $t11: u64
+  0: $t2 := copy($t0)
+  1: $t3 := 0
+  2: $t4 := ==($t2, $t3)
+  3: if ($t4) goto 4 else goto 10
+  4: label L1
+  5: $t5 := 0
+  6: return $t5
+  7: label L4
+  8: $t6 := move($t1)
+  9: return $t6
+ 10: label L0
+ 11: $t7 := copy($t0)
+ 12: $t8 := 1
+ 13: $t9 := ==($t7, $t8)
+ 14: if ($t9) goto 15 else goto 19
+ 15: label L3
+ 16: $t10 := 1
+ 17: $t1 := $t10
+ 18: goto 7
+ 19: label L2
+ 20: $t11 := move($t0)
+ 21: $t1 := $t11
+ 22: goto 7
+}
+
+
+[variant baseline]
+fun TestUnfold::test_depth_3($t0|n: u64): u64 {
+     var $t1: u64
+     var $t2: u64
+     var $t3: bool
+     var $t4: u64
+     var $t5: u64
+     var $t6: u64
+     var $t7: bool
+     var $t8: u64
+     var $t9: u64
+     var $t10: u64
+     var $t11: bool
+     var $t12: u64
+     var $t13: u64
+  0: $t1 := copy($t0)
+  1: $t2 := 0
+  2: $t3 := ==($t1, $t2)
+  3: if ($t3) goto 4 else goto 7
+  4: label L1
+  5: $t4 := 0
+  6: return $t4
+  7: label L0
+  8: $t5 := copy($t0)
+  9: $t6 := 1
+ 10: $t7 := ==($t5, $t6)
+ 11: if ($t7) goto 12 else goto 15
+ 12: label L3
+ 13: $t8 := 1
+ 14: return $t8
+ 15: label L2
+ 16: $t9 := copy($t0)
+ 17: $t10 := 2
+ 18: $t11 := ==($t9, $t10)
+ 19: if ($t11) goto 20 else goto 23
+ 20: label L5
+ 21: $t12 := 3
+ 22: return $t12
+ 23: label L4
+ 24: $t13 := move($t0)
+ 25: return $t13
+}
+
+
+[variant baseline]
+fun TestUnfold::test_unfold($t0|x: u64): u64 {
+     var $t1: u64
+     var $t2: u64
+     var $t3: u64
+  0: $t1 := copy($t0)
+  1: $t2 := move($t0)
+  2: $t3 := +($t1, $t2)
+  3: return $t3
+}
+
+============ after pipeline `proof_hint_processor` ================
+
+[variant verification]
+fun TestUnfold::test_depth_1($t0|n: u64): u64 {
+     var $t1: u64
+     var $t2: bool
+     var $t3: u64
+     var $t4: u64
+  0: assume forall n: u64: TypeDomain(): Eq(TestUnfold::sum(n), if Eq<u64>(n, 0) {
+  0
+} else {
+  Add(n, TestUnfold::sum(Sub(n, 1)))
+})
+  1: assume WellFormed($t0)
+  2: assume Le($t0, 0)
+  3: $t1 := 0
+  4: $t2 := ==($t0, $t1)
+  5: if ($t2) goto 6 else goto 10
+  6: label L1
+  7: $t3 := 0
+  8: $t4 := move($t3)
+  9: goto 12
+ 10: label L0
+ 11: $t4 := move($t0)
+ 12: label L2
+     # VC: post-condition does not hold at tests/proof_hint_processor/unfold.move:36:9+25
+ 13: assert Eq<u64>($t4, TestUnfold::sum($t0))
+ 14: return $t4
+}
+
+
+[variant verification]
+fun TestUnfold::test_depth_2($t0|n: u64): u64 {
+     var $t1|$t3: u64
+     var $t2: u64
+     var $t3: bool
+     var $t4: u64
+     var $t5: u64
+     var $t6: u64
+     var $t7: bool
+     var $t8: u64
+  0: assume forall n: u64: TypeDomain(): Eq(TestUnfold::sum(n), if Eq<u64>(n, 0) {
+  0
+} else {
+  Add(n, if Eq<u64>(Sub(n, 1), 0) {
+    0
+  } else {
+    Add(Sub(n, 1), TestUnfold::sum(Sub(Sub(n, 1), 1)))
+  })
+})
+  1: assume WellFormed($t0)
+  2: assume Le($t0, 1)
+  3: $t2 := 0
+  4: $t3 := ==($t0, $t2)
+  5: if ($t3) goto 6 else goto 13
+  6: label L1
+  7: $t4 := 0
+  8: $t5 := move($t4)
+  9: goto 24
+ 10: label L4
+ 11: $t5 := move($t1)
+ 12: goto 24
+ 13: label L0
+ 14: $t6 := 1
+ 15: $t7 := ==($t0, $t6)
+ 16: if ($t7) goto 17 else goto 21
+ 17: label L3
+ 18: $t8 := 1
+ 19: $t1 := $t8
+ 20: goto 10
+ 21: label L2
+ 22: $t1 := $t0
+ 23: goto 10
+ 24: label L5
+     # VC: post-condition does not hold at tests/proof_hint_processor/unfold.move:49:9+25
+ 25: assert Eq<u64>($t5, TestUnfold::sum($t0))
+ 26: return $t5
+}
+
+
+[variant verification]
+fun TestUnfold::test_depth_3($t0|n: u64): u64 {
+     var $t1: u64
+     var $t2: bool
+     var $t3: u64
+     var $t4: u64
+     var $t5: u64
+     var $t6: bool
+     var $t7: u64
+     var $t8: u64
+     var $t9: bool
+     var $t10: u64
+  0: assume forall n: u64: TypeDomain(): Eq(TestUnfold::sum(n), if Eq<u64>(n, 0) {
+  0
+} else {
+  Add(n, if Eq<u64>(Sub(n, 1), 0) {
+    0
+  } else {
+    Add(Sub(n, 1), if Eq<u64>(Sub(Sub(n, 1), 1), 0) {
+      0
+    } else {
+      Add(Sub(Sub(n, 1), 1), TestUnfold::sum(Sub(Sub(Sub(n, 1), 1), 1)))
+    })
+  })
+})
+  1: assume WellFormed($t0)
+  2: assume Le($t0, 2)
+  3: $t1 := 0
+  4: $t2 := ==($t0, $t1)
+  5: if ($t2) goto 6 else goto 10
+  6: label L1
+  7: $t3 := 0
+  8: $t4 := move($t3)
+  9: goto 28
+ 10: label L0
+ 11: $t5 := 1
+ 12: $t6 := ==($t0, $t5)
+ 13: if ($t6) goto 14 else goto 18
+ 14: label L3
+ 15: $t7 := 1
+ 16: $t4 := move($t7)
+ 17: goto 28
+ 18: label L2
+ 19: $t8 := 2
+ 20: $t9 := ==($t0, $t8)
+ 21: if ($t9) goto 22 else goto 26
+ 22: label L5
+ 23: $t10 := 3
+ 24: $t4 := move($t10)
+ 25: goto 28
+ 26: label L4
+ 27: $t4 := move($t0)
+ 28: label L6
+     # VC: post-condition does not hold at tests/proof_hint_processor/unfold.move:65:9+25
+ 29: assert Eq<u64>($t4, TestUnfold::sum($t0))
+ 30: return $t4
+}
+
+
+[variant verification]
+fun TestUnfold::test_unfold($t0|x: u64): u64 {
+     var $t1: u64
+     var $t2: num
+  0: assume forall x: u64: TypeDomain(): Eq(TestUnfold::double(x), Add(x, x))
+  1: assume WellFormed($t0)
+  2: $t1 := +($t0, $t0) on_abort goto 6 with $t2
+  3: label L1
+     # VC: post-condition does not hold at tests/proof_hint_processor/unfold.move:16:9+28
+  4: assert Eq<u64>($t1, TestUnfold::double($t0))
+  5: return $t1
+  6: label L2
+  7: abort($t2)
+}

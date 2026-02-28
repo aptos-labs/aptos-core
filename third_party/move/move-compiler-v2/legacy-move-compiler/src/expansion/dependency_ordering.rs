@@ -680,5 +680,27 @@ fn spec_block_member(context: &mut Context, sp!(_, sbm_): &E::SpecBlockMember) {
             }
         },
         M::Variable { .. } => (),
+        M::Proof { hints } => {
+            for sp!(_, hint) in hints {
+                match hint {
+                    E::ProofHint_::Assert(e)
+                    | E::ProofHint_::Assume(_, e)
+                    | E::ProofHint_::SplitOn(e) => exp(context, e),
+                    E::ProofHint_::Use(_, args) => args.iter().for_each(|e| exp(context, e)),
+                    E::ProofHint_::Trigger(_, trigger_groups) => {
+                        for group in trigger_groups {
+                            for e in group {
+                                exp(context, e);
+                            }
+                        }
+                    },
+                    E::ProofHint_::Witness(_, wexp, qexp) => {
+                        exp(context, wexp);
+                        exp(context, qexp);
+                    },
+                    E::ProofHint_::Unfold(..) | E::ProofHint_::InductOn(_) => (),
+                }
+            }
+        },
     }
 }

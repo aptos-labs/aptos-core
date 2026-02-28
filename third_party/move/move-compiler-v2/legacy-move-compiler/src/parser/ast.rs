@@ -387,6 +387,31 @@ pub enum SpecApplyFragment_ {
 
 pub type SpecApplyFragment = Spanned<SpecApplyFragment_>;
 
+/// A proof hint command inside a `proof { ... }` block.
+#[derive(Debug, Clone, PartialEq)]
+pub enum ProofHint_ {
+    /// `unfold <spec_fun> [depth N];` — expand an opaque spec function in this VC.
+    /// The optional depth controls recursive expansion (default 1).
+    Unfold(NameAccessChain, Option<usize>),
+    /// `assert <expr>;` — auxiliary lemma assertion.
+    Assert(Exp),
+    /// `use <fun>(args);` — instantiate a spec function at specific arguments.
+    Use(NameAccessChain, Vec<Exp>),
+    /// `assume [trusted] <expr>;` — guarded assumption (requires `[trusted]`).
+    Assume(Vec<PragmaProperty>, Exp),
+    /// `trigger forall x: T, y: U with {expr1, expr2} {expr3};`
+    /// Add E-matching triggers to a matched quantifier.
+    Trigger(BindWithRangeList, Vec<Vec<Exp>>),
+    /// `split on <expr>;` — case-split the VC on expression.
+    SplitOn(Exp),
+    /// `induct on <var>;` — induction on an integer parameter.
+    InductOn(Var),
+    /// `witness x = val in exists x: T: body;` — provide a witness for an existential.
+    Witness(Name, Exp, Exp),
+}
+
+pub type ProofHint = Spanned<ProofHint_>;
+
 #[derive(Debug, Clone, PartialEq)]
 #[allow(clippy::large_enum_variant)]
 pub enum SpecBlockMember_ {
@@ -429,6 +454,10 @@ pub enum SpecBlockMember_ {
     },
     Pragma {
         properties: Vec<PragmaProperty>,
+    },
+    /// `proof { ... }` — a block of proof hints guiding the SMT solver.
+    Proof {
+        hints: Vec<ProofHint>,
     },
 }
 
@@ -1612,6 +1641,86 @@ impl AstDebug for SpecBlockMember_ {
                     p.ast_debug(w);
                     true
                 });
+            },
+            SpecBlockMember_::Proof { hints } => {
+                w.write("proof ");
+                w.block(|w| {
+                    for hint in hints {
+                        hint.ast_debug(w);
+                        w.new_line();
+                    }
+                });
+            },
+        }
+    }
+}
+
+impl AstDebug for ProofHint_ {
+    fn ast_debug(&self, w: &mut AstWriter) {
+        match self {
+            ProofHint_::Unfold(name, depth) => {
+                w.write("unfold ");
+                name.ast_debug(w);
+                if let Some(d) = depth {
+                    w.write(&format!(" depth {}", d));
+                }
+            },
+            ProofHint_::Assert(exp) => {
+                w.write("assert ");
+                exp.ast_debug(w);
+            },
+            ProofHint_::Use(name, args) => {
+                w.write("use ");
+                name.ast_debug(w);
+                w.write("(");
+                w.list(args, ", ", |w, e| {
+                    e.ast_debug(w);
+                    true
+                });
+                w.write(")");
+            },
+            ProofHint_::Assume(props, exp) => {
+                w.write("assume ");
+                if !props.is_empty() {
+                    w.write("[");
+                    w.list(props, ", ", |w, p| {
+                        p.ast_debug(w);
+                        true
+                    });
+                    w.write("] ");
+                }
+                exp.ast_debug(w);
+            },
+            ProofHint_::Trigger(binds, triggers) => {
+                w.write("trigger forall ");
+                w.list(&binds.value, ", ", |w, sp!(_, (bind, range))| {
+                    bind.ast_debug(w);
+                    w.write(": ");
+                    range.ast_debug(w);
+                    true
+                });
+                w.write(" with ");
+                for group in triggers {
+                    w.write("{");
+                    w.list(group, ", ", |w, e| {
+                        e.ast_debug(w);
+                        true
+                    });
+                    w.write("}");
+                }
+            },
+            ProofHint_::SplitOn(exp) => {
+                w.write("split on ");
+                exp.ast_debug(w);
+            },
+            ProofHint_::InductOn(var) => {
+                w.write(&format!("induct on {}", var));
+            },
+            ProofHint_::Witness(name, witness_exp, quant_exp) => {
+                w.write(&format!("witness {} = ", name));
+                witness_exp.ast_debug(w);
+                w.write(" in ");
+                quant_exp.ast_debug(w);
             },
         }
     }

@@ -1,0 +1,12 @@
+Move prover returns: exiting with compilation errors
+error: the expression after `in` must be an existential quantifier (`exists`)
+   ┌─ tests/sources/functional/proof_hints/witness.move:39:13
+   │
+39 │             witness y = x in forall y: u64: y == y;
+   │             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+error: witness variable `z` not found in the existential quantifier
+   ┌─ tests/sources/functional/proof_hints/witness.move:52:13
+   │
+52 │             witness z = x in exists y: u64: y == x;
+   │             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^

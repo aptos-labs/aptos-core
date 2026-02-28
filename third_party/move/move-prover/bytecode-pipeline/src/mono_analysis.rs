@@ -340,9 +340,15 @@ impl Analyzer<'_> {
                 self.analyze_bytecode(&target, bc);
             }
         }
-        // Analyze spec conditions for closures and types.
-        for cond in target.get_spec().conditions.iter() {
-            for exp in cond.all_exps() {
+        // Analyze spec conditions and proof hints for closures and types.
+        {
+            let spec = target.get_spec();
+            for cond in spec.conditions.iter() {
+                for exp in cond.all_exps() {
+                    self.analyze_exp(exp);
+                }
+            }
+            for exp in spec.proof_hint_exps() {
                 self.analyze_exp(exp);
             }
         }

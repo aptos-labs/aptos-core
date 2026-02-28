@@ -338,8 +338,35 @@ pub enum SpecBlockMember_ {
     Pragma {
         properties: Vec<PragmaProperty>,
     },
+    /// `proof { ... }` — a block of proof hints guiding the SMT solver.
+    Proof {
+        hints: Vec<ProofHint>,
+    },
 }
 pub type SpecBlockMember = Spanned<SpecBlockMember_>;
+
+/// A proof hint command inside a `proof { ... }` block (expansion-phase AST).
+#[derive(Debug, Clone, PartialEq)]
+pub enum ProofHint_ {
+    /// `unfold <spec_fun> [depth N];`
+    Unfold(ModuleAccess, Option<usize>),
+    /// `assert <expr>;`
+    Assert(Exp),
+    /// `use <fun>(args);`
+    Use(ModuleAccess, Vec<Exp>),
+    /// `assume [trusted] <expr>;`
+    Assume(Vec<PragmaProperty>, Exp),
+    /// `trigger forall x: T with {exprs};`
+    Trigger(LValueWithRangeList, Vec<Vec<Exp>>),
+    /// `split on <expr>;`
+    SplitOn(Exp),
+    /// `induct on <var>;`
+    InductOn(Var),
+    /// `witness x = val in exists x: T: body;`
+    Witness(Name, Exp, Exp),
+}
+
+pub type ProofHint = Spanned<ProofHint_>;
 
 #[derive(PartialEq, Eq, Clone, Debug)]
 pub enum SpecConditionKind_ {
@@ -1381,6 +1408,86 @@ impl AstDebug for SpecBlockMember_ {
                     p.ast_debug(w);
                     true
                 });
+            },
+            SpecBlockMember_::Proof { hints } => {
+                w.write("proof ");
+                w.block(|w| {
+                    for hint in hints {
+                        hint.ast_debug(w);
+                        w.new_line();
+                    }
+                });
+            },
+        }
+    }
+}
+
+impl AstDebug for ProofHint_ {
+    fn ast_debug(&self, w: &mut AstWriter) {
+        match self {
+            ProofHint_::Unfold(access, depth) => {
+                w.write("unfold ");
+                access.ast_debug(w);
+                if let Some(d) = depth {
+                    w.write(&format!(" depth {}", d));
+                }
+            },
+            ProofHint_::Assert(exp) => {
+                w.write("assert ");
+                exp.ast_debug(w);
+            },
+            ProofHint_::Use(access, args) => {
+                w.write("use ");
+                access.ast_debug(w);
+                w.write("(");
+                w.list(args, ", ", |w, e| {
+                    e.ast_debug(w);
+                    true
+                });
+                w.write(")");
+            },
+            ProofHint_::Assume(props, exp) => {
+                w.write("assume ");
+                if !props.is_empty() {
+                    w.write("[");
+                    w.list(props, ", ", |w, p| {
+                        p.ast_debug(w);
+                        true
+                    });
+                    w.write("] ");
+                }
+                exp.ast_debug(w);
+            },
+            ProofHint_::Trigger(binds, triggers) => {
+                w.write("trigger forall ");
+                w.list(&binds.value, ", ", |w, sp!(_, (lv, range))| {
+                    lv.ast_debug(w);
+                    w.write(": ");
+                    range.ast_debug(w);
+                    true
+                });
+                w.write(" with ");
+                for group in triggers {
+                    w.write("{");
+                    w.list(group, ", ", |w, e| {
+                        e.ast_debug(w);
+                        true
+                    });
+                    w.write("}");
+                }
+            },
+            ProofHint_::SplitOn(exp) => {
+                w.write("split on ");
+                exp.ast_debug(w);
+            },
+            ProofHint_::InductOn(var) => {
+                w.write(&format!("induct on {}", var));
+            },
+            ProofHint_::Witness(name, witness_exp, quant_exp) => {
+                w.write(&format!("witness {} = ", name));
+                witness_exp.ast_debug(w);
+                w.write(" in ");
+                quant_exp.ast_debug(w);
             },
         }
     }

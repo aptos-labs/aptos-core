@@ -1,0 +1,31 @@
+============ initial translation from Move ================
+
+[variant baseline]
+fun TestInduct::test_induct($t0|n: u64): u64 {
+     var $t1: u64
+  0: $t1 := move($t0)
+  1: return $t1
+}
+
+============ after pipeline `proof_hint_processor` ================
+
+[variant verification[induct_base]]
+fun TestInduct::test_induct($t0|n: u64): u64 {
+  0: assume Eq($t0, 0)
+  1: assume WellFormed($t0)
+  2: label L1
+     # VC: post-condition does not hold at tests/proof_hint_processor/induct.move:14:9+20
+  3: assert Eq<u64>($t0, $t0)
+  4: return $t0
+}
+
+
+[variant verification[induct_step]]
+fun TestInduct::test_induct($t0|n: u64): u64 {
+  0: assume Gt($t0, 0)
+  1: assume WellFormed($t0)
+  2: label L1
+     # VC: post-condition does not hold at tests/proof_hint_processor/induct.move:14:9+20
+  3: assert Eq<u64>($t0, $t0)
+  4: return $t0
+}

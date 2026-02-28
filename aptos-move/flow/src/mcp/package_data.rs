@@ -186,7 +186,7 @@ fn log_diagnostics(diagnostics: &[String], source: &str) {
 }
 
 /// Render all diagnostics at Warning level or above from a `GlobalEnv`.
-fn render_diagnostics(env: &GlobalEnv) -> Vec<String> {
+pub(crate) fn render_diagnostics(env: &GlobalEnv) -> Vec<String> {
     let mut messages = Vec::new();
     env.report_diag_with_filter(
         |files, diag| {

@@ -704,6 +704,7 @@ pub trait ExpRewriterFunctions {
             properties: spec.properties.clone(),
             on_impl,
             update_map,
+            proof_hints: spec.proof_hints.clone(),
         };
 
         if let Some(new_spec) = self.rewrite_spec(target, &new_spec) {
