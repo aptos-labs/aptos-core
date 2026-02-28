@@ -676,14 +676,14 @@ impl StateMerkleDb {
 
         Ok(if readonly {
             DB::open_cf_readonly(
-                &gen_rocksdb_options(state_merkle_db_config, env, true),
+                gen_rocksdb_options(state_merkle_db_config, env, true),
                 path,
                 name,
                 gen_state_merkle_cfds(state_merkle_db_config, block_cache),
             )?
         } else {
             DB::open_cf(
-                &gen_rocksdb_options(state_merkle_db_config, env, false),
+                gen_rocksdb_options(state_merkle_db_config, env, false),
                 path,
                 name,
                 gen_state_merkle_cfds(state_merkle_db_config, block_cache),
