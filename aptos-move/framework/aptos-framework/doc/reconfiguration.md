@@ -36,7 +36,6 @@ to synchronize configuration changes for the validators.
 <pre><code><b>use</b> <a href="account.md#0x1_account">0x1::account</a>;
 <b>use</b> <a href="chain_status.md#0x1_chain_status">0x1::chain_status</a>;
 <b>use</b> <a href="event.md#0x1_event">0x1::event</a>;
-<b>use</b> <a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features">0x1::features</a>;
 <b>use</b> <a href="reconfiguration_state.md#0x1_reconfiguration_state">0x1::reconfiguration_state</a>;
 <b>use</b> <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">0x1::signer</a>;
 <b>use</b> <a href="stake.md#0x1_stake">0x1::stake</a>;
@@ -405,13 +404,11 @@ Signal validators to start using new configuration. Must be called from friend c
     };
     config_ref.epoch += 1;
 
-    <b>if</b> (std::features::module_event_migration_enabled()) {
-        <a href="event.md#0x1_event_emit">event::emit</a>(
-            <a href="reconfiguration.md#0x1_reconfiguration_NewEpoch">NewEpoch</a> {
-                epoch: config_ref.epoch,
-            },
-        );
-    };
+    <a href="event.md#0x1_event_emit">event::emit</a>(
+        <a href="reconfiguration.md#0x1_reconfiguration_NewEpoch">NewEpoch</a> {
+            epoch: config_ref.epoch,
+        },
+    );
     <a href="event.md#0x1_event_emit_event">event::emit_event</a>&lt;<a href="reconfiguration.md#0x1_reconfiguration_NewEpochEvent">NewEpochEvent</a>&gt;(
         &<b>mut</b> config_ref.events,
         <a href="reconfiguration.md#0x1_reconfiguration_NewEpochEvent">NewEpochEvent</a> {
@@ -497,13 +494,11 @@ reconfiguration event.
     <b>assert</b>!(config_ref.epoch == 0 && config_ref.last_reconfiguration_time == 0, <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_state">error::invalid_state</a>(<a href="reconfiguration.md#0x1_reconfiguration_ECONFIGURATION">ECONFIGURATION</a>));
     config_ref.epoch = 1;
 
-    <b>if</b> (std::features::module_event_migration_enabled()) {
-        <a href="event.md#0x1_event_emit">event::emit</a>(
-            <a href="reconfiguration.md#0x1_reconfiguration_NewEpoch">NewEpoch</a> {
-                epoch: config_ref.epoch,
-            },
-        );
-    };
+    <a href="event.md#0x1_event_emit">event::emit</a>(
+        <a href="reconfiguration.md#0x1_reconfiguration_NewEpoch">NewEpoch</a> {
+            epoch: config_ref.epoch,
+        },
+    );
     <a href="event.md#0x1_event_emit_event">event::emit_event</a>&lt;<a href="reconfiguration.md#0x1_reconfiguration_NewEpochEvent">NewEpochEvent</a>&gt;(
         &<b>mut</b> config_ref.events,
         <a href="reconfiguration.md#0x1_reconfiguration_NewEpochEvent">NewEpochEvent</a> {

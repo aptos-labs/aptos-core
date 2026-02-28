@@ -3,7 +3,7 @@ module aptos_framework::aptos_account {
     use aptos_framework::aptos_coin::AptosCoin;
     use aptos_framework::coin::{Self, Coin};
     use aptos_framework::create_signer::create_signer;
-    use aptos_framework::event::{EventHandle, emit_event, emit};
+    use aptos_framework::event::{EventHandle, emit};
     use aptos_framework::fungible_asset::{Self, Metadata, BurnRef, FungibleAsset};
     use aptos_framework::primary_fungible_store;
     use aptos_framework::object;
@@ -206,42 +206,24 @@ module aptos_framework::aptos_account {
 
             direct_transfer_config.allow_arbitrary_coin_transfers = allow;
 
-            if (std::features::module_event_migration_enabled()) {
-                emit(
-                    DirectCoinTransferConfigUpdated {
-                        account: addr,
-                        new_allow_direct_transfers: allow
-                    }
-                );
-            } else {
-                emit_event(
-                    &mut direct_transfer_config.update_coin_transfer_events,
-                    DirectCoinTransferConfigUpdatedEvent {
-                        new_allow_direct_transfers: allow
-                    }
-                );
-            };
+            emit(
+                DirectCoinTransferConfigUpdated {
+                    account: addr,
+                    new_allow_direct_transfers: allow
+                }
+            );
         } else {
             let direct_transfer_config = DirectTransferConfig {
                 allow_arbitrary_coin_transfers: allow,
                 update_coin_transfer_events: new_event_handle<
                     DirectCoinTransferConfigUpdatedEvent>(account)
             };
-            if (std::features::module_event_migration_enabled()) {
-                emit(
-                    DirectCoinTransferConfigUpdated {
-                        account: addr,
-                        new_allow_direct_transfers: allow
-                    }
-                );
-            } else {
-                emit_event(
-                    &mut direct_transfer_config.update_coin_transfer_events,
-                    DirectCoinTransferConfigUpdatedEvent {
-                        new_allow_direct_transfers: allow
-                    }
-                );
-            };
+            emit(
+                DirectCoinTransferConfigUpdated {
+                    account: addr,
+                    new_allow_direct_transfers: allow
+                }
+            );
             move_to(account, direct_transfer_config);
         };
     }

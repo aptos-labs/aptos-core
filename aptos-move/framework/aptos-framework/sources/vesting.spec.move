@@ -366,7 +366,7 @@ spec aptos_framework::vesting {
         aborts_if simple_map::spec_contains_key(staking_contracts, new_operator);
 
         let staking_contract = simple_map::spec_get(staking_contracts, old_operator);
-        include DistributeInternalAbortsIf { staker: acc, operator: old_operator, staking_contract, distribute_events: store.distribute_events };
+        include DistributeInternalAbortsIf { staker: acc, operator: old_operator, staking_contract };
     }
 
     spec update_operator_with_same_commission(
@@ -573,7 +573,7 @@ spec aptos_framework::vesting {
         // verify staking_contract::distribute_internal()
         let store = global<staking_contract::Store>(acc);
         let staking_contract = simple_map::spec_get(store.staking_contracts, operator);
-        include amount != 0 ==> DistributeInternalAbortsIf { staker: acc, operator, staking_contract, distribute_events: store.distribute_events };
+        include amount != 0 ==> DistributeInternalAbortsIf { staker: acc, operator, staking_contract };
     }
 
     spec withdraw_stake(vesting_contract: &VestingContract, contract_address: address): Coin<AptosCoin> {
@@ -592,14 +592,13 @@ spec aptos_framework::vesting {
         // verify staking_contract::distribute_internal()
         let store = global<staking_contract::Store>(contract_address);
         let staking_contract = simple_map::spec_get(store.staking_contracts, operator);
-        include DistributeInternalAbortsIf { staker: contract_address, operator, staking_contract, distribute_events: store.distribute_events };
+        include DistributeInternalAbortsIf { staker: contract_address, operator, staking_contract };
     }
 
     spec schema DistributeInternalAbortsIf {
         staker: address;    // The verification below does not contain the loop in staking_contract::update_distribution_pool().
         operator: address;
         staking_contract: staking_contract::StakingContract;
-        distribute_events: EventHandle<staking_contract::DistributeEvent>;
 
         let pool_address = staking_contract.pool_address;
         aborts_if !exists<stake::StakePool>(pool_address);
