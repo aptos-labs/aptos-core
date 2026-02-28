@@ -1681,9 +1681,10 @@ def test(
     assert image_exists(
         shell, VALIDATOR_TESTING_IMAGE_NAME, upgrade_image_tag, cloud=cloud_enum
     ), f"swarm upgrade (validator) image does not exist: {upgrade_image_tag}"
+    # NOTE: AWS ignores forge_image_name and always uses "forge", but we don't support AWS anymore
     assert image_exists(
-        shell, FORGE_IMAGE_NAME, forge_image_tag, cloud=cloud_enum
-    ), f"forge (test runner) image does not exist: {forge_image_tag}"
+        shell, forge_image_name, forge_image_tag, cloud=cloud_enum
+    ), f"forge (test runner) image does not exist: {forge_image_name}:{forge_image_tag}"
 
     forge_args = create_forge_command(
         forge_runner_mode=forge_runner_mode,
