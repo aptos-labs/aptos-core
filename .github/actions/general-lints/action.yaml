@@ -10,9 +10,10 @@ runs:
   steps:
     # The source code must be checkout out by the workflow that invokes this action.
 
-    # Install shellcheck and run it on the dev_setup.sh script
+    # Install shellcheck and run it on the setup scripts
     - name: Run shell lints
       run: |
         sudo apt-get install shellcheck --assume-yes --no-install-recommends
         shellcheck scripts/dev_setup.sh
+        shellcheck scripts/setup_build.sh
       shell: bash
