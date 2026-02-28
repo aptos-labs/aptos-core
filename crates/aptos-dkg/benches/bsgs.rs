@@ -160,11 +160,11 @@ where
 
 fn criterion_benchmark(c: &mut Criterion) {
     use ark_bls12_381::Bls12_381;
-    use ark_bn254::Bn254;
+//    use ark_bn254::Bn254;
 
-    bench_dlog::<Bn254>(c, "bn254");
-    bench_dlog_batch_size::<Bn254>(c, "bn254");
-    bench_table_build::<Bn254>(c, "bn254");
+    // bench_dlog::<Bn254>(c, "bn254");
+    // bench_dlog_batch_size::<Bn254>(c, "bn254");
+    // bench_table_build::<Bn254>(c, "bn254");
 
     bench_dlog::<Bls12_381>(c, "bls12_381");
     bench_dlog_batch_size::<Bls12_381>(c, "bls12_381");

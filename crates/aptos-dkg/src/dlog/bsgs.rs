@@ -9,6 +9,11 @@ use std::collections::HashMap;
 /// Benchmarks can be used to tune this (see `benches/bsgs.rs`, `dlog_bsgs_*_batch_size`).
 pub const DEFAULT_BSGS_SERIALIZATION_BATCH_SIZE: usize = 64;
 
+/// Below this batch size we use the original one-at-a-time algorithm (serialize each
+/// projective point without batch normalizing). Above it we use batch normalize + serialize.
+/// Tune via benchmarks; small batches (2–8) are often slower than 1 due to normalize_batch overhead.
+pub const BSGS_BATCH_NORMALIZE_THRESHOLD: usize = 16;
+
 /// Compute discrete log using baby-step giant-step with a precomputed table.
 /// Uses batched serialization in the giant-step loop; see `dlog_with_batch_size` to tune.
 ///
@@ -30,7 +35,8 @@ pub fn dlog<C: CurveGroup>(
 }
 
 /// Same as `dlog` but with configurable serialization batch size for the giant-step loop.
-/// Larger batches reduce allocations and can improve cache locality during table lookups.
+/// If `batch_size` is below `BSGS_BATCH_NORMALIZE_THRESHOLD`, the original one-at-a-time
+/// algorithm is used (no batch normalize). Otherwise we use batch normalize + serialize.
 #[allow(non_snake_case)]
 pub fn dlog_with_batch_size<C: CurveGroup>(
     G: C,
@@ -50,13 +56,28 @@ pub fn dlog_with_batch_size<C: CurveGroup>(
     let G_neg_m = G * -C::ScalarField::from(m);
 
     let batch_size = batch_size.max(1);
+
+    if batch_size < BSGS_BATCH_NORMALIZE_THRESHOLD {
+        // Original one-at-a-time path: serialize each projective point, no batch normalize
+        let mut buf = vec![0u8; byte_size];
+        let mut gamma = H;
+        for i in 0..n {
+            gamma.serialize_compressed(&mut buf[..]).unwrap();
+            if let Some(&j) = baby_table.get(&buf[..]) {
+                return Some(i * m + j);
+            }
+            gamma += G_neg_m;
+        }
+        return None;
+    }
+
+    // Batched path: build batch, normalize_batch, then serialize and look up each
     let mut buf = vec![0u8; byte_size];
     let mut batch = Vec::with_capacity(batch_size);
 
     for chunk_start in (0..n).step_by(batch_size) {
         let actual_batch = (n - chunk_start).min(batch_size as u64) as usize;
 
-        // Build batch of projective giant-step points
         batch.clear();
         let mut gamma = H + G_neg_m * C::ScalarField::from(chunk_start);
         for _ in 0..actual_batch {
@@ -64,7 +85,6 @@ pub fn dlog_with_batch_size<C: CurveGroup>(
             gamma += G_neg_m;
         }
 
-        // Batch-normalize then serialize and look up each point
         let normalized = C::normalize_batch(&batch);
         for (j, aff) in normalized.iter().enumerate() {
             aff.serialize_compressed(&mut buf[..]).unwrap();
