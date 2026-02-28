@@ -1,0 +1,8 @@
+processed 4 tasks
+task 0 lines 3-25:  publish [module 0xc0ffee::guarded_wildcard_primitive_positions {]
+task 1 lines 28-28:  run 0xc0ffee::guarded_wildcard_primitive_positions::test_guard_true
+return values: 1
+task 2 lines 30-30:  run 0xc0ffee::guarded_wildcard_primitive_positions::test_guard_false
+return values: 0
+task 3 lines 32-32:  run 0xc0ffee::guarded_wildcard_primitive_positions::test_guard_other_variant
+return values: 0

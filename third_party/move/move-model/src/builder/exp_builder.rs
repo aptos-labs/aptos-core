@@ -2901,6 +2901,16 @@ impl ExpTranslator<'_, '_, '_> {
                     context,
                 )
             },
+            EA::LValue_::Literal(val) => {
+                // Translate literal value pattern (for primitive pattern matching)
+                if let Some((value, ty)) = self.translate_value(val, expected_type, context) {
+                    let id = self.new_node_id_with_type_loc(&ty, loc);
+                    self.check_type_with_order(expected_order, loc, &ty, expected_type, context);
+                    Pattern::LiteralValue(id, value)
+                } else {
+                    self.new_error_pat(loc)
+                }
+            },
         }
     }
 

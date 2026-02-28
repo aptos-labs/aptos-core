@@ -1,0 +1,40 @@
+
+Diagnostics:
+error: match not exhaustive
+   ┌─ tests/match-checks/nested_enum_tuples.move:19:16
+   │
+19 │         match (t) {
+   │                ^
+   │
+   = missing `Top::T1{..}`
+
+error: match not exhaustive
+   ┌─ tests/match-checks/nested_enum_tuples.move:25:16
+   │
+25 │         match (t) {
+   │                ^
+   │
+   = missing `Top::T0{v: Mid::M1{..}}`
+
+error: unreachable pattern
+   ┌─ tests/match-checks/nested_enum_tuples.move:34:13
+   │
+34 │             Top::T0{v: Mid::M0{v: _}} => 1,
+   │             ^^^^^^^^^^^^^^^^^^^^^^^^^
+
+error: match not exhaustive
+   ┌─ tests/match-checks/nested_enum_tuples.move:40:16
+   │
+40 │         match (t) {
+   │                ^
+   │
+   = missing `Top::T1{..}`
+
+error: match not exhaustive
+   ┌─ tests/match-checks/nested_enum_tuples.move:47:16
+   │
+47 │         match ((t, flag)) {
+   │                ^^^^^^^^^
+   │
+   = missing `(Top::T0{..},false)`
+   = missing `(Top::T1{..},true)`

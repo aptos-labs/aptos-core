@@ -1,0 +1,258 @@
+//**** Cross-compiled for `move` syntax from `tests/no-v1-comparison/match_extensions/all_integer_types.move`
+
+//# publish
+module 0xc0ffee::m {
+    public fun test_i128(p0: i128): i128 {
+        let _v0;
+        loop {
+            if (!(p0 == -1i128)) {
+                if (p0 == 0i128) {
+                    _v0 = 0i128;
+                    break
+                };
+                _v0 = 7i128;
+                break
+            };
+            return -1i128
+        };
+        _v0
+    }
+    public fun test_i16(p0: i16): i16 {
+        let _v0;
+        loop {
+            if (!(p0 == -1i16)) {
+                if (p0 == 0i16) {
+                    _v0 = 0i16;
+                    break
+                };
+                _v0 = 7i16;
+                break
+            };
+            return -1i16
+        };
+        _v0
+    }
+    public fun test_i256(p0: i256): i256 {
+        let _v0;
+        let _v1;
+        if (p0 == -1i256) _v1 = p0 == -1i256 else _v1 = false;
+        loop {
+            if (!_v1) {
+                let _v2;
+                if (p0 == 0i256) _v2 = p0 == 0i256 else _v2 = false;
+                if (_v2) {
+                    _v0 = 0i256;
+                    break
+                };
+                _v0 = 7i256;
+                break
+            };
+            return -1i256
+        };
+        _v0
+    }
+    public fun test_i32(p0: i32): i32 {
+        let _v0;
+        loop {
+            if (!(p0 == -1i32)) {
+                if (p0 == 0i32) {
+                    _v0 = 0i32;
+                    break
+                };
+                _v0 = 7i32;
+                break
+            };
+            return -1i32
+        };
+        _v0
+    }
+    public fun test_i64(p0: i64): i64 {
+        let _v0;
+        loop {
+            if (!(p0 == -1i64)) {
+                if (p0 == 0i64) {
+                    _v0 = 0i64;
+                    break
+                };
+                _v0 = 7i64;
+                break
+            };
+            return -1i64
+        };
+        _v0
+    }
+    public fun test_i8(p0: i8): i8 {
+        let _v0;
+        loop {
+            if (!(p0 == -1i8)) {
+                if (p0 == 0i8) {
+                    _v0 = 0i8;
+                    break
+                };
+                _v0 = 7i8;
+                break
+            };
+            return -1i8
+        };
+        _v0
+    }
+    public fun test_u128(p0: u128): u128 {
+        let _v0;
+        loop {
+            if (!(p0 == 0u128)) {
+                if (p0 == 1u128) {
+                    _v0 = 1u128;
+                    break
+                };
+                _v0 = 999u128;
+                break
+            };
+            return 0u128
+        };
+        _v0
+    }
+    public fun test_u16(p0: u16): u16 {
+        let _v0;
+        loop {
+            if (!(p0 == 0u16)) {
+                if (p0 == 1u16) {
+                    _v0 = 1u16;
+                    break
+                };
+                _v0 = 999u16;
+                break
+            };
+            return 0u16
+        };
+        _v0
+    }
+    public fun test_u256(p0: u256): u256 {
+        let _v0;
+        loop {
+            if (!(p0 == 0u256)) {
+                if (p0 == 1u256) {
+                    _v0 = 1u256;
+                    break
+                };
+                _v0 = 999u256;
+                break
+            };
+            return 0u256
+        };
+        _v0
+    }
+    public fun test_u32(p0: u32): u32 {
+        let _v0;
+        loop {
+            if (!(p0 == 0u32)) {
+                if (p0 == 1u32) {
+                    _v0 = 1u32;
+                    break
+                };
+                _v0 = 999u32;
+                break
+            };
+            return 0u32
+        };
+        _v0
+    }
+    public fun test_u64(p0: u64): u64 {
+        let _v0;
+        loop {
+            if (!(p0 == 0)) {
+                if (p0 == 1) {
+                    _v0 = 1;
+                    break
+                };
+                _v0 = 999;
+                break
+            };
+            return 0
+        };
+        _v0
+    }
+    public fun test_u8(p0: u8): u8 {
+        let _v0;
+        loop {
+            if (!(p0 == 0u8)) {
+                if (p0 == 1u8) {
+                    _v0 = 1u8;
+                    break
+                };
+                _v0 = 99u8;
+                break
+            };
+            return 0u8
+        };
+        _v0
+    }
+}
+
+
+//# run 0xc0ffee::m::test_u8 --args 0u8
+
+//# run 0xc0ffee::m::test_u8 --args 1u8
+
+//# run 0xc0ffee::m::test_u8 --args 50u8
+
+//# run 0xc0ffee::m::test_u16 --args 0u16
+
+//# run 0xc0ffee::m::test_u16 --args 1u16
+
+//# run 0xc0ffee::m::test_u16 --args 500u16
+
+//# run 0xc0ffee::m::test_u32 --args 0u32
+
+//# run 0xc0ffee::m::test_u32 --args 1u32
+
+//# run 0xc0ffee::m::test_u32 --args 500u32
+
+//# run 0xc0ffee::m::test_u64 --args 0u64
+
+//# run 0xc0ffee::m::test_u64 --args 1u64
+
+//# run 0xc0ffee::m::test_u64 --args 500u64
+
+//# run 0xc0ffee::m::test_u128 --args 0u128
+
+//# run 0xc0ffee::m::test_u128 --args 1u128
+
+//# run 0xc0ffee::m::test_u256 --args 0u256
+
+//# run 0xc0ffee::m::test_u256 --args 1u256
+
+//# run 0xc0ffee::m::test_i8 --args -1i8
+
+//# run 0xc0ffee::m::test_i8 --args 0i8
+
+//# run 0xc0ffee::m::test_i8 --args 5i8
+
+//# run 0xc0ffee::m::test_i16 --args -1i16
+
+//# run 0xc0ffee::m::test_i16 --args 0i16
+
+//# run 0xc0ffee::m::test_i16 --args 5i16
+
+//# run 0xc0ffee::m::test_i32 --args -1i32
+
+//# run 0xc0ffee::m::test_i32 --args 0i32
+
+//# run 0xc0ffee::m::test_i32 --args 5i32
+
+//# run 0xc0ffee::m::test_i64 --args -1i64
+
+//# run 0xc0ffee::m::test_i64 --args 0i64
+
+//# run 0xc0ffee::m::test_i64 --args 5i64
+
+//# run 0xc0ffee::m::test_i128 --args -1i128
+
+//# run 0xc0ffee::m::test_i128 --args 0i128
+
+//# run 0xc0ffee::m::test_i128 --args 5i128
+
+//# run 0xc0ffee::m::test_i256 --args -1i256
+
+//# run 0xc0ffee::m::test_i256 --args 0i256
+
+//# run 0xc0ffee::m::test_i256 --args 5i256

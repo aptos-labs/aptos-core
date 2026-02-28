@@ -1,0 +1,10 @@
+processed 5 tasks
+task 0 lines 3-54:  publish [module 0xc0ffee::m {]
+task 1 lines 57-57:  run 0xc0ffee::m::test_v1_guard_pass
+return values: 30
+task 2 lines 59-59:  run 0xc0ffee::m::test_v1_guard_fail
+return values: 20
+task 3 lines 61-61:  run 0xc0ffee::m::test_v2_guard_pass
+return values: 14
+task 4 lines 63-63:  run 0xc0ffee::m::test_v2_guard_fail
+return values: 0

@@ -1,0 +1,70 @@
+processed 35 tasks
+task 0 lines 3-189:  publish [module 0xc0ffee::m {]
+task 1 lines 192-192:  run 0xc0ffee::m::test_u8 --args 0u8
+return values: 0
+task 2 lines 194-194:  run 0xc0ffee::m::test_u8 --args 1u8
+return values: 1
+task 3 lines 196-196:  run 0xc0ffee::m::test_u8 --args 50u8
+return values: 99
+task 4 lines 198-198:  run 0xc0ffee::m::test_u16 --args 0u16
+return values: 0
+task 5 lines 200-200:  run 0xc0ffee::m::test_u16 --args 1u16
+return values: 1
+task 6 lines 202-202:  run 0xc0ffee::m::test_u16 --args 500u16
+return values: 999
+task 7 lines 204-204:  run 0xc0ffee::m::test_u32 --args 0u32
+return values: 0
+task 8 lines 206-206:  run 0xc0ffee::m::test_u32 --args 1u32
+return values: 1
+task 9 lines 208-208:  run 0xc0ffee::m::test_u32 --args 500u32
+return values: 999
+task 10 lines 210-210:  run 0xc0ffee::m::test_u64 --args 0u64
+return values: 0
+task 11 lines 212-212:  run 0xc0ffee::m::test_u64 --args 1u64
+return values: 1
+task 12 lines 214-214:  run 0xc0ffee::m::test_u64 --args 500u64
+return values: 999
+task 13 lines 216-216:  run 0xc0ffee::m::test_u128 --args 0u128
+return values: 0
+task 14 lines 218-218:  run 0xc0ffee::m::test_u128 --args 1u128
+return values: 1
+task 15 lines 220-220:  run 0xc0ffee::m::test_u256 --args 0u256
+return values: 0
+task 16 lines 222-222:  run 0xc0ffee::m::test_u256 --args 1u256
+return values: 1
+task 17 lines 224-224:  run 0xc0ffee::m::test_i8 --args -1i8
+return values: -1
+task 18 lines 226-226:  run 0xc0ffee::m::test_i8 --args 0i8
+return values: 0
+task 19 lines 228-228:  run 0xc0ffee::m::test_i8 --args 5i8
+return values: 7
+task 20 lines 230-230:  run 0xc0ffee::m::test_i16 --args -1i16
+return values: -1
+task 21 lines 232-232:  run 0xc0ffee::m::test_i16 --args 0i16
+return values: 0
+task 22 lines 234-234:  run 0xc0ffee::m::test_i16 --args 5i16
+return values: 7
+task 23 lines 236-236:  run 0xc0ffee::m::test_i32 --args -1i32
+return values: -1
+task 24 lines 238-238:  run 0xc0ffee::m::test_i32 --args 0i32
+return values: 0
+task 25 lines 240-240:  run 0xc0ffee::m::test_i32 --args 5i32
+return values: 7
+task 26 lines 242-242:  run 0xc0ffee::m::test_i64 --args -1i64
+return values: -1
+task 27 lines 244-244:  run 0xc0ffee::m::test_i64 --args 0i64
+return values: 0
+task 28 lines 246-246:  run 0xc0ffee::m::test_i64 --args 5i64
+return values: 7
+task 29 lines 248-248:  run 0xc0ffee::m::test_i128 --args -1i128
+return values: -1
+task 30 lines 250-250:  run 0xc0ffee::m::test_i128 --args 0i128
+return values: 0
+task 31 lines 252-252:  run 0xc0ffee::m::test_i128 --args 5i128
+return values: 7
+task 32 lines 254-254:  run 0xc0ffee::m::test_i256 --args -1i256
+return values: -1
+task 33 lines 256-256:  run 0xc0ffee::m::test_i256 --args 0i256
+return values: 0
+task 34 lines 258-258:  run 0xc0ffee::m::test_i256 --args 5i256
+return values: 7

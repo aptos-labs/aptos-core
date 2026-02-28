@@ -1,0 +1,15 @@
+
+Diagnostics:
+error: match not exhaustive
+  ┌─ tests/match-checks/bytestring_coverage.move:4:16
+  │
+4 │         match (x) {
+  │                ^
+  │
+  = missing `_`
+
+error: unreachable pattern
+   ┌─ tests/match-checks/bytestring_coverage.move:14:13
+   │
+14 │             b"hello" => 2,
+   │             ^^^^^^^^

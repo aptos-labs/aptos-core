@@ -1,0 +1,87 @@
+//**** Cross-compiled for `move` syntax from `tests/no-v1-comparison/match_extensions/bytestring_match.move`
+
+//# publish
+module 0xc0ffee::m {
+    public fun test_bstring(p0: vector<u8>): u64 {
+        let _v0;
+        loop {
+            if (!(p0 == vector[104u8, 101u8, 108u8, 108u8, 111u8])) {
+                if (p0 == vector[119u8, 111u8, 114u8, 108u8, 100u8]) {
+                    _v0 = 2;
+                    break
+                };
+                _v0 = 99;
+                break
+            };
+            return 1
+        };
+        _v0
+    }
+    public fun test_empty(p0: vector<u8>): u64 {
+        if (p0 == vector[]) return 1;
+        0
+    }
+    public fun test_guard(p0: vector<u8>, p1: bool): u64 {
+        let _v0;
+        let _v1;
+        if (p0 == vector[104u8, 101u8, 108u8, 108u8, 111u8]) _v1 = p1 else _v1 = false;
+        loop {
+            if (!_v1) {
+                if (p0 == vector[104u8, 101u8, 108u8, 108u8, 111u8]) {
+                    _v0 = 20;
+                    break
+                };
+                _v0 = 0;
+                break
+            };
+            return 10
+        };
+        _v0
+    }
+    public fun test_var_binding(p0: vector<u8>): vector<u8> {
+        if (p0 == vector[115u8, 112u8, 101u8, 99u8, 105u8, 97u8, 108u8]) return vector[102u8, 111u8, 117u8, 110u8, 100u8];
+        p0
+    }
+    public fun test_xstring(p0: vector<u8>): u64 {
+        let _v0;
+        loop {
+            if (!(p0 == vector[222u8, 173u8, 190u8, 239u8])) {
+                if (p0 == vector[202u8, 254u8]) {
+                    _v0 = 2;
+                    break
+                };
+                _v0 = 99;
+                break
+            };
+            return 1
+        };
+        _v0
+    }
+}
+
+
+//# run 0xc0ffee::m::test_bstring --args b"hello"
+
+//# run 0xc0ffee::m::test_bstring --args b"world"
+
+//# run 0xc0ffee::m::test_bstring --args b"other"
+
+//# run 0xc0ffee::m::test_xstring --args x"deadbeef"
+
+//# run 0xc0ffee::m::test_xstring --args x"cafe"
+
+//# run 0xc0ffee::m::test_xstring --args x"0000"
+
+//# run 0xc0ffee::m::test_empty --args b""
+
+//# run 0xc0ffee::m::test_empty --args b"notempty"
+
+//# run 0xc0ffee::m::test_var_binding --args b"special"
+
+//# run 0xc0ffee::m::test_var_binding --args b"anything"
+
+//# run 0xc0ffee::m::test_guard --args b"hello" true
+
+//# run 0xc0ffee::m::test_guard --args b"hello" false
+
+//# run 0xc0ffee::m::test_guard --args b"other" true

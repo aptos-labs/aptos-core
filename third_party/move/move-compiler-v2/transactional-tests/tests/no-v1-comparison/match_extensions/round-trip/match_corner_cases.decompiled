@@ -1,0 +1,67 @@
+//**** Cross-compiled for `move` syntax from `tests/no-v1-comparison/match_extensions/match_corner_cases.move`
+
+//# publish
+module 0xc0ffee::corner_cases {
+    enum E has drop {
+        A {
+            _0: u8,
+        }
+        B {
+            _0: u8,
+        }
+    }
+    fun compute_mixed(p0: E, p1: E, p2: u8, p3: u8): u8 {
+        let _v0 = &p0;
+        let _v1 = &p1;
+        loop {
+            if (_v0 is A) {
+                let _v2 = &_v0._0;
+                if (_v1 is B) {
+                    let _v3;
+                    let _v4;
+                    if (p2 == 5u8) _v4 = p3 == 10u8 else _v4 = false;
+                    if (_v4) _v3 = *_v2 > 0u8 else _v3 = false;
+                    if (_v3) break
+                }
+            };
+            if (!((_v0 is B) && (_v1 is A) && p2 == 0u8)) return 1u8;
+            let E::B{_0: _v5} = p0;
+            let E::A{_0: _v6} = p1;
+            return p3
+        };
+        let E::A{_0: _v7} = p0;
+        let E::B{_0: _v8} = p1;
+        _v7 + _v8 + 5u8
+    }
+    public fun test_mixed(): u8 {
+        let _v0 = E::A{_0: 1u8};
+        let _v1 = E::B{_0: 2u8};
+        let _v2 = compute_mixed(_v0, _v1, 5u8, 10u8);
+        let _v3 = E::B{_0: 3u8};
+        let _v4 = E::A{_0: 4u8};
+        let _v5 = compute_mixed(_v3, _v4, 0u8, 7u8);
+        let _v6 = E::B{_0: 9u8};
+        let _v7 = E::B{_0: 1u8};
+        let _v8 = compute_mixed(_v6, _v7, 9u8, 10u8);
+        _v2 + _v5 + _v8
+    }
+    fun test_primitive_tuple(p0: u8, p1: u8): u8 {
+        let _v0;
+        if (p0 == 1u8) _v0 = p1 == 9u8 else _v0 = false;
+        if (_v0) return 9u8;
+        0u8
+    }
+    public fun test_tuple_match_false(): u8 {
+        test_primitive_tuple(2u8, 9u8)
+    }
+    public fun test_tuple_match_true(): u8 {
+        test_primitive_tuple(1u8, 9u8)
+    }
+}
+
+
+//# run 0xc0ffee::corner_cases::test_mixed
+
+//# run 0xc0ffee::corner_cases::test_tuple_match_true
+
+//# run 0xc0ffee::corner_cases::test_tuple_match_false

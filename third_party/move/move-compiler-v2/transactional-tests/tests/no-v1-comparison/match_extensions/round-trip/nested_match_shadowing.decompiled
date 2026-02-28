@@ -1,0 +1,50 @@
+//**** Cross-compiled for `move` syntax from `tests/no-v1-comparison/match_extensions/nested_match_shadowing.move`
+
+//# publish
+module 0xc0ffee::m {
+    public fun nested_body(p0: u64, p1: u64): u64 {
+        if (p0 > 10) {
+            let _v0 = p0;
+            if (_v0 > 100) return _v0 + 2000;
+            return _v0 + 100
+        };
+        p1
+    }
+    public fun nested_guard(p0: u64, p1: u64): u64 {
+        let _v0;
+        if (p0 > 10) _v0 = true else _v0 = false;
+        if (_v0) return p0 + 1000;
+        p1
+    }
+    public fun triple_nested(p0: u64, p1: u64): u64 {
+        if (p0 > 5) {
+            let _v0;
+            let _v1 = p0;
+            if (_v1 > 50) {
+                let _v2 = _v1;
+                if (_v2 > 500) _v0 = _v2 + 3000 else _v0 = _v2 + 2000
+            } else _v0 = _v1 + 1000;
+            return _v0
+        };
+        p1
+    }
+}
+
+
+//# run 0xc0ffee::m::nested_body --args 50u64 7u64
+
+//# run 0xc0ffee::m::nested_body --args 200u64 7u64
+
+//# run 0xc0ffee::m::nested_body --args 5u64 7u64
+
+//# run 0xc0ffee::m::nested_guard --args 50u64 7u64
+
+//# run 0xc0ffee::m::nested_guard --args 5u64 7u64
+
+//# run 0xc0ffee::m::triple_nested --args 3u64 42u64
+
+//# run 0xc0ffee::m::triple_nested --args 10u64 42u64
+
+//# run 0xc0ffee::m::triple_nested --args 100u64 42u64
+
+//# run 0xc0ffee::m::triple_nested --args 1000u64 42u64

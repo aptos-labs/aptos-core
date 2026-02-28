@@ -2243,6 +2243,10 @@ impl<'a> ExpSourcifier<'a> {
                     self.print_pat(p, no_parenthesize, no_type)
                 })
             },
+            Pattern::LiteralValue(node_id, val) => {
+                let ty = self.env().get_node_type(*node_id);
+                self.parent.print_value(val, Some(&ty), self.for_spec);
+            },
             Pattern::Error(_) => emit!(self.wr(), "*error*"),
         }
     }

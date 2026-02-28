@@ -1,0 +1,26 @@
+processed 13 tasks
+task 0 lines 1-32:  publish [module 0xc0ffee::m {]
+task 1 lines 34-34:  run 0xc0ffee::m::test_mixed --args 0u8 10u8
+return values: 0
+task 2 lines 36-36:  run 0xc0ffee::m::test_mixed --args 10u8 0u8
+return values: 1
+task 3 lines 38-38:  run 0xc0ffee::m::test_mixed --args 5u8 5u8
+return values: 2
+task 4 lines 40-40:  run 0xc0ffee::m::test_simple_tuple --args 0u8 0u8
+return values: 0
+task 5 lines 42-42:  run 0xc0ffee::m::test_simple_tuple --args 0u8 1u8
+return values: 1
+task 6 lines 44-44:  run 0xc0ffee::m::test_simple_tuple --args 1u8 0u8
+return values: 2
+task 7 lines 46-46:  run 0xc0ffee::m::test_simple_tuple --args 1u8 1u8
+return values: 3
+task 8 lines 48-48:  run 0xc0ffee::m::test_simple_tuple --args 5u8 5u8
+return values: 255
+task 9 lines 50-50:  run 0xc0ffee::m::test_triple --args 0u8 0u8 0u8
+return values: 0
+task 10 lines 52-52:  run 0xc0ffee::m::test_triple --args 0u8 0u8 1u8
+return values: 1
+task 11 lines 54-54:  run 0xc0ffee::m::test_triple --args 0u8 1u8 1u8
+return values: 2
+task 12 lines 56-56:  run 0xc0ffee::m::test_triple --args 1u8 1u8 1u8
+return values: 3

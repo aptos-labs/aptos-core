@@ -1,0 +1,9 @@
+
+Diagnostics:
+error: match not exhaustive
+  ┌─ tests/match-checks/int_non_exhaustive_witness.move:3:16
+  │
+3 │         match (x) {
+  │                ^
+  │
+  = missing `_`

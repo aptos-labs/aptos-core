@@ -1,0 +1,27 @@
+processed 10 tasks
+task 0 lines 1-46:  publish [module 0xc0ffee::m {]
+warning: This assignment/binding to the left-hand-side variable `y` is unused. Consider removing this assignment/binding, or prefixing the left-hand-side variable with an underscore (e.g., `_y`), or renaming to `_`
+   ┌─ TEMPFILE:19:26
+   │
+19 │             y if (match (y) {
+   │                          ^
+
+
+task 1 lines 47-49:  run 0xc0ffee::m::nested_body --args 50u64 7u64 [// x=200, y=7: both guards pass (200>10, 200>100) => 200+2000 = 2200]
+return values: 150
+task 2 lines 50-52:  run 0xc0ffee::m::nested_body --args 200u64 7u64 [// x=5, y=7: outer guard fails (5<=10), catch-all => parameter y = 7]
+return values: 2200
+task 3 lines 53-56:  run 0xc0ffee::m::nested_body --args 5u64 7u64 [// --- nested_guard tests ---]
+return values: 7
+task 4 lines 57-59:  run 0xc0ffee::m::nested_guard --args 50u64 7u64 [// x=5, y=7: inner match in guard: 5<=10 => false, outer catch-all => parameter y = 7]
+return values: 1050
+task 5 lines 60-63:  run 0xc0ffee::m::nested_guard --args 5u64 7u64 [// --- triple_nested tests ---]
+return values: 7
+task 6 lines 64-66:  run 0xc0ffee::m::triple_nested --args 3u64 42u64 [// x=10, y=42: level1 passes, level2 fails => 10+1000 = 1010]
+return values: 42
+task 7 lines 67-69:  run 0xc0ffee::m::triple_nested --args 10u64 42u64 [// x=100, y=42: level1+2 pass, level3 fails => 100+2000 = 2100]
+return values: 1010
+task 8 lines 70-72:  run 0xc0ffee::m::triple_nested --args 100u64 42u64 [// x=1000, y=42: all pass => 1000+3000 = 4000]
+return values: 2100
+task 9 lines 73-73:  run 0xc0ffee::m::triple_nested --args 1000u64 42u64
+return values: 4000

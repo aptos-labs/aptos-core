@@ -1,0 +1,9 @@
+
+Diagnostics:
+error: duplicate declaration of `x`
+   ┌─ tests/match-checks/tuple_overlapping_vars.move:10:30
+   │
+10 │             (Data::V1 { x }, x) => x,
+   │                         -    ^
+   │                         │
+   │                         previous declaration of `x`

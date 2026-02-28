@@ -1,0 +1,18 @@
+//**** Cross-compiled for `move` syntax from `tests/no-v1-comparison/match_extensions/struct_match.move`
+
+//# publish
+module 0xc0ffee::m {
+    struct Point has drop {
+        x: u64,
+        y: u64,
+    }
+    public fun test_struct_match(): u64 {
+        let _v0 = Point{x: 3, y: 7};
+        let _v1 = &_v0;
+        let Point{x: _v2, y: _v3} = _v0;
+        _v2 + _v3
+    }
+}
+
+
+//# run 0xc0ffee::m::test_struct_match

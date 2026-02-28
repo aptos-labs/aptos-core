@@ -1,0 +1,63 @@
+//**** Cross-compiled for `move` syntax from `tests/no-v1-comparison/match_extensions/ref_enum_guard.move`
+
+//# publish
+module 0xc0ffee::m {
+    enum Data has copy, drop {
+        V1 {
+            x: u64,
+        }
+        V2 {
+            x: u64,
+        }
+    }
+    fun match_ref(p0: &Data, p1: u64): u64 {
+        let _v0;
+        loop {
+            if (p0 is V1) {
+                let _v1;
+                _v0 = &p0.x;
+                if (*_v0 > 10) _v1 = p1 > 5 else _v1 = false;
+                if (_v1) break
+            };
+            'l0: loop {
+                loop {
+                    if (!(p0 is V1)) {
+                        if (!(p0 is V2)) break;
+                        _v0 = &p0.x;
+                        if (*_v0 == p1) break 'l0;
+                        break
+                    };
+                    return *&p0.x
+                };
+                return 0
+            };
+            return *_v0 * 2
+        };
+        *_v0 + p1
+    }
+    public fun test_v1_guard_fail(): u64 {
+        let _v0 = Data::V1{x: 20};
+        match_ref(&_v0, 3)
+    }
+    public fun test_v1_guard_pass(): u64 {
+        let _v0 = Data::V1{x: 20};
+        match_ref(&_v0, 10)
+    }
+    public fun test_v2_guard_fail(): u64 {
+        let _v0 = Data::V2{x: 7};
+        match_ref(&_v0, 8)
+    }
+    public fun test_v2_guard_pass(): u64 {
+        let _v0 = Data::V2{x: 7};
+        match_ref(&_v0, 7)
+    }
+}
+
+
+//# run 0xc0ffee::m::test_v1_guard_pass
+
+//# run 0xc0ffee::m::test_v1_guard_fail
+
+//# run 0xc0ffee::m::test_v2_guard_pass
+
+//# run 0xc0ffee::m::test_v2_guard_fail
