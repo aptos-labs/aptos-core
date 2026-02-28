@@ -61,7 +61,7 @@ Memory allocations for these caches are managed in epoch-based reclamation
 style, so that garbage collection (GC) only runs between transaction blocks.
 With this design, only concurrent allocations to the cache need to be
 supported, but not deallocations.
-**This imposes an invariant that our various limits need to imply caches cannot get full within a block.***
+**This imposes an invariant that our various limits need to imply caches cannot get full within a block.**
 
 #### Rationale
 
@@ -135,8 +135,8 @@ impl GlobalExecutionContext {
    }
 
    fn maintenance_guard(&self) -> Option<MaintenanceGuard<'_>> {
-      // If already in maintence mode or there are still executions, return None.
-      // Otherwise move to  maintence mode and return the guard.
+      // If already in maintenance mode or there are still executions, return None.
+      // Otherwise move to maintenance mode and return the guard.
       ...
    }
 }
@@ -340,7 +340,248 @@ Like `ModuleId`s, function and struct IDs are obtained:
    and type argument tags are interned.
 
 
-### 3. Generic Types
+### 3. Executables
+
+#### Executables
+
+When a module or a script are loaded, verified `CompiledModule` and
+`CompiledScript` are converted into `Executable`.
+Executable stores:
+
+  1. Monomorphized function and struct definitions.
+     These include non-generics as well as fully-monomorphized generics.
+  2. Generic function and struct definitions (to be monomorphized lazily at
+     runtime).
+  3. A constant pool for large non-inlined constants (e.g., vectors).
+  4. A bump-allocated arena where all executable data is stored.
+
+During load-time, all data structures (e.g., Move bytecode, constants, types)
+are allocated in the arena, and raw pointers are used.
+Executable can give out references to this data with the lifetime bounded by
+the lifetime of the executable (via unsafe Rust).
+This is safe as it is guaranteed that no data is re-allocated when executing
+transactions - only new allocations can be added due to monomorphization.
+
+When executable is dropped, memory used by maps and other data structures
+storing pointers to arena is freed.
+Then, memory from arena is deallocated in constant-time.
+*Invariant: executable is never dropped during the execution of a transaction
+block.*
+This design ensures raw pointers are stable, and simplifies memory management
+and concurrency.
+
+```rust
+struct Executable {
+   // Arena for all allocations. Lock is only taken when allocating a NEW
+   // instantiation during runtime monomorphization. Note that this can be
+   // optimized if needed.
+   arena: Mutex<Bump>,
+
+   // Non-generic (or monomorphized) caches for function definitions. Read-only
+   // during block execution, but instantiations can be added here if needed
+   // (via some synchronization or at block-boundaries). Stores both regular
+   // and native functions.
+   functions: HashMap<FunctionId, NonNull<Function>>,
+  
+   // TODO: generic functions
+   // TODO: constants
+   // TODO: structs
+}
+```
+
+##### Functions
+
+A non-generic or monomorphized function is represented via `Function` struct.
+Function stores the following:
+
+  1. Its type signature: parameter and return types that are pointers to
+     arena-allocated type vectors.
+
+  2. `Code` and related structure for this function.
+     Code can be native, in which case a function pointer is stored to the
+     actual Rust implementation.
+     Code can also be a pointer to Move execution instructions (translated
+     from file-format bytecode during monomorphization) and a pointer to
+     local types is also stored (for runtime type checks).
+     Note that parameter types are the prefix of local types, and so the
+     pointer to locals points to the same location as the pointer for parameter
+     types (but slice has different length).
+
+  3. Visibility of this function (enum): private, package, public.
+     This information is *only needed for runtime checks*.
+
+  4. Attributes for this function, stored as a bitset:
+
+     - If this function is an entry function.
+     - If this function is persistent.
+     - If this function has re-entrancy module lock.
+     - If this function is trusted (resides at special address).
+     
+     Any future attributes are part of this set.
+     Note that non-private struct APIs are translated to execution instructions
+     and are not calls.
+
+```rust
+/// A fully-instantiated function definition.
+struct Function {
+   // Stores function attributes and other miscellaneous information.
+   metadata: FunctionMetadata,
+
+   // Type signature of this function. 
+   param_types: NonNull<[TypeId]>,
+   return_types: NonNull<[TypeId]>,
+
+   // The code to execute. Wrapped in atomic pointer to be able to change the
+   // representaton during execution.
+   code: ArcSwap<Code>,
+}
+
+/// Function metadata, shared between generic and non-generic functions.
+struct FunctionMetadata {
+   attributes: u8,
+   visibility: u8,
+}
+
+/// Code for function definition. Can be native or non-native. For non-native
+/// code, stores additional metadata for interpretation. 
+enum Code {
+   Native {
+      // Function pointer.
+      ptr: NativeFunction,
+   },
+   MoveExecIR {
+      // Pointer to local types. This points to the same start as the parameter
+      // types slice but can be larger in size if there are more locals.
+      locals: *const [TypeId],
+
+      // Raw instructions (fixed-size).
+      instructions: NonNull<[Instruction]>,
+
+      // TODO: inline caches, or other data ...
+   },
+}
+```
+
+Instructions that call non-generic functions are set at load- or execution-
+time in the following way:
+
+  1. Every instruction that calls to function *local to this module* embeds
+     the pointer to this function at load-time:
+
+     ```rust
+     Instruction::CallLocal {
+        ptr: NonNull<Function>,
+     },
+     ``` 
+
+     This is safe in case of module upgrades: the caller is upgraded together
+     with the callee.
+     The overhead of function dispatch is 1 memory load.
+
+  2. Every instruction that calls to function *external to this Move module*
+     embeds the "link" to the function (indirection layer):
+
+     ```rust
+     Instruction::CallExternal {
+        link: *const FunctionLink,
+        // Index into side table that stores additional metadata for this call
+        // and which is not used on the hot path.
+        metadata_idx: u16,
+     },
+     ```
+
+     where the link stores the actual pointer to the function and the version
+     of the executable where this function is defined.
+
+     ```rust
+     struct FunctionLink {
+        /// Function definition, can be null if not yet set.
+        ptr: AtomicPtr<Function>,
+     }
+     ```
+
+     This link allows to update the function pointer to the newest version
+     after module upgrade, without any changes to the caller's code.
+     The algorithm works as follows:
+
+     - When executable is loaded for the first time, a `FunctionLink` is
+       created for a specified function ID with null `ptr` value.
+       The link is stored in a map stored in global context.
+       If link already exists in context, it is embedded in the call.
+   
+     - During execution, the following is checked.
+       If `ptr` is null, it means the function was not yet cached.
+       Based on the `idx` to side-table, executable is loaded, function pointer
+       extracted and link sets to point to it.
+       If `ptr` is not null, only the executable ID is recorded in the read-set
+       (note: for some additional bookkeeping, might be a full executable load).
+       and the call dispatches to the `ptr`.
+       Upgrade implementation guarantees that the executable points to the
+       newest function.
+
+     - During upgrade, for every executable, for every function the
+       corresponding links are set to null.
+       Because upgrade happens at Block-STM commit-time, linking to older
+       versions is not needed.
+       Alternative to this approach is storing version in the link so that
+       the caller checks it to invalidate.
+       Because upgrades are rare, doing more work on upgrade is preferred.
+
+       NOTE: For replay during post-commit hook, links **cannot** be used
+       because they store most recent code versions.
+       Hence, replay needs to always run on top of its executable read-set
+       and resolve calls via `idx` to fetch function from that version.
+       This can be mitigated by having a flag in the link to specify if
+       it was ever upgraded (if not, link is safe to use during replay).
+
+     The overheads of this approach at execution are 2 loads and additional
+     executable look-up (to record in read-set: unavoidable).
+
+     An alternative is to store `AtomicPtr<(u32, Function)>` in the caller
+     (initially set to null).
+     During resolution, the pointer of the callee is saved along with the
+     executable version in the instruction (via atomic swap).
+     However, then every function call needs to check the version against
+     the most recent read, and upgraded code is made visible only for callers
+     that executed (on-demand re-linking).
+     This approach has slightly lower overhead of only 1 load, but it is not
+     clear saving 1 extra load is worth it.
+
+In order to avoid 2 loads on every function call, the followng optimization is
+possible (which keeps upgradability correct).
+
+  (1) When a package of modules is published, during Block-STM commit time, all
+      executables are directly linked to each other before being added to cache.
+      This is safe to do because modules cannot be removed from packages.
+
+  (2) When modules are pre-fetched into executable cache (e.g., framework to
+      avoid cold starts), this is done in package granularity.
+      All calls within the same package are linked to each other.
+
+With (1) and (2), framework code never uses links within the same package.
+For other modules loads, in order to do this optimization, information needs to
+be obtained if callee belongs to the same package.
+This can be done by storing package information in `ModuleHandle` in file format
+or via "shallow" loading of immediate dependencies.
+Then, instruction like this can be used:
+
+```rust
+Instruction::CallLocal {
+   // Note: can be null, because dependencies are resolved lazily.
+   ptr: AtomicPtr<Function>,
+},
+```
+
+It is also worth mentioning the impact of this design on any Block-STM's
+post-commit replays (for asynchronous runtime checks).
+Because linking eagerly changes to newer versions of the code, replay, if
+done naively, can also link to version not from the original execution state
+but to the newer version.
+Hence, for cross-module (or cross-package, if optimization is used) replay,
+calls need to be resolved via: 1) fetching the module from read-set (correct
+version), 2) lookup of the `Function` via map.
+
+#### Generic Types
 
 In the file format, generics are represented as `TypeParam(u16)` variant in
 `SignatureToken`.
@@ -362,12 +603,16 @@ at runtime and are not cached.
 
 ```rust
 pub struct GenericType {
-   // TODO: consider this being allocated in executable's arena.
-   bytes: Box<[u8]>,
+   // This data is being allocated in executable's arena (see below).
+   bytes: NonNull<[u8]>,
 }
 
 impl GlobalExecutionContextGuard<'_> {
-   fn instantiate_generic_type(&self, template: &GenericType, ty_args: &[TypeId]) -> TypeId {
+   fn instantiate_generic_type(
+      &self,
+      ty: &GenericType,
+      ty_args: &[TypeId],
+   ) -> TypeId {
       // Walks the type tokens, interning what is needed.
       // We can also use a cache, because each ty_args list has a unique ID
       // so we can have a cache for each generic type.
@@ -381,7 +626,7 @@ impl GlobalExecutionContextGuard<'_> {
 During execution, the VM needs to manage memory for values — vectors (dynamically sized),
 structs (large ones may need to be on the heap), and global values (may need a separate region).
 
-This is distinct from memory for types, code and global context, which is covered in ealier sections.
+This is distinct from memory for types, code and global context, which is covered in earlier sections.
 
 MonoMove uses a **two-level memory management system** organized around the BlockSTM execution model:
 
