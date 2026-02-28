@@ -52,6 +52,7 @@ pub struct SecretShareManager {
     config: SecretShareConfig,
     reliable_broadcast: Arc<ReliableBroadcast<SecretShareMessage, ExponentialBackoff>>,
     network_sender: Arc<NetworkSender>,
+    secret_share_request_delay_ms: u64,
 
     // local channel received from dec_store
     decision_rx: Receiver<SecretSharedKey>,
@@ -71,6 +72,7 @@ impl SecretShareManager {
         network_sender: Arc<NetworkSender>,
         bounded_executor: BoundedExecutor,
         rb_config: &ReliableBroadcastConfig,
+        secret_share_request_delay_ms: u64,
     ) -> Self {
         let rb_backoff_policy = ExponentialBackoff::from_millis(rb_config.backoff_policy_base_ms)
             .factor(rb_config.backoff_policy_factor)
@@ -100,6 +102,7 @@ impl SecretShareManager {
             config,
             reliable_broadcast,
             network_sender,
+            secret_share_request_delay_ms,
 
             decision_rx,
             outgoing_blocks,
@@ -131,21 +134,23 @@ impl SecretShareManager {
     }
 
     async fn process_incoming_block(&self, block: &PipelinedBlock) -> anyhow::Result<DropGuard> {
-        let futures = block.pipeline_futs().expect("pipeline must exist");
+        let futures = block
+            .pipeline_futs()
+            .ok_or_else(|| anyhow::anyhow!("pipeline futures not set for round {}", block.round()))?;
         let self_secret_share = futures
             .secret_sharing_derive_self_fut
             .await
             .map_err(|_| anyhow::anyhow!("derive self failed"))?
-            .expect("Must not be None");
+            .ok_or_else(|| {
+                anyhow::anyhow!("secret share derive returned None for round {}", block.round())
+            })?;
         let metadata = self_secret_share.metadata().clone();
 
         // Now acquire lock and update store
         {
             let mut secret_share_store = self.secret_share_store.lock();
             secret_share_store.update_highest_known_round(block.round());
-            secret_share_store
-                .add_self_share(self_secret_share.clone())
-                .expect("Add self dec share should succeed");
+            secret_share_store.add_self_share(self_secret_share.clone())?;
         }
 
         info!(LogSchema::new(LogEvent::BroadcastSecretShare)
@@ -166,7 +171,9 @@ impl SecretShareManager {
         info!(rounds = rounds, "Processing secret share ready blocks.");
 
         for blocks in ready_blocks {
-            let _ = self.outgoing_blocks.unbounded_send(blocks);
+            if let Err(e) = self.outgoing_blocks.unbounded_send(blocks) {
+                error!("[SecretShareManager] Failed to send ready blocks downstream: {}", e);
+            }
         }
     }
 
@@ -244,9 +251,9 @@ impl SecretShareManager {
         ));
         let epoch_state = self.epoch_state.clone();
         let secret_share_store = self.secret_share_store.clone();
+        let request_delay_ms = self.secret_share_request_delay_ms;
         let task = async move {
-            // TODO(ibalajiarun): Make this configurable
-            tokio::time::sleep(Duration::from_millis(300)).await;
+            tokio::time::sleep(Duration::from_millis(request_delay_ms)).await;
             let maybe_existing_shares = secret_share_store.lock().get_all_shares_authors(&metadata);
             if let Some(existing_shares) = maybe_existing_shares {
                 let epoch = epoch_state.epoch;
@@ -262,9 +269,14 @@ impl SecretShareManager {
                     "[SecretShareManager] Start broadcasting share request for {}",
                     targets.len(),
                 );
-                rb.multicast(request, aggregate_state, targets)
-                    .await
-                    .expect("Broadcast cannot fail");
+                if let Err(e) = rb.multicast(request, aggregate_state, targets).await {
+                    warn!(
+                        epoch = epoch,
+                        round = metadata.round,
+                        "[SecretShareManager] Share request broadcast failed: {}", e,
+                    );
+                    return;
+                }
                 info!(
                     epoch = epoch,
                     round = metadata.round,
@@ -359,7 +371,13 @@ impl SecretShareManager {
                     }
                 }
                 Some(reset) = reset_rx.next() => {
-                    while matches!(incoming_blocks.try_next(), Ok(Some(_))) {}
+                    let mut dropped = 0;
+                    while matches!(incoming_blocks.try_next(), Ok(Some(_))) {
+                        dropped += 1;
+                    }
+                    if dropped > 0 {
+                        info!("[SecretShareManager] Dropped {} incoming block batches during reset", dropped);
+                    }
                     self.process_reset(reset);
                 }
                 Some(secret_shared_key) = self.decision_rx.next() => {

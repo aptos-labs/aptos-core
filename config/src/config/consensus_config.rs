@@ -94,6 +94,9 @@ pub struct ConsensusConfig {
     pub broadcast_vote: bool,
     pub proof_cache_capacity: u64,
     pub rand_rb_config: ReliableBroadcastConfig,
+    pub ss_rb_config: ReliableBroadcastConfig,
+    /// Delay in ms before broadcasting secret share requests.
+    pub secret_share_request_delay_ms: u64,
     pub num_bounded_executor_tasks: u64,
     pub enable_pre_commit: bool,
     pub max_pending_rounds_in_commit_vote_cache: u64,
@@ -380,6 +383,13 @@ impl Default for ConsensusConfig {
                 backoff_policy_max_delay_ms: 10000,
                 rpc_timeout_ms: 10000,
             },
+            ss_rb_config: ReliableBroadcastConfig {
+                backoff_policy_base_ms: 2,
+                backoff_policy_factor: 100,
+                backoff_policy_max_delay_ms: 10000,
+                rpc_timeout_ms: 10000,
+            },
+            secret_share_request_delay_ms: 300,
             num_bounded_executor_tasks: 16,
             enable_pre_commit: true,
             max_pending_rounds_in_commit_vote_cache: 100,

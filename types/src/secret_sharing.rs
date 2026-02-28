@@ -73,10 +73,18 @@ impl SecretShare {
     }
 
     pub fn verify(&self, config: &SecretShareConfig) -> anyhow::Result<()> {
-        let index = config.get_id(self.author());
+        let index = config.get_id(self.author())?;
         let decryption_key_share = self.share().clone();
-        // TODO(ibalajiarun): Check index out of bounds
-        config.verification_keys[index]
+        config
+            .verification_keys
+            .get(index)
+            .ok_or_else(|| {
+                anyhow::anyhow!(
+                    "Verification key index {} out of bounds (len {})",
+                    index,
+                    config.verification_keys.len()
+                )
+            })?
             .verify_decryption_key_share(&self.metadata.digest, &decryption_key_share)?;
         Ok(())
     }
@@ -171,13 +179,12 @@ impl SecretShareConfig {
         }
     }
 
-    pub fn get_id(&self, peer: &Author) -> usize {
-        // TODO(ibalajiarun): Index out of bounds
-        *self
-            .validator
+    pub fn get_id(&self, peer: &Author) -> anyhow::Result<usize> {
+        self.validator
             .address_to_validator_index()
             .get(peer)
-            .expect("Peer should be in the index!")
+            .copied()
+            .ok_or_else(|| anyhow::anyhow!("Peer {} not found in validator index", peer))
     }
 
     pub fn digest_key(&self) -> &DigestKey {
