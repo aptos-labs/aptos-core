@@ -1,0 +1,324 @@
+# This workflow monitors that the latest Aptos CLI release is downloadable
+# using the official installation scripts from aptos.dev.
+# It should be triggered hourly via PIES and alerts via Slack if downloads fail.
+#
+# NOTE: This workflow uses workflow_dispatch instead of schedule triggers.
+# To run this hourly, configure PIES to trigger this workflow on schedule.
+
+name: "Monitor CLI Release Downloads"
+
+on:
+  # Triggered via PIES on a schedule (hourly)
+  workflow_dispatch:
+  # Also run on changes to this workflow file
+  pull_request:
+    paths:
+      - ".github/workflows/cli-release-monitoring.yaml"
+
+# Explicit permissions following security best practices
+permissions:
+  contents: read
+
+# Prevent concurrent runs to avoid alert spam
+concurrency:
+  group: ${{ github.workflow }}
+  cancel-in-progress: true
+
+env:
+  # Timeout for the install script (in seconds)
+  INSTALL_TIMEOUT: 300
+
+jobs:
+  # Test the CLI download on Linux (Ubuntu)
+  test-linux-download:
+    name: "Test Linux Download"
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Download and run install script
+        id: install
+        run: |
+          set -e
+          echo "Downloading install script from aptos.dev..."
+          curl -fsSL "https://aptos.dev/scripts/install_cli.py" -o install_cli.py
+
+          echo "Running install script..."
+          timeout ${{ env.INSTALL_TIMEOUT }} python3 install_cli.py --bin-dir ./bin
+
+          echo "Verifying installation..."
+          ./bin/aptos --version
+
+          # Capture the version for reporting
+          VERSION=$(./bin/aptos --version | head -1)
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "Successfully installed: $VERSION"
+
+      - name: Test basic CLI functionality
+        run: |
+          # Verify the CLI can show help
+          ./bin/aptos --help > /dev/null
+          # Verify the CLI can show info subcommand help
+          ./bin/aptos info --help > /dev/null
+          echo "Basic CLI functionality verified"
+
+  # Test the CLI download on Linux ARM
+  test-linux-arm-download:
+    name: "Test Linux ARM Download"
+    runs-on: ubuntu-22.04-arm
+    timeout-minutes: 10
+    steps:
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Download and run install script
+        id: install
+        run: |
+          set -e
+          echo "Downloading install script from aptos.dev..."
+          curl -fsSL "https://aptos.dev/scripts/install_cli.py" -o install_cli.py
+
+          echo "Running install script..."
+          timeout ${{ env.INSTALL_TIMEOUT }} python3 install_cli.py --bin-dir ./bin
+
+          echo "Verifying installation..."
+          ./bin/aptos --version
+
+          VERSION=$(./bin/aptos --version | head -1)
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "Successfully installed: $VERSION"
+
+      - name: Test basic CLI functionality
+        run: |
+          ./bin/aptos --help > /dev/null
+          ./bin/aptos info --help > /dev/null
+          echo "Basic CLI functionality verified"
+
+  # Test the CLI download on macOS (ARM - Apple Silicon)
+  test-macos-arm-download:
+    name: "Test macOS ARM Download"
+    runs-on: macos-latest
+    timeout-minutes: 10
+    steps:
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Download and run install script
+        id: install
+        run: |
+          set -e
+          echo "Downloading install script from aptos.dev..."
+          curl -fsSL "https://aptos.dev/scripts/install_cli.py" -o install_cli.py
+
+          echo "Running install script..."
+          # macOS uses gtimeout from coreutils or we use a simpler approach
+          python3 install_cli.py --bin-dir ./bin
+
+          echo "Verifying installation..."
+          ./bin/aptos --version
+
+          VERSION=$(./bin/aptos --version | head -1)
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "Successfully installed: $VERSION"
+
+      - name: Test basic CLI functionality
+        run: |
+          ./bin/aptos --help > /dev/null
+          ./bin/aptos info --help > /dev/null
+          echo "Basic CLI functionality verified"
+
+  # Test the CLI download on macOS (x86_64 - Intel)
+  test-macos-x86-download:
+    name: "Test macOS x86_64 Download"
+    runs-on: macos-13
+    timeout-minutes: 10
+    steps:
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Download and run install script
+        id: install
+        run: |
+          set -e
+          echo "Downloading install script from aptos.dev..."
+          curl -fsSL "https://aptos.dev/scripts/install_cli.py" -o install_cli.py
+
+          echo "Running install script..."
+          python3 install_cli.py --bin-dir ./bin
+
+          echo "Verifying installation..."
+          ./bin/aptos --version
+
+          VERSION=$(./bin/aptos --version | head -1)
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "Successfully installed: $VERSION"
+
+      - name: Test basic CLI functionality
+        run: |
+          ./bin/aptos --help > /dev/null
+          ./bin/aptos info --help > /dev/null
+          echo "Basic CLI functionality verified"
+
+  # Test the CLI download on Windows
+  test-windows-download:
+    name: "Test Windows Download"
+    runs-on: windows-latest
+    timeout-minutes: 15
+    steps:
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Download and run install script
+        id: install
+        shell: pwsh
+        run: |
+          Write-Host "Downloading install script from aptos.dev..."
+          Invoke-WebRequest -Uri "https://aptos.dev/scripts/install_cli.py" -OutFile "install_cli.py"
+
+          Write-Host "Running install script..."
+          python install_cli.py --bin-dir .\bin
+
+          Write-Host "Verifying installation..."
+          $version = & .\bin\aptos.exe --version
+          Write-Host "Successfully installed: $version"
+          "version=$version" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
+
+      - name: Test basic CLI functionality
+        shell: pwsh
+        run: |
+          .\bin\aptos.exe --help | Out-Null
+          .\bin\aptos.exe info --help | Out-Null
+          Write-Host "Basic CLI functionality verified"
+
+  # Alert if any of the download tests fail
+  alert-on-failure:
+    name: "Alert on Failure"
+    runs-on: ubuntu-24.04
+    needs:
+      - test-linux-download
+      - test-linux-arm-download
+      - test-macos-arm-download
+      - test-macos-x86-download
+      - test-windows-download
+    if: failure()
+    steps:
+      - name: Determine failed jobs
+        id: failures
+        run: |
+          FAILURES=""
+          if [ "${{ needs.test-linux-download.result }}" == "failure" ]; then
+            FAILURES="${FAILURES}Linux, "
+          fi
+          if [ "${{ needs.test-linux-arm-download.result }}" == "failure" ]; then
+            FAILURES="${FAILURES}Linux ARM, "
+          fi
+          if [ "${{ needs.test-macos-arm-download.result }}" == "failure" ]; then
+            FAILURES="${FAILURES}macOS ARM, "
+          fi
+          if [ "${{ needs.test-macos-x86-download.result }}" == "failure" ]; then
+            FAILURES="${FAILURES}macOS x86_64, "
+          fi
+          if [ "${{ needs.test-windows-download.result }}" == "failure" ]; then
+            FAILURES="${FAILURES}Windows, "
+          fi
+          # Remove trailing comma and space
+          FAILURES="${FAILURES%, }"
+          echo "platforms=$FAILURES" >> $GITHUB_OUTPUT
+
+      - name: Post to Slack channel on failure
+        uses: slackapi/slack-github-action@936158bbe252e9a6062e793ea4609642c966e302 # pin@v1.21.0
+        with:
+          payload: |
+            {
+              "text": ":x: *Aptos CLI Release Download Monitor Failed*\n\nThe CLI installation script from aptos.dev failed on: *${{ steps.failures.outputs.platforms }}*\n\n<${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}|View workflow run>",
+              "blocks": [
+                {
+                  "type": "header",
+                  "text": {
+                    "type": "plain_text",
+                    "text": ":x: Aptos CLI Download Failure Alert"
+                  }
+                },
+                {
+                  "type": "section",
+                  "text": {
+                    "type": "mrkdwn",
+                    "text": "The CLI installation script from *aptos.dev* is failing to download or run the latest Aptos CLI release."
+                  }
+                },
+                {
+                  "type": "section",
+                  "fields": [
+                    {
+                      "type": "mrkdwn",
+                      "text": "*Failed Platforms:*\n${{ steps.failures.outputs.platforms }}"
+                    },
+                    {
+                      "type": "mrkdwn",
+                      "text": "*Time:*\n<!date^${{ github.event.repository.updated_at }}^{date_short_pretty} at {time}|now>"
+                    }
+                  ]
+                },
+                {
+                  "type": "actions",
+                  "elements": [
+                    {
+                      "type": "button",
+                      "text": {
+                        "type": "plain_text",
+                        "text": "View Workflow Run"
+                      },
+                      "url": "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+                    },
+                    {
+                      "type": "button",
+                      "text": {
+                        "type": "plain_text",
+                        "text": "View CLI Releases"
+                      },
+                      "url": "https://github.com/aptos-labs/aptos-core/releases?q=aptos-cli"
+                    }
+                  ]
+                }
+              ]
+            }
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.CLI_RELEASE_MONITOR_SLACK_WEBHOOK_URL }}
+
+  # Summary job that always runs to provide status
+  summary:
+    name: "Download Test Summary"
+    runs-on: ubuntu-24.04
+    needs:
+      - test-linux-download
+      - test-linux-arm-download
+      - test-macos-arm-download
+      - test-macos-x86-download
+      - test-windows-download
+    if: always()
+    steps:
+      - name: Print summary
+        run: |
+          echo "## CLI Release Download Monitor Results" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Platform | Status |" >> $GITHUB_STEP_SUMMARY
+          echo "|----------|--------|" >> $GITHUB_STEP_SUMMARY
+          echo "| Linux (Ubuntu) | ${{ needs.test-linux-download.result == 'success' && '✅ Pass' || '❌ Fail' }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Linux ARM | ${{ needs.test-linux-arm-download.result == 'success' && '✅ Pass' || '❌ Fail' }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| macOS ARM | ${{ needs.test-macos-arm-download.result == 'success' && '✅ Pass' || '❌ Fail' }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| macOS x86_64 | ${{ needs.test-macos-x86-download.result == 'success' && '✅ Pass' || '❌ Fail' }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Windows | ${{ needs.test-windows-download.result == 'success' && '✅ Pass' || '❌ Fail' }} |" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "This workflow monitors that the latest Aptos CLI release can be downloaded using the installation script at https://aptos.dev/scripts/install_cli.py" >> $GITHUB_STEP_SUMMARY
