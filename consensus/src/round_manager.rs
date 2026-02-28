@@ -363,6 +363,11 @@ pub struct RoundManager {
     // Proxy-only ValidatorVerifier for verifying ordered proxy block signatures/QCs.
     // Set on primary RoundManager when proxy consensus is enabled. None otherwise.
     proxy_verifier: Option<Arc<ValidatorVerifier>>,
+    // Optional override verifier for validator transaction (DKG, JWK) verification.
+    // Set on proxy RoundManager to the full primary verifier, because DKG transcripts
+    // have dealer indices from the full N-validator set but the proxy RM's epoch_state
+    // only contains the proxy subset verifier. When None, uses epoch_state.verifier.
+    vtxn_verifier: Option<Arc<ValidatorVerifier>>,
 }
 
 impl RoundManager {
@@ -388,6 +393,7 @@ impl RoundManager {
         proxy_event_tx: Option<TokioMpsc::UnboundedSender<PrimaryToProxyEvent>>,
         proxy_hooks: Option<Arc<dyn crate::proxy_hooks::ProxyConsensusHooks>>,
         proxy_verifier: Option<Arc<ValidatorVerifier>>,
+        vtxn_verifier: Option<Arc<ValidatorVerifier>>,
     ) -> Self {
         // when decoupled execution is false,
         // the counter is still static.
@@ -430,6 +436,7 @@ impl RoundManager {
             pending_proposal_event: None,
             proxy_hooks,
             proxy_verifier,
+            vtxn_verifier,
         }
     }
 
@@ -616,6 +623,16 @@ impl RoundManager {
         let safety_rules = self.safety_rules.clone();
         let proposer_election = self.proposer_election.clone();
         let proxy_hooks = self.proxy_hooks.clone();
+        // Compute parent's last_primary_proof_round for proxy block proposals
+        let parent_lppr = if proxy_hooks.is_some() {
+            let parent_id = sync_info.highest_quorum_cert().certified_block().id();
+            self.block_store
+                .get_block(parent_id)
+                .and_then(|b| b.block().block_data().last_primary_proof_round())
+                .unwrap_or(0)
+        } else {
+            0
+        };
         tokio::spawn(async move {
             if let Err(e) = monitor!(
                 "generate_and_send_proposal",
@@ -629,6 +646,7 @@ impl RoundManager {
                     proposer_election,
                     proxy_hooks,
                     proxy_payload,
+                    parent_lppr,
                 )
                 .await
             ) {
@@ -647,6 +665,7 @@ impl RoundManager {
         proposer_election: Arc<dyn ProposerElection + Send + Sync>,
         proxy_hooks: Option<Arc<dyn crate::proxy_hooks::ProxyConsensusHooks>>,
         proxy_payload: Option<(Vec<aptos_types::validator_txn::ValidatorTransaction>, aptos_consensus_types::common::Payload)>,
+        parent_last_primary_proof_round: Round,
     ) -> anyhow::Result<()> {
         Self::log_collected_vote_stats(epoch_state.clone(), &new_round_event);
         let proposal_msg = Self::generate_proposal(
@@ -658,6 +677,7 @@ impl RoundManager {
             proposer_election,
             proxy_hooks,
             proxy_payload,
+            parent_last_primary_proof_round,
         )
         .await?;
         #[cfg(feature = "failpoints")]
@@ -711,6 +731,7 @@ impl RoundManager {
         proposal_generator: Arc<ProposalGenerator>,
         proposer_election: Arc<dyn ProposerElection + Send + Sync>,
         proxy_hooks: Arc<dyn crate::proxy_hooks::ProxyConsensusHooks>,
+        parent_last_primary_proof_round: Round,
     ) -> anyhow::Result<()> {
         let (validator_txns, payload, timestamp) = proposal_generator
             .generate_opt_proposal_payload(round, parent.id(), proposer_election)
@@ -725,6 +746,7 @@ impl RoundManager {
             timestamp,
             parent,
             grandparent_qc,
+            parent_last_primary_proof_round,
         );
 
         // This is always a proxy opt proposal
@@ -836,6 +858,7 @@ impl RoundManager {
             self.proposer_election.clone(),
             None,
             None,
+            0, // parent_last_primary_proof_round: not needed for non-proxy
         )
         .await
     }
@@ -849,6 +872,7 @@ impl RoundManager {
         proposer_election: Arc<dyn ProposerElection + Send + Sync>,
         proxy_hooks: Option<Arc<dyn crate::proxy_hooks::ProxyConsensusHooks>>,
         proxy_payload: Option<(Vec<aptos_types::validator_txn::ValidatorTransaction>, aptos_consensus_types::common::Payload)>,
+        parent_last_primary_proof_round: Round,
     ) -> anyhow::Result<ProposalMsg> {
         let consensus_type = if proxy_hooks.is_some() { "proxy" } else { "primary" };
         let proposal = if let Some(hooks) = proxy_hooks {
@@ -870,6 +894,7 @@ impl RoundManager {
                 original.round(),
                 original.timestamp_usecs(),
                 original.quorum_cert().clone(),
+                parent_last_primary_proof_round,
             )
         } else if let Some((vtxns, payload)) = proxy_payload {
             // Primary RoundManager with proxy payload: use aggregated proxy transactions
@@ -1340,6 +1365,13 @@ impl RoundManager {
         }
 
         if let Some(vtxns) = proposal.validator_txns() {
+            // Use vtxn_verifier if set (proxy RM uses full primary verifier because DKG
+            // transcripts have dealer indices from the full N-validator set), otherwise
+            // fall back to epoch_state.verifier (primary RM).
+            let verifier = self
+                .vtxn_verifier
+                .as_deref()
+                .unwrap_or(self.epoch_state.verifier.as_ref());
             for vtxn in vtxns {
                 let vtxn_type_name = vtxn.type_name();
                 ensure!(
@@ -1347,7 +1379,7 @@ impl RoundManager {
                     "unexpected validator txn: {:?}",
                     vtxn_type_name
                 );
-                vtxn.verify(self.epoch_state.verifier.as_ref())
+                vtxn.verify(verifier)
                     .context(format!("{} verify failed", vtxn_type_name))?;
             }
         }
@@ -1694,6 +1726,12 @@ impl RoundManager {
             if let Some(ref proxy_hooks) = self.proxy_hooks {
                 // Proxy path: generate opt proxy proposal with ProxyV0 body
                 let proxy_hooks = proxy_hooks.clone();
+                // Look up parent's last_primary_proof_round from block store
+                let parent_lppr = self
+                    .block_store
+                    .get_block(parent.id())
+                    .and_then(|b| b.block().block_data().last_primary_proof_round())
+                    .unwrap_or(0);
                 tokio::spawn(async move {
                     if let Err(e) = monitor!(
                         "generate_and_send_opt_proxy_proposal",
@@ -1707,6 +1745,7 @@ impl RoundManager {
                             proposal_generator,
                             proposer_election,
                             proxy_hooks,
+                            parent_lppr,
                         )
                         .await
                     ) {
@@ -2332,18 +2371,6 @@ impl RoundManager {
             primary_block_from_proxy.primary_round(),
             primary_block_from_proxy.aggregated_payload_hash(),
         );
-
-        // Skip empty batches — they inflate pending_proxy_batches without contributing
-        // txns, making the backpressure signal noisy. Still send pipeline state so proxy
-        // gets updated backpressure info.
-        if primary_block_from_proxy.total_txn_count() == 0 {
-            info!(
-                self.new_log(LogEvent::ReceiveNewCertificate),
-                "Skipping empty proxy batch for primary round {}", primary_round,
-            );
-            self.send_pipeline_state_to_proxy();
-            return Ok(());
-        }
 
         // Accumulate proxy blocks. Multiple batches may arrive between primary rounds;
         // all will be drained and merged when the next proposal is generated.

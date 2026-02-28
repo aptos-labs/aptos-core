@@ -399,10 +399,6 @@ BlockType:
       OptimisticProposal:
         NEWTYPE:
           TYPENAME: OptBlockBody
-    5:
-      ProxyBlock:
-        NEWTYPE:
-          TYPENAME: OptProxyBlockBody
 ChainId:
   NEWTYPESTRUCT: U8
 ChangeSet:
@@ -572,9 +568,21 @@ ConsensusMsg:
         NEWTYPE:
           TYPENAME: ProxyOrderVoteMsg
     30:
+      ProxyRoundTimeoutMsg:
+        NEWTYPE:
+          TYPENAME: ProxyRoundTimeoutMsg
+    31:
       OrderedProxyBlocksMsg:
         NEWTYPE:
           TYPENAME: OrderedProxyBlocksMsg
+    32:
+      ProxyBlockRetrievalRequest:
+        NEWTYPE:
+          TYPENAME: BlockRetrievalRequest
+    33:
+      ProxySyncInfo:
+        NEWTYPE:
+          TYPENAME: ProxySyncInfo
 ContractEvent:
   ENUM:
     0:
@@ -912,6 +920,22 @@ OptBlockBody:
               TYPENAME: AccountAddress
           - grandparent_qc:
               TYPENAME: QuorumCert
+    1:
+      ProxyV0:
+        STRUCT:
+          - validator_txns:
+              SEQ:
+                TYPENAME: ValidatorTransaction
+          - payload:
+              TYPENAME: Payload
+          - author:
+              TYPENAME: AccountAddress
+          - grandparent_qc:
+              TYPENAME: QuorumCert
+          - last_primary_proof_round: U64
+          - primary_proof:
+              OPTION:
+                TYPENAME: PrimaryConsensusProof
 OptBlockData:
   STRUCT:
     - epoch: U64
@@ -941,10 +965,10 @@ OptProxyBlockBody:
               TYPENAME: AccountAddress
           - grandparent_qc:
               TYPENAME: QuorumCert
-          - primary_round: U64
-          - primary_qc:
+          - last_primary_proof_round: U64
+          - primary_proof:
               OPTION:
-                TYPENAME: QuorumCert
+                TYPENAME: PrimaryConsensusProof
 OptProxyBlockData:
   STRUCT:
     - epoch: U64
@@ -957,7 +981,7 @@ OptProxyBlockData:
 OptProxyProposalMsg:
   STRUCT:
     - block_data:
-        TYPENAME: OptProxyBlockData
+        TYPENAME: OptBlockData
     - sync_info:
         TYPENAME: ProxySyncInfo
 OptQuorumStorePayload:
@@ -999,9 +1023,8 @@ OrderedProxyBlocksMsg:
     - proxy_blocks:
         SEQ:
           TYPENAME: Block
-    - primary_round: U64
-    - primary_qc:
-        TYPENAME: QuorumCert
+    - primary_proof:
+        TYPENAME: PrimaryConsensusProof
 PartialAuthenticatorAssertionResponse:
   STRUCT:
     - signature:
@@ -1063,6 +1086,16 @@ Pepper:
     TUPLEARRAY:
       CONTENT: U8
       SIZE: 31
+PrimaryConsensusProof:
+  ENUM:
+    0:
+      QC:
+        NEWTYPE:
+          TYPENAME: QuorumCert
+    1:
+      TC:
+        NEWTYPE:
+          TYPENAME: TwoChainTimeoutCertificate
 ProofOfStore:
   STRUCT:
     - info:
@@ -1102,12 +1135,38 @@ ProposalExt:
                 TUPLE:
                   - U64
                   - TYPENAME: AccountAddress
+    1:
+      ProxyV0:
+        STRUCT:
+          - validator_txns:
+              SEQ:
+                TYPENAME: ValidatorTransaction
+          - payload:
+              TYPENAME: Payload
+          - author:
+              TYPENAME: AccountAddress
+          - failed_authors:
+              SEQ:
+                TUPLE:
+                  - U64
+                  - TYPENAME: AccountAddress
+          - last_primary_proof_round: U64
+          - primary_proof:
+              OPTION:
+                TYPENAME: PrimaryConsensusProof
 ProposalMsg:
   STRUCT:
     - proposal:
         TYPENAME: Block
     - sync_info:
         TYPENAME: SyncInfo
+ProviderJWKs:
+  STRUCT:
+    - issuer: BYTES
+    - version: U64
+    - jwks:
+        SEQ:
+          TYPENAME: JWKMoveStruct
 ProxyOrderVoteMsg:
   STRUCT:
     - order_vote:
@@ -1120,6 +1179,10 @@ ProxyProposalMsg:
         TYPENAME: Block
     - sync_info:
         TYPENAME: ProxySyncInfo
+ProxyRoundTimeoutMsg:
+  STRUCT:
+    - round_timeout:
+        TYPENAME: RoundTimeoutMsg
 ProxySyncInfo:
   STRUCT:
     - highest_proxy_qc:
@@ -1127,6 +1190,8 @@ ProxySyncInfo:
     - highest_proxy_ordered_cert:
         OPTION:
           TYPENAME: WrappedLedgerInfo
+    - highest_proxy_commit_cert:
+        TYPENAME: WrappedLedgerInfo
     - highest_proxy_timeout_cert:
         OPTION:
           TYPENAME: TwoChainTimeoutCertificate
@@ -1141,13 +1206,6 @@ ProxyVoteMsg:
         TYPENAME: Vote
     - sync_info:
         TYPENAME: ProxySyncInfo
-ProviderJWKs:
-  STRUCT:
-    - issuer: BYTES
-    - version: U64
-    - jwks:
-        SEQ:
-          TYPENAME: JWKMoveStruct
 PublicKey:
   NEWTYPESTRUCT: BYTES
 QuorumCert:

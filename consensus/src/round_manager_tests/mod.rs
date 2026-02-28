@@ -483,6 +483,7 @@ impl NodeSetup {
             None, // proxy_event_tx
             None, // proxy_hooks
             None, // proxy_verifier
+            None, // vtxn_verifier
         );
         block_on(round_manager.init(last_vote_sent));
         Self {

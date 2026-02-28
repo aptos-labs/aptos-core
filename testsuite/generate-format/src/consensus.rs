@@ -140,6 +140,9 @@ pub fn get_registry() -> Result<Registry> {
     tracer.trace_type::<aptos_consensus_types::block_retrieval::BlockRetrievalRequest>(&samples)?;
 
     // Proxy consensus types
+    tracer.trace_type::<aptos_consensus_types::primary_consensus_proof::PrimaryConsensusProof>(&samples)?;
+    tracer.trace_type::<aptos_consensus_types::proposal_ext::ProposalExt>(&samples)?;
+    tracer.trace_type::<aptos_consensus_types::proposal_ext::OptBlockBody>(&samples)?;
     tracer.trace_type::<aptos_consensus_types::proxy_sync_info::ProxySyncInfo>(&samples)?;
     tracer.trace_type::<aptos_consensus_types::proxy_messages::ProxyProposalMsg>(&samples)?;
     tracer.trace_type::<aptos_consensus_types::proxy_messages::OptProxyProposalMsg>(&samples)?;

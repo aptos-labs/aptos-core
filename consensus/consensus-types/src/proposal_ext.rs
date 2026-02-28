@@ -26,9 +26,9 @@ pub enum OptBlockBody {
         payload: Payload,
         author: Author,
         grandparent_qc: QuorumCert,
-        /// Which primary round this proxy block belongs to
-        primary_round: Round,
-        /// Primary consensus proof (QC or TC) attached when proof.round == primary_round - 1
+        /// Round of the most recent primary proof (QC/TC) in this block's ancestry
+        last_primary_proof_round: Round,
+        /// Primary consensus proof (QC or TC) attached at this cutting point
         primary_proof: Option<PrimaryConsensusProof>,
     },
 }
@@ -60,10 +60,10 @@ impl OptBlockBody {
         }
     }
 
-    pub fn primary_round(&self) -> Option<Round> {
+    pub fn last_primary_proof_round(&self) -> Option<Round> {
         match self {
             OptBlockBody::V0 { .. } => None,
-            OptBlockBody::ProxyV0 { primary_round, .. } => Some(*primary_round),
+            OptBlockBody::ProxyV0 { last_primary_proof_round, .. } => Some(*last_primary_proof_round),
         }
     }
 
@@ -94,9 +94,9 @@ pub enum ProposalExt {
         payload: Payload,
         author: Author,
         failed_authors: Vec<(Round, Author)>,
-        /// Which primary round this proxy block belongs to
-        primary_round: Round,
-        /// Primary consensus proof (QC or TC) attached when proof.round == primary_round - 1
+        /// Round of the most recent primary proof (QC/TC) in this block's ancestry
+        last_primary_proof_round: Round,
+        /// Primary consensus proof (QC or TC) attached at this cutting point
         primary_proof: Option<PrimaryConsensusProof>,
     },
 }
@@ -130,10 +130,10 @@ impl ProposalExt {
         }
     }
 
-    pub fn primary_round(&self) -> Option<Round> {
+    pub fn last_primary_proof_round(&self) -> Option<Round> {
         match self {
             ProposalExt::V0 { .. } => None,
-            ProposalExt::ProxyV0 { primary_round, .. } => Some(*primary_round),
+            ProposalExt::ProxyV0 { last_primary_proof_round, .. } => Some(*last_primary_proof_round),
         }
     }
 

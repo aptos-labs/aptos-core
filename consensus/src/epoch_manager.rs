@@ -1194,6 +1194,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
             proxy_event_tx,
             None, // proxy_hooks: None for primary RoundManager
             proxy_verifier,
+            None, // vtxn_verifier: None for primary (uses epoch_state.verifier)
         );
 
         round_manager.init(last_vote).await;
@@ -1445,7 +1446,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
                 self.config.max_sending_inline_txns / target,
                 self.config.max_sending_inline_bytes / target,
             ),
-            onchain_consensus_config.max_failed_authors_to_store(),
+            0, // Proxy uses RotatingProposer (round-robin), no failed_authors tracking
             self.config
                 .min_max_txns_in_block_after_filtering_from_backpressure,
             None, // proxy blocks aren't executed, no gas limit needed
@@ -1503,6 +1504,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
             None, // proxy_event_tx: None (this IS the proxy, it doesn't send to another proxy)
             Some(proxy_hooks.clone() as Arc<dyn crate::proxy_hooks::ProxyConsensusHooks>),
             None, // proxy_verifier: None (proxy RM doesn't receive ordered proxy blocks)
+            Some(epoch_state.verifier.clone()), // vtxn_verifier: full primary verifier for DKG txn verification
         );
 
         info!(

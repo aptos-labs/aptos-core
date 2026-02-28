@@ -62,7 +62,7 @@ impl OptBlockData {
         timestamp_usecs: u64,
         parent: BlockInfo,
         grandparent_qc: QuorumCert,
-        primary_round: Round,
+        last_primary_proof_round: Round,
         primary_proof: Option<PrimaryConsensusProof>,
     ) -> Self {
         Self {
@@ -75,7 +75,7 @@ impl OptBlockData {
                 payload,
                 author,
                 grandparent_qc,
-                primary_round,
+                last_primary_proof_round,
                 primary_proof,
             },
         }
@@ -142,16 +142,16 @@ impl OptBlockData {
             "Blocks must not be too far in the future"
         );
 
-        // Primary proof round must be >= primary_round - 1.
-        // With consecutive QCs: proof_round == primary_round - 1 (exact match).
-        // With TC gaps: proof_round > primary_round - 1 (primary had timeouts).
-        if let Some(primary_round) = self.primary_round() {
+        // Validate last_primary_proof_round consistency with attached proof.
+        // If proof is attached, proof.round must advance beyond the inherited lppr,
+        // and last_primary_proof_round must equal proof.round.
+        if let Some(lppr) = self.last_primary_proof_round() {
             if let Some(primary_proof) = self.primary_proof() {
                 ensure!(
-                    primary_proof.proof_round() >= primary_round.saturating_sub(1),
-                    "Primary proof round {} must be >= primary_round - 1 = {}",
+                    primary_proof.proof_round() >= lppr,
+                    "Primary proof round {} must be >= last_primary_proof_round {}",
                     primary_proof.proof_round(),
-                    primary_round.saturating_sub(1),
+                    lppr,
                 );
             }
         }

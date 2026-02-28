@@ -7,8 +7,8 @@
 //! - QC: the round succeeded and a block was certified
 //! - TC: the round timed out and 2f+1 validators moved on
 //!
-//! For proxy cutting-point semantics, both are treated identically: they advance
-//! `current_primary_round` and create a cutting point in the proxy block stream.
+//! For proxy cutting-point semantics, both are treated identically: they update
+//! `last_primary_proof_round` and create a cutting point in the proxy block stream.
 
 use crate::{quorum_cert::QuorumCert, timeout_2chain::TwoChainTimeoutCertificate};
 use aptos_types::{block_info::Round, validator_verifier::ValidatorVerifier};

@@ -405,29 +405,25 @@ impl Display for ProxyRoundTimeoutMsg {
 // OrderedProxyBlocksMsg - Forwarded to all primaries
 // ============================================================================
 
-/// OrderedProxyBlocksMsg contains ordered proxy blocks for one primary round.
+/// OrderedProxyBlocksMsg contains ordered proxy blocks ending at a cutting point.
 /// This is broadcast to ALL primaries (not just proxies) when proxy blocks are ordered.
 #[derive(Debug, Deserialize, Serialize, Clone)]
 pub struct OrderedProxyBlocksMsg {
-    /// Ordered proxy blocks for this primary round.
-    /// All blocks have the same primary_round and are linked by parent hashes.
+    /// Ordered proxy blocks linked by parent hashes.
+    /// last_primary_proof_round is non-decreasing across blocks.
     proxy_blocks: Vec<Block>,
-    /// The primary round these proxy blocks belong to.
-    primary_round: Round,
     /// The primary consensus proof (QC or TC) that "cut" these proxy blocks.
-    /// proof.round == primary_round - 1
+    /// Primary round for this batch = proof.proof_round() + 1.
     primary_proof: PrimaryConsensusProof,
 }
 
 impl OrderedProxyBlocksMsg {
     pub fn new(
         proxy_blocks: Vec<Block>,
-        primary_round: Round,
         primary_proof: PrimaryConsensusProof,
     ) -> Self {
         Self {
             proxy_blocks,
-            primary_round,
             primary_proof,
         }
     }
@@ -440,8 +436,9 @@ impl OrderedProxyBlocksMsg {
         self.proxy_blocks
     }
 
+    /// The primary round this batch belongs to, derived from the proof.
     pub fn primary_round(&self) -> Round {
-        self.primary_round
+        self.primary_proof.proof_round() + 1
     }
 
     pub fn primary_proof(&self) -> &PrimaryConsensusProof {
@@ -459,28 +456,21 @@ impl OrderedProxyBlocksMsg {
             "OrderedProxyBlocksMsg must contain at least one proxy block"
         );
 
-        // Primary proof round must be >= primary_round - 1.
-        // With consecutive QCs: proof_round == primary_round - 1 (exact match).
-        // With TC gaps: proof_round > primary_round - 1 (primary had timeouts).
-        ensure!(
-            self.primary_proof.proof_round() >= self.primary_round.saturating_sub(1),
-            "Primary proof round {} must be >= primary_round - 1 = {}",
-            self.primary_proof.proof_round(),
-            self.primary_round.saturating_sub(1),
-        );
-
-        // Verify all blocks are proxy blocks with correct primary_round
+        // Verify all blocks are proxy blocks with non-decreasing last_primary_proof_round
+        let mut prev_lppr = 0;
         for block in &self.proxy_blocks {
             ensure!(
                 block.block_data().is_proxy_block(),
                 "OrderedProxyBlocksMsg contains non-proxy block"
             );
+            let lppr = block.block_data().last_primary_proof_round().unwrap_or(0);
             ensure!(
-                block.block_data().primary_round() == Some(self.primary_round),
-                "Proxy block has primary_round {:?}, expected {}",
-                block.block_data().primary_round(),
-                self.primary_round,
+                lppr >= prev_lppr,
+                "last_primary_proof_round must be non-decreasing: {} < {}",
+                lppr,
+                prev_lppr,
             );
+            prev_lppr = lppr;
         }
 
         // Verify blocks are linked by parent hashes (chain structure)
@@ -525,7 +515,7 @@ impl Display for OrderedProxyBlocksMsg {
         write!(
             f,
             "OrderedProxyBlocksMsg: [primary_round: {}, num_blocks: {}, proof: {}]",
-            self.primary_round,
+            self.primary_round(),
             self.proxy_blocks.len(),
             self.primary_proof,
         )
@@ -552,8 +542,8 @@ mod tests {
         let li_sig = LedgerInfoWithSignatures::new(ledger_info, AggregateSignature::empty());
         let qc = QuorumCert::new(vote_data, li_sig);
 
-        let msg = OrderedProxyBlocksMsg::new(vec![], 1, PrimaryConsensusProof::QC(qc));
-        assert_eq!(msg.primary_round(), 1);
+        let msg = OrderedProxyBlocksMsg::new(vec![], PrimaryConsensusProof::QC(qc));
+        assert_eq!(msg.primary_round(), 1); // proof.round=0, so primary_round=1
         assert!(msg.proxy_blocks().is_empty());
     }
 }

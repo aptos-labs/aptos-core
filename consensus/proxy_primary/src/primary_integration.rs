@@ -31,8 +31,6 @@ use aptos_logger::info;
 pub struct PrimaryBlockFromProxy {
     /// Ordered proxy blocks (sorted by proxy round)
     proxy_blocks: Vec<Block>,
-    /// Primary round these blocks belong to
-    primary_round: Round,
     /// Primary consensus proof (QC or TC) that "cut" these proxy blocks
     primary_proof: PrimaryConsensusProof,
     /// Aggregated payload hash (for deterministic ordering)
@@ -48,7 +46,6 @@ impl PrimaryBlockFromProxy {
         msg: OrderedProxyBlocksMsg,
     ) -> Result<Self, ProxyConsensusError> {
         let proxy_blocks = msg.proxy_blocks().to_vec();
-        let primary_round = msg.primary_round();
         let primary_proof = msg.primary_proof().clone();
 
         // Verify non-empty
@@ -71,41 +68,32 @@ impl PrimaryBlockFromProxy {
             }
         }
 
-        // Verify primary_round is non-decreasing across blocks and all are <= message primary_round.
-        // Proof overwriting can cause batches where blocks span multiple primary rounds
-        // (intermediate cutting points may have been sent in previous batches).
-        // The proxy BFT guarantees block integrity; we just check structural consistency.
-        let mut prev_pr = 0;
+        // Verify all blocks are proxy blocks with non-decreasing last_primary_proof_round.
+        // A batch may span multiple cutting points (TC gaps in primary), so
+        // last_primary_proof_round values increase at intermediate cutting points.
+        let mut prev_lppr = 0;
         for (i, block) in proxy_blocks.iter().enumerate() {
-            let block_pr = block.block_data().primary_round().ok_or_else(|| {
+            let block_lppr = block.block_data().last_primary_proof_round().ok_or_else(|| {
                 ProxyConsensusError::InvalidProxyBlock(format!(
-                    "Block {} is not a proxy block (missing primary_round)",
+                    "Block {} is not a proxy block (missing last_primary_proof_round)",
                     i
                 ))
             })?;
-            if block_pr < prev_pr {
+            if block_lppr < prev_lppr {
                 return Err(ProxyConsensusError::InvalidPrimaryRound {
-                    expected: prev_pr,
-                    got: block_pr,
+                    expected: prev_lppr,
+                    got: block_lppr,
                 });
             }
-            if block_pr > primary_round {
-                return Err(ProxyConsensusError::InvalidPrimaryRound {
-                    expected: primary_round,
-                    got: block_pr,
-                });
-            }
-            prev_pr = block_pr;
+            prev_lppr = block_lppr;
         }
 
-        // Primary proof round must be >= primary_round - 1.
-        // With consecutive QCs: proof_round == primary_round - 1 (exact match).
-        // With overwritten proofs: proof_round > primary_round - 1 (jumped ahead).
-        let min_expected_proof_round = primary_round.saturating_sub(1);
-        if primary_proof.proof_round() < min_expected_proof_round {
-            return Err(ProxyConsensusError::PrimaryProofRoundMismatch {
-                expected: min_expected_proof_round,
-                got: primary_proof.proof_round(),
+        // Verify the last block's last_primary_proof_round matches the primary proof round.
+        // The cutting block should have last_primary_proof_round == proof.round.
+        if prev_lppr != primary_proof.proof_round() {
+            return Err(ProxyConsensusError::InvalidPrimaryRound {
+                expected: primary_proof.proof_round(),
+                got: prev_lppr,
             });
         }
 
@@ -143,6 +131,7 @@ impl PrimaryBlockFromProxy {
         // Compute deterministic aggregated payload hash
         let aggregated_payload_hash = Self::compute_aggregated_hash(&proxy_blocks);
 
+        let primary_round = primary_proof.proof_round() + 1;
         let first_round = proxy_blocks.first().map(|b| b.round()).unwrap_or(0);
         let last_round = proxy_blocks.last().map(|b| b.round()).unwrap_or(0);
         info!(
@@ -159,7 +148,6 @@ impl PrimaryBlockFromProxy {
 
         Ok(Self {
             proxy_blocks,
-            primary_round,
             primary_proof,
             aggregated_payload_hash,
         })
@@ -220,9 +208,9 @@ impl PrimaryBlockFromProxy {
         &self.proxy_blocks
     }
 
-    /// Get the primary round.
+    /// Get the primary round (derived from proof.round + 1).
     pub fn primary_round(&self) -> Round {
-        self.primary_round
+        self.primary_proof.proof_round() + 1
     }
 
     /// Get the primary consensus proof (QC or TC).
@@ -333,16 +321,14 @@ impl PrimaryBlockFromProxy {
 #[cfg(any(test, feature = "fuzzing"))]
 pub struct PrimaryBlockFromProxyBuilder {
     proxy_blocks: Vec<Block>,
-    primary_round: Round,
     primary_proof: Option<PrimaryConsensusProof>,
 }
 
 #[cfg(any(test, feature = "fuzzing"))]
 impl PrimaryBlockFromProxyBuilder {
-    pub fn new(primary_round: Round) -> Self {
+    pub fn new() -> Self {
         Self {
             proxy_blocks: Vec::new(),
-            primary_round,
             primary_proof: None,
         }
     }
@@ -367,7 +353,6 @@ impl PrimaryBlockFromProxyBuilder {
 
         Ok(PrimaryBlockFromProxy {
             proxy_blocks: self.proxy_blocks,
-            primary_round: self.primary_round,
             primary_proof,
             aggregated_payload_hash,
         })
@@ -409,7 +394,7 @@ mod tests {
         signer: &ValidatorSigner,
         round: Round,
         parent_qc: QuorumCert,
-        primary_round: Round,
+        last_primary_proof_round: Round,
         primary_proof: Option<PrimaryConsensusProof>,
     ) -> Block {
         let block_data = BlockData::new_from_proxy(
@@ -421,7 +406,7 @@ mod tests {
             Payload::empty(false, true), // payload
             signer.author(),
             vec![],                    // failed_authors
-            primary_round,
+            last_primary_proof_round,
             primary_proof,
         );
         Block::new_proposal_from_block_data(block_data, signer).unwrap()
@@ -432,7 +417,7 @@ mod tests {
         signer: &ValidatorSigner,
         num_blocks: usize,
         start_round: Round,
-        primary_round: Round,
+        last_primary_proof_round: Round,
         primary_qc: Option<QuorumCert>,
     ) -> Vec<Block> {
         assert!(num_blocks > 0);
@@ -442,7 +427,7 @@ mod tests {
         let genesis_qc = make_qc(1, 0);
         let is_last = num_blocks == 1;
         let first_proof = if is_last { primary_qc.as_ref().map(|qc| PrimaryConsensusProof::QC(qc.clone())) } else { None };
-        let first = make_proxy_block(signer, start_round, genesis_qc, primary_round, first_proof);
+        let first = make_proxy_block(signer, start_round, genesis_qc, last_primary_proof_round, first_proof);
         blocks.push(first);
 
         for i in 1..num_blocks {
@@ -454,7 +439,7 @@ mod tests {
                 signer,
                 start_round + i as u64,
                 parent_qc,
-                primary_round,
+                last_primary_proof_round,
                 proof,
             );
             blocks.push(block);
@@ -464,67 +449,49 @@ mod tests {
     }
 
     // =========================================================================
-    // Existing tests
+    // Empty / basic rejection tests
     // =========================================================================
 
     #[test]
-    fn test_primary_block_from_proxy_empty() {
-        let primary_qc = make_qc(1, 0);
-        let msg = OrderedProxyBlocksMsg::new(vec![], 1, PrimaryConsensusProof::QC(primary_qc));
-
-        let result = PrimaryBlockFromProxy::from_ordered_msg(msg);
-        assert!(result.is_err());
-    }
-
-    #[test]
-    fn test_primary_block_from_proxy_empty_rejected() {
+    fn test_empty_proxy_blocks_rejected() {
         let primary_qc = make_qc(1, 5);
-
-        // Fails because proxy_blocks is empty
-        let msg = OrderedProxyBlocksMsg::new(vec![], 1, PrimaryConsensusProof::QC(primary_qc));
+        let msg = OrderedProxyBlocksMsg::new(vec![], PrimaryConsensusProof::QC(primary_qc));
         let result = PrimaryBlockFromProxy::from_ordered_msg(msg);
         assert!(result.is_err());
+        assert!(format!("{:?}", result.unwrap_err()).contains("at least one"));
     }
 
     #[test]
-    fn test_primary_block_from_proxy_qc_round_too_low() {
+    fn test_last_block_lppr_mismatch_proof_round_rejected() {
         let signer = ValidatorSigner::from_int(0);
-        let primary_round = 10;
-        // QC.round=2 < primary_round - 1 = 9 → should fail
+        // Block claims lppr=10, but proof.round=2 → mismatch → rejected
         let primary_qc = make_qc(1, 2);
-
         let block = make_proxy_block(
-            &signer,
-            1,
-            make_qc(1, 0),
-            primary_round,
+            &signer, 1, make_qc(1, 0),
+            10, // mismatched: block says lppr=10, proof says round=2
             Some(PrimaryConsensusProof::QC(primary_qc.clone())),
         );
-
-        let msg = OrderedProxyBlocksMsg::new(vec![block], primary_round, PrimaryConsensusProof::QC(primary_qc));
+        let msg = OrderedProxyBlocksMsg::new(vec![block], PrimaryConsensusProof::QC(primary_qc));
         let result = PrimaryBlockFromProxy::from_ordered_msg(msg);
         assert!(result.is_err());
     }
 
     #[test]
-    fn test_primary_block_from_proxy_proof_round_higher_accepted() {
-        // TC gap case: proof.round > primary_round - 1 should be accepted.
-        // proof.round=5 >= primary_round - 1 = 1 → should succeed.
+    fn test_tc_gap_lppr_matches_proof_round_accepted() {
+        // TC gap case: proof.round=5 (skipped rounds via TC).
+        // Block's lppr = proof.round = 5 → should succeed.
         let signer = ValidatorSigner::from_int(0);
-        let primary_round = 2;
-        let primary_qc = make_qc(1, 5);
-
+        let proof_round = 5;
+        let primary_qc = make_qc(1, proof_round);
         let block = make_proxy_block(
-            &signer,
-            1,
-            make_qc(1, 0),
-            primary_round,
+            &signer, 1, make_qc(1, 0),
+            proof_round, // lppr = proof.round
             Some(PrimaryConsensusProof::QC(primary_qc.clone())),
         );
-
-        let msg = OrderedProxyBlocksMsg::new(vec![block], primary_round, PrimaryConsensusProof::QC(primary_qc));
+        let msg = OrderedProxyBlocksMsg::new(vec![block], PrimaryConsensusProof::QC(primary_qc));
         let result = PrimaryBlockFromProxy::from_ordered_msg(msg);
-        assert!(result.is_ok(), "proof_round >= primary_round - 1 should be accepted (TC gap case)");
+        assert!(result.is_ok());
+        assert_eq!(result.unwrap().primary_round(), proof_round + 1);
     }
 
     // =========================================================================
@@ -534,39 +501,39 @@ mod tests {
     #[test]
     fn test_from_ordered_msg_single_block() {
         let signer = ValidatorSigner::from_int(0);
-        let primary_round = 2;
-        let msg_primary_qc = make_qc(1, 1); // QC.round == primary_round - 1
+        let proof_round = 1;
+        let msg_primary_qc = make_qc(1, proof_round);
 
         let block = make_proxy_block(
             &signer,
             1,
             make_qc(1, 0),
-            primary_round,
+            proof_round, // last_primary_proof_round = proof.round
             Some(PrimaryConsensusProof::QC(msg_primary_qc.clone())),
         );
 
-        let msg = OrderedProxyBlocksMsg::new(vec![block], primary_round, PrimaryConsensusProof::QC(msg_primary_qc));
+        let msg = OrderedProxyBlocksMsg::new(vec![block], PrimaryConsensusProof::QC(msg_primary_qc));
         let result = PrimaryBlockFromProxy::from_ordered_msg(msg).unwrap();
 
         assert_eq!(result.num_blocks(), 1);
-        assert_eq!(result.primary_round(), primary_round);
+        assert_eq!(result.primary_round(), proof_round + 1);
         assert_eq!(result.proxy_blocks().len(), 1);
     }
 
     #[test]
     fn test_from_ordered_msg_multiple_linked_blocks() {
         let signer = ValidatorSigner::from_int(0);
-        let primary_round = 2;
-        let msg_primary_qc = make_qc(1, 1);
+        let proof_round = 1;
+        let msg_primary_qc = make_qc(1, proof_round);
 
         let blocks =
-            make_proxy_block_chain(&signer, 3, 1, primary_round, Some(msg_primary_qc.clone()));
+            make_proxy_block_chain(&signer, 3, 1, proof_round, Some(msg_primary_qc.clone()));
 
-        let msg = OrderedProxyBlocksMsg::new(blocks.clone(), primary_round, PrimaryConsensusProof::QC(msg_primary_qc));
+        let msg = OrderedProxyBlocksMsg::new(blocks.clone(), PrimaryConsensusProof::QC(msg_primary_qc));
         let result = PrimaryBlockFromProxy::from_ordered_msg(msg).unwrap();
 
         assert_eq!(result.num_blocks(), 3);
-        assert_eq!(result.primary_round(), primary_round);
+        assert_eq!(result.primary_round(), proof_round + 1);
         // Verify block order is preserved
         assert_eq!(result.proxy_blocks()[0].id(), blocks[0].id());
         assert_eq!(result.proxy_blocks()[1].id(), blocks[1].id());
@@ -580,21 +547,21 @@ mod tests {
     #[test]
     fn test_from_ordered_msg_unlinked_blocks_rejected() {
         let signer = ValidatorSigner::from_int(0);
-        let primary_round = 2;
-        let msg_primary_qc = make_qc(1, 1);
+        let proof_round = 1;
+        let msg_primary_qc = make_qc(1, proof_round);
 
         // Create two independent blocks (not linked by parent)
-        let block1 = make_proxy_block(&signer, 1, make_qc(1, 0), primary_round, None);
+        let block1 = make_proxy_block(&signer, 1, make_qc(1, 0), proof_round, None);
         let block2 = make_proxy_block(
             &signer,
             2,
             make_qc(1, 0), // NOT referencing block1
-            primary_round,
+            proof_round,
             Some(PrimaryConsensusProof::QC(msg_primary_qc.clone())),
         );
 
         let msg =
-            OrderedProxyBlocksMsg::new(vec![block1, block2], primary_round, PrimaryConsensusProof::QC(msg_primary_qc));
+            OrderedProxyBlocksMsg::new(vec![block1, block2], PrimaryConsensusProof::QC(msg_primary_qc));
         let result = PrimaryBlockFromProxy::from_ordered_msg(msg);
         assert!(result.is_err());
         let err_msg = format!("{:?}", result.unwrap_err());
@@ -608,13 +575,13 @@ mod tests {
     #[test]
     fn test_from_ordered_msg_missing_primary_qc_on_last_block() {
         let signer = ValidatorSigner::from_int(0);
-        let primary_round = 2;
-        let msg_primary_qc = make_qc(1, 1);
+        let proof_round = 1;
+        let msg_primary_qc = make_qc(1, proof_round);
 
         // Single block with NO primary_qc attached
-        let block = make_proxy_block(&signer, 1, make_qc(1, 0), primary_round, None);
+        let block = make_proxy_block(&signer, 1, make_qc(1, 0), proof_round, None);
 
-        let msg = OrderedProxyBlocksMsg::new(vec![block], primary_round, PrimaryConsensusProof::QC(msg_primary_qc));
+        let msg = OrderedProxyBlocksMsg::new(vec![block], PrimaryConsensusProof::QC(msg_primary_qc));
         let result = PrimaryBlockFromProxy::from_ordered_msg(msg);
         assert!(result.is_err());
         let err_msg = format!("{:?}", result.unwrap_err());
@@ -626,32 +593,8 @@ mod tests {
     }
 
     #[test]
-    fn test_from_ordered_msg_wrong_primary_round() {
-        let signer = ValidatorSigner::from_int(0);
-        let msg_primary_qc = make_qc(1, 1); // For primary_round=2
-
-        // Block has primary_round=3, but message says primary_round=2
-        let block = make_proxy_block(
-            &signer,
-            1,
-            make_qc(1, 0),
-            3, // block says primary_round=3
-            Some(PrimaryConsensusProof::QC(msg_primary_qc.clone())),
-        );
-
-        let msg = OrderedProxyBlocksMsg::new(
-            vec![block],
-            2, // message says primary_round=2
-            PrimaryConsensusProof::QC(msg_primary_qc),
-        );
-        let result = PrimaryBlockFromProxy::from_ordered_msg(msg);
-        assert!(result.is_err());
-    }
-
-    #[test]
     fn test_from_ordered_msg_non_proxy_block_rejected() {
         let signer = ValidatorSigner::from_int(0);
-        let primary_round = 2;
         let msg_primary_qc = make_qc(1, 1);
 
         // Create a normal (non-proxy) block
@@ -665,7 +608,7 @@ mod tests {
         )
         .unwrap();
 
-        let msg = OrderedProxyBlocksMsg::new(vec![normal_block], primary_round, PrimaryConsensusProof::QC(msg_primary_qc));
+        let msg = OrderedProxyBlocksMsg::new(vec![normal_block], PrimaryConsensusProof::QC(msg_primary_qc));
         let result = PrimaryBlockFromProxy::from_ordered_msg(msg);
         assert!(result.is_err());
         let err_msg = format!("{:?}", result.unwrap_err());
@@ -677,27 +620,226 @@ mod tests {
     }
 
     // =========================================================================
+    // Safety rule enforcement tests
+    // =========================================================================
+
+    #[test]
+    fn test_non_decreasing_lppr_across_multi_block_batch() {
+        // Batch spanning multiple cutting points (TC gaps): blocks have varying lppr
+        // block1: lppr=1, block2: lppr=1, block3: lppr=3 (intermediate cut), block4: lppr=5 (final cut)
+        let signer = ValidatorSigner::from_int(0);
+        let proof_round = 5;
+        let primary_qc = make_qc(1, proof_round);
+
+        let block1 = make_proxy_block(&signer, 1, make_qc(1, 0), 1, None);
+        let block2 = make_proxy_block(
+            &signer, 2, make_qc_for_block(1, 1, block1.id()), 1, None,
+        );
+        let block3 = make_proxy_block(
+            &signer, 3, make_qc_for_block(1, 2, block2.id()),
+            3, // lppr increases at intermediate cutting point
+            Some(PrimaryConsensusProof::QC(make_qc(1, 3))),
+        );
+        let block4 = make_proxy_block(
+            &signer, 4, make_qc_for_block(1, 3, block3.id()),
+            proof_round, // lppr = proof.round = 5 at final cutting point
+            Some(PrimaryConsensusProof::QC(primary_qc.clone())),
+        );
+
+        let msg = OrderedProxyBlocksMsg::new(
+            vec![block1, block2, block3, block4],
+            PrimaryConsensusProof::QC(primary_qc),
+        );
+        let result = PrimaryBlockFromProxy::from_ordered_msg(msg);
+        assert!(result.is_ok(), "Non-decreasing lppr [1,1,3,5] should be accepted");
+        assert_eq!(result.unwrap().primary_round(), proof_round + 1);
+    }
+
+    #[test]
+    fn test_decreasing_lppr_rejected() {
+        // Block sequence where lppr decreases: block1 lppr=5, block2 lppr=3 → rejected
+        let signer = ValidatorSigner::from_int(0);
+        let proof_round = 3;
+        let primary_qc = make_qc(1, proof_round);
+
+        let block1 = make_proxy_block(&signer, 1, make_qc(1, 0), 5, None);
+        let block2 = make_proxy_block(
+            &signer, 2, make_qc_for_block(1, 1, block1.id()),
+            3, // lppr DECREASES from 5 to 3 → violation
+            Some(PrimaryConsensusProof::QC(primary_qc.clone())),
+        );
+
+        let msg = OrderedProxyBlocksMsg::new(
+            vec![block1, block2],
+            PrimaryConsensusProof::QC(primary_qc),
+        );
+        let result = PrimaryBlockFromProxy::from_ordered_msg(msg);
+        assert!(result.is_err(), "Decreasing lppr should be rejected");
+    }
+
+    #[test]
+    fn test_tc_proof_accepted() {
+        // Verify TC proof path works (not just QC)
+        use aptos_consensus_types::timeout_2chain::{TwoChainTimeout, TwoChainTimeoutCertificate};
+
+        let signer = ValidatorSigner::from_int(0);
+        let tc_round = 5;
+        let timeout = TwoChainTimeout::new(1, tc_round, QuorumCert::dummy());
+        let tc = TwoChainTimeoutCertificate::new(timeout);
+        let tc_proof = PrimaryConsensusProof::TC(tc);
+
+        let block = make_proxy_block(
+            &signer, 1, make_qc(1, 0),
+            tc_round, // lppr = tc.round
+            Some(tc_proof.clone()),
+        );
+
+        let msg = OrderedProxyBlocksMsg::new(vec![block], tc_proof);
+        let result = PrimaryBlockFromProxy::from_ordered_msg(msg);
+        assert!(result.is_ok(), "TC proof should be accepted");
+        let pbfp = result.unwrap();
+        assert_eq!(pbfp.primary_round(), tc_round + 1);
+        assert!(pbfp.primary_proof().is_tc());
+    }
+
+    #[test]
+    fn test_failed_authors_non_empty_rejected() {
+        // Proxy blocks must have empty failed_authors (round-robin scheduling)
+        let signer = ValidatorSigner::from_int(0);
+        let proof_round = 1;
+        let primary_qc = make_qc(1, proof_round);
+
+        // Create block with non-empty failed_authors
+        let block_data = BlockData::new_from_proxy(
+            1, 1,
+            aptos_infallible::duration_since_epoch().as_micros() as u64,
+            make_qc(1, 0),
+            vec![],
+            Payload::empty(false, true),
+            signer.author(),
+            vec![(1, signer.author())], // non-empty failed_authors
+            proof_round,
+            Some(PrimaryConsensusProof::QC(primary_qc.clone())),
+        );
+        let block = Block::new_proposal_from_block_data(block_data, &signer).unwrap();
+
+        let msg = OrderedProxyBlocksMsg::new(vec![block], PrimaryConsensusProof::QC(primary_qc));
+        let result = PrimaryBlockFromProxy::from_ordered_msg(msg);
+        assert!(result.is_err(), "Non-empty failed_authors should be rejected");
+        assert!(format!("{:?}", result.unwrap_err()).contains("failed_authors"));
+    }
+
+    #[test]
+    fn test_non_ascending_round_order_rejected() {
+        // Blocks not in strictly ascending round order should be rejected
+        let signer = ValidatorSigner::from_int(0);
+        let proof_round = 1;
+        let primary_qc = make_qc(1, proof_round);
+
+        // block1 round=2, block2 round=1 → not ascending
+        let block1 = make_proxy_block(&signer, 2, make_qc(1, 0), proof_round, None);
+        let block2 = make_proxy_block(
+            &signer, 1, make_qc_for_block(1, 2, block1.id()),
+            proof_round,
+            Some(PrimaryConsensusProof::QC(primary_qc.clone())),
+        );
+
+        let msg = OrderedProxyBlocksMsg::new(
+            vec![block1, block2],
+            PrimaryConsensusProof::QC(primary_qc),
+        );
+        let result = PrimaryBlockFromProxy::from_ordered_msg(msg);
+        assert!(result.is_err(), "Non-ascending round order should be rejected");
+        assert!(format!("{:?}", result.unwrap_err()).contains("ascending round"));
+    }
+
+    #[test]
+    fn test_equal_rounds_rejected() {
+        // Blocks with equal rounds should be rejected (must be strictly ascending)
+        let signer = ValidatorSigner::from_int(0);
+        let proof_round = 1;
+        let primary_qc = make_qc(1, proof_round);
+
+        let block1 = make_proxy_block(&signer, 1, make_qc(1, 0), proof_round, None);
+        let block2 = make_proxy_block(
+            &signer, 1, make_qc_for_block(1, 1, block1.id()), // same round=1
+            proof_round,
+            Some(PrimaryConsensusProof::QC(primary_qc.clone())),
+        );
+
+        let msg = OrderedProxyBlocksMsg::new(
+            vec![block1, block2],
+            PrimaryConsensusProof::QC(primary_qc),
+        );
+        let result = PrimaryBlockFromProxy::from_ordered_msg(msg);
+        assert!(result.is_err(), "Equal rounds should be rejected");
+    }
+
+    #[test]
+    fn test_last_block_without_proof_rejected() {
+        // All blocks present but none has primary_proof → last block has no proof
+        let signer = ValidatorSigner::from_int(0);
+        let proof_round = 1;
+        let primary_qc = make_qc(1, proof_round);
+
+        let block1 = make_proxy_block(&signer, 1, make_qc(1, 0), proof_round, None);
+        let block2 = make_proxy_block(
+            &signer, 2, make_qc_for_block(1, 1, block1.id()),
+            proof_round, None, // no proof on last block
+        );
+
+        let msg = OrderedProxyBlocksMsg::new(
+            vec![block1, block2],
+            PrimaryConsensusProof::QC(primary_qc),
+        );
+        let result = PrimaryBlockFromProxy::from_ordered_msg(msg);
+        assert!(result.is_err(), "Last block without proof should be rejected");
+        assert!(format!("{:?}", result.unwrap_err()).contains("primary proof"));
+    }
+
+    #[test]
+    fn test_primary_round_derivation() {
+        // primary_round() = proof.proof_round() + 1
+        let signer = ValidatorSigner::from_int(0);
+        for proof_round in [0, 1, 5, 100] {
+            let primary_qc = make_qc(1, proof_round);
+            let block = make_proxy_block(
+                &signer, 1, make_qc(1, 0),
+                proof_round,
+                Some(PrimaryConsensusProof::QC(primary_qc.clone())),
+            );
+            let msg = OrderedProxyBlocksMsg::new(vec![block], PrimaryConsensusProof::QC(primary_qc));
+            let result = PrimaryBlockFromProxy::from_ordered_msg(msg).unwrap();
+            assert_eq!(
+                result.primary_round(), proof_round + 1,
+                "primary_round() must equal proof.round + 1 for proof_round={}",
+                proof_round,
+            );
+        }
+    }
+
+    // =========================================================================
     // Determinism and accessor tests
     // =========================================================================
 
     #[test]
     fn test_aggregated_hash_deterministic() {
         let signer = ValidatorSigner::from_int(0);
-        let primary_round = 2;
-        let msg_primary_qc = make_qc(1, 1);
+        let proof_round = 1;
+        let msg_primary_qc = make_qc(1, proof_round);
 
         let block = make_proxy_block(
             &signer,
             1,
             make_qc(1, 0),
-            primary_round,
+            proof_round,
             Some(PrimaryConsensusProof::QC(msg_primary_qc.clone())),
         );
 
         // Create two PrimaryBlockFromProxy from the same block
         let msg1 =
-            OrderedProxyBlocksMsg::new(vec![block.clone()], primary_round, PrimaryConsensusProof::QC(msg_primary_qc.clone()));
-        let msg2 = OrderedProxyBlocksMsg::new(vec![block], primary_round, PrimaryConsensusProof::QC(msg_primary_qc));
+            OrderedProxyBlocksMsg::new(vec![block.clone()], PrimaryConsensusProof::QC(msg_primary_qc.clone()));
+        let msg2 = OrderedProxyBlocksMsg::new(vec![block], PrimaryConsensusProof::QC(msg_primary_qc));
 
         let result1 = PrimaryBlockFromProxy::from_ordered_msg(msg1).unwrap();
         let result2 = PrimaryBlockFromProxy::from_ordered_msg(msg2).unwrap();
@@ -712,27 +854,27 @@ mod tests {
     #[test]
     fn test_aggregated_hash_differs_for_different_blocks() {
         let signer = ValidatorSigner::from_int(0);
-        let primary_round = 2;
-        let msg_primary_qc = make_qc(1, 1);
+        let proof_round = 1;
+        let msg_primary_qc = make_qc(1, proof_round);
 
         let block1 = make_proxy_block(
             &signer,
             1,
             make_qc(1, 0),
-            primary_round,
+            proof_round,
             Some(PrimaryConsensusProof::QC(msg_primary_qc.clone())),
         );
         let block2 = make_proxy_block(
             &signer,
             2,
             make_qc(1, 0),
-            primary_round,
+            proof_round,
             Some(PrimaryConsensusProof::QC(msg_primary_qc.clone())),
         );
 
         let msg1 =
-            OrderedProxyBlocksMsg::new(vec![block1], primary_round, PrimaryConsensusProof::QC(msg_primary_qc.clone()));
-        let msg2 = OrderedProxyBlocksMsg::new(vec![block2], primary_round, PrimaryConsensusProof::QC(msg_primary_qc));
+            OrderedProxyBlocksMsg::new(vec![block1], PrimaryConsensusProof::QC(msg_primary_qc.clone()));
+        let msg2 = OrderedProxyBlocksMsg::new(vec![block2], PrimaryConsensusProof::QC(msg_primary_qc));
 
         let result1 = PrimaryBlockFromProxy::from_ordered_msg(msg1).unwrap();
         let result2 = PrimaryBlockFromProxy::from_ordered_msg(msg2).unwrap();
@@ -747,18 +889,18 @@ mod tests {
     #[test]
     fn test_aggregate_payloads_all_empty() {
         let signer = ValidatorSigner::from_int(0);
-        let primary_round = 2;
-        let msg_primary_qc = make_qc(1, 1);
+        let proof_round = 1;
+        let msg_primary_qc = make_qc(1, proof_round);
 
         let block = make_proxy_block(
             &signer,
             1,
             make_qc(1, 0),
-            primary_round,
+            proof_round,
             Some(PrimaryConsensusProof::QC(msg_primary_qc.clone())),
         );
 
-        let msg = OrderedProxyBlocksMsg::new(vec![block], primary_round, PrimaryConsensusProof::QC(msg_primary_qc));
+        let msg = OrderedProxyBlocksMsg::new(vec![block], PrimaryConsensusProof::QC(msg_primary_qc));
         let result = PrimaryBlockFromProxy::from_ordered_msg(msg).unwrap();
 
         // All proxy blocks have empty payloads → aggregate returns empty
@@ -769,17 +911,17 @@ mod tests {
     #[test]
     fn test_accessors() {
         let signer = ValidatorSigner::from_int(0);
-        let primary_round = 2;
-        let msg_primary_qc = make_qc(1, 1);
+        let proof_round = 1;
+        let msg_primary_qc = make_qc(1, proof_round);
 
         let blocks =
-            make_proxy_block_chain(&signer, 3, 1, primary_round, Some(msg_primary_qc.clone()));
+            make_proxy_block_chain(&signer, 3, 1, proof_round, Some(msg_primary_qc.clone()));
         let first_id = blocks[0].id();
         let last_id = blocks[2].id();
         let first_ts = blocks[0].timestamp_usecs();
         let last_ts = blocks[2].timestamp_usecs();
 
-        let msg = OrderedProxyBlocksMsg::new(blocks, primary_round, PrimaryConsensusProof::QC(msg_primary_qc));
+        let msg = OrderedProxyBlocksMsg::new(blocks, PrimaryConsensusProof::QC(msg_primary_qc));
         let result = PrimaryBlockFromProxy::from_ordered_msg(msg).unwrap();
 
         assert_eq!(result.first_block_id(), first_id);
@@ -802,18 +944,18 @@ mod tests {
     #[test]
     fn test_builder_with_blocks_and_qc() {
         let signer = ValidatorSigner::from_int(0);
-        let primary_round = 2;
-        let msg_primary_qc = make_qc(1, 1);
+        let proof_round = 1;
+        let msg_primary_qc = make_qc(1, proof_round);
 
         let block = make_proxy_block(
             &signer,
             1,
             make_qc(1, 0),
-            primary_round,
+            proof_round,
             Some(PrimaryConsensusProof::QC(msg_primary_qc.clone())),
         );
 
-        let result = PrimaryBlockFromProxyBuilder::new(primary_round)
+        let result = PrimaryBlockFromProxyBuilder::new()
             .with_proxy_block(block)
             .with_primary_proof(PrimaryConsensusProof::QC(msg_primary_qc))
             .build();
@@ -821,23 +963,22 @@ mod tests {
         assert!(result.is_ok());
         let pbfp = result.unwrap();
         assert_eq!(pbfp.num_blocks(), 1);
-        assert_eq!(pbfp.primary_round(), primary_round);
+        assert_eq!(pbfp.primary_round(), proof_round + 1);
     }
 
     #[test]
     fn test_builder_without_qc_fails() {
         let signer = ValidatorSigner::from_int(0);
-        let primary_round = 2;
 
         let block = make_proxy_block(
             &signer,
             1,
             make_qc(1, 0),
-            primary_round,
+            1, // last_primary_proof_round
             None,
         );
 
-        let result = PrimaryBlockFromProxyBuilder::new(primary_round)
+        let result = PrimaryBlockFromProxyBuilder::new()
             .with_proxy_block(block)
             .build();
 

@@ -224,17 +224,17 @@ impl BlockData {
 
     pub fn is_proxy_block(&self) -> bool {
         match &self.block_type {
-            BlockType::ProposalExt(p) => p.primary_round().is_some(),
-            BlockType::OptimisticProposal(p) => p.primary_round().is_some(),
+            BlockType::ProposalExt(p) => p.last_primary_proof_round().is_some(),
+            BlockType::OptimisticProposal(p) => p.last_primary_proof_round().is_some(),
             _ => false,
         }
     }
 
-    /// Returns the primary round for proxy blocks.
-    pub fn primary_round(&self) -> Option<Round> {
+    /// Returns the last_primary_proof_round for proxy blocks.
+    pub fn last_primary_proof_round(&self) -> Option<Round> {
         match &self.block_type {
-            BlockType::ProposalExt(p) => p.primary_round(),
-            BlockType::OptimisticProposal(p) => p.primary_round(),
+            BlockType::ProposalExt(p) => p.last_primary_proof_round(),
+            BlockType::OptimisticProposal(p) => p.last_primary_proof_round(),
             _ => None,
         }
     }
@@ -464,7 +464,7 @@ impl BlockData {
             payload,
             author,
             grandparent_qc,
-            primary_round,
+            last_primary_proof_round,
             primary_proof,
         } = block_body;
         Self {
@@ -477,7 +477,7 @@ impl BlockData {
                 payload,
                 author,
                 grandparent_qc,
-                primary_round,
+                last_primary_proof_round,
                 primary_proof,
             }),
         }
@@ -495,7 +495,7 @@ impl BlockData {
         payload: Payload,
         author: Author,
         failed_authors: Vec<(Round, Author)>,
-        primary_round: Round,
+        last_primary_proof_round: Round,
         primary_proof: Option<PrimaryConsensusProof>,
     ) -> Self {
         Self {
@@ -508,7 +508,7 @@ impl BlockData {
                 payload,
                 author,
                 failed_authors,
-                primary_round,
+                last_primary_proof_round,
                 primary_proof,
             }),
         }

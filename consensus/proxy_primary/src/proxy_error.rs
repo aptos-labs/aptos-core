@@ -9,7 +9,7 @@ use thiserror::Error;
 /// Errors that can occur during proxy consensus.
 #[derive(Debug, Error)]
 pub enum ProxyConsensusError {
-    #[error("Invalid primary_round: expected {expected}, got {got}")]
+    #[error("Invalid last_primary_proof_round: expected {expected}, got {got}")]
     InvalidPrimaryRound { expected: Round, got: Round },
 
     #[error("Primary proof round too low: expected >= {expected}, got {got}")]

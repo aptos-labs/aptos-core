@@ -25,8 +25,8 @@ use std::{
 /// Optimistic proxy block data (1 message delay).
 ///
 /// Similar to OptBlockData but with additional fields for primary consensus linkage:
-/// - `primary_round`: Which primary round this proxy block belongs to
-/// - `primary_proof`: Attached when the primary proof (QC or TC) for `primary_round - 1` is available
+/// - `last_primary_proof_round`: Round of the most recent primary proof (QC/TC) in this block's ancestry
+/// - `primary_proof`: Attached at cutting points when a new primary proof is available
 #[derive(Deserialize, Serialize, Clone, Debug, PartialEq, Eq, CryptoHasher)]
 pub struct OptProxyBlockData {
     pub epoch: u64,
@@ -48,10 +48,9 @@ pub enum OptProxyBlockBody {
         author: Author,
         /// QC on grandparent proxy block (for optimistic path)
         grandparent_qc: QuorumCert,
-        /// Which primary round this proxy block belongs to
-        primary_round: Round,
-        /// Primary consensus proof (QC or TC) attached when proof.round == primary_round - 1
-        /// This proof "cuts" the proxy blocks for the previous primary round
+        /// Round of the most recent primary proof (QC/TC) in this block's ancestry
+        last_primary_proof_round: Round,
+        /// Primary consensus proof (QC or TC) attached at this cutting point
         primary_proof: Option<PrimaryConsensusProof>,
     },
 }
@@ -66,7 +65,7 @@ impl OptProxyBlockData {
         timestamp_usecs: u64,
         parent: BlockInfo,
         grandparent_qc: QuorumCert,
-        primary_round: Round,
+        last_primary_proof_round: Round,
         primary_proof: Option<PrimaryConsensusProof>,
     ) -> Self {
         Self {
@@ -79,7 +78,7 @@ impl OptProxyBlockData {
                 payload,
                 author,
                 grandparent_qc,
-                primary_round,
+                last_primary_proof_round,
                 primary_proof,
             },
         }
@@ -111,8 +110,7 @@ impl OptProxyBlockData {
     /// - Round relationships (grandparent -> parent -> this)
     /// - Epoch consistency
     /// - Timestamp monotonicity
-    /// - Primary round consistency with parent
-    /// - Primary QC round matches primary_round - 1 (if attached)
+    /// - last_primary_proof_round consistency with attached proof
     pub fn verify_well_formed(&self) -> anyhow::Result<()> {
         let parent = self.parent();
         let grandparent_qc = self.grandparent_qc().certified_block();
@@ -154,20 +152,15 @@ impl OptProxyBlockData {
             "Blocks must not be too far in the future"
         );
 
-        // Primary round validation
-        // If parent has a primary QC, this block should be in the next primary round
-        // Otherwise, it should be in the same primary round as parent
-        // Note: We can't check parent's primary_qc here since we only have BlockInfo,
-        // but we validate primary_qc attachment rule below
-
-        // Primary proof attachment validation.
-        // Proof round must be >= primary_round - 1 (allows TC gap case).
+        // Validate last_primary_proof_round consistency with attached proof.
+        // If proof is attached, proof.round must be >= last_primary_proof_round
+        // (it should equal last_primary_proof_round when set correctly by proposer).
         if let Some(ref primary_proof) = self.primary_proof() {
             ensure!(
-                primary_proof.proof_round() >= self.primary_round().saturating_sub(1),
-                "Primary proof round {} must be >= primary_round - 1 = {}",
+                primary_proof.proof_round() >= self.last_primary_proof_round(),
+                "Primary proof round {} must be >= last_primary_proof_round {}",
                 primary_proof.proof_round(),
-                self.primary_round().saturating_sub(1),
+                self.last_primary_proof_round(),
             );
         }
 
@@ -205,9 +198,9 @@ impl OptProxyBlockBody {
         }
     }
 
-    pub fn primary_round(&self) -> Round {
+    pub fn last_primary_proof_round(&self) -> Round {
         match self {
-            OptProxyBlockBody::V0 { primary_round, .. } => *primary_round,
+            OptProxyBlockBody::V0 { last_primary_proof_round, .. } => *last_primary_proof_round,
         }
     }
 
@@ -230,11 +223,11 @@ impl Display for OptProxyBlockData {
     fn fmt(&self, f: &mut Formatter) -> std::fmt::Result {
         write!(
             f,
-            "[proxy author: {}, epoch: {}, round: {:02}, primary_round: {:02}, parent_id: {}, timestamp: {}, has_primary_proof: {}]",
+            "[proxy author: {}, epoch: {}, round: {:02}, last_primary_proof_round: {:02}, parent_id: {}, timestamp: {}, has_primary_proof: {}]",
             self.author(),
             self.epoch(),
             self.round(),
-            self.primary_round(),
+            self.last_primary_proof_round(),
             self.parent_id(),
             self.timestamp_usecs(),
             self.has_primary_proof(),
@@ -249,6 +242,7 @@ mod tests {
     use aptos_crypto::HashValue;
     use aptos_types::{
         aggregate_signature::AggregateSignature,
+        block_info::BlockInfo,
         ledger_info::{LedgerInfo, LedgerInfoWithSignatures},
     };
 
@@ -287,13 +281,13 @@ mod tests {
             3000,
             parent,
             grandparent_qc,
-            1, // primary_round
+            1, // last_primary_proof_round
             None,
         );
 
         assert_eq!(block.epoch(), epoch);
         assert_eq!(block.round(), 3);
-        assert_eq!(block.primary_round(), 1);
+        assert_eq!(block.last_primary_proof_round(), 1);
         assert!(!block.has_primary_proof());
     }
 
@@ -302,7 +296,7 @@ mod tests {
         let epoch = 1;
         let grandparent_qc = make_qc(epoch, 1, 1000);
         let parent = make_block_info(epoch, 2, 2000);
-        let primary_qc = make_qc(epoch, 0, 500); // QC for primary round 0
+        let primary_qc = make_qc(epoch, 1, 500); // QC for primary round 1
 
         let block = OptProxyBlockData::new(
             vec![],
@@ -313,11 +307,179 @@ mod tests {
             3000,
             parent,
             grandparent_qc,
-            1, // primary_round = 1, so primary_proof should be for round 0
+            1, // last_primary_proof_round = proof.round = 1
             Some(PrimaryConsensusProof::QC(primary_qc)),
         );
 
         assert!(block.has_primary_proof());
-        assert_eq!(block.primary_proof().unwrap().proof_round(), 0);
+        assert_eq!(block.primary_proof().unwrap().proof_round(), 1);
+        assert_eq!(block.last_primary_proof_round(), 1);
+    }
+
+    // =========================================================================
+    // verify_well_formed() safety rule tests
+    // =========================================================================
+
+    /// Helper: create a well-formed OptProxyBlockData for verify_well_formed tests.
+    fn make_well_formed_block(
+        epoch: u64,
+        grandparent_round: Round,
+        parent_round: Round,
+        round: Round,
+        lppr: Round,
+        primary_proof: Option<PrimaryConsensusProof>,
+    ) -> OptProxyBlockData {
+        OptProxyBlockData::new(
+            vec![],
+            Payload::empty(false, true),
+            Author::random(),
+            epoch,
+            round,
+            (round + 1) * 1000, // strictly increasing timestamps
+            make_block_info(epoch, parent_round, parent_round * 1000),
+            make_qc(epoch, grandparent_round, (grandparent_round.saturating_sub(1)) * 1000),
+            lppr,
+            primary_proof,
+        )
+    }
+
+    #[test]
+    fn test_verify_well_formed_happy_path_no_proof() {
+        // grandparent=1, parent=2, block=3, lppr=0, no proof
+        let block = make_well_formed_block(1, 1, 2, 3, 0, None);
+        assert!(block.verify_well_formed().is_ok());
+    }
+
+    #[test]
+    fn test_verify_well_formed_happy_path_with_proof() {
+        // grandparent=1, parent=2, block=3, lppr=1, proof.round=1
+        let proof = PrimaryConsensusProof::QC(make_qc(1, 1, 500));
+        let block = make_well_formed_block(1, 1, 2, 3, 1, Some(proof));
+        assert!(block.verify_well_formed().is_ok());
+    }
+
+    #[test]
+    fn test_verify_well_formed_grandparent_parent_gap() {
+        // grandparent=1, parent=3 → parent.round != grandparent.round + 1
+        let block = make_well_formed_block(1, 1, 3, 4, 0, None);
+        let result = block.verify_well_formed();
+        assert!(result.is_err(), "Gap between grandparent and parent round should fail");
+        assert!(result.unwrap_err().to_string().contains("one more than grandparent"));
+    }
+
+    #[test]
+    fn test_verify_well_formed_parent_block_gap() {
+        // grandparent=1, parent=2, block=4 → block.round != parent.round + 1
+        let block = make_well_formed_block(1, 1, 2, 4, 0, None);
+        let result = block.verify_well_formed();
+        assert!(result.is_err(), "Gap between parent and block round should fail");
+        assert!(result.unwrap_err().to_string().contains("one more than parent"));
+    }
+
+    #[test]
+    fn test_verify_well_formed_epoch_mismatch_parent() {
+        // Parent in different epoch
+        let block = OptProxyBlockData::new(
+            vec![],
+            Payload::empty(false, true),
+            Author::random(),
+            1, // block epoch = 1
+            3,
+            3000,
+            make_block_info(2, 2, 2000), // parent epoch = 2 → mismatch
+            make_qc(1, 1, 500),
+            0,
+            None,
+        );
+        let result = block.verify_well_formed();
+        assert!(result.is_err(), "Epoch mismatch with parent should fail");
+        assert!(result.unwrap_err().to_string().contains("same epoch"));
+    }
+
+    #[test]
+    fn test_verify_well_formed_epoch_mismatch_grandparent() {
+        // Grandparent in different epoch
+        let block = OptProxyBlockData::new(
+            vec![],
+            Payload::empty(false, true),
+            Author::random(),
+            1, // block epoch = 1
+            3,
+            3000,
+            make_block_info(1, 2, 2000),
+            make_qc(2, 1, 500), // grandparent epoch = 2 → mismatch
+            0,
+            None,
+        );
+        let result = block.verify_well_formed();
+        assert!(result.is_err(), "Epoch mismatch with grandparent should fail");
+    }
+
+    #[test]
+    fn test_verify_well_formed_timestamp_not_increasing() {
+        // parent.timestamp >= block.timestamp → violation
+        let block = OptProxyBlockData::new(
+            vec![],
+            Payload::empty(false, true),
+            Author::random(),
+            1,
+            3,
+            1000, // block timestamp = 1000
+            make_block_info(1, 2, 2000), // parent timestamp = 2000 > block → violation
+            make_qc(1, 1, 500),
+            0,
+            None,
+        );
+        let result = block.verify_well_formed();
+        assert!(result.is_err(), "Non-increasing timestamp should fail");
+        assert!(result.unwrap_err().to_string().contains("timestamp"));
+    }
+
+    #[test]
+    fn test_verify_well_formed_proof_round_less_than_lppr() {
+        // proof.round (1) < lppr (5) → violation
+        let proof = PrimaryConsensusProof::QC(make_qc(1, 1, 500));
+        let block = make_well_formed_block(1, 1, 2, 3, 5, Some(proof));
+        let result = block.verify_well_formed();
+        assert!(result.is_err(), "proof.round < lppr should fail");
+        assert!(result.unwrap_err().to_string().contains("Primary proof round"));
+    }
+
+    #[test]
+    fn test_verify_well_formed_proof_round_equals_lppr() {
+        // proof.round (3) == lppr (3) → should pass (correct cutting block)
+        let proof = PrimaryConsensusProof::QC(make_qc(1, 3, 500));
+        let block = make_well_formed_block(1, 1, 2, 3, 3, Some(proof));
+        assert!(block.verify_well_formed().is_ok());
+    }
+
+    #[test]
+    fn test_verify_well_formed_reconfiguration_rejected() {
+        // Grandparent has reconfiguration → optimistic proposals disallowed
+        let epoch = 1;
+        let grandparent_info = BlockInfo::new(
+            epoch, 1, HashValue::random(), HashValue::random(), 0, 500,
+            Some(aptos_types::epoch_state::EpochState::empty()), // has reconfiguration
+        );
+        let gp_vote_data = VoteData::new(grandparent_info.clone(), grandparent_info.clone());
+        let gp_li = LedgerInfo::new(grandparent_info, HashValue::zero());
+        let gp_li_sig = LedgerInfoWithSignatures::new(gp_li, AggregateSignature::empty());
+        let grandparent_qc = QuorumCert::new(gp_vote_data, gp_li_sig);
+
+        let block = OptProxyBlockData::new(
+            vec![],
+            Payload::empty(false, true),
+            Author::random(),
+            epoch,
+            3,
+            3000,
+            make_block_info(epoch, 2, 2000),
+            grandparent_qc,
+            0,
+            None,
+        );
+        let result = block.verify_well_formed();
+        assert!(result.is_err(), "Block after reconfiguration should fail");
+        assert!(result.unwrap_err().to_string().contains("reconfiguration"));
     }
 }
