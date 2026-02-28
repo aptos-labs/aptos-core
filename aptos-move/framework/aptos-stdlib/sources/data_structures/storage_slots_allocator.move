@@ -79,7 +79,7 @@ module aptos_std::storage_slots_allocator {
 
     public fun allocate_spare_slots<T: store>(self: &mut StorageSlotsAllocator<T>, num_to_allocate: u64) {
         assert!(self.should_reuse, error::invalid_argument(ECANNOT_HAVE_SPARES_WITHOUT_REUSE));
-        for (i in 0..num_to_allocate) {
+        for (_i in 0..num_to_allocate) {
             let slot_index = self.next_slot_index();
             self.maybe_push_to_reuse_queue(slot_index);
         };

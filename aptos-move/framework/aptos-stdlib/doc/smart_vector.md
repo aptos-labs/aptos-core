@@ -781,7 +781,7 @@ Disclaimer: This function may be costly. Use it at your own discretion.
     <b>let</b> inline_len = self.inline_vec.<a href="smart_vector.md#0x1_smart_vector_length">length</a>();
     <b>let</b> new_inline_vec = <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>[];
     // Push the last `inline_len` Ts into a temp <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>.
-    for (i in 0..inline_len) {
+    for (_i in 0..inline_len) {
         new_inline_vec.<a href="smart_vector.md#0x1_smart_vector_push_back">push_back</a>(self.<a href="smart_vector.md#0x1_smart_vector_pop_back">pop_back</a>());
     };
     new_inline_vec.<a href="smart_vector.md#0x1_smart_vector_reverse">reverse</a>();
@@ -1507,9 +1507,9 @@ values without modifying the original vectors.
 
 
 <pre><code><b>invariant</b> bucket_size.is_none()
-    || (bucket_size.is_some() && <a href="../../move-stdlib/doc/option.md#0x1_option_borrow">option::borrow</a>(bucket_size) != 0);
+    || (bucket_size.is_some() && bucket_size.<a href="smart_vector.md#0x1_smart_vector_borrow">borrow</a>() != 0);
 <b>invariant</b> inline_capacity.is_none()
-    || (len(inline_vec) &lt;= <a href="../../move-stdlib/doc/option.md#0x1_option_borrow">option::borrow</a>(inline_capacity));
+    || (len(inline_vec) &lt;= inline_capacity.<a href="smart_vector.md#0x1_smart_vector_borrow">borrow</a>());
 <b>invariant</b> (inline_capacity.is_none() && bucket_size.is_none())
     || (inline_capacity.is_some() && bucket_size.is_some());
 </code></pre>
@@ -1573,7 +1573,7 @@ values without modifying the original vectors.
    self.inline_vec.<a href="smart_vector.md#0x1_smart_vector_length">length</a>() + <b>if</b> (self.big_vec.is_none()) {
        0
    } <b>else</b> {
-       <a href="../../move-stdlib/doc/option.md#0x1_option_borrow">option::borrow</a>(self.big_vec).<a href="smart_vector.md#0x1_smart_vector_length">length</a>()
+       self.big_vec.<a href="smart_vector.md#0x1_smart_vector_borrow">borrow</a>().<a href="smart_vector.md#0x1_smart_vector_length">length</a>()
    }
 }
 </code></pre>
@@ -1622,7 +1622,7 @@ values without modifying the original vectors.
 
 <pre><code><b>aborts_if</b> i &gt;= <a href="smart_vector.md#0x1_smart_vector_spec_len">spec_len</a>(self);
 <b>aborts_if</b> self.big_vec.is_some() && (
-    (len(self.inline_vec) + <a href="../../move-stdlib/doc/option.md#0x1_option_borrow">option::borrow</a>(self.big_vec).<a href="smart_vector.md#0x1_smart_vector_length">length</a>&lt;T&gt;()) &gt; MAX_U64
+    (len(self.inline_vec) + self.big_vec.<a href="smart_vector.md#0x1_smart_vector_borrow">borrow</a>().<a href="smart_vector.md#0x1_smart_vector_length">length</a>&lt;T&gt;()) &gt; MAX_U64
 );
 </code></pre>
 
@@ -1674,10 +1674,10 @@ values without modifying the original vectors.
 <pre><code><b>pragma</b> verify_duration_estimate = 120;
 <b>aborts_if</b>  self.big_vec.is_some()
     &&
-    (<a href="table_with_length.md#0x1_table_with_length_spec_len">table_with_length::spec_len</a>(<a href="../../move-stdlib/doc/option.md#0x1_option_borrow">option::borrow</a>(self.big_vec).buckets) == 0);
+    (<a href="table_with_length.md#0x1_table_with_length_spec_len">table_with_length::spec_len</a>(self.big_vec.<a href="smart_vector.md#0x1_smart_vector_borrow">borrow</a>().buckets) == 0);
 <b>aborts_if</b> <a href="smart_vector.md#0x1_smart_vector_spec_is_empty">spec_is_empty</a>(self);
 <b>aborts_if</b> self.big_vec.is_some() && (
-    (len(self.inline_vec) + <a href="../../move-stdlib/doc/option.md#0x1_option_borrow">option::borrow</a>(self.big_vec).<a href="smart_vector.md#0x1_smart_vector_length">length</a>&lt;T&gt;()) &gt; MAX_U64
+    (len(self.inline_vec) + self.big_vec.<a href="smart_vector.md#0x1_smart_vector_borrow">borrow</a>().<a href="smart_vector.md#0x1_smart_vector_length">length</a>&lt;T&gt;()) &gt; MAX_U64
 );
 <b>ensures</b> <a href="smart_vector.md#0x1_smart_vector_spec_len">spec_len</a>(self) == <b>old</b>(<a href="smart_vector.md#0x1_smart_vector_spec_len">spec_len</a>(self)) - 1;
 </code></pre>
@@ -1714,7 +1714,7 @@ values without modifying the original vectors.
 <pre><code><b>pragma</b> verify = <b>false</b>;
 <b>aborts_if</b> i &gt;= <a href="smart_vector.md#0x1_smart_vector_spec_len">spec_len</a>(self);
 <b>aborts_if</b> self.big_vec.is_some() && (
-    (len(self.inline_vec) + <a href="../../move-stdlib/doc/option.md#0x1_option_borrow">option::borrow</a>(self.big_vec).<a href="smart_vector.md#0x1_smart_vector_length">length</a>&lt;T&gt;()) &gt; MAX_U64
+    (len(self.inline_vec) + self.big_vec.<a href="smart_vector.md#0x1_smart_vector_borrow">borrow</a>().<a href="smart_vector.md#0x1_smart_vector_length">length</a>&lt;T&gt;()) &gt; MAX_U64
 );
 <b>ensures</b> <a href="smart_vector.md#0x1_smart_vector_spec_len">spec_len</a>(self) == <b>old</b>(<a href="smart_vector.md#0x1_smart_vector_spec_len">spec_len</a>(self)) - 1;
 </code></pre>
@@ -1748,7 +1748,7 @@ values without modifying the original vectors.
 
 
 
-<pre><code><b>aborts_if</b> self.big_vec.is_some() && len(self.inline_vec) + <a href="../../move-stdlib/doc/option.md#0x1_option_borrow">option::borrow</a>(self.big_vec).<a href="smart_vector.md#0x1_smart_vector_length">length</a>() &gt; MAX_U64;
+<pre><code><b>aborts_if</b> self.big_vec.is_some() && len(self.inline_vec) + self.big_vec.<a href="smart_vector.md#0x1_smart_vector_borrow">borrow</a>().<a href="smart_vector.md#0x1_smart_vector_length">length</a>() &gt; MAX_U64;
 </code></pre>
 
 

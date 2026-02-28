@@ -263,7 +263,7 @@ module aptos_std::bcs_stream {
         let len = deserialize_uleb128(stream);
         let v = vector::empty();
 
-        for (i in 0..len) {
+        for (_i in 0..len) {
             v.push_back(elem_deserializer(stream));
         };
 
