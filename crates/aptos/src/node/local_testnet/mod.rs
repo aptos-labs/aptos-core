@@ -54,6 +54,16 @@ use tracing_subscriber::fmt::MakeWriter;
 
 const TESTNET_FOLDER: &str = "testnet";
 
+/// Hint about ulimit that we show when the localnet fails to start, since "too many open files"
+/// is a common issue due to RocksDB opening many file descriptors.
+const ULIMIT_HINT: &str = r#"
+Hint: If you see "Too many open files" errors, try increasing your file descriptor limit.
+  Run this command in your shell before starting the localnet:
+    ulimit -n 1048576
+  Note: This only affects the current shell session. For system-wide changes, the configuration
+  differs by OS (e.g., launchd on macOS, /etc/security/limits.conf or systemd on Linux).
+"#;
+
 /// Run a localnet
 ///
 /// This localnet will run it's own genesis and run as a single node network
@@ -409,11 +419,12 @@ impl CliCommand<()> for RunLocalnet {
                 run_shutdown_steps(shutdown_steps).await?;
                 eprintln!("Ran shutdown steps");
                 return Err(CliError::UnexpectedError(format!(
-                    "\nOne of the services crashed on startup:\n{:#?}\nPlease check the logs in {}",
+                    "\nOne of the services crashed on startup:\n{:#?}\nPlease check the logs in {}\n{}",
                     // We can unwrap because we know for certain that the JoinSet is
                     // not empty.
                     res.unwrap(),
                     test_dir.display(),
+                    ULIMIT_HINT,
                 )));
             }
         }
@@ -483,8 +494,9 @@ impl CliCommand<()> for RunLocalnet {
         match was_ctrl_c {
             true => Ok(()),
             false => Err(CliError::UnexpectedError(format!(
-                "One of the services stopped unexpectedly.\nPlease check the logs in {}",
-                test_dir.display()
+                "One of the services stopped unexpectedly.\nPlease check the logs in {}\n{}",
+                test_dir.display(),
+                ULIMIT_HINT,
             ))),
         }
     }
