@@ -1,10 +1,10 @@
-warning[W00001]: DEPRECATED. will be removed
+error[E04003]: built-in operation not supported
   ┌─ old_invalid.move:5:18
   │
 5 │         requires old(x) > 0;
   │                  ^^^^^^ `old(..)` is not allowed in this spec context; it can only be used in `ensures`, global update invariants, or loop invariants (with a simple parameter name)
 
-warning[W00001]: DEPRECATED. will be removed
+error[E04003]: built-in operation not supported
   ┌─ old_invalid.move:6:19
   │
 6 │         aborts_if old(x) == 0;

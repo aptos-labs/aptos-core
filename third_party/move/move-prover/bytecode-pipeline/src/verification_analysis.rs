@@ -262,6 +262,40 @@ impl FunctionTargetProcessor for VerificationAnalysisProcessor {
             _ => {},
         }
 
+        // Validate that exclusion targets exist.
+        for excl in &options.verify_exclude {
+            match excl {
+                VerificationScope::Only(name) | VerificationScope::OnlyModule(name) => {
+                    let for_module = matches!(excl, VerificationScope::OnlyModule(_));
+                    let mut target_exists = false;
+                    for module in env.get_modules() {
+                        if module.is_target() {
+                            if for_module {
+                                target_exists = module.matches_name(name)
+                            } else {
+                                target_exists =
+                                    module.get_functions().any(|f| f.matches_name(name));
+                            }
+                            if target_exists {
+                                break;
+                            }
+                        }
+                    }
+                    if !target_exists {
+                        env.error(
+                            &env.unknown_loc(),
+                            &format!(
+                                "exclusion {} target `{}` does not exist in target modules",
+                                if for_module { "module" } else { "function" },
+                                name
+                            ),
+                        )
+                    }
+                },
+                _ => {},
+            }
+        }
+
         // Collect information for global invariant instrumentation
 
         // probe how global invariants will be evaluated in the functions
@@ -363,13 +397,23 @@ impl VerificationAnalysisProcessor {
         }
         let env = fun_env.module_env.env;
         let options = ProverOptions::get(env);
-        match &options.verify_scope {
+        let in_scope = match &options.verify_scope {
             VerificationScope::Public => fun_env.is_exposed(),
             VerificationScope::All => true,
             VerificationScope::Only(name) => fun_env.matches_name(name),
             VerificationScope::OnlyModule(name) => fun_env.module_env.matches_name(name),
             VerificationScope::None => false,
-        }
+        };
+        in_scope && !Self::is_excluded_from_verification(fun_env, &options)
+    }
+
+    /// Check whether the function matches any entry in the exclusion list.
+    fn is_excluded_from_verification(fun_env: &FunctionEnv, options: &ProverOptions) -> bool {
+        options.verify_exclude.iter().any(|excl| match excl {
+            VerificationScope::Only(name) => fun_env.matches_name(name),
+            VerificationScope::OnlyModule(name) => fun_env.module_env.matches_name(name),
+            _ => false,
+        })
     }
 
     /// Mark that this function should be verified, and as a result, mark that all its callees
