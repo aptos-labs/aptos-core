@@ -6,12 +6,14 @@ use aptos_config::{
     config::{AptosDataClientConfig, StorageServiceConfig},
     network_id::{NetworkId, PeerNetworkId},
 };
+use aptos_infallible::Mutex;
 use aptos_logger::warn;
 use aptos_network::application::storage::PeersAndMetadata;
 use aptos_storage_service_types::{
     requests::StorageServiceRequest, responses::StorageServerSummary,
 };
 use aptos_time_service::{TimeService, TimeServiceTrait};
+use aptos_token_bucket::TokenBucket;
 use arc_swap::ArcSwap;
 use dashmap::DashMap;
 use std::{
@@ -106,6 +108,7 @@ pub struct RequestModerator {
     aptos_data_client_config: AptosDataClientConfig,
     cached_storage_server_summary: Arc<ArcSwap<StorageServerSummary>>,
     peers_and_metadata: Arc<PeersAndMetadata>,
+    peer_rate_limit_states: Arc<DashMap<PeerNetworkId, Mutex<TokenBucket>>>,
     storage_service_config: StorageServiceConfig,
     time_service: TimeService,
     unhealthy_peer_states: Arc<DashMap<PeerNetworkId, UnhealthyPeerState>>,
@@ -122,6 +125,7 @@ impl RequestModerator {
         Self {
             aptos_data_client_config,
             cached_storage_server_summary,
+            peer_rate_limit_states: Arc::new(DashMap::new()),
             unhealthy_peer_states: Arc::new(DashMap::new()),
             peers_and_metadata,
             storage_service_config,
@@ -138,6 +142,23 @@ impl RequestModerator {
     ) -> Result<(), Error> {
         // Validate the request and time the operation
         let validate_request = || {
+            // Check request rate limiting for the peer
+            if !self.check_request_rate_limit_allowed(peer_network_id) {
+                // Update the rate limiting metrics
+                metrics::increment_counter(
+                    &metrics::STORAGE_REQUESTS_RATE_LIMITED,
+                    peer_network_id.network_id(),
+                    request.get_label(),
+                );
+
+                // Return an error
+                return Err(Error::TooManyRequests(format!(
+                    "Peer has exceeded the request rate limit ({:?} req/s). Request: {}",
+                    self.storage_service_config.max_requests_per_second_per_peer,
+                    request.get_label()
+                )));
+            }
+
             // If the peer is being ignored, return an error
             if let Some(peer_state) = self.unhealthy_peer_states.get(peer_network_id) {
                 if peer_state.is_ignored() {
@@ -195,6 +216,42 @@ impl RequestModerator {
         )
     }
 
+    /// Checks the rate limit for the given peer and request.
+    /// Returns true iff the request is allowed.
+    fn check_request_rate_limit_allowed(&self, peer_network_id: &PeerNetworkId) -> bool {
+        // If the peer is not on the public network, we shouldn't rate limit it
+        if !peer_network_id.network_id().is_public_network() {
+            return true;
+        }
+
+        // Get the max requests per second for the peer
+        let max_requests_per_second =
+            match self.storage_service_config.max_requests_per_second_per_peer {
+                Some(max_requests_per_second) => max_requests_per_second,
+                None => {
+                    return true; // Rate limiting is disabled
+                },
+            };
+
+        // Get the rate limit state for the peer (or create one if it doesn't exist)
+        let peer_rate_limit_state = self
+            .peer_rate_limit_states
+            .entry(*peer_network_id)
+            .or_insert_with(|| {
+                // Create a new token bucket with the specified max requests per
+                // second. Note: the capacity is set to the max requests per second,
+                // which allows for bursting up to 1 second of requests.
+                Mutex::new(TokenBucket::new(
+                    max_requests_per_second,
+                    max_requests_per_second,
+                    self.time_service.clone(),
+                ))
+            });
+
+        // Check if the request is allowed under the rate limit
+        peer_rate_limit_state.lock().try_acquire_all(1).is_ok()
+    }
+
     /// Refresh the unhealthy peer states and garbage collect disconnected peers
     pub fn refresh_unhealthy_peer_states(&self) -> Result<(), Error> {
         // Get the currently connected peers
@@ -208,7 +265,7 @@ impl RequestModerator {
                 ))
             })?;
 
-        // Remove disconnected peers and refresh ignored peer states
+        // Refresh the unhealthy peer states and garbage collect disconnected peers
         let mut num_ignored_peers = 0;
         self.unhealthy_peer_states
             .retain(|peer_network_id, unhealthy_peer_state| {
@@ -227,6 +284,11 @@ impl RequestModerator {
                 }
             });
 
+        // Garbage collect the rate limit states for disconnected peers
+        self.peer_rate_limit_states.retain(|peer_network_id, _| {
+            connected_peers_and_metadata.contains_key(peer_network_id)
+        });
+
         // Update the number of ignored peers
         metrics::set_gauge(
             &metrics::IGNORED_PEER_COUNT,
@@ -235,6 +297,14 @@ impl RequestModerator {
         );
 
         Ok(())
+    }
+
+    #[cfg(test)]
+    /// Returns a copy of the rate limit states for testing
+    pub(crate) fn get_peer_rate_limit_states(
+        &self,
+    ) -> Arc<DashMap<PeerNetworkId, Mutex<TokenBucket>>> {
+        self.peer_rate_limit_states.clone()
     }
 
     #[cfg(test)]

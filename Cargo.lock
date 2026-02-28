@@ -4343,6 +4343,7 @@ dependencies = [
  "aptos-storage-service-notifications",
  "aptos-storage-service-types",
  "aptos-time-service",
+ "aptos-token-bucket",
  "aptos-types",
  "arc-swap",
  "bcs 0.1.4",
