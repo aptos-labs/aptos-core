@@ -27,10 +27,10 @@ use aptos_crypto::arkworks::{
     GroupGenerators,
 };
 use ark_ec::{
-    pairing::{Pairing, PairingOutput},
+    pairing::{Pairing},
     CurveGroup, PrimeGroup, VariableBaseMSM,
 };
-use ark_ff::{AdditiveGroup, Field, PrimeField, Zero};
+use ark_ff::{AdditiveGroup, Field, PrimeField};
 use ark_poly::{self, EvaluationDomain, Polynomial};
 use ark_serialize::{
     CanonicalDeserialize, CanonicalSerialize, Compress, Read, SerializationError, Valid, Validate,

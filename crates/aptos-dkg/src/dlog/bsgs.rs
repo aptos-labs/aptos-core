@@ -2,9 +2,15 @@
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 use ark_ec::CurveGroup;
+use ark_serialize::CanonicalSerialize;
 use std::collections::HashMap;
 
-/// Compute discrete log using baby-step giant-step with a precomputed table
+/// Default batch size for serialization in the giant-step loop.
+/// Benchmarks can be used to tune this (see `benches/bsgs.rs`, `dlog_bsgs_*_batch_size`).
+pub const DEFAULT_BSGS_SERIALIZATION_BATCH_SIZE: usize = 64;
+
+/// Compute discrete log using baby-step giant-step with a precomputed table.
+/// Uses batched serialization in the giant-step loop; see `dlog_with_batch_size` to tune.
 ///
 /// # Arguments
 /// - `G`: base of the exponentiation
@@ -20,6 +26,19 @@ pub fn dlog<C: CurveGroup>(
     baby_table: &HashMap<Vec<u8>, u64>,
     range_limit: u64,
 ) -> Option<u64> {
+    dlog_with_batch_size(G, H, baby_table, range_limit, DEFAULT_BSGS_SERIALIZATION_BATCH_SIZE)
+}
+
+/// Same as `dlog` but with configurable serialization batch size for the giant-step loop.
+/// Larger batches reduce allocations and can improve cache locality during table lookups.
+#[allow(non_snake_case)]
+pub fn dlog_with_batch_size<C: CurveGroup>(
+    G: C,
+    H: C,
+    baby_table: &HashMap<Vec<u8>, u64>,
+    range_limit: u64,
+    batch_size: usize,
+) -> Option<u64> {
     let byte_size = G.compressed_size();
 
     let m = baby_table
@@ -30,17 +49,29 @@ pub fn dlog<C: CurveGroup>(
 
     let G_neg_m = G * -C::ScalarField::from(m);
 
-    let mut gamma = H;
+    let batch_size = batch_size.max(1);
+    let mut buf = vec![0u8; byte_size];
+    let mut batch = Vec::with_capacity(batch_size);
 
-    for i in 0..n {
-        let mut buf = vec![0u8; byte_size];
-        gamma.serialize_compressed(&mut buf[..]).unwrap();
+    for chunk_start in (0..n).step_by(batch_size) {
+        let actual_batch = (n - chunk_start).min(batch_size as u64) as usize;
 
-        if let Some(&j) = baby_table.get(&buf) {
-            return Some(i * m + j);
+        // Build batch of projective giant-step points
+        batch.clear();
+        let mut gamma = H + G_neg_m * C::ScalarField::from(chunk_start);
+        for _ in 0..actual_batch {
+            batch.push(gamma);
+            gamma += G_neg_m;
         }
 
-        gamma += G_neg_m;
+        // Batch-normalize then serialize and look up each point
+        let normalized = C::normalize_batch(&batch);
+        for (j, aff) in normalized.iter().enumerate() {
+            aff.serialize_compressed(&mut buf[..]).unwrap();
+            if let Some(&baby_j) = baby_table.get(&buf[..]) {
+                return Some((chunk_start + j as u64) * m + baby_j);
+            }
+        }
     }
 
     None
