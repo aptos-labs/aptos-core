@@ -116,12 +116,29 @@ pub trait WriteBatch: IntoRawBatch {
     }
 
     fn raw_delete(&mut self, cf_name: ColumnFamilyName, key: Vec<u8>) -> DbResult<()>;
+
+    /// Adds a range delete operation to the batch. Removes all entries in `[begin, end)`.
+    fn delete_range<S: Schema>(&mut self, begin: &S::Key, end: &S::Key) -> DbResult<()> {
+        let begin = <S::Key as KeyCodec<S>>::encode_key(begin)?;
+        let end = <S::Key as KeyCodec<S>>::encode_key(end)?;
+
+        self.stats().delete(S::COLUMN_FAMILY_NAME);
+        self.raw_delete_range(S::COLUMN_FAMILY_NAME, begin, end)
+    }
+
+    fn raw_delete_range(
+        &mut self,
+        cf_name: ColumnFamilyName,
+        begin: Vec<u8>,
+        end: Vec<u8>,
+    ) -> DbResult<()>;
 }
 
 #[derive(Debug)]
 pub enum WriteOp {
     Value { key: Vec<u8>, value: Vec<u8> },
     Deletion { key: Vec<u8> },
+    DeletionRange { begin: Vec<u8>, end: Vec<u8> },
 }
 
 /// `SchemaBatch` holds a collection of updates that can be applied to a DB atomically. The updates
@@ -145,6 +162,10 @@ impl SchemaBatch {
 
     pub fn delete<S: Schema>(&mut self, key: &S::Key) -> DbResult<()> {
         <Self as WriteBatch>::delete::<S>(self, key)
+    }
+
+    pub fn delete_range<S: Schema>(&mut self, begin: &S::Key, end: &S::Key) -> DbResult<()> {
+        <Self as WriteBatch>::delete_range::<S>(self, begin, end)
     }
 }
 
@@ -170,6 +191,20 @@ impl WriteBatch for SchemaBatch {
 
         Ok(())
     }
+
+    fn raw_delete_range(
+        &mut self,
+        cf_name: ColumnFamilyName,
+        begin: Vec<u8>,
+        end: Vec<u8>,
+    ) -> DbResult<()> {
+        self.rows
+            .entry(cf_name)
+            .or_default()
+            .push(WriteOp::DeletionRange { begin, end });
+
+        Ok(())
+    }
 }
 
 impl IntoRawBatch for SchemaBatch {
@@ -186,6 +221,9 @@ impl IntoRawBatch for SchemaBatch {
                 match write_op {
                     WriteOp::Value { key, value } => db_batch.put_cf(cf_handle, key, value),
                     WriteOp::Deletion { key } => db_batch.delete_cf(cf_handle, key),
+                    WriteOp::DeletionRange { begin, end } => {
+                        db_batch.delete_range_cf(cf_handle, begin, end)
+                    },
                 }
             }
         }
@@ -237,6 +275,19 @@ impl WriteBatch for NativeBatch<'_> {
         self.raw_batch
             .inner
             .delete_cf(&self.db.get_cf_handle(cf_name)?, &key);
+
+        Ok(())
+    }
+
+    fn raw_delete_range(
+        &mut self,
+        cf_name: ColumnFamilyName,
+        begin: Vec<u8>,
+        end: Vec<u8>,
+    ) -> DbResult<()> {
+        self.raw_batch
+            .inner
+            .delete_range_cf(&self.db.get_cf_handle(cf_name)?, &begin, &end);
 
         Ok(())
     }
