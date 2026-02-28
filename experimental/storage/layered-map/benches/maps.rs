@@ -279,13 +279,9 @@ fn get_rocksdb(
                         let mut options = rocksdb::Options::default();
                         options.create_if_missing(true);
 
-                        let db = DB::open(
-                            &db_path,
-                            "bench",
-                            vec![DEFAULT_COLUMN_FAMILY_NAME],
-                            &options,
-                        )
-                        .unwrap();
+                        let db =
+                            DB::open(&db_path, "bench", vec![DEFAULT_COLUMN_FAMILY_NAME], options)
+                                .unwrap();
 
                         let mut total = 0;
                         items.iter().chunks(1_000_000).into_iter().for_each(|kvs| {
