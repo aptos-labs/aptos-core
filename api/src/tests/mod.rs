@@ -3,6 +3,7 @@
 
 mod account_abstraction_test;
 mod accounts_test;
+mod axum_tests;
 mod blocks_test;
 mod converter_test;
 mod event_v2_translation_test;

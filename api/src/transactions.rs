@@ -4,20 +4,13 @@
 use crate::{
     accept_type::AcceptType,
     accounts::Account,
-    bcs_payload::Bcs,
     context::{api_spawn_blocking, Context, FunctionStats},
-    failpoint::fail_point_poem,
-    generate_error_response, generate_success_response, metrics,
-    metrics::WAIT_TRANSACTION_GAUGE,
+    metrics,
     page::Page,
-    response::{
-        api_disabled, api_forbidden, transaction_not_found_by_hash,
-        transaction_not_found_by_version, version_pruned, BadRequestError, BasicError,
-        BasicErrorWith404, BasicResponse, BasicResponseStatus, BasicResult, BasicResultWith404,
-        ForbiddenError, InsufficientStorageError, InternalError,
+    response_axum::{
+        transaction_not_found_by_hash, transaction_not_found_by_version, version_pruned,
+        AptosErrorResponse, AptosResponse,
     },
-    view_function::convert_view_function_error,
-    ApiTags,
 };
 use anyhow::Context as AnyhowContext;
 use aptos_api_types::{
@@ -31,7 +24,6 @@ use aptos_api_types::{
 use aptos_crypto::signing_message;
 use aptos_logger::error;
 use aptos_types::{
-    account_address::AccountAddress,
     mempool_status::MempoolStatusCode,
     transaction::{
         EntryFunction, ExecutionStatus, MultisigTransactionPayload, RawTransaction,
@@ -39,90 +31,41 @@ use aptos_types::{
         TransactionPayload, TransactionPayloadInner,
     },
     vm_status::StatusCode,
-    AptosCoinType, CoinType,
 };
-use aptos_vm::{AptosSimulationVM, AptosVM};
-use move_core_types::{ident_str, language_storage::ModuleId, vm_status::VMStatus};
-use poem_openapi::{
-    param::{Path, Query},
-    payload::Json,
-    ApiRequest, OpenApi,
-};
-use std::{cmp::min, sync::Arc, time::Duration};
-
-generate_success_response!(SubmitTransactionResponse, (202, Accepted));
-
-generate_error_response!(
-    SubmitTransactionError,
-    (400, BadRequest),
-    (403, Forbidden),
-    (404, NotFound),
-    (413, PayloadTooLarge),
-    (500, Internal),
-    (503, ServiceUnavailable),
-    (507, InsufficientStorage)
-);
-
-type SubmitTransactionResult<T> =
-    poem::Result<SubmitTransactionResponse<T>, SubmitTransactionError>;
-
-generate_success_response!(
-    SubmitTransactionsBatchResponse,
-    (202, Accepted),
-    (206, AcceptedPartial)
-);
-
-type SubmitTransactionsBatchResult<T> =
-    poem::Result<SubmitTransactionsBatchResponse<T>, SubmitTransactionError>;
-
-type SimulateTransactionResult<T> = poem::Result<BasicResponse<T>, SubmitTransactionError>;
+use aptos_vm::AptosSimulationVM;
+use move_core_types::vm_status::VMStatus;
+use std::{sync::Arc, time::Duration};
 
 // TODO: Consider making both content types accept either
 // SubmitTransactionRequest or SignedTransaction, the way
 // it is now is quite confusing.
 
-// We need a custom type here because we use different types for each of the
-// content types possible for the POST data.
-#[derive(ApiRequest, Debug)]
+#[derive(Debug)]
 pub enum SubmitTransactionPost {
-    #[oai(content_type = "application/json")]
-    Json(Json<SubmitTransactionRequest>),
-
-    // TODO: Since I don't want to impl all the Poem derives on SignedTransaction,
-    // find a way to at least indicate in the spec that it expects a SignedTransaction.
-    // TODO: https://github.com/aptos-labs/aptos-core/issues/2275
-    #[oai(content_type = "application/x.aptos.signed_transaction+bcs")]
-    Bcs(Bcs),
+    Json(SubmitTransactionRequest),
+    Bcs(Vec<u8>),
 }
 
 impl VerifyInput for SubmitTransactionPost {
     fn verify(&self) -> anyhow::Result<()> {
         match self {
-            SubmitTransactionPost::Json(inner) => inner.0.verify(),
+            SubmitTransactionPost::Json(inner) => inner.verify(),
             SubmitTransactionPost::Bcs(_) => Ok(()),
         }
     }
 }
 
-// We need a custom type here because we use different types for each of the
-// content types possible for the POST data.
-#[derive(ApiRequest, Debug)]
+#[derive(Debug)]
 pub enum SubmitTransactionsBatchPost {
-    #[oai(content_type = "application/json")]
-    Json(Json<Vec<SubmitTransactionRequest>>),
-
-    // TODO: Since I don't want to impl all the Poem derives on SignedTransaction,
-    // find a way to at least indicate in the spec that it expects a SignedTransaction.
-    // TODO: https://github.com/aptos-labs/aptos-core/issues/2275
-    #[oai(content_type = "application/x.aptos.signed_transaction+bcs")]
-    Bcs(Bcs),
+    Json(Vec<SubmitTransactionRequest>),
+    Bcs(Vec<u8>),
 }
 
 impl VerifyInput for SubmitTransactionsBatchPost {
     fn verify(&self) -> anyhow::Result<()> {
         match self {
             SubmitTransactionsBatchPost::Json(inner) => {
-                for request in inner.0.iter() {
+                for request in inner.iter() {
                     request.verify()?;
                 }
             },
@@ -138,647 +81,7 @@ pub struct TransactionsApi {
     pub context: Arc<Context>,
 }
 
-#[OpenApi]
 impl TransactionsApi {
-    /// Get transactions
-    ///
-    /// Retrieve on-chain committed transactions. The page size and start ledger version
-    /// can be provided to get a specific sequence of transactions.
-    ///
-    /// If the version has been pruned, then a 410 will be returned.
-    ///
-    /// To retrieve a pending transaction, use /transactions/by_hash.
-    #[oai(
-        path = "/transactions",
-        method = "get",
-        operation_id = "get_transactions",
-        tag = "ApiTags::Transactions"
-    )]
-    async fn get_transactions(
-        &self,
-        accept_type: AcceptType,
-        /// Ledger version to start list of transactions
-        ///
-        /// If not provided, defaults to showing the latest transactions
-        start: Query<Option<U64>>,
-        /// Max number of transactions to retrieve.
-        ///
-        /// If not provided, defaults to default page size
-        limit: Query<Option<u16>>,
-    ) -> BasicResultWith404<Vec<Transaction>> {
-        fail_point_poem("endpoint_get_transactions")?;
-        self.context
-            .check_api_output_enabled("Get transactions", &accept_type)?;
-        let page = Page::new(
-            start.0.map(|v| v.0),
-            limit.0,
-            self.context.max_transactions_page_size(),
-        );
-
-        let api = self.clone();
-        api_spawn_blocking(move || api.list(&accept_type, page)).await
-    }
-
-    /// Get transaction by hash
-    ///
-    /// Look up a transaction by its hash. This is the same hash that is returned
-    /// by the API when submitting a transaction (see PendingTransaction).
-    ///
-    /// When given a transaction hash, the server first looks for the transaction
-    /// in storage (on-chain, committed). If no on-chain transaction is found, it
-    /// looks the transaction up by hash in the mempool (pending, not yet committed).
-    ///
-    /// To create a transaction hash by yourself, do the following:
-    ///   1. Hash message bytes: "RawTransaction" bytes + BCS bytes of [Transaction](https://aptos-labs.github.io/aptos-core/aptos_types/transaction/enum.Transaction.html).
-    ///   2. Apply hash algorithm `SHA3-256` to the hash message bytes.
-    ///   3. Hex-encode the hash bytes with `0x` prefix.
-    // TODO: Include a link to an example of how to do this ^
-    #[oai(
-        path = "/transactions/by_hash/:txn_hash",
-        method = "get",
-        operation_id = "get_transaction_by_hash",
-        tag = "ApiTags::Transactions"
-    )]
-    async fn get_transaction_by_hash(
-        &self,
-        accept_type: AcceptType,
-        /// Hash of transaction to retrieve
-        txn_hash: Path<HashValue>,
-        // TODO: Use a new request type that can't return 507.
-    ) -> BasicResultWith404<Transaction> {
-        fail_point_poem("endpoint_transaction_by_hash")?;
-        self.context
-            .check_api_output_enabled("Get transactions by hash", &accept_type)?;
-        self.get_transaction_by_hash_inner(&accept_type, txn_hash.0)
-            .await
-    }
-
-    /// Wait for transaction by hash
-    ///
-    /// Same as /transactions/by_hash, but will wait for a pending transaction to be committed. To be used as a long
-    /// poll optimization by clients, to reduce latency caused by polling. The "long" poll is generally a second or
-    /// less but dictated by the server; the client must deal with the result as if the request was a normal
-    /// /transactions/by_hash request, e.g., by retrying if the transaction is pending.
-    #[oai(
-        path = "/transactions/wait_by_hash/:txn_hash",
-        method = "get",
-        operation_id = "wait_transaction_by_hash",
-        tag = "ApiTags::Transactions"
-    )]
-    async fn wait_transaction_by_hash(
-        &self,
-        accept_type: AcceptType,
-        /// Hash of transaction to retrieve
-        txn_hash: Path<HashValue>,
-        // TODO: Use a new request type that can't return 507.
-    ) -> BasicResultWith404<Transaction> {
-        fail_point_poem("endpoint_wait_transaction_by_hash")?;
-        self.context
-            .check_api_output_enabled("Get transactions by hash", &accept_type)?;
-
-        // Short poll if the active connections are too high
-        if self
-            .context
-            .wait_for_hash_active_connections
-            .fetch_add(1, std::sync::atomic::Ordering::Relaxed)
-            >= self
-                .context
-                .node_config
-                .api
-                .wait_by_hash_max_active_connections
-        {
-            self.context
-                .wait_for_hash_active_connections
-                .fetch_sub(1, std::sync::atomic::Ordering::Relaxed);
-            metrics::WAIT_TRANSACTION_POLL_TIME
-                .with_label_values(&["short"])
-                .observe(0.0);
-            return self
-                .get_transaction_by_hash_inner(&accept_type, txn_hash.0)
-                .await;
-        }
-
-        let start_time = std::time::Instant::now();
-        WAIT_TRANSACTION_GAUGE.inc();
-
-        let result = self
-            .wait_transaction_by_hash_inner(
-                &accept_type,
-                txn_hash.0,
-                self.context.node_config.api.wait_by_hash_timeout_ms,
-                self.context.node_config.api.wait_by_hash_poll_interval_ms,
-            )
-            .await;
-
-        WAIT_TRANSACTION_GAUGE.dec();
-        self.context
-            .wait_for_hash_active_connections
-            .fetch_sub(1, std::sync::atomic::Ordering::Relaxed);
-        metrics::WAIT_TRANSACTION_POLL_TIME
-            .with_label_values(&["long"])
-            .observe(start_time.elapsed().as_secs_f64());
-        result
-    }
-
-    /// Get transaction by version
-    ///
-    /// Retrieves a transaction by a given version. If the version has been
-    /// pruned, a 410 will be returned.
-    #[oai(
-        path = "/transactions/by_version/:txn_version",
-        method = "get",
-        operation_id = "get_transaction_by_version",
-        tag = "ApiTags::Transactions"
-    )]
-    async fn get_transaction_by_version(
-        &self,
-        accept_type: AcceptType,
-        /// Version of transaction to retrieve
-        txn_version: Path<U64>,
-    ) -> BasicResultWith404<Transaction> {
-        fail_point_poem("endpoint_transaction_by_version")?;
-        self.context
-            .check_api_output_enabled("Get transactions by version", &accept_type)?;
-        let api = self.clone();
-        api_spawn_blocking(move || {
-            api.get_transaction_by_version_inner(&accept_type, txn_version.0)
-        })
-        .await
-    }
-
-    /// Get transactions auxiliary info
-    ///
-    /// Retrieves persisted auxiliary information (such as transaction indices within blocks) for
-    /// transactions in a given version range.
-    ///
-    /// If the version range has been pruned, a 410 will be returned.
-    #[oai(
-        path = "/transactions/auxiliary_info",
-        method = "get",
-        operation_id = "get_transactions_auxiliary_info",
-        tag = "ApiTags::Transactions"
-    )]
-    async fn get_transactions_auxiliary_info(
-        &self,
-        accept_type: AcceptType,
-        /// Starting ledger version to retrieve auxiliary info for
-        start_version: Query<U64>,
-        /// Max number of transactions to retrieve auxiliary info for.
-        ///
-        /// If not provided, defaults to default page size
-        limit: Query<Option<u16>>,
-    ) -> BasicResultWith404<Vec<PersistedAuxiliaryInfo>> {
-        fail_point_poem("endpoint_get_transactions_auxiliary_info")?;
-        self.context
-            .check_api_output_enabled("Get transactions auxiliary info", &accept_type)?;
-
-        let page = Page::new(
-            Some(start_version.0 .0),
-            limit.0,
-            self.context.max_transactions_page_size(),
-        );
-
-        let api = self.clone();
-        api_spawn_blocking(move || api.list_auxiliary_infos(&accept_type, page)).await
-    }
-
-    /// Get account transactions
-    ///
-    /// Retrieves on-chain committed sequence-number based transactions from an account.
-    /// Does not retrieve orderless transactions sent from the account.
-    /// If the start version is too far in the past, a 410 will be returned.
-    ///
-    /// If no start version is given, it will start at version 0.
-    ///
-    /// To retrieve a pending transaction, use /transactions/by_hash.
-
-    // Question[Orderless]: Can this operation id and function name be changed to "get_account_ordered_transactions"?
-    #[oai(
-        path = "/accounts/:address/transactions",
-        method = "get",
-        operation_id = "get_account_transactions",
-        tag = "ApiTags::Transactions"
-    )]
-    async fn get_accounts_transactions(
-        &self,
-        accept_type: AcceptType,
-        /// Address of account with or without a `0x` prefix
-        address: Path<Address>,
-        /// Account sequence number to start list of transactions
-        ///
-        /// If not provided, defaults to showing the latest transactions
-        start: Query<Option<U64>>,
-        /// Max number of transactions to retrieve.
-        ///
-        /// If not provided, defaults to default page size
-        limit: Query<Option<u16>>,
-    ) -> BasicResultWith404<Vec<Transaction>> {
-        fail_point_poem("endpoint_get_accounts_transactions")?;
-        self.context
-            .check_api_output_enabled("Get account transactions", &accept_type)?;
-        let page = Page::new(
-            start.0.map(|v| v.0),
-            limit.0,
-            self.context.max_transactions_page_size(),
-        );
-        let api = self.clone();
-        api_spawn_blocking(move || api.list_ordered_txns_by_account(&accept_type, page, address.0))
-            .await
-    }
-
-    /// Get account transaction summaries
-    ///
-    /// Retrieves summaries of on-chain committed transactions (both sequence number based
-    /// and orderless transactions) from an account.
-    /// Each transaction summary contains the sender addresss, transaction hash, version, and replay protector.
-    ///
-    /// If start_version is provided, the output consists of transaction summaries starting form that version.
-    ///
-    /// If start_version is not provided but the end_version is provided, the output consists of transaction summaries
-    /// ending at the end_version.
-    ///
-    /// If both start_version and end_version are not provided, the output consists of the summaries of
-    /// most recent committed transaction from the account.
-    ///
-    /// The output always consists of transaction summaries ordered in ascending order by version.
-    ///
-    /// To retrieve a pending transaction, use /transactions/by_hash.
-    #[oai(
-        path = "/accounts/:address/transaction_summaries",
-        method = "get",
-        operation_id = "get_account_transaction_summaries",
-        tag = "ApiTags::Transactions"
-    )]
-    async fn get_accounts_transaction_summaries(
-        &self,
-        accept_type: AcceptType,
-        /// Address of account with or without a `0x` prefix
-        address: Path<Address>,
-        /// Transaction version to start list of transactions
-        ///
-        /// If not provided, defaults to showing the latest transactions
-        start_version: Query<Option<U64>>,
-        /// Transaction version to end list of transactions
-        ///
-        /// If not provided, defaults to showing the latest transactions
-        end_version: Query<Option<U64>>,
-        /// Max number of transactions to retrieve.
-        ///
-        /// If not provided, defaults to default page size
-        limit: Query<Option<u16>>,
-    ) -> BasicResultWith404<Vec<TransactionSummary>> {
-        fail_point_poem("endpoint_get_accounts_transaction_summaries")?;
-        self.context
-            .check_api_output_enabled("Get account transaction summaries", &accept_type)?;
-        let limit = if let Some(limit) = limit.0 {
-            min(limit, self.context.max_transactions_page_size())
-        } else {
-            self.context.max_transactions_page_size()
-        };
-        let api = self.clone();
-        api_spawn_blocking(move || {
-            api.list_txn_summaries_by_account(
-                &accept_type,
-                address.0,
-                start_version.0,
-                end_version.0,
-                limit,
-            )
-        })
-        .await
-    }
-
-    /// Submit transaction
-    ///
-    /// This endpoint accepts transaction submissions in two formats.
-    ///
-    /// To submit a transaction as JSON, you must submit a SubmitTransactionRequest.
-    /// To build this request, do the following:
-    ///
-    ///   1. Encode the transaction as BCS. If you are using a language that has
-    ///      native BCS support, make sure of that library. If not, you may take
-    ///      advantage of /transactions/encode_submission. When using this
-    ///      endpoint, make sure you trust the node you're talking to, as it is
-    ///      possible they could manipulate your request.
-    ///   2. Sign the encoded transaction and use it to create a TransactionSignature.
-    ///   3. Submit the request. Make sure to use the "application/json" Content-Type.
-    ///
-    /// To submit a transaction as BCS, you must submit a SignedTransaction
-    /// encoded as BCS. See SignedTransaction in types/src/transaction/mod.rs.
-    /// Make sure to use the `application/x.aptos.signed_transaction+bcs` Content-Type.
-    // TODO: Point to examples of both of these flows, in multiple languages.
-    #[oai(
-        path = "/transactions",
-        method = "post",
-        operation_id = "submit_transaction",
-        tag = "ApiTags::Transactions"
-    )]
-    async fn submit_transaction(
-        &self,
-        accept_type: AcceptType,
-        data: SubmitTransactionPost,
-    ) -> SubmitTransactionResult<PendingTransaction> {
-        data.verify()
-            .context("Submitted transaction invalid'")
-            .map_err(|err| {
-                SubmitTransactionError::bad_request_with_code_no_info(
-                    err,
-                    AptosErrorCode::InvalidInput,
-                )
-            })?;
-        fail_point_poem("endpoint_submit_transaction")?;
-        if !self.context.node_config.api.transaction_submission_enabled {
-            return Err(api_disabled("Submit transaction"));
-        }
-        self.context
-            .check_api_output_enabled("Submit transaction", &accept_type)?;
-        let ledger_info = self.context.get_latest_ledger_info()?;
-        let signed_transaction = self.get_signed_transaction(&ledger_info, data)?;
-        self.create(&accept_type, &ledger_info, signed_transaction)
-            .await
-    }
-
-    /// Submit batch transactions
-    ///
-    /// This allows you to submit multiple transactions.  The response has three outcomes:
-    ///
-    ///   1. All transactions succeed, and it will return a 202
-    ///   2. Some transactions succeed, and it will return the failed transactions and a 206
-    ///   3. No transactions succeed, and it will also return the failed transactions and a 206
-    ///
-    /// To submit a transaction as JSON, you must submit a SubmitTransactionRequest.
-    /// To build this request, do the following:
-    ///
-    ///   1. Encode the transaction as BCS. If you are using a language that has
-    ///      native BCS support, make sure to use that library. If not, you may take
-    ///      advantage of /transactions/encode_submission. When using this
-    ///      endpoint, make sure you trust the node you're talking to, as it is
-    ///      possible they could manipulate your request.
-    ///   2. Sign the encoded transaction and use it to create a TransactionSignature.
-    ///   3. Submit the request. Make sure to use the "application/json" Content-Type.
-    ///
-    /// To submit a transaction as BCS, you must submit a SignedTransaction
-    /// encoded as BCS. See SignedTransaction in types/src/transaction/mod.rs.
-    /// Make sure to use the `application/x.aptos.signed_transaction+bcs` Content-Type.
-    #[oai(
-        path = "/transactions/batch",
-        method = "post",
-        operation_id = "submit_batch_transactions",
-        tag = "ApiTags::Transactions"
-    )]
-    async fn submit_transactions_batch(
-        &self,
-        accept_type: AcceptType,
-        data: SubmitTransactionsBatchPost,
-    ) -> SubmitTransactionsBatchResult<TransactionsBatchSubmissionResult> {
-        data.verify()
-            .context("Submitted transactions invalid")
-            .map_err(|err| {
-                SubmitTransactionError::bad_request_with_code_no_info(
-                    err,
-                    AptosErrorCode::InvalidInput,
-                )
-            })?;
-        fail_point_poem("endpoint_submit_batch_transactions")?;
-        if !self.context.node_config.api.transaction_submission_enabled {
-            return Err(api_disabled("Submit batch transaction"));
-        }
-        self.context
-            .check_api_output_enabled("Submit batch transactions", &accept_type)?;
-        let ledger_info = self.context.get_latest_ledger_info()?;
-        let signed_transactions_batch = self.get_signed_transactions_batch(&ledger_info, data)?;
-        if self.context.max_submit_transaction_batch_size() < signed_transactions_batch.len() {
-            return Err(SubmitTransactionError::bad_request_with_code(
-                format!(
-                    "Submitted too many transactions: {}, while limit is {}",
-                    signed_transactions_batch.len(),
-                    self.context.max_submit_transaction_batch_size(),
-                ),
-                AptosErrorCode::InvalidInput,
-                &ledger_info,
-            ));
-        }
-        self.create_batch(&accept_type, &ledger_info, signed_transactions_batch)
-            .await
-    }
-
-    /// Simulate transaction
-    ///
-    /// The output of the transaction will have the exact transaction outputs and events that running
-    /// an actual signed transaction would have.  However, it will not have the associated state
-    /// hashes, as they are not updated in storage.  This can be used to estimate the maximum gas
-    /// units for a submitted transaction.
-    ///
-    /// To use this, you must:
-    /// - Create a SignedTransaction with a zero-padded signature.
-    /// - Submit a SubmitTransactionRequest containing a UserTransactionRequest containing that signature.
-    ///
-    /// To use this endpoint with BCS, you must submit a SignedTransaction
-    /// encoded as BCS. See SignedTransaction in types/src/transaction/mod.rs.
-    #[oai(
-        path = "/transactions/simulate",
-        method = "post",
-        operation_id = "simulate_transaction",
-        tag = "ApiTags::Transactions"
-    )]
-    async fn simulate_transaction(
-        &self,
-        accept_type: AcceptType,
-        /// If set to true, the max gas value in the transaction will be ignored
-        /// and the maximum possible gas will be used
-        estimate_max_gas_amount: Query<Option<bool>>,
-        /// If set to true, the gas unit price in the transaction will be ignored
-        /// and the estimated value will be used
-        estimate_gas_unit_price: Query<Option<bool>>,
-        /// If set to true, the transaction will use a higher price than the original
-        /// estimate.
-        estimate_prioritized_gas_unit_price: Query<Option<bool>>,
-        data: SubmitTransactionPost,
-    ) -> SimulateTransactionResult<Vec<UserTransaction>> {
-        data.verify()
-            .context("Simulated transaction invalid")
-            .map_err(|err| {
-                SubmitTransactionError::bad_request_with_code_no_info(
-                    err,
-                    AptosErrorCode::InvalidInput,
-                )
-            })?;
-        fail_point_poem("endpoint_simulate_transaction")?;
-        if !self.context.node_config.api.transaction_simulation_enabled {
-            return Err(api_disabled("Simulate transaction"));
-        }
-        self.context
-            .check_api_output_enabled("Simulate transaction", &accept_type)?;
-
-        let api = self.clone();
-        let context = self.context.clone();
-        api_spawn_blocking(move || {
-            let ledger_info = context.get_latest_ledger_info()?;
-            let mut signed_transaction = api.get_signed_transaction(&ledger_info, data)?;
-
-            // Confirm the API simulation filter allows the transaction
-            let api_filter = &context.node_config.transaction_filters.api_filter;
-            if api_filter.is_enabled()
-                && !api_filter
-                    .transaction_filter()
-                    .allows_transaction(&signed_transaction)
-            {
-                return Err(SubmitTransactionError::forbidden_with_code(
-                    "Transaction not allowed by simulation filter",
-                    AptosErrorCode::InvalidInput,
-                    &ledger_info,
-                ));
-            }
-
-            let estimated_gas_unit_price = match (
-                estimate_gas_unit_price.0.unwrap_or_default(),
-                estimate_prioritized_gas_unit_price.0.unwrap_or_default(),
-            ) {
-                (_, true) => {
-                    let gas_estimation = context.estimate_gas_price(&ledger_info)?;
-                    // The prioritized gas estimate should always be set, but if it's not use the gas estimate
-                    Some(
-                        gas_estimation
-                            .prioritized_gas_estimate
-                            .unwrap_or(gas_estimation.gas_estimate),
-                    )
-                },
-                (true, false) => Some(context.estimate_gas_price(&ledger_info)?.gas_estimate),
-                (false, false) => None,
-            };
-
-            // If estimate max gas amount is provided, we will just make it the maximum value
-            let estimated_max_gas_amount = if estimate_max_gas_amount.0.unwrap_or_default() {
-                // Retrieve max possible gas units
-                let (_, gas_params) = context.get_gas_schedule(&ledger_info)?;
-                let min_number_of_gas_units =
-                    u64::from(gas_params.vm.txn.min_transaction_gas_units)
-                        / u64::from(gas_params.vm.txn.gas_unit_scaling_factor);
-                let max_number_of_gas_units =
-                    u64::from(gas_params.vm.txn.maximum_number_of_gas_units);
-
-                // Retrieve account balance to determine max gas available, right now this is using
-                // a view function, but we may want to re-evaluate this based on performance
-                let (_, _, state_view) = context
-                    .state_view::<BasicErrorWith404>(Option::None)
-                    .map_err(|err| {
-                        SubmitTransactionError::bad_request_with_code_no_info(
-                            err,
-                            AptosErrorCode::InvalidInput,
-                        )
-                    })?;
-                let output = AptosVM::execute_view_function(
-                    &state_view,
-                    ModuleId::new(AccountAddress::ONE, ident_str!("coin").into()),
-                    ident_str!("balance").into(),
-                    vec![AptosCoinType::type_tag()],
-                    vec![signed_transaction.sender().to_vec()],
-                    context.node_config.api.max_gas_view_function,
-                );
-                let values = output.values.map_err(|status| {
-                    let (err_string, vm_error_code) =
-                        convert_view_function_error(&status, &state_view, &context);
-                    SubmitTransactionError::bad_request_with_optional_vm_status_and_ledger_info(
-                        anyhow::anyhow!(err_string),
-                        AptosErrorCode::InvalidInput,
-                        vm_error_code,
-                        Some(&ledger_info),
-                    )
-                })?;
-                let balance: u64 = bcs::from_bytes(&values[0]).map_err(|err| {
-                    SubmitTransactionError::bad_request_with_code_no_info(
-                        err,
-                        AptosErrorCode::InvalidInput,
-                    )
-                })?;
-
-                let gas_unit_price =
-                    estimated_gas_unit_price.unwrap_or_else(|| signed_transaction.gas_unit_price());
-
-                // With 0 gas price, we set it to max gas units, since we can't divide by 0
-                let max_account_gas_units = if gas_unit_price == 0 {
-                    balance
-                } else {
-                    balance / gas_unit_price
-                };
-
-                // To give better error messaging, we should not go below the minimum number of gas units
-                let max_account_gas_units =
-                    std::cmp::max(min_number_of_gas_units, max_account_gas_units);
-
-                // Minimum of the max account and the max total needs to be used for estimation
-                Some(std::cmp::min(
-                    max_account_gas_units,
-                    max_number_of_gas_units,
-                ))
-            } else {
-                None
-            };
-
-            // If there is an estimation of either, replace the values
-            if estimated_max_gas_amount.is_some() || estimated_gas_unit_price.is_some() {
-                signed_transaction = override_gas_parameters(
-                    &signed_transaction,
-                    estimated_max_gas_amount,
-                    estimated_gas_unit_price,
-                );
-            }
-
-            api.simulate(&accept_type, ledger_info, signed_transaction)
-        })
-        .await
-    }
-
-    /// Encode submission
-    ///
-    /// This endpoint accepts an EncodeSubmissionRequest, which internally is a
-    /// UserTransactionRequestInner (and optionally secondary signers) encoded
-    /// as JSON, validates the request format, and then returns that request
-    /// encoded in BCS. The client can then use this to create a transaction
-    /// signature to be used in a SubmitTransactionRequest, which it then
-    /// passes to the /transactions POST endpoint.
-    ///
-    /// To be clear, this endpoint makes it possible to submit transaction
-    /// requests to the API from languages that do not have library support for
-    /// BCS. If you are using an SDK that has BCS support, such as the official
-    /// Rust, TypeScript, or Python SDKs, you do not need to use this endpoint.
-    ///
-    /// To sign a message using the response from this endpoint:
-    /// - Decode the hex encoded string in the response to bytes.
-    /// - Sign the bytes to create the signature.
-    /// - Use that as the signature field in something like Ed25519Signature, which you then use to build a TransactionSignature.
-    //
-    #[oai(
-        path = "/transactions/encode_submission",
-        method = "post",
-        operation_id = "encode_submission",
-        tag = "ApiTags::Transactions"
-    )]
-    async fn encode_submission(
-        &self,
-        accept_type: AcceptType,
-        data: Json<EncodeSubmissionRequest>,
-        // TODO: Use a new request type that can't return 507 but still returns all the other necessary errors.
-    ) -> BasicResult<HexEncodedBytes> {
-        data.0
-            .verify()
-            .context("'UserTransactionRequest' invalid")
-            .map_err(|err| {
-                BasicError::bad_request_with_code_no_info(err, AptosErrorCode::InvalidInput)
-            })?;
-        fail_point_poem("endpoint_encode_submission")?;
-        if !self.context.node_config.api.encode_submission_enabled {
-            return Err(api_forbidden(
-                "Encode submission",
-                "Only JSON is supported as an AcceptType.",
-            ));
-        }
-        self.context
-            .check_api_output_enabled("Encode submission", &accept_type)?;
-        let api = self.clone();
-        api_spawn_blocking(move || api.get_signing_message(&accept_type, data.0)).await
-    }
-
     pub fn log_gas_estimation(gas_estimation: &GasEstimation) {
         metrics::GAS_ESTIMATE
             .with_label_values(&[metrics::GAS_ESTIMATE_CURRENT])
@@ -794,117 +97,73 @@ impl TransactionsApi {
                 .observe(prioritized as f64);
         }
     }
-
-    /// Estimate gas price
-    ///
-    /// Gives an estimate of the gas unit price required to get a transaction on chain in a
-    /// reasonable amount of time. The gas unit price is the amount that each transaction commits to
-    /// pay for each unit of gas consumed in executing the transaction. The estimate is based on
-    /// recent history: it gives the minimum gas that would have been required to get into recent
-    /// blocks, for blocks that were full. (When blocks are not full, the estimate will match the
-    /// minimum gas unit price.)
-    ///
-    /// The estimation is given in three values: de-prioritized (low), regular, and prioritized
-    /// (aggressive). Using a more aggressive value increases the likelihood that the transaction
-    /// will make it into the next block; more aggressive values are computed with a larger history
-    /// and higher percentile statistics. More details are in AIP-34.
-    #[oai(
-        path = "/estimate_gas_price",
-        method = "get",
-        operation_id = "estimate_gas_price",
-        tag = "ApiTags::Transactions"
-    )]
-    async fn estimate_gas_price(&self, accept_type: AcceptType) -> BasicResult<GasEstimation> {
-        fail_point_poem("endpoint_encode_submission")?;
-        self.context
-            .check_api_output_enabled("Estimate gas price", &accept_type)?;
-
-        let context = self.context.clone();
-        api_spawn_blocking(move || {
-            let latest_ledger_info = context.get_latest_ledger_info()?;
-            let gas_estimation = context.estimate_gas_price(&latest_ledger_info)?;
-            Self::log_gas_estimation(&gas_estimation);
-
-            match accept_type {
-                AcceptType::Json => BasicResponse::try_from_json((
-                    gas_estimation,
-                    &latest_ledger_info,
-                    BasicResponseStatus::Ok,
-                )),
-                AcceptType::Bcs => {
-                    let gas_estimation_bcs = GasEstimationBcs {
-                        gas_estimate: gas_estimation.gas_estimate,
-                    };
-                    BasicResponse::try_from_bcs((
-                        gas_estimation_bcs,
-                        &latest_ledger_info,
-                        BasicResponseStatus::Ok,
-                    ))
-                },
-            }
-        })
-        .await
-    }
 }
 
 impl TransactionsApi {
     const MAX_SIGNED_TRANSACTION_DEPTH: usize = 16;
 
     /// List all transactions paging by ledger version
-    fn list(&self, accept_type: &AcceptType, page: Page) -> BasicResultWith404<Vec<Transaction>> {
-        let latest_ledger_info = self.context.get_latest_ledger_info()?;
+    pub(crate) fn list(
+        &self,
+        accept_type: &AcceptType,
+        page: Page,
+    ) -> Result<AptosResponse<Vec<Transaction>>, AptosErrorResponse> {
+        let latest_ledger_info = self
+            .context
+            .get_latest_ledger_info::<AptosErrorResponse>()?;
         let ledger_version = latest_ledger_info.version();
 
-        let limit = page.limit(&latest_ledger_info)?;
-        let start_version = page.compute_start(limit, ledger_version, &latest_ledger_info)?;
+        let limit = page.limit::<AptosErrorResponse>(&latest_ledger_info)?;
+        let start_version =
+            page.compute_start::<AptosErrorResponse>(limit, ledger_version, &latest_ledger_info)?;
         let data = self
             .context
             .get_transactions(start_version, limit, ledger_version)
             .context("Failed to read raw transactions from storage")
             .map_err(|err| {
-                BasicErrorWith404::internal_with_code(
+                AptosErrorResponse::internal(
                     err,
                     AptosErrorCode::InternalError,
-                    &latest_ledger_info,
+                    Some(&latest_ledger_info),
                 )
             })?;
 
         match accept_type {
             AcceptType::Json => {
-                let timestamp = self
-                    .context
-                    .get_block_timestamp(&latest_ledger_info, start_version)?;
-                BasicResponse::try_from_json((
-                    self.context.render_transactions_sequential(
-                        &latest_ledger_info,
-                        data,
-                        timestamp,
-                    )?,
+                let timestamp = self.context.get_block_timestamp::<AptosErrorResponse>(
                     &latest_ledger_info,
-                    BasicResponseStatus::Ok,
-                ))
+                    start_version,
+                )?;
+                AptosResponse::try_from_json(
+                    self.context
+                        .render_transactions_sequential::<AptosErrorResponse>(
+                            &latest_ledger_info,
+                            data,
+                            timestamp,
+                        )?,
+                    &latest_ledger_info,
+                )
             },
-            AcceptType::Bcs => {
-                BasicResponse::try_from_bcs((data, &latest_ledger_info, BasicResponseStatus::Ok))
-            },
+            AcceptType::Bcs => AptosResponse::try_from_bcs(data, &latest_ledger_info),
         }
     }
 
-    async fn wait_transaction_by_hash_inner(
+    pub(crate) async fn wait_transaction_by_hash_inner(
         &self,
         accept_type: &AcceptType,
         hash: HashValue,
         wait_by_hash_timeout_ms: u64,
         wait_by_hash_poll_interval_ms: u64,
-    ) -> BasicResultWith404<Transaction> {
+    ) -> Result<AptosResponse<Transaction>, AptosErrorResponse> {
         let start_time = std::time::Instant::now();
         loop {
             let context = self.context.clone();
             let accept_type = accept_type.clone();
 
-            let (internal_ledger_info_opt, storage_ledger_info) =
-                api_spawn_blocking(move || context.get_latest_internal_and_storage_ledger_info())
-                    .await?;
+            let (internal_ledger_info_opt, storage_ledger_info) = api_spawn_blocking(move || {
+                context.get_latest_internal_and_storage_ledger_info::<AptosErrorResponse>()
+            })
+            .await?;
             let storage_version = storage_ledger_info.ledger_version.into();
             let internal_ledger_version = internal_ledger_info_opt
                 .as_ref()
@@ -915,10 +174,10 @@ impl TransactionsApi {
                 .await
                 .context(format!("Failed to get transaction by hash {}", hash))
                 .map_err(|err| {
-                    BasicErrorWith404::internal_with_code(
+                    AptosErrorResponse::internal(
                         err,
                         AptosErrorCode::InternalError,
-                        &latest_ledger_info,
+                        Some(&latest_ledger_info),
                     )
                 })?
                 .context(format!("Failed to find transaction with hash: {}", hash))
@@ -939,17 +198,18 @@ impl TransactionsApi {
         }
     }
 
-    async fn get_transaction_by_hash_inner(
+    pub(crate) async fn get_transaction_by_hash_inner(
         &self,
         accept_type: &AcceptType,
         hash: HashValue,
-    ) -> BasicResultWith404<Transaction> {
+    ) -> Result<AptosResponse<Transaction>, AptosErrorResponse> {
         let context = self.context.clone();
         let accept_type = accept_type.clone();
 
-        let (internal_ledger_info_opt, storage_ledger_info) =
-            api_spawn_blocking(move || context.get_latest_internal_and_storage_ledger_info())
-                .await?;
+        let (internal_ledger_info_opt, storage_ledger_info) = api_spawn_blocking(move || {
+            context.get_latest_internal_and_storage_ledger_info::<AptosErrorResponse>()
+        })
+        .await?;
         let storage_version = storage_ledger_info.ledger_version.into();
         let internal_indexer_version = internal_ledger_info_opt
             .as_ref()
@@ -961,10 +221,10 @@ impl TransactionsApi {
             .await
             .context(format!("Failed to get transaction by hash {}", hash))
             .map_err(|err| {
-                BasicErrorWith404::internal_with_code(
+                AptosErrorResponse::internal(
                     err,
                     AptosErrorCode::InternalError,
-                    &latest_ledger_info,
+                    Some(&latest_ledger_info),
                 )
             })?
             .context(format!("Failed to find transaction with hash: {}", hash))
@@ -977,21 +237,19 @@ impl TransactionsApi {
         .await
     }
 
-    fn get_transaction_by_version_inner(
+    pub(crate) fn get_transaction_by_version_inner(
         &self,
         accept_type: &AcceptType,
         version: U64,
-    ) -> BasicResultWith404<Transaction> {
-        let ledger_info = self.context.get_latest_ledger_info()?;
+    ) -> Result<AptosResponse<Transaction>, AptosErrorResponse> {
+        let ledger_info = self
+            .context
+            .get_latest_ledger_info::<AptosErrorResponse>()?;
         let txn_data = self
             .get_by_version(version.0, &ledger_info)
             .context(format!("Failed to get transaction by version {}", version))
             .map_err(|err| {
-                BasicErrorWith404::internal_with_code(
-                    err,
-                    AptosErrorCode::InternalError,
-                    &ledger_info,
-                )
+                AptosErrorResponse::internal(err, AptosErrorCode::InternalError, Some(&ledger_info))
             })?;
 
         match txn_data {
@@ -1011,14 +269,17 @@ impl TransactionsApi {
         accept_type: &AcceptType,
         transaction_data: TransactionData,
         ledger_info: &LedgerInfo,
-    ) -> BasicResultWith404<Transaction> {
+    ) -> Result<AptosResponse<Transaction>, AptosErrorResponse> {
         match accept_type {
             AcceptType::Json => {
-                let state_view = self.context.latest_state_view_poem(ledger_info)?;
+                let state_view = self
+                    .context
+                    .latest_state_view_typed::<AptosErrorResponse>(ledger_info)?;
                 let transaction = match transaction_data {
                     TransactionData::OnChain(txn) => {
-                        let timestamp =
-                            self.context.get_block_timestamp(ledger_info, txn.version)?;
+                        let timestamp = self
+                            .context
+                            .get_block_timestamp::<AptosErrorResponse>(ledger_info, txn.version)?;
                         state_view
                             .as_converter(
                                 self.context.db.clone(),
@@ -1027,10 +288,10 @@ impl TransactionsApi {
                             .try_into_onchain_transaction(timestamp, txn)
                             .context("Failed to convert on chain transaction to Transaction")
                             .map_err(|err| {
-                                BasicErrorWith404::internal_with_code(
+                                AptosErrorResponse::internal(
                                     err,
                                     AptosErrorCode::InternalError,
-                                    ledger_info,
+                                    Some(ledger_info),
                                 )
                             })?
                     },
@@ -1039,26 +300,22 @@ impl TransactionsApi {
                         .try_into_pending_transaction(*txn)
                         .context("Failed to convert on pending transaction to Transaction")
                         .map_err(|err| {
-                            BasicErrorWith404::internal_with_code(
+                            AptosErrorResponse::internal(
                                 err,
                                 AptosErrorCode::InternalError,
-                                ledger_info,
+                                Some(ledger_info),
                             )
                         })?,
                 };
 
-                BasicResponse::try_from_json((transaction, ledger_info, BasicResponseStatus::Ok))
+                AptosResponse::try_from_json(transaction, ledger_info)
             },
-            AcceptType::Bcs => BasicResponse::try_from_bcs((
-                transaction_data,
-                ledger_info,
-                BasicResponseStatus::Ok,
-            )),
+            AcceptType::Bcs => AptosResponse::try_from_bcs(transaction_data, ledger_info),
         }
     }
 
     /// Retrieves a transaction by ledger version
-    fn get_by_version(
+    pub(crate) fn get_by_version(
         &self,
         version: u64,
         ledger_info: &LedgerInfo,
@@ -1112,71 +369,73 @@ impl TransactionsApi {
     }
 
     /// List sequence number based transactions for an account
-    fn list_ordered_txns_by_account(
+    pub(crate) fn list_ordered_txns_by_account(
         &self,
         accept_type: &AcceptType,
         page: Page,
         address: Address,
-    ) -> BasicResultWith404<Vec<Transaction>> {
+    ) -> Result<AptosResponse<Vec<Transaction>>, AptosErrorResponse> {
         // Verify the account exists
         let account = Account::new(self.context.clone(), address, None, None, None)?;
 
         let latest_ledger_info = account.latest_ledger_info;
         // TODO: Return more specific errors from within this function.
-        let data = self.context.get_account_ordered_transactions(
-            address.into(),
-            page.start_option(),
-            page.limit(&latest_ledger_info)?,
-            account.ledger_version,
-            &latest_ledger_info,
-        )?;
-        match accept_type {
-            AcceptType::Json => BasicResponse::try_from_json((
-                self.context
-                    .render_transactions_non_sequential(&latest_ledger_info, data)?,
+        let data = self
+            .context
+            .get_account_ordered_transactions::<AptosErrorResponse>(
+                address.into(),
+                page.start_option(),
+                page.limit::<AptosErrorResponse>(&latest_ledger_info)?,
+                account.ledger_version,
                 &latest_ledger_info,
-                BasicResponseStatus::Ok,
-            )),
-            AcceptType::Bcs => {
-                BasicResponse::try_from_bcs((data, &latest_ledger_info, BasicResponseStatus::Ok))
-            },
+            )?;
+        match accept_type {
+            AcceptType::Json => AptosResponse::try_from_json(
+                self.context
+                    .render_transactions_non_sequential::<AptosErrorResponse>(
+                        &latest_ledger_info,
+                        data,
+                    )?,
+                &latest_ledger_info,
+            ),
+            AcceptType::Bcs => AptosResponse::try_from_bcs(data, &latest_ledger_info),
         }
     }
 
     /// List transaction summaries of committed transactions of an account
-    fn list_txn_summaries_by_account(
+    pub(crate) fn list_txn_summaries_by_account(
         &self,
         accept_type: &AcceptType,
         address: Address,
         start_version: Option<U64>,
         end_version: Option<U64>,
         limit: u16,
-    ) -> BasicResultWith404<Vec<TransactionSummary>> {
+    ) -> Result<AptosResponse<Vec<TransactionSummary>>, AptosErrorResponse> {
         let (latest_ledger_info, ledger_version) = self
             .context
-            .get_latest_ledger_info_and_verify_lookup_version(None)?;
+            .get_latest_ledger_info_and_verify_lookup_version::<AptosErrorResponse>(None)?;
 
         // TODO: Return more specific errors from within this function.
-        match self.context.get_account_transaction_summaries(
-            address.into(),
-            start_version.map(|v| v.into()),
-            end_version.map(|v| v.into()),
-            limit,
-            ledger_version,
-            &latest_ledger_info,
-        ) {
+        match self
+            .context
+            .get_account_transaction_summaries::<AptosErrorResponse>(
+                address.into(),
+                start_version.map(|v| v.into()),
+                end_version.map(|v| v.into()),
+                limit,
+                ledger_version,
+                &latest_ledger_info,
+            ) {
             Ok(data) => match accept_type {
-                AcceptType::Json => BasicResponse::try_from_json((
+                AcceptType::Json => AptosResponse::try_from_json(
                     self.context
-                        .render_transaction_summaries(&latest_ledger_info, data)?,
+                        .render_transaction_summaries::<AptosErrorResponse>(
+                            &latest_ledger_info,
+                            data,
+                        )?,
                     &latest_ledger_info,
-                    BasicResponseStatus::Ok,
-                )),
-                AcceptType::Bcs => BasicResponse::try_from_bcs((
-                    data,
-                    &latest_ledger_info,
-                    BasicResponseStatus::Ok,
-                )),
+                ),
+                AcceptType::Bcs => AptosResponse::try_from_bcs(data, &latest_ledger_info),
             },
             Err(e) => {
                 error!("list_all_txn_summaries_by_account error: {:?}", e);
@@ -1188,12 +447,12 @@ impl TransactionsApi {
     fn validate_script(
         ledger_info: &LedgerInfo,
         script: &Script,
-    ) -> Result<(), SubmitTransactionError> {
+    ) -> Result<(), AptosErrorResponse> {
         if script.code().is_empty() {
-            return Err(SubmitTransactionError::bad_request_with_code(
+            return Err(AptosErrorResponse::bad_request(
                 "Script payload bytecode must not be empty",
                 AptosErrorCode::InvalidInput,
-                ledger_info,
+                Some(ledger_info),
             ));
         }
 
@@ -1202,10 +461,10 @@ impl TransactionsApi {
             arg.verify(0)
                 .context("Transaction script function type arg invalid")
                 .map_err(|err| {
-                    SubmitTransactionError::bad_request_with_code(
+                    AptosErrorResponse::bad_request(
                         err,
                         AptosErrorCode::InvalidInput,
-                        ledger_info,
+                        Some(ledger_info),
                     )
                 })?;
         }
@@ -1213,40 +472,39 @@ impl TransactionsApi {
     }
 
     /// Parses a single signed transaction
-    fn get_signed_transaction(
+    pub(crate) fn get_signed_transaction(
         &self,
         ledger_info: &LedgerInfo,
         data: SubmitTransactionPost,
-    ) -> Result<SignedTransaction, SubmitTransactionError> {
+    ) -> Result<SignedTransaction, AptosErrorResponse> {
         match data {
             SubmitTransactionPost::Bcs(data) => {
                 let signed_transaction: SignedTransaction =
-                    bcs::from_bytes_with_limit(&data.0, Self::MAX_SIGNED_TRANSACTION_DEPTH)
+                    bcs::from_bytes_with_limit(&data, Self::MAX_SIGNED_TRANSACTION_DEPTH)
                         .context("Failed to deserialize input into SignedTransaction")
                         .map_err(|err| {
-                            SubmitTransactionError::bad_request_with_code(
+                            AptosErrorResponse::bad_request(
                                 err,
                                 AptosErrorCode::InvalidInput,
-                                ledger_info,
+                                Some(ledger_info),
                             )
                         })?;
                 // Verify the signed transaction
                 self.validate_signed_transaction_payload(ledger_info, &signed_transaction)?;
-                // TODO: Verify script args?
 
                 Ok(signed_transaction)
             },
             SubmitTransactionPost::Json(data) => self
                 .context
-                .latest_state_view_poem(ledger_info)?
+                .latest_state_view_typed::<AptosErrorResponse>(ledger_info)?
                 .as_converter(self.context.db.clone(), self.context.indexer_reader.clone())
-                .try_into_signed_transaction_poem(data.0, self.context.chain_id())
+                .try_into_signed_transaction(data, self.context.chain_id())
                 .context("Failed to create SignedTransaction from SubmitTransactionRequest")
                 .map_err(|err| {
-                    SubmitTransactionError::bad_request_with_code(
+                    AptosErrorResponse::bad_request(
                         err,
                         AptosErrorCode::InvalidInput,
-                        ledger_info,
+                        Some(ledger_info),
                     )
                 }),
         }
@@ -1257,7 +515,7 @@ impl TransactionsApi {
         &self,
         ledger_info: &LedgerInfo,
         signed_transaction: &SignedTransaction,
-    ) -> Result<(), SubmitTransactionError> {
+    ) -> Result<(), AptosErrorResponse> {
         match signed_transaction.payload() {
             TransactionPayload::EntryFunction(entry_function) => {
                 TransactionsApi::validate_entry_function_payload_format(
@@ -1284,10 +542,10 @@ impl TransactionsApi {
             // Deprecated. To avoid panics when malicios users submit this
             // payload, return an error.
             TransactionPayload::ModuleBundle(_) => {
-                return Err(SubmitTransactionError::bad_request_with_code(
+                return Err(AptosErrorResponse::bad_request(
                     "Module bundle payload has been removed",
                     AptosErrorCode::InvalidInput,
-                    ledger_info,
+                    Some(ledger_info),
                 ))
             },
             TransactionPayload::Payload(TransactionPayloadInner::V1 {
@@ -1297,10 +555,10 @@ impl TransactionsApi {
                 TransactionExecutable::Script(script) => {
                     TransactionsApi::validate_script(ledger_info, script)?;
                     if extra_config.is_multisig() {
-                        return Err(SubmitTransactionError::bad_request_with_code(
+                        return Err(AptosErrorResponse::bad_request(
                             "Script transaction payload must not be a multisig transaction",
                             AptosErrorCode::InvalidInput,
-                            ledger_info,
+                            Some(ledger_info),
                         ));
                     }
                 },
@@ -1312,43 +570,43 @@ impl TransactionsApi {
                 },
                 TransactionExecutable::Empty => {
                     if !extra_config.is_multisig() {
-                        return Err(SubmitTransactionError::bad_request_with_code(
+                        return Err(AptosErrorResponse::bad_request(
                             "Empty transaction payload must be a multisig transaction",
                             AptosErrorCode::InvalidInput,
-                            ledger_info,
+                            Some(ledger_info),
                         ));
                     }
                 },
                 TransactionExecutable::Encrypted => {
-                    return Err(SubmitTransactionError::bad_request_with_code(
+                    return Err(AptosErrorResponse::bad_request(
                         "Encrypted executable is not supported in PayloadV1",
                         AptosErrorCode::InvalidInput,
-                        ledger_info,
+                        Some(ledger_info),
                     ));
                 },
             },
             TransactionPayload::EncryptedPayload(payload) => {
                 if !self.context.node_config.api.allow_encrypted_txns_submission {
-                    return Err(SubmitTransactionError::bad_request_with_code(
+                    return Err(AptosErrorResponse::bad_request(
                         "Encrypted Transaction submission is not allowed yet",
                         AptosErrorCode::InvalidInput,
-                        ledger_info,
+                        Some(ledger_info),
                     ));
                 }
 
                 if !payload.is_encrypted() {
-                    return Err(SubmitTransactionError::bad_request_with_code(
+                    return Err(AptosErrorResponse::bad_request(
                         "Encrypted transaction must be in encrypted state",
                         AptosErrorCode::InvalidInput,
-                        ledger_info,
+                        Some(ledger_info),
                     ));
                 }
 
                 if let Err(e) = payload.verify(signed_transaction.sender()) {
-                    return Err(SubmitTransactionError::bad_request_with_code(
+                    return Err(AptosErrorResponse::bad_request(
                         e.context("Encrypted transaction payload could not be verified"),
                         AptosErrorCode::InvalidInput,
-                        ledger_info,
+                        Some(ledger_info),
                     ));
                 }
             },
@@ -1361,24 +619,24 @@ impl TransactionsApi {
     fn validate_entry_function_payload_format(
         ledger_info: &LedgerInfo,
         payload: &EntryFunction,
-    ) -> Result<(), SubmitTransactionError> {
+    ) -> Result<(), AptosErrorResponse> {
         verify_module_identifier(payload.module().name().as_str())
             .context("Transaction entry function module invalid")
             .map_err(|err| {
-                SubmitTransactionError::bad_request_with_code(
+                AptosErrorResponse::bad_request(
                     err,
                     AptosErrorCode::InvalidInput,
-                    ledger_info,
+                    Some(ledger_info),
                 )
             })?;
 
         verify_function_identifier(payload.function().as_str())
             .context("Transaction entry function name invalid")
             .map_err(|err| {
-                SubmitTransactionError::bad_request_with_code(
+                AptosErrorResponse::bad_request(
                     err,
                     AptosErrorCode::InvalidInput,
-                    ledger_info,
+                    Some(ledger_info),
                 )
             })?;
         for arg in payload.ty_args() {
@@ -1386,10 +644,10 @@ impl TransactionsApi {
             arg.verify(0)
                 .context("Transaction entry function type arg invalid")
                 .map_err(|err| {
-                    SubmitTransactionError::bad_request_with_code(
+                    AptosErrorResponse::bad_request(
                         err,
                         AptosErrorCode::InvalidInput,
-                        ledger_info,
+                        Some(ledger_info),
                     )
                 })?;
         }
@@ -1397,21 +655,21 @@ impl TransactionsApi {
     }
 
     /// Parses a batch of signed transactions
-    fn get_signed_transactions_batch(
+    pub(crate) fn get_signed_transactions_batch(
         &self,
         ledger_info: &LedgerInfo,
         data: SubmitTransactionsBatchPost,
-    ) -> Result<Vec<SignedTransaction>, SubmitTransactionError> {
+    ) -> Result<Vec<SignedTransaction>, AptosErrorResponse> {
         match data {
             SubmitTransactionsBatchPost::Bcs(data) => {
                 let signed_transactions: Vec<SignedTransaction> =
-                    bcs::from_bytes_with_limit(&data.0, Self::MAX_SIGNED_TRANSACTION_DEPTH)
+                    bcs::from_bytes_with_limit(&data, Self::MAX_SIGNED_TRANSACTION_DEPTH)
                         .context("Failed to deserialize input into SignedTransaction")
                         .map_err(|err| {
-                            SubmitTransactionError::bad_request_with_code(
+                            AptosErrorResponse::bad_request(
                                 err,
                                 AptosErrorCode::InvalidInput,
-                                ledger_info,
+                                Some(ledger_info),
                             )
                         })?;
                 // Verify each signed transaction
@@ -1421,19 +679,18 @@ impl TransactionsApi {
                 Ok(signed_transactions)
             }
             SubmitTransactionsBatchPost::Json(data) => data
-                .0
                 .into_iter()
                 .enumerate()
                 .map(|(index, txn)| {
-                    self.context.latest_state_view_poem(ledger_info)?
+                    self.context.latest_state_view_typed::<AptosErrorResponse>(ledger_info)?
                         .as_converter(self.context.db.clone(), self.context.indexer_reader.clone())
-                        .try_into_signed_transaction_poem(txn, self.context.chain_id())
+                        .try_into_signed_transaction(txn, self.context.chain_id())
                         .context(format!("Failed to create SignedTransaction from SubmitTransactionRequest at position {}", index))
                         .map_err(|err| {
-                            SubmitTransactionError::bad_request_with_code(
+                            AptosErrorResponse::bad_request(
                                 err,
                                 AptosErrorCode::InvalidInput,
-                                ledger_info,
+                                Some(ledger_info),
                             )
                         })
                 })
@@ -1498,12 +755,12 @@ impl TransactionsApi {
     }
 
     /// Submits a single transaction
-    async fn create(
+    pub(crate) async fn create(
         &self,
         accept_type: &AcceptType,
         ledger_info: &LedgerInfo,
         txn: SignedTransaction,
-    ) -> SubmitTransactionResult<PendingTransaction> {
+    ) -> Result<AptosResponse<PendingTransaction>, AptosErrorResponse> {
         match self.create_internal(txn.clone()).await {
             Ok(()) => match accept_type {
                 AcceptType::Json => {
@@ -1512,69 +769,53 @@ impl TransactionsApi {
                         .latest_state_view()
                         .context("Failed to read latest state checkpoint from DB")
                         .map_err(|e| {
-                            SubmitTransactionError::internal_with_code(
+                            AptosErrorResponse::internal(
                                 e,
                                 AptosErrorCode::InternalError,
-                                ledger_info,
+                                Some(ledger_info),
                             )
                         })?;
 
-                    // We provide the pending transaction so that users have the hash associated
                     let pending_txn = state_view
                             .as_converter(self.context.db.clone(), self.context.indexer_reader.clone())
-                            .try_into_pending_transaction_poem(txn)
+                            .try_into_pending_transaction_response(txn)
                             .context("Failed to build PendingTransaction from mempool response, even though it said the request was accepted")
-                            .map_err(|err| SubmitTransactionError::internal_with_code(
+                            .map_err(|err| AptosErrorResponse::internal(
                                 err,
                                 AptosErrorCode::InternalError,
-                                ledger_info,
+                                Some(ledger_info),
                             ))?;
-                    SubmitTransactionResponse::try_from_json((
+                    AptosResponse::try_from_json_with_status((
                         pending_txn,
                         ledger_info,
-                        SubmitTransactionResponseStatus::Accepted,
+                        axum::http::StatusCode::ACCEPTED,
                     ))
                 },
-                // With BCS, we don't return the pending transaction for efficiency, because there
-                // is no new information.  The hash can be retrieved by hashing the original
-                // transaction.
-                AcceptType::Bcs => SubmitTransactionResponse::try_from_bcs((
+                AcceptType::Bcs => AptosResponse::try_from_bcs_with_status((
                     (),
                     ledger_info,
-                    SubmitTransactionResponseStatus::Accepted,
+                    axum::http::StatusCode::ACCEPTED,
                 )),
             },
-            Err(error) => match error.error_code {
-                AptosErrorCode::InternalError => Err(
-                    SubmitTransactionError::internal_from_aptos_error(error, ledger_info),
-                ),
-                AptosErrorCode::VmError
-                | AptosErrorCode::SequenceNumberTooOld
-                | AptosErrorCode::InvalidTransactionUpdate => Err(
-                    SubmitTransactionError::bad_request_from_aptos_error(error, ledger_info),
-                ),
-                AptosErrorCode::MempoolIsFull => Err(
-                    SubmitTransactionError::insufficient_storage_from_aptos_error(
-                        error,
-                        ledger_info,
-                    ),
-                ),
-                _ => Err(SubmitTransactionError::internal_from_aptos_error(
-                    error,
-                    ledger_info,
-                )),
-            },
+            Err(error) => Err(AptosErrorResponse::new(
+                match error.error_code {
+                    AptosErrorCode::InternalError => axum::http::StatusCode::INTERNAL_SERVER_ERROR,
+                    AptosErrorCode::MempoolIsFull => axum::http::StatusCode::INSUFFICIENT_STORAGE,
+                    _ => axum::http::StatusCode::BAD_REQUEST,
+                },
+                error,
+                Some(ledger_info),
+            )),
         }
     }
 
     /// Submits a batch of transactions
-    async fn create_batch(
+    pub(crate) async fn create_batch(
         &self,
         accept_type: &AcceptType,
         ledger_info: &LedgerInfo,
         txns: Vec<SignedTransaction>,
-    ) -> SubmitTransactionsBatchResult<TransactionsBatchSubmissionResult> {
-        // Iterate through transactions keeping track of failures
+    ) -> Result<AptosResponse<TransactionsBatchSubmissionResult>, AptosErrorResponse> {
         let mut txn_failures = Vec::new();
         for (idx, txn) in txns.iter().enumerate() {
             if let Err(error) = self.create_internal(txn.clone()).await {
@@ -1585,27 +826,31 @@ impl TransactionsApi {
             }
         }
 
-        // Return the possible failures, and have a different success code for partial success
-        let response_status = if txn_failures.is_empty() {
-            SubmitTransactionsBatchResponseStatus::Accepted
+        if txn_failures.is_empty() {
+            AptosResponse::try_from_rust_value_with_status((
+                TransactionsBatchSubmissionResult {
+                    transaction_failures: txn_failures,
+                },
+                ledger_info,
+                axum::http::StatusCode::ACCEPTED,
+                accept_type,
+            ))
         } else if txn_failures.len() == txns.len() {
-            return Err(SubmitTransactionError::bad_request_with_code(
+            Err(AptosErrorResponse::bad_request(
                 "All transactions submitted were invalid.",
                 AptosErrorCode::InvalidInput,
-                ledger_info,
-            ));
+                Some(ledger_info),
+            ))
         } else {
-            SubmitTransactionsBatchResponseStatus::AcceptedPartial
-        };
-
-        SubmitTransactionsBatchResponse::try_from_rust_value((
-            TransactionsBatchSubmissionResult {
-                transaction_failures: txn_failures,
-            },
-            ledger_info,
-            response_status,
-            accept_type,
-        ))
+            AptosResponse::try_from_rust_value_with_status((
+                TransactionsBatchSubmissionResult {
+                    transaction_failures: txn_failures,
+                },
+                ledger_info,
+                axum::http::StatusCode::PARTIAL_CONTENT,
+                accept_type,
+            ))
+        }
     }
 
     // TODO: This function leverages a lot of types from aptos_types, use the
@@ -1620,14 +865,14 @@ impl TransactionsApi {
         accept_type: &AcceptType,
         ledger_info: LedgerInfo,
         txn: SignedTransaction,
-    ) -> SimulateTransactionResult<Vec<UserTransaction>> {
+    ) -> Result<AptosResponse<Vec<UserTransaction>>, AptosErrorResponse> {
         // The caller must ensure that the signature is not valid, as otherwise
         // a malicious actor could execute the transaction without their knowledge
         if txn.verify_signature().is_ok() {
-            return Err(SubmitTransactionError::bad_request_with_code(
+            return Err(AptosErrorResponse::bad_request(
                 "Simulated transactions must not have a valid signature",
                 AptosErrorCode::InvalidInput,
-                &ledger_info,
+                Some(&ledger_info),
             ));
         }
 
@@ -1636,15 +881,17 @@ impl TransactionsApi {
             .payload_ref()
             .is_encrypted_variant()
         {
-            return Err(SubmitTransactionError::bad_request_with_code(
+            return Err(AptosErrorResponse::bad_request(
                 "Encrypted transactions cannot be simulated",
                 AptosErrorCode::InvalidInput,
-                &ledger_info,
+                Some(&ledger_info),
             ));
         }
 
         // Simulate transaction
-        let state_view = self.context.latest_state_view_poem(&ledger_info)?;
+        let state_view = self
+            .context
+            .latest_state_view_typed::<AptosErrorResponse>(&ledger_info)?;
         let (vm_status, output) =
             AptosSimulationVM::create_vm_and_simulate_signed_transaction(&txn, &state_view);
         let version = ledger_info.version();
@@ -1741,7 +988,10 @@ impl TransactionsApi {
             AcceptType::Json => {
                 let transactions = self
                     .context
-                    .render_transactions_non_sequential(&ledger_info, vec![simulated_txn])?;
+                    .render_transactions_non_sequential::<AptosErrorResponse>(
+                        &ledger_info,
+                        vec![simulated_txn],
+                    )?;
 
                 // Users can only make requests to simulate UserTransactions, so unpack
                 // the Vec<Transaction> into Vec<UserTransaction>.
@@ -1765,23 +1015,17 @@ impl TransactionsApi {
                             user_transactions.push(user_txn);
                         },
                         _ => {
-                            return Err(SubmitTransactionError::internal_with_code(
+                            return Err(AptosErrorResponse::internal(
                                 "Simulation transaction resulted in a non-UserTransaction",
                                 AptosErrorCode::InternalError,
-                                &ledger_info,
+                                Some(&ledger_info),
                             ))
                         },
                     }
                 }
-                BasicResponse::try_from_json((
-                    user_transactions,
-                    &ledger_info,
-                    BasicResponseStatus::Ok,
-                ))
+                AptosResponse::try_from_json(user_transactions, &ledger_info)
             },
-            AcceptType::Bcs => {
-                BasicResponse::try_from_bcs((simulated_txn, &ledger_info, BasicResponseStatus::Ok))
-            },
+            AcceptType::Bcs => AptosResponse::try_from_bcs(simulated_txn, &ledger_info),
         };
 
         result.map(|r| r.with_gas_used(Some(output.gas_used())))
@@ -1792,68 +1036,80 @@ impl TransactionsApi {
         &self,
         accept_type: &AcceptType,
         request: EncodeSubmissionRequest,
-    ) -> BasicResult<HexEncodedBytes> {
+    ) -> Result<AptosResponse<HexEncodedBytes>, AptosErrorResponse> {
         // We don't want to encourage people to use this API if they can sign the request directly
         if accept_type == &AcceptType::Bcs {
-            return Err(BasicError::bad_request_with_code_no_info(
+            return Err(AptosErrorResponse::bad_request(
                 "BCS is not supported for encode submission",
                 AptosErrorCode::BcsNotSupported,
+                None,
             ));
         }
 
-        let ledger_info = self.context.get_latest_ledger_info()?;
-        let state_view = self.context.latest_state_view_poem(&ledger_info)?;
+        let ledger_info = self
+            .context
+            .get_latest_ledger_info::<AptosErrorResponse>()?;
+        let state_view = self
+            .context
+            .latest_state_view_typed::<AptosErrorResponse>(&ledger_info)?;
         let raw_txn: RawTransaction = state_view
             .as_converter(self.context.db.clone(), self.context.indexer_reader.clone())
-            .try_into_raw_transaction_poem(request.transaction, self.context.chain_id())
+            .try_into_raw_transaction(request.transaction, self.context.chain_id())
             .context("The given transaction is invalid")
             .map_err(|err| {
-                BasicError::bad_request_with_code(err, AptosErrorCode::InvalidInput, &ledger_info)
+                AptosErrorResponse::bad_request(
+                    err,
+                    AptosErrorCode::InvalidInput,
+                    Some(&ledger_info),
+                )
             })?;
 
         let raw_message = match request.secondary_signers {
-            Some(secondary_signer_addresses) => signing_message(
-                &RawTransactionWithData::new_multi_agent(
+            Some(secondary_signer_addresses) => {
+                signing_message(&RawTransactionWithData::new_multi_agent(
                     raw_txn,
                     secondary_signer_addresses
                         .into_iter()
                         .map(|v| v.into())
                         .collect(),
-                ),
-            )
-            .context("Invalid transaction to generate signing message")
-            .map_err(|err| {
-                BasicError::bad_request_with_code(err, AptosErrorCode::InvalidInput, &ledger_info)
-            })?,
+                ))
+                .context("Invalid transaction to generate signing message")
+                .map_err(|err| {
+                    AptosErrorResponse::bad_request(
+                        err,
+                        AptosErrorCode::InvalidInput,
+                        Some(&ledger_info),
+                    )
+                })?
+            },
             None => raw_txn
                 .signing_message()
                 .context("Invalid transaction to generate signing message")
                 .map_err(|err| {
-                    BasicError::bad_request_with_code(
+                    AptosErrorResponse::bad_request(
                         err,
                         AptosErrorCode::InvalidInput,
-                        &ledger_info,
+                        Some(&ledger_info),
                     )
                 })?,
         };
 
-        BasicResponse::try_from_json((
-            HexEncodedBytes::from(raw_message),
-            &ledger_info,
-            BasicResponseStatus::Ok,
-        ))
+        AptosResponse::try_from_json(HexEncodedBytes::from(raw_message), &ledger_info)
     }
 
-    fn list_auxiliary_infos(
+    pub(crate) fn list_auxiliary_infos(
         &self,
         accept_type: &AcceptType,
         page: Page,
-    ) -> BasicResultWith404<Vec<PersistedAuxiliaryInfo>> {
-        let latest_ledger_info = self.context.get_latest_ledger_info()?;
+    ) -> Result<AptosResponse<Vec<PersistedAuxiliaryInfo>>, AptosErrorResponse> {
+        let latest_ledger_info = self
+            .context
+            .get_latest_ledger_info::<AptosErrorResponse>()?;
         let ledger_version = latest_ledger_info.ledger_version;
 
-        let limit = page.limit(&latest_ledger_info)?;
-        let start_version = page.compute_start(limit, ledger_version.0, &latest_ledger_info)?;
+        let limit = page.limit::<AptosErrorResponse>(&latest_ledger_info)?;
+        let start_version =
+            page.compute_start::<AptosErrorResponse>(limit, ledger_version.0, &latest_ledger_info)?;
 
         // Use iterator for more efficient batch retrieval
         let iterator = self
@@ -1862,10 +1118,10 @@ impl TransactionsApi {
             .get_persisted_auxiliary_info_iterator(start_version, limit as usize)
             .context("Failed to get auxiliary info iterator from storage")
             .map_err(|err| {
-                BasicErrorWith404::internal_with_code(
+                AptosErrorResponse::internal(
                     err,
                     AptosErrorCode::InternalError,
-                    &latest_ledger_info,
+                    Some(&latest_ledger_info),
                 )
             })?;
 
@@ -1874,10 +1130,10 @@ impl TransactionsApi {
             let raw_aux_info = result
                 .context("Failed to read auxiliary info from iterator")
                 .map_err(|err| {
-                    BasicErrorWith404::internal_with_code(
+                    AptosErrorResponse::internal(
                         err,
                         AptosErrorCode::InternalError,
-                        &latest_ledger_info,
+                        Some(&latest_ledger_info),
                     )
                 })?;
             raw_auxiliary_infos.push(raw_aux_info);
@@ -1890,46 +1146,38 @@ impl TransactionsApi {
                     .into_iter()
                     .map(PersistedAuxiliaryInfo::from)
                     .collect();
-                BasicResponse::try_from_json((
-                    api_auxiliary_infos,
-                    &latest_ledger_info,
-                    BasicResponseStatus::Ok,
-                ))
+                AptosResponse::try_from_json(api_auxiliary_infos, &latest_ledger_info)
             },
             AcceptType::Bcs => {
                 // Use raw core types for BCS (backward compatible, versioned enum)
-                BasicResponse::try_from_bcs((
-                    raw_auxiliary_infos,
-                    &latest_ledger_info,
-                    BasicResponseStatus::Ok,
-                ))
+                AptosResponse::try_from_bcs(raw_auxiliary_infos, &latest_ledger_info)
             },
         }
     }
 }
 
-fn override_gas_parameters(
-    signed_txn: &SignedTransaction,
-    max_gas_amount: Option<u64>,
-    gas_unit_price: Option<u64>,
-) -> SignedTransaction {
-    let payload = signed_txn.payload();
+/// Inner implementation of estimate_gas_price that returns Axum-native types.
 
-    let raw_txn = RawTransaction::new(
-        signed_txn.sender(),
-        signed_txn.sequence_number(),
-        payload.clone(),
-        max_gas_amount.unwrap_or_else(|| signed_txn.max_gas_amount()),
-        gas_unit_price.unwrap_or_else(|| signed_txn.gas_unit_price()),
-        signed_txn.expiration_timestamp_secs(),
-        signed_txn.chain_id(),
-    );
+pub(crate) fn estimate_gas_price_inner(
+    context: &Arc<Context>,
+    accept_type: &AcceptType,
+) -> Result<AptosResponse<GasEstimation>, AptosErrorResponse> {
+    let ledger_info = context.get_latest_ledger_info::<AptosErrorResponse>()?;
+    let gas_estimation = context.estimate_gas_price::<AptosErrorResponse>(&ledger_info)?;
+    TransactionsApi::log_gas_estimation(&gas_estimation);
 
-    // TODO: Check that signature is null, this would just be helpful for downstream use
-    SignedTransaction::new_signed_transaction(raw_txn, signed_txn.authenticator())
+    match accept_type {
+        AcceptType::Json => AptosResponse::try_from_json(gas_estimation, &ledger_info),
+        AcceptType::Bcs => {
+            let gas_estimation_bcs = GasEstimationBcs {
+                gas_estimate: gas_estimation.gas_estimate,
+            };
+            AptosResponse::try_from_bcs(gas_estimation_bcs, &ledger_info)
+        },
+    }
 }
 
-enum GetByVersionResponse {
+pub(crate) enum GetByVersionResponse {
     VersionTooNew,
     VersionTooOld,
     Found(TransactionData),

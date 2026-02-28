@@ -12,6 +12,12 @@ publish = { workspace = true }
 repository = { workspace = true }
 rust-version = { workspace = true }
 
+[package.metadata.cargo-machete]
+ignored = ["mime"]
+
+[features]
+failpoints = ["fail/failpoints"]
+
 [dependencies]
 anyhow = { workspace = true }
 aptos-api-types = { workspace = true }
@@ -29,11 +35,14 @@ aptos-sdk = { workspace = true }
 aptos-storage-interface = { workspace = true }
 aptos-types = { workspace = true }
 aptos-vm = { workspace = true }
+axum = { workspace = true }
 bcs = { workspace = true }
 bytes = { workspace = true }
 fail = { workspace = true }
 futures = { workspace = true }
 hex = { workspace = true }
+http = "1"
+hyper-util = { workspace = true }
 itertools = { workspace = true }
 mime = { workspace = true }
 mini-moka = { workspace = true }
@@ -41,13 +50,14 @@ move-core-types = { workspace = true }
 num_cpus = { workspace = true }
 once_cell = { workspace = true }
 paste = { workspace = true }
-poem = { workspace = true }
-poem-openapi = { workspace = true }
 regex = { workspace = true }
 rstest = { workspace = true }
+rustls-pemfile = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
 tokio = { workspace = true }
+tokio-rustls = { workspace = true }
+tower-http = { workspace = true }
 
 [dev-dependencies]
 aptos-api-test-context = { workspace = true }
@@ -65,10 +75,3 @@ proptest = { workspace = true }
 rand = { workspace = true }
 regex = { workspace = true }
 reqwest = { workspace = true }
-warp = { workspace = true }
-
-[features]
-failpoints = ["fail/failpoints"]
-
-[package.metadata.cargo-machete]
-ignored = ["mime"]

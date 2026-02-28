@@ -1,13 +1,9 @@
 // Copyright (c) Aptos Foundation
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
-mod fake_context;
-
 use anyhow::Result;
-use aptos_api::{get_api_service, spec::get_spec};
 use clap::{Parser, ValueEnum};
-use fake_context::get_fake_context;
-use std::{path::PathBuf, sync::Arc};
+use std::path::PathBuf;
 
 #[derive(ValueEnum, Clone, Debug)]
 pub enum OutputFormat {
@@ -46,14 +42,12 @@ pub struct Args {
 pub fn main() -> Result<()> {
     let args = Args::parse();
 
-    let api_service = get_api_service(Arc::new(get_fake_context()));
-
     let spec = match args.output_args.format {
-        OutputFormat::Json => get_spec(&api_service, false),
-        OutputFormat::Yaml => get_spec(&api_service, true),
+        OutputFormat::Json => include_str!("../../doc/spec.json"),
+        OutputFormat::Yaml => include_str!("../../doc/spec.yaml"),
     };
 
-    args.output_args.write(&spec)
+    args.output_args.write(spec)
 }
 
 #[test]

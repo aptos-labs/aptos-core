@@ -2,12 +2,11 @@
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 use crate::{HexEncodedBytes, MoveType, VerifyInput, VerifyInputWithRecursion};
-use poem_openapi::Object;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
 /// Table Item request for the GetTableItem API
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, Object)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct TableItemRequest {
     pub key_type: MoveType,
     pub value_type: MoveType,
@@ -23,7 +22,7 @@ impl VerifyInput for TableItemRequest {
 }
 
 /// Table Item request for the GetTableItemRaw API
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, Object)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct RawTableItemRequest {
     pub key: HexEncodedBytes,
 }

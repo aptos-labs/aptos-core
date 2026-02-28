@@ -3,7 +3,6 @@
 
 use crate::{LedgerInfo, U64};
 use aptos_config::config::RoleType;
-use poem_openapi::Object as PoemObject;
 use serde::{Deserialize, Serialize};
 
 // The data in IndexResponse is flattened into a single JSON map to offer
@@ -11,7 +10,7 @@ use serde::{Deserialize, Serialize};
 
 /// The struct holding all data returned to the client by the
 /// index endpoint (i.e., GET "/").  Only for responding in JSON
-#[derive(Clone, Debug, Deserialize, PartialEq, Eq, PoemObject, Serialize)]
+#[derive(Clone, Debug, Deserialize, PartialEq, Eq, Serialize)]
 pub struct IndexResponse {
     /// Chain ID of the current chain
     pub chain_id: u8,
@@ -26,8 +25,8 @@ pub struct IndexResponse {
     /// Git hash of the build of the API endpoint.  Can be used to determine the exact
     /// software version used by the API endpoint.
     pub git_hash: Option<String>,
-    /// Per-epoch transaction encryption key (hex-encoded)
-    #[serde(skip_serializing_if = "Option::is_none")]
+    /// Per-epoch transaction encryption key (hex-encoded).
+    /// Always included in JSON responses (as null when absent) for backward compatibility.
     pub encryption_key: Option<String>,
 }
 
@@ -56,7 +55,7 @@ impl IndexResponse {
 /// The struct holding all data returned to the client by the
 /// index endpoint (i.e., GET "/").  This is just for the BCS response and
 /// cannot change
-#[derive(Clone, Debug, Deserialize, PartialEq, Eq, PoemObject, Serialize)]
+#[derive(Clone, Debug, Deserialize, PartialEq, Eq, Serialize)]
 pub struct IndexResponseBcs {
     /// Chain ID of the current chain
     pub chain_id: u8,

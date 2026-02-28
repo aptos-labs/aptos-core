@@ -3,19 +3,15 @@
 
 use crate::{
     accept_type::AcceptType,
-    context::{api_spawn_blocking, Context},
-    failpoint::fail_point_poem,
+    context::Context,
     page::determine_limit,
-    response::{
-        account_not_found, resource_not_found, struct_field_not_found, BadRequestError,
-        BasicErrorWith404, BasicResponse, BasicResponseStatus, BasicResultWith404, InternalError,
-    },
-    ApiTags,
+    response::{account_not_found, resource_not_found, struct_field_not_found},
+    response_axum::{AptosErrorResponse, AptosResponse},
 };
 use anyhow::Context as AnyhowContext;
 use aptos_api_types::{
     AccountData, Address, AptosErrorCode, AsConverter, AssetType, LedgerInfo, MoveModuleBytecode,
-    MoveModuleId, MoveResource, MoveStructTag, StateKeyWrapper, U64,
+    MoveModuleId, MoveResource, MoveStructTag, U64,
 };
 use aptos_sdk::types::{get_paired_fa_metadata_address, get_paired_fa_primary_store_address};
 use aptos_types::{
@@ -29,193 +25,7 @@ use aptos_types::{
 use move_core_types::{
     identifier::Identifier, language_storage::StructTag, move_resource::MoveStructType,
 };
-use poem_openapi::{
-    param::{Path, Query},
-    OpenApi,
-};
 use std::{collections::BTreeMap, convert::TryInto, str::FromStr, sync::Arc};
-
-/// API for accounts, their associated resources, and modules
-pub struct AccountsApi {
-    pub context: Arc<Context>,
-}
-
-#[OpenApi]
-impl AccountsApi {
-    /// Get account
-    ///
-    /// Return the authentication key and the sequence number for an account
-    /// address. Optionally, a ledger version can be specified. If the ledger
-    /// version is not specified in the request, the latest ledger version is used.
-    #[oai(
-        path = "/accounts/:address",
-        method = "get",
-        operation_id = "get_account",
-        tag = "ApiTags::Accounts"
-    )]
-    async fn get_account(
-        &self,
-        accept_type: AcceptType,
-        /// Address of account with or without a `0x` prefix
-        address: Path<Address>,
-        /// Ledger version to get state of account
-        ///
-        /// If not provided, it will be the latest version
-        ledger_version: Query<Option<U64>>,
-    ) -> BasicResultWith404<AccountData> {
-        fail_point_poem("endpoint_get_account")?;
-        self.context
-            .check_api_output_enabled("Get account", &accept_type)?;
-
-        let context = self.context.clone();
-        api_spawn_blocking(move || {
-            let account = Account::new(context, address.0, ledger_version.0, None, None)?;
-            account.account(&accept_type)
-        })
-        .await
-    }
-
-    /// Get account resources
-    ///
-    /// Retrieves all account resources for a given account and a specific ledger version.  If the
-    /// ledger version is not specified in the request, the latest ledger version is used.
-    ///
-    /// The Aptos nodes prune account state history, via a configurable time window.
-    /// If the requested ledger version has been pruned, the server responds with a 410.
-    #[oai(
-        path = "/accounts/:address/resources",
-        method = "get",
-        operation_id = "get_account_resources",
-        tag = "ApiTags::Accounts"
-    )]
-    async fn get_account_resources(
-        &self,
-        accept_type: AcceptType,
-        /// Address of account with or without a `0x` prefix
-        address: Path<Address>,
-        /// Ledger version to get state of account
-        ///
-        /// If not provided, it will be the latest version
-        ledger_version: Query<Option<U64>>,
-        /// Cursor specifying where to start for pagination
-        ///
-        /// This cursor cannot be derived manually client-side. Instead, you must
-        /// call this endpoint once without this query parameter specified, and
-        /// then use the cursor returned in the X-Aptos-Cursor header in the
-        /// response.
-        start: Query<Option<StateKeyWrapper>>,
-        /// Max number of account resources to retrieve
-        ///
-        /// If not provided, defaults to default page size.
-        limit: Query<Option<u16>>,
-    ) -> BasicResultWith404<Vec<MoveResource>> {
-        fail_point_poem("endpoint_get_account_resources")?;
-        self.context
-            .check_api_output_enabled("Get account resources", &accept_type)?;
-
-        let context = self.context.clone();
-        api_spawn_blocking(move || {
-            let account = Account::new(
-                context,
-                address.0,
-                ledger_version.0,
-                start.0.map(StateKey::from),
-                limit.0,
-            )?;
-            account.resources(&accept_type)
-        })
-        .await
-    }
-
-    /// Get account balance
-    ///
-    /// Retrieves account balance for coins / fungible asset (only for primary fungible asset store)
-    /// for a given account, asset type and a specific ledger version.  If the
-    /// ledger version is not specified in the request, the latest ledger version is used.
-    ///
-    /// The Aptos nodes prune account state history, via a configurable time window.
-    /// If the requested ledger version has been pruned, the server responds with a 410.
-    #[oai(
-        path = "/accounts/:address/balance/:asset_type",
-        method = "get",
-        operation_id = "get_account_balance",
-        tag = "ApiTags::Accounts"
-    )]
-    async fn get_account_balance(
-        &self,
-        accept_type: AcceptType,
-        /// Address of account with or without a `0x` prefix
-        address: Path<Address>,
-        asset_type: Path<AssetType>,
-        /// Ledger version to get state of account
-        ///
-        /// If not provided, it will be the latest version
-        ledger_version: Query<Option<U64>>,
-    ) -> BasicResultWith404<u64> {
-        fail_point_poem("endpoint_get_account_balance")?;
-        self.context
-            .check_api_output_enabled("Get account balance", &accept_type)?;
-
-        let context = self.context.clone();
-        api_spawn_blocking(move || {
-            let account = Account::new(context, address.0, ledger_version.0, None, None)?;
-            account.balance(asset_type.0, &accept_type)
-        })
-        .await
-    }
-
-    /// Get account modules
-    ///
-    /// Retrieves all account modules' bytecode for a given account at a specific ledger version.
-    /// If the ledger version is not specified in the request, the latest ledger version is used.
-    ///
-    /// The Aptos nodes prune account state history, via a configurable time window.
-    /// If the requested ledger version has been pruned, the server responds with a 410.
-    #[oai(
-        path = "/accounts/:address/modules",
-        method = "get",
-        operation_id = "get_account_modules",
-        tag = "ApiTags::Accounts"
-    )]
-    async fn get_account_modules(
-        &self,
-        accept_type: AcceptType,
-        /// Address of account with or without a `0x` prefix
-        address: Path<Address>,
-        /// Ledger version to get state of account
-        ///
-        /// If not provided, it will be the latest version
-        ledger_version: Query<Option<U64>>,
-        /// Cursor specifying where to start for pagination
-        ///
-        /// This cursor cannot be derived manually client-side. Instead, you must
-        /// call this endpoint once without this query parameter specified, and
-        /// then use the cursor returned in the X-Aptos-Cursor header in the
-        /// response.
-        start: Query<Option<StateKeyWrapper>>,
-        /// Max number of account modules to retrieve
-        ///
-        /// If not provided, defaults to default page size.
-        limit: Query<Option<u16>>,
-    ) -> BasicResultWith404<Vec<MoveModuleBytecode>> {
-        fail_point_poem("endpoint_get_account_modules")?;
-        self.context
-            .check_api_output_enabled("Get account modules", &accept_type)?;
-
-        let context = self.context.clone();
-        api_spawn_blocking(move || {
-            let account = Account::new(
-                context,
-                address.0,
-                ledger_version.0,
-                start.0.map(StateKey::from),
-                limit.0,
-            )?;
-            account.modules(&accept_type)
-        })
-        .await
-    }
-}
 
 /// A struct representing Account related lookups for resources and modules
 pub struct Account {
@@ -239,9 +49,9 @@ impl Account {
         requested_ledger_version: Option<U64>,
         start: Option<StateKey>,
         limit: Option<u16>,
-    ) -> Result<Self, BasicErrorWith404> {
+    ) -> Result<Self, AptosErrorResponse> {
         let (latest_ledger_info, requested_version) = context
-            .get_latest_ledger_info_and_verify_lookup_version(
+            .get_latest_ledger_info_and_verify_lookup_version::<AptosErrorResponse>(
                 requested_ledger_version.map(|inner| inner.0),
             )?;
 
@@ -261,18 +71,20 @@ impl Account {
     ///
     /// * JSON: Return a JSON encoded version of [`AccountData`]
     /// * BCS: Return a BCS encoded version of [`AccountData`]
-    pub fn account(self, accept_type: &AcceptType) -> BasicResultWith404<AccountData> {
-        // Retrieve the Account resource and convert it accordingly
+    pub fn account(
+        self,
+        accept_type: &AcceptType,
+    ) -> Result<AptosResponse<AccountData>, AptosErrorResponse> {
         let state_value_opt = self.get_account_resource()?;
 
         let account_resource = if let Some(state_value) = &state_value_opt {
             let account_resource: AccountResource = bcs::from_bytes(state_value)
                 .context("Internal error deserializing response from DB")
                 .map_err(|err| {
-                    BasicErrorWith404::internal_with_code(
+                    AptosErrorResponse::internal(
                         err,
                         AptosErrorCode::InternalError,
-                        &self.latest_ledger_info,
+                        Some(&self.latest_ledger_info),
                     )
                 })?;
             account_resource
@@ -284,16 +96,16 @@ impl Account {
                 )
                 .context("Failed to check if stateless account is enabled")
                 .map_err(|_| {
-                    BasicErrorWith404::internal_with_code(
+                    AptosErrorResponse::internal(
                         "Failed to check if stateless account is enabled",
                         AptosErrorCode::InternalError,
-                        &self.latest_ledger_info,
+                        Some(&self.latest_ledger_info),
                     )
                 })?;
             if stateless_account_enabled {
                 AccountResource::new_stateless(*self.address.inner())
             } else {
-                Err(account_not_found(
+                Err(account_not_found::<AptosErrorResponse>(
                     self.address,
                     self.ledger_version,
                     &self.latest_ledger_info,
@@ -301,18 +113,14 @@ impl Account {
             }
         };
 
-        // Convert the AccountResource into the summary object AccountData
         match accept_type {
-            AcceptType::Json => BasicResponse::try_from_json((
-                account_resource.into(),
-                &self.latest_ledger_info,
-                BasicResponseStatus::Ok,
-            )),
-            AcceptType::Bcs => BasicResponse::try_from_encoded((
+            AcceptType::Json => {
+                AptosResponse::try_from_json(account_resource.into(), &self.latest_ledger_info)
+            },
+            AcceptType::Bcs => AptosResponse::try_from_encoded(
                 state_value_opt.unwrap_or_else(|| bcs::to_bytes(&account_resource).unwrap()),
                 &self.latest_ledger_info,
-                BasicResponseStatus::Ok,
-            )),
+            ),
         }
     }
 
@@ -320,26 +128,25 @@ impl Account {
         &self,
         asset_type: AssetType,
         accept_type: &AcceptType,
-    ) -> BasicResultWith404<u64> {
+    ) -> Result<AptosResponse<u64>, AptosErrorResponse> {
         let (fa_metadata_address, mut balance) = match asset_type {
             AssetType::Coin(move_struct_tag) => {
                 let coin_store_type_tag =
                     StructTag::from_str(&format!("0x1::coin::CoinStore<{}>", move_struct_tag))
                         .map_err(|err| {
-                            BasicErrorWith404::internal_with_code(
+                            AptosErrorResponse::internal(
                                 err,
                                 AptosErrorCode::InternalError,
-                                &self.latest_ledger_info,
+                                Some(&self.latest_ledger_info),
                             )
                         })?;
-                // query coin balance
-                let state_value = self.context.get_state_value_poem(
+                let state_value = self.context.get_state_value_typed::<AptosErrorResponse>(
                     &StateKey::resource(&self.address.into(), &coin_store_type_tag).map_err(
                         |err| {
-                            BasicErrorWith404::internal_with_code(
+                            AptosErrorResponse::internal(
                                 err,
                                 AptosErrorCode::InternalError,
-                                &self.latest_ledger_info,
+                                Some(&self.latest_ledger_info),
                             )
                         },
                     )?,
@@ -350,10 +157,10 @@ impl Account {
                     None => 0,
                     Some(bytes) => bcs::from_bytes::<CoinStoreResourceUntyped>(&bytes)
                         .map_err(|err| {
-                            BasicErrorWith404::internal_with_code(
+                            AptosErrorResponse::internal(
                                 err,
                                 AptosErrorCode::InternalError,
-                                &self.latest_ledger_info,
+                                Some(&self.latest_ledger_info),
                             )
                         })?
                         .coin(),
@@ -367,7 +174,7 @@ impl Account {
         };
         let primary_fungible_store_address =
             get_paired_fa_primary_store_address(self.address.into(), fa_metadata_address);
-        if let Some(data_blob) = self.context.get_state_value_poem(
+        if let Some(data_blob) = self.context.get_state_value_typed::<AptosErrorResponse>(
             &StateKey::resource_group(
                 &primary_fungible_store_address,
                 &ObjectGroupResource::struct_tag(),
@@ -380,10 +187,10 @@ impl Account {
                 {
                     let fa_store_resource = bcs::from_bytes::<FungibleStoreResource>(fa_store)
                         .map_err(|err| {
-                            BasicErrorWith404::internal_with_code(
+                            AptosErrorResponse::internal(
                                 err,
                                 AptosErrorCode::InternalError,
-                                &self.latest_ledger_info,
+                                Some(&self.latest_ledger_info),
                             )
                         })?;
                     if fa_store_resource.balance != 0 {
@@ -392,16 +199,15 @@ impl Account {
                         .group
                         .get(&ConcurrentFungibleBalanceResource::struct_tag())
                     {
-                        // query potential concurrent fa balance
                         let concurrent_fa_balance_resource =
                             bcs::from_bytes::<ConcurrentFungibleBalanceResource>(
                                 concurrent_fa_balance,
                             )
                             .map_err(|err| {
-                                BasicErrorWith404::internal_with_code(
+                                AptosErrorResponse::internal(
                                     err,
                                     AptosErrorCode::InternalError,
-                                    &self.latest_ledger_info,
+                                    Some(&self.latest_ledger_info),
                                 )
                             })?;
                         balance += concurrent_fa_balance_resource.balance();
@@ -410,32 +216,30 @@ impl Account {
             }
         }
         match accept_type {
-            AcceptType::Json => BasicResponse::try_from_json((
-                balance,
-                &self.latest_ledger_info,
-                BasicResponseStatus::Ok,
-            )),
-            AcceptType::Bcs => BasicResponse::try_from_encoded((
+            AcceptType::Json => AptosResponse::try_from_json(balance, &self.latest_ledger_info),
+            AcceptType::Bcs => AptosResponse::try_from_encoded(
                 bcs::to_bytes(&balance).unwrap(),
                 &self.latest_ledger_info,
-                BasicResponseStatus::Ok,
-            )),
+            ),
         }
     }
 
     /// Retrieves the account resource for the associated account
-    fn get_account_resource(&self) -> Result<Option<Vec<u8>>, BasicErrorWith404> {
+    fn get_account_resource(&self) -> Result<Option<Vec<u8>>, AptosErrorResponse> {
         let state_key =
             StateKey::resource_typed::<AccountResource>(self.address.inner()).map_err(|e| {
-                BasicErrorWith404::internal_with_code(
+                AptosErrorResponse::internal(
                     e,
                     AptosErrorCode::InternalError,
-                    &self.latest_ledger_info,
+                    Some(&self.latest_ledger_info),
                 )
             })?;
 
-        self.context
-            .get_state_value_poem(&state_key, self.ledger_version, &self.latest_ledger_info)
+        self.context.get_state_value_typed::<AptosErrorResponse>(
+            &state_key,
+            self.ledger_version,
+            &self.latest_ledger_info,
+        )
     }
 
     /// Retrieves the move resources associated with the account
@@ -445,7 +249,10 @@ impl Account {
     ///
     /// Note: For the BCS response, if results are being returned in pages, i.e. with the
     /// `start` and `limit` query parameters, the results will only be sorted within each page.
-    pub fn resources(self, accept_type: &AcceptType) -> BasicResultWith404<Vec<MoveResource>> {
+    pub fn resources(
+        self,
+        accept_type: &AcceptType,
+    ) -> Result<AptosResponse<Vec<MoveResource>>, AptosErrorResponse> {
         let max_account_resources_page_size = self.context.max_account_resources_page_size();
         let (resources, next_state_key) = self
             .context
@@ -453,8 +260,7 @@ impl Account {
                 self.address.into(),
                 self.start.as_ref(),
                 self.ledger_version,
-                // Just use the max as the default
-                determine_limit(
+                determine_limit::<AptosErrorResponse>(
                     self.limit,
                     max_account_resources_page_size,
                     max_account_resources_page_size,
@@ -463,47 +269,37 @@ impl Account {
             )
             .context("Failed to get resources from storage")
             .map_err(|err| {
-                BasicErrorWith404::internal_with_code(
+                AptosErrorResponse::internal(
                     err,
                     AptosErrorCode::InternalError,
-                    &self.latest_ledger_info,
+                    Some(&self.latest_ledger_info),
                 )
             })?;
 
         match accept_type {
             AcceptType::Json => {
-                // Resolve the BCS encoded versions into `MoveResource`s
                 let state_view = self
                     .context
-                    .latest_state_view_poem(&self.latest_ledger_info)?;
+                    .latest_state_view_typed::<AptosErrorResponse>(&self.latest_ledger_info)?;
                 let converter = state_view
                     .as_converter(self.context.db.clone(), self.context.indexer_reader.clone());
                 let converted_resources = converter
                     .try_into_resources(resources.iter().map(|(k, v)| (k.clone(), v.as_slice())))
                     .context("Failed to build move resource response from data in DB")
                     .map_err(|err| {
-                        BasicErrorWith404::internal_with_code(
+                        AptosErrorResponse::internal(
                             err,
                             AptosErrorCode::InternalError,
-                            &self.latest_ledger_info,
+                            Some(&self.latest_ledger_info),
                         )
                     })?;
-                BasicResponse::try_from_json((
-                    converted_resources,
-                    &self.latest_ledger_info,
-                    BasicResponseStatus::Ok,
-                ))
-                .map(|v| v.with_cursor(next_state_key))
+                AptosResponse::try_from_json(converted_resources, &self.latest_ledger_info)
+                    .map(|v| v.with_cursor(next_state_key))
             },
             AcceptType::Bcs => {
-                // Put resources in a BTreeMap to ensure they're ordered the same every time
                 let resources: BTreeMap<StructTag, Vec<u8>> = resources.into_iter().collect();
-                BasicResponse::try_from_bcs((
-                    resources,
-                    &self.latest_ledger_info,
-                    BasicResponseStatus::Ok,
-                ))
-                .map(|v| v.with_cursor(next_state_key))
+                AptosResponse::try_from_bcs(resources, &self.latest_ledger_info)
+                    .map(|v| v.with_cursor(next_state_key))
             },
         }
     }
@@ -515,7 +311,10 @@ impl Account {
     ///
     /// Note: For the BCS response, if results are being returned in pages, i.e. with the
     /// `start` and `limit` query parameters, the results will only be sorted within each page.
-    pub fn modules(self, accept_type: &AcceptType) -> BasicResultWith404<Vec<MoveModuleBytecode>> {
+    pub fn modules(
+        self,
+        accept_type: &AcceptType,
+    ) -> Result<AptosResponse<Vec<MoveModuleBytecode>>, AptosErrorResponse> {
         let max_account_modules_page_size = self.context.max_account_modules_page_size();
         let (modules, next_state_key) = self
             .context
@@ -523,8 +322,7 @@ impl Account {
                 self.address.into(),
                 self.start.as_ref(),
                 self.ledger_version,
-                // Just use the max as the default
-                determine_limit(
+                determine_limit::<AptosErrorResponse>(
                     self.limit,
                     max_account_modules_page_size,
                     max_account_modules_page_size,
@@ -533,16 +331,15 @@ impl Account {
             )
             .context("Failed to get modules from storage")
             .map_err(|err| {
-                BasicErrorWith404::internal_with_code(
+                AptosErrorResponse::internal(
                     err,
                     AptosErrorCode::InternalError,
-                    &self.latest_ledger_info,
+                    Some(&self.latest_ledger_info),
                 )
             })?;
 
         match accept_type {
             AcceptType::Json => {
-                // Read bytecode and parse ABIs for output
                 let mut converted_modules = Vec::new();
                 for (_, module) in modules {
                     converted_modules.push(
@@ -550,33 +347,24 @@ impl Account {
                             .try_parse_abi()
                             .context("Failed to parse move module ABI")
                             .map_err(|err| {
-                                BasicErrorWith404::internal_with_code(
+                                AptosErrorResponse::internal(
                                     err,
                                     AptosErrorCode::InternalError,
-                                    &self.latest_ledger_info,
+                                    Some(&self.latest_ledger_info),
                                 )
                             })?,
                     );
                 }
-                BasicResponse::try_from_json((
-                    converted_modules,
-                    &self.latest_ledger_info,
-                    BasicResponseStatus::Ok,
-                ))
-                .map(|v| v.with_cursor(next_state_key))
+                AptosResponse::try_from_json(converted_modules, &self.latest_ledger_info)
+                    .map(|v| v.with_cursor(next_state_key))
             },
             AcceptType::Bcs => {
-                // Sort modules by name
                 let modules: BTreeMap<MoveModuleId, Vec<u8>> = modules
                     .into_iter()
                     .map(|(key, value)| (key.into(), value))
                     .collect();
-                BasicResponse::try_from_bcs((
-                    modules,
-                    &self.latest_ledger_info,
-                    BasicResponseStatus::Ok,
-                ))
-                .map(|v| v.with_cursor(next_state_key))
+                AptosResponse::try_from_bcs(modules, &self.latest_ledger_info)
+                    .map(|v| v.with_cursor(next_state_key))
             },
         }
     }
@@ -589,26 +377,24 @@ impl Account {
         &self,
         struct_tag: MoveStructTag,
         field_name: Identifier,
-    ) -> Result<EventKey, BasicErrorWith404> {
-        // Parse the struct tag
+    ) -> Result<EventKey, AptosErrorResponse> {
         let struct_tag: StructTag = (&struct_tag)
             .try_into()
             .context("Given event handle was invalid")
             .map_err(|err| {
-                BasicErrorWith404::bad_request_with_code(
+                AptosErrorResponse::bad_request(
                     err,
                     AptosErrorCode::InvalidInput,
-                    &self.latest_ledger_info,
+                    Some(&self.latest_ledger_info),
                 )
             })?;
 
-        // Find the resource and retrieve the struct field
         let (_, resource) = self.find_resource(&struct_tag)?;
         let (_id, value) = resource
             .into_iter()
             .find(|(id, _)| id == &field_name)
             .ok_or_else(|| {
-                struct_field_not_found(
+                struct_field_not_found::<AptosErrorResponse>(
                     self.address,
                     &struct_tag,
                     &field_name,
@@ -617,14 +403,13 @@ impl Account {
                 )
             })?;
 
-        // Deserialize the event handle to retrieve the key
         let event_handle_bytes = bcs::to_bytes(&value)
             .context("Failed to serialize event handle from storage")
             .map_err(|err| {
-                BasicErrorWith404::internal_with_code(
+                AptosErrorResponse::internal(
                     err,
                     AptosErrorCode::InternalError,
-                    &self.latest_ledger_info,
+                    Some(&self.latest_ledger_info),
                 )
             })?;
         // Deserialization may fail because the bytes are not EventHandle struct type.
@@ -634,10 +419,10 @@ impl Account {
                 field_name
             ))
             .map_err(|err| {
-                BasicErrorWith404::bad_request_with_code(
+                AptosErrorResponse::bad_request(
                     err,
                     AptosErrorCode::InvalidInput,
-                    &self.latest_ledger_info,
+                    Some(&self.latest_ledger_info),
                 )
             })?;
         Ok(*event_handle.key())
@@ -653,10 +438,11 @@ impl Account {
             Option<Identifier>,
             Vec<(Identifier, move_core_types::value::MoveValue)>,
         ),
-        BasicErrorWith404,
+        AptosErrorResponse,
     > {
-        let (ledger_info, requested_ledger_version, state_view) =
-            self.context.state_view(Some(self.ledger_version))?;
+        let (ledger_info, requested_ledger_version, state_view) = self
+            .context
+            .state_view::<AptosErrorResponse>(Some(self.ledger_version))?;
 
         let bytes = state_view
             .as_converter(self.context.db.clone(), self.context.indexer_reader.clone())
@@ -667,14 +453,10 @@ impl Account {
                 self.address
             ))
             .map_err(|err| {
-                BasicErrorWith404::internal_with_code(
-                    err,
-                    AptosErrorCode::InternalError,
-                    &ledger_info,
-                )
+                AptosErrorResponse::internal(err, AptosErrorCode::InternalError, Some(&ledger_info))
             })?
             .ok_or_else(|| {
-                resource_not_found(
+                resource_not_found::<AptosErrorResponse>(
                     self.address,
                     resource_type,
                     requested_ledger_version,
@@ -687,11 +469,7 @@ impl Account {
             .move_struct_fields(resource_type, &bytes)
             .context("Failed to convert move structs from storage")
             .map_err(|err| {
-                BasicErrorWith404::internal_with_code(
-                    err,
-                    AptosErrorCode::InternalError,
-                    &ledger_info,
-                )
+                AptosErrorResponse::internal(err, AptosErrorCode::InternalError, Some(&ledger_info))
             })
     }
 }

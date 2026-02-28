@@ -2,7 +2,7 @@
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 use super::{golden_output::GoldenOutputs, pretty};
-use aptos_api::{attach_poem_to_runtime, BasicError, Context};
+use aptos_api::{attach_axum_to_runtime, BasicError, Context};
 use aptos_api_types::{
     mime_types, HexEncodedBytes, TransactionOnChainData, X_APTOS_CHAIN_ID,
     X_APTOS_LEDGER_TIMESTAMP, X_APTOS_LEDGER_VERSION,
@@ -53,8 +53,6 @@ use aptos_types::{
 };
 use aptos_vm::aptos_vm::AptosVMBlockExecutor;
 use aptos_vm_validator::vm_validator::PooledVMValidator;
-use bytes::Bytes;
-use hyper::{HeaderMap, Response};
 use rand::{Rng, SeedableRng};
 use serde_json::{json, Value};
 use std::{
@@ -65,8 +63,6 @@ use std::{
     time::{Duration, Instant},
 };
 use tokio::sync::watch::channel;
-use warp::{http::header::CONTENT_TYPE, Filter, Rejection, Reply};
-use warp_reverse_proxy::reverse_proxy_filter;
 
 const TRANSFER_AMOUNT: u64 = 200_000_000;
 
@@ -80,15 +76,6 @@ impl ApiSpecificConfig {
     pub fn get_api_base_path(&self) -> String {
         match &self {
             ApiSpecificConfig::V1(_) => "/v1".to_string(),
-        }
-    }
-
-    pub fn assert_content_type(&self, headers: &HeaderMap) {
-        match &self {
-            ApiSpecificConfig::V1(_) => assert!(headers[CONTENT_TYPE]
-                .to_str()
-                .unwrap()
-                .starts_with(mime_types::JSON),),
         }
     }
 
@@ -215,10 +202,10 @@ pub fn new_test_context_inner(
 
     // Configure the testing depending on which API version we're testing.
     let runtime_handle = tokio::runtime::Handle::current();
-    let poem_address =
-        attach_poem_to_runtime(&runtime_handle, context.clone(), &node_config, true, None)
-            .expect("Failed to attach poem to runtime");
-    let api_specific_config = ApiSpecificConfig::V1(poem_address);
+    let axum_address =
+        attach_axum_to_runtime(&runtime_handle, context.clone(), &node_config, true, None)
+            .expect("Failed to attach axum to runtime");
+    let api_specific_config = ApiSpecificConfig::V1(axum_address);
 
     TestContext::new(
         context,
@@ -1267,78 +1254,206 @@ impl TestContext {
     }
 
     pub async fn get(&self, path: &str) -> Value {
-        self.execute(
-            warp::test::request()
-                .method("GET")
-                .path(&self.prepend_path(path)),
-        )
-        .await
+        self.execute_reqwest("GET", path, None, None).await
+    }
+
+    pub async fn get_with_headers(
+        &self,
+        path: &str,
+    ) -> (Value, reqwest::StatusCode, reqwest::header::HeaderMap) {
+        self.execute_reqwest_with_headers("GET", path, None, None)
+            .await
+    }
+
+    pub async fn get_raw(
+        &self,
+        path: &str,
+        query_params: &str,
+    ) -> (
+        reqwest::StatusCode,
+        reqwest::header::HeaderMap,
+        bytes::Bytes,
+    ) {
+        self.wait_for_internal_indexer_caught_up().await;
+        let ApiSpecificConfig::V1(address) = self.api_specific_config;
+        let url = format!(
+            "http://{}{}{}{}",
+            address,
+            self.api_specific_config.get_api_base_path(),
+            path,
+            if query_params.is_empty() {
+                String::new()
+            } else {
+                format!("?{}", query_params)
+            }
+        );
+        let client = reqwest::Client::new();
+        let resp = client
+            .get(&url)
+            .send()
+            .await
+            .expect("Failed to send request");
+        let status = resp.status();
+        let headers = resp.headers().clone();
+        let body = resp.bytes().await.expect("Failed to read body");
+        (status, headers, body)
     }
 
     pub async fn post(&self, path: &str, body: Value) -> Value {
-        self.execute(
-            warp::test::request()
-                .method("POST")
-                .path(&self.prepend_path(path))
-                .json(&body),
+        self.execute_reqwest(
+            "POST",
+            path,
+            Some(serde_json::to_vec(&body).unwrap()),
+            Some("application/json"),
         )
         .await
     }
 
     pub async fn post_bcs_txn(&self, path: &str, body: impl AsRef<[u8]>) -> Value {
-        self.execute(
-            warp::test::request()
-                .method("POST")
-                .path(&self.prepend_path(path))
-                .header(CONTENT_TYPE, mime_types::BCS_SIGNED_TRANSACTION)
-                .body(body),
+        self.execute_reqwest(
+            "POST",
+            path,
+            Some(body.as_ref().to_vec()),
+            Some(mime_types::BCS_SIGNED_TRANSACTION),
         )
         .await
     }
 
-    pub async fn reply(&self, req: warp::test::RequestBuilder) -> Response<Bytes> {
-        match self.api_specific_config {
-            ApiSpecificConfig::V1(address) => req.reply(&self.get_routes_with_poem(address)).await,
-        }
-    }
-
-    // Currently we still run our tests with warp.
-    // https://github.com/aptos-labs/aptos-core/issues/2966
-    pub fn get_routes_with_poem(
+    async fn execute_reqwest_with_headers(
         &self,
-        poem_address: SocketAddr,
-    ) -> impl Filter<Extract = (impl Reply + use<>,), Error = Rejection> + Clone + use<> {
-        warp::path!("v1" / ..).and(reverse_proxy_filter(
-            "v1".to_string(),
-            format!("http://{}/v1", poem_address),
-        ))
+        method: &str,
+        path: &str,
+        body: Option<Vec<u8>>,
+        content_type: Option<&str>,
+    ) -> (Value, reqwest::StatusCode, reqwest::header::HeaderMap) {
+        self.wait_for_internal_indexer_caught_up().await;
+
+        let ApiSpecificConfig::V1(address) = self.api_specific_config;
+        let url = format!(
+            "http://{}{}{}",
+            address,
+            self.api_specific_config.get_api_base_path(),
+            path
+        );
+
+        let client = reqwest::Client::new();
+        let mut request = match method {
+            "GET" => client.get(&url),
+            "POST" => client.post(&url),
+            _ => panic!("Unsupported HTTP method: {}", method),
+        };
+
+        if let Some(ct) = content_type {
+            request = request.header("Content-Type", ct);
+        }
+        if let Some(body_bytes) = body {
+            request = request.body(body_bytes);
+        }
+
+        let resp = request.send().await.expect("Failed to send request");
+        let status = resp.status();
+        let headers = resp.headers().clone();
+        let body_bytes = resp.bytes().await.expect("Failed to read response body");
+        let body: Value = serde_json::from_slice(&body_bytes).unwrap_or_else(|_| Value::Null);
+        (body, status, headers)
     }
 
-    pub async fn execute(&self, req: warp::test::RequestBuilder) -> Value {
+    async fn execute_reqwest(
+        &self,
+        method: &str,
+        path: &str,
+        body: Option<Vec<u8>>,
+        content_type: Option<&str>,
+    ) -> Value {
         self.wait_for_internal_indexer_caught_up().await;
-        let resp = self.reply(req).await;
 
-        let headers = resp.headers();
+        let ApiSpecificConfig::V1(address) = self.api_specific_config;
+        let url = format!(
+            "http://{}{}{}",
+            address,
+            self.api_specific_config.get_api_base_path(),
+            path
+        );
 
-        self.api_specific_config.assert_content_type(headers);
+        let client = reqwest::Client::new();
+        let mut request = match method {
+            "GET" => client.get(&url),
+            "POST" => client.post(&url),
+            _ => panic!("Unsupported HTTP method: {}", method),
+        };
 
-        let body = serde_json::from_slice(resp.body()).expect("response body is JSON");
+        if let Some(ct) = content_type {
+            request = request.header("Content-Type", ct);
+        }
+        if let Some(body_bytes) = body {
+            request = request.body(body_bytes);
+        }
+
+        let resp = request.send().await.expect("Failed to send request");
+        let status = resp.status().as_u16();
+        let headers = resp.headers().clone();
+
+        // Verify content-type is JSON
+        if let Some(ct) = headers.get("content-type") {
+            assert!(
+                ct.to_str().unwrap().starts_with(mime_types::JSON),
+                "Expected JSON content type, got: {:?}",
+                ct
+            );
+        }
+
+        let body_bytes = resp.bytes().await.expect("Failed to read response body");
+        if body_bytes.is_empty() {
+            // Some status codes legitimately have no response body.
+            if status == 204 || status == 304 {
+                assert_eq!(
+                    self.expect_status_code, status,
+                    "\nresponse: <empty response body>"
+                );
+                return Value::Null;
+            }
+            panic!(
+                "Empty response body from {} {} (status {})",
+                method, url, status
+            );
+        }
+        let body: Value = serde_json::from_slice(&body_bytes).unwrap_or_else(|e| {
+            panic!(
+                "response body is not JSON: {}. Raw body: {:?}",
+                e,
+                String::from_utf8_lossy(&body_bytes)
+            )
+        });
+
         assert_eq!(
             self.expect_status_code,
-            resp.status(),
+            status,
             "\nresponse: {}",
             pretty(&body)
         );
 
+        // HTTP header lookups are case-insensitive per RFC 7230.
+        // Use the canonical constants for clarity.
         if self.expect_status_code < 300 {
             let ledger_info = self.get_latest_ledger_info();
-            assert_eq!(headers[X_APTOS_CHAIN_ID], "4");
             assert_eq!(
-                headers[X_APTOS_LEDGER_VERSION],
+                headers.get(X_APTOS_CHAIN_ID).unwrap().to_str().unwrap(),
+                "4"
+            );
+            assert_eq!(
+                headers
+                    .get(X_APTOS_LEDGER_VERSION)
+                    .unwrap()
+                    .to_str()
+                    .unwrap(),
                 ledger_info.version().to_string()
             );
             assert_eq!(
-                headers[X_APTOS_LEDGER_TIMESTAMP],
+                headers
+                    .get(X_APTOS_LEDGER_TIMESTAMP)
+                    .unwrap()
+                    .to_str()
+                    .unwrap(),
                 ledger_info.timestamp().to_string()
             );
         }
