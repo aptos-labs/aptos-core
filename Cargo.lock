@@ -4773,6 +4773,7 @@ dependencies = [
 name = "aptos-transaction-workloads-lib"
 version = "0.0.0"
 dependencies = [
+ "anyhow",
  "aptos-framework",
  "aptos-sdk",
  "aptos-transaction-generator-lib",
@@ -14214,15 +14215,6 @@ dependencies = [
  "elliptic-curve",
  "primeorder",
  "sha2 0.10.8",
-]
-
-[[package]]
-name = "package-generator"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "aptos-transaction-generator-lib",
- "clap 4.5.21",
 ]
 
 [[package]]
