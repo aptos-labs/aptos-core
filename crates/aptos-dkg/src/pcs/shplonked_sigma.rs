@@ -179,7 +179,8 @@ impl<E: Pairing> sigma_protocol::CurveGroupTrait for EvalPointCommitHom<E> {
 }
 
 /// (com_y, V) as a curve-group tuple homomorphism.
-pub type FirstTupleHom<'a, E> = CurveGroupTupleHomomorphism<<E as Pairing>::G1, ComYHom<'a, E>, EvalPointCommitHom<E>>;
+pub type FirstTupleHom<'a, E> =
+    CurveGroupTupleHomomorphism<<E as Pairing>::G1, ComYHom<'a, E>, EvalPointCommitHom<E>>;
 
 /// Homomorphism for y_sum: (rho, evals, u) -> sum(evals). Used as third component with TupleHomomorphism.
 #[derive(Clone, Debug, Default, PartialEq, Eq, CanonicalSerialize)]

@@ -84,11 +84,7 @@ fn union_of_evaluation_sets<F: CanonicalSerialize + Eq + Clone>(
 /// Uses direct evaluation: Z_S(x) once, then per i compute Z_{S_i}(x) = ∏_{s∈S_i}(x−s) and divide.
 /// Cost O(|S|) + O(∑_i |S_i|) instead of polynomial division per i.
 #[allow(non_snake_case)]
-fn evaluate_z_S_minus_S_is<F: Field>(
-    z_S_at_x: F,
-    s_per_poly: &[impl AsRef<[F]>],
-    x: F,
-) -> Vec<F> {
+fn evaluate_z_S_minus_S_is<F: Field>(z_S_at_x: F, s_per_poly: &[impl AsRef<[F]>], x: F) -> Vec<F> {
     let mut z_S_i_vals: Vec<F> = s_per_poly
         .iter()
         .map(|s_i| {
@@ -101,13 +97,8 @@ fn evaluate_z_S_minus_S_is<F: Field>(
         })
         .collect();
     batch_inversion(&mut z_S_i_vals);
-    z_S_i_vals
-        .into_iter()
-        .map(|inv| z_S_at_x * inv)
-        .collect()
+    z_S_i_vals.into_iter().map(|inv| z_S_at_x * inv).collect()
 }
-
-
 
 /// Lagrange basis: L_{i,s}(x) for a single s in set S_i (1 at s, 0 at other points of S_i).
 #[allow(non_snake_case)]
@@ -408,7 +399,8 @@ pub fn batch_open_generalized<
             c_y_hid_randomness,
             evals: y_hid.clone(),
             com_evals_randomness: E::ScalarField::zero(),
-        }).0;
+        })
+        .0;
 
     // Step 1b
     append_batch_statement_to_transcript::<E>(trs, sets, &y_rev, phi_y, &com_y_hid.into_affine());
@@ -570,10 +562,7 @@ pub fn batch_open_generalized<
         hom2: sum_hom,
     };
     let statement_proj = TupleCodomainShape(
-        TupleCodomainShape(
-            CodomainShape(com_y_hid),
-            CodomainShape(C_eval_proj),
-        ),
+        TupleCodomainShape(CodomainShape(com_y_hid), CodomainShape(C_eval_proj)),
         phi_y,
     );
     let (sigma_protocol_proof, _) =
@@ -582,7 +571,8 @@ pub fn batch_open_generalized<
         FirstProofItem::Commitment(c) => (c.0 .0 .0, c.0 .1 .0, c.1),
         FirstProofItem::Challenge(_) => panic!("expected commitment"),
     };
-    let sigma_proof = ZkPcsOpeningSigmaProof { // TODO: should probably get rid of this stuff
+    let sigma_proof = ZkPcsOpeningSigmaProof {
+        // TODO: should probably get rid of this stuff
         r_com_y,
         r_V,
         r_y,
@@ -737,7 +727,8 @@ where
         }
         alpha_hid
     };
-    let v_hom = shplonked_sigma::EvalPointCommitHom::new(srs.taus_1[0], srs.xi_1, alpha_hid.clone());
+    let v_hom =
+        shplonked_sigma::EvalPointCommitHom::new(srs.taus_1[0], srs.xi_1, alpha_hid.clone());
     let com_y_v_hom = shplonked_sigma::FirstTupleHom::<E> {
         hom1: com_y_hom,
         hom2: v_hom,
@@ -963,7 +954,13 @@ where
         let polys = vec![poly];
         let rho_i = vec![r];
         let opening = batch_open_generalized::<E, R, SumEvalHom>(
-            ck, &sets, &polys, &rho_i, &SumEvalHom, trs, rng,
+            ck,
+            &sets,
+            &polys,
+            &rho_i,
+            &SumEvalHom,
+            trs,
+            rng,
         );
         ZkPcsOpeningProof {
             eval_points: vec![point],
@@ -996,7 +993,13 @@ where
             })
             .collect();
         let opening = batch_open_generalized::<E, R, SumEvalHom>(
-            &ck, &sets, &polys, &rs, &SumEvalHom, trs, rng,
+            &ck,
+            &sets,
+            &polys,
+            &rs,
+            &SumEvalHom,
+            trs,
+            rng,
         );
         ZkPcsOpeningProof {
             eval_points,

@@ -186,10 +186,8 @@ mod zeromorph {
 mod shplonked {
     use super::*;
     use aptos_dkg::pcs::{
+        shplonked::{batch_verify_generalized, ShplonkedBatchProof, SumEvalHom},
         EvaluationSet,
-        shplonked::{
-            batch_verify_generalized, ShplonkedBatchProof, SumEvalHom,
-        },
     };
 
     #[test]
