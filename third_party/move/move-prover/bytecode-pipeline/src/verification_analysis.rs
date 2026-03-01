@@ -91,7 +91,10 @@ impl FunctionTargetProcessor for VerificationAnalysisProcessor {
         // This function implements the logic to decide whether to verify this function
 
         // Rule 1: never verify if "pragma verify = false;"
-        if !fun_env.is_pragma_true(VERIFY_PRAGMA, || true) {
+        // In inference mode, ignore this pragma — we still need the verification
+        // variant as input to spec inference.
+        let options = ProverOptions::get(fun_env.module_env.env);
+        if !options.inference && !fun_env.is_pragma_true(VERIFY_PRAGMA, || true) {
             return data;
         }
 

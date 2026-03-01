@@ -310,6 +310,19 @@ pub struct Condition {
 }
 
 impl Condition {
+    /// Compares two conditions for structural equality, ignoring NodeIds in expressions.
+    pub fn structural_eq(&self, other: &Condition) -> bool {
+        self.kind == other.kind
+            && self.properties == other.properties
+            && self.exp.structural_eq(&other.exp)
+            && self.additional_exps.len() == other.additional_exps.len()
+            && self
+                .additional_exps
+                .iter()
+                .zip(other.additional_exps.iter())
+                .all(|(e1, e2)| e1.structural_eq(e2))
+    }
+
     /// Return all expressions in the condition, the primary one and the additional ones.
     pub fn all_exps(&self) -> impl Iterator<Item = &Exp> {
         std::iter::once(&self.exp).chain(self.additional_exps.iter())
@@ -352,6 +365,37 @@ pub struct Spec {
 }
 
 impl Spec {
+    /// Compares two specs for structural equality, ignoring NodeIds in expressions.
+    pub fn structural_eq(&self, other: &Spec) -> bool {
+        self.conditions.len() == other.conditions.len()
+            && self
+                .conditions
+                .iter()
+                .zip(other.conditions.iter())
+                .all(|(c1, c2)| c1.structural_eq(c2))
+            && self.properties == other.properties
+            && self.on_impl.len() == other.on_impl.len()
+            && self
+                .on_impl
+                .iter()
+                .zip(other.on_impl.iter())
+                .all(|((off1, s1), (off2, s2))| off1 == off2 && s1.structural_eq(s2))
+            && self.update_map.len() == other.update_map.len()
+            && {
+                // `NodeId` keys are intentionally ignored in structural comparison, so pair
+                // conditions by structure rather than by `BTreeMap` key order.
+                let mut unmatched = other.update_map.values().collect_vec();
+                self.update_map.values().all(|c1| {
+                    if let Some(pos) = unmatched.iter().position(|c2| c1.structural_eq(c2)) {
+                        unmatched.swap_remove(pos);
+                        true
+                    } else {
+                        false
+                    }
+                })
+            }
+    }
+
     pub fn has_conditions(&self) -> bool {
         !self.conditions.is_empty()
     }
@@ -888,6 +932,108 @@ impl ExpData {
         // For the internement based implementations, we can just test equality. Other
         // representations may need different measures.
         e1 == e2
+    }
+
+    /// Compares two expressions for structural equality, ignoring NodeIds.
+    /// This is useful when expressions are logically equivalent but were created
+    /// with different NodeIds.
+    pub fn structural_eq(&self, other: &Exp) -> bool {
+        use ExpData::*;
+        match (self, other.as_ref()) {
+            (Invalid(_), Invalid(_)) => true,
+            (Value(_, v1), Value(_, v2)) => v1 == v2,
+            (LocalVar(_, s1), LocalVar(_, s2)) => s1 == s2,
+            (Temporary(_, t1), Temporary(_, t2)) => t1 == t2,
+            (Call(_, op1, args1), Call(_, op2, args2)) => {
+                op1 == op2
+                    && args1.len() == args2.len()
+                    && args1
+                        .iter()
+                        .zip(args2.iter())
+                        .all(|(a1, a2)| a1.structural_eq(a2))
+            },
+            (Invoke(_, f1, args1), Invoke(_, f2, args2)) => {
+                f1.structural_eq(f2)
+                    && args1.len() == args2.len()
+                    && args1
+                        .iter()
+                        .zip(args2.iter())
+                        .all(|(a1, a2)| a1.structural_eq(a2))
+            },
+            (Lambda(_, p1, body1, cap1, spec1), Lambda(_, p2, body2, cap2, spec2)) => {
+                p1.structural_eq(p2)
+                    && body1.structural_eq(body2)
+                    && cap1 == cap2
+                    && match (spec1, spec2) {
+                        (Some(s1), Some(s2)) => s1.structural_eq(s2),
+                        (None, None) => true,
+                        _ => false,
+                    }
+            },
+            (Quant(_, k1, r1, t1, c1, b1), Quant(_, k2, r2, t2, c2, b2)) => {
+                k1 == k2
+                    && r1.len() == r2.len()
+                    && r1
+                        .iter()
+                        .zip(r2.iter())
+                        .all(|((p1, e1), (p2, e2))| p1.structural_eq(p2) && e1.structural_eq(e2))
+                    && t1.len() == t2.len()
+                    && t1.iter().zip(t2.iter()).all(|(ts1, ts2)| {
+                        ts1.len() == ts2.len()
+                            && ts1
+                                .iter()
+                                .zip(ts2.iter())
+                                .all(|(e1, e2)| e1.structural_eq(e2))
+                    })
+                    && match (c1, c2) {
+                        (Some(c1), Some(c2)) => c1.structural_eq(c2),
+                        (None, None) => true,
+                        _ => false,
+                    }
+                    && b1.structural_eq(b2)
+            },
+            (Block(_, pat1, opt1, body1), Block(_, pat2, opt2, body2)) => {
+                pat1.structural_eq(pat2)
+                    && match (opt1, opt2) {
+                        (Some(e1), Some(e2)) => e1.structural_eq(e2),
+                        (None, None) => true,
+                        _ => false,
+                    }
+                    && body1.structural_eq(body2)
+            },
+            (IfElse(_, c1, t1, e1), IfElse(_, c2, t2, e2)) => {
+                c1.structural_eq(c2) && t1.structural_eq(t2) && e1.structural_eq(e2)
+            },
+            (Match(_, d1, arms1), Match(_, d2, arms2)) => {
+                d1.structural_eq(d2)
+                    && arms1.len() == arms2.len()
+                    && arms1.iter().zip(arms2.iter()).all(|(a1, a2)| {
+                        a1.pattern.structural_eq(&a2.pattern)
+                            && match (&a1.condition, &a2.condition) {
+                                (Some(c1), Some(c2)) => c1.structural_eq(c2),
+                                (None, None) => true,
+                                _ => false,
+                            }
+                            && a1.body.structural_eq(&a2.body)
+                    })
+            },
+            (Sequence(_, items1), Sequence(_, items2)) => {
+                items1.len() == items2.len()
+                    && items1
+                        .iter()
+                        .zip(items2.iter())
+                        .all(|(i1, i2)| i1.structural_eq(i2))
+            },
+            (Loop(_, body1), Loop(_, body2)) => body1.structural_eq(body2),
+            (LoopCont(_, nest1, cont1), LoopCont(_, nest2, cont2)) => {
+                nest1 == nest2 && cont1 == cont2
+            },
+            (Return(_, val1), Return(_, val2)) => val1.structural_eq(val2),
+            (Mutate(_, l1, r1), Mutate(_, l2, r2)) => l1.structural_eq(l2) && r1.structural_eq(r2),
+            (Assign(_, l1, r1), Assign(_, l2, r2)) => l1.structural_eq(l2) && r1.structural_eq(r2),
+            (SpecBlock(_, spec1), SpecBlock(_, spec2)) => spec1.structural_eq(spec2),
+            _ => false,
+        }
     }
 
     pub fn node_id(&self) -> NodeId {
@@ -2240,6 +2386,32 @@ impl Pattern {
         }
     }
 
+    /// Compares two patterns for structural equality, ignoring NodeIds.
+    pub fn structural_eq(&self, other: &Pattern) -> bool {
+        match (self, other) {
+            (Pattern::Var(_, s1), Pattern::Var(_, s2)) => s1 == s2,
+            (Pattern::Wildcard(_), Pattern::Wildcard(_)) => true,
+            (Pattern::Tuple(_, pats1), Pattern::Tuple(_, pats2)) => {
+                pats1.len() == pats2.len()
+                    && pats1
+                        .iter()
+                        .zip(pats2.iter())
+                        .all(|(p1, p2)| p1.structural_eq(p2))
+            },
+            (Pattern::Struct(_, qid1, v1, pats1), Pattern::Struct(_, qid2, v2, pats2)) => {
+                qid1 == qid2
+                    && v1 == v2
+                    && pats1.len() == pats2.len()
+                    && pats1
+                        .iter()
+                        .zip(pats2.iter())
+                        .all(|(p1, p2)| p1.structural_eq(p2))
+            },
+            (Pattern::Error(_), Pattern::Error(_)) => true,
+            _ => false,
+        }
+    }
+
     /// Returns the variables in this pattern, per node_id and name.
     pub fn vars(&self) -> Vec<(NodeId, Symbol)> {
         let mut result = vec![];
@@ -2868,6 +3040,38 @@ impl fmt::Display for EnvDisplay<'_, Value> {
             Value::Vector(array) => write!(f, "{:?}", array),
             Value::Tuple(array) => write!(f, "({:?})", array),
         }
+    }
+}
+
+// enables `env.display(&property_value)`
+impl fmt::Display for EnvDisplay<'_, PropertyValue> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), Error> {
+        match self.val {
+            PropertyValue::Value(v) => write!(f, "{}", self.env.display(v)),
+            PropertyValue::Symbol(s) => write!(f, "{}", s.display(self.env.symbol_pool())),
+            PropertyValue::QualifiedSymbol(qs) => write!(f, "{}", qs.display(self.env)),
+        }
+    }
+}
+
+// enables `env.display(&property_bag)`
+impl fmt::Display for EnvDisplay<'_, PropertyBag> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), Error> {
+        write!(f, "[")?;
+        let mut first = true;
+        for (key, value) in self.val {
+            if !first {
+                write!(f, ", ")?;
+            }
+            first = false;
+            write!(
+                f,
+                "{}={}",
+                key.display(self.env.symbol_pool()),
+                self.env.display(value)
+            )?;
+        }
+        write!(f, "]")
     }
 }
 
@@ -4003,7 +4207,13 @@ impl fmt::Display for EnvDisplay<'_, Condition> {
                 self.val.additional_exps[0].display(self.env),
                 self.val.exp.display(self.env)
             )?,
-            _ => write!(f, "{} {};", self.val.kind, self.val.exp.display(self.env))?,
+            _ => {
+                write!(f, "{}", self.val.kind)?;
+                if !self.val.properties.is_empty() {
+                    write!(f, " {}", self.env.display(&self.val.properties))?;
+                }
+                write!(f, " {};", self.val.exp.display(self.env))?
+            },
         }
         Ok(())
     }
@@ -4044,11 +4254,24 @@ impl fmt::Display for AccessSpecifierKind {
 #[cfg(test)]
 mod tests {
     use crate::{
-        ast::{Address, Value},
+        ast::{Address, Condition, ConditionKind, ExpData, Spec, Value},
+        model::{Loc, NodeId},
         symbol::Symbol,
         AccountAddress,
     };
     use num::BigInt;
+    use std::collections::BTreeMap;
+
+    fn update_condition(exp_node_id: usize, val: bool) -> Condition {
+        Condition {
+            loc: Loc::default(),
+            kind: ConditionKind::Update,
+            properties: BTreeMap::new(),
+            exp: ExpData::Value(NodeId::new(exp_node_id), Value::Bool(val)).into_exp(),
+            additional_exps: vec![],
+        }
+    }
+
     #[test]
     fn test_value_equivalence() {
         // Some test values
@@ -4236,5 +4459,32 @@ mod tests {
         for val1 in &symbolic_examples {
             assert!(val1.equivalent(&((*val1).clone())) == Some(true));
         }
+    }
+
+    #[test]
+    fn test_spec_structural_eq_update_map_ignores_node_id_keys() {
+        let spec1 = Spec {
+            loc: None,
+            conditions: vec![],
+            properties: BTreeMap::new(),
+            on_impl: BTreeMap::new(),
+            update_map: BTreeMap::from([
+                (NodeId::new(1), update_condition(11, true)),
+                (NodeId::new(2), update_condition(22, false)),
+            ]),
+        };
+        let spec2 = Spec {
+            loc: None,
+            conditions: vec![],
+            properties: BTreeMap::new(),
+            on_impl: BTreeMap::new(),
+            update_map: BTreeMap::from([
+                (NodeId::new(100), update_condition(33, false)),
+                (NodeId::new(200), update_condition(44, true)),
+            ]),
+        };
+
+        assert!(spec1.structural_eq(&spec2));
+        assert!(spec2.structural_eq(&spec1));
     }
 }

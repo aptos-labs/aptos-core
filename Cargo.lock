@@ -13119,6 +13119,7 @@ dependencies = [
  "move-model",
  "move-stackless-bytecode",
  "move-stackless-bytecode-test-utils",
+ "num 0.4.1",
  "serde",
  "shell-words",
  "tempfile",
