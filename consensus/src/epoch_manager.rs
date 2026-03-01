@@ -1331,6 +1331,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
             self.network_sender.clone(),
             self.self_sender.clone(),
             proxy_epoch_state.verifier.clone(),
+            epoch_state.verifier.clone(), // primary verifier for block retrieval
         ));
 
         // Create broadcast NetworkSender with full verifier (OrderedProxyBlocksMsg to ALL)
@@ -1339,6 +1340,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
             self.network_sender.clone(),
             self.self_sender.clone(),
             epoch_state.verifier.clone(),
+            epoch_state.verifier.clone(), // primary verifier (same as validators here)
         ));
 
         // 4. Create round-robin ProposerElection for proxy (no leader reputation).
@@ -1481,6 +1483,9 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
         // so Byzantine proxy proposers with oversized payloads get rejected.
         proxy_local_config.max_receiving_block_txns = proxy_config.max_proxy_block_txns;
         proxy_local_config.max_receiving_block_bytes = proxy_config.max_proxy_block_bytes;
+        // Disable optimistic proposals for proxy consensus to simplify the proxy path.
+        proxy_local_config.enable_optimistic_proposal_tx = false;
+        proxy_local_config.enable_optimistic_proposal_rx = false;
 
         let proxy_block_store_clone = proxy_block_store.clone();
         let mut proxy_round_manager = RoundManager::new(

@@ -217,6 +217,7 @@ impl ProxyPrimaryTrafficTest {
             ("aptos_proxy_consensus_votes_sent", "Proxy Votes Sent"),
             ("aptos_proxy_consensus_qcs_formed", "Proxy QCs Formed"),
             ("aptos_proxy_consensus_blocks_ordered", "Proxy Blocks Ordered"),
+            ("aptos_proxy_consensus_opt_blocks_ordered", "Proxy Opt Blocks Ordered"),
             ("aptos_proxy_consensus_blocks_forwarded", "Proxy Blocks Forwarded"),
         ];
 

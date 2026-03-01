@@ -259,6 +259,10 @@ pub struct NetworkSender {
     /// When true, broadcast methods wrap standard messages in proxy variants
     /// for correct routing to the proxy RoundManager.
     proxy_mode: bool,
+    /// Full validator set verifier for proxy mode block retrieval.
+    /// Proxy blocks may contain primary consensus proofs (QC/TC with bitvec for N validators),
+    /// which cannot be verified with the proxy-only verifier.
+    primary_verifier: Option<Arc<ValidatorVerifier>>,
 }
 
 impl NetworkSender {
@@ -275,17 +279,21 @@ impl NetworkSender {
             validators,
             time_service: aptos_time_service::TimeService::real(),
             proxy_mode: false,
+            primary_verifier: None,
         }
     }
 
     /// Create a NetworkSender in proxy mode. When proxy_mode is true,
     /// standard broadcast methods (broadcast_proposal, send_vote, etc.)
     /// wrap messages in proxy ConsensusMsg variants for network routing.
+    /// `primary_verifier` is the full validator set verifier, used during block
+    /// retrieval to verify primary consensus proofs embedded in proxy blocks.
     pub fn new_for_proxy(
         author: Author,
         consensus_network_client: ConsensusNetworkClient<NetworkClient<ConsensusMsg>>,
         self_sender: aptos_channels::UnboundedSender<Event<ConsensusMsg>>,
         validators: Arc<ValidatorVerifier>,
+        primary_verifier: Arc<ValidatorVerifier>,
     ) -> Self {
         NetworkSender {
             author,
@@ -294,6 +302,7 @@ impl NetworkSender {
             validators,
             time_service: aptos_time_service::TimeService::real(),
             proxy_mode: true,
+            primary_verifier: Some(primary_verifier),
         }
     }
 
@@ -344,17 +353,32 @@ impl NetworkSender {
             _ => return Err(anyhow!("Invalid response to request")),
         };
 
-        // Verify response against retrieval request
-        response
-            .verify(retrieval_request, &self.validators)
-            .map_err(|e| {
-                error!(
-                    SecurityEvent::InvalidRetrievedBlock,
-                    request_block_response = response,
-                    error = ?e,
-                );
-                e
-            })?;
+        // Verify response against retrieval request.
+        // In proxy mode, use dual verifiers: proxy verifier for block signatures/QC,
+        // primary verifier for embedded primary consensus proofs (QC/TC with full bitvec).
+        if let Some(ref primary_verifier) = self.primary_verifier {
+            response
+                .verify_proxy(retrieval_request, &self.validators, primary_verifier)
+                .map_err(|e| {
+                    error!(
+                        SecurityEvent::InvalidRetrievedBlock,
+                        request_block_response = response,
+                        error = ?e,
+                    );
+                    e
+                })?;
+        } else {
+            response
+                .verify(retrieval_request, &self.validators)
+                .map_err(|e| {
+                    error!(
+                        SecurityEvent::InvalidRetrievedBlock,
+                        request_block_response = response,
+                        error = ?e,
+                    );
+                    e
+                })?;
+        }
 
         Ok(response)
     }

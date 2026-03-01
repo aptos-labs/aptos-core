@@ -420,6 +420,10 @@ impl ProxyConsensusHooks for ProxyHooksImpl {
         let primary_round = primary_proof.proof_round() + 1;
 
         proxy_metrics::PROXY_CONSENSUS_BLOCKS_ORDERED.inc_by(blocks.len() as u64);
+        let opt_count = blocks.iter().filter(|b| b.is_opt_block()).count();
+        if opt_count > 0 {
+            proxy_metrics::PROXY_CONSENSUS_OPT_BLOCKS_ORDERED.inc_by(opt_count as u64);
+        }
 
         info!(
             num_blocks = blocks.len(),

@@ -33,6 +33,15 @@ pub static PROXY_CONSENSUS_BLOCKS_ORDERED: Lazy<IntCounter> = Lazy::new(|| {
     .unwrap()
 });
 
+/// Number of proxy opt blocks ordered
+pub static PROXY_CONSENSUS_OPT_BLOCKS_ORDERED: Lazy<IntCounter> = Lazy::new(|| {
+    register_int_counter!(
+        "aptos_proxy_consensus_opt_blocks_ordered",
+        "Number of proxy opt blocks ordered"
+    )
+    .unwrap()
+});
+
 /// Number of proxy consensus QCs formed
 pub static PROXY_CONSENSUS_QCS_FORMED: Lazy<IntCounter> = Lazy::new(|| {
     register_int_counter!(
