@@ -348,11 +348,29 @@ impl BlockStore {
             .lock()
             .gc(finality_proof.commit_info().round());
 
-        self.inner.write().update_ordered_root(block_to_commit.id());
+        let ordered_root_id = block_to_commit.id();
+        self.inner.write().update_ordered_root(ordered_root_id);
         self.inner
             .write()
             .insert_ordered_cert(finality_proof_clone.clone());
         update_counters_for_ordered_blocks(&blocks_to_commit, self.consensus_type);
+
+        // Proxy mode: prune the block tree since commit_callback will never fire
+        // (pipeline_builder is None for proxy). For proxy, ordering IS the final step —
+        // treat ordered blocks as committed for tree management.
+        if self.consensus_type == "proxy" {
+            let ids_to_remove = self.inner.read().find_blocks_to_prune(ordered_root_id);
+            if let Err(e) = self
+                .storage
+                .prune_tree(ids_to_remove.clone().into_iter().collect())
+            {
+                warn!(error = ?e, "fail to delete block (proxy prune)");
+            }
+            let mut wlock = self.inner.write();
+            wlock.process_pruned_blocks(ids_to_remove);
+            wlock.update_commit_root(ordered_root_id);
+            wlock.update_window_root(ordered_root_id);
+        }
 
         self.execution_client
             .finalize_order(blocks_to_commit, finality_proof.clone())
@@ -726,11 +744,6 @@ impl BlockReader for BlockStore {
     }
 
     fn pipeline_pending_latency(&self, proposal_timestamp: Duration) -> Duration {
-        // Proxy mode: commit_root never advances, so path_from_commit_root grows unboundedly.
-        // Proxy has no pipeline backpressure, so return zero to avoid O(N) path computation.
-        if self.consensus_type == "proxy" {
-            return Duration::ZERO;
-        }
         let ordered_root = self.ordered_root();
         let commit_root = self.commit_root();
         let pending_path = self
