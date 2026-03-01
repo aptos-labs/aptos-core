@@ -91,6 +91,41 @@ static ROCKSDB_TICKERS_TO_REPORT: &[(Ticker, &str)] = &[
     (Ticker::BlockCacheDataMiss, "block_cache_data_miss"),
     (Ticker::BlockCacheFilterHit, "block_cache_filter_hit"),
     (Ticker::BlockCacheFilterMiss, "block_cache_filter_miss"),
+    (Ticker::BlockCacheIndexHit, "block_cache_index_hit"),
+    (Ticker::BlockCacheIndexMiss, "block_cache_index_miss"),
+    // Per-level seek filter stats — most meaningful for state KV DB which has
+    // bloom/ribbon filters and uses prefix seeks.
+    (Ticker::LastLevelSeekFiltered, "last_level_seek_filtered"),
+    (
+        Ticker::LastLevelSeekFilterMatch,
+        "last_level_seek_filter_match",
+    ),
+    (Ticker::LastLevelSeekData, "last_level_seek_data"),
+    (
+        Ticker::LastLevelSeekDataUsefulNoFilter,
+        "last_level_seek_data_useful_no_filter",
+    ),
+    (
+        Ticker::LastLevelSeekDataUsefulFilterMatch,
+        "last_level_seek_data_useful_filter_match",
+    ),
+    (
+        Ticker::NonLastLevelSeekFiltered,
+        "non_last_level_seek_filtered",
+    ),
+    (
+        Ticker::NonLastLevelSeekFilterMatch,
+        "non_last_level_seek_filter_match",
+    ),
+    (Ticker::NonLastLevelSeekData, "non_last_level_seek_data"),
+    (
+        Ticker::NonLastLevelSeekDataUsefulNoFilter,
+        "non_last_level_seek_data_useful_no_filter",
+    ),
+    (
+        Ticker::NonLastLevelSeekDataUsefulFilterMatch,
+        "non_last_level_seek_data_useful_filter_match",
+    ),
 ];
 
 fn set_tickers(db: &DB) {
