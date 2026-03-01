@@ -1,6 +1,7 @@
 // Copyright (c) Aptos Foundation
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
+use std::iter::repeat_with;
 use crate::{
     pvss::chunky::{chunked_elgamal::decrypt_chunked_scalars, keys, PublicParameters},
     traits::{transcript::Aggregated, Aggregatable, TranscriptCore},
@@ -21,7 +22,9 @@ use ark_serialize::{CanonicalDeserialize, CanonicalSerialize};
 use rand_core::{CryptoRng, RngCore};
 use serde::{Deserialize, Serialize};
 
-// TODO: not sure we need both CanonicalSerialize and Serialize here?
+// We need Serialize/Deserialize because of ValidCryptoMaterial below.
+// And we need CanonicalSerialize/CanonicalDeserialize to easily derive serialization
+// from this, as Pairing does not implement Serialize/Deserialize
 #[allow(non_snake_case)]
 #[derive(
     CanonicalSerialize, CanonicalDeserialize, Serialize, Deserialize, Clone, Debug, PartialEq, Eq,
@@ -33,7 +36,7 @@ pub struct Subtranscript<P: Pairing> {
     // The dealt public key shares
     #[serde(serialize_with = "ark_se", deserialize_with = "ark_de")]
     pub Vs: Vec<Vec<P::G2Affine>>,
-    /// First chunked ElGamal component: C[i][j] = s_{i,j} * G + r_j * ek_i. Here s_i = \sum_j s_{i,j} * B^j // TODO: change notation because B is not a group element?
+    /// First chunked ElGamal component: C[i][j] = s_{i,j} * G + r_j * ek_i. Here s_i = \sum_j s_{i,j} * B^j // TODO: change notation because B is not a group element? maybe β or radix?
     #[serde(serialize_with = "ark_se", deserialize_with = "ark_de")]
     pub Cs: Vec<Vec<Vec<P::G1Affine>>>,
     /// Second chunked ElGamal component: R[j] = r_j * H
@@ -41,65 +44,11 @@ pub struct Subtranscript<P: Pairing> {
     pub Rs: Vec<Vec<P::G1Affine>>,
 }
 
-// There doesn't seem to be a need to serialize or deserialize this
-#[allow(non_snake_case)]
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub struct SubtranscriptProjective<P: Pairing> {
-    // The dealt public key (in projective form)
-    pub V0_proj: P::G2,
-    // The dealt public key shares (in projective form)
-    pub Vs_proj: Vec<Vec<P::G2>>,
-    /// First chunked ElGamal component (in projective form)
-    pub Cs_proj: Vec<Vec<Vec<P::G1>>>,
-    /// Second chunked ElGamal component (in projective form)
-    pub Rs_proj: Vec<Vec<P::G1>>,
-}
-
-impl<P: Pairing> Subtranscript<P> {
-    /// Generates a subtranscript with random (V0, Vs, Cs, Rs) for use in `generate()` of
-    /// weighted chunky transcripts. `Vs` is built as `sc.group_by_player(&Vs_flat)` so the
-    /// layout matches the rest of the codebase.
-    #[allow(non_snake_case)]
-    pub fn random_bases<R: RngCore + CryptoRng>(
-        sc: &WeightedConfigArkworks<P::ScalarField>,
-        num_chunks_per_share: usize,
-        rng: &mut R,
-    ) -> Self {
-        let V0 = unsafe_random_point::<P::G2, _>(rng);
-        let Vs_flat = unsafe_random_points::<P::G2, _>(sc.get_total_weight(), rng);
-        let Vs = sc.group_by_player(&Vs_flat);
-
-        let Cs: Vec<Vec<Vec<P::G1Affine>>> = (0..sc.get_total_num_players())
-            .map(|i| {
-                let w = sc.get_player_weight(&sc.get_player(i));
-                (0..w)
-                    .map(|_| unsafe_random_points::<P::G1, _>(num_chunks_per_share, rng))
-                    .collect()
-            })
-            .collect();
-
-        let Rs: Vec<Vec<P::G1Affine>> = (0..sc.get_max_weight())
-            .map(|_| unsafe_random_points::<P::G1, _>(num_chunks_per_share, rng))
-            .collect();
-
-        Self { V0, Vs, Cs, Rs }
-    }
-
-    /// Builds the vector used as input to the SCRAPE low-degree test: all share
-    /// commitments in player/share order, then the dealt public key `V0`.
-    #[allow(non_snake_case)]
-    pub fn vs_flat(&self) -> Vec<P::G2Affine> {
-        let mut vs: Vec<P::G2Affine> = self.Vs.iter().flatten().copied().collect();
-        vs.push(self.V0);
-        vs
-    }
-}
-
 impl<P: Pairing> ValidCryptoMaterial for Subtranscript<P> {
     const AIP_80_PREFIX: &'static str = "";
 
     fn to_bytes(&self) -> Vec<u8> {
-        bcs::to_bytes(&self).expect("Unexpected error during PVSS transcript serialization")
+        bcs::to_bytes(&self).expect("Unexpected error during chunky PVSS subtranscript serialization")
     }
 }
 
@@ -112,34 +61,87 @@ impl<P: Pairing> TryFrom<&[u8]> for Subtranscript<P> {
     }
 }
 
-impl<E: Pairing> Aggregatable for Subtranscript<E> {
-    type Aggregated = SubtranscriptProjective<E>;
+impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>> TranscriptCore
+    for Subtranscript<E>
+{
+    type DealtPubKey = keys::DealtPubKey<E>;
+    type DealtPubKeyShare = Vec<keys::DealtPubKeyShare<E>>;
+    type DealtSecretKey = keys::DealtSecretKey<E::ScalarField>;
+    type DealtSecretKeyShare = Vec<keys::DealtSecretKeyShare<E::ScalarField>>;
+    type DecryptPrivKey = keys::DecryptPrivKey<E>;
+    type EncryptPubKey = keys::EncryptPubKey<E>;
+    type PublicParameters = PublicParameters<E>;
     type SecretSharingConfig = WeightedConfigArkworks<E::ScalarField>;
 
-    fn to_aggregated(&self) -> Self::Aggregated {
-        SubtranscriptProjective {
-            V0_proj: self.V0.into(),
-            Vs_proj: self
-                .Vs
-                .iter()
-                .map(|row| row.iter().map(|x| (*x).into()).collect())
-                .collect(),
-            Cs_proj: self
-                .Cs
-                .iter()
-                .map(|i| {
-                    i.iter()
-                        .map(|j| j.iter().map(|x| (*x).into()).collect())
-                        .collect()
-                })
-                .collect(),
-            Rs_proj: self
-                .Rs
-                .iter()
-                .map(|row| row.iter().map(|x| (*x).into()).collect())
-                .collect(),
-        }
+    #[allow(non_snake_case)]
+    fn get_public_key_share(
+        &self,
+        _sc: &Self::SecretSharingConfig,
+        player: &Player,
+    ) -> Self::DealtPubKeyShare {
+        self.Vs[player.id]
+            .iter()
+            .map(|&V_i| keys::DealtPubKeyShare::<E>::new(keys::DealtPubKey::new(V_i)))
+            .collect()
     }
+
+    fn get_dealt_public_key(&self) -> Self::DealtPubKey {
+        Self::DealtPubKey::new(self.V0)
+    }
+
+    #[allow(non_snake_case)]
+    fn decrypt_own_share(
+        &self,
+        sc: &Self::SecretSharingConfig,
+        player: &Player,
+        dk: &Self::DecryptPrivKey,
+        pp: &Self::PublicParameters,
+    ) -> (Self::DealtSecretKeyShare, Self::DealtPubKeyShare) {
+        let Cs = &self.Cs[player.id];
+        debug_assert_eq!(Cs.len(), sc.get_player_weight(player));
+
+        if !Cs.is_empty() {
+            if let Some(first_key) = self.Rs.first() {
+                debug_assert_eq!(
+                    first_key.len(),
+                    Cs[0].len(),
+                    "Number of ephemeral keys does not match the number of ciphertext chunks"
+                );
+            }
+        }
+
+        let pk_shares = self.get_public_key_share(sc, player);
+
+        let sk_shares: Vec<_> = decrypt_chunked_scalars(
+            &Cs,
+            &self.Rs,
+            &dk.dk,
+            &pp.pp_elgamal,
+            &pp.dlog_table,
+            pp.get_dlog_range_bound(),
+            pp.ell,
+        );
+
+        (
+            Scalar::vec_from_inner(sk_shares),
+            pk_shares, // TODO: review this formalism... why do we need this here?
+        )
+    }
+}
+
+// In contract to Subtranscript, there doesn't seem to be a need to serialize or
+// deserialize this; it is only used for aggregation by validators
+#[allow(non_snake_case)]
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct SubtranscriptProjective<P: Pairing> {
+    // The dealt public key (in projective form)
+    pub V0_proj: P::G2,
+    // The dealt public key shares (in projective form)
+    pub Vs_proj: Vec<Vec<P::G2>>,
+    /// First chunked ElGamal component (in projective form)
+    pub Cs_proj: Vec<Vec<Vec<P::G1>>>,
+    /// Second chunked ElGamal component (in projective form)
+    pub Rs_proj: Vec<Vec<P::G1>>,
 }
 
 impl<E: Pairing> Aggregated<Subtranscript<E>> for SubtranscriptProjective<E> {
@@ -240,70 +242,76 @@ impl<E: Pairing> Aggregated<Subtranscript<E>> for SubtranscriptProjective<E> {
     }
 }
 
-impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>> TranscriptCore
-    for Subtranscript<E>
-{
-    type DealtPubKey = keys::DealtPubKey<E>;
-    type DealtPubKeyShare = Vec<keys::DealtPubKeyShare<E>>;
-    type DealtSecretKey = keys::DealtSecretKey<E::ScalarField>;
-    type DealtSecretKeyShare = Vec<keys::DealtSecretKeyShare<E::ScalarField>>;
-    type DecryptPrivKey = keys::DecryptPrivKey<E>;
-    type EncryptPubKey = keys::EncryptPubKey<E>;
-    type PublicParameters = PublicParameters<E>;
+impl<E: Pairing> Aggregatable for Subtranscript<E> {
+    type Aggregated = SubtranscriptProjective<E>;
     type SecretSharingConfig = WeightedConfigArkworks<E::ScalarField>;
 
-    #[allow(non_snake_case)]
-    fn get_public_key_share(
-        &self,
-        _sc: &Self::SecretSharingConfig,
-        player: &Player,
-    ) -> Self::DealtPubKeyShare {
-        self.Vs[player.id]
-            .iter()
-            .map(|&V_i| keys::DealtPubKeyShare::<E>::new(keys::DealtPubKey::new(V_i)))
-            .collect()
-    }
-
-    fn get_dealt_public_key(&self) -> Self::DealtPubKey {
-        Self::DealtPubKey::new(self.V0)
-    }
-
-    #[allow(non_snake_case)]
-    fn decrypt_own_share(
-        &self,
-        sc: &Self::SecretSharingConfig,
-        player: &Player,
-        dk: &Self::DecryptPrivKey,
-        pp: &Self::PublicParameters,
-    ) -> (Self::DealtSecretKeyShare, Self::DealtPubKeyShare) {
-        let Cs = &self.Cs[player.id];
-        debug_assert_eq!(Cs.len(), sc.get_player_weight(player));
-
-        if !Cs.is_empty() {
-            if let Some(first_key) = self.Rs.first() {
-                debug_assert_eq!(
-                    first_key.len(),
-                    Cs[0].len(),
-                    "Number of ephemeral keys does not match the number of ciphertext chunks"
-                );
-            }
+    fn to_aggregated(&self) -> Self::Aggregated {
+        SubtranscriptProjective {
+            V0_proj: self.V0.into(),
+            Vs_proj: self
+                .Vs
+                .iter()
+                .map(|row| row.iter().map(|x| (*x).into()).collect())
+                .collect(),
+            Cs_proj: self
+                .Cs
+                .iter()
+                .map(|i| {
+                    i.iter()
+                        .map(|j| j.iter().map(|x| (*x).into()).collect())
+                        .collect()
+                })
+                .collect(),
+            Rs_proj: self
+                .Rs
+                .iter()
+                .map(|row| row.iter().map(|x| (*x).into()).collect())
+                .collect(),
         }
+    }
+}
 
-        let pk_shares = self.get_public_key_share(sc, player);
+impl<P: Pairing> Subtranscript<P> {
+    /// Generates a subtranscript with random (V0, Vs, Cs, Rs) for use in `generate()` of
+    /// weighted chunky transcripts. `Vs` is built as `sc.group_by_player(&Vs_flat)` so the
+    /// layout matches the rest of the codebase.
+    /// 
+    /// Would make this part of the Subtranscript trait, but we'd be computing `num_chunks_per_share` twice
+    /// inside the larger transcripts
+    #[allow(non_snake_case)]
+    pub fn generate<R: RngCore + CryptoRng>(
+        sc: &WeightedConfigArkworks<P::ScalarField>,
+        num_chunks_per_share: usize,
+        rng: &mut R,
+    ) -> Self {
+        let V0 = unsafe_random_point::<P::G2, _>(rng);
+        let Vs_flat = unsafe_random_points::<P::G2, _>(sc.get_total_weight(), rng);
+        let Vs = sc.group_by_player(&Vs_flat);
 
-        let sk_shares: Vec<_> = decrypt_chunked_scalars(
-            &Cs,
-            &self.Rs,
-            &dk.dk,
-            &pp.pp_elgamal,
-            &pp.dlog_table,
-            pp.get_dlog_range_bound(),
-            pp.ell,
-        );
+        let Cs: Vec<Vec<Vec<P::G1Affine>>> = (0..sc.get_total_num_players())
+            .map(|i| {
+                let player = sc.get_player(i);
+                let w = sc.get_player_weight(&player);
+                repeat_with(|| unsafe_random_points::<P::G1, _>(num_chunks_per_share, rng))
+                    .take(w)
+                    .collect()
+            })
+            .collect();
 
-        (
-            Scalar::vec_from_inner(sk_shares),
-            pk_shares, // TODO: review this formalism... why do we need this here?
-        )
+        let Rs: Vec<Vec<P::G1Affine>> = repeat_with(|| unsafe_random_points::<P::G1, _>(num_chunks_per_share, rng))
+            .take(sc.get_max_weight())
+            .collect();
+
+        Self { V0, Vs, Cs, Rs }
+    }
+
+    /// Builds the vector used as input to the SCRAPE low-degree test: all share
+    /// commitments in player/share order, then the dealt public key `V0`.
+    #[allow(non_snake_case)]
+    pub fn all_Vs_flat(&self) -> Vec<P::G2Affine> {
+        let mut Vs: Vec<P::G2Affine> = self.Vs.iter().flatten().copied().collect();
+        Vs.push(self.V0);
+        Vs
     }
 }

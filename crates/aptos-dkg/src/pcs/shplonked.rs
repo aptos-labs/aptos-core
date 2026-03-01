@@ -84,27 +84,30 @@ fn union_of_evaluation_sets<F: CanonicalSerialize + Eq + Clone>(
 /// Uses direct evaluation: Z_S(x) once, then per i compute Z_{S_i}(x) = ∏_{s∈S_i}(x−s) and divide.
 /// Cost O(|S|) + O(∑_i |S_i|) instead of polynomial division per i.
 #[allow(non_snake_case)]
-pub fn z_S_minus_S_i_at<F: Field>(
-    z_S: &DensePolynomial<F>,
+fn evaluate_z_S_minus_S_is<F: Field>(
+    z_S_at_x: F,
     s_per_poly: &[impl AsRef<[F]>],
     x: F,
 ) -> Vec<F> {
-    let z_S_at_x = z_S.evaluate(&x);
-    s_per_poly
+    let mut z_S_i_vals: Vec<F> = s_per_poly
         .iter()
         .map(|s_i| {
             let s_i = s_i.as_ref();
             if s_i.is_empty() {
-                return z_S_at_x;
+                F::ONE // placeholder so batch_inversion does not invert zero
+            } else {
+                s_i.iter().map(|&s| x - s).product()
             }
-            let z_S_i_at_x: F = s_i.iter().map(|&s| x - s).product();
-            z_S_at_x
-                * z_S_i_at_x
-                    .inverse()
-                    .expect("Z_{S_i}(x) nonzero for x ∉ S_i")
         })
+        .collect();
+    batch_inversion(&mut z_S_i_vals);
+    z_S_i_vals
+        .into_iter()
+        .map(|inv| z_S_at_x * inv)
         .collect()
 }
+
+
 
 /// Lagrange basis: L_{i,s}(x) for a single s in set S_i (1 at s, 0 at other points of S_i).
 #[allow(non_snake_case)]
@@ -209,31 +212,6 @@ pub struct Srs<E: Pairing> {
     pub(crate) xi_2: E::G2Affine,
 }
 
-// we will use hiding KZG for now
-pub fn zk_pcs_commit<E: Pairing>(
-    srs: &Srs<E>,
-    f_is: Vec<Vec<E::ScalarField>>,
-    r_is: Vec<E::ScalarField>,
-) -> Vec<E::G1> {
-    assert_eq!(f_is.len(), r_is.len());
-
-    let hom = univariate_hiding_kzg::CommitmentHomomorphism::<E> {
-        msm_basis: &srs.taus_1,
-        xi_1: srs.xi_1,
-    };
-
-    f_is.iter()
-        .zip(r_is.iter())
-        .map(|(f_i, r_i)| {
-            hom.apply(&univariate_hiding_kzg::Witness {
-                hiding_randomness: Scalar(*r_i),
-                values: Scalar::vec_from_inner(f_i.clone()),
-            })
-            .0
-        })
-        .collect()
-}
-
 #[allow(non_snake_case)]
 #[derive(CanonicalSerialize, Clone, CanonicalDeserialize, Debug, PartialEq, Eq)]
 pub(crate) struct ZkPcsOpeningSigmaProof<E: Pairing> {
@@ -328,43 +306,35 @@ fn append_batch_statement_to_transcript<E: Pairing>(
     y_rev: &[E::ScalarField],
     phi_y: E::ScalarField,
     c_y_hid: &E::G1Affine,
-) where
-    E::ScalarField: ark_serialize::CanonicalSerialize,
-{
-    let mut buf = Vec::new();
+) {
     for set in sets {
         trs.append_evaluation_set(set);
     }
-    trs.append_message(b"shplonked_sets", &buf);
     trs.append_evaluation_points(y_rev);
-    trs.append_message(b"shplonked_y_rev", &buf);
     trs.append_homomorphism_image(&phi_y);
-    phi_y
-        .serialize_compressed(&mut buf)
-        .expect("serialize phi_y");
-    trs.append_message(b"shplonked_phi_y", &buf);
     trs.append_point(c_y_hid);
 }
 
-/// Computes weights alpha_i = c^{i-1} * Z_{S\S_i}(x) for the sigma protocol (spec notation: c, x).
+/// Computes Z_S(x) and weights c^{i-1} * Z_{S\S_i}(x)
 #[allow(non_snake_case)]
-fn compute_alpha_generalized<E: Pairing>(
+fn compute_weights<E: Pairing>(
     z_S: &DensePolynomial<E::ScalarField>,
     s_per_poly: &[Vec<E::ScalarField>],
     x: E::ScalarField,
     c: E::ScalarField,
-) -> Vec<E::ScalarField>
+) -> (Vec<E::ScalarField>, E::ScalarField)
 where
     E::ScalarField: FftField,
 {
-    let z_S_minus_S_i_vals = z_S_minus_S_i_at(z_S, s_per_poly, x);
-    let mut alphas = Vec::with_capacity(z_S_minus_S_i_vals.len());
+    let z_S_val = z_S.evaluate(&x);
+    let z_S_minus_S_i_vals = evaluate_z_S_minus_S_is(z_S_val, s_per_poly, x);
+    let mut weights = Vec::with_capacity(z_S_minus_S_i_vals.len());
     let mut c_pow = E::ScalarField::ONE;
     for &z_val in &z_S_minus_S_i_vals {
-        alphas.push(c_pow * z_val);
+        weights.push(c_pow * z_val);
         c_pow *= c;
     }
-    alphas
+    (weights, z_S_val)
 }
 
 /// Legacy batch opening proof: one evaluation point per polynomial (all hidden), φ(y) = sum.
@@ -407,14 +377,14 @@ pub fn batch_open_generalized<
     srs: &Srs<E>,
     sets: &[EvaluationSet<E::ScalarField>],
     polys: &[DensePolynomial<E::ScalarField>],
-    rho_i: &[E::ScalarField],
+    rhos: &[E::ScalarField], // commitment randomness for each polynomial
     hom: &H,
     trs: &mut merlin::Transcript,
     rng: &mut R,
 ) -> ShplonkedBatchOpening<E> {
     let n = polys.len();
     assert_eq!(sets.len(), n);
-    assert_eq!(rho_i.len(), n);
+    assert_eq!(rhos.len(), n);
 
     // Step 1a: Compute y, phi(y) and com_y.
     let mut y_rev = Vec::new();
@@ -431,21 +401,17 @@ pub fn batch_open_generalized<
     let h = y_hid.len();
     let phi_y = hom.image(&y_rev, &y_hid);
 
-    let hom_commit = univariate_hiding_kzg::CommitmentHomomorphism::<E> {
-        msm_basis: &srs.taus_1,
-        xi_1: srs.xi_1,
-    };
     let c_y_hid_randomness = sample_field_element(rng);
-    let com_y_hid = hom_commit
-        .apply(&univariate_hiding_kzg::Witness {
-            hiding_randomness: Scalar(c_y_hid_randomness),
-            values: Scalar::vec_from_inner(y_hid.clone()),
-        })
-        .0
-        .into_affine();
+    let com_y_hom = shplonked_sigma::com_y_hom::<E>(&srs.taus_1[..h], srs.xi_1);
+    let com_y_hid = com_y_hom
+        .apply(&shplonked_sigma::ShplonkedSigmaWitness {
+            c_y_hid_randomness,
+            evals: y_hid.clone(),
+            com_evals_randomness: E::ScalarField::zero(),
+        }).0;
 
     // Step 1b
-    append_batch_statement_to_transcript::<E>(trs, sets, &y_rev, phi_y, &com_y_hid);
+    append_batch_statement_to_transcript::<E>(trs, sets, &y_rev, phi_y, &com_y_hid.into_affine());
 
     // Step 1c: Derive a challenge c from the Fiat-Shamir transcript.
     let c: E::ScalarField = trs.challenge_scalar();
@@ -470,7 +436,7 @@ pub fn batch_open_generalized<
         .map(|i| (0..=i).find(|&j| S_is[j] == S_is[i]).unwrap())
         .collect();
 
-    // Compute Lagrange basis polynomials once per unique set (all at once).
+    // Compute Lagrange basis polynomials once per unique set (all at once). // TODO: improve batch inversion here
     let mut lagrange_cache: Vec<Option<Vec<DensePolynomial<E::ScalarField>>>> = vec![None; n];
     for i in 0..n {
         if canonical[i] == i {
@@ -499,7 +465,7 @@ pub fn batch_open_generalized<
         let z = if canonical[i] == i {
             vanishing_poly::from_roots(&S_is[i])
         } else {
-            z_S_is[canonical[i]].clone()
+            z_S_is[canonical[i]].clone() // TODO: might not be necessary
         };
         z_S_is.push(z);
     }
@@ -518,8 +484,12 @@ pub fn batch_open_generalized<
     // Step 2b: Sample commitment randomness rho_q.
     let rho_q = sample_field_element(rng);
 
-    // Step 2c: Compute π_1.
-    let pi_1 = hom_commit
+    // Step 2c: Compute π_1 (commitment to q uses full SRS; q can have larger degree than h).
+    let hom_commit_q = univariate_hiding_kzg::CommitmentHomomorphism::<E> {
+        msm_basis: &srs.taus_1,
+        xi_1: srs.xi_1,
+    };
+    let pi_1 = hom_commit_q
         .apply(&univariate_hiding_kzg::Witness {
             hiding_randomness: Scalar(rho_q),
             values: Scalar::vec_from_inner(q_poly.coeffs().to_vec()),
@@ -536,24 +506,22 @@ pub fn batch_open_generalized<
     // Step 4a: Sample commitment randomness ρ_eval.
     let rho_eval = sample_field_element(rng);
 
-    // Step 4b: g = ∑_i c^{i-1} Z_{S\S_i}(x) f̃_i(x) (constant polynomial).
-    let z_S_val = z_S.evaluate(&x);
-    let mut z_S_i_vals: Vec<E::ScalarField> = z_S_is.iter().map(|z| z.evaluate(&x)).collect();
-    batch_inversion(&mut z_S_i_vals);
-    let z_S_minus_S_i_vals: Vec<E::ScalarField> =
-        z_S_i_vals.iter().map(|inv| z_S_val * inv).collect();
-    let weights: Vec<E::ScalarField> = (0..n)
-        .map(|i| c_powers[i] * z_S_minus_S_i_vals[i])
-        .collect();
+    // Step 4b: weights c^{i-1} Z_{S\S_i}(x)
+    let (weights, z_S_val) = compute_weights::<E>(&z_S, &S_is, x, c);
 
     let g: E::ScalarField = (0..n)
-        .map(|i| weights[i] * tilde_f_i_at(&S_is[i], &evals_per_poly[i], x))
+        .map(|i| weights[i] * tilde_f_is[i].evaluate(&x))
         .sum();
 
-    // Step 4c: C_eval ← PCS.Commit(g; ρ_eval).
-    let C_eval_no_hiding: E::G1 = srs.taus_1[0].into_group() * g;
-    let C_eval_hiding_factor = srs.xi_1 * rho_eval;
-    let C_eval_proj: E::G1 = C_eval_no_hiding + C_eval_hiding_factor;
+    // Step 4c: C_eval = eval_point_commit_hom(y^hid; ρ_eval) = (∑_j weights[j] * y^hid_j)*τ_0 + ρ_eval*ξ_1. // the j indexing is a bit wrong here, maybe y^hid is the wrong thing to construct... should instead set up a Vec<Vec<E>> and then use the j on the outer side... also the tilde_f_is evaluation on x is missing here!!!
+    let eval_point_commit_hom =
+        shplonked_sigma::EvalPointCommitHom::new(srs.taus_1[0], srs.xi_1, weights.clone());
+    let witness_for_C_eval = shplonked_sigma::ShplonkedSigmaWitness {
+        c_y_hid_randomness: E::ScalarField::zero(), // We're using the full sigma protocol witness here which is a bit awkward; but fine if we kill off this component
+        evals: y_hid.clone(),
+        com_evals_randomness: rho_eval,
+    };
+    let C_eval_proj: E::G1 = eval_point_commit_hom.apply(&witness_for_C_eval).0;
     let C_eval = C_eval_proj.into_affine();
 
     // Step 5a: f = ∑_i c^{i-1} Z_{S\S_i}(x) f_i − Z_S(x) q − g.
@@ -567,7 +535,7 @@ pub fn batch_open_generalized<
     // Step 5b: ρ = ∑_i c^{i-1} Z_{S\S_i}(x) ρ_i − Z_S(x) ρ_q − ρ_eval.
     let mut rho = E::ScalarField::zero();
     for i in 0..n {
-        rho += weights[i] * rho_i[i];
+        rho += weights[i] * rhos[i];
     }
     rho -= z_S_val * rho_q;
     rho -= rho_eval;
@@ -585,37 +553,25 @@ pub fn batch_open_generalized<
         0,
     );
 
-    // Step 5b: Compute alpha_hid for V homomorphism (weights for hidden evals in C_eval expression).
-    let mut alpha_hid = Vec::with_capacity(h);
-    for i in 0..n {
-        let s_i = &S_is[i];
-        let set_i = &sets[i];
-        for &s in set_i.hid.iter() {
-            let l = lagrange_basis_at(s_i, s, x);
-            alpha_hid.push(weights[i] * l);
-        }
-    }
-
+    // Step 5d: compute the sigma proof
     let witness = ShplonkedSigmaWitness {
         c_y_hid_randomness,
         evals: y_hid.clone(),
         com_evals_randomness: rho_eval,
     };
-    let com_y_hom = shplonked_sigma::com_y_hom(&srs.taus_1[..h], srs.xi_1);
-    let v_hom = shplonked_sigma::VHom::new(srs.taus_1[0], srs.xi_1, alpha_hid);
-    let com_y_v_hom = shplonked_sigma::ComYVHom::<E> {
+    let com_y_v_hom = shplonked_sigma::FirstTupleHom::<E> {
         hom1: com_y_hom,
-        hom2: v_hom,
+        hom2: eval_point_commit_hom,
         _group: std::marker::PhantomData,
     };
-    let sum_hom = shplonked_sigma::SumEvalsHom::<E::ScalarField>::default();
+    let sum_hom = shplonked_sigma::SumHom::<E::ScalarField>::default();
     let full_hom = shplonked_sigma::ShplonkedSigmaHom::<E> {
         hom1: com_y_v_hom,
         hom2: sum_hom,
     };
     let statement_proj = TupleCodomainShape(
         TupleCodomainShape(
-            CodomainShape(com_y_hid.into_group()),
+            CodomainShape(com_y_hid),
             CodomainShape(C_eval_proj),
         ),
         phi_y,
@@ -626,7 +582,7 @@ pub fn batch_open_generalized<
         FirstProofItem::Commitment(c) => (c.0 .0 .0, c.0 .1 .0, c.1),
         FirstProofItem::Challenge(_) => panic!("expected commitment"),
     };
-    let sigma_proof = ZkPcsOpeningSigmaProof {
+    let sigma_proof = ZkPcsOpeningSigmaProof { // TODO: should probably get rid of this stuff
         r_com_y,
         r_V,
         r_y,
@@ -640,7 +596,7 @@ pub fn batch_open_generalized<
     let pi_2_extra = opening.pi_2.into_affine();
 
     let sigma_proof_statement = ZkPcsOpeningSigmaProofStatement {
-        com_y_hid,
+        com_y_hid: com_y_hid.into_affine(),
         C_eval,
         phi_y,
         y_sum: phi_y,
@@ -748,12 +704,11 @@ where
 
     let s_union = union_of_evaluation_sets(sets);
     let z_S = zero_poly_S(&s_union);
-    let z_S_val = z_S.evaluate(&x);
     let s_per_poly: Vec<Vec<E::ScalarField>> = sets
         .iter()
         .map(|set| set.all_points().cloned().collect())
         .collect();
-    let alphas = compute_alpha_generalized::<E>(&z_S, &s_per_poly, x, c);
+    let (alphas, z_S_val) = compute_weights::<E>(&z_S, &s_per_poly, x, c);
 
     let commitment_refs: Vec<&MsmInput<E::G1Affine, E::ScalarField>> =
         commitment_msms.iter().collect();
@@ -768,7 +723,7 @@ where
     let h = sigma_proof.z_yi.len();
     let com_y_hom = shplonked_sigma::com_y_hom(&srs.taus_1[..h], srs.xi_1);
     let alpha_hid = {
-        let z_S_minus_S_i_vals = z_S_minus_S_i_at(&z_S, &s_per_poly, x);
+        let z_S_minus_S_i_vals = evaluate_z_S_minus_S_is(z_S_val, &s_per_poly, x);
         let mut alpha_hid = Vec::with_capacity(h);
         let mut c_pow = E::ScalarField::ONE;
         for i in 0..n {
@@ -782,13 +737,13 @@ where
         }
         alpha_hid
     };
-    let v_hom = shplonked_sigma::VHom::new(srs.taus_1[0], srs.xi_1, alpha_hid.clone());
-    let com_y_v_hom = shplonked_sigma::ComYVHom::<E> {
+    let v_hom = shplonked_sigma::EvalPointCommitHom::new(srs.taus_1[0], srs.xi_1, alpha_hid.clone());
+    let com_y_v_hom = shplonked_sigma::FirstTupleHom::<E> {
         hom1: com_y_hom,
         hom2: v_hom,
         _group: std::marker::PhantomData,
     };
-    let sum_hom = shplonked_sigma::SumEvalsHom::<E::ScalarField>::default();
+    let sum_hom = shplonked_sigma::SumHom::<E::ScalarField>::default();
     let full_hom = shplonked_sigma::ShplonkedSigmaHom::<E> {
         hom1: com_y_v_hom,
         hom2: sum_hom,
@@ -845,7 +800,7 @@ where
         rng,
     );
     let msm_terms_response = full_hom.hom1.msm_terms(&sigma_protocol_proof.z);
-    let hom1_msm_terms = <shplonked_sigma::ComYVHom<E> as CurveGroupTrait>::merge_msm_terms(
+    let hom1_msm_terms = <shplonked_sigma::FirstTupleHom<E> as CurveGroupTrait>::merge_msm_terms(
         msm_terms_response.into_iter().collect::<Vec<_>>(),
         &prover_commitment.0,
         &public_statement.0,
@@ -868,94 +823,6 @@ where
         srs.xi_2,
     ];
     Ok((g1_terms, g2_terms))
-}
-
-// ---------------------------------------------------------------------------
-// Legacy API: one evaluation point per polynomial (all hidden), φ = sum
-// ---------------------------------------------------------------------------
-
-/// Legacy batch open: one point per polynomial, all evaluations hidden; returns ZkPcsOpeningProof.
-/// Used by PolynomialCommitmentScheme trait and Dekart multivariate.
-#[allow(non_snake_case)]
-pub fn zk_pcs_open<E: Pairing, R: RngCore + CryptoRng>(
-    srs: &Srs<E>,
-    _degree: usize,
-    f_is: Vec<Vec<E::ScalarField>>,
-    _commitments: Vec<E::G1>,
-    eval_points: Vec<E::ScalarField>,
-    _evals: Vec<E::ScalarField>,
-    rho_i: Vec<E::ScalarField>,
-    trs: &mut merlin::Transcript,
-    rng: &mut R,
-) -> ZkPcsOpeningProof<E>
-where
-    E::ScalarField: FftField,
-{
-    let n = f_is.len();
-    assert_eq!(eval_points.len(), n);
-    assert_eq!(rho_i.len(), n);
-    let sets: Vec<EvaluationSet<E::ScalarField>> = eval_points
-        .iter()
-        .map(|&z| EvaluationSet {
-            rev: vec![],
-            hid: vec![z],
-        })
-        .collect();
-    let polys: Vec<DensePolynomial<E::ScalarField>> = f_is
-        .iter()
-        .map(|c| DensePolynomial::from_coefficients_vec(c.clone()))
-        .collect();
-    let opening = batch_open_generalized::<E, R, SumEvalHom>(
-        srs,
-        &sets,
-        &polys,
-        &rho_i,
-        &SumEvalHom,
-        trs,
-        rng,
-    );
-    ZkPcsOpeningProof {
-        eval_points,
-        pi_1: opening.proof.pi_1,
-        pi_2: opening.proof.pi_2,
-        sigma_proof: opening.proof.sigma_proof,
-        sigma_proof_statement: opening.proof.sigma_proof_statement,
-    }
-}
-
-/// Legacy batch verify: converts to ShplonkedBatchProof and runs batch_verify_generalized.
-#[allow(non_snake_case)]
-pub fn zk_pcs_verify<E: Pairing, R: RngCore + CryptoRng>(
-    proof: &ZkPcsOpeningProof<E>,
-    commitment_msms: &[MsmInput<E::G1Affine, E::ScalarField>],
-    vk: &Srs<E>,
-    trs: &mut merlin::Transcript,
-    rng: &mut R,
-) -> anyhow::Result<()>
-where
-    E::ScalarField: FftField,
-{
-    let batch_proof = ShplonkedBatchProof::from(proof.clone());
-    let sets: Vec<EvaluationSet<E::ScalarField>> = proof
-        .eval_points
-        .iter()
-        .map(|&z| EvaluationSet {
-            rev: vec![],
-            hid: vec![z],
-        })
-        .collect();
-    let y_rev: Vec<E::ScalarField> = vec![];
-    batch_verify_generalized::<E, R, SumEvalHom>(
-        vk,
-        &sets,
-        &SumEvalHom,
-        commitment_msms,
-        &y_rev,
-        proof.sigma_proof_statement.phi_y,
-        &batch_proof,
-        trs,
-        rng,
-    )
 }
 
 /// Returns (g1_terms, g2_terms) for the pairing check; used by Dekart to merge with other pairings.
@@ -992,226 +859,6 @@ where
         rng,
     )
 }
-
-// /// Verifier derives gamma, z and c from the shared transcript (same trs as prover, or
-// /// a fresh transcript with the same DST and prior content so challenges match).
-// /// Commitments are given as MSM inputs so they can be combined into one MSM with the opening weights.
-// #[allow(non_snake_case)]
-// pub fn zk_pcs_pairing_for_verify<E: Pairing, R: RngCore + CryptoRng>(
-//     zk_pcs_opening_proof: &ZkPcsOpeningProof<E>,
-//     commitment_msms: &[MsmInput<E::G1Affine, E::ScalarField>],
-//     srs: &Srs<E>,
-//     trs: &mut merlin::Transcript,
-//     rng: &mut R,
-// ) -> anyhow::Result<(Vec<E::G1Affine>, Vec<E::G2Affine>)>
-// where
-//     E::ScalarField: FftField,
-// {
-//     #[cfg(feature = "pcs_verify_timing")]
-//     let mut cumulative = Duration::ZERO;
-//     #[cfg(feature = "pcs_verify_timing")]
-//     let mut print_cumulative = |name: &str, duration: Duration| {
-//         cumulative += duration;
-//         println!(
-//             "  {:>10.2} ms  ({:>10.2} ms cum.)  [zk_pcs_verify] {}",
-//             duration.as_secs_f64() * 1000.0,
-//             cumulative.as_secs_f64() * 1000.0,
-//             name
-//         );
-//     };
-
-//     let ZkPcsOpeningProof {
-//         eval_points,
-//         sigma_proof_statement,
-//         W,
-//         W_prime,
-//         Y,
-//         sigma_proof,
-//     } = zk_pcs_opening_proof;
-
-//     let com_y = sigma_proof_statement.com_y_hid;
-//     let V = sigma_proof_statement.C_eval;
-
-//     #[cfg(feature = "pcs_verify_timing")]
-//     let start = Instant::now();
-//     trs.append_point(&com_y);
-
-//     let gamma: E::ScalarField = trs.challenge_scalar();
-//     trs.append_point(W);
-//     let z: E::ScalarField = trs.challenge_scalar();
-//     trs.append_point(W_prime);
-//     #[cfg(feature = "pcs_verify_timing")]
-//     print_cumulative("transcript (com_y, gamma, W, z, W_prime)", start.elapsed());
-
-//     let mut alphas = Vec::with_capacity(eval_points.len());
-//     let mut gamma_i = E::ScalarField::ONE;
-
-//     #[cfg(feature = "pcs_verify_timing")]
-//     let start = Instant::now();
-//     let z_T = vanishing_poly::from_roots(eval_points);
-//     #[cfg(feature = "pcs_verify_timing")]
-//     print_cumulative("build z_T polynomial", start.elapsed());
-
-//     #[cfg(feature = "pcs_verify_timing")]
-//     let start = Instant::now();
-//     for x_i in eval_points.iter() {
-//         let divisor = DOSPoly::from(DensePolynomial::from_coefficients_vec(vec![
-//             -*x_i,
-//             E::ScalarField::ONE,
-//         ]));
-//         let z_T_dos = DOSPoly::from(z_T.clone());
-//         let (z_t_i_poly, remainder) = z_T_dos.divide_with_q_and_r(&divisor).unwrap();
-//         debug_assert!(remainder.is_zero());
-//         let z_t_i_val = DensePolynomial::from(z_t_i_poly).evaluate(&z);
-//         alphas.push(gamma_i * z_t_i_val);
-//         gamma_i *= gamma;
-//     }
-//     #[cfg(feature = "pcs_verify_timing")]
-//     print_cumulative("build alphas (divide z_T, evaluate)", start.elapsed());
-
-//     #[cfg(feature = "pcs_verify_timing")]
-//     let start = Instant::now();
-//     let commitment_refs: Vec<&MsmInput<E::G1Affine, E::ScalarField>> =
-//         commitment_msms.iter().collect();
-//     let merged = merge_scaled_msm_terms::<E::G1>(&commitment_refs, &alphas);
-//     #[cfg(feature = "pcs_verify_timing")]
-//     print_cumulative("merged commitment MSM", start.elapsed());
-
-//     #[cfg(feature = "pcs_verify_timing")]
-//     let start = Instant::now();
-//     let alpha = compute_alpha::<E>(&eval_points, z, gamma);
-//     let n = eval_points.len();
-//     let com_y_hom = shplonked_sigma::com_y_hom(&srs.taus_1[..n], srs.xi_1);
-//     let v_hom = shplonked_sigma::VHom::new(srs.taus_1[0], srs.xi_1, alpha);
-//     let com_y_v_hom = shplonked_sigma::ComYVHom::<E> {
-//         hom1: com_y_hom,
-//         hom2: v_hom,
-//         _group: std::marker::PhantomData,
-//     };
-//     let sum_hom = shplonked_sigma::SumEvalsHom::<E::ScalarField>::default();
-//     let full_hom = shplonked_sigma::ShplonkedSigmaHom::<E> {
-//         hom1: com_y_v_hom,
-//         hom2: sum_hom,
-//     };
-
-//     let public_statement = TupleCodomainShape(
-//         TupleCodomainShape(
-//             CodomainShape(sigma_proof_statement.com_y_hid),
-//             CodomainShape(sigma_proof_statement.C_eval),
-//         ),
-//         sigma_proof_statement.phi_y,
-//     );
-
-//     let sigma_protocol_proof: Proof<E::ScalarField, shplonked_sigma::ShplonkedSigmaHom<E>> =
-//         Proof {
-//             first_proof_item: FirstProofItem::Commitment(TupleCodomainShape(
-//                 TupleCodomainShape(
-//                     CodomainShape(sigma_proof.r_com_y),
-//                     CodomainShape(sigma_proof.r_V),
-//                 ),
-//                 sigma_proof.r_y,
-//             )),
-//             z: ShplonkedSigmaWitness {
-//                 c_y_hid_randomness: sigma_proof.z_rho,
-//                 evals: sigma_proof.z_yi.clone(),
-//                 com_evals_randomness: sigma_proof.z_u,
-//             },
-//         };
-//     #[cfg(feature = "pcs_verify_timing")]
-//     print_cumulative(
-//         "compute_alpha + hom setup + proof packaging",
-//         start.elapsed(),
-//     );
-
-//     #[cfg(feature = "pcs_verify_timing")]
-//     let start = Instant::now();
-//     let prover_commitment = sigma_protocol_proof
-//         .prover_commitment()
-//         .expect("Shplonked verify: tuple proof must contain commitment");
-//     let c = fiat_shamir_challenge_for_sigma_protocol::<_, E::ScalarField, _>(
-//         SHPLONKED_SIGMA_DST,
-//         &full_hom,
-//         &public_statement,
-//         prover_commitment,
-//         &full_hom.dst(),
-//     );
-
-//     full_hom.hom2.verify_with_challenge(
-//         &public_statement.1,
-//         &prover_commitment.1,
-//         c,
-//         &sigma_protocol_proof.z,
-//         None,
-//         rng,
-//     )?;
-//     #[cfg(feature = "pcs_verify_timing")]
-//     print_cumulative("Fiat-Shamir challenge + hom2 verify", start.elapsed());
-
-//     #[cfg(feature = "pcs_verify_timing")]
-//     let start = Instant::now();
-//     // Use full protocol challenge c for hom1's MSM (msm_terms_for_verify would recompute c from inner hom).
-//     let (_, powers_of_beta) = full_hom.hom1.compute_verifier_challenges(
-//         &public_statement.0,
-//         &prover_commitment.0,
-//         SHPLONKED_SIGMA_DST,
-//         Some(2),
-//         rng,
-//     );
-//     let msm_terms_response = full_hom.hom1.msm_terms(&sigma_protocol_proof.z);
-//     let hom1_msm_terms = <shplonked_sigma::ComYVHom<E> as CurveGroupTrait>::merge_msm_terms(
-//         msm_terms_response.into_iter().collect::<Vec<_>>(),
-//         &prover_commitment.0,
-//         &public_statement.0,
-//         &powers_of_beta,
-//         c,
-//     );
-//     #[cfg(feature = "pcs_verify_timing")]
-//     print_cumulative(
-//         "hom1 verifier challenges + msm_terms + merge_msm_terms",
-//         start.elapsed(),
-//     );
-
-//     #[cfg(feature = "pcs_verify_timing")]
-//     let start = Instant::now();
-//     let delta = sample_field_element(rng);
-//     let merged_final =
-//         merge_scaled_msm_terms::<E::G1>(&[&merged, &hom1_msm_terms], &[E::ScalarField::ONE, delta]);
-//     let sum_com = E::G1::msm(merged_final.bases(), merged_final.scalars())
-//         .expect("Shplonked verify: merged commitment MSM");
-//     #[cfg(feature = "pcs_verify_timing")]
-//     print_cumulative(
-//         "delta + merge_scaled_msm_terms + sum_com MSM",
-//         start.elapsed(),
-//     );
-
-//     #[cfg(feature = "pcs_verify_timing")]
-//     let start = Instant::now();
-//     let z_T_val = z_T.evaluate(&z);
-
-//     // Paper: F := Σ_i γ^{i-1}·Z_{T∖x_i}(z)·com_i − Z_T(z)·W − V
-//     // Check: e(F + z·W', [1]_2) = e(W', [τ]_2) · e(Y, [ξ]_2)
-//     // So e(F+z·W', g_2) · e(−W', τ_2) · e(−Y, ξ_2) = identity
-//     let F = sum_com - (*W) * z_T_val - V;
-//     let g1_terms_proj = vec![
-//         (F + (*W_prime) * z),
-//         (-(*W_prime).into_group()),
-//         (-(*Y).into_group()),
-//     ];
-//     let g2_terms = vec![srs.g_2, srs.tau_2, srs.xi_2];
-//     // #[cfg(feature = "pcs_verify_timing")]
-//     // print_cumulative("z_T.evaluate + F + g1/g2_terms", start.elapsed());
-
-//     // #[cfg(feature = "pcs_verify_timing")]
-//     // let start = Instant::now();
-//     // let result = E::multi_pairing(g1_terms, g2_terms);
-//     // #[cfg(feature = "pcs_verify_timing")]
-//     // print_cumulative("multi_pairing", start.elapsed());
-//     // if PairingOutput::<E>::zero() != result {
-//     //     return Err(anyhow::anyhow!("Expected zero during multi-pairing check"));
-//     // }
-
-//     Ok((E::G1::normalize_batch(&g1_terms_proj), g2_terms))
-// }
 
 // ---------------------------------------------------------------------------
 // PolynomialCommitmentScheme trait implementation (univariate, single point)
@@ -1283,9 +930,17 @@ where
         r: Option<Self::WitnessField>,
     ) -> Self::Commitment {
         let r = r.expect("Shplonked::commit requires commitment randomness");
-        let coeffs = poly.coeffs.clone();
-        let comms = zk_pcs_commit(ck, vec![coeffs], vec![r]);
-        ShplonkedCommitment(comms[0])
+        let hom = univariate_hiding_kzg::CommitmentHomomorphism::<E> {
+            msm_basis: &ck.taus_1,
+            xi_1: ck.xi_1,
+        };
+        let comm = hom
+            .apply(&univariate_hiding_kzg::Witness {
+                hiding_randomness: Scalar(r),
+                values: Scalar::vec_from_inner(poly.coeffs.clone()),
+            })
+            .0;
+        ShplonkedCommitment(comm)
     }
 
     fn open<R: RngCore + CryptoRng>(
@@ -1301,26 +956,22 @@ where
             .first()
             .copied()
             .expect("Shplonked univariate open requires one challenge point");
-        let coeffs = poly.coeffs.clone();
-        let eval = poly.evaluate(&point);
-        let com = Self::commit(
-            ck,
-            DensePolynomial::from_coefficients_vec(coeffs.clone()),
-            Some(r),
+        let sets = vec![EvaluationSet {
+            rev: vec![],
+            hid: vec![point],
+        }];
+        let polys = vec![poly];
+        let rho_i = vec![r];
+        let opening = batch_open_generalized::<E, R, SumEvalHom>(
+            ck, &sets, &polys, &rho_i, &SumEvalHom, trs, rng,
         );
-        let commitments = vec![com.0];
-        let opening = zk_pcs_open(
-            ck,
-            0, // degree not used for single poly
-            vec![coeffs],
-            commitments,
-            vec![point],
-            vec![eval],
-            vec![r],
-            trs,
-            rng,
-        );
-        opening
+        ZkPcsOpeningProof {
+            eval_points: vec![point],
+            pi_1: opening.proof.pi_1,
+            pi_2: opening.proof.pi_2,
+            sigma_proof: opening.proof.sigma_proof,
+            sigma_proof_statement: opening.proof.sigma_proof_statement,
+        }
     }
 
     fn batch_open<R: RngCore + CryptoRng>(
@@ -1336,25 +987,24 @@ where
             .first()
             .copied()
             .expect("Shplonked univariate requires one challenge point");
-        let f_is: Vec<Vec<E::ScalarField>> = polys.iter().map(|p| p.coeffs.clone()).collect();
-        let evals: Vec<E::ScalarField> = polys.iter().map(|p| p.evaluate(&point)).collect();
-        let commitments: Vec<E::G1> = f_is
+        let eval_points: Vec<E::ScalarField> = (0..polys.len()).map(|_| point).collect();
+        let sets: Vec<EvaluationSet<E::ScalarField>> = eval_points
             .iter()
-            .zip(rs.iter())
-            .map(|(coeffs, &r)| zk_pcs_commit(&ck, vec![coeffs.clone()], vec![r])[0])
+            .map(|&z| EvaluationSet {
+                rev: vec![],
+                hid: vec![z],
+            })
             .collect();
-        let opening = zk_pcs_open(
-            &ck,
-            0,
-            f_is,
-            commitments,
-            vec![point; polys.len()],
-            evals,
-            rs,
-            trs,
-            rng,
+        let opening = batch_open_generalized::<E, R, SumEvalHom>(
+            &ck, &sets, &polys, &rs, &SumEvalHom, trs, rng,
         );
-        opening
+        ZkPcsOpeningProof {
+            eval_points,
+            pi_1: opening.proof.pi_1,
+            pi_2: opening.proof.pi_2,
+            sigma_proof: opening.proof.sigma_proof,
+            sigma_proof_statement: opening.proof.sigma_proof_statement,
+        }
     }
 
     fn verify(
@@ -1379,8 +1029,27 @@ where
             "claimed eval does not match opening proof"
         );
         let mut rng = rand::thread_rng();
-        let com_msm = com.into();
-        zk_pcs_verify(&proof, &[com_msm], vk, trs, &mut rng)
+        let batch_proof = ShplonkedBatchProof::from(proof.clone());
+        let sets: Vec<EvaluationSet<E::ScalarField>> = proof
+            .eval_points
+            .iter()
+            .map(|&z| EvaluationSet {
+                rev: vec![],
+                hid: vec![z],
+            })
+            .collect();
+        let y_rev: Vec<E::ScalarField> = vec![];
+        batch_verify_generalized::<E, _, SumEvalHom>(
+            vk,
+            &sets,
+            &SumEvalHom,
+            &[com.into()],
+            &y_rev,
+            proof.sigma_proof_statement.phi_y,
+            &batch_proof,
+            trs,
+            &mut rng,
+        )
     }
 
     fn random_witness<R: rand_core::RngCore + rand_core::CryptoRng>(
@@ -1470,7 +1139,7 @@ mod tests {
         let commitments: Vec<ark_bn254::G1Projective> = polys
             .iter()
             .zip(rho_i.iter())
-            .map(|(p, &r)| zk_pcs_commit(&srs, vec![p.coeffs().to_vec()], vec![r])[0])
+            .map(|(p, &r)| Shplonked::<Bn254>::commit(&srs, p.clone(), Some(r)).0)
             .collect();
         let commitment_msms: Vec<MsmInput<ark_bn254::G1Affine, Fr>> = commitments
             .iter()

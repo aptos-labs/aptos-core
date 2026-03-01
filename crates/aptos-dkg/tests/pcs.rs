@@ -185,7 +185,12 @@ mod zeromorph {
 
 mod shplonked {
     use super::*;
-    use aptos_dkg::pcs::shplonked::zk_pcs_verify;
+    use aptos_dkg::pcs::{
+        EvaluationSet,
+        shplonked::{
+            batch_verify_generalized, ShplonkedBatchProof, SumEvalHom,
+        },
+    };
 
     #[test]
     fn shplonked_bn254_setup_commit_open_verify() {
@@ -230,7 +235,26 @@ mod shplonked {
         let commitment_msms: Vec<_> = commitments.iter().map(|c| c.clone().into()).collect();
 
         let mut trs_verifier = merlin::Transcript::new(PCS_BATCH_DST);
-        zk_pcs_verify(&proof, &commitment_msms, &vk, &mut trs_verifier, &mut rng)
-            .expect("batch verify should succeed");
+        let batch_proof = ShplonkedBatchProof::from(proof.clone());
+        let sets: Vec<EvaluationSet<_>> = proof
+            .eval_points
+            .iter()
+            .map(|&z| EvaluationSet {
+                rev: vec![],
+                hid: vec![z],
+            })
+            .collect();
+        batch_verify_generalized::<Bn254, _, SumEvalHom>(
+            &vk,
+            &sets,
+            &SumEvalHom,
+            &commitment_msms,
+            &[],
+            proof.sigma_proof_statement.phi_y,
+            &batch_proof,
+            &mut trs_verifier,
+            &mut rng,
+        )
+        .expect("batch verify should succeed");
     }
 }

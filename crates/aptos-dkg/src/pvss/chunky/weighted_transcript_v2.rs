@@ -119,7 +119,7 @@ impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>>
             true,
             &sc.get_threshold_config().domain,
         );
-        let Vs_flat = self.subtrs.vs_flat();
+        let Vs_flat = self.subtrs.all_Vs_flat();
         let ldt_msm_terms = ldt.ldt_msm_input::<E::G2>(&Vs_flat)?;
 
         let eks_inner: Vec<_> = eks.iter().map(|ek| ek.ek).collect();
@@ -315,7 +315,7 @@ impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>> traits:
 
         Transcript {
             dealer: sc.get_player(0),
-            subtrs: Subtranscript::random_bases(sc, num_chunks_per_share, rng),
+            subtrs: Subtranscript::generate(sc, num_chunks_per_share, rng),
             sharing_proof: SharingProof {
                 range_proof_commitment: sigma_protocol::homomorphism::TrivialShape(
                     unsafe_random_point_group::<E::G1, _>(rng),

@@ -93,13 +93,13 @@ pub fn com_y_hom<'a, E: Pairing>(taus_1: &'a [E::G1Affine], xi_1: E::G1Affine) -
 /// Parameterized by public weights alphas (derived from transcript and challenge points).
 /// Owns bases for serialization.
 #[derive(Clone, Debug, PartialEq, Eq, CanonicalSerialize, CanonicalDeserialize)]
-pub struct VHom<E: Pairing> {
+pub struct EvalPointCommitHom<E: Pairing> {
     pub tau_0: E::G1Affine,
     pub xi_1: E::G1Affine,
     pub alphas: Vec<E::ScalarField>,
 }
 
-impl<E: Pairing> VHom<E> {
+impl<E: Pairing> EvalPointCommitHom<E> {
     /// Build from SRS (uses only `taus_1[0]` and `xi_1`).
     #[allow(dead_code)]
     pub fn from_srs(srs: &Srs<E>, alphas: Vec<E::ScalarField>) -> Self {
@@ -116,7 +116,7 @@ impl<E: Pairing> VHom<E> {
     }
 }
 
-impl<E: Pairing> HomTrait for VHom<E> {
+impl<E: Pairing> HomTrait for EvalPointCommitHom<E> {
     type Codomain = CodomainShape<E::G1>;
     type CodomainNormalized = CodomainShape<E::G1Affine>;
     type Domain = ShplonkedSigmaWitness<E::ScalarField>;
@@ -132,7 +132,7 @@ impl<E: Pairing> HomTrait for VHom<E> {
     }
 }
 
-impl<E: Pairing> fixed_base_msms::Trait for VHom<E> {
+impl<E: Pairing> fixed_base_msms::Trait for EvalPointCommitHom<E> {
     type Base = E::G1Affine;
     type CodomainShape<T>
         = CodomainShape<T>
@@ -170,7 +170,7 @@ impl<E: Pairing> fixed_base_msms::Trait for VHom<E> {
     }
 }
 
-impl<E: Pairing> sigma_protocol::CurveGroupTrait for VHom<E> {
+impl<E: Pairing> sigma_protocol::CurveGroupTrait for EvalPointCommitHom<E> {
     type Group = E::G1;
 
     fn dst(&self) -> Vec<u8> {
@@ -179,13 +179,13 @@ impl<E: Pairing> sigma_protocol::CurveGroupTrait for VHom<E> {
 }
 
 /// (com_y, V) as a curve-group tuple homomorphism.
-pub type ComYVHom<'a, E> = CurveGroupTupleHomomorphism<<E as Pairing>::G1, ComYHom<'a, E>, VHom<E>>;
+pub type FirstTupleHom<'a, E> = CurveGroupTupleHomomorphism<<E as Pairing>::G1, ComYHom<'a, E>, EvalPointCommitHom<E>>;
 
 /// Homomorphism for y_sum: (rho, evals, u) -> sum(evals). Used as third component with TupleHomomorphism.
 #[derive(Clone, Debug, Default, PartialEq, Eq, CanonicalSerialize)]
-pub struct SumEvalsHom<F: PrimeField>(PhantomData<F>);
+pub struct SumHom<F: PrimeField>(PhantomData<F>);
 
-impl<F: PrimeField> HomTrait for SumEvalsHom<F> {
+impl<F: PrimeField> HomTrait for SumHom<F> {
     type Codomain = F;
     type CodomainNormalized = F;
     type Domain = ShplonkedSigmaWitness<F>;
@@ -199,7 +199,7 @@ impl<F: PrimeField> HomTrait for SumEvalsHom<F> {
     }
 }
 
-impl<F: PrimeField> SigmaTrait for SumEvalsHom<F> {
+impl<F: PrimeField> SigmaTrait for SumHom<F> {
     type Scalar = F;
     type VerifierBatchSize = usize;
 
@@ -225,4 +225,4 @@ impl<F: PrimeField> SigmaTrait for SumEvalsHom<F> {
 
 /// Full sigma homomorphism: ((com_y, V), y_sum).
 pub type ShplonkedSigmaHom<'a, E> =
-    TupleHomomorphism<ComYVHom<'a, E>, SumEvalsHom<<E as Pairing>::ScalarField>>;
+    TupleHomomorphism<FirstTupleHom<'a, E>, SumHom<<E as Pairing>::ScalarField>>;

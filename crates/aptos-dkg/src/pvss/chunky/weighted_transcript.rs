@@ -65,7 +65,7 @@ pub struct Transcript<P: Pairing> {
     dealer: Player,
     /// This is the aggregatable subtranscript
     #[serde(serialize_with = "ark_se", deserialize_with = "ark_de")]
-    // Even though Subtranscript implements Serialize/Deserialize, we need this because `P` does not implement it
+    // Even though Subtranscript implements Serialize/Deserialize, we need this attribute macro because `P` does not implement Serialize/Deserialize
     pub subtrs: Subtranscript<P>,
     /// Proof (of knowledge) showing that the s_{i,j}'s in C are base-B representations (of the s_i's in V, but this is not part of the proof), and that the r_j's in R are used in C
     #[serde(serialize_with = "ark_se", deserialize_with = "ark_de")]
@@ -194,7 +194,7 @@ impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>> traits:
 
         Transcript {
             dealer: sc.get_player(0),
-            subtrs: Subtranscript::random_bases(sc, num_chunks_per_share, rng),
+            subtrs: Subtranscript::generate(sc, num_chunks_per_share, rng),
             sharing_proof: SharingProof {
                 range_proof_commitment: sigma_protocol::homomorphism::TrivialShape(
                     unsafe_random_point_group::<E::G1, _>(rng),
@@ -370,7 +370,7 @@ impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>>
             true,
             &sc.get_threshold_config().domain,
         );
-        let Vs_flat = self.subtrs.vs_flat();
+        let Vs_flat = self.subtrs.all_Vs_flat();
 
         let beta = sample_field_element(rng);
         let powers_of_beta = utils::powers(beta, sc.get_total_weight() + 1);

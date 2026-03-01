@@ -7,8 +7,10 @@ use super::scalars_to_bits;
 use crate::{
     fiat_shamir::PolynomialCommitmentScheme,
     pcs::{
+        EvaluationSet,
         shplonked::{
-            zk_pcs_commit, zk_pcs_open, zk_pcs_pairing_for_verify, Srs, ZkPcsOpeningProof,
+            batch_open_generalized, zk_pcs_pairing_for_verify, Shplonked, SumEvalHom, Srs,
+            ZkPcsOpeningProof,
         },
         univariate_hiding_kzg,
     },
@@ -719,26 +721,6 @@ pub fn prove_impl<E: Pairing, R: RngCore + CryptoRng>(
         &mut trs,
     );
 
-    // Step 7
-    let hat_g = batched_opening.0.f_coeffs;
-    let hat_x = batched_opening.0.x;
-
-    let batched_opening_proof = shplonked::zk_pcs_open(
-        &srs,
-        0, // I don't know what this is
-        hat_g,
-        vec![],
-        hat_x,
-        batched_eval,
-        batched_randomness,
-    );
-
-    #[cfg(feature = "range_proof_timing_multivariate")]
-    print_cumulative(
-        "batched_coeffs + z + y + combined_comm + batched_randomness",
-        start.elapsed(),
-    );
-
     #[cfg(feature = "range_proof_timing_multivariate")]
     let start = Instant::now();
     // Step 7 (spec): single batched opening proof for f̂ at z and g_i at rho_i (uPCS.BatchOpen)
@@ -755,21 +737,37 @@ pub fn prove_impl<E: Pairing, R: RngCore + CryptoRng>(
         start.elapsed(),
     );
 
+    let sets: Vec<EvaluationSet<E::ScalarField>> = eval_points
+        .iter()
+        .map(|&z| EvaluationSet {
+            rev: vec![],
+            hid: vec![z],
+        })
+        .collect();
+    let polys: Vec<DensePolynomial<E::ScalarField>> = all_f_is
+        .iter()
+        .map(|c| DensePolynomial::from_coefficients_vec(c.clone()))
+        .collect();
     #[cfg(feature = "range_proof_timing_multivariate")]
     let start = Instant::now();
-    let zk_pcs_opening_proof = zk_pcs_open(
+    let opening = batch_open_generalized::<E, _, SumEvalHom>(
         &srs,
-        (size - 1).max(4) as u8,
-        all_f_is,
-        vec![], // commitments not used in open
-        eval_points,
-        all_evals,
-        all_rs,
+        &sets,
+        &polys,
+        &all_rs,
+        &SumEvalHom,
         &mut trs,
         rng,
     );
+    let zk_pcs_opening_proof = ZkPcsOpeningProof {
+        eval_points: eval_points.clone(),
+        pi_1: opening.proof.pi_1,
+        pi_2: opening.proof.pi_2,
+        sigma_proof: opening.proof.sigma_proof,
+        sigma_proof_statement: opening.proof.sigma_proof_statement,
+    };
     #[cfg(feature = "range_proof_timing_multivariate")]
-    print_cumulative("zk_pcs_open (batched opening)", start.elapsed());
+    print_cumulative("batched opening", start.elapsed());
 
     let commitments: Vec<E::G1Affine> = f_j_comms_proj.iter().map(|g| g.into_affine()).collect();
     let g_commitments: Vec<E::G1Affine> = g_comm_proj.iter().map(|g| g.into_affine()).collect();
@@ -1039,7 +1037,18 @@ fn zksc_send_mask<E: Pairing, R: RngCore + CryptoRng>(
 
     // Step (2): Commit
     let r_is = sample_field_elements(num_vars.into(), rng);
-    let g_comm: Vec<E::G1> = zk_pcs_commit(srs, g_is.clone(), r_is.clone());
+    let g_comm: Vec<E::G1> = g_is
+        .iter()
+        .zip(r_is.iter())
+        .map(|(g_i, r_i)| {
+            Shplonked::<E>::commit(
+                srs,
+                DensePolynomial::from_coefficients_vec(g_i.clone()),
+                Some(*r_i),
+            )
+            .0
+        })
+        .collect();
 
     let mut sum_c = E::ScalarField::ZERO;
     let mut sum_b = E::ScalarField::ZERO;
