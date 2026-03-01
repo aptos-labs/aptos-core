@@ -44,7 +44,7 @@ use std::{fmt::Debug, io::Write};
 // TODO: make an affine version of this
 #[allow(non_snake_case)]
 #[derive(CanonicalSerialize, Debug, PartialEq, Eq, Clone, CanonicalDeserialize)]
-pub struct Proof<E: Pairing> {
+pub struct ProofProjective<E: Pairing> {
     hatC: E::G1,
     pi_PoK: sigma_protocol::Proof<E::ScalarField, two_term_msm::Homomorphism<E::G1>>,
     Cs: Vec<E::G1>, // has length ell
@@ -55,7 +55,7 @@ pub struct Proof<E: Pairing> {
     pi_gamma: univariate_hiding_kzg::OpeningProof<E>,
 }
 
-impl<E: Pairing> Proof<E> {
+impl<E: Pairing> ProofProjective<E> {
     /// Generates a random looking proof (but not a valid one).
     /// Useful for testing and benchmarking. TODO: might be able to derive this through macros etc
     pub fn generate<R: rand::Rng + rand::CryptoRng>(ell: u8, rng: &mut R) -> Self {
@@ -242,7 +242,7 @@ fn compute_h_denom_eval<E: Pairing>(
     h_denom_eval
 }
 
-impl<E: Pairing> traits::BatchedRangeProof<E> for Proof<E> {
+impl<E: Pairing> traits::BatchedRangeProof<E> for ProofProjective<E> {
     type Commitment = univariate_hiding_kzg::Commitment<E>;
     type CommitmentKey = univariate_hiding_kzg::CommitmentKey<E>;
     type CommitmentRandomness = univariate_hiding_kzg::CommitmentRandomness<E::ScalarField>;
@@ -380,7 +380,7 @@ impl<E: Pairing> traits::BatchedRangeProof<E> for Proof<E> {
         comm: &Self::Commitment,
         rho: &Self::CommitmentRandomness,
         rng: &mut R,
-    ) -> Proof<E>
+    ) -> ProofProjective<E>
     where
         R: rand_core::RngCore + rand_core::CryptoRng,
     {
@@ -503,7 +503,7 @@ impl<E: Pairing> traits::BatchedRangeProof<E> for Proof<E> {
         let bits = scalars_to_bits::scalars_to_bits_le(values, ell);
         let f_j_evals_without_r = scalars_to_bits::transpose_bit_matrix(&bits);
 
-        let rs: Vec<E::ScalarField> = (0..ell).map(|_| sample_field_element(rng)).collect();
+        let rs: Vec<E::ScalarField> = sample_field_elements(ell as usize, rng);
 
         let f_js_evals: Vec<Vec<E::ScalarField>> = f_j_evals_without_r
             .iter()
@@ -516,9 +516,7 @@ impl<E: Pairing> traits::BatchedRangeProof<E> for Proof<E> {
             })
             .collect();
 
-        let rhos: Vec<E::ScalarField> = std::iter::repeat_with(|| sample_field_element(rng))
-            .take(ell as usize)
-            .collect();
+        let rhos: Vec<E::ScalarField> = sample_field_elements(ell as usize, rng);
 
         let hkzg_commitment_hom = univariate_hiding_kzg::CommitmentHomomorphism::<E> {
             msm_basis: lagr_g1,
@@ -763,7 +761,7 @@ impl<E: Pairing> traits::BatchedRangeProof<E> for Proof<E> {
             prove_start.elapsed().as_secs_f64() * 1000.0
         );
 
-        Proof {
+        ProofProjective {
             hatC,
             pi_PoK,
             Cs,
@@ -818,7 +816,7 @@ impl<E: Pairing> traits::BatchedRangeProof<E> for Proof<E> {
             verifier_precomputed.powers_of_two.len()
         ); // Easy to work around this if it fails...
 
-        let Proof {
+        let ProofProjective {
             hatC,
             pi_PoK,
             Cs,
@@ -1002,9 +1000,9 @@ mod fiat_shamir {
         vk: &VerificationKey<E>,
         ps: PublicStatement<E>,
     ) {
-        <Transcript as RangeProof<E, Proof<E>>>::append_sep(fs_t, dst);
-        <Transcript as RangeProof<E, Proof<E>>>::append_vk(fs_t, vk);
-        <Transcript as RangeProof<E, Proof<E>>>::append_public_statement(fs_t, ps);
+        <Transcript as RangeProof<E, ProofProjective<E>>>::append_sep(fs_t, dst);
+        <Transcript as RangeProof<E, ProofProjective<E>>>::append_vk(fs_t, vk);
+        <Transcript as RangeProof<E, ProofProjective<E>>>::append_public_statement(fs_t, ps);
     }
 
     #[allow(non_snake_case)]
@@ -1012,7 +1010,10 @@ mod fiat_shamir {
         fs_transcript: &mut Transcript,
         hatC: &E::G1,
     ) {
-        <Transcript as RangeProof<E, Proof<E>>>::append_hat_f_commitment(fs_transcript, hatC);
+        <Transcript as RangeProof<E, ProofProjective<E>>>::append_hat_f_commitment(
+            fs_transcript,
+            hatC,
+        );
     }
 
     #[allow(non_snake_case)]
@@ -1020,7 +1021,10 @@ mod fiat_shamir {
         fs_transcript: &mut Transcript,
         pi_PoK: &sigma_protocol::Proof<E::ScalarField, two_term_msm::Homomorphism<E::G1>>,
     ) {
-        <Transcript as RangeProof<E, Proof<E>>>::append_sigma_proof(fs_transcript, pi_PoK);
+        <Transcript as RangeProof<E, ProofProjective<E>>>::append_sigma_proof(
+            fs_transcript,
+            pi_PoK,
+        );
     }
 
     #[allow(non_snake_case)]
@@ -1028,7 +1032,10 @@ mod fiat_shamir {
         fs_transcript: &mut Transcript,
         Cs: &Vec<E::G1>,
     ) {
-        <Transcript as RangeProof<E, Proof<E>>>::append_f_j_commitments(fs_transcript, Cs);
+        <Transcript as RangeProof<E, ProofProjective<E>>>::append_f_j_commitments(
+            fs_transcript,
+            Cs,
+        );
     }
 
     pub(crate) fn get_beta_challenges<E: Pairing>(
@@ -1036,7 +1043,7 @@ mod fiat_shamir {
         ell: usize,
     ) -> (E::ScalarField, Vec<E::ScalarField>) {
         let mut betas =
-            <Transcript as RangeProof<E, Proof<E>>>::challenges_for_quotient_polynomials(
+            <Transcript as RangeProof<E, ProofProjective<E>>>::challenges_for_quotient_polynomials(
                 fs_transcript,
                 ell,
             );
@@ -1048,17 +1055,18 @@ mod fiat_shamir {
 
     #[allow(non_snake_case)]
     pub(crate) fn append_h_commitment<E: Pairing>(fs_transcript: &mut Transcript, D: &E::G1) {
-        <Transcript as RangeProof<E, Proof<E>>>::append_h_commitment(fs_transcript, D);
+        <Transcript as RangeProof<E, ProofProjective<E>>>::append_h_commitment(fs_transcript, D);
     }
 
     pub(crate) fn get_mu_challenges<E: Pairing>(
         fs_transcript: &mut Transcript,
         ell: usize,
     ) -> (E::ScalarField, E::ScalarField, Vec<E::ScalarField>) {
-        let mut mus = <Transcript as RangeProof<E, Proof<E>>>::challenges_for_linear_combination(
-            fs_transcript,
-            ell + 2,
-        );
+        let mut mus =
+            <Transcript as RangeProof<E, ProofProjective<E>>>::challenges_for_linear_combination(
+                fs_transcript,
+                ell + 2,
+            );
 
         let mu = mus.pop().expect("The mus must have at least one element");
         let mu_h = mus.pop().expect("The mus must have at least two elements");
@@ -1072,8 +1080,9 @@ mod fiat_shamir {
         roots_of_unity: &Vec<E::ScalarField>,
     ) -> E::ScalarField {
         loop {
-            let gamma =
-                <Transcript as RangeProof<E, Proof<E>>>::challenge_from_verifier(fs_transcript);
+            let gamma = <Transcript as RangeProof<E, ProofProjective<E>>>::challenge_from_verifier(
+                fs_transcript,
+            );
             if !roots_of_unity.contains(&gamma) {
                 return gamma;
             }

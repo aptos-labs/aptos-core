@@ -179,16 +179,15 @@ type LiftedWeightedChunkedElgamal<'a, C> = LiftHomomorphism<
 // it would make more sense to say this is a tuple homomorphism consisting of (lifts of) the
 // DeKARTv2::commitment_homomorphism together with the chunked_elgamal::homomorphism.
 //pub type Homomorphism<'a, E> = CurveGroupTupleHomomorphism<LiftedHkzg<'a, E>, LiftedChunkedElgamal<'a, <E as Pairing>::G1>>;
-pub type WeightedHomomorphism<'a, E> = CurveGroupTupleHomomorphism<
+pub type Homomorphism<'a, E> = CurveGroupTupleHomomorphism<
     <E as Pairing>::G1,
     LiftedHkzgWeighted<'a, E>,
     LiftedWeightedChunkedElgamal<'a, <E as Pairing>::G1>,
 >;
 
-pub type WeightedProof<'a, E> =
-    sigma_protocol::Proof<<E as Pairing>::ScalarField, WeightedHomomorphism<'a, E>>;
+pub type Proof<'a, E> = sigma_protocol::Proof<<E as Pairing>::ScalarField, Homomorphism<'a, E>>;
 
-impl<'a, E: Pairing> WeightedProof<'a, E> {
+impl<'a, E: Pairing> Proof<'a, E> {
     /// Generates a random looking proof (but not a valid one).
     /// Useful for testing and benchmarking.
     pub fn generate<R: rand::Rng + rand::CryptoRng>(
@@ -252,7 +251,7 @@ impl<'a, E: Pairing> WeightedProof<'a, E> {
 }
 
 #[allow(non_snake_case)]
-impl<'a, E: Pairing> WeightedHomomorphism<'a, E> {
+impl<'a, E: Pairing> Homomorphism<'a, E> {
     pub fn new(
         lagr_g1: &'a [E::G1Affine],
         xi_1: E::G1Affine,

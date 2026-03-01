@@ -42,7 +42,7 @@ use aptos_crypto::{
     },
     bls12381::{self},
     utils,
-    weighted_config::WeightedConfigArkworks,
+    weighted_config::WeightedConfigArkworks as SecretSharingConfig,
     CryptoMaterialError, TSecretSharingConfig as _, ValidCryptoMaterial,
 };
 use ark_ec::{
@@ -65,158 +65,11 @@ pub struct Transcript<P: Pairing> {
     dealer: Player,
     /// This is the aggregatable subtranscript
     #[serde(serialize_with = "ark_se", deserialize_with = "ark_de")]
+    // Even though Subtranscript implements Serialize/Deserialize, we need this because `P` does not implement it
     pub subtrs: Subtranscript<P>,
     /// Proof (of knowledge) showing that the s_{i,j}'s in C are base-B representations (of the s_i's in V, but this is not part of the proof), and that the r_j's in R are used in C
     #[serde(serialize_with = "ark_se", deserialize_with = "ark_de")]
     pub sharing_proof: SharingProof<P>,
-}
-
-/// This is the secret sharing config that will be used for weighted `chunky`
-#[allow(type_alias_bounds)]
-type SecretSharingConfig<P: Pairing> = WeightedConfigArkworks<P::ScalarField>;
-
-impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>>
-    HasAggregatableSubtranscript for Transcript<E>
-{
-    type Subtranscript = Subtranscript<E>;
-
-    fn get_subtranscript(&self) -> Self::Subtranscript {
-        self.subtrs.clone()
-    }
-
-    #[allow(non_snake_case)]
-    fn verify<A: Serialize + Clone, R: RngCore + CryptoRng>(
-        &self,
-        sc: &Self::SecretSharingConfig,
-        pp: &Self::PublicParameters,
-        spks: &[Self::SigningPubKey],
-        eks: &[Self::EncryptPubKey],
-        sid: &A,
-        rng: &mut R,
-    ) -> anyhow::Result<()> {
-        let sok_cntxt = verify_weighted_preamble(
-            sc,
-            &self.subtrs,
-            &self.dealer,
-            spks,
-            eks,
-            sid,
-            <Self as traits::Transcript>::dst(),
-        )?;
-
-        // Verify the range proof
-        let (g1_terms, g2_terms) = self.sharing_proof.range_proof.pairing_for_verify(
-            &pp.pk_range_proof.vk,
-            sc.get_total_weight() * num_chunks_per_scalar::<E::ScalarField>(pp.ell) as usize,
-            pp.ell,
-            &self.sharing_proof.range_proof_commitment,
-            rng,
-        )?;
-
-        // PoK MSM terms (G1) and LDT MSM terms (G2) for merging into one pairing check
-        let eks_inner: Vec<_> = eks.iter().map(|ek| ek.ek).collect();
-        let lagr_g1: &[E::G1Affine] = match &pp.pk_range_proof.ck_S.msm_basis {
-            SrsBasis::Lagrange { lagr: lagr_g1 } => lagr_g1,
-            SrsBasis::PowersOfTau { .. } => {
-                bail!("Expected a Lagrange basis, received powers of tau basis instead")
-            },
-        };
-        let hom = hkzg_chunked_elgamal::WeightedHomomorphism::<E>::new(
-            lagr_g1,
-            pp.pk_range_proof.ck_S.xi_1,
-            &pp.pp_elgamal,
-            &eks_inner,
-        );
-        let pok_statement = TupleCodomainShape(
-            sigma_protocol::homomorphism::TrivialShape(
-                self.sharing_proof.range_proof_commitment.0.into_affine(),
-            ),
-            chunked_elgamal::WeightedCodomainShape {
-                chunks: self.subtrs.Cs.clone(),
-                randomness: self.subtrs.Rs.clone(),
-            },
-        );
-        let num_chunks = num_chunks_per_scalar::<E::ScalarField>(pp.ell) as usize;
-        let pok_num_beta_powers =
-            1 + sc.get_total_weight() * num_chunks + sc.get_max_weight() * num_chunks;
-        let pok_msm_terms = hom
-            .msm_terms_for_verify::<_, hkzg_chunked_elgamal::WeightedHomomorphism<'static, E>, _>(
-                &pok_statement,
-                &self.sharing_proof.SoK,
-                &sok_cntxt,
-                Some(pok_num_beta_powers),
-                rng,
-            );
-
-        let ldt = LowDegreeTest::random(
-            rng,
-            sc.get_threshold_weight(),
-            sc.get_total_weight() + 1,
-            true,
-            &sc.get_threshold_config().domain,
-        );
-        let Vs_flat = self.subtrs.vs_flat();
-
-        let beta = sample_field_element(rng);
-        let powers_of_beta = utils::powers(beta, sc.get_total_weight() + 1);
-
-        let Cs_flat: Vec<_> = self.subtrs.Cs.iter().flatten().cloned().collect();
-        assert_eq!(
-            Cs_flat.len(),
-            sc.get_total_weight(),
-            "Number of ciphertexts does not equal number of weights"
-        );
-
-        let mut weighted_Cs_base = Vec::new();
-        let mut weighted_Cs_scalar = Vec::new();
-        for i in 0..Cs_flat.len() {
-            for j in 0..Cs_flat[i].len() {
-                weighted_Cs_base.push(Cs_flat[i][j]);
-                weighted_Cs_scalar.push(pp.powers_of_radix[j] * powers_of_beta[i]);
-            }
-        }
-
-        let gamma = sample_field_element(rng);
-        let gamma_sq = gamma * gamma;
-
-        let weighted_Cs_msm =
-            MsmInput::new(weighted_Cs_base, weighted_Cs_scalar).expect("weighted_Cs MSM terms");
-        let merged_g1 =
-            msm::merge_scaled_msm_terms::<E::G1>(&[&pok_msm_terms, &weighted_Cs_msm], &[
-                gamma,
-                E::ScalarField::ONE,
-            ]);
-        let combined_G1 = E::G1::msm(merged_g1.bases(), merged_g1.scalars())
-            .expect("Failed to compute merged G1 MSM in chunky");
-
-        let ldt_msm_terms = ldt.ldt_msm_input::<E::G2>(&Vs_flat)?;
-        let n = sc.get_total_weight();
-        let weighted_Vs_msm = MsmInput::new(Vs_flat[..n].to_vec(), powers_of_beta[..n].to_vec())
-            .expect("weighted_Vs MSM terms");
-        let merged_g2 =
-            msm::merge_scaled_msm_terms::<E::G2>(&[&ldt_msm_terms, &weighted_Vs_msm], &[
-                gamma_sq,
-                E::ScalarField::ONE,
-            ]);
-        let combined_G2 = E::G2::msm(merged_g2.bases(), merged_g2.scalars())
-            .expect("Failed to compute merged G2 MSM in chunky");
-
-        let res = E::multi_pairing(
-            g1_terms.iter().copied().chain([
-                combined_G1.into_affine(),
-                *pp.get_encryption_public_params().message_base(),
-            ]),
-            g2_terms
-                .iter()
-                .copied()
-                .chain([pp.get_commitment_base(), (-combined_G2).into_affine()]),
-        );
-        if PairingOutput::<E>::ZERO != res {
-            return Err(anyhow::anyhow!("Expected zero during multi-pairing check"));
-        }
-
-        Ok(())
-    }
 }
 
 /// Proof that chunked ciphertexts and commitments are consistent (SoK + batched range proof).
@@ -224,15 +77,12 @@ impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>>
 #[derive(CanonicalSerialize, CanonicalDeserialize, Clone, Debug, PartialEq, Eq)]
 pub struct SharingProof<P: Pairing> {
     /// SoK: the SK is knowledge of `witnesses` s_{i,j} yielding the commitment and the C and the R, their image is the PK, and the signed message is a certain context `cntxt`
-    pub SoK: sigma_protocol::Proof<
-        P::ScalarField,
-        hkzg_chunked_elgamal::WeightedHomomorphism<'static, P>,
-    >, // static because we don't want the lifetime of the Proof to depend on the Homomorphism TODO: try removing it?
+    pub SoK: sigma_protocol::Proof<P::ScalarField, hkzg_chunked_elgamal::Homomorphism<'static, P>>, // static because we don't want the lifetime of the Proof to depend on the Homomorphism // TODO: try removing it?
     /// A batched range proof showing that all committed values s_{i,j} lie in some range
-    pub range_proof: dekart_univariate_v2::Proof<P>, // TODO: make an affine version of this
+    pub range_proof: dekart_univariate_v2::ProofProjective<P>, // TODO: make an affine version of this
     /// A KZG-style commitment to the values s_{i,j} going into the range proof
     pub range_proof_commitment:
-        <dekart_univariate_v2::Proof<P> as BatchedRangeProof<P>>::Commitment,
+        <dekart_univariate_v2::ProofProjective<P> as BatchedRangeProof<P>>::Commitment, // TODO: also make this affine
 }
 
 impl<E: Pairing> ValidCryptoMaterial for Transcript<E> {
@@ -251,8 +101,6 @@ impl<E: Pairing> TryFrom<&[u8]> for Transcript<E> {
             .map_err(|_| CryptoMaterialError::DeserializationError)
     }
 }
-
-delegate_transcript_core_to_subtrs!(Transcript<E>, subtrs);
 
 impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>> traits::Transcript
     for Transcript<E>
@@ -351,12 +199,14 @@ impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>> traits:
                 range_proof_commitment: sigma_protocol::homomorphism::TrivialShape(
                     unsafe_random_point_group::<E::G1, _>(rng),
                 ),
-                SoK: hkzg_chunked_elgamal::WeightedProof::generate(sc, num_chunks_per_share, rng),
-                range_proof: dekart_univariate_v2::Proof::generate(pp.ell, rng),
+                SoK: hkzg_chunked_elgamal::Proof::generate(sc, num_chunks_per_share, rng),
+                range_proof: dekart_univariate_v2::ProofProjective::generate(pp.ell, rng),
             },
         }
     }
 }
+
+delegate_transcript_core_to_subtrs!(Transcript<E>, subtrs);
 
 impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>> Transcript<E> {
     /// Encrypts chunked shares and builds the sharing proof (SoK + range proof).
@@ -392,7 +242,7 @@ impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>> Transcr
                 panic!("Expected a Lagrange basis, received powers of tau basis instead")
             },
         };
-        let hom = hkzg_chunked_elgamal::WeightedHomomorphism::<E>::new(
+        let hom = hkzg_chunked_elgamal::Homomorphism::<E>::new(
             lagr_g1,
             pp.pk_range_proof.ck_S.xi_1,
             &pp.pp_elgamal,
@@ -420,7 +270,7 @@ impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>> Transcr
         // );
 
         // Generate the batch range proof, given the `range_proof_commitment` produced in the PoK
-        let range_proof = dekart_univariate_v2::Proof::prove(
+        let range_proof = dekart_univariate_v2::ProofProjective::prove(
             &pp.pk_range_proof,
             &f_evals_chunked_flat,
             pp.ell,
@@ -437,6 +287,150 @@ impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>> Transcr
         };
 
         (Cs, Rs, sharing_proof)
+    }
+}
+
+impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>>
+    HasAggregatableSubtranscript for Transcript<E>
+{
+    type Subtranscript = Subtranscript<E>;
+
+    fn get_subtranscript(&self) -> Self::Subtranscript {
+        self.subtrs.clone()
+    }
+
+    #[allow(non_snake_case)]
+    fn verify<A: Serialize + Clone, R: RngCore + CryptoRng>(
+        &self,
+        sc: &Self::SecretSharingConfig,
+        pp: &Self::PublicParameters,
+        spks: &[Self::SigningPubKey],
+        eks: &[Self::EncryptPubKey],
+        sid: &A,
+        rng: &mut R,
+    ) -> anyhow::Result<()> {
+        let sok_cntxt = verify_weighted_preamble(
+            sc,
+            &self.subtrs,
+            &self.dealer,
+            spks,
+            eks,
+            sid,
+            <Self as traits::Transcript>::dst(),
+        )?;
+
+        // Verify the range proof
+        let (g1_terms, g2_terms) = self.sharing_proof.range_proof.pairing_for_verify(
+            &pp.pk_range_proof.vk,
+            sc.get_total_weight() * num_chunks_per_scalar::<E::ScalarField>(pp.ell) as usize,
+            pp.ell,
+            &self.sharing_proof.range_proof_commitment,
+            rng,
+        )?;
+
+        // PoK MSM terms (G1) and LDT MSM terms (G2) for merging into one pairing check
+        let eks_inner: Vec<_> = eks.iter().map(|ek| ek.ek).collect();
+        let lagr_g1: &[E::G1Affine] = match &pp.pk_range_proof.ck_S.msm_basis {
+            SrsBasis::Lagrange { lagr: lagr_g1 } => lagr_g1,
+            SrsBasis::PowersOfTau { .. } => {
+                bail!("Expected a Lagrange basis, received powers of tau basis instead")
+            },
+        };
+        let hom = hkzg_chunked_elgamal::Homomorphism::<E>::new(
+            lagr_g1,
+            pp.pk_range_proof.ck_S.xi_1,
+            &pp.pp_elgamal,
+            &eks_inner,
+        );
+        let pok_statement = TupleCodomainShape(
+            sigma_protocol::homomorphism::TrivialShape(
+                self.sharing_proof.range_proof_commitment.0.into_affine(),
+            ),
+            chunked_elgamal::WeightedCodomainShape {
+                chunks: self.subtrs.Cs.clone(),
+                randomness: self.subtrs.Rs.clone(),
+            },
+        );
+        let num_chunks = num_chunks_per_scalar::<E::ScalarField>(pp.ell) as usize;
+        let pok_num_beta_powers =
+            1 + sc.get_total_weight() * num_chunks + sc.get_max_weight() * num_chunks;
+        let pok_msm_terms = hom
+            .msm_terms_for_verify::<_, hkzg_chunked_elgamal::Homomorphism<'static, E>, _>(
+                &pok_statement,
+                &self.sharing_proof.SoK,
+                &sok_cntxt,
+                Some(pok_num_beta_powers),
+                rng,
+            );
+
+        let ldt = LowDegreeTest::random(
+            rng,
+            sc.get_threshold_weight(),
+            sc.get_total_weight() + 1,
+            true,
+            &sc.get_threshold_config().domain,
+        );
+        let Vs_flat = self.subtrs.vs_flat();
+
+        let beta = sample_field_element(rng);
+        let powers_of_beta = utils::powers(beta, sc.get_total_weight() + 1);
+
+        let Cs_flat: Vec<_> = self.subtrs.Cs.iter().flatten().cloned().collect();
+        assert_eq!(
+            Cs_flat.len(),
+            sc.get_total_weight(),
+            "Number of ciphertexts does not equal number of weights"
+        );
+
+        let mut weighted_Cs_base = Vec::new();
+        let mut weighted_Cs_scalar = Vec::new();
+        for i in 0..Cs_flat.len() {
+            for j in 0..Cs_flat[i].len() {
+                weighted_Cs_base.push(Cs_flat[i][j]);
+                weighted_Cs_scalar.push(pp.powers_of_radix[j] * powers_of_beta[i]);
+            }
+        }
+
+        let gamma = sample_field_element(rng);
+        let gamma_sq = gamma * gamma;
+
+        let weighted_Cs_msm =
+            MsmInput::new(weighted_Cs_base, weighted_Cs_scalar).expect("weighted_Cs MSM terms");
+        let merged_g1 =
+            msm::merge_scaled_msm_terms::<E::G1>(&[&pok_msm_terms, &weighted_Cs_msm], &[
+                gamma,
+                E::ScalarField::ONE,
+            ]);
+        let combined_G1 = E::G1::msm(merged_g1.bases(), merged_g1.scalars())
+            .expect("Failed to compute merged G1 MSM in chunky");
+
+        let ldt_msm_terms = ldt.ldt_msm_input::<E::G2>(&Vs_flat)?;
+        let n = sc.get_total_weight();
+        let weighted_Vs_msm = MsmInput::new(Vs_flat[..n].to_vec(), powers_of_beta[..n].to_vec())
+            .expect("weighted_Vs MSM terms");
+        let merged_g2 =
+            msm::merge_scaled_msm_terms::<E::G2>(&[&ldt_msm_terms, &weighted_Vs_msm], &[
+                gamma_sq,
+                E::ScalarField::ONE,
+            ]);
+        let combined_G2 = E::G2::msm(merged_g2.bases(), merged_g2.scalars())
+            .expect("Failed to compute merged G2 MSM in chunky");
+
+        let res = E::multi_pairing(
+            g1_terms.iter().copied().chain([
+                combined_G1.into_affine(),
+                *pp.get_encryption_public_params().message_base(),
+            ]),
+            g2_terms
+                .iter()
+                .copied()
+                .chain([pp.get_commitment_base(), (-combined_G2).into_affine()]),
+        );
+        if PairingOutput::<E>::ZERO != res {
+            return Err(anyhow::anyhow!("Expected zero during multi-pairing check"));
+        }
+
+        Ok(())
     }
 }
 

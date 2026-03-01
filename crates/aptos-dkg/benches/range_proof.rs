@@ -10,7 +10,7 @@ use aptos_dkg::{
     range_proofs::{
         //        dekart_multivariate::Proof as DekartMultivariate,
         dekart_univariate::Proof as UnivariateDeKART,
-        dekart_univariate_v2::Proof as UnivariateDeKARTv2,
+        dekart_univariate_v2::ProofProjective as UnivariateDeKARTv2,
         traits::BatchedRangeProof,
     },
     utils::test_utils::{self},

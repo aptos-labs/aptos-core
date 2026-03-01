@@ -254,7 +254,7 @@ impl<E: Pairing> PublicParameters<E> {
         let pp = Self {
             max_num_shares,
             pp_elgamal,
-            pk_range_proof: dekart_univariate_v2::Proof::setup(
+            pk_range_proof: dekart_univariate_v2::ProofProjective::setup(
                 max_num_chunks_padded.try_into().unwrap(),
                 ell,
                 group_generators,

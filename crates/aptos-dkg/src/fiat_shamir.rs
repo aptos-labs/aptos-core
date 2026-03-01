@@ -8,7 +8,8 @@
 //! define all the things that are appended to the transcript.
 
 use crate::{
-    range_proofs::traits::BatchedRangeProof, sigma_protocol, sigma_protocol::homomorphism,
+    pcs::EvaluationSet, range_proofs::traits::BatchedRangeProof, sigma_protocol,
+    sigma_protocol::homomorphism,
 };
 use ark_ec::{pairing::Pairing, AffineRepr};
 use ark_ff::PrimeField;
@@ -104,6 +105,12 @@ pub trait PolynomialCommitmentScheme {
     fn append_sep(&mut self, dst: &[u8]);
 
     fn append_point<C: AffineRepr>(&mut self, point: &C);
+
+    fn append_evaluation_set<F: CanonicalSerialize>(&mut self, evaluation_set: &EvaluationSet<F>);
+
+    fn append_evaluation_points<F: CanonicalSerialize>(&mut self, evaluation_points: &[F]);
+
+    fn append_homomorphism_image<F: CanonicalSerialize>(&mut self, homomorphism_image: &F);
 
     fn challenge_scalar<F: PrimeField>(&mut self) -> F;
 }
@@ -243,6 +250,32 @@ impl PolynomialCommitmentScheme for Transcript {
             .serialize_compressed(&mut buf)
             .expect("Point serialization failed");
         self.append_message(b"point", &buf);
+    }
+
+    fn append_evaluation_set<F: CanonicalSerialize>(&mut self, evaluation_set: &EvaluationSet<F>) {
+        let mut buf = Vec::new();
+        evaluation_set
+            .serialize_compressed(&mut buf)
+            .expect("evaluation_set serialization should succeed");
+        self.append_message(b"evaluation-set", &buf);
+    }
+
+    fn append_evaluation_points<F: CanonicalSerialize>(&mut self, evaluation_points: &[F]) {
+        let mut buf = Vec::new();
+        for point in evaluation_points {
+            point
+                .serialize_compressed(&mut buf)
+                .expect("evaluation_point serialization should succeed");
+        }
+        self.append_message(b"evaluation-points", &buf);
+    }
+
+    fn append_homomorphism_image<F: CanonicalSerialize>(&mut self, homomorphism_image: &F) {
+        let mut buf = Vec::new();
+        homomorphism_image
+            .serialize_compressed(&mut buf)
+            .expect("homomorphism_image serialization should succeed");
+        self.append_message(b"homomorphism-image", &buf);
     }
 
     fn challenge_scalar<F: PrimeField>(&mut self) -> F {

@@ -3,9 +3,12 @@
 
 //! SHPLONKeD opening proof: generalized batch opening with optional hiding and homomorphism φ.
 //!
-//! Batch opening of univariate polynomials f₁,…,fₙ over evaluation sets
-//! S_i = S_i^rev ⊔ S_i^hid, with revealed evaluations y^rev, homomorphism image φ(y), and
-//! commitment C_{y^hid} to hidden evaluations. Notation: Z_S(X) = ∏_{s∈S}(X−s), challenge c then x.
+//! Implements PCS.BatchOpen and PCS.BatchVerify per the SHPLONKeD spec: batch opening of
+//! univariate polynomials f₁,…,fₙ over evaluation sets S_i = S_i^rev ⊔ S_i^hid, with
+//! revealed evaluations y^rev, homomorphism image φ(y), and commitment C_{y^hid} to hidden
+//! evaluations. Proof π = (π_1, π_2, C_{y^hid}, C_eval, π_PoK). Notation: Z_S(X) = ∏_{s∈S}(X−s);
+//! combined polynomial f = ∑_i c^{i-1} Z_{S\S_i}(x) f_i − Z_S(x) q − g with g = ∑_i c^{i-1} Z_{S\S_i}(x) f̃_i(x);
+//! opening at (x, 0); verifier computes C_f = ∑·C_i − Z_S·π_1 − C_eval + c^n·C_PoK.
 
 // WARNING: THIS CODE HAS NOT BEEN PROPERLY VETTED, ONLY USE FOR BENCHMARKING PURPOSES!!!!!
 
@@ -15,6 +18,7 @@ use crate::{
         shplonked_sigma::{self, ShplonkedSigmaWitness},
         traits::PolynomialCommitmentScheme,
         univariate_hiding_kzg::{self, Trapdoor},
+        EvaluationSet,
     },
     sigma_protocol::{
         homomorphism::{
@@ -54,39 +58,26 @@ use std::time::{Duration, Instant};
 /// Domain separation tag for the Shplonked opening sigma protocol (Fiat–Shamir context).
 pub const SHPLONKED_SIGMA_DST: &[u8; 19] = b"Shplonked_Sigma_Dst";
 
-// ---------------------------------------------------------------------------
-// Generalized evaluation sets and zero polynomials (spec notation)
-// ---------------------------------------------------------------------------
-
-/// Per-polynomial evaluation set: S_i = S_i^rev ⊔ S_i^hid.
-/// Order of points in `rev` and `hid` determines the flat index in y^rev and y^hid.
-#[derive(Clone, Debug)]
-pub struct EvaluationSet<F> {
-    /// Points at which the prover reveals the evaluation (y^rev).
-    pub rev: Vec<F>,
-    /// Points at which the evaluation is hidden (y^hid); commitment C_{y^hid} is sent.
-    pub hid: Vec<F>,
-}
-
-impl<F> EvaluationSet<F> {
-    /// All points in this set (rev first, then hid).
-    pub fn all_points(&self) -> impl Iterator<Item = &F> {
-        self.rev.iter().chain(self.hid.iter())
-    }
-
-    pub fn len(&self) -> usize {
-        self.rev.len() + self.hid.len()
-    }
-
-    pub fn is_empty(&self) -> bool {
-        self.rev.is_empty() && self.hid.is_empty()
-    }
-}
-
 /// Zero polynomial Z_S(X) = ∏_{s∈S}(X − s) for a set S.
 #[allow(non_snake_case)]
 pub fn zero_poly_S<F: FftField>(s: &[F]) -> DensePolynomial<F> {
     vanishing_poly::from_roots(s)
+}
+
+/// Set-theoretic union of all points from the given evaluation sets (no duplicates).
+fn union_of_evaluation_sets<F: CanonicalSerialize + Eq + Clone>(
+    sets: &[EvaluationSet<F>],
+) -> Vec<F> {
+    let mut out = Vec::new();
+    for set in sets.iter() {
+        for p in set.all_points() {
+            let p = p.clone();
+            if !out.contains(&p) {
+                out.push(p);
+            }
+        }
+    }
+    out
 }
 
 /// Returns Z_{S \ S_i}(x) for each i: i.e. Z_S(x) / Z_{S_i}(x).
@@ -142,30 +133,47 @@ pub fn tilde_f_i_at<F: Field>(s_i: &[F], evals_at_s_i: &[F], x: F) -> F {
         .fold(F::zero(), |a, b| a + b)
 }
 
+/// Lagrange basis polynomials L_s(X) for s ∈ S_i (each L_s(s)=1 and L_s(t)=0 for t≠s).
+/// Uses batch inversion for the denominator normalizers.
+#[allow(non_snake_case)]
+fn lagrange_basis_polys<F: FftField>(s_i: &[F]) -> Vec<DensePolynomial<F>> {
+    if s_i.is_empty() {
+        return Vec::new();
+    }
+    let z_S_i = vanishing_poly::from_roots(s_i);
+    let z_S_i_dos = DOSPoly::from(z_S_i.clone());
+    let mut denoms: Vec<F> = s_i
+        .iter()
+        .map(|&s| {
+            s_i.iter()
+                .filter(|&&t| t != s)
+                .fold(F::one(), |a, &t| a * (s - t))
+        })
+        .collect();
+    batch_inversion(&mut denoms);
+    s_i.iter()
+        .enumerate()
+        .map(|(idx, &s)| {
+            let divisor = DOSPoly::from(DensePolynomial::from_coefficients_vec(vec![-s, F::one()]));
+            let (l_s_poly, r) = z_S_i_dos.clone().divide_with_q_and_r(&divisor).unwrap();
+            debug_assert!(r.is_zero());
+            let mut l_s: DensePolynomial<F> = l_s_poly.into();
+            l_s = &l_s * denoms[idx];
+            l_s
+        })
+        .collect()
+}
+
 /// Interpolation polynomial f̃_i(X) = ∑_{s∈S_i} L_{i,s}(X) f_i(s) as a dense polynomial.
 #[allow(non_snake_case)]
 pub fn tilde_f_i_poly<F: FftField>(s_i: &[F], evals_at_s_i: &[F]) -> DensePolynomial<F> {
     debug_assert_eq!(s_i.len(), evals_at_s_i.len());
-    if s_i.is_empty() {
-        return DensePolynomial::zero();
-    }
-    let z_S_i = vanishing_poly::from_roots(s_i);
-    let z_S_i_dos = DOSPoly::from(z_S_i.clone());
-    let mut out = DensePolynomial::zero();
-    for (idx, &s) in s_i.iter().enumerate() {
-        let divisor = DOSPoly::from(DensePolynomial::from_coefficients_vec(vec![-s, F::one()]));
-        let (l_s_poly, r) = z_S_i_dos.clone().divide_with_q_and_r(&divisor).unwrap();
-        debug_assert!(r.is_zero());
-        let mut l_s: DensePolynomial<F> = l_s_poly.into();
-        let den = s_i
-            .iter()
-            .filter(|&&t| t != s)
-            .fold(F::one(), |a, &t| a * (s - t));
-        let scale = evals_at_s_i[idx] * den.inverse().expect("distinct points");
-        l_s = &l_s * scale;
-        out += &l_s;
-    }
-    out
+    let bases = lagrange_basis_polys(s_i);
+    bases
+        .into_iter()
+        .zip(evals_at_s_i.iter())
+        .map(|(l_s, &y)| &l_s * y)
+        .fold(DensePolynomial::zero(), |a, b| &a + &b)
 }
 
 /// Homomorphism φ on the evaluation vector y = (y^rev, y^hid). Used so the prover reveals φ(y) and the
@@ -325,19 +333,12 @@ fn append_batch_statement_to_transcript<E: Pairing>(
 {
     let mut buf = Vec::new();
     for set in sets {
-        buf.extend_from_slice(&(set.rev.len() as u64).to_le_bytes());
-        buf.extend_from_slice(&(set.hid.len() as u64).to_le_bytes());
-        for s in set.rev.iter().chain(set.hid.iter()) {
-            s.serialize_compressed(&mut buf).expect("serialize point");
-        }
+        trs.append_evaluation_set(set);
     }
     trs.append_message(b"shplonked_sets", &buf);
-    buf.clear();
-    for y in y_rev {
-        y.serialize_compressed(&mut buf).expect("serialize y_rev");
-    }
+    trs.append_evaluation_points(y_rev);
     trs.append_message(b"shplonked_y_rev", &buf);
-    buf.clear();
+    trs.append_homomorphism_image(&phi_y);
     phi_y
         .serialize_compressed(&mut buf)
         .expect("serialize phi_y");
@@ -411,10 +412,11 @@ pub fn batch_open_generalized<
     trs: &mut merlin::Transcript,
     rng: &mut R,
 ) -> ShplonkedBatchOpening<E> {
-    // Step 1a: Compute y, phi(y) and com_y.
     let n = polys.len();
     assert_eq!(sets.len(), n);
     assert_eq!(rho_i.len(), n);
+
+    // Step 1a: Compute y, phi(y) and com_y.
     let mut y_rev = Vec::new();
     let mut y_hid = Vec::new();
     let mut evals_per_poly: Vec<Vec<E::ScalarField>> = Vec::with_capacity(n);
@@ -450,24 +452,41 @@ pub fn batch_open_generalized<
     let c_powers = powers(c, n);
 
     // Step 2a: Compute q(X) = ∑_{i=1}^n c^{i-1} (f_i(X) − f̃_i(X)) / Z_{S_i}(X).
-    // All evaluation sets S_i must be nonempty.
+    // All evaluation sets S_i must be nonempty, for convenience.
     for set in sets.iter() {
         assert!(!set.is_empty(), "all evaluation sets S_i must be nonempty");
     }
-    let s_union: Vec<E::ScalarField> = sets
-        .iter()
-        .flat_map(|set| set.all_points().cloned())
-        .collect();
+    let s_union = union_of_evaluation_sets(sets);
     let z_S = zero_poly_S(&s_union);
+    // One Vec per set (rev ∥ hid) so we have &[F] for from_roots, tilde_f_i_poly, etc.
+    // Same point data as in `sets`, just materialized as contiguous slices.
     let S_is: Vec<Vec<E::ScalarField>> = sets
         .iter()
         .map(|set| set.all_points().cloned().collect())
         .collect();
 
-    let tilde_f_is: Vec<DensePolynomial<E::ScalarField>> = S_is
-        .iter()
-        .zip(evals_per_poly.iter())
-        .map(|(S_i, evals_i)| tilde_f_i_poly(S_i, evals_i))
+    // Canonical index per polynomial: first j with S_is[j] == S_is[i].
+    let canonical: Vec<usize> = (0..n)
+        .map(|i| (0..=i).find(|&j| S_is[j] == S_is[i]).unwrap())
+        .collect();
+
+    // Compute Lagrange basis polynomials once per unique set (all at once).
+    let mut lagrange_cache: Vec<Option<Vec<DensePolynomial<E::ScalarField>>>> = vec![None; n];
+    for i in 0..n {
+        if canonical[i] == i {
+            lagrange_cache[i] = Some(lagrange_basis_polys(&S_is[i]));
+        }
+    }
+
+    let tilde_f_is: Vec<DensePolynomial<E::ScalarField>> = (0..n)
+        .map(|i| {
+            let bases = lagrange_cache[canonical[i]].as_ref().unwrap();
+            bases
+                .iter()
+                .zip(evals_per_poly[i].iter())
+                .map(|(l_s, &y)| l_s * y)
+                .fold(DensePolynomial::zero(), |a, b| &a + &b)
+        })
         .collect();
 
     let f_is: Vec<DensePolynomial<E::ScalarField>> = polys
@@ -475,10 +494,15 @@ pub fn batch_open_generalized<
         .map(|p| DensePolynomial::from_coefficients_vec(p.coeffs().to_vec()))
         .collect();
 
-    let z_S_is: Vec<DensePolynomial<E::ScalarField>> = S_is
-        .iter()
-        .map(|s_i| vanishing_poly::from_roots(s_i))
-        .collect(); // TODO: this is a bit inefficient when they overlap
+    let mut z_S_is: Vec<DensePolynomial<E::ScalarField>> = Vec::with_capacity(n);
+    for i in 0..n {
+        let z = if canonical[i] == i {
+            vanishing_poly::from_roots(&S_is[i])
+        } else {
+            z_S_is[canonical[i]].clone()
+        };
+        z_S_is.push(z);
+    }
 
     let mut q_poly = DensePolynomial::zero();
     for i in 0..n {
@@ -509,7 +533,10 @@ pub fn batch_open_generalized<
     // Step 3: Derive a challenge x from the Fiat-Shamir transcript.
     let x: E::ScalarField = trs.challenge_scalar();
 
-    // Step 4a: Compute f.
+    // Step 4a: Sample commitment randomness ρ_eval.
+    let rho_eval = sample_field_element(rng);
+
+    // Step 4b: g = ∑_i c^{i-1} Z_{S\S_i}(x) f̃_i(x) (constant polynomial).
     let z_S_val = z_S.evaluate(&x);
     let mut z_S_i_vals: Vec<E::ScalarField> = z_S_is.iter().map(|z| z.evaluate(&x)).collect();
     batch_inversion(&mut z_S_i_vals);
@@ -519,21 +546,33 @@ pub fn batch_open_generalized<
         .map(|i| c_powers[i] * z_S_minus_S_i_vals[i])
         .collect();
 
+    let g: E::ScalarField = (0..n)
+        .map(|i| weights[i] * tilde_f_i_at(&S_is[i], &evals_per_poly[i], x))
+        .sum();
+
+    // Step 4c: C_eval ← PCS.Commit(g; ρ_eval).
+    let C_eval_no_hiding: E::G1 = srs.taus_1[0].into_group() * g;
+    let C_eval_hiding_factor = srs.xi_1 * rho_eval;
+    let C_eval_proj: E::G1 = C_eval_no_hiding + C_eval_hiding_factor;
+    let C_eval = C_eval_proj.into_affine();
+
+    // Step 5a: f = ∑_i c^{i-1} Z_{S\S_i}(x) f_i − Z_S(x) q − g.
     let mut f_poly = DensePolynomial::zero();
     for i in 0..n {
         f_poly += &(&f_is[i] * weights[i]);
     }
     f_poly -= &(&q_poly * z_S_val);
+    f_poly -= &DensePolynomial::from_coefficients_vec(vec![g]);
 
-    // Step 4b: Compute rho.
+    // Step 5b: ρ = ∑_i c^{i-1} Z_{S\S_i}(x) ρ_i − Z_S(x) ρ_q − ρ_eval.
     let mut rho = E::ScalarField::zero();
     for i in 0..n {
         rho += weights[i] * rho_i[i];
     }
     rho -= z_S_val * rho_q;
+    rho -= rho_eval;
 
-    // Step 4c: π₂ ← PCS.Open(prk, f, x; ρ).
-    let y = f_poly.evaluate(&x);
+    // Step 5c: π₂ ← PCS.Open(prk, f, x; ρ). Opening is at (x, 0) since f(x) = 0.
     let ck = commitment_key_from_srs::<E>(srs);
     let s = sample_field_element(rng);
     let opening = univariate_hiding_kzg::CommitmentHomomorphism::<E>::open(
@@ -541,20 +580,10 @@ pub fn batch_open_generalized<
         f_poly.coeffs().to_vec(),
         rho,
         x,
-        y,
+        E::ScalarField::zero(),
         &Scalar(s),
         0,
     );
-
-    // Step 5a: C_eval = [∑_i weights[i]·f̃_i(x)]_1 + [rho_eval]_ξ.
-    let sum_weights_tilde_f: E::ScalarField = (0..n)
-        .map(|i| weights[i] * tilde_f_i_at(&S_is[i], &evals_per_poly[i], x))
-        .sum();
-    let c_eval_no_hiding: E::G1 = srs.taus_1[0].into_group() * sum_weights_tilde_f;
-    let rho_eval = sample_field_element(rng);
-    let c_eval_hiding_factor = srs.xi_1 * rho_eval;
-    let C_eval: E::G1 = c_eval_no_hiding + c_eval_hiding_factor;
-    let C_eval_affine = C_eval.into_affine();
 
     // Step 5b: Compute alpha_hid for V homomorphism (weights for hidden evals in C_eval expression).
     let mut alpha_hid = Vec::with_capacity(h);
@@ -584,11 +613,15 @@ pub fn batch_open_generalized<
         hom1: com_y_v_hom,
         hom2: sum_hom,
     };
-    let statement = TupleCodomainShape(
-        TupleCodomainShape(CodomainShape(com_y_hid.into_group()), CodomainShape(C_eval)),
+    let statement_proj = TupleCodomainShape(
+        TupleCodomainShape(
+            CodomainShape(com_y_hid.into_group()),
+            CodomainShape(C_eval_proj),
+        ),
         phi_y,
     );
-    let (sigma_protocol_proof, _) = full_hom.prove(&witness, statement, SHPLONKED_SIGMA_DST, rng);
+    let (sigma_protocol_proof, _) =
+        full_hom.prove(&witness, statement_proj, SHPLONKED_SIGMA_DST, rng);
     let (r_com_y, r_V, r_y) = match &sigma_protocol_proof.first_proof_item {
         FirstProofItem::Commitment(c) => (c.0 .0 .0, c.0 .1 .0, c.1),
         FirstProofItem::Challenge(_) => panic!("expected commitment"),
@@ -602,20 +635,20 @@ pub fn batch_open_generalized<
         z_rho: sigma_protocol_proof.z.c_y_hid_randomness,
     };
 
-    // π_2 from PCS.Open: pi_1 = quotient commitment (W′), pi_2 = hiding compensation (Y).
-    let pi_2_W_prime = opening.pi_1.0.into_affine();
-    let pi_2_Y = opening.pi_2.into_affine();
+    // π_2 from PCS.Open: pi_2 = quotient commitment, pi_2_extra = hiding compensation.
+    let pi_2 = opening.pi_1.0.into_affine();
+    let pi_2_extra = opening.pi_2.into_affine();
 
     let sigma_proof_statement = ZkPcsOpeningSigmaProofStatement {
         com_y_hid,
-        C_eval: C_eval_affine,
+        C_eval,
         phi_y,
         y_sum: phi_y,
     };
 
     let proof = ShplonkedBatchProof {
         pi_1,
-        pi_2: (pi_2_W_prime, pi_2_Y),
+        pi_2: (pi_2, pi_2_extra),
         sigma_proof,
         sigma_proof_statement,
     };
@@ -713,10 +746,7 @@ where
         anyhow::ensure!(!set.is_empty(), "all evaluation sets S_i must be nonempty");
     }
 
-    let s_union: Vec<E::ScalarField> = sets
-        .iter()
-        .flat_map(|set| set.all_points().cloned())
-        .collect();
+    let s_union = union_of_evaluation_sets(sets);
     let z_S = zero_poly_S(&s_union);
     let z_S_val = z_S.evaluate(&x);
     let s_per_poly: Vec<Vec<E::ScalarField>> = sets
@@ -815,46 +845,23 @@ where
         rng,
     );
     let msm_terms_response = full_hom.hom1.msm_terms(&sigma_protocol_proof.z);
-    let _hom1_msm_terms = <shplonked_sigma::ComYVHom<E> as CurveGroupTrait>::merge_msm_terms(
+    let hom1_msm_terms = <shplonked_sigma::ComYVHom<E> as CurveGroupTrait>::merge_msm_terms(
         msm_terms_response.into_iter().collect::<Vec<_>>(),
         &prover_commitment.0,
         &public_statement.0,
         &powers_of_beta,
         c_sigma,
     );
-    // Spec Step 5a: C_f = ∑_i c^{i-1} Z_{S\S_i}(x)·C_i − Z_S(x)·π_1 + c^n·C_PoK.
-    // π_2 was computed for C = ∑·C_i − Z_S·π_1 (no C_PoK), so we use that commitment in the pairing.
-    let commitment_to_f = E::G1::msm(merged_minus_pi1.bases(), merged_minus_pi1.scalars())
+    // Spec Step 4: deferred G₁ MSM from π_PoK; Step 5a: C_f = ∑_i c^{i-1} Z_{S\S_i}(x)·C_i − Z_S(x)·π_1 − C_eval + c^n·C_PoK.
+    let C_PoK = E::G1::msm(hom1_msm_terms.bases(), hom1_msm_terms.scalars())
+        .expect("batch verify: C_PoK MSM");
+    let c_n = (0..n).fold(E::ScalarField::ONE, |acc, _| acc * c);
+    let merged_minus_pi1_pt = E::G1::msm(merged_minus_pi1.bases(), merged_minus_pi1.scalars())
         .expect("batch verify: commitment to f MSM");
+    let C_f = merged_minus_pi1_pt - sigma_proof_statement.C_eval.into_group() + C_PoK * c_n;
 
-    // f(x) = ∑_i c^{i-1} Z_{S\S_i}(x) f̃_i(x): from revealed y_rev and sigma response z_yi.
-    let c_powers = powers(c, n);
-    let z_S_minus_S_i_vals = z_S_minus_S_i_at(&z_S, &s_per_poly, x);
-    let mut scalar_part = E::ScalarField::zero();
-    let mut y_rev_idx = 0;
-    for i in 0..n {
-        let s_i = &s_per_poly[i];
-        let z_val = z_S_minus_S_i_vals[i];
-        for &_s in sets[i].rev.iter() {
-            let l = lagrange_basis_at(s_i, _s, x);
-            let eval = y_rev[y_rev_idx];
-            y_rev_idx += 1;
-            scalar_part += c_powers[i] * z_val * l * eval;
-        }
-    }
-    let sum_y: E::ScalarField = alpha_hid
-        .iter()
-        .zip(sigma_proof.z_yi.iter())
-        .map(|(a, z)| *a * *z)
-        .sum();
-    let f_x = scalar_part + sum_y;
-
-    // PCS.Verify at x: e(C − f(x)·[1]_1, [1]_2) = e(π_2.W′, [τ]_2 − x·[1]_2) · e(π_2.Y, [ξ]_2).
-    let g1_terms = E::G1::normalize_batch(&[
-        commitment_to_f - srs.taus_1[0].into_group() * f_x,
-        -pi_2_W_prime.into_group(),
-        -pi_2_Y.into_group(),
-    ]);
+    // Step 5b: PCS.Verify(vk, x, C_f, 0, π_2) — opening at (x, 0).
+    let g1_terms = E::G1::normalize_batch(&[C_f, -pi_2_W_prime.into_group(), -pi_2_Y.into_group()]);
     let g2_terms = vec![
         srs.g_2,
         (srs.tau_2.into_group() - srs.g_2.into_group() * x).into_affine(),
