@@ -91,6 +91,8 @@ static ROCKSDB_TICKERS_TO_REPORT: &[(Ticker, &str)] = &[
     (Ticker::BlockCacheDataMiss, "block_cache_data_miss"),
     (Ticker::BlockCacheFilterHit, "block_cache_filter_hit"),
     (Ticker::BlockCacheFilterMiss, "block_cache_filter_miss"),
+    (Ticker::BlockCacheIndexHit, "block_cache_index_hit"),
+    (Ticker::BlockCacheIndexMiss, "block_cache_index_miss"),
 ];
 
 fn set_tickers(db: &DB) {
