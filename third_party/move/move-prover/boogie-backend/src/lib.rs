@@ -5,10 +5,7 @@
 #![forbid(unsafe_code)]
 
 use crate::{
-    boogie_helpers::{
-        boogie_bv_type, boogie_module_name, boogie_num_type_base, boogie_type,
-        boogie_type_suffix_bv,
-    },
+    boogie_helpers::{boogie_module_name, boogie_num_type_base, boogie_type, boogie_type_suffix},
     bytecode_translator::has_native_equality,
     options::{BoogieOptions, VectorTheory},
 };
@@ -224,7 +221,7 @@ pub fn add_prelude(
         .iter()
         .filter(|ty| ty.is_unsigned_int())
         .map(|ty| {
-            boogie_num_type_base(env, None, ty)
+            boogie_num_type_base(env, None, ty, false)
                 .parse::<usize>()
                 .expect("parse error")
         })
@@ -437,10 +434,9 @@ pub fn add_prelude(
 
 impl TypeInfo {
     fn new(env: &GlobalEnv, options: &BoogieOptions, ty: &Type, bv_flag: bool) -> Self {
-        let name_fun = if bv_flag { boogie_bv_type } else { boogie_type };
         Self {
-            name: name_fun(env, ty),
-            suffix: boogie_type_suffix_bv(env, ty, bv_flag),
+            name: boogie_type(env, ty, bv_flag),
+            suffix: boogie_type_suffix(env, ty, bv_flag),
             has_native_equality: has_native_equality(env, options, ty),
         }
     }
