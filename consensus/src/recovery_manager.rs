@@ -156,7 +156,7 @@ impl RecoveryManager {
                             process::exit(0);
                         },
                         Err(e) => {
-                            counters::ERROR_COUNT.inc();
+                            counters::ERROR_COUNT.with_label_values(&["primary"]).inc();
                             warn!(error = ?e, kind = error_kind(&e));
                         }
                     }

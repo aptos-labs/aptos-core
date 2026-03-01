@@ -277,10 +277,13 @@ impl ProxyConsensusHooks for ProxyHooksImpl {
             );
         }
 
+        let payload_txns = payload.len();
         info!(
             round = round,
             last_primary_proof_round = last_primary_proof_round,
             has_primary_proof = primary_proof.is_some(),
+            payload_txns = payload_txns,
+            num_vtxns = validator_txns.len(),
             "ProxyHooksImpl: transforming proposal to ProxyBlock"
         );
 
@@ -425,9 +428,19 @@ impl ProxyConsensusHooks for ProxyHooksImpl {
             proxy_metrics::PROXY_CONSENSUS_OPT_BLOCKS_ORDERED.inc_by(opt_count as u64);
         }
 
+        // Diagnostic: log round range and txn counts for proxy block analysis
+        let first_round = blocks.first().map(|b| b.round()).unwrap_or(0);
+        let last_round = blocks.last().map(|b| b.round()).unwrap_or(0);
+        let total_txns: usize = blocks.iter().map(|b| b.payload().map_or(0, |p| p.len())).sum();
+        let empty_blocks = blocks.iter().filter(|b| b.payload().map_or(true, |p| p.is_empty())).count();
         info!(
             num_blocks = blocks.len(),
             primary_round = primary_round,
+            first_proxy_round = first_round,
+            last_proxy_round = last_round,
+            total_txns = total_txns,
+            empty_blocks = empty_blocks,
+            opt_blocks = opt_count,
             "ProxyHooksImpl: forwarding ordered proxy blocks"
         );
 

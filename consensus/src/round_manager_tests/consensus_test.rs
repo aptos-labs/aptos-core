@@ -696,13 +696,13 @@ fn new_round_on_timeout_certificate() {
                 None,
             ),
         );
-        let before = counters::ERROR_COUNT.get();
+        let before = counters::ERROR_COUNT.with_label_values(&["primary"]).get();
         assert!(node
             .round_manager
             .process_proposal_msg(old_good_proposal)
             .await
             .is_ok()); // we eat the error
-        assert_eq!(counters::ERROR_COUNT.get(), before + 1); // but increase the counter
+        assert_eq!(counters::ERROR_COUNT.with_label_values(&["primary"]).get(), before + 1); // but increase the counter
     });
 }
 

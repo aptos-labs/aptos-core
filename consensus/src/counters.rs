@@ -67,10 +67,11 @@ pub static RAND_BLOCK: Lazy<IntCounterVec> = Lazy::new(|| {
 });
 
 /// Counts the total number of errors
-pub static ERROR_COUNT: Lazy<IntGauge> = Lazy::new(|| {
-    register_int_gauge!(
+pub static ERROR_COUNT: Lazy<IntGaugeVec> = Lazy::new(|| {
+    register_int_gauge_vec!(
         "aptos_consensus_error_count",
-        "Total number of errors in main loop"
+        "Total number of errors in main loop",
+        &["consensus_type"]
     )
     .unwrap()
 });
@@ -667,8 +668,8 @@ pub static AGGREGATED_ROUND_TIMEOUT_REASON_MISSING_AUTHORS: Lazy<IntCounterVec> 
 /// This count is different from `TIMEOUT_ROUNDS_COUNT`, because not every time a node has
 /// a timeout there is an ultimate decision to move to the next round (it might take multiple
 /// timeouts to get the timeout certificate).
-pub static TIMEOUT_COUNT: Lazy<IntCounter> = Lazy::new(|| {
-    register_int_counter!("aptos_consensus_timeout_count", "Count the number of timeouts a node experienced since last restart (close to 0 in happy path).").unwrap()
+pub static TIMEOUT_COUNT: Lazy<IntCounterVec> = Lazy::new(|| {
+    register_int_counter_vec!("aptos_consensus_timeout_count", "Count the number of timeouts a node experienced since last restart (close to 0 in happy path).", &["consensus_type"]).unwrap()
 });
 
 /// The timeout of the current round.

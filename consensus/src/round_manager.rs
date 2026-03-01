@@ -519,6 +519,7 @@ impl RoundManager {
             },
         };
         info!(
+            consensus_type = self.consensus_type(),
             self.new_log(LogEvent::NewRound),
             reason = new_round_event.reason
         );
@@ -563,10 +564,17 @@ impl RoundManager {
                     self.spawn_proposal_generation(new_round_event);
                 } else {
                     // Wait for proxy blocks to arrive before proposing.
+                    let commit_round = self.block_store.commit_root().round();
+                    let ordered_round = self.block_store.ordered_root().round();
                     info!(
                         self.new_log(LogEvent::NewRound),
-                        "Proxy consensus active, deferring proposal for round {} until proxy blocks arrive",
+                        "Proxy consensus active, deferring proposal for round {} until proxy blocks arrive. \
+                         last_consumed_proxy_round={}, commit_round={}, ordered_round={}, pipeline_gap={}",
                         new_round_event.round,
+                        self.last_consumed_proxy_primary_round,
+                        commit_round,
+                        ordered_round,
+                        ordered_round.saturating_sub(commit_round),
                     );
                     self.pending_proposal_event = Some(new_round_event);
                 }
@@ -586,6 +594,7 @@ impl RoundManager {
         // Drain all accumulated proxy block batches and merge their payloads.
         let proxy_payload = if !self.pending_proxy_blocks.is_empty() {
             let batched = std::mem::take(&mut self.pending_proxy_blocks);
+            let batched_count = batched.len();
             for blocks in &batched {
                 if blocks.primary_round() > self.last_consumed_proxy_primary_round {
                     self.last_consumed_proxy_primary_round = blocks.primary_round();
@@ -606,9 +615,12 @@ impl RoundManager {
             let payload = merged_payload.unwrap_or_else(|| Payload::empty(true, true));
             let payload_len = payload.len();
             let payload_size = payload.size();
+            let num_batches = batched_count;
             info!(
-                "spawn_proposal_generation: merged proxy payload: {} txns, {} bytes, {} vtxns",
+                "spawn_proposal_generation: merged proxy payload: {} txns, {} bytes, {} vtxns, \
+                 {} proxy batches merged, last_consumed_proxy_round={}",
                 payload_len, payload_size, all_vtxns.len(),
+                num_batches, self.last_consumed_proxy_primary_round,
             );
             aptos_proxy_primary::proxy_metrics::PROXY_AGGREGATED_PAYLOAD_SIZE
                 .set(payload_len as i64);
@@ -623,6 +635,7 @@ impl RoundManager {
         let safety_rules = self.safety_rules.clone();
         let proposer_election = self.proposer_election.clone();
         let proxy_hooks = self.proxy_hooks.clone();
+        let consensus_type = self.consensus_type();
         // Compute parent's last_primary_proof_round for proxy block proposals
         let parent_lppr = if proxy_hooks.is_some() {
             let parent_id = sync_info.highest_quorum_cert().certified_block().id();
@@ -650,7 +663,7 @@ impl RoundManager {
                 )
                 .await
             ) {
-                warn!("Error generating and sending proposal: {}", e);
+                warn!(consensus_type = consensus_type, "Error generating and sending proposal: {}", e);
             }
         });
     }
@@ -667,7 +680,8 @@ impl RoundManager {
         proxy_payload: Option<(Vec<aptos_types::validator_txn::ValidatorTransaction>, aptos_consensus_types::common::Payload)>,
         parent_last_primary_proof_round: Round,
     ) -> anyhow::Result<()> {
-        Self::log_collected_vote_stats(epoch_state.clone(), &new_round_event);
+        let consensus_type = if proxy_hooks.is_some() { "proxy" } else { "primary" };
+        Self::log_collected_vote_stats(epoch_state.clone(), &new_round_event, consensus_type);
         let proposal_msg = Self::generate_proposal(
             epoch_state.clone(),
             new_round_event,
@@ -768,7 +782,7 @@ impl RoundManager {
         Ok(())
     }
 
-    fn log_collected_vote_stats(epoch_state: Arc<EpochState>, new_round_event: &NewRoundEvent) {
+    fn log_collected_vote_stats(epoch_state: Arc<EpochState>, new_round_event: &NewRoundEvent, consensus_type: &'static str) {
         let prev_round_votes_for_li = new_round_event
             .prev_round_votes
             .iter()
@@ -831,6 +845,7 @@ impl RoundManager {
         counters::PROPOSER_COLLECTED_TIMEOUT_VOTING_POWER.inc_by(timeout_voting_power as f64);
 
         info!(
+            consensus_type = consensus_type,
             epoch = epoch_state.epoch,
             round = new_round_event.round,
             total_voting_power = ?epoch_state.verifier.total_voting_power(),
@@ -918,6 +933,7 @@ impl RoundManager {
             Block::new_proposal_from_block_data_and_signature(proposal, signature);
         observe_block_with_type(signed_proposal.timestamp_usecs(), BlockStage::SIGNED, consensus_type);
         info!(
+            consensus_type = consensus_type,
             Self::new_log_with_round_epoch(
                 LogEvent::Propose,
                 new_round_event.round,
@@ -972,6 +988,7 @@ impl RoundManager {
             self.consensus_type(),
         );
         info!(
+            consensus_type = self.consensus_type(),
             self.new_log(LogEvent::ReceiveProposal)
                 .remote_peer(proposal_msg.proposer()),
             block_round = proposal_msg.proposal().round(),
@@ -998,7 +1015,7 @@ impl RoundManager {
                     self.round_state.current_round()
                 )
             );
-            counters::ERROR_COUNT.inc();
+            counters::ERROR_COUNT.with_label_values(&[self.consensus_type()]).inc();
             Ok(())
         }
     }
@@ -1232,9 +1249,25 @@ impl RoundManager {
     /// Note this function returns Err even if messages are broadcasted successfully because timeout
     /// is considered as error. It only returns Ok(()) when the timeout is stale.
     pub async fn process_local_timeout(&mut self, round: Round) -> anyhow::Result<()> {
-        if !self.round_state.process_local_timeout(round) {
+        if !self.round_state.process_local_timeout(round, self.consensus_type()) {
             return Ok(());
         }
+
+        // Diagnostic: log timeout context for debugging
+        let timeout_reason = self.compute_timeout_reason(round);
+        let has_deferred_proposal = self.pending_proposal_event.is_some();
+        let pending_proxy_batches = self.pending_proxy_blocks.len();
+        let is_proxy_active = self.proxy_verifier.is_some();
+        warn!(
+            consensus_type = self.consensus_type(),
+            round = round,
+            timeout_reason = ?timeout_reason,
+            has_deferred_proposal = has_deferred_proposal,
+            pending_proxy_batches = pending_proxy_batches,
+            is_proxy_active = is_proxy_active,
+            last_consumed_proxy_round = self.last_consumed_proxy_primary_round,
+            "[DIAG] Local timeout context"
+        );
 
         if self.sync_only() {
             self.network
@@ -1277,6 +1310,7 @@ impl RoundManager {
                 .broadcast_round_timeout(round_timeout_msg)
                 .await;
             warn!(
+                consensus_type = self.consensus_type(),
                 round = round,
                 remote_peer = self.proposer_election.get_valid_proposer(round),
                 event = LogEvent::Timeout,
@@ -1653,7 +1687,7 @@ impl RoundManager {
             .await;
 
         if self.local_config.broadcast_vote {
-            info!(self.new_log(LogEvent::Vote), "{}", vote);
+            info!(consensus_type = self.consensus_type(), self.new_log(LogEvent::Vote), "{}", vote);
             PROPOSAL_VOTE_BROADCASTED.inc();
             self.network.broadcast_vote(vote_msg).await;
         } else {
@@ -1661,6 +1695,7 @@ impl RoundManager {
                 .proposer_election
                 .get_valid_proposer(proposal_round + 1);
             info!(
+                consensus_type = self.consensus_type(),
                 self.new_log(LogEvent::Vote).remote_peer(recipient),
                 "{}", vote
             );
@@ -2018,6 +2053,7 @@ impl RoundManager {
 
         if vote.is_timeout() {
             info!(
+                consensus_type = self.consensus_type(),
                 self.new_log(LogEvent::ReceiveVote)
                     .remote_peer(vote.author()),
                 vote = %vote,
@@ -2029,6 +2065,7 @@ impl RoundManager {
             );
         } else {
             trace!(
+                consensus_type = self.consensus_type(),
                 self.new_log(LogEvent::ReceiveVote)
                     .remote_peer(vote.author()),
                 epoch = vote.vote_data().proposed().epoch(),
@@ -2178,6 +2215,7 @@ impl RoundManager {
 
     async fn process_round_timeout(&mut self, timeout: RoundTimeout) -> anyhow::Result<()> {
         info!(
+            consensus_type = self.consensus_type(),
             self.new_log(LogEvent::ReceiveRoundTimeout)
                 .remote_peer(timeout.author()),
             vote = %timeout,
@@ -2332,12 +2370,20 @@ impl RoundManager {
     ) -> anyhow::Result<()> {
         let primary_round = msg.primary_round();
         let num_blocks = msg.proxy_blocks().len();
+        let has_deferred = self.pending_proposal_event.is_some();
+        let current_round = self.round_state().current_round();
 
         info!(
             self.new_log(LogEvent::ReceiveNewCertificate),
-            "Received {} ordered proxy blocks for primary round {}",
+            "Received {} ordered proxy blocks for primary round {}. \
+             current_round={}, has_deferred_proposal={}, pending_batches={}, \
+             last_consumed_proxy_round={}",
             num_blocks,
             primary_round,
+            current_round,
+            has_deferred,
+            self.pending_proxy_blocks.len(),
+            self.last_consumed_proxy_primary_round,
         );
 
         // Reject stale or duplicate messages
@@ -2411,9 +2457,13 @@ impl RoundManager {
                     e
                 );
             } else {
+                let commit_round = self.block_store.commit_root().round();
+                let ordered_round = self.block_store.ordered_root().round();
                 info!(
-                    "Notified proxy of new QC for round {}",
-                    qc.certified_block().round()
+                    "Notified proxy of new QC for round {}, pending_proxy_batches={}, pipeline_gap={}",
+                    qc.certified_block().round(),
+                    self.pending_proxy_blocks.len(),
+                    ordered_round.saturating_sub(commit_round),
                 );
             }
             // Piggyback pipeline state on every QC notification
@@ -2470,7 +2520,7 @@ impl RoundManager {
             self.round_state.record_vote(vote);
         }
         if let Err(e) = self.process_new_round_event(new_round_event).await {
-            warn!(error = ?e, "[RoundManager] Error during start");
+            warn!(error = ?e, consensus_type = self.consensus_type(), "[RoundManager] Error during start");
         }
     }
 
@@ -2514,7 +2564,7 @@ impl RoundManager {
         close_rx: oneshot::Receiver<oneshot::Sender<()>>,
         mut proxy_event_rx: Option<TokioMpsc::UnboundedReceiver<ProxyToPrimaryEvent>>,
     ) {
-        info!(epoch = self.epoch_state.epoch, "RoundManager started");
+        info!(epoch = self.epoch_state.epoch, consensus_type = self.consensus_type(), "RoundManager started");
         let mut close_rx = close_rx.into_stream();
         loop {
             // Handle optional proxy events. Each message is processed in order;
@@ -2547,10 +2597,10 @@ impl RoundManager {
                     let result = monitor!("process_opt_proposal_loopback", self.process_opt_proposal(opt_proposal).await);
                     let round_state = self.round_state();
                     match result {
-                        Ok(_) => trace!(RoundStateLogSchema::new(round_state)),
+                        Ok(_) => trace!(consensus_type = self.consensus_type(), RoundStateLogSchema::new(round_state)),
                         Err(e) => {
-                            counters::ERROR_COUNT.inc();
-                            warn!(kind = error_kind(&e), RoundStateLogSchema::new(round_state), "Error: {:#}", e);
+                            counters::ERROR_COUNT.with_label_values(&[self.consensus_type()]).inc();
+                            warn!(kind = error_kind(&e), consensus_type = self.consensus_type(), RoundStateLogSchema::new(round_state), "Error: {:#}", e);
                         }
                     }
                 }
@@ -2597,10 +2647,10 @@ impl RoundManager {
                         };
                         let round_state = self.round_state();
                         match result {
-                            Ok(_) => trace!(RoundStateLogSchema::new(round_state)),
+                            Ok(_) => trace!(consensus_type = self.consensus_type(), RoundStateLogSchema::new(round_state)),
                             Err(e) => {
-                                counters::ERROR_COUNT.inc();
-                                warn!(kind = error_kind(&e), RoundStateLogSchema::new(round_state), "Error: {:#}", e);
+                                counters::ERROR_COUNT.with_label_values(&[self.consensus_type()]).inc();
+                                warn!(kind = error_kind(&e), consensus_type = self.consensus_type(), RoundStateLogSchema::new(round_state), "Error: {:#}", e);
                             }
                         }
                     }
@@ -2612,12 +2662,12 @@ impl RoundManager {
                         Ok(()) => {
                             counters::CONSENSUS_PROPOSAL_PAYLOAD_FETCH_DURATION.with_label_values(&["success"]).observe(elapsed);
                             if let Err(e) = monitor!("payload_fetch_proposal_process", self.check_backpressure_and_process_proposal(block)).await {
-                                warn!("failed process proposal after payload fetch for block {}: {}", id, e);
+                                warn!(consensus_type = self.consensus_type(), "failed process proposal after payload fetch for block {}: {}", id, e);
                             }
                         },
                         Err(err) => {
                             counters::CONSENSUS_PROPOSAL_PAYLOAD_FETCH_DURATION.with_label_values(&["error"]).observe(elapsed);
-                            warn!("unable to fetch payload for block {}: {}", id, err);
+                            warn!(consensus_type = self.consensus_type(), "unable to fetch payload for block {}: {}", id, err);
                         },
                     };
                 },
@@ -2648,10 +2698,10 @@ impl RoundManager {
 
                     let round_state = self.round_state();
                     match result {
-                        Ok(_) => trace!(RoundStateLogSchema::new(round_state)),
+                        Ok(_) => trace!(consensus_type = self.consensus_type(), RoundStateLogSchema::new(round_state)),
                         Err(e) => {
-                            counters::ERROR_COUNT.inc();
-                            warn!(kind = error_kind(&e), RoundStateLogSchema::new(round_state), "Error: {:#}", e);
+                            counters::ERROR_COUNT.with_label_values(&[self.consensus_type()]).inc();
+                            warn!(kind = error_kind(&e), consensus_type = self.consensus_type(), RoundStateLogSchema::new(round_state), "Error: {:#}", e);
                         }
                     }
                 },
@@ -2666,16 +2716,16 @@ impl RoundManager {
                     );
                     let round_state = self.round_state();
                     match result {
-                        Ok(_) => trace!(RoundStateLogSchema::new(round_state)),
+                        Ok(_) => trace!(consensus_type = self.consensus_type(), RoundStateLogSchema::new(round_state)),
                         Err(e) => {
-                            counters::ERROR_COUNT.inc();
-                            warn!(kind = error_kind(&e), RoundStateLogSchema::new(round_state), "Error handling proxy event: {:#}", e);
+                            counters::ERROR_COUNT.with_label_values(&[self.consensus_type()]).inc();
+                            warn!(kind = error_kind(&e), consensus_type = self.consensus_type(), RoundStateLogSchema::new(round_state), "Error handling proxy event: {:#}", e);
                         }
                     }
                 },
             }
         }
-        info!(epoch = self.epoch_state.epoch, "RoundManager stopped");
+        info!(epoch = self.epoch_state.epoch, consensus_type = self.consensus_type(), "RoundManager stopped");
     }
 
     #[cfg(feature = "failpoints")]

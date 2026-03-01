@@ -1532,6 +1532,13 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
                         hooks_for_events.update_primary_tc(tc);
                     },
                     aptos_proxy_primary::PrimaryToProxyEvent::PipelineState(info) => {
+                        debug!(
+                            pipeline_gap = info.pipeline_pending_round_gap,
+                            pending_batches = info.pending_proxy_batches,
+                            committed_round = info.primary_committed_round,
+                            ordered_round = info.primary_ordered_round,
+                            "[DIAG] Proxy received pipeline state update"
+                        );
                         pipeline_state_for_events.store(&info);
                     },
                     aptos_proxy_primary::PrimaryToProxyEvent::Shutdown => {

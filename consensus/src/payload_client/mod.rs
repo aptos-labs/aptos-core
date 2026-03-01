@@ -242,8 +242,8 @@ impl PayloadClient for ProxyBudgetPayloadClient {
 
         proxy_metrics::PROXY_EFFECTIVE_MAX_TXNS.set(config.max_txns.count() as i64);
         proxy_metrics::PROXY_NONEMPTY_PAYLOAD_PULLED.inc();
-        // Log every 50th pull or first 10 pulls for debugging
-        if pull_num % 50 == 0 || pull_num < 10 {
+        // Log every 50th pull or first 20 pulls for debugging
+        if pull_num % 50 == 0 || pull_num < 20 {
             info!(
                 pull_num = pull_num,
                 decision = "PULLING",
