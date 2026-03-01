@@ -78,7 +78,9 @@ fn collect_consensus_metrics(core_metrics: &mut BTreeMap<String, String>) {
     );
     core_metrics.insert(
         CONSENSUS_TIMEOUT_COUNT.into(),
-        aptos_consensus::counters::TIMEOUT_COUNT.get().to_string(),
+        (aptos_consensus::counters::TIMEOUT_COUNT.with_label_values(&["primary"]).get()
+         + aptos_consensus::counters::TIMEOUT_COUNT.with_label_values(&["proxy"]).get())
+        .to_string(),
     );
     //TODO(joshlind): add block tracing and back pressure!
 }
