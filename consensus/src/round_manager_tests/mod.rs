@@ -447,6 +447,7 @@ impl NodeSetup {
             onchain_consensus_config.effective_validator_txn_config(),
             true,
             Arc::new(MockOptQSPayloadProvider {}),
+            false, // is_proxy
         );
 
         let round_state = Self::create_round_state(time_service);

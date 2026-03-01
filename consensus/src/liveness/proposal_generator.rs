@@ -408,6 +408,7 @@ pub struct ProposalGenerator {
     opt_qs_payload_param_provider: Arc<dyn TOptQSPullParamsProvider>,
 
     proposal_under_backpressure: Mutex<bool>,
+    is_proxy: bool,
 }
 
 impl ProposalGenerator {
@@ -430,6 +431,7 @@ impl ProposalGenerator {
         vtxn_config: ValidatorTxnConfig,
         allow_batches_without_pos_in_proposal: bool,
         opt_qs_payload_param_provider: Arc<dyn TOptQSPullParamsProvider>,
+        is_proxy: bool,
     ) -> Self {
         Self {
             author,
@@ -451,6 +453,7 @@ impl ProposalGenerator {
             allow_batches_without_pos_in_proposal,
             opt_qs_payload_param_provider,
             proposal_under_backpressure: Mutex::new(false),
+            is_proxy,
         }
     }
 
@@ -651,13 +654,24 @@ impl ProposalGenerator {
         }
         // One needs to hold the blocks with the references to the payloads while get_block is
         // being executed: pending blocks vector keeps all the pending ancestors of the extended branch.
-        let mut pending_blocks = self
-            .block_store
-            .path_from_commit_root(parent_id)
-            .ok_or_else(|| format_err!("Parent block {} already pruned", parent_id))?;
+        // Proxy mode: use path_from_ordered_root because proxy commit_root never advances
+        // (no pipeline_builder / commit_callback). ordered_root advances via send_for_execution.
+        let mut pending_blocks = if self.is_proxy {
+            self.block_store
+                .path_from_ordered_root(parent_id)
+                .ok_or_else(|| format_err!("Parent block {} already pruned", parent_id))?
+        } else {
+            self.block_store
+                .path_from_commit_root(parent_id)
+                .ok_or_else(|| format_err!("Parent block {} already pruned", parent_id))?
+        };
         // Avoid txn manager long poll if the root block has txns, so that the leader can
         // deliver the commit proof to others without delay.
-        pending_blocks.push(self.block_store.commit_root());
+        pending_blocks.push(if self.is_proxy {
+            self.block_store.ordered_root()
+        } else {
+            self.block_store.commit_root()
+        });
 
         // Exclude all the pending transactions: these are all the ancestors of
         // parent (including) up to the root (including).

@@ -55,6 +55,7 @@ async fn test_proposal_generation_empty_tree() {
         ValidatorTxnConfig::default_disabled(),
         true,
         Arc::new(MockOptQSPayloadProvider {}),
+        false, // is_proxy
     );
     let proposer_election = Arc::new(UnequivocalProposerElection::new(Arc::new(
         RotatingProposer::new(vec![signer.author()], 1),
@@ -102,6 +103,7 @@ async fn test_proposal_generation_parent() {
         ValidatorTxnConfig::default_disabled(),
         true,
         Arc::new(MockOptQSPayloadProvider {}),
+        false, // is_proxy
     );
     let proposer_election = Arc::new(UnequivocalProposerElection::new(Arc::new(
         RotatingProposer::new(vec![inserter.signer().author()], 1),
@@ -179,6 +181,7 @@ async fn test_old_proposal_generation() {
         ValidatorTxnConfig::default_disabled(),
         true,
         Arc::new(MockOptQSPayloadProvider {}),
+        false, // is_proxy
     );
     let proposer_election = Arc::new(UnequivocalProposerElection::new(Arc::new(
         RotatingProposer::new(vec![inserter.signer().author()], 1),
@@ -221,6 +224,7 @@ async fn test_correct_failed_authors() {
         ValidatorTxnConfig::default_disabled(),
         true,
         Arc::new(MockOptQSPayloadProvider {}),
+        false, // is_proxy
     );
     let proposer_election = Arc::new(UnequivocalProposerElection::new(Arc::new(
         RotatingProposer::new(vec![author, peer1, peer2], 1),

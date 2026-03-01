@@ -1037,6 +1037,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
                 .quorum_store
                 .allow_batches_without_pos_in_proposal,
             opt_qs_payload_param_provider,
+            false, // is_proxy
         );
         let (round_manager_tx, round_manager_rx) = aptos_channel::new(
             QueueStyle::KLAST,
@@ -1460,6 +1461,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
                 .quorum_store
                 .allow_batches_without_pos_in_proposal,
             opt_qs_payload_param_provider,
+            true, // is_proxy
         );
 
         // 9. Create channels for the proxy RoundManager

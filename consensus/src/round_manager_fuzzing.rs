@@ -190,6 +190,7 @@ fn create_node_for_fuzzing() -> RoundManager {
         ValidatorTxnConfig::default_disabled(),
         true,
         Arc::new(MockOptQSPayloadProvider {}),
+        false, // is_proxy
     );
 
     //
