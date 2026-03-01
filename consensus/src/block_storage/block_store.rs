@@ -726,6 +726,11 @@ impl BlockReader for BlockStore {
     }
 
     fn pipeline_pending_latency(&self, proposal_timestamp: Duration) -> Duration {
+        // Proxy mode: commit_root never advances, so path_from_commit_root grows unboundedly.
+        // Proxy has no pipeline backpressure, so return zero to avoid O(N) path computation.
+        if self.consensus_type == "proxy" {
+            return Duration::ZERO;
+        }
         let ordered_root = self.ordered_root();
         let commit_root = self.commit_root();
         let pending_path = self
