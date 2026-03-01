@@ -88,6 +88,39 @@ For each test there are the following files:
 This file might also be present if the test threw an exception:
 - test_name.exception
 
+## Test Categories
+
+The E2E test suite is organized into the following categories:
+
+### CLI Flag Regression Tests
+These tests verify that CLI flags and subcommands remain available across versions. They catch accidental flag removal or renaming by checking help text output. Located in `cases/cli_flag_helpers.py` and used in tests like `cases/account_e2e.py`.
+
+Example test pattern:
+```python
+@test_case
+def test_account_create_flags(run_helper: RunHelper, test_name=None):
+    help_text = run_help_command(
+        run_helper,
+        ["account", "create"],
+        test_name,
+    )
+    verify_flags_present(help_text, EXPECTED_FLAGS)
+```
+
+### Functional E2E Tests
+These tests verify actual CLI functionality against a running localnet, including:
+- Account operations (create, fund, transfer, balance)
+- Resource account operations
+- Key rotation
+- Move operations (compile, publish, run)
+- Node operations
+
+### Error Handling Tests
+These tests verify that the CLI properly handles error cases:
+- Invalid addresses
+- Missing required flags
+- Invalid parameters
+
 ## Writing new test cases
 To write a new test case, follow these steps:
 1. (Optional) Make a new file in [cases/](cases/) if none of the existing files seem appropriate.
@@ -97,6 +130,13 @@ To write a new test case, follow these steps:
     1. If you want to assert something, do so by raising an exception (TestError has been provided for this purpose, but any old exception does the trick).
     1. Use the `RunHelper` to invoke CLI commands. Follow the example of other test cases.
 1. Register the test in the `run_tests` function in [main.py](main.py). Note that the order matters here, later tests are allowed (and encouraged) to depend on the results of earlier tests. This way we can test truly end-to-end, beyond the span of a single invocation.
+
+### Adding Flag Regression Tests
+When adding a new CLI subcommand or modifying flags, add corresponding flag regression tests:
+
+1. Define expected flags using `ExpectedFlag` dataclass in `cases/cli_flag_helpers.py`
+2. Create a test function that verifies flags are present in help text
+3. This ensures the CLI interface remains stable across releases
 
 ## Formatting:
 ```
