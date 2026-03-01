@@ -55,7 +55,7 @@ impl<E: Pairing> ValidCryptoMaterial for Subtranscript<E> {
 
     fn to_bytes(&self) -> Vec<u8> {
         bcs::to_bytes(&self)
-            .expect("Unexpected error during chunky PVSS subtranscript serialization")
+            .expect("Unexpected error during chunky field PVSS subtranscript serialization")
     }
 }
 

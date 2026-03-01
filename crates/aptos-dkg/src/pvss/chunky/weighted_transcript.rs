@@ -65,7 +65,7 @@ pub struct Transcript<P: Pairing> {
     dealer: Player,
     /// This is the aggregatable subtranscript
     #[serde(serialize_with = "ark_se", deserialize_with = "ark_de")]
-    // Even though Subtranscript implements Serialize/Deserialize, we need this attribute macro because `P` does not implement Serialize/Deserialize
+    // Even though Subtranscript implements Serialize/Deserialize, we need this attribute macro because `Pairing` does not implement serde
     pub subtrs: Subtranscript<P>,
     /// Proof (of knowledge) showing that the s_{i,j}'s in C are base-B representations (of the s_i's in V, but this is not part of the proof), and that the r_j's in R are used in C
     #[serde(serialize_with = "ark_se", deserialize_with = "ark_de")]
@@ -77,7 +77,7 @@ pub struct Transcript<P: Pairing> {
 #[derive(CanonicalSerialize, CanonicalDeserialize, Clone, Debug, PartialEq, Eq)]
 pub struct SharingProof<P: Pairing> {
     /// SoK: the SK is knowledge of `witnesses` s_{i,j} yielding the commitment and the C and the R, their image is the PK, and the signed message is a certain context `cntxt`
-    pub SoK: sigma_protocol::Proof<P::ScalarField, hkzg_chunked_elgamal::Homomorphism<'static, P>>, // static because we don't want the lifetime of the Proof to depend on the Homomorphism // TODO: try removing it?
+    pub SoK: sigma_protocol::Proof<P::ScalarField, hkzg_chunked_elgamal::Homomorphism<'static, P>>, // static because we don't want the lifetime of the Proof to depend on the Homomorphism
     /// A batched range proof showing that all committed values s_{i,j} lie in some range
     pub range_proof: dekart_univariate_v2::ProofProjective<P>, // TODO: make an affine version of this
     /// A KZG-style commitment to the values s_{i,j} going into the range proof
@@ -89,7 +89,7 @@ impl<E: Pairing> ValidCryptoMaterial for Transcript<E> {
     const AIP_80_PREFIX: &'static str = "";
 
     fn to_bytes(&self) -> Vec<u8> {
-        bcs::to_bytes(&self).expect("Unexpected error during PVSS transcript serialization")
+        bcs::to_bytes(&self).expect("Unexpected error during chunky field PVSS transcript serialization")
     }
 }
 
@@ -139,22 +139,22 @@ impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>> traits:
         // Initialize the PVSS SoK context
         let sok_cntxt = SokContext::new(spk.clone(), session_id, dealer.id, Self::dst());
 
+        // Step 1: sample the polynomial and compute the Shamir shares
         let (f, mut f_evals) = sc
             .get_threshold_config()
-            .sample_polynomial_and_evals(*s.get_secret_a(), rng);
-
-        // Encrypt the chunked shares and generate the sharing proof
-        let (Cs, Rs, sharing_proof) =
-            Self::encrypt_chunked_shares(&f_evals, eks, pp, sc, sok_cntxt, rng);
+            .sample_polynomial_and_compute_shares(*s.get_secret_a(), rng);
 
         // Add constant term for the G₂ commitment (f(0) = a0)
         f_evals.push(f[0]);
 
-        // Commit to polynomial evaluations + constant term using batch_mul
-        //let G_2 = pp.get_commitment_base();
+        // Step 2:Commit to polynomial evaluations + constant term using batch_mul
         let flattened_Vs_proj = arkworks::batch_mul::<E::G2>(&pp.G2_table, &f_evals);
 
         debug_assert_eq!(flattened_Vs_proj.len(), sc.get_total_weight() + 1);
+
+        // Encrypt the chunked shares and generate the sharing proof
+        let (Cs, Rs, sharing_proof) =
+            Self::encrypt_chunked_shares(&f_evals, eks, pp, sc, sok_cntxt, rng);
 
         let Vs_proj = sc.group_by_player(&flattened_Vs_proj); // last item of flattened_Vs_proj is f(0), won't appear in Vs_proj
         let V0_proj = *flattened_Vs_proj.last().unwrap();
@@ -206,8 +206,6 @@ impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>> traits:
     }
 }
 
-delegate_transcript_core_to_subtrs!(Transcript<E>, subtrs);
-
 impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>> Transcript<E> {
     /// Encrypts chunked shares and builds the sharing proof (SoK + range proof).
     /// Panics if `pp.pk_range_proof.ck_S` is not a Lagrange SRS basis (same requirement as verify).
@@ -233,8 +231,7 @@ impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>> Transcr
             f_evals_chunked_flat,
         } = hkzg_chunked_elgamal::prepare_chunked_witness(f_evals, pp, sc, rng);
 
-        // Compute image under the homomorphism and produce the SoK
-        //   (2a) Set up the tuple homomorphism
+        // Step 4b and 5a: compute the encryptions and the KZG commitment
         let eks_inner: Vec<_> = eks.iter().map(|ek| ek.ek).collect(); // TODO: this is a bit ugly
         let lagr_g1: &[E::G1Affine] = match &pp.pk_range_proof.ck_S.msm_basis {
             SrsBasis::Lagrange { lagr: lagr_g1 } => lagr_g1,
@@ -248,12 +245,13 @@ impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>> Transcr
             &pp.pp_elgamal,
             &eks_inner,
         );
-        //   (2b) Compute its image (the public statement), so the range proof commitment and chunked_elgamal encryptions
         let statement = hom.apply(&witness);
-        //   (2c) Produce the SoK
+
+        // Step 6: produce the SoK; this is done before step 5b because it naturally normalises the statement
         let (SoK, normalized_statement) = hom.prove(&witness, statement, &sok_cntxt, rng);
         let SoK = SoK.change_lifetime(); // Make sure the lifetime of the proof is not coupled to `hom` which has references
 
+        // Step 5b: compute the range proof
         // Destructure the "public statement" of the above sigma protocol
         let TupleCodomainShape(
             range_proof_commitment,
@@ -262,14 +260,6 @@ impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>> Transcr
                 randomness: Rs,
             },
         ) = normalized_statement;
-
-        // debug_assert_eq!(
-        //     Cs.len(),
-        //     sc.get_total_weight(),
-        //     "Number of encrypted chunks must equal number of players"
-        // );
-
-        // Generate the batch range proof, given the `range_proof_commitment` produced in the PoK
         let range_proof = dekart_univariate_v2::ProofProjective::prove(
             &pp.pk_range_proof,
             &f_evals_chunked_flat,
@@ -434,6 +424,8 @@ impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>>
     }
 }
 
+delegate_transcript_core_to_subtrs!(Transcript<E>, subtrs);
+
 impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>> MalleableTranscript
     for Transcript<E>
 {
@@ -443,13 +435,7 @@ impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>> Malleab
         _aux: &A,
         _player: &Player,
     ) {
-        // TODO: We're not using this but it probably fails if we don't; but that would probably mean recomputing almost the entire transcript... but then that would require eks and pp
+        // TODO: We're not using this; it would probably mean recomputing almost the entire transcript... but then that would require eks and pp
         panic!("Doesn't work for this PVSS, at least for now");
-        // self.dealer = *player;
-
-        // let sgn = ssk
-        //     .sign(&self.utrs)
-        //     .expect("signing of `chunky` PVSS transcript failed");
-        // self.sgn = sgn;
     }
 }

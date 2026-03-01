@@ -281,7 +281,7 @@ impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>> traits:
 
         let (f, f_evals) = sc
             .get_threshold_config()
-            .sample_polynomial_and_evals(*s.get_secret_a(), rng);
+            .sample_polynomial_and_compute_shares(*s.get_secret_a(), rng);
 
         // Encrypt the chunked shares and generate the sharing proof
         let (Cs, Rs, Vs, sharing_proof) =
@@ -426,13 +426,7 @@ impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>> Malleab
         _aux: &A,
         _player: &Player,
     ) {
-        // TODO: We're not using this but it probably fails if we don't; but that would probably mean recomputing almost the entire transcript... but then that would require eks and pp
+        // TODO: We're not using this; it would probably mean recomputing almost the entire transcript... but then that would require eks and pp
         panic!("Doesn't work for this PVSS, at least for now");
-        // self.dealer = *player;
-
-        // let sgn = ssk
-        //     .sign(&self.utrs)
-        //     .expect("signing of `chunky` PVSS transcript failed");
-        // self.sgn = sgn;
     }
 }

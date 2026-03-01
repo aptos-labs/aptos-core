@@ -73,6 +73,16 @@ pub fn prepare_chunked_witness<E: Pairing, R: RngCore + CryptoRng>(
     sc: &WeightedConfigArkworks<E::ScalarField>,
     rng: &mut R,
 ) -> ChunkedWitnessData<E> {
+    // Step 3: convert the Shamir shares into chunked values
+    let f_evals_chunked: Vec<Vec<E::ScalarField>> = f_evals
+        .iter()
+        .map(|f_eval| chunks::scalar_to_le_chunks(pp.ell, f_eval))
+        .collect();
+    let f_evals_chunked_flat: Vec<E::ScalarField> =
+        f_evals_chunked.iter().flatten().copied().collect();
+    let f_evals_weighted = sc.group_by_player(&f_evals_chunked);
+
+    // Step 4a: sample the HKZG randomness and correlated randomness for the ElGamal encryptions
     let hkzg_randomness: univariate_hiding_kzg::CommitmentRandomness<E::ScalarField> =
         Scalar(sample_field_element(rng));
     let elgamal_randomness = Scalar::vecvec_from_inner(
@@ -87,14 +97,6 @@ pub fn prepare_chunked_witness<E: Pairing, R: RngCore + CryptoRng>(
         .take(sc.get_max_weight())
         .collect(),
     );
-
-    let f_evals_chunked: Vec<Vec<E::ScalarField>> = f_evals
-        .iter()
-        .map(|f_eval| chunks::scalar_to_le_chunks(pp.ell, f_eval))
-        .collect();
-    let f_evals_chunked_flat: Vec<E::ScalarField> =
-        f_evals_chunked.iter().flatten().copied().collect();
-    let f_evals_weighted = sc.group_by_player(&f_evals_chunked);
 
     let witness = HkzgWeightedElgamalWitness {
         hkzg_randomness,

@@ -309,7 +309,7 @@ impl<F: FftField> ShamirThresholdConfig<F> {
     /// evaluations. Useful for both classic and weighted Shamir (e.g. weighted PVSS where
     /// the threshold config has `n = W`).
     #[allow(non_snake_case)]
-    pub fn sample_polynomial_and_evals<R: RngCore + CryptoRng>(
+    pub fn sample_polynomial_and_compute_shares<R: RngCore + CryptoRng>(
         &self,
         a0: F,
         rng: &mut R,
