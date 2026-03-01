@@ -46,7 +46,7 @@ use aptos_crypto::{
     weighted_config::WeightedConfigArkworks as SecretSharingConfig,
     CryptoMaterialError, TSecretSharingConfig, ValidCryptoMaterial,
 };
-use ark_ec::{pairing::Pairing, CurveGroup, VariableBaseMSM};
+use ark_ec::{pairing::Pairing, AffineRepr, CurveGroup, VariableBaseMSM};
 use ark_ff::{AdditiveGroup, Field, Fp, FpConfig};
 use ark_serialize::{CanonicalDeserialize, CanonicalSerialize};
 use rand_core::{CryptoRng, RngCore};
@@ -394,21 +394,21 @@ impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>> Transcr
         //     "Number of encrypted chunks must equal number of players"
         // );
 
-        // Generate the batch range proof, given the `range_proof_commitment` produced in the PoK
+        // Generate the batch range proof; normalized statement has TrivialShape<E::G1Affine>.
         let range_proof = dekart_univariate_v2::ProofProjective::prove(
             &pp.pk_range_proof,
             &f_evals_chunked_flat,
             pp.ell,
-            &TrivialShape(range_proof_commitment.0.into()), // TODO: fix this
+            &dekart_univariate_v2::CommitmentNormalised(range_proof_commitment.0.clone()),
             &witness.hkzg_randomness,
             rng,
         );
 
-        // Assemble the sharing proof
+        // Assemble the sharing proof (Commitment type is TrivialShape<E::G1>).
         let sharing_proof = SharingProof {
             SoK,
             range_proof,
-            range_proof_commitment: TrivialShape(range_proof_commitment.0.into()), // TODO: fix this
+            range_proof_commitment: TrivialShape(range_proof_commitment.0.into_group()),
         };
 
         // Vs_flat from homomorphism codomain was grouped by player into Vs above.

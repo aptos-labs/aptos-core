@@ -10,7 +10,7 @@ use anyhow::ensure;
 use aptos_crypto::arkworks::{powers_of_two, random::sample_field_element, GroupGenerators};
 use ark_ec::{
     pairing::{Pairing, PairingOutput},
-    CurveGroup, PrimeGroup, VariableBaseMSM,
+    AffineRepr, CurveGroup, PrimeGroup, VariableBaseMSM,
 };
 use ark_ff::{AdditiveGroup, Field};
 use ark_poly::{self, EvaluationDomain, Radix2EvaluationDomain};
@@ -63,6 +63,15 @@ where
 
 #[derive(CanonicalSerialize, CanonicalDeserialize, Debug, Clone, PartialEq, Eq)]
 pub struct Commitment<E: Pairing>(E::G1);
+
+#[derive(CanonicalSerialize, CanonicalDeserialize, Debug, Clone, PartialEq, Eq)]
+pub struct CommitmentNormalised<E: Pairing>(pub E::G1Affine);
+
+impl<E: Pairing> From<Commitment<E>> for CommitmentNormalised<E> {
+    fn from(c: Commitment<E>) -> Self {
+        CommitmentNormalised(c.0.into_affine())
+    }
+}
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct ProverKey<E: Pairing> {
@@ -121,6 +130,7 @@ impl<E: Pairing> CanonicalSerialize for VerificationKey<E> {
 impl<E: Pairing> traits::BatchedRangeProof<E> for Proof<E> {
     type Commitment = Commitment<E>;
     type CommitmentKey = ProverKey<E>;
+    type CommitmentNormalised = CommitmentNormalised<E>;
     type CommitmentRandomness = Scalar<E::ScalarField>;
     type Input = E::ScalarField;
     type ProverKey = ProverKey<E>;
@@ -218,7 +228,7 @@ impl<E: Pairing> traits::BatchedRangeProof<E> for Proof<E> {
         pk: &ProverKey<E>,
         values: &[Self::Input],
         ell: u8,
-        comm: &Self::Commitment,
+        comm: &Self::CommitmentNormalised,
         r: &Self::CommitmentRandomness,
         rng: &mut R,
     ) -> Proof<E>
@@ -493,7 +503,7 @@ impl<E: Pairing> traits::BatchedRangeProof<E> for Proof<E> {
         let public_statement = PublicStatement {
             n,
             ell,
-            comm: comm.clone(),
+            comm: Commitment(comm.0.into_group()),
         };
         let c_aff = E::G1::normalize_batch(&c);
         let c_hat_aff = E::G2::normalize_batch(&c_hat);

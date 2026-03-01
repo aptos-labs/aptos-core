@@ -47,7 +47,7 @@ use aptos_crypto::{
 };
 use ark_ec::{
     pairing::{Pairing, PairingOutput},
-    CurveGroup, VariableBaseMSM,
+    AffineRepr, CurveGroup, VariableBaseMSM,
 };
 use ark_ff::{AdditiveGroup, Field, Fp, FpConfig};
 use ark_serialize::{CanonicalDeserialize, CanonicalSerialize};
@@ -89,7 +89,8 @@ impl<E: Pairing> ValidCryptoMaterial for Transcript<E> {
     const AIP_80_PREFIX: &'static str = "";
 
     fn to_bytes(&self) -> Vec<u8> {
-        bcs::to_bytes(&self).expect("Unexpected error during chunky field PVSS transcript serialization")
+        bcs::to_bytes(&self)
+            .expect("Unexpected error during chunky field PVSS transcript serialization")
     }
 }
 
@@ -147,7 +148,7 @@ impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>> traits:
         // Add constant term for the G₂ commitment (f(0) = a0)
         f_evals.push(f[0]);
 
-        // Step 2:Commit to polynomial evaluations + constant term using batch_mul
+        // Step 2: Commit to polynomial evaluations + constant term using batch_mul
         let flattened_Vs_proj = arkworks::batch_mul::<E::G2>(&pp.G2_table, &f_evals);
 
         debug_assert_eq!(flattened_Vs_proj.len(), sc.get_total_weight() + 1);
@@ -156,6 +157,7 @@ impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>> traits:
         let (Cs, Rs, sharing_proof) =
             Self::encrypt_chunked_shares(&f_evals, eks, pp, sc, sok_cntxt, rng);
 
+        // Remainder of this function is just batch-normalising the G2 elements and re-splitting into V0 and per-player Vs (same layout as Vs_proj).
         let Vs_proj = sc.group_by_player(&flattened_Vs_proj); // last item of flattened_Vs_proj is f(0), won't appear in Vs_proj
         let V0_proj = *flattened_Vs_proj.last().unwrap();
 
@@ -218,7 +220,7 @@ impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>> Transcr
         f_evals: &[E::ScalarField],
         eks: &[keys::EncryptPubKey<E>],
         pp: &PublicParameters<E>,
-        sc: &<Self as traits::TranscriptCore>::SecretSharingConfig, // only for debugging purposes?
+        sc: &<Self as traits::TranscriptCore>::SecretSharingConfig,
         sok_cntxt: SokContext<'a, A>,
         rng: &mut R,
     ) -> (
@@ -232,7 +234,7 @@ impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>> Transcr
         } = hkzg_chunked_elgamal::prepare_chunked_witness(f_evals, pp, sc, rng);
 
         // Step 4b and 5a: compute the encryptions and the KZG commitment
-        let eks_inner: Vec<_> = eks.iter().map(|ek| ek.ek).collect(); // TODO: this is a bit ugly
+        let ek_g1_affines: Vec<E::G1Affine> = eks.iter().map(|ek| ek.ek).collect();
         let lagr_g1: &[E::G1Affine] = match &pp.pk_range_proof.ck_S.msm_basis {
             SrsBasis::Lagrange { lagr: lagr_g1 } => lagr_g1,
             SrsBasis::PowersOfTau { .. } => {
@@ -243,7 +245,7 @@ impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>> Transcr
             lagr_g1,
             pp.pk_range_proof.ck_S.xi_1,
             &pp.pp_elgamal,
-            &eks_inner,
+            &ek_g1_affines,
         );
         let statement = hom.apply(&witness);
 
@@ -264,7 +266,7 @@ impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>> Transcr
             &pp.pk_range_proof,
             &f_evals_chunked_flat,
             pp.ell,
-            &TrivialShape(range_proof_commitment.0.into()), // TODO: fix this
+            &dekart_univariate_v2::CommitmentNormalised(range_proof_commitment.0.clone()),
             &witness.hkzg_randomness,
             rng,
         );
@@ -273,7 +275,7 @@ impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>> Transcr
         let sharing_proof = SharingProof {
             SoK,
             range_proof,
-            range_proof_commitment: TrivialShape(range_proof_commitment.0.into()), // TODO: fix this
+            range_proof_commitment: TrivialShape(range_proof_commitment.0.into_group()), // TODO: fix this
         };
 
         (Cs, Rs, sharing_proof)
@@ -319,7 +321,7 @@ impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>>
         )?;
 
         // PoK MSM terms (G1) and LDT MSM terms (G2) for merging into one pairing check
-        let eks_inner: Vec<_> = eks.iter().map(|ek| ek.ek).collect();
+        let ek_g1_affines: Vec<E::G1Affine> = eks.iter().map(|ek| ek.ek).collect();
         let lagr_g1: &[E::G1Affine] = match &pp.pk_range_proof.ck_S.msm_basis {
             SrsBasis::Lagrange { lagr: lagr_g1 } => lagr_g1,
             SrsBasis::PowersOfTau { .. } => {
@@ -330,7 +332,7 @@ impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>>
             lagr_g1,
             pp.pk_range_proof.ck_S.xi_1,
             &pp.pp_elgamal,
-            &eks_inner,
+            &ek_g1_affines,
         );
         let pok_statement = TupleCodomainShape(
             sigma_protocol::homomorphism::TrivialShape(
@@ -366,7 +368,7 @@ impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>>
         let powers_of_beta = utils::powers(beta, sc.get_total_weight() + 1);
 
         let Cs_flat: Vec<_> = self.subtrs.Cs.iter().flatten().cloned().collect();
-        assert_eq!(
+        debug_assert_eq!(
             Cs_flat.len(),
             sc.get_total_weight(),
             "Number of ciphertexts does not equal number of weights"
@@ -374,9 +376,9 @@ impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>>
 
         let mut weighted_Cs_base = Vec::new();
         let mut weighted_Cs_scalar = Vec::new();
-        for i in 0..Cs_flat.len() {
-            for j in 0..Cs_flat[i].len() {
-                weighted_Cs_base.push(Cs_flat[i][j]);
+        for (i, row) in Cs_flat.iter().enumerate() {
+            for (j, &base) in row.iter().enumerate() {
+                weighted_Cs_base.push(base);
                 weighted_Cs_scalar.push(pp.powers_of_radix[j] * powers_of_beta[i]);
             }
         }

@@ -13,7 +13,8 @@ pub trait BatchedRangeProof<E: Pairing>: Clone + CanonicalSerialize + CanonicalD
     type ProverKey;
     type VerificationKey: Clone + CanonicalSerialize; // Serialization is needed because this is often appended to a Fiat-Shamir transcript
     type Input: From<u64>; // Slightly hacky. It's used in `range_proof_random_instance()` to generate (chunks of) inputs that have a certain bit size
-    type Commitment;
+    type Commitment: Clone + Into<Self::CommitmentNormalised>;
+    type CommitmentNormalised: Clone;
     type CommitmentRandomness: UniformRand;
     type CommitmentKey;
 
@@ -49,7 +50,7 @@ pub trait BatchedRangeProof<E: Pairing>: Clone + CanonicalSerialize + CanonicalD
         pk: &Self::ProverKey,
         values: &[Self::Input],
         ell: u8,
-        comm: &Self::Commitment,
+        comm: &Self::CommitmentNormalised,
         r: &Self::CommitmentRandomness,
         rng: &mut R,
     ) -> Self;

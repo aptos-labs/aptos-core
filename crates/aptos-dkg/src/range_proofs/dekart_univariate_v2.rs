@@ -10,7 +10,7 @@ use crate::{
     range_proofs::traits,
     sigma_protocol::{
         self,
-        homomorphism::{self, Trait as _},
+        homomorphism::{self, Trait as _, TrivialShape},
         traits::Trait as _,
         CurveGroupTrait,
     },
@@ -26,7 +26,7 @@ use aptos_crypto::arkworks::{
     srs::{SrsBasis, SrsType},
     GroupGenerators,
 };
-use ark_ec::{pairing::Pairing, CurveGroup, PrimeGroup, VariableBaseMSM};
+use ark_ec::{pairing::Pairing, AffineRepr, CurveGroup, PrimeGroup, VariableBaseMSM};
 use ark_ff::{AdditiveGroup, Field, PrimeField};
 use ark_poly::{self, EvaluationDomain, Polynomial};
 use ark_serialize::{
@@ -43,7 +43,7 @@ use std::{fmt::Debug, io::Write};
 
 // TODO: make an affine version of this
 #[allow(non_snake_case)]
-#[derive(CanonicalSerialize, Debug, PartialEq, Eq, Clone, CanonicalDeserialize)]
+#[derive(CanonicalSerialize, CanonicalDeserialize, Debug, Clone, PartialEq, Eq)]
 pub struct ProofProjective<E: Pairing> {
     hatC: E::G1,
     pi_PoK: sigma_protocol::Proof<E::ScalarField, two_term_msm::Homomorphism<E::G1>>,
@@ -54,6 +54,10 @@ pub struct ProofProjective<E: Pairing> {
     a_js: Vec<E::ScalarField>, // has length ell
     pi_gamma: univariate_hiding_kzg::OpeningProof<E>,
 }
+
+/// Wrapper around E::G1Affine used as CommitmentNormalised to avoid coherence issues with From/Into.
+#[derive(CanonicalSerialize, CanonicalDeserialize, Debug, Clone, PartialEq, Eq)]
+pub struct CommitmentNormalised<E: Pairing>(pub E::G1Affine);
 
 impl<E: Pairing> ProofProjective<E> {
     /// Generates a random looking proof (but not a valid one).
@@ -242,9 +246,16 @@ fn compute_h_denom_eval<E: Pairing>(
     h_denom_eval
 }
 
+impl<E: Pairing> From<univariate_hiding_kzg::Commitment<E>> for CommitmentNormalised<E> {
+    fn from(c: univariate_hiding_kzg::Commitment<E>) -> Self {
+        CommitmentNormalised(c.0.into_affine())
+    }
+}
+
 impl<E: Pairing> traits::BatchedRangeProof<E> for ProofProjective<E> {
     type Commitment = univariate_hiding_kzg::Commitment<E>;
     type CommitmentKey = univariate_hiding_kzg::CommitmentKey<E>;
+    type CommitmentNormalised = CommitmentNormalised<E>;
     type CommitmentRandomness = univariate_hiding_kzg::CommitmentRandomness<E::ScalarField>;
     type Input = E::ScalarField;
     type ProverKey = ProverKey<E>;
@@ -377,13 +388,14 @@ impl<E: Pairing> traits::BatchedRangeProof<E> for ProofProjective<E> {
         pk: &ProverKey<E>,
         values: &[Self::Input],
         ell: u8,
-        comm: &Self::Commitment,
+        comm: &Self::CommitmentNormalised,
         rho: &Self::CommitmentRandomness,
         rng: &mut R,
     ) -> ProofProjective<E>
     where
         R: rand_core::RngCore + rand_core::CryptoRng,
     {
+        let comm_g1 = comm.0.into_group();
         #[cfg(feature = "range_proof_timing_univariate_v2")]
         let prove_start = Instant::now();
         #[cfg(feature = "range_proof_timing_univariate_v2")]
@@ -399,6 +411,8 @@ impl<E: Pairing> traits::BatchedRangeProof<E> for ProofProjective<E> {
             );
         };
 
+        // It was decided that the range proof should use an internal FS transcript,
+        // to make security proofs easier
         let mut fs_t = merlin::Transcript::new(Self::DST);
 
         #[cfg(feature = "range_proof_timing_univariate_v2")]
@@ -454,7 +468,7 @@ impl<E: Pairing> traits::BatchedRangeProof<E> for ProofProjective<E> {
         fiat_shamir::append_initial_data(&mut fs_t, Self::DST, vk, PublicStatement {
             n,
             ell,
-            comm: comm.clone(),
+            comm: TrivialShape(comm_g1),
         });
         #[cfg(feature = "range_proof_timing_univariate_v2")]
         print_cumulative("unpack pk + append_initial_data", start.elapsed());
@@ -464,7 +478,7 @@ impl<E: Pairing> traits::BatchedRangeProof<E> for ProofProjective<E> {
         // Step 2a
         let r = sample_field_element(rng);
         let delta_rho = sample_field_element(rng);
-        let hatC = *xi_1 * delta_rho + lagr_g1[0] * r + comm.0;
+        let hatC = *xi_1 * delta_rho + lagr_g1[0] * r + comm_g1;
 
         // Step 2b
         fiat_shamir::append_hat_f_commitment::<E>(&mut fs_t, &hatC);
@@ -483,7 +497,7 @@ impl<E: Pairing> traits::BatchedRangeProof<E> for ProofProjective<E> {
                 poly_randomness: Scalar(r),
                 hiding_kzg_randomness: Scalar(delta_rho),
             },
-            two_term_msm::CodomainShape(hatC - comm.0),
+            two_term_msm::CodomainShape(hatC - comm_g1),
             &Self::DST,
             rng,
         )
