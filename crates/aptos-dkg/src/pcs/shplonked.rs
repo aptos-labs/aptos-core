@@ -195,6 +195,32 @@ impl<F: Field> EvalHomomorphism<F> for SumEvalHom {
     }
 }
 
+/// Builds canonical indices and Lagrange basis cache for the given point sets (one per polynomial).
+/// Returns (canonical, lagrange_cache) where lagrange_cache[i] is Some(bases) when canonical[i] == i.
+#[allow(non_snake_case)]
+fn build_lagrange_cache<F: FftField>(
+    s_per_poly: &[Vec<F>],
+) -> (Vec<usize>, Vec<Option<Vec<DensePolynomial<F>>>>) {
+    let n = s_per_poly.len();
+    let canonical: Vec<usize> = (0..n)
+        .map(|i| (0..=i).find(|&j| s_per_poly[j] == s_per_poly[i]).unwrap())
+        .collect();
+    let unique_indices: Vec<usize> = (0..n).filter(|&i| canonical[i] == i).collect();
+    let unique_sets: Vec<&[F]> = unique_indices
+        .iter()
+        .map(|&i| s_per_poly[i].as_slice())
+        .collect();
+    let lagrange_bases_batched = lagrange_basis_polys_batched(&unique_sets);
+    let mut lagrange_cache: Vec<Option<Vec<DensePolynomial<F>>>> = vec![None; n];
+    for (bases, &idx) in lagrange_bases_batched
+        .into_iter()
+        .zip(unique_indices.iter())
+    {
+        lagrange_cache[idx] = Some(bases);
+    }
+    (canonical, lagrange_cache)
+}
+
 // ---------------------------------------------------------------------------
 // SRS and legacy API (single point per polynomial, φ = sum)
 // ---------------------------------------------------------------------------
@@ -431,23 +457,8 @@ pub fn batch_open_generalized<
         .map(|set| set.all_points().cloned().collect())
         .collect();
 
-    // Canonical index per polynomial: first j with S_is[j] == S_is[i].
-    let canonical: Vec<usize> = (0..n)
-        .map(|i| (0..=i).find(|&j| S_is[j] == S_is[i]).unwrap())
-        .collect();
-
-    // Compute Lagrange basis polynomials once per unique set, with one batch inversion for all denominators.
-    let unique_indices: Vec<usize> = (0..n).filter(|&i| canonical[i] == i).collect();
-    let unique_sets: Vec<&[E::ScalarField]> =
-        unique_indices.iter().map(|&i| S_is[i].as_slice()).collect();
-    let lagrange_bases_batched = lagrange_basis_polys_batched(&unique_sets);
-    let mut lagrange_cache: Vec<Option<Vec<DensePolynomial<E::ScalarField>>>> = vec![None; n];
-    for (bases, &idx) in lagrange_bases_batched
-        .into_iter()
-        .zip(unique_indices.iter())
-    {
-        lagrange_cache[idx] = Some(bases);
-    }
+    // Canonical index per polynomial and Lagrange basis cache (one batch inversion for all denominators).
+    let (canonical, lagrange_cache) = build_lagrange_cache(&S_is);
 
     let tilde_f_is: Vec<DensePolynomial<E::ScalarField>> = (0..n)
         .map(|i| {
@@ -519,13 +530,13 @@ pub fn batch_open_generalized<
         .sum();
 
     // Step 4c: C_eval = eval_point_commit_hom(y^hid; ρ_eval) = (∑_j weights[j] * (∑_i L_{j,i}(x) y_j^hid[i]))*τ_0 + ρ_eval*ξ_1.
+    // Use already-computed Lagrange basis polynomials and evaluate at x (Horner).
     let lagrange_at_x: Vec<Vec<E::ScalarField>> = (0..n)
         .map(|j| {
-            let s_j = &S_is[j];
-            sets[j]
-                .hid
-                .iter()
-                .map(|&s| lagrange_basis_at(s_j, s, x))
+            let bases = lagrange_cache[canonical[j]].as_ref().unwrap();
+            let n_rev = sets[j].rev.len();
+            (0..sets[j].hid.len())
+                .map(|i| bases[n_rev + i].evaluate(&x))
                 .collect()
         })
         .collect();
@@ -740,31 +751,31 @@ where
 
     let h: usize = sigma_proof.z_yi.iter().map(|v| v.len()).sum();
     let com_y_hom = shplonked_sigma::com_y_hom(&srs.taus_1[..h], srs.xi_1);
-    // One weight per polynomial: alphas from compute_weights. Lagrange at x per (j, i).
+    // One weight per polynomial: alphas from compute_weights. Lagrange at x: evaluate cached basis polys at x (Horner).
+    let (canonical, lagrange_cache) = build_lagrange_cache(&s_per_poly);
     let lagrange_at_x: Vec<Vec<E::ScalarField>> = (0..n)
         .map(|j| {
-            let s_j = &s_per_poly[j];
-            sets[j]
-                .hid
-                .iter()
-                .map(|&s| lagrange_basis_at(s_j, s, x))
+            let bases = lagrange_cache[canonical[j]].as_ref().unwrap();
+            let n_rev = sets[j].rev.len();
+            (0..sets[j].hid.len())
+                .map(|i| bases[n_rev + i].evaluate(&x))
                 .collect()
         })
         .collect();
-    let v_hom = shplonked_sigma::EvalPointCommitHom::new(
+    let eval_point_commit_hom = shplonked_sigma::EvalPointCommitHom::new(
         srs.taus_1[0],
         srs.xi_1,
         alphas.clone(),
         lagrange_at_x,
     );
-    let com_y_v_hom = shplonked_sigma::FirstTupleHom::<E> {
+    let first_tuple_hom = shplonked_sigma::FirstTupleHom::<E> {
         hom1: com_y_hom,
-        hom2: v_hom,
+        hom2: eval_point_commit_hom,
         _group: std::marker::PhantomData,
     };
     let sum_hom = shplonked_sigma::SumHom::<E::ScalarField>::default();
     let full_hom = shplonked_sigma::ShplonkedSigmaHom::<E> {
-        hom1: com_y_v_hom,
+        hom1: first_tuple_hom,
         hom2: sum_hom,
     };
 
