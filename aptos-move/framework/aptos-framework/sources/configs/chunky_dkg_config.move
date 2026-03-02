@@ -45,12 +45,12 @@ module aptos_framework::chunky_dkg_config {
     }
 
     /// Only used in reconfigurations to apply the pending `ChunkyDKGConfig`, if there is any.
-    public(friend) fun on_new_epoch(framework: &signer) acquires ChunkyDKGConfig {
+    friend fun on_new_epoch(framework: &signer) {
         system_addresses::assert_aptos_framework(framework);
         if (config_buffer::does_exist<ChunkyDKGConfig>()) {
             let new_config = config_buffer::extract_v2<ChunkyDKGConfig>();
             if (exists<ChunkyDKGConfig>(@aptos_framework)) {
-                *borrow_global_mut<ChunkyDKGConfig>(@aptos_framework) = new_config;
+                ChunkyDKGConfig[@aptos_framework] = new_config;
             } else {
                 move_to(framework, new_config);
             }
@@ -61,9 +61,9 @@ module aptos_framework::chunky_dkg_config {
     ///
     /// NOTE: this returning true does not mean chunky DKG will run.
     /// The feature works if and only if `consensus_config::validator_txn_enabled() && chunky_dkg_config::enabled()`.
-    public fun enabled(): bool acquires ChunkyDKGConfig {
+    public fun enabled(): bool {
         if (exists<ChunkyDKGConfig>(@aptos_framework)) {
-            let config = borrow_global<ChunkyDKGConfig>(@aptos_framework);
+            let config = &ChunkyDKGConfig[@aptos_framework];
             let variant_type_name = *config.variant.type_name().bytes();
             variant_type_name != b"0x1::chunky_dkg_config::ConfigOff"
         } else { false }
@@ -88,9 +88,9 @@ module aptos_framework::chunky_dkg_config {
     }
 
     /// Get the currently effective chunky DKG configuration object.
-    public fun current(): ChunkyDKGConfig acquires ChunkyDKGConfig {
+    public fun current(): ChunkyDKGConfig {
         if (exists<ChunkyDKGConfig>(@aptos_framework)) {
-            *borrow_global<ChunkyDKGConfig>(@aptos_framework)
+            ChunkyDKGConfig[@aptos_framework]
         } else {
             new_off()
         }
@@ -106,7 +106,7 @@ module aptos_framework::chunky_dkg_config {
     }
 
     #[test(framework = @0x1)]
-    fun init_buffer_apply(framework: signer) acquires ChunkyDKGConfig {
+    fun init_buffer_apply(framework: signer) {
         initialize_for_testing(&framework);
 
         // Enabling.

@@ -53,21 +53,21 @@ module aptos_framework::randomness {
     }
 
     #[test_only]
-    public fun initialize_for_testing(framework: &signer) acquires PerBlockRandomness {
+    public fun initialize_for_testing(framework: &signer) {
         initialize(framework);
         set_seed(x"0000000000000000000000000000000000000000000000000000000000000000");
     }
 
     /// Invoked in block prologues to update the block-level randomness seed.
-    public(friend) fun on_new_block(
+    friend fun on_new_block(
         vm: &signer,
         epoch: u64,
         round: u64,
         seed_for_new_block: Option<vector<u8>>
-    ) acquires PerBlockRandomness {
+    ) {
         system_addresses::assert_vm(vm);
         if (exists<PerBlockRandomness>(@aptos_framework)) {
-            let randomness = borrow_global_mut<PerBlockRandomness>(@aptos_framework);
+            let randomness = &mut PerBlockRandomness[@aptos_framework];
             randomness.epoch = epoch;
             randomness.round = round;
             randomness.seed = seed_for_new_block;
@@ -76,11 +76,11 @@ module aptos_framework::randomness {
 
     /// Generate the next 32 random bytes. Repeated calls will yield different results (assuming the collision-resistance
     /// of the hash function).
-    fun next_32_bytes(): vector<u8> acquires PerBlockRandomness {
+    fun next_32_bytes(): vector<u8> {
         assert!(is_unbiasable(), E_API_USE_IS_BIASIBLE);
 
         let input = DST;
-        let randomness = borrow_global<PerBlockRandomness>(@aptos_framework);
+        let randomness = &PerBlockRandomness[@aptos_framework];
         let seed = *randomness.seed.borrow();
 
         input.append(seed);
@@ -90,7 +90,7 @@ module aptos_framework::randomness {
     }
 
     /// Generates a sequence of bytes uniformly at random
-    public fun bytes(n: u64): vector<u8> acquires PerBlockRandomness {
+    public fun bytes(n: u64): vector<u8> {
         let v = vector[];
         let c = 0;
         while (c < n) {
@@ -110,7 +110,7 @@ module aptos_framework::randomness {
     }
 
     /// Generates an u8 uniformly at random.
-    public fun u8_integer(): u8 acquires PerBlockRandomness {
+    public fun u8_integer(): u8 {
         let raw = next_32_bytes();
         let ret: u8 = raw.pop_back();
 
@@ -120,7 +120,7 @@ module aptos_framework::randomness {
     }
 
     /// Generates an u16 uniformly at random.
-    public fun u16_integer(): u16 acquires PerBlockRandomness {
+    public fun u16_integer(): u16 {
         let raw = next_32_bytes();
         let i = 0;
         let ret: u16 = 0;
@@ -135,7 +135,7 @@ module aptos_framework::randomness {
     }
 
     /// Generates an u32 uniformly at random.
-    public fun u32_integer(): u32 acquires PerBlockRandomness {
+    public fun u32_integer(): u32 {
         let raw = next_32_bytes();
         let i = 0;
         let ret: u32 = 0;
@@ -150,7 +150,7 @@ module aptos_framework::randomness {
     }
 
     /// Generates an u64 uniformly at random.
-    public fun u64_integer(): u64 acquires PerBlockRandomness {
+    public fun u64_integer(): u64 {
         let raw = next_32_bytes();
         let i = 0;
         let ret: u64 = 0;
@@ -165,7 +165,7 @@ module aptos_framework::randomness {
     }
 
     /// Generates an u128 uniformly at random.
-    public fun u128_integer(): u128 acquires PerBlockRandomness {
+    public fun u128_integer(): u128 {
         let raw = next_32_bytes();
         let i = 0;
         let ret: u128 = 0;
@@ -180,13 +180,13 @@ module aptos_framework::randomness {
     }
 
     /// Generates a u256 uniformly at random.
-    public fun u256_integer(): u256 acquires PerBlockRandomness {
+    public fun u256_integer(): u256 {
         event::emit(RandomnessGeneratedEvent {});
         u256_integer_internal()
     }
 
     /// Generates a u256 uniformly at random.
-    fun u256_integer_internal(): u256 acquires PerBlockRandomness {
+    fun u256_integer_internal(): u256 {
         let raw = next_32_bytes();
         let i = 0;
         let ret: u256 = 0;
@@ -201,7 +201,7 @@ module aptos_framework::randomness {
     ///
     /// NOTE: The uniformity is not perfect, but it can be proved that the bias is negligible.
     /// If you need perfect uniformity, consider implement your own via rejection sampling.
-    public fun u8_range(min_incl: u8, max_excl: u8): u8 acquires PerBlockRandomness {
+    public fun u8_range(min_incl: u8, max_excl: u8): u8 {
         let range = ((max_excl - min_incl) as u256);
         let sample = ((u256_integer_internal() % range) as u8);
 
@@ -214,7 +214,7 @@ module aptos_framework::randomness {
     ///
     /// NOTE: The uniformity is not perfect, but it can be proved that the bias is negligible.
     /// If you need perfect uniformity, consider implement your own via rejection sampling.
-    public fun u16_range(min_incl: u16, max_excl: u16): u16 acquires PerBlockRandomness {
+    public fun u16_range(min_incl: u16, max_excl: u16): u16 {
         let range = ((max_excl - min_incl) as u256);
         let sample = ((u256_integer_internal() % range) as u16);
 
@@ -227,7 +227,7 @@ module aptos_framework::randomness {
     ///
     /// NOTE: The uniformity is not perfect, but it can be proved that the bias is negligible.
     /// If you need perfect uniformity, consider implement your own via rejection sampling.
-    public fun u32_range(min_incl: u32, max_excl: u32): u32 acquires PerBlockRandomness {
+    public fun u32_range(min_incl: u32, max_excl: u32): u32 {
         let range = ((max_excl - min_incl) as u256);
         let sample = ((u256_integer_internal() % range) as u32);
 
@@ -240,13 +240,13 @@ module aptos_framework::randomness {
     ///
     /// NOTE: The uniformity is not perfect, but it can be proved that the bias is negligible.
     /// If you need perfect uniformity, consider implement your own via rejection sampling.
-    public fun u64_range(min_incl: u64, max_excl: u64): u64 acquires PerBlockRandomness {
+    public fun u64_range(min_incl: u64, max_excl: u64): u64 {
         event::emit(RandomnessGeneratedEvent {});
 
         u64_range_internal(min_incl, max_excl)
     }
 
-    public fun u64_range_internal(min_incl: u64, max_excl: u64): u64 acquires PerBlockRandomness {
+    public fun u64_range_internal(min_incl: u64, max_excl: u64): u64 {
         let range = ((max_excl - min_incl) as u256);
         let sample = ((u256_integer_internal() % range) as u64);
 
@@ -257,7 +257,7 @@ module aptos_framework::randomness {
     ///
     /// NOTE: The uniformity is not perfect, but it can be proved that the bias is negligible.
     /// If you need perfect uniformity, consider implement your own via rejection sampling.
-    public fun u128_range(min_incl: u128, max_excl: u128): u128 acquires PerBlockRandomness {
+    public fun u128_range(min_incl: u128, max_excl: u128): u128 {
         let range = ((max_excl - min_incl) as u256);
         let sample = ((u256_integer_internal() % range) as u128);
 
@@ -270,7 +270,7 @@ module aptos_framework::randomness {
     ///
     /// NOTE: The uniformity is not perfect, but it can be proved that the bias is negligible.
     /// If you need perfect uniformity, consider implement your own with `u256_integer()` + rejection sampling.
-    public fun u256_range(min_incl: u256, max_excl: u256): u256 acquires PerBlockRandomness {
+    public fun u256_range(min_incl: u256, max_excl: u256): u256 {
         let range = max_excl - min_incl;
         let r0 = u256_integer_internal();
         let r1 = u256_integer_internal();
@@ -301,7 +301,7 @@ module aptos_framework::randomness {
 
     /// Generate a permutation of `[0, 1, ..., n-1]` uniformly at random.
     /// If n is 0, returns the empty vector.
-    public fun permutation(n: u64): vector<u64> acquires PerBlockRandomness {
+    public fun permutation(n: u64): vector<u64> {
         event::emit(RandomnessGeneratedEvent {});
 
         let values = vector[];
@@ -346,9 +346,9 @@ module aptos_framework::randomness {
     }
 
     #[test_only]
-    public fun set_seed(seed: vector<u8>) acquires PerBlockRandomness {
+    public fun set_seed(seed: vector<u8>) {
         assert!(seed.length() == 32, 0);
-        let randomness = borrow_global_mut<PerBlockRandomness>(@aptos_framework);
+        let randomness = &mut PerBlockRandomness[@aptos_framework];
         randomness.seed = option::some(seed);
     }
 
@@ -463,7 +463,7 @@ module aptos_framework::randomness {
     }
 
     #[test(fx = @aptos_framework)]
-    fun randomness_smoke_test(fx: signer) acquires PerBlockRandomness {
+    fun randomness_smoke_test(fx: signer) {
         initialize(&fx);
         set_seed(x"0000000000000000000000000000000000000000000000000000000000000000");
         // Test cases should always have no bias for any randomness call.
@@ -479,7 +479,7 @@ module aptos_framework::randomness {
     }
 
     #[test(fx = @aptos_framework)]
-    fun test_emit_events(fx: signer) acquires PerBlockRandomness {
+    fun test_emit_events(fx: signer) {
         initialize_for_testing(&fx);
 
         let c = 0;
@@ -543,7 +543,7 @@ module aptos_framework::randomness {
     }
 
     #[test(fx = @aptos_framework)]
-    fun test_bytes(fx: signer) acquires PerBlockRandomness {
+    fun test_bytes(fx: signer) {
         initialize_for_testing(&fx);
 
         let v = bytes(0);
@@ -601,7 +601,7 @@ module aptos_framework::randomness {
     }
 
     #[test(fx = @aptos_framework)]
-    fun test_permutation(fx: signer) acquires PerBlockRandomness {
+    fun test_permutation(fx: signer) {
         initialize_for_testing(&fx);
 
         let v = permutation(0);
@@ -616,7 +616,7 @@ module aptos_framework::randomness {
     #[test_only]
     /// WARNING: Do not call this with a large `size`, since execution time will be \Omega(size!), where ! is the factorial
     /// operator.
-    fun test_permutation_internal(size: u64) acquires PerBlockRandomness {
+    fun test_permutation_internal(size: u64) {
         let num_permutations = 1;
         let c = 1;
         for (i in 0..size) {

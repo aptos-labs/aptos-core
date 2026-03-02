@@ -204,7 +204,7 @@ module aptos_std::ordered_map {
     /// Changes the key, while keeping the same value attached to it
     /// Aborts with EKEY_NOT_FOUND if `old_key` doesn't exist.
     /// Aborts with ENEW_KEY_NOT_IN_ORDER if `new_key` doesn't keep the order `old_key` was in.
-    public(friend) fun replace_key_inplace<K: drop, V>(self: &mut OrderedMap<K, V>, old_key: &K, new_key: K) {
+    friend fun replace_key_inplace<K: drop, V>(self: &mut OrderedMap<K, V>, old_key: &K, new_key: K) {
         let len = self.entries.length();
         let index = binary_search(old_key, &self.entries, 0, len);
         assert!(index < len, error::invalid_argument(EKEY_NOT_FOUND));
