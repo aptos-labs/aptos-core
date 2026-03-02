@@ -56,6 +56,13 @@ pub trait SubprotocolNetworkSender<M: Send + Sync + Clone>: Send + Sync + Clone 
 
     /// Send a message to a specific peer
     async fn send_to(&self, peer: Author, msg: M);
+
+    /// Returns the number of currently connected peers.
+    /// Used by SlotManager to wait for network readiness before starting consensus.
+    /// Default returns 0 (suitable for test mocks that don't model real connectivity).
+    fn connected_peers(&self) -> usize {
+        0
+    }
 }
 
 // =============================================================================
@@ -98,6 +105,11 @@ where
     pub fn send_to(&self, peer: PeerId, message: M) -> Result<(), Error> {
         let peer_network_id = PeerNetworkId::new(NetworkId::Validator, peer);
         self.network_client.send_to_peer(message, peer_network_id)
+    }
+
+    /// Returns the number of available peers (connected and protocol-compatible)
+    pub fn get_available_peers(&self) -> Result<usize, Error> {
+        Ok(self.network_client.get_available_peers()?.len())
     }
 
     /// Send a single message to the destination peers
@@ -323,6 +335,10 @@ where
                 );
             }
         }
+    }
+
+    fn connected_peers(&self) -> usize {
+        self.network_client.get_available_peers().unwrap_or(0)
     }
 }
 

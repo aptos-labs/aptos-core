@@ -4,8 +4,8 @@
 
 Implementing Prefix Consensus protocols (from research paper "Prefix Consensus For Censorship Resistant BFT") within Aptos Core for leaderless, censorship-resistant consensus.
 
-**Current Phase**: Multi-Slot Consensus (Algorithm 4) — Phases 1-10 complete, Phase 11 next
-**Completed**: Basic Prefix Consensus, Strong Prefix Consensus (Phases 1-9), Stake-Weighted Quorum Refactoring, Multi-Slot Phases 1-10
+**Current Phase**: Multi-Slot Consensus (Algorithm 4) — Phases 1-11 complete, Phase 12 next
+**Completed**: Basic Prefix Consensus, Strong Prefix Consensus (Phases 1-9), Stake-Weighted Quorum Refactoring, Multi-Slot Phases 1-11
 
 ---
 
@@ -115,7 +115,7 @@ Execution Pipeline (unchanged):
 8. ~~EpochManager integration (~400 LOC)~~ ✅
 9. ~~BlockType integration + execution pipeline audit (merged with Phase 10)~~ ✅
 10. ~~(Merged into Phase 9)~~ ✅
-11. Smoke tests (~400 LOC)
+11. ~~Smoke test + end-to-end fixes (~400 LOC)~~ ✅
 12. Documentation + cleanup (~100 LOC)
 
 ---
@@ -123,8 +123,8 @@ Execution Pipeline (unchanged):
 ## Repository State
 
 - **Branch**: `prefix-consensus-prototype`
-- **HEAD**: Multi-Slot Phase 9+10 (BlockType integration + execution pipeline audit — merged, comments-only)
-- **Tests**: 246/246 unit tests (237 prefix-consensus + 9 slot manager), 6/6 smoke tests
+- **HEAD**: Multi-Slot Phase 11 (smoke test + end-to-end fixes)
+- **Tests**: 246/246 unit tests (237 prefix-consensus + 9 slot manager), 7/7 smoke tests (including slot_consensus), 100/100 stress runs
 - **Build**: Clean
 
 ### Repository Structure
@@ -156,7 +156,8 @@ consensus/src/prefix_consensus/
 
 testsuite/smoke-test/src/consensus/
 ├── prefix_consensus/     - 2 basic PC smoke tests
-└── strong_prefix_consensus/ - 2 strong PC smoke tests
+├── strong_prefix_consensus/ - 2 strong PC smoke tests
+└── slot_consensus.rs     - End-to-end multi-slot smoke test (4 validators, 3 epoch cycles)
 ```
 
 ### Plans

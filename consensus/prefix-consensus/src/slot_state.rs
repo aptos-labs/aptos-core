@@ -114,6 +114,7 @@ impl ProposalBuffer {
 
         (hash_vector, payload_map)
     }
+
 }
 
 // ============================================================================
@@ -153,6 +154,14 @@ pub struct SlotState {
     /// Set when transitioning to RunningSPC — maps payload_hash → Payload for commit.
     /// Late proposals (arriving during RunningSPC) are inserted directly into this map.
     payload_map: Option<HashMap<HashValue, Payload>>,
+    /// Timestamps from all proposals received in any phase (CollectingProposals or RunningSPC).
+    ///
+    /// The `ProposalBuffer` only stores proposals received during CollectingProposals.
+    /// Late proposals (arriving during RunningSPC) have their payload stored in `payload_map`
+    /// but their timestamp would be lost. This map captures timestamps from ALL proposals
+    /// so that `max_timestamp_for_v_high()` is deterministic across validators regardless
+    /// of when each proposal arrived.
+    timestamp_map: HashMap<Author, u64>,
 }
 
 impl SlotState {
@@ -164,6 +173,7 @@ impl SlotState {
             proposal_buffer: ProposalBuffer::new(n),
             input_vector: None,
             payload_map: None,
+            timestamp_map: HashMap::with_capacity(n),
         }
     }
 
@@ -191,8 +201,19 @@ impl SlotState {
     /// - `Committed`: silently ignored (slot is done). Returns `false`.
     pub fn insert_proposal(&mut self, proposal: SlotProposal) -> bool {
         match self.phase {
-            SlotPhase::CollectingProposals => self.proposal_buffer.insert(proposal),
+            SlotPhase::CollectingProposals => {
+                // Record timestamp before the proposal is moved into the buffer.
+                self.timestamp_map
+                    .entry(proposal.author)
+                    .or_insert(proposal.timestamp_usecs);
+                self.proposal_buffer.insert(proposal)
+            },
             SlotPhase::RunningSPC => {
+                // Record timestamp from late proposal so it's available for
+                // deterministic block timestamp computation.
+                self.timestamp_map
+                    .entry(proposal.author)
+                    .or_insert(proposal.timestamp_usecs);
                 // Insert late proposal's payload directly into payload_map
                 // so it's available for v_high resolution without a network fetch.
                 if let Some(ref mut map) = self.payload_map {
@@ -308,6 +329,28 @@ impl SlotState {
     pub fn has_all_proposals(&self) -> bool {
         self.proposal_buffer.is_complete()
     }
+
+    /// Returns the maximum timestamp from proposals whose authors correspond to
+    /// non-⊥ entries in `v_high`, using `timestamp_map` which includes late proposals.
+    ///
+    /// Unlike `ProposalBuffer::max_timestamp_for_v_high()`, this method uses timestamps
+    /// from ALL proposals received in any phase (CollectingProposals or RunningSPC),
+    /// making it deterministic across validators even when proposals arrive at different
+    /// times relative to SPC startup.
+    pub fn max_timestamp_for_v_high(
+        &self,
+        v_high: &PrefixVector,
+        ranking: &[Author],
+    ) -> u64 {
+        v_high
+            .iter()
+            .zip(ranking.iter())
+            .filter(|(hash, _)| **hash != HashValue::zero())
+            .filter_map(|(_, author)| self.timestamp_map.get(author))
+            .copied()
+            .max()
+            .unwrap_or(0)
+    }
 }
 
 // ============================================================================
@@ -333,7 +376,7 @@ mod tests {
         signer: &ValidatorSigner,
         payload: Payload,
     ) -> SlotProposal {
-        crate::slot_types::create_signed_slot_proposal(slot, epoch, signer.author(), payload, signer)
+        crate::slot_types::create_signed_slot_proposal(slot, epoch, signer.author(), payload, signer, 0)
             .expect("signing should not fail")
     }
 
@@ -353,6 +396,7 @@ mod tests {
             payload_hash: HashValue::random(),
             payload: Payload::DirectMempool(vec![]),
             signature: BlsSignature::dummy_signature(),
+            timestamp_usecs: 0,
         }
     }
 

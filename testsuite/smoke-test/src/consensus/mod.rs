@@ -9,4 +9,5 @@ mod helpers;
 mod optqs_fault_tolerance;
 mod prefix_consensus;
 mod quorum_store_fault_tolerance;
+mod slot_consensus;
 mod strong_prefix_consensus;

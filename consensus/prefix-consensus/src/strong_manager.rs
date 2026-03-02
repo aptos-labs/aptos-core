@@ -624,11 +624,16 @@ impl<NetworkSender: SubprotocolNetworkSender<StrongPrefixConsensusMsg>, T: Inner
         let msg = StrongPrefixConsensusMsg::EmptyView(Box::new(empty_msg.clone()));
         self.network_sender.broadcast(msg).await;
 
-        // Add our own to the collector
+        // Add our own to the collector and mark as seen to prevent duplicate
+        // processing if our broadcast echoes back via the network.
         self.empty_view_collectors
             .entry(view)
             .or_default()
             .push(empty_msg);
+        self.seen_empty_views
+            .entry(view)
+            .or_default()
+            .insert(self.party_id);
 
         // Check if we already have enough (unlikely with just our own)
         self.try_form_indirect_cert(view).await;

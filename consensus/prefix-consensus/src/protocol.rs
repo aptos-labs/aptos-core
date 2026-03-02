@@ -153,7 +153,7 @@ impl PrefixConsensusProtocol {
             self.input.party_id,
             self.input.input_vector.clone(),
             self.input.epoch,
-            0, // slot: always 0 for single-shot
+            self.input.slot,
             self.input.view,
             signer,
         )?;
@@ -261,7 +261,7 @@ impl PrefixConsensusProtocol {
             certified.clone(),
             qc1,
             self.input.epoch,
-            0, // slot: always 0 for single-shot
+            self.input.slot,
             self.input.view,
             signer,
         )?;
@@ -368,7 +368,7 @@ impl PrefixConsensusProtocol {
             mcp.clone(),
             qc2,
             self.input.epoch,
-            0, // slot: always 0 for single-shot
+            self.input.slot,
             self.input.view,
             signer,
         )?;

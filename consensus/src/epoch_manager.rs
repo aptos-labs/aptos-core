@@ -78,6 +78,7 @@ use aptos_dkg::{
     weighted_vuf::traits::WeightedVUF,
 };
 use aptos_event_notifications::ReconfigNotificationListener;
+use aptos_executor_types::state_compute_result::StateComputeResult;
 use aptos_infallible::{duration_since_epoch, Mutex};
 use aptos_logger::prelude::*;
 use aptos_mempool::QuorumStoreRequest;
@@ -90,6 +91,7 @@ use aptos_safety_rules::{
 };
 use aptos_types::{
     account_address::AccountAddress,
+    block_info::BlockInfo,
     dkg::{real_dkg::maybe_dk_from_bls_sk, DKGState, DKGTrait, DefaultDKG},
     epoch_change::EpochChangeProof,
     epoch_state::EpochState,
@@ -1410,7 +1412,13 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
         Arc<dyn TPayloadManager>,
     ) {
         self.set_epoch_start_metrics(epoch_state);
-        self.quorum_store_enabled = self.enable_quorum_store(consensus_config);
+        self.quorum_store_enabled = if self.config.enable_prefix_consensus {
+            // Prefix consensus uses DirectMempool (inline transactions in proposals).
+            // QuorumStore batch dissemination is not integrated with the proposal flow.
+            false
+        } else {
+            self.enable_quorum_store(consensus_config)
+        };
         let network_sender = self.create_network_sender(epoch_state);
         let (payload_manager, quorum_store_client, quorum_store_builder) = self
             .init_payload_provider(
@@ -1618,13 +1626,11 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
             onchain_consensus_config.decoupled_execution(),
             "decoupled execution must be enabled"
         );
-        let highest_committed_round = self
-            .storage
-            .aptos_db()
-            .get_latest_ledger_info()
-            .expect("unable to get latest ledger info")
-            .commit_info()
-            .round();
+        // Prefix consensus restarts slot/round numbering at 1 each epoch, so
+        // the previous epoch's highest committed round is irrelevant.  Using 0
+        // prevents the BufferManager from silently discarding early commit
+        // votes whose round (1, 2, …) would be <= the stale value.
+        let highest_committed_round: u64 = 0;
 
         self.execution_client
             .start_epoch(
@@ -1648,13 +1654,30 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
             .get_execution_channel()
             .expect("execution channel must exist after start_epoch");
 
-        let parent_block_info = self
+        // Compute the parent block id matching what the BlockExecutor uses as its
+        // speculation tree root (see executor::block_tree::root_from_db).
+        // At epoch boundaries the root id is the epoch genesis block hash, not the
+        // commit_info().id() stored in the ledger info.
+        let latest_li = self
             .storage
             .aptos_db()
             .get_latest_ledger_info()
-            .expect("unable to get latest ledger info")
-            .commit_info()
-            .clone();
+            .expect("unable to get latest ledger info");
+        let li = latest_li.ledger_info();
+        let parent_block_id = if li.ends_epoch() {
+            aptos_consensus_types::block::Block::make_genesis_block_from_ledger_info(li).id()
+        } else {
+            li.consensus_block_id()
+        };
+        let parent_block_info = BlockInfo::new(
+            li.epoch() + if li.ends_epoch() { 1 } else { 0 },
+            0,
+            parent_block_id,
+            li.transaction_accumulator_hash(),
+            li.version(),
+            li.timestamp_usecs(),
+            li.next_epoch_state().cloned(),
+        );
 
         // Create slot manager channels
         let (slot_tx, slot_rx) = aptos_channels::new_unbounded(
@@ -1688,6 +1711,12 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
             epoch_state.verifier.get_ordered_account_addresses(),
         );
 
+        // Create pipeline builder for block execution (same as Jolteon's BlockStore path)
+        // Reuse latest_li from above (same ledger info, avoids redundant storage call).
+        let pipeline_builder = self.execution_client.pipeline_builder(signer.clone());
+        let root_pipeline_futs = pipeline_builder
+            .build_root(StateComputeResult::new_dummy(), latest_li);
+
         let slot_signer = ValidatorSigner::new(
             self.author,
             loaded_consensus_key,
@@ -1703,6 +1732,8 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
             parent_block_info,
             slot_network_sender,
             spc_spawner,
+            Some(pipeline_builder),
+            Some(root_pipeline_futs),
         );
 
         self.slot_manager_tx = Some(slot_tx);
@@ -1911,14 +1942,26 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
                 let msg_epoch = msg.epoch();
                 if msg_epoch == self.epoch() {
                     if let Some(tx) = &mut self.strong_prefix_consensus_tx {
+                        // Direct SPC channel (test prefix consensus path)
                         tx.send((peer_id, *msg)).map_err(|e| {
                             anyhow::anyhow!("Failed to send to strong_prefix_consensus_tx: {:?}", e)
                         }).await?;
+                    } else if let Some(tx) = &mut self.slot_manager_tx {
+                        // Wrap as SlotConsensusMsg and route through SlotManager
+                        let slot = msg.slot();
+                        let wrapped = aptos_prefix_consensus::slot_types::SlotConsensusMsg::StrongPCMsg {
+                            slot,
+                            epoch: msg_epoch,
+                            msg: *msg,
+                        };
+                        tx.send((peer_id, wrapped)).await.map_err(|e| {
+                            anyhow::anyhow!("Failed to send SPC msg to slot_manager_tx: {:?}", e)
+                        })?;
                     } else {
                         warn!(
                             remote_peer = peer_id,
                             epoch = msg_epoch,
-                            "[EpochManager] Received StrongPrefixConsensusMsg but strong PC not running"
+                            "[EpochManager] Received StrongPrefixConsensusMsg but no handler running"
                         );
                     }
                 } else {
@@ -2511,6 +2554,17 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
                 round = round_timeout_sender_rx.select_next_some() => {
                     monitor!("epoch_manager_process_round_timeout",
                     self.process_local_timeout(round));
+                },
+                Some(reconfig_notification) = self.reconfig_events.next(), if self.config.enable_prefix_consensus => {
+                    // Prefix consensus detects epoch transitions via the committed reconfig
+                    // block's ReconfigNotification (from storage). Jolteon uses EpochChangeProof
+                    // messages from peers instead, so this branch is gated on prefix consensus.
+                    info!(
+                        epoch = self.epoch(),
+                        "Received reconfig notification, transitioning to new epoch"
+                    );
+                    self.shutdown_current_processor().await;
+                    self.start_new_epoch(reconfig_notification.on_chain_configs).await;
                 },
             }
             // Continually capture the time of consensus process to ensure that clock skew between

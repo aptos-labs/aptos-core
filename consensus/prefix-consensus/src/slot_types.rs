@@ -45,6 +45,10 @@ pub struct SlotProposalSignData {
 /// Each validator broadcasts one `SlotProposal` per slot containing transactions
 /// pulled from the mempool. The proposal is BLS-signed over the `SlotProposalSignData`
 /// (which includes the payload hash, not the full payload).
+///
+/// `timestamp_usecs` carries the proposer's local wall-clock time. It is NOT part of
+/// the signed data — it's advisory metadata used to compute a deterministic block
+/// timestamp as `max(parent_ts + 1, max(proposal timestamps in v_high))`.
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
 pub struct SlotProposal {
     pub slot: u64,
@@ -53,6 +57,7 @@ pub struct SlotProposal {
     pub payload_hash: HashValue,
     pub payload: Payload,
     pub signature: BlsSignature,
+    pub timestamp_usecs: u64,
 }
 
 impl SlotProposal {
@@ -63,6 +68,7 @@ impl SlotProposal {
         author: Author,
         payload: Payload,
         signature: BlsSignature,
+        timestamp_usecs: u64,
     ) -> Self {
         let payload_hash = Self::compute_payload_hash(&payload);
         Self {
@@ -72,6 +78,7 @@ impl SlotProposal {
             payload_hash,
             payload,
             signature,
+            timestamp_usecs,
         }
     }
 
@@ -124,6 +131,7 @@ pub fn create_signed_slot_proposal(
     author: Author,
     payload: Payload,
     signer: &ValidatorSigner,
+    timestamp_usecs: u64,
 ) -> Result<SlotProposal> {
     let payload_hash = SlotProposal::compute_payload_hash(&payload);
     let sign_data = SlotProposalSignData {
@@ -140,6 +148,7 @@ pub fn create_signed_slot_proposal(
         payload_hash,
         payload,
         signature,
+        timestamp_usecs,
     })
 }
 
@@ -284,7 +293,7 @@ mod tests {
         let payload = create_test_payload();
 
         let proposal =
-            create_signed_slot_proposal(1, 1, author, payload, &signer).expect("signing failed");
+            create_signed_slot_proposal(1, 1, author, payload, &signer, 0).expect("signing failed");
 
         assert_eq!(proposal.slot, 1);
         assert_eq!(proposal.epoch, 1);
@@ -300,7 +309,7 @@ mod tests {
         let payload = create_test_payload();
 
         let proposal =
-            create_signed_slot_proposal(1, 1, author, payload, &signer).expect("signing failed");
+            create_signed_slot_proposal(1, 1, author, payload, &signer, 0).expect("signing failed");
 
         // Verification with a different validator's verifier should fail
         assert!(proposal.verify(&wrong_verifier).is_err());
@@ -313,7 +322,7 @@ mod tests {
         let payload = create_test_payload();
 
         let proposal =
-            create_signed_slot_proposal(1, 1, author, payload, &signer).expect("signing failed");
+            create_signed_slot_proposal(1, 1, author, payload, &signer, 0).expect("signing failed");
 
         let bytes = bcs::to_bytes(&proposal).expect("serialization failed");
         let deserialized: SlotProposal =
@@ -329,7 +338,7 @@ mod tests {
         let payload = create_test_payload();
 
         let mut proposal =
-            create_signed_slot_proposal(1, 1, author, payload, &signer).expect("signing failed");
+            create_signed_slot_proposal(1, 1, author, payload, &signer, 0).expect("signing failed");
 
         // Tamper with the payload after signing (substitute different transactions)
         proposal.payload = Payload::DirectMempool(vec![]);
@@ -353,7 +362,7 @@ mod tests {
         let author = signer.author();
         let payload = create_test_payload();
         let proposal =
-            create_signed_slot_proposal(5, 3, author, payload, &signer).expect("signing failed");
+            create_signed_slot_proposal(5, 3, author, payload, &signer, 0).expect("signing failed");
 
         // Test SlotProposal variant
         let msg = SlotConsensusMsg::SlotProposal(Box::new(proposal));
@@ -391,7 +400,7 @@ mod tests {
         let author = signer.author();
         let payload = create_test_payload();
         let proposal =
-            create_signed_slot_proposal(1, 1, author, payload, &signer).expect("signing failed");
+            create_signed_slot_proposal(1, 1, author, payload, &signer, 0).expect("signing failed");
 
         let msg = SlotConsensusMsg::SlotProposal(Box::new(proposal));
         let bytes = bcs::to_bytes(&msg).expect("serialization failed");

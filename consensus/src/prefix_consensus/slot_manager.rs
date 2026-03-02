@@ -9,13 +9,15 @@
 
 use crate::{
     payload_client::PayloadClient,
-    pipeline::buffer_manager::OrderedBlocks,
+    pipeline::{buffer_manager::OrderedBlocks, pipeline_builder::PipelineBuilder},
 };
 use aptos_consensus_types::{
     common::{Author, Payload, PayloadFilter},
     payload_pull_params::PayloadPullParameters,
-    pipelined_block::PipelinedBlock,
+    pipelined_block::{PipelineFutures, PipelinedBlock},
     utils::PayloadTxnsSize,
+    vote_data::VoteData,
+    wrapped_ledger_info::WrappedLedgerInfo,
 };
 use aptos_crypto::HashValue;
 use aptos_executor_types::state_compute_result::StateComputeResult;
@@ -217,6 +219,8 @@ pub struct SlotManager<NS: SubprotocolNetworkSender<SlotConsensusMsg>, SP: SPCSp
 
     // Execution bridge
     execution_channel: futures::channel::mpsc::UnboundedSender<OrderedBlocks>,
+    pipeline_builder: Option<PipelineBuilder>,
+    parent_pipeline_futs: Option<PipelineFutures>,
 
     // Payload
     payload_client: Arc<dyn PayloadClient>,
@@ -244,6 +248,8 @@ impl<NS: SubprotocolNetworkSender<SlotConsensusMsg>, SP: SPCSpawner> SlotManager
         parent_block_info: BlockInfo,
         network_sender: NS,
         spc_spawner: SP,
+        pipeline_builder: Option<PipelineBuilder>,
+        parent_pipeline_futs: Option<PipelineFutures>,
     ) -> Self {
         Self {
             author,
@@ -259,6 +265,8 @@ impl<NS: SubprotocolNetworkSender<SlotConsensusMsg>, SP: SPCSpawner> SlotManager
             spc_spawner,
             pending_commit: None,
             execution_channel,
+            pipeline_builder,
+            parent_pipeline_futs,
             payload_client,
             parent_block_info,
             network_sender,
@@ -273,6 +281,52 @@ impl<NS: SubprotocolNetworkSender<SlotConsensusMsg>, SP: SPCSpawner> SlotManager
         mut message_rx: aptos_channels::UnboundedReceiver<(Author, SlotConsensusMsg)>,
         mut close_rx: oneshot::Receiver<oneshot::Sender<()>>,
     ) {
+        // Wait for network connectivity before starting the first slot.
+        // Without this, proposals and SPC messages are broadcast before peers connect,
+        // causing the first slot to get stuck with insufficient votes.
+        let expected_peers = self.ranking_manager.validator_count().saturating_sub(1);
+        if expected_peers > 0 {
+            let max_wait = tokio::time::sleep(Duration::from_secs(30));
+            tokio::pin!(max_wait);
+            loop {
+                let connected = self.network_sender.connected_peers();
+                if connected >= expected_peers {
+                    info!(
+                        epoch = self.epoch,
+                        connected = connected,
+                        "Network ready, starting slot consensus"
+                    );
+                    break;
+                }
+                tokio::select! {
+                    biased;
+                    close_req = &mut close_rx => {
+                        if let Ok(ack_tx) = close_req {
+                            let _ = ack_tx.send(());
+                        }
+                        return;
+                    }
+                    () = &mut max_wait => {
+                        warn!(
+                            epoch = self.epoch,
+                            connected = connected,
+                            expected = expected_peers,
+                            "Network wait timeout, proceeding with available peers"
+                        );
+                        break;
+                    }
+                    () = tokio::time::sleep(Duration::from_millis(500)) => {
+                        debug!(
+                            epoch = self.epoch,
+                            connected = connected,
+                            expected = expected_peers,
+                            "Waiting for network peers before starting slot consensus"
+                        );
+                    }
+                }
+            }
+        }
+
         self.start_new_slot(1).await;
 
         loop {
@@ -357,12 +411,14 @@ impl<NS: SubprotocolNetworkSender<SlotConsensusMsg>, SP: SPCSpawner> SlotManager
         let _ = validator_txns; // validator_txns collected in Phase 7
 
         // Create and sign proposal
+        let now_usecs = aptos_infallible::duration_since_epoch().as_micros() as u64;
         let proposal = match create_signed_slot_proposal(
             slot,
             self.epoch,
             self.author,
             payload,
             &self.validator_signer,
+            now_usecs,
         ) {
             Ok(p) => p,
             Err(e) => {
@@ -565,10 +621,25 @@ impl<NS: SubprotocolNetworkSender<SlotConsensusMsg>, SP: SPCSpawner> SlotManager
             "Building block from v_high"
         );
 
-        // Compute timestamp: max(parent + 1, now)
+        // Deterministic timestamp: max(parent_ts + 1, max_proposal_timestamp_in_v_high).
+        // All validators must agree on the exact same block (including timestamp)
+        // for commit votes to aggregate. We use only proposals referenced in v_high
+        // (not all proposals in the buffer) because different validators may have
+        // received different subsets of proposals. v_high and ranking are identical
+        // on all correct validators, making this deterministic.
         let parent_ts = self.parent_block_info.timestamp_usecs();
-        let now_usecs = aptos_infallible::duration_since_epoch().as_micros() as u64;
-        let timestamp = now_usecs.max(parent_ts.checked_add(1).expect("timestamp overflow"));
+        let max_proposal_ts = self
+            .slot_states
+            .get(&slot)
+            .map(|s| {
+                s.max_timestamp_for_v_high(
+                    &v_high,
+                    self.ranking_manager.current_ranking(),
+                )
+            })
+            .unwrap_or(0);
+        let timestamp = max_proposal_ts
+            .max(parent_ts.checked_add(1).expect("timestamp overflow"));
 
         // Build block (round == slot)
         let block = build_block_from_v_high(
@@ -588,6 +659,44 @@ impl<NS: SubprotocolNetworkSender<SlotConsensusMsg>, SP: SPCSpawner> SlotManager
             vec![],
             StateComputeResult::new_dummy(),
         ));
+
+        // Set up execution pipeline futures (required by buffer manager's ExecutionSchedulePhase).
+        // Without this, wait_for_compute_result() returns "Pipeline aborted".
+        if let Some(pipeline_builder) = &self.pipeline_builder {
+            if let Some(parent_futs) = self.parent_pipeline_futs.take() {
+                pipeline_builder.build_for_consensus(
+                    &pipelined,
+                    parent_futs,
+                    Box::new(|_, _| {}),
+                );
+                // Save this block's futs as parent for the next block
+                self.parent_pipeline_futs = pipelined.pipeline_futs();
+            } else {
+                error!(
+                    epoch = self.epoch,
+                    slot = slot,
+                    "Missing parent pipeline futs, block execution may fail"
+                );
+            }
+        }
+
+        // Resolve order_proof_tx so sign_and_broadcast_commit_vote can proceed.
+        // Without this, the pipeline's signing future hangs forever waiting for
+        // order_proof_fut, blocking commit vote broadcast and preventing commits.
+        // The consensus_data_hash (HashValue::zero()) must match ordered_proof below.
+        let wrapped_li = WrappedLedgerInfo::new(
+            VoteData::dummy(),
+            LedgerInfoWithSignatures::new(
+                LedgerInfo::new(BlockInfo::empty(), HashValue::zero()),
+                AggregateSignature::empty(),
+            ),
+        );
+        if let Some(tx) = pipelined.pipeline_tx().lock().as_mut() {
+            if let Some(tx) = tx.order_proof_tx.take() {
+                let _ = tx.send(wrapped_li);
+            }
+        }
+
         let block_info = pipelined.block_info();
         let ordered = OrderedBlocks {
             ordered_blocks: vec![pipelined],
@@ -888,6 +997,8 @@ mod tests {
             BlockInfo::empty(),
             network_sender.clone(),
             StubSPCSpawner,
+            None, // pipeline_builder: not needed for unit tests
+            None, // parent_pipeline_futs: not needed for unit tests
         );
 
         (manager, exec_rx, network_sender)
@@ -932,6 +1043,7 @@ mod tests {
                 signer.author(),
                 Payload::DirectMempool(vec![]),
                 signer,
+                0, // test timestamp
             )
             .unwrap();
             manager.process_proposal(signer.author(), proposal).await;
@@ -990,6 +1102,7 @@ mod tests {
             signers[1].author(),
             Payload::DirectMempool(vec![]),
             &signers[1],
+            0,
         )
         .unwrap();
 
@@ -1010,7 +1123,7 @@ mod tests {
         // Slot 1: only 2 proposals (from signers[0] and signers[1])
         manager.start_new_slot(1).await;
         let p1 = create_signed_slot_proposal(
-            1, 1, signers[1].author(), Payload::DirectMempool(vec![]), &signers[1],
+            1, 1, signers[1].author(), Payload::DirectMempool(vec![]), &signers[1], 0,
         ).unwrap();
         manager.process_proposal(signers[1].author(), p1).await;
 
@@ -1041,7 +1154,7 @@ mod tests {
 
         // Send the other proposal
         let p = create_signed_slot_proposal(
-            1, 1, signers[1].author(), Payload::DirectMempool(vec![]), &signers[1],
+            1, 1, signers[1].author(), Payload::DirectMempool(vec![]), &signers[1], 0,
         ).unwrap();
         manager.process_proposal(signers[1].author(), p).await;
 
@@ -1124,7 +1237,7 @@ mod tests {
 
         // Before starting slot 2, insert a proposal for slot 2 from signer[1]
         let future_proposal = create_signed_slot_proposal(
-            2, 1, signers[1].author(), Payload::DirectMempool(vec![]), &signers[1],
+            2, 1, signers[1].author(), Payload::DirectMempool(vec![]), &signers[1], 0,
         ).unwrap();
         manager.process_proposal(signers[1].author(), future_proposal).await;
 
