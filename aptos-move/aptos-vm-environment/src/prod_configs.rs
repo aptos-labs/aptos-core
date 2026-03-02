@@ -159,6 +159,7 @@ pub fn aptos_prod_verifier_config(
     // Note: we reuse the `enable_function_values` flag to set various stricter limits on types.
 
     let strict_bounds = timed_features.is_enabled(TimedFeatureFlag::EnableStrictBoundsInProdConfig);
+    let revised_bounds = timed_features.is_enabled(TimedFeatureFlag::RevisedBoundsInProdConfig);
 
     VerifierConfig {
         scope: VerificationScope::Everything,
@@ -173,8 +174,24 @@ pub fn aptos_prod_verifier_config(
             Some(256)
         },
         max_push_size: Some(10000),
-        max_struct_definitions: if strict_bounds { Some(200) } else { None },
-        max_struct_variants: if strict_bounds { Some(64) } else { None },
+        max_struct_definitions: if strict_bounds {
+            if revised_bounds {
+                Some(1100)
+            } else {
+                Some(200)
+            }
+        } else {
+            None
+        },
+        max_struct_variants: if strict_bounds {
+            if revised_bounds {
+                Some(127)
+            } else {
+                Some(64)
+            }
+        } else {
+            None
+        },
         max_fields_in_struct: if strict_bounds { Some(64) } else { None },
         max_function_definitions: if strict_bounds { Some(1000) } else { None },
         max_back_edges_per_function: None,
