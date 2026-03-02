@@ -56,11 +56,12 @@ fn apply_devnet_consensus_config(config: &mut aptos_config::config::NodeConfig) 
     config.consensus.quorum_store_poll_time_ms = 5;
     config.consensus.enable_optimistic_proposal_tx = true;
     config.consensus.internal_per_key_channel_size = 20;
-    // NOTE: Do NOT override max_sending_block_txns (default 5000) or
-    // max_sending_block_txns_after_filtering (default 1800) for primary.
-    // Primary blocks aggregate ~10 proxy blocks, so they are larger than
-    // individual devnet blocks. generate_proposal_with_proxy_payload()
-    // bypasses these limits, but keeping defaults avoids confusion.
+    // Primary blocks aggregate many proxy blocks, so they can be much larger
+    // than individual blocks. Raise the voter-side receiving limit to prevent
+    // rejection of aggregated proxy payloads during timeout recovery.
+    // generate_proposal_with_proxy_payload() bypasses sending limits.
+    config.consensus.max_receiving_block_txns = 50000;
+    config.consensus.max_receiving_block_bytes = 30 * 1024 * 1024; // 30MB
 
     // Proxy consensus block limits: match devnet per-block settings.
     // At steady state (3k TPS / ~70 proxy blocks/s), each proxy block
