@@ -144,7 +144,7 @@ module aptos_experimental::dead_mans_switch_tracker {
     /// ```move
     /// let tracker = new_dead_mans_switch_tracker(60); // 60 second minimum
     /// ```
-    public(friend) fun new_dead_mans_switch_tracker(
+    friend fun new_dead_mans_switch_tracker(
         min_keep_alive_time_secs: u64
     ): DeadMansSwitchTracker {
         DeadMansSwitchTracker {
@@ -153,7 +153,7 @@ module aptos_experimental::dead_mans_switch_tracker {
         }
     }
 
-    public(friend) fun set_min_keep_alive_time_secs(
+    friend fun set_min_keep_alive_time_secs(
         tracker: &mut DeadMansSwitchTracker,
         parent: address,
         market: address,
@@ -292,7 +292,7 @@ module aptos_experimental::dead_mans_switch_tracker {
     /// // Disable dead man's switch
     /// update_keep_alive_state(&mut tracker, trader_addr, 0);
     /// ```
-    public(friend) fun keep_alive(
+    friend fun keep_alive(
         tracker: &mut DeadMansSwitchTracker,
         parent: address,
         market: address,

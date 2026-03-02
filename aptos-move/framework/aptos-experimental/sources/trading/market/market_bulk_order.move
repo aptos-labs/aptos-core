@@ -158,7 +158,7 @@ module aptos_experimental::market_bulk_order {
         );
     }
 
-    public(friend) fun cancel_bulk_order_internal<M: store + copy + drop, R: store + copy + drop>(
+    friend fun cancel_bulk_order_internal<M: store + copy + drop, R: store + copy + drop>(
         market: &mut Market<M>,
         user: address,
         cancellation_reason: market_types::OrderCancellationReason,

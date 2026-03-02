@@ -860,7 +860,7 @@ module aptos_experimental::confidential_proof {
 
     /// Returns the number of range proofs in the provided `WithdrawalProof`.
     /// Used in the `confidential_asset` module to validate input parameters of the `confidential_transfer` function.
-    public(friend) fun auditors_count_in_transfer_proof(
+    friend fun auditors_count_in_transfer_proof(
         proof: &TransferProof
     ): u64 {
         proof.sigma_proof.xs.x7s.length()
