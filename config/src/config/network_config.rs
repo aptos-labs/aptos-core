@@ -49,6 +49,8 @@ pub const MAX_APPLICATION_MESSAGE_SIZE: usize =
 pub const MAX_FRAME_SIZE: usize = 4 * 1024 * 1024; /* 4 MiB large messages will be chunked into multiple frames and streamed */
 pub const MAX_MESSAGE_SIZE: usize = 64 * 1024 * 1024; /* 64 MiB */
 pub const CONNECTION_BACKOFF_BASE: u64 = 2;
+pub const DEFAULT_PUBLIC_NETWORK_PORT: u16 = 6182;
+pub const DEFAULT_VALIDATOR_NETWORK_PORT: u16 = 6180;
 
 /// Access control policy for peer connections.
 /// Determines which peers are allowed or blocked from connecting.
@@ -155,11 +157,15 @@ impl Default for NetworkConfig {
 impl NetworkConfig {
     pub fn network_with_id(network_id: NetworkId) -> NetworkConfig {
         let mutual_authentication = network_id.is_validator_network();
+        let listen_address = format!("/ip4/0.0.0/tcp/{}", DEFAULT_VALIDATOR_NETWORK_PORT)
+            .parse()
+            .unwrap();
+
         let mut config = Self {
             discovery_method: DiscoveryMethod::None,
             discovery_methods: Vec::new(),
             identity: Identity::None,
-            listen_address: "/ip4/0.0.0.0/tcp/6180".parse().unwrap(),
+            listen_address,
             mutual_authentication,
             network_id,
             runtime_threads: None,
