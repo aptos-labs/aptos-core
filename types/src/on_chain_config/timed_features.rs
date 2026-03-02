@@ -212,14 +212,12 @@ impl TimedFeatureFlag {
                 .unwrap()
                 .with_timezone(&Utc),
 
-            // ************** DO NOT SUBMIT **********
-            // fix timing
             (RevisedBoundsInProdConfig, TESTNET) => Los_Angeles
-                .with_ymd_and_hms(2026, 3, 4, 10, 0, 0)
+                .with_ymd_and_hms(2026, 3, 3, 12, 0, 0)
                 .unwrap()
                 .with_timezone(&Utc),
             (RevisedBoundsInProdConfig, MAINNET) => Los_Angeles
-                .with_ymd_and_hms(2026, 3, 4, 10, 0, 0)
+                .with_ymd_and_hms(2026, 3, 5, 10, 0, 0)
                 .unwrap()
                 .with_timezone(&Utc),
 
