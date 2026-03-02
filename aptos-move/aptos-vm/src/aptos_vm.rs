@@ -2717,53 +2717,25 @@ impl AptosVM {
         arguments: Vec<Vec<u8>>,
         max_gas_amount: u64,
     ) -> ViewFunctionOutput {
-        let env = AptosEnvironment::new(state_view);
-        let vm = AptosVM::new(&env);
-
-        let log_context = AdapterLogSchema::new(state_view.id(), 0);
-
-        let vm_gas_params = match vm.gas_params(&log_context) {
-            Ok(gas_params) => gas_params.vm.clone(),
-            Err(err) => {
-                return ViewFunctionOutput::new_error_message(
-                    format!("{}", err),
-                    Some(err.status_code()),
-                    0,
-                )
-            },
-        };
-        let storage_gas_params = match vm.storage_gas_params(&log_context) {
-            Ok(gas_params) => gas_params.clone(),
-            Err(err) => {
-                return ViewFunctionOutput::new_error_message(
-                    format!("{}", err),
-                    Some(err.status_code()),
-                    0,
-                )
-            },
-        };
-
-        let mut gas_meter = make_prod_gas_meter(
-            vm.gas_feature_version(),
-            vm_gas_params,
-            storage_gas_params,
-            /* is_approved_gov_script */ false,
-            max_gas_amount.into(),
-            &NoopBlockSynchronizationKillSwitch {},
-        );
-
-        Self::run_view_function(
-            &vm,
+        let (output, _) = Self::run_view_function(
             state_view,
-            &env,
-            &log_context,
             module_id,
             func_name,
             type_args,
             arguments,
             max_gas_amount,
-            &mut gas_meter,
-        )
+            |gas_feature_version, vm_gas_params, storage_gas_params| {
+                make_prod_gas_meter(
+                    gas_feature_version,
+                    vm_gas_params,
+                    storage_gas_params,
+                    /* is_approved_gov_script */ false,
+                    max_gas_amount.into(),
+                    &NoopBlockSynchronizationKillSwitch {},
+                )
+            },
+        );
+        output
     }
 
     /// Alternative entrypoint for view function execution that allows customization
@@ -2791,6 +2763,42 @@ impl AptosVM {
         G: AptosGasMeter,
         M: MemoryAlgebra,
     {
+        Self::run_view_function(
+            state_view,
+            module_id,
+            func_name,
+            type_args,
+            arguments,
+            max_gas_amount,
+            |gas_feature_version, vm_gas_params, storage_gas_params| {
+                let gas_meter = make_prod_gas_meter_impl::<_, M>(
+                    gas_feature_version,
+                    vm_gas_params,
+                    storage_gas_params,
+                    /* is_approved_gov_script */ false,
+                    max_gas_amount.into(),
+                    &NoopBlockSynchronizationKillSwitch {},
+                );
+                modify_gas_meter(gas_meter)
+            },
+        )
+    }
+
+    /// Common execution logic for view functions: loads gas parameters, creates the gas
+    /// meter via the provided closure, runs the function, and processes the result into
+    /// a [`ViewFunctionOutput`].
+    ///
+    /// Returns the output along with the gas meter (or `None` if gas parameter loading
+    /// failed before the meter could be created).
+    fn run_view_function<G: AptosGasMeter>(
+        state_view: &impl StateView,
+        module_id: ModuleId,
+        func_name: Identifier,
+        type_args: Vec<TypeTag>,
+        arguments: Vec<Vec<u8>>,
+        max_gas_amount: u64,
+        make_gas_meter: impl FnOnce(u64, VMGasParameters, StorageGasParameters) -> G,
+    ) -> (ViewFunctionOutput, Option<G>) {
         let env = AptosEnvironment::new(state_view);
         let vm = AptosVM::new(&env);
 
@@ -2823,47 +2831,11 @@ impl AptosVM {
             },
         };
 
-        let gas_meter = make_prod_gas_meter_impl::<_, M>(
-            vm.gas_feature_version(),
-            vm_gas_params,
-            storage_gas_params,
-            /* is_approved_gov_script */ false,
-            max_gas_amount.into(),
-            &NoopBlockSynchronizationKillSwitch {},
-        );
-        let mut gas_meter = modify_gas_meter(gas_meter);
+        let mut gas_meter =
+            make_gas_meter(vm.gas_feature_version(), vm_gas_params, storage_gas_params);
 
-        let output = Self::run_view_function(
-            &vm,
-            state_view,
-            &env,
-            &log_context,
-            module_id,
-            func_name,
-            type_args,
-            arguments,
-            max_gas_amount,
-            &mut gas_meter,
-        );
-        (output, Some(gas_meter))
-    }
-
-    /// Common execution logic for view functions: sets up the session, runs the function,
-    /// and processes the result into a [`ViewFunctionOutput`].
-    fn run_view_function(
-        vm: &AptosVM,
-        state_view: &impl StateView,
-        env: &AptosEnvironment,
-        log_context: &AdapterLogSchema,
-        module_id: ModuleId,
-        func_name: Identifier,
-        type_args: Vec<TypeTag>,
-        arguments: Vec<Vec<u8>>,
-        max_gas_amount: u64,
-        gas_meter: &mut impl AptosGasMeter,
-    ) -> ViewFunctionOutput {
         let resolver = state_view.as_move_resolver();
-        let module_storage = state_view.as_aptos_code_storage(env);
+        let module_storage = state_view.as_aptos_code_storage(&env);
 
         let mut session = vm.new_session(&resolver, SessionId::Void, None);
 
@@ -2871,17 +2843,17 @@ impl AptosVM {
         let mut traversal_context = TraversalContext::new(&traversal_storage);
         let execution_result = Self::execute_view_function_in_vm(
             &mut session,
-            vm,
+            &vm,
             module_id,
             func_name,
             type_args,
             arguments,
-            gas_meter,
+            &mut gas_meter,
             &mut traversal_context,
             &module_storage,
         );
-        let gas_used = Self::gas_used(max_gas_amount.into(), gas_meter);
-        match execution_result {
+        let gas_used = Self::gas_used(max_gas_amount.into(), &gas_meter);
+        let output = match execution_result {
             Ok(result) => ViewFunctionOutput::new(Ok(result), gas_used),
             Err(e) => {
                 let vm_status = e.clone().into_vm_status();
@@ -2892,10 +2864,13 @@ impl AptosVM {
                             .message()
                             .map(|m| m.to_string())
                             .unwrap_or_else(|| e.to_string());
-                        return ViewFunctionOutput::new_error_message(
-                            message,
-                            Some(vm_status.status_code()),
-                            gas_used,
+                        return (
+                            ViewFunctionOutput::new_error_message(
+                                message,
+                                Some(vm_status.status_code()),
+                                gas_used,
+                            ),
+                            Some(gas_meter),
                         );
                     },
                 }
@@ -2911,7 +2886,7 @@ impl AptosVM {
                 let status_with_abort_info = vm.inject_abort_info_if_available(
                     &module_storage,
                     &traversal_context,
-                    log_context,
+                    &log_context,
                     execution_status,
                 );
                 ViewFunctionOutput::new_move_abort_error(
@@ -2920,7 +2895,8 @@ impl AptosVM {
                     gas_used,
                 )
             },
-        }
+        };
+        (output, Some(gas_meter))
     }
 
     fn gas_used(max_gas_amount: Gas, gas_meter: &impl AptosGasMeter) -> u64 {
