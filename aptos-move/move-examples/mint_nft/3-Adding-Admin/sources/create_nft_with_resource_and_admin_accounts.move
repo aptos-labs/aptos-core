@@ -190,9 +190,9 @@ module mint_nft::create_nft_with_resource_and_admin_accounts {
     /// signer. This is because we used resource account to publish this module and stored the resource account's signer
     /// within the `ModuleData`, so we can programmatically sign for transactions instead of manually signing transactions.
     /// See https://aptos.dev/concepts/accounts/#resource-accounts for more details.
-    public entry fun mint_event_ticket(receiver: &signer) acquires ModuleData {
+    public entry fun mint_event_ticket(receiver: &signer) {
         // Mint token to the receiver.
-        let module_data = borrow_global_mut<ModuleData>(@mint_nft);
+        let module_data = &mut ModuleData[@mint_nft];
 
         // Check the config of this module to see if we enable minting tokens from this collection
         assert!(timestamp::now_seconds() < module_data.expiration_timestamp, error::permission_denied(ECOLLECTION_EXPIRED));
@@ -222,19 +222,19 @@ module mint_nft::create_nft_with_resource_and_admin_accounts {
     }
 
     /// Set if minting is enabled for this minting contract.
-    public entry fun set_minting_enabled(caller: &signer, minting_enabled: bool) acquires ModuleData {
+    public entry fun set_minting_enabled(caller: &signer, minting_enabled: bool) {
         let caller_address = signer::address_of(caller);
         // Abort if the caller is not the admin of this module.
         assert!(caller_address == @admin_addr, error::permission_denied(ENOT_AUTHORIZED));
-        let module_data = borrow_global_mut<ModuleData>(@mint_nft);
+        let module_data = &mut ModuleData[@mint_nft];
         module_data.minting_enabled = minting_enabled;
     }
 
     /// Set the expiration timestamp of this minting contract.
-    public entry fun set_timestamp(caller: &signer, expiration_timestamp: u64) acquires ModuleData {
+    public entry fun set_timestamp(caller: &signer, expiration_timestamp: u64) {
         let caller_address = signer::address_of(caller);
         assert!(caller_address == @admin_addr, error::permission_denied(ENOT_AUTHORIZED));
-        let module_data = borrow_global_mut<ModuleData>(@mint_nft);
+        let module_data = &mut ModuleData[@mint_nft];
         module_data.expiration_timestamp = expiration_timestamp;
     }
 }

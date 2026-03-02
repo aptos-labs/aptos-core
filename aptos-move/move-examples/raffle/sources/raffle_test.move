@@ -88,7 +88,7 @@ module raffle::raffle_test {
                 assert!(coin::balance<AptosCoin>(player) == 0, 1);
             };
 
-            i = i + 1;
+            i += 1;
         };
 
         // Clean up

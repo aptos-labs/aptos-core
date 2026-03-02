@@ -161,13 +161,13 @@ module aptos_std::iterable_table {
         let i = 0;
         while (i < 100) {
             add(&mut table, i, i);
-            i = i + 1;
+            i += 1;
         };
         assert!(length(&table) == 100, 0);
         i = 0;
         while (i < 100) {
             assert!(remove(&mut table, i) == i, 0);
-            i = i + 2;
+            i += 2;
         };
         assert!(!empty(&table), 0);
         let key = head_key(&table);
@@ -176,7 +176,7 @@ module aptos_std::iterable_table {
             let (val, _, next) = borrow_iter(&table, *option::borrow(&key));
             assert!(*val == i, 0);
             key = next;
-            i = i + 2;
+            i += 2;
         };
         assert!(i == 101, 0);
         let table2 = new();

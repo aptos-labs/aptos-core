@@ -12,16 +12,16 @@ module resource_groups_secondary::secondary {
         move_to(account, Secondary { value });
     }
 
-    public entry fun set_value(account: &signer, value: u32) acquires Secondary {
-        let primary = borrow_global_mut<Secondary>(signer::address_of(account));
+    public entry fun set_value(account: &signer, value: u32) {
+        let primary = &mut Secondary[signer::address_of(account)];
         primary.value = value;
     }
 
-    public fun read(account: address): u32 acquires Secondary {
-        borrow_global<Secondary>(account).value
+    public fun read(account: address): u32 {
+        Secondary[account].value
     }
 
-    public entry fun remove(account: &signer) acquires Secondary {
+    public entry fun remove(account: &signer) {
         move_from<Secondary>(signer::address_of(account));
     }
 
@@ -37,7 +37,7 @@ module resource_groups_secondary::secondary {
     }
 
     #[test(account = @0x3)]
-    fun test_multiple(account: &signer) acquires Secondary {
+    fun test_multiple(account: &signer) {
         let addr = signer::address_of(account);
         assert!(!exists_at(addr), 0);
         init(account, 7);

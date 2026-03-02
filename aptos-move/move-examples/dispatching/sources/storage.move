@@ -27,7 +27,7 @@ module dispatching::storage {
 
     /// Register a `T` to callback. Providing an instance of `T` guarantees that only the
     /// originating module can call `register` for that type.
-    public fun register<T: drop>(callback: FunctionInfo, _proof: T) acquires Dispatcher {
+    public fun register<T: drop>(callback: FunctionInfo, _proof: T) {
         let typename = type_info::type_name<T>();
         let constructor_ref = object::create_named_object(&storage_signer(), *string::bytes(&typename));
         let metadata = fungible_asset::add_fungibility(
@@ -44,23 +44,23 @@ module dispatching::storage {
             option::some(callback),
         );
 
-        let dispatcher = borrow_global_mut<Dispatcher>(@dispatching);
+        let dispatcher = &mut Dispatcher[@dispatching];
         table::add(&mut dispatcher.dispatcher, type_info::type_of<T>(), metadata);
     }
 
     /// Insert into this module as the callback needs to retrieve and avoid a cyclical dependency:
     /// engine -> storage and then engine -> callback -> storage
-    public(friend) fun insert<T>(data: vector<u8>): Object<Metadata> acquires Dispatcher {
+    friend fun insert<T>(data: vector<u8>): Object<Metadata> {
         move_to(&storage_signer(), Storage<T> { data });
 
         let typeinfo = type_info::type_of<T>();
-        let dispatcher = borrow_global<Dispatcher>(@dispatching);
+        let dispatcher = &Dispatcher[@dispatching];
         *table::borrow(&dispatcher.dispatcher, typeinfo)
     }
 
     /// Second half of the process for retrieving. This happens outside engine to prevent the
     /// cyclical dependency.
-    public fun retrieve<T: drop>(_proof: T): vector<u8> acquires Dispatcher, Storage {
+    public fun retrieve<T: drop>(_proof: T): vector<u8> {
         move_from<Storage<T>>(storage_address()).data
     }
 
@@ -77,12 +77,12 @@ module dispatching::storage {
         );
     }
 
-    inline fun storage_address(): address acquires Dispatcher {
-        object::address_from_extend_ref(&borrow_global<Dispatcher>(@dispatching).obj_ref)
+    inline fun storage_address(): address {
+        object::address_from_extend_ref(&Dispatcher[@dispatching].obj_ref)
     }
 
-    inline fun storage_signer(): signer acquires Dispatcher {
-        object::generate_signer_for_extending(&borrow_global<Dispatcher>(@dispatching).obj_ref)
+    inline fun storage_signer(): signer {
+        object::generate_signer_for_extending(&Dispatcher[@dispatching].obj_ref)
     }
 
     #[test_only]

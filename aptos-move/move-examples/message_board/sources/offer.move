@@ -47,7 +47,7 @@ module message_board::offer {
   /// Only succeeds if the sender is the intended recipient stored in `for` or the original
   /// publisher `offer_address`.
   /// Also fails if there is no `Offer<Offered>` published.
-  public fun redeem<Offered: store>(account: &signer, offer_address: address): Offered acquires Offer {
+  public fun redeem<Offered: store>(account: &signer, offer_address: address): Offered {
     assert!(exists<Offer<Offered>>(offer_address), error::not_found(EOFFER_DOES_NOT_EXIST));
     let Offer<Offered> { offered, for } = move_from<Offer<Offered>>(offer_address);
     let sender = signer::address_of(account);
@@ -77,9 +77,9 @@ module message_board::offer {
 
   // Returns the address of the `Offered` type stored at `offer_address.
   // Fails if no such `Offer` exists.
-  public fun address_of<Offered: store>(offer_address: address): address acquires Offer {
+  public fun address_of<Offered: store>(offer_address: address): address {
     assert!(exists<Offer<Offered>>(offer_address), error::not_found(EOFFER_DOES_NOT_EXIST));
-    borrow_global<Offer<Offered>>(offer_address).for
+    Offer<Offered>[offer_address].for
   }
   spec address_of {
     /// Aborts is there is no offer resource `Offer` at the `offer_address`.

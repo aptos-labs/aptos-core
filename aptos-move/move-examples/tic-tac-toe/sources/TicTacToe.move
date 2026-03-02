@@ -81,7 +81,7 @@ module tic_tac_toe::ttt {
     /*
      * @notice lets another user join given a valid game address
      */
-    public entry fun join_as_player_o(new_user: &signer, game_addr: address) acquires Game {
+    public entry fun join_as_player_o(new_user: &signer, game_addr: address) {
         let new_user_addr = signer::address_of(new_user);
         assert!(new_user_addr != game_addr, error::invalid_argument(ECANNOT_JOIN_AS_TWO_PLAYERS));
 
@@ -94,7 +94,7 @@ module tic_tac_toe::ttt {
      * @notice places a move at a given (x,y) coordinate on a 3x3 board
      * @dev checks to ensure a player can make a valid move
      */
-    public entry fun choose_move(player: &signer, game_addr: address, x: u64, y: u64) acquires Game {
+    public entry fun choose_move(player: &signer, game_addr: address, x: u64, y: u64) {
         assert!(x < 3, error::out_of_range(EOUT_OF_BOUNDS_MOVE));
         assert!(y < 3, error::out_of_range(EOUT_OF_BOUNDS_MOVE));
         let game: &mut Game = borrow_global_mut(game_addr);
@@ -117,7 +117,7 @@ module tic_tac_toe::ttt {
     /*
      * @notice destroy Game at the end of session / forfeit
      */
-    public entry fun cleanup(creator: &signer) acquires Game {
+    public entry fun cleanup(creator: &signer) {
         let creator_addr: address = signer::address_of(creator);
         // abort if no such game exists under creator
         let game: Game = move_from<Game>(creator_addr);
@@ -127,7 +127,7 @@ module tic_tac_toe::ttt {
     /*
      * @notice voluntarily give up, the other player wins
      */
-    public entry fun forfeit(player: &signer, game_addr: address) acquires Game {
+    public entry fun forfeit(player: &signer, game_addr: address) {
         let player_addr = signer::address_of(player);
         let game: &mut Game = borrow_global_mut(game_addr);
         let player_x = option::borrow_mut(&mut game.player_x);
@@ -151,7 +151,7 @@ module tic_tac_toe::ttt {
         let i = 0;
         while (i < GRID_SIZE) {
             vector::push_back(&mut v, EMPTY_CELL);
-            i = i + 1;
+            i += 1;
         };
 
         Game {
@@ -243,7 +243,7 @@ module tic_tac_toe::ttt {
                 return true
             };
 
-            row = row + 1;
+            row += 1;
         };
 
         // check cols
@@ -258,7 +258,7 @@ module tic_tac_toe::ttt {
                 return true
             };
 
-            col = col + 1;
+            col += 1;
         };
 
         // check diagonals
@@ -323,7 +323,7 @@ module tic_tac_toe::ttt {
     }
 
     #[test(creator = @0x123, new_user = @0x223, game_addr = @0x123)]
-    fun test_join_as_player_o(creator: &signer, new_user: &signer, game_addr: address) acquires Game {
+    fun test_join_as_player_o(creator: &signer, new_user: &signer, game_addr: address) {
         create_account_for_test(signer::address_of(creator));
         start_game(creator);
         join_as_player_o(new_user, game_addr);
@@ -336,7 +336,7 @@ module tic_tac_toe::ttt {
         new_user: &signer,
         third_user: &signer,
         game_addr: address,
-    ) acquires Game {
+    ) {
         create_account_for_test(signer::address_of(creator));
         start_game(creator);
         join_as_player_o(new_user, game_addr);
@@ -348,7 +348,7 @@ module tic_tac_toe::ttt {
         player_x: &signer,
         player_o: &signer,
         game_addr: address,
-    ) acquires Game {
+    ) {
         create_account_for_test(signer::address_of(player_x));
         start_game(player_x);
         join_as_player_o(player_o, game_addr);
@@ -369,7 +369,7 @@ module tic_tac_toe::ttt {
         player_x: &signer,
         player_o: &signer,
         game_addr: address,
-    ) acquires Game {
+    ) {
         create_account_for_test(signer::address_of(player_x));
         start_game(player_x);
         join_as_player_o(player_o, game_addr);
@@ -385,7 +385,7 @@ module tic_tac_toe::ttt {
         player_x: &signer,
         player_o: &signer,
         game_addr: address,
-    ) acquires Game {
+    ) {
         create_account_for_test(signer::address_of(player_x));
         start_game(player_x);
         join_as_player_o(player_o, game_addr);

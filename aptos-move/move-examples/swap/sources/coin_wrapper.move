@@ -89,26 +89,26 @@ module swap::coin_wrapper {
     #[view]
     /// Return whether a specific CoinType has a wrapper fungible asset. This is only the case if at least one wrap()
     /// call has been made for that CoinType.
-    public fun is_supported<CoinType>(): bool acquires WrapperAccount {
+    public fun is_supported<CoinType>(): bool {
         let coin_type = type_info::type_name<CoinType>();
         smart_table::contains(&wrapper_account().coin_to_fungible_asset, coin_type)
     }
 
     #[view]
     /// Return true if the given fungible asset is a wrapper fungible asset.
-    public fun is_wrapper(metadata: Object<Metadata>): bool acquires WrapperAccount {
+    public fun is_wrapper(metadata: Object<Metadata>): bool {
         smart_table::contains(&wrapper_account().fungible_asset_to_coin, metadata)
     }
 
     #[view]
     /// Return the original CoinType for a specific wrapper fungible asset. This errors out if there's no such wrapper.
-    public fun get_coin_type(metadata: Object<Metadata>): String acquires WrapperAccount {
+    public fun get_coin_type(metadata: Object<Metadata>): String {
         *smart_table::borrow(&wrapper_account().fungible_asset_to_coin, metadata)
     }
 
     #[view]
     /// Return the wrapper fungible asset for a specific CoinType. This errors out if there's no such wrapper.
-    public fun get_wrapper<CoinType>(): Object<Metadata> acquires WrapperAccount {
+    public fun get_wrapper<CoinType>(): Object<Metadata> {
         fungible_asset_data<CoinType>().metadata
     }
 
@@ -117,7 +117,7 @@ module swap::coin_wrapper {
     /// given fungible asset itself, which means it's a native fungible asset (not wrapped).
     /// The return value is a String such as "0x1::aptos_coin::AptosCoin" for an original coin or "0x12345" for a native
     /// fungible asset.
-    public fun get_original(fungible_asset: Object<Metadata>): String acquires WrapperAccount {
+    public fun get_original(fungible_asset: Object<Metadata>): String {
         if (is_wrapper(fungible_asset)) {
             get_coin_type(fungible_asset)
         } else {
@@ -137,7 +137,7 @@ module swap::coin_wrapper {
 
     /// Wrap the given coins into fungible asset. This will also create the fungible asset wrapper if it doesn't exist
     /// yet. The coins will be deposited into the main resource account.
-    public(friend) fun wrap<CoinType>(coins: Coin<CoinType>): FungibleAsset acquires WrapperAccount {
+    friend fun wrap<CoinType>(coins: Coin<CoinType>): FungibleAsset {
         // Ensure the corresponding fungible asset has already been created.
         create_fungible_asset<CoinType>();
 
@@ -151,7 +151,7 @@ module swap::coin_wrapper {
     /// Unwrap the given fungible asset into coins. This will burn the fungible asset and withdraw&return the coins from
     /// the main resource account.
     /// This errors out if the given fungible asset is not a wrapper fungible asset.
-    public(friend) fun unwrap<CoinType>(fa: FungibleAsset): Coin<CoinType> acquires WrapperAccount {
+    friend fun unwrap<CoinType>(fa: FungibleAsset): Coin<CoinType> {
         let amount = fungible_asset::amount(&fa);
         let burn_ref = &fungible_asset_data<CoinType>().burn_ref;
         fungible_asset::burn(burn_ref, fa);
@@ -160,7 +160,7 @@ module swap::coin_wrapper {
     }
 
     /// Create the fungible asset wrapper for the given CoinType if it doesn't exist yet.
-    public(friend) fun create_fungible_asset<CoinType>(): Object<Metadata> acquires WrapperAccount {
+    friend fun create_fungible_asset<CoinType>(): Object<Metadata> {
         let coin_type = type_info::type_name<CoinType>();
         let wrapper_account = mut_wrapper_account();
         let coin_to_fungible_asset = &mut wrapper_account.coin_to_fungible_asset;
@@ -190,17 +190,17 @@ module swap::coin_wrapper {
         smart_table::borrow(coin_to_fungible_asset, coin_type).metadata
     }
 
-    inline fun fungible_asset_data<CoinType>(): &FungibleAssetData acquires WrapperAccount {
+    inline fun fungible_asset_data<CoinType>(): &FungibleAssetData {
         let coin_type = type_info::type_name<CoinType>();
         smart_table::borrow(&wrapper_account().coin_to_fungible_asset, coin_type)
     }
 
-    inline fun wrapper_account(): &WrapperAccount acquires WrapperAccount {
-        borrow_global<WrapperAccount>(wrapper_address())
+    inline fun wrapper_account(): &WrapperAccount {
+        &WrapperAccount[wrapper_address()]
     }
 
-    inline fun mut_wrapper_account(): &mut WrapperAccount acquires WrapperAccount {
-        borrow_global_mut<WrapperAccount>(wrapper_address())
+    inline fun mut_wrapper_account(): &mut WrapperAccount {
+        &mut WrapperAccount[wrapper_address()]
     }
 
     #[test_only]

@@ -70,11 +70,11 @@ module post_mint_reveal_nft::big_vector {
         let i = 0;
         while (i < half_other_len) {
             push_back(lhs, swap_remove(&mut other, i));
-            i = i + 1;
+            i += 1;
         };
         while (i < other_len) {
             push_back(lhs, pop_back(&mut other));
-            i = i + 1;
+            i += 1;
         };
         destroy_empty(other);
     }
@@ -89,7 +89,7 @@ module post_mint_reveal_nft::big_vector {
         } else {
             vector::push_back(table_with_length::borrow_mut(&mut v.buckets, num_buckets - 1), val);
         };
-        v.end_index = v.end_index + 1;
+        v.end_index += 1;
     }
 
     /// Pop an element from the end of vector `v`. It doesn't shrink the buckets even if they're empty.
@@ -105,7 +105,7 @@ module post_mint_reveal_nft::big_vector {
             move last_bucket;
             vector::destroy_empty(table_with_length::remove(&mut v.buckets, num_buckets - 1));
         };
-        v.end_index = v.end_index - 1;
+        v.end_index -= 1;
         val
     }
 
@@ -117,7 +117,7 @@ module post_mint_reveal_nft::big_vector {
         assert!(i < len, error::invalid_argument(EINDEX_OUT_OF_BOUNDS));
         while (i + 1 < len) {
             swap(v, i, i + 1);
-            i = i + 1;
+            i += 1;
         };
         pop_back(v)
     }
@@ -181,7 +181,7 @@ module post_mint_reveal_nft::big_vector {
         let k = 0;
         while (k < half_len) {
             swap(v, k, len - 1 - k);
-            k = k + 1;
+            k += 1;
         }
     }
 
@@ -195,7 +195,7 @@ module post_mint_reveal_nft::big_vector {
             if (borrow(v, i) == val) {
                 return (true, i)
             };
-            i = i + 1;
+            i += 1;
         };
         (false, 0)
     }
@@ -232,16 +232,16 @@ module post_mint_reveal_nft::big_vector {
         let i = 0;
         while (i < 100) {
             push_back(&mut v, i);
-            i = i + 1;
+            i += 1;
         };
         let j = 0;
         while (j < 100) {
             let val = borrow(&v, j);
             assert!(*val == j, 0);
-            j = j + 1;
+            j += 1;
         };
         while (i > 0) {
-            i = i - 1;
+            i -= 1;
             let (exist, index) = index_of(&v, &i);
             let j = pop_back(&mut v);
             assert!(exist, 0);
@@ -250,7 +250,7 @@ module post_mint_reveal_nft::big_vector {
         };
         while (i < 100) {
             push_back(&mut v, i);
-            i = i + 1;
+            i += 1;
         };
         let last_index = length(&v) - 1;
         assert!(swap_remove(&mut v, last_index) == 99, 0);
@@ -286,18 +286,18 @@ module post_mint_reveal_nft::big_vector {
         let i = 0;
         while (i < 7) {
             push_back(&mut v1, i);
-            i = i + 1;
+            i += 1;
         };
         while (i < 25) {
             push_back(&mut v2, i);
-            i = i + 1;
+            i += 1;
         };
         append(&mut v1, v2);
         assert!(length(&v1) == 25, 0);
         i = 0;
         while (i < 25) {
             assert!(*borrow(&v1, i) == i, 0);
-            i = i + 1;
+            i += 1;
         };
         destroy(v1);
     }
@@ -308,7 +308,7 @@ module post_mint_reveal_nft::big_vector {
         let i = 0;
         while (i < 101) {
             push_back(&mut v, i);
-            i = i + 1;
+            i += 1;
         };
         remove(&mut v, 100);
         remove(&mut v, 90);
@@ -328,9 +328,9 @@ module post_mint_reveal_nft::big_vector {
         while (i < 101) {
             if (i % 10 != 0) {
                 assert!(*borrow(&v, index) == i, 0);
-                index = index + 1;
+                index += 1;
             };
-            i = i + 1;
+            i += 1;
         };
         destroy(v);
     }
@@ -341,17 +341,17 @@ module post_mint_reveal_nft::big_vector {
         let i = 0;
         while (i < 101) {
             push_back(&mut v, i);
-            i = i + 1;
+            i += 1;
         };
         i = 0;
         while (i < 51) {
             swap(&mut v, i, 100 - i);
-            i = i + 1;
+            i += 1;
         };
         i = 0;
         while (i < 101) {
             assert!(*borrow(&v, i) == 100 - i, 0);
-            i = i + 1;
+            i += 1;
         };
         destroy(v);
     }
@@ -364,7 +364,7 @@ module post_mint_reveal_nft::big_vector {
             push_back(&mut v, i);
             let (found, idx) = index_of(&mut v, &i);
             assert!(found && idx == i, 0);
-            i = i + 1;
+            i += 1;
         };
         destroy(v);
     }

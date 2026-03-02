@@ -82,8 +82,8 @@ module addr::cli_e2e_tests {
         description: String,
         name: String,
         uri: String,
-    ): ConstructorRef acquires OnChainConfig {
-        let on_chain_config = borrow_global<OnChainConfig>(signer::address_of(creator));
+    ): ConstructorRef {
+        let on_chain_config = &OnChainConfig[signer::address_of(creator)];
         token::create_named_token(
             creator,
             on_chain_config.collection,
@@ -103,7 +103,7 @@ module addr::cli_e2e_tests {
         name: String,
         race: String,
         uri: String,
-    ): Object<Hero> acquires OnChainConfig {
+    ): Object<Hero> {
         let constructor_ref = create(creator, description, name, uri);
         let token_signer = object::generate_signer(&constructor_ref);
 
@@ -128,7 +128,7 @@ module addr::cli_e2e_tests {
         uri: String,
         weapon_type: String,
         weight: u64,
-    ): Object<Weapon> acquires OnChainConfig {
+    ): Object<Weapon> {
         let constructor_ref = create(creator, description, name, uri);
         let token_signer = object::generate_signer(&constructor_ref);
 
@@ -151,7 +151,7 @@ module addr::cli_e2e_tests {
         magic_attribute: String,
         name: String,
         uri: String,
-    ): Object<Gem> acquires OnChainConfig {
+    ): Object<Gem> {
         let constructor_ref = create(creator, description, name, uri);
         let token_signer = object::generate_signer(&constructor_ref);
 
@@ -167,27 +167,27 @@ module addr::cli_e2e_tests {
 
     // Transfer wrappers
 
-    public fun hero_equip_weapon(owner: &signer, hero: Object<Hero>, weapon: Object<Weapon>) acquires Hero {
-        let hero_obj = borrow_global_mut<Hero>(object::object_address(&hero));
+    public fun hero_equip_weapon(owner: &signer, hero: Object<Hero>, weapon: Object<Weapon>) {
+        let hero_obj = &mut Hero[object::object_address(&hero)];
         option::fill(&mut hero_obj.weapon, weapon);
         object::transfer_to_object(owner, weapon, hero);
     }
 
-    public fun hero_unequip_weapon(owner: &signer, hero: Object<Hero>, weapon: Object<Weapon>) acquires Hero {
-        let hero_obj = borrow_global_mut<Hero>(object::object_address(&hero));
+    public fun hero_unequip_weapon(owner: &signer, hero: Object<Hero>, weapon: Object<Weapon>) {
+        let hero_obj = &mut Hero[object::object_address(&hero)];
         let stored_weapon = option::extract(&mut hero_obj.weapon);
         assert!(stored_weapon == weapon, error::not_found(EINVALID_WEAPON_UNEQUIP));
         object::transfer(owner, weapon, signer::address_of(owner));
     }
 
-    public fun weapon_equip_gem(owner: &signer, weapon: Object<Weapon>, gem: Object<Gem>) acquires Weapon {
-        let weapon_obj = borrow_global_mut<Weapon>(object::object_address(&weapon));
+    public fun weapon_equip_gem(owner: &signer, weapon: Object<Weapon>, gem: Object<Gem>) {
+        let weapon_obj = &mut Weapon[object::object_address(&weapon)];
         option::fill(&mut weapon_obj.gem, gem);
         object::transfer_to_object(owner, gem, weapon);
     }
 
-    public fun weapon_unequip_gem(owner: &signer, weapon: Object<Weapon>, gem: Object<Gem>) acquires Weapon {
-        let weapon_obj = borrow_global_mut<Weapon>(object::object_address(&weapon));
+    public fun weapon_unequip_gem(owner: &signer, weapon: Object<Weapon>, gem: Object<Gem>) {
+        let weapon_obj = &mut Weapon[object::object_address(&weapon)];
         let stored_gem = option::extract(&mut weapon_obj.gem);
         assert!(stored_gem == gem, error::not_found(EINVALID_GEM_UNEQUIP));
         object::transfer(owner, gem, signer::address_of(owner));
@@ -202,7 +202,7 @@ module addr::cli_e2e_tests {
         name: String,
         race: String,
         uri: String,
-    ) acquires OnChainConfig {
+    ) {
         create_hero(account, description, gender, name, race, uri);
     }
 
@@ -225,7 +225,7 @@ module addr::cli_e2e_tests {
         collection: String,
         name: String,
         description: String,
-    ) acquires Hero {
+    ) {
         let (hero_obj, hero) = get_hero(
             &signer::address_of(creator),
             &collection,
@@ -238,7 +238,7 @@ module addr::cli_e2e_tests {
 
     // View functions
     #[view]
-    public fun view_hero(creator: address, collection: String, name: String): Hero acquires Hero {
+    public fun view_hero(creator: address, collection: String, name: String): Hero {
         let token_address = token::create_token_address(
             &creator,
             &collection,
@@ -248,24 +248,24 @@ module addr::cli_e2e_tests {
     }
 
     #[view]
-    public fun view_hero_by_object(hero_obj: Object<Hero>): Hero acquires Hero {
+    public fun view_hero_by_object(hero_obj: Object<Hero>): Hero {
         let token_address = object::object_address(&hero_obj);
         move_from<Hero>(token_address)
     }
 
     #[view]
-    public fun view_object<T: key>(obj: Object<T>): String acquires Armor, Gem, Hero, Shield, Weapon {
+    public fun view_object<T: key>(obj: Object<T>): String {
         let token_address = object::object_address(&obj);
         if (exists<Armor>(token_address)) {
-            string_utils::to_string(borrow_global<Armor>(token_address))
+            string_utils::to_string(&Armor[token_address])
         } else if (exists<Gem>(token_address)) {
-            string_utils::to_string(borrow_global<Gem>(token_address))
+            string_utils::to_string(&Gem[token_address])
         } else if (exists<Hero>(token_address)) {
-            string_utils::to_string(borrow_global<Hero>(token_address))
+            string_utils::to_string(&Hero[token_address])
         } else if (exists<Shield>(token_address)) {
-            string_utils::to_string(borrow_global<Shield>(token_address))
+            string_utils::to_string(&Shield[token_address])
         } else if (exists<Weapon>(token_address)) {
-            string_utils::to_string(borrow_global<Weapon>(token_address))
+            string_utils::to_string(&Weapon[token_address])
         } else {
             abort EINVALID_TYPE
         }
@@ -302,11 +302,11 @@ module addr::cli_e2e_tests {
             collection,
             name,
         );
-        (object::address_to_object<Hero>(token_address), borrow_global<Hero>(token_address))
+        (object::address_to_object<Hero>(token_address), &Hero[token_address])
     }
 
     #[test(account = @0x3)]
-    fun test_hero_with_gem_weapon(account: &signer) acquires Hero, OnChainConfig, Weapon {
+    fun test_hero_with_gem_weapon(account: &signer) {
         init_module(account);
 
         let hero = create_hero(

@@ -66,7 +66,7 @@ module common_account::common_account {
         sender: &signer,
         common_account: address,
         other: address,
-    ) acquires Management {
+    ) {
         let management = assert_is_admin(sender, common_account);
         simple_map::add(&mut management.unclaimed_capabilities, other, Empty {});
     }
@@ -76,7 +76,7 @@ module common_account::common_account {
         admin: &signer,
         common_account: address,
         other: address,
-    ) acquires Capability, Management {
+    ) {
         let management = assert_is_admin(admin, common_account);
         if (simple_map::contains_key(&management.unclaimed_capabilities, &other)) {
             simple_map::remove(&mut management.unclaimed_capabilities, &other);
@@ -90,7 +90,7 @@ module common_account::common_account {
     public entry fun acquire_capability(
         sender: &signer,
         common_account: address,
-    ) acquires Management {
+    ) {
         let sender_addr = signer::address_of(sender);
 
         let management = borrow_management(common_account);
@@ -107,19 +107,19 @@ module common_account::common_account {
     public fun acquire_signer(
         sender: &signer,
         common_account: address,
-    ): signer acquires Capability, CommonAccount, Management {
+    ): signer {
         let sender_addr = signer::address_of(sender);
         if (!exists<Capability>(sender_addr)) {
           acquire_capability(sender, common_account)
         };
-        let capability = borrow_global<Capability>(sender_addr);
+        let capability = &Capability[sender_addr];
 
         assert!(
             capability.common_account == common_account,
             error::invalid_state(EUNEXPECTED_PARALLEL_ACCOUNT),
         );
 
-        let resource = borrow_global<CommonAccount>(common_account);
+        let resource = &CommonAccount[common_account];
         account::create_signer_with_capability(&resource.signer_cap)
     }
 
@@ -137,7 +137,7 @@ module common_account::common_account {
             exists<Management>(common_account),
             error::not_found(ENO_MANAGEMENT_RESOURCE_FOUND),
         );
-        borrow_global_mut<Management>(common_account)
+        &mut Management[common_account]
     }
 
     #[test_only]
@@ -147,7 +147,7 @@ module common_account::common_account {
     public fun test_end_to_end(
         alice: &signer,
         bob: &signer,
-    ) acquires Capability, Management, CommonAccount {
+    ) {
         let alice_addr = signer::address_of(alice);
         let bob_addr = signer::address_of(bob);
         let common_addr = account::create_resource_address(&alice_addr, vector::empty());
@@ -164,7 +164,7 @@ module common_account::common_account {
     public fun test_no_account_capability(
         alice: &signer,
         bob: &signer,
-    ) acquires Management {
+    ) {
         let alice_addr = signer::address_of(alice);
         let common_addr = account::create_resource_address(&alice_addr, vector::empty());
 
@@ -176,7 +176,7 @@ module common_account::common_account {
     public fun test_no_account_signer(
         alice: &signer,
         bob: &signer,
-    ) acquires Capability, CommonAccount, Management {
+    ) {
         let alice_addr = signer::address_of(alice);
         let common_addr = account::create_resource_address(&alice_addr, vector::empty());
 
@@ -188,7 +188,7 @@ module common_account::common_account {
     public fun test_account_no_capability(
         alice: &signer,
         bob: &signer,
-    ) acquires Management {
+    ) {
         let alice_addr = signer::address_of(alice);
         let common_addr = account::create_resource_address(&alice_addr, vector::empty());
 
@@ -201,7 +201,7 @@ module common_account::common_account {
     public fun test_account_revoke_none(
         alice: &signer,
         bob: &signer,
-    ) acquires Capability, Management {
+    ) {
         let alice_addr = signer::address_of(alice);
         let bob_addr = signer::address_of(bob);
         let common_addr = account::create_resource_address(&alice_addr, vector::empty());
@@ -214,7 +214,7 @@ module common_account::common_account {
     public fun test_account_revoke_capability(
         alice: &signer,
         bob: &signer,
-    ) acquires Capability, Management {
+    ) {
         let alice_addr = signer::address_of(alice);
         let bob_addr = signer::address_of(bob);
         let common_addr = account::create_resource_address(&alice_addr, vector::empty());
@@ -229,7 +229,7 @@ module common_account::common_account {
     public fun test_account_revoke_acl(
         alice: &signer,
         bob: &signer,
-    ) acquires Capability, Management {
+    ) {
         let alice_addr = signer::address_of(alice);
         let bob_addr = signer::address_of(bob);
         let common_addr = account::create_resource_address(&alice_addr, vector::empty());
@@ -244,7 +244,7 @@ module common_account::common_account {
     public fun test_wrong_admin(
         alice: &signer,
         bob: &signer,
-    ) acquires Management {
+    ) {
         let alice_addr = signer::address_of(alice);
         let bob_addr = signer::address_of(bob);
         let common_addr = account::create_resource_address(&alice_addr, vector::empty());
@@ -258,7 +258,7 @@ module common_account::common_account {
     public fun test_wrong_cap(
         alice: &signer,
         bob: &signer,
-    ) acquires Capability, Management, CommonAccount {
+    ) {
         let alice_addr = signer::address_of(alice);
         let bob_addr = signer::address_of(bob);
         let alice_common_addr = account::create_resource_address(&alice_addr, vector::empty());

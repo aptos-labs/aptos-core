@@ -33,7 +33,7 @@ module ring_deque::ring_deque {
         let data = vector::empty();
         while (i < capacity) {
             vector::push_back(&mut data, option::none());
-            i = i + 1;
+            i += 1;
         };
         RingDeque { data, capacity, front: 0, back: 0, length: 0 }
     }
@@ -86,7 +86,7 @@ module ring_deque::ring_deque {
             vector::borrow_mut(&mut rd_ref_mut.data, rd_ref_mut.front),
             value
         );
-        rd_ref_mut.length = rd_ref_mut.length + 1;
+        rd_ref_mut.length += 1;
     }
 
     public fun push_back<T>(rd_ref_mut: &mut RingDeque<T>, value: T) {
@@ -103,7 +103,7 @@ module ring_deque::ring_deque {
             vector::borrow_mut(&mut rd_ref_mut.data, rd_ref_mut.back),
             value
         );
-        rd_ref_mut.length = rd_ref_mut.length + 1;
+        rd_ref_mut.length += 1;
     }
 
     public fun pop_front<T>(rd_ref_mut: &mut RingDeque<T>): T {
@@ -119,7 +119,7 @@ module ring_deque::ring_deque {
                 rd_ref_mut.front + 1
             };
         };
-        rd_ref_mut.length = rd_ref_mut.length - 1;
+        rd_ref_mut.length -= 1;
         val
     }
 
@@ -136,7 +136,7 @@ module ring_deque::ring_deque {
                 rd_ref_mut.back - 1
             };
         };
-        rd_ref_mut.length = rd_ref_mut.length - 1;
+        rd_ref_mut.length -= 1;
         val
     }
 

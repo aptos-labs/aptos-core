@@ -43,28 +43,28 @@ module package::package_manager {
     }
 
     /// Can be called by friended modules to obtain the resource account signer.
-    public(friend) fun get_signer(): signer acquires PermissionConfig {
-        let signer_cap = &borrow_global<PermissionConfig>(@package).signer_cap;
+    friend fun get_signer(): signer {
+        let signer_cap = &PermissionConfig[@package].signer_cap;
         account::create_signer_with_capability(signer_cap)
     }
 
     /// Can be called by friended modules to keep track of a system address.
-    public(friend) fun add_address(name: String, object: address) acquires PermissionConfig {
-        let addresses = &mut borrow_global_mut<PermissionConfig>(@package).addresses;
+    friend fun add_address(name: String, object: address) {
+        let addresses = &mut PermissionConfig[@package].addresses;
         smart_table::add(addresses, name, object);
     }
 
-    public fun address_exists(name: String): bool acquires PermissionConfig {
+    public fun address_exists(name: String): bool {
         smart_table::contains(&safe_permission_config().addresses, name)
     }
 
-    public fun get_address(name: String): address acquires PermissionConfig {
-        let addresses = &borrow_global<PermissionConfig>(@package).addresses;
+    public fun get_address(name: String): address {
+        let addresses = &PermissionConfig[@package].addresses;
         *smart_table::borrow(addresses, name)
     }
 
-    inline fun safe_permission_config(): &PermissionConfig acquires PermissionConfig {
-        borrow_global<PermissionConfig>(@package)
+    inline fun safe_permission_config(): &PermissionConfig {
+        &PermissionConfig[@package]
     }
 
     #[test_only]

@@ -93,7 +93,7 @@ module example_addr::managed_fungible_asset {
         asset: Object<Metadata>,
         to: vector<address>,
         amounts: vector<u64>
-    ) acquires ManagingRefs {
+    ) {
         let receiver_primary_stores = vector::map(
             to,
             |addr| primary_fungible_store::ensure_primary_store_exists(addr, asset)
@@ -108,14 +108,14 @@ module example_addr::managed_fungible_asset {
         asset: Object<Metadata>,
         stores: vector<Object<FungibleStore>>,
         amounts: vector<u64>,
-    ) acquires ManagingRefs {
+    ) {
         let length = vector::length(&stores);
         assert!(length == vector::length(&amounts), error::invalid_argument(ERR_VECTORS_LENGTH_MISMATCH));
         let mint_ref = authorized_borrow_mint_ref(admin, asset);
         let i = 0;
         while (i < length) {
             fungible_asset::mint_to(mint_ref, *vector::borrow(&stores, i), *vector::borrow(&amounts, i));
-            i = i + 1;
+            i += 1;
         }
     }
 
@@ -127,7 +127,7 @@ module example_addr::managed_fungible_asset {
         from: vector<address>,
         to: vector<address>,
         amounts: vector<u64>
-    ) acquires ManagingRefs {
+    ) {
         let sender_primary_stores = vector::map(
             from,
             |addr| primary_fungible_store::primary_store(addr, asset)
@@ -146,7 +146,7 @@ module example_addr::managed_fungible_asset {
         sender_stores: vector<Object<FungibleStore>>,
         receiver_stores: vector<Object<FungibleStore>>,
         amounts: vector<u64>,
-    ) acquires ManagingRefs {
+    ) {
         let length = vector::length(&sender_stores);
         assert!(length == vector::length(&receiver_stores), error::invalid_argument(ERR_VECTORS_LENGTH_MISMATCH));
         assert!(length == vector::length(&amounts), error::invalid_argument(ERR_VECTORS_LENGTH_MISMATCH));
@@ -159,7 +159,7 @@ module example_addr::managed_fungible_asset {
                 *vector::borrow(&receiver_stores, i),
                 *vector::borrow(&amounts, i)
             );
-            i = i + 1;
+            i += 1;
         }
     }
 
@@ -169,7 +169,7 @@ module example_addr::managed_fungible_asset {
         asset: Object<Metadata>,
         from: vector<address>,
         amounts: vector<u64>
-    ) acquires ManagingRefs {
+    ) {
         let primary_stores = vector::map(
             from,
             |addr| primary_fungible_store::primary_store(addr, asset)
@@ -183,14 +183,14 @@ module example_addr::managed_fungible_asset {
         asset: Object<Metadata>,
         stores: vector<Object<FungibleStore>>,
         amounts: vector<u64>
-    ) acquires ManagingRefs {
+    ) {
         let length = vector::length(&stores);
         assert!(length == vector::length(&amounts), error::invalid_argument(ERR_VECTORS_LENGTH_MISMATCH));
         let burn_ref = authorized_borrow_burn_ref(admin, asset);
         let i = 0;
         while (i < length) {
             fungible_asset::burn_from(burn_ref, *vector::borrow(&stores, i), *vector::borrow(&amounts, i));
-            i = i + 1;
+            i += 1;
         };
     }
 
@@ -201,7 +201,7 @@ module example_addr::managed_fungible_asset {
         asset: Object<Metadata>,
         accounts: vector<address>,
         frozen: bool
-    ) acquires ManagingRefs {
+    ) {
         let primary_stores = vector::map(accounts, |acct| {
             primary_fungible_store::ensure_primary_store_exists(acct, asset)
         });
@@ -214,7 +214,7 @@ module example_addr::managed_fungible_asset {
         asset: Object<Metadata>,
         stores: vector<Object<FungibleStore>>,
         frozen: bool
-    ) acquires ManagingRefs {
+    ) {
         let transfer_ref = authorized_borrow_transfer_ref(admin, asset);
         vector::for_each(stores, |store| {
             fungible_asset::set_frozen_flag(transfer_ref, store, frozen);
@@ -227,7 +227,7 @@ module example_addr::managed_fungible_asset {
         asset: Object<Metadata>,
         from: vector<address>,
         amounts: vector<u64>
-    ): FungibleAsset acquires ManagingRefs {
+    ): FungibleAsset {
         let primary_stores = vector::map(
             from,
             |addr| primary_fungible_store::primary_store(addr, asset)
@@ -242,7 +242,7 @@ module example_addr::managed_fungible_asset {
         asset: Object<Metadata>,
         stores: vector<Object<FungibleStore>>,
         amounts: vector<u64>
-    ): FungibleAsset acquires ManagingRefs {
+    ): FungibleAsset {
         let length = vector::length(&stores);
         assert!(length == vector::length(&amounts), error::invalid_argument(ERR_VECTORS_LENGTH_MISMATCH));
         let transfer_ref = authorized_borrow_transfer_ref(admin, asset);
@@ -255,7 +255,7 @@ module example_addr::managed_fungible_asset {
                 *vector::borrow(&amounts, i)
             );
             fungible_asset::merge(&mut sum, fa);
-            i = i + 1;
+            i += 1;
         };
         sum
     }
@@ -267,7 +267,7 @@ module example_addr::managed_fungible_asset {
         fa: &mut FungibleAsset,
         from: vector<address>,
         amounts: vector<u64>,
-    ) acquires ManagingRefs {
+    ) {
         let primary_stores = vector::map(
             from,
             |addr| primary_fungible_store::ensure_primary_store_exists(addr, fungible_asset::asset_metadata(fa))
@@ -282,7 +282,7 @@ module example_addr::managed_fungible_asset {
         fa: &mut FungibleAsset,
         stores: vector<Object<FungibleStore>>,
         amounts: vector<u64>
-    ) acquires ManagingRefs {
+    ) {
         let length = vector::length(&stores);
         assert!(length == vector::length(&amounts), error::invalid_argument(ERR_VECTORS_LENGTH_MISMATCH));
         let transfer_ref = authorized_borrow_transfer_ref(admin, fungible_asset::asset_metadata(fa));
@@ -294,7 +294,7 @@ module example_addr::managed_fungible_asset {
                 *vector::borrow(&stores, i),
                 split_fa,
             );
-            i = i + 1;
+            i += 1;
         };
     }
 
@@ -303,16 +303,16 @@ module example_addr::managed_fungible_asset {
     inline fun authorized_borrow_refs(
         owner: &signer,
         asset: Object<Metadata>,
-    ): &ManagingRefs acquires ManagingRefs {
+    ): &ManagingRefs {
         assert!(object::is_owner(asset, signer::address_of(owner)), error::permission_denied(ERR_NOT_OWNER));
-        borrow_global<ManagingRefs>(object::object_address(&asset))
+        &ManagingRefs[object::object_address(&asset)]
     }
 
     /// Check the existence and borrow `MintRef`.
     inline fun authorized_borrow_mint_ref(
         owner: &signer,
         asset: Object<Metadata>,
-    ): &MintRef acquires ManagingRefs {
+    ): &MintRef {
         let refs = authorized_borrow_refs(owner, asset);
         assert!(option::is_some(&refs.mint_ref), error::not_found(ERR_MINT_REF));
         option::borrow(&refs.mint_ref)
@@ -322,7 +322,7 @@ module example_addr::managed_fungible_asset {
     inline fun authorized_borrow_transfer_ref(
         owner: &signer,
         asset: Object<Metadata>,
-    ): &TransferRef acquires ManagingRefs {
+    ): &TransferRef {
         let refs = authorized_borrow_refs(owner, asset);
         assert!(option::is_some(&refs.transfer_ref), error::not_found(ERR_TRANSFER_REF));
         option::borrow(&refs.transfer_ref)
@@ -332,7 +332,7 @@ module example_addr::managed_fungible_asset {
     inline fun authorized_borrow_burn_ref(
         owner: &signer,
         asset: Object<Metadata>,
-    ): &BurnRef acquires ManagingRefs {
+    ): &BurnRef {
         let refs = authorized_borrow_refs(owner, asset);
         assert!(option::is_some(&refs.mint_ref), error::not_found(ERR_BURN_REF));
         option::borrow(&refs.burn_ref)
@@ -364,7 +364,7 @@ module example_addr::managed_fungible_asset {
     #[test(creator = @example_addr)]
     fun test_basic_flow(
         creator: &signer,
-    ) acquires ManagingRefs {
+    ) {
         let metadata = create_test_mfa(creator);
         let creator_address = signer::address_of(creator);
         let aaron_address = @0xface;
@@ -411,7 +411,7 @@ module example_addr::managed_fungible_asset {
     fun test_permission_denied(
         creator: &signer,
         aaron: &signer
-    ) acquires ManagingRefs {
+    ) {
         let metadata = create_test_mfa(creator);
         let creator_address = signer::address_of(creator);
         mint_to_primary_stores(aaron, metadata, vector[creator_address], vector[100]);

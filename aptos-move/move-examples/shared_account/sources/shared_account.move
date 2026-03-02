@@ -42,7 +42,7 @@ module shared_account::SharedAccount {
             assert!(account::exists_at(addr), error::invalid_argument(EACCOUNT_NOT_FOUND));
 
             vector::push_back(&mut share_record, Share { share_holder: addr, num_shares });
-            total = total + num_shares;
+            total += num_shares;
         });
 
         let (resource_signer, resource_signer_cap) = account::create_resource_account(source, seed);
@@ -62,13 +62,13 @@ module shared_account::SharedAccount {
     }
 
     // Disperse all available balance to addresses in the shared account
-    public entry fun disperse<CoinType>(resource_addr: address) acquires SharedAccount {
+    public entry fun disperse<CoinType>(resource_addr: address) {
         assert!(exists<SharedAccount>(resource_addr), error::invalid_argument(ERESOURCE_DNE));
 
         let total_balance = coin::balance<CoinType>(resource_addr);
         assert!(total_balance > 0, error::out_of_range(EINSUFFICIENT_BALANCE));
 
-        let shared_account = borrow_global<SharedAccount>(resource_addr);
+        let shared_account = &SharedAccount[resource_addr];
         let resource_signer = account::create_signer_with_capability(&shared_account.signer_capability);
 
         vector::for_each_ref(&shared_account.share_record, |shared_record|{
@@ -79,7 +79,7 @@ module shared_account::SharedAccount {
     }
 
     #[test_only]
-    public fun set_up(user: signer, test_user1: signer, test_user2: signer) : address acquires SharedAccountEvent {
+    public fun set_up(user: signer, test_user1: signer, test_user2: signer) : address {
         let addresses = vector::empty<address>();
         let numerators = vector::empty<u64>();
         let seed = x"01";
@@ -100,18 +100,18 @@ module shared_account::SharedAccount {
         initialize(&user, seed, addresses, numerators);
 
         assert!(exists<SharedAccountEvent>(user_addr), error::not_found(EACCOUNT_NOT_FOUND));
-        borrow_global<SharedAccountEvent>(user_addr).resource_addr
+        SharedAccountEvent[user_addr].resource_addr
     }
 
     #[test(user = @0x1111, test_user1 = @0x1112, test_user2 = @0x1113, core_framework = @aptos_framework)]
-    public entry fun test_disperse(user: signer, test_user1: signer, test_user2: signer, core_framework: signer) acquires SharedAccount, SharedAccountEvent {
+    public entry fun test_disperse(user: signer, test_user1: signer, test_user2: signer, core_framework: signer) {
         use aptos_framework::aptos_coin::{Self, AptosCoin};
         let user_addr1 = signer::address_of(&test_user1);
         let user_addr2 = signer::address_of(&test_user2);
         let (burn_cap, mint_cap) = aptos_coin::initialize_for_test(&core_framework);
         let resource_addr = set_up(user, test_user1, test_user2);
 
-        let shared_account = borrow_global<SharedAccount>(resource_addr);
+        let shared_account = &SharedAccount[resource_addr];
         let resource_signer = account::create_signer_with_capability(&shared_account.signer_capability);
         coin::register<AptosCoin>(&resource_signer);
         coin::deposit(resource_addr, coin::mint(1000, &mint_cap));
@@ -125,10 +125,10 @@ module shared_account::SharedAccount {
 
     #[test(user = @0x1111, test_user1 = @0x1112, test_user2 = @0x1113)]
     #[expected_failure]
-    public entry fun test_disperse_insufficient_balance(user: signer, test_user1: signer, test_user2: signer) acquires SharedAccount, SharedAccountEvent {
+    public entry fun test_disperse_insufficient_balance(user: signer, test_user1: signer, test_user2: signer) {
         use aptos_framework::aptos_coin::AptosCoin;
         let resource_addr = set_up(user, test_user1, test_user2);
-        let shared_account = borrow_global<SharedAccount>(resource_addr);
+        let shared_account = &SharedAccount[resource_addr];
         let resource_signer = account::create_signer_with_capability(&shared_account.signer_capability);
         coin::register<AptosCoin>(&resource_signer);
         disperse<AptosCoin>(resource_addr);

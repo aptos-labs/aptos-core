@@ -211,7 +211,7 @@ module collection_offer {
     public entry fun cancel<CoinType>(
         purchaser: &signer,
         collection_offer: Object<CollectionOffer>,
-    ) acquires CoinOffer, CollectionOffer, CollectionOfferTokenV1, CollectionOfferTokenV2 {
+    ) {
         let collection_offer_addr = object::object_address(&collection_offer);
         assert!(
             exists<CollectionOffer>(collection_offer_addr),
@@ -221,13 +221,13 @@ module collection_offer {
             object::is_owner(collection_offer, signer::address_of(purchaser)),
             error::permission_denied(ENOT_OWNER),
         );
-        let collection_offer_obj = borrow_global_mut<CollectionOffer>(collection_offer_addr);
+        let collection_offer_obj = &mut CollectionOffer[collection_offer_addr];
         let collection_metadata = if (exists<CollectionOfferTokenV2>(collection_offer_addr)) {
             events::collection_metadata_for_tokenv2(
-                borrow_global<CollectionOfferTokenV2>(collection_offer_addr).collection,
+                CollectionOfferTokenV2[collection_offer_addr].collection,
             )
         } else {
-            let offer_info = borrow_global<CollectionOfferTokenV1>(collection_offer_addr);
+            let offer_info = &CollectionOfferTokenV1[collection_offer_addr];
             events::collection_metadata_for_tokenv1(
                 offer_info.creator_address,
                 offer_info.collection_name,
@@ -252,7 +252,7 @@ module collection_offer {
         collection_offer: Object<CollectionOffer>,
         token_name: String,
         property_version: u64,
-    ) acquires CoinOffer, CollectionOffer, CollectionOfferTokenV1, CollectionOfferTokenV2
+    )
     {
         sell_tokenv1<CoinType>(seller, collection_offer, token_name, property_version);
     }
@@ -264,11 +264,6 @@ module collection_offer {
         token_name: String,
         property_version: u64,
     ): Option<Object<TokenV1Container>>
-    acquires
-    CoinOffer,
-    CollectionOffer,
-    CollectionOfferTokenV1,
-    CollectionOfferTokenV2
     {
         let collection_offer_addr = object::object_address(&collection_offer);
         assert!(
@@ -276,7 +271,7 @@ module collection_offer {
             error::not_found(ENO_TOKEN_OFFER),
         );
         let collection_offer_tokenv1_offer =
-            borrow_global_mut<CollectionOfferTokenV1>(collection_offer_addr);
+            &mut CollectionOfferTokenV1[collection_offer_addr];
 
         // Move the token to its destination
 
@@ -320,14 +315,14 @@ module collection_offer {
         seller: &signer,
         collection_offer: Object<CollectionOffer>,
         token: Object<TokenV2>,
-    ) acquires CoinOffer, CollectionOffer, CollectionOfferTokenV1, CollectionOfferTokenV2 {
+    ) {
         let collection_offer_addr = object::object_address(&collection_offer);
         assert!(
             exists<CollectionOfferTokenV2>(collection_offer_addr),
             error::not_found(ENO_TOKEN_OFFER),
         );
         let collection_offer_token_v2 =
-            borrow_global_mut<CollectionOfferTokenV2>(collection_offer_addr);
+            &mut CollectionOfferTokenV2[collection_offer_addr];
 
         // Move the token to its destination
 
@@ -373,9 +368,9 @@ module collection_offer {
         royalty_denominator: u64,
         royalty_numerator: u64,
         token_metadata: events::TokenMetadata,
-    ) acquires CoinOffer, CollectionOffer, CollectionOfferTokenV1, CollectionOfferTokenV2 {
+    ) {
         assert!(exists<CollectionOffer>(collection_offer_addr), error::not_found(ENO_COLLECTION_OFFER));
-        let collection_offer_obj = borrow_global_mut<CollectionOffer>(collection_offer_addr);
+        let collection_offer_obj = &mut CollectionOffer[collection_offer_addr];
         assert!(
             timestamp::now_seconds() < collection_offer_obj.expiration_time,
             error::invalid_state(EEXPIRED),
@@ -415,7 +410,7 @@ module collection_offer {
             token_metadata,
         );
 
-        collection_offer_obj.remaining = collection_offer_obj.remaining - 1;
+        collection_offer_obj.remaining -= 1;
         if (collection_offer_obj.remaining == 0) {
             cleanup<CoinType>(object::address_to_object(collection_offer_addr));
         };
@@ -425,7 +420,7 @@ module collection_offer {
     /// creator.
     inline fun cleanup<CoinType>(
         collection_offer: Object<CollectionOffer>,
-    ) acquires CoinOffer, CollectionOffer, CollectionOfferTokenV1, CollectionOfferTokenV2 {
+    ) {
         let collection_offer_addr = object::object_address(&collection_offer);
         let CoinOffer<CoinType> { coins } = move_from(collection_offer_addr);
         aptos_account::deposit_coins(object::owner(collection_offer), coins);
@@ -454,38 +449,38 @@ module collection_offer {
     }
 
     #[view]
-    public fun expired(collection_offer: Object<CollectionOffer>): bool acquires CollectionOffer {
+    public fun expired(collection_offer: Object<CollectionOffer>): bool {
         borrow_collection_offer(collection_offer).expiration_time < timestamp::now_seconds()
     }
 
     #[view]
     public fun expiration_time(
         collection_offer: Object<CollectionOffer>,
-    ): u64 acquires CollectionOffer {
+    ): u64 {
         borrow_collection_offer(collection_offer).expiration_time
     }
 
     #[view]
     public fun fee_schedule(
         collection_offer: Object<CollectionOffer>,
-    ): Object<FeeSchedule> acquires CollectionOffer {
+    ): Object<FeeSchedule> {
         borrow_collection_offer(collection_offer).fee_schedule
     }
 
     #[view]
-    public fun price(collection_offer: Object<CollectionOffer>): u64 acquires CollectionOffer {
+    public fun price(collection_offer: Object<CollectionOffer>): u64 {
         borrow_collection_offer(collection_offer).item_price
     }
 
     #[view]
-    public fun remaining(collection_offer: Object<CollectionOffer>): u64 acquires CollectionOffer {
+    public fun remaining(collection_offer: Object<CollectionOffer>): u64 {
         borrow_collection_offer(collection_offer).remaining
     }
 
     #[view]
     public fun collectionv1(
         collection_offer: Object<CollectionOffer>,
-    ): CollectionOfferTokenV1 acquires CollectionOfferTokenV1 {
+    ): CollectionOfferTokenV1 {
         let collection_offer_addr = object::object_address(&collection_offer);
         assert!(
             exists<CollectionOfferTokenV1>(collection_offer_addr),
@@ -497,7 +492,7 @@ module collection_offer {
     #[view]
     public fun collectionv2(
         collection_offer: Object<CollectionOffer>,
-    ): CollectionOfferTokenV2 acquires CollectionOfferTokenV2 {
+    ): CollectionOfferTokenV2 {
         let collection_offer_addr = object::object_address(&collection_offer);
         assert!(
             exists<CollectionOffer>(collection_offer_addr),
@@ -508,7 +503,7 @@ module collection_offer {
 
     inline fun borrow_collection_offer(
         collection_offer: Object<CollectionOffer>,
-    ): &CollectionOffer acquires CollectionOffer {
+    ): &CollectionOffer {
         let collection_offer_addr = object::object_address(&collection_offer);
         assert!(
             exists<CollectionOffer>(collection_offer_addr),

@@ -60,7 +60,7 @@ module guild::guild {
     }
 
     /// Initializes the module, creating the manager object, the guild token collection and the whitelist.
-    fun init_module(sender: &signer) acquires Config {
+    fun init_module(sender: &signer) {
         // Create the guild collection manager object to use it to autonomously
         // manage the guild collection (e.g., create the collection and mint tokens).
         let constructor_ref = object::create_object(signer::address_of(sender));
@@ -75,23 +75,23 @@ module guild::guild {
 
     #[view]
     /// Returns the guild token address by name
-    public fun guild_token_address(guild_token_name: String): address acquires Config {
+    public fun guild_token_address(guild_token_name: String): address {
         token::create_token_address(&guild_collection_manager_address(), &string::utf8(GUILD_COLLECTION_NAME), &guild_token_name)
     }
 
     #[view]
     /// Returns the guild token address by name
-    public fun member_token_address(guild_token: Object<GuildToken>, member_token_name: String): address acquires GuildToken {
+    public fun member_token_address(guild_token: Object<GuildToken>, member_token_name: String): address {
         let guild_token_addr = object::object_address(&guild_token);
-        let member_collection_name = &borrow_global<GuildToken>(guild_token_addr).member_collection_name;
+        let member_collection_name = &GuildToken[guild_token_addr].member_collection_name;
         token::create_token_address(&guild_token_addr, member_collection_name, &member_token_name)
     }
 
     /// Adds a guild master to the whitelist. This function allows the admin to add a guild master
     /// to the whitelist.
-    public entry fun whitelist_guild_master(admin: &signer, guild_master: address) acquires Config {
+    public entry fun whitelist_guild_master(admin: &signer, guild_master: address) {
         assert!(signer::address_of(admin) == guild_collection_manager_owner(), ENOT_ADMIN);
-        let config = borrow_global_mut<Config>(@guild);
+        let config = &mut Config[@guild];
         smart_vector::push_back(&mut config.whitelist, guild_master);
     }
 
@@ -105,7 +105,7 @@ module guild::guild {
         member_collection_name: String,
         member_collection_description: String,
         member_collection_uri: String,
-    ) acquires Config {
+    ) {
         // Checks if the guild master is whitelisted.
         let guild_master_addr = signer::address_of(guild_master);
         assert!(is_whitelisted(guild_master_addr), ENOT_GUILD_MASTER);
@@ -154,11 +154,11 @@ module guild::guild {
         name: String,
         uri: String,
         receiver: address,
-    ) acquires GuildToken {
+    ) {
         // Checks if the guild master is the owner of the guild token.
         assert!(object::owner(guild_token) == signer::address_of(guild_master), ENOT_OWNER);
 
-        let guild = borrow_global<GuildToken>(object::object_address(&guild_token));
+        let guild = &GuildToken[object::object_address(&guild_token)];
         let guild_token_object_signer = object::generate_signer_for_extending(&guild.extend_ref);
         // Creates the member token, and get the constructor ref of the token. The constructor ref
         // is used to generate the refs of the token.
@@ -192,8 +192,8 @@ module guild::guild {
     public entry fun burn_member(
         guild_master: &signer,
         token: Object<MemberToken>,
-    ) acquires MemberToken {
-        let belonging_guild = borrow_global<MemberToken>(object::object_address(&token)).guild;
+    ) {
+        let belonging_guild = MemberToken[object::object_address(&token)].guild;
         assert!(object::owner(belonging_guild) == signer::address_of(guild_master), ENOT_OWNER);
         let member_token = move_from<MemberToken>(object::object_address(&token));
         let MemberToken {
@@ -204,21 +204,21 @@ module guild::guild {
     }
 
     /// Returns the signer of the guild collection manager object.
-    fun guild_collection_manager_signer(): signer acquires Config {
-        let manager = borrow_global<Config>(@guild);
+    fun guild_collection_manager_signer(): signer {
+        let manager = &Config[@guild];
         object::generate_signer_for_extending(&manager.extend_ref)
     }
 
     /// Returns the signer of the guild collection manager object.
-    fun guild_collection_manager_owner(): address acquires Config {
-        let manager = borrow_global<Config>(@guild);
+    fun guild_collection_manager_owner(): address {
+        let manager = &Config[@guild];
         let manager_addr = object::address_from_extend_ref(&manager.extend_ref);
         object::owner(object::address_to_object<object::ObjectCore>(manager_addr))
     }
 
     /// Returns the address of the guild collection manager object.
-    fun guild_collection_manager_address(): address acquires Config {
-        let manager = borrow_global<Config>(@guild);
+    fun guild_collection_manager_address(): address {
+        let manager = &Config[@guild];
         object::address_from_extend_ref(&manager.extend_ref)
     }
 
@@ -256,12 +256,12 @@ module guild::guild {
     }
 
     inline fun is_whitelisted(guild_master: address): bool {
-        let whitelist = &borrow_global<Config>(@guild).whitelist;
+        let whitelist = &Config[@guild].whitelist;
         smart_vector::contains(whitelist, &guild_master)
     }
 
     #[test(admin = @guild, guild_master = @0x456, user = @0x789)]
-    public fun test_guild(admin: &signer, guild_master: &signer, user: address) acquires GuildToken, MemberToken, Config, Config {
+    public fun test_guild(admin: &signer, guild_master: &signer, user: address) {
         // This test assumes that the creator's address is equal to @token_objects.
         assert!(signer::address_of(admin) == @guild, 0);
 

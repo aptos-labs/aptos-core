@@ -68,7 +68,7 @@ module marketplace::listing {
 
     // Init functions
 
-    public(friend) fun init(
+    friend fun init(
         creator: &signer,
         object: Object<ObjectCore>,
         fee_schedule: Object<FeeSchedule>,
@@ -96,7 +96,7 @@ module marketplace::listing {
         (listing_signer, constructor_ref)
     }
 
-    public(friend) fun create_tokenv1_container(
+    friend fun create_tokenv1_container(
         seller: &signer,
         token_creator: address,
         token_collection: String,
@@ -129,11 +129,11 @@ module marketplace::listing {
     // Mutators
 
     /// This should be called at the end of a listing.
-    public(friend) fun extract_or_transfer_tokenv1(
+    friend fun extract_or_transfer_tokenv1(
         closer: &signer,
         recipient: address,
         object: Object<TokenV1Container>,
-    ) acquires TokenV1Container {
+    ) {
         let direct_transfer_enabled = tokenv1::get_direct_transfer(recipient);
         let object_addr = object::object_address(&object);
         if (direct_transfer_enabled) {
@@ -153,7 +153,7 @@ module marketplace::listing {
             tokenv1::deposit_token(closer, token);
             object::delete(delete_ref);
         } else {
-            let tokenv1_container = borrow_global<TokenV1Container>(object_addr);
+            let tokenv1_container = &TokenV1Container[object_addr];
             let linear_transfer_ref =
                 object::generate_linear_transfer_ref(&tokenv1_container.transfer_ref);
             object::transfer_with_ref(linear_transfer_ref, recipient);
@@ -165,7 +165,7 @@ module marketplace::listing {
     public entry fun extract_tokenv1(
         owner: &signer,
         object: Object<TokenV1Container>,
-    ) acquires TokenV1Container {
+    ) {
         let object_addr = object::object_address(&object);
         assert!(
             object::is_owner(object, signer::address_of(owner)),
@@ -182,11 +182,11 @@ module marketplace::listing {
 
     /// The listing has concluded, transfer the asset and delete the listing. Returns the seller
     /// for depositing any profit and the fee schedule for the marketplaces commission.
-    public(friend) fun close(
+    friend fun close(
         closer: &signer,
         object: Object<Listing>,
         recipient: address,
-    ): (address, Object<FeeSchedule>) acquires Listing, TokenV1Container {
+    ): (address, Object<FeeSchedule>) {
         let listing_addr = object::object_address(&object);
         let Listing {
             object,
@@ -208,11 +208,11 @@ module marketplace::listing {
         (seller, fee_schedule)
     }
 
-    public(friend) fun assert_started(object: &Object<Listing>): address acquires Listing {
+    friend fun assert_started(object: &Object<Listing>): address {
         let listing_addr = object::object_address(object);
         assert!(exists<Listing>(listing_addr), error::not_found(ENO_LISTING));
 
-        let listing = borrow_global<Listing>(listing_addr);
+        let listing = &Listing[listing_addr];
         let now = timestamp::now_seconds();
         assert!(listing.start_time <= now, error::invalid_state(ELISTING_NOT_STARTED));
         listing_addr
@@ -221,19 +221,19 @@ module marketplace::listing {
     // View
 
     #[view]
-    public fun seller(object: Object<Listing>): address acquires Listing {
+    public fun seller(object: Object<Listing>): address {
         let listing = borrow_listing(object);
         listing.seller
     }
 
     #[view]
-    public fun listed_object(object: Object<Listing>): Object<ObjectCore> acquires Listing {
+    public fun listed_object(object: Object<Listing>): Object<ObjectCore> {
         let listing = borrow_listing(object);
         listing.object
     }
 
     #[view]
-    public fun fee_schedule(object: Object<Listing>): Object<FeeSchedule> acquires Listing {
+    public fun fee_schedule(object: Object<Listing>): Object<FeeSchedule> {
         let listing = borrow_listing(object);
         listing.fee_schedule
     }
@@ -244,11 +244,11 @@ module marketplace::listing {
     public fun compute_royalty(
         object: Object<Listing>,
         amount: u64,
-    ): (address, u64) acquires Listing, TokenV1Container {
+    ): (address, u64) {
         let listing = borrow_listing(object);
         let obj_addr = object::object_address(&listing.object);
         if (exists<TokenV1Container>(obj_addr)) {
-            let token_container = borrow_global<TokenV1Container>(obj_addr);
+            let token_container = &TokenV1Container[obj_addr];
             let token_id = tokenv1::get_token_id(&token_container.token);
             let royalty = tokenv1::get_royalty(token_id);
 
@@ -277,11 +277,11 @@ module marketplace::listing {
     /// Produce a events::TokenMetadata for a listing
     public fun token_metadata(
         object: Object<Listing>,
-    ): events::TokenMetadata acquires Listing, TokenV1Container {
+    ): events::TokenMetadata {
         let listing = borrow_listing(object);
         let obj_addr = object::object_address(&listing.object);
         if (exists<TokenV1Container>(obj_addr)) {
-            let token_container = borrow_global<TokenV1Container>(obj_addr);
+            let token_container = &TokenV1Container[obj_addr];
             let token_id = tokenv1::get_token_id(&token_container.token);
             events::token_metadata_for_tokenv1(token_id)
         } else {
@@ -298,9 +298,9 @@ module marketplace::listing {
         }
     }
 
-    inline fun borrow_listing(object: Object<Listing>): &Listing acquires Listing {
+    inline fun borrow_listing(object: Object<Listing>): &Listing {
         let obj_addr = object::object_address(&object);
         assert!(exists<Listing>(obj_addr), error::not_found(ENO_LISTING));
-        borrow_global<Listing>(obj_addr)
+        &Listing[obj_addr]
     }
 }

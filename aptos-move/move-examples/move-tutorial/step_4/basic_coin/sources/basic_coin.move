@@ -37,22 +37,22 @@ module named_addr::basic_coin {
     }
 
     /// Returns the balance of `owner`.
-    public fun balance_of(owner: address): u64 acquires Balance {
-        borrow_global<Balance>(owner).coin.value
+    public fun balance_of(owner: address): u64 {
+        Balance[owner].coin.value
     }
 
     /// Transfers `amount` of tokens from `from` to `to`.
-    public fun transfer(from: &signer, to: address, amount: u64) acquires Balance {
+    public fun transfer(from: &signer, to: address, amount: u64) {
         let check = withdraw(signer::address_of(from), amount);
         deposit(to, check);
     }
 
     /// Withdraw `amount` number of tokens from the balance under `addr`.
-    fun withdraw(addr: address, amount: u64) : Coin acquires Balance {
+    fun withdraw(addr: address, amount: u64) : Coin {
         let balance = balance_of(addr);
         // balance must be greater than the withdraw amount
         assert!(balance >= amount, EINSUFFICIENT_BALANCE);
-        let balance_ref = &mut borrow_global_mut<Balance>(addr).coin.value;
+        let balance_ref = &mut Balance[addr].coin.value;
         *balance_ref = balance - amount;
         Coin { value: amount }
     }

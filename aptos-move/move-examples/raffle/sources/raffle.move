@@ -45,7 +45,7 @@ module raffle::raffle {
     }
 
     #[test_only]
-    public(friend) fun init_module_for_testing(deployer: &signer) {
+    friend fun init_module_for_testing(deployer: &signer) {
         init_module(deployer)
     }
 
@@ -53,8 +53,8 @@ module raffle::raffle {
     public fun get_ticket_price(): u64 { TICKET_PRICE }
 
     /// Any user can call this to purchase a ticket in the raffle.
-    public entry fun buy_a_ticket(user: &signer) acquires Raffle {
-        let raffle = borrow_global_mut<Raffle>(@raffle);
+    public entry fun buy_a_ticket(user: &signer) {
+        let raffle = &mut Raffle[@raffle];
 
         // Charge the price of a raffle ticket from the user's balance, and
         // accumulate it into the raffle's bounty.
@@ -68,7 +68,7 @@ module raffle::raffle {
     #[randomness]
     /// Can only be called as a top-level call from a TXN, preventing **test-and-abort** attacks (see
     /// [AIP-41](https://github.com/aptos-foundation/AIPs/blob/main/aips/aip-41.md)).
-    entry fun randomly_pick_winner() acquires Raffle {
+    entry fun randomly_pick_winner() {
         randomly_pick_winner_internal();
     }
 
@@ -83,8 +83,8 @@ module raffle::raffle {
 
     /// Allows anyone to close the raffle (if enough time has elapsed & more than
     /// 1 user bought tickets) and to draw a random winner.
-    public(friend) fun randomly_pick_winner_internal(): address acquires Raffle {
-        let raffle = borrow_global_mut<Raffle>(@raffle);
+    friend fun randomly_pick_winner_internal(): address {
+        let raffle = &mut Raffle[@raffle];
         assert!(!raffle.is_closed, E_RAFFLE_HAS_CLOSED);
         assert!(!vector::is_empty(&raffle.tickets), E_NO_TICKETS);
 

@@ -84,8 +84,8 @@ module ambassador::ambassador {
 
     #[view]
     /// Returns the ambassador level of the token
-    public fun ambassador_level(token: Object<AmbassadorToken>): u64 acquires AmbassadorLevel {
-        let ambassador_level = borrow_global<AmbassadorLevel>(object::object_address(&token));
+    public fun ambassador_level(token: Object<AmbassadorToken>): u64 {
+        let ambassador_level = &AmbassadorLevel[object::object_address(&token)];
         ambassador_level.ambassador_level
     }
 
@@ -97,7 +97,7 @@ module ambassador::ambassador {
 
     #[view]
     /// Returns the ambassador level of the token of the address
-    public fun ambassador_level_from_address(addr: address): u64 acquires AmbassadorLevel {
+    public fun ambassador_level_from_address(addr: address): u64 {
         let token = object::address_to_object<AmbassadorToken>(addr);
         ambassador_level(token)
     }
@@ -253,7 +253,7 @@ module ambassador::ambassador {
 
     /// Burns an ambassador token. This function burns the ambassador token and destroys the
     /// AmbassadorToken resource, AmbassadorLevel resource, the event handle, and the property map.
-    public entry fun burn(creator: &signer, token: Object<AmbassadorToken>) acquires AmbassadorToken, AmbassadorLevel {
+    public entry fun burn(creator: &signer, token: Object<AmbassadorToken>) {
         authorize_creator(creator, &token);
         let ambassador_token = move_from<AmbassadorToken>(object::object_address(&token));
         let AmbassadorToken {
@@ -275,7 +275,7 @@ module ambassador::ambassador {
     /// Uses multisig to mint to user, with creator permissions.
     /// Uses users address as unique name of the soulbound token.
     /// Burns token that was minted by mint_ambassador_token_by_user
-    public entry fun burn_named_by_user(user: &signer, creator: &signer) acquires AmbassadorToken, AmbassadorLevel {
+    public entry fun burn_named_by_user(user: &signer, creator: &signer) {
         let collection_name = string::utf8(COLLECTION_NAME);
         let token_address = token::create_token_address(
             &signer::address_of(creator),
@@ -292,12 +292,12 @@ module ambassador::ambassador {
         creator: &signer,
         token: Object<AmbassadorToken>,
         new_ambassador_level: u64
-    ) acquires AmbassadorLevel, AmbassadorToken {
+    ) {
         // Asserts that `creator` is the creator of the token.
         authorize_creator(creator, &token);
 
         let token_address = object::object_address(&token);
-        let ambassador_level = borrow_global_mut<AmbassadorLevel>(token_address);
+        let ambassador_level = &mut AmbassadorLevel[token_address];
         // Emits the `LevelUpdate`.
         event::emit(
             LevelUpdate {
@@ -316,7 +316,7 @@ module ambassador::ambassador {
     fun update_ambassador_rank(
         token: Object<AmbassadorToken>,
         new_ambassador_level: u64
-    ) acquires AmbassadorToken {
+    ) {
         // `new_rank` is determined based on the new level.
         let new_rank = if (new_ambassador_level < 10) {
             RANK_BRONZE
@@ -327,7 +327,7 @@ module ambassador::ambassador {
         };
 
         let token_address = object::object_address(&token);
-        let ambassador_token = borrow_global<AmbassadorToken>(token_address);
+        let ambassador_token = &AmbassadorToken[token_address];
         // Gets `property_mutator_ref` to update the rank in the property map.
         let property_mutator_ref = &ambassador_token.property_mutator_ref;
         // Updates the rank in the property map.
@@ -353,7 +353,7 @@ module ambassador::ambassador {
     }
 
     #[test(creator = @0x123, user1 = @0x456)]
-    fun test_mint_burn(creator: &signer, user1: &signer) acquires AmbassadorToken, AmbassadorLevel {
+    fun test_mint_burn(creator: &signer, user1: &signer) {
         // ------------------------------------------
         // Creator creates the Ambassador Collection.
         // ------------------------------------------
@@ -412,7 +412,7 @@ module ambassador::ambassador {
     }
 
     #[test(creator = @0x123, user1 = @0x456)]
-    fun test_mint_burn_by_user(creator: &signer, user1: &signer) acquires AmbassadorToken, AmbassadorLevel {
+    fun test_mint_burn_by_user(creator: &signer, user1: &signer) {
         // ------------------------------------------
         // Creator creates the Ambassador Collection.
         // ------------------------------------------

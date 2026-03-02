@@ -25,7 +25,7 @@ module event::event {
                 bytes: vector[]
             };
             event::emit(event);
-            i = i + 1;
+            i += 1;
         }
     }
 
@@ -54,7 +54,7 @@ module event::event {
                 bytes: vector[]
             };
             assert!(vector::borrow(&module_events, i) == &event, i);
-            i = i + 1;
+            i += 1;
         };
         let event = MyEvent {
             seq: 0,

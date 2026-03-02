@@ -10,7 +10,7 @@ module dispatching::sample_callback {
 
     struct Test has drop {}
 
-    public(friend) fun new_proof(): Test {
+    friend fun new_proof(): Test {
       Test {}
     }
 

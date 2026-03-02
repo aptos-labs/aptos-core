@@ -99,17 +99,17 @@ module staking::commission {
     }
 
     #[view]
-    public fun operator(): address acquires CommissionConfig {
+    public fun operator(): address {
         CommissionConfig[@staking].operator
     }
 
     #[view]
-    public fun yearly_commission_amount(): u64 acquires CommissionConfig {
+    public fun yearly_commission_amount(): u64 {
         CommissionConfig[@staking].yearly_commission_amount
     }
 
     #[view]
-    public fun commission_owed(): u64 acquires CommissionConfig {
+    public fun commission_owed(): u64 {
         let config = &CommissionConfig[@staking];
         // Commission earned so far = per second commission rate * seconds passed.
         let now_secs = timestamp::now_seconds();
@@ -120,12 +120,12 @@ module staking::commission {
     }
 
     #[view]
-    public fun commission_owed_in_apt(): u64 acquires CommissionConfig {
+    public fun commission_owed_in_apt(): u64 {
         usd_to_apt(commission_owed())
     }
 
     /// Can be called by the manager to change the yearly commission amount.
-    public entry fun set_yearly_commission_amount(manager: &signer, new_commission: u64) acquires CommissionConfig {
+    public entry fun set_yearly_commission_amount(manager: &signer, new_commission: u64) {
         assert_manager(manager);
         let config = &mut CommissionConfig[@staking];
         let old_yearly_commission_amount = config.yearly_commission_amount;
@@ -140,7 +140,7 @@ module staking::commission {
     }
 
     /// Can be called by the manager or operator to change the account that receives the commission.
-    public entry fun set_operator(account: &signer, new_operator: address) acquires CommissionConfig {
+    public entry fun set_operator(account: &signer, new_operator: address) {
         assert_manager_or_operator(account);
         let config = &mut CommissionConfig[@staking];
         let old_operator = config.operator;
@@ -164,7 +164,7 @@ module staking::commission {
     /// not possible.
     /// This issue is also somewhat mitigated by asserting a min balance before distributing. For other uses of this
     /// contract, consider raising the minimum balance to minimize rounding errors from frequent distribution calls.
-    public entry fun distribute_commission(account: &signer) acquires CommissionConfig {
+    public entry fun distribute_commission(account: &signer) {
         assert_manager_or_operator(account);
 
         let balance = coin::balance<AptosCoin>(@staking);
