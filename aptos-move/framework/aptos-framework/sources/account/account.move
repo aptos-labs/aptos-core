@@ -266,7 +266,7 @@ module aptos_framework::account {
     }
 
     /// Only called during genesis to initialize system resources for this module.
-    public(friend) fun initialize(aptos_framework: &signer) {
+    friend fun initialize(aptos_framework: &signer) {
         system_addresses::assert_aptos_framework(aptos_framework);
         move_to(aptos_framework, OriginatingAddress {
             address_map: table::new(),
@@ -286,7 +286,7 @@ module aptos_framework::account {
     /// Publishes a new `Account` resource under `new_address`. A signer representing `new_address`
     /// is returned. This way, the caller of this function can publish additional resources under
     /// `new_address`.
-    public(friend) fun create_account(new_address: address): signer {
+    friend fun create_account(new_address: address): signer {
         // there cannot be an Account resource under new_addr already.
         assert!(!exists<Account>(new_address), error::already_exists(EACCOUNT_ALREADY_EXISTS));
         // NOTE: @core_resources gets created via a `create_account` call, so we do not include it below.
@@ -370,7 +370,7 @@ module aptos_framework::account {
     ///
     /// When the feature flag is disabled:
     /// - Aborts if no Account resource exists at `addr`
-    public fun get_guid_next_creation_num(addr: address): u64 acquires Account {
+    public fun get_guid_next_creation_num(addr: address): u64 {
         if (resource_exists_at(addr)) {
             Account[addr].guid_creation_num
         } else if (features::is_default_account_resource_enabled()) {
@@ -381,7 +381,7 @@ module aptos_framework::account {
     }
 
     #[view]
-    public fun get_sequence_number(addr: address): u64 acquires Account {
+    public fun get_sequence_number(addr: address): u64 {
         if (resource_exists_at(addr)) {
             Account[addr].sequence_number
         } else if (features::is_default_account_resource_enabled()) {
@@ -392,7 +392,7 @@ module aptos_framework::account {
     }
 
     #[view]
-    public fun originating_address(auth_key: address): Option<address> acquires OriginatingAddress {
+    public fun originating_address(auth_key: address): Option<address> {
         let address_map_ref = &OriginatingAddress[@aptos_framework].address_map;
         if (address_map_ref.contains(auth_key)) {
             option::some(*address_map_ref.borrow(auth_key))
@@ -409,7 +409,7 @@ module aptos_framework::account {
         }
     }
 
-    public(friend) fun increment_sequence_number(addr: address) acquires Account {
+    friend fun increment_sequence_number(addr: address) {
         ensure_resource_exists(addr);
         let sequence_number = &mut Account[addr].sequence_number;
 
@@ -422,7 +422,7 @@ module aptos_framework::account {
     }
 
     #[view]
-    public fun get_authentication_key(addr: address): vector<u8> acquires Account {
+    public fun get_authentication_key(addr: address): vector<u8> {
         if (resource_exists_at(addr)) {
             Account[addr].authentication_key
         } else if (features::is_default_account_resource_enabled()) {
@@ -437,7 +437,7 @@ module aptos_framework::account {
     /// 1. During normal key rotation via `rotate_authentication_key` or `rotate_authentication_key_call`
     /// 2. During resource account initialization so that no private key can control the resource account
     /// 3. During multisig_v2 account creation
-    public(friend) fun rotate_authentication_key_internal(account: &signer, new_auth_key: vector<u8>) acquires Account {
+    friend fun rotate_authentication_key_internal(account: &signer, new_auth_key: vector<u8>) {
         let addr = signer::address_of(account);
         ensure_resource_exists(addr);
         assert!(
@@ -457,7 +457,7 @@ module aptos_framework::account {
     ///
     /// If you'd like to followup with updating the `OriginatingAddress` table, you can call
     /// `set_originating_address()`.
-    entry fun rotate_authentication_key_call(account: &signer, new_auth_key: vector<u8>) acquires Account {
+    entry fun rotate_authentication_key_call(account: &signer, new_auth_key: vector<u8>) {
         rotate_authentication_key_internal(account, new_auth_key);
     }
 
@@ -465,7 +465,7 @@ module aptos_framework::account {
     /// This function will abort if the scheme is not recognized or if new_public_key_bytes is not a valid public key for the given scheme.
     ///
     /// Note: This function does not update the `OriginatingAddress` table.
-    entry fun rotate_authentication_key_from_public_key(account: &signer, scheme: u8, new_public_key_bytes: vector<u8>) acquires Account {
+    entry fun rotate_authentication_key_from_public_key(account: &signer, scheme: u8, new_public_key_bytes: vector<u8>) {
         let addr = signer::address_of(account);
         let account_resource = &Account[addr];
         let old_auth_key = account_resource.authentication_key;
@@ -517,7 +517,7 @@ module aptos_framework::account {
     ///
     /// # Events
     /// * Emits a `KeyRotationToMultiPublicKey` event with the new multi-key configuration
-    entry fun upsert_ed25519_backup_key_on_keyless_account(account: &signer, keyless_public_key: vector<u8>, backup_public_key: vector<u8>, backup_key_proof: vector<u8>) acquires Account {
+    entry fun upsert_ed25519_backup_key_on_keyless_account(account: &signer, keyless_public_key: vector<u8>, backup_public_key: vector<u8>, backup_key_proof: vector<u8>) {
         // Check that the provided public key is a keyless public key
         let keyless_single_key = single_key::new_public_key_from_bytes(keyless_public_key);
         assert!(single_key::is_keyless_or_federated_keyless_public_key(&keyless_single_key), error::invalid_argument(ENOT_A_KEYLESS_PUBLIC_KEY));
@@ -609,7 +609,7 @@ module aptos_framework::account {
         to_public_key_bytes: vector<u8>,
         cap_rotate_key: vector<u8>,
         cap_update_table: vector<u8>,
-    ) acquires Account, OriginatingAddress {
+    ) {
         let addr = signer::address_of(account);
         ensure_resource_exists(addr);
         check_rotation_permission(account);
@@ -686,7 +686,7 @@ module aptos_framework::account {
         new_scheme: u8,
         new_public_key_bytes: vector<u8>,
         cap_update_table: vector<u8>
-    ) acquires Account, OriginatingAddress {
+    ) {
         check_rotation_permission(delegate_signer);
         assert!(resource_exists_at(rotation_cap_offerer_address), error::not_found(EOFFERER_ADDRESS_DOES_NOT_EXIST));
 
@@ -766,7 +766,7 @@ module aptos_framework::account {
         account_scheme: u8,
         account_public_key_bytes: vector<u8>,
         recipient_address: address,
-    ) acquires Account {
+    ) {
         check_rotation_permission(account);
         let addr = signer::address_of(account);
         ensure_resource_exists(addr);
@@ -829,7 +829,7 @@ module aptos_framework::account {
     /// Kept as a private entry function to ensure that after an unproven rotation via
     /// `rotate_authentication_key_call()`, the `OriginatingAddress` table is only updated under the
     /// authority of the new authentication key.
-    entry fun set_originating_address(_account: &signer) acquires Account, OriginatingAddress {
+    entry fun set_originating_address(_account: &signer) {
         abort error::invalid_state(ESET_ORIGINATING_ADDRESS_DISABLED);
 
         let account_addr = signer::address_of(_account);
@@ -850,7 +850,7 @@ module aptos_framework::account {
 
     #[view]
     /// Returns true if the account at `account_addr` has a rotation capability offer.
-    public fun is_rotation_capability_offered(account_addr: address): bool acquires Account {
+    public fun is_rotation_capability_offered(account_addr: address): bool {
         if (features::is_default_account_resource_enabled()) {
             if (!resource_exists_at(account_addr)) {
                 return false;
@@ -864,7 +864,7 @@ module aptos_framework::account {
 
     #[view]
     /// Returns the address of the account that has a rotation capability offer from the account at `account_addr`.
-    public fun get_rotation_capability_offer_for(account_addr: address): address acquires Account {
+    public fun get_rotation_capability_offer_for(account_addr: address): address {
         assert_account_resource_with_error(account_addr, ENO_SUCH_ROTATION_CAPABILITY_OFFER);
         let account_resource = &Account[account_addr];
         assert!(
@@ -875,7 +875,7 @@ module aptos_framework::account {
     }
 
     /// Revoke the rotation capability offer given to `to_be_revoked_recipient_address` from `account`
-    public entry fun revoke_rotation_capability(account: &signer, to_be_revoked_address: address) acquires Account {
+    public entry fun revoke_rotation_capability(account: &signer, to_be_revoked_address: address) {
         assert!(exists_at(to_be_revoked_address), error::not_found(EACCOUNT_DOES_NOT_EXIST));
         check_rotation_permission(account);
         let addr = signer::address_of(account);
@@ -889,7 +889,7 @@ module aptos_framework::account {
     }
 
     /// Revoke any rotation capability offer in the specified account.
-    public entry fun revoke_any_rotation_capability(account: &signer) acquires Account {
+    public entry fun revoke_any_rotation_capability(account: &signer) {
         check_rotation_permission(account);
         let offerer_addr = signer::address_of(account);
         assert_account_resource_with_error(offerer_addr, ENO_SUCH_ROTATION_CAPABILITY_OFFER);
@@ -912,7 +912,7 @@ module aptos_framework::account {
         account_scheme: u8,
         account_public_key_bytes: vector<u8>,
         recipient_address: address
-    ) acquires Account {
+    ) {
         check_offering_permission(account);
         let source_address = signer::address_of(account);
         ensure_resource_exists(source_address);
@@ -934,7 +934,7 @@ module aptos_framework::account {
 
     #[view]
     /// Returns true if the account at `account_addr` has a signer capability offer.
-    public fun is_signer_capability_offered(account_addr: address): bool acquires Account {
+    public fun is_signer_capability_offered(account_addr: address): bool {
         if (features::is_default_account_resource_enabled()) {
             if (!resource_exists_at(account_addr)) {
                 return false;
@@ -948,7 +948,7 @@ module aptos_framework::account {
 
     #[view]
     /// Returns the address of the account that has a signer capability offer from the account at `account_addr`.
-    public fun get_signer_capability_offer_for(account_addr: address): address acquires Account {
+    public fun get_signer_capability_offer_for(account_addr: address): address {
         assert_account_resource_with_error(account_addr, ENO_SIGNER_CAPABILITY_OFFERED);
         let account_resource = &Account[account_addr];
         assert!(
@@ -960,7 +960,7 @@ module aptos_framework::account {
 
     /// Revoke the account owner's signer capability offer for `to_be_revoked_address` (i.e., the address that
     /// has a signer capability offer from `account` but will be revoked in this function).
-    public entry fun revoke_signer_capability(account: &signer, to_be_revoked_address: address) acquires Account {
+    public entry fun revoke_signer_capability(account: &signer, to_be_revoked_address: address) {
         check_offering_permission(account);
         assert!(exists_at(to_be_revoked_address), error::not_found(EACCOUNT_DOES_NOT_EXIST));
         let addr = signer::address_of(account);
@@ -974,7 +974,7 @@ module aptos_framework::account {
     }
 
     /// Revoke any signer capability offer in the specified account.
-    public entry fun revoke_any_signer_capability(account: &signer) acquires Account {
+    public entry fun revoke_any_signer_capability(account: &signer) {
         check_offering_permission(account);
         let offerer_addr = signer::address_of(account);
         assert_account_resource_with_error(offerer_addr, ENO_SUCH_SIGNER_CAPABILITY);
@@ -984,7 +984,7 @@ module aptos_framework::account {
 
     /// Return an authorized signer of the offerer, if there's an existing signer capability offer for `account`
     /// at the offerer's address.
-    public fun create_authorized_signer(account: &signer, offerer_address: address): signer acquires Account {
+    public fun create_authorized_signer(account: &signer, offerer_address: address): signer {
         check_offering_permission(account);
         assert_account_resource_with_error(offerer_address, ENO_SUCH_SIGNER_CAPABILITY);
         // Check if there's an existing signer capability offer from the offerer.
@@ -1045,7 +1045,7 @@ module aptos_framework::account {
         originating_addr: address,
         account_resource: &mut Account,
         new_auth_key_vector: vector<u8>,
-    ) acquires OriginatingAddress {
+    ) {
         let address_map = &mut OriginatingAddress[@aptos_framework].address_map;
         let curr_auth_key = from_bcs::to_address(account_resource.authentication_key);
         let new_auth_key = from_bcs::to_address(new_auth_key_vector);
@@ -1122,7 +1122,7 @@ module aptos_framework::account {
     /// yet to execute any transactions and that the `Account::signer_capability_offer::for` is none. The probability of a
     /// collision where someone has legitimately produced a private key that maps to a resource account address is less
     /// than `(1/2)^(256)`.
-    public fun create_resource_account(source: &signer, seed: vector<u8>): (signer, SignerCapability) acquires Account {
+    public fun create_resource_account(source: &signer, seed: vector<u8>): (signer, SignerCapability) {
         let resource_addr = create_resource_address(&signer::address_of(source), seed);
         let resource = if (exists_at(resource_addr)) {
             if (resource_exists_at(resource_addr)) {
@@ -1153,7 +1153,7 @@ module aptos_framework::account {
     }
 
     /// create the account for system reserved addresses
-    public(friend) fun create_framework_reserved_account(addr: address): (signer, SignerCapability) {
+    friend fun create_framework_reserved_account(addr: address): (signer, SignerCapability) {
         assert!(
             addr == @0x1 ||
                 addr == @0x2 ||
@@ -1186,7 +1186,7 @@ module aptos_framework::account {
     /// - Aborts if no Account resource exists
     ///
     /// Aborts if the maximum number of GUIDs has been reached (0x4000000000000)
-    public fun create_guid(account_signer: &signer): guid::GUID acquires Account {
+    public fun create_guid(account_signer: &signer): guid::GUID {
         let addr = signer::address_of(account_signer);
         ensure_resource_exists(addr);
         let account = &mut Account[addr];
@@ -1202,7 +1202,7 @@ module aptos_framework::account {
     ///
     /// This is a wrapper around `create_guid` that creates an EventHandle,
     /// inheriting the same behavior regarding account existence and feature flags.
-    public fun new_event_handle<T: drop + store>(account: &signer): EventHandle<T> acquires Account {
+    public fun new_event_handle<T: drop + store>(account: &signer): EventHandle<T> {
         event::new_event_handle(create_guid(account))
     }
 
@@ -1210,7 +1210,7 @@ module aptos_framework::account {
     /// Coin management methods.
     ///////////////////////////////////////////////////////////////////////////
 
-    public(friend) fun register_coin<CoinType>(account_addr: address) acquires Account {
+    friend fun register_coin<CoinType>(account_addr: address) {
         if (std::features::module_event_migration_enabled()) {
             event::emit(
                 CoinRegister {
@@ -1238,7 +1238,7 @@ module aptos_framework::account {
     public fun get_signer_capability_offer_proof_challenge_v2(
         source_address: address,
         recipient_address: address,
-    ): SignerCapabilityOfferProofChallengeV2 acquires Account {
+    ): SignerCapabilityOfferProofChallengeV2 {
         SignerCapabilityOfferProofChallengeV2 {
             sequence_number: get_sequence_number(source_address),
             source_address,
@@ -1265,7 +1265,7 @@ module aptos_framework::account {
         account_public_key: vector<u8>,
         signed_message_bytes: vector<u8>,
         message: T,
-    ) acquires Account {
+    ) {
         let auth_key = get_authentication_key(account);
         // Verify that the `SignerCapabilityOfferProofChallengeV2` has the right information and is signed by the account owner's key
         if (account_scheme == ED25519_SCHEME) {
@@ -1317,7 +1317,7 @@ module aptos_framework::account {
     }
 
     #[test(user = @0x1)]
-    public entry fun test_create_resource_account(user: signer) acquires Account {
+    public entry fun test_create_resource_account(user: signer) {
         let (resource_account, resource_account_cap) = create_resource_account(&user, x"01");
         let resource_addr = signer::address_of(&resource_account);
         assert!(resource_addr != signer::address_of(&user), 0);
@@ -1326,7 +1326,7 @@ module aptos_framework::account {
 
     #[test]
     #[expected_failure(abort_code = 0x10007, location = Self)]
-    public entry fun test_cannot_control_resource_account_via_auth_key() acquires Account {
+    public entry fun test_cannot_control_resource_account_via_auth_key() {
         let alice_pk = x"4141414141414141414141414141414141414141414141414141414141414145";
         let alice = create_account_from_ed25519_public_key(alice_pk);
         let alice_auth = get_authentication_key(signer::address_of(&alice)); // must look like a valid public key
@@ -1380,7 +1380,7 @@ module aptos_framework::account {
     struct DummyResource has key {}
 
     #[test(user = @0x1)]
-    public entry fun test_module_capability(user: signer) acquires Account {
+    public entry fun test_module_capability(user: signer) {
         let (resource_account, signer_cap) = create_resource_account(&user, x"01");
         assert!(signer::address_of(&resource_account) != signer::address_of(&user), 0);
 
@@ -1392,7 +1392,7 @@ module aptos_framework::account {
     }
 
     #[test(user = @0x1)]
-    public entry fun test_resource_account_and_create_account(user: signer) acquires Account {
+    public entry fun test_resource_account_and_create_account(user: signer) {
         let resource_addr = create_resource_address(&@0x1, x"01");
         create_account_unchecked(resource_addr);
 
@@ -1401,7 +1401,7 @@ module aptos_framework::account {
 
     #[test(user = @0x1)]
     #[expected_failure(abort_code = 0x8000f, location = Self)]
-    public entry fun test_duplice_create_resource_account(user: signer) acquires Account {
+    public entry fun test_duplice_create_resource_account(user: signer) {
         create_resource_account(&user, x"01");
         create_resource_account(&user, x"01");
     }
@@ -1414,7 +1414,7 @@ module aptos_framework::account {
     /// Increment sequence number of account at address `addr`
     public fun increment_sequence_number_for_test(
         addr: address,
-    ) acquires Account {
+    ) {
         let acct = &mut Account[addr];
         acct.sequence_number += 1;
     }
@@ -1424,7 +1424,7 @@ module aptos_framework::account {
     public fun set_sequence_number(
         addr: address,
         s: u64
-    ) acquires Account {
+    ) {
         Account[addr].sequence_number = s;
     }
 
@@ -1434,14 +1434,14 @@ module aptos_framework::account {
     }
 
     #[test_only]
-    public fun set_signer_capability_offer(offerer: address, receiver: address) acquires Account {
+    public fun set_signer_capability_offer(offerer: address, receiver: address) {
         ensure_resource_exists(offerer);
         let account_resource = &mut Account[offerer];
         account_resource.signer_capability_offer.for.swap_or_fill(receiver);
     }
 
     #[test_only]
-    public fun set_rotation_capability_offer(offerer: address, receiver: address) acquires Account {
+    public fun set_rotation_capability_offer(offerer: address, receiver: address) {
         ensure_resource_exists(offerer);
         let account_resource = &mut Account[offerer];
         account_resource.rotation_capability_offer.for.swap_or_fill(receiver);
@@ -1449,8 +1449,7 @@ module aptos_framework::account {
 
     #[test]
     /// Verify test-only sequence number mocking
-    public entry fun mock_sequence_numbers()
-    acquires Account {
+    public entry fun mock_sequence_numbers() {
         let addr: address = @0x1234; // Define test address
         create_account_unchecked(addr); // Initialize account resource
         // Assert sequence number intializes to 0
@@ -1469,7 +1468,7 @@ module aptos_framework::account {
 
     #[test(alice = @0xa11ce)]
     #[expected_failure(abort_code = 65537, location = aptos_framework::ed25519)]
-    public entry fun test_empty_public_key(alice: signer) acquires Account, OriginatingAddress {
+    public entry fun test_empty_public_key(alice: signer) {
         create_account(signer::address_of(&alice));
         let pk = vector[];
         let sig = x"00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000";
@@ -1478,7 +1477,7 @@ module aptos_framework::account {
 
     #[test(alice = @0xa11ce)]
     #[expected_failure(abort_code = 262151, location = Self)]
-    public entry fun test_empty_signature(alice: signer) acquires Account, OriginatingAddress {
+    public entry fun test_empty_signature(alice: signer) {
         create_account(signer::address_of(&alice));
         let test_signature = vector[];
         let pk = x"0000000000000000000000000000000000000000000000000000000000000000";
@@ -1500,7 +1499,7 @@ module aptos_framework::account {
 
     #[test(bob = @0x345)]
     #[expected_failure(abort_code = 65544, location = Self)]
-    public entry fun test_invalid_offer_signer_capability(bob: signer) acquires Account {
+    public entry fun test_invalid_offer_signer_capability(bob: signer) {
         let (_alice_sk, alice_pk) = ed25519::generate_keys();
         let alice_pk_bytes = ed25519::validated_public_key_to_bytes(&alice_pk);
         let alice = create_account_from_ed25519_public_key(alice_pk_bytes);
@@ -1526,7 +1525,7 @@ module aptos_framework::account {
     }
 
     #[test(bob = @0x345)]
-    public entry fun test_valid_check_signer_capability_and_create_authorized_signer(bob: signer) acquires Account {
+    public entry fun test_valid_check_signer_capability_and_create_authorized_signer(bob: signer) {
         let (alice_sk, alice_pk) = ed25519::generate_keys();
         let alice_pk_bytes = ed25519::validated_public_key_to_bytes(&alice_pk);
         let alice = create_account_from_ed25519_public_key(alice_pk_bytes);
@@ -1558,7 +1557,7 @@ module aptos_framework::account {
     }
 
     #[test(bob = @0x345)]
-    public entry fun test_valid_check_signer_capability_and_create_authorized_signer_with_permission(bob: signer) acquires Account {
+    public entry fun test_valid_check_signer_capability_and_create_authorized_signer_with_permission(bob: signer) {
         let (alice_sk, alice_pk) = ed25519::generate_keys();
         let alice_pk_bytes = ed25519::validated_public_key_to_bytes(&alice_pk);
         let alice = create_account_from_ed25519_public_key(alice_pk_bytes);
@@ -1598,7 +1597,7 @@ module aptos_framework::account {
 
     #[test(bob = @0x345)]
     #[expected_failure(abort_code = 0x50017, location = Self)]
-    public entry fun test_valid_check_signer_capability_and_create_authorized_signer_with_no_permission(bob: signer) acquires Account {
+    public entry fun test_valid_check_signer_capability_and_create_authorized_signer_with_no_permission(bob: signer) {
         let (alice_sk, alice_pk) = ed25519::generate_keys();
         let alice_pk_bytes = ed25519::validated_public_key_to_bytes(&alice_pk);
         let alice = create_account_from_ed25519_public_key(alice_pk_bytes);
@@ -1636,7 +1635,7 @@ module aptos_framework::account {
 
     #[test(bob = @0x345)]
     #[expected_failure(abort_code = 0x50017, location = Self)]
-    public entry fun test_valid_check_signer_capability_and_create_authorized_signer_with_wrong_permission(bob: signer) acquires Account {
+    public entry fun test_valid_check_signer_capability_and_create_authorized_signer_with_wrong_permission(bob: signer) {
         let (alice_sk, alice_pk) = ed25519::generate_keys();
         let alice_pk_bytes = ed25519::validated_public_key_to_bytes(&alice_pk);
         let alice = create_account_from_ed25519_public_key(alice_pk_bytes);
@@ -1675,7 +1674,7 @@ module aptos_framework::account {
     }
 
     #[test(bob = @0x345)]
-    public entry fun test_get_signer_cap_and_is_signer_cap(bob: signer) acquires Account {
+    public entry fun test_get_signer_cap_and_is_signer_cap(bob: signer) {
         let (alice_sk, alice_pk) = ed25519::generate_keys();
         let alice_pk_bytes = ed25519::validated_public_key_to_bytes(&alice_pk);
         let alice = create_account_from_ed25519_public_key(alice_pk_bytes);
@@ -1710,7 +1709,7 @@ module aptos_framework::account {
     public entry fun test_invalid_check_signer_capability_and_create_authorized_signer(
         bob: signer,
         charlie: signer
-    ) acquires Account {
+    ) {
         let (alice_sk, alice_pk) = ed25519::generate_keys();
         let alice_pk_bytes = ed25519::validated_public_key_to_bytes(&alice_pk);
         let alice = create_account_from_ed25519_public_key(alice_pk_bytes);
@@ -1742,7 +1741,7 @@ module aptos_framework::account {
     }
 
     #[test(bob = @0x345)]
-    public entry fun test_valid_revoke_signer_capability(bob: signer) acquires Account {
+    public entry fun test_valid_revoke_signer_capability(bob: signer) {
         let (alice_sk, alice_pk) = ed25519::generate_keys();
         let alice_pk_bytes = ed25519::validated_public_key_to_bytes(&alice_pk);
         let alice = create_account_from_ed25519_public_key(alice_pk_bytes);
@@ -1771,7 +1770,7 @@ module aptos_framework::account {
 
     #[test(bob = @0x345, charlie = @0x567)]
     #[expected_failure(abort_code = 393230, location = Self)]
-    public entry fun test_invalid_revoke_signer_capability(bob: signer, charlie: signer) acquires Account {
+    public entry fun test_invalid_revoke_signer_capability(bob: signer, charlie: signer) {
         let (alice_sk, alice_pk) = ed25519::generate_keys();
         let alice_pk_bytes = ed25519::validated_public_key_to_bytes(&alice_pk);
         let alice = create_account_from_ed25519_public_key(alice_pk_bytes);
@@ -1804,7 +1803,7 @@ module aptos_framework::account {
     // Tests for offering rotation capabilities
     //
     #[test(bob = @0x345, framework = @aptos_framework)]
-    public entry fun test_valid_offer_rotation_capability(bob: signer, framework: signer) acquires Account {
+    public entry fun test_valid_offer_rotation_capability(bob: signer, framework: signer) {
         chain_id::initialize_for_test(&framework, 4);
         let (alice_sk, alice_pk) = ed25519::generate_keys();
         let alice_pk_bytes = ed25519::validated_public_key_to_bytes(&alice_pk);
@@ -1837,7 +1836,7 @@ module aptos_framework::account {
 
     #[test(bob = @0x345, framework = @aptos_framework)]
     #[expected_failure(abort_code = 65544, location = Self)]
-    public entry fun test_invalid_offer_rotation_capability(bob: signer, framework: signer) acquires Account {
+    public entry fun test_invalid_offer_rotation_capability(bob: signer, framework: signer) {
         chain_id::initialize_for_test(&framework, 4);
         let (alice_sk, alice_pk) = ed25519::generate_keys();
         let alice_pk_bytes = ed25519::validated_public_key_to_bytes(&alice_pk);
@@ -1867,7 +1866,7 @@ module aptos_framework::account {
     }
 
     #[test(bob = @0x345, framework = @aptos_framework)]
-    public entry fun test_valid_revoke_rotation_capability(bob: signer, framework: signer) acquires Account {
+    public entry fun test_valid_revoke_rotation_capability(bob: signer, framework: signer) {
         chain_id::initialize_for_test(&framework, 4);
         let (alice_sk, alice_pk) = ed25519::generate_keys();
         let alice_pk_bytes = ed25519::validated_public_key_to_bytes(&alice_pk);
@@ -1902,7 +1901,7 @@ module aptos_framework::account {
         bob: signer,
         charlie: signer,
         framework: signer
-    ) acquires Account {
+    ) {
         chain_id::initialize_for_test(&framework, 4);
         let (alice_sk, alice_pk) = ed25519::generate_keys();
         let alice_pk_bytes = ed25519::validated_public_key_to_bytes(&alice_pk);
@@ -1939,7 +1938,7 @@ module aptos_framework::account {
     #[test(account = @aptos_framework)]
     public entry fun test_valid_rotate_authentication_key_multi_ed25519_to_multi_ed25519(
         account: signer
-    ) acquires Account, OriginatingAddress {
+    ) {
         initialize(&account);
         let (curr_sk, curr_pk) = multi_ed25519::generate_keys(2, 3);
         let curr_pk_unvalidated = multi_ed25519::public_key_to_unvalidated(&curr_pk);
@@ -1980,7 +1979,7 @@ module aptos_framework::account {
     #[test(account = @aptos_framework)]
     public entry fun test_valid_rotate_authentication_key_multi_ed25519_to_ed25519(
         account: signer
-    ) acquires Account, OriginatingAddress {
+    ) {
         initialize(&account);
 
         let (curr_sk, curr_pk) = multi_ed25519::generate_keys(2, 3);
@@ -2025,7 +2024,7 @@ module aptos_framework::account {
     #[test(account = @aptos_framework)]
     public entry fun test_add_ed25519_backup_key_to_keyless_account(
         account: signer
-    ) acquires Account {
+    ) {
         initialize(&account);
         let keyless_pk_bytes: vector<u8> = x"031b68747470733a2f2f6163636f756e74732e676f6f676c652e636f6d2086bc0a0a825eb6337ca1e8a3157e490eac8df23d5cef25d9641ad5e7edc1d514";
         let curr_pk = single_key::new_public_key_from_bytes(keyless_pk_bytes);
@@ -2058,7 +2057,7 @@ module aptos_framework::account {
     }
 
     #[test(account = @aptos_framework)]
-    public entry fun test_simple_rotation(account: &signer) acquires Account {
+    public entry fun test_simple_rotation(account: &signer) {
         initialize(account);
 
         let alice_addr = @0x1234;
@@ -2076,7 +2075,7 @@ module aptos_framework::account {
 
     #[test(account = @aptos_framework)]
     #[expected_failure(abort_code = 0x20014, location = Self)]
-    public entry fun test_max_guid(account: &signer) acquires Account {
+    public entry fun test_max_guid(account: &signer) {
         let addr = signer::address_of(account);
         create_account_unchecked(addr);
         let account_state = &mut Account[addr];
@@ -2091,7 +2090,7 @@ module aptos_framework::account {
     struct SadFakeCoin {}
 
     #[test(account = @0x1234)]
-    fun test_events(account: &signer) acquires Account {
+    fun test_events(account: &signer) {
         let addr = signer::address_of(account);
         create_account_unchecked(addr);
         register_coin<FakeCoin>(addr);
@@ -2109,7 +2108,7 @@ module aptos_framework::account {
 
     #[test(account = @0x1234)]
     #[expected_failure(abort_code = 0x3001b, location = Self)]
-    fun test_set_originating_address_fails(account: &signer) acquires Account, OriginatingAddress {
+    fun test_set_originating_address_fails(account: &signer) {
         set_originating_address(account);
     }
 }

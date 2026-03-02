@@ -23,7 +23,7 @@ module aptos_framework::reconfiguration_with_dkg {
 
     /// Trigger a reconfiguration with DKG.
     /// Do nothing if one is already in progress.
-    public(friend) fun try_start() {
+    friend fun try_start() {
         let incomplete_dkg_session = dkg::incomplete_session();
         if (incomplete_dkg_session.is_some()) {
             let session = incomplete_dkg_session.borrow();
@@ -43,7 +43,7 @@ module aptos_framework::reconfiguration_with_dkg {
 
     /// Trigger a reconfiguration with DKG and Chunky DKG.
     /// Do nothing if reconfiguration is already in progress; otherwise start both DKG and Chunky DKG.
-    public(friend) fun try_start_with_chunky_dkg() {
+    friend fun try_start_with_chunky_dkg() {
         if (reconfiguration_state::is_in_progress()) { return };
 
         reconfiguration_state::on_reconfig_start();
@@ -67,7 +67,7 @@ module aptos_framework::reconfiguration_with_dkg {
     /// Apply buffered on-chain configs (except for ValidatorSet, which is done inside `reconfiguration::reconfigure()`).
     /// Re-enable validator set changes.
     /// Run the default reconfiguration to enter the new epoch.
-    public(friend) fun finish(framework: &signer) {
+    friend fun finish(framework: &signer) {
         system_addresses::assert_aptos_framework(framework);
         dkg::try_clear_incomplete_session(framework);
         chunky_dkg::try_clear_incomplete_session(framework);

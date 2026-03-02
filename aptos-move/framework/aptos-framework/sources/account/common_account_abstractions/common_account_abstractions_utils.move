@@ -11,7 +11,7 @@ module aptos_framework::common_account_abstractions_utils {
     /// Entry function payload is missing.
     const EMISSING_ENTRY_FUNCTION_PAYLOAD: u64 = 1;
 
-    public(friend) fun network_name(): vector<u8> {
+    friend fun network_name(): vector<u8> {
         let chain_id = chain_id::get();
         if (chain_id == 1) {
             b"mainnet"
@@ -27,7 +27,7 @@ module aptos_framework::common_account_abstractions_utils {
         }
     }
 
-    public(friend) fun entry_function_name(entry_function_payload: &EntryFunctionPayload): vector<u8> {
+    friend fun entry_function_name(entry_function_payload: &EntryFunctionPayload): vector<u8> {
         let entry_function_name = &mut vector[];
         let addr_str = string_utils::to_string(
             &transaction_context::account_address(entry_function_payload)
@@ -45,7 +45,7 @@ module aptos_framework::common_account_abstractions_utils {
         *entry_function_name
     }
 
-    public(friend) fun construct_message(
+    friend fun construct_message(
         chain_name: &vector<u8>,
         account_address: &vector<u8>,
         domain: &vector<u8>,
@@ -74,7 +74,7 @@ module aptos_framework::common_account_abstractions_utils {
         *message
     }
 
-    public(friend) inline fun daa_authenticate(
+    friend inline fun daa_authenticate(
         account: signer,
         aa_auth_data: AbstractionAuthData,
         auth_fn: |AbstractionAuthData, &vector<u8>|,

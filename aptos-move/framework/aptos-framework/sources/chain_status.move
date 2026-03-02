@@ -17,7 +17,7 @@ module aptos_framework::chain_status {
     const ENOT_GENESIS: u64 = 2;
 
     /// Marks that genesis has finished.
-    public(friend) fun set_genesis_end(aptos_framework: &signer) {
+    friend fun set_genesis_end(aptos_framework: &signer) {
         system_addresses::assert_aptos_framework(aptos_framework);
         move_to(aptos_framework, GenesisEndMarker {});
     }

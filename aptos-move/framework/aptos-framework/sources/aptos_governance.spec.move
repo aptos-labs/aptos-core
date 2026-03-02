@@ -379,7 +379,7 @@ spec aptos_framework::aptos_governance {
 
         let staking_config = global<staking_config::StakingConfig>(@aptos_framework);
         let spec_voting_power = spec_get_voting_power(stake_pool, staking_config);
-        let voting_records_v2 = borrow_global<VotingRecordsV2>(@aptos_framework);
+        let voting_records_v2 = VotingRecordsV2[@aptos_framework];
         let used_voting_power = if (smart_table::spec_contains(voting_records_v2.votes, record_key)) {
             smart_table::spec_get(voting_records_v2.votes, record_key)
         } else {
@@ -661,7 +661,7 @@ spec aptos_framework::aptos_governance {
         };
         let staking_config = global<staking_config::StakingConfig>(@aptos_framework);
         let voting_power = spec_get_voting_power(stake_pool, staking_config);
-        let voting_records_v2 = borrow_global<VotingRecordsV2>(@aptos_framework);
+        let voting_records_v2 = VotingRecordsV2[@aptos_framework];
         let used_voting_power = if (smart_table::spec_contains(voting_records_v2.votes, record_key)) {
             smart_table::spec_get(voting_records_v2.votes, record_key)
         } else {
@@ -677,7 +677,7 @@ spec aptos_framework::aptos_governance {
         let locked_until = global<stake::StakePool>(stake_pool).locked_until_secs;
         let remain_zero_1_cond = (spec_proposal_expiration >= locked_until || timestamp::spec_now_seconds() >= spec_proposal_expiration);
         let staking_config = global<staking_config::StakingConfig>(@aptos_framework);
-        let voting_records_v2 = borrow_global<VotingRecordsV2>(@aptos_framework);
+        let voting_records_v2 = VotingRecordsV2[@aptos_framework];
         let record_key = RecordKey {
             stake_pool,
             proposal_id,

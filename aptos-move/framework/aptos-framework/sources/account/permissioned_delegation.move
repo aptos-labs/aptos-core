@@ -56,7 +56,7 @@ module aptos_framework::permissioned_delegation {
         key: DelegationKey,
         rate_limiter: Option<RateLimiter>,
         expiration_time: u64,
-    ): signer acquires RegisteredDelegations {
+    ): signer {
         assert!(!is_permissioned_signer(master), error::permission_denied(ENOT_MASTER_SIGNER));
         let addr = signer::address_of(master);
         if (!exists<RegisteredDelegations>(addr)) {
@@ -75,7 +75,7 @@ module aptos_framework::permissioned_delegation {
     public fun remove_permissioned_handle(
         master: &signer,
         key: DelegationKey,
-    ) acquires RegisteredDelegations {
+    ) {
         assert!(!is_permissioned_signer(master), error::permission_denied(ENOT_MASTER_SIGNER));
         let addr = signer::address_of(master);
         let delegations = &mut RegisteredDelegations[addr].delegations;
@@ -91,14 +91,14 @@ module aptos_framework::permissioned_delegation {
     public fun permissioned_signer_by_key(
         master: &signer,
         key: DelegationKey,
-    ): signer acquires RegisteredDelegations {
+    ): signer {
         assert!(!is_permissioned_signer(master), error::permission_denied(ENOT_MASTER_SIGNER));
         let addr = signer::address_of(master);
         let handle = get_storable_permissioned_handle(addr, key, false);
         permissioned_signer::signer_from_storable_permissioned_handle(handle)
     }
 
-    public fun handle_address_by_key(master: address, key: DelegationKey): address acquires RegisteredDelegations {
+    public fun handle_address_by_key(master: address, key: DelegationKey): address {
         let handle = get_storable_permissioned_handle(master, key, false);
         permissioned_signer::permissions_storage_address(handle)
     }
@@ -107,7 +107,7 @@ module aptos_framework::permissioned_delegation {
     public fun authenticate(
         account: signer,
         abstraction_auth_data: AbstractionAuthData
-    ): signer acquires RegisteredDelegations {
+    ): signer {
         let addr = signer::address_of(&account);
         let stream = bcs_stream::new(*abstraction_auth_data.authenticator());
         let public_key = new_unvalidated_public_key_from_bytes(
@@ -170,7 +170,7 @@ module aptos_framework::permissioned_delegation {
     }
 
     #[test(account = @0xcafe, account_copy = @0xcafe)]
-    fun test_basics(account: signer, account_copy: signer) acquires RegisteredDelegations {
+    fun test_basics(account: signer, account_copy: signer) {
         let aptos_framework = create_signer_for_test(@aptos_framework);
         timestamp::set_time_has_started_for_testing(&aptos_framework);
         let (sk, vpk) = generate_keys();
@@ -191,7 +191,7 @@ module aptos_framework::permissioned_delegation {
 
     #[test(account = @0xcafe, account_copy = @0xcafe, account_copy_2 = @0xcafe)]
     #[expected_failure(abort_code = 0x50006, location = Self)]
-    fun test_rate_limit(account: signer, account_copy: signer, account_copy_2: signer) acquires RegisteredDelegations {
+    fun test_rate_limit(account: signer, account_copy: signer, account_copy_2: signer) {
         let aptos_framework = create_signer_for_test(@aptos_framework);
         timestamp::set_time_has_started_for_testing(&aptos_framework);
         let (sk, vpk) = generate_keys();

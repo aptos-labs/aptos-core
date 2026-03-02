@@ -212,7 +212,7 @@ module aptos_framework::keyless_account {
     }
 
     #[deprecated]
-    public fun update_training_wheels(fx: &signer, pk: Option<vector<u8>>) acquires Configuration {
+    public fun update_training_wheels(fx: &signer, pk: Option<vector<u8>>) {
         system_addresses::assert_aptos_framework(fx);
         chain_status::assert_genesis();
 
@@ -220,34 +220,34 @@ module aptos_framework::keyless_account {
             assert!(pk.borrow().length() == 32, E_TRAINING_WHEELS_PK_WRONG_SIZE)
         };
 
-        let config = borrow_global_mut<Configuration>(signer::address_of(fx));
+        let config = &mut Configuration[signer::address_of(fx)];
         config.training_wheels_pubkey = pk;
     }
 
     #[deprecated]
-    public fun update_max_exp_horizon(fx: &signer, max_exp_horizon_secs: u64) acquires Configuration {
+    public fun update_max_exp_horizon(fx: &signer, max_exp_horizon_secs: u64) {
         system_addresses::assert_aptos_framework(fx);
         chain_status::assert_genesis();
 
-        let config = borrow_global_mut<Configuration>(signer::address_of(fx));
+        let config = &mut Configuration[signer::address_of(fx)];
         config.max_exp_horizon_secs = max_exp_horizon_secs;
     }
 
     #[deprecated]
-    public fun remove_all_override_auds(fx: &signer) acquires Configuration {
+    public fun remove_all_override_auds(fx: &signer) {
         system_addresses::assert_aptos_framework(fx);
         chain_status::assert_genesis();
 
-        let config = borrow_global_mut<Configuration>(signer::address_of(fx));
+        let config = &mut Configuration[signer::address_of(fx)];
         config.override_aud_vals = vector[];
     }
 
     #[deprecated]
-    public fun add_override_aud(fx: &signer, aud: String) acquires Configuration {
+    public fun add_override_aud(fx: &signer, aud: String) {
         system_addresses::assert_aptos_framework(fx);
         chain_status::assert_genesis();
 
-        let config = borrow_global_mut<Configuration>(signer::address_of(fx));
+        let config = &mut Configuration[signer::address_of(fx)];
         config.override_aud_vals.push_back(aud);
     }
 
@@ -278,7 +278,7 @@ module aptos_framework::keyless_account {
     /// reconfiguration. Only callable via governance proposal.
     ///
     /// WARNING: If a malicious key is set, this *could* lead to stolen funds.
-    public fun update_training_wheels_for_next_epoch(fx: &signer, pk: Option<vector<u8>>) acquires Configuration {
+    public fun update_training_wheels_for_next_epoch(fx: &signer, pk: Option<vector<u8>>) {
         system_addresses::assert_aptos_framework(fx);
 
         // If a PK is being set, validate it first.
@@ -291,7 +291,7 @@ module aptos_framework::keyless_account {
         let config = if (config_buffer::does_exist<Configuration>()) {
             config_buffer::extract_v2<Configuration>()
         } else {
-            *borrow_global<Configuration>(signer::address_of(fx))
+            Configuration[signer::address_of(fx)]
         };
 
         config.training_wheels_pubkey = pk;
@@ -301,13 +301,13 @@ module aptos_framework::keyless_account {
 
     /// Convenience method to queues up a change to the max expiration horizon. The change will only be effective after
     /// reconfiguration. Only callable via governance proposal.
-    public fun update_max_exp_horizon_for_next_epoch(fx: &signer, max_exp_horizon_secs: u64) acquires Configuration {
+    public fun update_max_exp_horizon_for_next_epoch(fx: &signer, max_exp_horizon_secs: u64) {
         system_addresses::assert_aptos_framework(fx);
 
         let config = if (config_buffer::does_exist<Configuration>()) {
             config_buffer::extract_v2<Configuration>()
         } else {
-            *borrow_global<Configuration>(signer::address_of(fx))
+            Configuration[signer::address_of(fx)]
         };
 
         config.max_exp_horizon_secs = max_exp_horizon_secs;
@@ -320,13 +320,13 @@ module aptos_framework::keyless_account {
     ///
     /// WARNING: When no override `aud` is set, recovery of keyless accounts associated with applications that disappeared
     /// is no longer possible.
-    public fun remove_all_override_auds_for_next_epoch(fx: &signer) acquires Configuration {
+    public fun remove_all_override_auds_for_next_epoch(fx: &signer) {
         system_addresses::assert_aptos_framework(fx);
 
         let config = if (config_buffer::does_exist<Configuration>()) {
             config_buffer::extract_v2<Configuration>()
         } else {
-            *borrow_global<Configuration>(signer::address_of(fx))
+            Configuration[signer::address_of(fx)]
         };
 
         config.override_aud_vals = vector[];
@@ -338,13 +338,13 @@ module aptos_framework::keyless_account {
     /// after reconfiguration. Only callable via governance proposal.
     ///
     /// WARNING: If a malicious override `aud` is set, this *could* lead to stolen funds.
-    public fun add_override_aud_for_next_epoch(fx: &signer, aud: String) acquires Configuration {
+    public fun add_override_aud_for_next_epoch(fx: &signer, aud: String) {
         system_addresses::assert_aptos_framework(fx);
 
         let config = if (config_buffer::does_exist<Configuration>()) {
             config_buffer::extract_v2<Configuration>()
         } else {
-            *borrow_global<Configuration>(signer::address_of(fx))
+            Configuration[signer::address_of(fx)]
         };
 
         config.override_aud_vals.push_back(aud);
@@ -353,13 +353,13 @@ module aptos_framework::keyless_account {
     }
 
     /// Only used in reconfigurations to apply the queued up configuration changes, if there are any.
-    public(friend) fun on_new_epoch(fx: &signer) acquires Groth16VerificationKey, Configuration {
+    friend fun on_new_epoch(fx: &signer) {
         system_addresses::assert_aptos_framework(fx);
 
         if (config_buffer::does_exist<Groth16VerificationKey>()) {
             let vk = config_buffer::extract_v2();
             if (exists<Groth16VerificationKey>(@aptos_framework)) {
-                *borrow_global_mut<Groth16VerificationKey>(@aptos_framework) = vk;
+                Groth16VerificationKey[@aptos_framework] = vk;
             } else {
                 move_to(fx, vk);
             }
@@ -368,7 +368,7 @@ module aptos_framework::keyless_account {
         if (config_buffer::does_exist<Configuration>()) {
             let config = config_buffer::extract_v2();
             if (exists<Configuration>(@aptos_framework)) {
-                *borrow_global_mut<Configuration>(@aptos_framework) = config;
+                Configuration[@aptos_framework] = config;
             } else {
                 move_to(fx, config);
             }

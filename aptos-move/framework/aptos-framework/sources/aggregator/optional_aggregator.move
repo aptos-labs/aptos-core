@@ -74,7 +74,7 @@ module aptos_framework::optional_aggregator {
     }
 
     /// Creates a new optional aggregator.
-    public(friend) fun new(parallelizable: bool): OptionalAggregator {
+    friend fun new(parallelizable: bool): OptionalAggregator {
         if (parallelizable) {
             OptionalAggregator {
                 aggregator: option::some(aggregator_factory::create_aggregator_internal()),

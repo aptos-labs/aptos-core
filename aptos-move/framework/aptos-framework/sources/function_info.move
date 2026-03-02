@@ -62,7 +62,7 @@ module aptos_framework::function_info {
     /// function to jump to.
     ///
     /// dispatch_target also needs to be public so the type signature will remain unchanged.
-    public(friend) fun check_dispatch_type_compatibility(
+    friend fun check_dispatch_type_compatibility(
         framework_function: &FunctionInfo,
         dispatch_target: &FunctionInfo,
     ): bool {
@@ -79,7 +79,7 @@ module aptos_framework::function_info {
     ///
     /// Calling `check_dispatch_type_compatibility_impl` or dispatch without loading up the module would yield an error
     /// if such module isn't accessed previously in the transaction.
-    public(friend) fun load_module_from_function(f: &FunctionInfo) {
+    friend fun load_module_from_function(f: &FunctionInfo) {
         load_function_impl(f)
     }
 

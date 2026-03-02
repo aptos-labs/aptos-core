@@ -58,13 +58,13 @@ module aptos_framework::dkg {
 
     /// Mark on-chain DKG state as in-progress. Notify validators to start DKG.
     /// Abort if a DKG is already in progress.
-    public(friend) fun start(
+    friend fun start(
         dealer_epoch: u64,
         randomness_config: RandomnessConfig,
         dealer_validator_set: vector<ValidatorConsensusInfo>,
         target_validator_set: vector<ValidatorConsensusInfo>,
-    ) acquires DKGState {
-        let dkg_state = borrow_global_mut<DKGState>(@aptos_framework);
+    ) {
+        let dkg_state = &mut DKGState[@aptos_framework];
         let new_session_metadata = DKGSessionMetadata {
             dealer_epoch,
             randomness_config,
@@ -87,8 +87,8 @@ module aptos_framework::dkg {
     /// Put a transcript into the currently incomplete DKG session, then mark it completed.
     ///
     /// Abort if DKG is not in progress.
-    public(friend) fun finish(transcript: vector<u8>) acquires DKGState {
-        let dkg_state = borrow_global_mut<DKGState>(@aptos_framework);
+    friend fun finish(transcript: vector<u8>) {
+        let dkg_state = &mut DKGState[@aptos_framework];
         assert!(dkg_state.in_progress.is_some(), error::invalid_state(EDKG_NOT_IN_PROGRESS));
         let session = dkg_state.in_progress.extract();
         session.transcript = transcript;
@@ -97,18 +97,18 @@ module aptos_framework::dkg {
     }
 
     /// Delete the currently incomplete session, if it exists.
-    public fun try_clear_incomplete_session(fx: &signer) acquires DKGState {
+    public fun try_clear_incomplete_session(fx: &signer) {
         system_addresses::assert_aptos_framework(fx);
         if (exists<DKGState>(@aptos_framework)) {
-            let dkg_state = borrow_global_mut<DKGState>(@aptos_framework);
+            let dkg_state = &mut DKGState[@aptos_framework];
             dkg_state.in_progress = option::none();
         }
     }
 
     /// Return the incomplete DKG session state, if it exists.
-    public fun incomplete_session(): Option<DKGSessionState> acquires DKGState {
+    public fun incomplete_session(): Option<DKGSessionState> {
         if (exists<DKGState>(@aptos_framework)) {
-            borrow_global<DKGState>(@aptos_framework).in_progress
+            DKGState[@aptos_framework].in_progress
         } else {
             option::none()
         }

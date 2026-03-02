@@ -12,15 +12,15 @@ module aptos_framework::chain_id {
 
     /// Only called during genesis.
     /// Publish the chain ID `id` of this instance under the SystemAddresses address
-    public(friend) fun initialize(aptos_framework: &signer, id: u8) {
+    friend fun initialize(aptos_framework: &signer, id: u8) {
         system_addresses::assert_aptos_framework(aptos_framework);
         move_to(aptos_framework, ChainId { id })
     }
 
     #[view]
     /// Return the chain ID of this instance.
-    public fun get(): u8 acquires ChainId {
-        borrow_global<ChainId>(@aptos_framework).id
+    public fun get(): u8 {
+        ChainId[@aptos_framework].id
     }
 
     #[test_only]
@@ -34,7 +34,7 @@ module aptos_framework::chain_id {
     }
 
     #[test(aptos_framework = @0x1)]
-    fun test_get(aptos_framework: &signer) acquires ChainId {
+    fun test_get(aptos_framework: &signer) {
         initialize_for_test(aptos_framework, 1u8);
         assert!(get() == 1u8, 1);
     }

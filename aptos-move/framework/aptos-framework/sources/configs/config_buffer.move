@@ -52,9 +52,9 @@ module aptos_framework::config_buffer {
     }
 
     /// Check whether there is a pending config payload for `T`.
-    public fun does_exist<T: store>(): bool acquires PendingConfigs {
+    public fun does_exist<T: store>(): bool {
         if (exists<PendingConfigs>(@aptos_framework)) {
-            let config = borrow_global<PendingConfigs>(@aptos_framework);
+            let config = &PendingConfigs[@aptos_framework];
             config.configs.contains_key(&type_info::type_name<T>())
         } else {
             false
@@ -64,8 +64,8 @@ module aptos_framework::config_buffer {
     /// Upsert an on-chain config to the buffer for the next epoch.
     ///
     /// Typically used in `X::set_for_next_epoch()` where X is an on-chain config.
-    public(friend) fun upsert<T: drop + store>(config: T) acquires PendingConfigs {
-        let configs = borrow_global_mut<PendingConfigs>(@aptos_framework);
+    friend fun upsert<T: drop + store>(config: T) {
+        let configs = &mut PendingConfigs[@aptos_framework];
         let key = type_info::type_name<T>();
         let value = any::pack(config);
         configs.configs.upsert(key, value);
@@ -81,8 +81,8 @@ module aptos_framework::config_buffer {
     /// Should only be used at the end of a reconfiguration.
     ///
     /// Typically used in `X::on_new_epoch()` where X is an on-chaon config.
-    public(friend) fun extract_v2<T: store>(): T acquires PendingConfigs {
-        let configs = borrow_global_mut<PendingConfigs>(@aptos_framework);
+    friend fun extract_v2<T: store>(): T {
+        let configs = &mut PendingConfigs[@aptos_framework];
         let key = type_info::type_name<T>();
         let (_, value_packed) = configs.configs.remove(&key);
         value_packed.unpack()
@@ -94,7 +94,7 @@ module aptos_framework::config_buffer {
     }
 
     #[test(fx = @std)]
-    fun test_config_buffer_basic(fx: &signer) acquires PendingConfigs {
+    fun test_config_buffer_basic(fx: &signer) {
         initialize(fx);
         // Initially nothing in the buffer.
         assert!(!does_exist<DummyConfig>(), 1);

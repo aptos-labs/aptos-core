@@ -121,7 +121,7 @@ module aptos_framework::object_code_deployment {
         metadata_serialized: vector<u8>,
         code: vector<vector<u8>>,
         code_object: Object<PackageRegistry>,
-    ) acquires ManagingRefs {
+    ) {
         code::check_code_publishing_permission(publisher);
         let publisher_address = signer::address_of(publisher);
         assert!(
@@ -132,7 +132,7 @@ module aptos_framework::object_code_deployment {
         let code_object_address = code_object.object_address();
         assert!(exists<ManagingRefs>(code_object_address), error::not_found(ECODE_OBJECT_DOES_NOT_EXIST));
 
-        let extend_ref = &borrow_global<ManagingRefs>(code_object_address).extend_ref;
+        let extend_ref = &ManagingRefs[code_object_address].extend_ref;
         let code_signer = &extend_ref.generate_signer_for_extending();
         code::publish_package_txn(code_signer, metadata_serialized, code);
 

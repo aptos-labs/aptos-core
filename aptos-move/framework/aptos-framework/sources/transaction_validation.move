@@ -93,7 +93,7 @@ module aptos_framework::transaction_validation {
     }
 
     /// Only called during genesis to initialize system resources for this module.
-    public(friend) fun initialize(
+    friend fun initialize(
         aptos_framework: &signer,
         script_prologue_name: vector<u8>,
         // module_prologue_name is deprecated and not used.

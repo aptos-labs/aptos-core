@@ -90,7 +90,7 @@ module aptos_framework::staking_config {
     }
 
     /// Only called during genesis.
-    public(friend) fun initialize(
+    friend fun initialize(
         aptos_framework: &signer,
         minimum_stake: u64,
         maximum_stake: u64,
@@ -147,8 +147,8 @@ module aptos_framework::staking_config {
 
     #[view]
     /// Return the reward rate of this epoch as a tuple (numerator, denominator).
-    public fun reward_rate(): (u64, u64) acquires StakingRewardsConfig, StakingConfig {
-        get_reward_rate(borrow_global<StakingConfig>(@aptos_framework))
+    public fun reward_rate(): (u64, u64) {
+        get_reward_rate(&StakingConfig[@aptos_framework])
     }
 
     /// Initialize rewards configurations.
@@ -183,8 +183,8 @@ module aptos_framework::staking_config {
         });
     }
 
-    public fun get(): StakingConfig acquires StakingConfig {
-        *borrow_global<StakingConfig>(@aptos_framework)
+    public fun get(): StakingConfig {
+        StakingConfig[@aptos_framework]
     }
 
     /// Return whether validator set changes are allowed
@@ -204,9 +204,9 @@ module aptos_framework::staking_config {
     }
 
     /// Return the reward rate of this epoch.
-    public fun get_reward_rate(config: &StakingConfig): (u64, u64) acquires StakingRewardsConfig {
+    public fun get_reward_rate(config: &StakingConfig): (u64, u64) {
         if (features::periodical_reward_rate_decrease_enabled()) {
-            let epoch_rewards_rate = borrow_global<StakingRewardsConfig>(@aptos_framework).rewards_rate;
+            let epoch_rewards_rate = StakingRewardsConfig[@aptos_framework].rewards_rate;
             if (epoch_rewards_rate.is_zero()) {
                 (0u64, 1u64)
             } else {
@@ -230,15 +230,15 @@ module aptos_framework::staking_config {
     }
 
     /// Calculate and save the latest rewards rate.
-    public(friend) fun calculate_and_save_latest_epoch_rewards_rate(): FixedPoint64 acquires StakingRewardsConfig {
+    friend fun calculate_and_save_latest_epoch_rewards_rate(): FixedPoint64 {
         assert!(features::periodical_reward_rate_decrease_enabled(), error::invalid_state(EDISABLED_FUNCTION));
         let staking_rewards_config = calculate_and_save_latest_rewards_config();
         staking_rewards_config.rewards_rate
     }
 
     /// Calculate and return the up-to-date StakingRewardsConfig.
-    fun calculate_and_save_latest_rewards_config(): StakingRewardsConfig acquires StakingRewardsConfig {
-        let staking_rewards_config = borrow_global_mut<StakingRewardsConfig>(@aptos_framework);
+    fun calculate_and_save_latest_rewards_config(): StakingRewardsConfig {
+        let staking_rewards_config = &mut StakingRewardsConfig[@aptos_framework];
         let current_time_in_secs = timestamp::now_seconds();
         assert!(
             current_time_in_secs >= staking_rewards_config.last_rewards_rate_period_start_in_secs,
@@ -270,11 +270,11 @@ module aptos_framework::staking_config {
         aptos_framework: &signer,
         minimum_stake: u64,
         maximum_stake: u64,
-    ) acquires StakingConfig {
+    ) {
         system_addresses::assert_aptos_framework(aptos_framework);
         validate_required_stake(minimum_stake, maximum_stake);
 
-        let staking_config = borrow_global_mut<StakingConfig>(@aptos_framework);
+        let staking_config = &mut StakingConfig[@aptos_framework];
         staking_config.minimum_stake = minimum_stake;
         staking_config.maximum_stake = maximum_stake;
     }
@@ -284,11 +284,11 @@ module aptos_framework::staking_config {
     public fun update_recurring_lockup_duration_secs(
         aptos_framework: &signer,
         new_recurring_lockup_duration_secs: u64,
-    ) acquires StakingConfig {
+    ) {
         assert!(new_recurring_lockup_duration_secs > 0, error::invalid_argument(EZERO_LOCKUP_DURATION));
         system_addresses::assert_aptos_framework(aptos_framework);
 
-        let staking_config = borrow_global_mut<StakingConfig>(@aptos_framework);
+        let staking_config = &mut StakingConfig[@aptos_framework];
         staking_config.recurring_lockup_duration_secs = new_recurring_lockup_duration_secs;
     }
 
@@ -299,7 +299,7 @@ module aptos_framework::staking_config {
         aptos_framework: &signer,
         new_rewards_rate: u64,
         new_rewards_rate_denominator: u64,
-    ) acquires StakingConfig {
+    ) {
         assert!(!features::periodical_reward_rate_decrease_enabled(), error::invalid_state(EDEPRECATED_FUNCTION));
         system_addresses::assert_aptos_framework(aptos_framework);
         assert!(
@@ -314,7 +314,7 @@ module aptos_framework::staking_config {
         // We assert that (rewards_rate / rewards_rate_denominator <= 1).
         assert!(new_rewards_rate <= new_rewards_rate_denominator, error::invalid_argument(EINVALID_REWARDS_RATE));
 
-        let staking_config = borrow_global_mut<StakingConfig>(@aptos_framework);
+        let staking_config = &mut StakingConfig[@aptos_framework];
         staking_config.rewards_rate = new_rewards_rate;
         staking_config.rewards_rate_denominator = new_rewards_rate_denominator;
     }
@@ -325,7 +325,7 @@ module aptos_framework::staking_config {
         min_rewards_rate: FixedPoint64,
         rewards_rate_period_in_secs: u64,
         rewards_rate_decrease_rate: FixedPoint64,
-    ) acquires StakingRewardsConfig {
+    ) {
         system_addresses::assert_aptos_framework(aptos_framework);
 
         validate_rewards_config(
@@ -335,7 +335,7 @@ module aptos_framework::staking_config {
             rewards_rate_decrease_rate,
         );
 
-        let staking_rewards_config = borrow_global_mut<StakingRewardsConfig>(@aptos_framework);
+        let staking_rewards_config = &mut StakingRewardsConfig[@aptos_framework];
         // Currently rewards_rate_period_in_secs is not allowed to be changed because this could bring complicated
         // logics. At the moment the argument is just a placeholder for future use.
         assert!(
@@ -353,14 +353,14 @@ module aptos_framework::staking_config {
     public fun update_voting_power_increase_limit(
         aptos_framework: &signer,
         new_voting_power_increase_limit: u64,
-    ) acquires StakingConfig {
+    ) {
         system_addresses::assert_aptos_framework(aptos_framework);
         assert!(
             new_voting_power_increase_limit > 0 && new_voting_power_increase_limit <= 50,
             error::invalid_argument(EINVALID_VOTING_POWER_INCREASE_LIMIT),
         );
 
-        let staking_config = borrow_global_mut<StakingConfig>(@aptos_framework);
+        let staking_config = &mut StakingConfig[@aptos_framework];
         staking_config.voting_power_increase_limit = new_voting_power_increase_limit;
     }
 
@@ -400,7 +400,7 @@ module aptos_framework::staking_config {
     use aptos_std::fixed_point64::create_from_rational;
 
     #[test(aptos_framework = @aptos_framework)]
-    public entry fun test_change_staking_configs(aptos_framework: signer) acquires StakingConfig {
+    public entry fun test_change_staking_configs(aptos_framework: signer) {
         initialize_for_test(&aptos_framework, 0, 1, 1, false, 1, 1, 1);
         // This test case checks the behavior when the periodical_reward_rate_decrease feature is disabled.
         features::change_feature_flags_for_testing(&aptos_framework, vector[], vector[features::get_periodical_reward_rate_decrease_feature()]);
@@ -410,7 +410,7 @@ module aptos_framework::staking_config {
         update_rewards_rate(&aptos_framework, 10, 100);
         update_voting_power_increase_limit(&aptos_framework, 10);
 
-        let config = borrow_global<StakingConfig>(@aptos_framework);
+        let config = &StakingConfig[@aptos_framework];
         assert!(config.minimum_stake == 100, 0);
         assert!(config.maximum_stake == 1000, 1);
         assert!(config.recurring_lockup_duration_secs == 10000, 3);
@@ -420,7 +420,7 @@ module aptos_framework::staking_config {
     }
 
     #[test(aptos_framework = @aptos_framework)]
-    public entry fun test_staking_rewards_rate_decrease_over_time(aptos_framework: signer) acquires StakingRewardsConfig {
+    public entry fun test_staking_rewards_rate_decrease_over_time(aptos_framework: signer) {
         let start_time_in_secs: u64 = 100001000000;
         initialize_rewards_for_test(
             &aptos_framework,
@@ -466,7 +466,7 @@ module aptos_framework::staking_config {
     }
 
     #[test(aptos_framework = @aptos_framework)]
-    public entry fun test_change_staking_rewards_configs(aptos_framework: signer) acquires StakingRewardsConfig {
+    public entry fun test_change_staking_rewards_configs(aptos_framework: signer) {
         let start_time_in_secs: u64 = 100001000000;
         initialize_rewards_for_test(
             &aptos_framework,
@@ -485,7 +485,7 @@ module aptos_framework::staking_config {
             create_from_rational(25, 100),
         );
 
-        let config = borrow_global<StakingRewardsConfig>(@aptos_framework);
+        let config = &StakingRewardsConfig[@aptos_framework];
         assert!(config.rewards_rate.equal(create_from_rational(2, 100)), 0);
         assert!(config.min_rewards_rate.equal(create_from_rational(6, 1000)), 1);
         assert!(config.rewards_rate_period_in_secs == ONE_YEAR_IN_SECS, 4);
@@ -495,19 +495,19 @@ module aptos_framework::staking_config {
 
     #[test(account = @0x123)]
     #[expected_failure(abort_code = 0x50003, location = aptos_framework::system_addresses)]
-    public entry fun test_update_required_stake_unauthorized_should_fail(account: signer) acquires StakingConfig {
+    public entry fun test_update_required_stake_unauthorized_should_fail(account: signer) {
         update_required_stake(&account, 1, 2);
     }
 
     #[test(account = @0x123)]
     #[expected_failure(abort_code = 0x50003, location = aptos_framework::system_addresses)]
-    public entry fun test_update_required_lockup_unauthorized_should_fail(account: signer) acquires StakingConfig {
+    public entry fun test_update_required_lockup_unauthorized_should_fail(account: signer) {
         update_recurring_lockup_duration_secs(&account, 1);
     }
 
     #[test(aptos_framework = @0x1, account = @0x123)]
     #[expected_failure(abort_code = 0x50003, location = aptos_framework::system_addresses)]
-    public entry fun test_update_rewards_unauthorized_should_fail(aptos_framework: signer, account: signer) acquires StakingConfig {
+    public entry fun test_update_rewards_unauthorized_should_fail(aptos_framework: signer, account: signer) {
         // This test case checks the behavior when the periodical_reward_rate_decrease feature is disabled.
         features::change_feature_flags_for_testing(&aptos_framework, vector[], vector[features::get_periodical_reward_rate_decrease_feature()]);
         update_rewards_rate(&account, 1, 10);
@@ -515,13 +515,13 @@ module aptos_framework::staking_config {
 
     #[test(account = @0x123)]
     #[expected_failure(abort_code = 0x50003, location = aptos_framework::system_addresses)]
-    public entry fun test_update_voting_power_increase_limit_unauthorized_should_fail(account: signer) acquires StakingConfig {
+    public entry fun test_update_voting_power_increase_limit_unauthorized_should_fail(account: signer) {
         update_voting_power_increase_limit(&account, 10);
     }
 
     #[test(account = @0x123, aptos_framework = @aptos_framework)]
     #[expected_failure(abort_code = 0x50003, location = aptos_framework::system_addresses)]
-    public entry fun test_update_rewards_config_unauthorized_should_fail(account: signer, aptos_framework: signer) acquires StakingRewardsConfig {
+    public entry fun test_update_rewards_config_unauthorized_should_fail(account: signer, aptos_framework: signer) {
         features::change_feature_flags_for_testing(&aptos_framework, vector[features::get_periodical_reward_rate_decrease_feature()], vector[]);
         update_rewards_config(
             &account,
@@ -534,25 +534,25 @@ module aptos_framework::staking_config {
 
     #[test(aptos_framework = @aptos_framework)]
     #[expected_failure(abort_code = 0x10003, location = Self)]
-    public entry fun test_update_required_stake_invalid_range_should_fail(aptos_framework: signer) acquires StakingConfig {
+    public entry fun test_update_required_stake_invalid_range_should_fail(aptos_framework: signer) {
         update_required_stake(&aptos_framework, 10, 5);
     }
 
     #[test(aptos_framework = @aptos_framework)]
     #[expected_failure(abort_code = 0x10003, location = Self)]
-    public entry fun test_update_required_stake_zero_max_stake_should_fail(aptos_framework: signer) acquires StakingConfig {
+    public entry fun test_update_required_stake_zero_max_stake_should_fail(aptos_framework: signer) {
         update_required_stake(&aptos_framework, 0, 0);
     }
 
     #[test(aptos_framework = @aptos_framework)]
     #[expected_failure(abort_code = 0x10001, location = Self)]
-    public entry fun test_update_required_lockup_to_zero_should_fail(aptos_framework: signer) acquires StakingConfig {
+    public entry fun test_update_required_lockup_to_zero_should_fail(aptos_framework: signer) {
         update_recurring_lockup_duration_secs(&aptos_framework, 0);
     }
 
     #[test(aptos_framework = @aptos_framework)]
     #[expected_failure(abort_code = 0x10002, location = Self)]
-    public entry fun test_update_rewards_invalid_denominator_should_fail(aptos_framework: signer) acquires StakingConfig {
+    public entry fun test_update_rewards_invalid_denominator_should_fail(aptos_framework: signer) {
         // This test case checks the behavior when the periodical_reward_rate_decrease feature is disabled.
         features::change_feature_flags_for_testing(&aptos_framework, vector[], vector[features::get_periodical_reward_rate_decrease_feature()]);
         update_rewards_rate(&aptos_framework, 1, 0);
@@ -560,7 +560,7 @@ module aptos_framework::staking_config {
 
     #[test(aptos_framework = @aptos_framework)]
     #[expected_failure(abort_code = 0x10005, location = Self)]
-    public entry fun test_update_rewards_config_rewards_rate_greater_than_1_should_fail(aptos_framework: signer) acquires StakingRewardsConfig {
+    public entry fun test_update_rewards_config_rewards_rate_greater_than_1_should_fail(aptos_framework: signer) {
         let start_time_in_secs: u64 = 100001000000;
         initialize_rewards_for_test(
             &aptos_framework,
@@ -581,7 +581,7 @@ module aptos_framework::staking_config {
 
     #[test(aptos_framework = @aptos_framework)]
     #[expected_failure(abort_code = 0x10008, location = Self)]
-    public entry fun test_update_rewards_config_invalid_rewards_rate_decrease_rate_should_fail(aptos_framework: signer) acquires StakingRewardsConfig {
+    public entry fun test_update_rewards_config_invalid_rewards_rate_decrease_rate_should_fail(aptos_framework: signer) {
         let start_time_in_secs: u64 = 100001000000;
         initialize_rewards_for_test(
             &aptos_framework,
@@ -602,7 +602,7 @@ module aptos_framework::staking_config {
 
     #[test(aptos_framework = @aptos_framework)]
     #[expected_failure(abort_code = 0x10009, location = Self)]
-    public entry fun test_update_rewards_config_cannot_change_rewards_rate_period(aptos_framework: signer) acquires StakingRewardsConfig {
+    public entry fun test_update_rewards_config_cannot_change_rewards_rate_period(aptos_framework: signer) {
         let start_time_in_secs: u64 = 100001000000;
         initialize_rewards_for_test(
             &aptos_framework,
@@ -623,7 +623,7 @@ module aptos_framework::staking_config {
 
     #[test(aptos_framework = @aptos_framework)]
     #[expected_failure(abort_code = 0x3000B, location = Self)]
-    public entry fun test_feature_flag_disabled_get_epoch_rewards_rate_should_fail(aptos_framework: signer) acquires StakingRewardsConfig {
+    public entry fun test_feature_flag_disabled_get_epoch_rewards_rate_should_fail(aptos_framework: signer) {
         features::change_feature_flags_for_testing(&aptos_framework, vector[], vector[features::get_periodical_reward_rate_decrease_feature()]);
         calculate_and_save_latest_epoch_rewards_rate();
     }
@@ -632,7 +632,7 @@ module aptos_framework::staking_config {
     #[expected_failure(abort_code = 0x10004, location = Self)]
     public entry fun test_update_voting_power_increase_limit_to_zero_should_fail(
         aptos_framework: signer
-    ) acquires StakingConfig {
+    ) {
         // This test case checks the behavior when the periodical_reward_rate_decrease feature is disabled.
         features::change_feature_flags_for_testing(&aptos_framework, vector[], vector[features::get_periodical_reward_rate_decrease_feature()]);
         update_voting_power_increase_limit(&aptos_framework, 0);
@@ -642,7 +642,7 @@ module aptos_framework::staking_config {
     #[expected_failure(abort_code = 0x10004, location = aptos_framework::staking_config)]
     public entry fun test_update_voting_power_increase_limit_to_more_than_upper_bound_should_fail(
         aptos_framework: signer
-    ) acquires StakingConfig {
+    ) {
         update_voting_power_increase_limit(&aptos_framework, 51);
     }
 

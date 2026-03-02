@@ -66,7 +66,7 @@ module aptos_framework::reconfiguration {
 
     /// Only called during genesis.
     /// Publishes `Configuration` resource. Can only be invoked by aptos framework account, and only a single time in Genesis.
-    public(friend) fun initialize(aptos_framework: &signer) {
+    friend fun initialize(aptos_framework: &signer) {
         system_addresses::assert_aptos_framework(aptos_framework);
 
         // assert it matches `new_epoch_event_key()`, otherwise the event can't be recognized
@@ -91,7 +91,7 @@ module aptos_framework::reconfiguration {
 
     /// Private function to resume reconfiguration.
     /// This function should only be used for offline WriteSet generation purpose and should never be invoked on chain.
-    fun enable_reconfiguration(aptos_framework: &signer) acquires DisableReconfiguration {
+    fun enable_reconfiguration(aptos_framework: &signer) {
         system_addresses::assert_aptos_framework(aptos_framework);
 
         assert!(!reconfiguration_enabled(), error::invalid_state(ECONFIGURATION));
@@ -103,13 +103,13 @@ module aptos_framework::reconfiguration {
     }
 
     /// Signal validators to start using new configuration. Must be called from friend config modules.
-    public(friend) fun reconfigure() acquires Configuration {
+    friend fun reconfigure() {
         // Do not do anything if genesis has not finished.
         if (chain_status::is_genesis() || timestamp::now_microseconds() == 0 || !reconfiguration_enabled()) {
             return
         };
 
-        let config_ref = borrow_global_mut<Configuration>(@aptos_framework);
+        let config_ref = &mut Configuration[@aptos_framework];
         let current_time = timestamp::now_microseconds();
 
         // Do not do anything if a reconfiguration event is already emitted within this transaction.
@@ -158,18 +158,18 @@ module aptos_framework::reconfiguration {
         reconfiguration_state::on_reconfig_finish();
     }
 
-    public fun last_reconfiguration_time(): u64 acquires Configuration {
-        borrow_global<Configuration>(@aptos_framework).last_reconfiguration_time
+    public fun last_reconfiguration_time(): u64 {
+        Configuration[@aptos_framework].last_reconfiguration_time
     }
 
-    public fun current_epoch(): u64 acquires Configuration {
-        borrow_global<Configuration>(@aptos_framework).epoch
+    public fun current_epoch(): u64 {
+        Configuration[@aptos_framework].epoch
     }
 
     /// Emit a `NewEpochEvent` event. This function will be invoked by genesis directly to generate the very first
     /// reconfiguration event.
-    fun emit_genesis_reconfiguration_event() acquires Configuration {
-        let config_ref = borrow_global_mut<Configuration>(@aptos_framework);
+    fun emit_genesis_reconfiguration_event() {
+        let config_ref = &mut Configuration[@aptos_framework];
         assert!(config_ref.epoch == 0 && config_ref.last_reconfiguration_time == 0, error::invalid_state(ECONFIGURATION));
         config_ref.epoch = 1;
 
@@ -203,15 +203,15 @@ module aptos_framework::reconfiguration {
     }
 
     #[test_only]
-    public fun reconfigure_for_test() acquires Configuration {
+    public fun reconfigure_for_test() {
         reconfigure();
     }
 
     // This is used together with stake::end_epoch() for testing with last_reconfiguration_time
     // It must be called each time an epoch changes
     #[test_only]
-    public fun reconfigure_for_test_custom() acquires Configuration {
-        let config_ref = borrow_global_mut<Configuration>(@aptos_framework);
+    public fun reconfigure_for_test_custom() {
+        let config_ref = &mut Configuration[@aptos_framework];
         let current_time = timestamp::now_microseconds();
         if (current_time == config_ref.last_reconfiguration_time) {
             return

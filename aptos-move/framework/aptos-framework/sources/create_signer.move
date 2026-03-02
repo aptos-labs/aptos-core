@@ -20,5 +20,5 @@ module aptos_framework::create_signer {
     friend aptos_framework::permissioned_signer;
     friend aptos_framework::transaction_validation;
 
-    public(friend) native fun create_signer(addr: address): signer;
+    friend native fun create_signer(addr: address): signer;
 }
