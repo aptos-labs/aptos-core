@@ -29,14 +29,15 @@ use rand_core::{CryptoRng, RngCore};
 use std::{fmt::Debug, marker::PhantomData};
 
 /// Witness for the Shplonked opening sigma protocol: (rho, evals, u) such that
-/// com_y = xi_1*rho + MSM(taus_1, evals), V = taus_1[0]*sum(alphas_i*evals_i) + xi_1*u, y_sum = sum(evals).
+/// C_y^hid = xi_1*rho + MSM(taus_1, evals), C_evals = taus_1[0]*sum_j(weights_j sum_i *evals_j,i) + xi_1*u, y_sum = sum(evals).
 /// evals is per polynomial: { y_i^hid }_i.
+#[allow(non_snake_case)]
 #[derive(Clone, Debug, PartialEq, Eq, CanonicalSerialize, CanonicalDeserialize)]
 pub struct ShplonkedSigmaWitness<F: PrimeField> {
-    pub c_y_hid_randomness: F,
-    /// Hidden evaluations per polynomial: { y_i^hid }_i.
+    pub C_y_hid_randomness: F,
+    /// Hidden evaluations per polynomial: { y_i^hid }_i. Could take in more but not needed atm.
     pub evals: Vec<Vec<F>>,
-    pub com_evals_randomness: F,
+    pub C_evals_randomness: F,
 }
 
 impl<F: PrimeField> Witness<F> for ShplonkedSigmaWitness<F> {
@@ -53,21 +54,21 @@ impl<F: PrimeField> Witness<F> for ShplonkedSigmaWitness<F> {
             })
             .collect();
         Self {
-            c_y_hid_randomness: self.c_y_hid_randomness + c * other.c_y_hid_randomness,
+            C_y_hid_randomness: self.C_y_hid_randomness + c * other.C_y_hid_randomness,
             evals,
-            com_evals_randomness: self.com_evals_randomness + c * other.com_evals_randomness,
+            C_evals_randomness: self.C_evals_randomness + c * other.C_evals_randomness,
         }
     }
 
     fn rand<R: RngCore + CryptoRng>(&self, rng: &mut R) -> Self {
         Self {
-            c_y_hid_randomness: sample_field_element(rng),
+            C_y_hid_randomness: sample_field_element(rng),
             evals: self
                 .evals
                 .iter()
                 .map(|v| sample_field_elements(v.len(), rng))
                 .collect(),
-            com_evals_randomness: sample_field_element(rng),
+            C_evals_randomness: sample_field_element(rng),
         }
     }
 }
@@ -75,21 +76,22 @@ impl<F: PrimeField> Witness<F> for ShplonkedSigmaWitness<F> {
 fn project_to_kzg_witness<F: PrimeField>(
     w: &ShplonkedSigmaWitness<F>,
 ) -> univariate_hiding_kzg::Witness<F> {
+    // To produce C_y^hid, we flatten the evals per polynomial into a single vector.
     let values: Vec<F> = w.evals.iter().flatten().cloned().collect();
+
     univariate_hiding_kzg::Witness {
-        hiding_randomness: Scalar(w.c_y_hid_randomness),
+        hiding_randomness: Scalar(w.C_y_hid_randomness),
         values: Scalar::vec_from_inner(values),
     }
 }
 
-/// Homomorphism for com_y: (rho, evals, u) -> commitment(rho, evals). Ignores u.
+/// Homomorphism for C_y^hid: (rho, evals, u) -> commitment(rho, evals). Ignores u.
 pub type ComYHom<'a, E> = homomorphism::LiftHomomorphism<
     univariate_hiding_kzg::CommitmentHomomorphism<'a, E>,
     ShplonkedSigmaWitness<<E as Pairing>::ScalarField>,
 >;
 
-/// Builds the com_y homomorphism (lifted commitment) using only the first `taus_1.len()` bases.
-/// Pass a slice of length equal to evals (e.g. `&srs.taus_1[..evals.len()]`) to avoid binding the full SRS.
+/// Builds the C_y^hid homomorphism (lifted commitment) using only the first `taus_1.len()` bases.
 pub fn com_y_hom<'a, E: Pairing>(taus_1: &'a [E::G1Affine], xi_1: E::G1Affine) -> ComYHom<'a, E> {
     let inner = univariate_hiding_kzg::CommitmentHomomorphism::<E> {
         msm_basis: taus_1,
@@ -101,29 +103,44 @@ pub fn com_y_hom<'a, E: Pairing>(taus_1: &'a [E::G1Affine], xi_1: E::G1Affine) -
     }
 }
 
-/// Homomorphism for V: (rho, evals, u) -> sum(alphas_i*evals_i) * tau_0 + u * xi_1.
-/// Parameterized by public weights alphas (derived from transcript and challenge points).
+/// Homomorphism for V: eval_point_commit_hom(y^hid; ρ_eval) = (∑_j weights[j] * (∑_i lagrange_at_x[j][i] * y_j^hid[i]))*τ_0 + ρ_eval*ξ_1.
+/// One weight per polynomial: weights.len() == witness.evals.len(). lagrange_at_x[j][i] = L_{j,s_i}(x) for the i-th hidden point of poly j.
 /// Owns bases for serialization.
 #[derive(Clone, Debug, PartialEq, Eq, CanonicalSerialize, CanonicalDeserialize)]
 pub struct EvalPointCommitHom<E: Pairing> {
     pub tau_0: E::G1Affine,
     pub xi_1: E::G1Affine,
-    pub alphas: Vec<E::ScalarField>,
+    /// One weight per polynomial (c^{j-1} Z_{S\\S_j}(x)).
+    pub weights: Vec<E::ScalarField>,
+    /// Lagrange basis at x per (j, i): lagrange_at_x[j][i] = L_{j,s_i}(x) for s_i in S_j^hid.
+    /// We already computed the tilde_f_is in the main function, but we need to redo it here
+    /// for the sigma proof.
+    pub lagrange_at_x: Vec<Vec<E::ScalarField>>,
 }
 
 impl<E: Pairing> EvalPointCommitHom<E> {
     /// Build from SRS (uses only `taus_1[0]` and `xi_1`).
     #[allow(dead_code)]
-    pub fn from_srs(srs: &Srs<E>, alphas: Vec<E::ScalarField>) -> Self {
-        Self::new(srs.taus_1[0], srs.xi_1, alphas)
+    pub fn from_srs(
+        srs: &Srs<E>,
+        weights: Vec<E::ScalarField>,
+        lagrange_at_x: Vec<Vec<E::ScalarField>>,
+    ) -> Self {
+        Self::new(srs.taus_1[0], srs.xi_1, weights, lagrange_at_x)
     }
 
     /// Build from the minimal bases needed: tau_0 and xi_1 (avoids passing the full SRS).
-    pub fn new(tau_0: E::G1Affine, xi_1: E::G1Affine, alphas: Vec<E::ScalarField>) -> Self {
+    pub fn new(
+        tau_0: E::G1Affine,
+        xi_1: E::G1Affine,
+        weights: Vec<E::ScalarField>,
+        lagrange_at_x: Vec<Vec<E::ScalarField>>,
+    ) -> Self {
         Self {
             tau_0,
             xi_1,
-            alphas,
+            weights,
+            lagrange_at_x,
         }
     }
 }
@@ -155,21 +172,40 @@ impl<E: Pairing> fixed_base_msms::Trait for EvalPointCommitHom<E> {
 
     fn msm_terms(
         &self,
-        w: &Self::Domain,
+        witness: &Self::Domain,
     ) -> Self::CodomainShape<MsmInput<Self::Base, Self::Scalar>> {
-        let evals_flat: Vec<E::ScalarField> = w.evals.iter().flatten().cloned().collect();
+        // eval_point_commit_hom(y^hid; ρ_eval) = (∑_j weights[j] * (∑_i lagrange_at_x[j][i] * y_j^hid[i]))*τ_0 + ρ_eval*ξ_1
         debug_assert_eq!(
-            evals_flat.len(),
-            self.alphas.len(),
-            "evals and alphas must have the same length"
+            self.weights.len(),
+            witness.evals.len(),
+            "weights and evals must have the same length (one per polynomial)"
         );
-        let sum_y = evals_flat
+        debug_assert_eq!(
+            self.lagrange_at_x.len(),
+            witness.evals.len(),
+            "lagrange_at_x and evals must have the same length"
+        );
+        let sum_y = witness
+            .evals
             .iter()
-            .zip(self.alphas.iter())
-            .map(|(y_i, alpha_i)| *alpha_i * y_i)
-            .fold(E::ScalarField::zero(), |acc, x| acc + x);
+            .zip(self.weights.iter())
+            .zip(self.lagrange_at_x.iter())
+            .map(|((y_j_hid, &w_j), l_j)| {
+                debug_assert_eq!(
+                    l_j.len(),
+                    y_j_hid.len(),
+                    "lagrange_at_x[j].len() == evals[j].len()"
+                );
+                let inner: E::ScalarField = y_j_hid
+                    .iter()
+                    .zip(l_j.iter())
+                    .map(|(&y_ji, &l_ji)| l_ji * y_ji)
+                    .fold(E::ScalarField::zero(), |a, b| a + b);
+                w_j * inner
+            })
+            .fold(E::ScalarField::zero(), |a, b| a + b);
         let bases = vec![self.tau_0, self.xi_1];
-        let scalars = vec![sum_y, w.com_evals_randomness];
+        let scalars = vec![sum_y, witness.C_evals_randomness];
         CodomainShape(MsmInput::new(bases, scalars).expect("EvalPointCommitHom MSM"))
     }
 

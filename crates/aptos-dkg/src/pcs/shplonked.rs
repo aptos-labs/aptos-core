@@ -135,17 +135,30 @@ fn lagrange_basis_polys<F: FftField>(s_i: &[F]) -> Vec<DensePolynomial<F>> {
     if s_i.is_empty() {
         return Vec::new();
     }
+    let mut all_denoms: Vec<F> = Vec::new();
+    for &s in s_i {
+        let denom = s_i
+            .iter()
+            .filter(|&&t| t != s)
+            .fold(F::one(), |a, &t| a * (s - t));
+        all_denoms.push(denom);
+    }
+    batch_inversion(&mut all_denoms);
+    lagrange_basis_polys_from_inverted_denoms(s_i, &all_denoms)
+}
+
+/// Builds Lagrange basis polynomials given pre-inverted denominators (L_s = (Z_{S_i}(X)/(X-s)) * inv_s).
+#[allow(non_snake_case)]
+fn lagrange_basis_polys_from_inverted_denoms<F: FftField>(
+    s_i: &[F],
+    inv_denoms: &[F],
+) -> Vec<DensePolynomial<F>> {
+    debug_assert_eq!(s_i.len(), inv_denoms.len());
+    if s_i.is_empty() {
+        return Vec::new();
+    }
     let z_S_i = vanishing_poly::from_roots(s_i);
     let z_S_i_dos = DOSPoly::from(z_S_i.clone());
-    let mut denoms: Vec<F> = s_i
-        .iter()
-        .map(|&s| {
-            s_i.iter()
-                .filter(|&&t| t != s)
-                .fold(F::one(), |a, &t| a * (s - t))
-        })
-        .collect();
-    batch_inversion(&mut denoms);
     s_i.iter()
         .enumerate()
         .map(|(idx, &s)| {
@@ -153,8 +166,38 @@ fn lagrange_basis_polys<F: FftField>(s_i: &[F]) -> Vec<DensePolynomial<F>> {
             let (l_s_poly, r) = z_S_i_dos.clone().divide_with_q_and_r(&divisor).unwrap();
             debug_assert!(r.is_zero());
             let mut l_s: DensePolynomial<F> = l_s_poly.into();
-            l_s = &l_s * denoms[idx];
+            l_s = &l_s * inv_denoms[idx];
             l_s
+        })
+        .collect()
+}
+
+/// Lagrange basis polynomials for multiple point sets with a single batch inversion across all denominators.
+/// Returns one `Vec<DensePolynomial<F>>` per set in `unique_sets`.
+#[allow(non_snake_case)]
+fn lagrange_basis_polys_batched<F: FftField>(unique_sets: &[&[F]]) -> Vec<Vec<DensePolynomial<F>>> {
+    if unique_sets.is_empty() {
+        return Vec::new();
+    }
+    let mut all_denoms: Vec<F> = Vec::new();
+    for s_i in unique_sets.iter() {
+        for &s in s_i.iter() {
+            let denom = s_i
+                .iter()
+                .filter(|&&t| t != s) // Can we rule this out?
+                .fold(F::one(), |a, &t| a * (s - t));
+            all_denoms.push(denom);
+        }
+    }
+    batch_inversion(&mut all_denoms);
+    let mut offset = 0;
+    unique_sets
+        .iter()
+        .map(|s_i| {
+            let len = s_i.len();
+            let inv_denoms = &all_denoms[offset..offset + len];
+            offset += len;
+            lagrange_basis_polys_from_inverted_denoms(s_i, inv_denoms)
         })
         .collect()
 }
@@ -306,8 +349,9 @@ fn append_batch_statement_to_transcript<E: Pairing>(
     for set in sets {
         trs.append_evaluation_set(set);
     }
-    let y_rev_flat: Vec<E::ScalarField> = y_rev.iter().flatten().cloned().collect();
-    trs.append_evaluation_points(&y_rev_flat); // Could do this with a for loop as well
+    for y_i_rev in y_rev {
+        trs.append_evaluation_points(y_i_rev);
+    }
     trs.append_homomorphism_image(&phi_y);
     trs.append_point(c_y_hid);
 }
@@ -322,6 +366,7 @@ fn compute_weights<E: Pairing>(
 ) -> (E::ScalarField, Vec<E::ScalarField>) {
     let z_S_val = z_S.evaluate(&x);
     let z_S_minus_S_i_vals = evaluate_z_S_minus_S_is(z_S_val, s_per_poly, x);
+
     debug_assert_eq!(c_powers.len(), z_S_minus_S_i_vals.len());
     let weights: Vec<E::ScalarField> = c_powers
         .iter()
@@ -399,9 +444,9 @@ pub fn batch_open_generalized<
     let com_y_hom = shplonked_sigma::com_y_hom::<E>(&srs.taus_1[..y_hid_flat.len()], srs.xi_1);
     let com_y_hid = com_y_hom
         .apply(&shplonked_sigma::ShplonkedSigmaWitness {
-            c_y_hid_randomness,
+            C_y_hid_randomness: c_y_hid_randomness,
             evals: y_hid_per_poly.clone(),
-            com_evals_randomness: E::ScalarField::zero(),
+            C_evals_randomness: E::ScalarField::zero(),
         })
         .0
         .into_affine();
@@ -432,12 +477,17 @@ pub fn batch_open_generalized<
         .map(|i| (0..=i).find(|&j| S_is[j] == S_is[i]).unwrap())
         .collect();
 
-    // Compute Lagrange basis polynomials once per unique set (all at once). // TODO: improve batch inversion here
+    // Compute Lagrange basis polynomials once per unique set, with one batch inversion for all denominators.
+    let unique_indices: Vec<usize> = (0..n).filter(|&i| canonical[i] == i).collect();
+    let unique_sets: Vec<&[E::ScalarField]> =
+        unique_indices.iter().map(|&i| S_is[i].as_slice()).collect();
+    let lagrange_bases_batched = lagrange_basis_polys_batched(&unique_sets);
     let mut lagrange_cache: Vec<Option<Vec<DensePolynomial<E::ScalarField>>>> = vec![None; n];
-    for i in 0..n {
-        if canonical[i] == i {
-            lagrange_cache[i] = Some(lagrange_basis_polys(&S_is[i]));
-        }
+    for (bases, &idx) in lagrange_bases_batched
+        .into_iter()
+        .zip(unique_indices.iter())
+    {
+        lagrange_cache[idx] = Some(bases);
     }
 
     let tilde_f_is: Vec<DensePolynomial<E::ScalarField>> = (0..n)
@@ -509,13 +559,27 @@ pub fn batch_open_generalized<
         .map(|i| weights[i] * tilde_f_is[i].evaluate(&x))
         .sum();
 
-    // Step 4c: C_eval = eval_point_commit_hom(y^hid; ρ_eval) = (∑_j weights[j] * y^hid_j)*τ_0 + ρ_eval*ξ_1. // the j indexing is a bit wrong here, maybe y^hid is the wrong thing to construct... should instead set up a Vec<Vec<E>> and then use the j on the outer side... also the tilde_f_is evaluation on x is missing here!!!
-    let eval_point_commit_hom =
-        shplonked_sigma::EvalPointCommitHom::new(srs.taus_1[0], srs.xi_1, weights.clone());
+    // Step 4c: C_eval = eval_point_commit_hom(y^hid; ρ_eval) = (∑_j weights[j] * (∑_i L_{j,i}(x) y_j^hid[i]))*τ_0 + ρ_eval*ξ_1.
+    let lagrange_at_x: Vec<Vec<E::ScalarField>> = (0..n)
+        .map(|j| {
+            let s_j = &S_is[j];
+            sets[j]
+                .hid
+                .iter()
+                .map(|&s| lagrange_basis_at(s_j, s, x))
+                .collect()
+        })
+        .collect();
+    let eval_point_commit_hom = shplonked_sigma::EvalPointCommitHom::new(
+        srs.taus_1[0],
+        srs.xi_1,
+        weights.clone(),
+        lagrange_at_x,
+    );
     let witness_for_C_eval = shplonked_sigma::ShplonkedSigmaWitness {
-        c_y_hid_randomness: E::ScalarField::zero(), // We're using the full sigma protocol witness here which is a bit awkward; but fine if we kill off this component
+        C_y_hid_randomness: E::ScalarField::zero(), // We're using the full sigma protocol witness here which is a bit awkward; but fine if we kill off this component
         evals: y_hid_per_poly.clone(),
-        com_evals_randomness: rho_eval,
+        C_evals_randomness: rho_eval,
     };
     let C_eval_proj: E::G1 = eval_point_commit_hom.apply(&witness_for_C_eval).0;
     let C_eval = C_eval_proj.into_affine();
@@ -551,9 +615,9 @@ pub fn batch_open_generalized<
 
     // Step 5d: compute the sigma proof
     let witness = ShplonkedSigmaWitness {
-        c_y_hid_randomness,
+        C_y_hid_randomness: c_y_hid_randomness,
         evals: y_hid_per_poly.clone(),
-        com_evals_randomness: rho_eval,
+        C_evals_randomness: rho_eval,
     };
     let com_y_v_hom = shplonked_sigma::FirstTupleHom::<E> {
         hom1: com_y_hom,
@@ -581,8 +645,8 @@ pub fn batch_open_generalized<
         r_V,
         r_y,
         z_yi: sigma_protocol_proof.z.evals,
-        z_u: sigma_protocol_proof.z.com_evals_randomness,
-        z_rho: sigma_protocol_proof.z.c_y_hid_randomness,
+        z_u: sigma_protocol_proof.z.C_evals_randomness,
+        z_rho: sigma_protocol_proof.z.C_y_hid_randomness,
     };
 
     // π_2 from PCS.Open: pi_2 = quotient commitment, pi_2_extra = hiding compensation.
@@ -717,23 +781,23 @@ where
 
     let h: usize = sigma_proof.z_yi.iter().map(|v| v.len()).sum();
     let com_y_hom = shplonked_sigma::com_y_hom(&srs.taus_1[..h], srs.xi_1);
-    let alpha_hid = {
-        let z_S_minus_S_i_vals = evaluate_z_S_minus_S_is(z_S_val, &s_per_poly, x);
-        let mut alpha_hid = Vec::with_capacity(h);
-        let mut c_pow = E::ScalarField::ONE;
-        for i in 0..n {
-            let s_i = &s_per_poly[i];
-            let z_val = z_S_minus_S_i_vals[i];
-            for &s in sets[i].hid.iter() {
-                let l = lagrange_basis_at(s_i, s, x);
-                alpha_hid.push(c_pow * z_val * l);
-            }
-            c_pow *= c;
-        }
-        alpha_hid
-    };
-    let v_hom =
-        shplonked_sigma::EvalPointCommitHom::new(srs.taus_1[0], srs.xi_1, alpha_hid.clone());
+    // One weight per polynomial: alphas from compute_weights. Lagrange at x per (j, i).
+    let lagrange_at_x: Vec<Vec<E::ScalarField>> = (0..n)
+        .map(|j| {
+            let s_j = &s_per_poly[j];
+            sets[j]
+                .hid
+                .iter()
+                .map(|&s| lagrange_basis_at(s_j, s, x))
+                .collect()
+        })
+        .collect();
+    let v_hom = shplonked_sigma::EvalPointCommitHom::new(
+        srs.taus_1[0],
+        srs.xi_1,
+        alphas.clone(),
+        lagrange_at_x,
+    );
     let com_y_v_hom = shplonked_sigma::FirstTupleHom::<E> {
         hom1: com_y_hom,
         hom2: v_hom,
@@ -762,9 +826,9 @@ where
                 sigma_proof.r_y,
             )),
             z: ShplonkedSigmaWitness {
-                c_y_hid_randomness: sigma_proof.z_rho,
+                C_y_hid_randomness: sigma_proof.z_rho,
                 evals: sigma_proof.z_yi.clone(), // already { z_i }_i per polynomial
-                com_evals_randomness: sigma_proof.z_u,
+                C_evals_randomness: sigma_proof.z_u,
             },
         };
 
