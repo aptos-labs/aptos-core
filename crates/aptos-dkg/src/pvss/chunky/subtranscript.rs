@@ -291,22 +291,22 @@ impl<E: Pairing> Subtranscript<E> {
         num_chunks_per_share: usize,
         rng: &mut R,
     ) -> Self {
-        let V0 = unsafe_random_point::<E::G2, _>(rng);
-        let Vs_flat = unsafe_random_points::<E::G2, _>(sc.get_total_weight(), rng);
+        let V0 = unsafe_random_point(rng);
+        let Vs_flat = unsafe_random_points(sc.get_total_weight(), rng);
         let Vs = sc.group_by_player(&Vs_flat);
 
         let Cs: Vec<Vec<Vec<E::G1Affine>>> = (0..sc.get_total_num_players())
             .map(|i| {
                 let player = sc.get_player(i);
                 let w = sc.get_player_weight(&player);
-                repeat_with(|| unsafe_random_points::<E::G1, _>(num_chunks_per_share, rng))
+                repeat_with(|| unsafe_random_points(num_chunks_per_share, rng))
                     .take(w)
                     .collect()
             })
             .collect();
 
         let Rs: Vec<Vec<E::G1Affine>> =
-            repeat_with(|| unsafe_random_points::<E::G1, _>(num_chunks_per_share, rng))
+            repeat_with(|| unsafe_random_points(num_chunks_per_share, rng))
                 .take(sc.get_max_weight())
                 .collect();
 

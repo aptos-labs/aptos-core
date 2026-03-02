@@ -92,10 +92,10 @@ impl<E: Pairing> Proof<E> {
     /// Useful for testing and benchmarking. TODO: might be able to derive this through macros etc
     pub fn generate<R: rand::Rng + rand::CryptoRng>(ell: u8, rng: &mut R) -> Self {
         Self {
-            hat_C: unsafe_random_point::<E::G1, _>(rng),
+            hat_C: unsafe_random_point(rng),
             pi_PoK: two_term_msm::Proof::generate(rng),
-            Cs: unsafe_random_points::<E::G1, _>(ell as usize, rng),
-            D: unsafe_random_point::<E::G1, _>(rng),
+            Cs: unsafe_random_points(ell as usize, rng),
+            D: unsafe_random_point(rng),
             a: sample_field_element(rng),
             a_h: sample_field_element(rng),
             a_js: sample_field_elements(ell as usize, rng),
@@ -1141,12 +1141,11 @@ pub mod two_term_msm {
     impl<C: CurveGroup> Proof<C> {
         /// Generates a random looking proof (but not a valid one).
         /// Useful for testing and benchmarking. TODO: might be able to derive this through macros etc
-        pub fn generate<R: rand::Rng + rand::CryptoRng>(rng: &mut R) -> Self {
+        pub fn generate<R: RngCore + CryptoRng>(rng: &mut R) -> Self {
             Self {
-                first_proof_item: FirstProofItem::Commitment(CodomainShape(unsafe_random_point::<
-                    C,
-                    _,
-                >(rng))),
+                first_proof_item: FirstProofItem::Commitment(CodomainShape(unsafe_random_point(
+                    rng,
+                ))),
                 z: Witness {
                     poly_randomness: Scalar::rand(rng),
                     hiding_kzg_randomness: Scalar::rand(rng),

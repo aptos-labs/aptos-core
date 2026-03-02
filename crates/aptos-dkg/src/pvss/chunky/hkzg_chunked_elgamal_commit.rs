@@ -49,7 +49,7 @@ impl<'a, E: Pairing> Proof<'a, E> {
             FirstProofItem::Commitment(first_proof_item_inner) => Self {
                 first_proof_item: FirstProofItem::Commitment(TupleCodomainShape(
                     first_proof_item_inner,
-                    chunked_scalar_mul::CodomainShape(unsafe_random_points::<E::G2, _>(
+                    chunked_scalar_mul::CodomainShape(unsafe_random_points(
                         sc.get_total_weight(),
                         rng,
                     )),

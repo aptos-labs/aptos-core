@@ -321,7 +321,7 @@ impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>> traits:
             subtrs: Subtranscript::generate(sc, num_chunks_per_share, rng),
             sharing_proof: SharingProof {
                 range_proof_commitment: univariate_hiding_kzg::CommitmentNormalised(
-                    unsafe_random_point::<E::G1, _>(rng),
+                    unsafe_random_point(rng),
                 ),
                 SoK: hkzg_chunked_elgamal_commit::Proof::generate(sc, num_chunks_per_share, rng),
                 range_proof: dekart_univariate_v2::Proof::generate(pp.ell, rng),
