@@ -115,27 +115,24 @@ module aptos_std::capability {
     /// Acquires a capability token. Only the owner of the capability class, or an authorized delegate,
     /// can succeed with this operation. A caller must pass a witness that they own the `Feature` type
     /// parameter.
-    public fun acquire<Feature>(requester: &signer, _feature_witness: &Feature): Cap<Feature>
-    acquires CapState, CapDelegateState {
+    public fun acquire<Feature>(requester: &signer, _feature_witness: &Feature): Cap<Feature> {
         Cap<Feature> { root: validate_acquire<Feature>(requester) }
     }
 
     /// Acquires a linear capability token. It is up to the module which owns `Feature` to decide
     /// whether to expose a linear or non-linear capability.
-    public fun acquire_linear<Feature>(requester: &signer, _feature_witness: &Feature): LinearCap<Feature>
-    acquires CapState, CapDelegateState {
+    public fun acquire_linear<Feature>(requester: &signer, _feature_witness: &Feature): LinearCap<Feature> {
         LinearCap<Feature> { root: validate_acquire<Feature>(requester) }
     }
 
     /// Helper to validate an acquire. Returns the root address of the capability.
-    fun validate_acquire<Feature>(requester: &signer): address
-    acquires CapState, CapDelegateState {
+    fun validate_acquire<Feature>(requester: &signer): address {
         let addr = signer::address_of(requester);
         if (exists<CapDelegateState<Feature>>(addr)) {
-            let root_addr = borrow_global<CapDelegateState<Feature>>(addr).root;
+            let root_addr = CapDelegateState<Feature>[addr].root;
             // double check that requester is actually registered as a delegate
             assert!(exists<CapState<Feature>>(root_addr), error::invalid_state(EDELEGATE));
-            assert!(borrow_global<CapState<Feature>>(root_addr).delegates.contains(&addr),
+            assert!(CapState<Feature>[root_addr].delegates.contains(&addr),
                 error::invalid_state(EDELEGATE));
             root_addr
         } else {
@@ -158,8 +155,7 @@ module aptos_std::capability {
     /// Registers a delegation relation. If the relation already exists, this function does
     /// nothing.
     // TODO: explore whether this should be idempotent like now or abort
-    public fun delegate<Feature>(self: Cap<Feature>, _feature_witness: &Feature, to: &signer)
-    acquires CapState {
+    public fun delegate<Feature>(self: Cap<Feature>, _feature_witness: &Feature, to: &signer) {
         let addr = signer::address_of(to);
         if (exists<CapDelegateState<Feature>>(addr)) return;
         move_to(to, CapDelegateState<Feature> { root: self.root });
@@ -169,7 +165,6 @@ module aptos_std::capability {
     /// Revokes a delegation relation. If no relation exists, this function does nothing.
     // TODO: explore whether this should be idempotent like now or abort
     public fun revoke<Feature>(self: Cap<Feature>, _feature_witness: &Feature, from: address)
-    acquires CapState, CapDelegateState
     {
         if (!exists<CapDelegateState<Feature>>(from)) return;
         let CapDelegateState { root: _root } = move_from<CapDelegateState<Feature>>(from);
