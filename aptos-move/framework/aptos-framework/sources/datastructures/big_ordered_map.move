@@ -1356,11 +1356,11 @@ module aptos_std::big_ordered_map {
         let left_node = node;
 
         let is_leaf = left_node.is_leaf;
+        let left_prev = &left_node.prev;
         let left_children = &mut left_node.children;
+        let left_next = &mut left_node.next;
 
         let right_node_index = right_node_reserved_slot.reserved_to_index();
-        let left_next = &mut left_node.next;
-        let left_prev = &mut left_node.prev;
 
         // Compute directly, as we cannot use get_max_degree(), as self is already mutably borrowed.
         let max_degree = if (is_leaf) {

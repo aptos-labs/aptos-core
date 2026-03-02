@@ -474,7 +474,7 @@ module aptos_framework::coin {
     ) {
         let MintRefReceipt { metadata } = receipt;
         assert!(
-            mint_ref.mint_ref_metadata() == metadata,
+            &mint_ref.mint_ref_metadata() == &metadata,
             error::invalid_argument(EMINT_REF_RECEIPT_MISMATCH)
         );
         let metadata_addr = metadata.object_address();
@@ -520,7 +520,7 @@ module aptos_framework::coin {
     ) {
         let TransferRefReceipt { metadata } = receipt;
         assert!(
-            transfer_ref.transfer_ref_metadata() == metadata,
+            &transfer_ref.transfer_ref_metadata() == &metadata,
             error::invalid_argument(ETRANSFER_REF_RECEIPT_MISMATCH)
         );
         let metadata_addr = metadata.object_address();
@@ -588,7 +588,7 @@ module aptos_framework::coin {
     ) {
         let BurnRefReceipt { metadata } = receipt;
         assert!(
-            burn_ref.burn_ref_metadata() == metadata,
+            &burn_ref.burn_ref_metadata() == &metadata,
             error::invalid_argument(EBURN_REF_RECEIPT_MISMATCH)
         );
         let metadata_addr = metadata.object_address();
@@ -1147,7 +1147,7 @@ module aptos_framework::coin {
     /// Create a new `Coin<CoinType>` with a value of `0`.
     public fun zero<CoinType>(): Coin<CoinType> {
         spec {
-            update supply<CoinType> = supply<CoinType> + 0;
+            update supply<CoinType> = supply<CoinType>;
         };
         Coin<CoinType> { value: 0 }
     }

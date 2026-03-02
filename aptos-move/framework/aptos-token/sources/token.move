@@ -1860,7 +1860,6 @@ module aptos_token::token {
 
     fun assert_non_standard_reserved_property(keys: &vector<String>) {
         keys.for_each_ref(|key| {
-            let key: &String = key;
             let length = key.length();
             if (length >= 6) {
                 let prefix = key.sub_string(0, 6);

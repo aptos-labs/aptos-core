@@ -281,7 +281,7 @@ module aptos_framework::randomness {
         let i = 0;
         while ({
             spec {
-                invariant sample >= 0 && sample < max_excl - min_incl;
+                invariant sample < max_excl - min_incl;
             };
             i < 256
         }) {
@@ -291,7 +291,7 @@ module aptos_framework::randomness {
 
         let sample = safe_add_mod(sample, r0 % range, range);
         spec {
-            assert sample >= 0 && sample < max_excl - min_incl;
+            assert sample < max_excl - min_incl;
         };
 
         event::emit(RandomnessGeneratedEvent {});
@@ -330,7 +330,7 @@ module aptos_framework::randomness {
         let tail = n - 1;
         while ({
             spec {
-                invariant tail >= 0 && tail < len(values);
+                invariant tail < len(values);
             };
             tail > 0
         }) {

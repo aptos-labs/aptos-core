@@ -73,7 +73,7 @@ module aptos_framework::transaction_context {
     /// This method runs `generate_unique_address` native function and returns
     /// the generated unique address wrapped in the AUID class.
     public fun generate_auid(): AUID {
-        return AUID {
+        AUID {
             unique_address: generate_unique_address()
         }
     }

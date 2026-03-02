@@ -523,7 +523,7 @@ module aptos_framework::account {
         assert!(single_key::is_keyless_or_federated_keyless_public_key(&keyless_single_key), error::invalid_argument(ENOT_A_KEYLESS_PUBLIC_KEY));
 
         let addr = signer::address_of(account);
-        let account_resource = &mut Account[addr];
+        let account_resource = &Account[addr];
         let old_auth_key = account_resource.authentication_key;
 
         // Check that the provided public key is original public key of the account by comparing

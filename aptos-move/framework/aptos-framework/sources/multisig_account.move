@@ -1081,11 +1081,9 @@ module aptos_framework::multisig_account {
 
         let sequence_number = last_resolved_sequence_number(multisig_account) + 1;
         let owner_addr = address_of(owner);
-        if (features::multisig_v2_enhancement_feature_enabled()) {
-            // Implicitly vote for rejection if the owner has not voted for rejection yet.
-            if (!has_voted_for_rejection(multisig_account, sequence_number, owner_addr)) {
-                reject_transaction(owner, multisig_account, sequence_number);
-            }
+        // Implicitly vote for rejection if the owner has not voted for rejection yet.
+        if (features::multisig_v2_enhancement_feature_enabled() && !has_voted_for_rejection(multisig_account, sequence_number, owner_addr)) {
+            reject_transaction(owner, multisig_account, sequence_number);
         };
 
         let multisig_account_resource = &mut MultisigAccount[multisig_account];

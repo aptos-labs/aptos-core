@@ -444,7 +444,7 @@ module aptos_framework::jwks {
     fun remove_oidc_provider_internal(provider_set: &mut SupportedOIDCProviders, name: vector<u8>): Option<vector<u8>> {
         let (name_exists, idx) = provider_set.providers.find(|obj| {
             let provider: &OIDCProvider = obj;
-            provider.name == name
+            &provider.name == &name
         });
 
         if (name_exists) {
@@ -610,7 +610,7 @@ module aptos_framework::jwks {
     fun remove_issuer(jwks: &mut AllProvidersJWKs, issuer: vector<u8>): Option<ProviderJWKs> {
         let (found, index) = jwks.entries.find(|obj| {
             let provider_jwk_set: &ProviderJWKs = obj;
-            provider_jwk_set.issuer == issuer
+            &provider_jwk_set.issuer == &issuer
         });
 
         let ret = if (found) {

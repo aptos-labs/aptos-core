@@ -87,7 +87,6 @@ module aptos_framework::jwk_consensus_config {
     public fun new_v1(oidc_providers: vector<OIDCProvider>): JWKConsensusConfig {
         let name_set = simple_map::new<String, u64>();
         oidc_providers.for_each_ref(|provider| {
-            let provider: &OIDCProvider = provider;
             let (_, old_value) = simple_map::upsert(&mut name_set, provider.name, 0);
             if (option::is_some(&old_value)) {
                 abort(error::invalid_argument(EDUPLICATE_PROVIDERS))
