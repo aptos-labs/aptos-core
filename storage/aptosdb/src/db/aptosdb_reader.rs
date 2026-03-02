@@ -12,7 +12,7 @@ use crate::{
 };
 use aptos_crypto::HashValue;
 use aptos_storage_interface::{
-    db_ensure as ensure, db_other_bail as bail,
+    db_ensure as ensure,
     state_store::{
         state::State, state_summary::StateSummary, state_view::hot_state_view::HotStateView,
     },
@@ -35,7 +35,6 @@ use aptos_types::{
         state_key::StateKey,
         state_storage_usage::StateStorageUsage,
         state_value::{StateValue, StateValueChunkWithProof},
-        table::{TableHandle, TableInfo},
     },
     transaction::{
         IndexedTransactionSummary, PersistedAuxiliaryInfo, Transaction, TransactionAuxiliaryData,
@@ -840,18 +839,6 @@ impl DbReader for AptosDB {
         })
     }
 
-    fn get_table_info(&self, handle: TableHandle) -> Result<TableInfo> {
-        gauged_api("get_table_info", || {
-            self.get_table_info_option(handle)?
-                .ok_or_else(|| AptosDbError::NotFound(format!("TableInfo for {:?}", handle)))
-        })
-    }
-
-    /// Returns whether the indexer DB has been enabled or not
-    fn indexer_enabled(&self) -> bool {
-        self.indexer.is_some()
-    }
-
     fn get_state_storage_usage(&self, version: Option<Version>) -> Result<StateStorageUsage> {
         gauged_api("get_state_storage_usage", || {
             if let Some(v) = version {
@@ -984,13 +971,5 @@ impl AptosDB {
             events,
             proof,
         })
-    }
-
-    /// TODO(jill): deprecate Indexer once Indexer Async V2 is ready
-    fn get_table_info_option(&self, handle: TableHandle) -> Result<Option<TableInfo>> {
-        match &self.indexer {
-            Some(indexer) => indexer.get_table_info(handle),
-            None => bail!("Indexer not enabled."),
-        }
     }
 }

@@ -28,7 +28,6 @@ impl DBDebuggerInterface {
                 /* readonly = */ true,
                 NO_OP_STORAGE_PRUNER_CONFIG,
                 RocksdbConfigs::default(),
-                /* enable_indexer = */ false,
                 BUFFERED_STATE_TARGET_ITEMS,
                 DEFAULT_MAX_NUM_NODES_PER_LRU_CACHE_SHARD,
                 /* internal_indexer_db = */ None,
