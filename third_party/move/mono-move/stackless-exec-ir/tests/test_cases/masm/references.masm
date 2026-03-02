@@ -1,0 +1,11 @@
+module 0x66::test
+
+struct S has drop+copy
+  _1: u64
+  _2: u8
+
+fun read_field_val(x: S): u8
+    borrow_loc x
+    borrow_field S, _2
+    read_ref
+    ret

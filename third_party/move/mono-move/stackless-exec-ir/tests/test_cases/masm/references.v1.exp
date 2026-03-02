@@ -1,0 +1,8 @@
+=== Module 0x66::test ===
+
+fun read_field_val(r0) {
+    params: 1, locals: 0, registers: 3
+    0: r1 := imm_borrow_loc r0
+    1: r2 := read_field S::_2, r1
+    2: ret [r2]
+}

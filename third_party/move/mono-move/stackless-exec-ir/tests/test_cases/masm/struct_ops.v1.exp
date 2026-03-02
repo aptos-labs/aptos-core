@@ -1,0 +1,10 @@
+=== Module 0x66::test ===
+
+fun pack_and_unpack() {
+    params: 0, locals: 1, registers: 3
+    0: r1 := ld_u64 3
+    1: r2 := ld_u8 2
+    2: r0 := pack S, [r1, r2]
+    3: [r1, r2] := unpack S, r0
+    4: ret [r1]
+}
