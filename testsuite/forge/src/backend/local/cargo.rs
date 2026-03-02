@@ -48,6 +48,16 @@ pub fn get_aptos_node_binary_from_worktree() -> Result<(String, PathBuf)> {
         revision.push_str("-dirty");
     }
 
+    // When running with pre-built binaries (e.g., sharded CI), use the specified path
+    // to skip the expensive cargo build.
+    if let Ok(bin_path_str) = env::var("APTOS_NODE_BIN_PATH") {
+        let path = PathBuf::from(bin_path_str);
+        if path.exists() {
+            info!("Using pre-built aptos-node binary: {:?}", path);
+            return Ok((revision, path));
+        }
+    }
+
     let bin_path = cargo_build_aptos_node(&metadata.workspace_root, &metadata.target_directory)?;
 
     Ok((revision, bin_path))
