@@ -7,7 +7,7 @@
 use legacy_move_compiler::shared::known_attributes::LintAttribute;
 use move_model::{
     ast::ExpData,
-    model::{FunctionEnv, GlobalEnv, Loc},
+    model::{FunctionEnv, GlobalEnv, Loc, ModuleEnv, NamedConstantEnv, StructEnv},
 };
 use move_stackless_bytecode::function_target::FunctionTarget;
 use std::{collections::BTreeSet, fmt, sync::Arc};
@@ -22,6 +22,11 @@ pub trait ExternalChecks {
 
     /// Get all the stackless bytecode checkers.
     fn get_stackless_bytecode_checkers(&self) -> Vec<Box<dyn StacklessBytecodeChecker>>;
+
+    /// Get all the module-level checkers.
+    fn get_module_checkers(&self) -> Vec<Box<dyn ModuleChecker>> {
+        vec![]
+    }
 }
 
 impl fmt::Debug for dyn ExternalChecks {
@@ -38,10 +43,16 @@ impl fmt::Debug for dyn ExternalChecks {
             .map(|c| c.get_name())
             .collect::<Vec<_>>()
             .join(", ");
+        let module_checkers = self
+            .get_module_checkers()
+            .into_iter()
+            .map(|c| c.get_name())
+            .collect::<Vec<_>>()
+            .join(", ");
         write!(
             f,
-            "dyn ExternalChecks {{ exp_checkers: [{}], stackless_bytecode_checkers: [{}] }}",
-            exp_checkers, stackless_bytecode_checkers
+            "dyn ExternalChecks {{ exp_checkers: [{}], stackless_bytecode_checkers: [{}], module_checkers: [{}] }}",
+            exp_checkers, stackless_bytecode_checkers, module_checkers
         )
     }
 }
@@ -81,6 +92,32 @@ pub trait StacklessBytecodeChecker {
     }
 }
 
+/// Implement this trait for checks on module-level declarations (modules, functions, constants,
+/// structs). Unlike `ExpChecker` which visits expressions within function bodies, this trait
+/// visits the declarations themselves.
+/// Implement at least one of the `visit` methods to be a useful checker.
+pub trait ModuleChecker {
+    /// Name of the module checker.
+    fn get_name(&self) -> String;
+
+    /// Examine a module declaration. Called once per module.
+    fn visit_module(&self, _env: &GlobalEnv, _module: &ModuleEnv) {}
+
+    /// Examine a function declaration (not its body).
+    fn visit_function(&self, _env: &GlobalEnv, _func: &FunctionEnv) {}
+
+    /// Examine a named constant declaration.
+    fn visit_named_constant(&self, _env: &GlobalEnv, _constant: &NamedConstantEnv) {}
+
+    /// Examine a struct or enum declaration.
+    fn visit_struct(&self, _env: &GlobalEnv, _struct_env: &StructEnv) {}
+
+    /// Report the `msg` highlighting the `loc`.
+    fn report(&self, env: &GlobalEnv, loc: &Loc, msg: &str) {
+        report(env, loc, msg, self.get_name().as_str());
+    }
+}
+
 /// Get the set of known checker names from the given external checkers.
 pub fn known_checker_names(external_checkers: &Vec<Arc<dyn ExternalChecks>>) -> BTreeSet<String> {
     let mut names = BTreeSet::new();
@@ -89,6 +126,9 @@ pub fn known_checker_names(external_checkers: &Vec<Arc<dyn ExternalChecks>>) -> 
             names.insert(checker.get_name());
         }
         for checker in checkers.get_stackless_bytecode_checkers() {
+            names.insert(checker.get_name());
+        }
+        for checker in checkers.get_module_checkers() {
             names.insert(checker.get_name());
         }
     }

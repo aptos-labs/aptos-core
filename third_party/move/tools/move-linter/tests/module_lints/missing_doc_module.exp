@@ -1,0 +1,13 @@
+
+Diagnostics:
+warning: [lint] Module is missing a doc comment.
+  ┌─ tests/module_lints/missing_doc_module.move:1:1
+  │
+1 │ ╭ module 0xc0ffee::missing_doc_module {
+2 │ │     /// Dummy.
+3 │ │     const DUMMY: u64 = 0;
+4 │ │ }
+  │ ╰─^
+  │
+  = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(missing_doc_module)]`.
+  = For more information, see https://aptos.dev/en/build/smart-contracts/linter#missing_doc_module.

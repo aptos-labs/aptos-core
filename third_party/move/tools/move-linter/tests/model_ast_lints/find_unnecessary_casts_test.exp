@@ -1,5 +1,32 @@
 Aborting with compilation errors:
 exiting with env checking errors
+warning: [lint] Constant is missing a doc comment.
+  ┌─ tests/model_ast_lints/find_unnecessary_casts_test.move:3:5
+  │
+3 │     const U8_VALUE: u8 = 255;
+  │     ^^^^^^^^^^^^^^^^^^^^^^^^^
+  │
+  = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(missing_doc_constant)]`.
+  = For more information, see https://aptos.dev/en/build/smart-contracts/linter#missing_doc_constant.
+
+warning: [lint] Constant is missing a doc comment.
+  ┌─ tests/model_ast_lints/find_unnecessary_casts_test.move:4:5
+  │
+4 │     const U64_VALUE: u64 = 1000;
+  │     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  │
+  = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(missing_doc_constant)]`.
+  = For more information, see https://aptos.dev/en/build/smart-contracts/linter#missing_doc_constant.
+
+warning: [lint] Public function is missing a doc comment.
+   ┌─ tests/model_ast_lints/find_unnecessary_casts_test.move:11:16
+   │
+11 │     public fun test_cast_in_let_warn() {
+   │                ^^^^^^^^^^^^^^^^^^^^^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(missing_doc_public_function)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#missing_doc_public_function.
+
 warning: [lint] Unnecessary cast: the expression is already of the target type. Consider removing the cast for better readability.
    ┌─ tests/model_ast_lints/find_unnecessary_casts_test.move:13:17
    │
@@ -8,6 +35,15 @@ warning: [lint] Unnecessary cast: the expression is already of the target type. 
    │
    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(unnecessary_cast)]`.
    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#unnecessary_cast.
+
+warning: [lint] Public function is missing a doc comment.
+   ┌─ tests/model_ast_lints/find_unnecessary_casts_test.move:16:16
+   │
+16 │     public fun test_cast_in_function_arg_warn() {
+   │                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(missing_doc_public_function)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#missing_doc_public_function.
 
 warning: [lint] Unnecessary cast: the expression is already of the target type. Consider removing the cast for better readability.
    ┌─ tests/model_ast_lints/find_unnecessary_casts_test.move:18:33
@@ -18,6 +54,15 @@ warning: [lint] Unnecessary cast: the expression is already of the target type. 
    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(unnecessary_cast)]`.
    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#unnecessary_cast.
 
+warning: [lint] Public function is missing a doc comment.
+   ┌─ tests/model_ast_lints/find_unnecessary_casts_test.move:21:16
+   │
+21 │     public fun test_cast_in_return_warn(): u64 {
+   │                ^^^^^^^^^^^^^^^^^^^^^^^^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(missing_doc_public_function)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#missing_doc_public_function.
+
 warning: [lint] Unnecessary cast: the expression is already of the target type. Consider removing the cast for better readability.
    ┌─ tests/model_ast_lints/find_unnecessary_casts_test.move:23:9
    │
@@ -26,6 +71,15 @@ warning: [lint] Unnecessary cast: the expression is already of the target type. 
    │
    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(unnecessary_cast)]`.
    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#unnecessary_cast.
+
+warning: [lint] Public function is missing a doc comment.
+   ┌─ tests/model_ast_lints/find_unnecessary_casts_test.move:26:16
+   │
+26 │     public fun test_cast_in_expression_warn() {
+   │                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(missing_doc_public_function)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#missing_doc_public_function.
 
 warning: [lint] Unnecessary cast: the expression is already of the target type. Consider removing the cast for better readability.
    ┌─ tests/model_ast_lints/find_unnecessary_casts_test.move:29:22
@@ -36,6 +90,15 @@ warning: [lint] Unnecessary cast: the expression is already of the target type. 
    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(unnecessary_cast)]`.
    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#unnecessary_cast.
 
+warning: [lint] Public function is missing a doc comment.
+   ┌─ tests/model_ast_lints/find_unnecessary_casts_test.move:32:16
+   │
+32 │     public fun test_cast_const_warn() {
+   │                ^^^^^^^^^^^^^^^^^^^^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(missing_doc_public_function)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#missing_doc_public_function.
+
 warning: [lint] Unnecessary cast: the expression is already of the target type. Consider removing the cast for better readability.
    ┌─ tests/model_ast_lints/find_unnecessary_casts_test.move:33:17
    │
@@ -44,6 +107,15 @@ warning: [lint] Unnecessary cast: the expression is already of the target type. 
    │
    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(unnecessary_cast)]`.
    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#unnecessary_cast.
+
+warning: [lint] Public function is missing a doc comment.
+   ┌─ tests/model_ast_lints/find_unnecessary_casts_test.move:36:16
+   │
+36 │     public fun test_cast_in_conditional_warn() {
+   │                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(missing_doc_public_function)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#missing_doc_public_function.
 
 warning: [lint] Unnecessary cast: the expression is already of the target type. Consider removing the cast for better readability.
    ┌─ tests/model_ast_lints/find_unnecessary_casts_test.move:38:13
@@ -63,6 +135,15 @@ warning: [lint] Empty `if` branch. Consider simplifying by removing or rewriting
    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(empty_if)]`.
    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#empty_if.
 
+warning: [lint] Public function is missing a doc comment.
+   ┌─ tests/model_ast_lints/find_unnecessary_casts_test.move:41:16
+   │
+41 │     public fun test_cast_in_assert_warn() {
+   │                ^^^^^^^^^^^^^^^^^^^^^^^^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(missing_doc_public_function)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#missing_doc_public_function.
+
 warning: [lint] Unnecessary cast: the expression is already of the target type. Consider removing the cast for better readability.
    ┌─ tests/model_ast_lints/find_unnecessary_casts_test.move:43:17
    │
@@ -71,6 +152,15 @@ warning: [lint] Unnecessary cast: the expression is already of the target type. 
    │
    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(unnecessary_cast)]`.
    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#unnecessary_cast.
+
+warning: [lint] Public function is missing a doc comment.
+   ┌─ tests/model_ast_lints/find_unnecessary_casts_test.move:46:16
+   │
+46 │     public fun test_multiple_casts_warn() {
+   │                ^^^^^^^^^^^^^^^^^^^^^^^^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(missing_doc_public_function)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#missing_doc_public_function.
 
 warning: [lint] Unnecessary cast: the expression is already of the target type. Consider removing the cast for better readability.
    ┌─ tests/model_ast_lints/find_unnecessary_casts_test.move:49:19
@@ -90,6 +180,15 @@ warning: [lint] Unnecessary cast: the expression is already of the target type. 
    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(unnecessary_cast)]`.
    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#unnecessary_cast.
 
+warning: [lint] Public function is missing a doc comment.
+   ┌─ tests/model_ast_lints/find_unnecessary_casts_test.move:52:16
+   │
+52 │     public fun test_cast_nested_warn() {
+   │                ^^^^^^^^^^^^^^^^^^^^^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(missing_doc_public_function)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#missing_doc_public_function.
+
 warning: [lint] Unnecessary cast: the expression is already of the target type. Consider removing the cast for better readability.
    ┌─ tests/model_ast_lints/find_unnecessary_casts_test.move:54:18
    │
@@ -108,11 +207,74 @@ warning: [lint] Unnecessary cast: the expression is already of the target type. 
    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(unnecessary_cast)]`.
    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#unnecessary_cast.
 
+warning: [lint] Public function is missing a doc comment.
+   ┌─ tests/model_ast_lints/find_unnecessary_casts_test.move:59:16
+   │
+59 │     public fun test_necessary_cast_no_warn() {
+   │                ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(missing_doc_public_function)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#missing_doc_public_function.
+
+warning: [lint] Public function is missing a doc comment.
+   ┌─ tests/model_ast_lints/find_unnecessary_casts_test.move:64:16
+   │
+64 │     public fun test_different_types_no_warn() {
+   │                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(missing_doc_public_function)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#missing_doc_public_function.
+
+warning: [lint] Public function is missing a doc comment.
+   ┌─ tests/model_ast_lints/find_unnecessary_casts_test.move:69:16
+   │
+69 │     public fun test_const_different_type_no_warn() {
+   │                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(missing_doc_public_function)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#missing_doc_public_function.
+
+warning: [lint] Public function is missing a doc comment.
+   ┌─ tests/model_ast_lints/find_unnecessary_casts_test.move:73:16
+   │
+73 │     public fun test_no_cast_no_warn() {
+   │                ^^^^^^^^^^^^^^^^^^^^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(missing_doc_public_function)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#missing_doc_public_function.
+
+warning: [lint] Public function is missing a doc comment.
+   ┌─ tests/model_ast_lints/find_unnecessary_casts_test.move:78:16
+   │
+78 │     public fun test_downcast_no_warn() {
+   │                ^^^^^^^^^^^^^^^^^^^^^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(missing_doc_public_function)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#missing_doc_public_function.
+
+warning: [lint] Public function is missing a doc comment.
+   ┌─ tests/model_ast_lints/find_unnecessary_casts_test.move:83:16
+   │
+83 │     public fun test_cross_type_cast_no_warn() {
+   │                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(missing_doc_public_function)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#missing_doc_public_function.
+
 error: unknown lint check: `unnecessary_casts`
    ┌─ tests/model_ast_lints/find_unnecessary_casts_test.move:90:18
    │
 90 │     #[lint::skip(unnecessary_casts)]
    │                  ^^^^^^^^^^^^^^^^^
+
+warning: [lint] Public function is missing a doc comment.
+   ┌─ tests/model_ast_lints/find_unnecessary_casts_test.move:91:16
+   │
+91 │     public fun test_skip_function_no_warn() {
+   │                ^^^^^^^^^^^^^^^^^^^^^^^^^^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(missing_doc_public_function)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#missing_doc_public_function.
 
 warning: [lint] Unnecessary cast: the expression is already of the target type. Consider removing the cast for better readability.
    ┌─ tests/model_ast_lints/find_unnecessary_casts_test.move:93:17
@@ -128,6 +290,15 @@ error: unknown lint check: `unnecessary_casts`
    │
 96 │     #[lint::skip(unnecessary_casts)]
    │                  ^^^^^^^^^^^^^^^^^
+
+warning: [lint] Public function is missing a doc comment.
+   ┌─ tests/model_ast_lints/find_unnecessary_casts_test.move:97:16
+   │
+97 │     public fun test_skip_multiple_casts_no_warn() {
+   │                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(missing_doc_public_function)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#missing_doc_public_function.
 
 warning: [lint] Unnecessary cast: the expression is already of the target type. Consider removing the cast for better readability.
     ┌─ tests/model_ast_lints/find_unnecessary_casts_test.move:100:19
@@ -147,11 +318,35 @@ warning: [lint] Unnecessary cast: the expression is already of the target type. 
     = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(unnecessary_cast)]`.
     = For more information, see https://aptos.dev/en/build/smart-contracts/linter#unnecessary_cast.
 
+warning: [lint] Module is missing a doc comment.
+    ┌─ tests/model_ast_lints/find_unnecessary_casts_test.move:1:1
+    │
+  1 │ ╭ module 0xc0ffee::unnecessary_casts_test {
+  2 │ │
+  3 │ │     const U8_VALUE: u8 = 255;
+  4 │ │     const U64_VALUE: u64 = 1000;
+    · │
+101 │ │     }
+102 │ │ }
+    │ ╰─^
+    │
+    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(missing_doc_module)]`.
+    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#missing_doc_module.
+
 error: unknown lint check: `unnecessary_casts`
     ┌─ tests/model_ast_lints/find_unnecessary_casts_test.move:105:14
     │
 105 │ #[lint::skip(unnecessary_casts)]
     │              ^^^^^^^^^^^^^^^^^
+
+warning: [lint] Public function is missing a doc comment.
+    ┌─ tests/model_ast_lints/find_unnecessary_casts_test.move:108:16
+    │
+108 │     public fun test_module_skip_no_warn() {
+    │                ^^^^^^^^^^^^^^^^^^^^^^^^
+    │
+    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(missing_doc_public_function)]`.
+    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#missing_doc_public_function.
 
 warning: [lint] Unnecessary cast: the expression is already of the target type. Consider removing the cast for better readability.
     ┌─ tests/model_ast_lints/find_unnecessary_casts_test.move:110:17
@@ -161,6 +356,15 @@ warning: [lint] Unnecessary cast: the expression is already of the target type. 
     │
     = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(unnecessary_cast)]`.
     = For more information, see https://aptos.dev/en/build/smart-contracts/linter#unnecessary_cast.
+
+warning: [lint] Public function is missing a doc comment.
+    ┌─ tests/model_ast_lints/find_unnecessary_casts_test.move:113:16
+    │
+113 │     public fun test_module_skip_multiple_no_warn() {
+    │                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    │
+    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(missing_doc_public_function)]`.
+    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#missing_doc_public_function.
 
 warning: [lint] Unnecessary cast: the expression is already of the target type. Consider removing the cast for better readability.
     ┌─ tests/model_ast_lints/find_unnecessary_casts_test.move:116:22
@@ -179,3 +383,18 @@ warning: [lint] Unnecessary cast: the expression is already of the target type. 
     │
     = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(unnecessary_cast)]`.
     = For more information, see https://aptos.dev/en/build/smart-contracts/linter#unnecessary_cast.
+
+warning: [lint] Module is missing a doc comment.
+    ┌─ tests/model_ast_lints/find_unnecessary_casts_test.move:106:1
+    │
+106 │ ╭ module 0xc0ffee::unnecessary_casts_skip_module {
+107 │ │
+108 │ │     public fun test_module_skip_no_warn() {
+109 │ │         let x: u64 = 100;
+    · │
+117 │ │     }
+118 │ │ }
+    │ ╰─^
+    │
+    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(missing_doc_module)]`.
+    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#missing_doc_module.

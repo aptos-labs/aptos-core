@@ -1,0 +1,19 @@
+
+Diagnostics:
+warning: [lint] Public function is missing a doc comment.
+  ┌─ tests/module_lints/missing_doc_public_function.move:9:16
+  │
+9 │     public fun no_doc_public() {}
+  │                ^^^^^^^^^^^^^
+  │
+  = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(missing_doc_public_function)]`.
+  = For more information, see https://aptos.dev/en/build/smart-contracts/linter#missing_doc_public_function.
+
+warning: [lint] Entry function is missing a doc comment.
+   ┌─ tests/module_lints/missing_doc_public_function.move:11:15
+   │
+11 │     entry fun no_doc_entry() {}
+   │               ^^^^^^^^^^^^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(missing_doc_public_function)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#missing_doc_public_function.

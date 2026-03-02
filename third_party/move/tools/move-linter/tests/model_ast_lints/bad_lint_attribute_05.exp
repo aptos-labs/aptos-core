@@ -5,3 +5,27 @@ error: did not expect an assigned value, expected only the names of the lint che
   │
 2 │     #[lint::skip(while_true=1)]
   │                  ^^^^^^^^^^^^
+
+warning: [lint] Public function is missing a doc comment.
+  ┌─ tests/model_ast_lints/bad_lint_attribute_05.move:3:16
+  │
+3 │     public fun test() {
+  │                ^^^^
+  │
+  = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(missing_doc_public_function)]`.
+  = For more information, see https://aptos.dev/en/build/smart-contracts/linter#missing_doc_public_function.
+
+warning: [lint] Module is missing a doc comment.
+  ┌─ tests/model_ast_lints/bad_lint_attribute_05.move:1:1
+  │
+1 │ ╭ module 0xc0ffee::m {
+2 │ │     #[lint::skip(while_true=1)]
+3 │ │     public fun test() {
+4 │ │
+5 │ │     }
+6 │ │
+7 │ │ }
+  │ ╰─^
+  │
+  = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(missing_doc_module)]`.
+  = For more information, see https://aptos.dev/en/build/smart-contracts/linter#missing_doc_module.

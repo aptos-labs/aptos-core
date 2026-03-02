@@ -1,5 +1,14 @@
 
 Diagnostics:
+warning: [lint] Public function is missing a doc comment.
+  ┌─ tests/model_ast_lints/simpler_numeric_expression_warn.move:2:16
+  │
+2 │     public fun test1(x: u64): u64 {
+  │                ^^^^^
+  │
+  = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(missing_doc_public_function)]`.
+  = For more information, see https://aptos.dev/en/build/smart-contracts/linter#missing_doc_public_function.
+
 warning: [lint] This expression can be simplified to just `0`
   ┌─ tests/model_ast_lints/simpler_numeric_expression_warn.move:3:9
   │
@@ -8,6 +17,15 @@ warning: [lint] This expression can be simplified to just `0`
   │
   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(simpler_numeric_expression)]`.
   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#simpler_numeric_expression.
+
+warning: [lint] Public function is missing a doc comment.
+  ┌─ tests/model_ast_lints/simpler_numeric_expression_warn.move:6:16
+  │
+6 │     public fun test2(x: u64): u64 {
+  │                ^^^^^
+  │
+  = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(missing_doc_public_function)]`.
+  = For more information, see https://aptos.dev/en/build/smart-contracts/linter#missing_doc_public_function.
 
 warning: [lint] This expression can be simplified to just `0`
   ┌─ tests/model_ast_lints/simpler_numeric_expression_warn.move:7:9
@@ -26,6 +44,15 @@ warning: [lint] This expression can be simplified to just `0`
   │
   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(simpler_numeric_expression)]`.
   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#simpler_numeric_expression.
+
+warning: [lint] Public function is missing a doc comment.
+   ┌─ tests/model_ast_lints/simpler_numeric_expression_warn.move:10:16
+   │
+10 │     public fun test3(x: u64): u64 {
+   │                ^^^^^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(missing_doc_public_function)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#missing_doc_public_function.
 
 warning: [lint] This expression can be simplified to just `0`
    ┌─ tests/model_ast_lints/simpler_numeric_expression_warn.move:11:10
@@ -53,6 +80,15 @@ warning: [lint] This binary operation can be simplified to just the left-hand si
    │
    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(simpler_numeric_expression)]`.
    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#simpler_numeric_expression.
+
+warning: [lint] Public function is missing a doc comment.
+   ┌─ tests/model_ast_lints/simpler_numeric_expression_warn.move:14:16
+   │
+14 │     public fun test4(x: u64): u64 {
+   │                ^^^^^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(missing_doc_public_function)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#missing_doc_public_function.
 
 warning: [lint] This binary operation can be simplified to just the left-hand side
    ┌─ tests/model_ast_lints/simpler_numeric_expression_warn.move:15:9
@@ -99,6 +135,15 @@ warning: [lint] This binary operation can be simplified to just the left-hand si
    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(simpler_numeric_expression)]`.
    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#simpler_numeric_expression.
 
+warning: [lint] Public function is missing a doc comment.
+   ┌─ tests/model_ast_lints/simpler_numeric_expression_warn.move:18:16
+   │
+18 │     public fun test5(x: u64): u64 {
+   │                ^^^^^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(missing_doc_public_function)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#missing_doc_public_function.
+
 warning: [lint] This binary operation can be simplified to just the left-hand side
    ┌─ tests/model_ast_lints/simpler_numeric_expression_warn.move:19:9
    │
@@ -116,6 +161,15 @@ warning: [lint] This binary operation can be simplified to just the left-hand si
    │
    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(simpler_numeric_expression)]`.
    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#simpler_numeric_expression.
+
+warning: [lint] Public function is missing a doc comment.
+   ┌─ tests/model_ast_lints/simpler_numeric_expression_warn.move:22:16
+   │
+22 │     public fun test6(x: u64): u64 {
+   │                ^^^^^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(missing_doc_public_function)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#missing_doc_public_function.
 
 warning: [lint] This binary operation can be simplified to just the right-hand side
    ┌─ tests/model_ast_lints/simpler_numeric_expression_warn.move:23:13
@@ -144,6 +198,15 @@ warning: [lint] This binary operation can be simplified to just the right-hand s
    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(simpler_numeric_expression)]`.
    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#simpler_numeric_expression.
 
+warning: [lint] Public function is missing a doc comment.
+   ┌─ tests/model_ast_lints/simpler_numeric_expression_warn.move:26:16
+   │
+26 │     public fun test7(x: u64): u64 {
+   │                ^^^^^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(missing_doc_public_function)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#missing_doc_public_function.
+
 warning: [lint] This binary operation can be simplified to just the right-hand side
    ┌─ tests/model_ast_lints/simpler_numeric_expression_warn.move:27:9
    │
@@ -152,6 +215,15 @@ warning: [lint] This binary operation can be simplified to just the right-hand s
    │
    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(simpler_numeric_expression)]`.
    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#simpler_numeric_expression.
+
+warning: [lint] Public function is missing a doc comment.
+   ┌─ tests/model_ast_lints/simpler_numeric_expression_warn.move:30:16
+   │
+30 │     public fun test8(x: u8): u64 {
+   │                ^^^^^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(missing_doc_public_function)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#missing_doc_public_function.
 
 warning: [lint] This binary operation can be simplified to just the left-hand side
    ┌─ tests/model_ast_lints/simpler_numeric_expression_warn.move:31:14
@@ -170,3 +242,63 @@ warning: [lint] This expression can be simplified to just `0`
    │
    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(simpler_numeric_expression)]`.
    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#simpler_numeric_expression.
+
+warning: [lint] Module is missing a doc comment.
+   ┌─ tests/model_ast_lints/simpler_numeric_expression_warn.move:1:1
+   │
+ 1 │ ╭ module 0xc0ffee::m {
+ 2 │ │     public fun test1(x: u64): u64 {
+ 3 │ │         (x & 0) + 1
+ 4 │ │     }
+   · │
+32 │ │     }
+33 │ │ }
+   │ ╰─^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(missing_doc_module)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#missing_doc_module.
+
+warning: [lint] Public function is missing a doc comment.
+   ┌─ tests/model_ast_lints/simpler_numeric_expression_warn.move:37:16
+   │
+37 │     public fun test8(x: u8): u64 {
+   │                ^^^^^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(missing_doc_public_function)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#missing_doc_public_function.
+
+warning: [lint] Module is missing a doc comment.
+   ┌─ tests/model_ast_lints/simpler_numeric_expression_warn.move:36:1
+   │
+36 │ ╭ module 0xc0ffee::no_warn1 {
+37 │ │     public fun test8(x: u8): u64 {
+38 │ │         0 >> x + 0 << x
+39 │ │     }
+40 │ │ }
+   │ ╰─^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(missing_doc_module)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#missing_doc_module.
+
+warning: [lint] Public function is missing a doc comment.
+   ┌─ tests/model_ast_lints/simpler_numeric_expression_warn.move:44:16
+   │
+44 │     public fun test8(x: u8): u64 {
+   │                ^^^^^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(missing_doc_public_function)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#missing_doc_public_function.
+
+warning: [lint] Module is missing a doc comment.
+   ┌─ tests/model_ast_lints/simpler_numeric_expression_warn.move:42:1
+   │
+42 │ ╭ module 0xc0ffee::no_warn2 {
+43 │ │     #[lint::skip(simpler_numeric_expression)]
+44 │ │     public fun test8(x: u8): u64 {
+45 │ │         0 >> x + 0 << x
+46 │ │     }
+47 │ │ }
+   │ ╰─^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(missing_doc_module)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#missing_doc_module.

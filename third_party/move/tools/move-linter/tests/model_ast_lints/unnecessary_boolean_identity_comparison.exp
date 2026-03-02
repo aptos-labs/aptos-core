@@ -1,5 +1,23 @@
 
 Diagnostics:
+warning: [lint] Constant is missing a doc comment.
+  ┌─ tests/model_ast_lints/unnecessary_boolean_identity_comparison.move:2:5
+  │
+2 │     const TRUE: bool = true;
+  │     ^^^^^^^^^^^^^^^^^^^^^^^^
+  │
+  = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(missing_doc_constant)]`.
+  = For more information, see https://aptos.dev/en/build/smart-contracts/linter#missing_doc_constant.
+
+warning: [lint] Public function is missing a doc comment.
+   ┌─ tests/model_ast_lints/unnecessary_boolean_identity_comparison.move:13:16
+   │
+13 │     public fun test1(x: u64) {
+   │                ^^^^^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(missing_doc_public_function)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#missing_doc_public_function.
+
 warning: [lint] Directly use the boolean expression, instead of comparing it with `true`.
    ┌─ tests/model_ast_lints/unnecessary_boolean_identity_comparison.move:14:13
    │
@@ -117,6 +135,15 @@ warning: [lint] Directly use the boolean expression, instead of comparing it wit
    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(unnecessary_boolean_identity_comparison)]`.
    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#unnecessary_boolean_identity_comparison.
 
+warning: [lint] Public function is missing a doc comment.
+   ┌─ tests/model_ast_lints/unnecessary_boolean_identity_comparison.move:29:16
+   │
+29 │     public fun test2(x: &bool, y: &bool) {
+   │                ^^^^^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(missing_doc_public_function)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#missing_doc_public_function.
+
 warning: [lint] Directly use the boolean expression, instead of comparing it with `true`.
    ┌─ tests/model_ast_lints/unnecessary_boolean_identity_comparison.move:30:13
    │
@@ -125,3 +152,41 @@ warning: [lint] Directly use the boolean expression, instead of comparing it wit
    │
    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(unnecessary_boolean_identity_comparison)]`.
    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#unnecessary_boolean_identity_comparison.
+
+warning: [lint] Module is missing a doc comment.
+   ┌─ tests/model_ast_lints/unnecessary_boolean_identity_comparison.move:1:1
+   │
+ 1 │ ╭ module 0xc0ffee::m {
+ 2 │ │     const TRUE: bool = true;
+ 3 │ │
+ 4 │ │     fun foo(x: u64): bool {
+   · │
+31 │ │     }
+32 │ │ }
+   │ ╰─^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(missing_doc_module)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#missing_doc_module.
+
+warning: [lint] Public function is missing a doc comment.
+   ┌─ tests/model_ast_lints/unnecessary_boolean_identity_comparison.move:36:16
+   │
+36 │     public fun test(x: bool) {
+   │                ^^^^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(missing_doc_public_function)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#missing_doc_public_function.
+
+warning: [lint] Module is missing a doc comment.
+   ┌─ tests/model_ast_lints/unnecessary_boolean_identity_comparison.move:34:1
+   │
+34 │ ╭ module 0xc0ffee::no_warn {
+35 │ │     #[lint::skip(unnecessary_boolean_identity_comparison)]
+36 │ │     public fun test(x: bool) {
+37 │ │         if (x == true) abort 1;
+38 │ │     }
+39 │ │ }
+   │ ╰─^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(missing_doc_module)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#missing_doc_module.

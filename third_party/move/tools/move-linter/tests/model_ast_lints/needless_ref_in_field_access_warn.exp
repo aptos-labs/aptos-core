@@ -1,5 +1,46 @@
 
 Diagnostics:
+warning: [lint] Struct is missing a doc comment.
+  ┌─ tests/model_ast_lints/needless_ref_in_field_access_warn.move:2:5
+  │
+2 │ ╭     struct S has key, drop {
+3 │ │         x: u64,
+4 │ │         y: U,
+5 │ │     }
+  │ ╰─────^
+  │
+  = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(missing_doc_struct)]`.
+  = For more information, see https://aptos.dev/en/build/smart-contracts/linter#missing_doc_struct.
+
+warning: [lint] Struct is missing a doc comment.
+  ┌─ tests/model_ast_lints/needless_ref_in_field_access_warn.move:7:5
+  │
+7 │ ╭     struct U has copy, store, drop {
+8 │ │         a: u64
+9 │ │     }
+  │ ╰─────^
+  │
+  = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(missing_doc_struct)]`.
+  = For more information, see https://aptos.dev/en/build/smart-contracts/linter#missing_doc_struct.
+
+warning: [lint] Public function is missing a doc comment.
+   ┌─ tests/model_ast_lints/needless_ref_in_field_access_warn.move:11:16
+   │
+11 │     public fun make_S(): S {
+   │                ^^^^^^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(missing_doc_public_function)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#missing_doc_public_function.
+
+warning: [lint] Public function is missing a doc comment.
+   ┌─ tests/model_ast_lints/needless_ref_in_field_access_warn.move:18:16
+   │
+18 │     public fun test1_warn(s: S): u64 {
+   │                ^^^^^^^^^^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(missing_doc_public_function)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#missing_doc_public_function.
+
 warning: [lint] Needless `&` taken for field access: consider removing `&` and directly accessing the field `x`
    ┌─ tests/model_ast_lints/needless_ref_in_field_access_warn.move:19:9
    │
@@ -8,6 +49,24 @@ warning: [lint] Needless `&` taken for field access: consider removing `&` and d
    │
    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(needless_ref_in_field_access)]`.
    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#needless_ref_in_field_access.
+
+warning: [lint] Public function is missing a doc comment.
+   ┌─ tests/model_ast_lints/needless_ref_in_field_access_warn.move:22:16
+   │
+22 │     public fun test1_no_warn(s: S): u64 {
+   │                ^^^^^^^^^^^^^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(missing_doc_public_function)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#missing_doc_public_function.
+
+warning: [lint] Public function is missing a doc comment.
+   ┌─ tests/model_ast_lints/needless_ref_in_field_access_warn.move:26:16
+   │
+26 │     public fun test2_warn(s: S): u64 {
+   │                ^^^^^^^^^^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(missing_doc_public_function)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#missing_doc_public_function.
 
 warning: [lint] Needless `&` taken for field access: consider removing `&` and directly accessing the field `y`
    ┌─ tests/model_ast_lints/needless_ref_in_field_access_warn.move:27:11
@@ -44,6 +103,24 @@ warning: [lint] Needless `&` taken for field access: consider removing `&` and d
    │
    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(needless_ref_in_field_access)]`.
    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#needless_ref_in_field_access.
+
+warning: [lint] Public function is missing a doc comment.
+   ┌─ tests/model_ast_lints/needless_ref_in_field_access_warn.move:30:16
+   │
+30 │     public fun test2_no_warn(s: S): u64 {
+   │                ^^^^^^^^^^^^^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(missing_doc_public_function)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#missing_doc_public_function.
+
+warning: [lint] Public function is missing a doc comment.
+   ┌─ tests/model_ast_lints/needless_ref_in_field_access_warn.move:34:16
+   │
+34 │     public fun test3_warn(s: S): u64 {
+   │                ^^^^^^^^^^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(missing_doc_public_function)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#missing_doc_public_function.
 
 warning: [lint] Needless `&` taken for field access: consider removing `&` and directly accessing the field `y`
    ┌─ tests/model_ast_lints/needless_ref_in_field_access_warn.move:35:9
@@ -90,6 +167,24 @@ warning: [lint] Needless `&` taken for field access: consider removing `&` and d
    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(needless_ref_in_field_access)]`.
    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#needless_ref_in_field_access.
 
+warning: [lint] Public function is missing a doc comment.
+   ┌─ tests/model_ast_lints/needless_ref_in_field_access_warn.move:38:16
+   │
+38 │     public fun test3_no_warn(s: S): u64 {
+   │                ^^^^^^^^^^^^^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(missing_doc_public_function)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#missing_doc_public_function.
+
+warning: [lint] Public function is missing a doc comment.
+   ┌─ tests/model_ast_lints/needless_ref_in_field_access_warn.move:42:16
+   │
+42 │     public fun test4_warn(): u64 {
+   │                ^^^^^^^^^^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(missing_doc_public_function)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#missing_doc_public_function.
+
 warning: [lint] Needless `&` taken for field access: consider removing `&` and directly accessing the field `y`
    ┌─ tests/model_ast_lints/needless_ref_in_field_access_warn.move:43:9
    │
@@ -98,6 +193,24 @@ warning: [lint] Needless `&` taken for field access: consider removing `&` and d
    │
    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(needless_ref_in_field_access)]`.
    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#needless_ref_in_field_access.
+
+warning: [lint] Public function is missing a doc comment.
+   ┌─ tests/model_ast_lints/needless_ref_in_field_access_warn.move:46:16
+   │
+46 │     public fun test4_no_warn(): u64 {
+   │                ^^^^^^^^^^^^^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(missing_doc_public_function)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#missing_doc_public_function.
+
+warning: [lint] Public function is missing a doc comment.
+   ┌─ tests/model_ast_lints/needless_ref_in_field_access_warn.move:50:16
+   │
+50 │     public fun test5_warn(s: S): u64 {
+   │                ^^^^^^^^^^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(missing_doc_public_function)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#missing_doc_public_function.
 
 warning: [lint] Needless `&mut` taken for field access: consider removing `&mut` and directly accessing the field `y`
    ┌─ tests/model_ast_lints/needless_ref_in_field_access_warn.move:51:9
@@ -126,6 +239,24 @@ warning: [lint] Needless `&mut` taken for field access: consider removing `&mut`
    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(needless_ref_in_field_access)]`.
    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#needless_ref_in_field_access.
 
+warning: [lint] Public function is missing a doc comment.
+   ┌─ tests/model_ast_lints/needless_ref_in_field_access_warn.move:54:16
+   │
+54 │     public fun test5_no_warn(s: S): u64 {
+   │                ^^^^^^^^^^^^^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(missing_doc_public_function)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#missing_doc_public_function.
+
+warning: [lint] Public function is missing a doc comment.
+   ┌─ tests/model_ast_lints/needless_ref_in_field_access_warn.move:58:16
+   │
+58 │     public fun test6_warn(s: S) {
+   │                ^^^^^^^^^^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(missing_doc_public_function)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#missing_doc_public_function.
+
 warning: [lint] Needless `&mut` taken for field access: consider removing `&mut` and directly accessing the field `x`
    ┌─ tests/model_ast_lints/needless_ref_in_field_access_warn.move:59:9
    │
@@ -134,6 +265,24 @@ warning: [lint] Needless `&mut` taken for field access: consider removing `&mut`
    │
    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(needless_ref_in_field_access)]`.
    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#needless_ref_in_field_access.
+
+warning: [lint] Public function is missing a doc comment.
+   ┌─ tests/model_ast_lints/needless_ref_in_field_access_warn.move:62:16
+   │
+62 │     public fun test6_no_warn(s: S) {
+   │                ^^^^^^^^^^^^^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(missing_doc_public_function)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#missing_doc_public_function.
+
+warning: [lint] Public function is missing a doc comment.
+   ┌─ tests/model_ast_lints/needless_ref_in_field_access_warn.move:66:16
+   │
+66 │     public fun test7_warn(s: S) {
+   │                ^^^^^^^^^^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(missing_doc_public_function)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#missing_doc_public_function.
 
 warning: [lint] Needless `&mut` taken for field access: consider removing `&mut` and directly accessing the field `y`
    ┌─ tests/model_ast_lints/needless_ref_in_field_access_warn.move:67:15
@@ -162,6 +311,24 @@ warning: [lint] Needless `&mut` taken for field access: consider removing `&mut`
    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(needless_ref_in_field_access)]`.
    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#needless_ref_in_field_access.
 
+warning: [lint] Public function is missing a doc comment.
+   ┌─ tests/model_ast_lints/needless_ref_in_field_access_warn.move:71:16
+   │
+71 │     public fun test7_no_warn(s: S) {
+   │                ^^^^^^^^^^^^^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(missing_doc_public_function)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#missing_doc_public_function.
+
+warning: [lint] Public function is missing a doc comment.
+   ┌─ tests/model_ast_lints/needless_ref_in_field_access_warn.move:76:16
+   │
+76 │     public fun test8_warn() {
+   │                ^^^^^^^^^^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(missing_doc_public_function)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#missing_doc_public_function.
+
 warning: [lint] Needless `&mut` taken for field access: consider removing `&mut` and directly accessing the field `a`
    ┌─ tests/model_ast_lints/needless_ref_in_field_access_warn.move:77:9
    │
@@ -170,6 +337,36 @@ warning: [lint] Needless `&mut` taken for field access: consider removing `&mut`
    │
    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(needless_ref_in_field_access)]`.
    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#needless_ref_in_field_access.
+
+warning: [lint] Public function is missing a doc comment.
+   ┌─ tests/model_ast_lints/needless_ref_in_field_access_warn.move:80:16
+   │
+80 │     public fun test8_no_warn() {
+   │                ^^^^^^^^^^^^^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(missing_doc_public_function)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#missing_doc_public_function.
+
+warning: [lint] Enum is missing a doc comment.
+   ┌─ tests/model_ast_lints/needless_ref_in_field_access_warn.move:84:5
+   │
+84 │ ╭     enum E has drop {
+85 │ │         A(u64),
+86 │ │         B(u64),
+87 │ │     }
+   │ ╰─────^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(missing_doc_struct)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#missing_doc_struct.
+
+warning: [lint] Public function is missing a doc comment.
+   ┌─ tests/model_ast_lints/needless_ref_in_field_access_warn.move:89:16
+   │
+89 │     public fun test_9_warn(e: E): u64 {
+   │                ^^^^^^^^^^^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(missing_doc_public_function)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#missing_doc_public_function.
 
 warning: [lint] Needless `&` taken for field access: consider removing `&` and directly accessing the field `0`
    ┌─ tests/model_ast_lints/needless_ref_in_field_access_warn.move:90:9
@@ -189,6 +386,24 @@ warning: [lint] Needless `&mut` taken for field access: consider removing `&mut`
    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(needless_ref_in_field_access)]`.
    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#needless_ref_in_field_access.
 
+warning: [lint] Public function is missing a doc comment.
+   ┌─ tests/model_ast_lints/needless_ref_in_field_access_warn.move:93:16
+   │
+93 │     public fun test_9_no_warn(e: E): u64 {
+   │                ^^^^^^^^^^^^^^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(missing_doc_public_function)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#missing_doc_public_function.
+
+warning: [lint] Public function is missing a doc comment.
+   ┌─ tests/model_ast_lints/needless_ref_in_field_access_warn.move:97:16
+   │
+97 │     public fun test_10_warn(e: E) {
+   │                ^^^^^^^^^^^^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(missing_doc_public_function)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#missing_doc_public_function.
+
 warning: [lint] Needless `&mut` taken for field access: consider removing `&mut` and directly accessing the field `0`
    ┌─ tests/model_ast_lints/needless_ref_in_field_access_warn.move:98:9
    │
@@ -197,6 +412,100 @@ warning: [lint] Needless `&mut` taken for field access: consider removing `&mut`
    │
    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(needless_ref_in_field_access)]`.
    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#needless_ref_in_field_access.
+
+warning: [lint] Public function is missing a doc comment.
+    ┌─ tests/model_ast_lints/needless_ref_in_field_access_warn.move:101:16
+    │
+101 │     public fun test_10_no_warn(e: E) {
+    │                ^^^^^^^^^^^^^^^
+    │
+    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(missing_doc_public_function)]`.
+    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#missing_doc_public_function.
+
+warning: [lint] Module is missing a doc comment.
+    ┌─ tests/model_ast_lints/needless_ref_in_field_access_warn.move:1:1
+    │
+  1 │ ╭ module 0xc0ffee::m {
+  2 │ │     struct S has key, drop {
+  3 │ │         x: u64,
+  4 │ │         y: U,
+    · │
+103 │ │     }
+104 │ │ }
+    │ ╰─^
+    │
+    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(missing_doc_module)]`.
+    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#missing_doc_module.
+
+warning: [lint] Struct is missing a doc comment.
+    ┌─ tests/model_ast_lints/needless_ref_in_field_access_warn.move:108:5
+    │
+108 │ ╭     struct S has key, drop {
+109 │ │         x: u64,
+110 │ │     }
+    │ ╰─────^
+    │
+    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(missing_doc_struct)]`.
+    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#missing_doc_struct.
+
+warning: [lint] Public function is missing a doc comment.
+    ┌─ tests/model_ast_lints/needless_ref_in_field_access_warn.move:113:16
+    │
+113 │     public fun test1_warn(s: S): u64 {
+    │                ^^^^^^^^^^
+    │
+    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(missing_doc_public_function)]`.
+    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#missing_doc_public_function.
+
+warning: [lint] Module is missing a doc comment.
+    ┌─ tests/model_ast_lints/needless_ref_in_field_access_warn.move:107:1
+    │
+107 │ ╭ module 0xc0ffee::no_warn_1 {
+108 │ │     struct S has key, drop {
+109 │ │         x: u64,
+110 │ │     }
+    · │
+115 │ │     }
+116 │ │ }
+    │ ╰─^
+    │
+    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(missing_doc_module)]`.
+    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#missing_doc_module.
+
+warning: [lint] Struct is missing a doc comment.
+    ┌─ tests/model_ast_lints/needless_ref_in_field_access_warn.move:120:5
+    │
+120 │ ╭     struct S has key, drop {
+121 │ │         x: u64,
+122 │ │     }
+    │ ╰─────^
+    │
+    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(missing_doc_struct)]`.
+    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#missing_doc_struct.
+
+warning: [lint] Public function is missing a doc comment.
+    ┌─ tests/model_ast_lints/needless_ref_in_field_access_warn.move:124:16
+    │
+124 │     public fun test1_warn(s: S): u64 {
+    │                ^^^^^^^^^^
+    │
+    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(missing_doc_public_function)]`.
+    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#missing_doc_public_function.
+
+warning: [lint] Module is missing a doc comment.
+    ┌─ tests/model_ast_lints/needless_ref_in_field_access_warn.move:119:1
+    │
+119 │ ╭ module 0xc0ffee::no_warn_2 {
+120 │ │     struct S has key, drop {
+121 │ │         x: u64,
+122 │ │     }
+    · │
+126 │ │     }
+127 │ │ }
+    │ ╰─^
+    │
+    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(missing_doc_module)]`.
+    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#missing_doc_module.
 
 warning: [lint] Needless mutable reference or borrow: consider using immutable reference or borrow instead
    ┌─ tests/model_ast_lints/needless_ref_in_field_access_warn.move:51:9

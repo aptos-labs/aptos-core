@@ -1,5 +1,24 @@
 
 Diagnostics:
+warning: [lint] Use doc comment `///` instead of regular comment `//` for documentable items.
+  ┌─ tests/model_ast_lints/cyclomatic_complexity_warn.move:2:1
+  │
+2 │ ╭     // complexity: 12
+3 │ │     public fun high_complexity(a: bool, b: bool): bool {
+  │ ╰^
+  │
+  = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(prefer_doc_comment)]`.
+  = For more information, see https://aptos.dev/en/build/smart-contracts/linter#prefer_doc_comment.
+
+warning: [lint] Public function is missing a doc comment.
+  ┌─ tests/model_ast_lints/cyclomatic_complexity_warn.move:3:16
+  │
+3 │     public fun high_complexity(a: bool, b: bool): bool {
+  │                ^^^^^^^^^^^^^^^
+  │
+  = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(missing_doc_public_function)]`.
+  = For more information, see https://aptos.dev/en/build/smart-contracts/linter#missing_doc_public_function.
+
 warning: [lint] Function `complexity::high_complexity` has cyclomatic complexity 12, which exceeds the allowed threshold of 10
    ┌─ tests/model_ast_lints/cyclomatic_complexity_warn.move:3:5
    │
@@ -14,6 +33,35 @@ warning: [lint] Function `complexity::high_complexity` has cyclomatic complexity
    │
    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(cyclomatic_complexity)]`.
    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#cyclomatic_complexity.
+
+warning: [lint] Use doc comment `///` instead of regular comment `//` for documentable items.
+   ┌─ tests/model_ast_lints/cyclomatic_complexity_warn.move:29:1
+   │
+29 │ ╭     // complexity: 1
+30 │ │     public fun low_complexity(): bool {
+   │ ╰^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(prefer_doc_comment)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#prefer_doc_comment.
+
+warning: [lint] Public function is missing a doc comment.
+   ┌─ tests/model_ast_lints/cyclomatic_complexity_warn.move:30:16
+   │
+30 │     public fun low_complexity(): bool {
+   │                ^^^^^^^^^^^^^^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(missing_doc_public_function)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#missing_doc_public_function.
+
+warning: [lint] Use doc comment `///` instead of regular comment `//` for documentable items.
+   ┌─ tests/model_ast_lints/cyclomatic_complexity_warn.move:35:1
+   │
+35 │ ╭     // complexity: 11
+36 │ │     inline fun inline_fun(b: u64): u64 {
+   │ ╰^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(prefer_doc_comment)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#prefer_doc_comment.
 
 warning: [lint] Function `complexity::inline_fun` has cyclomatic complexity 11, which exceeds the allowed threshold of 10
    ┌─ tests/model_ast_lints/cyclomatic_complexity_warn.move:36:5
@@ -30,6 +78,386 @@ warning: [lint] Function `complexity::inline_fun` has cyclomatic complexity 11, 
    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(cyclomatic_complexity)]`.
    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#cyclomatic_complexity.
 
+warning: [lint] Use doc comment `///` instead of regular comment `//` for documentable items.
+   ┌─ tests/model_ast_lints/cyclomatic_complexity_warn.move:62:1
+   │
+62 │ ╭     // complexity: 1
+63 │ │     public fun simple_function(): u64 {
+   │ ╰^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(prefer_doc_comment)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#prefer_doc_comment.
+
+warning: [lint] Public function is missing a doc comment.
+   ┌─ tests/model_ast_lints/cyclomatic_complexity_warn.move:63:16
+   │
+63 │     public fun simple_function(): u64 {
+   │                ^^^^^^^^^^^^^^^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(missing_doc_public_function)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#missing_doc_public_function.
+
+warning: [lint] Use doc comment `///` instead of regular comment `//` for documentable items.
+   ┌─ tests/model_ast_lints/cyclomatic_complexity_warn.move:67:1
+   │
+67 │ ╭     // complexity: 2
+68 │ │     public fun single_if(x: u64): u64 {
+   │ ╰^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(prefer_doc_comment)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#prefer_doc_comment.
+
+warning: [lint] Public function is missing a doc comment.
+   ┌─ tests/model_ast_lints/cyclomatic_complexity_warn.move:68:16
+   │
+68 │     public fun single_if(x: u64): u64 {
+   │                ^^^^^^^^^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(missing_doc_public_function)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#missing_doc_public_function.
+
+warning: [lint] Use doc comment `///` instead of regular comment `//` for documentable items.
+   ┌─ tests/model_ast_lints/cyclomatic_complexity_warn.move:76:1
+   │
+76 │ ╭     // complexity: 4
+77 │ │     public fun multiple_if_else(x: u64): u64 {
+   │ ╰^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(prefer_doc_comment)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#prefer_doc_comment.
+
+warning: [lint] Public function is missing a doc comment.
+   ┌─ tests/model_ast_lints/cyclomatic_complexity_warn.move:77:16
+   │
+77 │     public fun multiple_if_else(x: u64): u64 {
+   │                ^^^^^^^^^^^^^^^^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(missing_doc_public_function)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#missing_doc_public_function.
+
+warning: [lint] Use doc comment `///` instead of regular comment `//` for documentable items.
+   ┌─ tests/model_ast_lints/cyclomatic_complexity_warn.move:89:1
+   │
+89 │ ╭     // complexity: 4
+90 │ │     public fun simple_while(x: u64): u64 {
+   │ ╰^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(prefer_doc_comment)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#prefer_doc_comment.
+
+warning: [lint] Public function is missing a doc comment.
+   ┌─ tests/model_ast_lints/cyclomatic_complexity_warn.move:90:16
+   │
+90 │     public fun simple_while(x: u64): u64 {
+   │                ^^^^^^^^^^^^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(missing_doc_public_function)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#missing_doc_public_function.
+
+warning: [lint] Use doc comment `///` instead of regular comment `//` for documentable items.
+    ┌─ tests/model_ast_lints/cyclomatic_complexity_warn.move:101:1
+    │
+101 │ ╭     // complexity: 4
+102 │ │     public fun while_with_conditions(x: u64): u64 {
+    │ ╰^
+    │
+    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(prefer_doc_comment)]`.
+    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#prefer_doc_comment.
+
+warning: [lint] Public function is missing a doc comment.
+    ┌─ tests/model_ast_lints/cyclomatic_complexity_warn.move:102:16
+    │
+102 │     public fun while_with_conditions(x: u64): u64 {
+    │                ^^^^^^^^^^^^^^^^^^^^^
+    │
+    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(missing_doc_public_function)]`.
+    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#missing_doc_public_function.
+
+warning: [lint] Use doc comment `///` instead of regular comment `//` for documentable items.
+    ┌─ tests/model_ast_lints/cyclomatic_complexity_warn.move:116:1
+    │
+116 │ ╭     // complexity: 4
+117 │ │     public fun while_with_nested_conditions(x: u64): u64 {
+    │ ╰^
+    │
+    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(prefer_doc_comment)]`.
+    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#prefer_doc_comment.
+
+warning: [lint] Public function is missing a doc comment.
+    ┌─ tests/model_ast_lints/cyclomatic_complexity_warn.move:117:16
+    │
+117 │     public fun while_with_nested_conditions(x: u64): u64 {
+    │                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    │
+    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(missing_doc_public_function)]`.
+    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#missing_doc_public_function.
+
+warning: [lint] Use doc comment `///` instead of regular comment `//` for documentable items.
+    ┌─ tests/model_ast_lints/cyclomatic_complexity_warn.move:131:1
+    │
+131 │ ╭     // complexity: 5
+132 │ │     public fun while_with_nested_ifs(n: u64): u64 {
+    │ ╰^
+    │
+    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(prefer_doc_comment)]`.
+    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#prefer_doc_comment.
+
+warning: [lint] Public function is missing a doc comment.
+    ┌─ tests/model_ast_lints/cyclomatic_complexity_warn.move:132:16
+    │
+132 │     public fun while_with_nested_ifs(n: u64): u64 {
+    │                ^^^^^^^^^^^^^^^^^^^^^
+    │
+    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(missing_doc_public_function)]`.
+    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#missing_doc_public_function.
+
+warning: [lint] Use doc comment `///` instead of regular comment `//` for documentable items.
+    ┌─ tests/model_ast_lints/cyclomatic_complexity_warn.move:154:1
+    │
+154 │ ╭     // complexity: 8
+155 │ │     public fun complex_nested_structure(x: u64, y: u64): u64 {
+    │ ╰^
+    │
+    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(prefer_doc_comment)]`.
+    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#prefer_doc_comment.
+
+warning: [lint] Public function is missing a doc comment.
+    ┌─ tests/model_ast_lints/cyclomatic_complexity_warn.move:155:16
+    │
+155 │     public fun complex_nested_structure(x: u64, y: u64): u64 {
+    │                ^^^^^^^^^^^^^^^^^^^^^^^^
+    │
+    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(missing_doc_public_function)]`.
+    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#missing_doc_public_function.
+
+warning: [lint] Use doc comment `///` instead of regular comment `//` for documentable items.
+    ┌─ tests/model_ast_lints/cyclomatic_complexity_warn.move:179:1
+    │
+179 │ ╭     // complexity: 7
+180 │ │     public fun nested_while_loops(n: u64): u64 {
+    │ ╰^
+    │
+    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(prefer_doc_comment)]`.
+    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#prefer_doc_comment.
+
+warning: [lint] Public function is missing a doc comment.
+    ┌─ tests/model_ast_lints/cyclomatic_complexity_warn.move:180:16
+    │
+180 │     public fun nested_while_loops(n: u64): u64 {
+    │                ^^^^^^^^^^^^^^^^^^
+    │
+    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(missing_doc_public_function)]`.
+    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#missing_doc_public_function.
+
+warning: [lint] Use doc comment `///` instead of regular comment `//` for documentable items.
+    ┌─ tests/model_ast_lints/cyclomatic_complexity_warn.move:206:1
+    │
+206 │ ╭     // complexity: 7
+207 │ │     public fun very_complex_while(): u64 {
+    │ ╰^
+    │
+    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(prefer_doc_comment)]`.
+    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#prefer_doc_comment.
+
+warning: [lint] Public function is missing a doc comment.
+    ┌─ tests/model_ast_lints/cyclomatic_complexity_warn.move:207:16
+    │
+207 │     public fun very_complex_while(): u64 {
+    │                ^^^^^^^^^^^^^^^^^^
+    │
+    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(missing_doc_public_function)]`.
+    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#missing_doc_public_function.
+
+warning: [lint] Use doc comment `///` instead of regular comment `//` for documentable items.
+    ┌─ tests/model_ast_lints/cyclomatic_complexity_warn.move:235:1
+    │
+235 │ ╭     // complexity: 6
+236 │ │     public fun while_with_early_returns(x: u64): u64 {
+    │ ╰^
+    │
+    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(prefer_doc_comment)]`.
+    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#prefer_doc_comment.
+
+warning: [lint] Public function is missing a doc comment.
+    ┌─ tests/model_ast_lints/cyclomatic_complexity_warn.move:236:16
+    │
+236 │     public fun while_with_early_returns(x: u64): u64 {
+    │                ^^^^^^^^^^^^^^^^^^^^^^^^
+    │
+    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(missing_doc_public_function)]`.
+    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#missing_doc_public_function.
+
+warning: [lint] Use doc comment `///` instead of regular comment `//` for documentable items.
+    ┌─ tests/model_ast_lints/cyclomatic_complexity_warn.move:253:1
+    │
+253 │ ╭     // complexity: 10
+254 │ │     public fun switch_like_structure(n: u64): u64 {
+    │ ╰^
+    │
+    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(prefer_doc_comment)]`.
+    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#prefer_doc_comment.
+
+warning: [lint] Public function is missing a doc comment.
+    ┌─ tests/model_ast_lints/cyclomatic_complexity_warn.move:254:16
+    │
+254 │     public fun switch_like_structure(n: u64): u64 {
+    │                ^^^^^^^^^^^^^^^^^^^^^
+    │
+    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(missing_doc_public_function)]`.
+    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#missing_doc_public_function.
+
+warning: [lint] Use doc comment `///` instead of regular comment `//` for documentable items.
+    ┌─ tests/model_ast_lints/cyclomatic_complexity_warn.move:282:1
+    │
+282 │ ╭     // complexity: 5
+283 │ │     public fun double_nested_while_loops(n: u64, m: u64): u64 {
+    │ ╰^
+    │
+    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(prefer_doc_comment)]`.
+    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#prefer_doc_comment.
+
+warning: [lint] Public function is missing a doc comment.
+    ┌─ tests/model_ast_lints/cyclomatic_complexity_warn.move:283:16
+    │
+283 │     public fun double_nested_while_loops(n: u64, m: u64): u64 {
+    │                ^^^^^^^^^^^^^^^^^^^^^^^^^
+    │
+    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(missing_doc_public_function)]`.
+    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#missing_doc_public_function.
+
+warning: [lint] Use doc comment `///` instead of regular comment `//` for documentable items.
+    ┌─ tests/model_ast_lints/cyclomatic_complexity_warn.move:303:1
+    │
+303 │ ╭     // complexity: 3
+304 │ │     public fun while_with_nested_while(x: u64): u64 {
+    │ ╰^
+    │
+    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(prefer_doc_comment)]`.
+    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#prefer_doc_comment.
+
+warning: [lint] Public function is missing a doc comment.
+    ┌─ tests/model_ast_lints/cyclomatic_complexity_warn.move:304:16
+    │
+304 │     public fun while_with_nested_while(x: u64): u64 {
+    │                ^^^^^^^^^^^^^^^^^^^^^^^
+    │
+    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(missing_doc_public_function)]`.
+    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#missing_doc_public_function.
+
+warning: [lint] Use doc comment `///` instead of regular comment `//` for documentable items.
+    ┌─ tests/model_ast_lints/cyclomatic_complexity_warn.move:315:1
+    │
+315 │ ╭     // complexity: 10
+316 │ │     public fun extremely_complex_function(a: u64, b: u64, c: bool): u64 {
+    │ ╰^
+    │
+    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(prefer_doc_comment)]`.
+    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#prefer_doc_comment.
+
+warning: [lint] Public function is missing a doc comment.
+    ┌─ tests/model_ast_lints/cyclomatic_complexity_warn.move:316:16
+    │
+316 │     public fun extremely_complex_function(a: u64, b: u64, c: bool): u64 {
+    │                ^^^^^^^^^^^^^^^^^^^^^^^^^^
+    │
+    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(missing_doc_public_function)]`.
+    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#missing_doc_public_function.
+
+warning: [lint] Use doc comment `///` instead of regular comment `//` for documentable items.
+    ┌─ tests/model_ast_lints/cyclomatic_complexity_warn.move:356:1
+    │
+356 │ ╭     // complexity: 3
+357 │ │     public fun simple_while_loop(n: u64): u64 {
+    │ ╰^
+    │
+    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(prefer_doc_comment)]`.
+    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#prefer_doc_comment.
+
+warning: [lint] Public function is missing a doc comment.
+    ┌─ tests/model_ast_lints/cyclomatic_complexity_warn.move:357:16
+    │
+357 │     public fun simple_while_loop(n: u64): u64 {
+    │                ^^^^^^^^^^^^^^^^^
+    │
+    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(missing_doc_public_function)]`.
+    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#missing_doc_public_function.
+
+warning: [lint] Use doc comment `///` instead of regular comment `//` for documentable items.
+    ┌─ tests/model_ast_lints/cyclomatic_complexity_warn.move:369:1
+    │
+369 │ ╭     // complexity: 7
+370 │ │     public fun nested_while_with_many_conditions(n: u64, m: u64): u64 {
+    │ ╰^
+    │
+    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(prefer_doc_comment)]`.
+    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#prefer_doc_comment.
+
+warning: [lint] Public function is missing a doc comment.
+    ┌─ tests/model_ast_lints/cyclomatic_complexity_warn.move:370:16
+    │
+370 │     public fun nested_while_with_many_conditions(n: u64, m: u64): u64 {
+    │                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    │
+    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(missing_doc_public_function)]`.
+    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#missing_doc_public_function.
+
+warning: [lint] Use doc comment `///` instead of regular comment `//` for documentable items.
+    ┌─ tests/model_ast_lints/cyclomatic_complexity_warn.move:394:1
+    │
+394 │ ╭     // complexity: 6
+395 │ │     public fun while_while_combination(x: u64): u64 {
+    │ ╰^
+    │
+    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(prefer_doc_comment)]`.
+    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#prefer_doc_comment.
+
+warning: [lint] Public function is missing a doc comment.
+    ┌─ tests/model_ast_lints/cyclomatic_complexity_warn.move:395:16
+    │
+395 │     public fun while_while_combination(x: u64): u64 {
+    │                ^^^^^^^^^^^^^^^^^^^^^^^
+    │
+    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(missing_doc_public_function)]`.
+    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#missing_doc_public_function.
+
+warning: [lint] Use doc comment `///` instead of regular comment `//` for documentable items.
+    ┌─ tests/model_ast_lints/cyclomatic_complexity_warn.move:417:1
+    │
+417 │ ╭     // complexity: 10
+418 │ │     public fun complex_state_machine(): u64 {
+    │ ╰^
+    │
+    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(prefer_doc_comment)]`.
+    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#prefer_doc_comment.
+
+warning: [lint] Public function is missing a doc comment.
+    ┌─ tests/model_ast_lints/cyclomatic_complexity_warn.move:418:16
+    │
+418 │     public fun complex_state_machine(): u64 {
+    │                ^^^^^^^^^^^^^^^^^^^^^
+    │
+    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(missing_doc_public_function)]`.
+    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#missing_doc_public_function.
+
+warning: [lint] Use doc comment `///` instead of regular comment `//` for documentable items.
+    ┌─ tests/model_ast_lints/cyclomatic_complexity_warn.move:454:1
+    │
+454 │ ╭     // complexity: 14
+455 │ │     public fun triple_nested_while_loops(a: u64, b: u64, c: u64): u64 {
+    │ ╰^
+    │
+    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(prefer_doc_comment)]`.
+    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#prefer_doc_comment.
+
+warning: [lint] Public function is missing a doc comment.
+    ┌─ tests/model_ast_lints/cyclomatic_complexity_warn.move:455:16
+    │
+455 │     public fun triple_nested_while_loops(a: u64, b: u64, c: u64): u64 {
+    │                ^^^^^^^^^^^^^^^^^^^^^^^^^
+    │
+    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(missing_doc_public_function)]`.
+    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#missing_doc_public_function.
+
 warning: [lint] Function `complexity::triple_nested_while_loops` has cyclomatic complexity 14, which exceeds the allowed threshold of 10
     ┌─ tests/model_ast_lints/cyclomatic_complexity_warn.move:455:5
     │
@@ -44,6 +472,120 @@ warning: [lint] Function `complexity::triple_nested_while_loops` has cyclomatic 
     │
     = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(cyclomatic_complexity)]`.
     = For more information, see https://aptos.dev/en/build/smart-contracts/linter#cyclomatic_complexity.
+
+warning: [lint] Use doc comment `///` instead of regular comment `//` for documentable items.
+    ┌─ tests/model_ast_lints/cyclomatic_complexity_warn.move:495:1
+    │
+495 │ ╭     // complexity: 8
+496 │ │     public fun nested_while_combination(x: u64, y: u64): u64 {
+    │ ╰^
+    │
+    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(prefer_doc_comment)]`.
+    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#prefer_doc_comment.
+
+warning: [lint] Public function is missing a doc comment.
+    ┌─ tests/model_ast_lints/cyclomatic_complexity_warn.move:496:16
+    │
+496 │     public fun nested_while_combination(x: u64, y: u64): u64 {
+    │                ^^^^^^^^^^^^^^^^^^^^^^^^
+    │
+    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(missing_doc_public_function)]`.
+    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#missing_doc_public_function.
+
+warning: [lint] Use doc comment `///` instead of regular comment `//` for documentable items.
+    ┌─ tests/model_ast_lints/cyclomatic_complexity_warn.move:518:1
+    │
+518 │ ╭     // complexity: 10
+519 │ │     public fun while_with_early_returns_v2(n: u64): u64 {
+    │ ╰^
+    │
+    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(prefer_doc_comment)]`.
+    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#prefer_doc_comment.
+
+warning: [lint] Public function is missing a doc comment.
+    ┌─ tests/model_ast_lints/cyclomatic_complexity_warn.move:519:16
+    │
+519 │     public fun while_with_early_returns_v2(n: u64): u64 {
+    │                ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    │
+    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(missing_doc_public_function)]`.
+    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#missing_doc_public_function.
+
+warning: [lint] Use doc comment `///` instead of regular comment `//` for documentable items.
+    ┌─ tests/model_ast_lints/cyclomatic_complexity_warn.move:536:1
+    │
+536 │ ╭     // complexity: 10
+537 │ │     public fun deeply_nested_conditions(x: u64, y: u64, z: bool): u64 {
+    │ ╰^
+    │
+    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(prefer_doc_comment)]`.
+    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#prefer_doc_comment.
+
+warning: [lint] Public function is missing a doc comment.
+    ┌─ tests/model_ast_lints/cyclomatic_complexity_warn.move:537:16
+    │
+537 │     public fun deeply_nested_conditions(x: u64, y: u64, z: bool): u64 {
+    │                ^^^^^^^^^^^^^^^^^^^^^^^^
+    │
+    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(missing_doc_public_function)]`.
+    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#missing_doc_public_function.
+
+warning: [lint] Use doc comment `///` instead of regular comment `//` for documentable items.
+    ┌─ tests/model_ast_lints/cyclomatic_complexity_warn.move:578:1
+    │
+578 │ ╭     // complexity: 4
+579 │ │     public fun while_with_breaks_and_continues(n: u64): u64 {
+    │ ╰^
+    │
+    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(prefer_doc_comment)]`.
+    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#prefer_doc_comment.
+
+warning: [lint] Public function is missing a doc comment.
+    ┌─ tests/model_ast_lints/cyclomatic_complexity_warn.move:579:16
+    │
+579 │     public fun while_with_breaks_and_continues(n: u64): u64 {
+    │                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    │
+    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(missing_doc_public_function)]`.
+    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#missing_doc_public_function.
+
+warning: [lint] Use doc comment `///` instead of regular comment `//` for documentable items.
+    ┌─ tests/model_ast_lints/cyclomatic_complexity_warn.move:599:1
+    │
+599 │ ╭     // complexity: 8
+600 │ │     public fun double_while_loops(a: u64, b: u64): u64 {
+    │ ╰^
+    │
+    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(prefer_doc_comment)]`.
+    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#prefer_doc_comment.
+
+warning: [lint] Public function is missing a doc comment.
+    ┌─ tests/model_ast_lints/cyclomatic_complexity_warn.move:600:16
+    │
+600 │     public fun double_while_loops(a: u64, b: u64): u64 {
+    │                ^^^^^^^^^^^^^^^^^^
+    │
+    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(missing_doc_public_function)]`.
+    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#missing_doc_public_function.
+
+warning: [lint] Use doc comment `///` instead of regular comment `//` for documentable items.
+    ┌─ tests/model_ast_lints/cyclomatic_complexity_warn.move:622:1
+    │
+622 │ ╭     // complexity: 13
+623 │ │     public fun massive_switch_like(n: u64): u64 {
+    │ ╰^
+    │
+    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(prefer_doc_comment)]`.
+    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#prefer_doc_comment.
+
+warning: [lint] Public function is missing a doc comment.
+    ┌─ tests/model_ast_lints/cyclomatic_complexity_warn.move:623:16
+    │
+623 │     public fun massive_switch_like(n: u64): u64 {
+    │                ^^^^^^^^^^^^^^^^^^^
+    │
+    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(missing_doc_public_function)]`.
+    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#missing_doc_public_function.
 
 warning: [lint] Function `complexity::massive_switch_like` has cyclomatic complexity 13, which exceeds the allowed threshold of 10
     ┌─ tests/model_ast_lints/cyclomatic_complexity_warn.move:623:5
@@ -60,6 +602,44 @@ warning: [lint] Function `complexity::massive_switch_like` has cyclomatic comple
     = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(cyclomatic_complexity)]`.
     = For more information, see https://aptos.dev/en/build/smart-contracts/linter#cyclomatic_complexity.
 
+warning: [lint] Use doc comment `///` instead of regular comment `//` for documentable items.
+    ┌─ tests/model_ast_lints/cyclomatic_complexity_warn.move:657:1
+    │
+657 │ ╭     // complexity: 10
+658 │ │     public fun while_while_nested_complex(n: u64): u64 {
+    │ ╰^
+    │
+    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(prefer_doc_comment)]`.
+    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#prefer_doc_comment.
+
+warning: [lint] Public function is missing a doc comment.
+    ┌─ tests/model_ast_lints/cyclomatic_complexity_warn.move:658:16
+    │
+658 │     public fun while_while_nested_complex(n: u64): u64 {
+    │                ^^^^^^^^^^^^^^^^^^^^^^^^^^
+    │
+    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(missing_doc_public_function)]`.
+    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#missing_doc_public_function.
+
+warning: [lint] Use doc comment `///` instead of regular comment `//` for documentable items.
+    ┌─ tests/model_ast_lints/cyclomatic_complexity_warn.move:686:1
+    │
+686 │ ╭     // complexity: 16
+687 │ │     public fun ultra_complex_nested(x: u64, y: u64, z: u64): u64 {
+    │ ╰^
+    │
+    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(prefer_doc_comment)]`.
+    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#prefer_doc_comment.
+
+warning: [lint] Public function is missing a doc comment.
+    ┌─ tests/model_ast_lints/cyclomatic_complexity_warn.move:687:16
+    │
+687 │     public fun ultra_complex_nested(x: u64, y: u64, z: u64): u64 {
+    │                ^^^^^^^^^^^^^^^^^^^^
+    │
+    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(missing_doc_public_function)]`.
+    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#missing_doc_public_function.
+
 warning: [lint] Function `complexity::ultra_complex_nested` has cyclomatic complexity 16, which exceeds the allowed threshold of 10
     ┌─ tests/model_ast_lints/cyclomatic_complexity_warn.move:687:5
     │
@@ -74,6 +654,63 @@ warning: [lint] Function `complexity::ultra_complex_nested` has cyclomatic compl
     │
     = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(cyclomatic_complexity)]`.
     = For more information, see https://aptos.dev/en/build/smart-contracts/linter#cyclomatic_complexity.
+
+warning: [lint] Use doc comment `///` instead of regular comment `//` for documentable items.
+    ┌─ tests/model_ast_lints/cyclomatic_complexity_warn.move:746:1
+    │
+746 │ ╭     // complexity: 4
+747 │ │     public fun simple_triple_while(a: u64, b: u64, c: u64): u64 {
+    │ ╰^
+    │
+    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(prefer_doc_comment)]`.
+    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#prefer_doc_comment.
+
+warning: [lint] Public function is missing a doc comment.
+    ┌─ tests/model_ast_lints/cyclomatic_complexity_warn.move:747:16
+    │
+747 │     public fun simple_triple_while(a: u64, b: u64, c: u64): u64 {
+    │                ^^^^^^^^^^^^^^^^^^^
+    │
+    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(missing_doc_public_function)]`.
+    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#missing_doc_public_function.
+
+warning: [lint] Use doc comment `///` instead of regular comment `//` for documentable items.
+    ┌─ tests/model_ast_lints/cyclomatic_complexity_warn.move:765:1
+    │
+765 │ ╭     // complexity: 6
+766 │ │     public fun mixed_while_with_conditions(n: u64): u64 {
+    │ ╰^
+    │
+    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(prefer_doc_comment)]`.
+    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#prefer_doc_comment.
+
+warning: [lint] Public function is missing a doc comment.
+    ┌─ tests/model_ast_lints/cyclomatic_complexity_warn.move:766:16
+    │
+766 │     public fun mixed_while_with_conditions(n: u64): u64 {
+    │                ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    │
+    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(missing_doc_public_function)]`.
+    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#missing_doc_public_function.
+
+warning: [lint] Use doc comment `///` instead of regular comment `//` for documentable items.
+    ┌─ tests/model_ast_lints/cyclomatic_complexity_warn.move:788:1
+    │
+788 │ ╭     // complexity: 17
+789 │ │     public fun enormous_switch(n: u64): u64 {
+    │ ╰^
+    │
+    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(prefer_doc_comment)]`.
+    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#prefer_doc_comment.
+
+warning: [lint] Public function is missing a doc comment.
+    ┌─ tests/model_ast_lints/cyclomatic_complexity_warn.move:789:16
+    │
+789 │     public fun enormous_switch(n: u64): u64 {
+    │                ^^^^^^^^^^^^^^^
+    │
+    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(missing_doc_public_function)]`.
+    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#missing_doc_public_function.
 
 warning: [lint] Function `complexity::enormous_switch` has cyclomatic complexity 17, which exceeds the allowed threshold of 10
     ┌─ tests/model_ast_lints/cyclomatic_complexity_warn.move:789:5
@@ -90,6 +727,25 @@ warning: [lint] Function `complexity::enormous_switch` has cyclomatic complexity
     = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(cyclomatic_complexity)]`.
     = For more information, see https://aptos.dev/en/build/smart-contracts/linter#cyclomatic_complexity.
 
+warning: [lint] Use doc comment `///` instead of regular comment `//` for documentable items.
+    ┌─ tests/model_ast_lints/cyclomatic_complexity_warn.move:831:1
+    │
+831 │ ╭     // complexity: 16
+832 │ │     public fun maximum_complexity_test(a: u64, b: u64, c: u64, flag: bool): u64 {
+    │ ╰^
+    │
+    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(prefer_doc_comment)]`.
+    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#prefer_doc_comment.
+
+warning: [lint] Public function is missing a doc comment.
+    ┌─ tests/model_ast_lints/cyclomatic_complexity_warn.move:832:16
+    │
+832 │     public fun maximum_complexity_test(a: u64, b: u64, c: u64, flag: bool): u64 {
+    │                ^^^^^^^^^^^^^^^^^^^^^^^
+    │
+    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(missing_doc_public_function)]`.
+    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#missing_doc_public_function.
+
 warning: [lint] Function `complexity::maximum_complexity_test` has cyclomatic complexity 16, which exceeds the allowed threshold of 10
     ┌─ tests/model_ast_lints/cyclomatic_complexity_warn.move:832:5
     │
@@ -104,6 +760,234 @@ warning: [lint] Function `complexity::maximum_complexity_test` has cyclomatic co
     │
     = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(cyclomatic_complexity)]`.
     = For more information, see https://aptos.dev/en/build/smart-contracts/linter#cyclomatic_complexity.
+
+warning: [lint] Use doc comment `///` instead of regular comment `//` for documentable items.
+    ┌─ tests/model_ast_lints/cyclomatic_complexity_warn.move:900:1
+    │
+900 │ ╭     // complexity: 2
+901 │ │     public fun simple_for_loop(n: u64): u64 {
+    │ ╰^
+    │
+    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(prefer_doc_comment)]`.
+    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#prefer_doc_comment.
+
+warning: [lint] Public function is missing a doc comment.
+    ┌─ tests/model_ast_lints/cyclomatic_complexity_warn.move:901:16
+    │
+901 │     public fun simple_for_loop(n: u64): u64 {
+    │                ^^^^^^^^^^^^^^^
+    │
+    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(missing_doc_public_function)]`.
+    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#missing_doc_public_function.
+
+warning: [lint] Use doc comment `///` instead of regular comment `//` for documentable items.
+    ┌─ tests/model_ast_lints/cyclomatic_complexity_warn.move:909:1
+    │
+909 │ ╭     // complexity: 3
+910 │ │     public fun for_with_simple_if(n: u64): u64 {
+    │ ╰^
+    │
+    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(prefer_doc_comment)]`.
+    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#prefer_doc_comment.
+
+warning: [lint] Public function is missing a doc comment.
+    ┌─ tests/model_ast_lints/cyclomatic_complexity_warn.move:910:16
+    │
+910 │     public fun for_with_simple_if(n: u64): u64 {
+    │                ^^^^^^^^^^^^^^^^^^
+    │
+    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(missing_doc_public_function)]`.
+    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#missing_doc_public_function.
+
+warning: [lint] Use doc comment `///` instead of regular comment `//` for documentable items.
+    ┌─ tests/model_ast_lints/cyclomatic_complexity_warn.move:920:1
+    │
+920 │ ╭     // complexity: 4
+921 │ │     public fun for_with_multiple_conditions(n: u64): u64 {
+    │ ╰^
+    │
+    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(prefer_doc_comment)]`.
+    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#prefer_doc_comment.
+
+warning: [lint] Public function is missing a doc comment.
+    ┌─ tests/model_ast_lints/cyclomatic_complexity_warn.move:921:16
+    │
+921 │     public fun for_with_multiple_conditions(n: u64): u64 {
+    │                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    │
+    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(missing_doc_public_function)]`.
+    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#missing_doc_public_function.
+
+warning: [lint] Use doc comment `///` instead of regular comment `//` for documentable items.
+    ┌─ tests/model_ast_lints/cyclomatic_complexity_warn.move:935:1
+    │
+935 │ ╭     // complexity: 4
+936 │ │     public fun nested_for_loops(n: u64, m: u64): u64 {
+    │ ╰^
+    │
+    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(prefer_doc_comment)]`.
+    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#prefer_doc_comment.
+
+warning: [lint] Public function is missing a doc comment.
+    ┌─ tests/model_ast_lints/cyclomatic_complexity_warn.move:936:16
+    │
+936 │     public fun nested_for_loops(n: u64, m: u64): u64 {
+    │                ^^^^^^^^^^^^^^^^
+    │
+    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(missing_doc_public_function)]`.
+    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#missing_doc_public_function.
+
+warning: [lint] Use doc comment `///` instead of regular comment `//` for documentable items.
+    ┌─ tests/model_ast_lints/cyclomatic_complexity_warn.move:948:1
+    │
+948 │ ╭     // complexity: 6
+949 │ │     public fun nested_for_with_conditions(n: u64, m: u64): u64 {
+    │ ╰^
+    │
+    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(prefer_doc_comment)]`.
+    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#prefer_doc_comment.
+
+warning: [lint] Public function is missing a doc comment.
+    ┌─ tests/model_ast_lints/cyclomatic_complexity_warn.move:949:16
+    │
+949 │     public fun nested_for_with_conditions(n: u64, m: u64): u64 {
+    │                ^^^^^^^^^^^^^^^^^^^^^^^^^^
+    │
+    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(missing_doc_public_function)]`.
+    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#missing_doc_public_function.
+
+warning: [lint] Use doc comment `///` instead of regular comment `//` for documentable items.
+    ┌─ tests/model_ast_lints/cyclomatic_complexity_warn.move:967:1
+    │
+967 │ ╭     // complexity: 6
+968 │ │     public fun triple_for_loops(a: u64, b: u64, c: u64): u64 {
+    │ ╰^
+    │
+    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(prefer_doc_comment)]`.
+    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#prefer_doc_comment.
+
+warning: [lint] Public function is missing a doc comment.
+    ┌─ tests/model_ast_lints/cyclomatic_complexity_warn.move:968:16
+    │
+968 │     public fun triple_for_loops(a: u64, b: u64, c: u64): u64 {
+    │                ^^^^^^^^^^^^^^^^
+    │
+    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(missing_doc_public_function)]`.
+    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#missing_doc_public_function.
+
+warning: [lint] Use doc comment `///` instead of regular comment `//` for documentable items.
+    ┌─ tests/model_ast_lints/cyclomatic_complexity_warn.move:984:1
+    │
+984 │ ╭     // complexity: 4
+985 │ │     public fun for_with_continue(n: u64): u64 {
+    │ ╰^
+    │
+    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(prefer_doc_comment)]`.
+    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#prefer_doc_comment.
+
+warning: [lint] Public function is missing a doc comment.
+    ┌─ tests/model_ast_lints/cyclomatic_complexity_warn.move:985:16
+    │
+985 │     public fun for_with_continue(n: u64): u64 {
+    │                ^^^^^^^^^^^^^^^^^
+    │
+    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(missing_doc_public_function)]`.
+    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#missing_doc_public_function.
+
+warning: [lint] Use doc comment `///` instead of regular comment `//` for documentable items.
+    ┌─ tests/model_ast_lints/cyclomatic_complexity_warn.move:996:1
+    │
+996 │ ╭     // complexity: 4
+997 │ │     public fun for_with_break(n: u64): u64 {
+    │ ╰^
+    │
+    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(prefer_doc_comment)]`.
+    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#prefer_doc_comment.
+
+warning: [lint] Public function is missing a doc comment.
+    ┌─ tests/model_ast_lints/cyclomatic_complexity_warn.move:997:16
+    │
+997 │     public fun for_with_break(n: u64): u64 {
+    │                ^^^^^^^^^^^^^^
+    │
+    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(missing_doc_public_function)]`.
+    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#missing_doc_public_function.
+
+warning: [lint] Use doc comment `///` instead of regular comment `//` for documentable items.
+     ┌─ tests/model_ast_lints/cyclomatic_complexity_warn.move:1008:1
+     │
+1008 │ ╭     // complexity: 6
+1009 │ │     public fun for_with_break_and_continue(n: u64): u64 {
+     │ ╰^
+     │
+     = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(prefer_doc_comment)]`.
+     = For more information, see https://aptos.dev/en/build/smart-contracts/linter#prefer_doc_comment.
+
+warning: [lint] Public function is missing a doc comment.
+     ┌─ tests/model_ast_lints/cyclomatic_complexity_warn.move:1009:16
+     │
+1009 │     public fun for_with_break_and_continue(n: u64): u64 {
+     │                ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+     │
+     = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(missing_doc_public_function)]`.
+     = For more information, see https://aptos.dev/en/build/smart-contracts/linter#missing_doc_public_function.
+
+warning: [lint] Use doc comment `///` instead of regular comment `//` for documentable items.
+     ┌─ tests/model_ast_lints/cyclomatic_complexity_warn.move:1023:1
+     │
+1023 │ ╭     // complexity: 4
+1024 │ │     public fun for_with_while(n: u64): u64 {
+     │ ╰^
+     │
+     = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(prefer_doc_comment)]`.
+     = For more information, see https://aptos.dev/en/build/smart-contracts/linter#prefer_doc_comment.
+
+warning: [lint] Public function is missing a doc comment.
+     ┌─ tests/model_ast_lints/cyclomatic_complexity_warn.move:1024:16
+     │
+1024 │     public fun for_with_while(n: u64): u64 {
+     │                ^^^^^^^^^^^^^^
+     │
+     = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(missing_doc_public_function)]`.
+     = For more information, see https://aptos.dev/en/build/smart-contracts/linter#missing_doc_public_function.
+
+warning: [lint] Use doc comment `///` instead of regular comment `//` for documentable items.
+     ┌─ tests/model_ast_lints/cyclomatic_complexity_warn.move:1038:1
+     │
+1038 │ ╭     // complexity: 7
+1039 │ │     public fun for_while_complex(n: u64): u64 {
+     │ ╰^
+     │
+     = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(prefer_doc_comment)]`.
+     = For more information, see https://aptos.dev/en/build/smart-contracts/linter#prefer_doc_comment.
+
+warning: [lint] Public function is missing a doc comment.
+     ┌─ tests/model_ast_lints/cyclomatic_complexity_warn.move:1039:16
+     │
+1039 │     public fun for_while_complex(n: u64): u64 {
+     │                ^^^^^^^^^^^^^^^^^
+     │
+     = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(missing_doc_public_function)]`.
+     = For more information, see https://aptos.dev/en/build/smart-contracts/linter#missing_doc_public_function.
+
+warning: [lint] Use doc comment `///` instead of regular comment `//` for documentable items.
+     ┌─ tests/model_ast_lints/cyclomatic_complexity_warn.move:1061:1
+     │
+1061 │ ╭     // complexity: 11
+1062 │ │     public fun for_with_early_return(n: u64): u64 {
+     │ ╰^
+     │
+     = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(prefer_doc_comment)]`.
+     = For more information, see https://aptos.dev/en/build/smart-contracts/linter#prefer_doc_comment.
+
+warning: [lint] Public function is missing a doc comment.
+     ┌─ tests/model_ast_lints/cyclomatic_complexity_warn.move:1062:16
+     │
+1062 │     public fun for_with_early_return(n: u64): u64 {
+     │                ^^^^^^^^^^^^^^^^^^^^^
+     │
+     = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(missing_doc_public_function)]`.
+     = For more information, see https://aptos.dev/en/build/smart-contracts/linter#missing_doc_public_function.
 
 warning: [lint] Function `complexity::for_with_early_return` has cyclomatic complexity 11, which exceeds the allowed threshold of 10
      ┌─ tests/model_ast_lints/cyclomatic_complexity_warn.move:1062:5
@@ -120,6 +1004,25 @@ warning: [lint] Function `complexity::for_with_early_return` has cyclomatic comp
      = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(cyclomatic_complexity)]`.
      = For more information, see https://aptos.dev/en/build/smart-contracts/linter#cyclomatic_complexity.
 
+warning: [lint] Use doc comment `///` instead of regular comment `//` for documentable items.
+     ┌─ tests/model_ast_lints/cyclomatic_complexity_warn.move:1088:1
+     │
+1088 │ ╭     // complexity: 13
+1089 │ │     public fun complex_nested_for_with_boolean_ops(n: u64, m: u64): u64 {
+     │ ╰^
+     │
+     = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(prefer_doc_comment)]`.
+     = For more information, see https://aptos.dev/en/build/smart-contracts/linter#prefer_doc_comment.
+
+warning: [lint] Public function is missing a doc comment.
+     ┌─ tests/model_ast_lints/cyclomatic_complexity_warn.move:1089:16
+     │
+1089 │     public fun complex_nested_for_with_boolean_ops(n: u64, m: u64): u64 {
+     │                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+     │
+     = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(missing_doc_public_function)]`.
+     = For more information, see https://aptos.dev/en/build/smart-contracts/linter#missing_doc_public_function.
+
 warning: [lint] Function `complexity::complex_nested_for_with_boolean_ops` has cyclomatic complexity 13, which exceeds the allowed threshold of 10
      ┌─ tests/model_ast_lints/cyclomatic_complexity_warn.move:1089:5
      │
@@ -134,6 +1037,25 @@ warning: [lint] Function `complexity::complex_nested_for_with_boolean_ops` has c
      │
      = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(cyclomatic_complexity)]`.
      = For more information, see https://aptos.dev/en/build/smart-contracts/linter#cyclomatic_complexity.
+
+warning: [lint] Use doc comment `///` instead of regular comment `//` for documentable items.
+     ┌─ tests/model_ast_lints/cyclomatic_complexity_warn.move:1121:1
+     │
+1121 │ ╭     // complexity: 15
+1122 │ │     public fun massive_triple_for_with_conditions(a: u64, b: u64, c: u64): u64 {
+     │ ╰^
+     │
+     = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(prefer_doc_comment)]`.
+     = For more information, see https://aptos.dev/en/build/smart-contracts/linter#prefer_doc_comment.
+
+warning: [lint] Public function is missing a doc comment.
+     ┌─ tests/model_ast_lints/cyclomatic_complexity_warn.move:1122:16
+     │
+1122 │     public fun massive_triple_for_with_conditions(a: u64, b: u64, c: u64): u64 {
+     │                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+     │
+     = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(missing_doc_public_function)]`.
+     = For more information, see https://aptos.dev/en/build/smart-contracts/linter#missing_doc_public_function.
 
 warning: [lint] Function `complexity::massive_triple_for_with_conditions` has cyclomatic complexity 15, which exceeds the allowed threshold of 10
      ┌─ tests/model_ast_lints/cyclomatic_complexity_warn.move:1122:5
@@ -150,6 +1072,63 @@ warning: [lint] Function `complexity::massive_triple_for_with_conditions` has cy
      = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(cyclomatic_complexity)]`.
      = For more information, see https://aptos.dev/en/build/smart-contracts/linter#cyclomatic_complexity.
 
+warning: [lint] Use doc comment `///` instead of regular comment `//` for documentable items.
+     ┌─ tests/model_ast_lints/cyclomatic_complexity_warn.move:1158:1
+     │
+1158 │ ╭     // complexity: 9
+1159 │ │     public fun for_with_inner_loop(n: u64): u64 {
+     │ ╰^
+     │
+     = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(prefer_doc_comment)]`.
+     = For more information, see https://aptos.dev/en/build/smart-contracts/linter#prefer_doc_comment.
+
+warning: [lint] Public function is missing a doc comment.
+     ┌─ tests/model_ast_lints/cyclomatic_complexity_warn.move:1159:16
+     │
+1159 │     public fun for_with_inner_loop(n: u64): u64 {
+     │                ^^^^^^^^^^^^^^^^^^^
+     │
+     = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(missing_doc_public_function)]`.
+     = For more information, see https://aptos.dev/en/build/smart-contracts/linter#missing_doc_public_function.
+
+warning: [lint] Use doc comment `///` instead of regular comment `//` for documentable items.
+     ┌─ tests/model_ast_lints/cyclomatic_complexity_warn.move:1183:1
+     │
+1183 │ ╭     // complexity: 10
+1184 │ │     public fun for_while_switch_like(n: u64): u64 {
+     │ ╰^
+     │
+     = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(prefer_doc_comment)]`.
+     = For more information, see https://aptos.dev/en/build/smart-contracts/linter#prefer_doc_comment.
+
+warning: [lint] Public function is missing a doc comment.
+     ┌─ tests/model_ast_lints/cyclomatic_complexity_warn.move:1184:16
+     │
+1184 │     public fun for_while_switch_like(n: u64): u64 {
+     │                ^^^^^^^^^^^^^^^^^^^^^
+     │
+     = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(missing_doc_public_function)]`.
+     = For more information, see https://aptos.dev/en/build/smart-contracts/linter#missing_doc_public_function.
+
+warning: [lint] Use doc comment `///` instead of regular comment `//` for documentable items.
+     ┌─ tests/model_ast_lints/cyclomatic_complexity_warn.move:1212:1
+     │
+1212 │ ╭     // complexity: 62
+1213 │ │     public fun comprehensive_control_flow_test(x: u64, y: u64, z: u64, flag: bool): u64 {
+     │ ╰^
+     │
+     = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(prefer_doc_comment)]`.
+     = For more information, see https://aptos.dev/en/build/smart-contracts/linter#prefer_doc_comment.
+
+warning: [lint] Public function is missing a doc comment.
+     ┌─ tests/model_ast_lints/cyclomatic_complexity_warn.move:1213:16
+     │
+1213 │     public fun comprehensive_control_flow_test(x: u64, y: u64, z: u64, flag: bool): u64 {
+     │                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+     │
+     = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(missing_doc_public_function)]`.
+     = For more information, see https://aptos.dev/en/build/smart-contracts/linter#missing_doc_public_function.
+
 warning: [lint] Function `complexity::comprehensive_control_flow_test` has cyclomatic complexity 62, which exceeds the allowed threshold of 10
      ┌─ tests/model_ast_lints/cyclomatic_complexity_warn.move:1213:5
      │
@@ -165,6 +1144,91 @@ warning: [lint] Function `complexity::comprehensive_control_flow_test` has cyclo
      = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(cyclomatic_complexity)]`.
      = For more information, see https://aptos.dev/en/build/smart-contracts/linter#cyclomatic_complexity.
 
+warning: [lint] Public function is missing a doc comment.
+     ┌─ tests/model_ast_lints/cyclomatic_complexity_warn.move:1368:16
+     │
+1368 │     public fun skipped_function(b: u64): u64 {
+     │                ^^^^^^^^^^^^^^^^
+     │
+     = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(missing_doc_public_function)]`.
+     = For more information, see https://aptos.dev/en/build/smart-contracts/linter#missing_doc_public_function.
+
+warning: [lint] Use doc comment `///` instead of regular comment `//` for documentable items.
+     ┌─ tests/model_ast_lints/cyclomatic_complexity_warn.move:1394:1
+     │
+1394 │ ╭     // complexity: 10
+1395 │ │     public fun block_return_1(b: u64): u64 {
+     │ ╰^
+     │
+     = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(prefer_doc_comment)]`.
+     = For more information, see https://aptos.dev/en/build/smart-contracts/linter#prefer_doc_comment.
+
+warning: [lint] Public function is missing a doc comment.
+     ┌─ tests/model_ast_lints/cyclomatic_complexity_warn.move:1395:16
+     │
+1395 │     public fun block_return_1(b: u64): u64 {
+     │                ^^^^^^^^^^^^^^
+     │
+     = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(missing_doc_public_function)]`.
+     = For more information, see https://aptos.dev/en/build/smart-contracts/linter#missing_doc_public_function.
+
+warning: [lint] Use doc comment `///` instead of regular comment `//` for documentable items.
+     ┌─ tests/model_ast_lints/cyclomatic_complexity_warn.move:1420:1
+     │
+1420 │ ╭     // complexity: 10
+1421 │ │         public fun block_return_2(b: u64): u64 {
+     │ ╰^
+     │
+     = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(prefer_doc_comment)]`.
+     = For more information, see https://aptos.dev/en/build/smart-contracts/linter#prefer_doc_comment.
+
+warning: [lint] Public function is missing a doc comment.
+     ┌─ tests/model_ast_lints/cyclomatic_complexity_warn.move:1421:20
+     │
+1421 │         public fun block_return_2(b: u64): u64 {
+     │                    ^^^^^^^^^^^^^^
+     │
+     = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(missing_doc_public_function)]`.
+     = For more information, see https://aptos.dev/en/build/smart-contracts/linter#missing_doc_public_function.
+
+warning: [lint] Use doc comment `///` instead of regular comment `//` for documentable items.
+     ┌─ tests/model_ast_lints/cyclomatic_complexity_warn.move:1446:1
+     │
+1446 │ ╭     // complexity: 10
+1447 │ │     public fun block_return_3(b: u64): u64 {
+     │ ╰^
+     │
+     = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(prefer_doc_comment)]`.
+     = For more information, see https://aptos.dev/en/build/smart-contracts/linter#prefer_doc_comment.
+
+warning: [lint] Public function is missing a doc comment.
+     ┌─ tests/model_ast_lints/cyclomatic_complexity_warn.move:1447:16
+     │
+1447 │     public fun block_return_3(b: u64): u64 {
+     │                ^^^^^^^^^^^^^^
+     │
+     = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(missing_doc_public_function)]`.
+     = For more information, see https://aptos.dev/en/build/smart-contracts/linter#missing_doc_public_function.
+
+warning: [lint] Use doc comment `///` instead of regular comment `//` for documentable items.
+     ┌─ tests/model_ast_lints/cyclomatic_complexity_warn.move:1472:1
+     │
+1472 │ ╭         //complexity: 11
+1473 │ │         public fun block_return_4(b: u64): u64 {
+     │ ╰^
+     │
+     = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(prefer_doc_comment)]`.
+     = For more information, see https://aptos.dev/en/build/smart-contracts/linter#prefer_doc_comment.
+
+warning: [lint] Public function is missing a doc comment.
+     ┌─ tests/model_ast_lints/cyclomatic_complexity_warn.move:1473:20
+     │
+1473 │         public fun block_return_4(b: u64): u64 {
+     │                    ^^^^^^^^^^^^^^
+     │
+     = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(missing_doc_public_function)]`.
+     = For more information, see https://aptos.dev/en/build/smart-contracts/linter#missing_doc_public_function.
+
 warning: [lint] Function `complexity::block_return_4` has cyclomatic complexity 11, which exceeds the allowed threshold of 10
      ┌─ tests/model_ast_lints/cyclomatic_complexity_warn.move:1473:9
      │
@@ -179,3 +1243,18 @@ warning: [lint] Function `complexity::block_return_4` has cyclomatic complexity 
      │
      = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(cyclomatic_complexity)]`.
      = For more information, see https://aptos.dev/en/build/smart-contracts/linter#cyclomatic_complexity.
+
+warning: [lint] Module is missing a doc comment.
+     ┌─ tests/model_ast_lints/cyclomatic_complexity_warn.move:1:1
+     │
+   1 │ ╭ module 0xc0ffee::complexity {
+   2 │ │     // complexity: 12
+   3 │ │     public fun high_complexity(a: bool, b: bool): bool {
+   4 │ │         assert!(a || b, 100); // +1
+     · │
+1498 │ │
+1499 │ │ }
+     │ ╰─^
+     │
+     = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(missing_doc_module)]`.
+     = For more information, see https://aptos.dev/en/build/smart-contracts/linter#missing_doc_module.

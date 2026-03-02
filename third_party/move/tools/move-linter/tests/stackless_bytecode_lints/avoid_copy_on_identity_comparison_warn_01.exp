@@ -1,5 +1,200 @@
 
 Diagnostics:
+warning: [lint] Struct is missing a doc comment.
+   ┌─ tests/stackless_bytecode_lints/avoid_copy_on_identity_comparison_warn_01.move:10:5
+   │
+10 │ ╭     struct S has copy, drop {
+11 │ │         a: vector<u8>,
+12 │ │         b: vector<u8>,
+13 │ │         c: vector<u8>,
+14 │ │         d: vector<u8>
+15 │ │     }
+   │ ╰─────^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(missing_doc_struct)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#missing_doc_struct.
+
+warning: [lint] Public function is missing a doc comment.
+   ┌─ tests/stackless_bytecode_lints/avoid_copy_on_identity_comparison_warn_01.move:17:16
+   │
+17 │     public fun test1_warn_no_ref(): (bool, bool) {
+   │                ^^^^^^^^^^^^^^^^^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(missing_doc_public_function)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#missing_doc_public_function.
+
+warning: [lint] Public function is missing a doc comment.
+   ┌─ tests/stackless_bytecode_lints/avoid_copy_on_identity_comparison_warn_01.move:25:16
+   │
+25 │     public fun test2_no_warn_no_ref(): bool {
+   │                ^^^^^^^^^^^^^^^^^^^^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(missing_doc_public_function)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#missing_doc_public_function.
+
+warning: [lint] Public function is missing a doc comment.
+   ┌─ tests/stackless_bytecode_lints/avoid_copy_on_identity_comparison_warn_01.move:31:16
+   │
+31 │     public fun test3_warn_no_ref(a: S, b: S): S {
+   │                ^^^^^^^^^^^^^^^^^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(missing_doc_public_function)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#missing_doc_public_function.
+
+warning: [lint] Public function is missing a doc comment.
+   ┌─ tests/stackless_bytecode_lints/avoid_copy_on_identity_comparison_warn_01.move:37:16
+   │
+37 │     public fun test4_warn_no_ref(a: S, b: S) {
+   │                ^^^^^^^^^^^^^^^^^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(missing_doc_public_function)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#missing_doc_public_function.
+
+warning: [lint] Public function is missing a doc comment.
+   ┌─ tests/stackless_bytecode_lints/avoid_copy_on_identity_comparison_warn_01.move:45:16
+   │
+45 │     public fun test5_warn_no_ref(a: S, b: S) {
+   │                ^^^^^^^^^^^^^^^^^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(missing_doc_public_function)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#missing_doc_public_function.
+
+warning: [lint] Public function is missing a doc comment.
+   ┌─ tests/stackless_bytecode_lints/avoid_copy_on_identity_comparison_warn_01.move:50:16
+   │
+50 │     public fun test1_no_warn_ref(): (bool, bool) {
+   │                ^^^^^^^^^^^^^^^^^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(missing_doc_public_function)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#missing_doc_public_function.
+
+warning: [lint] Public function is missing a doc comment.
+   ┌─ tests/stackless_bytecode_lints/avoid_copy_on_identity_comparison_warn_01.move:58:16
+   │
+58 │     public fun test2_no_warn_ref(): bool {
+   │                ^^^^^^^^^^^^^^^^^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(missing_doc_public_function)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#missing_doc_public_function.
+
+warning: [lint] Public function is missing a doc comment.
+   ┌─ tests/stackless_bytecode_lints/avoid_copy_on_identity_comparison_warn_01.move:64:16
+   │
+64 │     public fun test3_no_warn_ref(a: S, b: S): S {
+   │                ^^^^^^^^^^^^^^^^^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(missing_doc_public_function)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#missing_doc_public_function.
+
+warning: [lint] Public function is missing a doc comment.
+   ┌─ tests/stackless_bytecode_lints/avoid_copy_on_identity_comparison_warn_01.move:68:16
+   │
+68 │     public fun test4_no_warn_ref(a: S, b: S) {
+   │                ^^^^^^^^^^^^^^^^^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(missing_doc_public_function)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#missing_doc_public_function.
+
+warning: [lint] Public function is missing a doc comment.
+   ┌─ tests/stackless_bytecode_lints/avoid_copy_on_identity_comparison_warn_01.move:76:16
+   │
+76 │     public fun test5_no_warn_ref(a: S, b: S) {
+   │                ^^^^^^^^^^^^^^^^^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(missing_doc_public_function)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#missing_doc_public_function.
+
+warning: [lint] Module is missing a doc comment.
+   ┌─ tests/stackless_bytecode_lints/avoid_copy_on_identity_comparison_warn_01.move:1:1
+   │
+ 1 │ ╭ module 0xc0ffee::m {
+ 2 │ │     fun get_vector_1(): vector<u8> {
+ 3 │ │         vector[1, 2, 3]
+ 4 │ │     }
+   · │
+79 │ │     }
+80 │ │ }
+   │ ╰─^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(missing_doc_module)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#missing_doc_module.
+
+warning: [lint] Struct is missing a doc comment.
+   ┌─ tests/stackless_bytecode_lints/avoid_copy_on_identity_comparison_warn_01.move:84:5
+   │
+84 │ ╭     struct S has copy, drop {
+85 │ │         a: vector<u8>,
+86 │ │         b: vector<u8>,
+87 │ │         c: vector<u8>,
+88 │ │         d: vector<u8>
+89 │ │     }
+   │ ╰─────^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(missing_doc_struct)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#missing_doc_struct.
+
+warning: [lint] Public function is missing a doc comment.
+   ┌─ tests/stackless_bytecode_lints/avoid_copy_on_identity_comparison_warn_01.move:93:16
+   │
+93 │     public fun test4_warn_no_ref(a: S, b: S) {
+   │                ^^^^^^^^^^^^^^^^^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(missing_doc_public_function)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#missing_doc_public_function.
+
+warning: [lint] Module is missing a doc comment.
+    ┌─ tests/stackless_bytecode_lints/avoid_copy_on_identity_comparison_warn_01.move:83:1
+    │
+ 83 │ ╭ module 0xc0ffee::no_warn1 {
+ 84 │ │     struct S has copy, drop {
+ 85 │ │         a: vector<u8>,
+ 86 │ │         b: vector<u8>,
+    · │
+ 99 │ │     }
+100 │ │ }
+    │ ╰─^
+    │
+    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(missing_doc_module)]`.
+    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#missing_doc_module.
+
+warning: [lint] Struct is missing a doc comment.
+    ┌─ tests/stackless_bytecode_lints/avoid_copy_on_identity_comparison_warn_01.move:103:5
+    │
+103 │ ╭     struct S has copy, drop {
+104 │ │         a: vector<u8>,
+105 │ │         b: vector<u8>,
+106 │ │         c: vector<u8>,
+107 │ │         d: vector<u8>
+108 │ │     }
+    │ ╰─────^
+    │
+    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(missing_doc_struct)]`.
+    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#missing_doc_struct.
+
+warning: [lint] Public function is missing a doc comment.
+    ┌─ tests/stackless_bytecode_lints/avoid_copy_on_identity_comparison_warn_01.move:113:16
+    │
+113 │     public fun test4_warn_no_ref(a: S, b: S) {
+    │                ^^^^^^^^^^^^^^^^^
+    │
+    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(missing_doc_public_function)]`.
+    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#missing_doc_public_function.
+
+warning: [lint] Module is missing a doc comment.
+    ┌─ tests/stackless_bytecode_lints/avoid_copy_on_identity_comparison_warn_01.move:102:1
+    │
+102 │ ╭ module 0xc0ffee::no_warn2 {
+103 │ │     struct S has copy, drop {
+104 │ │         a: vector<u8>,
+105 │ │         b: vector<u8>,
+    · │
+119 │ │     }
+120 │ │ }
+    │ ╰─^
+    │
+    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(missing_doc_module)]`.
+    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#missing_doc_module.
+
 warning: [lint] Compare using references of these values instead (i.e., place `&` on both the operands), to avoid unnecessary copies.
    ┌─ tests/stackless_bytecode_lints/avoid_copy_on_identity_comparison_warn_01.move:20:17
    │
