@@ -359,6 +359,18 @@ impl BlockStore {
         // (pipeline_builder is None for proxy). For proxy, ordering IS the final step —
         // treat ordered blocks as committed for tree management.
         if self.consensus_type == "proxy" {
+            // Notify PayloadManager that these blocks' batches are committed.
+            // Without this, QS batches are never marked committed and get re-pulled
+            // into future proxy proposals, causing massive txn duplication.
+            let payloads: Vec<_> = blocks_to_commit
+                .iter()
+                .filter_map(|b| b.payload().cloned())
+                .collect();
+            if !payloads.is_empty() {
+                self.payload_manager
+                    .notify_commit(block_to_commit.timestamp_usecs(), payloads);
+            }
+
             let ids_to_remove = self.inner.read().find_blocks_to_prune(ordered_root_id);
             if let Err(e) = self
                 .storage
