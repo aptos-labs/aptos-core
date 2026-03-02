@@ -40,6 +40,16 @@ use std::{borrow::Cow, fmt::Debug};
 
 pub type Commitment<E> = CodomainShape<<E as Pairing>::G1>;
 
+/// Newtype wrapper so we can implement `From<Commitment<E>>` without coherence issues.
+#[derive(CanonicalSerialize, CanonicalDeserialize, Debug, Clone, PartialEq, Eq)]
+pub struct CommitmentNormalised<E: Pairing>(pub E::G1Affine);
+
+impl<E: Pairing> From<Commitment<E>> for CommitmentNormalised<E> {
+    fn from(c: Commitment<E>) -> CommitmentNormalised<E> {
+        CommitmentNormalised(c.0.into_affine())
+    }
+}
+
 pub type CommitmentRandomness<F> = Scalar<F>;
 
 #[derive(CanonicalSerialize, CanonicalDeserialize, Debug, PartialEq, Eq, Clone)]

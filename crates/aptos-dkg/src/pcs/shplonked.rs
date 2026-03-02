@@ -876,10 +876,10 @@ where
 {
     type Commitment = ShplonkedCommitment<E>;
     type CommitmentKey = Srs<E>;
+    type CommitmentNormalised = ShplonkedVerifierCommitment<E>;
     type Polynomial = DensePolynomial<E::ScalarField>;
     type Proof = ZkPcsOpeningProof<E>;
     type VerificationKey = Srs<E>;
-    type VerifierCommitment = ShplonkedVerifierCommitment<E>;
     type WitnessField = E::ScalarField;
 
     fn setup<R: rand_core::RngCore + rand_core::CryptoRng>(
@@ -1012,7 +1012,7 @@ where
 
     fn verify(
         vk: &Self::VerificationKey,
-        com: impl Into<Self::VerifierCommitment>,
+        com: impl Into<Self::CommitmentNormalised>,
         challenge: Vec<Self::WitnessField>,
         eval: Self::WitnessField,
         proof: Self::Proof,

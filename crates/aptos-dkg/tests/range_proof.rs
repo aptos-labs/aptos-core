@@ -35,7 +35,7 @@ fn assert_range_proof_correctness<E: Pairing, B: BatchedRangeProof<E>>(
         ell
     );
 
-    let proof = B::prove(pk, &values, ell, &comm, &r, &mut rng);
+    let proof = B::prove(pk, &values, ell, &comm.clone().into(), &r, &mut rng);
     proof.verify(vk, n, ell, &comm, &mut rng).unwrap();
 
     // === Serialize to memory ===

@@ -5,6 +5,7 @@
 
 use crate::{
     delegate_transcript_core_to_subtrs,
+    pcs::univariate_hiding_kzg,
     pvss::{
         chunky::{
             chunked_elgamal::{self, num_chunks_per_scalar},
@@ -26,7 +27,7 @@ use crate::{
     range_proofs::{dekart_univariate_v2, traits::BatchedRangeProof},
     sigma_protocol::{
         self,
-        homomorphism::{tuple::TupleCodomainShape, Trait as _, TrivialShape},
+        homomorphism::{tuple::TupleCodomainShape, Trait as _},
         traits::{CurveGroupTrait as _, Trait},
     },
 };
@@ -35,7 +36,7 @@ use aptos_crypto::{
     arkworks::{
         self,
         msm::{self, MsmInput},
-        random::{sample_field_element, unsafe_random_point_group},
+        random::{sample_field_element, unsafe_random_point},
         scrape::LowDegreeTest,
         serialization::{ark_de, ark_se},
         srs::SrsBasis,
@@ -75,14 +76,14 @@ pub struct Transcript<P: Pairing> {
 /// Proof that chunked ciphertexts and commitments are consistent (SoK + batched range proof).
 #[allow(non_snake_case)]
 #[derive(CanonicalSerialize, CanonicalDeserialize, Clone, Debug, PartialEq, Eq)]
-pub struct SharingProof<P: Pairing> {
+pub struct SharingProof<E: Pairing> {
     /// SoK: the SK is knowledge of `witnesses` s_{i,j} yielding the commitment and the C and the R, their image is the PK, and the signed message is a certain context `cntxt`
-    pub SoK: sigma_protocol::Proof<P::ScalarField, hkzg_chunked_elgamal::Homomorphism<'static, P>>, // static because we don't want the lifetime of the Proof to depend on the Homomorphism
+    pub SoK: sigma_protocol::Proof<E::ScalarField, hkzg_chunked_elgamal::Homomorphism<'static, E>>, // static because we don't want the lifetime of the Proof to depend on the Homomorphism
     /// A batched range proof showing that all committed values s_{i,j} lie in some range
-    pub range_proof: dekart_univariate_v2::ProofProjective<P>, // TODO: make an affine version of this
+    pub range_proof: dekart_univariate_v2::ProofProjective<E>, // TODO: make an affine version of this
     /// A KZG-style commitment to the values s_{i,j} going into the range proof
     pub range_proof_commitment:
-        <dekart_univariate_v2::ProofProjective<P> as BatchedRangeProof<P>>::Commitment, // TODO: also make this affine
+        <dekart_univariate_v2::ProofProjective<E> as BatchedRangeProof<E>>::CommitmentNormalised,
 }
 
 impl<E: Pairing> ValidCryptoMaterial for Transcript<E> {
@@ -198,8 +199,8 @@ impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>> traits:
             dealer: sc.get_player(0),
             subtrs: Subtranscript::generate(sc, num_chunks_per_share, rng),
             sharing_proof: SharingProof {
-                range_proof_commitment: sigma_protocol::homomorphism::TrivialShape(
-                    unsafe_random_point_group::<E::G1, _>(rng),
+                range_proof_commitment: univariate_hiding_kzg::CommitmentNormalised(
+                    unsafe_random_point::<E::G1, _>(rng),
                 ),
                 SoK: hkzg_chunked_elgamal::Proof::generate(sc, num_chunks_per_share, rng),
                 range_proof: dekart_univariate_v2::ProofProjective::generate(pp.ell, rng),
@@ -266,7 +267,7 @@ impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>> Transcr
             &pp.pk_range_proof,
             &f_evals_chunked_flat,
             pp.ell,
-            &dekart_univariate_v2::CommitmentNormalised(range_proof_commitment.0.clone()),
+            &univariate_hiding_kzg::CommitmentNormalised(range_proof_commitment.0.clone()),
             &witness.hkzg_randomness,
             rng,
         );
@@ -275,7 +276,9 @@ impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>> Transcr
         let sharing_proof = SharingProof {
             SoK,
             range_proof,
-            range_proof_commitment: TrivialShape(range_proof_commitment.0.into_group()), // TODO: fix this
+            range_proof_commitment: univariate_hiding_kzg::CommitmentNormalised(
+                range_proof_commitment.0.clone(),
+            ),
         };
 
         (Cs, Rs, sharing_proof)
@@ -311,12 +314,15 @@ impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>>
             <Self as traits::Transcript>::dst(),
         )?;
 
-        // Verify the range proof
+        // Verify the range proof (convert CommitmentNormalised to Commitment for verify)
+        let comm_for_verify = sigma_protocol::homomorphism::TrivialShape(
+            self.sharing_proof.range_proof_commitment.0.into_group(),
+        );
         let (g1_terms, g2_terms) = self.sharing_proof.range_proof.pairing_for_verify(
             &pp.pk_range_proof.vk,
             sc.get_total_weight() * num_chunks_per_scalar::<E::ScalarField>(pp.ell) as usize,
             pp.ell,
-            &self.sharing_proof.range_proof_commitment,
+            &comm_for_verify,
             rng,
         )?;
 
@@ -336,7 +342,7 @@ impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>>
         );
         let pok_statement = TupleCodomainShape(
             sigma_protocol::homomorphism::TrivialShape(
-                self.sharing_proof.range_proof_commitment.0.into_affine(),
+                self.sharing_proof.range_proof_commitment.0.clone(),
             ),
             chunked_elgamal::WeightedCodomainShape {
                 chunks: self.subtrs.Cs.clone(),

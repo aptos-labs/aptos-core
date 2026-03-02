@@ -562,10 +562,10 @@ where
 {
     type Commitment = ZeromorphCommitment<P>;
     type CommitmentKey = ZeromorphProverKey<P>;
+    type CommitmentNormalised = ZeromorphVerifierCommitment<P>;
     type Polynomial = DenseMultilinearExtension<P::ScalarField>;
     type Proof = ZeromorphProof<P>;
     type VerificationKey = ZeromorphVerifierKey<P>;
-    type VerifierCommitment = ZeromorphVerifierCommitment<P>;
     type WitnessField = P::ScalarField;
 
     fn polynomial_from_vec(vec: Vec<Self::WitnessField>) -> Self::Polynomial {
@@ -678,7 +678,7 @@ where
 
     fn verify(
         vk: &Self::VerificationKey,
-        com: impl Into<Self::VerifierCommitment>,
+        com: impl Into<Self::CommitmentNormalised>,
         challenge: Vec<Self::WitnessField>,
         eval: Self::WitnessField,
         proof: Self::Proof,

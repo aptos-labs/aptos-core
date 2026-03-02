@@ -55,10 +55,6 @@ pub struct ProofProjective<E: Pairing> {
     pi_gamma: univariate_hiding_kzg::OpeningProof<E>,
 }
 
-/// Wrapper around E::G1Affine used as CommitmentNormalised to avoid coherence issues with From/Into.
-#[derive(CanonicalSerialize, CanonicalDeserialize, Debug, Clone, PartialEq, Eq)]
-pub struct CommitmentNormalised<E: Pairing>(pub E::G1Affine);
-
 impl<E: Pairing> ProofProjective<E> {
     /// Generates a random looking proof (but not a valid one).
     /// Useful for testing and benchmarking. TODO: might be able to derive this through macros etc
@@ -246,16 +242,10 @@ fn compute_h_denom_eval<E: Pairing>(
     h_denom_eval
 }
 
-impl<E: Pairing> From<univariate_hiding_kzg::Commitment<E>> for CommitmentNormalised<E> {
-    fn from(c: univariate_hiding_kzg::Commitment<E>) -> Self {
-        CommitmentNormalised(c.0.into_affine())
-    }
-}
-
 impl<E: Pairing> traits::BatchedRangeProof<E> for ProofProjective<E> {
     type Commitment = univariate_hiding_kzg::Commitment<E>;
     type CommitmentKey = univariate_hiding_kzg::CommitmentKey<E>;
-    type CommitmentNormalised = CommitmentNormalised<E>;
+    type CommitmentNormalised = univariate_hiding_kzg::CommitmentNormalised<E>;
     type CommitmentRandomness = univariate_hiding_kzg::CommitmentRandomness<E::ScalarField>;
     type Input = E::ScalarField;
     type ProverKey = ProverKey<E>;

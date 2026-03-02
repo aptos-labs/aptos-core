@@ -5,6 +5,7 @@
 
 use crate::{
     delegate_transcript_core_to_subtrs,
+    pcs::univariate_hiding_kzg,
     pvss::{
         chunky::{
             chunked_elgamal::{self, num_chunks_per_scalar},
@@ -28,7 +29,6 @@ use crate::{
         self, check_msm_eval_zero,
         homomorphism::{
             fixed_base_msms::Trait as MsmTrait, tuple::TupleCodomainShape, Trait as HomTrait,
-            TrivialShape,
         },
         verifier_challenges_with_length, CurveGroupTrait, Trait as _,
     },
@@ -37,7 +37,7 @@ use anyhow::bail;
 use aptos_crypto::{
     arkworks::{
         msm,
-        random::{sample_field_element, unsafe_random_point_group},
+        random::{sample_field_element, unsafe_random_point},
         scrape::LowDegreeTest,
         serialization::{ark_de, ark_se},
         srs::SrsBasis,
@@ -99,12 +99,15 @@ impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>>
         )?;
 
         {
-            // Verify the range proof
+            // Verify the range proof (convert CommitmentNormalised to Commitment for verify)
+            let comm_for_verify = sigma_protocol::homomorphism::TrivialShape(
+                self.sharing_proof.range_proof_commitment.0.into_group(),
+            );
             if let Err(err) = self.sharing_proof.range_proof.verify(
                 &pp.pk_range_proof.vk,
                 sc.get_total_weight() * num_chunks_per_scalar::<E::ScalarField>(pp.ell) as usize,
                 pp.ell,
-                &self.sharing_proof.range_proof_commitment,
+                &comm_for_verify,
                 rng,
             ) {
                 bail!("Range proof batch verification failed: {:?}", err);
@@ -146,7 +149,7 @@ impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>>
         let public_statement = TupleCodomainShape(
             TupleCodomainShape(
                 sigma_protocol::homomorphism::TrivialShape(
-                    self.sharing_proof.range_proof_commitment.0.into_affine(), // Because it's not affine by default. Should probably change that
+                    self.sharing_proof.range_proof_commitment.0.clone(),
                 ),
                 chunked_elgamal::WeightedCodomainShape {
                     chunks: self.subtrs.Cs.clone(),
@@ -219,7 +222,7 @@ pub struct SharingProof<E: Pairing> {
     pub range_proof: dekart_univariate_v2::ProofProjective<E>, // TODO: make an affine version of this
     /// A KZG-style commitment to the values s_{i,j} going into the range proof
     pub range_proof_commitment:
-        <dekart_univariate_v2::ProofProjective<E> as BatchedRangeProof<E>>::Commitment,
+        <dekart_univariate_v2::ProofProjective<E> as BatchedRangeProof<E>>::CommitmentNormalised,
 }
 
 impl<E: Pairing> ValidCryptoMaterial for Transcript<E> {
@@ -317,8 +320,8 @@ impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>> traits:
             dealer: sc.get_player(0),
             subtrs: Subtranscript::generate(sc, num_chunks_per_share, rng),
             sharing_proof: SharingProof {
-                range_proof_commitment: sigma_protocol::homomorphism::TrivialShape(
-                    unsafe_random_point_group::<E::G1, _>(rng),
+                range_proof_commitment: univariate_hiding_kzg::CommitmentNormalised(
+                    unsafe_random_point::<E::G1, _>(rng),
                 ),
                 SoK: hkzg_chunked_elgamal_commit::Proof::generate(sc, num_chunks_per_share, rng),
                 range_proof: dekart_univariate_v2::ProofProjective::generate(pp.ell, rng),
@@ -394,21 +397,23 @@ impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>> Transcr
         //     "Number of encrypted chunks must equal number of players"
         // );
 
-        // Generate the batch range proof; normalized statement has TrivialShape<E::G1Affine>.
+        // Generate the batch range proof, given the `range_proof_commitment` produced in the PoK
         let range_proof = dekart_univariate_v2::ProofProjective::prove(
             &pp.pk_range_proof,
             &f_evals_chunked_flat,
             pp.ell,
-            &dekart_univariate_v2::CommitmentNormalised(range_proof_commitment.0.clone()),
+            &univariate_hiding_kzg::CommitmentNormalised(range_proof_commitment.0.clone()),
             &witness.hkzg_randomness,
             rng,
         );
 
-        // Assemble the sharing proof (Commitment type is TrivialShape<E::G1>).
+        // Assemble the sharing proof
         let sharing_proof = SharingProof {
             SoK,
             range_proof,
-            range_proof_commitment: TrivialShape(range_proof_commitment.0.into_group()),
+            range_proof_commitment: univariate_hiding_kzg::CommitmentNormalised(
+                range_proof_commitment.0.clone(),
+            ),
         };
 
         // Vs_flat from homomorphism codomain was grouped by player into Vs above.
