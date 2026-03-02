@@ -19,11 +19,11 @@ use aptos_types::{
         fungible_store::FungibleStoreResource, object::ObjectGroupResource, AccountResource,
         CoinStoreResource, CORE_CODE_ADDRESS,
     },
-    chain_id::ChainId,
+    chain_id::{ChainId, NamedChain},
     contract_event::ContractEvent,
     fee_statement::FeeStatement,
     move_utils::MemberId,
-    on_chain_config::{FeatureFlag, GasScheduleV2, OnChainConfig},
+    on_chain_config::{FeatureFlag, GasScheduleV2, OnChainConfig, TimedFeatureFlag},
     state_store::{
         state_key::StateKey,
         state_value::{StateValue, StateValueMetadata},
@@ -131,10 +131,28 @@ impl<O: OutputLogger> MoveHarnessImpl<O> {
         }
     }
 
+<<<<<<< HEAD
     pub fn new_testnet() -> Self {
         register_package_hooks(Box::new(AptosPackageHooks {}));
         Self {
             executor: FakeExecutorImpl::from_testnet_genesis(),
+=======
+    /// Creates a new harness with TESTNET chain id. Timed features have real
+    /// activation dates on testnet, making them individually toggleable via
+    /// [`Self::set_timed_feature`].
+    pub fn new_testnet() -> Self {
+        register_package_hooks(Box::new(AptosPackageHooks {}));
+        // Use from_head_genesis (which applies the genesis write set with TESTING chain id),
+        // then override the on-chain chain id to TESTNET. We must set it after genesis
+        // because apply_write_set overwrites the chain id resource.
+        let executor = FakeExecutorImpl::from_head_genesis();
+        executor
+            .state_store()
+            .set_chain_id(ChainId::testnet())
+            .expect("failed to set chain id");
+        Self {
+            executor,
+>>>>>>> 103e70ae7b ([vm] Updating limits for structs (#18896))
             txn_seq_no: BTreeMap::default(),
             default_gas_unit_price: DEFAULT_GAS_UNIT_PRICE,
             max_gas_per_txn: Self::DEFAULT_MAX_GAS_PER_TXN,
@@ -794,6 +812,34 @@ impl<O: OutputLogger> MoveHarnessImpl<O> {
     pub fn new_epoch(&mut self) {
         self.fast_forward(7200);
         self.executor.new_block()
+    }
+
+    /// Sets block time to enable or disable a specific timed feature, then triggers an
+    /// epoch change so the reconfiguration timestamp is updated. The VM uses
+    /// `ConfigurationResource::last_reconfiguration_time` (not block time) for timed
+    /// features, so a reconfiguration must occur at the target time.
+    pub fn set_timed_feature(&mut self, flag: TimedFeatureFlag, enabled: bool) {
+        let chain_id = self.executor.get_chain_id();
+        let named_chain =
+            NamedChain::from_chain_id(&chain_id).expect("set_timed_feature requires a named chain");
+        let activation_micros = flag.activation_time_on(&named_chain).timestamp_micros() as u64;
+        let target = if enabled {
+            activation_micros
+        } else {
+            assert!(
+                activation_micros > 0,
+                "Cannot disable {:?} on {:?}: activates at epoch 0",
+                flag,
+                named_chain
+            );
+            activation_micros - 1
+        };
+        // Create a new block at exactly the target timestamp. This must exceed
+        // `last_reconfiguration_time + epoch_interval` to trigger a reconfiguration
+        // that updates `last_reconfiguration_time` — the value the VM actually uses
+        // for timed features. We use `new_block_with_timestamp` directly (not
+        // `set_block_time` + `new_block`) because `new_block` adds 1 microsecond.
+        self.executor.new_block_with_timestamp(target);
     }
 
     pub fn new_block_with_metadata(
