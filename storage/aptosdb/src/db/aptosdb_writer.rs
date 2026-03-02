@@ -36,7 +36,6 @@ use aptos_types::{
     },
     write_set::WriteSet,
 };
-use itertools::Itertools;
 use rayon::prelude::*;
 use std::{iter::Iterator, time::Instant};
 
@@ -589,7 +588,7 @@ impl AptosDB {
         old_committed_version: Option<Version>,
         version: Version,
         ledger_info_with_sigs: Option<&LedgerInfoWithSignatures>,
-        chunk_opt: Option<ChunkToCommit>,
+        _chunk_opt: Option<ChunkToCommit>,
     ) -> Result<()> {
         // If commit succeeds and there are at least one transaction written to the storage, we
         // will inform the pruner thread to work.
@@ -615,32 +614,6 @@ impl AptosDB {
                 .state_pruner
                 .state_kv_pruner
                 .maybe_set_pruner_target_db_version(version);
-
-            // Note: this must happen after txns have been saved to db because types can be newly
-            // created in this same chunk of transactions.
-            if let Some(indexer) = &self.indexer {
-                let _timer = OTHER_TIMERS_SECONDS.timer_with(&["indexer_index"]);
-                // n.b. txns_to_commit can be partial, when the control was handed over from consensus to state sync
-                // where state sync won't send the pre-committed part to the DB again.
-                if let Some(chunk) = chunk_opt
-                    && chunk.len() == num_txns as usize
-                {
-                    let write_sets = chunk
-                        .transaction_outputs
-                        .iter()
-                        .map(|t| t.write_set())
-                        .collect_vec();
-                    indexer.index(self.state_store.clone(), first_version, &write_sets)?;
-                } else {
-                    let write_sets: Vec<_> = self
-                        .ledger_db
-                        .write_set_db()
-                        .get_write_set_iter(first_version, num_txns as usize)?
-                        .try_collect()?;
-                    let write_set_refs = write_sets.iter().collect_vec();
-                    indexer.index(self.state_store.clone(), first_version, &write_set_refs)?;
-                };
-            }
         }
 
         // Once everything is successfully persisted, update the latest in-memory ledger info.

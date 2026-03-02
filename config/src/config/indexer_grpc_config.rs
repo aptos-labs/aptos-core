@@ -112,15 +112,14 @@ impl ConfigSanitizer for IndexerGrpcConfig {
             return Ok(());
         }
 
-        if !node_config.storage.enable_indexer
-            && !node_config
-                .indexer_table_info
-                .table_info_service_mode
-                .is_enabled()
+        if !node_config
+            .indexer_table_info
+            .table_info_service_mode
+            .is_enabled()
         {
             return Err(Error::ConfigSanitizerFailed(
                 sanitizer_name,
-                "storage.enable_indexer must be true or indexer_table_info.table_info_service_mode must be IndexingOnly if indexer_grpc.enabled is true".to_string(),
+                "indexer_table_info.table_info_service_mode must be enabled if indexer_grpc.enabled is true".to_string(),
             ));
         }
         Ok(())
@@ -147,45 +146,22 @@ impl ConfigOptimizer for IndexerGrpcConfig {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::config::{IndexerTableInfoConfig, StorageConfig, TableInfoServiceMode};
+    use crate::config::{IndexerTableInfoConfig, TableInfoServiceMode};
 
     #[test]
-    fn test_sanitize_enable_indexer() {
-        // Create a storage config and disable the storage indexer
-        let mut storage_config = StorageConfig::default();
-        let mut table_info_config = IndexerTableInfoConfig::default();
-        storage_config.enable_indexer = false;
-        table_info_config.table_info_service_mode = TableInfoServiceMode::Disabled;
-
-        // Create a node config with the indexer enabled, but the storage indexer disabled
+    fn test_sanitize_table_info_service() {
+        // Create a node config with the indexer gRPC enabled, but table info service disabled
         let mut node_config = NodeConfig {
-            storage: storage_config,
-            indexer_table_info: table_info_config,
+            indexer_table_info: IndexerTableInfoConfig {
+                table_info_service_mode: TableInfoServiceMode::Disabled,
+                ..Default::default()
+            },
             indexer_grpc: IndexerGrpcConfig {
                 enabled: true,
                 ..Default::default()
             },
             ..Default::default()
         };
-
-        // Sanitize the config and verify that it fails
-        let error = IndexerGrpcConfig::sanitize(
-            &node_config,
-            NodeType::Validator,
-            Some(ChainId::mainnet()),
-        )
-        .unwrap_err();
-        assert!(matches!(error, Error::ConfigSanitizerFailed(_, _)));
-
-        // Enable the storage indexer
-        node_config.storage.enable_indexer = true;
-
-        // Sanitize the config and verify that it now succeeds
-        IndexerGrpcConfig::sanitize(&node_config, NodeType::Validator, Some(ChainId::mainnet()))
-            .unwrap();
-
-        // Disable the storage indexer and enable the table info service
-        node_config.storage.enable_indexer = false;
 
         // Sanitize the config and verify that it fails
         let error = IndexerGrpcConfig::sanitize(
