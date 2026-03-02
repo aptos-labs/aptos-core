@@ -2,10 +2,13 @@
 // SPDX-License-Identifier: Apache-2.0
 
 mod model_ast_lints;
+mod module_lints;
 mod stackless_bytecode_lints;
 mod utils;
 
-use move_compiler_v2::external_checks::{ExpChecker, ExternalChecks, StacklessBytecodeChecker};
+use move_compiler_v2::external_checks::{
+    ExpChecker, ExternalChecks, ModuleChecker, StacklessBytecodeChecker,
+};
 use std::{collections::BTreeMap, sync::Arc};
 
 /// Holds collection of lint checks for Move.
@@ -20,6 +23,10 @@ impl ExternalChecks for MoveLintChecks {
 
     fn get_stackless_bytecode_checkers(&self) -> Vec<Box<dyn StacklessBytecodeChecker>> {
         stackless_bytecode_lints::get_default_linter_pipeline(&self.config)
+    }
+
+    fn get_module_checkers(&self) -> Vec<Box<dyn ModuleChecker>> {
+        module_lints::get_default_linter_pipeline(&self.config)
     }
 }
 

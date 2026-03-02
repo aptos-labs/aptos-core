@@ -17,3 +17,18 @@ warning: [lint] Needless pair of `&` and `*` operators: consider removing them
    │
    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(needless_ref_deref)]`.
    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#needless_ref_deref.
+
+warning: [lint] Module is missing a doc comment.
+   ┌─ tests/model_ast_lints/needless_ref_deref_warn.move:1:1
+   │
+ 1 │ ╭ module 0xc0ffee::m {
+ 2 │ │     use std::string::{Self, String};
+ 3 │ │     use std::vector;
+ 4 │ │
+   · │
+41 │ │     }
+42 │ │ }
+   │ ╰─^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(missing_doc_module)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#missing_doc_module.

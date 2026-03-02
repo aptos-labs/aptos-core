@@ -1,5 +1,14 @@
 
 Diagnostics:
+warning: [lint] Public function is missing a doc comment.
+  ┌─ tests/model_ast_lints/needless_bool_warn.move:6:16
+  │
+6 │     public fun test1_warn(): bool {
+  │                ^^^^^^^^^^
+  │
+  = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(missing_doc_public_function)]`.
+  = For more information, see https://aptos.dev/en/build/smart-contracts/linter#missing_doc_public_function.
+
 warning: [lint] This if-else can be replaced with just the condition
   ┌─ tests/model_ast_lints/needless_bool_warn.move:7:9
   │
@@ -8,6 +17,15 @@ warning: [lint] This if-else can be replaced with just the condition
   │
   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(needless_bool)]`.
   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#needless_bool.
+
+warning: [lint] Public function is missing a doc comment.
+   ┌─ tests/model_ast_lints/needless_bool_warn.move:10:16
+   │
+10 │     public fun test2_warn(): bool {
+   │                ^^^^^^^^^^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(missing_doc_public_function)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#missing_doc_public_function.
 
 warning: [lint] This if-else can be replaced with just the negation of the condition
    ┌─ tests/model_ast_lints/needless_bool_warn.move:11:9
@@ -21,6 +39,15 @@ warning: [lint] This if-else can be replaced with just the negation of the condi
    │
    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(needless_bool)]`.
    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#needless_bool.
+
+warning: [lint] Public function is missing a doc comment.
+   ┌─ tests/model_ast_lints/needless_bool_warn.move:18:16
+   │
+18 │     public fun test3_warn(): bool {
+   │                ^^^^^^^^^^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(missing_doc_public_function)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#missing_doc_public_function.
 
 warning: [lint] The `return` keyword is unnecessary here and can be removed.
    ┌─ tests/model_ast_lints/needless_bool_warn.move:20:13
@@ -53,6 +80,15 @@ warning: [lint] This if-else can be replaced with just returning the condition
    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(needless_bool)]`.
    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#needless_bool.
 
+warning: [lint] Public function is missing a doc comment.
+   ┌─ tests/model_ast_lints/needless_bool_warn.move:26:16
+   │
+26 │     public fun test4_warn(x: bool): bool {
+   │                ^^^^^^^^^^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(missing_doc_public_function)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#missing_doc_public_function.
+
 warning: [lint] This if-else can be replaced with just returning the negation of the condition
    ┌─ tests/model_ast_lints/needless_bool_warn.move:28:13
    │
@@ -65,6 +101,15 @@ warning: [lint] This if-else can be replaced with just returning the negation of
    │
    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(needless_bool)]`.
    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#needless_bool.
+
+warning: [lint] Public function is missing a doc comment.
+   ┌─ tests/model_ast_lints/needless_bool_warn.move:37:16
+   │
+37 │     public fun test5_warn(x: bool): bool {
+   │                ^^^^^^^^^^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(missing_doc_public_function)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#missing_doc_public_function.
 
 warning: [lint] The `return` keyword is unnecessary here and can be removed.
    ┌─ tests/model_ast_lints/needless_bool_warn.move:38:18
@@ -93,6 +138,15 @@ warning: [lint] This if-else has the same bool expression in both branches, cons
    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(needless_bool)]`.
    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#needless_bool.
 
+warning: [lint] Public function is missing a doc comment.
+   ┌─ tests/model_ast_lints/needless_bool_warn.move:41:16
+   │
+41 │     public fun test6_no_warn(): bool {
+   │                ^^^^^^^^^^^^^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(missing_doc_public_function)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#missing_doc_public_function.
+
 warning: [lint] The `return` keyword is unnecessary here and can be removed.
    ┌─ tests/model_ast_lints/needless_bool_warn.move:43:13
    │
@@ -101,3 +155,36 @@ warning: [lint] The `return` keyword is unnecessary here and can be removed.
    │
    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(needless_return)]`.
    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#needless_return.
+
+warning: [lint] Public function is missing a doc comment.
+   ┌─ tests/model_ast_lints/needless_bool_warn.move:47:16
+   │
+47 │     public fun test7_no_warn(): bool {
+   │                ^^^^^^^^^^^^^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(missing_doc_public_function)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#missing_doc_public_function.
+
+warning: [lint] Public function is missing a doc comment.
+   ┌─ tests/model_ast_lints/needless_bool_warn.move:55:16
+   │
+55 │     public fun test1_no_warn(): bool {
+   │                ^^^^^^^^^^^^^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(missing_doc_public_function)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#missing_doc_public_function.
+
+warning: [lint] Module is missing a doc comment.
+   ┌─ tests/model_ast_lints/needless_bool_warn.move:1:1
+   │
+ 1 │ ╭ module 0xc0ffee::m {
+ 2 │ │     fun foo(): bool {
+ 3 │ │         true
+ 4 │ │     }
+   · │
+57 │ │     }
+58 │ │ }
+   │ ╰─^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(missing_doc_module)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#missing_doc_module.

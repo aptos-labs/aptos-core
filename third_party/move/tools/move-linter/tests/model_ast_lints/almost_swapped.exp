@@ -1,5 +1,41 @@
 
 Diagnostics:
+warning: [lint] Struct is missing a doc comment.
+  ┌─ tests/model_ast_lints/almost_swapped.move:4:3
+  │
+4 │   struct X has drop, copy { f: u64 }
+  │   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  │
+  = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(missing_doc_struct)]`.
+  = For more information, see https://aptos.dev/en/build/smart-contracts/linter#missing_doc_struct.
+
+warning: [lint] Struct is missing a doc comment.
+  ┌─ tests/model_ast_lints/almost_swapped.move:5:3
+  │
+5 │   struct Y has drop, copy { x1: X, x2: X }
+  │   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  │
+  = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(missing_doc_struct)]`.
+  = For more information, see https://aptos.dev/en/build/smart-contracts/linter#missing_doc_struct.
+
+warning: [lint] Struct is missing a doc comment.
+  ┌─ tests/model_ast_lints/almost_swapped.move:6:3
+  │
+6 │   struct Pair(u64, u8) has copy, drop;
+  │   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  │
+  = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(missing_doc_struct)]`.
+  = For more information, see https://aptos.dev/en/build/smart-contracts/linter#missing_doc_struct.
+
+warning: [lint] Public function is missing a doc comment.
+  ┌─ tests/model_ast_lints/almost_swapped.move:8:14
+  │
+8 │   public fun assign_assign_swap_var() {
+  │              ^^^^^^^^^^^^^^^^^^^^^^
+  │
+  = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(missing_doc_public_function)]`.
+  = For more information, see https://aptos.dev/en/build/smart-contracts/linter#missing_doc_public_function.
+
 warning: [lint] This looks like a swap, but one assignment overwrites the other.
    ┌─ tests/model_ast_lints/almost_swapped.move:11:5
    │
@@ -18,6 +54,15 @@ warning: [lint] Empty `if` branch. Consider simplifying by removing or rewriting
    │
    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(empty_if)]`.
    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#empty_if.
+
+warning: [lint] Public function is missing a doc comment.
+   ┌─ tests/model_ast_lints/almost_swapped.move:16:14
+   │
+16 │   public fun assign_assign_swap_struct() {
+   │              ^^^^^^^^^^^^^^^^^^^^^^^^^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(missing_doc_public_function)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#missing_doc_public_function.
 
 warning: [lint] This looks like a swap, but one assignment overwrites the other.
    ┌─ tests/model_ast_lints/almost_swapped.move:19:5
@@ -38,6 +83,15 @@ warning: [lint] Empty `if` branch. Consider simplifying by removing or rewriting
    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(empty_if)]`.
    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#empty_if.
 
+warning: [lint] Public function is missing a doc comment.
+   ┌─ tests/model_ast_lints/almost_swapped.move:24:14
+   │
+24 │   public fun mutate_mutate_swap_struct() {
+   │              ^^^^^^^^^^^^^^^^^^^^^^^^^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(missing_doc_public_function)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#missing_doc_public_function.
+
 warning: [lint] This looks like a swap, but one assignment overwrites the other.
    ┌─ tests/model_ast_lints/almost_swapped.move:27:5
    │
@@ -47,6 +101,15 @@ warning: [lint] This looks like a swap, but one assignment overwrites the other.
    │
    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(almost_swapped)]`.
    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#almost_swapped.
+
+warning: [lint] Public function is missing a doc comment.
+   ┌─ tests/model_ast_lints/almost_swapped.move:31:14
+   │
+31 │   public fun mutate_mutate_swap_struct_deep() {
+   │              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(missing_doc_public_function)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#missing_doc_public_function.
 
 warning: [lint] This looks like a swap, but one assignment overwrites the other.
    ┌─ tests/model_ast_lints/almost_swapped.move:34:5
@@ -68,6 +131,15 @@ warning: [lint] This looks like a swap, but one assignment overwrites the other.
    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(almost_swapped)]`.
    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#almost_swapped.
 
+warning: [lint] Public function is missing a doc comment.
+   ┌─ tests/model_ast_lints/almost_swapped.move:40:14
+   │
+40 │   public fun assign_mutate_swap() {
+   │              ^^^^^^^^^^^^^^^^^^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(missing_doc_public_function)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#missing_doc_public_function.
+
 warning: [lint] This looks like a swap, but one assignment overwrites the other.
    ┌─ tests/model_ast_lints/almost_swapped.move:44:5
    │
@@ -77,6 +149,15 @@ warning: [lint] This looks like a swap, but one assignment overwrites the other.
    │
    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(almost_swapped)]`.
    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#almost_swapped.
+
+warning: [lint] Public function is missing a doc comment.
+   ┌─ tests/model_ast_lints/almost_swapped.move:48:14
+   │
+48 │   public fun mutate_assign_swap() {
+   │              ^^^^^^^^^^^^^^^^^^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(missing_doc_public_function)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#missing_doc_public_function.
 
 warning: [lint] This looks like a swap, but one assignment overwrites the other.
    ┌─ tests/model_ast_lints/almost_swapped.move:52:5
@@ -97,6 +178,15 @@ warning: [lint] Empty `if` branch. Consider simplifying by removing or rewriting
    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(empty_if)]`.
    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#empty_if.
 
+warning: [lint] Public function is missing a doc comment.
+   ┌─ tests/model_ast_lints/almost_swapped.move:57:14
+   │
+57 │   public fun inner_swap() {
+   │              ^^^^^^^^^^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(missing_doc_public_function)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#missing_doc_public_function.
+
 warning: [lint] This looks like a swap, but one assignment overwrites the other.
    ┌─ tests/model_ast_lints/almost_swapped.move:61:5
    │
@@ -106,6 +196,15 @@ warning: [lint] This looks like a swap, but one assignment overwrites the other.
    │
    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(almost_swapped)]`.
    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#almost_swapped.
+
+warning: [lint] Public function is missing a doc comment.
+   ┌─ tests/model_ast_lints/almost_swapped.move:65:14
+   │
+65 │   public fun inner_deref() {
+   │              ^^^^^^^^^^^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(missing_doc_public_function)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#missing_doc_public_function.
 
 warning: [lint] This looks like a swap, but one assignment overwrites the other.
    ┌─ tests/model_ast_lints/almost_swapped.move:70:5
@@ -136,6 +235,15 @@ warning: [lint] Empty `if` branch. Consider simplifying by removing or rewriting
    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(empty_if)]`.
    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#empty_if.
 
+warning: [lint] Public function is missing a doc comment.
+   ┌─ tests/model_ast_lints/almost_swapped.move:77:14
+   │
+77 │   public fun positional_struct_swap() {
+   │              ^^^^^^^^^^^^^^^^^^^^^^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(missing_doc_public_function)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#missing_doc_public_function.
+
 warning: [lint] This looks like a swap, but one assignment overwrites the other.
    ┌─ tests/model_ast_lints/almost_swapped.move:80:5
    │
@@ -145,6 +253,15 @@ warning: [lint] This looks like a swap, but one assignment overwrites the other.
    │
    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(almost_swapped)]`.
    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#almost_swapped.
+
+warning: [lint] Public function is missing a doc comment.
+   ┌─ tests/model_ast_lints/almost_swapped.move:84:14
+   │
+84 │   public fun double_swap() {
+   │              ^^^^^^^^^^^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(missing_doc_public_function)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#missing_doc_public_function.
 
 warning: [lint] This looks like a swap, but one assignment overwrites the other.
    ┌─ tests/model_ast_lints/almost_swapped.move:87:5
@@ -175,6 +292,15 @@ warning: [lint] Empty `if` branch. Consider simplifying by removing or rewriting
    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(empty_if)]`.
    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#empty_if.
 
+warning: [lint] Public function is missing a doc comment.
+   ┌─ tests/model_ast_lints/almost_swapped.move:93:14
+   │
+93 │   public fun entire_vector_swap() {
+   │              ^^^^^^^^^^^^^^^^^^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(missing_doc_public_function)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#missing_doc_public_function.
+
 warning: [lint] This looks like a swap, but one assignment overwrites the other.
    ┌─ tests/model_ast_lints/almost_swapped.move:98:5
    │
@@ -194,6 +320,18 @@ warning: [lint] Empty `if` branch. Consider simplifying by removing or rewriting
     = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(empty_if)]`.
     = For more information, see https://aptos.dev/en/build/smart-contracts/linter#empty_if.
 
+warning: [lint] Enum is missing a doc comment.
+    ┌─ tests/model_ast_lints/almost_swapped.move:103:3
+    │
+103 │ ╭   enum E has drop {
+104 │ │     A { x: u64 },
+105 │ │     B { x: u64 },
+106 │ │   }
+    │ ╰───^
+    │
+    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(missing_doc_struct)]`.
+    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#missing_doc_struct.
+
 warning: [lint] This looks like a swap, but one assignment overwrites the other.
     ┌─ tests/model_ast_lints/almost_swapped.move:111:5
     │
@@ -204,6 +342,15 @@ warning: [lint] This looks like a swap, but one assignment overwrites the other.
     = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(almost_swapped)]`.
     = For more information, see https://aptos.dev/en/build/smart-contracts/linter#almost_swapped.
 
+warning: [lint] Public function is missing a doc comment.
+    ┌─ tests/model_ast_lints/almost_swapped.move:115:14
+    │
+115 │   public fun no_swap_no_warn() {
+    │              ^^^^^^^^^^^^^^^
+    │
+    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(missing_doc_public_function)]`.
+    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#missing_doc_public_function.
+
 warning: [lint] Empty `if` branch. Consider simplifying by removing or rewriting.
     ┌─ tests/model_ast_lints/almost_swapped.move:120:5
     │
@@ -212,6 +359,33 @@ warning: [lint] Empty `if` branch. Consider simplifying by removing or rewriting
     │
     = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(empty_if)]`.
     = For more information, see https://aptos.dev/en/build/smart-contracts/linter#empty_if.
+
+warning: [lint] Public function is missing a doc comment.
+    ┌─ tests/model_ast_lints/almost_swapped.move:127:14
+    │
+127 │   public fun out_of_scope_vector_swap_no_warn() {
+    │              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    │
+    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(missing_doc_public_function)]`.
+    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#missing_doc_public_function.
+
+warning: [lint] Public function is missing a doc comment.
+    ┌─ tests/model_ast_lints/almost_swapped.move:136:14
+    │
+136 │   public fun out_of_scope_vector_swap_no_warn_2(): vector<u64> {
+    │              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    │
+    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(missing_doc_public_function)]`.
+    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#missing_doc_public_function.
+
+warning: [lint] Public function is missing a doc comment.
+    ┌─ tests/model_ast_lints/almost_swapped.move:148:14
+    │
+148 │   public fun out_of_scope_function_swap_no_warn() {
+    │              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    │
+    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(missing_doc_public_function)]`.
+    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#missing_doc_public_function.
 
 warning: [lint] Empty `if` branch. Consider simplifying by removing or rewriting.
     ┌─ tests/model_ast_lints/almost_swapped.move:153:5
@@ -222,6 +396,15 @@ warning: [lint] Empty `if` branch. Consider simplifying by removing or rewriting
     = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(empty_if)]`.
     = For more information, see https://aptos.dev/en/build/smart-contracts/linter#empty_if.
 
+warning: [lint] Public function is missing a doc comment.
+    ┌─ tests/model_ast_lints/almost_swapped.move:157:14
+    │
+157 │   public fun test_no_warn() {
+    │              ^^^^^^^^^^^^
+    │
+    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(missing_doc_public_function)]`.
+    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#missing_doc_public_function.
+
 warning: [lint] Empty `if` branch. Consider simplifying by removing or rewriting.
     ┌─ tests/model_ast_lints/almost_swapped.move:162:5
     │
@@ -230,3 +413,18 @@ warning: [lint] Empty `if` branch. Consider simplifying by removing or rewriting
     │
     = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(empty_if)]`.
     = For more information, see https://aptos.dev/en/build/smart-contracts/linter#empty_if.
+
+warning: [lint] Module is missing a doc comment.
+    ┌─ tests/model_ast_lints/almost_swapped.move:1:1
+    │
+  1 │ ╭ module 0xc0ffee::m {
+  2 │ │   use std::vector;
+  3 │ │
+  4 │ │   struct X has drop, copy { f: u64 }
+    · │
+163 │ │   }
+164 │ │ }
+    │ ╰─^
+    │
+    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(missing_doc_module)]`.
+    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#missing_doc_module.

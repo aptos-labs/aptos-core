@@ -1,5 +1,24 @@
 
 Diagnostics:
+warning: [lint] Use doc comment `///` instead of regular comment `//` for documentable items.
+   ┌─ tests/model_ast_lints/collapsible_if.move:10:1
+   │
+10 │ ╭     // Simple nested if case
+11 │ │     public fun test_warn_1(a: bool, b: bool) {
+   │ ╰^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(prefer_doc_comment)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#prefer_doc_comment.
+
+warning: [lint] Public function is missing a doc comment.
+   ┌─ tests/model_ast_lints/collapsible_if.move:11:16
+   │
+11 │     public fun test_warn_1(a: bool, b: bool) {
+   │                ^^^^^^^^^^^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(missing_doc_public_function)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#missing_doc_public_function.
+
 warning: [lint] Nested `if` statements can be collapsed into a single `if` by using logical conjunction (`&&`) of the conditions
    ┌─ tests/model_ast_lints/collapsible_if.move:12:9
    │
@@ -12,6 +31,25 @@ warning: [lint] Nested `if` statements can be collapsed into a single `if` by us
    │
    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(collapsible_if)]`.
    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#collapsible_if.
+
+warning: [lint] Use doc comment `///` instead of regular comment `//` for documentable items.
+   ┌─ tests/model_ast_lints/collapsible_if.move:19:1
+   │
+19 │ ╭     // Nested if with function calls in conditions
+20 │ │     public fun test_warn_2(x: u64, y: u64) {
+   │ ╰^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(prefer_doc_comment)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#prefer_doc_comment.
+
+warning: [lint] Public function is missing a doc comment.
+   ┌─ tests/model_ast_lints/collapsible_if.move:20:16
+   │
+20 │     public fun test_warn_2(x: u64, y: u64) {
+   │                ^^^^^^^^^^^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(missing_doc_public_function)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#missing_doc_public_function.
 
 warning: [lint] Nested `if` statements can be collapsed into a single `if` by using logical conjunction (`&&`) of the conditions
    ┌─ tests/model_ast_lints/collapsible_if.move:21:9
@@ -26,6 +64,25 @@ warning: [lint] Nested `if` statements can be collapsed into a single `if` by us
    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(collapsible_if)]`.
    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#collapsible_if.
 
+warning: [lint] Use doc comment `///` instead of regular comment `//` for documentable items.
+   ┌─ tests/model_ast_lints/collapsible_if.move:28:1
+   │
+28 │ ╭     // Nested if with complex conditions
+29 │ │     public fun test_warn_3(x: u64, y: u64) {
+   │ ╰^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(prefer_doc_comment)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#prefer_doc_comment.
+
+warning: [lint] Public function is missing a doc comment.
+   ┌─ tests/model_ast_lints/collapsible_if.move:29:16
+   │
+29 │     public fun test_warn_3(x: u64, y: u64) {
+   │                ^^^^^^^^^^^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(missing_doc_public_function)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#missing_doc_public_function.
+
 warning: [lint] Nested `if` statements can be collapsed into a single `if` by using logical conjunction (`&&`) of the conditions
    ┌─ tests/model_ast_lints/collapsible_if.move:30:9
    │
@@ -38,6 +95,25 @@ warning: [lint] Nested `if` statements can be collapsed into a single `if` by us
    │
    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(collapsible_if)]`.
    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#collapsible_if.
+
+warning: [lint] Use doc comment `///` instead of regular comment `//` for documentable items.
+   ┌─ tests/model_ast_lints/collapsible_if.move:37:1
+   │
+37 │ ╭     // Multiple levels of nesting (should warn on the first level)
+38 │ │     public fun test_warn_4(a: bool, b: bool, c: bool) {
+   │ ╰^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(prefer_doc_comment)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#prefer_doc_comment.
+
+warning: [lint] Public function is missing a doc comment.
+   ┌─ tests/model_ast_lints/collapsible_if.move:38:16
+   │
+38 │     public fun test_warn_4(a: bool, b: bool, c: bool) {
+   │                ^^^^^^^^^^^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(missing_doc_public_function)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#missing_doc_public_function.
 
 warning: [lint] Nested `if` statements can be collapsed into a single `if` by using logical conjunction (`&&`) of the conditions
    ┌─ tests/model_ast_lints/collapsible_if.move:39:9
@@ -54,6 +130,25 @@ warning: [lint] Nested `if` statements can be collapsed into a single `if` by us
    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(collapsible_if)]`.
    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#collapsible_if.
 
+warning: [lint] Use doc comment `///` instead of regular comment `//` for documentable items.
+   ┌─ tests/model_ast_lints/collapsible_if.move:48:1
+   │
+48 │ ╭     // Nested if with empty else branch
+49 │ │     public fun test_warn_5(a: bool, b: bool) {
+   │ ╰^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(prefer_doc_comment)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#prefer_doc_comment.
+
+warning: [lint] Public function is missing a doc comment.
+   ┌─ tests/model_ast_lints/collapsible_if.move:49:16
+   │
+49 │     public fun test_warn_5(a: bool, b: bool) {
+   │                ^^^^^^^^^^^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(missing_doc_public_function)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#missing_doc_public_function.
+
 warning: [lint] Nested `if` statements can be collapsed into a single `if` by using logical conjunction (`&&`) of the conditions
    ┌─ tests/model_ast_lints/collapsible_if.move:50:9
    │
@@ -68,3 +163,122 @@ warning: [lint] Nested `if` statements can be collapsed into a single `if` by us
    │
    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(collapsible_if)]`.
    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#collapsible_if.
+
+warning: [lint] Use doc comment `///` instead of regular comment `//` for documentable items.
+   ┌─ tests/model_ast_lints/collapsible_if.move:61:1
+   │
+61 │ ╭     // Outer if has else clause
+62 │ │     public fun test_no_warn_1(a: bool, b: bool) {
+   │ ╰^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(prefer_doc_comment)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#prefer_doc_comment.
+
+warning: [lint] Public function is missing a doc comment.
+   ┌─ tests/model_ast_lints/collapsible_if.move:62:16
+   │
+62 │     public fun test_no_warn_1(a: bool, b: bool) {
+   │                ^^^^^^^^^^^^^^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(missing_doc_public_function)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#missing_doc_public_function.
+
+warning: [lint] Use doc comment `///` instead of regular comment `//` for documentable items.
+   ┌─ tests/model_ast_lints/collapsible_if.move:72:1
+   │
+72 │ ╭     // Inner if has else clause
+73 │ │     public fun test_no_warn_2(a: bool, b: bool) {
+   │ ╰^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(prefer_doc_comment)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#prefer_doc_comment.
+
+warning: [lint] Public function is missing a doc comment.
+   ┌─ tests/model_ast_lints/collapsible_if.move:73:16
+   │
+73 │     public fun test_no_warn_2(a: bool, b: bool) {
+   │                ^^^^^^^^^^^^^^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(missing_doc_public_function)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#missing_doc_public_function.
+
+warning: [lint] Use doc comment `///` instead of regular comment `//` for documentable items.
+   ┌─ tests/model_ast_lints/collapsible_if.move:83:1
+   │
+83 │ ╭     // Both ifs have else clauses
+84 │ │     public fun test_no_warn_3(a: bool, b: bool) {
+   │ ╰^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(prefer_doc_comment)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#prefer_doc_comment.
+
+warning: [lint] Public function is missing a doc comment.
+   ┌─ tests/model_ast_lints/collapsible_if.move:84:16
+   │
+84 │     public fun test_no_warn_3(a: bool, b: bool) {
+   │                ^^^^^^^^^^^^^^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(missing_doc_public_function)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#missing_doc_public_function.
+
+warning: [lint] Use doc comment `///` instead of regular comment `//` for documentable items.
+   ┌─ tests/model_ast_lints/collapsible_if.move:96:1
+   │
+96 │ ╭     // No nesting - just a single if
+97 │ │     public fun test_no_warn_4(a: bool) {
+   │ ╰^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(prefer_doc_comment)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#prefer_doc_comment.
+
+warning: [lint] Public function is missing a doc comment.
+   ┌─ tests/model_ast_lints/collapsible_if.move:97:16
+   │
+97 │     public fun test_no_warn_4(a: bool) {
+   │                ^^^^^^^^^^^^^^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(missing_doc_public_function)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#missing_doc_public_function.
+
+warning: [lint] Use doc comment `///` instead of regular comment `//` for documentable items.
+    ┌─ tests/model_ast_lints/collapsible_if.move:103:1
+    │
+103 │ ╭     // Different statements between ifs
+104 │ │     public fun test_no_warn_5(a: bool, b: bool) {
+    │ ╰^
+    │
+    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(prefer_doc_comment)]`.
+    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#prefer_doc_comment.
+
+warning: [lint] Public function is missing a doc comment.
+    ┌─ tests/model_ast_lints/collapsible_if.move:104:16
+    │
+104 │     public fun test_no_warn_5(a: bool, b: bool) {
+    │                ^^^^^^^^^^^^^^
+    │
+    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(missing_doc_public_function)]`.
+    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#missing_doc_public_function.
+
+warning: [lint] Public function is missing a doc comment.
+    ┌─ tests/model_ast_lints/collapsible_if.move:114:16
+    │
+114 │     public fun test_no_warn_6(a: bool, b: bool) {
+    │                ^^^^^^^^^^^^^^
+    │
+    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(missing_doc_public_function)]`.
+    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#missing_doc_public_function.
+
+warning: [lint] Module is missing a doc comment.
+    ┌─ tests/model_ast_lints/collapsible_if.move:1:1
+    │
+  1 │ ╭ module 0xc0ffee::m {
+  2 │ │     fun foo(x: u64): bool {
+  3 │ │         x > 10
+  4 │ │     }
+    · │
+120 │ │     }
+121 │ │ }
+    │ ╰─^
+    │
+    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(missing_doc_module)]`.
+    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#missing_doc_module.

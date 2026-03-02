@@ -1,5 +1,59 @@
 
 Diagnostics:
+warning: [lint] Struct is missing a doc comment.
+  ┌─ tests/model_ast_lints/exists_bool_equality.move:2:5
+  │
+2 │     struct A(bool) has key, drop;
+  │     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  │
+  = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(missing_doc_struct)]`.
+  = For more information, see https://aptos.dev/en/build/smart-contracts/linter#missing_doc_struct.
+
+warning: [lint] Struct is missing a doc comment.
+  ┌─ tests/model_ast_lints/exists_bool_equality.move:3:5
+  │
+3 │     struct B(bool) has key, drop;
+  │     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  │
+  = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(missing_doc_struct)]`.
+  = For more information, see https://aptos.dev/en/build/smart-contracts/linter#missing_doc_struct.
+
+warning: [lint] Public function is missing a doc comment.
+  ┌─ tests/model_ast_lints/exists_bool_equality.move:6:16
+  │
+6 │     public fun no_warn_1(): bool {
+  │                ^^^^^^^^^
+  │
+  = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(missing_doc_public_function)]`.
+  = For more information, see https://aptos.dev/en/build/smart-contracts/linter#missing_doc_public_function.
+
+warning: [lint] Public function is missing a doc comment.
+   ┌─ tests/model_ast_lints/exists_bool_equality.move:10:16
+   │
+10 │     public fun no_warn_2(): bool {
+   │                ^^^^^^^^^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(missing_doc_public_function)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#missing_doc_public_function.
+
+warning: [lint] Public function is missing a doc comment.
+   ┌─ tests/model_ast_lints/exists_bool_equality.move:14:16
+   │
+14 │     public fun no_warn_3(): bool {
+   │                ^^^^^^^^^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(missing_doc_public_function)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#missing_doc_public_function.
+
+warning: [lint] Public function is missing a doc comment.
+   ┌─ tests/model_ast_lints/exists_bool_equality.move:18:16
+   │
+18 │     public fun warn_1(): bool {
+   │                ^^^^^^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(missing_doc_public_function)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#missing_doc_public_function.
+
 warning: [lint] This boolean expression can be simplified using idempotence (`a && a` is equivalent to `a`).
    ┌─ tests/model_ast_lints/exists_bool_equality.move:19:9
    │
@@ -8,6 +62,15 @@ warning: [lint] This boolean expression can be simplified using idempotence (`a 
    │
    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(simpler_bool_expression)]`.
    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#simpler_bool_expression.
+
+warning: [lint] Public function is missing a doc comment.
+   ┌─ tests/model_ast_lints/exists_bool_equality.move:22:16
+   │
+22 │     public fun warn_2(): bool {
+   │                ^^^^^^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(missing_doc_public_function)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#missing_doc_public_function.
 
 warning: [lint] This boolean expression can be simplified using idempotence (`a && a` is equivalent to `a`).
    ┌─ tests/model_ast_lints/exists_bool_equality.move:23:9
@@ -18,6 +81,15 @@ warning: [lint] This boolean expression can be simplified using idempotence (`a 
    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(simpler_bool_expression)]`.
    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#simpler_bool_expression.
 
+warning: [lint] Public function is missing a doc comment.
+   ┌─ tests/model_ast_lints/exists_bool_equality.move:26:16
+   │
+26 │     public fun warn_3(): bool {
+   │                ^^^^^^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(missing_doc_public_function)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#missing_doc_public_function.
+
 warning: [lint] This boolean expression can be simplified using idempotence (`a && a` is equivalent to `a`).
    ┌─ tests/model_ast_lints/exists_bool_equality.move:27:9
    │
@@ -26,3 +98,18 @@ warning: [lint] This boolean expression can be simplified using idempotence (`a 
    │
    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(simpler_bool_expression)]`.
    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#simpler_bool_expression.
+
+warning: [lint] Module is missing a doc comment.
+   ┌─ tests/model_ast_lints/exists_bool_equality.move:1:1
+   │
+ 1 │ ╭ module 0xc0ffee::m {
+ 2 │ │     struct A(bool) has key, drop;
+ 3 │ │     struct B(bool) has key, drop;
+ 4 │ │
+   · │
+28 │ │     }
+29 │ │ }
+   │ ╰─^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(missing_doc_module)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#missing_doc_module.

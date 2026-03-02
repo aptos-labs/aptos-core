@@ -1,5 +1,14 @@
 
 Diagnostics:
+warning: [lint] Public function is missing a doc comment.
+  ┌─ tests/model_ast_lints/multi_attributes_02.move:4:16
+  │
+4 │     public fun test1(x: u64) {
+  │                ^^^^^
+  │
+  = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(missing_doc_public_function)]`.
+  = For more information, see https://aptos.dev/en/build/smart-contracts/linter#missing_doc_public_function.
+
 warning: [lint] Empty `if` branch. Consider simplifying by removing or rewriting.
   ┌─ tests/model_ast_lints/multi_attributes_02.move:5:9
   │
@@ -11,6 +20,15 @@ warning: [lint] Empty `if` branch. Consider simplifying by removing or rewriting
   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(empty_if)]`.
   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#empty_if.
 
+warning: [lint] Public function is missing a doc comment.
+   ┌─ tests/model_ast_lints/multi_attributes_02.move:14:16
+   │
+14 │     public fun test2(x: u64) {
+   │                ^^^^^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(missing_doc_public_function)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#missing_doc_public_function.
+
 warning: [lint] Empty `if` branch. Consider simplifying by removing or rewriting.
    ┌─ tests/model_ast_lints/multi_attributes_02.move:15:9
    │
@@ -21,3 +39,18 @@ warning: [lint] Empty `if` branch. Consider simplifying by removing or rewriting
    │
    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(empty_if)]`.
    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#empty_if.
+
+warning: [lint] Module is missing a doc comment.
+   ┌─ tests/model_ast_lints/multi_attributes_02.move:2:1
+   │
+ 2 │ ╭ module 0xc0ffee::m {
+ 3 │ │     #[lint::skip(blocks_in_conditions)]
+ 4 │ │     public fun test1(x: u64) {
+ 5 │ │         if ({let y = x + 1; y < 5}) {
+   · │
+21 │ │     }
+22 │ │ }
+   │ ╰─^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(missing_doc_module)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#missing_doc_module.

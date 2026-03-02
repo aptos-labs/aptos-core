@@ -1,5 +1,14 @@
 
 Diagnostics:
+warning: [lint] Public function is missing a doc comment.
+  ┌─ tests/model_ast_lints/unnecessary_numerical_extreme_comparisons_warn.move:8:16
+  │
+8 │     public fun test1(x: u8) {
+  │                ^^^^^
+  │
+  = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(missing_doc_public_function)]`.
+  = For more information, see https://aptos.dev/en/build/smart-contracts/linter#missing_doc_public_function.
+
 warning: [lint] Comparison is always false, consider rewriting the code to remove the redundant comparison
   ┌─ tests/model_ast_lints/unnecessary_numerical_extreme_comparisons_warn.move:9:13
   │
@@ -8,6 +17,15 @@ warning: [lint] Comparison is always false, consider rewriting the code to remov
   │
   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(unnecessary_numerical_extreme_comparison)]`.
   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#unnecessary_numerical_extreme_comparison.
+
+warning: [lint] Public function is missing a doc comment.
+   ┌─ tests/model_ast_lints/unnecessary_numerical_extreme_comparisons_warn.move:12:16
+   │
+12 │     public fun test2(x: &u8, y: &u8) {
+   │                ^^^^^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(missing_doc_public_function)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#missing_doc_public_function.
 
 warning: [lint] Comparison is always false, consider rewriting the code to remove the redundant comparison
    ┌─ tests/model_ast_lints/unnecessary_numerical_extreme_comparisons_warn.move:13:13
@@ -26,6 +44,15 @@ warning: [lint] Directly use the boolean expression, instead of comparing it wit
    │
    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(unnecessary_boolean_identity_comparison)]`.
    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#unnecessary_boolean_identity_comparison.
+
+warning: [lint] Public function is missing a doc comment.
+   ┌─ tests/model_ast_lints/unnecessary_numerical_extreme_comparisons_warn.move:16:16
+   │
+16 │     public fun test3(x: u8) {
+   │                ^^^^^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(missing_doc_public_function)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#missing_doc_public_function.
 
 warning: [lint] Comparison is always false, consider rewriting the code to remove the redundant comparison
    ┌─ tests/model_ast_lints/unnecessary_numerical_extreme_comparisons_warn.move:17:13
@@ -62,6 +89,70 @@ warning: [lint] Comparison is always true, consider rewriting the code to remove
    │
    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(unnecessary_numerical_extreme_comparison)]`.
    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#unnecessary_numerical_extreme_comparison.
+
+warning: [lint] Constant is missing a doc comment.
+   ┌─ tests/model_ast_lints/unnecessary_numerical_extreme_comparisons_warn.move:26:5
+   │
+26 │     const U8_MAX: u8 = 255;
+   │     ^^^^^^^^^^^^^^^^^^^^^^^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(missing_doc_constant)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#missing_doc_constant.
+
+warning: [lint] Constant is missing a doc comment.
+   ┌─ tests/model_ast_lints/unnecessary_numerical_extreme_comparisons_warn.move:27:5
+   │
+27 │     const U16_MAX: u16 = 65535;
+   │     ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(missing_doc_constant)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#missing_doc_constant.
+
+warning: [lint] Constant is missing a doc comment.
+   ┌─ tests/model_ast_lints/unnecessary_numerical_extreme_comparisons_warn.move:28:5
+   │
+28 │     const U32_MAX: u32 = 4294967295;
+   │     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(missing_doc_constant)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#missing_doc_constant.
+
+warning: [lint] Constant is missing a doc comment.
+   ┌─ tests/model_ast_lints/unnecessary_numerical_extreme_comparisons_warn.move:29:5
+   │
+29 │     const U64_MAX: u64 = 18446744073709551615;
+   │     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(missing_doc_constant)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#missing_doc_constant.
+
+warning: [lint] Constant is missing a doc comment.
+   ┌─ tests/model_ast_lints/unnecessary_numerical_extreme_comparisons_warn.move:30:5
+   │
+30 │     const U128_MAX: u128 = 340282366920938463463374607431768211455;
+   │     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(missing_doc_constant)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#missing_doc_constant.
+
+warning: [lint] Constant is missing a doc comment.
+   ┌─ tests/model_ast_lints/unnecessary_numerical_extreme_comparisons_warn.move:31:5
+   │
+31 │ ╭     const U256_MAX: u256 =
+32 │ │         115792089237316195423570985008687907853269984665640564039457584007913129639935;
+   │ ╰───────────────────────────────────────────────────────────────────────────────────────^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(missing_doc_constant)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#missing_doc_constant.
+
+warning: [lint] Public function is missing a doc comment.
+   ┌─ tests/model_ast_lints/unnecessary_numerical_extreme_comparisons_warn.move:34:16
+   │
+34 │     public fun test4(a: u8, b: u16, c: u32, d: u64, e: u128, f: u256) {
+   │                ^^^^^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(missing_doc_public_function)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#missing_doc_public_function.
 
 warning: [lint] Comparison is always false, consider rewriting the code to remove the redundant comparison
    ┌─ tests/model_ast_lints/unnecessary_numerical_extreme_comparisons_warn.move:36:13
@@ -108,6 +199,15 @@ warning: [lint] Comparison is always true, consider rewriting the code to remove
    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(unnecessary_numerical_extreme_comparison)]`.
    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#unnecessary_numerical_extreme_comparison.
 
+warning: [lint] Public function is missing a doc comment.
+   ┌─ tests/model_ast_lints/unnecessary_numerical_extreme_comparisons_warn.move:53:16
+   │
+53 │     public fun test5(x: u8): bool {
+   │                ^^^^^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(missing_doc_public_function)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#missing_doc_public_function.
+
 warning: [lint] Comparison is always false, consider rewriting the code to remove the redundant comparison
    ┌─ tests/model_ast_lints/unnecessary_numerical_extreme_comparisons_warn.move:54:19
    │
@@ -117,6 +217,15 @@ warning: [lint] Comparison is always false, consider rewriting the code to remov
    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(unnecessary_numerical_extreme_comparison)]`.
    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#unnecessary_numerical_extreme_comparison.
 
+warning: [lint] Public function is missing a doc comment.
+   ┌─ tests/model_ast_lints/unnecessary_numerical_extreme_comparisons_warn.move:57:16
+   │
+57 │     public fun test6(x: i8) {
+   │                ^^^^^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(missing_doc_public_function)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#missing_doc_public_function.
+
 warning: [lint] Comparison is always false, consider rewriting the code to remove the redundant comparison
    ┌─ tests/model_ast_lints/unnecessary_numerical_extreme_comparisons_warn.move:58:13
    │
@@ -125,6 +234,15 @@ warning: [lint] Comparison is always false, consider rewriting the code to remov
    │
    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(unnecessary_numerical_extreme_comparison)]`.
    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#unnecessary_numerical_extreme_comparison.
+
+warning: [lint] Public function is missing a doc comment.
+   ┌─ tests/model_ast_lints/unnecessary_numerical_extreme_comparisons_warn.move:61:16
+   │
+61 │     public fun test7(x: &i8, y: &i8) {
+   │                ^^^^^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(missing_doc_public_function)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#missing_doc_public_function.
 
 warning: [lint] Comparison is always false, consider rewriting the code to remove the redundant comparison
    ┌─ tests/model_ast_lints/unnecessary_numerical_extreme_comparisons_warn.move:62:13
@@ -143,6 +261,183 @@ warning: [lint] Directly use the boolean expression, instead of comparing it wit
    │
    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(unnecessary_boolean_identity_comparison)]`.
    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#unnecessary_boolean_identity_comparison.
+
+warning: [lint] Use doc comment `///` instead of regular comment `//` for documentable items.
+   ┌─ tests/model_ast_lints/unnecessary_numerical_extreme_comparisons_warn.move:65:1
+   │
+65 │ ╭         // 8-bit
+66 │ │     const I8_MIN: i8 = -128;
+   │ ╰^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(prefer_doc_comment)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#prefer_doc_comment.
+
+warning: [lint] Constant is missing a doc comment.
+   ┌─ tests/model_ast_lints/unnecessary_numerical_extreme_comparisons_warn.move:66:5
+   │
+66 │     const I8_MIN: i8 = -128;
+   │     ^^^^^^^^^^^^^^^^^^^^^^^^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(missing_doc_constant)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#missing_doc_constant.
+
+warning: [lint] Constant is missing a doc comment.
+   ┌─ tests/model_ast_lints/unnecessary_numerical_extreme_comparisons_warn.move:67:5
+   │
+67 │     const I8_MAX: i8 = 127;
+   │     ^^^^^^^^^^^^^^^^^^^^^^^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(missing_doc_constant)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#missing_doc_constant.
+
+warning: [lint] Use doc comment `///` instead of regular comment `//` for documentable items.
+   ┌─ tests/model_ast_lints/unnecessary_numerical_extreme_comparisons_warn.move:69:1
+   │
+69 │ ╭     // 16-bit
+70 │ │     const I16_MIN: i16 = -32768;
+   │ ╰^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(prefer_doc_comment)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#prefer_doc_comment.
+
+warning: [lint] Constant is missing a doc comment.
+   ┌─ tests/model_ast_lints/unnecessary_numerical_extreme_comparisons_warn.move:70:5
+   │
+70 │     const I16_MIN: i16 = -32768;
+   │     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(missing_doc_constant)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#missing_doc_constant.
+
+warning: [lint] Constant is missing a doc comment.
+   ┌─ tests/model_ast_lints/unnecessary_numerical_extreme_comparisons_warn.move:71:5
+   │
+71 │     const I16_MAX: i16 = 32767;
+   │     ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(missing_doc_constant)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#missing_doc_constant.
+
+warning: [lint] Use doc comment `///` instead of regular comment `//` for documentable items.
+   ┌─ tests/model_ast_lints/unnecessary_numerical_extreme_comparisons_warn.move:73:1
+   │
+73 │ ╭     // 32-bit
+74 │ │     const I32_MIN: i32 = -2147483648;
+   │ ╰^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(prefer_doc_comment)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#prefer_doc_comment.
+
+warning: [lint] Constant is missing a doc comment.
+   ┌─ tests/model_ast_lints/unnecessary_numerical_extreme_comparisons_warn.move:74:5
+   │
+74 │     const I32_MIN: i32 = -2147483648;
+   │     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(missing_doc_constant)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#missing_doc_constant.
+
+warning: [lint] Constant is missing a doc comment.
+   ┌─ tests/model_ast_lints/unnecessary_numerical_extreme_comparisons_warn.move:75:5
+   │
+75 │     const I32_MAX: i32 = 2147483647;
+   │     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(missing_doc_constant)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#missing_doc_constant.
+
+warning: [lint] Use doc comment `///` instead of regular comment `//` for documentable items.
+   ┌─ tests/model_ast_lints/unnecessary_numerical_extreme_comparisons_warn.move:77:1
+   │
+77 │ ╭     // 64-bit
+78 │ │     const I64_MIN: i64 = -9223372036854775808;
+   │ ╰^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(prefer_doc_comment)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#prefer_doc_comment.
+
+warning: [lint] Constant is missing a doc comment.
+   ┌─ tests/model_ast_lints/unnecessary_numerical_extreme_comparisons_warn.move:78:5
+   │
+78 │     const I64_MIN: i64 = -9223372036854775808;
+   │     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(missing_doc_constant)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#missing_doc_constant.
+
+warning: [lint] Constant is missing a doc comment.
+   ┌─ tests/model_ast_lints/unnecessary_numerical_extreme_comparisons_warn.move:79:5
+   │
+79 │     const I64_MAX: i64 = 9223372036854775807;
+   │     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(missing_doc_constant)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#missing_doc_constant.
+
+warning: [lint] Use doc comment `///` instead of regular comment `//` for documentable items.
+   ┌─ tests/model_ast_lints/unnecessary_numerical_extreme_comparisons_warn.move:81:1
+   │
+81 │ ╭     // 128-bit
+82 │ │     const I128_MIN: i128 = -170141183460469231731687303715884105728;
+   │ ╰^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(prefer_doc_comment)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#prefer_doc_comment.
+
+warning: [lint] Constant is missing a doc comment.
+   ┌─ tests/model_ast_lints/unnecessary_numerical_extreme_comparisons_warn.move:82:5
+   │
+82 │     const I128_MIN: i128 = -170141183460469231731687303715884105728;
+   │     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(missing_doc_constant)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#missing_doc_constant.
+
+warning: [lint] Constant is missing a doc comment.
+   ┌─ tests/model_ast_lints/unnecessary_numerical_extreme_comparisons_warn.move:83:5
+   │
+83 │     const I128_MAX: i128 = 170141183460469231731687303715884105727;
+   │     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(missing_doc_constant)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#missing_doc_constant.
+
+warning: [lint] Use doc comment `///` instead of regular comment `//` for documentable items.
+   ┌─ tests/model_ast_lints/unnecessary_numerical_extreme_comparisons_warn.move:85:1
+   │
+85 │ ╭     // 256-bit (custom / nonstandard)
+86 │ │     const I256_MIN: i256 = -57896044618658097711785492504343953926634992332820282019728792003956564819968;
+   │ ╰^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(prefer_doc_comment)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#prefer_doc_comment.
+
+warning: [lint] Constant is missing a doc comment.
+   ┌─ tests/model_ast_lints/unnecessary_numerical_extreme_comparisons_warn.move:86:5
+   │
+86 │     const I256_MIN: i256 = -57896044618658097711785492504343953926634992332820282019728792003956564819968;
+   │     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(missing_doc_constant)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#missing_doc_constant.
+
+warning: [lint] Constant is missing a doc comment.
+   ┌─ tests/model_ast_lints/unnecessary_numerical_extreme_comparisons_warn.move:87:5
+   │
+87 │     const I256_MAX: i256 = 57896044618658097711785492504343953926634992332820282019728792003956564819967;
+   │     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(missing_doc_constant)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#missing_doc_constant.
+
+warning: [lint] Public function is missing a doc comment.
+   ┌─ tests/model_ast_lints/unnecessary_numerical_extreme_comparisons_warn.move:89:16
+   │
+89 │     public fun test8(x: i8) {
+   │                ^^^^^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(missing_doc_public_function)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#missing_doc_public_function.
 
 warning: [lint] Comparison is always false, consider rewriting the code to remove the redundant comparison
    ┌─ tests/model_ast_lints/unnecessary_numerical_extreme_comparisons_warn.move:90:13
@@ -179,6 +474,15 @@ warning: [lint] Comparison is always true, consider rewriting the code to remove
    │
    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(unnecessary_numerical_extreme_comparison)]`.
    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#unnecessary_numerical_extreme_comparison.
+
+warning: [lint] Public function is missing a doc comment.
+   ┌─ tests/model_ast_lints/unnecessary_numerical_extreme_comparisons_warn.move:99:16
+   │
+99 │     public fun test9(a: i8, b: i16, c: i32, d: i64, e: i128, f: i256) {
+   │                ^^^^^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(missing_doc_public_function)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#missing_doc_public_function.
 
 warning: [lint] Comparison is always false, consider rewriting the code to remove the redundant comparison
     ┌─ tests/model_ast_lints/unnecessary_numerical_extreme_comparisons_warn.move:100:13
@@ -224,3 +528,60 @@ warning: [lint] Comparison is always true, consider rewriting the code to remove
     │
     = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(unnecessary_numerical_extreme_comparison)]`.
     = For more information, see https://aptos.dev/en/build/smart-contracts/linter#unnecessary_numerical_extreme_comparison.
+
+warning: [lint] Use doc comment `///` instead of regular comment `//` for documentable items.
+    ┌─ tests/model_ast_lints/unnecessary_numerical_extreme_comparisons_warn.move:113:1
+    │
+113 │ ╭     // simulate `abs`
+114 │ │     public fun test_abs(x: i64): i64 {
+    │ ╰^
+    │
+    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(prefer_doc_comment)]`.
+    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#prefer_doc_comment.
+
+warning: [lint] Public function is missing a doc comment.
+    ┌─ tests/model_ast_lints/unnecessary_numerical_extreme_comparisons_warn.move:114:16
+    │
+114 │     public fun test_abs(x: i64): i64 {
+    │                ^^^^^^^^
+    │
+    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(missing_doc_public_function)]`.
+    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#missing_doc_public_function.
+
+warning: [lint] Module is missing a doc comment.
+    ┌─ tests/model_ast_lints/unnecessary_numerical_extreme_comparisons_warn.move:1:1
+    │
+  1 │ ╭ module 0xc0ffee::m {
+  2 │ │     fun bar() {}
+  3 │ │
+  4 │ │     fun foo<T>(x: T): T {
+    · │
+122 │ │
+123 │ │ }
+    │ ╰─^
+    │
+    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(missing_doc_module)]`.
+    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#missing_doc_module.
+
+warning: [lint] Public function is missing a doc comment.
+    ┌─ tests/model_ast_lints/unnecessary_numerical_extreme_comparisons_warn.move:127:16
+    │
+127 │     public fun test(x: u8) {
+    │                ^^^^
+    │
+    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(missing_doc_public_function)]`.
+    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#missing_doc_public_function.
+
+warning: [lint] Module is missing a doc comment.
+    ┌─ tests/model_ast_lints/unnecessary_numerical_extreme_comparisons_warn.move:125:1
+    │
+125 │ ╭ module 0xc0ffee::no_warn {
+126 │ │     #[lint::skip(unnecessary_numerical_extreme_comparison)]
+127 │ │     public fun test(x: u8) {
+128 │ │         if (x < 0) abort 1;
+129 │ │     }
+130 │ │ }
+    │ ╰─^
+    │
+    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(missing_doc_module)]`.
+    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#missing_doc_module.

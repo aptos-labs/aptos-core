@@ -1,5 +1,54 @@
 
 Diagnostics:
+warning: [lint] Struct is missing a doc comment.
+  ┌─ tests/model_ast_lints/equal_operands_in_bin_op.move:4:5
+  │
+4 │     struct Counter has key, store, drop { i: u64 }
+  │     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  │
+  = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(missing_doc_struct)]`.
+  = For more information, see https://aptos.dev/en/build/smart-contracts/linter#missing_doc_struct.
+
+warning: [lint] Struct is missing a doc comment.
+  ┌─ tests/model_ast_lints/equal_operands_in_bin_op.move:6:5
+  │
+6 │ ╭     struct NestedCounter has key, store, drop {
+7 │ │         n: Counter
+8 │ │     }
+  │ ╰─────^
+  │
+  = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(missing_doc_struct)]`.
+  = For more information, see https://aptos.dev/en/build/smart-contracts/linter#missing_doc_struct.
+
+warning: [lint] Struct is missing a doc comment.
+   ┌─ tests/model_ast_lints/equal_operands_in_bin_op.move:10:5
+   │
+10 │ ╭     struct HyperNestedCounter has key, store, drop {
+11 │ │         n: NestedCounter
+12 │ │     }
+   │ ╰─────^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(missing_doc_struct)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#missing_doc_struct.
+
+warning: [lint] Constant is missing a doc comment.
+   ┌─ tests/model_ast_lints/equal_operands_in_bin_op.move:14:5
+   │
+14 │     const TWO: u64 = 2;
+   │     ^^^^^^^^^^^^^^^^^^^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(missing_doc_constant)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#missing_doc_constant.
+
+warning: [lint] Public function is missing a doc comment.
+   ┌─ tests/model_ast_lints/equal_operands_in_bin_op.move:17:16
+   │
+17 │     public fun test1(x: u64) {
+   │                ^^^^^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(missing_doc_public_function)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#missing_doc_public_function.
+
 warning: [lint] This operation always evaluates to `0`.
    ┌─ tests/model_ast_lints/equal_operands_in_bin_op.move:18:13
    │
@@ -134,3 +183,36 @@ warning: [lint] This boolean expression can be simplified using idempotence (`a 
    │
    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(simpler_bool_expression)]`.
    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#simpler_bool_expression.
+
+warning: [lint] Public function is missing a doc comment.
+   ┌─ tests/model_ast_lints/equal_operands_in_bin_op.move:90:16
+   │
+90 │     public fun test2(x: u64) {
+   │                ^^^^^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(missing_doc_public_function)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#missing_doc_public_function.
+
+warning: [lint] Public function is missing a doc comment.
+   ┌─ tests/model_ast_lints/equal_operands_in_bin_op.move:96:16
+   │
+96 │     public fun a_fn(a: u64): u64 {
+   │                ^^^^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(missing_doc_public_function)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#missing_doc_public_function.
+
+warning: [lint] Module is missing a doc comment.
+    ┌─ tests/model_ast_lints/equal_operands_in_bin_op.move:1:1
+    │
+  1 │ ╭ module 0xc0ffee::m {
+  2 │ │     use std::vector;
+  3 │ │
+  4 │ │     struct Counter has key, store, drop { i: u64 }
+    · │
+100 │ │
+101 │ │ }
+    │ ╰─^
+    │
+    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(missing_doc_module)]`.
+    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#missing_doc_module.

@@ -1,5 +1,26 @@
 
 Diagnostics:
+warning: [lint] Enum is missing a doc comment.
+   ┌─ tests/model_ast_lints/blocks_in_conditions_warn.move:8:5
+   │
+ 8 │ ╭     enum Blah {
+ 9 │ │         Baz(u64),
+10 │ │         Qux(u64),
+11 │ │     }
+   │ ╰─────^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(missing_doc_struct)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#missing_doc_struct.
+
+warning: [lint] Public function is missing a doc comment.
+   ┌─ tests/model_ast_lints/blocks_in_conditions_warn.move:19:16
+   │
+19 │     public fun test_warn_1() {
+   │                ^^^^^^^^^^^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(missing_doc_public_function)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#missing_doc_public_function.
+
 warning: [lint] Having blocks in conditions make code harder to read. Consider rewriting this code.
    ┌─ tests/model_ast_lints/blocks_in_conditions_warn.move:20:13
    │
@@ -8,6 +29,15 @@ warning: [lint] Having blocks in conditions make code harder to read. Consider r
    │
    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(blocks_in_conditions)]`.
    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#blocks_in_conditions.
+
+warning: [lint] Public function is missing a doc comment.
+   ┌─ tests/model_ast_lints/blocks_in_conditions_warn.move:25:16
+   │
+25 │     public fun test_warn_2(x: bool) {
+   │                ^^^^^^^^^^^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(missing_doc_public_function)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#missing_doc_public_function.
 
 warning: [lint] Having blocks in conditions make code harder to read. Consider rewriting this code.
    ┌─ tests/model_ast_lints/blocks_in_conditions_warn.move:26:13
@@ -18,6 +48,15 @@ warning: [lint] Having blocks in conditions make code harder to read. Consider r
    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(blocks_in_conditions)]`.
    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#blocks_in_conditions.
 
+warning: [lint] Public function is missing a doc comment.
+   ┌─ tests/model_ast_lints/blocks_in_conditions_warn.move:31:16
+   │
+31 │     public fun test_warn_3() {
+   │                ^^^^^^^^^^^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(missing_doc_public_function)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#missing_doc_public_function.
+
 warning: [lint] Having blocks in conditions make code harder to read. Consider rewriting this code.
    ┌─ tests/model_ast_lints/blocks_in_conditions_warn.move:32:16
    │
@@ -26,6 +65,15 @@ warning: [lint] Having blocks in conditions make code harder to read. Consider r
    │
    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(blocks_in_conditions)]`.
    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#blocks_in_conditions.
+
+warning: [lint] Public function is missing a doc comment.
+   ┌─ tests/model_ast_lints/blocks_in_conditions_warn.move:38:16
+   │
+38 │     public fun test_warn_4() {
+   │                ^^^^^^^^^^^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(missing_doc_public_function)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#missing_doc_public_function.
 
 warning: [lint] Having blocks in conditions make code harder to read. Consider rewriting this code.
    ┌─ tests/model_ast_lints/blocks_in_conditions_warn.move:39:13
@@ -54,6 +102,15 @@ warning: [lint] Having blocks in conditions make code harder to read. Consider r
    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(blocks_in_conditions)]`.
    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#blocks_in_conditions.
 
+warning: [lint] Public function is missing a doc comment.
+   ┌─ tests/model_ast_lints/blocks_in_conditions_warn.move:50:16
+   │
+50 │     public fun test_warn_5() {
+   │                ^^^^^^^^^^^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(missing_doc_public_function)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#missing_doc_public_function.
+
 warning: [lint] Having blocks in conditions make code harder to read. Consider rewriting this code.
    ┌─ tests/model_ast_lints/blocks_in_conditions_warn.move:52:13
    │
@@ -62,6 +119,15 @@ warning: [lint] Having blocks in conditions make code harder to read. Consider r
    │
    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(blocks_in_conditions)]`.
    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#blocks_in_conditions.
+
+warning: [lint] Public function is missing a doc comment.
+   ┌─ tests/model_ast_lints/blocks_in_conditions_warn.move:57:16
+   │
+57 │     public fun test_warn_6(x: u64) {
+   │                ^^^^^^^^^^^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(missing_doc_public_function)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#missing_doc_public_function.
 
 warning: [lint] Having blocks in conditions make code harder to read. Consider rewriting this code.
    ┌─ tests/model_ast_lints/blocks_in_conditions_warn.move:58:16
@@ -72,6 +138,15 @@ warning: [lint] Having blocks in conditions make code harder to read. Consider r
    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(blocks_in_conditions)]`.
    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#blocks_in_conditions.
 
+warning: [lint] Public function is missing a doc comment.
+   ┌─ tests/model_ast_lints/blocks_in_conditions_warn.move:63:16
+   │
+63 │     public fun test_warn_7(x: u64) {
+   │                ^^^^^^^^^^^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(missing_doc_public_function)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#missing_doc_public_function.
+
 warning: [lint] Having blocks in conditions make code harder to read. Consider rewriting this code.
    ┌─ tests/model_ast_lints/blocks_in_conditions_warn.move:64:13
    │
@@ -80,3 +155,123 @@ warning: [lint] Having blocks in conditions make code harder to read. Consider r
    │
    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(blocks_in_conditions)]`.
    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#blocks_in_conditions.
+
+warning: [lint] Public function is missing a doc comment.
+   ┌─ tests/model_ast_lints/blocks_in_conditions_warn.move:71:16
+   │
+71 │     public fun test_no_warn_1(x: u64) {
+   │                ^^^^^^^^^^^^^^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(missing_doc_public_function)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#missing_doc_public_function.
+
+warning: [lint] Public function is missing a doc comment.
+   ┌─ tests/model_ast_lints/blocks_in_conditions_warn.move:77:16
+   │
+77 │     public fun test_no_warn_2(x: u64) {
+   │                ^^^^^^^^^^^^^^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(missing_doc_public_function)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#missing_doc_public_function.
+
+warning: [lint] Public function is missing a doc comment.
+   ┌─ tests/model_ast_lints/blocks_in_conditions_warn.move:83:16
+   │
+83 │     public fun test_no_warn_3(x: u64) {
+   │                ^^^^^^^^^^^^^^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(missing_doc_public_function)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#missing_doc_public_function.
+
+warning: [lint] Module is missing a doc comment.
+   ┌─ tests/model_ast_lints/blocks_in_conditions_warn.move:1:1
+   │
+ 1 │ ╭ module 0xc0ffee::m {
+ 2 │ │     fun foo(): bool {
+ 3 │ │         true
+ 4 │ │     }
+   · │
+87 │ │     }
+88 │ │ }
+   │ ╰─^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(missing_doc_module)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#missing_doc_module.
+
+warning: [lint] Enum is missing a doc comment.
+    ┌─ tests/model_ast_lints/blocks_in_conditions_warn.move:98:5
+    │
+ 98 │ ╭     enum Blah {
+ 99 │ │         Baz(u64),
+100 │ │         Qux(u64),
+101 │ │     }
+    │ ╰─────^
+    │
+    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(missing_doc_struct)]`.
+    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#missing_doc_struct.
+
+warning: [lint] Public function is missing a doc comment.
+    ┌─ tests/model_ast_lints/blocks_in_conditions_warn.move:109:16
+    │
+109 │     public fun test_warn_1() {
+    │                ^^^^^^^^^^^
+    │
+    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(missing_doc_public_function)]`.
+    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#missing_doc_public_function.
+
+warning: [lint] Public function is missing a doc comment.
+    ┌─ tests/model_ast_lints/blocks_in_conditions_warn.move:116:16
+    │
+116 │     public fun test_warn_2(x: bool) {
+    │                ^^^^^^^^^^^
+    │
+    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(missing_doc_public_function)]`.
+    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#missing_doc_public_function.
+
+warning: [lint] Public function is missing a doc comment.
+    ┌─ tests/model_ast_lints/blocks_in_conditions_warn.move:122:16
+    │
+122 │     public fun test_warn_3() {
+    │                ^^^^^^^^^^^
+    │
+    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(missing_doc_public_function)]`.
+    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#missing_doc_public_function.
+
+warning: [lint] Module is missing a doc comment.
+    ┌─ tests/model_ast_lints/blocks_in_conditions_warn.move:91:1
+    │
+ 91 │ ╭ module 0xc0ffee::no_warn_1 {
+ 92 │ │     fun foo(): bool {
+ 93 │ │         true
+ 94 │ │     }
+    · │
+127 │ │     }
+128 │ │ }
+    │ ╰─^
+    │
+    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(missing_doc_module)]`.
+    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#missing_doc_module.
+
+warning: [lint] Public function is missing a doc comment.
+    ┌─ tests/model_ast_lints/blocks_in_conditions_warn.move:140:16
+    │
+140 │     public fun test_warn_1() {
+    │                ^^^^^^^^^^^
+    │
+    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(missing_doc_public_function)]`.
+    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#missing_doc_public_function.
+
+warning: [lint] Module is missing a doc comment.
+    ┌─ tests/model_ast_lints/blocks_in_conditions_warn.move:130:1
+    │
+130 │ ╭ module 0xc0ffee::no_warn_2 {
+131 │ │     fun foo(): bool {
+132 │ │         true
+133 │ │     }
+    · │
+144 │ │     }
+145 │ │ }
+    │ ╰─^
+    │
+    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(missing_doc_module)]`.
+    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#missing_doc_module.

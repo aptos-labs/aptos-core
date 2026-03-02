@@ -1,5 +1,75 @@
 
 Diagnostics:
+warning: [lint] Constant is missing a doc comment.
+  ┌─ tests/model_ast_lints/simpler_bool_expression.move:3:5
+  │
+3 │     const TRUE_CONST: bool = true;
+  │     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  │
+  = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(missing_doc_constant)]`.
+  = For more information, see https://aptos.dev/en/build/smart-contracts/linter#missing_doc_constant.
+
+warning: [lint] Constant is missing a doc comment.
+  ┌─ tests/model_ast_lints/simpler_bool_expression.move:4:5
+  │
+4 │     const FALSE_CONST: bool = false;
+  │     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  │
+  = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(missing_doc_constant)]`.
+  = For more information, see https://aptos.dev/en/build/smart-contracts/linter#missing_doc_constant.
+
+warning: [lint] Struct is missing a doc comment.
+   ┌─ tests/model_ast_lints/simpler_bool_expression.move:6:5
+   │
+ 6 │ ╭     struct BoolFlags has copy, drop {
+ 7 │ │         a: bool,
+ 8 │ │         b: bool,
+ 9 │ │         c: bool,
+10 │ │     }
+   │ ╰─────^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(missing_doc_struct)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#missing_doc_struct.
+
+warning: [lint] Struct is missing a doc comment.
+   ┌─ tests/model_ast_lints/simpler_bool_expression.move:12:5
+   │
+12 │ ╭     struct NestedStruct has copy, drop {
+13 │ │         flags: BoolFlags,
+14 │ │         enabled: bool,
+15 │ │     }
+   │ ╰─────^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(missing_doc_struct)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#missing_doc_struct.
+
+warning: [lint] Public function is missing a doc comment.
+   ┌─ tests/model_ast_lints/simpler_bool_expression.move:17:16
+   │
+17 │     public fun helper_function(): bool {
+   │                ^^^^^^^^^^^^^^^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(missing_doc_public_function)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#missing_doc_public_function.
+
+warning: [lint] Public function is missing a doc comment.
+   ┌─ tests/model_ast_lints/simpler_bool_expression.move:21:16
+   │
+21 │     public fun get_bool_flags(): BoolFlags {
+   │                ^^^^^^^^^^^^^^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(missing_doc_public_function)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#missing_doc_public_function.
+
+warning: [lint] Public function is missing a doc comment.
+   ┌─ tests/model_ast_lints/simpler_bool_expression.move:28:16
+   │
+28 │     public fun test_double_negation_parameters(a: bool) {
+   │                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(missing_doc_public_function)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#missing_doc_public_function.
+
 warning: [lint] This boolean expression can be simplified using double negation law (`!!a` is equivalent to `a`).
    ┌─ tests/model_ast_lints/simpler_bool_expression.move:29:13
    │
@@ -17,6 +87,15 @@ warning: [lint] Empty `if` branch. Consider simplifying by removing or rewriting
    │
    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(empty_if)]`.
    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#empty_if.
+
+warning: [lint] Public function is missing a doc comment.
+   ┌─ tests/model_ast_lints/simpler_bool_expression.move:32:16
+   │
+32 │     public fun test_double_negation_variables() {
+   │                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(missing_doc_public_function)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#missing_doc_public_function.
 
 warning: [lint] This boolean expression can be simplified using double negation law (`!!a` is equivalent to `a`).
    ┌─ tests/model_ast_lints/simpler_bool_expression.move:36:13
@@ -54,6 +133,15 @@ warning: [lint] Empty `if` branch. Consider simplifying by removing or rewriting
    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(empty_if)]`.
    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#empty_if.
 
+warning: [lint] Public function is missing a doc comment.
+   ┌─ tests/model_ast_lints/simpler_bool_expression.move:40:16
+   │
+40 │     public fun test_double_negation_struct_field() {
+   │                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(missing_doc_public_function)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#missing_doc_public_function.
+
 warning: [lint] This boolean expression can be simplified using double negation law (`!!a` is equivalent to `a`).
    ┌─ tests/model_ast_lints/simpler_bool_expression.move:43:13
    │
@@ -89,6 +177,15 @@ warning: [lint] Empty `if` branch. Consider simplifying by removing or rewriting
    │
    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(empty_if)]`.
    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#empty_if.
+
+warning: [lint] Public function is missing a doc comment.
+   ┌─ tests/model_ast_lints/simpler_bool_expression.move:47:16
+   │
+47 │     public fun test_double_negation_nested_struct() {
+   │                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(missing_doc_public_function)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#missing_doc_public_function.
 
 warning: [lint] This boolean expression can be simplified using double negation law (`!!a` is equivalent to `a`).
    ┌─ tests/model_ast_lints/simpler_bool_expression.move:53:13
@@ -126,6 +223,15 @@ warning: [lint] Empty `if` branch. Consider simplifying by removing or rewriting
    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(empty_if)]`.
    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#empty_if.
 
+warning: [lint] Public function is missing a doc comment.
+   ┌─ tests/model_ast_lints/simpler_bool_expression.move:61:16
+   │
+61 │     public fun test_absorption_law_parameters(a: bool, b: bool) {
+   │                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(missing_doc_public_function)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#missing_doc_public_function.
+
 warning: [lint] This boolean expression can be simplified using absorption law (`a && b || a` is equivalent to `a`).
    ┌─ tests/model_ast_lints/simpler_bool_expression.move:62:13
    │
@@ -162,6 +268,15 @@ warning: [lint] Empty `if` branch. Consider simplifying by removing or rewriting
    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(empty_if)]`.
    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#empty_if.
 
+warning: [lint] Public function is missing a doc comment.
+   ┌─ tests/model_ast_lints/simpler_bool_expression.move:66:16
+   │
+66 │     public fun test_absorption_law_variables() {
+   │                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(missing_doc_public_function)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#missing_doc_public_function.
+
 warning: [lint] This boolean expression can be simplified using absorption law (`a && b || a` is equivalent to `a`).
    ┌─ tests/model_ast_lints/simpler_bool_expression.move:70:13
    │
@@ -197,6 +312,15 @@ warning: [lint] Empty `if` branch. Consider simplifying by removing or rewriting
    │
    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(empty_if)]`.
    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#empty_if.
+
+warning: [lint] Public function is missing a doc comment.
+   ┌─ tests/model_ast_lints/simpler_bool_expression.move:74:16
+   │
+74 │     public fun test_absorption_law_constants() {
+   │                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(missing_doc_public_function)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#missing_doc_public_function.
 
 warning: [lint] The left-hand side of `&&` evaluates to `true`. Recall that the expression `true && bexpr` is logically equivalent to `bexpr`. Consider simplifying.
    ┌─ tests/model_ast_lints/simpler_bool_expression.move:75:13
@@ -270,6 +394,15 @@ warning: [lint] Empty `if` branch. Consider simplifying by removing or rewriting
    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(empty_if)]`.
    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#empty_if.
 
+warning: [lint] Public function is missing a doc comment.
+   ┌─ tests/model_ast_lints/simpler_bool_expression.move:79:16
+   │
+79 │     public fun test_absorption_law_struct_field() {
+   │                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(missing_doc_public_function)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#missing_doc_public_function.
+
 warning: [lint] This boolean expression can be simplified using absorption law (`a && b || a` is equivalent to `a`).
    ┌─ tests/model_ast_lints/simpler_bool_expression.move:82:13
    │
@@ -305,6 +438,15 @@ warning: [lint] Empty `if` branch. Consider simplifying by removing or rewriting
    │
    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(empty_if)]`.
    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#empty_if.
+
+warning: [lint] Public function is missing a doc comment.
+   ┌─ tests/model_ast_lints/simpler_bool_expression.move:86:16
+   │
+86 │     public fun test_absorption_law_nested_struct() {
+   │                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(missing_doc_public_function)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#missing_doc_public_function.
 
 warning: [lint] This boolean expression can be simplified using absorption law (`a && b || a` is equivalent to `a`).
    ┌─ tests/model_ast_lints/simpler_bool_expression.move:92:13
@@ -342,6 +484,25 @@ warning: [lint] Empty `if` branch. Consider simplifying by removing or rewriting
    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(empty_if)]`.
    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#empty_if.
 
+warning: [lint] Use doc comment `///` instead of regular comment `//` for documentable items.
+   ┌─ tests/model_ast_lints/simpler_bool_expression.move:96:1
+   │
+96 │ ╭     // This test should not trigger the lint, since helper_function() might have side effects
+97 │ │     public fun test_absorption_law_mixed() {
+   │ ╰^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(prefer_doc_comment)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#prefer_doc_comment.
+
+warning: [lint] Public function is missing a doc comment.
+   ┌─ tests/model_ast_lints/simpler_bool_expression.move:97:16
+   │
+97 │     public fun test_absorption_law_mixed() {
+   │                ^^^^^^^^^^^^^^^^^^^^^^^^^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(missing_doc_public_function)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#missing_doc_public_function.
+
 warning: [lint] Empty `if` branch. Consider simplifying by removing or rewriting.
     ┌─ tests/model_ast_lints/simpler_bool_expression.move:101:9
     │
@@ -359,6 +520,15 @@ warning: [lint] Empty `if` branch. Consider simplifying by removing or rewriting
     │
     = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(empty_if)]`.
     = For more information, see https://aptos.dev/en/build/smart-contracts/linter#empty_if.
+
+warning: [lint] Public function is missing a doc comment.
+    ┌─ tests/model_ast_lints/simpler_bool_expression.move:109:16
+    │
+109 │     public fun test_idempotence_parameters(a: bool) {
+    │                ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    │
+    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(missing_doc_public_function)]`.
+    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#missing_doc_public_function.
 
 warning: [lint] This boolean expression can be simplified using double negation law (`!!a` is equivalent to `a`).
     ┌─ tests/model_ast_lints/simpler_bool_expression.move:110:13
@@ -423,6 +593,15 @@ warning: [lint] Empty `if` branch. Consider simplifying by removing or rewriting
     = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(empty_if)]`.
     = For more information, see https://aptos.dev/en/build/smart-contracts/linter#empty_if.
 
+warning: [lint] Public function is missing a doc comment.
+    ┌─ tests/model_ast_lints/simpler_bool_expression.move:115:16
+    │
+115 │     public fun test_idempotence_variables() {
+    │                ^^^^^^^^^^^^^^^^^^^^^^^^^^
+    │
+    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(missing_doc_public_function)]`.
+    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#missing_doc_public_function.
+
 warning: [lint] This boolean expression can be simplified using idempotence (`a && a` is equivalent to `a`).
     ┌─ tests/model_ast_lints/simpler_bool_expression.move:118:13
     │
@@ -458,6 +637,25 @@ warning: [lint] Empty `if` branch. Consider simplifying by removing or rewriting
     │
     = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(empty_if)]`.
     = For more information, see https://aptos.dev/en/build/smart-contracts/linter#empty_if.
+
+warning: [lint] Use doc comment `///` instead of regular comment `//` for documentable items.
+    ┌─ tests/model_ast_lints/simpler_bool_expression.move:122:1
+    │
+122 │ ╭     // This test should not trigger the lint, since it's already implemented in `nonminimal_bool`
+123 │ │     public fun test_idempotence_constants() {
+    │ ╰^
+    │
+    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(prefer_doc_comment)]`.
+    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#prefer_doc_comment.
+
+warning: [lint] Public function is missing a doc comment.
+    ┌─ tests/model_ast_lints/simpler_bool_expression.move:123:16
+    │
+123 │     public fun test_idempotence_constants() {
+    │                ^^^^^^^^^^^^^^^^^^^^^^^^^^
+    │
+    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(missing_doc_public_function)]`.
+    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#missing_doc_public_function.
 
 warning: [lint] The left-hand side of `&&` evaluates to `true`. Recall that the expression `true && bexpr` is logically equivalent to `bexpr`. Consider simplifying.
     ┌─ tests/model_ast_lints/simpler_bool_expression.move:124:13
@@ -495,6 +693,15 @@ warning: [lint] Empty `if` branch. Consider simplifying by removing or rewriting
     = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(empty_if)]`.
     = For more information, see https://aptos.dev/en/build/smart-contracts/linter#empty_if.
 
+warning: [lint] Public function is missing a doc comment.
+    ┌─ tests/model_ast_lints/simpler_bool_expression.move:128:16
+    │
+128 │     public fun test_idempotence_struct_field() {
+    │                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    │
+    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(missing_doc_public_function)]`.
+    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#missing_doc_public_function.
+
 warning: [lint] This boolean expression can be simplified using idempotence (`a && a` is equivalent to `a`).
     ┌─ tests/model_ast_lints/simpler_bool_expression.move:131:13
     │
@@ -530,6 +737,15 @@ warning: [lint] Empty `if` branch. Consider simplifying by removing or rewriting
     │
     = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(empty_if)]`.
     = For more information, see https://aptos.dev/en/build/smart-contracts/linter#empty_if.
+
+warning: [lint] Public function is missing a doc comment.
+    ┌─ tests/model_ast_lints/simpler_bool_expression.move:135:16
+    │
+135 │     public fun test_idempotence_nested_struct() {
+    │                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    │
+    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(missing_doc_public_function)]`.
+    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#missing_doc_public_function.
 
 warning: [lint] This boolean expression can be simplified using idempotence (`a && a` is equivalent to `a`).
     ┌─ tests/model_ast_lints/simpler_bool_expression.move:141:13
@@ -567,6 +783,25 @@ warning: [lint] Empty `if` branch. Consider simplifying by removing or rewriting
     = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(empty_if)]`.
     = For more information, see https://aptos.dev/en/build/smart-contracts/linter#empty_if.
 
+warning: [lint] Use doc comment `///` instead of regular comment `//` for documentable items.
+    ┌─ tests/model_ast_lints/simpler_bool_expression.move:145:1
+    │
+145 │ ╭     // This test should not trigger the lint, since helper_function() might have side effects
+146 │ │     public fun test_idempotence_mixed() {
+    │ ╰^
+    │
+    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(prefer_doc_comment)]`.
+    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#prefer_doc_comment.
+
+warning: [lint] Public function is missing a doc comment.
+    ┌─ tests/model_ast_lints/simpler_bool_expression.move:146:16
+    │
+146 │     public fun test_idempotence_mixed() {
+    │                ^^^^^^^^^^^^^^^^^^^^^^
+    │
+    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(missing_doc_public_function)]`.
+    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#missing_doc_public_function.
+
 warning: [lint] Empty `if` branch. Consider simplifying by removing or rewriting.
     ┌─ tests/model_ast_lints/simpler_bool_expression.move:149:9
     │
@@ -584,6 +819,15 @@ warning: [lint] Empty `if` branch. Consider simplifying by removing or rewriting
     │
     = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(empty_if)]`.
     = For more information, see https://aptos.dev/en/build/smart-contracts/linter#empty_if.
+
+warning: [lint] Public function is missing a doc comment.
+    ┌─ tests/model_ast_lints/simpler_bool_expression.move:159:16
+    │
+159 │     public fun test_contradiction_tautology_parameters(a: bool) {
+    │                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    │
+    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(missing_doc_public_function)]`.
+    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#missing_doc_public_function.
 
 warning: [lint] This boolean expression can be simplified using contradiction (`a && !a` is equivalent to `false`).
     ┌─ tests/model_ast_lints/simpler_bool_expression.move:160:13
@@ -657,6 +901,15 @@ warning: [lint] Empty `if` branch. Consider simplifying by removing or rewriting
     = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(empty_if)]`.
     = For more information, see https://aptos.dev/en/build/smart-contracts/linter#empty_if.
 
+warning: [lint] Public function is missing a doc comment.
+    ┌─ tests/model_ast_lints/simpler_bool_expression.move:166:16
+    │
+166 │     public fun test_contradiction_tautology_variables() {
+    │                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    │
+    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(missing_doc_public_function)]`.
+    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#missing_doc_public_function.
+
 warning: [lint] This boolean expression can be simplified using contradiction (`a && !a` is equivalent to `false`).
     ┌─ tests/model_ast_lints/simpler_bool_expression.move:169:13
     │
@@ -728,6 +981,25 @@ warning: [lint] Empty `if` branch. Consider simplifying by removing or rewriting
     │
     = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(empty_if)]`.
     = For more information, see https://aptos.dev/en/build/smart-contracts/linter#empty_if.
+
+warning: [lint] Use doc comment `///` instead of regular comment `//` for documentable items.
+    ┌─ tests/model_ast_lints/simpler_bool_expression.move:175:1
+    │
+175 │ ╭     // This test should not trigger the lint, since it's already implemented in `nonminimal_bool`
+176 │ │     public fun test_contradiction_tautology_constants() {
+    │ ╰^
+    │
+    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(prefer_doc_comment)]`.
+    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#prefer_doc_comment.
+
+warning: [lint] Public function is missing a doc comment.
+    ┌─ tests/model_ast_lints/simpler_bool_expression.move:176:16
+    │
+176 │     public fun test_contradiction_tautology_constants() {
+    │                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    │
+    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(missing_doc_public_function)]`.
+    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#missing_doc_public_function.
 
 warning: [lint] This expression evaluates to `false`. Recall that the expression `!true` is logically equivalent to `false`. Consider simplifying.
     ┌─ tests/model_ast_lints/simpler_bool_expression.move:177:27
@@ -837,6 +1109,15 @@ warning: [lint] Empty `if` branch. Consider simplifying by removing or rewriting
     = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(empty_if)]`.
     = For more information, see https://aptos.dev/en/build/smart-contracts/linter#empty_if.
 
+warning: [lint] Public function is missing a doc comment.
+    ┌─ tests/model_ast_lints/simpler_bool_expression.move:183:16
+    │
+183 │     public fun test_contradiction_tautology_struct_field() {
+    │                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    │
+    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(missing_doc_public_function)]`.
+    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#missing_doc_public_function.
+
 warning: [lint] This boolean expression can be simplified using contradiction (`a && !a` is equivalent to `false`).
     ┌─ tests/model_ast_lints/simpler_bool_expression.move:186:13
     │
@@ -908,6 +1189,15 @@ warning: [lint] Empty `if` branch. Consider simplifying by removing or rewriting
     │
     = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(empty_if)]`.
     = For more information, see https://aptos.dev/en/build/smart-contracts/linter#empty_if.
+
+warning: [lint] Public function is missing a doc comment.
+    ┌─ tests/model_ast_lints/simpler_bool_expression.move:192:16
+    │
+192 │     public fun test_contradiction_tautology_nested_struct() {
+    │                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    │
+    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(missing_doc_public_function)]`.
+    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#missing_doc_public_function.
 
 warning: [lint] This boolean expression can be simplified using contradiction (`a && !a` is equivalent to `false`).
     ┌─ tests/model_ast_lints/simpler_bool_expression.move:198:13
@@ -981,6 +1271,25 @@ warning: [lint] Empty `if` branch. Consider simplifying by removing or rewriting
     = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(empty_if)]`.
     = For more information, see https://aptos.dev/en/build/smart-contracts/linter#empty_if.
 
+warning: [lint] Use doc comment `///` instead of regular comment `//` for documentable items.
+    ┌─ tests/model_ast_lints/simpler_bool_expression.move:204:1
+    │
+204 │ ╭     // This test should not trigger the lint, since helper_function() might have side effects
+205 │ │     public fun test_contradiction_tautology_mixed() {
+    │ ╰^
+    │
+    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(prefer_doc_comment)]`.
+    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#prefer_doc_comment.
+
+warning: [lint] Public function is missing a doc comment.
+    ┌─ tests/model_ast_lints/simpler_bool_expression.move:205:16
+    │
+205 │     public fun test_contradiction_tautology_mixed() {
+    │                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    │
+    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(missing_doc_public_function)]`.
+    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#missing_doc_public_function.
+
 warning: [lint] Empty `if` branch. Consider simplifying by removing or rewriting.
     ┌─ tests/model_ast_lints/simpler_bool_expression.move:208:9
     │
@@ -1016,6 +1325,15 @@ warning: [lint] Empty `if` branch. Consider simplifying by removing or rewriting
     │
     = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(empty_if)]`.
     = For more information, see https://aptos.dev/en/build/smart-contracts/linter#empty_if.
+
+warning: [lint] Public function is missing a doc comment.
+    ┌─ tests/model_ast_lints/simpler_bool_expression.move:218:16
+    │
+218 │     public fun test_distributive_law_parameters(a: bool, b: bool, c: bool) {
+    │                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    │
+    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(missing_doc_public_function)]`.
+    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#missing_doc_public_function.
 
 warning: [lint] This boolean expression can be simplified using distributive law (`(a && b) || (a && c)` is equivalent to `a && (b || c)`).
     ┌─ tests/model_ast_lints/simpler_bool_expression.move:219:13
@@ -1053,6 +1371,15 @@ warning: [lint] Empty `if` branch. Consider simplifying by removing or rewriting
     = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(empty_if)]`.
     = For more information, see https://aptos.dev/en/build/smart-contracts/linter#empty_if.
 
+warning: [lint] Public function is missing a doc comment.
+    ┌─ tests/model_ast_lints/simpler_bool_expression.move:223:16
+    │
+223 │     public fun test_distributive_law_variables() {
+    │                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    │
+    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(missing_doc_public_function)]`.
+    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#missing_doc_public_function.
+
 warning: [lint] This boolean expression can be simplified using distributive law (`(a && b) || (a && c)` is equivalent to `a && (b || c)`).
     ┌─ tests/model_ast_lints/simpler_bool_expression.move:228:13
     │
@@ -1088,6 +1415,15 @@ warning: [lint] Empty `if` branch. Consider simplifying by removing or rewriting
     │
     = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(empty_if)]`.
     = For more information, see https://aptos.dev/en/build/smart-contracts/linter#empty_if.
+
+warning: [lint] Public function is missing a doc comment.
+    ┌─ tests/model_ast_lints/simpler_bool_expression.move:232:16
+    │
+232 │     public fun test_distributive_law_constants() {
+    │                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    │
+    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(missing_doc_public_function)]`.
+    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#missing_doc_public_function.
 
 warning: [lint] The left-hand side of `&&` evaluates to `true`. Recall that the expression `true && bexpr` is logically equivalent to `bexpr`. Consider simplifying.
     ┌─ tests/model_ast_lints/simpler_bool_expression.move:233:13
@@ -1161,6 +1497,15 @@ warning: [lint] Empty `if` branch. Consider simplifying by removing or rewriting
     = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(empty_if)]`.
     = For more information, see https://aptos.dev/en/build/smart-contracts/linter#empty_if.
 
+warning: [lint] Public function is missing a doc comment.
+    ┌─ tests/model_ast_lints/simpler_bool_expression.move:237:16
+    │
+237 │     public fun test_distributive_law_struct_field() {
+    │                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    │
+    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(missing_doc_public_function)]`.
+    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#missing_doc_public_function.
+
 warning: [lint] This boolean expression can be simplified using distributive law (`(a && b) || (a && c)` is equivalent to `a && (b || c)`).
     ┌─ tests/model_ast_lints/simpler_bool_expression.move:241:13
     │
@@ -1196,6 +1541,15 @@ warning: [lint] Empty `if` branch. Consider simplifying by removing or rewriting
     │
     = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(empty_if)]`.
     = For more information, see https://aptos.dev/en/build/smart-contracts/linter#empty_if.
+
+warning: [lint] Public function is missing a doc comment.
+    ┌─ tests/model_ast_lints/simpler_bool_expression.move:245:16
+    │
+245 │     public fun test_distributive_law_nested_struct() {
+    │                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    │
+    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(missing_doc_public_function)]`.
+    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#missing_doc_public_function.
 
 warning: [lint] This boolean expression can be simplified using distributive law (`(a && b) || (a && c)` is equivalent to `a && (b || c)`).
     ┌─ tests/model_ast_lints/simpler_bool_expression.move:251:13
@@ -1233,6 +1587,25 @@ warning: [lint] Empty `if` branch. Consider simplifying by removing or rewriting
     = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(empty_if)]`.
     = For more information, see https://aptos.dev/en/build/smart-contracts/linter#empty_if.
 
+warning: [lint] Use doc comment `///` instead of regular comment `//` for documentable items.
+    ┌─ tests/model_ast_lints/simpler_bool_expression.move:255:1
+    │
+255 │ ╭     // This test should not trigger the lint, since helper_function() might have side effects
+256 │ │     public fun test_distributive_law_mixed() {
+    │ ╰^
+    │
+    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(prefer_doc_comment)]`.
+    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#prefer_doc_comment.
+
+warning: [lint] Public function is missing a doc comment.
+    ┌─ tests/model_ast_lints/simpler_bool_expression.move:256:16
+    │
+256 │     public fun test_distributive_law_mixed() {
+    │                ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    │
+    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(missing_doc_public_function)]`.
+    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#missing_doc_public_function.
+
 warning: [lint] The right-hand side of `&&` evaluates to `true`. Recall that the expression `bexpr && true` is logically equivalent to `bexpr`. Consider simplifying.
     ┌─ tests/model_ast_lints/simpler_bool_expression.move:259:13
     │
@@ -1269,6 +1642,15 @@ warning: [lint] Empty `if` branch. Consider simplifying by removing or rewriting
     = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(empty_if)]`.
     = For more information, see https://aptos.dev/en/build/smart-contracts/linter#empty_if.
 
+warning: [lint] Public function is missing a doc comment.
+    ┌─ tests/model_ast_lints/simpler_bool_expression.move:267:16
+    │
+267 │     public fun test_skipped_simplifiable() {
+    │                ^^^^^^^^^^^^^^^^^^^^^^^^^
+    │
+    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(missing_doc_public_function)]`.
+    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#missing_doc_public_function.
+
 warning: [lint] Empty `if` branch. Consider simplifying by removing or rewriting.
     ┌─ tests/model_ast_lints/simpler_bool_expression.move:271:9
     │
@@ -1296,6 +1678,15 @@ warning: [lint] Empty `if` branch. Consider simplifying by removing or rewriting
     = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(empty_if)]`.
     = For more information, see https://aptos.dev/en/build/smart-contracts/linter#empty_if.
 
+warning: [lint] Public function is missing a doc comment.
+    ┌─ tests/model_ast_lints/simpler_bool_expression.move:278:16
+    │
+278 │     public fun test_parameters_no_lint(a: bool, b: bool, c: bool) {
+    │                ^^^^^^^^^^^^^^^^^^^^^^^
+    │
+    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(missing_doc_public_function)]`.
+    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#missing_doc_public_function.
+
 warning: [lint] Empty `if` branch. Consider simplifying by removing or rewriting.
     ┌─ tests/model_ast_lints/simpler_bool_expression.move:279:9
     │
@@ -1314,6 +1705,15 @@ warning: [lint] Empty `if` branch. Consider simplifying by removing or rewriting
     = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(empty_if)]`.
     = For more information, see https://aptos.dev/en/build/smart-contracts/linter#empty_if.
 
+warning: [lint] Public function is missing a doc comment.
+    ┌─ tests/model_ast_lints/simpler_bool_expression.move:283:16
+    │
+283 │     public fun test_variables_no_lint() {
+    │                ^^^^^^^^^^^^^^^^^^^^^^
+    │
+    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(missing_doc_public_function)]`.
+    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#missing_doc_public_function.
+
 warning: [lint] Empty `if` branch. Consider simplifying by removing or rewriting.
     ┌─ tests/model_ast_lints/simpler_bool_expression.move:287:9
     │
@@ -1331,6 +1731,15 @@ warning: [lint] Empty `if` branch. Consider simplifying by removing or rewriting
     │
     = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(empty_if)]`.
     = For more information, see https://aptos.dev/en/build/smart-contracts/linter#empty_if.
+
+warning: [lint] Public function is missing a doc comment.
+    ┌─ tests/model_ast_lints/simpler_bool_expression.move:291:16
+    │
+291 │     public fun test_constants_no_lint() {
+    │                ^^^^^^^^^^^^^^^^^^^^^^
+    │
+    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(missing_doc_public_function)]`.
+    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#missing_doc_public_function.
 
 warning: [lint] The left-hand side of `&&` evaluates to `true`. Recall that the expression `true && bexpr` is logically equivalent to `bexpr`. Consider simplifying.
     ┌─ tests/model_ast_lints/simpler_bool_expression.move:292:13
@@ -1368,6 +1777,15 @@ warning: [lint] Empty `if` branch. Consider simplifying by removing or rewriting
     = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(empty_if)]`.
     = For more information, see https://aptos.dev/en/build/smart-contracts/linter#empty_if.
 
+warning: [lint] Public function is missing a doc comment.
+    ┌─ tests/model_ast_lints/simpler_bool_expression.move:296:16
+    │
+296 │     public fun test_different_struct_fields_no_lint() {
+    │                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    │
+    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(missing_doc_public_function)]`.
+    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#missing_doc_public_function.
+
 warning: [lint] Empty `if` branch. Consider simplifying by removing or rewriting.
     ┌─ tests/model_ast_lints/simpler_bool_expression.move:299:9
     │
@@ -1403,6 +1821,15 @@ warning: [lint] Empty `if` branch. Consider simplifying by removing or rewriting
     │
     = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(empty_if)]`.
     = For more information, see https://aptos.dev/en/build/smart-contracts/linter#empty_if.
+
+warning: [lint] Public function is missing a doc comment.
+    ┌─ tests/model_ast_lints/simpler_bool_expression.move:305:16
+    │
+305 │     public fun test_nested_struct_no_lint() {
+    │                ^^^^^^^^^^^^^^^^^^^^^^^^^^
+    │
+    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(missing_doc_public_function)]`.
+    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#missing_doc_public_function.
 
 warning: [lint] Empty `if` branch. Consider simplifying by removing or rewriting.
     ┌─ tests/model_ast_lints/simpler_bool_expression.move:311:9
@@ -1440,6 +1867,15 @@ warning: [lint] Empty `if` branch. Consider simplifying by removing or rewriting
     = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(empty_if)]`.
     = For more information, see https://aptos.dev/en/build/smart-contracts/linter#empty_if.
 
+warning: [lint] Public function is missing a doc comment.
+    ┌─ tests/model_ast_lints/simpler_bool_expression.move:317:16
+    │
+317 │     public fun test_function_call_no_lint() {
+    │                ^^^^^^^^^^^^^^^^^^^^^^^^^^
+    │
+    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(missing_doc_public_function)]`.
+    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#missing_doc_public_function.
+
 warning: [lint] Empty `if` branch. Consider simplifying by removing or rewriting.
     ┌─ tests/model_ast_lints/simpler_bool_expression.move:321:9
     │
@@ -1458,6 +1894,15 @@ warning: [lint] Empty `if` branch. Consider simplifying by removing or rewriting
     = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(empty_if)]`.
     = For more information, see https://aptos.dev/en/build/smart-contracts/linter#empty_if.
 
+warning: [lint] Public function is missing a doc comment.
+    ┌─ tests/model_ast_lints/simpler_bool_expression.move:328:16
+    │
+328 │     public fun test_vector_no_lint() {
+    │                ^^^^^^^^^^^^^^^^^^^
+    │
+    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(missing_doc_public_function)]`.
+    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#missing_doc_public_function.
+
 warning: [lint] Empty `if` branch. Consider simplifying by removing or rewriting.
     ┌─ tests/model_ast_lints/simpler_bool_expression.move:331:9
     │
@@ -1475,3 +1920,18 @@ warning: [lint] Empty `if` branch. Consider simplifying by removing or rewriting
     │
     = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(empty_if)]`.
     = For more information, see https://aptos.dev/en/build/smart-contracts/linter#empty_if.
+
+warning: [lint] Module is missing a doc comment.
+    ┌─ tests/model_ast_lints/simpler_bool_expression.move:1:1
+    │
+  1 │ ╭ module 0xc0ffee::m {
+  2 │ │
+  3 │ │     const TRUE_CONST: bool = true;
+  4 │ │     const FALSE_CONST: bool = false;
+    · │
+333 │ │     }
+334 │ │ }
+    │ ╰─^
+    │
+    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(missing_doc_module)]`.
+    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#missing_doc_module.

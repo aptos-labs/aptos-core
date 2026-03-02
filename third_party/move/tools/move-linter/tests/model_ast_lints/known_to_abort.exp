@@ -1,5 +1,51 @@
 
 Diagnostics:
+warning: [lint] Use doc comment `///` instead of regular comment `//` for documentable items.
+  ┌─ tests/model_ast_lints/known_to_abort.move:2:1
+  │
+2 │ ╭     // Constants for testing
+3 │ │     const OVERFLOW_VALUE: u16 = 256;
+  │ ╰^
+  │
+  = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(prefer_doc_comment)]`.
+  = For more information, see https://aptos.dev/en/build/smart-contracts/linter#prefer_doc_comment.
+
+warning: [lint] Constant is missing a doc comment.
+  ┌─ tests/model_ast_lints/known_to_abort.move:3:5
+  │
+3 │     const OVERFLOW_VALUE: u16 = 256;
+  │     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  │
+  = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(missing_doc_constant)]`.
+  = For more information, see https://aptos.dev/en/build/smart-contracts/linter#missing_doc_constant.
+
+warning: [lint] Constant is missing a doc comment.
+  ┌─ tests/model_ast_lints/known_to_abort.move:4:5
+  │
+4 │     const LARGE_U32: u64 = 4_294_967_296;
+  │     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  │
+  = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(missing_doc_constant)]`.
+  = For more information, see https://aptos.dev/en/build/smart-contracts/linter#missing_doc_constant.
+
+warning: [lint] Constant is missing a doc comment.
+  ┌─ tests/model_ast_lints/known_to_abort.move:5:5
+  │
+5 │     const SHIFT_AMOUNT: u8 = 8;
+  │     ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  │
+  = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(missing_doc_constant)]`.
+  = For more information, see https://aptos.dev/en/build/smart-contracts/linter#missing_doc_constant.
+
+warning: [lint] Public function is missing a doc comment.
+  ┌─ tests/model_ast_lints/known_to_abort.move:7:16
+  │
+7 │     public fun test_divide_by_zero(x: u64): u64 {
+  │                ^^^^^^^^^^^^^^^^^^^
+  │
+  = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(missing_doc_public_function)]`.
+  = For more information, see https://aptos.dev/en/build/smart-contracts/linter#missing_doc_public_function.
+
 warning: [lint] Division by zero will abort
   ┌─ tests/model_ast_lints/known_to_abort.move:8:9
   │
@@ -8,6 +54,15 @@ warning: [lint] Division by zero will abort
   │
   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(known_to_abort)]`.
   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#known_to_abort.
+
+warning: [lint] Public function is missing a doc comment.
+   ┌─ tests/model_ast_lints/known_to_abort.move:11:16
+   │
+11 │     public fun test_modulo_by_zero(x: u64): u64 {
+   │                ^^^^^^^^^^^^^^^^^^^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(missing_doc_public_function)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#missing_doc_public_function.
 
 warning: [lint] Modulo by zero will abort
    ┌─ tests/model_ast_lints/known_to_abort.move:12:9
@@ -18,6 +73,15 @@ warning: [lint] Modulo by zero will abort
    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(known_to_abort)]`.
    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#known_to_abort.
 
+warning: [lint] Public function is missing a doc comment.
+   ┌─ tests/model_ast_lints/known_to_abort.move:15:16
+   │
+15 │     public fun test_cast_u8_overflow(): u8 {
+   │                ^^^^^^^^^^^^^^^^^^^^^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(missing_doc_public_function)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#missing_doc_public_function.
+
 warning: [lint] Cast operation will abort because the value is outside the target type's range
    ┌─ tests/model_ast_lints/known_to_abort.move:16:9
    │
@@ -26,6 +90,15 @@ warning: [lint] Cast operation will abort because the value is outside the targe
    │
    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(known_to_abort)]`.
    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#known_to_abort.
+
+warning: [lint] Public function is missing a doc comment.
+   ┌─ tests/model_ast_lints/known_to_abort.move:19:16
+   │
+19 │     public fun test_cast_u16_overflow(): u16 {
+   │                ^^^^^^^^^^^^^^^^^^^^^^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(missing_doc_public_function)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#missing_doc_public_function.
 
 warning: [lint] Cast operation will abort because the value is outside the target type's range
    ┌─ tests/model_ast_lints/known_to_abort.move:20:9
@@ -36,6 +109,15 @@ warning: [lint] Cast operation will abort because the value is outside the targe
    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(known_to_abort)]`.
    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#known_to_abort.
 
+warning: [lint] Public function is missing a doc comment.
+   ┌─ tests/model_ast_lints/known_to_abort.move:23:16
+   │
+23 │     public fun test_cast_u32_overflow(): u32 {
+   │                ^^^^^^^^^^^^^^^^^^^^^^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(missing_doc_public_function)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#missing_doc_public_function.
+
 warning: [lint] Cast operation will abort because the value is outside the target type's range
    ┌─ tests/model_ast_lints/known_to_abort.move:24:9
    │
@@ -44,6 +126,15 @@ warning: [lint] Cast operation will abort because the value is outside the targe
    │
    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(known_to_abort)]`.
    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#known_to_abort.
+
+warning: [lint] Public function is missing a doc comment.
+   ┌─ tests/model_ast_lints/known_to_abort.move:27:16
+   │
+27 │     public fun test_cast_u64_overflow(): u64 {
+   │                ^^^^^^^^^^^^^^^^^^^^^^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(missing_doc_public_function)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#missing_doc_public_function.
 
 warning: [lint] Cast operation will abort because the value is outside the target type's range
    ┌─ tests/model_ast_lints/known_to_abort.move:28:9
@@ -54,6 +145,15 @@ warning: [lint] Cast operation will abort because the value is outside the targe
    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(known_to_abort)]`.
    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#known_to_abort.
 
+warning: [lint] Public function is missing a doc comment.
+   ┌─ tests/model_ast_lints/known_to_abort.move:31:16
+   │
+31 │     public fun test_cast_u128_overflow(): u128 {
+   │                ^^^^^^^^^^^^^^^^^^^^^^^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(missing_doc_public_function)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#missing_doc_public_function.
+
 warning: [lint] Cast operation will abort because the value is outside the target type's range
    ┌─ tests/model_ast_lints/known_to_abort.move:32:9
    │
@@ -62,6 +162,15 @@ warning: [lint] Cast operation will abort because the value is outside the targe
    │
    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(known_to_abort)]`.
    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#known_to_abort.
+
+warning: [lint] Public function is missing a doc comment.
+   ┌─ tests/model_ast_lints/known_to_abort.move:35:16
+   │
+35 │     public fun test_const_cast_overflow(): u8 {
+   │                ^^^^^^^^^^^^^^^^^^^^^^^^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(missing_doc_public_function)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#missing_doc_public_function.
 
 warning: [lint] Cast operation will abort because the value is outside the target type's range
    ┌─ tests/model_ast_lints/known_to_abort.move:36:9
@@ -72,6 +181,15 @@ warning: [lint] Cast operation will abort because the value is outside the targe
    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(known_to_abort)]`.
    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#known_to_abort.
 
+warning: [lint] Public function is missing a doc comment.
+   ┌─ tests/model_ast_lints/known_to_abort.move:39:16
+   │
+39 │     public fun test_const_large_cast(): u32 {
+   │                ^^^^^^^^^^^^^^^^^^^^^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(missing_doc_public_function)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#missing_doc_public_function.
+
 warning: [lint] Cast operation will abort because the value is outside the target type's range
    ┌─ tests/model_ast_lints/known_to_abort.move:40:9
    │
@@ -80,6 +198,15 @@ warning: [lint] Cast operation will abort because the value is outside the targe
    │
    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(known_to_abort)]`.
    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#known_to_abort.
+
+warning: [lint] Public function is missing a doc comment.
+   ┌─ tests/model_ast_lints/known_to_abort.move:43:16
+   │
+43 │     public fun test_expr_cast_overflow(): u8 {
+   │                ^^^^^^^^^^^^^^^^^^^^^^^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(missing_doc_public_function)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#missing_doc_public_function.
 
 warning: [lint] Cast operation will abort because the value is outside the target type's range
    ┌─ tests/model_ast_lints/known_to_abort.move:44:9
@@ -90,6 +217,15 @@ warning: [lint] Cast operation will abort because the value is outside the targe
    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(known_to_abort)]`.
    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#known_to_abort.
 
+warning: [lint] Public function is missing a doc comment.
+   ┌─ tests/model_ast_lints/known_to_abort.move:47:16
+   │
+47 │     public fun test_expr_cast_overflow_2(): u16 {
+   │                ^^^^^^^^^^^^^^^^^^^^^^^^^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(missing_doc_public_function)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#missing_doc_public_function.
+
 warning: [lint] Cast operation will abort because the value is outside the target type's range
    ┌─ tests/model_ast_lints/known_to_abort.move:48:9
    │
@@ -98,6 +234,15 @@ warning: [lint] Cast operation will abort because the value is outside the targe
    │
    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(known_to_abort)]`.
    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#known_to_abort.
+
+warning: [lint] Public function is missing a doc comment.
+   ┌─ tests/model_ast_lints/known_to_abort.move:51:16
+   │
+51 │     public fun test_expr_cast_overflow_3(): u32 {
+   │                ^^^^^^^^^^^^^^^^^^^^^^^^^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(missing_doc_public_function)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#missing_doc_public_function.
 
 warning: [lint] Cast operation will abort because the value is outside the target type's range
    ┌─ tests/model_ast_lints/known_to_abort.move:52:9
@@ -108,6 +253,15 @@ warning: [lint] Cast operation will abort because the value is outside the targe
    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(known_to_abort)]`.
    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#known_to_abort.
 
+warning: [lint] Public function is missing a doc comment.
+   ┌─ tests/model_ast_lints/known_to_abort.move:55:16
+   │
+55 │     public fun test_mul_expr_cast_overflow(): u8 {
+   │                ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(missing_doc_public_function)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#missing_doc_public_function.
+
 warning: [lint] Cast operation will abort because the value is outside the target type's range
    ┌─ tests/model_ast_lints/known_to_abort.move:56:9
    │
@@ -125,6 +279,15 @@ warning: [lint] Unnecessary cast: the expression is already of the target type. 
    │
    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(unnecessary_cast)]`.
    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#unnecessary_cast.
+
+warning: [lint] Public function is missing a doc comment.
+   ┌─ tests/model_ast_lints/known_to_abort.move:59:16
+   │
+59 │     public fun test_mul_expr_cast_overflow_2(): u16 {
+   │                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(missing_doc_public_function)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#missing_doc_public_function.
 
 warning: [lint] Cast operation will abort because the value is outside the target type's range
    ┌─ tests/model_ast_lints/known_to_abort.move:60:9
@@ -144,6 +307,15 @@ warning: [lint] Unnecessary cast: the expression is already of the target type. 
    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(unnecessary_cast)]`.
    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#unnecessary_cast.
 
+warning: [lint] Public function is missing a doc comment.
+   ┌─ tests/model_ast_lints/known_to_abort.move:63:16
+   │
+63 │     public fun test_mixed_expr_cast_overflow(): u8 {
+   │                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(missing_doc_public_function)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#missing_doc_public_function.
+
 warning: [lint] Cast operation will abort because the value is outside the target type's range
    ┌─ tests/model_ast_lints/known_to_abort.move:64:9
    │
@@ -161,6 +333,15 @@ warning: [lint] Unnecessary cast: the expression is already of the target type. 
    │
    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(unnecessary_cast)]`.
    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#unnecessary_cast.
+
+warning: [lint] Public function is missing a doc comment.
+   ┌─ tests/model_ast_lints/known_to_abort.move:67:16
+   │
+67 │     public fun test_mixed_expr_cast_overflow_2(): u16 {
+   │                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(missing_doc_public_function)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#missing_doc_public_function.
 
 warning: [lint] Cast operation will abort because the value is outside the target type's range
    ┌─ tests/model_ast_lints/known_to_abort.move:68:9
@@ -180,6 +361,15 @@ warning: [lint] Unnecessary cast: the expression is already of the target type. 
    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(unnecessary_cast)]`.
    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#unnecessary_cast.
 
+warning: [lint] Public function is missing a doc comment.
+   ┌─ tests/model_ast_lints/known_to_abort.move:71:16
+   │
+71 │     public fun test_nested_mul_expr_cast_overflow(): u8 {
+   │                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(missing_doc_public_function)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#missing_doc_public_function.
+
 warning: [lint] Cast operation will abort because the value is outside the target type's range
    ┌─ tests/model_ast_lints/known_to_abort.move:72:9
    │
@@ -197,6 +387,15 @@ warning: [lint] Unnecessary cast: the expression is already of the target type. 
    │
    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(unnecessary_cast)]`.
    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#unnecessary_cast.
+
+warning: [lint] Public function is missing a doc comment.
+   ┌─ tests/model_ast_lints/known_to_abort.move:75:16
+   │
+75 │     public fun test_complex_expr_1(flag: bool): u8 {
+   │                ^^^^^^^^^^^^^^^^^^^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(missing_doc_public_function)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#missing_doc_public_function.
 
 warning: [lint] Cast operation will abort because the value is outside the target type's range
    ┌─ tests/model_ast_lints/known_to_abort.move:77:13
@@ -207,6 +406,15 @@ warning: [lint] Cast operation will abort because the value is outside the targe
    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(known_to_abort)]`.
    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#known_to_abort.
 
+warning: [lint] Public function is missing a doc comment.
+   ┌─ tests/model_ast_lints/known_to_abort.move:83:16
+   │
+83 │     public fun test_left_shift_u8_overflow(x: u8): u8 {
+   │                ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(missing_doc_public_function)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#missing_doc_public_function.
+
 warning: [lint] Shift by an amount greater than or equal to the type's bit width will abort
    ┌─ tests/model_ast_lints/known_to_abort.move:84:9
    │
@@ -215,6 +423,15 @@ warning: [lint] Shift by an amount greater than or equal to the type's bit width
    │
    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(known_to_abort)]`.
    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#known_to_abort.
+
+warning: [lint] Public function is missing a doc comment.
+   ┌─ tests/model_ast_lints/known_to_abort.move:87:16
+   │
+87 │     public fun test_left_shift_u16_overflow(x: u16): u16 {
+   │                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(missing_doc_public_function)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#missing_doc_public_function.
 
 warning: [lint] Shift by an amount greater than or equal to the type's bit width will abort
    ┌─ tests/model_ast_lints/known_to_abort.move:88:9
@@ -225,6 +442,15 @@ warning: [lint] Shift by an amount greater than or equal to the type's bit width
    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(known_to_abort)]`.
    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#known_to_abort.
 
+warning: [lint] Public function is missing a doc comment.
+   ┌─ tests/model_ast_lints/known_to_abort.move:91:16
+   │
+91 │     public fun test_left_shift_u32_overflow(x: u32): u32 {
+   │                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(missing_doc_public_function)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#missing_doc_public_function.
+
 warning: [lint] Shift by an amount greater than or equal to the type's bit width will abort
    ┌─ tests/model_ast_lints/known_to_abort.move:92:9
    │
@@ -233,6 +459,15 @@ warning: [lint] Shift by an amount greater than or equal to the type's bit width
    │
    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(known_to_abort)]`.
    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#known_to_abort.
+
+warning: [lint] Public function is missing a doc comment.
+   ┌─ tests/model_ast_lints/known_to_abort.move:95:16
+   │
+95 │     public fun test_left_shift_u64_overflow(x: u64): u64 {
+   │                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(missing_doc_public_function)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#missing_doc_public_function.
 
 warning: [lint] Shift by an amount greater than or equal to the type's bit width will abort
    ┌─ tests/model_ast_lints/known_to_abort.move:96:9
@@ -243,6 +478,15 @@ warning: [lint] Shift by an amount greater than or equal to the type's bit width
    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(known_to_abort)]`.
    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#known_to_abort.
 
+warning: [lint] Public function is missing a doc comment.
+   ┌─ tests/model_ast_lints/known_to_abort.move:99:16
+   │
+99 │     public fun test_left_shift_u128_overflow(x: u128): u128 {
+   │                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(missing_doc_public_function)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#missing_doc_public_function.
+
 warning: [lint] Shift by an amount greater than or equal to the type's bit width will abort
     ┌─ tests/model_ast_lints/known_to_abort.move:100:9
     │
@@ -251,6 +495,15 @@ warning: [lint] Shift by an amount greater than or equal to the type's bit width
     │
     = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(known_to_abort)]`.
     = For more information, see https://aptos.dev/en/build/smart-contracts/linter#known_to_abort.
+
+warning: [lint] Public function is missing a doc comment.
+    ┌─ tests/model_ast_lints/known_to_abort.move:103:16
+    │
+103 │     public fun test_shift_const_amount(x: u8): u8 {
+    │                ^^^^^^^^^^^^^^^^^^^^^^^
+    │
+    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(missing_doc_public_function)]`.
+    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#missing_doc_public_function.
 
 warning: [lint] Shift by an amount greater than or equal to the type's bit width will abort
     ┌─ tests/model_ast_lints/known_to_abort.move:104:9
@@ -261,6 +514,15 @@ warning: [lint] Shift by an amount greater than or equal to the type's bit width
     = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(known_to_abort)]`.
     = For more information, see https://aptos.dev/en/build/smart-contracts/linter#known_to_abort.
 
+warning: [lint] Public function is missing a doc comment.
+    ┌─ tests/model_ast_lints/known_to_abort.move:107:16
+    │
+107 │     public fun test_right_shift_u8_overflow(x: u8): u8 {
+    │                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    │
+    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(missing_doc_public_function)]`.
+    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#missing_doc_public_function.
+
 warning: [lint] Shift by an amount greater than or equal to the type's bit width will abort
     ┌─ tests/model_ast_lints/known_to_abort.move:108:9
     │
@@ -269,6 +531,15 @@ warning: [lint] Shift by an amount greater than or equal to the type's bit width
     │
     = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(known_to_abort)]`.
     = For more information, see https://aptos.dev/en/build/smart-contracts/linter#known_to_abort.
+
+warning: [lint] Public function is missing a doc comment.
+    ┌─ tests/model_ast_lints/known_to_abort.move:111:16
+    │
+111 │     public fun test_right_shift_u16_overflow(x: u16): u16 {
+    │                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    │
+    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(missing_doc_public_function)]`.
+    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#missing_doc_public_function.
 
 warning: [lint] Shift by an amount greater than or equal to the type's bit width will abort
     ┌─ tests/model_ast_lints/known_to_abort.move:112:9
@@ -279,6 +550,15 @@ warning: [lint] Shift by an amount greater than or equal to the type's bit width
     = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(known_to_abort)]`.
     = For more information, see https://aptos.dev/en/build/smart-contracts/linter#known_to_abort.
 
+warning: [lint] Public function is missing a doc comment.
+    ┌─ tests/model_ast_lints/known_to_abort.move:115:16
+    │
+115 │     public fun test_right_shift_u32_overflow(x: u32): u32 {
+    │                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    │
+    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(missing_doc_public_function)]`.
+    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#missing_doc_public_function.
+
 warning: [lint] Shift by an amount greater than or equal to the type's bit width will abort
     ┌─ tests/model_ast_lints/known_to_abort.move:116:9
     │
@@ -287,6 +567,15 @@ warning: [lint] Shift by an amount greater than or equal to the type's bit width
     │
     = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(known_to_abort)]`.
     = For more information, see https://aptos.dev/en/build/smart-contracts/linter#known_to_abort.
+
+warning: [lint] Public function is missing a doc comment.
+    ┌─ tests/model_ast_lints/known_to_abort.move:119:16
+    │
+119 │     public fun test_right_shift_u64_overflow(x: u64): u64 {
+    │                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    │
+    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(missing_doc_public_function)]`.
+    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#missing_doc_public_function.
 
 warning: [lint] Shift by an amount greater than or equal to the type's bit width will abort
     ┌─ tests/model_ast_lints/known_to_abort.move:120:9
@@ -297,6 +586,15 @@ warning: [lint] Shift by an amount greater than or equal to the type's bit width
     = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(known_to_abort)]`.
     = For more information, see https://aptos.dev/en/build/smart-contracts/linter#known_to_abort.
 
+warning: [lint] Public function is missing a doc comment.
+    ┌─ tests/model_ast_lints/known_to_abort.move:123:16
+    │
+123 │     public fun test_right_shift_u128_overflow(x: u128): u128 {
+    │                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    │
+    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(missing_doc_public_function)]`.
+    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#missing_doc_public_function.
+
 warning: [lint] Shift by an amount greater than or equal to the type's bit width will abort
     ┌─ tests/model_ast_lints/known_to_abort.move:124:9
     │
@@ -305,6 +603,51 @@ warning: [lint] Shift by an amount greater than or equal to the type's bit width
     │
     = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(known_to_abort)]`.
     = For more information, see https://aptos.dev/en/build/smart-contracts/linter#known_to_abort.
+
+warning: [lint] Public function is missing a doc comment.
+    ┌─ tests/model_ast_lints/known_to_abort.move:130:16
+    │
+130 │     public fun test_divide_by_zero_skip(x: u64): u64 {
+    │                ^^^^^^^^^^^^^^^^^^^^^^^^
+    │
+    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(missing_doc_public_function)]`.
+    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#missing_doc_public_function.
+
+warning: [lint] Public function is missing a doc comment.
+    ┌─ tests/model_ast_lints/known_to_abort.move:135:16
+    │
+135 │     public fun test_modulo_by_zero_skip(x: u64): u64 {
+    │                ^^^^^^^^^^^^^^^^^^^^^^^^
+    │
+    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(missing_doc_public_function)]`.
+    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#missing_doc_public_function.
+
+warning: [lint] Public function is missing a doc comment.
+    ┌─ tests/model_ast_lints/known_to_abort.move:140:16
+    │
+140 │     public fun test_cast_u8_overflow_skip(): u8 {
+    │                ^^^^^^^^^^^^^^^^^^^^^^^^^^
+    │
+    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(missing_doc_public_function)]`.
+    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#missing_doc_public_function.
+
+warning: [lint] Public function is missing a doc comment.
+    ┌─ tests/model_ast_lints/known_to_abort.move:145:16
+    │
+145 │     public fun test_cast_u16_overflow_skip(): u16 {
+    │                ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    │
+    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(missing_doc_public_function)]`.
+    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#missing_doc_public_function.
+
+warning: [lint] Public function is missing a doc comment.
+    ┌─ tests/model_ast_lints/known_to_abort.move:151:16
+    │
+151 │     public fun test_complex_expr(x: u8): u8 {
+    │                ^^^^^^^^^^^^^^^^^
+    │
+    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(missing_doc_public_function)]`.
+    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#missing_doc_public_function.
 
 warning: [lint] Unnecessary cast: the expression is already of the target type. Consider removing the cast for better readability.
     ┌─ tests/model_ast_lints/known_to_abort.move:152:9
@@ -315,6 +658,51 @@ warning: [lint] Unnecessary cast: the expression is already of the target type. 
     = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(unnecessary_cast)]`.
     = For more information, see https://aptos.dev/en/build/smart-contracts/linter#unnecessary_cast.
 
+warning: [lint] Public function is missing a doc comment.
+    ┌─ tests/model_ast_lints/known_to_abort.move:155:16
+    │
+155 │     public fun test_max_u8_cast(): u8 {
+    │                ^^^^^^^^^^^^^^^^
+    │
+    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(missing_doc_public_function)]`.
+    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#missing_doc_public_function.
+
+warning: [lint] Public function is missing a doc comment.
+    ┌─ tests/model_ast_lints/known_to_abort.move:159:16
+    │
+159 │     public fun test_max_u16_cast(): u16 {
+    │                ^^^^^^^^^^^^^^^^^
+    │
+    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(missing_doc_public_function)]`.
+    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#missing_doc_public_function.
+
+warning: [lint] Public function is missing a doc comment.
+    ┌─ tests/model_ast_lints/known_to_abort.move:163:16
+    │
+163 │     public fun test_max_u32_cast(): u32 {
+    │                ^^^^^^^^^^^^^^^^^
+    │
+    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(missing_doc_public_function)]`.
+    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#missing_doc_public_function.
+
+warning: [lint] Public function is missing a doc comment.
+    ┌─ tests/model_ast_lints/known_to_abort.move:167:16
+    │
+167 │     public fun test_max_u64_cast(): u64 {
+    │                ^^^^^^^^^^^^^^^^^
+    │
+    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(missing_doc_public_function)]`.
+    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#missing_doc_public_function.
+
+warning: [lint] Public function is missing a doc comment.
+    ┌─ tests/model_ast_lints/known_to_abort.move:171:16
+    │
+171 │     public fun test_valid_mixed_expr(): u8 {
+    │                ^^^^^^^^^^^^^^^^^^^^^
+    │
+    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(missing_doc_public_function)]`.
+    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#missing_doc_public_function.
+
 warning: [lint] Unnecessary cast: the expression is already of the target type. Consider removing the cast for better readability.
     ┌─ tests/model_ast_lints/known_to_abort.move:172:9
     │
@@ -323,6 +711,15 @@ warning: [lint] Unnecessary cast: the expression is already of the target type. 
     │
     = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(unnecessary_cast)]`.
     = For more information, see https://aptos.dev/en/build/smart-contracts/linter#unnecessary_cast.
+
+warning: [lint] Public function is missing a doc comment.
+    ┌─ tests/model_ast_lints/known_to_abort.move:175:16
+    │
+175 │     public fun test_valid_nested_mul(): u8 {
+    │                ^^^^^^^^^^^^^^^^^^^^^
+    │
+    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(missing_doc_public_function)]`.
+    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#missing_doc_public_function.
 
 warning: [lint] Unnecessary cast: the expression is already of the target type. Consider removing the cast for better readability.
     ┌─ tests/model_ast_lints/known_to_abort.move:176:9
@@ -333,6 +730,15 @@ warning: [lint] Unnecessary cast: the expression is already of the target type. 
     = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(unnecessary_cast)]`.
     = For more information, see https://aptos.dev/en/build/smart-contracts/linter#unnecessary_cast.
 
+warning: [lint] Public function is missing a doc comment.
+    ┌─ tests/model_ast_lints/known_to_abort.move:179:16
+    │
+179 │     public fun test_valid_large_expr(): u16 {
+    │                ^^^^^^^^^^^^^^^^^^^^^
+    │
+    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(missing_doc_public_function)]`.
+    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#missing_doc_public_function.
+
 warning: [lint] Unnecessary cast: the expression is already of the target type. Consider removing the cast for better readability.
     ┌─ tests/model_ast_lints/known_to_abort.move:180:9
     │
@@ -341,6 +747,15 @@ warning: [lint] Unnecessary cast: the expression is already of the target type. 
     │
     = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(unnecessary_cast)]`.
     = For more information, see https://aptos.dev/en/build/smart-contracts/linter#unnecessary_cast.
+
+warning: [lint] Public function is missing a doc comment.
+    ┌─ tests/model_ast_lints/known_to_abort.move:183:16
+    │
+183 │     public fun test_conditional_cast(x: u8, y: u8): u8 {
+    │                ^^^^^^^^^^^^^^^^^^^^^
+    │
+    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(missing_doc_public_function)]`.
+    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#missing_doc_public_function.
 
 warning: [lint] Unnecessary cast: the expression is already of the target type. Consider removing the cast for better readability.
     ┌─ tests/model_ast_lints/known_to_abort.move:185:13
@@ -359,6 +774,15 @@ warning: [lint] Unnecessary cast: the expression is already of the target type. 
     │
     = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(unnecessary_cast)]`.
     = For more information, see https://aptos.dev/en/build/smart-contracts/linter#unnecessary_cast.
+
+warning: [lint] Public function is missing a doc comment.
+    ┌─ tests/model_ast_lints/known_to_abort.move:191:16
+    │
+191 │     public fun test_nested_conditional_cast(x: u8, y: u8, z: u8): u8 {
+    │                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    │
+    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(missing_doc_public_function)]`.
+    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#missing_doc_public_function.
 
 warning: [lint] Unnecessary cast: the expression is already of the target type. Consider removing the cast for better readability.
     ┌─ tests/model_ast_lints/known_to_abort.move:194:17
@@ -386,3 +810,72 @@ warning: [lint] Unnecessary cast: the expression is already of the target type. 
     │
     = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(unnecessary_cast)]`.
     = For more information, see https://aptos.dev/en/build/smart-contracts/linter#unnecessary_cast.
+
+warning: [lint] Public function is missing a doc comment.
+    ┌─ tests/model_ast_lints/known_to_abort.move:203:16
+    │
+203 │     public fun test_valid_shift_u8(x: u8): u8 {
+    │                ^^^^^^^^^^^^^^^^^^^
+    │
+    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(missing_doc_public_function)]`.
+    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#missing_doc_public_function.
+
+warning: [lint] Public function is missing a doc comment.
+    ┌─ tests/model_ast_lints/known_to_abort.move:207:16
+    │
+207 │     public fun test_valid_shift_u16(x: u16): u16 {
+    │                ^^^^^^^^^^^^^^^^^^^^
+    │
+    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(missing_doc_public_function)]`.
+    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#missing_doc_public_function.
+
+warning: [lint] Public function is missing a doc comment.
+    ┌─ tests/model_ast_lints/known_to_abort.move:211:16
+    │
+211 │     public fun test_valid_shift_u32(x: u32): u32 {
+    │                ^^^^^^^^^^^^^^^^^^^^
+    │
+    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(missing_doc_public_function)]`.
+    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#missing_doc_public_function.
+
+warning: [lint] Public function is missing a doc comment.
+    ┌─ tests/model_ast_lints/known_to_abort.move:215:16
+    │
+215 │     public fun test_valid_shift_u64(x: u64): u64 {
+    │                ^^^^^^^^^^^^^^^^^^^^
+    │
+    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(missing_doc_public_function)]`.
+    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#missing_doc_public_function.
+
+warning: [lint] Public function is missing a doc comment.
+    ┌─ tests/model_ast_lints/known_to_abort.move:219:16
+    │
+219 │     public fun test_valid_shift_u128(x: u128): u128 {
+    │                ^^^^^^^^^^^^^^^^^^^^^
+    │
+    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(missing_doc_public_function)]`.
+    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#missing_doc_public_function.
+
+warning: [lint] Public function is missing a doc comment.
+    ┌─ tests/model_ast_lints/known_to_abort.move:223:16
+    │
+223 │     public fun test_valid_shift_u256(x: u256): u256 {
+    │                ^^^^^^^^^^^^^^^^^^^^^
+    │
+    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(missing_doc_public_function)]`.
+    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#missing_doc_public_function.
+
+warning: [lint] Module is missing a doc comment.
+    ┌─ tests/model_ast_lints/known_to_abort.move:1:1
+    │
+  1 │ ╭ module 0xc0ffee::m {
+  2 │ │     // Constants for testing
+  3 │ │     const OVERFLOW_VALUE: u16 = 256;
+  4 │ │     const LARGE_U32: u64 = 4_294_967_296;
+    · │
+225 │ │     }
+226 │ │ }
+    │ ╰─^
+    │
+    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(missing_doc_module)]`.
+    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#missing_doc_module.
