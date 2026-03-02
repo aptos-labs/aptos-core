@@ -146,17 +146,15 @@ impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>> traits:
             .get_threshold_config()
             .sample_polynomial_and_compute_shares(*s.get_secret_a(), rng);
 
-        // Add constant term for the G₂ commitment (f(0) = a0)
-        f_evals.push(f[0]);
-
-        // Step 2: Commit to polynomial evaluations + constant term using batch_mul
-        let flattened_Vs_proj = arkworks::batch_mul::<E::G2>(&pp.G2_table, &f_evals);
-
-        debug_assert_eq!(flattened_Vs_proj.len(), sc.get_total_weight() + 1);
-
         // Encrypt the chunked shares and generate the sharing proof
         let (Cs, Rs, sharing_proof) =
             Self::encrypt_chunked_shares(&f_evals, eks, pp, sc, sok_cntxt, rng);
+
+        // Step 2 (which comes a bit later because we modify f_evals): Commit to polynomial evaluations + constant term using batch_mul
+        f_evals.push(f[0]);
+        let flattened_Vs_proj = arkworks::batch_mul::<E::G2>(&pp.G2_table, &f_evals);
+
+        debug_assert_eq!(flattened_Vs_proj.len(), sc.get_total_weight() + 1);
 
         // Remainder of this function is just batch-normalising the G2 elements and re-splitting into V0 and per-player Vs (same layout as Vs_proj).
         let Vs_proj = sc.group_by_player(&flattened_Vs_proj); // last item of flattened_Vs_proj is f(0), won't appear in Vs_proj
