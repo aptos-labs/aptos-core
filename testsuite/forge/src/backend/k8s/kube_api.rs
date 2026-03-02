@@ -3,7 +3,7 @@
 
 use async_trait::async_trait;
 use kube::{
-    api::{Api, ListParams, PostParams},
+    api::{Api, DeleteParams, ListParams, PostParams},
     client::Client as K8sClient,
     Error as KubeError, Resource as ApiResource,
 };
@@ -40,6 +40,7 @@ where
 pub trait ReadWrite<K>: Send + Sync {
     async fn get(&self, name: &str) -> Result<K, KubeError>;
     async fn create(&self, pp: &PostParams, k: &K) -> Result<K, KubeError>;
+    async fn delete(&self, name: &str, dp: &DeleteParams) -> Result<(), KubeError>;
     async fn get_status(&self, name: &str) -> Result<K, KubeError>;
     async fn list(&self, lp: &ListParams) -> Result<Vec<K>, KubeError>;
 }
@@ -57,6 +58,10 @@ where
 
     async fn create(&self, pp: &PostParams, k: &K) -> Result<K, KubeError> {
         self.api.create(pp, k).await
+    }
+
+    async fn delete(&self, name: &str, dp: &DeleteParams) -> Result<(), KubeError> {
+        self.api.delete(name, dp).await.map(|_| ())
     }
 
     async fn get_status(&self, name: &str) -> Result<K, KubeError> {
@@ -78,7 +83,7 @@ pub mod mocks {
     use hyper::StatusCode;
     use k8s_openapi::Metadata;
     use kube::{
-        api::{ListParams, ObjectMeta, PostParams},
+        api::{DeleteParams, ListParams, ObjectMeta, PostParams},
         error::ErrorResponse,
         Error as KubeError,
     };
@@ -188,6 +193,20 @@ pub mod mocks {
             Ok(resource.clone())
         }
 
+        async fn delete(&self, name: &str, _dp: &DeleteParams) -> Result<(), KubeError> {
+            let mut resources = self.resources.lock();
+            if resources.remove(name).is_some() {
+                Ok(())
+            } else {
+                Err(KubeError::Api(ErrorResponse {
+                    status: "failed".to_string(),
+                    message: format!("Resource with name {} could not be found", name),
+                    reason: "not_found".to_string(),
+                    code: 404,
+                }))
+            }
+        }
+
         async fn get_status(&self, _name: &str) -> Result<T, KubeError> {
             todo!()
         }
@@ -230,6 +249,16 @@ pub mod mocks {
                 status: status.to_string(),
                 code: status.as_u16(),
                 message: "Failed to create resource".to_string(),
+                reason: "Failed to parse error data".into(),
+            }))
+        }
+
+        async fn delete(&self, _name: &str, _dp: &DeleteParams) -> Result<(), KubeError> {
+            let status = StatusCode::from_u16(self.status_code).unwrap();
+            Err(KubeError::Api(ErrorResponse {
+                status: status.to_string(),
+                code: status.as_u16(),
+                message: "Failed to delete resource".to_string(),
                 reason: "Failed to parse error data".into(),
             }))
         }
