@@ -307,31 +307,28 @@ fn append_batch_statement_to_transcript<E: Pairing>(
         trs.append_evaluation_set(set);
     }
     let y_rev_flat: Vec<E::ScalarField> = y_rev.iter().flatten().cloned().collect();
-    trs.append_evaluation_points(&y_rev_flat);
+    trs.append_evaluation_points(&y_rev_flat); // Could do this with a for loop as well
     trs.append_homomorphism_image(&phi_y);
     trs.append_point(c_y_hid);
 }
 
-/// Computes Z_S(x) and weights c^{i-1} * Z_{S\S_i}(x)
+/// Computes Z_S(x) and weights c_powers[i] * Z_{S\S_i}(x).
 #[allow(non_snake_case)]
 fn compute_weights<E: Pairing>(
     z_S: &DensePolynomial<E::ScalarField>,
     s_per_poly: &[Vec<E::ScalarField>],
     x: E::ScalarField,
-    c: E::ScalarField,
-) -> (Vec<E::ScalarField>, E::ScalarField)
-where
-    E::ScalarField: FftField,
-{
+    c_powers: &[E::ScalarField],
+) -> (E::ScalarField, Vec<E::ScalarField>) {
     let z_S_val = z_S.evaluate(&x);
     let z_S_minus_S_i_vals = evaluate_z_S_minus_S_is(z_S_val, s_per_poly, x);
-    let mut weights = Vec::with_capacity(z_S_minus_S_i_vals.len());
-    let mut c_pow = E::ScalarField::ONE;
-    for &z_val in &z_S_minus_S_i_vals {
-        weights.push(c_pow * z_val);
-        c_pow *= c;
-    }
-    (weights, z_S_val)
+    debug_assert_eq!(c_powers.len(), z_S_minus_S_i_vals.len());
+    let weights: Vec<E::ScalarField> = c_powers
+        .iter()
+        .zip(z_S_minus_S_i_vals.iter())
+        .map(|(&c_i, &z_val)| c_i * z_val)
+        .collect();
+    (z_S_val, weights)
 }
 
 /// Legacy batch opening proof: one evaluation point per polynomial (all hidden), φ(y) = sum.
@@ -386,7 +383,7 @@ pub fn batch_open_generalized<
     // Step 1a: Compute { y_i }_i = (y_i^rev, y_i^hid) per polynomial, then φ({ y_i }_i) and C_{y^hid}.
     let mut y_rev_per_poly: Vec<Vec<E::ScalarField>> = Vec::with_capacity(n);
     let mut y_hid_per_poly: Vec<Vec<E::ScalarField>> = Vec::with_capacity(n);
-    let mut evals_per_poly: Vec<Vec<E::ScalarField>> = Vec::with_capacity(n);
+    let mut evals_per_poly: Vec<Vec<E::ScalarField>> = Vec::with_capacity(n); // a bit inefficient constructing all three, but shoulnd't be an issue atm
     for (set, poly) in sets.iter().zip(polys.iter()) {
         let s_i: Vec<_> = set.all_points().cloned().collect();
         let evals_i: Vec<_> = s_i.iter().map(|s| poly.evaluate(s)).collect();
@@ -400,16 +397,16 @@ pub fn batch_open_generalized<
 
     let c_y_hid_randomness = sample_field_element(rng);
     let com_y_hom = shplonked_sigma::com_y_hom::<E>(&srs.taus_1[..y_hid_flat.len()], srs.xi_1);
-    let com_y_hid_proj = com_y_hom
+    let com_y_hid = com_y_hom
         .apply(&shplonked_sigma::ShplonkedSigmaWitness {
             c_y_hid_randomness,
             evals: y_hid_per_poly.clone(),
             com_evals_randomness: E::ScalarField::zero(),
         })
-        .0;
+        .0
+        .into_affine();
 
     // Step 1b: Add { S_i }_i, { y_i^rev }_i, φ({ y_i }_i), C_{y^hid} to transcript.
-    let com_y_hid = com_y_hid_proj.into_affine();
     append_batch_statement_to_transcript::<E>(trs, sets, &y_rev_per_poly, phi_y, &com_y_hid);
 
     // Step 1c: Derive a challenge c from the Fiat-Shamir transcript.
@@ -424,7 +421,7 @@ pub fn batch_open_generalized<
     let s_union = union_of_evaluation_sets(sets);
     let z_S = zero_poly_S(&s_union);
     // One Vec per set (rev ∥ hid) so we have &[F] for from_roots, tilde_f_i_poly, etc.
-    // Same point data as in `sets`, just materialized as contiguous slices.
+    // Same point data as in `sets`, just materialized as contiguous slices for convenience.
     let S_is: Vec<Vec<E::ScalarField>> = sets
         .iter()
         .map(|set| set.all_points().cloned().collect())
@@ -464,7 +461,7 @@ pub fn batch_open_generalized<
         let z = if canonical[i] == i {
             vanishing_poly::from_roots(&S_is[i])
         } else {
-            z_S_is[canonical[i]].clone() // TODO: might not be necessary
+            z_S_is[canonical[i]].clone() // TODO: might not be necessary, just use canonical[..] again
         };
         z_S_is.push(z);
     }
@@ -473,7 +470,7 @@ pub fn batch_open_generalized<
     for i in 0..n {
         let diff = &f_is[i] - &tilde_f_is[i];
         let (q_i_dos, remainder) = DOSPoly::from(diff.clone())
-            .divide_with_q_and_r(&DOSPoly::from(&z_S_is[i]))
+            .divide_with_q_and_r(&DOSPoly::from(&z_S_is[canonical[i]]))
             .expect("Z_{S_i} divides (f_i − f̃_i)");
         debug_assert!(remainder.is_zero());
         let q_i: DensePolynomial<E::ScalarField> = q_i_dos.into();
@@ -505,8 +502,8 @@ pub fn batch_open_generalized<
     // Step 4a: Sample commitment randomness ρ_eval.
     let rho_eval = sample_field_element(rng);
 
-    // Step 4b: weights c^{i-1} Z_{S\S_i}(x)
-    let (weights, z_S_val) = compute_weights::<E>(&z_S, &S_is, x, c);
+    // Step 4b: Compute all weights c^{i-1} Z_{S\S_i}(x), then g
+    let (z_S_val, weights) = compute_weights::<E>(&z_S, &S_is, x, &c_powers);
 
     let g: E::ScalarField = (0..n)
         .map(|i| weights[i] * tilde_f_is[i].evaluate(&x))
@@ -569,7 +566,7 @@ pub fn batch_open_generalized<
         hom2: sum_hom,
     };
     let statement_proj = TupleCodomainShape(
-        TupleCodomainShape(CodomainShape(com_y_hid_proj), CodomainShape(C_eval_proj)),
+        TupleCodomainShape(CodomainShape(com_y_hid.into()), CodomainShape(C_eval_proj)),
         phi_y,
     );
     let (sigma_protocol_proof, _) =
@@ -705,7 +702,8 @@ where
         .iter()
         .map(|set| set.all_points().cloned().collect())
         .collect();
-    let (alphas, z_S_val) = compute_weights::<E>(&z_S, &s_per_poly, x, c);
+    let c_powers = powers(c, n);
+    let (z_S_val, alphas) = compute_weights::<E>(&z_S, &s_per_poly, x, &c_powers);
 
     let commitment_refs: Vec<&MsmInput<E::G1Affine, E::ScalarField>> =
         commitment_msms.iter().collect();

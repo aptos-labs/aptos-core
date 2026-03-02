@@ -480,7 +480,7 @@ where
 pub fn prove_homomorphism<Ct: Serialize, F: PrimeField, H: homomorphism::Trait, R>(
     homomorphism: &H,
     witness: &H::Domain,
-    statement: H::Codomain,
+    statement: H::Codomain, // TODO: should allow to either submit H::Codomain or H::CodomainNormalized
     cntxt: &Ct,
     store_prover_commitment: bool, // true = store prover's commitment, false = store Fiat-Shamir challenge instead
     rng: &mut R,
