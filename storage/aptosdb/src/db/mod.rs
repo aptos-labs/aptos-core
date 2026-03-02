@@ -8,7 +8,7 @@ use crate::{
     transaction_store::TransactionStore,
 };
 use aptos_config::config::{HotStateConfig, PrunerConfig, RocksdbConfigs, StorageDirPaths};
-use aptos_db_indexer::{db_indexer::InternalIndexerDB, Indexer};
+use aptos_db_indexer::db_indexer::InternalIndexerDB;
 use aptos_logger::prelude::*;
 use aptos_schemadb::{batch::SchemaBatch, Cache, Env};
 use aptos_storage_interface::{db_ensure as ensure, AptosDbError, Result};
@@ -35,7 +35,6 @@ pub struct AptosDB {
     pre_commit_lock: std::sync::Mutex<()>,
     /// This is just to detect concurrent calls to `commit_ledger()`
     commit_lock: std::sync::Mutex<()>,
-    indexer: Option<Indexer>,
     update_subscriber: Option<Sender<(Instant, Version)>>,
 }
 
@@ -58,7 +57,6 @@ impl AptosDB {
         readonly: bool,
         pruner_config: PrunerConfig,
         rocksdb_configs: RocksdbConfigs,
-        enable_indexer: bool,
         buffered_state_target_items: usize,
         max_num_nodes_per_lru_cache_shard: usize,
         internal_indexer_db: Option<InternalIndexerDB>,
@@ -69,7 +67,6 @@ impl AptosDB {
             readonly,
             pruner_config,
             rocksdb_configs,
-            enable_indexer,
             buffered_state_target_items,
             max_num_nodes_per_lru_cache_shard,
             false,
@@ -83,7 +80,6 @@ impl AptosDB {
         readonly: bool,
         pruner_config: PrunerConfig,
         rocksdb_configs: RocksdbConfigs,
-        enable_indexer: bool,
         buffered_state_target_items: usize,
         max_num_nodes_per_lru_cache_shard: usize,
         internal_indexer_db: Option<InternalIndexerDB>,
@@ -93,7 +89,6 @@ impl AptosDB {
             readonly,
             pruner_config,
             rocksdb_configs,
-            enable_indexer,
             buffered_state_target_items,
             max_num_nodes_per_lru_cache_shard,
             true,

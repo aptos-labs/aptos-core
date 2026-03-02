@@ -1271,7 +1271,6 @@ dependencies = [
  "aptos-logger",
  "aptos-metrics-core",
  "aptos-proptest-helpers",
- "aptos-resource-viewer",
  "aptos-rocksdb-options",
  "aptos-schemadb",
  "aptos-scratchpad",
