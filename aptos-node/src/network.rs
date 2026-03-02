@@ -3,7 +3,7 @@
 
 use aptos_channels::{self, aptos_channel, message_queues::QueueStyle};
 use aptos_config::{
-    config::{NetworkConfig, NodeConfig},
+    config::{NetworkConfig, NodeConfig, NodeType},
     network_id::NetworkId,
 };
 use aptos_consensus::{
@@ -231,6 +231,7 @@ pub fn setup_networks_and_get_interfaces(
 ) {
     // Gather all network configs
     let network_configs = extract_network_configs(node_config);
+    let node_type = NodeType::extract_from_config(node_config);
 
     // Create each network and register the application handles
     let mut network_runtimes = vec![];
@@ -258,6 +259,8 @@ pub fn setup_networks_and_get_interfaces(
             TimeService::real(),
             Some(event_subscription_service),
             peers_and_metadata.clone(),
+            node_type,
+            &node_config.base,
         );
 
         // Register consensus (both client and server) with the network

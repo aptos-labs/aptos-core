@@ -5,7 +5,10 @@ use crate::{
     counters::DISCOVERY_COUNTS, file::FileStream, rest::RestStream,
     validator_set::ValidatorSetStream,
 };
-use aptos_config::{config::PeerSet, network_id::NetworkContext};
+use aptos_config::{
+    config::{BaseConfig, NodeType, PeerSet},
+    network_id::NetworkContext,
+};
 use aptos_crypto::x25519;
 use aptos_event_notifications::ReconfigNotificationListener;
 use aptos_logger::prelude::*;
@@ -69,11 +72,15 @@ impl<P: OnChainConfigProvider> DiscoveryChangeListener<P> {
         update_channel: aptos_channels::Sender<ConnectivityRequest>,
         expected_pubkey: x25519::PublicKey,
         reconfig_events: ReconfigNotificationListener<P>,
+        node_type: NodeType,
+        base_config: BaseConfig,
     ) -> Self {
         let source_stream = DiscoveryChangeStream::ValidatorSet(ValidatorSetStream::new(
             network_context,
             expected_pubkey,
             reconfig_events,
+            node_type,
+            base_config,
         ));
         DiscoveryChangeListener {
             discovery_source: DiscoverySource::OnChainValidatorSet,
@@ -109,12 +116,16 @@ impl<P: OnChainConfigProvider> DiscoveryChangeListener<P> {
         rest_url: url::Url,
         interval_duration: Duration,
         time_service: TimeService,
+        node_type: NodeType,
+        base_config: BaseConfig,
     ) -> Self {
         let source_stream = DiscoveryChangeStream::Rest(RestStream::new(
             network_context,
             rest_url,
             interval_duration,
             time_service,
+            node_type,
+            base_config,
         ));
         DiscoveryChangeListener {
             discovery_source: DiscoverySource::Rest,
