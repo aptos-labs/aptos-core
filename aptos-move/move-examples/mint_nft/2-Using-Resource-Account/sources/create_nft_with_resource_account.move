@@ -147,8 +147,8 @@ module mint_nft::create_nft_with_resource_account {
     /// signer. This is because we used resource account to publish this module and stored the resource account's signer
     /// within the `ModuleData`, so we can programmatically sign for transactions instead of manually signing transactions.
     /// See https://aptos.dev/concepts/accounts/#resource-accounts for more information about resource account.
-    public entry fun mint_event_ticket(receiver: &signer) acquires ModuleData {
-        let module_data = borrow_global_mut<ModuleData>(@mint_nft);
+    public entry fun mint_event_ticket(receiver: &signer) {
+        let module_data = &mut ModuleData[@mint_nft];
 
         // Create a signer of the resource account from the signer capability stored in this module.
         // Using a resource account and storing its signer capability within the module allows the module to programmatically

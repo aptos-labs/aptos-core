@@ -28,7 +28,7 @@ module named_addr::basic_coin {
     }
 
     /// Mint `amount` tokens to `mint_addr`. Mint must be approved by the module owner.
-    public fun mint(module_owner: &signer, mint_addr: address, amount: u64) acquires Balance {
+    public fun mint(module_owner: &signer, mint_addr: address, amount: u64) {
         // Only the owner of the module can initialize this module
         assert!(signer::address_of(module_owner) == MODULE_OWNER, ENOT_MODULE_OWNER);
 
@@ -37,30 +37,30 @@ module named_addr::basic_coin {
     }
 
     /// Returns the balance of `owner`.
-    public fun balance_of(owner: address): u64 acquires Balance {
-        borrow_global<Balance>(owner).coin.value
+    public fun balance_of(owner: address): u64 {
+        Balance[owner].coin.value
     }
 
     /// Transfers `amount` of tokens from `from` to `to`.
-    public fun transfer(from: &signer, to: address, amount: u64) acquires Balance {
+    public fun transfer(from: &signer, to: address, amount: u64) {
         let check = withdraw(signer::address_of(from), amount);
         deposit(to, check);
     }
 
     /// Withdraw `amount` number of tokens from the balance under `addr`.
-    fun withdraw(addr: address, amount: u64) : Coin acquires Balance {
+    fun withdraw(addr: address, amount: u64) : Coin {
         let balance = balance_of(addr);
         // balance must be greater than the withdraw amount
         assert!(balance >= amount, EINSUFFICIENT_BALANCE);
-        let balance_ref = &mut borrow_global_mut<Balance>(addr).coin.value;
+        let balance_ref = &mut Balance[addr].coin.value;
         *balance_ref = balance - amount;
         Coin { value: amount }
     }
 
     /// Deposit `amount` number of tokens to the balance under `addr`.
-    fun deposit(addr: address, check: Coin) acquires Balance {
+    fun deposit(addr: address, check: Coin) {
         let balance = balance_of(addr);
-        let balance_ref = &mut borrow_global_mut<Balance>(addr).coin.value;
+        let balance_ref = &mut Balance[addr].coin.value;
         let Coin { value } = check;
         *balance_ref = balance + value;
     }

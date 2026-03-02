@@ -44,7 +44,7 @@ module bcs_stream::bcs_stream {
 
         while (stream.cur < vector::length(&stream.data)) {
             let byte = *vector::borrow(&stream.data, stream.cur);
-            stream.cur = stream.cur + 1;
+            stream.cur += 1;
 
             let val = ((byte & 0x7f) as u64);
             if (((val << shift) >> shift) != val) {
@@ -59,7 +59,7 @@ module bcs_stream::bcs_stream {
                 return res
             };
 
-            shift = shift + 7;
+            shift += 7;
             if (shift > 64) {
                 abort error::invalid_argument(EMALFORMED_DATA)
             };
@@ -72,7 +72,7 @@ module bcs_stream::bcs_stream {
     public fun deserialize_bool(stream: &mut BCSStream): bool {
         assert!(stream.cur < vector::length(&stream.data), error::out_of_range(EOUT_OF_BYTES));
         let byte = *vector::borrow(&stream.data, stream.cur);
-        stream.cur = stream.cur + 1;
+        stream.cur += 1;
         if (byte == 0) {
             false
         } else if (byte == 1) {
@@ -123,7 +123,7 @@ module bcs_stream::bcs_stream {
                 ((*vector::borrow(data, cur + 1) as u16) << 8)
         ;
 
-        stream.cur = stream.cur + 2;
+        stream.cur += 2;
         res
     }
 
@@ -141,7 +141,7 @@ module bcs_stream::bcs_stream {
                 ((*vector::borrow(data, cur + 3) as u32) << 24)
         ;
 
-        stream.cur = stream.cur + 4;
+        stream.cur += 4;
         res
     }
 
@@ -163,7 +163,7 @@ module bcs_stream::bcs_stream {
                 ((*vector::borrow(data, cur + 7) as u64) << 56)
         ;
 
-        stream.cur = stream.cur + 8;
+        stream.cur += 8;
         res
     }
 
@@ -193,7 +193,7 @@ module bcs_stream::bcs_stream {
                 ((*vector::borrow(data, cur + 15) as u128) << 120)
         ;
 
-        stream.cur = stream.cur + 16;
+        stream.cur += 16;
         res
     }
 
@@ -239,7 +239,7 @@ module bcs_stream::bcs_stream {
                 ((*vector::borrow(data, cur + 31) as u256) << 248)
         ;
 
-        stream.cur = stream.cur + 32;
+        stream.cur += 32;
         res
     }
 
@@ -263,7 +263,7 @@ module bcs_stream::bcs_stream {
         let i = 0;
         while (i < len) {
             vector::push_back(&mut v, elem_deserializer(stream));
-            i = i + 1;
+            i += 1;
         };
 
         v

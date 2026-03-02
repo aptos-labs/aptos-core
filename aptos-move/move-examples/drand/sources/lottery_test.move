@@ -85,7 +85,7 @@ module drand::lottery_test {
 
             // Shift the next lottery's start time a little (otherwise, timestamp::update_global_time_for_test fails
             // when resetting the time back to the past).
-            lottery_start_time_secs = lottery_start_time_secs + 2 * lottery_duration;
+            lottery_start_time_secs += 2 * lottery_duration;
         };
 
         // Clean up

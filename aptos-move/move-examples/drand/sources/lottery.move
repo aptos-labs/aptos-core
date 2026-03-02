@@ -93,8 +93,8 @@ module drand::lottery {
     public fun get_ticket_price(): u64 { TICKET_PRICE }
     public fun get_minimum_lottery_duration_in_secs(): u64 { MINIMUM_LOTTERY_DURATION_SECS }
 
-    public fun get_lottery_winner(): Option<address> acquires Lottery {
-        let lottery = borrow_global_mut<Lottery>(@drand);
+    public fun get_lottery_winner(): Option<address> {
+        let lottery = &mut Lottery[@drand];
         lottery.winner
     }
 
@@ -102,12 +102,12 @@ module drand::lottery {
     /// have plenty of time to buy tickets), where `draw_at` is a UNIX timestamp in seconds.
     ///
     /// NOTE: A real application can access control this.
-    public entry fun start_lottery(end_time_secs: u64) acquires Lottery {
+    public entry fun start_lottery(end_time_secs: u64) {
         // Make sure the lottery stays open long enough for people to buy tickets.
         assert!(end_time_secs >= timestamp::now_seconds() + MINIMUM_LOTTERY_DURATION_SECS, error::out_of_range(E_LOTTERY_IS_NOT_LONG_ENOUGH));
 
         // Update the Lottery resource with the (future) lottery drawing time, effectively 'starting' the lottery.
-        let lottery = borrow_global_mut<Lottery>(@drand);
+        let lottery = &mut Lottery[@drand];
         assert!(option::is_none(&lottery.draw_at), error::permission_denied(E_LOTTERY_ALREADY_STARTED));
         lottery.draw_at = option::some(end_time_secs);
 
@@ -116,9 +116,9 @@ module drand::lottery {
     }
 
     /// Called by any user to purchase a ticket in the lottery.
-    public entry fun buy_a_ticket(user: &signer) acquires Lottery {
+    public entry fun buy_a_ticket(user: &signer) {
         // Get the Lottery resource
-        let lottery = borrow_global_mut<Lottery>(@drand);
+        let lottery = &mut Lottery[@drand];
 
         // Make sure the lottery has been 'started' but has NOT been 'drawn' yet
         let draw_at = *option::borrow(&lottery.draw_at);
@@ -137,9 +137,9 @@ module drand::lottery {
     /// Allows anyone to close the lottery (if enough time has elapsed) and to decide the winner, by uploading
     /// the correct _drand-signed bytes_ associated with the committed draw time in `Lottery::draw_at`.
     /// These bytes will then be verified and used to extract randomness.
-    public entry fun close_lottery(drand_signed_bytes: vector<u8>) acquires Lottery {
+    public entry fun close_lottery(drand_signed_bytes: vector<u8>) {
         // Get the Lottery resource
-        let lottery = borrow_global_mut<Lottery>(@drand);
+        let lottery = &mut Lottery[@drand];
 
         // Make sure the lottery has been 'started' and enough time has elapsed before the drawing can start
         let draw_at = *option::borrow(&lottery.draw_at);

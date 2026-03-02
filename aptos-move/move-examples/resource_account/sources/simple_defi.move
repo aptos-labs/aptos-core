@@ -59,26 +59,26 @@ module resource_account::simple_defi {
     }
 
     /// Exchange AptosCoin to ChloesCoin
-    public fun exchange_to(a_coin: Coin<AptosCoin>): Coin<ChloesCoin> acquires ModuleData {
-        let coin_cap = borrow_global_mut<ModuleData>(@resource_account);
+    public fun exchange_to(a_coin: Coin<AptosCoin>): Coin<ChloesCoin> {
+        let coin_cap = &mut ModuleData[@resource_account];
         let amount = coin::value(&a_coin);
         coin::deposit(@resource_account, a_coin);
         coin::mint<ChloesCoin>(amount, &coin_cap.mint_cap)
     }
 
     /// Exchange ChloesCoin to AptosCoin
-    public fun exchange_from(c_coin: Coin<ChloesCoin>): Coin<AptosCoin> acquires ModuleData {
+    public fun exchange_from(c_coin: Coin<ChloesCoin>): Coin<AptosCoin> {
         let amount = coin::value(&c_coin);
-        let coin_cap = borrow_global_mut<ModuleData>(@resource_account);
+        let coin_cap = &mut ModuleData[@resource_account];
         coin::burn<ChloesCoin>(c_coin, &coin_cap.burn_cap);
 
-        let module_data = borrow_global_mut<ModuleData>(@resource_account);
+        let module_data = &mut ModuleData[@resource_account];
         let resource_signer = account::create_signer_with_capability(&module_data.resource_signer_cap);
         coin::withdraw<AptosCoin>(&resource_signer, amount)
     }
 
     /// Entry function version of exchange_to() for e2e tests only
-    public entry fun exchange_to_entry(account: &signer, amount: u64) acquires ModuleData {
+    public entry fun exchange_to_entry(account: &signer, amount: u64) {
         let a_coin = coin::withdraw<AptosCoin>(account, amount);
         let c_coin = exchange_to(a_coin);
 
@@ -87,7 +87,7 @@ module resource_account::simple_defi {
     }
 
     /// Entry function version of exchange_from() for e2e tests only
-    public entry fun exchange_from_entry(account: &signer, amount: u64) acquires ModuleData {
+    public entry fun exchange_from_entry(account: &signer, amount: u64) {
         let c_coin = coin::withdraw<ChloesCoin>(account, amount);
         let a_coin = exchange_from(c_coin);
 
@@ -106,7 +106,7 @@ module resource_account::simple_defi {
     }
 
     #[test(origin_account = @0xcafe, resource_account = @0xc3bb8488ab1a5815a9d543d7e41b0e0df46a7396f89b22821f07a4362f75ddc5, framework = @aptos_framework)]
-    public entry fun test_exchange_to_and_exchange_from(origin_account: signer, resource_account: signer, framework: signer) acquires ModuleData {
+    public entry fun test_exchange_to_and_exchange_from(origin_account: signer, resource_account: signer, framework: signer) {
         use aptos_framework::aptos_coin;
 
         let (aptos_coin_burn_cap, aptos_coin_mint_cap) = aptos_coin::initialize_for_test(&framework);

@@ -42,20 +42,20 @@ module message_board::acl_based_mb {
         move_to(account, board);
     }
 
-    public fun view_message(board_addr: address): vector<u8> acquires ACLBasedMB {
-        let post = borrow_global<ACLBasedMB>(board_addr).pinned_post;
+    public fun view_message(board_addr: address): vector<u8> {
+        let post = ACLBasedMB[board_addr].pinned_post;
         copy post
     }
 
     /// board owner control adding new participants
-    public entry fun add_participant(account: &signer, participant: address) acquires ACLBasedMB {
-        let board = borrow_global_mut<ACLBasedMB>(signer::address_of(account));
+    public entry fun add_participant(account: &signer, participant: address) {
+        let board = &mut ACLBasedMB[signer::address_of(account)];
         acl::add(&mut board.participants, participant);
     }
 
     /// remove a participant from the ACL
-    public entry fun remove_participant(account: signer, participant: address) acquires ACLBasedMB {
-        let board = borrow_global_mut<ACLBasedMB>(signer::address_of(&account));
+    public entry fun remove_participant(account: signer, participant: address) {
+        let board = &mut ACLBasedMB[signer::address_of(&account)];
         assert!(signer::address_of(&account) != participant, ECANNOT_REMOVE_ADMIN_FROM_ACL);
         acl::remove(&mut board.participants, participant);
     }
@@ -63,11 +63,11 @@ module message_board::acl_based_mb {
     /// an account publish the message to update the notice
     public entry fun send_pinned_message(
         account: &signer, board_addr: address, message: vector<u8>
-    ) acquires ACLBasedMB {
-        let board = borrow_global<ACLBasedMB>(board_addr);
+    ) {
+        let board = &ACLBasedMB[board_addr];
         assert!(acl::contains(&board.participants, signer::address_of(account)), EACCOUNT_NOT_IN_ACL);
 
-        let board = borrow_global_mut<ACLBasedMB>(board_addr);
+        let board = &mut ACLBasedMB[board_addr];
         board.pinned_post = message;
 
         let send_acct = signer::address_of(account);

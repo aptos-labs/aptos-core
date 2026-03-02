@@ -96,7 +96,7 @@ module marketplace::events {
         token_metadata: TokenMetadata,
     }
 
-    public(friend) fun emit_bid_event<T: key>(
+    friend fun emit_bid_event<T: key>(
         marketplace: Object<T>,
         listing: address,
         new_bidder: address,
@@ -130,7 +130,7 @@ module marketplace::events {
         token_metadata: TokenMetadata
     }
 
-    public(friend) fun emit_listing_placed<T: key>(
+    friend fun emit_listing_placed<T: key>(
         marketplace: Object<T>,
         type: String,
         listing: address,
@@ -158,7 +158,7 @@ module marketplace::events {
         token_metadata: TokenMetadata
     }
 
-    public(friend) fun emit_listing_canceled<T: key>(
+    friend fun emit_listing_canceled<T: key>(
         marketplace: Object<T>,
         type: String,
         listing: address,
@@ -189,7 +189,7 @@ module marketplace::events {
         token_metadata: TokenMetadata
     }
 
-    public(friend) fun emit_listing_filled<T: key>(
+    friend fun emit_listing_filled<T: key>(
         marketplace: Object<T>,
         type: String,
         listing: address,
@@ -225,7 +225,7 @@ module marketplace::events {
         collection_metadata: CollectionMetadata,
     }
 
-    public(friend) fun emit_collection_offer_placed<T: key>(
+    friend fun emit_collection_offer_placed<T: key>(
         marketplace: Object<T>,
         collection_offer: address,
         purchaser: address,
@@ -253,7 +253,7 @@ module marketplace::events {
         collection_metadata: CollectionMetadata,
     }
 
-    public(friend) fun emit_collection_offer_canceled<T: key>(
+    friend fun emit_collection_offer_canceled<T: key>(
         marketplace: Object<T>,
         collection_offer: address,
         purchaser: address,
@@ -283,7 +283,7 @@ module marketplace::events {
         token_metadata: TokenMetadata,
     }
 
-    public(friend) fun emit_collection_offer_filled<T: key>(
+    friend fun emit_collection_offer_filled<T: key>(
         marketplace: Object<T>,
         collection_offer: address,
         purchaser: address,
@@ -315,7 +315,7 @@ module marketplace::events {
         token_metadata: TokenMetadata,
     }
 
-    public(friend) fun emit_token_offer_placed<T: key>(
+    friend fun emit_token_offer_placed<T: key>(
         marketplace: Object<T>,
         token_offer: address,
         purchaser: address,
@@ -340,7 +340,7 @@ module marketplace::events {
         token_metadata: TokenMetadata,
     }
 
-    public(friend) fun emit_token_offer_canceled<T: key>(
+    friend fun emit_token_offer_canceled<T: key>(
         marketplace: Object<T>,
         token_offer: address,
         purchaser: address,
@@ -368,7 +368,7 @@ module marketplace::events {
         token_metadata: TokenMetadata,
     }
 
-    public(friend) fun emit_token_offer_filled<T: key>(
+    friend fun emit_token_offer_filled<T: key>(
         marketplace: Object<T>,
         token_offer: address,
         purchaser: address,

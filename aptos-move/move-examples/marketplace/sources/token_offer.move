@@ -208,7 +208,7 @@ module token_offer {
     public entry fun cancel<CoinType>(
         purchaser: &signer,
         token_offer: Object<TokenOffer>,
-    ) acquires CoinOffer, TokenOffer, TokenOfferTokenV1, TokenOfferTokenV2 {
+    ) {
         let token_offer_addr = object::object_address(&token_offer);
         assert!(
             exists<TokenOffer>(token_offer_addr),
@@ -218,13 +218,13 @@ module token_offer {
             object::is_owner(token_offer, signer::address_of(purchaser)),
             error::permission_denied(ENOT_OWNER),
         );
-        let token_offer_obj = borrow_global_mut<TokenOffer>(token_offer_addr);
+        let token_offer_obj = &mut TokenOffer[token_offer_addr];
         let token_metadata = if (exists<TokenOfferTokenV2>(token_offer_addr)) {
             events::token_metadata_for_tokenv2(
-                borrow_global<TokenOfferTokenV2>(token_offer_addr).token,
+                TokenOfferTokenV2[token_offer_addr].token,
             )
         } else {
-            let offer_info = borrow_global<TokenOfferTokenV1>(token_offer_addr);
+            let offer_info = &TokenOfferTokenV1[token_offer_addr];
             events::token_metadata_for_tokenv1(
                 token_v1_token_id(offer_info)
             )
@@ -247,7 +247,7 @@ module token_offer {
         token_offer: Object<TokenOffer>,
         token_name: String,
         property_version: u64,
-    ) acquires CoinOffer, TokenOffer, TokenOfferTokenV1, TokenOfferTokenV2
+    )
     {
         sell_tokenv1<CoinType>(seller, token_offer, token_name, property_version);
     }
@@ -259,11 +259,6 @@ module token_offer {
         token_name: String,
         property_version: u64,
     ): Option<Object<TokenV1Container>>
-    acquires
-    CoinOffer,
-    TokenOffer,
-    TokenOfferTokenV1,
-    TokenOfferTokenV2
     {
         let token_offer_addr = object::object_address(&token_offer);
         assert!(
@@ -271,7 +266,7 @@ module token_offer {
             error::not_found(ENO_TOKEN_OFFER),
         );
         let token_offer_tokenv1_offer =
-            borrow_global_mut<TokenOfferTokenV1>(token_offer_addr);
+            &mut TokenOfferTokenV1[token_offer_addr];
 
         // Move the token to its destination
 
@@ -314,7 +309,7 @@ module token_offer {
     public entry fun sell_tokenv2<CoinType>(
         seller: &signer,
         token_offer: Object<TokenOffer>,
-    ) acquires CoinOffer, TokenOffer, TokenOfferTokenV1, TokenOfferTokenV2 {
+    ) {
         let token_offer_addr = object::object_address(&token_offer);
         assert!(
             exists<TokenOfferTokenV2>(token_offer_addr),
@@ -323,7 +318,7 @@ module token_offer {
 
         // Check it's the correct token
         let seller_address = signer::address_of(seller);
-        let token = borrow_global<TokenOfferTokenV2>(token_offer_addr).token;
+        let token = TokenOfferTokenV2[token_offer_addr].token;
         assert!(seller_address == object::owner(token), error::permission_denied(ENOT_TOKEN_OWNER));
 
         // Move the token to its destination
@@ -365,9 +360,9 @@ module token_offer {
         royalty_denominator: u64,
         royalty_numerator: u64,
         token_metadata: events::TokenMetadata,
-    ) acquires CoinOffer, TokenOffer, TokenOfferTokenV1, TokenOfferTokenV2 {
+    ) {
         assert!(exists<TokenOffer>(token_offer_addr), error::not_found(ENO_TOKEN_OFFER));
-        let token_offer_obj = borrow_global_mut<TokenOffer>(token_offer_addr);
+        let token_offer_obj = &mut TokenOffer[token_offer_addr];
         assert!(
             timestamp::now_seconds() < token_offer_obj.expiration_time,
             error::invalid_state(EEXPIRED),
@@ -410,7 +405,7 @@ module token_offer {
     /// creator.
     inline fun cleanup<CoinType>(
         token_offer: Object<TokenOffer>,
-    ) acquires CoinOffer, TokenOffer, TokenOfferTokenV1, TokenOfferTokenV2 {
+    ) {
         let token_offer_addr = object::object_address(&token_offer);
         let CoinOffer<CoinType> { coins } = move_from(token_offer_addr);
         aptos_account::deposit_coins(object::owner(token_offer), coins);
@@ -438,33 +433,33 @@ module token_offer {
     }
 
     #[view]
-    public fun expired(token_offer: Object<TokenOffer>): bool acquires TokenOffer {
+    public fun expired(token_offer: Object<TokenOffer>): bool {
         borrow_token_offer(token_offer).expiration_time < timestamp::now_seconds()
     }
 
     #[view]
     public fun expiration_time(
         token_offer: Object<TokenOffer>,
-    ): u64 acquires TokenOffer {
+    ): u64 {
         borrow_token_offer(token_offer).expiration_time
     }
 
     #[view]
     public fun fee_schedule(
         token_offer: Object<TokenOffer>,
-    ): Object<FeeSchedule> acquires TokenOffer {
+    ): Object<FeeSchedule> {
         borrow_token_offer(token_offer).fee_schedule
     }
 
     #[view]
-    public fun price(token_offer: Object<TokenOffer>): u64 acquires TokenOffer {
+    public fun price(token_offer: Object<TokenOffer>): u64 {
         borrow_token_offer(token_offer).item_price
     }
 
     #[view]
     public fun collectionv1(
         token_offer: Object<TokenOffer>,
-    ): TokenOfferTokenV1 acquires TokenOfferTokenV1 {
+    ): TokenOfferTokenV1 {
         let token_offer_addr = object::object_address(&token_offer);
         assert!(
             exists<TokenOfferTokenV1>(token_offer_addr),
@@ -476,7 +471,7 @@ module token_offer {
     #[view]
     public fun collectionv2(
         token_offer: Object<TokenOffer>,
-    ): TokenOfferTokenV2 acquires TokenOfferTokenV2 {
+    ): TokenOfferTokenV2 {
         let token_offer_addr = object::object_address(&token_offer);
         assert!(
             exists<TokenOffer>(token_offer_addr),
@@ -487,7 +482,7 @@ module token_offer {
 
     inline fun borrow_token_offer(
         token_offer: Object<TokenOffer>,
-    ): &TokenOffer acquires TokenOffer {
+    ): &TokenOffer {
         let token_offer_addr = object::object_address(&token_offer);
         assert!(
             exists<TokenOffer>(token_offer_addr),

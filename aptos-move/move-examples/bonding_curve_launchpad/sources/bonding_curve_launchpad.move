@@ -72,8 +72,8 @@ module bonding_curve_launchpad::bonding_curve_launchpad {
     public fun get_fa_obj_address(
         name: String,
         symbol: String
-    ): address acquires LaunchPad {
-        let launchpad = borrow_global<LaunchPad>(@bonding_curve_launchpad);
+    ): address {
+        let launchpad = &LaunchPad[@bonding_curve_launchpad];
         let fa_generator_address = object::address_from_extend_ref(&launchpad.fa_generator_extend_ref);
         let fa_key_seed = *string::bytes(&name);
         vector::append(&mut fa_key_seed, b"-");
@@ -87,7 +87,7 @@ module bonding_curve_launchpad::bonding_curve_launchpad {
         name: String,
         symbol: String,
         user: address
-    ): u64 acquires LaunchPad {
+    ): u64 {
         let fa_metadata_obj: Object<Metadata> = object::address_to_object(get_fa_obj_address(name, symbol));
         primary_fungible_store::balance(user, fa_metadata_obj)
     }
@@ -97,7 +97,7 @@ module bonding_curve_launchpad::bonding_curve_launchpad {
     public fun get_metadata(
         name: String,
         symbol: String
-    ): Object<Metadata> acquires LaunchPad {
+    ): Object<Metadata> {
         object::address_to_object(get_fa_obj_address(name, symbol))
     }
 
@@ -140,13 +140,13 @@ module bonding_curve_launchpad::bonding_curve_launchpad {
         decimals: u8,
         icon_uri: String,
         project_uri: String
-    ) acquires LaunchPad, FAController {
+    ) {
         // Create, mint, and control the FA using the signer obtained from the "FA Generator" object.
         let (fa_address, fa_minted) = create_fa(name, symbol, max_supply, decimals, icon_uri, project_uri);
         let fa_metadata_obj = object::address_to_object(fa_address);
         // `transfer_ref` is required for swapping in `liquidity_pair`. Otherwise, the custom withdraw function would
         // block the transfer of APT to the creator.
-        let transfer_ref = &borrow_global<FAController>(fa_address).transfer_ref;
+        let transfer_ref = &FAController[fa_address].transfer_ref;
         // Create the liquidity pair between APT and the new FA. Include the initial creator swap, if needed.
         liquidity_pairs::register_liquidity_pair(
             name,
@@ -167,14 +167,14 @@ module bonding_curve_launchpad::bonding_curve_launchpad {
         symbol: String,
         swap_to_apt: bool,
         amount_in: u64
-    ) acquires LaunchPad, FAController {
+    ) {
         // Verify the `amount_in` is valid and that the FA exists.
         assert!(amount_in > 0, ELIQUIDITY_PAIR_SWAP_AMOUNTIN_INVALID);
         // FA Object<Metadata> required for primary_fungible_store interactions.
         // `transfer_ref` is used to bypass the `is_frozen` status of the FA. Without this, the defined dispatchable
         // withdraw function would prevent the ability to transfer the participant's FA onto the liquidity pair.
         let fa_metadata_obj = object::address_to_object(get_fa_obj_address(name, symbol));
-        let transfer_ref = &borrow_global<FAController>(get_fa_obj_address(name, symbol)).transfer_ref;
+        let transfer_ref = &FAController[get_fa_obj_address(name, symbol)].transfer_ref;
         // Initiate the swap on the associated liquidity pair.
         if (swap_to_apt) {
             liquidity_pairs::swap_fa_to_apt(name, symbol, transfer_ref, account, fa_metadata_obj, amount_in);
@@ -191,11 +191,11 @@ module bonding_curve_launchpad::bonding_curve_launchpad {
         decimals: u8,
         icon_uri: String,
         project_uri: String
-    ): (address, FungibleAsset) acquires LaunchPad {
+    ): (address, FungibleAsset) {
         // Only unique entries of the FA key (name and symbol) can be launched.
         let does_fa_exist = object::object_exists<FAController>(get_fa_obj_address(name, symbol));
         assert!(!does_fa_exist, EFA_EXISTS_ALREADY);
-        let launchpad = borrow_global_mut<LaunchPad>(@bonding_curve_launchpad);
+        let launchpad = &mut LaunchPad[@bonding_curve_launchpad];
         // Obtain the signer from the "FA Generator" object, to create the FA.
         let fa_generator_signer = object::generate_signer_for_extending(&launchpad.fa_generator_extend_ref);
         // The FA's name and symbol is combined, to create a seed for deterministic object creation.

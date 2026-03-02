@@ -167,7 +167,7 @@ module stablecoin::usdk {
         from_public_key: vector<u8>,
         to: address,
         amount: u64,
-    ) acquires Management, State {
+    ) {
         assert_not_paused();
         assert_not_denylisted(from);
         assert_not_denylisted(to);
@@ -182,7 +182,7 @@ module stablecoin::usdk {
         };
         account::verify_signed_message(from, from_account_scheme, from_public_key, proof, expected_message);
 
-        let transfer_ref = &borrow_global<Management>(usdk_address()).transfer_ref;
+        let transfer_ref = &Management[usdk_address()].transfer_ref;
         // Only use with_ref API for primary_fungible_store (PFS) transfers in this module.
         primary_fungible_store::transfer_with_ref(transfer_ref, from, to, amount);
     }
@@ -192,7 +192,7 @@ module stablecoin::usdk {
         store: Object<T>,
         fa: FungibleAsset,
         transfer_ref: &TransferRef,
-    ) acquires State {
+    ) {
         assert_not_paused();
         assert_not_denylisted(object::owner(store));
         fungible_asset::deposit_with_ref(transfer_ref, store, fa);
@@ -203,7 +203,7 @@ module stablecoin::usdk {
         store: Object<T>,
         amount: u64,
         transfer_ref: &TransferRef,
-    ): FungibleAsset acquires State {
+    ): FungibleAsset {
         assert_not_paused();
         assert_not_denylisted(object::owner(store));
         fungible_asset::withdraw_with_ref(transfer_ref, store, amount)
@@ -211,13 +211,13 @@ module stablecoin::usdk {
 
     /// Mint new tokens to the specified account. This checks that the caller is a minter, the stablecoin is not paused,
     /// and the account is not denylisted.
-    public entry fun mint(minter: &signer, to: address, amount: u64) acquires Management, Roles, State {
+    public entry fun mint(minter: &signer, to: address, amount: u64) {
         assert_not_paused();
         assert_is_minter(minter);
         assert_not_denylisted(to);
         if (amount == 0) { return };
 
-        let management = borrow_global<Management>(usdk_address());
+        let management = &Management[usdk_address()];
         let tokens = fungible_asset::mint(&management.mint_ref, amount);
         // Ensure not to call pfs::deposit or dfa::deposit directly in the module.
         deposit(primary_fungible_store::ensure_primary_store_exists(to, metadata()), tokens, &management.transfer_ref);
@@ -230,7 +230,7 @@ module stablecoin::usdk {
     }
 
     /// Burn tokens from the specified account. This checks that the caller is a minter and the stablecoin is not paused.
-    public entry fun burn(minter: &signer, from: address, amount: u64) acquires Management, Roles, State {
+    public entry fun burn(minter: &signer, from: address, amount: u64) {
         burn_from(minter, primary_fungible_store::ensure_primary_store_exists(from, metadata()), amount);
     }
 
@@ -240,12 +240,12 @@ module stablecoin::usdk {
         minter: &signer,
         store: Object<FungibleStore>,
         amount: u64,
-    ) acquires Management, Roles, State {
+    ) {
         assert_not_paused();
         assert_is_minter(minter);
         if (amount == 0) { return };
 
-        let management = borrow_global<Management>(usdk_address());
+        let management = &Management[usdk_address()];
         let tokens = fungible_asset::withdraw_with_ref(
             &management.transfer_ref,
             store,
@@ -262,10 +262,10 @@ module stablecoin::usdk {
     }
 
     /// Pause or unpause the stablecoin. This checks that the caller is the pauser.
-    public entry fun set_pause(pauser: &signer, paused: bool) acquires Roles, State {
-        let roles = borrow_global<Roles>(usdk_address());
+    public entry fun set_pause(pauser: &signer, paused: bool) {
+        let roles = &Roles[usdk_address()];
         assert!(signer::address_of(pauser) == roles.pauser, EUNAUTHORIZED);
-        let state = borrow_global_mut<State>(usdk_address());
+        let state = &mut State[usdk_address()];
         if (state.paused == paused) { return };
         state.paused = paused;
 
@@ -276,12 +276,12 @@ module stablecoin::usdk {
     }
 
     /// Add an account to the denylist. This checks that the caller is the denylister.
-    public entry fun denylist(denylister: &signer, account: address) acquires Management, Roles, State {
+    public entry fun denylist(denylister: &signer, account: address) {
         assert_not_paused();
-        let roles = borrow_global<Roles>(usdk_address());
+        let roles = &Roles[usdk_address()];
         assert!(signer::address_of(denylister) == roles.denylister, EUNAUTHORIZED);
 
-        let freeze_ref = &borrow_global<Management>(usdk_address()).transfer_ref;
+        let freeze_ref = &Management[usdk_address()].transfer_ref;
         primary_fungible_store::set_frozen_flag(freeze_ref, account, true);
 
         event::emit(Denylist {
@@ -291,12 +291,12 @@ module stablecoin::usdk {
     }
 
     /// Remove an account from the denylist. This checks that the caller is the denylister.
-    public entry fun undenylist(denylister: &signer, account: address) acquires Management, Roles, State {
+    public entry fun undenylist(denylister: &signer, account: address) {
         assert_not_paused();
-        let roles = borrow_global<Roles>(usdk_address());
+        let roles = &Roles[usdk_address()];
         assert!(signer::address_of(denylister) == roles.denylister, EUNAUTHORIZED);
 
-        let freeze_ref = &borrow_global<Management>(usdk_address()).transfer_ref;
+        let freeze_ref = &Management[usdk_address()].transfer_ref;
         primary_fungible_store::set_frozen_flag(freeze_ref, account, false);
 
         event::emit(Denylist {
@@ -306,22 +306,22 @@ module stablecoin::usdk {
     }
 
     /// Add a new minter. This checks that the caller is the master minter and the account is not already a minter.
-    public entry fun add_minter(admin: &signer, minter: address) acquires Roles, State {
+    public entry fun add_minter(admin: &signer, minter: address) {
         assert_not_paused();
-        let roles = borrow_global_mut<Roles>(usdk_address());
+        let roles = &mut Roles[usdk_address()];
         assert!(signer::address_of(admin) == roles.master_minter, EUNAUTHORIZED);
         assert!(!vector::contains(&roles.minters, &minter), EALREADY_MINTER);
         vector::push_back(&mut roles.minters, minter);
     }
 
-    fun assert_is_minter(minter: &signer) acquires Roles {
-        let roles = borrow_global<Roles>(usdk_address());
+    fun assert_is_minter(minter: &signer) {
+        let roles = &Roles[usdk_address()];
         let minter_addr = signer::address_of(minter);
         assert!(minter_addr == roles.master_minter || vector::contains(&roles.minters, &minter_addr), EUNAUTHORIZED);
     }
 
-    fun assert_not_paused() acquires State {
-        let state = borrow_global<State>(usdk_address());
+    fun assert_not_paused() {
+        let state = &State[usdk_address()];
         assert!(!state.paused, EPAUSED);
     }
 
