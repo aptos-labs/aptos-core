@@ -131,12 +131,6 @@ impl<O: OutputLogger> MoveHarnessImpl<O> {
         }
     }
 
-<<<<<<< HEAD
-    pub fn new_testnet() -> Self {
-        register_package_hooks(Box::new(AptosPackageHooks {}));
-        Self {
-            executor: FakeExecutorImpl::from_testnet_genesis(),
-=======
     /// Creates a new harness with TESTNET chain id. Timed features have real
     /// activation dates on testnet, making them individually toggleable via
     /// [`Self::set_timed_feature`].
@@ -152,7 +146,6 @@ impl<O: OutputLogger> MoveHarnessImpl<O> {
             .expect("failed to set chain id");
         Self {
             executor,
->>>>>>> 103e70ae7b ([vm] Updating limits for structs (#18896))
             txn_seq_no: BTreeMap::default(),
             default_gas_unit_price: DEFAULT_GAS_UNIT_PRICE,
             max_gas_per_txn: Self::DEFAULT_MAX_GAS_PER_TXN,
