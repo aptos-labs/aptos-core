@@ -41,25 +41,25 @@ module aptos_experimental::order_book {
 
     // ============================= APIs relevant to single order only ====================================
 
-    public(friend) fun client_order_id_exists<M: store + copy + drop>(
+    friend fun client_order_id_exists<M: store + copy + drop>(
         self: &OrderBook<M>, order_creator: address, client_order_id: String
     ): bool {
         self.single_order_book.client_order_id_exists(order_creator, client_order_id)
     }
 
-    public(friend) fun get_single_order_metadata<M: store + copy + drop>(
+    friend fun get_single_order_metadata<M: store + copy + drop>(
         self: &OrderBook<M>, order_id: OrderId
     ): Option<M> {
         self.single_order_book.get_order_metadata(order_id)
     }
 
-    public(friend) fun get_order_id_by_client_id<M: store + copy + drop>(
+    friend fun get_order_id_by_client_id<M: store + copy + drop>(
         self: &OrderBook<M>, order_creator: address, client_order_id: String
     ): Option<OrderId> {
         self.single_order_book.get_order_id_by_client_id(order_creator, client_order_id)
     }
 
-    public(friend) fun get_single_order<M: store + copy + drop>(
+    friend fun get_single_order<M: store + copy + drop>(
         self: &OrderBook<M>, order_id: OrderId
     ): Option<aptos_trading::single_order_types::OrderWithState<M>> {
         self.single_order_book.get_order(order_id)
@@ -79,7 +79,7 @@ module aptos_experimental::order_book {
         )
     }
 
-    public(friend) fun try_cancel_single_order<M: store + copy + drop>(
+    friend fun try_cancel_single_order<M: store + copy + drop>(
         self: &mut OrderBook<M>, order_creator: address, order_id: OrderId
     ): Option<SingleOrder<M>> {
         self.single_order_book.try_cancel_order(
@@ -87,7 +87,7 @@ module aptos_experimental::order_book {
         )
     }
 
-    public(friend) fun try_cancel_single_order_with_client_order_id<M: store + copy + drop>(
+    friend fun try_cancel_single_order_with_client_order_id<M: store + copy + drop>(
         self: &mut OrderBook<M>, order_creator: address, client_order_id: String
     ): Option<SingleOrder<M>> {
         self.single_order_book.try_cancel_order_with_client_order_id(
@@ -103,7 +103,7 @@ module aptos_experimental::order_book {
         );
     }
 
-    public(friend) fun decrease_single_order_size<M: store + copy + drop>(
+    friend fun decrease_single_order_size<M: store + copy + drop>(
         self: &mut OrderBook<M>,
         order_creator: address,
         order_id: OrderId,
@@ -117,19 +117,19 @@ module aptos_experimental::order_book {
         )
     }
 
-    public(friend) fun set_single_order_metadata<M: store + copy + drop>(
+    friend fun set_single_order_metadata<M: store + copy + drop>(
         self: &mut OrderBook<M>, order_id: OrderId, metadata: M
     ) {
         self.single_order_book.set_order_metadata(order_id, metadata)
     }
 
-    public(friend) fun take_ready_price_based_orders<M: store + copy + drop>(
+    friend fun take_ready_price_based_orders<M: store + copy + drop>(
         self: &mut OrderBook<M>, oracle_price: u64, order_limit: u64
     ): vector<SingleOrder<M>> {
         self.single_order_book.take_ready_price_based_orders(oracle_price, order_limit)
     }
 
-    public(friend) fun take_ready_time_based_orders<M: store + copy + drop>(
+    friend fun take_ready_time_based_orders<M: store + copy + drop>(
         self: &mut OrderBook<M>, order_limit: u64
     ): vector<SingleOrder<M>> {
         self.single_order_book.take_ready_time_based_orders(order_limit)
@@ -137,13 +137,13 @@ module aptos_experimental::order_book {
 
     // ============================= APIs relevant to both single and bulk order ====================================
 
-    public(friend) fun best_bid_price<M: store + copy + drop>(
+    friend fun best_bid_price<M: store + copy + drop>(
         self: &OrderBook<M>
     ): Option<u64> {
         self.price_time_idx.best_bid_price()
     }
 
-    public(friend) fun best_ask_price<M: store + copy + drop>(
+    friend fun best_ask_price<M: store + copy + drop>(
         self: &OrderBook<M>
     ): Option<u64> {
         self.price_time_idx.best_ask_price()
@@ -184,7 +184,7 @@ module aptos_experimental::order_book {
         }
     }
 
-    public(friend) fun reinsert_order<M: store + copy + drop>(
+    friend fun reinsert_order<M: store + copy + drop>(
         self: &mut OrderBook<M>,
         reinsert_order: OrderMatchDetails<M>,
         original_order: &OrderMatchDetails<M>
@@ -202,31 +202,31 @@ module aptos_experimental::order_book {
 
     // ============================= APIs relevant to bulk order only ====================================
 
-    public(friend) fun get_bulk_order_remaining_size<M: store + copy + drop>(
+    friend fun get_bulk_order_remaining_size<M: store + copy + drop>(
         self: &OrderBook<M>, order_creator: address, is_bid: bool
     ): u64 {
         self.bulk_order_book.get_remaining_size(order_creator, is_bid)
     }
 
-    public(friend) fun place_bulk_order<M: store + copy + drop>(
+    friend fun place_bulk_order<M: store + copy + drop>(
         self: &mut OrderBook<M>, order_req: BulkOrderRequest<M>
     ): BulkOrderPlaceResponse<M> {
         self.bulk_order_book.place_bulk_order(&mut self.price_time_idx, order_req)
     }
 
-    public(friend) fun get_bulk_order<M: store + copy + drop>(
+    friend fun get_bulk_order<M: store + copy + drop>(
         self: &OrderBook<M>, order_creator: address
     ): BulkOrder<M> {
         self.bulk_order_book.get_bulk_order(order_creator)
     }
 
-    public(friend) fun cancel_bulk_order<M: store + copy + drop>(
+    friend fun cancel_bulk_order<M: store + copy + drop>(
         self: &mut OrderBook<M>, order_creator: address
     ): BulkOrder<M> {
         self.bulk_order_book.cancel_bulk_order(&mut self.price_time_idx, order_creator)
     }
 
-    public(friend) fun cancel_bulk_order_at_price<M: store + copy + drop>(
+    friend fun cancel_bulk_order_at_price<M: store + copy + drop>(
         self: &mut OrderBook<M>,
         order_creator: address,
         price: u64,

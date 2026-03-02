@@ -40,7 +40,7 @@ module aptos_experimental::pending_order_book_index {
         }
     }
 
-    public(friend) fun new_pending_order_book_index(): PendingOrderBookIndex {
+    friend fun new_pending_order_book_index(): PendingOrderBookIndex {
         PendingOrderBookIndex::V1 {
             price_move_up_index: order_book_utils::new_default_big_ordered_map(),
             price_move_down_index: order_book_utils::new_default_big_ordered_map(),
@@ -48,7 +48,7 @@ module aptos_experimental::pending_order_book_index {
         }
     }
 
-    public(friend) fun cancel_pending_order(
+    friend fun cancel_pending_order(
         self: &mut PendingOrderBookIndex,
         trigger_condition: TriggerCondition,
         unique_priority_idx: IncreasingIdx
@@ -81,7 +81,7 @@ module aptos_experimental::pending_order_book_index {
         };
     }
 
-    public(friend) fun place_pending_order(
+    friend fun place_pending_order(
         self: &mut PendingOrderBookIndex,
         order_id: OrderId,
         trigger_condition: TriggerCondition,
@@ -153,7 +153,7 @@ module aptos_experimental::pending_order_book_index {
         };
     }
 
-    public(friend) fun take_ready_price_based_orders(
+    friend fun take_ready_price_based_orders(
         self: &mut PendingOrderBookIndex, current_price: u64, order_limit: u64
     ): vector<OrderId> {
         let orders = vector::empty();
@@ -168,7 +168,7 @@ module aptos_experimental::pending_order_book_index {
         orders
     }
 
-    public(friend) fun take_ready_time_based_orders(
+    friend fun take_ready_time_based_orders(
         self: &mut PendingOrderBookIndex, order_limit: u64
     ): vector<OrderId> {
         let orders = vector::empty();
@@ -186,7 +186,7 @@ module aptos_experimental::pending_order_book_index {
     }
 
     #[test_only]
-    public(friend) fun destroy_pending_order_book_index(
+    friend fun destroy_pending_order_book_index(
         self: PendingOrderBookIndex
     ) {
         let PendingOrderBookIndex::V1 {
@@ -200,21 +200,21 @@ module aptos_experimental::pending_order_book_index {
     }
 
     #[test_only]
-    public(friend) fun get_price_move_down_index(
+    friend fun get_price_move_down_index(
         self: &PendingOrderBookIndex
     ): &BigOrderedMap<PendingDownOrderKey, OrderId> {
         &self.price_move_down_index
     }
 
     #[test_only]
-    public(friend) fun get_price_move_up_index(
+    friend fun get_price_move_up_index(
         self: &PendingOrderBookIndex
     ): &BigOrderedMap<PendingUpOrderKey, OrderId> {
         &self.price_move_up_index
     }
 
     #[test_only]
-    public(friend) fun get_time_based_index(
+    friend fun get_time_based_index(
         self: &PendingOrderBookIndex
     ): &BigOrderedMap<PendingTimeKey, OrderId> {
         &self.time_based_index

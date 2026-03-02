@@ -1057,41 +1057,41 @@ module aptos_experimental::market_types {
     }
 
     // ============================= Public Package APIs ====================================
-    public(friend) fun get_order_book_mut<M: store + copy + drop>(
+    friend fun get_order_book_mut<M: store + copy + drop>(
         self: &mut Market<M>
     ): &mut OrderBook<M> {
         &mut self.order_book
     }
 
-    public(friend) fun get_pre_cancellation_tracker_mut<M: store + copy + drop>(
+    friend fun get_pre_cancellation_tracker_mut<M: store + copy + drop>(
         self: &mut Market<M>
     ): &mut PreCancellationTracker {
         self.pre_cancellation_tracker.borrow_mut(PRE_CANCELLATION_TRACKER_KEY)
     }
 
-    public(friend) fun get_dead_mans_switch_tracker<M: store + copy + drop>(
+    friend fun get_dead_mans_switch_tracker<M: store + copy + drop>(
         self: &Market<M>
     ): &DeadMansSwitchTracker {
         self.dead_mans_switch_tracker.borrow(DEAD_MANS_SWITCH_TRACKER_KEY)
     }
 
-    public(friend) fun get_dead_mans_switch_tracker_mut<M: store + copy + drop>(
+    friend fun get_dead_mans_switch_tracker_mut<M: store + copy + drop>(
         self: &mut Market<M>
     ): &mut DeadMansSwitchTracker {
         self.dead_mans_switch_tracker.borrow_mut(DEAD_MANS_SWITCH_TRACKER_KEY)
     }
 
-    public(friend) fun is_dead_mans_switch_enabled<M: store + copy + drop>(
+    friend fun is_dead_mans_switch_enabled<M: store + copy + drop>(
         self: &Market<M>
     ): bool {
         self.config.enable_dead_mans_switch
     }
 
-    public(friend) fun get_parent<M: store + copy + drop>(self: &Market<M>): address {
+    friend fun get_parent<M: store + copy + drop>(self: &Market<M>): address {
         self.parent
     }
 
-    public(friend) fun get_market<M: store + copy + drop>(self: &Market<M>): address {
+    friend fun get_market<M: store + copy + drop>(self: &Market<M>): address {
         self.market
     }
 

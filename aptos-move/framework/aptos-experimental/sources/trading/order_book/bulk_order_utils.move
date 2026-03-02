@@ -35,7 +35,7 @@ module aptos_experimental::bulk_order_utils {
     /// - If bid_prices and bid_sizes have different lengths
     /// - If ask_prices and ask_sizes have different lengths
     /// - If bid_prices or ask_prices exceeds MAX_BULK_ORDER_DEPTH_PER_SIDE (30) levels
-    public(friend) fun new_bulk_order_request_with_sanitization<M: store + copy + drop>(
+    friend fun new_bulk_order_request_with_sanitization<M: store + copy + drop>(
         account: address,
         sequence_number: u64,
         bid_prices: vector<u64>,
@@ -94,7 +94,7 @@ module aptos_experimental::bulk_order_utils {
     /// - `vector<u64>`: Cancelled bid sizes corresponding to cancelled prices
     /// - `vector<u64>`: Cancelled ask prices (levels that crossed the spread)
     /// - `vector<u64>`: Cancelled ask sizes corresponding to cancelled prices
-    public(friend) fun new_bulk_order_with_sanitization<M: store + copy + drop>(
+    friend fun new_bulk_order_with_sanitization<M: store + copy + drop>(
         order_id: OrderId,
         unique_priority_idx: IncreasingIdx,
         order_req: BulkOrderRequest<M>,
@@ -234,7 +234,7 @@ module aptos_experimental::bulk_order_utils {
     /// # Arguments:
     /// - `self`: Mutable reference to the bulk order
     /// - `other`: Reference to the order result to reinsert
-    public(friend) fun reinsert_order_into_bulk_order<M: store + copy + drop>(
+    friend fun reinsert_order_into_bulk_order<M: store + copy + drop>(
         order: &mut BulkOrder<M>, other: &OrderMatchDetails<M>
     ) {
         // Reinsert the order into the bulk order
@@ -269,7 +269,7 @@ module aptos_experimental::bulk_order_utils {
     ///
     /// # Aborts:
     /// - If the matched size exceeds the available size at the first level
-    public(friend) fun match_order_and_get_next_from_bulk_order<M: store + copy + drop>(
+    friend fun match_order_and_get_next_from_bulk_order<M: store + copy + drop>(
         order: &mut BulkOrder<M>, is_bid: bool, matched_size: u64
     ): (Option<u64>, Option<u64>) {
         let (prices, sizes) =
@@ -300,7 +300,7 @@ module aptos_experimental::bulk_order_utils {
     ///
     /// # Returns:
     /// The size that was cancelled at that price level, or 0 if the price wasn't found
-    public(friend) fun cancel_at_price_level<M: store + copy + drop>(
+    friend fun cancel_at_price_level<M: store + copy + drop>(
         order: &mut BulkOrder<M>, price: u64, is_bid: bool
     ): u64 {
         let (prices, sizes) =
@@ -314,7 +314,7 @@ module aptos_experimental::bulk_order_utils {
                 sizes.remove(i);
                 return cancelled_size
             };
-            i = i + 1;
+            i += 1;
         };
         0 // Price not found
     }
