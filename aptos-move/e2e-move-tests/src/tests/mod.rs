@@ -68,6 +68,7 @@ mod state_metadata;
 mod storage_refund;
 mod string_args;
 mod string_utils;
+mod struct_def_count;
 mod swap_function_values;
 mod test_self;
 mod token_event_store;
