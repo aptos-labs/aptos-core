@@ -66,7 +66,7 @@ module std::mem_tests {
     }
 
     #[test(creator = @0xcafe)]
-    fun test_swap_resource(creator: &signer) acquires SomeStruct {
+    fun test_swap_resource(creator: &signer) {
         use std::signer;
         {
             move_to(creator, SomeStruct { f: 5, v: vector[6, 7] });
