@@ -136,6 +136,11 @@ struct K8sSwarm {
     enable_indexer: bool,
     #[clap(
         long,
+        help = "If set, deploys a public full node (PFN) alongside the testnet"
+    )]
+    enable_pfn: bool,
+    #[clap(
+        long,
         help = "The deployer profile used to spin up and configure forge infrastructure",
         default_value = &DEFAULT_FORGE_DEPLOYER_PROFILE,
     )]
@@ -205,6 +210,11 @@ struct Create {
         requires = "enable_indexer"
     )]
     indexer_image_tag: Option<String>,
+    #[clap(
+        long,
+        help = "If set, deploys a public full node (PFN) alongside the testnet"
+    )]
+    enable_pfn: bool,
     #[clap(
         long,
         help = "The deployer profile used to spin up and configure forge infrastructure",
@@ -318,6 +328,7 @@ fn main() -> Result<()> {
                             k8s.keep,
                             k8s.enable_haproxy,
                             k8s.enable_indexer,
+                            k8s.enable_pfn,
                             k8s.deployer_profile.clone(),
                         )?,
                     );
@@ -363,6 +374,14 @@ fn main() -> Result<()> {
                     },
                 }))?;
 
+                // Clone values needed by multiple deployer futures before they move
+                let pfn_kube_client = kube_client.clone();
+                let pfn_namespace = create.namespace.clone();
+                let pfn_era = era.clone();
+                let pfn_image_tag = create.validator_image_tag.clone();
+                let pfn_profile = create.deployer_profile.clone();
+                let enable_pfn = create.enable_pfn;
+
                 let deploy_testnet_fut = async {
                     install_testnet_resources(
                         era.clone(),
@@ -372,7 +391,7 @@ fn main() -> Result<()> {
                         create.validator_image_tag,
                         create.testnet_image_tag,
                         create.move_modules_dir,
-                        false, // since we skip_collecting_running_nodes, we don't connect directly to the nodes to validatet their health
+                        false, // since we skip_collecting_running_nodes, we don't connect directly to the nodes to validate their health
                         create.enable_haproxy,
                         create.enable_indexer,
                         create.deployer_profile,
@@ -400,7 +419,40 @@ fn main() -> Result<()> {
                 }
                 .boxed();
 
-                runtime.block_on(future::try_join(deploy_testnet_fut, deploy_indexer_fut))?;
+                let deploy_pfn_fut = async move {
+                    if enable_pfn {
+                        let genesis_bucket_path = format!(
+                            "{}/{}/{}",
+                            FORGE_GENESIS_SHARED_BUCKET, pfn_namespace, pfn_era
+                        );
+                        let pfn_config: Value = serde_json::from_value(json!({
+                            "profile": pfn_profile,
+                            "era": pfn_era,
+                            "namespace": pfn_namespace,
+                            "pfn-values": {
+                                "image": format!("{}:{}", VALIDATOR_DOCKER_IMAGE_REPO, &pfn_image_tag),
+                                "genesis_bucket_path": genesis_bucket_path,
+                            },
+                        }))?;
+                        let pfn_deployer = ForgeDeployerManager::new(
+                            pfn_kube_client,
+                            pfn_namespace.clone(),
+                            FORGE_PFN_DEPLOYER_DOCKER_IMAGE_REPO.to_string(),
+                            None,
+                        );
+                        pfn_deployer.start(pfn_config).await?;
+                        pfn_deployer.wait_completed().await
+                    } else {
+                        Ok(())
+                    }
+                }
+                .boxed();
+
+                runtime.block_on(future::try_join3(
+                    deploy_testnet_fut,
+                    deploy_indexer_fut,
+                    deploy_pfn_fut,
+                ))?;
                 Ok(())
             },
         },

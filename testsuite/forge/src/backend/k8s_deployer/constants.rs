@@ -5,6 +5,8 @@ pub const FORGE_INDEXER_DEPLOYER_DOCKER_IMAGE_REPO: &str =
     "us-docker.pkg.dev/aptos-registry/docker/forge-indexer-deployer";
 pub const FORGE_TESTNET_DEPLOYER_DOCKER_IMAGE_REPO: &str =
     "us-docker.pkg.dev/aptos-registry/docker/forge-testnet-deployer";
+pub const FORGE_PFN_DEPLOYER_DOCKER_IMAGE_REPO: &str =
+    "us-docker.pkg.dev/aptos-registry/docker/forge-pfn-deployer";
 pub const VALIDATOR_DOCKER_IMAGE_REPO: &str = "us-docker.pkg.dev/aptos-registry/docker/validator";
 pub const INDEXER_GRPC_DOCKER_IMAGE_REPO: &str =
     "us-docker.pkg.dev/aptos-registry/docker/indexer-grpc";
@@ -19,3 +21,5 @@ pub const FORGE_DEPLOYER_SERVICE_ACCOUNT_NAME: &str = "forge";
 pub const FORGE_DEPLOYER_VALUES_ENV_VAR_NAME: &str = "FORGE_DEPLOY_VALUES_JSON";
 
 pub const DEFAULT_FORGE_DEPLOYER_PROFILE: &str = "forge";
+
+pub const FORGE_GENESIS_SHARED_BUCKET: &str = "gs://aptos-forge-shared-genesis-bucket/genesis";
