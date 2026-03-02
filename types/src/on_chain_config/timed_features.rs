@@ -213,7 +213,7 @@ impl TimedFeatureFlag {
                 .with_timezone(&Utc),
 
             (RevisedBoundsInProdConfig, TESTNET) => Los_Angeles
-                .with_ymd_and_hms(2026, 3, 3, 12, 0, 0)
+                .with_ymd_and_hms(2026, 3, 3, 21, 0, 0)
                 .unwrap()
                 .with_timezone(&Utc),
             (RevisedBoundsInProdConfig, MAINNET) => Los_Angeles
