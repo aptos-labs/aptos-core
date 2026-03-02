@@ -1216,18 +1216,11 @@ impl StateValueWriter<StateKey, StateValue> for StateStore {
             &DbMetadataValue::StateSnapshotProgress(progress),
         )?;
 
-        if self.internal_indexer_db.is_some()
-            && self
-                .internal_indexer_db
-                .as_ref()
-                .unwrap()
-                .statekeys_enabled()
+        if let Some(internal_indexer_db) = self.internal_indexer_db.as_ref()
+            && internal_indexer_db.statekeys_enabled()
         {
             let keys = node_batch.keys().map(|key| key.0.clone()).collect();
-            self.internal_indexer_db
-                .as_ref()
-                .unwrap()
-                .write_keys_to_indexer_db(&keys, version, progress)?;
+            internal_indexer_db.write_keys_to_indexer_db(&keys, version, progress)?;
         }
         self.shard_state_value_batch(&mut sharded_schema_batch, node_batch)?;
         self.state_kv_db
@@ -1278,18 +1271,10 @@ impl StateValueWriter<StateKey, StateValue> for StateStore {
             .map(|v| v.expect_state_snapshot_progress());
 
         // verify if internal indexer db and main db are consistent before starting the restore
-        if self.internal_indexer_db.is_some()
-            && self
-                .internal_indexer_db
-                .as_ref()
-                .unwrap()
-                .statekeys_enabled()
+        if let Some(internal_indexer_db) = self.internal_indexer_db.as_ref()
+            && internal_indexer_db.statekeys_enabled()
         {
-            let progress_opt = self
-                .internal_indexer_db
-                .as_ref()
-                .unwrap()
-                .get_restore_progress(version)?;
+            let progress_opt = internal_indexer_db.get_restore_progress(version)?;
 
             match (main_db_progress, progress_opt) {
                 (None, None) => (),
