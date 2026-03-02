@@ -203,7 +203,8 @@ fn compute_batched_lifted_degree_quotient<P: Pairing>(
     (UniPoly::from_coefficients_vec(q_hat), 1 << (num_vars - 1))
 }
 
-fn eval_and_quotient_scalars<P: Pairing>(
+/// Used by Dekart multivariate verifier to replay Zeromorph and form zeta_z_com.
+pub(crate) fn eval_and_quotient_scalars<P: Pairing>(
     y_challenge: P::ScalarField,
     x_challenge: P::ScalarField,
     z_challenge: P::ScalarField,

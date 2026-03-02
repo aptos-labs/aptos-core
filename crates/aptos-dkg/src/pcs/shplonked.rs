@@ -737,11 +737,11 @@ where
         .map(|set| set.all_points().cloned().collect())
         .collect();
     let c_powers = powers(c, n);
-    let (z_S_val, alphas) = compute_weights::<E>(&z_S, &s_per_poly, x, &c_powers);
+    let (z_S_val, weights) = compute_weights::<E>(&z_S, &s_per_poly, x, &c_powers);
 
     let commitment_refs: Vec<&MsmInput<E::G1Affine, E::ScalarField>> =
         commitment_msms.iter().collect();
-    let merged = merge_scaled_msm_terms::<E::G1>(&commitment_refs, &alphas);
+    let merged = merge_scaled_msm_terms::<E::G1>(&commitment_refs, &weights);
 
     let msm_pi1 = MsmInput::new(vec![*pi_1], vec![-z_S_val]).expect("MSM pi_1");
     let merged_minus_pi1 = merge_scaled_msm_terms::<E::G1>(&[&merged, &msm_pi1], &[
@@ -751,7 +751,7 @@ where
 
     let h: usize = sigma_proof.z_yi.iter().map(|v| v.len()).sum();
     let com_y_hom = shplonked_sigma::com_y_hom(&srs.taus_1[..h], srs.xi_1);
-    // One weight per polynomial: alphas from compute_weights. Lagrange at x: evaluate cached basis polys at x (Horner).
+    // One weight per polynomial. Lagrange at x: evaluate cached basis polys at x (Horner).
     let (canonical, lagrange_cache) = build_lagrange_cache(&s_per_poly);
     let lagrange_at_x: Vec<Vec<E::ScalarField>> = (0..n)
         .map(|j| {
@@ -765,7 +765,7 @@ where
     let eval_point_commit_hom = shplonked_sigma::EvalPointCommitHom::new(
         srs.taus_1[0],
         srs.xi_1,
-        alphas.clone(),
+        weights.clone(),
         lagrange_at_x,
     );
     let first_tuple_hom = shplonked_sigma::FirstTupleHom::<E> {

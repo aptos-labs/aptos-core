@@ -38,7 +38,7 @@ pub mod pcs;
 pub mod pvss;
 pub mod range_proofs;
 pub mod sigma_protocol;
-//pub mod sumcheck;
+pub mod sumcheck;
 pub mod utils;
 pub mod weighted_vuf;
 

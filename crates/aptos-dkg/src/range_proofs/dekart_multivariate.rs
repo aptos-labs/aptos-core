@@ -2,7 +2,7 @@
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 use crate::pcs::shplonked;
-use crate::pcs::zeromorph::{Zeromorph, ZeromorphProverKey};
+use crate::pcs::zeromorph::{eval_and_quotient_scalars, Zeromorph, ZeromorphProverKey};
 use super::scalars_to_bits;
 use crate::{
     fiat_shamir::PolynomialCommitmentScheme,
@@ -88,18 +88,22 @@ pub struct Proof<E: Pairing> {
     pub sumcheck_proof: Vec<ProverMsg<E::ScalarField>>,
     /// Single batched opening proof for f̂ and g_1..g_m (per spec Step 7: one uPCS.BatchVerify)
     pub zk_pcs_opening_proof: ZkPcsOpeningProof<E>,
+    /// mPCS.ReduceToUnivariate (Zeromorph) quotient commitments, so verifier can replay and form zeta_z_com
+    pub zeromorph_q_hat_com: E::G1Affine,
+    pub zeromorph_q_k_com: Vec<E::G1Affine>,
     pub commitments: Vec<E::G1Affine>,
     pub g_commitments: Vec<E::G1Affine>,
     pub h_g: E::ScalarField,
     /// y_g = sum_i g_i(x_i), used in Step 5 check
     pub y_g: E::ScalarField,
-    /// Batched evaluation f̂(z) at the opening point z (so verifier can check y_sum == y_batched_at_z + y_g)
+    /// For Zeromorph reduction: f̂(x) is proved via batched univariate that vanishes at x_challenge, so y_batched_at_z = 0
     pub y_batched_at_z: E::ScalarField,
     pub evals: Vec<E::ScalarField>,
 }
 
 impl<E: Pairing> traits::BatchedRangeProof<E> for Proof<E> {
     type Commitment = univariate_hiding_kzg::Commitment<E>;
+    type CommitmentNormalised = univariate_hiding_kzg::CommitmentNormalised<E>;
     type CommitmentKey = univariate_hiding_kzg::CommitmentKey<E>;
     type CommitmentRandomness = univariate_hiding_kzg::CommitmentRandomness<E::ScalarField>;
     type Input = E::ScalarField;
@@ -334,16 +338,37 @@ impl<E: Pairing> traits::BatchedRangeProof<E> for Proof<E> {
 
         let hat_c_powers = powers(hat_c, ell as usize + 1);
 
-        // Prover drew the opening point z before zk_pcs_open; consume it so transcript matches.
-        let z: E::ScalarField = trs.challenge_scalar();
+        // Replay mPCS.ReduceToUnivariate (Zeromorph) to get x_challenge and form zeta_z_com.
+        trs.append_sep(Zeromorph::protocol_name());
+        for c in &self.zeromorph_q_k_com {
+            trs.append_point(c);
+        }
+        let y_challenge: E::ScalarField = trs.challenge_scalar();
+        trs.append_point(&self.zeromorph_q_hat_com);
+        let x_challenge: E::ScalarField = trs.challenge_scalar();
+        let z_challenge: E::ScalarField = trs.challenge_scalar();
+
         anyhow::ensure!(
-            z == self.zk_pcs_opening_proof.eval_points[0],
-            "Batched opening: transcript opening point z does not match proof.eval_points[0]"
+            self.zk_pcs_opening_proof.eval_points[0] == x_challenge,
+            "Batched opening: first eval point must equal Zeromorph x_challenge"
         );
 
-        // Step 4d (spec): single uPCS.BatchVerify for f̂ and g_1..g_m (one zk_pcs_verify call).
-        // Pass combined commitment as one MsmInput (comm + optional blinding + commitments*hat_c^i);
-        // zk_pcs_verify merges it with g_commitment_msms and does one batched MSM.
+        let batched_eval = self.evals[0]
+            + self.evals[1..=ell as usize]
+                .iter()
+                .enumerate()
+                .map(|(j, &y_j)| hat_c_powers[j + 1] * y_j)
+                .sum::<E::ScalarField>();
+
+        let x = &subclaim.point;
+        let point_reversed: Vec<E::ScalarField> = x.iter().rev().cloned().collect();
+        let (eval_scalar, (mut q_scalars, zmpoly_q_scalars)) =
+            eval_and_quotient_scalars::<E>(y_challenge, x_challenge, z_challenge, &point_reversed);
+        q_scalars
+            .iter_mut()
+            .zip(zmpoly_q_scalars)
+            .for_each(|(s, zm)| *s += zm);
+
         let mut combined_bases = vec![comm.0.into_affine()];
         let mut combined_scalars = vec![E::ScalarField::ONE];
         if let Some(ref bc) = self.blinding_poly_comm {
@@ -352,9 +377,31 @@ impl<E: Pairing> traits::BatchedRangeProof<E> for Proof<E> {
         }
         combined_bases.extend(self.commitments.iter().copied());
         combined_scalars.extend(hat_c_powers.iter().skip(1).copied());
-        let combined_comm_msm =
-            MsmInput::new(combined_bases, combined_scalars).expect("combined commitment MSM input");
+        let combined_comm = E::G1::msm(&combined_bases, &combined_scalars)
+            .expect("combined commitment MSM");
 
+        let scalars: Vec<E::ScalarField> = [
+            vec![
+                E::ScalarField::ONE,
+                z_challenge,
+                eval_scalar * batched_eval,
+            ],
+            q_scalars,
+        ]
+        .concat();
+        let mut zeta_bases = vec![
+            self.zeromorph_q_hat_com,
+            combined_comm.into_affine(),
+            vk.vk_hkzg.group_generators.g1,
+        ];
+        zeta_bases.extend(self.zeromorph_q_k_com.iter().copied());
+        let zeta_z_com = E::G1::msm(&zeta_bases, &scalars)
+            .expect("Zeromorph zeta_z MSM")
+            .into_affine();
+
+        // Step 4d (spec): single uPCS.BatchVerify; first commitment is Zeromorph-reduced (zeta_z_com), then g_i.
+        let zeromorph_msm =
+            MsmInput::new(vec![zeta_z_com], vec![E::ScalarField::ONE]).expect("zeta_z MSM input");
         let g_commitment_msms: Vec<MsmInput<E::G1Affine, E::ScalarField>> = self
             .g_commitments
             .iter()
@@ -363,7 +410,7 @@ impl<E: Pairing> traits::BatchedRangeProof<E> for Proof<E> {
             })
             .collect();
         let commitment_msms: Vec<MsmInput<E::G1Affine, E::ScalarField>> =
-            once(combined_comm_msm).chain(g_commitment_msms).collect();
+            once(zeromorph_msm).chain(g_commitment_msms).collect();
 
         // y_sum in the opening proof must equal y_batched_at_z (f̂(z)) + y_g (sum of g_i at x_i)
         anyhow::ensure!(
@@ -432,6 +479,7 @@ pub fn prove_impl<E: Pairing, R: RngCore + CryptoRng>(
 
     #[cfg(feature = "range_proof_timing_multivariate")]
     let start = Instant::now();
+    // Step 2 (optional)
     let (beta, comm_blinding_poly, comm_blinding_poly_rand, beta_sigma_proof) = if use_blinding {
         let last_msm_elt = tau_powers.last().expect("PowersOfTau SRS has no elements");
         let (b, c, r, proof): (
@@ -455,7 +503,7 @@ pub fn prove_impl<E: Pairing, R: RngCore + CryptoRng>(
 
     #[cfg(feature = "range_proof_timing_multivariate")]
     let start = Instant::now();
-    // Step 3a: construct the f_js
+    // Step 3a: construct the bits for the f_js
     let bits = scalars_to_bits::scalars_to_bits_le(values, ell);
     let f_j_evals_without_r = scalars_to_bits::transpose_bit_matrix(&bits);
 
@@ -463,8 +511,8 @@ pub fn prove_impl<E: Pairing, R: RngCore + CryptoRng>(
     let betas: Vec<E::ScalarField> = sample_field_elements(ell as usize, rng);
 
     // Step 3c: Construct f_j
-    let num_vars = (values.len() + 1).next_power_of_two().ilog2() as u8;
-    let size = 1 << num_vars;
+    let size = (values.len() + 1).next_power_of_two();
+    let num_vars = size.ilog2() as u8;
     let f_j_evals: Vec<Vec<E::ScalarField>> = f_j_evals_without_r
         .iter()
         .enumerate()
@@ -549,28 +597,16 @@ pub fn prove_impl<E: Pairing, R: RngCore + CryptoRng>(
 
     #[cfg(feature = "range_proof_timing_multivariate")]
     let start = Instant::now();
-    // Step 4b: // TODO: maybe combine with 3f
+    // Step 4b: // TODO: maybe combine with 3f for better batching
     g_j_comms.iter().for_each(|g_j_comm| {
         trs.append_point(g_j_comm);
     });
-    {
-        let mut buf = Vec::new();
-        H_g.serialize_compressed(&mut buf).expect("serialize H_g");
-        trs.append_message(b"H_g", &buf);
-    }
+    let mut buf = Vec::new();
+    H_g.serialize_compressed(&mut buf).expect("serialize H_g");
+    trs.append_message(b"H_g", &buf);
     #[cfg(feature = "range_proof_timing_multivariate")]
     print_cumulative("transcript append g_comm + H_g", start.elapsed());
 
-    #[cfg(feature = "range_proof_timing_multivariate")]
-    let start = Instant::now();
-    let size = 1 << num_vars;
-    let mut f_evals = vec![E::ScalarField::ZERO; size];
-    f_evals[0] = beta;
-    for (i, &v) in values.iter().enumerate() {
-        f_evals[i + 1] = v;
-    }
-    #[cfg(feature = "range_proof_timing_multivariate")]
-    print_cumulative("f_evals construction", start.elapsed());
 
     #[cfg(feature = "range_proof_timing_multivariate")]
     let start = Instant::now();
@@ -579,6 +615,17 @@ pub fn prove_impl<E: Pairing, R: RngCore + CryptoRng>(
     let alpha: E::ScalarField = trs.challenge_scalar::<E::ScalarField>();
     #[cfg(feature = "range_proof_timing_multivariate")]
     print_cumulative("transcript challenges (c, alpha)", start.elapsed());
+
+
+    #[cfg(feature = "range_proof_timing_multivariate")]
+    let start = Instant::now();
+    let mut f_evals = vec![E::ScalarField::ZERO; size];
+    f_evals[0] = beta;
+    for (i, &v) in values.iter().enumerate() {
+        f_evals[i + 1] = v;
+    }
+    #[cfg(feature = "range_proof_timing_multivariate")]
+    print_cumulative("f_evals construction", start.elapsed());
 
     // TODO: define hat(f) hier ipv in zkzc_send_polys()
     #[cfg(feature = "range_proof_timing_multivariate")]
@@ -694,24 +741,26 @@ pub fn prove_impl<E: Pairing, R: RngCore + CryptoRng>(
     //     E::G1::msm(&bases, &scalars).expect("batched commitment MSM")
     // };
 
-    // TODO: waar is zeromorph???
-
     let mut batched_randomness = rho.0 + comm_blinding_poly_rand.unwrap_or(E::ScalarField::ZERO);
     for (j, &r_j) in f_j_comms_randomness.iter().enumerate() {
         batched_randomness += hat_c_powers[j + 1] * r_j;
     }
 
-    let batched_poly = DenseMultilinearExtension::from_evaluations_vec(num_vars.into(), batched_evals.clone());
-    let mut batched_eval = y_f;
-    for (j, y_j) in y_js.iter().enumerate() {
-        batched_eval += hat_c_powers[j + 1] * y_j;
-    }
-
+    // Step 6g (spec): mPCS.ReduceToUnivariate(x, f̂, ρ̂) = Zeromorph::open_to_batched_instance.
+    // Produces batched univariate poly that vanishes at x_challenge; we then batch it with g_i in Step 7.
+    let batched_poly =
+        DenseMultilinearExtension::from_evaluations_vec(num_vars.into(), batched_evals.clone());
+    let batched_eval = y_f
+        + y_js
+            .iter()
+            .enumerate()
+            .map(|(j, &y_j)| hat_c_powers[j + 1] * y_j)
+            .sum::<E::ScalarField>();
     let zeromorph_pp = ZeromorphProverKey::<E> {
         hiding_kzg_pp: pk.ck.clone(),
         open_offset: 0,
     };
-    let batched_opening = Zeromorph::open_to_batched_instance(
+    let (batched_instance, q_hat_com, q_k_com) = Zeromorph::open_to_batched_instance(
         &zeromorph_pp,
         &batched_poly,
         &xs,
@@ -723,13 +772,14 @@ pub fn prove_impl<E: Pairing, R: RngCore + CryptoRng>(
 
     #[cfg(feature = "range_proof_timing_multivariate")]
     let start = Instant::now();
-    // Step 7 (spec): single batched opening proof for f̂ at z and g_i at rho_i (uPCS.BatchOpen)
-    let mut all_f_is = vec![batched_evals];
+    // Step 7 (spec): batch open Zeromorph reduced poly at x_challenge (eval 0) and g_i at x_i
+    let mut all_f_is = vec![batched_instance.f_coeffs];
     all_f_is.extend(g_is);
-    let eval_points: Vec<E::ScalarField> = once(z).chain(xs.iter().copied()).collect();
-    let mut all_evals = vec![y];
+    let eval_points: Vec<E::ScalarField> =
+        once(batched_instance.x).chain(xs.iter().copied()).collect();
+    let mut all_evals = vec![E::ScalarField::ZERO]; // batched poly vanishes at x_challenge // TODO: does it??
     all_evals.extend(g_evals.iter().copied());
-    let mut all_rs = vec![batched_randomness];
+    let mut all_rs = vec![batched_instance.rho];
     all_rs.extend(g_comm_randomnesses.iter().copied());
     #[cfg(feature = "range_proof_timing_multivariate")]
     print_cumulative(
@@ -737,16 +787,27 @@ pub fn prove_impl<E: Pairing, R: RngCore + CryptoRng>(
         start.elapsed(),
     );
 
+    // First poly (Zeromorph): eval 0 at x_challenge is revealed. Rest (g_i at x_i) stay hidden.
     let sets: Vec<EvaluationSet<E::ScalarField>> = eval_points
         .iter()
-        .map(|&z| EvaluationSet {
-            rev: vec![],
-            hid: vec![z],
+        .enumerate()
+        .map(|(i, &pt)| {
+            if i == 0 {
+                EvaluationSet {
+                    rev: vec![pt],
+                    hid: vec![],
+                }
+            } else {
+                EvaluationSet {
+                    rev: vec![],
+                    hid: vec![pt],
+                }
+            }
         })
         .collect();
     let polys: Vec<DensePolynomial<E::ScalarField>> = all_f_is
         .iter()
-        .map(|c| DensePolynomial::from_coefficients_vec(c.clone()))
+        .map(|coeffs| DensePolynomial::from_coefficients_vec(coeffs.clone()))
         .collect();
     #[cfg(feature = "range_proof_timing_multivariate")]
     let start = Instant::now();
@@ -779,11 +840,13 @@ pub fn prove_impl<E: Pairing, R: RngCore + CryptoRng>(
         asserted_sum,
         sumcheck_proof: sumcheck_proof.0,
         zk_pcs_opening_proof,
+        zeromorph_q_hat_com: q_hat_com.0.into_affine(),
+        zeromorph_q_k_com: q_k_com.iter().map(|c| c.0.into_affine()).collect(),
         commitments,
         g_commitments,
         h_g: H_g,
         y_g,
-        y_batched_at_z: y,
+        y_batched_at_z: E::ScalarField::ZERO, // Zeromorph proves f̂(x)=batched_eval via poly that vanishes at x
         evals,
     }
 }
@@ -1254,7 +1317,12 @@ mod tests {
         let (comm, r) = <Proof<E> as traits::BatchedRangeProof<E>>::commit(&ck, &values, &mut rng);
 
         let proof = <Proof<E> as traits::BatchedRangeProof<E>>::prove(
-            &pk, &values, max_ell, &comm, &r, &mut rng,
+            &pk,
+            &values,
+            max_ell,
+            &comm.clone().into(),
+            &r,
+            &mut rng,
         );
 
         // Assert proof structure
