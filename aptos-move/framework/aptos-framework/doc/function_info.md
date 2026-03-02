@@ -194,7 +194,7 @@ dispatch_target also needs to be public so the type signature will remain unchan
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="function_info.md#0x1_function_info_check_dispatch_type_compatibility">check_dispatch_type_compatibility</a>(
+<pre><code><b>friend</b> <b>fun</b> <a href="function_info.md#0x1_function_info_check_dispatch_type_compatibility">check_dispatch_type_compatibility</a>(
     framework_function: &<a href="function_info.md#0x1_function_info_FunctionInfo">FunctionInfo</a>,
     dispatch_target: &<a href="function_info.md#0x1_function_info_FunctionInfo">FunctionInfo</a>,
 ): bool {
@@ -231,7 +231,7 @@ if such module isn't accessed previously in the transaction.
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="function_info.md#0x1_function_info_load_module_from_function">load_module_from_function</a>(f: &<a href="function_info.md#0x1_function_info_FunctionInfo">FunctionInfo</a>) {
+<pre><code><b>friend</b> <b>fun</b> <a href="function_info.md#0x1_function_info_load_module_from_function">load_module_from_function</a>(f: &<a href="function_info.md#0x1_function_info_FunctionInfo">FunctionInfo</a>) {
     <a href="function_info.md#0x1_function_info_load_function_impl">load_function_impl</a>(f)
 }
 </code></pre>

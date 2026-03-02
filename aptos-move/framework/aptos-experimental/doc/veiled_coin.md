@@ -646,7 +646,7 @@ Sends a *public* <code>amount</code> of normal coins from <code>sender</code> to
 
 <pre><code><b>public</b> entry <b>fun</b> <a href="veiled_coin.md#0x7_veiled_coin_veil_to">veil_to</a>&lt;CoinType&gt;(
     sender: &<a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, recipient: <b>address</b>, amount: u32
-) <b>acquires</b> <a href="veiled_coin.md#0x7_veiled_coin_VeiledCoinMinter">VeiledCoinMinter</a>, <a href="veiled_coin.md#0x7_veiled_coin_VeiledCoinStore">VeiledCoinStore</a> {
+) {
     <b>let</b> c = <a href="../../aptos-framework/doc/coin.md#0x1_coin_withdraw">coin::withdraw</a>&lt;CoinType&gt;(sender, <a href="veiled_coin.md#0x7_veiled_coin_cast_u32_to_u64_amount">cast_u32_to_u64_amount</a>(amount));
 
     <b>let</b> vc = <a href="veiled_coin.md#0x7_veiled_coin_veiled_mint_from_coin">veiled_mint_from_coin</a>(c);
@@ -681,7 +681,7 @@ This function can be used by the <code>owner</code> to initialize his veiled bal
 
 <pre><code><b>public</b> entry <b>fun</b> <a href="veiled_coin.md#0x7_veiled_coin_veil">veil</a>&lt;CoinType&gt;(
     owner: &<a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, amount: u32
-) <b>acquires</b> <a href="veiled_coin.md#0x7_veiled_coin_VeiledCoinMinter">VeiledCoinMinter</a>, <a href="veiled_coin.md#0x7_veiled_coin_VeiledCoinStore">VeiledCoinStore</a> {
+) {
     <a href="veiled_coin.md#0x7_veiled_coin_veil_to">veil_to</a>&lt;CoinType&gt;(owner, <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(owner), amount)
 }
 </code></pre>
@@ -719,7 +719,7 @@ No ZK range proof is necessary for the <code>amount</code>, which is given as a 
     comm_new_balance: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;,
     zkrp_new_balance: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;,
     withdraw_subproof: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;
-) <b>acquires</b> <a href="veiled_coin.md#0x7_veiled_coin_VeiledCoinStore">VeiledCoinStore</a>, <a href="veiled_coin.md#0x7_veiled_coin_VeiledCoinMinter">VeiledCoinMinter</a> {
+) {
     // Deserialize all the proofs into their proper Move structs
     <b>let</b> comm_new_balance = pedersen::new_commitment_from_bytes(comm_new_balance);
     <b>assert</b>!(
@@ -779,7 +779,7 @@ Like <code>unveil_to</code>, except the <code>sender</code> is also the recipien
     comm_new_balance: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;,
     zkrp_new_balance: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;,
     withdraw_subproof: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;
-) <b>acquires</b> <a href="veiled_coin.md#0x7_veiled_coin_VeiledCoinStore">VeiledCoinStore</a>, <a href="veiled_coin.md#0x7_veiled_coin_VeiledCoinMinter">VeiledCoinMinter</a> {
+) {
     <a href="veiled_coin.md#0x7_veiled_coin_unveil_to">unveil_to</a>&lt;CoinType&gt;(
         sender,
         <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(sender),
@@ -835,7 +835,7 @@ as in 'deposit_ct' (with the same randomness) and as in <code>comm_amount</code>
     zkrp_new_balance: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;,
     zkrp_amount: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;,
     transfer_subproof: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;
-) <b>acquires</b> <a href="veiled_coin.md#0x7_veiled_coin_VeiledCoinStore">VeiledCoinStore</a> {
+) {
     // Deserialize everything into their proper Move structs
     <b>let</b> veiled_withdraw_amount = elgamal::new_ciphertext_from_bytes(withdraw_ct);
     <b>assert</b>!(
@@ -1018,13 +1018,13 @@ Returns the ElGamal encryption of the veiled balance of <code>owner</code> for t
 
 <pre><code><b>public</b> <b>fun</b> <a href="veiled_coin.md#0x7_veiled_coin_veiled_balance">veiled_balance</a>&lt;CoinType&gt;(
     owner: <b>address</b>
-): elgamal::CompressedCiphertext <b>acquires</b> <a href="veiled_coin.md#0x7_veiled_coin_VeiledCoinStore">VeiledCoinStore</a> {
+): elgamal::CompressedCiphertext {
     <b>assert</b>!(
         <a href="veiled_coin.md#0x7_veiled_coin_has_veiled_coin_store">has_veiled_coin_store</a>&lt;CoinType&gt;(owner),
         <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_not_found">error::not_found</a>(<a href="veiled_coin.md#0x7_veiled_coin_EVEILED_COIN_STORE_NOT_PUBLISHED">EVEILED_COIN_STORE_NOT_PUBLISHED</a>)
     );
 
-    <b>borrow_global</b>&lt;<a href="veiled_coin.md#0x7_veiled_coin_VeiledCoinStore">VeiledCoinStore</a>&lt;CoinType&gt;&gt;(owner).veiled_balance
+    <a href="veiled_coin.md#0x7_veiled_coin_VeiledCoinStore">VeiledCoinStore</a>&lt;CoinType&gt;[owner].veiled_balance
 }
 </code></pre>
 
@@ -1050,13 +1050,13 @@ Given an address <code>addr</code>, returns the ElGamal encryption public key as
 
 <pre><code><b>public</b> <b>fun</b> <a href="veiled_coin.md#0x7_veiled_coin_encryption_public_key">encryption_public_key</a>&lt;CoinType&gt;(
     addr: <b>address</b>
-): elgamal::CompressedPubkey <b>acquires</b> <a href="veiled_coin.md#0x7_veiled_coin_VeiledCoinStore">VeiledCoinStore</a> {
+): elgamal::CompressedPubkey {
     <b>assert</b>!(
         <a href="veiled_coin.md#0x7_veiled_coin_has_veiled_coin_store">has_veiled_coin_store</a>&lt;CoinType&gt;(addr),
         <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_not_found">error::not_found</a>(<a href="veiled_coin.md#0x7_veiled_coin_EVEILED_COIN_STORE_NOT_PUBLISHED">EVEILED_COIN_STORE_NOT_PUBLISHED</a>)
     );
 
-    <b>borrow_global</b>&lt;<a href="veiled_coin.md#0x7_veiled_coin_VeiledCoinStore">VeiledCoinStore</a>&lt;CoinType&gt;&gt;(addr).pk
+    <a href="veiled_coin.md#0x7_veiled_coin_VeiledCoinStore">VeiledCoinStore</a>&lt;CoinType&gt;[addr].pk
 }
 </code></pre>
 
@@ -1080,7 +1080,7 @@ Returns the total supply of veiled coins
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="veiled_coin.md#0x7_veiled_coin_total_veiled_coins">total_veiled_coins</a>&lt;CoinType&gt;(): u64 <b>acquires</b> <a href="veiled_coin.md#0x7_veiled_coin_VeiledCoinMinter">VeiledCoinMinter</a> {
+<pre><code><b>public</b> <b>fun</b> <a href="veiled_coin.md#0x7_veiled_coin_total_veiled_coins">total_veiled_coins</a>&lt;CoinType&gt;(): u64 {
     <b>let</b> rsrc_acc_addr = <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(&<a href="veiled_coin.md#0x7_veiled_coin_get_resource_account_signer">get_resource_account_signer</a>());
     <b>assert</b>!(<a href="../../aptos-framework/doc/coin.md#0x1_coin_is_account_registered">coin::is_account_registered</a>&lt;CoinType&gt;(rsrc_acc_addr), <a href="veiled_coin.md#0x7_veiled_coin_EINTERNAL_ERROR">EINTERNAL_ERROR</a>);
 
@@ -1203,7 +1203,7 @@ Deposits a veiled <code><a href="../../aptos-framework/doc/coin.md#0x1_coin">coi
 
 <pre><code><b>public</b> <b>fun</b> <a href="veiled_coin.md#0x7_veiled_coin_veiled_deposit">veiled_deposit</a>&lt;CoinType&gt;(
     to_addr: <b>address</b>, <a href="../../aptos-framework/doc/coin.md#0x1_coin">coin</a>: <a href="veiled_coin.md#0x7_veiled_coin_VeiledCoin">VeiledCoin</a>&lt;CoinType&gt;
-) <b>acquires</b> <a href="veiled_coin.md#0x7_veiled_coin_VeiledCoinStore">VeiledCoinStore</a> {
+) {
     <b>assert</b>!(
         <a href="veiled_coin.md#0x7_veiled_coin_has_veiled_coin_store">has_veiled_coin_store</a>&lt;CoinType&gt;(to_addr),
         <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_not_found">error::not_found</a>(<a href="veiled_coin.md#0x7_veiled_coin_EVEILED_COIN_STORE_NOT_PUBLISHED">EVEILED_COIN_STORE_NOT_PUBLISHED</a>)
@@ -1255,7 +1255,7 @@ Like <code>unveil_to</code>, except the proofs have been deserialized into type-
     amount: u32,
     comm_new_balance: pedersen::Commitment,
     withdrawal_proof: <a href="veiled_coin.md#0x7_veiled_coin_WithdrawalProof">WithdrawalProof</a>
-) <b>acquires</b> <a href="veiled_coin.md#0x7_veiled_coin_VeiledCoinStore">VeiledCoinStore</a>, <a href="veiled_coin.md#0x7_veiled_coin_VeiledCoinMinter">VeiledCoinMinter</a> {
+) {
     <b>let</b> addr = <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(sender);
     <b>assert</b>!(
         <a href="veiled_coin.md#0x7_veiled_coin_has_veiled_coin_store">has_veiled_coin_store</a>&lt;CoinType&gt;(addr),
@@ -1339,7 +1339,7 @@ Like <code>fully_veiled_transfer</code>, except the ciphertext and proofs have b
     comm_new_balance: pedersen::Commitment,
     comm_amount: pedersen::Commitment,
     transfer_proof: &<a href="veiled_coin.md#0x7_veiled_coin_TransferProof">TransferProof</a>
-) <b>acquires</b> <a href="veiled_coin.md#0x7_veiled_coin_VeiledCoinStore">VeiledCoinStore</a> {
+) {
     <b>let</b> sender_addr = <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(sender);
 
     <b>let</b> sender_pk = <a href="veiled_coin.md#0x7_veiled_coin_encryption_public_key">encryption_public_key</a>&lt;CoinType&gt;(sender_addr);
@@ -1493,9 +1493,9 @@ Returns a signer for the resource account storing all the normal coins that have
 <summary>Implementation</summary>
 
 
-<pre><code><b>fun</b> <a href="veiled_coin.md#0x7_veiled_coin_get_resource_account_signer">get_resource_account_signer</a>(): <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a> <b>acquires</b> <a href="veiled_coin.md#0x7_veiled_coin_VeiledCoinMinter">VeiledCoinMinter</a> {
+<pre><code><b>fun</b> <a href="veiled_coin.md#0x7_veiled_coin_get_resource_account_signer">get_resource_account_signer</a>(): <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a> {
     <a href="../../aptos-framework/doc/account.md#0x1_account_create_signer_with_capability">account::create_signer_with_capability</a>(
-        &<b>borrow_global</b>&lt;<a href="veiled_coin.md#0x7_veiled_coin_VeiledCoinMinter">VeiledCoinMinter</a>&gt;(@aptos_experimental).signer_cap
+        &<a href="veiled_coin.md#0x7_veiled_coin_VeiledCoinMinter">VeiledCoinMinter</a>[@aptos_experimental].signer_cap
     )
 }
 </code></pre>
@@ -1524,7 +1524,7 @@ Mints a veiled coin from a normal coin, shelving the normal coin into the resour
 
 <pre><code><b>fun</b> <a href="veiled_coin.md#0x7_veiled_coin_veiled_mint_from_coin">veiled_mint_from_coin</a>&lt;CoinType&gt;(
     c: Coin&lt;CoinType&gt;
-): <a href="veiled_coin.md#0x7_veiled_coin_VeiledCoin">VeiledCoin</a>&lt;CoinType&gt; <b>acquires</b> <a href="veiled_coin.md#0x7_veiled_coin_VeiledCoinMinter">VeiledCoinMinter</a> {
+): <a href="veiled_coin.md#0x7_veiled_coin_VeiledCoin">VeiledCoin</a>&lt;CoinType&gt; {
     // If there is no `<a href="../../aptos-framework/doc/coin.md#0x1_coin_CoinStore">coin::CoinStore</a>&lt;CoinType&gt;` in the resource <a href="../../aptos-framework/doc/account.md#0x1_account">account</a>, create one.
     <b>let</b> rsrc_acc_signer = <a href="veiled_coin.md#0x7_veiled_coin_get_resource_account_signer">get_resource_account_signer</a>();
     <b>let</b> rsrc_acc_addr = <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(&rsrc_acc_signer);

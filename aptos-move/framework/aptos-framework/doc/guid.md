@@ -127,7 +127,7 @@ Create and return a new GUID from a trusted module.
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="guid.md#0x1_guid_create">create</a>(addr: <b>address</b>, creation_num_ref: &<b>mut</b> u64): <a href="guid.md#0x1_guid_GUID">GUID</a> {
+<pre><code><b>friend</b> <b>fun</b> <a href="guid.md#0x1_guid_create">create</a>(addr: <b>address</b>, creation_num_ref: &<b>mut</b> u64): <a href="guid.md#0x1_guid_GUID">GUID</a> {
     <b>let</b> creation_num = *creation_num_ref;
     *creation_num_ref = creation_num + 1;
     <a href="guid.md#0x1_guid_GUID">GUID</a> {

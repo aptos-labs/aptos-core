@@ -247,15 +247,15 @@ Invoked in block prologues to update the block-level randomness seed.
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="randomness.md#0x1_randomness_on_new_block">on_new_block</a>(
+<pre><code><b>friend</b> <b>fun</b> <a href="randomness.md#0x1_randomness_on_new_block">on_new_block</a>(
     vm: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>,
     epoch: u64,
     round: u64,
     seed_for_new_block: Option&lt;<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;&gt;
-) <b>acquires</b> <a href="randomness.md#0x1_randomness_PerBlockRandomness">PerBlockRandomness</a> {
+) {
     <a href="system_addresses.md#0x1_system_addresses_assert_vm">system_addresses::assert_vm</a>(vm);
     <b>if</b> (<b>exists</b>&lt;<a href="randomness.md#0x1_randomness_PerBlockRandomness">PerBlockRandomness</a>&gt;(@aptos_framework)) {
-        <b>let</b> <a href="randomness.md#0x1_randomness">randomness</a> = <b>borrow_global_mut</b>&lt;<a href="randomness.md#0x1_randomness_PerBlockRandomness">PerBlockRandomness</a>&gt;(@aptos_framework);
+        <b>let</b> <a href="randomness.md#0x1_randomness">randomness</a> = &<b>mut</b> <a href="randomness.md#0x1_randomness_PerBlockRandomness">PerBlockRandomness</a>[@aptos_framework];
         <a href="randomness.md#0x1_randomness">randomness</a>.epoch = epoch;
         <a href="randomness.md#0x1_randomness">randomness</a>.round = round;
         <a href="randomness.md#0x1_randomness">randomness</a>.seed = seed_for_new_block;
@@ -284,11 +284,11 @@ of the hash function).
 <summary>Implementation</summary>
 
 
-<pre><code><b>fun</b> <a href="randomness.md#0x1_randomness_next_32_bytes">next_32_bytes</a>(): <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt; <b>acquires</b> <a href="randomness.md#0x1_randomness_PerBlockRandomness">PerBlockRandomness</a> {
+<pre><code><b>fun</b> <a href="randomness.md#0x1_randomness_next_32_bytes">next_32_bytes</a>(): <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt; {
     <b>assert</b>!(<a href="randomness.md#0x1_randomness_is_unbiasable">is_unbiasable</a>(), <a href="randomness.md#0x1_randomness_E_API_USE_IS_BIASIBLE">E_API_USE_IS_BIASIBLE</a>);
 
     <b>let</b> input = <a href="randomness.md#0x1_randomness_DST">DST</a>;
-    <b>let</b> <a href="randomness.md#0x1_randomness">randomness</a> = <b>borrow_global</b>&lt;<a href="randomness.md#0x1_randomness_PerBlockRandomness">PerBlockRandomness</a>&gt;(@aptos_framework);
+    <b>let</b> <a href="randomness.md#0x1_randomness">randomness</a> = &<a href="randomness.md#0x1_randomness_PerBlockRandomness">PerBlockRandomness</a>[@aptos_framework];
     <b>let</b> seed = *<a href="randomness.md#0x1_randomness">randomness</a>.seed.borrow();
 
     input.append(seed);
@@ -318,7 +318,7 @@ Generates a sequence of bytes uniformly at random
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="randomness.md#0x1_randomness_bytes">bytes</a>(n: u64): <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt; <b>acquires</b> <a href="randomness.md#0x1_randomness_PerBlockRandomness">PerBlockRandomness</a> {
+<pre><code><b>public</b> <b>fun</b> <a href="randomness.md#0x1_randomness_bytes">bytes</a>(n: u64): <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt; {
     <b>let</b> v = <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>[];
     <b>let</b> c = 0;
     <b>while</b> (c &lt; n) {
@@ -358,7 +358,7 @@ Generates an u8 uniformly at random.
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="randomness.md#0x1_randomness_u8_integer">u8_integer</a>(): u8 <b>acquires</b> <a href="randomness.md#0x1_randomness_PerBlockRandomness">PerBlockRandomness</a> {
+<pre><code><b>public</b> <b>fun</b> <a href="randomness.md#0x1_randomness_u8_integer">u8_integer</a>(): u8 {
     <b>let</b> raw = <a href="randomness.md#0x1_randomness_next_32_bytes">next_32_bytes</a>();
     <b>let</b> ret: u8 = raw.pop_back();
 
@@ -388,7 +388,7 @@ Generates an u16 uniformly at random.
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="randomness.md#0x1_randomness_u16_integer">u16_integer</a>(): u16 <b>acquires</b> <a href="randomness.md#0x1_randomness_PerBlockRandomness">PerBlockRandomness</a> {
+<pre><code><b>public</b> <b>fun</b> <a href="randomness.md#0x1_randomness_u16_integer">u16_integer</a>(): u16 {
     <b>let</b> raw = <a href="randomness.md#0x1_randomness_next_32_bytes">next_32_bytes</a>();
     <b>let</b> i = 0;
     <b>let</b> ret: u16 = 0;
@@ -423,7 +423,7 @@ Generates an u32 uniformly at random.
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="randomness.md#0x1_randomness_u32_integer">u32_integer</a>(): u32 <b>acquires</b> <a href="randomness.md#0x1_randomness_PerBlockRandomness">PerBlockRandomness</a> {
+<pre><code><b>public</b> <b>fun</b> <a href="randomness.md#0x1_randomness_u32_integer">u32_integer</a>(): u32 {
     <b>let</b> raw = <a href="randomness.md#0x1_randomness_next_32_bytes">next_32_bytes</a>();
     <b>let</b> i = 0;
     <b>let</b> ret: u32 = 0;
@@ -458,7 +458,7 @@ Generates an u64 uniformly at random.
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="randomness.md#0x1_randomness_u64_integer">u64_integer</a>(): u64 <b>acquires</b> <a href="randomness.md#0x1_randomness_PerBlockRandomness">PerBlockRandomness</a> {
+<pre><code><b>public</b> <b>fun</b> <a href="randomness.md#0x1_randomness_u64_integer">u64_integer</a>(): u64 {
     <b>let</b> raw = <a href="randomness.md#0x1_randomness_next_32_bytes">next_32_bytes</a>();
     <b>let</b> i = 0;
     <b>let</b> ret: u64 = 0;
@@ -493,7 +493,7 @@ Generates an u128 uniformly at random.
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="randomness.md#0x1_randomness_u128_integer">u128_integer</a>(): u128 <b>acquires</b> <a href="randomness.md#0x1_randomness_PerBlockRandomness">PerBlockRandomness</a> {
+<pre><code><b>public</b> <b>fun</b> <a href="randomness.md#0x1_randomness_u128_integer">u128_integer</a>(): u128 {
     <b>let</b> raw = <a href="randomness.md#0x1_randomness_next_32_bytes">next_32_bytes</a>();
     <b>let</b> i = 0;
     <b>let</b> ret: u128 = 0;
@@ -528,7 +528,7 @@ Generates a u256 uniformly at random.
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="randomness.md#0x1_randomness_u256_integer">u256_integer</a>(): u256 <b>acquires</b> <a href="randomness.md#0x1_randomness_PerBlockRandomness">PerBlockRandomness</a> {
+<pre><code><b>public</b> <b>fun</b> <a href="randomness.md#0x1_randomness_u256_integer">u256_integer</a>(): u256 {
     <a href="event.md#0x1_event_emit">event::emit</a>(<a href="randomness.md#0x1_randomness_RandomnessGeneratedEvent">RandomnessGeneratedEvent</a> {});
     <a href="randomness.md#0x1_randomness_u256_integer_internal">u256_integer_internal</a>()
 }
@@ -554,7 +554,7 @@ Generates a u256 uniformly at random.
 <summary>Implementation</summary>
 
 
-<pre><code><b>fun</b> <a href="randomness.md#0x1_randomness_u256_integer_internal">u256_integer_internal</a>(): u256 <b>acquires</b> <a href="randomness.md#0x1_randomness_PerBlockRandomness">PerBlockRandomness</a> {
+<pre><code><b>fun</b> <a href="randomness.md#0x1_randomness_u256_integer_internal">u256_integer_internal</a>(): u256 {
     <b>let</b> raw = <a href="randomness.md#0x1_randomness_next_32_bytes">next_32_bytes</a>();
     <b>let</b> i = 0;
     <b>let</b> ret: u256 = 0;
@@ -589,7 +589,7 @@ If you need perfect uniformity, consider implement your own via rejection sampli
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="randomness.md#0x1_randomness_u8_range">u8_range</a>(min_incl: u8, max_excl: u8): u8 <b>acquires</b> <a href="randomness.md#0x1_randomness_PerBlockRandomness">PerBlockRandomness</a> {
+<pre><code><b>public</b> <b>fun</b> <a href="randomness.md#0x1_randomness_u8_range">u8_range</a>(min_incl: u8, max_excl: u8): u8 {
     <b>let</b> range = ((max_excl - min_incl) <b>as</b> u256);
     <b>let</b> sample = ((<a href="randomness.md#0x1_randomness_u256_integer_internal">u256_integer_internal</a>() % range) <b>as</b> u8);
 
@@ -622,7 +622,7 @@ If you need perfect uniformity, consider implement your own via rejection sampli
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="randomness.md#0x1_randomness_u16_range">u16_range</a>(min_incl: u16, max_excl: u16): u16 <b>acquires</b> <a href="randomness.md#0x1_randomness_PerBlockRandomness">PerBlockRandomness</a> {
+<pre><code><b>public</b> <b>fun</b> <a href="randomness.md#0x1_randomness_u16_range">u16_range</a>(min_incl: u16, max_excl: u16): u16 {
     <b>let</b> range = ((max_excl - min_incl) <b>as</b> u256);
     <b>let</b> sample = ((<a href="randomness.md#0x1_randomness_u256_integer_internal">u256_integer_internal</a>() % range) <b>as</b> u16);
 
@@ -655,7 +655,7 @@ If you need perfect uniformity, consider implement your own via rejection sampli
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="randomness.md#0x1_randomness_u32_range">u32_range</a>(min_incl: u32, max_excl: u32): u32 <b>acquires</b> <a href="randomness.md#0x1_randomness_PerBlockRandomness">PerBlockRandomness</a> {
+<pre><code><b>public</b> <b>fun</b> <a href="randomness.md#0x1_randomness_u32_range">u32_range</a>(min_incl: u32, max_excl: u32): u32 {
     <b>let</b> range = ((max_excl - min_incl) <b>as</b> u256);
     <b>let</b> sample = ((<a href="randomness.md#0x1_randomness_u256_integer_internal">u256_integer_internal</a>() % range) <b>as</b> u32);
 
@@ -688,7 +688,7 @@ If you need perfect uniformity, consider implement your own via rejection sampli
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="randomness.md#0x1_randomness_u64_range">u64_range</a>(min_incl: u64, max_excl: u64): u64 <b>acquires</b> <a href="randomness.md#0x1_randomness_PerBlockRandomness">PerBlockRandomness</a> {
+<pre><code><b>public</b> <b>fun</b> <a href="randomness.md#0x1_randomness_u64_range">u64_range</a>(min_incl: u64, max_excl: u64): u64 {
     <a href="event.md#0x1_event_emit">event::emit</a>(<a href="randomness.md#0x1_randomness_RandomnessGeneratedEvent">RandomnessGeneratedEvent</a> {});
 
     <a href="randomness.md#0x1_randomness_u64_range_internal">u64_range_internal</a>(min_incl, max_excl)
@@ -714,7 +714,7 @@ If you need perfect uniformity, consider implement your own via rejection sampli
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="randomness.md#0x1_randomness_u64_range_internal">u64_range_internal</a>(min_incl: u64, max_excl: u64): u64 <b>acquires</b> <a href="randomness.md#0x1_randomness_PerBlockRandomness">PerBlockRandomness</a> {
+<pre><code><b>public</b> <b>fun</b> <a href="randomness.md#0x1_randomness_u64_range_internal">u64_range_internal</a>(min_incl: u64, max_excl: u64): u64 {
     <b>let</b> range = ((max_excl - min_incl) <b>as</b> u256);
     <b>let</b> sample = ((<a href="randomness.md#0x1_randomness_u256_integer_internal">u256_integer_internal</a>() % range) <b>as</b> u64);
 
@@ -745,7 +745,7 @@ If you need perfect uniformity, consider implement your own via rejection sampli
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="randomness.md#0x1_randomness_u128_range">u128_range</a>(min_incl: u128, max_excl: u128): u128 <b>acquires</b> <a href="randomness.md#0x1_randomness_PerBlockRandomness">PerBlockRandomness</a> {
+<pre><code><b>public</b> <b>fun</b> <a href="randomness.md#0x1_randomness_u128_range">u128_range</a>(min_incl: u128, max_excl: u128): u128 {
     <b>let</b> range = ((max_excl - min_incl) <b>as</b> u256);
     <b>let</b> sample = ((<a href="randomness.md#0x1_randomness_u256_integer_internal">u256_integer_internal</a>() % range) <b>as</b> u128);
 
@@ -778,7 +778,7 @@ If you need perfect uniformity, consider implement your own with <code><a href="
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="randomness.md#0x1_randomness_u256_range">u256_range</a>(min_incl: u256, max_excl: u256): u256 <b>acquires</b> <a href="randomness.md#0x1_randomness_PerBlockRandomness">PerBlockRandomness</a> {
+<pre><code><b>public</b> <b>fun</b> <a href="randomness.md#0x1_randomness_u256_range">u256_range</a>(min_incl: u256, max_excl: u256): u256 {
     <b>let</b> range = max_excl - min_incl;
     <b>let</b> r0 = <a href="randomness.md#0x1_randomness_u256_integer_internal">u256_integer_internal</a>();
     <b>let</b> r1 = <a href="randomness.md#0x1_randomness_u256_integer_internal">u256_integer_internal</a>();
@@ -829,7 +829,7 @@ If n is 0, returns the empty vector.
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="randomness.md#0x1_randomness_permutation">permutation</a>(n: u64): <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt; <b>acquires</b> <a href="randomness.md#0x1_randomness_PerBlockRandomness">PerBlockRandomness</a> {
+<pre><code><b>public</b> <b>fun</b> <a href="randomness.md#0x1_randomness_permutation">permutation</a>(n: u64): <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt; {
     <a href="event.md#0x1_event_emit">event::emit</a>(<a href="randomness.md#0x1_randomness_RandomnessGeneratedEvent">RandomnessGeneratedEvent</a> {});
 
     <b>let</b> values = <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>[];
@@ -998,6 +998,21 @@ function as its payload.
 <b>invariant</b> [suspendable] <a href="chain_status.md#0x1_chain_status_is_operating">chain_status::is_operating</a>() ==&gt; <b>exists</b>&lt;<a href="randomness.md#0x1_randomness_PerBlockRandomness">PerBlockRandomness</a>&gt;(@aptos_framework);
 <a id="0x1_randomness_var"></a>
 <b>global</b> <a href="randomness.md#0x1_randomness_var">var</a>: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;;
+</code></pre>
+
+
+
+
+<a id="0x1_randomness_spec_safe_add_mod"></a>
+
+
+<pre><code><b>fun</b> <a href="randomness.md#0x1_randomness_spec_safe_add_mod">spec_safe_add_mod</a>(a: u256, b: u256, m: u256): u256 {
+   <b>if</b> (a &lt; m - b) {
+       a + b
+   } <b>else</b> {
+       a - (m - b)
+   }
+}
 </code></pre>
 
 
@@ -1275,21 +1290,6 @@ function as its payload.
 
 
 <pre><code><b>pragma</b> aborts_if_is_partial;
-</code></pre>
-
-
-
-
-<a id="0x1_randomness_spec_safe_add_mod"></a>
-
-
-<pre><code><b>fun</b> <a href="randomness.md#0x1_randomness_spec_safe_add_mod">spec_safe_add_mod</a>(a: u256, b: u256, m: u256): u256 {
-   <b>if</b> (a &lt; m - b) {
-       a + b
-   } <b>else</b> {
-       a - (m - b)
-   }
-}
 </code></pre>
 
 

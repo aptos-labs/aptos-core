@@ -337,7 +337,7 @@ Batch version of transfer_coins.
 
 <pre><code><b>public</b> entry <b>fun</b> <a href="aptos_account.md#0x1_aptos_account_batch_transfer_coins">batch_transfer_coins</a>&lt;CoinType&gt;(
     from: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, recipients: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<b>address</b>&gt;, amounts: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;
-) <b>acquires</b> <a href="aptos_account.md#0x1_aptos_account_DirectTransferConfig">DirectTransferConfig</a> {
+) {
     <b>let</b> recipients_len = recipients.length();
     <b>assert</b>!(
         recipients_len == amounts.length(),
@@ -374,7 +374,7 @@ This would create the recipient account first and register it to receive the Coi
 
 <pre><code><b>public</b> entry <b>fun</b> <a href="aptos_account.md#0x1_aptos_account_transfer_coins">transfer_coins</a>&lt;CoinType&gt;(
     from: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, <b>to</b>: <b>address</b>, amount: u64
-) <b>acquires</b> <a href="aptos_account.md#0x1_aptos_account_DirectTransferConfig">DirectTransferConfig</a> {
+) {
     <a href="aptos_account.md#0x1_aptos_account_deposit_coins">deposit_coins</a>(<b>to</b>, <a href="coin.md#0x1_coin_withdraw">coin::withdraw</a>&lt;CoinType&gt;(from, amount));
 }
 </code></pre>
@@ -402,7 +402,7 @@ This would create the recipient account first and register it to receive the Coi
 
 <pre><code><b>public</b> <b>fun</b> <a href="aptos_account.md#0x1_aptos_account_deposit_coins">deposit_coins</a>&lt;CoinType&gt;(
     <b>to</b>: <b>address</b>, coins: Coin&lt;CoinType&gt;
-) <b>acquires</b> <a href="aptos_account.md#0x1_aptos_account_DirectTransferConfig">DirectTransferConfig</a> {
+) {
     <b>if</b> (!<a href="account.md#0x1_account_exists_at">account::exists_at</a>(<b>to</b>)) {
         <a href="aptos_account.md#0x1_aptos_account_create_account">create_account</a>(<b>to</b>);
         <b>spec</b> {
@@ -599,10 +599,10 @@ Set whether <code><a href="account.md#0x1_account">account</a></code> can receiv
 
 <pre><code><b>public</b> entry <b>fun</b> <a href="aptos_account.md#0x1_aptos_account_set_allow_direct_coin_transfers">set_allow_direct_coin_transfers</a>(
     <a href="account.md#0x1_account">account</a>: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, allow: bool
-) <b>acquires</b> <a href="aptos_account.md#0x1_aptos_account_DirectTransferConfig">DirectTransferConfig</a> {
+) {
     <b>let</b> addr = <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(<a href="account.md#0x1_account">account</a>);
     <b>if</b> (<b>exists</b>&lt;<a href="aptos_account.md#0x1_aptos_account_DirectTransferConfig">DirectTransferConfig</a>&gt;(addr)) {
-        <b>let</b> direct_transfer_config = <b>borrow_global_mut</b>&lt;<a href="aptos_account.md#0x1_aptos_account_DirectTransferConfig">DirectTransferConfig</a>&gt;(addr);
+        <b>let</b> direct_transfer_config = &<b>mut</b> <a href="aptos_account.md#0x1_aptos_account_DirectTransferConfig">DirectTransferConfig</a>[addr];
         // Short-circuit <b>to</b> avoid emitting an <a href="event.md#0x1_event">event</a> <b>if</b> direct transfer config is not changing.
         <b>if</b> (direct_transfer_config.allow_arbitrary_coin_transfers == allow) { <b>return</b> };
 
@@ -675,9 +675,9 @@ By default, this returns true if an account has not explicitly set whether the c
 
 <pre><code><b>public</b> <b>fun</b> <a href="aptos_account.md#0x1_aptos_account_can_receive_direct_coin_transfers">can_receive_direct_coin_transfers</a>(
     <a href="account.md#0x1_account">account</a>: <b>address</b>
-): bool <b>acquires</b> <a href="aptos_account.md#0x1_aptos_account_DirectTransferConfig">DirectTransferConfig</a> {
+): bool {
     !<b>exists</b>&lt;<a href="aptos_account.md#0x1_aptos_account_DirectTransferConfig">DirectTransferConfig</a>&gt;(<a href="account.md#0x1_account">account</a>)
-        || <b>borrow_global</b>&lt;<a href="aptos_account.md#0x1_aptos_account_DirectTransferConfig">DirectTransferConfig</a>&gt;(<a href="account.md#0x1_account">account</a>).allow_arbitrary_coin_transfers
+        || <a href="aptos_account.md#0x1_aptos_account_DirectTransferConfig">DirectTransferConfig</a>[<a href="account.md#0x1_account">account</a>].allow_arbitrary_coin_transfers
 }
 </code></pre>
 
@@ -700,7 +700,7 @@ By default, this returns true if an account has not explicitly set whether the c
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="aptos_account.md#0x1_aptos_account_register_apt">register_apt</a>(account_signer: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>) {
+<pre><code><b>friend</b> <b>fun</b> <a href="aptos_account.md#0x1_aptos_account_register_apt">register_apt</a>(account_signer: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>) {
     <b>if</b> (<a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features_new_accounts_default_to_fa_apt_store_enabled">features::new_accounts_default_to_fa_apt_store_enabled</a>()) {
         <a href="aptos_account.md#0x1_aptos_account_ensure_primary_fungible_store_exists">ensure_primary_fungible_store_exists</a>(<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(account_signer));
     } <b>else</b> {
@@ -734,7 +734,7 @@ to transfer APT) - if we want to allow APT PFS without account itself
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b>(<b>friend</b>) entry <b>fun</b> <a href="aptos_account.md#0x1_aptos_account_fungible_transfer_only">fungible_transfer_only</a>(
+<pre><code><b>friend</b> entry <b>fun</b> <a href="aptos_account.md#0x1_aptos_account_fungible_transfer_only">fungible_transfer_only</a>(
     source: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, <b>to</b>: <b>address</b>, amount: u64
 ) {
     <b>let</b> sender_store =
@@ -775,7 +775,7 @@ Is balance from APT Primary FungibleStore at least the given amount
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="aptos_account.md#0x1_aptos_account_is_fungible_balance_at_least">is_fungible_balance_at_least</a>(
+<pre><code><b>friend</b> <b>fun</b> <a href="aptos_account.md#0x1_aptos_account_is_fungible_balance_at_least">is_fungible_balance_at_least</a>(
     <a href="account.md#0x1_account">account</a>: <b>address</b>, amount: u64
 ): bool {
     <b>let</b> store_addr = <a href="aptos_account.md#0x1_aptos_account_primary_fungible_store_address">primary_fungible_store_address</a>(<a href="account.md#0x1_account">account</a>);
@@ -803,7 +803,7 @@ Burn from APT Primary FungibleStore for gas charge
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="aptos_account.md#0x1_aptos_account_burn_from_fungible_store_for_gas">burn_from_fungible_store_for_gas</a>(
+<pre><code><b>friend</b> <b>fun</b> <a href="aptos_account.md#0x1_aptos_account_burn_from_fungible_store_for_gas">burn_from_fungible_store_for_gas</a>(
     ref: &BurnRef, <a href="account.md#0x1_account">account</a>: <b>address</b>, amount: u64
 ) {
     // Skip burning <b>if</b> amount is zero. This shouldn't <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error">error</a> out <b>as</b> it's called <b>as</b> part of transaction fee burning.

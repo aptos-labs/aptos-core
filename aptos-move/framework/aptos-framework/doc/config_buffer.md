@@ -136,9 +136,9 @@ Check whether there is a pending config payload for <code>T</code>.
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="config_buffer.md#0x1_config_buffer_does_exist">does_exist</a>&lt;T: store&gt;(): bool <b>acquires</b> <a href="config_buffer.md#0x1_config_buffer_PendingConfigs">PendingConfigs</a> {
+<pre><code><b>public</b> <b>fun</b> <a href="config_buffer.md#0x1_config_buffer_does_exist">does_exist</a>&lt;T: store&gt;(): bool {
     <b>if</b> (<b>exists</b>&lt;<a href="config_buffer.md#0x1_config_buffer_PendingConfigs">PendingConfigs</a>&gt;(@aptos_framework)) {
-        <b>let</b> config = <b>borrow_global</b>&lt;<a href="config_buffer.md#0x1_config_buffer_PendingConfigs">PendingConfigs</a>&gt;(@aptos_framework);
+        <b>let</b> config = &<a href="config_buffer.md#0x1_config_buffer_PendingConfigs">PendingConfigs</a>[@aptos_framework];
         config.configs.contains_key(&<a href="../../aptos-stdlib/doc/type_info.md#0x1_type_info_type_name">type_info::type_name</a>&lt;T&gt;())
     } <b>else</b> {
         <b>false</b>
@@ -168,8 +168,8 @@ Typically used in <code>X::set_for_next_epoch()</code> where X is an on-chain co
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="config_buffer.md#0x1_config_buffer_upsert">upsert</a>&lt;T: drop + store&gt;(config: T) <b>acquires</b> <a href="config_buffer.md#0x1_config_buffer_PendingConfigs">PendingConfigs</a> {
-    <b>let</b> configs = <b>borrow_global_mut</b>&lt;<a href="config_buffer.md#0x1_config_buffer_PendingConfigs">PendingConfigs</a>&gt;(@aptos_framework);
+<pre><code><b>friend</b> <b>fun</b> <a href="config_buffer.md#0x1_config_buffer_upsert">upsert</a>&lt;T: drop + store&gt;(config: T) {
+    <b>let</b> configs = &<b>mut</b> <a href="config_buffer.md#0x1_config_buffer_PendingConfigs">PendingConfigs</a>[@aptos_framework];
     <b>let</b> key = <a href="../../aptos-stdlib/doc/type_info.md#0x1_type_info_type_name">type_info::type_name</a>&lt;T&gt;();
     <b>let</b> value = <a href="../../aptos-stdlib/doc/any.md#0x1_any_pack">any::pack</a>(config);
     configs.configs.<a href="config_buffer.md#0x1_config_buffer_upsert">upsert</a>(key, value);
@@ -225,8 +225,8 @@ Typically used in <code>X::on_new_epoch()</code> where X is an on-chaon config.
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="config_buffer.md#0x1_config_buffer_extract_v2">extract_v2</a>&lt;T: store&gt;(): T <b>acquires</b> <a href="config_buffer.md#0x1_config_buffer_PendingConfigs">PendingConfigs</a> {
-    <b>let</b> configs = <b>borrow_global_mut</b>&lt;<a href="config_buffer.md#0x1_config_buffer_PendingConfigs">PendingConfigs</a>&gt;(@aptos_framework);
+<pre><code><b>friend</b> <b>fun</b> <a href="config_buffer.md#0x1_config_buffer_extract_v2">extract_v2</a>&lt;T: store&gt;(): T {
+    <b>let</b> configs = &<b>mut</b> <a href="config_buffer.md#0x1_config_buffer_PendingConfigs">PendingConfigs</a>[@aptos_framework];
     <b>let</b> key = <a href="../../aptos-stdlib/doc/type_info.md#0x1_type_info_type_name">type_info::type_name</a>&lt;T&gt;();
     <b>let</b> (_, value_packed) = configs.configs.remove(&key);
     value_packed.unpack()

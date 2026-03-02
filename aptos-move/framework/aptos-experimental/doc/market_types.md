@@ -3725,7 +3725,7 @@ call the <code>place_order_with_order_id</code> API to place the order with the 
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="market_types.md#0x7_market_types_get_order_book_mut">get_order_book_mut</a>&lt;M: store + <b>copy</b> + drop&gt;(
+<pre><code><b>friend</b> <b>fun</b> <a href="market_types.md#0x7_market_types_get_order_book_mut">get_order_book_mut</a>&lt;M: store + <b>copy</b> + drop&gt;(
     self: &<b>mut</b> <a href="market_types.md#0x7_market_types_Market">Market</a>&lt;M&gt;
 ): &<b>mut</b> OrderBook&lt;M&gt; {
     &<b>mut</b> self.<a href="order_book.md#0x7_order_book">order_book</a>
@@ -3751,7 +3751,7 @@ call the <code>place_order_with_order_id</code> API to place the order with the 
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="market_types.md#0x7_market_types_get_pre_cancellation_tracker_mut">get_pre_cancellation_tracker_mut</a>&lt;M: store + <b>copy</b> + drop&gt;(
+<pre><code><b>friend</b> <b>fun</b> <a href="market_types.md#0x7_market_types_get_pre_cancellation_tracker_mut">get_pre_cancellation_tracker_mut</a>&lt;M: store + <b>copy</b> + drop&gt;(
     self: &<b>mut</b> <a href="market_types.md#0x7_market_types_Market">Market</a>&lt;M&gt;
 ): &<b>mut</b> PreCancellationTracker {
     self.<a href="pre_cancellation_tracker.md#0x7_pre_cancellation_tracker">pre_cancellation_tracker</a>.borrow_mut(<a href="market_types.md#0x7_market_types_PRE_CANCELLATION_TRACKER_KEY">PRE_CANCELLATION_TRACKER_KEY</a>)
@@ -3777,7 +3777,7 @@ call the <code>place_order_with_order_id</code> API to place the order with the 
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="market_types.md#0x7_market_types_get_dead_mans_switch_tracker">get_dead_mans_switch_tracker</a>&lt;M: store + <b>copy</b> + drop&gt;(
+<pre><code><b>friend</b> <b>fun</b> <a href="market_types.md#0x7_market_types_get_dead_mans_switch_tracker">get_dead_mans_switch_tracker</a>&lt;M: store + <b>copy</b> + drop&gt;(
     self: &<a href="market_types.md#0x7_market_types_Market">Market</a>&lt;M&gt;
 ): &DeadMansSwitchTracker {
     self.<a href="dead_mans_switch_tracker.md#0x7_dead_mans_switch_tracker">dead_mans_switch_tracker</a>.borrow(<a href="market_types.md#0x7_market_types_DEAD_MANS_SWITCH_TRACKER_KEY">DEAD_MANS_SWITCH_TRACKER_KEY</a>)
@@ -3803,7 +3803,7 @@ call the <code>place_order_with_order_id</code> API to place the order with the 
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="market_types.md#0x7_market_types_get_dead_mans_switch_tracker_mut">get_dead_mans_switch_tracker_mut</a>&lt;M: store + <b>copy</b> + drop&gt;(
+<pre><code><b>friend</b> <b>fun</b> <a href="market_types.md#0x7_market_types_get_dead_mans_switch_tracker_mut">get_dead_mans_switch_tracker_mut</a>&lt;M: store + <b>copy</b> + drop&gt;(
     self: &<b>mut</b> <a href="market_types.md#0x7_market_types_Market">Market</a>&lt;M&gt;
 ): &<b>mut</b> DeadMansSwitchTracker {
     self.<a href="dead_mans_switch_tracker.md#0x7_dead_mans_switch_tracker">dead_mans_switch_tracker</a>.borrow_mut(<a href="market_types.md#0x7_market_types_DEAD_MANS_SWITCH_TRACKER_KEY">DEAD_MANS_SWITCH_TRACKER_KEY</a>)
@@ -3829,7 +3829,7 @@ call the <code>place_order_with_order_id</code> API to place the order with the 
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="market_types.md#0x7_market_types_is_dead_mans_switch_enabled">is_dead_mans_switch_enabled</a>&lt;M: store + <b>copy</b> + drop&gt;(
+<pre><code><b>friend</b> <b>fun</b> <a href="market_types.md#0x7_market_types_is_dead_mans_switch_enabled">is_dead_mans_switch_enabled</a>&lt;M: store + <b>copy</b> + drop&gt;(
     self: &<a href="market_types.md#0x7_market_types_Market">Market</a>&lt;M&gt;
 ): bool {
     self.config.enable_dead_mans_switch
@@ -3855,7 +3855,7 @@ call the <code>place_order_with_order_id</code> API to place the order with the 
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="market_types.md#0x7_market_types_get_parent">get_parent</a>&lt;M: store + <b>copy</b> + drop&gt;(self: &<a href="market_types.md#0x7_market_types_Market">Market</a>&lt;M&gt;): <b>address</b> {
+<pre><code><b>friend</b> <b>fun</b> <a href="market_types.md#0x7_market_types_get_parent">get_parent</a>&lt;M: store + <b>copy</b> + drop&gt;(self: &<a href="market_types.md#0x7_market_types_Market">Market</a>&lt;M&gt;): <b>address</b> {
     self.parent
 }
 </code></pre>
@@ -3879,7 +3879,7 @@ call the <code>place_order_with_order_id</code> API to place the order with the 
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="market_types.md#0x7_market_types_get_market">get_market</a>&lt;M: store + <b>copy</b> + drop&gt;(self: &<a href="market_types.md#0x7_market_types_Market">Market</a>&lt;M&gt;): <b>address</b> {
+<pre><code><b>friend</b> <b>fun</b> <a href="market_types.md#0x7_market_types_get_market">get_market</a>&lt;M: store + <b>copy</b> + drop&gt;(self: &<a href="market_types.md#0x7_market_types_Market">Market</a>&lt;M&gt;): <b>address</b> {
     self.market
 }
 </code></pre>

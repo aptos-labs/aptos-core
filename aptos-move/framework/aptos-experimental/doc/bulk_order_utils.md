@@ -177,7 +177,7 @@ This limit prevents gas DoS scenarios when cancelling bulk orders.
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="bulk_order_utils.md#0x7_bulk_order_utils_new_bulk_order_request_with_sanitization">new_bulk_order_request_with_sanitization</a>&lt;M: store + <b>copy</b> + drop&gt;(
+<pre><code><b>friend</b> <b>fun</b> <a href="bulk_order_utils.md#0x7_bulk_order_utils_new_bulk_order_request_with_sanitization">new_bulk_order_request_with_sanitization</a>&lt;M: store + <b>copy</b> + drop&gt;(
     <a href="../../aptos-framework/doc/account.md#0x1_account">account</a>: <b>address</b>,
     sequence_number: u64,
     bid_prices: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;,
@@ -264,7 +264,7 @@ A tuple containing:
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="bulk_order_utils.md#0x7_bulk_order_utils_new_bulk_order_with_sanitization">new_bulk_order_with_sanitization</a>&lt;M: store + <b>copy</b> + drop&gt;(
+<pre><code><b>friend</b> <b>fun</b> <a href="bulk_order_utils.md#0x7_bulk_order_utils_new_bulk_order_with_sanitization">new_bulk_order_with_sanitization</a>&lt;M: store + <b>copy</b> + drop&gt;(
     order_id: OrderId,
     unique_priority_idx: IncreasingIdx,
     order_req: BulkOrderRequest&lt;M&gt;,
@@ -514,7 +514,7 @@ the size; otherwise, it inserts the new price level at the front.
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="bulk_order_utils.md#0x7_bulk_order_utils_reinsert_order_into_bulk_order">reinsert_order_into_bulk_order</a>&lt;M: store + <b>copy</b> + drop&gt;(
+<pre><code><b>friend</b> <b>fun</b> <a href="bulk_order_utils.md#0x7_bulk_order_utils_reinsert_order_into_bulk_order">reinsert_order_into_bulk_order</a>&lt;M: store + <b>copy</b> + drop&gt;(
     order: &<b>mut</b> BulkOrder&lt;M&gt;, other: &OrderMatchDetails&lt;M&gt;
 ) {
     // Reinsert the order into the bulk order
@@ -581,7 +581,7 @@ A tuple containing the next active price and size as options.
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="bulk_order_utils.md#0x7_bulk_order_utils_match_order_and_get_next_from_bulk_order">match_order_and_get_next_from_bulk_order</a>&lt;M: store + <b>copy</b> + drop&gt;(
+<pre><code><b>friend</b> <b>fun</b> <a href="bulk_order_utils.md#0x7_bulk_order_utils_match_order_and_get_next_from_bulk_order">match_order_and_get_next_from_bulk_order</a>&lt;M: store + <b>copy</b> + drop&gt;(
     order: &<b>mut</b> BulkOrder&lt;M&gt;, is_bid: bool, matched_size: u64
 ): (Option&lt;u64&gt;, Option&lt;u64&gt;) {
     <b>let</b> (prices, sizes) =
@@ -640,7 +640,7 @@ The size that was cancelled at that price level, or 0 if the price wasn't found
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="bulk_order_utils.md#0x7_bulk_order_utils_cancel_at_price_level">cancel_at_price_level</a>&lt;M: store + <b>copy</b> + drop&gt;(
+<pre><code><b>friend</b> <b>fun</b> <a href="bulk_order_utils.md#0x7_bulk_order_utils_cancel_at_price_level">cancel_at_price_level</a>&lt;M: store + <b>copy</b> + drop&gt;(
     order: &<b>mut</b> BulkOrder&lt;M&gt;, price: u64, is_bid: bool
 ): u64 {
     <b>let</b> (prices, sizes) =
@@ -654,7 +654,7 @@ The size that was cancelled at that price level, or 0 if the price wasn't found
             sizes.remove(i);
             <b>return</b> cancelled_size
         };
-        i = i + 1;
+        i += 1;
     };
     0 // Price not found
 }

@@ -305,7 +305,7 @@ types of pending orders are supported.
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="single_order_book.md#0x7_single_order_book_new_single_order_book">new_single_order_book</a>&lt;M: store + <b>copy</b> + drop&gt;(): <a href="single_order_book.md#0x7_single_order_book_SingleOrderBook">SingleOrderBook</a>&lt;M&gt; {
+<pre><code><b>friend</b> <b>fun</b> <a href="single_order_book.md#0x7_single_order_book_new_single_order_book">new_single_order_book</a>&lt;M: store + <b>copy</b> + drop&gt;(): <a href="single_order_book.md#0x7_single_order_book_SingleOrderBook">SingleOrderBook</a>&lt;M&gt; {
     SingleOrderBook::V1 {
         orders: <a href="order_book_utils.md#0x7_order_book_utils_new_default_big_ordered_map">order_book_utils::new_default_big_ordered_map</a>(),
         client_order_ids: <a href="order_book_utils.md#0x7_order_book_utils_new_default_big_ordered_map">order_book_utils::new_default_big_ordered_map</a>(),
@@ -338,7 +338,7 @@ If order doesn't exist, it aborts with EORDER_NOT_FOUND.
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="single_order_book.md#0x7_single_order_book_cancel_order">cancel_order</a>&lt;M: store + <b>copy</b> + drop&gt;(
+<pre><code><b>friend</b> <b>fun</b> <a href="single_order_book.md#0x7_single_order_book_cancel_order">cancel_order</a>&lt;M: store + <b>copy</b> + drop&gt;(
     self: &<b>mut</b> <a href="single_order_book.md#0x7_single_order_book_SingleOrderBook">SingleOrderBook</a>&lt;M&gt;,
     price_time_idx: &<b>mut</b> PriceTimeIndex,
     order_creator: <b>address</b>,
@@ -401,7 +401,7 @@ If order doesn't exist, it aborts with EORDER_NOT_FOUND.
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="single_order_book.md#0x7_single_order_book_try_cancel_order_with_client_order_id">try_cancel_order_with_client_order_id</a>&lt;M: store + <b>copy</b> + drop&gt;(
+<pre><code><b>friend</b> <b>fun</b> <a href="single_order_book.md#0x7_single_order_book_try_cancel_order_with_client_order_id">try_cancel_order_with_client_order_id</a>&lt;M: store + <b>copy</b> + drop&gt;(
     self: &<b>mut</b> <a href="single_order_book.md#0x7_single_order_book_SingleOrderBook">SingleOrderBook</a>&lt;M&gt;,
     price_time_idx: &<b>mut</b> PriceTimeIndex,
     order_creator: <b>address</b>,
@@ -438,7 +438,7 @@ If order doesn't exist, it aborts with EORDER_NOT_FOUND.
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="single_order_book.md#0x7_single_order_book_try_cancel_order">try_cancel_order</a>&lt;M: store + <b>copy</b> + drop&gt;(
+<pre><code><b>friend</b> <b>fun</b> <a href="single_order_book.md#0x7_single_order_book_try_cancel_order">try_cancel_order</a>&lt;M: store + <b>copy</b> + drop&gt;(
     self: &<b>mut</b> <a href="single_order_book.md#0x7_single_order_book_SingleOrderBook">SingleOrderBook</a>&lt;M&gt;,
     price_time_idx: &<b>mut</b> PriceTimeIndex,
     order_creator: <b>address</b>,
@@ -478,7 +478,7 @@ If order doesn't exist, it aborts with EORDER_NOT_FOUND.
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="single_order_book.md#0x7_single_order_book_client_order_id_exists">client_order_id_exists</a>&lt;M: store + <b>copy</b> + drop&gt;(
+<pre><code><b>friend</b> <b>fun</b> <a href="single_order_book.md#0x7_single_order_book_client_order_id_exists">client_order_id_exists</a>&lt;M: store + <b>copy</b> + drop&gt;(
     self: &<a href="single_order_book.md#0x7_single_order_book_SingleOrderBook">SingleOrderBook</a>&lt;M&gt;, order_creator: <b>address</b>, client_order_id: String
 ): bool {
     <b>let</b> account_client_order_id =
@@ -508,7 +508,7 @@ else it is added to the active order book. The API aborts if it's not a maker or
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="single_order_book.md#0x7_single_order_book_place_maker_or_pending_order">place_maker_or_pending_order</a>&lt;M: store + <b>copy</b> + drop&gt;(
+<pre><code><b>friend</b> <b>fun</b> <a href="single_order_book.md#0x7_single_order_book_place_maker_or_pending_order">place_maker_or_pending_order</a>&lt;M: store + <b>copy</b> + drop&gt;(
     self: &<b>mut</b> <a href="single_order_book.md#0x7_single_order_book_SingleOrderBook">SingleOrderBook</a>&lt;M&gt;,
     price_time_idx: &<b>mut</b> PriceTimeIndex,
     order_req: SingleOrderRequest&lt;M&gt;
@@ -597,7 +597,7 @@ it is added to the order book, if it exists, its size is updated.
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="single_order_book.md#0x7_single_order_book_reinsert_order">reinsert_order</a>&lt;M: store + <b>copy</b> + drop&gt;(
+<pre><code><b>friend</b> <b>fun</b> <a href="single_order_book.md#0x7_single_order_book_reinsert_order">reinsert_order</a>&lt;M: store + <b>copy</b> + drop&gt;(
     self: &<b>mut</b> <a href="single_order_book.md#0x7_single_order_book_SingleOrderBook">SingleOrderBook</a>&lt;M&gt;,
     price_time_idx: &<b>mut</b> PriceTimeIndex,
     reinsert_order: OrderMatchDetails&lt;M&gt;,
@@ -705,7 +705,7 @@ API to ensure that the order is a taker order before calling this API, otherwise
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="single_order_book.md#0x7_single_order_book_get_single_match_for_taker">get_single_match_for_taker</a>&lt;M: store + <b>copy</b> + drop&gt;(
+<pre><code><b>friend</b> <b>fun</b> <a href="single_order_book.md#0x7_single_order_book_get_single_match_for_taker">get_single_match_for_taker</a>&lt;M: store + <b>copy</b> + drop&gt;(
     self: &<b>mut</b> <a href="single_order_book.md#0x7_single_order_book_SingleOrderBook">SingleOrderBook</a>&lt;M&gt;, active_matched_order: ActiveMatchedOrder
 ): OrderMatch&lt;M&gt; {
     <b>let</b> (order_id, matched_size, remaining_size, order_book_type) =
@@ -800,7 +800,7 @@ cancellation of the order. Please use the <code>cancel_order</code> API to cance
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="single_order_book.md#0x7_single_order_book_decrease_order_size">decrease_order_size</a>&lt;M: store + <b>copy</b> + drop&gt;(
+<pre><code><b>friend</b> <b>fun</b> <a href="single_order_book.md#0x7_single_order_book_decrease_order_size">decrease_order_size</a>&lt;M: store + <b>copy</b> + drop&gt;(
     self: &<b>mut</b> <a href="single_order_book.md#0x7_single_order_book_SingleOrderBook">SingleOrderBook</a>&lt;M&gt;,
     price_time_idx: &<b>mut</b> PriceTimeIndex,
     order_creator: <b>address</b>,
@@ -860,7 +860,7 @@ cancellation of the order. Please use the <code>cancel_order</code> API to cance
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="single_order_book.md#0x7_single_order_book_get_order_id_by_client_id">get_order_id_by_client_id</a>&lt;M: store + <b>copy</b> + drop&gt;(
+<pre><code><b>friend</b> <b>fun</b> <a href="single_order_book.md#0x7_single_order_book_get_order_id_by_client_id">get_order_id_by_client_id</a>&lt;M: store + <b>copy</b> + drop&gt;(
     self: &<a href="single_order_book.md#0x7_single_order_book_SingleOrderBook">SingleOrderBook</a>&lt;M&gt;, order_creator: <b>address</b>, client_order_id: String
 ): Option&lt;OrderId&gt; {
     <b>let</b> account_client_order_id =
@@ -888,7 +888,7 @@ cancellation of the order. Please use the <code>cancel_order</code> API to cance
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="single_order_book.md#0x7_single_order_book_get_order_metadata">get_order_metadata</a>&lt;M: store + <b>copy</b> + drop&gt;(
+<pre><code><b>friend</b> <b>fun</b> <a href="single_order_book.md#0x7_single_order_book_get_order_metadata">get_order_metadata</a>&lt;M: store + <b>copy</b> + drop&gt;(
     self: &<a href="single_order_book.md#0x7_single_order_book_SingleOrderBook">SingleOrderBook</a>&lt;M&gt;, order_id: OrderId
 ): Option&lt;M&gt; {
     self.orders.get_and_map(&order_id, |order| order.get_metadata_from_state())
@@ -914,7 +914,7 @@ cancellation of the order. Please use the <code>cancel_order</code> API to cance
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="single_order_book.md#0x7_single_order_book_set_order_metadata">set_order_metadata</a>&lt;M: store + <b>copy</b> + drop&gt;(
+<pre><code><b>friend</b> <b>fun</b> <a href="single_order_book.md#0x7_single_order_book_set_order_metadata">set_order_metadata</a>&lt;M: store + <b>copy</b> + drop&gt;(
     self: &<b>mut</b> <a href="single_order_book.md#0x7_single_order_book_SingleOrderBook">SingleOrderBook</a>&lt;M&gt;, order_id: OrderId, metadata: M
 ) {
     <b>let</b> present =
@@ -947,7 +947,7 @@ cancellation of the order. Please use the <code>cancel_order</code> API to cance
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="single_order_book.md#0x7_single_order_book_is_active_order">is_active_order</a>&lt;M: store + <b>copy</b> + drop&gt;(
+<pre><code><b>friend</b> <b>fun</b> <a href="single_order_book.md#0x7_single_order_book_is_active_order">is_active_order</a>&lt;M: store + <b>copy</b> + drop&gt;(
     self: &<a href="single_order_book.md#0x7_single_order_book_SingleOrderBook">SingleOrderBook</a>&lt;M&gt;, order_id: OrderId
 ): bool {
     self.orders.get_and_map(&order_id, |order| order.<a href="single_order_book.md#0x7_single_order_book_is_active_order">is_active_order</a>()).destroy_with_default(
@@ -975,7 +975,7 @@ cancellation of the order. Please use the <code>cancel_order</code> API to cance
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="single_order_book.md#0x7_single_order_book_get_order">get_order</a>&lt;M: store + <b>copy</b> + drop&gt;(
+<pre><code><b>friend</b> <b>fun</b> <a href="single_order_book.md#0x7_single_order_book_get_order">get_order</a>&lt;M: store + <b>copy</b> + drop&gt;(
     self: &<a href="single_order_book.md#0x7_single_order_book_SingleOrderBook">SingleOrderBook</a>&lt;M&gt;, order_id: OrderId
 ): Option&lt;OrderWithState&lt;M&gt;&gt; {
     self.orders.get(&order_id)
@@ -1001,7 +1001,7 @@ cancellation of the order. Please use the <code>cancel_order</code> API to cance
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="single_order_book.md#0x7_single_order_book_get_remaining_size">get_remaining_size</a>&lt;M: store + <b>copy</b> + drop&gt;(
+<pre><code><b>friend</b> <b>fun</b> <a href="single_order_book.md#0x7_single_order_book_get_remaining_size">get_remaining_size</a>&lt;M: store + <b>copy</b> + drop&gt;(
     self: &<a href="single_order_book.md#0x7_single_order_book_SingleOrderBook">SingleOrderBook</a>&lt;M&gt;, order_id: OrderId
 ): u64 {
     self.orders.get_and_map(
@@ -1030,7 +1030,7 @@ Removes and returns the orders that are ready to be executed based on the curren
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="single_order_book.md#0x7_single_order_book_take_ready_price_based_orders">take_ready_price_based_orders</a>&lt;M: store + <b>copy</b> + drop&gt;(
+<pre><code><b>friend</b> <b>fun</b> <a href="single_order_book.md#0x7_single_order_book_take_ready_price_based_orders">take_ready_price_based_orders</a>&lt;M: store + <b>copy</b> + drop&gt;(
     self: &<b>mut</b> <a href="single_order_book.md#0x7_single_order_book_SingleOrderBook">SingleOrderBook</a>&lt;M&gt;, current_price: u64, order_limit: u64
 ): <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;SingleOrder&lt;M&gt;&gt; {
     <b>let</b> self_orders = &<b>mut</b> self.orders;
@@ -1081,7 +1081,7 @@ Removes and returns the orders that are ready to be executed based on the time c
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="single_order_book.md#0x7_single_order_book_take_ready_time_based_orders">take_ready_time_based_orders</a>&lt;M: store + <b>copy</b> + drop&gt;(
+<pre><code><b>friend</b> <b>fun</b> <a href="single_order_book.md#0x7_single_order_book_take_ready_time_based_orders">take_ready_time_based_orders</a>&lt;M: store + <b>copy</b> + drop&gt;(
     self: &<b>mut</b> <a href="single_order_book.md#0x7_single_order_book_SingleOrderBook">SingleOrderBook</a>&lt;M&gt;, order_limit: u64
 ): <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;SingleOrder&lt;M&gt;&gt; {
     <b>let</b> self_orders = &<b>mut</b> self.orders;
