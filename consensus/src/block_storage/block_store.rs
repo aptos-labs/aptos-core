@@ -744,6 +744,13 @@ impl BlockReader for BlockStore {
     }
 
     fn pipeline_pending_latency(&self, proposal_timestamp: Duration) -> Duration {
+        // Proxy mode: no pipeline backpressure needed. Even with pruning keeping
+        // commit_root in sync with ordered_root, skip the full computation to avoid
+        // unnecessary info logging, histogram updates, and potential lock contention
+        // on the proxy BlockStore's RwLock during high-throughput proposal generation.
+        if self.consensus_type == "proxy" {
+            return Duration::ZERO;
+        }
         let ordered_root = self.ordered_root();
         let commit_root = self.commit_root();
         let pending_path = self
