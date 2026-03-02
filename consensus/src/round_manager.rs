@@ -587,22 +587,52 @@ impl RoundManager {
     }
 
     /// Spawn the proposal generation task (used by process_new_round_event).
-    /// Drains all accumulated proxy block batches and merges their payloads into
-    /// a single proposal. Each primary block includes ALL proxy blocks since its
-    /// parent, covering every OrderedProxyBlocksMsg that arrived.
+    /// Consumes accumulated proxy block batches (up to max_receiving_block_txns)
+    /// and merges their payloads into a single proposal. Excess batches are deferred
+    /// to the next round to avoid voter-side payload rejection.
     fn spawn_proposal_generation(&mut self, new_round_event: NewRoundEvent) {
-        // Drain all accumulated proxy block batches and merge their payloads.
+        // Consume proxy block batches up to the voter-side txn limit.
+        // Remaining batches stay in pending_proxy_blocks for the next round.
+        // This prevents the negative feedback loop where oversized proposals get
+        // rejected by voters, causing timeouts that accumulate even more batches.
         let proxy_payload = if !self.pending_proxy_blocks.is_empty() {
-            let batched = std::mem::take(&mut self.pending_proxy_blocks);
-            let batched_count = batched.len();
-            for blocks in &batched {
+            let max_txns = self.local_config.max_receiving_block_txns as usize;
+            let mut all_batches = std::mem::take(&mut self.pending_proxy_blocks);
+            let total_batch_count = all_batches.len();
+            let mut total_txns: usize = 0;
+            let mut consume_count = 0;
+
+            for batch in all_batches.iter() {
+                let batch_txns = batch.total_txn_count();
+                // Always consume at least one batch for liveness
+                if consume_count > 0 && total_txns + batch_txns > max_txns {
+                    break;
+                }
+                total_txns += batch_txns;
+                consume_count += 1;
+            }
+
+            // Put deferred batches back into pending_proxy_blocks
+            self.pending_proxy_blocks = all_batches.split_off(consume_count);
+            let consumed = all_batches;
+            let deferred_count = self.pending_proxy_blocks.len();
+
+            if deferred_count > 0 {
+                warn!(
+                    "spawn_proposal_generation: deferring {} of {} proxy batches \
+                     (consumed {} txns, limit {})",
+                    deferred_count, total_batch_count, total_txns, max_txns,
+                );
+            }
+
+            for blocks in &consumed {
                 if blocks.primary_round() > self.last_consumed_proxy_primary_round {
                     self.last_consumed_proxy_primary_round = blocks.primary_round();
                 }
             }
             let mut all_vtxns = Vec::new();
             let mut merged_payload: Option<Payload> = None;
-            for blocks in batched {
+            for blocks in consumed {
                 all_vtxns.extend(blocks.aggregate_validator_txns());
                 let p = blocks.aggregate_payloads();
                 if !p.is_empty() {
@@ -615,12 +645,12 @@ impl RoundManager {
             let payload = merged_payload.unwrap_or_else(|| Payload::empty(true, true));
             let payload_len = payload.len();
             let payload_size = payload.size();
-            let num_batches = batched_count;
             info!(
                 "spawn_proposal_generation: merged proxy payload: {} txns, {} bytes, {} vtxns, \
-                 {} proxy batches merged, last_consumed_proxy_round={}",
+                 {} of {} proxy batches consumed ({} deferred), last_consumed_proxy_round={}",
                 payload_len, payload_size, all_vtxns.len(),
-                num_batches, self.last_consumed_proxy_primary_round,
+                consume_count, total_batch_count, deferred_count,
+                self.last_consumed_proxy_primary_round,
             );
             aptos_proxy_primary::proxy_metrics::PROXY_AGGREGATED_PAYLOAD_SIZE
                 .set(payload_len as i64);
