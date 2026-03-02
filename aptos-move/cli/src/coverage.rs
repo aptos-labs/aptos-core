@@ -7,13 +7,13 @@ use aptos_framework::extended_checks;
 use async_trait::async_trait;
 use clap::{Parser, Subcommand};
 use legacy_move_compiler::compiled_unit::{CompiledUnit, NamedCompiledModule};
+use move_asm::disassembler::disassemble_module_with_coverage;
 use move_coverage::{
     coverage_map::CoverageMap,
     format_csv_summary, format_human_summary,
     source_coverage::{ColorChoice, SourceCoverageBuilder, TextIndicator},
     summary::summarize_inst_cov,
 };
-use move_disassembler::disassembler::Disassembler;
 use move_model::metadata::{CompilerVersion, LanguageVersion};
 use move_package::{compilation::compiled_package::CompiledPackage, BuildConfig, CompilerConfig};
 use std::{path::PathBuf, sync::Arc};
@@ -177,9 +177,14 @@ impl CliCommand<()> for BytecodeCoverage {
     async fn execute(self) -> CliTypedResult<()> {
         let (coverage_map, package) = compile_coverage(self.common, self.move_options)?;
         let unit = package.get_module_by_name_from_root(&self.module_name)?;
-        let mut disassembler = Disassembler::from_unit(&unit.unit);
-        disassembler.add_coverage_map(coverage_map.to_unified_exec_map());
-        println!("{}", disassembler.disassemble()?);
+        let module = match &unit.unit {
+            CompiledUnit::Module(NamedCompiledModule { module, .. }) => module,
+            _ => unreachable!("get_module_by_name_from_root filters to modules only"),
+        };
+        let coverage = coverage_map.to_unified_exec_map();
+        let output = disassemble_module_with_coverage(module, &coverage)
+            .map_err(|err| CliError::UnexpectedError(format!("Unable to disassemble: {}", err)))?;
+        println!("{}", output);
         Ok(())
     }
 }
