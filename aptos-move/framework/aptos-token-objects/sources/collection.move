@@ -373,7 +373,7 @@ module aptos_token_objects::collection {
     friend fun increment_supply(
         collection: &Object<Collection>,
         token: address,
-    ): Option<AggregatorSnapshot<u64>> acquires FixedSupply, UnlimitedSupply, ConcurrentSupply {
+    ): Option<AggregatorSnapshot<u64>> {
         let collection_addr = collection.object_address();
         if (exists<ConcurrentSupply>(collection_addr)) {
             let supply = &mut ConcurrentSupply[collection_addr];
@@ -469,7 +469,7 @@ module aptos_token_objects::collection {
         token: address,
         index: Option<u64>,
         previous_owner: address,
-    ) acquires FixedSupply, UnlimitedSupply, ConcurrentSupply {
+    ) {
         let collection_addr = collection.object_address();
         if (exists<ConcurrentSupply>(collection_addr)) {
             let supply = &mut ConcurrentSupply[collection_addr];
@@ -536,7 +536,7 @@ module aptos_token_objects::collection {
 
     public fun upgrade_to_concurrent(
         ref: &ExtendRef,
-    ) acquires FixedSupply, UnlimitedSupply {
+    ) {
         let metadata_object_address = ref.address_from_extend_ref();
         let metadata_object_signer = ref.generate_signer_for_extending();
 
@@ -605,7 +605,7 @@ module aptos_token_objects::collection {
     /// it from being parallelized.
     public fun count<T: key>(
         collection: Object<T>
-    ): Option<u64> acquires FixedSupply, UnlimitedSupply, ConcurrentSupply {
+    ): Option<u64> {
         let collection_address = collection.object_address();
         check_collection_exists(collection_address);
 
@@ -624,22 +624,22 @@ module aptos_token_objects::collection {
     }
 
     #[view]
-    public fun creator<T: key>(collection: Object<T>): address acquires Collection {
+    public fun creator<T: key>(collection: Object<T>): address {
         borrow(&collection).creator
     }
 
     #[view]
-    public fun description<T: key>(collection: Object<T>): String acquires Collection {
+    public fun description<T: key>(collection: Object<T>): String {
         borrow(&collection).description
     }
 
     #[view]
-    public fun name<T: key>(collection: Object<T>): String acquires Collection {
+    public fun name<T: key>(collection: Object<T>): String {
         borrow(&collection).name
     }
 
     #[view]
-    public fun uri<T: key>(collection: Object<T>): String acquires Collection {
+    public fun uri<T: key>(collection: Object<T>): String {
         borrow(&collection).uri
     }
 
@@ -656,7 +656,7 @@ module aptos_token_objects::collection {
     /// `create_collection_address` should not be used to derive the collection's address.
     ///
     /// After changing the collection's name, to create tokens - only call functions that accept the collection object as an argument.
-    public fun set_name(mutator_ref: &MutatorRef, name: String) acquires Collection {
+    public fun set_name(mutator_ref: &MutatorRef, name: String) {
         assert!(name.length() <= MAX_COLLECTION_NAME_LENGTH, error::out_of_range(ECOLLECTION_NAME_TOO_LONG));
         let collection = borrow_mut(mutator_ref);
         event::emit(Mutation {
@@ -668,7 +668,7 @@ module aptos_token_objects::collection {
         collection.name = name;
     }
 
-    public fun set_description(mutator_ref: &MutatorRef, description: String) acquires Collection {
+    public fun set_description(mutator_ref: &MutatorRef, description: String) {
         assert!(description.length() <= MAX_DESCRIPTION_LENGTH, error::out_of_range(EDESCRIPTION_TOO_LONG));
         let collection = borrow_mut(mutator_ref);
         if (std::features::module_event_migration_enabled()) {
@@ -687,7 +687,7 @@ module aptos_token_objects::collection {
         collection.description = description;
     }
 
-    public fun set_uri(mutator_ref: &MutatorRef, uri: String) acquires Collection {
+    public fun set_uri(mutator_ref: &MutatorRef, uri: String) {
         assert!(uri.length() <= MAX_URI_LENGTH, error::out_of_range(EURI_TOO_LONG));
         let collection = borrow_mut(mutator_ref);
         if (std::features::module_event_migration_enabled()) {
@@ -706,7 +706,7 @@ module aptos_token_objects::collection {
         collection.uri = uri;
     }
 
-    public fun set_max_supply(mutator_ref: &MutatorRef, max_supply: u64) acquires ConcurrentSupply, FixedSupply {
+    public fun set_max_supply(mutator_ref: &MutatorRef, max_supply: u64) {
         let collection = object::address_to_object<Collection>(mutator_ref.self);
         let collection_address = collection.object_address();
         let old_max_supply;
@@ -741,7 +741,7 @@ module aptos_token_objects::collection {
     #[test_only]
     fun downgrade_from_concurrent_for_test(
         ref: &ExtendRef,
-    ) acquires ConcurrentSupply {
+    ) {
         let metadata_object_address = ref.address_from_extend_ref();
         let metadata_object_signer = ref.generate_signer_for_extending();
 
@@ -769,7 +769,7 @@ module aptos_token_objects::collection {
     }
 
     #[test(creator = @0x123)]
-    fun test_create_mint_burn_for_unlimited(creator: &signer) acquires FixedSupply, UnlimitedSupply, ConcurrentSupply {
+    fun test_create_mint_burn_for_unlimited(creator: &signer) {
         let creator_address = signer::address_of(creator);
         let name = string::utf8(b"collection name");
         let constructor_ref = create_unlimited_collection(creator, string::utf8(b""), name, option::none(), string::utf8(b""));
@@ -787,7 +787,7 @@ module aptos_token_objects::collection {
     }
 
     #[test(creator = @0x123)]
-    fun test_create_mint_burn_for_fixed(creator: &signer) acquires FixedSupply, UnlimitedSupply, ConcurrentSupply {
+    fun test_create_mint_burn_for_fixed(creator: &signer) {
         let creator_address = signer::address_of(creator);
         let name = string::utf8(b"collection name");
         let constructor_ref = create_fixed_collection(creator, string::utf8(b""), 1, name, option::none(), string::utf8(b""));
@@ -807,7 +807,7 @@ module aptos_token_objects::collection {
     #[test(creator = @0x123)]
     fun test_create_mint_burn_for_concurrent(
         creator: &signer
-    ) acquires FixedSupply, UnlimitedSupply, ConcurrentSupply {
+    ) {
         let creator_address = signer::address_of(creator);
         let name = string::utf8(b"collection name");
         create_fixed_collection(creator, string::utf8(b""), 1, name, option::none(), string::utf8(b""));
@@ -873,7 +873,7 @@ module aptos_token_objects::collection {
     }
 
     #[test(creator = @0x123)]
-    entry fun test_set_name(creator: &signer) acquires Collection {
+    entry fun test_set_name(creator: &signer) {
         let collection_name = string::utf8(b"collection name");
         let constructor_ref = create_collection_helper(creator, collection_name);
         let mutator_ref = generate_mutator_ref(&constructor_ref);
@@ -893,7 +893,7 @@ module aptos_token_objects::collection {
     }
 
     #[test(creator = @0x123)]
-    entry fun test_set_description(creator: &signer) acquires Collection {
+    entry fun test_set_description(creator: &signer) {
         let collection_name = string::utf8(b"collection name");
         let constructor_ref = create_collection_helper(creator, collection_name);
         let collection = object::address_to_object<Collection>(
@@ -907,7 +907,7 @@ module aptos_token_objects::collection {
     }
 
     #[test(creator = @0x123)]
-    entry fun test_set_uri(creator: &signer) acquires Collection {
+    entry fun test_set_uri(creator: &signer) {
         let collection_name = string::utf8(b"collection name");
         let constructor_ref = create_collection_helper(creator, collection_name);
         let mutator_ref = generate_mutator_ref(&constructor_ref);
@@ -921,7 +921,7 @@ module aptos_token_objects::collection {
     }
 
     #[test(creator = @0x123)]
-    entry fun test_set_max_supply_concurrent(creator: &signer) acquires ConcurrentSupply, FixedSupply {
+    entry fun test_set_max_supply_concurrent(creator: &signer) {
         let collection_name = string::utf8(b"collection name");
         let max_supply = 100;
         let constructor_ref = create_fixed_collection_helper(creator, collection_name, max_supply);
@@ -944,7 +944,7 @@ module aptos_token_objects::collection {
     #[test(creator = @0x123)]
     entry fun test_set_max_supply_same_as_current_supply_fixed(
         creator: &signer,
-    ) acquires ConcurrentSupply, FixedSupply, UnlimitedSupply {
+    ) {
         let collection_name = string::utf8(b"collection name");
         let max_supply = 10;
         let constructor_ref = create_fixed_collection_helper(creator, collection_name, max_supply);
@@ -972,7 +972,7 @@ module aptos_token_objects::collection {
 
     #[test(creator = @0x123)]
     #[expected_failure(abort_code = 0x1000A, location = aptos_token_objects::collection)]
-    entry fun test_set_max_supply_none(creator: &signer) acquires ConcurrentSupply, FixedSupply {
+    entry fun test_set_max_supply_none(creator: &signer) {
         let collection_name = string::utf8(b"collection name");
         let constructor_ref = create_collection_helper(creator, collection_name);
         let mutator_ref = generate_mutator_ref(&constructor_ref);
@@ -981,7 +981,7 @@ module aptos_token_objects::collection {
 
     #[test(creator = @0x123)]
     #[expected_failure(abort_code = 0x20009, location = aptos_token_objects::collection)]
-    entry fun test_set_max_supply_too_low_fixed_supply(creator: &signer) acquires ConcurrentSupply, FixedSupply, UnlimitedSupply {
+    entry fun test_set_max_supply_too_low_fixed_supply(creator: &signer) {
         let max_supply = 3;
         let collection_name = string::utf8(b"Low Supply Collection");
         let constructor_ref = create_fixed_collection_helper(creator, collection_name, max_supply);
@@ -1001,7 +1001,7 @@ module aptos_token_objects::collection {
 
     #[test(creator = @0x123)]
     #[expected_failure(abort_code = 0x20009, location = aptos_token_objects::collection)]
-    entry fun test_set_max_supply_too_low_concurrent_supply(creator: &signer) acquires ConcurrentSupply, FixedSupply, UnlimitedSupply {
+    entry fun test_set_max_supply_too_low_concurrent_supply(creator: &signer) {
         let collection_name = string::utf8(b"Low Supply Collection");
         let max_supply = 3;
         let constructor_ref = create_fixed_collection_helper(creator, collection_name, max_supply);

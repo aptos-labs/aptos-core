@@ -632,22 +632,22 @@ module aptos_token_objects::token {
     }
 
     #[view]
-    public fun creator<T: key>(token: Object<T>): address acquires Token {
+    public fun creator<T: key>(token: Object<T>): address {
         collection::creator(borrow(&token).collection)
     }
 
     #[view]
-    public fun collection_name<T: key>(token: Object<T>): String acquires Token {
+    public fun collection_name<T: key>(token: Object<T>): String {
         collection::name(borrow(&token).collection)
     }
 
     #[view]
-    public fun collection_object<T: key>(token: Object<T>): Object<Collection> acquires Token {
+    public fun collection_object<T: key>(token: Object<T>): Object<Collection> {
         borrow(&token).collection
     }
 
     #[view]
-    public fun description<T: key>(token: Object<T>): String acquires Token {
+    public fun description<T: key>(token: Object<T>): String {
         borrow(&token).description
     }
 
@@ -667,7 +667,7 @@ module aptos_token_objects::token {
     #[view]
     /// Avoid this method in the same transaction as the token is minted
     /// as that would prohibit transactions to be executed in parallel.
-    public fun name<T: key>(token: Object<T>): String acquires Token, TokenIdentifiers {
+    public fun name<T: key>(token: Object<T>): String {
         let token_address = token.object_address();
         if (exists<TokenIdentifiers>(token_address)) {
             TokenIdentifiers[token_address].name.read_derived_string()
@@ -677,12 +677,12 @@ module aptos_token_objects::token {
     }
 
     #[view]
-    public fun uri<T: key>(token: Object<T>): String acquires Token {
+    public fun uri<T: key>(token: Object<T>): String {
         borrow(&token).uri
     }
 
     #[view]
-    public fun royalty<T: key>(token: Object<T>): Option<Royalty> acquires Token {
+    public fun royalty<T: key>(token: Object<T>): Option<Royalty> {
         borrow(&token);
         let royalty = royalty::get(token);
         if (royalty.is_some()) {
@@ -712,7 +712,7 @@ module aptos_token_objects::token {
     #[view]
     /// Avoid this method in the same transaction as the token is minted
     /// as that would prohibit transactions to be executed in parallel.
-    public fun index<T: key>(token: Object<T>): u64 acquires Token, TokenIdentifiers {
+    public fun index<T: key>(token: Object<T>): u64 {
         let token_address = token.object_address();
         if (exists<TokenIdentifiers>(token_address)) {
             TokenIdentifiers[token_address].index.read_snapshot()
@@ -731,7 +731,7 @@ module aptos_token_objects::token {
         &mut Token[mutator_ref.self]
     }
 
-    public fun burn(burn_ref: BurnRef) acquires Token, TokenIdentifiers {
+    public fun burn(burn_ref: BurnRef) {
         let (addr, previous_owner) = if (burn_ref.inner.is_some()) {
             let delete_ref = burn_ref.inner.extract();
             let addr = delete_ref.address_from_delete_ref();
@@ -771,7 +771,7 @@ module aptos_token_objects::token {
         collection::decrement_supply(&collection, addr, option::some(index), previous_owner);
     }
 
-    public fun set_description(mutator_ref: &MutatorRef, description: String) acquires Token {
+    public fun set_description(mutator_ref: &MutatorRef, description: String) {
         assert!(description.length() <= MAX_DESCRIPTION_LENGTH, error::out_of_range(EDESCRIPTION_TOO_LONG));
         let token = borrow_mut(mutator_ref);
         if (std::features::module_event_migration_enabled()) {
@@ -794,7 +794,7 @@ module aptos_token_objects::token {
         token.description = description;
     }
 
-    public fun set_name(mutator_ref: &MutatorRef, name: String) acquires Token, TokenIdentifiers {
+    public fun set_name(mutator_ref: &MutatorRef, name: String) {
         assert!(name.length() <= MAX_TOKEN_NAME_LENGTH, error::out_of_range(ETOKEN_NAME_TOO_LONG));
 
         let token = borrow_mut(mutator_ref);
@@ -829,7 +829,7 @@ module aptos_token_objects::token {
         };
     }
 
-    public fun set_uri(mutator_ref: &MutatorRef, uri: String) acquires Token {
+    public fun set_uri(mutator_ref: &MutatorRef, uri: String) {
         assert!(uri.length() <= MAX_URI_LENGTH, error::out_of_range(EURI_TOO_LONG));
         let token = borrow_mut(mutator_ref);
         if (std::features::module_event_migration_enabled()) {
@@ -853,7 +853,7 @@ module aptos_token_objects::token {
     }
 
     #[test(creator = @0x123, trader = @0x456)]
-    fun test_create_and_transfer(creator: &signer, trader: &signer) acquires Token {
+    fun test_create_and_transfer(creator: &signer, trader: &signer) {
         let collection_name = string::utf8(b"collection name");
         let token_name = string::utf8(b"token name");
 
@@ -872,7 +872,7 @@ module aptos_token_objects::token {
     }
 
     #[test(creator = @0x123, trader = @0x456, aptos_framework = @aptos_framework)]
-    fun test_create_and_transfer_token_as_collection_owner(creator: &signer, trader: &signer, aptos_framework: &signer) acquires Token {
+    fun test_create_and_transfer_token_as_collection_owner(creator: &signer, trader: &signer, aptos_framework: &signer) {
         features::change_feature_flags_for_testing(aptos_framework, vector[features::get_collection_owner_feature()], vector[]);
         let collection_name = string::utf8(b"collection name");
         let token_name = string::utf8(b"token name");
@@ -967,7 +967,7 @@ module aptos_token_objects::token {
     }
 
     #[test(creator = @0x123, trader = @0x456)]
-    fun test_create_and_transfer_token_with_seed(creator: &signer, trader: &signer) acquires Token {
+    fun test_create_and_transfer_token_with_seed(creator: &signer, trader: &signer) {
         let collection_name = string::utf8(b"collection name");
         let token_name = string::utf8(b"token name");
 
@@ -1028,7 +1028,7 @@ module aptos_token_objects::token {
     }
 
     #[test(creator = @0x123)]
-    fun test_collection_royalty(creator: &signer) acquires Token {
+    fun test_collection_royalty(creator: &signer) {
         let collection_name = string::utf8(b"collection name");
         let token_name = string::utf8(b"token name");
 
@@ -1059,7 +1059,7 @@ module aptos_token_objects::token {
     }
 
     #[test(creator = @0x123)]
-    fun test_no_royalty(creator: &signer) acquires Token {
+    fun test_no_royalty(creator: &signer) {
         let collection_name = string::utf8(b"collection name");
         let token_name = string::utf8(b"token name");
 
@@ -1109,7 +1109,7 @@ module aptos_token_objects::token {
     }
 
     #[test(creator = @0x123)]
-    fun test_set_description(creator: &signer) acquires Token {
+    fun test_set_description(creator: &signer) {
         let collection_name = string::utf8(b"collection name");
         let token_name = string::utf8(b"token name");
 
@@ -1126,7 +1126,7 @@ module aptos_token_objects::token {
     }
 
     #[test(creator = @0x123)]
-    fun test_set_name(creator: &signer) acquires Token, TokenIdentifiers {
+    fun test_set_name(creator: &signer) {
         let collection_name = string::utf8(b"collection name");
         let token_name = string::utf8(b"token name");
 
@@ -1143,7 +1143,7 @@ module aptos_token_objects::token {
     }
 
     #[test(creator = @0x123)]
-    fun test_set_uri(creator: &signer) acquires Token {
+    fun test_set_uri(creator: &signer) {
         let collection_name = string::utf8(b"collection name");
         let token_name = string::utf8(b"token name");
 
@@ -1160,7 +1160,7 @@ module aptos_token_objects::token {
     }
 
     #[test(creator = @0x123)]
-    fun test_burn_without_royalty(creator: &signer) acquires Token, TokenIdentifiers {
+    fun test_burn_without_royalty(creator: &signer) {
         let collection_name = string::utf8(b"collection name");
         let token_name = string::utf8(b"token name");
 
@@ -1183,7 +1183,7 @@ module aptos_token_objects::token {
     }
 
     #[test(creator = @0x123)]
-    fun test_burn_with_royalty(creator: &signer) acquires Token, TokenIdentifiers {
+    fun test_burn_with_royalty(creator: &signer) {
         let collection_name = string::utf8(b"collection name");
         let token_name = string::utf8(b"token name");
 
@@ -1207,7 +1207,7 @@ module aptos_token_objects::token {
     }
 
     #[test(creator = @0x123)]
-    fun test_create_from_account_burn_and_delete(creator: &signer) acquires Token, TokenIdentifiers {
+    fun test_create_from_account_burn_and_delete(creator: &signer) {
         use aptos_framework::account;
 
         let collection_name = string::utf8(b"collection name");
@@ -1232,7 +1232,7 @@ module aptos_token_objects::token {
     }
 
     #[test(creator = @0x123)]
-    fun test_create_burn_and_delete(creator: &signer) acquires Token, TokenIdentifiers {
+    fun test_create_burn_and_delete(creator: &signer) {
         use aptos_framework::account;
 
         let collection_name = string::utf8(b"collection name");
@@ -1258,7 +1258,7 @@ module aptos_token_objects::token {
     }
 
     #[test(creator = @0x123)]
-    fun test_upgrade_to_concurrent_and_numbered_tokens(creator: &signer) acquires Token, TokenIdentifiers {
+    fun test_upgrade_to_concurrent_and_numbered_tokens(creator: &signer) {
         let collection_name = string::utf8(b"collection name");
         let token_name = string::utf8(b"token name");
 
