@@ -242,12 +242,13 @@ mod shplonked {
                 hid: vec![z],
             })
             .collect();
+        let y_rev: Vec<Vec<_>> = sets.iter().map(|_| vec![]).collect();
         batch_verify_generalized::<Bn254, _, SumEvalHom>(
             &vk,
             &sets,
             &SumEvalHom,
             &commitment_msms,
-            &[],
+            &y_rev,
             proof.sigma_proof_statement.phi_y,
             &batch_proof,
             &mut trs_verifier,

@@ -30,10 +30,12 @@ use std::{fmt::Debug, marker::PhantomData};
 
 /// Witness for the Shplonked opening sigma protocol: (rho, evals, u) such that
 /// com_y = xi_1*rho + MSM(taus_1, evals), V = taus_1[0]*sum(alphas_i*evals_i) + xi_1*u, y_sum = sum(evals).
+/// evals is per polynomial: { y_i^hid }_i.
 #[derive(Clone, Debug, PartialEq, Eq, CanonicalSerialize, CanonicalDeserialize)]
 pub struct ShplonkedSigmaWitness<F: PrimeField> {
     pub c_y_hid_randomness: F,
-    pub evals: Vec<F>,
+    /// Hidden evaluations per polynomial: { y_i^hid }_i.
+    pub evals: Vec<Vec<F>>,
     pub com_evals_randomness: F,
 }
 
@@ -43,7 +45,12 @@ impl<F: PrimeField> Witness<F> for ShplonkedSigmaWitness<F> {
             .evals
             .into_iter()
             .zip(other.evals.iter())
-            .map(|(a, b)| a + c * b)
+            .map(|(a, b)| {
+                a.into_iter()
+                    .zip(b.iter())
+                    .map(|(x, y)| x + c * y)
+                    .collect()
+            })
             .collect();
         Self {
             c_y_hid_randomness: self.c_y_hid_randomness + c * other.c_y_hid_randomness,
@@ -55,7 +62,11 @@ impl<F: PrimeField> Witness<F> for ShplonkedSigmaWitness<F> {
     fn rand<R: RngCore + CryptoRng>(&self, rng: &mut R) -> Self {
         Self {
             c_y_hid_randomness: sample_field_element(rng),
-            evals: sample_field_elements(self.evals.len(), rng),
+            evals: self
+                .evals
+                .iter()
+                .map(|v| sample_field_elements(v.len(), rng))
+                .collect(),
             com_evals_randomness: sample_field_element(rng),
         }
     }
@@ -64,9 +75,10 @@ impl<F: PrimeField> Witness<F> for ShplonkedSigmaWitness<F> {
 fn project_to_kzg_witness<F: PrimeField>(
     w: &ShplonkedSigmaWitness<F>,
 ) -> univariate_hiding_kzg::Witness<F> {
+    let values: Vec<F> = w.evals.iter().flatten().cloned().collect();
     univariate_hiding_kzg::Witness {
         hiding_randomness: Scalar(w.c_y_hid_randomness),
-        values: Scalar::vec_from_inner(w.evals.clone()),
+        values: Scalar::vec_from_inner(values),
     }
 }
 
@@ -145,24 +157,25 @@ impl<E: Pairing> fixed_base_msms::Trait for EvalPointCommitHom<E> {
         &self,
         w: &Self::Domain,
     ) -> Self::CodomainShape<MsmInput<Self::Base, Self::Scalar>> {
+        let evals_flat: Vec<E::ScalarField> = w.evals.iter().flatten().cloned().collect();
         debug_assert_eq!(
-            w.evals.len(),
+            evals_flat.len(),
             self.alphas.len(),
             "evals and alphas must have the same length"
         );
-        let sum_y = w
-            .evals
+        let sum_y = evals_flat
             .iter()
             .zip(self.alphas.iter())
             .map(|(y_i, alpha_i)| *alpha_i * y_i)
             .fold(E::ScalarField::zero(), |acc, x| acc + x);
         let bases = vec![self.tau_0, self.xi_1];
         let scalars = vec![sum_y, w.com_evals_randomness];
-        CodomainShape(MsmInput::new(bases, scalars).expect("VHom MSM"))
+        CodomainShape(MsmInput::new(bases, scalars).expect("EvalPointCommitHom MSM"))
     }
 
     fn msm_eval(input: MsmInput<Self::Base, Self::Scalar>) -> Self::MsmOutput {
-        E::G1::msm(input.bases(), input.scalars()).expect("VHom msm_eval") // TODO: not sure we should be doing this because size-2 MSMs in arkworks might not be faster than elementwise multiplication
+        E::G1::msm(input.bases(), input.scalars()).expect("EvalPointCommitHom msm_eval")
+        // TODO: not sure we should be doing this because size-2 MSMs in arkworks might not be faster than elementwise multiplication
     }
 
     fn batch_normalize(msm_output: Vec<Self::MsmOutput>) -> Vec<Self::Base> {
@@ -192,7 +205,7 @@ impl<F: PrimeField> HomTrait for SumHom<F> {
     type Domain = ShplonkedSigmaWitness<F>;
 
     fn apply(&self, w: &Self::Domain) -> Self::Codomain {
-        w.evals.iter().fold(F::zero(), |acc, x| acc + x)
+        w.evals.iter().flatten().fold(F::zero(), |acc, x| acc + x)
     }
 
     fn normalize(&self, value: Self::Codomain) -> Self::CodomainNormalized {
@@ -217,7 +230,11 @@ impl<F: PrimeField> SigmaTrait for SumHom<F> {
         _verifier_batch_size: Option<Self::VerifierBatchSize>,
         _rng: &mut R,
     ) -> anyhow::Result<()> {
-        let sum_z = response.evals.iter().fold(F::zero(), |acc, x| acc + x);
+        let sum_z = response
+            .evals
+            .iter()
+            .flatten()
+            .fold(F::zero(), |acc, x| acc + x);
         let expected = *prover_commitment + challenge * public_statement;
         anyhow::ensure!(sum_z == expected, "SumEvalsHom sigma check failed");
         Ok(())

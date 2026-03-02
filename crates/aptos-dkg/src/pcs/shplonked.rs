@@ -5,9 +5,10 @@
 //!
 //! Implements PCS.BatchOpen and PCS.BatchVerify per the SHPLONKeD spec: batch opening of
 //! univariate polynomials f₁,…,fₙ over evaluation sets S_i = S_i^rev ⊔ S_i^hid, with
-//! revealed evaluations y^rev, homomorphism image φ(y), and commitment C_{y^hid} to hidden
-//! evaluations. Proof π = (π_1, π_2, C_{y^hid}, C_eval, π_PoK). Notation: Z_S(X) = ∏_{s∈S}(X−s);
-//! combined polynomial f = ∑_i c^{i-1} Z_{S\S_i}(x) f_i − Z_S(x) q − g with g = ∑_i c^{i-1} Z_{S\S_i}(x) f̃_i(x);
+//! revealed evaluations { y_i^rev }_i (one vector per polynomial), homomorphism image φ({ y_i }_i),
+//! and commitment C_{y^hid} to hidden evaluations. Proof π = (π_1, π_2, C_{y^hid}, C_eval, π_PoK).
+//! Notation: Z_S(X) = ∏_{s∈S}(X−s); y_i = (y_i^rev, y_i^hid); combined polynomial
+//! f = ∑_i c^{i-1} Z_{S\S_i}(x) f_i − Z_S(x) q − g with g = ∑_i c^{i-1} Z_{S\S_i}(x) f̃_i(x);
 //! opening at (x, 0); verifier computes C_f = ∑·C_i − Z_S·π_1 − C_eval + c^n·C_PoK.
 
 // WARNING: THIS CODE HAS NOT BEEN PROPERLY VETTED, ONLY USE FOR BENCHMARKING PURPOSES!!!!!
@@ -170,11 +171,12 @@ pub fn tilde_f_i_poly<F: FftField>(s_i: &[F], evals_at_s_i: &[F]) -> DensePolyno
         .fold(DensePolynomial::zero(), |a, b| &a + &b)
 }
 
-/// Homomorphism φ on the evaluation vector y = (y^rev, y^hid). Used so the prover reveals φ(y) and the
-/// sigma protocol proves knowledge of y^hid consistent with C_{y^hid}, C_eval, and φ(y).
+/// Homomorphism φ on the evaluations { y_i }_i, where y_i = (y_i^rev, y_i^hid). The prover reveals
+/// { y_i^rev }_i and φ({ y_i }_i); the sigma protocol proves knowledge of { y_i^hid }_i consistent
+/// with C_{y^hid}, C_eval, and φ({ y_i }_i).
 pub trait EvalHomomorphism<F: Field>: Send + Sync {
-    /// φ(y) where y = (y_rev, y_hid) in the canonical flat order (rev then hid per spec).
-    fn image(&self, y_rev: &[F], y_hid: &[F]) -> F;
+    /// φ({ y_i }_i) with y_rev = { y_i^rev }_i and y_hid = { y_i^hid }_i (one vector per polynomial each).
+    fn apply(&self, y_rev: &[Vec<F>], y_hid: &[Vec<F>]) -> F;
 }
 
 /// Default: φ(y) = ∑_j y_j (sum of all evaluations).
@@ -182,10 +184,11 @@ pub trait EvalHomomorphism<F: Field>: Send + Sync {
 pub struct SumEvalHom;
 
 impl<F: Field> EvalHomomorphism<F> for SumEvalHom {
-    fn image(&self, y_rev: &[F], y_hid: &[F]) -> F {
+    fn apply(&self, y_rev: &[Vec<F>], y_hid: &[Vec<F>]) -> F {
         y_rev
             .iter()
-            .chain(y_hid.iter())
+            .flatten()
+            .chain(y_hid.iter().flatten())
             .fold(F::zero(), |a, &b| a + b)
     }
 }
@@ -209,7 +212,8 @@ pub(crate) struct ZkPcsOpeningSigmaProof<E: Pairing> {
     r_com_y: E::G1Affine,
     r_V: E::G1Affine,
     r_y: E::ScalarField,
-    z_yi: Vec<E::ScalarField>,
+    /// Sigma protocol response: hidden evals per polynomial { z_i }_i (same shape as { y_i^hid }_i).
+    z_yi: Vec<Vec<E::ScalarField>>,
     z_u: E::ScalarField,
     z_rho: E::ScalarField,
 }
@@ -245,18 +249,19 @@ pub struct ShplonkedBatchProof<E: Pairing> {
 }
 
 /// Batch opening: revealed evaluations plus the batch proof.
+/// Output is { y_i^rev }_i (one vector of revealed evals per polynomial).
 #[allow(non_snake_case)]
 #[derive(Clone, Debug)]
 pub struct ShplonkedBatchOpening<E: Pairing> {
-    /// Revealed evaluations y^rev (order matches evaluation sets).
-    pub evals: Vec<E::ScalarField>,
+    /// Revealed evaluations { y_i^rev }_i: for each polynomial i, the evaluations at S_i^rev.
+    pub evals: Vec<Vec<E::ScalarField>>,
     /// Batch opening proof π.
     pub proof: ShplonkedBatchProof<E>,
 }
 
 impl<E: Pairing> ShplonkedBatchOpening<E> {
-    /// Returns the revealed evaluations.
-    pub fn get_evals(&self) -> &[E::ScalarField] {
+    /// Returns the revealed evaluations per polynomial: { y_i^rev }_i.
+    pub fn get_evals(&self) -> &[Vec<E::ScalarField>] {
         &self.evals
     }
 
@@ -294,14 +299,15 @@ where
 fn append_batch_statement_to_transcript<E: Pairing>(
     trs: &mut merlin::Transcript,
     sets: &[EvaluationSet<E::ScalarField>],
-    y_rev: &[E::ScalarField],
+    y_rev: &[Vec<E::ScalarField>],
     phi_y: E::ScalarField,
     c_y_hid: &E::G1Affine,
 ) {
     for set in sets {
         trs.append_evaluation_set(set);
     }
-    trs.append_evaluation_points(y_rev);
+    let y_rev_flat: Vec<E::ScalarField> = y_rev.iter().flatten().cloned().collect();
+    trs.append_evaluation_points(&y_rev_flat);
     trs.append_homomorphism_image(&phi_y);
     trs.append_point(c_y_hid);
 }
@@ -377,33 +383,34 @@ pub fn batch_open_generalized<
     assert_eq!(sets.len(), n);
     assert_eq!(rhos.len(), n);
 
-    // Step 1a: Compute y, phi(y) and com_y.
-    let mut y_rev = Vec::new();
-    let mut y_hid = Vec::new();
+    // Step 1a: Compute { y_i }_i = (y_i^rev, y_i^hid) per polynomial, then φ({ y_i }_i) and C_{y^hid}.
+    let mut y_rev_per_poly: Vec<Vec<E::ScalarField>> = Vec::with_capacity(n);
+    let mut y_hid_per_poly: Vec<Vec<E::ScalarField>> = Vec::with_capacity(n);
     let mut evals_per_poly: Vec<Vec<E::ScalarField>> = Vec::with_capacity(n);
     for (set, poly) in sets.iter().zip(polys.iter()) {
         let s_i: Vec<_> = set.all_points().cloned().collect();
         let evals_i: Vec<_> = s_i.iter().map(|s| poly.evaluate(s)).collect();
         evals_per_poly.push(evals_i.clone());
         let n_rev = set.rev.len();
-        y_rev.extend(evals_i.iter().take(n_rev).cloned()); // meh remove this
-        y_hid.extend(evals_i.iter().skip(n_rev).cloned());
+        y_rev_per_poly.push(evals_i.iter().take(n_rev).cloned().collect());
+        y_hid_per_poly.push(evals_i.iter().skip(n_rev).cloned().collect());
     }
-    let h = y_hid.len();
-    let phi_y = hom.image(&y_rev, &y_hid);
+    let y_hid_flat: Vec<E::ScalarField> = y_hid_per_poly.iter().flatten().cloned().collect();
+    let phi_y = hom.apply(&y_rev_per_poly, &y_hid_per_poly);
 
     let c_y_hid_randomness = sample_field_element(rng);
-    let com_y_hom = shplonked_sigma::com_y_hom::<E>(&srs.taus_1[..h], srs.xi_1);
-    let com_y_hid = com_y_hom
+    let com_y_hom = shplonked_sigma::com_y_hom::<E>(&srs.taus_1[..y_hid_flat.len()], srs.xi_1);
+    let com_y_hid_proj = com_y_hom
         .apply(&shplonked_sigma::ShplonkedSigmaWitness {
             c_y_hid_randomness,
-            evals: y_hid.clone(),
+            evals: y_hid_per_poly.clone(),
             com_evals_randomness: E::ScalarField::zero(),
         })
         .0;
 
-    // Step 1b
-    append_batch_statement_to_transcript::<E>(trs, sets, &y_rev, phi_y, &com_y_hid.into_affine());
+    // Step 1b: Add { S_i }_i, { y_i^rev }_i, φ({ y_i }_i), C_{y^hid} to transcript.
+    let com_y_hid = com_y_hid_proj.into_affine();
+    append_batch_statement_to_transcript::<E>(trs, sets, &y_rev_per_poly, phi_y, &com_y_hid);
 
     // Step 1c: Derive a challenge c from the Fiat-Shamir transcript.
     let c: E::ScalarField = trs.challenge_scalar();
@@ -510,7 +517,7 @@ pub fn batch_open_generalized<
         shplonked_sigma::EvalPointCommitHom::new(srs.taus_1[0], srs.xi_1, weights.clone());
     let witness_for_C_eval = shplonked_sigma::ShplonkedSigmaWitness {
         c_y_hid_randomness: E::ScalarField::zero(), // We're using the full sigma protocol witness here which is a bit awkward; but fine if we kill off this component
-        evals: y_hid.clone(),
+        evals: y_hid_per_poly.clone(),
         com_evals_randomness: rho_eval,
     };
     let C_eval_proj: E::G1 = eval_point_commit_hom.apply(&witness_for_C_eval).0;
@@ -548,7 +555,7 @@ pub fn batch_open_generalized<
     // Step 5d: compute the sigma proof
     let witness = ShplonkedSigmaWitness {
         c_y_hid_randomness,
-        evals: y_hid.clone(),
+        evals: y_hid_per_poly.clone(),
         com_evals_randomness: rho_eval,
     };
     let com_y_v_hom = shplonked_sigma::FirstTupleHom::<E> {
@@ -562,7 +569,7 @@ pub fn batch_open_generalized<
         hom2: sum_hom,
     };
     let statement_proj = TupleCodomainShape(
-        TupleCodomainShape(CodomainShape(com_y_hid), CodomainShape(C_eval_proj)),
+        TupleCodomainShape(CodomainShape(com_y_hid_proj), CodomainShape(C_eval_proj)),
         phi_y,
     );
     let (sigma_protocol_proof, _) =
@@ -586,7 +593,7 @@ pub fn batch_open_generalized<
     let pi_2_extra = opening.pi_2.into_affine();
 
     let sigma_proof_statement = ZkPcsOpeningSigmaProofStatement {
-        com_y_hid: com_y_hid.into_affine(),
+        com_y_hid,
         C_eval,
         phi_y,
         y_sum: phi_y,
@@ -599,12 +606,12 @@ pub fn batch_open_generalized<
         sigma_proof_statement,
     };
     ShplonkedBatchOpening {
-        evals: y_rev,
+        evals: y_rev_per_poly,
         proof,
     }
 }
 
-/// Generalized batch verify per spec: PCS.BatchVerify(vk, {S_i}, φ, {C_i}; y^rev, φ(y), π) → {0,1}.
+/// Generalized batch verify per spec: PCS.BatchVerify(vk, {S_i}, φ, {C_i}; { y_i^rev }_i, φ(y), π) → {0,1}.
 /// Commitments C_i may be given as MSM representations (they are expanded into the equation).
 #[allow(non_snake_case)]
 pub fn batch_verify_generalized<
@@ -616,7 +623,7 @@ pub fn batch_verify_generalized<
     sets: &[EvaluationSet<E::ScalarField>],
     hom: &H,
     commitment_msms: &[MsmInput<E::G1Affine, E::ScalarField>],
-    y_rev: &[E::ScalarField],
+    y_rev: &[Vec<E::ScalarField>],
     phi_y: E::ScalarField,
     proof: &ShplonkedBatchProof<E>,
     trs: &mut merlin::Transcript,
@@ -652,7 +659,7 @@ pub fn batch_pairing_for_verify_generalized<
     sets: &[EvaluationSet<E::ScalarField>],
     hom: &H,
     commitment_msms: &[MsmInput<E::G1Affine, E::ScalarField>],
-    y_rev: &[E::ScalarField],
+    y_rev: &[Vec<E::ScalarField>],
     phi_y: E::ScalarField,
     proof: &ShplonkedBatchProof<E>,
     trs: &mut merlin::Transcript,
@@ -710,7 +717,7 @@ where
         E::ScalarField::ONE,
     ]);
 
-    let h = sigma_proof.z_yi.len();
+    let h: usize = sigma_proof.z_yi.iter().map(|v| v.len()).sum();
     let com_y_hom = shplonked_sigma::com_y_hom(&srs.taus_1[..h], srs.xi_1);
     let alpha_hid = {
         let z_S_minus_S_i_vals = evaluate_z_S_minus_S_is(z_S_val, &s_per_poly, x);
@@ -758,7 +765,7 @@ where
             )),
             z: ShplonkedSigmaWitness {
                 c_y_hid_randomness: sigma_proof.z_rho,
-                evals: sigma_proof.z_yi.clone(),
+                evals: sigma_proof.z_yi.clone(), // already { z_i }_i per polynomial
                 com_evals_randomness: sigma_proof.z_u,
             },
         };
@@ -779,7 +786,7 @@ where
     );
 
     anyhow::ensure!(
-        hom.image(y_rev, &sigma_proof.z_yi) == sigma_proof.r_y + c_sigma * phi_y,
+        hom.apply(y_rev, &sigma_proof.z_yi) == sigma_proof.r_y + c_sigma * phi_y,
         "sigma protocol scalar check (φ(y^rev, z) = r_φ + c·φ(y)) failed"
     );
 
@@ -837,7 +844,7 @@ where
             hid: vec![z],
         })
         .collect();
-    let y_rev: Vec<E::ScalarField> = vec![];
+    let y_rev: Vec<Vec<E::ScalarField>> = sets.iter().map(|_| vec![]).collect();
     batch_pairing_for_verify_generalized::<E, R, SumEvalHom>(
         srs,
         &sets,
@@ -1041,7 +1048,7 @@ where
                 hid: vec![z],
             })
             .collect();
-        let y_rev: Vec<E::ScalarField> = vec![];
+        let y_rev: Vec<Vec<E::ScalarField>> = sets.iter().map(|_| vec![]).collect();
         batch_verify_generalized::<E, _, SumEvalHom>(
             vk,
             &sets,
@@ -1133,7 +1140,7 @@ mod tests {
             &mut trs,
             &mut rng,
         );
-        assert!(opening.get_evals().is_empty());
+        assert!(opening.get_evals().iter().all(|v| v.is_empty()));
         assert_eq!(
             opening.get_phi_eval(),
             polys[0].evaluate(&points[0]) + polys[1].evaluate(&points[1])
