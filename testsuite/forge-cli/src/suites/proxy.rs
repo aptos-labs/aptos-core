@@ -85,11 +85,15 @@ fn apply_devnet_consensus_config(config: &mut aptos_config::config::NodeConfig) 
         .proxy_consensus_config
         .round_timeout_backoff_max_exponent = 6;
 
-    // Disable mempool failover broadcast to prevent cross-proxy txn sharing.
-    // With QS enabled, each proxy validator should only batch transactions
-    // submitted directly to it. Failover gossip causes the same txn to appear
-    // in different QS batches from different validators → duplicate execution.
+    // Disable mempool broadcast between validators to prevent cross-proxy txn
+    // sharing. default_failovers=0 only prevents failover broadcasts for non-validators;
+    // validators always broadcast to ALL peers with Primary priority. Setting
+    // tick_interval to a very large value effectively disables periodic broadcasts,
+    // ensuring each proxy validator only QS-batches transactions it received directly.
+    // Without this, each txn gets broadcast to all 4 proxy validators, creating
+    // 4 QS batches with the same txn → ~3x duplicate execution overhead.
     config.mempool.default_failovers = 0;
+    config.mempool.shared_mempool_tick_interval_ms = 10 * 60 * 1000; // 10 min (effectively disabled)
 }
 
 /// Remote test: 7 validators (4 proxy + 3 primary-only), multi-region network emulation.
