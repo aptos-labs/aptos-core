@@ -17894,6 +17894,27 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a8f112729512f8e442d81f95a8a7ddf2b7c6b8a1a6f509a95864142b30cab2d3"
 
 [[package]]
+name = "stackless-exec-ir"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "clap 4.5.21",
+ "codespan-reporting",
+ "datatest-stable",
+ "either",
+ "legacy-move-compiler",
+ "move-asm",
+ "move-binary-format",
+ "move-bytecode-verifier",
+ "move-compiler-v2",
+ "move-core-types",
+ "move-model",
+ "move-prover-test-utils",
+ "move-vm-types",
+ "triomphe",
+]
+
+[[package]]
 name = "static_assertions"
 version = "1.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
