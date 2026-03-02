@@ -1920,7 +1920,7 @@ Used in the <code><a href="confidential_asset.md#0x7_confidential_asset">confide
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="confidential_proof.md#0x7_confidential_proof_auditors_count_in_transfer_proof">auditors_count_in_transfer_proof</a>(
+<pre><code><b>friend</b> <b>fun</b> <a href="confidential_proof.md#0x7_confidential_proof_auditors_count_in_transfer_proof">auditors_count_in_transfer_proof</a>(
     proof: &<a href="confidential_proof.md#0x7_confidential_proof_TransferProof">TransferProof</a>
 ): u64 {
     proof.sigma_proof.xs.x7s.length()

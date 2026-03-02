@@ -287,7 +287,7 @@ There is a code bug that breaks internal invariant
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="price_time_index.md#0x7_price_time_index_new_price_time_idx">new_price_time_idx</a>(): <a href="price_time_index.md#0x7_price_time_index_PriceTimeIndex">PriceTimeIndex</a> {
+<pre><code><b>friend</b> <b>fun</b> <a href="price_time_index.md#0x7_price_time_index_new_price_time_idx">new_price_time_idx</a>(): <a href="price_time_index.md#0x7_price_time_index_PriceTimeIndex">PriceTimeIndex</a> {
     // potentially add max value <b>to</b> both sides (that will be skipped),
     // so that max_key never changes, and doesn't create conflict.
     PriceTimeIndex::V1 {
@@ -318,7 +318,7 @@ Returns None if there are no buys
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="price_time_index.md#0x7_price_time_index_best_bid_price">best_bid_price</a>(self: &<a href="price_time_index.md#0x7_price_time_index_PriceTimeIndex">PriceTimeIndex</a>): Option&lt;u64&gt; {
+<pre><code><b>friend</b> <b>fun</b> <a href="price_time_index.md#0x7_price_time_index_best_bid_price">best_bid_price</a>(self: &<a href="price_time_index.md#0x7_price_time_index_PriceTimeIndex">PriceTimeIndex</a>): Option&lt;u64&gt; {
     <b>if</b> (self.buys.is_empty()) {
         <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_none">option::none</a>()
     } <b>else</b> {
@@ -349,7 +349,7 @@ Returns None if there are no sells
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="price_time_index.md#0x7_price_time_index_best_ask_price">best_ask_price</a>(self: &<a href="price_time_index.md#0x7_price_time_index_PriceTimeIndex">PriceTimeIndex</a>): Option&lt;u64&gt; {
+<pre><code><b>friend</b> <b>fun</b> <a href="price_time_index.md#0x7_price_time_index_best_ask_price">best_ask_price</a>(self: &<a href="price_time_index.md#0x7_price_time_index_PriceTimeIndex">PriceTimeIndex</a>): Option&lt;u64&gt; {
     <b>if</b> (self.sells.is_empty()) {
         <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_none">option::none</a>()
     } <b>else</b> {
@@ -380,7 +380,7 @@ there are o buys / sells, returns None.
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="price_time_index.md#0x7_price_time_index_get_mid_price">get_mid_price</a>(self: &<a href="price_time_index.md#0x7_price_time_index_PriceTimeIndex">PriceTimeIndex</a>): Option&lt;u64&gt; {
+<pre><code><b>friend</b> <b>fun</b> <a href="price_time_index.md#0x7_price_time_index_get_mid_price">get_mid_price</a>(self: &<a href="price_time_index.md#0x7_price_time_index_PriceTimeIndex">PriceTimeIndex</a>): Option&lt;u64&gt; {
     <b>if</b> (self.sells.is_empty() || self.buys.is_empty()) {
         <b>return</b> <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_none">option::none</a>();
     };
@@ -412,7 +412,7 @@ there are o buys / sells, returns None.
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="price_time_index.md#0x7_price_time_index_get_slippage_price">get_slippage_price</a>(
+<pre><code><b>friend</b> <b>fun</b> <a href="price_time_index.md#0x7_price_time_index_get_slippage_price">get_slippage_price</a>(
     self: &<a href="price_time_index.md#0x7_price_time_index_PriceTimeIndex">PriceTimeIndex</a>, is_bid: bool, slippage_bps: u64
 ): Option&lt;u64&gt; {
     <b>if</b> (!is_bid) {
@@ -456,7 +456,7 @@ there are o buys / sells, returns None.
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="price_time_index.md#0x7_price_time_index_cancel_active_order">cancel_active_order</a>(
+<pre><code><b>friend</b> <b>fun</b> <a href="price_time_index.md#0x7_price_time_index_cancel_active_order">cancel_active_order</a>(
     self: &<b>mut</b> <a href="price_time_index.md#0x7_price_time_index_PriceTimeIndex">PriceTimeIndex</a>,
     price: u64,
     unique_priority_idx: IncreasingIdx,
@@ -495,7 +495,7 @@ Check if the order is a taker order - i.e. if it can be immediately matched with
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="price_time_index.md#0x7_price_time_index_is_taker_order">is_taker_order</a>(
+<pre><code><b>friend</b> <b>fun</b> <a href="price_time_index.md#0x7_price_time_index_is_taker_order">is_taker_order</a>(
     self: &<a href="price_time_index.md#0x7_price_time_index_PriceTimeIndex">PriceTimeIndex</a>, price: u64, is_bid: bool
 ): bool {
     <b>if</b> (is_bid) {
@@ -673,7 +673,7 @@ Check if the order is a taker order - i.e. if it can be immediately matched with
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="price_time_index.md#0x7_price_time_index_get_single_match_result">get_single_match_result</a>(
+<pre><code><b>friend</b> <b>fun</b> <a href="price_time_index.md#0x7_price_time_index_get_single_match_result">get_single_match_result</a>(
     self: &<b>mut</b> <a href="price_time_index.md#0x7_price_time_index_PriceTimeIndex">PriceTimeIndex</a>,
     price: u64,
     size: u64,
@@ -707,7 +707,7 @@ Increase the size of the order in the orderbook without altering its position in
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="price_time_index.md#0x7_price_time_index_increase_order_size">increase_order_size</a>(
+<pre><code><b>friend</b> <b>fun</b> <a href="price_time_index.md#0x7_price_time_index_increase_order_size">increase_order_size</a>(
     self: &<b>mut</b> <a href="price_time_index.md#0x7_price_time_index_PriceTimeIndex">PriceTimeIndex</a>,
     price: u64,
     unique_priority_idx: IncreasingIdx,
@@ -759,7 +759,7 @@ Decrease the size of the order in the order book without altering its position i
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="price_time_index.md#0x7_price_time_index_decrease_order_size">decrease_order_size</a>(
+<pre><code><b>friend</b> <b>fun</b> <a href="price_time_index.md#0x7_price_time_index_decrease_order_size">decrease_order_size</a>(
     self: &<b>mut</b> <a href="price_time_index.md#0x7_price_time_index_PriceTimeIndex">PriceTimeIndex</a>,
     price: u64,
     unique_priority_idx: IncreasingIdx,
@@ -810,7 +810,7 @@ Decrease the size of the order in the order book without altering its position i
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="price_time_index.md#0x7_price_time_index_place_maker_order">place_maker_order</a>(
+<pre><code><b>friend</b> <b>fun</b> <a href="price_time_index.md#0x7_price_time_index_place_maker_order">place_maker_order</a>(
     self: &<b>mut</b> <a href="price_time_index.md#0x7_price_time_index_PriceTimeIndex">PriceTimeIndex</a>,
     order_id: OrderId,
     order_book_type: OrderType,

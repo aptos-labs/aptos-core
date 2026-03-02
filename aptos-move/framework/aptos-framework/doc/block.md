@@ -426,7 +426,7 @@ This can only be called during Genesis.
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="block.md#0x1_block_initialize">initialize</a>(
+<pre><code><b>friend</b> <b>fun</b> <a href="block.md#0x1_block_initialize">initialize</a>(
     aptos_framework: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, epoch_interval_microsecs: u64
 ) {
     <a href="system_addresses.md#0x1_system_addresses_assert_aptos_framework">system_addresses::assert_aptos_framework</a>(aptos_framework);
@@ -510,11 +510,11 @@ Can only be called as part of the Aptos governance proposal process established 
 
 <pre><code><b>public</b> <b>fun</b> <a href="block.md#0x1_block_update_epoch_interval_microsecs">update_epoch_interval_microsecs</a>(
     aptos_framework: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, new_epoch_interval: u64
-) <b>acquires</b> <a href="block.md#0x1_block_BlockResource">BlockResource</a> {
+) {
     <a href="system_addresses.md#0x1_system_addresses_assert_aptos_framework">system_addresses::assert_aptos_framework</a>(aptos_framework);
     <b>assert</b>!(new_epoch_interval &gt; 0, <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="block.md#0x1_block_EZERO_EPOCH_INTERVAL">EZERO_EPOCH_INTERVAL</a>));
 
-    <b>let</b> block_resource = <b>borrow_global_mut</b>&lt;<a href="block.md#0x1_block_BlockResource">BlockResource</a>&gt;(@aptos_framework);
+    <b>let</b> block_resource = &<b>mut</b> <a href="block.md#0x1_block_BlockResource">BlockResource</a>[@aptos_framework];
     <b>let</b> old_epoch_interval = block_resource.epoch_interval;
     block_resource.epoch_interval = new_epoch_interval;
 
@@ -550,8 +550,8 @@ Return epoch interval in seconds.
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="block.md#0x1_block_get_epoch_interval_secs">get_epoch_interval_secs</a>(): u64 <b>acquires</b> <a href="block.md#0x1_block_BlockResource">BlockResource</a> {
-    <b>borrow_global</b>&lt;<a href="block.md#0x1_block_BlockResource">BlockResource</a>&gt;(@aptos_framework).epoch_interval / 1000000
+<pre><code><b>public</b> <b>fun</b> <a href="block.md#0x1_block_get_epoch_interval_secs">get_epoch_interval_secs</a>(): u64 {
+    <a href="block.md#0x1_block_BlockResource">BlockResource</a>[@aptos_framework].epoch_interval / 1000000
 }
 </code></pre>
 
@@ -583,7 +583,7 @@ Return epoch interval in seconds.
     failed_proposer_indices: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;,
     previous_block_votes_bitvec: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;,
     <a href="timestamp.md#0x1_timestamp">timestamp</a>: u64
-): u64 <b>acquires</b> <a href="block.md#0x1_block_BlockResource">BlockResource</a>, <a href="block.md#0x1_block_CommitHistory">CommitHistory</a> {
+): u64 {
     // Operational constraint: can only be invoked by the VM.
     <a href="system_addresses.md#0x1_system_addresses_assert_vm">system_addresses::assert_vm</a>(vm);
 
@@ -598,7 +598,7 @@ Return epoch interval in seconds.
         proposer_index = <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_some">option::some</a>(<a href="stake.md#0x1_stake_get_validator_index">stake::get_validator_index</a>(proposer));
     };
 
-    <b>let</b> block_metadata_ref = <b>borrow_global_mut</b>&lt;<a href="block.md#0x1_block_BlockResource">BlockResource</a>&gt;(@aptos_framework);
+    <b>let</b> block_metadata_ref = &<b>mut</b> <a href="block.md#0x1_block_BlockResource">BlockResource</a>[@aptos_framework];
     block_metadata_ref.height = <a href="event.md#0x1_event_counter">event::counter</a>(&block_metadata_ref.new_block_events);
 
     <b>let</b> new_block_event = <a href="block.md#0x1_block_NewBlockEvent">NewBlockEvent</a> {
@@ -654,7 +654,7 @@ The runtime always runs this before executing the transactions in a block.
     failed_proposer_indices: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;,
     previous_block_votes_bitvec: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;,
     <a href="timestamp.md#0x1_timestamp">timestamp</a>: u64
-) <b>acquires</b> <a href="block.md#0x1_block_BlockResource">BlockResource</a>, <a href="block.md#0x1_block_CommitHistory">CommitHistory</a> {
+) {
     <b>let</b> epoch_interval =
         <a href="block.md#0x1_block_block_prologue_common">block_prologue_common</a>(
             &vm,
@@ -705,7 +705,7 @@ The runtime always runs this before executing the transactions in a block.
     previous_block_votes_bitvec: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;,
     <a href="timestamp.md#0x1_timestamp">timestamp</a>: u64,
     randomness_seed: Option&lt;<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;&gt;
-) <b>acquires</b> <a href="block.md#0x1_block_BlockResource">BlockResource</a>, <a href="block.md#0x1_block_CommitHistory">CommitHistory</a> {
+) {
     <b>let</b> epoch_interval =
         <a href="block.md#0x1_block_block_prologue_common">block_prologue_common</a>(
             &vm,
@@ -758,7 +758,7 @@ reconfiguration with DKG and Chunky DKG after epoch timed out.
     <a href="timestamp.md#0x1_timestamp">timestamp</a>: u64,
     randomness_seed: Option&lt;<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;&gt;,
     decryption_key: Option&lt;<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;&gt;
-) <b>acquires</b> <a href="block.md#0x1_block_BlockResource">BlockResource</a>, <a href="block.md#0x1_block_CommitHistory">CommitHistory</a> {
+) {
     <b>let</b> epoch_interval =
         <a href="block.md#0x1_block_block_prologue_common">block_prologue_common</a>(
             &vm,
@@ -828,8 +828,8 @@ Get the current block height
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="block.md#0x1_block_get_current_block_height">get_current_block_height</a>(): u64 <b>acquires</b> <a href="block.md#0x1_block_BlockResource">BlockResource</a> {
-    <b>borrow_global</b>&lt;<a href="block.md#0x1_block_BlockResource">BlockResource</a>&gt;(@aptos_framework).height
+<pre><code><b>public</b> <b>fun</b> <a href="block.md#0x1_block_get_current_block_height">get_current_block_height</a>(): u64 {
+    <a href="block.md#0x1_block_BlockResource">BlockResource</a>[@aptos_framework].height
 }
 </code></pre>
 
@@ -857,9 +857,9 @@ Emit the event and update height and global timestamp
     vm: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>,
     event_handle: &<b>mut</b> EventHandle&lt;<a href="block.md#0x1_block_NewBlockEvent">NewBlockEvent</a>&gt;,
     new_block_event: <a href="block.md#0x1_block_NewBlockEvent">NewBlockEvent</a>
-) <b>acquires</b> <a href="block.md#0x1_block_CommitHistory">CommitHistory</a> {
+) {
     <b>if</b> (<b>exists</b>&lt;<a href="block.md#0x1_block_CommitHistory">CommitHistory</a>&gt;(@aptos_framework)) {
-        <b>let</b> commit_history_ref = <b>borrow_global_mut</b>&lt;<a href="block.md#0x1_block_CommitHistory">CommitHistory</a>&gt;(@aptos_framework);
+        <b>let</b> commit_history_ref = &<b>mut</b> <a href="block.md#0x1_block_CommitHistory">CommitHistory</a>[@aptos_framework];
         <b>let</b> idx = commit_history_ref.next_idx;
         <b>if</b> (commit_history_ref.<a href="../../aptos-stdlib/doc/table.md#0x1_table">table</a>.contains(idx)) {
             commit_history_ref.<a href="../../aptos-stdlib/doc/table.md#0x1_table">table</a>.remove(idx);
@@ -902,8 +902,8 @@ reconfiguration event.
 <summary>Implementation</summary>
 
 
-<pre><code><b>fun</b> <a href="block.md#0x1_block_emit_genesis_block_event">emit_genesis_block_event</a>(vm: <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>) <b>acquires</b> <a href="block.md#0x1_block_BlockResource">BlockResource</a>, <a href="block.md#0x1_block_CommitHistory">CommitHistory</a> {
-    <b>let</b> block_metadata_ref = <b>borrow_global_mut</b>&lt;<a href="block.md#0x1_block_BlockResource">BlockResource</a>&gt;(@aptos_framework);
+<pre><code><b>fun</b> <a href="block.md#0x1_block_emit_genesis_block_event">emit_genesis_block_event</a>(vm: <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>) {
+    <b>let</b> block_metadata_ref = &<b>mut</b> <a href="block.md#0x1_block_BlockResource">BlockResource</a>[@aptos_framework];
     <b>let</b> genesis_id = @0x0;
     <a href="block.md#0x1_block_emit_new_block_event">emit_new_block_event</a>(
         &vm,
@@ -945,9 +945,9 @@ new block event for WriteSetPayload.
 
 <pre><code><b>public</b> <b>fun</b> <a href="block.md#0x1_block_emit_writeset_block_event">emit_writeset_block_event</a>(
     vm_signer: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, fake_block_hash: <b>address</b>
-) <b>acquires</b> <a href="block.md#0x1_block_BlockResource">BlockResource</a>, <a href="block.md#0x1_block_CommitHistory">CommitHistory</a> {
+) {
     <a href="system_addresses.md#0x1_system_addresses_assert_vm">system_addresses::assert_vm</a>(vm_signer);
-    <b>let</b> block_metadata_ref = <b>borrow_global_mut</b>&lt;<a href="block.md#0x1_block_BlockResource">BlockResource</a>&gt;(@aptos_framework);
+    <b>let</b> block_metadata_ref = &<b>mut</b> <a href="block.md#0x1_block_BlockResource">BlockResource</a>[@aptos_framework];
     block_metadata_ref.height = <a href="event.md#0x1_event_counter">event::counter</a>(&block_metadata_ref.new_block_events);
 
     <a href="block.md#0x1_block_emit_new_block_event">emit_new_block_event</a>(
