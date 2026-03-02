@@ -1216,18 +1216,11 @@ impl StateValueWriter<StateKey, StateValue> for StateStore {
             &DbMetadataValue::StateSnapshotProgress(progress),
         )?;
 
-        if self.internal_indexer_db.is_some()
-            && self
-                .internal_indexer_db
-                .as_ref()
-                .unwrap()
-                .statekeys_enabled()
-        {
-            let keys = node_batch.keys().map(|key| key.0.clone()).collect();
-            self.internal_indexer_db
-                .as_ref()
-                .unwrap()
-                .write_keys_to_indexer_db(&keys, version, progress)?;
+        if let Some(internal_indexer_db) = self.internal_indexer_db.as_ref() {
+            if internal_indexer_db.statekeys_enabled() {
+                let keys = node_batch.keys().map(|key| key.0.clone()).collect();
+                internal_indexer_db.write_keys_to_indexer_db(&keys, version, progress)?;
+            }
         }
         self.shard_state_value_batch(&mut sharded_schema_batch, node_batch)?;
         self.state_kv_db
@@ -1278,38 +1271,30 @@ impl StateValueWriter<StateKey, StateValue> for StateStore {
             .map(|v| v.expect_state_snapshot_progress());
 
         // verify if internal indexer db and main db are consistent before starting the restore
-        if self.internal_indexer_db.is_some()
-            && self
-                .internal_indexer_db
-                .as_ref()
-                .unwrap()
-                .statekeys_enabled()
-        {
-            let progress_opt = self
-                .internal_indexer_db
-                .as_ref()
-                .unwrap()
-                .get_restore_progress(version)?;
+        if let Some(internal_indexer_db) = self.internal_indexer_db.as_ref() {
+            if internal_indexer_db.statekeys_enabled() {
+                let progress_opt = internal_indexer_db.get_restore_progress(version)?;
 
-            match (main_db_progress, progress_opt) {
-                (None, None) => (),
-                (None, Some(_)) => (),
-                (Some(main_progress), Some(indexer_progress)) => {
-                    if main_progress.key_hash > indexer_progress.key_hash {
+                match (main_db_progress, progress_opt) {
+                    (None, None) => (),
+                    (None, Some(_)) => (),
+                    (Some(main_progress), Some(indexer_progress)) => {
+                        if main_progress.key_hash > indexer_progress.key_hash {
+                            bail!(
+                                "Inconsistent restore progress between main db and internal indexer db. main db: {:?}, internal indexer db: {:?}",
+                                main_progress,
+                                indexer_progress,
+                            );
+                        }
+                    },
+                    _ => {
                         bail!(
                             "Inconsistent restore progress between main db and internal indexer db. main db: {:?}, internal indexer db: {:?}",
-                            main_progress,
-                            indexer_progress,
+                            main_db_progress,
+                            progress_opt,
                         );
-                    }
-                },
-                _ => {
-                    bail!(
-                        "Inconsistent restore progress between main db and internal indexer db. main db: {:?}, internal indexer db: {:?}",
-                        main_db_progress,
-                        progress_opt,
-                    );
-                },
+                    },
+                }
             }
         }
 
