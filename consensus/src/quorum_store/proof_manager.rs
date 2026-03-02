@@ -24,6 +24,11 @@ pub enum ProofManagerCommand {
     ReceiveProofs(ProofOfStoreMsg<BatchInfoExt>),
     ReceiveBatches(Vec<(BatchInfoExt, Vec<TxnSummaryWithExpiration>)>),
     CommitNotification(u64, Vec<BatchInfoExt>),
+    /// Mark batches as committed in the proof queue only (no timestamp update).
+    /// Used by proxy consensus when blocks are ordered but not yet committed by primary.
+    /// This prevents other proposers from re-pulling the same batch proofs from their
+    /// local proof queues.
+    MarkOrdered(Vec<BatchInfoExt>),
     Shutdown(tokio::sync::oneshot::Sender<()>),
 }
 
@@ -97,6 +102,18 @@ impl ProofManager {
         self.batch_proof_queue.mark_committed(batches);
         self.batch_proof_queue
             .handle_updated_block_timestamp(block_timestamp);
+        self.update_remaining_txns_and_proofs();
+    }
+
+    /// Mark batches as committed in the proof queue without updating the block timestamp.
+    /// Used for proxy consensus ordering: prevents re-pulling of batch proofs by other
+    /// proposers without triggering batch expiration or batch generator cleanup.
+    pub(crate) fn handle_order_notification(&mut self, batches: Vec<BatchInfoExt>) {
+        trace!(
+            "QS: proxy order notification, marking {} batches as committed in proof queue",
+            batches.len()
+        );
+        self.batch_proof_queue.mark_committed(batches);
         self.update_remaining_txns_and_proofs();
     }
 
@@ -341,6 +358,10 @@ impl ProofManager {
                                     block_timestamp,
                                     batches,
                                 );
+                            },
+                            ProofManagerCommand::MarkOrdered(batches) => {
+                                counters::QUORUM_STORE_MSG_COUNT.with_label_values(&["ProofManager::mark_ordered"]).inc();
+                                self.handle_order_notification(batches);
                             },
                         }
                         let updated_back_pressure = self.qs_back_pressure();

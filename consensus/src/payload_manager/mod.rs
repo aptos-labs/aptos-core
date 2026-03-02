@@ -29,6 +29,12 @@ pub trait TPayloadManager: Send + Sync {
     /// transactions in the block's payload are no longer required for consensus.
     fn notify_commit(&self, block_timestamp: u64, payloads: Vec<Payload>);
 
+    /// Notify the payload manager that blocks have been ordered by proxy consensus.
+    /// Marks batches as committed in the proof queue only (prevents re-pulling by other
+    /// proposers) WITHOUT notifying the batch generator or updating the certified timestamp.
+    /// The full commit notification will arrive later when primary consensus commits.
+    fn notify_ordered(&self, _payloads: Vec<Payload>) {}
+
     /// Prefetch the data for a payload. This is used to ensure that the data for a payload is
     /// available when block is executed.
     fn prefetch_payload_data(&self, payload: &Payload, author: Author, timestamp: u64);

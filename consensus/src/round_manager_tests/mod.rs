@@ -742,6 +742,10 @@ impl TQuorumStoreCommitNotifier for MockQuorumStoreCommitNotifier {
     fn notify(&self, _block_timestamp: u64, _batches: Vec<BatchInfoExt>) {
         unimplemented!()
     }
+
+    fn notify_ordered(&self, _batches: Vec<BatchInfoExt>) {
+        unimplemented!()
+    }
 }
 
 /// A mock batch reader that provides limited functionality

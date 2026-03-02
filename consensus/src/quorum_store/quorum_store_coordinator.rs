@@ -18,6 +18,9 @@ use tokio::sync::{mpsc, oneshot};
 
 pub enum CoordinatorCommand {
     CommitNotification(u64, Vec<BatchInfoExt>),
+    /// Mark batches as committed in the proof queue only (proxy consensus ordering).
+    /// Only sent to ProofManager, NOT to BatchGenerator or ProofCoordinator.
+    OrderNotification(Vec<BatchInfoExt>),
     Shutdown(futures_channel::oneshot::Sender<()>),
 }
 
@@ -78,6 +81,18 @@ impl QuorumStoreCoordinator {
                             ))
                             .await
                             .expect("Failed to send to BatchGenerator");
+                    },
+                    CoordinatorCommand::OrderNotification(batches) => {
+                        counters::QUORUM_STORE_MSG_COUNT
+                            .with_label_values(&["QSCoordinator::order_notification"])
+                            .inc();
+                        // Only notify ProofManager to mark batches as committed in the
+                        // proof queue. Do NOT notify BatchGenerator (would prematurely
+                        // release txns for re-batching) or ProofCoordinator (not needed).
+                        self.proof_manager_cmd_tx
+                            .send(ProofManagerCommand::MarkOrdered(batches))
+                            .await
+                            .expect("Failed to send to ProofManager");
                     },
                     CoordinatorCommand::Shutdown(ack_tx) => {
                         counters::QUORUM_STORE_MSG_COUNT
