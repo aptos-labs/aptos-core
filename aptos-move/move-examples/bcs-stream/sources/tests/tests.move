@@ -262,14 +262,14 @@ module bcs_stream::tests {
         let i = 0;
         while (i < 256) {
             vector::push_back(&mut data, (i as u8));
-            i = i + 1;
+            i += 1;
         };
 
         let stream = bcs_stream::new(data);
         let i = 0;
         while (i < 256) {
             assert!(bcs_stream::deserialize_u8(&mut stream) == (i as u8), 0);
-            i = i + 1;
+            i += 1;
         }
     }
 
@@ -289,14 +289,14 @@ module bcs_stream::tests {
         while (i < 65536) {
             vector::push_back(&mut data, ((i % 256) as u8));
             vector::push_back(&mut data, ((i / 256) as u8));
-            i = i + 1;
+            i += 1;
         };
 
         let stream = bcs_stream::new(data);
         let i = 0;
         while (i < 65536) {
             assert!(bcs_stream::deserialize_u16(&mut stream) == (i as u16), 0);
-            i = i + 1;
+            i += 1;
         }
     }
 

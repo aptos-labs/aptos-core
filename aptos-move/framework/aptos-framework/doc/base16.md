@@ -30,7 +30,7 @@
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="base16.md#0x1_base16_hex_char_to_u8">hex_char_to_u8</a>(c: u8): u8 {
+<pre><code><b>friend</b> <b>fun</b> <a href="base16.md#0x1_base16_hex_char_to_u8">hex_char_to_u8</a>(c: u8): u8 {
     <b>if</b> (c &gt;= 48 && c &lt;= 57) {  // '0' <b>to</b> '9'
         c - 48
     } <b>else</b> <b>if</b> (c &gt;= 65 && c &lt;= 70) { // 'A' <b>to</b> 'F'
@@ -62,7 +62,7 @@
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="base16.md#0x1_base16_base16_utf8_to_vec_u8">base16_utf8_to_vec_u8</a>(str: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt; {
+<pre><code><b>friend</b> <b>fun</b> <a href="base16.md#0x1_base16_base16_utf8_to_vec_u8">base16_utf8_to_vec_u8</a>(str: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt; {
     <b>let</b> result = <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_empty">vector::empty</a>&lt;u8&gt;();
     <b>let</b> i = 0;
     <b>while</b> (i &lt; str.length()) {

@@ -76,16 +76,16 @@ module aptos_framework::transaction_fee {
     }
 
     /// Burn transaction fees in epilogue.
-    public(friend) fun burn_fee(
+    friend fun burn_fee(
         account: address, fee: u64
-    ) acquires AptosFABurnCapabilities, AptosCoinCapabilities {
+    ) {
         if (exists<AptosFABurnCapabilities>(@aptos_framework)) {
             let burn_ref =
-                &borrow_global<AptosFABurnCapabilities>(@aptos_framework).burn_ref;
+                &AptosFABurnCapabilities[@aptos_framework].burn_ref;
             aptos_account::burn_from_fungible_store_for_gas(burn_ref, account, fee);
         } else {
             let burn_cap =
-                &borrow_global<AptosCoinCapabilities>(@aptos_framework).burn_cap;
+                &AptosCoinCapabilities[@aptos_framework].burn_cap;
             if (features::operations_default_to_fa_apt_store_enabled()) {
                 let (burn_ref, burn_receipt) = coin::get_paired_burn_ref(burn_cap);
                 aptos_account::burn_from_fungible_store_for_gas(&burn_ref, account, fee);
@@ -97,16 +97,16 @@ module aptos_framework::transaction_fee {
     }
 
     /// Mint refund in epilogue.
-    public(friend) fun mint_and_refund(
+    friend fun mint_and_refund(
         account: address, refund: u64
-    ) acquires AptosCoinMintCapability {
-        let mint_cap = &borrow_global<AptosCoinMintCapability>(@aptos_framework).mint_cap;
+    ) {
+        let mint_cap = &AptosCoinMintCapability[@aptos_framework].mint_cap;
         let refund_coin = coin::mint(refund, mint_cap);
         coin::deposit_for_gas_fee(account, refund_coin);
     }
 
     /// Only called during genesis.
-    public(friend) fun store_aptos_coin_burn_cap(
+    friend fun store_aptos_coin_burn_cap(
         aptos_framework: &signer, burn_cap: BurnCapability<AptosCoin>
     ) {
         system_addresses::assert_aptos_framework(aptos_framework);
@@ -121,7 +121,7 @@ module aptos_framework::transaction_fee {
 
     public entry fun convert_to_aptos_fa_burn_ref(
         aptos_framework: &signer
-    ) acquires AptosCoinCapabilities {
+    ) {
         assert!(
             features::operations_default_to_fa_apt_store_enabled(),
             EFA_GAS_CHARGING_NOT_ENABLED
@@ -133,7 +133,7 @@ module aptos_framework::transaction_fee {
     }
 
     /// Only called during genesis.
-    public(friend) fun store_aptos_coin_mint_cap(
+    friend fun store_aptos_coin_mint_cap(
         aptos_framework: &signer, mint_cap: MintCapability<AptosCoin>
     ) {
         system_addresses::assert_aptos_framework(aptos_framework);

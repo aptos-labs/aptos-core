@@ -15,12 +15,12 @@ module aa::single_key {
     }
 
     /// Update the public key.
-    public entry fun update_public_key(admin: &signer, key: vector<u8>) acquires BLSPublicKey {
+    public entry fun update_public_key(admin: &signer, key: vector<u8>) {
         let addr = signer::address_of(admin);
         let pubkey_opt = bls12381::public_key_from_bytes(key);
         assert!(option::is_some(&pubkey_opt), EINVALID_PUBLIC_KEY);
         if (exists<BLSPublicKey>(addr)) {
-            let pubkey = &mut borrow_global_mut<BLSPublicKey>(addr).key;
+            let pubkey = &mut BLSPublicKey[addr].key;
             *pubkey = option::destroy_some(pubkey_opt);
         } else {
             move_to(admin, BLSPublicKey {
@@ -33,10 +33,10 @@ module aa::single_key {
     public fun authenticate(
         account: signer,
         signing_data: AbstractionAuthData,
-    ): signer acquires BLSPublicKey {
+    ): signer {
         let addr = signer::address_of(&account);
         assert!(exists<BLSPublicKey>(addr), EPUBLIC_KEY_NOT_FOUND);
-        let pubkey = &borrow_global<BLSPublicKey>(addr).key;
+        let pubkey = &BLSPublicKey[addr].key;
         assert!(
             bls12381::verify_normal_signature(
                 &bls12381::signature_from_bytes(*auth_data::authenticator(&signing_data)),
@@ -49,7 +49,7 @@ module aa::single_key {
     }
 
     /// cleanup storage footprint before transition to another authentication scheme.
-    public entry fun cleanup(admin: &signer) acquires BLSPublicKey {
+    public entry fun cleanup(admin: &signer) {
         let addr = signer::address_of(admin);
         if (exists<BLSPublicKey>(addr)) {
             move_from<BLSPublicKey>(addr);

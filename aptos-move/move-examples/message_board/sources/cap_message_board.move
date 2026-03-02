@@ -57,8 +57,8 @@ module message_board::cap_based_mb {
     }
 
     /// directly view message
-    public fun view_message(board_addr: address): vector<u8> acquires CapBasedMB {
-        let post = borrow_global<CapBasedMB>(board_addr).pinned_post;
+    public fun view_message(board_addr: address): vector<u8> {
+        let post = CapBasedMB[board_addr].pinned_post;
         copy post
     }
 
@@ -78,8 +78,8 @@ module message_board::cap_based_mb {
     }
 
     /// remove a participant capability to publish notice
-    public entry fun remove_participant(account: signer, participant: address) acquires MessageChangeCapability {
-        let cap = borrow_global_mut<MessageChangeCapability>(participant);
+    public entry fun remove_participant(account: signer, participant: address) {
+        let cap = &mut MessageChangeCapability[participant];
         assert!(signer::address_of(&account) == cap.board, EONLY_ADMIN_CAN_REMOVE_NOTICE_CAP);
         let cap = move_from<MessageChangeCapability>(participant);
         let MessageChangeCapability { board: _ } = cap;
@@ -88,10 +88,10 @@ module message_board::cap_based_mb {
     /// only the participant with right capability can publish the message
     public entry fun send_pinned_message(
         account: &signer, board_addr: address, message: vector<u8>
-    ) acquires MessageChangeCapability, CapBasedMB {
-        let cap = borrow_global<MessageChangeCapability>(signer::address_of(account));
+    ) {
+        let cap = &MessageChangeCapability[signer::address_of(account)];
         assert!(cap.board == board_addr, EACCOUNT_NO_NOTICE_CAP);
-        let board = borrow_global_mut<CapBasedMB>(board_addr);
+        let board = &mut CapBasedMB[board_addr];
         board.pinned_post = message;
         event::emit(
             MessageChange {

@@ -49,12 +49,12 @@ module aptos_framework::reconfiguration_state {
     }
 
     /// Return whether the reconfiguration state is marked "in progress".
-    public(friend) fun is_in_progress(): bool acquires State {
+    friend fun is_in_progress(): bool {
         if (!exists<State>(@aptos_framework)) {
             return false
         };
 
-        let state = borrow_global<State>(@aptos_framework);
+        let state = &State[@aptos_framework];
         let variant_type_name = *state.variant.type_name().bytes();
         variant_type_name == b"0x1::reconfiguration_state::StateActive"
     }
@@ -63,9 +63,9 @@ module aptos_framework::reconfiguration_state {
     /// to mark the reconfiguration state "in progress" if it is currently "stopped".
     ///
     /// Also record the current time as the reconfiguration start time. (Some module, e.g., `stake.move`, needs this info).
-    public(friend) fun on_reconfig_start() acquires State {
+    friend fun on_reconfig_start() {
         if (exists<State>(@aptos_framework)) {
-            let state = borrow_global_mut<State>(@aptos_framework);
+            let state = &mut State[@aptos_framework];
             let variant_type_name = *state.variant.type_name().bytes();
             if (variant_type_name == b"0x1::reconfiguration_state::StateInactive") {
                 state.variant = copyable_any::pack(StateActive {
@@ -77,8 +77,8 @@ module aptos_framework::reconfiguration_state {
 
     /// Get the unix time when the currently in-progress reconfiguration started.
     /// Abort if the reconfiguration state is not "in progress".
-    public(friend) fun start_time_secs(): u64 acquires State {
-        let state = borrow_global<State>(@aptos_framework);
+    friend fun start_time_secs(): u64 {
+        let state = &State[@aptos_framework];
         let variant_type_name = *state.variant.type_name().bytes();
         if (variant_type_name == b"0x1::reconfiguration_state::StateActive") {
             let active = state.variant.unpack<StateActive>();
@@ -90,9 +90,9 @@ module aptos_framework::reconfiguration_state {
 
     /// Called at the end of every reconfiguration to mark the state as "stopped".
     /// Abort if the current state is not "in progress".
-    public(friend) fun on_reconfig_finish() acquires State {
+    friend fun on_reconfig_finish() {
         if (exists<State>(@aptos_framework)) {
-            let state = borrow_global_mut<State>(@aptos_framework);
+            let state = &mut State[@aptos_framework];
             let variant_type_name = *state.variant.type_name().bytes();
             if (variant_type_name == b"0x1::reconfiguration_state::StateActive") {
                 state.variant = copyable_any::pack(StateInactive {});
@@ -103,7 +103,7 @@ module aptos_framework::reconfiguration_state {
     }
 
     #[test(fx = @aptos_framework)]
-    fun basic(fx: &signer) acquires State {
+    fun basic(fx: &signer) {
         // Setip.
         timestamp::set_time_has_started_for_testing(fx);
         initialize(fx);

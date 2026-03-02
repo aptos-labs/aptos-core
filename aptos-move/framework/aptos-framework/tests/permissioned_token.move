@@ -33,9 +33,9 @@ module 0xcafe::permissioned_token {
         );
     }
 
-    public fun add_to_allow_list(account: &signer, new_address: address) acquires AllowlistStore {
+    public fun add_to_allow_list(account: &signer, new_address: address) {
         assert!(signer::address_of(account) == @0xcafe, 1);
-        let allowed_sender = borrow_global_mut<AllowlistStore>(@0xcafe);
+        let allowed_sender = &mut AllowlistStore[@0xcafe];
         if(!allowed_sender.allowed_sender.contains(&new_address)) {
             allowed_sender.allowed_sender.push_back(new_address);
         }
@@ -45,8 +45,8 @@ module 0xcafe::permissioned_token {
         store: Object<T>,
         amount: u64,
         transfer_ref: &TransferRef,
-    ): FungibleAsset acquires AllowlistStore {
-        assert!(borrow_global<AllowlistStore>(@0xcafe).allowed_sender.contains(&store.object_address()), EWITHDRAW_NOT_ALLOWED);
+    ): FungibleAsset {
+        assert!(AllowlistStore[@0xcafe].allowed_sender.contains(&store.object_address()), EWITHDRAW_NOT_ALLOWED);
 
         transfer_ref.withdraw_with_ref(store, amount)
     }

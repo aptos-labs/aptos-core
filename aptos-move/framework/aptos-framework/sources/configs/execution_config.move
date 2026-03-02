@@ -22,14 +22,14 @@ module aptos_framework::execution_config {
     /// WARNING: calling this while randomness is enabled will trigger a new epoch without randomness!
     ///
     /// TODO: update all the tests that reference this function, then disable this function.
-    public fun set(account: &signer, config: vector<u8>) acquires ExecutionConfig {
+    public fun set(account: &signer, config: vector<u8>) {
         system_addresses::assert_aptos_framework(account);
         chain_status::assert_genesis();
 
         assert!(config.length() > 0, error::invalid_argument(EINVALID_CONFIG));
 
         if (exists<ExecutionConfig>(@aptos_framework)) {
-            let config_ref = &mut borrow_global_mut<ExecutionConfig>(@aptos_framework).config;
+            let config_ref = &mut ExecutionConfig[@aptos_framework].config;
             *config_ref = config;
         } else {
             move_to(account, ExecutionConfig { config });
@@ -51,12 +51,12 @@ module aptos_framework::execution_config {
     }
 
     /// Only used in reconfigurations to apply the pending `ExecutionConfig`, if there is any.
-    public(friend) fun on_new_epoch(framework: &signer) acquires ExecutionConfig {
+    friend fun on_new_epoch(framework: &signer) {
         system_addresses::assert_aptos_framework(framework);
         if (config_buffer::does_exist<ExecutionConfig>()) {
             let config = config_buffer::extract_v2<ExecutionConfig>();
             if (exists<ExecutionConfig>(@aptos_framework)) {
-                *borrow_global_mut<ExecutionConfig>(@aptos_framework) = config;
+                ExecutionConfig[@aptos_framework] = config;
             } else {
                 move_to(framework, config);
             };

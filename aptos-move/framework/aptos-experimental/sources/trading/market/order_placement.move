@@ -657,7 +657,7 @@ module aptos_experimental::order_placement {
         }
     }
 
-    public(friend) fun cleanup_order_internal<M: store + copy + drop, R: store + copy + drop>(
+    friend fun cleanup_order_internal<M: store + copy + drop, R: store + copy + drop>(
         user_addr: address,
         order_id: OrderId,
         client_order_id: Option<String>,

@@ -22,7 +22,7 @@ module aptos_framework::timestamp {
     const EINVALID_TIMESTAMP: u64 = 2;
 
     /// Marks that time has started. This can only be called from genesis and with the aptos framework account.
-    public(friend) fun set_time_has_started(aptos_framework: &signer) {
+    friend fun set_time_has_started(aptos_framework: &signer) {
         system_addresses::assert_aptos_framework(aptos_framework);
         let timer = CurrentTimeMicroseconds { microseconds: 0 };
         move_to(aptos_framework, timer);
@@ -33,11 +33,11 @@ module aptos_framework::timestamp {
         account: &signer,
         proposer: address,
         timestamp: u64
-    ) acquires CurrentTimeMicroseconds {
+    ) {
         // Can only be invoked by AptosVM signer.
         system_addresses::assert_vm(account);
 
-        let global_timer = borrow_global_mut<CurrentTimeMicroseconds>(@aptos_framework);
+        let global_timer = &mut CurrentTimeMicroseconds[@aptos_framework];
         let now = global_timer.microseconds;
         if (proposer == @vm_reserved) {
             // NIL block with null address as proposer. Timestamp must be equal.
@@ -58,31 +58,31 @@ module aptos_framework::timestamp {
 
     #[view]
     /// Gets the current time in microseconds.
-    public fun now_microseconds(): u64 acquires CurrentTimeMicroseconds {
-        borrow_global<CurrentTimeMicroseconds>(@aptos_framework).microseconds
+    public fun now_microseconds(): u64 {
+        CurrentTimeMicroseconds[@aptos_framework].microseconds
     }
 
     #[view]
     /// Gets the current time in seconds.
-    public fun now_seconds(): u64 acquires CurrentTimeMicroseconds {
+    public fun now_seconds(): u64 {
         now_microseconds() / MICRO_CONVERSION_FACTOR
     }
 
     #[test_only]
-    public fun update_global_time_for_test(timestamp_microsecs: u64) acquires CurrentTimeMicroseconds {
-        let global_timer = borrow_global_mut<CurrentTimeMicroseconds>(@aptos_framework);
+    public fun update_global_time_for_test(timestamp_microsecs: u64) {
+        let global_timer = &mut CurrentTimeMicroseconds[@aptos_framework];
         let now = global_timer.microseconds;
         assert!(now < timestamp_microsecs, error::invalid_argument(EINVALID_TIMESTAMP));
         global_timer.microseconds = timestamp_microsecs;
     }
 
     #[test_only]
-    public fun update_global_time_for_test_secs(timestamp_seconds: u64) acquires CurrentTimeMicroseconds {
+    public fun update_global_time_for_test_secs(timestamp_seconds: u64) {
         update_global_time_for_test(timestamp_seconds * MICRO_CONVERSION_FACTOR);
     }
 
     #[test_only]
-    public fun fast_forward_seconds(timestamp_seconds: u64) acquires CurrentTimeMicroseconds {
+    public fun fast_forward_seconds(timestamp_seconds: u64) {
         update_global_time_for_test(now_microseconds() + timestamp_seconds * MICRO_CONVERSION_FACTOR);
     }
 }

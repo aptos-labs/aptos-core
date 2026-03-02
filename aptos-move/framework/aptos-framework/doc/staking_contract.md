@@ -1431,9 +1431,9 @@ This errors out the staking contract with the provided staker and operator doesn
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="staking_contract.md#0x1_staking_contract_stake_pool_address">stake_pool_address</a>(staker: <b>address</b>, operator: <b>address</b>): <b>address</b> <b>acquires</b> <a href="staking_contract.md#0x1_staking_contract_Store">Store</a> {
+<pre><code><b>public</b> <b>fun</b> <a href="staking_contract.md#0x1_staking_contract_stake_pool_address">stake_pool_address</a>(staker: <b>address</b>, operator: <b>address</b>): <b>address</b> {
     <a href="staking_contract.md#0x1_staking_contract_assert_staking_contract_exists">assert_staking_contract_exists</a>(staker, operator);
-    <b>let</b> staking_contracts = &<b>borrow_global</b>&lt;<a href="staking_contract.md#0x1_staking_contract_Store">Store</a>&gt;(staker).staking_contracts;
+    <b>let</b> staking_contracts = &<a href="staking_contract.md#0x1_staking_contract_Store">Store</a>[staker].staking_contracts;
     staking_contracts.borrow(&operator).pool_address
 }
 </code></pre>
@@ -1465,9 +1465,9 @@ return None.
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="staking_contract.md#0x1_staking_contract_staker_address">staker_address</a>(pool_address: <b>address</b>): std::option::Option&lt;<b>address</b>&gt; <b>acquires</b> <a href="staking_contract.md#0x1_staking_contract_Staker">Staker</a> {
+<pre><code><b>public</b> <b>fun</b> <a href="staking_contract.md#0x1_staking_contract_staker_address">staker_address</a>(pool_address: <b>address</b>): std::option::Option&lt;<b>address</b>&gt; {
     <b>if</b> (<b>exists</b>&lt;<a href="staking_contract.md#0x1_staking_contract_Staker">Staker</a>&gt;(pool_address)) {
-        <b>return</b> std::option::some(<b>borrow_global</b>&lt;<a href="staking_contract.md#0x1_staking_contract_Staker">Staker</a>&gt;(pool_address).staker)
+        <b>return</b> std::option::some(<a href="staking_contract.md#0x1_staking_contract_Staker">Staker</a>[pool_address].staker)
     } <b>else</b> {
         std::option::none()
     }
@@ -1500,9 +1500,9 @@ This errors out the staking contract with the provided staker and operator doesn
 
 <pre><code><b>public</b> <b>fun</b> <a href="staking_contract.md#0x1_staking_contract_last_recorded_principal">last_recorded_principal</a>(
     staker: <b>address</b>, operator: <b>address</b>
-): u64 <b>acquires</b> <a href="staking_contract.md#0x1_staking_contract_Store">Store</a> {
+): u64 {
     <a href="staking_contract.md#0x1_staking_contract_assert_staking_contract_exists">assert_staking_contract_exists</a>(staker, operator);
-    <b>let</b> staking_contracts = &<b>borrow_global</b>&lt;<a href="staking_contract.md#0x1_staking_contract_Store">Store</a>&gt;(staker).staking_contracts;
+    <b>let</b> staking_contracts = &<a href="staking_contract.md#0x1_staking_contract_Store">Store</a>[staker].staking_contracts;
     staking_contracts.borrow(&operator).principal
 }
 </code></pre>
@@ -1531,9 +1531,9 @@ This errors out the staking contract with the provided staker and operator doesn
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="staking_contract.md#0x1_staking_contract_commission_percentage">commission_percentage</a>(staker: <b>address</b>, operator: <b>address</b>): u64 <b>acquires</b> <a href="staking_contract.md#0x1_staking_contract_Store">Store</a> {
+<pre><code><b>public</b> <b>fun</b> <a href="staking_contract.md#0x1_staking_contract_commission_percentage">commission_percentage</a>(staker: <b>address</b>, operator: <b>address</b>): u64 {
     <a href="staking_contract.md#0x1_staking_contract_assert_staking_contract_exists">assert_staking_contract_exists</a>(staker, operator);
-    <b>let</b> staking_contracts = &<b>borrow_global</b>&lt;<a href="staking_contract.md#0x1_staking_contract_Store">Store</a>&gt;(staker).staking_contracts;
+    <b>let</b> staking_contracts = &<a href="staking_contract.md#0x1_staking_contract_Store">Store</a>[staker].staking_contracts;
     staking_contracts.borrow(&operator).commission_percentage
 }
 </code></pre>
@@ -1566,9 +1566,9 @@ This errors out the staking contract with the provided staker and operator doesn
 
 <pre><code><b>public</b> <b>fun</b> <a href="staking_contract.md#0x1_staking_contract_staking_contract_amounts">staking_contract_amounts</a>(
     staker: <b>address</b>, operator: <b>address</b>
-): (u64, u64, u64) <b>acquires</b> <a href="staking_contract.md#0x1_staking_contract_Store">Store</a> {
+): (u64, u64, u64) {
     <a href="staking_contract.md#0x1_staking_contract_assert_staking_contract_exists">assert_staking_contract_exists</a>(staker, operator);
-    <b>let</b> staking_contracts = &<b>borrow_global</b>&lt;<a href="staking_contract.md#0x1_staking_contract_Store">Store</a>&gt;(staker).staking_contracts;
+    <b>let</b> staking_contracts = &<a href="staking_contract.md#0x1_staking_contract_Store">Store</a>[staker].staking_contracts;
     <b>let</b> <a href="staking_contract.md#0x1_staking_contract">staking_contract</a> = staking_contracts.borrow(&operator);
     <a href="staking_contract.md#0x1_staking_contract_get_staking_contract_amounts_internal">get_staking_contract_amounts_internal</a>(<a href="staking_contract.md#0x1_staking_contract">staking_contract</a>)
 }
@@ -1599,9 +1599,9 @@ This errors out the staking contract with the provided staker and operator doesn
 
 <pre><code><b>public</b> <b>fun</b> <a href="staking_contract.md#0x1_staking_contract_pending_distribution_counts">pending_distribution_counts</a>(
     staker: <b>address</b>, operator: <b>address</b>
-): u64 <b>acquires</b> <a href="staking_contract.md#0x1_staking_contract_Store">Store</a> {
+): u64 {
     <a href="staking_contract.md#0x1_staking_contract_assert_staking_contract_exists">assert_staking_contract_exists</a>(staker, operator);
-    <b>let</b> staking_contracts = &<b>borrow_global</b>&lt;<a href="staking_contract.md#0x1_staking_contract_Store">Store</a>&gt;(staker).staking_contracts;
+    <b>let</b> staking_contracts = &<a href="staking_contract.md#0x1_staking_contract_Store">Store</a>[staker].staking_contracts;
     staking_contracts.borrow(&operator).distribution_pool.shareholders_count()
 }
 </code></pre>
@@ -1629,12 +1629,12 @@ Return true if the staking contract between the provided staker and operator exi
 
 <pre><code><b>public</b> <b>fun</b> <a href="staking_contract.md#0x1_staking_contract_staking_contract_exists">staking_contract_exists</a>(
     staker: <b>address</b>, operator: <b>address</b>
-): bool <b>acquires</b> <a href="staking_contract.md#0x1_staking_contract_Store">Store</a> {
+): bool {
     <b>if</b> (!<b>exists</b>&lt;<a href="staking_contract.md#0x1_staking_contract_Store">Store</a>&gt;(staker)) {
         <b>return</b> <b>false</b>
     };
 
-    <b>let</b> store = <b>borrow_global</b>&lt;<a href="staking_contract.md#0x1_staking_contract_Store">Store</a>&gt;(staker);
+    <b>let</b> store = &<a href="staking_contract.md#0x1_staking_contract_Store">Store</a>[staker];
     store.staking_contracts.contains_key(&operator)
 }
 </code></pre>
@@ -1660,9 +1660,9 @@ Return the beneficiary address of the operator.
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="staking_contract.md#0x1_staking_contract_beneficiary_for_operator">beneficiary_for_operator</a>(operator: <b>address</b>): <b>address</b> <b>acquires</b> <a href="staking_contract.md#0x1_staking_contract_BeneficiaryForOperator">BeneficiaryForOperator</a> {
+<pre><code><b>public</b> <b>fun</b> <a href="staking_contract.md#0x1_staking_contract_beneficiary_for_operator">beneficiary_for_operator</a>(operator: <b>address</b>): <b>address</b> {
     <b>if</b> (<b>exists</b>&lt;<a href="staking_contract.md#0x1_staking_contract_BeneficiaryForOperator">BeneficiaryForOperator</a>&gt;(operator)) {
-        <b>return</b> <b>borrow_global</b>&lt;<a href="staking_contract.md#0x1_staking_contract_BeneficiaryForOperator">BeneficiaryForOperator</a>&gt;(operator).beneficiary_for_operator
+        <b>return</b> <a href="staking_contract.md#0x1_staking_contract_BeneficiaryForOperator">BeneficiaryForOperator</a>[operator].beneficiary_for_operator
     } <b>else</b> {
         operator
     }
@@ -1777,7 +1777,7 @@ Staker can call this function to create a simple staking contract with a specifi
     commission_percentage: u64,
     // Optional seed used when creating the staking contract <a href="account.md#0x1_account">account</a>.
     contract_creation_seed: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;
-) <b>acquires</b> <a href="staking_contract.md#0x1_staking_contract_Store">Store</a> {
+) {
     <b>let</b> staked_coins = <a href="coin.md#0x1_coin_withdraw">coin::withdraw</a>&lt;AptosCoin&gt;(staker, amount);
     <a href="staking_contract.md#0x1_staking_contract_create_staking_contract_with_coins">create_staking_contract_with_coins</a>(
         staker,
@@ -1818,7 +1818,7 @@ Staker can call this function to create a simple staking contract with a specifi
     commission_percentage: u64,
     // Optional seed used when creating the staking contract <a href="account.md#0x1_account">account</a>.
     contract_creation_seed: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;
-): <b>address</b> <b>acquires</b> <a href="staking_contract.md#0x1_staking_contract_Store">Store</a> {
+): <b>address</b> {
     <b>assert</b>!(
         commission_percentage &gt;= 0 && <a href="staking_contract.md#0x1_staking_contract_commission_percentage">commission_percentage</a> &lt;= 100,
         <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="staking_contract.md#0x1_staking_contract_EINVALID_COMMISSION_PERCENTAGE">EINVALID_COMMISSION_PERCENTAGE</a>)
@@ -1840,7 +1840,7 @@ Staker can call this function to create a simple staking contract with a specifi
     };
 
     // Cannot create the staking contract <b>if</b> it already <b>exists</b>.
-    <b>let</b> store = <b>borrow_global_mut</b>&lt;<a href="staking_contract.md#0x1_staking_contract_Store">Store</a>&gt;(staker_address);
+    <b>let</b> store = &<b>mut</b> <a href="staking_contract.md#0x1_staking_contract_Store">Store</a>[staker_address];
     <b>let</b> staking_contracts = &<b>mut</b> store.staking_contracts;
     <b>assert</b>!(
         !staking_contracts.contains_key(&operator),
@@ -1928,11 +1928,11 @@ Add more stake to an existing staking contract.
 
 <pre><code><b>public</b> entry <b>fun</b> <a href="staking_contract.md#0x1_staking_contract_add_stake">add_stake</a>(
     staker: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, operator: <b>address</b>, amount: u64
-) <b>acquires</b> <a href="staking_contract.md#0x1_staking_contract_Store">Store</a> {
+) {
     <b>let</b> staker_address = <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(staker);
     <a href="staking_contract.md#0x1_staking_contract_assert_staking_contract_exists">assert_staking_contract_exists</a>(staker_address, operator);
 
-    <b>let</b> store = <b>borrow_global_mut</b>&lt;<a href="staking_contract.md#0x1_staking_contract_Store">Store</a>&gt;(staker_address);
+    <b>let</b> store = &<b>mut</b> <a href="staking_contract.md#0x1_staking_contract_Store">Store</a>[staker_address];
     <b>let</b> <a href="staking_contract.md#0x1_staking_contract">staking_contract</a> = store.staking_contracts.borrow_mut(&operator);
 
     // Add the <a href="stake.md#0x1_stake">stake</a> <b>to</b> the <a href="stake.md#0x1_stake">stake</a> pool.
@@ -1974,11 +1974,11 @@ Convenient function to allow the staker to update the voter address in a staking
 
 <pre><code><b>public</b> entry <b>fun</b> <a href="staking_contract.md#0x1_staking_contract_update_voter">update_voter</a>(
     staker: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, operator: <b>address</b>, new_voter: <b>address</b>
-) <b>acquires</b> <a href="staking_contract.md#0x1_staking_contract_Store">Store</a> {
+) {
     <b>let</b> staker_address = <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(staker);
     <a href="staking_contract.md#0x1_staking_contract_assert_staking_contract_exists">assert_staking_contract_exists</a>(staker_address, operator);
 
-    <b>let</b> store = <b>borrow_global_mut</b>&lt;<a href="staking_contract.md#0x1_staking_contract_Store">Store</a>&gt;(staker_address);
+    <b>let</b> store = &<b>mut</b> <a href="staking_contract.md#0x1_staking_contract_Store">Store</a>[staker_address];
     <b>let</b> <a href="staking_contract.md#0x1_staking_contract">staking_contract</a> = store.staking_contracts.borrow_mut(&operator);
     <b>let</b> pool_address = <a href="staking_contract.md#0x1_staking_contract">staking_contract</a>.pool_address;
     <b>let</b> old_voter = <a href="stake.md#0x1_stake_get_delegated_voter">stake::get_delegated_voter</a>(pool_address);
@@ -2017,11 +2017,11 @@ Convenient function to allow the staker to reset their stake pool's lockup perio
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> entry <b>fun</b> <a href="staking_contract.md#0x1_staking_contract_reset_lockup">reset_lockup</a>(staker: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, operator: <b>address</b>) <b>acquires</b> <a href="staking_contract.md#0x1_staking_contract_Store">Store</a> {
+<pre><code><b>public</b> entry <b>fun</b> <a href="staking_contract.md#0x1_staking_contract_reset_lockup">reset_lockup</a>(staker: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, operator: <b>address</b>) {
     <b>let</b> staker_address = <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(staker);
     <a href="staking_contract.md#0x1_staking_contract_assert_staking_contract_exists">assert_staking_contract_exists</a>(staker_address, operator);
 
-    <b>let</b> store = <b>borrow_global_mut</b>&lt;<a href="staking_contract.md#0x1_staking_contract_Store">Store</a>&gt;(staker_address);
+    <b>let</b> store = &<b>mut</b> <a href="staking_contract.md#0x1_staking_contract_Store">Store</a>[staker_address];
     <b>let</b> <a href="staking_contract.md#0x1_staking_contract">staking_contract</a> = store.staking_contracts.borrow_mut(&operator);
     <b>let</b> pool_address = <a href="staking_contract.md#0x1_staking_contract">staking_contract</a>.pool_address;
     <a href="stake.md#0x1_stake_increase_lockup_with_cap">stake::increase_lockup_with_cap</a>(&<a href="staking_contract.md#0x1_staking_contract">staking_contract</a>.owner_cap);
@@ -2060,7 +2060,7 @@ TODO: fix the typo in function name. commision -> commission
 
 <pre><code><b>public</b> entry <b>fun</b> <a href="staking_contract.md#0x1_staking_contract_update_commision">update_commision</a>(
     staker: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, operator: <b>address</b>, new_commission_percentage: u64
-) <b>acquires</b> <a href="staking_contract.md#0x1_staking_contract_Store">Store</a>, <a href="staking_contract.md#0x1_staking_contract_BeneficiaryForOperator">BeneficiaryForOperator</a>, <a href="staking_contract.md#0x1_staking_contract_StakingGroupUpdateCommissionEvent">StakingGroupUpdateCommissionEvent</a> {
+) {
     <b>assert</b>!(
         new_commission_percentage &gt;= 0 && new_commission_percentage &lt;= 100,
         <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="staking_contract.md#0x1_staking_contract_EINVALID_COMMISSION_PERCENTAGE">EINVALID_COMMISSION_PERCENTAGE</a>)
@@ -2072,7 +2072,7 @@ TODO: fix the typo in function name. commision -> commission
         <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_not_found">error::not_found</a>(<a href="staking_contract.md#0x1_staking_contract_ENO_STAKING_CONTRACT_FOUND_FOR_STAKER">ENO_STAKING_CONTRACT_FOUND_FOR_STAKER</a>)
     );
 
-    <b>let</b> store = <b>borrow_global_mut</b>&lt;<a href="staking_contract.md#0x1_staking_contract_Store">Store</a>&gt;(staker_address);
+    <b>let</b> store = &<b>mut</b> <a href="staking_contract.md#0x1_staking_contract_Store">Store</a>[staker_address];
     <b>let</b> <a href="staking_contract.md#0x1_staking_contract">staking_contract</a> = store.staking_contracts.borrow_mut(&operator);
     <a href="staking_contract.md#0x1_staking_contract_distribute_internal">distribute_internal</a>(
         staker_address,
@@ -2108,7 +2108,7 @@ TODO: fix the typo in function name. commision -> commission
         );
     } <b>else</b> {
         emit_event(
-            &<b>mut</b> <b>borrow_global_mut</b>&lt;<a href="staking_contract.md#0x1_staking_contract_StakingGroupUpdateCommissionEvent">StakingGroupUpdateCommissionEvent</a>&gt;(staker_address).update_commission_events,
+            &<b>mut</b> <a href="staking_contract.md#0x1_staking_contract_StakingGroupUpdateCommissionEvent">StakingGroupUpdateCommissionEvent</a>[staker_address].update_commission_events,
             <a href="staking_contract.md#0x1_staking_contract_UpdateCommissionEvent">UpdateCommissionEvent</a> {
                 staker: staker_address,
                 operator,
@@ -2145,7 +2145,7 @@ Only staker, operator or beneficiary can call this.
 
 <pre><code><b>public</b> entry <b>fun</b> <a href="staking_contract.md#0x1_staking_contract_request_commission">request_commission</a>(
     <a href="account.md#0x1_account">account</a>: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, staker: <b>address</b>, operator: <b>address</b>
-) <b>acquires</b> <a href="staking_contract.md#0x1_staking_contract_Store">Store</a>, <a href="staking_contract.md#0x1_staking_contract_BeneficiaryForOperator">BeneficiaryForOperator</a> {
+) {
     <b>let</b> account_addr = <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(<a href="account.md#0x1_account">account</a>);
     <b>assert</b>!(
         account_addr == staker
@@ -2155,7 +2155,7 @@ Only staker, operator or beneficiary can call this.
     );
     <a href="staking_contract.md#0x1_staking_contract_assert_staking_contract_exists">assert_staking_contract_exists</a>(staker, operator);
 
-    <b>let</b> store = <b>borrow_global_mut</b>&lt;<a href="staking_contract.md#0x1_staking_contract_Store">Store</a>&gt;(staker);
+    <b>let</b> store = &<b>mut</b> <a href="staking_contract.md#0x1_staking_contract_Store">Store</a>[staker];
     <b>let</b> <a href="staking_contract.md#0x1_staking_contract">staking_contract</a> = store.staking_contracts.borrow_mut(&operator);
     // Short-circuit <b>if</b> zero commission.
     <b>if</b> (<a href="staking_contract.md#0x1_staking_contract">staking_contract</a>.commission_percentage == 0) { <b>return</b> };
@@ -2274,14 +2274,14 @@ This also triggers paying commission to the operator for accounting simplicity.
 
 <pre><code><b>public</b> entry <b>fun</b> <a href="staking_contract.md#0x1_staking_contract_unlock_stake">unlock_stake</a>(
     staker: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, operator: <b>address</b>, amount: u64
-) <b>acquires</b> <a href="staking_contract.md#0x1_staking_contract_Store">Store</a>, <a href="staking_contract.md#0x1_staking_contract_BeneficiaryForOperator">BeneficiaryForOperator</a> {
+) {
     // Short-circuit <b>if</b> amount is 0.
     <b>if</b> (amount == 0) <b>return</b>;
 
     <b>let</b> staker_address = <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(staker);
     <a href="staking_contract.md#0x1_staking_contract_assert_staking_contract_exists">assert_staking_contract_exists</a>(staker_address, operator);
 
-    <b>let</b> store = <b>borrow_global_mut</b>&lt;<a href="staking_contract.md#0x1_staking_contract_Store">Store</a>&gt;(staker_address);
+    <b>let</b> store = &<b>mut</b> <a href="staking_contract.md#0x1_staking_contract_Store">Store</a>[staker_address];
     <b>let</b> <a href="staking_contract.md#0x1_staking_contract">staking_contract</a> = store.staking_contracts.borrow_mut(&operator);
 
     // Force distribution of <a href="../../aptos-stdlib/doc/any.md#0x1_any">any</a> already inactive <a href="stake.md#0x1_stake">stake</a>.
@@ -2359,7 +2359,7 @@ Unlock all accumulated rewards since the last recorded principals.
 
 <pre><code><b>public</b> entry <b>fun</b> <a href="staking_contract.md#0x1_staking_contract_unlock_rewards">unlock_rewards</a>(
     staker: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, operator: <b>address</b>
-) <b>acquires</b> <a href="staking_contract.md#0x1_staking_contract_Store">Store</a>, <a href="staking_contract.md#0x1_staking_contract_BeneficiaryForOperator">BeneficiaryForOperator</a> {
+) {
     <b>let</b> staker_address = <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(staker);
     <a href="staking_contract.md#0x1_staking_contract_assert_staking_contract_exists">assert_staking_contract_exists</a>(staker_address, operator);
 
@@ -2393,7 +2393,7 @@ Allows staker to switch operator without going through the lenghthy process to u
 
 <pre><code><b>public</b> entry <b>fun</b> <a href="staking_contract.md#0x1_staking_contract_switch_operator_with_same_commission">switch_operator_with_same_commission</a>(
     staker: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, old_operator: <b>address</b>, new_operator: <b>address</b>
-) <b>acquires</b> <a href="staking_contract.md#0x1_staking_contract_Store">Store</a>, <a href="staking_contract.md#0x1_staking_contract_BeneficiaryForOperator">BeneficiaryForOperator</a> {
+) {
     <b>let</b> staker_address = <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(staker);
     <a href="staking_contract.md#0x1_staking_contract_assert_staking_contract_exists">assert_staking_contract_exists</a>(staker_address, old_operator);
 
@@ -2432,7 +2432,7 @@ Allows staker to switch operator without going through the lenghthy process to u
     old_operator: <b>address</b>,
     new_operator: <b>address</b>,
     new_commission_percentage: u64
-) <b>acquires</b> <a href="staking_contract.md#0x1_staking_contract_Store">Store</a>, <a href="staking_contract.md#0x1_staking_contract_BeneficiaryForOperator">BeneficiaryForOperator</a> {
+) {
     <b>let</b> staker_address = <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(staker);
     <a href="staking_contract.md#0x1_staking_contract_assert_staking_contract_exists">assert_staking_contract_exists</a>(staker_address, old_operator);
 
@@ -2441,7 +2441,7 @@ Allows staker to switch operator without going through the lenghthy process to u
         <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="staking_contract.md#0x1_staking_contract_EINVALID_COMMISSION_PERCENTAGE">EINVALID_COMMISSION_PERCENTAGE</a>)
     );
     // Merging two existing staking contracts is too complex <b>as</b> we'd need <b>to</b> merge two separate <a href="stake.md#0x1_stake">stake</a> pools.
-    <b>let</b> store = <b>borrow_global_mut</b>&lt;<a href="staking_contract.md#0x1_staking_contract_Store">Store</a>&gt;(staker_address);
+    <b>let</b> store = &<b>mut</b> <a href="staking_contract.md#0x1_staking_contract_Store">Store</a>[staker_address];
     <b>let</b> staking_contracts = &<b>mut</b> store.staking_contracts;
     <b>assert</b>!(
         !staking_contracts.contains_key(&new_operator),
@@ -2507,7 +2507,7 @@ the beneficiary. An operator can set one beneficiary for staking contract pools,
 
 <pre><code><b>public</b> entry <b>fun</b> <a href="staking_contract.md#0x1_staking_contract_set_beneficiary_for_operator">set_beneficiary_for_operator</a>(
     operator: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, new_beneficiary: <b>address</b>
-) <b>acquires</b> <a href="staking_contract.md#0x1_staking_contract_BeneficiaryForOperator">BeneficiaryForOperator</a> {
+) {
     <b>assert</b>!(
         <a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features_operator_beneficiary_change_enabled">features::operator_beneficiary_change_enabled</a>(),
         std::error::invalid_state(<a href="staking_contract.md#0x1_staking_contract_EOPERATOR_BENEFICIARY_CHANGE_NOT_SUPPORTED">EOPERATOR_BENEFICIARY_CHANGE_NOT_SUPPORTED</a>)
@@ -2517,7 +2517,7 @@ the beneficiary. An operator can set one beneficiary for staking contract pools,
     <b>let</b> operator_addr = <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(operator);
     <b>let</b> old_beneficiary = <a href="staking_contract.md#0x1_staking_contract_beneficiary_for_operator">beneficiary_for_operator</a>(operator_addr);
     <b>if</b> (<b>exists</b>&lt;<a href="staking_contract.md#0x1_staking_contract_BeneficiaryForOperator">BeneficiaryForOperator</a>&gt;(operator_addr)) {
-        <b>borrow_global_mut</b>&lt;<a href="staking_contract.md#0x1_staking_contract_BeneficiaryForOperator">BeneficiaryForOperator</a>&gt;(operator_addr).beneficiary_for_operator =
+        <a href="staking_contract.md#0x1_staking_contract_BeneficiaryForOperator">BeneficiaryForOperator</a>[operator_addr].beneficiary_for_operator =
             new_beneficiary;
     } <b>else</b> {
         <b>move_to</b>(
@@ -2559,9 +2559,9 @@ not need to be restricted to just the staker or operator.
 
 <pre><code><b>public</b> entry <b>fun</b> <a href="staking_contract.md#0x1_staking_contract_distribute">distribute</a>(
     staker: <b>address</b>, operator: <b>address</b>
-) <b>acquires</b> <a href="staking_contract.md#0x1_staking_contract_Store">Store</a>, <a href="staking_contract.md#0x1_staking_contract_BeneficiaryForOperator">BeneficiaryForOperator</a> {
+) {
     <a href="staking_contract.md#0x1_staking_contract_assert_staking_contract_exists">assert_staking_contract_exists</a>(staker, operator);
-    <b>let</b> store = <b>borrow_global_mut</b>&lt;<a href="staking_contract.md#0x1_staking_contract_Store">Store</a>&gt;(staker);
+    <b>let</b> store = &<b>mut</b> <a href="staking_contract.md#0x1_staking_contract_Store">Store</a>[staker];
     <b>let</b> <a href="staking_contract.md#0x1_staking_contract">staking_contract</a> = store.staking_contracts.borrow_mut(&operator);
     <a href="staking_contract.md#0x1_staking_contract_distribute_internal">distribute_internal</a>(
         staker,
@@ -2597,7 +2597,7 @@ Distribute all unlocked (inactive) funds according to distribution shares.
     operator: <b>address</b>,
     <a href="staking_contract.md#0x1_staking_contract">staking_contract</a>: &<b>mut</b> <a href="staking_contract.md#0x1_staking_contract_StakingContract">StakingContract</a>,
     distribute_events: &<b>mut</b> EventHandle&lt;<a href="staking_contract.md#0x1_staking_contract_DistributeEvent">DistributeEvent</a>&gt;
-) <b>acquires</b> <a href="staking_contract.md#0x1_staking_contract_BeneficiaryForOperator">BeneficiaryForOperator</a> {
+) {
     <b>let</b> pool_address = <a href="staking_contract.md#0x1_staking_contract">staking_contract</a>.pool_address;
     // Create the <a href="staking_contract.md#0x1_staking_contract_Staker">Staker</a> resource <b>if</b> it doesn't exist <b>to</b> backfill the <a href="staking_contract.md#0x1_staking_contract_Staker">Staker</a> resource for each pool.
     <b>if</b> (!<b>exists</b>&lt;<a href="staking_contract.md#0x1_staking_contract_Staker">Staker</a>&gt;(pool_address)) {
@@ -2694,12 +2694,12 @@ Assert that a staking_contract exists for the staker/operator pair.
 
 <pre><code><b>fun</b> <a href="staking_contract.md#0x1_staking_contract_assert_staking_contract_exists">assert_staking_contract_exists</a>(
     staker: <b>address</b>, operator: <b>address</b>
-) <b>acquires</b> <a href="staking_contract.md#0x1_staking_contract_Store">Store</a> {
+) {
     <b>assert</b>!(
         <b>exists</b>&lt;<a href="staking_contract.md#0x1_staking_contract_Store">Store</a>&gt;(staker),
         <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_not_found">error::not_found</a>(<a href="staking_contract.md#0x1_staking_contract_ENO_STAKING_CONTRACT_FOUND_FOR_STAKER">ENO_STAKING_CONTRACT_FOUND_FOR_STAKER</a>)
     );
-    <b>let</b> staking_contracts = &<b>borrow_global</b>&lt;<a href="staking_contract.md#0x1_staking_contract_Store">Store</a>&gt;(staker).staking_contracts;
+    <b>let</b> staking_contracts = &<a href="staking_contract.md#0x1_staking_contract_Store">Store</a>[staker].staking_contracts;
     <b>assert</b>!(
         staking_contracts.contains_key(&operator),
         <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_not_found">error::not_found</a>(<a href="staking_contract.md#0x1_staking_contract_ENO_STAKING_CONTRACT_FOUND_FOR_OPERATOR">ENO_STAKING_CONTRACT_FOUND_FOR_OPERATOR</a>)
@@ -3644,7 +3644,7 @@ The value of inactive and pending_inactive in the stake_pool is up to MAX_U64.
 <pre><code><b>pragma</b> verify_duration_estimate = 120;
 <b>pragma</b> aborts_if_is_partial;
 <b>let</b> pool_address = <a href="staking_contract.md#0x1_staking_contract">staking_contract</a>.pool_address;
-<b>let</b> stake_pool = <b>borrow_global</b>&lt;<a href="stake.md#0x1_stake_StakePool">stake::StakePool</a>&gt;(pool_address);
+<b>let</b> stake_pool = <a href="stake.md#0x1_stake_StakePool">stake::StakePool</a>[pool_address];
 <b>aborts_if</b> !<b>exists</b>&lt;<a href="stake.md#0x1_stake_StakePool">stake::StakePool</a>&gt;(pool_address);
 <b>aborts_if</b> stake_pool.inactive.value + stake_pool.pending_inactive.value
     &gt; MAX_U64;

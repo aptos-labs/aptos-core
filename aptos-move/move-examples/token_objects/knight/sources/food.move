@@ -103,8 +103,8 @@ module knight::food {
 
     #[view]
     /// Returns the restoration value of the food token
-    public fun restoration_value(token: Object<FoodToken>): u64 acquires RestorationValue {
-        let restoration_value_in_food = borrow_global<RestorationValue>(object::object_address(&token));
+    public fun restoration_value(token: Object<FoodToken>): u64 {
+        let restoration_value_in_food = &RestorationValue[object::object_address(&token)];
         restoration_value_in_food.value
     }
 
@@ -135,13 +135,13 @@ module knight::food {
     }
 
     /// Mints the given amount of the corn token to the given receiver.
-    public entry fun mint_corn(creator: &signer, receiver: address, amount: u64) acquires FoodToken {
+    public entry fun mint_corn(creator: &signer, receiver: address, amount: u64) {
         let corn_token = object::address_to_object<FoodToken>(corn_token_address());
         mint_internal(creator, corn_token, receiver, amount);
     }
 
     /// Mints the given amount of the meat token to the given receiver.
-    public entry fun mint_meat(creator: &signer, receiver: address, amount: u64) acquires FoodToken {
+    public entry fun mint_meat(creator: &signer, receiver: address, amount: u64) {
         let meat_token = object::address_to_object<FoodToken>(meat_token_address());
         mint_internal(creator, meat_token, receiver, amount);
     }
@@ -161,10 +161,10 @@ module knight::food {
         primary_fungible_store::transfer(from, metadata, to, amount);
     }
 
-    public(friend) fun burn_food(from: &signer, food: Object<FoodToken>, amount: u64) acquires FoodToken {
+    friend fun burn_food(from: &signer, food: Object<FoodToken>, amount: u64) {
         let metadata = object::convert<FoodToken, Metadata>(food);
         let food_addr = object::object_address(&food);
-        let food_token = borrow_global<FoodToken>(food_addr);
+        let food_token = &FoodToken[food_addr];
         let from_store = primary_fungible_store::ensure_primary_store_exists(signer::address_of(from), metadata);
         fungible_asset::burn_from(&food_token.fungible_asset_burn_ref, from_store, amount);
     }
@@ -251,7 +251,7 @@ module knight::food {
     }
 
     /// The internal mint function.
-    fun mint_internal(creator: &signer, token: Object<FoodToken>, receiver: address, amount: u64) acquires FoodToken {
+    fun mint_internal(creator: &signer, token: Object<FoodToken>, receiver: address, amount: u64) {
         let food_token = authorized_borrow<FoodToken>(creator, &token);
         let fungible_asset_mint_ref = &food_token.fungible_asset_mint_ref;
         let fa = fungible_asset::mint(fungible_asset_mint_ref, amount);
@@ -269,7 +269,7 @@ module knight::food {
             token::creator(*token) == signer::address_of(creator),
             error::permission_denied(ENOT_CREATOR),
         );
-        borrow_global<FoodToken>(token_address)
+        &FoodToken[token_address]
     }
 
     #[test_only]
@@ -278,7 +278,7 @@ module knight::food {
     }
 
     #[test(creator = @knight, user1 = @0x456, user2 = @0x789)]
-    public fun test_food(creator: &signer, user1: &signer, user2: &signer) acquires FoodToken {
+    public fun test_food(creator: &signer, user1: &signer, user2: &signer) {
         // This test assumes that the creator's address is equal to @knight.
         assert!(signer::address_of(creator) == @knight, 0);
 

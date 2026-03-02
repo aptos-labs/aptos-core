@@ -62,12 +62,12 @@ module aptos_framework::jwk_consensus_config {
     }
 
     /// Only used in reconfigurations to apply the pending `JWKConsensusConfig`, if there is any.
-    public(friend) fun on_new_epoch(framework: &signer) acquires JWKConsensusConfig {
+    friend fun on_new_epoch(framework: &signer) {
         system_addresses::assert_aptos_framework(framework);
         if (config_buffer::does_exist<JWKConsensusConfig>()) {
             let new_config = config_buffer::extract_v2<JWKConsensusConfig>();
             if (exists<JWKConsensusConfig>(@aptos_framework)) {
-                *borrow_global_mut<JWKConsensusConfig>(@aptos_framework) = new_config;
+                JWKConsensusConfig[@aptos_framework] = new_config;
             } else {
                 move_to(framework, new_config);
             };
@@ -87,7 +87,6 @@ module aptos_framework::jwk_consensus_config {
     public fun new_v1(oidc_providers: vector<OIDCProvider>): JWKConsensusConfig {
         let name_set = simple_map::new<String, u64>();
         oidc_providers.for_each_ref(|provider| {
-            let provider: &OIDCProvider = provider;
             let (_, old_value) = simple_map::upsert(&mut name_set, provider.name, 0);
             if (option::is_some(&old_value)) {
                 abort(error::invalid_argument(EDUPLICATE_PROVIDERS))
@@ -104,8 +103,8 @@ module aptos_framework::jwk_consensus_config {
     }
 
     #[test_only]
-    fun enabled(): bool acquires JWKConsensusConfig {
-        let variant= borrow_global<JWKConsensusConfig>(@aptos_framework).variant;
+    fun enabled(): bool {
+        let variant= JWKConsensusConfig[@aptos_framework].variant;
         let variant_type_name = *variant.type_name().bytes();
         variant_type_name != b"0x1::jwk_consensus_config::ConfigOff"
     }
@@ -117,7 +116,7 @@ module aptos_framework::jwk_consensus_config {
     }
 
     #[test(framework = @0x1)]
-    fun init_buffer_apply(framework: signer) acquires JWKConsensusConfig {
+    fun init_buffer_apply(framework: signer) {
         initialize_for_testing(&framework);
         let config = new_v1(vector[
             new_oidc_provider(utf8(b"Bob"), utf8(b"https://bob.dev")),

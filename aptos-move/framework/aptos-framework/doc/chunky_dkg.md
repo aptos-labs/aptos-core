@@ -264,13 +264,13 @@ Mark on-chain Chunky DKG state as in-progress. Notify validators to start Chunky
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="chunky_dkg.md#0x1_chunky_dkg_start">start</a>(
+<pre><code><b>friend</b> <b>fun</b> <a href="chunky_dkg.md#0x1_chunky_dkg_start">start</a>(
     dealer_epoch: u64,
     <a href="chunky_dkg_config.md#0x1_chunky_dkg_config">chunky_dkg_config</a>: ChunkyDKGConfig,
     dealer_validator_set: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;ValidatorConsensusInfo&gt;,
     target_validator_set: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;ValidatorConsensusInfo&gt;
-) <b>acquires</b> <a href="chunky_dkg.md#0x1_chunky_dkg_ChunkyDKGState">ChunkyDKGState</a> {
-    <b>let</b> chunky_dkg_state = <b>borrow_global_mut</b>&lt;<a href="chunky_dkg.md#0x1_chunky_dkg_ChunkyDKGState">ChunkyDKGState</a>&gt;(@aptos_framework);
+) {
+    <b>let</b> chunky_dkg_state = &<b>mut</b> <a href="chunky_dkg.md#0x1_chunky_dkg_ChunkyDKGState">ChunkyDKGState</a>[@aptos_framework];
     <b>let</b> new_session_metadata = <a href="chunky_dkg.md#0x1_chunky_dkg_ChunkyDKGSessionMetadata">ChunkyDKGSessionMetadata</a> {
         dealer_epoch,
         <a href="chunky_dkg_config.md#0x1_chunky_dkg_config">chunky_dkg_config</a>,
@@ -314,8 +314,8 @@ Abort if Chunky DKG is not in progress.
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="chunky_dkg.md#0x1_chunky_dkg_finish">finish</a>(aggregated_subtranscript: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;) <b>acquires</b> <a href="chunky_dkg.md#0x1_chunky_dkg_ChunkyDKGState">ChunkyDKGState</a> {
-    <b>let</b> chunky_dkg_state = <b>borrow_global_mut</b>&lt;<a href="chunky_dkg.md#0x1_chunky_dkg_ChunkyDKGState">ChunkyDKGState</a>&gt;(@aptos_framework);
+<pre><code><b>friend</b> <b>fun</b> <a href="chunky_dkg.md#0x1_chunky_dkg_finish">finish</a>(aggregated_subtranscript: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;) {
+    <b>let</b> chunky_dkg_state = &<b>mut</b> <a href="chunky_dkg.md#0x1_chunky_dkg_ChunkyDKGState">ChunkyDKGState</a>[@aptos_framework];
     <b>assert</b>!(
         chunky_dkg_state.in_progress.is_some(),
         <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_state">error::invalid_state</a>(<a href="chunky_dkg.md#0x1_chunky_dkg_ECHUNKY_DKG_NOT_IN_PROGRESS">ECHUNKY_DKG_NOT_IN_PROGRESS</a>)
@@ -347,10 +347,10 @@ Delete the currently incomplete session, if it exists.
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="chunky_dkg.md#0x1_chunky_dkg_try_clear_incomplete_session">try_clear_incomplete_session</a>(fx: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>) <b>acquires</b> <a href="chunky_dkg.md#0x1_chunky_dkg_ChunkyDKGState">ChunkyDKGState</a> {
+<pre><code><b>public</b> <b>fun</b> <a href="chunky_dkg.md#0x1_chunky_dkg_try_clear_incomplete_session">try_clear_incomplete_session</a>(fx: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>) {
     <a href="system_addresses.md#0x1_system_addresses_assert_aptos_framework">system_addresses::assert_aptos_framework</a>(fx);
     <b>if</b> (<b>exists</b>&lt;<a href="chunky_dkg.md#0x1_chunky_dkg_ChunkyDKGState">ChunkyDKGState</a>&gt;(@aptos_framework)) {
-        <b>let</b> chunky_dkg_state = <b>borrow_global_mut</b>&lt;<a href="chunky_dkg.md#0x1_chunky_dkg_ChunkyDKGState">ChunkyDKGState</a>&gt;(@aptos_framework);
+        <b>let</b> chunky_dkg_state = &<b>mut</b> <a href="chunky_dkg.md#0x1_chunky_dkg_ChunkyDKGState">ChunkyDKGState</a>[@aptos_framework];
         chunky_dkg_state.in_progress = <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_none">option::none</a>();
     }
 }
@@ -376,9 +376,9 @@ Return the incomplete Chunky DKG session state, if it exists.
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="chunky_dkg.md#0x1_chunky_dkg_incomplete_session">incomplete_session</a>(): Option&lt;<a href="chunky_dkg.md#0x1_chunky_dkg_ChunkyDKGSessionState">ChunkyDKGSessionState</a>&gt; <b>acquires</b> <a href="chunky_dkg.md#0x1_chunky_dkg_ChunkyDKGState">ChunkyDKGState</a> {
+<pre><code><b>public</b> <b>fun</b> <a href="chunky_dkg.md#0x1_chunky_dkg_incomplete_session">incomplete_session</a>(): Option&lt;<a href="chunky_dkg.md#0x1_chunky_dkg_ChunkyDKGSessionState">ChunkyDKGSessionState</a>&gt; {
     <b>if</b> (<b>exists</b>&lt;<a href="chunky_dkg.md#0x1_chunky_dkg_ChunkyDKGState">ChunkyDKGState</a>&gt;(@aptos_framework)) {
-        <b>borrow_global</b>&lt;<a href="chunky_dkg.md#0x1_chunky_dkg_ChunkyDKGState">ChunkyDKGState</a>&gt;(@aptos_framework).in_progress
+        <a href="chunky_dkg.md#0x1_chunky_dkg_ChunkyDKGState">ChunkyDKGState</a>[@aptos_framework].in_progress
     } <b>else</b> {
         <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_none">option::none</a>()
     }

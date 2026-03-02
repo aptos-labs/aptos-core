@@ -44,7 +44,7 @@ module aptos_experimental::pre_cancellation_tracker {
         account_order_id: AccountClientOrderId
     }
 
-    public(friend) fun new_pre_cancellation_tracker(
+    friend fun new_pre_cancellation_tracker(
         expiration_time_secs: u64
     ): PreCancellationTracker {
         PreCancellationTracker::V1 {
@@ -54,7 +54,7 @@ module aptos_experimental::pre_cancellation_tracker {
         }
     }
 
-    public(friend) fun pre_cancel_order_for_tracker(
+    friend fun pre_cancel_order_for_tracker(
         tracker: &mut PreCancellationTracker, account: address, client_order_id: String
     ) {
         garbage_collect(tracker);
@@ -85,7 +85,7 @@ module aptos_experimental::pre_cancellation_tracker {
         tracker.expiration_with_order_ids.add(order_id_with_expiration, true);
     }
 
-    public(friend) fun is_pre_cancelled(
+    friend fun is_pre_cancelled(
         tracker: &mut PreCancellationTracker, account: address, client_order_id: String
     ): bool {
         garbage_collect(tracker);
@@ -110,7 +110,7 @@ module aptos_experimental::pre_cancellation_tracker {
         return false
     }
 
-    public(friend) fun garbage_collect(
+    friend fun garbage_collect(
         tracker: &mut PreCancellationTracker
     ) {
         let i = 0;

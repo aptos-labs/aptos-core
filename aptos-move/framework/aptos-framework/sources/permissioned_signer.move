@@ -132,7 +132,7 @@ module aptos_framework::permissioned_signer {
     }
 
     /// Destroys an ephermeral permission handle. Clean up the permission stored in that handle
-    public fun destroy_permissioned_handle(p: PermissionedHandle) acquires PermissionStorage {
+    public fun destroy_permissioned_handle(p: PermissionedHandle) {
         assert!(
             features::is_permissioned_signer_enabled(),
             error::permission_denied(EPERMISSION_SIGNER_DISABLED)
@@ -173,7 +173,7 @@ module aptos_framework::permissioned_signer {
     public fun grant_revoke_permission(
         master: &signer,
         permissioned: &signer,
-    ) acquires PermissionStorage {
+    ) {
         assert!(
             features::is_permissioned_signer_enabled(),
             error::permission_denied(EPERMISSION_SIGNER_DISABLED)
@@ -185,7 +185,7 @@ module aptos_framework::permissioned_signer {
     /// the storable permission handle to derive signer from it anymore.
     public entry fun revoke_permission_storage_address(
         s: &signer, permissions_storage_addr: address
-    ) acquires GrantedPermissionHandles, PermissionStorage {
+    ) {
         assert!(
             features::is_permissioned_signer_enabled(),
             error::permission_denied(EPERMISSION_SIGNER_DISABLED)
@@ -210,7 +210,7 @@ module aptos_framework::permissioned_signer {
     }
 
     /// Revoke all storable permission handle of the signer immediately.
-    public entry fun revoke_all_handles(s: &signer) acquires GrantedPermissionHandles, PermissionStorage {
+    public entry fun revoke_all_handles(s: &signer) {
         assert!(
             features::is_permissioned_signer_enabled(),
             error::permission_denied(EPERMISSION_SIGNER_DISABLED)
@@ -223,7 +223,7 @@ module aptos_framework::permissioned_signer {
         if (!exists<GrantedPermissionHandles>(master_account_addr)) { return };
 
         let granted_permissions =
-            borrow_global_mut<GrantedPermissionHandles>(master_account_addr);
+            &mut GrantedPermissionHandles[master_account_addr];
         let delete_list = granted_permissions.active_handles.trim_reverse(0);
         delete_list.destroy(|address| {
                 destroy_permissions_storage_address(address);
@@ -245,9 +245,9 @@ module aptos_framework::permissioned_signer {
     /// This is as dangerous as key delegation, thus it remains public(package) for now.
     ///
     /// The caller should check if `expiration_time` is not too far in the future.
-    public(package) fun create_storable_permissioned_handle(
+    package fun create_storable_permissioned_handle(
         master: &signer, expiration_time: u64
-    ): StorablePermissionedHandle acquires GrantedPermissionHandles {
+    ): StorablePermissionedHandle {
         assert!(
             features::is_permissioned_signer_enabled(),
             error::permission_denied(EPERMISSION_SIGNER_DISABLED)
@@ -281,9 +281,9 @@ module aptos_framework::permissioned_signer {
     }
 
     /// Destroys a storable permission handle. Clean up the permission stored in that handle
-    public(package) fun destroy_storable_permissioned_handle(
+    package fun destroy_storable_permissioned_handle(
         p: StorablePermissionedHandle
-    ) acquires PermissionStorage, GrantedPermissionHandles {
+    ) {
         let StorablePermissionedHandle::V1 {
             master_account_addr,
             permissions_storage_addr,
@@ -315,7 +315,7 @@ module aptos_framework::permissioned_signer {
     }
 
     /// Generate the permissioned signer based on the storable permission handle.
-    public(package) fun signer_from_storable_permissioned_handle(
+    package fun signer_from_storable_permissioned_handle(
         p: &StorablePermissionedHandle
     ): signer {
         assert!(
@@ -336,14 +336,14 @@ module aptos_framework::permissioned_signer {
     }
 
     /// Return the permission handle address so that it could be used for revocation purpose.
-    public(package) fun permissions_storage_address(
+    package fun permissions_storage_address(
         p: &StorablePermissionedHandle
     ): address {
         p.permissions_storage_addr
     }
 
     /// Helper function that would abort if the signer passed in is a permissioned signer.
-    public(package) fun assert_master_signer(s: &signer) {
+    package fun assert_master_signer(s: &signer) {
         assert!(
             !is_permissioned_signer(s), error::permission_denied(ENOT_MASTER_SIGNER)
         );
@@ -416,7 +416,7 @@ module aptos_framework::permissioned_signer {
             error::permission_denied(E_NOT_ACTIVE)
         );
         let perms =
-            &mut borrow_global_mut<PermissionStorage>(permission_signer_addr).perms;
+            &mut PermissionStorage[permission_signer_addr].perms;
         let key = copyable_any::pack(perm);
         if (perms.contains(&key)) {
             let value = perms.remove(&key);
@@ -440,7 +440,7 @@ module aptos_framework::permissioned_signer {
             error::permission_denied(E_NOT_ACTIVE)
         );
         let perms =
-            &mut borrow_global_mut<PermissionStorage>(permission_signer_addr).perms;
+            &mut PermissionStorage[permission_signer_addr].perms;
         let key = copyable_any::pack(perm);
         if (perms.contains(&key)) {
             let value = perms.remove(&key);
@@ -454,12 +454,12 @@ module aptos_framework::permissioned_signer {
     /// Authorizes `permissioned` with a given capacity and increment the existing capacity if present.
     ///
     /// Consumption using `check_permission_consume` will deduct the capacity.
-    public(package) fun authorize_increase<PermKey: copy + drop + store>(
+    package fun authorize_increase<PermKey: copy + drop + store>(
         master: &signer,
         permissioned: &signer,
         capacity: u256,
         perm: PermKey
-    ) acquires PermissionStorage {
+    ) {
         assert!(
             is_permissioned_signer(permissioned)
                 && !is_permissioned_signer(master)
@@ -478,11 +478,11 @@ module aptos_framework::permissioned_signer {
 
     /// Authorizes `permissioned` with the given unlimited permission.
     /// Unlimited permission can be consumed however many times.
-    public(package) fun authorize_unlimited<PermKey: copy + drop + store>(
+    package fun authorize_unlimited<PermKey: copy + drop + store>(
         master: &signer,
         permissioned: &signer,
         perm: PermKey
-    ) acquires PermissionStorage {
+    ) {
         assert!(
             is_permissioned_signer(permissioned)
                 && !is_permissioned_signer(master)
@@ -500,10 +500,10 @@ module aptos_framework::permissioned_signer {
     }
 
     /// Grant an unlimited permission to a permissioned signer **without** master signer's approvoal.
-    public(package) fun grant_unlimited_with_permissioned_signer<PermKey: copy + drop + store>(
+    package fun grant_unlimited_with_permissioned_signer<PermKey: copy + drop + store>(
         permissioned: &signer,
         perm: PermKey
-    ) acquires PermissionStorage {
+    ) {
         if(!is_permissioned_signer(permissioned)) {
             return;
         };
@@ -522,11 +522,11 @@ module aptos_framework::permissioned_signer {
     /// The caller of the module will need to make sure the witness type `PermKey` can only be
     /// constructed within its own module, otherwise attackers can refill the permission for itself
     /// to bypass the checks.
-    public(package) fun increase_limit<PermKey: copy + drop + store>(
+    package fun increase_limit<PermKey: copy + drop + store>(
         permissioned: &signer,
         capacity: u256,
         perm: PermKey
-    ) acquires PermissionStorage {
+    ) {
         if(!is_permissioned_signer(permissioned)) {
             return;
         };
@@ -540,16 +540,16 @@ module aptos_framework::permissioned_signer {
         )
     }
 
-    public(package) fun check_permission_exists<PermKey: copy + drop + store>(
+    package fun check_permission_exists<PermKey: copy + drop + store>(
         s: &signer, perm: PermKey
-    ): bool acquires PermissionStorage {
+    ): bool {
         // 0 capacity permissions will be treated as non-existant.
         check_permission_capacity_above(s, 1, perm)
     }
 
-    public(package) fun check_permission_capacity_above<PermKey: copy + drop + store>(
+    package fun check_permission_capacity_above<PermKey: copy + drop + store>(
         s: &signer, threshold: u256, perm: PermKey
-    ): bool acquires PermissionStorage {
+    ): bool {
         if (!is_permissioned_signer(s)) {
             // master signer has all permissions
             return true
@@ -564,9 +564,9 @@ module aptos_framework::permissioned_signer {
         )
     }
 
-    public(package) fun check_permission_consume<PermKey: copy + drop + store>(
+    package fun check_permission_consume<PermKey: copy + drop + store>(
         s: &signer, threshold: u256, perm: PermKey
-    ): bool acquires PermissionStorage {
+    ): bool {
         if (!is_permissioned_signer(s)) {
             // master signer has all permissions
             return true
@@ -581,9 +581,9 @@ module aptos_framework::permissioned_signer {
         )
     }
 
-    public(package) fun capacity<PermKey: copy + drop + store>(
+    package fun capacity<PermKey: copy + drop + store>(
         s: &signer, perm: PermKey
-    ): Option<u256> acquires PermissionStorage {
+    ): Option<u256> {
         if (!is_permissioned_signer(s)) {
             return option::some(U256_MAX)
         };
@@ -600,9 +600,9 @@ module aptos_framework::permissioned_signer {
         )
     }
 
-    public(package) fun revoke_permission<PermKey: copy + drop + store>(
+    package fun revoke_permission<PermKey: copy + drop + store>(
         permissioned: &signer, perm: PermKey
-    ) acquires PermissionStorage {
+    ) {
         if (!is_permissioned_signer(permissioned)) {
             // Master signer has no permissions associated with it.
             return
@@ -647,7 +647,7 @@ module aptos_framework::permissioned_signer {
     #[test(creator = @0xcafe)]
     fun signer_address_roundtrip(
         creator: &signer
-    ) acquires PermissionStorage, GrantedPermissionHandles {
+    ) {
         let aptos_framework = create_signer(@0x1);
         timestamp::set_time_has_started_for_testing(&aptos_framework);
 
@@ -683,7 +683,7 @@ module aptos_framework::permissioned_signer {
     #[expected_failure(abort_code = 0x1C5, location = aptos_std::bcs)]
     fun signer_serialization(
         creator: &signer
-    ) acquires PermissionStorage {
+    ) {
         let aptos_framework = create_signer(@0x1);
         timestamp::set_time_has_started_for_testing(&aptos_framework);
 

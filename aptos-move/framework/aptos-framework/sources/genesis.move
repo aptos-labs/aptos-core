@@ -175,7 +175,6 @@ module aptos_framework::genesis {
     fun create_accounts(aptos_framework: &signer, accounts: vector<AccountMap>) {
         let unique_accounts = vector::empty();
         accounts.for_each_ref(|account_map| {
-            let account_map: &AccountMap = account_map;
             assert!(
                 !vector::contains(&unique_accounts, &account_map.account_address),
                 error::already_exists(EDUPLICATE_ACCOUNT),
@@ -215,7 +214,6 @@ module aptos_framework::genesis {
 
         employees.for_each_ref(|employee_group| {
             let j = 0;
-            let employee_group: &EmployeeAccountMap = employee_group;
             let num_employees_in_group = vector::length(&employee_group.accounts);
 
             let buy_ins = simple_map::create();
@@ -300,7 +298,6 @@ module aptos_framework::genesis {
         validators: vector<ValidatorConfigurationWithCommission>,
     ) {
         validators.for_each_ref(|validator| {
-            let validator: &ValidatorConfigurationWithCommission = validator;
             create_initialize_validator(aptos_framework, validator, use_staking_contract);
         });
 

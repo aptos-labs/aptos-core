@@ -55,7 +55,7 @@ module dao_platform::bucket_table {
         let i = 0;
         while (i < map.num_buckets) {
             vector::destroy_empty(table_with_length::remove(&mut map.buckets, i));
-            i = i + 1;
+            i += 1;
         };
         let BucketTable {buckets, num_buckets: _, level: _, len: _} = map;
         table_with_length::destroy_empty(buckets);
@@ -73,7 +73,7 @@ module dao_platform::bucket_table {
             assert!(&entry.key != &key, error::invalid_argument(EALREADY_EXIST));
         });
         vector::push_back(bucket, Entry {hash, key, value});
-        map.len = map.len + 1;
+        map.len += 1;
 
         if (load_factor(map) > SPLIT_THRESHOLD) {
             split_one_bucket(map);
@@ -97,7 +97,7 @@ module dao_platform::bucket_table {
         map.num_buckets = new_bucket_index + 1;
         // if the whole level is splitted once, bump the level.
         if (to_split + 1 == 1 << map.level) {
-            map.level = map.level + 1;
+            map.level += 1;
         };
         let old_bucket = table_with_length::borrow_mut(&mut map.buckets, to_split);
         // partition the bucket. after the loop, i == j and [0..i) stays in old bucket, [j..len) goes to new bucket
@@ -108,16 +108,16 @@ module dao_platform::bucket_table {
             let entry = vector::borrow(old_bucket, i);
             let index = bucket_index(map.level, map.num_buckets, entry.hash);
             if (index == new_bucket_index) {
-                j = j - 1;
+                j -= 1;
                 vector::swap(old_bucket, i, j);
             } else {
-                i = i + 1;
+                i += 1;
             };
         };
         while (j < len) {
             let entry = vector::pop_back(old_bucket);
             vector::push_back(&mut new_bucket, entry);
-            len = len - 1;
+            len -= 1;
         };
         table_with_length::add(&mut map.buckets, new_bucket_index, new_bucket);
     }
@@ -148,7 +148,7 @@ module dao_platform::bucket_table {
             if (&entry.key == &key) {
                 return &entry.value
             };
-            i = i + 1;
+            i += 1;
         };
         abort error::invalid_argument(ENOT_FOUND)
     }
@@ -165,7 +165,7 @@ module dao_platform::bucket_table {
             if (&entry.key == &key) {
                 return &mut entry.value
             };
-            i = i + 1;
+            i += 1;
         };
         abort error::invalid_argument(ENOT_FOUND)
     }
@@ -191,10 +191,10 @@ module dao_platform::bucket_table {
             let entry = vector::borrow(bucket, i);
             if (&entry.key == key) {
                 let Entry {hash:_, key:_, value} = vector::swap_remove(bucket, i);
-                map.len = map.len - 1;
+                map.len -= 1;
                 return value
             };
-            i = i + 1;
+            i += 1;
         };
         abort error::invalid_argument(ENOT_FOUND)
     }
@@ -212,7 +212,7 @@ module dao_platform::bucket_table {
     /// Reserve `additional_buckets` more buckets.
     public fun split<K, V>(map: &mut BucketTable<K, V>, additional_buckets: u64) {
         while (additional_buckets > 0) {
-            additional_buckets = additional_buckets - 1;
+            additional_buckets -= 1;
             split_one_bucket(map);
         }
     }
@@ -223,21 +223,21 @@ module dao_platform::bucket_table {
         let i = 0;
         while (i < 200) {
             add(&mut map, i, i);
-            i = i + 1;
+            i += 1;
         };
         assert!(length(&map) == 200, 0);
         i = 0;
         while (i < 200) {
             *borrow_mut(&mut map, i) = i * 2;
             assert!(*borrow(&mut map, i) == i * 2, 0);
-            i = i + 1;
+            i += 1;
         };
         i = 0;
         assert!(map.num_buckets > 20, map.num_buckets);
         while (i < 200) {
             assert!(contains(&map, &i), 0);
             assert!(remove(&mut map, &i) == i * 2, 0);
-            i = i + 1;
+            i += 1;
         };
         destroy_empty(map);
     }
@@ -251,9 +251,9 @@ module dao_platform::bucket_table {
             assert!(map.num_buckets == i, 0);
             assert!(map.level == level, i);
             split_one_bucket(&mut map);
-            i = i + 1;
+            i += 1;
             if (i == 1 << (level + 1)) {
-                level = level + 1;
+                level += 1;
             };
         };
         destroy_empty(map);
@@ -266,7 +266,7 @@ module dao_platform::bucket_table {
         let i = 0;
         while (i < 4) {
             split_one_bucket(&mut map);
-            i = i + 1;
+            i += 1;
         };
         assert!(map.level == 3, 0);
         assert!(map.num_buckets == 12, 0);
@@ -278,7 +278,7 @@ module dao_platform::bucket_table {
             };
             let index = bucket_index(map.level, map.num_buckets, i);
             assert!(index == j, 0);
-            i = i + 1;
+            i += 1;
         };
         destroy_empty(map);
     }

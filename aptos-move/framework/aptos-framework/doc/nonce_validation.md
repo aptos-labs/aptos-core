@@ -231,7 +231,7 @@
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="nonce_validation.md#0x1_nonce_validation_initialize">initialize</a>(aptos_framework: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>) {
+<pre><code><b>friend</b> <b>fun</b> <a href="nonce_validation.md#0x1_nonce_validation_initialize">initialize</a>(aptos_framework: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>) {
     <a href="nonce_validation.md#0x1_nonce_validation_initialize_nonce_table">initialize_nonce_table</a>(aptos_framework);
 }
 </code></pre>
@@ -324,7 +324,7 @@
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> entry <b>fun</b> <a href="nonce_validation.md#0x1_nonce_validation_add_nonce_buckets">add_nonce_buckets</a>(count: u64) <b>acquires</b> <a href="nonce_validation.md#0x1_nonce_validation_NonceHistory">NonceHistory</a> {
+<pre><code><b>public</b> entry <b>fun</b> <a href="nonce_validation.md#0x1_nonce_validation_add_nonce_buckets">add_nonce_buckets</a>(count: u64) {
     <b>assert</b>!(<b>exists</b>&lt;<a href="nonce_validation.md#0x1_nonce_validation_NonceHistory">NonceHistory</a>&gt;(@aptos_framework), <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_state">error::invalid_state</a>(<a href="nonce_validation.md#0x1_nonce_validation_E_NONCE_HISTORY_DOES_NOT_EXIST">E_NONCE_HISTORY_DOES_NOT_EXIST</a>));
     <b>let</b> nonce_history = &<b>mut</b> <a href="nonce_validation.md#0x1_nonce_validation_NonceHistory">NonceHistory</a>[@aptos_framework];
     for (i in 0..count) {
@@ -360,11 +360,11 @@
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="nonce_validation.md#0x1_nonce_validation_check_and_insert_nonce">check_and_insert_nonce</a>(
+<pre><code><b>friend</b> <b>fun</b> <a href="nonce_validation.md#0x1_nonce_validation_check_and_insert_nonce">check_and_insert_nonce</a>(
     sender_address: <b>address</b>,
     nonce: u64,
     txn_expiration_time: u64,
-): bool <b>acquires</b> <a href="nonce_validation.md#0x1_nonce_validation_NonceHistory">NonceHistory</a> {
+): bool {
     <b>assert</b>!(<b>exists</b>&lt;<a href="nonce_validation.md#0x1_nonce_validation_NonceHistory">NonceHistory</a>&gt;(@aptos_framework), <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_state">error::invalid_state</a>(<a href="nonce_validation.md#0x1_nonce_validation_E_NONCE_HISTORY_DOES_NOT_EXIST">E_NONCE_HISTORY_DOES_NOT_EXIST</a>));
     // Check <b>if</b> the transaction expiration time is too far in the future.
     <b>assert</b>!(txn_expiration_time &lt;= <a href="timestamp.md#0x1_timestamp_now_seconds">timestamp::now_seconds</a>() + <a href="nonce_validation.md#0x1_nonce_validation_NONCE_REPLAY_PROTECTION_OVERLAP_INTERVAL_SECONDS">NONCE_REPLAY_PROTECTION_OVERLAP_INTERVAL_SECONDS</a>, <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="nonce_validation.md#0x1_nonce_validation_ETRANSACTION_EXPIRATION_TOO_FAR_IN_FUTURE">ETRANSACTION_EXPIRATION_TOO_FAR_IN_FUTURE</a>));

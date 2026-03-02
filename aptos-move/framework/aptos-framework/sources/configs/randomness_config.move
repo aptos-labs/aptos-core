@@ -55,12 +55,12 @@ module aptos_framework::randomness_config {
     }
 
     /// Only used in reconfigurations to apply the pending `RandomnessConfig`, if there is any.
-    public(friend) fun on_new_epoch(framework: &signer) acquires RandomnessConfig {
+    friend fun on_new_epoch(framework: &signer) {
         system_addresses::assert_aptos_framework(framework);
         if (config_buffer::does_exist<RandomnessConfig>()) {
             let new_config = config_buffer::extract_v2<RandomnessConfig>();
             if (exists<RandomnessConfig>(@aptos_framework)) {
-                *borrow_global_mut<RandomnessConfig>(@aptos_framework) = new_config;
+                RandomnessConfig[@aptos_framework] = new_config;
             } else {
                 move_to(framework, new_config);
             }
@@ -71,9 +71,9 @@ module aptos_framework::randomness_config {
     ///
     /// NOTE: this returning true does not mean randomness will run.
     /// The feature works if and only if `consensus_config::validator_txn_enabled() && randomness_config::enabled()`.
-    public fun enabled(): bool acquires RandomnessConfig {
+    public fun enabled(): bool {
         if (exists<RandomnessConfig>(@aptos_framework)) {
-            let config = borrow_global<RandomnessConfig>(@aptos_framework);
+            let config = &RandomnessConfig[@aptos_framework];
             let variant_type_name = *config.variant.type_name().bytes();
             variant_type_name != b"0x1::randomness_config::ConfigOff"
         } else {
@@ -114,9 +114,9 @@ module aptos_framework::randomness_config {
     }
 
     /// Get the currently effective randomness configuration object.
-    public fun current(): RandomnessConfig acquires RandomnessConfig {
+    public fun current(): RandomnessConfig {
         if (exists<RandomnessConfig>(@aptos_framework)) {
-            *borrow_global<RandomnessConfig>(@aptos_framework)
+            RandomnessConfig[@aptos_framework]
         } else {
             new_off()
         }
@@ -132,7 +132,7 @@ module aptos_framework::randomness_config {
     }
 
     #[test(framework = @0x1)]
-    fun init_buffer_apply(framework: signer) acquires RandomnessConfig {
+    fun init_buffer_apply(framework: signer) {
         initialize_for_testing(&framework);
 
         // Enabling.

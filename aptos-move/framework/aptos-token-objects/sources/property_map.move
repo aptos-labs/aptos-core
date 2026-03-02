@@ -78,7 +78,7 @@ module aptos_token_objects::property_map {
     }
 
     /// Burns the entire property map
-    public fun burn(ref: MutatorRef) acquires PropertyMap {
+    public fun burn(ref: MutatorRef) {
         move_from<PropertyMap>(ref.self);
     }
 
@@ -173,6 +173,7 @@ module aptos_token_objects::property_map {
         to_internal_type(type)
     }
 
+    #[lint::skip(empty_if)]
     /// Validates property value type against its expected type
     inline fun validate_type(type: u8, value: vector<u8>) {
         if (type == BOOL) {
@@ -206,13 +207,13 @@ module aptos_token_objects::property_map {
 
     // Accessors
 
-    public fun contains_key<T: key>(object: &Object<T>, key: &String): bool acquires PropertyMap {
+    public fun contains_key<T: key>(object: &Object<T>, key: &String): bool {
         assert_exists(object.object_address());
         let property_map = &PropertyMap[object.object_address()];
         property_map.inner.contains_key(key)
     }
 
-    public fun length<T: key>(object: &Object<T>): u64 acquires PropertyMap {
+    public fun length<T: key>(object: &Object<T>): u64 {
         assert_exists(object.object_address());
         let property_map = &PropertyMap[object.object_address()];
         property_map.inner.length()
@@ -221,7 +222,7 @@ module aptos_token_objects::property_map {
     /// Read the property and get it's external type in it's bcs encoded format
     ///
     /// The preferred method is to use `read_<type>` where the type is already known.
-    public fun read<T: key>(object: &Object<T>, key: &String): (String, vector<u8>) acquires PropertyMap {
+    public fun read<T: key>(object: &Object<T>, key: &String): (String, vector<u8>) {
         assert_exists(object.object_address());
         let property_map = &PropertyMap[object.object_address()];
         let property_value = property_map.inner.borrow(key);
@@ -246,66 +247,66 @@ module aptos_token_objects::property_map {
         value
     }
 
-    public fun read_bool<T: key>(object: &Object<T>, key: &String): bool acquires PropertyMap {
+    public fun read_bool<T: key>(object: &Object<T>, key: &String): bool {
         let value = read_typed<T, bool>(object, key);
         from_bcs::to_bool(value)
     }
 
-    public fun read_u8<T: key>(object: &Object<T>, key: &String): u8 acquires PropertyMap {
+    public fun read_u8<T: key>(object: &Object<T>, key: &String): u8 {
         let value = read_typed<T, u8>(object, key);
         from_bcs::to_u8(value)
     }
 
-    public fun read_u16<T: key>(object: &Object<T>, key: &String): u16 acquires PropertyMap {
+    public fun read_u16<T: key>(object: &Object<T>, key: &String): u16 {
         let value = read_typed<T, u16>(object, key);
         from_bcs::to_u16(value)
     }
 
-    public fun read_u32<T: key>(object: &Object<T>, key: &String): u32 acquires PropertyMap {
+    public fun read_u32<T: key>(object: &Object<T>, key: &String): u32 {
         let value = read_typed<T, u32>(object, key);
         from_bcs::to_u32(value)
     }
 
-    public fun read_u64<T: key>(object: &Object<T>, key: &String): u64 acquires PropertyMap {
+    public fun read_u64<T: key>(object: &Object<T>, key: &String): u64 {
         let value = read_typed<T, u64>(object, key);
         from_bcs::to_u64(value)
     }
 
-    public fun read_u128<T: key>(object: &Object<T>, key: &String): u128 acquires PropertyMap {
+    public fun read_u128<T: key>(object: &Object<T>, key: &String): u128 {
         let value = read_typed<T, u128>(object, key);
         from_bcs::to_u128(value)
     }
 
-    public fun read_u256<T: key>(object: &Object<T>, key: &String): u256 acquires PropertyMap {
+    public fun read_u256<T: key>(object: &Object<T>, key: &String): u256 {
         let value = read_typed<T, u256>(object, key);
         from_bcs::to_u256(value)
     }
 
-    public fun read_address<T: key>(object: &Object<T>, key: &String): address acquires PropertyMap {
+    public fun read_address<T: key>(object: &Object<T>, key: &String): address {
         let value = read_typed<T, address>(object, key);
         from_bcs::to_address(value)
     }
 
-    public fun read_bytes<T: key>(object: &Object<T>, key: &String): vector<u8> acquires PropertyMap {
+    public fun read_bytes<T: key>(object: &Object<T>, key: &String): vector<u8> {
         let value = read_typed<T, vector<u8>>(object, key);
         from_bcs::to_bytes(value)
     }
 
-    public fun read_string<T: key>(object: &Object<T>, key: &String): String acquires PropertyMap {
+    public fun read_string<T: key>(object: &Object<T>, key: &String): String {
         let value = read_typed<T, String>(object, key);
         from_bcs::to_string(value)
     }
 
     // Mutators
     /// Add a property, already bcs encoded as a `vector<u8>`
-    public fun add(ref: &MutatorRef, key: String, type: String, value: vector<u8>) acquires PropertyMap {
+    public fun add(ref: &MutatorRef, key: String, type: String, value: vector<u8>) {
         let new_type = to_internal_type(type);
         validate_type(new_type, value);
         add_internal(ref, key, new_type, value);
     }
 
     /// Add a property that isn't already encoded as a `vector<u8>`
-    public fun add_typed<T: drop>(ref: &MutatorRef, key: String, value: T) acquires PropertyMap {
+    public fun add_typed<T: drop>(ref: &MutatorRef, key: String, value: T) {
         let type = type_info_to_internal_type<T>();
         add_internal(ref, key, type, bcs::to_bytes(&value));
     }
@@ -317,14 +318,14 @@ module aptos_token_objects::property_map {
     }
 
     /// Updates a property in place already bcs encoded
-    public fun update(ref: &MutatorRef, key: &String, type: String, value: vector<u8>) acquires PropertyMap {
+    public fun update(ref: &MutatorRef, key: &String, type: String, value: vector<u8>) {
         let new_type = to_internal_type(type);
         validate_type(new_type, value);
         update_internal(ref, key, new_type, value);
     }
 
     /// Updates a property in place that is not already bcs encoded
-    public fun update_typed<T: drop>(ref: &MutatorRef, key: &String, value: T) acquires PropertyMap {
+    public fun update_typed<T: drop>(ref: &MutatorRef, key: &String, value: T) {
         let type = type_info_to_internal_type<T>();
         update_internal(ref, key, type, bcs::to_bytes(&value));
     }
@@ -337,7 +338,7 @@ module aptos_token_objects::property_map {
     }
 
     /// Removes a property from the map, ensuring that it does in fact exist
-    public fun remove(ref: &MutatorRef, key: &String) acquires PropertyMap {
+    public fun remove(ref: &MutatorRef, key: &String) {
         assert_exists(ref.self);
         let property_map = &mut PropertyMap[ref.self];
         property_map.inner.remove(key);
@@ -345,7 +346,7 @@ module aptos_token_objects::property_map {
 
     // Tests
     #[test(creator = @0x123)]
-    fun test_end_to_end(creator: &signer) acquires PropertyMap {
+    fun test_end_to_end(creator: &signer) {
         let constructor_ref = object::create_named_object(creator, b"");
         let object = constructor_ref.object_from_constructor_ref<object::ObjectCore>();
 
@@ -467,7 +468,7 @@ module aptos_token_objects::property_map {
     }
 
     #[test_only]
-    fun test_end_to_end_update_typed(mutator: &MutatorRef, object: &Object<object::ObjectCore>) acquires PropertyMap {
+    fun test_end_to_end_update_typed(mutator: &MutatorRef, object: &Object<object::ObjectCore>) {
         update_typed<bool>(mutator, &string::utf8(b"bool"), false);
         update_typed<u8>(mutator, &string::utf8(b"u8"), 0x21);
         update_typed<u16>(mutator, &string::utf8(b"u16"), 0x22);
@@ -490,7 +491,7 @@ module aptos_token_objects::property_map {
     }
 
     #[test_only]
-    fun test_end_to_end_add_typed(mutator: &MutatorRef, object: &Object<object::ObjectCore>) acquires PropertyMap {
+    fun test_end_to_end_add_typed(mutator: &MutatorRef, object: &Object<object::ObjectCore>) {
         add_typed<bool>(mutator, string::utf8(b"bool"), false);
         add_typed<u8>(mutator, string::utf8(b"u8"), 0x21);
         add_typed<u16>(mutator, string::utf8(b"u16"), 0x22);
@@ -513,7 +514,7 @@ module aptos_token_objects::property_map {
     }
 
     #[test(creator = @0x123)]
-    fun test_extend_property_map(creator: &signer) acquires PropertyMap {
+    fun test_extend_property_map(creator: &signer) {
         let constructor_ref = object::create_named_object(creator, b"");
         let extend_ref = constructor_ref.generate_extend_ref();
         extend(&extend_ref, end_to_end_input());
@@ -602,7 +603,7 @@ module aptos_token_objects::property_map {
 
     #[test(creator = @0x123)]
     #[expected_failure(abort_code = 0x10001, location = aptos_std::from_bcs)]
-    fun test_invalid_add(creator: &signer) acquires PropertyMap {
+    fun test_invalid_add(creator: &signer) {
         let constructor_ref = object::create_named_object(creator, b"");
 
         let input = prepare_input(
@@ -618,7 +619,7 @@ module aptos_token_objects::property_map {
 
     #[test(creator = @0x123)]
     #[expected_failure(abort_code = 0x10001, location = aptos_std::from_bcs)]
-    fun test_invalid_update(creator: &signer) acquires PropertyMap {
+    fun test_invalid_update(creator: &signer) {
         let constructor_ref = object::create_named_object(creator, b"");
 
         let input = prepare_input(
@@ -634,7 +635,7 @@ module aptos_token_objects::property_map {
 
     #[test(creator = @0x123)]
     #[expected_failure(abort_code = 0x10006, location = Self)]
-    fun test_invalid_read(creator: &signer) acquires PropertyMap {
+    fun test_invalid_read(creator: &signer) {
         let constructor_ref = object::create_named_object(creator, b"");
         let object = constructor_ref.object_from_constructor_ref<object::ObjectCore>();
 
@@ -647,7 +648,7 @@ module aptos_token_objects::property_map {
         read_u8(&object, &string::utf8(b"bool"));
     }
 
-    fun assert_end_to_end_input(object: Object<ObjectCore>) acquires PropertyMap {
+    fun assert_end_to_end_input(object: Object<ObjectCore>) {
         assert!(read_bool(&object, &string::utf8(b"bool")), 0);
         assert!(read_u8(&object, &string::utf8(b"u8")) == 0x12, 1);
         assert!(read_u16(&object, &string::utf8(b"u16")) == 0x1234, 2);

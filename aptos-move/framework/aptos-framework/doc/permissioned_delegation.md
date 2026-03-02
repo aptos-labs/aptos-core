@@ -273,7 +273,7 @@
     key: <a href="permissioned_delegation.md#0x1_permissioned_delegation_DelegationKey">DelegationKey</a>,
     <a href="rate_limiter.md#0x1_rate_limiter">rate_limiter</a>: Option&lt;RateLimiter&gt;,
     expiration_time: u64,
-): <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a> <b>acquires</b> <a href="permissioned_delegation.md#0x1_permissioned_delegation_RegisteredDelegations">RegisteredDelegations</a> {
+): <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a> {
     <b>assert</b>!(!is_permissioned_signer(master), <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_permission_denied">error::permission_denied</a>(<a href="permissioned_delegation.md#0x1_permissioned_delegation_ENOT_MASTER_SIGNER">ENOT_MASTER_SIGNER</a>));
     <b>let</b> addr = <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(master);
     <b>if</b> (!<b>exists</b>&lt;<a href="permissioned_delegation.md#0x1_permissioned_delegation_RegisteredDelegations">RegisteredDelegations</a>&gt;(addr)) {
@@ -312,7 +312,7 @@
 <pre><code><b>public</b> <b>fun</b> <a href="permissioned_delegation.md#0x1_permissioned_delegation_remove_permissioned_handle">remove_permissioned_handle</a>(
     master: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>,
     key: <a href="permissioned_delegation.md#0x1_permissioned_delegation_DelegationKey">DelegationKey</a>,
-) <b>acquires</b> <a href="permissioned_delegation.md#0x1_permissioned_delegation_RegisteredDelegations">RegisteredDelegations</a> {
+) {
     <b>assert</b>!(!is_permissioned_signer(master), <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_permission_denied">error::permission_denied</a>(<a href="permissioned_delegation.md#0x1_permissioned_delegation_ENOT_MASTER_SIGNER">ENOT_MASTER_SIGNER</a>));
     <b>let</b> addr = <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(master);
     <b>let</b> delegations = &<b>mut</b> <a href="permissioned_delegation.md#0x1_permissioned_delegation_RegisteredDelegations">RegisteredDelegations</a>[addr].delegations;
@@ -348,7 +348,7 @@
 <pre><code><b>public</b> <b>fun</b> <a href="permissioned_delegation.md#0x1_permissioned_delegation_permissioned_signer_by_key">permissioned_signer_by_key</a>(
     master: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>,
     key: <a href="permissioned_delegation.md#0x1_permissioned_delegation_DelegationKey">DelegationKey</a>,
-): <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a> <b>acquires</b> <a href="permissioned_delegation.md#0x1_permissioned_delegation_RegisteredDelegations">RegisteredDelegations</a> {
+): <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a> {
     <b>assert</b>!(!is_permissioned_signer(master), <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_permission_denied">error::permission_denied</a>(<a href="permissioned_delegation.md#0x1_permissioned_delegation_ENOT_MASTER_SIGNER">ENOT_MASTER_SIGNER</a>));
     <b>let</b> addr = <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(master);
     <b>let</b> handle = <a href="permissioned_delegation.md#0x1_permissioned_delegation_get_storable_permissioned_handle">get_storable_permissioned_handle</a>(addr, key, <b>false</b>);
@@ -375,7 +375,7 @@
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="permissioned_delegation.md#0x1_permissioned_delegation_handle_address_by_key">handle_address_by_key</a>(master: <b>address</b>, key: <a href="permissioned_delegation.md#0x1_permissioned_delegation_DelegationKey">DelegationKey</a>): <b>address</b> <b>acquires</b> <a href="permissioned_delegation.md#0x1_permissioned_delegation_RegisteredDelegations">RegisteredDelegations</a> {
+<pre><code><b>public</b> <b>fun</b> <a href="permissioned_delegation.md#0x1_permissioned_delegation_handle_address_by_key">handle_address_by_key</a>(master: <b>address</b>, key: <a href="permissioned_delegation.md#0x1_permissioned_delegation_DelegationKey">DelegationKey</a>): <b>address</b> {
     <b>let</b> handle = <a href="permissioned_delegation.md#0x1_permissioned_delegation_get_storable_permissioned_handle">get_storable_permissioned_handle</a>(master, key, <b>false</b>);
     <a href="permissioned_signer.md#0x1_permissioned_signer_permissions_storage_address">permissioned_signer::permissions_storage_address</a>(handle)
 }
@@ -404,7 +404,7 @@ Authorization function for account abstraction.
 <pre><code><b>public</b> <b>fun</b> <a href="permissioned_delegation.md#0x1_permissioned_delegation_authenticate">authenticate</a>(
     <a href="account.md#0x1_account">account</a>: <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>,
     abstraction_auth_data: AbstractionAuthData
-): <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a> <b>acquires</b> <a href="permissioned_delegation.md#0x1_permissioned_delegation_RegisteredDelegations">RegisteredDelegations</a> {
+): <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a> {
     <b>let</b> addr = <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(&<a href="account.md#0x1_account">account</a>);
     <b>let</b> stream = <a href="../../aptos-stdlib/doc/bcs_stream.md#0x1_bcs_stream_new">bcs_stream::new</a>(*abstraction_auth_data.authenticator());
     <b>let</b> public_key = new_unvalidated_public_key_from_bytes(

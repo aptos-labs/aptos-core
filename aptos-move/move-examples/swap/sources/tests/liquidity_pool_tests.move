@@ -119,7 +119,7 @@ module swap::liquidity_pool_tests {
         let out = liquidity_pool::swap(pool, fungible_asset::extract(tokens, amount_in));
 
         let fees_amount = liquidity_pool::swap_fee_bps(pool) * amount_in / 10000;
-        amount_in = amount_in - fees_amount;
+        amount_in -= fees_amount;
         let actual_amount = fungible_asset::amount(&out);
         if (!liquidity_pool::is_stable(pool)) {
             assert!(actual_amount == amount_in * reserves_2 / (reserves_1 + amount_in), 0);

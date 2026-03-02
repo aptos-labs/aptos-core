@@ -50,8 +50,8 @@ module post_mint_reveal_nft::whitelist {
 
     #[view]
     /// Returns the number of total stages available.
-    public fun get_num_of_stages(module_address: address): u64 acquires WhitelistMintConfig {
-        vector::length(&borrow_global<WhitelistMintConfig>(module_address).whitelist_configs)
+    public fun get_num_of_stages(module_address: address): u64 {
+        vector::length(&WhitelistMintConfig[module_address].whitelist_configs)
     }
 
     #[view]
@@ -59,12 +59,12 @@ module post_mint_reveal_nft::whitelist {
     /// Return value first u64 is the minting price of the current stage.
     /// Return value second u64 is the current active whitelist stage.
     /// Return value bool is true if the given address is whitelisted.
-    public fun is_user_currently_eligible_for_whitelisted_minting(module_address: address, minter_address: address): (u64, u64, bool) acquires WhitelistMintConfig {
+    public fun is_user_currently_eligible_for_whitelisted_minting(module_address: address, minter_address: address): (u64, u64, bool) {
         // If the project doesn't have a whitelist, return false.
         if (!whitelist_config_exists(module_address)) {
             return (0, 0, false)
         };
-        let whitelist_mint_config = borrow_global<WhitelistMintConfig>(module_address);
+        let whitelist_mint_config = &WhitelistMintConfig[module_address];
         let now = timestamp::now_seconds();
 
         let i = 0;
@@ -74,7 +74,7 @@ module post_mint_reveal_nft::whitelist {
                 let user_is_eligible_for_current_whitelisted_minting = bucket_table::contains(&whitelist_stage.whitelisted_address, &minter_address);
                 return (whitelist_stage.whitelist_mint_price, i, user_is_eligible_for_current_whitelisted_minting)
                 };
-            i = i + 1;
+            i += 1;
         };
 
         (0, 0, false)
@@ -89,25 +89,25 @@ module post_mint_reveal_nft::whitelist {
     }
 
     /// Deducts the number of source certificate that the user wants to mint from the user's minting limit.
-    public(friend) fun deduct_user_minting_amount(module_address: address, minter_address: address, stage: u64, user_minting_amount: u64) acquires WhitelistMintConfig {
-        let whitelist_mint_config = borrow_global_mut<WhitelistMintConfig>(module_address);
+    friend fun deduct_user_minting_amount(module_address: address, minter_address: address, stage: u64, user_minting_amount: u64) {
+        let whitelist_mint_config = &mut WhitelistMintConfig[module_address];
         assert!(stage < vector::length(&whitelist_mint_config.whitelist_configs), error::invalid_argument(EINVALID_STAGE));
         let whitelist_stage = vector::borrow_mut(&mut whitelist_mint_config.whitelist_configs, stage);
         assert!(bucket_table::contains(&whitelist_stage.whitelisted_address, &minter_address), error::permission_denied(EACCOUNT_NOT_WHITELISTED));
         let remaining_minting_amount = bucket_table::borrow_mut(&mut whitelist_stage.whitelisted_address, minter_address);
         assert!(*remaining_minting_amount >= user_minting_amount, error::invalid_argument(EEXCEEDS_MINT_LIMIT));
-        *remaining_minting_amount = *remaining_minting_amount - user_minting_amount;
+        *remaining_minting_amount -= user_minting_amount;
     }
 
     /// Adds a new whitelist stage.
-    public fun add_or_update_whitelist_stage(admin: &signer, whitelist_start_time: u64, whitelist_end_time: u64, whitelist_price: u64, whitelist_stage: u64) acquires WhitelistMintConfig {
+    public fun add_or_update_whitelist_stage(admin: &signer, whitelist_start_time: u64, whitelist_end_time: u64, whitelist_price: u64, whitelist_stage: u64) {
         assert!(whitelist_start_time < whitelist_end_time, error::invalid_argument(EINVALID_WHITELIST_SETTING));
         if (!whitelist_config_exists(signer::address_of(admin))) {
             init_whitelist_config(admin);
         };
         let num_stages = get_num_of_stages(signer::address_of(admin));
         assert!(whitelist_stage <= num_stages, error::invalid_argument(EINVALID_STAGE));
-        let config = borrow_global_mut<WhitelistMintConfig>(signer::address_of(admin));
+        let config = &mut WhitelistMintConfig[signer::address_of(admin)];
 
         // If whitelist_stage equals num_stages, it means that the user wants to add a new stage at the end of the whitelist stages.
         if (whitelist_stage == num_stages) {
@@ -127,8 +127,8 @@ module post_mint_reveal_nft::whitelist {
     }
 
     /// Adds addresses to a specified whitelist stage.
-    public fun add_whitelist_addresses(admin: &signer, wl_addresses: vector<address>, mint_limit: u64, whitelist_stage: u64) acquires WhitelistMintConfig {
-        let config = borrow_global_mut<WhitelistMintConfig>(signer::address_of(admin));
+    public fun add_whitelist_addresses(admin: &signer, wl_addresses: vector<address>, mint_limit: u64, whitelist_stage: u64) {
+        let config = &mut WhitelistMintConfig[signer::address_of(admin)];
         assert!(whitelist_stage < vector::length(&config.whitelist_configs), error::invalid_argument(EINVALID_STAGE));
         let whitelist_stage = vector::borrow_mut(&mut config.whitelist_configs, whitelist_stage);
         let now = timestamp::now_seconds();

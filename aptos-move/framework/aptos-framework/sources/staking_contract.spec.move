@@ -368,7 +368,7 @@ spec aptos_framework::staking_contract {
         // TODO: Call `update_distribution_pool` and could not verify `update_distribution_pool`.
         pragma aborts_if_is_partial;
         let pool_address = staking_contract.pool_address;
-        let stake_pool = borrow_global<stake::StakePool>(pool_address);
+        let stake_pool = stake::StakePool[pool_address];
         aborts_if !exists<stake::StakePool>(pool_address);
         aborts_if stake_pool.inactive.value + stake_pool.pending_inactive.value
             > MAX_U64;

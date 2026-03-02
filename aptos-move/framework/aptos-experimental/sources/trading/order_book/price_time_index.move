@@ -80,7 +80,7 @@ module aptos_experimental::price_time_index {
         }
     }
 
-    public(friend) fun new_price_time_idx(): PriceTimeIndex {
+    friend fun new_price_time_idx(): PriceTimeIndex {
         // potentially add max value to both sides (that will be skipped),
         // so that max_key never changes, and doesn't create conflict.
         PriceTimeIndex::V1 {
@@ -91,7 +91,7 @@ module aptos_experimental::price_time_index {
 
     /// Picks the best (i.e. highest) bid (i.e. buy) price from the active order book.
     /// Returns None if there are no buys
-    public(friend) fun best_bid_price(self: &PriceTimeIndex): Option<u64> {
+    friend fun best_bid_price(self: &PriceTimeIndex): Option<u64> {
         if (self.buys.is_empty()) {
             option::none()
         } else {
@@ -102,7 +102,7 @@ module aptos_experimental::price_time_index {
 
     /// Picks the best (i.e. lowest) ask (i.e. sell) price from the active order book.
     /// Returns None if there are no sells
-    public(friend) fun best_ask_price(self: &PriceTimeIndex): Option<u64> {
+    friend fun best_ask_price(self: &PriceTimeIndex): Option<u64> {
         if (self.sells.is_empty()) {
             option::none()
         } else {
@@ -113,7 +113,7 @@ module aptos_experimental::price_time_index {
 
     /// Returns the mid price (i.e. the average of the highest bid (buy) price and the lowest ask (sell) price. If
     /// there are o buys / sells, returns None.
-    public(friend) fun get_mid_price(self: &PriceTimeIndex): Option<u64> {
+    friend fun get_mid_price(self: &PriceTimeIndex): Option<u64> {
         if (self.sells.is_empty() || self.buys.is_empty()) {
             return option::none();
         };
@@ -125,7 +125,7 @@ module aptos_experimental::price_time_index {
         option::some((best_bid + best_ask) / 2)
     }
 
-    public(friend) fun get_slippage_price(
+    friend fun get_slippage_price(
         self: &PriceTimeIndex, is_bid: bool, slippage_bps: u64
     ): Option<u64> {
         if (!is_bid) {
@@ -149,7 +149,7 @@ module aptos_experimental::price_time_index {
         }
     }
 
-    public(friend) fun cancel_active_order(
+    friend fun cancel_active_order(
         self: &mut PriceTimeIndex,
         price: u64,
         unique_priority_idx: IncreasingIdx,
@@ -168,7 +168,7 @@ module aptos_experimental::price_time_index {
     }
 
     /// Check if the order is a taker order - i.e. if it can be immediately matched with the order book fully or partially.
-    public(friend) fun is_taker_order(
+    friend fun is_taker_order(
         self: &PriceTimeIndex, price: u64, is_bid: bool
     ): bool {
         if (is_bid) {
@@ -246,7 +246,7 @@ module aptos_experimental::price_time_index {
         modify_fn(order);
     }
 
-    public(friend) fun get_single_match_result(
+    friend fun get_single_match_result(
         self: &mut PriceTimeIndex,
         price: u64,
         size: u64,
@@ -260,7 +260,7 @@ module aptos_experimental::price_time_index {
     }
 
     /// Increase the size of the order in the orderbook without altering its position in the price-time priority.
-    public(friend) fun increase_order_size(
+    friend fun increase_order_size(
         self: &mut PriceTimeIndex,
         price: u64,
         unique_priority_idx: IncreasingIdx,
@@ -292,7 +292,7 @@ module aptos_experimental::price_time_index {
     }
 
     /// Decrease the size of the order in the order book without altering its position in the price-time priority.
-    public(friend) fun decrease_order_size(
+    friend fun decrease_order_size(
         self: &mut PriceTimeIndex,
         price: u64,
         unique_priority_idx: IncreasingIdx,
@@ -323,7 +323,7 @@ module aptos_experimental::price_time_index {
         };
     }
 
-    public(friend) fun place_maker_order(
+    friend fun place_maker_order(
         self: &mut PriceTimeIndex,
         order_id: OrderId,
         order_book_type: OrderType,

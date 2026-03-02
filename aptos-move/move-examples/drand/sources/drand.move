@@ -84,7 +84,7 @@ module drand::drand {
         while (!vector::is_empty(&entropy)) {
             let byte = vector::pop_back(&mut entropy);
             num = num << 8;
-            num = num + (byte as u256);
+            num += (byte as u256);
         };
 
         ((num % max_256) as u64)

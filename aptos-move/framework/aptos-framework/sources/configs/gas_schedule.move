@@ -39,7 +39,7 @@ module aptos_framework::gas_schedule {
     }
 
     /// Only called during genesis.
-    public(friend) fun initialize(aptos_framework: &signer, gas_schedule_blob: vector<u8>) {
+    friend fun initialize(aptos_framework: &signer, gas_schedule_blob: vector<u8>) {
         system_addresses::assert_aptos_framework(aptos_framework);
         assert!(!gas_schedule_blob.is_empty(), error::invalid_argument(EINVALID_GAS_SCHEDULE));
 
@@ -53,13 +53,13 @@ module aptos_framework::gas_schedule {
     /// WARNING: calling this while randomness is enabled will trigger a new epoch without randomness!
     ///
     /// TODO: update all the tests that reference this function, then disable this function.
-    public fun set_gas_schedule(aptos_framework: &signer, gas_schedule_blob: vector<u8>) acquires GasSchedule, GasScheduleV2 {
+    public fun set_gas_schedule(aptos_framework: &signer, gas_schedule_blob: vector<u8>) {
         system_addresses::assert_aptos_framework(aptos_framework);
         assert!(!gas_schedule_blob.is_empty(), error::invalid_argument(EINVALID_GAS_SCHEDULE));
         chain_status::assert_genesis();
 
         if (exists<GasScheduleV2>(@aptos_framework)) {
-            let gas_schedule = borrow_global_mut<GasScheduleV2>(@aptos_framework);
+            let gas_schedule = &mut GasScheduleV2[@aptos_framework];
             let new_gas_schedule: GasScheduleV2 = from_bytes(gas_schedule_blob);
             assert!(new_gas_schedule.feature_version >= gas_schedule.feature_version,
                 error::invalid_argument(EINVALID_GAS_FEATURE_VERSION));
@@ -87,12 +87,12 @@ module aptos_framework::gas_schedule {
     /// aptos_framework::gas_schedule::set_for_next_epoch(&framework_signer, some_gas_schedule_blob);
     /// aptos_framework::aptos_governance::reconfigure(&framework_signer);
     /// ```
-    public fun set_for_next_epoch(aptos_framework: &signer, gas_schedule_blob: vector<u8>) acquires GasScheduleV2 {
+    public fun set_for_next_epoch(aptos_framework: &signer, gas_schedule_blob: vector<u8>) {
         system_addresses::assert_aptos_framework(aptos_framework);
         assert!(!gas_schedule_blob.is_empty(), error::invalid_argument(EINVALID_GAS_SCHEDULE));
         let new_gas_schedule: GasScheduleV2 = from_bytes(gas_schedule_blob);
         if (exists<GasScheduleV2>(@aptos_framework)) {
-            let cur_gas_schedule = borrow_global<GasScheduleV2>(@aptos_framework);
+            let cur_gas_schedule = &GasScheduleV2[@aptos_framework];
             assert!(
                 new_gas_schedule.feature_version >= cur_gas_schedule.feature_version,
                 error::invalid_argument(EINVALID_GAS_FEATURE_VERSION)
@@ -108,13 +108,13 @@ module aptos_framework::gas_schedule {
         aptos_framework: &signer,
         old_gas_schedule_hash: vector<u8>,
         new_gas_schedule_blob: vector<u8>
-    ) acquires GasScheduleV2 {
+    ) {
         system_addresses::assert_aptos_framework(aptos_framework);
         assert!(!new_gas_schedule_blob.is_empty(), error::invalid_argument(EINVALID_GAS_SCHEDULE));
 
         let new_gas_schedule: GasScheduleV2 = from_bytes(new_gas_schedule_blob);
         if (exists<GasScheduleV2>(@aptos_framework)) {
-            let cur_gas_schedule = borrow_global<GasScheduleV2>(@aptos_framework);
+            let cur_gas_schedule = &GasScheduleV2[@aptos_framework];
             assert!(
                 new_gas_schedule.feature_version >= cur_gas_schedule.feature_version,
                 error::invalid_argument(EINVALID_GAS_FEATURE_VERSION)
@@ -131,12 +131,12 @@ module aptos_framework::gas_schedule {
     }
 
     /// Only used in reconfigurations to apply the pending `GasScheduleV2`, if there is any.
-    public(friend) fun on_new_epoch(framework: &signer) acquires GasScheduleV2 {
+    friend fun on_new_epoch(framework: &signer) {
         system_addresses::assert_aptos_framework(framework);
         if (config_buffer::does_exist<GasScheduleV2>()) {
             let new_gas_schedule = config_buffer::extract_v2<GasScheduleV2>();
             if (exists<GasScheduleV2>(@aptos_framework)) {
-                *borrow_global_mut<GasScheduleV2>(@aptos_framework) = new_gas_schedule;
+                GasScheduleV2[@aptos_framework] = new_gas_schedule;
             } else {
                 move_to(framework, new_gas_schedule);
             }
@@ -156,7 +156,7 @@ module aptos_framework::gas_schedule {
 
     #[test(fx = @0x1)]
     #[expected_failure(abort_code=0x010002, location = Self)]
-    fun set_for_next_epoch_should_abort_if_gas_version_is_too_old(fx: signer) acquires GasScheduleV2 {
+    fun set_for_next_epoch_should_abort_if_gas_version_is_too_old(fx: signer) {
         // Setup.
         let old_gas_schedule = GasScheduleV2 {
             feature_version: 1000,

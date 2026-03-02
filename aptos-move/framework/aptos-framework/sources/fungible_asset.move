@@ -367,7 +367,7 @@ module aptos_framework::fungible_asset {
     }
 
     /// Create a fungible asset store whose transfer rule would be overloaded by the provided function.
-    public(friend) fun register_dispatch_functions(
+    friend fun register_dispatch_functions(
         constructor_ref: &ConstructorRef,
         withdraw_function: Option<FunctionInfo>,
         deposit_function: Option<FunctionInfo>,
@@ -448,7 +448,7 @@ module aptos_framework::fungible_asset {
     }
 
     /// Define the derived supply dispatch with the provided function.
-    public(friend) fun register_derive_supply_dispatch_function(
+    friend fun register_derive_supply_dispatch_function(
         constructor_ref: &ConstructorRef, dispatch_function: Option<FunctionInfo>
     ) {
         // Verify that caller type matches callee type so wrongly typed function cannot be registered.
@@ -518,7 +518,7 @@ module aptos_framework::fungible_asset {
     }
 
     /// Creates a burn copy ref that can be used to burn fungible assets from the given burn ref.
-    public(friend) fun generate_burn_copy_ref(self: &BurnRef): BurnRef {
+    friend fun generate_burn_copy_ref(self: &BurnRef): BurnRef {
         BurnRef { metadata: self.metadata }
     }
 
@@ -561,7 +561,7 @@ module aptos_framework::fungible_asset {
     ///
     /// Note: This function will abort on FAs with `derived_supply` hook set up.
     ///       Use `dispatchable_fungible_asset::supply` instead if you intend to work with those FAs.
-    public fun supply<T: key>(metadata: Object<T>): Option<u128> acquires Supply, ConcurrentSupply {
+    public fun supply<T: key>(metadata: Object<T>): Option<u128> {
         assert!(
             !has_supply_dispatch_function(metadata.object_address()),
             error::invalid_argument(EINVALID_DISPATCHABLE_OPERATIONS)
@@ -569,13 +569,13 @@ module aptos_framework::fungible_asset {
         supply_impl(metadata)
     }
 
-    fun supply_impl<T: key>(metadata: Object<T>): Option<u128> acquires Supply, ConcurrentSupply {
+    fun supply_impl<T: key>(metadata: Object<T>): Option<u128> {
         let metadata_address = metadata.object_address();
         if (exists<ConcurrentSupply>(metadata_address)) {
-            let supply = borrow_global<ConcurrentSupply>(metadata_address);
+            let supply = &ConcurrentSupply[metadata_address];
             option::some(supply.current.read())
         } else if (exists<Supply>(metadata_address)) {
-            let supply = borrow_global<Supply>(metadata_address);
+            let supply = &Supply[metadata_address];
             option::some(supply.current)
         } else {
             option::none()
@@ -585,10 +585,10 @@ module aptos_framework::fungible_asset {
     #[view]
     /// Get the maximum supply from the `metadata` object.
     /// If supply is unlimited (or set explicitly to MAX_U128), none is returned
-    public fun maximum<T: key>(metadata: Object<T>): Option<u128> acquires Supply, ConcurrentSupply {
+    public fun maximum<T: key>(metadata: Object<T>): Option<u128> {
         let metadata_address = metadata.object_address();
         if (exists<ConcurrentSupply>(metadata_address)) {
-            let supply = borrow_global<ConcurrentSupply>(metadata_address);
+            let supply = &ConcurrentSupply[metadata_address];
             let max_value = supply.current.max_value();
             if (max_value == MAX_U128) {
                 option::none()
@@ -596,7 +596,7 @@ module aptos_framework::fungible_asset {
                 option::some(max_value)
             }
         } else if (exists<Supply>(metadata_address)) {
-            let supply = borrow_global<Supply>(metadata_address);
+            let supply = &Supply[metadata_address];
             supply.maximum
         } else {
             option::none()
@@ -605,37 +605,37 @@ module aptos_framework::fungible_asset {
 
     #[view]
     /// Get the name of the fungible asset from the `metadata` object.
-    public fun name<T: key>(metadata: Object<T>): String acquires Metadata {
+    public fun name<T: key>(metadata: Object<T>): String {
         borrow_fungible_metadata(&metadata).name
     }
 
     #[view]
     /// Get the symbol of the fungible asset from the `metadata` object.
-    public fun symbol<T: key>(metadata: Object<T>): String acquires Metadata {
+    public fun symbol<T: key>(metadata: Object<T>): String {
         borrow_fungible_metadata(&metadata).symbol
     }
 
     #[view]
     /// Get the decimals from the `metadata` object.
-    public fun decimals<T: key>(metadata: Object<T>): u8 acquires Metadata {
+    public fun decimals<T: key>(metadata: Object<T>): u8 {
         borrow_fungible_metadata(&metadata).decimals
     }
 
     #[view]
     /// Get the icon uri from the `metadata` object.
-    public fun icon_uri<T: key>(metadata: Object<T>): String acquires Metadata {
+    public fun icon_uri<T: key>(metadata: Object<T>): String {
         borrow_fungible_metadata(&metadata).icon_uri
     }
 
     #[view]
     /// Get the project uri from the `metadata` object.
-    public fun project_uri<T: key>(metadata: Object<T>): String acquires Metadata {
+    public fun project_uri<T: key>(metadata: Object<T>): String {
         borrow_fungible_metadata(&metadata).project_uri
     }
 
     #[view]
     /// Get the metadata struct from the `metadata` object.
-    public fun metadata<T: key>(metadata: Object<T>): Metadata acquires Metadata {
+    public fun metadata<T: key>(metadata: Object<T>): Metadata {
         *borrow_fungible_metadata(&metadata)
     }
 
@@ -663,7 +663,7 @@ module aptos_framework::fungible_asset {
 
     #[view]
     /// Return the underlying metadata object.
-    public fun store_metadata<T: key>(store: Object<T>): Object<Metadata> acquires FungibleStore {
+    public fun store_metadata<T: key>(store: Object<T>): Object<Metadata> {
         borrow_store_resource(&store).metadata
     }
 
@@ -679,7 +679,7 @@ module aptos_framework::fungible_asset {
     ///       Use `dispatchable_fungible_asset::balance` instead if you intend to work with those FAs.
     public fun balance<T: key>(
         store: Object<T>
-    ): u64 acquires FungibleStore, ConcurrentFungibleBalance, DispatchFunctionStore {
+    ): u64 {
         let fa_store = borrow_store_resource(&store);
         assert!(
             !has_balance_dispatch_function(fa_store.metadata),
@@ -688,14 +688,14 @@ module aptos_framework::fungible_asset {
         balance_impl(store)
     }
 
-    fun balance_impl<T: key>(store: Object<T>): u64 acquires FungibleStore, ConcurrentFungibleBalance {
+    fun balance_impl<T: key>(store: Object<T>): u64 {
         let store_addr = store.object_address();
         if (store_exists_inline(store_addr)) {
             let store_balance = borrow_store_resource(&store).balance;
             if (store_balance == 0
                 && concurrent_fungible_balance_exists_inline(store_addr)) {
                 let balance_resource =
-                    borrow_global<ConcurrentFungibleBalance>(store_addr);
+                    &ConcurrentFungibleBalance[store_addr];
                 balance_resource.balance.read()
             } else {
                 store_balance
@@ -707,21 +707,21 @@ module aptos_framework::fungible_asset {
     /// Check whether the balance of a given store is >= `amount`.
     public fun is_balance_at_least<T: key>(
         store: Object<T>, amount: u64
-    ): bool acquires FungibleStore, ConcurrentFungibleBalance {
+    ): bool {
         let store_addr = store.object_address();
         is_address_balance_at_least(store_addr, amount)
     }
 
     /// Check whether the balance of a given store is >= `amount`.
-    public(friend) fun is_address_balance_at_least(
+    friend fun is_address_balance_at_least(
         store_addr: address, amount: u64
-    ): bool acquires FungibleStore, ConcurrentFungibleBalance {
+    ): bool {
         if (store_exists_inline(store_addr)) {
-            let store_balance = borrow_global<FungibleStore>(store_addr).balance;
+            let store_balance = FungibleStore[store_addr].balance;
             if (store_balance == 0
                 && concurrent_fungible_balance_exists_inline(store_addr)) {
                 let balance_resource =
-                    borrow_global<ConcurrentFungibleBalance>(store_addr);
+                    &ConcurrentFungibleBalance[store_addr];
                 balance_resource.balance.is_at_least(amount)
             } else {
                 store_balance >= amount
@@ -735,15 +735,15 @@ module aptos_framework::fungible_asset {
     /// Return whether a store is frozen.
     ///
     /// If the store has not been created, we default to returning false so deposits can be sent to it.
-    public fun is_frozen<T: key>(store: Object<T>): bool acquires FungibleStore {
+    public fun is_frozen<T: key>(store: Object<T>): bool {
         let store_addr = store.object_address();
         store_exists_inline(store_addr)
-            && borrow_global<FungibleStore>(store_addr).frozen
+            && FungibleStore[store_addr].frozen
     }
 
     #[view]
     /// Return whether a fungible asset type is dispatchable.
-    public fun is_store_dispatchable<T: key>(store: Object<T>): bool acquires FungibleStore {
+    public fun is_store_dispatchable<T: key>(store: Object<T>): bool {
         let fa_store = borrow_store_resource(&store);
         let metadata_addr = fa_store.metadata.object_address();
         exists<DispatchFunctionStore>(metadata_addr)
@@ -751,11 +751,11 @@ module aptos_framework::fungible_asset {
 
     public fun deposit_dispatch_function<T: key>(
         store: Object<T>
-    ): Option<FunctionInfo> acquires FungibleStore, DispatchFunctionStore {
+    ): Option<FunctionInfo> {
         let fa_store = borrow_store_resource(&store);
         let metadata_addr = fa_store.metadata.object_address();
         if (exists<DispatchFunctionStore>(metadata_addr)) {
-            borrow_global<DispatchFunctionStore>(metadata_addr).deposit_function
+            DispatchFunctionStore[metadata_addr].deposit_function
         } else {
             option::none()
         }
@@ -763,22 +763,22 @@ module aptos_framework::fungible_asset {
 
     fun has_deposit_dispatch_function(
         metadata: Object<Metadata>
-    ): bool acquires DispatchFunctionStore {
+    ): bool {
         let metadata_addr = metadata.object_address();
         // Short circuit on APT for better perf
         if (metadata_addr != @aptos_fungible_asset
             && exists<DispatchFunctionStore>(metadata_addr)) {
-            borrow_global<DispatchFunctionStore>(metadata_addr).deposit_function.is_some()
+            DispatchFunctionStore[metadata_addr].deposit_function.is_some()
         } else { false }
     }
 
     public fun withdraw_dispatch_function<T: key>(
         store: Object<T>
-    ): Option<FunctionInfo> acquires FungibleStore, DispatchFunctionStore {
+    ): Option<FunctionInfo> {
         let fa_store = borrow_store_resource(&store);
         let metadata_addr = fa_store.metadata.object_address();
         if (exists<DispatchFunctionStore>(metadata_addr)) {
-            borrow_global<DispatchFunctionStore>(metadata_addr).withdraw_function
+            DispatchFunctionStore[metadata_addr].withdraw_function
         } else {
             option::none()
         }
@@ -786,23 +786,23 @@ module aptos_framework::fungible_asset {
 
     fun has_withdraw_dispatch_function(
         metadata: Object<Metadata>
-    ): bool acquires DispatchFunctionStore {
+    ): bool {
         let metadata_addr = metadata.object_address();
         // Short circuit on APT for better perf
         if (metadata_addr != @aptos_fungible_asset
             && exists<DispatchFunctionStore>(metadata_addr)) {
-            borrow_global<DispatchFunctionStore>(metadata_addr).withdraw_function.is_some()
+            DispatchFunctionStore[metadata_addr].withdraw_function.is_some()
         } else { false }
     }
 
     fun has_balance_dispatch_function(
         metadata: Object<Metadata>
-    ): bool acquires DispatchFunctionStore {
+    ): bool {
         let metadata_addr = metadata.object_address();
         // Short circuit on APT for better perf
         if (metadata_addr != @aptos_fungible_asset
             && exists<DispatchFunctionStore>(metadata_addr)) {
-            borrow_global<DispatchFunctionStore>(metadata_addr).derived_balance_function.is_some()
+            DispatchFunctionStore[metadata_addr].derived_balance_function.is_some()
         } else { false }
     }
 
@@ -813,24 +813,24 @@ module aptos_framework::fungible_asset {
         } else { false }
     }
 
-    public(friend) fun derived_balance_dispatch_function<T: key>(
+    friend fun derived_balance_dispatch_function<T: key>(
         store: Object<T>
-    ): Option<FunctionInfo> acquires FungibleStore, DispatchFunctionStore {
+    ): Option<FunctionInfo> {
         let fa_store = borrow_store_resource(&store);
         let metadata_addr = fa_store.metadata.object_address();
         if (exists<DispatchFunctionStore>(metadata_addr)) {
-            borrow_global<DispatchFunctionStore>(metadata_addr).derived_balance_function
+            DispatchFunctionStore[metadata_addr].derived_balance_function
         } else {
             option::none()
         }
     }
 
-    public(friend) fun derived_supply_dispatch_function<T: key>(
+    friend fun derived_supply_dispatch_function<T: key>(
         metadata: Object<T>
-    ): Option<FunctionInfo> acquires DeriveSupply {
+    ): Option<FunctionInfo> {
         let metadata_addr = metadata.object_address();
         if (exists<DeriveSupply>(metadata_addr)) {
-            borrow_global<DeriveSupply>(metadata_addr).dispatch_function
+            DeriveSupply[metadata_addr].dispatch_function
         } else {
             option::none()
         }
@@ -870,7 +870,7 @@ module aptos_framework::fungible_asset {
         from: Object<T>,
         to: Object<T>,
         amount: u64
-    ) acquires FungibleStore, DispatchFunctionStore, ConcurrentFungibleBalance {
+    ) {
         let fa = withdraw(sender, from, amount);
         deposit(to, fa);
     }
@@ -905,7 +905,7 @@ module aptos_framework::fungible_asset {
     /// Used to delete a store.  Requires the store to be completely empty prior to removing it
     public fun remove_store(
         delete_ref: &DeleteRef
-    ) acquires FungibleStore, FungibleAssetEvents, ConcurrentFungibleBalance {
+    ) {
         let store = delete_ref.object_from_delete_ref<FungibleStore>();
         let addr = store.object_address();
         let FungibleStore { metadata, balance, frozen: _ } =
@@ -941,14 +941,14 @@ module aptos_framework::fungible_asset {
     ///       that function unless you DO NOT want to support fungible assets with dispatchable hooks.
     public fun withdraw<T: key>(
         owner: &signer, store: Object<T>, amount: u64
-    ): FungibleAsset acquires FungibleStore, DispatchFunctionStore, ConcurrentFungibleBalance {
+    ): FungibleAsset {
         withdraw_sanity_check(owner, store, true);
         withdraw_permission_check(owner, store, amount);
         unchecked_withdraw(store.object_address(), amount)
     }
 
     /// Check the permission for withdraw operation.
-    public(friend) fun withdraw_permission_check<T: key>(
+    friend fun withdraw_permission_check<T: key>(
         owner: &signer, store: Object<T>, amount: u64
     ) {
         assert!(
@@ -964,7 +964,7 @@ module aptos_framework::fungible_asset {
     }
 
     /// Check the permission for withdraw operation.
-    public(friend) fun withdraw_permission_check_by_address(
+    friend fun withdraw_permission_check_by_address(
         owner: &signer, store_address: address, amount: u64
     ) {
         assert!(
@@ -978,9 +978,9 @@ module aptos_framework::fungible_asset {
     }
 
     /// Check the permission for withdraw operation.
-    public(friend) fun withdraw_sanity_check<T: key>(
+    friend fun withdraw_sanity_check<T: key>(
         owner: &signer, store: Object<T>, abort_on_dispatch: bool
-    ) acquires FungibleStore, DispatchFunctionStore {
+    ) {
         withdraw_sanity_check_impl(
             signer::address_of(owner),
             store,
@@ -1006,7 +1006,7 @@ module aptos_framework::fungible_asset {
     /// Deposit `amount` of the fungible asset to `store`.
     public fun deposit_sanity_check<T: key>(
         store: Object<T>, abort_on_dispatch: bool
-    ) acquires FungibleStore, DispatchFunctionStore {
+    ) {
         let fa_store = borrow_store_resource(&store);
         assert!(
             !abort_on_dispatch || !has_deposit_dispatch_function(fa_store.metadata),
@@ -1021,21 +1021,21 @@ module aptos_framework::fungible_asset {
     ///       that function unless you DO NOT want to support fungible assets with dispatchable hooks.
     public fun deposit<T: key>(
         store: Object<T>, fa: FungibleAsset
-    ) acquires FungibleStore, DispatchFunctionStore, ConcurrentFungibleBalance {
+    ) {
         deposit_sanity_check(store, true);
         unchecked_deposit(store.object_address(), fa);
     }
 
     /// Mint the specified `amount` of the fungible asset.
-    public fun mint(self: &MintRef, amount: u64): FungibleAsset acquires Supply, ConcurrentSupply {
+    public fun mint(self: &MintRef, amount: u64): FungibleAsset {
         let metadata = self.metadata;
         mint_internal(metadata, amount)
     }
 
     /// CAN ONLY BE CALLED BY coin.move for migration.
-    public(friend) fun mint_internal(
+    friend fun mint_internal(
         metadata: Object<Metadata>, amount: u64
-    ): FungibleAsset acquires Supply, ConcurrentSupply {
+    ): FungibleAsset {
         increase_supply(&metadata, amount);
         FungibleAsset { metadata, amount }
     }
@@ -1043,7 +1043,7 @@ module aptos_framework::fungible_asset {
     /// Mint the specified `amount` of the fungible asset to a destination store.
     public fun mint_to<T: key>(
         self: &MintRef, store: Object<T>, amount: u64
-    ) acquires FungibleStore, Supply, ConcurrentSupply, DispatchFunctionStore, ConcurrentFungibleBalance {
+    ) {
         deposit_sanity_check(store, false);
         unchecked_deposit(store.object_address(), self.mint(amount));
     }
@@ -1051,7 +1051,7 @@ module aptos_framework::fungible_asset {
     /// Enable/disable a store's ability to do direct transfers of the fungible asset.
     public fun set_frozen_flag<T: key>(
         self: &TransferRef, store: Object<T>, frozen: bool
-    ) acquires FungibleStore {
+    ) {
         assert!(
             self.metadata == store_metadata(store),
             error::invalid_argument(ETRANSFER_REF_AND_STORE_MISMATCH)
@@ -1059,17 +1059,17 @@ module aptos_framework::fungible_asset {
         set_frozen_flag_internal(store, frozen)
     }
 
-    public(friend) fun set_frozen_flag_internal<T: key>(
+    friend fun set_frozen_flag_internal<T: key>(
         store: Object<T>, frozen: bool
-    ) acquires FungibleStore {
+    ) {
         let store_addr = store.object_address();
-        borrow_global_mut<FungibleStore>(store_addr).frozen = frozen;
+        FungibleStore[store_addr].frozen = frozen;
 
         event::emit(Frozen { store: store_addr, frozen });
     }
 
     /// Burns a fungible asset
-    public fun burn(self: &BurnRef, fa: FungibleAsset) acquires Supply, ConcurrentSupply {
+    public fun burn(self: &BurnRef, fa: FungibleAsset) {
         assert!(
             self.metadata == fa.metadata_from_asset(),
             error::invalid_argument(EBURN_REF_AND_FUNGIBLE_ASSET_MISMATCH)
@@ -1078,7 +1078,7 @@ module aptos_framework::fungible_asset {
     }
 
     /// CAN ONLY BE CALLED BY coin.move for migration.
-    public(friend) fun burn_internal(self: FungibleAsset): u64 acquires Supply, ConcurrentSupply {
+    friend fun burn_internal(self: FungibleAsset): u64 {
         let FungibleAsset { metadata, amount } = self;
         decrease_supply(&metadata, amount);
         amount
@@ -1087,15 +1087,15 @@ module aptos_framework::fungible_asset {
     /// Burn the `amount` of the fungible asset from the given store.
     public fun burn_from<T: key>(
         self: &BurnRef, store: Object<T>, amount: u64
-    ) acquires FungibleStore, Supply, ConcurrentSupply, ConcurrentFungibleBalance {
+    ) {
         // ref metadata match is checked in burn() call
         self.burn(unchecked_withdraw(store.object_address(), amount));
     }
 
     /// Burn the `amount` of the fungible asset from the given store for gas charge.
-    public(friend) fun address_burn_from_for_gas(
+    friend fun address_burn_from_for_gas(
         self: &BurnRef, store_addr: address, amount: u64
-    ) acquires FungibleStore, Supply, ConcurrentSupply, ConcurrentFungibleBalance {
+    ) {
         // ref metadata match is checked in burn() call
         self.burn(unchecked_withdraw_with_no_events(store_addr, amount));
     }
@@ -1103,7 +1103,7 @@ module aptos_framework::fungible_asset {
     /// Withdraw `amount` of the fungible asset from the `store` ignoring `frozen`.
     public fun withdraw_with_ref<T: key>(
         self: &TransferRef, store: Object<T>, amount: u64
-    ): FungibleAsset acquires FungibleStore, ConcurrentFungibleBalance {
+    ): FungibleAsset {
         assert!(
             self.metadata == store_metadata(store),
             error::invalid_argument(ETRANSFER_REF_AND_STORE_MISMATCH)
@@ -1114,7 +1114,7 @@ module aptos_framework::fungible_asset {
     /// Deposit the fungible asset into the `store` ignoring `frozen`.
     public fun deposit_with_ref<T: key>(
         self: &TransferRef, store: Object<T>, fa: FungibleAsset
-    ) acquires FungibleStore, ConcurrentFungibleBalance {
+    ) {
         assert!(
             self.metadata == fa.metadata,
             error::invalid_argument(ETRANSFER_REF_AND_FUNGIBLE_ASSET_MISMATCH)
@@ -1128,7 +1128,7 @@ module aptos_framework::fungible_asset {
         from: Object<T>,
         to: Object<T>,
         amount: u64
-    ) acquires FungibleStore, ConcurrentFungibleBalance {
+    ) {
         let fa = self.withdraw_with_ref(from, amount);
         self.deposit_with_ref(to, fa);
     }
@@ -1136,7 +1136,7 @@ module aptos_framework::fungible_asset {
     /// Access raw balance of a store using `RawBalanceRef`
     public fun balance_with_ref<T: key>(
         self: &RawBalanceRef, store: Object<T>
-    ): u64 acquires FungibleStore, ConcurrentFungibleBalance {
+    ): u64 {
         assert!(
             self.metadata == store_metadata(store),
             error::invalid_argument(ERAW_BALANCE_REF_AND_FUNGIBLE_ASSET_MISMATCH)
@@ -1147,7 +1147,7 @@ module aptos_framework::fungible_asset {
     /// Access raw supply of a FA using `RawSupplyRef`
     public fun supply_with_ref<T: key>(
         self: &RawSupplyRef, metadata: Object<T>
-    ): Option<u128> acquires Supply, ConcurrentSupply {
+    ): Option<u128> {
         assert!(
             self.metadata.object_address() == metadata.object_address(),
             error::invalid_argument(ERAW_BALANCE_REF_AND_FUNGIBLE_ASSET_MISMATCH)
@@ -1163,9 +1163,9 @@ module aptos_framework::fungible_asset {
         decimals: Option<u8>,
         icon_uri: Option<String>,
         project_uri: Option<String>
-    ) acquires Metadata {
+    ) {
         let metadata_address = self.metadata.object_address();
-        let mutable_metadata = borrow_global_mut<Metadata>(metadata_address);
+        let mutable_metadata = &mut Metadata[metadata_address];
 
         if (name.is_some()) {
             let name = name.extract();
@@ -1249,7 +1249,7 @@ module aptos_framework::fungible_asset {
             exists<FungibleStore>(store_addr),
             error::not_found(EFUNGIBLE_STORE_EXISTENCE)
         );
-        let store = borrow_global_mut<FungibleStore>(store_addr);
+        let store = &mut FungibleStore[store_addr];
         assert!(
             metadata == store.metadata,
             error::invalid_argument(EFUNGIBLE_ASSET_AND_STORE_MISMATCH)
@@ -1259,7 +1259,7 @@ module aptos_framework::fungible_asset {
             if (store.balance == 0
                 && concurrent_fungible_balance_exists_inline(store_addr)) {
                 let balance_resource =
-                    borrow_global_mut<ConcurrentFungibleBalance>(store_addr);
+                    &mut ConcurrentFungibleBalance[store_addr];
                 balance_resource.balance.add(amount);
             } else {
                 store.balance += amount;
@@ -1268,25 +1268,25 @@ module aptos_framework::fungible_asset {
         amount
     }
 
-    public(friend) fun unchecked_deposit(
+    friend fun unchecked_deposit(
         store_addr: address, fa: FungibleAsset
-    ) acquires FungibleStore, ConcurrentFungibleBalance {
+    ) {
         let amount = unchecked_deposit_with_no_events_inline(store_addr, fa);
         if (amount != 0) {
             event::emit(Deposit { store: store_addr, amount });
         }
     }
 
-    public(friend) fun unchecked_deposit_with_no_events(
+    friend fun unchecked_deposit_with_no_events(
         store_addr: address, fa: FungibleAsset
-    ) acquires FungibleStore, ConcurrentFungibleBalance {
+    ) {
         unchecked_deposit_with_no_events_inline(store_addr, fa);
     }
 
     /// Extract `amount` of the fungible asset from `store` emitting event.
-    public(friend) fun unchecked_withdraw(
+    friend fun unchecked_withdraw(
         store_addr: address, amount: u64
-    ): FungibleAsset acquires FungibleStore, ConcurrentFungibleBalance {
+    ): FungibleAsset {
         let fa = unchecked_withdraw_with_no_events(store_addr, amount);
         if (amount != 0) {
             event::emit<Withdraw>(Withdraw { store: store_addr, amount });
@@ -1303,13 +1303,13 @@ module aptos_framework::fungible_asset {
             error::not_found(EFUNGIBLE_STORE_EXISTENCE)
         );
 
-        let store = borrow_global_mut<FungibleStore>(store_addr);
+        let store = &mut FungibleStore[store_addr];
         let metadata = store.metadata;
         if (amount != 0) {
             if (store.balance == 0
                 && concurrent_fungible_balance_exists_inline(store_addr)) {
                 let balance_resource =
-                    borrow_global_mut<ConcurrentFungibleBalance>(store_addr);
+                    &mut ConcurrentFungibleBalance[store_addr];
                 assert!(
                     balance_resource.balance.try_sub(amount),
                     error::invalid_argument(EINSUFFICIENT_BALANCE)
@@ -1326,18 +1326,18 @@ module aptos_framework::fungible_asset {
     }
 
     /// Increase the supply of a fungible asset by minting.
-    fun increase_supply<T: key>(metadata: &Object<T>, amount: u64) acquires Supply, ConcurrentSupply {
+    fun increase_supply<T: key>(metadata: &Object<T>, amount: u64) {
         if (amount == 0) { return };
         let metadata_address = metadata.object_address();
 
         if (exists<ConcurrentSupply>(metadata_address)) {
-            let supply = borrow_global_mut<ConcurrentSupply>(metadata_address);
+            let supply = &mut ConcurrentSupply[metadata_address];
             assert!(
                 supply.current.try_add(amount as u128),
                 error::out_of_range(EMAX_SUPPLY_EXCEEDED)
             );
         } else if (exists<Supply>(metadata_address)) {
-            let supply = borrow_global_mut<Supply>(metadata_address);
+            let supply = &mut Supply[metadata_address];
             if (supply.maximum.is_some()) {
                 let max = *supply.maximum.borrow_mut();
                 assert!(
@@ -1352,12 +1352,12 @@ module aptos_framework::fungible_asset {
     }
 
     /// Decrease the supply of a fungible asset by burning.
-    fun decrease_supply<T: key>(metadata: &Object<T>, amount: u64) acquires Supply, ConcurrentSupply {
+    fun decrease_supply<T: key>(metadata: &Object<T>, amount: u64) {
         if (amount == 0) { return };
         let metadata_address = metadata.object_address();
 
         if (exists<ConcurrentSupply>(metadata_address)) {
-            let supply = borrow_global_mut<ConcurrentSupply>(metadata_address);
+            let supply = &mut ConcurrentSupply[metadata_address];
 
             assert!(
                 supply.current.try_sub(amount as u128),
@@ -1368,25 +1368,25 @@ module aptos_framework::fungible_asset {
                 exists<Supply>(metadata_address),
                 error::not_found(ESUPPLY_NOT_FOUND)
             );
-            let supply = borrow_global_mut<Supply>(metadata_address);
+            let supply = &mut Supply[metadata_address];
             assert!(
                 supply.current >= (amount as u128),
                 error::invalid_state(ESUPPLY_UNDERFLOW)
             );
             supply.current -= (amount as u128);
         } else {
-            assert!(false, error::not_found(ESUPPLY_NOT_FOUND));
+            abort error::not_found(ESUPPLY_NOT_FOUND);
         }
     }
 
     inline fun borrow_fungible_metadata<T: key>(metadata: &Object<T>): &Metadata {
         let addr = metadata.object_address();
-        borrow_global<Metadata>(addr)
+        &Metadata[addr]
     }
 
     inline fun borrow_fungible_metadata_mut<T: key>(metadata: &Object<T>): &mut Metadata {
         let addr = metadata.object_address();
-        borrow_global_mut<Metadata>(addr)
+        &mut Metadata[addr]
     }
 
     inline fun borrow_store_resource<T: key>(store: &Object<T>): &FungibleStore {
@@ -1395,10 +1395,10 @@ module aptos_framework::fungible_asset {
             exists<FungibleStore>(store_addr),
             error::not_found(EFUNGIBLE_STORE_EXISTENCE)
         );
-        borrow_global<FungibleStore>(store_addr)
+        &FungibleStore[store_addr]
     }
 
-    public fun upgrade_to_concurrent(ref: &ExtendRef) acquires Supply {
+    public fun upgrade_to_concurrent(ref: &ExtendRef) {
         let metadata_object_address = ref.address_from_extend_ref();
         let metadata_object_signer = ref.generate_signer_for_extending();
         assert!(
@@ -1426,7 +1426,7 @@ module aptos_framework::fungible_asset {
 
     public entry fun upgrade_store_to_concurrent<T: key>(
         owner: &signer, store: Object<T>
-    ) acquires FungibleStore {
+    ) {
         assert!(
             store.owns(signer::address_of(owner)),
             error::permission_denied(ENOT_STORE_OWNER)
@@ -1445,9 +1445,9 @@ module aptos_framework::fungible_asset {
     /// Ensure a known `FungibleStore` has `ConcurrentFungibleBalance`.
     fun ensure_store_upgraded_to_concurrent_internal(
         fungible_store_address: address
-    ) acquires FungibleStore {
+    ) {
         if (exists<ConcurrentFungibleBalance>(fungible_store_address)) { return };
-        let store = borrow_global_mut<FungibleStore>(fungible_store_address);
+        let store = &mut FungibleStore[fungible_store_address];
         let balance =
             aggregator_v2::create_unbounded_aggregator_with_value(store.balance);
         store.balance = 0;
@@ -1472,7 +1472,7 @@ module aptos_framework::fungible_asset {
         )
     }
 
-    public(friend) fun grant_permission_by_address(
+    friend fun grant_permission_by_address(
         master: &signer,
         permissioned: &signer,
         store_address: address,
@@ -1486,7 +1486,7 @@ module aptos_framework::fungible_asset {
         )
     }
 
-    public(friend) fun refill_permission(
+    friend fun refill_permission(
         permissioned: &signer, amount: u64, store_address: address
     ) {
         permissioned_signer::increase_limit(
@@ -1567,7 +1567,7 @@ module aptos_framework::fungible_asset {
     use aptos_framework::timestamp;
 
     #[test(creator = @0xcafe)]
-    fun test_metadata_basic_flow(creator: &signer) acquires Metadata, Supply, ConcurrentSupply {
+    fun test_metadata_basic_flow(creator: &signer) {
         let (creator_ref, metadata) = create_test_token(creator);
         init_test_metadata(&creator_ref);
         assert!(supply(metadata) == option::some(0), 1);
@@ -1604,7 +1604,7 @@ module aptos_framework::fungible_asset {
 
     #[test(creator = @0xcafe)]
     #[expected_failure(abort_code = 0x20005, location = Self)]
-    fun test_supply_overflow(creator: &signer) acquires Supply, ConcurrentSupply {
+    fun test_supply_overflow(creator: &signer) {
         let (creator_ref, metadata) = create_test_token(creator);
         init_test_metadata(&creator_ref);
         increase_supply(&metadata, 101);
@@ -1613,7 +1613,7 @@ module aptos_framework::fungible_asset {
     #[test(creator = @0xcafe)]
     fun test_create_and_remove_store(
         creator: &signer
-    ) acquires FungibleStore, FungibleAssetEvents, ConcurrentFungibleBalance {
+    ) {
         let (_, _, _, _, metadata) = create_fungible_asset(creator);
         let creator_ref = object::create_object_from_account(creator);
         create_store(&creator_ref, metadata);
@@ -1624,7 +1624,7 @@ module aptos_framework::fungible_asset {
     #[test(creator = @0xcafe, aaron = @0xface)]
     fun test_e2e_basic_flow(
         creator: &signer, aaron: &signer
-    ) acquires FungibleStore, Supply, ConcurrentSupply, DispatchFunctionStore, ConcurrentFungibleBalance, Metadata {
+    ) {
         let (mint_ref, transfer_ref, burn_ref, mutate_metadata_ref, test_token) =
             create_fungible_asset(creator);
         let metadata = mint_ref.metadata;
@@ -1670,7 +1670,7 @@ module aptos_framework::fungible_asset {
     #[expected_failure(abort_code = 0x50003, location = Self)]
     fun test_frozen(
         creator: &signer
-    ) acquires FungibleStore, Supply, ConcurrentSupply, DispatchFunctionStore, ConcurrentFungibleBalance {
+    ) {
         let (mint_ref, transfer_ref, _burn_ref, _mutate_metadata_ref, _) =
             create_fungible_asset(creator);
 
@@ -1684,7 +1684,7 @@ module aptos_framework::fungible_asset {
     #[expected_failure(abort_code = 0x50003, location = Self)]
     fun test_mint_to_frozen(
         creator: &signer
-    ) acquires FungibleStore, ConcurrentFungibleBalance, Supply, ConcurrentSupply, DispatchFunctionStore {
+    ) {
         let (mint_ref, transfer_ref, _burn_ref, _mutate_metadata_ref, _) =
             create_fungible_asset(creator);
 
@@ -1707,7 +1707,7 @@ module aptos_framework::fungible_asset {
     #[test(creator = @0xcafe, aaron = @0xface)]
     fun test_transfer_with_ref(
         creator: &signer, aaron: &signer
-    ) acquires FungibleStore, Supply, ConcurrentSupply, ConcurrentFungibleBalance, DispatchFunctionStore {
+    ) {
         let (mint_ref, transfer_ref, _burn_ref, _mutate_metadata_ref, _) =
             create_fungible_asset(creator);
         let metadata = mint_ref.metadata;
@@ -1726,7 +1726,7 @@ module aptos_framework::fungible_asset {
     }
 
     #[test(creator = @0xcafe)]
-    fun test_mutate_metadata(creator: &signer) acquires Metadata {
+    fun test_mutate_metadata(creator: &signer) {
         let (mint_ref, _transfer_ref, _burn_ref, mutate_metadata_ref, _) =
             create_fungible_asset(creator);
         let metadata = mint_ref.metadata;
@@ -1755,7 +1755,7 @@ module aptos_framework::fungible_asset {
     }
 
     #[test(creator = @0xcafe)]
-    fun test_partial_mutate_metadata(creator: &signer) acquires Metadata {
+    fun test_partial_mutate_metadata(creator: &signer) {
         let (mint_ref, _transfer_ref, _burn_ref, mutate_metadata_ref, _) =
             create_fungible_asset(creator);
         let metadata = mint_ref.metadata;
@@ -1776,7 +1776,7 @@ module aptos_framework::fungible_asset {
 
     #[test(creator = @0xcafe)]
     #[expected_failure(abort_code = 0x2000f, location = Self)]
-    fun test_mutate_metadata_name_over_maximum_length(creator: &signer) acquires Metadata {
+    fun test_mutate_metadata_name_over_maximum_length(creator: &signer) {
         let (_mint_ref, _transfer_ref, _burn_ref, mutate_metadata_ref, _) =
             create_fungible_asset(creator);
 
@@ -1791,7 +1791,7 @@ module aptos_framework::fungible_asset {
     #[expected_failure(abort_code = 0x20010, location = Self)]
     fun test_mutate_metadata_symbol_over_maximum_length(
         creator: &signer
-    ) acquires Metadata {
+    ) {
         let (_mint_ref, _transfer_ref, _burn_ref, mutate_metadata_ref, _) =
             create_fungible_asset(creator);
 
@@ -1806,7 +1806,7 @@ module aptos_framework::fungible_asset {
     #[expected_failure(abort_code = 0x20011, location = Self)]
     fun test_mutate_metadata_decimals_over_maximum_amount(
         creator: &signer
-    ) acquires Metadata {
+    ) {
         let (_mint_ref, _transfer_ref, _burn_ref, mutate_metadata_ref, _) =
             create_fungible_asset(creator);
 
@@ -1828,7 +1828,7 @@ module aptos_framework::fungible_asset {
     #[expected_failure(abort_code = 0x20013, location = Self)]
     fun test_mutate_metadata_icon_uri_over_maximum_length(
         creator: &signer
-    ) acquires Metadata {
+    ) {
         let (_mint_ref, _transfer_ref, _burn_ref, mutate_metadata_ref, _) =
             create_fungible_asset(creator);
         let too_long_of_uri = create_exceedingly_long_uri();
@@ -1839,7 +1839,7 @@ module aptos_framework::fungible_asset {
     #[expected_failure(abort_code = 0x20013, location = Self)]
     fun test_mutate_metadata_project_uri_over_maximum_length(
         creator: &signer
-    ) acquires Metadata {
+    ) {
         let (_mint_ref, _transfer_ref, _burn_ref, mutate_metadata_ref, _) =
             create_fungible_asset(creator);
         let too_long_of_uri = create_exceedingly_long_uri();
@@ -1847,7 +1847,7 @@ module aptos_framework::fungible_asset {
     }
 
     #[test(creator = @0xcafe)]
-    fun test_merge_and_exact(creator: &signer) acquires Supply, ConcurrentSupply {
+    fun test_merge_and_exact(creator: &signer) {
         let (mint_ref, _transfer_ref, burn_ref, _mutate_metadata_ref, _) =
             create_fungible_asset(creator);
         let fa = mint_ref.mint(100);
@@ -1885,7 +1885,7 @@ module aptos_framework::fungible_asset {
     #[test(fx = @aptos_framework, creator = @0xcafe)]
     fun test_fungible_asset_upgrade(
         fx: &signer, creator: &signer
-    ) acquires Supply, ConcurrentSupply, FungibleStore, ConcurrentFungibleBalance {
+    ) {
         let supply_feature = features::get_concurrent_fungible_assets_feature();
         let balance_feature = features::get_concurrent_fungible_balance_feature();
         let default_balance_feature =
@@ -1965,9 +1965,9 @@ module aptos_framework::fungible_asset {
             11
         );
         assert!(
-            borrow_global<ConcurrentFungibleBalance>(
+            ConcurrentFungibleBalance[
                 creator_store.object_address()
-            ).balance.read() == 10,
+            ].balance.read() == 10,
             12
         );
 
@@ -1977,7 +1977,7 @@ module aptos_framework::fungible_asset {
     #[test(fx = @aptos_framework, creator = @0xcafe)]
     fun test_fungible_asset_default_concurrent(
         fx: &signer, creator: &signer
-    ) acquires Supply, ConcurrentSupply, FungibleStore, ConcurrentFungibleBalance {
+    ) {
         let supply_feature = features::get_concurrent_fungible_assets_feature();
         let balance_feature = features::get_concurrent_fungible_balance_feature();
         let default_balance_feature =
@@ -2026,9 +2026,9 @@ module aptos_framework::fungible_asset {
             11
         );
         assert!(
-            borrow_global<ConcurrentFungibleBalance>(
+            ConcurrentFungibleBalance[
                 creator_store.object_address()
-            ).balance.read() == 30,
+            ].balance.read() == 30,
             12
         );
     }
@@ -2036,7 +2036,7 @@ module aptos_framework::fungible_asset {
     #[test(creator = @0xcafe, aaron = @0xface)]
     fun test_e2e_withdraw_limit(
         creator: &signer, aaron: &signer
-    ) acquires FungibleStore, Supply, ConcurrentSupply, DispatchFunctionStore, ConcurrentFungibleBalance {
+    ) {
         let aptos_framework = account::create_signer_for_test(@0x1);
         timestamp::set_time_has_started_for_testing(&aptos_framework);
 
@@ -2087,7 +2087,7 @@ module aptos_framework::fungible_asset {
     #[expected_failure(abort_code = 0x50024, location = Self)]
     fun test_e2e_withdraw_limit_exceeds(
         creator: &signer, aaron: &signer
-    ) acquires FungibleStore, Supply, ConcurrentSupply, DispatchFunctionStore, ConcurrentFungibleBalance {
+    ) {
         let aptos_framework = account::create_signer_for_test(@0x1);
         timestamp::set_time_has_started_for_testing(&aptos_framework);
 

@@ -30,7 +30,7 @@ module staking::oracle {
     }
 
     #[view]
-    public fun get_apt_price(): u128 acquires OracleConfig, TestPrice {
+    public fun get_apt_price(): u128 {
         if (exists<TestPrice>(@staking)) {
             return TestPrice[@staking].price;
         };
@@ -60,7 +60,7 @@ module staking::oracle {
     }
 
     #[test_only]
-    public fun set_test_price(price: u128) acquires TestPrice {
+    public fun set_test_price(price: u128) {
         if (exists<TestPrice>(@staking)) {
             TestPrice[@staking].price = price;
         } else {
