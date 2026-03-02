@@ -1426,14 +1426,12 @@ module aptos_framework::stake {
 
         // Process pending stake and distribute transaction fees and rewards for each currently active validator.
         validator_set.active_validators.for_each_ref(|validator| {
-            let validator: &ValidatorInfo = validator;
             update_stake_pool(validator_perf, validator.addr, &config);
         });
 
         // Process pending stake and distribute transaction fees and rewards for each currently pending_inactive validator
         // (requested to leave but not removed yet).
         validator_set.pending_inactive.for_each_ref(|validator| {
-            let validator: &ValidatorInfo = validator;
             update_stake_pool(validator_perf, validator.addr, &config);
         });
 
@@ -1529,7 +1527,7 @@ module aptos_framework::stake {
                 invariant spec_validators_are_initialized(validator_set.active_validators);
                 invariant len(validator_set.pending_active) == 0;
                 invariant len(validator_set.pending_inactive) == 0;
-                invariant 0 <= validator_index && validator_index <= vlen;
+                invariant validator_index <= vlen;
                 invariant vlen == len(validator_set.active_validators);
                 invariant forall i in 0..validator_index:
                     global<ValidatorConfig>(validator_set.active_validators[i].addr).validator_index

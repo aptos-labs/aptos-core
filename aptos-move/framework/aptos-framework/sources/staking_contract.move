@@ -286,7 +286,7 @@ module aptos_framework::staking_contract {
     /// return None.
     public fun staker_address(pool_address: address): std::option::Option<address> {
         if (exists<Staker>(pool_address)) {
-            return std::option::some(Staker[pool_address].staker)
+            std::option::some(Staker[pool_address].staker)
         } else {
             std::option::none()
         }
@@ -361,7 +361,7 @@ module aptos_framework::staking_contract {
     /// Return the beneficiary address of the operator.
     public fun beneficiary_for_operator(operator: address): address {
         if (exists<BeneficiaryForOperator>(operator)) {
-            return BeneficiaryForOperator[operator].beneficiary_for_operator
+            BeneficiaryForOperator[operator].beneficiary_for_operator
         } else {
             operator
         }
@@ -439,7 +439,7 @@ module aptos_framework::staking_contract {
         contract_creation_seed: vector<u8>
     ): address {
         assert!(
-            commission_percentage >= 0 && commission_percentage <= 100,
+            commission_percentage <= 100,
             error::invalid_argument(EINVALID_COMMISSION_PERCENTAGE)
         );
         // The amount should be at least the min_stake_required, so the stake pool will be eligible to join the
@@ -601,7 +601,7 @@ module aptos_framework::staking_contract {
         staker: &signer, operator: address, new_commission_percentage: u64
     ) {
         assert!(
-            new_commission_percentage >= 0 && new_commission_percentage <= 100,
+            new_commission_percentage <= 100,
             error::invalid_argument(EINVALID_COMMISSION_PERCENTAGE)
         );
 

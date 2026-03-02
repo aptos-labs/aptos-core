@@ -113,7 +113,6 @@ module aptos_framework::aptos_coin {
         system_addresses::assert_core_resource(&account);
         let delegations = &mut Delegations[@core_resources].inner;
         delegations.for_each_ref(|element| {
-            let element: &DelegatedMintCapability = element;
             assert!(element.to != to, error::invalid_argument(EALREADY_DELEGATED));
         });
         delegations.push_back(DelegatedMintCapability { to });

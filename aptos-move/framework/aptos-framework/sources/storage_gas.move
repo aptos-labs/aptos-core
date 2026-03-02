@@ -404,7 +404,7 @@ module aptos_framework::storage_gas {
             write_curve: base_8192_exponential_curve(300 * k, 300 * k * 100),
         };
         let byte_config = UsageGasConfig {
-            target_usage: 1 * m * m, // 1TB
+            target_usage: m * m, // 1TB
             read_curve: base_8192_exponential_curve(300, 300 * 100),
             create_curve: base_8192_exponential_curve(5 * k,  5 * k * 100),
             write_curve: base_8192_exponential_curve(5 * k,  5 * k * 100),

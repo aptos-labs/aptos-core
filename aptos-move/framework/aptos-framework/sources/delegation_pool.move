@@ -909,7 +909,7 @@ module aptos_framework::delegation_pool {
     /// Return the beneficiary address of the operator.
     public fun beneficiary_for_operator(operator: address): address {
         if (exists<BeneficiaryForOperator>(operator)) {
-            return BeneficiaryForOperator[operator].beneficiary_for_operator
+            BeneficiaryForOperator[operator].beneficiary_for_operator
         } else {
             operator
         }

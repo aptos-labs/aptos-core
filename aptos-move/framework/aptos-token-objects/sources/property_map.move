@@ -173,6 +173,7 @@ module aptos_token_objects::property_map {
         to_internal_type(type)
     }
 
+    #[lint::skip(empty_if)]
     /// Validates property value type against its expected type
     inline fun validate_type(type: u8, value: vector<u8>) {
         if (type == BOOL) {
