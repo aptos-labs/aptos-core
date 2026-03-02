@@ -489,21 +489,23 @@ impl DKGTrait for RealDKG {
             .clone()
             .into_iter()
             .all(|(_, y)| y.fast.is_some())
-            && pub_params.pvss_config.fast_wconfig.is_some()
         {
-            let fast_player_share_pairs: Vec<_> = input_player_share_pairs
-                .into_iter()
-                .map(|(x, y)| (Player { id: x as usize }, y.fast.unwrap()))
-                .collect();
-            let fast_reconstructed_secret = <WTrx as TranscriptCore>::DealtSecretKey::reconstruct(
-                pub_params.pvss_config.fast_wconfig.as_ref().unwrap(),
-                &fast_player_share_pairs,
-            )
-            .unwrap();
-            ensure!(
-                reconstructed_secret == fast_reconstructed_secret,
-                "real_dkg::reconstruct_secret_from_shares failed with inconsistent dealt secrets."
-            );
+            if let Some(fast_wconfig) = &pub_params.pvss_config.fast_wconfig {
+                let fast_player_share_pairs: Vec<_> = input_player_share_pairs
+                    .into_iter()
+                    .map(|(x, y)| (Player { id: x as usize }, y.fast.unwrap()))
+                    .collect();
+                let fast_reconstructed_secret =
+                    <WTrx as TranscriptCore>::DealtSecretKey::reconstruct(
+                        fast_wconfig,
+                        &fast_player_share_pairs,
+                    )
+                    .unwrap();
+                ensure!(
+                    reconstructed_secret == fast_reconstructed_secret,
+                    "real_dkg::reconstruct_secret_from_shares failed with inconsistent dealt secrets."
+                );
+            }
         }
         Ok(reconstructed_secret)
     }
