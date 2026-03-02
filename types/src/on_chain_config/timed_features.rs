@@ -7,7 +7,6 @@ use chrono_tz::America::Los_Angeles;
 use serde::Serialize;
 use strum::{EnumCount, IntoEnumIterator};
 use strum_macros::{EnumCount as EnumCountMacro, EnumIter};
-use crate::on_chain_config::TimedFeatureFlag::RevisedBoundsInProdConfig;
 
 /// NOTE: if you add a restriction e.g. for the bytecode verifier and want
 /// to test whether testnet/mainnet is effected, you MUST define an override
@@ -67,25 +66,34 @@ pub enum TimedFeatureOverride {
 }
 
 impl TimedFeatureOverride {
-    #[allow(unused, clippy::match_single_binding)]
+    #[allow(unused)]
     const fn get_override(&self, flag: TimedFeatureFlag) -> Option<bool> {
         use TimedFeatureFlag::*;
         use TimedFeatureOverride::*;
 
-        Some(match self {
-            Replay => match flag {
-                _LimitTypeTagSize => true,
-                _ModuleComplexityCheck => true,
-                RevisedBoundsInProdConfig => true,
-                // Add overrides for replay here.
-                _ => return None,
-            },
-            Testing => match flag {
-                EntryCompatibility => true,
-                RevisedBoundsInProdConfig => true,
-                _ => return None,
-            },
-        })
+        match (self, flag) {
+            // Add overrides for replay here.
+            (Replay, _LimitTypeTagSize) => Some(true),
+            (Replay, _ModuleComplexityCheck) => Some(true),
+            // Add overrides for testing here.
+            (Testing, EntryCompatibility) => Some(true),
+            // Exhaustive over flags so adding a new flag forces a decision.
+            (
+                _,
+                _LimitTypeTagSize
+                | _ModuleComplexityCheck
+                | EntryCompatibility
+                | ChargeBytesForPrints
+                | FixMemoryUsageTracking
+                | DisabledCaptureOption
+                | FixTableNativesMemoryDoubleCounting
+                | ClosureDepthCheck
+                | FixCryptoAlgebraNativesResultHandling
+                | UseFullTransactionSizeForGasCheck
+                | EnableStrictBoundsInProdConfig
+                | RevisedBoundsInProdConfig,
+            ) => None,
+        }
     }
 }
 
@@ -204,6 +212,8 @@ impl TimedFeatureFlag {
                 .unwrap()
                 .with_timezone(&Utc),
 
+            // ************** DO NOT SUBMIT **********
+            // fix timing
             (RevisedBoundsInProdConfig, TESTNET) => Los_Angeles
                 .with_ymd_and_hms(2026, 3, 4, 10, 0, 0)
                 .unwrap()

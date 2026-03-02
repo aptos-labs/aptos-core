@@ -185,7 +185,7 @@ pub fn aptos_prod_verifier_config(
         },
         max_struct_variants: if strict_bounds {
             if revised_bounds {
-                Some(128)
+                Some(127)
             } else {
                 Some(64)
             }
