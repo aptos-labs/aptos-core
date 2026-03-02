@@ -219,10 +219,10 @@ pub struct SharingProof<E: Pairing> {
     /// SoK: the SK is knowledge of `witnesses` s_{i,j} yielding the commitment and the C and the R, their image is the PK, and the signed message is a certain context `cntxt`
     pub SoK: hkzg_chunked_elgamal_commit::Proof<'static, E>, // static because we don't want the lifetime of the Proof to depend on the Homomorphism TODO: try removing it?
     /// A batched range proof showing that all committed values s_{i,j} lie in some range
-    pub range_proof: dekart_univariate_v2::ProofProjective<E>, // TODO: make an affine version of this
+    pub range_proof: dekart_univariate_v2::Proof<E>, // TODO: make an affine version of this
     /// A KZG-style commitment to the values s_{i,j} going into the range proof
     pub range_proof_commitment:
-        <dekart_univariate_v2::ProofProjective<E> as BatchedRangeProof<E>>::CommitmentNormalised,
+        <dekart_univariate_v2::Proof<E> as BatchedRangeProof<E>>::CommitmentNormalised,
 }
 
 impl<E: Pairing> ValidCryptoMaterial for Transcript<E> {
@@ -324,7 +324,7 @@ impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>> traits:
                     unsafe_random_point::<E::G1, _>(rng),
                 ),
                 SoK: hkzg_chunked_elgamal_commit::Proof::generate(sc, num_chunks_per_share, rng),
-                range_proof: dekart_univariate_v2::ProofProjective::generate(pp.ell, rng),
+                range_proof: dekart_univariate_v2::Proof::generate(pp.ell, rng),
             },
         }
     }
@@ -398,7 +398,7 @@ impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>> Transcr
         // );
 
         // Generate the batch range proof, given the `range_proof_commitment` produced in the PoK
-        let range_proof = dekart_univariate_v2::ProofProjective::prove(
+        let range_proof = dekart_univariate_v2::Proof::prove(
             &pp.pk_range_proof,
             &f_evals_chunked_flat,
             pp.ell,

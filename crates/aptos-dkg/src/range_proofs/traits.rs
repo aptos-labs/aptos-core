@@ -60,7 +60,7 @@ pub trait BatchedRangeProof<E: Pairing>: Clone + CanonicalSerialize + CanonicalD
         vk: &Self::VerificationKey,
         n: usize,
         ell: u8,
-        comm: &Self::Commitment,
+        comm: &Self::Commitment, // TODO: should make this CommitmentNormalised
         rng: &mut R,
     ) -> anyhow::Result<()> {
         let (g1_terms, g2_terms) = self.pairing_for_verify(vk, n, ell, comm, rng)?;
