@@ -118,35 +118,6 @@ pub fn lagrange_basis_at<F: Field>(s_i: &[F], s: F, x: F) -> F {
         .expect("denominator nonzero for distinct points")
 }
 
-/// Interpolation polynomial f̃_i(x) = ∑_{s∈S_i} L_{i,s}(x) f_i(s); here we only need its value at one point.
-#[allow(non_snake_case)]
-pub fn tilde_f_i_at<F: Field>(s_i: &[F], evals_at_s_i: &[F], x: F) -> F {
-    debug_assert_eq!(s_i.len(), evals_at_s_i.len());
-    s_i.iter()
-        .zip(evals_at_s_i.iter())
-        .map(|(&s, &y)| lagrange_basis_at(s_i, s, x) * y)
-        .fold(F::zero(), |a, b| a + b)
-}
-
-/// Lagrange basis polynomials L_s(X) for s ∈ S_i (each L_s(s)=1 and L_s(t)=0 for t≠s).
-/// Uses batch inversion for the denominator normalizers.
-#[allow(non_snake_case)]
-fn lagrange_basis_polys<F: FftField>(s_i: &[F]) -> Vec<DensePolynomial<F>> {
-    if s_i.is_empty() {
-        return Vec::new();
-    }
-    let mut all_denoms: Vec<F> = Vec::new();
-    for &s in s_i {
-        let denom = s_i
-            .iter()
-            .filter(|&&t| t != s)
-            .fold(F::one(), |a, &t| a * (s - t));
-        all_denoms.push(denom);
-    }
-    batch_inversion(&mut all_denoms);
-    lagrange_basis_polys_from_inverted_denoms(s_i, &all_denoms)
-}
-
 /// Builds Lagrange basis polynomials given pre-inverted denominators (L_s = (Z_{S_i}(X)/(X-s)) * inv_s).
 #[allow(non_snake_case)]
 fn lagrange_basis_polys_from_inverted_denoms<F: FftField>(
@@ -200,18 +171,6 @@ fn lagrange_basis_polys_batched<F: FftField>(unique_sets: &[&[F]]) -> Vec<Vec<De
             lagrange_basis_polys_from_inverted_denoms(s_i, inv_denoms)
         })
         .collect()
-}
-
-/// Interpolation polynomial f̃_i(X) = ∑_{s∈S_i} L_{i,s}(X) f_i(s) as a dense polynomial.
-#[allow(non_snake_case)]
-pub fn tilde_f_i_poly<F: FftField>(s_i: &[F], evals_at_s_i: &[F]) -> DensePolynomial<F> {
-    debug_assert_eq!(s_i.len(), evals_at_s_i.len());
-    let bases = lagrange_basis_polys(s_i);
-    bases
-        .into_iter()
-        .zip(evals_at_s_i.iter())
-        .map(|(l_s, &y)| &l_s * y)
-        .fold(DensePolynomial::zero(), |a, b| &a + &b)
 }
 
 /// Homomorphism φ on the evaluations { y_i }_i, where y_i = (y_i^rev, y_i^hid). The prover reveals
