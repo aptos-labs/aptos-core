@@ -59,7 +59,7 @@ impl DigestKey {
     pub fn new(rng: &mut impl RngCore, batch_size: usize, num_rounds: usize) -> Result<Self> {
         let mut i = batch_size;
         while i > 1 {
-            (i % 2 == 0)
+            i.is_multiple_of(2)
                 .then_some(())
                 .ok_or(BatchEncryptionError::DigestInitError(
                     DigestKeyInitError::BatchSizeMustBePowerOfTwo,

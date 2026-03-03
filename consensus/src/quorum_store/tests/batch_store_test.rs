@@ -163,7 +163,7 @@ async fn test_extend_expiration_vs_save() {
 
     for (i, &digest) in digests.iter().enumerate().take(num_experiments) {
         // Set the conditions for experiment (both threads waiting).
-        while start_flag.load(Ordering::Acquire) % 3 != 0 {
+        while !start_flag.load(Ordering::Acquire).is_multiple_of(3) {
             assert!(!save_error.load(Ordering::Acquire));
         }
 
@@ -175,7 +175,7 @@ async fn test_extend_expiration_vs_save() {
         start_flag.fetch_add(1, Ordering::Relaxed);
     }
     // Finish the experiment
-    while start_flag.load(Ordering::Acquire) % 3 != 0 {}
+    while !start_flag.load(Ordering::Acquire).is_multiple_of(3) {}
 
     // Expire everything, call for higher times as well.
     for i in 35..50 {
