@@ -487,24 +487,13 @@ module aptos_framework::object {
             object.owner == self.owner,
             error::permission_denied(ENOT_OBJECT_OWNER),
         );
-        if (std::features::module_event_migration_enabled()) {
-            event::emit(
-                Transfer {
-                    object: self.self,
-                    from: object.owner,
-                    to,
-                },
-            );
-        } else {
-            event::emit_event(
-                &mut object.transfer_events,
-                TransferEvent {
-                    object: self.self,
-                    from: object.owner,
-                    to,
-                },
-            );
-        };
+        event::emit(
+            Transfer {
+                object: self.self,
+                from: object.owner,
+                to,
+            },
+        );
         object.owner = to;
     }
 
@@ -548,24 +537,13 @@ module aptos_framework::object {
     inline fun transfer_raw_inner(object: address, to: address) {
         let object_core = borrow_global_mut<ObjectCore>(object);
         if (object_core.owner != to) {
-            if (std::features::module_event_migration_enabled()) {
-                event::emit(
-                    Transfer {
-                        object,
-                        from: object_core.owner,
-                        to,
-                    },
-                );
-            } else {
-                event::emit_event(
-                    &mut object_core.transfer_events,
-                    TransferEvent {
-                        object,
-                        from: object_core.owner,
-                        to,
-                    },
-                );
-            };
+            event::emit(
+                Transfer {
+                    object,
+                    from: object_core.owner,
+                    to,
+                },
+            );
             object_core.owner = to;
         };
     }

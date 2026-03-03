@@ -398,44 +398,25 @@ module aptos_token_objects::collection {
                 supply.current_supply <= supply.max_supply,
                 error::out_of_range(ECOLLECTION_SUPPLY_EXCEEDED),
             );
-            if (std::features::module_event_migration_enabled()) {
-                event::emit(
-                    Mint {
-                        collection: collection_addr,
-                        index: aggregator_v2::create_snapshot(supply.total_minted),
-                        token,
-                    },
-                );
-            } else {
-                event::emit_event(&mut supply.mint_events,
-                    MintEvent {
-                        index: supply.total_minted,
-                        token,
-                    },
-                );
-            };
+            event::emit(
+                Mint {
+                    collection: collection_addr,
+                    index: aggregator_v2::create_snapshot(supply.total_minted),
+                    token,
+                },
+            );
             option::some(aggregator_v2::create_snapshot<u64>(supply.total_minted))
         } else if (exists<UnlimitedSupply>(collection_addr)) {
             let supply = &mut UnlimitedSupply[collection_addr];
             supply.current_supply += 1;
             supply.total_minted += 1;
-            if (std::features::module_event_migration_enabled()) {
-                event::emit(
-                    Mint {
-                        collection: collection_addr,
-                        index: aggregator_v2::create_snapshot(supply.total_minted),
-                        token,
-                    },
-                );
-            } else {
-                event::emit_event(
-                    &mut supply.mint_events,
-                    MintEvent {
-                        index: supply.total_minted,
-                        token,
-                    },
-                );
-            };
+            event::emit(
+                Mint {
+                    collection: collection_addr,
+                    index: aggregator_v2::create_snapshot(supply.total_minted),
+                    token,
+                },
+            );
             option::some(aggregator_v2::create_snapshot<u64>(supply.total_minted))
         } else {
             option::none()
@@ -486,45 +467,25 @@ module aptos_token_objects::collection {
         } else if (exists<FixedSupply>(collection_addr)) {
             let supply = &mut FixedSupply[collection_addr];
             supply.current_supply -= 1;
-            if (std::features::module_event_migration_enabled()) {
-                event::emit(
-                    Burn {
-                        collection: collection_addr,
-                        index: *index.borrow(),
-                        token,
-                        previous_owner,
-                    },
-                );
-            } else {
-                event::emit_event(
-                    &mut supply.burn_events,
-                    BurnEvent {
-                        index: *index.borrow(),
-                        token,
-                    },
-                );
-            };
+            event::emit(
+                Burn {
+                    collection: collection_addr,
+                    index: *index.borrow(),
+                    token,
+                    previous_owner,
+                },
+            );
         } else if (exists<UnlimitedSupply>(collection_addr)) {
             let supply = &mut UnlimitedSupply[collection_addr];
             supply.current_supply -= 1;
-            if (std::features::module_event_migration_enabled()) {
-                event::emit(
-                    Burn {
-                        collection: collection_addr,
-                        index: *index.borrow(),
-                        token,
-                        previous_owner,
-                    },
-                );
-            } else {
-                event::emit_event(
-                    &mut supply.burn_events,
-                    BurnEvent {
-                        index: *index.borrow(),
-                        token,
-                    },
-                );
-            };
+            event::emit(
+                Burn {
+                    collection: collection_addr,
+                    index: *index.borrow(),
+                    token,
+                    previous_owner,
+                },
+            );
         }
     }
 
@@ -671,38 +632,24 @@ module aptos_token_objects::collection {
     public fun set_description(mutator_ref: &MutatorRef, description: String) acquires Collection {
         assert!(description.length() <= MAX_DESCRIPTION_LENGTH, error::out_of_range(EDESCRIPTION_TOO_LONG));
         let collection = borrow_mut(mutator_ref);
-        if (std::features::module_event_migration_enabled()) {
-            event::emit(Mutation {
-                mutated_field_name: string::utf8(b"description"),
-                collection: object::address_to_object(mutator_ref.self),
-                old_value: collection.description,
-                new_value: description,
-            });
-        } else {
-            event::emit_event(
-                &mut collection.mutation_events,
-                MutationEvent { mutated_field_name: string::utf8(b"description") },
-            );
-        };
+        event::emit(Mutation {
+            mutated_field_name: string::utf8(b"description"),
+            collection: object::address_to_object(mutator_ref.self),
+            old_value: collection.description,
+            new_value: description,
+        });
         collection.description = description;
     }
 
     public fun set_uri(mutator_ref: &MutatorRef, uri: String) acquires Collection {
         assert!(uri.length() <= MAX_URI_LENGTH, error::out_of_range(EURI_TOO_LONG));
         let collection = borrow_mut(mutator_ref);
-        if (std::features::module_event_migration_enabled()) {
-            event::emit(Mutation {
-                mutated_field_name: string::utf8(b"uri"),
-                collection: object::address_to_object(mutator_ref.self),
-                old_value: collection.uri,
-                new_value: uri,
-            });
-        } else {
-            event::emit_event(
-                &mut collection.mutation_events,
-                MutationEvent { mutated_field_name: string::utf8(b"uri") },
-            );
-        };
+        event::emit(Mutation {
+            mutated_field_name: string::utf8(b"uri"),
+            collection: object::address_to_object(mutator_ref.self),
+            old_value: collection.uri,
+            new_value: uri,
+        });
         collection.uri = uri;
     }
 
