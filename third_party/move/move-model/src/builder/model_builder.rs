@@ -31,14 +31,14 @@ use crate::ty::PrimitiveType;
 /// Adding a new builtin receiver type requires adding a variant here, a `from_type` arm,
 /// and a `module_name` arm — the compiler enforces exhaustive matching for the latter two.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
-pub enum BuiltinReceiverType {
+pub(crate) enum BuiltinReceiverType {
     Vector,
     Signer,
 }
 
 impl BuiltinReceiverType {
     /// Maps a base type (references already stripped) to its builtin receiver type, if any.
-    pub fn from_type(ty: &Type) -> Option<Self> {
+    pub(crate) fn from_type(ty: &Type) -> Option<Self> {
         match ty {
             Type::Vector(_) => Some(Self::Vector),
             Type::Primitive(PrimitiveType::Signer) => Some(Self::Signer),
@@ -47,7 +47,7 @@ impl BuiltinReceiverType {
     }
 
     /// Returns the well-known module name for this builtin receiver type.
-    pub fn module_name(&self) -> &'static str {
+    pub(crate) fn module_name(&self) -> &'static str {
         match self {
             Self::Vector => well_known::VECTOR_MODULE,
             Self::Signer => well_known::SIGNER_MODULE,
@@ -527,7 +527,7 @@ impl<'env> ModelBuilder<'env> {
                         } else {
                             diag(
                                 "is not suitable for receiver functions. \
-                                 Only structs, vectors, and select primitive types \
+                                 Only structs, vectors, and the `signer` primitive type \
                                  can have receiver functions",
                             )
                         }

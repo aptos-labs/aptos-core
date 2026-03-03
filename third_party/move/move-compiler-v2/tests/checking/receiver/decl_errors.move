@@ -22,6 +22,12 @@ module 0x42::m {
     // Error
     fun receiver_non_linear_instantiated<T>(self: G<T, T>) {}
 
+    // Error: external module cannot add receiver functions on signer
+    fun receiver_for_signer(self: &signer): address { abort 0 }
+
+    // Error: cannot overload address_of on signer from outside module
+    fun address_of(self: &signer): address { abort 0 }
+
 }
 
 module 0x42::n {
