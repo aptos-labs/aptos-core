@@ -429,6 +429,9 @@ pub(crate) fn realistic_env_max_load_test(
     ForgeConfig::default()
         .with_initial_validator_count(NonZeroUsize::new(num_validators).unwrap())
         .with_initial_fullnode_count(num_fullnodes)
+        .with_validator_override_node_config_fn(Arc::new(|config, _| {
+            config.consensus.enable_prefix_consensus = true;
+        }))
         .add_network_test(wrap_with_realistic_env(num_validators, TwoTrafficsTest {
             inner_traffic: EmitJobRequest::default()
                 .mode(EmitJobMode::MaxLoad { mempool_backlog })
