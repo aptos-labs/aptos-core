@@ -5,7 +5,7 @@
 
 
 
--  [Struct `DomainSeparator`](#0x7_sigma_protocol_fiat_shamir_DomainSeparator)
+-  [Enum `DomainSeparator`](#0x7_sigma_protocol_fiat_shamir_DomainSeparator)
 -  [Struct `FiatShamirInputs`](#0x7_sigma_protocol_fiat_shamir_FiatShamirInputs)
 -  [Constants](#@Constants_0)
 -  [Function `new_domain_separator`](#0x7_sigma_protocol_fiat_shamir_new_domain_separator)
@@ -16,6 +16,8 @@
 <b>use</b> <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/bcs.md#0x1_bcs">0x1::bcs</a>;
 <b>use</b> <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option">0x1::option</a>;
 <b>use</b> <a href="../../aptos-framework/../aptos-stdlib/doc/ristretto255.md#0x1_ristretto255">0x1::ristretto255</a>;
+<b>use</b> <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string">0x1::string</a>;
+<b>use</b> <a href="../../aptos-framework/../aptos-stdlib/doc/type_info.md#0x1_type_info">0x1::type_info</a>;
 <b>use</b> <a href="sigma_protocol_statement.md#0x7_sigma_protocol_statement">0x7::sigma_protocol_statement</a>;
 </code></pre>
 
@@ -23,18 +25,22 @@
 
 <a id="0x7_sigma_protocol_fiat_shamir_DomainSeparator"></a>
 
-## Struct `DomainSeparator`
+## Enum `DomainSeparator`
 
-A domain separator prevents replay attacks in $\Sigma$ protocols and consists of 3 things.
+A domain separator prevents replay attacks in $\Sigma$ protocols and consists of 5 things.
 
-1. A protocol identifier, which is typically split up into two things:
+1. The contract address (defense in depth: binds the proof to a specific deployed contract)
+
+2. The chain ID (defense in depth: binds the proof to a specific Aptos network)
+
+3. A protocol identifier, which is typically split up into two things:
 - A higher-level protocol: "Confidential Assets v1 on Aptos"
 - A lower-level relation identifier (e.g., "PedEq", "Schnorr", "DLEQ", etc.)
 
-2. Statement (i.e., the public statement in the NP relation being proved)
+4. Statement (i.e., the public statement in the NP relation being proved)
 - This is captured implicitly in our <code>prove</code> and <code>verify</code> functions ==> it is not part of this struct.
 
-3. Session identifier
+5. Session identifier
 - Chosen by user
 - specifies the "context" in which this proof is valid
 - e.g., "Alice (0x1) is paying Bob (0x2) at time <code>t</code>
@@ -44,10 +50,22 @@ Note: The session identifier can be tricky, since in some settings the "session"
 statement being proven. For confidential assets, it does not AFAICT: the "session" is represented at least by
 the confidential balances of the users & their addresses.
 
+TODO(Security): We may want to add more here (like some sort of account TXN counter). I suspect that the
+ciphertext randomness in the public statement would act as enough of a "session ID", but I would prefer
+to avoid reasoning about that.
 
-<pre><code><b>struct</b> <a href="sigma_protocol_fiat_shamir.md#0x7_sigma_protocol_fiat_shamir_DomainSeparator">DomainSeparator</a> <b>has</b> <b>copy</b>, drop
+
+<pre><code>enum <a href="sigma_protocol_fiat_shamir.md#0x7_sigma_protocol_fiat_shamir_DomainSeparator">DomainSeparator</a> <b>has</b> <b>copy</b>, drop
 </code></pre>
 
+
+
+<details>
+<summary>Variants</summary>
+
+
+<details>
+<summary>V1</summary>
 
 
 <details>
@@ -55,6 +73,18 @@ the confidential balances of the users & their addresses.
 
 
 <dl>
+<dt>
+<code>contract_address: <b>address</b></code>
+</dt>
+<dd>
+
+</dd>
+<dt>
+<code><a href="../../aptos-framework/doc/chain_id.md#0x1_chain_id">chain_id</a>: u8</code>
+</dt>
+<dd>
+
+</dd>
 <dt>
 <code>protocol_id: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;</code>
 </dt>
@@ -69,6 +99,10 @@ the confidential balances of the users & their addresses.
 </dd>
 </dl>
 
+
+</details>
+
+</details>
 
 </details>
 
@@ -96,6 +130,14 @@ an actual point.
 </dt>
 <dd>
 
+</dd>
+<dt>
+<code>type_name: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_String">string::String</a></code>
+</dt>
+<dd>
+ The fully-qualified type name of the phantom marker type <code>P</code> in <code>Statement&lt;P&gt;</code>.
+ E.g., <code>"<a href="sigma_protocol_registration.md#0x7_sigma_protocol_registration_Registration">0x7::sigma_protocol_registration::Registration</a>"</code>.
+ This binds the Fiat-Shamir challenge to the specific protocol type for defense in depth.
 </dd>
 <dt>
 <code>k: u64</code>
@@ -157,7 +199,7 @@ The length of the <code>A</code> field in <code>Proof</code> should NOT be zero
 
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="sigma_protocol_fiat_shamir.md#0x7_sigma_protocol_fiat_shamir_new_domain_separator">new_domain_separator</a>(protocol_id: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;, session_id: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): <a href="sigma_protocol_fiat_shamir.md#0x7_sigma_protocol_fiat_shamir_DomainSeparator">sigma_protocol_fiat_shamir::DomainSeparator</a>
+<pre><code><b>public</b> <b>fun</b> <a href="sigma_protocol_fiat_shamir.md#0x7_sigma_protocol_fiat_shamir_new_domain_separator">new_domain_separator</a>(contract_address: <b>address</b>, <a href="../../aptos-framework/doc/chain_id.md#0x1_chain_id">chain_id</a>: u8, protocol_id: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;, session_id: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): <a href="sigma_protocol_fiat_shamir.md#0x7_sigma_protocol_fiat_shamir_DomainSeparator">sigma_protocol_fiat_shamir::DomainSeparator</a>
 </code></pre>
 
 
@@ -166,8 +208,10 @@ The length of the <code>A</code> field in <code>Proof</code> should NOT be zero
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="sigma_protocol_fiat_shamir.md#0x7_sigma_protocol_fiat_shamir_new_domain_separator">new_domain_separator</a>(protocol_id: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;, session_id: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): <a href="sigma_protocol_fiat_shamir.md#0x7_sigma_protocol_fiat_shamir_DomainSeparator">DomainSeparator</a> {
-    <a href="sigma_protocol_fiat_shamir.md#0x7_sigma_protocol_fiat_shamir_DomainSeparator">DomainSeparator</a> {
+<pre><code><b>public</b> <b>fun</b> <a href="sigma_protocol_fiat_shamir.md#0x7_sigma_protocol_fiat_shamir_new_domain_separator">new_domain_separator</a>(contract_address: <b>address</b>, <a href="../../aptos-framework/doc/chain_id.md#0x1_chain_id">chain_id</a>: u8, protocol_id: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;, session_id: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): <a href="sigma_protocol_fiat_shamir.md#0x7_sigma_protocol_fiat_shamir_DomainSeparator">DomainSeparator</a> {
+    DomainSeparator::V1 {
+        contract_address,
+        <a href="../../aptos-framework/doc/chain_id.md#0x1_chain_id">chain_id</a>,
         protocol_id,
         session_id
     }
@@ -185,7 +229,7 @@ The length of the <code>A</code> field in <code>Proof</code> should NOT be zero
 Returns the Sigma protocol challenge $e$ and $1,\beta,\beta^2,\ldots, \beta^{m-1}$
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="sigma_protocol_fiat_shamir.md#0x7_sigma_protocol_fiat_shamir_fiat_shamir">fiat_shamir</a>(dst: <a href="sigma_protocol_fiat_shamir.md#0x7_sigma_protocol_fiat_shamir_DomainSeparator">sigma_protocol_fiat_shamir::DomainSeparator</a>, stmt: &<a href="sigma_protocol_statement.md#0x7_sigma_protocol_statement_Statement">sigma_protocol_statement::Statement</a>, compressed_A: &<a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="../../aptos-framework/../aptos-stdlib/doc/ristretto255.md#0x1_ristretto255_CompressedRistretto">ristretto255::CompressedRistretto</a>&gt;, k: u64): (<a href="../../aptos-framework/../aptos-stdlib/doc/ristretto255.md#0x1_ristretto255_Scalar">ristretto255::Scalar</a>, <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="../../aptos-framework/../aptos-stdlib/doc/ristretto255.md#0x1_ristretto255_Scalar">ristretto255::Scalar</a>&gt;)
+<pre><code><b>public</b> <b>fun</b> <a href="sigma_protocol_fiat_shamir.md#0x7_sigma_protocol_fiat_shamir_fiat_shamir">fiat_shamir</a>&lt;P&gt;(dst: <a href="sigma_protocol_fiat_shamir.md#0x7_sigma_protocol_fiat_shamir_DomainSeparator">sigma_protocol_fiat_shamir::DomainSeparator</a>, stmt: &<a href="sigma_protocol_statement.md#0x7_sigma_protocol_statement_Statement">sigma_protocol_statement::Statement</a>&lt;P&gt;, compressed_A: &<a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="../../aptos-framework/../aptos-stdlib/doc/ristretto255.md#0x1_ristretto255_CompressedRistretto">ristretto255::CompressedRistretto</a>&gt;, k: u64): (<a href="../../aptos-framework/../aptos-stdlib/doc/ristretto255.md#0x1_ristretto255_Scalar">ristretto255::Scalar</a>, <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="../../aptos-framework/../aptos-stdlib/doc/ristretto255.md#0x1_ristretto255_Scalar">ristretto255::Scalar</a>&gt;)
 </code></pre>
 
 
@@ -194,9 +238,9 @@ Returns the Sigma protocol challenge $e$ and $1,\beta,\beta^2,\ldots, \beta^{m-1
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="sigma_protocol_fiat_shamir.md#0x7_sigma_protocol_fiat_shamir_fiat_shamir">fiat_shamir</a>(
+<pre><code><b>public</b> <b>fun</b> <a href="sigma_protocol_fiat_shamir.md#0x7_sigma_protocol_fiat_shamir_fiat_shamir">fiat_shamir</a>&lt;P&gt;(
     dst: <a href="sigma_protocol_fiat_shamir.md#0x7_sigma_protocol_fiat_shamir_DomainSeparator">DomainSeparator</a>,
-    stmt: &Statement,
+    stmt: &Statement&lt;P&gt;,
     compressed_A: &<a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;CompressedRistretto&gt;,
     k: u64): (Scalar, <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;Scalar&gt;)
 {
@@ -209,6 +253,7 @@ Returns the Sigma protocol challenge $e$ and $1,\beta,\beta^2,\ldots, \beta^{m-1
     // Note: A hardcodes $m$, the statement hardcodes $n_1$ and $n_2$, and $k$ is specified manually!
     <b>let</b> bytes = <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/bcs.md#0x1_bcs_to_bytes">bcs::to_bytes</a>(&<a href="sigma_protocol_fiat_shamir.md#0x7_sigma_protocol_fiat_shamir_FiatShamirInputs">FiatShamirInputs</a> {
         dst,
+        type_name: <a href="../../aptos-framework/../aptos-stdlib/doc/type_info.md#0x1_type_info_type_name">type_info::type_name</a>&lt;P&gt;(),
         k,
         stmt_X: *stmt.get_compressed_points(),
         stmt_x: *stmt.get_scalars(),
@@ -216,8 +261,16 @@ Returns the Sigma protocol challenge $e$ and $1,\beta,\beta^2,\ldots, \beta^{m-1
     });
 
     // TODO(Security): A bit ad-hoc.
-    <b>let</b> e_hash = sha2_512(bytes);
-    <b>let</b> beta_hash = sha2_512(e_hash);
+    <b>let</b> seed = sha2_512(bytes);
+
+    // e = SHA2-512(SHA2-512(bytes) || 0x00)
+    seed.push_back(0u8);
+    <b>let</b> e_hash = sha2_512(seed);
+
+    // beta = SHA2-512(SHA2-512(bytes) || 0x01)
+    <b>let</b> len = seed.length();
+    seed[len - 1] = 1u8;
+    <b>let</b> beta_hash = sha2_512(seed);
 
     <b>let</b> e = new_scalar_uniform_from_64_bytes(e_hash).extract();
     <b>let</b> beta = new_scalar_uniform_from_64_bytes(beta_hash).extract();
@@ -225,15 +278,9 @@ Returns the Sigma protocol challenge $e$ and $1,\beta,\beta^2,\ldots, \beta^{m-1
     <b>let</b> betas = <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>[];
     <b>let</b> prev_beta = scalar_one();
     betas.push_back(prev_beta);
-    <b>let</b> i = 1;
-    <b>while</b> (i &lt; m) {
-        <b>let</b> new_beta = scalar_mul(&prev_beta, &beta);
-
-        // \beta^i &lt;- \beta^{i-1} * \beta
-        betas.push_back(new_beta);
-
-        prev_beta = new_beta;
-        i += 1;
+    for (_i in 1..m) {
+        prev_beta = scalar_mul(&prev_beta, &beta);
+        betas.push_back(prev_beta);
     };
 
     // This will only fail when our logic above for generating the `\beta_i`'s is broken

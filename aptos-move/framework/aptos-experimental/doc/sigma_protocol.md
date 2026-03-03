@@ -73,7 +73,7 @@ returned as a <code>RepresentationVec</code>.
 Returns true if it succeeds and false otherwise.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="sigma_protocol.md#0x7_sigma_protocol_verify">verify</a>(dst: <a href="sigma_protocol_fiat_shamir.md#0x7_sigma_protocol_fiat_shamir_DomainSeparator">sigma_protocol_fiat_shamir::DomainSeparator</a>, psi: <a href="sigma_protocol_homomorphism.md#0x7_sigma_protocol_homomorphism_Homomorphism">sigma_protocol_homomorphism::Homomorphism</a>, f: <a href="sigma_protocol_homomorphism.md#0x7_sigma_protocol_homomorphism_TransformationFunction">sigma_protocol_homomorphism::TransformationFunction</a>, stmt: &<a href="sigma_protocol_statement.md#0x7_sigma_protocol_statement_Statement">sigma_protocol_statement::Statement</a>, proof: &<a href="sigma_protocol_proof.md#0x7_sigma_protocol_proof_Proof">sigma_protocol_proof::Proof</a>): bool
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="sigma_protocol.md#0x7_sigma_protocol_verify">verify</a>&lt;P&gt;(dst: <a href="sigma_protocol_fiat_shamir.md#0x7_sigma_protocol_fiat_shamir_DomainSeparator">sigma_protocol_fiat_shamir::DomainSeparator</a>, psi: <a href="sigma_protocol_homomorphism.md#0x7_sigma_protocol_homomorphism_Homomorphism">sigma_protocol_homomorphism::Homomorphism</a>&lt;P&gt;, f: <a href="sigma_protocol_homomorphism.md#0x7_sigma_protocol_homomorphism_TransformationFunction">sigma_protocol_homomorphism::TransformationFunction</a>&lt;P&gt;, stmt: &<a href="sigma_protocol_statement.md#0x7_sigma_protocol_statement_Statement">sigma_protocol_statement::Statement</a>&lt;P&gt;, proof: &<a href="sigma_protocol_proof.md#0x7_sigma_protocol_proof_Proof">sigma_protocol_proof::Proof</a>): bool
 </code></pre>
 
 
@@ -82,11 +82,11 @@ Returns true if it succeeds and false otherwise.
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> inline <b>fun</b> <a href="sigma_protocol.md#0x7_sigma_protocol_verify">verify</a>(
+<pre><code><b>public</b>(<b>friend</b>) inline <b>fun</b> <a href="sigma_protocol.md#0x7_sigma_protocol_verify">verify</a>&lt;P&gt;(
     dst: DomainSeparator,
-    psi: Homomorphism,
-    f: TransformationFunction,
-    stmt: &Statement,
+    psi: Homomorphism&lt;P&gt;,
+    f: TransformationFunction&lt;P&gt;,
+    stmt: &Statement&lt;P&gt;,
     proof: &Proof,
 ): bool {
     // Step 1: Fiat-Shamir transform on `(dst, (psi, f), stmt)` <b>to</b> derive the random challenge `e`

@@ -11,11 +11,7 @@ module aptos_experimental::sigma_protocol_witness {
     }
 
     /// Creates a new secret witness from a vector of scalars.
-    public fun new_secret_witness(w: vector<Scalar>): Witness {
-        Witness {
-            w
-        }
-    }
+    public fun new_secret_witness(w: vector<Scalar>): Witness { Witness { w } }
 
     /// Returns the length of the witness: i.e., the number of scalars in it.
     public fun length(self: &Witness): u64 {
@@ -24,7 +20,6 @@ module aptos_experimental::sigma_protocol_witness {
 
     /// Returns the `i`th scalar in the witness.
     public fun get(self: &Witness, i: u64): &Scalar {
-        // debug::print(&string_utils::format2(&b"len = {}, i = {}", self.length(), i));
         &self.w[i]
     }
 

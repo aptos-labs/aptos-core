@@ -1,3 +1,4 @@
+#[test_only]
 /// A ZKPoK of $v, r_1, r_2$ such that $C_1 = v G + r_1 H$ and $C_2 = v G + r_2 H$.
 ///
 /// The NP relation is:
@@ -31,13 +32,14 @@
 ///   ```
 module aptos_experimental::sigma_protocol_pedeq_example {
     use std::error;
-    use aptos_std::ristretto255::{RistrettoPoint, Scalar, CompressedRistretto};
+    use aptos_std::ristretto255::{Scalar, CompressedRistretto};
 
-    use aptos_std::ristretto255::scalar_one;
+    use aptos_framework::chain_id;
     use aptos_experimental::sigma_protocol_fiat_shamir::{DomainSeparator, new_domain_separator};
     use aptos_experimental::sigma_protocol_witness::{Witness, new_secret_witness};
-    use aptos_experimental::sigma_protocol_statement::{Statement, new_statement};
-    use aptos_experimental::sigma_protocol_representation::new_representation;
+    use aptos_experimental::sigma_protocol_statement::Statement;
+    use aptos_experimental::sigma_protocol_statement_builder::new_builder;
+    use aptos_experimental::sigma_protocol_representation::{repr_point, new_representation};
     use aptos_experimental::sigma_protocol_representation_vec::{RepresentationVec, new_representation_vec};
     #[test_only]
     use aptos_experimental::sigma_protocol_homomorphism::evaluate_psi;
@@ -45,6 +47,8 @@ module aptos_experimental::sigma_protocol_pedeq_example {
     use aptos_std::ristretto255::{random_point, random_scalar};
     #[test_only]
     use aptos_experimental::sigma_protocol;
+    #[test_only]
+    use aptos_framework::account;
     #[test_only]
     use aptos_experimental::sigma_protocol_utils::equal_vec_points;
 
@@ -80,6 +84,9 @@ module aptos_experimental::sigma_protocol_pedeq_example {
     /// WARNING: Crucial for security.
     const M: u64 = 2;
 
+    /// Phantom marker type for PedEq statements.
+    struct PedEq has drop {}
+
     /// The expected number of points $n_1$ in a PedEq statement is `N_1 = 4`.
     const E_WRONG_N_1: u64 = 1;
     /// The expected number of scalars $n_2$ in a PedEq statement is `N_2 = 0`.
@@ -90,21 +97,22 @@ module aptos_experimental::sigma_protocol_pedeq_example {
     const E_WRONG_M: u64 = 4;
 
     fun new_session(session_id: vector<u8>): DomainSeparator {
-        new_domain_separator(PROTOCOL_ID, session_id)
+        new_domain_separator(@aptos_experimental, chain_id::get(), PROTOCOL_ID, session_id)
     }
 
-    /// Creates a new PedEq statement.
+    /// Creates a new PedEq statement using the builder.
     fun new_pedeq_statement(
-        compressed_G: CompressedRistretto, _G: RistrettoPoint,
-        compressed_H: CompressedRistretto, _H: RistrettoPoint,
-        compressed_C_1: CompressedRistretto, _C_1: RistrettoPoint,
-        compressed_C_2: CompressedRistretto, _C_2: RistrettoPoint,
-    ): Statement {
-        new_statement(
-            vector[_G, _H, _C_1, _C_2],
-            vector[compressed_G, compressed_H, compressed_C_1, compressed_C_2],
-            vector[]
-        )
+        compressed_G: CompressedRistretto,
+        compressed_H: CompressedRistretto,
+        compressed_C_1: CompressedRistretto,
+        compressed_C_2: CompressedRistretto,
+    ): Statement<PedEq> {
+        let b = new_builder();
+        b.add_point(compressed_G);
+        b.add_point(compressed_H);
+        b.add_point(compressed_C_1);
+        b.add_point(compressed_C_2);
+        b.build()
     }
 
     /// Creates a new PedEq witness.
@@ -113,7 +121,7 @@ module aptos_experimental::sigma_protocol_pedeq_example {
     }
 
     /// WARNING: See README.md in the `sigma_protocols/` directory for principles on how to implement this correctly!
-    fun psi(stmt: &Statement, w: &Witness): RepresentationVec {
+    fun psi(stmt: &Statement<PedEq>, w: &Witness): RepresentationVec {
         // WARNING: Crucial for security
         assert!(stmt.get_points().length() == N_1, error::invalid_argument(E_WRONG_N_1));
         // WARNING: Crucial for security
@@ -137,7 +145,7 @@ module aptos_experimental::sigma_protocol_pedeq_example {
     }
 
     /// WARNING: See README.md in the `sigma_protocols/` directory for principles on how to implement this correctly!
-    fun f(stmt: &Statement): RepresentationVec {
+    fun f(stmt: &Statement<PedEq>): RepresentationVec {
         // WARNING: Crucial for security
         assert!(stmt.get_points().length() == N_1, error::invalid_argument(E_WRONG_N_1));
         // WARNING: Crucial for security
@@ -148,8 +156,8 @@ module aptos_experimental::sigma_protocol_pedeq_example {
         //   C_2
         // ]
         let repr_vec = new_representation_vec(vector[
-            new_representation(vector[IDX_C_1], vector[scalar_one()]),
-            new_representation(vector[IDX_C_2], vector[scalar_one()])
+            repr_point(IDX_C_1),
+            repr_point(IDX_C_2)
         ]);
 
         // WARNING: Crucial for security
@@ -159,7 +167,7 @@ module aptos_experimental::sigma_protocol_pedeq_example {
     }
 
     #[test_only]
-    fun random_statement_witness_pair(): (Statement, Witness) {
+    fun random_statement_witness_pair(): (Statement<PedEq>, Witness) {
         let v = random_scalar();
         let r_1 = random_scalar();
         let r_2 = random_scalar();
@@ -172,10 +180,10 @@ module aptos_experimental::sigma_protocol_pedeq_example {
         let _C_2 = v_G.point_add(&r_2_H);  // Move linter does not let us use C_2
 
         let stmt = new_pedeq_statement(
-            _G.point_compress(), _G,
-            _H.point_compress(), _H,
-            _C_1.point_compress(), _C_1,
-            _C_2.point_compress(), _C_2,
+            _G.point_compress(),
+            _H.point_compress(),
+            _C_1.point_compress(),
+            _C_2.point_compress(),
         );
         let witn = new_pedeq_witness(v, r_1, r_2);
 
@@ -204,7 +212,6 @@ module aptos_experimental::sigma_protocol_pedeq_example {
         ];
 
         // Actual evaluation, computed via our $\psi$ implementation
-        // TODO(Ugly): Change `|_X, w| psi(_X, w)` to `psi` when public structs ship and allow this.
         let actual_psi = evaluate_psi(|_X, w| psi(_X, w), &_X, &w);
 
         assert!(equal_vec_points(&actual_psi, &expected_psi), 1);
@@ -212,9 +219,9 @@ module aptos_experimental::sigma_protocol_pedeq_example {
 
     #[test]
     fun proof_correctness() {
+        chain_id::initialize_for_test(&account::create_signer_for_test(@aptos_framework), 4);
         let (stmt, witn) = random_statement_witness_pair();
 
-        // TODO(Ugly): Change `|_X, w| psi(_X, w)` to `psi` and `|_X| f(_X)` to `f` when public structs ship and allow this.
         sigma_protocol::assert_correctly_computed_proof_verifies(
             new_session(b"session: test pedeq proving correctness"),
             stmt,
@@ -227,21 +234,17 @@ module aptos_experimental::sigma_protocol_pedeq_example {
     #[test]
     #[expected_failure(abort_code=65537, location=aptos_experimental::sigma_protocol_fiat_shamir)]
     fun empty_proof_for_random_statement_test() {
-        let _G = random_point();
-        let _H = random_point();
-        let _C_1 = random_point();
-        let _C_2 = random_point();
-        // TODO(Ugly): Change `|_X, w| psi(_X, w)` to `psi` and `|_X| f(_X)` to `f` when public structs ship and allow this.
+        chain_id::initialize_for_test(&account::create_signer_for_test(@aptos_framework), 4);
         assert!(
             !sigma_protocol::empty_proof_verifies(
                 new_session(b"session: test empty pedeq proof for random statement does not verify"),
                 |_X, w| psi(_X, w),
                 |_X| f(_X),
                 new_pedeq_statement(
-                    _G.point_compress(), _G,
-                    _H.point_compress(), _H,
-                    _C_1.point_compress(), _C_1,
-                    _C_2.point_compress(), _C_2,
+                    random_point().point_compress(),
+                    random_point().point_compress(),
+                    random_point().point_compress(),
+                    random_point().point_compress(),
                 )
             ), 1);
     }
@@ -249,13 +252,15 @@ module aptos_experimental::sigma_protocol_pedeq_example {
     #[test]
     #[expected_failure(abort_code=65537, location=aptos_experimental::sigma_protocol_fiat_shamir)]
     fun empty_proof_for_empty_statement_test() {
-        // TODO(Ugly): Change `|_X, w| psi(_X, w)` to `psi` and `|_X| f(_X)` to `f` when public structs ship and allow this.
+        chain_id::initialize_for_test(&account::create_signer_for_test(@aptos_framework), 4);
+        let b = new_builder();
+        let stmt: Statement<PedEq> = b.build();
         assert!(
             !sigma_protocol::empty_proof_verifies(
                 new_session(b"session: test empty pedeq proof for empty statement does not verify"),
                 |_X, w| psi(_X, w),
                 |_X| f(_X),
-                new_statement(vector[], vector[], vector[])
+                stmt
             ), 1);
     }
 }

@@ -66,11 +66,7 @@ Used to represent the output of the transformation function $f$ and the homomorp
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="sigma_protocol_representation_vec.md#0x7_sigma_protocol_representation_vec_new_representation_vec">new_representation_vec</a>(v: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;Representation&gt;): <a href="sigma_protocol_representation_vec.md#0x7_sigma_protocol_representation_vec_RepresentationVec">RepresentationVec</a> {
-    <a href="sigma_protocol_representation_vec.md#0x7_sigma_protocol_representation_vec_RepresentationVec">RepresentationVec</a> {
-        v
-    }
-}
+<pre><code><b>public</b> <b>fun</b> <a href="sigma_protocol_representation_vec.md#0x7_sigma_protocol_representation_vec_new_representation_vec">new_representation_vec</a>(v: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;Representation&gt;): <a href="sigma_protocol_representation_vec.md#0x7_sigma_protocol_representation_vec_RepresentationVec">RepresentationVec</a> { <a href="sigma_protocol_representation_vec.md#0x7_sigma_protocol_representation_vec_RepresentationVec">RepresentationVec</a> { v } }
 </code></pre>
 
 
@@ -196,9 +192,7 @@ Multiply all representations by $e$ (i.e., multiply each <code>self.v[i].scalars
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="sigma_protocol_representation_vec.md#0x7_sigma_protocol_representation_vec_scale_all">scale_all</a>(self: &<b>mut</b> <a href="sigma_protocol_representation_vec.md#0x7_sigma_protocol_representation_vec_RepresentationVec">RepresentationVec</a>, e: &Scalar) {
-    self.v.for_each_mut(|repr| {
-        repr.scale(e)
-    });
+    self.v.for_each_mut(|repr| repr.scale(e));
 }
 </code></pre>
 

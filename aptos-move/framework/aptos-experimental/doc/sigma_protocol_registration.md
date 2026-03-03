@@ -26,19 +26,19 @@ This is a Schnorr-like proof framed as a homomorphism check:
 
 
 -  [The registration NP relation ($\mathcal{R}_\mathsf{dl}$)](#@The_registration_NP_relation_($\mathcal{R}_\mathsf{dl}$)_0)
+-  [Struct `Registration`](#0x7_sigma_protocol_registration_Registration)
 -  [Struct `RegistrationSession`](#0x7_sigma_protocol_registration_RegistrationSession)
 -  [Constants](#@Constants_1)
 -  [Function `assert_registration_statement_is_well_formed`](#0x7_sigma_protocol_registration_assert_registration_statement_is_well_formed)
 -  [Function `new_session`](#0x7_sigma_protocol_registration_new_session)
 -  [Function `new_registration_statement`](#0x7_sigma_protocol_registration_new_registration_statement)
--  [Function `new_registration_witness`](#0x7_sigma_protocol_registration_new_registration_witness)
 -  [Function `psi`](#0x7_sigma_protocol_registration_psi)
 -  [Function `f`](#0x7_sigma_protocol_registration_f)
 -  [Function `assert_verifies`](#0x7_sigma_protocol_registration_assert_verifies)
 
 
 <pre><code><b>use</b> <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/bcs.md#0x1_bcs">0x1::bcs</a>;
-<b>use</b> <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error">0x1::error</a>;
+<b>use</b> <a href="../../aptos-framework/doc/chain_id.md#0x1_chain_id">0x1::chain_id</a>;
 <b>use</b> <a href="../../aptos-framework/doc/fungible_asset.md#0x1_fungible_asset">0x1::fungible_asset</a>;
 <b>use</b> <a href="../../aptos-framework/doc/object.md#0x1_object">0x1::object</a>;
 <b>use</b> <a href="../../aptos-framework/../aptos-stdlib/doc/ristretto255.md#0x1_ristretto255">0x1::ristretto255</a>;
@@ -49,10 +49,39 @@ This is a Schnorr-like proof framed as a homomorphism check:
 <b>use</b> <a href="sigma_protocol_representation.md#0x7_sigma_protocol_representation">0x7::sigma_protocol_representation</a>;
 <b>use</b> <a href="sigma_protocol_representation_vec.md#0x7_sigma_protocol_representation_vec">0x7::sigma_protocol_representation_vec</a>;
 <b>use</b> <a href="sigma_protocol_statement.md#0x7_sigma_protocol_statement">0x7::sigma_protocol_statement</a>;
+<b>use</b> <a href="sigma_protocol_statement_builder.md#0x7_sigma_protocol_statement_builder">0x7::sigma_protocol_statement_builder</a>;
 <b>use</b> <a href="sigma_protocol_witness.md#0x7_sigma_protocol_witness">0x7::sigma_protocol_witness</a>;
 </code></pre>
 
 
+
+<a id="0x7_sigma_protocol_registration_Registration"></a>
+
+## Struct `Registration`
+
+Phantom marker type for registration statements.
+
+
+<pre><code><b>struct</b> <a href="sigma_protocol_registration.md#0x7_sigma_protocol_registration_Registration">Registration</a> <b>has</b> drop
+</code></pre>
+
+
+
+<details>
+<summary>Fields</summary>
+
+
+<dl>
+<dt>
+<code>dummy_field: bool</code>
+</dt>
+<dd>
+
+</dd>
+</dl>
+
+
+</details>
 
 <a id="0x7_sigma_protocol_registration_RegistrationSession"></a>
 
@@ -111,46 +140,6 @@ WARNING: Crucial for security.
 
 
 <pre><code><b>const</b> <a href="sigma_protocol_registration.md#0x7_sigma_protocol_registration_M">M</a>: u64 = 1;
-</code></pre>
-
-
-
-<a id="0x7_sigma_protocol_registration_E_WRONG_NUM_POINTS"></a>
-
-The expected number of points in a registration statement is <code><a href="sigma_protocol_registration.md#0x7_sigma_protocol_registration_N_1">N_1</a></code>.
-
-
-<pre><code><b>const</b> <a href="sigma_protocol_registration.md#0x7_sigma_protocol_registration_E_WRONG_NUM_POINTS">E_WRONG_NUM_POINTS</a>: u64 = 1;
-</code></pre>
-
-
-
-<a id="0x7_sigma_protocol_registration_E_WRONG_NUM_SCALARS"></a>
-
-The expected number of scalars in a registration statement is <code><a href="sigma_protocol_registration.md#0x7_sigma_protocol_registration_N_2">N_2</a></code>.
-
-
-<pre><code><b>const</b> <a href="sigma_protocol_registration.md#0x7_sigma_protocol_registration_E_WRONG_NUM_SCALARS">E_WRONG_NUM_SCALARS</a>: u64 = 2;
-</code></pre>
-
-
-
-<a id="0x7_sigma_protocol_registration_E_WRONG_OUTPUT_LEN"></a>
-
-The expected number of points in the homomorphism & transformation function output is <code><a href="sigma_protocol_registration.md#0x7_sigma_protocol_registration_M">M</a></code>.
-
-
-<pre><code><b>const</b> <a href="sigma_protocol_registration.md#0x7_sigma_protocol_registration_E_WRONG_OUTPUT_LEN">E_WRONG_OUTPUT_LEN</a>: u64 = 4;
-</code></pre>
-
-
-
-<a id="0x7_sigma_protocol_registration_E_WRONG_WITNESS_LEN"></a>
-
-The expected number of scalars in a registration witness is <code><a href="sigma_protocol_registration.md#0x7_sigma_protocol_registration_K">K</a></code>.
-
-
-<pre><code><b>const</b> <a href="sigma_protocol_registration.md#0x7_sigma_protocol_registration_E_WRONG_WITNESS_LEN">E_WRONG_WITNESS_LEN</a>: u64 = 3;
 </code></pre>
 
 
@@ -234,7 +223,7 @@ WARNING: Crucial for security.
 Ensures the statement has <code><a href="sigma_protocol_registration.md#0x7_sigma_protocol_registration_N_1">N_1</a></code> points and <code><a href="sigma_protocol_registration.md#0x7_sigma_protocol_registration_N_2">N_2</a></code> scalars.
 
 
-<pre><code><b>fun</b> <a href="sigma_protocol_registration.md#0x7_sigma_protocol_registration_assert_registration_statement_is_well_formed">assert_registration_statement_is_well_formed</a>(stmt: &<a href="sigma_protocol_statement.md#0x7_sigma_protocol_statement_Statement">sigma_protocol_statement::Statement</a>)
+<pre><code><b>fun</b> <a href="sigma_protocol_registration.md#0x7_sigma_protocol_registration_assert_registration_statement_is_well_formed">assert_registration_statement_is_well_formed</a>(stmt: &<a href="sigma_protocol_statement.md#0x7_sigma_protocol_statement_Statement">sigma_protocol_statement::Statement</a>&lt;<a href="sigma_protocol_registration.md#0x7_sigma_protocol_registration_Registration">sigma_protocol_registration::Registration</a>&gt;)
 </code></pre>
 
 
@@ -243,9 +232,9 @@ Ensures the statement has <code><a href="sigma_protocol_registration.md#0x7_sigm
 <summary>Implementation</summary>
 
 
-<pre><code><b>fun</b> <a href="sigma_protocol_registration.md#0x7_sigma_protocol_registration_assert_registration_statement_is_well_formed">assert_registration_statement_is_well_formed</a>(stmt: &Statement) {
-    <b>assert</b>!(stmt.get_points().length() == <a href="sigma_protocol_registration.md#0x7_sigma_protocol_registration_N_1">N_1</a>, <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="sigma_protocol_registration.md#0x7_sigma_protocol_registration_E_WRONG_NUM_POINTS">E_WRONG_NUM_POINTS</a>));
-    <b>assert</b>!(stmt.get_scalars().length() == <a href="sigma_protocol_registration.md#0x7_sigma_protocol_registration_N_2">N_2</a>, <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="sigma_protocol_registration.md#0x7_sigma_protocol_registration_E_WRONG_NUM_SCALARS">E_WRONG_NUM_SCALARS</a>));
+<pre><code><b>fun</b> <a href="sigma_protocol_registration.md#0x7_sigma_protocol_registration_assert_registration_statement_is_well_formed">assert_registration_statement_is_well_formed</a>(stmt: &Statement&lt;<a href="sigma_protocol_registration.md#0x7_sigma_protocol_registration_Registration">Registration</a>&gt;) {
+    <b>assert</b>!(stmt.get_points().length() == <a href="sigma_protocol_registration.md#0x7_sigma_protocol_registration_N_1">N_1</a>, e_wrong_num_points());
+    <b>assert</b>!(stmt.get_scalars().length() == <a href="sigma_protocol_registration.md#0x7_sigma_protocol_registration_N_2">N_2</a>, e_wrong_num_scalars());
 }
 </code></pre>
 
@@ -259,7 +248,7 @@ Ensures the statement has <code><a href="sigma_protocol_registration.md#0x7_sigm
 
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="sigma_protocol_registration.md#0x7_sigma_protocol_registration_new_session">new_session</a>(sender: &<a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, asset_type: <a href="../../aptos-framework/doc/object.md#0x1_object_Object">object::Object</a>&lt;<a href="../../aptos-framework/doc/fungible_asset.md#0x1_fungible_asset_Metadata">fungible_asset::Metadata</a>&gt;): <a href="sigma_protocol_registration.md#0x7_sigma_protocol_registration_RegistrationSession">sigma_protocol_registration::RegistrationSession</a>
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="sigma_protocol_registration.md#0x7_sigma_protocol_registration_new_session">new_session</a>(sender: &<a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, asset_type: <a href="../../aptos-framework/doc/object.md#0x1_object_Object">object::Object</a>&lt;<a href="../../aptos-framework/doc/fungible_asset.md#0x1_fungible_asset_Metadata">fungible_asset::Metadata</a>&gt;): <a href="sigma_protocol_registration.md#0x7_sigma_protocol_registration_RegistrationSession">sigma_protocol_registration::RegistrationSession</a>
 </code></pre>
 
 
@@ -268,7 +257,7 @@ Ensures the statement has <code><a href="sigma_protocol_registration.md#0x7_sigm
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="sigma_protocol_registration.md#0x7_sigma_protocol_registration_new_session">new_session</a>(sender: &<a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, asset_type: Object&lt;Metadata&gt;): <a href="sigma_protocol_registration.md#0x7_sigma_protocol_registration_RegistrationSession">RegistrationSession</a> {
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="sigma_protocol_registration.md#0x7_sigma_protocol_registration_new_session">new_session</a>(sender: &<a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, asset_type: Object&lt;Metadata&gt;): <a href="sigma_protocol_registration.md#0x7_sigma_protocol_registration_RegistrationSession">RegistrationSession</a> {
     <a href="sigma_protocol_registration.md#0x7_sigma_protocol_registration_RegistrationSession">RegistrationSession</a> {
         sender: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(sender),
         asset_type,
@@ -286,8 +275,11 @@ Ensures the statement has <code><a href="sigma_protocol_registration.md#0x7_sigm
 
 Creates a new registration statement: $(H, \mathsf{ek})$.
 
+H is computed internally via <code>get_encryption_key_basepoint_compressed()</code>.
+ek is decompressed internally from <code>compressed_ek</code>.
 
-<pre><code><b>public</b> <b>fun</b> <a href="sigma_protocol_registration.md#0x7_sigma_protocol_registration_new_registration_statement">new_registration_statement</a>(compressed_H: <a href="../../aptos-framework/../aptos-stdlib/doc/ristretto255.md#0x1_ristretto255_CompressedRistretto">ristretto255::CompressedRistretto</a>, _H: <a href="../../aptos-framework/../aptos-stdlib/doc/ristretto255.md#0x1_ristretto255_RistrettoPoint">ristretto255::RistrettoPoint</a>, compressed_ek: <a href="../../aptos-framework/../aptos-stdlib/doc/ristretto255.md#0x1_ristretto255_CompressedRistretto">ristretto255::CompressedRistretto</a>, ek: <a href="../../aptos-framework/../aptos-stdlib/doc/ristretto255.md#0x1_ristretto255_RistrettoPoint">ristretto255::RistrettoPoint</a>): <a href="sigma_protocol_statement.md#0x7_sigma_protocol_statement_Statement">sigma_protocol_statement::Statement</a>
+
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="sigma_protocol_registration.md#0x7_sigma_protocol_registration_new_registration_statement">new_registration_statement</a>(compressed_ek: <a href="../../aptos-framework/../aptos-stdlib/doc/ristretto255.md#0x1_ristretto255_CompressedRistretto">ristretto255::CompressedRistretto</a>): <a href="sigma_protocol_statement.md#0x7_sigma_protocol_statement_Statement">sigma_protocol_statement::Statement</a>&lt;<a href="sigma_protocol_registration.md#0x7_sigma_protocol_registration_Registration">sigma_protocol_registration::Registration</a>&gt;
 </code></pre>
 
 
@@ -296,42 +288,15 @@ Creates a new registration statement: $(H, \mathsf{ek})$.
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="sigma_protocol_registration.md#0x7_sigma_protocol_registration_new_registration_statement">new_registration_statement</a>(
-    compressed_H: CompressedRistretto, _H: RistrettoPoint,
-    compressed_ek: CompressedRistretto, ek: RistrettoPoint,
-): Statement {
-    <b>let</b> stmt = new_statement(
-        <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>[_H, ek],
-        <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>[compressed_H, compressed_ek],
-        <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>[]
-    );
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="sigma_protocol_registration.md#0x7_sigma_protocol_registration_new_registration_statement">new_registration_statement</a>(
+    compressed_ek: CompressedRistretto,
+): Statement&lt;<a href="sigma_protocol_registration.md#0x7_sigma_protocol_registration_Registration">Registration</a>&gt; {
+    <b>let</b> b = new_builder();
+    b.add_point(get_encryption_key_basepoint_compressed());  // H
+    b.add_point(compressed_ek);                               // ek
+    <b>let</b> stmt = b.build();
     <a href="sigma_protocol_registration.md#0x7_sigma_protocol_registration_assert_registration_statement_is_well_formed">assert_registration_statement_is_well_formed</a>(&stmt);
     stmt
-}
-</code></pre>
-
-
-
-</details>
-
-<a id="0x7_sigma_protocol_registration_new_registration_witness"></a>
-
-## Function `new_registration_witness`
-
-Creates a new registration witness: $(\mathsf{dk})$.
-
-
-<pre><code><b>public</b> <b>fun</b> <a href="sigma_protocol_registration.md#0x7_sigma_protocol_registration_new_registration_witness">new_registration_witness</a>(dk: <a href="../../aptos-framework/../aptos-stdlib/doc/ristretto255.md#0x1_ristretto255_Scalar">ristretto255::Scalar</a>): <a href="sigma_protocol_witness.md#0x7_sigma_protocol_witness_Witness">sigma_protocol_witness::Witness</a>
-</code></pre>
-
-
-
-<details>
-<summary>Implementation</summary>
-
-
-<pre><code><b>public</b> <b>fun</b> <a href="sigma_protocol_registration.md#0x7_sigma_protocol_registration_new_registration_witness">new_registration_witness</a>(dk: Scalar): Witness {
-    new_secret_witness(<a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>[dk])
 }
 </code></pre>
 
@@ -346,7 +311,7 @@ Creates a new registration witness: $(\mathsf{dk})$.
 The homomorphism $\psi_\mathsf{dl}(\mathsf{dk} \mid \mathsf{ek}) = \mathsf{dk} \cdot \mathsf{ek}$.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="sigma_protocol_registration.md#0x7_sigma_protocol_registration_psi">psi</a>(stmt: &<a href="sigma_protocol_statement.md#0x7_sigma_protocol_statement_Statement">sigma_protocol_statement::Statement</a>, w: &<a href="sigma_protocol_witness.md#0x7_sigma_protocol_witness_Witness">sigma_protocol_witness::Witness</a>): <a href="sigma_protocol_representation_vec.md#0x7_sigma_protocol_representation_vec_RepresentationVec">sigma_protocol_representation_vec::RepresentationVec</a>
+<pre><code><b>fun</b> <a href="sigma_protocol_registration.md#0x7_sigma_protocol_registration_psi">psi</a>(stmt: &<a href="sigma_protocol_statement.md#0x7_sigma_protocol_statement_Statement">sigma_protocol_statement::Statement</a>&lt;<a href="sigma_protocol_registration.md#0x7_sigma_protocol_registration_Registration">sigma_protocol_registration::Registration</a>&gt;, w: &<a href="sigma_protocol_witness.md#0x7_sigma_protocol_witness_Witness">sigma_protocol_witness::Witness</a>): <a href="sigma_protocol_representation_vec.md#0x7_sigma_protocol_representation_vec_RepresentationVec">sigma_protocol_representation_vec::RepresentationVec</a>
 </code></pre>
 
 
@@ -355,21 +320,21 @@ The homomorphism $\psi_\mathsf{dl}(\mathsf{dk} \mid \mathsf{ek}) = \mathsf{dk} \
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="sigma_protocol_registration.md#0x7_sigma_protocol_registration_psi">psi</a>(stmt: &Statement, w: &Witness): RepresentationVec {
+<pre><code><b>fun</b> <a href="sigma_protocol_registration.md#0x7_sigma_protocol_registration_psi">psi</a>(stmt: &Statement&lt;<a href="sigma_protocol_registration.md#0x7_sigma_protocol_registration_Registration">Registration</a>&gt;, w: &Witness): RepresentationVec {
     // WARNING: Crucial for security
     <a href="sigma_protocol_registration.md#0x7_sigma_protocol_registration_assert_registration_statement_is_well_formed">assert_registration_statement_is_well_formed</a>(stmt);
     // WARNING: Crucial for security
-    <b>assert</b>!(w.length() == <a href="sigma_protocol_registration.md#0x7_sigma_protocol_registration_K">K</a>, <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="sigma_protocol_registration.md#0x7_sigma_protocol_registration_E_WRONG_WITNESS_LEN">E_WRONG_WITNESS_LEN</a>));
+    <b>assert</b>!(w.length() == <a href="sigma_protocol_registration.md#0x7_sigma_protocol_registration_K">K</a>, e_wrong_witness_len());
 
     <b>let</b> dk = *w.get(<a href="sigma_protocol_registration.md#0x7_sigma_protocol_registration_IDX_DK">IDX_DK</a>);
 
     <b>let</b> output = new_representation_vec(<a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>[
         // dk * ek
-        new_representation(<a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>[<a href="sigma_protocol_registration.md#0x7_sigma_protocol_registration_IDX_EK">IDX_EK</a>], <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>[dk]),
+        repr_scaled(<a href="sigma_protocol_registration.md#0x7_sigma_protocol_registration_IDX_EK">IDX_EK</a>, dk),
     ]);
 
     // WARNING: Crucial for security
-    <b>assert</b>!(output.length() == <a href="sigma_protocol_registration.md#0x7_sigma_protocol_registration_M">M</a>, <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="sigma_protocol_registration.md#0x7_sigma_protocol_registration_E_WRONG_OUTPUT_LEN">E_WRONG_OUTPUT_LEN</a>));
+    <b>assert</b>!(output.length() == <a href="sigma_protocol_registration.md#0x7_sigma_protocol_registration_M">M</a>, e_wrong_output_len());
 
     output
 }
@@ -386,7 +351,7 @@ The homomorphism $\psi_\mathsf{dl}(\mathsf{dk} \mid \mathsf{ek}) = \mathsf{dk} \
 The transformation function $\mathsf{f}_\mathsf{dl}(\mathsf{ek}) = H$.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="sigma_protocol_registration.md#0x7_sigma_protocol_registration_f">f</a>(_stmt: &<a href="sigma_protocol_statement.md#0x7_sigma_protocol_statement_Statement">sigma_protocol_statement::Statement</a>): <a href="sigma_protocol_representation_vec.md#0x7_sigma_protocol_representation_vec_RepresentationVec">sigma_protocol_representation_vec::RepresentationVec</a>
+<pre><code><b>fun</b> <a href="sigma_protocol_registration.md#0x7_sigma_protocol_registration_f">f</a>(_stmt: &<a href="sigma_protocol_statement.md#0x7_sigma_protocol_statement_Statement">sigma_protocol_statement::Statement</a>&lt;<a href="sigma_protocol_registration.md#0x7_sigma_protocol_registration_Registration">sigma_protocol_registration::Registration</a>&gt;): <a href="sigma_protocol_representation_vec.md#0x7_sigma_protocol_representation_vec_RepresentationVec">sigma_protocol_representation_vec::RepresentationVec</a>
 </code></pre>
 
 
@@ -395,11 +360,11 @@ The transformation function $\mathsf{f}_\mathsf{dl}(\mathsf{ek}) = H$.
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="sigma_protocol_registration.md#0x7_sigma_protocol_registration_f">f</a>(_stmt: &Statement): RepresentationVec {
+<pre><code><b>fun</b> <a href="sigma_protocol_registration.md#0x7_sigma_protocol_registration_f">f</a>(_stmt: &Statement&lt;<a href="sigma_protocol_registration.md#0x7_sigma_protocol_registration_Registration">Registration</a>&gt;): RepresentationVec {
     // We do not re-<b>assert</b> well-formedness since wherever f is called, psi is also called.
     new_representation_vec(<a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>[
         // H
-        new_representation(<a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>[<a href="sigma_protocol_registration.md#0x7_sigma_protocol_registration_IDX_H">IDX_H</a>], <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>[<a href="../../aptos-framework/../aptos-stdlib/doc/ristretto255.md#0x1_ristretto255_scalar_one">ristretto255::scalar_one</a>()]),
+        repr_point(<a href="sigma_protocol_registration.md#0x7_sigma_protocol_registration_IDX_H">IDX_H</a>),
     ])
 }
 </code></pre>
@@ -415,7 +380,7 @@ The transformation function $\mathsf{f}_\mathsf{dl}(\mathsf{ek}) = H$.
 Asserts that a registration proof verifies.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="sigma_protocol_registration.md#0x7_sigma_protocol_registration_assert_verifies">assert_verifies</a>(session: &<a href="sigma_protocol_registration.md#0x7_sigma_protocol_registration_RegistrationSession">sigma_protocol_registration::RegistrationSession</a>, stmt: &<a href="sigma_protocol_statement.md#0x7_sigma_protocol_statement_Statement">sigma_protocol_statement::Statement</a>, proof: &<a href="sigma_protocol_proof.md#0x7_sigma_protocol_proof_Proof">sigma_protocol_proof::Proof</a>)
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="sigma_protocol_registration.md#0x7_sigma_protocol_registration_assert_verifies">assert_verifies</a>(self: &<a href="sigma_protocol_registration.md#0x7_sigma_protocol_registration_RegistrationSession">sigma_protocol_registration::RegistrationSession</a>, stmt: &<a href="sigma_protocol_statement.md#0x7_sigma_protocol_statement_Statement">sigma_protocol_statement::Statement</a>&lt;<a href="sigma_protocol_registration.md#0x7_sigma_protocol_registration_Registration">sigma_protocol_registration::Registration</a>&gt;, proof: &<a href="sigma_protocol_proof.md#0x7_sigma_protocol_proof_Proof">sigma_protocol_proof::Proof</a>)
 </code></pre>
 
 
@@ -424,9 +389,9 @@ Asserts that a registration proof verifies.
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="sigma_protocol_registration.md#0x7_sigma_protocol_registration_assert_verifies">assert_verifies</a>(session: &<a href="sigma_protocol_registration.md#0x7_sigma_protocol_registration_RegistrationSession">RegistrationSession</a>, stmt: &Statement, proof: &Proof) {
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="sigma_protocol_registration.md#0x7_sigma_protocol_registration_assert_verifies">assert_verifies</a>(self: &<a href="sigma_protocol_registration.md#0x7_sigma_protocol_registration_RegistrationSession">RegistrationSession</a>, stmt: &Statement&lt;<a href="sigma_protocol_registration.md#0x7_sigma_protocol_registration_Registration">Registration</a>&gt;, proof: &Proof) {
     <b>let</b> success = <a href="sigma_protocol.md#0x7_sigma_protocol_verify">sigma_protocol::verify</a>(
-        new_domain_separator(<a href="sigma_protocol_registration.md#0x7_sigma_protocol_registration_PROTOCOL_ID">PROTOCOL_ID</a>, <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/bcs.md#0x1_bcs_to_bytes">bcs::to_bytes</a>(session)),
+        new_domain_separator(@aptos_experimental, <a href="../../aptos-framework/doc/chain_id.md#0x1_chain_id_get">chain_id::get</a>(), <a href="sigma_protocol_registration.md#0x7_sigma_protocol_registration_PROTOCOL_ID">PROTOCOL_ID</a>, <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/bcs.md#0x1_bcs_to_bytes">bcs::to_bytes</a>(self)),
         |_X, w| <a href="sigma_protocol_registration.md#0x7_sigma_protocol_registration_psi">psi</a>(_X, w),
         |_X| <a href="sigma_protocol_registration.md#0x7_sigma_protocol_registration_f">f</a>(_X),
         stmt,

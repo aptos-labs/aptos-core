@@ -13,13 +13,11 @@
 -  [Function `get_commitment`](#0x7_sigma_protocol_proof_get_commitment)
 -  [Function `get_compressed_commitment`](#0x7_sigma_protocol_proof_get_compressed_commitment)
 -  [Function `get_response_length`](#0x7_sigma_protocol_proof_get_response_length)
--  [Function `get_response`](#0x7_sigma_protocol_proof_get_response)
 
 
 <pre><code><b>use</b> <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option">0x1::option</a>;
 <b>use</b> <a href="../../aptos-framework/../aptos-stdlib/doc/ristretto255.md#0x1_ristretto255">0x1::ristretto255</a>;
 <b>use</b> <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">0x1::vector</a>;
-<b>use</b> <a href="sigma_protocol_utils.md#0x7_sigma_protocol_utils">0x7::sigma_protocol_utils</a>;
 <b>use</b> <a href="sigma_protocol_witness.md#0x7_sigma_protocol_witness">0x7::sigma_protocol_witness</a>;
 </code></pre>
 
@@ -125,7 +123,7 @@ Creates a new proof consisting of the commitment $A \in \mathbb{G}^m$ and the sc
 Deserializes the elliptic curve points and scalars and then calls <code>new_proof</code>.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="sigma_protocol_proof.md#0x7_sigma_protocol_proof_new_proof_from_bytes">new_proof_from_bytes</a>(_A_bytes: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;&gt;, sigma_bytes: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;&gt;): <a href="sigma_protocol_proof.md#0x7_sigma_protocol_proof_Proof">sigma_protocol_proof::Proof</a>
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="sigma_protocol_proof.md#0x7_sigma_protocol_proof_new_proof_from_bytes">new_proof_from_bytes</a>(_A_bytes: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;&gt;, sigma_bytes: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;&gt;): <a href="sigma_protocol_proof.md#0x7_sigma_protocol_proof_Proof">sigma_protocol_proof::Proof</a>
 </code></pre>
 
 
@@ -134,7 +132,7 @@ Deserializes the elliptic curve points and scalars and then calls <code>new_proo
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="sigma_protocol_proof.md#0x7_sigma_protocol_proof_new_proof_from_bytes">new_proof_from_bytes</a>(
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="sigma_protocol_proof.md#0x7_sigma_protocol_proof_new_proof_from_bytes">new_proof_from_bytes</a>(
     _A_bytes: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;&gt;,
     sigma_bytes: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;&gt;
 ): <a href="sigma_protocol_proof.md#0x7_sigma_protocol_proof_Proof">Proof</a> {
@@ -240,30 +238,6 @@ This is needed during proof verification: when calling the homomorphism on the <
 
 <pre><code><b>public</b> <b>fun</b> <a href="sigma_protocol_proof.md#0x7_sigma_protocol_proof_get_response_length">get_response_length</a>(self: &<a href="sigma_protocol_proof.md#0x7_sigma_protocol_proof_Proof">Proof</a>): u64 {
     self.resp_sigma.length()
-}
-</code></pre>
-
-
-
-</details>
-
-<a id="0x7_sigma_protocol_proof_get_response"></a>
-
-## Function `get_response`
-
-
-
-<pre><code><b>public</b> <b>fun</b> <a href="sigma_protocol_proof.md#0x7_sigma_protocol_proof_get_response">get_response</a>(self: &<a href="sigma_protocol_proof.md#0x7_sigma_protocol_proof_Proof">sigma_protocol_proof::Proof</a>): &<a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="../../aptos-framework/../aptos-stdlib/doc/ristretto255.md#0x1_ristretto255_Scalar">ristretto255::Scalar</a>&gt;
-</code></pre>
-
-
-
-<details>
-<summary>Implementation</summary>
-
-
-<pre><code><b>public</b> <b>fun</b> <a href="sigma_protocol_proof.md#0x7_sigma_protocol_proof_get_response">get_response</a>(self: &<a href="sigma_protocol_proof.md#0x7_sigma_protocol_proof_Proof">Proof</a>): &<a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;Scalar&gt; {
-    &self.resp_sigma
 }
 </code></pre>
 

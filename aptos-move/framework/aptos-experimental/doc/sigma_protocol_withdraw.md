@@ -12,7 +12,7 @@
 $\def\old#1{{\color{red}{\dot{#1}}}}\def\new#1{{\color{teal}{\widetilde{#1}}}}\def\opt#1{{\color{orange}{\boldsymbol{[}}} #1 {\color{orange}{\boldsymbol{]}}}}$
 
 A ZKPoK of a correct balance update when publicly withdrawing amount $v$ from an old available balance.
-Also used for normalization (where $v = 0$) with a different protocol ID.
+Also used for normalization (where $v = 0$).
 
 
 <a id="@Notation_1"></a>
@@ -23,7 +23,7 @@ Also used for normalization (where $v = 0$) with a different protocol ID.
 - $\old{x}$ denotes a stale/old ciphertext component; $\new{x}$ denotes a fresh/new one.
 - $\opt{\cdot}$ denotes components present only when an auditor is set.
 Auditor components are placed at the **end** of the statement so that the common prefix is
-identical in both cases. psi/f detect auditor presence by checking the statement length.
+identical in both cases. psi/f receive auditor presence via an explicit <code>has_auditor</code> flag.
 - $\langle \mathbf{x}, \mathbf{y} \rangle = \sum_i x_i \cdot y_i$ denotes the inner product.
 - $\mathbf{B} = (B^0, B^1, \ldots)$ where $B = 2^{16}$ is the positional weight vector for chunk encoding.
 - $\ell$: number of available balance chunks.
@@ -38,7 +38,7 @@ $$
 \mathcal{R}^{-}_\mathsf{withdraw}\left(\begin{array}{l}
 G, H, \mathsf{ek},
 \old{\mathbf{P}}, \old{\mathbf{R}}, \new{\mathbf{P}}, \new{\mathbf{R}},
-\opt{\mathsf{ek}^\mathsf{aid}, \new{\mathbf{R}}^\mathsf{aid}}
+\opt{\mathsf{ek}^\mathsf{eff}, \new{\mathbf{R}}^\mathsf{eff}}
 \textbf{;}\\
 \mathsf{dk}, \new{\mathbf{a}}, \new{\mathbf{r}}
 \textbf{;}\; v
@@ -48,7 +48,7 @@ G, H, \mathsf{ek},
 H &= \mathsf{dk} \cdot \mathsf{ek}\\
 \new{P}_i &= \new{a}_i \cdot G + \new{r}_i \cdot H, &\forall i \in [\ell]\\
 \new{R}_i &= \new{r}_i \cdot \mathsf{ek}, &\forall i \in [\ell]\\
-\opt{\new{R}^\mathsf{aid}_i} &\opt{= \new{r}_i \cdot \mathsf{ek}^\mathsf{aid},}
+\opt{\new{R}^\mathsf{eff}_i} &\opt{= \new{r}_i \cdot \mathsf{ek}^\mathsf{eff},}
 &\opt{\forall i \in [\ell]}\\
 \langle \mathbf{B}, \old{\mathbf{P}} \rangle - v \cdot G
 &= \mathsf{dk} \cdot \langle \mathbf{B}, \old{\mathbf{R}} \rangle
@@ -75,7 +75,7 @@ $$
 \mathsf{dk} \cdot \mathsf{ek}\\
 \new{a}_i \cdot G + \new{r}_i \cdot H, &\forall i \in [\ell]\\
 \new{r}_i \cdot \mathsf{ek}, &\forall i \in [\ell]\\
-\opt{\new{r}_i \cdot \mathsf{ek}^\mathsf{aid}, \;\forall i \in [\ell]}\\
+\opt{\new{r}_i \cdot \mathsf{ek}^\mathsf{eff}, \;\forall i \in [\ell]}\\
 \mathsf{dk} \cdot \langle \mathbf{B}, \old{\mathbf{R}} \rangle
 + \langle \mathbf{B}, \new{\mathbf{a}} \rangle \cdot G\\
 \end{pmatrix}
@@ -88,7 +88,7 @@ f(\mathbf{X}) = \begin{pmatrix}
 H\\
 \new{P}_i, &\forall i \in [\ell]\\
 \new{R}_i, &\forall i \in [\ell]\\
-\opt{\new{R}^\mathsf{aid}_i, \;\forall i \in [\ell]}\\
+\opt{\new{R}^\mathsf{eff}_i, \;\forall i \in [\ell]}\\
 \langle \mathbf{B}, \old{\mathbf{P}} \rangle - v \cdot G\\
 \end{pmatrix}
 $$
@@ -98,22 +98,20 @@ $$
     -  [Notation](#@Notation_1)
     -  [The relation](#@The_relation_2)
     -  [Homomorphism](#@Homomorphism_3)
+-  [Struct `Withdrawal`](#0x7_sigma_protocol_withdraw_Withdrawal)
 -  [Struct `WithdrawSession`](#0x7_sigma_protocol_withdraw_WithdrawSession)
 -  [Constants](#@Constants_4)
 -  [Function `get_num_chunks`](#0x7_sigma_protocol_withdraw_get_num_chunks)
--  [Function `has_auditor`](#0x7_sigma_protocol_withdraw_has_auditor)
--  [Function `get_b_powers`](#0x7_sigma_protocol_withdraw_get_b_powers)
 -  [Function `assert_withdraw_statement_is_well_formed`](#0x7_sigma_protocol_withdraw_assert_withdraw_statement_is_well_formed)
 -  [Function `new_session`](#0x7_sigma_protocol_withdraw_new_session)
 -  [Function `new_withdrawal_statement`](#0x7_sigma_protocol_withdraw_new_withdrawal_statement)
--  [Function `new_withdrawal_witness`](#0x7_sigma_protocol_withdraw_new_withdrawal_witness)
 -  [Function `psi`](#0x7_sigma_protocol_withdraw_psi)
 -  [Function `f`](#0x7_sigma_protocol_withdraw_f)
--  [Function `assert_verifies_withdrawal`](#0x7_sigma_protocol_withdraw_assert_verifies_withdrawal)
--  [Function `assert_verifies_normalization`](#0x7_sigma_protocol_withdraw_assert_verifies_normalization)
+-  [Function `assert_verifies`](#0x7_sigma_protocol_withdraw_assert_verifies)
 
 
 <pre><code><b>use</b> <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/bcs.md#0x1_bcs">0x1::bcs</a>;
+<b>use</b> <a href="../../aptos-framework/doc/chain_id.md#0x1_chain_id">0x1::chain_id</a>;
 <b>use</b> <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error">0x1::error</a>;
 <b>use</b> <a href="../../aptos-framework/doc/fungible_asset.md#0x1_fungible_asset">0x1::fungible_asset</a>;
 <b>use</b> <a href="../../aptos-framework/doc/object.md#0x1_object">0x1::object</a>;
@@ -121,15 +119,46 @@ $$
 <b>use</b> <a href="../../aptos-framework/../aptos-stdlib/doc/ristretto255.md#0x1_ristretto255">0x1::ristretto255</a>;
 <b>use</b> <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">0x1::signer</a>;
 <b>use</b> <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">0x1::vector</a>;
+<b>use</b> <a href="confidential_balance.md#0x7_confidential_balance">0x7::confidential_balance</a>;
 <b>use</b> <a href="sigma_protocol_fiat_shamir.md#0x7_sigma_protocol_fiat_shamir">0x7::sigma_protocol_fiat_shamir</a>;
 <b>use</b> <a href="sigma_protocol_proof.md#0x7_sigma_protocol_proof">0x7::sigma_protocol_proof</a>;
 <b>use</b> <a href="sigma_protocol_representation.md#0x7_sigma_protocol_representation">0x7::sigma_protocol_representation</a>;
 <b>use</b> <a href="sigma_protocol_representation_vec.md#0x7_sigma_protocol_representation_vec">0x7::sigma_protocol_representation_vec</a>;
 <b>use</b> <a href="sigma_protocol_statement.md#0x7_sigma_protocol_statement">0x7::sigma_protocol_statement</a>;
+<b>use</b> <a href="sigma_protocol_statement_builder.md#0x7_sigma_protocol_statement_builder">0x7::sigma_protocol_statement_builder</a>;
+<b>use</b> <a href="sigma_protocol_utils.md#0x7_sigma_protocol_utils">0x7::sigma_protocol_utils</a>;
 <b>use</b> <a href="sigma_protocol_witness.md#0x7_sigma_protocol_witness">0x7::sigma_protocol_witness</a>;
 </code></pre>
 
 
+
+<a id="0x7_sigma_protocol_withdraw_Withdrawal"></a>
+
+## Struct `Withdrawal`
+
+Phantom marker type for withdrawal statements.
+
+
+<pre><code><b>struct</b> <a href="sigma_protocol_withdraw.md#0x7_sigma_protocol_withdraw_Withdrawal">Withdrawal</a> <b>has</b> drop
+</code></pre>
+
+
+
+<details>
+<summary>Fields</summary>
+
+
+<dl>
+<dt>
+<code>dummy_field: bool</code>
+</dt>
+<dd>
+
+</dd>
+</dl>
+
+
+</details>
 
 <a id="0x7_sigma_protocol_withdraw_WithdrawSession"></a>
 
@@ -166,6 +195,12 @@ Used for domain separation in the Fiat-Shamir transform.
 <dd>
 
 </dd>
+<dt>
+<code>has_auditor: bool</code>
+</dt>
+<dd>
+
+</dd>
 </dl>
 
 
@@ -176,9 +211,20 @@ Used for domain separation in the Fiat-Shamir transform.
 ## Constants
 
 
+<a id="0x7_sigma_protocol_withdraw_E_AUDITOR_COUNT_MISMATCH"></a>
+
+The number of auditor R components does not match the expected auditor count.
+
+
+<pre><code><b>const</b> <a href="sigma_protocol_withdraw.md#0x7_sigma_protocol_withdraw_E_AUDITOR_COUNT_MISMATCH">E_AUDITOR_COUNT_MISMATCH</a>: u64 = 6;
+</code></pre>
+
+
+
 <a id="0x7_sigma_protocol_withdraw_E_INVALID_PROOF"></a>
 
-The withdrawal/normalization proof was invalid.
+new_a[0..ℓ-1] starts at index 1. new_r[0..ℓ-1] starts at 1 + ℓ.
+The withdrawal proof was invalid.
 
 
 <pre><code><b>const</b> <a href="sigma_protocol_withdraw.md#0x7_sigma_protocol_withdraw_E_INVALID_PROOF">E_INVALID_PROOF</a>: u64 = 5;
@@ -192,47 +238,6 @@ An error occurred in one of our tests.
 
 
 <pre><code><b>const</b> <a href="sigma_protocol_withdraw.md#0x7_sigma_protocol_withdraw_E_TEST_INTERNAL">E_TEST_INTERNAL</a>: u64 = 1000;
-</code></pre>
-
-
-
-<a id="0x7_sigma_protocol_withdraw_E_WRONG_NUM_POINTS"></a>
-
-new_a[0..ℓ-1] starts at index 1. new_r[0..ℓ-1] starts at 1 + ℓ.
-Statement has wrong number of points.
-
-
-<pre><code><b>const</b> <a href="sigma_protocol_withdraw.md#0x7_sigma_protocol_withdraw_E_WRONG_NUM_POINTS">E_WRONG_NUM_POINTS</a>: u64 = 1;
-</code></pre>
-
-
-
-<a id="0x7_sigma_protocol_withdraw_E_WRONG_NUM_SCALARS"></a>
-
-Statement scalars vector must have exactly 1 element (the withdrawal amount v).
-
-
-<pre><code><b>const</b> <a href="sigma_protocol_withdraw.md#0x7_sigma_protocol_withdraw_E_WRONG_NUM_SCALARS">E_WRONG_NUM_SCALARS</a>: u64 = 2;
-</code></pre>
-
-
-
-<a id="0x7_sigma_protocol_withdraw_E_WRONG_OUTPUT_LEN"></a>
-
-Homomorphism output has wrong length.
-
-
-<pre><code><b>const</b> <a href="sigma_protocol_withdraw.md#0x7_sigma_protocol_withdraw_E_WRONG_OUTPUT_LEN">E_WRONG_OUTPUT_LEN</a>: u64 = 4;
-</code></pre>
-
-
-
-<a id="0x7_sigma_protocol_withdraw_E_WRONG_WITNESS_LEN"></a>
-
-Witness has wrong length.
-
-
-<pre><code><b>const</b> <a href="sigma_protocol_withdraw.md#0x7_sigma_protocol_withdraw_E_WRONG_WITNESS_LEN">E_WRONG_WITNESS_LEN</a>: u64 = 3;
 </code></pre>
 
 
@@ -277,16 +282,6 @@ Index of $H$ (the encryption key basepoint) in the statement.
 
 
 
-<a id="0x7_sigma_protocol_withdraw_NORMALIZATION_PROTOCOL_ID"></a>
-
-Protocol ID for normalization proofs (same psi/f, but distinct domain separation)
-
-
-<pre><code><b>const</b> <a href="sigma_protocol_withdraw.md#0x7_sigma_protocol_withdraw_NORMALIZATION_PROTOCOL_ID">NORMALIZATION_PROTOCOL_ID</a>: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt; = [65, 112, 116, 111, 115, 67, 111, 110, 102, 105, 100, 101, 110, 116, 105, 97, 108, 65, 115, 115, 101, 116, 47, 78, 111, 114, 109, 97, 108, 105, 122, 97, 116, 105, 111, 110, 86, 49];
-</code></pre>
-
-
-
 <a id="0x7_sigma_protocol_withdraw_START_IDX_OLD_P"></a>
 
 old_P values start at index 3. old_R starts at 3 + ℓ. new_P at 3 + 2ℓ. new_R at 3 + 3ℓ.
@@ -300,7 +295,7 @@ If auditor present: ek_aud at 3 + 4ℓ, then new_R_aud at 3 + 4ℓ + 1.
 
 <a id="0x7_sigma_protocol_withdraw_WITHDRAWAL_PROTOCOL_ID"></a>
 
-Protocol ID for withdrawal proofs
+Protocol ID for withdrawal proofs (also used for normalization, which is withdrawal with v = 0)
 
 
 <pre><code><b>const</b> <a href="sigma_protocol_withdraw.md#0x7_sigma_protocol_withdraw_WITHDRAWAL_PROTOCOL_ID">WITHDRAWAL_PROTOCOL_ID</a>: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt; = [65, 112, 116, 111, 115, 67, 111, 110, 102, 105, 100, 101, 110, 116, 105, 97, 108, 65, 115, 115, 101, 116, 47, 87, 105, 116, 104, 100, 114, 97, 119, 97, 108, 86, 49];
@@ -325,69 +320,7 @@ Returns the fixed number of balance chunks ℓ (= AVAILABLE_BALANCE_CHUNKS).
 
 
 <pre><code>inline <b>fun</b> <a href="sigma_protocol_withdraw.md#0x7_sigma_protocol_withdraw_get_num_chunks">get_num_chunks</a>(): u64 {
-    <a href="confidential_available_balance.md#0x7_confidential_available_balance_get_num_chunks">confidential_available_balance::get_num_chunks</a>()
-}
-</code></pre>
-
-
-
-</details>
-
-<a id="0x7_sigma_protocol_withdraw_has_auditor"></a>
-
-## Function `has_auditor`
-
-Determines whether the statement includes auditor components based on point count.
-Auditorless: 3 + 4ℓ points
-With auditor: 4 + 5ℓ points
-
-
-<pre><code><b>fun</b> <a href="sigma_protocol_withdraw.md#0x7_sigma_protocol_withdraw_has_auditor">has_auditor</a>(stmt: &<a href="sigma_protocol_statement.md#0x7_sigma_protocol_statement_Statement">sigma_protocol_statement::Statement</a>): bool
-</code></pre>
-
-
-
-<details>
-<summary>Implementation</summary>
-
-
-<pre><code>inline <b>fun</b> <a href="sigma_protocol_withdraw.md#0x7_sigma_protocol_withdraw_has_auditor">has_auditor</a>(stmt: &Statement): bool {
-    <b>let</b> ell = <a href="sigma_protocol_withdraw.md#0x7_sigma_protocol_withdraw_get_num_chunks">get_num_chunks</a>();
-    stmt.get_points().length() &gt; 3 + 4 * ell
-}
-</code></pre>
-
-
-
-</details>
-
-<a id="0x7_sigma_protocol_withdraw_get_b_powers"></a>
-
-## Function `get_b_powers`
-
-Returns the B^i powers for the chunk weighted-sum: B = 2^16.
-
-
-<pre><code><b>fun</b> <a href="sigma_protocol_withdraw.md#0x7_sigma_protocol_withdraw_get_b_powers">get_b_powers</a>(ell: u64): <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="../../aptos-framework/../aptos-stdlib/doc/ristretto255.md#0x1_ristretto255_Scalar">ristretto255::Scalar</a>&gt;
-</code></pre>
-
-
-
-<details>
-<summary>Implementation</summary>
-
-
-<pre><code><b>fun</b> <a href="sigma_protocol_withdraw.md#0x7_sigma_protocol_withdraw_get_b_powers">get_b_powers</a>(ell: u64): <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;Scalar&gt; {
-    <b>let</b> b = <a href="../../aptos-framework/../aptos-stdlib/doc/ristretto255.md#0x1_ristretto255_new_scalar_from_u128">ristretto255::new_scalar_from_u128</a>(65536u128); // 2^16
-    <b>let</b> powers = <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>[<a href="../../aptos-framework/../aptos-stdlib/doc/ristretto255.md#0x1_ristretto255_scalar_one">ristretto255::scalar_one</a>()]; // B^0 = 1
-    <b>let</b> prev = <a href="../../aptos-framework/../aptos-stdlib/doc/ristretto255.md#0x1_ristretto255_scalar_one">ristretto255::scalar_one</a>();
-    <b>let</b> i = 1;
-    <b>while</b> (i &lt; ell) {
-        prev = prev.scalar_mul(&b);
-        powers.push_back(prev);
-        i = i + 1;
-    };
-    powers
+    get_num_available_chunks()
 }
 </code></pre>
 
@@ -399,10 +332,10 @@ Returns the B^i powers for the chunk weighted-sum: B = 2^16.
 
 ## Function `assert_withdraw_statement_is_well_formed`
 
-Validates that the statement has the correct structure.
+Validates that the statement has the correct structure for the given auditor flag.
 
 
-<pre><code><b>fun</b> <a href="sigma_protocol_withdraw.md#0x7_sigma_protocol_withdraw_assert_withdraw_statement_is_well_formed">assert_withdraw_statement_is_well_formed</a>(stmt: &<a href="sigma_protocol_statement.md#0x7_sigma_protocol_statement_Statement">sigma_protocol_statement::Statement</a>)
+<pre><code><b>fun</b> <a href="sigma_protocol_withdraw.md#0x7_sigma_protocol_withdraw_assert_withdraw_statement_is_well_formed">assert_withdraw_statement_is_well_formed</a>(stmt: &<a href="sigma_protocol_statement.md#0x7_sigma_protocol_statement_Statement">sigma_protocol_statement::Statement</a>&lt;<a href="sigma_protocol_withdraw.md#0x7_sigma_protocol_withdraw_Withdrawal">sigma_protocol_withdraw::Withdrawal</a>&gt;, has_auditor: bool)
 </code></pre>
 
 
@@ -411,19 +344,12 @@ Validates that the statement has the correct structure.
 <summary>Implementation</summary>
 
 
-<pre><code><b>fun</b> <a href="sigma_protocol_withdraw.md#0x7_sigma_protocol_withdraw_assert_withdraw_statement_is_well_formed">assert_withdraw_statement_is_well_formed</a>(stmt: &Statement) {
-    <b>let</b> num_points = stmt.get_points().length();
+<pre><code><b>fun</b> <a href="sigma_protocol_withdraw.md#0x7_sigma_protocol_withdraw_assert_withdraw_statement_is_well_formed">assert_withdraw_statement_is_well_formed</a>(stmt: &Statement&lt;<a href="sigma_protocol_withdraw.md#0x7_sigma_protocol_withdraw_Withdrawal">Withdrawal</a>&gt;, has_auditor: bool) {
     <b>let</b> ell = <a href="sigma_protocol_withdraw.md#0x7_sigma_protocol_withdraw_get_num_chunks">get_num_chunks</a>();
-
-    <b>let</b> expected_num_points_no_aud = 3 + 4 * ell; // i.e., G, H, ek, <b>old</b> balance (2\ell), new balance (2\ell)
-    <b>let</b> expected_num_points_with_aud = expected_num_points_no_aud + 1 + ell; // + auditor's EK and R-component
-    <b>assert</b>!(
-        num_points == expected_num_points_no_aud || num_points == expected_num_points_with_aud,
-        <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="sigma_protocol_withdraw.md#0x7_sigma_protocol_withdraw_E_WRONG_NUM_POINTS">E_WRONG_NUM_POINTS</a>)
-    );
-
+    <b>let</b> expected = 3 + 4 * ell + <b>if</b> (has_auditor) { 1 + ell } <b>else</b> { 0 };
+    <b>assert</b>!(stmt.get_points().length() == expected,e_wrong_num_points());
     // i.e., the transferred amount v
-    <b>assert</b>!(stmt.get_scalars().length() == 1, <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="sigma_protocol_withdraw.md#0x7_sigma_protocol_withdraw_E_WRONG_NUM_SCALARS">E_WRONG_NUM_SCALARS</a>));
+    <b>assert</b>!(stmt.get_scalars().length() == 1, e_wrong_num_scalars());
 }
 </code></pre>
 
@@ -437,7 +363,7 @@ Validates that the statement has the correct structure.
 
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="sigma_protocol_withdraw.md#0x7_sigma_protocol_withdraw_new_session">new_session</a>(sender: &<a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, asset_type: <a href="../../aptos-framework/doc/object.md#0x1_object_Object">object::Object</a>&lt;<a href="../../aptos-framework/doc/fungible_asset.md#0x1_fungible_asset_Metadata">fungible_asset::Metadata</a>&gt;): <a href="sigma_protocol_withdraw.md#0x7_sigma_protocol_withdraw_WithdrawSession">sigma_protocol_withdraw::WithdrawSession</a>
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="sigma_protocol_withdraw.md#0x7_sigma_protocol_withdraw_new_session">new_session</a>(sender: &<a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, asset_type: <a href="../../aptos-framework/doc/object.md#0x1_object_Object">object::Object</a>&lt;<a href="../../aptos-framework/doc/fungible_asset.md#0x1_fungible_asset_Metadata">fungible_asset::Metadata</a>&gt;, has_auditor: bool): <a href="sigma_protocol_withdraw.md#0x7_sigma_protocol_withdraw_WithdrawSession">sigma_protocol_withdraw::WithdrawSession</a>
 </code></pre>
 
 
@@ -446,11 +372,12 @@ Validates that the statement has the correct structure.
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="sigma_protocol_withdraw.md#0x7_sigma_protocol_withdraw_new_session">new_session</a>(sender: &<a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, asset_type: Object&lt;Metadata&gt;): <a href="sigma_protocol_withdraw.md#0x7_sigma_protocol_withdraw_WithdrawSession">WithdrawSession</a> {
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="sigma_protocol_withdraw.md#0x7_sigma_protocol_withdraw_new_session">new_session</a>(sender: &<a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, asset_type: Object&lt;Metadata&gt;, has_auditor: bool): <a href="sigma_protocol_withdraw.md#0x7_sigma_protocol_withdraw_WithdrawSession">WithdrawSession</a> {
     <a href="sigma_protocol_withdraw.md#0x7_sigma_protocol_withdraw_WithdrawSession">WithdrawSession</a> {
         sender: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(sender),
         asset_type,
         num_chunks: <a href="sigma_protocol_withdraw.md#0x7_sigma_protocol_withdraw_get_num_chunks">get_num_chunks</a>(),
+        has_auditor,
     }
 }
 </code></pre>
@@ -469,11 +396,11 @@ Points (auditorless): [ G, H, ek, old_P[0..ℓ-1], old_R[0..ℓ-1], new_P[0..ℓ
 Points (w/ auditor):  [ ---------------------------- as above ------------------------------, ek_aud, new_R_aud]
 Scalars:              [ v ]
 
-For the auditorless case, pass <code><a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_none">option::none</a>()</code> for <code>compressed_ek_aud</code> and <code>ek_aud</code>,
-and empty vectors for <code>compressed_new_R_aud</code> and <code>new_R_aud</code>.
+For the auditorless case, pass <code><a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_none">option::none</a>()</code> for <code>compressed_ek_aud</code>
+and ensure <code>new_balance</code> / <code>compressed_new_balance</code> have empty R_aud.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="sigma_protocol_withdraw.md#0x7_sigma_protocol_withdraw_new_withdrawal_statement">new_withdrawal_statement</a>(compressed_G: <a href="../../aptos-framework/../aptos-stdlib/doc/ristretto255.md#0x1_ristretto255_CompressedRistretto">ristretto255::CompressedRistretto</a>, _G: <a href="../../aptos-framework/../aptos-stdlib/doc/ristretto255.md#0x1_ristretto255_RistrettoPoint">ristretto255::RistrettoPoint</a>, compressed_H: <a href="../../aptos-framework/../aptos-stdlib/doc/ristretto255.md#0x1_ristretto255_CompressedRistretto">ristretto255::CompressedRistretto</a>, _H: <a href="../../aptos-framework/../aptos-stdlib/doc/ristretto255.md#0x1_ristretto255_RistrettoPoint">ristretto255::RistrettoPoint</a>, compressed_ek: <a href="../../aptos-framework/../aptos-stdlib/doc/ristretto255.md#0x1_ristretto255_CompressedRistretto">ristretto255::CompressedRistretto</a>, ek: <a href="../../aptos-framework/../aptos-stdlib/doc/ristretto255.md#0x1_ristretto255_RistrettoPoint">ristretto255::RistrettoPoint</a>, compressed_old_P: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="../../aptos-framework/../aptos-stdlib/doc/ristretto255.md#0x1_ristretto255_CompressedRistretto">ristretto255::CompressedRistretto</a>&gt;, old_P: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="../../aptos-framework/../aptos-stdlib/doc/ristretto255.md#0x1_ristretto255_RistrettoPoint">ristretto255::RistrettoPoint</a>&gt;, compressed_old_R: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="../../aptos-framework/../aptos-stdlib/doc/ristretto255.md#0x1_ristretto255_CompressedRistretto">ristretto255::CompressedRistretto</a>&gt;, old_R: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="../../aptos-framework/../aptos-stdlib/doc/ristretto255.md#0x1_ristretto255_RistrettoPoint">ristretto255::RistrettoPoint</a>&gt;, compressed_new_P: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="../../aptos-framework/../aptos-stdlib/doc/ristretto255.md#0x1_ristretto255_CompressedRistretto">ristretto255::CompressedRistretto</a>&gt;, new_P: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="../../aptos-framework/../aptos-stdlib/doc/ristretto255.md#0x1_ristretto255_RistrettoPoint">ristretto255::RistrettoPoint</a>&gt;, compressed_new_R: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="../../aptos-framework/../aptos-stdlib/doc/ristretto255.md#0x1_ristretto255_CompressedRistretto">ristretto255::CompressedRistretto</a>&gt;, new_R: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="../../aptos-framework/../aptos-stdlib/doc/ristretto255.md#0x1_ristretto255_RistrettoPoint">ristretto255::RistrettoPoint</a>&gt;, compressed_ek_aud: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;<a href="../../aptos-framework/../aptos-stdlib/doc/ristretto255.md#0x1_ristretto255_CompressedRistretto">ristretto255::CompressedRistretto</a>&gt;, ek_aud: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;<a href="../../aptos-framework/../aptos-stdlib/doc/ristretto255.md#0x1_ristretto255_RistrettoPoint">ristretto255::RistrettoPoint</a>&gt;, compressed_new_R_aud: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="../../aptos-framework/../aptos-stdlib/doc/ristretto255.md#0x1_ristretto255_CompressedRistretto">ristretto255::CompressedRistretto</a>&gt;, new_R_aud: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="../../aptos-framework/../aptos-stdlib/doc/ristretto255.md#0x1_ristretto255_RistrettoPoint">ristretto255::RistrettoPoint</a>&gt;, v: <a href="../../aptos-framework/../aptos-stdlib/doc/ristretto255.md#0x1_ristretto255_Scalar">ristretto255::Scalar</a>): <a href="sigma_protocol_statement.md#0x7_sigma_protocol_statement_Statement">sigma_protocol_statement::Statement</a>
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="sigma_protocol_withdraw.md#0x7_sigma_protocol_withdraw_new_withdrawal_statement">new_withdrawal_statement</a>(compressed_ek: <a href="../../aptos-framework/../aptos-stdlib/doc/ristretto255.md#0x1_ristretto255_CompressedRistretto">ristretto255::CompressedRistretto</a>, compressed_old_balance: &<a href="confidential_balance.md#0x7_confidential_balance_CompressedBalance">confidential_balance::CompressedBalance</a>&lt;<a href="confidential_balance.md#0x7_confidential_balance_Available">confidential_balance::Available</a>&gt;, compressed_new_balance: &<a href="confidential_balance.md#0x7_confidential_balance_CompressedBalance">confidential_balance::CompressedBalance</a>&lt;<a href="confidential_balance.md#0x7_confidential_balance_Available">confidential_balance::Available</a>&gt;, compressed_ek_aud: &<a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;<a href="../../aptos-framework/../aptos-stdlib/doc/ristretto255.md#0x1_ristretto255_CompressedRistretto">ristretto255::CompressedRistretto</a>&gt;, v: <a href="../../aptos-framework/../aptos-stdlib/doc/ristretto255.md#0x1_ristretto255_Scalar">ristretto255::Scalar</a>): (<a href="sigma_protocol_statement.md#0x7_sigma_protocol_statement_Statement">sigma_protocol_statement::Statement</a>&lt;<a href="sigma_protocol_withdraw.md#0x7_sigma_protocol_withdraw_Withdrawal">sigma_protocol_withdraw::Withdrawal</a>&gt;, <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="../../aptos-framework/../aptos-stdlib/doc/ristretto255.md#0x1_ristretto255_RistrettoPoint">ristretto255::RistrettoPoint</a>&gt;)
 </code></pre>
 
 
@@ -482,70 +409,36 @@ and empty vectors for <code>compressed_new_R_aud</code> and <code>new_R_aud</cod
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="sigma_protocol_withdraw.md#0x7_sigma_protocol_withdraw_new_withdrawal_statement">new_withdrawal_statement</a>(
-    compressed_G: CompressedRistretto, _G: RistrettoPoint,
-    compressed_H: CompressedRistretto, _H: RistrettoPoint,
-    compressed_ek: CompressedRistretto, ek: RistrettoPoint,
-    compressed_old_P: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;CompressedRistretto&gt;, old_P: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;RistrettoPoint&gt;,
-    compressed_old_R: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;CompressedRistretto&gt;, old_R: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;RistrettoPoint&gt;,
-    compressed_new_P: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;CompressedRistretto&gt;, new_P: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;RistrettoPoint&gt;,
-    compressed_new_R: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;CompressedRistretto&gt;, new_R: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;RistrettoPoint&gt;,
-    compressed_ek_aud: Option&lt;CompressedRistretto&gt;, ek_aud: Option&lt;RistrettoPoint&gt;,
-    compressed_new_R_aud: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;CompressedRistretto&gt;, new_R_aud: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;RistrettoPoint&gt;,
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="sigma_protocol_withdraw.md#0x7_sigma_protocol_withdraw_new_withdrawal_statement">new_withdrawal_statement</a>(
+    compressed_ek: CompressedRistretto,
+    compressed_old_balance: &CompressedBalance&lt;Available&gt;,
+    compressed_new_balance: &CompressedBalance&lt;Available&gt;,
+    compressed_ek_aud: &Option&lt;CompressedRistretto&gt;,
     v: Scalar,
-): Statement {
-    <b>let</b> points = <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>[_G, _H, ek];
-    points.append(old_P);
-    points.append(old_R);
-    points.append(new_P);
-    points.append(new_R);
+): (Statement&lt;<a href="sigma_protocol_withdraw.md#0x7_sigma_protocol_withdraw_Withdrawal">Withdrawal</a>&gt;, <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;RistrettoPoint&gt;) {
+    <b>assert</b>!(
+        compressed_new_balance.get_compressed_R_aud().length() == <b>if</b> (compressed_ek_aud.is_some()) { <a href="sigma_protocol_withdraw.md#0x7_sigma_protocol_withdraw_get_num_chunks">get_num_chunks</a>() } <b>else</b> { 0 },
+        <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="sigma_protocol_withdraw.md#0x7_sigma_protocol_withdraw_E_AUDITOR_COUNT_MISMATCH">E_AUDITOR_COUNT_MISMATCH</a>)
+    );
 
-    <b>let</b> compressed_points = <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>[compressed_G, compressed_H, compressed_ek];
-    compressed_points.append(compressed_old_P);
-    compressed_points.append(compressed_old_R);
-    compressed_points.append(compressed_new_P);
-    compressed_points.append(compressed_new_R);
+    <b>let</b> b = new_builder();
+    b.add_point(<a href="../../aptos-framework/../aptos-stdlib/doc/ristretto255.md#0x1_ristretto255_basepoint_compressed">ristretto255::basepoint_compressed</a>());                                                 // G
+    b.add_point(get_encryption_key_basepoint_compressed());                                            // H
+    b.add_point(compressed_ek);                                                                           // ek
+    b.add_points(compressed_old_balance.get_compressed_P());                                           // old_P
+    b.add_points(compressed_old_balance.get_compressed_R());                                           // old_R
+    <b>let</b> (_, new_P) = b.add_points_cloned(compressed_new_balance.get_compressed_P()); // new_P
+    b.add_points(compressed_new_balance.get_compressed_R());                                           // new_R
 
-    <b>if</b> (ek_aud.is_some()) {
-        points.push_back(ek_aud.extract());
-        points.append(new_R_aud);
-        compressed_points.push_back(compressed_ek_aud.extract());
-        compressed_points.append(compressed_new_R_aud);
+    <b>if</b> (compressed_ek_aud.is_some()) {
+        b.add_point(*compressed_ek_aud.borrow());                                                      // ek_aud
+        b.add_points(compressed_new_balance.get_compressed_R_aud());                                   // new_R_aud
     };
 
-    <b>let</b> stmt = new_statement(points, compressed_points, <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>[v]);
-    <a href="sigma_protocol_withdraw.md#0x7_sigma_protocol_withdraw_assert_withdraw_statement_is_well_formed">assert_withdraw_statement_is_well_formed</a>(&stmt);
-    stmt
-}
-</code></pre>
-
-
-
-</details>
-
-<a id="0x7_sigma_protocol_withdraw_new_withdrawal_witness"></a>
-
-## Function `new_withdrawal_witness`
-
-Creates a withdrawal witness: $(\mathsf{dk}, \new{a}_0, \ldots, \new{a}_{\ell-1}, \new{r}_0, \ldots, \new{r}_{\ell-1})$.
-
-
-<pre><code><b>public</b> <b>fun</b> <a href="sigma_protocol_withdraw.md#0x7_sigma_protocol_withdraw_new_withdrawal_witness">new_withdrawal_witness</a>(dk: <a href="../../aptos-framework/../aptos-stdlib/doc/ristretto255.md#0x1_ristretto255_Scalar">ristretto255::Scalar</a>, new_a: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="../../aptos-framework/../aptos-stdlib/doc/ristretto255.md#0x1_ristretto255_Scalar">ristretto255::Scalar</a>&gt;, new_r: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="../../aptos-framework/../aptos-stdlib/doc/ristretto255.md#0x1_ristretto255_Scalar">ristretto255::Scalar</a>&gt;): <a href="sigma_protocol_witness.md#0x7_sigma_protocol_witness_Witness">sigma_protocol_witness::Witness</a>
-</code></pre>
-
-
-
-<details>
-<summary>Implementation</summary>
-
-
-<pre><code><b>public</b> <b>fun</b> <a href="sigma_protocol_withdraw.md#0x7_sigma_protocol_withdraw_new_withdrawal_witness">new_withdrawal_witness</a>(dk: Scalar, new_a: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;Scalar&gt;, new_r: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;Scalar&gt;): Witness {
-    <b>assert</b>!(new_a.length() == new_r.length(), <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="sigma_protocol_withdraw.md#0x7_sigma_protocol_withdraw_E_WRONG_WITNESS_LEN">E_WRONG_WITNESS_LEN</a>));
-
-    <b>let</b> w = <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>[dk];
-    w.append(new_a);
-    w.append(new_r);
-    new_secret_witness(w)
+    b.add_scalar(v);
+    <b>let</b> stmt = b.build();
+    <a href="sigma_protocol_withdraw.md#0x7_sigma_protocol_withdraw_assert_withdraw_statement_is_well_formed">assert_withdraw_statement_is_well_formed</a>(&stmt, compressed_ek_aud.is_some());
+    (stmt, new_P)
 }
 </code></pre>
 
@@ -571,7 +464,7 @@ With auditor (m = 2 + 3ℓ), inserts between 3 and 4:
 3b. new_r[i] · ek_aud, for i ∈ [1..ℓ]
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="sigma_protocol_withdraw.md#0x7_sigma_protocol_withdraw_psi">psi</a>(stmt: &<a href="sigma_protocol_statement.md#0x7_sigma_protocol_statement_Statement">sigma_protocol_statement::Statement</a>, w: &<a href="sigma_protocol_witness.md#0x7_sigma_protocol_witness_Witness">sigma_protocol_witness::Witness</a>): <a href="sigma_protocol_representation_vec.md#0x7_sigma_protocol_representation_vec_RepresentationVec">sigma_protocol_representation_vec::RepresentationVec</a>
+<pre><code><b>fun</b> <a href="sigma_protocol_withdraw.md#0x7_sigma_protocol_withdraw_psi">psi</a>(stmt: &<a href="sigma_protocol_statement.md#0x7_sigma_protocol_statement_Statement">sigma_protocol_statement::Statement</a>&lt;<a href="sigma_protocol_withdraw.md#0x7_sigma_protocol_withdraw_Withdrawal">sigma_protocol_withdraw::Withdrawal</a>&gt;, w: &<a href="sigma_protocol_witness.md#0x7_sigma_protocol_witness_Witness">sigma_protocol_witness::Witness</a>, has_auditor: bool): <a href="sigma_protocol_representation_vec.md#0x7_sigma_protocol_representation_vec_RepresentationVec">sigma_protocol_representation_vec::RepresentationVec</a>
 </code></pre>
 
 
@@ -580,24 +473,23 @@ With auditor (m = 2 + 3ℓ), inserts between 3 and 4:
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="sigma_protocol_withdraw.md#0x7_sigma_protocol_withdraw_psi">psi</a>(stmt: &Statement, w: &Witness): RepresentationVec {
+<pre><code><b>fun</b> <a href="sigma_protocol_withdraw.md#0x7_sigma_protocol_withdraw_psi">psi</a>(stmt: &Statement&lt;<a href="sigma_protocol_withdraw.md#0x7_sigma_protocol_withdraw_Withdrawal">Withdrawal</a>&gt;, w: &Witness, has_auditor: bool): RepresentationVec {
     // WARNING: Crucial for security
-    <a href="sigma_protocol_withdraw.md#0x7_sigma_protocol_withdraw_assert_withdraw_statement_is_well_formed">assert_withdraw_statement_is_well_formed</a>(stmt);
+    <a href="sigma_protocol_withdraw.md#0x7_sigma_protocol_withdraw_assert_withdraw_statement_is_well_formed">assert_withdraw_statement_is_well_formed</a>(stmt, has_auditor);
 
     <b>let</b> ell = <a href="sigma_protocol_withdraw.md#0x7_sigma_protocol_withdraw_get_num_chunks">get_num_chunks</a>();
-    <b>let</b> has_aud = <a href="sigma_protocol_withdraw.md#0x7_sigma_protocol_withdraw_has_auditor">has_auditor</a>(stmt);
-    <b>let</b> b_powers = <a href="sigma_protocol_withdraw.md#0x7_sigma_protocol_withdraw_get_b_powers">get_b_powers</a>(ell);
+    <b>let</b> b_powers = get_b_powers(ell);
 
     // WARNING: Crucial for security
     <b>let</b> expected_witness_len = 1 + 2 * ell;
-    <b>assert</b>!(w.length() == expected_witness_len, <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="sigma_protocol_withdraw.md#0x7_sigma_protocol_withdraw_E_WRONG_WITNESS_LEN">E_WRONG_WITNESS_LEN</a>));
+    <b>assert</b>!(w.length() == expected_witness_len, e_wrong_witness_len());
 
     <b>let</b> dk = *w.get(<a href="sigma_protocol_withdraw.md#0x7_sigma_protocol_withdraw_IDX_DK">IDX_DK</a>);
 
     <b>let</b> reprs = <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>[];
 
     // 1. dk · ek
-    reprs.push_back(new_representation(<a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>[<a href="sigma_protocol_withdraw.md#0x7_sigma_protocol_withdraw_IDX_EK">IDX_EK</a>], <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>[dk]));
+    reprs.push_back(repr_scaled(<a href="sigma_protocol_withdraw.md#0x7_sigma_protocol_withdraw_IDX_EK">IDX_EK</a>, dk));
 
     // 2. new_a[i] · G + new_r[i] · H, for i ∈ [1..ℓ]
     <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_range">vector::range</a>(0, ell).for_each(|i| {
@@ -609,15 +501,15 @@ With auditor (m = 2 + 3ℓ), inserts between 3 and 4:
     // 3. new_r[i] · ek, for i ∈ [1..ℓ]
     <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_range">vector::range</a>(0, ell).for_each(|i| {
         <b>let</b> new_r_i = *w.get(1 + ell + i);
-        reprs.push_back(new_representation(<a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>[<a href="sigma_protocol_withdraw.md#0x7_sigma_protocol_withdraw_IDX_EK">IDX_EK</a>], <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>[new_r_i]));
+        reprs.push_back(repr_scaled(<a href="sigma_protocol_withdraw.md#0x7_sigma_protocol_withdraw_IDX_EK">IDX_EK</a>, new_r_i));
     });
 
     // 3b. (auditor only) new_r[i] · ek_aud, for i ∈ [1..ℓ]
-    <b>if</b> (has_aud) {
+    <b>if</b> (has_auditor) {
         <b>let</b> idx_ek_aud = <a href="sigma_protocol_withdraw.md#0x7_sigma_protocol_withdraw_START_IDX_OLD_P">START_IDX_OLD_P</a> + 4 * ell;
         <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_range">vector::range</a>(0, ell).for_each(|i| {
             <b>let</b> new_r_i = *w.get(1 + ell + i);
-            reprs.push_back(new_representation(<a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>[idx_ek_aud], <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>[new_r_i]));
+            reprs.push_back(repr_scaled(idx_ek_aud, new_r_i));
         });
     };
 
@@ -643,10 +535,10 @@ With auditor (m = 2 + 3ℓ), inserts between 3 and 4:
     reprs.push_back(new_representation(point_idxs, scalars));
 
     <b>let</b> repr_vec = new_representation_vec(reprs);
-    <b>let</b> expected_output_len = <b>if</b> (has_aud) { 2 + 3 * ell } <b>else</b> { 2 + 2 * ell };
+    <b>let</b> expected_output_len = <b>if</b> (has_auditor) { 2 + 3 * ell } <b>else</b> { 2 + 2 * ell };
 
     // WARNING: Crucial for security
-    <b>assert</b>!(repr_vec.length() == expected_output_len, <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="sigma_protocol_withdraw.md#0x7_sigma_protocol_withdraw_E_WRONG_OUTPUT_LEN">E_WRONG_OUTPUT_LEN</a>));
+    <b>assert</b>!(repr_vec.length() == expected_output_len, e_wrong_output_len());
 
     repr_vec
 }
@@ -672,7 +564,7 @@ With auditor (m = 2 + 3ℓ), inserts between 3 and 4:
 3b. new_R_aud[i], for i ∈ [1..ℓ]
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="sigma_protocol_withdraw.md#0x7_sigma_protocol_withdraw_f">f</a>(stmt: &<a href="sigma_protocol_statement.md#0x7_sigma_protocol_statement_Statement">sigma_protocol_statement::Statement</a>): <a href="sigma_protocol_representation_vec.md#0x7_sigma_protocol_representation_vec_RepresentationVec">sigma_protocol_representation_vec::RepresentationVec</a>
+<pre><code><b>fun</b> <a href="sigma_protocol_withdraw.md#0x7_sigma_protocol_withdraw_f">f</a>(stmt: &<a href="sigma_protocol_statement.md#0x7_sigma_protocol_statement_Statement">sigma_protocol_statement::Statement</a>&lt;<a href="sigma_protocol_withdraw.md#0x7_sigma_protocol_withdraw_Withdrawal">sigma_protocol_withdraw::Withdrawal</a>&gt;, has_auditor: bool): <a href="sigma_protocol_representation_vec.md#0x7_sigma_protocol_representation_vec_RepresentationVec">sigma_protocol_representation_vec::RepresentationVec</a>
 </code></pre>
 
 
@@ -681,10 +573,9 @@ With auditor (m = 2 + 3ℓ), inserts between 3 and 4:
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="sigma_protocol_withdraw.md#0x7_sigma_protocol_withdraw_f">f</a>(stmt: &Statement): RepresentationVec {
+<pre><code><b>fun</b> <a href="sigma_protocol_withdraw.md#0x7_sigma_protocol_withdraw_f">f</a>(stmt: &Statement&lt;<a href="sigma_protocol_withdraw.md#0x7_sigma_protocol_withdraw_Withdrawal">Withdrawal</a>&gt;, has_auditor: bool): RepresentationVec {
     <b>let</b> ell = <a href="sigma_protocol_withdraw.md#0x7_sigma_protocol_withdraw_get_num_chunks">get_num_chunks</a>();
-    <b>let</b> has_aud = <a href="sigma_protocol_withdraw.md#0x7_sigma_protocol_withdraw_has_auditor">has_auditor</a>(stmt);
-    <b>let</b> b_powers = <a href="sigma_protocol_withdraw.md#0x7_sigma_protocol_withdraw_get_b_powers">get_b_powers</a>(ell);
+    <b>let</b> b_powers = get_b_powers(ell);
     <b>let</b> v = stmt.get_scalars()[0];
 
     <b>let</b> idx_new_P_start = <a href="sigma_protocol_withdraw.md#0x7_sigma_protocol_withdraw_START_IDX_OLD_P">START_IDX_OLD_P</a> + 2 * ell;
@@ -693,25 +584,23 @@ With auditor (m = 2 + 3ℓ), inserts between 3 and 4:
     <b>let</b> reprs = <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>[];
 
     // 1. H
-    reprs.push_back(new_representation(<a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>[<a href="sigma_protocol_withdraw.md#0x7_sigma_protocol_withdraw_IDX_H">IDX_H</a>], <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>[<a href="../../aptos-framework/../aptos-stdlib/doc/ristretto255.md#0x1_ristretto255_scalar_one">ristretto255::scalar_one</a>()]));
+    reprs.push_back(repr_point(<a href="sigma_protocol_withdraw.md#0x7_sigma_protocol_withdraw_IDX_H">IDX_H</a>));
 
     // 2. new_P[i]
     <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_range">vector::range</a>(0, ell).for_each(|i| {
-        reprs.push_back(new_representation(<a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>[idx_new_P_start + i], <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>[<a href="../../aptos-framework/../aptos-stdlib/doc/ristretto255.md#0x1_ristretto255_scalar_one">ristretto255::scalar_one</a>()]));
+        reprs.push_back(repr_point(idx_new_P_start + i));
     });
 
     // 3. new_R[i]
     <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_range">vector::range</a>(0, ell).for_each(|i| {
-        reprs.push_back(new_representation(<a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>[idx_new_R_start + i], <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>[<a href="../../aptos-framework/../aptos-stdlib/doc/ristretto255.md#0x1_ristretto255_scalar_one">ristretto255::scalar_one</a>()]));
+        reprs.push_back(repr_point(idx_new_R_start + i));
     });
 
     // 3b. (auditor only) new_R_aud[i]
-    <b>if</b> (has_aud) {
+    <b>if</b> (has_auditor) {
         <b>let</b> idx_new_R_aud_start = <a href="sigma_protocol_withdraw.md#0x7_sigma_protocol_withdraw_START_IDX_OLD_P">START_IDX_OLD_P</a> + 4 * ell + 1; // +1 for ek_aud
         <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_range">vector::range</a>(0, ell).for_each(|i| {
-            reprs.push_back(new_representation(
-                <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>[idx_new_R_aud_start + i], <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>[<a href="../../aptos-framework/../aptos-stdlib/doc/ristretto255.md#0x1_ristretto255_scalar_one">ristretto255::scalar_one</a>()]
-            ));
+            reprs.push_back(repr_point(idx_new_R_aud_start + i));
         });
     };
 
@@ -737,14 +626,14 @@ With auditor (m = 2 + 3ℓ), inserts between 3 and 4:
 
 </details>
 
-<a id="0x7_sigma_protocol_withdraw_assert_verifies_withdrawal"></a>
+<a id="0x7_sigma_protocol_withdraw_assert_verifies"></a>
 
-## Function `assert_verifies_withdrawal`
+## Function `assert_verifies`
 
 Asserts that a withdrawal proof verifies.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="sigma_protocol_withdraw.md#0x7_sigma_protocol_withdraw_assert_verifies_withdrawal">assert_verifies_withdrawal</a>(session: &<a href="sigma_protocol_withdraw.md#0x7_sigma_protocol_withdraw_WithdrawSession">sigma_protocol_withdraw::WithdrawSession</a>, stmt: &<a href="sigma_protocol_statement.md#0x7_sigma_protocol_statement_Statement">sigma_protocol_statement::Statement</a>, proof: &<a href="sigma_protocol_proof.md#0x7_sigma_protocol_proof_Proof">sigma_protocol_proof::Proof</a>)
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="sigma_protocol_withdraw.md#0x7_sigma_protocol_withdraw_assert_verifies">assert_verifies</a>(self: &<a href="sigma_protocol_withdraw.md#0x7_sigma_protocol_withdraw_WithdrawSession">sigma_protocol_withdraw::WithdrawSession</a>, stmt: &<a href="sigma_protocol_statement.md#0x7_sigma_protocol_statement_Statement">sigma_protocol_statement::Statement</a>&lt;<a href="sigma_protocol_withdraw.md#0x7_sigma_protocol_withdraw_Withdrawal">sigma_protocol_withdraw::Withdrawal</a>&gt;, proof: &<a href="sigma_protocol_proof.md#0x7_sigma_protocol_proof_Proof">sigma_protocol_proof::Proof</a>)
 </code></pre>
 
 
@@ -753,48 +642,13 @@ Asserts that a withdrawal proof verifies.
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="sigma_protocol_withdraw.md#0x7_sigma_protocol_withdraw_assert_verifies_withdrawal">assert_verifies_withdrawal</a>(session: &<a href="sigma_protocol_withdraw.md#0x7_sigma_protocol_withdraw_WithdrawSession">WithdrawSession</a>, stmt: &Statement, proof: &Proof) {
-    <a href="sigma_protocol_withdraw.md#0x7_sigma_protocol_withdraw_assert_withdraw_statement_is_well_formed">assert_withdraw_statement_is_well_formed</a>(stmt);
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="sigma_protocol_withdraw.md#0x7_sigma_protocol_withdraw_assert_verifies">assert_verifies</a>(self: &<a href="sigma_protocol_withdraw.md#0x7_sigma_protocol_withdraw_WithdrawSession">WithdrawSession</a>, stmt: &Statement&lt;<a href="sigma_protocol_withdraw.md#0x7_sigma_protocol_withdraw_Withdrawal">Withdrawal</a>&gt;, proof: &Proof) {
+    <a href="sigma_protocol_withdraw.md#0x7_sigma_protocol_withdraw_assert_withdraw_statement_is_well_formed">assert_withdraw_statement_is_well_formed</a>(stmt, self.has_auditor);
 
     <b>let</b> success = <a href="sigma_protocol.md#0x7_sigma_protocol_verify">sigma_protocol::verify</a>(
-        new_domain_separator(<a href="sigma_protocol_withdraw.md#0x7_sigma_protocol_withdraw_WITHDRAWAL_PROTOCOL_ID">WITHDRAWAL_PROTOCOL_ID</a>, <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/bcs.md#0x1_bcs_to_bytes">bcs::to_bytes</a>(session)),
-        |_X, w| <a href="sigma_protocol_withdraw.md#0x7_sigma_protocol_withdraw_psi">psi</a>(_X, w),
-        |_X| <a href="sigma_protocol_withdraw.md#0x7_sigma_protocol_withdraw_f">f</a>(_X),
-        stmt,
-        proof
-    );
-
-    <b>assert</b>!(success, <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="sigma_protocol_withdraw.md#0x7_sigma_protocol_withdraw_E_INVALID_PROOF">E_INVALID_PROOF</a>));
-}
-</code></pre>
-
-
-
-</details>
-
-<a id="0x7_sigma_protocol_withdraw_assert_verifies_normalization"></a>
-
-## Function `assert_verifies_normalization`
-
-Asserts that a normalization proof verifies (same psi/f as withdrawal, different protocol ID).
-
-
-<pre><code><b>public</b> <b>fun</b> <a href="sigma_protocol_withdraw.md#0x7_sigma_protocol_withdraw_assert_verifies_normalization">assert_verifies_normalization</a>(session: &<a href="sigma_protocol_withdraw.md#0x7_sigma_protocol_withdraw_WithdrawSession">sigma_protocol_withdraw::WithdrawSession</a>, stmt: &<a href="sigma_protocol_statement.md#0x7_sigma_protocol_statement_Statement">sigma_protocol_statement::Statement</a>, proof: &<a href="sigma_protocol_proof.md#0x7_sigma_protocol_proof_Proof">sigma_protocol_proof::Proof</a>)
-</code></pre>
-
-
-
-<details>
-<summary>Implementation</summary>
-
-
-<pre><code><b>public</b> <b>fun</b> <a href="sigma_protocol_withdraw.md#0x7_sigma_protocol_withdraw_assert_verifies_normalization">assert_verifies_normalization</a>(session: &<a href="sigma_protocol_withdraw.md#0x7_sigma_protocol_withdraw_WithdrawSession">WithdrawSession</a>, stmt: &Statement, proof: &Proof) {
-    <a href="sigma_protocol_withdraw.md#0x7_sigma_protocol_withdraw_assert_withdraw_statement_is_well_formed">assert_withdraw_statement_is_well_formed</a>(stmt);
-
-    <b>let</b> success = <a href="sigma_protocol.md#0x7_sigma_protocol_verify">sigma_protocol::verify</a>(
-        new_domain_separator(<a href="sigma_protocol_withdraw.md#0x7_sigma_protocol_withdraw_NORMALIZATION_PROTOCOL_ID">NORMALIZATION_PROTOCOL_ID</a>, <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/bcs.md#0x1_bcs_to_bytes">bcs::to_bytes</a>(session)),
-        |_X, w| <a href="sigma_protocol_withdraw.md#0x7_sigma_protocol_withdraw_psi">psi</a>(_X, w),
-        |_X| <a href="sigma_protocol_withdraw.md#0x7_sigma_protocol_withdraw_f">f</a>(_X),
+        new_domain_separator(@aptos_experimental, <a href="../../aptos-framework/doc/chain_id.md#0x1_chain_id_get">chain_id::get</a>(), <a href="sigma_protocol_withdraw.md#0x7_sigma_protocol_withdraw_WITHDRAWAL_PROTOCOL_ID">WITHDRAWAL_PROTOCOL_ID</a>, <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/bcs.md#0x1_bcs_to_bytes">bcs::to_bytes</a>(self)),
+        |_X, w| <a href="sigma_protocol_withdraw.md#0x7_sigma_protocol_withdraw_psi">psi</a>(_X, w, self.has_auditor),
+        |_X| <a href="sigma_protocol_withdraw.md#0x7_sigma_protocol_withdraw_f">f</a>(_X, self.has_auditor),
         stmt,
         proof
     );

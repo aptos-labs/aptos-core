@@ -48,21 +48,21 @@ module aptos_experimental::sigma_protocol_homomorphism {
     use aptos_experimental::sigma_protocol_representation_vec::RepresentationVec;
 
     /// The transformation function  $f : \mathbb{G}^{n_1} \times \mathbb{F}^{n_2} \rightarrow \mathbb{G}^m$
-    struct TransformationFunction(|&Statement| RepresentationVec);
+    struct TransformationFunction<phantom P>(|&Statement<P>| RepresentationVec);
 
     /// The homomorphism $\psi : \mathbb{F}^k \rightarrow \mathbb{G}^m$
-    struct Homomorphism(|&Statement, &Witness| RepresentationVec);
+    struct Homomorphism<phantom P>(|&Statement<P>, &Witness| RepresentationVec);
 
     /// Computes and returns $\psi(X, w) \in \mathbb{G}^m$ given the public statement $X$ and the secret witness $w$.
-    public inline fun evaluate_psi(psi: Homomorphism,
-                                   stmt: &Statement,
+    public inline fun evaluate_psi<P>(psi: Homomorphism<P>,
+                                   stmt: &Statement<P>,
                                    witn: &Witness): vector<RistrettoPoint> {
         psi(stmt, witn).map_ref(|repr| multi_scalar_mul(&repr.to_points(stmt), repr.get_scalars()))
     }
 
     /// Returns $f(X) \in \mathbb{G}^m$ given the public statement $X$.
-    public inline fun evaluate_f(f: TransformationFunction,
-                                 stmt: &Statement): vector<RistrettoPoint> {
+    public inline fun evaluate_f<P>(f: TransformationFunction<P>,
+                                 stmt: &Statement<P>): vector<RistrettoPoint> {
         f(stmt).map_ref(|repr| multi_scalar_mul(&repr.to_points(stmt), repr.get_scalars()))
     }
 }

@@ -3,7 +3,6 @@
 
 # Module `0x7::sigma_protocol_statement`
 
-TODO: make more functions public(friend)
 
 
 -  [Struct `Statement`](#0x7_sigma_protocol_statement_Statement)
@@ -29,8 +28,11 @@ A *public statement* consists of:
 - a <code>compressed_points</code> vector of $n_1$ compressed group elements (redundant, for faster Fiat-Shamir)
 - a <code>scalars</code> vector of $n_2$ scalars
 
+The phantom type parameter <code>P</code> tags the statement with a specific protocol marker type
+(e.g., <code>Registration</code>, <code>KeyRotation</code>, etc.) for compile-time safety.
 
-<pre><code><b>struct</b> <a href="sigma_protocol_statement.md#0x7_sigma_protocol_statement_Statement">Statement</a> <b>has</b> drop
+
+<pre><code><b>struct</b> <a href="sigma_protocol_statement.md#0x7_sigma_protocol_statement_Statement">Statement</a>&lt;P&gt; <b>has</b> drop
 </code></pre>
 
 
@@ -82,11 +84,9 @@ When creating a <code><a href="sigma_protocol_statement.md#0x7_sigma_protocol_st
 
 ## Function `new_statement`
 
-TODO: Maybe make this a public(friend) and only let the proofs/*.move files call it, to make sure no one accidentally
-calls it in confidential_asset.move
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="sigma_protocol_statement.md#0x7_sigma_protocol_statement_new_statement">new_statement</a>(points: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="../../aptos-framework/../aptos-stdlib/doc/ristretto255.md#0x1_ristretto255_RistrettoPoint">ristretto255::RistrettoPoint</a>&gt;, compressed_points: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="../../aptos-framework/../aptos-stdlib/doc/ristretto255.md#0x1_ristretto255_CompressedRistretto">ristretto255::CompressedRistretto</a>&gt;, scalars: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="../../aptos-framework/../aptos-stdlib/doc/ristretto255.md#0x1_ristretto255_Scalar">ristretto255::Scalar</a>&gt;): <a href="sigma_protocol_statement.md#0x7_sigma_protocol_statement_Statement">sigma_protocol_statement::Statement</a>
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="sigma_protocol_statement.md#0x7_sigma_protocol_statement_new_statement">new_statement</a>&lt;P&gt;(points: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="../../aptos-framework/../aptos-stdlib/doc/ristretto255.md#0x1_ristretto255_RistrettoPoint">ristretto255::RistrettoPoint</a>&gt;, compressed_points: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="../../aptos-framework/../aptos-stdlib/doc/ristretto255.md#0x1_ristretto255_CompressedRistretto">ristretto255::CompressedRistretto</a>&gt;, scalars: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="../../aptos-framework/../aptos-stdlib/doc/ristretto255.md#0x1_ristretto255_Scalar">ristretto255::Scalar</a>&gt;): <a href="sigma_protocol_statement.md#0x7_sigma_protocol_statement_Statement">sigma_protocol_statement::Statement</a>&lt;P&gt;
 </code></pre>
 
 
@@ -95,11 +95,11 @@ calls it in confidential_asset.move
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="sigma_protocol_statement.md#0x7_sigma_protocol_statement_new_statement">new_statement</a>(
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="sigma_protocol_statement.md#0x7_sigma_protocol_statement_new_statement">new_statement</a>&lt;P&gt;(
     points: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;RistrettoPoint&gt;,
     compressed_points: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;CompressedRistretto&gt;,
     scalars: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;Scalar&gt;
-): <a href="sigma_protocol_statement.md#0x7_sigma_protocol_statement_Statement">Statement</a> {
+): <a href="sigma_protocol_statement.md#0x7_sigma_protocol_statement_Statement">Statement</a>&lt;P&gt; {
     <b>assert</b>!(points.length() == compressed_points.length(), <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="sigma_protocol_statement.md#0x7_sigma_protocol_statement_E_MISMATCHED_NUMBER_OF_COMPRESSED_POINTS">E_MISMATCHED_NUMBER_OF_COMPRESSED_POINTS</a>));
     <a href="sigma_protocol_statement.md#0x7_sigma_protocol_statement_Statement">Statement</a> { points, compressed_points, scalars }
 }
@@ -116,7 +116,7 @@ calls it in confidential_asset.move
 Returns the $i$th elliptic curve point in the public statement.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="sigma_protocol_statement.md#0x7_sigma_protocol_statement_get_point">get_point</a>(self: &<a href="sigma_protocol_statement.md#0x7_sigma_protocol_statement_Statement">sigma_protocol_statement::Statement</a>, i: u64): &<a href="../../aptos-framework/../aptos-stdlib/doc/ristretto255.md#0x1_ristretto255_RistrettoPoint">ristretto255::RistrettoPoint</a>
+<pre><code><b>public</b> <b>fun</b> <a href="sigma_protocol_statement.md#0x7_sigma_protocol_statement_get_point">get_point</a>&lt;P&gt;(self: &<a href="sigma_protocol_statement.md#0x7_sigma_protocol_statement_Statement">sigma_protocol_statement::Statement</a>&lt;P&gt;, i: u64): &<a href="../../aptos-framework/../aptos-stdlib/doc/ristretto255.md#0x1_ristretto255_RistrettoPoint">ristretto255::RistrettoPoint</a>
 </code></pre>
 
 
@@ -125,7 +125,7 @@ Returns the $i$th elliptic curve point in the public statement.
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="sigma_protocol_statement.md#0x7_sigma_protocol_statement_get_point">get_point</a>(self: &<a href="sigma_protocol_statement.md#0x7_sigma_protocol_statement_Statement">Statement</a>, i: u64): &RistrettoPoint {
+<pre><code><b>public</b> <b>fun</b> <a href="sigma_protocol_statement.md#0x7_sigma_protocol_statement_get_point">get_point</a>&lt;P&gt;(self: &<a href="sigma_protocol_statement.md#0x7_sigma_protocol_statement_Statement">Statement</a>&lt;P&gt;, i: u64): &RistrettoPoint {
     &self.points[i]
 }
 </code></pre>
@@ -142,7 +142,7 @@ Returns all the scalars in the statement.
 (Needed to feed in the statement in the Fiat-Shamir transform.)
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="sigma_protocol_statement.md#0x7_sigma_protocol_statement_get_scalars">get_scalars</a>(self: &<a href="sigma_protocol_statement.md#0x7_sigma_protocol_statement_Statement">sigma_protocol_statement::Statement</a>): &<a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="../../aptos-framework/../aptos-stdlib/doc/ristretto255.md#0x1_ristretto255_Scalar">ristretto255::Scalar</a>&gt;
+<pre><code><b>public</b> <b>fun</b> <a href="sigma_protocol_statement.md#0x7_sigma_protocol_statement_get_scalars">get_scalars</a>&lt;P&gt;(self: &<a href="sigma_protocol_statement.md#0x7_sigma_protocol_statement_Statement">sigma_protocol_statement::Statement</a>&lt;P&gt;): &<a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="../../aptos-framework/../aptos-stdlib/doc/ristretto255.md#0x1_ristretto255_Scalar">ristretto255::Scalar</a>&gt;
 </code></pre>
 
 
@@ -151,7 +151,7 @@ Returns all the scalars in the statement.
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="sigma_protocol_statement.md#0x7_sigma_protocol_statement_get_scalars">get_scalars</a>(self: &<a href="sigma_protocol_statement.md#0x7_sigma_protocol_statement_Statement">Statement</a>): &<a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;Scalar&gt; {
+<pre><code><b>public</b> <b>fun</b> <a href="sigma_protocol_statement.md#0x7_sigma_protocol_statement_get_scalars">get_scalars</a>&lt;P&gt;(self: &<a href="sigma_protocol_statement.md#0x7_sigma_protocol_statement_Statement">Statement</a>&lt;P&gt;): &<a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;Scalar&gt; {
     &self.scalars
 }
 </code></pre>
@@ -167,7 +167,7 @@ Returns all the scalars in the statement.
 Returns all the elliptic curve points in the statement.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="sigma_protocol_statement.md#0x7_sigma_protocol_statement_get_points">get_points</a>(self: &<a href="sigma_protocol_statement.md#0x7_sigma_protocol_statement_Statement">sigma_protocol_statement::Statement</a>): &<a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="../../aptos-framework/../aptos-stdlib/doc/ristretto255.md#0x1_ristretto255_RistrettoPoint">ristretto255::RistrettoPoint</a>&gt;
+<pre><code><b>public</b> <b>fun</b> <a href="sigma_protocol_statement.md#0x7_sigma_protocol_statement_get_points">get_points</a>&lt;P&gt;(self: &<a href="sigma_protocol_statement.md#0x7_sigma_protocol_statement_Statement">sigma_protocol_statement::Statement</a>&lt;P&gt;): &<a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="../../aptos-framework/../aptos-stdlib/doc/ristretto255.md#0x1_ristretto255_RistrettoPoint">ristretto255::RistrettoPoint</a>&gt;
 </code></pre>
 
 
@@ -176,7 +176,7 @@ Returns all the elliptic curve points in the statement.
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="sigma_protocol_statement.md#0x7_sigma_protocol_statement_get_points">get_points</a>(self: &<a href="sigma_protocol_statement.md#0x7_sigma_protocol_statement_Statement">Statement</a>): &<a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;RistrettoPoint&gt; {
+<pre><code><b>public</b> <b>fun</b> <a href="sigma_protocol_statement.md#0x7_sigma_protocol_statement_get_points">get_points</a>&lt;P&gt;(self: &<a href="sigma_protocol_statement.md#0x7_sigma_protocol_statement_Statement">Statement</a>&lt;P&gt;): &<a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;RistrettoPoint&gt; {
     &self.points
 }
 </code></pre>
@@ -193,7 +193,7 @@ Returns all the compressed elliptic curve points in the statement.
 (Needed to feed in the statement in the Fiat-Shamir transform.)
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="sigma_protocol_statement.md#0x7_sigma_protocol_statement_get_compressed_points">get_compressed_points</a>(self: &<a href="sigma_protocol_statement.md#0x7_sigma_protocol_statement_Statement">sigma_protocol_statement::Statement</a>): &<a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="../../aptos-framework/../aptos-stdlib/doc/ristretto255.md#0x1_ristretto255_CompressedRistretto">ristretto255::CompressedRistretto</a>&gt;
+<pre><code><b>public</b> <b>fun</b> <a href="sigma_protocol_statement.md#0x7_sigma_protocol_statement_get_compressed_points">get_compressed_points</a>&lt;P&gt;(self: &<a href="sigma_protocol_statement.md#0x7_sigma_protocol_statement_Statement">sigma_protocol_statement::Statement</a>&lt;P&gt;): &<a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="../../aptos-framework/../aptos-stdlib/doc/ristretto255.md#0x1_ristretto255_CompressedRistretto">ristretto255::CompressedRistretto</a>&gt;
 </code></pre>
 
 
@@ -202,7 +202,7 @@ Returns all the compressed elliptic curve points in the statement.
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="sigma_protocol_statement.md#0x7_sigma_protocol_statement_get_compressed_points">get_compressed_points</a>(self: &<a href="sigma_protocol_statement.md#0x7_sigma_protocol_statement_Statement">Statement</a>): &<a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;CompressedRistretto&gt; {
+<pre><code><b>public</b> <b>fun</b> <a href="sigma_protocol_statement.md#0x7_sigma_protocol_statement_get_compressed_points">get_compressed_points</a>&lt;P&gt;(self: &<a href="sigma_protocol_statement.md#0x7_sigma_protocol_statement_Statement">Statement</a>&lt;P&gt;): &<a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;CompressedRistretto&gt; {
     &self.compressed_points
 }
 </code></pre>

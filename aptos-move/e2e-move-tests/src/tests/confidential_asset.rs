@@ -78,7 +78,7 @@ fn setup_harness() -> MoveHarness {
 fn create_alice(h: &mut MoveHarness) -> Account {
     h.new_account_with_balance_at(
         AccountAddress::from_hex_literal(ALICE_ADDRESS).unwrap(),
-        1_000_000_000,
+        10_000_000_000,
     )
 }
 
@@ -86,12 +86,13 @@ fn create_alice(h: &mut MoveHarness) -> Account {
 fn create_bob(h: &mut MoveHarness) -> Account {
     h.new_account_with_balance_at(
         AccountAddress::from_hex_literal(BOB_ADDRESS).unwrap(),
-        1_000_000_000,
+        10_000_000_000,
     )
 }
 
 /// Register an account for confidential assets using a real sigma protocol proof.
 /// Takes the decryption key and encryption key bytes. Generates the sigma proof via Move test helper.
+#[cfg(feature = "move-harness-with-test-only")]
 fn register_account(
     h: &mut MoveHarness,
     account: &Account,
@@ -133,6 +134,7 @@ fn register_account(
 
 /// Generate a valid twisted ElGamal keypair using the Move function.
 /// Returns (dk_bytes, ek_bytes).
+#[cfg(feature = "move-harness-with-test-only")]
 fn generate_keypair(h: &mut MoveHarness) -> (Vec<u8>, Vec<u8>) {
     let result = h
         .exec_function_bypass_visibility(
@@ -204,6 +206,7 @@ fn set_up_confidential_store_for_apt(h: &mut MoveHarness) -> AccountAddress {
 }
 
 /// Create a payload for the confidential_asset::register_raw entry function.
+#[cfg(feature = "move-harness-with-test-only")]
 fn create_register_payload(
     token_metadata: AccountAddress,
     encryption_key: &[u8],
@@ -224,6 +227,7 @@ fn create_register_payload(
 }
 
 /// Create a payload for the confidential_asset::deposit function.
+#[cfg(feature = "move-harness-with-test-only")]
 fn create_deposit_payload(token_metadata: AccountAddress, amount: u64) -> TransactionPayload {
     TransactionPayload::EntryFunction(EntryFunction::new(
         ModuleId::new(EXPERIMENTAL_ADDRESS, ident_str!(MODULE_NAME).to_owned()),
@@ -237,6 +241,7 @@ fn create_deposit_payload(token_metadata: AccountAddress, amount: u64) -> Transa
 }
 
 /// Create a payload for the confidential_asset::rollover_pending_balance function.
+#[cfg(feature = "move-harness-with-test-only")]
 fn create_rollover_pending_balance_payload(token_metadata: AccountAddress) -> TransactionPayload {
     TransactionPayload::EntryFunction(EntryFunction::new(
         ModuleId::new(EXPERIMENTAL_ADDRESS, ident_str!(MODULE_NAME).to_owned()),
@@ -274,13 +279,14 @@ fn create_fungible_asset_transfer_payload(
 
 /// Create a payload for the confidential_asset::withdraw_to_raw entry function.
 #[cfg(feature = "move-harness-with-test-only")]
+#[allow(non_snake_case)]
 fn create_withdraw_to_payload(
     token_metadata: AccountAddress,
     recipient: AccountAddress,
     amount: u64,
-    new_balance_p_bytes: Vec<Vec<u8>>,
-    new_balance_r_bytes: Vec<Vec<u8>>,
-    new_balance_r_aud_bytes: Vec<Vec<u8>>,
+    new_balance_P_bytes: Vec<Vec<u8>>,
+    new_balance_R_bytes: Vec<Vec<u8>>,
+    new_balance_R_aud_bytes: Vec<Vec<u8>>,
     zkrp_new_balance_bytes: Vec<u8>,
     sigma_proto_comm: Vec<Vec<u8>>,
     sigma_proto_resp: Vec<Vec<u8>>,
@@ -293,9 +299,9 @@ fn create_withdraw_to_payload(
             bcs::to_bytes(&token_metadata).unwrap(),
             bcs::to_bytes(&recipient).unwrap(),
             bcs::to_bytes(&amount).unwrap(),
-            bcs::to_bytes(&new_balance_p_bytes).unwrap(),
-            bcs::to_bytes(&new_balance_r_bytes).unwrap(),
-            bcs::to_bytes(&new_balance_r_aud_bytes).unwrap(),
+            bcs::to_bytes(&new_balance_P_bytes).unwrap(),
+            bcs::to_bytes(&new_balance_R_bytes).unwrap(),
+            bcs::to_bytes(&new_balance_R_aud_bytes).unwrap(),
             bcs::to_bytes(&zkrp_new_balance_bytes).unwrap(),
             bcs::to_bytes(&sigma_proto_comm).unwrap(),
             bcs::to_bytes(&sigma_proto_resp).unwrap(),
@@ -305,17 +311,19 @@ fn create_withdraw_to_payload(
 
 /// Create a payload for the confidential_asset::confidential_transfer_raw entry function.
 #[cfg(feature = "move-harness-with-test-only")]
+#[allow(non_snake_case)]
 fn create_confidential_transfer_payload(
     token_metadata: AccountAddress,
     recipient: AccountAddress,
-    new_balance_p_bytes: Vec<Vec<u8>>,
-    new_balance_r_bytes: Vec<Vec<u8>>,
-    new_balance_r_aud_bytes: Vec<Vec<u8>>,
-    sender_amount_p_bytes: Vec<Vec<u8>>,
-    sender_amount_r_bytes: Vec<Vec<u8>>,
-    recipient_r_bytes: Vec<Vec<u8>>,
-    extra_auditor_eks: Vec<Vec<u8>>,
-    auditor_amount_rs: Vec<Vec<Vec<u8>>>,
+    new_balance_P_bytes: Vec<Vec<u8>>,
+    new_balance_R_bytes: Vec<Vec<u8>>,
+    new_balance_R_eff_aud_bytes: Vec<Vec<u8>>,
+    amount_P_bytes: Vec<Vec<u8>>,
+    amount_R_sender_bytes: Vec<Vec<u8>>,
+    amount_R_recip_bytes: Vec<Vec<u8>>,
+    amount_R_eff_aud_bytes: Vec<Vec<u8>>,
+    ek_volun_auds: Vec<Vec<u8>>,
+    amount_R_volun_auds_bytes: Vec<Vec<Vec<u8>>>,
     zkrp_new_balance_bytes: Vec<u8>,
     zkrp_transfer_amount_bytes: Vec<u8>,
     sigma_proto_comm: Vec<Vec<u8>>,
@@ -328,14 +336,15 @@ fn create_confidential_transfer_payload(
         vec![
             bcs::to_bytes(&token_metadata).unwrap(),
             bcs::to_bytes(&recipient).unwrap(),
-            bcs::to_bytes(&new_balance_p_bytes).unwrap(),
-            bcs::to_bytes(&new_balance_r_bytes).unwrap(),
-            bcs::to_bytes(&new_balance_r_aud_bytes).unwrap(),
-            bcs::to_bytes(&sender_amount_p_bytes).unwrap(),
-            bcs::to_bytes(&sender_amount_r_bytes).unwrap(),
-            bcs::to_bytes(&recipient_r_bytes).unwrap(),
-            bcs::to_bytes(&extra_auditor_eks).unwrap(),
-            bcs::to_bytes(&auditor_amount_rs).unwrap(),
+            bcs::to_bytes(&new_balance_P_bytes).unwrap(),
+            bcs::to_bytes(&new_balance_R_bytes).unwrap(),
+            bcs::to_bytes(&new_balance_R_eff_aud_bytes).unwrap(),
+            bcs::to_bytes(&amount_P_bytes).unwrap(),
+            bcs::to_bytes(&amount_R_sender_bytes).unwrap(),
+            bcs::to_bytes(&amount_R_recip_bytes).unwrap(),
+            bcs::to_bytes(&amount_R_eff_aud_bytes).unwrap(),
+            bcs::to_bytes(&ek_volun_auds).unwrap(),
+            bcs::to_bytes(&amount_R_volun_auds_bytes).unwrap(),
             bcs::to_bytes(&zkrp_new_balance_bytes).unwrap(),
             bcs::to_bytes(&zkrp_transfer_amount_bytes).unwrap(),
             bcs::to_bytes(&sigma_proto_comm).unwrap(),
@@ -358,9 +367,9 @@ fn serialize_signer(address: AccountAddress) -> Vec<u8> {
 fn set_auditor_for_asset_type(
     h: &mut MoveHarness,
     token_metadata: AccountAddress,
-    auditor_ek_bytes: &[u8],
+    ek_aud_bytes: &[u8],
 ) {
-    let auditor_ek_option: Option<Vec<u8>> = Some(auditor_ek_bytes.to_vec());
+    let ek_aud_option: Option<Vec<u8>> = Some(ek_aud_bytes.to_vec());
     h.exec_function_bypass_visibility(
         EXPERIMENTAL_ADDRESS,
         MODULE_NAME,
@@ -369,7 +378,7 @@ fn set_auditor_for_asset_type(
         vec![
             serialize_signer(FRAMEWORK_ADDRESS),
             bcs::to_bytes(&token_metadata).unwrap(),
-            bcs::to_bytes(&auditor_ek_option).unwrap(),
+            bcs::to_bytes(&ek_aud_option).unwrap(),
         ],
     )
     .expect("set_auditor_for_asset_type should succeed");
@@ -377,11 +386,12 @@ fn set_auditor_for_asset_type(
 
 /// Create a payload for the confidential_asset::rotate_encryption_key_raw entry function.
 #[cfg(feature = "move-harness-with-test-only")]
+#[allow(non_snake_case)]
 fn create_rotate_encryption_key_payload(
     token_metadata: AccountAddress,
     new_ek_bytes: Vec<u8>,
     unpause: bool,
-    new_r_bytes: Vec<Vec<u8>>,
+    new_R_bytes: Vec<Vec<u8>>,
     sigma_proto_comm: Vec<Vec<u8>>,
     sigma_proto_resp: Vec<Vec<u8>>,
 ) -> TransactionPayload {
@@ -393,34 +403,7 @@ fn create_rotate_encryption_key_payload(
             bcs::to_bytes(&token_metadata).unwrap(),
             bcs::to_bytes(&new_ek_bytes).unwrap(),
             bcs::to_bytes(&unpause).unwrap(),
-            bcs::to_bytes(&new_r_bytes).unwrap(),
-            bcs::to_bytes(&sigma_proto_comm).unwrap(),
-            bcs::to_bytes(&sigma_proto_resp).unwrap(),
-        ],
-    ))
-}
-
-/// Create a payload for the confidential_asset::normalize_raw entry function.
-#[cfg(feature = "move-harness-with-test-only")]
-fn create_normalize_payload(
-    token_metadata: AccountAddress,
-    new_balance_p_bytes: Vec<Vec<u8>>,
-    new_balance_r_bytes: Vec<Vec<u8>>,
-    new_balance_r_aud_bytes: Vec<Vec<u8>>,
-    zkrp_new_balance_bytes: Vec<u8>,
-    sigma_proto_comm: Vec<Vec<u8>>,
-    sigma_proto_resp: Vec<Vec<u8>>,
-) -> TransactionPayload {
-    TransactionPayload::EntryFunction(EntryFunction::new(
-        ModuleId::new(EXPERIMENTAL_ADDRESS, ident_str!(MODULE_NAME).to_owned()),
-        ident_str!("normalize_raw").to_owned(),
-        vec![],
-        vec![
-            bcs::to_bytes(&token_metadata).unwrap(),
-            bcs::to_bytes(&new_balance_p_bytes).unwrap(),
-            bcs::to_bytes(&new_balance_r_bytes).unwrap(),
-            bcs::to_bytes(&new_balance_r_aud_bytes).unwrap(),
-            bcs::to_bytes(&zkrp_new_balance_bytes).unwrap(),
+            bcs::to_bytes(&new_R_bytes).unwrap(),
             bcs::to_bytes(&sigma_proto_comm).unwrap(),
             bcs::to_bytes(&sigma_proto_resp).unwrap(),
         ],
@@ -455,135 +438,112 @@ fn assert_success(status: &TransactionStatus, function_name: &str) {
 // RistrettoPoint in Move is { handle: u64 } (a VM-internal handle, not actual point bytes).
 // CompressedRistretto and Scalar are { data: Vec<u8> }.
 
-#[allow(dead_code)]
+#[cfg(feature = "move-harness-with-test-only")]
 #[derive(serde::Deserialize)]
+#[allow(dead_code)]
 struct MoveRistrettoPoint {
     handle: u64,
 }
 
-#[allow(dead_code)]
+#[cfg(feature = "move-harness-with-test-only")]
 #[derive(serde::Deserialize)]
 struct MoveCompressedRistretto {
     data: Vec<u8>,
 }
 
-#[allow(dead_code)]
+#[cfg(feature = "move-harness-with-test-only")]
 #[derive(serde::Deserialize)]
 struct MoveScalar {
     data: Vec<u8>,
 }
 
-#[allow(dead_code)]
+#[cfg(feature = "move-harness-with-test-only")]
 #[derive(serde::Deserialize)]
+#[allow(dead_code)]
 struct MoveSigmaProof {
     comm_a: Vec<MoveRistrettoPoint>,
     compressed_comm_a: Vec<MoveCompressedRistretto>,
     resp_sigma: Vec<MoveScalar>,
 }
 
-#[allow(dead_code)]
+#[cfg(feature = "move-harness-with-test-only")]
 #[derive(serde::Deserialize)]
 struct MoveRangeProof {
     bytes: Vec<u8>,
 }
 
-#[allow(dead_code)]
+#[cfg(feature = "move-harness-with-test-only")]
+#[allow(non_snake_case)]
 #[derive(serde::Deserialize)]
-struct MoveAvailableBalance {
-    p: Vec<MoveRistrettoPoint>,
-    r: Vec<MoveRistrettoPoint>,
-    r_aud: Vec<MoveRistrettoPoint>,
-}
-
-#[allow(dead_code)]
-#[derive(serde::Deserialize)]
-struct MoveCompressedAvailableBalance {
-    p: Vec<MoveCompressedRistretto>,
-    r: Vec<MoveCompressedRistretto>,
-    r_aud: Vec<MoveCompressedRistretto>,
-}
-
-#[allow(dead_code)]
-#[derive(serde::Deserialize)]
-struct MovePendingBalance {
-    p: Vec<MoveRistrettoPoint>,
-    r: Vec<MoveRistrettoPoint>,
-}
-
-#[allow(dead_code)]
-#[derive(serde::Deserialize)]
-struct MoveCompressedPendingBalance {
-    p: Vec<MoveCompressedRistretto>,
-    r: Vec<MoveCompressedRistretto>,
-}
-
-#[allow(dead_code)]
-#[derive(serde::Deserialize)]
-enum MoveRegistrationProof {
+enum MoveCompressedAvailableBalance {
     V1 {
-        sigma: MoveSigmaProof,
+        P: Vec<MoveCompressedRistretto>,
+        R: Vec<MoveCompressedRistretto>,
+        R_aud: Vec<MoveCompressedRistretto>,
     },
 }
 
-#[allow(dead_code)]
+#[cfg(feature = "move-harness-with-test-only")]
 #[derive(serde::Deserialize)]
+enum MoveRegistrationProof {
+    V1 { sigma: MoveSigmaProof },
+}
+
+#[cfg(feature = "move-harness-with-test-only")]
+#[derive(serde::Deserialize)]
+#[allow(dead_code)]
 enum MoveWithdrawalProof {
     V1 {
-        new_balance: MoveAvailableBalance,
         compressed_new_balance: MoveCompressedAvailableBalance,
         zkrp_new_balance: MoveRangeProof,
         sigma: MoveSigmaProof,
     },
 }
 
-#[allow(dead_code)]
+#[cfg(feature = "move-harness-with-test-only")]
+#[allow(non_snake_case)]
+#[derive(serde::Deserialize)]
+struct MoveCompressedAmount {
+    compressed_P: Vec<MoveCompressedRistretto>,
+    compressed_R_sender: Vec<MoveCompressedRistretto>,
+    compressed_R_recip: Vec<MoveCompressedRistretto>,
+    compressed_R_eff_aud: Vec<MoveCompressedRistretto>,
+    compressed_R_volun_auds: Vec<Vec<MoveCompressedRistretto>>,
+}
+
+#[cfg(feature = "move-harness-with-test-only")]
+#[allow(non_snake_case, dead_code)]
 #[derive(serde::Deserialize)]
 enum MoveTransferProof {
     V1 {
-        new_balance: MoveAvailableBalance,
         compressed_new_balance: MoveCompressedAvailableBalance,
-        sender_amount: MovePendingBalance,
-        compressed_sender_amount: MoveCompressedPendingBalance,
-        recipient_amount_r: Vec<MoveRistrettoPoint>,
-        compressed_recip_amount_r: Vec<MoveCompressedRistretto>,
-        auditor_amount_rs: Vec<Vec<MoveRistrettoPoint>>,
-        compressed_auditor_rs: Vec<Vec<MoveCompressedRistretto>>,
+        compressed_amount: MoveCompressedAmount,
+        compressed_ek_volun_auds: Vec<MoveCompressedRistretto>,
         zkrp_new_balance: MoveRangeProof,
         zkrp_amount: MoveRangeProof,
         sigma: MoveSigmaProof,
     },
 }
 
-#[allow(dead_code)]
-#[derive(serde::Deserialize)]
-enum MoveNormalizationProof {
-    V1 {
-        new_balance: MoveAvailableBalance,
-        compressed_new_balance: MoveCompressedAvailableBalance,
-        zkrp_new_balance: MoveRangeProof,
-        sigma: MoveSigmaProof,
-    },
-}
-
-#[allow(dead_code)]
+#[cfg(feature = "move-harness-with-test-only")]
+#[allow(non_snake_case, dead_code)]
 #[derive(serde::Deserialize)]
 enum MoveKeyRotationProof {
     V1 {
         compressed_new_ek: MoveCompressedRistretto,
-        new_r: Vec<MoveRistrettoPoint>,
-        compressed_new_r: Vec<MoveCompressedRistretto>,
+        compressed_new_R: Vec<MoveCompressedRistretto>,
         sigma: MoveSigmaProof,
     },
 }
 
 /// Extract byte vectors from compressed Ristretto points.
-#[allow(dead_code)]
+#[cfg(feature = "move-harness-with-test-only")]
 fn extract_compressed_bytes(points: Vec<MoveCompressedRistretto>) -> Vec<Vec<u8>> {
     points.into_iter().map(|p| p.data).collect()
 }
 
 /// Extract byte vectors from scalars.
-#[allow(dead_code)]
+#[cfg(feature = "move-harness-with-test-only")]
 fn extract_scalar_bytes(scalars: Vec<MoveScalar>) -> Vec<Vec<u8>> {
     scalars.into_iter().map(|s| s.data).collect()
 }
@@ -903,19 +863,24 @@ fn prove_and_build_withdraw_to(
     let proof: MoveWithdrawalProof =
         bcs::from_bytes(&result.return_values[0].0).expect("deserialize WithdrawalProof");
     let MoveWithdrawalProof::V1 {
-        new_balance: _,
         compressed_new_balance,
         zkrp_new_balance,
         sigma,
     } = proof;
 
+    let MoveCompressedAvailableBalance::V1 {
+        P: new_bal_p,
+        R: new_bal_r,
+        R_aud: new_bal_r_aud,
+    } = compressed_new_balance;
+
     create_withdraw_to_payload(
         apt_metadata,
         *bob.address(),
         withdraw_amount,
-        extract_compressed_bytes(compressed_new_balance.p),
-        extract_compressed_bytes(compressed_new_balance.r),
-        extract_compressed_bytes(compressed_new_balance.r_aud),
+        extract_compressed_bytes(new_bal_p),
+        extract_compressed_bytes(new_bal_r),
+        extract_compressed_bytes(new_bal_r_aud),
         zkrp_new_balance.bytes,
         extract_compressed_bytes(sigma.compressed_comm_a),
         extract_scalar_bytes(sigma.resp_sigma),
@@ -932,8 +897,8 @@ fn profile_confidential_asset_withdraw_to(detailed: bool, auditor_mode: AuditorM
     let apt_metadata = set_up_confidential_store_for_apt(&mut h);
 
     if auditor_mode != AuditorMode::NoAuditor {
-        let (_auditor_dk, auditor_ek) = generate_keypair(&mut h);
-        set_auditor_for_asset_type(&mut h, apt_metadata, &auditor_ek);
+        let (_dk_aud, ek_aud) = generate_keypair(&mut h);
+        set_auditor_for_asset_type(&mut h, apt_metadata, &ek_aud);
     }
 
     let (alice_dk, alice_ek) = generate_keypair(&mut h);
@@ -956,7 +921,13 @@ fn profile_confidential_asset_withdraw_to(detailed: bool, auditor_mode: AuditorM
     if auditor_mode == AuditorMode::AuditorSubsequent {
         remaining -= withdraw_amount;
         let payload = prove_and_build_withdraw_to(
-            &mut h, &alice, &bob, apt_metadata, &alice_dk, withdraw_amount, remaining as u128,
+            &mut h,
+            &alice,
+            &bob,
+            apt_metadata,
+            &alice_dk,
+            withdraw_amount,
+            remaining as u128,
         );
         let status = h.run_transaction_payload(&alice, payload);
         assert_success(&status, "withdraw_to (warmup)");
@@ -964,7 +935,13 @@ fn profile_confidential_asset_withdraw_to(detailed: bool, auditor_mode: AuditorM
 
     remaining -= withdraw_amount;
     let payload = prove_and_build_withdraw_to(
-        &mut h, &alice, &bob, apt_metadata, &alice_dk, withdraw_amount, remaining as u128,
+        &mut h,
+        &alice,
+        &bob,
+        apt_metadata,
+        &alice_dk,
+        withdraw_amount,
+        remaining as u128,
     );
 
     let (status, gas_log, gas_used, fee_statement) =
@@ -975,7 +952,13 @@ fn profile_confidential_asset_withdraw_to(detailed: bool, auditor_mode: AuditorM
         AuditorMode::AuditorFirst => "withdraw_to (with auditor, first time)",
         AuditorMode::AuditorSubsequent => "withdraw_to (with auditor, subsequent)",
     };
-    print_gas_cost(label, gas_used, &fee_statement.unwrap(), EXPERIMENTAL_ADDRESS, MODULE_NAME);
+    print_gas_cost(
+        label,
+        gas_used,
+        &fee_statement.unwrap(),
+        EXPERIMENTAL_ADDRESS,
+        MODULE_NAME,
+    );
     maybe_generate_html_report(detailed, &gas_log, "confidential_asset_withdraw_to");
 
     assert_success(&status, "withdraw_to");
@@ -1009,6 +992,7 @@ fn bench_gas_withdraw_to_detailed() {
 
 /// Generate a transfer proof and build the transaction payload.
 #[cfg(feature = "move-harness-with-test-only")]
+#[allow(non_snake_case)]
 fn prove_and_build_confidential_transfer(
     h: &mut MoveHarness,
     alice: &Account,
@@ -1017,6 +1001,7 @@ fn prove_and_build_confidential_transfer(
     alice_dk: &[u8],
     transfer_amount: u64,
     new_balance_amount: u128,
+    volun_auditor_eks: &[Vec<u8>],
 ) -> TransactionPayload {
     let result = h
         .exec_function_bypass_visibility(
@@ -1031,44 +1016,52 @@ fn prove_and_build_confidential_transfer(
                 bcs::to_bytes(&alice_dk.to_vec()).unwrap(),
                 bcs::to_bytes(&transfer_amount).unwrap(),
                 bcs::to_bytes(&new_balance_amount).unwrap(),
-                bcs::to_bytes(&Vec::<Vec<u8>>::new()).unwrap(), // extra_auditor_eks (empty)
+                bcs::to_bytes(&volun_auditor_eks.to_vec()).unwrap(),
             ],
         )
         .expect("prove_transfer should succeed");
 
-    assert_eq!(result.return_values.len(), 2);
+    assert_eq!(result.return_values.len(), 1);
     let proof: MoveTransferProof =
         bcs::from_bytes(&result.return_values[0].0).expect("deserialize TransferProof");
     let MoveTransferProof::V1 {
-        new_balance: _,
         compressed_new_balance,
-        sender_amount: _,
-        compressed_sender_amount,
-        recipient_amount_r: _,
-        compressed_recip_amount_r,
-        auditor_amount_rs: _,
-        compressed_auditor_rs,
+        compressed_amount,
+        compressed_ek_volun_auds,
         zkrp_new_balance,
         zkrp_amount,
         sigma,
     } = proof;
 
-    let auditor_rs_bytes: Vec<Vec<Vec<u8>>> = compressed_auditor_rs
+    let ek_volun_auds_bytes: Vec<Vec<u8>> = compressed_ek_volun_auds
+        .into_iter()
+        .map(|p| p.data)
+        .collect();
+
+    let amount_R_volun_auds_bytes: Vec<Vec<Vec<u8>>> = compressed_amount
+        .compressed_R_volun_auds
         .into_iter()
         .map(|rs| extract_compressed_bytes(rs))
         .collect();
 
+    let MoveCompressedAvailableBalance::V1 {
+        P: new_bal_P,
+        R: new_bal_R,
+        R_aud: new_bal_R_aud,
+    } = compressed_new_balance;
+
     create_confidential_transfer_payload(
         apt_metadata,
         *bob.address(),
-        extract_compressed_bytes(compressed_new_balance.p),
-        extract_compressed_bytes(compressed_new_balance.r),
-        extract_compressed_bytes(compressed_new_balance.r_aud),
-        extract_compressed_bytes(compressed_sender_amount.p),
-        extract_compressed_bytes(compressed_sender_amount.r),
-        extract_compressed_bytes(compressed_recip_amount_r),
-        vec![], // extra_auditor_eks (empty — effective auditor fetched by contract)
-        auditor_rs_bytes,
+        extract_compressed_bytes(new_bal_P),
+        extract_compressed_bytes(new_bal_R),
+        extract_compressed_bytes(new_bal_R_aud),
+        extract_compressed_bytes(compressed_amount.compressed_P),
+        extract_compressed_bytes(compressed_amount.compressed_R_sender),
+        extract_compressed_bytes(compressed_amount.compressed_R_recip),
+        extract_compressed_bytes(compressed_amount.compressed_R_eff_aud),
+        ek_volun_auds_bytes,
+        amount_R_volun_auds_bytes,
         zkrp_new_balance.bytes,
         zkrp_amount.bytes,
         extract_compressed_bytes(sigma.compressed_comm_a),
@@ -1079,16 +1072,27 @@ fn prove_and_build_confidential_transfer(
 /// Profile gas usage for the confidential asset `confidential_transfer` function.
 /// This requires generating ZK proofs via test-only Move functions.
 #[cfg(feature = "move-harness-with-test-only")]
-fn profile_confidential_asset_confidential_transfer(detailed: bool, auditor_mode: AuditorMode) {
+fn profile_confidential_asset_confidential_transfer(
+    detailed: bool,
+    auditor_mode: AuditorMode,
+    num_volun_auditors: u8,
+) {
     let mut h = setup_harness();
     let alice = create_alice(&mut h);
     let bob = create_bob(&mut h);
     let apt_metadata = set_up_confidential_store_for_apt(&mut h);
 
     if auditor_mode != AuditorMode::NoAuditor {
-        let (_auditor_dk, auditor_ek) = generate_keypair(&mut h);
-        set_auditor_for_asset_type(&mut h, apt_metadata, &auditor_ek);
+        let (_dk_aud, ek_aud) = generate_keypair(&mut h);
+        set_auditor_for_asset_type(&mut h, apt_metadata, &ek_aud);
     }
+
+    let volun_auditor_eks: Vec<Vec<u8>> = (0..num_volun_auditors)
+        .map(|_| {
+            let (_dk, ek) = generate_keypair(&mut h);
+            ek
+        })
+        .collect();
 
     let (alice_dk, alice_ek) = generate_keypair(&mut h);
     let (bob_dk, bob_ek) = generate_keypair(&mut h);
@@ -1110,7 +1114,14 @@ fn profile_confidential_asset_confidential_transfer(detailed: bool, auditor_mode
     if auditor_mode == AuditorMode::AuditorSubsequent {
         remaining -= transfer_amount;
         let payload = prove_and_build_confidential_transfer(
-            &mut h, &alice, &bob, apt_metadata, &alice_dk, transfer_amount, remaining as u128,
+            &mut h,
+            &alice,
+            &bob,
+            apt_metadata,
+            &alice_dk,
+            transfer_amount,
+            remaining as u128,
+            &volun_auditor_eks,
         );
         let status = h.run_transaction_payload(&alice, payload);
         assert_success(&status, "confidential_transfer (warmup)");
@@ -1118,19 +1129,51 @@ fn profile_confidential_asset_confidential_transfer(detailed: bool, auditor_mode
 
     remaining -= transfer_amount;
     let payload = prove_and_build_confidential_transfer(
-        &mut h, &alice, &bob, apt_metadata, &alice_dk, transfer_amount, remaining as u128,
+        &mut h,
+        &alice,
+        &bob,
+        apt_metadata,
+        &alice_dk,
+        transfer_amount,
+        remaining as u128,
+        &volun_auditor_eks,
     );
 
     let (status, gas_log, gas_used, fee_statement) =
         h.evaluate_gas_with_profiler_and_status(&alice, payload);
 
-    let label = match auditor_mode {
-        AuditorMode::NoAuditor => "confidential_transfer",
-        AuditorMode::AuditorFirst => "confidential_transfer (with auditor, first time)",
-        AuditorMode::AuditorSubsequent => "confidential_transfer (with auditor, subsequent)",
+    let volun_label = if num_volun_auditors > 0 {
+        format!(", {} volun", num_volun_auditors)
+    } else {
+        String::new()
     };
-    print_gas_cost(label, gas_used, &fee_statement.unwrap(), EXPERIMENTAL_ADDRESS, MODULE_NAME);
-    maybe_generate_html_report(detailed, &gas_log, "confidential_asset_confidential_transfer");
+    let label = match auditor_mode {
+        AuditorMode::NoAuditor => format!("confidential_transfer ({} volun)", num_volun_auditors),
+        AuditorMode::AuditorFirst => {
+            format!(
+                "confidential_transfer (with auditor, first time{})",
+                volun_label
+            )
+        },
+        AuditorMode::AuditorSubsequent => {
+            format!(
+                "confidential_transfer (with auditor, subsequent{})",
+                volun_label
+            )
+        },
+    };
+    print_gas_cost(
+        &label,
+        gas_used,
+        &fee_statement.unwrap(),
+        EXPERIMENTAL_ADDRESS,
+        MODULE_NAME,
+    );
+    maybe_generate_html_report(
+        detailed,
+        &gas_log,
+        "confidential_asset_confidential_transfer",
+    );
 
     assert_success(&status, "confidential_transfer");
     assert!(gas_used > 0, "confidential_transfer should consume gas");
@@ -1139,31 +1182,86 @@ fn profile_confidential_asset_confidential_transfer(detailed: bool, auditor_mode
 #[test]
 #[cfg(feature = "move-harness-with-test-only")]
 fn bench_gas_confidential_transfer() {
-    profile_confidential_asset_confidential_transfer(false, AuditorMode::NoAuditor);
+    profile_confidential_asset_confidential_transfer(false, AuditorMode::NoAuditor, 0);
+}
+
+#[test]
+#[cfg(feature = "move-harness-with-test-only")]
+fn bench_gas_confidential_transfer_1_volun() {
+    profile_confidential_asset_confidential_transfer(false, AuditorMode::NoAuditor, 1);
+}
+
+#[test]
+#[cfg(feature = "move-harness-with-test-only")]
+fn bench_gas_confidential_transfer_2_volun() {
+    profile_confidential_asset_confidential_transfer(false, AuditorMode::NoAuditor, 2);
+}
+
+#[test]
+#[cfg(feature = "move-harness-with-test-only")]
+fn bench_gas_confidential_transfer_3_volun() {
+    profile_confidential_asset_confidential_transfer(false, AuditorMode::NoAuditor, 3);
 }
 
 #[test]
 #[cfg(feature = "move-harness-with-test-only")]
 fn bench_gas_confidential_transfer_with_auditor() {
-    profile_confidential_asset_confidential_transfer(false, AuditorMode::AuditorFirst);
+    profile_confidential_asset_confidential_transfer(false, AuditorMode::AuditorFirst, 0);
 }
 
 #[test]
 #[cfg(feature = "move-harness-with-test-only")]
 fn bench_gas_confidential_transfer_with_auditor_subsequent() {
-    profile_confidential_asset_confidential_transfer(false, AuditorMode::AuditorSubsequent);
+    profile_confidential_asset_confidential_transfer(false, AuditorMode::AuditorSubsequent, 0);
+}
+
+#[test]
+#[cfg(feature = "move-harness-with-test-only")]
+fn bench_gas_confidential_transfer_with_auditor_1_volun() {
+    profile_confidential_asset_confidential_transfer(false, AuditorMode::AuditorFirst, 1);
+}
+
+#[test]
+#[cfg(feature = "move-harness-with-test-only")]
+fn bench_gas_confidential_transfer_with_auditor_1_volun_subsequent() {
+    profile_confidential_asset_confidential_transfer(false, AuditorMode::AuditorSubsequent, 1);
+}
+
+#[test]
+#[cfg(feature = "move-harness-with-test-only")]
+fn bench_gas_confidential_transfer_with_auditor_2_volun() {
+    profile_confidential_asset_confidential_transfer(false, AuditorMode::AuditorFirst, 2);
+}
+
+#[test]
+#[cfg(feature = "move-harness-with-test-only")]
+fn bench_gas_confidential_transfer_with_auditor_2_volun_subsequent() {
+    profile_confidential_asset_confidential_transfer(false, AuditorMode::AuditorSubsequent, 2);
+}
+
+#[test]
+#[cfg(feature = "move-harness-with-test-only")]
+fn bench_gas_confidential_transfer_with_auditor_3_volun() {
+    profile_confidential_asset_confidential_transfer(false, AuditorMode::AuditorFirst, 3);
+}
+
+#[test]
+#[cfg(feature = "move-harness-with-test-only")]
+fn bench_gas_confidential_transfer_with_auditor_3_volun_subsequent() {
+    profile_confidential_asset_confidential_transfer(false, AuditorMode::AuditorSubsequent, 3);
 }
 
 #[test]
 #[ignore]
 #[cfg(feature = "move-harness-with-test-only")]
 fn bench_gas_confidential_transfer_detailed() {
-    profile_confidential_asset_confidential_transfer(true, AuditorMode::NoAuditor);
+    profile_confidential_asset_confidential_transfer(true, AuditorMode::NoAuditor, 0);
 }
 
 /// Profile gas usage for the confidential asset `rotate_encryption_key` function.
 /// This requires generating ZK proofs via test-only Move functions.
 #[cfg(feature = "move-harness-with-test-only")]
+#[allow(non_snake_case)]
 fn profile_confidential_asset_rotate_encryption_key(detailed: bool) {
     let mut h = setup_harness();
     let alice = create_alice(&mut h);
@@ -1209,13 +1307,12 @@ fn profile_confidential_asset_rotate_encryption_key(detailed: bool) {
     let proof: MoveKeyRotationProof = bcs::from_bytes(bytes).expect("deserialize KeyRotationProof");
     let MoveKeyRotationProof::V1 {
         compressed_new_ek,
-        new_r: _,
-        compressed_new_r,
+        compressed_new_R,
         sigma,
     } = proof;
 
     let new_ek_bytes = compressed_new_ek.data;
-    let new_r_bytes = extract_compressed_bytes(compressed_new_r);
+    let new_R_bytes = extract_compressed_bytes(compressed_new_R);
     let sigma_proto_comm = extract_compressed_bytes(sigma.compressed_comm_a);
     let sigma_proto_resp = extract_scalar_bytes(sigma.resp_sigma);
 
@@ -1224,7 +1321,7 @@ fn profile_confidential_asset_rotate_encryption_key(detailed: bool) {
         apt_metadata,
         new_ek_bytes,
         true, // unpause
-        new_r_bytes,
+        new_R_bytes,
         sigma_proto_comm,
         sigma_proto_resp,
     );
@@ -1260,158 +1357,6 @@ fn bench_gas_rotate_encryption_key() {
 #[cfg(feature = "move-harness-with-test-only")]
 fn bench_gas_rotate_encryption_key_detailed() {
     profile_confidential_asset_rotate_encryption_key(true);
-}
-
-/// Generate a normalization proof and build the transaction payload.
-#[cfg(feature = "move-harness-with-test-only")]
-fn prove_and_build_normalize(
-    h: &mut MoveHarness,
-    alice: &Account,
-    apt_metadata: AccountAddress,
-    alice_dk: &[u8],
-    balance_amount: u128,
-) -> TransactionPayload {
-    let result = h
-        .exec_function_bypass_visibility(
-            EXPERIMENTAL_ADDRESS,
-            MODULE_NAME,
-            "prove_normalization",
-            vec![],
-            vec![
-                bcs::to_bytes(alice.address()).unwrap(),
-                bcs::to_bytes(&apt_metadata).unwrap(),
-                bcs::to_bytes(&alice_dk.to_vec()).unwrap(),
-                bcs::to_bytes(&balance_amount).unwrap(),
-            ],
-        )
-        .expect("prove_normalization should succeed");
-
-    assert_eq!(result.return_values.len(), 1);
-    let proof: MoveNormalizationProof =
-        bcs::from_bytes(&result.return_values[0].0).expect("deserialize NormalizationProof");
-    let MoveNormalizationProof::V1 {
-        new_balance: _,
-        compressed_new_balance,
-        zkrp_new_balance,
-        sigma,
-    } = proof;
-
-    create_normalize_payload(
-        apt_metadata,
-        extract_compressed_bytes(compressed_new_balance.p),
-        extract_compressed_bytes(compressed_new_balance.r),
-        extract_compressed_bytes(compressed_new_balance.r_aud),
-        zkrp_new_balance.bytes,
-        extract_compressed_bytes(sigma.compressed_comm_a),
-        extract_scalar_bytes(sigma.resp_sigma),
-    )
-}
-
-/// Create a non-normalized balance by depositing `amount` and rolling over.
-#[cfg(feature = "move-harness-with-test-only")]
-fn deposit_and_rollover_to_unnormalized(
-    h: &mut MoveHarness,
-    alice: &Account,
-    apt_metadata: AccountAddress,
-    amount: u64,
-) {
-    let deposit_payload = create_deposit_payload(apt_metadata, amount);
-    let status = h.run_transaction_payload(alice, deposit_payload);
-    assert_success(&status, "deposit");
-
-    let rollover_payload = create_rollover_pending_balance_payload(apt_metadata);
-    let status = h.run_transaction_payload(alice, rollover_payload);
-    assert_success(&status, "rollover_pending_balance");
-}
-
-/// Profile gas usage for the confidential asset `normalize` function.
-/// This requires generating ZK proofs via test-only Move functions.
-#[cfg(feature = "move-harness-with-test-only")]
-fn profile_confidential_asset_normalize(detailed: bool, auditor_mode: AuditorMode) {
-    let mut h = setup_harness();
-    let alice = create_alice(&mut h);
-    let apt_metadata = set_up_confidential_store_for_apt(&mut h);
-
-    if auditor_mode != AuditorMode::NoAuditor {
-        let (_auditor_dk, auditor_ek) = generate_keypair(&mut h);
-        set_auditor_for_asset_type(&mut h, apt_metadata, &auditor_ek);
-    }
-
-    let (alice_dk, alice_ek) = generate_keypair(&mut h);
-    register_account(&mut h, &alice, apt_metadata, &alice_dk, &alice_ek);
-
-    let max_chunk_value = 65535u64;
-
-    // Deposit twice and rollover to create a non-normalized balance
-    let deposit_payload = create_deposit_payload(apt_metadata, max_chunk_value);
-    let status = h.run_transaction_payload(&alice, deposit_payload.clone());
-    assert_success(&status, "deposit (1)");
-
-    let deposit_payload2 = create_deposit_payload(apt_metadata, max_chunk_value);
-    let status = h.run_transaction_payload(&alice, deposit_payload2);
-    assert_success(&status, "deposit (2)");
-
-    let rollover_payload = create_rollover_pending_balance_payload(apt_metadata);
-    let status = h.run_transaction_payload(&alice, rollover_payload);
-    assert_success(&status, "rollover_pending_balance");
-
-    let mut balance_amount = (max_chunk_value as u128) * 2;
-
-    if auditor_mode == AuditorMode::AuditorSubsequent {
-        // Run a first (unmeasured) normalization to pay the one-time storage expansion cost
-        let payload = prove_and_build_normalize(
-            &mut h, &alice, apt_metadata, &alice_dk, balance_amount,
-        );
-        let status = h.run_transaction_payload(&alice, payload);
-        assert_success(&status, "normalize (warmup)");
-
-        // Un-normalize: deposit + rollover
-        deposit_and_rollover_to_unnormalized(&mut h, &alice, apt_metadata, max_chunk_value);
-        balance_amount += max_chunk_value as u128;
-    }
-
-    let payload = prove_and_build_normalize(
-        &mut h, &alice, apt_metadata, &alice_dk, balance_amount,
-    );
-
-    let (status, gas_log, gas_used, fee_statement) =
-        h.evaluate_gas_with_profiler_and_status(&alice, payload);
-
-    let label = match auditor_mode {
-        AuditorMode::NoAuditor => "normalize",
-        AuditorMode::AuditorFirst => "normalize (with auditor, first time)",
-        AuditorMode::AuditorSubsequent => "normalize (with auditor, subsequent)",
-    };
-    print_gas_cost(label, gas_used, &fee_statement.unwrap(), EXPERIMENTAL_ADDRESS, MODULE_NAME);
-    maybe_generate_html_report(detailed, &gas_log, "confidential_asset_normalize");
-
-    assert_success(&status, "normalize");
-    assert!(gas_used > 0, "normalize should consume gas");
-}
-
-#[test]
-#[cfg(feature = "move-harness-with-test-only")]
-fn bench_gas_normalize() {
-    profile_confidential_asset_normalize(false, AuditorMode::NoAuditor);
-}
-
-#[test]
-#[cfg(feature = "move-harness-with-test-only")]
-fn bench_gas_normalize_with_auditor() {
-    profile_confidential_asset_normalize(false, AuditorMode::AuditorFirst);
-}
-
-#[test]
-#[cfg(feature = "move-harness-with-test-only")]
-fn bench_gas_normalize_with_auditor_subsequent() {
-    profile_confidential_asset_normalize(false, AuditorMode::AuditorSubsequent);
-}
-
-#[test]
-#[ignore]
-#[cfg(feature = "move-harness-with-test-only")]
-fn bench_gas_normalize_detailed() {
-    profile_confidential_asset_normalize(true, AuditorMode::NoAuditor);
 }
 
 // =================================================================================================
@@ -1462,7 +1407,7 @@ fn call_test_only_function() {
     // Create Alice with some APT
     let alice = h.new_account_with_balance_at(
         AccountAddress::from_hex_literal(ALICE_ADDRESS).unwrap(),
-        1_000_000_000, // 10 APT
+        10_000_000_000, // 10 APT
     );
 
     // Set up the confidential store for APT

@@ -61,11 +61,7 @@ Creates a new secret witness from a vector of scalars.
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="sigma_protocol_witness.md#0x7_sigma_protocol_witness_new_secret_witness">new_secret_witness</a>(w: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;Scalar&gt;): <a href="sigma_protocol_witness.md#0x7_sigma_protocol_witness_Witness">Witness</a> {
-    <a href="sigma_protocol_witness.md#0x7_sigma_protocol_witness_Witness">Witness</a> {
-        w
-    }
-}
+<pre><code><b>public</b> <b>fun</b> <a href="sigma_protocol_witness.md#0x7_sigma_protocol_witness_new_secret_witness">new_secret_witness</a>(w: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;Scalar&gt;): <a href="sigma_protocol_witness.md#0x7_sigma_protocol_witness_Witness">Witness</a> { <a href="sigma_protocol_witness.md#0x7_sigma_protocol_witness_Witness">Witness</a> { w } }
 </code></pre>
 
 
@@ -114,7 +110,6 @@ Returns the <code>i</code>th scalar in the witness.
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="sigma_protocol_witness.md#0x7_sigma_protocol_witness_get">get</a>(self: &<a href="sigma_protocol_witness.md#0x7_sigma_protocol_witness_Witness">Witness</a>, i: u64): &Scalar {
-    // <a href="../../aptos-framework/../aptos-stdlib/doc/debug.md#0x1_debug_print">debug::print</a>(&<a href="../../aptos-framework/../aptos-stdlib/doc/string_utils.md#0x1_string_utils_format2">string_utils::format2</a>(&b"len = {}, i = {}", self.<a href="sigma_protocol_witness.md#0x7_sigma_protocol_witness_length">length</a>(), i));
     &self.w[i]
 }
 </code></pre>

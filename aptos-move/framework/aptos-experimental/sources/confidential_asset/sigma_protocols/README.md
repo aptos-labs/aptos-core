@@ -48,5 +48,3 @@ In other words, the implementations of $\psi$ and $f$ return "representations" (
 There are certainly cases where the transformation function needs to work directly with the scalars (e.g., the public withdrawal NP relation).
 
 The Schnorr and PedEq examples in the [../../../tests/confidential_asset/sigma_protocols/](../../../tests/confidential_asset/sigma_protocols/) directory should serve as good examples of how to do this right.
-
-**TODO:** May want to add another example where the public statement & witness size is a variable, rather than fixed: e.g., PedEq for Pedersen vector commmitments?

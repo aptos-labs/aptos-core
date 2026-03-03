@@ -3,17 +3,8 @@
 
 # Module `0x7::ristretto255_twisted_elgamal`
 
-This module provides utilities for Twisted ElGamal encryption over the Ristretto255 curve.
-
-In Twisted ElGamal, an encryption key (EK) is derived from a decryption key (DK) as:
-EK = DK^(-1) * H
-where H is a secondary basepoint (distinct from the primary basepoint G).
-
-A ciphertext encrypting value <code>v</code> with randomness <code>r</code> under EK is:
-C = v * G + r * H  (value component)
-D = r * EK         (EK component for decryption)
-
-Decryption: v * G = C - DK * D
+Twisted ElGamal encryption over Ristretto255.
+EK = DK^(-1) * H. Ciphertext: C = v*G + r*H, D = r*EK. Decrypt: v*G = C - DK*D.
 
 
 -  [Function `get_encryption_key_basepoint_compressed`](#0x7_ristretto255_twisted_elgamal_get_encryption_key_basepoint_compressed)

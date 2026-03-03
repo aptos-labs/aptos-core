@@ -67,7 +67,7 @@ identifier and a session identifier)
 The transformation function  $f : \mathbb{G}^{n_1} \times \mathbb{F}^{n_2} \rightarrow \mathbb{G}^m$
 
 
-<pre><code><b>struct</b> <a href="sigma_protocol_homomorphism.md#0x7_sigma_protocol_homomorphism_TransformationFunction">TransformationFunction</a>
+<pre><code><b>struct</b> <a href="sigma_protocol_homomorphism.md#0x7_sigma_protocol_homomorphism_TransformationFunction">TransformationFunction</a>&lt;P&gt;
 </code></pre>
 
 
@@ -78,7 +78,7 @@ The transformation function  $f : \mathbb{G}^{n_1} \times \mathbb{F}^{n_2} \righ
 
 <dl>
 <dt>
-<code>0: |&<a href="sigma_protocol_statement.md#0x7_sigma_protocol_statement_Statement">sigma_protocol_statement::Statement</a>|<a href="sigma_protocol_representation_vec.md#0x7_sigma_protocol_representation_vec_RepresentationVec">sigma_protocol_representation_vec::RepresentationVec</a></code>
+<code>0: |&<a href="sigma_protocol_statement.md#0x7_sigma_protocol_statement_Statement">sigma_protocol_statement::Statement</a>&lt;P&gt;|<a href="sigma_protocol_representation_vec.md#0x7_sigma_protocol_representation_vec_RepresentationVec">sigma_protocol_representation_vec::RepresentationVec</a></code>
 </dt>
 <dd>
 
@@ -95,7 +95,7 @@ The transformation function  $f : \mathbb{G}^{n_1} \times \mathbb{F}^{n_2} \righ
 The homomorphism $\psi : \mathbb{F}^k \rightarrow \mathbb{G}^m$
 
 
-<pre><code><b>struct</b> <a href="sigma_protocol_homomorphism.md#0x7_sigma_protocol_homomorphism_Homomorphism">Homomorphism</a>
+<pre><code><b>struct</b> <a href="sigma_protocol_homomorphism.md#0x7_sigma_protocol_homomorphism_Homomorphism">Homomorphism</a>&lt;P&gt;
 </code></pre>
 
 
@@ -106,7 +106,7 @@ The homomorphism $\psi : \mathbb{F}^k \rightarrow \mathbb{G}^m$
 
 <dl>
 <dt>
-<code>0: |&<a href="sigma_protocol_statement.md#0x7_sigma_protocol_statement_Statement">sigma_protocol_statement::Statement</a>, &<a href="sigma_protocol_witness.md#0x7_sigma_protocol_witness_Witness">sigma_protocol_witness::Witness</a>|<a href="sigma_protocol_representation_vec.md#0x7_sigma_protocol_representation_vec_RepresentationVec">sigma_protocol_representation_vec::RepresentationVec</a></code>
+<code>0: |&<a href="sigma_protocol_statement.md#0x7_sigma_protocol_statement_Statement">sigma_protocol_statement::Statement</a>&lt;P&gt;, &<a href="sigma_protocol_witness.md#0x7_sigma_protocol_witness_Witness">sigma_protocol_witness::Witness</a>|<a href="sigma_protocol_representation_vec.md#0x7_sigma_protocol_representation_vec_RepresentationVec">sigma_protocol_representation_vec::RepresentationVec</a></code>
 </dt>
 <dd>
 
@@ -123,7 +123,7 @@ The homomorphism $\psi : \mathbb{F}^k \rightarrow \mathbb{G}^m$
 Computes and returns $\psi(X, w) \in \mathbb{G}^m$ given the public statement $X$ and the secret witness $w$.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="sigma_protocol_homomorphism.md#0x7_sigma_protocol_homomorphism_evaluate_psi">evaluate_psi</a>(psi: <a href="sigma_protocol_homomorphism.md#0x7_sigma_protocol_homomorphism_Homomorphism">sigma_protocol_homomorphism::Homomorphism</a>, stmt: &<a href="sigma_protocol_statement.md#0x7_sigma_protocol_statement_Statement">sigma_protocol_statement::Statement</a>, witn: &<a href="sigma_protocol_witness.md#0x7_sigma_protocol_witness_Witness">sigma_protocol_witness::Witness</a>): <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="../../aptos-framework/../aptos-stdlib/doc/ristretto255.md#0x1_ristretto255_RistrettoPoint">0x1::ristretto255::RistrettoPoint</a>&gt;
+<pre><code><b>public</b> <b>fun</b> <a href="sigma_protocol_homomorphism.md#0x7_sigma_protocol_homomorphism_evaluate_psi">evaluate_psi</a>&lt;P&gt;(psi: <a href="sigma_protocol_homomorphism.md#0x7_sigma_protocol_homomorphism_Homomorphism">sigma_protocol_homomorphism::Homomorphism</a>&lt;P&gt;, stmt: &<a href="sigma_protocol_statement.md#0x7_sigma_protocol_statement_Statement">sigma_protocol_statement::Statement</a>&lt;P&gt;, witn: &<a href="sigma_protocol_witness.md#0x7_sigma_protocol_witness_Witness">sigma_protocol_witness::Witness</a>): <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="../../aptos-framework/../aptos-stdlib/doc/ristretto255.md#0x1_ristretto255_RistrettoPoint">0x1::ristretto255::RistrettoPoint</a>&gt;
 </code></pre>
 
 
@@ -132,8 +132,8 @@ Computes and returns $\psi(X, w) \in \mathbb{G}^m$ given the public statement $X
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> inline <b>fun</b> <a href="sigma_protocol_homomorphism.md#0x7_sigma_protocol_homomorphism_evaluate_psi">evaluate_psi</a>(psi: <a href="sigma_protocol_homomorphism.md#0x7_sigma_protocol_homomorphism_Homomorphism">Homomorphism</a>,
-                               stmt: &Statement,
+<pre><code><b>public</b> inline <b>fun</b> <a href="sigma_protocol_homomorphism.md#0x7_sigma_protocol_homomorphism_evaluate_psi">evaluate_psi</a>&lt;P&gt;(psi: <a href="sigma_protocol_homomorphism.md#0x7_sigma_protocol_homomorphism_Homomorphism">Homomorphism</a>&lt;P&gt;,
+                               stmt: &Statement&lt;P&gt;,
                                witn: &Witness): <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;RistrettoPoint&gt; {
     psi(stmt, witn).map_ref(|repr| multi_scalar_mul(&repr.to_points(stmt), repr.get_scalars()))
 }
@@ -150,7 +150,7 @@ Computes and returns $\psi(X, w) \in \mathbb{G}^m$ given the public statement $X
 Returns $f(X) \in \mathbb{G}^m$ given the public statement $X$.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="sigma_protocol_homomorphism.md#0x7_sigma_protocol_homomorphism_evaluate_f">evaluate_f</a>(f: <a href="sigma_protocol_homomorphism.md#0x7_sigma_protocol_homomorphism_TransformationFunction">sigma_protocol_homomorphism::TransformationFunction</a>, stmt: &<a href="sigma_protocol_statement.md#0x7_sigma_protocol_statement_Statement">sigma_protocol_statement::Statement</a>): <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="../../aptos-framework/../aptos-stdlib/doc/ristretto255.md#0x1_ristretto255_RistrettoPoint">0x1::ristretto255::RistrettoPoint</a>&gt;
+<pre><code><b>public</b> <b>fun</b> <a href="sigma_protocol_homomorphism.md#0x7_sigma_protocol_homomorphism_evaluate_f">evaluate_f</a>&lt;P&gt;(f: <a href="sigma_protocol_homomorphism.md#0x7_sigma_protocol_homomorphism_TransformationFunction">sigma_protocol_homomorphism::TransformationFunction</a>&lt;P&gt;, stmt: &<a href="sigma_protocol_statement.md#0x7_sigma_protocol_statement_Statement">sigma_protocol_statement::Statement</a>&lt;P&gt;): <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="../../aptos-framework/../aptos-stdlib/doc/ristretto255.md#0x1_ristretto255_RistrettoPoint">0x1::ristretto255::RistrettoPoint</a>&gt;
 </code></pre>
 
 
@@ -159,8 +159,8 @@ Returns $f(X) \in \mathbb{G}^m$ given the public statement $X$.
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> inline <b>fun</b> <a href="sigma_protocol_homomorphism.md#0x7_sigma_protocol_homomorphism_evaluate_f">evaluate_f</a>(f: <a href="sigma_protocol_homomorphism.md#0x7_sigma_protocol_homomorphism_TransformationFunction">TransformationFunction</a>,
-                             stmt: &Statement): <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;RistrettoPoint&gt; {
+<pre><code><b>public</b> inline <b>fun</b> <a href="sigma_protocol_homomorphism.md#0x7_sigma_protocol_homomorphism_evaluate_f">evaluate_f</a>&lt;P&gt;(f: <a href="sigma_protocol_homomorphism.md#0x7_sigma_protocol_homomorphism_TransformationFunction">TransformationFunction</a>&lt;P&gt;,
+                             stmt: &Statement&lt;P&gt;): <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;RistrettoPoint&gt; {
     f(stmt).map_ref(|repr| multi_scalar_mul(&repr.to_points(stmt), repr.get_scalars()))
 }
 </code></pre>

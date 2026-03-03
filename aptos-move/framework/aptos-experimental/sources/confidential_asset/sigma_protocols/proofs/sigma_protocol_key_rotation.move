@@ -56,33 +56,43 @@
 /// $$
 ///
 module aptos_experimental::sigma_protocol_key_rotation {
+    friend aptos_experimental::confidential_asset;
+
     use std::bcs;
     use std::error;
     use std::signer;
     use std::vector;
-    use aptos_std::ristretto255::{Self, RistrettoPoint, Scalar, CompressedRistretto};
+    use aptos_std::ristretto255::CompressedRistretto;
+    use aptos_framework::chain_id;
     use aptos_framework::fungible_asset::Metadata;
     use aptos_framework::object::Object;
-    use aptos_experimental::confidential_available_balance;
+    use aptos_experimental::confidential_balance::get_num_available_chunks;
     use aptos_experimental::sigma_protocol;
     use aptos_experimental::sigma_protocol_proof::Proof;
     use aptos_experimental::sigma_protocol_fiat_shamir::new_domain_separator;
-    use aptos_experimental::sigma_protocol_witness::{Witness, new_secret_witness};
-    use aptos_experimental::sigma_protocol_statement::{Statement, new_statement};
-    use aptos_experimental::sigma_protocol_representation::new_representation;
+    use aptos_experimental::sigma_protocol_witness::Witness;
+    use aptos_experimental::sigma_protocol_statement::Statement;
+    use aptos_experimental::sigma_protocol_statement_builder::new_builder;
+    use aptos_experimental::sigma_protocol_utils::{e_wrong_num_points, e_wrong_num_scalars, e_wrong_witness_len, e_wrong_output_len};
+    use aptos_experimental::sigma_protocol_representation::{repr_point, repr_scaled};
     use aptos_experimental::sigma_protocol_representation_vec::{RepresentationVec, new_representation_vec};
+    use aptos_experimental::ristretto255_twisted_elgamal::get_encryption_key_basepoint_compressed;
     #[test_only]
-    use aptos_framework::account;
+    use aptos_std::ristretto255::{Scalar, random_scalar, random_point, point_identity_compressed};
     #[test_only]
-    use aptos_framework::fungible_asset;
+    use aptos_experimental::sigma_protocol_witness::new_secret_witness;
     #[test_only]
-    use aptos_experimental::ristretto255_twisted_elgamal::{get_encryption_key_basepoint_compressed, generate_twisted_elgamal_keypair};
+    use aptos_experimental::sigma_protocol_utils::compressed_identity_points;
+    #[test_only]
+    use aptos_experimental::sigma_protocol_test_utils::setup_test_environment;
+    #[test_only]
+    use aptos_experimental::ristretto255_twisted_elgamal::generate_twisted_elgamal_keypair;
     #[test_only]
     use aptos_experimental::sigma_protocol_homomorphism::evaluate_psi;
     #[test_only]
     use aptos_experimental::sigma_protocol_proof;
     #[test_only]
-    use aptos_experimental::sigma_protocol_utils::{equal_vec_points, points_clone};
+    use aptos_experimental::sigma_protocol_utils::equal_vec_points;
     #[test_only]
     use aptos_experimental::sigma_protocol_utils::compress_points;
 
@@ -124,14 +134,6 @@ module aptos_experimental::sigma_protocol_key_rotation {
     // Error codes
     //
 
-    /// The expected number of points in a key rotation statement is 3 + 2 * num_chunks, with num_chunks > 0.
-    const E_WRONG_NUM_POINTS: u64 = 1;
-    /// The expected number of scalars in a key rotation statement is 0.
-    const E_WRONG_NUM_SCALARS: u64 = 2;
-    /// The expected number of scalars in a key rotation witness is 3.
-    const E_WRONG_WITNESS_LEN: u64 = 3;
-    /// The expected number of points in the homomorphism & transformation function output is 3 + num_chunks, with num_chunks > 0.
-    const E_WRONG_OUTPUT_LEN: u64 = 4;
     /// The key rotation proof was invalid
     const E_INVALID_KEY_ROTATION_PROOF: u64 = 5;
 
@@ -139,10 +141,10 @@ module aptos_experimental::sigma_protocol_key_rotation {
     // Structs
     //
 
+    /// Phantom marker type for key rotation statements.
+    struct KeyRotation has drop {}
+
     /// Used for domain separation
-    /// TODO(Security): It'd be nice to add more here (like some sort of account TXN counter). I suspect that the
-    ///   ciphertext randomness in the public statement would act as enough of a "session ID", but I would prefer
-    ///   to avoid reasoning about that.
     struct KeyRotationSession has drop {
         sender: address,
         token_type: Object<Metadata>,
@@ -153,14 +155,9 @@ module aptos_experimental::sigma_protocol_key_rotation {
     // Helper functions
     //
 
-    /// Returns the fixed number of available balance chunks ℓ.
-    inline fun get_num_chunks(): u64 {
-        confidential_available_balance::get_num_chunks()
-    }
-
     /// Returns the starting index of new_R values.
     inline fun get_start_idx_for_new_R(): u64 {
-        START_IDX_OLD_R + get_num_chunks()
+        START_IDX_OLD_R + get_num_available_chunks()
     }
 
     /// Ensures the statement is of the form:
@@ -170,21 +167,21 @@ module aptos_experimental::sigma_protocol_key_rotation {
     ///     (\widetilde{R}_i)_{i \in [\ell]}
     /// \right)$
     fun assert_key_rotation_statement_is_well_formed(
-        stmt: &Statement,
+        stmt: &Statement<KeyRotation>,
     ) {
-        assert!(stmt.get_points().length() == 3 + 2 * get_num_chunks(), error::invalid_argument(E_WRONG_NUM_POINTS));
-        assert!(stmt.get_scalars().length() == 0, error::invalid_argument(E_WRONG_NUM_SCALARS));
+        assert!(stmt.get_points().length() == 3 + 2 * get_num_available_chunks(), e_wrong_num_points());
+        assert!(stmt.get_scalars().length() == 0, e_wrong_num_scalars());
     }
 
     //
     // Public functions
     //
 
-    public fun new_session(sender: &signer, token_type: Object<Metadata>): KeyRotationSession {
+    public(friend) fun new_session(sender: &signer, token_type: Object<Metadata>): KeyRotationSession {
         KeyRotationSession {
             sender: signer::address_of(sender),
             token_type,
-            num_chunks: confidential_available_balance::get_num_chunks(),
+            num_chunks: get_num_available_chunks(),
         }
     }
 
@@ -192,46 +189,30 @@ module aptos_experimental::sigma_protocol_key_rotation {
     /// The order matches the NP relation: $(H, \mathsf{ek}, \widetilde{\mathsf{ek}}, \dot{\mathbf{R}}, \widetilde{\mathbf{R}})$.
     /// Note that the # of chunks is inferred from the sizes of the old and new balance ciphertexts.
     ///
-    /// @param compressed_H: Compressed form of h
-    /// @param _H: The hash-to-point base (= dk * ek)
+    /// All points are decompressed internally from their compressed forms by the `StatementBuilder`.
     ///
-    /// @param compressed_ek: Compressed form of ek
-    /// @param ek: The old encryption key
-    ///
-    /// @param compressed_new_ek: Compressed form of new_ek
-    /// @param new_ek: The new encryption key
-    ///
-    /// @param compressed_old_R: Compressed forms of old_R
-    /// @param old_R: The old R values from the ciphertext (num_chunks elements)
-    ///
-    /// @param compressed_new_R: Compressed forms of new_R
-    /// @param new_R: The new R values after re-encryption (num_chunks elements, must match old_R length)
-    public fun new_key_rotation_statement(
-        compressed_H: CompressedRistretto, _H: RistrettoPoint,
-        compressed_ek: CompressedRistretto, ek: RistrettoPoint,
-        compressed_new_ek: CompressedRistretto, new_ek: RistrettoPoint,
-        compressed_old_R: vector<CompressedRistretto>, old_R: vector<RistrettoPoint>,
-        compressed_new_R: vector<CompressedRistretto>, new_R: vector<RistrettoPoint>,
-    ): Statement {
-        // assert all the R-component vectors are of equal size
-        assert!(compressed_old_R.length() == old_R.length(), error::invalid_argument(E_WRONG_NUM_POINTS));
-        assert!(compressed_new_R.length() == new_R.length(), error::invalid_argument(E_WRONG_NUM_POINTS));
-        assert!(old_R.length() == new_R.length(), error::invalid_argument(E_WRONG_NUM_POINTS));
-        assert!(old_R.length() == get_num_chunks(), error::invalid_argument(E_WRONG_NUM_POINTS));
-
-        let points = vector[_H, ek, new_ek];
-        points.append(old_R);
-        points.append(new_R);
-
-        let compressed_points = vector[compressed_H, compressed_ek, compressed_new_ek];
-        compressed_points.append(compressed_old_R);
-        compressed_points.append(compressed_new_R);
-
-        let stmt = new_statement(points, compressed_points, vector[]);
+    /// @param compressed_ek: Compressed form of the old encryption key
+    /// @param compressed_new_ek: Compressed form of the new encryption key
+    /// @param compressed_old_R: Compressed forms of old_R (by reference; num_chunks elements)
+    /// @param compressed_new_R: Compressed forms of new_R (by reference; num_chunks elements)
+    public(friend) fun new_key_rotation_statement(
+        compressed_ek: CompressedRistretto,
+        compressed_new_ek: CompressedRistretto,
+        compressed_old_R: &vector<CompressedRistretto>,
+        compressed_new_R: &vector<CompressedRistretto>,
+    ): Statement<KeyRotation> {
+        let b = new_builder();
+        b.add_point(get_encryption_key_basepoint_compressed());  // H
+        b.add_point(compressed_ek);                               // ek
+        b.add_point(compressed_new_ek);                           // new_ek
+        b.add_points(compressed_old_R);                           // old_R
+        b.add_points(compressed_new_R);                           // new_R
+        let stmt = b.build();
         assert_key_rotation_statement_is_well_formed(&stmt);
         stmt
     }
 
+    #[test_only]
     /// Creates a new key rotation witness.
     ///
     /// @param dk: The old decryption key
@@ -252,11 +233,11 @@ module aptos_experimental::sigma_protocol_key_rotation {
     ///   delta * old_R_i,   // should equal new_R_i, for i in [1..num_chunks]
     /// ]
     /// ```
-    public fun psi(_stmt: &Statement, w: &Witness): RepresentationVec {
+    fun psi(_stmt: &Statement<KeyRotation>, w: &Witness): RepresentationVec {
         // WARNING: Crucial for security
         assert_key_rotation_statement_is_well_formed(_stmt);
         // WARNING: Crucial for security
-        assert!(w.length() == 3, error::invalid_argument(E_WRONG_WITNESS_LEN));
+        assert!(w.length() == 3, e_wrong_witness_len());
 
         let dk = *w.get(IDX_DK);
         let delta = *w.get(IDX_DELTA);
@@ -265,24 +246,24 @@ module aptos_experimental::sigma_protocol_key_rotation {
         // Build the representation vector
         let reprs = vector[
             // dk * ek
-            new_representation(vector[IDX_EK], vector[dk]),
+            repr_scaled(IDX_EK, dk),
             // delta * ek
-            new_representation(vector[IDX_EK], vector[delta]),
+            repr_scaled(IDX_EK, delta),
             // delta_inv * new_ek
-            new_representation(vector[IDX_EK_NEW], vector[delta_inv]),
+            repr_scaled(IDX_EK_NEW, delta_inv),
         ];
 
         // delta * old_R_i for each chunk
-        let ell = get_num_chunks();
+        let ell = get_num_available_chunks();
         reprs.append(vector::range(0, ell).map(|i|
-            new_representation(vector[START_IDX_OLD_R + i], vector[delta])
+            repr_scaled(START_IDX_OLD_R + i, delta)
         ));
 
         let repr_vec = new_representation_vec(reprs);
         let expected_output_len = 3 + ell;
 
         // WARNING: Crucial for security
-        assert!(repr_vec.length() == expected_output_len, error::invalid_argument(E_WRONG_OUTPUT_LEN));
+        assert!(repr_vec.length() == expected_output_len, e_wrong_output_len());
 
         repr_vec
     }
@@ -298,43 +279,42 @@ module aptos_experimental::sigma_protocol_key_rotation {
     ///   new_R_i for i in [1..num_chunks]
     /// ]
     /// ```
-    public fun f(_stmt: &Statement): RepresentationVec {
+    fun f(_stmt: &Statement<KeyRotation>): RepresentationVec {
         // WARNING: We do not re-assert the stmt is well-formed anymore here, since wherever the transformation function
         // is called, so is the homomorphism, so the check will be done.
 
-        let ell = get_num_chunks();
+        let ell = get_num_available_chunks();
         let idx_r_new_start = get_start_idx_for_new_R();
 
         let reprs = vector[
             // H
-            new_representation(vector[IDX_H], vector[ristretto255::scalar_one()]),
+            repr_point(IDX_H),
             // new_ek
-            new_representation(vector[IDX_EK_NEW], vector[ristretto255::scalar_one()]),
+            repr_point(IDX_EK_NEW),
             // ek
-            new_representation(vector[IDX_EK], vector[ristretto255::scalar_one()]),
+            repr_point(IDX_EK),
         ];
 
         // new_R_i for each chunk
         reprs.append(vector::range(0, ell).map(|i|
-            new_representation(vector[idx_r_new_start + i], vector[ristretto255::scalar_one()])
+            repr_point(idx_r_new_start + i)
         ));
 
         let repr_vec = new_representation_vec(reprs);
         let expected_output_len = 3 + ell;
 
         // WARNING: Crucial for security
-        assert!(repr_vec.length() == expected_output_len, error::invalid_argument(E_WRONG_OUTPUT_LEN));
+        assert!(repr_vec.length() == expected_output_len, e_wrong_output_len());
 
         repr_vec
     }
 
     /// Asserts that a key rotation proof verifies
-    public fun assert_verifies(session: &KeyRotationSession, stmt: &Statement, proof: &Proof) {
+    public(friend) fun assert_verifies(self: &KeyRotationSession, stmt: &Statement<KeyRotation>, proof: &Proof) {
         assert_key_rotation_statement_is_well_formed(stmt);
 
         let success = sigma_protocol::verify(
-            new_domain_separator(PROTOCOL_ID, bcs::to_bytes(session)),
-            // TODO(Ugly): Change `|_X, w| psi(_X, w)` to `psi` and `|_X| f(_X)` to `f` when public structs ship and allow this.
+            new_domain_separator(@aptos_experimental, chain_id::get(), PROTOCOL_ID, bcs::to_bytes(self)),
             |_X, w| psi(_X, w),
             |_X| f(_X),
             stmt,
@@ -349,25 +329,16 @@ module aptos_experimental::sigma_protocol_key_rotation {
     //
 
     #[test_only]
-    /// Returns a dummy session used for testing
-    /// WARNING: Can only be called once because it calls `create_fungible_asset`!
     fun key_rotation_session_for_testing(): KeyRotationSession {
-        let sender = account::create_signer_for_test(@0x1);
-        let (_, _, _, _, token_type) = fungible_asset::create_fungible_asset(&sender);
-
-        KeyRotationSession {
-            sender: signer::address_of(&sender),
-            token_type,
-            num_chunks: get_num_chunks(),
-        }
+        let (sender, token_type) = setup_test_environment();
+        KeyRotationSession { sender: signer::address_of(&sender), token_type, num_chunks: get_num_available_chunks() }
     }
 
     #[test_only]
     /// Creates a key rotation proof (for testing)
-    public fun prove(session: &KeyRotationSession, stmt: &Statement, witn: &Witness): Proof {
+    public fun prove(self: &KeyRotationSession, stmt: &Statement<KeyRotation>, witn: &Witness): Proof {
         let (proof, _) = sigma_protocol::prove(
-            new_domain_separator(PROTOCOL_ID, bcs::to_bytes(session)),
-            // TODO(Ugly): Change `|_X, w| psi(_X, w)` to `psi` when public structs ship and allow this.
+            new_domain_separator(@aptos_experimental, chain_id::get(), PROTOCOL_ID, bcs::to_bytes(self)),
             |_X, w| psi(_X, w),
             stmt,
             witn
@@ -378,17 +349,14 @@ module aptos_experimental::sigma_protocol_key_rotation {
 
     #[test_only]
     /// Computes the key rotation statement and witness from actual keys and balance.
-    /// Returns (statement, witness, compressed_new_ek, new_R, compressed_new_R).
+    /// Returns (statement, witness, compressed_new_ek, compressed_new_R).
     public fun compute_statement_and_witness_from_keys_and_old_ctxt(
         old_dk: &Scalar,
         new_dk: &Scalar,
         compressed_old_ek: CompressedRistretto,
-        old_ek: RistrettoPoint,
-        compressed_old_R: vector<CompressedRistretto>,
-        old_R: vector<RistrettoPoint>,
-    ): (Statement, Witness, CompressedRistretto, vector<RistrettoPoint>, vector<CompressedRistretto>) {
-        let compressed_gen_H = get_encryption_key_basepoint_compressed();
-        let gen_H = compressed_gen_H.point_decompress();
+        compressed_old_R: &vector<CompressedRistretto>,
+    ): (Statement<KeyRotation>, Witness, CompressedRistretto, vector<CompressedRistretto>) {
+        let old_ek = compressed_old_ek.point_decompress();
 
         // Compute delta = old_dk * new_dk^{-1} (since ek = dk^{-1} * H, new_ek = delta * old_ek)
         let new_dk_inv = new_dk.scalar_invert().extract();
@@ -400,34 +368,34 @@ module aptos_experimental::sigma_protocol_key_rotation {
         let compressed_new_ek = new_ek.point_compress();
 
         // Compute new_R = delta * old_R
+        let old_R = compressed_old_R.map_ref(|r| r.point_decompress());
         let new_R = old_R.map_ref(|r| r.point_mul(&delta));
         let compressed_new_R = compress_points(&new_R);
 
         let stmt = new_key_rotation_statement(
-            compressed_gen_H, gen_H,
-            compressed_old_ek, old_ek,
-            compressed_new_ek, new_ek,
-            compressed_old_R, old_R,
-            compressed_new_R, points_clone(&new_R),
+            compressed_old_ek,
+            compressed_new_ek,
+            compressed_old_R,
+            &compressed_new_R,
         );
         let witn = new_key_rotation_witness(*old_dk, delta, delta_inv);
 
-        (stmt, witn, compressed_new_ek, new_R, compressed_new_R)
+        (stmt, witn, compressed_new_ek, compressed_new_R)
     }
 
     #[test_only]
     /// Generates a random valid statement-witness pair for testing.
-    fun random_valid_statement_witness_pair(): (Statement, Witness) {
-        let ell = get_num_chunks();
+    fun random_valid_statement_witness_pair(): (Statement<KeyRotation>, Witness) {
+        let ell = get_num_available_chunks();
         let (dk, compressed_ek) = generate_twisted_elgamal_keypair();
-        let new_dk = ristretto255::random_scalar();
-        let ek = compressed_ek.point_decompress();
-        let old_R = vector::range(0, ell).map(|_| ristretto255::random_point());
+        let new_dk = random_scalar();
+        let old_R = vector::range(0, ell).map(|_| random_point());
+        let compressed_old_R = compress_points(&old_R);
 
-        let (stmt, witn, _, _, _) = compute_statement_and_witness_from_keys_and_old_ctxt(
+        let (stmt, witn, _, _) = compute_statement_and_witness_from_keys_and_old_ctxt(
             &dk, &new_dk,
-            compressed_ek, ek,
-            compress_points(&old_R), old_R,
+            compressed_ek,
+            &compressed_old_R,
         );
 
         (stmt, witn)
@@ -456,14 +424,13 @@ module aptos_experimental::sigma_protocol_key_rotation {
         ];
 
         // Add delta * old_R_i for each chunk
-        let ell = get_num_chunks();
+        let ell = get_num_available_chunks();
         vector::range(0, ell).for_each(|i| {
             let old_R_i = _X.get_point(START_IDX_OLD_R + i);
             expected_psi.push_back(old_R_i.point_mul(delta));
         });
 
         // Compute actual psi output via our implementation
-        // TODO(Ugly): Change `|_X, w| psi(_X, w)` to `psi` when public structs ship and allow this.
         let actual_psi = evaluate_psi(|_X, w| psi(_X, w), &_X, &w);
 
         assert!(equal_vec_points(&actual_psi, &expected_psi), 1);
@@ -474,8 +441,7 @@ module aptos_experimental::sigma_protocol_key_rotation {
     fun proof_correctness() {
         let (stmt, witn) = random_valid_statement_witness_pair();
         let ss = key_rotation_session_for_testing();
-        let proof = prove(&ss, &stmt, &witn);
-        assert_verifies(&ss, &stmt, &proof);
+        ss.assert_verifies(&stmt, &ss.prove(&stmt, &witn));
     }
 
     #[test]
@@ -483,39 +449,22 @@ module aptos_experimental::sigma_protocol_key_rotation {
     /// Verifies that an empty proof does not verify for a random statement.
     fun proof_soundness_against_random_statement() {
         let (stmt, _) = random_valid_statement_witness_pair();
-        let proof = sigma_protocol_proof::empty();
-        assert_verifies(&key_rotation_session_for_testing(), &stmt, &proof);
+        key_rotation_session_for_testing().assert_verifies(&stmt, &sigma_protocol_proof::empty());
     }
 
     #[test]
     #[expected_failure(abort_code=65537, location=aptos_experimental::sigma_protocol_fiat_shamir)]
-    /// Verifies that an empty proof does not verify for an "empty" statement (all identity points).
-    fun proof_soundness_against_empty_statement_and_empty_proof() {
-        let ell = get_num_chunks();
-
-        // Create identity points for old_R and new_R
-        let old_R = vector::range(0, ell).map(|_| ristretto255::point_identity());
-        let compressed_old_R = vector::range(0, ell).map(|_| ristretto255::point_identity_compressed());
-        let new_R = vector::range(0, ell).map(|_| ristretto255::point_identity());
-        let compressed_new_R = vector::range(0, ell).map(|_| ristretto255::point_identity_compressed());
-
-        let _H = ristretto255::point_identity();
-        let compressed_H = ristretto255::point_identity_compressed();
-        let ek = ristretto255::point_identity();
-        let compressed_ek = ristretto255::point_identity_compressed();
-        let new_ek = ristretto255::point_identity();
-        let compressed_new_ek = ristretto255::point_identity_compressed();
+    /// Verifies that an empty proof does not verify for a "zero" statement (all identity points).
+    fun proof_soundness_against_zero_statement_and_empty_proof() {
+        let ell = get_num_available_chunks();
 
         let stmt = new_key_rotation_statement(
-            compressed_H, _H,
-            compressed_ek, ek,
-            compressed_new_ek, new_ek,
-            compressed_old_R, old_R,
-            compressed_new_R, new_R,
+            point_identity_compressed(),
+            point_identity_compressed(),
+            &compressed_identity_points(ell),
+            &compressed_identity_points(ell),
         );
 
-        let proof = sigma_protocol_proof::empty();
-
-        assert_verifies(&key_rotation_session_for_testing(), &stmt, &proof);
+        key_rotation_session_for_testing().assert_verifies(&stmt, &sigma_protocol_proof::empty());
     }
 }
