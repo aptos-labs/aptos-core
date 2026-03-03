@@ -203,8 +203,11 @@ impl SecretShareConfig {
         self.config.get_threshold_config().n as u64
     }
 
-    pub fn get_peer_weight(&self, peer: &Author) -> u64 {
-        self.weights.get(peer).copied().unwrap_or(0)
+    pub fn get_peer_weight(&self, peer: &Author) -> anyhow::Result<u64> {
+        self.weights
+            .get(peer)
+            .copied()
+            .ok_or_else(|| anyhow::anyhow!("Peer {} not found in validator index", peer))
     }
 
     pub fn get_peer_weights(&self) -> &HashMap<Author, u64> {

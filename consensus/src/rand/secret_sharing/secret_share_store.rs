@@ -12,7 +12,7 @@ use aptos_types::secret_sharing::{
     SecretShare, SecretShareConfig, SecretShareMetadata, SecretSharedKey,
 };
 use itertools::Either;
-use std::collections::{HashMap, HashSet};
+use std::collections::{BTreeMap, HashMap, HashSet};
 
 pub struct SecretShareAggregator {
     self_author: Author,
@@ -210,7 +210,7 @@ pub struct SecretShareStore {
     epoch: u64,
     self_author: Author,
     secret_share_config: SecretShareConfig,
-    secret_share_map: HashMap<Round, SecretShareItem>,
+    secret_share_map: BTreeMap<Round, SecretShareItem>,
     highest_known_round: u64,
     decision_tx: Sender<SecretSharedKey>,
 }
@@ -226,7 +226,7 @@ impl SecretShareStore {
             epoch,
             self_author: author,
             secret_share_config: dec_config,
-            secret_share_map: HashMap::new(),
+            secret_share_map: BTreeMap::new(),
             highest_known_round: 0,
             decision_tx,
         }
@@ -259,7 +259,7 @@ impl SecretShareStore {
     }
 
     pub fn add_share(&mut self, share: SecretShare) -> anyhow::Result<bool> {
-        let weight = self.secret_share_config.get_peer_weight(share.author());
+        let weight = self.secret_share_config.get_peer_weight(share.author())?;
         let metadata = share.metadata();
         ensure!(metadata.epoch == self.epoch, "Share from different epoch");
         ensure!(
@@ -267,6 +267,7 @@ impl SecretShareStore {
             "Share from future round"
         );
 
+        // TODO(ibalajiarun): Make sure to garbage collect the items after they're decided.
         let item = self
             .secret_share_map
             .entry(metadata.round)

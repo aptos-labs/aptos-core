@@ -18,13 +18,13 @@ pub struct QueueItem {
     ordered_blocks: OrderedBlocks,
     offsets_by_round: HashMap<Round, usize>,
     pending_secret_key_rounds: HashSet<Round>,
-    share_requester_handles: Option<Vec<DropGuard>>,
+    share_requester_handles: Vec<DropGuard>,
 }
 
 impl QueueItem {
     pub fn new(
         ordered_blocks: OrderedBlocks,
-        share_requester_handles: Option<Vec<DropGuard>>,
+        share_requester_handles: Vec<DropGuard>,
         pending_secret_key_rounds: HashSet<Round>,
     ) -> Self {
         assert!(!ordered_blocks.ordered_blocks.is_empty());

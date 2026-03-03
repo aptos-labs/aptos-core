@@ -112,9 +112,22 @@ impl SecretShareManager {
         }
     }
 
+    /// Processes a batch of incoming ordered blocks sent by execution client.
+    ///
+    /// The function collects a handle for each per-block share requester task,
+    /// aggregates the relevant rounds, and pushes a new item onto the block queue
+    /// for further processing.
+    ///
+    /// # Arguments
+    ///
+    /// * `blocks` - The batch of ordered blocks to process.
+    ///
+    /// # Returns
+    ///
+    /// * `anyhow::Result<()>` indicating success or providing error context.
     async fn process_incoming_blocks(&mut self, blocks: OrderedBlocks) -> anyhow::Result<()> {
         let rounds: Vec<u64> = blocks.ordered_blocks.iter().map(|b| b.round()).collect();
-        info!(rounds = rounds, "Processing incoming blocks.");
+        info!(rounds = rounds, num_blocks = rounds.len(), "Processing incoming blocks.");
 
         let mut share_requester_handles = Vec::new();
         let mut pending_secret_key_rounds = HashSet::new();
@@ -126,7 +139,7 @@ impl SecretShareManager {
 
         let queue_item = QueueItem::new(
             blocks,
-            Some(share_requester_handles),
+            share_requester_handles,
             pending_secret_key_rounds,
         );
         self.block_queue.push_back(queue_item);
@@ -137,10 +150,11 @@ impl SecretShareManager {
         let futures = block
             .pipeline_futs()
             .ok_or_else(|| anyhow::anyhow!("pipeline futures not set for round {}", block.round()))?;
+        // TODO(ibalajiarun): Skip processing if derive self fails.
         let self_secret_share = futures
             .secret_sharing_derive_self_fut
             .await
-            .map_err(|_| anyhow::anyhow!("derive self failed"))?
+            .map_err(|_| anyhow::anyhow!("derive self failed for round {}", block.round()))?
             .ok_or_else(|| {
                 anyhow::anyhow!("secret share derive returned None for round {}", block.round())
             })?;
