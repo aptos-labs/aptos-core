@@ -224,7 +224,7 @@ fn set_port_to_public_network(addr: NetworkAddress) -> Option<NetworkAddress> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{DiscoveryChangeListener};
+    use crate::DiscoveryChangeListener;
     use aptos_channels::{aptos_channel, message_queues::QueueStyle};
     use aptos_config::{
         config::{RoleType, HANDSHAKE_VERSION},

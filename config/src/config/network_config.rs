@@ -157,7 +157,7 @@ impl Default for NetworkConfig {
 impl NetworkConfig {
     pub fn network_with_id(network_id: NetworkId) -> NetworkConfig {
         let mutual_authentication = network_id.is_validator_network();
-        let listen_address = format!("/ip4/0.0.0/tcp/{}", DEFAULT_VALIDATOR_NETWORK_PORT)
+        let listen_address = format!("/ip4/0.0.0.0/tcp/{}", DEFAULT_VALIDATOR_NETWORK_PORT)
             .parse()
             .unwrap();
 
