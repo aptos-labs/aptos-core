@@ -206,6 +206,13 @@ impl SecretShareItem {
     }
 }
 
+/// Per-epoch store that tracks secret share aggregation state for each round.
+/// Remote shares can accumulate here while the self-share derivation is still
+/// in flight. Once enough shares arrive and the self share is added,
+/// aggregation produces a `SecretSharedKey` sent via `decision_tx`.
+///
+/// Note: there is no garbage collection of items after they're decided. They
+/// are kept around until the epoch ends.
 pub struct SecretShareStore {
     epoch: u64,
     self_author: Author,
@@ -234,6 +241,13 @@ impl SecretShareStore {
 
     pub fn update_highest_known_round(&mut self, round: u64) {
         self.highest_known_round = std::cmp::max(self.highest_known_round, round);
+    }
+
+    pub fn reset(&mut self, round: u64) {
+        self.update_highest_known_round(round);
+        // remove future rounds items in case they're already decided
+        // otherwise if the block re-enters the queue, it'll be stuck
+        let _ = self.secret_share_map.split_off(&round);
     }
 
     pub fn add_self_share(&mut self, share: SecretShare) -> anyhow::Result<()> {
