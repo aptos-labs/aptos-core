@@ -275,8 +275,6 @@ spec aptos_framework::staking_contract {
     spec request_commission_internal(
         operator: address,
         staking_contract: &mut StakingContract,
-        add_distribution_events: &mut EventHandle<AddDistributionEvent>,
-        request_commission_events: &mut EventHandle<RequestCommissionEvent>
     ): u64 {
         // TODO: A data invariant not hold happened here involve with 'pool_u64' #L16.
         pragma verify = false;
@@ -361,7 +359,6 @@ spec aptos_framework::staking_contract {
         staker: address,
         operator: address,
         staking_contract: &mut StakingContract,
-        distribute_events: &mut EventHandle<DistributeEvent>
     ) {
         // TODO: These function passed locally however failed in github CI
         pragma verify_duration_estimate = 120;
@@ -385,7 +382,6 @@ spec aptos_framework::staking_contract {
         staking_contract: &mut StakingContract,
         recipient: address,
         coins_amount: u64,
-        add_distribution_events: &mut EventHandle<AddDistributionEvent>
     ) {
         // TODO: Call `update_distribution_pool` and could not verify `update_distribution_pool`.
         pragma verify = false;
