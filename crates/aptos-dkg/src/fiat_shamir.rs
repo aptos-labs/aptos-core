@@ -86,6 +86,7 @@ pub trait RangeProof<E: Pairing, B: BatchedRangeProof<E>> {
 
     fn challenge_nonzero_scalar(&mut self) -> E::ScalarField;
 
+    // Maybe move this to a Sumcheck trait?
     fn challenge_point(&mut self, dimension: u8) -> Vec<E::ScalarField>;
 }
 
