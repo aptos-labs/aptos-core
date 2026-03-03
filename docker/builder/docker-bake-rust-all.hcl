@@ -61,7 +61,6 @@ group "all" {
     "keyless-pepper-service",
     "indexer-grpc",
     "validator-testing",
-    "nft-metadata-crawler",
   ])
 }
 
