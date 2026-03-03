@@ -17,8 +17,8 @@ use crate::{
     reentrancy_checker::{CallType, ReentrancyChecker},
     runtime_ref_checks::{FullRuntimeRefCheck, NoRuntimeRefCheck, RefCheckState, RuntimeRefCheck},
     runtime_type_checks::{
-        verify_pack_closure, FullRuntimeTypeCheck, NoRuntimeTypeCheck, RuntimeTypeCheck,
-        UntrustedOnlyRuntimeTypeCheck,
+        check_function_type_count_and_depth, verify_pack_closure, FullRuntimeTypeCheck,
+        NoRuntimeTypeCheck, RuntimeTypeCheck, UntrustedOnlyRuntimeTypeCheck,
     },
     storage::{
         loader::traits::Loader, ty_depth_checker::TypeDepthChecker,
@@ -2238,10 +2238,16 @@ impl Frame {
                     },
                     Instruction::LdConst(idx) => {
                         let constant = self.constant_at(*idx);
+                        let num_nodes = if self.ty_builder.check_depth_on_type_counts_v2 {
+                            let (num_nodes, depth) = constant.type_.num_nodes_with_max_depth();
+                            self.ty_builder
+                                .check_final_size_and_depth(num_nodes as u64, depth as u64)?;
+                            num_nodes
+                        } else {
+                            constant.type_.num_nodes()
+                        };
 
-                        gas_meter.charge_create_ty(NumTypeNodes::new(
-                            constant.type_.num_nodes() as u64,
-                        ))?;
+                        gas_meter.charge_create_ty(NumTypeNodes::new(num_nodes as u64))?;
                         gas_meter.charge_ld_const(NumBytes::new(constant.data.len() as u64))?;
 
                         let val = Value::deserialize_constant(constant).ok_or_else(|| {
@@ -2648,7 +2654,17 @@ impl Frame {
                                 &function,
                                 *mask,
                             )?;
+                        } else if trace_recorder.is_enabled() {
+                            // Otherwise, we run checks async: check the depth of the type.
+                            // This is wasteful but prevents async checks to fail on type
+                            // size limits.
+                            check_function_type_count_and_depth(
+                                self.ty_builder(),
+                                &function,
+                                *mask,
+                            )?;
                         }
+
                         let captured = interpreter.operand_stack.popn(mask.captured_count())?;
                         interpreter.check_depth_of_closure_captured_values(&captured)?;
                         let lazy_function = LazyLoadedFunction::new_resolved(
@@ -2704,6 +2720,15 @@ impl Frame {
                             verify_pack_closure(
                                 self.ty_builder(),
                                 &mut interpreter.operand_stack,
+                                &function,
+                                *mask,
+                            )?;
+                        } else if trace_recorder.is_enabled() {
+                            // Otherwise, we run checks async: check the depth of the type.
+                            // This is wasteful but prevents async checks to fail on type
+                            // size limits.
+                            check_function_type_count_and_depth(
+                                self.ty_builder(),
                                 &function,
                                 *mask,
                             )?;
@@ -3096,7 +3121,15 @@ impl Frame {
                         gas_meter.charge_simple_instr(S::Nop)?;
                     },
                     Instruction::VecPack(si, num) => {
-                        let (ty, ty_count) = frame_cache.get_signature_index_type(*si, self)?;
+                        let (ty, ty_count, depth) =
+                            frame_cache.get_signature_index_type(*si, self)?;
+                        if self.ty_builder.check_depth_on_type_counts_v2 {
+                            // Account for new vector node.
+                            self.ty_builder.check_final_size_and_depth(
+                                u64::from(ty_count) + 1,
+                                depth as u64 + 1,
+                            )?;
+                        }
                         gas_meter.charge_create_ty(ty_count)?;
                         interpreter.ty_depth_checker.check_depth_of_type(
                             gas_meter,
@@ -3111,7 +3144,7 @@ impl Frame {
                     },
                     Instruction::VecLen(si) => {
                         let vec_ref = interpreter.operand_stack.pop_as::<VectorRef>()?;
-                        let (_, ty_count) = frame_cache.get_signature_index_type(*si, self)?;
+                        let (_, ty_count, _) = frame_cache.get_signature_index_type(*si, self)?;
                         gas_meter.charge_create_ty(ty_count)?;
                         gas_meter.charge_vec_len()?;
                         let value = vec_ref.len()?;
@@ -3120,7 +3153,7 @@ impl Frame {
                     Instruction::VecImmBorrow(si) => {
                         let idx = interpreter.operand_stack.pop_as::<u64>()? as usize;
                         let vec_ref = interpreter.operand_stack.pop_as::<VectorRef>()?;
-                        let (_, ty_count) = frame_cache.get_signature_index_type(*si, self)?;
+                        let (_, ty_count, _) = frame_cache.get_signature_index_type(*si, self)?;
                         gas_meter.charge_create_ty(ty_count)?;
                         gas_meter.charge_vec_borrow(false)?;
                         let elem = vec_ref.borrow_elem(idx)?;
@@ -3129,7 +3162,7 @@ impl Frame {
                     Instruction::VecMutBorrow(si) => {
                         let idx = interpreter.operand_stack.pop_as::<u64>()? as usize;
                         let vec_ref = interpreter.operand_stack.pop_as::<VectorRef>()?;
-                        let (_, ty_count) = frame_cache.get_signature_index_type(*si, self)?;
+                        let (_, ty_count, _) = frame_cache.get_signature_index_type(*si, self)?;
                         gas_meter.charge_create_ty(ty_count)?;
                         gas_meter.charge_vec_borrow(true)?;
                         let elem = vec_ref.borrow_elem(idx)?;
@@ -3138,14 +3171,14 @@ impl Frame {
                     Instruction::VecPushBack(si) => {
                         let elem = interpreter.operand_stack.pop()?;
                         let vec_ref = interpreter.operand_stack.pop_as::<VectorRef>()?;
-                        let (_, ty_count) = frame_cache.get_signature_index_type(*si, self)?;
+                        let (_, ty_count, _) = frame_cache.get_signature_index_type(*si, self)?;
                         gas_meter.charge_create_ty(ty_count)?;
                         gas_meter.charge_vec_push_back(&elem)?;
                         vec_ref.push_back(elem)?;
                     },
                     Instruction::VecPopBack(si) => {
                         let vec_ref = interpreter.operand_stack.pop_as::<VectorRef>()?;
-                        let (_, ty_count) = frame_cache.get_signature_index_type(*si, self)?;
+                        let (_, ty_count, _) = frame_cache.get_signature_index_type(*si, self)?;
                         gas_meter.charge_create_ty(ty_count)?;
                         let res = vec_ref.pop();
                         gas_meter.charge_vec_pop_back(res.as_ref().ok())?;
@@ -3153,7 +3186,7 @@ impl Frame {
                     },
                     Instruction::VecUnpack(si, num) => {
                         let vec_val = interpreter.operand_stack.pop_as::<Vector>()?;
-                        let (_, ty_count) = frame_cache.get_signature_index_type(*si, self)?;
+                        let (_, ty_count, _) = frame_cache.get_signature_index_type(*si, self)?;
                         gas_meter.charge_create_ty(ty_count)?;
                         gas_meter.charge_vec_unpack(NumArgs::new(*num), vec_val.elem_views())?;
                         let elements = vec_val.unpack(*num)?;
@@ -3165,7 +3198,7 @@ impl Frame {
                         let idx2 = interpreter.operand_stack.pop_as::<u64>()? as usize;
                         let idx1 = interpreter.operand_stack.pop_as::<u64>()? as usize;
                         let vec_ref = interpreter.operand_stack.pop_as::<VectorRef>()?;
-                        let (_, ty_count) = frame_cache.get_signature_index_type(*si, self)?;
+                        let (_, ty_count, _) = frame_cache.get_signature_index_type(*si, self)?;
                         gas_meter.charge_create_ty(ty_count)?;
                         gas_meter.charge_vec_swap()?;
                         vec_ref.swap(idx1, idx2)?;
