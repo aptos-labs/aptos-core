@@ -121,7 +121,7 @@ jobs:
         github.event.pull_request.auto_merge != null) ||
         contains(github.event.pull_request.body, '#e2e'
       )
-    runs-on: runs-on,cpu=64,family=c7,disk=large,image=aptos-ubuntu-x64,run-id=${{ github.run_id }}
+    runs-on: runs-on,cpu=32,family=c7,disk=large,image=aptos-ubuntu-x64,run-id=${{ github.run_id }}
     strategy:
       fail-fast: false
       matrix:
