@@ -209,10 +209,9 @@ impl<E: Pairing> traits::BatchedRangeProof<E> for Proof<E> {
             );
         }
 
+        // Step 1c: Append initial data to the Fiat-Shamir transcript.
         #[cfg(feature = "range_proof_timing_multivariate")]
         let start = Instant::now();
-
-        // Step 1c: Append initial data to the Fiat-Shamir transcript.
         let mut trs = merlin::Transcript::new(b"dekart_multivariate");
         <merlin::Transcript as RangeProof<E, Proof<E>>>::append_vk(&mut trs, &vk);
         <merlin::Transcript as RangeProof<E, Proof<E>>>::append_public_statement(
@@ -223,8 +222,12 @@ impl<E: Pairing> traits::BatchedRangeProof<E> for Proof<E> {
                 comm: comm.clone(),
             },
         );
+        #[cfg(feature = "range_proof_timing_multivariate")]
+        print_cumulative("transcript init (vk + public statement)", start.elapsed());
 
         // Step 2: Verify the blinding commitment
+        #[cfg(feature = "range_proof_timing_multivariate")]
+        let start = Instant::now();
         if let (Some(blinding_comm), Some(blinding_proof)) =
             (&self.blinding_poly_comm, &self.blinding_poly_proof)
         {
@@ -240,8 +243,12 @@ impl<E: Pairing> traits::BatchedRangeProof<E> for Proof<E> {
                 rng,
             )?;
         }
+        #[cfg(feature = "range_proof_timing_multivariate")]
+        print_cumulative("blinding two_term_msm verify", start.elapsed());
 
-        // Step 3a:
+        // Step 3a–3d: Append commitments and draw challenges
+        #[cfg(feature = "range_proof_timing_multivariate")]
+        let start = Instant::now();
         <merlin::Transcript as RangeProof<E, Proof<E>>>::append_f_j_commitments(
             &mut trs,
             &self.f_j_commitments,
@@ -252,30 +259,23 @@ impl<E: Pairing> traits::BatchedRangeProof<E> for Proof<E> {
         );
         <merlin::Transcript as RangeProof<E, Proof<E>>>::append_hypercube_sum(&mut trs, &self.H_g);
 
-        // Step 3b:
         let c: E::ScalarField =
             <merlin::Transcript as RangeProof<E, Proof<E>>>::challenge_scalar(&mut trs);
-        // Step 3c:
         let alpha: E::ScalarField =
             <merlin::Transcript as RangeProof<E, Proof<E>>>::challenge_nonzero_scalar(&mut trs);
-        // Step 3d:
         let c_zc = <merlin::Transcript as RangeProof<E, Proof<E>>>::challenge_point(
             &mut trs,
             num_vars as u8,
         );
-
         #[cfg(feature = "range_proof_timing_multivariate")]
-        print_cumulative("transcript + challenges (c, alpha, t)", start.elapsed());
+        print_cumulative(
+            "append commitments + challenges (c, alpha, c_zc)",
+            start.elapsed(),
+        );
 
-        #[cfg(feature = "range_proof_timing_multivariate")]
-        let start = Instant::now();
-
-        #[cfg(feature = "range_proof_timing_multivariate")]
-        print_cumulative("blinding two_term_msm verify", start.elapsed());
-
+        // Step 3e: Sumcheck verify
         #[cfg(feature = "range_proof_timing_multivariate")]
         let start = Instant::now();
-        // Step 3e:
         let sumcheck_poly_info_instance = SumcheckPolynomialInfo {
             num_variables: num_vars,
             max_multiplicands: vk.poly_info.max_multiplicands,
@@ -327,9 +327,11 @@ impl<E: Pairing> traits::BatchedRangeProof<E> for Proof<E> {
             return Err(anyhow::anyhow!("Step 4 check failed: lhs != h_m(x_m)"));
         }
         #[cfg(feature = "range_proof_timing_multivariate")]
-        print_cumulative("step5 scalar check (eq_t, vnsh_0, lhs)", start.elapsed());
+        print_cumulative("step4 scalar check (eq_c_zc, Z_0, lhs)", start.elapsed());
 
-        // Step 5a (spec): Add y_f and {y_j}_{1≤j≤ℓ} to the Fiat–Shamir transcript.
+        // Step 5a: Add y_f and {y_j}_{1≤j≤ℓ} to the Fiat–Shamir transcript.        #[cfg(feature = "range_proof_timing_multivariate")]
+        #[cfg(feature = "range_proof_timing_multivariate")]
+        let start = Instant::now();
         trs.append_evaluation_points(&[self.y_f]);
         for &y_j in self.y_js.iter().take(ell as usize) {
             trs.append_evaluation_points(&[y_j]);
@@ -382,7 +384,6 @@ impl<E: Pairing> traits::BatchedRangeProof<E> for Proof<E> {
             batched_eval,
         );
 
-        // Step 5d: single uPCS.BatchVerify; first commitment is Zeromorph-reduced (zeta_z_com), then g_i.
         let g_commitment_msms: Vec<MsmInput<E::G1Affine, E::ScalarField>> = self
             .g_i_commitments
             .iter()
@@ -392,7 +393,13 @@ impl<E: Pairing> traits::BatchedRangeProof<E> for Proof<E> {
             .collect();
         let commitment_msms: Vec<MsmInput<E::G1Affine, E::ScalarField>> =
             once(zeromorph_msm).chain(g_commitment_msms).collect();
+        #[cfg(feature = "range_proof_timing_multivariate")]
+        print_cumulative(
+            "transcript y_f,y_js + hat_c + replay_challenges + combined_comm + zeta_z_com",
+            start.elapsed(),
+        );
 
+        // Step 5d: Build sets, y_rev, then single uPCS.BatchVerify
         #[cfg(feature = "range_proof_timing_multivariate")]
         let start = Instant::now();
         let sets: Vec<EvaluationSet<E::ScalarField>> = self
@@ -435,6 +442,8 @@ impl<E: Pairing> traits::BatchedRangeProof<E> for Proof<E> {
             &mut trs,
             rng,
         )?;
+        #[cfg(feature = "range_proof_timing_multivariate")]
+        print_cumulative("batch_pairing_for_verify_generalized", start.elapsed());
 
         Ok((g1_terms, g2_terms))
     }
@@ -758,6 +767,8 @@ pub fn prove_impl<E: Pairing, R: RngCore + CryptoRng>(
         hiding_kzg_pp: pk.ck.clone(),
         open_offset: 0,
     };
+    #[cfg(feature = "range_proof_timing_multivariate")]
+    let start = Instant::now();
     let (batched_instance, q_hat_com, q_k_com) = Zeromorph::open_to_batched_instance(
         &zeromorph_pp,
         &batched_poly,
@@ -767,6 +778,8 @@ pub fn prove_impl<E: Pairing, R: RngCore + CryptoRng>(
         rng,
         &mut trs,
     );
+    #[cfg(feature = "range_proof_timing_multivariate")]
+    print_cumulative("Zeromorph open_to_batched_instance", start.elapsed());
 
     #[cfg(feature = "range_proof_timing_multivariate")]
     let start = Instant::now();
@@ -871,7 +884,7 @@ fn zkzc_send_polys<E: Pairing>(
     alpha: E::ScalarField,
     f_evals: &[E::ScalarField],
     hat_f_j_evals: &[Vec<E::ScalarField>],
-    mut timing: Option<&mut dyn FnMut(&str, std::time::Duration)>,
+    timing: Option<&mut dyn FnMut(&str, std::time::Duration)>,
 ) -> (
     Vec<ProverMsg<E::ScalarField>>,
     Vec<VerifierMsg<E::ScalarField>>,
