@@ -2432,8 +2432,8 @@ dependencies = [
  "futures",
  "http-body-util",
  "hyper-util",
- "jemallocator",
  "serde",
+ "tikv-jemallocator",
  "tokio",
  "tonic 0.12.3",
  "tracing",
@@ -11472,24 +11472,6 @@ name = "itoa"
 version = "1.0.10"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b1a46d1a171d865aa5f83f92695765caa047a9b4cbae2cbf37dbd613a793fd4c"
-
-[[package]]
-name = "jemalloc-sys"
-version = "0.5.4+5.3.0-patched"
-source = "git+https://github.com/aptos-labs/jemalloc-sys-shim?rev=e0920246dd74303fab9a14b990768c6ac990a59b#e0920246dd74303fab9a14b990768c6ac990a59b"
-dependencies = [
- "tikv-jemalloc-sys",
-]
-
-[[package]]
-name = "jemallocator"
-version = "0.5.4"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a0de374a9f8e63150e6f5e8a60cc14c668226d7a347d8aee1a45766e3c4dd3bc"
-dependencies = [
- "jemalloc-sys",
- "libc",
-]
 
 [[package]]
 name = "jobserver"
