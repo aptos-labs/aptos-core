@@ -136,10 +136,9 @@ struct K8sSwarm {
     enable_indexer: bool,
     #[clap(
         long,
-        help = "Number of public full nodes (PFNs) to deploy alongside the testnet (0 to disable)",
-        default_value = "0"
+        help = "Number of public full nodes (PFNs) to deploy alongside the testnet (0 to disable). Overrides the test suite default if set."
     )]
-    num_pfns: usize,
+    num_pfns: Option<usize>,
     #[clap(
         long,
         help = "The deployer profile used to spin up and configure forge infrastructure",
@@ -294,6 +293,9 @@ fn main() -> Result<()> {
                     run_forge(forge, &args.options)
                 },
                 TestCommand::K8sSwarm(k8s) => {
+                    if let Some(num_pfns) = k8s.num_pfns {
+                        test_suite = test_suite.with_num_pfns(num_pfns);
+                    }
                     if let Some(move_modules_dir) = &k8s.move_modules_dir {
                         test_suite = test_suite.with_genesis_modules_path(move_modules_dir.clone());
                     }
@@ -316,6 +318,7 @@ fn main() -> Result<()> {
                     };
                     let forge_runner_mode =
                         ForgeRunnerMode::try_from_env().unwrap_or(ForgeRunnerMode::K8s);
+                    let num_pfns = test_suite.num_pfns;
                     let forge = Forge::new(
                         &args.options,
                         test_suite,
@@ -330,7 +333,7 @@ fn main() -> Result<()> {
                             k8s.keep,
                             k8s.enable_haproxy,
                             k8s.enable_indexer,
-                            k8s.num_pfns,
+                            num_pfns,
                             k8s.deployer_profile.clone(),
                         )?,
                     );
