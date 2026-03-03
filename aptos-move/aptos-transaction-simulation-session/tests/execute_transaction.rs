@@ -45,7 +45,7 @@ fn test_execute_transfer() -> Result<()> {
     // Create account and fund with 1 APT.
     session
         .state_store()
-        .store_and_fund_account(sender.clone(), 100_000_000, 0)?;
+        .store_and_fund_account(sender.clone(), 1_000_000_000, 0)?;
 
     let txn = transfer_txn(&sender, *recipient.address(), 1_000);
     let (vm_status, output) = session.execute_transaction(txn, false)?;
@@ -64,7 +64,7 @@ fn test_execute_transaction_increments_sequence_number() -> Result<()> {
     let sender = Account::new();
     session
         .state_store()
-        .store_and_fund_account(sender.clone(), 100_000_000, 0)?;
+        .store_and_fund_account(sender.clone(), 1_000_000_000, 0)?;
 
     let txn = transfer_txn(&sender, *sender.address(), 100);
     session.execute_transaction(txn, false)?;
@@ -90,7 +90,7 @@ fn test_execute_transaction_with_gas_profiling() -> Result<()> {
 
     session
         .state_store()
-        .store_and_fund_account(sender.clone(), 100_000_000, 0)?;
+        .store_and_fund_account(sender.clone(), 1_000_000_000, 0)?;
 
     let txn = transfer_txn(&sender, *recipient.address(), 1_000);
     let (vm_status, output) = session.execute_transaction(txn, true)?;
