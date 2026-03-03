@@ -1372,10 +1372,10 @@ module aptos_experimental::confidential_proof {
             g1: ristretto255::new_scalar_from_sha2_512(msm_gamma_1(rho, 1)),
             g2: ristretto255::new_scalar_from_sha2_512(msm_gamma_1(rho, 2)),
             g3s: vector::range(0, 8).map(|i| {
-                ristretto255::new_scalar_from_sha2_512(msm_gamma_2(rho, 3, (i as u8)))
+                ristretto255::new_scalar_from_sha2_512(msm_gamma_2(rho, 3, i as u8))
             }),
             g4s: vector::range(0, 8).map(|i| {
-                ristretto255::new_scalar_from_sha2_512(msm_gamma_2(rho, 4, (i as u8)))
+                ristretto255::new_scalar_from_sha2_512(msm_gamma_2(rho, 4, i as u8))
             })
         }
     }
@@ -1385,29 +1385,29 @@ module aptos_experimental::confidential_proof {
         TransferSigmaProofGammas {
             g1: ristretto255::new_scalar_from_sha2_512(msm_gamma_1(rho, 1)),
             g2s: vector::range(0, 8).map(|i| {
-                ristretto255::new_scalar_from_sha2_512(msm_gamma_2(rho, 2, (i as u8)))
+                ristretto255::new_scalar_from_sha2_512(msm_gamma_2(rho, 2, i as u8))
             }),
             g3s: vector::range(0, 4).map(|i| {
-                ristretto255::new_scalar_from_sha2_512(msm_gamma_2(rho, 3, (i as u8)))
+                ristretto255::new_scalar_from_sha2_512(msm_gamma_2(rho, 3, i as u8))
             }),
             g4s: vector::range(0, 4).map(|i| {
-                ristretto255::new_scalar_from_sha2_512(msm_gamma_2(rho, 4, (i as u8)))
+                ristretto255::new_scalar_from_sha2_512(msm_gamma_2(rho, 4, i as u8))
             }),
             g5: ristretto255::new_scalar_from_sha2_512(msm_gamma_1(rho, 5)),
             g6s: vector::range(0, 8).map(|i| {
-                ristretto255::new_scalar_from_sha2_512(msm_gamma_2(rho, 6, (i as u8)))
+                ristretto255::new_scalar_from_sha2_512(msm_gamma_2(rho, 6, i as u8))
             }),
             g7s: vector::range(0, auditors_count).map(
                 |i| {
                     vector::range(0, 4).map(|j| {
                         ristretto255::new_scalar_from_sha2_512(
-                            msm_gamma_2(rho, (i + 7 as u8), (j as u8))
+                            msm_gamma_2(rho, (i + 7 as u8), j as u8)
                         )
                     })
                 }
             ),
             g8s: vector::range(0, 4).map(|i| {
-                ristretto255::new_scalar_from_sha2_512(msm_gamma_2(rho, 8, (i as u8)))
+                ristretto255::new_scalar_from_sha2_512(msm_gamma_2(rho, 8, i as u8))
             })
         }
     }
@@ -1418,10 +1418,10 @@ module aptos_experimental::confidential_proof {
             g1: ristretto255::new_scalar_from_sha2_512(msm_gamma_1(rho, 1)),
             g2: ristretto255::new_scalar_from_sha2_512(msm_gamma_1(rho, 2)),
             g3s: vector::range(0, 8).map(|i| {
-                ristretto255::new_scalar_from_sha2_512(msm_gamma_2(rho, 3, (i as u8)))
+                ristretto255::new_scalar_from_sha2_512(msm_gamma_2(rho, 3, i as u8))
             }),
             g4s: vector::range(0, 8).map(|i| {
-                ristretto255::new_scalar_from_sha2_512(msm_gamma_2(rho, 4, (i as u8)))
+                ristretto255::new_scalar_from_sha2_512(msm_gamma_2(rho, 4, i as u8))
             })
         }
     }
@@ -1433,10 +1433,10 @@ module aptos_experimental::confidential_proof {
             g2: ristretto255::new_scalar_from_sha2_512(msm_gamma_1(rho, 2)),
             g3: ristretto255::new_scalar_from_sha2_512(msm_gamma_1(rho, 3)),
             g4s: vector::range(0, 8).map(|i| {
-                ristretto255::new_scalar_from_sha2_512(msm_gamma_2(rho, 4, (i as u8)))
+                ristretto255::new_scalar_from_sha2_512(msm_gamma_2(rho, 4, i as u8))
             }),
             g5s: vector::range(0, 8).map(|i| {
-                ristretto255::new_scalar_from_sha2_512(msm_gamma_2(rho, 5, (i as u8)))
+                ristretto255::new_scalar_from_sha2_512(msm_gamma_2(rho, 5, i as u8))
             })
         }
     }

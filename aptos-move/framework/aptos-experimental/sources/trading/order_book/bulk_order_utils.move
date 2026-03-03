@@ -124,7 +124,7 @@ module aptos_experimental::bulk_order_utils {
                     );
                 (cancelled_bid_prices, cancelled_bid_sizes)
             } else {
-                (vector::empty<u64>(), vector::empty<u64>())
+                (vector<u64>[], vector<u64>[])
             };
         let (cancelled_ask_prices, cancelled_ask_sizes) =
             if (ask_price_crossing_idx > 0) {
@@ -138,7 +138,7 @@ module aptos_experimental::bulk_order_utils {
                     );
                 (cancelled_ask_prices, cancelled_ask_sizes)
             } else {
-                (vector::empty<u64>(), vector::empty<u64>())
+                (vector<u64>[], vector<u64>[])
             };
         let bulk_order =
             bulk_order_types::new_bulk_order(
@@ -201,7 +201,7 @@ module aptos_experimental::bulk_order_utils {
     }
 
     fun trim_start<Element>(v: &mut vector<Element>, new_start: u64): vector<Element> {
-        let other = vector::empty();
+        let other = vector[];
         vector::move_range(v, 0, new_start, &mut other, 0);
         other
     }

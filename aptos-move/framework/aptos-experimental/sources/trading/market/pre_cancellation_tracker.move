@@ -211,7 +211,7 @@ module aptos_experimental::pre_cancellation_tracker {
         let tracker = new_pre_cancellation_tracker(expiration_window);
         let addr = signer::address_of(account);
 
-        let ids = vector::empty<String>();
+        let ids = vector<String>[];
         ids.push_back(std::string::utf8(b"1"));
         ids.push_back(std::string::utf8(b"2"));
         ids.push_back(std::string::utf8(b"3"));

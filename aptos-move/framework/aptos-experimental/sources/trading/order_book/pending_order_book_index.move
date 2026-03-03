@@ -2,7 +2,6 @@
 module aptos_experimental::pending_order_book_index {
     friend aptos_experimental::single_order_book;
 
-    use std::vector;
     use aptos_std::math64;
     use aptos_framework::timestamp;
     use aptos_framework::big_ordered_map::BigOrderedMap;
@@ -156,7 +155,7 @@ module aptos_experimental::pending_order_book_index {
     friend fun take_ready_price_based_orders(
         self: &mut PendingOrderBookIndex, current_price: u64, order_limit: u64
     ): vector<OrderId> {
-        let orders = vector::empty();
+        let orders = vector[];
         self.take_ready_price_move_up_orders(
             current_price,
             &mut orders,
@@ -171,7 +170,7 @@ module aptos_experimental::pending_order_book_index {
     friend fun take_ready_time_based_orders(
         self: &mut PendingOrderBookIndex, order_limit: u64
     ): vector<OrderId> {
-        let orders = vector::empty();
+        let orders = vector[];
         while (!self.time_based_index.is_empty() && orders.length() < order_limit) {
             let current_time = timestamp::now_seconds();
             let (time, order_id) = self.time_based_index.borrow_front();

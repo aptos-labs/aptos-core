@@ -108,7 +108,6 @@ module aptos_experimental::veiled_coin {
     use std::error;
     use std::option::Option;
     use std::signer;
-    use std::vector;
 
     use aptos_std::ristretto255;
     use aptos_std::ristretto255_bulletproofs as bulletproofs;
@@ -254,7 +253,7 @@ module aptos_experimental::veiled_coin {
         // Create the resource account. This will allow this module to later obtain a `signer` for this account and
         // transfer `Coin<T>`'s into its `CoinStore<T>` before minting a `VeiledCoin<T>`.
         let (_resource, signer_cap) =
-            account::create_resource_account(deployer, vector::empty());
+            account::create_resource_account(deployer, vector[]);
 
         move_to(deployer, VeiledCoinMinter { signer_cap })
     }
@@ -450,7 +449,7 @@ module aptos_experimental::veiled_coin {
         amount >>= NUM_LEAST_SIGNIFICANT_BITS_REMOVED;
 
         // We are now left with a 32-bit value
-        (amount as u32)
+        amount as u32
     }
 
     /// Casts a `u32` to-be-veiled amount to a `u64` normal public amount. No precision is lost here.

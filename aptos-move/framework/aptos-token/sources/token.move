@@ -877,8 +877,8 @@ module aptos_token::token {
         let all_token_data = &mut Collections[token_data_id.creator].token_data;
         let token_data = all_token_data.borrow_mut(token_data_id);
         assert!(token_data.mutability_config.properties, error::permission_denied(EFIELD_NOT_MUTABLE));
-        let old_values: vector<Option<PropertyValue>> = vector::empty();
-        let new_values: vector<PropertyValue> = vector::empty();
+        let old_values: vector<Option<PropertyValue>> = vector[];
+        let new_values: vector<PropertyValue> = vector[];
         assert_non_standard_reserved_property(&keys);
         for (i in 0..keys.length()){
             let key = keys.borrow(i);

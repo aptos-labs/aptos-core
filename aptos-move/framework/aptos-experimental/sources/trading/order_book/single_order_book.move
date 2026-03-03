@@ -13,7 +13,6 @@
 module aptos_experimental::single_order_book {
     friend aptos_experimental::order_book;
 
-    use std::vector;
     use std::error;
     use std::option::{Self, Option};
     use std::string::String;
@@ -484,7 +483,7 @@ module aptos_experimental::single_order_book {
             self.pending_orders.take_ready_price_based_orders(
                 current_price, order_limit
             );
-        let orders = vector::empty();
+        let orders = vector[];
 
         order_ids.for_each(
             |order_id| {
@@ -512,7 +511,7 @@ module aptos_experimental::single_order_book {
         let self_orders = &mut self.orders;
         let self_client_order_ids = &mut self.client_order_ids;
         let order_ids = self.pending_orders.take_ready_time_based_orders(order_limit);
-        let orders = vector::empty();
+        let orders = vector[];
 
         order_ids.for_each(
             |order_id| {
@@ -573,7 +572,7 @@ module aptos_experimental::single_order_book {
         price_time_idx: &mut PriceTimeIndex,
         order_req: SingleOrderRequest<M>
     ): vector<OrderMatch<M>> {
-        let match_results = vector::empty();
+        let match_results = vector[];
         let remaining_size = order_req.get_remaining_size();
         while (remaining_size > 0) {
             if (!is_taker_order(
@@ -619,7 +618,7 @@ module aptos_experimental::single_order_book {
         oracle_price: u64
     ): vector<OrderMatch<M>> {
         let ready_orders = self.take_ready_price_based_orders(oracle_price, 1000);
-        let all_matches = vector::empty();
+        let all_matches = vector[];
         let i = 0;
         while (i < ready_orders.length()) {
             let order = ready_orders[i];

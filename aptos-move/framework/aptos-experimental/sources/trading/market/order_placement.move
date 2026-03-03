@@ -60,7 +60,6 @@ module aptos_experimental::order_placement {
     use std::option::Option;
     use std::signer;
     use std::string::String;
-    use std::vector;
     use aptos_trading::order_book_types::{
         OrderId,
         TriggerCondition,
@@ -1004,7 +1003,7 @@ module aptos_experimental::order_placement {
             order_id = option::some(next_order_id());
         };
         let order_id = order_id.destroy_some();
-        let callback_results = vector::empty();
+        let callback_results = vector[];
         let validation_result =
             callbacks.validate_order_placement(
                 new_clearinghouse_order_info(
@@ -1171,7 +1170,7 @@ module aptos_experimental::order_placement {
             );
         };
 
-        let fill_sizes = vector::empty();
+        let fill_sizes = vector[];
         let match_count = 0;
         loop {
             match_count += 1;

@@ -97,7 +97,6 @@
 module aptos_experimental::sigma_protos {
     use std::error;
     use std::option::Option;
-    use std::vector;
 
     use aptos_std::ristretto255_elgamal as elgamal;
     use aptos_std::ristretto255_pedersen as pedersen;
@@ -531,7 +530,7 @@ module aptos_experimental::sigma_protos {
         let c = pedersen::commitment_as_point(sender_new_balance_comm);
         let y = elgamal::pubkey_to_compressed_point(sender_pk);
 
-        let bytes = vector::empty<u8>();
+        let bytes = vector<u8>[];
 
         bytes.append(FIAT_SHAMIR_SIGMA_DST);
         bytes.append(
@@ -590,7 +589,7 @@ module aptos_experimental::sigma_protos {
         let (c1, c2) = elgamal::ciphertext_as_points(sender_curr_balance_ct);
         let bar_c = pedersen::commitment_as_point(sender_new_balance_comm);
 
-        let bytes = vector::empty<u8>();
+        let bytes = vector<u8>[];
 
         bytes.append(FIAT_SHAMIR_SIGMA_DST);
         bytes.append(
@@ -836,7 +835,7 @@ module aptos_experimental::sigma_protos {
         let alpha2_bytes = ristretto255::scalar_to_bytes(&proof.alpha2);
         let alpha3_bytes = ristretto255::scalar_to_bytes(&proof.alpha3);
 
-        let bytes = vector::empty<u8>();
+        let bytes = vector<u8>[];
         bytes.append(alpha3_bytes);
         bytes.append(alpha2_bytes);
         bytes.append(alpha1_bytes);
@@ -872,7 +871,7 @@ module aptos_experimental::sigma_protos {
         let alpha4_bytes = ristretto255::scalar_to_bytes(&proof.alpha4);
         let alpha5_bytes = ristretto255::scalar_to_bytes(&proof.alpha5);
 
-        let bytes = vector::empty<u8>();
+        let bytes = vector<u8>[];
         bytes.append(alpha5_bytes);
         bytes.append(alpha4_bytes);
         bytes.append(alpha3_bytes);

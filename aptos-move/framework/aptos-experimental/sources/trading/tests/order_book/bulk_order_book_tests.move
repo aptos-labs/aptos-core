@@ -102,7 +102,7 @@ module aptos_experimental::bulk_order_book_tests {
         taker_size: u64,
         is_bid: bool
     ): vector<OrderMatch<TestMetadata>> {
-        let match_results = vector::empty();
+        let match_results = vector[];
         // If the order is not a taker order, we return an empty match result
         let remaining_size = taker_size;
         while (remaining_size > 0) {
@@ -944,8 +944,8 @@ module aptos_experimental::bulk_order_book_tests {
         // Test placing an order with empty bid vectors
         let (order_book, price_time_index) = setup_test();
 
-        let bid_prices = vector::empty<u64>(); // Empty bid prices
-        let bid_sizes = vector::empty<u64>(); // Empty bid sizes
+        let bid_prices = vector<u64>[]; // Empty bid prices
+        let bid_sizes = vector<u64>[]; // Empty bid sizes
         let ask_prices = vector[ASK_PRICE_1, ASK_PRICE_2];
         let ask_sizes = vector[SIZE_1, SIZE_2];
 

@@ -161,7 +161,7 @@ module aptos_experimental::large_packages {
         let i = 0;
         while (i < code_chunks.length()) {
             let inner_code = code_chunks[i];
-            let idx = (code_indices[i] as u64);
+            let idx = code_indices[i] as u64;
 
             if (staging_area.code.contains(idx)) {
                 staging_area.code.borrow_mut(idx).append(inner_code);

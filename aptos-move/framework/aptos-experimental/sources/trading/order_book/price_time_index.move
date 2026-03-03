@@ -367,7 +367,7 @@ module aptos_experimental::price_time_index {
     #[test_only]
     fun place_test_order(self: &mut PriceTimeIndex, order: TestOrder)
         : vector<ActiveMatchedOrder> {
-        let result = vector::empty();
+        let result = vector[];
         let remaining_size = order.size;
         while (remaining_size > 0) {
             if (!self.is_taker_order(order.price, order.is_bid)) {
