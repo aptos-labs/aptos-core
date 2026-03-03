@@ -1,24 +1,13 @@
-/// This module provides utilities for Twisted ElGamal encryption over the Ristretto255 curve.
-///
-/// In Twisted ElGamal, an encryption key (EK) is derived from a decryption key (DK) as:
-///   EK = DK^(-1) * H
-/// where H is a secondary basepoint (distinct from the primary basepoint G).
-///
-/// A ciphertext encrypting value `v` with randomness `r` under EK is:
-///   C = v * G + r * H  (value component)
-///   D = r * EK         (EK component for decryption)
-///
-/// Decryption: v * G = C - DK * D
+/// Twisted ElGamal encryption over Ristretto255.
+/// EK = DK^(-1) * H. Ciphertext: C = v*G + r*H, D = r*EK. Decrypt: v*G = C - DK*D.
 module aptos_experimental::ristretto255_twisted_elgamal {
     use aptos_std::ristretto255::{Self, CompressedRistretto, RistrettoPoint};
     #[test_only]
     use std::option::Option;
     #[test_only]
-    use aptos_std::ristretto255::Scalar;
+    use aptos_std::ristretto255::{Scalar, random_scalar};
 
-    //
-    // Public functions
-    //
+    // === Public functions ===
 
     /// Returns the compressed generator H used to derive the encryption key as EK = DK^(-1) * H.
     public fun get_encryption_key_basepoint_compressed(): CompressedRistretto {
@@ -30,13 +19,10 @@ module aptos_experimental::ristretto255_twisted_elgamal {
         ristretto255::hash_to_point_base()
     }
 
-    //
-    // Test-only functions
-    //
+    // === Test-only functions ===
 
     #[test_only]
-    /// Derives an encryption key from a decryption key using the formula EK = DK^(-1) * H.
-    /// Returns `Some(CompressedRistretto)` if the DK inversion succeeds, otherwise `None`.
+    /// Returns `Some(EK)` where EK = DK^(-1) * H, or `None` if DK is not invertible.
     public fun pubkey_from_secret_key(dk: &Scalar): Option<CompressedRistretto> {
         let dk_invert = dk.scalar_invert();
 
@@ -49,9 +35,8 @@ module aptos_experimental::ristretto255_twisted_elgamal {
     }
 
     #[test_only]
-    /// Generates a random Twisted ElGamal key pair (DK, EK), where EK = DK^(-1) * H.
     public fun generate_twisted_elgamal_keypair(): (Scalar, CompressedRistretto) {
-        let dk = ristretto255::random_scalar();
+        let dk = random_scalar();
         let ek = pubkey_from_secret_key(&dk);
         (dk, ek.extract())
     }

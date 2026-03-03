@@ -1,7 +1,7 @@
-/// The `confidential_proof` module provides range proof verification helpers used by the Confidential Asset protocol.
+/// The `confidential_range_proofs` module provides range proof verification helpers used by the Confidential Asset protocol.
 /// Proof enums and their verify/prove functions live in `confidential_asset` (since Move disallows friend
 /// modules from constructing/destructuring enum variants).
-module aptos_experimental::confidential_proof {
+module aptos_experimental::confidential_range_proofs {
     use std::error;
     use aptos_std::ristretto255::{Self, RistrettoPoint};
     use aptos_std::ristretto255_bulletproofs::{Self as bulletproofs, RangeProof};

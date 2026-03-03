@@ -9,11 +9,7 @@ module aptos_experimental::sigma_protocol_representation_vec {
         v: vector<Representation>
     }
 
-    public fun new_representation_vec(v: vector<Representation>): RepresentationVec {
-        RepresentationVec {
-            v
-        }
-    }
+    public fun new_representation_vec(v: vector<Representation>): RepresentationVec { RepresentationVec { v } }
 
     /// Returns all the underlying `Representation`'s stored in this vector
     /// (Public due to forced inlining for functions that take lambda arguments.)
@@ -39,9 +35,7 @@ module aptos_experimental::sigma_protocol_representation_vec {
 
     /// Multiply all representations by $e$ (i.e., multiply each `self.v[i].scalars` by $e$).
     public fun scale_all(self: &mut RepresentationVec, e: &Scalar) {
-        self.v.for_each_mut(|repr| {
-            repr.scale(e)
-        });
+        self.v.for_each_mut(|repr| repr.scale(e));
     }
 
     /// For all $i$, multiply the $i$th representation by `b[i]` (i.e., multiply `self.v[i].scalars` by `b[i]`)
