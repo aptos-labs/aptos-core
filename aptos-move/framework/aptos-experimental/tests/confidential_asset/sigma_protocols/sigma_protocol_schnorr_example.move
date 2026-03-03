@@ -1,3 +1,4 @@
+#[test_only]
 /// A Schnorr ZKPoK of $s$ such that $Y = s G$.
 ///
 /// The Schnorr NP relation is:
@@ -23,13 +24,14 @@
 ///   ```
 module aptos_experimental::sigma_protocol_schnorr_example {
     use std::error;
-    use aptos_std::ristretto255::{RistrettoPoint, Scalar, CompressedRistretto};
+    use aptos_std::ristretto255::{Scalar, CompressedRistretto};
 
-    use aptos_std::ristretto255::scalar_one;
+    use aptos_framework::chain_id;
     use aptos_experimental::sigma_protocol_fiat_shamir::{DomainSeparator, new_domain_separator};
     use aptos_experimental::sigma_protocol_witness::{Witness, new_secret_witness};
-    use aptos_experimental::sigma_protocol_statement::{Statement, new_statement};
-    use aptos_experimental::sigma_protocol_representation::new_representation;
+    use aptos_experimental::sigma_protocol_statement::Statement;
+    use aptos_experimental::sigma_protocol_statement_builder::new_builder;
+    use aptos_experimental::sigma_protocol_representation::{repr_point, repr_scaled};
     use aptos_experimental::sigma_protocol_representation_vec::{RepresentationVec, new_representation_vec};
     #[test_only]
     use aptos_std::ristretto255::{random_point, random_scalar};
@@ -37,6 +39,8 @@ module aptos_experimental::sigma_protocol_schnorr_example {
     use aptos_experimental::sigma_protocol_homomorphism::evaluate_psi;
     #[test_only]
     use aptos_experimental::sigma_protocol;
+    #[test_only]
+    use aptos_framework::account;
     #[test_only]
     use aptos_experimental::sigma_protocol_utils::equal_vec_points;
 
@@ -60,6 +64,8 @@ module aptos_experimental::sigma_protocol_schnorr_example {
     /// The number of points $v$ in the image of the Schnorr homomorphism and transformation function is 1: $G^s$
     const M: u64 = 1;
 
+    /// Phantom marker type for Schnorr statements.
+    struct Schnorr has drop {}
 
     /// The expected number of points $n_1$ in a Schnorr statement is `N_1 = 2`.
     const E_WRONG_N_1: u64 = 1;
@@ -71,19 +77,18 @@ module aptos_experimental::sigma_protocol_schnorr_example {
     const E_WRONG_M: u64 = 4;
 
     fun new_session(session_id: vector<u8>): DomainSeparator {
-        new_domain_separator(PROTOCOL_ID, session_id)
+        new_domain_separator(@aptos_experimental, chain_id::get(), PROTOCOL_ID, session_id)
     }
 
-    /// Creates a new Schnorr statement.
+    /// Creates a new Schnorr statement using the builder.
     fun new_schnorr_statement(
-        compressed_G: CompressedRistretto, _G: RistrettoPoint,
-        compressed_Y: CompressedRistretto, _Y: RistrettoPoint,
-    ): Statement {
-        new_statement(
-            vector[_G, _Y],
-            vector[compressed_G, compressed_Y],
-            vector[]
-        )
+        compressed_G: CompressedRistretto,
+        compressed_Y: CompressedRistretto,
+    ): Statement<Schnorr> {
+        let b = new_builder();
+        b.add_point(compressed_G);
+        b.add_point(compressed_Y);
+        b.build()
     }
 
     fun new_schnorr_witness(s: Scalar): Witness {
@@ -91,7 +96,7 @@ module aptos_experimental::sigma_protocol_schnorr_example {
     }
 
     /// WARNING: See README.md in the `sigma_protocols/` directory for principles on how to implement this correctly!
-    fun psi(stmt: &Statement, w: &Witness): RepresentationVec {
+    fun psi(stmt: &Statement<Schnorr>, w: &Witness): RepresentationVec {
         // WARNING: Crucial for security
         assert!(stmt.get_points().length() == N_1, error::invalid_argument(E_WRONG_N_1));
         // WARNING: Crucial for security
@@ -103,7 +108,7 @@ module aptos_experimental::sigma_protocol_schnorr_example {
         //   s G
         // ]
         let repr_vec = new_representation_vec(vector[
-            new_representation(vector[IDX_G], vector[*w.get(IDX_s)])
+            repr_scaled(IDX_G, *w.get(IDX_s))
         ]);
 
         // WARNING: Crucial for security
@@ -113,7 +118,7 @@ module aptos_experimental::sigma_protocol_schnorr_example {
     }
 
     /// WARNING: See README.md in the `sigma_protocols/` directory for principles on how to implement this correctly!
-    fun f(stmt: &Statement): RepresentationVec {
+    fun f(stmt: &Statement<Schnorr>): RepresentationVec {
         // WARNING: Crucial for security
         assert!(stmt.get_points().length() == N_1, error::invalid_argument(E_WRONG_N_1));
         // WARNING: Crucial for security
@@ -123,7 +128,7 @@ module aptos_experimental::sigma_protocol_schnorr_example {
         //   Y
         // ]
         let repr_vec = new_representation_vec(vector[
-            new_representation(vector[IDX_Y], vector[scalar_one()])
+            repr_point(IDX_Y)
         ]);
 
         // WARNING: Crucial for security
@@ -133,14 +138,15 @@ module aptos_experimental::sigma_protocol_schnorr_example {
     }
 
     #[test_only]
-    fun random_statement_witness_pair(): (Statement, Witness) {
+    fun random_statement_witness_pair(): (Statement<Schnorr>, Witness) {
         let s = random_scalar();
-        let _G = random_point(); // Move linter does not let us use G
-        let _Y = _G.point_mul(&s); // Move linter does not let us use Y
+        let _G = random_point();
+        let compressed_G = _G.point_compress(); // Move linter does not let us use G
+        let compressed_Y = _G.point_mul(&s).point_compress(); // Move linter does not let us use Y
 
         let stmt = new_schnorr_statement(
-            _G.point_compress(), _G.point_clone(),
-            _Y.point_compress(), _Y,
+            compressed_G,
+            compressed_Y,
         );
         let witn = new_schnorr_witness(s);
 
@@ -159,7 +165,6 @@ module aptos_experimental::sigma_protocol_schnorr_example {
         let expected_psi = vector[ _G.point_mul(s) ];
 
         // Actual evaluation, computed via our $\psi$ implementation
-        // TODO(Ugly): Change `|_X, w| psi(_X, w)` to `psi` when public structs ship and allow this.
         let actual_psi = evaluate_psi(|_X, w| psi(_X, w), &_X, &w);
 
         assert!(equal_vec_points(&actual_psi, &expected_psi), 1);
@@ -167,9 +172,9 @@ module aptos_experimental::sigma_protocol_schnorr_example {
 
     #[test]
     fun proof_correctness() {
+        chain_id::initialize_for_test(&account::create_signer_for_test(@aptos_framework), 4);
         let (stmt, witn) = random_statement_witness_pair();
 
-        // TODO(Ugly): Change `|_X, w| psi(_X, w)` to `psi` and `|_X| f(_X)` to `f` when public structs ship and allow this.
         sigma_protocol::assert_correctly_computed_proof_verifies(
             new_session(b"session: test schnorr proving correctness"),
             stmt,
@@ -182,28 +187,30 @@ module aptos_experimental::sigma_protocol_schnorr_example {
     #[test]
     #[expected_failure(abort_code=65537, location=aptos_experimental::sigma_protocol_fiat_shamir)]
     fun empty_proof_for_random_statement_test() {
-        let _G = random_point();
-        let _Y = random_point();
-        // TODO(Ugly): Change `|_X, w| psi(_X, w)` to `psi` and `|_X| f(_X)` to `f` when public structs ship and allow this.
+        chain_id::initialize_for_test(&account::create_signer_for_test(@aptos_framework), 4);
+        let compressed_G = random_point().point_compress();
+        let compressed_Y = random_point().point_compress();
         assert!(
             !sigma_protocol::empty_proof_verifies(
                 new_session(b"session: test empty schnorr proof for random statement does not verify"),
                 |_X, w| psi(_X, w),
                 |_X| f(_X),
-                new_schnorr_statement(_G.point_compress(), _G, _Y.point_compress(), _Y)
+                new_schnorr_statement(compressed_G, compressed_Y)
             ), 1);
     }
 
     #[test]
     #[expected_failure(abort_code=65537, location=aptos_experimental::sigma_protocol_fiat_shamir)]
     fun empty_proof_for_empty_statement_test() {
-        // TODO(Ugly): Change `|_X, w| psi(_X, w)` to `psi` and `|_X| f(_X)` to `f` when public structs ship and allow this.
+        chain_id::initialize_for_test(&account::create_signer_for_test(@aptos_framework), 4);
+        let b = new_builder();
+        let stmt: Statement<Schnorr> = b.build();
         assert!(
             !sigma_protocol::empty_proof_verifies(
                 new_session(b"session: test empty schnorr proof for empty statement does not verify"),
                 |_X, w| psi(_X, w),
                 |_X| f(_X),
-                new_statement(vector[], vector[], vector[])
+                stmt
             ), 1);
     }
 }

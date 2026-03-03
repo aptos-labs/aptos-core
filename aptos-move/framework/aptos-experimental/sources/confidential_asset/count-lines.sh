@@ -41,18 +41,7 @@ printf "%6d  TOTAL (tests)\n" "$tests_lines"
 total_tests_lines=$((total_tests_lines + tests_lines))
 
 echo ""
-echo "=== move-examples/ ==="
-tests_lines=0
-for f in $(find "$APTOS_CORE_DIR/aptos-move/move-examples/confidential_asset/tests/" -name '*.move' | sort); do
-    n=$(wc -l < "$f")
-    printf "%6d  %s\n" "$n" "${f#$ROOT_DIR/}"
-    tests_lines=$((tests_lines + n))
-done
-printf "%6d  TOTAL (tests)\n" "$tests_lines"
-total_tests_lines=$((total_tests_lines + tests_lines))
-
-echo ""
-total=$((sources_lines + tests_lines))
+total=$((total_sources_lines + total_tests_lines))
 echo "=== Summary ==="
 printf "%6d  sources\n" "$total_sources_lines"
 printf "%6d  tests\n" "$total_tests_lines"

@@ -1,7 +1,6 @@
-// TODO: Consider renaming to MSM / MSMs
 module aptos_experimental::sigma_protocol_representation {
     use std::error;
-    use aptos_std::ristretto255::{Scalar, RistrettoPoint};
+    use aptos_std::ristretto255::{Scalar, RistrettoPoint, scalar_one};
     use aptos_experimental::sigma_protocol_statement::Statement;
 
     /// The number of points and scalars in a Representation needs to be the same.
@@ -27,9 +26,19 @@ module aptos_experimental::sigma_protocol_representation {
         }
     }
 
+    /// A single statement point scaled by 1 (used extensively in f()).
+    public fun repr_point(idx: u64): Representation {
+        new_representation(vector[idx], vector[scalar_one()])
+    }
+
+    /// A single statement point scaled by a witness scalar (used extensively in psi()).
+    public fun repr_scaled(idx: u64, scalar: Scalar): Representation {
+        new_representation(vector[idx], vector[scalar])
+    }
+
     /// Given a representation, which only stores locations of group elements within a public statement, returns the
     /// actual vector of group elements by "looking up" these elements in the public statement.
-    public fun to_points(self: &Representation, stmt: &Statement): vector<RistrettoPoint> {
+    public fun to_points<P>(self: &Representation, stmt: &Statement<P>): vector<RistrettoPoint> {
         self.point_idxs.map(|idx| stmt.get_point(idx).point_clone())
     }
 
