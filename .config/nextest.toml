@@ -31,13 +31,3 @@ fail-fast = true
 test-threads = 6
 retries = 3
 slow-timeout = { period = "1800s", terminate-after = 1 }
-
-[profile.smoke-test-shard]
-# Sharded smoke tests: slightly more threads since fewer tests per runner.
-# Note: too many threads causes resource contention (each test starts a local swarm).
-status-level = "skip"
-failure-output = "immediate-final"
-fail-fast = true
-test-threads = 8
-retries = 3
-slow-timeout = { period = "1800s", terminate-after = 1 }

@@ -12,6 +12,10 @@ inputs:
     description: "Nextest profile to use"
     required: false
     default: "smoke-test"
+  ARTIFACT_SUFFIX:
+    description: "Optional suffix for the log artifact name (e.g., '-shard-1')"
+    required: false
+    default: ""
 
 runs:
   using: composite
@@ -40,7 +44,7 @@ runs:
       if: ${{ failure() || success() }}
       uses: actions/upload-artifact@v4
       with:
-        name: failed-smoke-test-logs${{ inputs.PARTITION != '' && format('-shard-{0}', inputs.PARTITION) || '' }}
+        name: failed-smoke-test-logs${{ inputs.ARTIFACT_SUFFIX }}
         include-hidden-files: true
         # Retain all smoke test data except for the db (which may be large).
         path: |

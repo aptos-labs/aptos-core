@@ -109,74 +109,10 @@ jobs:
         with:
           GIT_CREDENTIALS: ${{ secrets.GIT_CREDENTIALS }}
 
-  # Build smoke test binaries once, then fan out to shards.
-  rust-smoke-test-build:
-    needs: file_change_determinator
-    if: | # Only run on each PR once an appropriate event occurs
-      (
-        github.event_name == 'workflow_dispatch' ||
-        github.event_name == 'push' ||
-        contains(github.event.pull_request.labels.*.name, 'CICD:run-e2e-tests') ||
-        github.event.pull_request.auto_merge != null) ||
-        contains(github.event.pull_request.body, '#e2e'
-      )
-    runs-on: runs-on,cpu=64,family=c7,disk=large,image=aptos-ubuntu-x64,run-id=${{ github.run_id }}
-    steps:
-      - uses: actions/checkout@v4
-        if: needs.file_change_determinator.outputs.only_docs_changed != 'true'
-
-      - name: Setup rust toolchain and cache
-        if: needs.file_change_determinator.outputs.only_docs_changed != 'true'
-        uses: ./.github/actions/rust-setup
-        with:
-          GIT_CREDENTIALS: ${{ secrets.GIT_CREDENTIALS }}
-          ADDITIONAL_KEY: smoke-test
-
-      # Build aptos-node separately to avoid feature unification issues.
-      - name: Build aptos-node binary
-        if: needs.file_change_determinator.outputs.only_docs_changed != 'true'
-        run: cargo build --locked --package=aptos-node --features=failpoints --release
-
-      # Build all workspace binaries that tests need at runtime via workspace_builder.rs.
-      - name: Build workspace binaries
-        if: needs.file_change_determinator.outputs.only_docs_changed != 'true'
-        run: cargo build --locked --release --all --bins --exclude aptos-node
-
-      # Compile smoke-test binary. LOCAL_SWARM_NODE_RELEASE is read via option_env! at compile time.
-      - name: Compile smoke test binary
-        if: needs.file_change_determinator.outputs.only_docs_changed != 'true'
-        run: LOCAL_SWARM_NODE_RELEASE=1 cargo nextest run --no-run --release --package smoke-test
-
-      # Create a nextest archive for shard runners (self-contained test binary).
-      - name: Create nextest archive
-        if: needs.file_change_determinator.outputs.only_docs_changed != 'true'
-        run: |
-          mkdir -p /tmp/smoke-test-cache
-          LOCAL_SWARM_NODE_RELEASE=1 cargo nextest archive --release --package smoke-test --archive-file /tmp/smoke-test-cache/smoke-test-archive.tar.zst
-
-      # Package all release binaries needed at test runtime.
-      - name: Package release binaries
-        if: needs.file_change_determinator.outputs.only_docs_changed != 'true'
-        run: |
-          mkdir -p /tmp/smoke-test-cache/bins
-          cp target/release/aptos-node /tmp/smoke-test-cache/bins/
-          # Copy all workspace release binaries (used by workspace_builder.rs get_bin())
-          find target/release -maxdepth 1 -type f -executable ! -name '*.d' \
-            -exec cp {} /tmp/smoke-test-cache/bins/ \;
-
-      - name: Save smoke test artifacts to cache
-        if: needs.file_change_determinator.outputs.only_docs_changed != 'true'
-        uses: runs-on/cache/save@v4
-        with:
-          path: /tmp/smoke-test-cache
-          key: smoke-test-${{ github.sha }}
-
-      - run: echo "Skipping smoke test build! Unrelated changes detected."
-        if: needs.file_change_determinator.outputs.only_docs_changed == 'true'
-
-  # Run smoke tests across 4 parallel shards. This is a PR required job.
+  # Run smoke tests across 4 parallel shards, each with Swatinem/rust-cache.
+  # This is a PR required job.
   rust-smoke-tests:
-    needs: [file_change_determinator, rust-smoke-test-build]
+    needs: file_change_determinator
     if: | # Only run on each PR once an appropriate event occurs
       (
         github.event_name == 'workflow_dispatch' ||
@@ -194,49 +130,20 @@ jobs:
       - uses: actions/checkout@v4
         if: needs.file_change_determinator.outputs.only_docs_changed != 'true'
 
-      - name: Restore smoke test artifacts from cache
+      - name: Setup rust toolchain and cache
         if: needs.file_change_determinator.outputs.only_docs_changed != 'true'
-        uses: runs-on/cache/restore@v4
+        uses: ./.github/actions/rust-setup
         with:
-          path: /tmp/smoke-test-cache
-          key: smoke-test-${{ github.sha }}
-          fail-on-cache-miss: true
+          GIT_CREDENTIALS: ${{ secrets.GIT_CREDENTIALS }}
+          ADDITIONAL_KEY: smoke-test
 
-      - name: Install release binaries
+      - uses: ./.github/actions/rust-smoke-tests
         if: needs.file_change_determinator.outputs.only_docs_changed != 'true'
-        run: |
-          mkdir -p target/release
-          cp /tmp/smoke-test-cache/bins/* target/release/
-          chmod +x target/release/*
-
-      - name: Run postgres database
-        if: needs.file_change_determinator.outputs.only_docs_changed != 'true'
-        run: docker run --detach -p 5432:5432 cimg/postgres:14.2
-
-      - name: Run smoke test shard ${{ matrix.shard }}/4
-        if: needs.file_change_determinator.outputs.only_docs_changed != 'true'
-        run: |
-          cargo nextest run \
-            --archive-file /tmp/smoke-test-cache/smoke-test-archive.tar.zst \
-            --workspace-remap . \
-            --profile smoke-test-shard \
-            --partition count:${{ matrix.shard }}/4
-        env:
-          SMOKE_TEST_PREBUILD: "1"
-          SMOKE_TEST_BIN_DIR: ${{ github.workspace }}/target/release
-          APTOS_NODE_BIN_PATH: ${{ github.workspace }}/target/release/aptos-node
-
-      # We always try to create the artifact, but it only creates on flaky or failed smoke tests -- when the directories are empty.
-      - name: Upload smoke test logs for failed and flaky tests
-        if: ${{ (failure() || success()) && needs.file_change_determinator.outputs.only_docs_changed != 'true' }}
-        uses: actions/upload-artifact@v4
         with:
-          name: failed-smoke-test-logs-shard-${{ matrix.shard }}
-          include-hidden-files: true
-          path: |
-            /tmp/.tmp*
-            !/tmp/.tmp*/**/db/
-          retention-days: 14
+          GIT_CREDENTIALS: ${{ secrets.GIT_CREDENTIALS }}
+          PARTITION: "count:${{ matrix.shard }}/4"
+          NEXTEST_PROFILE: smoke-test
+          ARTIFACT_SUFFIX: "-shard-${{ matrix.shard }}"
 
       - run: echo "Skipping rust smoke tests! Unrelated changes detected."
         if: needs.file_change_determinator.outputs.only_docs_changed == 'true'
