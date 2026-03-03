@@ -53,7 +53,7 @@ pub struct K8sFactory {
     keep: bool,
     enable_haproxy: bool,
     enable_indexer: bool,
-    enable_pfn: bool,
+    num_pfns: usize,
     deployer_profile: String,
 }
 
@@ -67,7 +67,7 @@ impl K8sFactory {
         keep: bool,
         enable_haproxy: bool,
         enable_indexer: bool,
-        enable_pfn: bool,
+        num_pfns: usize,
         deployer_profile: String,
     ) -> Result<K8sFactory> {
         let root_key: [u8; ED25519_PRIVATE_KEY_LENGTH] =
@@ -98,7 +98,7 @@ impl K8sFactory {
             keep,
             enable_haproxy,
             enable_indexer,
-            enable_pfn,
+            num_pfns,
             deployer_profile,
         })
     }
@@ -275,14 +275,14 @@ impl Factory for K8sFactory {
             // PFN deploy phase (if enabled)
             let pfn_deploy_start = Instant::now();
             let pfn_namespace = self.kube_namespace.clone();
-            let enable_pfn = self.enable_pfn;
+            let num_pfns = self.num_pfns;
             let pfn_era = new_era.clone();
             let pfn_profile = self.deployer_profile.clone();
             let pfn_kube_namespace = self.kube_namespace.clone();
             let pfn_init_version = format!("{}", init_version);
             let pfn_kube_client = kube_client.clone();
             let deploy_pfn_fut = async move {
-                if enable_pfn {
+                if num_pfns > 0 {
                     let genesis_bucket_path = format!(
                         "{}/{}/{}",
                         FORGE_GENESIS_SHARED_BUCKET, pfn_kube_namespace, pfn_era
@@ -291,6 +291,7 @@ impl Factory for K8sFactory {
                         "profile": pfn_profile,
                         "era": pfn_era,
                         "namespace": pfn_kube_namespace,
+                        "num_pfns": num_pfns,
                         "pfn-values": {
                             "imageTag": pfn_init_version,
                             "genesis_bucket_path": genesis_bucket_path,

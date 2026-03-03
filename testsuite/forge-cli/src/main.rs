@@ -136,9 +136,10 @@ struct K8sSwarm {
     enable_indexer: bool,
     #[clap(
         long,
-        help = "If set, deploys a public full node (PFN) alongside the testnet"
+        help = "Number of public full nodes (PFNs) to deploy alongside the testnet (0 to disable)",
+        default_value = "0"
     )]
-    enable_pfn: bool,
+    num_pfns: usize,
     #[clap(
         long,
         help = "The deployer profile used to spin up and configure forge infrastructure",
@@ -212,9 +213,10 @@ struct Create {
     indexer_image_tag: Option<String>,
     #[clap(
         long,
-        help = "If set, deploys a public full node (PFN) alongside the testnet"
+        help = "Number of public full nodes (PFNs) to deploy alongside the testnet (0 to disable)",
+        default_value = "0"
     )]
-    enable_pfn: bool,
+    num_pfns: usize,
     #[clap(
         long,
         help = "The deployer profile used to spin up and configure forge infrastructure",
@@ -328,7 +330,7 @@ fn main() -> Result<()> {
                             k8s.keep,
                             k8s.enable_haproxy,
                             k8s.enable_indexer,
-                            k8s.enable_pfn,
+                            k8s.num_pfns,
                             k8s.deployer_profile.clone(),
                         )?,
                     );
@@ -380,7 +382,7 @@ fn main() -> Result<()> {
                 let pfn_era = era.clone();
                 let pfn_image_tag = create.validator_image_tag.clone();
                 let pfn_profile = create.deployer_profile.clone();
-                let enable_pfn = create.enable_pfn;
+                let num_pfns = create.num_pfns;
 
                 let deploy_testnet_fut = async {
                     install_testnet_resources(
@@ -420,7 +422,7 @@ fn main() -> Result<()> {
                 .boxed();
 
                 let deploy_pfn_fut = async move {
-                    if enable_pfn {
+                    if num_pfns > 0 {
                         let genesis_bucket_path = format!(
                             "{}/{}/{}",
                             FORGE_GENESIS_SHARED_BUCKET, pfn_namespace, pfn_era
@@ -429,6 +431,7 @@ fn main() -> Result<()> {
                             "profile": pfn_profile,
                             "era": pfn_era,
                             "namespace": pfn_namespace,
+                            "num_pfns": num_pfns,
                             "pfn-values": {
                                 "imageTag": pfn_image_tag,
                                 "genesis_bucket_path": genesis_bucket_path,
