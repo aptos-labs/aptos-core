@@ -73,8 +73,12 @@ def parse_proof_size_from_folder(folder_path):
                         m = re.search(r"proof_size=(\d+)", data["function_id"])
                         if m:
                             return int(m.group(1))
-            except (json.JSONDecodeError, IOError, ValueError):
-                pass
+            except (json.JSONDecodeError, IOError, ValueError) as e:
+                # If benchmark.json is missing or malformed, ignore and fall back to returning None.
+                print(
+                    f"Warning: could not parse proof_size from {benchmark_json}: {e}",
+                    file=sys.stderr,
+                )
     return None
 
 

@@ -70,13 +70,19 @@ pub trait RangeProof<E: Pairing, B: BatchedRangeProof<E>> {
 
     fn append_f_j_commitments<A: CanonicalSerialize>(&mut self, f_j_commitments: &A);
 
+    fn append_g_i_commitments<A: CanonicalSerialize>(&mut self, g_i_commitments: &A);
+
     fn append_h_commitment<A: CanonicalSerialize>(&mut self, commitment: &A);
+
+    fn append_hypercube_sum<F: CanonicalSerialize>(&mut self, point: &F);
 
     fn challenges_for_quotient_polynomials(&mut self, ell: usize) -> Vec<E::ScalarField>;
 
     fn challenges_for_linear_combination(&mut self, ell: usize) -> Vec<E::ScalarField>;
 
-    fn challenge_from_verifier(&mut self) -> E::ScalarField;
+    fn challenge_scalar(&mut self) -> E::ScalarField;
+
+    fn challenge_point(&mut self, dimension: u8) -> Vec<E::ScalarField>;
 }
 
 #[allow(private_bounds)]
@@ -160,12 +166,28 @@ impl<E: Pairing, B: BatchedRangeProof<E>> RangeProof<E, B> for Transcript {
         self.append_message(b"f-j-commitments", f_j_commitments_bytes.as_slice());
     }
 
+    fn append_g_i_commitments<A: CanonicalSerialize>(&mut self, g_i_commitments: &A) {
+        let mut g_i_commitments_bytes = Vec::new();
+        g_i_commitments
+            .serialize_compressed(&mut g_i_commitments_bytes)
+            .expect("g_i_commitments serialization should succeed");
+        self.append_message(b"g-i-commitments", g_i_commitments_bytes.as_slice());
+    }
+
     fn append_h_commitment<A: CanonicalSerialize>(&mut self, commitment: &A) {
         let mut commitment_bytes = Vec::new();
         commitment
             .serialize_compressed(&mut commitment_bytes)
             .expect("h_commitment serialization should succeed");
         self.append_message(b"h-commitment", commitment_bytes.as_slice());
+    }
+
+    fn append_hypercube_sum<A: CanonicalSerialize>(&mut self, point: &A) {
+        let mut buf = Vec::new();
+        point
+            .serialize_compressed(&mut buf)
+            .expect("hypercube_sum serialization should succeed");
+        self.append_message(b"hypercube-sum", &buf);
     }
 
     fn challenges_for_quotient_polynomials(&mut self, ell: usize) -> Vec<E::ScalarField> {
@@ -184,10 +206,18 @@ impl<E: Pairing, B: BatchedRangeProof<E>> RangeProof<E, B> for Transcript {
         )
     }
 
-    fn challenge_from_verifier(&mut self) -> E::ScalarField {
+    fn challenge_scalar(&mut self) -> E::ScalarField {
         <Transcript as ScalarProtocol<E::ScalarField>>::challenge_full_scalar(
             self,
             b"verifier-challenge-for-linear-combination",
+        )
+    }
+
+    fn challenge_point(&mut self, dimension: u8) -> Vec<E::ScalarField> {
+        <Transcript as ScalarProtocol<E::ScalarField>>::challenge_full_scalars(
+            self,
+            b"challenge-for-evaluation-point",
+            dimension.into(),
         )
     }
 }

@@ -186,7 +186,7 @@ mod zeromorph {
 mod shplonked {
     use super::*;
     use aptos_dkg::pcs::{
-        shplonked::{batch_verify_generalized, ShplonkedBatchProof, SumEvalHom},
+        shplonked::{batch_verify_generalized, SumEvalHom},
         EvaluationSet,
     };
 
@@ -233,13 +233,11 @@ mod shplonked {
         let commitment_msms: Vec<_> = commitments.iter().map(|c| c.clone().into()).collect();
 
         let mut trs_verifier = merlin::Transcript::new(PCS_BATCH_DST);
-        let batch_proof = ShplonkedBatchProof::from(proof.clone());
-        let sets: Vec<EvaluationSet<_>> = proof
-            .eval_points
-            .iter()
-            .map(|&z| EvaluationSet {
+        let point = challenge[0];
+        let sets: Vec<EvaluationSet<_>> = (0..polys.len())
+            .map(|_| EvaluationSet {
                 rev: vec![],
-                hid: vec![z],
+                hid: vec![point],
             })
             .collect();
         let y_rev: Vec<Vec<_>> = sets.iter().map(|_| vec![]).collect();
@@ -250,7 +248,7 @@ mod shplonked {
             &commitment_msms,
             &y_rev,
             proof.sigma_proof_statement.phi_y,
-            &batch_proof,
+            &proof,
             &mut trs_verifier,
             &mut rng,
         )

@@ -7,7 +7,7 @@ use super::scalars_to_bits;
 use crate::{
     algebra::polynomials,
     pcs::univariate_hiding_kzg,
-    range_proofs::traits,
+    range_proofs::{traits, PublicStatement},
     sigma_protocol::{
         self,
         homomorphism::{self, Trait as _, TrivialShape},
@@ -111,13 +111,6 @@ pub struct ProverKey<E: Pairing> {
     pub(crate) ck_S: univariate_hiding_kzg::CommitmentKey<E>,
     pub(crate) max_n: usize,
     pub(crate) prover_precomputed: ProverPrecomputed<E>,
-}
-
-#[derive(CanonicalSerialize)]
-pub struct PublicStatement<E: Pairing> {
-    n: usize,
-    ell: u8,
-    comm: univariate_hiding_kzg::Commitment<E>,
 }
 
 #[derive(CanonicalSerialize, CanonicalDeserialize, Clone, Debug, PartialEq, Eq)]
@@ -1109,8 +1102,7 @@ mod fiat_shamir {
         roots_of_unity: &Vec<E::ScalarField>,
     ) -> E::ScalarField {
         loop {
-            let gamma =
-                <Transcript as RangeProof<E, Proof<E>>>::challenge_from_verifier(fs_transcript);
+            let gamma = <Transcript as RangeProof<E, Proof<E>>>::challenge_scalar(fs_transcript);
             if !roots_of_unity.contains(&gamma) {
                 return gamma;
             }
