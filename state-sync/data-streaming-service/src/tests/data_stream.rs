@@ -3636,7 +3636,7 @@ fn set_epoch_ending_response_for_indices(
         let random_number = create_random_u64(100);
         if indices.contains(&index) {
             set_epoch_ending_response_in_queue(data_stream, index as usize, 0); // Set a valid response
-        } else if random_number % 3 == 0 {
+        } else if random_number.is_multiple_of(3) {
             set_timeout_response_in_queue(data_stream, index as usize); // Set a timeout response
         } else if random_number % 3 == 1 {
             set_failure_response_in_queue(data_stream, index as usize); // Set a failure response

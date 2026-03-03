@@ -213,7 +213,7 @@ impl FileStoreOperator for GcsFileStoreOperator {
         let end_version = transactions.last().unwrap().version;
         let batch_size = transactions.len();
         anyhow::ensure!(
-            start_version % FILE_ENTRY_TRANSACTION_COUNT == 0,
+            start_version.is_multiple_of(FILE_ENTRY_TRANSACTION_COUNT),
             "Starting version has to be a multiple of BLOB_STORAGE_SIZE."
         );
         anyhow::ensure!(
