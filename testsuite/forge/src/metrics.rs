@@ -23,6 +23,8 @@ pub enum ClusterPhase {
     TestnetInstall,
     /// Deploying indexer stack
     IndexerDeploy,
+    /// Deploying PFN (public full node) stack
+    PfnDeploy,
     /// Waiting for nodes to become healthy
     HealthCheck,
     /// Total end-to-end spin-up time
@@ -35,6 +37,7 @@ impl ClusterPhase {
             ClusterPhase::Cleanup => "cleanup",
             ClusterPhase::TestnetInstall => "testnet_install",
             ClusterPhase::IndexerDeploy => "indexer_deploy",
+            ClusterPhase::PfnDeploy => "pfn_deploy",
             ClusterPhase::HealthCheck => "health_check",
             ClusterPhase::Total => "total",
         }
@@ -123,6 +126,7 @@ mod tests {
         assert_eq!(ClusterPhase::Cleanup.as_str(), "cleanup");
         assert_eq!(ClusterPhase::TestnetInstall.as_str(), "testnet_install");
         assert_eq!(ClusterPhase::IndexerDeploy.as_str(), "indexer_deploy");
+        assert_eq!(ClusterPhase::PfnDeploy.as_str(), "pfn_deploy");
         assert_eq!(ClusterPhase::HealthCheck.as_str(), "health_check");
         assert_eq!(ClusterPhase::Total.as_str(), "total");
     }

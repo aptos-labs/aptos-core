@@ -28,7 +28,10 @@ pub mod prometheus;
 mod stateful_set;
 mod swarm;
 
-use super::{ForgeDeployerManager, FORGE_INDEXER_DEPLOYER_DOCKER_IMAGE_REPO};
+use super::{
+    ForgeDeployerManager, FORGE_GENESIS_SHARED_BUCKET, FORGE_INDEXER_DEPLOYER_DOCKER_IMAGE_REPO,
+    FORGE_PFN_DEPLOYER_DOCKER_IMAGE_REPO,
+};
 use aptos_sdk::crypto::ed25519::ED25519_PRIVATE_KEY_LENGTH;
 pub use cluster_helper::*;
 pub use constants::*;
@@ -50,6 +53,7 @@ pub struct K8sFactory {
     keep: bool,
     enable_haproxy: bool,
     enable_indexer: bool,
+    num_pfns: usize,
     deployer_profile: String,
 }
 
@@ -63,6 +67,7 @@ impl K8sFactory {
         keep: bool,
         enable_haproxy: bool,
         enable_indexer: bool,
+        num_pfns: usize,
         deployer_profile: String,
     ) -> Result<K8sFactory> {
         let root_key: [u8; ED25519_PRIVATE_KEY_LENGTH] =
@@ -93,6 +98,7 @@ impl K8sFactory {
             keep,
             enable_haproxy,
             enable_indexer,
+            num_pfns,
             deployer_profile,
         })
     }
@@ -266,11 +272,64 @@ impl Factory for K8sFactory {
             }
             .boxed();
 
-            // join on testnet and indexer deployment futures, handling the output from the testnet
-            // deployment
+            // PFN deploy phase (if enabled)
+            let pfn_deploy_start = Instant::now();
+            let pfn_namespace = self.kube_namespace.clone();
+            let num_pfns = self.num_pfns;
+            let pfn_era = new_era.clone();
+            let pfn_profile = self.deployer_profile.clone();
+            let pfn_kube_namespace = self.kube_namespace.clone();
+            let pfn_init_version = format!("{}", init_version);
+            let pfn_kube_client = kube_client.clone();
+            let deploy_pfn_fut = async move {
+                if num_pfns > 0 {
+                    let genesis_bucket_path = format!(
+                        "{}/{}/{}",
+                        FORGE_GENESIS_SHARED_BUCKET, pfn_kube_namespace, pfn_era
+                    );
+                    let config = serde_json::from_value(json!({
+                        "profile": pfn_profile,
+                        "era": pfn_era,
+                        "namespace": pfn_kube_namespace,
+                        "num_pfns": num_pfns,
+                        "pfn-values": {
+                            "imageTag": pfn_init_version,
+                            "genesis_bucket_path": genesis_bucket_path,
+                            "chain": {
+                                "era": pfn_era,
+                                "name": "ephemeral",
+                            },
+                        },
+                    }))?;
+
+                    let pfn_deployer = ForgeDeployerManager::new(
+                        pfn_kube_client,
+                        pfn_kube_namespace.clone(),
+                        FORGE_PFN_DEPLOYER_DOCKER_IMAGE_REPO.to_string(),
+                        None,
+                    );
+                    pfn_deployer.start(config).await?;
+                    let result = pfn_deployer.wait_completed().await;
+                    record_cluster_spinup_phase(
+                        &pfn_namespace,
+                        ClusterPhase::PfnDeploy,
+                        pfn_deploy_start,
+                        result.is_ok(),
+                    );
+                    result
+                } else {
+                    Ok(())
+                }
+            }
+            .boxed();
+
+            // Join on testnet, indexer, and PFN deployment futures in parallel.
+            // try_join3 ensures fail-fast: if any deployer fails, the others are cancelled.
             let (validators, fullnodes) =
-                match future::try_join(deploy_testnet_fut, deploy_indexer_fut).await {
-                    Ok((deploy_testnet_ret, _)) => deploy_testnet_ret,
+                match future::try_join3(deploy_testnet_fut, deploy_indexer_fut, deploy_pfn_fut)
+                    .await
+                {
+                    Ok((deploy_testnet_ret, _, _)) => deploy_testnet_ret,
                     Err(e) => {
                         uninstall_testnet_resources(self.kube_namespace.clone()).await?;
                         bail!(e);
