@@ -4,7 +4,7 @@
 pub use aptos_gas_schedule::LATEST_GAS_FEATURE_VERSION;
 use aptos_gas_schedule::{
     gas_feature_versions::{
-        RELEASE_V1_15, RELEASE_V1_30, RELEASE_V1_34, RELEASE_V1_38, RELEASE_V1_41,
+        RELEASE_V1_15, RELEASE_V1_30, RELEASE_V1_34, RELEASE_V1_38, RELEASE_V1_41, RELEASE_V1_42,
     },
     AptosGasParameters,
 };
@@ -119,20 +119,26 @@ pub fn aptos_prod_ty_builder(
     gas_feature_version: u64,
     gas_params: &AptosGasParameters,
 ) -> TypeBuilder {
+    let check_depth_on_type_counts_v2 = gas_feature_version >= RELEASE_V1_42;
     if gas_feature_version >= RELEASE_V1_15 {
         let max_ty_size = gas_params.vm.txn.max_ty_size;
         let max_ty_depth = gas_params.vm.txn.max_ty_depth;
-        TypeBuilder::with_limits(max_ty_size.into(), max_ty_depth.into())
+
+        TypeBuilder::with_limits(
+            max_ty_size.into(),
+            max_ty_depth.into(),
+            check_depth_on_type_counts_v2,
+        )
     } else {
-        aptos_default_ty_builder()
+        aptos_default_ty_builder(false)
     }
 }
 
 /// Returns default [TypeBuilder], used only when:
 ///  1. Type size gas parameters are not yet in gas schedule (before 1.15).
 ///   2. No gas parameters are found on-chain.
-pub fn aptos_default_ty_builder() -> TypeBuilder {
-    TypeBuilder::with_limits(128, 20)
+pub fn aptos_default_ty_builder(check_depth_on_type_counts_v2: bool) -> TypeBuilder {
+    TypeBuilder::with_limits(128, 20, check_depth_on_type_counts_v2)
 }
 
 /// Returns [DeserializerConfig] used by the Aptos blockchain in production.
