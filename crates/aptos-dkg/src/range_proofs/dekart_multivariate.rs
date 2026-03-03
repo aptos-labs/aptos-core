@@ -297,9 +297,9 @@ impl<E: Pairing> traits::BatchedRangeProof<E> for Proof<E> {
         let start = Instant::now();
 
         // Step 4: (y_f - sum 2^{j-1} y_j + sum c^j y_j(1-y_j)) * eq_c_zc(x) * Z_0(x) + alpha * y_g == h_m(x_m)
-        // BinaryConstraintPolynomial uses (1 - eq_0) with eq_0 = ∏ᵢ(1-xᵢ); Z_0 = 1 - eq_0 (vanishes at (0,...,0))
-        // Variable order: sumcheck folds variable 0 first; point[0] = first round challenge.
-        // DenseMultilinearExtension in ark_poly uses index = sum_i b_i * 2^i with b_0 LSB, so var 0 = LSB. Match that.
+        // BinaryConstraintPolynomial uses (1 - eq_0) with eq_0 = ∏ᵢ(1-Xᵢ); Z_0 = 1 - eq_0 (vanishes at (0,...,0)).
+        // Use the same variable order as the sumcheck prover: subclaim.point is (x_0,…,x_{m-1}) with x_i
+        // from round i+1; eq_point c_zc is indexed to match. So we use x as-is for eq and Z_0. // OLD comment: // DenseMultilinearExtension in ark_poly uses index = sum_i b_i * 2^i with b_0 LSB, so var 0 = LSB. Match that.
         let eq_c_zc_at_x: E::ScalarField = (0..x.len())
             .map(|i| {
                 let c_i = c_zc[i];
@@ -312,19 +312,23 @@ impl<E: Pairing> traits::BatchedRangeProof<E> for Proof<E> {
 
         let two = E::ScalarField::from(2u64);
         let mut pow2 = E::ScalarField::ONE; // TODO: can precompute these powers
-        let mut sum_weighted_y = self.y_f; // y_f
+        let mut sum_weighted_y = self.y_f;
         for (_, &y_j) in self.y_js.iter().enumerate().take(ell as usize) {
             sum_weighted_y -= pow2 * y_j;
             pow2 *= two;
         }
         let mut c_pow = c;
         for &y_j in self.y_js.iter().take(ell as usize) {
-            sum_weighted_y += c_pow * y_j * (y_j - E::ScalarField::ONE);
+            sum_weighted_y += c_pow * y_j * (E::ScalarField::ONE - y_j);
             c_pow *= c;
         }
         let lhs = sum_weighted_y * eq_c_zc_at_x * Z_0_at_x + alpha * self.y_g;
         if lhs != subclaim.expected_evaluation {
-            return Err(anyhow::anyhow!("Step 4 check failed: lhs != h_m(x_m)"));
+            return Err(anyhow::anyhow!(
+                "Step 4 check failed: (y_f - sum 2^(j-1) y_j + sum c^j y_j(1-y_j)) * eq_c_zc(x) * Z_0(x) + alpha*y_g != h(x). \
+                 Check transcript order (vk, C, n, ell, C_fj, C_gi, H_g, c, alpha, c_zc), \
+                 that y_f/y_js/y_g are f(x)/f_j(x)/g(x) at subclaim.point, and sumcheck variable order."
+            ));
         }
         #[cfg(feature = "range_proof_timing_multivariate")]
         print_cumulative("step4 scalar check (eq_c_zc, Z_0, lhs)", start.elapsed());
@@ -884,7 +888,7 @@ fn zkzc_send_polys<E: Pairing>(
     alpha: E::ScalarField,
     f_evals: &[E::ScalarField],
     hat_f_j_evals: &[Vec<E::ScalarField>],
-    timing: Option<&mut dyn FnMut(&str, std::time::Duration)>,
+    mut timing: Option<&mut dyn FnMut(&str, std::time::Duration)>,
 ) -> (
     Vec<ProverMsg<E::ScalarField>>,
     Vec<VerifierMsg<E::ScalarField>>,
