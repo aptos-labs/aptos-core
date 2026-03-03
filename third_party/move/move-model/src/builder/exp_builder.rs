@@ -10,7 +10,8 @@ use crate::{
     },
     builder::{
         model_builder::{
-            AnyFunEntry, ConstEntry, EntryVisibility, LocalVarEntry, StructEntry, StructLayout,
+            AnyFunEntry, BuiltinReceiverType, ConstEntry, EntryVisibility, LocalVarEntry,
+            StructEntry, StructLayout,
         },
         module_builder::{ModuleBuilder, SpecBlockContext},
     },
@@ -4196,8 +4197,9 @@ impl ExpTranslator<'_, '_, '_> {
             if let Some(borrow_symbol) = self
                 .parent
                 .parent
-                .vector_receiver_functions
-                .get(&self.env().symbol_pool.make(borrow_fun_name))
+                .builtin_receiver_functions
+                .get(&BuiltinReceiverType::Vector)
+                .and_then(|fns| fns.get(&self.env().symbol_pool.make(borrow_fun_name)))
             {
                 if let Some(borrow_fun_entry) = self.parent.parent.fun_table.get(borrow_symbol) {
                     let mid = borrow_fun_entry.module_id;

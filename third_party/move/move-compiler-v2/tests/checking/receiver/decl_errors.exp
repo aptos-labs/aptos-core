@@ -6,7 +6,7 @@ warning: parameter name `self` indicates a receiver function but the type `0x42:
 11 │     fun receiver_for_external_type(self: T) {}
    │         ^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-warning: parameter name `self` indicates a receiver function but the type `u64` is not suitable for receiver functions. Only structs and vectors can have receiver functions. Consider using a different name.
+warning: parameter name `self` indicates a receiver function but the type `u64` is not suitable for receiver functions. Only structs, vectors, and select primitive types can have receiver functions. Consider using a different name.
    ┌─ tests/checking/receiver/decl_errors.move:14:9
    │
 14 │     fun receiver_for_primitive(self: &u64) {}

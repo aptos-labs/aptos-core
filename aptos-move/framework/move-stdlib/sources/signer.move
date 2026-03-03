@@ -20,15 +20,15 @@ module std::signer {
     /// semantics.
     ///
     /// `borrow_address` borrows this inner field
-    native public fun borrow_address(s: &signer): &address;
+    native public fun borrow_address(self: &signer): &address;
 
     // Copies the address of the signer
-    public fun address_of(s: &signer): address {
-        *borrow_address(s)
+    public fun address_of(self: &signer): address {
+        *borrow_address(self)
     }
 
     /// Return true only if `s` is a transaction signer. This is a spec function only available in spec.
-    spec native fun is_txn_signer(s: signer): bool;
+    spec native fun is_txn_signer(self: signer): bool;
 
     /// Return true only if `a` is a transaction signer address. This is a spec function only available in spec.
     spec native fun is_txn_signer_addr(a: address): bool;
