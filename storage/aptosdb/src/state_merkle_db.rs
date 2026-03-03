@@ -150,7 +150,19 @@ impl StateMerkleDb {
         self.commit_top_levels(version, top_levels_batch)
     }
 
-    /// Only used by fast sync / restore.
+    /// Commits JMT node data without writing any commit progress metadata
+    /// (`StateMerkleCommitProgress` / `StateMerkleShardCommitProgress`).
+    ///
+    /// Only used by `TreeWriter::write_node_batch` during fast-sync / state snapshot restore,
+    /// where the caller (JMT restore) writes raw `NodeBatch` data that contains only JMT nodes —
+    /// no progress bookkeeping. Progress is tracked externally by the restore framework instead.
+    ///
+    /// Unlike [`Self::commit`] which writes shards in parallel, this method commits shards
+    /// sequentially from left (shard 0) to right (shard N-1). This is because JMT restore
+    /// processes keys in hash order (left to right), so each `write_node_batch` call contains
+    /// frozen nodes spanning a contiguous range of shards. Sequential left-to-right writes
+    /// ensure that on crash, all fully-committed shards form a prefix, making it
+    /// straightforward to determine a consistent resume point.
     pub(crate) fn commit_no_progress(
         &self,
         top_level_batch: SchemaBatch,
