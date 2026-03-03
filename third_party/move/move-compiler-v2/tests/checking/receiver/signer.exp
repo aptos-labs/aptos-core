@@ -4,9 +4,13 @@ module 0x1::signer {
         Deref(signer::borrow_address(self))
     }
     private native fun borrow_address(self: &signer): &address;
+    private fun receiver_mut(self: &mut signer) {
+        Tuple()
+    }
     private fun test_receiver_calls(s: signer) {
         signer::address_of(Borrow(Immutable)(s));
         signer::borrow_address(Borrow(Immutable)(s));
+        signer::receiver_mut(Borrow(Mutable)(s));
         Tuple()
     }
 } // end 0x1::signer
@@ -17,8 +21,11 @@ module 0x1::signer {
         *borrow_address(self)
     }
     native fun borrow_address(self: &signer): &address;
+    fun receiver_mut(self: &mut signer) {
+    }
     fun test_receiver_calls(s: signer) {
         address_of(&s);
         borrow_address(&s);
+        receiver_mut(&mut s);
     }
 }

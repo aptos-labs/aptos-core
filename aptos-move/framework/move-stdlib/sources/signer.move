@@ -27,7 +27,7 @@ module std::signer {
         *borrow_address(self)
     }
 
-    /// Return true only if `s` is a transaction signer. This is a spec function only available in spec.
+    /// Return true only if `self` is a transaction signer. This is a spec function only available in spec.
     spec native fun is_txn_signer(self: signer): bool;
 
     /// Return true only if `a` is a transaction signer address. This is a spec function only available in spec.

@@ -16,7 +16,7 @@ use crate::{
         QualifiedInstId, SpecFunId, SpecVarId, StructId, TypeParameter, UserId,
     },
     symbol::Symbol,
-    ty::{Constraint, Type, TypeDisplayContext},
+    ty::{Constraint, PrimitiveType, Type, TypeDisplayContext},
     well_known,
 };
 use codespan_reporting::diagnostic::Severity;
@@ -25,11 +25,8 @@ use legacy_move_compiler::{expansion::ast as EA, parser::ast as PA, shared::Nume
 use move_binary_format::file_format::Visibility;
 use move_core_types::ability::{Ability, AbilitySet};
 use std::collections::{BTreeMap, BTreeSet};
-use crate::ty::PrimitiveType;
 
 /// Discriminant for builtin (non-struct) types that support receiver-style function calls.
-/// Adding a new builtin receiver type requires adding a variant here, a `from_type` arm,
-/// and a `module_name` arm — the compiler enforces exhaustive matching for the latter two.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub(crate) enum BuiltinReceiverType {
     Vector,
@@ -82,7 +79,8 @@ pub(crate) struct ModelBuilder<'env> {
     pub fun_table: BTreeMap<QualifiedSymbol, FunEntry>,
     /// A mapping from builtin receiver types to their receiver function dispatch tables.
     /// Each dispatch table maps simple function names to fully qualified names for `fun_table`.
-    pub builtin_receiver_functions: BTreeMap<BuiltinReceiverType, BTreeMap<Symbol, QualifiedSymbol>>,
+    pub builtin_receiver_functions:
+        BTreeMap<BuiltinReceiverType, BTreeMap<Symbol, QualifiedSymbol>>,
     /// A symbol table for constants.
     pub const_table: BTreeMap<QualifiedSymbol, ConstEntry>,
     /// A list of intrinsic declarations
@@ -504,10 +502,8 @@ impl<'env> ModelBuilder<'env> {
                     },
                     _ => {
                         if let Some(brt) = BuiltinReceiverType::from_type(base_type) {
-                            let module_sym =
-                                self.env.symbol_pool.make(brt.module_name());
-                            if name.module_name.addr()
-                                != &self.env.get_stdlib_address()
+                            let module_sym = self.env.symbol_pool.make(brt.module_name());
+                            if name.module_name.addr() != &self.env.get_stdlib_address()
                                 || name.module_name.name() != module_sym
                             {
                                 diag(&format!(

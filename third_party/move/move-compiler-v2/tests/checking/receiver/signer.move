@@ -9,8 +9,11 @@ module 0x1::signer { // must be this module
         *borrow_address(self)
     }
 
+    fun receiver_mut(self: &mut signer) {}
+
     fun test_receiver_calls(s: signer) {
         s.address_of();
         s.borrow_address();
+        s.receiver_mut();
     }
 }
