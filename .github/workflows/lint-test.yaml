@@ -150,7 +150,9 @@ jobs:
       # Create a nextest archive for shard runners (self-contained test binary).
       - name: Create nextest archive
         if: needs.file_change_determinator.outputs.only_docs_changed != 'true'
-        run: LOCAL_SWARM_NODE_RELEASE=1 cargo nextest archive --release --package smoke-test --archive-file /tmp/smoke-test-cache/smoke-test-archive.tar.zst
+        run: |
+          mkdir -p /tmp/smoke-test-cache
+          LOCAL_SWARM_NODE_RELEASE=1 cargo nextest archive --release --package smoke-test --archive-file /tmp/smoke-test-cache/smoke-test-archive.tar.zst
 
       # Package all release binaries needed at test runtime.
       - name: Package release binaries
