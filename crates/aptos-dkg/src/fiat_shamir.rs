@@ -12,7 +12,7 @@ use crate::{
     sigma_protocol::homomorphism,
 };
 use ark_ec::{pairing::Pairing, AffineRepr};
-use ark_ff::PrimeField;
+use ark_ff::{PrimeField, Zero};
 use ark_serialize::CanonicalSerialize;
 use merlin::Transcript;
 use serde::Serialize;
@@ -67,6 +67,8 @@ pub trait RangeProof<E: Pairing, B: BatchedRangeProof<E>> {
     fn append_hat_f_commitment<A: CanonicalSerialize>(&mut self, commitment: &A);
 
     fn append_sigma_proof<A: CanonicalSerialize>(&mut self, sigma_proof: &A);
+
+    fn append_blinding_poly_commitment<A: CanonicalSerialize>(&mut self, commitment: &A);
 
     fn append_f_j_commitments<A: CanonicalSerialize>(&mut self, f_j_commitments: &A);
 
@@ -150,6 +152,14 @@ impl<E: Pairing, B: BatchedRangeProof<E>> RangeProof<E, B> for Transcript {
             .serialize_compressed(&mut commitment_bytes)
             .expect("hat_f_commitment serialization should succeed");
         self.append_message(b"hat-f-commitment", commitment_bytes.as_slice());
+    }
+
+    fn append_blinding_poly_commitment<A: CanonicalSerialize>(&mut self, commitment: &A) {
+        let mut commitment_bytes = Vec::new();
+        commitment
+            .serialize_compressed(&mut commitment_bytes)
+            .expect("blinding_poly_commitment serialization should succeed");
+        self.append_message(b"blinding-poly-commitment", commitment_bytes.as_slice());
     }
 
     fn append_sigma_proof<A: CanonicalSerialize>(&mut self, sigma_proof: &A) {

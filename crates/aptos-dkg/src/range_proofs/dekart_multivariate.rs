@@ -5,11 +5,11 @@ use super::scalars_to_bits;
 use crate::{
     fiat_shamir::RangeProof,
     pcs::{
-        shplonked,
         shplonked::{
             batch_open_generalized, batch_pairing_for_verify_generalized, Shplonked,
             ShplonkedBatchProof, Srs, SumEvalHom,
         },
+        traits::PolynomialCommitmentScheme as _,
         univariate_hiding_kzg,
         zeromorph::{replay_challenges, zeta_z_com, Zeromorph, ZeromorphProverKey},
         EvaluationSet,
@@ -39,11 +39,8 @@ use aptos_crypto::{
     },
     utils::powers,
 };
-use ark_ec::{
-    pairing::{Pairing, PairingOutput},
-    AffineRepr, CurveGroup, PrimeGroup, VariableBaseMSM,
-};
-use ark_ff::{AdditiveGroup, Field, Zero};
+use ark_ec::{pairing::Pairing, AffineRepr, CurveGroup, PrimeGroup, VariableBaseMSM};
+use ark_ff::{AdditiveGroup, Field};
 use ark_poly::{
     univariate::DensePolynomial, DenseMultilinearExtension, DenseUVPolynomial, Polynomial,
 };
@@ -216,12 +213,15 @@ impl<E: Pairing> traits::BatchedRangeProof<E> for Proof<E> {
 
         // Step 1c: Append initial data to the Fiat-Shamir transcript.
         let mut trs = merlin::Transcript::new(b"dekart_multivariate");
-        trs.append_vk(&vk);
-        trs.append_public_statement(PublicStatement {
-            n, // TODO: do we want to append the actual n or the max_n? Or its log?
-            ell,
-            comm: comm.clone(),
-        });
+        <merlin::Transcript as RangeProof<E, Proof<E>>>::append_vk(&mut trs, &vk);
+        <merlin::Transcript as RangeProof<E, Proof<E>>>::append_public_statement(
+            &mut trs,
+            PublicStatement {
+                n, // TODO: do we want to append the actual n or the max_n? Or its log?
+                ell,
+                comm: comm.clone(),
+            },
+        );
 
         // Step 2: Verify the blinding commitment
         if let (Some(blinding_comm), Some(blinding_proof)) =
@@ -241,16 +241,27 @@ impl<E: Pairing> traits::BatchedRangeProof<E> for Proof<E> {
         }
 
         // Step 3a:
-        trs.append_f_j_commitments(&self.f_j_commitments);
-        trs.append_g_i_commitments(&self.g_i_commitments);
-        trs.append_hypercube_sum(&self.H_g);
+        <merlin::Transcript as RangeProof<E, Proof<E>>>::append_f_j_commitments(
+            &mut trs,
+            &self.f_j_commitments,
+        );
+        <merlin::Transcript as RangeProof<E, Proof<E>>>::append_g_i_commitments(
+            &mut trs,
+            &self.g_i_commitments,
+        );
+        <merlin::Transcript as RangeProof<E, Proof<E>>>::append_hypercube_sum(&mut trs, &self.H_g);
 
         // Step 3b:
-        let c: E::ScalarField = trs.challenge_scalar();
+        let c: E::ScalarField =
+            <merlin::Transcript as RangeProof<E, Proof<E>>>::challenge_scalar(&mut trs);
         // Step 3c:
-        let alpha: E::ScalarField = trs.challenge_nonzero_scalar();
+        let alpha: E::ScalarField =
+            <merlin::Transcript as RangeProof<E, Proof<E>>>::challenge_nonzero_scalar(&mut trs);
         // Step 3d:
-        let c_zc = trs.challenge_point(num_vars as u8);
+        let c_zc = <merlin::Transcript as RangeProof<E, Proof<E>>>::challenge_point(
+            &mut trs,
+            num_vars as u8,
+        );
 
         #[cfg(feature = "range_proof_timing_multivariate")]
         print_cumulative("transcript + challenges (c, alpha, t)", start.elapsed());
@@ -320,7 +331,8 @@ impl<E: Pairing> traits::BatchedRangeProof<E> for Proof<E> {
         // Step 5a: Append the evaluations to the transcript. (TODO)
 
         // Step 5b: Challenge hat_c.
-        let hat_c: E::ScalarField = trs.challenge_scalar();
+        let hat_c: E::ScalarField =
+            <merlin::Transcript as RangeProof<E, Proof<E>>>::challenge_scalar(&mut trs);
         let hat_c_powers = powers(hat_c, ell as usize + 1);
 
         // Step 5c: Replay mPCS.ReduceToUnivariate (Zeromorph) to get x_challenge and form zeta_z_com.
@@ -427,14 +439,15 @@ impl<E: Pairing> traits::BatchedRangeProof<E> for Proof<E> {
         pk: &ProverKey<E>,
         values: &[Self::Input],
         ell: u8,
-        comm: &Self::Commitment,
+        comm: &Self::CommitmentNormalised,
         rho: &Self::CommitmentRandomness,
         rng: &mut R,
     ) -> Proof<E> {
         // Use blinding=false: with blinding, combined_comm = comm + comm_blinding_poly + ... mixes
         // a two-term MSM (beta*tau^{n-1}+rho*xi) with KZG commitments; that sum is not a KZG
         // commitment to batched_coeffs, so the batched opening verification fails.
-        prove_impl(pk, values, ell, comm, rho, rng, false)
+        let comm_conv = TrivialShape(comm.0.into_group()); // TODO: hacky, remove etc
+        prove_impl(pk, values, ell, &comm_conv, rho, rng, false)
     }
 }
 
@@ -468,12 +481,15 @@ pub fn prove_impl<E: Pairing, R: RngCore + CryptoRng>(
         _ => panic!("Expected PowersOfTau SRS"),
     };
 
-    trs.append_vk(&pk.vk);
-    trs.append_public_statement(PublicStatement {
-        n: values.len(),
-        ell,
-        comm: comm.clone(),
-    });
+    <merlin::Transcript as RangeProof<E, Proof<E>>>::append_vk(&mut trs, &pk.vk);
+    <merlin::Transcript as RangeProof<E, Proof<E>>>::append_public_statement(
+        &mut trs,
+        PublicStatement {
+            n: values.len(),
+            ell,
+            comm: comm.clone(),
+        },
+    );
 
     #[cfg(feature = "range_proof_timing_multivariate")]
     let start = Instant::now();
@@ -486,7 +502,9 @@ pub fn prove_impl<E: Pairing, R: RngCore + CryptoRng>(
             E::ScalarField,
             two_term_msm::Proof<E::G1>,
         ) = zksc_blind::<E, _>(*last_msm_elt, pk.ck.xi_1, rng);
-        trs.append_point(&c.into_affine());
+        <merlin::Transcript as RangeProof<E, Proof<E>>>::append_blinding_poly_commitment(
+            &mut trs, &c,
+        );
         (b, Some(c), Some(r), Some(proof))
     } else {
         (
@@ -561,9 +579,8 @@ pub fn prove_impl<E: Pairing, R: RngCore + CryptoRng>(
     #[cfg(feature = "range_proof_timing_multivariate")]
     let start = Instant::now();
     // Step 3f:
-    f_j_comms.iter().for_each(|f_j_comm| {
-        trs.append_point(f_j_comm);
-    });
+    <merlin::Transcript as RangeProof<E, Proof<E>>>::append_f_j_commitments(&mut trs, &f_j_comms);
+
     #[cfg(feature = "range_proof_timing_multivariate")]
     print_cumulative("transcript append hat_f_j_comms", start.elapsed());
 
@@ -596,18 +613,17 @@ pub fn prove_impl<E: Pairing, R: RngCore + CryptoRng>(
     #[cfg(feature = "range_proof_timing_multivariate")]
     let start = Instant::now();
     // Step 4b: // TODO: maybe combine with 3f for better batching
-    g_j_comms.iter().for_each(|g_j_comm| {
-        trs.append_point(g_j_comm);
-    });
-    trs.append_hypercube_sum(&H_g);
+    <merlin::Transcript as RangeProof<E, Proof<E>>>::append_g_i_commitments(&mut trs, &g_j_comms);
     #[cfg(feature = "range_proof_timing_multivariate")]
     print_cumulative("transcript append g_comm + H_g", start.elapsed());
 
     #[cfg(feature = "range_proof_timing_multivariate")]
     let start = Instant::now();
     // Step 5a–5c: Verifier challenges c, alpha; eq_point t; run sumcheck on transcript with linear term (f - sum 2^{j-1} f_j) + sum c^j f_j(f_j-1)
-    let c: E::ScalarField = trs.challenge_scalar();
-    let alpha: E::ScalarField = trs.challenge_nonzero_scalar();
+    let c: E::ScalarField =
+        <merlin::Transcript as RangeProof<E, Proof<E>>>::challenge_scalar(&mut trs);
+    let alpha: E::ScalarField =
+        <merlin::Transcript as RangeProof<E, Proof<E>>>::challenge_nonzero_scalar(&mut trs);
     #[cfg(feature = "range_proof_timing_multivariate")]
     print_cumulative("transcript challenges (c, alpha)", start.elapsed());
 
@@ -680,7 +696,8 @@ pub fn prove_impl<E: Pairing, R: RngCore + CryptoRng>(
         let label = format!("y_{}", j + 1);
         trs.append_message(label.as_bytes(), &buf);
     }
-    let hat_c: E::ScalarField = trs.challenge_scalar();
+    let hat_c: E::ScalarField =
+        <merlin::Transcript as RangeProof<E, Proof<E>>>::challenge_scalar(&mut trs);
     #[cfg(feature = "range_proof_timing_multivariate")]
     print_cumulative(
         "asserted_sum + xs + g_evals + y_g + sumcheck_point + y_f + y_evals + hat_c",
@@ -859,9 +876,10 @@ fn zkzc_send_polys<E: Pairing>(
 ) {
     #[cfg(feature = "range_proof_timing_multivariate")]
     let start = std::time::Instant::now();
-    let t: Vec<E::ScalarField> = (0..num_vars)
-        .map(|_| trs.challenge_scalar::<E::ScalarField>())
-        .collect();
+    let mut t = Vec::with_capacity(num_vars as usize);
+    for _ in 0..num_vars {
+        t.push(<merlin::Transcript as RangeProof<E, Proof<E>>>::challenge_scalar(trs));
+    }
     let nv = num_vars as usize;
     let size = 1 << nv;
 
