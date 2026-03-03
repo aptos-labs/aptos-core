@@ -217,9 +217,9 @@ module aptos_std::type_info {
         // Assert size is two bytes.
         assert!(size_of_val(&two_bools) == 2, 0);
         // Declare an empty vector of element type u64.
-        let empty_vector_u64 = vector::empty<u64>();
+        let empty_vector_u64 = vector<u64>[];
         // Declare an empty vector of element type u128.
-        let empty_vector_u128 = vector::empty<u128>();
+        let empty_vector_u128 = vector<u128>[];
         // Assert size is 1 byte regardless of underlying element type.
         assert!(size_of_val(&empty_vector_u64) == 1, 0);
         // Assert size is 1 byte regardless of underlying element type.
@@ -279,7 +279,7 @@ module aptos_std::type_info {
         let n_elems_cutoff_1 = 127; // (2 ^ 7) ^ 1 - 1.
         // A base size of 2 applies for 128 < n <= 16384 elements.
         let n_elems_cutoff_2 = 16383; // (2 ^ 7) ^ 2 - 1.
-        let vector_u64 = vector::empty<u64>(); // Declare empty vector.
+        let vector_u64 = vector<u64>[]; // Declare empty vector.
         let null_element = 0; // Declare a null element.
         // Get element size.
         let element_size = size_of_val(&null_element);

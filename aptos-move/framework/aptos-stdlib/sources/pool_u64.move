@@ -67,7 +67,7 @@ module aptos_std::pool_u64 {
             total_coins: 0,
             total_shares: 0,
             shares: simple_map::create<address, u64>(),
-            shareholders: vector::empty<address>(),
+            shareholders: vector<address>[],
             scaling_factor,
         }
     }

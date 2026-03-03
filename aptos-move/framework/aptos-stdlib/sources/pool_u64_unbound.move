@@ -238,7 +238,7 @@ module aptos_std::pool_u64_unbound {
             // Shares price = total_coins / total existing shares.
             // Shares worth = shares * shares price = shares * total_coins / total existing shares.
             // We rearrange the calc and do multiplication first to avoid rounding errors.
-            (self.multiply_then_divide(shares, total_coins as u128, self.total_shares) as u64)
+            self.multiply_then_divide(shares, total_coins as u128, self.total_shares) as u64
         }
     }
 
@@ -252,7 +252,7 @@ module aptos_std::pool_u64_unbound {
         if (self.total_coins == 0 || total_shares == 0) {
             0
         } else {
-            (self.multiply_then_divide(shares, total_coins as u128, total_shares) as u64)
+            self.multiply_then_divide(shares, total_coins as u128, total_shares) as u64
         }
     }
 

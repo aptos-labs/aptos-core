@@ -109,7 +109,7 @@ module aptos_std::capability {
     public fun create<Feature>(owner: &signer, _feature_witness: &Feature) {
         let addr = signer::address_of(owner);
         assert!(!exists<CapState<Feature>>(addr), error::already_exists(ECAPABILITY_ALREADY_EXISTS));
-        move_to<CapState<Feature>>(owner, CapState { delegates: vector::empty() });
+        move_to<CapState<Feature>>(owner, CapState { delegates: vector[] });
     }
 
     /// Acquires a capability token. Only the owner of the capability class, or an authorized delegate,

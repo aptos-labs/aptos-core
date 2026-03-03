@@ -293,14 +293,14 @@ module std::option {
     /// and an empty vector otherwise
     public fun to_vec<Element>(self: Option<Element>): vector<Element> {
         match (self) {
-            Option::None => vector::empty(),
+            Option::None => vector[],
             Option::Some { e } => vector::singleton(e),
         }
     }
     spec to_vec {
         pragma opaque;
         aborts_if false;
-        ensures result == (if (self.is_some()) vector[self.borrow()] else vector::empty());
+        ensures result == (if (self.is_some()) vector[self.borrow()] else vector[]);
     }
 
     /// Apply the function to the optional element, consuming it. Does nothing if no value present.

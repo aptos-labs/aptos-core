@@ -14,33 +14,33 @@ module aptos_std::math_fixed {
 
     /// Square root of fixed point number
     public fun sqrt(x: FixedPoint32): FixedPoint32 {
-        let y = (x.get_raw_value() as u128);
-        fixed_point32::create_from_raw_value((math128::sqrt(y << 32) as u64))
+        let y = x.get_raw_value() as u128;
+        fixed_point32::create_from_raw_value(math128::sqrt(y << 32) as u64)
     }
 
     /// Exponent function with a precission of 9 digits.
     public fun exp(x: FixedPoint32): FixedPoint32 {
-        let raw_value = (x.get_raw_value() as u128);
-        fixed_point32::create_from_raw_value((exp_raw(raw_value) as u64))
+        let raw_value = x.get_raw_value() as u128;
+        fixed_point32::create_from_raw_value(exp_raw(raw_value) as u64)
     }
 
     /// Because log2 is negative for values < 1 we instead return log2(x) + 32 which
     /// is positive for all values of x.
     public fun log2_plus_32(x: FixedPoint32): FixedPoint32 {
-        let raw_value = (x.get_raw_value() as u128);
+        let raw_value = x.get_raw_value() as u128;
         math128::log2(raw_value)
     }
 
     public fun ln_plus_32ln2(x: FixedPoint32): FixedPoint32 {
-        let raw_value = (x.get_raw_value() as u128);
-        let x = (math128::log2(raw_value).get_raw_value() as u128);
+        let raw_value = x.get_raw_value() as u128;
+        let x = math128::log2(raw_value).get_raw_value() as u128;
         fixed_point32::create_from_raw_value((x * LN2 >> 32 as u64))
     }
 
     /// Integer power of a fixed point number
     public fun pow(x: FixedPoint32, n: u64): FixedPoint32 {
-        let raw_value = (x.get_raw_value() as u128);
-        fixed_point32::create_from_raw_value((pow_raw(raw_value, (n as u128)) as u64))
+        let raw_value = x.get_raw_value() as u128;
+        fixed_point32::create_from_raw_value(pow_raw(raw_value, n as u128) as u64)
     }
 
     /// Specialized function for x * y / z that omits intermediate shifting
@@ -56,7 +56,7 @@ module aptos_std::math_fixed {
         // exp(x / 2^32) = 2^(x / (2^32 * ln(2))) = 2^(floor(x / (2^32 * ln(2))) + frac(x / (2^32 * ln(2))))
         let shift_long = x / LN2;
         assert!(shift_long <= 31, std::error::invalid_state(EOVERFLOW_EXP));
-        let shift = (shift_long as u8);
+        let shift = shift_long as u8;
         let remainder = x % LN2;
         // At this point we want to calculate 2^(remainder / ln2) << shift
         // ln2 = 595528 * 4999 which means
@@ -86,9 +86,9 @@ module aptos_std::math_fixed {
                 res = (res * (x as u256)) >> 64;
             };
             n >>= 1;
-            x = ((((x as u256) * (x as u256)) >> 64) as u128);
+            x = (((x as u256) * (x as u256)) >> 64) as u128;
         };
-        ((res >> 32) as u128)
+        (res >> 32) as u128
     }
 
     #[test]
@@ -99,7 +99,7 @@ module aptos_std::math_fixed {
         assert!(result.get_raw_value() == fixed_base, 0);
 
         let result = sqrt(fixed_point32::create_from_u64(2));
-        assert_approx_the_same((result.get_raw_value() as u128), 6074001000, 9);
+        assert_approx_the_same(result.get_raw_value() as u128, 6074001000, 9);
     }
 
     #[test]

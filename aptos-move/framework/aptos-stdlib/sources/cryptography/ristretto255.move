@@ -369,7 +369,7 @@ module aptos_std::ristretto255 {
     /// Creates a Scalar from an u32.
     public fun new_scalar_from_u32(four_bytes: u32): Scalar {
         Scalar {
-            data: scalar_from_u64_internal((four_bytes as u64))
+            data: scalar_from_u64_internal(four_bytes as u64)
         }
     }
 

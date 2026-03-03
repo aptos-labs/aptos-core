@@ -41,7 +41,7 @@ spec std::features {
 
     spec fun spec_contains(features: vector<u8>, feature: u64): bool {
         ((int2bv(
-            (((1 as u8) << ((feature % (8 as u64)) as u64)) as u8)
+            ((1 as u8) << ((feature % (8 as u64)) as u64)) as u8
         ) as u8) & features[feature / 8] as u8) > (0 as u8)
             && (feature / 8) < len(features)
     }

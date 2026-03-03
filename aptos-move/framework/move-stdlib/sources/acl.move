@@ -4,7 +4,6 @@
 /// use a "set" instead when it's available in the language in the future.
 
 module std::acl {
-    use std::vector;
     use std::error;
 
     /// The ACL already contains the address.
@@ -18,7 +17,7 @@ module std::acl {
 
     /// Return an empty ACL.
     public fun empty(): ACL {
-        ACL{ list: vector::empty<address>() }
+        ACL{ list: vector<address>[] }
     }
 
     /// Add the address to the ACL.

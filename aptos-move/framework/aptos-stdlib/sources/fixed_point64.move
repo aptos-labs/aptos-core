@@ -48,7 +48,7 @@ module aptos_std::fixed_point64 {
         let y_raw = y.get_raw_value();
         let result = (x_raw as u256) + (y_raw as u256);
         assert!(result <= MAX_U128, ERATIO_OUT_OF_RANGE);
-        create_from_raw_value((result as u128))
+        create_from_raw_value(result as u128)
     }
     spec add {
         pragma opaque;
@@ -69,7 +69,7 @@ module aptos_std::fixed_point64 {
         let product = unscaled_product >> 64;
         // Check whether the value is too large.
         assert!(product <= MAX_U128, EMULTIPLICATION);
-        (product as u128)
+        product as u128
     }
     spec multiply_u128 {
         pragma opaque;
@@ -99,7 +99,7 @@ module aptos_std::fixed_point64 {
         assert!(quotient <= MAX_U128, EDIVISION);
         // the value may be too large, which will cause the cast to fail
         // with an arithmetic error.
-        (quotient as u128)
+        quotient as u128
     }
     spec divide_u128 {
         pragma opaque;
@@ -413,7 +413,7 @@ module aptos_std::fixed_point64 {
         let result = x.sub(y);
         // 9/7 - 1/3 = 20/21
         let expected_result = create_from_rational(20, 21);
-        assert_approx_the_same((result.get_raw_value() as u256), (expected_result.get_raw_value() as u256), 16);
+        assert_approx_the_same(result.get_raw_value() as u256, expected_result.get_raw_value() as u256, 16);
     }
 
     #[test]

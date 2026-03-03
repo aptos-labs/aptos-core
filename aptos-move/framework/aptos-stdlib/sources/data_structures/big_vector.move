@@ -1,6 +1,5 @@
 module aptos_std::big_vector {
     use std::error;
-    use std::vector;
     use aptos_std::table_with_length::{Self, TableWithLength};
     friend aptos_std::smart_vector;
 
@@ -97,7 +96,7 @@ module aptos_std::big_vector {
     public fun push_back<T: store>(self: &mut BigVector<T>, val: T) {
         let num_buckets = self.buckets.length();
         if (self.end_index == num_buckets * self.bucket_size) {
-            self.buckets.add(num_buckets, vector::empty());
+            self.buckets.add(num_buckets, vector[]);
             self.buckets.borrow_mut(num_buckets).push_back(val);
         } else {
             self.buckets.borrow_mut(num_buckets - 1).push_back(val);

@@ -9,7 +9,6 @@
 /// has been deprecated in favor of `big_ordered_map.move`.
 module aptos_std::smart_table {
     use std::error;
-    use std::vector;
     use aptos_std::aptos_hash::sip_hash_from_value;
     use aptos_std::table_with_length::{Self, TableWithLength};
     use aptos_std::type_info::size_of_val;
@@ -75,7 +74,7 @@ module aptos_std::smart_table {
     ): SmartTable<K, V> {
         assert!(split_load_threshold <= 100, error::invalid_argument(EINVALID_LOAD_THRESHOLD_PERCENT));
         let buckets = table_with_length::new();
-        buckets.add(0, vector::empty());
+        buckets.add(0, vector[]);
         let table = SmartTable {
             buckets,
             num_buckets: 1,
@@ -115,7 +114,7 @@ module aptos_std::smart_table {
 
     /// Clear a table completely when T has `drop`.
     public fun clear<K: drop, V: drop>(self: &mut SmartTable<K, V>) {
-        *self.buckets.borrow_mut(0) = vector::empty();
+        *self.buckets.borrow_mut(0) = vector[];
         for (i in 1..self.num_buckets) {
             self.buckets.remove(i);
         };

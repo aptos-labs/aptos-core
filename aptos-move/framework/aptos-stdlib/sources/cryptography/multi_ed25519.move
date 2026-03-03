@@ -246,7 +246,7 @@ module aptos_std::multi_ed25519 {
     public fun unvalidated_public_key_num_sub_pks(pk: &UnvalidatedPublicKey): u8 {
         let len = pk.bytes.length();
 
-        ((len / INDIVIDUAL_PUBLIC_KEY_NUM_BYTES) as u8)
+        (len / INDIVIDUAL_PUBLIC_KEY_NUM_BYTES) as u8
     }
 
     /// Returns the number t of sub-PKs in an unvalidated t-out-of-n MultiEd25519 PK (i.e., the threshold) or `None`
@@ -265,7 +265,7 @@ module aptos_std::multi_ed25519 {
     public fun validated_public_key_num_sub_pks(pk: &ValidatedPublicKey): u8 {
         let len = pk.bytes.length();
 
-        ((len / INDIVIDUAL_PUBLIC_KEY_NUM_BYTES) as u8)
+        (len / INDIVIDUAL_PUBLIC_KEY_NUM_BYTES) as u8
     }
 
     /// Returns the number t of sub-PKs in a validated t-out-of-n MultiEd25519 PK (i.e., the threshold).

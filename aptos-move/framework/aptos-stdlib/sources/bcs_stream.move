@@ -10,7 +10,6 @@
 ///   especially useful for systems requiring cross-chain message interpretation or off-chain data verification.
 module aptos_std::bcs_stream {
     use std::error;
-    use std::vector;
     use std::option::{Self, Option};
     use std::string::{Self, String};
 
@@ -51,7 +50,7 @@ module aptos_std::bcs_stream {
             let byte = stream.data[stream.cur];
             stream.cur += 1;
 
-            let val = ((byte & 0x7f) as u64);
+            let val = (byte & 0x7f) as u64;
             if (((val << shift) >> shift) != val) {
                 abort error::invalid_argument(EMALFORMED_DATA)
             };
@@ -262,7 +261,7 @@ module aptos_std::bcs_stream {
     /// The `elem_deserializer` lambda expression is used sequentially to deserialize each element of the vector.
     public inline fun deserialize_vector<E>(stream: &mut BCSStream, elem_deserializer: |&mut BCSStream| E): vector<E> {
         let len = deserialize_uleb128(stream);
-        let v = vector::empty();
+        let v = vector[];
 
         for (i in 0..len) {
             v.push_back(elem_deserializer(stream));

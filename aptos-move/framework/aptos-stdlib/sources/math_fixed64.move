@@ -16,13 +16,13 @@ module aptos_std::math_fixed64 {
         let y = x.get_raw_value();
         let z = (math128::sqrt(y) << 32 as u256);
         z = (z + ((y as u256) << 64) / z) >> 1;
-        fixed_point64::create_from_raw_value((z as u128))
+        fixed_point64::create_from_raw_value(z as u128)
     }
 
     /// Exponent function with a precission of 9 digits.
     public fun exp(x: FixedPoint64): FixedPoint64 {
-        let raw_value = (x.get_raw_value() as u256);
-        fixed_point64::create_from_raw_value((exp_raw(raw_value) as u128))
+        let raw_value = x.get_raw_value() as u256;
+        fixed_point64::create_from_raw_value(exp_raw(raw_value) as u128)
     }
 
     /// Because log2 is negative for values < 1 we instead return log2(x) + 64 which
@@ -34,14 +34,14 @@ module aptos_std::math_fixed64 {
 
     public fun ln_plus_32ln2(x: FixedPoint64): FixedPoint64 {
         let raw_value = x.get_raw_value();
-        let x = (math128::log2_64(raw_value).get_raw_value() as u256);
+        let x = math128::log2_64(raw_value).get_raw_value() as u256;
         fixed_point64::create_from_raw_value(((x * LN2) >> 64 as u128))
     }
 
     /// Integer power of a fixed point number
     public fun pow(x: FixedPoint64, n: u64): FixedPoint64 {
-        let raw_value = (x.get_raw_value() as u256);
-        fixed_point64::create_from_raw_value((pow_raw(raw_value, (n as u128)) as u128))
+        let raw_value = x.get_raw_value() as u256;
+        fixed_point64::create_from_raw_value(pow_raw(raw_value, n as u128) as u128)
     }
 
     /// Specialized function for x * y / z that omits intermediate shifting
@@ -57,7 +57,7 @@ module aptos_std::math_fixed64 {
         // exp(x / 2^64) = 2^(x / (2^64 * ln(2))) = 2^(floor(x / (2^64 * ln(2))) + frac(x / (2^64 * ln(2))))
         let shift_long = x / LN2;
         assert!(shift_long <= 63, std::error::invalid_state(EOVERFLOW_EXP));
-        let shift = (shift_long as u8);
+        let shift = shift_long as u8;
         let remainder = x % LN2;
         // At this point we want to calculate 2^(remainder / ln2) << shift
         // ln2 = 580 * 22045359733108027
@@ -67,7 +67,7 @@ module aptos_std::math_fixed64 {
         // 2^(remainder / ln2) = (2^(1/580))^exponent * exp(x / 2^64)
         let roottwo = 18468802611690918839;  // fixed point representation of 2^(1/580)
         // 2^(1/580) = roottwo(1 - eps), so the number we seek is roottwo^exponent (1 - eps * exponent)
-        let power = pow_raw(roottwo, (exponent as u128));
+        let power = pow_raw(roottwo, exponent as u128);
         let eps_correction = 219071715585908898;
         power -= ((power * eps_correction * exponent) >> 128);
         // x is fixed point number smaller than bigfactor/2^64 < 0.0011 so we need only 5 tayler steps
@@ -102,7 +102,7 @@ module aptos_std::math_fixed64 {
         assert!(result.get_raw_value() == fixed_base, 0);
 
         let result = sqrt(fixed_point64::create_from_u128(2));
-        assert_approx_the_same((result.get_raw_value() as u256), 26087635650665564424, 16);
+        assert_approx_the_same(result.get_raw_value() as u256, 26087635650665564424, 16);
     }
 
     #[test]
@@ -136,7 +136,7 @@ module aptos_std::math_fixed64 {
             x = y;
             y = tmp;
         };
-        let mult = (math128::pow(10, precission) as u256);
+        let mult = math128::pow(10, precission) as u256;
         assert!((x - y) * mult < x, 0);
     }
 }
