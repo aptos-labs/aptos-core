@@ -22,7 +22,7 @@ use crate::{
     sumcheck::{
         ml_sumcheck,
         ml_sumcheck::{
-            data_structures::PolynomialInfo,
+            data_structures::PolynomialInfo as SumcheckPolynomialInfo,
             protocol::{prover::ProverMsg, verifier::VerifierMsg},
             MLSumcheck,
         },
@@ -68,7 +68,7 @@ pub struct VerificationKey<E: Pairing> {
     last_tau: E::G1Affine,
     vk_hkzg: univariate_hiding_kzg::VerificationKey<E>,
     //verifier_precomputed: VerifierPrecomputed<E>,
-    poly_info: PolynomialInfo,
+    poly_info: SumcheckPolynomialInfo,
     srs: Srs<E>,
 }
 
@@ -87,7 +87,7 @@ pub struct Proof<E: Pairing> {
     pub y_is: Vec<E::ScalarField>,
     pub y_g: E::ScalarField,
     pub zk_pcs_batch_proof: ShplonkedBatchProof<E>,
-    pub zk_pcs_eval_points: Vec<E::ScalarField>,
+    pub shplonked_eval_points: Vec<E::ScalarField>,
     pub zeromorph_q_hat_com: E::G1Affine,
     pub zeromorph_q_k_com: Vec<E::G1Affine>,
 }
@@ -139,7 +139,7 @@ impl<E: Pairing> traits::BatchedRangeProof<E> for Proof<E> {
             .last()
             .expect("PowersOfTau SRS has at least one element");
         let num_vars = size.ilog2() as usize;
-        let poly_info = PolynomialInfo {
+        let poly_info = SumcheckPolynomialInfo {
             num_variables: num_vars,
             max_multiplicands: 2,
         };
@@ -218,7 +218,7 @@ impl<E: Pairing> traits::BatchedRangeProof<E> for Proof<E> {
         let mut trs = merlin::Transcript::new(b"dekart_multivariate");
         trs.append_vk(&vk);
         trs.append_public_statement(PublicStatement {
-            n,
+            n, // TODO: do we want to append the actual n or the max_n? Or its log?
             ell,
             comm: comm.clone(),
         });
@@ -248,7 +248,7 @@ impl<E: Pairing> traits::BatchedRangeProof<E> for Proof<E> {
         // Step 3b:
         let c: E::ScalarField = trs.challenge_scalar();
         // Step 3c:
-        let alpha: E::ScalarField = trs.challenge_scalar();
+        let alpha: E::ScalarField = trs.challenge_nonzero_scalar();
         // Step 3d:
         let c_zc = trs.challenge_point(num_vars as u8);
 
@@ -264,14 +264,14 @@ impl<E: Pairing> traits::BatchedRangeProof<E> for Proof<E> {
         #[cfg(feature = "range_proof_timing_multivariate")]
         let start = Instant::now();
         // Step 3e:
-        let poly_info_instance = PolynomialInfo {
+        let sumcheck_poly_info_instance = SumcheckPolynomialInfo {
             num_variables: num_vars,
             max_multiplicands: vk.poly_info.max_multiplicands,
         };
         let mut trng = TranscriptRng::<E::ScalarField>::new(&mut trs);
         let subclaim = ml_sumcheck::MLSumcheck::verify_as_subprotocol(
             &mut trng,
-            &poly_info_instance,
+            &sumcheck_poly_info_instance,
             alpha * &self.H_g,
             &self.sumcheck_proof,
         )
@@ -299,7 +299,7 @@ impl<E: Pairing> traits::BatchedRangeProof<E> for Proof<E> {
         let Z_0_at_x = E::ScalarField::ONE - eq_zero_at_x;
 
         let two = E::ScalarField::from(2u64);
-        let mut pow2 = E::ScalarField::ONE; // TODO: can precompute these
+        let mut pow2 = E::ScalarField::ONE; // TODO: can precompute these powers
         let mut sum_weighted_y = self.y_f; // y_f
         for (_, &y_j) in self.y_is.iter().enumerate().take(ell as usize) {
             sum_weighted_y -= pow2 * y_j;
@@ -328,17 +328,18 @@ impl<E: Pairing> traits::BatchedRangeProof<E> for Proof<E> {
             replay_challenges::<E>(&mut trs, &self.zeromorph_q_k_com, &self.zeromorph_q_hat_com);
 
         anyhow::ensure!(
-            self.zk_pcs_eval_points[0] == x_challenge,
+            self.shplonked_eval_points[0] == x_challenge,
             "Batched opening: first eval point must equal Zeromorph x_challenge"
         );
 
-        let batched_eval = self.y_is[0]
-            + self.y_is[1..=ell as usize]
+        let batched_eval = self.y_f
+            + self.y_is[0..ell as usize]
                 .iter()
                 .enumerate()
                 .map(|(j, &y_j)| hat_c_powers[j + 1] * y_j)
                 .sum::<E::ScalarField>();
 
+        // Now form the MSM corresponding to batching the Zeromorph openings
         let mut combined_bases = vec![comm.0.into_affine()];
         let mut combined_scalars = vec![E::ScalarField::ONE];
         if let Some(ref bc) = self.blinding_poly_comm {
@@ -351,8 +352,8 @@ impl<E: Pairing> traits::BatchedRangeProof<E> for Proof<E> {
             E::G1::msm(&combined_bases, &combined_scalars).expect("combined commitment MSM");
 
         let x = &subclaim.point;
-        let point_reversed: Vec<E::ScalarField> = x.iter().rev().cloned().collect();
-        let zeta_z_com = zeta_z_com::<E>(
+        let point_reversed: Vec<E::ScalarField> = x.iter().rev().cloned().collect(); // Why??
+        let zeromorph_msm = zeta_z_com::<E>(
             self.zeromorph_q_hat_com,
             combined_comm.into_affine(),
             vk.vk_hkzg.group_generators.g1,
@@ -364,9 +365,7 @@ impl<E: Pairing> traits::BatchedRangeProof<E> for Proof<E> {
             batched_eval,
         );
 
-        // Step 4d (spec): single uPCS.BatchVerify; first commitment is Zeromorph-reduced (zeta_z_com), then g_i.
-        let zeromorph_msm =
-            MsmInput::new(vec![zeta_z_com], vec![E::ScalarField::ONE]).expect("zeta_z MSM input");
+        // Step 5d: single uPCS.BatchVerify; first commitment is Zeromorph-reduced (zeta_z_com), then g_i.
         let g_commitment_msms: Vec<MsmInput<E::G1Affine, E::ScalarField>> = self
             .g_i_commitments
             .iter()
@@ -377,23 +376,37 @@ impl<E: Pairing> traits::BatchedRangeProof<E> for Proof<E> {
         let commitment_msms: Vec<MsmInput<E::G1Affine, E::ScalarField>> =
             once(zeromorph_msm).chain(g_commitment_msms).collect();
 
-        // y_sum in the opening proof must equal y_batched_at_z (f̂(z)) + y_g (sum of g_i at x_i)
-        anyhow::ensure!(
-            self.zk_pcs_batch_proof.sigma_proof_statement.y_sum == self.y_batched_at_z + self.y_g,
-            "Batched opening y_sum != y_batched_at_z + y_g"
-        );
-
         #[cfg(feature = "range_proof_timing_multivariate")]
         let start = Instant::now();
         let sets: Vec<EvaluationSet<E::ScalarField>> = self
-            .zk_pcs_eval_points
+            .shplonked_eval_points
             .iter()
-            .map(|&z| EvaluationSet {
-                rev: vec![],
-                hid: vec![z],
+            .enumerate()
+            .map(|(i, &z)| {
+                if i == 0 {
+                    EvaluationSet {
+                        rev: vec![z],
+                        hid: vec![],
+                    }
+                } else {
+                    EvaluationSet {
+                        rev: vec![],
+                        hid: vec![z],
+                    }
+                }
             })
             .collect();
-        let y_rev: Vec<Vec<E::ScalarField>> = sets.iter().map(|_| vec![]).collect();
+
+        // First poly (Zeromorph) vanishes at first point; rest have hidden evals only.
+        let y_rev: Vec<Vec<E::ScalarField>> = (0..sets.len())
+            .map(|i| {
+                if i == 0 {
+                    vec![E::ScalarField::ZERO]
+                } else {
+                    vec![]
+                }
+            })
+            .collect();
         let (g1_terms, g2_terms) = batch_pairing_for_verify_generalized::<E, _, SumEvalHom>(
             &vk.srs,
             &sets,
@@ -593,8 +606,8 @@ pub fn prove_impl<E: Pairing, R: RngCore + CryptoRng>(
     #[cfg(feature = "range_proof_timing_multivariate")]
     let start = Instant::now();
     // Step 5a–5c: Verifier challenges c, alpha; eq_point t; run sumcheck on transcript with linear term (f - sum 2^{j-1} f_j) + sum c^j f_j(f_j-1)
-    let c: E::ScalarField = trs.challenge_scalar::<E::ScalarField>();
-    let alpha: E::ScalarField = trs.challenge_scalar::<E::ScalarField>();
+    let c: E::ScalarField = trs.challenge_scalar();
+    let alpha: E::ScalarField = trs.challenge_nonzero_scalar();
     #[cfg(feature = "range_proof_timing_multivariate")]
     print_cumulative("transcript challenges (c, alpha)", start.elapsed());
 
@@ -821,7 +834,7 @@ pub fn prove_impl<E: Pairing, R: RngCore + CryptoRng>(
         y_is,
         y_g,
         zk_pcs_batch_proof: opening.proof,
-        zk_pcs_eval_points: eval_points,
+        shplonked_eval_points: eval_points,
         zeromorph_q_hat_com: q_hat_com.0.into_affine(),
         zeromorph_q_k_com: q_k_com.iter().map(|c| c.0.into_affine()).collect(),
     }

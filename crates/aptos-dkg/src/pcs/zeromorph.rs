@@ -16,6 +16,7 @@ use crate::{
 };
 use aptos_crypto::{
     arkworks::{
+        msm::MsmInput,
         random::{sample_field_element, sample_field_elements},
         srs::SrsType,
         GroupGenerators,
@@ -221,7 +222,7 @@ pub fn replay_challenges<P: Pairing>(
     (y_challenge, x_challenge, z_challenge)
 }
 
-/// Compute the zeta_z commitment for Zeromorph verification.
+/// Compute the zeta_z commitment for Zeromorph verification as an MSM input.
 /// `combined_comm` is the (possibly batched) commitment to the polynomial being opened; `eval` is its evaluation at the point.
 /// Used by [`Zeromorph::verify`] and by Dekart when it uses Zeromorph in a batched setting.
 pub fn zeta_z_com<P: Pairing>(
@@ -234,7 +235,7 @@ pub fn zeta_z_com<P: Pairing>(
     z_challenge: P::ScalarField,
     point_reversed: &[P::ScalarField],
     eval: P::ScalarField,
-) -> P::G1Affine {
+) -> MsmInput<P::G1Affine, P::ScalarField> {
     let (eval_scalar, (mut q_scalars, zmpoly_q_scalars)) =
         eval_and_quotient_scalars::<P>(y_challenge, x_challenge, z_challenge, point_reversed);
     q_scalars
@@ -248,9 +249,7 @@ pub fn zeta_z_com<P: Pairing>(
     .concat();
     let mut bases = vec![q_hat_com, combined_comm, g1];
     bases.extend(q_k_com.iter().copied());
-    P::G1::msm(&bases, &scalars)
-        .expect("Zeromorph zeta_z MSM")
-        .into_affine()
+    MsmInput::new(bases, scalars).expect("Zeromorph zeta_z MSM input")
 }
 
 /// Used by Dekart multivariate verifier to replay Zeromorph and form zeta_z_com.
@@ -554,7 +553,7 @@ where
 
         // Must match prover: use point in reversed order so q_scalars[k] aligns with quotients[k].
         let point_reversed_for_scalars: Vec<P::ScalarField> = point.iter().rev().cloned().collect();
-        let zeta_z_com = zeta_z_com::<P>(
+        let zeta_z_msm = zeta_z_com::<P>(
             q_hat_affine,
             comm.0.into_affine(),
             vk.hkzg_vk.group_generators.g1,
@@ -565,8 +564,12 @@ where
             &point_reversed_for_scalars,
             *eval,
         );
+        let zeta_z_com = P::G1::msm(&zeta_z_msm.bases, &zeta_z_msm.scalars)
+            .expect("Zeromorph zeta_z MSM")
+            .into_affine();
 
         // Delegate to standard hiding KZG verify: e(C - y*[1]_1, [1]_2) + e(-pi_1, [τ-x]_2) + e(-pi_2, ξ_2) = 0.
+        // TODO: when the offset is nonzero we need to account for it here...
         // Commitment type is TrivialShape<P::G1>; y = 0 since the batched polynomial vanishes at x.
         let zeta_z_commitment = TrivialShape(zeta_z_com.into_group());
         univariate_hiding_kzg::CommitmentHomomorphism::verify(
@@ -623,7 +626,7 @@ where
         // setup_extra requires m to be a power of 2. number_of_coefficients is already a power of 2.
         // Use m = N so that offset = 0 and tau_N_max_sub_2_N = g2_powers[0] = [1]_2, giving the
         // standard hiding KZG check: e(zeta_z_com, [1]_2) = e(pi_1, [τ-x]_2) * e(pi_2, xi_2).
-        let m = number_of_coefficients;
+        let m = number_of_coefficients; // will be the size of the SRS... in practice might not agree with number_of_coefficients
         let (hkzg_vk_pp, hkzg_commit_pp) = univariate_hiding_kzg::setup_extra(
             m,
             SrsType::PowersOfTau,
@@ -631,7 +634,7 @@ where
             trapdoor,
         );
 
-        let offset = m - number_of_coefficients; // 0 when m = N
+        let offset = m - number_of_coefficients; // this is 0; the point is that we're setting up the powers-of-tau with the exact max_degree
         let prover_key = ZeromorphProverKey {
             hiding_kzg_pp: hkzg_commit_pp,
             open_offset: offset,

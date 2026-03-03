@@ -221,10 +221,6 @@ fn build_lagrange_cache<F: FftField>(
     (canonical, lagrange_cache)
 }
 
-// ---------------------------------------------------------------------------
-// SRS and legacy API (single point per polynomial, φ = sum)
-// ---------------------------------------------------------------------------
-
 #[derive(CanonicalSerialize, CanonicalDeserialize, Clone, Debug, PartialEq, Eq)]
 pub struct Srs<E: Pairing> {
     pub(crate) taus_1: Vec<E::G1Affine>,
@@ -236,14 +232,19 @@ pub struct Srs<E: Pairing> {
 
 #[allow(non_snake_case)]
 #[derive(CanonicalSerialize, Clone, CanonicalDeserialize, Debug, PartialEq, Eq)]
-pub(crate) struct ShplonkedSigmaProof<E: Pairing> {
-    r_com_y: E::G1Affine,
-    r_V: E::G1Affine,
-    r_y: E::ScalarField,
+pub struct ShplonkedSigmaProof<E: Pairing> {
+    /// Sigma protocol commitment message: commitment to hidden evaluations (C_{y^hid}).
+    r_com_ys: E::G1Affine,
+    /// Sigma protocol commitment message: commitment to evaluations (C_eval).
+    r_com_eval: E::G1Affine,
+    /// Sigma protocol commitment message: sum of hidden evaluations (y_sum).
+    r_sum_ys: E::ScalarField,
     /// Sigma protocol response: hidden evals per polynomial { z_i }_i (same shape as { y_i^hid }_i).
-    z_yi: Vec<Vec<E::ScalarField>>,
-    z_u: E::ScalarField,
-    z_rho: E::ScalarField,
+    z_ys: Vec<Vec<E::ScalarField>>,
+    /// Sigma protocol response: commitment randomness for C_eval.
+    z_com_eval_rand: E::ScalarField,
+    /// Sigma protocol response: commitment randomness for C_{y^hid}.
+    z_com_ys_rand: E::ScalarField,
 }
 
 /// Statement for the sigma protocol: commitment to hidden evaluations (C_{y^hid}), C_eval, and φ(y).
@@ -256,8 +257,6 @@ pub struct ShplonkedSigmaProofStatement<E: Pairing> {
     pub C_eval: E::G1Affine,
     /// φ(y) (e.g. sum of all evaluations).
     pub phi_y: E::ScalarField,
-    /// Alias for φ(y) for legacy API (e.g. Dekart batch check: y_sum == y_batched_at_z + y_g).
-    pub y_sum: E::ScalarField,
 }
 
 /// Generalized batch opening proof per spec: π = (π_1, π_2, π_PoK).
@@ -583,12 +582,12 @@ pub fn batch_open_generalized<
     };
     let sigma_proof = ShplonkedSigmaProof {
         // TODO: should probably get rid of this stuff
-        r_com_y,
-        r_V,
-        r_y,
-        z_yi: sigma_protocol_proof.z.evals,
-        z_u: sigma_protocol_proof.z.C_evals_randomness,
-        z_rho: sigma_protocol_proof.z.C_y_hid_randomness,
+        r_com_ys: r_com_y,
+        r_com_eval: r_V,
+        r_sum_ys: r_y,
+        z_ys: sigma_protocol_proof.z.evals,
+        z_com_eval_rand: sigma_protocol_proof.z.C_evals_randomness,
+        z_com_ys_rand: sigma_protocol_proof.z.C_y_hid_randomness,
     };
 
     // π_2 from PCS.Open: pi_2 = quotient commitment, pi_2_extra = hiding compensation.
@@ -599,7 +598,6 @@ pub fn batch_open_generalized<
         com_y_hid,
         C_eval,
         phi_y,
-        y_sum: phi_y,
     };
 
     let proof = ShplonkedBatchProof {
@@ -721,7 +719,7 @@ where
         E::ScalarField::ONE,
     ]);
 
-    let h: usize = sigma_proof.z_yi.iter().map(|v| v.len()).sum();
+    let h: usize = sigma_proof.z_ys.iter().map(|v| v.len()).sum();
     let com_y_hom = shplonked_sigma::com_y_hom(&srs.taus_1[..h], srs.xi_1);
     // One weight per polynomial. Lagrange at x: evaluate cached basis polys at x (Horner).
     let (canonical, lagrange_cache) = build_lagrange_cache(&s_per_poly);
@@ -762,15 +760,15 @@ where
         Proof {
             first_proof_item: FirstProofItem::Commitment(TupleCodomainShape(
                 TupleCodomainShape(
-                    CodomainShape(sigma_proof.r_com_y),
-                    CodomainShape(sigma_proof.r_V),
+                    CodomainShape(sigma_proof.r_com_ys),
+                    CodomainShape(sigma_proof.r_com_eval),
                 ),
-                sigma_proof.r_y,
+                sigma_proof.r_sum_ys,
             )),
             z: ShplonkedSigmaWitness {
-                C_y_hid_randomness: sigma_proof.z_rho,
-                evals: sigma_proof.z_yi.clone(), // already { z_i }_i per polynomial
-                C_evals_randomness: sigma_proof.z_u,
+                C_y_hid_randomness: sigma_proof.z_com_ys_rand,
+                evals: sigma_proof.z_ys.clone(), // already { z_i }_i per polynomial
+                C_evals_randomness: sigma_proof.z_com_eval_rand,
             },
         };
 
@@ -790,7 +788,7 @@ where
     );
 
     anyhow::ensure!(
-        hom.apply(y_rev, &sigma_proof.z_yi) == sigma_proof.r_y + c_sigma * phi_y,
+        hom.apply(y_rev, &sigma_proof.z_ys) == sigma_proof.r_sum_ys + c_sigma * phi_y,
         "sigma protocol scalar check (φ(y^rev, z) = r_φ + c·φ(y)) failed"
     );
 

@@ -112,7 +112,7 @@ impl<E: Pairing> Trapdoor<E> {
 }
 
 pub fn setup<E: Pairing>(
-    m: usize,
+    m: usize, // maximum polynomial degree, assumed to be power of 2
     basis_type: SrsType,
     group_generators: GroupGenerators<E>,
     trapdoor: Trapdoor<E>,
@@ -158,12 +158,17 @@ pub fn setup<E: Pairing>(
     )
 }
 
+// For e.g. Zeromorph one also need powers of tau in G_2
 pub fn setup_extra<E: Pairing>(
-    m: usize,
+    m: usize, // maximum polynomial degree, assumed to be power of 2
     basis_type: SrsType,
     group_generators: GroupGenerators<E>,
     trapdoor: Trapdoor<E>,
 ) -> (VerificationKeyExtra<E>, CommitmentKey<E>) {
+    assert!(
+        matches!(basis_type, SrsType::PowersOfTau),
+        "setup_extra requires powers-of-tau basis type... for now"
+    );
     let tau = trapdoor.tau;
 
     let (vk, ck) = setup(m, basis_type, group_generators, trapdoor);

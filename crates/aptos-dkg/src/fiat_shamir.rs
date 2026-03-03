@@ -82,6 +82,8 @@ pub trait RangeProof<E: Pairing, B: BatchedRangeProof<E>> {
 
     fn challenge_scalar(&mut self) -> E::ScalarField;
 
+    fn challenge_nonzero_scalar(&mut self) -> E::ScalarField;
+
     fn challenge_point(&mut self, dimension: u8) -> Vec<E::ScalarField>;
 }
 
@@ -211,6 +213,18 @@ impl<E: Pairing, B: BatchedRangeProof<E>> RangeProof<E, B> for Transcript {
             self,
             b"verifier-challenge-for-linear-combination",
         )
+    }
+
+    fn challenge_nonzero_scalar(&mut self) -> E::ScalarField {
+        loop {
+            let s = <Transcript as ScalarProtocol<E::ScalarField>>::challenge_full_scalar(
+                self,
+                b"verifier-nonzero-challenge-for-linear-combination",
+            );
+            if !s.is_zero() {
+                break s;
+            }
+        }
     }
 
     fn challenge_point(&mut self, dimension: u8) -> Vec<E::ScalarField> {
