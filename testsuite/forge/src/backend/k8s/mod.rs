@@ -292,8 +292,12 @@ impl Factory for K8sFactory {
                         "era": pfn_era,
                         "namespace": pfn_kube_namespace,
                         "pfn-values": {
-                            "image": format!("{}:{}", VALIDATOR_DOCKER_IMAGE_REPO, pfn_init_version),
+                            "imageTag": pfn_init_version,
                             "genesis_bucket_path": genesis_bucket_path,
+                            "chain": {
+                                "era": pfn_era,
+                                "name": "ephemeral",
+                            },
                         },
                     }))?;
 

@@ -430,8 +430,12 @@ fn main() -> Result<()> {
                             "era": pfn_era,
                             "namespace": pfn_namespace,
                             "pfn-values": {
-                                "image": format!("{}:{}", VALIDATOR_DOCKER_IMAGE_REPO, &pfn_image_tag),
+                                "imageTag": pfn_image_tag,
                                 "genesis_bucket_path": genesis_bucket_path,
+                                "chain": {
+                                    "era": pfn_era,
+                                    "name": "ephemeral",
+                                },
                             },
                         }))?;
                         let pfn_deployer = ForgeDeployerManager::new(
