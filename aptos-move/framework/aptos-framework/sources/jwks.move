@@ -11,9 +11,7 @@ module aptos_framework::jwks {
     use std::option;
     use std::option::Option;
     use std::signer;
-    use std::string;
     use std::string::{String, utf8};
-    use std::vector;
     use aptos_std::comparator::compare_u8_vector;
     use aptos_std::copyable_any;
     use aptos_std::copyable_any::Any;
@@ -466,8 +464,8 @@ module aptos_framework::jwks {
         if (features::is_jwk_consensus_per_key_mode_enabled()) {
             provider_jwks_vec.for_each(|proposed_provider_jwks|{
                 let maybe_cur_issuer_jwks = remove_issuer(&mut observed_jwks.jwks, proposed_provider_jwks.issuer);
-                let cur_issuer_jwks = if (option::is_some(&maybe_cur_issuer_jwks)) {
-                    option::extract(&mut maybe_cur_issuer_jwks)
+                let cur_issuer_jwks = if (maybe_cur_issuer_jwks.is_some()) {
+                    maybe_cur_issuer_jwks.extract()
                 } else {
                     ProviderJWKs {
                         issuer: proposed_provider_jwks.issuer,
@@ -476,8 +474,8 @@ module aptos_framework::jwks {
                     }
                 };
                 assert!(cur_issuer_jwks.version + 1 == proposed_provider_jwks.version, error::invalid_argument(EUNEXPECTED_VERSION));
-                vector::for_each(proposed_provider_jwks.jwks, |jwk|{
-                    let variant_type_name = *string::bytes(copyable_any::type_name(&jwk.variant));
+                proposed_provider_jwks.jwks.for_each(|jwk|{
+                    let variant_type_name = *copyable_any::type_name(&jwk.variant).bytes();
                     let is_delete = if (variant_type_name == b"0x1::jwks::UnsupportedJWK") {
                         let repr = copyable_any::unpack<UnsupportedJWK>(jwk.variant);
                         &repr.payload == &DELETE_COMMAND_INDICATOR

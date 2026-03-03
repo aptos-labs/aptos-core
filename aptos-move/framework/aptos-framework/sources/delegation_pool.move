@@ -111,7 +111,6 @@ module aptos_framework::delegation_pool {
     use std::error;
     use std::features;
     use std::signer;
-    use std::vector;
 
     use aptos_std::math64;
     use aptos_std::pool_u64_unbound as pool_u64;
@@ -702,7 +701,7 @@ module aptos_framework::delegation_pool {
 
                 rewards_rate *= (MAX_FEE - operator_commission_percentage(pool_address));
                 rewards_rate_denominator *= MAX_FEE;
-                ((((amount as u128) * (rewards_rate as u128)) / ((rewards_rate as u128) + (rewards_rate_denominator as u128))) as u64)
+                (((amount as u128) * (rewards_rate as u128)) / ((rewards_rate as u128) + (rewards_rate_denominator as u128))) as u64
             } else { 0 }
         } else { 0 }
     }
@@ -828,7 +827,7 @@ module aptos_framework::delegation_pool {
 
         let allowlist = vector[];
         freeze(borrow_mut_delegators_allowlist(pool_address)).for_each_ref(|delegator, _v| {
-            vector::push_back(&mut allowlist, *delegator);
+            allowlist.push_back(*delegator);
         });
         allowlist
     }
@@ -1170,7 +1169,7 @@ module aptos_framework::delegation_pool {
     fun create_resource_account_seed(
         delegation_pool_creation_seed: vector<u8>,
     ): vector<u8> {
-        let seed = vector::empty<u8>();
+        let seed = vector<u8>[];
         // include module salt (before any subseeds) to avoid conflicts with other modules creating resource accounts
         seed.append(MODULE_SALT);
         // include an additional salt in case the same resource account has already been created
@@ -2320,7 +2319,7 @@ module aptos_framework::delegation_pool {
             account::create_account_for_test(validator_address);
         };
 
-        initialize_delegation_pool(validator, commission_percentage, vector::empty<u8>());
+        initialize_delegation_pool(validator, commission_percentage, vector<u8>[]);
         let pool_address = get_owned_pool_address(validator_address);
 
         stake::rotate_consensus_key(validator, pool_address, CONSENSUS_KEY_1, CONSENSUS_POP_1);
@@ -2422,7 +2421,7 @@ module aptos_framework::delegation_pool {
         initialize_for_test(aptos_framework);
 
         let validator_address = signer::address_of(validator);
-        initialize_delegation_pool(validator, 1234, vector::empty<u8>());
+        initialize_delegation_pool(validator, 1234, vector<u8>[]);
 
         assert_owner_cap_exists(validator_address);
         let pool_address = get_owned_pool_address(validator_address);
@@ -2460,7 +2459,7 @@ module aptos_framework::delegation_pool {
         account::create_account_for_test(validator_address);
 
         // create delegation pool with 37.35% operator commission
-        initialize_delegation_pool(validator, 3735, vector::empty<u8>());
+        initialize_delegation_pool(validator, 3735, vector<u8>[]);
         let pool_address = get_owned_pool_address(validator_address);
 
         stake::rotate_consensus_key(validator, pool_address, CONSENSUS_KEY_1, CONSENSUS_POP_1);
@@ -3614,7 +3613,7 @@ module aptos_framework::delegation_pool {
         account::create_account_for_test(validator_address);
 
         // create delegation pool of commission fee 12.65%
-        initialize_delegation_pool(validator, 1265, vector::empty<u8>());
+        initialize_delegation_pool(validator, 1265, vector<u8>[]);
         let pool_address = get_owned_pool_address(validator_address);
         assert!(stake::get_operator(pool_address) == validator_address, 0);
 
@@ -3766,7 +3765,7 @@ module aptos_framework::delegation_pool {
         account::create_account_for_test(new_operator_address);
 
         // create delegation pool of commission fee 12.65%
-        initialize_delegation_pool(old_operator, 1265, vector::empty<u8>());
+        initialize_delegation_pool(old_operator, 1265, vector<u8>[]);
         let pool_address = get_owned_pool_address(old_operator_address);
         assert!(stake::get_operator(pool_address) == old_operator_address, 0);
 
@@ -3838,7 +3837,7 @@ module aptos_framework::delegation_pool {
         aptos_account::create_account(beneficiary_address);
 
         // create delegation pool of commission fee 12.65%
-        initialize_delegation_pool(operator1, 1265, vector::empty<u8>());
+        initialize_delegation_pool(operator1, 1265, vector<u8>[]);
         let pool_address = get_owned_pool_address(operator1_address);
         assert!(stake::get_operator(pool_address) == operator1_address, 0);
         assert!(beneficiary_for_operator(operator1_address) == operator1_address, 0);
@@ -3904,7 +3903,7 @@ module aptos_framework::delegation_pool {
         account::create_account_for_test(operator_address);
 
         // create delegation pool of commission fee 12.65%
-        initialize_delegation_pool(operator, 1265, vector::empty<u8>());
+        initialize_delegation_pool(operator, 1265, vector<u8>[]);
         let pool_address = get_owned_pool_address(operator_address);
         assert!(stake::get_operator(pool_address) == operator_address, 0);
 
@@ -3966,7 +3965,7 @@ module aptos_framework::delegation_pool {
         account::create_account_for_test(operator_address);
 
         // create delegation pool of commission fee 12.65%
-        initialize_delegation_pool(operator, 1265, vector::empty<u8>());
+        initialize_delegation_pool(operator, 1265, vector<u8>[]);
         let pool_address = get_owned_pool_address(operator_address);
         assert!(stake::get_operator(pool_address) == operator_address, 0);
 
@@ -4142,7 +4141,7 @@ module aptos_framework::delegation_pool {
         add_stake(delegator1, pool_address, 10 * ONE_APT);
         end_aptos_epoch();
 
-        let execution_hash = vector::empty<u8>();
+        let execution_hash = vector<u8>[];
         execution_hash.push_back(1);
         create_proposal(
             delegator1,
@@ -4182,7 +4181,7 @@ module aptos_framework::delegation_pool {
         add_stake(delegator1, pool_address, 100 * ONE_APT);
         end_aptos_epoch();
 
-        let execution_hash = vector::empty<u8>();
+        let execution_hash = vector<u8>[];
         execution_hash.push_back(1);
         create_proposal(
             delegator1,

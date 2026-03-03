@@ -1345,7 +1345,7 @@ module aptos_framework::fungible_asset {
                     error::out_of_range(EMAX_SUPPLY_EXCEEDED)
                 )
             };
-            supply.current += (amount as u128);
+            supply.current += amount as u128;
         } else {
             abort error::not_found(ESUPPLY_NOT_FOUND)
         }
@@ -1373,7 +1373,7 @@ module aptos_framework::fungible_asset {
                 supply.current >= (amount as u128),
                 error::invalid_state(ESUPPLY_UNDERFLOW)
             );
-            supply.current -= (amount as u128);
+            supply.current -= amount as u128;
         } else {
             abort error::not_found(ESUPPLY_NOT_FOUND);
         }

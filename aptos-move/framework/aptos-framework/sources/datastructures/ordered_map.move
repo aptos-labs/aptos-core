@@ -73,7 +73,7 @@ module aptos_std::ordered_map {
     /// Create a new empty OrderedMap, using default (SortedVectorMap) implementation.
     public fun new<K, V>(): OrderedMap<K, V> {
         OrderedMap::SortedVectorMap {
-            entries: vector::empty(),
+            entries: vector[],
         }
     }
 
@@ -260,7 +260,7 @@ module aptos_std::ordered_map {
         let OrderedMap::SortedVectorMap {
             entries: other_entries,
         } = other;
-        let overwritten = vector::empty();
+        let overwritten = vector[];
 
         if (other_entries.is_empty()) {
             other_entries.destroy_empty();
@@ -279,7 +279,7 @@ module aptos_std::ordered_map {
         };
 
         // In O(n), traversing from the back, build reverse sorted result, and then reverse it back
-        let reverse_result = vector::empty();
+        let reverse_result = vector[];
         let cur_i = self.entries.length() - 1;
         let other_i = other_entries.length() - 1;
 
@@ -602,8 +602,8 @@ module aptos_std::ordered_map {
     /// Transform the map into two vectors with the keys and values respectively
     /// Primarily used to destroy a map
     public fun to_vec_pair<K, V>(self: OrderedMap<K, V>): (vector<K>, vector<V>) {
-        let keys: vector<K> = vector::empty();
-        let values: vector<V> = vector::empty();
+        let keys: vector<K> = vector[];
+        let values: vector<V> = vector[];
         let OrderedMap::SortedVectorMap { entries } = self;
         entries.for_each(|e| {
             let Entry { key, value } = e;
@@ -1339,7 +1339,7 @@ module aptos_std::ordered_map {
             assert!(it_next == it_after, 8);
         };
 
-        let removed = vector::empty();
+        let removed = vector[];
         for (i in 0..len) {
             let element = shuffled_data.borrow(i);
             if (!removed.contains(element)) {

@@ -529,7 +529,7 @@ module aptos_std::big_ordered_map {
     public fun internal_find_with_path<K: drop + copy + store, V: store>(self: &BigOrderedMap<K, V>, key: &K): IteratorPtrWithPath<K> {
         let leaf_path = self.find_leaf_path(key);
         if (leaf_path.is_empty()) {
-            return IteratorPtrWithPath { iterator: self.internal_new_end_iter(), path: vector::empty() };
+            return IteratorPtrWithPath { iterator: self.internal_new_end_iter(), path: vector[] };
         };
 
         let leaf = leaf_path[leaf_path.length() - 1];
@@ -538,14 +538,14 @@ module aptos_std::big_ordered_map {
 
         let child_lower_bound = node.children.internal_lower_bound(key);
         if (child_lower_bound.iter_is_end(&node.children)) {
-            IteratorPtrWithPath { iterator: self.internal_new_end_iter(), path: vector::empty() }
+            IteratorPtrWithPath { iterator: self.internal_new_end_iter(), path: vector[] }
         } else {
             let iter_key = *child_lower_bound.iter_borrow_key(&node.children);
 
             if (&iter_key == key) {
                 IteratorPtrWithPath { iterator: new_iter(leaf, child_lower_bound, iter_key), path: leaf_path }
             } else {
-                IteratorPtrWithPath { iterator: self.internal_new_end_iter(), path: vector::empty() }
+                IteratorPtrWithPath { iterator: self.internal_new_end_iter(), path: vector[] }
             }
         }
     }
@@ -1185,7 +1185,7 @@ module aptos_std::big_ordered_map {
     /// Returns the path from root to that leaf (including the leaf itself)
     /// Returns empty path if `key` is larger than any key currently stored in the map.
     fun find_leaf_path<K: drop + copy + store, V: store>(self: &BigOrderedMap<K, V>, key: &K): vector<u64> {
-        let vec = vector::empty();
+        let vec = vector[];
 
         let current = ROOT_INDEX;
         loop {
@@ -1198,7 +1198,7 @@ module aptos_std::big_ordered_map {
             let children = &node.children;
             let child_iter = children.internal_lower_bound(key);
             if (child_iter.iter_is_end(children)) {
-                return vector::empty();
+                return vector[];
             } else {
                 current = child_iter.iter_borrow(children).node_index.stored_to_index();
             };
@@ -2440,7 +2440,7 @@ module aptos_std::big_ordered_map {
             assert!(it_next == it_after, i);
         };
 
-        let removed = vector::empty();
+        let removed = vector[];
         for (i in 0..len) {
             let element = shuffled_data.borrow(i);
             if (!removed.contains(element)) {

@@ -24,7 +24,6 @@ module aptos_framework::sui_derivable_account {
     use std::bcs_stream::{ Self, deserialize_u8 };
     use std::bcs;
     use std::string_utils;
-    use std::vector;
     use aptos_std::aptos_hash;
 
     /// Entry function payload is missing.
@@ -138,8 +137,8 @@ module aptos_framework::sui_derivable_account {
         assert!(bytes.length() == 97, EINVALID_SIGNATURE_LENGTH);
 
         let signing_scheme = bytes[0];
-        let abstract_signature_signature = vector::empty<u8>();
-        let abstract_signature_public_key = vector::empty<u8>();
+        let abstract_signature_signature = vector<u8>[];
+        let abstract_signature_public_key = vector<u8>[];
 
         // Extract signature (64 bytes)
         let i = 1;

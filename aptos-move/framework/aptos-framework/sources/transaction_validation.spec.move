@@ -162,23 +162,19 @@ spec aptos_framework::transaction_validation {
             !account::spec_exists_at(secondary_signer_addresses[i]);
         aborts_if exists i in 0..num_secondary_signers:
             !can_skip(features::spec_simulation_enhancement_enabled(), is_simulation, secondary_signer_public_key_hashes[i]) &&
-                option::is_some(secondary_signer_public_key_hashes[i]) && option::borrow(
-                secondary_signer_public_key_hashes[i]
-            ) !=
+                secondary_signer_public_key_hashes[i].is_some() && secondary_signer_public_key_hashes[i].borrow() !=
                     account::spec_get_authentication_key(secondary_signer_addresses[i]);
         // By the end, all secondary signers account should exist and public key hash should match.
         ensures forall i in 0..num_secondary_signers:
             account::spec_exists_at(secondary_signer_addresses[i]);
         ensures forall i in 0..num_secondary_signers:
-            option::is_none(secondary_signer_public_key_hashes[i]) || option::borrow(
-                secondary_signer_public_key_hashes[i]
-            ) ==
+            secondary_signer_public_key_hashes[i].is_none() || secondary_signer_public_key_hashes[i].borrow() ==
                 account::spec_get_authentication_key(secondary_signer_addresses[i])
                 || can_skip(features::spec_simulation_enhancement_enabled(), is_simulation, secondary_signer_public_key_hashes[i]);
     }
 
     spec fun can_skip(feature_flag: bool, is_simulation: bool, auth_key: Option<vector<u8>>): bool {
-        features::spec_simulation_enhancement_enabled() && is_simulation && option::is_none(auth_key)
+        features::spec_simulation_enhancement_enabled() && is_simulation && auth_key.is_none()
     }
 
     spec multi_agent_common_prologue(
@@ -444,7 +440,6 @@ spec aptos_framework::transaction_validation {
 
 
     spec schema EpilogueGasPayerAbortsIf {
-        use std::option;
         use aptos_std::type_info;
         use aptos_framework::account::{Account};
         use aptos_framework::aptos_coin::{AptosCoin};
@@ -486,11 +481,11 @@ spec aptos_framework::transaction_validation {
         let amount_to_burn = transaction_fee_amount - storage_fee_refunded;
         let apt_addr = type_info::type_of<AptosCoin>().account_address;
         let maybe_apt_supply = global<CoinInfo<AptosCoin>>(apt_addr).supply;
-        let total_supply_enabled = option::is_some(maybe_apt_supply);
-        let apt_supply = option::borrow(maybe_apt_supply);
+        let total_supply_enabled = maybe_apt_supply.is_some();
+        let apt_supply = maybe_apt_supply.borrow();
         let apt_supply_value = optional_aggregator::optional_aggregator_value(apt_supply);
         let post post_maybe_apt_supply = global<CoinInfo<AptosCoin>>(apt_addr).supply;
-        let post post_apt_supply = option::borrow(post_maybe_apt_supply);
+        let post post_apt_supply = post_maybe_apt_supply.borrow();
         let post post_apt_supply_value = optional_aggregator::optional_aggregator_value(post_apt_supply);
 
         aborts_if amount_to_burn > 0 && !exists<AptosCoinCapabilities>(@aptos_framework);

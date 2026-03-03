@@ -202,8 +202,8 @@ module aptos_framework::randomness {
     /// NOTE: The uniformity is not perfect, but it can be proved that the bias is negligible.
     /// If you need perfect uniformity, consider implement your own via rejection sampling.
     public fun u8_range(min_incl: u8, max_excl: u8): u8 {
-        let range = ((max_excl - min_incl) as u256);
-        let sample = ((u256_integer_internal() % range) as u8);
+        let range = (max_excl - min_incl) as u256;
+        let sample = (u256_integer_internal() % range) as u8;
 
         event::emit(RandomnessGeneratedEvent {});
 
@@ -215,8 +215,8 @@ module aptos_framework::randomness {
     /// NOTE: The uniformity is not perfect, but it can be proved that the bias is negligible.
     /// If you need perfect uniformity, consider implement your own via rejection sampling.
     public fun u16_range(min_incl: u16, max_excl: u16): u16 {
-        let range = ((max_excl - min_incl) as u256);
-        let sample = ((u256_integer_internal() % range) as u16);
+        let range = (max_excl - min_incl) as u256;
+        let sample = (u256_integer_internal() % range) as u16;
 
         event::emit(RandomnessGeneratedEvent {});
 
@@ -228,8 +228,8 @@ module aptos_framework::randomness {
     /// NOTE: The uniformity is not perfect, but it can be proved that the bias is negligible.
     /// If you need perfect uniformity, consider implement your own via rejection sampling.
     public fun u32_range(min_incl: u32, max_excl: u32): u32 {
-        let range = ((max_excl - min_incl) as u256);
-        let sample = ((u256_integer_internal() % range) as u32);
+        let range = (max_excl - min_incl) as u256;
+        let sample = (u256_integer_internal() % range) as u32;
 
         event::emit(RandomnessGeneratedEvent {});
 
@@ -247,8 +247,8 @@ module aptos_framework::randomness {
     }
 
     public fun u64_range_internal(min_incl: u64, max_excl: u64): u64 {
-        let range = ((max_excl - min_incl) as u256);
-        let sample = ((u256_integer_internal() % range) as u64);
+        let range = (max_excl - min_incl) as u256;
+        let sample = (u256_integer_internal() % range) as u64;
 
         min_incl + sample
     }
@@ -258,8 +258,8 @@ module aptos_framework::randomness {
     /// NOTE: The uniformity is not perfect, but it can be proved that the bias is negligible.
     /// If you need perfect uniformity, consider implement your own via rejection sampling.
     public fun u128_range(min_incl: u128, max_excl: u128): u128 {
-        let range = ((max_excl - min_incl) as u256);
-        let sample = ((u256_integer_internal() % range) as u128);
+        let range = (max_excl - min_incl) as u256;
+        let sample = (u256_integer_internal() % range) as u128;
 
         event::emit(RandomnessGeneratedEvent {});
 

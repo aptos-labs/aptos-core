@@ -1255,7 +1255,7 @@ module aptos_framework::staking_contract {
             operator_address,
             amount,
             commission,
-            vector::empty<u8>()
+            vector<u8>[]
         );
         // In the test environment, the periodical_reward_rate_decrease feature is initially turned off.
         std::features::change_feature_flags_for_testing(
@@ -1576,7 +1576,7 @@ module aptos_framework::staking_contract {
             operator_address,
             INITIAL_BALANCE,
             10,
-            vector::empty<u8>()
+            vector<u8>[]
         );
     }
 

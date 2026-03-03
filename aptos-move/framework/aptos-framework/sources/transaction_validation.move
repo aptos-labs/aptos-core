@@ -82,7 +82,7 @@ module aptos_framework::transaction_validation {
         permissioned_signer::authorize_increase(
             master,
             permissioned,
-            (gas_amount as u256),
+            gas_amount as u256,
             GasPermission {}
         )
     }
@@ -191,7 +191,7 @@ module aptos_framework::transaction_validation {
             assert!(
                 permissioned_signer::check_permission_capacity_above(
                     gas_payer,
-                    (max_transaction_fee as u256),
+                    max_transaction_fee as u256,
                     GasPermission {}
                 ),
                 error::permission_denied(PROLOGUE_PERMISSIONED_GAS_LIMIT_INSUFFICIENT)
@@ -840,7 +840,7 @@ module aptos_framework::transaction_validation {
                 transaction_fee::burn_fee(gas_payer_address, burn_amount);
                 permissioned_signer::check_permission_consume(
                     &gas_payer,
-                    (burn_amount as u256),
+                    burn_amount as u256,
                     GasPermission {}
                 );
             } else if (transaction_fee_amount < storage_fee_refunded) {
@@ -848,7 +848,7 @@ module aptos_framework::transaction_validation {
                 transaction_fee::mint_and_refund(gas_payer_address, mint_amount);
                 permissioned_signer::increase_limit(
                     &gas_payer,
-                    (mint_amount as u256),
+                    mint_amount as u256,
                     GasPermission {}
                 );
             };

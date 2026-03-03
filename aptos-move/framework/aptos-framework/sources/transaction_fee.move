@@ -7,7 +7,7 @@ module aptos_framework::transaction_fee {
     use aptos_framework::system_addresses;
     use std::error;
     use std::features;
-    use std::option::{Self, Option};
+    use std::option::Option;
     use aptos_framework::event;
 
     friend aptos_framework::block;

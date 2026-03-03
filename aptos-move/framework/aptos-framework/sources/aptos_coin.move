@@ -4,7 +4,6 @@ module aptos_framework::aptos_coin {
     use std::error;
     use std::signer;
     use std::string;
-    use std::vector;
     use std::option::{Self, Option};
 
     use aptos_framework::coin::{Self, BurnCapability, MintCapability};
@@ -85,7 +84,7 @@ module aptos_framework::aptos_coin {
         coin::deposit<AptosCoin>(signer::address_of(core_resources), coins);
 
         move_to(core_resources, MintCapStore { mint_cap });
-        move_to(core_resources, Delegations { inner: vector::empty() });
+        move_to(core_resources, Delegations { inner: vector[] });
     }
 
     /// Only callable in tests and testnets where the core resources account exists.

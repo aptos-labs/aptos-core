@@ -404,9 +404,9 @@ module aptos_framework::voting {
             error::invalid_state(EMULTI_STEP_PROPOSAL_IN_EXECUTION));
 
         if (should_pass) {
-            proposal.yes_votes += (num_votes as u128);
+            proposal.yes_votes += num_votes as u128;
         } else {
-            proposal.no_votes += (num_votes as u128);
+            proposal.no_votes += num_votes as u128;
         };
 
         // Record the resolvable time to ensure that resolution has to be done non-atomically.
@@ -792,7 +792,7 @@ module aptos_framework::voting {
         let proposal = TestProposal {};
 
         // This works because our Move unit test extensions mock out the execution hash to be [1].
-        let execution_hash = vector::empty<u8>();
+        let execution_hash = vector<u8>[];
         execution_hash.push_back(1);
         let metadata = simple_map::create<String, vector<u8>>();
 
@@ -830,12 +830,12 @@ module aptos_framework::voting {
         finish_multi_step_execution: bool
     ) {
         if (is_multi_step) {
-            let execution_hash = vector::empty<u8>();
+            let execution_hash = vector<u8>[];
             execution_hash.push_back(1);
             resolve_proposal_v2<TestProposal>(voting_forum_address, proposal_id, execution_hash);
 
             if (finish_multi_step_execution) {
-                resolve_proposal_v2<TestProposal>(voting_forum_address, proposal_id, vector::empty<u8>());
+                resolve_proposal_v2<TestProposal>(voting_forum_address, proposal_id, vector<u8>[]);
             };
         } else {
             let proposal = resolve<TestProposal>(voting_forum_address, proposal_id);
@@ -932,7 +932,7 @@ module aptos_framework::voting {
         // It's testing when we have a single-step proposal that was created by the single-step `create_proposal()`,
         // we should be able to successfully resolve it using the generic `resolve_proposal_v2` function.
         if (!use_create_multi_step && use_resolve_multi_step) {
-            resolve_proposal_v2<TestProposal>(governance_address, proposal_id, vector::empty<u8>());
+            resolve_proposal_v2<TestProposal>(governance_address, proposal_id, vector<u8>[]);
         } else {
             resolve_proposal_for_test<TestProposal>(governance_address, proposal_id, use_resolve_multi_step, true);
         };

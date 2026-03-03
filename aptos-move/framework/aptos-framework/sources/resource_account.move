@@ -63,7 +63,6 @@
 module aptos_framework::resource_account {
     use std::error;
     use std::signer;
-    use std::vector;
     use aptos_framework::account;
     use aptos_framework::aptos_coin::AptosCoin;
     use aptos_framework::coin;
@@ -202,7 +201,7 @@ module aptos_framework::resource_account {
 
         let seed = x"01";
 
-        create_resource_account(&user, copy seed, vector::empty());
+        create_resource_account(&user, copy seed, vector[]);
         let container = &Container[user_addr];
 
         let resource_addr =
@@ -224,7 +223,7 @@ module aptos_framework::resource_account {
         let seed = x"01";
         let seed2 = x"02";
 
-        create_resource_account(&user, seed2, vector::empty());
+        create_resource_account(&user, seed2, vector[]);
         let container = &Container[user_addr];
 
         let resource_addr = account::create_resource_address(&user_addr, seed);
@@ -244,7 +243,7 @@ module aptos_framework::resource_account {
         coin::deposit(copy user_addr, coin);
 
         let seed = x"01";
-        create_resource_account_and_fund(&user, copy seed, vector::empty(), 10);
+        create_resource_account_and_fund(&user, copy seed, vector[], 10);
 
         let resource_addr =
             aptos_framework::account::create_resource_address(&user_addr, seed);

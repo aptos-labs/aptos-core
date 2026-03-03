@@ -1188,19 +1188,19 @@ module aptos_framework::coin {
                 assume optional_aggregator::is_parallelizable(supply) ==>
                     (
                         aggregator::spec_aggregator_get_val(
-                            option::borrow(supply.aggregator)
+                            supply.aggregator.borrow()
                         ) + amount
                             <= aggregator::spec_get_limit(
-                                option::borrow(supply.aggregator)
+                                supply.aggregator.borrow()
                             )
                     );
                 assume !optional_aggregator::is_parallelizable(supply) ==>
                     (
-                        option::borrow(supply.integer).value + amount
-                            <= option::borrow(supply.integer).limit
+                        supply.integer.borrow().value + amount
+                            <= supply.integer.borrow().limit
                     );
             };
-            optional_aggregator::add(supply, (amount as u128));
+            optional_aggregator::add(supply, amount as u128);
         };
         spec {
             update supply<CoinType> = supply<CoinType> + amount;
@@ -1218,7 +1218,7 @@ module aptos_framework::coin {
                 &mut borrow_global_mut<CoinInfo<CoinType>>(coin_address<CoinType>()).supply;
             if (maybe_supply.is_some()) {
                 let supply = maybe_supply.borrow_mut();
-                optional_aggregator::sub(supply, (amount as u128));
+                optional_aggregator::sub(supply, amount as u128);
             };
         };
         amount

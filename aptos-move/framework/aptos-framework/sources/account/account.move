@@ -5,7 +5,6 @@ module aptos_framework::account {
     use std::hash;
     use std::option::{Self, Option};
     use std::signer;
-    use std::vector;
     use aptos_framework::chain_id;
     use aptos_framework::create_signer::create_signer;
     use aptos_framework::event::{Self, EventHandle};

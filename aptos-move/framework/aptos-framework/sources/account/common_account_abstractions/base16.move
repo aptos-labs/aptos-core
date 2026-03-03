@@ -1,7 +1,5 @@
 module aptos_framework::base16 {
 
-    use std::vector;
-
     friend aptos_framework::ethereum_derivable_account;
 
     // Convert a hex character to a u8
@@ -19,7 +17,7 @@ module aptos_framework::base16 {
 
     // Convert a base16 encoded string to a vector of u8
     friend fun base16_utf8_to_vec_u8(str: vector<u8>): vector<u8> {
-        let result = vector::empty<u8>();
+        let result = vector<u8>[];
         let i = 0;
         while (i < str.length()) {
             let c1 = str.borrow(i);

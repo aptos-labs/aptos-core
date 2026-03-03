@@ -51,7 +51,6 @@ module aptos_framework::multisig_account {
     use std::option::{Self, Option};
     use std::signer::address_of;
     use std::string::String;
-    use std::vector;
 
     /// The salt used to create a resource account during multisig account creation.
     /// This is used to avoid conflicts with other modules that also create resource accounts with the same owner
@@ -1337,7 +1336,7 @@ module aptos_framework::multisig_account {
 
     fun create_multisig_account_seed(seed: vector<u8>): vector<u8> {
         // Generate a seed that will be used to create the resource account that hosts the multisig account.
-        let multisig_account_seed = vector::empty<u8>();
+        let multisig_account_seed = vector<u8>[];
         multisig_account_seed.append(DOMAIN_SEPARATOR);
         multisig_account_seed.append(seed);
 
@@ -1349,9 +1348,9 @@ module aptos_framework::multisig_account {
         owners.for_each_ref(|owner| {
             let owner = *owner;
             assert!(owner != multisig_account, error::invalid_argument(EOWNER_CANNOT_BE_MULTISIG_ACCOUNT_ITSELF));
-            let (found, _) = vector::index_of(&distinct_owners, &owner);
+            let (found, _) = distinct_owners.index_of(&owner);
             assert!(!found, error::invalid_argument(EDUPLICATE_OWNER));
-            vector::push_back(&mut distinct_owners, owner);
+            distinct_owners.push_back(owner);
         });
     }
 
@@ -1373,8 +1372,8 @@ module aptos_framework::multisig_account {
 
         let votes = &transaction.votes;
         owners.for_each_ref(|owner| {
-            if (simple_map::contains_key(votes, owner)) {
-                if (*simple_map::borrow(votes, owner)) {
+            if (votes.contains_key(owner)) {
+                if (*votes.borrow(owner)) {
                     num_approvals += 1;
                 } else {
                     num_rejections += 1;
@@ -1434,7 +1433,7 @@ module aptos_framework::multisig_account {
         // Verify no overlap between new owners and owners to remove.
         new_owners.for_each_ref(|new_owner_ref| {
             assert!(
-                !vector::contains(&owners_to_remove, new_owner_ref),
+                !owners_to_remove.contains(new_owner_ref),
                 error::invalid_argument(EOWNERS_TO_REMOVE_NEW_OWNERS_OVERLAP)
             )
         });
@@ -1460,12 +1459,9 @@ module aptos_framework::multisig_account {
             let owners_removed = vector[];
             owners_to_remove.for_each_ref(|owner_to_remove_ref| {
                 let (found, index) =
-                    vector::index_of(owners_ref_mut, owner_to_remove_ref);
+                    owners_ref_mut.index_of(owner_to_remove_ref);
                 if (found) {
-                    vector::push_back(
-                        &mut owners_removed,
-                        vector::swap_remove(owners_ref_mut, index)
-                    );
+                    owners_removed.push_back(owners_ref_mut.swap_remove(index));
                 }
             });
             // Only emit event if owner(s) actually removed.

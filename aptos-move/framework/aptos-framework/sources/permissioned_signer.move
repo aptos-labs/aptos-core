@@ -264,7 +264,7 @@ module aptos_framework::permissioned_signer {
 
         if (!exists<GrantedPermissionHandles>(master_account_addr)) {
             move_to<GrantedPermissionHandles>(
-                master, GrantedPermissionHandles { active_handles: vector::empty() }
+                master, GrantedPermissionHandles { active_handles: vector[] }
             );
         };
 

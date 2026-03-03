@@ -92,13 +92,13 @@ module aptos_framework::solana_derivable_account {
             assert!(found, EINVALID_BASE_58_PUBLIC_KEY);
 
             let j = 0;
-            let carry = (char_index as u16);
+            let carry = char_index as u16;
 
             // For each existing byte, multiply by 58 and add carry
             while (j < bytes.length()) {
-                let current = (bytes[j] as u16);
+                let current = bytes[j] as u16;
                 let new_carry = current * base + carry;
-                bytes[j] = ((new_carry & 0xff) as u8);
+                bytes[j] = (new_carry & 0xff) as u8;
                 carry = new_carry >> 8;
                 j += 1;
             };

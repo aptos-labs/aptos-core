@@ -3,7 +3,6 @@ module aptos_framework::code {
     use std::string::String;
     use std::error;
     use std::signer;
-    use std::vector;
     use std::features;
 
     use aptos_framework::util;
@@ -174,7 +173,7 @@ module aptos_framework::code {
 
         let addr = signer::address_of(owner);
         if (!exists<PackageRegistry>(addr)) {
-            move_to(owner, PackageRegistry { packages: vector::empty() })
+            move_to(owner, PackageRegistry { packages: vector[] })
         };
 
         // Checks for valid dependencies to other packages
@@ -268,7 +267,7 @@ module aptos_framework::code {
 
         old_modules.for_each_ref(|old_module| {
             assert!(
-                vector::contains(new_modules, old_module),
+                new_modules.contains(old_module),
                 EMODULE_MISSING
             );
         });
@@ -279,8 +278,8 @@ module aptos_framework::code {
         // The modules introduced by each package must not overlap with `names`.
         old_pack.modules.for_each_ref(|old_mod| {
             let j = 0;
-            while (j < vector::length(new_modules)) {
-                let name = vector::borrow(new_modules, j);
+            while (j < new_modules.length()) {
+                let name = &new_modules[j];
                 assert!(&old_mod.name != name, error::already_exists(EMODULE_NAME_CLASH));
                 j += 1;
             };
@@ -291,7 +290,7 @@ module aptos_framework::code {
     /// compute the list of module dependencies which are allowed by the package metadata. The later
     /// is passed on to the native layer to verify that bytecode dependencies are actually what is pretended here.
     fun check_dependencies(publish_address: address, pack: &PackageMetadata): vector<AllowedDep> {
-        let allowed_module_deps = vector::empty();
+        let allowed_module_deps = vector[];
         let deps = &pack.deps;
         deps.for_each_ref(|dep: &PackageDep| {
             assert!(exists<PackageRegistry>(dep.account), error::not_found(EPACKAGE_DEP_MISSING));
@@ -299,10 +298,10 @@ module aptos_framework::code {
                 // Allow all modules from this address, by using "" as a wildcard in the AllowedDep
                 let account: address = dep.account;
                 let module_name = string::utf8(b"");
-                vector::push_back(&mut allowed_module_deps, AllowedDep { account, module_name });
+                allowed_module_deps.push_back(AllowedDep { account, module_name });
             } else {
                 let registry = &PackageRegistry[dep.account];
-                let found = vector::any(&registry.packages, |dep_pack| {
+                let found = registry.packages.any(|dep_pack| {
                     if (dep_pack.name == dep.package_name) {
                         // Check policy
                         assert!(
@@ -318,10 +317,10 @@ module aptos_framework::code {
                         // Add allowed deps
                         let account = dep.account;
                         let k = 0;
-                        let r = vector::length(&dep_pack.modules);
+                        let r = dep_pack.modules.length();
                         while (k < r) {
-                            let module_name = vector::borrow(&dep_pack.modules, k).name;
-                            vector::push_back(&mut allowed_module_deps, AllowedDep { account, module_name });
+                            let module_name = dep_pack.modules[k].name;
+                            allowed_module_deps.push_back(AllowedDep { account, module_name });
                             k += 1;
                         };
                         true
@@ -345,9 +344,9 @@ module aptos_framework::code {
 
     /// Get the names of the modules in a package.
     fun get_module_names(pack: &PackageMetadata): vector<String> {
-        let module_names = vector::empty();
+        let module_names = vector[];
         pack.modules.for_each_ref(|pack_module| {
-            vector::push_back(&mut module_names, pack_module.name);
+            module_names.push_back(pack_module.name);
         });
         module_names
     }

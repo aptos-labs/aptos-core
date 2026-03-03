@@ -137,7 +137,7 @@ module aptos_framework::staking_config {
         // while setting min_rewards_rate and rewards_rate_decrease_rate to 0.
         initialize_rewards(
             aptos_framework,
-            fixed_point64::create_from_rational((rewards_rate as u128), (rewards_rate_denominator as u128)),
+            fixed_point64::create_from_rational(rewards_rate as u128, rewards_rate_denominator as u128),
             fixed_point64::create_from_rational(0, 1000),
             ONE_YEAR_IN_SECS,
             0,
@@ -212,11 +212,11 @@ module aptos_framework::staking_config {
             } else {
                 // Maximize denominator for higher precision.
                 // Restriction: nominator <= MAX_REWARDS_RATE && denominator <= MAX_U64
-                let denominator = fixed_point64::divide_u128((MAX_REWARDS_RATE as u128), epoch_rewards_rate);
+                let denominator = fixed_point64::divide_u128(MAX_REWARDS_RATE as u128, epoch_rewards_rate);
                 if (denominator > MAX_U64) {
                     denominator = MAX_U64
                 };
-                let nominator = (fixed_point64::multiply_u128(denominator, epoch_rewards_rate) as u64);
+                let nominator = fixed_point64::multiply_u128(denominator, epoch_rewards_rate) as u64;
                 (nominator, (denominator as u64))
             }
         } else {

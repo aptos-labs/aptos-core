@@ -1,7 +1,6 @@
 /// Structs and functions related to JWK consensus configurations.
 module aptos_framework::jwk_consensus_config {
     use std::error;
-    use std::option;
     use std::string::String;
     use aptos_std::copyable_any;
     use aptos_std::copyable_any::Any;
@@ -87,8 +86,8 @@ module aptos_framework::jwk_consensus_config {
     public fun new_v1(oidc_providers: vector<OIDCProvider>): JWKConsensusConfig {
         let name_set = simple_map::new<String, u64>();
         oidc_providers.for_each_ref(|provider| {
-            let (_, old_value) = simple_map::upsert(&mut name_set, provider.name, 0);
-            if (option::is_some(&old_value)) {
+            let (_, old_value) = name_set.upsert(provider.name, 0);
+            if (old_value.is_some()) {
                 abort(error::invalid_argument(EDUPLICATE_PROVIDERS))
             }
         });

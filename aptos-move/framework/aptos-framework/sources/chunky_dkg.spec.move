@@ -17,9 +17,8 @@ spec aptos_framework::chunky_dkg {
     }
 
     spec finish(aggregated_subtranscript: vector<u8>) {
-        use std::option;
         requires exists<ChunkyDKGState>(@aptos_framework);
-        requires option::is_some(global<ChunkyDKGState>(@aptos_framework).in_progress);
+        requires global<ChunkyDKGState>(@aptos_framework).in_progress.is_some();
         aborts_if false;
     }
 

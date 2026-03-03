@@ -39,7 +39,6 @@ module aptos_framework::vesting {
     use std::fixed_point32::{Self, FixedPoint32};
     use std::signer;
     use std::string::{utf8, String};
-    use std::vector;
 
     use aptos_std::pool_u64::{Self, Pool};
     use aptos_std::simple_map::{Self, SimpleMap};
@@ -411,7 +410,7 @@ module aptos_framework::vesting {
     /// Return all the vesting contracts a given address is an admin of.
     public fun vesting_contracts(admin: address): vector<address> {
         if (!exists<AdminStore>(admin)) {
-            vector::empty<address>()
+            vector<address>[]
         } else {
             AdminStore[admin].vesting_contracts
         }
@@ -572,7 +571,7 @@ module aptos_framework::vesting {
         let grant_pool = pool_u64::create(MAXIMUM_SHAREHOLDERS);
         shareholders.for_each_ref(|shareholder| {
             let shareholder: address = *shareholder;
-            let (_, buy_in) = simple_map::remove(&mut buy_ins, &shareholder);
+            let (_, buy_in) = buy_ins.remove(&shareholder);
             let buy_in_amount = coin::value(&buy_in);
             coin::merge(&mut grant, buy_in);
             pool_u64::buy_in(
@@ -588,7 +587,7 @@ module aptos_framework::vesting {
         let admin_address = signer::address_of(admin);
         if (!exists<AdminStore>(admin_address)) {
             move_to(admin, AdminStore {
-                vesting_contracts: vector::empty<address>(),
+                vesting_contracts: vector<address>[],
                 nonce: 0,
                 create_events: new_event_handle<CreateVestingContractEvent>(admin),
             });
@@ -1288,9 +1287,9 @@ module aptos_framework::vesting {
         vesting_numerators: &vector<u64>,
         vesting_denominator: u64,
     ): address {
-        let schedule = vector::empty<FixedPoint32>();
+        let schedule = vector<FixedPoint32>[];
         vesting_numerators.for_each_ref(|num| {
-            vector::push_back(&mut schedule, fixed_point32::create_from_rational(*num, vesting_denominator));
+            schedule.push_back(fixed_point32::create_from_rational(*num, vesting_denominator));
         });
         let vesting_schedule = create_vesting_schedule(
             schedule,
@@ -1302,7 +1301,7 @@ module aptos_framework::vesting {
         let buy_ins = simple_map::create<address, Coin<AptosCoin>>();
         shares.enumerate_ref(|i, share| {
             let shareholder = shareholders[i];
-            simple_map::add(&mut buy_ins, shareholder, stake::mint_coins(*share));
+            buy_ins.add(shareholder, stake::mint_coins(*share));
         });
 
         create_vesting_contract(

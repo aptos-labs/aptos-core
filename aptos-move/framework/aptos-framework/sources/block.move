@@ -1,7 +1,6 @@
 /// This module defines a struct storing the metadata of the block and new block events.
 module aptos_framework::block {
     use std::error;
-    use std::vector;
     use std::option;
     use aptos_std::table_with_length::{Self, TableWithLength};
     use std::option::Option;
@@ -356,9 +355,9 @@ module aptos_framework::block {
                 epoch: 0,
                 round: 0,
                 height: 0,
-                previous_block_votes_bitvec: vector::empty(),
+                previous_block_votes_bitvec: vector[],
                 proposer: @vm_reserved,
-                failed_proposer_indices: vector::empty(),
+                failed_proposer_indices: vector[],
                 time_microseconds: 0
             }
         );
@@ -381,9 +380,9 @@ module aptos_framework::block {
                 epoch: reconfiguration::current_epoch(),
                 round: MAX_U64,
                 height: block_metadata_ref.height,
-                previous_block_votes_bitvec: vector::empty(),
+                previous_block_votes_bitvec: vector[],
                 proposer: @vm_reserved,
-                failed_proposer_indices: vector::empty(),
+                failed_proposer_indices: vector[],
                 time_microseconds: timestamp::now_microseconds()
             }
         );

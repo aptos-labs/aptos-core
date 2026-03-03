@@ -816,11 +816,11 @@ module aptos_framework::aptos_governance {
         finish_multi_step_execution: bool
     ): signer {
         if (multi_step) {
-            let execution_hash = vector::empty<u8>();
+            let execution_hash = vector<u8>[];
             execution_hash.push_back(1);
 
             if (finish_multi_step_execution) {
-                resolve_multi_step_proposal(proposal_id, signer_address, vector::empty<u8>())
+                resolve_multi_step_proposal(proposal_id, signer_address, vector<u8>[])
             } else {
                 resolve_multi_step_proposal(proposal_id, signer_address, execution_hash)
             }
@@ -942,8 +942,8 @@ module aptos_framework::aptos_governance {
 
         // Resolve the proposal.
         if (multi_step) {
-            let execution_hash = vector::empty<u8>();
-            let next_execution_hash = vector::empty<u8>();
+            let execution_hash = vector<u8>[];
+            let next_execution_hash = vector<u8>[];
             execution_hash.push_back(1);
             voting::resolve_proposal_v2<GovernanceProposal>(@aptos_framework, 0, next_execution_hash);
             assert!(voting::is_resolved<GovernanceProposal>(@aptos_framework, 0), 0);
@@ -1261,7 +1261,7 @@ module aptos_framework::aptos_governance {
         );
 
         // Initialize the stake pools for proposer and voters.
-        let active_validators = vector::empty<address>();
+        let active_validators = vector<address>[];
         active_validators.push_back(signer::address_of(proposer));
         active_validators.push_back(signer::address_of(yes_voter));
         active_validators.push_back(signer::address_of(no_voter));
@@ -1394,8 +1394,8 @@ module aptos_framework::aptos_governance {
         add_approved_script_hash(0);
 
         // Resolve the proposal.
-        let execution_hash = vector::empty<u8>();
-        let next_execution_hash = vector::empty<u8>();
+        let execution_hash = vector<u8>[];
+        let next_execution_hash = vector<u8>[];
         execution_hash.push_back(1);
         next_execution_hash.push_back(10);
 

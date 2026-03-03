@@ -1,7 +1,6 @@
 module aptos_framework::genesis {
     use std::error;
     use std::fixed_point32;
-    use std::vector;
 
     use aptos_std::simple_map;
 
@@ -173,13 +172,13 @@ module aptos_framework::genesis {
     }
 
     fun create_accounts(aptos_framework: &signer, accounts: vector<AccountMap>) {
-        let unique_accounts = vector::empty();
+        let unique_accounts = vector[];
         accounts.for_each_ref(|account_map| {
             assert!(
-                !vector::contains(&unique_accounts, &account_map.account_address),
+                !unique_accounts.contains(&account_map.account_address),
                 error::already_exists(EDUPLICATE_ACCOUNT),
             );
-            vector::push_back(&mut unique_accounts, account_map.account_address);
+            unique_accounts.push_back(account_map.account_address);
 
             create_account(
                 aptos_framework,
@@ -210,38 +209,38 @@ module aptos_framework::genesis {
         employee_vesting_period_duration: u64,
         employees: vector<EmployeeAccountMap>,
     ) {
-        let unique_accounts = vector::empty();
+        let unique_accounts = vector[];
 
         employees.for_each_ref(|employee_group| {
             let j = 0;
-            let num_employees_in_group = vector::length(&employee_group.accounts);
+            let num_employees_in_group = employee_group.accounts.length();
 
             let buy_ins = simple_map::create();
 
             while (j < num_employees_in_group) {
-                let account = vector::borrow(&employee_group.accounts, j);
+                let account = &employee_group.accounts[j];
                 assert!(
-                    !vector::contains(&unique_accounts, account),
+                    !unique_accounts.contains(account),
                     error::already_exists(EDUPLICATE_ACCOUNT),
                 );
-                vector::push_back(&mut unique_accounts, *account);
+                unique_accounts.push_back(*account);
 
                 let employee = create_signer(*account);
                 let total = coin::balance<AptosCoin>(*account);
                 let coins = coin::withdraw<AptosCoin>(&employee, total);
-                simple_map::add(&mut buy_ins, *account, coins);
+                buy_ins.add(*account, coins);
 
                 j += 1;
             };
 
             let j = 0;
-            let num_vesting_events = vector::length(&employee_group.vesting_schedule_numerator);
-            let schedule = vector::empty();
+            let num_vesting_events = employee_group.vesting_schedule_numerator.length();
+            let schedule = vector[];
 
             while (j < num_vesting_events) {
-                let numerator = vector::borrow(&employee_group.vesting_schedule_numerator, j);
+                let numerator = &employee_group.vesting_schedule_numerator[j];
                 let event = fixed_point32::create_from_rational(*numerator, employee_group.vesting_schedule_denominator);
-                vector::push_back(&mut schedule, event);
+                schedule.push_back(event);
 
                 j += 1;
             };
@@ -319,14 +318,14 @@ module aptos_framework::genesis {
     /// Network address fields are a vector per account, where each entry is a vector of addresses
     /// encoded in a single BCS byte array.
     fun create_initialize_validators(aptos_framework: &signer, validators: vector<ValidatorConfiguration>) {
-        let validators_with_commission = vector::empty();
+        let validators_with_commission = vector[];
         validators.for_each_reverse(|validator| {
             let validator_with_commission = ValidatorConfigurationWithCommission {
                 validator_config: validator,
                 commission_percentage: 0,
                 join_during_genesis: true,
             };
-            vector::push_back(&mut validators_with_commission, validator_with_commission);
+            validators_with_commission.push_back(validator_with_commission);
         });
 
         create_initialize_validators_with_commission(aptos_framework, false, validators_with_commission);
