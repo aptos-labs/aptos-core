@@ -1012,6 +1012,7 @@ impl AptosVM {
                 );
                 if maybe_randomness_annotation.is_some() {
                     session.mark_unbiasable();
+                    gas_meter.charge_randomness_txn()?;
                 }
             }
 

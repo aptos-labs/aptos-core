@@ -132,6 +132,11 @@ pub trait AptosGasMeter: MoveGasMeter {
     /// expensive computation required (5x more expensive than ed25519).
     fn charge_slh_dsa_sha2_128s(&mut self) -> VMResult<()>;
 
+    /// Charges an additional cost for randomness transactions to account for the
+    /// network-wide overhead of randomness generation (pipeline serialization,
+    /// DKG share aggregation, zaptos optimization bypass).
+    fn charge_randomness_txn(&mut self) -> VMResult<()>;
+
     /// Charges IO gas for the transaction itself.
     fn charge_io_gas_for_transaction(&mut self, txn_size: NumBytes) -> VMResult<()>;
 
