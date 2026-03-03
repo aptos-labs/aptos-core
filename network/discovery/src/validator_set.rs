@@ -224,7 +224,7 @@ fn set_port_to_public_network(addr: NetworkAddress) -> Option<NetworkAddress> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{DiscoveryChangeListener};
+    use crate::DiscoveryChangeListener;
     use aptos_channels::{aptos_channel, message_queues::QueueStyle};
     use aptos_config::{
         config::{RoleType, HANDSHAKE_VERSION},
@@ -389,10 +389,7 @@ mod tests {
             .as_slice()
             .iter()
             .any(|p| p == &Protocol::Tcp(validator_port));
-        assert!(
-            has_validator_port,
-            "Validator should use validator port 6180!"
-        );
+        assert!(has_validator_port);
 
         // Extract validator set updates for a validator network (with validator-PFN connections enabled)
         let base_config = BaseConfig {
@@ -415,10 +412,7 @@ mod tests {
             .as_slice()
             .iter()
             .any(|p| p == &Protocol::Tcp(validator_port));
-        assert!(
-            has_validator_port,
-            "Validator should use validator port 6180!"
-        );
+        assert!(has_validator_port);
     }
 
     #[test]
@@ -454,11 +448,7 @@ mod tests {
                 .as_slice()
                 .iter()
                 .any(|p| p == &Protocol::Tcp(fullnode_port));
-            assert!(
-                has_fullnode_port,
-                "VFN should use fullnode port 6182 (enable_validator_pfn_connections={})",
-                enable_validator_pfn_connections
-            );
+            assert!(has_fullnode_port);
         }
     }
 
