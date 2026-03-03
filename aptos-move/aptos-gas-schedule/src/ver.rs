@@ -8,6 +8,8 @@
 ///   - Changing how gas is calculated in any way
 ///
 /// Change log:
+/// - V44:
+///    - Gas charging for encrypted transaction decryption
 /// - V41:
 ///    - Gas charging for SLH-DSA-SHA2-128s signature verification
 /// - V31:
@@ -111,4 +113,5 @@ pub mod gas_feature_versions {
     pub const RELEASE_V1_41: u64 = 45;
     pub const RELEASE_V1_42: u64 = 46;
     pub const RELEASE_V1_43: u64 = 47;
+    pub const RELEASE_V1_44: u64 = 48;
 }

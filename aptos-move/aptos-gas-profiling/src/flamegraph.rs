@@ -118,6 +118,8 @@ impl ExecutionAndIOCosts {
 
         lines.push("slh_dsa_sha2_128s", self.slh_dsa_sha2_128s_cost);
 
+        lines.push("encrypted_txn", self.encrypted_txn_cost);
+
         let mut path = vec![];
 
         struct Rec<'a> {

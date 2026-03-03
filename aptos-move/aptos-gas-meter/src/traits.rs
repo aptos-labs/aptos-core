@@ -132,6 +132,10 @@ pub trait AptosGasMeter: MoveGasMeter {
     /// expensive computation required (5x more expensive than ed25519).
     fn charge_slh_dsa_sha2_128s(&mut self) -> VMResult<()>;
 
+    /// Charges an additional cost for encrypted transactions to compensate for
+    /// the decryption computation required.
+    fn charge_encrypted_txn(&mut self) -> VMResult<()>;
+
     /// Charges IO gas for the transaction itself.
     fn charge_io_gas_for_transaction(&mut self, txn_size: NumBytes) -> VMResult<()>;
 

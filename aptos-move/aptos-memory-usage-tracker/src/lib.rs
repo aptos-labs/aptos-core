@@ -710,5 +710,7 @@ where
         fn charge_keyless(&mut self) -> VMResult<()>;
 
         fn charge_slh_dsa_sha2_128s(&mut self) -> VMResult<()>;
+
+        fn charge_encrypted_txn(&mut self) -> VMResult<()>;
     }
 }
