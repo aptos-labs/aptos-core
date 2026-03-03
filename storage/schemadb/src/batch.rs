@@ -138,6 +138,11 @@ impl SchemaBatch {
         Self::default()
     }
 
+    /// Returns true if the batch contains no operations.
+    pub fn is_empty(&self) -> bool {
+        self.rows.is_empty()
+    }
+
     /// keep these on the struct itself so that we don't need to update each call site.
     pub fn put<S: Schema>(&mut self, key: &S::Key, value: &S::Value) -> DbResult<()> {
         <Self as WriteBatch>::put::<S>(self, key, value)
