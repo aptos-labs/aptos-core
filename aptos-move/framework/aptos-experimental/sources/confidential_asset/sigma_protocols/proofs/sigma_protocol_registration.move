@@ -16,25 +16,34 @@
 /// \end{align}
 ///
 module aptos_experimental::sigma_protocol_registration {
+    friend aptos_experimental::confidential_asset;
+
     use std::bcs;
     use std::error;
     use std::signer;
-    use aptos_std::ristretto255::{Self, RistrettoPoint, Scalar, CompressedRistretto};
+    use aptos_std::ristretto255::CompressedRistretto;
+    use aptos_framework::chain_id;
     use aptos_framework::fungible_asset::Metadata;
     use aptos_framework::object::Object;
     use aptos_experimental::sigma_protocol;
     use aptos_experimental::sigma_protocol_proof::Proof;
     use aptos_experimental::sigma_protocol_fiat_shamir::new_domain_separator;
-    use aptos_experimental::sigma_protocol_witness::{Witness, new_secret_witness};
-    use aptos_experimental::sigma_protocol_statement::{Statement, new_statement};
-    use aptos_experimental::sigma_protocol_representation::new_representation;
+    use aptos_experimental::sigma_protocol_witness::Witness;
+    use aptos_experimental::sigma_protocol_statement::Statement;
+    use aptos_experimental::sigma_protocol_statement_builder::new_builder;
+    use aptos_experimental::sigma_protocol_representation::{repr_point, repr_scaled};
     use aptos_experimental::sigma_protocol_representation_vec::{RepresentationVec, new_representation_vec};
+    use aptos_experimental::sigma_protocol_utils::{e_wrong_num_points, e_wrong_num_scalars, e_wrong_witness_len, e_wrong_output_len};
+    use aptos_experimental::ristretto255_twisted_elgamal::get_encryption_key_basepoint_compressed;
     #[test_only]
-    use aptos_framework::account;
+    use aptos_std::ristretto255::{Scalar, point_identity_compressed, random_scalar};
     #[test_only]
-    use aptos_framework::fungible_asset;
+    use aptos_experimental::sigma_protocol_witness::new_secret_witness;
+
     #[test_only]
-    use aptos_experimental::ristretto255_twisted_elgamal::{get_encryption_key_basepoint_compressed, pubkey_from_secret_key};
+    use aptos_experimental::sigma_protocol_test_utils::setup_test_environment;
+    #[test_only]
+    use aptos_experimental::ristretto255_twisted_elgamal::pubkey_from_secret_key;
     #[test_only]
     use aptos_experimental::sigma_protocol_homomorphism::evaluate_psi;
     #[test_only]
@@ -82,20 +91,15 @@ module aptos_experimental::sigma_protocol_registration {
     // Error codes
     //
 
-    /// The expected number of points in a registration statement is `N_1`.
-    const E_WRONG_NUM_POINTS: u64 = 1;
-    /// The expected number of scalars in a registration statement is `N_2`.
-    const E_WRONG_NUM_SCALARS: u64 = 2;
-    /// The expected number of scalars in a registration witness is `K`.
-    const E_WRONG_WITNESS_LEN: u64 = 3;
-    /// The expected number of points in the homomorphism & transformation function output is `M`.
-    const E_WRONG_OUTPUT_LEN: u64 = 4;
     /// The registration proof was invalid
     const E_INVALID_REGISTRATION_PROOF: u64 = 5;
 
     //
     // Structs
     //
+
+    /// Phantom marker type for registration statements.
+    struct Registration has drop {}
 
     /// Used for domain separation in the Fiat-Shamir transform.
     struct RegistrationSession has drop {
@@ -108,16 +112,16 @@ module aptos_experimental::sigma_protocol_registration {
     //
 
     /// Ensures the statement has `N_1` points and `N_2` scalars.
-    fun assert_registration_statement_is_well_formed(stmt: &Statement) {
-        assert!(stmt.get_points().length() == N_1, error::invalid_argument(E_WRONG_NUM_POINTS));
-        assert!(stmt.get_scalars().length() == N_2, error::invalid_argument(E_WRONG_NUM_SCALARS));
+    fun assert_registration_statement_is_well_formed(stmt: &Statement<Registration>) {
+        assert!(stmt.get_points().length() == N_1, e_wrong_num_points());
+        assert!(stmt.get_scalars().length() == N_2, e_wrong_num_scalars());
     }
 
     //
     // Public functions
     //
 
-    public fun new_session(sender: &signer, asset_type: Object<Metadata>): RegistrationSession {
+    public(friend) fun new_session(sender: &signer, asset_type: Object<Metadata>): RegistrationSession {
         RegistrationSession {
             sender: signer::address_of(sender),
             asset_type,
@@ -125,57 +129,59 @@ module aptos_experimental::sigma_protocol_registration {
     }
 
     /// Creates a new registration statement: $(H, \mathsf{ek})$.
-    public fun new_registration_statement(
-        compressed_H: CompressedRistretto, _H: RistrettoPoint,
-        compressed_ek: CompressedRistretto, ek: RistrettoPoint,
-    ): Statement {
-        let stmt = new_statement(
-            vector[_H, ek],
-            vector[compressed_H, compressed_ek],
-            vector[]
-        );
+    ///
+    /// H is computed internally via `get_encryption_key_basepoint_compressed()`.
+    /// ek is decompressed internally from `compressed_ek`.
+    public(friend) fun new_registration_statement(
+        compressed_ek: CompressedRistretto,
+    ): Statement<Registration> {
+        let b = new_builder();
+        b.add_point(get_encryption_key_basepoint_compressed());  // H
+        b.add_point(compressed_ek);                               // ek
+        let stmt = b.build();
         assert_registration_statement_is_well_formed(&stmt);
         stmt
     }
 
+    #[test_only]
     /// Creates a new registration witness: $(\mathsf{dk})$.
     public fun new_registration_witness(dk: Scalar): Witness {
         new_secret_witness(vector[dk])
     }
 
     /// The homomorphism $\psi_\mathsf{dl}(\mathsf{dk} \mid \mathsf{ek}) = \mathsf{dk} \cdot \mathsf{ek}$.
-    public fun psi(stmt: &Statement, w: &Witness): RepresentationVec {
+    fun psi(stmt: &Statement<Registration>, w: &Witness): RepresentationVec {
         // WARNING: Crucial for security
         assert_registration_statement_is_well_formed(stmt);
         // WARNING: Crucial for security
-        assert!(w.length() == K, error::invalid_argument(E_WRONG_WITNESS_LEN));
+        assert!(w.length() == K, e_wrong_witness_len());
 
         let dk = *w.get(IDX_DK);
 
         let output = new_representation_vec(vector[
             // dk * ek
-            new_representation(vector[IDX_EK], vector[dk]),
+            repr_scaled(IDX_EK, dk),
         ]);
 
         // WARNING: Crucial for security
-        assert!(output.length() == M, error::invalid_argument(E_WRONG_OUTPUT_LEN));
+        assert!(output.length() == M, e_wrong_output_len());
 
         output
     }
 
     /// The transformation function $\mathsf{f}_\mathsf{dl}(\mathsf{ek}) = H$.
-    public fun f(_stmt: &Statement): RepresentationVec {
+    fun f(_stmt: &Statement<Registration>): RepresentationVec {
         // We do not re-assert well-formedness since wherever f is called, psi is also called.
         new_representation_vec(vector[
             // H
-            new_representation(vector[IDX_H], vector[ristretto255::scalar_one()]),
+            repr_point(IDX_H),
         ])
     }
 
     /// Asserts that a registration proof verifies.
-    public fun assert_verifies(session: &RegistrationSession, stmt: &Statement, proof: &Proof) {
+    public(friend) fun assert_verifies(self: &RegistrationSession, stmt: &Statement<Registration>, proof: &Proof) {
         let success = sigma_protocol::verify(
-            new_domain_separator(PROTOCOL_ID, bcs::to_bytes(session)),
+            new_domain_separator(@aptos_experimental, chain_id::get(), PROTOCOL_ID, bcs::to_bytes(self)),
             |_X, w| psi(_X, w),
             |_X| f(_X),
             stmt,
@@ -190,23 +196,16 @@ module aptos_experimental::sigma_protocol_registration {
     //
 
     #[test_only]
-    /// Returns a dummy session used for testing.
-    /// WARNING: Can only be called once because it calls `create_fungible_asset`!
     fun registration_session_for_testing(): RegistrationSession {
-        let sender = account::create_signer_for_test(@0x1);
-        let (_, _, _, _, asset_type) = fungible_asset::create_fungible_asset(&sender);
-
-        RegistrationSession {
-            sender: signer::address_of(&sender),
-            asset_type,
-        }
+        let (sender, asset_type) = setup_test_environment();
+        RegistrationSession { sender: signer::address_of(&sender), asset_type }
     }
 
     #[test_only]
     /// Creates a registration proof (for testing).
-    public fun prove(session: &RegistrationSession, stmt: &Statement, witn: &Witness): Proof {
+    public fun prove(self: &RegistrationSession, stmt: &Statement<Registration>, witn: &Witness): Proof {
         let (proof, _) = sigma_protocol::prove(
-            new_domain_separator(PROTOCOL_ID, bcs::to_bytes(session)),
+            new_domain_separator(@aptos_experimental, chain_id::get(), PROTOCOL_ID, bcs::to_bytes(self)),
             |_X, w| psi(_X, w),
             stmt,
             witn
@@ -219,14 +218,10 @@ module aptos_experimental::sigma_protocol_registration {
     /// Computes the statement and witness from a decryption key.
     public fun compute_statement_and_witness(
         dk: &Scalar,
-    ): (Statement, Witness) {
-        let compressed_H = get_encryption_key_basepoint_compressed();
-        let _H = compressed_H.point_decompress();
-
+    ): (Statement<Registration>, Witness) {
         let compressed_ek = pubkey_from_secret_key(dk).extract();
-        let ek = compressed_ek.point_decompress();
 
-        let stmt = new_registration_statement(compressed_H, _H, compressed_ek, ek);
+        let stmt = new_registration_statement(compressed_ek);
         let witn = new_registration_witness(*dk);
 
         (stmt, witn)
@@ -235,7 +230,7 @@ module aptos_experimental::sigma_protocol_registration {
     #[test]
     /// Verifies that the homomorphism $\psi$ is implemented correctly.
     fun psi_correctness() {
-        let dk = ristretto255::random_scalar();
+        let dk = random_scalar();
         let (_X, w) = compute_statement_and_witness(&dk);
 
         // Get statement components
@@ -255,39 +250,38 @@ module aptos_experimental::sigma_protocol_registration {
     #[test]
     /// Verifies that a correctly computed proof verifies.
     fun proof_correctness() {
-        let dk = ristretto255::random_scalar();
+        let dk = random_scalar();
         let (stmt, witn) = compute_statement_and_witness(&dk);
 
         let ss = registration_session_for_testing();
-        let proof = prove(&ss, &stmt, &witn);
+        let proof = ss.prove(&stmt, &witn);
 
-        assert_verifies(&ss, &stmt, &proof);
+        ss.assert_verifies(&stmt, &proof);
     }
 
     #[test]
     #[expected_failure(abort_code=65537, location=aptos_experimental::sigma_protocol_fiat_shamir)]
     /// Verifies that an empty proof does not verify for a random statement.
     fun proof_soundness_against_random_statement() {
-        let dk = ristretto255::random_scalar();
+        let dk = random_scalar();
         let (stmt, _) = compute_statement_and_witness(&dk);
 
         let proof = sigma_protocol_proof::empty();
 
-        assert_verifies(&registration_session_for_testing(), &stmt, &proof);
+        registration_session_for_testing().assert_verifies(&stmt, &proof);
     }
 
     #[test]
     #[expected_failure(abort_code=65537, location=aptos_experimental::sigma_protocol_fiat_shamir)]
-    /// Verifies that an empty proof does not verify for an "empty" statement (all identity points).
-    fun proof_soundness_against_empty_statement_and_empty_proof() {
-        let _H = ristretto255::point_identity();
-        let compressed_H = ristretto255::point_identity_compressed();
-        let ek = ristretto255::point_identity();
-        let compressed_ek = ristretto255::point_identity_compressed();
+    /// Verifies that an empty proof does not verify for a "zero" statement (all identity points).
+    fun proof_soundness_against_zero_statement_and_empty_proof() {
+        let b = new_builder();
+        b.add_point(point_identity_compressed()); // H
+        b.add_point(point_identity_compressed()); // ek
+        let stmt: Statement<Registration> = b.build();
 
-        let stmt = new_registration_statement(compressed_H, _H, compressed_ek, ek);
         let proof = sigma_protocol_proof::empty();
 
-        assert_verifies(&registration_session_for_testing(), &stmt, &proof);
+        registration_session_for_testing().assert_verifies(&stmt, &proof);
     }
 }

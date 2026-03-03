@@ -1,4 +1,9 @@
 module aptos_experimental::sigma_protocol {
+    friend aptos_experimental::sigma_protocol_registration;
+    friend aptos_experimental::sigma_protocol_withdraw;
+    friend aptos_experimental::sigma_protocol_transfer;
+    friend aptos_experimental::sigma_protocol_key_rotation;
+
     use std::error;
     use aptos_std::ristretto255::{point_identity, multi_scalar_mul};
     use aptos_experimental::sigma_protocol_utils::{neg_scalars, points_clone};
@@ -27,26 +32,23 @@ module aptos_experimental::sigma_protocol {
     #[test_only]
     /// Creates a proof and additionally returns the randomness $\alpha \in \mathbb{F}^k$ used to
     /// create the sigma protocol commitment $A = \psi(\alpha) \in \mathbb{G}^m$.
-    public inline fun prove(
+    public inline fun prove<P>(
         dst: DomainSeparator,
-        psi: Homomorphism,
-        stmt: &Statement,
+        psi: Homomorphism<P>,
+        stmt: &Statement<P>,
         witn: &Witness,
     ): (Proof, Witness) {
         let k = witn.length();
 
         // Step 1: Pick a random \alpha \in \F^k
         let alpha = sigma_protocol_witness::random(k);
-        // debug::print(&string_utils::format1(&b"len(alpha) = k = {}", k));
 
         // Step 2: A <- \psi(\alpha) \in \Gr^m
-        // TODO(Ugly): Change `|_X, w| psi(_X, w)` to `psi` when public structs ship and allow this.
         let _A = evaluate_psi(|_X, w| psi(_X, w), stmt, &alpha);
 
         // Step 3: Derive a random-challenge `e` via Fiat-Shamir
         let compressed_A = compress_points(&_A);
         let (e, _) = fiat_shamir(dst, stmt, &compressed_A, k);
-        // debug::print(&string_utils::format1(&b"len(A) = m = {}", m));
 
         // Step 4: \sigma <- \alpha + e w
         let sigma = add_vec_scalars(
@@ -79,30 +81,26 @@ module aptos_experimental::sigma_protocol {
     ///      );
     ///   );
     /// ```
-    public inline fun verify_slow(
+    public inline fun verify_slow<P>(
         dst: DomainSeparator,
-        psi: Homomorphism,
-        f: TransformationFunction,
-        stmt: &Statement,
+        psi: Homomorphism<P>,
+        f: TransformationFunction<P>,
+        stmt: &Statement<P>,
         proof: &Proof,
     ): bool {
 
         // Step 1: Fiat-Shamir transform on `(dst, (psi, f), stmt)` to derive the random challenge `e`
         let _A = proof.get_commitment();
-        let m = _A.length();
         let sigma = proof.response_to_witness();
-        let k = sigma.length();
-        let (e, _) = fiat_shamir(dst, stmt, proof.get_compressed_commitment(), k);
+        let (e, _) = fiat_shamir(dst, stmt, proof.get_compressed_commitment(), sigma.length());
 
         // Step 3: Compute the `m` entries of `f(X)`
-        // TODO(Ugly): Change `|_X| f(_X)` to `f` when public structs ship and allow this.
         let fx = evaluate_f(|_X| f(_X), stmt);
-        assert!(fx.length() == m, error::invalid_argument(E_PROOF_COMMITMENT_WRONG_LEN));
+        assert!(fx.length() == _A.length(), error::invalid_argument(E_PROOF_COMMITMENT_WRONG_LEN));
 
         // Step 4: Compute the `m` entries of \psi(X, w)
-        // TODO(Ugly): Change `|_X, w| psi(_X, w)` to `psi` when public structs ship and allow this.
         let psi_sigma = evaluate_psi(|_X, w| psi(_X, w), stmt, &sigma);
-        assert!(psi_sigma.length() == m, error::invalid_argument(E_PROOF_COMMITMENT_WRONG_LEN));
+        assert!(psi_sigma.length() == _A.length(), error::invalid_argument(E_PROOF_COMMITMENT_WRONG_LEN));
 
         equal_vec_points(
             &psi_sigma,
@@ -145,11 +143,11 @@ module aptos_experimental::sigma_protocol {
     /// @param  proof  the ZKP proving that the prover knows a $w$ s.t. $f(X) = \psi(w)$
     ///
     /// Returns true if it succeeds and false otherwise.
-    public inline fun verify(
+    public(friend) inline fun verify<P>(
         dst: DomainSeparator,
-        psi: Homomorphism,
-        f: TransformationFunction,
-        stmt: &Statement,
+        psi: Homomorphism<P>,
+        f: TransformationFunction<P>,
+        stmt: &Statement<P>,
         proof: &Proof,
     ): bool {
         // Step 1: Fiat-Shamir transform on `(dst, (psi, f), stmt)` to derive the random challenge `e`
@@ -212,22 +210,21 @@ module aptos_experimental::sigma_protocol {
 
     #[test_only]
     /// The slow verification of the sigma protocol proof failed (instead of succeeding) in one of the tests.
-    const E_SLOW_VERIFICATION_FAILED: u64 = 4;
+    const E_SLOW_VERIFICATION_FAILED: u64 = 3;
     #[test_only]
     /// The fast verification of the sigma protocol proof failed (instead of succeeding) in one of the tests.
-    const E_FAST_VERIFICATION_FAILED: u64 = 5;
+    const E_FAST_VERIFICATION_FAILED: u64 = 4;
 
     #[test_only]
     /// A generic correctness test that takes the DST, the public statement, the secret witness, and the $\psi$ and $f$
     /// lambdas.
-    public inline fun assert_correctly_computed_proof_verifies(
+    public inline fun assert_correctly_computed_proof_verifies<P>(
         dst: DomainSeparator,
-        stmt: Statement,
+        stmt: Statement<P>,
         witn: Witness,
-        psi: Homomorphism,
-        f: TransformationFunction,
+        psi: Homomorphism<P>,
+        f: TransformationFunction<P>,
     ): (Proof, Witness) {
-        // TODO(Ugly): Change `|_X, w| psi(_X, w)` to `psi` when public structs ship and allow this.
         let (proof, alpha) = prove(
             dst,
             |_X, w| psi(_X, w),
@@ -236,7 +233,6 @@ module aptos_experimental::sigma_protocol {
         );
 
         // Make sure the sigma protocol proof verifies (slowly)
-        // TODO(Ugly): Change `|_X, w| psi(_X, w)` to `psi` and `|_X| f(_X)` to `f` when public structs ship and allow this.
         assert!(
             verify_slow(
                 dst,
@@ -247,7 +243,6 @@ module aptos_experimental::sigma_protocol {
             ), error::invalid_argument(E_SLOW_VERIFICATION_FAILED));
 
         // Make sure the sigma protocol proof verifies (quickly)
-        // TODO(Ugly): Change `|_X, w| psi(_X, w)` to `psi` and `|_X| f(_X)` to `f` when public structs ship and allow this.
         assert!(
             verify(
                 dst,
@@ -262,15 +257,14 @@ module aptos_experimental::sigma_protocol {
 
     #[test_only]
     /// Returns `true` if the empty proof does not verify for the specific statement. Otherwise, returns `false`.
-    public inline fun empty_proof_verifies(
+    public inline fun empty_proof_verifies<P>(
         dst: DomainSeparator,
-        psi: Homomorphism,
-        f: TransformationFunction,
-        stmt: Statement,
+        psi: Homomorphism<P>,
+        f: TransformationFunction<P>,
+        stmt: Statement<P>,
     ): bool {
         let proof = sigma_protocol_proof::empty();
 
-        // TODO(Ugly): Change `|_X, w| psi(_X, w)` to `psi` and `|_X| f(_X)` to `f` when public structs ship and allow this.
         let r1 = !verify_slow(
             dst,
             |_X, w| psi(_X, w),
@@ -279,7 +273,6 @@ module aptos_experimental::sigma_protocol {
             &proof
         );
 
-        // TODO(Ugly): Change `|_X, w| psi(_X, w)` to `psi` and `|_X| f(_X)` to `f` when public structs ship and allow this.
         let r2 = !verify(
             dst,
             |_X, w| psi(_X, w),

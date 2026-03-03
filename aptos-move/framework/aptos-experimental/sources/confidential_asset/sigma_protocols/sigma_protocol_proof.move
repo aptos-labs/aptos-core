@@ -1,4 +1,6 @@
 module aptos_experimental::sigma_protocol_proof {
+    friend aptos_experimental::confidential_asset;
+
     use std::error;
     use aptos_std::ristretto255::{RistrettoPoint, Scalar, CompressedRistretto};
     use aptos_experimental::sigma_protocol_utils;
@@ -33,7 +35,7 @@ module aptos_experimental::sigma_protocol_proof {
     }
 
     /// Deserializes the elliptic curve points and scalars and then calls `new_proof`.
-    public fun new_proof_from_bytes(
+    public(friend) fun new_proof_from_bytes(
         _A_bytes: vector<vector<u8>>,
         sigma_bytes: vector<vector<u8>>
     ): Proof {
@@ -59,10 +61,6 @@ module aptos_experimental::sigma_protocol_proof {
 
     public fun get_response_length(self: &Proof): u64 {
         self.resp_sigma.length()
-    }
-
-    public fun get_response(self: &Proof): &vector<Scalar> {
-        &self.resp_sigma
     }
 
     #[test_only]
