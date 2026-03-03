@@ -973,8 +973,3 @@ ark-ff-macros = { git = "https://github.com/aptos-labs/algebra", branch = "fix-f
 ark-ff-asm = { git = "https://github.com/aptos-labs/algebra", branch = "fix-fft-parallelism-cutoff" }
 ark-poly = { git = "https://github.com/aptos-labs/algebra", branch = "fix-fft-parallelism-cutoff" }
 ark-serialize = { git = "https://github.com/aptos-labs/algebra", branch = "fix-fft-parallelism-cutoff" }
-
-# There is a circular dependency between aptos-core, aptos-indexer-processor-sdk, and aptos-indexer-processors-v2,
-# so we cannot simply change the version and package for `jemalloc-sys` in one repo without running into conflicts.
-# We have to keep this shim until everything uses the same jemalloc dependency.
-jemalloc-sys = { git = "https://github.com/aptos-labs/jemalloc-sys-shim", rev = "e0920246dd74303fab9a14b990768c6ac990a59b" }
