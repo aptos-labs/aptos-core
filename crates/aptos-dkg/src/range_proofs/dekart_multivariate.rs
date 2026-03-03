@@ -132,7 +132,9 @@ impl<E: Pairing> traits::BatchedRangeProof<E> for Proof<E> {
             SrsBasis::PowersOfTau { tau_powers } => tau_powers.clone(),
             _ => panic!("Expected PowersOfTau SRS"),
         };
-        let last_tau = *tau_powers
+        // VK only stores the first `size` tau powers (minimal needed for num_vars); prover uses ck for full SRS.
+        let vk_taus_1: Vec<E::G1Affine> = tau_powers[..size].to_vec();
+        let last_tau = *vk_taus_1
             .last()
             .expect("PowersOfTau SRS has at least one element");
         let num_vars = size.ilog2() as usize;
@@ -141,7 +143,7 @@ impl<E: Pairing> traits::BatchedRangeProof<E> for Proof<E> {
             max_multiplicands: 2,
         };
         let srs = Srs {
-            taus_1: tau_powers,
+            taus_1: vk_taus_1,
             xi_1: ck.xi_1,
             g_2: vk_hkzg.group_generators.g2,
             tau_2: vk_hkzg.tau_2,

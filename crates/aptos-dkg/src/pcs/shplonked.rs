@@ -26,6 +26,7 @@ use crate::{
             fixed_base_msms::Trait as FixedBaseMsmsTrait, tuple::TupleCodomainShape, Trait as _,
             TrivialShape as CodomainShape,
         },
+        traits::fiat_shamir_challenge_for_sigma_protocol,
         CurveGroupTrait, FirstProofItem, Proof, Trait as SigmaTrait,
     },
     Scalar,
@@ -614,6 +615,7 @@ pub fn batch_open_generalized<
 
 /// Generalized batch verify per spec: PCS.BatchVerify(vk, {S_i}, φ, {C_i}; { y_i^rev }_i, φ(y), π) → {0,1}.
 /// Commitments C_i may be given as MSM representations (they are expanded into the equation).
+/// TODO: Isn't this method already part of the trait?
 #[allow(non_snake_case)]
 pub fn batch_verify_generalized<
     E: Pairing,
@@ -629,10 +631,7 @@ pub fn batch_verify_generalized<
     proof: &ShplonkedBatchProof<E>,
     trs: &mut merlin::Transcript,
     rng: &mut R,
-) -> anyhow::Result<()>
-where
-    E::ScalarField: FftField,
-{
+) -> anyhow::Result<()> {
     let (g1_terms, g2_terms) = batch_pairing_for_verify_generalized(
         srs,
         sets,
@@ -665,10 +664,7 @@ pub fn batch_pairing_for_verify_generalized<
     proof: &ShplonkedBatchProof<E>,
     trs: &mut merlin::Transcript,
     rng: &mut R,
-) -> anyhow::Result<(Vec<E::G1Affine>, Vec<E::G2Affine>)>
-where
-    E::ScalarField: FftField,
-{
+) -> anyhow::Result<(Vec<E::G1Affine>, Vec<E::G2Affine>)> {
     let ShplonkedBatchProof {
         pi_1,
         pi_2: (pi_2_W_prime, pi_2_Y),
@@ -775,11 +771,7 @@ where
     let prover_commitment = sigma_protocol_proof
         .prover_commitment()
         .expect("batch verify: expected commitment");
-    let c_sigma = crate::sigma_protocol::traits::fiat_shamir_challenge_for_sigma_protocol::<
-        _,
-        E::ScalarField,
-        _,
-    >(
+    let c_sigma = fiat_shamir_challenge_for_sigma_protocol::<_, E::ScalarField, _>(
         SHPLONKED_SIGMA_DST,
         &full_hom,
         &public_statement,
@@ -854,6 +846,7 @@ where
     type Polynomial = DensePolynomial<E::ScalarField>;
     type Proof = ShplonkedBatchProof<E>;
     type VerificationKey = Srs<E>;
+    // This is not ideal, but we need some of the SRS in order to verify the sigma protocol proof.
     type WitnessField = E::ScalarField;
 
     fn setup<R: rand_core::RngCore + rand_core::CryptoRng>(
