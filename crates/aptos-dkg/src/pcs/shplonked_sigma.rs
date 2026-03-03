@@ -5,6 +5,8 @@
 // such that com_y = commitment(rho, evals), V = taus_1[0]*sum(alphas_i*evals_i) + xi_1*u, and y_sum = sum(evals).
 // Built from CurveGroupTupleHomomorphism (com_y, V) and SumHomomorphism (y_sum) via TupleHomomorphism.
 
+// TODO: maybe this should go inside shplonked.rs as a submodule?
+
 use crate::{
     pcs::{shplonked::Srs, univariate_hiding_kzg},
     sigma_protocol::{

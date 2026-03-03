@@ -11,7 +11,7 @@ use crate::{
             ShplonkedBatchProof, Srs, SumEvalHom,
         },
         univariate_hiding_kzg,
-        zeromorph::{eval_and_quotient_scalars, Zeromorph, ZeromorphProverKey},
+        zeromorph::{replay_challenges, zeta_z_com, Zeromorph, ZeromorphProverKey},
         EvaluationSet,
     },
     range_proofs::{dekart_univariate_v2::two_term_msm, traits, PublicStatement},
@@ -323,16 +323,9 @@ impl<E: Pairing> traits::BatchedRangeProof<E> for Proof<E> {
         let hat_c: E::ScalarField = trs.challenge_scalar();
         let hat_c_powers = powers(hat_c, ell as usize + 1);
 
-        // Step 5c: ...
-        // Replay mPCS.ReduceToUnivariate (Zeromorph) to get x_challenge and form zeta_z_com.
-        trs.append_sep(Zeromorph::protocol_name());
-        for c in &self.zeromorph_q_k_com {
-            trs.append_point(c);
-        }
-        let y_challenge: E::ScalarField = trs.challenge_scalar();
-        trs.append_point(&self.zeromorph_q_hat_com);
-        let x_challenge: E::ScalarField = trs.challenge_scalar();
-        let z_challenge: E::ScalarField = trs.challenge_scalar();
+        // Step 5c: Replay mPCS.ReduceToUnivariate (Zeromorph) to get x_challenge and form zeta_z_com.
+        let (y_challenge, x_challenge, z_challenge) =
+            replay_challenges::<E>(&mut trs, &self.zeromorph_q_k_com, &self.zeromorph_q_hat_com);
 
         anyhow::ensure!(
             self.zk_pcs_eval_points[0] == x_challenge,
@@ -346,15 +339,6 @@ impl<E: Pairing> traits::BatchedRangeProof<E> for Proof<E> {
                 .map(|(j, &y_j)| hat_c_powers[j + 1] * y_j)
                 .sum::<E::ScalarField>();
 
-        let x = &subclaim.point;
-        let point_reversed: Vec<E::ScalarField> = x.iter().rev().cloned().collect();
-        let (eval_scalar, (mut q_scalars, zmpoly_q_scalars)) =
-            eval_and_quotient_scalars::<E>(y_challenge, x_challenge, z_challenge, &point_reversed);
-        q_scalars
-            .iter_mut()
-            .zip(zmpoly_q_scalars)
-            .for_each(|(s, zm)| *s += zm);
-
         let mut combined_bases = vec![comm.0.into_affine()];
         let mut combined_scalars = vec![E::ScalarField::ONE];
         if let Some(ref bc) = self.blinding_poly_comm {
@@ -366,20 +350,19 @@ impl<E: Pairing> traits::BatchedRangeProof<E> for Proof<E> {
         let combined_comm =
             E::G1::msm(&combined_bases, &combined_scalars).expect("combined commitment MSM");
 
-        let scalars: Vec<E::ScalarField> = [
-            vec![E::ScalarField::ONE, z_challenge, eval_scalar * batched_eval],
-            q_scalars,
-        ]
-        .concat();
-        let mut zeta_bases = vec![
+        let x = &subclaim.point;
+        let point_reversed: Vec<E::ScalarField> = x.iter().rev().cloned().collect();
+        let zeta_z_com = zeta_z_com::<E>(
             self.zeromorph_q_hat_com,
             combined_comm.into_affine(),
             vk.vk_hkzg.group_generators.g1,
-        ];
-        zeta_bases.extend(self.zeromorph_q_k_com.iter().copied());
-        let zeta_z_com = E::G1::msm(&zeta_bases, &scalars)
-            .expect("Zeromorph zeta_z MSM")
-            .into_affine();
+            &self.zeromorph_q_k_com,
+            y_challenge,
+            x_challenge,
+            z_challenge,
+            &point_reversed,
+            batched_eval,
+        );
 
         // Step 4d (spec): single uPCS.BatchVerify; first commitment is Zeromorph-reduced (zeta_z_com), then g_i.
         let zeromorph_msm =

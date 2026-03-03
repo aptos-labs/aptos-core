@@ -5,7 +5,7 @@ use crate::pcs::univariate_hiding_kzg;
 use ark_ec::pairing::Pairing;
 use ark_serialize::CanonicalSerialize;
 
-pub mod dekart_multivariate;
+//pub mod dekart_multivariate;
 pub mod dekart_univariate;
 pub mod dekart_univariate_v2;
 pub mod scalars_to_bits;
