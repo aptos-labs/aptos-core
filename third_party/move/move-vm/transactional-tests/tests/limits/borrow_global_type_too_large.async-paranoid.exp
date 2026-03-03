@@ -1,0 +1,12 @@
+processed 4 tasks
+task 0 lines 1-36:  publish [module 0x22::test]
+task 1 lines 38-38:  run 0x22::test::entry_below_limit --signers 0x22
+task 2 lines 40-40:  run 0x22::test::entry_at_limit --signers 0x22
+task 3 lines 42-42:  run 0x22::test::entry_above_limit
+Error: Function execution failed with VMError: {
+    major_status: VM_MAX_TYPE_DEPTH_REACHED,
+    sub_status: None,
+    location: 0x22::test,
+    indices: [],
+    offsets: [(FunctionDefinitionIndex(2), 1)],
+}

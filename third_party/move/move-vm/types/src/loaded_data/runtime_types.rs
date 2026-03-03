@@ -866,7 +866,7 @@ impl Type {
     ///      Its depth is 2.
     ///   - `Foo<u64, Bar<u8, bool>>` has 5 nodes with depth of 3.
     #[cfg_attr(feature = "force-inline", inline(always))]
-    pub fn num_nodes_with_depth(&self) -> (usize, usize) {
+    pub fn num_nodes_with_max_depth(&self) -> (usize, usize) {
         self.preorder_traversal_with_depth()
             .fold((0, 0), |(count, max_depth), (_, depth)| {
                 (count + 1, max_depth.max(depth))
@@ -896,7 +896,7 @@ impl Type {
                                 idx
                             ))
                         })?;
-                        *entry.insert(ty.num_nodes_with_depth())
+                        *entry.insert(ty.num_nodes_with_max_depth())
                     },
                 })
             };
@@ -1013,13 +1013,31 @@ pub struct TypeBuilder {
     max_ty_size: u64,
     // Maximum depth (in terms of number of nodes) a fully-instantiated type has.
     max_ty_depth: u64,
+    // Gates changes to type construction algorithm:
+    //   - Reference nodes are not counted towards the final node count and depth.
+    pub check_depth_on_type_counts_v2: bool,
+    ref_ty_count_decrement: u64,
+    ref_ty_depth_increment: u64,
 }
 
 impl TypeBuilder {
-    pub fn with_limits(max_ty_size: u64, max_ty_depth: u64) -> Self {
+    pub fn with_limits(
+        max_ty_size: u64,
+        max_ty_depth: u64,
+        check_depth_on_type_counts_v2: bool,
+    ) -> Self {
         Self {
             max_ty_size,
             max_ty_depth,
+            check_depth_on_type_counts_v2,
+            // We set count to 0 and depth to 1, which means we do not account for reference node
+            // in count/depth calculation. This is fine as we have no nested references, so we only
+            // allow 1 extra hop, in the worst case. In return, this guarantees that at runtime
+            // taking a reference to some generic T never fails due to exceeding limits: instead,
+            // either T exceeds limits and type instantiation fails, or reference can be created
+            // successfully.
+            ref_ty_count_decrement: if check_depth_on_type_counts_v2 { 1 } else { 0 },
+            ref_ty_depth_increment: if check_depth_on_type_counts_v2 { 0 } else { 1 },
         }
     }
 
@@ -1102,10 +1120,10 @@ impl TypeBuilder {
     /// Returns an error if the type size or depth are too large.
     #[cfg_attr(feature = "force-inline", inline(always))]
     pub fn create_ref_ty(&self, inner_ty: &Type, is_mut: bool) -> PartialVMResult<Type> {
-        let mut count = 1;
+        let mut count = 1 - self.ref_ty_count_decrement;
         let check = |c: &mut u64, d: u64| self.check_before_count_increment(c, d);
         let inner_ty = self
-            .clone_impl(inner_ty, &mut count, 2, check)
+            .clone_impl(inner_ty, &mut count, 1 + self.ref_ty_depth_increment, check)
             .map_err(|e| {
                 e.append_message_with_separator(
                     '.',
@@ -1333,7 +1351,7 @@ impl TypeBuilder {
     where
         G: Fn(&mut u64, u64) -> PartialVMResult<()> + Copy,
     {
-        Self::apply_subst(
+        self.apply_subst(
             ty,
             |idx, c, d| match ty_args.get(idx as usize) {
                 Some(ty) => self.clone_impl(ty, c, d, check),
@@ -1362,7 +1380,7 @@ impl TypeBuilder {
     where
         G: Fn(&mut u64, u64) -> PartialVMResult<()> + Copy,
     {
-        Self::apply_subst(
+        self.apply_subst(
             ty,
             |idx, _, _| {
                 // The type cannot contain type parameters anymore (it also does not make
@@ -1383,6 +1401,7 @@ impl TypeBuilder {
     }
 
     fn apply_subst<F, G>(
+        &self,
         ty: &Type,
         subst: F,
         count: &mut u64,
@@ -1420,15 +1439,29 @@ impl TypeBuilder {
             Address => Address,
             Signer => Signer,
             Vector(elem_ty) => {
-                let elem_ty = Self::apply_subst(elem_ty, subst, count, depth + 1, check)?;
+                let elem_ty = self.apply_subst(elem_ty, subst, count, depth + 1, check)?;
                 Vector(TriompheArc::new(elem_ty))
             },
             Reference(inner_ty) => {
-                let inner_ty = Self::apply_subst(inner_ty, subst, count, depth + 1, check)?;
+                *count -= self.ref_ty_count_decrement;
+                let inner_ty = self.apply_subst(
+                    inner_ty,
+                    subst,
+                    count,
+                    depth + self.ref_ty_depth_increment,
+                    check,
+                )?;
                 Reference(Box::new(inner_ty))
             },
             MutableReference(inner_ty) => {
-                let inner_ty = Self::apply_subst(inner_ty, subst, count, depth + 1, check)?;
+                *count -= self.ref_ty_count_decrement;
+                let inner_ty = self.apply_subst(
+                    inner_ty,
+                    subst,
+                    count,
+                    depth + self.ref_ty_depth_increment,
+                    check,
+                )?;
                 MutableReference(Box::new(inner_ty))
             },
             Struct { idx, ability } => Struct {
@@ -1442,7 +1475,7 @@ impl TypeBuilder {
             } => {
                 let mut instantiated_tys = vec![];
                 for ty in non_instantiated_tys.iter() {
-                    let ty = Self::apply_subst(ty, subst, count, depth + 1, check)?;
+                    let ty = self.apply_subst(ty, subst, count, depth + 1, check)?;
                     instantiated_tys.push(ty);
                 }
                 StructInstantiation {
@@ -1457,7 +1490,7 @@ impl TypeBuilder {
                 abilities,
             } => {
                 let subs_elem = |count: &mut u64, ty: &Type| -> PartialVMResult<Type> {
-                    Self::apply_subst(ty, subst, count, depth + 1, check)
+                    self.apply_subst(ty, subst, count, depth + 1, check)
                 };
                 let args = args
                     .iter()
@@ -1816,7 +1849,7 @@ mod unit_tests {
     fn test_num_nodes_in_subst() {
         use Type::*;
 
-        let ty_builder = TypeBuilder::with_limits(11, 5);
+        let ty_builder = TypeBuilder::with_limits(11, 5, true);
         let cases: Vec<(Type, Vec<Type>, usize, usize)> = vec![
             (TyParam(0), vec![Bool], 1, 1),
             (TyParam(0), vec![Vector(TriompheArc::new(Bool))], 2, 2),
@@ -1851,7 +1884,7 @@ mod unit_tests {
     fn test_substitution_large_depth() {
         use Type::*;
 
-        let ty_builder = TypeBuilder::with_limits(11, 5);
+        let ty_builder = TypeBuilder::with_limits(11, 5, true);
 
         let ty = Vector(TriompheArc::new(Vector(TriompheArc::new(TyParam(0)))));
         let ty_arg = Vector(TriompheArc::new(Vector(TriompheArc::new(Bool))));
@@ -1866,7 +1899,7 @@ mod unit_tests {
     fn test_substitution_large_count() {
         use Type::*;
 
-        let ty_builder = TypeBuilder::with_limits(11, 5);
+        let ty_builder = TypeBuilder::with_limits(11, 5, true);
 
         let ty_params: Vec<Type> = (0..5).map(TyParam).collect();
         let ty = struct_instantiation_ty_for_test(ty_params);
@@ -1895,7 +1928,7 @@ mod unit_tests {
         use Type::*;
 
         // Limits are irrelevant here.
-        let ty_builder = TypeBuilder::with_limits(1, 1);
+        let ty_builder = TypeBuilder::with_limits(1, 1, true);
 
         assert_eq!(ty_builder.create_u8_ty(), U8);
         assert_eq!(ty_builder.create_u16_ty(), U16);
@@ -1912,7 +1945,8 @@ mod unit_tests {
         let ability_info = AbilityInfo::struct_(AbilitySet::EMPTY);
 
         // Limits are not relevant here.
-        let struct_ty = TypeBuilder::with_limits(1, 1).create_struct_ty(idx, ability_info.clone());
+        let struct_ty =
+            TypeBuilder::with_limits(1, 1, true).create_struct_ty(idx, ability_info.clone());
         assert_matches!(struct_ty, Type::Struct { .. });
     }
 
@@ -1924,7 +1958,7 @@ mod unit_tests {
         let ty_params = [TyParam(0), Bool, TyParam(1)];
 
         // Should succeed, type size limit is 5, and we have 5 nodes.
-        let ty_builder = TypeBuilder::with_limits(5, 100);
+        let ty_builder = TypeBuilder::with_limits(5, 100, true);
         let ty_args = [Bool, Vector(TriompheArc::new(Bool))];
         assert_ok!(ty_builder.create_struct_instantiation_ty(&struct_ty, &ty_params, &ty_args));
 
@@ -1941,7 +1975,7 @@ mod unit_tests {
         // Should succeed, type depth limit is 4, and we have 4 nodes (3 in type parameter + struct).
         let nested_vec = Vector(TriompheArc::new(Vector(TriompheArc::new(Bool))));
         let ty_args = vec![Bool, nested_vec.clone()];
-        let ty_builder = TypeBuilder::with_limits(100, 4);
+        let ty_builder = TypeBuilder::with_limits(100, 4, true);
         assert_ok!(ty_builder.create_struct_instantiation_ty(&struct_ty, &ty_params, &ty_args));
 
         // Should fail, we have depth of 5 now.
@@ -1955,7 +1989,7 @@ mod unit_tests {
     #[test]
     fn test_create_vec_ty() {
         let max_ty_depth = 5;
-        let ty_builder = TypeBuilder::with_limits(100, max_ty_depth);
+        let ty_builder = TypeBuilder::with_limits(100, max_ty_depth, true);
 
         let mut depth = 1;
         let mut ty = Type::Bool;
@@ -1974,55 +2008,53 @@ mod unit_tests {
         // a type builder with smaller than depth size limit must return a different
         // error code.
         let max_ty_size = 5;
-        let ty_builder = TypeBuilder::with_limits(max_ty_size, 100);
+        let ty_builder = TypeBuilder::with_limits(max_ty_size, 100, true);
         let err = assert_err!(ty_builder.create_vec_ty(&ty));
         assert_eq!(err.major_status(), StatusCode::TOO_MANY_TYPE_NODES);
     }
 
     #[test]
     fn test_create_ref_ty() {
-        let max_ty_depth = 5;
-        let ty_builder = TypeBuilder::with_limits(100, max_ty_depth);
+        let limit = 5;
+
+        let ty_builder = TypeBuilder::with_limits(100, limit, true);
 
         let mut depth = 1;
         let mut ty = Type::Bool;
-        while depth < max_ty_depth {
-            ty = assert_ok!(ty_builder.create_ref_ty(&ty, false));
-            assert_matches!(ty, Type::Reference(_));
+        while depth < limit {
+            ty = assert_ok!(ty_builder.create_vec_ty(&ty));
             depth += 1;
         }
-        assert_eq!(depth, max_ty_depth);
 
-        let err = assert_err!(ty_builder.create_ref_ty(&ty, false));
-        assert_eq!(err.major_status(), StatusCode::VM_MAX_TYPE_DEPTH_REACHED);
+        let ref_ty = assert_ok!(ty_builder.create_ref_ty(&ty, false));
+        assert_matches!(ref_ty, Type::Reference(_));
 
-        let max_ty_size = 5;
-        let ty_builder = TypeBuilder::with_limits(max_ty_size, 100);
-        let err = assert_err!(ty_builder.create_ref_ty(&ty, false));
-        assert_eq!(err.major_status(), StatusCode::TOO_MANY_TYPE_NODES);
+        let ty_builder = TypeBuilder::with_limits(limit, 100, true);
+
+        let ref_ty = assert_ok!(ty_builder.create_ref_ty(&ty, false));
+        assert_matches!(ref_ty, Type::Reference(_));
     }
 
     #[test]
     fn test_create_mut_ref_ty() {
-        let max_ty_depth = 5;
-        let ty_builder = TypeBuilder::with_limits(100, max_ty_depth);
+        let limit = 5;
+
+        let ty_builder = TypeBuilder::with_limits(100, limit, true);
 
         let mut depth = 1;
         let mut ty = Type::Bool;
-        while depth < max_ty_depth {
-            ty = assert_ok!(ty_builder.create_ref_ty(&ty, true));
-            assert_matches!(ty, Type::MutableReference(_));
+        while depth < limit {
+            ty = assert_ok!(ty_builder.create_vec_ty(&ty));
             depth += 1;
         }
-        assert_eq!(depth, max_ty_depth);
 
-        let err = assert_err!(ty_builder.create_ref_ty(&ty, true));
-        assert_eq!(err.major_status(), StatusCode::VM_MAX_TYPE_DEPTH_REACHED);
+        let ref_ty = assert_ok!(ty_builder.create_ref_ty(&ty, true));
+        assert_matches!(ref_ty, Type::MutableReference(_));
 
-        let max_ty_size = 5;
-        let ty_builder = TypeBuilder::with_limits(max_ty_size, 100);
-        let err = assert_err!(ty_builder.create_ref_ty(&ty, true));
-        assert_eq!(err.major_status(), StatusCode::TOO_MANY_TYPE_NODES);
+        let ty_builder = TypeBuilder::with_limits(limit, 100, true);
+
+        let ref_ty = assert_ok!(ty_builder.create_ref_ty(&ty, true));
+        assert_matches!(ref_ty, Type::MutableReference(_));
     }
 
     #[test]
@@ -2031,7 +2063,7 @@ mod unit_tests {
         use Type::*;
 
         let max_ty_depth = 5;
-        let ty_builder = TypeBuilder::with_limits(100, max_ty_depth);
+        let ty_builder = TypeBuilder::with_limits(100, max_ty_depth, true);
 
         assert_eq!(assert_ok!(ty_builder.create_constant_ty(&S::U8)), U8);
         assert_eq!(assert_ok!(ty_builder.create_constant_ty(&S::U16)), U16);
@@ -2065,7 +2097,7 @@ mod unit_tests {
         assert_eq!(err.major_status(), StatusCode::VM_MAX_TYPE_DEPTH_REACHED);
 
         let max_ty_size = 5;
-        let ty_builder = TypeBuilder::with_limits(max_ty_size, 100);
+        let ty_builder = TypeBuilder::with_limits(max_ty_size, 100, true);
 
         for size in [max_ty_size - 1, max_ty_size] {
             let (expected_ty, vec_tok, _) = nested_vec_for_test(size);
@@ -2104,7 +2136,7 @@ mod unit_tests {
 
         let max_ty_size = 11;
         let max_ty_depth = 5;
-        let ty_builder = TypeBuilder::with_limits(max_ty_size, max_ty_depth);
+        let ty_builder = TypeBuilder::with_limits(max_ty_size, max_ty_depth, true);
 
         let no_op = |_: &StructTag| unreachable!("Should not be called");
 
@@ -2136,7 +2168,7 @@ mod unit_tests {
         assert_eq!(err.major_status(), StatusCode::VM_MAX_TYPE_DEPTH_REACHED);
 
         let max_ty_size = 5;
-        let ty_builder = TypeBuilder::with_limits(max_ty_size, 100);
+        let ty_builder = TypeBuilder::with_limits(max_ty_size, 100, true);
 
         for size in [max_ty_size - 1, max_ty_size] {
             let (expected_ty, _, vec_tag) = nested_vec_for_test(size);

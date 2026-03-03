@@ -139,6 +139,42 @@ fn verify_pack<'a>(
     operand_stack.push_ty(output_ty)
 }
 
+pub(crate) fn check_function_type_count_and_depth(
+    ty_builder: &TypeBuilder,
+    func: &LoadedFunction,
+    mask: ClosureMask,
+) -> PartialVMResult<()> {
+    // Creates function type which implicitly performs count and depth checks via the TypeBuilder,
+    // and then throws away the created type. The TypeBuilder enforces size and depth limits during
+    // type construction, so any violations will be caught and returned as errors.
+    // Abilities are not important for the depth / size checks.
+    create_function_type(ty_builder, func, mask, AbilitySet::PUBLIC_FUNCTIONS)?;
+    Ok(())
+}
+
+pub(crate) fn create_function_type(
+    ty_builder: &TypeBuilder,
+    func: &LoadedFunction,
+    mask: ClosureMask,
+    abilities: AbilitySet,
+) -> PartialVMResult<Type> {
+    let args = mask
+        .extract(func.param_tys(), false)
+        .into_iter()
+        .map(|curried| with_owned_instantiation(ty_builder, func, curried, Ok))
+        .collect::<PartialVMResult<Vec<_>>>()?;
+    let results = func
+        .return_tys()
+        .iter()
+        .map(|ret| with_owned_instantiation(ty_builder, func, ret, Ok))
+        .collect::<PartialVMResult<Vec<_>>>()?;
+    Ok(Type::Function {
+        args,
+        results,
+        abilities,
+    })
+}
+
 pub fn verify_pack_closure(
     ty_builder: &TypeBuilder,
     operand_stack: &mut Stack,
@@ -168,21 +204,7 @@ pub fn verify_pack_closure(
         })?
     }
     // Push result type onto stack
-    let args = mask
-        .extract(func.param_tys(), false)
-        .into_iter()
-        .map(|curried| with_owned_instantiation(ty_builder, func, curried, Ok))
-        .collect::<PartialVMResult<Vec<_>>>()?;
-    let results = func
-        .return_tys()
-        .iter()
-        .map(|ret| with_owned_instantiation(ty_builder, func, ret, Ok))
-        .collect::<PartialVMResult<Vec<_>>>()?;
-    operand_stack.push_ty(Type::Function {
-        args,
-        results,
-        abilities,
-    })?;
+    operand_stack.push_ty(create_function_type(ty_builder, func, mask, abilities)?)?;
 
     Ok(())
 }
@@ -274,7 +296,7 @@ impl RuntimeTypeCheck for FullRuntimeTypeCheck {
                 // top of the stack. The argument types are checked when the frame
                 // is constructed in the interpreter, using the same code as for regular
                 // calls.
-                let (expected_ty, _) = ty_cache.get_signature_index_type(*sig_idx, frame)?;
+                let (expected_ty, _, _) = ty_cache.get_signature_index_type(*sig_idx, frame)?;
                 let given_ty = operand_stack.pop_ty()?;
                 given_ty.paranoid_check_assignable(expected_ty)?;
             },
@@ -865,7 +887,7 @@ impl RuntimeTypeCheck for FullRuntimeTypeCheck {
                 // operand_stack.push_ty(bool_ty)?;
             },
             Instruction::VecPack(si, num) => {
-                let (ty, _) = ty_cache.get_signature_index_type(*si, frame)?;
+                let (ty, _, _) = ty_cache.get_signature_index_type(*si, frame)?;
                 let elem_tys = operand_stack.popn_tys(*num as u16)?;
                 for elem_ty in elem_tys.iter() {
                     // For vector element types, use assignability
@@ -876,7 +898,7 @@ impl RuntimeTypeCheck for FullRuntimeTypeCheck {
                 operand_stack.push_ty(vec_ty)?;
             },
             Instruction::VecLen(si) => {
-                let (ty, _) = ty_cache.get_signature_index_type(*si, frame)?;
+                let (ty, _, _) = ty_cache.get_signature_index_type(*si, frame)?;
                 operand_stack
                     .pop_ty()?
                     .paranoid_check_is_vec_ref_ty::<false>(ty)?;
@@ -885,7 +907,7 @@ impl RuntimeTypeCheck for FullRuntimeTypeCheck {
                 operand_stack.push_ty(u64_ty)?;
             },
             Instruction::VecImmBorrow(si) => {
-                let (ty, _) = ty_cache.get_signature_index_type(*si, frame)?;
+                let (ty, _, _) = ty_cache.get_signature_index_type(*si, frame)?;
                 operand_stack.pop_ty()?.paranoid_check_is_u64_ty()?;
                 let elem_ref_ty = operand_stack
                     .pop_ty()?
@@ -894,7 +916,7 @@ impl RuntimeTypeCheck for FullRuntimeTypeCheck {
                 operand_stack.push_ty(elem_ref_ty)?;
             },
             Instruction::VecMutBorrow(si) => {
-                let (ty, _) = ty_cache.get_signature_index_type(*si, frame)?;
+                let (ty, _, _) = ty_cache.get_signature_index_type(*si, frame)?;
                 operand_stack.pop_ty()?.paranoid_check_is_u64_ty()?;
                 let elem_ref_ty = operand_stack
                     .pop_ty()?
@@ -902,7 +924,7 @@ impl RuntimeTypeCheck for FullRuntimeTypeCheck {
                 operand_stack.push_ty(elem_ref_ty)?;
             },
             Instruction::VecPushBack(si) => {
-                let (ty, _) = ty_cache.get_signature_index_type(*si, frame)?;
+                let (ty, _, _) = ty_cache.get_signature_index_type(*si, frame)?;
                 // For pushing an element to a vector, use assignability
                 operand_stack.pop_ty()?.paranoid_check_assignable(ty)?;
                 operand_stack
@@ -910,14 +932,14 @@ impl RuntimeTypeCheck for FullRuntimeTypeCheck {
                     .paranoid_check_is_vec_ref_ty::<true>(ty)?;
             },
             Instruction::VecPopBack(si) => {
-                let (ty, _) = ty_cache.get_signature_index_type(*si, frame)?;
+                let (ty, _, _) = ty_cache.get_signature_index_type(*si, frame)?;
                 let elem_ty = operand_stack
                     .pop_ty()?
                     .paranoid_check_and_get_vec_elem_ty::<true>(ty)?;
                 operand_stack.push_ty(elem_ty)?;
             },
             Instruction::VecUnpack(si, num) => {
-                let (expected_elem_ty, _) = ty_cache.get_signature_index_type(*si, frame)?;
+                let (expected_elem_ty, _, _) = ty_cache.get_signature_index_type(*si, frame)?;
                 let vec_ty = operand_stack.pop_ty()?;
                 vec_ty.paranoid_check_is_vec_ty(expected_elem_ty)?;
                 for _ in 0..*num {
@@ -925,7 +947,7 @@ impl RuntimeTypeCheck for FullRuntimeTypeCheck {
                 }
             },
             Instruction::VecSwap(si) => {
-                let (ty, _) = ty_cache.get_signature_index_type(*si, frame)?;
+                let (ty, _, _) = ty_cache.get_signature_index_type(*si, frame)?;
                 operand_stack.pop_ty()?.paranoid_check_is_u64_ty()?;
                 operand_stack.pop_ty()?.paranoid_check_is_u64_ty()?;
                 operand_stack
