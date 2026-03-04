@@ -41,13 +41,15 @@ use aptos_types::{
 };
 use aptos_validator_transaction_pool::{TxnGuard, VTxnPoolState};
 use futures_channel::oneshot;
-use futures_util::{future::AbortHandle, future::Abortable, FutureExt, StreamExt};
+use futures_util::{
+    future::{AbortHandle, Abortable},
+    FutureExt, StreamExt,
+};
 use move_core_types::account_address::AccountAddress;
 use rand::{prelude::StdRng, thread_rng, SeedableRng};
 use std::{
     collections::{HashMap, HashSet},
-    fmt,
-    mem,
+    fmt, mem,
     sync::Arc,
     time::Duration,
 };

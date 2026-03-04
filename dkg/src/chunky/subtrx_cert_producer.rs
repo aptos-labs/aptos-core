@@ -16,8 +16,7 @@ use aptos_infallible::Mutex;
 use aptos_logger::info;
 use aptos_reliable_broadcast::{BroadcastStatus, ReliableBroadcast};
 use aptos_types::{
-    dkg::chunky_dkg::AggregatedSubtranscript,
-    epoch_state::EpochState,
+    dkg::chunky_dkg::AggregatedSubtranscript, epoch_state::EpochState,
     validator_verifier::VerifyError,
 };
 use futures::future::AbortHandle;
