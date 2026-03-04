@@ -1178,7 +1178,7 @@ fn load_attribute(
         ),
         CONSTANT_ACCESSOR => deserialize_function_attribute(
             bytecode_version,
-            VERSION_11,
+            VERSION_10,
             |_cursor| Ok(FunctionAttribute::ConstantAccessor),
             "const",
             err_msg,

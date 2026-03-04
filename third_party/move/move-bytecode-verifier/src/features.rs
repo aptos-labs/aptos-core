@@ -9,8 +9,8 @@ use move_binary_format::{
     binary_views::BinaryIndexedView,
     errors::{Location, PartialVMError, PartialVMResult, VMResult},
     file_format::{
-        Bytecode, CompiledModule, CompiledScript, FieldDefinition, SignatureToken,
-        StructFieldInformation, TableIndex,
+        Bytecode, CompiledModule, CompiledScript, FieldDefinition, FunctionAttribute,
+        SignatureToken, StructFieldInformation, TableIndex,
     },
     IndexKind,
 };
@@ -106,19 +106,29 @@ impl<'a> FeatureVerifier<'a> {
     }
 
     fn verify_function_handles(&self) -> PartialVMResult<()> {
-        if !self.config.enable_resource_access_control || !self.config.enable_function_values {
+        let check_rac = !self.config.enable_resource_access_control;
+        let check_fv = !self.config.enable_function_values;
+        let check_const = !self.config.enable_public_const;
+        if check_rac || check_fv || check_const {
             for (idx, function_handle) in self.code.function_handles().iter().enumerate() {
-                if !self.config.enable_resource_access_control
-                    && function_handle.access_specifiers.is_some()
-                {
+                if check_rac && function_handle.access_specifiers.is_some() {
                     return Err(PartialVMError::new(StatusCode::FEATURE_NOT_ENABLED)
                         .at_index(IndexKind::FunctionHandle, idx as u16)
                         .with_message("resource access control feature not enabled".to_string()));
                 }
-                if !self.config.enable_function_values && !function_handle.attributes.is_empty() {
+                if check_fv && !function_handle.attributes.is_empty() {
                     return Err(PartialVMError::new(StatusCode::FEATURE_NOT_ENABLED)
                         .at_index(IndexKind::FunctionDefinition, idx as u16)
                         .with_message("function value feature not enabled".to_string()));
+                }
+                if check_const
+                    && function_handle
+                        .attributes
+                        .contains(&FunctionAttribute::ConstantAccessor)
+                {
+                    return Err(PartialVMError::new(StatusCode::FEATURE_NOT_ENABLED)
+                        .at_index(IndexKind::FunctionHandle, idx as u16)
+                        .with_message("public const feature not enabled".to_string()));
                 }
             }
         }

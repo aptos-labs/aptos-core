@@ -162,6 +162,7 @@ pub fn aptos_prod_verifier_config(
     let enable_resource_access_control =
         features.is_enabled(FeatureFlag::ENABLE_RESOURCE_ACCESS_CONTROL);
     let enable_function_values = features.is_enabled(FeatureFlag::ENABLE_FUNCTION_VALUES);
+    let enable_public_const = features.is_enabled(FeatureFlag::ENABLE_PUBLIC_CONST);
     // Note: we reuse the `enable_function_values` flag to set various stricter limits on types.
 
     let strict_bounds = timed_features.is_enabled(TimedFeatureFlag::EnableStrictBoundsInProdConfig);
@@ -211,6 +212,7 @@ pub fn aptos_prod_verifier_config(
         enable_enum_types,
         enable_resource_access_control,
         enable_function_values,
+        enable_public_const,
         max_function_return_values: if enable_function_values {
             Some(128)
         } else {
