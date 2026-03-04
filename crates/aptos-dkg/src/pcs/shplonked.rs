@@ -51,7 +51,6 @@ use ark_poly::{
 };
 use ark_serialize::{CanonicalDeserialize, CanonicalSerialize};
 use rand::{CryptoRng, RngCore};
-use std::time::{Duration, Instant};
 
 /// Domain separation tag for the Shplonked opening sigma protocol (Fiat–Shamir context).
 pub const SHPLONKED_SIGMA_DST: &[u8; 19] = b"Shplonked_Sigma_Dst";
