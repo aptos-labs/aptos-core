@@ -24,6 +24,7 @@
 /aptos-move/aptos-release-builder/src/simulate.rs @vgao1996
 /aptos-move/aptos-transaction-simulation/ @vgao1996
 /aptos-move/aptos-transaction-simulation-session/ @vgao1996
+/aptos-move/aptos-workspace-server/ @vgao1996
 /aptos-move/cli/src/local_simulation.rs @vgao1996
 /aptos-move/cli/src/sim.rs @vgao1996
 
@@ -41,7 +42,6 @@
 # Owner for aptos-token, cryptography natives, parallel-executor and vm-genesis.
 /aptos-move/framework/src/natives/cryptography/ @alinush @zjma
 /aptos-move/framework/src/natives/aggregator_natives/ @georgemitenkov @gelash @zekun000
-/aptos-move/aptos-workspace-server/ @vgao1996
 /aptos-move/block-executor/ @gelash @zekun000 @sasha8 @danielxiangzl
 /aptos-move/sharded_block-executor/ @sitalkedia
 /aptos-move/mvhashmap/ @gelash @runtian-zhou @sasha8 @danielxiangzl
