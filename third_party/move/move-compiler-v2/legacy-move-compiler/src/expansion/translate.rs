@@ -3189,6 +3189,11 @@ fn bind(context: &mut Context, sp!(loc, pb_): P::Bind) -> Option<E::LValue> {
                 .collect();
             EL::PositionalUnpack(tn, tys_opt, Spanned::new(loc, fields?))
         },
+        PB::Literal(pval) => {
+            // Translate literal value patterns (for primitive pattern matching)
+            let eval = value(context, pval)?;
+            EL::Literal(eval)
+        },
     };
     Some(sp(loc, b_))
 }
@@ -3575,6 +3580,9 @@ fn unbound_names_bind(unbound: &mut UnboundNames, sp!(_, l_): &E::LValue) {
                 .collect();
             unbound_names_binds(unbound, &sp(loc, ls))
         },
+        EL::Literal(_) => {
+            // Literals don't bind any variables
+        },
     }
 }
 
@@ -3610,6 +3618,9 @@ fn unbound_names_assign(unbound: &mut UnboundNames, sp!(_, l_): &E::LValue) {
                 })
                 .collect();
             unbound_names_assigns(unbound, &sp(loc, ls))
+        },
+        EL::Literal(_) => {
+            // Literals don't have variables to assign
         },
     }
 }

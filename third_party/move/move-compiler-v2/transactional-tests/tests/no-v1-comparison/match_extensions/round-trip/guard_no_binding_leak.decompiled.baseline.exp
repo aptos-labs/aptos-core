@@ -1,0 +1,21 @@
+processed 7 tasks
+task 0 lines 3-29:  publish [module 0xc0ffee::m {]
+warning: Unused value of parameter `p0`. Consider removing the parameter, or prefixing with an underscore (e.g., `_p0`), or binding to `_`
+   ┌─ TEMPFILE:20:33
+   │
+20 │     public fun scalar_catch_all(p0: u8, p1: u8): u8 {
+   │                                 ^^
+
+
+task 1 lines 32-32:  run 0xc0ffee::m::scalar_catch_all --args 1u8 2u8
+return values: 2
+task 2 lines 34-34:  run 0xc0ffee::m::scalar_catch_all --args 5u8 10u8
+return values: 10
+task 3 lines 36-36:  run 0xc0ffee::m::tuple_with_vars --args 10u64 20u64
+return values: 20
+task 4 lines 38-38:  run 0xc0ffee::m::tuple_with_vars --args 99u64 1u64
+return values: 1
+task 5 lines 40-40:  run 0xc0ffee::m::chained_guards --args 10u64 42u64
+return values: 42
+task 6 lines 42-42:  run 0xc0ffee::m::chained_guards --args 2000u64 42u64
+return values: 2000

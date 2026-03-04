@@ -1,0 +1,55 @@
+
+Diagnostics:
+error: match not exhaustive
+   ┌─ tests/match-checks/match_coverage_algorithm_comparison.move:39:16
+   │
+39 │         match ((a, b)) {
+   │                ^^^^^^
+   │
+   = missing `(true,false)`
+   = missing `(false,_)`
+
+error: match not exhaustive
+   ┌─ tests/match-checks/match_coverage_algorithm_comparison.move:65:16
+   │
+65 │         match ((a, b, c)) {
+   │                ^^^^^^^^^
+   │
+   = missing `(true,true,false)`
+   = missing `(true,false,_)`
+   = missing `(false,_,_)`
+
+error: match not exhaustive
+   ┌─ tests/match-checks/match_coverage_algorithm_comparison.move:89:16
+   │
+89 │         match ((c, b)) {
+   │                ^^^^^^
+   │
+   = missing `(Color::Red,false)`
+   = missing `(Color::Green,false)`
+   = missing `(Color::Blue,_)`
+
+error: match not exhaustive
+    ┌─ tests/match-checks/match_coverage_algorithm_comparison.move:103:16
+    │
+103 │         match ((c1, b1, c2, b2)) {
+    │                ^^^^^^^^^^^^^^^^
+    │
+    = missing `(Color::Red,true,Color::Red,false)`
+    = missing `(Color::Red,true,Color::Green,_)`
+    = missing `(Color::Red,false,_,_)`
+    = missing `(Color::Green,_,_,_)`
+
+error: unreachable pattern
+    ┌─ tests/match-checks/match_coverage_algorithm_comparison.move:117:13
+    │
+117 │             _ => 4,  // unreachable: all variants already covered
+    │             ^
+
+error: match not exhaustive
+    ┌─ tests/match-checks/match_coverage_algorithm_comparison.move:126:16
+    │
+126 │         match (x) {
+    │                ^
+    │
+    = missing `_`

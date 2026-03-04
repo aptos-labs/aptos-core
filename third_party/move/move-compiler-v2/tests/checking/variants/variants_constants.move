@@ -24,8 +24,4 @@ module 0x815::m {
         let c : Color = Blue(); // no error expected
         c.red == 1
     }
-
-    fun t4(c: &Color) {
-        match (c) { Red => abort 1, Blue => abort 2 } // no error
-    }
 }

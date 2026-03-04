@@ -1,0 +1,9 @@
+
+Diagnostics:
+error: match not exhaustive
+  ┌─ tests/match-checks/bytestring_non_exhaustive.move:4:16
+  │
+4 │         match (v) {
+  │                ^
+  │
+  = missing `_`

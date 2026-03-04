@@ -1,0 +1,9 @@
+
+Diagnostics:
+error: match not exhaustive
+   ┌─ tests/match-checks/dotdot_non_exhaustive.move:11:16
+   │
+11 │         match (x) {
+   │                ^
+   │
+   = missing `E1::C{..}`

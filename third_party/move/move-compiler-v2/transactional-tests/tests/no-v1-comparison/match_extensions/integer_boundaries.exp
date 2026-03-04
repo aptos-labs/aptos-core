@@ -1,0 +1,20 @@
+processed 10 tasks
+task 0 lines 1-29:  publish [module 0xc0ffee::m {]
+task 1 lines 31-31:  run 0xc0ffee::m::test_u8_max --args 255u8
+return values: 1
+task 2 lines 33-33:  run 0xc0ffee::m::test_u8_max --args 0u8
+return values: 0
+task 3 lines 35-35:  run 0xc0ffee::m::test_u8_max --args 100u8
+return values: 2
+task 4 lines 37-37:  run 0xc0ffee::m::test_u64_boundaries --args 0u64
+return values: 0
+task 5 lines 39-39:  run 0xc0ffee::m::test_u64_boundaries --args 18446744073709551615u64
+return values: 1
+task 6 lines 41-41:  run 0xc0ffee::m::test_u64_boundaries --args 1000u64
+return values: 2
+task 7 lines 43-43:  run 0xc0ffee::m::test_u128_max --args 0u128
+return values: 0
+task 8 lines 45-45:  run 0xc0ffee::m::test_u128_max --args 1u128
+return values: 1
+task 9 lines 47-47:  run 0xc0ffee::m::test_u128_max --args 1000u128
+return values: 2
