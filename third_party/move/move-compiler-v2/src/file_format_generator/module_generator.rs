@@ -1561,9 +1561,7 @@ impl ModuleGenerator {
             attributes: vec![FF::FunctionAttribute::ConstantAccessor],
         };
         self.module.function_handles.push(handle);
-        self.struct_api_index
-            .const_to_accessor_idx
-            .insert(qid, idx);
+        self.struct_api_index.const_to_accessor_idx.insert(qid, idx);
         idx
     }
 

@@ -17,8 +17,7 @@ use crate::{
     },
     metadata::{
         lang_feature_versions::{
-            LANGUAGE_VERSION_FOR_PUBLIC_CONST, LANGUAGE_VERSION_FOR_RAC,
-            LANGUAGE_VERSION_FOR_SINT,
+            LANGUAGE_VERSION_FOR_PUBLIC_CONST, LANGUAGE_VERSION_FOR_RAC, LANGUAGE_VERSION_FOR_SINT,
         },
         LanguageVersion,
     },
@@ -4017,11 +4016,8 @@ impl ExpTranslator<'_, '_, '_> {
                     Visibility::Public => true,
                     Visibility::Friend => {
                         // Allow if the calling module is a declared friend of the defining module.
-                        if let Some(defining_module) = self
-                            .parent
-                            .parent
-                            .env
-                            .find_module(&sym.module_name)
+                        if let Some(defining_module) =
+                            self.parent.parent.env.find_module(&sym.module_name)
                         {
                             let caller_id = self.parent.module_id;
                             defining_module.get_friend_modules().contains(&caller_id)

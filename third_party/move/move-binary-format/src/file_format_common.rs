@@ -587,6 +587,10 @@ pub const VERSION_DEFAULT_LANG_V2_4: u32 = VERSION_10;
 /// temporarily set to VERSION_10
 pub const VERSION_DEFAULT_LANG_V2_5: u32 = VERSION_10;
 
+/// Mark which version is the default version if compiling with language version 2.6
+/// temporarily set to VERSION_10
+pub const VERSION_DEFAULT_LANG_V2_6: u32 = VERSION_10;
+
 pub(crate) mod versioned_data {
     use crate::{errors::*, file_format_common::*};
     use move_core_types::vm_status::StatusCode;

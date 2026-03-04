@@ -1,0 +1,7 @@
+//# publish --print-bytecode
+module 0x66::test_const_wrong_body
+
+// Invalid: body is not LdConst + Ret — uses ld_u64 (a literal push) instead of ld_const
+#[const] public fun const$MY_U64(): u64
+    ld_u64 42
+    ret

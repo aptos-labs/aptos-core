@@ -1738,8 +1738,11 @@ pub fn check_const_accessor_impl(
         .filter(|a| matches!(a, FunctionAttribute::ConstantAccessor))
         .count();
     if attr_count > 1 {
-        return Err(PartialVMError::new(StatusCode::INVALID_STRUCT_API_CODE)
-            .with_message("function has multiple ConstantAccessor attributes; at most one is allowed"));
+        return Err(
+            PartialVMError::new(StatusCode::INVALID_STRUCT_API_CODE).with_message(
+                "function has multiple ConstantAccessor attributes; at most one is allowed",
+            ),
+        );
     }
 
     // Phase 2: implementation invariants.
@@ -1780,9 +1783,11 @@ fn validate_const_accessor_body(
     declared_return_type: &SignatureToken,
 ) -> PartialVMResult<()> {
     if code.code.len() != 2 {
-        return Err(PartialVMError::new(StatusCode::INVALID_STRUCT_API_CODE).with_message(
-            "const accessor function body must contain exactly 2 instructions: LdConst and Ret",
-        ));
+        return Err(
+            PartialVMError::new(StatusCode::INVALID_STRUCT_API_CODE).with_message(
+                "const accessor function body must contain exactly 2 instructions: LdConst and Ret",
+            ),
+        );
     }
 
     // Last instruction must be Ret.
@@ -1795,9 +1800,8 @@ fn validate_const_accessor_body(
     let const_idx = match &code.code[0] {
         Bytecode::LdConst(idx) => *idx,
         _ => {
-            return Err(PartialVMError::new(StatusCode::INVALID_STRUCT_API_CODE).with_message(
-                "const accessor function body must begin with LdConst",
-            ));
+            return Err(PartialVMError::new(StatusCode::INVALID_STRUCT_API_CODE)
+                .with_message("const accessor function body must begin with LdConst"));
         },
     };
 

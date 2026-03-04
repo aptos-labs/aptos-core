@@ -1,10 +1,22 @@
-error: failed to parse manifest
-  |
-1 | [package]
-2 | name = "some_package_name"
-3 | version = "0.1.2"
-4 |
-5 | [build]
-6 | language_version = "2.6"
-  |                    ^^^^^ unrecognized language version "2.6" (supported versions: "1", "2", "2.0-2.5")
-  |
+success
+
+PackageManifest {
+    package: PackageMetadata {
+        name: "some_package_name",
+        version: "0.1.2",
+        authors: [],
+        license: None,
+        upgrade_policy: None,
+    },
+    addresses: {},
+    dev_addresses: {},
+    build: Some(
+        BuildOptions {
+            language_version: Some(
+                V2_6,
+            ),
+        },
+    ),
+    dependencies: {},
+    dev_dependencies: {},
+}

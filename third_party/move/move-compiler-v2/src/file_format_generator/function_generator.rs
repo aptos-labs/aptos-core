@@ -2362,9 +2362,7 @@ pub(crate) fn model_value_to_const(val: &Value, ty: &Type) -> Constant {
             Type::Primitive(PrimitiveType::U16) => Constant::U16(n.to_u16().unwrap_or_default()),
             Type::Primitive(PrimitiveType::U32) => Constant::U32(n.to_u32().unwrap_or_default()),
             Type::Primitive(PrimitiveType::U64) => Constant::U64(n.to_u64().unwrap_or_default()),
-            Type::Primitive(PrimitiveType::U128) => {
-                Constant::U128(n.to_u128().unwrap_or_default())
-            },
+            Type::Primitive(PrimitiveType::U128) => Constant::U128(n.to_u128().unwrap_or_default()),
             Type::Primitive(PrimitiveType::U256) => {
                 let bytes = n.to_bytes_le().1;
                 let mut arr = [0u8; 32];
@@ -2375,9 +2373,7 @@ pub(crate) fn model_value_to_const(val: &Value, ty: &Type) -> Constant {
             Type::Primitive(PrimitiveType::I16) => Constant::I16(n.to_i16().unwrap_or_default()),
             Type::Primitive(PrimitiveType::I32) => Constant::I32(n.to_i32().unwrap_or_default()),
             Type::Primitive(PrimitiveType::I64) => Constant::I64(n.to_i64().unwrap_or_default()),
-            Type::Primitive(PrimitiveType::I128) => {
-                Constant::I128(n.to_i128().unwrap_or_default())
-            },
+            Type::Primitive(PrimitiveType::I128) => Constant::I128(n.to_i128().unwrap_or_default()),
             Type::Primitive(PrimitiveType::I256) => {
                 let (sign, bytes) = n.to_bytes_le();
                 let mut arr = [0u8; 32];
