@@ -51,10 +51,6 @@ use ark_poly::{
 };
 use ark_serialize::{CanonicalDeserialize, CanonicalSerialize};
 use rand::{CryptoRng, RngCore};
-#[cfg(any(
-    feature = "pcs_verify_timing",
-    feature = "range_proof_timing_multivariate"
-))]
 use std::time::{Duration, Instant};
 
 /// Domain separation tag for the Shplonked opening sigma protocol (Fiat–Shamir context).
