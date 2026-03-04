@@ -319,3 +319,192 @@ impl SecretShareStore {
             .filter(|share| &share.metadata == metadata))
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::rand::secret_sharing::test_utils::{
+        create_metadata, create_secret_share, TestContext,
+    };
+    use aptos_types::secret_sharing::SecretSharedKey;
+    use futures_channel::mpsc::{unbounded, UnboundedReceiver};
+
+    fn make_store(ctx: &TestContext) -> (SecretShareStore, UnboundedReceiver<SecretSharedKey>) {
+        let (tx, rx) = unbounded();
+        let store = SecretShareStore::new(
+            ctx.epoch,
+            ctx.authors[0],
+            ctx.secret_share_config.clone(),
+            tx,
+        );
+        (store, rx)
+    }
+
+    #[test]
+    fn test_store_update_highest_known_round() {
+        let ctx = TestContext::new(vec![1, 1, 1, 1]);
+        let (mut store, _rx) = make_store(&ctx);
+
+        assert_eq!(store.highest_known_round, 0);
+        store.update_highest_known_round(5);
+        assert_eq!(store.highest_known_round, 5);
+        // Should take max
+        store.update_highest_known_round(3);
+        assert_eq!(store.highest_known_round, 5);
+        store.update_highest_known_round(10);
+        assert_eq!(store.highest_known_round, 10);
+    }
+
+    #[test]
+    fn test_store_add_self_share_validation() {
+        let ctx = TestContext::new(vec![1, 1, 1, 1]);
+        let (mut store, _rx) = make_store(&ctx);
+        store.update_highest_known_round(10);
+
+        // Wrong epoch fails
+        let bad_epoch_meta = create_metadata(99, 5);
+        let share = create_secret_share(&ctx, 0, &bad_epoch_meta);
+        assert!(store.add_self_share(share).is_err());
+
+        // Round too far in future fails (> highest + 200)
+        let far_future_meta = create_metadata(ctx.epoch, 10 + FUTURE_ROUNDS_TO_ACCEPT + 1);
+        let share = create_secret_share(&ctx, 0, &far_future_meta);
+        assert!(store.add_self_share(share).is_err());
+
+        // Valid round succeeds
+        let valid_meta = create_metadata(ctx.epoch, 5);
+        let share = create_secret_share(&ctx, 0, &valid_meta);
+        assert!(store.add_self_share(share).is_ok());
+    }
+
+    #[test]
+    fn test_store_add_share_validation() {
+        let ctx = TestContext::new(vec![1, 1, 1, 1]);
+        let (mut store, _rx) = make_store(&ctx);
+        store.update_highest_known_round(10);
+
+        // Wrong epoch fails
+        let bad_epoch_meta = create_metadata(99, 5);
+        let share = create_secret_share(&ctx, 1, &bad_epoch_meta);
+        assert!(store.add_share(share).is_err());
+
+        // Future round fails
+        let far_future_meta = create_metadata(ctx.epoch, 10 + FUTURE_ROUNDS_TO_ACCEPT + 1);
+        let share = create_secret_share(&ctx, 1, &far_future_meta);
+        assert!(store.add_share(share).is_err());
+
+        // Valid share succeeds
+        let valid_meta = create_metadata(ctx.epoch, 5);
+        let share = create_secret_share(&ctx, 1, &valid_meta);
+        assert!(store.add_share(share).is_ok());
+    }
+
+    #[tokio::test]
+    async fn test_store_self_share_then_peer_shares() {
+        let ctx = TestContext::new(vec![1, 1, 1, 1]);
+        let (mut store, mut rx) = make_store(&ctx);
+        let round = 5;
+        store.update_highest_known_round(round);
+        let metadata = create_metadata(ctx.epoch, round);
+
+        // Add self share first -> PendingDecision
+        let self_share = create_secret_share(&ctx, 0, &metadata);
+        store.add_self_share(self_share).unwrap();
+
+        // Add peer shares until aggregation triggers
+        for i in 1..ctx.authors.len() {
+            let share = create_secret_share(&ctx, i, &metadata);
+            let decided = store.add_share(share).unwrap();
+            if decided {
+                break;
+            }
+        }
+
+        // Verify decision arrives on channel
+        use futures::StreamExt;
+        let key = tokio::time::timeout(std::time::Duration::from_secs(5), rx.next())
+            .await
+            .expect("Timed out waiting for decision")
+            .expect("Channel closed unexpectedly");
+        assert_eq!(key.metadata, metadata);
+    }
+
+    #[tokio::test]
+    async fn test_store_peer_shares_then_self_share() {
+        let ctx = TestContext::new(vec![1, 1, 1, 1]);
+        let (mut store, mut rx) = make_store(&ctx);
+        let round = 5;
+        store.update_highest_known_round(round);
+        let metadata = create_metadata(ctx.epoch, round);
+
+        // Add peer shares first (PendingMetadata accumulates)
+        for i in 1..ctx.authors.len() {
+            let share = create_secret_share(&ctx, i, &metadata);
+            store.add_share(share).unwrap();
+        }
+
+        // Add self share with metadata -> triggers transition + aggregation
+        let self_share = create_secret_share(&ctx, 0, &metadata);
+        store.add_self_share(self_share).unwrap();
+
+        // Verify decision arrives on channel
+        use futures::StreamExt;
+        let key = tokio::time::timeout(std::time::Duration::from_secs(5), rx.next())
+            .await
+            .expect("Timed out waiting for decision")
+            .expect("Channel closed unexpectedly");
+        assert_eq!(key.metadata, metadata);
+    }
+
+    #[test]
+    fn test_store_get_all_shares_authors() {
+        let ctx = TestContext::new(vec![1, 1, 1, 1]);
+        let (mut store, _rx) = make_store(&ctx);
+        let round = 5;
+        store.update_highest_known_round(round);
+        let metadata = create_metadata(ctx.epoch, round);
+
+        // Add self share
+        let self_share = create_secret_share(&ctx, 0, &metadata);
+        store.add_self_share(self_share).unwrap();
+
+        // Add one peer share
+        let peer_share = create_secret_share(&ctx, 1, &metadata);
+        store.add_share(peer_share).unwrap();
+
+        // Should return authors who have contributed shares
+        let authors = store.get_all_shares_authors(&metadata).unwrap();
+        assert!(authors.contains(&ctx.authors[0]));
+        assert!(authors.contains(&ctx.authors[1]));
+        assert_eq!(authors.len(), 2);
+    }
+
+    #[test]
+    fn test_store_get_self_share() {
+        let ctx = TestContext::new(vec![1, 1, 1, 1]);
+        let (mut store, _rx) = make_store(&ctx);
+        let round = 5;
+        store.update_highest_known_round(round);
+        let metadata = create_metadata(ctx.epoch, round);
+
+        // Future round errors
+        let future_meta = create_metadata(ctx.epoch, round + 1);
+        assert!(store.get_self_share(&future_meta).is_err());
+
+        // No share yet -> None
+        assert!(store.get_self_share(&metadata).unwrap().is_none());
+
+        // Add self share
+        let self_share = create_secret_share(&ctx, 0, &metadata);
+        store.add_self_share(self_share).unwrap();
+
+        // Matching metadata returns share
+        let retrieved = store.get_self_share(&metadata).unwrap();
+        assert!(retrieved.is_some());
+        assert_eq!(retrieved.unwrap().author, ctx.authors[0]);
+
+        // Mismatched metadata returns None
+        let other_meta = create_metadata(ctx.epoch, round);
+        assert!(store.get_self_share(&other_meta).unwrap().is_none());
+    }
+}

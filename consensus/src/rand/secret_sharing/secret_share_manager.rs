@@ -40,7 +40,7 @@ use futures_channel::{
     mpsc::{unbounded, UnboundedReceiver, UnboundedSender},
     oneshot,
 };
-use std::{collections::HashSet, future::Future, pin::Pin, sync::Arc, time::Duration};
+use std::{future::Future, pin::Pin, sync::Arc, time::Duration};
 use tokio_retry::strategy::ExponentialBackoff;
 
 pub type Sender<T> = UnboundedSender<T>;
@@ -128,13 +128,11 @@ impl SecretShareManager {
             "Processing incoming blocks."
         );
 
-        let pending_secret_key_rounds = HashSet::from_iter(rounds);
         for block in blocks.ordered_blocks.iter() {
             self.enqueue_self_derive(block)?;
         }
 
-        self.block_queue
-            .push_back(QueueItem::new(blocks, pending_secret_key_rounds));
+        self.block_queue.push_back(QueueItem::new(blocks));
         Ok(())
     }
 
