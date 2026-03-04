@@ -166,7 +166,28 @@ impl<NetworkSender: SubprotocolNetworkSender<StrongPrefixConsensusMsg>, T: Inner
     /// Notify SlotManager (if connected) that SPC committed v_high.
     fn send_output(&self, v_high: &PrefixVector) {
         if let Some(tx) = &self.output_tx {
-            let _ = tx.send((self.slot, v_high.clone()));
+            if let Err(e) = tx.send((self.slot, v_high.clone())) {
+                error!(
+                    party_id = %self.party_id,
+                    slot = self.slot,
+                    error = ?e,
+                    "Failed to send v_high to SlotManager — receiver dropped. \
+                     SPC completed but block will never be committed."
+                );
+            } else {
+                info!(
+                    party_id = %self.party_id,
+                    slot = self.slot,
+                    v_high_len = v_high.len(),
+                    "Sent v_high to SlotManager"
+                );
+            }
+        } else {
+            warn!(
+                party_id = %self.party_id,
+                slot = self.slot,
+                "No output_tx configured — SPC result will not reach SlotManager"
+            );
         }
     }
 
@@ -241,10 +262,23 @@ impl<NetworkSender: SubprotocolNetworkSender<StrongPrefixConsensusMsg>, T: Inner
                     if self.protocol.is_complete() {
                         info!(
                             party_id = %self.party_id,
-                            "Strong Prefix Consensus complete"
+                            slot = self.slot,
+                            current_view = self.current_view,
+                            "Strong Prefix Consensus complete — exiting event loop"
                         );
                         break;
                     }
+                }
+
+                else => {
+                    error!(
+                        party_id = %self.party_id,
+                        slot = self.slot,
+                        current_view = self.current_view,
+                        "SPC message channel closed — all senders dropped. \
+                         Protocol incomplete, exiting."
+                    );
+                    break;
                 }
             }
         }

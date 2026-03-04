@@ -370,8 +370,24 @@ impl<NS: SubprotocolNetworkSender<SlotConsensusMsg>, SP: SPCSpawner> SlotManager
                 } => {
                     self.slot_timer = timer_opt;
                     self.spc_output_rx = spc_rx_opt;
-                    if let Some((slot, v_high)) = output {
-                        self.on_spc_v_high(slot, v_high).await;
+                    match output {
+                        Some((slot, v_high)) => {
+                            info!(
+                                epoch = self.epoch,
+                                slot = slot,
+                                v_high_len = v_high.len(),
+                                "Received v_high from SPC task"
+                            );
+                            self.on_spc_v_high(slot, v_high).await;
+                        }
+                        None => {
+                            error!(
+                                epoch = self.epoch,
+                                current_slot = self.current_slot,
+                                "SPC output channel closed without producing v_high — \
+                                 SPC task may have exited prematurely"
+                            );
+                        }
                     }
                 }
 
@@ -547,6 +563,16 @@ impl<NS: SubprotocolNetworkSender<SlotConsensusMsg>, SP: SPCSpawner> SlotManager
             .expect("input_vector set by prepare_spc_input")
             .clone();
 
+        let non_bot_count = input_vector.iter().filter(|h| **h != HashValue::zero()).count();
+        info!(
+            epoch = self.epoch,
+            slot = slot,
+            input_len = input_vector.len(),
+            non_bot_entries = non_bot_count,
+            proposals_received = slot_state.proposal_buffer().proposal_count(),
+            "Spawning SPC task"
+        );
+
         let handles = self.spc_spawner.spawn_spc(
             slot,
             input_vector,
@@ -693,7 +719,14 @@ impl<NS: SubprotocolNetworkSender<SlotConsensusMsg>, SP: SPCSpawner> SlotManager
         );
         if let Some(tx) = pipelined.pipeline_tx().lock().as_mut() {
             if let Some(tx) = tx.order_proof_tx.take() {
-                let _ = tx.send(wrapped_li);
+                if tx.send(wrapped_li).is_err() {
+                    error!(
+                        epoch = self.epoch,
+                        slot = slot,
+                        "Failed to send order_proof — pipeline receiver dropped. \
+                         Block execution will stall."
+                    );
+                }
             }
         }
 
@@ -714,6 +747,15 @@ impl<NS: SubprotocolNetworkSender<SlotConsensusMsg>, SP: SPCSpawner> SlotManager
                 error = ?e,
                 "Failed to send OrderedBlocks to execution"
             );
+        } else {
+            info!(
+                epoch = self.epoch,
+                slot = slot,
+                block_id = %block_info.id(),
+                round = block_info.round(),
+                timestamp = block_info.timestamp_usecs(),
+                "Block sent to execution pipeline"
+            );
         }
 
         // Update parent tracking
@@ -729,6 +771,13 @@ impl<NS: SubprotocolNetworkSender<SlotConsensusMsg>, SP: SPCSpawner> SlotManager
         self.spc_close_tx.take();
         self.pending_commit = None;
         self.slot_states.remove(&slot);
+
+        info!(
+            epoch = self.epoch,
+            completed_slot = slot,
+            next_slot = slot + 1,
+            "Slot committed, advancing to next slot"
+        );
 
         // Advance to next slot
         self.start_new_slot(slot + 1).await;
@@ -750,7 +799,21 @@ impl<NS: SubprotocolNetworkSender<SlotConsensusMsg>, SP: SPCSpawner> SlotManager
             return;
         }
         if let Some(tx) = &mut self.spc_msg_tx {
-            let _ = tx.send((author, msg)).await;
+            if let Err(e) = tx.send((author, msg)).await {
+                error!(
+                    epoch = self.epoch,
+                    slot = slot,
+                    error = ?e,
+                    "Failed to send SPC message — SPC task receiver dropped. \
+                     SPC may be stalled."
+                );
+            }
+        } else {
+            debug!(
+                epoch = self.epoch,
+                slot = slot,
+                "No spc_msg_tx — SPC not running for this slot, dropping message"
+            );
         }
     }
 

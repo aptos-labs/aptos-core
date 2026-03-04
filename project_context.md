@@ -178,6 +178,45 @@ testsuite/smoke-test/src/consensus/
 
 ---
 
+## Forge Testing
+
+### Configuration
+- **Config flag**: `ConsensusConfig.enable_prefix_consensus: bool` (default: `false`)
+  - Defined in `config/src/config/consensus_config.rs:110-113`
+  - `#[serde(default)]` — backwards-compatible, absent means `false`
+- **EpochManager decision point**: `consensus/src/epoch_manager.rs:1346-1398`
+  - `enable_prefix_consensus == true` → SlotManager (prefix consensus)
+  - `is_dag_enabled()` → DAG
+  - else → Jolteon (default)
+- **Side effects when enabled**:
+  - QuorumStore auto-disabled → DirectMempool used (`epoch_manager.rs:1415-1421`)
+  - Epoch transitions use `ReconfigNotification` instead of `EpochChangeProof` (`epoch_manager.rs:2558`)
+
+### Running on Forge
+- **PR label**: `CICD:run-forge-e2e-perf` triggers the `realistic_env_max_load` test suite
+- **Workflow**: `.github/workflows/docker-build-test.yaml` → `FORGE_TEST_SUITE=realistic_env_max_load`
+- **Test definition**: `testsuite/forge-cli/src/suites/realistic_environment.rs:357-480`
+  - 7 validators, 5 fullnodes, MaxLoad traffic, epoch transitions
+- **Change made**: Added `.with_validator_override_node_config_fn()` to `realistic_env_max_load_test()` that sets `config.consensus.enable_prefix_consensus = true` on all validators
+- **PR**: aptos-labs/aptos-core#18922 (branch: `prefix-consensus-prototype`)
+
+### First Forge Run (2026-03-03)
+- **Result**: Failed (exit code 1, ~46 min runtime)
+- **GitHub Actions run**: https://github.com/aptos-labs/aptos-core/actions/runs/22640970493/job/65619849052
+- **Root cause**: TBD — logs need to be retrieved from Humio (`forge-e2e-pr-18922` namespace)
+- **Expected failure modes**:
+  1. Fullnode crash — consensus observer can't deserialize `PrefixConsensusBlock` (`#[serde(skip_deserializing)]`)
+  2. TPS criteria not met — test expects 10k+ TPS, DirectMempool won't reach that
+  3. Chain progress stall — `max_non_epoch_no_progress_secs: 15.0` may be too tight
+
+### Humio Log Access (pending)
+- Humio query namespace: `forge-e2e-pr-18922`
+- MCP server for Humio access: see `aptos-labs/internal-ops#6989` for setup instructions
+- Deploy command: `pnpm infra pulumi preview --stack aptoslabs/humio-mcp/prod`
+- Status: Not yet configured (`/mcp` shows no MCP servers)
+
+---
+
 ## TODO (Future Work)
 
 ### Multi-Slot (deferred from current plan)

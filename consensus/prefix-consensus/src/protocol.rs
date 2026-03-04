@@ -142,6 +142,8 @@ impl PrefixConsensusProtocol {
 
         info!(
             party_id = %self.input.party_id,
+            slot = self.input.slot,
+            view = self.input.view,
             input_len = self.input.input_vector.len(),
             "Starting Round 1"
         );
@@ -186,12 +188,14 @@ impl PrefixConsensusProtocol {
 
         info!(
             vote_count = vote_count,
+            slot = self.input.slot,
+            view = self.input.view,
             "Vote1 count updated"
         );
 
         // Check if we have quorum (>2/3 stake)
         if pending.has_quorum(&self.validator_verifier) {
-            info!("Quorum reached for Round 1, forming QC1");
+            info!(slot = self.input.slot, view = self.input.view, "Quorum reached for Round 1, forming QC1");
 
             // Form QC1 by consuming pending votes
             // Replace with new empty PendingVotes1 for potential future use
@@ -252,6 +256,8 @@ impl PrefixConsensusProtocol {
 
         info!(
             party_id = %self.input.party_id,
+            slot = self.input.slot,
+            view = self.input.view,
             certified_len = certified.len(),
             "Starting Round 2"
         );
@@ -293,12 +299,14 @@ impl PrefixConsensusProtocol {
 
         info!(
             vote_count = vote_count,
+            slot = self.input.slot,
+            view = self.input.view,
             "Vote2 count updated"
         );
 
         // Check if we have quorum (>2/3 stake)
         if pending.has_quorum(&self.validator_verifier) {
-            info!("Quorum reached for Round 2, forming QC2");
+            info!(slot = self.input.slot, view = self.input.view, "Quorum reached for Round 2, forming QC2");
 
             // Form QC2 by consuming pending votes
             // Replace with new empty PendingVotes2 for potential future use
@@ -359,6 +367,8 @@ impl PrefixConsensusProtocol {
 
         info!(
             party_id = %self.input.party_id,
+            slot = self.input.slot,
+            view = self.input.view,
             mcp_len = mcp.len(),
             "Starting Round 3"
         );
@@ -400,12 +410,14 @@ impl PrefixConsensusProtocol {
 
         info!(
             vote_count = vote_count,
+            slot = self.input.slot,
+            view = self.input.view,
             "Vote3 count updated"
         );
 
         // Check if we have quorum (>2/3 stake)
         if pending.has_quorum(&self.validator_verifier) {
-            info!("Quorum reached for Round 3, forming QC3 and computing output");
+            info!(slot = self.input.slot, view = self.input.view, "Quorum reached for Round 3, forming QC3 and computing output");
 
             // Form QC3 by consuming pending votes
             // Replace with new empty PendingVotes3 for potential future use
@@ -422,6 +434,8 @@ impl PrefixConsensusProtocol {
             let (v_low, v_high) = qc3_certify(&qc3);
 
             info!(
+                slot = self.input.slot,
+                view = self.input.view,
                 v_low_len = v_low.len(),
                 v_high_len = v_high.len(),
                 "Protocol complete, output computed"
