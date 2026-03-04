@@ -1,0 +1,39 @@
+// -- Model dump before first bytecode pipeline
+module 0x42::m {
+    struct S {
+        value: u64,
+    }
+    private inline fun apply<T>(s: &T,f: |&T|u64): u64 {
+        (f)(s)
+    }
+    private fun get_value(self: &S): u64 {
+        select m::S.value<&S>(self)
+    }
+    private fun test(s: &S): u64 {
+        {
+          let (s: &S): (&S) = Tuple(s);
+          {
+            let (x: &S): (&S) = Tuple(s);
+            Add<u64>(select m::S.value<&S>(x), m::get_value(x))
+          }
+        }
+    }
+} // end 0x42::m
+
+// -- Sourcified model before first bytecode pipeline
+module 0x42::m {
+    struct S {
+        value: u64,
+    }
+    inline fun apply<T>(s: &T, f: |&T|u64): u64 {
+        f(s)
+    }
+    fun get_value(self: &S): u64 {
+        self.value
+    }
+    fun test(s: &S): u64 {
+        let s = s;
+        let x = s;
+        x.value + get_value(x)
+    }
+}

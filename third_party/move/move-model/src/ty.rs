@@ -640,6 +640,10 @@ impl Constraint {
                 }
                 Ok(false)
             },
+            // SomeStruct and SomeReceiverFunction constrain orthogonal aspects of a type
+            // (field existence vs receiver function existence), so they can coexist.
+            (Constraint::SomeStruct(..), Constraint::SomeReceiverFunction(..))
+            | (Constraint::SomeReceiverFunction(..), Constraint::SomeStruct(..)) => Ok(false),
             // After the above checks, if one of the constraints is
             // accumulating, indicate its compatible but cannot be joined.
             (c1, c2) if c1.accumulating() || c2.accumulating() => Ok(false),
