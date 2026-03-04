@@ -130,8 +130,12 @@ impl TransferFunder {
         transaction_expiration_secs: u64,
         wait_for_transactions: bool,
     ) -> Self {
-        let gas_unit_price_manager =
-            GasUnitPriceManager::new(node_url.clone(), gas_unit_price_ttl_secs);
+        let gas_unit_price_manager = GasUnitPriceManager::new(
+            node_url.clone(),
+            gas_unit_price_ttl_secs,
+            node_api_key.clone(),
+            node_additional_headers.as_ref(),
+        );
 
         Self {
             faucet_account,

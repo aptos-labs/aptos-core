@@ -16,15 +16,9 @@ use aptos_jellyfish_merkle::{
 };
 use aptos_storage_interface::{DbReader, DbWriter, StateSnapshotReceiver};
 use aptos_temppath::TempPath;
-use aptos_types::{
-    account_address::AccountAddress,
-    account_config::{AccountResource, ChainIdResource, CoinInfoResource, CoinStoreResource},
-    nibble::nibble_path::NibblePath,
-    state_store::state_key::inner::StateKeyTag,
-    AptosCoinType,
-};
+use aptos_types::nibble::nibble_path::NibblePath;
 use proptest::{collection::hash_map, prelude::*};
-use std::collections::{BTreeMap, HashMap};
+use std::collections::BTreeMap;
 
 fn put_value_set(
     state_store: &StateStore,
@@ -121,104 +115,6 @@ fn test_state_store_reader_writer() {
     verify_value_and_proof(store, key1, Some(&value1_update), 1, root);
     verify_value_and_proof(store, key2, Some(&value2), 1, root);
     verify_value_and_proof(store, key3, Some(&value3), 1, root);
-}
-
-fn traverse_values(
-    store: &StateStore,
-    prefix: &StateKeyPrefix,
-    version: Version,
-) -> HashMap<StateKey, StateValue> {
-    let mut ret = HashMap::new();
-    let mut cursor = None;
-    loop {
-        let mut iter = store
-            .get_prefixed_state_value_iterator(prefix, cursor.as_ref(), version)
-            .unwrap();
-        if let Some((k, v)) = iter.next().transpose().unwrap() {
-            ret.insert(k, v);
-        }
-        cursor = iter.next().transpose().unwrap().map(|(k, _v)| k);
-        if cursor.is_none() {
-            return ret;
-        }
-    }
-}
-
-#[test]
-fn test_get_values_by_key_prefix() {
-    let tmp_dir = TempPath::new();
-    let db = AptosDB::new_for_test(&tmp_dir);
-    let store = &db.state_store;
-    let address = AccountAddress::new([12u8; AccountAddress::LENGTH]);
-
-    let key1 = StateKey::resource_typed::<AccountResource>(&address).unwrap();
-    let key2 = StateKey::resource_typed::<ChainIdResource>(&address).unwrap();
-
-    let value1_v0 = StateValue::from(String::from("value1_v0").into_bytes());
-    let value2_v0 = StateValue::from(String::from("value2_v0").into_bytes());
-
-    let account_key_prefix = StateKeyPrefix::new(StateKeyTag::AccessPath, address.to_vec());
-
-    put_value_set(
-        store,
-        vec![
-            (key1.clone(), value1_v0.clone()),
-            (key2.clone(), value2_v0.clone()),
-        ],
-        0,
-    );
-
-    let key_value_map = traverse_values(store, &account_key_prefix, 0);
-    assert_eq!(key_value_map.len(), 2);
-    assert_eq!(*key_value_map.get(&key1).unwrap(), value1_v0);
-    assert_eq!(*key_value_map.get(&key2).unwrap(), value2_v0);
-
-    let key4 = StateKey::resource_typed::<CoinInfoResource<AptosCoinType>>(&address).unwrap();
-
-    let value2_v1 = StateValue::from(String::from("value2_v1").into_bytes());
-    let value4_v1 = StateValue::from(String::from("value4_v1").into_bytes());
-
-    put_value_set(
-        store,
-        vec![
-            (key2.clone(), value2_v1.clone()),
-            (key4.clone(), value4_v1.clone()),
-        ],
-        1,
-    );
-
-    // Ensure that we still get only values for key1 and key2 for version 0 after the update
-    let key_value_map = traverse_values(store, &account_key_prefix, 0);
-    assert_eq!(key_value_map.len(), 2);
-    assert_eq!(*key_value_map.get(&key1).unwrap(), value1_v0);
-    assert_eq!(*key_value_map.get(&key2).unwrap(), value2_v0);
-
-    // Ensure that key value map for version 1 returns value for key1 at version 0.
-    let key_value_map = traverse_values(store, &account_key_prefix, 1);
-    assert_eq!(key_value_map.len(), 3);
-    assert_eq!(*key_value_map.get(&key1).unwrap(), value1_v0);
-    assert_eq!(*key_value_map.get(&key2).unwrap(), value2_v1);
-    assert_eq!(*key_value_map.get(&key4).unwrap(), value4_v1);
-
-    // Add values for one more account and verify the state
-    let address1 = AccountAddress::new([22u8; AccountAddress::LENGTH]);
-    let key5 = StateKey::resource_typed::<CoinStoreResource<AptosCoinType>>(&address1).unwrap();
-    let value5_v2 = StateValue::from(String::from("value5_v2").into_bytes());
-
-    let account1_key_prefix = StateKeyPrefix::new(StateKeyTag::AccessPath, address1.to_vec());
-
-    put_value_set(store, vec![(key5.clone(), value5_v2.clone())], 2);
-
-    // address1 did not exist in version 0 and 1.
-    let key_value_map = traverse_values(store, &account1_key_prefix, 0);
-    assert_eq!(key_value_map.len(), 0);
-
-    let key_value_map = traverse_values(store, &account1_key_prefix, 1);
-    assert_eq!(key_value_map.len(), 0);
-
-    let key_value_map = traverse_values(store, &account1_key_prefix, 2);
-    assert_eq!(key_value_map.len(), 1);
-    assert_eq!(*key_value_map.get(&key5).unwrap(), value5_v2);
 }
 
 #[test]

@@ -7,8 +7,6 @@ pub use crate::{
     aptos_framework_sdk_builder::*, aptos_token_objects_sdk_builder as aptos_token_objects_stdlib,
     aptos_token_sdk_builder as aptos_token_stdlib,
 };
-use aptos_framework::{BuildOptions, BuiltPackage};
-use aptos_package_builder::PackageBuilder;
 use aptos_types::{
     account_address::AccountAddress,
     transaction::{EntryFunction, TransactionPayload},
@@ -20,7 +18,11 @@ pub fn aptos_coin_transfer(to: AccountAddress, amount: u64) -> TransactionPayloa
     coin_transfer(AptosCoinType::type_tag(), to, amount)
 }
 
+#[cfg(feature = "testing")]
 pub fn publish_module_source(module_name: &str, module_src: &str) -> TransactionPayload {
+    use aptos_framework::{BuildOptions, BuiltPackage};
+    use aptos_package_builder::PackageBuilder;
+
     let mut builder = PackageBuilder::new("tmp");
     builder.add_source(module_name, module_src);
 

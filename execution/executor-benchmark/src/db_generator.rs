@@ -49,11 +49,7 @@ pub fn create_db_with_accounts<V>(
     // create if not exists
     fs::create_dir_all(db_dir.as_ref()).unwrap();
 
-    bootstrap_with_genesis(
-        &db_dir,
-        storage_test_config.enable_storage_sharding,
-        init_features.clone(),
-    );
+    bootstrap_with_genesis(&db_dir, init_features.clone());
 
     println!(
         "Finished empty DB creation, DB dir: {}. Creating accounts now...",
@@ -74,11 +70,7 @@ pub fn create_db_with_accounts<V>(
     );
 }
 
-pub(crate) fn bootstrap_with_genesis(
-    db_dir: impl AsRef<Path>,
-    enable_storage_sharding: bool,
-    init_features: Features,
-) {
+pub(crate) fn bootstrap_with_genesis(db_dir: impl AsRef<Path>, init_features: Features) {
     let (config, _genesis_key) =
         aptos_genesis::test_utils::test_config_with_custom_onchain(Some(Arc::new(move |config| {
             config.initial_features_override = Some(init_features.clone());
@@ -93,14 +85,12 @@ pub(crate) fn bootstrap_with_genesis(
 
     let mut rocksdb_configs = RocksdbConfigs::default();
     rocksdb_configs.state_merkle_db_config.max_open_files = -1;
-    rocksdb_configs.enable_storage_sharding = enable_storage_sharding;
     let (_db, db_rw) = DbReaderWriter::wrap(
         AptosDB::open(
             StorageDirPaths::from_path(db_dir),
             false, /* readonly */
             NO_OP_STORAGE_PRUNER_CONFIG,
             rocksdb_configs,
-            false, /* enable_indexer */
             BUFFERED_STATE_TARGET_ITEMS,
             DEFAULT_MAX_NUM_NODES_PER_LRU_CACHE_SHARD,
             None, /* internal_indexer_db */

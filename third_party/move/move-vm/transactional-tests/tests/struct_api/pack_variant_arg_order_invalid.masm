@@ -1,0 +1,17 @@
+//# publish --print-bytecode
+// Test that a pack_variant function which moves locals out of order is rejected.
+// The compiler always emits MoveLoc(0), MoveLoc(1), ...; swapping them
+// would silently reorder fields, so the verifier must enforce sequential order.
+module 0x66::test_pack_variant_arg_order_invalid
+
+enum E has drop
+  V
+    a: u64
+    b: bool
+
+// Invalid: locals loaded in reverse order (l1 before l0)
+#[pack_variant(0)] public fun pack$E$V(l0: u64, l1: bool): E
+    move_loc l1
+    move_loc l0
+    pack_variant E, V
+    ret

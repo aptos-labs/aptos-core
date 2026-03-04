@@ -1,0 +1,18 @@
+processed 3 tasks
+task 0 lines 5-41:  publish [module 0x42::m1]
+task 1 lines 42-74:  publish [module 0x42::m2]
+Error: Unable to publish module '0000000000000000000000000000000000000000000000000000000000000042::m2'. Got VMError: {
+    major_status: CALL_BORROWED_MUTABLE_REFERENCE_ERROR,
+    sub_status: None,
+    location: 0x42::m2,
+    indices: [(FunctionDefinition, 0)],
+    offsets: [(FunctionDefinitionIndex(0), 12)],
+}
+task 2 lines 76-76:  run 0x42::m2::try_unpack_mut_ref
+Error: Function execution failed with VMError: {
+    major_status: LINKER_ERROR,
+    sub_status: None,
+    location: undefined,
+    indices: [],
+    offsets: [],
+}

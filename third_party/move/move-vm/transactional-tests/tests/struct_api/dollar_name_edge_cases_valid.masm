@@ -1,0 +1,35 @@
+//# publish --print-bytecode
+module 0x66::test_dollar_name_edge_cases
+
+struct S
+    x: u64
+
+// Regular function whose name has '$' but a non-struct-API prefix.
+// The name parser returns Ok(None) for the "helper" prefix.
+public fun helper$S(l0: u64): u64
+    move_loc l0
+    ret
+
+// "test_variant" prefix but no variant part (only struct name follows).
+// The name parser returns Ok(None) because a variant name is required.
+public fun test_variant$S(l0: u64): u64
+    move_loc l0
+    ret
+
+// "borrow" prefix with a non-numeric offset ("abc" cannot parse as u16).
+// The name parser returns Ok(None) and treats this as a regular function.
+public fun borrow$S$abc(l0: u64): u64
+    move_loc l0
+    ret
+
+// "borrow" prefix with a non-numeric type_order ("abc" cannot parse as u16).
+// remaining = ["0", "abc"]: offset parses but type_order fails → Ok(None).
+public fun borrow$S$0$abc(l0: u64): u64
+    move_loc l0
+    ret
+
+// "borrow" prefix with too many '$'-delimited parts (more than 2 after struct name).
+// The name parser returns Ok(None) and treats this as a regular function.
+public fun borrow$S$0$1$extra(l0: u64): u64
+    move_loc l0
+    ret

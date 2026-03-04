@@ -175,4 +175,9 @@ impl TestSummary {
     pub fn is_soft_failure(&self) -> bool {
         !self.soft_failure.is_empty() && self.failed.is_empty()
     }
+
+    /// Returns the number of hard failures.
+    pub fn failed_count(&self) -> usize {
+        self.failed.len()
+    }
 }

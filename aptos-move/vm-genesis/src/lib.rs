@@ -11,10 +11,10 @@ use aptos_crypto::{
     ed25519::{Ed25519PrivateKey, Ed25519PublicKey},
     HashValue, PrivateKey, Uniform,
 };
-use aptos_framework::{ReleaseBundle, ReleasePackage};
 use aptos_gas_schedule::{
     AptosGasParameters, InitialGasSchedule, ToOnChainGasSchedule, LATEST_GAS_FEATURE_VERSION,
 };
+use aptos_release_bundle::{ReleaseBundle, ReleasePackage};
 use aptos_types::{
     account_config::{
         self, aptos_test_root_address, events::NewEpochEvent, CORE_CODE_ADDRESS,
@@ -1354,49 +1354,17 @@ fn verify_genesis_events(events: &[ContractEvent]) {
     assert_eq!(new_epoch_events[0].sequence_number(), 0);
 }
 
-/// An enum specifying whether the compiled stdlib/scripts should be used or freshly built versions
-/// should be used.
-#[derive(Debug, Eq, PartialEq)]
-pub enum GenesisOptions {
-    /// Framework compiled from head
-    Head,
-    /// Framework as it was released or upgraded in testnet
-    Testnet,
-    /// Framework as it was released or upgraded in mainnet
-    Mainnet,
-}
-
 /// Generate an artificial genesis `ChangeSet` for testing
-pub fn generate_genesis_change_set_for_testing(genesis_options: GenesisOptions) -> ChangeSet {
-    generate_genesis_change_set_for_testing_with_count(genesis_options, 1)
+pub fn generate_genesis_change_set_for_testing() -> ChangeSet {
+    generate_genesis_change_set_for_testing_with_count(1)
 }
 
-pub fn generate_genesis_change_set_for_testing_with_count(
-    genesis_options: GenesisOptions,
-    count: u64,
-) -> ChangeSet {
-    let framework = match genesis_options {
-        GenesisOptions::Head => aptos_cached_packages::head_release_bundle(),
-        GenesisOptions::Testnet => aptos_framework::testnet_release_bundle(),
-        GenesisOptions::Mainnet => {
-            // We don't yet have mainnet, so returning testnet here
-            aptos_framework::testnet_release_bundle()
-        },
-    };
-
-    generate_test_genesis(framework, Some(count as usize)).0
-}
-
-/// Generate a genesis `ChangeSet` for mainnet
-pub fn generate_genesis_change_set_for_mainnet(genesis_options: GenesisOptions) -> ChangeSet {
-    let framework = match genesis_options {
-        GenesisOptions::Head => aptos_cached_packages::head_release_bundle(),
-        GenesisOptions::Testnet => aptos_framework::testnet_release_bundle(),
-        // We don't yet have mainnet, so returning testnet here
-        GenesisOptions::Mainnet => aptos_framework::testnet_release_bundle(),
-    };
-
-    generate_mainnet_genesis(framework, Some(1)).0
+pub fn generate_genesis_change_set_for_testing_with_count(count: u64) -> ChangeSet {
+    generate_test_genesis(
+        aptos_cached_packages::head_release_bundle(),
+        Some(count as usize),
+    )
+    .0
 }
 
 pub fn test_genesis_transaction() -> Transaction {

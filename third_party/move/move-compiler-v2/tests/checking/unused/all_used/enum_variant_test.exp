@@ -1,0 +1,35 @@
+// -- Model dump before first bytecode pipeline
+module 0x42::m {
+    enum Status {
+        Active,
+        Inactive {
+            reason: u64,
+        }
+    }
+    public fun is_active(s: &Status): bool {
+        test_variants m::Status::Active(s)
+    }
+    public fun test(): bool {
+        {
+          let s: Status = pack m::Status::Active();
+          m::is_active(Borrow(Immutable)(s))
+        }
+    }
+} // end 0x42::m
+
+// -- Sourcified model before first bytecode pipeline
+module 0x42::m {
+    enum Status has drop {
+        Active,
+        Inactive {
+            reason: u64,
+        }
+    }
+    public fun is_active(s: &Status): bool {
+        s is Active
+    }
+    public fun test(): bool {
+        let s = Status::Active{};
+        is_active(&s)
+    }
+}

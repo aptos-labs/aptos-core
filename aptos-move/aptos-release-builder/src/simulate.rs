@@ -22,13 +22,12 @@
 
 use crate::aptos_framework_path;
 use anyhow::{anyhow, bail, Context, Result};
-use aptos::{
-    common::types::PromptOptions, governance::compile_in_temp_dir, move_tool::FrameworkPackageArgs,
-};
+use aptos_cli_common::PromptOptions;
 use aptos_crypto::HashValue;
 use aptos_gas_profiling::GasProfiler;
 use aptos_gas_schedule::{AptosGasParameters, FromOnChainGasSchedule};
 use aptos_language_e2e_tests::account::AccountData;
+use aptos_move_cli::{compile_in_temp_dir, FrameworkPackageArgs};
 use aptos_move_debugger::aptos_debugger::AptosDebugger;
 use aptos_rest_client::{AptosBaseUrl, Client};
 use aptos_transaction_simulation::{DeltaStateStore, SimulationStateStore};
@@ -57,6 +56,7 @@ use move_binary_format::{
     CompiledModule,
 };
 use move_core_types::{
+    diag_writer::DiagWriter,
     identifier::{IdentStr, Identifier},
     language_storage::ModuleId,
     value::MoveValue,
@@ -384,6 +384,7 @@ pub async fn simulate_multistep_proposal(
         )?;
 
         let (blob, hash) = compile_in_temp_dir(
+            &DiagWriter::stderr(),
             "script",
             path,
             &framework_package_args,

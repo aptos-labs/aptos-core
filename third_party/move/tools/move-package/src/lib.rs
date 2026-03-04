@@ -11,7 +11,9 @@ pub mod source_package;
 
 use crate::{
     compilation::{
-        build_plan::BuildPlan, compiled_package::CompiledPackage, model_builder::ModelBuilder,
+        build_plan::{BuildPlan, CompilerDriverResult},
+        compiled_package::CompiledPackage,
+        model_builder::ModelBuilder,
     },
     package_lock::PackageLock,
     resolution::resolution_graph::{ResolutionGraph, ResolvedGraph},
@@ -137,6 +139,11 @@ pub struct ModelConfig {
     pub compiler_version: CompilerVersion,
     /// The language version used to build the model
     pub language_version: LanguageVersion,
+    /// If set, the full compiler pipeline including bytecode generation is run.
+    /// Required by the prover which operates on FileFormat bytecode.
+    /// When false (default for most uses), only the type checker and AST
+    /// transforms are executed.
+    pub with_bytecode: bool,
 }
 
 impl BuildConfig {
@@ -168,11 +175,40 @@ impl BuildConfig {
         ret
     }
 
+    /// Like [`compile_package_no_exit`](Self::compile_package_no_exit) but accepts a custom
+    /// compiler driver, allowing callers to control where compiler diagnostics are written.
+    pub fn compile_package_no_exit_with_driver<W: Write>(
+        self,
+        resolved_graph: ResolvedGraph,
+        external_checks: Vec<Arc<dyn ExternalChecks>>,
+        writer: &mut W,
+        driver: impl FnMut(move_compiler_v2::Options) -> CompilerDriverResult,
+    ) -> Result<(CompiledPackage, Option<model::GlobalEnv>)> {
+        let config = self.compiler_config.clone();
+        let mutx = PackageLock::lock();
+        let ret = BuildPlan::create(resolved_graph)?.compile_with_driver(
+            writer,
+            &config,
+            external_checks,
+            driver,
+        );
+        mutx.unlock();
+        ret
+    }
+
     // NOTE: If there are no renamings, then the root package has the global resolution of all named
     // addresses in the package graph in scope. So we can simply grab all of the source files
     // across all packages and build the Move model from that.
     // TODO: In the future we will need a better way to do this to support renaming in packages
     // where we want to support building a Move model.
+
+    /// Build the Move model for the package at `path`.
+    ///
+    /// Only fails on I/O errors; all compilation errors and warnings are stored
+    /// in the returned `GlobalEnv`. Use `env.check_errors(msg)?` at call sites
+    /// where compilation errors should be fatal.
+    ///
+    /// See [`ModelConfig::with_bytecode`] for the effect of that flag.
     pub fn move_model_for_package(
         self,
         path: &Path,

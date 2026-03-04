@@ -1,0 +1,25 @@
+{
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Edit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "${MOVE_FLOW:-move-flow} hook edit"
+          }
+        ]
+      }
+    ],
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "${MOVE_FLOW:-move-flow} hook package-path"
+          }
+        ]
+      }
+    ]
+  }
+}

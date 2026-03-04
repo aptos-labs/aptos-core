@@ -26,6 +26,7 @@ use move_core_types::{
     identifier::{IdentStr, Identifier},
     language_storage::{ModuleId, StructTag, TypeTag},
     value::{MoveTypeLayout, MoveValue},
+    vm_status::StatusType,
 };
 use move_model::metadata::LanguageVersion;
 use move_resource_viewer::MoveValueAnnotator;
@@ -495,6 +496,18 @@ impl SimpleVMTestAdapter<'_> {
                 );
                 let trace = logger.finish();
                 let replay_result = TypeChecker::new(code_storage).replay(&trace);
+                if let Err(err) = &replay_result {
+                    // Replay validates that the execution trace is well-typed. If replay fails,
+                    // it should only be due to invariant violations (e.g., type mismatches in the trace).
+                    // Any other error type indicates an unexpected failure in the replay mechanism itself,
+                    // which we want to catch immediately during testing.
+                    if err.status_type() != StatusType::InvariantViolation {
+                        panic!(
+                            "Replay should never fail with non-invariant violation: {:?}",
+                            err
+                        );
+                    }
+                }
                 match replay_result.and(result) {
                     Ok(return_values) => (return_values, Some(trace)),
                     Err(err) => return (Err(err), Some(trace)),

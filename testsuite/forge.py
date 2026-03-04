@@ -881,6 +881,7 @@ class K8sForgeRunner(ForgeRunner):
             UPGRADE_IMAGE_TAG=context.upgrade_image_tag,
             FORGE_IMAGE=forge_image_full,
             FORGE_NAMESPACE=context.forge_namespace,
+            FORGE_CHAIN_NAME=context.forge_chain_name,
             FORGE_ARGS=" ".join(context.forge_args),
             FORGE_TRIGGERED_BY=forge_triggered_by,
             FORGE_TEST_SUITE=sanitize_k8s_resource_name(context.forge_test_suite),
@@ -890,6 +891,8 @@ class K8sForgeRunner(ForgeRunner):
             VALIDATOR_NODE_SELECTOR=validator_node_selector,
             KUBECONFIG=MULTIREGION_KUBECONFIG_PATH,
             MULTIREGION_KUBECONFIG_DIR=MULTIREGION_KUBECONFIG_DIR,
+            GITHUB_HEAD_REF=os.getenv("GITHUB_HEAD_REF", ""),
+            GITHUB_REF_NAME=os.getenv("GITHUB_REF_NAME", ""),
         )
 
         log.info(f"rendered_forge_test_runner: {rendered}")
@@ -1215,6 +1218,7 @@ def create_forge_command(
     forge_namespace_keep: Optional[str],
     forge_enable_haproxy: Optional[str],
     forge_enable_indexer: Optional[str],
+    forge_num_pfns: Optional[str],
     forge_deployer_profile: Optional[str],
     cargo_args: Optional[Sequence[str]],
     forge_cli_args: Optional[Sequence[str]],
@@ -1287,6 +1291,8 @@ def create_forge_command(
         forge_args.append("--enable-haproxy")
     if forge_enable_indexer == "true":
         forge_args.append("--enable-indexer")
+    if forge_num_pfns and int(forge_num_pfns) > 0:
+        forge_args.extend(["--num-pfns", forge_num_pfns])
     if forge_deployer_profile:
         forge_args.extend(["--deployer-profile", forge_deployer_profile])
 
@@ -1402,6 +1408,7 @@ def seeded_random_choice(namespace: str, cluster_names: Sequence[str]) -> str:
 @envoption("FORGE_NAMESPACE_REUSE")
 @envoption("FORGE_ENABLE_HAPROXY")
 @envoption("FORGE_ENABLE_INDEXER")
+@envoption("FORGE_NUM_PFNS")
 @envoption("FORGE_DEPLOYER_PROFILE")
 @envoption("FORGE_ENABLE_FAILPOINTS")
 @envoption("FORGE_ENABLE_PERFORMANCE")
@@ -1452,6 +1459,7 @@ def test(
     forge_enable_performance: Optional[str],
     forge_enable_haproxy: Optional[str],
     forge_enable_indexer: Optional[str],
+    forge_num_pfns: Optional[str],
     forge_deployer_profile: Optional[str],
     forge_test_suite: str,
     forge_runner_duration_secs: str,
@@ -1695,6 +1703,7 @@ def test(
         forge_namespace_keep=forge_namespace_keep,
         forge_enable_haproxy=forge_enable_haproxy,
         forge_enable_indexer=forge_enable_indexer,
+        forge_num_pfns=forge_num_pfns,
         forge_deployer_profile=forge_deployer_profile,
         cargo_args=cargo_args,
         forge_cli_args=forge_cli_args,

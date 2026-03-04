@@ -8,8 +8,8 @@ use super::{
 use crate::{
     config::{
         node_config_loader::NodeType, utils::get_config_name, AdminServiceConfig, Error,
-        ExecutionConfig, IndexerConfig, InspectionServiceConfig, LoggerConfig, MempoolConfig,
-        NodeConfig, Peer, PeerRole, PeerSet, StateSyncConfig,
+        ExecutionConfig, InspectionServiceConfig, LoggerConfig, MempoolConfig, NodeConfig, Peer,
+        PeerRole, PeerSet, StateSyncConfig,
     },
     network_id::NetworkId,
 };
@@ -119,9 +119,6 @@ impl ConfigOptimizer for NodeConfig {
         }
         if ExecutionConfig::optimize(node_config, local_config_yaml, node_type, chain_id)? {
             optimizers_with_modifications.push(ExecutionConfig::get_optimizer_name());
-        }
-        if IndexerConfig::optimize(node_config, local_config_yaml, node_type, chain_id)? {
-            optimizers_with_modifications.push(IndexerConfig::get_optimizer_name());
         }
         if IndexerGrpcConfig::optimize(node_config, local_config_yaml, node_type, chain_id)? {
             optimizers_with_modifications.push(IndexerGrpcConfig::get_optimizer_name());

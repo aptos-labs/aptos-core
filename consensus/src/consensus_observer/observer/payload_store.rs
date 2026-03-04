@@ -282,7 +282,8 @@ mod test {
     use aptos_consensus_types::{
         block::Block,
         block_data::{BlockData, BlockType},
-        common::{Author, Payload, ProofWithData},
+        common::{Author, Payload},
+        payload::{OptQuorumStorePayload, PayloadExecutionLimit},
         pipelined_block::OrderedBlockWindow,
         proof_of_store::{BatchInfo, ProofOfStore},
         quorum_cert::QuorumCert,
@@ -1099,21 +1100,26 @@ mod test {
                 );
                 proofs_of_store.push(ProofOfStore::new(batch_info, AggregateSignature::empty()));
             }
-            let block_transaction_payload = BlockTransactionPayload::new_quorum_store_inline_hybrid(
+            let batch_infos: Vec<_> = proofs_of_store.iter().map(|p| p.info().clone()).collect();
+            let block_transaction_payload = BlockTransactionPayload::new_opt_quorum_store(
                 vec![],
                 proofs_of_store.clone(),
                 None,
                 None,
-                vec![],
-                true,
+                batch_infos.clone(),
             );
 
             // Insert the block payload into the store
             let block_payload = BlockPayload::new(block_info.clone(), block_transaction_payload);
             block_payload_store.insert_block_payload(block_payload, verified_payload_signatures);
 
-            // Create the block type
-            let payload = Payload::InQuorumStore(ProofWithData::new(proofs_of_store));
+            // Create the block type with an OptQuorumStore payload containing the batch infos
+            let payload = Payload::OptQuorumStore(OptQuorumStorePayload::new(
+                Vec::<(BatchInfo, Vec<aptos_types::transaction::SignedTransaction>)>::new().into(),
+                batch_infos.clone().into(),
+                proofs_of_store.into(),
+                PayloadExecutionLimit::None,
+            ));
             let block_type = BlockType::DAGBlock {
                 author: Author::random(),
                 failed_authors: vec![],

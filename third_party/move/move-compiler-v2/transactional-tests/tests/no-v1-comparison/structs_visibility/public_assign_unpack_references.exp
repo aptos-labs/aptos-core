@@ -1,30 +1,5 @@
 processed 4 tasks
 task 0 lines 2-8:  publish [module 0x42::m {]
 task 1 lines 10-35:  publish [module 0x42::m2 {]
-Error: compilation errors:
- bug: bytecode verification failed with unexpected status code `CALL_BORROWED_MUTABLE_REFERENCE_ERROR`:
-Error message: none
-   ┌─ TEMPFILE1:24:9
-   │
-24 │         R { s1: S { f }, s2 } = &mut R { s1: S{f: 0}, s2: S{f: 1} }; f; s2;
-   │         ^^^^^^^^^^^^^^^^^^^^^
-   │
-   = please consider reporting this issue (see https://aptos.dev/en/build/smart-contracts/compiler_v2#reporting-an-issue)
-
-
 task 2 lines 37-37:  run 0x42::m2::t1
-Error: Function execution failed with VMError: {
-    major_status: LINKER_ERROR,
-    sub_status: None,
-    location: undefined,
-    indices: [],
-    offsets: [],
-}
 task 3 lines 39-39:  run 0x42::m2::t2
-Error: Function execution failed with VMError: {
-    major_status: LINKER_ERROR,
-    sub_status: None,
-    location: undefined,
-    indices: [],
-    offsets: [],
-}

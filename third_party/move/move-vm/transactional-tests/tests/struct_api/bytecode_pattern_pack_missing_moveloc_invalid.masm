@@ -1,0 +1,14 @@
+//# publish --print-bytecode
+module 0x66::test_bytecode_pattern_pack_missing_moveloc
+
+struct S
+    x: u64
+    y: u64
+
+// Invalid: pack function must have only MoveLoc instructions before Pack
+// This has ld_u64 instead of MoveLoc
+#[pack] public fun pack$S(l0: u64): S
+    move_loc l0
+    ld_u64 999
+    pack S
+    ret

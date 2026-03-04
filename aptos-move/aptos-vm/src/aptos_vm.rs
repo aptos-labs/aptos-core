@@ -38,7 +38,7 @@ use aptos_block_executor::{
     txn_provider::{default::DefaultTxnProvider, TxnProvider},
 };
 use aptos_crypto::HashValue;
-use aptos_framework::natives::code::PublishRequest;
+use aptos_framework_natives::code::PublishRequest;
 use aptos_gas_algebra::{Gas, GasQuantity, NumBytes, Octa};
 use aptos_gas_meter::{AptosGasMeter, GasAlgebra, StandardGasAlgebra, StandardGasMeter};
 use aptos_gas_schedule::{
@@ -1099,14 +1099,15 @@ impl AptosVM {
             },
             TransactionExecutableRef::Encrypted => {
                 // If the executable is still `Encrypted` here, it means that decryption
-                // failed. The transaction is kept on chain as aborted.
-                // TODO(ibalajiarun): Figure out better status code
-                let status_code = StatusCode::ABORTED;
-                let vm_status = VMStatus::Executed;
-                let txn_status =
-                    TransactionStatus::Keep(ExecutionStatus::MiscellaneousError(Some(status_code)));
-                let vm_output = VMOutput::empty_with_status(txn_status);
-                return Ok((vm_status, vm_output));
+                // failed. Return an error so the caller runs the failure epilogue, which
+                // increments the sequence number and charges gas.
+                return Err(VMStatus::error(
+                    StatusCode::FAILED_TO_DESERIALIZE_ARGUMENT,
+                    Some(
+                        "Encrypted transaction decryption failed; payload not available"
+                            .to_string(),
+                    ),
+                ));
             },
             // Not reachable as this function should only be invoked for entry or script
             // transaction payload.
@@ -2185,9 +2186,16 @@ impl AptosVM {
             );
         }
 
-        // Whether user transaction succeeded or failed (e.g., abort in Move code or running out
-        // of gas in epilogue), we record the trace of all executed instructions.
-        output.set_trace(trace_recorder.finish());
+        // Only if user transaction succeeded, record the trace of all executed instructions.
+        // If transaction did not succeed, its side effects are discarded and so there is no
+        // need to replay the trace for extra runtime checks.
+        if output
+            .status()
+            .as_kept_status()
+            .is_ok_and(|s| s.is_success())
+        {
+            output.set_trace(trace_recorder.finish());
+        }
 
         (vm_status, output)
     }
@@ -2717,6 +2725,88 @@ impl AptosVM {
         arguments: Vec<Vec<u8>>,
         max_gas_amount: u64,
     ) -> ViewFunctionOutput {
+        let (output, _) = Self::run_view_function(
+            state_view,
+            module_id,
+            func_name,
+            type_args,
+            arguments,
+            max_gas_amount,
+            |gas_feature_version, vm_gas_params, storage_gas_params| {
+                make_prod_gas_meter(
+                    gas_feature_version,
+                    vm_gas_params,
+                    storage_gas_params,
+                    /* is_approved_gov_script */ false,
+                    max_gas_amount.into(),
+                    &NoopBlockSynchronizationKillSwitch {},
+                )
+            },
+        );
+        output
+    }
+
+    /// Alternative entrypoint for view function execution that allows customization
+    /// based on the production gas meter.
+    ///
+    /// This can be useful for gas profiling while preserving the production gas behavior.
+    /// Returns the view function output along with the modified gas meter (or `None` if
+    /// gas parameter loading failed before the meter could be created).
+    pub fn execute_view_function_with_modified_gas_meter<G, M, F>(
+        state_view: &impl StateView,
+        module_id: ModuleId,
+        func_name: Identifier,
+        type_args: Vec<TypeTag>,
+        arguments: Vec<Vec<u8>>,
+        max_gas_amount: u64,
+        modify_gas_meter: F,
+    ) -> (ViewFunctionOutput, Option<G>)
+    where
+        F: FnOnce(
+            MemoryTrackedGasMeterImpl<
+                StandardGasMeter<StandardGasAlgebra<'static, NoopBlockSynchronizationKillSwitch>>,
+                M,
+            >,
+        ) -> G,
+        G: AptosGasMeter,
+        M: MemoryAlgebra,
+    {
+        Self::run_view_function(
+            state_view,
+            module_id,
+            func_name,
+            type_args,
+            arguments,
+            max_gas_amount,
+            |gas_feature_version, vm_gas_params, storage_gas_params| {
+                let gas_meter = make_prod_gas_meter_impl::<_, M>(
+                    gas_feature_version,
+                    vm_gas_params,
+                    storage_gas_params,
+                    /* is_approved_gov_script */ false,
+                    max_gas_amount.into(),
+                    &NoopBlockSynchronizationKillSwitch {},
+                );
+                modify_gas_meter(gas_meter)
+            },
+        )
+    }
+
+    /// Common execution logic for view functions: loads gas parameters, creates the gas
+    /// meter via the provided closure, runs the function, and processes the result into
+    /// a [`ViewFunctionOutput`].
+    ///
+    /// Returns the output along with the gas meter (or `None` if gas parameter loading
+    /// failed before the meter could be created).
+    fn run_view_function<G: AptosGasMeter>(
+        state_view: &impl StateView,
+        module_id: ModuleId,
+        func_name: Identifier,
+        type_args: Vec<TypeTag>,
+        arguments: Vec<Vec<u8>>,
+        max_gas_amount: u64,
+        make_gas_meter: impl FnOnce(u64, VMGasParameters, StorageGasParameters) -> G,
+    ) -> (ViewFunctionOutput, Option<G>) {
         let env = AptosEnvironment::new(state_view);
         let vm = AptosVM::new(&env);
 
@@ -2725,32 +2815,32 @@ impl AptosVM {
         let vm_gas_params = match vm.gas_params(&log_context) {
             Ok(gas_params) => gas_params.vm.clone(),
             Err(err) => {
-                return ViewFunctionOutput::new_error_message(
-                    format!("{}", err),
-                    Some(err.status_code()),
-                    0,
+                return (
+                    ViewFunctionOutput::new_error_message(
+                        format!("{}", err),
+                        Some(err.status_code()),
+                        0,
+                    ),
+                    None,
                 )
             },
         };
         let storage_gas_params = match vm.storage_gas_params(&log_context) {
             Ok(gas_params) => gas_params.clone(),
             Err(err) => {
-                return ViewFunctionOutput::new_error_message(
-                    format!("{}", err),
-                    Some(err.status_code()),
-                    0,
+                return (
+                    ViewFunctionOutput::new_error_message(
+                        format!("{}", err),
+                        Some(err.status_code()),
+                        0,
+                    ),
+                    None,
                 )
             },
         };
 
-        let mut gas_meter = make_prod_gas_meter(
-            vm.gas_feature_version(),
-            vm_gas_params,
-            storage_gas_params,
-            /* is_approved_gov_script */ false,
-            max_gas_amount.into(),
-            &NoopBlockSynchronizationKillSwitch {},
-        );
+        let mut gas_meter =
+            make_gas_meter(vm.gas_feature_version(), vm_gas_params, storage_gas_params);
 
         let resolver = state_view.as_move_resolver();
         let module_storage = state_view.as_aptos_code_storage(&env);
@@ -2771,7 +2861,7 @@ impl AptosVM {
             &module_storage,
         );
         let gas_used = Self::gas_used(max_gas_amount.into(), &gas_meter);
-        match execution_result {
+        let output = match execution_result {
             Ok(result) => ViewFunctionOutput::new(Ok(result), gas_used),
             Err(e) => {
                 let vm_status = e.clone().into_vm_status();
@@ -2782,10 +2872,13 @@ impl AptosVM {
                             .message()
                             .map(|m| m.to_string())
                             .unwrap_or_else(|| e.to_string());
-                        return ViewFunctionOutput::new_error_message(
-                            message,
-                            Some(vm_status.status_code()),
-                            gas_used,
+                        return (
+                            ViewFunctionOutput::new_error_message(
+                                message,
+                                Some(vm_status.status_code()),
+                                gas_used,
+                            ),
+                            Some(gas_meter),
                         );
                     },
                 }
@@ -2810,7 +2903,8 @@ impl AptosVM {
                     gas_used,
                 )
             },
-        }
+        };
+        (output, Some(gas_meter))
     }
 
     fn gas_used(max_gas_amount: Gas, gas_meter: &impl AptosGasMeter) -> u64 {

@@ -25,7 +25,7 @@ use aptos_dkg::pvss::{
 };
 use aptos_infallible::{duration_since_epoch, Mutex};
 use aptos_logger::{debug, error, info, warn};
-use aptos_reliable_broadcast::ReliableBroadcast;
+use aptos_reliable_broadcast::{DropGuard, ReliableBroadcast};
 use aptos_types::{
     dkg::{
         chunky_dkg::{
@@ -41,19 +41,22 @@ use aptos_types::{
 };
 use aptos_validator_transaction_pool::{TxnGuard, VTxnPoolState};
 use futures_channel::oneshot;
-use futures_util::{future::AbortHandle, FutureExt, StreamExt};
+use futures_util::{
+    future::{AbortHandle, Abortable},
+    FutureExt, StreamExt,
+};
 use move_core_types::account_address::AccountAddress;
 use rand::{prelude::StdRng, thread_rng, SeedableRng};
 use std::{
     collections::{HashMap, HashSet},
-    mem,
+    fmt, mem,
     sync::Arc,
     time::Duration,
 };
 use tokio_retry::strategy::ExponentialBackoff;
 
 #[allow(dead_code)]
-#[derive(Debug, Default)]
+#[derive(Default)]
 enum InnerState {
     #[default]
     Init,
@@ -61,14 +64,14 @@ enum InnerState {
         start_time: Duration,
         my_transcript: ChunkyDKGTranscript,
         dkg_config: ChunkyDKGConfig,
-        abort_handle: AbortHandle,
+        _abort_guard: DropGuard,
     },
     AwaitAggregatedSubtranscriptCertification {
         start_time: Duration,
         my_transcript: ChunkyDKGTranscript,
         aggregated_subtranscript: AggregatedSubtranscript,
         dkg_config: ChunkyDKGConfig,
-        abort_handle: AbortHandle,
+        _abort_guard: DropGuard,
     },
     Finished {
         vtxn_guard: TxnGuard,
@@ -76,6 +79,12 @@ enum InnerState {
         my_transcript: ChunkyDKGTranscript,
         proposed: bool,
     },
+}
+
+impl fmt::Debug for InnerState {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str(self.variant_name())
+    }
 }
 
 impl InnerState {
@@ -114,6 +123,9 @@ pub struct ChunkyDKGManager {
     // Shared map to track transcripts received from each recipient
     received_transcripts: Arc<Mutex<HashMap<AccountAddress, ChunkyTranscript>>>,
 
+    // Guards for spawned RPC handler tasks; dropped on close to abort them.
+    rpc_handler_guards: Vec<DropGuard>,
+
     // Control states.
     stopped: bool,
     state: InnerState,
@@ -147,6 +159,7 @@ impl ChunkyDKGManager {
             pull_notification_tx,
             pull_notification_rx,
             received_transcripts: Arc::new(Mutex::new(HashMap::new())),
+            rpc_handler_guards: Vec::new(),
             stopped: false,
             state: InnerState::Init,
         }
@@ -258,15 +271,12 @@ impl ChunkyDKGManager {
     /// On a CLOSE command from epoch manager, do clean-up.
     fn process_close_cmd(&mut self, ack_tx: Option<oneshot::Sender<()>>) -> Result<()> {
         self.stopped = true;
+        self.rpc_handler_guards.clear();
 
         match std::mem::take(&mut self.state) {
             InnerState::Init => {},
-            InnerState::AwaitSubtranscriptAggregation { abort_handle, .. } => {
-                abort_handle.abort();
-            },
-            InnerState::AwaitAggregatedSubtranscriptCertification { abort_handle, .. } => {
-                abort_handle.abort();
-            },
+            InnerState::AwaitSubtranscriptAggregation { .. } => {},
+            InnerState::AwaitAggregatedSubtranscriptCertification { .. } => {},
             InnerState::Finished {
                 vtxn_guard,
                 start_time,
@@ -408,7 +418,7 @@ impl ChunkyDKGManager {
         self.state = InnerState::AwaitSubtranscriptAggregation {
             start_time: dkg_start_time,
             my_transcript,
-            abort_handle,
+            _abort_guard: DropGuard::new(abort_handle),
             dkg_config,
         };
 
@@ -446,7 +456,6 @@ impl ChunkyDKGManager {
             start_time,
             self.my_addr,
             self.epoch_state.clone(),
-            dkg_config.clone(),
             aggregated_subtranscript.clone(),
             self.certified_subtrx_tx.clone(),
         );
@@ -456,7 +465,7 @@ impl ChunkyDKGManager {
             my_transcript,
             aggregated_subtranscript,
             dkg_config,
-            abort_handle,
+            _abort_guard: DropGuard::new(abort_handle),
         };
 
         Ok(())
@@ -495,12 +504,12 @@ impl ChunkyDKGManager {
 
         counters::observe_chunky_dkg_stage(start_time, self.my_addr, "agg_subtrx_certified");
 
-        info!("deriving encryption key");
+        info!("[ChunkyDKG] deriving encryption key");
         // Derive encryption key from subtranscript + DigestKey
         let encryption_key_bytes =
             aggregated_subtranscript.derive_encryption_key_bytes(TEST_DIGEST_KEY.tau_g2)?;
 
-        info!("forming ceritified_transcript struct");
+        info!("[ChunkyDKG] forming certified_transcript struct");
         let certified_transcript = CertifiedAggregatedChunkySubtranscript {
             metadata: DKGTranscriptMetadata {
                 epoch: self.epoch_state.epoch,
@@ -654,7 +663,7 @@ impl ChunkyDKGManager {
     /// Process a subtranscript validation request RPC message.
     /// Spawns a tokio task to handle the computation and respond via the response_sender.
     fn process_subtranscript_signature_request_rpc(
-        &self,
+        &mut self,
         sender: AccountAddress,
         req: ChunkyDKGSubtranscriptSignatureRequest,
         mut response_sender: Box<dyn RpcResponseSender>,
@@ -679,22 +688,26 @@ impl ChunkyDKGManager {
         let ssk = self.ssk.clone();
         let my_addr = self.my_addr;
         let network_sender = self.network_sender.clone();
-        // TODO(ibalajiarun): Track the handle and cancel task properly
-        tokio::spawn(async move {
-            let response = Self::handle_subtranscript_signature_request(
-                sender,
-                req,
-                aggregated_transcript,
-                dkg_config,
-                ssk,
-                my_addr,
-                received_transcripts,
-                epoch_state,
-                network_sender,
-            )
-            .await;
-            response_sender.send(response);
-        });
+        let (abort_handle, abort_registration) = AbortHandle::new_pair();
+        tokio::spawn(Abortable::new(
+            async move {
+                let response = Self::handle_subtranscript_signature_request(
+                    sender,
+                    req,
+                    aggregated_transcript,
+                    dkg_config,
+                    ssk,
+                    my_addr,
+                    received_transcripts,
+                    epoch_state,
+                    network_sender,
+                )
+                .await;
+                response_sender.send(response);
+            },
+            abort_registration,
+        ));
+        self.rpc_handler_guards.push(DropGuard::new(abort_handle));
 
         Ok(())
     }
@@ -779,6 +792,7 @@ impl ChunkyDKGManager {
                 missing_dealers.clone(),
                 Duration::from_secs(10), // RPC timeout
                 dkg_config.clone(),
+                epoch_state.clone(),
             );
 
             let fetched_transcripts = fetcher.run(network_sender).await?;

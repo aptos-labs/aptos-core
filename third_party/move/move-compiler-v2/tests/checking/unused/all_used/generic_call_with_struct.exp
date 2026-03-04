@@ -1,0 +1,27 @@
+// -- Model dump before first bytecode pipeline
+module 0x42::m {
+    use std::vector;
+    struct Item {
+        value: u64,
+    }
+    public fun test(): u64 {
+        {
+          let v: vector<Item> = vector::empty<Item>();
+          vector::push_back<Item>(Borrow(Mutable)(v), pack m::Item(42));
+          select m::Item.value<Item>(vector::pop_back<Item>(Borrow(Mutable)(v)))
+        }
+    }
+} // end 0x42::m
+
+// -- Sourcified model before first bytecode pipeline
+module 0x42::m {
+    use std::vector;
+    struct Item has copy, drop {
+        value: u64,
+    }
+    public fun test(): u64 {
+        let v = 0x1::vector::empty<Item>();
+        0x1::vector::push_back<Item>(&mut v, Item{value: 42});
+        0x1::vector::pop_back<Item>(&mut v).value
+    }
+}

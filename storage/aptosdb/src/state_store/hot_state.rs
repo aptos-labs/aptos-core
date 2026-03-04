@@ -1,7 +1,9 @@
 // Copyright (c) Aptos Foundation
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
-use crate::metrics::{COUNTER, GAUGE, OTHER_TIMERS_SECONDS};
+use crate::metrics::{
+    COUNTER, GAUGE, HOT_STATE_SHARD_GAUGE, OTHER_TIMERS_SECONDS, SHARD_NAME_BY_ID,
+};
 use anyhow::{ensure, Result};
 use aptos_config::config::HotStateConfig;
 use aptos_infallible::Mutex;
@@ -10,11 +12,12 @@ use aptos_metrics_core::{IntCounterVecHelper, IntGaugeVecHelper, TimerHelper};
 use aptos_storage_interface::state_store::{
     state::State, state_delta::StateDelta, state_view::hot_state_view::HotStateView,
 };
-use aptos_types::state_store::{
-    hot_state::THotStateSlot, state_key::StateKey, state_slot::StateSlot, NUM_STATE_SHARDS,
+use aptos_types::{
+    state_store::{
+        hot_state::THotStateSlot, state_key::StateKey, state_slot::StateSlot, NUM_STATE_SHARDS,
+    },
+    transaction::Version,
 };
-#[cfg(test)]
-use aptos_types::transaction::Version;
 use arr_macro::arr;
 use dashmap::{mapref::one::Ref, DashMap};
 #[cfg(test)]
@@ -343,8 +346,6 @@ impl Committer {
                 }
             }
 
-            let committed_version = to_commit.next_version();
-
             // Build a layered view: delta(merged_state -> to_commit) over base DashMaps.
             let delta = to_commit.make_delta(&self.merged_state);
             let new_view = Arc::new(LayeredHotStateView {
@@ -360,18 +361,6 @@ impl Committer {
             }
 
             self.try_merge();
-
-            GAUGE.set_with(&["hot_state_items"], self.base.len() as i64);
-            GAUGE.set_with(&["hot_state_key_bytes"], self.total_key_bytes as i64);
-            GAUGE.set_with(&["hot_state_value_bytes"], self.total_value_bytes as i64);
-            GAUGE.set_with(
-                &["hot_state_deferred_merge_old_views"],
-                self.old_views.len() as i64,
-            );
-            GAUGE.set_with(
-                &["hot_state_deferred_merge_version_lag"],
-                (committed_version - self.merged_state.next_version()) as i64,
-            );
         }
 
         self.try_merge(); // flush any remaining deferred merge before exit
@@ -456,11 +445,13 @@ impl Committer {
     fn try_merge(&mut self) -> bool {
         self.old_views.retain(|v| v.strong_count() > 0);
         if !self.old_views.is_empty() {
+            self.update_deferred_merge_gauges(self.committed.lock().state.next_version());
             return false;
         }
 
         let target = self.committed.lock().state.clone();
         if self.merged_state.is_the_same(&target) {
+            self.update_deferred_merge_gauges(self.merged_state.next_version());
             return true;
         }
 
@@ -480,7 +471,20 @@ impl Committer {
             base: Arc::clone(&self.base),
         });
         Self::swap_view(&mut self.old_views, &mut self.committed.lock(), clean_view);
+        self.update_deferred_merge_gauges(self.merged_state.next_version());
+
         true
+    }
+
+    fn update_deferred_merge_gauges(&self, committed_version: Version) {
+        GAUGE.set_with(
+            &["hot_state_deferred_merge_old_views"],
+            self.old_views.len() as i64,
+        );
+        GAUGE.set_with(
+            &["hot_state_deferred_merge_version_lag"],
+            (committed_version - self.merged_state.next_version()) as i64,
+        );
     }
 
     /// Apply the delta between `merged_state` and `target` to the base DashMaps.
@@ -524,6 +528,50 @@ impl Committer {
         COUNTER.inc_with_by(&["hot_state_insert"], n_insert);
         COUNTER.inc_with_by(&["hot_state_update"], n_update);
         COUNTER.inc_with_by(&["hot_state_evict"], n_evict);
+        GAUGE.set_with(&["hot_state_items"], self.base.len() as i64);
+        GAUGE.set_with(&["hot_state_key_bytes"], self.total_key_bytes as i64);
+        GAUGE.set_with(&["hot_state_value_bytes"], self.total_value_bytes as i64);
+
+        self.report_age_metrics();
+    }
+
+    /// Reports per-shard MRU/LRU `hot_since_version` gauges and aggregate max/min LRU across shards.
+    fn report_age_metrics(&self) {
+        let mut global_min_lru: Option<Version> = None;
+        let mut global_max_lru: Option<Version> = None;
+
+        for (shard_id, shard_label) in SHARD_NAME_BY_ID.iter().enumerate() {
+            let mru_version = self.heads[shard_id].as_ref().map(|k| {
+                self.base.shards[shard_id]
+                    .get(k)
+                    .expect("head must exist in base")
+                    .expect_hot_since_version()
+            });
+            let lru_version = self.tails[shard_id].as_ref().map(|k| {
+                self.base.shards[shard_id]
+                    .get(k)
+                    .expect("tail must exist in base")
+                    .expect_hot_since_version()
+            });
+
+            if let Some(v) = mru_version {
+                HOT_STATE_SHARD_GAUGE
+                    .with_label_values(&[*shard_label, "mru_hot_since_version"])
+                    .set(v as i64);
+            }
+            if let Some(v) = lru_version {
+                HOT_STATE_SHARD_GAUGE
+                    .with_label_values(&[*shard_label, "lru_hot_since_version"])
+                    .set(v as i64);
+                global_min_lru = Some(global_min_lru.map_or(v, |cur| cur.min(v)));
+                global_max_lru = Some(global_max_lru.map_or(v, |cur| cur.max(v)));
+            }
+        }
+
+        if let (Some(max_lru), Some(min_lru)) = (global_max_lru, global_min_lru) {
+            GAUGE.set_with(&["hot_state_max_lru_hot_since_version"], max_lru as i64);
+            GAUGE.set_with(&["hot_state_min_lru_hot_since_version"], min_lru as i64);
+        }
     }
 
     /// Traverses the entire map and checks if all the pointers are correctly linked.

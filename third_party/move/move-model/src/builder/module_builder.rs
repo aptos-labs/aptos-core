@@ -23,7 +23,7 @@ use crate::{
     model::{
         self, EqIgnoringLoc, FieldData, FieldId, FunId, FunctionData, FunctionKind, FunctionLoc,
         Loc, ModuleId, MoveIrLoc, NamedConstantData, NamedConstantId, NodeId, Parameter, SchemaId,
-        SpecFunId, SpecVarId, StructData, StructId, TypeParameter, TypeParameterKind,
+        SpecFunId, SpecVarId, StructData, StructId, TypeParameter, TypeParameterKind, UserId,
     },
     pragmas::{
         is_pragma_valid_for_block, is_property_valid_for_condition, CONDITION_DEACTIVATED_PROP,
@@ -499,6 +499,7 @@ impl ModuleBuilder<'_, '_> {
                 &format!("duplicate declaration of const `{}`", &name.value()),
             )
         }
+        let attributes = self.translate_attributes(&def.attributes);
         let mut et = ExpTranslator::new(self);
         et.set_translate_move_fun();
         let loc = et.to_loc(&def.loc);
@@ -508,6 +509,8 @@ impl ModuleBuilder<'_, '_> {
             ty,
             value: Value::Bool(false), // dummy value, actual will be assigned in def_ana
             visibility: EntryVisibility::SpecAndImpl,
+            users: BTreeSet::new(),
+            attributes,
         });
     }
 
@@ -1255,7 +1258,9 @@ impl ModuleBuilder<'_, '_> {
         };
         let value = {
             // Type check the constant.
+            let const_id = self.module_id.qualified(NamedConstantId::new(qsym.symbol));
             let mut et = ExpTranslator::new(self);
+            et.set_constant_use_context(UserId::Constant(const_id));
             et.set_translate_move_fun();
             let exp = et.translate_exp(&def.value, &ty).into_exp();
             et.finalize_types(true);
@@ -1456,11 +1461,12 @@ impl ModuleBuilder<'_, '_> {
             let params = entry.params.clone();
             let result_type = entry.result_type.clone();
             let spec_block_map = entry.inline_specs.clone();
-
+            let fun_qid = entry.module_id.qualified(entry.fun_id);
             let mut et = ExpTranslator::new(self);
             et.set_spec_block_map(spec_block_map);
             et.set_result_type(result_type.clone());
             et.set_fun_name(full_name.clone());
+            et.set_constant_use_context(UserId::Function(fun_qid));
             et.set_translate_move_fun();
             let loc = et.to_loc(&body.loc);
             for (pos, TypeParameter(name, kind, loc)) in type_params.iter().enumerate() {
@@ -1544,15 +1550,28 @@ impl ModuleBuilder<'_, '_> {
         let mut behavior_predicates: Vec<(Option<MemoryLabel>, Option<MemoryLabel>, NodeId)> =
             Vec::new();
 
+        // Also collect labels used in Global/Exists memory access operations, with NodeId
+        // for error reporting
+        let mut memory_access_labels: Vec<(MemoryLabel, NodeId)> = Vec::new();
+
         self.update_spec(context, |spec| {
             fn collect_behavior_predicates(
                 exp: &Exp,
                 predicates: &mut Vec<(Option<MemoryLabel>, Option<MemoryLabel>, NodeId)>,
+                memory_labels: &mut Vec<(MemoryLabel, NodeId)>,
             ) {
                 exp.visit_pre_order(&mut |e| {
-                    if let ExpData::Call(id, Operation::Behavior(_, state), _) = e {
-                        if state.pre.is_some() || state.post.is_some() {
-                            predicates.push((state.pre, state.post, *id));
+                    if let ExpData::Call(id, op, _) = e {
+                        match op {
+                            Operation::Behavior(_, state)
+                                if state.pre.is_some() || state.post.is_some() =>
+                            {
+                                predicates.push((state.pre, state.post, *id));
+                            },
+                            Operation::Global(Some(label)) | Operation::Exists(Some(label)) => {
+                                memory_labels.push((*label, *id));
+                            },
+                            _ => {},
                         }
                     }
                     true
@@ -1560,9 +1579,17 @@ impl ModuleBuilder<'_, '_> {
             }
 
             for cond in &spec.conditions {
-                collect_behavior_predicates(&cond.exp, &mut behavior_predicates);
+                collect_behavior_predicates(
+                    &cond.exp,
+                    &mut behavior_predicates,
+                    &mut memory_access_labels,
+                );
                 for additional in &cond.additional_exps {
-                    collect_behavior_predicates(additional, &mut behavior_predicates);
+                    collect_behavior_predicates(
+                        additional,
+                        &mut behavior_predicates,
+                        &mut memory_access_labels,
+                    );
                 }
             }
         });
@@ -1572,6 +1599,7 @@ impl ModuleBuilder<'_, '_> {
             |label: MemoryLabel| -> Option<Symbol> { self.parent.env.get_memory_label_name(label) };
 
         // Build set of defined post-labels and used pre-labels
+        // TODO(#18762): Duplicate post-state labels are silently overwritten; should report an error.
         let mut defined_post_labels: BTreeMap<Symbol, Loc> = BTreeMap::new();
         let mut used_pre_labels: BTreeSet<Symbol> = BTreeSet::new();
         for (pre_label, post_label, node_id) in &behavior_predicates {
@@ -1581,6 +1609,12 @@ impl ModuleBuilder<'_, '_> {
             }
             if let Some(pre_name) = pre_label.and_then(&get_label_name) {
                 used_pre_labels.insert(pre_name);
+            }
+        }
+        // Labels in Global/Exists memory accesses also count as references
+        for (label, _) in &memory_access_labels {
+            if let Some(name) = get_label_name(*label) {
+                used_pre_labels.insert(name);
             }
         }
 
@@ -1597,6 +1631,22 @@ impl ModuleBuilder<'_, '_> {
                             "state label `{}` is not defined; \
                              pre-state labels must reference a post-state label defined by another behavior predicate in the same spec",
                             pre_name.display(symbol_pool)
+                        ),
+                    );
+                }
+            }
+        }
+        // Also validate labels from memory accesses
+        for (label, node_id) in &memory_access_labels {
+            if let Some(name) = get_label_name(*label) {
+                if !defined_post_labels.contains_key(&name) {
+                    let exp_loc = self.parent.env.get_node_loc(*node_id);
+                    self.parent.env.error(
+                        &exp_loc,
+                        &format!(
+                            "state label `{}` is not defined; \
+                             labels in memory accesses must reference a post-state label defined by a behavior predicate in the same spec",
+                            name.display(symbol_pool)
                         ),
                     );
                 }
@@ -3690,6 +3740,7 @@ impl ModuleBuilder<'_, '_> {
                 visibility: entry.visibility,
                 has_package_visibility: self.package_structs.contains(&entry.struct_id),
                 is_empty_struct: entry.is_empty_struct,
+                users: entry.users.clone(),
             };
             struct_data.insert(StructId::new(name.symbol), data);
             if entry.visibility != Visibility::Private
@@ -3769,12 +3820,16 @@ impl ModuleBuilder<'_, '_> {
                 value,
                 ty,
                 visibility: _,
+                users,
+                attributes,
             } = const_entry.clone();
             let data = NamedConstantData {
                 name: name.symbol,
                 loc,
                 type_: ty,
                 value,
+                attributes,
+                users,
             };
             named_constants.insert(NamedConstantId::new(name.symbol), data);
         }

@@ -1,0 +1,13 @@
+//# publish --print-bytecode
+module 0x66::test_struct_not_found
+
+struct S
+    x: u64
+    y: u64
+
+// Invalid: pack$T references struct T which doesn't exist in this module
+#[pack] public fun pack$T(l0: u64, l1: u64): S
+    move_loc l0
+    move_loc l1
+    pack S
+    ret

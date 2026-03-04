@@ -53,11 +53,6 @@ impl SwarmBuilder {
         self
     }
 
-    pub fn with_aptos_testnet(mut self) -> Self {
-        self.genesis_framework = Some(aptos_framework::testnet_release_bundle().clone());
-        self
-    }
-
     pub fn with_init_config(mut self, init_config: InitConfigFn) -> Self {
         self.init_config = Some(init_config);
         self

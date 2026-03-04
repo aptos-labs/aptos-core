@@ -443,6 +443,15 @@ impl OptQuorumStorePayload {
         })
     }
 
+    pub fn empty() -> Self {
+        Self::new(
+            Vec::<(BatchInfo, Vec<SignedTransaction>)>::new().into(),
+            Vec::<BatchInfo>::new().into(),
+            Vec::<ProofOfStore<BatchInfo>>::new().into(),
+            PayloadExecutionLimit::None,
+        )
+    }
+
     pub(crate) fn extend(self, other: Self) -> Self {
         match (self, other) {
             (Self::V1(p1), Self::V1(p2)) => Self::V1(p1.extend(p2)),

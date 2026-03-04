@@ -16,15 +16,12 @@ use aptos_data_streaming_service::{
 };
 use aptos_executor_types::{ChunkCommitNotification, ChunkExecutorTrait};
 use aptos_storage_interface::{
-    chunk_to_commit::ChunkToCommit, DbReader, DbReaderWriter, DbWriter, LedgerSummary, Order,
-    Result, StateSnapshotReceiver,
+    chunk_to_commit::ChunkToCommit, DbReader, DbReaderWriter, DbWriter, LedgerSummary, Result,
+    StateSnapshotReceiver,
 };
 use aptos_types::{
-    account_address::AccountAddress,
-    contract_event::EventWithVersion,
     epoch_change::EpochChangeProof,
     epoch_state::EpochState,
-    event::EventKey,
     ledger_info::LedgerInfoWithSignatures,
     proof::{
         AccumulatorConsistencyProof, SparseMerkleProof, SparseMerkleRangeProof,
@@ -36,8 +33,7 @@ use aptos_types::{
         state_value::{StateValue, StateValueChunkWithProof},
     },
     transaction::{
-        AccountOrderedTransactionsWithProof, TransactionListWithProofV2,
-        TransactionOutputListWithProofV2, TransactionWithProof, Version,
+        TransactionListWithProofV2, TransactionOutputListWithProofV2, TransactionWithProof, Version,
     },
 };
 use async_trait::async_trait;
@@ -214,15 +210,6 @@ mock! {
             ledger_version: Version,
         ) -> Result<TransactionOutputListWithProofV2>;
 
-        fn get_events(
-            &self,
-            event_key: &EventKey,
-            start: u64,
-            order: Order,
-            limit: u64,
-            ledger_version: Version,
-        ) -> Result<Vec<EventWithVersion>>;
-
         fn get_block_timestamp(&self, version: u64) -> Result<u64>;
 
         fn get_last_version_before_timestamp(
@@ -244,23 +231,6 @@ mock! {
         fn get_latest_ledger_info_version(&self) -> Result<Version>;
 
         fn get_latest_commit_metadata(&self) -> Result<(Version, u64)>;
-
-        fn get_account_ordered_transaction(
-            &self,
-            address: AccountAddress,
-            seq_num: u64,
-            include_events: bool,
-            ledger_version: Version,
-        ) -> Result<Option<TransactionWithProof>>;
-
-        fn get_account_ordered_transactions(
-            &self,
-            address: AccountAddress,
-            seq_num: u64,
-            limit: u64,
-            include_events: bool,
-            ledger_version: Version,
-        ) -> Result<AccountOrderedTransactionsWithProof>;
 
         fn get_state_proof_with_ledger_info(
             &self,

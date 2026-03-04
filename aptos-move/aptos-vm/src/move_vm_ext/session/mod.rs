@@ -7,7 +7,7 @@ use crate::{
         resource_state_key, write_op_converter::WriteOpConverter, AptosMoveResolver, SessionId,
     },
 };
-use aptos_framework::natives::{
+use aptos_framework_natives::{
     aggregator_natives::{AggregatorChangeSet, AggregatorChangeV1, NativeAggregatorContext},
     code::{NativeCodeContext, PublishRequest},
     cryptography::{algebra::AlgebraContext, ristretto255_point::NativeRistrettoPointContext},

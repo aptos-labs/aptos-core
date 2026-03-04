@@ -26,8 +26,7 @@ use aptos_gas_schedule::{
 use aptos_keygen::KeyGen;
 use aptos_rest_client::AptosBaseUrl;
 use aptos_transaction_simulation::{
-    DeltaStateStore, EitherStateView, EmptyStateView, SimulationStateStore,
-    GENESIS_CHANGE_SET_HEAD, GENESIS_CHANGE_SET_MAINNET, GENESIS_CHANGE_SET_TESTNET,
+    DeltaStateStore, EitherStateView, EmptyStateView, SimulationStateStore, GENESIS_CHANGE_SET_HEAD,
 };
 use aptos_types::{
     account_config::{
@@ -72,7 +71,7 @@ use aptos_vm::{
     AptosVM, VMValidator,
 };
 use aptos_vm_environment::environment::AptosEnvironment;
-use aptos_vm_genesis::{generate_genesis_change_set_for_testing_with_count, GenesisOptions};
+use aptos_vm_genesis::generate_genesis_change_set_for_testing_with_count;
 use aptos_vm_logging::log_schema::AdapterLogSchema;
 use aptos_vm_types::{
     module_and_script_storage::{module_storage::AptosModuleStorage, AsAptosCodeStorage},
@@ -496,25 +495,8 @@ impl<O: OutputLogger> FakeExecutorImpl<O> {
     /// Creates an executor from the genesis file GENESIS_FILE_LOCATION
     pub fn from_head_genesis_with_count(count: u64) -> Self {
         Self::from_genesis(
-            generate_genesis_change_set_for_testing_with_count(GenesisOptions::Head, count)
-                .write_set(),
+            generate_genesis_change_set_for_testing_with_count(count).write_set(),
             ChainId::test(),
-        )
-    }
-
-    /// Creates an executor using the standard genesis.
-    pub fn from_testnet_genesis() -> Self {
-        Self::from_genesis(
-            GENESIS_CHANGE_SET_TESTNET.clone().write_set(),
-            ChainId::testnet(),
-        )
-    }
-
-    /// Creates an executor using the mainnet genesis.
-    pub fn from_mainnet_genesis() -> Self {
-        Self::from_genesis(
-            GENESIS_CHANGE_SET_MAINNET.clone().write_set(),
-            ChainId::mainnet(),
         )
     }
 

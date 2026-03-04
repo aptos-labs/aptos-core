@@ -34,12 +34,16 @@ members = [
     "aptos-move/aptos-vm-types",
     "aptos-move/aptos-workspace-server",
     "aptos-move/block-executor",
+    "aptos-move/cli",
     "aptos-move/e2e-benchmark",
     "aptos-move/e2e-move-tests",
     "aptos-move/e2e-tests",
     "aptos-move/e2e-testsuite",
+    "aptos-move/flow",
     "aptos-move/framework",
     "aptos-move/framework/cached-packages",
+    "aptos-move/framework/natives",
+    "aptos-move/framework/release-bundle",
     "aptos-move/framework/table-natives",
     "aptos-move/move-examples",
     "aptos-move/mvhashmap",
@@ -104,13 +108,13 @@ members = [
     "crates/aptos-telemetry-service/e2e-test/test-client",
     "crates/aptos-temppath",
     "crates/aptos-time-service",
+    "crates/aptos-token-bucket",
     "crates/aptos-transaction-filters",
     "crates/aptos-warp-webserver",
     "crates/bounded-executor",
     "crates/channel",
     "crates/crash-handler",
     "crates/fallible",
-    "crates/indexer",
     "crates/jwk-utils",
     "crates/node-resource-metrics",
     "crates/num-variants",
@@ -287,7 +291,7 @@ license = "LicenseRef-Aptos"
 license-file = "LICENSE"
 publish = false
 repository = "https://github.com/aptos-labs/aptos-core"
-rust-version = "1.85"
+rust-version = "1.88"
 
 [workspace.dependencies]
 # Internal crate dependencies.
@@ -348,6 +352,8 @@ aptos-faucet-metrics-server = { path = "crates/aptos-faucet/metrics-server" }
 aptos-fallible = { path = "crates/fallible" }
 aptos-forge = { path = "testsuite/forge" }
 aptos-framework = { path = "aptos-move/framework" }
+aptos-framework-natives = { path = "aptos-move/framework/natives" }
+aptos-release-bundle = { path = "aptos-move/framework/release-bundle" }
 fuzzer = { path = "testsuite/fuzzer" }
 aptos-abstract-gas-usage = { path = "aptos-move/aptos-abstract-gas-usage" }
 aptos-gas-meter = { path = "aptos-move/aptos-gas-meter" }
@@ -361,7 +367,6 @@ aptos-github-client = { path = "crates/aptos-github-client" }
 aptos-global-constants = { path = "config/global-constants" }
 aptos-id-generator = { path = "crates/aptos-id-generator" }
 aptos-in-memory-cache = { path = "crates/aptos-in-memory-cache" }
-aptos-indexer = { path = "crates/indexer" }
 aptos-indexer-grpc-cache-worker = { path = "ecosystem/indexer-grpc/indexer-grpc-cache-worker" }
 aptos-indexer-grpc-data-service = { path = "ecosystem/indexer-grpc/indexer-grpc-data-service" }
 aptos-indexer-grpc-data-service-v2 = { path = "ecosystem/indexer-grpc/indexer-grpc-data-service-v2" }
@@ -395,8 +400,10 @@ aptos-mempool = { path = "mempool" }
 aptos-mempool-notifications = { path = "state-sync/inter-component/mempool-notifications" }
 aptos-memsocket = { path = "network/memsocket" }
 aptos-metrics-core = { path = "crates/aptos-metrics-core" }
+aptos-move-cli = { path = "aptos-move/cli" }
 aptos-move-debugger = { path = "aptos-move/aptos-debugger" }
 aptos-move-examples = { path = "aptos-move/move-examples" }
+aptos-move-flow = { path = "aptos-move/flow" }
 aptos-move-e2e-benchmark = { path = "aptos-move/e2e-benchmark" }
 aptos-mvhashmap = { path = "aptos-move/mvhashmap" }
 aptos-native-interface = { path = "aptos-move/aptos-native-interface" }
@@ -458,6 +465,7 @@ aptos-testcases = { path = "testsuite/testcases" }
 aptos-time-service = { path = "crates/aptos-time-service", features = [
     "async",
 ] }
+aptos-token-bucket = { path = "crates/aptos-token-bucket" }
 aptos-transaction-emitter-lib = { path = "crates/transaction-emitter-lib" }
 aptos-transaction-generator-lib = { path = "crates/transaction-generator-lib" }
 aptos-transaction-workloads-lib = { path = "crates/transaction-workloads-lib" }
@@ -680,6 +688,7 @@ more-asserts = "0.3.0"
 named-lock = "0.2.0"
 native-tls = "0.2.10"
 neptune = { version = "13.0.0", default-features = false }
+notify = "8.2.0"
 ntest = "0.9.3"
 num = "0.4.0"
 num-bigint = { version = "0.3.2", features = ["rand"] }
@@ -757,6 +766,7 @@ reqwest-retry = "0.2.1"
 ring = { version = "0.16.20", features = ["std"] }
 ripemd = "0.1.1"
 rlimit = "0.10.2"
+rmcp = { version = "0.16", features = ["server", "transport-io"] }
 rocksdb = { version = "0.24.0", features = ["lz4"] }
 rsa = { version = "0.9.6" }
 rstack-self = { version = "0.3.0", features = ["dw"], default-features = false }
@@ -807,6 +817,7 @@ thread_local = "1.1.7"
 tiny-bip39 = "0.8.2"
 tiny-keccak = { version = "2.0.2", features = ["keccak", "sha3"] }
 tracing = "0.1.37"
+tracing-log = "0.2.0"
 tracing-subscriber = { version = "0.3.17", features = ["json", "env-filter"] }
 triomphe = "0.1.14"
 trybuild = "1.0.80"
@@ -963,8 +974,3 @@ ark-ff-macros = { git = "https://github.com/aptos-labs/algebra", branch = "fix-f
 ark-ff-asm = { git = "https://github.com/aptos-labs/algebra", branch = "fix-fft-parallelism-cutoff" }
 ark-poly = { git = "https://github.com/aptos-labs/algebra", branch = "fix-fft-parallelism-cutoff" }
 ark-serialize = { git = "https://github.com/aptos-labs/algebra", branch = "fix-fft-parallelism-cutoff" }
-
-# There is a circular dependency between aptos-core, aptos-indexer-processor-sdk, and aptos-indexer-processors-v2,
-# so we cannot simply change the version and package for `jemalloc-sys` in one repo without running into conflicts.
-# We have to keep this shim until everything uses the same jemalloc dependency.
-jemalloc-sys = { git = "https://github.com/aptos-labs/jemalloc-sys-shim", rev = "e0920246dd74303fab9a14b990768c6ac990a59b" }

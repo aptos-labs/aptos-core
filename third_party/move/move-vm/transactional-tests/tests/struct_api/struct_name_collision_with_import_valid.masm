@@ -1,0 +1,29 @@
+//# publish
+// First module defines a struct S
+module 0x66::external_module
+
+struct S has drop
+    external_field: u64
+
+//# publish --print-bytecode
+// Second module references external S (creating a struct handle for it)
+// and also defines its own local S with the same name
+module 0x67::local_module
+
+// This struct definition creates both:
+// 1. A struct handle for the imported 0x66::external_module::S
+// 2. A struct handle and definition for the local S
+struct Container has drop
+    imported: 0x66::external_module::S
+
+struct S has drop
+    local_field: u64
+
+// This pack function should work with the LOCAL S, not the imported external S
+// Before Fix #1, if StructApiContext iterated through all struct_handles,
+// both the imported S and local S would have the name "S" causing a collision.
+// After Fix #1, only the local S (from struct_defs) is considered.
+#[pack] public fun pack$S(l0: u64): S
+    move_loc l0
+    pack S
+    ret

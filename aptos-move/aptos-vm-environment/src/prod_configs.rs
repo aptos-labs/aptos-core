@@ -4,7 +4,7 @@
 pub use aptos_gas_schedule::LATEST_GAS_FEATURE_VERSION;
 use aptos_gas_schedule::{
     gas_feature_versions::{
-        RELEASE_V1_15, RELEASE_V1_30, RELEASE_V1_34, RELEASE_V1_38, RELEASE_V1_41,
+        RELEASE_V1_15, RELEASE_V1_30, RELEASE_V1_34, RELEASE_V1_38, RELEASE_V1_41, RELEASE_V1_42,
     },
     AptosGasParameters,
 };
@@ -119,20 +119,26 @@ pub fn aptos_prod_ty_builder(
     gas_feature_version: u64,
     gas_params: &AptosGasParameters,
 ) -> TypeBuilder {
+    let check_depth_on_type_counts_v2 = gas_feature_version >= RELEASE_V1_42;
     if gas_feature_version >= RELEASE_V1_15 {
         let max_ty_size = gas_params.vm.txn.max_ty_size;
         let max_ty_depth = gas_params.vm.txn.max_ty_depth;
-        TypeBuilder::with_limits(max_ty_size.into(), max_ty_depth.into())
+
+        TypeBuilder::with_limits(
+            max_ty_size.into(),
+            max_ty_depth.into(),
+            check_depth_on_type_counts_v2,
+        )
     } else {
-        aptos_default_ty_builder()
+        aptos_default_ty_builder(false)
     }
 }
 
 /// Returns default [TypeBuilder], used only when:
 ///  1. Type size gas parameters are not yet in gas schedule (before 1.15).
 ///   2. No gas parameters are found on-chain.
-pub fn aptos_default_ty_builder() -> TypeBuilder {
-    TypeBuilder::with_limits(128, 20)
+pub fn aptos_default_ty_builder(check_depth_on_type_counts_v2: bool) -> TypeBuilder {
+    TypeBuilder::with_limits(128, 20, check_depth_on_type_counts_v2)
 }
 
 /// Returns [DeserializerConfig] used by the Aptos blockchain in production.
@@ -144,7 +150,11 @@ pub fn aptos_prod_deserializer_config(features: &Features) -> DeserializerConfig
 }
 
 /// Returns [VerifierConfig] used by the Aptos blockchain in production.
-pub fn aptos_prod_verifier_config(gas_feature_version: u64, features: &Features) -> VerifierConfig {
+pub fn aptos_prod_verifier_config(
+    gas_feature_version: u64,
+    features: &Features,
+    timed_features: &TimedFeatures,
+) -> VerifierConfig {
     let sig_checker_v2_fix_script_ty_param_count =
         features.is_enabled(FeatureFlag::SIGNATURE_CHECKER_V2_SCRIPT_FIX);
     let sig_checker_v2_fix_function_signatures = gas_feature_version >= RELEASE_V1_34;
@@ -153,6 +163,9 @@ pub fn aptos_prod_verifier_config(gas_feature_version: u64, features: &Features)
         features.is_enabled(FeatureFlag::ENABLE_RESOURCE_ACCESS_CONTROL);
     let enable_function_values = features.is_enabled(FeatureFlag::ENABLE_FUNCTION_VALUES);
     // Note: we reuse the `enable_function_values` flag to set various stricter limits on types.
+
+    let strict_bounds = timed_features.is_enabled(TimedFeatureFlag::EnableStrictBoundsInProdConfig);
+    let revised_bounds = timed_features.is_enabled(TimedFeatureFlag::RevisedBoundsInProdConfig);
 
     VerifierConfig {
         scope: VerificationScope::Everything,
@@ -167,13 +180,29 @@ pub fn aptos_prod_verifier_config(gas_feature_version: u64, features: &Features)
             Some(256)
         },
         max_push_size: Some(10000),
-        max_struct_definitions: None,
-        max_struct_variants: None,
-        max_fields_in_struct: None,
-        max_function_definitions: None,
+        max_struct_definitions: if strict_bounds {
+            if revised_bounds {
+                Some(1100)
+            } else {
+                Some(200)
+            }
+        } else {
+            None
+        },
+        max_struct_variants: if strict_bounds {
+            if revised_bounds {
+                Some(127)
+            } else {
+                Some(64)
+            }
+        } else {
+            None
+        },
+        max_fields_in_struct: if strict_bounds { Some(64) } else { None },
+        max_function_definitions: if strict_bounds { Some(1000) } else { None },
         max_back_edges_per_function: None,
         max_back_edges_per_module: None,
-        max_basic_blocks_in_script: None,
+        max_basic_blocks_in_script: if strict_bounds { Some(1024) } else { None },
         max_per_fun_meter_units: Some(1000 * 80000),
         max_per_mod_meter_units: Some(1000 * 80000),
         _use_signature_checker_v2: true,
@@ -210,7 +239,7 @@ pub fn aptos_prod_vm_config(
     let enable_debugging = get_debugging_enabled();
 
     let deserializer_config = aptos_prod_deserializer_config(features);
-    let verifier_config = aptos_prod_verifier_config(gas_feature_version, features);
+    let verifier_config = aptos_prod_verifier_config(gas_feature_version, features, timed_features);
     let enable_enum_option = features.is_enabled(FeatureFlag::ENABLE_ENUM_OPTION);
     let enable_framework_for_option = features.is_enabled(FeatureFlag::ENABLE_FRAMEWORK_FOR_OPTION);
 
@@ -269,6 +298,7 @@ pub fn aptos_prod_vm_config(
         enable_closure_depth_check,
         enable_struct_layout_local_cache: gas_feature_version >= RELEASE_V1_41,
         check_depth_on_type_counts: gas_feature_version >= RELEASE_V1_41,
+        enable_public_struct_args: features.is_enabled(FeatureFlag::PUBLIC_STRUCT_ENUM_ARGS),
     };
 
     // Note: if max_value_nest_depth changed, make sure the constant is in-sync. Do not remove this

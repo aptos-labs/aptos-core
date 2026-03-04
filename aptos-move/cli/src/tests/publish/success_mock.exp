@@ -1,0 +1,7 @@
+BUILDING pub_mock
+{
+  "Result": {
+    "transaction_hash": "0x0000000000000000000000000000000000000000000000000000000000000000",
+    "success": true
+  }
+}

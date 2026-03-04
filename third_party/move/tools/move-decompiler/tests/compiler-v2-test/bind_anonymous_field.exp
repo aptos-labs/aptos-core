@@ -41,7 +41,7 @@ module 0x42::test {
 }
 
 --- unable to recompile the decompiled code:
-exiting with context checking errors
+exiting with compilation errors
 error: cannot select field `_0` since it has different types in variants of enum `E1`
    ┌─ bind_anonymous_field.move:24:24
    │

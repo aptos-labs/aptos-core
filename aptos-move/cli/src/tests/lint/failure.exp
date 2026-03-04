@@ -1,0 +1,10 @@
+BUILDING lint_bad
+error: entry function cannot return values
+  ┌─ <TEMPDIR>/lint_bad.move:2:22
+  │
+2 │     public entry fun bad_entry(): u64 { 42 }
+  │                      ^^^^^^^^^
+
+{
+  "Error": "Unexpected error: extended checks failed"
+}

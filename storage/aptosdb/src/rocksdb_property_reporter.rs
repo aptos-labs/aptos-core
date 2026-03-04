@@ -3,14 +3,16 @@
 
 use crate::{
     db_options::{
-        event_db_column_families, ledger_db_column_families, ledger_metadata_db_column_families,
-        skip_reporting_cf, state_kv_db_column_families, state_kv_db_new_key_column_families,
-        state_merkle_db_column_families, transaction_accumulator_db_column_families,
-        transaction_db_column_families, transaction_info_db_column_families,
-        write_set_db_column_families,
+        event_db_column_families, ledger_metadata_db_column_families, skip_reporting_cf,
+        state_kv_db_new_key_column_families, state_merkle_db_column_families,
+        transaction_accumulator_db_column_families, transaction_db_column_families,
+        transaction_info_db_column_families, write_set_db_column_families,
     },
     ledger_db::LedgerDb,
-    metrics::{OTHER_TIMERS_SECONDS, ROCKSDB_PROPERTIES, ROCKSDB_SHARD_PROPERTIES},
+    metrics::{
+        OTHER_TIMERS_SECONDS, ROCKSDB_PROPERTIES, ROCKSDB_SHARD_PROPERTIES, ROCKSDB_TICKERS,
+        SHARD_NAME_BY_ID,
+    },
     state_kv_db::StateKvDb,
     state_merkle_db::StateMerkleDb,
 };
@@ -18,7 +20,7 @@ use anyhow::Result;
 use aptos_infallible::Mutex;
 use aptos_logger::prelude::*;
 use aptos_metrics_core::TimerHelper;
-use aptos_schemadb::{ColumnFamilyName, DB};
+use aptos_schemadb::{ColumnFamilyName, Ticker, DB};
 use aptos_types::state_store::NUM_STATE_SHARDS;
 use once_cell::sync::Lazy;
 use std::{
@@ -38,20 +40,8 @@ static ROCKSDB_PROPERTY_MAP: Lazy<HashMap<&str, String>> = Lazy::new(|| {
         "rocksdb.cur-size-active-mem-table",
         "rocksdb.cur-size-all-mem-tables",
         "rocksdb.size-all-mem-tables",
-        "rocksdb.num-entries-active-mem-table",
-        "rocksdb.num-entries-imm-mem-tables",
-        "rocksdb.num-deletes-active-mem-table",
-        "rocksdb.num-deletes-imm-mem-tables",
-        "rocksdb.estimate-num-keys",
         "rocksdb.estimate-table-readers-mem",
-        "rocksdb.is-file-deletions-enabled",
-        "rocksdb.num-snapshots",
-        "rocksdb.oldest-snapshot-time",
-        "rocksdb.num-live-versions",
-        "rocksdb.current-super-version-number",
         "rocksdb.estimate-live-data-size",
-        "rocksdb.min-log-number-to-keep",
-        "rocksdb.min-obsolete-sst-number-to-keep",
         "rocksdb.total-sst-files-size",
         "rocksdb.live-sst-files-size",
         "rocksdb.base-level",
@@ -62,12 +52,90 @@ static ROCKSDB_PROPERTY_MAP: Lazy<HashMap<&str, String>> = Lazy::new(|| {
         "rocksdb.is-write-stopped",
         "rocksdb.block-cache-capacity",
         "rocksdb.block-cache-usage",
-        "rocksdb.block-cache-pinned-usage",
     ]
     .iter()
     .map(|x| (*x, format!("aptos_{}", x.replace('.', "_"))))
     .collect()
 });
+
+/// RocksDB tickers to report. These are per-DB cumulative counters (not per-CF).
+static ROCKSDB_TICKERS_TO_REPORT: &[(Ticker, &str)] = &[
+    (Ticker::StallMicros, "stall_micros"),
+    (Ticker::CompactReadBytes, "compact_read_bytes"),
+    (Ticker::CompactWriteBytes, "compact_write_bytes"),
+    (Ticker::FlushWriteBytes, "flush_write_bytes"),
+    (Ticker::BloomFilterUseful, "bloom_filter_useful"),
+    (
+        Ticker::BloomFilterFullPositive,
+        "bloom_filter_full_positive",
+    ),
+    (
+        Ticker::BloomFilterFullTruePositive,
+        "bloom_filter_full_true_positive",
+    ),
+    (
+        Ticker::BloomFilterPrefixChecked,
+        "bloom_filter_prefix_checked",
+    ),
+    (
+        Ticker::BloomFilterPrefixUseful,
+        "bloom_filter_prefix_useful",
+    ),
+    (
+        Ticker::BloomFilterPrefixTruePositive,
+        "bloom_filter_prefix_true_positive",
+    ),
+    (Ticker::BlockCacheHit, "block_cache_hit"),
+    (Ticker::BlockCacheMiss, "block_cache_miss"),
+    (Ticker::BlockCacheDataHit, "block_cache_data_hit"),
+    (Ticker::BlockCacheDataMiss, "block_cache_data_miss"),
+    (Ticker::BlockCacheFilterHit, "block_cache_filter_hit"),
+    (Ticker::BlockCacheFilterMiss, "block_cache_filter_miss"),
+    (Ticker::BlockCacheIndexHit, "block_cache_index_hit"),
+    (Ticker::BlockCacheIndexMiss, "block_cache_index_miss"),
+    // Per-level seek filter stats — most meaningful for state KV DB which has
+    // bloom/ribbon filters and uses prefix seeks.
+    (Ticker::LastLevelSeekFiltered, "last_level_seek_filtered"),
+    (
+        Ticker::LastLevelSeekFilterMatch,
+        "last_level_seek_filter_match",
+    ),
+    (Ticker::LastLevelSeekData, "last_level_seek_data"),
+    (
+        Ticker::LastLevelSeekDataUsefulNoFilter,
+        "last_level_seek_data_useful_no_filter",
+    ),
+    (
+        Ticker::LastLevelSeekDataUsefulFilterMatch,
+        "last_level_seek_data_useful_filter_match",
+    ),
+    (
+        Ticker::NonLastLevelSeekFiltered,
+        "non_last_level_seek_filtered",
+    ),
+    (
+        Ticker::NonLastLevelSeekFilterMatch,
+        "non_last_level_seek_filter_match",
+    ),
+    (Ticker::NonLastLevelSeekData, "non_last_level_seek_data"),
+    (
+        Ticker::NonLastLevelSeekDataUsefulNoFilter,
+        "non_last_level_seek_data_useful_no_filter",
+    ),
+    (
+        Ticker::NonLastLevelSeekDataUsefulFilterMatch,
+        "non_last_level_seek_data_useful_filter_match",
+    ),
+];
+
+fn set_tickers(db: &DB) {
+    let db_name = db.name();
+    for (ticker, ticker_name) in ROCKSDB_TICKERS_TO_REPORT {
+        ROCKSDB_TICKERS
+            .with_label_values(&[db_name, ticker_name])
+            .set(db.get_ticker_count(*ticker) as i64);
+    }
+}
 
 fn set_property(cf_name: &str, db: &DB) -> Result<()> {
     if !skip_reporting_cf(cf_name) {
@@ -79,10 +147,6 @@ fn set_property(cf_name: &str, db: &DB) -> Result<()> {
     }
     Ok(())
 }
-
-const SHARD_NAME_BY_ID: [&str; NUM_STATE_SHARDS] = [
-    "0", "1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12", "13", "14", "15",
-];
 
 fn set_shard_property(cf_name: ColumnFamilyName, db: &DB, shard: usize) -> Result<()> {
     if !skip_reporting_cf(cf_name) {
@@ -106,59 +170,62 @@ fn update_rocksdb_properties(
 ) -> Result<()> {
     let _timer = OTHER_TIMERS_SECONDS.timer_with(&["update_rocksdb_properties"]);
 
-    let enable_storage_sharding = state_kv_db.enabled_sharding();
+    for cf in ledger_metadata_db_column_families() {
+        set_property(cf, ledger_db.metadata_db_raw())?;
+    }
 
-    if enable_storage_sharding {
-        for cf in ledger_metadata_db_column_families() {
-            set_property(cf, &ledger_db.metadata_db_arc())?;
-        }
+    for cf in write_set_db_column_families() {
+        set_property(cf, ledger_db.write_set_db_raw())?;
+    }
 
-        for cf in write_set_db_column_families() {
-            set_property(cf, ledger_db.write_set_db_raw())?;
-        }
+    for cf in transaction_info_db_column_families() {
+        set_property(cf, ledger_db.transaction_info_db_raw())?;
+    }
 
-        for cf in transaction_info_db_column_families() {
-            set_property(cf, ledger_db.transaction_info_db_raw())?;
-        }
+    for cf in transaction_db_column_families() {
+        set_property(cf, ledger_db.transaction_db_raw())?;
+    }
 
-        for cf in transaction_db_column_families() {
-            set_property(cf, ledger_db.transaction_db_raw())?;
-        }
+    for cf in event_db_column_families() {
+        set_property(cf, ledger_db.event_db_raw())?;
+    }
 
-        for cf in event_db_column_families() {
-            set_property(cf, ledger_db.event_db_raw())?;
-        }
+    for cf in transaction_accumulator_db_column_families() {
+        set_property(cf, ledger_db.transaction_accumulator_db_raw())?;
+    }
 
-        for cf in transaction_accumulator_db_column_families() {
-            set_property(cf, ledger_db.transaction_accumulator_db_raw())?;
-        }
-
-        if !state_kv_db.enabled_sharding() {
-            for cf in state_kv_db_column_families() {
-                set_property(cf, state_kv_db.metadata_db())?;
-            }
-        } else {
-            for cf in state_kv_db_new_key_column_families() {
-                set_property(cf, state_kv_db.metadata_db())?;
-                for shard in 0..NUM_STATE_SHARDS {
-                    set_shard_property(cf, state_kv_db.db_shard(shard), shard)?;
-                }
-            }
-        }
-    } else {
-        for cf in ledger_db_column_families() {
-            set_property(cf, &ledger_db.metadata_db_arc())?;
+    for cf in state_kv_db_new_key_column_families() {
+        set_property(cf, state_kv_db.metadata_db())?;
+        for shard in 0..NUM_STATE_SHARDS {
+            set_shard_property(cf, state_kv_db.db_shard(shard), shard)?;
         }
     }
 
     for cf_name in state_merkle_db_column_families() {
         set_property(cf_name, state_merkle_db.metadata_db())?;
-        if state_merkle_db.sharding_enabled() {
-            for shard in 0..NUM_STATE_SHARDS {
-                set_shard_property(cf_name, state_merkle_db.db_shard(shard), shard)?;
-            }
+        for shard in 0..NUM_STATE_SHARDS {
+            set_shard_property(cf_name, state_merkle_db.db_shard(shard), shard)?;
         }
     }
+
+    // Report per-DB tickers (not per-CF — tickers are DB-level statistics).
+    set_tickers(ledger_db.metadata_db_raw());
+    set_tickers(ledger_db.write_set_db_raw());
+    set_tickers(ledger_db.transaction_info_db_raw());
+    set_tickers(ledger_db.transaction_db_raw());
+    set_tickers(ledger_db.event_db_raw());
+    set_tickers(ledger_db.transaction_accumulator_db_raw());
+
+    set_tickers(state_kv_db.metadata_db());
+    for shard in 0..NUM_STATE_SHARDS {
+        set_tickers(state_kv_db.db_shard(shard));
+    }
+
+    set_tickers(state_merkle_db.metadata_db());
+    for shard in 0..NUM_STATE_SHARDS {
+        set_tickers(state_merkle_db.db_shard(shard));
+    }
+
     Ok(())
 }
 
@@ -175,22 +242,29 @@ impl RocksdbPropertyReporter {
         state_kv_db: Arc<StateKvDb>,
     ) -> Self {
         let (send, recv) = mpsc::channel();
-        let join_handle = Some(thread::spawn(move || loop {
-            if let Err(e) = update_rocksdb_properties(&ledger_db, &state_merkle_db, &state_kv_db) {
-                warn!(
-                    error = ?e,
-                    "Updating rocksdb property failed."
-                );
-            }
-            // report rocksdb properties each 10 seconds
-            const TIMEOUT_MS: u64 = if cfg!(test) { 10 } else { 10000 };
+        let join_handle = Some(
+            thread::Builder::new()
+                .name("rocksdb-prop".into())
+                .spawn(move || loop {
+                    if let Err(e) =
+                        update_rocksdb_properties(&ledger_db, &state_merkle_db, &state_kv_db)
+                    {
+                        warn!(
+                            error = ?e,
+                            "Updating rocksdb property failed."
+                        );
+                    }
+                    // report rocksdb properties each 60 seconds
+                    const TIMEOUT_MS: u64 = if cfg!(test) { 10 } else { 60000 };
 
-            match recv.recv_timeout(Duration::from_millis(TIMEOUT_MS)) {
-                Ok(_) => break,
-                Err(mpsc::RecvTimeoutError::Timeout) => (),
-                Err(mpsc::RecvTimeoutError::Disconnected) => break,
-            }
-        }));
+                    match recv.recv_timeout(Duration::from_millis(TIMEOUT_MS)) {
+                        Ok(_) => break,
+                        Err(mpsc::RecvTimeoutError::Timeout) => (),
+                        Err(mpsc::RecvTimeoutError::Disconnected) => break,
+                    }
+                })
+                .expect("failed to spawn rocksdb-prop thread"),
+        );
         Self {
             sender: Mutex::new(send),
             join_handle,

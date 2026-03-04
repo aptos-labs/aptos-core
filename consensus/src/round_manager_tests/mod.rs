@@ -399,7 +399,6 @@ impl NodeSetup {
                 None,
                 vec![],
                 hashmap![],
-                false,
             ))
         } else {
             Arc::new(DirectMempoolPayloadManager::new())

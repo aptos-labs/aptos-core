@@ -1,0 +1,47 @@
+
+Diagnostics:
+warning: function `test_helper` is unused. Remove it, or suppress warning with `#[test_only]` (if test-only), `#[verify_only]` (if verify-only), or `#[lint::skip(unused)]`.
+  ┌─ tests/checking/unused/harmless_false_positives/test_only_items.move:5:9
+  │
+5 │     fun test_helper(): u64 {
+  │         ^^^^^^^^^^^
+
+warning: struct `TestStruct` is unused in current package. Remove it (if not published), or suppress warning with `#[test_only]` (if test-only), `#[verify_only]` (if verify-only), or `#[lint::skip(unused)]`.
+   ┌─ tests/checking/unused/harmless_false_positives/test_only_items.move:9:5
+   │
+ 9 │ ╭     struct TestStruct {
+10 │ │         x: u64
+11 │ │     }
+   │ ╰─────^
+
+warning: constant `TEST_CONST` is unused. Remove it, or suppress warning with `#[test_only]` (if test-only), `#[verify_only]` (if verify-only), or `#[lint::skip(unused)]`.
+   ┌─ tests/checking/unused/harmless_false_positives/test_only_items.move:13:5
+   │
+13 │     const TEST_CONST: u64 = 100;
+   │     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+// -- Model dump before first bytecode pipeline
+module 0x42::m {
+    struct TestStruct {
+        x: u64,
+    }
+    public fun regular(): u64 {
+        1
+    }
+    private fun test_helper(): u64 {
+        42
+    }
+} // end 0x42::m
+
+// -- Sourcified model before first bytecode pipeline
+module 0x42::m {
+    struct TestStruct {
+        x: u64,
+    }
+    public fun regular(): u64 {
+        1
+    }
+    fun test_helper(): u64 {
+        42
+    }
+}

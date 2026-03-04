@@ -8,7 +8,6 @@
 compile_error!("Testing features shouldn't be compiled for production aptos-node");
 
 mod consensus;
-mod indexer;
 mod logger;
 mod network;
 mod services;
@@ -206,8 +205,8 @@ pub struct AptosHandle {
     _consensus_runtime: Option<Runtime>,
     _dkg_runtime: Option<Runtime>,
     _indexer_grpc_runtime: Option<Runtime>,
-    _indexer_runtime: Option<Runtime>,
     _indexer_table_info_runtime: Option<Runtime>,
+    _inspection_service_runtime: Runtime,
     _jwk_consensus_runtime: Option<Runtime>,
     _mempool_runtime: Runtime,
     _network_runtimes: Vec<Runtime>,
@@ -771,22 +770,21 @@ pub fn setup_environment_and_start_node(
         )?;
 
     // Start the node inspection service
-    services::start_node_inspection_service(
+    let inspection_service_runtime = services::start_node_inspection_service(
         &node_config,
         aptos_data_client,
         peers_and_metadata.clone(),
     );
 
-    // Bootstrap the API and indexer
+    // Bootstrap the API and transaction streaming services
     let (
         mempool_client_receiver,
         api_runtime,
         indexer_table_info_runtime,
-        indexer_runtime,
         indexer_grpc_runtime,
         internal_indexer_db_runtime,
         mempool_client_sender,
-    ) = services::bootstrap_api_and_indexer(
+    ) = services::bootstrap_api_and_streaming(
         &node_config,
         db_rw.clone(),
         chain_id,
@@ -861,8 +859,8 @@ pub fn setup_environment_and_start_node(
         _consensus_runtime: consensus_runtime,
         _dkg_runtime: dkg_runtime,
         _indexer_grpc_runtime: indexer_grpc_runtime,
-        _indexer_runtime: indexer_runtime,
         _indexer_table_info_runtime: indexer_table_info_runtime,
+        _inspection_service_runtime: inspection_service_runtime,
         _jwk_consensus_runtime: jwk_consensus_runtime,
         _mempool_runtime: mempool_runtime,
         _network_runtimes: network_runtimes,

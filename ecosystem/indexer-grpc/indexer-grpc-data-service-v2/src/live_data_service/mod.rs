@@ -122,7 +122,7 @@ impl<'a> LiveDataService<'a> {
 
                 let ending_version = request
                     .transactions_count
-                    .map(|count| starting_version + count);
+                    .map(|count| starting_version.saturating_add(count));
 
                 scope.spawn(async move {
                     self.start_streaming(

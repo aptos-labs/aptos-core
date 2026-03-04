@@ -1,0 +1,4 @@
+BUILDING pub_pkg
+{
+  "Error": "Unexpected error: This command requires the full Aptos CLI environment. Transaction submission and chain interaction are not available in standalone mode. Use the full `aptos` CLI instead."
+}

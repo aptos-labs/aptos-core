@@ -10,7 +10,8 @@ use crate::{
     },
     builder::{
         model_builder::{
-            AnyFunEntry, ConstEntry, EntryVisibility, LocalVarEntry, StructEntry, StructLayout,
+            AnyFunEntry, BuiltinReceiverType, ConstEntry, EntryVisibility, LocalVarEntry,
+            StructEntry, StructLayout,
         },
         module_builder::{ModuleBuilder, SpecBlockContext},
     },
@@ -19,8 +20,9 @@ use crate::{
         LanguageVersion,
     },
     model::{
-        FieldData, FieldId, FunctionKind, GlobalEnv, GlobalId, Loc, ModuleId, NodeId, Parameter,
-        QualifiedId, QualifiedInstId, SpecFunId, StructId, TypeParameter, TypeParameterKind,
+        FieldData, FieldId, FunId, FunctionKind, GlobalEnv, GlobalId, Loc, ModuleId, NodeId,
+        Parameter, QualifiedId, QualifiedInstId, SpecFunId, StructId, TypeParameter,
+        TypeParameterKind, UserId,
     },
     symbol::{Symbol, SymbolPool},
     ty::{
@@ -28,11 +30,7 @@ use crate::{
         ReceiverFunctionInstance, ReferenceKind, Substitution, Type, TypeDisplayContext,
         TypeUnificationError, UnificationContext, Variance, WideningOrder, BOOL_TYPE,
     },
-    well_known::{
-        BORROW_MUT_NAME, BORROW_NAME, UNSPECIFIED_ABORT_CODE, VECTOR_FUNCS_WITH_BYTECODE_INSTRS,
-        VECTOR_MODULE,
-    },
-    FunId,
+    well_known::{UNSPECIFIED_ABORT_CODE, VECTOR_FUNCS_WITH_BYTECODE_INSTRS, VECTOR_MODULE},
 };
 use codespan_reporting::diagnostic::Severity;
 use itertools::Itertools;
@@ -45,6 +43,7 @@ use move_core_types::{
     ability::{Ability, AbilitySet},
     account_address::AccountAddress,
     function::ClosureMask,
+    language_storage::{BORROW, BORROW_MUT},
 };
 use move_ir_types::{
     location::{sp, Spanned},
@@ -73,6 +72,9 @@ pub(crate) struct ExpTranslator<'env, 'translator, 'module_translator> {
     pub local_table: LinkedList<BTreeMap<Symbol, LocalVarEntry>>,
     /// The name of the function this expression is associated with, if there is one.
     pub fun_name: Option<QualifiedSymbol>,
+    /// Context for tracking constant usage. When set, user of the constant
+    /// being translated will be recorded in it.
+    pub constant_use_context: Option<UserId>,
     /// Whether we are translating an inline function body.
     pub fun_is_inline: bool,
     /// The result type of the function this expression is associated with.
@@ -168,6 +170,7 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
             fun_ptrs_table: BTreeMap::new(),
             local_table: LinkedList::new(),
             fun_name: None,
+            constant_use_context: None,
             fun_is_inline: false,
             result_type: None,
             lambda_result_type_stack: vec![],
@@ -238,6 +241,10 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
             .map(|e| e.kind == FunctionKind::Inline)
             .unwrap_or_default();
         self.fun_name = Some(name)
+    }
+
+    pub fn set_constant_use_context(&mut self, context: UserId) {
+        self.constant_use_context = Some(context)
     }
 
     pub fn set_result_type(&mut self, ty: Type) {
@@ -2056,6 +2063,11 @@ impl ExpTranslator<'_, '_, '_> {
                     expected_type,
                     context,
                 )
+            },
+            EA::Exp_::LabeledCall(label, name, type_args, sp!(_, args)) => self
+                .translate_labeled_call(&loc, label, name, type_args, args, expected_type, context),
+            EA::Exp_::LabeledIndex(label, target, index) => {
+                self.translate_labeled_index(&loc, label, target, index, expected_type, context)
             },
             EA::Exp_::UnresolvedError => {
                 // Error reported
@@ -4006,10 +4018,31 @@ impl ExpTranslator<'_, '_, '_> {
             );
             self.new_error_exp()
         } else {
+            // Record constant usage.
+            // Why tracking constants on the fly:
+            // - they are replaced by values after translation!
+            if let Some(user_id) = &self.constant_use_context {
+                self.track_constant_usage(loc, sym, user_id.clone());
+            }
             let ConstEntry { ty, value, .. } = entry;
             let ty = self.check_type(loc, &ty, expected_type, context);
             let id = self.new_node_id_with_type_loc(&ty, loc);
             ExpData::Value(id, value)
+        }
+    }
+
+    fn track_constant_usage(&mut self, loc: &Loc, const_sym: &QualifiedSymbol, user_id: UserId) {
+        if let Some(const_entry) = self.parent.parent.const_table.get_mut(const_sym) {
+            const_entry.users.insert(user_id);
+        } else {
+            self.parent.parent.env.diag(
+                Severity::Bug,
+                loc,
+                &format!(
+                    "constant `{}` not found in const_table while tracking usage",
+                    const_sym.display(self.parent.parent.env)
+                ),
+            );
         }
     }
 
@@ -4165,16 +4198,13 @@ impl ExpTranslator<'_, '_, '_> {
             return call;
         } else {
             // To use index notation in vector module
-            let borrow_fun_name = if mutable {
-                BORROW_MUT_NAME
-            } else {
-                BORROW_NAME
-            };
+            let borrow_fun_name = if mutable { BORROW_MUT } else { BORROW };
             if let Some(borrow_symbol) = self
                 .parent
                 .parent
-                .vector_receiver_functions
-                .get(&self.env().symbol_pool.make(borrow_fun_name))
+                .builtin_receiver_functions
+                .get(&BuiltinReceiverType::Vector)
+                .and_then(|fns| fns.get(&self.env().symbol_pool.make(borrow_fun_name)))
             {
                 if let Some(borrow_fun_entry) = self.parent.parent.fun_table.get(borrow_symbol) {
                     let mid = borrow_fun_entry.module_id;
@@ -4446,11 +4476,12 @@ impl ExpTranslator<'_, '_, '_> {
                     .parent
                     .parent
                     .lookup_struct_field_decl(&mid.qualified_inst(sid, inst), field_name);
-                let expected_field_type = if let Some((_, ty)) = field_decls.into_iter().next() {
-                    ty
-                } else {
-                    Type::Error // this error is reported via type unification
-                };
+                let (variant, expected_field_type) =
+                    if let Some((variant, ty)) = field_decls.into_iter().next() {
+                        (variant, ty)
+                    } else {
+                        (None, Type::Error) // this error is reported via type unification
+                    };
                 let constraint = Constraint::SomeStruct(
                     [(field_name, expected_field_type.clone())]
                         .into_iter()
@@ -4472,11 +4503,20 @@ impl ExpTranslator<'_, '_, '_> {
                 let value_exp = self.translate_exp(args[2], &expected_field_type);
                 let id = self.new_node_id_with_type_loc(expected_type, loc);
                 self.set_node_instantiation(id, vec![expected_type.clone()]);
-                ExpData::Call(
-                    id,
-                    Operation::UpdateField(mid, sid, FieldId::new(field_name)),
-                    vec![struct_exp.into_exp(), value_exp.into_exp()],
-                )
+                // For enum types, use variant-qualified FieldId (like Select does)
+                let field_id = if let Some(v) = variant {
+                    let pool = self.symbol_pool();
+                    FieldId::new(pool.make(&FieldId::make_variant_field_id_str(
+                        pool.string(v).as_str(),
+                        pool.string(field_name).as_str(),
+                    )))
+                } else {
+                    FieldId::new(field_name)
+                };
+                ExpData::Call(id, Operation::UpdateField(mid, sid, field_id), vec![
+                    struct_exp.into_exp(),
+                    value_exp.into_exp(),
+                ])
             } else {
                 // Error reported
                 self.new_error_exp()
@@ -5805,6 +5845,20 @@ impl ExpTranslator<'_, '_, '_> {
         )
     }
 
+    /// Translates a single state label to a MemoryLabel (GlobalId), reusing existing labels
+    /// if the same name was already used. Registers the name in GlobalEnv for printing.
+    fn translate_state_label(&mut self, label: &PA::Label) -> GlobalId {
+        let sym = self.symbol_pool().make(label.value().as_str());
+        if let Some(&id) = self.state_label_map.get(&sym) {
+            id
+        } else {
+            let id = self.env().new_global_id();
+            self.state_label_map.insert(sym, id);
+            self.env().set_memory_label_name(id, sym);
+            id
+        }
+    }
+
     /// Validates and translates state labels for behavior predicates.
     /// Returns a BehaviorState with the translated memory labels. Names are registered
     /// in GlobalEnv for lookup during printing.
@@ -5829,26 +5883,87 @@ impl ExpTranslator<'_, '_, '_> {
             );
         }
 
-        // Convert labels to memory labels and register names with GlobalEnv
-        let pre_name = pre_label
-            .as_ref()
-            .map(|l| self.symbol_pool().make(l.value().as_str()));
-        let post_name = post_label
-            .as_ref()
-            .map(|l| self.symbol_pool().make(l.value().as_str()));
-        let mut get_or_create_label = |sym: Symbol| -> GlobalId {
-            if let Some(&id) = self.state_label_map.get(&sym) {
-                id
-            } else {
-                let id = self.env().new_global_id();
-                self.state_label_map.insert(sym, id);
-                self.env().set_memory_label_name(id, sym);
-                id
-            }
-        };
-        let pre = pre_name.map(&mut get_or_create_label);
-        let post = post_name.map(&mut get_or_create_label);
+        let pre = pre_label.as_ref().map(|l| self.translate_state_label(l));
+        let post = post_label.as_ref().map(|l| self.translate_state_label(l));
         BehaviorState::new(pre, post)
+    }
+
+    /// Translates a labeled call expression (label@global<R>(addr) or label@exists<R>(addr)).
+    /// Strictly accepts only unqualified `global`/`exists`, translates the call, and injects
+    /// the memory label into the resulting operation.
+    fn translate_labeled_call(
+        &mut self,
+        loc: &Loc,
+        label: &PA::Label,
+        name: &EA::ModuleAccess,
+        type_args: &Option<Vec<EA::Type>>,
+        args: &[EA::Exp],
+        expected_type: &Type,
+        context: &ErrorMessageContext,
+    ) -> ExpData {
+        let mem_label = self.translate_state_label(label);
+        // Labeled calls are only valid for unqualified `global` / `exists`.
+        let builtin_name = match &name.value {
+            EA::ModuleAccess_::Name(n)
+                if n.value.as_str() == "global" || n.value.as_str() == "exists" =>
+            {
+                self.symbol_pool().make(n.value.as_str())
+            },
+            _ => {
+                self.error(
+                    &self.to_loc(&name.loc),
+                    "labeled call must use unqualified `global` or `exists`",
+                );
+                return self.new_error_exp();
+            },
+        };
+        let args_refs: Vec<&EA::Exp> = args.iter().collect();
+        let result = self.translate_call(
+            loc,
+            &self.to_loc(&name.loc),
+            CallKind::Regular,
+            &Some(self.parent.parent.builtin_module()),
+            builtin_name,
+            type_args,
+            &args_refs,
+            expected_type,
+            context,
+        );
+        // Inject the memory label into the operation
+        Self::inject_memory_label(result, mem_label)
+    }
+
+    /// Translates a labeled index expression (label@R[addr]).
+    /// Translates the index expression and injects the memory label into the
+    /// resulting Global operation.
+    fn translate_labeled_index(
+        &mut self,
+        loc: &Loc,
+        label: &PA::Label,
+        target: &EA::Exp,
+        index: &EA::Exp,
+        expected_type: &Type,
+        context: &ErrorMessageContext,
+    ) -> ExpData {
+        let mem_label = self.translate_state_label(label);
+        let result = self.translate_index(loc, target, index, expected_type, context);
+        Self::inject_memory_label(result, mem_label)
+    }
+
+    /// Injects a memory label into a Global(None) or Exists(None) operation
+    /// within an ExpData::Call node.
+    // TODO(#18762): This does not handle BorrowGlobal from index ops, so `label@R[addr]`
+    // silently drops the label. Need to also match BorrowGlobal(ReferenceKind, _, None).
+    fn inject_memory_label(exp: ExpData, label: GlobalId) -> ExpData {
+        match exp {
+            ExpData::Call(id, Operation::Global(None), args) => {
+                ExpData::Call(id, Operation::Global(Some(label)), args)
+            },
+            ExpData::Call(id, Operation::Exists(None), args) => {
+                ExpData::Call(id, Operation::Exists(Some(label)), args)
+            },
+            other => other,
+        }
     }
 
     /// Resolves the target of a behavior predicate to either a local variable or a function.

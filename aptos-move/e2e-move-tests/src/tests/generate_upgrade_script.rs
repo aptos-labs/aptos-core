@@ -2,7 +2,7 @@
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 use crate::{tests::common, MoveHarness};
-use aptos_framework::{BuildOptions, BuiltPackage, ReleasePackage};
+use aptos_framework::{new_release_package, BuildOptions, BuiltPackage};
 use aptos_package_builder::PackageBuilder;
 use aptos_types::account_address::AccountAddress;
 use move_package::compilation::package_layout::CompiledPackageLayout;
@@ -36,7 +36,7 @@ module 0x{}::test {{
     );
     let proposal_dir = proposal.write_to_temp().unwrap();
 
-    let upgrade_release = ReleasePackage::new(
+    let upgrade_release = new_release_package(
         BuiltPackage::build(upgrade_dir.path().to_path_buf(), BuildOptions::default()).unwrap(),
     )
     .unwrap();

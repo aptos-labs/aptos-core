@@ -9,19 +9,17 @@ use aptos_crypto::{
     HashValue,
 };
 use aptos_scratchpad::SparseMerkleTree;
-use aptos_storage_interface::{DbReader, Order, Result};
+use aptos_storage_interface::{DbReader, Result};
 use aptos_temppath::TempPath;
 use aptos_types::{
     account_address::AccountAddress,
-    contract_event::ContractEvent,
-    event::EventKey,
     ledger_info::{generate_ledger_info_with_sig, LedgerInfo, LedgerInfoWithSignatures},
     proof::accumulator::{InMemoryEventAccumulator, InMemoryTransactionAccumulator},
     proptest_types::{AccountInfoUniverse, BlockGen},
     state_store::{state_key::StateKey, state_value::StateValue},
     transaction::{
-        AuxiliaryInfo, PersistedAuxiliaryInfo, ReplayProtector, Transaction,
-        TransactionAuxiliaryData, TransactionInfo, TransactionToCommit, Version,
+        AuxiliaryInfo, PersistedAuxiliaryInfo, Transaction, TransactionAuxiliaryData,
+        TransactionInfo, TransactionToCommit, Version,
     },
     write_set::TransactionWrite,
 };
@@ -212,19 +210,11 @@ pub fn arb_blocks_to_commit(
 pub fn arb_blocks_to_commit_with_block_nums(
     min_blocks: usize,
     max_blocks: usize,
-) -> impl Strategy<
-    Value = (
-        Vec<(Vec<TransactionToCommit>, LedgerInfoWithSignatures)>,
-        bool,
-    ),
-> {
-    (
-        arb_blocks_to_commit_impl(
-            5, /* num_accounts */
-            2, /* max_user_txn_per_block */
-            min_blocks, max_blocks,
-        ),
-        proptest::bool::ANY,
+) -> impl Strategy<Value = Vec<(Vec<TransactionToCommit>, LedgerInfoWithSignatures)>> {
+    arb_blocks_to_commit_impl(
+        5, /* num_accounts */
+        2, /* max_user_txn_per_block */
+        min_blocks, max_blocks,
     )
 }
 
@@ -447,170 +437,6 @@ fn verify_snapshots(
     }
 }
 
-fn get_events_by_event_key(
-    db: &AptosDB,
-    ledger_info: &LedgerInfo,
-    event_key: &EventKey,
-    first_seq_num: u64,
-    last_seq_num: u64,
-    order: Order,
-    is_latest: bool,
-) -> Result<Vec<(Version, ContractEvent)>> {
-    const LIMIT: u64 = 3;
-
-    let mut cursor = if order == Order::Ascending {
-        first_seq_num
-    } else if is_latest {
-        // Test the ability to get the latest.
-        u64::MAX
-    } else {
-        last_seq_num
-    };
-
-    let mut ret = Vec::new();
-    loop {
-        let events =
-            db.get_events_by_event_key(event_key, cursor, order, LIMIT, ledger_info.version())?;
-
-        let num_events = events.len() as u64;
-        if cursor == u64::MAX {
-            cursor = last_seq_num;
-        }
-        let expected_seq_nums: Vec<_> = if order == Order::Ascending {
-            (cursor..cursor + num_events).collect()
-        } else {
-            (cursor + 1 - num_events..=cursor).rev().collect()
-        };
-
-        let events: Vec<_> = itertools::zip_eq(events, expected_seq_nums)
-            .map(|(e, _)| Ok((e.transaction_version, e.event)))
-            .collect::<Result<_>>()
-            .unwrap();
-
-        let num_results = events.len() as u64;
-        if num_results == 0 {
-            break;
-        }
-        assert_eq!(
-            events
-                .first()
-                .unwrap()
-                .1
-                .clone()
-                .v1()
-                .unwrap()
-                .sequence_number(),
-            cursor
-        );
-
-        if order == Order::Ascending {
-            if cursor + num_results > last_seq_num {
-                ret.extend(
-                    events
-                        .into_iter()
-                        .take((last_seq_num - cursor + 1) as usize),
-                );
-                break;
-            } else {
-                ret.extend(events);
-                cursor += num_results;
-            }
-        } else {
-            // descending
-            if first_seq_num + num_results > cursor {
-                ret.extend(
-                    events
-                        .into_iter()
-                        .take((cursor - first_seq_num + 1) as usize),
-                );
-                break;
-            } else {
-                ret.extend(events);
-                cursor -= num_results;
-            }
-        }
-    }
-
-    if order == Order::Descending {
-        ret.reverse();
-    }
-
-    Ok(ret)
-}
-
-fn verify_events_by_event_key(
-    db: &AptosDB,
-    events: Vec<(EventKey, Vec<(Version, ContractEvent)>)>,
-    ledger_info: &LedgerInfo,
-    is_latest: bool,
-) {
-    events
-        .into_iter()
-        .map(|(access_path, events)| {
-            let first_seq = events
-                .first()
-                .expect("Shouldn't be empty")
-                .1
-                .clone()
-                .v1()
-                .unwrap()
-                .sequence_number();
-            let last_seq = events
-                .last()
-                .expect("Shouldn't be empty")
-                .1
-                .clone()
-                .v1()
-                .unwrap()
-                .sequence_number();
-
-            let traversed = get_events_by_event_key(
-                db,
-                ledger_info,
-                &access_path,
-                first_seq,
-                last_seq,
-                Order::Ascending,
-                is_latest,
-            )
-            .unwrap();
-            assert_eq!(events, traversed);
-
-            let rev_traversed = get_events_by_event_key(
-                db,
-                ledger_info,
-                &access_path,
-                first_seq,
-                last_seq,
-                Order::Descending,
-                is_latest,
-            )
-            .unwrap();
-            assert_eq!(events, rev_traversed);
-            Ok(())
-        })
-        .collect::<Result<Vec<_>>>()
-        .unwrap();
-}
-
-fn group_events_by_event_key(
-    first_version: Version,
-    txns_to_commit: &[TransactionToCommit],
-) -> Vec<(EventKey, Vec<(Version, ContractEvent)>)> {
-    let mut event_key_to_events: HashMap<EventKey, Vec<(Version, ContractEvent)>> = HashMap::new();
-    for (batch_idx, txn) in txns_to_commit.iter().enumerate() {
-        for event in txn.events() {
-            if let ContractEvent::V1(v1) = event {
-                event_key_to_events
-                    .entry(*v1.key())
-                    .or_default()
-                    .push((first_version + batch_idx as u64, event.clone()));
-            }
-        }
-    }
-    event_key_to_events.into_iter().collect()
-}
-
 fn verify_account_txn_summaries(
     db: &AptosDB,
     expected_txns_by_account: HashMap<AccountAddress, Vec<Transaction>>,
@@ -653,64 +479,6 @@ fn verify_account_txn_summaries(
     }
 }
 
-fn verify_account_ordered_txns(
-    db: &AptosDB,
-    expected_ordered_txns_by_account: HashMap<
-        AccountAddress,
-        Vec<(Transaction, Vec<ContractEvent>)>,
-    >,
-    ledger_info: &LedgerInfo,
-) {
-    let actual_ordered_txns_by_account = expected_ordered_txns_by_account
-        .iter()
-        .map(|(account, txns_and_events)| {
-            let account = *account;
-            let first_seq_num = if let Some((txn, _)) = txns_and_events.first() {
-                txn.try_as_signed_user_txn().unwrap().sequence_number()
-            } else {
-                return (account, Vec::new());
-            };
-
-            let last_txn = &txns_and_events.last().unwrap().0;
-            let last_seq_num = last_txn.try_as_signed_user_txn().unwrap().sequence_number();
-            let limit = last_seq_num + 1;
-
-            let acct_txns_with_proof = db
-                .get_account_ordered_transactions(
-                    account,
-                    first_seq_num,
-                    limit,
-                    true, /* include_events */
-                    ledger_info.version(),
-                )
-                .unwrap();
-            acct_txns_with_proof
-                .verify(
-                    ledger_info,
-                    account,
-                    first_seq_num,
-                    limit,
-                    true,
-                    ledger_info.version(),
-                )
-                .unwrap();
-
-            let txns_and_events = acct_txns_with_proof
-                .into_inner()
-                .into_iter()
-                .map(|txn_with_proof| (txn_with_proof.transaction, txn_with_proof.events.unwrap()))
-                .collect::<Vec<_>>();
-
-            (account, txns_and_events)
-        })
-        .collect::<HashMap<_, _>>();
-
-    assert_eq!(
-        actual_ordered_txns_by_account,
-        expected_ordered_txns_by_account
-    );
-}
-
 fn group_txns_by_account(
     txns_to_commit: &[TransactionToCommit],
 ) -> HashMap<AccountAddress, Vec<Transaction>> {
@@ -722,24 +490,6 @@ fn group_txns_by_account(
                 .entry(account)
                 .or_insert_with(Vec::new)
                 .push(txn.transaction().clone());
-        }
-    }
-    account_to_txns
-}
-
-fn group_ordered_txns_by_account(
-    txns_to_commit: &[TransactionToCommit],
-) -> HashMap<AccountAddress, Vec<(Transaction, Vec<ContractEvent>)>> {
-    let mut account_to_txns = HashMap::new();
-    for txn in txns_to_commit {
-        if let Some(signed_txn) = txn.transaction().try_as_signed_user_txn() {
-            if let ReplayProtector::SequenceNumber(_) = signed_txn.replay_protector() {
-                let account = signed_txn.sender();
-                account_to_txns
-                    .entry(account)
-                    .or_insert_with(Vec::new)
-                    .push((txn.transaction().clone(), txn.events().to_vec()));
-            }
         }
     }
     account_to_txns
@@ -808,7 +558,7 @@ pub fn verify_committed_transactions(
     txns_to_commit: &[TransactionToCommit],
     first_version: Version,
     ledger_info_with_sigs: &LedgerInfoWithSignatures,
-    is_latest: bool,
+    _is_latest: bool,
 ) {
     verify_ledger_iterators(db, txns_to_commit, first_version, ledger_info_with_sigs);
     let ledger_info = ledger_info_with_sigs.ledger_info();
@@ -868,36 +618,6 @@ pub fn verify_committed_transactions(
                 .verify_user_txn(ledger_info, cur_ver, txn.sender(), txn.replay_protector())
                 .unwrap();
 
-            if let ReplayProtector::SequenceNumber(seq_num) = txn.replay_protector() {
-                let txn_with_proof = db
-                    .get_account_ordered_transaction(txn.sender(), seq_num, true, ledger_version)
-                    .unwrap()
-                    .expect("Should exist.");
-                txn_with_proof
-                    .verify_user_txn(ledger_info, cur_ver, txn.sender(), txn.replay_protector())
-                    .unwrap();
-
-                let acct_txns_with_proof = db
-                    .get_account_ordered_transactions(
-                        txn.sender(),
-                        seq_num,
-                        1,
-                        true,
-                        ledger_version,
-                    )
-                    .unwrap();
-                acct_txns_with_proof
-                    .verify(
-                        ledger_info,
-                        txn.sender(),
-                        txn.sequence_number(),
-                        1,
-                        true,
-                        ledger_version,
-                    )
-                    .unwrap();
-                assert_eq!(acct_txns_with_proof.len(), 1);
-            }
             let txn_list_with_proof = db
                 .get_transactions(cur_ver, 1, ledger_version, true /* fetch_events */)
                 .unwrap();
@@ -917,25 +637,12 @@ pub fn verify_committed_transactions(
         cur_ver += 1;
     }
 
-    // Fetch and verify events.
-    verify_events_by_event_key(
-        db,
-        group_events_by_event_key(first_version, txns_to_commit),
-        ledger_info,
-        is_latest,
-    );
-
     // Fetch and verify batch transactions by account
     verify_account_txn_summaries(
         db,
         group_txns_by_account(txns_to_commit),
         ledger_info,
         first_version,
-    );
-    verify_account_ordered_txns(
-        db,
-        group_ordered_txns_by_account(txns_to_commit),
-        ledger_info,
     );
 }
 

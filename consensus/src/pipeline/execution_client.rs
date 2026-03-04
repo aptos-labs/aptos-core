@@ -296,7 +296,8 @@ impl ExecutionProxyClient {
             secret_ready_block_tx,
             network_sender.clone(),
             self.bounded_executor.clone(),
-            &self.consensus_config.rand_rb_config,
+            &self.consensus_config.secret_share_rb_config,
+            self.consensus_config.secret_share_request_delay_ms,
         );
 
         tokio::spawn(secret_share_manager.start(
@@ -691,15 +692,32 @@ impl TExecutionClient for ExecutionProxyClient {
     }
 
     async fn reset(&self, target: &LedgerInfoWithSignatures) -> Result<()> {
-        let (reset_tx_to_rand_manager, reset_tx_to_buffer_manager) = {
+        let (
+            reset_tx_to_rand_manager,
+            reset_tx_to_secret_share_manager,
+            reset_tx_to_buffer_manager,
+        ) = {
             let handle = self.handle.read();
             (
                 handle.reset_tx_to_rand_manager.clone(),
+                handle.reset_tx_to_secret_share_manager.clone(),
                 handle.reset_tx_to_buffer_manager.clone(),
             )
         };
 
         if let Some(mut reset_tx) = reset_tx_to_rand_manager {
+            let (ack_tx, ack_rx) = oneshot::channel::<ResetAck>();
+            reset_tx
+                .send(ResetRequest {
+                    tx: ack_tx,
+                    signal: ResetSignal::TargetRound(target.commit_info().round()),
+                })
+                .await
+                .map_err(|_| Error::RandResetDropped)?;
+            ack_rx.await.map_err(|_| Error::RandResetDropped)?;
+        }
+
+        if let Some(mut reset_tx) = reset_tx_to_secret_share_manager {
             let (ack_tx, ack_rx) = oneshot::channel::<ResetAck>();
             reset_tx
                 .send(ResetRequest {

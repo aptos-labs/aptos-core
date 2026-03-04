@@ -116,9 +116,6 @@ struct StorageOpt {
     pruner_opt: PrunerOpt,
 
     #[clap(long)]
-    enable_storage_sharding: bool,
-
-    #[clap(long)]
     enable_indexer_grpc: bool,
 }
 
@@ -126,7 +123,6 @@ impl StorageOpt {
     fn storage_test_config(&self) -> StorageTestConfig {
         StorageTestConfig {
             pruner_config: self.pruner_opt.pruner_config(),
-            enable_storage_sharding: self.enable_storage_sharding,
             enable_indexer_grpc: self.enable_indexer_grpc,
         }
     }

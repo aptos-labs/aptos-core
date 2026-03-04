@@ -28,8 +28,6 @@ mod fullnode;
 #[cfg(test)]
 mod genesis;
 #[cfg(test)]
-mod indexer;
-#[cfg(test)]
 mod inspection_service;
 #[cfg(test)]
 mod jwks;
@@ -67,8 +65,6 @@ mod transaction_filter;
 mod txn_broadcast;
 #[cfg(test)]
 mod txn_emitter;
-#[cfg(test)]
-mod upgrade;
 
 #[cfg(test)]
 mod smoke_test_environment;

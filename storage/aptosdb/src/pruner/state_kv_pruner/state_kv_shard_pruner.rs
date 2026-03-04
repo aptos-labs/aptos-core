@@ -15,7 +15,7 @@ use aptos_storage_interface::Result;
 use aptos_types::transaction::Version;
 use std::sync::Arc;
 
-// This pruner is only used when enable_sharding flag is true
+// Per-shard pruner for state KV data
 pub(in crate::pruner) struct StateKvShardPruner {
     shard_id: usize,
     db_shard: Arc<DB>,

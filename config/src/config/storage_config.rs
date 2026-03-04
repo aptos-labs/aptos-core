@@ -289,11 +289,6 @@ pub struct StorageConfig {
     pub max_num_nodes_per_lru_cache_shard: usize,
     /// Rocksdb-specific configurations
     pub rocksdb_configs: RocksdbConfigs,
-    /// Try to enable the internal indexer. The indexer expects to have seen all transactions
-    /// since genesis. To recover operation after data loss, or to bootstrap a node in fast sync
-    /// mode, the indexer db needs to be copied in from another node.
-    /// TODO(jill): deprecate Indexer once Indexer Async V2 is ready
-    pub enable_indexer: bool,
     /// Fine grained control for db paths of individal databases/shards.
     /// If not specificed, will use `dir` as default.
     /// Only allowed when sharding is enabled.
@@ -462,7 +457,6 @@ impl Default for StorageConfig {
             storage_pruner_config: PrunerConfig::default(),
             data_dir: PathBuf::from("/opt/aptos/data"),
             rocksdb_configs: RocksdbConfigs::default(),
-            enable_indexer: false,
             db_path_overrides: None,
             buffered_state_target_items: BUFFERED_STATE_TARGET_ITEMS,
             max_num_nodes_per_lru_cache_shard: DEFAULT_MAX_NUM_NODES_PER_LRU_CACHE_SHARD,
@@ -580,6 +574,12 @@ impl StorageDirPaths {
             .unwrap_or(&self.default_path)
     }
 
+    pub fn hot_state_kv_db_metadata_root_path(&self) -> &PathBuf {
+        self.hot_state_kv_db_paths
+            .metadata_path()
+            .unwrap_or(&self.default_path)
+    }
+
     pub fn hot_state_kv_db_shard_root_path(&self, shard_id: usize) -> &PathBuf {
         self.hot_state_kv_db_paths
             .shard_path(shard_id)
@@ -678,11 +678,6 @@ impl ConfigOptimizer for StorageConfig {
                 config.assert_rlimit_nofile = true;
                 modified_config = true;
             }
-            if (chain_id.is_testnet() || chain_id.is_mainnet())
-                && config_yaml["rocksdb_configs"]["enable_storage_sharding"].as_bool() != Some(true)
-            {
-                panic!("Storage sharding (AIP-97) is not enabled in node config. Please follow the guide to migration your node, and set storage.rocksdb_configs.enable_storage_sharding to true explicitly in your node config. https://aptoslabs.notion.site/DB-Sharding-Migration-Public-Full-Nodes-1978b846eb7280b29f17ceee7d480730");
-            }
             // TODO(HotState): Hot state root hash computation is off by default in Mainnet unless
             // explicitly enabled.
             if chain_id.is_mainnet()
@@ -745,13 +740,6 @@ impl ConfigSanitizer for StorageConfig {
         }
 
         if let Some(db_path_overrides) = config.db_path_overrides.as_ref() {
-            if !config.rocksdb_configs.enable_storage_sharding {
-                return Err(Error::ConfigSanitizerFailed(
-                    sanitizer_name,
-                    "db_path_overrides is allowed only if sharding is enabled.".to_string(),
-                ));
-            }
-
             if let Some(ledger_db_path) = db_path_overrides.ledger_db_path.as_ref() {
                 if !ledger_db_path.is_absolute() {
                     return Err(Error::ConfigSanitizerFailed(

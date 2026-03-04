@@ -329,10 +329,13 @@ impl DBIndexer {
 
         let db = indexer_db.get_inner_db_ref().to_owned();
         let internal_indexer_db = db.clone();
-        let committer_handle = thread::spawn(move || {
-            let committer = DBCommitter::new(db, reciver);
-            committer.run();
-        });
+        let committer_handle = thread::Builder::new()
+            .name("db-idx-commit".into())
+            .spawn(move || {
+                let committer = DBCommitter::new(db, reciver);
+                committer.run();
+            })
+            .expect("failed to spawn db-idx-commit thread");
 
         Self {
             indexer_db,

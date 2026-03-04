@@ -85,7 +85,7 @@ impl HexyBase {
             if level_size == 1 {
                 break;
             } else {
-                level_size = level_size / ARITY + (level_size % ARITY != 0) as usize;
+                level_size = level_size / ARITY + (!level_size.is_multiple_of(ARITY)) as usize;
             }
         }
 

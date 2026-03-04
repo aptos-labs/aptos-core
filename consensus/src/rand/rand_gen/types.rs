@@ -28,7 +28,7 @@ use std::{collections::HashSet, fmt::Debug, sync::Arc};
 pub const NUM_THREADS_FOR_WVUF_DERIVATION: usize = 8;
 pub const FUTURE_ROUNDS_TO_ACCEPT: u64 = 200;
 
-#[derive(PartialEq)]
+#[derive(Clone, Copy, Debug, PartialEq)]
 pub enum PathType {
     Fast,
     Slow,
@@ -151,31 +151,28 @@ impl TShare for Share {
 
         // Try batch verification: build proof and verify in one shot.
         // If any step fails, fall back to individual verification.
-        let batch_ok = Self::build_apks_and_proofs(&shares_vec, rand_config)
-            .and_then(|apks_and_proofs| {
-                let proof = WVUF::aggregate_shares(&rand_config.wconfig, &apks_and_proofs);
-                let metadata_serialized = bcs::to_bytes(rand_metadata)
-                    .map_err(|e| anyhow!("metadata serialization failed: {e}"))?;
-                WVUF::verify_proof(
-                    &rand_config.vuf_pp,
-                    rand_config.pk(),
-                    &rand_config.get_all_certified_apk(),
-                    metadata_serialized.as_slice(),
-                    &proof,
-                    THREAD_MANAGER.get_non_exe_cpu_pool(),
-                )
-            })
-            .is_ok();
-
-        if batch_ok {
-            return HashSet::new();
+        match Self::build_apks_and_proofs(&shares_vec, rand_config).and_then(|apks_and_proofs| {
+            let proof = WVUF::aggregate_shares(&rand_config.wconfig, &apks_and_proofs);
+            let metadata_serialized = bcs::to_bytes(rand_metadata)
+                .map_err(|e| anyhow!("metadata serialization failed: {e}"))?;
+            WVUF::verify_proof(
+                &rand_config.vuf_pp,
+                rand_config.pk(),
+                &rand_config.get_all_certified_apk(),
+                metadata_serialized.as_slice(),
+                &proof,
+                THREAD_MANAGER.get_non_exe_cpu_pool(),
+            )
+        }) {
+            Ok(()) => return HashSet::new(),
+            Err(e) => {
+                // Batch verification failed; fall back to individual verification
+                warn!(
+                    "Batch verification failed for round {}, falling back to individual verification: {e}",
+                    rand_metadata.round
+                );
+            },
         }
-
-        // Batch verification failed; fall back to individual verification
-        warn!(
-            "Batch verification failed for round {}, falling back to individual verification",
-            rand_metadata.round
-        );
 
         let verification_results: Vec<bool> = THREAD_MANAGER.get_non_exe_cpu_pool().install(|| {
             shares_vec

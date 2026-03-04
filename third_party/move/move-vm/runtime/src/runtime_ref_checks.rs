@@ -1819,8 +1819,11 @@ impl RefCheckState {
                 // so we can optimize for that (common) case.
                 if ref_info.is_mutable {
                     frame_state.lock_node_subtree(&access_path_tree_node, Lock::Exclusive)?;
-                    // Having a mutable reference argument is the same as performing a destructive write.
-                    frame_state.destructive_write_via_mut_ref(&access_path_tree_node)?;
+                    // When calling a borrow field mut api, skip the destructive write
+                    if function.function.borrow_field_mut_api_at_offset().is_none() {
+                        // Having a mutable reference argument is the same as performing a destructive write.
+                        frame_state.destructive_write_via_mut_ref(&access_path_tree_node)?;
+                    }
                     mut_ref_indexes.push(i);
                 } else {
                     frame_state.lock_node_subtree(&access_path_tree_node, Lock::Shared)?;

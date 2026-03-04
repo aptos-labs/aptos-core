@@ -15,7 +15,9 @@ use move_binary_format::{
     access::ModuleAccess,
     binary_views::BinaryIndexedView,
     errors::{Location, PartialVMError, PartialVMResult, VMResult},
-    file_format::{CompiledModule, FunctionAttribute, FunctionDefinitionIndex, Visibility},
+    file_format::{
+        CompiledModule, FunctionAttribute, FunctionDefinitionIndex, MemberCount, Visibility,
+    },
 };
 use move_core_types::{
     ability::AbilitySet,
@@ -89,6 +91,25 @@ pub struct Function {
     pub(crate) is_persistent: bool,
     pub(crate) has_module_reentrancy_lock: bool,
     pub(crate) is_trusted: bool,
+    /// Non-`None` when the function is a compiler-synthesized struct/enum API that requires
+    /// special treatment during bytecode validation or execution.  At most one variant can apply
+    /// to any given function.
+    pub(crate) struct_api: Option<StructApiKind>,
+}
+
+/// Classifies the struct/enum API role of a compiler-synthesized function.
+///
+/// Exactly one of these roles is assigned to a function that carries a struct API attribute;
+/// ordinary functions leave `Function::struct_api` as `None`.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) enum StructApiKind {
+    /// Function packs a non-private struct or enum variant
+    /// (`FunctionAttribute::Pack` / `FunctionAttribute::PackVariant`).
+    Pack,
+    /// Function mutably borrows a field of a non-private struct or enum
+    /// (`FunctionAttribute::BorrowFieldMutable`).
+    /// The value is the zero-based field offset used to bypass the runtime ref-check.
+    BorrowFieldMut(MemberCount),
 }
 
 /// For loaded function representation, specifies the owner: a script or a module.
@@ -629,6 +650,23 @@ impl Debug for Function {
 }
 
 impl Function {
+    fn load_struct_api_kind(
+        handle: &move_binary_format::file_format::FunctionHandle,
+    ) -> Option<StructApiKind> {
+        for attr in &handle.attributes {
+            match attr {
+                FunctionAttribute::Pack | FunctionAttribute::PackVariant(_) => {
+                    return Some(StructApiKind::Pack)
+                },
+                FunctionAttribute::BorrowFieldMutable(offset) => {
+                    return Some(StructApiKind::BorrowFieldMut(*offset))
+                },
+                _ => {},
+            }
+        }
+        None
+    }
+
     pub(crate) fn new(
         natives: &NativeFunctions,
         index: FunctionDefinitionIndex,
@@ -699,6 +737,7 @@ impl Function {
             is_persistent: handle.attributes.contains(&FunctionAttribute::Persistent),
             has_module_reentrancy_lock: handle.attributes.contains(&FunctionAttribute::ModuleLock),
             is_trusted,
+            struct_api: Self::load_struct_api_kind(handle),
         })
     }
 
@@ -745,6 +784,13 @@ impl Function {
         self.is_persistent || self.is_public()
     }
 
+    pub fn borrow_field_mut_api_at_offset(&self) -> Option<MemberCount> {
+        match self.struct_api {
+            Some(StructApiKind::BorrowFieldMut(offset)) => Some(offset),
+            _ => None,
+        }
+    }
+
     pub fn has_module_lock(&self) -> bool {
         self.has_module_reentrancy_lock
     }
@@ -755,6 +801,10 @@ impl Function {
 
     pub fn is_public(&self) -> bool {
         matches!(self.visibility, Visibility::Public)
+    }
+
+    pub fn is_pack_or_pack_variant(&self) -> bool {
+        matches!(self.struct_api, Some(StructApiKind::Pack))
     }
 
     pub fn is_friend(&self) -> bool {

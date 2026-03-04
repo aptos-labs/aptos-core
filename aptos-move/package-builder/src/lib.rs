@@ -1,7 +1,7 @@
 // Copyright (c) Aptos Foundation
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
-use aptos_framework::natives::code::UpgradePolicy;
+use aptos_framework_natives::code::UpgradePolicy;
 use itertools::Itertools;
 use move_command_line_common::files::MOVE_EXTENSION;
 use move_package::compilation::package_layout::CompiledPackageLayout;

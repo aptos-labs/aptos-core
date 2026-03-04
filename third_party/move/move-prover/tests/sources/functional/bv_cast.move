@@ -50,4 +50,32 @@ module 0x42::test {
         pragma bv_ret=b"0";
     }
 
+    fun cast_eq(v: u16): bool {
+        spec {
+            // this cannot be proved because
+            // cast of v to u8 returns an arbitrary value
+            assert (v as u8) == (v as u8);
+        };
+        v == v
+    }
+
+    spec cast_eq {
+        pragma bv=b"0,1";
+        requires v > (255 as u16);
+    }
+
+    fun cast_eq_2(v: u16): bool {
+        spec {
+            // this can be proved
+            assert (v as u8) == (v as u8);
+        };
+        v == v
+    }
+
+    spec cast_eq_2 {
+        pragma bv=b"0,1";
+        requires v <= (255 as u16);
+    }
+
+
 }

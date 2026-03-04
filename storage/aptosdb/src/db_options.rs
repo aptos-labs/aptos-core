@@ -128,16 +128,6 @@ pub(super) fn skip_reporting_cf(cf_name: &str) -> bool {
     cf_name == DEFAULT_COLUMN_FAMILY_NAME || cf_name == DB_METADATA_CF_NAME
 }
 
-pub(super) fn state_kv_db_column_families() -> Vec<ColumnFamilyName> {
-    vec![
-        /* empty cf */ DEFAULT_COLUMN_FAMILY_NAME,
-        DB_METADATA_CF_NAME,
-        STALE_STATE_VALUE_INDEX_CF_NAME,
-        STATE_VALUE_CF_NAME,
-        STATE_VALUE_INDEX_CF_NAME,
-    ]
-}
-
 pub(super) fn state_kv_db_new_key_column_families() -> Vec<ColumnFamilyName> {
     vec![
         /* empty cf */ DEFAULT_COLUMN_FAMILY_NAME,
@@ -145,13 +135,6 @@ pub(super) fn state_kv_db_new_key_column_families() -> Vec<ColumnFamilyName> {
         STALE_STATE_VALUE_INDEX_BY_KEY_HASH_CF_NAME,
         STATE_VALUE_BY_KEY_HASH_CF_NAME,
         STATE_VALUE_INDEX_CF_NAME, // we still need this cf before deleting all the write callsites
-    ]
-}
-
-pub(super) fn hot_state_kv_db_column_families() -> Vec<ColumnFamilyName> {
-    vec![
-        /* empty cf */ DEFAULT_COLUMN_FAMILY_NAME,
-        HOT_STATE_VALUE_BY_KEY_HASH_CF_NAME,
     ]
 }
 
@@ -364,19 +347,6 @@ pub(super) fn gen_state_kv_shard_cfds(
     block_cache: Option<&Cache>,
 ) -> Vec<ColumnFamilyDescriptor> {
     let cfs = state_kv_db_new_key_column_families();
-    gen_cfds(
-        rocksdb_config,
-        block_cache,
-        cfs,
-        with_state_key_extractor_processor,
-    )
-}
-
-pub(super) fn gen_hot_state_kv_shard_cfds(
-    rocksdb_config: &RocksdbConfig,
-    block_cache: Option<&Cache>,
-) -> Vec<ColumnFamilyDescriptor> {
-    let cfs = hot_state_kv_db_column_families();
     gen_cfds(
         rocksdb_config,
         block_cache,

@@ -97,7 +97,6 @@ the resolution process.
 <pre><code><b>use</b> <a href="account.md#0x1_account">0x1::account</a>;
 <b>use</b> <a href="../../aptos-stdlib/../move-stdlib/doc/bcs.md#0x1_bcs">0x1::bcs</a>;
 <b>use</b> <a href="event.md#0x1_event">0x1::event</a>;
-<b>use</b> <a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features">0x1::features</a>;
 <b>use</b> <a href="../../aptos-stdlib/doc/from_bcs.md#0x1_from_bcs">0x1::from_bcs</a>;
 <b>use</b> <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option">0x1::option</a>;
 <b>use</b> <a href="permissioned_signer.md#0x1_permissioned_signer">0x1::permissioned_signer</a>;
@@ -904,22 +903,12 @@ Grant permission to vote on behalf of the master signer.
         }
     };
 
-    <b>if</b> (std::features::module_event_migration_enabled()) {
-        <a href="event.md#0x1_event_emit">event::emit</a>(
-            <a href="voting.md#0x1_voting_RegisterForum">RegisterForum</a> {
-                hosting_account: addr,
-                proposal_type_info: <a href="../../aptos-stdlib/doc/type_info.md#0x1_type_info_type_of">type_info::type_of</a>&lt;ProposalType&gt;(),
-            },
-        );
-    } <b>else</b> {
-        <a href="event.md#0x1_event_emit_event">event::emit_event</a>&lt;<a href="voting.md#0x1_voting_RegisterForumEvent">RegisterForumEvent</a>&gt;(
-            &<b>mut</b> voting_forum.events.register_forum_events,
-            <a href="voting.md#0x1_voting_RegisterForumEvent">RegisterForumEvent</a> {
-                hosting_account: addr,
-                proposal_type_info: <a href="../../aptos-stdlib/doc/type_info.md#0x1_type_info_type_of">type_info::type_of</a>&lt;ProposalType&gt;(),
-            },
-        );
-    };
+    <a href="event.md#0x1_event_emit">event::emit</a>(
+        <a href="voting.md#0x1_voting_RegisterForum">RegisterForum</a> {
+            hosting_account: addr,
+            proposal_type_info: <a href="../../aptos-stdlib/doc/type_info.md#0x1_type_info_type_of">type_info::type_of</a>&lt;ProposalType&gt;(),
+        },
+    );
 
     <b>move_to</b>(<a href="account.md#0x1_account">account</a>, voting_forum);
 }
@@ -1066,30 +1055,16 @@ resolve this proposal.
         resolution_time_secs: 0,
     });
 
-    <b>if</b> (std::features::module_event_migration_enabled()) {
-        <a href="event.md#0x1_event_emit">event::emit</a>(
-            <a href="voting.md#0x1_voting_CreateProposal">CreateProposal</a> {
-                proposal_id,
-                early_resolution_vote_threshold,
-                execution_hash,
-                expiration_secs,
-                metadata,
-                min_vote_threshold,
-            },
-        );
-    } <b>else</b> {
-        <a href="event.md#0x1_event_emit_event">event::emit_event</a>&lt;<a href="voting.md#0x1_voting_CreateProposalEvent">CreateProposalEvent</a>&gt;(
-            &<b>mut</b> voting_forum.events.create_proposal_events,
-            <a href="voting.md#0x1_voting_CreateProposalEvent">CreateProposalEvent</a> {
-                proposal_id,
-                early_resolution_vote_threshold,
-                execution_hash,
-                expiration_secs,
-                metadata,
-                min_vote_threshold,
-            },
-        );
-    };
+    <a href="event.md#0x1_event_emit">event::emit</a>(
+        <a href="voting.md#0x1_voting_CreateProposal">CreateProposal</a> {
+            proposal_id,
+            early_resolution_vote_threshold,
+            execution_hash,
+            expiration_secs,
+            metadata,
+            min_vote_threshold,
+        },
+    );
     proposal_id
 }
 </code></pre>
@@ -1159,14 +1134,7 @@ This guarantees that voting eligibility and voting power are controlled by the r
         proposal.metadata.add(key, timestamp_secs_bytes);
     };
 
-    <b>if</b> (std::features::module_event_migration_enabled()) {
-        <a href="event.md#0x1_event_emit">event::emit</a>(<a href="voting.md#0x1_voting_Vote">Vote</a> { proposal_id, num_votes });
-    } <b>else</b> {
-        <a href="event.md#0x1_event_emit_event">event::emit_event</a>&lt;<a href="voting.md#0x1_voting_VoteEvent">VoteEvent</a>&gt;(
-            &<b>mut</b> voting_forum.events.vote_events,
-            <a href="voting.md#0x1_voting_VoteEvent">VoteEvent</a> { proposal_id, num_votes },
-        );
-    };
+    <a href="event.md#0x1_event_emit">event::emit</a>(<a href="voting.md#0x1_voting_Vote">Vote</a> { proposal_id, num_votes });
 }
 </code></pre>
 
@@ -1261,26 +1229,14 @@ there are more yes votes than no. If either of these conditions is not met, this
     proposal.is_resolved = <b>true</b>;
     proposal.resolution_time_secs = <a href="timestamp.md#0x1_timestamp_now_seconds">timestamp::now_seconds</a>();
 
-    <b>if</b> (std::features::module_event_migration_enabled()) {
-        <a href="event.md#0x1_event_emit">event::emit</a>(
-            <a href="voting.md#0x1_voting_ResolveProposal">ResolveProposal</a> {
-                proposal_id,
-                yes_votes: proposal.yes_votes,
-                no_votes: proposal.no_votes,
-                resolved_early,
-            },
-        );
-    } <b>else</b> {
-        <a href="event.md#0x1_event_emit_event">event::emit_event</a>&lt;<a href="voting.md#0x1_voting_ResolveProposal">ResolveProposal</a>&gt;(
-            &<b>mut</b> voting_forum.events.resolve_proposal_events,
-            <a href="voting.md#0x1_voting_ResolveProposal">ResolveProposal</a> {
-                proposal_id,
-                yes_votes: proposal.yes_votes,
-                no_votes: proposal.no_votes,
-                resolved_early,
-            },
-        );
-    };
+    <a href="event.md#0x1_event_emit">event::emit</a>(
+        <a href="voting.md#0x1_voting_ResolveProposal">ResolveProposal</a> {
+            proposal_id,
+            yes_votes: proposal.yes_votes,
+            no_votes: proposal.no_votes,
+            resolved_early,
+        },
+    );
 
     proposal.execution_content.extract()
 }
@@ -1365,26 +1321,14 @@ there are more yes votes than no. If either of these conditions is not met, this
     // For multi-step proposals, we emit one `<a href="voting.md#0x1_voting_ResolveProposal">ResolveProposal</a>` <a href="event.md#0x1_event">event</a> per step in the multi-step proposal. This means
     // that we emit multiple `<a href="voting.md#0x1_voting_ResolveProposal">ResolveProposal</a>` events for the same multi-step proposal.
     <b>let</b> resolved_early = <a href="voting.md#0x1_voting_can_be_resolved_early">can_be_resolved_early</a>(proposal);
-    <b>if</b> (std::features::module_event_migration_enabled()) {
-        <a href="event.md#0x1_event_emit">event::emit</a>(
-            <a href="voting.md#0x1_voting_ResolveProposal">ResolveProposal</a> {
-                proposal_id,
-                yes_votes: proposal.yes_votes,
-                no_votes: proposal.no_votes,
-                resolved_early,
-            },
-        );
-    } <b>else</b> {
-        <a href="event.md#0x1_event_emit_event">event::emit_event</a>(
-            &<b>mut</b> voting_forum.events.resolve_proposal_events,
-            <a href="voting.md#0x1_voting_ResolveProposal">ResolveProposal</a> {
-                proposal_id,
-                yes_votes: proposal.yes_votes,
-                no_votes: proposal.no_votes,
-                resolved_early,
-            },
-        );
-    };
+    <a href="event.md#0x1_event_emit">event::emit</a>(
+        <a href="voting.md#0x1_voting_ResolveProposal">ResolveProposal</a> {
+            proposal_id,
+            yes_votes: proposal.yes_votes,
+            no_votes: proposal.no_votes,
+            resolved_early,
+        },
+    );
 }
 </code></pre>
 

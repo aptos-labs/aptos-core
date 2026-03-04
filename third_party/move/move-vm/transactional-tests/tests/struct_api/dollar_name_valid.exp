@@ -1,0 +1,96 @@
+processed 2 tasks
+task 0 lines 1-30:  publish --print-bytecode [// Test struct with '$' in name: Foo$Bar has pack/unpack/borrow/borrow_mut APIs]
+
+== BEGIN Bytecode ==
+// Bytecode version v9
+module 0x66::test_dollar_struct_valid
+struct Foo$Bar
+  x: u64
+
+// Function definition at index 0
+#[pack] public fun pack$Foo$Bar(l0: u64): Foo$Bar
+    move_loc l0
+    pack Foo$Bar
+    ret
+
+// Function definition at index 1
+#[unpack] public fun unpack$Foo$Bar(l0: Foo$Bar): u64
+    move_loc l0
+    unpack Foo$Bar
+    ret
+
+// Function definition at index 2
+#[borrow(0)] public fun borrow$Foo$Bar$0(l0: &Foo$Bar): &u64
+    move_loc l0
+    borrow_field Foo$Bar, x
+    ret
+
+// Function definition at index 3
+#[borrow_mut(0)] public fun borrow_mut$Foo$Bar$0(l0: &mut Foo$Bar): &mut u64
+    move_loc l0
+    mut_borrow_field Foo$Bar, x
+    ret
+
+
+== END Bytecode ==
+task 1 lines 32-89:  publish --print-bytecode [// Test enum with '$' in name and variant name: Color$Ext with Red$A and Blue variants]
+
+== BEGIN Bytecode ==
+// Bytecode version v9
+module 0x66::test_dollar_enum_valid
+enum Color$Ext has drop
+  Red$A
+    r: u8
+  Blue
+    b: u8
+
+// Function definition at index 0
+#[pack_variant(0)] public fun pack$Color$Ext$Red$A(l0: u8): Color$Ext
+    move_loc l0
+    pack_variant Color$Ext, Red$A
+    ret
+
+// Function definition at index 1
+#[pack_variant(1)] public fun pack$Color$Ext$Blue(l0: u8): Color$Ext
+    move_loc l0
+    pack_variant Color$Ext, Blue
+    ret
+
+// Function definition at index 2
+#[unpack_variant(0)] public fun unpack$Color$Ext$Red$A(l0: Color$Ext): u8
+    move_loc l0
+    unpack_variant Color$Ext, Red$A
+    ret
+
+// Function definition at index 3
+#[unpack_variant(1)] public fun unpack$Color$Ext$Blue(l0: Color$Ext): u8
+    move_loc l0
+    unpack_variant Color$Ext, Blue
+    ret
+
+// Function definition at index 4
+#[test_variant(0)] public fun test_variant$Color$Ext$Red$A(l0: &Color$Ext): bool
+    move_loc l0
+    test_variant Color$Ext, Red$A
+    ret
+
+// Function definition at index 5
+#[test_variant(1)] public fun test_variant$Color$Ext$Blue(l0: &Color$Ext): bool
+    move_loc l0
+    test_variant Color$Ext, Blue
+    ret
+
+// Function definition at index 6
+#[borrow(0)] public fun borrow$Color$Ext$0$0(l0: &Color$Ext): &u8
+    move_loc l0
+    borrow_variant_field Color$Ext, Red$A::r, Blue::b
+    ret
+
+// Function definition at index 7
+#[borrow_mut(0)] public fun borrow_mut$Color$Ext$0$0(l0: &mut Color$Ext): &mut u8
+    move_loc l0
+    mut_borrow_variant_field Color$Ext, Red$A::r, Blue::b
+    ret
+
+
+== END Bytecode ==

@@ -1,3 +1,17 @@
+
+Diagnostics:
+warning: enum `MessageHolder` is unused in current package. Remove it (if not published), or suppress warning with `#[test_only]` (if test-only), `#[verify_only]` (if verify-only), or `#[lint::skip(unused)]`.
+   ┌─ tests/checking/unused/unused_enum.move:5:5
+   │
+ 5 │ ╭     enum MessageHolder has key, drop {
+ 6 │ │         Empty,
+ 7 │ │         Message{
+ 8 │ │             message: string::String,
+   · │
+12 │ │         }
+13 │ │     }
+   │ ╰─────^
+
 // -- Model dump before first bytecode pipeline
 module 0x42::enum_types {
     use std::string;

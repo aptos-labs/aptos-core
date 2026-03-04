@@ -1014,14 +1014,19 @@ impl From<CompiledModule> for MoveModule {
             exposed_functions: m
                 .function_defs
                 .iter()
-                // Return all entry or public functions.
-                // Private entry functions are still callable by entry function transactions so
-                // they should be included.
+                // Return all entry, view, or public functions.
+                // Private entry functions are still callable by entry function
+                // transactions so they should be included. Similarly, private view
+                // functions can be called via the view function API endpoint.
                 .filter(|def| {
                     def.is_entry
                         || match def.visibility {
                             Visibility::Public | Visibility::Friend => true,
-                            Visibility::Private => false,
+                            Visibility::Private => {
+                                let fhandle = Bytecode::function_handle_at(&m, def.function);
+                                let name = Bytecode::identifier_at(&m, fhandle.name);
+                                m.function_is_view(name)
+                            },
                         }
                 })
                 .map(|def| m.new_move_function(def))

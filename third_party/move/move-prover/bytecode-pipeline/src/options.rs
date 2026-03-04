@@ -74,10 +74,17 @@ pub struct ProverOptions {
     /// Whether to skip loop analysis.
     #[arg(skip)]
     pub skip_loop_analysis: bool,
+    /// Whether to run spec inference instead of verification.
+    #[arg(skip)]
+    pub inference: bool,
     /// Optional names of native methods (qualified with module name, e.g., m::foo) implementing
     /// mutable borrow semantics
     #[arg(skip)]
     pub borrow_natives: Vec<String>,
+    /// Targets to exclude from verification. Each entry must be
+    /// `VerificationScope::Only(name)` or `VerificationScope::OnlyModule(name)`.
+    #[arg(skip)]
+    pub verify_exclude: Vec<VerificationScope>,
 }
 
 // add custom struct for mutation options
@@ -98,7 +105,9 @@ impl Default for ProverOptions {
             unconditional_abort_as_inconsistency: false,
             for_interpretation: false,
             skip_loop_analysis: false,
+            inference: false,
             borrow_natives: vec![],
+            verify_exclude: vec![],
         }
     }
 }

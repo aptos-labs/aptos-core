@@ -43,4 +43,5 @@ pub mod meter;
 mod reference_safety;
 mod regression_tests;
 mod stack_usage_verifier;
+mod struct_api_checker;
 mod type_safety;

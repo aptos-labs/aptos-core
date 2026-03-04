@@ -1,0 +1,44 @@
+// -- Model dump before first bytecode pipeline
+module 0x42::m {
+    struct Container<T> {
+        value: T,
+    }
+    struct Marker<T> {
+        dummy_field: bool,
+    }
+    private fun create_marker<T>(): Marker<T> {
+        pack m::Marker<T>(false)
+    }
+    private fun identity<T>(x: T): T {
+        x
+    }
+    public fun test(): u64 {
+        {
+          let c: Container<u64> = pack m::Container<u64>(42);
+          {
+            let _m: Marker<u8> = m::create_marker<u8>();
+            m::identity<u64>(select m::Container.value<Container<u64>>(c))
+          }
+        }
+    }
+} // end 0x42::m
+
+// -- Sourcified model before first bytecode pipeline
+module 0x42::m {
+    struct Container<T> has drop {
+        value: T,
+    }
+    struct Marker<phantom T> has drop {
+    }
+    fun create_marker<T>(): Marker<T> {
+        Marker<T>{}
+    }
+    fun identity<T>(x: T): T {
+        x
+    }
+    public fun test(): u64 {
+        let c = Container<u64>{value: 42};
+        let _m = create_marker<u8>();
+        identity<u64>(c.value)
+    }
+}

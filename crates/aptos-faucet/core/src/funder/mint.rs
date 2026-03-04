@@ -228,8 +228,12 @@ impl MintFunder {
         default_asset: String,
         amount_to_fund: u64,
     ) -> Self {
-        let gas_unit_price_manager =
-            GasUnitPriceManager::new(node_url.clone(), txn_config.get_gas_unit_price_ttl_secs());
+        let gas_unit_price_manager = GasUnitPriceManager::new(
+            node_url.clone(),
+            txn_config.get_gas_unit_price_ttl_secs(),
+            node_api_key.clone(),
+            node_additional_headers.as_ref(),
+        );
         let transaction_factory = TransactionFactory::new(chain_id)
             .with_max_gas_amount(txn_config.max_gas_amount)
             .with_transaction_expiration_time(txn_config.transaction_expiration_secs)

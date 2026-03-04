@@ -1,4 +1,4 @@
-Abigen returns: exiting with context checking errors
+Abigen returns: exiting with compilation errors
 error: invalid argument to `abort`: unsupported type `bool`
   ┌─ tests/sources/bad_script.move:3:15
   │

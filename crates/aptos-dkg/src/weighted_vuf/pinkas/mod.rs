@@ -216,7 +216,7 @@ impl WeightedVUF for PinkasWUF {
         proof: &Self::Proof,
         thread_pool: &ThreadPool,
     ) -> anyhow::Result<()> {
-        if proof.len() >= apks.len() {
+        if proof.len() > apks.len() {
             bail!("Number of proof shares ({}) exceeds number of APKs ({}) when verifying aggregated WVUF proof", proof.len(), apks.len());
         }
 

@@ -14,8 +14,8 @@ use std::{
     convert::Infallible,
     net::{SocketAddr, ToSocketAddrs},
     sync::Arc,
-    thread,
 };
+use tokio::runtime::Runtime;
 
 mod configuration;
 mod identity_information;
@@ -46,12 +46,13 @@ pub const INVALID_ENDPOINT_MESSAGE: &str = "The requested endpoint is invalid!";
 pub const UNEXPECTED_ERROR_MESSAGE: &str = "An unexpected error was encountered!";
 
 /// Starts the inspection service that listens on the configured
-/// address and handles various endpoint requests.
+/// address and handles various endpoint requests. Returns the
+/// runtime so the caller can keep it alive.
 pub fn start_inspection_service(
     node_config: NodeConfig,
     aptos_data_client: AptosDataClient,
     peers_and_metadata: Arc<PeersAndMetadata>,
-) {
+) -> Runtime {
     // Fetch the service port and address
     let service_port = node_config.inspection_service.port;
     let service_address = node_config.inspection_service.address.clone();
@@ -74,8 +75,8 @@ pub fn start_inspection_service(
         node_config.inspection_service.num_threads,
     );
 
-    // Spawn the inspection service
-    thread::spawn(move || {
+    // Spawn the inspection service on the runtime
+    runtime.spawn(async move {
         // Create the service function that handles the endpoint requests
         let make_service = make_service_fn(move |_conn| {
             let node_config = node_config.clone();
@@ -93,14 +94,12 @@ pub fn start_inspection_service(
             }
         });
 
-        // Start and block on the server
-        runtime
-            .block_on(async {
-                let server = Server::bind(&address).serve(make_service);
-                server.await
-            })
-            .unwrap();
+        // Start the server
+        let server = Server::bind(&address).serve(make_service);
+        server.await.unwrap();
     });
+
+    runtime
 }
 
 /// A simple helper function that handles each endpoint request

@@ -9,8 +9,8 @@ use crate::{
         jwk_consensus_config::JWKConsensusConfig, node_config_loader::NodeConfigLoader,
         node_startup_config::NodeStartupConfig, persistable_config::PersistableConfig,
         transaction_filters_config::TransactionFiltersConfig, utils::RootPath, AdminServiceConfig,
-        ApiConfig, BaseConfig, ConsensusConfig, Error, ExecutionConfig, IndexerConfig,
-        IndexerGrpcConfig, InspectionServiceConfig, LoggerConfig, MempoolConfig, NetworkConfig,
+        ApiConfig, BaseConfig, ConsensusConfig, Error, ExecutionConfig, IndexerGrpcConfig,
+        InspectionServiceConfig, LoggerConfig, MempoolConfig, NetworkConfig,
         PeerMonitoringServiceConfig, SafetyRulesTestConfig, StateSyncConfig, StorageConfig,
         TelemetryServiceConfig,
     },
@@ -31,7 +31,7 @@ use std::{
 /// The node configuration defines the configuration for a single Aptos
 /// node (i.e., validator or fullnode). It is composed of module
 /// configurations for each of the modules that the node uses (e.g.,
-/// the API, indexer, mempool, state sync, etc.).
+/// the API, mempool, state sync, etc.).
 #[derive(Clone, Debug, Default, Deserialize, PartialEq, Serialize)]
 #[serde(deny_unknown_fields)]
 pub struct NodeConfig {
@@ -55,8 +55,6 @@ pub struct NodeConfig {
     pub failpoints: Option<HashMap<String, String>>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub full_node_networks: Vec<NetworkConfig>,
-    #[serde(default)]
-    pub indexer: IndexerConfig,
     #[serde(default)]
     pub indexer_grpc: IndexerGrpcConfig,
     #[serde(default)]

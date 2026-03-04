@@ -1120,5 +1120,5 @@ pub fn create_output_list_with_proof(
 ///
 /// Note: there's a 50-50 chance of this occurring.
 fn return_transactions_instead_of_outputs() -> bool {
-    (create_random_u64(u64::MAX) % 2) == 0
+    create_random_u64(u64::MAX).is_multiple_of(2)
 }

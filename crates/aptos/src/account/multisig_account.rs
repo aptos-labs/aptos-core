@@ -3,14 +3,15 @@
 
 use crate::common::{
     types::{
-        CliCommand, CliError, CliTypedResult, EntryFunctionArguments, MultisigAccount,
-        MultisigAccountWithSequenceNumber, TransactionOptions, TransactionSummary,
+        CliCommand, CliError, CliTypedResult, MultisigAccount, MultisigAccountWithSequenceNumber,
+        TransactionOptions, TransactionOptionsExt, TransactionSummary,
     },
     utils::view_json_option_str,
 };
 use aptos_api_types::ViewFunction;
 use aptos_cached_packages::aptos_stdlib;
 use aptos_crypto::HashValue;
+use aptos_move_cli::EntryFunctionArguments;
 use aptos_rest_client::{
     aptos_api_types::{HexEncodedBytes, WriteResource, WriteSetChange},
     Transaction,

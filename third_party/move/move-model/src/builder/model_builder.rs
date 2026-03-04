@@ -13,10 +13,10 @@ use crate::{
     intrinsics::IntrinsicDecl,
     model::{
         FieldData, FunId, FunctionKind, GlobalEnv, Loc, ModuleId, Parameter, QualifiedId,
-        QualifiedInstId, SpecFunId, SpecVarId, StructId, TypeParameter,
+        QualifiedInstId, SpecFunId, SpecVarId, StructId, TypeParameter, UserId,
     },
     symbol::Symbol,
-    ty::{Constraint, Type, TypeDisplayContext},
+    ty::{Constraint, PrimitiveType, Type, TypeDisplayContext},
     well_known,
 };
 use codespan_reporting::diagnostic::Severity;
@@ -25,6 +25,41 @@ use legacy_move_compiler::{expansion::ast as EA, parser::ast as PA, shared::Nume
 use move_binary_format::file_format::Visibility;
 use move_core_types::ability::{Ability, AbilitySet};
 use std::collections::{BTreeMap, BTreeSet};
+
+/// Discriminant for builtin (non-struct) types that support receiver-style function calls.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+pub(crate) enum BuiltinReceiverType {
+    Vector,
+    Signer,
+}
+
+impl BuiltinReceiverType {
+    /// Maps a base type (references already stripped) to its builtin receiver type, if any.
+    pub(crate) fn from_type(ty: &Type) -> Option<Self> {
+        match ty {
+            Type::Vector(_) => Some(Self::Vector),
+            Type::Primitive(PrimitiveType::Signer) => Some(Self::Signer),
+            Type::Primitive(_) => None,
+            Type::Var(_) => None,
+            Type::Struct(..) => None,
+            Type::TypeParameter(_) => None,
+            Type::TypeDomain(_) => None,
+            Type::Tuple(_) => None,
+            Type::Error => None,
+            Type::Reference(..) => None,
+            Type::Fun(..) => None,
+            Type::ResourceDomain(..) => None,
+        }
+    }
+
+    /// Returns the well-known module name for this builtin receiver type.
+    pub(crate) fn module_name(&self) -> &'static str {
+        match self {
+            Self::Vector => well_known::VECTOR_MODULE,
+            Self::Signer => well_known::SIGNER_MODULE,
+        }
+    }
+}
 
 /// A builder is used to enter a sequence of modules in acyclic dependency order into the model. The
 /// builder maintains the incremental state of this process, such that the various tables
@@ -51,9 +86,10 @@ pub(crate) struct ModelBuilder<'env> {
     pub reverse_struct_table: BTreeMap<(ModuleId, StructId), QualifiedSymbol>,
     /// A symbol table for functions.
     pub fun_table: BTreeMap<QualifiedSymbol, FunEntry>,
-    /// A mapping from simple names of receiver functions for the builtin vector type to full names
-    /// which can be used to index `fun_table`.
-    pub vector_receiver_functions: BTreeMap<Symbol, QualifiedSymbol>,
+    /// A mapping from builtin receiver types to their receiver function dispatch tables.
+    /// Each dispatch table maps simple function names to fully qualified names for `fun_table`.
+    pub builtin_receiver_functions:
+        BTreeMap<BuiltinReceiverType, BTreeMap<Symbol, QualifiedSymbol>>,
     /// A symbol table for constants.
     pub const_table: BTreeMap<QualifiedSymbol, ConstEntry>,
     /// A list of intrinsic declarations
@@ -130,6 +166,8 @@ pub(crate) struct StructEntry {
     pub is_empty_struct: bool,
     pub is_native: bool,
     pub visibility: Visibility,
+    /// Users of this struct
+    pub users: BTreeSet<UserId>,
 }
 
 #[derive(Debug, Clone)]
@@ -217,6 +255,8 @@ pub(crate) struct ConstEntry {
     pub ty: Type,
     pub value: Value,
     pub visibility: EntryVisibility,
+    pub users: BTreeSet<UserId>,
+    pub attributes: Vec<Attribute>,
 }
 
 impl<'env> ModelBuilder<'env> {
@@ -231,7 +271,7 @@ impl<'env> ModelBuilder<'env> {
             struct_table: BTreeMap::new(),
             reverse_struct_table: BTreeMap::new(),
             fun_table: BTreeMap::new(),
-            vector_receiver_functions: BTreeMap::new(),
+            builtin_receiver_functions: BTreeMap::new(),
             const_table: BTreeMap::new(),
             intrinsics: Vec::new(),
             module_table: BTreeMap::new(),
@@ -391,6 +431,7 @@ impl<'env> ModelBuilder<'env> {
             is_empty_struct: false,
             is_native,
             visibility,
+            users: BTreeSet::new(),
         };
         self.struct_table.insert(name.clone(), entry);
         self.reverse_struct_table
@@ -465,30 +506,37 @@ impl<'env> ModelBuilder<'env> {
                                 .insert(name.symbol, name.clone());
                         }
                     },
-                    Type::Vector(elem_ty) => {
-                        // Vector receiver functions can only be defined in the well-known vector module
-                        if name.module_name.addr() != &self.env.get_stdlib_address()
-                            || name.module_name.name()
-                                != self.env.symbol_pool.make(well_known::VECTOR_MODULE)
-                        {
-                            diag(
-                                "is associated with the standard vector module \
-                                 and new receiver functions cannot be added",
-                            )
-                        } else {
-                            // See above  for structs
-                            check_generics(&[*elem_ty.clone()]);
-                            self.vector_receiver_functions
-                                .insert(name.symbol, name.clone());
-                        }
-                    },
                     Type::Error => {
                         // Ignore this, there will be a message where the error type is generated.
                     },
-                    _ => diag(
-                        "is not suitable for receiver functions. \
-                         Only structs and vectors can have receiver functions",
-                    ),
+                    _ => {
+                        if let Some(brt) = BuiltinReceiverType::from_type(base_type) {
+                            let module_sym = self.env.symbol_pool.make(brt.module_name());
+                            if name.module_name.addr() != &self.env.get_stdlib_address()
+                                || name.module_name.name() != module_sym
+                            {
+                                diag(&format!(
+                                    "is associated with the standard {} module \
+                                     and new receiver functions cannot be added",
+                                    brt.module_name()
+                                ))
+                            } else {
+                                if let Type::Vector(elem_ty) = base_type {
+                                    check_generics(&[*elem_ty.clone()]);
+                                }
+                                self.builtin_receiver_functions
+                                    .entry(brt)
+                                    .or_default()
+                                    .insert(name.symbol, name.clone());
+                            }
+                        } else {
+                            diag(
+                                "is not suitable for receiver functions. \
+                                 Only structs, vectors, and the `signer` primitive type \
+                                 can have receiver functions",
+                            )
+                        }
+                    },
                 }
             }
         }
@@ -617,13 +665,15 @@ impl<'env> ModelBuilder<'env> {
 
     /// Looks up a receiver function for a given type.
     pub fn lookup_receiver_function(&self, ty: &Type, name: Symbol) -> Option<&FunEntry> {
-        let qualified_fun_name = match ty.skip_reference() {
+        let base = ty.skip_reference();
+        let qualified_fun_name = match base {
             Type::Struct(mid, sid, _) => self
                 .lookup_struct_entry(mid.qualified(*sid))
                 .receiver_functions
                 .get(&name),
-            Type::Vector(_) => self.vector_receiver_functions.get(&name),
-            _ => None,
+            _ => BuiltinReceiverType::from_type(base)
+                .and_then(|brt| self.builtin_receiver_functions.get(&brt))
+                .and_then(|fns| fns.get(&name)),
         };
         qualified_fun_name.and_then(|qn| self.fun_table.get(qn))
     }

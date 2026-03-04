@@ -8,12 +8,13 @@ use crate::{
     schema::transaction_summaries_by_account::TransactionSummariesByAccountSchema,
     utils::iterators::AccountTransactionSummariesIter,
 };
-use aptos_db_indexer_schemas::{
-    schema::ordered_transaction_by_account::OrderedTransactionByAccountSchema,
-    utils::AccountOrderedTransactionsIter,
-};
+use aptos_db_indexer_schemas::schema::ordered_transaction_by_account::OrderedTransactionByAccountSchema;
+#[cfg(test)]
+use aptos_db_indexer_schemas::utils::AccountOrderedTransactionsIter;
 use aptos_schemadb::{batch::SchemaBatch, iterator::ScanDirection};
-use aptos_storage_interface::{AptosDbError, Result};
+#[cfg(test)]
+use aptos_storage_interface::AptosDbError;
+use aptos_storage_interface::Result;
 use aptos_types::{
     account_address::AccountAddress,
     transaction::{ReplayProtector, Transaction, Version},
@@ -33,6 +34,7 @@ impl TransactionStore {
     }
 
     /// Gets the version of a transaction by the sender `address` and `sequence_number`.
+    #[cfg(test)]
     pub fn get_account_ordered_transaction_version(
         &self,
         address: AccountAddress,
@@ -57,6 +59,7 @@ impl TransactionStore {
     /// `version <= ledger_version`.
     /// Guarantees that the returned sequence numbers are sequential, i.e.,
     /// `seq_num_{i} + 1 = seq_num_{i+1}`.
+    #[cfg(test)]
     pub fn get_account_ordered_transactions_iter(
         &self,
         address: AccountAddress,

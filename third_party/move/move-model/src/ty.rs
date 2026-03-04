@@ -916,6 +916,19 @@ impl PrimitiveType {
         }
     }
 
+    /// Returns true if this is a signed integer type.
+    pub fn is_signed(&self) -> bool {
+        matches!(
+            self,
+            PrimitiveType::I8
+                | PrimitiveType::I16
+                | PrimitiveType::I32
+                | PrimitiveType::I64
+                | PrimitiveType::I128
+                | PrimitiveType::I256
+        )
+    }
+
     /// Gets the number of bits in the type, or None if unbounded..
     pub fn get_num_bits(self: &PrimitiveType) -> Option<usize> {
         match self {
@@ -1375,7 +1388,8 @@ impl Type {
         env: &'env GlobalEnv,
     ) -> Option<(StructEnv<'env>, &'env [Type])> {
         if let Type::Struct(module_idx, struct_idx, params) = self {
-            Some((env.get_module(*module_idx).into_struct(*struct_idx), params))
+            env.get_module_opt(*module_idx)
+                .map(|module_env| (module_env.into_struct(*struct_idx), params.as_slice()))
         } else {
             None
         }

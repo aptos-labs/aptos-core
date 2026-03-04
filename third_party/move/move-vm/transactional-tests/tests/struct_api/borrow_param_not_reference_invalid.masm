@@ -1,0 +1,11 @@
+//# publish --print-bytecode
+module 0x66::test_borrow_param_not_reference
+
+struct S
+    x: u64
+
+// Invalid: borrow$S$0 must take a reference (&S), not a value (S)
+#[borrow(0)] public fun borrow$S$0(l0: S): &u64
+    move_loc l0
+    borrow_field S, x
+    ret
