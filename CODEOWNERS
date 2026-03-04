@@ -9,6 +9,23 @@
 # Owners for the `/aptos-move` directory and its subdirectories.
 /aptos-move/aptos-aggregator/ @georgemitenkov @gelash @zekun000
 /aptos-move/aptos-native-interface/ @vgao1996
+/aptos-move/aptos-vm/ @wrwg @zekun000 @vgao1996 @georgemitenkov
+/aptos-move/aptos-vm/src/keyless_validation.rs @alinush
+/aptos-move/aptos-vm-profiling/ @vgao1996
+/aptos-move/aptos-vm-types/ @georgemitenkov @gelash @vgao1996
+/aptos-move/framework/ @wrwg
+/aptos-move/framework/aptos-framework/sources/account.move @alinush
+/aptos-move/framework/aptos-framework/sources/jwks.move @zjma
+/aptos-move/framework/aptos-framework/sources/keyless_account.move @alinush
+/aptos-move/framework/aptos-stdlib/sources/cryptography/ @alinush @zjma
+/aptos-move/framework/aptos-stdlib/sources/hash.move @alinush
+
+# Owner for aptos-token, cryptography natives, parallel-executor and vm-genesis.
+/aptos-move/framework/src/natives/cryptography/ @alinush @zjma
+/aptos-move/framework/src/natives/aggregator_natives/ @georgemitenkov @gelash @zekun000
+/aptos-move/block-executor/ @gelash @zekun000 @sasha8 @danielxiangzl
+/aptos-move/sharded_block-executor/ @sitalkedia
+/aptos-move/mvhashmap/ @gelash @runtian-zhou @sasha8 @danielxiangzl
 
 # Owners for the gas subsystem.
 /aptos-move/aptos-abstract-gas-usage/ @vgao1996
@@ -27,24 +44,6 @@
 /aptos-move/aptos-workspace-server/ @vgao1996
 /aptos-move/cli/src/local_simulation.rs @vgao1996
 /aptos-move/cli/src/sim.rs @vgao1996
-
-/aptos-move/aptos-vm/ @wrwg @zekun000 @vgao1996 @georgemitenkov
-/aptos-move/aptos-vm/src/keyless_validation.rs @alinush
-/aptos-move/aptos-vm-profiling/ @vgao1996
-/aptos-move/aptos-vm-types/ @georgemitenkov @gelash @vgao1996
-/aptos-move/framework/ @wrwg
-/aptos-move/framework/aptos-framework/sources/account.move @alinush
-/aptos-move/framework/aptos-framework/sources/jwks.move @zjma
-/aptos-move/framework/aptos-framework/sources/keyless_account.move @alinush
-/aptos-move/framework/aptos-stdlib/sources/cryptography/ @alinush @zjma
-/aptos-move/framework/aptos-stdlib/sources/hash.move @alinush
-
-# Owner for aptos-token, cryptography natives, parallel-executor and vm-genesis.
-/aptos-move/framework/src/natives/cryptography/ @alinush @zjma
-/aptos-move/framework/src/natives/aggregator_natives/ @georgemitenkov @gelash @zekun000
-/aptos-move/block-executor/ @gelash @zekun000 @sasha8 @danielxiangzl
-/aptos-move/sharded_block-executor/ @sitalkedia
-/aptos-move/mvhashmap/ @gelash @runtian-zhou @sasha8 @danielxiangzl
 
 # Owner for aptos node (to prevent things from becoming out of hand :D)
 /aptos-node/ @joshlind
