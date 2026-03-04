@@ -1,8 +1,16 @@
 // Copyright (c) Aptos Foundation
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
-//! Weighted chunky PVSS transcript: SCRAPE LDT + PoK + consistency check
-//! combined into two MSMs, then checked via a single pairing check.
+//! Weighted Chunky PVSS transcript:
+//! - SCRAPE LDT
+//! - SoK (knowledge-of-exponent)
+//! - Share consistency check
+//! Batched into:
+//!   * one MSM in G1
+//!   * one MSM in G2
+//! Verified with a single pairing equation.
+//!
+//! Based on: https://alinush.github.io/chunky#chunky-a-weighted-non-malleable-pvss
 
 use crate::{
     delegate_transcript_core_to_subtrs,
@@ -61,13 +69,12 @@ use serde::{Deserialize, Serialize};
 pub const DST: &[u8; 39] = b"APTOS_WEIGHTED_CHUNKY_FIELD_PVSS_FS_DST";
 
 /// Weighted chunky PVSS transcript.
-#[allow(non_snake_case)]
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
 pub struct Transcript<P: Pairing> {
     dealer: Player,
     /// This is the aggregatable subtranscript
     #[serde(serialize_with = "ark_se", deserialize_with = "ark_de")]
-    // Even though Subtranscript implements Serialize/Deserialize, we need this attribute macro because `Pairing` does not implement serde
+    // Even though `Subtranscript` implements serde, we need this attribute macro because `Pairing` does not implement serde
     pub subtrs: Subtranscript<P>,
     /// Proof (of knowledge) showing that the s_{i,j}'s in C are base-B representations (of the s_i's in V, but this is not part of the proof), and that the r_j's in R are used in C
     #[serde(serialize_with = "ark_se", deserialize_with = "ark_de")]
@@ -81,7 +88,7 @@ pub struct SharingProof<E: Pairing> {
     /// SoK: the SK is knowledge of `witnesses` s_{i,j} yielding the commitment and the C and the R, their image is the PK, and the signed message is a certain context `cntxt`
     pub SoK: sigma_protocol::Proof<E::ScalarField, hkzg_chunked_elgamal::Homomorphism<'static, E>>, // static because we don't want the lifetime of the Proof to depend on the Homomorphism
     /// A batched range proof showing that all committed values s_{i,j} lie in some range
-    pub range_proof: dekart_univariate_v2::Proof<E>, // TODO: make an affine version of this
+    pub range_proof: dekart_univariate_v2::Proof<E>,
     /// A KZG-style commitment to the values s_{i,j} going into the range proof
     pub range_proof_commitment:
         <dekart_univariate_v2::Proof<E> as BatchedRangeProof<E>>::CommitmentNormalised,
@@ -136,7 +143,7 @@ impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>> traits:
         debug_assert_eq!(
             eks.len(),
             sc.get_total_num_players(),
-            "Number of encryption keys must equal total weight"
+            "Number of encryption keys must equal total number of players"
         );
 
         // Initialize the PVSS SoK context

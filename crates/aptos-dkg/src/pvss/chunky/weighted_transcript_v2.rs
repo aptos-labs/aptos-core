@@ -132,7 +132,7 @@ impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>> traits:
         debug_assert_eq!(
             eks.len(),
             sc.get_total_num_players(),
-            "Number of encryption keys must equal total weight"
+            "Number of encryption keys must equal total number of players"
         );
 
         // Initialize the PVSS SoK context

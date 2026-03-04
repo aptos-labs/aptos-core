@@ -8,8 +8,8 @@
 use aptos_crypto::arkworks::GroupGenerators;
 use aptos_dkg::{
     range_proofs::{
-        dekart_multivariate::Proof as DekartMultivariate,
-        // dekart_univariate::Proof as UnivariateDeKART,
+        //        dekart_multivariate::Proof as DekartMultivariate,
+        dekart_univariate::Proof as UnivariateDeKART,
         dekart_univariate_v2::Proof as UnivariateDeKARTv2,
         traits::BatchedRangeProof,
     },
@@ -18,7 +18,6 @@ use aptos_dkg::{
 use ark_bls12_381::Bls12_381;
 use ark_bn254::Bn254;
 use ark_ec::pairing::Pairing;
-use ark_serialize::CanonicalSerialize;
 use criterion::{
     criterion_group, criterion_main, measurement::WallTime, BenchmarkGroup, BenchmarkId, Criterion,
 };
@@ -28,7 +27,7 @@ use rand::{rngs::StdRng, SeedableRng};
 /// `crates/aptos-crypto/README.md` rely on it.
 const BROKEN_DEKART_RS_SCHEME_NAME: &str = "dekart-rs-broken";
 const DEKART_RS_SCHEME_NAME: &str = "dekart-rs";
-const DEKART_MULTIVARIATE_SCHEME_NAME: &str = "dekart-multivar";
+//const DEKART_MULTIVARIATE_SCHEME_NAME: &str = "dekart-multivar";
 const BN254: &str = "bn254";
 const BLS12_381: &str = "bls12-381";
 
@@ -40,26 +39,26 @@ const BATCH_SIZES: [usize; 3] = [1023, 16383, 131071]; //[1048575]; // 104857510
 const BIT_WIDTHS: [u8; 4] = [8, 16, 32, 64]; // [8, 16, 32, 64];
 
 fn bench_groups(c: &mut Criterion) {
-    // bench_range_proof::<Bn254, UnivariateDeKART<Bn254>>(c, BROKEN_DEKART_RS_SCHEME_NAME, BN254);
-    // bench_range_proof::<Bls12_381, UnivariateDeKART<Bls12_381>>(
-    //     c,
-    //     BROKEN_DEKART_RS_SCHEME_NAME,
-    //     BLS12_381,
-    // );
-
-    //bench_range_proof::<Bn254, UnivariateDeKARTv2<Bn254>>(c, DEKART_RS_SCHEME_NAME, BN254);
-    // bench_range_proof::<Bls12_381, UnivariateDeKARTv2<Bls12_381>>(
-    //     c,
-    //     DEKART_RS_SCHEME_NAME,
-    //     BLS12_381,
-    // );
-
-    //bench_range_proof::<Bn254, DekartMultivariate<Bn254>>(c, DEKART_MULTIVARIATE_SCHEME_NAME, BN254);
-    bench_range_proof::<Bls12_381, DekartMultivariate<Bls12_381>>(
+    bench_range_proof::<Bn254, UnivariateDeKART<Bn254>>(c, BROKEN_DEKART_RS_SCHEME_NAME, BN254);
+    bench_range_proof::<Bls12_381, UnivariateDeKART<Bls12_381>>(
         c,
-        DEKART_MULTIVARIATE_SCHEME_NAME,
+        BROKEN_DEKART_RS_SCHEME_NAME,
         BLS12_381,
     );
+
+    bench_range_proof::<Bn254, UnivariateDeKARTv2<Bn254>>(c, DEKART_RS_SCHEME_NAME, BN254);
+    bench_range_proof::<Bls12_381, UnivariateDeKARTv2<Bls12_381>>(
+        c,
+        DEKART_RS_SCHEME_NAME,
+        BLS12_381,
+    );
+
+    //bench_range_proof::<Bn254, DekartMultivariate<Bn254>>(c, DEKART_MULTIVARIATE_SCHEME_NAME, BN254);
+    // bench_range_proof::<Bls12_381, DekartMultivariate<Bls12_381>>(
+    //     c,
+    //     DEKART_MULTIVARIATE_SCHEME_NAME,
+    //     BLS12_381,
+    // );
 }
 
 /// Generic benchmark function over any pairing curve and range proof

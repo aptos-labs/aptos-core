@@ -53,7 +53,7 @@ pub trait Trait:
     /// Verify a sigma protocol proof.
     ///
     /// `verifier_batch_size`: per-component batch sizes, shape mirrors the homomorphism.
-    /// - `None`: infer from `public_statement` (may clone to count).
+    /// - `None`: infer from `public_statement` (may clone to count, so performance may be degraded).
     /// - `Some(shape)`: use the given shape; avoids cloning when the caller already has it.
     fn verify<Ct: Serialize, R: RngCore + CryptoRng>(
         &self,
@@ -65,7 +65,7 @@ pub trait Trait:
     ) -> anyhow::Result<()> {
         let prover_first_message = proof
             .prover_commitment()
-            .expect("tuple proof must contain commitment for Fiat–Shamir"); // TODO: code alternative version
+            .expect("proof must contain commitment for Fiat–Shamir"); // TODO: code required function for this
         let c = fiat_shamir_challenge_for_sigma_protocol::<_, Self::Scalar, _>(
             cntxt,
             self,
@@ -103,7 +103,7 @@ impl<T: CurveGroupTrait> Trait for T {
     type VerifierBatchSize = usize;
 
     fn dst(&self) -> Vec<u8> {
-        CurveGroupTrait::dst(self) // `self.dst()` works but seems a bit too concise
+        CurveGroupTrait::dst(self) // `self.dst()` works but seems a bit too concise/circular
     }
 
     fn verify_with_challenge<R: RngCore + CryptoRng>(
@@ -131,16 +131,11 @@ impl<T: CurveGroupTrait> Trait for T {
             &powers_of_beta,
             challenge,
         );
-        let msm_result = Self::msm_eval(msm_terms);
-        ensure!(msm_result == <<Self as CurveGroupTrait>::Group as AdditiveGroup>::ZERO);
+        check_msm_eval_zero(self, msm_terms)?;
         Ok(())
     }
 }
 
-// TODO: rename this to CurveGroupTrait
-// then make a more basic Trait
-// then make CurveGroupTrait automatically implement that
-// and then make a field hom implement the basic Trait
 pub trait CurveGroupTrait:
     fixed_base_msms::Trait<
         Domain: Witness<<Self::Group as PrimeGroup>::ScalarField>,
@@ -178,8 +173,7 @@ pub trait CurveGroupTrait:
             rng,
         );
 
-        let msm_result = Self::msm_eval(msm_terms);
-        ensure!(msm_result == <Self::Group as AdditiveGroup>::ZERO); // or MsmOutput::zero()
+        check_msm_eval_zero(self, msm_terms)?;
 
         Ok(())
     }
@@ -315,7 +309,6 @@ pub trait CurveGroupTrait:
 }
 
 /// Checks that the given MSM input evaluates to the group identity.
-/// Use when verifying one component of a tuple homomorphism component-wise.
 #[allow(non_snake_case)]
 pub fn check_msm_eval_zero<H: CurveGroupTrait>(
     _hom: &H, // This is convenient, we can pass the homomorphism so we don't have to specify the homomorphism type in the caller

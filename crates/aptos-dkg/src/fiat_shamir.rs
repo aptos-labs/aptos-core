@@ -92,14 +92,17 @@ pub trait RangeProof<E: Pairing, B: BatchedRangeProof<E>> {
 
     fn append_sigma_proof<A: CanonicalSerialize>(&mut self, sigma_proof: &A);
 
+    #[allow(dead_code)] // To be used in next PR
     fn append_blinding_poly_commitment<A: CanonicalSerialize>(&mut self, commitment: &A);
 
     fn append_f_j_commitments<A: CanonicalSerialize>(&mut self, f_j_commitments: &A);
 
+    #[allow(dead_code)] // To be used in next PR
     fn append_g_i_commitments<A: CanonicalSerialize>(&mut self, g_i_commitments: &A);
 
     fn append_h_commitment<A: CanonicalSerialize>(&mut self, commitment: &A);
 
+    #[allow(dead_code)] // To be used in next PR
     fn append_hypercube_sum<F: CanonicalSerialize>(&mut self, point: &F);
 
     fn challenges_for_quotient_polynomials(&mut self, ell: usize) -> Vec<E::ScalarField>;
@@ -108,9 +111,11 @@ pub trait RangeProof<E: Pairing, B: BatchedRangeProof<E>> {
 
     fn challenge_scalar(&mut self) -> E::ScalarField;
 
+    #[allow(dead_code)] // To be used in next PR
     fn challenge_nonzero_scalar(&mut self) -> E::ScalarField;
 
     // Maybe move this to a Sumcheck trait?
+    #[allow(dead_code)] // To be used in next PR
     fn challenge_point(&mut self, dimension: u8) -> Vec<E::ScalarField>;
 }
 
