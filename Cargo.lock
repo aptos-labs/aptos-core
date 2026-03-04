@@ -4956,6 +4956,7 @@ dependencies = [
 name = "aptos-vm"
 version = "0.1.0"
 dependencies = [
+ "ahash 0.8.11",
  "anyhow",
  "aptos-aggregator",
  "aptos-block-executor",

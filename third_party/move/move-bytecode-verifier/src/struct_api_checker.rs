@@ -1491,6 +1491,39 @@ pub fn check_struct_api_impl(
 
     let attr = struct_api_attr.unwrap(); // Safe: we checked above
 
+    // Structs with the key ability cannot have struct APIs.
+    // The key ability marks a struct as a top-level resource intended for global storage
+    // (move_to/move_from), which is incompatible with being passed as a transaction argument
+    // via pack/unpack/borrow wrappers.
+    let struct_handle_idx = match &info {
+        StructApiNameInfo::Pack {
+            struct_handle_idx, ..
+        }
+        | StructApiNameInfo::PackVariant {
+            struct_handle_idx, ..
+        }
+        | StructApiNameInfo::Unpack {
+            struct_handle_idx, ..
+        }
+        | StructApiNameInfo::UnpackVariant {
+            struct_handle_idx, ..
+        }
+        | StructApiNameInfo::TestVariant {
+            struct_handle_idx, ..
+        }
+        | StructApiNameInfo::BorrowField {
+            struct_handle_idx, ..
+        } => *struct_handle_idx,
+    };
+    if module
+        .struct_handle_at(struct_handle_idx)
+        .abilities
+        .has_key()
+    {
+        return Err(PartialVMError::new(StatusCode::INVALID_STRUCT_API_CODE)
+            .with_message("struct with key ability cannot have struct APIs"));
+    }
+
     // Validate signature types based on the parsed name information
     match &info {
         StructApiNameInfo::Pack {

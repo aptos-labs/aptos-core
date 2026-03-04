@@ -14,7 +14,7 @@ use move_binary_format::{
 use move_core_types::{
     identifier::{IdentStr, Identifier},
     language_storage::{ModuleId, StructTag, TypeTag, LEGACY_OPTION_VEC},
-    value::{MoveFieldLayout, MoveStructLayout, MoveTypeLayout},
+    value::{MoveFieldLayout, MoveStructLayout, MoveTypeLayout, MoveVariantLayout},
 };
 use std::{borrow::Borrow, convert::TryInto, fmt::Debug};
 
@@ -259,50 +259,93 @@ impl StructLayoutBuilder {
                 })
             },
             StructFieldInformation::DeclaredVariants(variant_definitions) => {
-                if m.self_id().is_option() {
-                    match layout_type {
-                        LayoutType::WithTypes => {
-                            let mid = m.self_id();
-                            let type_args = type_arguments
-                                .iter()
-                                .map(|t| t.try_into())
-                                .collect::<anyhow::Result<Vec<TypeTag>>>()?;
-                            let type_ = StructTag {
-                                address: *mid.address(),
-                                module: mid.name().to_owned(),
-                                name: m.identifier_at(s_handle.name).to_owned(),
-                                type_args,
-                            };
-                            if variant_definitions.len() != 2 {
-                                bail!("Option must have exactly two variants");
-                            }
-                            let variant = &variant_definitions[1];
-                            let name = m.identifier_at(variant.name).to_owned();
-                            if name.as_str() == "Some" {
-                                if variant.fields.len() != 1 {
-                                    bail!("Variant `Some` must have exactly one field");
-                                }
-                                let layout = TypeLayoutBuilder::build_from_signature_token(
-                                    m,
-                                    &variant.fields[0].signature.0,
-                                    &type_arguments,
-                                    compiled_module_view,
-                                    layout_type,
-                                )?;
-                                let vector_layout = MoveTypeLayout::Vector(Box::new(layout));
-                                let identifier = Identifier::new(LEGACY_OPTION_VEC)?;
-                                let fields = vec![MoveFieldLayout::new(identifier, vector_layout)];
-                                return Ok(MoveStructLayout::WithTypes { type_, fields });
-                            } else {
-                                bail!("Variant name must be `Some`");
-                            }
-                        },
-                        _ => {
-                            bail!("enum variants not yet supported by layouts");
-                        },
-                    }
+                // Enum variants only support WithTypes layout, consistent with Option handling.
+                // Only WithTypes layout is used in practice (via build_with_types from API layer).
+                if !matches!(layout_type, LayoutType::WithTypes) {
+                    bail!("enum variants not yet supported by layouts");
                 }
-                bail!("enum variants not yet supported by layouts")
+
+                // Build the StructTag for the enum type (common to both Option and general enums)
+                let mid = m.self_id();
+                let type_args = type_arguments
+                    .iter()
+                    .map(|t| t.try_into())
+                    .collect::<anyhow::Result<Vec<TypeTag>>>()?;
+                let type_ = StructTag {
+                    address: *mid.address(),
+                    module: mid.name().to_owned(),
+                    name: m.identifier_at(s_handle.name).to_owned(),
+                    type_args,
+                };
+
+                if m.self_id().is_option() {
+                    // Special handling for Option: convert to legacy vector-based representation
+                    if variant_definitions.len() != 2 {
+                        bail!("Option must have exactly two variants");
+                    }
+                    let variant = &variant_definitions[1];
+                    let name = m.identifier_at(variant.name).to_owned();
+                    if name.as_str() == "Some" {
+                        if variant.fields.len() != 1 {
+                            bail!("Variant `Some` must have exactly one field");
+                        }
+                        let layout = TypeLayoutBuilder::build_from_signature_token(
+                            m,
+                            &variant.fields[0].signature.0,
+                            &type_arguments,
+                            compiled_module_view,
+                            layout_type,
+                        )?;
+                        let vector_layout = MoveTypeLayout::Vector(Box::new(layout));
+                        let identifier = Identifier::new(LEGACY_OPTION_VEC)?;
+                        let fields = vec![MoveFieldLayout::new(identifier, vector_layout)];
+                        Ok(MoveStructLayout::WithTypes { type_, fields })
+                    } else {
+                        bail!("Variant name must be `Some`");
+                    }
+                } else {
+                    // Handle general enums: build WithVariants layout
+                    let variant_layouts = variant_definitions
+                        .iter()
+                        .map(|variant| {
+                            let field_layouts = variant
+                                .fields
+                                .iter()
+                                .map(|f| {
+                                    TypeLayoutBuilder::build_from_signature_token(
+                                        m,
+                                        &f.signature.0,
+                                        &type_arguments,
+                                        compiled_module_view,
+                                        layout_type,
+                                    )
+                                })
+                                .collect::<anyhow::Result<Vec<MoveTypeLayout>>>()?;
+                            Ok((variant, field_layouts))
+                        })
+                        .collect::<anyhow::Result<Vec<_>>>()?;
+
+                    Ok(MoveStructLayout::WithVariants {
+                        type_,
+                        variants: variant_layouts
+                            .into_iter()
+                            .map(|(variant, layouts)| {
+                                let variant_name = m.identifier_at(variant.name).to_owned();
+                                let fields = variant
+                                    .fields
+                                    .iter()
+                                    .map(|f| m.identifier_at(f.name).to_owned())
+                                    .zip(layouts)
+                                    .map(|(name, layout)| MoveFieldLayout::new(name, layout))
+                                    .collect();
+                                MoveVariantLayout {
+                                    name: variant_name,
+                                    fields,
+                                }
+                            })
+                            .collect(),
+                    })
+                }
             },
         }
     }

@@ -13,6 +13,7 @@ repository = { workspace = true }
 rust-version = { workspace = true }
 
 [dependencies]
+ahash = { workspace = true }
 anyhow = { workspace = true }
 aptos-aggregator = { workspace = true }
 aptos-block-executor = { workspace = true }
