@@ -1,25 +1,68 @@
 // Copyright (c) Aptos Foundation
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
-//! Runtime instruction set.
+//! # Runtime Instruction Set (Micro-ops)
 //!
-//! # Design decisions to revisit
+//! ## Design overview
+//!
+//! - **Highly specialized**: we are not aiming for a minimal set of micro-ops.
+//!   Specialized variants (e.g. `HeapMoveFrom8` for the common 8-byte case)
+//!   are preferred when they enable faster dispatch or more efficient interpreter code.
+//!
+//! - **Fixed-size micro-ops**: each [`MicroOp`] variant should fit in a fixed
+//!   number of bytes so side-tables (e.g. source maps, gas tables) can be
+//!   indexed by program counter without indirection. Current size is 24 bytes;
+//!   we should aim to bring this down to 16.
+//!
+//! - **Variable-size frame slots**: frame slots are variable-sized. Each
+//!   micro-op makes the width explicit — either baked into the opcode name
+//!   (e.g. `Move8` = 8 bytes) or as an explicit `size` field.
+//!
+//! - **Inline (flat) structs**: most structs are stored inline in the frame,
+//!   not heap-allocated. The existing data movement ops (`Move`, `Move8`)
+//!   already handle inline structs. The `Heap*` ops are only for structs
+//!   that must live on the heap (e.g. too large to inline).
+//!
+//! - **Calling convention**: the VM uses a single flat linear buffer as its
+//!   call stack. Each frame contains locals/args followed by a 24-byte
+//!   metadata section `(saved_pc, saved_fp, func_id)`.
+//!
+//!   ```text
+//!                 caller frame                           callee frame
+//!     ┌──────────────────────────────────┐   ┌──────────────────────────────┐
+//!     │                        │ saved  ││   │                              │
+//!     │  caller locals         │  pc    ││   │  args  │  callee locals      │
+//!     │                        │  fp    ││   │                              │
+//!     │                        │func_id ││   │                              │
+//!     └──────────────────────────────────┘   └──────────────────────────────┘
+//!                              ▲             ▲
+//!                         metadata (24B)     fp
+//!   ```
+//!
+//!   **Call**: caller writes metadata at end of its frame, places args at
+//!   the start of the callee frame, then sets `fp` to the callee frame.
+//!   **Return**: callee writes return values at the start of its own frame
+//!   (potentially overwriting args/locals), then restores `pc`/`fp` from
+//!   the metadata at `fp - 24`.
+//!
+//! ## Design decisions to revisit
 //!
 //! - **Addressing modes**: most operands are fp-relative offsets today.
-//!   Secondary modes: immediate (`*Const`), pointer + static-offset (`ObjLoad`),
-//!   pointer + dynamic-offset (`VecLoadElem`).
-//!     - Right now, offsets are `u32`. Do we want something more packed?
+//!   Secondary modes: immediate (`*Imm`), pointer + static-offset
+//!   (`HeapMoveFrom`), pointer + dynamic-offset (`VecLoadElem`).
+//!     - Right now, offsets are `u32` wrapped in [`FrameOffset`]. Do we want
+//!       something more packed?
 //!     - Do we need other addressing modes?
 //!     - Which instructions should support which addressing modes?
 //!
-//! - **Size specialization**: 8-byte variants (`Mov8`, `ObjLoad8`, `ObjStore8`)
-//!   fast-path the common primitive/pointer size. May want `Mov16` (fat
-//!   pointers) and others.
+//! - **Size specialization**: 8-byte variants (`Move8`, `HeapMoveFrom8`,
+//!   `HeapMoveTo8`) fast-path the common primitive/pointer size. May want
+//!   `Move16` (fat pointers) and others.
 //!
 //! - **Branch design**: fused compare-and-branch (current) vs separate
 //!   `Cmp` + `BranchTrue`/`BranchFalse`. Fused is standard for bytecode VMs.
 //!
-//! - **Immediate representation**: instructions like `StoreConst8` carry a
+//! - **Immediate representation**: instructions like `StoreImm8` carry a
 //!   `u64`, but the same instruction is used for other 8-byte types (addresses,
 //!   bools, pointers). Should immediates be `u64` or `[u8; 8]`? `u64` is
 //!   convenient but conflates the bit pattern with an integer type.
@@ -28,34 +71,61 @@
 //!   instructions or memory layouts need to be portable across architectures,
 //!   we'll be in trouble.
 //!
-//! - **Encoding**: Rust enum is convenient for prototyping but may not be optimal.
-//!   Revisit for production.
+//! - **Encoding**: Rust enum is convenient for prototyping but may not be
+//!   optimal. Revisit for production.
+//!
+//! ## Naming conventions
+//!
+//! Micro-op names follow the pattern `{Op}{Modifier}{Type}{Size}`:
+//!
+//! - **Op**: the operation (`Store`, `Move`, `Add`, `HeapMoveFrom`, `Vec`, …)
+//! - **Modifier**: addressing or source mode (`Imm` = immediate)
+//! - **Type**: data type when relevant (`U64`, …)
+//! - **Size**: byte width when specialized (`8` = 8 bytes)
+//!
+//! Examples: `StoreImm8`, `AddU64Imm`, `HeapMoveFrom8`, `VecLoadElem`.
+//!
+//! Operand ordering: destination (`dst`) or branch target (`target`) comes
+//! first, followed by sources and immediates.
+//!
+//! ## Object descriptor table
+//!
+//! `descriptor_id` fields index into a table of type descriptors that the GC
+//! uses to trace heap objects. Each descriptor records the size of the object
+//! and the offsets of any pointer/reference fields within it. `descriptor_id = 0`
+//! means the object contains no references (trivial for GC).
+
+/// A typed wrapper around a `u32` frame-pointer-relative byte offset.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct FrameOffset(pub u32);
+
+/// A typed wrapper around a `u32` program-counter offset (instruction index).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct CodeOffset(pub u32);
 
 #[derive(Debug)]
-pub enum Instruction {
+pub enum MicroOp {
     //======================================================================
     // Data movement
     //======================================================================
     // Move data between frame slots or store constants.
-    // `Mov8` fast-paths 8-byte values; `Mov` handles arbitrary sizes.
+    // `Move8` fast-paths 8-byte values; `Move` handles arbitrary sizes.
     //
     // May want:
-    // - `Mov16` (fat pointers) + other sizes,
-    // - `StoreConst` to handle arbitrary sizes.
+    // - `Move16` (fat pointers) + other sizes,
+    // - `StoreImm` to handle arbitrary sizes,
+    // - bulk data movement.
     //======================================================================
-    /// Store an immediate u64 (8 bytes) at `dst_fp_offset` from the current frame pointer.
-    StoreConst8 { dst_fp_offset: u32, val: u64 },
+    /// Store an immediate u64 (8 bytes) at `dst` in the current frame.
+    StoreImm8 { dst: FrameOffset, imm: u64 },
 
-    /// Copy 8 bytes from `src_fp_offset` to `dst_fp_offset`.
-    Mov8 {
-        src_fp_offset: u32,
-        dst_fp_offset: u32,
-    },
+    /// Copy 8 bytes from `src` to `dst`.
+    Move8 { dst: FrameOffset, src: FrameOffset },
 
-    /// Copy `size` bytes from `src_fp_offset` to `dst_fp_offset`.
-    Mov {
-        src_fp_offset: u32,
-        dst_fp_offset: u32,
+    /// Copy `size` bytes from `src` to `dst`.
+    Move {
+        dst: FrameOffset,
+        src: FrameOffset,
         size: u32,
     },
 
@@ -70,39 +140,46 @@ pub enum Instruction {
     // - u8, u16, u32 variants (mask on u64?), u128/u256 (multi-word),
     // - signed integer support.
     //======================================================================
-    /// `dst = src1 + src2` (u64, checked).
+    /// `dst = lhs + rhs` (u64, checked).
     AddU64 {
-        src_fp_offset_1: u32,
-        src_fp_offset_2: u32,
-        dst_fp_offset: u32,
+        dst: FrameOffset,
+        lhs: FrameOffset,
+        rhs: FrameOffset,
     },
 
-    /// `dst = src + val` (u64, checked).
-    AddU64Const {
-        src_fp_offset: u32,
-        val: u64,
-        dst_fp_offset: u32,
+    /// `dst = src + imm` (u64, checked).
+    AddU64Imm {
+        dst: FrameOffset,
+        src: FrameOffset,
+        imm: u64,
     },
 
-    /// `dst = src - val` (u64, checked).
-    SubU64Const {
-        src_fp_offset: u32,
-        val: u64,
-        dst_fp_offset: u32,
+    /// `dst = src - imm` (u64, checked).
+    SubU64Imm {
+        dst: FrameOffset,
+        src: FrameOffset,
+        imm: u64,
     },
 
-    /// `dst = src >> val` (u64, logical right shift).
-    ShrU64Const {
-        src_fp_offset: u32,
-        val: u64,
-        dst_fp_offset: u32,
+    /// `dst = imm - src` (u64, checked). Reverse immediate subtract.
+    RSubU64Imm {
+        dst: FrameOffset,
+        src: FrameOffset,
+        imm: u64,
     },
 
-    /// `dst = lhs % rhs` (u64 remainder). Panics on division by zero.
-    RemU64 {
-        lhs_fp_offset: u32,
-        rhs_fp_offset: u32,
-        dst_fp_offset: u32,
+    /// `dst = src >> imm` (u64, logical right shift).
+    ShrU64Imm {
+        dst: FrameOffset,
+        src: FrameOffset,
+        imm: u64,
+    },
+
+    /// `dst = lhs % rhs` (u64 modulo). Panics on division by zero.
+    ModU64 {
+        dst: FrameOffset,
+        lhs: FrameOffset,
+        rhs: FrameOffset,
     },
 
     //======================================================================
@@ -115,32 +192,38 @@ pub enum Instruction {
     // - more conditions: ==, !=, >, <=, and const variants,
     // - something for enum dispatch (jump table)?
     //======================================================================
-    /// Call function `func_id`. Frame metadata is saved at
-    /// current fp + data_size, and callee fp = current fp + data_size
-    /// + FRAME_METADATA_SIZE.
-    CallFunc { func_id: usize },
+    /// Call function `func_id`. The caller has already placed arguments
+    /// at the start of the callee's frame and written the 24-byte metadata
+    /// `(pc, fp, func_id)` at `current_fp + data_size`. Sets `fp` to
+    /// `current_fp + data_size + 24`.
+    CallFunc { func_id: u32 },
 
-    /// Return from the current function call.
+    /// Return from the current function call. The callee has written
+    /// return values at the start of its frame. Restores `pc` and `fp`
+    /// from the metadata at `fp - 24`.
     Return,
 
     /// Unconditional jump.
-    Jump { dst_pc: u32 },
+    Jump { target: CodeOffset },
 
-    /// Jump to `dst_pc` if the u64 at `src_fp_offset` is **not** zero.
-    JumpIfNotZero { src_fp_offset: u32, dst_pc: u32 },
-
-    /// Jump to `dst_pc` if the u64 at `src_fp_offset` is **>=** `val`.
-    JumpIfGreaterEqualU64Const {
-        src_fp_offset: u32,
-        dst_pc: u32,
-        val: u64,
+    /// Jump to `target` if the u64 at `src` is **not** zero.
+    JumpIfNotZero {
+        target: CodeOffset,
+        src: FrameOffset,
     },
 
-    /// Jump to `dst_pc` if u64 at `lhs_fp_offset` < u64 at `rhs_fp_offset`.
+    /// Jump to `target` if the u64 at `src` is **>=** `imm`.
+    JumpIfGreaterEqualU64Imm {
+        target: CodeOffset,
+        src: FrameOffset,
+        imm: u64,
+    },
+
+    /// Jump to `target` if u64 at `lhs` < u64 at `rhs`.
     JumpIfLessU64 {
-        lhs_fp_offset: u32,
-        rhs_fp_offset: u32,
-        dst_pc: u32,
+        target: CodeOffset,
+        lhs: FrameOffset,
+        rhs: FrameOffset,
     },
 
     //======================================================================
@@ -153,57 +236,59 @@ pub enum Instruction {
     // - VecSwap (native in Move's vector module),
     // - VecMoveRange (bulk move between vectors) — tricky: this is
     //   really a memcpy between two heap-allocated regions, but we
-    //   currently have no vector-to-vector addressing mode.
+    //   currently have no vector-to-vector addressing mode,
+    // - specializations for common element sizes (e.g. 1-byte for
+    //   byte strings, 8-byte for primitives).
     //======================================================================
     /// Allocate a new empty vector with the given initial capacity.
     /// `descriptor_id = 0` means trivial elements (no refs); >= 1 indexes
-    /// the object descriptor table. Writes heap pointer to `dst_fp_offset`.
+    /// the object descriptor table. Writes heap pointer to `dst`.
     /// MAY TRIGGER GC.
     VecNew {
+        dst: FrameOffset,
         descriptor_id: u16,
         elem_size: u32,
         initial_capacity: u64,
-        dst_fp_offset: u32,
     },
 
-    /// Write the length (u64) of the vector to `dst_fp_offset`.
+    /// Write the length (u64) of the vector to `dst`.
     VecLen {
-        vec_fp_offset: u32,
-        dst_fp_offset: u32,
+        dst: FrameOffset,
+        heap_ptr: FrameOffset,
     },
 
-    /// Append an element. Copies `elem_size` bytes from `elem_fp_offset`
+    /// Append an element. Copies `elem_size` bytes from `elem`
     /// into the vector. If capacity is exceeded, reallocates (bump) and
-    /// updates `vec_fp_offset` in place. MAY TRIGGER GC.
+    /// updates `heap_ptr` in place. MAY TRIGGER GC.
     VecPushBack {
-        vec_fp_offset: u32,
-        elem_fp_offset: u32,
+        heap_ptr: FrameOffset,
+        elem: FrameOffset,
         elem_size: u32,
     },
 
-    /// Pop last element. Copies `elem_size` bytes to `dst_fp_offset`.
+    /// Pop last element. Copies `elem_size` bytes to `dst`.
     /// Aborts if empty.
     VecPopBack {
-        vec_fp_offset: u32,
-        dst_fp_offset: u32,
+        dst: FrameOffset,
+        heap_ptr: FrameOffset,
         elem_size: u32,
     },
 
-    /// Read vector[idx]. Copies `elem_size` bytes to `dst_fp_offset`.
+    /// Read vector[idx]. Copies `elem_size` bytes to `dst`.
     /// Aborts if out of bounds.
     VecLoadElem {
-        vec_fp_offset: u32,
-        idx_fp_offset: u32,
-        dst_fp_offset: u32,
+        dst: FrameOffset,
+        heap_ptr: FrameOffset,
+        idx: FrameOffset,
         elem_size: u32,
     },
 
-    /// Write vector[idx]. Copies `elem_size` bytes from `src_fp_offset`.
+    /// Write vector[idx]. Copies `elem_size` bytes from `src`.
     /// Aborts if out of bounds.
     VecStoreElem {
-        vec_fp_offset: u32,
-        idx_fp_offset: u32,
-        src_fp_offset: u32,
+        heap_ptr: FrameOffset,
+        idx: FrameOffset,
+        src: FrameOffset,
         elem_size: u32,
     },
 
@@ -214,128 +299,144 @@ pub enum Instruction {
     // Fat pointers keep the base visible to GC; thin pointers would be
     // cheaper but GC couldn't identify the owning object.
     //
+    // Even local references use fat pointers (with offset = 0), because
+    // the same frame slot may hold either a local reference or a
+    // reference into a heap object (e.g. a vector element), so we need a
+    // uniform representation.
+    //
     // May want:
     // - Specializations (e.g. ReadRef8/WriteRef8)
     //======================================================================
     /// Borrow a stack-local slot, producing a fat pointer `(base, offset)`.
-    /// Writes 16 bytes at `[dst_fp_offset, dst_fp_offset+16)`:
-    ///   - base   = fp + local_fp_offset (a stack address)
+    /// Writes 16 bytes at `[dst, dst+16)`:
+    ///   - base   = fp + local (a stack address)
     ///   - offset = 0
-    BorrowLocal {
-        local_fp_offset: u32,
-        dst_fp_offset: u32,
+    ///
+    /// The resulting pointer slot is marked as containing a pointer. During
+    /// GC, the collector checks whether a pointer falls within the heap
+    /// address range — stack-local references like this one are ignored.
+    StackBorrow {
+        dst: FrameOffset,
+        local: FrameOffset,
     },
 
     /// Borrow a vector element, producing a fat pointer `(base, offset)`.
-    /// Writes 16 bytes at `[dst_fp_offset, dst_fp_offset+16)`:
+    /// Writes 16 bytes at `[dst, dst+16)`:
     ///   - base   = the vector's heap pointer
     ///   - offset = VEC_DATA_OFFSET + idx * elem_size
     ///
     /// Aborts if index is out of bounds.
     VecBorrow {
-        vec_fp_offset: u32,
-        idx_fp_offset: u32,
+        dst: FrameOffset,
+        heap_ptr: FrameOffset,
+        idx: FrameOffset,
         elem_size: u32,
-        dst_fp_offset: u32,
     },
 
     /// Borrow a location within a heap object, producing a fat pointer
-    /// `(obj_ptr, offset)`. Writes 16 bytes at `[dst_fp_offset, dst_fp_offset+16)`:
+    /// `(heap_ptr, offset)`. Writes 16 bytes at `[dst, dst+16)`:
     ///   - base   = the object's heap pointer
     ///   - offset = offset from the object's start
-    ObjBorrow {
-        obj_fp_offset: u32,
+    ///
+    /// Move semantics guarantee the offset is within bounds.
+    HeapBorrow {
+        dst: FrameOffset,
+        heap_ptr: FrameOffset,
         offset: u32,
-        dst_fp_offset: u32,
     },
 
     /// Read through a fat pointer. Copies `size` bytes from the
-    /// referenced location `(base + offset)` to `dst_fp_offset`.
+    /// referenced location `(base + offset)` to `dst`.
     ReadRef {
-        ref_fp_offset: u32,
-        dst_fp_offset: u32,
+        dst: FrameOffset,
+        ref_ptr: FrameOffset,
         size: u32,
     },
 
     /// Write through a fat pointer. Copies `size` bytes from
-    /// `src_fp_offset` to the referenced location `(base + offset)`.
+    /// `src` to the referenced location `(base + offset)`.
     WriteRef {
-        ref_fp_offset: u32,
-        src_fp_offset: u32,
+        ref_ptr: FrameOffset,
+        src: FrameOffset,
         size: u32,
     },
 
     //======================================================================
     // Heap object operations (structs and enums)
     //======================================================================
-    // Structs and enums are both heap objects. The interpreter treats them
-    // uniformly as ptr+offset load/store — the compiler helpers (below)
-    // bake in the right offsets for each.
+    // These ops are for structs/enums that live on the heap. Most
+    // structs are inline in the frame and use the data movement ops
+    // instead; enums are always heap-allocated for now. The interpreter
+    // treats heap structs and enums uniformly as ptr+offset load/store —
+    // the compiler helpers (below) bake in the right offsets for each.
     //
-    // `ObjLoad8`/`ObjStore8` specialize for 8-byte fields.
+    // `HeapMoveFrom8`/`HeapMoveTo8` specialize for 8-byte fields.
     //
     // May want:
-    // - fused Pack/Unpack,
-    // - ObjLoad16/ObjStore16,
+    // - fused Pack/Unpack (allocate + initialize or destructure in one
+    //   step; also addresses the bulk-move problem for call setup),
+    // - More specializations for common sizes (HeapMoveFrom/To).
     //======================================================================
     /// Allocate a new heap object. Size is determined by the `Struct` or
     /// `Enum` descriptor at `descriptor_id`. Writes the heap pointer to
-    /// `dst_fp_offset`. **MAY TRIGGER GC.**
+    /// `dst`. **MAY TRIGGER GC.**
     ///
-    /// Note: the allocated memory is not zeroed or initialized — the caller
-    /// must store into every field before reading. This is potentially
-    /// dangerous; revisit whether ObjNew should zero-initialize, or use a
-    /// fused Pack instruction that allocates and initializes in one step.
-    ObjNew {
+    /// The allocated memory is zero-initialized. Revisit whether a fused
+    /// Pack instruction (allocate + initialize in one step) would be
+    /// preferable.
+    HeapNew {
+        dst: FrameOffset,
         descriptor_id: u16,
-        dst_fp_offset: u32,
     },
 
-    /// Read 8 bytes from a heap object at `obj_ptr + offset` into `dst_fp_offset`.
-    ObjLoad8 {
-        obj_fp_offset: u32,
+    /// Copy 8 bytes from a heap object at `heap_ptr + offset` into `dst`.
+    HeapMoveFrom8 {
+        dst: FrameOffset,
+        heap_ptr: FrameOffset,
         offset: u32,
-        dst_fp_offset: u32,
     },
 
-    /// Read `size` bytes from a heap object at `obj_ptr + offset` into `dst_fp_offset`.
-    ObjLoad {
-        obj_fp_offset: u32,
+    /// Copy `size` bytes from a heap object at `heap_ptr + offset` into `dst`.
+    HeapMoveFrom {
+        dst: FrameOffset,
+        heap_ptr: FrameOffset,
         offset: u32,
-        dst_fp_offset: u32,
         size: u32,
     },
 
-    /// Write 8 bytes from `src_fp_offset` into a heap object at `obj_ptr + offset`.
-    ObjStore8 {
-        obj_fp_offset: u32,
+    /// Copy 8 bytes from `src` into a heap object at `heap_ptr + offset`.
+    HeapMoveTo8 {
+        heap_ptr: FrameOffset,
         offset: u32,
-        src_fp_offset: u32,
+        src: FrameOffset,
     },
 
-    /// Write an immediate u64 into a heap object at `obj_ptr + offset`.
-    ObjStoreConst8 {
-        obj_fp_offset: u32,
+    /// Write an immediate u64 into a heap object at `heap_ptr + offset`.
+    HeapMoveToImm8 {
+        heap_ptr: FrameOffset,
         offset: u32,
-        val: u64,
+        imm: u64,
     },
 
-    /// Write `size` bytes from `src_fp_offset` into a heap object at `obj_ptr + offset`.
-    ObjStore {
-        obj_fp_offset: u32,
+    /// Copy `size` bytes from `src` into a heap object at `heap_ptr + offset`.
+    HeapMoveTo {
+        heap_ptr: FrameOffset,
         offset: u32,
-        src_fp_offset: u32,
+        src: FrameOffset,
         size: u32,
     },
 
     //======================================================================
     // Debugging
     //======================================================================
-    /// Advance the interpreter's RNG and write a random u64 to `dst_fp_offset`.
-    StoreRandomU64 { dst_fp_offset: u32 },
+    /// Advance the interpreter's RNG and write a random u64 to `dst`.
+    /// Provides easy access to randomness during execution, enabling
+    /// stress tests based on random sequences of operations (e.g. GC
+    /// correctness, heap layout robustness).
+    StoreRandomU64 { dst: FrameOffset },
 
     /// Unconditionally trigger a garbage collection cycle.
-    /// Requires a stack map entry at this PC. Useful for testing.
+    /// Useful for testing GC correctness.
     ForceGC,
     //======================================================================
     // Missing instructions
@@ -368,128 +469,140 @@ const ENUM_TAG_OFFSET: usize = OBJECT_HEADER_SIZE; // 8
 /// Offset where enum variant field data begins (after header + tag).
 const ENUM_DATA_OFFSET: usize = OBJECT_HEADER_SIZE + 8; // 16
 
-impl Instruction {
+impl MicroOp {
     // ----- Struct helpers (offsets relative to STRUCT_DATA_OFFSET) -----
 
-    pub fn struct_load8(struct_fp_offset: u32, field_offset: u32, dst_fp_offset: u32) -> Self {
-        Instruction::ObjLoad8 {
-            obj_fp_offset: struct_fp_offset,
+    pub fn struct_load8(heap_ptr: FrameOffset, field_offset: u32, dst: FrameOffset) -> Self {
+        MicroOp::HeapMoveFrom8 {
+            dst,
+            heap_ptr,
             offset: STRUCT_DATA_OFFSET as u32 + field_offset,
-            dst_fp_offset,
         }
     }
 
     pub fn struct_load(
-        struct_fp_offset: u32,
+        heap_ptr: FrameOffset,
         field_offset: u32,
-        dst_fp_offset: u32,
+        dst: FrameOffset,
         size: u32,
     ) -> Self {
-        Instruction::ObjLoad {
-            obj_fp_offset: struct_fp_offset,
+        MicroOp::HeapMoveFrom {
+            dst,
+            heap_ptr,
             offset: STRUCT_DATA_OFFSET as u32 + field_offset,
-            dst_fp_offset,
             size,
         }
     }
 
-    pub fn struct_store8(struct_fp_offset: u32, field_offset: u32, src_fp_offset: u32) -> Self {
-        Instruction::ObjStore8 {
-            obj_fp_offset: struct_fp_offset,
+    pub fn struct_store8(heap_ptr: FrameOffset, field_offset: u32, src: FrameOffset) -> Self {
+        MicroOp::HeapMoveTo8 {
+            heap_ptr,
             offset: STRUCT_DATA_OFFSET as u32 + field_offset,
-            src_fp_offset,
+            src,
         }
     }
 
     pub fn struct_store(
-        struct_fp_offset: u32,
+        heap_ptr: FrameOffset,
         field_offset: u32,
-        src_fp_offset: u32,
+        src: FrameOffset,
         size: u32,
     ) -> Self {
-        Instruction::ObjStore {
-            obj_fp_offset: struct_fp_offset,
+        MicroOp::HeapMoveTo {
+            heap_ptr,
             offset: STRUCT_DATA_OFFSET as u32 + field_offset,
-            src_fp_offset,
+            src,
             size,
         }
     }
 
-    pub fn struct_borrow(struct_fp_offset: u32, field_offset: u32, dst_fp_offset: u32) -> Self {
-        Instruction::ObjBorrow {
-            obj_fp_offset: struct_fp_offset,
+    pub fn struct_borrow(heap_ptr: FrameOffset, field_offset: u32, dst: FrameOffset) -> Self {
+        MicroOp::HeapBorrow {
+            dst,
+            heap_ptr,
             offset: STRUCT_DATA_OFFSET as u32 + field_offset,
-            dst_fp_offset,
         }
     }
 
     // ----- Enum helpers (offsets relative to ENUM_DATA_OFFSET) -----
 
-    pub fn enum_get_tag(enum_fp_offset: u32, dst_fp_offset: u32) -> Self {
-        Instruction::ObjLoad8 {
-            obj_fp_offset: enum_fp_offset,
+    pub fn enum_get_tag(heap_ptr: FrameOffset, dst: FrameOffset) -> Self {
+        MicroOp::HeapMoveFrom8 {
+            dst,
+            heap_ptr,
             offset: ENUM_TAG_OFFSET as u32,
-            dst_fp_offset,
         }
     }
 
-    pub fn enum_set_tag(enum_fp_offset: u32, variant: u16) -> Self {
-        Instruction::ObjStoreConst8 {
-            obj_fp_offset: enum_fp_offset,
+    pub fn enum_set_tag(heap_ptr: FrameOffset, variant: u16) -> Self {
+        MicroOp::HeapMoveToImm8 {
+            heap_ptr,
             offset: ENUM_TAG_OFFSET as u32,
-            val: variant as u64,
+            imm: variant as u64,
         }
     }
 
-    pub fn enum_load8(enum_fp_offset: u32, field_offset: u32, dst_fp_offset: u32) -> Self {
-        Instruction::ObjLoad8 {
-            obj_fp_offset: enum_fp_offset,
+    pub fn enum_load8(heap_ptr: FrameOffset, field_offset: u32, dst: FrameOffset) -> Self {
+        MicroOp::HeapMoveFrom8 {
+            dst,
+            heap_ptr,
             offset: ENUM_DATA_OFFSET as u32 + field_offset,
-            dst_fp_offset,
         }
     }
 
     pub fn enum_load(
-        enum_fp_offset: u32,
+        heap_ptr: FrameOffset,
         field_offset: u32,
-        dst_fp_offset: u32,
+        dst: FrameOffset,
         size: u32,
     ) -> Self {
-        Instruction::ObjLoad {
-            obj_fp_offset: enum_fp_offset,
+        MicroOp::HeapMoveFrom {
+            dst,
+            heap_ptr,
             offset: ENUM_DATA_OFFSET as u32 + field_offset,
-            dst_fp_offset,
             size,
         }
     }
 
-    pub fn enum_store8(enum_fp_offset: u32, field_offset: u32, src_fp_offset: u32) -> Self {
-        Instruction::ObjStore8 {
-            obj_fp_offset: enum_fp_offset,
+    pub fn enum_store8(heap_ptr: FrameOffset, field_offset: u32, src: FrameOffset) -> Self {
+        MicroOp::HeapMoveTo8 {
+            heap_ptr,
             offset: ENUM_DATA_OFFSET as u32 + field_offset,
-            src_fp_offset,
+            src,
         }
     }
 
     pub fn enum_store(
-        enum_fp_offset: u32,
+        heap_ptr: FrameOffset,
         field_offset: u32,
-        src_fp_offset: u32,
+        src: FrameOffset,
         size: u32,
     ) -> Self {
-        Instruction::ObjStore {
-            obj_fp_offset: enum_fp_offset,
+        MicroOp::HeapMoveTo {
+            heap_ptr,
             offset: ENUM_DATA_OFFSET as u32 + field_offset,
-            src_fp_offset,
+            src,
             size,
         }
     }
 
-    pub fn enum_borrow(enum_fp_offset: u32, field_offset: u32, dst_fp_offset: u32) -> Self {
-        Instruction::ObjBorrow {
-            obj_fp_offset: enum_fp_offset,
+    pub fn enum_borrow(heap_ptr: FrameOffset, field_offset: u32, dst: FrameOffset) -> Self {
+        MicroOp::HeapBorrow {
+            dst,
+            heap_ptr,
             offset: ENUM_DATA_OFFSET as u32 + field_offset,
-            dst_fp_offset,
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn micro_op_size() {
+        // Current size is 24 bytes due to large variants (e.g. VecNew,
+        // JumpIfGreaterEqualU64Imm). We should aim to bring this down to 16.
+        assert_eq!(std::mem::size_of::<MicroOp>(), 24);
     }
 }
