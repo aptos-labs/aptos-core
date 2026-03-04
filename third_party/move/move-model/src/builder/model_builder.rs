@@ -39,7 +39,16 @@ impl BuiltinReceiverType {
         match ty {
             Type::Vector(_) => Some(Self::Vector),
             Type::Primitive(PrimitiveType::Signer) => Some(Self::Signer),
-            _ => None,
+            Type::Primitive(_) => None,
+            Type::Var(_) => None,
+            Type::Struct(..) => None,
+            Type::TypeParameter(_) => None,
+            Type::TypeDomain(_) => None,
+            Type::Tuple(_) => None,
+            Type::Error => None,
+            Type::Reference(..) => None,
+            Type::Fun(..) => None,
+            Type::ResourceDomain(..) => None,
         }
     }
 
