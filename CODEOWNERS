@@ -29,10 +29,12 @@
 
 # Owners for the gas subsystem.
 /aptos-move/aptos-abstract-gas-usage/ @vgao1996
+/aptos-move/aptos-gas-algebra/ @vgao1996
 /aptos-move/aptos-gas-calibration/ @vgao1996
 /aptos-move/aptos-gas-meter/ @vgao1996
 /aptos-move/aptos-gas-profiling/ @vgao1996
 /aptos-move/aptos-gas-schedule/ @vgao1996
+/aptos-move/aptos-gas-schedule-updator/ @vgao1996
 /aptos-move/aptos-memory-usage-tracker/ @vgao1996
 /aptos-move/aptos-release-builder/src/components/gas.rs @vgao1996
 /types/src/on_chain_config/gas_schedule.rs @vgao1996
