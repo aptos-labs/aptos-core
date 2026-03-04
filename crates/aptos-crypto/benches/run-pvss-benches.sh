@@ -18,13 +18,13 @@ if [ "$ANS" == "y" ]; then
     rm -rf $repo_root/target/criterion/pvss_chunky_v1*
 
     echo "Benchmarking chunky_v1 (with RAYON_NUM_THREADS=1)..."
-    RAYON_NUM_THREADS=8 cargo bench --bench pvss -- pvss/chunky_v1/bls12-381
+    RAYON_NUM_THREADS=1 cargo bench --bench pvss -- pvss/chunky_v1/bls12-381
 
     echo "Cleaning previous chunky_v2 criterion benchmark results..."
     rm -rf $repo_root/target/criterion/pvss_chunky_v2*
 
     echo "Benchmarking chunky_v2 (with RAYON_NUM_THREADS=1)..."
-    RAYON_NUM_THREADS=8 cargo bench --bench pvss -- pvss/chunky_v2/bls12-381
+    RAYON_NUM_THREADS=1 cargo bench --bench pvss -- pvss/chunky_v2/bls12-381
 
     cd - &>/dev/null
 else

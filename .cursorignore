@@ -53,7 +53,7 @@ metadata-cache/
 consensus/safety-rules/
 
 # Cryptographic implementations
-
+crates/aptos-crypto/
 
 # Security module
 secure/
