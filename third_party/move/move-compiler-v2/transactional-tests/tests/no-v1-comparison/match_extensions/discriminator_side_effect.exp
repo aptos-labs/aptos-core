@@ -1,0 +1,7 @@
+processed 6 tasks
+task 0 lines 1-68:  publish [module 0xc0ffee::m {]
+task 1 lines 70-70:  run 0xc0ffee::m::test_wildcard_side_effect
+task 2 lines 72-72:  run 0xc0ffee::m::test_scalar_single_eval
+task 3 lines 74-74:  run 0xc0ffee::m::test_tuple_single_eval
+task 4 lines 76-76:  run 0xc0ffee::m::test_mixed_tuple_single_eval
+task 5 lines 78-78:  run 0xc0ffee::m::test_mixed_tuple_eval_order
