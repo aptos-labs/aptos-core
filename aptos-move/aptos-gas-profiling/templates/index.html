@@ -245,6 +245,11 @@
             {{slh_dsa_sha2_128s}} gas units, {{slh_dsa_sha2_128s-percentage}} of execution gas.
             {{/if}}
 
+            {{#if randomness_txn}}
+            <h4>Randomness Transaction Cost</h4>
+            {{randomness_txn}} gas units, {{randomness_txn-percentage}} of execution gas.
+            {{/if}}
+
             <h4>Dependencies</h4>
             {{#if deps}}
             <table data-name="exec_dependencies">

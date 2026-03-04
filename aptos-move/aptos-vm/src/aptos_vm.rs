@@ -39,7 +39,7 @@ use aptos_block_executor::{
 };
 use aptos_crypto::HashValue;
 use aptos_framework_natives::code::PublishRequest;
-use aptos_gas_algebra::{Gas, GasQuantity, NumBytes, Octa};
+use aptos_gas_algebra::{FeePerGasUnit, Gas, GasQuantity, NumBytes, Octa};
 use aptos_gas_meter::{AptosGasMeter, GasAlgebra, StandardGasAlgebra, StandardGasMeter};
 use aptos_gas_schedule::{
     gas_feature_versions::{self, RELEASE_V1_10, RELEASE_V1_27, RELEASE_V1_38},
@@ -580,6 +580,7 @@ impl AptosVM {
             u64::from(gas_meter.io_gas_used()),
             u64::from(gas_meter.storage_fee_used()),
             storage_fee_refund,
+            u64::from(gas_meter.feature_fee_used()),
         )
     }
 
@@ -841,6 +842,7 @@ impl AptosVM {
                 log_context,
                 traversal_context,
                 self.is_simulation,
+                self.gas_feature_version(),
             )
         })?;
         epilogue_session.finish(fee_statement, status, change_set_configs, module_storage)
@@ -889,6 +891,7 @@ impl AptosVM {
                 log_context,
                 traversal_context,
                 self.is_simulation,
+                self.gas_feature_version(),
             )
         })?;
         let output = epilogue_session.finish(
@@ -975,6 +978,7 @@ impl AptosVM {
         gas_meter: &mut impl AptosGasMeter,
         traversal_context: &mut TraversalContext,
         entry_fn: &EntryFunction,
+        gas_unit_price: FeePerGasUnit,
         trace_recorder: &mut impl TraceRecorder,
     ) -> Result<(), VMStatus> {
         dispatch_loader!(module_storage, loader, {
@@ -1012,6 +1016,7 @@ impl AptosVM {
                 );
                 if maybe_randomness_annotation.is_some() {
                     session.mark_unbiasable();
+                    gas_meter.charge_randomness_txn(gas_unit_price)?;
                 }
             }
 
@@ -1093,6 +1098,7 @@ impl AptosVM {
                         gas_meter,
                         traversal_context,
                         entry_fn,
+                        txn_data.gas_unit_price(),
                         trace_recorder,
                     )
                 })?;
@@ -1341,6 +1347,7 @@ impl AptosVM {
                     traversal_context,
                     multisig_address,
                     &entry_function,
+                    txn_data.gas_unit_price(),
                     change_set_configs,
                     trace_recorder,
                 ),
@@ -1416,6 +1423,7 @@ impl AptosVM {
         traversal_context: &mut TraversalContext,
         multisig_address: AccountAddress,
         payload: &EntryFunction,
+        gas_unit_price: FeePerGasUnit,
         change_set_configs: &ChangeSetConfigs,
         trace_recorder: &mut impl TraceRecorder,
     ) -> Result<UserSessionChangeSet, VMStatus> {
@@ -1429,6 +1437,7 @@ impl AptosVM {
                 gas_meter,
                 traversal_context,
                 payload,
+                gas_unit_price,
                 trace_recorder,
             )
         })?;

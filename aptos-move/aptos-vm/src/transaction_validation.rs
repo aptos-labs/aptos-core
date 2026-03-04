@@ -460,6 +460,7 @@ fn run_epilogue(
     features: &Features,
     traversal_context: &mut TraversalContext,
     is_simulation: bool,
+    gas_feature_version: u64,
 ) -> VMResult<()> {
     let txn_gas_price = txn_data.gas_unit_price();
     let txn_max_gas_units = txn_data.max_gas_amount();
@@ -592,7 +593,13 @@ fn run_epilogue(
 
     // Emit the FeeStatement event
     if features.is_emit_fee_statement_enabled() {
-        emit_fee_statement(session, module_storage, fee_statement, traversal_context)?;
+        emit_fee_statement(
+            session,
+            module_storage,
+            fee_statement,
+            gas_feature_version,
+            traversal_context,
+        )?;
     }
 
     maybe_raise_injected_error(InjectedError::EndOfRunEpilogue)?;
@@ -604,13 +611,21 @@ fn emit_fee_statement(
     session: &mut SessionExt<impl AptosMoveResolver>,
     module_storage: &impl ModuleStorage,
     fee_statement: FeeStatement,
+    gas_feature_version: u64,
     traversal_context: &mut TraversalContext,
 ) -> VMResult<()> {
+    use aptos_gas_schedule::gas_feature_versions::RELEASE_V1_44;
+
+    let bytes = if gas_feature_version >= RELEASE_V1_44 {
+        bcs::to_bytes(&fee_statement).expect("Failed to serialize fee statement")
+    } else {
+        fee_statement.legacy_bcs_bytes()
+    };
     session.execute_function_bypass_visibility(
         &TRANSACTION_FEE_MODULE,
         EMIT_FEE_STATEMENT,
         vec![],
-        vec![bcs::to_bytes(&fee_statement).expect("Failed to serialize fee statement")],
+        vec![bytes],
         &mut UnmeteredGasMeter,
         traversal_context,
         module_storage,
@@ -631,6 +646,7 @@ pub(crate) fn run_success_epilogue(
     log_context: &AdapterLogSchema,
     traversal_context: &mut TraversalContext,
     is_simulation: bool,
+    gas_feature_version: u64,
 ) -> Result<(), VMStatus> {
     fail_point!("move_adapter::run_success_epilogue", |_| {
         Err(VMStatus::error(
@@ -649,6 +665,7 @@ pub(crate) fn run_success_epilogue(
         features,
         traversal_context,
         is_simulation,
+        gas_feature_version,
     )
     .or_else(|err| convert_epilogue_error(err, log_context))
 }
@@ -666,6 +683,7 @@ pub(crate) fn run_failure_epilogue(
     log_context: &AdapterLogSchema,
     traversal_context: &mut TraversalContext,
     is_simulation: bool,
+    gas_feature_version: u64,
 ) -> Result<(), VMStatus> {
     run_epilogue(
         session,
@@ -677,6 +695,7 @@ pub(crate) fn run_failure_epilogue(
         features,
         traversal_context,
         is_simulation,
+        gas_feature_version,
     )
     .or_else(|err| {
         expect_only_successful_execution(

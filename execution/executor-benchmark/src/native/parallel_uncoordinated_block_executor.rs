@@ -143,7 +143,7 @@ impl IncrementalOutput {
     fn into_success_output(mut self, gas: u64) -> Result<TransactionOutput> {
         if gas != 0 {
             self.events.push(
-                FeeStatement::new(gas, gas, 0, 0, 0)
+                FeeStatement::new(gas, gas, 0, 0, 0, 0)
                     .create_event_v2()
                     .expect("Creating FeeStatement should always succeed"),
             );

@@ -90,6 +90,19 @@ pub trait GasAlgebra {
     /// Returns the amount of storage fee used.
     fn storage_fee_used(&self) -> Fee;
 
+    /// Charges a feature fee (e.g., randomness).
+    ///
+    /// The amount charged is denominated in Octa (fixed APT cost) and does not
+    /// count toward the block gas limit.
+    fn charge_feature_fee(
+        &mut self,
+        abstract_amount: impl GasExpression<VMGasParameters, Unit = Octa>,
+        gas_unit_price: FeePerGasUnit,
+    ) -> PartialVMResult<()>;
+
+    /// Returns the amount of feature fee used.
+    fn feature_fee_used(&self) -> Fee;
+
     /// Bump the `extra_balance`.
     fn inject_balance(&mut self, extra_balance: impl Into<Gas>) -> PartialVMResult<()>;
 }
@@ -131,6 +144,11 @@ pub trait AptosGasMeter: MoveGasMeter {
     /// Charges an additional cost for SLH-DSA signature verification to compensate for the
     /// expensive computation required (5x more expensive than ed25519).
     fn charge_slh_dsa_sha2_128s(&mut self) -> VMResult<()>;
+
+    /// Charges an additional cost for randomness transactions to account for the
+    /// network-wide overhead of randomness generation (pipeline serialization,
+    /// DKG share aggregation, zaptos optimization bypass).
+    fn charge_randomness_txn(&mut self, gas_unit_price: FeePerGasUnit) -> VMResult<()>;
 
     /// Charges IO gas for the transaction itself.
     fn charge_io_gas_for_transaction(&mut self, txn_size: NumBytes) -> VMResult<()>;
@@ -265,6 +283,11 @@ pub trait AptosGasMeter: MoveGasMeter {
     /// Return the total fee used for storage.
     fn storage_fee_used(&self) -> Fee {
         self.algebra().storage_fee_used()
+    }
+
+    /// Return the total feature fee used.
+    fn feature_fee_used(&self) -> Fee {
+        self.algebra().feature_fee_used()
     }
 
     /// Bump the `extra_balance`.

@@ -163,7 +163,7 @@ impl ExecutorTask for NativeVMExecutorTask {
                 ExecutionStatus::Success(AptosTransactionOutput::new(VMOutput::new(
                     change_set,
                     ModuleWriteSet::empty(),
-                    FeeStatement::new(gas_units, gas_units, 0, 0, 0),
+                    FeeStatement::new(gas_units, gas_units, 0, 0, 0, 0),
                     TransactionStatus::Keep(aptos_types::transaction::ExecutionStatus::Success),
                 )))
             },
@@ -361,7 +361,7 @@ impl NativeVMExecutorTask {
         };
 
         events.push((
-            FeeStatement::new(gas_units, gas_units, 0, 0, 0)
+            FeeStatement::new(gas_units, gas_units, 0, 0, 0, 0)
                 .create_event_v2()
                 .expect("Creating FeeStatement should always succeed"),
             None,
