@@ -12,7 +12,7 @@ use crate::env_pipeline::rewrite_target::{
 use move_model::{
     ast::{AbortKind, Exp, ExpData, MatchArm, Operation, Pattern, Value},
     exp_rewriter::ExpRewriterFunctions,
-    metadata::LanguageVersion,
+    metadata::lang_feature_versions::LANGUAGE_VERSION_FOR_PRIMITIVE_MATCH,
     model::{GlobalEnv, Loc, NodeId},
     symbol::Symbol,
     ty::{PrimitiveType, Type},
@@ -57,7 +57,7 @@ impl ExpRewriterFunctions for MatchTransformer<'_> {
         let mixed_tuple =
             !fully_transformable && is_mixed_tuple_match(self.env, discriminator, arms);
         // Matches over primitive types (and mixed tuples containing them) require
-        // language version 2.4+.
+        // a minimum language version.
         if (fully_transformable || mixed_tuple)
             && !check_primitive_match_version(self.env, discriminator)
         {
@@ -83,13 +83,19 @@ impl ExpRewriterFunctions for MatchTransformer<'_> {
 /// Check that the language version supports primitive match expressions.
 /// Returns `true` if the version is sufficient, `false` after emitting an error otherwise.
 fn check_primitive_match_version(env: &GlobalEnv, discriminator: &Exp) -> bool {
-    if env.language_version().is_at_least(LanguageVersion::V2_4) {
+    if env
+        .language_version()
+        .is_at_least(LANGUAGE_VERSION_FOR_PRIMITIVE_MATCH)
+    {
         return true;
     }
     env.error(
         &env.get_node_loc(discriminator.node_id()),
-        "match over integers, booleans, or byte strings \
-         is not supported before language version 2.4",
+        &format!(
+            "match over integers, booleans, or byte strings \
+             is not supported before language version {}",
+            LANGUAGE_VERSION_FOR_PRIMITIVE_MATCH
+        ),
     );
     false
 }
@@ -97,7 +103,8 @@ fn check_primitive_match_version(env: &GlobalEnv, discriminator: &Exp) -> bool {
 // ================================================================================================
 // Primitive Match Detection
 
-/// Check if a match expression is fully transformable to an if-else chain.
+/// Check if a match expression and its arms are fully transformable to an if-else chain (as opposed to
+/// a match expression with guards).
 fn is_match_fully_transformable(env: &GlobalEnv, discriminator: &Exp, arms: &[MatchArm]) -> bool {
     // Check if discriminator is a suitable type
     let discriminator_ty = env.get_node_type(discriminator.node_id());
@@ -413,9 +420,7 @@ fn maybe_bind_pattern(env: &GlobalEnv, discriminator: &Exp, pattern: &Pattern, b
                     _ => Pattern::Wildcard(p.node_id()),
                 })
                 .collect();
-            let has_bindings = bind_pats
-                .iter()
-                .any(|p| matches!(p, Pattern::Var(..)));
+            let has_bindings = bind_pats.iter().any(|p| matches!(p, Pattern::Var(..)));
             if has_bindings {
                 let bind_pattern = Pattern::Tuple(*tuple_id, bind_pats);
                 let loc = env.get_node_loc(pattern.node_id());
@@ -509,8 +514,10 @@ fn is_mixed_tuple_match(env: &GlobalEnv, discriminator: &Exp, arms: &[MatchArm])
                     }
                 })
             },
-            // Top-level catch-all is fine
-            Pattern::Wildcard(_) | Pattern::Var(_, _) => true,
+            Pattern::Wildcard(_) => true,
+            Pattern::Var(..) => {
+                unreachable!("top-level Var pattern on mixed tuple: rejected by type checker")
+            },
             _ => false,
         }
     })
@@ -521,6 +528,39 @@ fn is_mixed_tuple_match(env: &GlobalEnv, discriminator: &Exp, arms: &[MatchArm])
 /// All tuple elements are bound to temporaries in left-to-right order to
 /// preserve evaluation order and ensure each sub-expression is evaluated
 /// exactly once.
+///
+/// ## Example
+///
+/// Given a mixed tuple match where position 0 is non-primitive (enum) and
+/// position 1 is primitive (`u64`), with a user-written guard on one arm:
+///
+/// ```move
+/// match ((make_data(), compute_x())) {
+///     (Data::V1 { f }, 5) if (f > 10) => f + 1,
+///     (Data::V2, y)                    => y,
+///     _                                => 0,
+/// }
+/// ```
+///
+/// The transform binds each tuple element to a temporary (preserving
+/// left-to-right evaluation), strips the primitive position from the
+/// pattern, and moves its literal check into a guard.  User-written guards
+/// are wrapped so that primitive-position variable bindings are in scope,
+/// then combined with the synthesized primitive check via `&&`:
+///
+/// ```move
+/// { let _$np_0 = make_data();       // non-prim temp (pos 0)
+///   let _$prim_0 = compute_x();     // prim temp     (pos 1)
+///   match (_$np_0) {
+///     //  pattern: only non-prim positions remain
+///     //  guard:   prim literal check && user_guard
+///     Data::V1 { f } if (_$prim_0 == 5 && f > 10) => f + 1,
+///     //  pattern: non-prim only; prim var `y` bound via let in body
+///     Data::V2       => { let y = _$prim_0; y },
+///     _              => 0,
+///   }
+/// }
+/// ```
 fn transform_mixed_tuple_match(
     env: &GlobalEnv,
     match_id: NodeId,
@@ -642,6 +682,25 @@ fn transform_mixed_tuple_match(
 }
 
 /// Transform a single arm of a mixed tuple match.
+///
+/// For a `Pattern::Tuple` arm, the primitive sub-patterns are removed from
+/// the pattern and converted into guard conditions:
+///
+/// - `LiteralValue(v)` -- `_$prim_N == v` added to the guard conjunction.
+/// - `Var(sym)`        -- `let sym = _$prim_N` injected into the guard and body.
+/// - `Wildcard`        -- no condition or binding.
+///
+/// When the arm already carries a user-written guard, the final guard is:
+///
+/// ```text
+///   prim_check_0 && prim_check_1 && ... && { let y = _$prim_K; user_guard }
+/// ```
+///
+/// The user guard is wrapped with any primitive-position variable bindings
+/// so those names are in scope.  The body is wrapped identically.
+///
+/// `Pattern::Wildcard` arms are retyped to the non-primitive-only
+/// discriminator.  Top-level `Pattern::Var` is unreachable (see comment).
 fn transform_mixed_arm(
     env: &GlobalEnv,
     arm: &MatchArm,

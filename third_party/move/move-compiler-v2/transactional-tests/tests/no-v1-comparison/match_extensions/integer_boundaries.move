@@ -22,7 +22,7 @@ module 0xc0ffee::m {
     public fun test_u128_max(x: u128): u128 {
         match (x) {
             0 => 0,
-            1 => 1,
+            340282366920938463463374607431768211455 => 1,  // u128::MAX
             _ => 2,
         }
     }
@@ -42,6 +42,6 @@ module 0xc0ffee::m {
 
 //# run 0xc0ffee::m::test_u128_max --args 0u128
 
-//# run 0xc0ffee::m::test_u128_max --args 1u128
+//# run 0xc0ffee::m::test_u128_max --args 340282366920938463463374607431768211455u128
 
 //# run 0xc0ffee::m::test_u128_max --args 1000u128

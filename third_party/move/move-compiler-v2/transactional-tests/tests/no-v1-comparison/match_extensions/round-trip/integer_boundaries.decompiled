@@ -6,7 +6,7 @@ module 0xc0ffee::m {
         let _v0;
         loop {
             if (!(p0 == 0u128)) {
-                if (p0 == 1u128) {
+                if (p0 == MAX_U128) {
                     _v0 = 1u128;
                     break
                 };
@@ -64,6 +64,6 @@ module 0xc0ffee::m {
 
 //# run 0xc0ffee::m::test_u128_max --args 0u128
 
-//# run 0xc0ffee::m::test_u128_max --args 1u128
+//# run 0xc0ffee::m::test_u128_max --args 340282366920938463463374607431768211455u128
 
 //# run 0xc0ffee::m::test_u128_max --args 1000u128
