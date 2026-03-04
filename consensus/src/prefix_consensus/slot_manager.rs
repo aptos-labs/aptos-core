@@ -211,6 +211,11 @@ pub struct SlotManager<NS: SubprotocolNetworkSender<SlotConsensusMsg>, SP: SPCSp
     spc_output_rx: Option<tokio::sync::mpsc::UnboundedReceiver<(u64, PrefixVector)>>,
     spc_close_tx: Option<futures::channel::oneshot::Sender<futures::channel::oneshot::Sender<()>>>,
 
+    // Buffer for SPC messages that arrive before the SPC task is spawned.
+    // Keyed by slot: messages for current_slot (pre-spawn) and future slots are
+    // buffered here, then drained into spc_msg_tx when run_spc() is called.
+    spc_msg_buffer: HashMap<u64, Vec<(Author, StrongPrefixConsensusMsg)>>,
+
     // SPC spawner (production vs. test)
     spc_spawner: SP,
 
@@ -262,6 +267,7 @@ impl<NS: SubprotocolNetworkSender<SlotConsensusMsg>, SP: SPCSpawner> SlotManager
             spc_msg_tx: None,
             spc_output_rx: None,
             spc_close_tx: None,
+            spc_msg_buffer: HashMap::new(),
             spc_spawner,
             pending_commit: None,
             execution_channel,
@@ -358,7 +364,7 @@ impl<NS: SubprotocolNetworkSender<SlotConsensusMsg>, SP: SPCSpawner> SlotManager
                     let (slot, _) = timer_opt.expect("timer branch only fires when timer exists");
                     // Timer fired — don't restore it
                     self.spc_output_rx = spc_rx_opt;
-                    self.on_timer_expired(slot);
+                    self.on_timer_expired(slot).await;
                 }
 
                 // SPC output
@@ -470,7 +476,7 @@ impl<NS: SubprotocolNetworkSender<SlotConsensusMsg>, SP: SPCSpawner> SlotManager
             .map_or(false, |s| s.has_all_proposals());
         if all_received {
             self.slot_timer = None;
-            self.run_spc(slot);
+            self.run_spc(slot).await;
         }
     }
 
@@ -519,7 +525,7 @@ impl<NS: SubprotocolNetworkSender<SlotConsensusMsg>, SP: SPCSpawner> SlotManager
         {
             info!(epoch = self.epoch, slot = slot, "All proposals received, starting SPC");
             self.slot_timer = None;
-            self.run_spc(slot);
+            self.run_spc(slot).await;
         }
 
         // Check if this late proposal resolves a pending commit
@@ -527,7 +533,7 @@ impl<NS: SubprotocolNetworkSender<SlotConsensusMsg>, SP: SPCSpawner> SlotManager
             .await;
     }
 
-    fn on_timer_expired(&mut self, slot: u64) {
+    async fn on_timer_expired(&mut self, slot: u64) {
         if slot != self.current_slot {
             debug!(
                 epoch = self.epoch,
@@ -545,14 +551,14 @@ impl<NS: SubprotocolNetworkSender<SlotConsensusMsg>, SP: SPCSpawner> SlotManager
             slot = slot,
             "Timer expired, starting SPC with available proposals"
         );
-        self.run_spc(slot);
+        self.run_spc(slot).await;
     }
 
     // ========================================================================
     // SPC: run_spc, on_spc_v_high, process_spc_message
     // ========================================================================
 
-    fn run_spc(&mut self, slot: u64) {
+    async fn run_spc(&mut self, slot: u64) {
         let slot_state = self
             .slot_states
             .get_mut(&slot)
@@ -582,6 +588,29 @@ impl<NS: SubprotocolNetworkSender<SlotConsensusMsg>, SP: SPCSpawner> SlotManager
         self.spc_msg_tx = Some(handles.msg_tx);
         self.spc_output_rx = Some(handles.output_rx);
         self.spc_close_tx = Some(handles.close_tx);
+
+        // Drain any SPC messages that arrived before the task was spawned.
+        if let Some(buffered) = self.spc_msg_buffer.remove(&slot) {
+            let count = buffered.len();
+            info!(
+                epoch = self.epoch,
+                slot = slot,
+                buffered_count = count,
+                "Draining pre-spawn SPC message buffer"
+            );
+            let tx = self.spc_msg_tx.as_mut().expect("just set above");
+            for (author, msg) in buffered {
+                if let Err(e) = tx.send((author, msg)).await {
+                    error!(
+                        epoch = self.epoch,
+                        slot = slot,
+                        error = ?e,
+                        "Failed to drain buffered SPC message"
+                    );
+                    break;
+                }
+            }
+        }
     }
 
     async fn on_spc_v_high(&mut self, slot: u64, v_high: PrefixVector) {
@@ -765,10 +794,11 @@ impl<NS: SubprotocolNetworkSender<SlotConsensusMsg>, SP: SPCSpawner> SlotManager
         // If ℓ < n, the validator at position ℓ (first excluded) is demoted.
         self.ranking_manager.update(v_high.len());
 
-        // Clean up slot state, SPC channels, and pending commit
+        // Clean up slot state, SPC channels, message buffer, and pending commit
         self.spc_msg_tx.take();
         self.spc_output_rx.take();
         self.spc_close_tx.take();
+        self.spc_msg_buffer.remove(&slot);
         self.pending_commit = None;
         self.slot_states.remove(&slot);
 
@@ -789,32 +819,45 @@ impl<NS: SubprotocolNetworkSender<SlotConsensusMsg>, SP: SPCSpawner> SlotManager
         slot: u64,
         msg: StrongPrefixConsensusMsg,
     ) {
-        if slot != self.current_slot {
+        if slot < self.current_slot {
             debug!(
                 epoch = self.epoch,
                 slot = slot,
                 current_slot = self.current_slot,
-                "Dropping SPC message for non-current slot"
+                "Dropping SPC message for past slot"
             );
             return;
         }
-        if let Some(tx) = &mut self.spc_msg_tx {
-            if let Err(e) = tx.send((author, msg)).await {
-                error!(
-                    epoch = self.epoch,
-                    slot = slot,
-                    error = ?e,
-                    "Failed to send SPC message — SPC task receiver dropped. \
-                     SPC may be stalled."
-                );
+
+        // If SPC is running for this slot, forward directly.
+        if slot == self.current_slot {
+            if let Some(tx) = &mut self.spc_msg_tx {
+                if let Err(e) = tx.send((author, msg)).await {
+                    error!(
+                        epoch = self.epoch,
+                        slot = slot,
+                        error = ?e,
+                        "Failed to send SPC message — SPC task receiver dropped. \
+                         SPC may be stalled."
+                    );
+                }
+                return;
             }
-        } else {
-            debug!(
-                epoch = self.epoch,
-                slot = slot,
-                "No spc_msg_tx — SPC not running for this slot, dropping message"
-            );
         }
+
+        // SPC not yet spawned for this slot (current pre-spawn or future slot).
+        // Buffer the message so it can be drained when run_spc() is called.
+        info!(
+            epoch = self.epoch,
+            slot = slot,
+            current_slot = self.current_slot,
+            msg_type = msg.name(),
+            "Buffering SPC message (SPC not yet spawned for slot)"
+        );
+        self.spc_msg_buffer
+            .entry(slot)
+            .or_default()
+            .push((author, msg));
     }
 
     // ========================================================================
@@ -1192,7 +1235,7 @@ mod tests {
 
         // Fire timer to trigger SPC with partial proposals
         manager.slot_timer = None;
-        manager.run_spc(1);
+        manager.run_spc(1).await;
         let (slot, v_high) = manager.spc_output_rx.as_mut().unwrap().recv().await.unwrap();
 
         // v_high has length 4 (full ranking), entries for signers[2] and [3] are zero
@@ -1314,7 +1357,7 @@ mod tests {
         // Now run slot 1 quickly (single validator would be too easy, let's just fast-forward)
         manager.start_new_slot(1).await;
         manager.slot_timer = None;
-        manager.run_spc(1);
+        manager.run_spc(1).await;
         let (slot, v_high) = manager.spc_output_rx.as_mut().unwrap().recv().await.unwrap();
         manager.on_spc_v_high(slot, v_high).await;
         let _block1 = exec_rx.try_next().unwrap().unwrap();
