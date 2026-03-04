@@ -268,15 +268,13 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
 
         // Create shared network sender for both DKG managers
         let network_sender = Arc::new(self.create_network_sender());
+        let rb_config = self.rb_config.clone();
 
-        let rb_backoff_policy =
-            || {
-                ExponentialBackoff::from_millis(self.rb_config.backoff_policy_base_ms)
-                    .factor(self.rb_config.backoff_policy_factor)
-                    .max_delay(Duration::from_millis(
-                        self.rb_config.backoff_policy_max_delay_ms,
-                    ))
-            };
+        let rb_backoff_policy = || {
+            ExponentialBackoff::from_millis(rb_config.backoff_policy_base_ms)
+                .factor(rb_config.backoff_policy_factor)
+                .max_delay(Duration::from_millis(rb_config.backoff_policy_max_delay_ms))
+        };
 
         // Check both validator txn and randomness features are enabled
         if onchain_consensus_config.is_vtxn_enabled()
@@ -289,7 +287,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
                 network_sender.clone(),
                 rb_backoff_policy(),
                 aptos_time_service::TimeService::real(),
-                Duration::from_millis(self.rb_config.rpc_timeout_ms),
+                Duration::from_millis(rb_config.rpc_timeout_ms),
                 BoundedExecutor::new(8, tokio::runtime::Handle::current()),
             ));
             self.start_dkg_manager(epoch_state.clone(), my_index, &payload, rb)
@@ -307,7 +305,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
                 network_sender.clone(),
                 rb_backoff_policy(),
                 aptos_time_service::TimeService::real(),
-                Duration::from_millis(self.rb_config.rpc_timeout_ms),
+                Duration::from_millis(rb_config.rpc_timeout_ms),
                 BoundedExecutor::new(8, tokio::runtime::Handle::current()),
             ));
             self.start_chunky_dkg_manager(
