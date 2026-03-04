@@ -10,7 +10,7 @@
 /aptos-move/aptos-aggregator/ @georgemitenkov @gelash @zekun000
 /aptos-move/aptos-native-interface/ @vgao1996
 
-# Owners for gas-related crates and files.
+# Owners for the gas subsystem.
 /aptos-move/aptos-abstract-gas-usage/ @vgao1996
 /aptos-move/aptos-gas-calibration/ @vgao1996
 /aptos-move/aptos-gas-meter/ @vgao1996
@@ -18,6 +18,7 @@
 /aptos-move/aptos-gas-schedule/ @vgao1996
 /aptos-move/aptos-memory-usage-tracker/ @vgao1996
 /aptos-move/aptos-release-builder/src/components/gas.rs @vgao1996
+/types/src/on_chain_config/gas_schedule.rs @vgao1996
 
 # Owners for transaction simulation infrastructure and user interfaces.
 /aptos-move/aptos-release-builder/src/simulate.rs @vgao1996
@@ -135,6 +136,5 @@
 
 # Owners for types.
 /types/src/keyless/ @alinush
-/types/src/on_chain_config/gas_schedule.rs @vgao1996
 /types/src/on_chain_config/timed_features.rs @vgao1996
 /types/src/transaction/authenticator.rs @alinush
