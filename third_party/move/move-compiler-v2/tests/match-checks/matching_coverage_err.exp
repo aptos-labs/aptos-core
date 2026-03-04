@@ -1,0 +1,59 @@
+
+Diagnostics:
+error: match not exhaustive
+   ┌─ tests/match-checks/matching_coverage_err.move:21:16
+   │
+21 │         match (o) {
+   │                ^
+   │
+   = missing `Outer::Two{..}`
+
+error: match not exhaustive
+   ┌─ tests/match-checks/matching_coverage_err.move:28:16
+   │
+28 │         match (o) {
+   │                ^
+   │
+   = missing `Outer::Two{..}`
+
+error: match not exhaustive
+   ┌─ tests/match-checks/matching_coverage_err.move:36:16
+   │
+36 │         match (o) {
+   │                ^
+   │
+   = missing `Outer::One{i: Inner::Inner2{..}}`
+
+error: match not exhaustive
+   ┌─ tests/match-checks/matching_coverage_err.move:52:16
+   │
+52 │         match ((i, i)) {
+   │                ^^^^^^
+   │
+   = missing `(Inner::Inner2{..},_)`
+
+error: match not exhaustive
+   ┌─ tests/match-checks/matching_coverage_err.move:65:16
+   │
+65 │         match ((i, i)) {
+   │                ^^^^^^
+   │
+   = missing `(Inner::Inner2{..},Inner::Inner1{..})`
+
+error: unreachable pattern
+   ┌─ tests/match-checks/matching_coverage_err.move:78:14
+   │
+78 │              _ => {}
+   │              ^
+
+error: unreachable pattern
+   ┌─ tests/match-checks/matching_coverage_err.move:86:14
+   │
+86 │              One{i: _} => {}
+   │              ^^^^^^^^^
+
+error: unreachable pattern
+   ┌─ tests/match-checks/matching_coverage_err.move:96:14
+   │
+96 │              One{i: Inner1{x:_}} => {}
+   │              ^^^^^^^^^^^^^^^^^^^

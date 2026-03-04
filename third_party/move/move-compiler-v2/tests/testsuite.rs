@@ -173,6 +173,23 @@ const TEST_CONFIGS: Lazy<BTreeMap<&str, TestConfig>> = Lazy::new(|| {
     opts.testing = true;
     let config = || TestConfig::new(opts.clone());
     let configs = vec![
+        // --- Tests for match exhaustiveness and unreachable arm checking
+        TestConfig {
+            name: "match-checks",
+            runner: |p| run_test(p, get_config_by_name("match-checks")),
+            include: vec!["/match-checks/"],
+            stop_after: StopAfter::FirstAstPipeline,
+            ..config()
+        },
+        // --- Tests to showcase match transforms
+        TestConfig {
+            name: "match-transforms",
+            runner: |p| run_test(p, get_config_by_name("match-transforms")),
+            include: vec!["/match-transforms/"],
+            stop_after: StopAfter::FirstAstPipeline,
+            dump_ast: DumpLevel::EndStage,
+            ..config()
+        },
         // --- Tests for checking and ast processing
         // Tests for model building and various post-processing checking
         TestConfig {

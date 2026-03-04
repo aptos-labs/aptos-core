@@ -852,6 +852,48 @@ fn parse_typed_bind(context: &mut Context) -> Result<TypedBind, Box<Diagnostic>>
     ))
 }
 
+// Try to parse a literal value usable in a match pattern. Handles positive literals
+// (numbers, bools, byte strings) and negative numeric literals (e.g. -1i8).
+// Returns `Ok(None)` if the current position doesn't start a literal pattern.
+fn maybe_parse_literal_pattern(context: &mut Context) -> Result<Option<Value>, Box<Diagnostic>> {
+    let tok = context.tokens.peek();
+    // Negative numeric literal: `-` followed by a number, but not `-0x1::module`.
+    if tok == Tok::Minus {
+        let is_negative_literal = match context.tokens.lookahead2()? {
+            (Tok::NumTypedValue, _) => true,
+            (Tok::NumValue, after) => after != Tok::ColonColon,
+            _ => false,
+        };
+        if is_negative_literal {
+            let start_loc = context.tokens.start_loc();
+            context.tokens.advance()?; // consume `-`
+            let val = parse_value(context)?;
+            let end_loc = context.tokens.previous_end_loc();
+            let neg_num = match val.value {
+                Value_::Num(s) => Value_::Num(Symbol::from(format!("-{}", s.as_str()))),
+                _ => unreachable!("expected numeric value after minus in pattern"),
+            };
+            return Ok(Some(spanned(
+                context.tokens.file_hash(),
+                start_loc,
+                end_loc,
+                neg_num,
+            )));
+        }
+        return Ok(None);
+    }
+    // Positive literal: bool, typed number, byte string, or untyped number
+    // (excluding `NumValue ::` which is a module access like `0x1::module`).
+    let is_literal = matches!(
+        tok,
+        Tok::True | Tok::False | Tok::NumTypedValue | Tok::ByteStringValue
+    ) || (tok == Tok::NumValue && context.tokens.lookahead()? != Tok::ColonColon);
+    if is_literal {
+        return Ok(Some(parse_value(context)?));
+    }
+    Ok(None)
+}
+
 // Parse a binding:
 //      Bind =
 //          <Var>
@@ -860,6 +902,17 @@ fn parse_typed_bind(context: &mut Context) -> Result<TypedBind, Box<Diagnostic>>
 //          | <NameAccessChain> <OptionalTypeArgs>
 fn parse_bind(context: &mut Context) -> Result<Bind, Box<Diagnostic>> {
     let start_loc = context.tokens.start_loc();
+
+    if let Some(val) = maybe_parse_literal_pattern(context)? {
+        let end_loc = context.tokens.previous_end_loc();
+        return Ok(spanned(
+            context.tokens.file_hash(),
+            start_loc,
+            end_loc,
+            Bind_::Literal(val),
+        ));
+    }
+
     if context.tokens.peek() == Tok::Identifier {
         let next_tok = context.tokens.lookahead()?;
         if next_tok != Tok::LBrace

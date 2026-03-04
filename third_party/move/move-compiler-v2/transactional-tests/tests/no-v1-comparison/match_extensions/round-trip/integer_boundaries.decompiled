@@ -1,0 +1,69 @@
+//**** Cross-compiled for `move` syntax from `tests/no-v1-comparison/match_extensions/integer_boundaries.move`
+
+//# publish
+module 0xc0ffee::m {
+    public fun test_u128_max(p0: u128): u128 {
+        let _v0;
+        loop {
+            if (!(p0 == 0u128)) {
+                if (p0 == 1u128) {
+                    _v0 = 1u128;
+                    break
+                };
+                _v0 = 2u128;
+                break
+            };
+            return 0u128
+        };
+        _v0
+    }
+    public fun test_u64_boundaries(p0: u64): u64 {
+        let _v0;
+        loop {
+            if (!(p0 == 0)) {
+                if (p0 == MAX_U64) {
+                    _v0 = 1;
+                    break
+                };
+                _v0 = 2;
+                break
+            };
+            return 0
+        };
+        _v0
+    }
+    public fun test_u8_max(p0: u8): u8 {
+        let _v0;
+        loop {
+            if (!(p0 == MAX_U8)) {
+                if (p0 == 0u8) {
+                    _v0 = 0u8;
+                    break
+                };
+                _v0 = 2u8;
+                break
+            };
+            return 1u8
+        };
+        _v0
+    }
+}
+
+
+//# run 0xc0ffee::m::test_u8_max --args 255u8
+
+//# run 0xc0ffee::m::test_u8_max --args 0u8
+
+//# run 0xc0ffee::m::test_u8_max --args 100u8
+
+//# run 0xc0ffee::m::test_u64_boundaries --args 0u64
+
+//# run 0xc0ffee::m::test_u64_boundaries --args 18446744073709551615u64
+
+//# run 0xc0ffee::m::test_u64_boundaries --args 1000u64
+
+//# run 0xc0ffee::m::test_u128_max --args 0u128
+
+//# run 0xc0ffee::m::test_u128_max --args 1u128
+
+//# run 0xc0ffee::m::test_u128_max --args 1000u128

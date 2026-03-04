@@ -171,7 +171,7 @@ pub fn taskify<Command: Debug + Parser>(filename: &Path) -> Result<Vec<TaskInput
         let command_split = command_text.split_ascii_whitespace().collect::<Vec<_>>();
         let name_opt = command_split.get(1).map(|s| (*s).to_owned());
         let command_split = preprocess_args_with_negative_numbers(command_split);
-        let command = match Command::try_parse_from(&command_split) {
+        let command = match Command::try_parse_from(command_split) {
             Ok(command) => command,
             Err(e) => {
                 let mut spit_iter = command_text.split_ascii_whitespace();

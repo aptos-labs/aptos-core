@@ -1,0 +1,13 @@
+
+Diagnostics:
+error: cannot bind `integer` to left-hand side of type `bool`
+  ┌─ tests/match-checks/match_literal_type_error.move:4:13
+  │
+4 │             1 => 1,
+  │             ^
+
+error: cannot bind `u64` to left-hand side of type `u8`
+   ┌─ tests/match-checks/match_literal_type_error.move:11:13
+   │
+11 │             1u64 => 1,
+   │             ^^^^
