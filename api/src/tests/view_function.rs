@@ -82,16 +82,20 @@ async fn test_view_gas_used_header(
     context.commit_block(&[txn1, txn2]).await;
     context.wait_for_internal_indexer_caught_up().await;
 
-    let req = warp::test::request()
-        .method("POST")
-        .path("/v1/view")
-        .json(&build_coin_balance_request(&owner.address()));
-    let resp = context.reply(req).await;
+    let aptos_api_test_context::ApiSpecificConfig::V1(address) = context.api_specific_config;
+    let client = reqwest::Client::new();
+    let resp = client
+        .post(format!("http://{}/v1/view", address))
+        .header("content-type", "application/json")
+        .body(serde_json::to_vec(&build_coin_balance_request(&owner.address())).unwrap())
+        .send()
+        .await
+        .expect("Failed to send request");
 
     // Confirm the gas used header is present.
     assert!(
         resp.headers()
-            .get("X-Aptos-Gas-Used")
+            .get("x-aptos-gas-used")
             .unwrap()
             .to_str()
             .unwrap()
@@ -100,7 +104,9 @@ async fn test_view_gas_used_header(
             > 0
     );
 
-    context.check_golden_output_no_prune(serde_json::from_slice(resp.body()).unwrap());
+    context.check_golden_output_no_prune(
+        serde_json::from_slice(&resp.bytes().await.unwrap()).unwrap(),
+    );
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]

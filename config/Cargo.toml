@@ -12,6 +12,17 @@ publish = { workspace = true }
 repository = { workspace = true }
 rust-version = { workspace = true }
 
+[package.metadata.cargo-machete]
+ignored = ["strum"]
+
+[features]
+default = []
+failpoints = []
+fuzzing = ["aptos-crypto/fuzzing", "aptos-types/fuzzing"]
+smoke-test = []
+testing = []
+tokio-console = []
+
 [dependencies]
 anyhow = { workspace = true }
 aptos-crypto = { workspace = true }
@@ -29,7 +40,6 @@ cfg-if = { workspace = true }
 get_if_addrs = { workspace = true }
 maplit = { workspace = true }
 num_cpus = { workspace = true }
-poem-openapi = { workspace = true }
 rand = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
@@ -44,14 +54,3 @@ url = { workspace = true }
 aptos-crypto = { workspace = true }
 aptos-types = { workspace = true, features = ["fuzzing"] }
 tempfile = { workspace = true }
-
-[features]
-default = []
-failpoints = []
-fuzzing = ["aptos-crypto/fuzzing", "aptos-types/fuzzing"]
-smoke-test = []
-testing = []
-tokio-console = []
-
-[package.metadata.cargo-machete]
-ignored = ["strum"]

@@ -162,7 +162,7 @@ impl<'a, S: StateView> MoveConverter<'a, S> {
         Ok((txn, payload).into())
     }
 
-    pub fn try_into_pending_transaction_poem(
+    pub fn try_into_pending_transaction_response(
         &self,
         txn: SignedTransaction,
     ) -> Result<PendingTransaction> {
@@ -625,7 +625,7 @@ impl<'a, S: StateView> MoveConverter<'a, S> {
         Ok(ret)
     }
 
-    pub fn try_into_signed_transaction_poem(
+    pub fn try_into_signed_transaction(
         &self,
         submit_transaction_request: SubmitTransactionRequest,
         chain_id: ChainId,
@@ -636,7 +636,7 @@ impl<'a, S: StateView> MoveConverter<'a, S> {
         } = submit_transaction_request;
 
         Ok(SignedTransaction::new_signed_transaction(
-            self.try_into_raw_transaction_poem(
+            self.try_into_raw_transaction(
                 user_transaction_request,
                 chain_id,
             )?,
@@ -644,7 +644,7 @@ impl<'a, S: StateView> MoveConverter<'a, S> {
         ))
     }
 
-    pub fn try_into_raw_transaction_poem(
+    pub fn try_into_raw_transaction(
         &self,
         user_transaction_request: UserTransactionRequestInner,
         chain_id: ChainId,

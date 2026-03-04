@@ -5,8 +5,8 @@
 //! endpoint handlers, specifically for accepting these types as parameters.
 //! In Poem, it is not enough to impl FromStr for the types we want to use
 //! as path parameters, as that does not describe anything about the input.
-//! These wrappers say "I don't care" and use the impl_poem_type and
-//! impl_poem_parameter macros to make it that we declare these inputs as
+//! These wrappers say "I don't care" and previously used the impl_poem_type and
+//! impl_poem_parameter macros (now removed) to make it that we declare these inputs as
 //! just strings, using the FromStr impl to parse the path param. They can
 //! then be unpacked to the real type beneath.
 
@@ -14,7 +14,6 @@ use crate::{Address, VerifyInput, U64};
 use anyhow::{bail, Context};
 use aptos_types::{event::EventKey, state_store::state_key::StateKey};
 use move_core_types::identifier::{IdentStr, Identifier};
-use poem_openapi::Object;
 use serde::{Deserialize, Serialize};
 use std::{convert::From, fmt, ops::Deref, str::FromStr};
 
@@ -95,7 +94,7 @@ impl fmt::Display for IdentifierWrapper {
 // 1. To avoid implementing Poem derives on types outside of the API crate.
 // 2. To express the EventKey as types that already work in the API, such as
 //    Address and U64 instead of AccountAddress and u64.
-#[derive(Clone, Copy, Debug, Deserialize, Eq, Object, PartialEq, Serialize)]
+#[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
 pub struct EventGuid {
     pub creation_number: U64,
     pub account_address: Address,
@@ -120,8 +119,20 @@ impl From<EventGuid> for EventKey {
 }
 
 /// This wraps the StateKey, serializing it as hex encoded bytes.
-#[derive(Debug, Serialize, Deserialize)]
+/// Uses custom deserialize to support query params and JSON string values via FromStr.
+#[derive(Debug, Serialize)]
 pub struct StateKeyWrapper(pub StateKey);
+
+impl<'de> Deserialize<'de> for StateKeyWrapper {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        use serde::de::Error;
+        let s = String::deserialize(deserializer)?;
+        s.parse().map_err(D::Error::custom)
+    }
+}
 
 impl fmt::Display for StateKeyWrapper {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {

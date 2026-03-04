@@ -2,14 +2,13 @@
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 use crate::{HashValue, Transaction, TransactionOnChainData, U64};
-use poem_openapi::Object;
 use serde::{Deserialize, Serialize};
 
 /// A Block with or without transactions
 ///
 /// This contains the information about a transactions along with
 /// associated transactions if requested
-#[derive(Debug, Clone, Serialize, Deserialize, Object)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Block {
     pub block_height: U64,
     pub block_hash: HashValue,

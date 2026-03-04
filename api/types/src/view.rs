@@ -7,11 +7,10 @@ use move_core_types::{
     identifier::Identifier,
     language_storage::{ModuleId, TypeTag},
 };
-use poem_openapi::Object;
 use serde::{Deserialize, Serialize};
 
 /// View request for the Move View Function API
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, Object)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ViewRequest {
     pub function: EntryFunctionId,
     /// Type arguments of the function

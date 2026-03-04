@@ -3,14 +3,9 @@
 
 use crate::{
     accept_type::AcceptType,
-    bcs_payload::Bcs,
-    context::{api_spawn_blocking, FunctionStats},
-    failpoint::fail_point_poem,
-    response::{
-        BadRequestError, BasicErrorWith404, BasicResponse, BasicResponseStatus, BasicResultWith404,
-        ForbiddenError, InternalError,
-    },
-    ApiTags, Context,
+    context::FunctionStats,
+    response_axum::{AptosErrorResponse, AptosResponse},
+    Context,
 };
 use anyhow::Context as anyhowContext;
 use aptos_api_types::{
@@ -22,14 +17,7 @@ use aptos_types::{state_store::StateView, transaction::ViewFunctionError, vm_sta
 use aptos_vm::AptosVM;
 use itertools::Itertools;
 use move_core_types::language_storage::TypeTag;
-use poem_openapi::{param::Query, payload::Json, ApiRequest, OpenApi};
 use std::sync::Arc;
-
-/// API for executing Move view function.
-#[derive(Clone)]
-pub struct ViewFunctionApi {
-    pub context: Arc<Context>,
-}
 
 pub fn convert_view_function_error(
     error: &ViewFunctionError,
@@ -49,88 +37,51 @@ pub fn convert_view_function_error(
     }
 }
 
-#[derive(ApiRequest, Debug)]
+#[derive(Debug)]
 pub enum ViewFunctionRequest {
-    #[oai(content_type = "application/json")]
-    Json(Json<ViewRequest>),
-
-    #[oai(content_type = "application/x.aptos.view_function+bcs")]
-    Bcs(Bcs),
+    Json(ViewRequest),
+    Bcs(Vec<u8>),
 }
 
-#[OpenApi]
-impl ViewFunctionApi {
-    /// Execute view function of a module
-    ///
-    /// Execute the Move function with the given parameters and return its execution result.
-    ///
-    /// The Aptos nodes prune account state history, via a configurable time window.
-    /// If the requested ledger version has been pruned, the server responds with a 410.
-    #[oai(
-        path = "/view",
-        method = "post",
-        operation_id = "view",
-        tag = "ApiTags::View"
-    )]
-    async fn view_function(
-        &self,
-        accept_type: AcceptType,
-        /// View function request with type and position arguments
-        request: ViewFunctionRequest,
-        /// Ledger version to get state of account
-        ///
-        /// If not provided, it will be the latest version
-        ledger_version: Query<Option<U64>>,
-    ) -> BasicResultWith404<Vec<MoveValue>> {
-        fail_point_poem("endpoint_view_function")?;
-        self.context
-            .check_api_output_enabled("View function", &accept_type)?;
-
-        let context = self.context.clone();
-        api_spawn_blocking(move || view_request(context, accept_type, request, ledger_version))
-            .await
-    }
-}
-
-fn view_request(
+/// Framework-agnostic business logic for the view function endpoint.
+/// Called by the Axum handler directly, bypassing the Poem bridge.
+pub fn view_request_inner(
     context: Arc<Context>,
     accept_type: AcceptType,
     request: ViewFunctionRequest,
-    ledger_version: Query<Option<U64>>,
-) -> BasicResultWith404<Vec<MoveValue>> {
+    ledger_version: Option<U64>,
+) -> Result<AptosResponse<Vec<MoveValue>>, AptosErrorResponse> {
     // Retrieve the current state of the chain
     let (ledger_info, requested_version) = context
-        .get_latest_ledger_info_and_verify_lookup_version(ledger_version.map(|inner| inner.0))?;
+        .get_latest_ledger_info_and_verify_lookup_version::<AptosErrorResponse>(
+            ledger_version.map(|v| v.0),
+        )?;
 
     let state_view = context
         .state_view_at_version(requested_version)
         .map_err(|err| {
-            BasicErrorWith404::bad_request_with_code(
-                err,
-                AptosErrorCode::InternalError,
-                &ledger_info,
-            )
+            AptosErrorResponse::bad_request(err, AptosErrorCode::InternalError, Some(&ledger_info))
         })?;
 
     let view_function: ViewFunction = match request {
         ViewFunctionRequest::Json(data) => state_view
             .as_converter(context.db.clone(), context.indexer_reader.clone())
-            .convert_view_function(data.0)
+            .convert_view_function(data)
             .map_err(|err| {
-                BasicErrorWith404::bad_request_with_code(
+                AptosErrorResponse::bad_request(
                     err,
                     AptosErrorCode::InvalidInput,
-                    &ledger_info,
+                    Some(&ledger_info),
                 )
             })?,
         ViewFunctionRequest::Bcs(data) => {
-            bcs::from_bytes_with_limit(data.0.as_slice(), MAX_RECURSIVE_TYPES_ALLOWED as usize)
+            bcs::from_bytes_with_limit(data.as_slice(), MAX_RECURSIVE_TYPES_ALLOWED as usize)
                 .context("Failed to deserialize input into ViewRequest")
                 .map_err(|err| {
-                    BasicErrorWith404::bad_request_with_code(
+                    AptosErrorResponse::bad_request(
                         err,
                         AptosErrorCode::InvalidInput,
-                        &ledger_info,
+                        Some(&ledger_info),
                     )
                 })?
         },
@@ -142,12 +93,13 @@ fn view_request(
         view_function.module.name().as_str(),
         view_function.function.as_str(),
     ) {
-        return Err(BasicErrorWith404::forbidden_with_code_no_info(
+        return Err(AptosErrorResponse::forbidden(
             format!(
                 "Function {}::{} is not allowed",
                 view_function.module, view_function.function
             ),
             AptosErrorCode::InvalidInput,
+            None,
         ));
     }
 
@@ -163,13 +115,22 @@ fn view_request(
     let values = output.values.map_err(|status| {
         let (err_string, vm_error_code) =
             convert_view_function_error(&status, &state_view, &context);
-        BasicErrorWith404::bad_request_with_optional_vm_status_and_ledger_info(
-            anyhow::anyhow!(err_string),
-            AptosErrorCode::InvalidInput,
-            vm_error_code,
-            Some(&ledger_info),
-        )
+        if let Some(vm_error_code) = vm_error_code {
+            AptosErrorResponse::bad_request_with_vm_status(
+                anyhow::anyhow!(err_string),
+                AptosErrorCode::InvalidInput,
+                vm_error_code,
+                Some(&ledger_info),
+            )
+        } else {
+            AptosErrorResponse::bad_request(
+                anyhow::anyhow!(err_string),
+                AptosErrorCode::InvalidInput,
+                Some(&ledger_info),
+            )
+        }
     })?;
+
     let result = match accept_type {
         AcceptType::Bcs => {
             // The return values are already BCS encoded, but we still need to encode the outside
@@ -179,18 +140,14 @@ fn view_request(
             // Push the length of the return values
             let mut length = vec![];
             serialize_uleb128(&mut length, num_vals as u64).map_err(|err| {
-                BasicErrorWith404::internal_with_code(
-                    err,
-                    AptosErrorCode::InternalError,
-                    &ledger_info,
-                )
+                AptosErrorResponse::internal(err, AptosErrorCode::InternalError, Some(&ledger_info))
             })?;
 
             // Combine all of the return values
             let values = values.into_iter().concat();
             let ret = [length, values].concat();
 
-            BasicResponse::try_from_encoded((ret, &ledger_info, BasicResponseStatus::Ok))
+            AptosResponse::try_from_encoded(ret, &ledger_info)
         },
         AcceptType::Json => {
             let return_types = state_view
@@ -202,10 +159,10 @@ fn view_request(
                         .collect::<anyhow::Result<Vec<_>>>()
                 })
                 .map_err(|err| {
-                    BasicErrorWith404::bad_request_with_code(
+                    AptosErrorResponse::bad_request(
                         err,
                         AptosErrorCode::InternalError,
-                        &ledger_info,
+                        Some(&ledger_info),
                     )
                 })?;
 
@@ -219,16 +176,17 @@ fn view_request(
                 })
                 .collect::<anyhow::Result<Vec<_>>>()
                 .map_err(|err| {
-                    BasicErrorWith404::bad_request_with_code(
+                    AptosErrorResponse::bad_request(
                         err,
                         AptosErrorCode::InternalError,
-                        &ledger_info,
+                        Some(&ledger_info),
                     )
                 })?;
 
-            BasicResponse::try_from_json((move_vals, &ledger_info, BasicResponseStatus::Ok))
+            AptosResponse::try_from_json(move_vals, &ledger_info)
         },
     };
+
     context.view_function_stats().increment(
         FunctionStats::function_to_key(&view_function.module, &view_function.function),
         output.gas_used,

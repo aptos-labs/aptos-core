@@ -8,7 +8,6 @@ mod address;
 mod block;
 mod bytecode;
 mod convert;
-mod derives;
 mod error;
 mod hash;
 mod headers;

@@ -156,7 +156,7 @@ impl Context {
         Ok(self.db.latest_state_checkpoint_view()?)
     }
 
-    pub fn latest_state_view_poem<E: InternalError>(
+    pub fn latest_state_view_typed<E: InternalError>(
         &self,
         ledger_info: &LedgerInfo,
     ) -> Result<DbStateView, E> {
@@ -226,7 +226,7 @@ impl Context {
     // For use from external crates where they don't want to handle
     // the API response error types.
     pub fn get_latest_ledger_info_wrapped(&self) -> anyhow::Result<LedgerInfo> {
-        self.get_latest_ledger_info::<crate::response::BasicError>()
+        self.get_latest_ledger_info::<crate::response_axum::AptosErrorResponse>()
             .map_err(|e| e.into())
     }
 
@@ -401,7 +401,7 @@ impl Context {
             .map(|val| val.to_vec()))
     }
 
-    pub fn get_state_value_poem<E: InternalError>(
+    pub fn get_state_value_typed<E: InternalError>(
         &self,
         state_key: &StateKey,
         version: u64,
@@ -424,7 +424,7 @@ impl Context {
             .map_err(|err| anyhow!(format!("Failed to deserialize resource: {}", err)))
     }
 
-    pub fn get_resource_poem<T: MoveResource, E: InternalError>(
+    pub fn get_resource_typed<T: MoveResource, E: InternalError>(
         &self,
         address: AccountAddress,
         version: Version,
@@ -437,13 +437,13 @@ impl Context {
             })
     }
 
-    pub fn expect_resource_poem<T: MoveResource, E: InternalError + NotFoundError>(
+    pub fn expect_resource_typed<T: MoveResource, E: InternalError + NotFoundError>(
         &self,
         address: AccountAddress,
         version: Version,
         latest_ledger_info: &LedgerInfo,
     ) -> Result<T, E> {
-        self.get_resource_poem(address, version, latest_ledger_info)?
+        self.get_resource_typed(address, version, latest_ledger_info)?
             .ok_or_else(|| {
                 E::not_found_with_code(
                     format!(
@@ -712,7 +712,7 @@ impl Context {
             return Ok(vec![]);
         }
 
-        let state_view = self.latest_state_view_poem(ledger_info)?;
+        let state_view = self.latest_state_view_typed(ledger_info)?;
         let converter = state_view.as_converter(self.db.clone(), self.indexer_reader.clone());
         let txns: Vec<aptos_api_types::Transaction> = data
             .into_iter()
@@ -744,7 +744,7 @@ impl Context {
             return Ok(vec![]);
         }
 
-        let state_view = self.latest_state_view_poem(ledger_info)?;
+        let state_view = self.latest_state_view_typed(ledger_info)?;
         let converter = state_view.as_converter(self.db.clone(), self.indexer_reader.clone());
         let txns: Vec<aptos_api_types::Transaction> = data
             .into_iter()
@@ -855,7 +855,7 @@ impl Context {
         let start_seq_number = if let Some(start_seq_number) = start_seq_number {
             start_seq_number
         } else {
-            self.get_resource_poem::<AccountResource, E>(
+            self.get_resource_typed::<AccountResource, E>(
                 address,
                 ledger_info.version(),
                 ledger_info,
