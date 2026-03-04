@@ -72,7 +72,10 @@ module aptos_framework::transaction_fee {
         /// Storage fee charge.
         storage_fee_octas: u64,
         /// Storage fee refund.
-        storage_fee_refund_octas: u64
+        storage_fee_refund_octas: u64,
+        /// Feature fee charge (e.g., randomness). Fixed APT cost, not counted
+        /// toward the block gas limit.
+        feature_fee_octas: u64,
     }
 
     /// Burn transaction fees in epilogue.

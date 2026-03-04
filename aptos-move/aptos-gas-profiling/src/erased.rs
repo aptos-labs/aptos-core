@@ -221,6 +221,8 @@ impl ExecutionAndIOCosts {
 
         nodes.push(Node::new("slh_dsa_sha2_128s", self.slh_dsa_sha2_128s_cost));
 
+        nodes.push(Node::new("randomness_txn", self.randomness_txn_cost));
+
         if !self.dependencies.is_empty() {
             let deps = Node::new_with_children(
                 "dependencies",
