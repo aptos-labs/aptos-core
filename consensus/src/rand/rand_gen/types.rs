@@ -42,6 +42,7 @@ pub struct Share {
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct AugmentedData {
     delta: Delta,
+    /// Kept for BCS serialization compatibility; always `None` after fast path removal.
     fast_delta: Option<Delta>,
 }
 

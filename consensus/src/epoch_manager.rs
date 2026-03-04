@@ -1094,40 +1094,9 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
         let aggregate_pk_main = transcript.main.get_dealt_public_key();
 
         // Recover existing augmented key pair or generate a new one.
-        // Try to deserialize as old format ((ASK,APK), Option<(ASK,APK)>) first,
-        // then as new format (ASK, APK), and fall through to regenerate if both fail.
-        let augmented_key_pair = if let Some((_, key_pair)) = self
-            .rand_storage
-            .get_key_pair_bytes()
-            .map_err(NoRandomnessReason::RandDbNotAvailable)?
-            .filter(|(epoch, _)| *epoch == new_epoch)
-        {
-            type AugKeyPair = (<WVUF as WeightedVUF>::AugmentedSecretKeyShare, <WVUF as WeightedVUF>::AugmentedPubKeyShare);
-            if let Ok((main_key_pair, _fast_key_pair)) = bcs::from_bytes::<(AugKeyPair, Option<AugKeyPair>)>(&key_pair) {
-                info!(epoch = new_epoch, "Recovering existing augmented key (old format)");
-                main_key_pair
-            } else if let Ok(key_pair) = bcs::from_bytes::<AugKeyPair>(&key_pair) {
-                info!(epoch = new_epoch, "Recovering existing augmented key (new format)");
-                key_pair
-            } else {
-                warn!(epoch = new_epoch, "Failed to deserialize key pair, regenerating");
-                let mut rng =
-                    StdRng::from_rng(thread_rng()).map_err(NoRandomnessReason::RngCreationError)?;
-                let augmented_key_pair = WVUF::augment_key_pair(&vuf_pp, sk.main, pk.main, &mut rng);
-                self.rand_storage
-                    .save_key_pair_bytes(
-                        new_epoch,
-                        bcs::to_bytes(&augmented_key_pair)
-                            .map_err(NoRandomnessReason::KeyPairSerializationError)?,
-                    )
-                    .map_err(NoRandomnessReason::KeyPairPersistError)?;
-                augmented_key_pair
-            }
-        } else {
-            info!(
-                epoch = new_epoch_state.epoch,
-                "Generating a new augmented key"
-            );
+        type AugKeyPair = (<WVUF as WeightedVUF>::AugmentedSecretKeyShare, <WVUF as WeightedVUF>::AugmentedPubKeyShare);
+
+        let generate_and_save_key_pair = || -> Result<AugKeyPair, NoRandomnessReason> {
             let mut rng =
                 StdRng::from_rng(thread_rng()).map_err(NoRandomnessReason::RngCreationError)?;
             let augmented_key_pair = WVUF::augment_key_pair(&vuf_pp, sk.main, pk.main, &mut rng);
@@ -1138,7 +1107,32 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
                         .map_err(NoRandomnessReason::KeyPairSerializationError)?,
                 )
                 .map_err(NoRandomnessReason::KeyPairPersistError)?;
-            augmented_key_pair
+            Ok(augmented_key_pair)
+        };
+
+        let augmented_key_pair = if let Some((_, key_pair)) = self
+            .rand_storage
+            .get_key_pair_bytes()
+            .map_err(NoRandomnessReason::RandDbNotAvailable)?
+            .filter(|(epoch, _)| *epoch == new_epoch)
+        {
+            // Try new format first (steady state), then old format for backward compat.
+            if let Ok(key_pair) = bcs::from_bytes::<AugKeyPair>(&key_pair) {
+                info!(epoch = new_epoch, "Recovering existing augmented key (new format)");
+                key_pair
+            } else if let Ok((main_key_pair, _fast_key_pair)) = bcs::from_bytes::<(AugKeyPair, Option<AugKeyPair>)>(&key_pair) {
+                info!(epoch = new_epoch, "Recovering existing augmented key (old format)");
+                main_key_pair
+            } else {
+                warn!(epoch = new_epoch, "Failed to deserialize key pair, regenerating");
+                generate_and_save_key_pair()?
+            }
+        } else {
+            info!(
+                epoch = new_epoch_state.epoch,
+                "Generating a new augmented key"
+            );
+            generate_and_save_key_pair()?
         };
 
         let (ask, apk) = augmented_key_pair;
