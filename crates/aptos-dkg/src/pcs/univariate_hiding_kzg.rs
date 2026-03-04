@@ -287,7 +287,7 @@ impl<'a, E: Pairing> CommitmentHomomorphism<'a, E> {
         let OpeningProof { pi_1, pi_2 } = pi;
 
         (
-            E::G1::normalize_batch(&vec![C.0 - one_1 * y, -pi_1.0, -pi_2]),
+            E::G1::normalize_batch(&[C.0 - one_1 * y, -pi_1.0, -pi_2]),
             vec![one_2, (tau_2 - one_2 * x).into_affine(), xi_2],
         )
     }

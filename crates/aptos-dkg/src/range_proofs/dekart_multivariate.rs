@@ -286,7 +286,7 @@ impl<E: Pairing> traits::BatchedRangeProof<E> for Proof<E> {
         let subclaim = ml_sumcheck::MLSumcheck::verify_as_subprotocol(
             &mut trng,
             &sumcheck_poly_info_instance,
-            alpha * &self.H_g,
+            alpha * self.H_g,
             &self.sumcheck_proof,
         )
         .map_err(|e| anyhow::anyhow!("sumcheck verify: {:?}", e))?;
@@ -587,8 +587,8 @@ pub fn prove_impl<E: Pairing, R: RngCore + CryptoRng>(
         .enumerate()
         .map(|(j, (f_j_eval, r_i))| {
             let bits = f_j_evals_without_r[j].clone();
-            let sum = tau_powers[0] * f_j_eval[0]
-                + utils::msm_bool(&tau_powers[1..=values.len() as usize], &bits);
+            let sum =
+                tau_powers[0] * f_j_eval[0] + utils::msm_bool(&tau_powers[1..=values.len()], &bits);
             pk.ck.xi_1 * *r_i + sum // TODO: could turn this into a 3-term MSM, should be faster
         })
         .collect();
@@ -877,10 +877,7 @@ pub fn prove_impl<E: Pairing, R: RngCore + CryptoRng>(
 /// Run sumcheck on the main transcript with linear term (f - sum 2^{j-1} f_j) and constraints c^j f_j(f_j-1).
 /// Draws eq_point t from trs, then runs MLSumcheck::prove_as_subprotocol with TranscriptRng.
 #[allow(clippy::type_complexity)]
-#[cfg_attr(
-    not(feature = "range_proof_timing_multivariate"),
-    allow(unused_variables)
-)]
+#[allow(unused_mut)]
 fn zkzc_send_polys<E: Pairing>(
     trs: &mut merlin::Transcript,
     g_is: Vec<Vec<E::ScalarField>>,

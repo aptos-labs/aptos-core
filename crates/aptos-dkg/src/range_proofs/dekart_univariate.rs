@@ -629,11 +629,11 @@ impl<E: Pairing> traits::BatchedRangeProof<E> for Proof<E> {
         let g2_comb = VariableBaseMSM::msm(&self.c_hat, &alphas).unwrap();
 
         Ok((
-            E::G1::normalize_batch(&vec![
+            E::G1::normalize_batch(&[
                 g1_comb,   // from MSM in G1
                 -vk.tau_1, // subtract tau_1
             ]),
-            E::G2::normalize_batch(&vec![
+            E::G2::normalize_batch(&[
                 vk.tau_2, // tau_2
                 g2_comb,  // from MSM in G2
             ]),

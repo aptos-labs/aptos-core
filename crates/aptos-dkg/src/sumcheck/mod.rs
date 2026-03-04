@@ -8,7 +8,7 @@
 #![deny(trivial_numeric_casts, variant_size_differences)]
 #![deny(stable_features, unreachable_pub, non_shorthand_field_patterns)]
 #![deny(unused_attributes)]
-#![deny(renamed_and_removed_lints, stable_features, unused_allocation)]
+#![deny(renamed_and_removed_lints, unused_allocation)]
 #![deny(unused_comparisons, bare_trait_objects, unused_must_use)]
 
 pub use error::Error;

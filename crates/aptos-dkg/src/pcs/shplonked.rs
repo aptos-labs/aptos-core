@@ -1054,7 +1054,7 @@ mod tests {
                 sample_field_element(&mut rng),
             ]),
         ];
-        let points = vec![
+        let points = [
             sample_field_element(&mut rng),
             sample_field_element(&mut rng),
         ];
