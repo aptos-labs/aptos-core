@@ -982,6 +982,15 @@ fn serialize_function_attribute(
             },
             "borrow_mut",
         ),
+        ConstantAccessor => serialize_function_attribute_if_supported(
+            version,
+            VERSION_10,
+            binary,
+            |binary| -> Result<()> {
+                binary.push(SerializedFunctionAttribute::CONSTANT_ACCESSOR as u8)
+            },
+            "const",
+        ),
     }
 }
 

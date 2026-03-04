@@ -62,8 +62,8 @@ use move_binary_format::{
 };
 use move_core_types::{
     language_storage::{
-        BORROW, BORROW_MUT, PACK, PACK_VARIANT, PUBLIC_STRUCT_DELIMITER, TEST_VARIANT, UNPACK,
-        UNPACK_VARIANT,
+        BORROW, BORROW_MUT, CONST, PACK, PACK_VARIANT, PUBLIC_STRUCT_DELIMITER, TEST_VARIANT,
+        UNPACK, UNPACK_VARIANT,
     },
     vm_status::StatusCode,
 };
@@ -177,7 +177,7 @@ fn try_get_struct_api_attr(
                 attr_attribute = Some(attr.clone());
                 true
             },
-            Persistent | ModuleLock => false,
+            Persistent | ModuleLock | ConstantAccessor => false,
         };
         if is_struct_api_attr {
             count += 1;
@@ -1659,11 +1659,158 @@ pub fn check_struct_api_impl(
         FunctionAttribute::BorrowFieldMutable(offset) => {
             pattern_check_for_borrow_field(true, resolver, module, &offset, code, ctx)
         },
-        FunctionAttribute::Persistent | FunctionAttribute::ModuleLock => {
+        FunctionAttribute::Persistent
+        | FunctionAttribute::ModuleLock
+        | FunctionAttribute::ConstantAccessor => {
             // These should never reach here - try_get_struct_api_attr only returns struct API attributes.
             // If we reach this, Phase 1 validation failed to filter properly.
             Err(PartialVMError::new(StatusCode::INVALID_STRUCT_API_CODE)
                 .with_message("internal error: non-struct-API attribute reached the bytecode validation phase"))
         },
     }
+}
+
+// ============================================================================
+// Constant API checker
+// ============================================================================
+//
+// Validates that functions with the `ConstantAccessor` attribute (and those
+// whose names match the `const$<NAME>` pattern) are correctly formed.
+//
+// ## Validation rules
+//
+// ### Phase 1: Name/Attribute correspondence (bidirectional)
+// - A function whose name starts with `const$` MUST carry `ConstantAccessor`.
+// - A function carrying `ConstantAccessor` MUST have a name starting with `const$`.
+//
+// ### Phase 2: Implementation invariants
+// - No parameters (constants are values, not references).
+// - Exactly one return value whose type matches the `LdConst` instruction.
+// - Body must be exactly `LdConst(<idx>), Ret` (2 instructions).
+
+/// Returns `true` when the function name matches the `const$<NAME>` pattern.
+fn is_const_accessor_name(function_name: &str) -> bool {
+    // Must be "const$<at-least-one-char>"
+    function_name
+        .strip_prefix(CONST)
+        .and_then(|rest| rest.strip_prefix(PUBLIC_STRUCT_DELIMITER))
+        .map(|rest| !rest.is_empty())
+        .unwrap_or(false)
+}
+
+/// Check well-formedness of a `ConstantAccessor` attribute.
+///
+/// Phase 1 enforces the bidirectional name ↔ attribute correspondence.
+/// Phase 2 validates signature and bytecode body.
+pub fn check_const_accessor_impl(
+    module: &CompiledModule,
+    function_definition: &FunctionDefinition,
+) -> PartialVMResult<()> {
+    let handle = module.function_handle_at(function_definition.function);
+    let function_name = module.identifier_at(handle.name).as_str();
+
+    let has_const_name = is_const_accessor_name(function_name);
+    let has_const_attr = handle
+        .attributes
+        .iter()
+        .any(|a| matches!(a, FunctionAttribute::ConstantAccessor));
+
+    // Phase 1: bidirectional correspondence
+    match (has_const_name, has_const_attr) {
+        (true, false) => {
+            return Err(PartialVMError::new(StatusCode::INVALID_STRUCT_API_CODE).with_message(
+                "function name matches `const$` pattern but is missing the ConstantAccessor attribute",
+            ));
+        },
+        (false, true) => {
+            return Err(PartialVMError::new(StatusCode::INVALID_STRUCT_API_CODE).with_message(
+                "function has ConstantAccessor attribute but its name does not match the `const$<NAME>` pattern",
+            ));
+        },
+        (false, false) => return Ok(()), // Regular function – nothing to check.
+        (true, true) => {},              // Proceed to Phase 2.
+    }
+
+    // Only one ConstantAccessor attribute is permitted.
+    let attr_count = handle
+        .attributes
+        .iter()
+        .filter(|a| matches!(a, FunctionAttribute::ConstantAccessor))
+        .count();
+    if attr_count > 1 {
+        return Err(PartialVMError::new(StatusCode::INVALID_STRUCT_API_CODE)
+            .with_message("function has multiple ConstantAccessor attributes; at most one is allowed"));
+    }
+
+    // Phase 2: implementation invariants.
+
+    // Must have a code body.
+    let code = match &function_definition.code {
+        Some(c) => c,
+        None => {
+            return Err(PartialVMError::new(StatusCode::INVALID_STRUCT_API_CODE)
+                .with_message("const accessor function must have a code body (cannot be native)"));
+        },
+    };
+
+    // No parameters.
+    let params = module.signature_at(handle.parameters);
+    if !params.0.is_empty() {
+        return Err(PartialVMError::new(StatusCode::INVALID_STRUCT_API_CODE)
+            .with_message("const accessor function must have no parameters"));
+    }
+
+    // Exactly one return value.
+    let returns = module.signature_at(handle.return_);
+    if returns.0.len() != 1 {
+        return Err(PartialVMError::new(StatusCode::INVALID_STRUCT_API_CODE)
+            .with_message("const accessor function must return exactly one value"));
+    }
+    let declared_return_type = &returns.0[0];
+
+    // Body must be exactly `LdConst(<idx>), Ret`.
+    validate_const_accessor_body(module, code, declared_return_type)
+}
+
+/// Validate that the body of a constant accessor is exactly `LdConst(<idx>), Ret`
+/// and that the constant's type matches the declared return type.
+fn validate_const_accessor_body(
+    module: &CompiledModule,
+    code: &CodeUnit,
+    declared_return_type: &SignatureToken,
+) -> PartialVMResult<()> {
+    if code.code.len() != 2 {
+        return Err(PartialVMError::new(StatusCode::INVALID_STRUCT_API_CODE).with_message(
+            "const accessor function body must contain exactly 2 instructions: LdConst and Ret",
+        ));
+    }
+
+    // Last instruction must be Ret.
+    if !matches!(code.code[1], Bytecode::Ret) {
+        return Err(PartialVMError::new(StatusCode::INVALID_STRUCT_API_CODE)
+            .with_message("const accessor function body must end with Ret"));
+    }
+
+    // First instruction must be LdConst.
+    let const_idx = match &code.code[0] {
+        Bytecode::LdConst(idx) => *idx,
+        _ => {
+            return Err(PartialVMError::new(StatusCode::INVALID_STRUCT_API_CODE).with_message(
+                "const accessor function body must begin with LdConst",
+            ));
+        },
+    };
+
+    // The constant's type must match the declared return type.
+    let constant = module.constant_at(const_idx);
+    let const_type = &constant.type_;
+    if const_type != declared_return_type {
+        return Err(PartialVMError::new(StatusCode::INVALID_STRUCT_API_CODE).with_message(format!(
+            "const accessor function return type does not match the type of the constant in the pool \
+             (expected {:?}, found {:?})",
+            declared_return_type, const_type
+        )));
+    }
+
+    Ok(())
 }

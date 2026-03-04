@@ -616,6 +616,7 @@ impl AsmParser {
                         "borrow_mut" => {
                             FunctionAttribute::BorrowFieldMutable(parse_u16_param(parser)?)
                         },
+                        "const" => FunctionAttribute::ConstantAccessor,
                         _ => {
                             return Err(error(
                                 parser.next_loc,

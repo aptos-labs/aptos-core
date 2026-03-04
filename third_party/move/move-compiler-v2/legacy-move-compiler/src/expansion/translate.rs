@@ -1590,6 +1590,7 @@ fn constant_(context: &mut Context, pconstant: P::Constant) -> (ConstantName, E:
         attributes: pattributes,
         loc,
         name,
+        visibility: pvisibility,
         signature: psignature,
         value: pvalue,
     } = pconstant;
@@ -1598,9 +1599,11 @@ fn constant_(context: &mut Context, pconstant: P::Constant) -> (ConstantName, E:
     let signature = type_(context, psignature);
     let value = exp_(context, pvalue);
     let _specs = context.extract_exp_specs();
+    let visibility = pvisibility.map(visibility).unwrap_or(E::Visibility::Internal);
     let constant = E::Constant {
         attributes,
         loc,
+        visibility,
         signature,
         value,
     };

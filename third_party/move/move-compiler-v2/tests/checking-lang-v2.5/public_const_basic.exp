@@ -1,0 +1,25 @@
+// -- Model dump before first bytecode pipeline
+module 0x42::M {
+    public fun use_all(): u64 {
+        Add<u64>(Add<u64>(10, 20), 30)
+    }
+} // end 0x42::M
+module 0x42::N {
+    use 0x42::M; // resolved as: 0x42::M
+    public fun use_pub(): u64 {
+        20
+    }
+} // end 0x42::N
+
+// -- Sourcified model before first bytecode pipeline
+module 0x42::M {
+    public fun use_all(): u64 {
+        10 + 20 + 30
+    }
+}
+module 0x42::N {
+    use 0x42::M;
+    public fun use_pub(): u64 {
+        20
+    }
+}

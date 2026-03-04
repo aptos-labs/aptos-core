@@ -85,6 +85,9 @@ impl<'a> CodeUnitVerifier<'a> {
                     ctx,
                 )
                 .map_err(|err| err.at_index(IndexKind::FunctionDefinition, index.0))?;
+
+                struct_api_checker::check_const_accessor_impl(module, function_definition)
+                    .map_err(|err| err.at_index(IndexKind::FunctionDefinition, index.0))?;
             }
 
             // Now reference_safety can safely trust that BorrowFieldMutable attributes

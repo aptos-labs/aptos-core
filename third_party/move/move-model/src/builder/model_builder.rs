@@ -255,6 +255,10 @@ pub(crate) struct ConstEntry {
     pub ty: Type,
     pub value: Value,
     pub visibility: EntryVisibility,
+    /// Move language visibility (public/friend/private) for the constant declaration.
+    pub move_visibility: Visibility,
+    /// Whether this constant has `package` visibility (stored as `Friend` in move_visibility).
+    pub has_package_visibility: bool,
     pub users: BTreeSet<UserId>,
     pub attributes: Vec<Attribute>,
 }

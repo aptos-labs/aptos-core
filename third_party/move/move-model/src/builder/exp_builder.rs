@@ -16,13 +16,16 @@ use crate::{
         module_builder::{ModuleBuilder, SpecBlockContext},
     },
     metadata::{
-        lang_feature_versions::{LANGUAGE_VERSION_FOR_RAC, LANGUAGE_VERSION_FOR_SINT},
+        lang_feature_versions::{
+            LANGUAGE_VERSION_FOR_PUBLIC_CONST, LANGUAGE_VERSION_FOR_RAC,
+            LANGUAGE_VERSION_FOR_SINT,
+        },
         LanguageVersion,
     },
     model::{
         FieldData, FieldId, FunId, FunctionKind, GlobalEnv, GlobalId, Loc, ModuleId, NodeId,
         Parameter, QualifiedId, QualifiedInstId, SpecFunId, StructId, TypeParameter,
-        TypeParameterKind, UserId,
+        TypeParameterKind, UserId, Visibility,
     },
     symbol::{Symbol, SymbolPool},
     ty::{
@@ -4003,32 +4006,54 @@ impl ExpTranslator<'_, '_, '_> {
         context: &ErrorMessageContext,
         sym: &QualifiedSymbol,
     ) -> ExpData {
+        let is_cross_module = sym.module_name != self.parent.module_name
+            && sym.module_name != ModuleName::builtin_module(self.env());
         // Constants are always visible in specs. Builtin constants are visible everywhere.
-        if self.mode != ExpTranslationMode::Spec
-            && sym.module_name != self.parent.module_name
-            && sym.module_name != ModuleName::builtin_module(self.env())
-        {
-            self.error(
-                loc,
-                &format!(
+        // In impl mode, cross-module access requires V2_5+ and sufficient visibility.
+        if self.mode != ExpTranslationMode::Spec && is_cross_module {
+            let lang_version = self.parent.parent.env.language_version();
+            let access_ok = if lang_version.is_at_least(LANGUAGE_VERSION_FOR_PUBLIC_CONST) {
+                match entry.move_visibility {
+                    Visibility::Public => true,
+                    Visibility::Friend => {
+                        // Allow if the calling module is a declared friend of the defining module.
+                        if let Some(defining_module) = self
+                            .parent
+                            .parent
+                            .env
+                            .find_module(&sym.module_name)
+                        {
+                            let caller_id = self.parent.module_id;
+                            defining_module.get_friend_modules().contains(&caller_id)
+                        } else {
+                            false
+                        }
+                    },
+                    Visibility::Private => false,
+                }
+            } else {
+                false
+            };
+            if !access_ok {
+                let msg = format!(
                     "constant `{}` cannot be used here because it is private to the module `{}`",
                     sym.display_full(self.env()),
                     sym.module_name.display_full(self.env())
-                ),
-            );
-            self.new_error_exp()
-        } else {
-            // Record constant usage.
-            // Why tracking constants on the fly:
-            // - they are replaced by values after translation!
-            if let Some(user_id) = &self.constant_use_context {
-                self.track_constant_usage(loc, sym, user_id.clone());
+                );
+                self.error(loc, &msg);
+                return self.new_error_exp();
             }
-            let ConstEntry { ty, value, .. } = entry;
-            let ty = self.check_type(loc, &ty, expected_type, context);
-            let id = self.new_node_id_with_type_loc(&ty, loc);
-            ExpData::Value(id, value)
         }
+        // Record constant usage.
+        // Why tracking constants on the fly:
+        // - they are replaced by values after translation!
+        if let Some(user_id) = &self.constant_use_context {
+            self.track_constant_usage(loc, sym, user_id.clone());
+        }
+        let ConstEntry { ty, value, .. } = entry;
+        let ty = self.check_type(loc, &ty, expected_type, context);
+        let id = self.new_node_id_with_type_loc(&ty, loc);
+        ExpData::Value(id, value)
     }
 
     fn track_constant_usage(&mut self, loc: &Loc, const_sym: &QualifiedSymbol, user_id: UserId) {

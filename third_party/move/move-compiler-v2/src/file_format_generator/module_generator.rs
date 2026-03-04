@@ -22,8 +22,8 @@ use move_core_types::{
     account_address::AccountAddress,
     identifier::Identifier,
     language_storage::{
-        BORROW, BORROW_MUT, PACK, PACK_VARIANT, PUBLIC_STRUCT_DELIMITER, TEST_VARIANT, UNPACK,
-        UNPACK_VARIANT,
+        BORROW, BORROW_MUT, CONST, PACK, PACK_VARIANT, PUBLIC_STRUCT_DELIMITER, TEST_VARIANT,
+        UNPACK, UNPACK_VARIANT,
     },
     metadata::Metadata,
 };
@@ -31,12 +31,13 @@ use move_ir_types::ast as IR_AST;
 use move_model::{
     ast::{AccessSpecifier, AccessSpecifierKind, AddressSpecifier, Attribute, ResourceSpecifier},
     metadata::{
-        lang_feature_versions::LANGUAGE_VERSION_FOR_RAC, CompilationMetadata, CompilerVersion,
-        LanguageVersion, COMPILATION_METADATA_KEY,
+        lang_feature_versions::{LANGUAGE_VERSION_FOR_PUBLIC_CONST, LANGUAGE_VERSION_FOR_RAC},
+        CompilationMetadata, CompilerVersion, LanguageVersion, COMPILATION_METADATA_KEY,
     },
     model::{
-        FieldEnv, FunId, FunctionEnv, GlobalEnv, Loc, ModuleEnv, ModuleId, Parameter, QualifiedId,
-        StructEnv, StructId, TypeParameter, TypeParameterKind,
+        FieldEnv, FunId, FunctionEnv, GlobalEnv, Loc, ModuleEnv, ModuleId, NamedConstantEnv,
+        NamedConstantId, Parameter, QualifiedId, StructEnv, StructId, TypeParameter,
+        TypeParameterKind,
     },
     symbol::Symbol,
     ty::{PrimitiveType, ReferenceKind, Type},
@@ -52,6 +53,8 @@ use std::collections::{btree_map::Entry, BTreeMap, BTreeSet};
 /// Data structure to store indices for struct APIs.
 #[derive(Debug, Default)]
 struct StructAPIIndex {
+    /// For each non-private constant, the handle index for `const$NAME` accessor function.
+    const_to_accessor_idx: BTreeMap<QualifiedId<NamedConstantId>, FF::FunctionHandleIndex>,
     /// For each enum, maintaining a map from variant to corresponding handle index of test variant API.
     enum_to_test_variant_api_idx:
         BTreeMap<QualifiedId<StructId>, BTreeMap<Symbol, FF::FunctionHandleIndex>>,
@@ -258,6 +261,16 @@ impl ModuleGenerator {
                 FunctionGenerator::gen_struct_unpack_api(self, ctx, &struct_env);
                 FunctionGenerator::gen_struct_borrow_field_api(self, ctx, &struct_env, true);
                 FunctionGenerator::gen_struct_borrow_field_api(self, ctx, &struct_env, false);
+            }
+        }
+
+        // Generate const$NAME accessor functions for non-private constants (at V2_5+).
+        let language_version = ctx.env.language_version();
+        if language_version.is_at_least(LANGUAGE_VERSION_FOR_PUBLIC_CONST) {
+            for const_env in module_env.get_named_constants() {
+                if const_env.get_visibility().is_public_or_friend() {
+                    FunctionGenerator::gen_const_accessor_api(self, ctx, &const_env);
+                }
             }
         }
 
@@ -1502,6 +1515,55 @@ impl ModuleGenerator {
                 type_parameters,
             });
         self.struct_variant_inst_to_idx.insert(key, idx);
+        idx
+    }
+
+    /// Generates or retrieves the function handle index for a `const$NAME` accessor function.
+    /// The handle is for a function with no parameters returning the constant's type, annotated
+    /// with `FunctionAttribute::ConstantAccessor`.
+    pub fn const_accessor_index(
+        &mut self,
+        ctx: &ModuleContext,
+        loc: &Loc,
+        const_env: &NamedConstantEnv,
+    ) -> FF::FunctionHandleIndex {
+        let qid = const_env.module_env.get_id().qualified(const_env.get_id());
+        if let Some(idx) = self.struct_api_index.const_to_accessor_idx.get(&qid) {
+            return *idx;
+        }
+        let module = self.module_index(ctx, loc, &const_env.module_env);
+        let const_name = ctx
+            .env
+            .symbol_pool()
+            .string(const_env.get_name())
+            .to_string();
+        let fun_name = format!("{}{}{}", CONST, PUBLIC_STRUCT_DELIMITER, const_name);
+        let name_sym = ctx.env.symbol_pool().make(&fun_name);
+        let name_idx = self.name_index(ctx, loc, name_sym);
+
+        let empty_sig = self.signature(ctx, loc, vec![]);
+        let return_sig = self.signature(ctx, loc, vec![const_env.get_type()]);
+
+        let idx = FF::FunctionHandleIndex(ctx.checked_bound(
+            loc,
+            self.module.function_handles.len(),
+            MAX_FUNCTION_COUNT,
+            "used function",
+        ));
+
+        let handle = FF::FunctionHandle {
+            module,
+            name: name_idx,
+            type_parameters: vec![],
+            parameters: empty_sig,
+            return_: return_sig,
+            access_specifiers: None,
+            attributes: vec![FF::FunctionAttribute::ConstantAccessor],
+        };
+        self.module.function_handles.push(handle);
+        self.struct_api_index
+            .const_to_accessor_idx
+            .insert(qid, idx);
         idx
     }
 

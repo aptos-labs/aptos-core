@@ -229,6 +229,7 @@ pub enum SerializedFunctionAttribute {
     TEST_VARIANT = 0x7,
     BORROW_FIELD_IMMUTABLE = 0x8,
     BORROW_FIELD_MUTABLE = 0x9,
+    CONSTANT_ACCESSOR = 0xA,
 }
 
 /// List of opcodes constants.
