@@ -81,6 +81,10 @@ pub struct ProverOptions {
     /// mutable borrow semantics
     #[arg(skip)]
     pub borrow_natives: Vec<String>,
+    /// Targets to exclude from verification. Each entry must be
+    /// `VerificationScope::Only(name)` or `VerificationScope::OnlyModule(name)`.
+    #[arg(skip)]
+    pub verify_exclude: Vec<VerificationScope>,
 }
 
 // add custom struct for mutation options
@@ -103,6 +107,7 @@ impl Default for ProverOptions {
             skip_loop_analysis: false,
             inference: false,
             borrow_natives: vec![],
+            verify_exclude: vec![],
         }
     }
 }
