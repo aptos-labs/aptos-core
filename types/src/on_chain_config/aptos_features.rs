@@ -169,8 +169,8 @@ pub enum FeatureFlag {
     ENCRYPTED_TRANSACTIONS = 108,
     /// Enables public struct and enum types as transaction arguments.
     PUBLIC_STRUCT_ENUM_ARGS = 109,
-    /// Enables public/package/friend visibility on Move constants.
-    ENABLE_PUBLIC_CONST = 110,
+    /// Enables bytecode version v11
+    VM_BINARY_FORMAT_V11 = 110,
 }
 
 impl FeatureFlag {
@@ -280,7 +280,7 @@ impl FeatureFlag {
             Self::VM_BINARY_FORMAT_V10,
             Self::SLH_DSA_SHA2_128S_SIGNATURE,
             Self::PUBLIC_STRUCT_ENUM_ARGS,
-            Self::ENABLE_PUBLIC_CONST,
+            Self::VM_BINARY_FORMAT_V11,
         ]
     }
 }
@@ -495,7 +495,9 @@ impl Features {
     }
 
     pub fn get_max_binary_format_version(&self) -> u32 {
-        if self.is_enabled(FeatureFlag::VM_BINARY_FORMAT_V10) {
+        if self.is_enabled(FeatureFlag::VM_BINARY_FORMAT_V11) {
+            file_format_common::VERSION_11
+        } else if self.is_enabled(FeatureFlag::VM_BINARY_FORMAT_V10) {
             file_format_common::VERSION_10
         } else if self.is_enabled(FeatureFlag::VM_BINARY_FORMAT_V9) {
             file_format_common::VERSION_9
@@ -555,7 +557,7 @@ mod test {
             file_format_common::VERSION_MIN
         );
         assert_eq!(
-            file_format_common::VERSION_10,
+            file_format_common::VERSION_11,
             file_format_common::VERSION_MAX
         );
     }

@@ -3825,7 +3825,7 @@ fn parse_use_alias(context: &mut Context) -> Result<Option<Name>, Box<Diagnostic
 fn is_friend_declaration(context: &mut Context) -> bool {
     if context.tokens.peek() == Tok::Friend {
         if let Ok((tok, content)) = context.tokens.lookahead_content() {
-            if ![Tok::Fun, Tok::Inline, Tok::Native, Tok::Struct].contains(&tok)
+            if ![Tok::Fun, Tok::Inline, Tok::Native, Tok::Struct, Tok::Const].contains(&tok)
                 && content != ENTRY_MODIFIER
                 && content != ENUM_MODIFIER
             {

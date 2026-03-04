@@ -1,0 +1,13 @@
+
+Diagnostics:
+error: unbound module `0x42::N` in friend declaration
+  ┌─ tests/checking-lang-v2.5/friend_const_non_friend_rejected.move:4:5
+  │
+4 │     friend 0x42::N;
+  │     ^^^^^^^^^^^^^^^
+
+error: constant `0x42::M::FRIEND_CONST` cannot be used here because it is private to the module `0x42::M`
+   ┌─ tests/checking-lang-v2.5/friend_const_non_friend_rejected.move:13:9
+   │
+13 │         M::FRIEND_CONST
+   │         ^^^^^^^^^^^^^^^

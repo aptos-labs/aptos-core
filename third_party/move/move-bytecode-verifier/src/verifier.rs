@@ -57,7 +57,6 @@ pub struct VerifierConfig {
     pub enable_enum_types: bool,
     pub enable_resource_access_control: bool,
     pub enable_function_values: bool,
-    pub enable_public_const: bool,
     /// Maximum number of function return values.
     pub max_function_return_values: Option<usize>,
     /// Maximum depth of a type node.
@@ -266,7 +265,6 @@ impl Default for VerifierConfig {
             enable_enum_types: true,
             enable_resource_access_control: true,
             enable_function_values: true,
-            enable_public_const: true,
 
             max_function_return_values: None,
             max_type_depth: None,
@@ -316,7 +314,6 @@ impl VerifierConfig {
             enable_enum_types: true,
             enable_resource_access_control: true,
             enable_function_values: true,
-            enable_public_const: true,
 
             max_function_return_values: Some(128),
             max_type_depth: Some(20),

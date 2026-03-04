@@ -3132,7 +3132,7 @@ impl Operation {
     pub fn is_ok_to_remove_from_code(&self) -> bool {
         use Operation::*;
         match self {
-            MoveFunction(..) => false,       // could abort
+            MoveFunction(..) => false,       // function call
             SpecFunction(..) => false,       // Spec
             Pack(..) | Closure(..) => false, // Could yield an undroppable value
             Tuple => true,

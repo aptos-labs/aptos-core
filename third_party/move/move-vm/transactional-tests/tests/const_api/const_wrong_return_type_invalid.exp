@@ -1,7 +1,7 @@
 processed 1 task
 task 0 lines 1-7:  publish --print-bytecode [module 0x66::test_const_wrong_return_type]
 Error: Unable to publish module '0000000000000000000000000000000000000000000000000000000000000066::test_const_wrong_return_type'. Got VMError: {
-    major_status: INVALID_STRUCT_API_CODE,
+    major_status: INVALID_CONST_API_CODE,
     sub_status: None,
     location: 0x66::test_const_wrong_return_type,
     indices: [(FunctionDefinition, 0)],

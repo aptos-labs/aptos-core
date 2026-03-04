@@ -1,6 +1,6 @@
 
 ============ disassembled file-format ==================
-// Bytecode version v10
+// Bytecode version v11
 module 0xc0ffee::m
 friend 0xc0ffee::n9
 struct Empty
@@ -99,7 +99,7 @@ struct S2
     mut_borrow_field S2, s
     ret
 
-// Bytecode version v10
+// Bytecode version v11
 module 0xc0ffee::m_friend
 friend 0xc0ffee::n_friend
 struct T
@@ -133,7 +133,7 @@ struct T
     mut_borrow_field T, x
     ret
 
-// Bytecode version v10
+// Bytecode version v11
 module 0xc0ffee::n7
 use 0xc0ffee::m
 // Function definition at index 0
@@ -142,7 +142,7 @@ fun test_pack_struct(): m::S
     call m::pack$S
     ret
 
-// Bytecode version v10
+// Bytecode version v11
 module 0xc0ffee::n8
 use 0xc0ffee::m
 // Function definition at index 0
@@ -151,7 +151,7 @@ fun test_pack_struct(): m::S
     call m::pack$S
     ret
 
-// Bytecode version v10
+// Bytecode version v11
 module 0xc0ffee::n9
 use 0xc0ffee::m
 // Function definition at index 0
@@ -167,7 +167,7 @@ fun test_pack_unpack_struct_in_lambda()
     pop
     ret
 
-// Bytecode version v10
+// Bytecode version v11
 module 0xc0ffee::n_friend
 use 0xc0ffee::m_friend
 // Function definition at index 0

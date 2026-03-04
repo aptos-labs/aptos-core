@@ -78,7 +78,7 @@ public fun m::test() {
 
 
 ============ disassembled file-format ==================
-// Bytecode version v10
+// Bytecode version v11
 module 0xc0ffee::m
 struct S
   x: u64

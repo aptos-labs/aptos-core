@@ -3782,7 +3782,7 @@ fun <SELF>_0::check() {
 
 
 ============ disassembled file-format ==================
-// Bytecode version v10
+// Bytecode version v11
 script
 // Function definition at index 0
 entry public fun main()

@@ -37,6 +37,7 @@ pub use verifier::{
 };
 
 mod acquires_list_verifier;
+mod const_api_checker;
 mod features;
 mod locals_safety;
 pub mod meter;

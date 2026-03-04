@@ -263,7 +263,7 @@ fun m::two(): u64 {
 
 
 ============ disassembled file-format ==================
-// Bytecode version v10
+// Bytecode version v11
 module 0xc0ffee::m
 // Function definition at index 0
 fun foo()

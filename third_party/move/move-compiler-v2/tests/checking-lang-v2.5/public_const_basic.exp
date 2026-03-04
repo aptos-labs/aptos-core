@@ -3,11 +3,17 @@ module 0x42::M {
     public fun use_all(): u64 {
         Add<u64>(Add<u64>(10, 20), 30)
     }
+    public fun const$PUB(): u64 {
+        20
+    }
+    friend fun const$PKG(): u64 {
+        30
+    }
 } // end 0x42::M
 module 0x42::N {
     use 0x42::M; // resolved as: 0x42::M
     public fun use_pub(): u64 {
-        20
+        M::const$PUB()
     }
 } // end 0x42::N
 
@@ -16,10 +22,139 @@ module 0x42::M {
     public fun use_all(): u64 {
         10 + 20 + 30
     }
+    public fun const_PUB(): u64 {
+        20
+    }
+    friend fun const_PKG(): u64 {
+        30
+    }
 }
 module 0x42::N {
     use 0x42::M;
     public fun use_pub(): u64 {
-        20
+        M::const_PUB()
     }
 }
+
+============ bytecode before first stackless bytecode pipeline ================
+
+[variant baseline]
+public fun M::use_all(): u64 {
+     var $t0: u64
+     var $t1: u64
+     var $t2: u64
+     var $t3: u64
+     var $t4: u64
+  0: $t2 := 10
+  1: $t3 := 20
+  2: $t1 := +($t2, $t3)
+  3: $t4 := 30
+  4: $t0 := +($t1, $t4)
+  5: return $t0
+}
+
+
+[variant baseline]
+public fun M::const$PUB(): u64 {
+     var $t0: u64
+  0: $t0 := 20
+  1: return $t0
+}
+
+
+[variant baseline]
+public(friend) fun M::const$PKG(): u64 {
+     var $t0: u64
+  0: $t0 := 30
+  1: return $t0
+}
+
+
+[variant baseline]
+public fun N::use_pub(): u64 {
+     var $t0: u64
+  0: $t0 := M::const$PUB()
+  1: return $t0
+}
+
+// -- Model dump before second bytecode pipeline
+module 0x42::M {
+    public fun use_all(): u64 {
+        60
+    }
+    public fun const$PUB(): u64 {
+        20
+    }
+    friend fun const$PKG(): u64 {
+        30
+    }
+} // end 0x42::M
+module 0x42::N {
+    use 0x42::M; // resolved as: 0x42::M
+    public fun use_pub(): u64 {
+        M::const$PUB()
+    }
+} // end 0x42::N
+
+============ bytecode before second stackless bytecode pipeline ================
+
+[variant baseline]
+public fun M::use_all(): u64 {
+     var $t0: u64
+  0: $t0 := 60
+  1: return $t0
+}
+
+
+[variant baseline]
+public fun M::const$PUB(): u64 {
+     var $t0: u64
+  0: $t0 := 20
+  1: return $t0
+}
+
+
+[variant baseline]
+public(friend) fun M::const$PKG(): u64 {
+     var $t0: u64
+  0: $t0 := 30
+  1: return $t0
+}
+
+
+[variant baseline]
+public fun N::use_pub(): u64 {
+     var $t0: u64
+  0: $t0 := M::const$PUB()
+  1: return $t0
+}
+
+
+============ disassembled file-format ==================
+// Bytecode version v11
+module 0x42::M
+// Function definition at index 0
+#[persistent] public fun use_all(): u64
+    ld_u64 60
+    ret
+
+// Function definition at index 1
+#[const] public fun const$PUB(): u64
+    ld_u64 20
+    ret
+
+// Function definition at index 2
+#[const] friend fun const$PKG(): u64
+    ld_u64 30
+    ret
+
+// Bytecode version v11
+module 0x42::N
+use 0x42::M
+// Function definition at index 0
+#[persistent] public fun use_pub(): u64
+    call M::const$PUB
+    ret
+
+
+============ bytecode verification succeeded ========

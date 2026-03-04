@@ -5,4 +5,3 @@ error: unsupported language construct
   │
 3 │     public const Foo: u64 = 0;
   │     ^^^^^^ Move 2.5 language construct is not enabled: visibility modifier on constants
-

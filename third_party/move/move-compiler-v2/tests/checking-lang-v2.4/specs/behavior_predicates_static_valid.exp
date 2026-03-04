@@ -1708,7 +1708,7 @@ fun N::call_increment($t0: u64): u64 {
 
 
 ============ disassembled file-format ==================
-// Bytecode version v10
+// Bytecode version v11
 module 0x42::M
 struct Box<T0> has copy + drop
   value: T0
@@ -1961,7 +1961,7 @@ fun test_unbox_inferred(l0: Box<u64>): u64
     read_ref
     ret
 
-// Bytecode version v10
+// Bytecode version v11
 module 0x42::N
 use 0x42::M
 // Function definition at index 0

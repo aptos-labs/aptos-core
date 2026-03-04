@@ -6,6 +6,7 @@ pub mod binary_samples;
 pub mod bounds_tests;
 pub mod catch_unwind;
 pub mod code_unit_tests;
+pub mod const_api_serde_test;
 pub mod constants_tests;
 pub mod control_flow_tests;
 pub mod dependencies_tests;

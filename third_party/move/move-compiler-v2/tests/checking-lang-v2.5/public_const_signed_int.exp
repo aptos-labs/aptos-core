@@ -1,0 +1,156 @@
+// -- Model dump before first bytecode pipeline
+module 0x42::M {
+    public fun use_all(): i64 {
+        Add<i64>(-1, 100)
+    }
+    public fun const$NEG(): i64 {
+        -1
+    }
+    public fun const$POS(): i64 {
+        100
+    }
+} // end 0x42::M
+module 0x42::N {
+    use 0x42::M; // resolved as: 0x42::M
+    public fun use_neg(): i64 {
+        M::const$NEG()
+    }
+} // end 0x42::N
+
+// -- Sourcified model before first bytecode pipeline
+module 0x42::M {
+    public fun use_all(): i64 {
+        -1i64 + 100i64
+    }
+    public fun const_NEG(): i64 {
+        -1i64
+    }
+    public fun const_POS(): i64 {
+        100i64
+    }
+}
+module 0x42::N {
+    use 0x42::M;
+    public fun use_neg(): i64 {
+        M::const_NEG()
+    }
+}
+
+============ bytecode before first stackless bytecode pipeline ================
+
+[variant baseline]
+public fun M::use_all(): i64 {
+     var $t0: i64
+     var $t1: i64
+     var $t2: i64
+  0: $t1 := -1
+  1: $t2 := 100
+  2: $t0 := +($t1, $t2)
+  3: return $t0
+}
+
+
+[variant baseline]
+public fun M::const$NEG(): i64 {
+     var $t0: i64
+  0: $t0 := -1
+  1: return $t0
+}
+
+
+[variant baseline]
+public fun M::const$POS(): i64 {
+     var $t0: i64
+  0: $t0 := 100
+  1: return $t0
+}
+
+
+[variant baseline]
+public fun N::use_neg(): i64 {
+     var $t0: i64
+  0: $t0 := M::const$NEG()
+  1: return $t0
+}
+
+// -- Model dump before second bytecode pipeline
+module 0x42::M {
+    public fun use_all(): i64 {
+        99
+    }
+    public fun const$NEG(): i64 {
+        -1
+    }
+    public fun const$POS(): i64 {
+        100
+    }
+} // end 0x42::M
+module 0x42::N {
+    use 0x42::M; // resolved as: 0x42::M
+    public fun use_neg(): i64 {
+        M::const$NEG()
+    }
+} // end 0x42::N
+
+============ bytecode before second stackless bytecode pipeline ================
+
+[variant baseline]
+public fun M::use_all(): i64 {
+     var $t0: i64
+  0: $t0 := 99
+  1: return $t0
+}
+
+
+[variant baseline]
+public fun M::const$NEG(): i64 {
+     var $t0: i64
+  0: $t0 := -1
+  1: return $t0
+}
+
+
+[variant baseline]
+public fun M::const$POS(): i64 {
+     var $t0: i64
+  0: $t0 := 100
+  1: return $t0
+}
+
+
+[variant baseline]
+public fun N::use_neg(): i64 {
+     var $t0: i64
+  0: $t0 := M::const$NEG()
+  1: return $t0
+}
+
+
+============ disassembled file-format ==================
+// Bytecode version v11
+module 0x42::M
+// Function definition at index 0
+#[persistent] public fun use_all(): i64
+    ld_i64 99
+    ret
+
+// Function definition at index 1
+#[const] public fun const$NEG(): i64
+    ld_i64 -1
+    ret
+
+// Function definition at index 2
+#[const] public fun const$POS(): i64
+    ld_i64 100
+    ret
+
+// Bytecode version v11
+module 0x42::N
+use 0x42::M
+// Function definition at index 0
+#[persistent] public fun use_neg(): i64
+    call M::const$NEG
+    ret
+
+
+============ bytecode verification succeeded ========

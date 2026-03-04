@@ -1,0 +1,27 @@
+
+Diagnostics:
+warning: constant `INTERNAL` is unused. Remove it, or suppress warning with `#[test_only]` (if test-only), `#[verify_only]` (if verify-only), or `#[lint::skip(unused)]`.
+  ┌─ tests/checking/unused/truly_unused/public_const_no_warning.move:8:5
+  │
+8 │     const INTERNAL: u64 = 42;
+  │     ^^^^^^^^^^^^^^^^^^^^^^^^^
+
+// -- Model dump before first bytecode pipeline
+module 0x42::m {
+    public fun api(): u64 {
+        100
+    }
+    public fun const$MAX(): u64 {
+        100
+    }
+} // end 0x42::m
+
+// -- Sourcified model before first bytecode pipeline
+module 0x42::m {
+    public fun api(): u64 {
+        100
+    }
+    public fun const_MAX(): u64 {
+        100
+    }
+}

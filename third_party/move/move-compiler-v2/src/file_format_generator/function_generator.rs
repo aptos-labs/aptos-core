@@ -20,11 +20,10 @@ use move_core_types::{
     ability, function::ClosureMask, language_storage::PARAM_NAME_FOR_STRUCT_API,
 };
 use move_model::{
-    ast::{ExpData, Spec, SpecBlockTarget, TempIndex, Value},
+    ast::{ExpData, Spec, SpecBlockTarget, TempIndex},
     exp_rewriter::{ExpRewriter, ExpRewriterFunctions, RewriteTarget},
     model::{
-        FunId, FunctionEnv, Loc, NamedConstantEnv, NodeId, Parameter, QualifiedId, StructEnv,
-        StructId, TypeParameter,
+        FunId, FunctionEnv, Loc, NodeId, Parameter, QualifiedId, StructEnv, StructId, TypeParameter,
     },
     symbol::Symbol,
     ty::{PrimitiveType, ReferenceKind, Type},
@@ -643,53 +642,6 @@ impl<'a> FunctionGenerator<'a> {
 
             genr.module.function_defs.push(def);
         }
-    }
-
-    /// Generates the `const$NAME` accessor function for a non-private named constant.
-    /// The function body is: `LdConst(pool_idx) + Ret`.
-    pub fn gen_const_accessor_api<'b>(
-        genr: &'a mut ModuleGenerator,
-        ctx: &'b ModuleContext,
-        const_env: &'b NamedConstantEnv<'b>,
-    ) {
-        let loc = const_env.get_loc();
-        let visibility = const_env.get_visibility();
-        debug_assert!(visibility.is_public_or_friend());
-
-        let function_index = genr.const_accessor_index(ctx, &loc, const_env);
-
-        let def_idx = FunctionDefinitionIndex::new(ctx.checked_bound(
-            &loc,
-            genr.module.function_defs.len(),
-            MAX_FUNCTION_DEF_COUNT,
-            "defined function",
-        ));
-
-        genr.source_map
-            .add_top_level_function_mapping(def_idx, ctx.env.to_ir_loc(&loc), false)
-            .expect(SOURCE_MAP_OK);
-
-        // Convert the model Value + Type to a stackless Constant, then get the pool index.
-        let const_type = const_env.get_type();
-        let const_value = const_env.get_value();
-        let stackless_const = model_value_to_const(&const_value, &const_type);
-        let pool_idx = genr.constant_index(ctx, &loc, &stackless_const, &const_type);
-
-        let empty_locals = genr.signature(ctx, &loc, vec![]);
-        let code = FF::CodeUnit {
-            locals: empty_locals,
-            code: vec![FF::Bytecode::LdConst(pool_idx), FF::Bytecode::Ret],
-        };
-
-        let def = FF::FunctionDefinition {
-            function: function_index,
-            visibility,
-            is_entry: false,
-            acquires_global_resources: vec![],
-            code: Some(code),
-        };
-
-        genr.module.function_defs.push(def);
     }
 
     /// Generates code for a function.
@@ -2344,62 +2296,5 @@ impl BytecodeContext<'_> {
             .get_annotations()
             .get::<FlushWritesAnnotation>()
             .and_then(|annotation| annotation.0.get(&self.code_offset))
-    }
-}
-
-/// Converts a model `Value` with its model `Type` into a stackless-bytecode `Constant`.
-/// This is used to serialize named constants for inclusion in the constant pool.
-pub(crate) fn model_value_to_const(val: &Value, ty: &Type) -> Constant {
-    use ethnum::{I256, U256};
-    use num::ToPrimitive as _;
-    match val {
-        Value::Bool(b) => Constant::Bool(*b),
-        Value::Address(a) => Constant::Address(a.clone()),
-        Value::ByteArray(b) => Constant::ByteArray(b.clone()),
-        Value::AddressArray(v) => Constant::AddressArray(v.clone()),
-        Value::Number(n) => match ty {
-            Type::Primitive(PrimitiveType::U8) => Constant::U8(n.to_u8().unwrap_or_default()),
-            Type::Primitive(PrimitiveType::U16) => Constant::U16(n.to_u16().unwrap_or_default()),
-            Type::Primitive(PrimitiveType::U32) => Constant::U32(n.to_u32().unwrap_or_default()),
-            Type::Primitive(PrimitiveType::U64) => Constant::U64(n.to_u64().unwrap_or_default()),
-            Type::Primitive(PrimitiveType::U128) => Constant::U128(n.to_u128().unwrap_or_default()),
-            Type::Primitive(PrimitiveType::U256) => {
-                let bytes = n.to_bytes_le().1;
-                let mut arr = [0u8; 32];
-                arr[..bytes.len().min(32)].copy_from_slice(&bytes[..bytes.len().min(32)]);
-                Constant::U256(U256::from_le_bytes(arr))
-            },
-            Type::Primitive(PrimitiveType::I8) => Constant::I8(n.to_i8().unwrap_or_default()),
-            Type::Primitive(PrimitiveType::I16) => Constant::I16(n.to_i16().unwrap_or_default()),
-            Type::Primitive(PrimitiveType::I32) => Constant::I32(n.to_i32().unwrap_or_default()),
-            Type::Primitive(PrimitiveType::I64) => Constant::I64(n.to_i64().unwrap_or_default()),
-            Type::Primitive(PrimitiveType::I128) => Constant::I128(n.to_i128().unwrap_or_default()),
-            Type::Primitive(PrimitiveType::I256) => {
-                let (sign, bytes) = n.to_bytes_le();
-                let mut arr = [0u8; 32];
-                arr[..bytes.len().min(32)].copy_from_slice(&bytes[..bytes.len().min(32)]);
-                let u = I256::from_le_bytes(arr);
-                if sign == num::bigint::Sign::Minus {
-                    Constant::I256(-u)
-                } else {
-                    Constant::I256(u)
-                }
-            },
-            _ => Constant::Bool(false), // fallback; should not happen for well-typed constants
-        },
-        Value::Vector(elems) => {
-            let elem_ty = if let Type::Vector(el) = ty {
-                el.as_ref()
-            } else {
-                ty
-            };
-            Constant::Vector(
-                elems
-                    .iter()
-                    .map(|e| model_value_to_const(e, elem_ty))
-                    .collect(),
-            )
-        },
-        Value::Tuple(_) => Constant::Bool(false), // tuples are not valid constant types
     }
 }

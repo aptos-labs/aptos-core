@@ -5,7 +5,6 @@ use anyhow::bail;
 use legacy_move_compiler::shared::LanguageVersion as CompilerLanguageVersion;
 use move_binary_format::file_format_common::{
     VERSION_DEFAULT, VERSION_DEFAULT_LANG_V2_4, VERSION_DEFAULT_LANG_V2_5,
-    VERSION_DEFAULT_LANG_V2_6,
 };
 use move_command_line_common::env;
 use serde::{Deserialize, Serialize};
@@ -221,7 +220,8 @@ pub enum LanguageVersion {
     V2_4,
     /// The currently unstable 2.5 version of Move
     V2_5,
-    /// The currently unstable 2.6 version of Move
+    /// The currently unstable 2.6 version of Move, which adds support for
+    /// - read/write access specifiers (RAC)
     V2_6,
 }
 
@@ -321,6 +321,10 @@ impl LanguageVersion {
         self.is_at_least(lang_feature_versions::LANGUAGE_VERSION_FOR_PUBLIC_STRUCT)
     }
 
+    pub fn language_version_for_public_const(&self) -> bool {
+        self.is_at_least(lang_feature_versions::LANGUAGE_VERSION_FOR_PUBLIC_CONST)
+    }
+
     /// If the bytecode version is not specified, infer it from the language version. For
     /// debugging purposes, respects the MOVE_BYTECODE_VERSION env var as an override.
     pub fn infer_bytecode_version(&self, version: Option<u32>) -> u32 {
@@ -332,7 +336,8 @@ impl LanguageVersion {
             | LanguageVersion::V2_3 => VERSION_DEFAULT,
             LanguageVersion::V2_4 => VERSION_DEFAULT_LANG_V2_4,
             LanguageVersion::V2_5 => VERSION_DEFAULT_LANG_V2_5,
-            LanguageVersion::V2_6 => VERSION_DEFAULT_LANG_V2_6,
+            // V2.6 (RAC) uses the same bytecode version as V2.5; no new binary format changes.
+            LanguageVersion::V2_6 => VERSION_DEFAULT_LANG_V2_5,
         })
     }
 

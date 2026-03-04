@@ -41,6 +41,7 @@ const COMMON_EXCLUSIONS: &[&str] = &[
     "/no-recursive-type-check/",
     "/testing-constant/",
     "/structs_visibility/",
+    "/public_const/",
 ];
 
 /// Note that any config which has different output for a test directory
@@ -147,6 +148,15 @@ const TEST_CONFIGS: &[TestConfig] = &[
         experiments: &[],
         language_version: LanguageVersion::latest(),
         include: &["/structs_visibility/"],
+        exclude: &[],
+        cross_compile: false,
+    },
+    TestConfig {
+        name: "public-const",
+        runner: |p| run(p, get_config_by_name("public-const")),
+        experiments: &[],
+        language_version: LanguageVersion::latest(),
+        include: &["/public_const/"],
         exclude: &[],
         cross_compile: false,
     },

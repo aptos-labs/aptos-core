@@ -4015,14 +4015,29 @@ impl ExpTranslator<'_, '_, '_> {
                 match entry.move_visibility {
                     Visibility::Public => true,
                     Visibility::Friend => {
-                        // Allow if the calling module is a declared friend of the defining module.
-                        if let Some(defining_module) =
-                            self.parent.parent.env.find_module(&sym.module_name)
-                        {
-                            let caller_id = self.parent.module_id;
-                            defining_module.get_friend_modules().contains(&caller_id)
+                        if entry.has_package_visibility {
+                            // `package` visibility: allow if caller is in the same package
+                            // (i.e. has the same address as the defining module).
+                            sym.module_name.addr() == self.parent.module_name.addr()
                         } else {
-                            false
+                            // `friend` visibility: allow if the calling module is a declared
+                            // friend of the defining module.
+                            // NOTE: we use `get_friend_decls()` (source-level, by name) rather
+                            // than `get_friend_modules()` (by resolved ModuleId) because
+                            // `friend_modules` is populated by `check_and_update_friend_info`
+                            // which runs after all module translations — so it is always empty
+                            // at the point where expressions are checked.
+                            if let Some(defining_module) =
+                                self.parent.parent.env.find_module(&sym.module_name)
+                            {
+                                let caller_name = &self.parent.module_name;
+                                defining_module
+                                    .get_friend_decls()
+                                    .iter()
+                                    .any(|d| &d.module_name == caller_name)
+                            } else {
+                                false
+                            }
                         }
                     },
                     Visibility::Private => false,
@@ -4042,14 +4057,36 @@ impl ExpTranslator<'_, '_, '_> {
         }
         // Record constant usage.
         // Why tracking constants on the fly:
-        // - they are replaced by values after translation!
+        // - same-module constants are replaced by values after translation!
         if let Some(user_id) = &self.constant_use_context {
             self.track_constant_usage(loc, sym, user_id.clone());
         }
         let ConstEntry { ty, value, .. } = entry;
         let ty = self.check_type(loc, &ty, expected_type, context);
         let id = self.new_node_id_with_type_loc(&ty, loc);
-        ExpData::Value(id, value)
+        if self.mode != ExpTranslationMode::Spec && is_cross_module {
+            // Cross-module constant in impl mode: emit a call to the `const$NAME` accessor
+            // function (injected into the model by `inject_const_accessor_functions`).
+            let module_id = self
+                .parent
+                .parent
+                .env
+                .find_module(&sym.module_name)
+                .expect("defining module must exist when cross-module access is permitted")
+                .get_id();
+            let accessor_name = format!(
+                "{}{}{}",
+                move_core_types::language_storage::CONST,
+                move_core_types::language_storage::PUBLIC_STRUCT_DELIMITER,
+                self.env().symbol_pool().string(sym.symbol)
+            );
+            let accessor_sym = self.env().symbol_pool().make(&accessor_name);
+            let fun_id = crate::model::FunId::new(accessor_sym);
+            ExpData::Call(id, Operation::MoveFunction(module_id, fun_id), vec![])
+        } else {
+            // Same-module or spec mode: inline the value as before.
+            ExpData::Value(id, value)
+        }
     }
 
     fn track_constant_usage(&mut self, loc: &Loc, const_sym: &QualifiedSymbol, user_id: UserId) {

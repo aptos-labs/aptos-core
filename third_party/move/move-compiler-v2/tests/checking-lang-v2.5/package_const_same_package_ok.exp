@@ -1,0 +1,94 @@
+// -- Model dump before first bytecode pipeline
+module 0x42::M {
+    friend fun const$PKG(): u64 {
+        10
+    }
+} // end 0x42::M
+module 0x42::N {
+    use 0x42::M; // resolved as: 0x42::M
+    public fun use_pkg(): u64 {
+        M::const$PKG()
+    }
+} // end 0x42::N
+
+// -- Sourcified model before first bytecode pipeline
+module 0x42::M {
+    friend 0x42::N;
+    friend fun const_PKG(): u64 {
+        10
+    }
+}
+module 0x42::N {
+    use 0x42::M;
+    public fun use_pkg(): u64 {
+        M::const_PKG()
+    }
+}
+
+============ bytecode before first stackless bytecode pipeline ================
+
+[variant baseline]
+public(friend) fun M::const$PKG(): u64 {
+     var $t0: u64
+  0: $t0 := 10
+  1: return $t0
+}
+
+
+[variant baseline]
+public fun N::use_pkg(): u64 {
+     var $t0: u64
+  0: $t0 := M::const$PKG()
+  1: return $t0
+}
+
+// -- Model dump before second bytecode pipeline
+module 0x42::M {
+    friend fun const$PKG(): u64 {
+        10
+    }
+} // end 0x42::M
+module 0x42::N {
+    use 0x42::M; // resolved as: 0x42::M
+    public fun use_pkg(): u64 {
+        M::const$PKG()
+    }
+} // end 0x42::N
+
+============ bytecode before second stackless bytecode pipeline ================
+
+[variant baseline]
+public(friend) fun M::const$PKG(): u64 {
+     var $t0: u64
+  0: $t0 := 10
+  1: return $t0
+}
+
+
+[variant baseline]
+public fun N::use_pkg(): u64 {
+     var $t0: u64
+  0: $t0 := M::const$PKG()
+  1: return $t0
+}
+
+
+============ disassembled file-format ==================
+// Bytecode version v11
+module 0x42::M
+friend 0x42::N
+// Function definition at index 0
+#[const] friend fun const$PKG(): u64
+    ld_u64 10
+    ret
+
+// Bytecode version v11
+module 0x42::N
+use 0x42::M
+// Function definition at index 0
+#[persistent] public fun use_pkg(): u64
+    call M::const$PKG
+    ret
+
+
+============ bytecode verification succeeded ========

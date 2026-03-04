@@ -827,12 +827,15 @@ pub enum StatusCode {
     // The struct API code does not have the correct implementation.
     // for instance, function attribute #[pack] must only be attached to the corresponding pack$S API.
     INVALID_STRUCT_API_CODE = 1136,
+    // The const API accessor function does not have the correct implementation.
+    // for instance, a const$FOO function must have exactly (LdU8/LdTrue/LdFalse.../LdConst + Ret as its body.
+    INVALID_CONST_API_CODE = 1137,
 
     // Reserved error code for future use
-    RESERVED_VERIFICATION_ERROR_1 = 1137,
-    RESERVED_VERIFICATION_ERROR_2 = 1138,
-    RESERVED_VERIFICATION_ERROR_3 = 1139,
-    RESERVED_VERIFICATION_ERROR_4 = 1140,
+    RESERVED_VERIFICATION_ERROR_1 = 1138,
+    RESERVED_VERIFICATION_ERROR_2 = 1139,
+    RESERVED_VERIFICATION_ERROR_3 = 1140,
+    RESERVED_VERIFICATION_ERROR_4 = 1141,
 
     // These are errors that the VM might raise if a violation of internal
     // invariants takes place.

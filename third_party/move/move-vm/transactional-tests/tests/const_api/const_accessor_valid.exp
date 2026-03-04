@@ -1,17 +1,32 @@
 processed 1 task
-task 0 lines 1-12:  publish --print-bytecode [module 0x66::test_const_accessor_valid]
+task 0 lines 1-27:  publish --print-bytecode [module 0x66::test_const_accessor_valid]
 
 == BEGIN Bytecode ==
 // Bytecode version v9
 module 0x66::test_const_accessor_valid
 // Function definition at index 0
 #[const] public fun const$MY_U64(): u64
-    ld_const<u64> 42
+    ld_u64 42
     ret
 
 // Function definition at index 1
 #[const] public fun const$MY_VEC(): vector<u8>
     ld_const<vector<u8>> [1, 2, 3]
+    ret
+
+// Function definition at index 2
+#[const] public fun const$MY_VEC_ADDR(): vector<address>
+    ld_const<vector<address>> [1, 2]
+    ret
+
+// Function definition at index 3
+#[const] public fun const$MY_ADDR(): address
+    ld_const<address> 66
+    ret
+
+// Function definition at index 4
+#[const] public fun const$MY_I64(): i64
+    ld_i64 -1
     ret
 
 
