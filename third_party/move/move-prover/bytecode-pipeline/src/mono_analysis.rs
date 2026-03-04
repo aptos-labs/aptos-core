@@ -340,6 +340,12 @@ impl Analyzer<'_> {
                 self.analyze_bytecode(&target, bc);
             }
         }
+        // Analyze spec conditions for closures and types.
+        for cond in target.get_spec().conditions.iter() {
+            for exp in cond.all_exps() {
+                self.analyze_exp(exp);
+            }
+        }
         // Analyze instantiations (when this function is a verification target)
         if self.inst_opt.is_none() {
             // Collect function-typed parameters for behavioral predicate support.
@@ -377,13 +383,7 @@ impl Analyzer<'_> {
                     let all_outputs: Vec<Type> = results_flat
                         .into_iter()
                         .chain(mut_ref_outputs)
-                        .map(|ty| {
-                            if ty.is_mutable_reference() {
-                                ty.skip_reference().clone()
-                            } else {
-                                ty
-                            }
-                        })
+                        .map(|ty| ty.skip_reference().clone())
                         .collect();
                     if all_outputs.len() >= 2 {
                         self.info.tuple_inst.insert(all_outputs);
@@ -671,7 +671,9 @@ impl Analyzer<'_> {
             },
             Type::Tuple(elems) if elems.len() >= 2 => {
                 // Only collect proper tuples, tuples of size 0 and 1 do not exist.
-                self.info.tuple_inst.insert(elems.clone());
+                // Strip references since Boogie tuple types work with values only.
+                let elems: Vec<Type> = elems.iter().map(|ty| ty.skip_reference().clone()).collect();
+                self.info.tuple_inst.insert(elems);
             },
             Type::Struct(mid, sid, targs) => {
                 self.add_struct(self.env.get_module(*mid).into_struct(*sid), targs)

@@ -2063,6 +2063,11 @@ impl ExpTranslator<'_, '_, '_> {
                     context,
                 )
             },
+            EA::Exp_::LabeledCall(label, name, type_args, sp!(_, args)) => self
+                .translate_labeled_call(&loc, label, name, type_args, args, expected_type, context),
+            EA::Exp_::LabeledIndex(label, target, index) => {
+                self.translate_labeled_index(&loc, label, target, index, expected_type, context)
+            },
             EA::Exp_::UnresolvedError => {
                 // Error reported
                 self.new_error_exp()
@@ -4469,11 +4474,12 @@ impl ExpTranslator<'_, '_, '_> {
                     .parent
                     .parent
                     .lookup_struct_field_decl(&mid.qualified_inst(sid, inst), field_name);
-                let expected_field_type = if let Some((_, ty)) = field_decls.into_iter().next() {
-                    ty
-                } else {
-                    Type::Error // this error is reported via type unification
-                };
+                let (variant, expected_field_type) =
+                    if let Some((variant, ty)) = field_decls.into_iter().next() {
+                        (variant, ty)
+                    } else {
+                        (None, Type::Error) // this error is reported via type unification
+                    };
                 let constraint = Constraint::SomeStruct(
                     [(field_name, expected_field_type.clone())]
                         .into_iter()
@@ -4495,11 +4501,20 @@ impl ExpTranslator<'_, '_, '_> {
                 let value_exp = self.translate_exp(args[2], &expected_field_type);
                 let id = self.new_node_id_with_type_loc(expected_type, loc);
                 self.set_node_instantiation(id, vec![expected_type.clone()]);
-                ExpData::Call(
-                    id,
-                    Operation::UpdateField(mid, sid, FieldId::new(field_name)),
-                    vec![struct_exp.into_exp(), value_exp.into_exp()],
-                )
+                // For enum types, use variant-qualified FieldId (like Select does)
+                let field_id = if let Some(v) = variant {
+                    let pool = self.symbol_pool();
+                    FieldId::new(pool.make(&FieldId::make_variant_field_id_str(
+                        pool.string(v).as_str(),
+                        pool.string(field_name).as_str(),
+                    )))
+                } else {
+                    FieldId::new(field_name)
+                };
+                ExpData::Call(id, Operation::UpdateField(mid, sid, field_id), vec![
+                    struct_exp.into_exp(),
+                    value_exp.into_exp(),
+                ])
             } else {
                 // Error reported
                 self.new_error_exp()
@@ -5828,6 +5843,20 @@ impl ExpTranslator<'_, '_, '_> {
         )
     }
 
+    /// Translates a single state label to a MemoryLabel (GlobalId), reusing existing labels
+    /// if the same name was already used. Registers the name in GlobalEnv for printing.
+    fn translate_state_label(&mut self, label: &PA::Label) -> GlobalId {
+        let sym = self.symbol_pool().make(label.value().as_str());
+        if let Some(&id) = self.state_label_map.get(&sym) {
+            id
+        } else {
+            let id = self.env().new_global_id();
+            self.state_label_map.insert(sym, id);
+            self.env().set_memory_label_name(id, sym);
+            id
+        }
+    }
+
     /// Validates and translates state labels for behavior predicates.
     /// Returns a BehaviorState with the translated memory labels. Names are registered
     /// in GlobalEnv for lookup during printing.
@@ -5852,26 +5881,87 @@ impl ExpTranslator<'_, '_, '_> {
             );
         }
 
-        // Convert labels to memory labels and register names with GlobalEnv
-        let pre_name = pre_label
-            .as_ref()
-            .map(|l| self.symbol_pool().make(l.value().as_str()));
-        let post_name = post_label
-            .as_ref()
-            .map(|l| self.symbol_pool().make(l.value().as_str()));
-        let mut get_or_create_label = |sym: Symbol| -> GlobalId {
-            if let Some(&id) = self.state_label_map.get(&sym) {
-                id
-            } else {
-                let id = self.env().new_global_id();
-                self.state_label_map.insert(sym, id);
-                self.env().set_memory_label_name(id, sym);
-                id
-            }
-        };
-        let pre = pre_name.map(&mut get_or_create_label);
-        let post = post_name.map(&mut get_or_create_label);
+        let pre = pre_label.as_ref().map(|l| self.translate_state_label(l));
+        let post = post_label.as_ref().map(|l| self.translate_state_label(l));
         BehaviorState::new(pre, post)
+    }
+
+    /// Translates a labeled call expression (label@global<R>(addr) or label@exists<R>(addr)).
+    /// Strictly accepts only unqualified `global`/`exists`, translates the call, and injects
+    /// the memory label into the resulting operation.
+    fn translate_labeled_call(
+        &mut self,
+        loc: &Loc,
+        label: &PA::Label,
+        name: &EA::ModuleAccess,
+        type_args: &Option<Vec<EA::Type>>,
+        args: &[EA::Exp],
+        expected_type: &Type,
+        context: &ErrorMessageContext,
+    ) -> ExpData {
+        let mem_label = self.translate_state_label(label);
+        // Labeled calls are only valid for unqualified `global` / `exists`.
+        let builtin_name = match &name.value {
+            EA::ModuleAccess_::Name(n)
+                if n.value.as_str() == "global" || n.value.as_str() == "exists" =>
+            {
+                self.symbol_pool().make(n.value.as_str())
+            },
+            _ => {
+                self.error(
+                    &self.to_loc(&name.loc),
+                    "labeled call must use unqualified `global` or `exists`",
+                );
+                return self.new_error_exp();
+            },
+        };
+        let args_refs: Vec<&EA::Exp> = args.iter().collect();
+        let result = self.translate_call(
+            loc,
+            &self.to_loc(&name.loc),
+            CallKind::Regular,
+            &Some(self.parent.parent.builtin_module()),
+            builtin_name,
+            type_args,
+            &args_refs,
+            expected_type,
+            context,
+        );
+        // Inject the memory label into the operation
+        Self::inject_memory_label(result, mem_label)
+    }
+
+    /// Translates a labeled index expression (label@R[addr]).
+    /// Translates the index expression and injects the memory label into the
+    /// resulting Global operation.
+    fn translate_labeled_index(
+        &mut self,
+        loc: &Loc,
+        label: &PA::Label,
+        target: &EA::Exp,
+        index: &EA::Exp,
+        expected_type: &Type,
+        context: &ErrorMessageContext,
+    ) -> ExpData {
+        let mem_label = self.translate_state_label(label);
+        let result = self.translate_index(loc, target, index, expected_type, context);
+        Self::inject_memory_label(result, mem_label)
+    }
+
+    /// Injects a memory label into a Global(None) or Exists(None) operation
+    /// within an ExpData::Call node.
+    // TODO(#18762): This does not handle BorrowGlobal from index ops, so `label@R[addr]`
+    // silently drops the label. Need to also match BorrowGlobal(ReferenceKind, _, None).
+    fn inject_memory_label(exp: ExpData, label: GlobalId) -> ExpData {
+        match exp {
+            ExpData::Call(id, Operation::Global(None), args) => {
+                ExpData::Call(id, Operation::Global(Some(label)), args)
+            },
+            ExpData::Call(id, Operation::Exists(None), args) => {
+                ExpData::Call(id, Operation::Exists(Some(label)), args)
+            },
+            other => other,
+        }
     }
 
     /// Resolves the target of a behavior predicate to either a local variable or a function.

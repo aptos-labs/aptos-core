@@ -80,6 +80,11 @@ pub const DELEGATE_INVARIANTS_TO_CALLER_PRAGMA: &str = "delegate_invariants_to_c
 /// to a certain depth *when there are no invariants specified*
 pub const UNROLL_PRAGMA: &str = "unroll";
 
+/// Pragma controlling which spec conditions are inferred.
+/// Values: `none` (skip inference), `only_ensures` (skip aborts_if), `only_aborts` (skip ensures).
+/// Default (unset): infer both ensures and aborts_if.
+pub const INFERENCE_PRAGMA: &str = "inference";
+
 /// # Pragmas for intrinsic table declaration
 
 /// The intrinsic type for `Map<K, V>`
@@ -212,6 +217,7 @@ pub fn is_pragma_valid_for_block(
                 | ABORTS_IF_IS_PARTIAL_PRAGMA
                 | INTRINSIC_PRAGMA
                 | UNROLL_PRAGMA
+                | INFERENCE_PRAGMA
         ),
         Function(..) | FunctionCodeV2(.., Some(..)) => matches!(
             pragma,
@@ -236,6 +242,7 @@ pub fn is_pragma_valid_for_block(
                 | BV_PARAM_PROP
                 | BV_RET_PROP
                 | UNROLL_PRAGMA
+                | INFERENCE_PRAGMA
         ),
         Struct(..) => match pragma {
             INTRINSIC_PRAGMA | BV_PARAM_PROP => true,
@@ -295,6 +302,19 @@ pub const CONDITION_ABORT_ASSERT_PROP: &str = "assert";
 /// condition will still be type checked.
 pub const CONDITION_DEACTIVATED_PROP: &str = "deactivated";
 
+/// A property which marks a condition as inferred by the spec inference engine.
+/// Values: `Bool(true)` for normal, `Symbol("vacuous")` for vacuously strong,
+/// `Symbol("sathard")` for hard-to-solve quantifier patterns.
+pub const CONDITION_INFERRED_PROP: &str = "inferred";
+
+/// Symbol value for `inferred` property indicating vacuously strong conditions
+/// (unconstrained quantifier variables).
+pub const CONDITION_INFERRED_VACUOUS: &str = "vacuous";
+
+/// Symbol value for `inferred` property indicating conditions with quantifiers
+/// that are hard for SAT/SMT solvers (exists in aborts_if, forall in ensures).
+pub const CONDITION_INFERRED_SATHARD: &str = "sathard";
+
 /// A property which can be attached to an aborts_with to indicate that it should act as check
 /// whether the function produces exactly the provided number of error codes.
 pub const CONDITION_CHECK_ABORT_CODES_PROP: &str = "check";
@@ -326,6 +346,7 @@ pub fn is_property_valid_for_condition(kind: &ConditionKind, prop: &str) -> bool
             | CONDITION_ABSTRACT_PROP
             | CONDITION_CONCRETE_PROP
             | CONDITION_DEACTIVATED_PROP
+            | CONDITION_INFERRED_PROP
     ) {
         // Applicable everywhere.
         return true;

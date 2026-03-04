@@ -632,7 +632,7 @@ impl<'a> Instrumenter<'a> {
         }
 
         // From here on code differs depending on whether the callee is opaque or not.
-        if !callee_env.is_opaque() || self.options.for_interpretation {
+        if !callee_env.is_opaque() || self.options.for_interpretation || self.options.inference {
             self.builder.emit(Call(
                 id,
                 dests,
