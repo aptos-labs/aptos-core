@@ -1072,6 +1072,7 @@ fn load_function_attributes(
 
 fn deserialize_function_attribute<E, F>(
     bytecode_version: u32,
+    min_version: u32,
     attr_loader: F,
     attr_name: &str,
     err_msg: E,
@@ -1081,7 +1082,7 @@ where
     F: Fn(&mut VersionedCursor) -> BinaryLoaderResult<FunctionAttribute>,
     E: Fn(&str) -> String,
 {
-    if bytecode_version < VERSION_10 {
+    if bytecode_version < min_version {
         Err(PartialVMError::new(StatusCode::MALFORMED).with_message(err_msg(attr_name)))
     } else {
         attr_loader(cursor)
@@ -1113,6 +1114,7 @@ fn load_attribute(
         MODULE_LOCK => Ok(FunctionAttribute::ModuleLock),
         PACK => deserialize_function_attribute(
             bytecode_version,
+            VERSION_10,
             |_cursor| Ok(FunctionAttribute::Pack),
             "pack",
             err_msg,
@@ -1120,6 +1122,7 @@ fn load_attribute(
         ),
         PACK_VARIANT => deserialize_function_attribute(
             bytecode_version,
+            VERSION_10,
             |cursor| Ok(FunctionAttribute::PackVariant(read_u16_internal(cursor)?)),
             "pack_variant",
             err_msg,
@@ -1127,6 +1130,7 @@ fn load_attribute(
         ),
         UNPACK => deserialize_function_attribute(
             bytecode_version,
+            VERSION_10,
             |_cursor| Ok(FunctionAttribute::Unpack),
             "unpack",
             err_msg,
@@ -1134,6 +1138,7 @@ fn load_attribute(
         ),
         UNPACK_VARIANT => deserialize_function_attribute(
             bytecode_version,
+            VERSION_10,
             |cursor| Ok(FunctionAttribute::UnpackVariant(read_u16_internal(cursor)?)),
             "unpack_variant",
             err_msg,
@@ -1141,6 +1146,7 @@ fn load_attribute(
         ),
         TEST_VARIANT => deserialize_function_attribute(
             bytecode_version,
+            VERSION_10,
             |cursor| Ok(FunctionAttribute::TestVariant(read_u16_internal(cursor)?)),
             "test_variant",
             err_msg,
@@ -1148,6 +1154,7 @@ fn load_attribute(
         ),
         BORROW_FIELD_IMMUTABLE => deserialize_function_attribute(
             bytecode_version,
+            VERSION_10,
             |cursor| {
                 Ok(FunctionAttribute::BorrowFieldImmutable(read_u16_internal(
                     cursor,
@@ -1159,6 +1166,7 @@ fn load_attribute(
         ),
         BORROW_FIELD_MUTABLE => deserialize_function_attribute(
             bytecode_version,
+            VERSION_10,
             |cursor| {
                 Ok(FunctionAttribute::BorrowFieldMutable(read_u16_internal(
                     cursor,
@@ -1170,6 +1178,7 @@ fn load_attribute(
         ),
         CONSTANT_ACCESSOR => deserialize_function_attribute(
             bytecode_version,
+            VERSION_11,
             |_cursor| Ok(FunctionAttribute::ConstantAccessor),
             "const",
             err_msg,
