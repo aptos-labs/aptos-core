@@ -23,23 +23,39 @@ use move_core_types::{
     identifier::Identifier,
     language_storage::{pseudo_script_module_id, ModuleId},
 };
+use move_coverage::coverage_map::{ExecCoverageMap, FunctionCoverage};
 use std::{
     cmp::Ordering,
     collections::{BTreeMap, BTreeSet},
     fmt,
 };
 
-pub fn disassemble_module<T: fmt::Write>(
-    out: T,
-    module: &CompiledModule,
-    print_code_size: bool,
-) -> anyhow::Result<T> {
-    Disassembler::run(out, module, print_code_size)
+pub fn disassemble_module<T: fmt::Write>(out: T, module: &CompiledModule) -> anyhow::Result<T> {
+    Disassembler::run(out, module, None)
 }
 
 pub fn disassemble_script<T: fmt::Write>(out: T, script: &CompiledScript) -> anyhow::Result<T> {
     let script_as_module = script_into_module(script.clone(), "main");
-    Disassembler::run(out, &script_as_module, false)
+    Disassembler::run(out, &script_as_module, None)
+}
+
+/// Disassemble a module with ANSI-colored coverage annotations.
+///
+/// Covered functions and instructions are colored green, uncovered ones red.
+pub fn disassemble_module_with_coverage(
+    module: &CompiledModule,
+    coverage_map: &ExecCoverageMap,
+) -> anyhow::Result<String> {
+    Disassembler::run(String::new(), module, Some(coverage_map))
+}
+
+/// Disassemble a script with ANSI-colored coverage annotations.
+pub fn disassemble_script_with_coverage(
+    script: &CompiledScript,
+    coverage_map: &ExecCoverageMap,
+) -> anyhow::Result<String> {
+    let script_as_module = script_into_module(script.clone(), "main");
+    Disassembler::run(String::new(), &script_as_module, Some(coverage_map))
 }
 
 struct Disassembler<T>
@@ -52,12 +68,17 @@ where
 }
 
 impl<T: fmt::Write> Disassembler<T> {
-    fn run(out: T, module: &CompiledModule, print_code_size: bool) -> anyhow::Result<T> {
+    fn run(
+        out: T,
+        module: &CompiledModule,
+        coverage: Option<&ExecCoverageMap>,
+    ) -> anyhow::Result<T> {
         let version = module.version;
         let module = ModuleView::new(module);
+        let module_id = module.id();
         let mut dis = Disassembler {
             out,
-            self_module: module.id(),
+            self_module: module_id.clone(),
             reverse_module_aliases: BTreeMap::new(),
         };
         writeln!(dis.out, "// Bytecode version v{}", version)?;
@@ -104,9 +125,27 @@ impl<T: fmt::Write> Disassembler<T> {
             dis.struct_(str)?;
             writeln!(dis.out)?
         }
+
+        let module_coverage = coverage.and_then(|cm| {
+            cm.module_maps
+                .get(&(*module_id.address(), module_id.name().to_owned()))
+        });
+        // An empty map used as a sentinel for "coverage mode, but no data for this function"
+        // so that all instructions are colored red (uncovered).
+        let empty_coverage = BTreeMap::new();
+
         for (idx, fdef) in module.functions().enumerate() {
             writeln!(dis.out, "// Function definition at index {}", idx)?;
-            dis.fun(fdef, print_code_size)?;
+            let func_coverage = if coverage.is_some() {
+                Some(
+                    module_coverage
+                        .and_then(|mc| mc.get_function_coverage(fdef.name()))
+                        .unwrap_or(&empty_coverage),
+                )
+            } else {
+                None
+            };
+            dis.fun(fdef, func_coverage)?;
             writeln!(dis.out)?
         }
 
@@ -265,15 +304,8 @@ impl<T: fmt::Write> Disassembler<T> {
     fn fun(
         &mut self,
         fdef: FunctionDefinitionView<CompiledModule>,
-        print_code_size: bool,
+        func_coverage: Option<&FunctionCoverage>,
     ) -> anyhow::Result<()> {
-        if print_code_size && fdef.code().is_some() {
-            println!(
-                "function {} has {} instructions",
-                fdef.name(),
-                fdef.code().unwrap().code.len()
-            );
-        }
         if !fdef.attributes().is_empty() {
             self.list(
                 fdef.attributes(),
@@ -382,12 +414,22 @@ impl<T: fmt::Write> Disassembler<T> {
                 if offs != 0 && offs % 5 == 0 {
                     writeln!(self.out, "    // @{}", offs)?
                 }
+                if let Some(fc) = func_coverage {
+                    if fc.contains_key(&(offs as u64)) {
+                        self.out.write_str(ANSI_GREEN)?;
+                    } else {
+                        self.out.write_str(ANSI_RED)?;
+                    }
+                }
                 if let Some(label) = label_map.get(&(offs as CodeOffset)) {
                     write!(self.out, "{:>2}: ", label)?;
                 } else {
                     write!(self.out, "    ")?;
                 }
                 self.bytecode(fdef.module(), &label_map, bc)?;
+                if func_coverage.is_some() {
+                    self.out.write_str(ANSI_RESET)?;
+                }
                 writeln!(self.out)?
             }
         }
@@ -787,6 +829,10 @@ impl<T: fmt::Write> Disassembler<T> {
         Ok(())
     }
 }
+
+const ANSI_GREEN: &str = "\x1b[32m";
+const ANSI_RED: &str = "\x1b[31m";
+const ANSI_RESET: &str = "\x1b[0m";
 
 fn type_param_name(idx: usize) -> String {
     format!("T{}", idx)

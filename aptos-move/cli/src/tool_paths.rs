@@ -1,7 +1,7 @@
 // Copyright (c) Aptos Foundation
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
-//! Tool path resolution for external binaries (revela, movefmt).
+//! Tool path resolution for external binaries (movefmt).
 //!
 //! In the full Aptos CLI, these are managed by the update system which installs
 //! them into `~/.local/bin` (Linux/macOS) or `~/.aptoscli/bin` (Windows).
@@ -11,9 +11,7 @@
 use anyhow::{anyhow, Result};
 use std::path::PathBuf;
 
-const REVELA_BINARY_NAME: &str = "revela";
 const MOVEFMT_BINARY_NAME: &str = "movefmt";
-const REVELA_EXE_ENV: &str = "REVELA_EXE";
 const MOVEFMT_EXE_ENV: &str = "MOVEFMT_EXE";
 
 /// Returns the directory where `aptos update` installs additional binaries.
@@ -55,10 +53,6 @@ fn get_path(name: &str, exe_env: &str, binary_name: &str) -> Result<PathBuf> {
         exe_env,
         binary_name,
     ))
-}
-
-pub fn get_revela_path() -> Result<PathBuf> {
-    get_path(REVELA_BINARY_NAME, REVELA_EXE_ENV, REVELA_BINARY_NAME)
 }
 
 pub fn get_movefmt_path() -> Result<PathBuf> {

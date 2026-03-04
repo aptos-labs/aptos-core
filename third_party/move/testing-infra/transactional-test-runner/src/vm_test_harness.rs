@@ -615,9 +615,6 @@ pub struct TestRunConfig {
     pub experiments: Vec<(String, bool)>,
     /// Configuration for the VM that runs tests.
     pub vm_config: VMConfig,
-    /// Whether to use  Move Assembler (.masm) format when printing
-    /// bytecode.
-    pub use_masm: bool,
     /// Whether to print each command executed to test output.
     pub echo: bool,
     /// Set of targets into which to cross-compile.
@@ -661,17 +658,9 @@ impl TestRunConfig {
                 enable_debugging: true,
                 ..VMConfig::default_for_test()
             },
-            use_masm: true,
             echo: true,
             cross_compilation_targets: BTreeSet::new(),
             tracing: false,
-        }
-    }
-
-    pub fn with_masm(self) -> Self {
-        Self {
-            use_masm: true,
-            ..self
         }
     }
 
@@ -696,10 +685,6 @@ impl TestRunConfig {
 
     pub fn with_echo(self) -> Self {
         Self { echo: true, ..self }
-    }
-
-    pub(crate) fn using_masm(&self) -> bool {
-        self.use_masm
     }
 
     pub(crate) fn verifier_disabled(&self) -> bool {

@@ -191,7 +191,6 @@ fn run(path: &Path, config: TestConfig) -> datatest_stable::Result<()> {
         language_version: config.language_version,
         experiments,
         vm_config: config.vm_config,
-        use_masm: true,
         echo: true,
         cross_compilation_targets: BTreeSet::new(),
         tracing: config.tracing,
