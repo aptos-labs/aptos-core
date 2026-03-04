@@ -14,6 +14,7 @@ use std::{sync::Arc, time::Duration};
 use tokio::time::Instant;
 
 mod correctness;
+mod enable_feature;
 mod with_validator_down;
 
 /// Poll on-chain `ChunkyDKGState` until we see a completed session.
