@@ -18,15 +18,11 @@ pub struct QueueItem {
     ordered_blocks: OrderedBlocks,
     offsets_by_round: HashMap<Round, usize>,
     pending_secret_key_rounds: HashSet<Round>,
-    share_requester_handles: Option<Vec<DropGuard>>,
+    share_requester_handles: Vec<DropGuard>,
 }
 
 impl QueueItem {
-    pub fn new(
-        ordered_blocks: OrderedBlocks,
-        share_requester_handles: Option<Vec<DropGuard>>,
-        pending_secret_key_rounds: HashSet<Round>,
-    ) -> Self {
+    pub fn new(ordered_blocks: OrderedBlocks, pending_secret_key_rounds: HashSet<Round>) -> Self {
         assert!(!ordered_blocks.ordered_blocks.is_empty());
         let offsets_by_round: HashMap<Round, usize> = ordered_blocks
             .ordered_blocks
@@ -37,7 +33,7 @@ impl QueueItem {
         Self {
             ordered_blocks,
             offsets_by_round,
-            share_requester_handles,
+            share_requester_handles: Vec::new(),
             pending_secret_key_rounds,
         }
     }
@@ -61,9 +57,13 @@ impl QueueItem {
         self.pending_secret_key_rounds.is_empty()
     }
 
+    pub fn push_share_requester_handle(&mut self, handle: DropGuard) {
+        self.share_requester_handles.push(handle);
+    }
+
     pub fn set_secret_shared_key(&mut self, round: Round, key: SecretSharedKey) {
         let offset = self.offset(round);
-        // TODO(ibalajiarun): revisit the importance of this hashset
+        // Guard against setting a key for an already-resolved round.
         if self.pending_secret_key_rounds.contains(&round) {
             observe_block(
                 self.blocks()[offset].timestamp_usecs(),

@@ -59,6 +59,7 @@ impl PipelineBuilder {
         // Assumption: `input_txns` is free of Encrypted Transactions
         // due to VM validation checks
         let Some(secret_share_config) = maybe_secret_share_config else {
+            // TODO(ibalajiarun): Is sending None necessary?
             let _ = derived_self_key_share_tx.send(None);
             let maybe_key = secret_shared_key_rx
                 .await

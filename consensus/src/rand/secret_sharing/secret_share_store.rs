@@ -12,7 +12,7 @@ use aptos_types::secret_sharing::{
     SecretShare, SecretShareConfig, SecretShareMetadata, SecretSharedKey,
 };
 use itertools::Either;
-use std::collections::{HashMap, HashSet};
+use std::collections::{BTreeMap, HashMap, HashSet};
 
 pub struct SecretShareAggregator {
     self_author: Author,
@@ -49,9 +49,13 @@ impl SecretShareAggregator {
             BlockStage::SECRET_SHARING_ADD_ENOUGH_SHARE,
         );
         let dec_config = secret_share_config.clone();
-        let self_share = self
-            .get_self_share()
-            .expect("Aggregated item should have self share");
+        let self_share = match self.get_self_share() {
+            Some(share) => share,
+            None => {
+                warn!("Aggregation threshold met but self share missing");
+                return Either::Left(self);
+            },
+        };
         tokio::task::spawn_blocking(move || {
             let maybe_key = SecretShare::aggregate(self.shares.values(), &dec_config);
             match maybe_key {
@@ -76,7 +80,7 @@ impl SecretShareAggregator {
         self.total_weight = self
             .shares
             .keys()
-            .map(|author| weights.get(author).expect("Author must exist for weight"))
+            .filter_map(|author| weights.get(author))
             .sum();
     }
 
@@ -161,7 +165,7 @@ impl SecretShareItem {
         let item = std::mem::replace(self, Self::new(Author::ONE));
         let share_weight = *share_weights
             .get(share.author())
-            .expect("Author must exist in weights");
+            .ok_or_else(|| anyhow::anyhow!("Author {} not found in weights", share.author()))?;
         let new_item = match item {
             SecretShareItem::PendingMetadata(mut share_aggregator) => {
                 let metadata = share.metadata.clone();
@@ -187,9 +191,7 @@ impl SecretShareItem {
                 share_aggregator, ..
             } => Some(share_aggregator.shares.keys().cloned().collect()),
             SecretShareItem::Decided { .. } => None,
-            SecretShareItem::PendingMetadata(_) => {
-                unreachable!("Should only be called after block is added")
-            },
+            SecretShareItem::PendingMetadata(_) => None,
         }
     }
 
@@ -204,11 +206,18 @@ impl SecretShareItem {
     }
 }
 
+/// Per-epoch store that tracks secret share aggregation state for each round.
+/// Remote shares can accumulate here while the self-share derivation is still
+/// in flight. Once enough shares arrive and the self share is added,
+/// aggregation produces a `SecretSharedKey` sent via `decision_tx`.
+///
+/// Note: there is no garbage collection of items after they're decided. They
+/// are kept around until the epoch ends.
 pub struct SecretShareStore {
     epoch: u64,
     self_author: Author,
     secret_share_config: SecretShareConfig,
-    secret_share_map: HashMap<Round, SecretShareItem>,
+    secret_share_map: BTreeMap<Round, SecretShareItem>,
     highest_known_round: u64,
     decision_tx: Sender<SecretSharedKey>,
 }
@@ -224,7 +233,7 @@ impl SecretShareStore {
             epoch,
             self_author: author,
             secret_share_config: dec_config,
-            secret_share_map: HashMap::new(),
+            secret_share_map: BTreeMap::new(),
             highest_known_round: 0,
             decision_tx,
         }
@@ -234,8 +243,15 @@ impl SecretShareStore {
         self.highest_known_round = std::cmp::max(self.highest_known_round, round);
     }
 
+    pub fn reset(&mut self, round: u64) {
+        self.update_highest_known_round(round);
+        // remove future rounds items in case they're already decided
+        // otherwise if the block re-enters the queue, it'll be stuck
+        let _ = self.secret_share_map.split_off(&round);
+    }
+
     pub fn add_self_share(&mut self, share: SecretShare) -> anyhow::Result<()> {
-        assert!(
+        ensure!(
             self.self_author == share.author,
             "Only self shares can be added with metadata"
         );
@@ -257,7 +273,7 @@ impl SecretShareStore {
     }
 
     pub fn add_share(&mut self, share: SecretShare) -> anyhow::Result<bool> {
-        let weight = self.secret_share_config.get_peer_weight(share.author());
+        let weight = self.secret_share_config.get_peer_weight(share.author())?;
         let metadata = share.metadata();
         ensure!(metadata.epoch == self.epoch, "Share from different epoch");
         ensure!(
@@ -265,6 +281,7 @@ impl SecretShareStore {
             "Share from future round"
         );
 
+        // TODO(ibalajiarun): Make sure to garbage collect the items after they're decided.
         let item = self
             .secret_share_map
             .entry(metadata.round)
