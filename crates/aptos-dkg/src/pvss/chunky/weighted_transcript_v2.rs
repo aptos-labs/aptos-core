@@ -1,7 +1,8 @@
 // Copyright (c) Aptos Foundation
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
-//! Weighted chunky PVSS transcript (v2): SCRAPE LDT + PoK with G2-side MSM merge (no pairing in verify).
+//! Weighted chunky PVSS transcript: SCRAPE LDT + PoK with G2-side MSM merge
+//! and no pairing in verify, consistency check is part of the sigma protocol.
 
 use crate::{
     delegate_transcript_core_to_subtrs,
@@ -69,149 +70,6 @@ pub struct Transcript<E: Pairing> {
     pub sharing_proof: SharingProof<E>,
 }
 
-impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>>
-    HasAggregatableSubtranscript for Transcript<E>
-{
-    type Subtranscript = Subtranscript<E>;
-
-    fn get_subtranscript(&self) -> Self::Subtranscript {
-        self.subtrs.clone()
-    }
-
-    #[allow(non_snake_case)]
-    fn verify<A: Serialize + Clone, R: RngCore + CryptoRng>(
-        &self,
-        sc: &Self::SecretSharingConfig,
-        pp: &Self::PublicParameters,
-        spks: &[Self::SigningPubKey],
-        eks: &[Self::EncryptPubKey],
-        sid: &A,
-        rng: &mut R,
-    ) -> anyhow::Result<()> {
-        let sok_cntxt = verify_weighted_preamble(
-            sc,
-            &self.subtrs,
-            &self.dealer,
-            spks,
-            eks,
-            sid,
-            <Self as traits::Transcript>::dst(),
-        )?;
-
-        {
-            // Verify the range proof (convert CommitmentNormalised to Commitment for verify)
-            let comm_for_verify = sigma_protocol::homomorphism::TrivialShape(
-                self.sharing_proof.range_proof_commitment.0.into_group(),
-            );
-            if let Err(err) = self.sharing_proof.range_proof.verify(
-                &pp.pk_range_proof.vk,
-                sc.get_total_weight() * num_chunks_per_scalar::<E::ScalarField>(pp.ell) as usize,
-                pp.ell,
-                &comm_for_verify,
-                rng,
-            ) {
-                bail!("Range proof batch verification failed: {:?}", err);
-            }
-        }
-
-        // Do the SCRAPE LDT
-        let ldt = LowDegreeTest::random(
-            rng,
-            sc.get_threshold_weight(),
-            sc.get_total_weight() + 1,
-            true,
-            &sc.get_threshold_config().domain,
-        );
-        let Vs_flat = self.subtrs.all_Vs_flat();
-        let ldt_msm_terms = ldt.ldt_msm_input::<E::G2>(&Vs_flat)?;
-
-        let eks_inner: Vec<_> = eks.iter().map(|ek| ek.ek).collect();
-        let lagr_g1: &[E::G1Affine] = match &pp.pk_range_proof.ck_S.msm_basis {
-            SrsBasis::Lagrange { lagr: lagr_g1 } => lagr_g1,
-            SrsBasis::PowersOfTau { .. } => {
-                bail!("Expected a Lagrange basis, received powers of tau basis instead")
-            },
-        };
-        let hom = hkzg_chunked_elgamal_commit::Homomorphism::<E>::new(
-            lagr_g1,
-            pp.pk_range_proof.ck_S.xi_1,
-            &pp.pp_elgamal,
-            &pp.G2_table,
-            &eks_inner,
-            pp.get_commitment_base(),
-            pp.ell,
-        );
-
-        let num_chunks = num_chunks_per_scalar::<E::ScalarField>(pp.ell) as usize;
-        let total_weight = sc.get_total_weight();
-        // First component length: 1 (TrivialShape) + chunks (total_weight*num_chunks) + randomness (max_weight*num_chunks), matching WeightedCodomainShape::into_iter
-        let first_len = 1 + total_weight * num_chunks + sc.get_max_weight() * num_chunks;
-        let public_statement = TupleCodomainShape(
-            TupleCodomainShape(
-                sigma_protocol::homomorphism::TrivialShape(
-                    self.sharing_proof.range_proof_commitment.0.clone(),
-                ),
-                chunked_elgamal::WeightedCodomainShape {
-                    chunks: self.subtrs.Cs.clone(),
-                    randomness: self.subtrs.Rs.clone(),
-                },
-            ),
-            chunked_scalar_mul::CodomainShape(self.subtrs.Vs.iter().flatten().cloned().collect()),
-        );
-        let prover_first_message = self
-            .sharing_proof
-            .SoK
-            .prover_commitment()
-            .expect("SoK must contain commitment for Fiat–Shamir");
-        let (c, powers_of_beta) = verifier_challenges_with_length::<_, E::ScalarField, _, _>(
-            &sok_cntxt,
-            &hom,
-            &public_statement,
-            prover_first_message,
-            &sigma_protocol::Trait::dst(&hom),
-            first_len + total_weight,
-            rng,
-        );
-
-        let first_terms = hom.hom1.msm_terms(&self.sharing_proof.SoK.z);
-        let first_msm_terms =
-            hkzg_chunked_elgamal_commit::HkzgElgamalHomomorphism::<E>::merge_msm_terms(
-                first_terms.into_iter().collect(),
-                &prover_first_message.0,
-                &public_statement.0,
-                &powers_of_beta[..first_len],
-                c,
-            );
-        check_msm_eval_zero(&hom.hom1, first_msm_terms)?;
-
-        let second_terms = hom.hom2.msm_terms(&self.sharing_proof.SoK.z);
-        let second_msm_terms = hkzg_chunked_elgamal_commit::LiftedCommitHomomorphism::<
-            'static,
-            E::G2,
-        >::merge_msm_terms(
-            second_terms.into_iter().collect(),
-            &prover_first_message.1,
-            &public_statement.1,
-            &powers_of_beta[first_len..],
-            c,
-        );
-
-        let beta = sample_field_element(rng);
-        let merged_g2 =
-            msm::merge_scaled_msm_terms::<E::G2>(&[&second_msm_terms, &ldt_msm_terms], &[
-                E::ScalarField::ONE,
-                beta,
-            ]);
-        let g2_msm = E::G2::msm(merged_g2.bases(), merged_g2.scalars())
-            .expect("Failed to compute merged G2 MSM in chunky v2");
-        if g2_msm != E::G2::ZERO {
-            bail!("G2 MSM check failed (expected zero)");
-        }
-
-        Ok(())
-    }
-}
-
 /// Proof that chunked ciphertexts and commitments are consistent (SoK + batched range proof).
 #[allow(non_snake_case)]
 #[derive(CanonicalSerialize, CanonicalDeserialize, Clone, Debug, PartialEq, Eq)]
@@ -243,8 +101,6 @@ impl<E: Pairing> TryFrom<&[u8]> for Transcript<E> {
     }
 }
 
-delegate_transcript_core_to_subtrs!(Transcript<E>, subtrs);
-
 impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>> traits::Transcript
     for Transcript<E>
 {
@@ -253,7 +109,7 @@ impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>> traits:
     type SigningSecretKey = bls12381::PrivateKey;
 
     fn scheme_name() -> String {
-        "chunky_v2".to_string()
+        "chunky_prime".to_string()
     }
 
     /// Fetches the domain-separation tag (DST)
@@ -421,6 +277,151 @@ impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>> Transcr
         (Cs, Rs, Vs, sharing_proof)
     }
 }
+
+impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>>
+    HasAggregatableSubtranscript for Transcript<E>
+{
+    type Subtranscript = Subtranscript<E>;
+
+    fn get_subtranscript(&self) -> Self::Subtranscript {
+        self.subtrs.clone()
+    }
+
+    #[allow(non_snake_case)]
+    fn verify<A: Serialize + Clone, R: RngCore + CryptoRng>(
+        &self,
+        sc: &Self::SecretSharingConfig,
+        pp: &Self::PublicParameters,
+        spks: &[Self::SigningPubKey],
+        eks: &[Self::EncryptPubKey],
+        sid: &A,
+        rng: &mut R,
+    ) -> anyhow::Result<()> {
+        let sok_cntxt = verify_weighted_preamble(
+            sc,
+            &self.subtrs,
+            &self.dealer,
+            spks,
+            eks,
+            sid,
+            <Self as traits::Transcript>::dst(),
+        )?;
+
+        {
+            // Verify the range proof (convert CommitmentNormalised to Commitment for verify)
+            let comm_for_verify = sigma_protocol::homomorphism::TrivialShape(
+                self.sharing_proof.range_proof_commitment.0.into_group(),
+            );
+            if let Err(err) = self.sharing_proof.range_proof.verify(
+                &pp.pk_range_proof.vk,
+                sc.get_total_weight() * num_chunks_per_scalar::<E::ScalarField>(pp.ell) as usize,
+                pp.ell,
+                &comm_for_verify,
+                rng,
+            ) {
+                bail!("Range proof batch verification failed: {:?}", err);
+            }
+        }
+
+        // Do the SCRAPE LDT
+        let ldt = LowDegreeTest::random(
+            rng,
+            sc.get_threshold_weight(),
+            sc.get_total_weight() + 1,
+            true,
+            &sc.get_threshold_config().domain,
+        );
+        let Vs_flat = self.subtrs.all_Vs_flat();
+        let ldt_msm_terms = ldt.ldt_msm_input::<E::G2>(&Vs_flat)?;
+
+        let eks_inner: Vec<_> = eks.iter().map(|ek| ek.ek).collect();
+        let lagr_g1: &[E::G1Affine] = match &pp.pk_range_proof.ck_S.msm_basis {
+            SrsBasis::Lagrange { lagr: lagr_g1 } => lagr_g1,
+            SrsBasis::PowersOfTau { .. } => {
+                bail!("Expected a Lagrange basis, received powers of tau basis instead")
+            },
+        };
+        let hom = hkzg_chunked_elgamal_commit::Homomorphism::<E>::new(
+            lagr_g1,
+            pp.pk_range_proof.ck_S.xi_1,
+            &pp.pp_elgamal,
+            &pp.G2_table,
+            &eks_inner,
+            pp.get_commitment_base(),
+            pp.ell,
+        );
+
+        let num_chunks = num_chunks_per_scalar::<E::ScalarField>(pp.ell) as usize;
+        let total_weight = sc.get_total_weight();
+        // First component length: 1 (TrivialShape) + chunks (total_weight*num_chunks) + randomness (max_weight*num_chunks), matching WeightedCodomainShape::into_iter
+        let first_len = 1 + total_weight * num_chunks + sc.get_max_weight() * num_chunks;
+        let public_statement = TupleCodomainShape(
+            TupleCodomainShape(
+                sigma_protocol::homomorphism::TrivialShape(
+                    self.sharing_proof.range_proof_commitment.0.clone(),
+                ),
+                chunked_elgamal::WeightedCodomainShape {
+                    chunks: self.subtrs.Cs.clone(),
+                    randomness: self.subtrs.Rs.clone(),
+                },
+            ),
+            chunked_scalar_mul::CodomainShape(self.subtrs.Vs.iter().flatten().cloned().collect()),
+        );
+        let prover_first_message = self
+            .sharing_proof
+            .SoK
+            .prover_commitment()
+            .expect("SoK must contain commitment for Fiat–Shamir");
+        let (c, powers_of_beta) = verifier_challenges_with_length::<_, E::ScalarField, _, _>(
+            &sok_cntxt,
+            &hom,
+            &public_statement,
+            prover_first_message,
+            &sigma_protocol::Trait::dst(&hom),
+            first_len + total_weight,
+            rng,
+        );
+
+        let first_terms = hom.hom1.msm_terms(&self.sharing_proof.SoK.z);
+        let first_msm_terms =
+            hkzg_chunked_elgamal_commit::HkzgElgamalHomomorphism::<E>::merge_msm_terms(
+                first_terms.into_iter().collect(),
+                &prover_first_message.0,
+                &public_statement.0,
+                &powers_of_beta[..first_len],
+                c,
+            );
+        check_msm_eval_zero(&hom.hom1, first_msm_terms)?;
+
+        let second_terms = hom.hom2.msm_terms(&self.sharing_proof.SoK.z);
+        let second_msm_terms = hkzg_chunked_elgamal_commit::LiftedCommitHomomorphism::<
+            'static,
+            E::G2,
+        >::merge_msm_terms(
+            second_terms.into_iter().collect(),
+            &prover_first_message.1,
+            &public_statement.1,
+            &powers_of_beta[first_len..],
+            c,
+        );
+
+        let beta = sample_field_element(rng);
+        let merged_g2 =
+            msm::merge_scaled_msm_terms::<E::G2>(&[&second_msm_terms, &ldt_msm_terms], &[
+                E::ScalarField::ONE,
+                beta,
+            ]);
+        let g2_msm = E::G2::msm(merged_g2.bases(), merged_g2.scalars())
+            .expect("Failed to compute merged G2 MSM in chunky v2");
+        if g2_msm != E::G2::ZERO {
+            bail!("G2 MSM check failed (expected zero)");
+        }
+
+        Ok(())
+    }
+}
+
+delegate_transcript_core_to_subtrs!(Transcript<E>, subtrs);
 
 impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>> MalleableTranscript
     for Transcript<E>

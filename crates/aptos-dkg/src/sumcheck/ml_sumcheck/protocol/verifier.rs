@@ -18,6 +18,7 @@ pub struct VerifierMsg<F: Field> {
 }
 
 /// Verifier State
+#[allow(dead_code)] // We don't seem to be using `max_multiplicands`?
 pub struct VerifierState<F: Field> {
     round: usize,
     nv: usize,

@@ -332,7 +332,7 @@ fn append_batch_statement_to_transcript<E: Pairing>(
     c_y_hid: &E::G1Affine,
 ) {
     for set in sets {
-        trs.append_evaluation_set(set);
+        trs.append_evaluation_set::<E::ScalarField>(set);
     }
     for y_i_rev in y_rev {
         trs.append_evaluation_points(y_i_rev);

@@ -85,6 +85,8 @@ pub trait Trait:
 
     /// Verify the equations coming from the proof given an explicit Fiat–Shamir challenge
     /// (derived from the proof's first message).
+    /// The reason for this method is tuple homomorphisms - we need to verify each component
+    /// of the tuple homomorphism separately, but they have the same challenge.
     fn verify_with_challenge<R: RngCore + CryptoRng>(
         &self,
         public_statement: &Self::CodomainNormalized,
@@ -316,7 +318,7 @@ pub trait CurveGroupTrait:
 /// Use when verifying one component of a tuple homomorphism component-wise.
 #[allow(non_snake_case)]
 pub fn check_msm_eval_zero<H: CurveGroupTrait>(
-    _hom: &H,
+    _hom: &H, // This is convenient, we can pass the homomorphism so we don't have to specify the homomorphism type in the caller
     input: MsmInput<<H::Group as CurveGroup>::Affine, <H::Group as PrimeGroup>::ScalarField>,
 ) -> anyhow::Result<()> {
     let result = H::msm_eval(input);

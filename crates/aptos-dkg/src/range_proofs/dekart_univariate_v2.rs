@@ -14,11 +14,11 @@ use crate::{
         traits::Trait as _,
         CurveGroupTrait,
     },
-    utils, Scalar,
+    Scalar,
 };
 use aptos_crypto::arkworks::{
     self,
-    msm::MsmInput,
+    msm::{msm_bool, MsmInput},
     random::{
         sample_field_element, sample_field_elements, unsafe_random_point, unsafe_random_points,
     },
@@ -559,7 +559,7 @@ impl<E: Pairing> traits::BatchedRangeProof<E> for Proof<E> {
             .enumerate()
             .map(|(j, (f_j_evals, &rho))| {
                 let bits = &f_j_evals_without_r[j];
-                let sum = lagr_g1[0] * f_j_evals[0] + utils::msm_bool(&lagr_g1[1..(1 + n)], bits);
+                let sum = lagr_g1[0] * f_j_evals[0] + msm_bool(&lagr_g1[1..(1 + n)], bits);
                 *xi_1 * rho + sum // TODO: could turn this into a 3-term MSM, should be faster
             })
             .collect();

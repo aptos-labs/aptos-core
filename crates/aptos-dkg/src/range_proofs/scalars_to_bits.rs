@@ -23,12 +23,17 @@ pub fn scalars_to_bits_le<F: PrimeField>(scalars: &[F], number_of_bits: u8) -> V
     scalars
         .iter()
         .map(|scalar| {
-            crate::utils::scalar_to_bits_le(scalar)
+            scalar_to_bits_le(scalar)
                 .into_iter()
                 .take(number_of_bits as usize)
                 .collect::<Vec<_>>()
         })
         .collect()
+}
+
+fn scalar_to_bits_le<F: PrimeField>(x: &F) -> Vec<bool> {
+    let bigint: F::BigInt = x.into_bigint();
+    ark_ff::BitIteratorLE::new(&bigint).collect()
 }
 
 #[cfg(test)]

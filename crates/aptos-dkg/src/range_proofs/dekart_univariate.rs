@@ -7,7 +7,9 @@ use crate::{
     sigma_protocol::homomorphism::Trait, utils, Scalar,
 };
 use anyhow::ensure;
-use aptos_crypto::arkworks::{powers_of_two, random::sample_field_element, GroupGenerators};
+use aptos_crypto::arkworks::{
+    msm::msm_bool, powers_of_two, random::sample_field_element, GroupGenerators,
+};
 use ark_ec::{
     pairing::{Pairing, PairingOutput},
     AffineRepr, CurveGroup, PrimeGroup, VariableBaseMSM,
@@ -360,7 +362,7 @@ impl<E: Pairing> traits::BatchedRangeProof<E> for Proof<E> {
                 //  `k = \ell / c = 2048 / 16 = 128` tables, each of size 2^c => 2^{16} * 48 bytes =
                 //  3 MiB / table => 384 MiB total.
                 let mut c_j: <E as Pairing>::G1 = pk.lagr_g1[0].mul(&r[j]); // start with r[j] * lagr_g1[0]
-                c_j.add_assign(&utils::msm_bool(
+                c_j.add_assign(&msm_bool(
                     &pk.lagr_g1[1..=pk.max_n], // TODO: why are we padding?
                     &f_evals_without_r[j],
                 ));
@@ -388,10 +390,7 @@ impl<E: Pairing> traits::BatchedRangeProof<E> for Proof<E> {
             // .map(|j| g2_multi_exp(&pp.lagrange_basis_g2, &f_evals[j]))
             .map(|j| {
                 let mut c_hat_j: <E as Pairing>::G2 = pk.lagr_g2[0].mul(&r[j]);
-                c_hat_j.add_assign(&utils::msm_bool(
-                    &pk.lagr_g2[1..=pk.max_n],
-                    &f_evals_without_r[j],
-                ));
+                c_hat_j.add_assign(&msm_bool(&pk.lagr_g2[1..=pk.max_n], &f_evals_without_r[j]));
                 c_hat_j
             })
             .collect();

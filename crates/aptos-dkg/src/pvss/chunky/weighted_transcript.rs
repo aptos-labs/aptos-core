@@ -1,7 +1,8 @@
 // Copyright (c) Aptos Foundation
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
-//! Weighted chunky PVSS transcript (v1): SCRAPE LDT + PoK + consistency check combined into two MSMs, then checked via a single pairing check.
+//! Weighted chunky PVSS transcript: SCRAPE LDT + PoK + consistency check
+//! combined into two MSMs, then checked via a single pairing check.
 
 use crate::{
     delegate_transcript_core_to_subtrs,
@@ -112,7 +113,7 @@ impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>> traits:
     type SigningSecretKey = bls12381::PrivateKey;
 
     fn scheme_name() -> String {
-        "chunky_v1".to_string()
+        "chunky".to_string()
     }
 
     /// Fetches the domain-separation tag (DST)
