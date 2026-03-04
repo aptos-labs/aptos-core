@@ -12527,7 +12527,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "mono-move"
+name = "mono-move-types"
 version = "0.1.0"
 
 [[package]]
