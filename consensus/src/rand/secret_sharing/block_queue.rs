@@ -18,15 +18,11 @@ pub struct QueueItem {
     ordered_blocks: OrderedBlocks,
     offsets_by_round: HashMap<Round, usize>,
     pending_secret_key_rounds: HashSet<Round>,
-    share_requester_handles: Option<Vec<DropGuard>>,
+    share_requester_handles: Vec<DropGuard>,
 }
 
 impl QueueItem {
-    pub fn new(
-        ordered_blocks: OrderedBlocks,
-        share_requester_handles: Option<Vec<DropGuard>>,
-        pending_secret_key_rounds: HashSet<Round>,
-    ) -> Self {
+    pub fn new(ordered_blocks: OrderedBlocks) -> Self {
         assert!(!ordered_blocks.ordered_blocks.is_empty());
         let offsets_by_round: HashMap<Round, usize> = ordered_blocks
             .ordered_blocks
@@ -34,10 +30,11 @@ impl QueueItem {
             .enumerate()
             .map(|(idx, b)| (b.round(), idx))
             .collect();
+        let pending_secret_key_rounds: HashSet<Round> = offsets_by_round.keys().copied().collect();
         Self {
             ordered_blocks,
             offsets_by_round,
-            share_requester_handles,
+            share_requester_handles: Vec::new(),
             pending_secret_key_rounds,
         }
     }
@@ -61,9 +58,13 @@ impl QueueItem {
         self.pending_secret_key_rounds.is_empty()
     }
 
+    pub fn push_share_requester_handle(&mut self, handle: DropGuard) {
+        self.share_requester_handles.push(handle);
+    }
+
     pub fn set_secret_shared_key(&mut self, round: Round, key: SecretSharedKey) {
         let offset = self.offset(round);
-        // TODO(ibalajiarun): revisit the importance of this hashset
+        // Guard against setting a key for an already-resolved round.
         if self.pending_secret_key_rounds.contains(&round) {
             observe_block(
                 self.blocks()[offset].timestamp_usecs(),
@@ -132,5 +133,134 @@ impl BlockQueue {
             .last()
             .map(|(_, item)| item)
             .filter(|item| item.offsets_by_round.contains_key(&round))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::rand::{
+        rand_gen::test_utils::create_ordered_blocks,
+        secret_sharing::test_utils::{create_metadata, create_secret_shared_key, TestContext},
+    };
+
+    /// Helper: mark all rounds in a QueueItem as secret-shared so it becomes ready.
+    fn mark_all_ready(ctx: &TestContext, item: &mut QueueItem) {
+        let rounds: Vec<Round> = item.pending_secret_key_rounds.iter().copied().collect();
+        for round in rounds {
+            let metadata = create_metadata(ctx.epoch, round);
+            let key = create_secret_shared_key(ctx, &metadata);
+            item.set_secret_shared_key(round, key);
+        }
+    }
+
+    #[test]
+    fn test_queue_item_basic() {
+        let blocks = create_ordered_blocks(vec![1, 2, 3]);
+        let item = QueueItem::new(blocks);
+
+        assert_eq!(item.first_round(), 1);
+        assert_eq!(item.offset(1), 0);
+        assert_eq!(item.offset(2), 1);
+        assert_eq!(item.offset(3), 2);
+        // All block rounds are pending secret sharing
+        assert!(!item.is_fully_secret_shared());
+        assert_eq!(item.pending_secret_key_rounds.len(), 3);
+    }
+
+    #[test]
+    fn test_queue_item_pending_rounds_match_blocks() {
+        // Verify that new() populates pending_secret_key_rounds from block rounds
+        let blocks = create_ordered_blocks(vec![5, 6]);
+        let item = QueueItem::new(blocks);
+        assert_eq!(item.pending_secret_key_rounds, HashSet::from([5, 6]));
+        assert!(!item.is_fully_secret_shared());
+    }
+
+    #[test]
+    fn test_queue_item_set_secret_shared_key() {
+        let ctx = TestContext::new(vec![1, 1, 1, 1]);
+        let blocks = create_ordered_blocks(vec![10]);
+        let mut item = QueueItem::new(blocks);
+
+        assert!(!item.is_fully_secret_shared());
+
+        let metadata = create_metadata(ctx.epoch, 10);
+        let key = create_secret_shared_key(&ctx, &metadata);
+        item.set_secret_shared_key(10, key);
+
+        assert!(item.is_fully_secret_shared());
+    }
+
+    #[test]
+    fn test_block_queue_push_and_dequeue() {
+        let ctx = TestContext::new(vec![1, 1, 1, 1]);
+        let mut queue = BlockQueue::new();
+
+        // Push an item and mark all rounds ready
+        let blocks = create_ordered_blocks(vec![1, 2]);
+        let mut item = QueueItem::new(blocks);
+        mark_all_ready(&ctx, &mut item);
+        queue.push_back(item);
+
+        let ready = queue.dequeue_ready_prefix();
+        assert_eq!(ready.len(), 1);
+        assert!(queue.queue().is_empty());
+    }
+
+    #[test]
+    fn test_block_queue_dequeue_prefix_only() {
+        let ctx = TestContext::new(vec![1, 1, 1, 1]);
+        let mut queue = BlockQueue::new();
+
+        // First item: ready
+        let blocks1 = create_ordered_blocks(vec![1, 2]);
+        let mut item1 = QueueItem::new(blocks1);
+        mark_all_ready(&ctx, &mut item1);
+        queue.push_back(item1);
+
+        // Second item: NOT ready (pending round 3)
+        let blocks2 = create_ordered_blocks(vec![3]);
+        let item2 = QueueItem::new(blocks2);
+        queue.push_back(item2);
+
+        // Third item: ready
+        let blocks3 = create_ordered_blocks(vec![5, 6]);
+        let mut item3 = QueueItem::new(blocks3);
+        mark_all_ready(&ctx, &mut item3);
+        queue.push_back(item3);
+
+        // Only first item should dequeue (second blocks third)
+        let ready = queue.dequeue_ready_prefix();
+        assert_eq!(ready.len(), 1);
+        assert_eq!(queue.queue().len(), 2);
+
+        // Mark second item as ready
+        let metadata = create_metadata(ctx.epoch, 3);
+        let key = create_secret_shared_key(&ctx, &metadata);
+        queue.item_mut(3).unwrap().set_secret_shared_key(3, key);
+
+        // Now both remaining items should dequeue
+        let ready = queue.dequeue_ready_prefix();
+        assert_eq!(ready.len(), 2);
+        assert!(queue.queue().is_empty());
+    }
+
+    #[test]
+    fn test_block_queue_item_mut() {
+        let mut queue = BlockQueue::new();
+
+        let blocks = create_ordered_blocks(vec![10, 11, 12]);
+        let item = QueueItem::new(blocks);
+        queue.push_back(item);
+
+        // Finds correct item by round
+        assert!(queue.item_mut(10).is_some());
+        assert!(queue.item_mut(11).is_some());
+        assert!(queue.item_mut(12).is_some());
+
+        // None for gap / non-existent rounds
+        assert!(queue.item_mut(5).is_none());
+        assert!(queue.item_mut(13).is_none());
     }
 }

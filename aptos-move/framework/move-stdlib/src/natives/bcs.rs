@@ -222,7 +222,9 @@ fn constant_serialized_size(ty_layout: &MoveTypeLayout) -> (u64, PartialVMResult
         // enums and functions have no constant size
         MoveTypeLayout::Function => Ok(None),
         MoveTypeLayout::Struct(struct_layout) => match struct_layout.as_ref() {
-            MoveStructLayout::RuntimeVariants(_) | MoveStructLayout::WithVariants(_) => Ok(None),
+            MoveStructLayout::RuntimeVariants(_) | MoveStructLayout::WithVariants { .. } => {
+                Ok(None)
+            },
             MoveStructLayout::Runtime(fields) => {
                 let mut total = Some(0);
                 for field in fields {

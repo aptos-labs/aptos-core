@@ -1,0 +1,18 @@
+inference succeeded, injected specs into 1 file(s) (read the files to see the changes):
+- <TEMPDIR>/multi.move
+
+=== source after inference ===
+module 0xCAFE::multi {
+    fun add_one(x: u64): u64 {
+        x + 1
+    }
+    spec add_one(x: u64): u64 {
+        ensures [inferred] result == x + 1;
+        aborts_if [inferred] x > MAX_U64 - 1;
+    }
+
+
+    fun double(x: u64): u64 {
+        x * 2
+    }
+}

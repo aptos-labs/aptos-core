@@ -1099,14 +1099,15 @@ impl AptosVM {
             },
             TransactionExecutableRef::Encrypted => {
                 // If the executable is still `Encrypted` here, it means that decryption
-                // failed. The transaction is kept on chain as aborted.
-                // TODO(ibalajiarun): Figure out better status code
-                let status_code = StatusCode::ABORTED;
-                let vm_status = VMStatus::Executed;
-                let txn_status =
-                    TransactionStatus::Keep(ExecutionStatus::MiscellaneousError(Some(status_code)));
-                let vm_output = VMOutput::empty_with_status(txn_status);
-                return Ok((vm_status, vm_output));
+                // failed. Return an error so the caller runs the failure epilogue, which
+                // increments the sequence number and charges gas.
+                return Err(VMStatus::error(
+                    StatusCode::FAILED_TO_DESERIALIZE_ARGUMENT,
+                    Some(
+                        "Encrypted transaction decryption failed; payload not available"
+                            .to_string(),
+                    ),
+                ));
             },
             // Not reachable as this function should only be invoked for entry or script
             // transaction payload.
@@ -2185,9 +2186,16 @@ impl AptosVM {
             );
         }
 
-        // Whether user transaction succeeded or failed (e.g., abort in Move code or running out
-        // of gas in epilogue), we record the trace of all executed instructions.
-        output.set_trace(trace_recorder.finish());
+        // Only if user transaction succeeded, record the trace of all executed instructions.
+        // If transaction did not succeed, its side effects are discarded and so there is no
+        // need to replay the trace for extra runtime checks.
+        if output
+            .status()
+            .as_kept_status()
+            .is_ok_and(|s| s.is_success())
+        {
+            output.set_trace(trace_recorder.finish());
+        }
 
         (vm_status, output)
     }

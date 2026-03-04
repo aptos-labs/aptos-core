@@ -227,6 +227,11 @@ impl BroadcastStatus<DKGMessage> for Arc<ChunkyTranscriptAggregationState> {
             self.validate_and_deserialize_transcript(sender, metadata, transcript_bytes, &mut rng)?;
 
         let mut inner_state = self.inner_state.write();
+        // Re-check under write lock to prevent TOCTOU race (concurrent adds may have
+        // already inserted this sender between the read-lock check and the write-lock acquire).
+        if inner_state.contributors.contains(&sender) {
+            return Ok(None);
+        }
         // Track first peer transcript for metrics
         let is_self = self.my_addr == sender;
         if !is_self && !inner_state.valid_peer_transcript_seen {

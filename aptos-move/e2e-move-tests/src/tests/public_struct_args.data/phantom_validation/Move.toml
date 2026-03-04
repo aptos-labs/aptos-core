@@ -1,0 +1,9 @@
+[package]
+name = "PhantomValidationTest"
+version = "1.0.0"
+
+[addresses]
+cafe = "0xcafe"
+
+[dependencies]
+AptosFramework = { local = "../../../../../framework/aptos-framework" }

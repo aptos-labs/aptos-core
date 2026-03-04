@@ -19,7 +19,7 @@ use aptos_channels::aptos_channel;
 use aptos_config::config::ReliableBroadcastConfig;
 use aptos_consensus_types::{
     common::{Author, Round},
-    pipelined_block::PipelinedBlock,
+    pipelined_block::{PipelinedBlock, SecretShareResult, TaskResult},
 };
 use aptos_infallible::Mutex;
 use aptos_logger::{error, info, spawn_named, warn};
@@ -33,17 +33,21 @@ use aptos_types::{
 use bytes::Bytes;
 use futures::{
     future::{AbortHandle, Abortable},
+    stream::FuturesUnordered,
     FutureExt, StreamExt,
 };
 use futures_channel::{
     mpsc::{unbounded, UnboundedReceiver, UnboundedSender},
     oneshot,
 };
-use std::{collections::HashSet, sync::Arc, time::Duration};
+use std::{future::Future, pin::Pin, sync::Arc, time::Duration};
 use tokio_retry::strategy::ExponentialBackoff;
 
 pub type Sender<T> = UnboundedSender<T>;
 pub type Receiver<T> = UnboundedReceiver<T>;
+
+type PendingDeriveFut =
+    Pin<Box<dyn Future<Output = (Round, TaskResult<SecretShareResult>)> + Send>>;
 
 pub struct SecretShareManager {
     author: Author,
@@ -52,6 +56,7 @@ pub struct SecretShareManager {
     config: SecretShareConfig,
     reliable_broadcast: Arc<ReliableBroadcast<SecretShareMessage, ExponentialBackoff>>,
     network_sender: Arc<NetworkSender>,
+    secret_share_request_delay_ms: u64,
 
     // local channel received from dec_store
     decision_rx: Receiver<SecretSharedKey>,
@@ -60,6 +65,7 @@ pub struct SecretShareManager {
     // local state
     secret_share_store: Arc<Mutex<SecretShareStore>>,
     block_queue: BlockQueue,
+    pending_derives: FuturesUnordered<PendingDeriveFut>,
 }
 
 impl SecretShareManager {
@@ -71,6 +77,7 @@ impl SecretShareManager {
         network_sender: Arc<NetworkSender>,
         bounded_executor: BoundedExecutor,
         rb_config: &ReliableBroadcastConfig,
+        secret_share_request_delay_ms: u64,
     ) -> Self {
         let rb_backoff_policy = ExponentialBackoff::from_millis(rb_config.backoff_policy_base_ms)
             .factor(rb_config.backoff_policy_factor)
@@ -100,62 +107,93 @@ impl SecretShareManager {
             config,
             reliable_broadcast,
             network_sender,
+            secret_share_request_delay_ms,
 
             decision_rx,
             outgoing_blocks,
 
             secret_share_store: dec_store,
             block_queue: BlockQueue::new(),
+            pending_derives: FuturesUnordered::new(),
         }
     }
 
-    async fn process_incoming_blocks(&mut self, blocks: OrderedBlocks) -> anyhow::Result<()> {
+    /// Processes a batch of incoming ordered blocks by registering their rounds
+    /// in the store and deferring self-share derivation to `pending_derives`.
+    fn process_incoming_blocks(&mut self, blocks: OrderedBlocks) -> anyhow::Result<()> {
         let rounds: Vec<u64> = blocks.ordered_blocks.iter().map(|b| b.round()).collect();
-        info!(rounds = rounds, "Processing incoming blocks.");
+        info!(
+            rounds = rounds,
+            num_blocks = rounds.len(),
+            "Processing incoming blocks."
+        );
 
-        let mut share_requester_handles = Vec::new();
-        let mut pending_secret_key_rounds = HashSet::new();
         for block in blocks.ordered_blocks.iter() {
-            let handle = self.process_incoming_block(block).await?;
-            share_requester_handles.push(handle);
-            pending_secret_key_rounds.insert(block.round());
+            self.enqueue_self_derive(block)?;
         }
 
-        let queue_item = QueueItem::new(
-            blocks,
-            Some(share_requester_handles),
-            pending_secret_key_rounds,
-        );
-        self.block_queue.push_back(queue_item);
+        self.block_queue.push_back(QueueItem::new(blocks));
         Ok(())
     }
 
-    async fn process_incoming_block(&self, block: &PipelinedBlock) -> anyhow::Result<DropGuard> {
-        let futures = block.pipeline_futs().expect("pipeline must exist");
-        let self_secret_share = futures
-            .secret_sharing_derive_self_fut
-            .await
-            .map_err(|_| anyhow::anyhow!("derive self failed"))?
-            .expect("Must not be None");
-        let metadata = self_secret_share.metadata().clone();
+    /// Registers the round in the store so remote shares can accumulate, and
+    /// pushes the self-derive future into `pending_derives` for later resolution.
+    fn enqueue_self_derive(&mut self, block: &PipelinedBlock) -> anyhow::Result<()> {
+        let futures = block.pipeline_futs().ok_or_else(|| {
+            anyhow::anyhow!("pipeline futures not set for round {}", block.round())
+        })?;
 
-        // Now acquire lock and update store
+        self.secret_share_store
+            .lock()
+            .update_highest_known_round(block.round());
+
+        let round = block.round();
+        let derive_fut = futures.secret_sharing_derive_self_fut.clone();
+        self.pending_derives
+            .push(Box::pin(async move { (round, derive_fut.await) }));
+        Ok(())
+    }
+
+    /// Handles a completed self-share derivation: updates the store, broadcasts
+    /// the share, and spawns the share requester task.
+    fn process_completed_derive(&mut self, round: Round, result: TaskResult<SecretShareResult>) {
+        let share = match result {
+            Ok(Some(share)) => share,
+            Ok(None) => {
+                error!(round = round, "Self-share derive returned None, skipping");
+                return;
+            },
+            Err(e) => {
+                error!(round = round, "Self-share derive failed: {:?}", e);
+                return;
+            },
+        };
+
+        let metadata = share.metadata().clone();
         {
-            let mut secret_share_store = self.secret_share_store.lock();
-            secret_share_store.update_highest_known_round(block.round());
-            secret_share_store
-                .add_self_share(self_secret_share.clone())
-                .expect("Add self dec share should succeed");
+            let mut store = self.secret_share_store.lock();
+            if let Err(e) = store.add_self_share(share.clone()) {
+                error!(round = round, "Failed to add self share to store: {:?}", e);
+                return;
+            }
         }
 
         info!(LogSchema::new(LogEvent::BroadcastSecretShare)
             .epoch(self.epoch_state.epoch)
             .author(self.author)
-            .round(block.round()));
-        self.network_sender.broadcast_without_self(
-            SecretShareMessage::Share(self_secret_share).into_network_message(),
-        );
-        Ok(self.spawn_share_requester_task(metadata))
+            .round(round));
+        self.network_sender
+            .broadcast_without_self(SecretShareMessage::Share(share).into_network_message());
+
+        let guard = self.spawn_share_requester_task(metadata);
+        if let Some(item) = self.block_queue.item_mut(round) {
+            item.push_share_requester_handle(guard);
+        } else {
+            warn!(
+                round = round,
+                "Secret share item not found for round {}", round
+            );
+        }
     }
 
     fn process_ready_blocks(&mut self, ready_blocks: Vec<OrderedBlocks>) {
@@ -166,7 +204,12 @@ impl SecretShareManager {
         info!(rounds = rounds, "Processing secret share ready blocks.");
 
         for blocks in ready_blocks {
-            let _ = self.outgoing_blocks.unbounded_send(blocks);
+            if let Err(e) = self.outgoing_blocks.unbounded_send(blocks) {
+                error!(
+                    "[SecretShareManager] Failed to send ready blocks downstream: {}",
+                    e
+                );
+            }
         }
     }
 
@@ -177,9 +220,8 @@ impl SecretShareManager {
             ResetSignal::TargetRound(round) => round,
         };
         self.block_queue = BlockQueue::new();
-        self.secret_share_store
-            .lock()
-            .update_highest_known_round(target_round);
+        self.pending_derives = FuturesUnordered::new();
+        self.secret_share_store.lock().reset(target_round);
         self.stop = matches!(signal, ResetSignal::Stop);
         let _ = tx.send(ResetAck::default());
     }
@@ -244,9 +286,9 @@ impl SecretShareManager {
         ));
         let epoch_state = self.epoch_state.clone();
         let secret_share_store = self.secret_share_store.clone();
+        let request_delay_ms = self.secret_share_request_delay_ms;
         let task = async move {
-            // TODO(ibalajiarun): Make this configurable
-            tokio::time::sleep(Duration::from_millis(300)).await;
+            tokio::time::sleep(Duration::from_millis(request_delay_ms)).await;
             let maybe_existing_shares = secret_share_store.lock().get_all_shares_authors(&metadata);
             if let Some(existing_shares) = maybe_existing_shares {
                 let epoch = epoch_state.epoch;
@@ -262,9 +304,15 @@ impl SecretShareManager {
                     "[SecretShareManager] Start broadcasting share request for {}",
                     targets.len(),
                 );
-                rb.multicast(request, aggregate_state, targets)
-                    .await
-                    .expect("Broadcast cannot fail");
+                if let Err(e) = rb.multicast(request, aggregate_state, targets).await {
+                    warn!(
+                        epoch = epoch,
+                        round = metadata.round,
+                        "[SecretShareManager] Share request broadcast failed: {}",
+                        e,
+                    );
+                    return;
+                }
                 info!(
                     epoch = epoch,
                     round = metadata.round,
@@ -354,12 +402,21 @@ impl SecretShareManager {
         while !self.stop {
             tokio::select! {
                 Some(blocks) = incoming_blocks.next() => {
-                    if let Err(e) = self.process_incoming_blocks(blocks).await {
+                    if let Err(e) = self.process_incoming_blocks(blocks) {
                         error!("error processing incoming blocks: {:?}", e);
                     }
                 }
+                Some((round, result)) = self.pending_derives.next() => {
+                    self.process_completed_derive(round, result);
+                }
                 Some(reset) = reset_rx.next() => {
-                    while matches!(incoming_blocks.try_next(), Ok(Some(_))) {}
+                    let mut dropped = 0;
+                    while matches!(incoming_blocks.try_next(), Ok(Some(_))) {
+                        dropped += 1;
+                    }
+                    if dropped > 0 {
+                        info!("[SecretShareManager] Dropped {} incoming block batches during reset", dropped);
+                    }
                     self.process_reset(reset);
                 }
                 Some(secret_shared_key) = self.decision_rx.next() => {

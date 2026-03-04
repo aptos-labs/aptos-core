@@ -1,10 +1,10 @@
-warning[W00001]: DEPRECATED. will be removed
+error[E04003]: built-in operation not supported
   ┌─ spec_deref_borrow.move:7:27
   │
 7 │         ensures result == (*r).value;
   │                           ^^^^ dereference `*e` is not allowed in spec expressions
 
-warning[W00001]: DEPRECATED. will be removed
+error[E04003]: built-in operation not supported
   ┌─ spec_deref_borrow.move:8:27
   │
 8 │         ensures result == (&r).value;

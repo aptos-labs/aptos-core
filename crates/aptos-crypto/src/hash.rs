@@ -112,7 +112,7 @@ use std::{
     fmt,
     str::FromStr,
 };
-use tiny_keccak::{Hasher, Sha3};
+use tiny_keccak::{keccakf, Hasher, Sha3};
 
 /// A prefix used to begin the salt of every hashable structure. The salt
 /// consists in this global prefix, concatenated with the specified
@@ -723,5 +723,114 @@ impl<T: ser::Serialize + ?Sized> TestOnlyHash for T {
         let mut hasher = TestOnlyHasher::default();
         hasher.update(&bytes);
         hasher.finish()
+    }
+}
+
+/// Pre-seeded keccak state for hashing exactly two 32-byte values.
+///
+/// Stores the raw `[u64; 25]` keccak state with the domain-separation seed already
+/// XORed into words 0-3 (bytes 0-31). This bypasses all the `Sha3`/`KeccakState`
+/// wrapper overhead (mode tracking, offset tracking, rate calculations, Lazy clone).
+///
+/// Only valid on little-endian targets (x86-64, aarch64-LE).
+#[cfg(target_endian = "little")]
+pub struct PreSeededKeccak([u64; 25]);
+
+#[cfg(target_endian = "little")]
+impl PreSeededKeccak {
+    /// Create from a 32-byte seed (the output of `CryptoHasher::seed()`).
+    pub fn new(seed: &[u8; 32]) -> Self {
+        let mut state = [0u64; 25];
+        // XOR seed into first 4 words (bytes 0-31).
+        // On LE, from_le_bytes is a no-op reinterpret.
+        for i in 0..4 {
+            state[i] = u64::from_le_bytes(seed[i * 8..(i + 1) * 8].try_into().unwrap());
+        }
+        PreSeededKeccak(state)
+    }
+
+    /// Hash two 32-byte values with this pre-seeded state.
+    ///
+    /// Total absorbed: seed(32, pre-absorbed) + a(32) + b(32) = 96 bytes.
+    /// SHA3-256 rate = 136 > 96, so no intermediate keccak-f permutation.
+    #[inline]
+    pub fn hash_pair(&self, a: &[u8; 32], b: &[u8; 32]) -> HashValue {
+        let mut state = self.0; // Copy 200 bytes (just the raw state, no wrapper)
+
+        // XOR a into words 4-7 (bytes 32-63)
+        for i in 0..4 {
+            state[4 + i] ^= u64::from_le_bytes(a[i * 8..(i + 1) * 8].try_into().unwrap());
+        }
+
+        // XOR b into words 8-11 (bytes 64-95)
+        for i in 0..4 {
+            state[8 + i] ^= u64::from_le_bytes(b[i * 8..(i + 1) * 8].try_into().unwrap());
+        }
+
+        // SHA3 padding: delim=0x06 at byte 96, 0x80 at byte 135
+        state[12] ^= 0x06; // byte 96 = word 12, byte 0 (LE LSB)
+        state[16] ^= 0x80u64 << 56; // byte 135 = word 16, byte 7 (LE MSB)
+
+        keccakf(&mut state);
+
+        // Extract first 32 bytes
+        let mut hash = [0u8; 32];
+        for i in 0..4 {
+            hash[i * 8..(i + 1) * 8].copy_from_slice(&state[i].to_le_bytes());
+        }
+        HashValue::new(hash)
+    }
+}
+
+/// Pre-seeded keccak state for `SparseMerkleInternalHasher`.
+#[cfg(target_endian = "little")]
+pub static SPARSE_MERKLE_INTERNAL_PRESEEDED: Lazy<PreSeededKeccak> =
+    Lazy::new(|| PreSeededKeccak::new(SparseMerkleInternalHasher::seed()));
+
+/// Pre-seeded keccak state for `TransactionAccumulatorHasher`.
+#[cfg(target_endian = "little")]
+pub static TRANSACTION_ACCUMULATOR_PRESEEDED: Lazy<PreSeededKeccak> =
+    Lazy::new(|| PreSeededKeccak::new(TransactionAccumulatorHasher::seed()));
+
+#[cfg(test)]
+mod preseeded_tests {
+    use super::*;
+
+    #[test]
+    fn preseeded_matches_original_sparse_merkle_internal() {
+        for _ in 0..100 {
+            let left = HashValue::random();
+            let right = HashValue::random();
+
+            // Original path
+            let mut state = SparseMerkleInternalHasher::default();
+            state.update(left.as_ref());
+            state.update(right.as_ref());
+            let original = state.finish();
+
+            // Optimized path
+            let optimized =
+                SPARSE_MERKLE_INTERNAL_PRESEEDED.hash_pair(left.as_ref(), right.as_ref());
+
+            assert_eq!(original, optimized, "left={:?} right={:?}", left, right);
+        }
+    }
+
+    #[test]
+    fn preseeded_matches_original_transaction_accumulator() {
+        for _ in 0..100 {
+            let left = HashValue::random();
+            let right = HashValue::random();
+
+            let mut state = TransactionAccumulatorHasher::default();
+            state.update(left.as_ref());
+            state.update(right.as_ref());
+            let original = state.finish();
+
+            let optimized =
+                TRANSACTION_ACCUMULATOR_PRESEEDED.hash_pair(left.as_ref(), right.as_ref());
+
+            assert_eq!(original, optimized);
+        }
     }
 }

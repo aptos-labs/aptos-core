@@ -29,7 +29,7 @@ pub const MAX_BOOGIE_VERSION: Option<&str> = Some("3.5.1.0");
 pub const MIN_BOOGIE_VERSION_NEW_MOD_SET_ANALYSIS: Option<&str> = Some("3.5.1.0");
 
 pub const MIN_Z3_VERSION: Option<&str> = Some("4.11.2");
-pub const MAX_Z3_VERSION: Option<&str> = Some("4.11.2");
+pub const MAX_Z3_VERSION: Option<&str> = Some("4.13.0");
 
 pub const MIN_CVC5_VERSION: Option<&str> = Some("0.0.3");
 pub const MAX_CVC5_VERSION: Option<&str> = None;
