@@ -7,7 +7,7 @@ use super::unused_common::SHARED_SUPPRESSION_ATTRS;
 use move_compiler_v2::external_checks::ConstantChecker;
 use move_model::{
     ast::Attribute,
-    model::{GlobalEnv, Loc, NamedConstantEnv},
+    model::{GlobalEnv, Loc, NamedConstantEnv, Visibility},
     ty::Type,
 };
 
@@ -55,6 +55,7 @@ fn should_warn_unused_constant(const_env: &NamedConstantEnv) -> bool {
         || const_env.has_attribute(is_suppression_attr)
         || !const_env.get_users().is_empty()
         || is_error_code(const_env)
+        || const_env.get_visibility() != Visibility::Private
     {
         return false;
     }

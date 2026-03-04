@@ -20,7 +20,7 @@ use move_core_types::{
     account_address::AccountAddress,
     ident_str,
     identifier::{IdentStr, Identifier},
-    language_storage::{ModuleId, PACK, PUBLIC_STRUCT_DELIMITER},
+    language_storage::{ModuleId, DOLLAR_SIGN_DELIMITER, PACK},
     vm_status::StatusCode,
 };
 use move_vm_metrics::{Timer, VM_TIMER};
@@ -120,14 +120,14 @@ fn make_pack_fn_cache_key(module_id: &ModuleId, function_name: &str) -> String {
 
 /// Constructs the pack function name for a struct: pack$<struct_name>
 fn make_struct_pack_fn_name(struct_name: &Identifier) -> String {
-    format!("{}{}{}", PACK, PUBLIC_STRUCT_DELIMITER, struct_name)
+    format!("{}{}{}", PACK, DOLLAR_SIGN_DELIMITER, struct_name)
 }
 
 /// Constructs the pack function name for an enum variant: pack$<enum_name>$<variant_name>
 fn make_variant_pack_fn_name(enum_name: &Identifier, variant_name: &Identifier) -> String {
     format!(
         "{}{}{}{}{}",
-        PACK, PUBLIC_STRUCT_DELIMITER, enum_name, PUBLIC_STRUCT_DELIMITER, variant_name
+        PACK, DOLLAR_SIGN_DELIMITER, enum_name, DOLLAR_SIGN_DELIMITER, variant_name
     )
 }
 

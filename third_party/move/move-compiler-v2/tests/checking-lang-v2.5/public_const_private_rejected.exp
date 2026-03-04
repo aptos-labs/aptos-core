@@ -1,0 +1,7 @@
+
+Diagnostics:
+error: constant `0x42::M::PRIV` cannot be used here because it is private to the module `0x42::M`
+   ┌─ tests/checking-lang-v2.5/public_const_private_rejected.move:12:9
+   │
+12 │         M::PRIV
+   │         ^^^^^^^

@@ -1,0 +1,10 @@
+
+Diagnostics:
+error: unexpected token
+  ┌─ tests/checking-lang-v2.5/public_const_in_script.move:4:12
+  │
+4 │     public const X: u64 = 42;
+  │            ^^^^^
+  │            │
+  │            Unexpected 'const'
+  │            Expected 'fun'

@@ -535,6 +535,22 @@ impl ModuleBuilder<'_, '_> {
                 &format!("duplicate declaration of const `{}`", &name.value()),
             )
         }
+        let (move_visibility, has_package_visibility) = match def.visibility {
+            EA::Visibility::Public(_) => (Visibility::Public, false),
+            EA::Visibility::Friend(loc) => {
+                if self.friend_visibility_loc.is_none() {
+                    self.friend_visibility_loc = Some(loc);
+                }
+                (Visibility::Friend, false)
+            },
+            EA::Visibility::Internal => (Visibility::Private, false),
+            EA::Visibility::Package(loc) => {
+                if self.package_fun_loc.is_none() {
+                    self.package_fun_loc = Some(loc);
+                }
+                (Visibility::Friend, true)
+            },
+        };
         let attributes = self.translate_attributes(&def.attributes);
         let mut et = ExpTranslator::new(self);
         et.set_translate_move_fun();
@@ -545,6 +561,8 @@ impl ModuleBuilder<'_, '_> {
             ty,
             value: Value::Bool(false), // dummy value, actual will be assigned in def_ana
             visibility: EntryVisibility::SpecAndImpl,
+            move_visibility,
+            has_package_visibility,
             users: BTreeSet::new(),
             attributes,
         });
@@ -4905,6 +4923,8 @@ impl ModuleBuilder<'_, '_> {
                 value,
                 ty,
                 visibility: _,
+                move_visibility,
+                has_package_visibility,
                 users,
                 attributes,
             } = const_entry.clone();
@@ -4913,6 +4933,8 @@ impl ModuleBuilder<'_, '_> {
                 loc,
                 type_: ty,
                 value,
+                visibility: move_visibility,
+                has_package_visibility,
                 attributes,
                 users,
             };
