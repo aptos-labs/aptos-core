@@ -16,7 +16,7 @@ use aptos_infallible::Mutex;
 use aptos_logger::info;
 use aptos_reliable_broadcast::{BroadcastStatus, ReliableBroadcast};
 use aptos_types::{
-    dkg::chunky_dkg::{AggregatedSubtranscript, ChunkyDKGConfig},
+    dkg::chunky_dkg::AggregatedSubtranscript,
     epoch_state::EpochState,
     validator_verifier::VerifyError,
 };
@@ -32,7 +32,6 @@ pub fn start_chunky_subtranscript_certification(
     start_time: Duration,
     my_addr: AccountAddress,
     epoch_state: Arc<EpochState>,
-    _dkg_config: ChunkyDKGConfig,
     aggregated_subtranscript: AggregatedSubtranscript,
     certified_agg_subtx_tx: Option<Sender<(), CertifiedAggregatedSubtranscript>>,
 ) -> AbortHandle {
@@ -79,12 +78,12 @@ pub fn start_chunky_subtranscript_certification(
 #[derive(Default)]
 struct ChunkySubtranscriptSignatureAggregator {
     signatures: BTreeMap<AccountAddress, Signature>,
+    valid_peer_signature_seen: bool,
 }
 
 pub struct ChunkySubtranscriptCertificationState {
     start_time: Duration,
     my_addr: AccountAddress,
-    valid_peer_signature_seen: bool,
     sig_aggregator: Mutex<ChunkySubtranscriptSignatureAggregator>,
     epoch_state: Arc<EpochState>,
     aggregated_subtranscript: AggregatedSubtranscript,
@@ -100,7 +99,6 @@ impl ChunkySubtranscriptCertificationState {
         Self {
             start_time,
             my_addr,
-            valid_peer_signature_seen: false,
             sig_aggregator: Mutex::new(ChunkySubtranscriptSignatureAggregator::default()),
             epoch_state,
             aggregated_subtranscript,
@@ -148,7 +146,8 @@ impl BroadcastStatus<DKGMessage> for Arc<ChunkySubtranscriptCertificationState> 
 
         // All checks passed. Adding signature.
         let is_self = self.my_addr == sender;
-        if !is_self && !self.valid_peer_signature_seen {
+        if !is_self && !sig_aggregator.valid_peer_signature_seen {
+            sig_aggregator.valid_peer_signature_seen = true;
             counters::observe_chunky_dkg_stage(
                 self.start_time,
                 self.my_addr,
