@@ -3,6 +3,11 @@
 
 //! # Runtime Instruction Set (Micro-ops)
 //!
+//! Defines the low-level instruction set that the MonoMove interpreter
+//! executes. These micro-ops are emitted by the runtime compiler
+//! (monomorphizer) from Move bytecode. They operate on a flat frame-pointer-
+//! relative memory model — no operand stack, no type metadata at runtime.
+//!
 //! ## Design overview
 //!
 //! - **Highly specialized**: we are not aiming for a minimal set of micro-ops.
@@ -90,10 +95,18 @@
 //!
 //! ## Object descriptor table
 //!
-//! `descriptor_id` fields index into a table of type descriptors that the GC
-//! uses to trace heap objects. Each descriptor records the size of the object
-//! and the offsets of any pointer/reference fields within it. `descriptor_id = 0`
-//! means the object contains no references (trivial for GC).
+//! Every heap object has a header `[descriptor_id: u32 | size_in_bytes: u32]`.
+//! `descriptor_id` indexes into a table of [`ObjectDescriptor`] entries that
+//! tell the GC how to trace internal pointers. Three variants:
+//!
+//! - **Trivial** — no internal heap pointers; GC just copies the blob.
+//! - **Struct** `{ size, ptr_offsets }` — fixed-size payload; `ptr_offsets`
+//!   lists byte offsets within the payload that hold heap pointers.
+//! - **Enum** `{ size, variants }` — like Struct but with per-variant
+//!   ptr_offsets, keyed by the tag value.
+//! - **Vector** `{ elem_size, elem_ptr_offsets }` — variable-length array;
+//!   `elem_ptr_offsets` lists byte offsets *within each element* that hold
+//!   heap pointers.
 
 /// A typed wrapper around a `u32` frame-pointer-relative byte offset.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
