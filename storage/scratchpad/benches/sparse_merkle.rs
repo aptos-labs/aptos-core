@@ -95,7 +95,7 @@ impl Benches {
             .take(keys.len())
             .collect::<Vec<_>>();
         let existing_state = zip_eq(&keys, &values)
-            .filter_map(|(key, value)| value.as_ref().map(|v| (*key, v)))
+            .filter_map(|(key, value)| value.as_ref().map(|v| (*key, *v)))
             .collect::<Vec<_>>();
         let mut naive_base_smt = NaiveSmt::new(&existing_state);
 
@@ -171,7 +171,7 @@ impl Benches {
             None
         } else {
             let bytes: Vec<u8> = rng.sample_iter::<u8, _>(Standard).take(100).collect();
-            Some(HashValue::new_legacy(bytes.into()))
+            Some(HashValue::sha3_256_of(&bytes))
         }
     }
 
