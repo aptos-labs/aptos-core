@@ -473,6 +473,7 @@ pub(crate) fn realistic_env_max_load_test(
         .with_success_criteria(success_criteria)
         .with_validator_resource_override(resource_override)
         .with_fullnode_resource_override(resource_override)
+        .with_num_pfns(1)
 }
 
 pub(crate) fn realistic_network_tuned_for_throughput_test() -> ForgeConfig {

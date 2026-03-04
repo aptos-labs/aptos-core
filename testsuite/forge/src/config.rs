@@ -25,6 +25,9 @@ pub struct ForgeConfig {
     /// The initial number of fullnodes to spawn when the test harness creates a swarm
     pub initial_fullnode_count: usize,
 
+    /// The number of public full nodes (PFNs) to deploy via the PFN deployer (0 to disable)
+    pub num_pfns: usize,
+
     /// The initial version to use when the test harness creates a swarm
     pub initial_version: InitialVersion,
 
@@ -110,6 +113,11 @@ impl ForgeConfig {
 
     pub fn with_initial_fullnode_count(mut self, initial_fullnode_count: usize) -> Self {
         self.initial_fullnode_count = initial_fullnode_count;
+        self
+    }
+
+    pub fn with_num_pfns(mut self, num_pfns: usize) -> Self {
+        self.num_pfns = num_pfns;
         self
     }
 
@@ -342,6 +350,7 @@ impl Default for ForgeConfig {
             network_tests: vec![],
             initial_validator_count: NonZeroUsize::new(1).unwrap(),
             initial_fullnode_count: 0,
+            num_pfns: 0,
             initial_version: InitialVersion::Oldest,
             genesis_config: None,
             genesis_helm_config_fn: None,
