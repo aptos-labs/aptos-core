@@ -23,3 +23,7 @@ once_cell = { workspace = true }
 rand = { workspace = true }
 rand_core = { workspace = true }
 serde = { workspace = true }
+
+[build-dependencies]
+anyhow = { workspace = true }
+aptos-transaction-generator-lib = { workspace = true }
