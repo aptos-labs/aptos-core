@@ -30,6 +30,7 @@ fn create_test_manager(setup: &ChunkyTestSetup) -> ChunkyDKGManager {
     let my_addr = setup.addrs[0];
 
     let reliable_broadcast = Arc::new(ReliableBroadcast::new(
+        "test",
         my_addr,
         setup.addrs.clone(),
         Arc::new(DummyNetworkSender),
