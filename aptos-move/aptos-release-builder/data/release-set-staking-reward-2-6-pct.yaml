@@ -1,0 +1,12 @@
+---
+remote_endpoint: https://fullnode.mainnet.aptoslabs.com
+name: "set-staking-reward-2.6-pct"
+proposals:
+  - name: proposal_1_set_staking_reward_2_6_pct
+    metadata:
+      title: "Set staking reward rate to 2.6% per year"
+      description: "This proposal sets the staking reward rate to 2.6% per year. The existing 1.5% annual reduction rate is preserved."
+    execution_mode: MultiStep
+    update_sequence:
+      - Custom:
+          script_path: "aptos-move/aptos-release-builder/data/proposals/set_staking_reward_2_6_pct.move"
