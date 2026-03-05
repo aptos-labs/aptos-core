@@ -2,16 +2,13 @@
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 // Sigma protocol for the Shplonked ZK-PCS opening proof: proves knowledge of (rho, evals, u)
-// such that com_y = commitment(rho, evals), V = taus_1[0]*sum(alphas_i*evals_i) + xi_1*u, and φ(y) = hom(y_rev, evals).
-// Built from CurveGroupTupleHomomorphism (com_y, V) and a scalar homomorphism (SumHom or EvalHomLiftedOwned) via TupleHomomorphism.
+// such that com_y = commitment(rho, evals), V = taus_1[0]*sum(alphas_i*evals_i) + xi_1*u, and φ(hidden_evals) = hom(hidden_evals).
+// Built from CurveGroupTupleHomomorphism (com_y, V) and a scalar homomorphism (SumHom or EvalHomLifted) via TupleHomomorphism.
 
 // TODO: maybe this should go inside shplonked.rs as a submodule called sigma_protocol?
 
 use crate::{
-    pcs::{
-        shplonked::{EvalPair, Srs},
-        univariate_hiding_kzg,
-    },
+    pcs::{shplonked::Srs, univariate_hiding_kzg},
     sigma_protocol::{
         self,
         homomorphism::{
@@ -285,27 +282,17 @@ impl<F: PrimeField> SigmaTrait for SumHom<F> {
     }
 }
 
-/// Lifts a homomorphism φ with domain [`EvalPair`] to the full sigma witness: projects
-/// `ShplonkedSigmaWitness` to `(y_rev, hidden_evals)` and applies φ.
+/// Lifts a homomorphism φ with domain `Vec<Vec<F>>` (hidden evals) to the full sigma witness:
+/// apply(w) = hom.apply(&w.hidden_evals). So φ is a homomorphism on the witness.
 #[derive(CanonicalSerialize, Clone, Debug)]
 pub struct EvalHomLifted<
     F: PrimeField,
-    H: HomTrait<Domain = EvalPair<F>, Codomain = F, CodomainNormalized = F>,
+    H: HomTrait<Domain = Vec<Vec<F>>, Codomain = F, CodomainNormalized = F>,
 > {
-    /// Revealed evaluations per polynomial (public input to φ).
-    pub y_rev: Vec<Vec<F>>,
-    /// The homomorphism φ; apply(w) = hom.apply(&EvalPair { y_rev, y_hid: w.hidden_evals }).
     pub hom: H,
 }
 
-fn eval_pair_from_witness<F: PrimeField>(y_rev: &[Vec<F>], hidden_evals: &[Vec<F>]) -> EvalPair<F> {
-    EvalPair {
-        y_rev: y_rev.to_vec(),
-        y_hid: hidden_evals.to_vec(),
-    }
-}
-
-impl<F: PrimeField, H: HomTrait<Domain = EvalPair<F>, Codomain = F, CodomainNormalized = F>>
+impl<F: PrimeField, H: HomTrait<Domain = Vec<Vec<F>>, Codomain = F, CodomainNormalized = F>>
     HomTrait for EvalHomLifted<F, H>
 {
     type Codomain = F;
@@ -313,8 +300,7 @@ impl<F: PrimeField, H: HomTrait<Domain = EvalPair<F>, Codomain = F, CodomainNorm
     type Domain = ShplonkedSigmaWitness<F>;
 
     fn apply(&self, w: &Self::Domain) -> Self::Codomain {
-        let pair = eval_pair_from_witness(&self.y_rev, &w.hidden_evals);
-        self.hom.apply(&pair)
+        self.hom.apply(&w.hidden_evals)
     }
 
     fn normalize(&self, value: Self::Codomain) -> Self::CodomainNormalized {
@@ -322,13 +308,11 @@ impl<F: PrimeField, H: HomTrait<Domain = EvalPair<F>, Codomain = F, CodomainNorm
     }
 }
 
-impl<F: PrimeField, H: HomTrait<Domain = EvalPair<F>, Codomain = F, CodomainNormalized = F>>
+impl<F: PrimeField, H: HomTrait<Domain = Vec<Vec<F>>, Codomain = F, CodomainNormalized = F>>
     SigmaTrait for EvalHomLifted<F, H>
 {
     type Scalar = F;
     type VerifierBatchSize = usize;
-
-    // Should not get used since this is a scalar homomorphism
 
     fn dst(&self) -> Vec<u8> {
         b"ShplonkedSigma_EvalHomLifted".to_vec()
@@ -340,15 +324,14 @@ impl<F: PrimeField, H: HomTrait<Domain = EvalPair<F>, Codomain = F, CodomainNorm
         prover_commitment: &F,
         challenge: F,
         response: &ShplonkedSigmaWitness<F>,
-        _verifier_batch_size: Option<Self::VerifierBatchSize>, // Should not get used since this is a scalar homomorphism
+        _verifier_batch_size: Option<Self::VerifierBatchSize>,
         _rng: &mut R,
     ) -> anyhow::Result<()> {
-        let pair = eval_pair_from_witness(&self.y_rev, &response.hidden_evals);
-        let phi_z = self.hom.apply(&pair);
+        let phi_z = self.hom.apply(&response.hidden_evals);
         let expected = *prover_commitment + challenge * public_statement;
         anyhow::ensure!(
             phi_z == expected,
-            "EvalHomLifted sigma check failed (φ(y_rev, z) = r + c·φ(y))"
+            "EvalHomLifted sigma check failed (φ(z) = r + c·φ(y))"
         );
         Ok(())
     }
@@ -358,6 +341,6 @@ impl<F: PrimeField, H: HomTrait<Domain = EvalPair<F>, Codomain = F, CodomainNorm
 pub type ShplonkedSigmaHom<'a, E> =
     TupleHomomorphism<FirstTupleHom<'a, E>, SumHom<<E as Pairing>::ScalarField>>;
 
-/// Full sigma homomorphism with scalar part = arbitrary φ(y_rev, hidden_evals). Used at prove/verify.
+/// Full sigma homomorphism with scalar part = arbitrary φ(hidden_evals). Used at prove/verify.
 pub type ShplonkedSigmaHomWithEval<'a, E, H> =
     TupleHomomorphism<FirstTupleHom<'a, E>, EvalHomLifted<<E as Pairing>::ScalarField, H>>;
