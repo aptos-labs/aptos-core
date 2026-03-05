@@ -31,8 +31,8 @@ use rand_core::{CryptoRng, RngCore};
 use std::{fmt::Debug, marker::PhantomData};
 
 /// Witness for the Shplonked opening sigma protocol: (rho, evals, u) such that
-/// C_y^hid = xi_1*rho + MSM(taus_1, hidden_evals), C_eval = taus_1[0]*(g_rev + g_hid) + xi_1*u, y_sum = sum(hidden_evals).
-/// evals is per polynomial: { y_i^hid }_i. g_rev is public input to the homomorphism (not part of witness).
+/// C_y^hid = xi_1*rho + MSM(taus_1, hidden_evals), C_eval_hid = taus_1[0]*g_hid + xi_1*u, y_sum = sum(hidden_evals).
+/// evals is per polynomial: { y_i^hid }_i. Full C_eval = C_eval_hid + g_rev·τ_0 is built by the verifier for the pairing check.
 #[allow(non_snake_case)]
 #[derive(Clone, Debug, PartialEq, Eq, CanonicalSerialize, CanonicalDeserialize)]
 pub struct ShplonkedSigmaWitness<F: PrimeField> {
@@ -105,8 +105,9 @@ pub fn com_y_hom<'a, E: Pairing>(taus_1: &'a [E::G1Affine], xi_1: E::G1Affine) -
     }
 }
 
-/// Homomorphism for C_eval: (g_rev + g_hid)·τ_0 + ρ_eval·ξ_1 where g_rev is public input and
+/// Homomorphism for C_eval_hid: g_hid·τ_0 + ρ_eval·ξ_1 where
 /// g_hid = ∑_j weights[j] * (∑_i lagrange_at_x[j][i] * y_j^hid[i]) from the witness.
+/// The verifier builds full C_eval = C_eval_hid + g_rev·τ_0 for the batch pairing check.
 #[derive(Clone, Debug, PartialEq, Eq, CanonicalSerialize, CanonicalDeserialize)]
 pub struct EvalPointCommitHom<E: Pairing> {
     pub tau_0: E::G1Affine,
@@ -114,39 +115,32 @@ pub struct EvalPointCommitHom<E: Pairing> {
     /// One weight per polynomial (c^{j-1} Z_{S\\S_j}(x)).
     pub weights: Vec<E::ScalarField>,
     /// Lagrange basis at x per (j, i): lagrange_at_x[j][i] = L_{j,s_i}(x) for s_i in S_j^hid.
-    /// We already computed the tilde_f_is in the main function, but we need to redo it here
-    /// for the sigma proof.
     pub lagrange_at_x: Vec<Vec<E::ScalarField>>,
-    /// Revealed part of g (public input to the homomorphism), evaluated at x
-    pub g_rev: E::ScalarField,
 }
 
 impl<E: Pairing> EvalPointCommitHom<E> {
-    /// Build from SRS (uses only `taus_1[0]` and `xi_1`) and public input g_rev.
+    /// Build from SRS (uses only `taus_1[0]` and `xi_1`).
     #[allow(dead_code)]
     pub fn from_srs(
         srs: &Srs<E>,
         weights: Vec<E::ScalarField>,
         lagrange_at_x: Vec<Vec<E::ScalarField>>,
-        g_rev: E::ScalarField,
     ) -> Self {
-        Self::new(srs.taus_1[0], srs.xi_1, weights, lagrange_at_x, g_rev)
+        Self::new(srs.taus_1[0], srs.xi_1, weights, lagrange_at_x)
     }
 
-    /// Build from the minimal bases needed: tau_0 and xi_1 (avoids passing the full SRS), and g_rev.
+    /// Build from the minimal bases needed: tau_0 and xi_1.
     pub fn new(
         tau_0: E::G1Affine,
         xi_1: E::G1Affine,
         weights: Vec<E::ScalarField>,
         lagrange_at_x: Vec<Vec<E::ScalarField>>,
-        g_rev: E::ScalarField,
     ) -> Self {
         Self {
             tau_0,
             xi_1,
             weights,
             lagrange_at_x,
-            g_rev,
         }
     }
 }
@@ -180,7 +174,7 @@ impl<E: Pairing> fixed_base_msms::Trait for EvalPointCommitHom<E> {
         &self,
         witness: &Self::Domain,
     ) -> Self::CodomainShape<MsmInput<Self::Base, Self::Scalar>> {
-        // eval_point_commit_hom(y^hid; ρ_eval) = (∑_j weights[j] * (∑_i lagrange_at_x[j][i] * y_j^hid[i]))*τ_0 + ρ_eval*ξ_1
+        // C_eval_hid = g_hid·τ_0 + ρ_eval·ξ_1
         debug_assert_eq!(
             self.weights.len(),
             witness.hidden_evals.len(),
@@ -210,9 +204,8 @@ impl<E: Pairing> fixed_base_msms::Trait for EvalPointCommitHom<E> {
                 w_j * inner
             })
             .fold(E::ScalarField::zero(), |a, b| a + b);
-        let g_at_x = self.g_rev + g_hid;
         let bases = vec![self.tau_0, self.xi_1];
-        let scalars = vec![g_at_x, witness.C_evals_randomness];
+        let scalars = vec![g_hid, witness.C_evals_randomness];
         CodomainShape(MsmInput::new(bases, scalars).expect("EvalPointCommitHom MSM"))
     }
 
@@ -248,7 +241,10 @@ impl<F: PrimeField> HomTrait for SumHom<F> {
     type Domain = ShplonkedSigmaWitness<F>;
 
     fn apply(&self, w: &Self::Domain) -> Self::Codomain {
-        w.hidden_evals.iter().flatten().fold(F::zero(), |acc, x| acc + x)
+        w.hidden_evals
+            .iter()
+            .flatten()
+            .fold(F::zero(), |acc, x| acc + x)
     }
 
     fn normalize(&self, value: Self::Codomain) -> Self::CodomainNormalized {

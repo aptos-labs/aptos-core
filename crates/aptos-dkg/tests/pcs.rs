@@ -247,7 +247,7 @@ mod shplonked {
             &SumEvalHom,
             &commitment_msms,
             &y_rev,
-            proof.sigma_proof_statement.phi_y,
+            proof.sigma_proof_statement.1,
             &proof,
             &mut trs_verifier,
             &mut rng,

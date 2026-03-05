@@ -24,11 +24,11 @@ use crate::{
     },
     sigma_protocol::{
         homomorphism::{
-            fixed_base_msms::Trait as FixedBaseMsmsTrait, tuple::TupleCodomainShape, Trait as _,
-            TrivialShape as CodomainShape,
+            fixed_base_msms::Trait as FixedBaseMsmsTrait, tuple::TupleCodomainShape,
+            Trait as HomTrait, TrivialShape as CodomainShape,
         },
         traits::fiat_shamir_challenge_for_sigma_protocol,
-        CurveGroupTrait, FirstProofItem, Proof, Trait as SigmaTrait,
+        CurveGroupTrait, Proof, Trait as SigmaTrait,
     },
     Scalar,
 };
@@ -187,10 +187,7 @@ pub struct SumEvalHom;
 
 impl<F: Field> EvalHomomorphism<F> for SumEvalHom {
     fn apply(&self, _y_rev: &[Vec<F>], y_hid: &[Vec<F>]) -> F {
-        y_hid
-            .iter()
-            .flatten()
-            .fold(F::zero(), |a, &b| a + b)
+        y_hid.iter().flatten().fold(F::zero(), |a, &b| a + b)
     }
 }
 
@@ -229,34 +226,9 @@ pub struct Srs<E: Pairing> {
     pub(crate) xi_2: E::G2Affine,
 }
 
-#[allow(non_snake_case)]
-#[derive(CanonicalSerialize, Clone, CanonicalDeserialize, Debug, PartialEq, Eq)]
-pub struct ShplonkedSigmaProof<E: Pairing> {
-    /// Sigma protocol commitment message: commitment to hidden evaluations (C_{y^hid}).
-    r_com_ys: E::G1Affine,
-    /// Sigma protocol commitment message: commitment to evaluations (C_eval).
-    r_com_eval: E::G1Affine,
-    /// Sigma protocol commitment message: sum of hidden evaluations (y_sum).
-    r_sum_ys: E::ScalarField,
-    /// Sigma protocol response: hidden evals per polynomial { z_i }_i (same shape as { y_i^hid }_i).
-    z_ys: Vec<Vec<E::ScalarField>>,
-    /// Sigma protocol response: commitment randomness for C_eval.
-    z_com_eval_rand: E::ScalarField,
-    /// Sigma protocol response: commitment randomness for C_{y^hid}.
-    z_com_ys_rand: E::ScalarField,
-}
-
-/// Statement for the sigma protocol: commitment to hidden evaluations (C_{y^hid}), C_eval, and φ(y).
-#[allow(non_snake_case)]
-#[derive(CanonicalSerialize, Clone, CanonicalDeserialize, Debug, PartialEq, Eq)]
-pub struct ShplonkedSigmaProofStatement<E: Pairing> {
-    /// C_{y^hid}: commitment to hidden evaluations.
-    pub com_y_hid: E::G1Affine,
-    /// C_eval: [∑_i c^{i-1} Z_{S\S_i}(x) f̃_i(x)]_1.
-    pub C_eval: E::G1Affine,
-    /// φ(y) (e.g. sum of all evaluations).
-    pub phi_y: E::ScalarField,
-}
+/// Type of the sigma protocol statement: (com_y_hid, C_eval, φ(y)).
+type ShplonkedSigmaStatement<E> =
+    <shplonked_sigma::ShplonkedSigmaHom<'static, E> as HomTrait>::CodomainNormalized;
 
 /// Generalized batch opening proof per spec: π = (π_1, π_2, π_PoK).
 /// π_1 = commitment to q; π_2 = opening at x (quotient commitment and hiding compensation).
@@ -268,10 +240,10 @@ pub struct ShplonkedBatchProof<E: Pairing> {
     pub pi_1: E::G1Affine,
     /// π_2: quotient commitment from PCS.Open (opening at x).
     pub pi_2: (E::G1Affine, E::G1Affine),
-    /// π_PoK: sigma protocol proof of knowledge of y^hid.
-    pub sigma_proof: ShplonkedSigmaProof<E>,
-    /// Statement for sigma verify and legacy API (com_y_hid, C_eval, phi_y / y_sum).
-    pub sigma_proof_statement: ShplonkedSigmaProofStatement<E>,
+    /// π_PoK: sigma protocol proof (knowledge of y^hid). Statement is (com_y_hid, C_eval, φ(y)).
+    pub sigma_proof: Proof<E::ScalarField, shplonked_sigma::ShplonkedSigmaHom<'static, E>>,
+    /// Sigma protocol statement (com_y_hid, C_eval, φ(y)).
+    pub sigma_proof_statement: ShplonkedSigmaStatement<E>,
 }
 
 /// Batch opening: revealed evaluations plus the batch proof.
@@ -293,7 +265,7 @@ impl<E: Pairing> ShplonkedBatchOpening<E> {
 
     /// Returns φ(y) (e.g. sum of all evaluations).
     pub fn get_phi_eval(&self) -> E::ScalarField {
-        self.proof.sigma_proof_statement.phi_y
+        self.proof.sigma_proof_statement.1
     }
 }
 
@@ -321,7 +293,11 @@ where
     }
 }
 
+/// Single label for the whole batch statement so prover and verifier hash the same bytes.
+const BATCH_STATEMENT_LABEL: &[u8] = b"shplonked-batch-statement";
+
 /// Appends the batch-open statement to the transcript for Fiat–Shamir (Step 1b).
+/// Uses a single canonical blob so prover and verifier derive the same c and x.
 fn append_batch_statement_to_transcript<E: Pairing>(
     trs: &mut merlin::Transcript,
     sets: &[EvaluationSet<E::ScalarField>],
@@ -329,14 +305,33 @@ fn append_batch_statement_to_transcript<E: Pairing>(
     phi_y: E::ScalarField,
     c_y_hid: &E::G1Affine,
 ) {
+    let mut buf = Vec::new();
+    (sets.len() as u64)
+        .serialize_compressed(&mut buf)
+        .expect("length serialization");
     for set in sets {
-        trs.append_evaluation_set::<E::ScalarField>(set);
+        set.serialize_compressed(&mut buf)
+            .expect("set serialization");
     }
-    for y_i_rev in y_rev {
-        trs.append_evaluation_points(y_i_rev);
+    (y_rev.len() as u64)
+        .serialize_compressed(&mut buf)
+        .expect("y_rev len serialization");
+    for row in y_rev {
+        (row.len() as u64)
+            .serialize_compressed(&mut buf)
+            .expect("row len serialization");
+        for p in row {
+            p.serialize_compressed(&mut buf)
+                .expect("point serialization");
+        }
     }
-    trs.append_homomorphism_image(&phi_y);
-    trs.append_point(c_y_hid);
+    phi_y
+        .serialize_compressed(&mut buf)
+        .expect("phi_y serialization");
+    c_y_hid
+        .serialize_compressed(&mut buf)
+        .expect("com_y_hid serialization");
+    trs.append_message(BATCH_STATEMENT_LABEL, &buf);
 }
 
 /// Computes g_rev = ∑_j weight_j · (∑_{i ∈ rev} L_{j,i}(x) · y_j^rev[i]) from weights, Lagrange cache, and y_rev.
@@ -533,7 +528,15 @@ pub fn batch_open_generalized<
                 .collect()
         })
         .collect();
-    let g_rev_at_x = compute_g_rev::<E>(n, sets, &weights, &canonical, &lagrange_cache, x, &y_rev_per_poly);
+    let g_rev_at_x = compute_g_rev::<E>(
+        n,
+        sets,
+        &weights,
+        &canonical,
+        &lagrange_cache,
+        x,
+        &y_rev_per_poly,
+    );
     let g_hid_at_x: E::ScalarField = (0..n)
         .map(|j| {
             weights[j]
@@ -551,15 +554,13 @@ pub fn batch_open_generalized<
         srs.xi_1,
         weights.clone(),
         lagrange_at_x_hid,
-        g_rev_at_x,
     );
-    let witness_for_C_eval = shplonked_sigma::ShplonkedSigmaWitness {
-        C_y_hid_randomness: E::ScalarField::zero(), // We're using the full sigma protocol witness here which is a bit awkward; but fine if we kill off this component
+    let witness_for_C_eval_hid = shplonked_sigma::ShplonkedSigmaWitness {
+        C_y_hid_randomness: E::ScalarField::zero(),
         hidden_evals: y_hid_per_poly.clone(),
         C_evals_randomness: rho_eval,
     };
-    let C_eval_proj: E::G1 = eval_point_commit_hom.apply(&witness_for_C_eval).0;
-    let C_eval = C_eval_proj.into_affine();
+    let C_eval_hid: E::G1 = eval_point_commit_hom.apply(&witness_for_C_eval_hid).0;
 
     // Step 5a: f = ∑_i c^{i-1} Z_{S\S_i}(x) f_i − Z_S(x) q − g.
     let mut f_poly = DensePolynomial::zero();
@@ -590,7 +591,7 @@ pub fn batch_open_generalized<
         0,
     );
 
-    // Step 5d: compute the sigma proof (statement = full C_eval; g_rev is input to homomorphism)
+    // Step 5d: sigma proof proves (com_y_hid, C_eval_hid) with C_eval_hid = g_hid·τ_0 + ρ·ξ_1.
     let witness = ShplonkedSigmaWitness {
         C_y_hid_randomness: c_y_hid_randomness,
         hidden_evals: y_hid_per_poly.clone(),
@@ -607,42 +608,23 @@ pub fn batch_open_generalized<
         hom2: sum_hom,
     };
     let statement_proj = TupleCodomainShape(
-        TupleCodomainShape(
-            CodomainShape(com_y_hid.into()),
-            CodomainShape(C_eval_proj),
-        ),
+        TupleCodomainShape(CodomainShape(com_y_hid.into()), CodomainShape(C_eval_hid)),
         phi_y,
     );
-    let (sigma_protocol_proof, _) =
+    let (sigma_protocol_proof, sigma_statement) =
         full_hom.prove(&witness, statement_proj, SHPLONKED_SIGMA_DST, rng);
-    let (r_com_y, r_V, r_y) = match &sigma_protocol_proof.first_proof_item {
-        FirstProofItem::Commitment(c) => (c.0 .0 .0, c.0 .1 .0, c.1),
-        FirstProofItem::Challenge(_) => panic!("expected commitment"),
-    };
-    let sigma_proof = ShplonkedSigmaProof {
-        r_com_ys: r_com_y,
-        r_com_eval: r_V,
-        r_sum_ys: r_y,
-        z_ys: sigma_protocol_proof.z.hidden_evals,
-        z_com_eval_rand: sigma_protocol_proof.z.C_evals_randomness,
-        z_com_ys_rand: sigma_protocol_proof.z.C_y_hid_randomness,
-    };
+    let sigma_proof =
+        sigma_protocol_proof.change_lifetime::<shplonked_sigma::ShplonkedSigmaHom<'static, E>>();
 
     // π_2 from PCS.Open: pi_2 = quotient commitment, pi_2_extra = hiding compensation.
     let pi_2 = opening.pi_1.0.into_affine();
     let pi_2_extra = opening.pi_2.into_affine();
 
-    let sigma_proof_statement = ShplonkedSigmaProofStatement {
-        com_y_hid,
-        C_eval,
-        phi_y,
-    };
-
     let proof = ShplonkedBatchProof {
         pi_1,
         pi_2: (pi_2, pi_2_extra),
         sigma_proof,
-        sigma_proof_statement,
+        sigma_proof_statement: sigma_statement,
     };
     ShplonkedBatchOpening {
         evals: y_rev_per_poly,
@@ -709,17 +691,15 @@ pub fn batch_pairing_for_verify_generalized<
         sigma_proof_statement,
     } = proof;
     anyhow::ensure!(
-        phi_y == sigma_proof_statement.phi_y,
+        phi_y == sigma_proof_statement.1,
         "φ(y) does not match proof"
     );
 
-    append_batch_statement_to_transcript::<E>(
-        trs,
-        sets,
-        y_rev,
-        phi_y,
-        &sigma_proof_statement.com_y_hid,
+    let (com_y_hid, c_eval_hid) = (
+        &sigma_proof_statement.0 .0 .0,
+        &sigma_proof_statement.0 .1 .0,
     );
+    append_batch_statement_to_transcript::<E>(trs, sets, y_rev, phi_y, com_y_hid);
     let c: E::ScalarField = trs.challenge_scalar();
     trs.append_point(pi_1);
     let x: E::ScalarField = trs.challenge_scalar();
@@ -752,7 +732,12 @@ pub fn batch_pairing_for_verify_generalized<
         E::ScalarField::ONE,
     ]);
 
-    let h: usize = sigma_proof.z_ys.iter().map(|v| v.len()).sum();
+    let h: usize = sigma_proof
+        .z
+        .hidden_evals
+        .iter()
+        .map(|v: &Vec<E::ScalarField>| v.len())
+        .sum();
     let com_y_hom = shplonked_sigma::com_y_hom(&srs.taus_1[..h], srs.xi_1);
     // One weight per polynomial. Lagrange at x: evaluate cached basis polys at x (Horner).
     let (canonical, lagrange_cache) = build_lagrange_cache(&s_per_poly);
@@ -771,7 +756,6 @@ pub fn batch_pairing_for_verify_generalized<
         srs.xi_1,
         weights.clone(),
         lagrange_at_x,
-        g_rev_at_x,
     );
     let first_tuple_hom = shplonked_sigma::FirstTupleHom::<E> {
         hom1: com_y_hom,
@@ -784,67 +768,50 @@ pub fn batch_pairing_for_verify_generalized<
         hom2: sum_hom,
     };
 
-    let public_statement = TupleCodomainShape(
-        TupleCodomainShape(
-            CodomainShape(sigma_proof_statement.com_y_hid),
-            CodomainShape(sigma_proof_statement.C_eval),
-        ),
-        phi_y,
-    );
-    let sigma_protocol_proof: Proof<E::ScalarField, shplonked_sigma::ShplonkedSigmaHom<E>> =
-        Proof {
-            first_proof_item: FirstProofItem::Commitment(TupleCodomainShape(
-                TupleCodomainShape(
-                    CodomainShape(sigma_proof.r_com_ys),
-                    CodomainShape(sigma_proof.r_com_eval),
-                ),
-                sigma_proof.r_sum_ys,
-            )),
-            z: ShplonkedSigmaWitness {
-                C_y_hid_randomness: sigma_proof.z_com_ys_rand,
-                hidden_evals: sigma_proof.z_ys.clone(),
-                C_evals_randomness: sigma_proof.z_com_eval_rand,
-            },
-        };
+    let statement_curve_for_merge =
+        TupleCodomainShape(CodomainShape(*com_y_hid), CodomainShape(*c_eval_hid));
 
-    let prover_commitment = sigma_protocol_proof
+    let prover_commitment = sigma_proof
         .prover_commitment()
         .expect("batch verify: expected commitment");
     let c_sigma = fiat_shamir_challenge_for_sigma_protocol::<_, E::ScalarField, _>(
         SHPLONKED_SIGMA_DST,
         &full_hom,
-        &public_statement,
+        sigma_proof_statement,
         prover_commitment,
         &full_hom.dst(),
     );
 
+    let r_sum_ys = prover_commitment.1;
     anyhow::ensure!(
-        hom.apply(y_rev, &sigma_proof.z_ys) == sigma_proof.r_sum_ys + c_sigma * phi_y,
+        hom.apply(y_rev, &sigma_proof.z.hidden_evals) == r_sum_ys + c_sigma * phi_y,
         "sigma protocol scalar check (φ(y^rev, z) = r_φ + c·φ(y)) failed"
     );
 
     let (_, powers_of_beta) = full_hom.hom1.compute_verifier_challenges(
-        &public_statement.0,
+        &statement_curve_for_merge,
         &prover_commitment.0,
         SHPLONKED_SIGMA_DST,
         Some(2),
         rng,
     );
-    let msm_terms_response = full_hom.hom1.msm_terms(&sigma_protocol_proof.z);
+    let msm_terms_response = full_hom.hom1.msm_terms(&sigma_proof.z);
     let hom1_msm_terms = <shplonked_sigma::FirstTupleHom<E> as CurveGroupTrait>::merge_msm_terms(
         msm_terms_response.into_iter().collect::<Vec<_>>(),
         &prover_commitment.0,
-        &public_statement.0,
+        &statement_curve_for_merge,
         &powers_of_beta,
         c_sigma,
     );
+    // C_eval = C_eval_hid + g_rev·τ_0 for the batch pairing check.
+    let c_eval = (c_eval_hid.into_group() + srs.taus_1[0].into_group() * g_rev_at_x).into_affine();
     // Spec Step 4: deferred G₁ MSM from π_PoK; Step 5a: C_f = ∑_i c^{i-1} Z_{S\S_i}(x)·C_i − Z_S(x)·π_1 − C_eval + c^n·C_PoK.
     let C_PoK = E::G1::msm(hom1_msm_terms.bases(), hom1_msm_terms.scalars())
         .expect("batch verify: C_PoK MSM");
     let c_n = (0..n).fold(E::ScalarField::ONE, |acc, _| acc * c);
     let merged_minus_pi1_pt = E::G1::msm(merged_minus_pi1.bases(), merged_minus_pi1.scalars())
         .expect("batch verify: commitment to f MSM");
-    let C_f = merged_minus_pi1_pt - sigma_proof_statement.C_eval.into_group() + C_PoK * c_n;
+    let C_f = merged_minus_pi1_pt - c_eval.into_group() + C_PoK * c_n;
 
     // Step 5b: PCS.Verify(vk, x, C_f, 0, π_2) — opening at (x, 0).
     let g1_terms = E::G1::normalize_batch(&[C_f, -pi_2_W_prime.into_group(), -pi_2_Y.into_group()]);
@@ -1017,10 +984,8 @@ where
             .first()
             .copied()
             .ok_or_else(|| anyhow::anyhow!("Shplonked verify: expected one challenge point"))?;
-        anyhow::ensure!(
-            proof.sigma_proof_statement.phi_y == eval,
-            "claimed eval does not match opening proof"
-        );
+        let phi_y: E::ScalarField = proof.sigma_proof_statement.1;
+        anyhow::ensure!(eval == phi_y, "claimed eval does not match opening proof");
         let mut rng = rand::thread_rng();
         let sets = vec![EvaluationSet {
             rev: vec![],
@@ -1120,9 +1085,8 @@ mod tests {
             &mut rng,
         );
         assert!(opening.get_evals().iter().all(|v| v.is_empty()));
-        let expected_phi = polys[0].evaluate(&p0)
-            + polys[1].evaluate(&p10)
-            + polys[1].evaluate(&p11);
+        let expected_phi =
+            polys[0].evaluate(&p0) + polys[1].evaluate(&p10) + polys[1].evaluate(&p11);
         assert_eq!(opening.get_phi_eval(), expected_phi);
 
         let commitments: Vec<ark_bn254::G1Projective> = polys
@@ -1231,9 +1195,7 @@ mod tests {
         let expected_phi_y: Fr = sets
             .iter()
             .zip(polys.iter())
-            .map(|(set, poly)| {
-                set.hid.iter().map(|p| poly.evaluate(p)).sum::<Fr>()
-            })
+            .map(|(set, poly)| set.hid.iter().map(|p| poly.evaluate(p)).sum::<Fr>())
             .sum();
         assert_eq!(
             opening.get_phi_eval(),
@@ -1375,6 +1337,10 @@ mod tests {
             &mut trs_v,
             &mut rng,
         );
-        assert!(ok.is_ok(), "batch verify with mixed rev/hid: {:?}", ok.err());
+        assert!(
+            ok.is_ok(),
+            "batch verify with mixed rev/hid: {:?}",
+            ok.err()
+        );
     }
 }
