@@ -36,16 +36,40 @@ module 0x42::m {
     struct DeprecatedStruct has drop { x: u64 }
 
     // ========================================
-    // #[lint::skip(unused)] - function only
+    // #[lint::skip] - per-item suppression
     // ========================================
-    #[lint::skip(unused)]
+    #[lint::skip(unused_function)]
     fun lint_skip_func(): u64 { 4 }
 
+    #[lint::skip(unused_constant)]
+    const LINT_SKIP_CONST: u64 = 4;
+
+    #[lint::skip(unused_struct)]
+    struct LintSkipStruct has drop { x: u64 }
+
     // ========================================
-    // #[persistent] - function only
+    // #[persistent] - function-only suppression
     // ========================================
     #[persistent]
     fun persistent_func(): u64 { 5 }
+
+    // ========================================
+    // #[view] - function-only suppression
+    // ========================================
+    #[view]
+    fun view_func(): u64 { 6 }
+
+    // ========================================
+    // #[resource_group] - struct-only suppression
+    // ========================================
+    #[resource_group(scope = global)]
+    struct ResourceGroupMarker {}
+
+    // ========================================
+    // #[resource_group_member] - struct-only suppression
+    // ========================================
+    #[resource_group_member(group = 0x42::m::ResourceGroupMarker)]
+    struct ResourceGroupMemberStruct has key { x: u64 }
 
     // ========================================
     // Required public function

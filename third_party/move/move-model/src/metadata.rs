@@ -35,8 +35,6 @@ pub mod lang_feature_versions {
     pub const LANGUAGE_VERSION_FOR_COMPILE_FOR_TESTING: LanguageVersion = LanguageVersion::V2_2;
     pub const LANGUAGE_VERSION_FOR_SINT: LanguageVersion = LanguageVersion::V2_3;
     pub const LANGUAGE_VERSION_FOR_PUBLIC_STRUCT: LanguageVersion = LanguageVersion::V2_4;
-    /// This version guards checks for unused private functions, private structs, and constants.
-    pub const LANGUAGE_VERSION_FOR_UNUSED_CHECK: LanguageVersion = LanguageVersion::V2_4;
     /// This version guards match support for primitive types.
     pub const LANGUAGE_VERSION_FOR_PRIMITIVE_MATCH: LanguageVersion = LanguageVersion::V2_4;
     pub const LANGUAGE_VERSION_FOR_RAC: LanguageVersion =

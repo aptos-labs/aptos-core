@@ -7,7 +7,7 @@ use move_linter::MoveLintChecks;
 use move_model::metadata::{CompilerVersion, LanguageVersion};
 use move_prover_test_utils::baseline_test;
 use std::{
-    collections::BTreeMap,
+    collections::{BTreeMap, BTreeSet},
     path::{Path, PathBuf},
 };
 
@@ -28,6 +28,11 @@ fn test_runner(path: &Path) -> datatest_stable::Result<()> {
         language_version: Some(LanguageVersion::latest()),
         compiler_version: Some(CompilerVersion::latest_stable()),
         experiments: vec![Experiment::LINT_CHECKS.to_string()],
+        known_attributes: BTreeSet::from([
+            "view".to_string(),
+            "resource_group".to_string(),
+            "resource_group_member".to_string(),
+        ]),
         external_checks: vec![MoveLintChecks::make(BTreeMap::from([(
             "checks".to_string(),
             "experimental".to_string(),

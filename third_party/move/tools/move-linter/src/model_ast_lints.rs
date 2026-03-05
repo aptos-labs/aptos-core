@@ -24,13 +24,23 @@ mod simpler_numeric_expression;
 mod unnecessary_boolean_identity_comparison;
 mod unnecessary_cast;
 mod unnecessary_numerical_extreme_comparison;
+pub(crate) mod unused_common;
+mod unused_constant;
+mod unused_function;
+mod unused_struct;
 mod while_true;
 
-use move_compiler_v2::external_checks::ExpChecker;
+use move_compiler_v2::external_checks::{
+    ConstantChecker, ExpChecker, FunctionChecker, StructChecker,
+};
 use std::collections::BTreeMap;
 
 /// Returns a default pipeline of "expression linters" to run.
-pub fn get_default_linter_pipeline(config: &BTreeMap<String, String>) -> Vec<Box<dyn ExpChecker>> {
+/// The `config` parameter gates checkers by category. The `"checks"` key selects which
+/// tier of lints to enable: `"default"`, `"strict"`, or `"experimental"`.
+pub fn get_default_exp_linter_pipeline(
+    config: &BTreeMap<String, String>,
+) -> Vec<Box<dyn ExpChecker>> {
     // Start with the default set of checks.
     let mut checks: Vec<Box<dyn ExpChecker>> = vec![
         Box::<aborting_overflow_checks::AbortingOverflowChecks>::default(),
@@ -64,4 +74,28 @@ pub fn get_default_linter_pipeline(config: &BTreeMap<String, String>) -> Vec<Box
         checks.push(Box::<cyclomatic_complexity::CyclomaticComplexity>::default());
     }
     checks
+}
+
+/// Returns a default pipeline of constant linters.
+/// The `_config` parameter follows the same convention as in [`get_default_exp_linter_pipeline`].
+pub fn get_default_constant_linter_pipeline(
+    _config: &BTreeMap<String, String>,
+) -> Vec<Box<dyn ConstantChecker>> {
+    vec![Box::<unused_constant::UnusedConstant>::default()]
+}
+
+/// Returns a default pipeline of struct linters.
+/// The `_config` parameter follows the same convention as in [`get_default_exp_linter_pipeline`].
+pub fn get_default_struct_linter_pipeline(
+    _config: &BTreeMap<String, String>,
+) -> Vec<Box<dyn StructChecker>> {
+    vec![Box::<unused_struct::UnusedStruct>::default()]
+}
+
+/// Returns a default pipeline of function linters.
+/// The `_config` parameter follows the same convention as in [`get_default_exp_linter_pipeline`].
+pub fn get_default_function_linter_pipeline(
+    _config: &BTreeMap<String, String>,
+) -> Vec<Box<dyn FunctionChecker>> {
+    vec![Box::<unused_function::UnusedFunction>::default()]
 }

@@ -4,6 +4,12 @@ module 0x42::m {
         42
     }
 
+    // Self-recursive only function - should warn (no external caller)
+    fun self_recursive(n: u64): u64 {
+        if (n <= 1) 1
+        else n * self_recursive(n - 1)
+    }
+
     // Truly unused constant - should warn
     const UNUSED_CONST: u64 = 100;
 

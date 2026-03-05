@@ -60,7 +60,7 @@ use move_binary_format::errors::VMError;
 use move_bytecode_source_map::source_map::SourceMap;
 use move_core_types::vm_status::StatusType;
 use move_model::{
-    metadata::{lang_feature_versions::LANGUAGE_VERSION_FOR_UNUSED_CHECK, LanguageVersion},
+    metadata::LanguageVersion,
     model::{GlobalEnv, Loc, MoveIrLoc},
     PackageInfo,
 };
@@ -434,38 +434,6 @@ pub fn env_check_and_transform_pipeline<'a, 'b>(options: &'a Options) -> EnvProc
         });
     }
 
-    let unused_check_version = options
-        .language_version
-        .unwrap_or_default()
-        .is_at_least(LANGUAGE_VERSION_FOR_UNUSED_CHECK);
-
-    if unused_check_version {
-        // checks for unused private functions, private structs, and constants
-        // Needs to run before inlining
-
-        if options.experiment_on(Experiment::UNUSED_CONSTANT_CHECK) {
-            env_pipeline.add("unused constant check", |env: &mut GlobalEnv| {
-                function_checker::check_unused_constants(env)
-            });
-        }
-
-        if options.experiment_on(Experiment::UNUSED_FUNCTION_CHECK) {
-            env_pipeline.add("unused function check", |env: &mut GlobalEnv| {
-                function_checker::check_unused_functions(env)
-            });
-        }
-
-        if options.experiment_on(Experiment::UNUSED_STRUCT_CHECK) {
-            env_pipeline.add(
-                "collect struct usage",
-                struct_usage_collector::collect_struct_usage,
-            );
-            env_pipeline.add("unused struct check", |env: &mut GlobalEnv| {
-                function_checker::check_unused_structs(env)
-            });
-        }
-    }
-
     if options.experiment_on(Experiment::ACCESS_CHECK) {
         env_pipeline.add("access check before inlining", |env: &mut GlobalEnv| {
             function_checker::check_access_before_inlining(env)
@@ -485,6 +453,11 @@ pub fn env_check_and_transform_pipeline<'a, 'b>(options: &'a Options) -> EnvProc
     }
 
     if options.experiment_on(Experiment::LINT_CHECKS) {
+        // collect_struct_usage must run before lint checks for unused struct detection
+        env_pipeline.add(
+            "collect struct usage",
+            struct_usage_collector::collect_struct_usage,
+        );
         // Perform all the model AST lint checks before inlining, to be closer "in form"
         // to the user code.
         env_pipeline.add("model AST lints", model_ast_lints::checker);

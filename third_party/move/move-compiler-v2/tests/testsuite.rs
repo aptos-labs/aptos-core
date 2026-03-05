@@ -203,24 +203,10 @@ const TEST_CONFIGS: Lazy<BTreeMap<&str, TestConfig>> = Lazy::new(|| {
             ],
             // Need to exclude `inlining` because it is under checking
             // TODO: move `inlining` tests to top-level test directory
-            // Need to exclude `unused` because it has its own dedicated config with specific settings
-            exclude: vec!["/inlining/", "/more-v1/", "/unused/"],
+            exclude: vec!["/inlining/", "/more-v1/"],
             stop_after: StopAfter::FirstBytecodeGen, // FileFormat,
             dump_ast: DumpLevel::EndStage,
             ..config().lang(LanguageVersion::V2_1)
-        },
-        // Tests for unused entity warnings
-        TestConfig {
-            name: "unused",
-            runner: |p| run_test(p, get_config_by_name("unused")),
-            include: vec!["/unused/"],
-            stop_after: StopAfter::FirstBytecodeGen,
-            dump_ast: DumpLevel::EndStage,
-            ..config()
-                .exp(Experiment::UNUSED_CONSTANT_CHECK)
-                .exp(Experiment::UNUSED_FUNCTION_CHECK)
-                .exp(Experiment::UNUSED_STRUCT_CHECK)
-                .lang(LanguageVersion::V2_4)
         },
         TestConfig {
             name: "macros",
