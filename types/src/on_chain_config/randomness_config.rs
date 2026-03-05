@@ -90,7 +90,7 @@ pub struct RandomnessConfigMoveStruct {
     variant: MoveAny,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Deserialize, Serialize)]
 pub enum OnChainRandomnessConfig {
     Off,
     V1(ConfigV1),
