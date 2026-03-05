@@ -735,7 +735,7 @@ pub fn disassemble_compiled_units(units: &[CompiledUnit]) -> anyhow::Result<Stri
         .iter()
         .map(|unit| match unit {
             CompiledUnit::Module(module) => {
-                move_asm::disassembler::disassemble_module(String::new(), &module.module, false)
+                move_asm::disassembler::disassemble_module(String::new(), &module.module)
             },
             CompiledUnit::Script(script) => {
                 move_asm::disassembler::disassemble_script(String::new(), &script.script)

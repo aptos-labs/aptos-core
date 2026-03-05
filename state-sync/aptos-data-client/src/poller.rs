@@ -308,7 +308,7 @@ pub async fn start_poller(poller: DataSummaryPoller) {
         // Determine the peers to poll this round. If the round is even, poll
         // the priority peers. Otherwise, poll the regular peers. This allows
         // us to alternate between peer types and load balance requests.
-        let poll_priority_peers = polling_round % 2 == 0;
+        let poll_priority_peers = polling_round.is_multiple_of(2);
 
         // Identify the peers to poll (if any)
         let peers_to_poll = match poller.identify_peers_to_poll(poll_priority_peers) {

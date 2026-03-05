@@ -28,6 +28,7 @@ use std::{
 };
 
 pub mod cli;
+pub mod inference;
 pub mod package_prove;
 
 // =================================================================================================
@@ -45,7 +46,23 @@ pub fn run_move_prover_v2<W: WriteColor>(
 ) -> anyhow::Result<()> {
     let now = Instant::now();
     let mut env = create_move_prover_v2_model(error_writer, options.clone(), experiments)?;
-    run_move_prover_with_model_v2(&mut env, error_writer, options, now)
+    if options.inference.inference {
+        inference::run_spec_inference_with_model(&mut env, error_writer, options, now)
+    } else {
+        run_move_prover_with_model_v2(&mut env, error_writer, options, now)
+    }
+}
+
+/// Like `run_move_prover_v2` for inference, but also returns a bytecode dump
+/// with WP annotations for debugging test baselines.
+pub fn run_inference_with_bytecode_dump<W: WriteColor>(
+    error_writer: &mut W,
+    options: Options,
+    experiments: Vec<String>,
+) -> anyhow::Result<String> {
+    let now = Instant::now();
+    let mut env = create_move_prover_v2_model(error_writer, options.clone(), experiments)?;
+    inference::run_spec_inference_with_model_and_dump(&mut env, error_writer, options, now)
 }
 
 pub fn create_move_prover_v2_model<W: WriteColor>(

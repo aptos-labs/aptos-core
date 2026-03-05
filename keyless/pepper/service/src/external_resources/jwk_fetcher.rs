@@ -272,7 +272,7 @@ pub fn start_jwk_refresh_loop(
             match &fetch_result {
                 Ok(key_set) => {
                     // Log the successful fetch
-                    if loop_iteration_counter % JWK_REFRESH_LOOP_LOG_FREQUENCY == 0 {
+                    if loop_iteration_counter.is_multiple_of(JWK_REFRESH_LOOP_LOG_FREQUENCY) {
                         info!(
                             "Successfully fetched the JWK in {:?}! Issuer: {}, URL: {}, Key set: {:?}",
                             fetch_time,

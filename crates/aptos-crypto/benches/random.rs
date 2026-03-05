@@ -28,7 +28,7 @@ fn bench_unsafe_random_points<C: CurveGroup>(c: &mut Criterion, label: &str) {
     group.bench_function("unsafe_random_points_hash (batch)", |b| {
         b.iter_batched(
             || StdRng::seed_from_u64(0xCAFEBABE),
-            |mut rng| unsafe_random_points::<C, _>(SAMPLE_SIZE, &mut rng),
+            |mut rng| unsafe_random_points::<C::Affine, _>(SAMPLE_SIZE, &mut rng),
             BatchSize::PerIteration,
         )
     });
@@ -52,7 +52,7 @@ fn bench_single_random_points<C: CurveGroup>(c: &mut Criterion, label: &str) {
     group.bench_function("unsafe_random_point_hash (single)", |b| {
         b.iter_batched(
             || StdRng::seed_from_u64(0xB16B00B5),
-            |mut rng: StdRng| unsafe_random_point::<C, _>(&mut rng),
+            |mut rng: StdRng| unsafe_random_point::<C::Affine, _>(&mut rng),
             BatchSize::PerIteration,
         )
     });

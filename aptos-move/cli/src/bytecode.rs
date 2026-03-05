@@ -1,7 +1,7 @@
 // Copyright (c) Aptos Foundation
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
-use crate::{tool_paths::get_revela_path, MoveEnv};
+use crate::MoveEnv;
 use anyhow::Context;
 use aptos_cli_common::{
     check_if_file_exists, create_dir_if_not_exist, read_dir_files, read_from_file,
@@ -9,33 +9,21 @@ use aptos_cli_common::{
 };
 use aptos_types::vm::module_metadata::prelude::*;
 use async_trait::async_trait;
-use clap::{Args, Parser, ValueEnum};
+use clap::{Args, Parser};
 use itertools::Itertools;
-use move_binary_format::{
-    binary_views::BinaryIndexedView, file_format::CompiledScript, file_format_common,
-    CompiledModule,
-};
-use move_bytecode_source_map::{mapping::SourceMapping, utils::source_map_from_file};
-use move_command_line_common::files::{
-    MOVE_COMPILED_EXTENSION, MOVE_EXTENSION, SOURCE_MAP_EXTENSION,
-};
+use move_binary_format::{file_format::CompiledScript, CompiledModule};
+use move_command_line_common::files::MOVE_COMPILED_EXTENSION;
 use move_coverage::coverage_map::CoverageMap;
 use move_decompiler::{Decompiler, Options as DecompilerOptions};
-use move_disassembler::disassembler::{Disassembler, DisassemblerOptions};
-use move_ir_types::location::Spanned;
 use move_model::metadata::{CompilationMetadata, CompilerVersion, LanguageVersion};
 use serde::{Deserialize, Serialize};
 use std::{
-    fs,
-    path::{Component, Path, PathBuf},
-    process::Command,
+    path::{Path, PathBuf},
     str,
     sync::Arc,
 };
-use tempfile::NamedTempFile;
 
-const DISASSEMBLER_EXTENSION_V1: &str = "mv.asm";
-const DISASSEMBLER_EXTENSION_V2: &str = "mv.masm";
+const DISASSEMBLER_EXTENSION: &str = "mv.masm";
 const DECOMPILER_EXTENSION: &str = "mv.move";
 
 /// Disassemble the Move bytecode pointed to in the textual representation
@@ -48,9 +36,6 @@ const DECOMPILER_EXTENSION: &str = "mv.move";
 pub struct Disassemble {
     #[clap(flatten)]
     pub command: BytecodeCommand,
-    /// (Optional) Disassembler version to use
-    #[arg(long, value_enum, default_value = "v2")]
-    pub disassembler_version: DisassemblerVersion,
 
     #[clap(skip)]
     pub env: Arc<MoveEnv>,
@@ -65,34 +50,9 @@ pub struct Disassemble {
 pub struct Decompile {
     #[clap(flatten)]
     pub command: BytecodeCommand,
-    /// (Optional) Decompiler version to use
-    #[arg(long, value_enum, default_value = "v2")]
-    pub decompiler_version: DecompilerVersion,
 
     #[clap(skip)]
     pub env: Arc<MoveEnv>,
-}
-
-#[derive(Clone, Copy, Debug)]
-pub enum BinaryCommandVersion {
-    DecompilerVersion(DecompilerVersion),
-    DisassemblerVersion(DisassemblerVersion),
-}
-
-#[derive(Clone, Copy, Debug, Eq, PartialEq, PartialOrd, Ord, ValueEnum)]
-pub enum DisassemblerVersion {
-    /// Use the old disassembler
-    V1,
-    /// Use the new disassembler
-    V2,
-}
-
-#[derive(Clone, Copy, Debug, Eq, PartialEq, PartialOrd, Ord, ValueEnum)]
-pub enum DecompilerVersion {
-    /// Use the Revela decompiler
-    V1,
-    /// Use the new Aptos decompiler
-    V2,
 }
 
 #[derive(Debug, Args)]
@@ -123,10 +83,6 @@ pub struct BytecodeCommand {
     /// only print out the metadata and bytecode version of the target bytecode
     #[clap(long)]
     pub print_metadata_only: bool,
-
-    /// print out module size in kb and number of instructions in each function
-    #[clap(long, num_args = 0.., value_delimiter = ',', default_missing_value = "", require_equals = false, hide(true))]
-    pub print_code_size: Option<Vec<String>>,
 }
 
 /// Allows to ensure that either one of both is selected (via  the `group` attribute).
@@ -159,12 +115,7 @@ impl CliCommand<String> for Disassemble {
     }
 
     async fn execute(mut self) -> CliTypedResult<String> {
-        self.command
-            .execute(
-                BytecodeCommandType::Disassemble,
-                BinaryCommandVersion::DisassemblerVersion(self.disassembler_version),
-            )
-            .await
+        self.command.execute(BytecodeCommandType::Disassemble).await
     }
 }
 
@@ -175,12 +126,7 @@ impl CliCommand<String> for Decompile {
     }
 
     async fn execute(mut self) -> CliTypedResult<String> {
-        self.command
-            .execute(
-                BytecodeCommandType::Decompile,
-                BinaryCommandVersion::DecompilerVersion(self.decompiler_version),
-            )
-            .await
+        self.command.execute(BytecodeCommandType::Decompile).await
     }
 }
 
@@ -192,11 +138,7 @@ struct BytecodeMetadata {
 }
 
 impl BytecodeCommand {
-    async fn execute(
-        self,
-        command_type: BytecodeCommandType,
-        version: BinaryCommandVersion,
-    ) -> CliTypedResult<String> {
+    async fn execute(self, command_type: BytecodeCommandType) -> CliTypedResult<String> {
         let inputs = if let Some(path) = self.input.bytecode_path.clone() {
             vec![path]
         } else if let Some(path) = self.input.package_dir.clone() {
@@ -227,41 +169,12 @@ impl BytecodeCommand {
                 )));
             }
 
-            let print_code_bool = self.print_code_size.as_ref().is_some_and(|v| {
-                (v.len() == 1 && v[0].is_empty())
-                    || v.contains(
-                        &bytecode_path
-                            .file_name()
-                            .unwrap_or_default()
-                            .to_string_lossy()
-                            .to_string(),
-                    )
-            });
-
-            let (output, extension) = match (command_type, version) {
-                (
-                    BytecodeCommandType::Disassemble,
-                    BinaryCommandVersion::DisassemblerVersion(DisassemblerVersion::V1),
-                ) => (
-                    self.disassemble(bytecode_path, DisassemblerVersion::V1, print_code_bool)?,
-                    DISASSEMBLER_EXTENSION_V1,
-                ),
-
-                (
-                    BytecodeCommandType::Disassemble,
-                    BinaryCommandVersion::DisassemblerVersion(DisassemblerVersion::V2),
-                ) => (
-                    self.disassemble(bytecode_path, DisassemblerVersion::V2, print_code_bool)?,
-                    DISASSEMBLER_EXTENSION_V2,
-                ),
-
-                (BytecodeCommandType::Decompile, BinaryCommandVersion::DecompilerVersion(v)) => {
-                    (self.decompile(bytecode_path, v)?, DECOMPILER_EXTENSION)
+            let (output, extension) = match command_type {
+                BytecodeCommandType::Disassemble => {
+                    (self.disassemble(bytecode_path)?, DISASSEMBLER_EXTENSION)
                 },
-                _ => {
-                    return Err(CliError::UnexpectedError(
-                        "Incorrect bytecode command or incorrect version provided".to_string(),
-                    ));
+                BytecodeCommandType::Decompile => {
+                    (self.decompile(bytecode_path)?, DECOMPILER_EXTENSION)
                 },
             };
 
@@ -343,207 +256,53 @@ impl BytecodeCommand {
         Ok("ok".to_string())
     }
 
-    fn disassemble(
-        &self,
-        bytecode_path: &Path,
-        version: DisassemblerVersion,
-        print_code_size: bool,
-    ) -> Result<String, CliError> {
-        match version {
-            DisassemblerVersion::V1 => self.disassemble_v1(bytecode_path, print_code_size),
-            DisassemblerVersion::V2 => self.disassemble_v2(bytecode_path, print_code_size),
-        }
-    }
-
-    fn disassemble_v1(
-        &self,
-        bytecode_path: &Path,
-        print_code_size: bool,
-    ) -> Result<String, CliError> {
+    fn disassemble(&self, bytecode_path: &Path) -> Result<String, CliError> {
         let bytecode_bytes = read_from_file(bytecode_path)?;
-        if print_code_size {
-            println!(
-                "Code size of module {} is: {} kbs",
-                bytecode_path
-                    .file_name()
-                    .unwrap_or_default()
-                    .to_string_lossy(),
-                bytecode_bytes.len() / 1024
-            );
-        }
-
-        let source = {
-            let move_path = bytecode_path.with_extension(MOVE_EXTENSION);
-            if let Ok(source) = fs::read_to_string(move_path.clone()) {
-                Some(source)
-            } else {
-                let move_path = move_path
-                    .components()
-                    .map(|elt| {
-                        if elt.as_os_str() == "bytecode_modules" {
-                            Component::Normal("sources".as_ref())
-                        } else {
-                            elt
-                        }
-                    })
-                    .collect::<PathBuf>();
-                fs::read_to_string(move_path).ok()
-            }
-        };
-        let source_map = {
-            let source_map_path = bytecode_path.with_extension(SOURCE_MAP_EXTENSION);
-            if let Ok(source_map) = source_map_from_file(&source_map_path) {
-                Some(source_map)
-            } else {
-                let source_map_path = source_map_path
-                    .components()
-                    .map(|elt| {
-                        if elt.as_os_str() == "bytecode_modules" {
-                            Component::Normal("source_maps".as_ref())
-                        } else {
-                            elt
-                        }
-                    })
-                    .collect::<PathBuf>();
-                source_map_from_file(&source_map_path).ok()
-            }
-        };
-
-        let disassembler_options = DisassemblerOptions {
-            print_code: true,
-            only_externally_visible: false,
-            print_basic_blocks: true,
-            print_locals: true,
-            print_bytecode_stats: print_code_size,
-            print_code_size,
-        };
-        let no_loc = Spanned::unsafe_no_loc(()).loc;
-        let module: CompiledModule;
-        let script: CompiledScript;
-        let bytecode = if self.is_script {
-            script = CompiledScript::deserialize(&bytecode_bytes).context(format!(
-                "Script blob at {} can't be deserialized",
-                bytecode_path.display()
-            ))?;
-            BinaryIndexedView::Script(&script)
-        } else {
-            module = CompiledModule::deserialize(&bytecode_bytes).context(format!(
-                "Module blob at {} can't be deserialized",
-                bytecode_path.display()
-            ))?;
-            BinaryIndexedView::Module(&module)
-        };
-
-        let mut source_mapping = if let Some(s) = source_map {
-            SourceMapping::new(s, bytecode)
-        } else {
-            SourceMapping::new_from_view(bytecode, no_loc)
-                .context("Unable to build dummy source mapping")?
-        };
-
-        if let Some(source_code) = source {
-            source_mapping.with_source_code((bytecode_path.display().to_string(), source_code));
-        }
-
-        let mut disassembler = Disassembler::new(source_mapping, disassembler_options);
-
-        if let Some(file_path) = &self.code_coverage_path {
-            disassembler.add_coverage_map(
+        let coverage_map = if let Some(file_path) = &self.code_coverage_path {
+            Some(
                 CoverageMap::from_binary_file(file_path)
                     .map_err(|_err| {
                         CliError::UnexpectedError("Unable to read from file_path".to_string())
                     })?
                     .to_unified_exec_map(),
-            );
-        }
-
-        disassembler
-            .disassemble()
-            .map_err(|err| CliError::UnexpectedError(format!("Unable to disassemble: {}", err)))
-    }
-
-    fn disassemble_v2(
-        &self,
-        bytecode_path: &Path,
-        print_code_size: bool,
-    ) -> Result<String, CliError> {
-        let bytecode_bytes = read_from_file(bytecode_path)?;
-        if print_code_size {
-            println!(
-                "Code size of module {} is: {} kbs",
-                bytecode_path
-                    .file_name()
-                    .unwrap_or_default()
-                    .to_string_lossy(),
-                bytecode_bytes.len() / 1024
-            );
-        }
+            )
+        } else {
+            None
+        };
         if self.is_script {
             let script = CompiledScript::deserialize(&bytecode_bytes).context(format!(
                 "Script blob at {} can't be deserialized",
                 bytecode_path.display()
             ))?;
-            Ok(move_asm::disassembler::disassemble_script(
-                String::new(),
-                &script,
-            )?)
+            if let Some(ref cov) = coverage_map {
+                Ok(move_asm::disassembler::disassemble_script_with_coverage(
+                    &script, cov,
+                )?)
+            } else {
+                Ok(move_asm::disassembler::disassemble_script(
+                    String::new(),
+                    &script,
+                )?)
+            }
         } else {
             let module = CompiledModule::deserialize(&bytecode_bytes).context(format!(
                 "Module blob at {} can't be deserialized",
                 bytecode_path.display()
             ))?;
-            Ok(move_asm::disassembler::disassemble_module(
-                String::new(),
-                &module,
-                print_code_size,
-            )?)
+            if let Some(ref cov) = coverage_map {
+                Ok(move_asm::disassembler::disassemble_module_with_coverage(
+                    &module, cov,
+                )?)
+            } else {
+                Ok(move_asm::disassembler::disassemble_module(
+                    String::new(),
+                    &module,
+                )?)
+            }
         }
     }
 
-    fn decompile(
-        &self,
-        bytecode_path: &Path,
-        version: DecompilerVersion,
-    ) -> Result<String, CliError> {
-        match version {
-            DecompilerVersion::V1 => self.decompile_v1(bytecode_path),
-            DecompilerVersion::V2 => self.decompile_v2(bytecode_path),
-        }
-    }
-
-    fn decompile_v1(&self, bytecode_path: &Path) -> Result<String, CliError> {
-        let exe = get_revela_path()?;
-        let to_cli_error = |e| CliError::IO(exe.display().to_string(), e);
-        let mut cmd = Command::new(exe.as_path());
-        // WORKAROUND: if the bytecode is v7, try to downgrade to v6 since Revela
-        // does not support v7
-        let v6_temp_file = self.downgrade_to_v6(bytecode_path)?;
-        if let Some(file) = &v6_temp_file {
-            cmd.arg(format!("--bytecode={}", file.path().display()));
-        } else {
-            cmd.arg(format!("--bytecode={}", bytecode_path.display()));
-        }
-        if self.is_script {
-            cmd.arg("--script");
-        }
-        let out = cmd.output().map_err(to_cli_error)?;
-        if out.status.success() {
-            String::from_utf8(out.stdout).map_err(|err| {
-                CliError::UnexpectedError(format!(
-                    "output generated by decompiler is not valid utf8: {}",
-                    err
-                ))
-            })
-        } else {
-            Err(CliError::UnexpectedError(format!(
-                "decompiler exited with status {}: {}",
-                out.status,
-                String::from_utf8(out.stderr).unwrap_or_default()
-            )))
-        }
-    }
-
-    fn decompile_v2(&self, bytecode_path: &Path) -> Result<String, CliError> {
+    fn decompile(&self, bytecode_path: &Path) -> Result<String, CliError> {
         let bytecode_bytes = read_from_file(bytecode_path)?;
         let mut decompiler = Decompiler::new(DecompilerOptions::default());
         let source_map =
@@ -562,50 +321,5 @@ impl BytecodeCommand {
             decompiler.decompile_module(module, source_map)?
         };
         Ok(res)
-    }
-
-    fn downgrade_to_v6(&self, file_path: &Path) -> Result<Option<NamedTempFile>, CliError> {
-        let error_explanation = || {
-            format!(
-                "{} in `{}` contains Move 2 features (e.g. enum types) \
-                types which are not yet supported by the decompiler",
-                if self.is_script { "script " } else { "module" },
-                file_path.display()
-            )
-        };
-        let create_new_bytecode = |bytes: &[u8]| -> Result<NamedTempFile, CliError> {
-            let temp_file = NamedTempFile::new()
-                .map_err(|e| CliError::IO("creating v6 temp file".to_string(), e))?;
-            fs::write(temp_file.path(), bytes)
-                .map_err(|e| CliError::IO("writing v6 temp file".to_string(), e))?;
-            Ok(temp_file)
-        };
-        let bytes = read_from_file(file_path)?;
-        if self.is_script {
-            let script = CompiledScript::deserialize(&bytes).map_err(|e| {
-                CliError::UnableToParse("script", format!("cannot deserialize: {}", e))
-            })?;
-            if script.version < file_format_common::VERSION_7 {
-                return Ok(None);
-            }
-            let mut new_bytes = vec![];
-            script
-                .serialize_for_version(Some(file_format_common::VERSION_6), &mut new_bytes)
-                // The only reason why this can fail is because of Move 2 features
-                .map_err(|_| CliError::UnexpectedError(error_explanation()))?;
-            Ok(Some(create_new_bytecode(&new_bytes)?))
-        } else {
-            let module = CompiledModule::deserialize(&bytes).map_err(|e| {
-                CliError::UnableToParse("script", format!("cannot deserialize: {}", e))
-            })?;
-            if module.version < file_format_common::VERSION_7 {
-                return Ok(None);
-            }
-            let mut new_bytes = vec![];
-            module
-                .serialize_for_version(Some(file_format_common::VERSION_6), &mut new_bytes)
-                .map_err(|_| CliError::UnexpectedError(error_explanation()))?;
-            Ok(Some(create_new_bytecode(&new_bytes)?))
-        }
     }
 }

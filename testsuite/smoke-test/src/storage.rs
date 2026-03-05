@@ -527,7 +527,7 @@ async fn test_db_restart() {
             let validator = swarm.validator_mut(*vid).unwrap();
             // sometimes trigger reconfig right before the restart, to expose edge cases around
             // epoch change
-            if rand::random::<usize>() % 3 == 0 {
+            if rand::random::<usize>().is_multiple_of(3) {
                 info!(
                     "{LINE} Triggering reconfig right before restarting. Root account seq_num: {}. Ledger info: {:?}",
                     pub_chain_info.root_account().sequence_number(),

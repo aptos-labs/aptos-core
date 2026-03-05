@@ -168,6 +168,16 @@ pub fn create_fullnode_base_config() -> BaseConfig {
 pub fn create_validator_base_config() -> BaseConfig {
     BaseConfig {
         role: RoleType::Validator,
+        enable_validator_pfn_connections: false, // Disable PFN connections by default
+        ..Default::default()
+    }
+}
+
+/// Creates and returns a base config for a validator node with pfn connections enabled
+pub fn create_validator_base_config_with_pfn_connections() -> BaseConfig {
+    BaseConfig {
+        role: RoleType::Validator,
+        enable_validator_pfn_connections: true, // Enable PFN connections
         ..Default::default()
     }
 }
@@ -311,7 +321,7 @@ pub fn get_peer_priority_for_polling(poll_priority_peers: bool) -> PeerPriority 
 
         // If the random number is even, return medium priority.
         // Otherwise, return low priority.
-        if random_number % 2 == 0 {
+        if random_number.is_multiple_of(2) {
             PeerPriority::MediumPriority
         } else {
             PeerPriority::LowPriority

@@ -40,6 +40,10 @@ pub fn make_package(name: &str, sources: &[(&str, &str)]) -> TempDir {
 /// Uses `tokio::io::duplex` for an in-memory transport pair; the server runs
 /// as a background tokio task.
 pub async fn make_client() -> rmcp::service::RunningService<rmcp::RoleClient, ()> {
+    // Suppress movefmt so baselines are deterministic across platforms.
+    // SAFETY: test-only; each test process is single-threaded at this point.
+    unsafe { std::env::set_var("MOVE_FLOW_NO_FMT", "1") };
+
     let args = McpArgs {
         dev_mode: false,
         named_addresses: vec![],

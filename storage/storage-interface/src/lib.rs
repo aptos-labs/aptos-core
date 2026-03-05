@@ -20,7 +20,6 @@ use aptos_types::{
         state_key::StateKey,
         state_storage_usage::StateStorageUsage,
         state_value::{StateValue, StateValueChunkWithProof},
-        table::{TableHandle, TableInfo},
     },
     transaction::{
         IndexedTransactionSummary, PersistedAuxiliaryInfo, Transaction, TransactionAuxiliaryData,
@@ -459,12 +458,6 @@ pub trait DbReader: Send + Sync {
 
         /// Get the ledger prune window config value.
         fn get_ledger_prune_window(&self) -> Result<usize>;
-
-        /// Get table info from the internal indexer.
-        fn get_table_info(&self, handle: TableHandle) -> Result<TableInfo>;
-
-        /// Returns whether the internal indexer DB has been enabled or not
-        fn indexer_enabled(&self) -> bool;
 
         /// Returns state storage usage at the end of an epoch.
         fn get_state_storage_usage(&self, version: Option<Version>) -> Result<StateStorageUsage>;

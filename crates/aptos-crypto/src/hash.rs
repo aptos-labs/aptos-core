@@ -213,7 +213,7 @@ impl HashValue {
     pub fn nibble(&self, index: usize) -> u8 {
         debug_assert!(index < Self::LENGTH * 2); // assumed precondition
         let pos = index / 2;
-        let shift = if index % 2 == 0 { 4 } else { 0 };
+        let shift = if index.is_multiple_of(2) { 4 } else { 0 };
         (self.hash[pos] >> shift) & 0x0F
     }
 

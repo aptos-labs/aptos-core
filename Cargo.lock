@@ -1271,7 +1271,6 @@ dependencies = [
  "aptos-logger",
  "aptos-metrics-core",
  "aptos-proptest-helpers",
- "aptos-resource-viewer",
  "aptos-rocksdb-options",
  "aptos-schemadb",
  "aptos-scratchpad",
@@ -1907,6 +1906,8 @@ dependencies = [
  "aptos-infallible",
  "aptos-inspection-service",
  "aptos-logger",
+ "aptos-metrics-core",
+ "aptos-push-metrics",
  "aptos-rest-client",
  "aptos-retrier",
  "aptos-runtimes",
@@ -2431,8 +2432,8 @@ dependencies = [
  "futures",
  "http-body-util",
  "hyper-util",
- "jemallocator",
  "serde",
+ "tikv-jemallocator",
  "tokio",
  "tonic 0.12.3",
  "tracing",
@@ -3159,14 +3160,11 @@ dependencies = [
  "mockall 0.11.4",
  "move-asm",
  "move-binary-format",
- "move-bytecode-source-map",
  "move-command-line-common",
  "move-compiler-v2",
  "move-core-types",
  "move-coverage",
  "move-decompiler",
- "move-disassembler",
- "move-ir-types",
  "move-linter",
  "move-model",
  "move-package",
@@ -3284,6 +3282,7 @@ dependencies = [
  "tempfile",
  "tera",
  "tokio",
+ "tracing-log",
  "walkdir",
 ]
 
@@ -3668,6 +3667,7 @@ dependencies = [
 name = "aptos-peer-monitoring-service-client"
 version = "0.1.0"
 dependencies = [
+ "anyhow",
  "aptos-build-info",
  "aptos-channels",
  "aptos-config",
@@ -3681,7 +3681,9 @@ dependencies = [
  "aptos-peer-monitoring-service-types",
  "aptos-time-service",
  "aptos-types",
+ "async-trait",
  "bcs 0.1.4",
+ "bytes",
  "enum_dispatch",
  "futures",
  "maplit",
@@ -4627,6 +4629,7 @@ dependencies = [
  "aptos-global-constants",
  "aptos-infallible",
  "aptos-logger",
+ "aptos-metrics-core",
  "aptos-rest-client",
  "aptos-sdk",
  "aptos-transaction-generator-lib",
@@ -4951,6 +4954,7 @@ dependencies = [
 name = "aptos-vm"
 version = "0.1.0"
 dependencies = [
+ "ahash 0.8.11",
  "anyhow",
  "aptos-aggregator",
  "aptos-block-executor",
@@ -6805,12 +6809,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "cassowary"
-version = "0.3.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "df8670b8c7b9dae1793364eafadf7239c40d669904660c5960d74cfd80b46a53"
-
-[[package]]
 name = "cast"
 version = "0.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -7647,47 +7645,6 @@ name = "crossbeam-utils"
 version = "0.8.19"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "248e3bacc7dc6baa3b21e405ee045c3047101a49145e7e9eca583ab4c2ca5345"
-
-[[package]]
-name = "crossterm"
-version = "0.25.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e64e6c0fbe2c17357405f7c758c1ef960fce08bdfb2c03d88d2a18d7e09c4b67"
-dependencies = [
- "bitflags 1.3.2",
- "crossterm_winapi",
- "libc",
- "mio 0.8.11",
- "parking_lot 0.12.1",
- "signal-hook",
- "signal-hook-mio",
- "winapi 0.3.9",
-]
-
-[[package]]
-name = "crossterm"
-version = "0.26.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a84cda67535339806297f1b331d6dd6320470d2a0fe65381e79ee9e156dd3d13"
-dependencies = [
- "bitflags 1.3.2",
- "crossterm_winapi",
- "libc",
- "mio 0.8.11",
- "parking_lot 0.12.1",
- "signal-hook",
- "signal-hook-mio",
- "winapi 0.3.9",
-]
-
-[[package]]
-name = "crossterm_winapi"
-version = "0.9.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "acdd7c62a3665c7f6830a51635d9ac9b23ed385797f70a83bb8bafe9c572ab2b"
-dependencies = [
- "winapi 0.3.9",
-]
 
 [[package]]
 name = "crunchy"
@@ -11469,24 +11426,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b1a46d1a171d865aa5f83f92695765caa047a9b4cbae2cbf37dbd613a793fd4c"
 
 [[package]]
-name = "jemalloc-sys"
-version = "0.5.4+5.3.0-patched"
-source = "git+https://github.com/aptos-labs/jemalloc-sys-shim?rev=e0920246dd74303fab9a14b990768c6ac990a59b#e0920246dd74303fab9a14b990768c6ac990a59b"
-dependencies = [
- "tikv-jemalloc-sys",
-]
-
-[[package]]
-name = "jemallocator"
-version = "0.5.4"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a0de374a9f8e63150e6f5e8a60cc14c668226d7a347d8aee1a45766e3c4dd3bc"
-dependencies = [
- "jemalloc-sys",
- "libc",
-]
-
-[[package]]
 name = "jobserver"
 version = "0.1.32"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -12438,18 +12377,6 @@ dependencies = [
 
 [[package]]
 name = "mio"
-version = "0.8.11"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a4a650543ca06a924e8b371db273b2756685faae30f8487da1b56505a8f78b0c"
-dependencies = [
- "libc",
- "log",
- "wasi 0.11.0+wasi-snapshot-preview1",
- "windows-sys 0.48.0",
-]
-
-[[package]]
-name = "mio"
 version = "1.0.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "80e04d1dcff3aae0704555fe5fee3bcfaf3d1fdf8a7e521d5b9d2b42acb52cec"
@@ -12562,6 +12489,7 @@ dependencies = [
  "libtest-mimic",
  "move-binary-format",
  "move-core-types",
+ "move-coverage",
  "move-transactional-test-runner",
  "walkdir",
 ]
@@ -12658,20 +12586,6 @@ dependencies = [
  "move-binary-format",
  "move-core-types",
  "proptest",
-]
-
-[[package]]
-name = "move-bytecode-viewer"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "clap 4.5.21",
- "crossterm 0.26.1",
- "move-binary-format",
- "move-bytecode-source-map",
- "move-disassembler",
- "regex",
- "tui",
 ]
 
 [[package]]
@@ -12807,22 +12721,6 @@ dependencies = [
  "once_cell",
  "tempfile",
  "walkdir",
-]
-
-[[package]]
-name = "move-disassembler"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "clap 4.5.21",
- "colored",
- "legacy-move-compiler",
- "move-binary-format",
- "move-bytecode-source-map",
- "move-command-line-common",
- "move-core-types",
- "move-coverage",
- "move-ir-types",
 ]
 
 [[package]]
@@ -13113,6 +13011,7 @@ dependencies = [
  "move-model",
  "move-stackless-bytecode",
  "move-stackless-bytecode-test-utils",
+ "num 0.4.1",
  "serde",
  "shell-words",
  "tempfile",
@@ -13265,14 +13164,11 @@ dependencies = [
  "legacy-move-compiler",
  "move-asm",
  "move-binary-format",
- "move-bytecode-source-map",
  "move-bytecode-verifier",
  "move-command-line-common",
  "move-compiler-v2",
  "move-core-types",
  "move-decompiler",
- "move-disassembler",
- "move-ir-types",
  "move-model",
  "move-resource-viewer",
  "move-stdlib",
@@ -13664,7 +13560,7 @@ dependencies = [
  "kqueue",
  "libc",
  "log",
- "mio 1.0.2",
+ "mio",
  "notify-types",
  "walkdir",
  "windows-sys 0.60.2",
@@ -17597,27 +17493,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "0fda2ff0d084019ba4d7c6f371c95d8fd75ce3524c3cb8fb653a3023f6323e64"
 
 [[package]]
-name = "signal-hook"
-version = "0.3.17"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8621587d4798caf8eb44879d42e56b9a93ea5dcd315a6487c357130095b62801"
-dependencies = [
- "libc",
- "signal-hook-registry",
-]
-
-[[package]]
-name = "signal-hook-mio"
-version = "0.2.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "29ad2e15f37ec9a6cc544097b78a1ec90001e9f71b81338ca39f430adaca99af"
-dependencies = [
- "libc",
- "mio 0.8.11",
- "signal-hook",
-]
-
-[[package]]
 name = "signal-hook-registry"
 version = "1.4.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -18772,7 +18647,7 @@ dependencies = [
  "backtrace",
  "bytes",
  "libc",
- "mio 1.0.2",
+ "mio",
  "parking_lot 0.12.1",
  "pin-project-lite",
  "signal-hook-registry",
@@ -19423,19 +19298,6 @@ dependencies = [
  "serde_derive",
  "serde_json",
  "termcolor",
-]
-
-[[package]]
-name = "tui"
-version = "0.19.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ccdd26cbd674007e649a272da4475fb666d3aa0ad0531da7136db6fab0e5bad1"
-dependencies = [
- "bitflags 1.3.2",
- "cassowary",
- "crossterm 0.25.0",
- "unicode-segmentation",
- "unicode-width 0.1.11",
 ]
 
 [[package]]

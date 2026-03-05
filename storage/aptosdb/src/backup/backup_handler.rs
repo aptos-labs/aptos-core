@@ -10,6 +10,7 @@ use crate::{
     state_store::StateStore,
 };
 use aptos_crypto::hash::HashValue;
+use aptos_schemadb::ReadOptions;
 use aptos_storage_interface::{db_ensure as ensure, AptosDbError, Result};
 use aptos_types::{
     contract_event::ContractEvent,
@@ -21,6 +22,14 @@ use aptos_types::{
 };
 use serde::{Deserialize, Serialize};
 use std::{fmt, sync::Arc};
+
+/// Returns `ReadOptions` with `fill_cache(false)`, suitable for bulk scans that
+/// should not pollute the RocksDB block cache.
+fn no_cache_read_opts() -> ReadOptions {
+    let mut opts = ReadOptions::default();
+    opts.fill_cache(false);
+    opts
+}
 
 /// `BackupHandler` provides functionalities for AptosDB data backup.
 #[derive(Clone)]
@@ -56,23 +65,40 @@ impl BackupHandler {
         let txn_iter = self
             .ledger_db
             .transaction_db()
-            .get_transaction_iter(start_version, num_transactions)?;
+            .get_transaction_iter_with_opts(
+                start_version,
+                num_transactions,
+                no_cache_read_opts(),
+            )?;
         let mut txn_info_iter = self
             .ledger_db
             .transaction_info_db()
-            .get_transaction_info_iter(start_version, num_transactions)?;
+            .get_transaction_info_iter_with_opts(
+                start_version,
+                num_transactions,
+                no_cache_read_opts(),
+            )?;
         let mut event_vec_iter = self
             .ledger_db
             .event_db()
-            .get_events_by_version_iter(start_version, num_transactions)?;
-        let mut write_set_iter = self
-            .ledger_db
-            .write_set_db()
-            .get_write_set_iter(start_version, num_transactions)?;
+            .get_events_by_version_iter_with_opts(
+                start_version,
+                num_transactions,
+                no_cache_read_opts(),
+            )?;
+        let mut write_set_iter = self.ledger_db.write_set_db().get_write_set_iter_with_opts(
+            start_version,
+            num_transactions,
+            no_cache_read_opts(),
+        )?;
         let mut persisted_aux_info_iter = self
             .ledger_db
             .persisted_auxiliary_info_db()
-            .get_persisted_auxiliary_info_iter(start_version, num_transactions)?;
+            .get_persisted_auxiliary_info_iter_with_opts(
+                start_version,
+                num_transactions,
+                no_cache_read_opts,
+            )?;
 
         let zipped = txn_iter.enumerate().map(move |(idx, txn_res)| {
             let version = start_version + idx as u64; // overflow is impossible since it's check upon txn_iter construction.
@@ -212,7 +238,11 @@ impl BackupHandler {
         Ok(self
             .ledger_db
             .metadata_db()
-            .get_epoch_ending_ledger_info_iter(start_epoch, end_epoch)?
+            .get_epoch_ending_ledger_info_iter_with_opts(
+                start_epoch,
+                end_epoch,
+                no_cache_read_opts(),
+            )?
             .enumerate()
             .map(move |(idx, li)| {
                 BACKUP_EPOCH_ENDING_EPOCH.set((start_epoch + idx as u64) as i64);

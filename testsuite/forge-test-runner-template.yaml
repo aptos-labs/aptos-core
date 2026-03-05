@@ -39,6 +39,20 @@ spec:
           value: "{FORGE_RETAIN_DEBUG_LOGS}"
         - name: FORGE_JUNIT_XML_PATH
           value: "{FORGE_JUNIT_XML_PATH}"
+        - name: FORGE_NAMESPACE
+          value: {FORGE_NAMESPACE}
+        - name: FORGE_CHAIN_NAME
+          value: {FORGE_CHAIN_NAME}
+        - name: GITHUB_HEAD_REF
+          value: "{GITHUB_HEAD_REF}"
+        - name: GITHUB_REF_NAME
+          value: "{GITHUB_REF_NAME}"
+        - name: KUBERNETES_POD_NAME
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.name
+        - name: PUSH_METRICS_ENDPOINT
+          value: "http://vmagent-victoria-metrics-agent.victoria-metrics.svc:8429/api/v1/import/prometheus"
         - name: PROMETHEUS_URL
           valueFrom:
             secretKeyRef:

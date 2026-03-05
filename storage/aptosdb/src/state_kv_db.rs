@@ -337,9 +337,9 @@ impl StateKvDb {
         let cfds = gen_state_kv_shard_cfds(state_kv_db_config, block_cache);
 
         if readonly {
-            DB::open_cf_readonly(&rocksdb_opts, path, name, cfds)
+            DB::open_cf_readonly(rocksdb_opts, path, name, cfds)
         } else {
-            DB::open_cf(&rocksdb_opts, path, name, cfds)
+            DB::open_cf(rocksdb_opts, path, name, cfds)
         }
     }
 

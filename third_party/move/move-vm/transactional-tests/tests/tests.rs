@@ -102,6 +102,7 @@ static TEST_CONFIGS: Lazy<Vec<TestConfig>> = Lazy::new(|| {
             exclude: &[
                 "/function_values_safety/",
                 "/lazy_loading/",
+                "/limits/",
                 "/paranoid-tests/",
                 "/runtime_ref_checks/",
                 "/stack_size/",
@@ -158,6 +159,7 @@ fn vm_config_for_tests(verifier_config: VerifierConfig) -> VMConfig {
 /// "foo" will have a separate baseline output file `test.foo.exp`.
 const SEPARATE_BASELINE: &[&str] = &[
     "/function_values_safety/",
+    "/limits/",
     "/module_publishing/",
     "/re_entrancy/",
     "/runtime_ref_checks/",
@@ -189,7 +191,6 @@ fn run(path: &Path, config: TestConfig) -> datatest_stable::Result<()> {
         language_version: config.language_version,
         experiments,
         vm_config: config.vm_config,
-        use_masm: true,
         echo: true,
         cross_compilation_targets: BTreeSet::new(),
         tracing: config.tracing,

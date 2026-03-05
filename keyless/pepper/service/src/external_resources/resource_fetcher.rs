@@ -240,7 +240,7 @@ pub fn start_external_resource_refresh_loop<T: DeserializeOwned + Send + Sync + 
             match fetch_result {
                 Ok(resource) => {
                     // Log the successful fetch
-                    if loop_iteration_counter % RESOURCE_REFRESH_LOOP_LOG_FREQUENCY == 0 {
+                    if loop_iteration_counter.is_multiple_of(RESOURCE_REFRESH_LOOP_LOG_FREQUENCY) {
                         info!(
                             "Successfully fetched resource {} from {} in {:?}",
                             resource_name, resource_url, fetch_time

@@ -6,7 +6,7 @@ HEADER = [
     "Scheme",
     "Ell",  # <-- need capital E here to be consistent with code later
     "Setup",
-    "Transcript Bytes",
+    "Transcript size",
     "Deal (ms)",
     "Serialize (ms)",
     "Aggregate (ms)",
@@ -14,8 +14,13 @@ HEADER = [
     "Decrypt-share (ms)",
 ]
 
-V1_NAME = "chunky_v1"
-V2_NAME = "chunky_v2"
+# Maps internal column names to their rendered display names (e.g. LaTeX-style Markdown)
+HEADER_DISPLAY = {
+    "Ell": r"$\ell$",
+}
+
+V1_NAME = "Chunky"
+V2_NAME = "Chunky2"
 
 # Match patterns like "pvss/chunky_v1/bls12-381", "pvss_chunky_v1_bls12-381", or just "chunky_v1"
 # Criterion converts slashes to underscores in CSV output, so we match both formats
@@ -44,6 +49,29 @@ def fmt_ms(x):
 
 def fmt_ratio(r):
     return f"{r:.2f}x"
+
+
+def fmt_setup(setup):
+    """
+    Transform a setup string like 'weighted_129-out-of-219_136-players'
+    into '129-out-of-219 / 136 players'. Leaves unrecognized formats unchanged.
+    """
+    m = re.match(r'^(?:[^_]+_)?(\d+-out-of-\d+)_(\d+)-players$', setup)
+    if m:
+        return f"{m.group(1)} / {m.group(2)} players"
+    return setup
+
+
+def humanize_bytes(n):
+    if n is None or n == "—":
+        return "—"
+    n = int(n)
+    if n >= 1024 * 1024:
+        return f"{n / (1024 * 1024):,.2f} MiB"
+    elif n >= 1024:
+        return f"{n / 1024:.2f} KiB"
+    else:
+        return f"{n} B"
 
 
 GREEN = 'color:#15803d'  # bold green when faster
@@ -244,16 +272,16 @@ def make_rows_for_setup(setup, ell, v1_data, v2_data):
     if not v1_complete and not v2_complete:
         return rows
 
-    v1_tx_bytes = v1_data.get("tx_bytes", "—")
-    v2_tx_bytes = v2_data.get("tx_bytes", "—")
+    v1_tx_bytes = humanize_bytes(v1_data.get("tx_bytes", "—"))
+    v2_tx_bytes = humanize_bytes(v2_data.get("tx_bytes", "—"))
 
     # Build row for v1
     if v1_complete:
         v1_row = {
             "Scheme": V1_NAME,
             "Ell": ell or "—",
-            "Setup": setup,
-            "Transcript Bytes": v1_tx_bytes,
+            "Setup": fmt_setup(setup),
+            "Transcript size": v1_tx_bytes,
         }
         for op in OPERATIONS:
             v1_ms = ns_to_ms(v1_data[op])
@@ -266,8 +294,8 @@ def make_rows_for_setup(setup, ell, v1_data, v2_data):
         v2_row = {
             "Scheme": V2_NAME,
             "Ell": ell or "—",
-            "Setup": setup,
-            "Transcript Bytes": v2_tx_bytes,
+            "Setup": fmt_setup(setup),
+            "Transcript size": v2_tx_bytes,
         }
         for op in OPERATIONS:
             if op not in v2_data:
@@ -295,7 +323,7 @@ def padded_table(rows):
         "Scheme": "Scheme",
         "Ell": "Ell",
         "Setup": "Setup",
-        "Transcript Bytes": "Transcript Bytes",
+        "Transcript size": "Transcript size",
         "Deal (ms)": "deal_display",
         "Serialize (ms)": "serialize_display",
         "Aggregate (ms)": "aggregate_display",
@@ -306,7 +334,7 @@ def padded_table(rows):
         "Scheme": "Scheme",
         "Ell": "Ell",
         "Setup": "Setup",
-        "Transcript Bytes": "Transcript Bytes",
+        "Transcript size": "Transcript size",
         "Deal (ms)": "deal_render",
         "Serialize (ms)": "serialize_render",
         "Aggregate (ms)": "aggregate_render",
@@ -314,7 +342,7 @@ def padded_table(rows):
         "Decrypt-share (ms)": "decrypt-share_render",
     }
 
-    widths = {c: len(c) for c in cols}
+    widths = {c: len(HEADER_DISPLAY.get(c, c)) for c in cols}
     for r in rows:
         for c in cols:
             widths[c] = max(widths[c], len(str(r.get(display_map[c], ""))))
@@ -333,7 +361,7 @@ def padded_table(rows):
             return " " + s.rjust(widths[c]) + " "
         return " " + s.ljust(widths[c]) + " "
 
-    header_line = "|" + "|".join(pad(c, c, "left") for c in cols) + "|"
+    header_line = "|" + "|".join(pad(c, HEADER_DISPLAY.get(c, c), "left") for c in cols) + "|"
     sep_line = "|" + "|".join("-" * (widths[c] + 2) for c in cols) + "|"
 
     body_lines = []
@@ -395,4 +423,3 @@ def main():
     print("\n\n".join(tables))
 if __name__ == "__main__":
     main()
-

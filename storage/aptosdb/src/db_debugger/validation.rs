@@ -186,7 +186,7 @@ fn verify_state_kv(
             );
         }
         counter += 1;
-        if counter as usize % SAMPLE_RATE == 0 {
+        if (counter as usize).is_multiple_of(SAMPLE_RATE) {
             println!(
                 "Processed {} keys, the current sample is {} at version {}",
                 counter, state_key_hash, version
@@ -248,7 +248,7 @@ fn verify_event_by_key(
         },
         Ok(Some((version, idx))) => {
             assert!(idx as usize == expected_idx && version == expected_version);
-            if version as usize % SAMPLE_RATE == 0 {
+            if (version as usize).is_multiple_of(SAMPLE_RATE) {
                 println!(
                     "Processed {} at {:?}, {:?}",
                     version, event_key, expected_idx

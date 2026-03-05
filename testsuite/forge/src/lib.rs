@@ -30,6 +30,8 @@ pub use slack::*;
 
 pub mod success_criteria;
 
+pub mod metrics;
+
 pub mod test_utils;
 
 pub mod config;

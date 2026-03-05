@@ -1,7 +1,8 @@
 // Copyright (c) Aptos Foundation
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
-//! SoK context and shared verification helpers for weighted chunky PVSS (v1 and v2).
+//! SoK context and shared verification helpers for two two different versions of the
+//! weighted chunky PVSS.
 //!
 //! The SoK context is bound to the Fiat–Shamir transcript so that proofs are tied to
 //! the dealer's signing key, session, and domain-separation tag.

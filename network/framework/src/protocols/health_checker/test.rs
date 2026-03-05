@@ -70,6 +70,7 @@ impl TestHarness {
             PING_INTERVAL,
             PING_TIMEOUT,
             ping_failures_tolerated,
+            true, // disconnect_on_failure (enabled for tests)
         );
 
         (

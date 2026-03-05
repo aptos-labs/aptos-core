@@ -168,6 +168,18 @@ pub static ROCKSDB_SHARD_PROPERTIES: Lazy<IntGaugeVec> = Lazy::new(|| {
     .unwrap()
 });
 
+/// Rocksdb ticker metrics (per-DB cumulative counters).
+/// Unlike properties (which are per-CF), tickers are per-DB-instance.
+/// The db_name already encodes shard info for sharded DBs (e.g. "state_kv_db_shard_0").
+pub static ROCKSDB_TICKERS: Lazy<IntGaugeVec> = Lazy::new(|| {
+    register_int_gauge_vec!(
+        "aptos_rocksdb_tickers",
+        "rocksdb cumulative ticker counters",
+        &["db_name", "ticker_name"]
+    )
+    .unwrap()
+});
+
 // Async committer gauges:
 pub(crate) static LATEST_SNAPSHOT_VERSION: Lazy<IntGauge> = Lazy::new(|| {
     register_int_gauge!(

@@ -153,7 +153,7 @@ where
     }
 
     /// Flushes all caches.
-    pub fn flush(&mut self) {
+    pub fn flush_all_caches(&mut self) {
         self.module_cache.clear();
         self.size = 0;
         self.struct_layouts.clear();
@@ -375,7 +375,7 @@ mod test {
         assert_eq!(cache.num_modules(), 2);
         assert_eq!(cache.size_in_bytes(), 24);
 
-        cache.flush();
+        cache.flush_all_caches();
         assert_eq!(cache.num_modules(), 0);
         assert_eq!(cache.size_in_bytes(), 0);
     }

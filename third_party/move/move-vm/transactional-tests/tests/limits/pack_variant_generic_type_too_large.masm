@@ -1,0 +1,24 @@
+//# publish
+module 0x22::test
+
+enum A<phantom T> has drop
+    V1
+        x: u64
+
+public fun entry_below_limit<T>()
+    local a: A<vector<vector<vector<vector<vector<vector<vector<vector<vector<vector<vector<vector<vector<vector<vector<vector<vector<vector<T>>>>>>>>>>>>>>>>>>>
+    ld_u64 1
+    pack_variant A<vector<vector<vector<vector<vector<vector<vector<vector<vector<vector<vector<vector<vector<vector<vector<vector<vector<vector<T>>>>>>>>>>>>>>>>>>>, V1
+    pop
+    ret
+
+public fun entry_above_limit<T>()
+    local a: A<vector<vector<vector<vector<vector<vector<vector<vector<vector<vector<vector<vector<vector<vector<vector<vector<vector<vector<T>>>>>>>>>>>>>>>>>>>
+    ld_u64 1
+    pack_variant A<vector<vector<vector<vector<vector<vector<vector<vector<vector<vector<vector<vector<vector<vector<vector<vector<vector<vector<T>>>>>>>>>>>>>>>>>>>, V1
+    pop
+    ret
+
+//# run --verbose 0x22::test::entry_below_limit --type-args u8
+
+//# run --verbose 0x22::test::entry_above_limit --type-args vector<u8>

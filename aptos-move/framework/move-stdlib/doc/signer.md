@@ -41,7 +41,7 @@ semantics.
 <code>borrow_address</code> borrows this inner field
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="signer.md#0x1_signer_borrow_address">borrow_address</a>(s: &<a href="signer.md#0x1_signer">signer</a>): &<b>address</b>
+<pre><code><b>public</b> <b>fun</b> <a href="signer.md#0x1_signer_borrow_address">borrow_address</a>(self: &<a href="signer.md#0x1_signer">signer</a>): &<b>address</b>
 </code></pre>
 
 
@@ -50,7 +50,7 @@ semantics.
 <summary>Implementation</summary>
 
 
-<pre><code><b>native</b> <b>public</b> <b>fun</b> <a href="signer.md#0x1_signer_borrow_address">borrow_address</a>(s: &<a href="signer.md#0x1_signer">signer</a>): &<b>address</b>;
+<pre><code><b>native</b> <b>public</b> <b>fun</b> <a href="signer.md#0x1_signer_borrow_address">borrow_address</a>(self: &<a href="signer.md#0x1_signer">signer</a>): &<b>address</b>;
 </code></pre>
 
 
@@ -63,7 +63,7 @@ semantics.
 
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="signer.md#0x1_signer_address_of">address_of</a>(s: &<a href="signer.md#0x1_signer">signer</a>): <b>address</b>
+<pre><code><b>public</b> <b>fun</b> <a href="signer.md#0x1_signer_address_of">address_of</a>(self: &<a href="signer.md#0x1_signer">signer</a>): <b>address</b>
 </code></pre>
 
 
@@ -72,8 +72,8 @@ semantics.
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="signer.md#0x1_signer_address_of">address_of</a>(s: &<a href="signer.md#0x1_signer">signer</a>): <b>address</b> {
-    *<a href="signer.md#0x1_signer_borrow_address">borrow_address</a>(s)
+<pre><code><b>public</b> <b>fun</b> <a href="signer.md#0x1_signer_address_of">address_of</a>(self: &<a href="signer.md#0x1_signer">signer</a>): <b>address</b> {
+    *<a href="signer.md#0x1_signer_borrow_address">borrow_address</a>(self)
 }
 </code></pre>
 
@@ -85,13 +85,13 @@ semantics.
 
 ## Specification
 
-Return true only if <code>s</code> is a transaction signer. This is a spec function only available in spec.
+Return true only if <code>self</code> is a transaction signer. This is a spec function only available in spec.
 
 
 <a id="0x1_signer_is_txn_signer"></a>
 
 
-<pre><code><b>native</b> <b>fun</b> <a href="signer.md#0x1_signer_is_txn_signer">is_txn_signer</a>(s: <a href="signer.md#0x1_signer">signer</a>): bool;
+<pre><code><b>native</b> <b>fun</b> <a href="signer.md#0x1_signer_is_txn_signer">is_txn_signer</a>(self: <a href="signer.md#0x1_signer">signer</a>): bool;
 </code></pre>
 
 

@@ -1,7 +1,7 @@
 // Copyright (c) Aptos Foundation
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
-//! Weighted threshold secret sharing configuration for BLSTRS-based PVSS.
+//! Weighted threshold secret sharing configuration for arkworks-based and BLSTRS-based PVSS.
 
 use crate::{
     arkworks::{
@@ -299,13 +299,6 @@ impl WeightedConfigBlstrs {
         self.tc.get_evaluation_domain()
     }
 }
-
-//impl<F: FftField> WeightedConfigArkworks<F> {
-//    pub fn share(&self, coeffs: &[F]) -> Vec<WeightedShamirShare<F>> {
-//        debug_assert_eq!(coeffs.len(), self.get_total_weight());
-//        let evals = self.get_threshold_config().domain.fft(coeffs);
-//    }
-//}
 
 impl<TC: ThresholdConfig> Display for WeightedConfig<TC> {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {

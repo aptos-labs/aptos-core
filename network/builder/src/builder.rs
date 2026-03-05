@@ -209,6 +209,7 @@ impl NetworkBuilder {
             config.ping_interval_ms,
             config.ping_timeout_ms,
             config.ping_failures_tolerated,
+            config.disconnect_on_health_check_failure,
             config.max_parallel_deserialization_tasks,
         );
 
@@ -412,6 +413,7 @@ impl NetworkBuilder {
         ping_interval_ms: u64,
         ping_timeout_ms: u64,
         ping_failures_tolerated: u64,
+        disconnect_on_failure: bool,
         max_parallel_deserialization_tasks: Option<usize>,
     ) -> &mut Self {
         // Initialize and start HealthChecker.
@@ -426,6 +428,7 @@ impl NetworkBuilder {
             ping_interval_ms,
             ping_timeout_ms,
             ping_failures_tolerated,
+            disconnect_on_failure,
             hc_network_tx,
             hc_network_rx,
             self.peers_and_metadata.clone(),

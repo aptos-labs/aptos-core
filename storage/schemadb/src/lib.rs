@@ -35,11 +35,11 @@ use batch::{IntoRawBatch, NativeBatch, WriteBatch};
 use iterator::{ScanDirection, SchemaIterator};
 /// Type alias to `rocksdb::ReadOptions`. See [`rocksdb doc`](https://github.com/pingcap/rust-rocksdb/blob/master/src/rocksdb_options.rs)
 pub use rocksdb::{
-    BlockBasedIndexType, BlockBasedOptions, Cache, ColumnFamilyDescriptor, DBCompressionType, Env,
-    Options, ReadOptions, SliceTransform, DEFAULT_COLUMN_FAMILY_NAME,
+    statistics::Ticker, BlockBasedIndexType, BlockBasedOptions, Cache, ColumnFamilyDescriptor,
+    DBCompressionType, Env, Options, ReadOptions, SliceTransform, DEFAULT_COLUMN_FAMILY_NAME,
 };
 use rocksdb::{ErrorKind, WriteOptions};
-use std::{collections::HashSet, fmt::Debug, iter::Iterator, path::Path};
+use std::{collections::HashSet, fmt, iter::Iterator, path::Path};
 
 pub type ColumnFamilyName = &'static str;
 
@@ -52,10 +52,16 @@ enum OpenMode<'a> {
 
 /// This DB is a schematized RocksDB wrapper where all data passed in and out are typed according to
 /// [`Schema`]s.
-#[derive(Debug)]
 pub struct DB {
     name: String, // for logging
     inner: rocksdb::DB,
+    opts: Options, // retained for statistics / ticker access
+}
+
+impl fmt::Debug for DB {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("DB").field("name", &self.name).finish()
+    }
 }
 
 impl DB {
@@ -63,7 +69,7 @@ impl DB {
         path: impl AsRef<Path>,
         name: &str,
         column_families: Vec<ColumnFamilyName>,
-        db_opts: &Options,
+        db_opts: Options,
     ) -> DbResult<Self> {
         Self::open_impl(path, name, column_families, db_opts, OpenMode::ReadWrite)
     }
@@ -72,13 +78,13 @@ impl DB {
         path: impl AsRef<Path>,
         name: &str,
         column_families: Vec<ColumnFamilyName>,
-        db_opts: &Options,
+        db_opts: Options,
     ) -> DbResult<Self> {
         Self::open_impl(path, name, column_families, db_opts, OpenMode::ReadOnly)
     }
 
     pub fn open_cf(
-        db_opts: &Options,
+        db_opts: Options,
         path: impl AsRef<Path>,
         name: &str,
         cfds: Vec<ColumnFamilyDescriptor>,
@@ -90,7 +96,7 @@ impl DB {
     /// Note that this still assumes there's only one process that opens the same DB.
     /// See `open_as_secondary`
     pub fn open_cf_readonly(
-        opts: &Options,
+        opts: Options,
         path: impl AsRef<Path>,
         name: &str,
         cfds: Vec<ColumnFamilyDescriptor>,
@@ -99,7 +105,7 @@ impl DB {
     }
 
     pub fn open_cf_as_secondary<P: AsRef<Path>>(
-        opts: &Options,
+        opts: Options,
         primary_path: P,
         secondary_path: P,
         name: &str,
@@ -118,7 +124,7 @@ impl DB {
         path: impl AsRef<Path>,
         name: &str,
         column_families: Vec<ColumnFamilyName>,
-        db_opts: &Options,
+        db_opts: Options,
         open_mode: OpenMode,
     ) -> DbResult<Self> {
         let db = DB::open_cf_impl(
@@ -139,14 +145,14 @@ impl DB {
     }
 
     fn open_cf_impl(
-        db_opts: &Options,
+        db_opts: Options,
         path: impl AsRef<Path>,
         name: &str,
         cfds: Vec<ColumnFamilyDescriptor>,
         open_mode: OpenMode,
     ) -> DbResult<DB> {
         // ignore error, since it'll fail to list cfs on the first open
-        let existing_cfs: HashSet<String> = rocksdb::DB::list_cf(db_opts, path.de_unc())
+        let existing_cfs: HashSet<String> = rocksdb::DB::list_cf(&db_opts, path.de_unc())
             .unwrap_or_default()
             .into_iter()
             .collect();
@@ -170,17 +176,17 @@ impl DB {
             use OpenMode::*;
 
             match open_mode {
-                ReadWrite => DB::open_cf_descriptors(db_opts, path.de_unc(), all_cfds),
+                ReadWrite => DB::open_cf_descriptors(&db_opts, path.de_unc(), all_cfds),
                 ReadOnly => {
                     DB::open_cf_descriptors_read_only(
-                        db_opts,
+                        &db_opts,
                         path.de_unc(),
                         all_cfds.filter(|cfd| !missing_cfs.contains(cfd.name())),
                         false, /* error_if_log_file_exist */
                     )
                 },
                 Secondary(secondary_path) => DB::open_cf_descriptors_as_secondary(
-                    db_opts,
+                    &db_opts,
                     path.de_unc(),
                     secondary_path,
                     all_cfds,
@@ -189,7 +195,7 @@ impl DB {
         }
         .into_db_res()?;
 
-        Ok(Self::log_construct(name, open_mode, inner))
+        Ok(Self::log_construct(name, open_mode, inner, db_opts))
     }
 
     fn cfd_for_unrecognized_cf(cf: &String) -> ColumnFamilyDescriptor {
@@ -200,7 +206,7 @@ impl DB {
         ColumnFamilyDescriptor::new(cf.to_string(), cf_opts)
     }
 
-    fn log_construct(name: &str, open_mode: OpenMode, inner: rocksdb::DB) -> DB {
+    fn log_construct(name: &str, open_mode: OpenMode, inner: rocksdb::DB, opts: Options) -> DB {
         info!(
             rocksdb_name = name,
             open_mode = ?open_mode,
@@ -209,6 +215,7 @@ impl DB {
         DB {
             name: name.to_string(),
             inner,
+            opts,
         }
     }
 
@@ -359,6 +366,18 @@ impl DB {
             .create_checkpoint(path)
             .into_db_res()?;
         Ok(())
+    }
+
+    /// Returns the name of this DB instance.
+    pub fn name(&self) -> &str {
+        &self.name
+    }
+
+    /// Returns the cumulative count for a RocksDB ticker. Requires statistics to be enabled
+    /// in the DB options (via `Options::enable_statistics`). Returns 0 if statistics are not
+    /// enabled.
+    pub fn get_ticker_count(&self, ticker: Ticker) -> u64 {
+        self.opts.get_ticker_count(ticker)
     }
 }
 

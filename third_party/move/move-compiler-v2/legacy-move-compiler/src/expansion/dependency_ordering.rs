@@ -596,6 +596,15 @@ fn exp(context: &mut Context, sp!(_loc, e_): &E::Exp) {
             types_opt(context, type_args);
             args.iter().for_each(|e| exp(context, e))
         },
+        E::LabeledCall(_, name, type_args, sp!(_, args)) => {
+            module_access(context, name);
+            types_opt(context, type_args);
+            args.iter().for_each(|e| exp(context, e))
+        },
+        E::LabeledIndex(_, target, index) => {
+            exp(context, target);
+            exp(context, index)
+        },
     }
 }
 

@@ -191,7 +191,6 @@ Checkout our developer doc on our token standard https://aptos.dev/standards
 <pre><code><b>use</b> <a href="../../aptos-framework/doc/account.md#0x1_account">0x1::account</a>;
 <b>use</b> <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error">0x1::error</a>;
 <b>use</b> <a href="../../aptos-framework/doc/event.md#0x1_event">0x1::event</a>;
-<b>use</b> <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features">0x1::features</a>;
 <b>use</b> <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option">0x1::option</a>;
 <b>use</b> <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">0x1::signer</a>;
 <b>use</b> <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string">0x1::string</a>;
@@ -2576,15 +2575,7 @@ The token is owned at address owner
 
     // <a href="token.md#0x3_token_Burn">Burn</a> the tokens.
     <b>let</b> <a href="token.md#0x3_token_Token">Token</a> { id: _, amount: burned_amount, token_properties: _ } = <a href="token.md#0x3_token_withdraw_with_event_internal">withdraw_with_event_internal</a>(owner, token_id, amount);
-    <b>let</b> token_store = &<b>mut</b> <a href="token.md#0x3_token_TokenStore">TokenStore</a>[owner];
-    <b>if</b> (std::features::module_event_migration_enabled()) {
-        <a href="../../aptos-framework/doc/event.md#0x1_event_emit">event::emit</a>(<a href="token.md#0x3_token_Burn">Burn</a> { <a href="../../aptos-framework/doc/account.md#0x1_account">account</a>: owner, id: token_id, amount: burned_amount });
-    } <b>else</b> {
-        <a href="../../aptos-framework/doc/event.md#0x1_event_emit_event">event::emit_event</a>&lt;<a href="token.md#0x3_token_BurnTokenEvent">BurnTokenEvent</a>&gt;(
-            &<b>mut</b> token_store.burn_events,
-            <a href="token.md#0x3_token_BurnTokenEvent">BurnTokenEvent</a> { id: token_id, amount: burned_amount }
-        );
-    };
+    <a href="../../aptos-framework/doc/event.md#0x1_event_emit">event::emit</a>(<a href="token.md#0x3_token_Burn">Burn</a> { <a href="../../aptos-framework/doc/account.md#0x1_account">account</a>: owner, id: token_id, amount: burned_amount });
 
     <b>if</b> (token_data.maximum &gt; 0) {
         token_data.supply -= burned_amount;
@@ -2660,15 +2651,7 @@ Burn a token by the token owner
 
     // <a href="token.md#0x3_token_Burn">Burn</a> the tokens.
     <b>let</b> <a href="token.md#0x3_token_Token">Token</a> { id: _, amount: burned_amount, token_properties: _ } = <a href="token.md#0x3_token_withdraw_token">withdraw_token</a>(owner, token_id, amount);
-    <b>let</b> token_store = &<b>mut</b> <a href="token.md#0x3_token_TokenStore">TokenStore</a>[<a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(owner)];
-    <b>if</b> (std::features::module_event_migration_enabled()) {
-        <a href="../../aptos-framework/doc/event.md#0x1_event_emit">event::emit</a>(<a href="token.md#0x3_token_Burn">Burn</a> { <a href="../../aptos-framework/doc/account.md#0x1_account">account</a>: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(owner), id: token_id, amount: burned_amount });
-    } <b>else</b> {
-        <a href="../../aptos-framework/doc/event.md#0x1_event_emit_event">event::emit_event</a>&lt;<a href="token.md#0x3_token_BurnTokenEvent">BurnTokenEvent</a>&gt;(
-            &<b>mut</b> token_store.burn_events,
-            <a href="token.md#0x3_token_BurnTokenEvent">BurnTokenEvent</a> { id: token_id, amount: burned_amount }
-        );
-    };
+    <a href="../../aptos-framework/doc/event.md#0x1_event_emit">event::emit</a>(<a href="token.md#0x3_token_Burn">Burn</a> { <a href="../../aptos-framework/doc/account.md#0x1_account">account</a>: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(owner), id: token_id, amount: burned_amount });
 
     // Decrease the supply correspondingly by the amount of tokens burned.
     <b>let</b> token_data = collections.token_data.borrow_mut(token_id.token_data_id);
@@ -3057,27 +3040,14 @@ Mutate the token_properties of one token.
         };
         <a href="token.md#0x3_token_direct_deposit">direct_deposit</a>(token_owner, new_token);
         <a href="token.md#0x3_token_update_token_property_internal">update_token_property_internal</a>(token_owner, new_token_id, keys, values, types);
-        <b>if</b> (std::features::module_event_migration_enabled()) {
-            <a href="../../aptos-framework/doc/event.md#0x1_event_emit">event::emit</a>(<a href="token.md#0x3_token_MutatePropertyMap">MutatePropertyMap</a> {
-                <a href="../../aptos-framework/doc/account.md#0x1_account">account</a>: token_owner,
-                old_id: token_id,
-                new_id: new_token_id,
-                keys,
-                values,
-                types
-            });
-        } <b>else</b> {
-            <a href="../../aptos-framework/doc/event.md#0x1_event_emit_event">event::emit_event</a>&lt;<a href="token.md#0x3_token_MutateTokenPropertyMapEvent">MutateTokenPropertyMapEvent</a>&gt;(
-                &<b>mut</b> <a href="token.md#0x3_token_TokenStore">TokenStore</a>[token_owner].mutate_token_property_events,
-                <a href="token.md#0x3_token_MutateTokenPropertyMapEvent">MutateTokenPropertyMapEvent</a> {
-                    old_id: token_id,
-                    new_id: new_token_id,
-                    keys,
-                    values,
-                    types
-                },
-            );
-        };
+        <a href="../../aptos-framework/doc/event.md#0x1_event_emit">event::emit</a>(<a href="token.md#0x3_token_MutatePropertyMap">MutatePropertyMap</a> {
+            <a href="../../aptos-framework/doc/account.md#0x1_account">account</a>: token_owner,
+            old_id: token_id,
+            new_id: new_token_id,
+            keys,
+            values,
+            types
+        });
 
         token_data.largest_property_version = cur_property_version;
         // burn the orignial property_version 0 <a href="token.md#0x3_token">token</a> after mutation
@@ -3086,27 +3056,14 @@ Mutate the token_properties of one token.
     } <b>else</b> {
         // only 1 <b>copy</b> for the <a href="token.md#0x3_token">token</a> <b>with</b> property verion bigger than 0
         <a href="token.md#0x3_token_update_token_property_internal">update_token_property_internal</a>(token_owner, token_id, keys, values, types);
-        <b>if</b> (std::features::module_event_migration_enabled()) {
-            <a href="../../aptos-framework/doc/event.md#0x1_event_emit">event::emit</a>(<a href="token.md#0x3_token_MutatePropertyMap">MutatePropertyMap</a> {
-                <a href="../../aptos-framework/doc/account.md#0x1_account">account</a>: token_owner,
-                old_id: token_id,
-                new_id: token_id,
-                keys,
-                values,
-                types
-            });
-        } <b>else</b> {
-            <a href="../../aptos-framework/doc/event.md#0x1_event_emit_event">event::emit_event</a>&lt;<a href="token.md#0x3_token_MutateTokenPropertyMapEvent">MutateTokenPropertyMapEvent</a>&gt;(
-                &<b>mut</b> <a href="token.md#0x3_token_TokenStore">TokenStore</a>[token_owner].mutate_token_property_events,
-                <a href="token.md#0x3_token_MutateTokenPropertyMapEvent">MutateTokenPropertyMapEvent</a> {
-                    old_id: token_id,
-                    new_id: token_id,
-                    keys,
-                    values,
-                    types
-                },
-            );
-        };
+        <a href="../../aptos-framework/doc/event.md#0x1_event_emit">event::emit</a>(<a href="token.md#0x3_token_MutatePropertyMap">MutatePropertyMap</a> {
+            <a href="../../aptos-framework/doc/account.md#0x1_account">account</a>: token_owner,
+            old_id: token_id,
+            new_id: token_id,
+            keys,
+            values,
+            types
+        });
         token_id
     }
 }
@@ -3592,29 +3549,15 @@ Create a new collection to hold tokens
     };
 
     collection_data.add(name, collection);
-    <b>let</b> collection_handle = &<b>mut</b> <a href="token.md#0x3_token_Collections">Collections</a>[account_addr];
-    <b>if</b> (std::features::module_event_migration_enabled()) {
-        <a href="../../aptos-framework/doc/event.md#0x1_event_emit">event::emit</a>(
-            <a href="token.md#0x3_token_CreateCollection">CreateCollection</a> {
-                creator: account_addr,
-                collection_name: name,
-                uri,
-                description,
-                maximum,
-            }
-        );
-    } <b>else</b> {
-        <a href="../../aptos-framework/doc/event.md#0x1_event_emit_event">event::emit_event</a>&lt;<a href="token.md#0x3_token_CreateCollectionEvent">CreateCollectionEvent</a>&gt;(
-            &<b>mut</b> collection_handle.create_collection_events,
-            <a href="token.md#0x3_token_CreateCollectionEvent">CreateCollectionEvent</a> {
-                creator: account_addr,
-                collection_name: name,
-                uri,
-                description,
-                maximum,
-            }
-        );
-    };
+    <a href="../../aptos-framework/doc/event.md#0x1_event_emit">event::emit</a>(
+        <a href="token.md#0x3_token_CreateCollection">CreateCollection</a> {
+            creator: account_addr,
+            collection_name: name,
+            uri,
+            description,
+            maximum,
+        }
+    );
 }
 </code></pre>
 
@@ -3761,43 +3704,23 @@ Create a new collection to hold tokens
     };
 
     collections.token_data.add(token_data_id, token_data);
-    <b>if</b> (std::features::module_event_migration_enabled()) {
-        <a href="../../aptos-framework/doc/event.md#0x1_event_emit">event::emit</a>(
-            <a href="token.md#0x3_token_TokenDataCreation">TokenDataCreation</a> {
-                creator: account_addr,
-                id: token_data_id,
-                description,
-                maximum,
-                uri,
-                royalty_payee_address,
-                royalty_points_denominator,
-                royalty_points_numerator,
-                name,
-                mutability_config: token_mutate_config,
-                property_keys,
-                property_values,
-                property_types,
-            }
-        );
-    } <b>else</b> {
-        <a href="../../aptos-framework/doc/event.md#0x1_event_emit_event">event::emit_event</a>&lt;<a href="token.md#0x3_token_CreateTokenDataEvent">CreateTokenDataEvent</a>&gt;(
-            &<b>mut</b> collections.create_token_data_events,
-            <a href="token.md#0x3_token_CreateTokenDataEvent">CreateTokenDataEvent</a> {
-                id: token_data_id,
-                description,
-                maximum,
-                uri,
-                royalty_payee_address,
-                royalty_points_denominator,
-                royalty_points_numerator,
-                name,
-                mutability_config: token_mutate_config,
-                property_keys,
-                property_values,
-                property_types,
-            },
-        );
-    };
+    <a href="../../aptos-framework/doc/event.md#0x1_event_emit">event::emit</a>(
+        <a href="token.md#0x3_token_TokenDataCreation">TokenDataCreation</a> {
+            creator: account_addr,
+            id: token_data_id,
+            description,
+            maximum,
+            uri,
+            royalty_payee_address,
+            royalty_points_denominator,
+            royalty_points_numerator,
+            name,
+            mutability_config: token_mutate_config,
+            property_keys,
+            property_values,
+            property_types,
+        }
+    );
 
     token_data_id
 }
@@ -4131,17 +4054,7 @@ return the TokenId for a given Token
 
     // we add more tokens <b>with</b> property_version 0
     <b>let</b> token_id = <a href="token.md#0x3_token_create_token_id">create_token_id</a>(token_data_id, 0);
-    <b>if</b> (std::features::module_event_migration_enabled()) {
-        <a href="../../aptos-framework/doc/event.md#0x1_event_emit">event::emit</a>(<a href="token.md#0x3_token_Mint">Mint</a> { creator: creator_addr, id: token_data_id, amount })
-    } <b>else</b> {
-        <a href="../../aptos-framework/doc/event.md#0x1_event_emit_event">event::emit_event</a>&lt;<a href="token.md#0x3_token_MintTokenEvent">MintTokenEvent</a>&gt;(
-            &<b>mut</b> <a href="token.md#0x3_token_Collections">Collections</a>[creator_addr].mint_token_events,
-            <a href="token.md#0x3_token_MintTokenEvent">MintTokenEvent</a> {
-                id: token_data_id,
-                amount,
-            }
-        );
-    };
+    <a href="../../aptos-framework/doc/event.md#0x1_event_emit">event::emit</a>(<a href="token.md#0x3_token_Mint">Mint</a> { creator: creator_addr, id: token_data_id, amount });
 
     <a href="token.md#0x3_token_deposit_token">deposit_token</a>(<a href="../../aptos-framework/doc/account.md#0x1_account">account</a>,
         <a href="token.md#0x3_token_Token">Token</a> {
@@ -4199,17 +4112,7 @@ create tokens and directly deposite to receiver's address. The receiver should o
     // we add more tokens <b>with</b> property_version 0
     <b>let</b> token_id = <a href="token.md#0x3_token_create_token_id">create_token_id</a>(token_data_id, 0);
 
-    <b>if</b> (std::features::module_event_migration_enabled()) {
-        <a href="../../aptos-framework/doc/event.md#0x1_event_emit">event::emit</a>(<a href="token.md#0x3_token_Mint">Mint</a> { creator: creator_addr, id: token_data_id, amount })
-    } <b>else</b> {
-        <a href="../../aptos-framework/doc/event.md#0x1_event_emit_event">event::emit_event</a>&lt;<a href="token.md#0x3_token_MintTokenEvent">MintTokenEvent</a>&gt;(
-            &<b>mut</b> <a href="token.md#0x3_token_Collections">Collections</a>[creator_addr].mint_token_events,
-            <a href="token.md#0x3_token_MintTokenEvent">MintTokenEvent</a> {
-                id: token_data_id,
-                amount,
-            }
-        );
-    };
+    <a href="../../aptos-framework/doc/event.md#0x1_event_emit">event::emit</a>(<a href="token.md#0x3_token_Mint">Mint</a> { creator: creator_addr, id: token_data_id, amount });
 
     <a href="token.md#0x3_token_direct_deposit">direct_deposit</a>(receiver,
         <a href="token.md#0x3_token_Token">Token</a> {
@@ -5087,15 +4990,7 @@ return if the collection maximum is mutable with collection mutability config
         <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_not_found">error::not_found</a>(<a href="token.md#0x3_token_ETOKEN_STORE_NOT_PUBLISHED">ETOKEN_STORE_NOT_PUBLISHED</a>),
     );
 
-    <b>let</b> token_store = &<b>mut</b> <a href="token.md#0x3_token_TokenStore">TokenStore</a>[account_addr];
-    <b>if</b> (std::features::module_event_migration_enabled()) {
-        <a href="../../aptos-framework/doc/event.md#0x1_event_emit">event::emit</a>(<a href="token.md#0x3_token_TokenWithdraw">TokenWithdraw</a> { <a href="../../aptos-framework/doc/account.md#0x1_account">account</a>: account_addr, id, amount })
-    } <b>else</b> {
-        <a href="../../aptos-framework/doc/event.md#0x1_event_emit_event">event::emit_event</a>&lt;<a href="token.md#0x3_token_WithdrawEvent">WithdrawEvent</a>&gt;(
-            &<b>mut</b> token_store.withdraw_events,
-            <a href="token.md#0x3_token_WithdrawEvent">WithdrawEvent</a> { id, amount }
-        );
-    };
+    <a href="../../aptos-framework/doc/event.md#0x1_event_emit">event::emit</a>(<a href="token.md#0x3_token_TokenWithdraw">TokenWithdraw</a> { <a href="../../aptos-framework/doc/account.md#0x1_account">account</a>: account_addr, id, amount });
 
     <b>let</b> tokens = &<b>mut</b> <a href="token.md#0x3_token_TokenStore">TokenStore</a>[account_addr].tokens;
     <b>assert</b>!(
@@ -5172,14 +5067,7 @@ Deposit the token balance into the recipients account and emit an event.
     <b>assert</b>!(<a href="token.md#0x3_token">token</a>.amount &gt; 0, <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="token.md#0x3_token_ETOKEN_CANNOT_HAVE_ZERO_AMOUNT">ETOKEN_CANNOT_HAVE_ZERO_AMOUNT</a>));
     <b>let</b> token_store = &<b>mut</b> <a href="token.md#0x3_token_TokenStore">TokenStore</a>[account_addr];
 
-    <b>if</b> (std::features::module_event_migration_enabled()) {
-        <a href="../../aptos-framework/doc/event.md#0x1_event_emit">event::emit</a>(<a href="token.md#0x3_token_TokenDeposit">TokenDeposit</a> { <a href="../../aptos-framework/doc/account.md#0x1_account">account</a>: account_addr, id: <a href="token.md#0x3_token">token</a>.id, amount: <a href="token.md#0x3_token">token</a>.amount });
-    } <b>else</b> {
-        <a href="../../aptos-framework/doc/event.md#0x1_event_emit_event">event::emit_event</a>&lt;<a href="token.md#0x3_token_DepositEvent">DepositEvent</a>&gt;(
-            &<b>mut</b> token_store.deposit_events,
-            <a href="token.md#0x3_token_DepositEvent">DepositEvent</a> { id: <a href="token.md#0x3_token">token</a>.id, amount: <a href="token.md#0x3_token">token</a>.amount },
-        );
-    };
+    <a href="../../aptos-framework/doc/event.md#0x1_event_emit">event::emit</a>(<a href="token.md#0x3_token_TokenDeposit">TokenDeposit</a> { <a href="../../aptos-framework/doc/account.md#0x1_account">account</a>: account_addr, id: <a href="token.md#0x3_token">token</a>.id, amount: <a href="token.md#0x3_token">token</a>.amount });
 
     <b>assert</b>!(
         <b>exists</b>&lt;<a href="token.md#0x3_token_TokenStore">TokenStore</a>&gt;(account_addr),

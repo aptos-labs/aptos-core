@@ -4,15 +4,22 @@
 use crate::{
     metrics,
     peer_states::{key_value::StateValueInterface, request_tracker::RequestTracker},
-    Error, LogEntry, LogEvent, LogSchema,
+    Error, LogEntry, LogEvent, LogSchema, PeerMonitoringServiceClient,
 };
 use aptos_config::{config::LatencyMonitoringConfig, network_id::PeerNetworkId};
 use aptos_infallible::RwLock;
-use aptos_logger::{error, warn};
-use aptos_network::application::metadata::PeerMetadata;
+use aptos_logger::{error, info, warn};
+use aptos_network::{
+    application::{
+        interface::{NetworkClient, NetworkClientInterface},
+        metadata::PeerMetadata,
+    },
+    peer::DisconnectReason,
+};
 use aptos_peer_monitoring_service_types::{
     request::{LatencyPingRequest, PeerMonitoringServiceRequest},
     response::PeerMonitoringServiceResponse,
+    PeerMonitoringServiceMessage,
 };
 use aptos_time_service::TimeService;
 use std::{
@@ -20,20 +27,30 @@ use std::{
     fmt,
     fmt::{Display, Formatter},
     sync::Arc,
+    time::Duration,
 };
+
+// The timeout for disconnecting from a peer after too many ping failures
+const DISCONNECT_TIMEOUT_SECS: u64 = 1;
 
 /// A simple container that holds a peer's latency info
 #[derive(Clone, Debug)]
-pub struct LatencyInfoState {
+pub struct LatencyInfoState<
+    T: NetworkClientInterface<PeerMonitoringServiceMessage> + 'static = NetworkClient<
+        PeerMonitoringServiceMessage,
+    >,
+> {
     latency_monitoring_config: LatencyMonitoringConfig, // The config for latency monitoring
     latency_ping_counter: u64, // The monotonically increasing counter for each ping
+    peer_monitoring_client: PeerMonitoringServiceClient<T>, // The network client for disconnects
     recorded_latency_ping_durations_secs: BTreeMap<u64, f64>, // Successful ping durations by counter (secs)
     request_tracker: Arc<RwLock<RequestTracker>>, // The request tracker for latency ping requests
 }
 
-impl LatencyInfoState {
+impl<T: NetworkClientInterface<PeerMonitoringServiceMessage> + 'static> LatencyInfoState<T> {
     pub fn new(
         latency_monitoring_config: LatencyMonitoringConfig,
+        peer_monitoring_client: PeerMonitoringServiceClient<T>,
         time_service: TimeService,
     ) -> Self {
         let request_tracker = RequestTracker::new(
@@ -44,6 +61,7 @@ impl LatencyInfoState {
         Self {
             latency_monitoring_config,
             latency_ping_counter: 0,
+            peer_monitoring_client,
             recorded_latency_ping_durations_secs: BTreeMap::new(),
             request_tracker: Arc::new(RwLock::new(request_tracker)),
         }
@@ -56,18 +74,37 @@ impl LatencyInfoState {
         latency_ping_counter
     }
 
-    /// Handles a ping failure for the specified peer
+    /// Handles a ping failure for the specified peer. If too many consecutive
+    /// failures occur and disconnect is enabled, disconnects from the peer.
     fn handle_request_failure(&self, peer_network_id: &PeerNetworkId) {
         // Update the number of ping failures for the request tracker
         self.request_tracker.write().record_response_failure();
 
-        // TODO: If the number of ping failures is too high, disconnect from the node
+        // Check if the number of ping failures is too high
         let num_consecutive_failures = self.request_tracker.read().get_num_consecutive_failures();
         if num_consecutive_failures >= self.latency_monitoring_config.max_latency_ping_failures {
-            warn!(LogSchema::new(LogEntry::LatencyPing)
-                .event(LogEvent::TooManyPingFailures)
-                .peer(peer_network_id)
-                .message("Too many ping failures occurred for the peer!"));
+            // Check if we should disconnect from the peer
+            if self
+                .latency_monitoring_config
+                .disconnect_from_peers_on_failures
+            {
+                warn!(LogSchema::new(LogEntry::LatencyPing)
+                    .event(LogEvent::TooManyPingFailures)
+                    .peer(peer_network_id)
+                    .message("Too many ping failures occurred for the peer! Disconnecting."));
+
+                // Spawn a task to disconnect from the peer (asynchronously, to avoid blocking)
+                let peer_monitoring_client = self.peer_monitoring_client.clone();
+                let peer_network_id = *peer_network_id;
+                tokio::spawn(async move {
+                    disconnect_from_peer(peer_monitoring_client, peer_network_id).await;
+                });
+            } else {
+                warn!(LogSchema::new(LogEntry::LatencyPing)
+                    .event(LogEvent::TooManyPingFailures)
+                    .peer(peer_network_id)
+                    .message("Too many ping failures for the peer, but disconnect is disabled."));
+            }
         }
     }
 
@@ -124,7 +161,57 @@ impl LatencyInfoState {
     }
 }
 
-impl StateValueInterface for LatencyInfoState {
+/// Disconnects from the specified peer due to too many ping failures
+async fn disconnect_from_peer<T: NetworkClientInterface<PeerMonitoringServiceMessage>>(
+    peer_monitoring_client: PeerMonitoringServiceClient<T>,
+    peer_network_id: PeerNetworkId,
+) {
+    // Log the disconnect attempt
+    info!(LogSchema::new(LogEntry::LatencyPing)
+        .event(LogEvent::TooManyPingFailures)
+        .peer(&peer_network_id)
+        .message("Disconnecting from peer due to too many ping failures"));
+
+    // Disconnect from the peer with a timeout (to prevent hanging indefinitely)
+    let disconnect_result = tokio::time::timeout(
+        Duration::from_secs(DISCONNECT_TIMEOUT_SECS),
+        peer_monitoring_client
+            .disconnect_from_peer(peer_network_id, DisconnectReason::PeerMonitoringPingFailure),
+    )
+    .await;
+
+    // Log any errors
+    match disconnect_result {
+        Ok(Ok(())) => {
+            info!(LogSchema::new(LogEntry::LatencyPing)
+                .event(LogEvent::TooManyPingFailures)
+                .peer(&peer_network_id)
+                .message("Successfully disconnected from peer!"));
+        },
+        Ok(Err(error)) => {
+            warn!(LogSchema::new(LogEntry::LatencyPing)
+                .event(LogEvent::TooManyPingFailures)
+                .peer(&peer_network_id)
+                .message(&format!(
+                    "Failed to disconnect from peer! Error: {:?}",
+                    error
+                )));
+        },
+        Err(error) => {
+            warn!(LogSchema::new(LogEntry::LatencyPing)
+                .event(LogEvent::TooManyPingFailures)
+                .peer(&peer_network_id)
+                .message(&format!(
+                    "Timeout while disconnecting from peer! Error: {:?}",
+                    error
+                )));
+        },
+    }
+}
+
+impl<T: NetworkClientInterface<PeerMonitoringServiceMessage>> StateValueInterface
+    for LatencyInfoState<T>
+{
     fn create_monitoring_service_request(&mut self) -> PeerMonitoringServiceRequest {
         let ping_counter = self.get_and_increment_latency_ping_counter();
         PeerMonitoringServiceRequest::LatencyPing(LatencyPingRequest { ping_counter })
@@ -199,15 +286,15 @@ impl StateValueInterface for LatencyInfoState {
         peer_network_id: &PeerNetworkId,
         error: Error,
     ) {
-        // Handle the failure
-        self.handle_request_failure(peer_network_id);
-
         // Log the error
         warn!(LogSchema::new(LogEntry::LatencyPing)
             .event(LogEvent::ResponseError)
             .message("Error encountered when pinging peer!")
             .peer(peer_network_id)
             .error(&error));
+
+        // Handle the failure
+        self.handle_request_failure(peer_network_id);
     }
 
     fn update_peer_state_metrics(&self, peer_network_id: &PeerNetworkId) {
@@ -222,7 +309,7 @@ impl StateValueInterface for LatencyInfoState {
     }
 }
 
-impl Display for LatencyInfoState {
+impl<T: NetworkClientInterface<PeerMonitoringServiceMessage>> Display for LatencyInfoState<T> {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         write!(
             f,
@@ -234,35 +321,173 @@ impl Display for LatencyInfoState {
 
 #[cfg(test)]
 mod test {
-    use crate::peer_states::{key_value::StateValueInterface, latency_info::LatencyInfoState};
+    use crate::{
+        peer_states::{
+            key_value::StateValueInterface,
+            latency_info::{LatencyInfoState, DISCONNECT_TIMEOUT_SECS},
+        },
+        Error, PeerMonitoringServiceClient,
+    };
     use aptos_config::{
         config::{LatencyMonitoringConfig, PeerRole},
         network_id::{NetworkId, PeerNetworkId},
     };
+    use aptos_infallible::RwLock;
     use aptos_netcore::transport::ConnectionOrigin;
     use aptos_network::{
-        application::metadata::PeerMetadata,
+        application::{
+            interface::NetworkClientInterface, metadata::PeerMetadata, storage::PeersAndMetadata,
+        },
+        peer::DisconnectReason,
         protocols::wire::handshake::v1::{MessagingProtocolVersion, ProtocolIdSet},
         transport::{ConnectionId, ConnectionMetadata},
     };
     use aptos_peer_monitoring_service_types::{
         request::{LatencyPingRequest, PeerMonitoringServiceRequest},
         response::{LatencyPingResponse, PeerMonitoringServiceResponse},
+        PeerMonitoringServiceMessage,
     };
     use aptos_time_service::TimeService;
     use aptos_types::{network_address::NetworkAddress, PeerId};
+    use async_trait::async_trait;
+    use bytes::Bytes;
     use rand::{rngs::OsRng, Rng};
-    use std::{cmp::min, str::FromStr};
+    use std::{cmp::min, collections::HashMap, str::FromStr, sync::Arc, time::Duration};
+    use tokio::time::sleep;
 
     // Useful test constants
     const TEST_NETWORK_ADDRESS: &str = "/ip4/127.0.0.1/tcp/8081";
+
+    /// A mock network client that tracks disconnect calls for testing
+    #[derive(Clone, Debug)]
+    struct MockNetworkClient {
+        /// Tracks all disconnect calls: (peer_network_id, disconnect_reason)
+        disconnect_calls: Arc<RwLock<Vec<(PeerNetworkId, DisconnectReason)>>>,
+        /// The peers and metadata container
+        peers_and_metadata: Arc<PeersAndMetadata>,
+    }
+
+    impl MockNetworkClient {
+        fn new() -> Self {
+            Self {
+                disconnect_calls: Arc::new(RwLock::new(Vec::new())),
+                peers_and_metadata: PeersAndMetadata::new(&[NetworkId::Validator]),
+            }
+        }
+
+        /// Returns the number of disconnect calls made
+        fn get_disconnect_call_count(&self) -> usize {
+            self.disconnect_calls.read().len()
+        }
+
+        /// Returns the disconnect calls made
+        fn get_disconnect_calls(&self) -> Vec<(PeerNetworkId, DisconnectReason)> {
+            self.disconnect_calls.read().clone()
+        }
+    }
+
+    #[async_trait]
+    impl NetworkClientInterface<PeerMonitoringServiceMessage> for MockNetworkClient {
+        async fn add_peers_to_discovery(
+            &self,
+            _peers: &[(PeerNetworkId, NetworkAddress)],
+        ) -> Result<(), aptos_network::application::error::Error> {
+            Ok(())
+        }
+
+        async fn disconnect_from_peer(
+            &self,
+            peer: PeerNetworkId,
+            disconnect_reason: DisconnectReason,
+        ) -> Result<(), aptos_network::application::error::Error> {
+            self.disconnect_calls
+                .write()
+                .push((peer, disconnect_reason));
+            Ok(())
+        }
+
+        fn get_available_peers(
+            &self,
+        ) -> Result<Vec<PeerNetworkId>, aptos_network::application::error::Error> {
+            Ok(vec![])
+        }
+
+        fn get_peers_and_metadata(&self) -> Arc<PeersAndMetadata> {
+            self.peers_and_metadata.clone()
+        }
+
+        fn send_to_peer(
+            &self,
+            _message: PeerMonitoringServiceMessage,
+            _peer: PeerNetworkId,
+        ) -> Result<(), aptos_network::application::error::Error> {
+            Ok(())
+        }
+
+        fn send_to_peer_raw(
+            &self,
+            _message: Bytes,
+            _peer: PeerNetworkId,
+        ) -> Result<(), aptos_network::application::error::Error> {
+            Ok(())
+        }
+
+        fn send_to_peers(
+            &self,
+            _message: PeerMonitoringServiceMessage,
+            _peers: Vec<PeerNetworkId>,
+        ) -> Result<(), aptos_network::application::error::Error> {
+            Ok(())
+        }
+
+        async fn send_to_peer_rpc(
+            &self,
+            _message: PeerMonitoringServiceMessage,
+            _rpc_timeout: Duration,
+            _peer: PeerNetworkId,
+        ) -> Result<PeerMonitoringServiceMessage, aptos_network::application::error::Error>
+        {
+            Err(aptos_network::application::error::Error::UnexpectedError(
+                "Not implemented".to_string(),
+            ))
+        }
+
+        async fn send_to_peer_rpc_raw(
+            &self,
+            _message: Bytes,
+            _rpc_timeout: Duration,
+            _peer: PeerNetworkId,
+        ) -> Result<PeerMonitoringServiceMessage, aptos_network::application::error::Error>
+        {
+            Err(aptos_network::application::error::Error::UnexpectedError(
+                "Not implemented".to_string(),
+            ))
+        }
+
+        fn to_bytes_by_protocol(
+            &self,
+            _peers: Vec<PeerNetworkId>,
+            _message: PeerMonitoringServiceMessage,
+        ) -> anyhow::Result<HashMap<PeerNetworkId, Bytes>> {
+            Ok(HashMap::new())
+        }
+
+        fn sort_peers_by_latency(&self, _network: NetworkId, _peers: &mut [PeerId]) {
+            // No-op for mock
+        }
+    }
 
     #[test]
     fn test_verify_latency_info_state() {
         // Create the latency info state
         let latency_monitoring_config = LatencyMonitoringConfig::default();
+        let (peer_monitoring_client, _) = create_mock_peer_monitoring_client();
         let time_service = TimeService::mock();
-        let mut latency_info_state = LatencyInfoState::new(latency_monitoring_config, time_service);
+        let mut latency_info_state = LatencyInfoState::new(
+            latency_monitoring_config,
+            peer_monitoring_client,
+            time_service,
+        );
 
         // Verify the initial latency info state
         assert_eq!(latency_info_state.latency_ping_counter, 0);
@@ -307,8 +532,13 @@ mod test {
     fn test_verify_latency_info_garbage_collection() {
         // Create the latency info state
         let latency_monitoring_config = LatencyMonitoringConfig::default();
+        let (peer_monitoring_client, _) = create_mock_peer_monitoring_client();
         let time_service = TimeService::mock();
-        let mut latency_info_state = LatencyInfoState::new(latency_monitoring_config, time_service);
+        let mut latency_info_state = LatencyInfoState::new(
+            latency_monitoring_config,
+            peer_monitoring_client,
+            time_service,
+        );
 
         // Verify the initial latency info state
         assert_eq!(latency_info_state.latency_ping_counter, 0);
@@ -359,6 +589,188 @@ mod test {
         }
     }
 
+    #[tokio::test]
+    async fn test_disconnect_called_on_max_failures() {
+        // Create a latency monitoring config (with disconnect enabled)
+        let latency_monitoring_config = LatencyMonitoringConfig {
+            disconnect_from_peers_on_failures: true,
+            max_latency_ping_failures: 3,
+            ..LatencyMonitoringConfig::default()
+        };
+
+        // Create a latency info state with the mock network client
+        let (peer_monitoring_client, mock_network_client) = create_mock_peer_monitoring_client();
+        let mut latency_info_state = LatencyInfoState::new(
+            latency_monitoring_config,
+            peer_monitoring_client,
+            TimeService::mock(),
+        );
+
+        // Verify no disconnect calls initially
+        assert_eq!(mock_network_client.get_disconnect_call_count(), 0);
+
+        // Create a test peer
+        let peer_network_id = PeerNetworkId::new(NetworkId::Validator, PeerId::random());
+
+        // Trigger failures up to but not exceeding the threshold
+        trigger_ping_failures(
+            &mut latency_info_state,
+            &peer_network_id,
+            latency_monitoring_config.max_latency_ping_failures - 1,
+        );
+
+        // Give the disconnect task time to complete
+        sleep(Duration::from_secs(DISCONNECT_TIMEOUT_SECS)).await;
+
+        // Verify no disconnect was called yet (below threshold)
+        assert_eq!(mock_network_client.get_disconnect_call_count(), 0);
+
+        // Trigger one more failure to exceed the threshold
+        trigger_ping_failures(&mut latency_info_state, &peer_network_id, 1);
+
+        // Give the disconnect task time to complete
+        sleep(Duration::from_secs(DISCONNECT_TIMEOUT_SECS)).await;
+
+        // Verify disconnect was called
+        assert_eq!(mock_network_client.get_disconnect_call_count(), 1);
+
+        // Verify the disconnect was for the correct peer and reason
+        let disconnect_calls = mock_network_client.get_disconnect_calls();
+        let (called_peer_network_id, disconnect_reason) = disconnect_calls.first().unwrap();
+        assert_eq!(called_peer_network_id, &peer_network_id);
+        assert!(matches!(
+            disconnect_reason,
+            DisconnectReason::PeerMonitoringPingFailure
+        ));
+    }
+
+    #[tokio::test]
+    async fn test_disconnect_not_called_when_disabled() {
+        // Create a latency monitoring config (with disconnect disabled)
+        let latency_monitoring_config = LatencyMonitoringConfig {
+            disconnect_from_peers_on_failures: false,
+            max_latency_ping_failures: 3,
+            ..LatencyMonitoringConfig::default()
+        };
+
+        // Create a latency info state with the mock network client
+        let (peer_monitoring_client, mock_network_client) = create_mock_peer_monitoring_client();
+        let mut latency_info_state = LatencyInfoState::new(
+            latency_monitoring_config,
+            peer_monitoring_client,
+            TimeService::mock(),
+        );
+
+        // Create a test peer
+        let peer_network_id = PeerNetworkId::new(NetworkId::Validator, PeerId::random());
+
+        // Trigger failures exceeding the threshold
+        trigger_ping_failures(
+            &mut latency_info_state,
+            &peer_network_id,
+            latency_monitoring_config.max_latency_ping_failures + 5,
+        );
+
+        // Give the disconnect task time to complete
+        sleep(Duration::from_secs(DISCONNECT_TIMEOUT_SECS)).await;
+
+        // Verify disconnect was not called (config is disabled)
+        assert_eq!(mock_network_client.get_disconnect_call_count(), 0);
+    }
+
+    #[tokio::test]
+    async fn test_disconnect_called_multiple_times_for_continued_failures() {
+        // Create a latency monitoring config (with disconnect enabled)
+        let latency_monitoring_config = LatencyMonitoringConfig {
+            disconnect_from_peers_on_failures: true,
+            max_latency_ping_failures: 2,
+            ..LatencyMonitoringConfig::default()
+        };
+
+        // Create a latency info state with the mock network client
+        let (peer_monitoring_client, mock_network_client) = create_mock_peer_monitoring_client();
+        let mut latency_info_state = LatencyInfoState::new(
+            latency_monitoring_config,
+            peer_monitoring_client,
+            TimeService::mock(),
+        );
+
+        // Create a test peer
+        let peer_network_id = PeerNetworkId::new(NetworkId::Validator, PeerId::random());
+
+        // Trigger failures exceeding the threshold multiple times
+        trigger_ping_failures(&mut latency_info_state, &peer_network_id, 2);
+        sleep(Duration::from_secs(DISCONNECT_TIMEOUT_SECS)).await;
+        assert_eq!(mock_network_client.get_disconnect_call_count(), 1);
+
+        // Continued failures should trigger more disconnects
+        trigger_ping_failures(&mut latency_info_state, &peer_network_id, 1);
+        sleep(Duration::from_secs(DISCONNECT_TIMEOUT_SECS)).await;
+        assert_eq!(mock_network_client.get_disconnect_call_count(), 2);
+
+        // Additional failures should continue to trigger disconnects
+        trigger_ping_failures(&mut latency_info_state, &peer_network_id, 1);
+        sleep(Duration::from_secs(DISCONNECT_TIMEOUT_SECS)).await;
+        assert_eq!(mock_network_client.get_disconnect_call_count(), 3);
+    }
+
+    #[tokio::test]
+    async fn test_success_resets_failure_counter_no_disconnect() {
+        // Create a latency monitoring config (with disconnect enabled)
+        let latency_monitoring_config = LatencyMonitoringConfig {
+            disconnect_from_peers_on_failures: true,
+            max_latency_ping_failures: 3,
+            ..LatencyMonitoringConfig::default()
+        };
+
+        // Create a latency info state with the mock network client
+        let (peer_monitoring_client, mock_network_client) = create_mock_peer_monitoring_client();
+        let mut latency_info_state = LatencyInfoState::new(
+            latency_monitoring_config,
+            peer_monitoring_client,
+            TimeService::mock(),
+        );
+
+        // Create a test peer
+        let peer_network_id = PeerNetworkId::new(NetworkId::Validator, PeerId::random());
+
+        // Trigger failures up to but not exceeding the threshold
+        trigger_ping_failures(
+            &mut latency_info_state,
+            &peer_network_id,
+            latency_monitoring_config.max_latency_ping_failures - 1,
+        );
+        sleep(Duration::from_secs(DISCONNECT_TIMEOUT_SECS)).await;
+
+        // Verify no disconnect was called
+        assert_eq!(mock_network_client.get_disconnect_call_count(), 0);
+
+        // Record a successful ping (this resets the failure counter)
+        let ping_counter = latency_info_state.get_and_increment_latency_ping_counter();
+        latency_info_state.record_new_latency_and_reset_failures(ping_counter, 0.1);
+
+        // Trigger more failures, but less than the threshold
+        trigger_ping_failures(
+            &mut latency_info_state,
+            &peer_network_id,
+            latency_monitoring_config.max_latency_ping_failures - 1,
+        );
+        sleep(Duration::from_secs(DISCONNECT_TIMEOUT_SECS)).await;
+
+        // Verify disconnect was still not called (counter was reset)
+        assert_eq!(mock_network_client.get_disconnect_call_count(), 0);
+    }
+
+    /// Creates a peer monitoring service client with a mock network client
+    fn create_mock_peer_monitoring_client() -> (
+        PeerMonitoringServiceClient<MockNetworkClient>,
+        MockNetworkClient,
+    ) {
+        let mock_network_client = MockNetworkClient::new();
+        let peer_monitoring_client = PeerMonitoringServiceClient::new(mock_network_client.clone());
+        (peer_monitoring_client, mock_network_client)
+    }
+
     /// Returns a random U64
     fn get_random_u64() -> u64 {
         let mut rng = OsRng;
@@ -367,7 +779,7 @@ mod test {
 
     /// Handles a monitoring service response from a peer
     fn handle_monitoring_service_response(
-        latency_info_state: &mut LatencyInfoState,
+        latency_info_state: &mut LatencyInfoState<MockNetworkClient>,
         request_ping_counter: u64,
         response_ping_counter: u64,
         response_time_secs: f64,
@@ -407,8 +819,22 @@ mod test {
         );
     }
 
+    /// Triggers multiple ping failures for the given latency info state
+    fn trigger_ping_failures<T: NetworkClientInterface<PeerMonitoringServiceMessage> + 'static>(
+        latency_info_state: &mut LatencyInfoState<T>,
+        peer_network_id: &PeerNetworkId,
+        num_failures: u64,
+    ) {
+        for _ in 0..num_failures {
+            latency_info_state.handle_monitoring_service_response_error(
+                peer_network_id,
+                Error::UnexpectedError("Test ping failure".to_string()),
+            );
+        }
+    }
+
     /// Verifies that there are no recorded latency pings
-    fn verify_no_recorded_pings(latency_info_state: &mut LatencyInfoState) {
+    fn verify_no_recorded_pings(latency_info_state: &mut LatencyInfoState<MockNetworkClient>) {
         assert!(latency_info_state
             .recorded_latency_ping_durations_secs
             .is_empty());

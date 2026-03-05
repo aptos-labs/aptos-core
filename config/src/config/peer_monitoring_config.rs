@@ -42,6 +42,7 @@ impl Default for PeerMonitoringServiceConfig {
 #[derive(Clone, Copy, Debug, Deserialize, PartialEq, Eq, Serialize)]
 #[serde(default, deny_unknown_fields)]
 pub struct LatencyMonitoringConfig {
+    pub disconnect_from_peers_on_failures: bool, // Whether to disconnect from peers on failures
     pub latency_ping_interval_ms: u64, // The interval (ms) between latency pings for each peer
     pub latency_ping_timeout_ms: u64,  // The timeout (ms) for each latency ping
     pub max_latency_ping_failures: u64, // Max ping failures before the peer connection fails
@@ -51,8 +52,9 @@ pub struct LatencyMonitoringConfig {
 impl Default for LatencyMonitoringConfig {
     fn default() -> Self {
         Self {
-            latency_ping_interval_ms: 30_000, // 30 seconds
-            latency_ping_timeout_ms: 20_000,  // 20 seconds
+            disconnect_from_peers_on_failures: true, // Disconnect from peers on failures by default
+            latency_ping_interval_ms: 20_000,        // 20 seconds
+            latency_ping_timeout_ms: 20_000,         // 20 seconds
             max_latency_ping_failures: 3,
             max_num_latency_pings_to_retain: 10,
         }

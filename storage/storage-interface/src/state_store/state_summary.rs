@@ -316,7 +316,7 @@ impl<'db> ProvableStateSummary<'db> {
         // fetch and construct the corresponding `HotStateValue` for `key` at `version`, including
         // `hot_since_version`. However, the current in-memory hot state does not support this
         // query, and we might need persist hot state KV to db first.
-        if !use_hot_state && rand::random::<usize>() % 10000 == 0 {
+        if !use_hot_state && rand::random::<usize>().is_multiple_of(10000) {
             // 1 out of 10000 times, verify the proof.
             let (val_opt, proof) = self
                 .db
