@@ -6,7 +6,7 @@ use crate::{
     errors::{convert_epilogue_error, convert_prologue_error, expect_only_successful_execution},
     move_vm_ext::{AptosMoveResolver, SessionExt},
     system_module_names::{
-        EMIT_FEE_STATEMENT, MULTISIG_ACCOUNT_MODULE, TRANSACTION_FEE_MODULE,
+        EMIT_FEE_STATEMENT, EMIT_FEATURE_FEE, MULTISIG_ACCOUNT_MODULE, TRANSACTION_FEE_MODULE,
         VALIDATE_MULTISIG_TRANSACTION,
     },
     testing::{maybe_raise_injected_error, InjectedError},
@@ -15,7 +15,7 @@ use crate::{
 use aptos_gas_algebra::Gas;
 use aptos_types::{
     account_config::constants::CORE_CODE_ADDRESS,
-    fee_statement::FeeStatement,
+    fee_statement::{FeatureFee, FeeStatement},
     move_utils::as_move_value::AsMoveValue,
     on_chain_config::Features,
     transaction::{MultisigTransactionPayload, ReplayProtector, TransactionExecutableRef},
@@ -456,6 +456,7 @@ fn run_epilogue(
     serialized_signers: &SerializedSigners,
     gas_remaining: Gas,
     fee_statement: FeeStatement,
+    feature_fee_octas: u64,
     txn_data: &TransactionMetadata,
     features: &Features,
     traversal_context: &mut TraversalContext,
@@ -592,7 +593,14 @@ fn run_epilogue(
 
     // Emit the FeeStatement event
     if features.is_emit_fee_statement_enabled() {
-        emit_fee_statement(session, module_storage, fee_statement, traversal_context)?;
+        emit_fee_statement(session, module_storage, &fee_statement, traversal_context)?;
+        emit_feature_fee(
+            session,
+            module_storage,
+            feature_fee_octas,
+            features,
+            traversal_context,
+        )?;
     }
 
     maybe_raise_injected_error(InjectedError::EndOfRunEpilogue)?;
@@ -603,14 +611,44 @@ fn run_epilogue(
 fn emit_fee_statement(
     session: &mut SessionExt<impl AptosMoveResolver>,
     module_storage: &impl ModuleStorage,
-    fee_statement: FeeStatement,
+    fee_statement: &FeeStatement,
     traversal_context: &mut TraversalContext,
 ) -> VMResult<()> {
+    let bytes = bcs::to_bytes(fee_statement).expect("Failed to serialize fee statement");
     session.execute_function_bypass_visibility(
         &TRANSACTION_FEE_MODULE,
         EMIT_FEE_STATEMENT,
         vec![],
-        vec![bcs::to_bytes(&fee_statement).expect("Failed to serialize fee statement")],
+        vec![bytes],
+        &mut UnmeteredGasMeter,
+        traversal_context,
+        module_storage,
+    )?;
+    Ok(())
+}
+
+fn emit_feature_fee(
+    session: &mut SessionExt<impl AptosMoveResolver>,
+    module_storage: &impl ModuleStorage,
+    feature_fee_octas: u64,
+    features: &Features,
+    traversal_context: &mut TraversalContext,
+) -> VMResult<()> {
+    if !features.is_emit_feature_fee_enabled() {
+        return Ok(());
+    }
+    if feature_fee_octas == 0 {
+        return Ok(());
+    }
+    let bytes = bcs::to_bytes(&FeatureFee::Randomness {
+        fee_octas: feature_fee_octas,
+    })
+    .expect("Failed to serialize feature fee");
+    session.execute_function_bypass_visibility(
+        &TRANSACTION_FEE_MODULE,
+        EMIT_FEATURE_FEE,
+        vec![],
+        vec![bytes],
         &mut UnmeteredGasMeter,
         traversal_context,
         module_storage,
@@ -626,6 +664,7 @@ pub(crate) fn run_success_epilogue(
     serialized_signers: &SerializedSigners,
     gas_remaining: Gas,
     fee_statement: FeeStatement,
+    feature_fee_octas: u64,
     features: &Features,
     txn_data: &TransactionMetadata,
     log_context: &AdapterLogSchema,
@@ -645,6 +684,7 @@ pub(crate) fn run_success_epilogue(
         serialized_signers,
         gas_remaining,
         fee_statement,
+        feature_fee_octas,
         txn_data,
         features,
         traversal_context,
@@ -661,6 +701,7 @@ pub(crate) fn run_failure_epilogue(
     serialized_signers: &SerializedSigners,
     gas_remaining: Gas,
     fee_statement: FeeStatement,
+    feature_fee_octas: u64,
     features: &Features,
     txn_data: &TransactionMetadata,
     log_context: &AdapterLogSchema,
@@ -673,6 +714,7 @@ pub(crate) fn run_failure_epilogue(
         serialized_signers,
         gas_remaining,
         fee_statement,
+        feature_fee_octas,
         txn_data,
         features,
         traversal_context,

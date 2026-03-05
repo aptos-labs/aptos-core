@@ -238,6 +238,18 @@ impl TransactionGasLog {
             );
         }
 
+        // Randomness transaction cost (execution category)
+        if !self.exec_io.randomness_txn_cost.is_zero() {
+            data.insert(
+                "randomness_txn".to_string(),
+                json!(fmt_gas(self.exec_io.randomness_txn_cost)),
+            );
+            data.insert(
+                "randomness_txn-percentage".to_string(),
+                json!(exec_percentage(self.exec_io.randomness_txn_cost)),
+            );
+        }
+
         // Dependencies (execution category - loading modules is CPU work)
         let mut deps = self.exec_io.dependencies.clone();
         deps.sort_by(|lhs, rhs| rhs.cost.cmp(&lhs.cost));

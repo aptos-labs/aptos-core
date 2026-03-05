@@ -879,6 +879,17 @@ module std::features {
         is_enabled(ENCRYPTED_TRANSACTIONS)
     }
 
+    /// Whether the FeatureFee event emission is enabled.
+    const EMIT_FEATURE_FEE: u64 = 109;
+
+    public fun get_emit_feature_fee_feature(): u64 {
+        EMIT_FEATURE_FEE
+    }
+
+    public fun is_emit_feature_fee_enabled(): bool acquires Features {
+        is_enabled(EMIT_FEATURE_FEE)
+    }
+
     // ============================================================================================
     // Feature Flag Implementation
 

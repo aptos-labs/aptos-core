@@ -72,7 +72,14 @@ module aptos_framework::transaction_fee {
         /// Storage fee charge.
         storage_fee_octas: u64,
         /// Storage fee refund.
-        storage_fee_refund_octas: u64
+        storage_fee_refund_octas: u64,
+    }
+
+    #[event]
+    /// Separate event for feature-specific fees (e.g., randomness).
+    /// Emitted alongside FeeStatement when a feature fee is charged.
+    enum FeatureFee has drop, store {
+        Randomness { fee_octas: u64 },
     }
 
     /// Burn transaction fees in epilogue.
@@ -143,6 +150,11 @@ module aptos_framework::transaction_fee {
     // Called by the VM after epilogue.
     fun emit_fee_statement(fee_statement: FeeStatement) {
         event::emit(fee_statement)
+    }
+
+    // Called by the VM after epilogue when a feature fee is charged.
+    fun emit_feature_fee(feature_fee: FeatureFee) {
+        event::emit(feature_fee)
     }
 
     // DEPRECATED section:

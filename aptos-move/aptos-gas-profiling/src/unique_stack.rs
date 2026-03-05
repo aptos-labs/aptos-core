@@ -84,6 +84,7 @@ impl ExecutionAndIOCosts {
             intrinsic_cost: self.intrinsic_cost + other.intrinsic_cost,
             keyless_cost: self.keyless_cost + other.keyless_cost,
             slh_dsa_sha2_128s_cost: self.slh_dsa_sha2_128s_cost + other.slh_dsa_sha2_128s_cost,
+            randomness_txn_cost: self.randomness_txn_cost + other.randomness_txn_cost,
             dependencies: dependencies
                 .into_iter()
                 .map(|((kind, id, size), cost)| Dependency {

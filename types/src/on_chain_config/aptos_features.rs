@@ -167,6 +167,8 @@ pub enum FeatureFlag {
     SLH_DSA_SHA2_128S_SIGNATURE = 107,
     /// Whether EncryptedTransactions is enabled
     ENCRYPTED_TRANSACTIONS = 108,
+    /// Whether the FeatureFee event emission is enabled
+    EMIT_FEATURE_FEE = 109,
 }
 
 impl FeatureFlag {
@@ -478,6 +480,10 @@ impl Features {
 
     pub fn is_encrypted_transactions_enabled(&self) -> bool {
         self.is_enabled(FeatureFlag::ENCRYPTED_TRANSACTIONS)
+    }
+
+    pub fn is_emit_feature_fee_enabled(&self) -> bool {
+        self.is_emit_fee_statement_enabled() && self.is_enabled(FeatureFlag::EMIT_FEATURE_FEE)
     }
 
     pub fn get_max_identifier_size(&self) -> u64 {

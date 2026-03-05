@@ -100,6 +100,13 @@ impl FeeStatement {
     }
 }
 
+/// Separate event for feature-specific fees (e.g., randomness).
+/// Mirrors the Move `FeatureFee` enum in `transaction_fee.move`.
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub enum FeatureFee {
+    Randomness { fee_octas: u64 },
+}
+
 impl MoveEventV2Type for FeeStatement {}
 
 impl MoveStructType for FeeStatement {

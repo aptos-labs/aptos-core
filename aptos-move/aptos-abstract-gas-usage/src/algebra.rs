@@ -107,6 +107,19 @@ impl<A: GasAlgebra> GasAlgebra for CalibrationAlgebra<A> {
         self.base.storage_fee_used()
     }
 
+    fn charge_feature_fee(
+        &mut self,
+        abstract_amount: impl GasExpression<VMGasParameters, Unit = Octa>,
+        gas_unit_price: FeePerGasUnit,
+    ) -> PartialVMResult<()> {
+        self.base
+            .charge_feature_fee(abstract_amount, gas_unit_price)
+    }
+
+    fn feature_fee_used(&self) -> Fee {
+        self.base.feature_fee_used()
+    }
+
     fn inject_balance(&mut self, new_initial_gas: impl Into<Gas>) -> PartialVMResult<()> {
         self.base.inject_balance(new_initial_gas)
     }

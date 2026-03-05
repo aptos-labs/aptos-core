@@ -39,7 +39,7 @@ use aptos_block_executor::{
 };
 use aptos_crypto::HashValue;
 use aptos_framework_natives::code::PublishRequest;
-use aptos_gas_algebra::{Gas, GasQuantity, NumBytes, Octa};
+use aptos_gas_algebra::{FeePerGasUnit, Gas, GasQuantity, NumBytes, Octa};
 use aptos_gas_meter::{AptosGasMeter, GasAlgebra, StandardGasAlgebra, StandardGasMeter};
 use aptos_gas_schedule::{
     gas_feature_versions::{self, RELEASE_V1_10, RELEASE_V1_27, RELEASE_V1_38},
@@ -572,15 +572,17 @@ impl AptosVM {
         txn_data: &TransactionMetadata,
         gas_meter: &impl AptosGasMeter,
         storage_fee_refund: u64,
-    ) -> FeeStatement {
+    ) -> (FeeStatement, u64) {
         let gas_used = Self::gas_used(txn_data.max_gas_amount(), gas_meter);
-        FeeStatement::new(
+        let feature_fee_octas = u64::from(gas_meter.feature_fee_used());
+        let fee_statement = FeeStatement::new(
             gas_used,
             u64::from(gas_meter.execution_gas_used()),
             u64::from(gas_meter.io_gas_used()),
             u64::from(gas_meter.storage_fee_used()),
             storage_fee_refund,
-        )
+        );
+        (fee_statement, feature_fee_octas)
     }
 
     pub(crate) fn failed_transaction_cleanup(
@@ -730,7 +732,7 @@ impl AptosVM {
         let should_create_account_resource =
             should_create_account_resource(txn_data, self.features(), resolver, module_storage)?;
 
-        let (previous_session_change_set, fee_statement) = if should_create_account_resource {
+        let (previous_session_change_set, fee_statement, feature_fee_octas) = if should_create_account_resource {
             let mut abort_hook_session =
                 AbortHookSession::new(self, txn_data, resolver, prologue_session_change_set);
 
@@ -778,7 +780,7 @@ impl AptosVM {
                 );
             };
 
-            let fee_statement =
+            let (fee_statement, feature_fee_octas) =
                 AptosVM::fee_statement_from_gas_meter(txn_data, gas_meter, ZERO_STORAGE_REFUND);
 
             // Verify we charged sufficiently for creating an account slot
@@ -808,11 +810,11 @@ impl AptosVM {
                     )?;
                 }
             }
-            (abort_hook_session_change_set, fee_statement)
+            (abort_hook_session_change_set, fee_statement, feature_fee_octas)
         } else {
-            let fee_statement =
+            let (fee_statement, feature_fee_octas) =
                 AptosVM::fee_statement_from_gas_meter(txn_data, gas_meter, ZERO_STORAGE_REFUND);
-            (prologue_session_change_set, fee_statement)
+            (prologue_session_change_set, fee_statement, feature_fee_octas)
         };
 
         let mut epilogue_session = EpilogueSession::on_user_session_failure(
@@ -836,6 +838,7 @@ impl AptosVM {
                 serialized_signers,
                 gas_meter.balance(),
                 fee_statement,
+                feature_fee_octas,
                 self.features(),
                 txn_data,
                 log_context,
@@ -872,7 +875,7 @@ impl AptosVM {
             }
         }
 
-        let fee_statement = AptosVM::fee_statement_from_gas_meter(
+        let (fee_statement, feature_fee_octas) = AptosVM::fee_statement_from_gas_meter(
             txn_data,
             gas_meter,
             u64::from(epilogue_session.get_storage_fee_refund()),
@@ -884,6 +887,7 @@ impl AptosVM {
                 serialized_signers,
                 gas_meter.balance(),
                 fee_statement,
+                feature_fee_octas,
                 self.features(),
                 txn_data,
                 log_context,
@@ -975,6 +979,7 @@ impl AptosVM {
         gas_meter: &mut impl AptosGasMeter,
         traversal_context: &mut TraversalContext,
         entry_fn: &EntryFunction,
+        gas_unit_price: FeePerGasUnit,
         trace_recorder: &mut impl TraceRecorder,
     ) -> Result<(), VMStatus> {
         dispatch_loader!(module_storage, loader, {
@@ -1012,6 +1017,7 @@ impl AptosVM {
                 );
                 if maybe_randomness_annotation.is_some() {
                     session.mark_unbiasable();
+                    gas_meter.charge_randomness_txn(gas_unit_price)?;
                 }
             }
 
@@ -1093,6 +1099,7 @@ impl AptosVM {
                         gas_meter,
                         traversal_context,
                         entry_fn,
+                        txn_data.gas_unit_price(),
                         trace_recorder,
                     )
                 })?;
@@ -1341,6 +1348,7 @@ impl AptosVM {
                     traversal_context,
                     multisig_address,
                     &entry_function,
+                    txn_data.gas_unit_price(),
                     change_set_configs,
                     trace_recorder,
                 ),
@@ -1416,6 +1424,7 @@ impl AptosVM {
         traversal_context: &mut TraversalContext,
         multisig_address: AccountAddress,
         payload: &EntryFunction,
+        gas_unit_price: FeePerGasUnit,
         change_set_configs: &ChangeSetConfigs,
         trace_recorder: &mut impl TraceRecorder,
     ) -> Result<UserSessionChangeSet, VMStatus> {
@@ -1429,6 +1438,7 @@ impl AptosVM {
                 gas_meter,
                 traversal_context,
                 payload,
+                gas_unit_price,
                 trace_recorder,
             )
         })?;
