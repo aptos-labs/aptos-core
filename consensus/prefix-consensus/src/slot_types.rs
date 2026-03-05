@@ -462,6 +462,34 @@ mod tests {
     }
 
     #[test]
+    fn test_slot_consensus_msg_is_never_priority() {
+        use crate::network_interface::PriorityClassifiable;
+
+        // SlotConsensusMsg uses the default is_priority() which always returns false
+        let (signer, _) = create_test_validator();
+        let author = signer.author();
+        let payload = create_test_payload();
+        let proposal =
+            create_signed_slot_proposal(1, 1, author, payload, &signer, 0).expect("signing failed");
+
+        let msg = SlotConsensusMsg::SlotProposal(Box::new(proposal));
+        assert!(!msg.is_priority());
+
+        let inner_vote = crate::types::Vote1::new(
+            author,
+            vec![HashValue::random()],
+            1, 1, 1,
+            BlsSignature::dummy_signature(),
+        );
+        let spc_msg = StrongPrefixConsensusMsg::InnerPC {
+            view: 1,
+            msg: crate::network_messages::PrefixConsensusMsg::Vote1Msg(Box::new(inner_vote)),
+        };
+        let msg = SlotConsensusMsg::StrongPCMsg { slot: 1, epoch: 1, msg: spc_msg };
+        assert!(!msg.is_priority());
+    }
+
+    #[test]
     fn test_payload_fetch_response_wrong_hash() {
         let payload = create_test_payload();
         let resp = PayloadFetchResponse {

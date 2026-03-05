@@ -111,8 +111,6 @@ pub struct StrongPrefixConsensusManager<NetworkSender, T: InnerPCAlgorithm> {
     pending_fetches: HashMap<HashValue, u32>,
 
     // Per-view start timer: fires after VIEW_START_TIMEOUT to start the inner PC
-    // even if no first-ranked certificate has arrived.
-    // Per-view start timer: fires after VIEW_START_TIMEOUT to start the inner PC
     // even if no first-ranked certificate has arrived. Acts as a fallback for
     // Byzantine or slow rank-0 parties.
     view_start_timer: Option<(u64, std::pin::Pin<Box<Sleep>>)>,

@@ -197,6 +197,7 @@ pub struct EpochManager<P: OnChainConfigProvider> {
 
     // Strong Prefix Consensus channels
     strong_prefix_consensus_tx: Option<aptos_channels::UnboundedSender<(Author, aptos_prefix_consensus::StrongPrefixConsensusMsg)>>,
+    strong_prefix_consensus_priority_tx: Option<aptos_channels::UnboundedSender<(Author, aptos_prefix_consensus::StrongPrefixConsensusMsg)>>,
     strong_prefix_consensus_close_tx: Option<oneshot::Sender<oneshot::Sender<()>>>,
 
     // Slot Manager (Multi-Slot Prefix Consensus) channels
@@ -281,6 +282,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
             prefix_consensus_tx: None,
             prefix_consensus_close_tx: None,
             strong_prefix_consensus_tx: None,
+            strong_prefix_consensus_priority_tx: None,
             strong_prefix_consensus_close_tx: None,
             slot_manager_tx: None,
             slot_manager_close_tx: None,
@@ -1941,11 +1943,26 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
             ConsensusMsg::StrongPrefixConsensusMsg(msg) => {
                 let msg_epoch = msg.epoch();
                 if msg_epoch == self.epoch() {
-                    if let Some(tx) = &mut self.strong_prefix_consensus_tx {
+                    if let Some(regular_tx) = &mut self.strong_prefix_consensus_tx {
                         // Direct SPC channel (test prefix consensus path)
-                        tx.send((peer_id, *msg)).map_err(|e| {
-                            anyhow::anyhow!("Failed to send to strong_prefix_consensus_tx: {:?}", e)
-                        }).await?;
+                        // Route priority messages to the priority channel if available
+                        use aptos_prefix_consensus::PriorityClassifiable;
+                        if msg.is_priority() {
+                            if let Some(ptx) = &mut self.strong_prefix_consensus_priority_tx {
+                                ptx.send((peer_id, *msg)).map_err(|e| {
+                                    anyhow::anyhow!("Failed to send to strong_prefix_consensus_priority_tx: {:?}", e)
+                                }).await?;
+                            } else {
+                                // Fallback: no priority channel, use regular
+                                regular_tx.send((peer_id, *msg)).map_err(|e| {
+                                    anyhow::anyhow!("Failed to send to strong_prefix_consensus_tx: {:?}", e)
+                                }).await?;
+                            }
+                        } else {
+                            regular_tx.send((peer_id, *msg)).map_err(|e| {
+                                anyhow::anyhow!("Failed to send to strong_prefix_consensus_tx: {:?}", e)
+                            }).await?;
+                        }
                     } else if let Some(tx) = &mut self.slot_manager_tx {
                         // Wrap as SlotConsensusMsg and route through SlotManager
                         let slot = msg.slot();
@@ -2413,6 +2430,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
             &counters::OP_COUNTERS.gauge("strong_prefix_consensus_priority_channel_msgs"),
         );
         self.strong_prefix_consensus_tx = Some(tx.clone());
+        self.strong_prefix_consensus_priority_tx = Some(priority_tx.clone());
 
         // Get epoch state and validators
         let epoch_state = self.epoch_state().clone();
@@ -2487,8 +2505,9 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
                 }
             }
 
-            // Clear channel
+            // Clear channels
             self.strong_prefix_consensus_tx = None;
+            self.strong_prefix_consensus_priority_tx = None;
 
             info!(epoch = self.epoch(), "Strong prefix consensus stopped");
         } else {

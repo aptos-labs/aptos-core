@@ -790,6 +790,51 @@ mod tests {
         assert_eq!(deserialized.epoch(), 1);
     }
 
+    // --- PriorityClassifiable tests ---
+
+    #[test]
+    fn test_is_priority_proposal() {
+        let proposal = create_test_view_proposal();
+        let msg = StrongPrefixConsensusMsg::Proposal(Box::new(proposal));
+        assert!(msg.is_priority());
+    }
+
+    #[test]
+    fn test_is_priority_empty_view() {
+        let empty = create_test_empty_view_message();
+        let msg = StrongPrefixConsensusMsg::EmptyView(Box::new(empty));
+        assert!(msg.is_priority());
+    }
+
+    #[test]
+    fn test_is_priority_commit() {
+        let commit = create_test_strong_pc_commit();
+        let msg = StrongPrefixConsensusMsg::Commit(Box::new(commit));
+        assert!(msg.is_priority());
+    }
+
+    #[test]
+    fn test_is_not_priority_inner_pc() {
+        let vote1 = create_test_vote1();
+        let inner = PrefixConsensusMsg::from(vote1);
+        let msg = StrongPrefixConsensusMsg::InnerPC { view: 2, msg: inner };
+        assert!(!msg.is_priority());
+    }
+
+    #[test]
+    fn test_is_not_priority_fetch_request() {
+        let req = create_test_cert_fetch_request();
+        let msg = StrongPrefixConsensusMsg::FetchRequest(req);
+        assert!(!msg.is_priority());
+    }
+
+    #[test]
+    fn test_is_not_priority_fetch_response() {
+        let resp = create_test_cert_fetch_response();
+        let msg = StrongPrefixConsensusMsg::FetchResponse(Box::new(resp));
+        assert!(!msg.is_priority());
+    }
+
     #[test]
     fn test_strong_msg_fetch_roundtrip() {
         let req = create_test_cert_fetch_request();
