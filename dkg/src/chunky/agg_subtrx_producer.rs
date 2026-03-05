@@ -348,112 +348,136 @@ impl BroadcastStatus<DKGMessage> for Arc<ChunkyTranscriptAggregationState> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use aptos_bounded_executor::BoundedExecutor;
-    use aptos_crypto::{
-        bls12381::{PrivateKey, PublicKey},
-        Uniform,
-    };
+    use crate::chunky::test_utils::ChunkyTestSetup;
     use aptos_infallible::duration_since_epoch;
-    use aptos_reliable_broadcast::RBNetworkSender;
-    use aptos_time_service::TimeService;
-    use aptos_types::{
-        dkg::chunky_dkg::{ChunkyDKG, ChunkyDKGSessionMetadata},
-        on_chain_config::OnChainChunkyDKGConfig,
-        validator_verifier::{ValidatorConsensusInfo, ValidatorConsensusInfoMoveStruct},
-    };
-    use async_trait::async_trait;
-    use bytes::Bytes;
-    use std::collections::HashMap;
-    use tokio::runtime::Handle;
+    use futures_util::{FutureExt, StreamExt};
 
-    struct DummyNetworkSender;
-
-    #[async_trait]
-    impl RBNetworkSender<DKGMessage> for DummyNetworkSender {
-        async fn send_rb_rpc_raw(
-            &self,
-            _receiver: AccountAddress,
-            _raw_message: Bytes,
-            _timeout: Duration,
-        ) -> anyhow::Result<DKGMessage> {
-            // Dummy implementation - return error to prevent actual network calls
-            anyhow::bail!("dummy sender")
-        }
-
-        async fn send_rb_rpc(
-            &self,
-            author: AccountAddress,
-            _message: DKGMessage,
-            timeout: Duration,
-        ) -> anyhow::Result<DKGMessage> {
-            self.send_rb_rpc_raw(author, Bytes::new(), timeout).await
-        }
-
-        fn to_bytes_by_protocol(
-            &self,
-            _peers: Vec<AccountAddress>,
-            _message: DKGMessage,
-        ) -> anyhow::Result<HashMap<AccountAddress, Bytes>> {
-            Ok(HashMap::new())
-        }
-
-        fn sort_peers_by_latency(&self, _: &mut [AccountAddress]) {}
+    fn make_agg_state(
+        setup: &ChunkyTestSetup,
+        validator_index: usize,
+    ) -> (
+        Arc<ChunkyTranscriptAggregationState>,
+        aptos_channel::Receiver<(), AggregatedSubtranscript>,
+    ) {
+        let (tx, rx) = aptos_channel::new(
+            aptos_channels::message_queues::QueueStyle::KLAST,
+            1,
+            None,
+        );
+        let state = Arc::new(ChunkyTranscriptAggregationState::new(
+            setup.epoch_state.clone(),
+            setup.addrs[validator_index],
+            setup.dkg_config.clone(),
+            setup.spks(),
+            duration_since_epoch(),
+            Some(tx),
+            Arc::new(Mutex::new(HashMap::new())),
+        ));
+        (state, rx)
     }
 
     #[tokio::test]
-    async fn test_start_chunky_transcript_aggregation() {
-        // Setup minimal test data
-        let epoch = 999;
-        let my_addr = AccountAddress::random();
-        let private_key = PrivateKey::generate_for_testing();
-        let public_key = PublicKey::from(&private_key);
-        let voting_power = 1u64;
+    async fn test_aggregation_happy_path() {
+        let setup = ChunkyTestSetup::new_uniform(4);
+        let (state, mut rx) = make_agg_state(&setup, 0);
 
-        let validator_info = ValidatorConsensusInfo::new(my_addr, public_key.clone(), voting_power);
-        let validator_info_move = ValidatorConsensusInfoMoveStruct::from(validator_info.clone());
-        let verifier =
-            aptos_types::validator_verifier::ValidatorVerifier::new(vec![validator_info]);
-        let epoch_state = Arc::new(EpochState::new(epoch, verifier));
+        // Add transcripts from validators 0, 1, 2 — first two below quorum.
+        let (trx0, _) = setup.deal_transcript(0);
+        let result = BroadcastStatus::add(&state, setup.addrs[0], trx0);
+        assert!(result.is_ok());
+        assert!(result.unwrap().is_none()); // no quorum yet
 
-        let session_metadata = ChunkyDKGSessionMetadata {
-            dealer_epoch: epoch,
-            chunky_dkg_config: OnChainChunkyDKGConfig::default_enabled().into(),
-            dealer_validator_set: vec![validator_info_move.clone()],
-            target_validator_set: vec![validator_info_move],
-        };
-        let dkg_config = ChunkyDKG::generate_config(&session_metadata);
+        let (trx1, _) = setup.deal_transcript(1);
+        let result = BroadcastStatus::add(&state, setup.addrs[1], trx1);
+        assert!(result.is_ok());
+        assert!(result.unwrap().is_none()); // still no quorum
 
-        let reliable_broadcast = Arc::new(ReliableBroadcast::new(
-            my_addr,
-            vec![my_addr],
-            Arc::new(DummyNetworkSender),
-            ExponentialBackoff::from_millis(10),
-            TimeService::real(),
-            Duration::from_millis(500),
-            BoundedExecutor::new(2, Handle::current()),
-        ));
+        // Third transcript triggers quorum (3 of 4 uniform = 2f+1).
+        let (trx2, _) = setup.deal_transcript(2);
+        let result = BroadcastStatus::add(&state, setup.addrs[2], trx2);
+        assert!(result.is_ok());
+        assert!(result.unwrap().is_none()); // not all received yet
 
-        let start_time = duration_since_epoch();
-        let received_transcripts = Arc::new(Mutex::new(HashMap::new()));
+        // Verify the aggregated subtranscript was sent via the channel.
+        let agg = rx.select_next_some().now_or_never();
+        assert!(agg.is_some());
+        let agg_subtrx = agg.unwrap();
+        // Dealers should be sorted by AccountAddress, then mapped to validator indices.
+        assert_eq!(agg_subtrx.dealers.len(), 3);
 
-        // Test that the function returns an AbortHandle without panicking
-        let abort_handle = start_subtranscript_aggregation(
-            reliable_broadcast,
-            epoch_state,
-            my_addr,
-            dkg_config,
-            vec![public_key],
-            start_time,
-            None,
-            received_transcripts,
+        // Fourth transcript — all received, returns Some(()).
+        let (trx3, _) = setup.deal_transcript(3);
+        let result = BroadcastStatus::add(&state, setup.addrs[3], trx3);
+        assert!(result.is_ok());
+        assert!(result.unwrap().is_some()); // all received
+    }
+
+    #[tokio::test]
+    async fn test_aggregation_rejects_invalid_transcripts() {
+        let setup = ChunkyTestSetup::new_uniform(4);
+        let (state, _rx) = make_agg_state(&setup, 0);
+
+        // Wrong epoch.
+        let wrong_epoch_trx = ChunkyDKGTranscript::new(
+            1, // wrong epoch
+            setup.addrs[0],
+            vec![],
         );
+        let result = BroadcastStatus::add(&state, setup.addrs[0], wrong_epoch_trx);
+        assert!(result.is_err());
 
-        // Verify it returns an AbortHandle
-        assert!(!abort_handle.is_aborted());
+        // Author mismatch — transcript says validator 0, but sent by validator 1.
+        let (trx0, _) = setup.deal_transcript(0);
+        let result = BroadcastStatus::add(&state, setup.addrs[1], trx0);
+        assert!(result.is_err());
 
-        // TODO(ibalajiarun): Complete this test
+        // Unknown sender.
+        let unknown_addr = AccountAddress::random();
+        let (trx1, _) = setup.deal_transcript(1);
+        let mut trx_unknown = trx1;
+        trx_unknown.metadata.author = unknown_addr;
+        let result = BroadcastStatus::add(&state, unknown_addr, trx_unknown);
+        assert!(result.is_err());
 
-        // Clean up
-        abort_handle.abort();
+        // Dealer ID mismatch — deal as validator 0 but change metadata to validator 1.
+        let (mut trx_dealer_mismatch, _) = setup.deal_transcript(0);
+        trx_dealer_mismatch.metadata.author = setup.addrs[1];
+        let result = BroadcastStatus::add(&state, setup.addrs[1], trx_dealer_mismatch);
+        assert!(result.is_err());
+    }
+
+    #[tokio::test]
+    async fn test_aggregation_ignores_duplicate_sender() {
+        let setup = ChunkyTestSetup::new_uniform(4);
+        let (state, _rx) = make_agg_state(&setup, 0);
+
+        let (trx0, _) = setup.deal_transcript(0);
+        let result = BroadcastStatus::add(&state, setup.addrs[0], trx0.clone());
+        assert!(result.is_ok());
+        assert!(result.unwrap().is_none());
+
+        // Same sender again — should be silently ignored.
+        let result = BroadcastStatus::add(&state, setup.addrs[0], trx0);
+        assert!(result.is_ok());
+        assert!(result.unwrap().is_none());
+    }
+
+    #[tokio::test]
+    async fn test_aggregation_unequal_voting_power() {
+        // Validator 3 has power 7, total = 10, quorum = 7.
+        let setup = ChunkyTestSetup::new(4, vec![1, 1, 1, 7]);
+        let (state, mut rx) = make_agg_state(&setup, 0);
+
+        // Single add from the high-power validator should trigger quorum.
+        let (trx3, _) = setup.deal_transcript(3);
+        let result = BroadcastStatus::add(&state, setup.addrs[3], trx3);
+        assert!(result.is_ok());
+        assert!(result.unwrap().is_none()); // not all received
+
+        // Channel should have received the aggregated subtranscript.
+        let agg = rx.select_next_some().now_or_never();
+        assert!(agg.is_some());
+        let agg_subtrx = agg.unwrap();
+        assert_eq!(agg_subtrx.dealers.len(), 1);
     }
 }

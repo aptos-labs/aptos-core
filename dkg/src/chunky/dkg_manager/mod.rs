@@ -55,6 +55,9 @@ use std::{
 };
 use tokio_retry::strategy::ExponentialBackoff;
 
+#[cfg(test)]
+mod tests;
+
 #[allow(dead_code)]
 #[derive(Default)]
 enum InnerState {
@@ -841,5 +844,48 @@ impl ChunkyDKGManager {
         );
 
         Ok(response)
+    }
+
+    #[cfg(test)]
+    pub(crate) fn new_for_testing(
+        ssk: Arc<DealerPrivateKey>,
+        spk: Arc<DealerPublicKey>,
+        my_index: usize,
+        my_addr: AccountAddress,
+        epoch_state: Arc<EpochState>,
+        vtxn_pool: VTxnPoolState,
+        reliable_broadcast: Arc<ReliableBroadcast<DKGMessage, ExponentialBackoff>>,
+        network_sender: Arc<NetworkSender>,
+    ) -> Self {
+        let (pull_notification_tx, pull_notification_rx) =
+            aptos_channel::new(QueueStyle::KLAST, 1, None);
+        Self {
+            ssk,
+            spk,
+            my_addr,
+            my_index,
+            epoch_state,
+            vtxn_pool,
+            reliable_broadcast,
+            network_sender,
+            agg_subtrx_tx: None,
+            certified_subtrx_tx: None,
+            pull_notification_tx,
+            pull_notification_rx,
+            received_transcripts: Arc::new(Mutex::new(HashMap::new())),
+            rpc_handler_guards: Vec::new(),
+            stopped: false,
+            state: InnerState::Init,
+        }
+    }
+
+    #[cfg(test)]
+    pub(crate) fn state_name(&self) -> &str {
+        self.state.variant_name()
+    }
+
+    #[cfg(test)]
+    pub(crate) fn is_stopped(&self) -> bool {
+        self.stopped
     }
 }
