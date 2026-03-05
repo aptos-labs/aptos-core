@@ -37,7 +37,7 @@
 //!                 caller frame                           callee frame
 //!     ┌──────────────────────────────────┐   ┌──────────────────────────────┐
 //!     │                        │ saved  ││   │                              │
-//!     │  caller slots         │  pc    ││   │  arg slots  │  other slots      │
+//!     │  caller slots          │  pc    ││   │  arg slots  │  other slots   │
 //!     │                        │  fp    ││   │                              │
 //!     │                        │func_id ││   │                              │
 //!     └──────────────────────────────────┘   └──────────────────────────────┘
@@ -206,27 +206,34 @@ pub enum MicroOp {
     //======================================================================
     // Fused compare-and-branch (no separate cmp + flags).
     //
+    // Boolean branches: booleans could be represented as small integers
+    // (0 = false, non-zero = true) and handled with a dedicated
+    // `JumpIfTrue` / `JumpIfNotZeroU8` variant. Open questions: how to
+    // handle "dirty" bools (values other than 0 or 1).
+    //
     // May want:
     // - Abort,
     // - more conditions: ==, !=, >, <=, and const variants,
     // - something for enum dispatch (jump table)?
     //======================================================================
-    /// Call function `func_id`. The caller has already placed arguments
-    /// at the start of the callee's frame and written the 24-byte metadata
-    /// `(pc, fp, func_id)` at `current_fp + data_size`. Sets `fp` to
-    /// `current_fp + data_size + 24`.
+    /// Call function `func_id`. The compiler has already emitted micro-ops
+    /// to place arguments into the callee's frame. This instruction
+    /// implicitly writes the metadata `(pc, fp, func_id)` at
+    /// `current_fp + data_size` and sets `fp` to
+    /// `current_fp + data_size + FRAME_METADATA_SIZE`.
     CallFunc { func_id: u32 },
 
-    /// Return from the current function call. The callee has written
-    /// return values at the start of its frame. Restores `pc` and `fp`
-    /// from the metadata at `fp - 24`.
+    /// Return from the current function call. The compiler has already
+    /// emitted micro-ops to write return values at the start of the
+    /// callee's frame. This instruction implicitly restores `pc` and `fp`
+    /// from the metadata at `fp - FRAME_METADATA_SIZE`.
     Return,
 
     /// Unconditional jump.
     Jump { target: CodeOffset },
 
     /// Jump to `target` if the u64 at `src` is **not** zero.
-    JumpIfNotZero {
+    JumpIfNotZeroU64 {
         target: CodeOffset,
         src: FrameOffset,
     },
@@ -260,8 +267,10 @@ pub enum MicroOp {
     //   byte strings, 8-byte for primitives).
     //======================================================================
     /// Allocate a new empty vector with the given initial capacity.
-    /// `descriptor_id = 0` means trivial elements (no refs); >= 1 indexes
-    /// the object descriptor table. Writes heap pointer to `dst`.
+    /// `descriptor_id = 0` indexes the **Trivial** variant in the heap
+    /// object descriptor table (element 0 is always the trivial
+    /// descriptor, meaning no internal heap pointers); `>= 1` indexes
+    /// other descriptors. Writes heap pointer to `dst`.
     /// MAY TRIGGER GC.
     VecNew {
         dst: FrameOffset,
