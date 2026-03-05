@@ -16,7 +16,10 @@ struct MovePackageStatusParams {
 
 #[tool_router(router = package_status_router, vis = "pub(crate)")]
 impl FlowSession {
-    #[tool(description = "Check a Move package for compilation errors and warnings")]
+    #[tool(
+        description = "Check a Move package for compilation errors and warnings",
+        annotations(read_only_hint = false, destructive_hint = false)
+    )]
     async fn move_package_status(
         &self,
         Parameters(params): Parameters<MovePackageStatusParams>,

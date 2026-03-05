@@ -1,7 +1,4 @@
----
-name: move-inf
-description: Infer specifications for a Move package
----
+{{ frontmatter(name="move-inf", description="Infer specifications for a Move package") }}
 
 {#
  # This agent allows to ask something like 'infer specs in a subagent'
