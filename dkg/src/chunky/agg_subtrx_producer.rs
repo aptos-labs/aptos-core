@@ -359,11 +359,8 @@ mod tests {
         Arc<ChunkyTranscriptAggregationState>,
         aptos_channel::Receiver<(), AggregatedSubtranscript>,
     ) {
-        let (tx, rx) = aptos_channel::new(
-            aptos_channels::message_queues::QueueStyle::KLAST,
-            1,
-            None,
-        );
+        let (tx, rx) =
+            aptos_channel::new(aptos_channels::message_queues::QueueStyle::KLAST, 1, None);
         let state = Arc::new(ChunkyTranscriptAggregationState::new(
             setup.epoch_state.clone(),
             setup.addrs[validator_index],

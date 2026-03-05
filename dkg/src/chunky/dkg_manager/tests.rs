@@ -48,8 +48,11 @@ fn create_test_manager(setup: &ChunkyTestSetup) -> ChunkyDKGManager {
         aptos_channels::Sender<Event<DKGMessage>>,
         aptos_channels::Receiver<Event<DKGMessage>>,
     ) = aptos_channels::new_test(1);
-    let network_sender =
-        Arc::new(crate::network::NetworkSender::new(my_addr, dkg_network_client, self_sender));
+    let network_sender = Arc::new(crate::network::NetworkSender::new(
+        my_addr,
+        dkg_network_client,
+        self_sender,
+    ));
 
     ChunkyDKGManager::new_for_testing(
         setup.private_keys[0].clone(),
@@ -104,11 +107,8 @@ async fn test_chunky_dkg_state_transition() {
 
     // Transcript request should fail in Init state.
     let rpc_response_collector = Arc::new(RwLock::new(vec![]));
-    let rpc_req = new_chunky_transcript_rpc_request(
-        999,
-        setup.addrs[3],
-        rpc_response_collector.clone(),
-    );
+    let rpc_req =
+        new_chunky_transcript_rpc_request(999, setup.addrs[3], rpc_response_collector.clone());
     let result = manager.process_peer_rpc_msg(rpc_req).await;
     assert!(result.is_err()); // transcript request fails in Init state
 
@@ -122,11 +122,8 @@ async fn test_chunky_dkg_state_transition() {
     assert_eq!(manager.state_name(), "AwaitSubtranscriptAggregation");
 
     // Transcript request should succeed now.
-    let rpc_req = new_chunky_transcript_rpc_request(
-        999,
-        setup.addrs[3],
-        rpc_response_collector.clone(),
-    );
+    let rpc_req =
+        new_chunky_transcript_rpc_request(999, setup.addrs[3], rpc_response_collector.clone());
     let result = manager.process_peer_rpc_msg(rpc_req).await;
     assert!(result.is_ok());
     let last_responses = std::mem::take(&mut *rpc_response_collector.write());
@@ -138,7 +135,9 @@ async fn test_chunky_dkg_state_transition() {
 
     // process_aggregated_subtranscript should transition to AwaitAggregatedSubtranscriptCertification.
     let agg_subtrx = setup.aggregate_subtranscripts(&[0, 1, 2]);
-    let result = manager.process_aggregated_subtranscript(agg_subtrx.clone()).await;
+    let result = manager
+        .process_aggregated_subtranscript(agg_subtrx.clone())
+        .await;
     assert!(result.is_ok());
     assert_eq!(
         manager.state_name(),
@@ -183,11 +182,8 @@ async fn test_rpc_handling() {
     let rpc_response_collector = Arc::new(RwLock::new(vec![]));
 
     // Transcript request should return own transcript.
-    let rpc_req = new_chunky_transcript_rpc_request(
-        999,
-        setup.addrs[1],
-        rpc_response_collector.clone(),
-    );
+    let rpc_req =
+        new_chunky_transcript_rpc_request(999, setup.addrs[1], rpc_response_collector.clone());
     manager.process_peer_rpc_msg(rpc_req).await.unwrap();
     let last_responses = std::mem::take(&mut *rpc_response_collector.write());
     assert_eq!(last_responses.len(), 1);

@@ -129,8 +129,8 @@ impl ChunkyTestSetup {
             .collect();
 
         use aptos_dkg::pvss::traits::transcript::Aggregatable;
-        let agg = Aggregatable::aggregate(&self.dkg_config.threshold_config, subtranscripts)
-            .unwrap();
+        let agg =
+            Aggregatable::aggregate(&self.dkg_config.threshold_config, subtranscripts).unwrap();
 
         let mut sorted_indices: Vec<usize> = indices.to_vec();
         sorted_indices.sort();

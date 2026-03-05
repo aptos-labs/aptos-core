@@ -274,16 +274,14 @@ mod tests {
 
         let certified = certified.unwrap();
         // Verify the aggregate signature is valid.
-        assert!(
-            setup
-                .epoch_state
-                .verifier
-                .verify_multi_signatures(
-                    &certified.aggregated_subtranscript,
-                    &certified.aggregate_signature
-                )
-                .is_ok()
-        );
+        assert!(setup
+            .epoch_state
+            .verifier
+            .verify_multi_signatures(
+                &certified.aggregated_subtranscript,
+                &certified.aggregate_signature
+            )
+            .is_ok());
     }
 
     #[tokio::test]
@@ -305,9 +303,7 @@ mod tests {
 
         // Signature over wrong data.
         let wrong_key = aptos_crypto::bls12381::PrivateKey::generate_for_testing();
-        let wrong_sig = wrong_key
-            .sign(state.aggregated_subtranscript())
-            .unwrap();
+        let wrong_sig = wrong_key.sign(state.aggregated_subtranscript()).unwrap();
         let wrong_resp = ChunkyDKGSubtranscriptSignatureResponse::new(
             999,
             state.aggregated_subtranscript().hash(),
