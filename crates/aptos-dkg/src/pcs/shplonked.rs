@@ -102,23 +102,6 @@ fn evaluate_z_S_minus_S_is<F: Field>(z_S_at_x: F, s_per_poly: &[impl AsRef<[F]>]
     z_S_i_vals.into_iter().map(|inv| z_S_at_x * inv).collect()
 }
 
-/// Lagrange basis: L_{i,s}(x) for a single s in set S_i (1 at s, 0 at other points of S_i).
-#[allow(non_snake_case)]
-pub fn lagrange_basis_at<F: Field>(s_i: &[F], s: F, x: F) -> F {
-    let mut num = F::one();
-    let mut den = F::one();
-    for &t in s_i {
-        if t == s {
-            continue;
-        }
-        num *= x - t;
-        den *= s - t;
-    }
-    num * den
-        .inverse()
-        .expect("denominator nonzero for distinct points")
-}
-
 /// Builds Lagrange basis polynomials given pre-inverted denominators (L_s = (Z_{S_i}(X)/(X-s)) * inv_s).
 #[allow(non_snake_case)]
 fn lagrange_basis_polys_from_inverted_denoms<F: FftField>(

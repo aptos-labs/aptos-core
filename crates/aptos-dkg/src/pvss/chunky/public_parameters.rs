@@ -57,7 +57,7 @@ pub struct PublicParameters<E: Pairing> {
     #[serde(serialize_with = "ark_se")]
     G_2: E::G2Affine,
 
-    pub ell: u8,
+    pub ell: u8, // Should be below 64 to prevent overflows etc
 
     pub max_num_shares: u32,
 
