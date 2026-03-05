@@ -10,6 +10,7 @@
 //! Notation: Z_S(X) = ∏_{s∈S}(X−s); y_i = (y_i^rev, y_i^hid); combined polynomial
 //! f = ∑_i c^{i-1} Z_{S\S_i}(x) f_i − Z_S(x) q − g with g = ∑_i c^{i-1} Z_{S\S_i}(x) f̃_i(x);
 //! opening at (x, 0); verifier computes C_f = ∑·C_i − Z_S·π_1 − C_eval + c^n·C_PoK.
+//! C_eval = g·τ_0 + ρ_eval·ξ_1 with g = ∑_i weight_i·f̃_i(x) (all evals, rev + hid).
 
 // WARNING: THIS CODE HAS NOT BEEN PROPERLY VETTED, ONLY USE FOR BENCHMARKING PURPOSES!!!!!
 
@@ -54,6 +55,9 @@ use rand::{CryptoRng, RngCore};
 
 /// Domain separation tag for the Shplonked opening sigma protocol (Fiat–Shamir context).
 pub const SHPLONKED_SIGMA_DST: &[u8; 19] = b"Shplonked_Sigma_Dst";
+
+/// Type marker for the Shplonked PCS (univariate, batch opening support).
+pub struct Shplonked<E: Pairing>(core::marker::PhantomData<E>);
 
 /// Zero polynomial Z_S(X) = ∏_{s∈S}(X − s) for a set S.
 #[allow(non_snake_case)]
@@ -177,16 +181,15 @@ pub trait EvalHomomorphism<F: Field>: Send + Sync {
     fn apply(&self, y_rev: &[Vec<F>], y_hid: &[Vec<F>]) -> F;
 }
 
-/// Default: φ(y) = ∑_j y_j (sum of all evaluations).
+/// Default: φ(y) = ∑_j y_j^hid (sum of all hidden evaluations).
 #[derive(Clone, Debug, Default)]
 pub struct SumEvalHom;
 
 impl<F: Field> EvalHomomorphism<F> for SumEvalHom {
-    fn apply(&self, y_rev: &[Vec<F>], y_hid: &[Vec<F>]) -> F {
-        y_rev
+    fn apply(&self, _y_rev: &[Vec<F>], y_hid: &[Vec<F>]) -> F {
+        y_hid
             .iter()
             .flatten()
-            .chain(y_hid.iter().flatten())
             .fold(F::zero(), |a, &b| a + b)
     }
 }
@@ -336,6 +339,29 @@ fn append_batch_statement_to_transcript<E: Pairing>(
     trs.append_point(c_y_hid);
 }
 
+/// Computes g_rev = ∑_j weight_j · (∑_{i ∈ rev} L_{j,i}(x) · y_j^rev[i]) from weights, Lagrange cache, and y_rev.
+#[allow(non_snake_case)]
+fn compute_g_rev<E: Pairing>(
+    n: usize,
+    sets: &[EvaluationSet<E::ScalarField>],
+    weights: &[E::ScalarField],
+    canonical: &[usize],
+    lagrange_cache: &[Option<Vec<DensePolynomial<E::ScalarField>>>],
+    x: E::ScalarField,
+    y_rev: &[Vec<E::ScalarField>],
+) -> E::ScalarField {
+    (0..n)
+        .map(|j| {
+            let bases = lagrange_cache[canonical[j]].as_ref().unwrap();
+            let n_rev = sets[j].rev.len();
+            let rev_part: E::ScalarField = (0..n_rev)
+                .map(|i| bases[i].evaluate(&x) * y_rev[j][i])
+                .sum();
+            weights[j] * rev_part
+        })
+        .sum()
+}
+
 /// Computes Z_S(x) and weights c_powers[i] * Z_{S\S_i}(x).
 #[allow(non_snake_case)]
 fn compute_weights<E: Pairing>(
@@ -397,7 +423,7 @@ pub fn batch_open_generalized<
     let com_y_hid = com_y_hom
         .apply(&shplonked_sigma::ShplonkedSigmaWitness {
             C_y_hid_randomness: c_y_hid_randomness,
-            evals: y_hid_per_poly.clone(),
+            hidden_evals: y_hid_per_poly.clone(),
             C_evals_randomness: E::ScalarField::zero(),
         })
         .0
@@ -492,13 +518,13 @@ pub fn batch_open_generalized<
     // Step 4b: Compute all weights c^{i-1} Z_{S\S_i}(x), then g
     let (z_S_val, weights) = compute_weights::<E>(&z_S, &S_is, x, &c_powers);
 
-    let g: E::ScalarField = (0..n)
+    let g_at_x: E::ScalarField = (0..n)
         .map(|i| weights[i] * tilde_f_is[i].evaluate(&x))
         .sum();
 
-    // Step 4c: C_eval = eval_point_commit_hom(y^hid; ρ_eval) = (∑_j weights[j] * (∑_i L_{j,i}(x) y_j^hid[i]))*τ_0 + ρ_eval*ξ_1.
-    // Use already-computed Lagrange basis polynomials and evaluate at x (Horner).
-    let lagrange_at_x: Vec<Vec<E::ScalarField>> = (0..n)
+    // Step 4c: C_eval = g·τ_0 + ρ_eval·ξ_1 where g = ∑_j weight_j·f̃_j(x) (all evals, rev + hid).
+    // Compute Lagrange-at-x for hidden indices (for sigma) and for revealed (for g_rev).
+    let lagrange_at_x_hid: Vec<Vec<E::ScalarField>> = (0..n)
         .map(|j| {
             let bases = lagrange_cache[canonical[j]].as_ref().unwrap();
             let n_rev = sets[j].rev.len();
@@ -507,15 +533,29 @@ pub fn batch_open_generalized<
                 .collect()
         })
         .collect();
+    let g_rev_at_x = compute_g_rev::<E>(n, sets, &weights, &canonical, &lagrange_cache, x, &y_rev_per_poly);
+    let g_hid_at_x: E::ScalarField = (0..n)
+        .map(|j| {
+            weights[j]
+                * lagrange_at_x_hid[j]
+                    .iter()
+                    .zip(y_hid_per_poly[j].iter())
+                    .map(|(&l, &y)| l * y)
+                    .sum::<E::ScalarField>()
+        })
+        .sum();
+    debug_assert_eq!(g_at_x, g_rev_at_x + g_hid_at_x, "g = g_rev + g_hid");
+
     let eval_point_commit_hom = shplonked_sigma::EvalPointCommitHom::new(
         srs.taus_1[0],
         srs.xi_1,
         weights.clone(),
-        lagrange_at_x,
+        lagrange_at_x_hid,
+        g_rev_at_x,
     );
     let witness_for_C_eval = shplonked_sigma::ShplonkedSigmaWitness {
         C_y_hid_randomness: E::ScalarField::zero(), // We're using the full sigma protocol witness here which is a bit awkward; but fine if we kill off this component
-        evals: y_hid_per_poly.clone(),
+        hidden_evals: y_hid_per_poly.clone(),
         C_evals_randomness: rho_eval,
     };
     let C_eval_proj: E::G1 = eval_point_commit_hom.apply(&witness_for_C_eval).0;
@@ -527,7 +567,7 @@ pub fn batch_open_generalized<
         f_poly += &(&f_is[i] * weights[i]);
     }
     f_poly -= &(&q_poly * z_S_val);
-    f_poly -= &DensePolynomial::from_coefficients_vec(vec![g]);
+    f_poly -= &DensePolynomial::from_coefficients_vec(vec![g_at_x]);
 
     // Step 5b: ρ = ∑_i c^{i-1} Z_{S\S_i}(x) ρ_i − Z_S(x) ρ_q − ρ_eval.
     let mut rho = E::ScalarField::zero();
@@ -550,10 +590,10 @@ pub fn batch_open_generalized<
         0,
     );
 
-    // Step 5d: compute the sigma proof
+    // Step 5d: compute the sigma proof (statement = full C_eval; g_rev is input to homomorphism)
     let witness = ShplonkedSigmaWitness {
         C_y_hid_randomness: c_y_hid_randomness,
-        evals: y_hid_per_poly.clone(),
+        hidden_evals: y_hid_per_poly.clone(),
         C_evals_randomness: rho_eval,
     };
     let com_y_v_hom = shplonked_sigma::FirstTupleHom::<E> {
@@ -567,7 +607,10 @@ pub fn batch_open_generalized<
         hom2: sum_hom,
     };
     let statement_proj = TupleCodomainShape(
-        TupleCodomainShape(CodomainShape(com_y_hid.into()), CodomainShape(C_eval_proj)),
+        TupleCodomainShape(
+            CodomainShape(com_y_hid.into()),
+            CodomainShape(C_eval_proj),
+        ),
         phi_y,
     );
     let (sigma_protocol_proof, _) =
@@ -577,11 +620,10 @@ pub fn batch_open_generalized<
         FirstProofItem::Challenge(_) => panic!("expected commitment"),
     };
     let sigma_proof = ShplonkedSigmaProof {
-        // TODO: should probably get rid of this stuff
         r_com_ys: r_com_y,
         r_com_eval: r_V,
         r_sum_ys: r_y,
-        z_ys: sigma_protocol_proof.z.evals,
+        z_ys: sigma_protocol_proof.z.hidden_evals,
         z_com_eval_rand: sigma_protocol_proof.z.C_evals_randomness,
         z_com_ys_rand: sigma_protocol_proof.z.C_y_hid_randomness,
     };
@@ -723,11 +765,13 @@ pub fn batch_pairing_for_verify_generalized<
                 .collect()
         })
         .collect();
+    let g_rev_at_x = compute_g_rev::<E>(n, sets, &weights, &canonical, &lagrange_cache, x, y_rev);
     let eval_point_commit_hom = shplonked_sigma::EvalPointCommitHom::new(
         srs.taus_1[0],
         srs.xi_1,
         weights.clone(),
         lagrange_at_x,
+        g_rev_at_x,
     );
     let first_tuple_hom = shplonked_sigma::FirstTupleHom::<E> {
         hom1: com_y_hom,
@@ -758,7 +802,7 @@ pub fn batch_pairing_for_verify_generalized<
             )),
             z: ShplonkedSigmaWitness {
                 C_y_hid_randomness: sigma_proof.z_com_ys_rand,
-                evals: sigma_proof.z_ys.clone(), // already { z_i }_i per polynomial
+                hidden_evals: sigma_proof.z_ys.clone(),
                 C_evals_randomness: sigma_proof.z_com_eval_rand,
             },
         };
@@ -1022,9 +1066,6 @@ where
     }
 }
 
-/// Type marker for the Shplonked PCS (univariate, batch opening support).
-pub struct Shplonked<E: Pairing>(core::marker::PhantomData<E>);
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1033,6 +1074,7 @@ mod tests {
     use ark_poly::Polynomial;
     use rand_core::OsRng;
 
+    /// Minimal batch open/verify: two polynomials, one or two hidden points per set.
     #[test]
     fn test_batch_open_verify_generalized_single_point_per_poly() {
         let mut rng = OsRng;
@@ -1049,17 +1091,20 @@ mod tests {
                 sample_field_element(&mut rng),
             ]),
         ];
-        let points = [
-            sample_field_element(&mut rng),
-            sample_field_element(&mut rng),
-        ];
-        let sets: Vec<EvaluationSet<Fr>> = points
-            .iter()
-            .map(|&p| EvaluationSet {
+        // First set: single point; second set: two points (so we don't only test singleton sets)
+        let p0 = sample_field_element(&mut rng);
+        let p10 = sample_field_element(&mut rng);
+        let p11 = sample_field_element(&mut rng);
+        let sets: Vec<EvaluationSet<Fr>> = vec![
+            EvaluationSet {
                 rev: vec![],
-                hid: vec![p],
-            })
-            .collect();
+                hid: vec![p0],
+            },
+            EvaluationSet {
+                rev: vec![],
+                hid: vec![p10, p11],
+            },
+        ];
         let rho_i: Vec<Fr> = (0..polys.len())
             .map(|_| sample_field_element(&mut rng))
             .collect();
@@ -1075,10 +1120,10 @@ mod tests {
             &mut rng,
         );
         assert!(opening.get_evals().iter().all(|v| v.is_empty()));
-        assert_eq!(
-            opening.get_phi_eval(),
-            polys[0].evaluate(&points[0]) + polys[1].evaluate(&points[1])
-        );
+        let expected_phi = polys[0].evaluate(&p0)
+            + polys[1].evaluate(&p10)
+            + polys[1].evaluate(&p11);
+        assert_eq!(opening.get_phi_eval(), expected_phi);
 
         let commitments: Vec<ark_bn254::G1Projective> = polys
             .iter()
@@ -1102,7 +1147,234 @@ mod tests {
             &mut trs_v,
             &mut rng,
         );
-        // TODO: pairing check can still fail; if so, debug C_f vs commitment_to_f and HKZG formula.
         assert!(ok.is_ok(), "batch verify: {:?}", ok.err());
+    }
+
+    /// General batch open/verify test: more polynomials, multiple hidden points per set,
+    /// and varying set sizes (all hidden points).
+    #[test]
+    fn test_batch_open_verify_generalized_multi_point_per_poly() {
+        let mut rng = OsRng;
+        let (srs, _vk) = Shplonked::<Bn254>::setup(vec![8, 8, 8, 8], &mut rng);
+
+        // Four polynomials with different degrees
+        let polys: Vec<DensePolynomial<Fr>> = vec![
+            DensePolynomial::from_coefficients_vec(vec![
+                sample_field_element(&mut rng),
+                sample_field_element(&mut rng),
+            ]),
+            DensePolynomial::from_coefficients_vec(vec![
+                sample_field_element(&mut rng),
+                sample_field_element(&mut rng),
+                sample_field_element(&mut rng),
+            ]),
+            DensePolynomial::from_coefficients_vec(vec![
+                sample_field_element(&mut rng),
+                sample_field_element(&mut rng),
+                sample_field_element(&mut rng),
+                sample_field_element(&mut rng),
+            ]),
+            DensePolynomial::from_coefficients_vec(vec![
+                sample_field_element(&mut rng),
+                sample_field_element(&mut rng),
+            ]),
+        ];
+
+        // Evaluation sets: all hidden, but with 1, 2, 3, and 2 points per poly respectively
+        let sets: Vec<EvaluationSet<Fr>> = vec![
+            EvaluationSet {
+                rev: vec![],
+                hid: vec![sample_field_element(&mut rng)],
+            },
+            EvaluationSet {
+                rev: vec![],
+                hid: vec![
+                    sample_field_element(&mut rng),
+                    sample_field_element(&mut rng),
+                ],
+            },
+            EvaluationSet {
+                rev: vec![],
+                hid: vec![
+                    sample_field_element(&mut rng),
+                    sample_field_element(&mut rng),
+                    sample_field_element(&mut rng),
+                ],
+            },
+            EvaluationSet {
+                rev: vec![],
+                hid: vec![
+                    sample_field_element(&mut rng),
+                    sample_field_element(&mut rng),
+                ],
+            },
+        ];
+
+        let rho_i: Vec<Fr> = (0..polys.len())
+            .map(|_| sample_field_element(&mut rng))
+            .collect();
+
+        let mut trs = merlin::Transcript::new(b"shplonked_multi_point_test");
+        let opening = batch_open_generalized::<Bn254, _, _>(
+            &srs,
+            &sets,
+            &polys,
+            &rho_i,
+            &SumEvalHom,
+            &mut trs,
+            &mut rng,
+        );
+
+        assert!(opening.get_evals().iter().all(|v| v.is_empty()));
+
+        // SumEvalHom: φ(y) = sum of all hidden evals
+        let expected_phi_y: Fr = sets
+            .iter()
+            .zip(polys.iter())
+            .map(|(set, poly)| {
+                set.hid.iter().map(|p| poly.evaluate(p)).sum::<Fr>()
+            })
+            .sum();
+        assert_eq!(
+            opening.get_phi_eval(),
+            expected_phi_y,
+            "φ(y) = sum of hidden evals"
+        );
+
+        let commitments: Vec<ark_bn254::G1Projective> = polys
+            .iter()
+            .zip(rho_i.iter())
+            .map(|(p, &r)| Shplonked::<Bn254>::commit(&srs, p.clone(), Some(r)).0)
+            .collect();
+        let commitment_msms: Vec<MsmInput<ark_bn254::G1Affine, Fr>> = commitments
+            .iter()
+            .map(|c| MsmInput::new(vec![c.into_affine()], vec![Fr::ONE]).expect("msm"))
+            .collect();
+
+        let mut trs_v = merlin::Transcript::new(b"shplonked_multi_point_test");
+        let ok = batch_verify_generalized::<Bn254, _, _>(
+            &srs,
+            &sets,
+            &SumEvalHom,
+            &commitment_msms,
+            opening.get_evals(),
+            opening.get_phi_eval(),
+            &opening.proof,
+            &mut trs_v,
+            &mut rng,
+        );
+        assert!(ok.is_ok(), "batch verify: {:?}", ok.err());
+    }
+
+    /// Batch open/verify with mixed revealed and hidden evaluation sets (C_eval uses all evals).
+    #[test]
+    fn test_batch_open_verify_generalized_mixed_rev_hid() {
+        let mut rng = OsRng;
+        let (srs, _vk) = Shplonked::<Bn254>::setup(vec![8, 8, 8, 8], &mut rng);
+
+        let polys: Vec<DensePolynomial<Fr>> = vec![
+            DensePolynomial::from_coefficients_vec(vec![
+                sample_field_element(&mut rng),
+                sample_field_element(&mut rng),
+            ]),
+            DensePolynomial::from_coefficients_vec(vec![
+                sample_field_element(&mut rng),
+                sample_field_element(&mut rng),
+                sample_field_element(&mut rng),
+            ]),
+            DensePolynomial::from_coefficients_vec(vec![
+                sample_field_element(&mut rng),
+                sample_field_element(&mut rng),
+                sample_field_element(&mut rng),
+                sample_field_element(&mut rng),
+            ]),
+            DensePolynomial::from_coefficients_vec(vec![
+                sample_field_element(&mut rng),
+                sample_field_element(&mut rng),
+            ]),
+        ];
+
+        let p00 = sample_field_element(&mut rng);
+        let p01 = sample_field_element(&mut rng);
+        let p02 = sample_field_element(&mut rng);
+        let p10 = sample_field_element(&mut rng);
+        let p11 = sample_field_element(&mut rng);
+        let p20 = sample_field_element(&mut rng);
+        let p21 = sample_field_element(&mut rng);
+        let p22 = sample_field_element(&mut rng);
+        let p30 = sample_field_element(&mut rng);
+        let p31 = sample_field_element(&mut rng);
+
+        let sets: Vec<EvaluationSet<Fr>> = vec![
+            EvaluationSet {
+                rev: vec![p00, p01],
+                hid: vec![p02],
+            },
+            EvaluationSet {
+                rev: vec![],
+                hid: vec![p10, p11],
+            },
+            EvaluationSet {
+                rev: vec![p20],
+                hid: vec![p21, p22],
+            },
+            EvaluationSet {
+                rev: vec![p30, p31],
+                hid: vec![],
+            },
+        ];
+
+        let rho_i: Vec<Fr> = (0..polys.len())
+            .map(|_| sample_field_element(&mut rng))
+            .collect();
+
+        let mut trs = merlin::Transcript::new(b"shplonked_mixed_rev_hid_test");
+        let opening = batch_open_generalized::<Bn254, _, _>(
+            &srs,
+            &sets,
+            &polys,
+            &rho_i,
+            &SumEvalHom,
+            &mut trs,
+            &mut rng,
+        );
+
+        let expected_y_rev: Vec<Vec<Fr>> = sets
+            .iter()
+            .zip(polys.iter())
+            .map(|(set, poly)| set.rev.iter().map(|p| poly.evaluate(p)).collect())
+            .collect();
+        assert_eq!(opening.get_evals(), &expected_y_rev[..]);
+
+        let expected_phi_y: Fr = polys[0].evaluate(&p02)
+            + polys[1].evaluate(&p10)
+            + polys[1].evaluate(&p11)
+            + polys[2].evaluate(&p21)
+            + polys[2].evaluate(&p22);
+        assert_eq!(opening.get_phi_eval(), expected_phi_y);
+
+        let commitments: Vec<ark_bn254::G1Projective> = polys
+            .iter()
+            .zip(rho_i.iter())
+            .map(|(p, &r)| Shplonked::<Bn254>::commit(&srs, p.clone(), Some(r)).0)
+            .collect();
+        let commitment_msms: Vec<MsmInput<ark_bn254::G1Affine, Fr>> = commitments
+            .iter()
+            .map(|c| MsmInput::new(vec![c.into_affine()], vec![Fr::ONE]).expect("msm"))
+            .collect();
+
+        let mut trs_v = merlin::Transcript::new(b"shplonked_mixed_rev_hid_test");
+        let ok = batch_verify_generalized::<Bn254, _, _>(
+            &srs,
+            &sets,
+            &SumEvalHom,
+            &commitment_msms,
+            opening.get_evals(),
+            opening.get_phi_eval(),
+            &opening.proof,
+            &mut trs_v,
+            &mut rng,
+        );
+        assert!(ok.is_ok(), "batch verify with mixed rev/hid: {:?}", ok.err());
     }
 }
