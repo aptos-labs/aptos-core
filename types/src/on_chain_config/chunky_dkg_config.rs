@@ -47,7 +47,7 @@ pub struct ChunkyDKGConfigMoveStruct {
     variant: MoveAny,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Deserialize, Serialize)]
 pub enum OnChainChunkyDKGConfig {
     Off,
     V1(ConfigV1),
