@@ -648,8 +648,7 @@ async fn handle_custom_event_ingest(
 
         // Collect server-side reserved keys so client params with the same
         // names are dropped (server-side labels take precedence).
-        let mut reserved_keys: HashSet<&str> =
-            HashSet::from(["contract_name", "trust_status"]);
+        let mut reserved_keys: HashSet<&str> = HashSet::from(["contract_name", "trust_status"]);
         for key in instance.extra_labels.keys() {
             reserved_keys.insert(key.as_str());
         }
