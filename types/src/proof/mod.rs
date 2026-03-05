@@ -80,10 +80,7 @@ impl<H: CryptoHasher> CryptoHash for MerkleTreeInternalNode<H> {
     type Hasher = H;
 
     fn hash(&self) -> HashValue {
-        let mut state = Self::Hasher::default();
-        state.update(self.left_child.as_ref());
-        state.update(self.right_child.as_ref());
-        state.finish()
+        H::hash_pair(&self.left_child, &self.right_child)
     }
 }
 
@@ -121,9 +118,6 @@ impl CryptoHash for SparseMerkleLeafNode {
     type Hasher = SparseMerkleLeafNodeHasher;
 
     fn hash(&self) -> HashValue {
-        let mut state = Self::Hasher::default();
-        state.update(self.key.as_ref());
-        state.update(self.value_hash.as_ref());
-        state.finish()
+        SparseMerkleLeafNodeHasher::hash_pair(&self.key, &self.value_hash)
     }
 }

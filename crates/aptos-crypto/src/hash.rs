@@ -112,7 +112,7 @@ use std::{
     fmt,
     str::FromStr,
 };
-use tiny_keccak::{Hasher, Sha3};
+use tiny_keccak::{keccakf, Hasher, Sha3};
 
 /// A prefix used to begin the salt of every hashable structure. The salt
 /// consists in this global prefix, concatenated with the specified
@@ -505,6 +505,69 @@ pub trait CryptoHasher: Default + std::io::Write {
         hasher.update(bytes);
         hasher.finish()
     }
+
+    /// Specialized method to hash exactly two 32-byte inputs.
+    ///
+    /// This is optimized for the common Merkle tree pattern of hashing
+    /// `seed || left_child || right_child` where all three are 32 bytes.
+    /// Avoids the overhead of cloning the pre-seeded SHA3 state.
+    fn hash_pair(a: &HashValue, b: &HashValue) -> HashValue {
+        sha3_hash_pair(Self::seed(), a.as_ref(), b.as_ref())
+    }
+}
+
+/// Specialized SHA3-256 hash for exactly two 32-byte inputs with a known 32-byte seed.
+///
+/// This is semantically equivalent to:
+/// ```ignore
+/// let mut hasher = Sha3::v256();
+/// hasher.update(seed);
+/// hasher.update(a);
+/// hasher.update(b);
+/// hasher.finalize(&mut output);
+/// ```
+///
+/// But avoids the 200-byte state clone and generic sponge overhead by directly
+/// constructing the keccak state. Since seed(32) + a(32) + b(32) = 96 bytes < rate(136),
+/// the entire input fits in one block, requiring exactly one keccak-f[1600] call.
+#[inline]
+fn sha3_hash_pair(seed: &[u8; 32], a: &[u8; 32], b: &[u8; 32]) -> HashValue {
+    let mut state = [0u64; 25];
+
+    // Absorb seed (bytes 0..32 = words 0..4)
+    state[0] = u64::from_le_bytes(seed[0..8].try_into().unwrap());
+    state[1] = u64::from_le_bytes(seed[8..16].try_into().unwrap());
+    state[2] = u64::from_le_bytes(seed[16..24].try_into().unwrap());
+    state[3] = u64::from_le_bytes(seed[24..32].try_into().unwrap());
+
+    // Absorb first input (bytes 32..64 = words 4..8)
+    state[4] = u64::from_le_bytes(a[0..8].try_into().unwrap());
+    state[5] = u64::from_le_bytes(a[8..16].try_into().unwrap());
+    state[6] = u64::from_le_bytes(a[16..24].try_into().unwrap());
+    state[7] = u64::from_le_bytes(a[24..32].try_into().unwrap());
+
+    // Absorb second input (bytes 64..96 = words 8..12)
+    state[8] = u64::from_le_bytes(b[0..8].try_into().unwrap());
+    state[9] = u64::from_le_bytes(b[8..16].try_into().unwrap());
+    state[10] = u64::from_le_bytes(b[16..24].try_into().unwrap());
+    state[11] = u64::from_le_bytes(b[24..32].try_into().unwrap());
+
+    // SHA3-256 padding: domain suffix 0x06 at byte 96 (word 12, byte 0)
+    state[12] = 0x06;
+    // End-of-rate padding: 0x80 at byte 135 (rate-1), which is word 16, byte 7
+    state[16] = 0x80u64 << 56;
+
+    // Single keccak-f[1600] permutation
+    keccakf(&mut state);
+
+    // Squeeze first 32 bytes as output
+    let mut hash = [0u8; HashValue::LENGTH];
+    hash[0..8].copy_from_slice(&state[0].to_le_bytes());
+    hash[8..16].copy_from_slice(&state[1].to_le_bytes());
+    hash[16..24].copy_from_slice(&state[2].to_le_bytes());
+    hash[24..32].copy_from_slice(&state[3].to_le_bytes());
+
+    HashValue::new(hash)
 }
 
 /// The default hasher underlying generated implementations of `CryptoHasher`.
