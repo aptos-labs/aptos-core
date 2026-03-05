@@ -61,9 +61,9 @@ pub use certify::{qc1_certify, qc2_certify, qc3_certify};
 pub use manager::{DefaultPCManager, PrefixConsensusManager};
 pub use network_interface::{
     NetworkSenderAdapter, PrefixConsensusNetworkClient, PrefixConsensusNetworkSender,
-    SlotConsensusNetworkClient, SlotNetworkSenderAdapter, StrongNetworkSenderAdapter,
-    StrongPrefixConsensusNetworkClient, SubprotocolNetworkClient, SubprotocolNetworkSender,
-    SubprotocolSenderAdapter,
+    PriorityClassifiable, SlotConsensusNetworkClient, SlotNetworkSenderAdapter,
+    StrongNetworkSenderAdapter, StrongPrefixConsensusNetworkClient, SubprotocolNetworkClient,
+    SubprotocolNetworkSender, SubprotocolSenderAdapter,
 };
 pub use network_messages::{PrefixConsensusMsg, StrongPrefixConsensusMsg};
 pub use protocol::PrefixConsensusProtocol;

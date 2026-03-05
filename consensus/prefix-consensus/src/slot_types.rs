@@ -10,6 +10,7 @@
 //! (transactions pulled from mempool). The `SlotConsensusMsg` enum wraps both
 //! slot proposals and per-slot Strong Prefix Consensus messages for network routing.
 
+use crate::network_interface::PriorityClassifiable;
 use crate::network_messages::StrongPrefixConsensusMsg;
 use anyhow::{ensure, Result};
 use aptos_consensus_types::common::{Author, Payload};
@@ -256,6 +257,10 @@ impl SlotConsensusMsg {
         }
     }
 }
+
+/// SlotConsensusMsg does not use priority routing (the SlotManager processes all
+/// message types in a single event loop without priority separation).
+impl PriorityClassifiable for SlotConsensusMsg {}
 
 // ============================================================================
 // Tests

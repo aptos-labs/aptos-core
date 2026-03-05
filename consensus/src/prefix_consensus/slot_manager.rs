@@ -23,7 +23,7 @@ use aptos_crypto::HashValue;
 use aptos_executor_types::state_compute_result::StateComputeResult;
 use aptos_logger::prelude::*;
 use aptos_prefix_consensus::{
-    PrefixVector, SubprotocolNetworkSender, StrongPrefixConsensusMsg,
+    PrefixVector, PriorityClassifiable, SubprotocolNetworkSender, StrongPrefixConsensusMsg,
     build_block_from_v_high,
     slot_ranking::MultiSlotRankingManager,
     slot_state::SlotState,
@@ -73,8 +73,10 @@ struct PendingCommit {
 
 /// Handles returned by an SPC spawner for communicating with the running SPC task.
 pub struct SPCHandles {
-    /// Channel for forwarding incoming SPC network messages to the SPC task.
+    /// Channel for forwarding regular SPC messages (InnerPC votes, fetch) to the SPC task.
     pub msg_tx: aptos_channels::UnboundedSender<(Author, StrongPrefixConsensusMsg)>,
+    /// Channel for forwarding priority SPC messages (Proposal, EmptyView, Commit) to the SPC task.
+    pub priority_tx: aptos_channels::UnboundedSender<(Author, StrongPrefixConsensusMsg)>,
     /// Channel for receiving committed (slot, v_high) from the SPC task.
     pub output_rx: tokio::sync::mpsc::UnboundedReceiver<(u64, PrefixVector)>,
     /// Oneshot to signal the SPC task to shut down (with ack).
@@ -141,9 +143,12 @@ where
         input_vector: PrefixVector,
         ranking: Vec<Author>,
     ) -> SPCHandles {
-        // Create message channel (aptos_channels for gauge tracking)
+        // Create message channels (aptos_channels for gauge tracking)
         let (spc_tx, spc_rx) = aptos_channels::new_unbounded(
             &crate::counters::OP_COUNTERS.gauge("spc_slot_channel_msgs"),
+        );
+        let (priority_tx, priority_rx) = aptos_channels::new_unbounded(
+            &crate::counters::OP_COUNTERS.gauge("spc_priority_channel_msgs"),
         );
 
         // Create output channel (SPC → SlotManager)
@@ -163,7 +168,8 @@ where
             network_client,
             spc_tx.clone(),
             self.validator_verifier.clone(),
-        );
+        )
+        .with_priority_sender(priority_tx.clone());
 
         // Create ValidatorSigner from stored Arc<PrivateKey> (cheap Arc clone).
         let signer = ValidatorSigner::new(self.author, self.private_key.clone());
@@ -179,10 +185,11 @@ where
             Some(output_tx),
         );
 
-        tokio::spawn(manager.run(spc_rx, close_rx));
+        tokio::spawn(manager.run(spc_rx, priority_rx, close_rx));
 
         SPCHandles {
             msg_tx: spc_tx,
+            priority_tx,
             output_rx,
             close_tx,
         }
@@ -206,15 +213,18 @@ pub struct SlotManager<NS: SubprotocolNetworkSender<SlotConsensusMsg>, SP: SPCSp
     slot_states: HashMap<u64, SlotState>,
     ranking_manager: MultiSlotRankingManager,
 
-    // Per-slot SPC channels (set by run_spc, cleared by on_spc_v_high)
+    // Per-slot SPC channels (set by run_spc, cleared by build_and_commit_block).
+    // spc_msg_tx and spc_priority_tx are always set and cleared together.
     spc_msg_tx: Option<aptos_channels::UnboundedSender<(Author, StrongPrefixConsensusMsg)>>,
+    spc_priority_tx: Option<aptos_channels::UnboundedSender<(Author, StrongPrefixConsensusMsg)>>,
     spc_output_rx: Option<tokio::sync::mpsc::UnboundedReceiver<(u64, PrefixVector)>>,
     spc_close_tx: Option<futures::channel::oneshot::Sender<futures::channel::oneshot::Sender<()>>>,
 
-    // Buffer for SPC messages that arrive before the SPC task is spawned.
+    // Buffers for SPC messages that arrive before the SPC task is spawned.
     // Keyed by slot: messages for current_slot (pre-spawn) and future slots are
-    // buffered here, then drained into spc_msg_tx when run_spc() is called.
+    // buffered here, then drained into spc_msg_tx/spc_priority_tx when run_spc() is called.
     spc_msg_buffer: HashMap<u64, Vec<(Author, StrongPrefixConsensusMsg)>>,
+    spc_priority_buffer: HashMap<u64, Vec<(Author, StrongPrefixConsensusMsg)>>,
 
     // SPC spawner (production vs. test)
     spc_spawner: SP,
@@ -265,9 +275,11 @@ impl<NS: SubprotocolNetworkSender<SlotConsensusMsg>, SP: SPCSpawner> SlotManager
             slot_states: HashMap::new(),
             ranking_manager,
             spc_msg_tx: None,
+            spc_priority_tx: None,
             spc_output_rx: None,
             spc_close_tx: None,
             spc_msg_buffer: HashMap::new(),
+            spc_priority_buffer: HashMap::new(),
             spc_spawner,
             pending_commit: None,
             execution_channel,
@@ -586,10 +598,34 @@ impl<NS: SubprotocolNetworkSender<SlotConsensusMsg>, SP: SPCSpawner> SlotManager
         );
 
         self.spc_msg_tx = Some(handles.msg_tx);
+        self.spc_priority_tx = Some(handles.priority_tx);
         self.spc_output_rx = Some(handles.output_rx);
         self.spc_close_tx = Some(handles.close_tx);
 
-        // Drain any SPC messages that arrived before the task was spawned.
+        // Drain priority buffer first (proposals, empty-view, commit).
+        if let Some(buffered) = self.spc_priority_buffer.remove(&slot) {
+            let count = buffered.len();
+            info!(
+                epoch = self.epoch,
+                slot = slot,
+                buffered_count = count,
+                "Draining pre-spawn SPC priority message buffer"
+            );
+            let tx = self.spc_priority_tx.as_mut().expect("just set above");
+            for (author, msg) in buffered {
+                if let Err(e) = tx.send((author, msg)).await {
+                    error!(
+                        epoch = self.epoch,
+                        slot = slot,
+                        error = ?e,
+                        "Failed to drain buffered priority SPC message"
+                    );
+                    break;
+                }
+            }
+        }
+
+        // Then drain regular buffer (inner PC votes, fetch).
         if let Some(buffered) = self.spc_msg_buffer.remove(&slot) {
             let count = buffered.len();
             info!(
@@ -794,11 +830,13 @@ impl<NS: SubprotocolNetworkSender<SlotConsensusMsg>, SP: SPCSpawner> SlotManager
         // If ℓ < n, the validator at position ℓ (first excluded) is demoted.
         self.ranking_manager.update(v_high.len());
 
-        // Clean up slot state, SPC channels, message buffer, and pending commit
+        // Clean up slot state, SPC channels, message buffers, and pending commit
         self.spc_msg_tx.take();
+        self.spc_priority_tx.take();
         self.spc_output_rx.take();
         self.spc_close_tx.take();
         self.spc_msg_buffer.remove(&slot);
+        self.spc_priority_buffer.remove(&slot);
         self.pending_commit = None;
         self.slot_states.remove(&slot);
 
@@ -829,19 +867,33 @@ impl<NS: SubprotocolNetworkSender<SlotConsensusMsg>, SP: SPCSpawner> SlotManager
             return;
         }
 
-        // If SPC is running for this slot, forward directly.
+        // If SPC is running for this slot, forward to the appropriate channel.
         if slot == self.current_slot {
-            if let Some(tx) = &mut self.spc_msg_tx {
-                if let Err(e) = tx.send((author, msg)).await {
-                    error!(
-                        epoch = self.epoch,
-                        slot = slot,
-                        error = ?e,
-                        "Failed to send SPC message — SPC task receiver dropped. \
-                         SPC may be stalled."
-                    );
+            if msg.is_priority() {
+                if let Some(tx) = &mut self.spc_priority_tx {
+                    if let Err(e) = tx.send((author, msg)).await {
+                        error!(
+                            epoch = self.epoch,
+                            slot = slot,
+                            error = ?e,
+                            "Failed to send priority SPC message — SPC task receiver dropped."
+                        );
+                    }
+                    return;
                 }
-                return;
+            } else {
+                if let Some(tx) = &mut self.spc_msg_tx {
+                    if let Err(e) = tx.send((author, msg)).await {
+                        error!(
+                            epoch = self.epoch,
+                            slot = slot,
+                            error = ?e,
+                            "Failed to send SPC message — SPC task receiver dropped. \
+                             SPC may be stalled."
+                        );
+                    }
+                    return;
+                }
             }
         }
 
@@ -854,10 +906,17 @@ impl<NS: SubprotocolNetworkSender<SlotConsensusMsg>, SP: SPCSpawner> SlotManager
             msg_type = msg.name(),
             "Buffering SPC message (SPC not yet spawned for slot)"
         );
-        self.spc_msg_buffer
-            .entry(slot)
-            .or_default()
-            .push((author, msg));
+        if msg.is_priority() {
+            self.spc_priority_buffer
+                .entry(slot)
+                .or_default()
+                .push((author, msg));
+        } else {
+            self.spc_msg_buffer
+                .entry(slot)
+                .or_default()
+                .push((author, msg));
+        }
     }
 
     // ========================================================================
@@ -1012,6 +1071,7 @@ mod tests {
             _ranking: Vec<Author>,
         ) -> SPCHandles {
             let (msg_tx, _msg_rx) = aptos_channels::new_unbounded_test();
+            let (priority_tx, _priority_rx) = aptos_channels::new_unbounded_test();
             let (output_tx, output_rx) = mpsc::unbounded_channel();
             let (close_tx, _close_rx) = futures::channel::oneshot::channel();
 
@@ -1020,6 +1080,7 @@ mod tests {
 
             SPCHandles {
                 msg_tx,
+                priority_tx,
                 output_rx,
                 close_tx,
             }

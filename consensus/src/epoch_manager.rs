@@ -2405,9 +2405,12 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
             "Starting strong prefix consensus"
         );
 
-        // Create unbounded channel for messages
+        // Create unbounded channels for messages (regular + priority)
         let (tx, rx) = aptos_channels::new_unbounded(
             &counters::OP_COUNTERS.gauge("strong_prefix_consensus_channel_msgs"),
+        );
+        let (priority_tx, priority_rx) = aptos_channels::new_unbounded(
+            &counters::OP_COUNTERS.gauge("strong_prefix_consensus_priority_channel_msgs"),
         );
         self.strong_prefix_consensus_tx = Some(tx.clone());
 
@@ -2423,7 +2426,8 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
             network_client,
             tx.clone(),
             validators.clone(),
-        );
+        )
+        .with_priority_sender(priority_tx);
 
         // Get validator signer
         let private_key = self.load_consensus_key(&validators)?;
@@ -2450,7 +2454,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
         self.strong_prefix_consensus_close_tx = Some(close_tx);
 
         // Spawn manager task
-        tokio::spawn(manager.run(rx, close_rx));
+        tokio::spawn(manager.run(rx, priority_rx, close_rx));
 
         info!(
             epoch = self.epoch(),

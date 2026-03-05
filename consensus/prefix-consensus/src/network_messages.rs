@@ -10,6 +10,7 @@
 //! between validators during Prefix Consensus execution.
 
 use crate::certificates::{EmptyViewMessage, StrongPCCommit};
+use crate::network_interface::PriorityClassifiable;
 use crate::types::{CertFetchRequest, CertFetchResponse, PartyId, ViewProposal, Vote1, Vote2, Vote3};
 use serde::{Deserialize, Serialize};
 
@@ -227,6 +228,20 @@ impl StrongPrefixConsensusMsg {
             StrongPrefixConsensusMsg::FetchRequest(_) => None,
             StrongPrefixConsensusMsg::FetchResponse(_) => None,
         }
+    }
+}
+
+impl PriorityClassifiable for StrongPrefixConsensusMsg {
+    /// Proposals, EmptyView messages, and Commits are priority — they directly
+    /// advance the Strong PC protocol. Inner PC votes and fetch messages are
+    /// regular — they are expensive to verify and can tolerate queuing.
+    fn is_priority(&self) -> bool {
+        matches!(
+            self,
+            StrongPrefixConsensusMsg::Proposal(_)
+                | StrongPrefixConsensusMsg::EmptyView(_)
+                | StrongPrefixConsensusMsg::Commit(_)
+        )
     }
 }
 

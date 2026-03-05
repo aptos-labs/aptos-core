@@ -26,6 +26,24 @@ use serde::{Serialize, de::DeserializeOwned};
 use std::{marker::PhantomData, sync::Arc};
 
 // =============================================================================
+// Priority classification
+// =============================================================================
+
+/// Trait for messages that can be classified as priority or regular.
+///
+/// Priority messages (e.g., ViewProposals, EmptyViewMessages, Commits) are
+/// routed to a dedicated channel for faster processing, avoiding head-of-line
+/// blocking behind expensive inner PC vote verification.
+///
+/// Default implementation returns `false` (non-priority), so only message
+/// types with actual priority variants need to override.
+pub trait PriorityClassifiable {
+    fn is_priority(&self) -> bool {
+        false
+    }
+}
+
+// =============================================================================
 // Sender traits
 // =============================================================================
 
@@ -248,6 +266,9 @@ pub struct SubprotocolSenderAdapter<M, NetworkClient> {
     author: Author,
     network_client: SubprotocolNetworkClient<M, NetworkClient>,
     self_sender: UnboundedSender<(Author, M)>,
+    /// Optional priority channel for self-sends. When set, messages where
+    /// `is_priority()` returns true are routed here instead of `self_sender`.
+    priority_self_sender: Option<UnboundedSender<(Author, M)>>,
     validators: Arc<ValidatorVerifier>,
 }
 
@@ -258,6 +279,7 @@ impl<M, NC: Clone> Clone for SubprotocolSenderAdapter<M, NC> {
             author: self.author,
             network_client: self.network_client.clone(),
             self_sender: self.self_sender.clone(),
+            priority_self_sender: self.priority_self_sender.clone(),
             validators: self.validators.clone(),
         }
     }
@@ -274,8 +296,20 @@ impl<M, NetworkClient> SubprotocolSenderAdapter<M, NetworkClient> {
             author,
             network_client,
             self_sender,
+            priority_self_sender: None,
             validators,
         }
+    }
+
+    /// Set a priority channel for self-sends. Priority messages (as classified
+    /// by `PriorityClassifiable::is_priority()`) will be routed here instead of
+    /// the regular `self_sender`.
+    pub fn with_priority_sender(
+        mut self,
+        priority_sender: UnboundedSender<(Author, M)>,
+    ) -> Self {
+        self.priority_self_sender = Some(priority_sender);
+        self
     }
 
     fn other_validators(&self) -> Vec<Author> {
@@ -290,17 +324,29 @@ impl<M, NetworkClient> SubprotocolSenderAdapter<M, NetworkClient> {
 impl<M, NetworkClient> SubprotocolNetworkSender<M>
     for SubprotocolSenderAdapter<M, NetworkClient>
 where
-    M: Serialize + DeserializeOwned + Send + Sync + Clone + 'static,
+    M: Serialize + DeserializeOwned + Send + Sync + Clone + PriorityClassifiable + 'static,
     NetworkClient: NetworkClientInterface<M> + Send + Sync + Clone,
 {
     async fn broadcast(&self, msg: M) {
-        // Send to self via channel
-        let mut self_sender = self.self_sender.clone();
-        if let Err(err) = self_sender.send((self.author, msg.clone())).await {
-            error!(
-                error = ?err,
-                "Failed to send sub-protocol msg to self via channel"
-            );
+        // Send to self via the appropriate channel (priority or regular).
+        // Check is_priority() before cloning the message for the network send.
+        let use_priority = msg.is_priority() && self.priority_self_sender.is_some();
+        if use_priority {
+            let mut sender = self.priority_self_sender.as_ref().unwrap().clone();
+            if let Err(err) = sender.send((self.author, msg.clone())).await {
+                error!(
+                    error = ?err,
+                    "Failed to send priority sub-protocol msg to self via channel"
+                );
+            }
+        } else {
+            let mut self_sender = self.self_sender.clone();
+            if let Err(err) = self_sender.send((self.author, msg.clone())).await {
+                error!(
+                    error = ?err,
+                    "Failed to send sub-protocol msg to self via channel"
+                );
+            }
         }
 
         // Send to all other validators
@@ -317,13 +363,24 @@ where
 
     async fn send_to(&self, peer: Author, msg: M) {
         if peer == self.author {
-            // Self-send via channel
-            let mut self_sender = self.self_sender.clone();
-            if let Err(err) = self_sender.send((self.author, msg)).await {
-                error!(
-                    error = ?err,
-                    "Failed to send sub-protocol msg to self via channel"
-                );
+            // Self-send via the appropriate channel (priority or regular)
+            let use_priority = msg.is_priority() && self.priority_self_sender.is_some();
+            if use_priority {
+                let mut sender = self.priority_self_sender.as_ref().unwrap().clone();
+                if let Err(err) = sender.send((self.author, msg)).await {
+                    error!(
+                        error = ?err,
+                        "Failed to send priority sub-protocol msg to self via channel"
+                    );
+                }
+            } else {
+                let mut self_sender = self.self_sender.clone();
+                if let Err(err) = self_sender.send((self.author, msg)).await {
+                    error!(
+                        error = ?err,
+                        "Failed to send sub-protocol msg to self via channel"
+                    );
+                }
             }
         } else {
             // Send to remote peer via network
