@@ -56,6 +56,17 @@ pub trait GasAlgebra {
         abstract_amount: impl GasExpression<VMGasParameters, Unit = InternalGasUnit> + Debug,
     ) -> PartialVMResult<()>;
 
+    /// Charges a fee that reduces the user's gas balance but does NOT count as
+    /// execution or IO gas. Used for overhead costs (e.g., encrypted txn decryption)
+    /// that should not affect the block gas limit.
+    fn charge_additional_fee(
+        &mut self,
+        abstract_amount: impl GasExpression<VMGasParameters, Unit = InternalGasUnit> + Debug,
+    ) -> PartialVMResult<()>;
+
+    /// Returns the amount of additional fee used.
+    fn additional_fee_used(&self) -> InternalGas;
+
     /// Charges gas charge under the IO category.
     ///
     /// The amount charged can be a quantity or an abstract expression containing

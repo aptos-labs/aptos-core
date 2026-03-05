@@ -640,7 +640,7 @@ where
         }
 
         self.algebra
-            .charge_execution(ENCRYPTED_TXN_BASE_COST)
+            .charge_additional_fee(ENCRYPTED_TXN_BASE_COST)
             .map_err(|e| e.finish(Location::Undefined))
     }
 }

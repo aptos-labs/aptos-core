@@ -758,6 +758,7 @@ where
             gas_scaling_factor: self.base.gas_unit_scaling_factor(),
             execution_gas: self.algebra().execution_gas_used(),
             io_gas: self.algebra().io_gas_used(),
+            additional_fee: self.algebra().additional_fee_used(),
             intrinsic_cost: self.intrinsic_cost.unwrap_or_else(InternalGas::zero),
             keyless_cost: self.keyless_cost.unwrap_or_else(InternalGas::zero),
             slh_dsa_sha2_128s_cost: self

@@ -42,6 +42,8 @@ where
     // The storage fee consumed by the storage operations.
     storage_fee_used: Fee,
 
+    additional_fee_used: InternalGas,
+
     num_dependencies: NumModules,
     total_dependency_size: NumBytes,
 
@@ -99,6 +101,7 @@ where
             max_storage_fee,
             storage_fee_in_internal_units: 0.into(),
             storage_fee_used: 0.into(),
+            additional_fee_used: 0.into(),
             num_dependencies: 0.into(),
             total_dependency_size: 0.into(),
             block_synchronization_kill_switch,
@@ -150,17 +153,18 @@ where
             })?;
 
         let total_calculated =
-            self.execution_gas_used + self.io_gas_used + self.storage_fee_in_internal_units;
+            self.execution_gas_used + self.io_gas_used + self.storage_fee_in_internal_units + self.additional_fee_used;
         if total != total_calculated {
             return Err(
                 PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR).with_message(
                     format!(
-                        "The per-category costs do not add up. {} (total) != {} = {} (exec) + {} (io) + {} (storage)",
+                        "The per-category costs do not add up. {} (total) != {} = {} (exec) + {} (io) + {} (storage) + {} (additional)",
                         total,
                         total_calculated,
                         self.execution_gas_used,
                         self.io_gas_used,
                         self.storage_fee_in_internal_units,
+                        self.additional_fee_used,
                     ),
                 ),
             );
@@ -206,6 +210,32 @@ where
         } else {
             Ok(())
         }
+    }
+
+    fn charge_additional_fee(
+        &mut self,
+        abstract_amount: impl GasExpression<VMGasParameters, Unit = InternalGasUnit> + Debug,
+    ) -> PartialVMResult<()> {
+        let amount = abstract_amount.evaluate(self.feature_version, &self.vm_gas_params);
+
+        match self.balance.checked_sub(amount) {
+            Some(new_balance) => {
+                self.balance = new_balance;
+                self.additional_fee_used += amount;
+            },
+            None => {
+                let old_balance = self.balance;
+                self.balance = 0.into();
+                self.additional_fee_used += old_balance;
+                return Err(PartialVMError::new(StatusCode::OUT_OF_GAS));
+            },
+        };
+
+        Ok(())
+    }
+
+    fn additional_fee_used(&self) -> InternalGas {
+        self.additional_fee_used
     }
 
     fn charge_io(
