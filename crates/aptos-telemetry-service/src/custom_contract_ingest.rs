@@ -22,7 +22,10 @@ use crate::{
 use aptos_types::{chain_id::ChainId, PeerId};
 use flate2::read::GzDecoder;
 use gcp_bigquery_client::model::table_data_insert_all_request::TableDataInsertAllRequest;
-use std::{collections::HashMap, io::Read};
+use std::{
+    collections::{HashMap, HashSet},
+    io::Read,
+};
 use uuid::Uuid;
 use warp::{filters::BoxedFilter, hyper::body::Bytes, reject, reply, Filter, Rejection, Reply};
 
@@ -643,11 +646,20 @@ async fn handle_custom_event_ingest(
         // Convert events to BigQuery rows and build insert request
         let mut insert_request = TableDataInsertAllRequest::new();
 
+        // Collect server-side reserved keys so client params with the same
+        // names are dropped (server-side labels take precedence).
+        let mut reserved_keys: HashSet<&str> =
+            HashSet::from(["contract_name", "trust_status"]);
+        for key in instance.extra_labels.keys() {
+            reserved_keys.insert(key.as_str());
+        }
+
         for event in body.events {
-            // Add contract_name and trust_status to event params
+            // Add client event params, filtering out any that conflict with server-side labels
             let mut event_params: Vec<serde_json::Value> = event
                 .params
                 .into_iter()
+                .filter(|(key, _)| !reserved_keys.contains(key.as_str()))
                 .map(|(key, value)| {
                     serde_json::json!({
                         "key": key,
@@ -655,7 +667,7 @@ async fn handle_custom_event_ingest(
                     })
                 })
                 .collect();
-            // Append contract_name and trust_status as additional parameters
+            // Append server-side parameters (these take precedence)
             event_params.push(serde_json::json!({
                 "key": "contract_name",
                 "value": {"string_value": contract_name.clone()}
