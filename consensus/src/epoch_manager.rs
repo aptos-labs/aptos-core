@@ -1121,22 +1121,9 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
                 );
                 key_pair
             } else {
-                warn!(
-                    epoch = new_epoch,
-                    "Failed to deserialize key pair, regenerating"
-                );
-                let mut rng =
-                    StdRng::from_rng(thread_rng()).map_err(NoRandomnessReason::RngCreationError)?;
-                let augmented_key_pair =
-                    WVUF::augment_key_pair(&vuf_pp, sk.main, pk.main, &mut rng);
-                self.rand_storage
-                    .save_key_pair_bytes(
-                        new_epoch,
-                        bcs::to_bytes(&augmented_key_pair)
-                            .map_err(NoRandomnessReason::KeyPairSerializationError)?,
-                    )
-                    .map_err(NoRandomnessReason::KeyPairPersistError)?;
-                augmented_key_pair
+                return Err(NoRandomnessReason::KeyPairDeserializationError(
+                    anyhow!("Failed to deserialize key pair in both old and new format"),
+                ));
             }
         } else {
             info!(
@@ -2140,7 +2127,7 @@ pub enum NoRandomnessReason {
     SecretShareDecryptionFailed(anyhow::Error),
     RngCreationError(rand::Error),
     RandDbNotAvailable(anyhow::Error),
-    KeyPairDeserializationError(bcs::Error),
+    KeyPairDeserializationError(anyhow::Error),
     KeyPairSerializationError(bcs::Error),
     KeyPairPersistError(anyhow::Error),
 }
