@@ -61,6 +61,7 @@ pub async fn new_test_context_with_multiple_contracts(
                     untrusted_logs_rate_limit: None,
                     peer_identities: HashMap::new(),
                     blacklist_peers: None,
+                    extra_labels: HashMap::new(),
                 })
                 .collect()
         })
