@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-import sys, csv, re, math
+import sys, csv, re, math, os, json
 from collections import defaultdict
 
 HEADER = [
@@ -12,7 +12,8 @@ HEADER = [
 ]
 
 BP_NAME = "Bulletproofs"
-DE_NAME = "DeKART (BLS12-381)"
+DE_NAME = "univ DeKART (BLS12-381)"
+DE_MV_NAME = "multiv DeKART (BLS12-381)"
 
 BP_PROVE_ID = "range_prove"
 BP_VERIFY_ID = "range_verify"
@@ -20,7 +21,8 @@ DE_PROVE_ID = "prove"
 DE_VERIFY_ID = "verify"
 
 bp_re = re.compile(r"batch=(\d+)_bits=(\d+)")
-de_re = re.compile(r"ell=(\d+)_n=(\d+)")
+# Criterion may use / or _ in Parameter; proof_size is stored in criterion by the bench
+de_re = re.compile(r"ell=(\d+)[/_]n=(\d+)(?:[/_]proof_size=(\d+))?")
 
 
 def bp_proof_size(n, ell):
@@ -47,11 +49,63 @@ def parse_param_bulletproofs(param):
     return n, ell
 
 def parse_param_dekart(param):
-    m = de_re.fullmatch(param)
+    """Returns (n, ell, proof_size_or_none). proof_size is present when stored by criterion (prove bench)."""
+    m = de_re.search(param)  # search to allow extra text; fullmatch would require exact match
     if not m: return None
     ell = int(m.group(1))
     n = int(m.group(2))
-    return n, ell
+    proof_size = int(m.group(3)) if (m.lastindex is not None and m.lastindex >= 3 and m.group(3)) else None
+    return n, ell, proof_size
+
+
+def parse_proof_size_from_folder(folder_path):
+    """
+    Extract proof_size from benchmark.json in the folder.
+    folder_path should be relative to current directory (target/criterion).
+    """
+    for sub in ("base", "new"):
+        benchmark_json = os.path.join(folder_path, sub, "benchmark.json")
+        if os.path.exists(benchmark_json):
+            try:
+                with open(benchmark_json, "r") as f:
+                    data = json.load(f)
+                    if "function_id" in data:
+                        m = re.search(r"proof_size=(\d+)", data["function_id"])
+                        if m:
+                            return int(m.group(1))
+            except (json.JSONDecodeError, IOError, ValueError) as e:
+                # If benchmark.json is missing or malformed, ignore and fall back to returning None.
+                print(
+                    f"Warning: could not parse proof_size from {benchmark_json}: {e}",
+                    file=sys.stderr,
+                )
+    return None
+
+
+def build_folder_map():
+    """
+    Build (group_prefix, n, ell) -> proof_size by scanning dekart* criterion folders
+    for prove_ell=*_n=*_proof_size=* subfolders. Call from target/criterion.
+    """
+    folder_map = {}
+    for entry in os.listdir("."):
+        if not os.path.isdir(entry):
+            continue
+        if not (entry.startswith("dekart-rs") or entry.startswith("dekart_multivar") or
+                "dekart-multivar" in entry or "dekart_multivar" in entry):
+            continue
+        group_path = os.path.join(".", entry)
+        for sub in os.listdir(group_path):
+            subpath = os.path.join(group_path, sub)
+            if not os.path.isdir(subpath) or not sub.startswith("prove_"):
+                continue
+            m = re.search(r"ell=(\d+)[/_]n=(\d+)[/_]proof_size=(\d+)", sub.replace("-", "_"))
+            if not m:
+                continue
+            ell, n, proof_size = int(m.group(1)), int(m.group(2)), int(m.group(3))
+            key = (entry, n, ell)
+            folder_map[key] = (os.path.join(entry, sub), proof_size)
+    return folder_map
 
 def ns_to_ms(ns):
     return round(float(ns) / 1e6, 2)
@@ -122,13 +176,16 @@ def next_pow2_ge(x: int) -> int:
         p <<= 1
     return p
 
-def accumulate(rows):
+def accumulate(rows, folder_map=None):
     """
-    Build dicts keyed by (n, ell) -> {"prove": ns, "verify": ns}
+    Build dicts keyed by (n, ell) -> {"prove": ns, "verify": ns, "proof_size": ...}
     separately for Bulletproofs and DeKART.
+    If folder_map is provided (from build_folder_map when run from target/criterion),
+    proof_size is filled from benchmark folders when not in CSV.
     """
     bp = defaultdict(dict)
     de = defaultdict(dict)
+    de_mv = defaultdict(dict)
     ells_seen = set()
 
     for r in rows:
@@ -154,48 +211,68 @@ def accumulate(rows):
             elif ident == BP_VERIFY_ID:
                 bp[(n, ell)]["verify"] = mean_ns
 
+        elif "dekart-multivar" in group or "dekart_multivar" in group:
+            parsed = parse_param_dekart(param)
+            if not parsed: continue
+            n, ell, proof_size = parsed
+            ells_seen.add(ell)
+            if ident == DE_PROVE_ID:
+                de_mv[(n, ell)]["prove"] = mean_ns
+                if proof_size is not None:
+                    de_mv[(n, ell)]["proof_size"] = proof_size
+                elif folder_map:
+                    key = (group.replace("/", "_"), n, ell)
+                    if key in folder_map:
+                        de_mv[(n, ell)]["proof_size"] = folder_map[key][1]
+            elif ident == DE_VERIFY_ID:
+                de_mv[(n, ell)]["verify"] = mean_ns
         elif group.startswith("dekart"):
             parsed = parse_param_dekart(param)
             if not parsed: continue
-            n, ell = parsed
+            n, ell, proof_size = parsed
             ells_seen.add(ell)
             if ident == DE_PROVE_ID:
                 de[(n, ell)]["prove"] = mean_ns
+                if proof_size is not None:
+                    de[(n, ell)]["proof_size"] = proof_size
+                elif folder_map:
+                    key = (group.replace("/", "_"), n, ell)
+                    if key in folder_map:
+                        de[(n, ell)]["proof_size"] = folder_map[key][1]
             elif ident == DE_VERIFY_ID:
                 de[(n, ell)]["verify"] = mean_ns
 
-    return bp, de, sorted(ells_seen)
+    return bp, de, de_mv, sorted(ells_seen)
 
-def make_rows_for_ell(bp_map, de_map, ell):
+def make_rows_for_ell(bp_map, de_map, de_mv_map, ell):
     """
-    Alternate rows: Bulletproofs (n asc) then DeKART (n asc).
-    DeKART ratios are computed vs Bulletproofs at the *next power of two* batch size:
-      compare DeKART n = 2^k - 1  against Bulletproofs n = 2^k.
-    Only include rows where each scheme has both prove & verify for its own n.
+    For each n (across all schemes), emit BP row, univ DeKART row, multiv DeKART row when present.
+    DeKART ratios are computed vs Bulletproofs at the *next power of two* batch size.
     """
-    # Collect valid ns per scheme for this ell
     bp_ns = sorted(n for (n,e),dv in bp_map.items() if e==ell and "prove" in dv and "verify" in dv)
     de_ns = sorted(n for (n,e),dv in de_map.items() if e==ell and "prove" in dv and "verify" in dv)
+    de_mv_ns = sorted(n for (n,e),dv in de_mv_map.items() if e==ell and "prove" in dv and "verify" in dv)
 
-    # Lookup tables in ms
     bp_vals = {}
     for n in bp_ns:
         dv = bp_map[(n, ell)]
         p = ns_to_ms(dv["prove"]); v = ns_to_ms(dv["verify"]); t = round(p+v, 2)
         bp_vals[n] = (p, v, t)
-
     de_vals = {}
     for n in de_ns:
         dv = de_map[(n, ell)]
         p = ns_to_ms(dv["prove"]); v = ns_to_ms(dv["verify"]); t = round(p+v, 2)
         de_vals[n] = (p, v, t)
+    de_mv_vals = {}
+    for n in de_mv_ns:
+        dv = de_mv_map[(n, ell)]
+        p = ns_to_ms(dv["prove"]); v = ns_to_ms(dv["verify"]); t = round(p+v, 2)
+        de_mv_vals[n] = (p, v, t)
 
-    # Alternate output
+    all_n = sorted(set(bp_ns) | set(de_ns) | set(de_mv_ns))
     out = []
-    i = j = 0
-    while i < len(bp_ns) or j < len(de_ns):
-        if i < len(bp_ns):
-            n = bp_ns[i]; i += 1
+    for n in all_n:
+        if n in bp_ns:
             bp_p, bp_v, bp_t = bp_vals[n]
             bp_size = bp_proof_size(n, ell)
             out.append({
@@ -207,12 +284,11 @@ def make_rows_for_ell(bp_map, de_map, ell):
                 "s_display": fmt_int(bp_size),
                 "s_render":  fmt_int(bp_size),
             })
-        if j < len(de_ns):
-            n = de_ns[j]; j += 1
+        if n in de_ns:
             de_p, de_v, de_t = de_vals[n]
-            # Baseline Bulletproofs = next power of two of (n+1)  (for 2^k-1 -> 2^k)
             baseline_n = next_pow2_ge(n + 1)
-            de_size = de_proof_size(n, ell)
+            dv = de_map[(n, ell)]
+            de_size = dv.get("proof_size") or de_proof_size(n, ell)
             if baseline_n in bp_vals:
                 bp_p, bp_v, bp_t = bp_vals[baseline_n]
                 rp = bp_p / de_p if bp_p else float("inf")
@@ -221,20 +297,45 @@ def make_rows_for_ell(bp_map, de_map, ell):
                 p_disp, p_rend = decorate_dekart(de_p, rp)
                 v_disp, v_rend = decorate_dekart(de_v, rv)
                 t_disp, t_rend = decorate_dekart(de_t, rt)
-
-                # proof-size ratio: DeKART vs BP baseline, same direction & coloring as verify time
                 bp_size = bp_proof_size(baseline_n, ell)
                 rs = de_size / bp_size if bp_size else float("inf")
                 s_disp, s_rend = decorate_dekart_size(de_size, rs)
             else:
-                # No BP baseline available; print plain values
                 p_disp = p_rend = fmt_ms(de_p)
                 v_disp = v_rend = fmt_ms(de_v)
                 t_disp = t_rend = fmt_ms(de_t)
                 s_disp = s_rend = fmt_int(de_size)
-
             out.append({
                 "Scheme": DE_NAME,
+                "n": str(n),
+                "p_display": p_disp, "p_render": p_rend,
+                "v_display": v_disp, "v_render": v_rend,
+                "t_display": t_disp, "t_render": t_rend,
+                "s_display": s_disp, "s_render": s_rend,
+            })
+        if n in de_mv_ns:
+            de_p, de_v, de_t = de_mv_vals[n]
+            baseline_n = next_pow2_ge(n + 1)
+            dv_mv = de_mv_map[(n, ell)]
+            de_size = dv_mv.get("proof_size") or de_proof_size(n, ell)
+            if baseline_n in bp_vals:
+                bp_p, bp_v, bp_t = bp_vals[baseline_n]
+                rp = bp_p / de_p if bp_p else float("inf")
+                rv = bp_v / de_v if bp_v else float("inf")
+                rt = bp_t / de_t if bp_t else float("inf")
+                p_disp, p_rend = decorate_dekart(de_p, rp)
+                v_disp, v_rend = decorate_dekart(de_v, rv)
+                t_disp, t_rend = decorate_dekart(de_t, rt)
+                bp_size = bp_proof_size(baseline_n, ell)
+                rs = de_size / bp_size if bp_size else float("inf")
+                s_disp, s_rend = decorate_dekart_size(de_size, rs)
+            else:
+                p_disp = p_rend = fmt_ms(de_p)
+                v_disp = v_rend = fmt_ms(de_v)
+                t_disp = t_rend = fmt_ms(de_t)
+                s_disp = s_rend = fmt_int(de_size)
+            out.append({
+                "Scheme": DE_MV_NAME,
                 "n": str(n),
                 "p_display": p_disp, "p_render": p_rend,
                 "v_display": v_disp, "v_render": v_rend,
@@ -303,11 +404,13 @@ def main():
     else:
         rows = list(read_rows(sys.stdin))
 
-    bp_map, de_map, ells = accumulate(rows)
+    # When run from target/criterion, proof_size can be read from benchmark folders
+    folder_map = build_folder_map()
+    bp_map, de_map, de_mv_map, ells = accumulate(rows, folder_map=folder_map)
 
     first = True
     for ell in ells:
-        tbl_rows = make_rows_for_ell(bp_map, de_map, ell)
+        tbl_rows = make_rows_for_ell(bp_map, de_map, de_mv_map, ell)
         if not tbl_rows:
             continue
         if not first:

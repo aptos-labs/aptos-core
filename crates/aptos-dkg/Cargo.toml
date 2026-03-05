@@ -17,14 +17,14 @@ ark-poly = { workspace = true }
 ark-serialize = { workspace = true }
 ark-std = { workspace = true }
 bcs = { workspace = true }
-# blake2 = { workspace = true }
+#blake2 = { workspace = true }
 blst = { workspace = true }
 blstrs = { workspace = true }
 criterion = { workspace = true }
 derive_more = { workspace = true }
 ff = { workspace = true }
 group = { workspace = true }
-# hashbrown = { workspace = true }
+#hashbrown = { workspace = true }
 hex = { workspace = true }
 itertools = { workspace = true }
 merlin = { workspace = true }
@@ -49,6 +49,7 @@ assert-private-keys-not-cloneable = []
 fuzzing = []
 parallel = []
 range_proof_timing = []
+range_proof_timing_univariate_v2 = []  # per-component timing for dekart_univariate_v2; use --test range_proof -- --nocapture to see output
 
 [[bench]]
 name = "bsgs"

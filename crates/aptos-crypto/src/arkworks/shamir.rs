@@ -4,14 +4,17 @@
 //! Contains a version of shamir secret sharing and `ThresholdConfig` for arkworks
 
 use crate::{
-    arkworks::{differentiate::DifferentiableFn, vanishing_poly, weighted_sum::WeightedSum},
+    arkworks::{
+        differentiate::DifferentiableFn, random::sample_field_elements, vanishing_poly,
+        weighted_sum::WeightedSum,
+    },
     player::Player,
     traits,
     traits::TSecretSharingConfig,
 };
 use anyhow::{anyhow, Result};
 use ark_ec::CurveGroup;
-use ark_ff::{batch_inversion, FftField, Field};
+use ark_ff::{batch_inversion, FftField, Field, PrimeField};
 use ark_poly::{EvaluationDomain, Radix2EvaluationDomain};
 use ark_std::fmt;
 use rand::{seq::IteratorRandom, Rng};
@@ -299,6 +302,27 @@ impl<F: FftField> ShamirThresholdConfig<F> {
         debug_assert_eq!(coeffs.len(), self.t);
         let evals = self.domain.fft(coeffs);
         (0..self.n).map(|i| self.get_player(i)).zip(evals).collect()
+    }
+
+    /// Samples a random polynomial with constant term `a0` and degree `t - 1`, evaluates it
+    /// over the config's domain via FFT, and returns the coefficient vector and the first `n`
+    /// evaluations. Useful for both classic and weighted Shamir (e.g. weighted PVSS where
+    /// the threshold config has `n = W`).
+    #[allow(non_snake_case)]
+    pub fn sample_polynomial_and_compute_shares<R: RngCore + CryptoRng>(
+        &self,
+        a0: F,
+        rng: &mut R,
+    ) -> (Vec<F>, Vec<F>)
+    where
+        F: PrimeField,
+    {
+        let mut coeffs = vec![a0];
+        coeffs.extend(sample_field_elements::<F, _>(self.t - 1, rng));
+        let mut evals = self.domain.fft(&coeffs);
+        evals.truncate(self.n);
+        debug_assert_eq!(evals.len(), self.n);
+        (coeffs, evals)
     }
 }
 

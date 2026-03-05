@@ -7,10 +7,12 @@ use crate::{
     sigma_protocol::homomorphism::Trait, utils, Scalar,
 };
 use anyhow::ensure;
-use aptos_crypto::arkworks::{powers_of_two, random::sample_field_element, GroupGenerators};
+use aptos_crypto::arkworks::{
+    msm::msm_bool, powers_of_two, random::sample_field_element, GroupGenerators,
+};
 use ark_ec::{
     pairing::{Pairing, PairingOutput},
-    CurveGroup, PrimeGroup, VariableBaseMSM,
+    AffineRepr, CurveGroup, PrimeGroup, VariableBaseMSM,
 };
 use ark_ff::{AdditiveGroup, Field};
 use ark_poly::{self, EvaluationDomain, Radix2EvaluationDomain};
@@ -64,6 +66,15 @@ where
 #[derive(CanonicalSerialize, CanonicalDeserialize, Debug, Clone, PartialEq, Eq)]
 pub struct Commitment<E: Pairing>(E::G1);
 
+#[derive(CanonicalSerialize, CanonicalDeserialize, Debug, Clone, PartialEq, Eq)]
+pub struct CommitmentNormalised<E: Pairing>(pub E::G1Affine);
+
+impl<E: Pairing> From<Commitment<E>> for CommitmentNormalised<E> {
+    fn from(c: Commitment<E>) -> Self {
+        CommitmentNormalised(c.0.into_affine())
+    }
+}
+
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct ProverKey<E: Pairing> {
     max_n: usize,
@@ -87,7 +98,7 @@ pub struct PublicStatement<E: Pairing> {
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct VerificationKey<E: Pairing> {
     max_ell: u8,
-    tau_1: E::G1,
+    tau_1: E::G1, // TODO: should make this stuff affine
     tau_2: E::G2,
     vanishing_com: E::G2, // commitment to deg-n vanishing polynomial (X^{n+1} - 1) / (X - 1) used to test h(X)
     powers_of_two: Vec<E::ScalarField>, // [1, 2, 4, ..., 2^{max_ell - 1}]
@@ -121,6 +132,7 @@ impl<E: Pairing> CanonicalSerialize for VerificationKey<E> {
 impl<E: Pairing> traits::BatchedRangeProof<E> for Proof<E> {
     type Commitment = Commitment<E>;
     type CommitmentKey = ProverKey<E>;
+    type CommitmentNormalised = CommitmentNormalised<E>;
     type CommitmentRandomness = Scalar<E::ScalarField>;
     type Input = E::ScalarField;
     type ProverKey = ProverKey<E>;
@@ -218,7 +230,7 @@ impl<E: Pairing> traits::BatchedRangeProof<E> for Proof<E> {
         pk: &ProverKey<E>,
         values: &[Self::Input],
         ell: u8,
-        comm: &Self::Commitment,
+        comm: &Self::CommitmentNormalised,
         r: &Self::CommitmentRandomness,
         rng: &mut R,
     ) -> Proof<E>
@@ -265,7 +277,7 @@ impl<E: Pairing> traits::BatchedRangeProof<E> for Proof<E> {
         let bits: Vec<Vec<bool>> = zz
             .iter()
             .map(|z_val| {
-                utils::scalar_to_bits_le::<E>(z_val)
+                utils::scalar_to_bits_le::<E::ScalarField>(z_val)
                     .into_iter()
                     .take(ell as usize)
                     .collect::<Vec<_>>()
@@ -350,7 +362,7 @@ impl<E: Pairing> traits::BatchedRangeProof<E> for Proof<E> {
                 //  `k = \ell / c = 2048 / 16 = 128` tables, each of size 2^c => 2^{16} * 48 bytes =
                 //  3 MiB / table => 384 MiB total.
                 let mut c_j: <E as Pairing>::G1 = pk.lagr_g1[0].mul(&r[j]); // start with r[j] * lagr_g1[0]
-                c_j.add_assign(&utils::msm_bool(
+                c_j.add_assign(&msm_bool(
                     &pk.lagr_g1[1..=pk.max_n], // TODO: why are we padding?
                     &f_evals_without_r[j],
                 ));
@@ -378,10 +390,7 @@ impl<E: Pairing> traits::BatchedRangeProof<E> for Proof<E> {
             // .map(|j| g2_multi_exp(&pp.lagrange_basis_g2, &f_evals[j]))
             .map(|j| {
                 let mut c_hat_j: <E as Pairing>::G2 = pk.lagr_g2[0].mul(&r[j]);
-                c_hat_j.add_assign(&utils::msm_bool(
-                    &pk.lagr_g2[1..=pk.max_n],
-                    &f_evals_without_r[j],
-                ));
+                c_hat_j.add_assign(&msm_bool(&pk.lagr_g2[1..=pk.max_n], &f_evals_without_r[j]));
                 c_hat_j
             })
             .collect();
@@ -493,7 +502,7 @@ impl<E: Pairing> traits::BatchedRangeProof<E> for Proof<E> {
         let public_statement = PublicStatement {
             n,
             ell,
-            comm: comm.clone(),
+            comm: Commitment(comm.0.into_group()),
         };
         let c_aff = E::G1::normalize_batch(&c);
         let c_hat_aff = E::G2::normalize_batch(&c_hat);
@@ -560,14 +569,14 @@ impl<E: Pairing> traits::BatchedRangeProof<E> for Proof<E> {
         }
     }
 
-    fn verify<R: RngCore + CryptoRng>(
+    fn pairing_for_verify<R: RngCore + CryptoRng>(
         &self,
         vk: &Self::VerificationKey,
         n: usize,
         ell: u8,
         comm: &Self::Commitment,
         _rng: &mut R,
-    ) -> anyhow::Result<()> {
+    ) -> anyhow::Result<(Vec<E::G1Affine>, Vec<E::G2Affine>)> {
         let mut fs_t = merlin::Transcript::new(Self::DST);
 
         assert!(
@@ -597,6 +606,7 @@ impl<E: Pairing> traits::BatchedRangeProof<E> for Proof<E> {
         );
 
         // Verify h(\tau)
+        // TODO: uhh I should also move this multi-pairing to the output... oh well this code is dead anyway
         let h_check = E::multi_pairing(
             (0..ell as usize)
                 .map(|j| self.c[j] * betas[j]) // E::G1
@@ -616,19 +626,31 @@ impl<E: Pairing> traits::BatchedRangeProof<E> for Proof<E> {
 
         // Compute MSM in G2: sum_j (alphas[j] * proof.c_hat[j])
         let g2_comb = VariableBaseMSM::msm(&self.c_hat, &alphas).unwrap();
-        let c_check = E::multi_pairing(
-            vec![
+
+        Ok((
+            E::G1::normalize_batch(&[
                 g1_comb,   // from MSM in G1
                 -vk.tau_1, // subtract tau_1
-            ],
-            vec![
+            ]),
+            E::G2::normalize_batch(&[
                 vk.tau_2, // tau_2
                 g2_comb,  // from MSM in G2
-            ],
-        );
-        ensure!(PairingOutput::<E>::ZERO == c_check);
+            ]),
+        ))
 
-        Ok(())
+        // let c_check = E::multi_pairing(
+        //     vec![
+        //         g1_comb,   // from MSM in G1
+        //         -vk.tau_1, // subtract tau_1
+        //     ],
+        //     vec![
+        //         vk.tau_2, // tau_2
+        //         g2_comb,  // from MSM in G2
+        //     ],
+        // );
+        // ensure!(PairingOutput::<E>::ZERO == c_check);
+
+        // Ok(())
     }
 
     fn maul(&mut self) {
