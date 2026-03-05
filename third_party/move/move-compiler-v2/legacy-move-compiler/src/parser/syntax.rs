@@ -896,10 +896,13 @@ fn maybe_parse_literal_pattern(context: &mut Context) -> Result<Option<Value>, B
 
 // Parse a binding:
 //      Bind =
-//          <Var>
+//          <Literal>
+//          | <Var>
 //          | <NameAccessChain> <OptionalTypeArgs> "{" Comma<BindFieldOrDotDot> "}"
 //          | <NameAccessChain> <OptionalTypeArgs> "(" Comma<BindOrDotDot> "," ")"
 //          | <NameAccessChain> <OptionalTypeArgs>
+//
+// Literal patterns include numeric values (with optional sign), bools, and byte strings.
 fn parse_bind(context: &mut Context) -> Result<Bind, Box<Diagnostic>> {
     let start_loc = context.tokens.start_loc();
 
