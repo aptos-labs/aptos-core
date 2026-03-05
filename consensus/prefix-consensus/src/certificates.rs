@@ -98,9 +98,19 @@ impl DirectCertificate {
         Ok(())
     }
 
-    /// Canonical hash for this certificate
+    /// Canonical hash for this certificate (semantic, proof-independent).
+    ///
+    /// Hashes only the certified values (view, epoch, slot, v_low, v_high), NOT
+    /// the full QC3 proof. This ensures that any two QC3s certifying the same
+    /// values for the same (view, epoch, slot) produce the same certificate hash,
+    /// regardless of which quorum subset was collected.
     pub fn hash(&self) -> HashValue {
-        let bytes = bcs::to_bytes(self).expect("BCS serialization failed");
+        let (v_low, v_high) = qc3_certify(&self.proof);
+        let slot = self.proof.votes.first().map(|v| v.slot).unwrap_or(0);
+        let epoch = self.proof.votes.first().map(|v| v.epoch).unwrap_or(0);
+        let semantic: (&str, u64, u64, u64, &PrefixVector, PrefixVector) =
+            ("DirectCert", self.view, epoch, slot, &v_low, v_high);
+        let bytes = bcs::to_bytes(&semantic).expect("BCS serialization failed");
         HashValue::sha3_256_of(&bytes)
     }
 }
@@ -360,9 +370,19 @@ impl IndirectCertificate {
         Ok(())
     }
 
-    /// Canonical hash for this certificate
+    /// Canonical hash for this certificate (semantic, proof-independent).
+    ///
+    /// Hashes only the certified values (empty_view, parent_view, epoch, slot,
+    /// v_high from parent_proof), NOT the full messages or parent_proof votes.
+    /// This ensures that any two IndirectCertificates with different message
+    /// subsets but same semantic content produce the same hash.
     pub fn hash(&self) -> HashValue {
-        let bytes = bcs::to_bytes(self).expect("BCS serialization failed");
+        let (_, v_high) = qc3_certify(&self.parent_proof);
+        let slot = self.parent_proof.votes.first().map(|v| v.slot).unwrap_or(0);
+        let epoch = self.parent_proof.votes.first().map(|v| v.epoch).unwrap_or(0);
+        let semantic: (&str, u64, u64, u64, u64, PrefixVector) =
+            ("IndirectCert", self.empty_view, self.parent_view, epoch, slot, v_high);
+        let bytes = bcs::to_bytes(&semantic).expect("BCS serialization failed");
         HashValue::sha3_256_of(&bytes)
     }
 }
@@ -888,6 +908,50 @@ mod tests {
         assert_ne!(cert1.hash(), cert2.hash());
     }
 
+    #[test]
+    fn test_direct_certificate_different_vote_subsets_same_hash() {
+        // Two QC3s with different vote subsets but same certified values (mcp/mce).
+        // This simulates two honest nodes that collected different quorum subsets.
+        // With semantic hashing, both should produce the same certificate hash.
+
+        // Subset A: parties 0, 1, 2 — all vote [hash(1), hash(2)]
+        let qc3_a = create_qc3_with_prefixes_and_view(
+            vec![
+                vec![hash(1), hash(2)],
+                vec![hash(1), hash(2)],
+                vec![hash(1), hash(2)],
+            ],
+            1,
+        );
+
+        // Subset B: parties 0, 1, 3 (party 3 replaces party 2) — same prefix
+        // We need to manually create this since create_qc3_with_prefixes uses parties 0,1,2
+        let qc1 = crate::types::QC1::new(vec![
+            crate::types::Vote1::new(dummy_party_id(0), vec![hash(1)], 0, 0, 1, dummy_signature()),
+            crate::types::Vote1::new(dummy_party_id(1), vec![hash(1)], 0, 0, 1, dummy_signature()),
+            crate::types::Vote1::new(dummy_party_id(3), vec![hash(1)], 0, 0, 1, dummy_signature()),
+        ]);
+        let qc2 = crate::types::QC2::new(vec![
+            crate::types::Vote2::new(dummy_party_id(0), vec![hash(1)], qc1.clone(), 0, 0, 1, dummy_signature()),
+            crate::types::Vote2::new(dummy_party_id(1), vec![hash(1)], qc1.clone(), 0, 0, 1, dummy_signature()),
+            crate::types::Vote2::new(dummy_party_id(3), vec![hash(1)], qc1, 0, 0, 1, dummy_signature()),
+        ]);
+        let qc3_b = crate::types::QC3::new(vec![
+            crate::types::Vote3::new(dummy_party_id(0), vec![hash(1), hash(2)], qc2.clone(), 0, 0, 1, dummy_signature()),
+            crate::types::Vote3::new(dummy_party_id(1), vec![hash(1), hash(2)], qc2.clone(), 0, 0, 1, dummy_signature()),
+            crate::types::Vote3::new(dummy_party_id(3), vec![hash(1), hash(2)], qc2, 0, 0, 1, dummy_signature()),
+        ]);
+
+        let cert_a = DirectCertificate::new(1, qc3_a);
+        let cert_b = DirectCertificate::new(1, qc3_b);
+
+        // Both certify the same (v_low, v_high) = ([hash(1), hash(2)], [hash(1), hash(2)])
+        assert_eq!(cert_a.v_high(), cert_b.v_high());
+
+        // Semantic hash should be identical despite different vote subsets
+        assert_eq!(cert_a.hash(), cert_b.hash());
+    }
+
     // ========================================================================
     // EmptyViewStatement Tests
     // ========================================================================
@@ -990,6 +1054,43 @@ mod tests {
         let cert2 = IndirectCertificate::from_messages(5, messages, &verifier).unwrap();
 
         assert_eq!(cert1.hash(), cert2.hash());
+    }
+
+    #[test]
+    fn test_indirect_certificate_different_message_subsets_same_hash() {
+        // Two IndirectCertificates with different message subsets but same semantic content.
+        // Simulates two honest nodes collecting different >1/3 stake subsets.
+        // 4 validators, minority (>1/3) = 2
+        let verifier = create_test_verifier(4);
+
+        let qc3 = create_qc3_with_prefixes(vec![
+            vec![hash(1)],
+            vec![hash(1)],
+            vec![hash(1)],
+        ]);
+
+        // Subset A: messages from parties 0 and 1
+        let messages_a = vec![
+            EmptyViewMessage::new(5, dummy_party_id(0), 3, qc3.clone(), dummy_signature(), 1, 0),
+            EmptyViewMessage::new(5, dummy_party_id(1), 3, qc3.clone(), dummy_signature(), 1, 0),
+        ];
+
+        // Subset B: messages from parties 0 and 2
+        let messages_b = vec![
+            EmptyViewMessage::new(5, dummy_party_id(0), 3, qc3.clone(), dummy_signature(), 1, 0),
+            EmptyViewMessage::new(5, dummy_party_id(2), 3, qc3.clone(), dummy_signature(), 1, 0),
+        ];
+
+        let cert_a = IndirectCertificate::from_messages(5, messages_a, &verifier).unwrap();
+        let cert_b = IndirectCertificate::from_messages(5, messages_b, &verifier).unwrap();
+
+        // Both have same semantic content: empty_view=5, parent_view=3, same v_high
+        assert_eq!(cert_a.view(), cert_b.view());
+        assert_eq!(cert_a.parent_view(), cert_b.parent_view());
+        assert_eq!(cert_a.v_high(), cert_b.v_high());
+
+        // Semantic hash should be identical despite different message subsets
+        assert_eq!(cert_a.hash(), cert_b.hash());
     }
 
     // ========================================================================
