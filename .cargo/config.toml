@@ -48,6 +48,12 @@ CXX_x86_64_unknown_linux_gnu = "clang++"
 CFLAGS_x86_64_unknown_linux_gnu = "-march=x86-64-v3"
 # Need `-mpclmul` for RocksDB to build until its build script is fixed.
 CXXFLAGS_x86_64_unknown_linux_gnu = "-march=x86-64-v3 -mpclmul"
+# Use AVX-512VL-optimized Keccak assembly for SHA3 hashing (from cryptogams/OpenSSL).
+# The sha3-asm crate normally selects the implementation based on target-cpu features,
+# but since we build with x86-64-v3 (no AVX-512), we force the AVX-512VL variant here.
+# This is safe because the AVX-512VL assembly does not require runtime feature detection;
+# it will simply crash on CPUs without AVX-512VL support. Only use on capable hardware.
+SHA3_ASM_SCRIPT = "x86_64/keccak1600-avx512vl.pl"
 
 # 64 bit MSVC
 [target.x86_64-pc-windows-msvc]

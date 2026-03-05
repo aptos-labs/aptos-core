@@ -1167,6 +1167,7 @@ dependencies = [
  "sha2 0.10.8",
  "sha2 0.9.9",
  "sha3 0.9.1",
+ "sha3-asm",
  "signature 2.2.0",
  "slh-dsa",
  "static_assertions",
@@ -17456,6 +17457,16 @@ checksum = "c5bfe7820113e633d8886e839aae78c1184b8d7011000db6bc7eb61e34f28350"
 dependencies = [
  "digest 0.11.0",
  "keccak 0.2.0-rc.1",
+]
+
+[[package]]
+name = "sha3-asm"
+version = "0.1.5"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b31139435f327c93c6038ed350ae4588e2c70a13d50599509fee6349967ba35a"
+dependencies = [
+ "cc",
+ "cfg-if",
 ]
 
 [[package]]

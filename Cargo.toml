@@ -775,6 +775,7 @@ scopeguard = "1.2.0"
 sha2 = "0.9.3"
 sha256 = "1.4.0"
 sha2_0_10_6 = { package = "sha2", version = "0.10.6" }
+sha3-asm = "0.1.5"
 sha3 = "0.9.1"
 shell-words = "1.0.0"
 siphasher = "0.3.10"

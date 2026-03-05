@@ -112,7 +112,6 @@ use std::{
     fmt,
     str::FromStr,
 };
-use tiny_keccak::{Hasher, Sha3};
 
 /// A prefix used to begin the salt of every hashable structure. The salt
 /// consists in this global prefix, concatenated with the specified
@@ -173,9 +172,11 @@ impl HashValue {
     /// Note this will not result in the `<T as CryptoHash>::hash()` for any
     /// reasonable struct T, as this computes a sha3 without any ornaments.
     pub fn sha3_256_of(buffer: &[u8]) -> Self {
-        let mut sha3 = Sha3::v256();
+        let mut sha3 = AsmSha3::new();
         sha3.update(buffer);
-        HashValue::from_keccak(sha3)
+        let mut hash = Self::zero();
+        sha3.finalize(hash.as_ref_mut());
+        hash
     }
 
     /// Convenience function that sha3_256 the set of buffers
@@ -184,21 +185,17 @@ impl HashValue {
     where
         I: IntoIterator<Item = &'a [u8]>,
     {
-        let mut sha3 = Sha3::v256();
+        let mut sha3 = AsmSha3::new();
         for buffer in buffers {
             sha3.update(buffer);
         }
-        HashValue::from_keccak(sha3)
+        let mut hash = Self::zero();
+        sha3.finalize(hash.as_ref_mut());
+        hash
     }
 
     fn as_ref_mut(&mut self) -> &mut [u8] {
         &mut self.hash[..]
-    }
-
-    fn from_keccak(state: Sha3) -> Self {
-        let mut hash = Self::zero();
-        state.finalize(hash.as_ref_mut());
-        hash
     }
 
     /// Returns the `index`-th bit in the bytes.
@@ -507,11 +504,91 @@ pub trait CryptoHasher: Default + std::io::Write {
     }
 }
 
+/// SHA3-256 sponge state backed by sha3-asm's optimized assembly (cryptogams/OpenSSL).
+///
+/// On x86_64 with AVX-512VL, this uses hand-written AVX-512 assembly (`vpternlogq`, `vprolq`)
+/// that is significantly faster than the pure-Rust implementation in `tiny_keccak`.
+#[derive(Clone)]
+struct AsmSha3 {
+    /// Keccak state (25 x u64 = 200 bytes).
+    a: sha3_asm::Buffer,
+    /// Number of bytes buffered in `buf` (not yet absorbed).
+    bufsz: usize,
+    /// Temporary buffer for partial blocks.
+    buf: [u8; Self::RATE],
+}
+
+impl AsmSha3 {
+    /// SHA3-256 rate in bytes: (1600 - 2*256) / 8 = 136.
+    const RATE: usize = 136;
+    /// SHA3 padding delimiter.
+    const PAD: u8 = 0x06;
+
+    fn new() -> Self {
+        Self {
+            a: [0u64; 25],
+            bufsz: 0,
+            buf: [0u8; Self::RATE],
+        }
+    }
+
+    #[inline]
+    fn update(&mut self, input: &[u8]) {
+        let bsz = Self::RATE;
+
+        if input.is_empty() {
+            return;
+        }
+
+        let mut consumed = 0usize;
+        let num = self.bufsz;
+        if num != 0 {
+            let rem = bsz - num;
+            if input.len() < rem {
+                self.buf[num..num + input.len()].copy_from_slice(input);
+                self.bufsz += input.len();
+                return;
+            }
+            self.buf[num..num + rem].copy_from_slice(&input[..rem]);
+            sha3_asm::sha3_absorb(&mut self.a, &self.buf[..bsz], bsz);
+            consumed = rem;
+            self.bufsz = 0;
+        }
+
+        let remaining = input.len() - consumed;
+        let leftover = if remaining >= bsz {
+            sha3_asm::sha3_absorb(&mut self.a, &input[consumed..], bsz)
+        } else {
+            remaining
+        };
+
+        if leftover > 0 {
+            let start = input.len() - leftover;
+            self.buf[..leftover].copy_from_slice(&input[start..]);
+            self.bufsz = leftover;
+        }
+    }
+
+    #[inline]
+    fn finalize(mut self, output: &mut [u8]) {
+        let bsz = Self::RATE;
+        let num = self.bufsz;
+
+        // Pad: zero-fill remainder, set delim byte, set final byte.
+        self.buf[num..bsz].fill(0);
+        self.buf[num] = Self::PAD;
+        self.buf[bsz - 1] |= 0x80;
+
+        sha3_asm::sha3_absorb(&mut self.a, &self.buf[..bsz], bsz);
+        sha3_asm::sha3_squeeze(&mut self.a, output, bsz);
+    }
+}
+
 /// The default hasher underlying generated implementations of `CryptoHasher`.
 #[doc(hidden)]
 #[derive(Clone)]
 pub struct DefaultHasher {
-    state: Sha3,
+    state: AsmSha3,
 }
 
 impl DefaultHasher {
@@ -530,7 +607,7 @@ impl DefaultHasher {
 
     #[doc(hidden)]
     pub fn new(typename: &[u8]) -> Self {
-        let mut state = Sha3::v256();
+        let mut state = AsmSha3::new();
         if !typename.is_empty() {
             state.update(&Self::prefixed_hash(typename));
         }
