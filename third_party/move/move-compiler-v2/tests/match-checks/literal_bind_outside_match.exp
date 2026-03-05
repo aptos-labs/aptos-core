@@ -1,0 +1,37 @@
+
+Diagnostics:
+error: literals are not allowed here
+   ┌─ tests/match-checks/literal_bind_outside_match.move:12:20
+   │
+12 │         let S { x: 1 } = S { x: 1 };
+   │                    ^
+
+error: literals are not allowed here
+   ┌─ tests/match-checks/literal_bind_outside_match.move:17:15
+   │
+17 │         let P(1) = P(1);
+   │               ^
+
+error: literals are not allowed here
+   ┌─ tests/match-checks/literal_bind_outside_match.move:22:13
+   │
+22 │         let 1u64 = 1;
+   │             ^^^^
+
+error: literals are not allowed here
+   ┌─ tests/match-checks/literal_bind_outside_match.move:29:25
+   │
+29 │         let f = |S { x: 1 }| 0;
+   │                         ^
+
+error: literals are not allowed here
+   ┌─ tests/match-checks/literal_bind_outside_match.move:34:20
+   │
+34 │         let f = |P(1)| 0;
+   │                    ^
+
+error: literals are not allowed here
+   ┌─ tests/match-checks/literal_bind_outside_match.move:39:18
+   │
+39 │         let f = |1u64| 0;
+   │                  ^^^^
