@@ -507,7 +507,7 @@ fn generate_script_wrapper_for_non_entry_function(
     if _target_func_def.visibility != Visibility::Public {
         return Err(anyhow::anyhow!(
             "Function {} is not public",
-            func_name_ident.to_string()
+            func_name_ident
         ));
     }
 

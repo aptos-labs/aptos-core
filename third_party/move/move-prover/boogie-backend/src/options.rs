@@ -414,7 +414,7 @@ impl BoogieOptions {
                     "cannot execute `{}` to obtain version of `{}`: {}",
                     prog,
                     tool,
-                    msg.to_string()
+                    msg
                 ))
             },
         };
