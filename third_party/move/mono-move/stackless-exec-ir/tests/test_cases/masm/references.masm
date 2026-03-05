@@ -9,3 +9,29 @@ fun read_field_val(x: S): u8
     borrow_field S, _2
     read_ref
     ret
+
+// read_ref result used in a binary op with an immediate constant.
+// Verifies that fusion does not break reference semantics:
+// the read_ref must complete before the add, and the reference
+// must not be used after the read.
+fun read_and_add(x: &u64): u64
+    move_loc x
+    read_ref
+    ld_u64 1
+    add
+    ret
+
+// The field reference is stored and used twice.
+// fuse_field_access must NOT fuse the first borrow_field+read_ref
+// if the field reference register is used again later.
+fun read_field_ref_twice(x: S): u64
+    local fref: &u64
+    borrow_loc x
+    borrow_field S, _1
+    st_loc fref
+    copy_loc fref
+    read_ref
+    move_loc fref
+    read_ref
+    add
+    ret
