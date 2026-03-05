@@ -302,6 +302,7 @@ message TransactionPayload {
     TYPE_SCRIPT_PAYLOAD = 2;
     TYPE_WRITE_SET_PAYLOAD = 4;
     TYPE_MULTISIG_PAYLOAD = 5;
+    TYPE_ENCRYPTED_TRANSACTION_PAYLOAD = 6;
     reserved 3;
   }
 
@@ -312,6 +313,7 @@ message TransactionPayload {
     ScriptPayload script_payload = 3;
     WriteSetPayload write_set_payload = 5;
     MultisigPayload multisig_payload = 6;
+    EncryptedTransactionPayload encrypted_transaction_payload = 8;
   }
   reserved 4;
 
@@ -323,6 +325,26 @@ message TransactionPayload {
 message ExtraConfigV1 {
   optional string multisig_address = 1;
   optional uint64 replay_protection_nonce = 2;
+}
+
+message EncryptedTransactionPayload {
+  enum EncryptedState {
+    ENCRYPTED_STATE_UNSPECIFIED = 0;
+    ENCRYPTED_STATE_ENCRYPTED = 1;
+    ENCRYPTED_STATE_FAILED_DECRYPTION = 2;
+    ENCRYPTED_STATE_DECRYPTED = 3;
+  }
+
+  EncryptedState encrypted_state = 1;
+  bytes payload_hash = 2;
+  optional string multisig_address = 3;
+  optional uint64 replay_protection_nonce = 4;
+  // Present only when decrypted
+  oneof decrypted_payload {
+    EntryFunctionPayload entry_function_payload = 5;
+    ScriptPayload script_payload = 6;
+  }
+  optional uint64 decryption_nonce = 7;
 }
 
 message EntryFunctionPayload {

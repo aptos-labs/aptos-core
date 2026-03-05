@@ -38,7 +38,7 @@ use aptos_types::{
 };
 use bcs::to_bytes;
 use once_cell::sync::Lazy;
-use poem_openapi::{Object, Union};
+use poem_openapi::{Enum, Object, Union};
 use serde::{Deserialize, Serialize};
 use std::{
     boxed::Box,
@@ -1023,6 +1023,7 @@ pub enum TransactionPayload {
     // ordering, unfortunately.
     ModuleBundlePayload(DeprecatedModuleBundlePayload),
     MultisigPayload(MultisigPayload),
+    EncryptedTransactionPayload(EncryptedTransactionPayload),
 }
 
 impl VerifyInput for TransactionPayload {
@@ -1031,6 +1032,8 @@ impl VerifyInput for TransactionPayload {
             TransactionPayload::EntryFunctionPayload(inner) => inner.verify(),
             TransactionPayload::ScriptPayload(inner) => inner.verify(),
             TransactionPayload::MultisigPayload(inner) => inner.verify(),
+
+            TransactionPayload::EncryptedTransactionPayload(inner) => inner.verify(),
 
             // Deprecated.
             TransactionPayload::ModuleBundlePayload(_) => {
@@ -1134,6 +1137,56 @@ impl VerifyInput for MultisigPayload {
             }
         }
 
+        Ok(())
+    }
+}
+
+/// The inner payload of an encrypted transaction, present only when decrypted.
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize, Union)]
+#[serde(tag = "type", rename_all = "snake_case")]
+#[oai(one_of, discriminator_name = "type", rename_all = "snake_case")]
+pub enum EncryptedTransactionInnerPayload {
+    EntryFunctionPayload(EntryFunctionPayload),
+    ScriptPayload(ScriptPayload),
+}
+
+/// The decryption state of an encrypted transaction payload.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize, Enum)]
+#[oai(rename_all = "snake_case")]
+#[serde(rename_all = "snake_case")]
+pub enum EncryptedState {
+    Encrypted,
+    FailedDecryption,
+    Decrypted,
+}
+
+/// An encrypted transaction payload. Exposes metadata and, when decrypted, the inner payload.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, Object)]
+pub struct EncryptedTransactionPayload {
+    pub encrypted_state: EncryptedState,
+    pub payload_hash: HashValue,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(default)]
+    pub multisig_address: Option<Address>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(default)]
+    pub replay_protection_nonce: Option<U64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(default)]
+    pub decrypted_payload: Option<EncryptedTransactionInnerPayload>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(default)]
+    pub decryption_nonce: Option<U64>,
+}
+
+impl VerifyInput for EncryptedTransactionPayload {
+    fn verify(&self) -> anyhow::Result<()> {
+        if let Some(inner) = &self.decrypted_payload {
+            match inner {
+                EncryptedTransactionInnerPayload::EntryFunctionPayload(ef) => ef.verify()?,
+                EncryptedTransactionInnerPayload::ScriptPayload(s) => s.verify()?,
+            }
+        }
         Ok(())
     }
 }

@@ -3,13 +3,14 @@
 
 use aptos_api_types::{
     transaction::ValidatorTransaction as ApiValidatorTransactionEnum, AccountSignature,
-    DeleteModule, DeleteResource, Ed25519Signature, EntryFunctionId, EntryFunctionPayload, Event,
-    GenesisPayload, MoveAbility, MoveFunction, MoveFunctionGenericTypeParam,
-    MoveFunctionVisibility, MoveModule, MoveModuleBytecode, MoveModuleId, MoveScriptBytecode,
-    MoveStruct, MoveStructField, MoveStructTag, MoveStructVariant, MoveType, MultiEd25519Signature,
-    MultiKeySignature, MultisigPayload, MultisigTransactionPayload, PublicKey, ScriptPayload,
-    Signature, SingleKeySignature, Transaction, TransactionInfo, TransactionPayload,
-    TransactionSignature, WriteSet, WriteSetChange,
+    DeleteModule, DeleteResource, Ed25519Signature, EncryptedState,
+    EncryptedTransactionInnerPayload, EntryFunctionId, EntryFunctionPayload, Event, GenesisPayload,
+    MoveAbility, MoveFunction, MoveFunctionGenericTypeParam, MoveFunctionVisibility, MoveModule,
+    MoveModuleBytecode, MoveModuleId, MoveScriptBytecode, MoveStruct, MoveStructField,
+    MoveStructTag, MoveStructVariant, MoveType, MultiEd25519Signature, MultiKeySignature,
+    MultisigPayload, MultisigTransactionPayload, PublicKey, ScriptPayload, Signature,
+    SingleKeySignature, Transaction, TransactionInfo, TransactionPayload, TransactionSignature,
+    WriteSet, WriteSetChange,
 };
 use aptos_bitvec::BitVec;
 use aptos_logger::warn;
@@ -221,6 +222,55 @@ pub fn convert_transaction_payload(
                     },
                 ),
             ),
+        },
+
+        TransactionPayload::EncryptedTransactionPayload(ep) => {
+            let encrypted_state = match ep.encrypted_state {
+                EncryptedState::Encrypted => {
+                    transaction::encrypted_transaction_payload::EncryptedState::Encrypted
+                },
+                EncryptedState::FailedDecryption => {
+                    transaction::encrypted_transaction_payload::EncryptedState::FailedDecryption
+                },
+                EncryptedState::Decrypted => {
+                    transaction::encrypted_transaction_payload::EncryptedState::Decrypted
+                },
+            };
+            let decrypted_payload = ep.decrypted_payload.as_ref().map(|inner| match inner {
+                EncryptedTransactionInnerPayload::EntryFunctionPayload(efp) => {
+                    transaction::encrypted_transaction_payload::DecryptedPayload::EntryFunctionPayload(
+                        convert_entry_function_payload(efp),
+                    )
+                },
+                EncryptedTransactionInnerPayload::ScriptPayload(sp) => {
+                    transaction::encrypted_transaction_payload::DecryptedPayload::ScriptPayload(
+                        convert_script_payload(sp),
+                    )
+                },
+            });
+            transaction::TransactionPayload {
+                r#type: transaction::transaction_payload::Type::EncryptedTransactionPayload as i32,
+                payload: Some(
+                    transaction::transaction_payload::Payload::EncryptedTransactionPayload(
+                        transaction::EncryptedTransactionPayload {
+                            encrypted_state: encrypted_state as i32,
+                            payload_hash: ep.payload_hash.0.to_vec(),
+                            multisig_address: ep.multisig_address.as_ref().map(|a| a.to_string()),
+                            replay_protection_nonce: ep.replay_protection_nonce.map(|n| n.into()),
+                            decryption_nonce: ep.decryption_nonce.map(|n| n.into()),
+                            decrypted_payload,
+                        },
+                    ),
+                ),
+                extra_config: Some(
+                    transaction::transaction_payload::ExtraConfig::ExtraConfigV1(
+                        transaction::ExtraConfigV1 {
+                            multisig_address: ep.multisig_address.as_ref().map(|a| a.to_string()),
+                            replay_protection_nonce: ep.replay_protection_nonce.map(|n| n.into()),
+                        },
+                    ),
+                ),
+            }
         },
 
         // Deprecated.
