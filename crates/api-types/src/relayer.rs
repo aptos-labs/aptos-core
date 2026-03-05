@@ -3,6 +3,8 @@ use async_trait::async_trait;
 use std::sync::{Arc, OnceLock};
 
 /// Result of polling a URI, containing JWK structures and the maximum block number fetched
+/// It's polled directly from RPC provider, so it might be malicious.
+/// Security relies on BFT quorum, not individual relayer trust.
 #[derive(Debug, Clone)]
 pub struct PollResult {
     /// JWK structures from the observed state

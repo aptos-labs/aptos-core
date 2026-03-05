@@ -69,7 +69,7 @@ impl JWKObserver {
         };
 
         if issuer.starts_with("gravity://") {
-            let relayer = GLOBAL_RELAYER.get().unwrap();
+            let relayer = GLOBAL_RELAYER.get().expect("Relayer not initialized");
             let r = relayer
                 .add_uri(issuer.as_str(), open_id_config_url.as_str())
                 .await;
@@ -117,7 +117,7 @@ impl JWKObserver {
 }
 
 async fn fetch_jwks_with_relayer(issuer: &str) -> Result<(Vec<JWK>, Option<u64>)> {
-    let relayer = GLOBAL_RELAYER.get().unwrap();
+    let relayer = GLOBAL_RELAYER.get().expect("Relayer not initialized");
     let poll_result = relayer
         .get_last_state(issuer)
         .await

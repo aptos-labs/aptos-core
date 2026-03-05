@@ -407,8 +407,6 @@ impl Default for OnChainConsensusConfig {
     }
 }
 
-/// 得把gravity onchain config也放进去作为enum的一个类型. 但是这里依赖关系会不会出问题
-/// 为了避免依赖关系的问题，需要把aptos这里的config的声明挪动到api-types下面 不然肯定会循环引用.
 impl OnChainConfig for OnChainConsensusConfig {
     const MODULE_IDENTIFIER: &'static str = "consensus_config";
     const TYPE_IDENTIFIER: &'static str = "ConsensusConfig";
@@ -421,8 +419,8 @@ impl OnChainConfig for OnChainConsensusConfig {
     /// ```
     /// so we need two rounds of bcs deserilization to turn it back to OnChainConsensusConfig
     fn deserialize_into_config(bytes: &[u8]) -> Result<Self> {
+        // Aptos use double serialize, but gravity use single serialize.
         // let raw_bytes: Vec<u8> = bcs::from_bytes(bytes)?;
-        // TODO(gravity_alex): Some diff for aptos and gravity, need to check
         let raw_bytes = bytes;
         bcs::from_bytes(&raw_bytes)
             .map_err(|e| format_err!("[on-chain config] Failed to deserialize into config: {}", e))
