@@ -3,8 +3,7 @@
 
 use crate::dkg::real_dkg::rounding::{
     is_valid_profile, total_weight_lower_bound, total_weight_upper_bound, DKGRounding,
-    DKGRoundingProfile, DEFAULT_RECONSTRUCT_THRESHOLD,
-    DEFAULT_SECRECY_THRESHOLD,
+    DKGRoundingProfile, DEFAULT_RECONSTRUCT_THRESHOLD, DEFAULT_SECRECY_THRESHOLD,
 };
 use aptos_dkg::pvss::WeightedConfigBlstrs;
 use claims::assert_le;

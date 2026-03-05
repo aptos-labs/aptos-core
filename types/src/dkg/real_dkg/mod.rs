@@ -93,11 +93,7 @@ pub fn build_dkg_pvss_config(
         wconfig,
         rounding_error,
         rounding_method,
-    } = DKGRounding::new(
-        &validator_stakes,
-        secrecy_threshold,
-        reconstruct_threshold,
-    );
+    } = DKGRounding::new(&validator_stakes, secrecy_threshold, reconstruct_threshold);
     let rounding_time = timer.elapsed();
     let validator_consensus_keys: Vec<bls12381::PublicKey> = next_validators
         .iter()
@@ -413,7 +409,6 @@ impl RealDKG {
         assert_eq!(2, trx_0.main.get_dealers().len());
         trx_0
     }
-
 }
 pub fn maybe_dk_from_bls_sk(
     sk: &PrivateKey,

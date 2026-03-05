@@ -1102,18 +1102,33 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
             .map_err(NoRandomnessReason::RandDbNotAvailable)?
             .filter(|(epoch, _)| *epoch == new_epoch)
         {
-            type AugKeyPair = (<WVUF as WeightedVUF>::AugmentedSecretKeyShare, <WVUF as WeightedVUF>::AugmentedPubKeyShare);
-            if let Ok((main_key_pair, _fast_key_pair)) = bcs::from_bytes::<(AugKeyPair, Option<AugKeyPair>)>(&key_pair) {
-                info!(epoch = new_epoch, "Recovering existing augmented key (old format)");
+            type AugKeyPair = (
+                <WVUF as WeightedVUF>::AugmentedSecretKeyShare,
+                <WVUF as WeightedVUF>::AugmentedPubKeyShare,
+            );
+            if let Ok((main_key_pair, _fast_key_pair)) =
+                bcs::from_bytes::<(AugKeyPair, Option<AugKeyPair>)>(&key_pair)
+            {
+                info!(
+                    epoch = new_epoch,
+                    "Recovering existing augmented key (old format)"
+                );
                 main_key_pair
             } else if let Ok(key_pair) = bcs::from_bytes::<AugKeyPair>(&key_pair) {
-                info!(epoch = new_epoch, "Recovering existing augmented key (new format)");
+                info!(
+                    epoch = new_epoch,
+                    "Recovering existing augmented key (new format)"
+                );
                 key_pair
             } else {
-                warn!(epoch = new_epoch, "Failed to deserialize key pair, regenerating");
+                warn!(
+                    epoch = new_epoch,
+                    "Failed to deserialize key pair, regenerating"
+                );
                 let mut rng =
                     StdRng::from_rng(thread_rng()).map_err(NoRandomnessReason::RngCreationError)?;
-                let augmented_key_pair = WVUF::augment_key_pair(&vuf_pp, sk.main, pk.main, &mut rng);
+                let augmented_key_pair =
+                    WVUF::augment_key_pair(&vuf_pp, sk.main, pk.main, &mut rng);
                 self.rand_storage
                     .save_key_pair_bytes(
                         new_epoch,

@@ -58,8 +58,7 @@ pub use self::{
         ConfigV1 as JWKConsensusConfigV1, OIDCProvider, OnChainJWKConsensusConfig,
     },
     randomness_config::{
-        OnChainRandomnessConfig, RandomnessConfigMoveStruct,
-        RandomnessConfigSeqNum,
+        OnChainRandomnessConfig, RandomnessConfigMoveStruct, RandomnessConfigSeqNum,
     },
     timed_features::{TimedFeatureFlag, TimedFeatureOverride, TimedFeatures, TimedFeaturesBuilder},
     timestamp::CurrentTimeMicroseconds,

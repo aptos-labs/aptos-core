@@ -41,9 +41,7 @@ impl<S: TShare, D: TAugmentedData> RandMessage<S, D> {
         match self {
             RandMessage::RequestShare(_) => Ok(()),
             RandMessage::Share(share) => share.optimistic_verify(rand_config, &sender),
-            RandMessage::AugData(aug_data) => {
-                aug_data.verify(rand_config, sender)
-            },
+            RandMessage::AugData(aug_data) => aug_data.verify(rand_config, sender),
             RandMessage::CertifiedAugData(certified_aug_data) => {
                 certified_aug_data.verify(&epoch_state.verifier)
             },

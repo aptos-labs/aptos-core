@@ -101,12 +101,7 @@ impl<S: TShare, D: TAugmentedData> RandManager<S, D> {
             config.clone(),
             decision_tx.clone(),
         )));
-        let aug_data_store = AugDataStore::new(
-            epoch_state.epoch,
-            signer,
-            config.clone(),
-            db,
-        );
+        let aug_data_store = AugDataStore::new(epoch_state.epoch, signer, config.clone(), db);
 
         Self {
             author,
@@ -264,11 +259,7 @@ impl<S: TShare, D: TAugmentedData> RandManager<S, D> {
                     match bcs::from_bytes::<RandMessage<S, D>>(rand_gen_msg.req.data()) {
                         Ok(msg) => {
                             if msg
-                                .verify(
-                                    &epoch_state_clone,
-                                    &config_clone,
-                                    rand_gen_msg.sender,
-                                )
+                                .verify(&epoch_state_clone, &config_clone, rand_gen_msg.sender)
                                 .is_ok()
                             {
                                 let _ = tx.unbounded_send(RpcRequest {

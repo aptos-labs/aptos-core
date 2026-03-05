@@ -34,7 +34,6 @@ use crate::{
 use anyhow::{bail, ensure, Context};
 use aptos_channels::aptos_channel;
 use aptos_config::config::{BlockTransactionFilterConfig, ConsensusConfig};
-use aptos_crypto::hash::CryptoHash;
 use aptos_consensus_types::{
     block::Block,
     block_data::BlockType,
@@ -55,6 +54,7 @@ use aptos_consensus_types::{
     vote_msg::VoteMsg,
     wrapped_ledger_info::WrappedLedgerInfo,
 };
+use aptos_crypto::hash::CryptoHash;
 use aptos_infallible::{checked, Mutex};
 use aptos_logger::prelude::*;
 #[cfg(test)]
@@ -75,8 +75,7 @@ use fail::fail_point;
 use futures::{channel::oneshot, stream::FuturesUnordered, Future, FutureExt, SinkExt, StreamExt};
 use serde::Serialize;
 use std::{
-    collections::BTreeMap, mem::Discriminant, ops::Add, pin::Pin, sync::Arc,
-    time::Duration,
+    collections::BTreeMap, mem::Discriminant, ops::Add, pin::Pin, sync::Arc, time::Duration,
 };
 use tokio::{
     sync::oneshot as TokioOneshot,
@@ -1343,6 +1342,7 @@ impl RoundManager {
             }
         });
     }
+
     async fn create_vote(&mut self, proposal: Block) -> anyhow::Result<Vote> {
         let vote = self
             .vote_block(proposal)

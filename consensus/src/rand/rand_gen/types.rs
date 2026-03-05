@@ -244,22 +244,14 @@ impl TAugmentedData for AugmentedData {
         AugData::new(rand_config.epoch(), rand_config.author(), data)
     }
 
-    fn augment(
-        &self,
-        rand_config: &RandConfig,
-        author: &Author,
-    ) {
+    fn augment(&self, rand_config: &RandConfig, author: &Author) {
         let AugmentedData { delta, .. } = self;
         rand_config
             .add_certified_delta(author, delta.clone())
             .expect("Add delta should succeed");
     }
 
-    fn verify(
-        &self,
-        rand_config: &RandConfig,
-        author: &Author,
-    ) -> anyhow::Result<()> {
+    fn verify(&self, rand_config: &RandConfig, author: &Author) -> anyhow::Result<()> {
         rand_config
             .derive_apk(author, self.delta.clone())
             .map(|_| ())?;
@@ -304,18 +296,9 @@ impl TAugmentedData for MockAugData {
         AugData::new(rand_config.epoch(), rand_config.author(), Self)
     }
 
-    fn augment(
-        &self,
-        _rand_config: &RandConfig,
-        _author: &Author,
-    ) {
-    }
+    fn augment(&self, _rand_config: &RandConfig, _author: &Author) {}
 
-    fn verify(
-        &self,
-        _rand_config: &RandConfig,
-        _author: &Author,
-    ) -> anyhow::Result<()> {
+    fn verify(&self, _rand_config: &RandConfig, _author: &Author) -> anyhow::Result<()> {
         Ok(())
     }
 }
@@ -363,17 +346,9 @@ pub trait TAugmentedData:
     where
         Self: Sized;
 
-    fn augment(
-        &self,
-        rand_config: &RandConfig,
-        author: &Author,
-    );
+    fn augment(&self, rand_config: &RandConfig, author: &Author);
 
-    fn verify(
-        &self,
-        rand_config: &RandConfig,
-        author: &Author,
-    ) -> anyhow::Result<()>;
+    fn verify(&self, rand_config: &RandConfig, author: &Author) -> anyhow::Result<()>;
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq, Hash)]
@@ -473,7 +448,6 @@ impl RequestShare {
     }
 }
 
-
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize, Hash, Eq)]
 pub struct AugDataId {
     epoch: u64,
@@ -525,14 +499,9 @@ impl<D: TAugmentedData> AugData<D> {
         &self.author
     }
 
-    pub fn verify(
-        &self,
-        rand_config: &RandConfig,
-        sender: Author,
-    ) -> anyhow::Result<()> {
+    pub fn verify(&self, rand_config: &RandConfig, sender: Author) -> anyhow::Result<()> {
         ensure!(self.author == sender, "Invalid author");
-        self.data
-            .verify(rand_config, &self.author)?;
+        self.data.verify(rand_config, &self.author)?;
         Ok(())
     }
 }
@@ -1168,14 +1137,26 @@ mod tests {
         // Old format with fast=Some should deserialize via old path
         let (main, _fast): (AugKeyPair, Option<AugKeyPair>) =
             bcs::from_bytes(&old_bytes_with_fast).unwrap();
-        assert_eq!(bcs::to_bytes(&main.0).unwrap(), bcs::to_bytes(&ask).unwrap());
-        assert_eq!(bcs::to_bytes(&main.1).unwrap(), bcs::to_bytes(&apk).unwrap());
+        assert_eq!(
+            bcs::to_bytes(&main.0).unwrap(),
+            bcs::to_bytes(&ask).unwrap()
+        );
+        assert_eq!(
+            bcs::to_bytes(&main.1).unwrap(),
+            bcs::to_bytes(&apk).unwrap()
+        );
 
         // Old format with fast=None should deserialize via old path
         let (main, fast): (AugKeyPair, Option<AugKeyPair>) =
             bcs::from_bytes(&old_bytes_without_fast).unwrap();
-        assert_eq!(bcs::to_bytes(&main.0).unwrap(), bcs::to_bytes(&ask).unwrap());
-        assert_eq!(bcs::to_bytes(&main.1).unwrap(), bcs::to_bytes(&apk).unwrap());
+        assert_eq!(
+            bcs::to_bytes(&main.0).unwrap(),
+            bcs::to_bytes(&ask).unwrap()
+        );
+        assert_eq!(
+            bcs::to_bytes(&main.1).unwrap(),
+            bcs::to_bytes(&apk).unwrap()
+        );
         assert!(fast.is_none());
 
         // New format should deserialize via new path
