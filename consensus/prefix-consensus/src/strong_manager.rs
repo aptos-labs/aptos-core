@@ -51,7 +51,9 @@ use tokio::time::Sleep;
 /// How long to wait for the first-ranked certificate before starting the inner PC
 /// with whatever certificates are available (possibly none).
 ///
-/// TODO: Make this configurable (e.g., via consensus config or constructor parameter).
+/// TEMPORARY: Disabled for theory verification. See `.plans/forge-debugging-summary.md`.
+/// TODO: Restore after verification, with proper channel separation.
+#[allow(dead_code)]
 const VIEW_START_TIMEOUT: Duration = Duration::from_millis(300);
 
 // ============================================================================
@@ -110,6 +112,8 @@ pub struct StrongPrefixConsensusManager<NetworkSender, T: InnerPCAlgorithm> {
 
     // Per-view start timer: fires after VIEW_START_TIMEOUT to start the inner PC
     // even if no first-ranked certificate has arrived.
+    // TEMPORARY: Timer disabled for theory verification (Issue 4 in forge-debugging-summary.md).
+    #[allow(dead_code)]
     view_start_timer: Option<(u64, std::pin::Pin<Box<Sleep>>)>,
 
     // Network and signing
@@ -238,23 +242,8 @@ impl<NetworkSender: SubprotocolNetworkSender<StrongPrefixConsensusMsg>, T: Inner
                     break;
                 }
 
-                // View start timer: fires when we've waited long enough for first-ranked cert
-                _ = async {
-                    if let Some((_view, timer)) = &mut self.view_start_timer {
-                        timer.as_mut().await;
-                    } else {
-                        futures::future::pending::<()>().await;
-                    }
-                } => {
-                    if let Some((view, _)) = self.view_start_timer.take() {
-                        info!(
-                            party_id = %self.party_id,
-                            view = view,
-                            "View start timer expired, starting inner PC with available certificates"
-                        );
-                        self.start_pc_now(view).await;
-                    }
-                }
+                // TEMPORARY: Timer disabled for theory verification.
+                // See `.plans/forge-debugging-summary.md` Issue 4.
 
                 Some((author, msg)) = message_rx.next() => {
                     self.process_message(author, msg).await;
@@ -398,8 +387,13 @@ impl<NetworkSender: SubprotocolNetworkSender<StrongPrefixConsensusMsg>, T: Inner
     /// Enter a new view (either from completing previous or receiving a proposal)
     ///
     /// Starts the inner PC immediately if the first-ranked certificate is already
-    /// available. Otherwise, sets a timer (VIEW_START_TIMEOUT) and starts when
-    /// either the first-ranked cert arrives or the timer expires.
+    /// available. Otherwise, waits for the first-ranked cert to arrive via
+    /// `try_start_pc` (called from `process_proposal`).
+    ///
+    /// TEMPORARY: Timer disabled to verify theory that event loop congestion
+    /// causes ViewProposals to be starved behind expensive inner PC messages.
+    /// See `.plans/forge-debugging-summary.md` Issue 4.
+    /// TODO: Restore timer after verification, with proper channel separation.
     async fn enter_view(&mut self, view: u64) {
         if view <= self.current_view {
             return; // Already at or past this view
@@ -422,13 +416,11 @@ impl<NetworkSender: SubprotocolNetworkSender<StrongPrefixConsensusMsg>, T: Inner
         if self.has_first_ranked_cert(view) {
             // Best case: start immediately with the optimal (shortest) input vector
             self.start_pc_now(view).await;
-        } else {
-            // Set timer: start when first-ranked cert arrives or timeout expires
-            self.view_start_timer = Some((
-                view,
-                Box::pin(tokio::time::sleep(VIEW_START_TIMEOUT)),
-            ));
         }
+        // TEMPORARY: No timer fallback. Wait for first-ranked cert via try_start_pc.
+        // Previously: VIEW_START_TIMEOUT timer would start the inner PC with whatever
+        // certs were available, but event loop congestion caused the timer to fire
+        // before any ViewProposals were processed from the channel.
     }
 
     /// Check if the first-ranked party's certificate is available for a view.
@@ -439,10 +431,11 @@ impl<NetworkSender: SubprotocolNetworkSender<StrongPrefixConsensusMsg>, T: Inner
     }
 
     /// Try to start the inner PC for the current view if the first-ranked
-    /// certificate just arrived. Cancels the pending timer if so.
+    /// certificate just arrived.
     ///
     /// Called from `process_proposal` when a certificate is added to a view
-    /// we've already entered.
+    /// we've already entered. This is now the ONLY trigger for starting the
+    /// inner PC in views > 1 (timer temporarily disabled).
     async fn try_start_pc(&mut self, view: u64) {
         // Already started?
         if self.pc_states.get(&view).map_or(false, |s| s.started) {
@@ -450,12 +443,7 @@ impl<NetworkSender: SubprotocolNetworkSender<StrongPrefixConsensusMsg>, T: Inner
         }
 
         if !self.has_first_ranked_cert(view) {
-            return; // Wait for timer or first-ranked cert
-        }
-
-        // Cancel the timer if it's for this view
-        if matches!(self.view_start_timer, Some((v, _)) if v == view) {
-            self.view_start_timer = None;
+            return; // Wait for first-ranked cert
         }
 
         self.start_pc_now(view).await;
