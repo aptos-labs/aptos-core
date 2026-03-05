@@ -1,14 +1,12 @@
 /// This module provides the foundation for typesafe Coins.
 module aptos_framework::coin {
     use std::error;
-    use std::features;
     use std::option::{Self, Option};
     use std::signer;
     use std::string::{Self, String};
     use aptos_std::table::{Self, Table};
 
     use aptos_framework::account;
-    use aptos_framework::aggregator_factory;
     use aptos_framework::aggregator::Aggregator;
     use aptos_framework::event::{Self, EventHandle};
     use aptos_framework::guid;
@@ -720,12 +718,9 @@ module aptos_framework::coin {
     public entry fun migrate_coin_store_to_fungible_store<CoinType>(
         accounts: vector<address>
     ) acquires CoinStore, CoinConversionMap, CoinInfo {
-        if (features::new_accounts_default_to_fa_store_enabled()
-            || features::new_accounts_default_to_fa_apt_store_enabled()) {
-            accounts.for_each(|account| {
-                    maybe_convert_to_fungible_store<CoinType>(account);
-                });
-        }
+        accounts.for_each(|account| {
+                maybe_convert_to_fungible_store<CoinType>(account);
+            });
     }
 
     //

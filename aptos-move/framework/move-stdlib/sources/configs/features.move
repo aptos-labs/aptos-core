@@ -40,7 +40,7 @@ module std::features {
     /// Lifetime: transient
     const CODE_DEPENDENCY_CHECK: u64 = 1;
 
-    public fun code_dependency_check_enabled(): bool acquires Features {
+    public fun code_dependency_check_enabled(): bool {
         is_enabled(CODE_DEPENDENCY_CHECK)
     }
 
@@ -49,7 +49,7 @@ module std::features {
     /// Lifetime: permanent
     const TREAT_FRIEND_AS_PRIVATE: u64 = 2;
 
-    public fun treat_friend_as_private(): bool acquires Features {
+    public fun treat_friend_as_private(): bool {
         is_enabled(TREAT_FRIEND_AS_PRIVATE)
     }
 
@@ -62,7 +62,7 @@ module std::features {
         SHA_512_AND_RIPEMD_160_NATIVES
     }
 
-    public fun sha_512_and_ripemd_160_enabled(): bool acquires Features {
+    public fun sha_512_and_ripemd_160_enabled(): bool {
         is_enabled(SHA_512_AND_RIPEMD_160_NATIVES)
     }
 
@@ -75,7 +75,7 @@ module std::features {
         APTOS_STD_CHAIN_ID_NATIVES
     }
 
-    public fun aptos_stdlib_chain_id_enabled(): bool acquires Features {
+    public fun aptos_stdlib_chain_id_enabled(): bool {
         is_enabled(APTOS_STD_CHAIN_ID_NATIVES)
     }
 
@@ -87,7 +87,7 @@ module std::features {
         VM_BINARY_FORMAT_V6
     }
 
-    public fun allow_vm_binary_format_v6(): bool acquires Features {
+    public fun allow_vm_binary_format_v6(): bool {
         is_enabled(VM_BINARY_FORMAT_V6)
     }
 
@@ -116,7 +116,7 @@ module std::features {
         MULTI_ED25519_PK_VALIDATE_V2_NATIVES
     }
 
-    public fun multi_ed25519_pk_validate_v2_enabled(): bool acquires Features {
+    public fun multi_ed25519_pk_validate_v2_enabled(): bool {
         is_enabled(MULTI_ED25519_PK_VALIDATE_V2_NATIVES)
     }
 
@@ -129,7 +129,7 @@ module std::features {
         BLAKE2B_256_NATIVE
     }
 
-    public fun blake2b_256_enabled(): bool acquires Features {
+    public fun blake2b_256_enabled(): bool {
         is_enabled(BLAKE2B_256_NATIVE)
     }
 
@@ -141,7 +141,7 @@ module std::features {
         RESOURCE_GROUPS
     }
 
-    public fun resource_groups_enabled(): bool acquires Features {
+    public fun resource_groups_enabled(): bool {
         is_enabled(RESOURCE_GROUPS)
     }
 
@@ -152,7 +152,7 @@ module std::features {
         MULTISIG_ACCOUNTS
     }
 
-    public fun multisig_accounts_enabled(): bool acquires Features {
+    public fun multisig_accounts_enabled(): bool {
         is_enabled(MULTISIG_ACCOUNTS)
     }
 
@@ -164,7 +164,7 @@ module std::features {
         DELEGATION_POOLS
     }
 
-    public fun delegation_pools_enabled(): bool acquires Features {
+    public fun delegation_pools_enabled(): bool {
         is_enabled(DELEGATION_POOLS)
     }
 
@@ -177,7 +177,7 @@ module std::features {
         CRYPTOGRAPHY_ALGEBRA_NATIVES
     }
 
-    public fun cryptography_algebra_enabled(): bool acquires Features {
+    public fun cryptography_algebra_enabled(): bool {
         is_enabled(CRYPTOGRAPHY_ALGEBRA_NATIVES)
     }
 
@@ -190,7 +190,7 @@ module std::features {
         BLS12_381_STRUCTURES
     }
 
-    public fun bls12_381_structures_enabled(): bool acquires Features {
+    public fun bls12_381_structures_enabled(): bool {
         is_enabled(BLS12_381_STRUCTURES)
     }
 
@@ -211,7 +211,7 @@ module std::features {
         PERIODICAL_REWARD_RATE_DECREASE
     }
 
-    public fun periodical_reward_rate_decrease_enabled(): bool acquires Features {
+    public fun periodical_reward_rate_decrease_enabled(): bool {
         is_enabled(PERIODICAL_REWARD_RATE_DECREASE)
     }
 
@@ -223,7 +223,7 @@ module std::features {
         PARTIAL_GOVERNANCE_VOTING
     }
 
-    public fun partial_governance_voting_enabled(): bool acquires Features {
+    public fun partial_governance_voting_enabled(): bool {
         is_enabled(PARTIAL_GOVERNANCE_VOTING)
     }
 
@@ -239,7 +239,7 @@ module std::features {
         DELEGATION_POOL_PARTIAL_GOVERNANCE_VOTING
     }
 
-    public fun delegation_pool_partial_governance_voting_enabled(): bool acquires Features {
+    public fun delegation_pool_partial_governance_voting_enabled(): bool {
         is_enabled(DELEGATION_POOL_PARTIAL_GOVERNANCE_VOTING)
     }
 
@@ -247,7 +247,7 @@ module std::features {
     /// Lifetime: transient
     const FEE_PAYER_ENABLED: u64 = 22;
 
-    public fun fee_payer_enabled(): bool acquires Features {
+    public fun fee_payer_enabled(): bool {
         is_enabled(FEE_PAYER_ENABLED)
     }
 
@@ -272,7 +272,7 @@ module std::features {
         BULLETPROOFS_NATIVES
     }
 
-    public fun bulletproofs_enabled(): bool acquires Features {
+    public fun bulletproofs_enabled(): bool {
         is_enabled(BULLETPROOFS_NATIVES)
     }
 
@@ -284,7 +284,7 @@ module std::features {
         SIGNER_NATIVE_FORMAT_FIX
     }
 
-    public fun signer_native_format_fix_enabled(): bool acquires Features {
+    public fun signer_native_format_fix_enabled(): bool {
         is_enabled(SIGNER_NATIVE_FORMAT_FIX)
     }
 
@@ -297,7 +297,7 @@ module std::features {
         MODULE_EVENT
     }
 
-    public fun module_event_enabled(): bool acquires Features {
+    public fun module_event_enabled(): bool {
         is_enabled(MODULE_EVENT)
     }
 
@@ -337,7 +337,7 @@ module std::features {
         SPONSORED_AUTOMATIC_ACCOUNT_CREATION
     }
 
-    public fun sponsored_automatic_account_creation_enabled(): bool acquires Features {
+    public fun sponsored_automatic_account_creation_enabled(): bool {
         is_enabled(SPONSORED_AUTOMATIC_ACCOUNT_CREATION)
     }
 
@@ -371,7 +371,7 @@ module std::features {
         OPERATOR_BENEFICIARY_CHANGE
     }
 
-    public fun operator_beneficiary_change_enabled(): bool acquires Features {
+    public fun operator_beneficiary_change_enabled(): bool {
         is_enabled(OPERATOR_BENEFICIARY_CHANGE)
     }
 
@@ -387,7 +387,7 @@ module std::features {
         COMMISSION_CHANGE_DELEGATION_POOL
     }
 
-    public fun commission_change_delegation_pool_enabled(): bool acquires Features {
+    public fun commission_change_delegation_pool_enabled(): bool {
         is_enabled(COMMISSION_CHANGE_DELEGATION_POOL)
     }
 
@@ -400,7 +400,7 @@ module std::features {
         BN254_STRUCTURES
     }
 
-    public fun bn254_structures_enabled(): bool acquires Features {
+    public fun bn254_structures_enabled(): bool {
         is_enabled(BN254_STRUCTURES)
     }
 
@@ -411,7 +411,7 @@ module std::features {
         RECONFIGURE_WITH_DKG
     }
 
-    public fun reconfigure_with_dkg_enabled(): bool acquires Features {
+    public fun reconfigure_with_dkg_enabled(): bool {
         is_enabled(RECONFIGURE_WITH_DKG)
     }
 
@@ -424,7 +424,7 @@ module std::features {
         KEYLESS_ACCOUNTS
     }
 
-    public fun keyless_accounts_enabled(): bool acquires Features {
+    public fun keyless_accounts_enabled(): bool {
         is_enabled(KEYLESS_ACCOUNTS)
     }
 
@@ -437,7 +437,7 @@ module std::features {
         KEYLESS_BUT_ZKLESS_ACCOUNTS
     }
 
-    public fun keyless_but_zkless_accounts_feature_enabled(): bool acquires Features {
+    public fun keyless_but_zkless_accounts_feature_enabled(): bool {
         is_enabled(KEYLESS_BUT_ZKLESS_ACCOUNTS)
     }
 
@@ -448,7 +448,7 @@ module std::features {
         JWK_CONSENSUS
     }
 
-    public fun jwk_consensus_enabled(): bool acquires Features {
+    public fun jwk_consensus_enabled(): bool {
         is_enabled(JWK_CONSENSUS)
     }
 
@@ -461,14 +461,14 @@ module std::features {
         CONCURRENT_FUNGIBLE_ASSETS
     }
 
-    public fun concurrent_fungible_assets_enabled(): bool acquires Features {
+    public fun concurrent_fungible_assets_enabled(): bool {
         is_enabled(CONCURRENT_FUNGIBLE_ASSETS)
     }
 
     /// Whether deploying to objects is enabled.
     const OBJECT_CODE_DEPLOYMENT: u64 = 52;
 
-    public fun is_object_code_deployment_enabled(): bool acquires Features {
+    public fun is_object_code_deployment_enabled(): bool {
         is_enabled(OBJECT_CODE_DEPLOYMENT)
     }
 
@@ -479,7 +479,7 @@ module std::features {
         MAX_OBJECT_NESTING_CHECK
     }
 
-    public fun max_object_nesting_check_enabled(): bool acquires Features {
+    public fun max_object_nesting_check_enabled(): bool {
         is_enabled(MAX_OBJECT_NESTING_CHECK)
     }
 
@@ -492,7 +492,7 @@ module std::features {
         KEYLESS_ACCOUNTS_WITH_PASSKEYS
     }
 
-    public fun keyless_accounts_with_passkeys_feature_enabled(): bool acquires Features {
+    public fun keyless_accounts_with_passkeys_feature_enabled(): bool {
         is_enabled(KEYLESS_ACCOUNTS_WITH_PASSKEYS)
     }
 
@@ -505,7 +505,7 @@ module std::features {
         MULTISIG_V2_ENHANCEMENT
     }
 
-    public fun multisig_v2_enhancement_feature_enabled(): bool acquires Features {
+    public fun multisig_v2_enhancement_feature_enabled(): bool {
         is_enabled(MULTISIG_V2_ENHANCEMENT)
     }
 
@@ -517,7 +517,7 @@ module std::features {
         DELEGATION_POOL_ALLOWLISTING
     }
 
-    public fun delegation_pool_allowlisting_enabled(): bool acquires Features {
+    public fun delegation_pool_allowlisting_enabled(): bool {
         is_enabled(DELEGATION_POOL_ALLOWLISTING)
     }
 
@@ -530,7 +530,7 @@ module std::features {
         MODULE_EVENT_MIGRATION
     }
 
-    public fun module_event_migration_enabled(): bool acquires Features {
+    public fun module_event_migration_enabled(): bool {
         is_enabled(MODULE_EVENT_MIGRATION)
     }
 
@@ -544,7 +544,7 @@ module std::features {
         TRANSACTION_CONTEXT_EXTENSION
     }
 
-    public fun transaction_context_extension_enabled(): bool acquires Features {
+    public fun transaction_context_extension_enabled(): bool {
         is_enabled(TRANSACTION_CONTEXT_EXTENSION)
     }
 
@@ -557,7 +557,7 @@ module std::features {
         COIN_TO_FUNGIBLE_ASSET_MIGRATION
     }
 
-    public fun coin_to_fungible_asset_migration_feature_enabled(): bool acquires Features {
+    public fun coin_to_fungible_asset_migration_feature_enabled(): bool {
         is_enabled(COIN_TO_FUNGIBLE_ASSET_MIGRATION)
     }
 
@@ -569,7 +569,7 @@ module std::features {
     }
 
     #[deprecated]
-    public fun primary_apt_fungible_store_at_user_address_enabled(): bool acquires Features {
+    public fun primary_apt_fungible_store_at_user_address_enabled(): bool {
         is_enabled(PRIMARY_APT_FUNGIBLE_STORE_AT_USER_ADDRESS)
     }
 
@@ -610,7 +610,7 @@ module std::features {
         NEW_ACCOUNTS_DEFAULT_TO_FA_APT_STORE
     }
 
-    public fun new_accounts_default_to_fa_apt_store_enabled(): bool acquires Features {
+    public fun new_accounts_default_to_fa_apt_store_enabled(): bool {
         is_enabled(NEW_ACCOUNTS_DEFAULT_TO_FA_APT_STORE)
     }
 
@@ -621,8 +621,9 @@ module std::features {
         OPERATIONS_DEFAULT_TO_FA_APT_STORE
     }
 
-    public fun operations_default_to_fa_apt_store_enabled(): bool acquires Features {
-        is_enabled(OPERATIONS_DEFAULT_TO_FA_APT_STORE)
+    #[deprecated]
+    public fun operations_default_to_fa_apt_store_enabled(): bool {
+        true
     }
 
     /// Whether enable concurent Fungible Balance
@@ -634,7 +635,7 @@ module std::features {
         CONCURRENT_FUNGIBLE_BALANCE
     }
 
-    public fun concurrent_fungible_balance_enabled(): bool acquires Features {
+    public fun concurrent_fungible_balance_enabled(): bool {
         is_enabled(CONCURRENT_FUNGIBLE_BALANCE)
     }
 
@@ -646,7 +647,7 @@ module std::features {
         DEFAULT_TO_CONCURRENT_FUNGIBLE_BALANCE
     }
 
-    public fun default_to_concurrent_fungible_balance_enabled(): bool acquires Features {
+    public fun default_to_concurrent_fungible_balance_enabled(): bool {
         is_enabled(DEFAULT_TO_CONCURRENT_FUNGIBLE_BALANCE)
     }
 
@@ -660,7 +661,7 @@ module std::features {
         ABORT_IF_MULTISIG_PAYLOAD_MISMATCH
     }
 
-    public fun abort_if_multisig_payload_mismatch_enabled(): bool acquires Features {
+    public fun abort_if_multisig_payload_mismatch_enabled(): bool {
         is_enabled(ABORT_IF_MULTISIG_PAYLOAD_MISMATCH)
     }
 
@@ -675,7 +676,7 @@ module std::features {
         TRANSACTION_SIMULATION_ENHANCEMENT
     }
 
-    public fun transaction_simulation_enhancement_enabled(): bool acquires Features {
+    public fun transaction_simulation_enhancement_enabled(): bool {
         is_enabled(TRANSACTION_SIMULATION_ENHANCEMENT)
     }
 
@@ -685,7 +686,7 @@ module std::features {
         COLLECTION_OWNER
     }
 
-    public fun is_collection_owner_enabled(): bool acquires Features {
+    public fun is_collection_owner_enabled(): bool {
         is_enabled(COLLECTION_OWNER)
     }
 
@@ -705,7 +706,7 @@ module std::features {
         PERMISSIONED_SIGNER
     }
 
-    public fun is_permissioned_signer_enabled(): bool acquires Features {
+    public fun is_permissioned_signer_enabled(): bool {
         is_enabled(PERMISSIONED_SIGNER)
     }
 
@@ -718,7 +719,7 @@ module std::features {
         ACCOUNT_ABSTRACTION
     }
 
-    public fun is_account_abstraction_enabled(): bool acquires Features {
+    public fun is_account_abstraction_enabled(): bool {
         is_enabled(ACCOUNT_ABSTRACTION)
     }
 
@@ -736,7 +737,7 @@ module std::features {
         BULLETPROOFS_BATCH_NATIVES
     }
 
-    public fun bulletproofs_batch_enabled(): bool acquires Features {
+    public fun bulletproofs_batch_enabled(): bool {
         is_enabled(BULLETPROOFS_BATCH_NATIVES)
     }
 
@@ -745,7 +746,7 @@ module std::features {
     /// Lifetime: transient
     const DERIVABLE_ACCOUNT_ABSTRACTION: u64 = 88;
 
-    public fun is_derivable_account_abstraction_enabled(): bool acquires Features {
+    public fun is_derivable_account_abstraction_enabled(): bool {
         is_enabled(DERIVABLE_ACCOUNT_ABSTRACTION)
     }
 
@@ -768,7 +769,7 @@ module std::features {
         NEW_ACCOUNTS_DEFAULT_TO_FA_STORE
     }
 
-    public fun new_accounts_default_to_fa_store_enabled(): bool acquires Features {
+    public fun new_accounts_default_to_fa_store_enabled(): bool {
         is_enabled(NEW_ACCOUNTS_DEFAULT_TO_FA_STORE)
     }
 
@@ -779,7 +780,7 @@ module std::features {
         DEFAULT_ACCOUNT_RESOURCE
     }
 
-    public fun is_default_account_resource_enabled(): bool acquires Features {
+    public fun is_default_account_resource_enabled(): bool {
         is_enabled(DEFAULT_ACCOUNT_RESOURCE)
     }
 
@@ -796,7 +797,7 @@ module std::features {
         JWK_CONSENSUS_PER_KEY_MODE
     }
 
-    public fun is_jwk_consensus_per_key_mode_enabled(): bool acquires Features {
+    public fun is_jwk_consensus_per_key_mode_enabled(): bool {
         is_enabled(JWK_CONSENSUS_PER_KEY_MODE)
     }
 
@@ -808,7 +809,7 @@ module std::features {
         ORDERLESS_TRANSACTIONS
     }
 
-    public fun orderless_transactions_enabled(): bool acquires Features {
+    public fun orderless_transactions_enabled(): bool {
         is_enabled(ORDERLESS_TRANSACTIONS)
     }
 
@@ -819,7 +820,7 @@ module std::features {
         CALCULATE_TRANSACTION_FEE_FOR_DISTRIBUTION
     }
 
-    public fun is_calculate_transaction_fee_for_distribution_enabled(): bool acquires Features {
+    public fun is_calculate_transaction_fee_for_distribution_enabled(): bool {
         is_enabled(CALCULATE_TRANSACTION_FEE_FOR_DISTRIBUTION)
     }
 
@@ -830,7 +831,7 @@ module std::features {
         DISTRIBUTE_TRANSACTION_FEE
     }
 
-    public fun is_distribute_transaction_fee_enabled(): bool acquires Features {
+    public fun is_distribute_transaction_fee_enabled(): bool {
         is_enabled(DISTRIBUTE_TRANSACTION_FEE)
     }
 
@@ -841,8 +842,9 @@ module std::features {
         MONOTONICALLY_INCREASING_COUNTER
     }
 
-    public fun is_monotonically_increasing_counter_enabled(): bool acquires Features {
-        is_enabled(MONOTONICALLY_INCREASING_COUNTER)
+    #[deprecated]
+    public fun is_monotonically_increasing_counter_enabled(): bool {
+        true
     }
 
     /// Whether function reflection is enabled.
@@ -852,7 +854,7 @@ module std::features {
         FUNCTION_REFLECTION
     }
 
-    public fun is_function_reflection_enabled(): bool acquires Features {
+    public fun is_function_reflection_enabled(): bool {
         is_enabled(FUNCTION_REFLECTION)
     }
 
@@ -864,7 +866,7 @@ module std::features {
         SLH_DSA_SHA2_128S_SIGNATURE
     }
 
-    public fun slh_dsa_sha2_128s_signature_enabled(): bool acquires Features {
+    public fun slh_dsa_sha2_128s_signature_enabled(): bool {
         is_enabled(SLH_DSA_SHA2_128S_SIGNATURE)
     }
 
@@ -875,7 +877,7 @@ module std::features {
         ENCRYPTED_TRANSACTIONS
     }
 
-    public fun is_encrypted_transactions_enabled(): bool acquires Features {
+    public fun is_encrypted_transactions_enabled(): bool {
         is_enabled(ENCRYPTED_TRANSACTIONS)
     }
 
@@ -910,7 +912,7 @@ module std::features {
     /// Update feature flags directly. Only used in genesis/tests.
     fun change_feature_flags_internal(
         framework: &signer, enable: vector<u64>, disable: vector<u64>
-    ) acquires Features {
+    ) {
         assert!(
             signer::address_of(framework) == @std,
             error::permission_denied(EFRAMEWORK_SIGNER_NEEDED)
@@ -973,7 +975,7 @@ module std::features {
 
     #[view]
     /// Check whether the feature is enabled.
-    public fun is_enabled(feature: u64): bool acquires Features {
+    public fun is_enabled(feature: u64): bool {
         exists<Features>(@std) && contains(&Features[@std].features, feature)
     }
 
@@ -1013,14 +1015,14 @@ module std::features {
     #[verify_only]
     public fun change_feature_flags_for_verification(
         framework: &signer, enable: vector<u64>, disable: vector<u64>
-    ) acquires Features {
+    ) {
         change_feature_flags_internal(framework, enable, disable)
     }
 
     #[test_only]
     public fun change_feature_flags_for_testing(
         framework: &signer, enable: vector<u64>, disable: vector<u64>
-    ) acquires Features {
+    ) {
         change_feature_flags_internal(framework, enable, disable)
     }
 
@@ -1044,7 +1046,7 @@ module std::features {
     }
 
     #[test(fx = @std)]
-    fun test_change_feature_txn(fx: signer) acquires Features {
+    fun test_change_feature_txn(fx: signer) {
         change_feature_flags_for_testing(&fx, vector[1, 9, 23], vector[]);
         assert!(is_enabled(1), 1);
         assert!(is_enabled(9), 2);
