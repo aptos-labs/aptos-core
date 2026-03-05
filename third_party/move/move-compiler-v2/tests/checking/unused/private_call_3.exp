@@ -1,12 +1,12 @@
 
 Diagnostics:
-warning: function `inaccessible` is unused. Remove it, or suppress warning with `#[test_only]` (if test-only), `#[verify_only]` (if verify-only), or `#[lint::skip(unused)]`.
+warning: function `inaccessible` is unused. Remove it, or suppress warning with `#[test_only]` (if for test only) or `#[lint::skip(unused)]` (if for spec only or otherwise needed).
   ┌─ tests/checking/unused/private_call_3.move:8:16
   │
 8 │     inline fun inaccessible(): u64 {
   │                ^^^^^^^^^^^^
 
-warning: function `inaccessible` is unused. Remove it, or suppress warning with `#[test_only]` (if test-only), `#[verify_only]` (if verify-only), or `#[lint::skip(unused)]`.
+warning: function `inaccessible` is unused. Remove it, or suppress warning with `#[test_only]` (if for test only) or `#[lint::skip(unused)]` (if for spec only or otherwise needed).
    ┌─ tests/checking/unused/private_call_3.move:24:16
    │
 24 │     inline fun inaccessible(): u64 {

@@ -24,7 +24,8 @@ const SHARED_SUPPRESSION_ATTRS: &[&str] = &["deprecated"];
 
 /// Additional attribute names that suppress unused warnings for functions only.
 /// - `persistent`: Marks a function as being persistent on upgrade (behave like a public function)
-const FUNC_ONLY_SUPPRESSION_ATTRS: &[&str] = &["persistent"];
+/// - `view`: View functions are callable externally via the Aptos REST API
+const FUNC_ONLY_SUPPRESSION_ATTRS: &[&str] = &["persistent", "view"];
 
 /// Additional attribute names that suppress unused warnings for structs only.
 /// - `resource_group`: Empty marker structs used by VM for storage optimization
@@ -919,7 +920,7 @@ pub fn check_unused_functions(env: &GlobalEnv) {
             for func in module.get_functions() {
                 if should_warn_unused_function(&func) {
                     let msg = format!(
-                        "function `{}` is unused. Remove it, or suppress warning with `#[test_only]` (if test-only), `#[verify_only]` (if verify-only), or `#[lint::skip(unused)]`.",
+                        "function `{}` is unused. Remove it, or suppress warning with `#[test_only]` (if for test only) or `#[lint::skip(unused)]` (if for spec only or otherwise needed).",
                         func.get_name_str(),
                     );
                     env.diag(Severity::Warning, &func.get_id_loc(), &msg);
@@ -941,7 +942,7 @@ pub fn check_unused_structs(env: &GlobalEnv) {
                         "struct"
                     };
                     let msg = format!(
-                        "{} `{}` is unused in current package. Remove it (if not published), or suppress warning with `#[test_only]` (if test-only), `#[verify_only]` (if verify-only), or `#[lint::skip(unused)]`.",
+                        "{} `{}` is unused in current package. Remove it (if not published), or suppress warning with `#[test_only]` (if for test only) or `#[lint::skip(unused)]` (if for spec only or otherwise needed).",
                         entity_type,
                         struct_env.get_name_str()
                     );
@@ -959,7 +960,7 @@ pub fn check_unused_constants(env: &GlobalEnv) {
             for const_env in module.get_named_constants() {
                 if should_warn_unused_constant(&const_env) {
                     let msg = format!(
-                        "constant `{}` is unused. Remove it, or suppress warning with `#[test_only]` (if test-only), `#[verify_only]` (if verify-only), or `#[lint::skip(unused)]`.",
+                        "constant `{}` is unused. Remove it, or suppress warning with `#[test_only]` (if for test only) or `#[lint::skip(unused)]` (if for spec only or otherwise needed).",
                         const_env.get_name().display(env.symbol_pool()),
                     );
                     env.diag(Severity::Warning, &const_env.get_loc(), &msg);
@@ -1056,15 +1057,24 @@ fn should_warn_unused_constant(const_env: &NamedConstantEnv) -> bool {
     // - test_only or verify_only constants or modules
     // - constants with suppression attributes or #[lint::skip(unused)]
     // - constants with users
+    // - error code constants
     if const_env.is_test_or_verify_only()
         || const_env.has_attribute(is_suppression_attr)
         || skip_unused_check(env, const_env.get_attributes())
         || !const_env.get_users().is_empty()
+        || is_error_code(const_env)
     {
         return false;
     }
 
     true
+}
+
+/// Check if a constant is an error code. Error code constants are named with an `E` prefix.
+fn is_error_code(const_env: &NamedConstantEnv) -> bool {
+    let env = const_env.module_env.env;
+    let name = env.symbol_pool().string(const_env.get_name());
+    name.starts_with("E")
 }
 
 /// Check if attributes contain #[lint::skip(unused)].

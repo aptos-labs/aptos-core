@@ -63,6 +63,40 @@ impl FromStr for OptimizationLevel {
     }
 }
 
+/// Options for checking unused items
+#[derive(Debug, Clone, Default, Parser)]
+pub enum CheckUnusedLevel {
+    /// No unused checks
+    #[default]
+    None,
+    /// Check all unused items (private functions, private structs, constants).
+    All,
+    /// Check unused private functions only
+    Function,
+    /// Check unused private structs only
+    Struct,
+    /// Check unused constants only
+    Constant,
+}
+
+impl FromStr for CheckUnusedLevel {
+    type Err = anyhow::Error;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s.to_lowercase().as_str() {
+            "none" => Ok(Self::None),
+            "all" => Ok(Self::All),
+            "function" => Ok(Self::Function),
+            "struct" => Ok(Self::Struct),
+            "constant" => Ok(Self::Constant),
+            _ => bail!(
+                "unrecognized check-unused option `{}` (supported: `all`, `function`, `struct`, `constant`, `none`)",
+                s
+            ),
+        }
+    }
+}
+
 /// Options for compiling a move package.
 #[derive(Debug, Clone, Parser)]
 pub struct MovePackageOptions {
@@ -151,6 +185,12 @@ pub struct MovePackageOptions {
     /// Fail the compilation if there are any warnings.
     #[clap(long)]
     pub fail_on_warning: bool,
+
+    /// Check for unused private functions, private structs, and constants. Off by default.
+    /// Choices: "all", "function", "struct", "constant", "none". Multiple can be combined
+    /// with commas, e.g. --check-unused function,constant
+    #[clap(long, num_args = 1.., value_delimiter = ',', value_parser = clap::value_parser!(CheckUnusedLevel))]
+    pub check_unused: Vec<CheckUnusedLevel>,
 }
 
 impl Default for MovePackageOptions {
@@ -175,6 +215,7 @@ impl MovePackageOptions {
             skip_checks_on_test_code: false,
             optimize: None,
             fail_on_warning: false,
+            check_unused: vec![],
             experiments: vec![],
         }
     }
@@ -217,6 +258,25 @@ impl MovePackageOptions {
         }
         if self.fail_on_warning {
             set(Experiment::FAIL_ON_WARNING, true);
+        }
+        for level in &self.check_unused {
+            match level {
+                CheckUnusedLevel::All => {
+                    set(Experiment::UNUSED_FUNCTION_CHECK, true);
+                    set(Experiment::UNUSED_STRUCT_CHECK, true);
+                    set(Experiment::UNUSED_CONSTANT_CHECK, true);
+                },
+                CheckUnusedLevel::Function => {
+                    set(Experiment::UNUSED_FUNCTION_CHECK, true);
+                },
+                CheckUnusedLevel::Struct => {
+                    set(Experiment::UNUSED_STRUCT_CHECK, true);
+                },
+                CheckUnusedLevel::Constant => {
+                    set(Experiment::UNUSED_CONSTANT_CHECK, true);
+                },
+                CheckUnusedLevel::None => {},
+            }
         }
         experiments
     }
