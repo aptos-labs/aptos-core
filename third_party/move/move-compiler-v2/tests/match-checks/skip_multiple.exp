@@ -6,4 +6,4 @@ error: match not exhaustive
 11 │         match (d) {
    │                ^
    │
-   = missing `Direction::East`
+   = missing `Direction::East` (and 1 more)

@@ -72,10 +72,16 @@ enum MatPat {
 }
 
 /// A witness pattern for displaying missing values.
+/// `additional_missing` counts how many further constructors at this
+/// level are also missing (beyond the one shown).
 #[derive(Clone, Debug)]
 enum WitnessPat {
     Wild,
-    Ctor(MConstructor, Vec<WitnessPat>),
+    Ctor {
+        ctor: MConstructor,
+        args: Vec<WitnessPat>,
+        additional_missing: usize,
+    },
 }
 
 /// Convert an AST `Pattern` to a `MatPat`.
@@ -98,7 +104,7 @@ fn pattern_to_matpat(pat: &Pattern) -> MatPat {
             Value::Bool(b) => MatPat::Ctor(MConstructor::Bool(*b), vec![]),
             Value::Number(n) => MatPat::Ctor(MConstructor::Number(n.clone()), vec![]),
             Value::ByteArray(bytes) => MatPat::Ctor(MConstructor::ByteArray(bytes.clone()), vec![]),
-            _ => MatPat::Wild,
+            _ => unreachable!("unsupported literal pattern value"),
         },
     }
 }
@@ -141,23 +147,29 @@ fn all_constructors_if_complete(
     }
 }
 
-/// Return a constructor of the type that is NOT in `seen`, for witness display.
+/// Return a constructor of the type that is NOT in `seen`, plus how
+/// many *additional* constructors are also missing (beyond the one
+/// returned).
 fn find_missing_constructor(
     env: &GlobalEnv,
     seen: &BTreeSet<MConstructor>,
-) -> Option<MConstructor> {
+) -> Option<(MConstructor, usize)> {
     let first = seen.iter().next()?;
-    match first {
+    let missing: Vec<MConstructor> = match first {
         MConstructor::Bool(_) => [MConstructor::Bool(false), MConstructor::Bool(true)]
             .into_iter()
-            .find(|c| !seen.contains(c)),
+            .filter(|c| !seen.contains(c))
+            .collect(),
         MConstructor::Variant(sid, _) => env
             .get_struct(*sid)
             .get_variants()
             .map(|v| MConstructor::Variant(*sid, v))
-            .find(|c| !seen.contains(c)),
-        _ => None,
-    }
+            .filter(|c| !seen.contains(c))
+            .collect(),
+        _ => return None,
+    };
+    let additional = missing.len().saturating_sub(1);
+    missing.into_iter().next().map(|c| (c, additional))
 }
 
 // ---- Matrix operations ------------------------------------------------------------------
@@ -298,9 +310,13 @@ fn collect_witnesses(
                 let def = default_matrix(matrix);
                 for w in collect_witnesses(env, &def, &q[1..]) {
                     let head = match find_missing_constructor(env, &head_ctors) {
-                        Some(c) => {
-                            let a = constructor_arity(env, &c);
-                            WitnessPat::Ctor(c, vec![WitnessPat::Wild; a])
+                        Some((ctor, additional_missing)) => {
+                            let a = constructor_arity(env, &ctor);
+                            WitnessPat::Ctor {
+                                ctor,
+                                args: vec![WitnessPat::Wild; a],
+                                additional_missing,
+                            }
                         },
                         None => WitnessPat::Wild,
                     };
@@ -321,7 +337,11 @@ fn reconstruct_witness(
     witness: Vec<WitnessPat>,
 ) -> Vec<WitnessPat> {
     let (sub, rest) = witness.split_at(arity);
-    let mut out = vec![WitnessPat::Ctor(ctor.clone(), sub.to_vec())];
+    let mut out = vec![WitnessPat::Ctor {
+        ctor: ctor.clone(),
+        args: sub.to_vec(),
+        additional_missing: 0,
+    }];
     out.extend_from_slice(rest);
     out
 }
@@ -358,16 +378,28 @@ fn analyze_match_coverage(env: &GlobalEnv, disc_node_id: NodeId, arms: &[MatchAr
     // Exhaustiveness: check if a wildcard is still useful against the unconditional matrix.
     let witnesses = collect_witnesses(env, &uncond_matrix, &[MatPat::Wild]);
     if !witnesses.is_empty() {
+        let notes: Vec<String> = witnesses
+            .iter()
+            .map(|w| {
+                assert_eq!(w.len(), 1, "witness length must equal query length");
+                let pat = display_witness_pat(env, &w[0]);
+                let additional = match &w[0] {
+                    WitnessPat::Ctor {
+                        additional_missing, ..
+                    } => *additional_missing,
+                    _ => 0,
+                };
+                if additional > 0 {
+                    format!("missing `{}` (and {} more)", pat, additional)
+                } else {
+                    format!("missing `{}`", pat)
+                }
+            })
+            .collect();
         env.error_with_notes(
             &env.get_node_loc(disc_node_id),
             "match not exhaustive",
-            witnesses
-                .iter()
-                .map(|w| {
-                    assert_eq!(w.len(), 1);
-                    format!("missing `{}`", display_witness_pat(env, &w[0]))
-                })
-                .collect(),
+            notes,
         );
     }
 }
@@ -377,21 +409,19 @@ fn analyze_match_coverage(env: &GlobalEnv, disc_node_id: NodeId, arms: &[MatchAr
 fn display_witness_pat(env: &GlobalEnv, w: &WitnessPat) -> String {
     match w {
         WitnessPat::Wild => "_".to_string(),
-        WitnessPat::Ctor(MConstructor::Bool(b), _) => format!("{}", b),
-        WitnessPat::Ctor(MConstructor::Number(n), _) => format!("{}", n),
-        WitnessPat::Ctor(MConstructor::ByteArray(bytes), _) => {
-            let hex: String = bytes.iter().map(|b| format!("{:02x}", b)).collect();
-            format!("x\"{}\"", hex)
-        },
-        WitnessPat::Ctor(MConstructor::Tuple(_), args) => {
-            let inner = args.iter().map(|a| display_witness_pat(env, a)).join(",");
-            format!("({})", inner)
-        },
-        WitnessPat::Ctor(MConstructor::Variant(sid, var), args) => {
-            display_witness_struct(env, *sid, Some(*var), args)
-        },
-        WitnessPat::Ctor(MConstructor::Struct(sid), args) => {
-            display_witness_struct(env, *sid, None, args)
+        WitnessPat::Ctor { ctor, args, .. } => match ctor {
+            MConstructor::Bool(b) => format!("{}", b),
+            MConstructor::Number(n) => format!("{}", n),
+            MConstructor::ByteArray(bytes) => {
+                let hex: String = bytes.iter().map(|b| format!("{:02x}", b)).collect();
+                format!("x\"{}\"", hex)
+            },
+            MConstructor::Tuple(_) => {
+                let inner = args.iter().map(|a| display_witness_pat(env, a)).join(",");
+                format!("({})", inner)
+            },
+            MConstructor::Variant(sid, var) => display_witness_struct(env, *sid, Some(*var), args),
+            MConstructor::Struct(sid) => display_witness_struct(env, *sid, None, args),
         },
     }
 }
