@@ -12449,6 +12449,10 @@ dependencies = [
 ]
 
 [[package]]
+name = "mono-move-micro-ops"
+version = "0.1.0"
+
+[[package]]
 name = "more-asserts"
 version = "0.3.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
