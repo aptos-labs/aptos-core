@@ -1,9 +1,7 @@
 // Copyright (c) Aptos Foundation
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
-use super::{
-    get_encryption_key_resource, verify_chunky_dkg_transcript, wait_for_chunky_dkg_finish,
-};
+use super::{get_encryption_key_resource, verify_chunky_dkg_transcript};
 use crate::{smoke_test_environment::SwarmBuilder, utils::get_on_chain_resource};
 use aptos_forge::{Node, Swarm, SwarmExt};
 use aptos_logger::info;
