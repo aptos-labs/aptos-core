@@ -205,6 +205,7 @@ members = [
     "testsuite/smoke-test",
     "testsuite/testcases",
     "third_party/move/extensions/move-table-extension",
+    "third_party/move/mono-move/tools/bytecode-stats",
     "third_party/move/move-binary-format",
     "third_party/move/move-binary-format/serializer-tests",
     "third_party/move/move-borrow-graph",
