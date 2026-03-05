@@ -5,7 +5,7 @@
 //!
 //! Defines the low-level instruction set that the MonoMove interpreter
 //! executes. These micro-ops are emitted by the runtime compiler
-//! (monomorphizer) from Move bytecode. They operate on a flat frame-pointer-
+//! (monomorphizer). They operate on a flat frame-pointer-
 //! relative memory model — no operand stack, no type metadata at runtime.
 //!
 //! ## Design overview
@@ -26,17 +26,18 @@
 //! - **Inline (flat) structs**: most structs are stored inline in the frame,
 //!   not heap-allocated. The existing data movement ops (`Move`, `Move8`)
 //!   already handle inline structs. The `Heap*` ops are only for structs
-//!   that must live on the heap (e.g. too large to inline).
+//!   that must live on the heap (e.g. too large to inline or enums).
 //!
 //! - **Calling convention**: the VM uses a single flat linear buffer as its
-//!   call stack. Each frame contains locals/args followed by a 24-byte
-//!   metadata section `(saved_pc, saved_fp, func_id)`.
+//!   call stack. Each frame contains slots followed by a
+//!   [`FRAME_METADATA_SIZE`]-byte metadata section `(saved_pc, saved_fp,
+//!   func_id)`.
 //!
 //!   ```text
 //!                 caller frame                           callee frame
 //!     ┌──────────────────────────────────┐   ┌──────────────────────────────┐
 //!     │                        │ saved  ││   │                              │
-//!     │  caller locals         │  pc    ││   │  args  │  callee locals      │
+//!     │  caller slots         │  pc    ││   │  arg slots  │  other slots      │
 //!     │                        │  fp    ││   │                              │
 //!     │                        │func_id ││   │                              │
 //!     └──────────────────────────────────┘   └──────────────────────────────┘
@@ -44,11 +45,14 @@
 //!                         metadata (24B)     fp
 //!   ```
 //!
-//!   **Call**: caller writes metadata at end of its frame, places args at
-//!   the start of the callee frame, then sets `fp` to the callee frame.
-//!   **Return**: callee writes return values at the start of its own frame
-//!   (potentially overwriting args/locals), then restores `pc`/`fp` from
-//!   the metadata at `fp - 24`.
+//!   **Call**: the compiler emits explicit micro-ops to place arguments
+//!   into the callee's frame slots. The `CallFunc` instruction itself
+//!   implicitly writes the metadata `(pc, fp, func_id)` at the end of
+//!   the caller frame and sets `fp` to the callee frame.
+//!   **Return**: the compiler emits explicit micro-ops to write return
+//!   values at the start of the callee's frame (potentially overwriting
+//!   arg slots). The `Return` instruction itself implicitly restores
+//!   `pc`/`fp` from the metadata at `fp - FRAME_METADATA_SIZE`.
 //!
 //! ## Design decisions to revisit
 //!
@@ -93,11 +97,13 @@
 //! Operand ordering: destination (`dst`) or branch target (`target`) comes
 //! first, followed by sources and immediates.
 //!
-//! ## Object descriptor table
+//! ## Heap object descriptor table
 //!
-//! Every heap object has a header `[descriptor_id: u32 | size_in_bytes: u32]`.
-//! `descriptor_id` indexes into a table of [`ObjectDescriptor`] entries that
-//! tell the GC how to trace internal pointers. Three variants:
+//! Frame slots that refer to heap objects store a raw pointer to the heap
+//! allocation. Every heap object has a header
+//! `[descriptor_id: u32 | size_in_bytes: u32]`.
+//! `descriptor_id` indexes into a table of [`HeapObjectDescriptor`] entries
+//! that tell the GC how to trace internal pointers. Three variants:
 //!
 //! - **Trivial** — no internal heap pointers; GC just copies the blob.
 //! - **Struct** `{ size, ptr_offsets }` — fixed-size payload; `ptr_offsets`
@@ -320,7 +326,7 @@ pub enum MicroOp {
     // May want:
     // - Specializations (e.g. ReadRef8/WriteRef8)
     //======================================================================
-    /// Borrow a stack-local slot, producing a fat pointer `(base, offset)`.
+    /// Borrow a frame slot, producing a fat pointer `(base, offset)`.
     /// Writes 16 bytes at `[dst, dst+16)`:
     ///   - base   = fp + local (a stack address)
     ///   - offset = 0
@@ -328,7 +334,7 @@ pub enum MicroOp {
     /// The resulting pointer slot is marked as containing a pointer. During
     /// GC, the collector checks whether a pointer falls within the heap
     /// address range — stack-local references like this one are ignored.
-    StackBorrow {
+    SlotBorrow {
         dst: FrameOffset,
         local: FrameOffset,
     },
@@ -469,6 +475,9 @@ pub enum MicroOp {
 // ---------------------------------------------------------------------------
 // Constructor helpers for the re-compiler
 // ---------------------------------------------------------------------------
+
+/// Size of the per-frame metadata section: `(saved_pc, saved_fp, func_id)`.
+pub const FRAME_METADATA_SIZE: usize = 24;
 
 /// Size of the object header: [descriptor_id: u32 | size_in_bytes: u32].
 const OBJECT_HEADER_SIZE: usize = 8;
