@@ -868,7 +868,7 @@ where
             .max()
             .unwrap_or(1)
             .next_power_of_two()
-            .max(5);
+            .max(8); // 5 rounded up to next power of 2
         let trapdoor = Trapdoor::<E>::rand(rng);
         let (vk_extra, ck) = univariate_hiding_kzg::setup_extra(
             m,
