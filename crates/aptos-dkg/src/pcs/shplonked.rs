@@ -52,6 +52,7 @@ use ark_poly::{
 };
 use ark_serialize::{CanonicalDeserialize, CanonicalSerialize};
 use rand::{CryptoRng, RngCore};
+use std::fmt::Debug;
 
 /// Domain separation tag for the Shplonked opening sigma protocol (Fiat–Shamir context).
 pub const SHPLONKED_SIGMA_DST: &[u8; 19] = b"Shplonked_Sigma_Dst";
@@ -173,21 +174,33 @@ fn lagrange_basis_polys_batched<F: FftField>(unique_sets: &[&[F]]) -> Vec<Vec<De
         .collect()
 }
 
-/// Homomorphism φ on the evaluations { y_i }_i, where y_i = (y_i^rev, y_i^hid). The prover reveals
-/// { y_i^rev }_i and φ({ y_i }_i); the sigma protocol proves knowledge of { y_i^hid }_i consistent
-/// with C_{y^hid}, C_eval, and φ({ y_i }_i).
-pub trait EvalHomomorphism<F: Field>: Send + Sync {
-    /// φ({ y_i }_i) with y_rev = { y_i^rev }_i and y_hid = { y_i^hid }_i (one vector per polynomial each).
-    fn apply(&self, y_rev: &[Vec<F>], y_hid: &[Vec<F>]) -> F;
+/// Domain for the evaluation homomorphism φ: (y_rev, y_hid) with one vector of evals per polynomial.
+/// Used with [`HomTrait`](crate::sigma_protocol::homomorphism::Trait): φ is any homomorphism with
+/// `Domain = EvalPair<F>`, `Codomain = F`, `CodomainNormalized = F`.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct EvalPair<F> {
+    /// Revealed evaluations per polynomial: { y_i^rev }_i.
+    pub y_rev: Vec<Vec<F>>,
+    /// Hidden evaluations per polynomial: { y_i^hid }_i.
+    pub y_hid: Vec<Vec<F>>,
 }
 
 /// Default: φ(y) = ∑_j y_j^hid (sum of all hidden evaluations).
-#[derive(Clone, Debug, Default)]
-pub struct SumEvalHom;
+/// Implements the sigma_protocol homomorphism trait with domain [`EvalPair`].
+#[derive(Clone, Debug, Default, CanonicalSerialize)]
+pub struct SumEvalHom<F>(core::marker::PhantomData<F>);
 
-impl<F: Field> EvalHomomorphism<F> for SumEvalHom {
-    fn apply(&self, _y_rev: &[Vec<F>], y_hid: &[Vec<F>]) -> F {
-        y_hid.iter().flatten().fold(F::zero(), |a, &b| a + b)
+impl<F: Field> HomTrait for SumEvalHom<F> {
+    type Codomain = F;
+    type CodomainNormalized = F;
+    type Domain = EvalPair<F>;
+
+    fn apply(&self, pair: &Self::Domain) -> Self::Codomain {
+        pair.y_hid.iter().flatten().fold(F::zero(), |a, &b| a + b)
+    }
+
+    fn normalize(&self, value: Self::Codomain) -> Self::CodomainNormalized {
+        value
     }
 }
 
@@ -366,7 +379,11 @@ fn compute_weights<E: Pairing>(
 pub fn batch_open_generalized<
     E: Pairing,
     R: RngCore + CryptoRng,
-    H: EvalHomomorphism<E::ScalarField>,
+    H: HomTrait<
+            Domain = EvalPair<E::ScalarField>,
+            Codomain = E::ScalarField,
+            CodomainNormalized = E::ScalarField,
+        > + Clone,
 >(
     srs: &Srs<E>,
     sets: &[EvaluationSet<E::ScalarField>],
@@ -393,7 +410,10 @@ pub fn batch_open_generalized<
         y_hid_per_poly.push(evals_i.iter().skip(n_rev).cloned().collect());
     }
     let y_hid_flat: Vec<E::ScalarField> = y_hid_per_poly.iter().flatten().cloned().collect();
-    let phi_y = hom.apply(&y_rev_per_poly, &y_hid_per_poly);
+    let phi_y = hom.apply(&EvalPair {
+        y_rev: y_rev_per_poly.clone(),
+        y_hid: y_hid_per_poly.clone(),
+    });
 
     let c_y_hid_randomness = sample_field_element(rng);
     let com_y_hom = shplonked_sigma::com_y_hom::<E>(&srs.taus_1[..y_hid_flat.len()], srs.xi_1);
@@ -579,14 +599,18 @@ pub fn batch_open_generalized<
         hidden_evals: y_hid_per_poly.clone(),
         C_evals_randomness: rho_eval,
     };
-    let com_y_v_hom = shplonked_sigma::FirstTupleHom::<E> {
+    let com_y_eval_hom = shplonked_sigma::FirstTupleHom::<E> {
         hom1: com_y_hom,
         hom2: eval_point_commit_hom,
         _group: std::marker::PhantomData,
     };
-    let sum_hom = shplonked_sigma::SumHom::<E::ScalarField>::default();
-    let full_hom = shplonked_sigma::ShplonkedSigmaHom::<E> {
-        hom1: com_y_v_hom,
+    // Use the caller's homomorphism φ so the sigma proof proves φ(y_rev, y_hid) = phi_y (not just sum).
+    let sum_hom = shplonked_sigma::EvalHomLifted::<E::ScalarField, H> {
+        y_rev: y_rev_per_poly.clone(),
+        hom: hom.clone(),
+    };
+    let full_hom = shplonked_sigma::ShplonkedSigmaHomWithEval::<E, H> {
+        hom1: com_y_eval_hom,
         hom2: sum_hom,
     };
     let statement_proj = TupleCodomainShape(
@@ -624,7 +648,11 @@ pub fn batch_open_generalized<
 pub fn batch_verify_generalized<
     E: Pairing,
     R: RngCore + CryptoRng,
-    H: EvalHomomorphism<E::ScalarField>,
+    H: HomTrait<
+            Domain = EvalPair<E::ScalarField>,
+            Codomain = E::ScalarField,
+            CodomainNormalized = E::ScalarField,
+        > + Clone,
 >(
     srs: &Srs<E>,
     sets: &[EvaluationSet<E::ScalarField>],
@@ -657,7 +685,11 @@ pub fn batch_verify_generalized<
 pub fn batch_pairing_for_verify_generalized<
     E: Pairing,
     R: RngCore + CryptoRng,
-    H: EvalHomomorphism<E::ScalarField>,
+    H: HomTrait<
+            Domain = EvalPair<E::ScalarField>,
+            Codomain = E::ScalarField,
+            CodomainNormalized = E::ScalarField,
+        > + Clone,
 >(
     srs: &Srs<E>,
     sets: &[EvaluationSet<E::ScalarField>],
@@ -747,8 +779,12 @@ pub fn batch_pairing_for_verify_generalized<
         hom2: eval_point_commit_hom,
         _group: std::marker::PhantomData,
     };
-    let sum_hom = shplonked_sigma::SumHom::<E::ScalarField>::default();
-    let full_hom = shplonked_sigma::ShplonkedSigmaHom::<E> {
+    // Use the same φ as the prover so the Fiat–Shamir challenge c_sigma matches.
+    let sum_hom = shplonked_sigma::EvalHomLifted::<E::ScalarField, H> {
+        y_rev: y_rev.to_vec(),
+        hom: hom.clone(),
+    };
+    let full_hom = shplonked_sigma::ShplonkedSigmaHomWithEval::<E, H> {
         hom1: first_tuple_hom,
         hom2: sum_hom,
     };
@@ -769,7 +805,10 @@ pub fn batch_pairing_for_verify_generalized<
 
     let r_sum_ys = prover_commitment.1;
     anyhow::ensure!(
-        hom.apply(y_rev, &sigma_proof.z.hidden_evals) == r_sum_ys + c_sigma * phi_y,
+        hom.apply(&EvalPair {
+            y_rev: y_rev.to_vec(),
+            y_hid: sigma_proof.z.hidden_evals.clone(),
+        }) == r_sum_ys + c_sigma * phi_y, // TODO: isn't this duplicate with the sigma protocol code?
         "sigma protocol scalar check (φ(y^rev, z) = r_φ + c·φ(y)) failed"
     );
 
@@ -911,12 +950,12 @@ where
         }];
         let polys = vec![poly];
         let rho_i = vec![r];
-        let opening = batch_open_generalized::<E, R, SumEvalHom>(
+        let opening = batch_open_generalized::<E, R, SumEvalHom<E::ScalarField>>(
             ck,
             &sets,
             &polys,
             &rho_i,
-            &SumEvalHom,
+            &SumEvalHom::<E::ScalarField>::default(),
             trs,
             rng,
         );
@@ -944,12 +983,12 @@ where
                 hid: vec![z],
             })
             .collect();
-        let opening = batch_open_generalized::<E, R, SumEvalHom>(
+        let opening = batch_open_generalized::<E, R, SumEvalHom<E::ScalarField>>(
             &ck,
             &sets,
             &polys,
             &rs,
-            &SumEvalHom,
+            &SumEvalHom::<E::ScalarField>::default(),
             trs,
             rng,
         );
@@ -977,10 +1016,10 @@ where
             hid: vec![point],
         }];
         let y_rev: Vec<Vec<E::ScalarField>> = sets.iter().map(|_| vec![]).collect();
-        batch_verify_generalized::<E, _, SumEvalHom>(
+        batch_verify_generalized::<E, _, SumEvalHom<E::ScalarField>>(
             vk,
             &sets,
-            &SumEvalHom,
+            &SumEvalHom::<E::ScalarField>::default(),
             &[com.into()],
             &y_rev,
             eval,
@@ -1065,7 +1104,7 @@ mod tests {
             &sets,
             &polys,
             &rho_i,
-            &SumEvalHom,
+            &SumEvalHom::<Fr>::default(),
             &mut trs,
             &mut rng,
         );
@@ -1088,7 +1127,7 @@ mod tests {
         let ok = batch_verify_generalized::<Bn254, _, _>(
             &srs,
             &sets,
-            &SumEvalHom,
+            &SumEvalHom::<Fr>::default(),
             &commitment_msms,
             opening.get_evals(),
             opening.get_phi_eval(),
@@ -1169,7 +1208,7 @@ mod tests {
             &sets,
             &polys,
             &rho_i,
-            &SumEvalHom,
+            &SumEvalHom::<Fr>::default(),
             &mut trs,
             &mut rng,
         );
@@ -1202,7 +1241,7 @@ mod tests {
         let ok = batch_verify_generalized::<Bn254, _, _>(
             &srs,
             &sets,
-            &SumEvalHom,
+            &SumEvalHom::<Fr>::default(),
             &commitment_msms,
             opening.get_evals(),
             opening.get_phi_eval(),
@@ -1281,7 +1320,7 @@ mod tests {
             &sets,
             &polys,
             &rho_i,
-            &SumEvalHom,
+            &SumEvalHom::<Fr>::default(),
             &mut trs,
             &mut rng,
         );
@@ -1314,7 +1353,7 @@ mod tests {
         let ok = batch_verify_generalized::<Bn254, _, _>(
             &srs,
             &sets,
-            &SumEvalHom,
+            &SumEvalHom::<Fr>::default(),
             &commitment_msms,
             opening.get_evals(),
             opening.get_phi_eval(),

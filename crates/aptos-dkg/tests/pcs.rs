@@ -241,10 +241,14 @@ mod shplonked {
             })
             .collect();
         let y_rev: Vec<Vec<_>> = sets.iter().map(|_| vec![]).collect();
-        batch_verify_generalized::<Bn254, _, SumEvalHom>(
+        batch_verify_generalized::<
+            Bn254,
+            _,
+            SumEvalHom<<Bn254 as ark_ec::pairing::Pairing>::ScalarField>,
+        >(
             &vk,
             &sets,
-            &SumEvalHom,
+            &SumEvalHom::<<Bn254 as ark_ec::pairing::Pairing>::ScalarField>::default(),
             &commitment_msms,
             &y_rev,
             proof.sigma_proof_statement.1,
