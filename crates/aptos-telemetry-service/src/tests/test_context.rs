@@ -109,6 +109,7 @@ pub async fn new_test_context_with_multiple_contracts(
                     bigquery_client: None,
                     peer_identities: cc_config.peer_identities.clone(),
                     blacklist_peers: cc_config.blacklist_peers.clone(),
+                    extra_labels: cc_config.extra_labels.clone(),
                 },
             );
         }

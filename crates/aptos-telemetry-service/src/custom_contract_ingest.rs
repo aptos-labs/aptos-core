@@ -171,13 +171,14 @@ async fn handle_metrics_ingest(
         format!("kubernetes_pod_name=peer_id:{}", peer_id.to_hex_literal())
     };
 
-    let extra_labels = vec![
+    let mut extra_labels = vec![
         format!("peer_id={}", peer_id),
         format!("node_type={}", node_type),
         format!("contract_name={}", contract_name),
         format!("trust_status={}", trust_label),
         pod_name,
     ];
+    extra_labels.extend(instance.extra_labels.iter().cloned());
 
     // Determine encoding
     let encoding = content_encoding.unwrap_or_else(|| "identity".to_string());
@@ -415,6 +416,11 @@ async fn handle_log_ingest(
     tags.insert(PEER_ROLE_TAG_NAME.into(), node_type.as_str());
     tags.insert("contract_name".into(), contract_name.clone());
     tags.insert("trust_status".into(), trust_label.into());
+    for label in &instance.extra_labels {
+        if let Some((key, value)) = label.split_once('=') {
+            tags.insert(key.to_string(), value.to_string());
+        }
+    }
 
     let unstructured_log = UnstructuredLog {
         fields,
@@ -655,6 +661,14 @@ async fn handle_custom_event_ingest(
                 "key": "trust_status",
                 "value": {"string_value": trust_label}
             }));
+            for label in &instance.extra_labels {
+                if let Some((key, value)) = label.split_once('=') {
+                    event_params.push(serde_json::json!({
+                        "key": key,
+                        "value": {"string_value": value}
+                    }));
+                }
+            }
 
             let row = BigQueryRow {
                 event_identity: event_identity.clone(),
