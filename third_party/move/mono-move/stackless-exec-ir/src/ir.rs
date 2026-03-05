@@ -72,6 +72,20 @@ pub enum BinaryOp {
     And,
 }
 
+/// Immediate values for `BinaryOpImm`. Restricted to small types.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum ImmValue {
+    Bool(bool),
+    U8(u8),
+    U16(u16),
+    U32(u32),
+    U64(u64),
+    I8(i8),
+    I16(i16),
+    I32(i32),
+    I64(i64),
+}
+
 /// A stackless IR instruction with explicit register operands.
 #[derive(Clone, Debug)]
 pub enum Instr {
@@ -103,6 +117,8 @@ pub enum Instr {
     UnaryOp(Reg, UnaryOp, Reg),
     /// `dst = op(lhs, rhs)`
     BinaryOp(Reg, BinaryOp, Reg, Reg),
+    /// `dst = op(lhs_reg, immediate)` — binary op with immediate right operand
+    BinaryOpImm(Reg, BinaryOp, Reg, ImmValue),
 
     // --- Struct ---
     Pack(Reg, StructDefinitionIndex, Vec<Reg>),

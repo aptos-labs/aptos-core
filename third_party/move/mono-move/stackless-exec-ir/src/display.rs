@@ -4,7 +4,7 @@
 //! Human-readable display for the stackless execution IR.
 //! Resolves pool indices using the CompiledModule for readable output.
 
-use crate::ir::{BinaryOp, FunctionIR, Instr, ModuleIR, Reg, UnaryOp};
+use crate::ir::{BinaryOp, FunctionIR, ImmValue, Instr, ModuleIR, Reg, UnaryOp};
 use move_binary_format::{
     access::ModuleAccess,
     file_format::{
@@ -245,6 +245,10 @@ fn display_instr(
         // --- Binary: dst := op lhs, rhs ---
         Instr::BinaryOp(d, op, l, r) => {
             write_dst(f, *d)?; write!(f, "{} {}, {}", binary_op_name(op), reg(*l), reg(*r))
+        },
+        // --- Binary immediate: dst := op lhs, #imm ---
+        Instr::BinaryOpImm(d, op, l, imm) => {
+            write_dst(f, *d)?; write!(f, "{} {}, {}", binary_op_name(op), reg(*l), imm_value(imm))
         },
 
         // --- Struct ---
@@ -509,5 +513,20 @@ fn binary_op_name(op: &BinaryOp) -> &'static str {
         BinaryOp::Neq => "neq",
         BinaryOp::Or => "or",
         BinaryOp::And => "and",
+    }
+}
+
+fn imm_value(imm: &ImmValue) -> String {
+    match imm {
+        ImmValue::Bool(true) => "#true".to_string(),
+        ImmValue::Bool(false) => "#false".to_string(),
+        ImmValue::U8(v) => format!("#{}u8", v),
+        ImmValue::U16(v) => format!("#{}u16", v),
+        ImmValue::U32(v) => format!("#{}u32", v),
+        ImmValue::U64(v) => format!("#{}", v),
+        ImmValue::I8(v) => format!("#{}i8", v),
+        ImmValue::I16(v) => format!("#{}i16", v),
+        ImmValue::I32(v) => format!("#{}i32", v),
+        ImmValue::I64(v) => format!("#{}i64", v),
     }
 }
