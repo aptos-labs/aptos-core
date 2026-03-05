@@ -233,20 +233,20 @@ pub enum MicroOp {
     Jump { target: CodeOffset },
 
     /// Jump to `target` if the u64 at `src` is **not** zero.
-    JumpIfNotZeroU64 {
+    JumpNotZeroU64 {
         target: CodeOffset,
         src: FrameOffset,
     },
 
     /// Jump to `target` if the u64 at `src` is **>=** `imm`.
-    JumpIfGreaterEqualU64Imm {
+    JumpGreaterEqualU64Imm {
         target: CodeOffset,
         src: FrameOffset,
         imm: u64,
     },
 
     /// Jump to `target` if u64 at `lhs` < u64 at `rhs`.
-    JumpIfLessU64 {
+    JumpLessU64 {
         target: CodeOffset,
         lhs: FrameOffset,
         rhs: FrameOffset,
@@ -633,7 +633,7 @@ mod tests {
     #[test]
     fn micro_op_size() {
         // Current size is 24 bytes due to large variants (e.g. VecNew,
-        // JumpIfGreaterEqualU64Imm). We should aim to bring this down to 16.
+        // JumpGreaterEqualU64Imm). We should aim to bring this down to 16.
         assert_eq!(std::mem::size_of::<MicroOp>(), 24);
     }
 }
