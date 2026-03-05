@@ -13444,6 +13444,10 @@ components:
           $ref: '#/components/schemas/EncryptedState'
         payload_hash:
           $ref: '#/components/schemas/HashValue'
+        ciphertext:
+          allOf:
+          - $ref: '#/components/schemas/HexEncodedBytes'
+          - description: BCS-serialized ciphertext bytes. Required for submission, omitted in read responses.
         multisig_address:
           $ref: '#/components/schemas/Address'
         replay_protection_nonce:

@@ -1165,6 +1165,10 @@ pub enum EncryptedState {
 pub struct EncryptedTransactionPayload {
     pub encrypted_state: EncryptedState,
     pub payload_hash: HashValue,
+    /// BCS-serialized ciphertext bytes. Required for submission, omitted in read responses.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(default)]
+    pub ciphertext: Option<HexEncodedBytes>,
     #[serde(skip_serializing_if = "Option::is_none")]
     #[serde(default)]
     pub multisig_address: Option<Address>,
@@ -1181,11 +1185,14 @@ pub struct EncryptedTransactionPayload {
 
 impl VerifyInput for EncryptedTransactionPayload {
     fn verify(&self) -> anyhow::Result<()> {
-        if let Some(inner) = &self.decrypted_payload {
-            match inner {
-                EncryptedTransactionInnerPayload::EntryFunctionPayload(ef) => ef.verify()?,
-                EncryptedTransactionInnerPayload::ScriptPayload(s) => s.verify()?,
-            }
+        if self.encrypted_state != EncryptedState::Encrypted {
+            bail!(
+                "Only encrypted state transactions can be submitted, got {:?}",
+                self.encrypted_state
+            );
+        }
+        if self.ciphertext.is_none() {
+            bail!("ciphertext is required for encrypted transaction submission");
         }
         Ok(())
     }

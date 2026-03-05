@@ -418,6 +418,7 @@ impl<'a, S: StateView> MoveConverter<'a, S> {
                             EncryptedTransactionPayload {
                                 encrypted_state: EncryptedState::Encrypted,
                                 payload_hash: crate::HashValue::from(payload_hash),
+                                ciphertext: None,
                                 multisig_address,
                                 replay_protection_nonce,
                                 decrypted_payload: None,
@@ -430,6 +431,7 @@ impl<'a, S: StateView> MoveConverter<'a, S> {
                             EncryptedTransactionPayload {
                                 encrypted_state: EncryptedState::FailedDecryption,
                                 payload_hash: crate::HashValue::from(payload_hash),
+                                ciphertext: None,
                                 multisig_address,
                                 replay_protection_nonce,
                                 decrypted_payload: None,
@@ -460,6 +462,7 @@ impl<'a, S: StateView> MoveConverter<'a, S> {
                             EncryptedTransactionPayload {
                                 encrypted_state: EncryptedState::Decrypted,
                                 payload_hash: crate::HashValue::from(payload_hash),
+                                ciphertext: None,
                                 multisig_address,
                                 replay_protection_nonce,
                                 decrypted_payload: inner,
@@ -891,8 +894,24 @@ impl<'a, S: StateView> MoveConverter<'a, S> {
                     })
                 }
             },
-            TransactionPayload::EncryptedTransactionPayload(_) => {
-                bail!("Encrypted transaction payloads cannot be submitted via JSON; use BCS")
+            TransactionPayload::EncryptedTransactionPayload(encrypted) => {
+                let ciphertext_bytes = encrypted.ciphertext.ok_or_else(|| {
+                    format_err!("ciphertext is required for encrypted transaction submission")
+                })?;
+                let ciphertext: aptos_types::secret_sharing::Ciphertext =
+                    bcs::from_bytes(&ciphertext_bytes.0)
+                        .context("Failed to BCS-deserialize ciphertext")?;
+                let extra_config = ExtraConfig::V1 {
+                    multisig_address: encrypted.multisig_address.map(|a| a.into()),
+                    replay_protection_nonce: encrypted.replay_protection_nonce.map(|n| n.into()),
+                };
+                Target::EncryptedPayload(
+                    aptos_types::transaction::encrypted_payload::EncryptedPayload::Encrypted {
+                        ciphertext,
+                        extra_config,
+                        payload_hash: encrypted.payload_hash.into(),
+                    },
+                )
             },
             // Deprecated.
             TransactionPayload::ModuleBundlePayload(_) => {
