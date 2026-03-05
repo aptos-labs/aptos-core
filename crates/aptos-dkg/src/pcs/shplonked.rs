@@ -730,6 +730,25 @@ pub fn batch_pairing_for_verify_generalized<
         anyhow::ensure!(!set.is_empty(), "all evaluation sets S_i must be nonempty");
     }
 
+    // Validate proof's hidden_evals dimensions against sets before using h for SRS indexing.
+    // A malicious proof could otherwise set huge hidden_evals and cause srs.taus_1[..h] to panic.
+    let expected_h: usize = sets.iter().map(|s| s.hid.len()).sum();
+    anyhow::ensure!(
+        sigma_proof.z.hidden_evals.len() == n,
+        "hidden_evals must have one vector per evaluation set"
+    );
+    for (j, evals) in sigma_proof.z.hidden_evals.iter().enumerate() {
+        anyhow::ensure!(
+            evals.len() == sets[j].hid.len(),
+            "hidden_evals length for set {} must match set hid length",
+            j
+        );
+    }
+    anyhow::ensure!(
+        expected_h <= srs.taus_1.len(),
+        "SRS has insufficient tau_1 powers for hidden evaluations"
+    );
+
     let s_union = union_of_evaluation_sets(sets);
     let z_S = zero_poly_S(&s_union);
     let s_per_poly: Vec<Vec<E::ScalarField>> = sets

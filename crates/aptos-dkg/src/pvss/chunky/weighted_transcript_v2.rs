@@ -109,7 +109,7 @@ impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>> traits:
     type SigningSecretKey = bls12381::PrivateKey;
 
     fn scheme_name() -> String {
-        "chunky_prime".to_string()
+        "chunky_v2".to_string()
     }
 
     /// Fetches the domain-separation tag (DST)
