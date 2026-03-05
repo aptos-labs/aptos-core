@@ -924,10 +924,10 @@ pub struct CustomContractConfig {
     pub blacklist_peers: Option<HashSet<PeerId>>,
 
     /// Extra labels to attach to all telemetry from this contract.
-    /// Each entry is a "key=value" string (e.g., "chain_name=testnet").
+    /// Maps label name to label value (e.g., chain_name: "testnet").
     /// These are appended to metrics extra_labels, log tags, and BigQuery event params.
-    #[serde(default, skip_serializing_if = "Vec::is_empty")]
-    pub extra_labels: Vec<String>,
+    #[serde(default, skip_serializing_if = "HashMap::is_empty")]
+    pub extra_labels: HashMap<String, String>,
 }
 
 impl CustomContractConfig {

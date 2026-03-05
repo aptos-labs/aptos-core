@@ -213,8 +213,8 @@ pub struct CustomContractInstance {
     /// Optional set of peer IDs to block from this contract's telemetry ingestion.
     pub blacklist_peers: Option<HashSet<PeerId>>,
     /// Extra labels to attach to all telemetry from this contract.
-    /// Each entry is a "key=value" string (e.g., "chain_name=testnet").
-    pub extra_labels: Vec<String>,
+    /// Maps label name to label value (e.g., chain_name -> "testnet").
+    pub extra_labels: HashMap<String, String>,
 }
 
 impl CustomContractInstance {

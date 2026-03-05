@@ -178,7 +178,12 @@ async fn handle_metrics_ingest(
         format!("trust_status={}", trust_label),
         pod_name,
     ];
-    extra_labels.extend(instance.extra_labels.iter().cloned());
+    extra_labels.extend(
+        instance
+            .extra_labels
+            .iter()
+            .map(|(k, v)| format!("{}={}", k, v)),
+    );
 
     // Determine encoding
     let encoding = content_encoding.unwrap_or_else(|| "identity".to_string());
@@ -416,10 +421,8 @@ async fn handle_log_ingest(
     tags.insert(PEER_ROLE_TAG_NAME.into(), node_type.as_str());
     tags.insert("contract_name".into(), contract_name.clone());
     tags.insert("trust_status".into(), trust_label.into());
-    for label in &instance.extra_labels {
-        if let Some((key, value)) = label.split_once('=') {
-            tags.insert(key.to_string(), value.to_string());
-        }
+    for (key, value) in &instance.extra_labels {
+        tags.insert(key.clone(), value.clone());
     }
 
     let unstructured_log = UnstructuredLog {
@@ -661,13 +664,11 @@ async fn handle_custom_event_ingest(
                 "key": "trust_status",
                 "value": {"string_value": trust_label}
             }));
-            for label in &instance.extra_labels {
-                if let Some((key, value)) = label.split_once('=') {
-                    event_params.push(serde_json::json!({
-                        "key": key,
-                        "value": {"string_value": value}
-                    }));
-                }
+            for (key, value) in &instance.extra_labels {
+                event_params.push(serde_json::json!({
+                    "key": key,
+                    "value": {"string_value": value}
+                }));
             }
 
             let row = BigQueryRow {
