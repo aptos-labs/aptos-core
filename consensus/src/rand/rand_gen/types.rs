@@ -1111,7 +1111,8 @@ mod tests {
     /// Old format: (AugKeyPair, Option<AugKeyPair>) where AugKeyPair = (ASK, APK)
     /// New format: AugKeyPair = (ASK, APK)
     /// The deserialization logic in epoch_manager.rs tries old format first,
-    /// then new format, then falls through to regenerate.
+    /// Key pairs are stored as (AugKeyPair, Option<AugKeyPair>) for backward compatibility.
+    /// The second element was the fast path key pair, now always None.
     #[test]
     fn test_key_pair_serialization_backward_compat() {
         use aptos_types::randomness::{APK, ASK};
@@ -1125,16 +1126,14 @@ mod tests {
 
         let key_pair: AugKeyPair = (ask.clone(), apk.clone());
 
-        // Old format: (main_key_pair, fast_key_pair) where fast is Option
+        // Old data with fast=Some (written before fast path removal)
         let old_bytes_with_fast =
             bcs::to_bytes(&(key_pair.clone(), Some(key_pair.clone()))).unwrap();
-        let old_bytes_without_fast =
-            bcs::to_bytes(&(key_pair.clone(), Option::<AugKeyPair>::None)).unwrap();
+        // New data with fast=None (written after fast path removal)
+        let new_bytes =
+            bcs::to_bytes(&(key_pair.clone(), None::<AugKeyPair>)).unwrap();
 
-        // New format: just the key pair
-        let new_bytes = bcs::to_bytes(&key_pair).unwrap();
-
-        // Old format with fast=Some should deserialize via old path
+        // Old format with fast=Some should deserialize, extracting the main key pair
         let (main, _fast): (AugKeyPair, Option<AugKeyPair>) =
             bcs::from_bytes(&old_bytes_with_fast).unwrap();
         assert_eq!(
@@ -1146,9 +1145,9 @@ mod tests {
             bcs::to_bytes(&apk).unwrap()
         );
 
-        // Old format with fast=None should deserialize via old path
+        // New format with fast=None should deserialize identically
         let (main, fast): (AugKeyPair, Option<AugKeyPair>) =
-            bcs::from_bytes(&old_bytes_without_fast).unwrap();
+            bcs::from_bytes(&new_bytes).unwrap();
         assert_eq!(
             bcs::to_bytes(&main.0).unwrap(),
             bcs::to_bytes(&ask).unwrap()
@@ -1158,25 +1157,5 @@ mod tests {
             bcs::to_bytes(&apk).unwrap()
         );
         assert!(fast.is_none());
-
-        // New format should deserialize via new path
-        let recovered: AugKeyPair = bcs::from_bytes(&new_bytes).unwrap();
-        assert_eq!(
-            bcs::to_bytes(&recovered.0).unwrap(),
-            bcs::to_bytes(&ask).unwrap()
-        );
-        assert_eq!(
-            bcs::to_bytes(&recovered.1).unwrap(),
-            bcs::to_bytes(&apk).unwrap()
-        );
-
-        // New format should NOT deserialize as old format (ensures we need the fallback)
-        assert!(bcs::from_bytes::<(AugKeyPair, Option<AugKeyPair>)>(&new_bytes).is_err());
-
-        // Old format should NOT deserialize as new format (ensures ordering matters)
-        // Old-with-fast bytes contain extra data, so trying to parse as just AugKeyPair
-        // would either fail or silently consume only the prefix. BCS is strict, so it
-        // should fail on trailing bytes.
-        assert!(bcs::from_bytes::<AugKeyPair>(&old_bytes_with_fast).is_err());
     }
 }

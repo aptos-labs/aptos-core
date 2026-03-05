@@ -1094,37 +1094,23 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
         let aggregate_pk_main = transcript.main.get_dealt_public_key();
 
         // Recover existing augmented key pair or generate a new one.
-        // Try to deserialize as old format ((ASK,APK), Option<(ASK,APK)>) first,
-        // then as new format (ASK, APK), and fall through to regenerate if both fail.
-        let augmented_key_pair = if let Some((_, key_pair)) = self
+        // Key pairs are stored as (AugKeyPair, Option<AugKeyPair>) for backward compatibility
+        // with the old format that included an optional fast path key pair.
+        type AugKeyPair = (
+            <WVUF as WeightedVUF>::AugmentedSecretKeyShare,
+            <WVUF as WeightedVUF>::AugmentedPubKeyShare,
+        );
+        let augmented_key_pair = if let Some((_, key_pair_bytes)) = self
             .rand_storage
             .get_key_pair_bytes()
             .map_err(NoRandomnessReason::RandDbNotAvailable)?
             .filter(|(epoch, _)| *epoch == new_epoch)
         {
-            type AugKeyPair = (
-                <WVUF as WeightedVUF>::AugmentedSecretKeyShare,
-                <WVUF as WeightedVUF>::AugmentedPubKeyShare,
-            );
-            if let Ok((main_key_pair, _fast_key_pair)) =
-                bcs::from_bytes::<(AugKeyPair, Option<AugKeyPair>)>(&key_pair)
-            {
-                info!(
-                    epoch = new_epoch,
-                    "Recovering existing augmented key (old format)"
-                );
-                main_key_pair
-            } else if let Ok(key_pair) = bcs::from_bytes::<AugKeyPair>(&key_pair) {
-                info!(
-                    epoch = new_epoch,
-                    "Recovering existing augmented key (new format)"
-                );
-                key_pair
-            } else {
-                return Err(NoRandomnessReason::KeyPairDeserializationError(
-                    anyhow!("Failed to deserialize key pair in both old and new format"),
-                ));
-            }
+            let (main_key_pair, _fast_key_pair) =
+                bcs::from_bytes::<(AugKeyPair, Option<AugKeyPair>)>(&key_pair_bytes)
+                    .map_err(NoRandomnessReason::KeyPairDeserializationError)?;
+            info!(epoch = new_epoch, "Recovering existing augmented key");
+            main_key_pair
         } else {
             info!(
                 epoch = new_epoch_state.epoch,
@@ -1136,7 +1122,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
             self.rand_storage
                 .save_key_pair_bytes(
                     new_epoch,
-                    bcs::to_bytes(&augmented_key_pair)
+                    bcs::to_bytes(&(augmented_key_pair.clone(), None::<AugKeyPair>))
                         .map_err(NoRandomnessReason::KeyPairSerializationError)?,
                 )
                 .map_err(NoRandomnessReason::KeyPairPersistError)?;
@@ -2127,7 +2113,7 @@ pub enum NoRandomnessReason {
     SecretShareDecryptionFailed(anyhow::Error),
     RngCreationError(rand::Error),
     RandDbNotAvailable(anyhow::Error),
-    KeyPairDeserializationError(anyhow::Error),
+    KeyPairDeserializationError(bcs::Error),
     KeyPairSerializationError(bcs::Error),
     KeyPairPersistError(anyhow::Error),
 }
