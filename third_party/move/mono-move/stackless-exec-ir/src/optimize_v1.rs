@@ -7,7 +7,7 @@
 //! - Step B: Copy propagation (forward scan)
 //! - Step C: Dead instruction elimination (backward scan)
 
-use crate::ir::{FunctionIR, Instr, ModuleIR, Reg};
+use crate::ir::{BinaryOp, FunctionIR, ImmValue, Instr, ModuleIR, Reg};
 use move_vm_types::loaded_data::runtime_types::Type;
 use std::collections::{BTreeMap, BTreeSet};
 
@@ -20,6 +20,7 @@ pub fn optimize_module_v1(module_ir: &mut ModuleIR) {
 
 fn optimize_function(func: &mut FunctionIR) {
     fuse_field_access(func);
+    fuse_immediate_binops(func);
     copy_propagation(func);
     dead_instruction_elimination(func);
     renumber_registers(func);
@@ -100,6 +101,80 @@ pub(crate) fn fuse_field_access(func: &mut FunctionIR) {
 }
 
 // ================================================================================================
+// Step A2: Immediate Binary Op Fusion
+// ================================================================================================
+
+/// Extract the destination register and immediate value from a load instruction.
+/// Returns None for LdU128/LdU256/LdI128/LdI256/LdConst (too large or non-numeric).
+pub(crate) fn extract_imm_value(instr: &Instr) -> Option<(Reg, ImmValue)> {
+    match instr {
+        Instr::LdTrue(d) => Some((*d, ImmValue::Bool(true))),
+        Instr::LdFalse(d) => Some((*d, ImmValue::Bool(false))),
+        Instr::LdU8(d, v) => Some((*d, ImmValue::U8(*v))),
+        Instr::LdU16(d, v) => Some((*d, ImmValue::U16(*v))),
+        Instr::LdU32(d, v) => Some((*d, ImmValue::U32(*v))),
+        Instr::LdU64(d, v) => Some((*d, ImmValue::U64(*v))),
+        Instr::LdI8(d, v) => Some((*d, ImmValue::I8(*v))),
+        Instr::LdI16(d, v) => Some((*d, ImmValue::I16(*v))),
+        Instr::LdI32(d, v) => Some((*d, ImmValue::I32(*v))),
+        Instr::LdI64(d, v) => Some((*d, ImmValue::I64(*v))),
+        _ => None,
+    }
+}
+
+/// Whether a binary operation is commutative (operands can be swapped).
+pub(crate) fn is_commutative(op: &BinaryOp) -> bool {
+    matches!(
+        op,
+        BinaryOp::Add
+            | BinaryOp::Mul
+            | BinaryOp::BitOr
+            | BinaryOp::BitAnd
+            | BinaryOp::Xor
+            | BinaryOp::Eq
+            | BinaryOp::Neq
+            | BinaryOp::Or
+            | BinaryOp::And
+    )
+}
+
+/// Fuse consecutive `Ld*` + `BinaryOp` pairs into `BinaryOpImm`.
+///
+/// Safety: no explicit single-use guard is needed. The stack machine guarantees
+/// that consecutive `Ld + BinaryOp` implies the loaded register was pushed and
+/// immediately consumed (Move has no dup instruction; reuse requires
+/// `st_loc`+`copy_loc` which inserts intervening `Move`/`Copy` IR instructions
+/// that break consecutiveness). Block terminators (Branch/Ret/Abort) prevent
+/// cross-block fusion even when in-place removal shifts instruction indices.
+pub(crate) fn fuse_immediate_binops(func: &mut FunctionIR) {
+    let mut i = 0;
+    while i + 1 < func.instrs.len() {
+        let fused = if let Some((tmp, imm)) = extract_imm_value(&func.instrs[i]) {
+            match &func.instrs[i + 1] {
+                Instr::BinaryOp(dst, op, _lhs, rhs) if *rhs == tmp => {
+                    Some(Instr::BinaryOpImm(*dst, op.clone(), *_lhs, imm))
+                },
+                Instr::BinaryOp(dst, op, lhs, _rhs)
+                    if *lhs == tmp && is_commutative(op) =>
+                {
+                    Some(Instr::BinaryOpImm(*dst, op.clone(), *_rhs, imm))
+                },
+                _ => None,
+            }
+        } else {
+            None
+        };
+
+        if let Some(fused_instr) = fused {
+            func.instrs[i] = fused_instr;
+            func.instrs.remove(i + 1);
+        } else {
+            i += 1;
+        }
+    }
+}
+
+// ================================================================================================
 // Step B: Copy Propagation
 // ================================================================================================
 
@@ -162,6 +237,9 @@ fn apply_subst_to_sources(instr: &mut Instr, subst: &BTreeMap<Reg, Reg>) {
             s(lhs, subst);
             s(rhs, subst);
         },
+
+        // Binary immediate: substitute lhs only (immediate has no register)
+        Instr::BinaryOpImm(_, _, lhs, _) => s(lhs, subst),
 
         // Struct ops
         Instr::Pack(_, _, fields) | Instr::PackGeneric(_, _, fields) => s_vec(fields, subst),
@@ -365,6 +443,10 @@ pub(crate) fn get_defs_uses(instr: &Instr) -> (Vec<Reg>, Vec<Reg>) {
             defs.push(*d);
             uses.push(*l);
             uses.push(*r);
+        },
+        Instr::BinaryOpImm(d, _, l, _) => {
+            defs.push(*d);
+            uses.push(*l);
         },
 
         Instr::Pack(d, _, fields) | Instr::PackGeneric(d, _, fields) => {
@@ -602,6 +684,10 @@ pub(crate) fn rename_instr(instr: &mut Instr, map: &BTreeMap<Reg, Reg>) {
             r(d, map);
             r(l, map);
             r(rr, map);
+        },
+        Instr::BinaryOpImm(d, _, l, _) => {
+            r(d, map);
+            r(l, map);
         },
 
         Instr::Pack(d, _, fields) | Instr::PackGeneric(d, _, fields) => {

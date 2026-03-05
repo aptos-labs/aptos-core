@@ -1,3 +1,10 @@
+Would it be useful to create an "immediate" version of binary operations (and maybe unary operations) where instead of always reading from registers, the operands could be constants. This would allow us to not have to write always load constants to a register, thereby reducing the number of instructions. How would the two versions of convertors/optimizers adapt to this change?
+
+The main goal, as a reminder, is in the stackless exec ir conversion:
+- it minimizes the number of registers, reusing or avoid creating them in the first place
+- minimizes moves, copies, stores
+- minimizes the number of instructions
+
 Now, can you add a new kind of pipeline, where the file format bytecode is first reduced to a partial SSA form (intra-block SSA), where within a basic block, each computed value is assigned a value ID.
 
 

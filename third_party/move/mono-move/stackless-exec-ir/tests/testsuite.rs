@@ -104,7 +104,7 @@ fn move_runner(path: &Path) -> datatest_stable::Result<()> {
         for module in &modules {
             let table = make_struct_name_table(module);
             let masm_output =
-                move_asm::disassembler::disassemble_module(String::new(), module, false)
+                move_asm::disassembler::disassemble_module(String::new(), module)
                     .map_err(|e| format!("disassembly failed: {:#}", e))?;
             let module_ir =
                 run_pipeline(module.clone(), &config, &table).map_err(|e| format!("{:#}", e))?;
@@ -131,7 +131,7 @@ fn move_runner(path: &Path) -> datatest_stable::Result<()> {
         for module in &modules {
             let table = make_struct_name_table(module);
             let masm_output =
-                move_asm::disassembler::disassemble_module(String::new(), module, false)
+                move_asm::disassembler::disassemble_module(String::new(), module)
                     .map_err(|e| format!("disassembly failed: {:#}", e))?;
             let module_ir =
                 run_pipeline(module.clone(), &config, &table).map_err(|e| format!("{:#}", e))?;

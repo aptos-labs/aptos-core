@@ -11,6 +11,7 @@
 //!         with StLoc look-ahead and CopyLoc/MoveLoc coalescing.
 
 use crate::ir::{BinaryOp, FunctionIR, Instr, Label, ModuleIR, Reg, UnaryOp};
+use crate::optimize_v1::{extract_imm_value, get_defs_uses, is_commutative, split_into_blocks};
 use crate::type_conversion::{convert_sig_token, convert_sig_tokens};
 use move_binary_format::{
     access::ModuleAccess,
@@ -79,6 +80,9 @@ pub fn convert_module_v2(module: CompiledModule, struct_name_table: &[StructName
                 converter.convert_function(&module, &code.code);
                 let ssa_instrs = converter.instrs;
                 let vid_types = converter.vid_types;
+
+                // Pass 1.5: Fuse immediate binops (before register allocation)
+                let ssa_instrs = fuse_immediate_binops_ssa(ssa_instrs, num_pinned);
 
                 // Pass 2: Greedy Register Allocation
                 let (allocated_instrs, num_regs, reg_types) =
@@ -1061,10 +1065,89 @@ impl<'a> SsaConverter<'a> {
 }
 
 // ================================================================================================
-// Pass 2: Greedy Register Allocation (per block)
+// Pass 1.5: Fuse Immediate BinaryOps (SSA level)
 // ================================================================================================
 
-use crate::optimize_v1::{get_defs_uses, split_into_blocks};
+/// Fuse consecutive `Ld*` + `BinaryOp` pairs into `BinaryOpImm` in the SSA IR.
+///
+/// Safety: the stack machine guarantees that consecutive `Ld + BinaryOp` means
+/// the loaded VID was pushed and immediately consumed (Move has no dup
+/// instruction; reuse requires `st_loc`+`copy_loc` which inserts intervening
+/// instructions that break consecutiveness). The within-block boundary check
+/// prevents fusing across labels (where VIDs restart and have unrelated
+/// definitions).
+///
+/// Since V2 VIDs are true SSA within a block (monotonically allocated, never
+/// recycled), a debug_assert verifies single-use as an invariant check.
+fn fuse_immediate_binops_ssa(instrs: Vec<Instr>, _num_pinned: Reg) -> Vec<Instr> {
+    let blocks = split_into_blocks(&instrs);
+    let mut result = Vec::with_capacity(instrs.len());
+
+    let mut block_idx = 0;
+    let mut skip_next = false;
+
+    for i in 0..instrs.len() {
+        if skip_next {
+            skip_next = false;
+            continue;
+        }
+
+        // Advance to the current block.
+        while block_idx < blocks.len() && i >= blocks[block_idx].1 {
+            block_idx += 1;
+        }
+
+        // Only fuse within the same basic block.
+        if i + 1 < instrs.len()
+            && block_idx < blocks.len()
+            && i + 1 < blocks[block_idx].1
+        {
+            if let Some((tmp, imm)) = extract_imm_value(&instrs[i]) {
+                let fused = match &instrs[i + 1] {
+                    Instr::BinaryOp(dst, op, lhs, rhs) if *rhs == tmp => {
+                        Some(Instr::BinaryOpImm(*dst, op.clone(), *lhs, imm.clone()))
+                    },
+                    Instr::BinaryOp(dst, op, lhs, rhs)
+                        if *lhs == tmp && is_commutative(op) =>
+                    {
+                        Some(Instr::BinaryOpImm(*dst, op.clone(), *rhs, imm.clone()))
+                    },
+                    _ => None,
+                };
+                if let Some(fused_instr) = fused {
+                    // V2 VIDs are true SSA within a block (alloc_vid is monotonic,
+                    // no free list). Verify the loaded VID is single-use.
+                    debug_assert!({
+                        let (bstart, bend) = blocks[block_idx];
+                        instrs[bstart..bend]
+                            .iter()
+                            .enumerate()
+                            .filter(|&(j, _)| bstart + j != i + 1)
+                            .all(|(_, ins)| {
+                                let (_, uses) = get_defs_uses(ins);
+                                !uses.contains(&tmp)
+                            })
+                    },
+                        "BinaryOpImm SSA fusion: VID {} has uses outside the \
+                         consecutive Ld+BinaryOp pair — stack machine invariant violated",
+                        tmp,
+                    );
+                    result.push(fused_instr);
+                    skip_next = true;
+                    continue;
+                }
+            }
+        }
+
+        result.push(instrs[i].clone());
+    }
+
+    result
+}
+
+// ================================================================================================
+// Pass 2: Greedy Register Allocation (per block)
+// ================================================================================================
 
 fn allocate_registers(
     instrs: &[Instr],
