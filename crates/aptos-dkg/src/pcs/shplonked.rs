@@ -294,7 +294,7 @@ where
 }
 
 /// Single label for the whole batch statement so prover and verifier hash the same bytes.
-const SHPLONKED_FS_STATEMENT_DST: &[u8] = b"shplonked-fs-statement-dst";
+//const SHPLONKED_FS_STATEMENT_DST: &[u8] = b"shplonked-fs-statement-dst";
 
 /// Appends the batch-open statement to the transcript for Fiat–Shamir (Step 1b).
 /// Uses a single canonical blob so prover and verifier derive the same c and x.
@@ -313,7 +313,7 @@ fn append_batch_statement_to_transcript<E: Pairing>(
     }
     trs.append_homomorphism_image(&phi_y);
     trs.append_point(c_y_hid);
-    trs.append_message(SHPLONKED_FS_STATEMENT_DST, &buf);
+    //trs.append_message(SHPLONKED_FS_STATEMENT_DST, &buf);
 }
 
 /// Computes g_rev = ∑_j weight_j · (∑_{i ∈ rev} L_{j,i}(x) · y_j^rev[i]) from weights, Lagrange cache, and y_rev.

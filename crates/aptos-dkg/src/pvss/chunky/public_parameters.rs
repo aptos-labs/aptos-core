@@ -32,6 +32,11 @@ use std::{collections::HashMap, ops::Mul};
 
 const DST: &[u8] = b"APTOS_CHUNKED_ELGAMAL_FIELD_PVSS_DST"; // This DST will be used in setting up a group generator `G_2`, see below
 
+/// Default extra bits for the dlog table when deserializing legacy PublicParameters that did not store this field.
+fn default_dlog_extra_bits() -> u64 {
+    6
+}
+
 fn compute_powers_of_radix<E: Pairing>(ell: u8) -> Vec<E::ScalarField> {
     utils::powers(
         E::ScalarField::from(1u64 << ell),
@@ -59,6 +64,10 @@ pub struct PublicParameters<E: Pairing> {
     // Meaning here it seems, the max number of times `n` that transcripts can be aggregated (which means the number of contained transcripts can be `n + 1`)
     pub max_aggregation: usize,
 
+    /// Extra bits for the dlog baby-step table size. Must be serialized so clone/deserialize rebuild the same table.
+    #[serde(default = "default_dlog_extra_bits")]
+    pub dlog_extra_bits: u64,
+
     #[serde(skip)]
     pub dlog_table: HashMap<Vec<u8>, u64>,
 
@@ -79,7 +88,13 @@ impl<E: Pairing> Clone for PublicParameters<E> {
             G_2: self.G_2,
             ell: self.ell,
             max_aggregation: self.max_aggregation,
-            dlog_table: Self::build_dlog_table(g, self.ell, self.max_aggregation, 0),
+            dlog_extra_bits: self.dlog_extra_bits,
+            dlog_table: Self::build_dlog_table(
+                g,
+                self.ell,
+                self.max_aggregation,
+                self.dlog_extra_bits,
+            ),
             G2_table: BatchMulPreprocessing::new(self.G_2.into(), self.max_num_shares as usize), // Recreate table because it doesn't allow for Copy/Clone? TODO: Fix this
             powers_of_radix: compute_powers_of_radix::<E>(self.ell),
         }
@@ -94,6 +109,7 @@ impl<E: Pairing> PartialEq for PublicParameters<E> {
             && self.ell == other.ell
             && self.max_num_shares == other.max_num_shares
             && self.max_aggregation == other.max_aggregation
+            && self.dlog_extra_bits == other.dlog_extra_bits
         // table, G2_table, and powers_of_radix are ignored
     }
 }
@@ -108,6 +124,7 @@ impl<E: Pairing> std::fmt::Debug for PublicParameters<E> {
             .field("G_2", &self.G_2)
             .field("ell", &self.ell)
             .field("max_aggregation", &self.max_aggregation)
+            .field("dlog_extra_bits", &self.dlog_extra_bits)
             .field("table", &"<skipped>")
             .field("G2_table", &"<skipped>")
             .field("powers_of_radix", &"<skipped>")
@@ -139,6 +156,8 @@ impl<'de, E: Pairing> Deserialize<'de> for PublicParameters<E> {
             ell: u8,
             max_num_shares: u32,
             max_aggregation: usize,
+            #[serde(default = "default_dlog_extra_bits")]
+            dlog_extra_bits: u64,
         }
 
         let serialized = SerializedFields::<E>::deserialize(deserializer)?;
@@ -156,7 +175,13 @@ impl<'de, E: Pairing> Deserialize<'de> for PublicParameters<E> {
             G_2: serialized.G_2,
             ell: serialized.ell,
             max_aggregation: serialized.max_aggregation,
-            dlog_table: Self::build_dlog_table(G, serialized.ell, serialized.max_aggregation, 0),
+            dlog_extra_bits: serialized.dlog_extra_bits,
+            dlog_table: Self::build_dlog_table(
+                G,
+                serialized.ell,
+                serialized.max_aggregation,
+                serialized.dlog_extra_bits,
+            ),
             G2_table: BatchMulPreprocessing::new(
                 serialized.G_2.into(),
                 serialized.max_num_shares as usize,
@@ -251,6 +276,7 @@ impl<E: Pairing> PublicParameters<E> {
         let pp_elgamal = chunked_elgamal_pp::PublicParameters::new(max_num_shares);
         let G = *pp_elgamal.message_base();
         let G_2 = g2.unwrap_or_else(|| hashing::unsafe_hash_to_affine(b"G_2", DST));
+        const DLOG_EXTRA_BITS: u64 = 6;
         let pp = Self {
             max_num_shares,
             pp_elgamal,
@@ -264,7 +290,8 @@ impl<E: Pairing> PublicParameters<E> {
             G_2,
             ell,
             max_aggregation,
-            dlog_table: Self::build_dlog_table(G.into(), ell, max_aggregation, 6),
+            dlog_extra_bits: DLOG_EXTRA_BITS,
+            dlog_table: Self::build_dlog_table(G.into(), ell, max_aggregation, DLOG_EXTRA_BITS),
             G2_table: BatchMulPreprocessing::new(G_2.into(), max_num_shares as usize),
             powers_of_radix: compute_powers_of_radix::<E>(ell),
         };

@@ -206,12 +206,19 @@ pub fn dlog_vec_batched_with_batch_size<C: CurveGroup>(
     let mut buf = vec![0u8; byte_size];
 
     for chunk_start in (0..n).step_by(batch_size) {
+        // Only process targets not yet solved (avoids redundant work and keeps batch smaller).
+        let unsolved: Vec<usize> = (0..v).filter(|&i| result[i].is_none()).collect();
+        if unsolved.is_empty() {
+            break;
+        }
+
         let actual_batch = (n - chunk_start).min(batch_size as u64) as usize;
         batch.clear();
 
-        // Append giant-step points for each target in order (target 0, then 1, …)
-        for H in H_vec {
-            let mut gamma = *H + G_neg_m * C::ScalarField::from(chunk_start);
+        // Append giant-step points only for unsolved targets (target 0, then 1, … within unsolved).
+        for &target_idx in &unsolved {
+            let H = H_vec[target_idx];
+            let mut gamma = H + G_neg_m * C::ScalarField::from(chunk_start);
             for _ in 0..actual_batch {
                 batch.push(gamma);
                 gamma += G_neg_m;
@@ -219,13 +226,16 @@ pub fn dlog_vec_batched_with_batch_size<C: CurveGroup>(
         }
 
         let normalized = C::normalize_batch(&batch);
-        // normalized[idx] corresponds to target (idx / actual_batch), step (idx % actual_batch)
-        for (target_idx, res) in result.iter_mut().enumerate() {
+        // normalized[idx] corresponds to unsolved target (idx / actual_batch), step (idx % actual_batch)
+        for (batch_idx, &result_idx) in unsolved.iter().enumerate() {
             for j in 0..actual_batch {
-                let idx = target_idx * actual_batch + j;
+                let idx = batch_idx * actual_batch + j;
                 normalized[idx].serialize_compressed(&mut buf[..]).unwrap();
                 if let Some(&baby_j) = baby_table.get(&buf[..]) {
-                    *res = Some((chunk_start + j as u64) * m + baby_j);
+                    // Only assign if not already solved (avoids overwriting with a spurious match).
+                    if result[result_idx].is_none() {
+                        result[result_idx] = Some((chunk_start + j as u64) * m + baby_j);
+                    }
                 }
             }
         }
