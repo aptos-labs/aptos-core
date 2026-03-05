@@ -140,6 +140,10 @@ name = "hash"
 harness = false
 
 [[bench]]
+name = "hash_pair"
+harness = false
+
+[[bench]]
 name = "noise"
 harness = false
 
