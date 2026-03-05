@@ -804,13 +804,9 @@ pub fn batch_pairing_for_verify_generalized<
     );
 
     let r_sum_ys = prover_commitment.1;
-    anyhow::ensure!(
-        hom.apply(&EvalPair {
-            y_rev: y_rev.to_vec(),
-            y_hid: sigma_proof.z.hidden_evals.clone(),
-        }) == r_sum_ys + c_sigma * phi_y, // TODO: isn't this duplicate with the sigma protocol code?
-        "sigma protocol scalar check (φ(y^rev, z) = r_φ + c·φ(y)) failed"
-    );
+    full_hom
+        .hom2
+        .verify_with_challenge(&phi_y, &r_sum_ys, c_sigma, &sigma_proof.z, None, rng)?;
 
     let (_, powers_of_beta) = full_hom.hom1.compute_verifier_challenges(
         &statement_curve_for_merge,
