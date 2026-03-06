@@ -221,6 +221,9 @@ pub enum Payload {
         ProofWithData,
         PayloadExecutionLimit,
     ),
+    /// A sequence of payloads whose transaction ordering must be preserved.
+    /// Used by proxy primary consensus to maintain per-proxy-block ordering.
+    OrderedPayloads(Vec<Payload>),
 }
 
 impl Payload {
@@ -265,6 +268,17 @@ impl Payload {
                     }),
                 )
             },
+            Payload::OrderedPayloads(payloads) => Payload::OrderedPayloads(
+                payloads
+                    .into_iter()
+                    .map(|p| {
+                        p.transform_to_quorum_store_v2(
+                            max_txns_to_execute,
+                            block_gas_limit_override,
+                        )
+                    })
+                    .collect(),
+            ),
         }
     }
 
@@ -298,6 +312,7 @@ impl Payload {
                         .sum::<usize>()
             },
             Payload::OptQuorumStore(opt_qs_payload) => opt_qs_payload.num_txns(),
+            Payload::OrderedPayloads(payloads) => payloads.iter().map(|p| p.len()).sum(),
         }
     }
 
@@ -336,6 +351,9 @@ impl Payload {
                     .map(|(_, txns)| txns.len())
                     .sum::<usize>()) as u64)
                 .min(execution_limit.max_txns_to_execute().unwrap_or(u64::MAX)),
+            Payload::OrderedPayloads(payloads) => {
+                payloads.iter().map(|p| p.len_for_execution()).sum()
+            },
         }
     }
 
@@ -351,6 +369,7 @@ impl Payload {
                 proof_with_data.proofs.is_empty() && inline_batches.is_empty()
             },
             Payload::OptQuorumStore(opt_qs_payload) => opt_qs_payload.is_empty(),
+            Payload::OrderedPayloads(payloads) => payloads.iter().all(|p| p.is_empty()),
         }
     }
 
@@ -478,6 +497,14 @@ impl Payload {
                 let opt_qs3 = opt_qs1.extend(opt_qs2);
                 Payload::OptQuorumStore(opt_qs3)
             },
+            (Payload::OrderedPayloads(mut v), other) => {
+                v.push(other);
+                Payload::OrderedPayloads(v)
+            },
+            (existing, Payload::OrderedPayloads(mut v)) => {
+                v.insert(0, existing);
+                Payload::OrderedPayloads(v)
+            },
             (_, _) => unreachable!(),
         }
     }
@@ -511,6 +538,7 @@ impl Payload {
                         .sum::<usize>()
             },
             Payload::OptQuorumStore(opt_qs_payload) => opt_qs_payload.num_bytes(),
+            Payload::OrderedPayloads(payloads) => payloads.iter().map(|p| p.size()).sum(),
         }
     }
 
@@ -622,6 +650,12 @@ impl Payload {
                 Self::verify_opt_batches(verifier, p.opt_batches())?;
                 Ok(())
             },
+            (true, Payload::OrderedPayloads(payloads)) => {
+                for p in payloads {
+                    p.verify(verifier, proof_cache, quorum_store_enabled, opt_qs_v2_rx_enabled)?;
+                }
+                Ok(())
+            },
             (_, _) => Err(anyhow::anyhow!(
                 "Wrong payload type. Expected Payload::InQuorumStore {} got {} ",
                 quorum_store_enabled,
@@ -663,6 +697,11 @@ impl Payload {
             Payload::OptQuorumStore(opt_quorum_store_payload) => {
                 opt_quorum_store_payload.check_epoch(epoch)?;
             },
+            Payload::OrderedPayloads(payloads) => {
+                for p in payloads {
+                    p.verify_epoch(epoch)?;
+                }
+            },
         };
         Ok(())
     }
@@ -698,6 +737,9 @@ impl fmt::Display for Payload {
             },
             Payload::OptQuorumStore(opt_quorum_store) => {
                 write!(f, "{}", opt_quorum_store)
+            },
+            Payload::OrderedPayloads(payloads) => {
+                write!(f, "OrderedPayloads({} sub-payloads, {} txns)", payloads.len(), self.len())
             },
         }
     }
@@ -830,6 +872,14 @@ impl From<&Vec<&Payload>> for PayloadFilter {
                         }
                         for proof in &p.proof_with_data().batch_summary {
                             exclude_batches.insert(proof.info().clone());
+                        }
+                    },
+                    Payload::OrderedPayloads(payloads) => {
+                        let sub_refs: Vec<&Payload> = payloads.iter().collect();
+                        if let PayloadFilter::InQuorumStore(sub_batches) =
+                            PayloadFilter::from(&sub_refs)
+                        {
+                            exclude_batches.extend(sub_batches);
                         }
                     },
                 }

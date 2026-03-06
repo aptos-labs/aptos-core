@@ -4,7 +4,7 @@
 #![allow(clippy::unwrap_used)]
 
 use crate::{
-    block_storage::tracing::{observe_block, BlockStage},
+    block_storage::tracing::{observe_block_with_type, BlockStage},
     quorum_store,
 };
 use aptos_consensus_types::{block::Block, pipelined_block::PipelinedBlock};
@@ -67,10 +67,11 @@ pub static RAND_BLOCK: Lazy<IntCounterVec> = Lazy::new(|| {
 });
 
 /// Counts the total number of errors
-pub static ERROR_COUNT: Lazy<IntGauge> = Lazy::new(|| {
-    register_int_gauge!(
+pub static ERROR_COUNT: Lazy<IntGaugeVec> = Lazy::new(|| {
+    register_int_gauge_vec!(
         "aptos_consensus_error_count",
-        "Total number of errors in main loop"
+        "Total number of errors in main loop",
+        &["consensus_type"]
     )
     .unwrap()
 });
@@ -667,8 +668,8 @@ pub static AGGREGATED_ROUND_TIMEOUT_REASON_MISSING_AUTHORS: Lazy<IntCounterVec> 
 /// This count is different from `TIMEOUT_ROUNDS_COUNT`, because not every time a node has
 /// a timeout there is an ultimate decision to move to the next round (it might take multiple
 /// timeouts to get the timeout certificate).
-pub static TIMEOUT_COUNT: Lazy<IntCounter> = Lazy::new(|| {
-    register_int_counter!("aptos_consensus_timeout_count", "Count the number of timeouts a node experienced since last restart (close to 0 in happy path).").unwrap()
+pub static TIMEOUT_COUNT: Lazy<IntCounterVec> = Lazy::new(|| {
+    register_int_counter_vec!("aptos_consensus_timeout_count", "Count the number of timeouts a node experienced since last restart (close to 0 in happy path).", &["consensus_type"]).unwrap()
 });
 
 /// The timeout of the current round.
@@ -899,6 +900,17 @@ pub static BLOCK_TRACING: Lazy<HistogramVec> = Lazy::new(|| {
         "aptos_consensus_block_tracing",
         "Histogram for different stages of a block",
         &["stage"],
+        TRACING_BUCKETS.to_vec()
+    )
+    .unwrap()
+});
+
+/// Traces block movement throughout the node, tagged by consensus type (proxy/primary)
+pub static BLOCK_TRACING_BY_CONSENSUS_TYPE: Lazy<HistogramVec> = Lazy::new(|| {
+    register_histogram_vec!(
+        "aptos_consensus_block_tracing_by_consensus_type",
+        "Histogram for different stages of a block, tagged by consensus type",
+        &["stage", "consensus_type"],
         TRACING_BUCKETS.to_vec()
     )
     .unwrap()
@@ -1321,13 +1333,13 @@ pub static FETCH_COMMIT_HISTORY_DURATION: Lazy<DurationHistogram> = Lazy::new(||
     )
 });
 
-pub fn update_counters_for_block(block: &Block) {
-    observe_block(block.timestamp_usecs(), BlockStage::COMMITTED);
+pub fn update_counters_for_block(block: &Block, consensus_type: &'static str) {
+    observe_block_with_type(block.timestamp_usecs(), BlockStage::COMMITTED, consensus_type);
     NUM_BYTES_PER_BLOCK.observe(block.payload().map_or(0, |payload| payload.size()) as f64);
     COMMITTED_BLOCKS_COUNT.inc();
     LAST_COMMITTED_ROUND.set(block.round() as i64);
     if block.is_opt_block() {
-        observe_block(block.timestamp_usecs(), BlockStage::COMMITTED_OPT_BLOCK);
+        observe_block_with_type(block.timestamp_usecs(), BlockStage::COMMITTED_OPT_BLOCK, consensus_type);
         COMMITTED_OPT_BLOCKS_COUNT.inc();
         LAST_COMMITTED_OPT_BLOCK_ROUND.set(block.round() as i64);
     }
@@ -1346,13 +1358,17 @@ pub fn update_counters_for_compute_result(compute_result: &StateComputeResult) {
     let txn_status = compute_result.compute_status_for_input_txns();
     LAST_COMMITTED_VERSION.set(compute_result.last_version_or_0() as i64);
     NUM_TXNS_PER_BLOCK.observe(txn_status.len() as f64);
+    let mut dup_count = 0u64;
+    let mut seqnum_too_new_count = 0u64;
     for status in txn_status.iter() {
         let commit_status = match status {
             TransactionStatus::Keep(_) => TXN_COMMIT_SUCCESS_LABEL,
             TransactionStatus::Discard(reason) => {
                 if *reason == DiscardedVMStatus::SEQUENCE_NUMBER_TOO_NEW {
+                    seqnum_too_new_count += 1;
                     TXN_COMMIT_SEQNUM_TOO_NEW_LABEL
                 } else if *reason == DiscardedVMStatus::SEQUENCE_NUMBER_TOO_OLD {
+                    dup_count += 1;
                     TXN_COMMIT_FAILED_DUPLICATE_LABEL
                 } else if *reason == DiscardedVMStatus::TRANSACTION_EXPIRED {
                     TXN_COMMIT_FAILED_EXPIRED_LABEL
@@ -1370,12 +1386,24 @@ pub fn update_counters_for_compute_result(compute_result: &StateComputeResult) {
             .with_label_values(&[commit_status])
             .inc();
     }
+    // [proxy-debug] Log per-block duplicate/seqnum stats when non-zero.
+    if dup_count > 0 || seqnum_too_new_count > 0 {
+        warn!(
+            "[proxy-debug] Block execution: total_txns={}, failed_duplicate={}, seqnum_too_new={}",
+            txn_status.len(),
+            dup_count,
+            seqnum_too_new_count,
+        );
+    }
 }
 
 /// Update various counters for committed blocks
-pub fn update_counters_for_committed_blocks(blocks_to_commit: &[Arc<PipelinedBlock>]) {
+pub fn update_counters_for_committed_blocks(
+    blocks_to_commit: &[Arc<PipelinedBlock>],
+    consensus_type: &'static str,
+) {
     for block in blocks_to_commit {
-        update_counters_for_block(block.block());
+        update_counters_for_block(block.block(), consensus_type);
         update_counters_for_compute_result(&block.compute_result());
     }
 }
@@ -1466,4 +1494,13 @@ pub static OPTQS_LAST_CONSECUTIVE_SUCCESS_COUNT: Lazy<Histogram> = Lazy::new(|| 
         "aptos_optqs_last_consecutive_successes",
         "The number of last consecutive successes capped at window length",
     )
+});
+
+/// Number of ordered proxy block batches successfully verified by primary consensus.
+pub static PROXY_BLOCKS_VERIFIED_BY_PRIMARY: Lazy<IntCounter> = Lazy::new(|| {
+    register_int_counter!(
+        "aptos_consensus_proxy_blocks_verified_by_primary",
+        "Number of ordered proxy block batches verified by primary consensus"
+    )
+    .unwrap()
 });

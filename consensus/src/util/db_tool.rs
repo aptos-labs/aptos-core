@@ -148,6 +148,9 @@ pub fn extract_txns_from_block<'a>(
                 );
                 Ok(all_txns)
             },
+            Payload::OrderedPayloads(_) => {
+                bail!("OrderedPayloads is not supported in db_tool.");
+            },
         },
         None => Ok(vec![]),
     }

@@ -745,6 +745,11 @@ impl BlockTransactionPayload {
                 // Verify the transaction limit
                 self.verify_transaction_limit(p.max_txns_to_execute())?;
             },
+            Payload::OrderedPayloads(payloads) => {
+                for sub in payloads {
+                    self.verify_against_ordered_payload(sub)?;
+                }
+            },
         }
 
         Ok(())

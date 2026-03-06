@@ -5,6 +5,7 @@ use crate::{
     common::{Author, Payload, Round},
     quorum_cert::QuorumCert,
 };
+use aptos_crypto::HashValue;
 use aptos_types::validator_txn::ValidatorTransaction;
 use serde::{Deserialize, Serialize};
 
@@ -19,30 +20,39 @@ pub enum OptBlockBody {
         // QC of the grandparent block
         grandparent_qc: QuorumCert,
     },
+    /// Proxy optimistic block — pure BFT, no primary consensus linkage fields.
+    ProxyV0 {
+        validator_txns: Vec<ValidatorTransaction>,
+        payload: Payload,
+        author: Author,
+        grandparent_qc: QuorumCert,
+    },
 }
 
 impl OptBlockBody {
     pub fn author(&self) -> &Author {
         match self {
-            OptBlockBody::V0 { author, .. } => author,
+            OptBlockBody::V0 { author, .. } | OptBlockBody::ProxyV0 { author, .. } => author,
         }
     }
 
     pub fn validator_txns(&self) -> Option<&Vec<ValidatorTransaction>> {
         match self {
-            OptBlockBody::V0 { validator_txns, .. } => Some(validator_txns),
+            OptBlockBody::V0 { validator_txns, .. }
+            | OptBlockBody::ProxyV0 { validator_txns, .. } => Some(validator_txns),
         }
     }
 
     pub fn payload(&self) -> &Payload {
         match self {
-            OptBlockBody::V0 { payload, .. } => payload,
+            OptBlockBody::V0 { payload, .. } | OptBlockBody::ProxyV0 { payload, .. } => payload,
         }
     }
 
     pub fn grandparent_qc(&self) -> &QuorumCert {
         match self {
-            OptBlockBody::V0 { grandparent_qc, .. } => grandparent_qc,
+            OptBlockBody::V0 { grandparent_qc, .. }
+            | OptBlockBody::ProxyV0 { grandparent_qc, .. } => grandparent_qc,
         }
     }
 }
@@ -60,30 +70,73 @@ pub enum ProposalExt {
         /// immediately preceeding rounds that didn't produce a successful block.
         failed_authors: Vec<(Round, Author)>,
     },
+    /// Proxy regular block — pure BFT, no primary consensus linkage fields.
+    ProxyV0 {
+        validator_txns: Vec<ValidatorTransaction>,
+        payload: Payload,
+        author: Author,
+        failed_authors: Vec<(Round, Author)>,
+    },
+    /// Proxy aggregated block — used by primary to aggregate proxy blocks.
+    /// Contains metadata linking back to the proxy block range that was aggregated.
+    ProxyAggregatedV0 {
+        validator_txns: Vec<ValidatorTransaction>,
+        payload: Payload,
+        author: Author,
+        failed_authors: Vec<(Round, Author)>,
+        /// Round of the last proxy block included in this aggregation.
+        last_proxy_round: Round,
+        /// Block ID of the last proxy block included in this aggregation.
+        last_proxy_block_id: HashValue,
+    },
 }
 
 impl ProposalExt {
     pub fn author(&self) -> &Author {
         match self {
-            ProposalExt::V0 { author, .. } => author,
+            ProposalExt::V0 { author, .. }
+            | ProposalExt::ProxyV0 { author, .. }
+            | ProposalExt::ProxyAggregatedV0 { author, .. } => author,
         }
     }
 
     pub fn failed_authors(&self) -> &Vec<(Round, Author)> {
         match self {
-            ProposalExt::V0 { failed_authors, .. } => failed_authors,
+            ProposalExt::V0 { failed_authors, .. }
+            | ProposalExt::ProxyV0 { failed_authors, .. }
+            | ProposalExt::ProxyAggregatedV0 { failed_authors, .. } => failed_authors,
         }
     }
 
     pub fn validator_txns(&self) -> Option<&Vec<ValidatorTransaction>> {
         match self {
-            ProposalExt::V0 { validator_txns, .. } => Some(validator_txns),
+            ProposalExt::V0 { validator_txns, .. }
+            | ProposalExt::ProxyV0 { validator_txns, .. }
+            | ProposalExt::ProxyAggregatedV0 { validator_txns, .. } => Some(validator_txns),
         }
     }
 
     pub fn payload(&self) -> Option<&Payload> {
         match self {
-            ProposalExt::V0 { payload, .. } => Some(payload),
+            ProposalExt::V0 { payload, .. }
+            | ProposalExt::ProxyV0 { payload, .. }
+            | ProposalExt::ProxyAggregatedV0 { payload, .. } => Some(payload),
+        }
+    }
+
+    pub fn last_proxy_round(&self) -> Option<Round> {
+        match self {
+            ProposalExt::ProxyAggregatedV0 { last_proxy_round, .. } => Some(*last_proxy_round),
+            _ => None,
+        }
+    }
+
+    pub fn last_proxy_block_id(&self) -> Option<HashValue> {
+        match self {
+            ProposalExt::ProxyAggregatedV0 { last_proxy_block_id, .. } => {
+                Some(*last_proxy_block_id)
+            },
+            _ => None,
         }
     }
 }

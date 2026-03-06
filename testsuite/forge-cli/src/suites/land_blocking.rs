@@ -1,7 +1,7 @@
 // Copyright (c) Aptos Foundation
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
-use super::ungrouped::mixed_compatible_emit_job;
+use super::{proxy::get_proxy_test, ungrouped::mixed_compatible_emit_job};
 use crate::{suites::realistic_environment::realistic_env_max_load_test, TestCommand};
 use aptos_forge::{success_criteria::SuccessCriteria, ForgeConfig};
 use aptos_testcases::{
@@ -17,10 +17,11 @@ pub(crate) fn get_land_blocking_test(
 ) -> Option<ForgeConfig> {
     let test = match test_name {
         "land_blocking" | "realistic_env_max_load" => {
-            realistic_env_max_load_test(duration, test_cmd, 7, 5)
+            return get_proxy_test("proxy_primary_test");
         },
         "compat" => compat(),
         "framework_upgrade" => framework_upgrade(),
+        "proxy_primary_test" => return get_proxy_test("proxy_primary_test"),
         _ => return None, // The test name does not match a land-blocking test
     };
     Some(test)

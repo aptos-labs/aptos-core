@@ -276,4 +276,49 @@ mod test {
         let loaded_config = OverrideNodeConfig::load_config(temp_file.as_path()).unwrap();
         assert_eq!(override_config, loaded_config);
     }
+
+    #[test]
+    fn test_override_node_config_enable_proxy_consensus() {
+        // Verify that setting enable_proxy_consensus = true produces the correct yaml diff
+        // and that loading the yaml restores the value correctly
+        let mut override_config =
+            OverrideNodeConfig::new(NodeConfig::default(), NodeConfig::default());
+
+        // Verify default is false
+        assert!(!override_config.override_config().consensus.enable_proxy_consensus);
+
+        // Set to true
+        let config = override_config.override_config_mut();
+        config.consensus.enable_proxy_consensus = true;
+
+        // Verify yaml diff contains the override
+        let diff_yaml = override_config.get_yaml().unwrap();
+        let expected_yaml: serde_yaml::Value = serde_yaml::from_str(
+            r#"
+            consensus:
+                enable_proxy_consensus: true
+            "#,
+        )
+        .unwrap();
+        assert_eq!(diff_yaml, expected_yaml);
+
+        // Verify save/load roundtrip preserves the value
+        let temp_file = temp_dir().join("proxy_config.yaml");
+        override_config.save_config(temp_file.as_path()).unwrap();
+
+        // Verify the yaml file content
+        let yaml_content = std::fs::read_to_string(&temp_file).unwrap();
+        assert!(
+            yaml_content.contains("enable_proxy_consensus: true"),
+            "yaml content should contain enable_proxy_consensus: true, got: {}",
+            yaml_content
+        );
+
+        // Load and verify
+        let loaded_config = OverrideNodeConfig::load_config(temp_file.as_path()).unwrap();
+        assert!(
+            loaded_config.override_config().consensus.enable_proxy_consensus,
+            "loaded config should have enable_proxy_consensus = true"
+        );
+    }
 }

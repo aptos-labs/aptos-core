@@ -5,6 +5,7 @@ use crate::{
     common::{Author, Payload, Round},
     opt_block_data::OptBlockData,
     proposal_ext::{OptBlockBody, ProposalExt},
+    proxy_block_data::{OptProxyBlockBody, OptProxyBlockData},
     quorum_cert::QuorumCert,
     vote_data::VoteData,
 };
@@ -220,6 +221,37 @@ impl BlockData {
         matches!(self.block_type, BlockType::OptimisticProposal { .. })
     }
 
+    pub fn is_proxy_block(&self) -> bool {
+        match &self.block_type {
+            BlockType::ProposalExt(ProposalExt::ProxyV0 { .. }) => true,
+            BlockType::OptimisticProposal(OptBlockBody::ProxyV0 { .. }) => true,
+            _ => false,
+        }
+    }
+
+    pub fn is_proxy_aggregated(&self) -> bool {
+        matches!(
+            &self.block_type,
+            BlockType::ProposalExt(ProposalExt::ProxyAggregatedV0 { .. })
+        )
+    }
+
+    /// Returns the last_proxy_round for proxy aggregated blocks.
+    pub fn last_proxy_round(&self) -> Option<Round> {
+        match &self.block_type {
+            BlockType::ProposalExt(p) => p.last_proxy_round(),
+            _ => None,
+        }
+    }
+
+    /// Returns the last_proxy_block_id for proxy aggregated blocks.
+    pub fn last_proxy_block_id(&self) -> Option<HashValue> {
+        match &self.block_type {
+            BlockType::ProposalExt(p) => p.last_proxy_block_id(),
+            _ => None,
+        }
+    }
+
     /// the list of consecutive proposers from the immediately preceeding
     /// rounds that didn't produce a successful block
     pub fn failed_authors(&self) -> Option<&Vec<(Round, Author)>> {
@@ -415,6 +447,95 @@ impl BlockData {
             timestamp_usecs,
             quorum_cert,
             block_type: BlockType::OptimisticProposal(proposal_body),
+        }
+    }
+
+    /// Returns an instance of BlockData by converting the OptProxyBlockData to BlockData
+    /// and adding the parent QC. Creates an OptimisticProposal with OptBlockBody::ProxyV0.
+    pub fn new_from_opt_proxy(
+        opt_proxy_block_data: OptProxyBlockData,
+        quorum_cert: QuorumCert,
+    ) -> Self {
+        let OptProxyBlockData {
+            epoch,
+            round,
+            timestamp_usecs,
+            block_body,
+            ..
+        } = opt_proxy_block_data;
+        let OptProxyBlockBody::V0 {
+            validator_txns,
+            payload,
+            author,
+            grandparent_qc,
+        } = block_body;
+        Self {
+            epoch,
+            round,
+            timestamp_usecs,
+            quorum_cert,
+            block_type: BlockType::OptimisticProposal(OptBlockBody::ProxyV0 {
+                validator_txns,
+                payload,
+                author,
+                grandparent_qc,
+            }),
+        }
+    }
+
+    /// Creates a new proxy BlockData directly (not from OptProxyBlockData).
+    /// This is used when creating proxy block proposals with the full parent QC available.
+    /// Creates a ProposalExt::ProxyV0 block type.
+    pub fn new_from_proxy(
+        epoch: u64,
+        round: Round,
+        timestamp_usecs: u64,
+        quorum_cert: QuorumCert,
+        validator_txns: Vec<ValidatorTransaction>,
+        payload: Payload,
+        author: Author,
+        failed_authors: Vec<(Round, Author)>,
+    ) -> Self {
+        Self {
+            epoch,
+            round,
+            timestamp_usecs,
+            quorum_cert,
+            block_type: BlockType::ProposalExt(ProposalExt::ProxyV0 {
+                validator_txns,
+                payload,
+                author,
+                failed_authors,
+            }),
+        }
+    }
+
+    /// Creates a new proxy aggregated BlockData for primary blocks that aggregate proxy blocks.
+    /// Contains metadata linking back to the proxy block range that was aggregated.
+    pub fn new_proxy_aggregated(
+        validator_txns: Vec<ValidatorTransaction>,
+        payload: Payload,
+        author: Author,
+        failed_authors: Vec<(Round, Author)>,
+        round: Round,
+        timestamp_usecs: u64,
+        quorum_cert: QuorumCert,
+        last_proxy_round: Round,
+        last_proxy_block_id: HashValue,
+    ) -> Self {
+        Self {
+            epoch: quorum_cert.certified_block().epoch(),
+            round,
+            timestamp_usecs,
+            quorum_cert,
+            block_type: BlockType::ProposalExt(ProposalExt::ProxyAggregatedV0 {
+                validator_txns,
+                payload,
+                author,
+                failed_authors,
+                last_proxy_round,
+                last_proxy_block_id,
+            }),
         }
     }
 

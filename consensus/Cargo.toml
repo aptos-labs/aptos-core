@@ -37,6 +37,7 @@ aptos-mempool = { workspace = true }
 aptos-metrics-core = { workspace = true }
 aptos-network = { workspace = true }
 aptos-peer-monitoring-service-types = { workspace = true }
+aptos-proxy-primary = { workspace = true }
 aptos-reliable-broadcast = { workspace = true }
 aptos-resource-viewer = { workspace = true }
 aptos-runtimes = { workspace = true }

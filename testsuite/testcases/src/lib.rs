@@ -15,6 +15,7 @@ pub mod network_loss_test;
 pub mod network_partition_test;
 pub mod partial_nodes_down_test;
 pub mod performance_test;
+pub mod proxy_primary_test;
 pub mod public_fullnode_performance;
 pub mod quorum_store_onchain_enable_test;
 pub mod reconfiguration_test;

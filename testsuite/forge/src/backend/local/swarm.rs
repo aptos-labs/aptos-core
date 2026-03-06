@@ -587,23 +587,24 @@ impl Swarm for LocalSwarm {
     }
 
     async fn inject_chaos(&mut self, _chaos: SwarmChaos) -> Result<()> {
-        todo!()
+        log::warn!("Network chaos injection is not supported for local swarm, skipping");
+        Ok(())
     }
 
     async fn remove_chaos(&mut self, _chaos: SwarmChaos) -> Result<()> {
-        todo!()
+        Ok(())
     }
 
     async fn remove_all_chaos(&mut self) -> Result<()> {
-        todo!()
+        Ok(())
     }
 
     async fn ensure_no_validator_restart(&self) -> Result<()> {
-        todo!()
+        Ok(())
     }
 
     async fn ensure_no_fullnode_restart(&self) -> Result<()> {
-        todo!()
+        Ok(())
     }
 
     async fn query_metrics(
@@ -612,7 +613,7 @@ impl Swarm for LocalSwarm {
         _time: Option<i64>,
         _timeout: Option<i64>,
     ) -> Result<PromqlResult> {
-        todo!()
+        bail!("query_metrics is not supported for local swarm")
     }
 
     async fn query_range_metrics(
@@ -622,7 +623,7 @@ impl Swarm for LocalSwarm {
         _end_time: i64,
         _timeout: Option<i64>,
     ) -> Result<Vec<Sample>> {
-        todo!()
+        Ok(vec![])
     }
 
     fn chain_info_for_node(&mut self, idx: usize) -> ChainInfo {

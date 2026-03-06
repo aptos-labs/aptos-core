@@ -1126,7 +1126,7 @@ impl PipelineBuilder {
         notify_state_sync_fut.await?;
 
         tracker.start_working();
-        update_counters_for_block(&block);
+        update_counters_for_block(&block, "primary");
         update_counters_for_compute_result(&compute_result);
 
         let payload = block.payload().cloned();

@@ -196,7 +196,9 @@ impl RoundState {
         // Prometheus if some conditions never happen. Invoking get() function enforces creation.
         counters::QC_ROUNDS_COUNT.get();
         counters::TIMEOUT_ROUNDS_COUNT.get();
-        counters::TIMEOUT_COUNT.get();
+        // Force lazy initialization of the TIMEOUT_COUNT counter vec
+        counters::TIMEOUT_COUNT.with_label_values(&["primary"]);
+        counters::TIMEOUT_COUNT.with_label_values(&["proxy"]);
 
         let pending_votes = PendingVotes::new();
         Self {
@@ -230,12 +232,12 @@ impl RoundState {
 
     /// In case the local timeout corresponds to the current round, reset the timeout and
     /// return true. Otherwise ignore and return false.
-    pub fn process_local_timeout(&mut self, round: Round) -> bool {
+    pub fn process_local_timeout(&mut self, round: Round, consensus_type: &str) -> bool {
         if round != self.current_round {
             return false;
         }
-        warn!(round = round, "Local timeout");
-        counters::TIMEOUT_COUNT.inc();
+        warn!(consensus_type = consensus_type, round = round, "Local timeout");
+        counters::TIMEOUT_COUNT.with_label_values(&[consensus_type]).inc();
         self.setup_timeout(1);
         true
     }

@@ -209,16 +209,28 @@ pub enum OnChainConsensusConfig {
         // Whether to check if we can skip generating randomness for blocks
         rand_check_enabled: bool,
     },
+    V6 {
+        alg: ConsensusAlgorithmConfig,
+        vtxn: ValidatorTxnConfig,
+        // Execution pool block window
+        window_size: Option<u64>,
+        // Whether to check if we can skip generating randomness for blocks
+        rand_check_enabled: bool,
+        // Indices into the ordered validator set identifying proxy validators.
+        // Empty means proxy consensus is disabled.
+        proxy_validator_indices: Vec<u16>,
+    },
 }
 
 /// The public interface that exposes all values with safe fallback.
 impl OnChainConsensusConfig {
     pub fn default_for_genesis() -> Self {
-        Self::V5 {
+        Self::V6 {
             alg: ConsensusAlgorithmConfig::default_for_genesis(),
             vtxn: ValidatorTxnConfig::default_for_genesis(),
             window_size: DEFAULT_WINDOW_SIZE,
             rand_check_enabled: true,
+            proxy_validator_indices: vec![],
         }
     }
 
@@ -226,9 +238,10 @@ impl OnChainConsensusConfig {
     pub fn leader_reputation_exclude_round(&self) -> u64 {
         match self {
             Self::V1(config) | Self::V2(config) => config.exclude_round,
-            Self::V3 { alg, .. } | Self::V4 { alg, .. } | Self::V5 { alg, .. } => {
-                alg.leader_reputation_exclude_round()
-            },
+            Self::V3 { alg, .. }
+            | Self::V4 { alg, .. }
+            | Self::V5 { alg, .. }
+            | Self::V6 { alg, .. } => alg.leader_reputation_exclude_round(),
         }
     }
 
@@ -242,9 +255,10 @@ impl OnChainConsensusConfig {
     pub fn max_failed_authors_to_store(&self) -> usize {
         match self {
             Self::V1(config) | Self::V2(config) => config.max_failed_authors_to_store,
-            Self::V3 { alg, .. } | Self::V4 { alg, .. } | Self::V5 { alg, .. } => {
-                alg.max_failed_authors_to_store()
-            },
+            Self::V3 { alg, .. }
+            | Self::V4 { alg, .. }
+            | Self::V5 { alg, .. }
+            | Self::V6 { alg, .. } => alg.max_failed_authors_to_store(),
         }
     }
 
@@ -252,9 +266,10 @@ impl OnChainConsensusConfig {
     pub fn proposer_election_type(&self) -> &ProposerElectionType {
         match self {
             Self::V1(config) | Self::V2(config) => &config.proposer_election_type,
-            Self::V3 { alg, .. } | Self::V4 { alg, .. } | Self::V5 { alg, .. } => {
-                alg.proposer_election_type()
-            },
+            Self::V3 { alg, .. }
+            | Self::V4 { alg, .. }
+            | Self::V5 { alg, .. }
+            | Self::V6 { alg, .. } => alg.proposer_election_type(),
         }
     }
 
@@ -262,9 +277,10 @@ impl OnChainConsensusConfig {
         match self {
             Self::V1(_config) => false,
             Self::V2(_) => true,
-            Self::V3 { alg, .. } | Self::V4 { alg, .. } | Self::V5 { alg, .. } => {
-                alg.quorum_store_enabled()
-            },
+            Self::V3 { alg, .. }
+            | Self::V4 { alg, .. }
+            | Self::V5 { alg, .. }
+            | Self::V6 { alg, .. } => alg.quorum_store_enabled(),
         }
     }
 
@@ -272,9 +288,10 @@ impl OnChainConsensusConfig {
         match self {
             Self::V1(_config) => false,
             Self::V2(_) => false,
-            Self::V3 { alg, .. } | Self::V4 { alg, .. } | Self::V5 { alg, .. } => {
-                alg.order_vote_enabled()
-            },
+            Self::V3 { alg, .. }
+            | Self::V4 { alg, .. }
+            | Self::V5 { alg, .. }
+            | Self::V6 { alg, .. } => alg.order_vote_enabled(),
         }
     }
 
@@ -282,9 +299,10 @@ impl OnChainConsensusConfig {
         match self {
             Self::V1(_) => false,
             Self::V2(_) => false,
-            Self::V3 { alg, .. } | Self::V4 { alg, .. } | Self::V5 { alg, .. } => {
-                alg.is_dag_enabled()
-            },
+            Self::V3 { alg, .. }
+            | Self::V4 { alg, .. }
+            | Self::V5 { alg, .. }
+            | Self::V6 { alg, .. } => alg.is_dag_enabled(),
         }
     }
 
@@ -293,16 +311,20 @@ impl OnChainConsensusConfig {
             Self::V1(_) | Self::V2(_) => {
                 unreachable!("not a dag config")
             },
-            Self::V3 { alg, .. } | Self::V4 { alg, .. } | Self::V5 { alg, .. } => {
-                alg.unwrap_dag_config_v1()
-            },
+            Self::V3 { alg, .. }
+            | Self::V4 { alg, .. }
+            | Self::V5 { alg, .. }
+            | Self::V6 { alg, .. } => alg.unwrap_dag_config_v1(),
         }
     }
 
     pub fn effective_validator_txn_config(&self) -> ValidatorTxnConfig {
         match self {
             Self::V1(_) | Self::V2(_) => ValidatorTxnConfig::default_disabled(),
-            Self::V3 { vtxn, .. } | Self::V4 { vtxn, .. } | Self::V5 { vtxn, .. } => vtxn.clone(),
+            Self::V3 { vtxn, .. }
+            | Self::V4 { vtxn, .. }
+            | Self::V5 { vtxn, .. }
+            | Self::V6 { vtxn, .. } => vtxn.clone(),
         }
     }
 
@@ -315,7 +337,10 @@ impl OnChainConsensusConfig {
             Self::V1(_) | Self::V2(_) => {
                 // vtxn not supported. No-op.
             },
-            Self::V3 { vtxn, .. } | Self::V4 { vtxn, .. } | Self::V5 { vtxn, .. } => {
+            Self::V3 { vtxn, .. }
+            | Self::V4 { vtxn, .. }
+            | Self::V5 { vtxn, .. }
+            | Self::V6 { vtxn, .. } => {
                 *vtxn = ValidatorTxnConfig::V0;
             },
         }
@@ -372,6 +397,19 @@ impl OnChainConsensusConfig {
                 window_size,
                 rand_check_enabled: rand_check,
             },
+            Self::V6 {
+                alg,
+                vtxn: ValidatorTxnConfig::V0,
+                window_size,
+                rand_check_enabled: rand_check,
+                proxy_validator_indices,
+            } => Self::V6 {
+                alg,
+                vtxn: ValidatorTxnConfig::default_enabled(),
+                window_size,
+                rand_check_enabled: rand_check,
+                proxy_validator_indices,
+            },
             item @ Self::V3 {
                 vtxn: ValidatorTxnConfig::V1 { .. },
                 ..
@@ -384,6 +422,10 @@ impl OnChainConsensusConfig {
                 vtxn: ValidatorTxnConfig::V1 { .. },
                 ..
             } => item,
+            item @ Self::V6 {
+                vtxn: ValidatorTxnConfig::V1 { .. },
+                ..
+            } => item,
         };
         *self = new_self;
     }
@@ -391,7 +433,9 @@ impl OnChainConsensusConfig {
     pub fn window_size(&self) -> Option<u64> {
         match self {
             Self::V1(_) | Self::V2(_) | Self::V3 { .. } => None,
-            Self::V4 { window_size, .. } | Self::V5 { window_size, .. } => *window_size,
+            Self::V4 { window_size, .. }
+            | Self::V5 { window_size, .. }
+            | Self::V6 { window_size, .. } => *window_size,
         }
     }
 
@@ -399,6 +443,10 @@ impl OnChainConsensusConfig {
         match self {
             Self::V1(_) | Self::V2(_) | Self::V3 { .. } | Self::V4 { .. } => false,
             Self::V5 {
+                rand_check_enabled: rand_check,
+                ..
+            }
+            | Self::V6 {
                 rand_check_enabled: rand_check,
                 ..
             } => *rand_check,
@@ -409,12 +457,27 @@ impl OnChainConsensusConfig {
         match self {
             Self::V5 {
                 rand_check_enabled, ..
+            }
+            | Self::V6 {
+                rand_check_enabled, ..
             } => {
                 *rand_check_enabled = false;
             },
             _ => {
                 // rand_check not supported. No-op.
             },
+        }
+    }
+
+    /// Returns the proxy validator indices from the on-chain config.
+    /// Empty slice means proxy consensus is disabled.
+    pub fn proxy_validator_indices(&self) -> &[u16] {
+        match self {
+            Self::V6 {
+                proxy_validator_indices,
+                ..
+            } => proxy_validator_indices,
+            _ => &[],
         }
     }
 }

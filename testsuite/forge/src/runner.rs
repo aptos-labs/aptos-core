@@ -289,6 +289,7 @@ impl<'cfg, F: Factory> Forge<'cfg, F> {
                 self.tests.genesis_helm_config_fn.clone(),
                 self.tests.build_node_helm_config_fn(retain_debug_logs),
                 self.tests.existing_db_tag.clone(),
+                self.tests.validator_override_node_config_fn.clone(),
             ))?;
 
             // Run AptosTests

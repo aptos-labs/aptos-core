@@ -115,6 +115,7 @@ impl Factory for K8sFactory {
         genesis_config_fn: Option<GenesisConfigFn>,
         node_config_fn: Option<NodeConfigFn>,
         existing_db_tag: Option<String>,
+        _override_node_config_fn: Option<crate::OverrideNodeConfigFn>,
     ) -> Result<Box<dyn Swarm>> {
         let genesis_modules_path = match genesis_config {
             Some(config) => match config {

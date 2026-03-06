@@ -279,6 +279,33 @@ impl BlockRetrievalResponse {
             })
             .map(|_| ())
     }
+
+    /// Verify retrieved blocks using dual verifiers for proxy mode.
+    /// Uses `proxy_verifier` for block signatures/QC and `primary_verifier`
+    /// for any embedded primary consensus proofs (QC/TC from the full validator set).
+    pub fn verify_proxy(
+        &self,
+        retrieval_request: BlockRetrievalRequest,
+        proxy_verifier: &ValidatorVerifier,
+        primary_verifier: &ValidatorVerifier,
+    ) -> anyhow::Result<()> {
+        self.verify_inner(&retrieval_request)?;
+
+        self.blocks
+            .iter()
+            .try_fold(retrieval_request.block_id(), |expected_id, block| {
+                block.validate_proxy_signature(proxy_verifier, primary_verifier)?;
+                block.verify_well_formed()?;
+                ensure!(
+                    block.id() == expected_id,
+                    "blocks doesn't form a chain: expect {}, get {}",
+                    expected_id,
+                    block.id()
+                );
+                Ok(block.parent_id())
+            })
+            .map(|_| ())
+    }
 }
 
 impl fmt::Display for BlockRetrievalResponse {

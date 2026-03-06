@@ -51,7 +51,7 @@ async fn test_basic_timeout() {
         // Here we just test timeout send retry,
         // round for timeout is not changed as no timeout certificate was gathered at this point
         assert_eq!(1, round);
-        pm.process_local_timeout(round);
+        pm.process_local_timeout(round, "primary");
     }
 }
 

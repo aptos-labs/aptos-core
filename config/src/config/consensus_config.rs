@@ -101,6 +101,9 @@ pub struct ConsensusConfig {
     pub enable_round_timeout_msg: bool,
     pub enable_optimistic_proposal_rx: bool,
     pub enable_optimistic_proposal_tx: bool,
+    // Proxy consensus configuration
+    pub enable_proxy_consensus: bool,
+    pub proxy_consensus_config: ProxyConsensusConfig,
 }
 
 /// Deprecated
@@ -108,6 +111,87 @@ pub struct ConsensusConfig {
 pub enum QcAggregatorType {
     #[default]
     NoDelay,
+}
+
+/// Configuration for proxy consensus.
+#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
+#[serde(default, deny_unknown_fields)]
+pub struct ProxyConsensusConfig {
+    /// Round timeout for proxy consensus in milliseconds
+    pub round_initial_timeout_ms: u64,
+    /// Timeout backoff exponent base
+    pub round_timeout_backoff_exponent_base: f64,
+    /// Maximum backoff exponent
+    pub round_timeout_backoff_max_exponent: usize,
+    /// Target number of proxy blocks with transactions per primary round.
+    /// After this many proxy blocks carry real txns, subsequent blocks are empty.
+    #[serde(alias = "max_proxy_blocks_per_primary_round")]
+    pub target_proxy_blocks_per_primary_round: u64,
+    /// Maximum transactions per proxy block
+    pub max_proxy_block_txns: u64,
+    /// Maximum transactions per proxy block after filtering
+    pub max_proxy_block_txns_after_filtering: u64,
+    /// Maximum proxy block size in bytes
+    pub max_proxy_block_bytes: u64,
+    /// Pull validator txns every N proxy blocks. 0 = never pull vtxns.
+    pub vtxn_pull_interval: u64,
+    /// Backpressure tuning parameters for adaptive proxy throttling.
+    pub backpressure: ProxyBackpressureConfig,
+}
+
+impl Default for ProxyConsensusConfig {
+    fn default() -> Self {
+        Self {
+            // Proxy runs fast: 100ms initial timeout
+            round_initial_timeout_ms: 100,
+            round_timeout_backoff_exponent_base: 1.2,
+            round_timeout_backoff_max_exponent: 4,
+            // Target ~10 proxy blocks with txns per primary round
+            target_proxy_blocks_per_primary_round: 10,
+            // Match devnet primary consensus config limits. At steady state with
+            // 3k TPS / ~70 proxy blocks/s, each block averages ~43 txns (well
+            // under the 300 cap). Budget + backpressure prevent runaway aggregation.
+            max_proxy_block_txns: 300,
+            max_proxy_block_txns_after_filtering: 200,
+            max_proxy_block_bytes: 5 * 1024 * 1024,
+            vtxn_pull_interval: 10,                     // pull validator txns every 10th block
+            backpressure: ProxyBackpressureConfig::default(),
+        }
+    }
+}
+
+/// Backpressure configuration for proxy consensus adaptive throttling.
+///
+/// Controls how the proxy adjusts its throughput based on primary pipeline
+/// congestion via budget/max_txns reduction when the pipeline gap or pending
+/// batch count exceeds configured thresholds.
+#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
+#[serde(default, deny_unknown_fields)]
+pub struct ProxyBackpressureConfig {
+    /// Pipeline gap threshold for moderate congestion (reduce budget by 50%,
+    /// reduce per-block max_txns by 25%).
+    pub pipeline_moderate_gap: u64,
+    /// Pipeline gap threshold for heavy congestion (minimize budget to 1,
+    /// halve per-block max_txns).
+    pub pipeline_heavy_gap: u64,
+    /// Pending batches >= this → halve max_txns per block (moderate throttle).
+    pub batch_moderate_threshold: u64,
+    /// Pending batches >= this → quarter max_txns per block (heavy throttle).
+    pub batch_heavy_threshold: u64,
+}
+
+impl Default for ProxyBackpressureConfig {
+    fn default() -> Self {
+        Self {
+            // Gap thresholds must be high enough to avoid spurious throttling.
+            // In production, gap is 0-2. In debug builds, gap reaches 10-15 due
+            // to slow execution. These thresholds only fire in genuine emergencies.
+            pipeline_moderate_gap: 20,
+            pipeline_heavy_gap: 40,
+            batch_moderate_threshold: 20,
+            batch_heavy_threshold: 50,
+        }
+    }
 }
 
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
@@ -383,6 +467,8 @@ impl Default for ConsensusConfig {
             enable_round_timeout_msg: true,
             enable_optimistic_proposal_rx: true,
             enable_optimistic_proposal_tx: true,
+            enable_proxy_consensus: false,
+            proxy_consensus_config: ProxyConsensusConfig::default(),
         }
     }
 }

@@ -121,6 +121,7 @@ impl Block {
                 Payload::OptQuorumStore(opt_quorum_store_payload) => {
                     opt_quorum_store_payload.num_txns()
                 },
+                Payload::OrderedPayloads(_) => payload.len(),
             },
         }
     }
@@ -156,6 +157,7 @@ impl Block {
                         p.proof_with_data().num_bytes(),
                     ),
                 },
+                Payload::OrderedPayloads(_) => (0, 0, 0),
             },
         }
     }
@@ -416,6 +418,18 @@ impl Block {
         }
     }
 
+    pub fn new_from_opt_proxy(
+        opt_proxy_data: crate::proxy_block_data::OptProxyBlockData,
+        quorum_cert: QuorumCert,
+    ) -> Self {
+        let block_data = BlockData::new_from_opt_proxy(opt_proxy_data, quorum_cert);
+        Block {
+            id: block_data.hash(),
+            block_data,
+            signature: None,
+        }
+    }
+
     pub fn validator_txns(&self) -> Option<&Vec<ValidatorTransaction>> {
         self.block_data.validator_txns()
     }
@@ -423,6 +437,25 @@ impl Block {
     /// Verifies that the proposal and the QC are correctly signed.
     /// If this is the genesis block, we skip these checks.
     pub fn validate_signature(&self, validator: &ValidatorVerifier) -> anyhow::Result<()> {
+        self.validate_signature_impl(validator, validator)
+    }
+
+    /// Verifies a proxy block's signatures, using `proxy_verifier` for block signatures/QC
+    /// and `primary_verifier` for any embedded primary consensus proofs (QC/TC from the
+    /// full validator set).
+    pub fn validate_proxy_signature(
+        &self,
+        proxy_verifier: &ValidatorVerifier,
+        primary_verifier: &ValidatorVerifier,
+    ) -> anyhow::Result<()> {
+        self.validate_signature_impl(proxy_verifier, primary_verifier)
+    }
+
+    fn validate_signature_impl(
+        &self,
+        validator: &ValidatorVerifier,
+        _primary_proof_verifier: &ValidatorVerifier,
+    ) -> anyhow::Result<()> {
         match self.block_data.block_type() {
             BlockType::Genesis => bail!("We should not accept genesis from others"),
             BlockType::NilBlock { .. } => self.quorum_cert().verify(validator),

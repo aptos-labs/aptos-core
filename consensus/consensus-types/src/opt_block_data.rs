@@ -52,6 +52,30 @@ impl OptBlockData {
         }
     }
 
+    pub fn new_proxy(
+        validator_txns: Vec<ValidatorTransaction>,
+        payload: Payload,
+        author: Author,
+        epoch: u64,
+        round: Round,
+        timestamp_usecs: u64,
+        parent: BlockInfo,
+        grandparent_qc: QuorumCert,
+    ) -> Self {
+        Self {
+            epoch,
+            round,
+            timestamp_usecs,
+            parent,
+            block_body: OptBlockBody::ProxyV0 {
+                validator_txns,
+                payload,
+                author,
+                grandparent_qc,
+            },
+        }
+    }
+
     pub fn epoch(&self) -> u64 {
         self.epoch
     }
@@ -112,6 +136,7 @@ impl OptBlockData {
             self.timestamp_usecs() <= (current_ts.as_micros() as u64).saturating_add(TIMEBOUND),
             "Blocks must not be too far in the future"
         );
+
         Ok(())
     }
 }

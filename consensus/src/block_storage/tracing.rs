@@ -59,3 +59,21 @@ pub fn observe_block(timestamp: u64, stage: &'static str) {
             .observe(t.as_secs_f64());
     }
 }
+
+/// Record the time during each stage of a block, tagged by consensus type (proxy/primary).
+/// Also records to the untagged BLOCK_TRACING histogram for backward compatibility.
+pub fn observe_block_with_type(
+    timestamp: u64,
+    stage: &'static str,
+    consensus_type: &'static str,
+) {
+    if let Some(t) = duration_since_epoch().checked_sub(Duration::from_micros(timestamp)) {
+        let secs = t.as_secs_f64();
+        counters::BLOCK_TRACING
+            .with_label_values(&[stage])
+            .observe(secs);
+        counters::BLOCK_TRACING_BY_CONSENSUS_TYPE
+            .with_label_values(&[stage, consensus_type])
+            .observe(secs);
+    }
+}

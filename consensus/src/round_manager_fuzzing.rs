@@ -92,11 +92,13 @@ fn build_empty_store(
         Arc::new(DummyExecutionClient),
         10, // max pruned blocks in mem
         Arc::new(SimulatedTimeService::new()),
-        10,
+        Some(10),
         Arc::from(DirectMempoolPayloadManager::new()),
         false,
         DEFAULT_ENABLED_WINDOW_SIZE,
         Arc::new(Mutex::new(PendingBlocks::new())),
+        None,
+        "primary",
         None,
     ))
 }
@@ -224,6 +226,10 @@ fn create_node_for_fuzzing() -> RoundManager {
         None,
         Arc::new(MockPastProposalStatusTracker {}),
         opt_proposal_loopback_tx,
+        None, // proxy_event_tx
+        None, // proxy_hooks
+        None, // proxy_verifier
+        None, // vtxn_verifier
     )
 }
 

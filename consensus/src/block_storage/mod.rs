@@ -3,6 +3,7 @@
 
 use aptos_consensus_types::{
     pipelined_block::{ExecutionSummary, PipelinedBlock},
+    proof_of_store::BatchInfoExt,
     quorum_cert::QuorumCert,
     sync_info::SyncInfo,
     timeout_2chain::TwoChainTimeoutCertificate,
@@ -13,7 +14,7 @@ pub use block_store::{
     sync_manager::{BlockRetriever, NeedFetchResult},
     BlockStore,
 };
-use std::{sync::Arc, time::Duration};
+use std::{collections::HashSet, sync::Arc, time::Duration};
 
 mod block_store;
 mod block_tree;
@@ -73,4 +74,10 @@ pub trait BlockReader: Send + Sync {
     fn pipeline_pending_latency(&self, proposal_timestamp: Duration) -> Duration;
 
     fn get_recent_block_execution_times(&self, num_blocks: usize) -> Vec<ExecutionSummary>;
+
+    /// Returns batch infos from recently pruned proxy blocks whose mark_committed
+    /// may not yet have been processed by the QS coordinator.
+    fn committed_batch_infos(&self) -> HashSet<BatchInfoExt> {
+        HashSet::new()
+    }
 }

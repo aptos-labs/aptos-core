@@ -9,7 +9,7 @@ use crate::{
 use aptos_consensus_types::{
     common::{Payload, PayloadFilter, ProofWithData, TxnSummaryWithExpiration},
     payload::{OptQuorumStorePayload, PayloadExecutionLimit},
-    proof_of_store::{BatchInfoExt, ProofOfStore, ProofOfStoreMsg},
+    proof_of_store::{BatchInfoExt, ProofOfStore, ProofOfStoreMsg, TBatchInfo},
     request_response::{GetPayloadCommand, GetPayloadResponse},
     utils::PayloadTxnsSize,
 };
@@ -17,7 +17,7 @@ use aptos_logger::prelude::*;
 use aptos_types::PeerId;
 use futures::StreamExt;
 use futures_channel::mpsc::Receiver;
-use std::{cmp::min, collections::HashSet, sync::Arc, time::Duration};
+use std::{cmp::min, collections::{HashMap, HashSet}, sync::Arc, time::Duration};
 
 #[derive(Debug)]
 pub enum ProofManagerCommand {
@@ -184,6 +184,48 @@ impl ProofManager {
             };
         counters::NUM_INLINE_BATCHES.observe(inline_block.len() as f64);
         counters::NUM_INLINE_TXNS.observe(inline_block_size.count() as f64);
+
+        // [proxy-debug] Detect proof/opt partition overlap per author.
+        // If the same author has batches in both proof and opt partitions,
+        // execution order may be reversed (newer proof batches before older opt batches).
+        if !proof_block.is_empty() || !opt_batches.is_empty() {
+            let mut proof_authors: HashMap<PeerId, Vec<String>> = HashMap::new();
+            for proof in proof_block.iter() {
+                let info = proof.info();
+                proof_authors
+                    .entry(info.author())
+                    .or_default()
+                    .push(format!("{}", info.batch_id()));
+            }
+            let mut opt_authors: HashMap<PeerId, Vec<String>> = HashMap::new();
+            for batch in opt_batches.iter() {
+                opt_authors
+                    .entry(batch.author())
+                    .or_default()
+                    .push(format!("{}", batch.batch_id()));
+            }
+            let overlapping: Vec<_> = proof_authors
+                .keys()
+                .filter(|a| opt_authors.contains_key(a))
+                .collect();
+            if !overlapping.is_empty() {
+                for author in &overlapping {
+                    warn!(
+                        "[proxy-debug] Author {:?} split across proof/opt: proof_batch_ids={:?}, opt_batch_ids={:?}",
+                        author,
+                        proof_authors.get(author).unwrap(),
+                        opt_authors.get(author).unwrap(),
+                    );
+                }
+            }
+            info!(
+                "[proxy-debug] Payload: proof_batches={}, opt_batches={}, inline_batches={}, overlapping_authors={}",
+                proof_block.len(),
+                opt_batches.len(),
+                inline_block.len(),
+                overlapping.len(),
+            );
+        }
 
         let response = if let Some(ref params) = request.maybe_optqs_payload_pull_params {
             // Determine whether to use V2 payload based on the flag

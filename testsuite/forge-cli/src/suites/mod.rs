@@ -8,6 +8,7 @@ pub mod land_blocking;
 pub mod multi_region;
 pub mod netbench;
 pub mod pfn;
+pub mod proxy;
 pub mod realistic_environment;
 pub mod realistic_workloads;
 pub mod state_sync;

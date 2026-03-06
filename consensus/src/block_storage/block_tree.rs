@@ -552,6 +552,17 @@ impl BlockTree {
         self.path_from_root_to_block(block_id, self.ordered_root_id, self.ordered_root().round())
     }
 
+    /// Find the block ID with the highest round <= target_round that is still in the tree
+    /// between commit_root (exclusive) and ordered_root (inclusive).
+    /// Returns None if no such block exists.
+    pub(super) fn find_block_id_by_round(&self, target_round: Round) -> Option<HashValue> {
+        let commit_round = self.commit_root().round();
+        self.round_to_ids
+            .range(commit_round + 1..=target_round)
+            .next_back()
+            .map(|(_, id)| *id)
+    }
+
     pub(super) fn path_from_commit_root(
         &self,
         block_id: HashValue,
