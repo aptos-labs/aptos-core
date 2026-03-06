@@ -28,7 +28,7 @@ pub fn batch_store_for_test(memory_quota: usize) -> Arc<BatchStore> {
     let db = Arc::new(QuorumStoreDB::new(&tmp_dir));
     let (signers, _validator_verifier) = random_validator_verifier(4, None, false);
 
-    Arc::new(BatchStore::new(
+    BatchStore::new(
         10, // epoch
         false,
         10, // last committed round
@@ -38,7 +38,7 @@ pub fn batch_store_for_test(memory_quota: usize) -> Arc<BatchStore> {
         2001,         // batch quota
         signers[0].clone(),
         0,
-    ))
+    )
 }
 
 fn request_for_test(
@@ -298,7 +298,7 @@ fn test_batch_store_bootstrap_gc_expiry() {
         let db = Arc::new(QuorumStoreDB::new(&tmp_dir_path_clone));
         let (signers, _validator_verifier) = random_validator_verifier(4, None, false);
 
-        let store = Arc::new(BatchStore::new(
+        let store = BatchStore::new(
             10, // epoch
             false,
             10, // last committed round
@@ -308,7 +308,7 @@ fn test_batch_store_bootstrap_gc_expiry() {
             2001,         // batch quota
             signers[0].clone(),
             0,
-        ));
+        );
 
         let request_1 = request_for_test(&digest_1, 50, 20, Some(vec![]));
         // Should be stored in memory and DB.
@@ -321,7 +321,7 @@ fn test_batch_store_bootstrap_gc_expiry() {
         let db = Arc::new(QuorumStoreDB::new(&tmp_dir));
         let (signers, _validator_verifier) = random_validator_verifier(4, None, false);
 
-        let store = Arc::new(BatchStore::new(
+        let store = BatchStore::new(
             10, // epoch
             false,
             45, // last committed round
@@ -331,7 +331,7 @@ fn test_batch_store_bootstrap_gc_expiry() {
             2001,         // batch quota
             signers[0].clone(),
             10,
-        ));
+        );
 
         store.get_batch_from_local(&digest_1).unwrap();
     });
