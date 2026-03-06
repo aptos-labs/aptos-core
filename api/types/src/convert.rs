@@ -411,13 +411,17 @@ impl<'a, S: StateView> MoveConverter<'a, S> {
                 let extra_config = encrypted.extra_config();
                 let multisig_address = extra_config.multisig_address().map(Address::from);
 
+                let ciphertext = Some(HexEncodedBytes::from(bcs::to_bytes(
+                    encrypted.ciphertext(),
+                )?));
+
                 match encrypted {
                     EP::Encrypted { payload_hash, .. } => {
                         TransactionPayload::EncryptedTransactionPayload(
                             EncryptedTransactionPayload {
                                 encrypted_state: EncryptedState::Encrypted,
                                 payload_hash: crate::HashValue::from(payload_hash),
-                                ciphertext: None,
+                                ciphertext: ciphertext.clone(),
                                 decrypted_payload: None,
                                 decryption_nonce: None,
                             },
@@ -428,7 +432,7 @@ impl<'a, S: StateView> MoveConverter<'a, S> {
                             EncryptedTransactionPayload {
                                 encrypted_state: EncryptedState::FailedDecryption,
                                 payload_hash: crate::HashValue::from(payload_hash),
-                                ciphertext: None,
+                                ciphertext: ciphertext.clone(),
                                 decrypted_payload: None,
                                 decryption_nonce: None,
                             },
@@ -473,7 +477,7 @@ impl<'a, S: StateView> MoveConverter<'a, S> {
                             EncryptedTransactionPayload {
                                 encrypted_state: EncryptedState::Decrypted,
                                 payload_hash: crate::HashValue::from(payload_hash),
-                                ciphertext: None,
+                                ciphertext,
                                 decrypted_payload: inner,
                                 decryption_nonce: Some(U64::from(decryption_nonce)),
                             },

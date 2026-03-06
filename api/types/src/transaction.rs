@@ -1166,10 +1166,9 @@ pub enum EncryptedState {
 pub struct EncryptedTransactionPayload {
     pub encrypted_state: EncryptedState,
     pub payload_hash: HashValue,
-    /// BCS-serialized ciphertext bytes, hex-encoded. This field is `Option` because the same
-    /// struct is used for both read responses and submission requests. In read responses the
-    /// ciphertext is omitted (the node does not resurface it). For JSON submission, `VerifyInput`
-    /// enforces that ciphertext is present and the encrypted state is `Encrypted`.
+    /// BCS-serialized ciphertext bytes, hex-encoded. Present in read responses and required
+    /// for JSON submission. `VerifyInput` enforces that ciphertext is present and the
+    /// encrypted state is `Encrypted` on the submission path.
     #[serde(skip_serializing_if = "Option::is_none")]
     #[serde(default)]
     pub ciphertext: Option<HexEncodedBytes>,
