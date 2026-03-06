@@ -712,7 +712,7 @@ async fn test_fee_payer_signed_transaction(
             &fee_payer,
             factory
                 .create_user_account(yet_another_account.public_key())
-                .max_gas_amount(200_000)
+                .max_gas_amount(2_000_000)
                 .gas_unit_price(1)
                 .expiration_timestamp_secs(context.get_expiration_time())
                 .upgrade_payload_with_rng(
