@@ -13,8 +13,8 @@ encrypted mempool. There are several variants of the scheme:
 * `FPTXSuccinct` is a modified version of the scheme which saves a single
   group element per ciphertext. However, it requires a DKG which outputs
   $[\tau \cdot \mathsf{sk}]_2$, where $\mathsf{sk}$ is the per-epoch master
-  secret key, which our DKG does not currently do. Because of this, it is
-  not currently used.
+  secret key, which our DKG does not currently do. **Because of this, it is
+  not currently used in production.**
 
 ## Repo structure
 
@@ -28,6 +28,8 @@ encrypted mempool. There are several variants of the scheme:
   `src/shared/ciphertext/mod.rs`, which generically turns a batch IBE ciphertext
   into a non-malleable (non-IBE) ciphertext. To do this, it uses various
   symmetric crypto primitives defined in `src/shared/symmetric.rs`.
+  - **Note: `src/shared/ciphertext/bibe_succinct.rs` is part of
+    `FPTXSuccinct`, and is not used in production.**
 - Block-specific decryption key reconstruction and verification are in
   `src/shared/key_derivation.rs`.
 - Types/code related to digest computation are in `src/shared/digest.rs`
