@@ -18,9 +18,8 @@ use aptos_logger::{error, info, warn};
 use aptos_types::{
     epoch_state::EpochState,
     on_chain_config::{
-        ChunkyDKGConfigMoveStruct, OnChainChunkyDKGConfig, OnChainConsensusConfig,
-        OnChainExecutionConfig, OnChainRandomnessConfig, RandomnessConfigMoveStruct,
-        RandomnessConfigSeqNum, ValidatorSet,
+        OnChainConsensusConfig, OnChainExecutionConfig, OnChainRandomnessConfig,
+        RandomnessConfigMoveStruct, RandomnessConfigSeqNum, ValidatorSet,
     },
 };
 use futures::StreamExt;
@@ -92,10 +91,9 @@ impl ObserverEpochState {
         OnChainConsensusConfig,
         OnChainExecutionConfig,
         OnChainRandomnessConfig,
-        OnChainChunkyDKGConfig,
     ) {
         // Extract the epoch state and on-chain configs
-        let (epoch_state, consensus_config, execution_config, randomness_config, chunky_dkg_config) =
+        let (epoch_state, consensus_config, execution_config, randomness_config) =
             extract_on_chain_configs(&self.node_config, &mut self.reconfig_events).await;
 
         // Update the local epoch state and quorum store config
@@ -125,7 +123,6 @@ impl ObserverEpochState {
             consensus_config,
             execution_config,
             randomness_config,
-            chunky_dkg_config,
         )
     }
 }
@@ -139,7 +136,6 @@ async fn extract_on_chain_configs(
     OnChainConsensusConfig,
     OnChainExecutionConfig,
     OnChainRandomnessConfig,
-    OnChainChunkyDKGConfig,
 ) {
     // Fetch the next reconfiguration notification
     let reconfig_notification = reconfig_events
@@ -213,26 +209,12 @@ async fn extract_on_chain_configs(
         onchain_randomness_config.ok(),
     );
 
-    // Extract the chunky DKG config
-    let onchain_chunky_dkg_config: anyhow::Result<ChunkyDKGConfigMoveStruct> =
-        on_chain_configs.get();
-    if let Err(error) = &onchain_chunky_dkg_config {
-        error!(
-            LogSchema::new(LogEntry::ConsensusObserver).message(&format!(
-                "Failed to read on-chain chunky DKG config! Error: {:?}",
-                error
-            ))
-        );
-    }
-    let chunky_dkg_config = OnChainChunkyDKGConfig::from_configs(onchain_chunky_dkg_config.ok());
-
     // Return the extracted epoch state and on-chain configs
     (
         epoch_state,
         consensus_config,
         execution_config,
         onchain_randomness_config,
-        chunky_dkg_config,
     )
 }
 
