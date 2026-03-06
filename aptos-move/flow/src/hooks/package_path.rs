@@ -8,31 +8,28 @@
 //! knows which package the user is working in. Outputs nothing if no
 //! package is found. Always exits 0.
 
+use crate::utilities::find_package_root;
 use anyhow::Result;
 use std::path::Path;
 
 /// Entry point: detect the nearest Move package and emit context.
 pub fn run() -> Result<()> {
     let cwd = std::env::current_dir()?;
-    let mut dir = cwd.as_path();
-    loop {
-        let manifest = dir.join("Move.toml");
-        if manifest.is_file() {
-            let pkg_name = read_package_name(&manifest).unwrap_or_else(|| "(unknown)".to_string());
-            let ctx = format!("Current Move package: {} at {}.", pkg_name, dir.display());
-            let output = serde_json::json!({
-                "hookSpecificOutput": {
-                    "hookEventName": "UserPromptSubmit",
-                    "additionalContext": ctx
-                }
-            });
-            println!("{}", output);
-            return Ok(());
-        }
-        match dir.parent() {
-            Some(parent) => dir = parent,
-            None => break,
-        }
+    if let Some(pkg_path) = find_package_root(&cwd) {
+        let manifest = pkg_path.join("Move.toml");
+        let pkg_name = read_package_name(&manifest).unwrap_or_else(|| "(unknown)".to_string());
+        let ctx = format!(
+            "Current Move package: {} at {}.",
+            pkg_name,
+            pkg_path.display()
+        );
+        let output = serde_json::json!({
+            "hookSpecificOutput": {
+                "hookEventName": "UserPromptSubmit",
+                "additionalContext": ctx
+            }
+        });
+        println!("{}", output);
     }
     Ok(())
 }

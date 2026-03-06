@@ -253,100 +253,102 @@ impl<'a> SourceCoverageBuilder<'a> {
         let mut fun_coverage: Vec<FunctionSourceCoverageV2> = Vec::new();
         for (module, source_map) in root_modules.iter() {
             let module_name = module.self_id();
+            // Look up coverage data for this module. When `module_map` is `None`
+            // the module was never executed (e.g. it has no tests), but we still
+            // need to iterate its functions so that their bytecode locations are
+            // recorded as uncovered.  Skipping the loop would leave `fun_coverage`
+            // empty, causing every source line to appear as "covered / not
+            // executable" — a misleading result.
             let module_map = unified_exec_map
                 .module_maps
                 .get(&(*module_name.address(), module_name.name().to_owned()));
-            if let Some(module_map) = module_map {
-                for (function_def_idx, function_def) in module.function_defs().iter().enumerate() {
-                    let fn_handle = module.function_handle_at(function_def.function);
-                    let fn_name = module.identifier_at(fn_handle.name).to_owned();
-                    let function_def_idx = FunctionDefinitionIndex(function_def_idx as u16);
-                    let function_covered_locations: FunctionSourceCoverageV2 =
-                        match &function_def.code {
-                            None => FunctionSourceCoverageV2::for_native(),
-                            Some(code_unit) => match module_map.function_maps.get(&fn_name) {
-                                None => {
-                                    let all_locations = minimize_locations(
-                                        (0..code_unit.code.len())
-                                            .filter_map(|code_offset| {
-                                                source_map
-                                                    .get_code_location(
-                                                        function_def_idx,
-                                                        code_offset as CodeOffset,
-                                                    )
-                                                    .ok()
-                                            })
-                                            .collect(),
-                                    );
-                                    FunctionSourceCoverageV2 {
-                                        fn_is_native: false,
-                                        covered_locations: vec![],
-                                        all_locations,
+            for (function_def_idx, function_def) in module.function_defs().iter().enumerate() {
+                let fn_handle = module.function_handle_at(function_def.function);
+                let fn_name = module.identifier_at(fn_handle.name).to_owned();
+                let function_def_idx = FunctionDefinitionIndex(function_def_idx as u16);
+                let function_covered_locations: FunctionSourceCoverageV2 = match &function_def.code
+                {
+                    None => FunctionSourceCoverageV2::for_native(),
+                    Some(code_unit) => match module_map.and_then(|m| m.function_maps.get(&fn_name))
+                    {
+                        None => {
+                            let all_locations = minimize_locations(
+                                (0..code_unit.code.len())
+                                    .filter_map(|code_offset| {
+                                        source_map
+                                            .get_code_location(
+                                                function_def_idx,
+                                                code_offset as CodeOffset,
+                                            )
+                                            .ok()
+                                    })
+                                    .collect(),
+                            );
+                            FunctionSourceCoverageV2 {
+                                fn_is_native: false,
+                                covered_locations: vec![],
+                                all_locations,
+                            }
+                        },
+                        Some(function_coverage) => {
+                            let (fun_cov, fun_uncov): (Vec<_>, Vec<_>) = (0..code_unit.code.len())
+                                .filter_map(|code_offset| {
+                                    if let Ok(loc) = source_map.get_code_location(
+                                        function_def_idx,
+                                        code_offset as CodeOffset,
+                                    ) {
+                                        if function_coverage
+                                            .get(&(code_offset as u64))
+                                            .unwrap_or(&0)
+                                            != &0
+                                        {
+                                            // Non-zero execution count, so covered.
+                                            Some((loc, true))
+                                        } else {
+                                            Some((loc, false))
+                                        }
+                                    } else {
+                                        None
                                     }
-                                },
-                                Some(function_coverage) => {
-                                    let (fun_cov, fun_uncov): (Vec<_>, Vec<_>) =
-                                        (0..code_unit.code.len())
-                                            .filter_map(|code_offset| {
-                                                if let Ok(loc) = source_map.get_code_location(
-                                                    function_def_idx,
-                                                    code_offset as CodeOffset,
-                                                ) {
-                                                    if function_coverage
-                                                        .get(&(code_offset as u64))
-                                                        .unwrap_or(&0)
-                                                        != &0
-                                                    {
-                                                        // Non-zero execution count, so covered.
-                                                        Some((loc, true))
-                                                    } else {
-                                                        Some((loc, false))
-                                                    }
-                                                } else {
-                                                    None
-                                                }
-                                            })
-                                            .partition(|(_, covered)| *covered);
+                                })
+                                .partition(|(_, covered)| *covered);
 
-                                    let covered_locations: Vec<_> = minimize_locations(
-                                        fun_cov.iter().map(|(loc, _)| *loc).collect(),
-                                    );
-                                    let uncovered_locations: Vec<_> = minimize_locations(
-                                        fun_uncov.iter().map(|(loc, _)| *loc).collect(),
-                                    );
-                                    // If any uncovered locations are the same as covered locations,
-                                    // remove them from uncovered locations.
-                                    let uncovered_locations =
-                                        BTreeSet::from_iter(uncovered_locations.into_iter())
-                                            .difference(&BTreeSet::from_iter(
-                                                covered_locations.iter().cloned(),
-                                            ))
-                                            .cloned()
-                                            .collect();
-                                    // Covered locations may be an over-approximation, so uncovered
-                                    // locations are subtracted from covered locations.
-                                    let covered_locations = subtract_locations(
-                                        covered_locations.into_iter().collect(),
-                                        &uncovered_locations,
-                                    );
-                                    let all_locations: Vec<_> = minimize_locations(
-                                        fun_cov
-                                            .iter()
-                                            .chain(fun_uncov.iter())
-                                            .map(|(loc, _)| *loc)
-                                            .collect(),
-                                    );
+                            let covered_locations: Vec<_> =
+                                minimize_locations(fun_cov.iter().map(|(loc, _)| *loc).collect());
+                            let uncovered_locations: Vec<_> =
+                                minimize_locations(fun_uncov.iter().map(|(loc, _)| *loc).collect());
+                            // If any uncovered locations are the same as covered locations,
+                            // remove them from uncovered locations.
+                            let uncovered_locations =
+                                BTreeSet::from_iter(uncovered_locations.into_iter())
+                                    .difference(&BTreeSet::from_iter(
+                                        covered_locations.iter().cloned(),
+                                    ))
+                                    .cloned()
+                                    .collect();
+                            // Covered locations may be an over-approximation, so uncovered
+                            // locations are subtracted from covered locations.
+                            let covered_locations = subtract_locations(
+                                covered_locations.into_iter().collect(),
+                                &uncovered_locations,
+                            );
+                            let all_locations: Vec<_> = minimize_locations(
+                                fun_cov
+                                    .iter()
+                                    .chain(fun_uncov.iter())
+                                    .map(|(loc, _)| *loc)
+                                    .collect(),
+                            );
 
-                                    FunctionSourceCoverageV2 {
-                                        fn_is_native: false,
-                                        covered_locations,
-                                        all_locations,
-                                    }
-                                },
-                            },
-                        };
-                    fun_coverage.push(function_covered_locations);
-                }
+                            FunctionSourceCoverageV2 {
+                                fn_is_native: false,
+                                covered_locations,
+                                all_locations,
+                            }
+                        },
+                    },
+                };
+                fun_coverage.push(function_covered_locations);
             }
         }
 

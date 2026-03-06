@@ -48,6 +48,8 @@ impl VerifiedScope {
     }
 }
 
+// ================================================================================================
+
 /// Compiled package data holding a `GlobalEnv` (the Move model).
 pub(crate) struct PackageData {
     env: GlobalEnv,
@@ -79,6 +81,12 @@ impl PackageData {
             .collect();
         let env = aptos_framework::build_model(
             args.dev_mode,
+            // Why `test_mode` only:
+            // - Enabling both will lead to name clash in `std::cmp`
+            // - `verify_only` code, enabled by `verify_mode`, is rarely used
+            // TODO: fix the name clash in std::cmp and enable both
+            true,  // test_mode
+            false, // verify_mode
             path,
             named_addresses,
             args.target_filter.clone(),
@@ -130,6 +138,8 @@ impl PackageData {
             .collect();
         self.env = aptos_framework::build_model(
             self.args.dev_mode,
+            true,  // test_mode
+            false, // verify_mode
             self.path.as_ref(),
             named_addresses,
             self.args.target_filter.clone(),

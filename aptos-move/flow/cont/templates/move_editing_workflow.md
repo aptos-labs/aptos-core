@@ -2,6 +2,7 @@
 {% if once(name="move_editing_workflow") %}
 
 {% include "templates/move_lang.md" %}
+{% include "templates/move_package.md" %}
 {% include "templates/status_tool.md" %}
 
 ## Writing and Editing Move Code

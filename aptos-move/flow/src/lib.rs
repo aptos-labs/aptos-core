@@ -4,6 +4,7 @@
 pub mod hooks;
 pub mod mcp;
 pub mod plugin;
+pub mod utilities;
 
 use anyhow::Result;
 use clap::{Args, Parser, Subcommand, ValueEnum};
@@ -11,7 +12,11 @@ use std::path::PathBuf;
 
 /// MoveFlow: AI-assisted Move development tooling (plugin generator, MCP server, hooks).
 #[derive(Parser, Debug)]
-#[command(name = "move-flow", about = "AI-assisted Move development tooling")]
+#[command(
+    name = "move-flow",
+    about = "AI-assisted Move development tooling",
+    version
+)]
 pub struct FlowCli {
     #[command(flatten)]
     pub global: GlobalOpts,

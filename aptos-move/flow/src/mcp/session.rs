@@ -2,7 +2,7 @@
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 use super::{file_watcher::FileWatcher, package_data::PackageData, McpArgs};
-use crate::GlobalOpts;
+use crate::{utilities::format_error_chain, GlobalOpts};
 use rmcp::{
     handler::server::router::tool::ToolRouter,
     model::{CallToolResult, Content, Implementation, ServerCapabilities, ServerInfo},
@@ -35,12 +35,21 @@ impl FlowSession {
         let router = Self::package_manifest_router()
             + Self::package_status_router()
             + Self::package_verify_router()
-            + Self::package_spec_infer_router();
+            + Self::package_spec_infer_router()
+            + Self::package_test_router();
         router
             .list_all()
             .into_iter()
             .map(|t| t.name.to_string())
             .collect()
+    }
+
+    pub(crate) fn args(&self) -> &McpArgs {
+        &self.args
+    }
+
+    pub(crate) fn file_watcher(&self) -> &FileWatcher {
+        &self.file_watcher
     }
 
     pub(crate) fn new(args: McpArgs, global: GlobalOpts) -> Self {
@@ -65,7 +74,8 @@ impl FlowSession {
             tool_router: Self::package_manifest_router()
                 + Self::package_status_router()
                 + Self::package_verify_router()
-                + Self::package_spec_infer_router(),
+                + Self::package_spec_infer_router()
+                + Self::package_test_router(),
         }
     }
 
@@ -116,9 +126,10 @@ impl FlowSession {
                     rmcp::ErrorData::internal_error(format!("build task failed: {}", e), None)
                 })?
                 .map_err(|e| {
-                    log::info!("build failed for `{}`: {}", key, e);
+                    let msg = format_error_chain(&e);
+                    log::info!("build failed for `{}`: {}", key, msg);
                     rmcp::ErrorData::internal_error(
-                        format!("failed to build package `{}`: {}", key, e),
+                        format!("failed to build package `{}`: {}", key, msg),
                         None,
                     )
                 })?;
