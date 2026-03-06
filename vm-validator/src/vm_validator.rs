@@ -305,10 +305,13 @@ impl PooledVMValidator {
         PooledVMValidator { vm_validators }
     }
 
-    fn get_next_vm(&self) -> Arc<Mutex<VMValidator>> {
-        let mut rng = thread_rng(); // Create a thread-local random number generator
-        let random_index = rng.gen_range(0, self.vm_validators.len()); // Generate random index
-        self.vm_validators[random_index].clone() // Return the VM at the random index
+    fn get_next_vm(&self) -> Option<Arc<Mutex<VMValidator>>> {
+        if self.vm_validators.is_empty() {
+            return None;
+        }
+        let mut rng = thread_rng();
+        let random_index = rng.gen_range(0, self.vm_validators.len());
+        Some(self.vm_validators[random_index].clone())
     }
 }
 
@@ -316,7 +319,11 @@ impl TransactionValidation for PooledVMValidator {
     type ValidationInstance = AptosVM;
 
     fn validate_transaction(&self, txn: SignedTransaction) -> Result<VMValidatorResult> {
-        let vm_validator = self.get_next_vm();
+        // NOTE: VM validation is skipped because reth/execution layer handles transaction validation.
+        // The VM validator pool is intentionally left empty.
+        let Some(vm_validator) = self.get_next_vm() else {
+            return Ok(VMValidatorResult::new(None, 0));
+        };
 
         fail_point!("vm_validator::validate_transaction", |_| {
             Err(anyhow::anyhow!(

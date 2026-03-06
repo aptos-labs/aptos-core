@@ -22,7 +22,8 @@ struct SizeRollingFileAppender {
 impl SizeRollingFileAppender {
     fn new(log_file: PathBuf, max_log_file_size_mbs: u64, max_log_files: usize) -> Self {
         let max_log_file_size = max_log_file_size_mbs * 1024 * 1024;
-        let (current_log_file, current_log_size) = Self::open_log_file(&log_file);
+        let (current_log_file, current_log_size) = Self::open_log_file(&log_file)
+            .expect("Unable to open initial log file");
 
         Self {
             max_log_file_size,
@@ -33,35 +34,44 @@ impl SizeRollingFileAppender {
         }
     }
 
-    fn open_log_file(path: &Path) -> (File, u64) {
+    fn open_log_file(path: &Path) -> io::Result<(File, u64)> {
         let file = OpenOptions::new()
             .append(true)
             .create(true)
-            .open(path)
-            .expect("Unable to open log file");
-        let metadata = file.metadata().expect("Unable to get log file metadata");
-        (file, metadata.len())
+            .open(path)?;
+        let size = file.metadata().map(|m| m.len()).unwrap_or(0);
+        Ok((file, size))
     }
 
     fn rotate(&mut self) {
-        self.current_log_file
-            .sync_all()
-            .expect("Failed to sync log file");
+        if let Err(e) = self.current_log_file.sync_all() {
+            eprintln!("Failed to sync log file before rotation: {}", e);
+        }
 
         for i in (1..self.max_log_files).rev() {
             let old_path = self.rotated_log_path(i - 1);
             if old_path.exists() {
                 let new_path = self.rotated_log_path(i);
-                fs::rename(old_path, new_path).expect("Failed to rename log file");
+                if let Err(e) = fs::rename(&old_path, &new_path) {
+                    eprintln!("Failed to rename log file {:?} -> {:?}: {}", old_path, new_path, e);
+                }
             }
         }
 
         let new_path = self.rotated_log_path(0);
-        fs::rename(&self.log_file_path, new_path).expect("Failed to rename log file");
+        if let Err(e) = fs::rename(&self.log_file_path, &new_path) {
+            eprintln!("Failed to rename log file {:?} -> {:?}: {}", self.log_file_path, new_path, e);
+        }
 
-        let (file, size) = Self::open_log_file(&self.log_file_path);
-        self.current_log_file = file;
-        self.current_log_size = size;
+        match Self::open_log_file(&self.log_file_path) {
+            Ok((file, size)) => {
+                self.current_log_file = file;
+                self.current_log_size = size;
+            }
+            Err(e) => {
+                eprintln!("Failed to open new log file after rotation: {}", e);
+            }
+        }
     }
 
     fn rotated_log_path(&self, index: usize) -> PathBuf {

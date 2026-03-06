@@ -209,6 +209,7 @@ fn test_get_account_sequence_number() {
     let state_view = vm_validator
         .vm_validator
         .get_next_vm()
+        .unwrap()
         .lock()
         .unwrap()
         .db_reader
