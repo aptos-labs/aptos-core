@@ -135,7 +135,7 @@ fn create_batch_coordinator(
         consensus_network_sender,
         sender_to_proof_manager,
         sender_to_batch_generator,
-        Arc::new(batch_store),
+        batch_store,
         10_000,
         10_000,
         10_000,
@@ -146,7 +146,7 @@ fn create_batch_coordinator(
 }
 
 /// Creates and returns a mock batch store
-fn create_batch_store() -> BatchStore {
+fn create_batch_store() -> Arc<BatchStore> {
     let qs_storage = Arc::new(MockQuorumStoreDB::new());
     let validator_signer = ValidatorSigner::random(None);
     BatchStore::new(0, false, 0, qs_storage, 0, 0, 0, validator_signer, 0)
