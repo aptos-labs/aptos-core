@@ -661,11 +661,10 @@ pub struct EncryptedTransactionPayload {
     pub encrypted_state: i32,
     #[prost(bytes="vec", tag="2")]
     pub payload_hash: ::prost::alloc::vec::Vec<u8>,
-    // Field 3 (multisig_address) and field 4 (replay_protection_nonce) removed
-    #[prost(uint64, optional, tag="7")]
+    #[prost(uint64, optional, tag="6")]
     pub decryption_nonce: ::core::option::Option<u64>,
     /// Present only when decrypted
-    #[prost(oneof="encrypted_transaction_payload::DecryptedPayload", tags="5, 6, 8")]
+    #[prost(oneof="encrypted_transaction_payload::DecryptedPayload", tags="3, 4, 5")]
     pub decrypted_payload: ::core::option::Option<encrypted_transaction_payload::DecryptedPayload>,
 }
 /// Nested message and enum types in `EncryptedTransactionPayload`.
@@ -701,11 +700,11 @@ pub mod encrypted_transaction_payload {
     #[allow(clippy::derive_partial_eq_without_eq)]
     #[derive(Clone, PartialEq, ::prost::Oneof)]
     pub enum DecryptedPayload {
-        #[prost(message, tag="5")]
+        #[prost(message, tag="3")]
         EntryFunctionPayload(super::EntryFunctionPayload),
-        #[prost(message, tag="6")]
+        #[prost(message, tag="4")]
         ScriptPayload(super::ScriptPayload),
-        #[prost(message, tag="8")]
+        #[prost(message, tag="5")]
         MultisigPayload(super::MultisigPayload),
     }
 }
