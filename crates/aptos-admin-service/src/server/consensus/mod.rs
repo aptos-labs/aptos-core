@@ -164,11 +164,18 @@ fn dump_quorum_store_db(
     if let Some(digest) = digest {
         body.push_str(&format!("{digest:?}:\n"));
         body.push_str(&format!(
-            "{:?}",
+            "{:?}\n",
             quorum_store_db.get_batch(&digest).map_err(Error::msg)?
+        ));
+        body.push_str(&format!(
+            "{:?}\n",
+            quorum_store_db.get_batch_v2(&digest).map_err(Error::msg)?
         ));
     } else {
         for (digest, _batch) in quorum_store_db.get_all_batches()? {
+            body.push_str(&format!("{digest:?}:\n"));
+        }
+        for (digest, _batch) in quorum_store_db.get_all_batches_v2()? {
             body.push_str(&format!("{digest:?}:\n"));
         }
     }
