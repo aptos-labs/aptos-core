@@ -205,12 +205,20 @@ fn convert_index_type(index_type: IndexType) -> BlockBasedIndexType {
     }
 }
 
-/// Disable pending compaction bytes based write stalling. This is for append-only DBs (ledger
-/// sub-DBs keyed by sequential version) where compaction is done entirely via trivial moves —
-/// the estimated pending compaction bytes is fictional and should not trigger stalls.
+/// Disable write stalling for append-only, sequential-key CFs (ledger sub-DBs keyed by version).
+/// Compaction on these CFs is entirely trivial moves (file renames, no I/O), but they share the
+/// background compaction thread pool with state DBs. When the pool is saturated by state DB
+/// compactions, these CFs can't get scheduled and would otherwise stall writes.
+///
+/// We disable both stall vectors:
+///   - Pending compaction bytes: set to 0 (unlimited) — the estimate is fictional for trivial moves.
+///   - L0 file count: set very high — non-overlapping L0 files from sequential keys don't hurt
+///     read performance, and auto-compaction will catch up when the pool has spare capacity.
 fn with_no_compaction_stalling(cf_opts: &mut Options) {
     cf_opts.set_soft_pending_compaction_bytes_limit(0);
     cf_opts.set_hard_pending_compaction_bytes_limit(0);
+    cf_opts.set_level_zero_slowdown_writes_trigger(1000);
+    cf_opts.set_level_zero_stop_writes_trigger(2000);
 }
 
 fn with_state_key_extractor_processor(cf_name: ColumnFamilyName, cf_opts: &mut Options) {

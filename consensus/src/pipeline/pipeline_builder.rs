@@ -473,6 +473,7 @@ impl PipelineBuilder {
                 self.secret_share_config.clone(),
                 derived_self_key_share_tx,
                 secret_shared_key_rx,
+                observer_enabled,
             ),
             Some(&mut abort_handles),
         );

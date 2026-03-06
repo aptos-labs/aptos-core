@@ -266,27 +266,31 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
             })
             .unwrap_or_default();
 
-        // Create shared network sender and reliable broadcast for both DKG managers
+        // Create shared network sender for both DKG managers
         let network_sender = Arc::new(self.create_network_sender());
-        let rb = Arc::new(ReliableBroadcast::new(
-            self.my_addr,
-            epoch_state.verifier.get_ordered_account_addresses(),
-            network_sender.clone(),
-            ExponentialBackoff::from_millis(self.rb_config.backoff_policy_base_ms)
-                .factor(self.rb_config.backoff_policy_factor)
-                .max_delay(Duration::from_millis(
-                    self.rb_config.backoff_policy_max_delay_ms,
-                )),
-            aptos_time_service::TimeService::real(),
-            Duration::from_millis(self.rb_config.rpc_timeout_ms),
-            BoundedExecutor::new(8, tokio::runtime::Handle::current()),
-        ));
+        let rb_config = self.rb_config.clone();
+
+        let rb_backoff_policy = || {
+            ExponentialBackoff::from_millis(rb_config.backoff_policy_base_ms)
+                .factor(rb_config.backoff_policy_factor)
+                .max_delay(Duration::from_millis(rb_config.backoff_policy_max_delay_ms))
+        };
 
         // Check both validator txn and randomness features are enabled
         if onchain_consensus_config.is_vtxn_enabled()
             && onchain_randomness_config.randomness_enabled()
         {
-            self.start_dkg_manager(epoch_state.clone(), my_index, &payload, rb.clone())
+            let rb = Arc::new(ReliableBroadcast::new(
+                "dkg",
+                self.my_addr,
+                epoch_state.verifier.get_ordered_account_addresses(),
+                network_sender.clone(),
+                rb_backoff_policy(),
+                aptos_time_service::TimeService::real(),
+                Duration::from_millis(rb_config.rpc_timeout_ms),
+                BoundedExecutor::new(8, tokio::runtime::Handle::current()),
+            ));
+            self.start_dkg_manager(epoch_state.clone(), my_index, &payload, rb)
                 .await?;
         }
 
@@ -294,11 +298,21 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
         if onchain_consensus_config.is_vtxn_enabled()
             && onchain_chunky_dkg_config.chunky_dkg_enabled()
         {
+            let rb = Arc::new(ReliableBroadcast::new(
+                "chunky_dkg",
+                self.my_addr,
+                epoch_state.verifier.get_ordered_account_addresses(),
+                network_sender.clone(),
+                rb_backoff_policy(),
+                aptos_time_service::TimeService::real(),
+                Duration::from_millis(rb_config.rpc_timeout_ms),
+                BoundedExecutor::new(8, tokio::runtime::Handle::current()),
+            ));
             self.start_chunky_dkg_manager(
                 epoch_state.clone(),
                 my_index,
                 &payload,
-                rb.clone(),
+                rb,
                 network_sender,
             )
             .await?;

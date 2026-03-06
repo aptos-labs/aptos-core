@@ -29,6 +29,7 @@ module aptos_framework::aptos_governance {
     use aptos_framework::staking_config;
     use aptos_framework::system_addresses;
     use aptos_framework::aptos_coin::{Self, AptosCoin};
+    use aptos_framework::chunky_dkg_config;
     use aptos_framework::consensus_config;
     use aptos_framework::permissioned_signer;
     use aptos_framework::randomness_config;
@@ -662,7 +663,11 @@ module aptos_framework::aptos_governance {
     public entry fun reconfigure(aptos_framework: &signer) {
         system_addresses::assert_aptos_framework(aptos_framework);
         if (consensus_config::validator_txn_enabled() && randomness_config::enabled()) {
-            reconfiguration_with_dkg::try_start();
+            if (chunky_dkg_config::enabled()) {
+                reconfiguration_with_dkg::try_start_with_chunky_dkg();
+            } else {
+                reconfiguration_with_dkg::try_start();
+            }
         } else {
             reconfiguration_with_dkg::finish(aptos_framework);
         }

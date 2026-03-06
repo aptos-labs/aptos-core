@@ -162,6 +162,7 @@ Run the default reconfiguration to enter the new epoch.
     <a href="randomness_config_seqnum.md#0x1_randomness_config_seqnum_on_new_epoch">randomness_config_seqnum::on_new_epoch</a>(framework);
     <a href="randomness_config.md#0x1_randomness_config_on_new_epoch">randomness_config::on_new_epoch</a>(framework);
     <a href="randomness_api_v0_config.md#0x1_randomness_api_v0_config_on_new_epoch">randomness_api_v0_config::on_new_epoch</a>(framework);
+    <a href="chunky_dkg_config.md#0x1_chunky_dkg_config_on_new_epoch">chunky_dkg_config::on_new_epoch</a>(framework);
     <a href="decryption.md#0x1_decryption_on_new_epoch">decryption::on_new_epoch</a>(framework);
     <a href="reconfiguration.md#0x1_reconfiguration_reconfigure">reconfiguration::reconfigure</a>();
 }
