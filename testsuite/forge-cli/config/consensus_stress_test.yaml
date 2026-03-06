@@ -1,0 +1,30 @@
+test_name: changing_working_quorum
+initial_validator_count: 10
+emit_job:
+  mode:
+    type: ConstTps
+    tps: 100
+  transaction_mix:
+    - transaction_type: CoinTransfer
+      weight: 80
+    - transaction_type: AccountGeneration
+      weight: 20
+genesis_helm_config:
+  chain:
+    epoch_duration_secs: 60
+success_criteria:
+  min_avg_tps: 80
+  check_no_restarts: true
+  wait_for_catchup_s: 30
+  chain_progress:
+    max_non_epoch_no_progress_secs: 3.0
+    max_epoch_no_progress_secs: 3.0
+    max_non_epoch_round_gap: 60
+    max_epoch_round_gap: 60
+extra:
+  min_tps: 50
+  always_healthy_nodes: 10
+  max_down_nodes: 0
+  num_large_validators: 0
+  add_execution_delay: false
+  check_period_s: 27

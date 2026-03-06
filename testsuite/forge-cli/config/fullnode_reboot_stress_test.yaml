@@ -1,0 +1,10 @@
+test_name: fullnode_reboot_stress_test
+initial_validator_count: 7
+initial_fullnode_count: 7
+emit_job:
+  mode:
+    type: ConstTps
+    tps: 5000
+success_criteria:
+  min_avg_tps: 2000
+  wait_for_catchup_s: 600

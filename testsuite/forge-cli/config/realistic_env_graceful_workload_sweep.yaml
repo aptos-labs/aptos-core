@@ -1,0 +1,23 @@
+test_name: graceful_workload_sweep_realistic_env
+initial_validator_count: 7
+initial_fullnode_count: 3
+emit_job:
+  mode:
+    type: MaxLoad
+    mempool_backlog: 40000
+  txn_expiration_time_secs: 20
+  init_gas_price_multiplier: 5
+  init_expiration_multiplier: 6.0
+  latency_polling_interval_ms: 100
+genesis_helm_config:
+  chain:
+    epoch_duration_secs: 86400
+success_criteria:
+  min_avg_tps: 0
+  check_no_restarts: true
+  wait_for_catchup_s: 60
+  chain_progress:
+    max_non_epoch_no_progress_secs: 30.0
+    max_epoch_no_progress_secs: 30.0
+    max_non_epoch_round_gap: 10
+    max_epoch_round_gap: 10

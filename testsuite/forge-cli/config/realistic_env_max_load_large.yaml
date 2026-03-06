@@ -1,0 +1,43 @@
+test_name: two_traffics_realistic_env
+initial_validator_count: 20
+initial_fullnode_count: 10
+num_pfns: 1
+genesis_helm_config:
+  chain:
+    epoch_duration_secs: 600
+emit_job:
+  mode:
+    type: ConstTps
+    tps: 100
+  gas_price: 500
+  latency_polling_interval_ms: 100
+success_criteria:
+  min_avg_tps: 85
+  check_no_restarts: true
+  wait_for_catchup_s: 720
+  latency_thresholds:
+    - threshold_s: 3.6
+      latency_type: P50
+    - threshold_s: 4.8
+      latency_type: P70
+  chain_progress:
+    max_non_epoch_no_progress_secs: 15.0
+    max_epoch_no_progress_secs: 16.0
+    max_non_epoch_round_gap: 4
+    max_epoch_round_gap: 4
+  system_metrics:
+    cpu_threshold:
+      max: 25.0
+      max_breach_pct: 15
+    memory_threshold:
+      # 16 GB base + 8 GB/hr * 2hr
+      max: 34359738368.0
+      max_breach_pct: 20
+validator_resource_override:
+  storage_gib: 1000
+fullnode_resource_override:
+  storage_gib: 1000
+extra:
+  inner_mempool_backlog: 38000
+  inner_min_tps: 11000
+  inner_gas_price_multiplier: 20

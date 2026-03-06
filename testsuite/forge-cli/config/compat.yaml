@@ -1,0 +1,8 @@
+test_name: simple_validator_upgrade
+initial_validator_count: 4
+genesis_helm_config:
+  chain:
+    epoch_duration_secs: 60
+success_criteria:
+  min_avg_tps: 5000
+  wait_for_catchup_s: 240

@@ -28,6 +28,8 @@ use suites::{
 use tokio::runtime::Runtime;
 
 mod suites;
+mod test_registry;
+mod embedded_configs;
 
 #[cfg(unix)]
 #[global_allocator]
@@ -249,8 +251,19 @@ fn main() -> Result<()> {
     match args.cli_cmd {
         // cmd input for test
         CliCommand::Test(ref test_cmd) => {
-            // Identify the test suite to run
-            let mut test_suite = get_test_suite(suite_name, duration, test_cmd)?;
+            // Identify the test suite to run.
+            // If FORGE_TEST_CONFIG env var is set, load from that YAML file.
+            // Otherwise, use the normal suite resolution (embedded YAML -> Rust code).
+            let mut test_suite = if let Ok(config_path) = std::env::var("FORGE_TEST_CONFIG") {
+                let config = aptos_forge::ForgeTestConfig::from_file(std::path::Path::new(&config_path))?;
+                let registry = test_registry::TestRegistry::build_default();
+                let code = registry
+                    .get_with_config(&config.test_name, &config)
+                    .ok_or_else(|| format_err!("Unknown test_name in config: {}", config.test_name))?;
+                config.to_forge_config(code)?
+            } else {
+                get_test_suite(suite_name, duration, test_cmd)?
+            };
 
             // Identify the number of validators and fullnodes to run
             // (if overriding what test has specified)
@@ -491,14 +504,23 @@ pub fn run_forge<F: Factory>(forge: Forge<F>, options: &Options) -> Result<()> {
     }
 }
 
-// TODO: can we clean this function up?
-/// Returns the test suite for the given test name
+/// Returns the test suite for the given test name.
+/// First tries embedded YAML configs, then falls back to Rust-defined suites.
 fn get_test_suite(
     test_name: &str,
     duration: Duration,
     test_cmd: &TestCommand,
 ) -> Result<ForgeConfig> {
-    // These are high level suite aliases that express an intent
+    // Try embedded YAML config first
+    if let Some(yaml) = embedded_configs::get(test_name) {
+        let config = aptos_forge::ForgeTestConfig::from_yaml(yaml)?;
+        let registry = test_registry::TestRegistry::build_default();
+        if let Some(code) = registry.get_with_config(&config.test_name, &config) {
+            return config.to_forge_config(code);
+        }
+    }
+
+    // Fall back to Rust-defined suite aliases
     let suite_aliases = hmap! {
         "local_test_suite" => boxed!(local_test_suite) as Box<dyn Fn() -> ForgeConfig>,
         "pre_release" => boxed!(pre_release_suite),
@@ -511,9 +533,7 @@ fn get_test_suite(
         return Ok(test_suite());
     }
 
-    // Otherwise, check the test name against the grouped test suites
-    // This is done in order of priority
-    // A match higher up in the list will take precedence
+    // Fall back to Rust-defined grouped test suites
     let named_test_suites = [
         boxed!(|| get_land_blocking_test(test_name, duration, test_cmd))
             as Box<dyn Fn() -> Option<ForgeConfig>>,
@@ -554,5 +574,67 @@ mod test {
     fn verify_tool() {
         use clap::CommandFactory;
         Args::command().debug_assert()
+    }
+
+    #[test]
+    fn test_all_embedded_configs_parse_and_assemble() {
+        use aptos_forge::ForgeTestConfig;
+
+        let registry = test_registry::TestRegistry::build_default();
+
+        // All suite names that have embedded YAML configs (excluding aliases like "land_blocking")
+        let suite_names = vec![
+            "compat",
+            "framework_upgrade",
+            "realistic_env_max_load",
+            "realistic_env_max_load_large",
+            "consensus_only_realistic_env_max_tps",
+            "multiregion_benchmark_test",
+            "realistic_env_load_sweep",
+            "realistic_env_workload_sweep",
+            "realistic_env_orderbook_workload_sweep",
+            "realistic_env_graceful_overload",
+            "realistic_env_graceful_workload_sweep",
+            "realistic_env_fairness_workload_sweep",
+            "realistic_network_tuned_for_throughput",
+            "consensus_stress_test",
+            "workload_mix",
+            "single_vfn_perf",
+            "fullnode_reboot_stress_test",
+            "changing_working_quorum_test",
+            "changing_working_quorum_test_high_load",
+            "pfn_const_tps_with_realistic_env",
+        ];
+
+        for suite_name in &suite_names {
+            let yaml = embedded_configs::get(suite_name)
+                .unwrap_or_else(|| panic!("Missing embedded config for suite: {}", suite_name));
+
+            let config = ForgeTestConfig::from_yaml(yaml)
+                .unwrap_or_else(|e| panic!("Failed to parse YAML for suite '{}': {}", suite_name, e));
+
+            let code = registry.get_with_config(&config.test_name, &config)
+                .unwrap_or_else(|| panic!(
+                    "Test name '{}' (from suite '{}') not found in registry",
+                    config.test_name, suite_name
+                ));
+
+            config.to_forge_config(code)
+                .unwrap_or_else(|e| panic!("Failed to assemble ForgeConfig for suite '{}': {}", suite_name, e));
+        }
+    }
+
+    #[test]
+    fn test_land_blocking_alias() {
+        use aptos_forge::ForgeTestConfig;
+
+        // "land_blocking" should resolve to the same config as "realistic_env_max_load"
+        let land_blocking = embedded_configs::get("land_blocking").expect("land_blocking config missing");
+        let realistic = embedded_configs::get("realistic_env_max_load").expect("realistic_env_max_load config missing");
+        assert_eq!(land_blocking, realistic, "land_blocking should alias realistic_env_max_load");
+
+        // And it should parse correctly
+        let config = ForgeTestConfig::from_yaml(land_blocking).expect("Failed to parse land_blocking YAML");
+        assert_eq!(config.test_name, "two_traffics_realistic_env");
     }
 }

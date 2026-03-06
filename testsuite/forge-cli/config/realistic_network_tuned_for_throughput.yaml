@@ -1,0 +1,15 @@
+test_name: realistic_network_tuned_for_throughput
+initial_validator_count: 12
+initial_fullnode_count: 12
+emit_job:
+  mode:
+    type: MaxLoad
+    mempool_backlog: 60000
+success_criteria:
+  min_avg_tps: 11000
+  check_no_restarts: true
+  wait_for_catchup_s: 120
+extra:
+  target_tps: 15000
+  max_txns_per_block: 3500
+  vn_latency: 2.5
