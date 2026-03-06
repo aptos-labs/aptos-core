@@ -333,6 +333,9 @@ impl NetworkConfig {
             "bcs",
             "--url",
             self.endpoint.as_str(),
+            // Use the max gas unit for now. The simulate API sometimes cannot get the right gas estimate for proposals.
+            "--max-gas",
+            "2000000",
         ];
 
         if let Some(api_key) = node_api_key.as_ref() {
