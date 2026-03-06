@@ -69,8 +69,8 @@ fn failed_encrypted_transaction_increments_sequence_number() {
     let mut h = MoveHarness::new_with_features(vec![FeatureFlag::ENCRYPTED_TRANSACTIONS], vec![]);
 
     let initial_seq_num = 10;
-    // Needs sufficient balance to cover max_gas_amount (2M) * gas_unit_price (100) = 200M octas.
-    let sender = h.new_account_with_balance_and_sequence_number(1_000_000_000, initial_seq_num);
+    // Needs sufficient balance to cover max_gas_amount (20M) * gas_unit_price (100) = 2B octas.
+    let sender = h.new_account_with_balance_and_sequence_number(10_000_000_000, initial_seq_num);
 
     let ciphertext = Ciphertext::random();
     let extra_config = TransactionExtraConfig::V1 {

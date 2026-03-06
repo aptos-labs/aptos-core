@@ -135,7 +135,7 @@ impl OnChainExecutionConfig {
 impl BlockGasLimitType {
     pub fn default_for_genesis() -> Self {
         Self::ComplexLimitV1 {
-            effective_block_gas_limit: 20000,
+            effective_block_gas_limit: 200000,
             execution_gas_effective_multiplier: 1,
             io_gas_effective_multiplier: 1,
             conflict_penalty_window: 9,
