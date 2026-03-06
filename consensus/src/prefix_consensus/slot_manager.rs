@@ -774,7 +774,7 @@ impl<NS: SubprotocolNetworkSender<SlotConsensusMsg>, SP: SPCSpawner> SlotManager
         // Resolve order_proof_tx so sign_and_broadcast_commit_vote can proceed.
         // Without this, the pipeline's signing future hangs forever waiting for
         // order_proof_fut, blocking commit vote broadcast and preventing commits.
-        // The consensus_data_hash (HashValue::zero()) must match ordered_proof below.
+        // The consensus_data_hash (HashValue::zero()) must match ordered_proof below
         let wrapped_li = WrappedLedgerInfo::new(
             VoteData::dummy(),
             LedgerInfoWithSignatures::new(
@@ -1060,9 +1060,8 @@ mod tests {
     // Test infrastructure
     // ========================================================================
 
-    /// Stub SPC spawner for tests: immediately returns input_vector as v_high.
+    /// Stub SPC spawner for tests: immediately returns input_vector as v_high
     struct StubSPCSpawner;
-
     impl SPCSpawner for StubSPCSpawner {
         fn spawn_spc(
             &self,
@@ -1149,6 +1148,7 @@ mod tests {
         futures_mpsc::UnboundedReceiver<OrderedBlocks>,
         MockSlotNetworkSender,
     ) {
+
         let (exec_tx, exec_rx) = futures_mpsc::unbounded();
         let authors: Vec<Author> = signers.iter().map(|s| s.author()).collect();
         let network_sender = MockSlotNetworkSender::new();
