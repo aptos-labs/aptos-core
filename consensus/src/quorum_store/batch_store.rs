@@ -238,7 +238,7 @@ impl BatchStore {
             "QS: Batch store bootstrap expired keys len {}",
             expired_keys.len()
         );
-        db.delete_batches(expired_keys)
+        db.delete_batches_v2(expired_keys)
             .expect("Deletion of expired keys should not fail");
     }
 
