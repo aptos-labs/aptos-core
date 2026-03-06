@@ -477,8 +477,11 @@ impl BatchStore {
             .fetch_max(certified_time, Ordering::SeqCst);
 
         let expired_keys = self.clear_expired_payload(certified_time);
-        if let Err(e) = self.db.delete_batches(expired_keys) {
+        if let Err(e) = self.db.delete_batches(expired_keys.clone()) {
             debug!("Error deleting batches: {:?}", e)
+        }
+        if let Err(e) = self.db.delete_batches_v2(expired_keys) {
+            debug!("Error deleting v2 batches: {:?}", e)
         }
     }
 
