@@ -18115,9 +18115,6 @@
               }
             ]
           },
-          "multisig_address": {
-            "$ref": "#/components/schemas/Address"
-          },
           "replay_protection_nonce": {
             "$ref": "#/components/schemas/U64"
           },

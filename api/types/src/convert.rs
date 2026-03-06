@@ -419,7 +419,6 @@ impl<'a, S: StateView> MoveConverter<'a, S> {
                                 encrypted_state: EncryptedState::Encrypted,
                                 payload_hash: crate::HashValue::from(payload_hash),
                                 ciphertext: None,
-                                multisig_address,
                                 replay_protection_nonce,
                                 decrypted_payload: None,
                                 decryption_nonce: None,
@@ -432,7 +431,6 @@ impl<'a, S: StateView> MoveConverter<'a, S> {
                                 encrypted_state: EncryptedState::FailedDecryption,
                                 payload_hash: crate::HashValue::from(payload_hash),
                                 ciphertext: None,
-                                multisig_address,
                                 replay_protection_nonce,
                                 decrypted_payload: None,
                                 decryption_nonce: None,
@@ -479,7 +477,6 @@ impl<'a, S: StateView> MoveConverter<'a, S> {
                                 encrypted_state: EncryptedState::Decrypted,
                                 payload_hash: crate::HashValue::from(payload_hash),
                                 ciphertext: None,
-                                multisig_address,
                                 replay_protection_nonce,
                                 decrypted_payload: inner,
                                 decryption_nonce: Some(U64::from(decryption_nonce)),
@@ -918,7 +915,7 @@ impl<'a, S: StateView> MoveConverter<'a, S> {
                     bcs::from_bytes(&ciphertext_bytes.0)
                         .context("Failed to BCS-deserialize ciphertext")?;
                 let extra_config = ExtraConfig::V1 {
-                    multisig_address: encrypted.multisig_address.map(|a| a.into()),
+                    multisig_address: None,
                     replay_protection_nonce: encrypted.replay_protection_nonce.map(|n| n.into()),
                 };
                 Target::EncryptedPayload(

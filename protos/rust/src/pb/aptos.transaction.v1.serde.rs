@@ -3026,9 +3026,6 @@ impl serde::Serialize for EncryptedTransactionPayload {
         if !self.payload_hash.is_empty() {
             len += 1;
         }
-        if self.multisig_address.is_some() {
-            len += 1;
-        }
         if self.replay_protection_nonce.is_some() {
             len += 1;
         }
@@ -3046,9 +3043,6 @@ impl serde::Serialize for EncryptedTransactionPayload {
         }
         if !self.payload_hash.is_empty() {
             struct_ser.serialize_field("payloadHash", pbjson::private::base64::encode(&self.payload_hash).as_str())?;
-        }
-        if let Some(v) = self.multisig_address.as_ref() {
-            struct_ser.serialize_field("multisigAddress", v)?;
         }
         if let Some(v) = self.replay_protection_nonce.as_ref() {
             struct_ser.serialize_field("replayProtectionNonce", ToString::to_string(&v).as_str())?;
@@ -3083,8 +3077,6 @@ impl<'de> serde::Deserialize<'de> for EncryptedTransactionPayload {
             "encryptedState",
             "payload_hash",
             "payloadHash",
-            "multisig_address",
-            "multisigAddress",
             "replay_protection_nonce",
             "replayProtectionNonce",
             "decryption_nonce",
@@ -3101,7 +3093,6 @@ impl<'de> serde::Deserialize<'de> for EncryptedTransactionPayload {
         enum GeneratedField {
             EncryptedState,
             PayloadHash,
-            MultisigAddress,
             ReplayProtectionNonce,
             DecryptionNonce,
             EntryFunctionPayload,
@@ -3130,7 +3121,6 @@ impl<'de> serde::Deserialize<'de> for EncryptedTransactionPayload {
                         match value {
                             "encryptedState" | "encrypted_state" => Ok(GeneratedField::EncryptedState),
                             "payloadHash" | "payload_hash" => Ok(GeneratedField::PayloadHash),
-                            "multisigAddress" | "multisig_address" => Ok(GeneratedField::MultisigAddress),
                             "replayProtectionNonce" | "replay_protection_nonce" => Ok(GeneratedField::ReplayProtectionNonce),
                             "decryptionNonce" | "decryption_nonce" => Ok(GeneratedField::DecryptionNonce),
                             "entryFunctionPayload" | "entry_function_payload" => Ok(GeneratedField::EntryFunctionPayload),
@@ -3157,7 +3147,6 @@ impl<'de> serde::Deserialize<'de> for EncryptedTransactionPayload {
             {
                 let mut encrypted_state__ = None;
                 let mut payload_hash__ = None;
-                let mut multisig_address__ = None;
                 let mut replay_protection_nonce__ = None;
                 let mut decryption_nonce__ = None;
                 let mut decrypted_payload__ = None;
@@ -3176,12 +3165,6 @@ impl<'de> serde::Deserialize<'de> for EncryptedTransactionPayload {
                             payload_hash__ =
                                 Some(map.next_value::<::pbjson::private::BytesDeserialize<_>>()?.0)
                             ;
-                        }
-                        GeneratedField::MultisigAddress => {
-                            if multisig_address__.is_some() {
-                                return Err(serde::de::Error::duplicate_field("multisigAddress"));
-                            }
-                            multisig_address__ = map.next_value()?;
                         }
                         GeneratedField::ReplayProtectionNonce => {
                             if replay_protection_nonce__.is_some() {
@@ -3225,7 +3208,6 @@ impl<'de> serde::Deserialize<'de> for EncryptedTransactionPayload {
                 Ok(EncryptedTransactionPayload {
                     encrypted_state: encrypted_state__.unwrap_or_default(),
                     payload_hash: payload_hash__.unwrap_or_default(),
-                    multisig_address: multisig_address__,
                     replay_protection_nonce: replay_protection_nonce__,
                     decryption_nonce: decryption_nonce__,
                     decrypted_payload: decrypted_payload__,

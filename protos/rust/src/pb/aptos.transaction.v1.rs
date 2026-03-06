@@ -661,8 +661,7 @@ pub struct EncryptedTransactionPayload {
     pub encrypted_state: i32,
     #[prost(bytes="vec", tag="2")]
     pub payload_hash: ::prost::alloc::vec::Vec<u8>,
-    #[prost(string, optional, tag="3")]
-    pub multisig_address: ::core::option::Option<::prost::alloc::string::String>,
+    // Field 3 (multisig_address) removed
     #[prost(uint64, optional, tag="4")]
     pub replay_protection_nonce: ::core::option::Option<u64>,
     #[prost(uint64, optional, tag="7")]

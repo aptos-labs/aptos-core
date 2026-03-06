@@ -337,7 +337,8 @@ message EncryptedTransactionPayload {
 
   EncryptedState encrypted_state = 1;
   bytes payload_hash = 2;
-  optional string multisig_address = 3;
+  // Field 3 (multisig_address) removed: for Decrypted state, it is embedded
+  // in the MultisigPayload variant of decrypted_payload.
   optional uint64 replay_protection_nonce = 4;
   // Present only when decrypted
   oneof decrypted_payload {

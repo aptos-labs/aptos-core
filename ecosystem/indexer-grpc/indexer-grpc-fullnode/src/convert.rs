@@ -260,7 +260,6 @@ pub fn convert_transaction_payload(
                         transaction::EncryptedTransactionPayload {
                             encrypted_state: encrypted_state as i32,
                             payload_hash: ep.payload_hash.0.to_vec(),
-                            multisig_address: ep.multisig_address.as_ref().map(|a| a.to_string()),
                             replay_protection_nonce: ep.replay_protection_nonce.map(|n| n.into()),
                             decryption_nonce: ep.decryption_nonce.map(|n| n.into()),
                             decrypted_payload,
@@ -270,7 +269,7 @@ pub fn convert_transaction_payload(
                 extra_config: Some(
                     transaction::transaction_payload::ExtraConfig::ExtraConfigV1(
                         transaction::ExtraConfigV1 {
-                            multisig_address: ep.multisig_address.as_ref().map(|a| a.to_string()),
+                            multisig_address: None,
                             replay_protection_nonce: ep.replay_protection_nonce.map(|n| n.into()),
                         },
                     ),
