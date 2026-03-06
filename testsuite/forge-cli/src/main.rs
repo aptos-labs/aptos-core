@@ -27,9 +27,9 @@ use suites::{
 };
 use tokio::runtime::Runtime;
 
+mod embedded_configs;
 mod suites;
 mod test_registry;
-mod embedded_configs;
 
 #[cfg(unix)]
 #[global_allocator]
@@ -255,11 +255,14 @@ fn main() -> Result<()> {
             // If FORGE_TEST_CONFIG env var is set, load from that YAML file.
             // Otherwise, use the normal suite resolution (embedded YAML -> Rust code).
             let mut test_suite = if let Ok(config_path) = std::env::var("FORGE_TEST_CONFIG") {
-                let config = aptos_forge::ForgeTestConfig::from_file(std::path::Path::new(&config_path))?;
+                let config =
+                    aptos_forge::ForgeTestConfig::from_file(std::path::Path::new(&config_path))?;
                 let registry = test_registry::TestRegistry::build_default();
                 let code = registry
                     .get_with_config(&config.test_name, &config)
-                    .ok_or_else(|| format_err!("Unknown test_name in config: {}", config.test_name))?;
+                    .ok_or_else(|| {
+                        format_err!("Unknown test_name in config: {}", config.test_name)
+                    })?;
                 config.to_forge_config(code)?
             } else {
                 get_test_suite(suite_name, duration, test_cmd)?
@@ -610,17 +613,25 @@ mod test {
             let yaml = embedded_configs::get(suite_name)
                 .unwrap_or_else(|| panic!("Missing embedded config for suite: {}", suite_name));
 
-            let config = ForgeTestConfig::from_yaml(yaml)
-                .unwrap_or_else(|e| panic!("Failed to parse YAML for suite '{}': {}", suite_name, e));
+            let config = ForgeTestConfig::from_yaml(yaml).unwrap_or_else(|e| {
+                panic!("Failed to parse YAML for suite '{}': {}", suite_name, e)
+            });
 
-            let code = registry.get_with_config(&config.test_name, &config)
-                .unwrap_or_else(|| panic!(
-                    "Test name '{}' (from suite '{}') not found in registry",
-                    config.test_name, suite_name
-                ));
+            let code = registry
+                .get_with_config(&config.test_name, &config)
+                .unwrap_or_else(|| {
+                    panic!(
+                        "Test name '{}' (from suite '{}') not found in registry",
+                        config.test_name, suite_name
+                    )
+                });
 
-            config.to_forge_config(code)
-                .unwrap_or_else(|e| panic!("Failed to assemble ForgeConfig for suite '{}': {}", suite_name, e));
+            config.to_forge_config(code).unwrap_or_else(|e| {
+                panic!(
+                    "Failed to assemble ForgeConfig for suite '{}': {}",
+                    suite_name, e
+                )
+            });
         }
     }
 
@@ -629,12 +640,18 @@ mod test {
         use aptos_forge::ForgeTestConfig;
 
         // "land_blocking" should resolve to the same config as "realistic_env_max_load"
-        let land_blocking = embedded_configs::get("land_blocking").expect("land_blocking config missing");
-        let realistic = embedded_configs::get("realistic_env_max_load").expect("realistic_env_max_load config missing");
-        assert_eq!(land_blocking, realistic, "land_blocking should alias realistic_env_max_load");
+        let land_blocking =
+            embedded_configs::get("land_blocking").expect("land_blocking config missing");
+        let realistic = embedded_configs::get("realistic_env_max_load")
+            .expect("realistic_env_max_load config missing");
+        assert_eq!(
+            land_blocking, realistic,
+            "land_blocking should alias realistic_env_max_load"
+        );
 
         // And it should parse correctly
-        let config = ForgeTestConfig::from_yaml(land_blocking).expect("Failed to parse land_blocking YAML");
+        let config =
+            ForgeTestConfig::from_yaml(land_blocking).expect("Failed to parse land_blocking YAML");
         assert_eq!(config.test_name, "two_traffics_realistic_env");
     }
 }

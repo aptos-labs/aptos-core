@@ -144,8 +144,12 @@ pub struct TransactionMixEntry {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(tag = "type")]
 pub enum EmitJobModeConfig {
-    MaxLoad { mempool_backlog: usize },
-    ConstTps { tps: usize },
+    MaxLoad {
+        mempool_backlog: usize,
+    },
+    ConstTps {
+        tps: usize,
+    },
     WaveTps {
         average_tps: usize,
         wave_ratio: f32,
@@ -315,7 +319,8 @@ impl ForgeTestConfig {
             criteria = criteria.add_wait_for_catchup_s(secs);
         }
         for entry in &sc.latency_thresholds {
-            criteria = criteria.add_latency_threshold(entry.threshold_s, entry.latency_type.clone());
+            criteria =
+                criteria.add_latency_threshold(entry.threshold_s, entry.latency_type.clone());
         }
         if let Some(ref breakdown) = sc.latency_breakdown_thresholds {
             let thresholds: Vec<_> = breakdown
@@ -324,7 +329,10 @@ impl ForgeTestConfig {
                 .map(|e| (e.slice.clone(), e.max_s))
                 .collect();
             criteria = criteria.add_latency_breakdown_threshold(
-                LatencyBreakdownThreshold::new_with_breach_pct(thresholds, breakdown.max_breach_pct),
+                LatencyBreakdownThreshold::new_with_breach_pct(
+                    thresholds,
+                    breakdown.max_breach_pct,
+                ),
             );
         }
         if let Some(ref sys) = sc.system_metrics {
@@ -359,8 +367,8 @@ impl ForgeTestConfig {
                 let mut config_value =
                     serde_yaml::to_value(&*config).expect("NodeConfig must serialize");
                 deep_merge_yaml(&mut config_value, &yaml_override);
-                *config =
-                    serde_yaml::from_value(config_value).expect("Merged NodeConfig must deserialize");
+                *config = serde_yaml::from_value(config_value)
+                    .expect("Merged NodeConfig must deserialize");
             }) as OverrideNodeConfigFn
         })
     }
@@ -371,8 +379,8 @@ impl ForgeTestConfig {
         let mut config = ForgeConfig::default();
 
         // Set data fields
-        config.initial_validator_count =
-            NonZeroUsize::new(self.initial_validator_count).unwrap_or(NonZeroUsize::new(1).unwrap());
+        config.initial_validator_count = NonZeroUsize::new(self.initial_validator_count)
+            .unwrap_or(NonZeroUsize::new(1).unwrap());
         config.initial_fullnode_count = self.initial_fullnode_count;
         config.num_pfns = self.num_pfns;
         config.multi_region_config = self.multi_region_config;
@@ -390,10 +398,12 @@ impl ForgeTestConfig {
 
         // Build genesis helm config fn: compose YAML overrides + extra code
         let yaml_genesis_fn = self.build_genesis_helm_config_fn();
-        config.genesis_helm_config_fn = compose_config_fns(yaml_genesis_fn, code.extra_genesis_helm_config_fn);
+        config.genesis_helm_config_fn =
+            compose_config_fns(yaml_genesis_fn, code.extra_genesis_helm_config_fn);
 
         // Build validator override fn: compose YAML overrides + extra code
-        let yaml_validator_fn = Self::build_node_config_override_fn(&self.validator_config_override);
+        let yaml_validator_fn =
+            Self::build_node_config_override_fn(&self.validator_config_override);
         config.validator_override_node_config_fn =
             compose_override_fns(yaml_validator_fn, code.extra_validator_override_fn);
 
@@ -419,10 +429,12 @@ fn compose_config_fns(
     match (yaml_fn, code_fn) {
         (None, None) => None,
         (Some(f), None) | (None, Some(f)) => Some(f),
-        (Some(yaml_f), Some(code_f)) => Some(Arc::new(move |helm_values: &mut serde_yaml::Value| {
-            yaml_f(helm_values);
-            code_f(helm_values);
-        })),
+        (Some(yaml_f), Some(code_f)) => {
+            Some(Arc::new(move |helm_values: &mut serde_yaml::Value| {
+                yaml_f(helm_values);
+                code_f(helm_values);
+            }))
+        },
     }
 }
 
@@ -434,12 +446,12 @@ fn compose_override_fns(
     match (yaml_fn, code_fn) {
         (None, None) => None,
         (Some(f), None) | (None, Some(f)) => Some(f),
-        (Some(yaml_f), Some(code_f)) => {
-            Some(Arc::new(move |config: &mut NodeConfig, base: &mut NodeConfig| {
+        (Some(yaml_f), Some(code_f)) => Some(Arc::new(
+            move |config: &mut NodeConfig, base: &mut NodeConfig| {
                 yaml_f(config, base);
                 code_f(config, base);
-            }))
-        },
+            },
+        )),
     }
 }
 
@@ -552,7 +564,9 @@ success_criteria:
         let config = ForgeTestConfig::from_yaml(yaml).unwrap();
         assert_eq!(config.initial_validator_count, 7);
         let emit = config.emit_job.as_ref().unwrap();
-        assert!(matches!(emit.mode, EmitJobModeConfig::ConstTps { tps: 5000 }));
+        assert!(matches!(emit.mode, EmitJobModeConfig::ConstTps {
+            tps: 5000
+        }));
         assert_eq!(emit.gas_price, Some(500));
         assert_eq!(config.success_criteria.latency_thresholds.len(), 2);
     }
