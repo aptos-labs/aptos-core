@@ -4,15 +4,16 @@
 //! SlotManager: main orchestrator for multi-slot prefix consensus (Algorithm 4).
 //!
 //! Runs one slot at a time: broadcasts proposals, collects them via [`SlotState`],
-//! spawns SPC via [`SPCSpawner`], builds blocks from v_high, wraps in
-//! [`OrderedBlocks`], sends to execution, updates ranking, and advances.
+//! spawns SPC via [`SPCSpawner`], commits blocks in two waves (v_low early,
+//! v_high delta later), wraps in [`OrderedBlocks`], sends to execution,
+//! updates ranking, and advances.
 
 use crate::{
     payload_client::PayloadClient,
     pipeline::{buffer_manager::OrderedBlocks, pipeline_builder::PipelineBuilder},
 };
 use aptos_consensus_types::{
-    common::{Author, Payload, PayloadFilter},
+    common::{Author, Payload, PayloadFilter, Round},
     payload_pull_params::PayloadPullParameters,
     pipelined_block::{PipelineFutures, PipelinedBlock},
     utils::PayloadTxnsSize,
@@ -24,7 +25,7 @@ use aptos_executor_types::state_compute_result::StateComputeResult;
 use aptos_logger::prelude::*;
 use aptos_prefix_consensus::{
     PrefixVector, PriorityClassifiable, SubprotocolNetworkSender, StrongPrefixConsensusMsg,
-    build_block_from_v_high,
+    build_block_for_entry,
     slot_ranking::MultiSlotRankingManager,
     slot_state::SlotState,
     slot_types::{
@@ -56,15 +57,51 @@ const SLOT_PROPOSAL_TIMEOUT_MS: u64 = 300;
 // PendingCommit: waiting for missing payloads before building block
 // ============================================================================
 
-/// State held when v_high has been received but some payloads are still missing.
+/// State held when a wave (v_low or v_high delta) has unresolved payloads.
 ///
 /// The SlotManager stores this while waiting for late proposals or fetch responses
-/// to resolve all missing hashes. Once `missing` is empty, the block is built.
-struct PendingCommit {
-    slot: u64,
-    v_high: PrefixVector,
-    resolved: HashMap<HashValue, Payload>,
-    missing: HashSet<HashValue>,
+/// to resolve all missing hashes. Once `missing` is empty, the wave is committed.
+enum PendingWave {
+    /// Wave 1: waiting for v_low payloads before early commit.
+    VLow {
+        slot: u64,
+        v_low: PrefixVector,
+        resolved: HashMap<HashValue, Payload>,
+        missing: HashSet<HashValue>,
+    },
+    /// Wave 2: waiting for v_high delta payloads before final commit.
+    VHighDelta {
+        slot: u64,
+        v_high: PrefixVector,   // full v_high (not just delta)
+        v_high_len: usize,      // for ranking update
+        resolved: HashMap<HashValue, Payload>,
+        missing: HashSet<HashValue>,
+    },
+}
+
+impl PendingWave {
+    /// Whether this is wave 1 (v_low).
+    fn is_v_low(&self) -> bool {
+        matches!(self, PendingWave::VLow { .. })
+    }
+
+    /// Mutable access to the common fields across both variants.
+    fn pending_fields(&mut self) -> (u64, &mut HashSet<HashValue>, &mut HashMap<HashValue, Payload>) {
+        match self {
+            PendingWave::VLow { slot, missing, resolved, .. } => (*slot, missing, resolved),
+            PendingWave::VHighDelta { slot, missing, resolved, .. } => (*slot, missing, resolved),
+        }
+    }
+
+    /// Extract the fields needed by `commit_wave`: (slot, vector, resolved, finalize_len).
+    fn into_commit_args(self) -> (u64, PrefixVector, HashMap<HashValue, Payload>, Option<usize>) {
+        match self {
+            PendingWave::VLow { slot, v_low, resolved, .. } => (slot, v_low, resolved, None),
+            PendingWave::VHighDelta { slot, v_high, v_high_len, resolved, .. } => {
+                (slot, v_high, resolved, Some(v_high_len))
+            },
+        }
+    }
 }
 
 // ============================================================================
@@ -199,8 +236,9 @@ where
 /// Main orchestrator for multi-slot prefix consensus.
 ///
 /// Runs one slot at a time: broadcasts proposals, collects them via
-/// [`SlotState`], spawns SPC, builds blocks from v_high, wraps in
-/// [`OrderedBlocks`], sends to execution, updates ranking, and advances.
+/// [`SlotState`], spawns SPC, commits blocks in two waves (v_low early,
+/// v_high delta later), wraps in [`OrderedBlocks`], sends to execution,
+/// updates ranking, and advances.
 pub struct SlotManager<NS: SubprotocolNetworkSender<SlotConsensusMsg>, SP: SPCSpawner> {
     // Identity
     author: Author,
@@ -229,8 +267,11 @@ pub struct SlotManager<NS: SubprotocolNetworkSender<SlotConsensusMsg>, SP: SPCSp
     // SPC spawner (production vs. test)
     spc_spawner: SP,
 
-    // Pending commit: waiting for missing payloads before block construction
-    pending_commit: Option<PendingCommit>,
+    // Two-wave commit state
+    pending_wave: Option<PendingWave>,
+    next_round: Round,                          // global sequential round counter (persists across slots)
+    v_low_committed_positions: HashSet<usize>,  // ranking positions committed in wave 1 (reset per slot)
+    buffered_v_high: Option<(u64, PrefixVector)>, // v_high buffered if it arrives while wave 1 is pending
 
     // Execution bridge
     execution_channel: futures::channel::mpsc::UnboundedSender<OrderedBlocks>,
@@ -281,7 +322,10 @@ impl<NS: SubprotocolNetworkSender<SlotConsensusMsg>, SP: SPCSpawner> SlotManager
             spc_msg_buffer: HashMap::new(),
             spc_priority_buffer: HashMap::new(),
             spc_spawner,
-            pending_commit: None,
+            pending_wave: None,
+            next_round: 1,
+            v_low_committed_positions: HashSet::new(),
+            buffered_v_high: None,
             execution_channel,
             pipeline_builder,
             parent_pipeline_futs,
@@ -390,24 +434,20 @@ impl<NS: SubprotocolNetworkSender<SlotConsensusMsg>, SP: SPCSpawner> SlotManager
                     self.spc_output_rx = spc_rx_opt;
                     match output {
                         Some(SPCOutput::VLow { slot, v_low }) => {
-                            info!(
-                                epoch = self.epoch,
-                                slot = slot,
-                                v_low_len = v_low.len(),
-                                "Received v_low from SPC task"
-                            );
-                            // TODO(Phase 3): on_spc_v_low for early commit.
-                            // For now, v_low is logged but not acted upon until
-                            // the two-wave commit logic is implemented.
+                            self.on_spc_v_low(slot, v_low).await;
                         }
                         Some(SPCOutput::VHigh { slot, v_high }) => {
-                            info!(
-                                epoch = self.epoch,
-                                slot = slot,
-                                v_high_len = v_high.len(),
-                                "Received v_high from SPC task"
-                            );
-                            self.on_spc_v_high(slot, v_high).await;
+                            // If wave 1 payloads are still pending, buffer v_high
+                            if self.pending_wave.as_ref().is_some_and(|p| p.is_v_low()) {
+                                info!(
+                                    epoch = self.epoch,
+                                    slot = slot,
+                                    "Wave 1 still pending, buffering v_high"
+                                );
+                                self.buffered_v_high = Some((slot, v_high));
+                            } else {
+                                self.on_spc_v_high_complete(slot, v_high).await;
+                            }
                         }
                         None => {
                             error!(
@@ -449,6 +489,9 @@ impl<NS: SubprotocolNetworkSender<SlotConsensusMsg>, SP: SPCSpawner> SlotManager
 
     async fn start_new_slot(&mut self, slot: u64) {
         self.current_slot = slot;
+        // Reset per-slot state (next_round persists across slots)
+        self.v_low_committed_positions.clear();
+        self.buffered_v_high = None;
         info!(epoch = self.epoch, slot = slot, "Starting new slot");
 
         // Pull payload from mempool
@@ -551,7 +594,7 @@ impl<NS: SubprotocolNetworkSender<SlotConsensusMsg>, SP: SPCSpawner> SlotManager
             self.run_spc(slot).await;
         }
 
-        // Check if this late proposal resolves a pending commit
+        // Check if this late proposal resolves a pending wave
         self.try_resolve_pending(proposal_hash, proposal_payload)
             .await;
     }
@@ -578,7 +621,7 @@ impl<NS: SubprotocolNetworkSender<SlotConsensusMsg>, SP: SPCSpawner> SlotManager
     }
 
     // ========================================================================
-    // SPC: run_spc, on_spc_v_high, process_spc_message
+    // SPC: run_spc, on_spc_v_low, on_spc_v_high_complete, commit_wave, process_spc_message
     // ========================================================================
 
     async fn run_spc(&mut self, slot: u64) {
@@ -660,42 +703,43 @@ impl<NS: SubprotocolNetworkSender<SlotConsensusMsg>, SP: SPCSpawner> SlotManager
         }
     }
 
-    async fn on_spc_v_high(&mut self, slot: u64, v_high: PrefixVector) {
+    /// Handle v_low from SPC (wave 1 — early commit).
+    async fn on_spc_v_low(&mut self, slot: u64, v_low: PrefixVector) {
         info!(
             epoch = self.epoch,
             slot = slot,
-            v_high_len = v_high.len(),
-            "SPC completed, resolving payloads"
+            v_low_len = v_low.len(),
+            non_bot = v_low.iter().filter(|h| **h != HashValue::zero()).count(),
+            "Resolving v_low payloads for wave 1 (early commit)"
         );
 
-        // Resolve payloads from primary payload_map + late proposals
         let (resolved, missing) = self
             .slot_states
             .get(&slot)
-            .expect("SlotState must exist when SPC completes")
-            .resolve_missing_payloads(&v_high);
+            .expect("SlotState must exist when SPC produces v_low")
+            .resolve_missing_payloads(&v_low);
 
         if missing.is_empty() {
-            // Happy path: all payloads available
-            self.build_and_commit_block(slot, v_high, resolved).await;
+            self.commit_wave(slot, &v_low, &resolved, None).await;
+            // Check if v_high was buffered (shouldn't happen if v_low resolves instantly,
+            // but handle it for robustness)
+            if let Some((vhigh_slot, v_high)) = self.buffered_v_high.take() {
+                self.on_spc_v_high_complete(vhigh_slot, v_high).await;
+            }
         } else {
             info!(
                 epoch = self.epoch,
                 slot = slot,
                 missing_count = missing.len(),
-                "Missing payloads, broadcasting fetch requests"
+                "Wave 1 (v_low): missing payloads, broadcasting fetch requests"
             );
-
-            // Store pending commit
             let missing_set: HashSet<HashValue> = missing.iter().cloned().collect();
-            self.pending_commit = Some(PendingCommit {
+            self.pending_wave = Some(PendingWave::VLow {
                 slot,
-                v_high,
+                v_low,
                 resolved,
                 missing: missing_set,
             });
-
-            // Broadcast fetch requests for each missing hash
             for hash in &missing {
                 self.network_sender
                     .broadcast(SlotConsensusMsg::PayloadFetchRequest(
@@ -710,112 +754,216 @@ impl<NS: SubprotocolNetworkSender<SlotConsensusMsg>, SP: SPCSpawner> SlotManager
         }
     }
 
-    /// Build block from v_high and resolved payloads, send to execution, advance slot.
-    async fn build_and_commit_block(
-        &mut self,
-        slot: u64,
-        v_high: PrefixVector,
-        payload_map: HashMap<HashValue, Payload>,
-    ) {
+    /// Handle v_high from SPC (wave 2 — delta commit + slot finalization).
+    async fn on_spc_v_high_complete(&mut self, slot: u64, v_high: PrefixVector) {
         info!(
             epoch = self.epoch,
             slot = slot,
-            "Building block from v_high"
+            v_high_len = v_high.len(),
+            committed_in_wave1 = self.v_low_committed_positions.len(),
+            "Processing v_high for wave 2 (delta commit)"
         );
 
-        // Deterministic timestamp: max(parent_ts + 1, max_proposal_timestamp_in_v_high).
-        // All validators must agree on the exact same block (including timestamp)
-        // for commit votes to aggregate. We use only proposals referenced in v_high
-        // (not all proposals in the buffer) because different validators may have
-        // received different subsets of proposals. v_high and ranking are identical
-        // on all correct validators, making this deterministic.
-        let parent_ts = self.parent_block_info.timestamp_usecs();
-        let max_proposal_ts = self
-            .slot_states
-            .get(&slot)
-            .map(|s| {
-                s.max_timestamp_for_v_high(
-                    &v_high,
-                    self.ranking_manager.current_ranking(),
-                )
+        // Build delta vector: zero out positions already committed in wave 1
+        let delta_vector: PrefixVector = v_high
+            .iter()
+            .enumerate()
+            .map(|(i, h)| {
+                if self.v_low_committed_positions.contains(&i) {
+                    HashValue::zero()
+                } else {
+                    *h
+                }
             })
-            .unwrap_or(0);
-        let timestamp = max_proposal_ts
-            .max(parent_ts.checked_add(1).expect("timestamp overflow"));
+            .collect();
 
-        // Build block (round == slot)
-        let block = build_block_from_v_high(
-            self.epoch,
-            slot,                                    // round (== slot)
-            timestamp,
-            self.ranking_manager.current_ranking(),  // ranking
-            &v_high,
-            &payload_map,
-            self.parent_block_info.id(),             // parent_block_id
-            vec![],                                  // validator_txns
-        );
+        let has_delta = delta_vector.iter().any(|h| *h != HashValue::zero());
 
-        // Wrap in PipelinedBlock + OrderedBlocks
-        let pipelined = Arc::new(PipelinedBlock::new(
-            block,
-            vec![],
-            StateComputeResult::new_dummy(),
-        ));
-
-        // Set up execution pipeline futures (required by buffer manager's ExecutionSchedulePhase).
-        // Without this, wait_for_compute_result() returns "Pipeline aborted".
-        if let Some(pipeline_builder) = &self.pipeline_builder {
-            if let Some(parent_futs) = self.parent_pipeline_futs.take() {
-                pipeline_builder.build_for_consensus(
-                    &pipelined,
-                    parent_futs,
-                    Box::new(|_, _| {}),
-                );
-                // Save this block's futs as parent for the next block
-                self.parent_pipeline_futs = pipelined.pipeline_futs();
-            } else {
-                error!(
-                    epoch = self.epoch,
-                    slot = slot,
-                    "Missing parent pipeline futs, block execution may fail"
-                );
-            }
+        if !has_delta {
+            // v_low == v_high or all delta positions are bot. Finalize immediately.
+            info!(
+                epoch = self.epoch,
+                slot = slot,
+                "No delta entries in v_high, finalizing slot"
+            );
+            self.finalize_slot(slot, v_high.len()).await;
+            return;
         }
 
-        // Resolve order_proof_tx so sign_and_broadcast_commit_vote can proceed.
-        // Without this, the pipeline's signing future hangs forever waiting for
-        // order_proof_fut, blocking commit vote broadcast and preventing commits.
-        // The consensus_data_hash (HashValue::zero()) must match ordered_proof below
-        let wrapped_li = WrappedLedgerInfo::new(
-            VoteData::dummy(),
-            LedgerInfoWithSignatures::new(
-                LedgerInfo::new(BlockInfo::empty(), HashValue::zero()),
-                AggregateSignature::empty(),
-            ),
-        );
-        if let Some(tx) = pipelined.pipeline_tx().lock().as_mut() {
-            if let Some(tx) = tx.order_proof_tx.take() {
-                if tx.send(wrapped_li).is_err() {
+        let (resolved, missing) = self
+            .slot_states
+            .get(&slot)
+            .expect("SlotState must exist when SPC produces v_high")
+            .resolve_missing_payloads(&delta_vector);
+
+        if missing.is_empty() {
+            self.commit_wave(slot, &v_high, &resolved, Some(v_high.len()))
+                .await;
+        } else {
+            info!(
+                epoch = self.epoch,
+                slot = slot,
+                missing_count = missing.len(),
+                "Wave 2 (v_high delta): missing payloads, broadcasting fetch requests"
+            );
+            let v_high_len = v_high.len();
+            let missing_set: HashSet<HashValue> = missing.iter().cloned().collect();
+            self.pending_wave = Some(PendingWave::VHighDelta {
+                slot,
+                v_high,
+                v_high_len,
+                resolved,
+                missing: missing_set,
+            });
+            for hash in &missing {
+                self.network_sender
+                    .broadcast(SlotConsensusMsg::PayloadFetchRequest(
+                        PayloadFetchRequest {
+                            slot,
+                            epoch: self.epoch,
+                            payload_hash: *hash,
+                        },
+                    ))
+                    .await;
+            }
+        }
+    }
+
+    /// Build blocks for one wave (v_low or v_high delta), send to execution.
+    ///
+    /// Iterates `vector` in ranking order, skipping positions in
+    /// `v_low_committed_positions` and bot entries. Each non-skipped non-bot
+    /// entry becomes its own block with `round = self.next_round++`.
+    ///
+    /// If `finalize_with_v_high_len` is `Some(len)`, this is the final wave:
+    /// ranking is updated, slot state and SPC channels are cleaned up, and
+    /// the next slot starts.
+    async fn commit_wave(
+        &mut self,
+        slot: u64,
+        vector: &PrefixVector,
+        payload_map: &HashMap<HashValue, Payload>,
+        finalize_with_v_high_len: Option<usize>,
+    ) {
+        let ranking = self.ranking_manager.current_ranking();
+        let mut blocks: Vec<Arc<PipelinedBlock>> = Vec::new();
+        let mut newly_committed_positions: Vec<usize> = Vec::new();
+
+        for (pos, (hash, author)) in vector.iter().zip(ranking.iter()).enumerate() {
+            if *hash == HashValue::zero() {
+                continue;
+            }
+            if self.v_low_committed_positions.contains(&pos) {
+                continue;
+            }
+
+            let payload = payload_map
+                .get(hash)
+                .expect("Payload missing for committed hash — payload resolution bug");
+
+            // Deterministic timestamp: max(parent_ts + 1, proposal_timestamp)
+            let parent_ts = self.parent_block_info.timestamp_usecs();
+            let proposal_ts = self
+                .slot_states
+                .get(&slot)
+                .map(|s| s.proposal_timestamp(author))
+                .unwrap_or(0);
+            let timestamp = proposal_ts
+                .max(parent_ts.checked_add(1).expect("timestamp overflow"));
+
+            let round = self.next_round;
+            self.next_round += 1;
+
+            let block = build_block_for_entry(
+                self.epoch,
+                round,
+                timestamp,
+                *author,
+                *hash,
+                payload.clone(),
+                self.parent_block_info.id(),
+                vec![], // validator_txns
+            );
+
+            let pipelined = Arc::new(PipelinedBlock::new(
+                block,
+                vec![],
+                StateComputeResult::new_dummy(),
+            ));
+
+            // Set up execution pipeline futures
+            if let Some(pipeline_builder) = &self.pipeline_builder {
+                if let Some(parent_futs) = self.parent_pipeline_futs.take() {
+                    pipeline_builder.build_for_consensus(
+                        &pipelined,
+                        parent_futs,
+                        Box::new(|_, _| {}),
+                    );
+                    self.parent_pipeline_futs = pipelined.pipeline_futs();
+                } else {
                     error!(
                         epoch = self.epoch,
                         slot = slot,
-                        "Failed to send order_proof — pipeline receiver dropped. \
-                         Block execution will stall."
+                        round = round,
+                        "Missing parent pipeline futs, block execution may fail"
                     );
                 }
             }
+
+            // Resolve order_proof_tx so the pipeline's signing future can proceed
+            let wrapped_li = WrappedLedgerInfo::new(
+                VoteData::dummy(),
+                LedgerInfoWithSignatures::new(
+                    LedgerInfo::new(BlockInfo::empty(), HashValue::zero()),
+                    AggregateSignature::empty(),
+                ),
+            );
+            if let Some(tx) = pipelined.pipeline_tx().lock().as_mut() {
+                if let Some(tx) = tx.order_proof_tx.take() {
+                    if tx.send(wrapped_li).is_err() {
+                        error!(
+                            epoch = self.epoch,
+                            slot = slot,
+                            round = round,
+                            "Failed to send order_proof — pipeline receiver dropped"
+                        );
+                    }
+                }
+            }
+
+            self.parent_block_info = pipelined.block_info();
+            newly_committed_positions.push(pos);
+            blocks.push(pipelined);
         }
 
-        let block_info = pipelined.block_info();
+        // Defensive early-return if no blocks produced
+        if blocks.is_empty() {
+            info!(
+                epoch = self.epoch,
+                slot = slot,
+                "commit_wave: no blocks produced (all entries bot or already committed)"
+            );
+            if let Some(v_high_len) = finalize_with_v_high_len {
+                self.finalize_slot(slot, v_high_len).await;
+            }
+            return;
+        }
+
+        // Record committed positions (for wave 1 → wave 2 tracking)
+        for pos in &newly_committed_positions {
+            self.v_low_committed_positions.insert(*pos);
+        }
+
+        // Build OrderedBlocks with ordered_proof covering the last block
+        let last_block_info = blocks.last().unwrap().block_info();
         let ordered = OrderedBlocks {
-            ordered_blocks: vec![pipelined],
+            ordered_blocks: blocks,
             ordered_proof: LedgerInfoWithSignatures::new(
-                LedgerInfo::new(block_info.clone(), HashValue::zero()),
+                LedgerInfo::new(last_block_info.clone(), HashValue::zero()),
                 AggregateSignature::empty(),
             ),
         };
 
-        // Send to execution
         if let Err(e) = self.execution_channel.unbounded_send(ordered) {
             error!(
                 epoch = self.epoch,
@@ -827,38 +975,41 @@ impl<NS: SubprotocolNetworkSender<SlotConsensusMsg>, SP: SPCSpawner> SlotManager
             info!(
                 epoch = self.epoch,
                 slot = slot,
-                block_id = %block_info.id(),
-                round = block_info.round(),
-                timestamp = block_info.timestamp_usecs(),
-                "Block sent to execution pipeline"
+                block_count = newly_committed_positions.len(),
+                last_round = last_block_info.round(),
+                is_final_wave = finalize_with_v_high_len.is_some(),
+                "Wave committed — blocks sent to execution pipeline"
             );
         }
 
-        // Update parent tracking
-        self.parent_block_info = block_info;
+        if let Some(v_high_len) = finalize_with_v_high_len {
+            self.finalize_slot(slot, v_high_len).await;
+        }
+    }
 
-        // Update ranking: v_high.len() is the committed prefix length ℓ.
-        // If ℓ < n, the validator at position ℓ (first excluded) is demoted.
-        self.ranking_manager.update(v_high.len());
+    /// Finalize the slot: update ranking, clean up state, advance to next slot.
+    async fn finalize_slot(&mut self, slot: u64, v_high_len: usize) {
+        self.ranking_manager.update(v_high_len);
 
-        // Clean up slot state, SPC channels, message buffers, and pending commit
+        // Clean up slot state, SPC channels, message buffers, and pending state
         self.spc_msg_tx.take();
         self.spc_priority_tx.take();
         self.spc_output_rx.take();
         self.spc_close_tx.take();
         self.spc_msg_buffer.remove(&slot);
         self.spc_priority_buffer.remove(&slot);
-        self.pending_commit = None;
+        self.pending_wave = None;
+        self.buffered_v_high = None;
         self.slot_states.remove(&slot);
 
         info!(
             epoch = self.epoch,
             completed_slot = slot,
             next_slot = slot + 1,
-            "Slot committed, advancing to next slot"
+            next_round = self.next_round,
+            "Slot finalized, advancing to next slot"
         );
 
-        // Advance to next slot
         self.start_new_slot(slot + 1).await;
     }
 
@@ -963,7 +1114,7 @@ impl<NS: SubprotocolNetworkSender<SlotConsensusMsg>, SP: SPCSpawner> SlotManager
     // TODO(production): A Byzantine node can send unsolicited PayloadFetchResponse
     // messages, forcing us to compute H(payload) for each one. The cost is low
     // (SHA3-256 over serialized payload), but for hardening we should check
-    // `pending_commit.missing.contains(&resp.payload_hash)` *before* computing
+    // `pending_wave.missing.contains(&resp.payload_hash)` *before* computing
     // the hash, so unsolicited responses are dropped at near-zero cost.
     async fn process_payload_fetch_response(&mut self, resp: PayloadFetchResponse) {
         if resp.epoch != self.epoch {
@@ -980,30 +1131,12 @@ impl<NS: SubprotocolNetworkSender<SlotConsensusMsg>, SP: SPCSpawner> SlotManager
             return;
         }
 
-        // Check if this resolves a pending commit
-        if let Some(pending) = &mut self.pending_commit {
-            if pending.slot == resp.slot && pending.missing.remove(&resp.payload_hash) {
-                pending.resolved.insert(resp.payload_hash, resp.payload);
-
-                if pending.missing.is_empty() {
-                    // All payloads resolved — build block
-                    let pending = self.pending_commit.take().unwrap();
-                    self.build_and_commit_block(pending.slot, pending.v_high, pending.resolved)
-                        .await;
-                }
-            }
-        }
-    }
-
-    /// Check if a newly resolved payload_hash resolves a pending commit.
-    ///
-    /// Called after a late proposal is inserted into the slot state. The payload
-    /// is passed directly to avoid a redundant HashMap lookup + clone.
-    async fn try_resolve_pending(&mut self, payload_hash: HashValue, payload: Payload) {
-        let should_commit = if let Some(pending) = &mut self.pending_commit {
-            if pending.missing.remove(&payload_hash) {
-                pending.resolved.insert(payload_hash, payload);
-                pending.missing.is_empty()
+        // Check if this resolves a pending wave
+        let should_commit = if let Some(pending) = &mut self.pending_wave {
+            let (pending_slot, missing, resolved) = pending.pending_fields();
+            if pending_slot == resp.slot && missing.remove(&resp.payload_hash) {
+                resolved.insert(resp.payload_hash, resp.payload);
+                missing.is_empty()
             } else {
                 false
             }
@@ -1012,9 +1145,45 @@ impl<NS: SubprotocolNetworkSender<SlotConsensusMsg>, SP: SPCSpawner> SlotManager
         };
 
         if should_commit {
-            let pending = self.pending_commit.take().unwrap();
-            self.build_and_commit_block(pending.slot, pending.v_high, pending.resolved)
-                .await;
+            let pending = self.pending_wave.take().unwrap();
+            let check_buffered = pending.is_v_low();
+            let (slot, vector, resolved, finalize_len) = pending.into_commit_args();
+            self.commit_wave(slot, &vector, &resolved, finalize_len).await;
+            if check_buffered {
+                if let Some((vhigh_slot, v_high)) = self.buffered_v_high.take() {
+                    self.on_spc_v_high_complete(vhigh_slot, v_high).await;
+                }
+            }
+        }
+    }
+
+    /// Check if a newly resolved payload_hash resolves a pending wave.
+    ///
+    /// Called after a late proposal is inserted into the slot state. The payload
+    /// is passed directly to avoid a redundant HashMap lookup + clone.
+    async fn try_resolve_pending(&mut self, payload_hash: HashValue, payload: Payload) {
+        let should_commit = if let Some(pending) = &mut self.pending_wave {
+            let (_slot, missing, resolved) = pending.pending_fields();
+            if missing.remove(&payload_hash) {
+                resolved.insert(payload_hash, payload);
+                missing.is_empty()
+            } else {
+                false
+            }
+        } else {
+            false
+        };
+
+        if should_commit {
+            let pending = self.pending_wave.take().unwrap();
+            let check_buffered = pending.is_v_low();
+            let (slot, vector, resolved, finalize_len) = pending.into_commit_args();
+            self.commit_wave(slot, &vector, &resolved, finalize_len).await;
+            if check_buffered {
+                if let Some((vhigh_slot, v_high)) = self.buffered_v_high.take() {
+                    self.on_spc_v_high_complete(vhigh_slot, v_high).await;
+                }
+            }
         }
     }
 
@@ -1147,15 +1316,29 @@ mod tests {
         }
     }
 
-    /// Helper: drain VLow from the SPC output channel and return the VHigh (slot, v_high).
-    /// StubSPCSpawner sends VLow then VHigh, so we skip VLow and extract VHigh.
-    async fn recv_v_high(
-        rx: &mut tokio::sync::mpsc::UnboundedReceiver<SPCOutput>,
-    ) -> (u64, PrefixVector) {
+    /// Process all SPC output: handles VLow (wave 1) then VHigh (wave 2), driving
+    /// the two-wave commit flow. StubSPCSpawner sends VLow then VHigh.
+    ///
+    /// Takes `spc_output_rx` out of the manager to avoid borrow conflicts (same
+    /// pattern as the main event loop). The rx is not restored since both messages
+    /// are consumed and `finalize_slot` cleans up the field anyway.
+    async fn process_spc_output(
+        manager: &mut SlotManager<MockSlotNetworkSender, StubSPCSpawner>,
+    ) {
+        let mut rx = manager.spc_output_rx.take().expect("SPC output rx must exist");
         loop {
             match rx.recv().await.expect("SPC output channel closed") {
-                SPCOutput::VLow { .. } => continue, // skip v_low
-                SPCOutput::VHigh { slot, v_high } => return (slot, v_high),
+                SPCOutput::VLow { slot, v_low } => {
+                    manager.on_spc_v_low(slot, v_low).await;
+                },
+                SPCOutput::VHigh { slot, v_high } => {
+                    if manager.pending_wave.as_ref().is_some_and(|p| p.is_v_low()) {
+                        manager.buffered_v_high = Some((slot, v_high));
+                    } else {
+                        manager.on_spc_v_high_complete(slot, v_high).await;
+                    }
+                    break;
+                },
             }
         }
     }
@@ -1219,7 +1402,7 @@ mod tests {
         assert!(manager.spc_msg_tx.is_none());
         assert!(manager.spc_output_rx.is_none());
         assert!(manager.spc_close_tx.is_none());
-        assert!(manager.pending_commit.is_none());
+        assert!(manager.pending_wave.is_none());
         assert!(manager.slot_timer.is_none());
     }
 
@@ -1249,18 +1432,20 @@ mod tests {
         }
 
         // All 4 proposals received → SPC should have been triggered
-        // StubSPCSpawner sends output synchronously → available immediately
+        // StubSPCSpawner sends VLow then VHigh synchronously → available immediately
         if manager.spc_output_rx.is_some() {
-            let (slot, v_high) = recv_v_high(manager.spc_output_rx.as_mut().unwrap()).await;
-            manager.on_spc_v_high(slot, v_high).await;
+            process_spc_output(&mut manager).await;
         }
 
-        // Block should have been sent to execution
-        let ordered = exec_rx.try_next().unwrap().expect("Block should be on execution channel");
-        assert_eq!(ordered.ordered_blocks.len(), 1);
-        let block = ordered.ordered_blocks[0].block();
-        assert_eq!(block.epoch(), 1);
-        assert_eq!(block.round(), 1); // round == slot
+        // Wave 1: one OrderedBlocks with 4 per-entry blocks (v_low == v_high, all non-bot)
+        let ordered = exec_rx.try_next().unwrap().expect("Wave 1 should be on execution channel");
+        assert_eq!(ordered.ordered_blocks.len(), 4);
+        assert_eq!(ordered.ordered_blocks[0].block().epoch(), 1);
+        // Rounds are sequential: 1, 2, 3, 4
+        assert_eq!(ordered.ordered_blocks[0].block().round(), 1);
+        assert_eq!(ordered.ordered_blocks[3].block().round(), 4);
+        // ordered_proof covers the last block
+        assert_eq!(ordered.ordered_proof.commit_info().round(), 4);
 
         // Manager should have advanced to slot 2
         assert_eq!(manager.current_slot, 2);
@@ -1275,15 +1460,15 @@ mod tests {
         manager.start_new_slot(1).await;
 
         // With 1 validator, the own proposal is the only one needed
-        // StubSPCSpawner sends output synchronously → available immediately
+        // StubSPCSpawner sends VLow then VHigh synchronously → available immediately
         if manager.spc_output_rx.is_some() {
-            let (slot, v_high) = recv_v_high(manager.spc_output_rx.as_mut().unwrap()).await;
-            manager.on_spc_v_high(slot, v_high).await;
+            process_spc_output(&mut manager).await;
         }
 
-        // Block should be on exec channel
-        let ordered = exec_rx.try_next().unwrap().expect("Block should be on execution channel");
+        // Wave 1: 1 block (single validator)
+        let ordered = exec_rx.try_next().unwrap().expect("Wave 1 should be on execution channel");
         assert_eq!(ordered.ordered_blocks.len(), 1);
+        assert_eq!(ordered.ordered_blocks[0].block().round(), 1);
         assert_eq!(manager.current_slot, 2);
     }
 
@@ -1329,14 +1514,11 @@ mod tests {
         // Fire timer to trigger SPC with partial proposals
         manager.slot_timer = None;
         manager.run_spc(1).await;
-        let (slot, v_high) = recv_v_high(manager.spc_output_rx.as_mut().unwrap()).await;
+        process_spc_output(&mut manager).await;
 
-        // v_high has length 4 (full ranking), entries for signers[2] and [3] are zero
-        assert_eq!(v_high.len(), 4);
-        manager.on_spc_v_high(slot, v_high).await;
-
-        // Consume the block
-        let _block1 = exec_rx.try_next().unwrap().expect("Block 1");
+        // Wave 1: 2 non-bot entries (signers[0] and [1]), signers[2] and [3] are bot
+        let ordered = exec_rx.try_next().unwrap().expect("Wave 1");
+        assert_eq!(ordered.ordered_blocks.len(), 2);
 
         // After slot 1: v_high.len() == 4, so ranking_manager.update(4) → no demotion
         // (full prefix, all 4 positions present even if some are ⊥)
@@ -1358,19 +1540,20 @@ mod tests {
         manager.process_proposal(signers[1].author(), p).await;
 
         if manager.spc_output_rx.is_some() {
-            let (slot, v_high) = recv_v_high(manager.spc_output_rx.as_mut().unwrap()).await;
-            manager.on_spc_v_high(slot, v_high).await;
+            process_spc_output(&mut manager).await;
         }
 
-        let ordered = exec_rx.try_next().unwrap().expect("Block on exec channel");
-        assert_eq!(ordered.ordered_blocks.len(), 1);
+        // Wave 1: 2 per-entry blocks (2 validators, both non-bot)
+        let ordered = exec_rx.try_next().unwrap().expect("Wave 1 on exec channel");
+        assert_eq!(ordered.ordered_blocks.len(), 2);
         let block = ordered.ordered_blocks[0].block();
         assert_eq!(block.epoch(), 1);
         assert_eq!(block.round(), 1);
-        // Verify it has a valid proof
+        assert_eq!(ordered.ordered_blocks[1].block().round(), 2);
+        // ordered_proof covers the last block
         assert_eq!(
             ordered.ordered_proof.commit_info().round(),
-            1
+            2
         );
     }
 
@@ -1381,11 +1564,10 @@ mod tests {
 
         let initial_parent = manager.parent_block_info.clone();
 
-        // Run slot 1
+        // Run slot 1 (1 validator → 1 block)
         manager.start_new_slot(1).await;
         if manager.spc_output_rx.is_some() {
-            let (slot, v_high) = recv_v_high(manager.spc_output_rx.as_mut().unwrap()).await;
-            manager.on_spc_v_high(slot, v_high).await;
+            process_spc_output(&mut manager).await;
         }
         let _block1 = exec_rx.try_next().unwrap().unwrap();
 
@@ -1393,10 +1575,9 @@ mod tests {
         assert_ne!(manager.parent_block_info.id(), initial_parent.id());
         let parent_after_slot1 = manager.parent_block_info.clone();
 
-        // Run slot 2 (start_new_slot(2) was called by on_spc_v_high for slot 1)
+        // Run slot 2 (start_new_slot(2) was called by finalize_slot for slot 1)
         if manager.spc_output_rx.is_some() {
-            let (slot, v_high) = recv_v_high(manager.spc_output_rx.as_mut().unwrap()).await;
-            manager.on_spc_v_high(slot, v_high).await;
+            process_spc_output(&mut manager).await;
         }
         let _block2 = exec_rx.try_next().unwrap().unwrap();
 
@@ -1447,12 +1628,11 @@ mod tests {
             1
         );
 
-        // Now run slot 1 quickly (single validator would be too easy, let's just fast-forward)
+        // Now run slot 1 quickly (fast-forward with timer skip)
         manager.start_new_slot(1).await;
         manager.slot_timer = None;
         manager.run_spc(1).await;
-        let (slot, v_high) = recv_v_high(manager.spc_output_rx.as_mut().unwrap()).await;
-        manager.on_spc_v_high(slot, v_high).await;
+        process_spc_output(&mut manager).await;
         let _block1 = exec_rx.try_next().unwrap().unwrap();
 
         // Now at slot 2 — the pre-buffered proposal should still be there

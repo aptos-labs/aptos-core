@@ -330,6 +330,11 @@ impl SlotState {
         self.proposal_buffer.is_complete()
     }
 
+    /// Returns the timestamp for a specific author's proposal, or 0 if not found.
+    pub fn proposal_timestamp(&self, author: &Author) -> u64 {
+        self.timestamp_map.get(author).copied().unwrap_or(0)
+    }
+
     /// Returns the maximum timestamp from proposals whose authors correspond to
     /// non-⊥ entries in `v_high`, using `timestamp_map` which includes late proposals.
     ///
