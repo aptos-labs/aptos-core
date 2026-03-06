@@ -11,7 +11,7 @@ proposals:
     execution_mode: MultiStep
     update_sequence:
       - Execution:
-          V4:
+          V7:
             block_gas_limit_type:
               complex_limit_v1:
                 effective_block_gas_limit: 300000
