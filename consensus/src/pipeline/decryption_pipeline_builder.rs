@@ -38,6 +38,7 @@ impl PipelineBuilder {
         maybe_secret_share_config: Option<SecretShareConfig>,
         derived_self_key_share_tx: oneshot::Sender<Option<SecretShare>>,
         secret_shared_key_rx: oneshot::Receiver<Option<SecretSharedKey>>,
+        observer_enabled: bool,
     ) -> TaskResult<DecryptionResult> {
         let mut tracker = Tracker::start_waiting("decrypt_encrypted_txns", &block);
         let (input_txns, max_txns_from_block_to_execute, block_gas_limit) = materialize_fut.await?;
@@ -59,6 +60,15 @@ impl PipelineBuilder {
         // Assumption: `input_txns` is free of Encrypted Transactions
         // due to VM validation checks
         let Some(secret_share_config) = maybe_secret_share_config else {
+            if !observer_enabled {
+                return Ok((
+                    input_txns,
+                    max_txns_from_block_to_execute,
+                    block_gas_limit,
+                    Some(None),
+                ));
+            }
+
             // TODO(ibalajiarun): Is sending None necessary?
             let _ = derived_self_key_share_tx.send(None);
             let maybe_key = secret_shared_key_rx
