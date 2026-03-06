@@ -3,13 +3,14 @@
 
 use aptos_api_types::{
     transaction::ValidatorTransaction as ApiValidatorTransactionEnum, AccountSignature,
-    DeleteModule, DeleteResource, Ed25519Signature, EntryFunctionId, EntryFunctionPayload, Event,
-    GenesisPayload, MoveAbility, MoveFunction, MoveFunctionGenericTypeParam,
-    MoveFunctionVisibility, MoveModule, MoveModuleBytecode, MoveModuleId, MoveScriptBytecode,
-    MoveStruct, MoveStructField, MoveStructTag, MoveStructVariant, MoveType, MultiEd25519Signature,
-    MultiKeySignature, MultisigPayload, MultisigTransactionPayload, PublicKey, ScriptPayload,
-    Signature, SingleKeySignature, Transaction, TransactionInfo, TransactionPayload,
-    TransactionSignature, WriteSet, WriteSetChange,
+    DeleteModule, DeleteResource, Ed25519Signature, EncryptedTransactionInnerPayload,
+    EntryFunctionId, EntryFunctionPayload, Event, GenesisPayload, MoveAbility, MoveFunction,
+    MoveFunctionGenericTypeParam, MoveFunctionVisibility, MoveModule, MoveModuleBytecode,
+    MoveModuleId, MoveScriptBytecode, MoveStruct, MoveStructField, MoveStructTag,
+    MoveStructVariant, MoveType, MultiEd25519Signature, MultiKeySignature, MultisigPayload,
+    MultisigTransactionPayload, PublicKey, ScriptPayload, Signature, SingleKeySignature,
+    Transaction, TransactionInfo, TransactionPayload, TransactionSignature, WriteSet,
+    WriteSetChange,
 };
 use aptos_bitvec::BitVec;
 use aptos_logger::warn;
@@ -221,6 +222,38 @@ pub fn convert_transaction_payload(
                     },
                 ),
             ),
+        },
+
+        TransactionPayload::EncryptedTransactionPayload(ep) => {
+            let decrypted_payload = ep.decrypted_payload.as_ref().map(|inner| match inner {
+                EncryptedTransactionInnerPayload::EntryFunctionPayload(efp) => {
+                    transaction::transaction_payload::Payload::EntryFunctionPayload(
+                        convert_entry_function_payload(efp),
+                    )
+                },
+                EncryptedTransactionInnerPayload::ScriptPayload(sp) => {
+                    transaction::transaction_payload::Payload::ScriptPayload(
+                        convert_script_payload(sp),
+                    )
+                },
+                EncryptedTransactionInnerPayload::MultisigPayload(mp) => {
+                    transaction::transaction_payload::Payload::MultisigPayload(
+                        convert_multisig_payload(mp),
+                    )
+                },
+            });
+            transaction::TransactionPayload {
+                r#type: transaction::transaction_payload::Type::Unspecified as i32,
+                payload: decrypted_payload,
+                extra_config: Some(
+                    transaction::transaction_payload::ExtraConfig::ExtraConfigV1(
+                        transaction::ExtraConfigV1 {
+                            multisig_address: None,
+                            replay_protection_nonce: None,
+                        },
+                    ),
+                ),
+            }
         },
 
         // Deprecated.
