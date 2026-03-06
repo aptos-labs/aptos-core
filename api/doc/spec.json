@@ -18011,13 +18011,17 @@
           },
           {
             "$ref": "#/components/schemas/EncryptedTransactionInnerPayload_ScriptPayload"
+          },
+          {
+            "$ref": "#/components/schemas/EncryptedTransactionInnerPayload_MultisigPayload"
           }
         ],
         "discriminator": {
           "propertyName": "type",
           "mapping": {
             "entry_function_payload": "#/components/schemas/EncryptedTransactionInnerPayload_EntryFunctionPayload",
-            "script_payload": "#/components/schemas/EncryptedTransactionInnerPayload_ScriptPayload"
+            "script_payload": "#/components/schemas/EncryptedTransactionInnerPayload_ScriptPayload",
+            "multisig_payload": "#/components/schemas/EncryptedTransactionInnerPayload_MultisigPayload"
           }
         }
       },
@@ -18040,6 +18044,28 @@
           },
           {
             "$ref": "#/components/schemas/EntryFunctionPayload"
+          }
+        ]
+      },
+      "EncryptedTransactionInnerPayload_MultisigPayload": {
+        "allOf": [
+          {
+            "type": "object",
+            "required": [
+              "type"
+            ],
+            "properties": {
+              "type": {
+                "type": "string",
+                "enum": [
+                  "multisig_payload"
+                ],
+                "example": "multisig_payload"
+              }
+            }
+          },
+          {
+            "$ref": "#/components/schemas/MultisigPayload"
           }
         ]
       },
@@ -18085,7 +18111,7 @@
                 "$ref": "#/components/schemas/HexEncodedBytes"
               },
               {
-                "description": "BCS-serialized ciphertext bytes. Required for submission, omitted in read responses."
+                "description": "BCS-serialized ciphertext bytes, hex-encoded. This field is `Option` because the same\nstruct is used for both read responses and submission requests. In read responses the\nciphertext is omitted (the node does not resurface it). For JSON submission, `VerifyInput`\nenforces that ciphertext is present and the encrypted state is `Encrypted`."
               }
             ]
           },

@@ -1148,6 +1148,7 @@ impl VerifyInput for MultisigPayload {
 pub enum EncryptedTransactionInnerPayload {
     EntryFunctionPayload(EntryFunctionPayload),
     ScriptPayload(ScriptPayload),
+    MultisigPayload(MultisigPayload),
 }
 
 /// The decryption state of an encrypted transaction payload.

@@ -343,6 +343,7 @@ message EncryptedTransactionPayload {
   oneof decrypted_payload {
     EntryFunctionPayload entry_function_payload = 5;
     ScriptPayload script_payload = 6;
+    MultisigPayload multisig_payload = 8;
   }
   optional uint64 decryption_nonce = 7;
 }

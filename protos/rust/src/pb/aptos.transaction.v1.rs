@@ -668,7 +668,7 @@ pub struct EncryptedTransactionPayload {
     #[prost(uint64, optional, tag="7")]
     pub decryption_nonce: ::core::option::Option<u64>,
     /// Present only when decrypted
-    #[prost(oneof="encrypted_transaction_payload::DecryptedPayload", tags="5, 6")]
+    #[prost(oneof="encrypted_transaction_payload::DecryptedPayload", tags="5, 6, 8")]
     pub decrypted_payload: ::core::option::Option<encrypted_transaction_payload::DecryptedPayload>,
 }
 /// Nested message and enum types in `EncryptedTransactionPayload`.
@@ -708,6 +708,8 @@ pub mod encrypted_transaction_payload {
         EntryFunctionPayload(super::EntryFunctionPayload),
         #[prost(message, tag="6")]
         ScriptPayload(super::ScriptPayload),
+        #[prost(message, tag="8")]
+        MultisigPayload(super::MultisigPayload),
     }
 }
 #[allow(clippy::derive_partial_eq_without_eq)]

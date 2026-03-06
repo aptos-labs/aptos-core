@@ -247,6 +247,11 @@ pub fn convert_transaction_payload(
                         convert_script_payload(sp),
                     )
                 },
+                EncryptedTransactionInnerPayload::MultisigPayload(mp) => {
+                    transaction::encrypted_transaction_payload::DecryptedPayload::MultisigPayload(
+                        convert_multisig_payload(mp),
+                    )
+                },
             });
             transaction::TransactionPayload {
                 r#type: transaction::transaction_payload::Type::EncryptedTransactionPayload as i32,

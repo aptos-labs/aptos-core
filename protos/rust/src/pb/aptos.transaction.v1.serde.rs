@@ -3064,6 +3064,9 @@ impl serde::Serialize for EncryptedTransactionPayload {
                 encrypted_transaction_payload::DecryptedPayload::ScriptPayload(v) => {
                     struct_ser.serialize_field("scriptPayload", v)?;
                 }
+                encrypted_transaction_payload::DecryptedPayload::MultisigPayload(v) => {
+                    struct_ser.serialize_field("multisigPayload", v)?;
+                }
             }
         }
         struct_ser.end()
@@ -3090,6 +3093,8 @@ impl<'de> serde::Deserialize<'de> for EncryptedTransactionPayload {
             "entryFunctionPayload",
             "script_payload",
             "scriptPayload",
+            "multisig_payload",
+            "multisigPayload",
         ];
 
         #[allow(clippy::enum_variant_names)]
@@ -3101,6 +3106,7 @@ impl<'de> serde::Deserialize<'de> for EncryptedTransactionPayload {
             DecryptionNonce,
             EntryFunctionPayload,
             ScriptPayload,
+            MultisigPayload,
         }
         impl<'de> serde::Deserialize<'de> for GeneratedField {
             fn deserialize<D>(deserializer: D) -> std::result::Result<GeneratedField, D::Error>
@@ -3129,6 +3135,7 @@ impl<'de> serde::Deserialize<'de> for EncryptedTransactionPayload {
                             "decryptionNonce" | "decryption_nonce" => Ok(GeneratedField::DecryptionNonce),
                             "entryFunctionPayload" | "entry_function_payload" => Ok(GeneratedField::EntryFunctionPayload),
                             "scriptPayload" | "script_payload" => Ok(GeneratedField::ScriptPayload),
+                            "multisigPayload" | "multisig_payload" => Ok(GeneratedField::MultisigPayload),
                             _ => Err(serde::de::Error::unknown_field(value, FIELDS)),
                         }
                     }
@@ -3204,6 +3211,13 @@ impl<'de> serde::Deserialize<'de> for EncryptedTransactionPayload {
                                 return Err(serde::de::Error::duplicate_field("scriptPayload"));
                             }
                             decrypted_payload__ = map.next_value::<::std::option::Option<_>>()?.map(encrypted_transaction_payload::DecryptedPayload::ScriptPayload)
+;
+                        }
+                        GeneratedField::MultisigPayload => {
+                            if decrypted_payload__.is_some() {
+                                return Err(serde::de::Error::duplicate_field("multisigPayload"));
+                            }
+                            decrypted_payload__ = map.next_value::<::std::option::Option<_>>()?.map(encrypted_transaction_payload::DecryptedPayload::MultisigPayload)
 ;
                         }
                     }

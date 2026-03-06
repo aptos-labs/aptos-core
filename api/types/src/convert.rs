@@ -448,6 +448,22 @@ impl<'a, S: StateView> MoveConverter<'a, S> {
                         let inner = match executable {
                             aptos_types::transaction::TransactionExecutable::EntryFunction(
                                 entry_function,
+                            ) if multisig_address.is_some() => {
+                                Some(EncryptedTransactionInnerPayload::MultisigPayload(
+                                    MultisigPayload {
+                                        multisig_address: multisig_address.unwrap(),
+                                        transaction_payload: Some(
+                                            MultisigTransactionPayload::EntryFunctionPayload(
+                                                try_into_entry_function_payload(
+                                                    entry_function.clone(),
+                                                )?,
+                                            ),
+                                        ),
+                                    },
+                                ))
+                            },
+                            aptos_types::transaction::TransactionExecutable::EntryFunction(
+                                entry_function,
                             ) => Some(EncryptedTransactionInnerPayload::EntryFunctionPayload(
                                 try_into_entry_function_payload(entry_function.clone())?,
                             )),
