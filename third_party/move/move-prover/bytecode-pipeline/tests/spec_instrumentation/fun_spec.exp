@@ -330,7 +330,7 @@ fun Test::resource_with_old($t0|val: u64) {
  19: write_back[0x42::Test::R@]($t7)
  20: label L2
      # VC: function does not abort under this condition at tests/spec_instrumentation/fun_spec.move:41:6+35
- 21: assert Not(Not(exists[@0]<0x42::Test::R>(0x0)))
+ 21: assert exists[@0]<0x42::Test::R>(0x0)
      # VC: function does not abort under this condition at tests/spec_instrumentation/fun_spec.move:42:6+58
  22: assert Not(Ge(Add(select Test::R.v<0x42::Test::R>(global[@0]<0x42::Test::R>(0x0)), $t0), 18446744073709551615))
      # VC: post-condition does not hold at tests/spec_instrumentation/fun_spec.move:43:6+58

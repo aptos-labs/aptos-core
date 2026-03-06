@@ -20,7 +20,7 @@ use aptos_crypto::{
 };
 use ark_ec::{pairing::Pairing, scalar_mul::BatchMulPreprocessing, AffineRepr, CurveGroup};
 
-pub(crate) type HkzgElgamalHomomorphism<'a, E> = hkzg_chunked_elgamal::WeightedHomomorphism<'a, E>;
+pub(crate) type HkzgElgamalHomomorphism<'a, E> = hkzg_chunked_elgamal::Homomorphism<'a, E>;
 pub(crate) type LiftedCommitHomomorphism<'a, C> = LiftHomomorphism<
     chunked_scalar_mul::Homomorphism<'a, C>,
     HkzgWeightedElgamalWitness<<<C as CurveGroup>::Affine as AffineRepr>::ScalarField>,
@@ -41,15 +41,15 @@ impl<'a, E: Pairing> Proof<'a, E> {
         rng: &mut R,
     ) -> Self {
         // or should number_of_chunks_per_share be a const?
-        let hkzg_chunked_elgamal::WeightedProof::<E> {
+        let hkzg_chunked_elgamal::Proof::<E> {
             first_proof_item,
             z,
-        } = hkzg_chunked_elgamal::WeightedProof::generate(sc, number_of_chunks_per_share, rng);
+        } = hkzg_chunked_elgamal::Proof::generate(sc, number_of_chunks_per_share, rng);
         match first_proof_item {
             FirstProofItem::Commitment(first_proof_item_inner) => Self {
                 first_proof_item: FirstProofItem::Commitment(TupleCodomainShape(
                     first_proof_item_inner,
-                    chunked_scalar_mul::CodomainShape(unsafe_random_points::<E::G2, _>(
+                    chunked_scalar_mul::CodomainShape(unsafe_random_points(
                         sc.get_total_weight(),
                         rng,
                     )),
@@ -75,8 +75,7 @@ impl<'a, E: Pairing> Homomorphism<'a, E> {
         ell: u8,
     ) -> Self {
         // Set up the HKZG-EG homomorphism, and use a projection map to lift it to HkzgElgamalCommitWitness
-        let hkzg_el_hom =
-            hkzg_chunked_elgamal::WeightedHomomorphism::<E>::new(lagr_g1, xi_1, pp, eks);
+        let hkzg_el_hom = hkzg_chunked_elgamal::Homomorphism::<E>::new(lagr_g1, xi_1, pp, eks);
 
         // Set up the lifted commit homomorphism
         let lifted_commit_hom = LiftedCommitHomomorphism::<'a, E::G2> {

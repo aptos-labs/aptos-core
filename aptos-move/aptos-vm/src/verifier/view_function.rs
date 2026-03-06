@@ -61,6 +61,8 @@ pub(crate) fn validate_view_function(
     }
 
     let allowed_structs = get_allowed_structs(struct_constructors_feature);
+    let mut pack_fn_cache = ahash::AHashMap::new();
+
     let result = if loader.is_lazy_loading_enabled() {
         transaction_arg_validation::construct_args(
             session,
@@ -72,6 +74,7 @@ pub(crate) fn validate_view_function(
             func.ty_args(),
             allowed_structs,
             true,
+            &mut pack_fn_cache,
         )
     } else {
         let traversal_storage = TraversalStorage::new();
@@ -86,6 +89,7 @@ pub(crate) fn validate_view_function(
             func.ty_args(),
             allowed_structs,
             true,
+            &mut pack_fn_cache,
         )
     };
     result.map_err(|e| PartialVMError::new(e.status_code()))

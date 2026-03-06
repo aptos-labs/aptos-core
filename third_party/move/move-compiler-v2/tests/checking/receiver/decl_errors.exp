@@ -6,7 +6,7 @@ warning: parameter name `self` indicates a receiver function but the type `0x42:
 11 │     fun receiver_for_external_type(self: T) {}
    │         ^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-warning: parameter name `self` indicates a receiver function but the type `u64` is not suitable for receiver functions. Only structs and vectors can have receiver functions. Consider using a different name.
+warning: parameter name `self` indicates a receiver function but the type `u64` is not suitable for receiver functions. Only structs, vectors, and the `signer` primitive type can have receiver functions. Consider using a different name.
    ┌─ tests/checking/receiver/decl_errors.move:14:9
    │
 14 │     fun receiver_for_primitive(self: &u64) {}
@@ -30,6 +30,18 @@ warning: parameter name `self` indicates a receiver function but the type `0x42:
 23 │     fun receiver_non_linear_instantiated<T>(self: G<T, T>) {}
    │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
+warning: parameter name `self` indicates a receiver function but the type `signer` is associated with the standard signer module and new receiver functions cannot be added. Consider using a different name.
+   ┌─ tests/checking/receiver/decl_errors.move:26:9
+   │
+26 │     fun receiver_for_signer(self: &signer): address { abort 0 }
+   │         ^^^^^^^^^^^^^^^^^^^
+
+warning: parameter name `self` indicates a receiver function but the type `signer` is associated with the standard signer module and new receiver functions cannot be added. Consider using a different name.
+   ┌─ tests/checking/receiver/decl_errors.move:29:9
+   │
+29 │     fun address_of(self: &signer): address { abort 0 }
+   │         ^^^^^^^^^^
+
 // -- Model dump before first bytecode pipeline
 module 0x42::n {
     struct T {
@@ -45,6 +57,9 @@ module 0x42::m {
     struct S {
         x: u64,
     }
+    private fun address_of(self: &signer): address {
+        Abort(0)
+    }
     private fun receiver(self: S) {
         Tuple()
     }
@@ -56,6 +71,9 @@ module 0x42::m {
     }
     private fun receiver_for_primitive(self: &u64) {
         Tuple()
+    }
+    private fun receiver_for_signer(self: &signer): address {
+        Abort(0)
     }
     private fun receiver_non_linear_instantiated<T>(self: G<T, T>) {
         Tuple()
@@ -80,6 +98,9 @@ module 0x42::m {
     struct S {
         x: u64,
     }
+    fun address_of(self: &signer): address {
+        abort 0
+    }
     fun receiver(self: S) {
     }
     fun receiver_for_external_type(self: n::T) {
@@ -87,6 +108,9 @@ module 0x42::m {
     fun receiver_for_external_vector(self: vector<u64>) {
     }
     fun receiver_for_primitive(self: &u64) {
+    }
+    fun receiver_for_signer(self: &signer): address {
+        abort 0
     }
     fun receiver_non_linear_instantiated<T>(self: G<T, T>) {
     }

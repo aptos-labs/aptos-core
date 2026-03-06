@@ -624,3 +624,28 @@ fn create_event() -> ContractEvent {
     let event_key = EventKey::new(0, AccountAddress::random());
     ContractEvent::new_v1(event_key, 0, TypeTag::Bool, bcs::to_bytes(&0).unwrap()).unwrap()
 }
+
+mod hash_two_children_tests {
+    use super::super::super::SparseMerkleLeafNodeHasher;
+    use aptos_crypto::{hash::CryptoHasher, HashValue};
+    use proptest::prelude::*;
+
+    fn hash_two_children_reference<H: CryptoHasher>(h1: &HashValue, h2: &HashValue) -> HashValue {
+        let mut state = H::default();
+        state.update(h1.as_ref());
+        state.update(h2.as_ref());
+        state.finish()
+    }
+
+    proptest! {
+        #[test]
+        fn matches_reference_sparse_merkle_leaf_node(
+            h1 in any::<HashValue>(),
+            h2 in any::<HashValue>(),
+        ) {
+            let optimized = SparseMerkleLeafNodeHasher::hash_two_children(&h1, &h2);
+            let reference = hash_two_children_reference::<SparseMerkleLeafNodeHasher>(&h1, &h2);
+            prop_assert_eq!(optimized, reference);
+        }
+    }
+}

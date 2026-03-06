@@ -40,6 +40,7 @@ pub mod constant_folder;
 pub mod exp_builder;
 pub mod exp_generator;
 pub mod exp_rewriter;
+pub mod exp_simplifier;
 pub mod intrinsics;
 pub mod metadata;
 pub mod model;
@@ -264,6 +265,7 @@ pub fn run_model_builder_with_options_and_compilation_flags<
         ImplicitModuleDeps::new(well_known::CMP_MODULE),
         ImplicitModuleDeps::new(well_known::STRING_MODULE),
         ImplicitModuleDeps::new(well_known::STRING_UTILS_MODULE),
+        ImplicitModuleDeps::new(well_known::SIGNER_MODULE),
     ];
     for (_, mident, mdef) in &expansion_ast.modules {
         let src_file_hash = mdef.loc.file_hash();

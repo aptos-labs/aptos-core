@@ -38,6 +38,7 @@ impl PipelineBuilder {
         maybe_secret_share_config: Option<SecretShareConfig>,
         derived_self_key_share_tx: oneshot::Sender<Option<SecretShare>>,
         secret_shared_key_rx: oneshot::Receiver<Option<SecretSharedKey>>,
+        observer_enabled: bool,
     ) -> TaskResult<DecryptionResult> {
         let mut tracker = Tracker::start_waiting("decrypt_encrypted_txns", &block);
         let (input_txns, max_txns_from_block_to_execute, block_gas_limit) = materialize_fut.await?;
@@ -60,6 +61,20 @@ impl PipelineBuilder {
         // due to VM validation checks
         let Some(secret_share_config) = maybe_secret_share_config else {
             let _ = derived_self_key_share_tx.send(None);
+            // Consensus node without secret share config (e.g. bootstrapping
+            // epoch where chunky DKG is newly enabled but hasn't completed yet).
+            // Return immediately with no decryption key to avoid a circular
+            // dependency: has_rand_txns_fut -> prepare -> decrypt (waiting for
+            // secret_shared_key_rx) -> ordering (blocked on has_rand_txns_fut).
+            if !observer_enabled {
+                return Ok((
+                    input_txns,
+                    max_txns_from_block_to_execute,
+                    block_gas_limit,
+                    Some(None),
+                ));
+            }
+            // Observer: wait for the decryption key from the ordering path.
             let maybe_key = secret_shared_key_rx
                 .await
                 .map_err(|_| anyhow!("secret_shared_key_rx dropped in observer path"))?;

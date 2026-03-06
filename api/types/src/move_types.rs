@@ -260,10 +260,7 @@ impl TryFrom<AnnotatedMoveStruct> for MoveStructValue {
                         MoveValue::Vector(vec![MoveValue::try_from(v)?]).json()?,
                     );
                 } else {
-                    return Err(anyhow::anyhow!(
-                        "Invalid option variant: {}",
-                        name.to_string()
-                    ));
+                    return Err(anyhow::anyhow!("Invalid option variant: {}", name));
                 }
                 return Ok(Self(map));
             }

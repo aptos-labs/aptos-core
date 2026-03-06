@@ -321,7 +321,7 @@ pub fn get_peer_priority_for_polling(poll_priority_peers: bool) -> PeerPriority 
 
         // If the random number is even, return medium priority.
         // Otherwise, return low priority.
-        if random_number % 2 == 0 {
+        if random_number.is_multiple_of(2) {
             PeerPriority::MediumPriority
         } else {
             PeerPriority::LowPriority

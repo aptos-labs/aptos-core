@@ -167,6 +167,8 @@ pub enum FeatureFlag {
     SLH_DSA_SHA2_128S_SIGNATURE = 107,
     /// Whether EncryptedTransactions is enabled
     ENCRYPTED_TRANSACTIONS = 108,
+    /// Enables public struct and enum types as transaction arguments.
+    PUBLIC_STRUCT_ENUM_ARGS = 109,
 }
 
 impl FeatureFlag {
@@ -275,6 +277,7 @@ impl FeatureFlag {
             Self::ENABLE_FUNCTION_REFLECTION,
             Self::VM_BINARY_FORMAT_V10,
             Self::SLH_DSA_SHA2_128S_SIGNATURE,
+            Self::PUBLIC_STRUCT_ENUM_ARGS,
         ]
     }
 }

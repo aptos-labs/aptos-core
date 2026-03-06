@@ -916,6 +916,19 @@ impl PrimitiveType {
         }
     }
 
+    /// Returns true if this is a signed integer type.
+    pub fn is_signed(&self) -> bool {
+        matches!(
+            self,
+            PrimitiveType::I8
+                | PrimitiveType::I16
+                | PrimitiveType::I32
+                | PrimitiveType::I64
+                | PrimitiveType::I128
+                | PrimitiveType::I256
+        )
+    }
+
     /// Gets the number of bits in the type, or None if unbounded..
     pub fn get_num_bits(self: &PrimitiveType) -> Option<usize> {
         match self {

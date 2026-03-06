@@ -82,6 +82,7 @@ module aptos_framework::reconfiguration_with_dkg {
         randomness_config_seqnum::on_new_epoch(framework);
         randomness_config::on_new_epoch(framework);
         randomness_api_v0_config::on_new_epoch(framework);
+        chunky_dkg_config::on_new_epoch(framework);
         decryption::on_new_epoch(framework);
         reconfiguration::reconfigure();
     }

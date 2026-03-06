@@ -282,7 +282,7 @@ macro_rules! delegate_transcript_core_to_subtrs {
             type DecryptPrivKey = keys::DecryptPrivKey<E>;
             type EncryptPubKey = keys::EncryptPubKey<E>;
             type PublicParameters = PublicParameters<E>;
-            type SecretSharingConfig = SecretSharingConfig<E>;
+            type SecretSharingConfig = SecretSharingConfig<E::ScalarField>;
 
             fn get_public_key_share(
                 &self,
