@@ -1130,8 +1130,7 @@ mod tests {
         let old_bytes_with_fast =
             bcs::to_bytes(&(key_pair.clone(), Some(key_pair.clone()))).unwrap();
         // New data with fast=None (written after fast path removal)
-        let new_bytes =
-            bcs::to_bytes(&(key_pair.clone(), None::<AugKeyPair>)).unwrap();
+        let new_bytes = bcs::to_bytes(&(key_pair.clone(), None::<AugKeyPair>)).unwrap();
 
         // Old format with fast=Some should deserialize, extracting the main key pair
         let (main, _fast): (AugKeyPair, Option<AugKeyPair>) =
@@ -1146,8 +1145,7 @@ mod tests {
         );
 
         // New format with fast=None should deserialize identically
-        let (main, fast): (AugKeyPair, Option<AugKeyPair>) =
-            bcs::from_bytes(&new_bytes).unwrap();
+        let (main, fast): (AugKeyPair, Option<AugKeyPair>) = bcs::from_bytes(&new_bytes).unwrap();
         assert_eq!(
             bcs::to_bytes(&main.0).unwrap(),
             bcs::to_bytes(&ask).unwrap()
