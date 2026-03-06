@@ -254,7 +254,7 @@ impl BatchStore {
             .expect("failed to read v1 data from db");
         info!(
             epoch = current_epoch,
-            "QS: Read v1 batches from storage. Len: {}, Last Cerified Time: {}",
+            "QS: Read v1 batches from storage. Len: {}, Last Certified Time: {}",
             db_content.len(),
             last_certified_time
         );
@@ -298,10 +298,10 @@ impl BatchStore {
     ) {
         let db_content = db
             .get_all_batches_v2()
-            .expect("failed to read v1 data from db");
+            .expect("failed to read v2 data from db");
         info!(
             epoch = current_epoch,
-            "QS: Read v1 batches from storage. Len: {}, Last Cerified Time: {}",
+            "QS: Read v2 batches from storage. Len: {}, Last Certified Time: {}",
             db_content.len(),
             last_certified_time
         );
