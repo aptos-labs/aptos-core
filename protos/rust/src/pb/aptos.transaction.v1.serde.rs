@@ -3026,9 +3026,6 @@ impl serde::Serialize for EncryptedTransactionPayload {
         if !self.payload_hash.is_empty() {
             len += 1;
         }
-        if self.replay_protection_nonce.is_some() {
-            len += 1;
-        }
         if self.decryption_nonce.is_some() {
             len += 1;
         }
@@ -3043,9 +3040,6 @@ impl serde::Serialize for EncryptedTransactionPayload {
         }
         if !self.payload_hash.is_empty() {
             struct_ser.serialize_field("payloadHash", pbjson::private::base64::encode(&self.payload_hash).as_str())?;
-        }
-        if let Some(v) = self.replay_protection_nonce.as_ref() {
-            struct_ser.serialize_field("replayProtectionNonce", ToString::to_string(&v).as_str())?;
         }
         if let Some(v) = self.decryption_nonce.as_ref() {
             struct_ser.serialize_field("decryptionNonce", ToString::to_string(&v).as_str())?;
@@ -3077,8 +3071,6 @@ impl<'de> serde::Deserialize<'de> for EncryptedTransactionPayload {
             "encryptedState",
             "payload_hash",
             "payloadHash",
-            "replay_protection_nonce",
-            "replayProtectionNonce",
             "decryption_nonce",
             "decryptionNonce",
             "entry_function_payload",
@@ -3093,7 +3085,6 @@ impl<'de> serde::Deserialize<'de> for EncryptedTransactionPayload {
         enum GeneratedField {
             EncryptedState,
             PayloadHash,
-            ReplayProtectionNonce,
             DecryptionNonce,
             EntryFunctionPayload,
             ScriptPayload,
@@ -3121,7 +3112,6 @@ impl<'de> serde::Deserialize<'de> for EncryptedTransactionPayload {
                         match value {
                             "encryptedState" | "encrypted_state" => Ok(GeneratedField::EncryptedState),
                             "payloadHash" | "payload_hash" => Ok(GeneratedField::PayloadHash),
-                            "replayProtectionNonce" | "replay_protection_nonce" => Ok(GeneratedField::ReplayProtectionNonce),
                             "decryptionNonce" | "decryption_nonce" => Ok(GeneratedField::DecryptionNonce),
                             "entryFunctionPayload" | "entry_function_payload" => Ok(GeneratedField::EntryFunctionPayload),
                             "scriptPayload" | "script_payload" => Ok(GeneratedField::ScriptPayload),
@@ -3147,7 +3137,6 @@ impl<'de> serde::Deserialize<'de> for EncryptedTransactionPayload {
             {
                 let mut encrypted_state__ = None;
                 let mut payload_hash__ = None;
-                let mut replay_protection_nonce__ = None;
                 let mut decryption_nonce__ = None;
                 let mut decrypted_payload__ = None;
                 while let Some(k) = map.next_key()? {
@@ -3164,14 +3153,6 @@ impl<'de> serde::Deserialize<'de> for EncryptedTransactionPayload {
                             }
                             payload_hash__ =
                                 Some(map.next_value::<::pbjson::private::BytesDeserialize<_>>()?.0)
-                            ;
-                        }
-                        GeneratedField::ReplayProtectionNonce => {
-                            if replay_protection_nonce__.is_some() {
-                                return Err(serde::de::Error::duplicate_field("replayProtectionNonce"));
-                            }
-                            replay_protection_nonce__ =
-                                map.next_value::<::std::option::Option<::pbjson::private::NumberDeserialize<_>>>()?.map(|x| x.0)
                             ;
                         }
                         GeneratedField::DecryptionNonce => {
@@ -3208,7 +3189,6 @@ impl<'de> serde::Deserialize<'de> for EncryptedTransactionPayload {
                 Ok(EncryptedTransactionPayload {
                     encrypted_state: encrypted_state__.unwrap_or_default(),
                     payload_hash: payload_hash__.unwrap_or_default(),
-                    replay_protection_nonce: replay_protection_nonce__,
                     decryption_nonce: decryption_nonce__,
                     decrypted_payload: decrypted_payload__,
                 })

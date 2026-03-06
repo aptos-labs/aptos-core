@@ -410,7 +410,6 @@ impl<'a, S: StateView> MoveConverter<'a, S> {
 
                 let extra_config = encrypted.extra_config();
                 let multisig_address = extra_config.multisig_address().map(Address::from);
-                let replay_protection_nonce = extra_config.replay_protection_nonce().map(U64::from);
 
                 match encrypted {
                     EP::Encrypted { payload_hash, .. } => {
@@ -419,7 +418,6 @@ impl<'a, S: StateView> MoveConverter<'a, S> {
                                 encrypted_state: EncryptedState::Encrypted,
                                 payload_hash: crate::HashValue::from(payload_hash),
                                 ciphertext: None,
-                                replay_protection_nonce,
                                 decrypted_payload: None,
                                 decryption_nonce: None,
                             },
@@ -431,7 +429,6 @@ impl<'a, S: StateView> MoveConverter<'a, S> {
                                 encrypted_state: EncryptedState::FailedDecryption,
                                 payload_hash: crate::HashValue::from(payload_hash),
                                 ciphertext: None,
-                                replay_protection_nonce,
                                 decrypted_payload: None,
                                 decryption_nonce: None,
                             },
@@ -477,7 +474,6 @@ impl<'a, S: StateView> MoveConverter<'a, S> {
                                 encrypted_state: EncryptedState::Decrypted,
                                 payload_hash: crate::HashValue::from(payload_hash),
                                 ciphertext: None,
-                                replay_protection_nonce,
                                 decrypted_payload: inner,
                                 decryption_nonce: Some(U64::from(decryption_nonce)),
                             },
@@ -916,7 +912,7 @@ impl<'a, S: StateView> MoveConverter<'a, S> {
                         .context("Failed to BCS-deserialize ciphertext")?;
                 let extra_config = ExtraConfig::V1 {
                     multisig_address: None,
-                    replay_protection_nonce: encrypted.replay_protection_nonce.map(|n| n.into()),
+                    replay_protection_nonce: nonce,
                 };
                 Target::EncryptedPayload(
                     aptos_types::transaction::encrypted_payload::EncryptedPayload::Encrypted {

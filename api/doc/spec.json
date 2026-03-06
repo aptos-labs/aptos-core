@@ -18115,9 +18115,6 @@
               }
             ]
           },
-          "replay_protection_nonce": {
-            "$ref": "#/components/schemas/U64"
-          },
           "decrypted_payload": {
             "$ref": "#/components/schemas/EncryptedTransactionInnerPayload"
           },

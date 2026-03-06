@@ -1173,12 +1173,10 @@ pub struct EncryptedTransactionPayload {
     #[serde(skip_serializing_if = "Option::is_none")]
     #[serde(default)]
     pub ciphertext: Option<HexEncodedBytes>,
-    // NOTE: multisig_address is not surfaced here. For Encrypted/FailedDecryption states,
-    // the multisig_address lives in the internal extra_config but is not exposed in the API.
-    // For Decrypted state, it is embedded inside the MultisigPayload variant of decrypted_payload.
-    #[serde(skip_serializing_if = "Option::is_none")]
-    #[serde(default)]
-    pub replay_protection_nonce: Option<U64>,
+    // NOTE: multisig_address and replay_protection_nonce are not surfaced here.
+    // They are part of extra_config and already exposed on UserTransactionRequest.
+    // For Decrypted state, multisig_address is embedded in the MultisigPayload variant
+    // of decrypted_payload.
     #[serde(skip_serializing_if = "Option::is_none")]
     #[serde(default)]
     pub decrypted_payload: Option<EncryptedTransactionInnerPayload>,
