@@ -2,7 +2,7 @@
 remote_endpoint: https://fullnode.testnet.aptoslabs.com
 # replace with below for actual release, compat test needs concrete URL above:
 # remote_endpoint: ~
-name: "v1.41.3"
+name: "v1.41.1"
 proposals:
   - name: proposal_1_upgrade_framework
     metadata:
@@ -16,3 +16,8 @@ proposals:
           # replace with below for actual release, above "current" is needed for compat tests:
           # old: https://raw.githubusercontent.com/aptos-labs/aptos-networks/main/gas/vX.WW.Z.json
           # new: https://raw.githubusercontent.com/aptos-labs/aptos-networks/main/gas/vX.YY.Z.json
+      - Execution:
+          V4:
+            block_gas_limit_type:
+              complex_limit_v1:
+                effective_block_gas_limit: 200000
