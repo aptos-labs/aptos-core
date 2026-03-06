@@ -53,3 +53,64 @@ fn failed_transaction_cleanup_charges_gas(status_code: StatusCode) {
         ExecutionStatus::MiscellaneousError(Some(status_code))
     );
 }
+<<<<<<< HEAD
+=======
+
+// When an encrypted transaction fails decryption, it should still be kept on chain
+// with the sequence number incremented and gas charged.
+#[test]
+fn failed_encrypted_transaction_increments_sequence_number() {
+    let mut h = MoveHarness::new_with_features(vec![FeatureFlag::ENCRYPTED_TRANSACTIONS], vec![]);
+
+    let initial_seq_num = 10;
+    // Needs sufficient balance to cover max_gas_amount (20M) * gas_unit_price (100) = 2B octas.
+    let sender = h.new_account_with_balance_and_sequence_number(10_000_000_000, initial_seq_num);
+
+    let ciphertext = Ciphertext::random();
+    let extra_config = TransactionExtraConfig::V1 {
+        multisig_address: None,
+        replay_protection_nonce: None,
+    };
+    let payload_hash = HashValue::random();
+
+    // Sign the transaction in the Encrypted state (the original state before decryption
+    // is attempted). The signature is verified against this state.
+    let encrypted_payload = EncryptedPayload::Encrypted {
+        ciphertext: ciphertext.clone(),
+        extra_config: extra_config.clone(),
+        payload_hash,
+    };
+    let payload = TransactionPayload::EncryptedPayload(encrypted_payload);
+    let mut txn = h.create_transaction_payload(&sender, payload);
+
+    // Mutate the payload to simulate a failed decryption attempt, as the block executor
+    // would do after failing to decrypt the ciphertext.
+    let failed_payload = EncryptedPayload::FailedDecryption {
+        ciphertext,
+        extra_config,
+        payload_hash,
+        eval_proof: EvalProof::random(),
+    };
+    *txn.payload_mut() = TransactionPayload::EncryptedPayload(failed_payload);
+
+    let output = h.run_raw(txn);
+
+    // Transaction should be kept, not discarded.
+    assert!(
+        !output.status().is_discarded(),
+        "Expected transaction to be kept, but got: {:?}",
+        output.status()
+    );
+
+    // Gas should be charged.
+    assert!(output.gas_used() > 0);
+
+    // Sequence number should have been incremented.
+    let new_seq_num = h.sequence_number(sender.address());
+    assert_eq!(
+        new_seq_num,
+        initial_seq_num + 1,
+        "Sequence number should be incremented after failed encrypted transaction"
+    );
+}
+>>>>>>> 4cb1077a64 ([gas] Apply 10x multiplier to gas costs and storage fees (#18880))
