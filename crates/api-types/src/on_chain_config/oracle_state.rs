@@ -8,7 +8,7 @@ pub struct OracleSourceState {
     /// Source ID (e.g., chain ID)
     pub source_id: u64,
     /// Latest nonce for this source
-    pub latest_nonce: u64,
+    pub latest_nonce: u128,
     /// The latest DataRecord (None if nonce is 0)
     pub latest_record: Option<LatestDataRecord>,
 }
