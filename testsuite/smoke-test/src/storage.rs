@@ -454,7 +454,7 @@ pub(crate) fn db_restore(
 }
 
 async fn do_transfer_or_reconfig(info: &mut AptosPublicInfo) -> Result<()> {
-    const LOTS_MONEY: u64 = 100_000_000;
+    const LOTS_MONEY: u64 = 1_000_000_000;
     let r = rand::random::<u64>() % 10;
     if r < 3 {
         info!(
@@ -527,7 +527,7 @@ async fn test_db_restart() {
             let validator = swarm.validator_mut(*vid).unwrap();
             // sometimes trigger reconfig right before the restart, to expose edge cases around
             // epoch change
-            if rand::random::<usize>() % 3 == 0 {
+            if rand::random::<usize>().is_multiple_of(3) {
                 info!(
                     "{LINE} Triggering reconfig right before restarting. Root account seq_num: {}. Ledger info: {:?}",
                     pub_chain_info.root_account().sequence_number(),

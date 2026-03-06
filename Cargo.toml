@@ -205,6 +205,7 @@ members = [
     "testsuite/smoke-test",
     "testsuite/testcases",
     "third_party/move/extensions/move-table-extension",
+    "third_party/move/mono-move/micro-ops",
     "third_party/move/move-binary-format",
     "third_party/move/move-binary-format/serializer-tests",
     "third_party/move/move-borrow-graph",
@@ -245,10 +246,8 @@ members = [
     "third_party/move/tools/move-abigen",
     "third_party/move/tools/move-asm",
     "third_party/move/tools/move-bytecode-utils",
-    "third_party/move/tools/move-bytecode-viewer",
     "third_party/move/tools/move-coverage",
     "third_party/move/tools/move-decompiler",
-    "third_party/move/tools/move-disassembler",
     "third_party/move/tools/move-docgen",
     "third_party/move/tools/move-linter",
     "third_party/move/tools/move-package",
@@ -291,7 +290,7 @@ license = "LicenseRef-Aptos"
 license-file = "LICENSE"
 publish = false
 repository = "https://github.com/aptos-labs/aptos-core"
-rust-version = "1.85"
+rust-version = "1.88"
 
 [workspace.dependencies]
 # Internal crate dependencies.
@@ -513,10 +512,10 @@ ark-relations = "0.5.0"
 ark-serialize = { version = "0.5.0", features = ["derive"] }
 ark-snark = { version = "0.5.0" }
 ark-std = { version = "0.5.0", features = ["getrandom"] }
-aptos-indexer-processor-sdk = { git = "https://github.com/aptos-labs/aptos-indexer-processor-sdk.git", tag = "aptos-indexer-processor-sdk-v2.1.4", features = [
+aptos-indexer-processor-sdk = { git = "https://github.com/aptos-labs/aptos-indexer-processor-sdk.git", tag = "aptos-indexer-processor-sdk-v2.2.1", features = [
     "postgres_partial",
 ] }
-aptos-moving-average = { git = "https://github.com/aptos-labs/aptos-indexer-processor-sdk.git", tag = "aptos-indexer-processor-sdk-v2.1.4" }
+aptos-moving-average = { git = "https://github.com/aptos-labs/aptos-indexer-processor-sdk.git", tag = "aptos-indexer-processor-sdk-v2.2.1" }
 assert_approx_eq = "1.1.0"
 async-channel = "1.7.1"
 async-mutex = "1.4.0"
@@ -727,7 +726,7 @@ pretty = "0.10.0"
 pretty_assertions = "1.2.1"
 # We set default-features to false so we don't onboard the libpq dep. See more here:
 # https://github.com/aptos-labs/aptos-core/pull/12568
-processor = { git = "https://github.com/aptos-labs/aptos-indexer-processors-v2.git", tag = "aptos-indexer-processors-v2.3.0", default-features = false }
+processor = { git = "https://github.com/aptos-labs/aptos-indexer-processors-v2.git", tag = "aptos-indexer-processors-v2.4.1", default-features = false }
 procfs = "0.14.1"
 proc-macro2 = "1.0.38"
 project-root = "0.2.2"
@@ -817,6 +816,7 @@ thread_local = "1.1.7"
 tiny-bip39 = "0.8.2"
 tiny-keccak = { version = "2.0.2", features = ["keccak", "sha3"] }
 tracing = "0.1.37"
+tracing-log = "0.2.0"
 tracing-subscriber = { version = "0.3.17", features = ["json", "env-filter"] }
 triomphe = "0.1.14"
 trybuild = "1.0.80"
@@ -871,7 +871,6 @@ move-bytecode-source-map = { path = "third_party/move/move-ir-compiler/move-byte
 move-bytecode-spec = { path = "third_party/move/move-bytecode-spec" }
 move-bytecode-verifier = { path = "third_party/move/move-bytecode-verifier" }
 move-bytecode-verifier-invalid-mutations = { path = "third_party/move/move-bytecode-verifier/invalid-mutations" }
-move-bytecode-viewer = { path = "third_party/move/tools/move-bytecode-viewer" }
 move-bytecode-utils = { path = "third_party/move/tools/move-bytecode-utils" }
 move-command-line-common = { path = "third_party/move/move-command-line-common" }
 move-coverage = { path = "third_party/move/tools/move-coverage" }
@@ -880,7 +879,6 @@ move-compiler-v2 = { path = "third_party/move/move-compiler-v2" }
 move-core-types = { path = "third_party/move/move-core/types" }
 move-decompiler = { path = "third_party/move/tools/move-decompiler" }
 move-docgen = { path = "third_party/move/tools/move-docgen" }
-move-disassembler = { path = "third_party/move/tools/move-disassembler" }
 move-ir-types = { path = "third_party/move/move-ir/types" }
 move-ir-compiler = { path = "third_party/move/move-ir-compiler" }
 move-ir-to-bytecode = { path = "third_party/move/move-ir-compiler/move-ir-to-bytecode" }
@@ -973,8 +971,3 @@ ark-ff-macros = { git = "https://github.com/aptos-labs/algebra", branch = "fix-f
 ark-ff-asm = { git = "https://github.com/aptos-labs/algebra", branch = "fix-fft-parallelism-cutoff" }
 ark-poly = { git = "https://github.com/aptos-labs/algebra", branch = "fix-fft-parallelism-cutoff" }
 ark-serialize = { git = "https://github.com/aptos-labs/algebra", branch = "fix-fft-parallelism-cutoff" }
-
-# There is a circular dependency between aptos-core, aptos-indexer-processor-sdk, and aptos-indexer-processors-v2,
-# so we cannot simply change the version and package for `jemalloc-sys` in one repo without running into conflicts.
-# We have to keep this shim until everything uses the same jemalloc dependency.
-jemalloc-sys = { git = "https://github.com/aptos-labs/jemalloc-sys-shim", rev = "e0920246dd74303fab9a14b990768c6ac990a59b" }

@@ -16,8 +16,8 @@ where
     let mut group = c.benchmark_group(format!("dlog_bsgs_{}", curve_name));
 
     // Parameters
-    let range_limit = 1u64 << 16;
-    let table_sizes = [1 << 8, 1 << 12]; // 256 and 4096 entries
+    let range_limit = 1u64 << 32;
+    let table_sizes = [1 << 20, 1 << 24];
     let num_samples = 16usize; // For the vector benchmark
 
     // Deterministic RNG for reproducibility
@@ -80,6 +80,98 @@ where
     group.finish();
 }
 
+/// Benchmark single dlog over a range of serialization batch sizes to find the optimal value.
+#[allow(non_snake_case)]
+fn bench_dlog_batch_size<E: Pairing>(c: &mut Criterion, curve_name: &str)
+where
+    E::G1: CurveGroup<ScalarField = E::ScalarField>,
+{
+    let mut group = c.benchmark_group(format!("dlog_bsgs_{}_batch_size", curve_name));
+
+    let range_limit = 1u64 << 32;
+    let table_size = 1u64 << 24;
+    let batch_sizes: &[usize] = &[1, 2, 4, 8, 16, 32, 64, 128, 256, 512, 1024, 2048, 4096];
+
+    let mut rng = StdRng::seed_from_u64(42);
+    let G = E::G1::generator();
+    let baby_table: HashMap<Vec<u8>, u64> = table::build::<E::G1>(G, table_size);
+
+    for &batch_size in batch_sizes {
+        group.bench_with_input(
+            BenchmarkId::new("single_dlog", batch_size),
+            &batch_size,
+            |b, &batch_size| {
+                b.iter_with_setup(
+                    || {
+                        let x: u64 = rng.gen_range(0, range_limit);
+                        let H = G * E::ScalarField::from(x);
+                        (x, H)
+                    },
+                    |(x, H)| {
+                        let recovered =
+                            bsgs::dlog_with_batch_size(G, H, &baby_table, range_limit, batch_size)
+                                .expect("Discrete log not found");
+                        assert_eq!(recovered, x);
+                    },
+                );
+            },
+        );
+    }
+
+    group.finish();
+}
+
+/// Compare `dlog_vec` (one dlog per target) vs `dlog_vec_batched` (batch across targets)
+/// over varying numbers of targets.
+#[allow(non_snake_case)]
+fn bench_dlog_vec_vs_batched<E: Pairing>(c: &mut Criterion, curve_name: &str)
+where
+    E::G1: CurveGroup<ScalarField = E::ScalarField>,
+{
+    let mut group = c.benchmark_group(format!("dlog_bsgs_{}_vec_vs_batched", curve_name));
+
+    let range_limit = 1u64 << 32;
+    let table_size = 1u64 << 24;
+    let num_targets_list: &[usize] = &[1, 4, 16, 64, 256];
+
+    let mut rng = StdRng::seed_from_u64(42);
+    let G = E::G1::generator();
+    let baby_table: HashMap<Vec<u8>, u64> = table::build::<E::G1>(G, table_size);
+
+    for &num_targets in num_targets_list {
+        let xs: Vec<u64> = (0..num_targets)
+            .map(|_| rng.gen_range(0, range_limit))
+            .collect();
+        let Hs: Vec<E::G1> = xs.iter().map(|&x| G * E::ScalarField::from(x)).collect();
+
+        group.bench_with_input(
+            BenchmarkId::new("dlog_vec", num_targets),
+            &(table_size, num_targets),
+            |b, &_| {
+                b.iter(|| {
+                    let recovered = bsgs::dlog_vec(G, &Hs, &baby_table, range_limit)
+                        .expect("Discrete log not found");
+                    assert_eq!(recovered, xs);
+                });
+            },
+        );
+
+        group.bench_with_input(
+            BenchmarkId::new("dlog_vec_batched", num_targets),
+            &(table_size, num_targets),
+            |b, &_| {
+                b.iter(|| {
+                    let recovered = bsgs::dlog_vec_batched(G, &Hs, &baby_table, range_limit)
+                        .expect("Discrete log not found");
+                    assert_eq!(recovered, xs);
+                });
+            },
+        );
+    }
+
+    group.finish();
+}
+
 #[allow(non_snake_case)]
 fn bench_table_build<E: Pairing>(c: &mut Criterion, curve_name: &str)
 where
@@ -115,12 +207,15 @@ where
 
 fn criterion_benchmark(c: &mut Criterion) {
     use ark_bls12_381::Bls12_381;
-    use ark_bn254::Bn254;
+    //    use ark_bn254::Bn254;
 
-    bench_dlog::<Bn254>(c, "bn254");
-    bench_table_build::<Bn254>(c, "bn254");
+    // bench_dlog::<Bn254>(c, "bn254");
+    // bench_dlog_batch_size::<Bn254>(c, "bn254");
+    // bench_table_build::<Bn254>(c, "bn254");
 
     bench_dlog::<Bls12_381>(c, "bls12_381");
+    bench_dlog_batch_size::<Bls12_381>(c, "bls12_381");
+    bench_dlog_vec_vs_batched::<Bls12_381>(c, "bls12_381");
     bench_table_build::<Bls12_381>(c, "bls12_381");
 }
 

@@ -201,7 +201,7 @@ mod tests {
         sigma_protocol::homomorphism::Trait as _,
     };
     use aptos_crypto::arkworks::random::{sample_field_elements, unsafe_random_point};
-    use ark_bls12_381::G1Projective;
+    use ark_bls12_381::{G1Affine, G1Projective};
     use rand::thread_rng;
 
     #[test]
@@ -214,7 +214,7 @@ mod tests {
         let num_scalars = 8;
 
         // Random base
-        let base = unsafe_random_point::<G1Projective, _>(&mut rng);
+        let base = unsafe_random_point::<G1Affine, _>(&mut rng);
 
         // Create random scalars
         let scalars = sample_field_elements(num_scalars, &mut rng);

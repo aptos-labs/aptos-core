@@ -3,7 +3,9 @@
 
 use crate::{
     pcs::univariate_hiding_kzg,
-    pvss::chunky::{chunked_elgamal, chunked_elgamal_pp},
+    pvss::chunky::{
+        chunked_elgamal, chunked_elgamal_pp, chunks, public_parameters::PublicParameters,
+    },
     sigma_protocol::{
         self,
         homomorphism::{
@@ -26,7 +28,8 @@ use aptos_crypto_derive::SigmaProtocolWitness;
 use ark_ec::{pairing::Pairing, AdditiveGroup, AffineRepr, CurveGroup};
 use ark_ff::PrimeField;
 use ark_serialize::{CanonicalDeserialize, CanonicalSerialize};
-use std::marker::PhantomData;
+use rand_core::{CryptoRng, RngCore};
+use std::{iter::repeat_with, marker::PhantomData};
 
 /// Witness data for the `chunked_elgamal_field` PVSS protocol.
 ///
@@ -49,6 +52,67 @@ pub struct HkzgWeightedElgamalWitness<F: PrimeField> {
     pub hkzg_randomness: univariate_hiding_kzg::CommitmentRandomness<F>,
     pub chunked_plaintexts: Vec<Vec<Vec<Scalar<F>>>>, // For each player, plaintexts z_i, which are chunked z_{i,j}
     pub elgamal_randomness: Vec<Vec<Scalar<F>>>, // For at most max_weight, for each chunk, a blinding factor
+}
+
+/// Prepared data for the chunked ElGamal + range proof witness.
+pub struct ChunkedWitnessData<E: Pairing> {
+    pub witness: HkzgWeightedElgamalWitness<E::ScalarField>,
+    /// Flattened chunked shares for the range proof (length `W * m`);
+    /// this data is already in the witness but we flatten it here for convenience.
+    pub f_evals_chunked_flat: Vec<E::ScalarField>,
+}
+
+/// Prepares the chunked witness and flattened chunked values used by both
+/// v1 and v2 `encrypt_chunked_shares`. Callers then run their specific
+/// homomorphism and SoK, then feed `f_evals_chunked_flat` and `witness.hkzg_randomness`
+/// into the DeKART range proof.
+#[allow(non_snake_case)]
+pub fn prepare_chunked_witness<E: Pairing, R: RngCore + CryptoRng>(
+    f_evals: &[E::ScalarField],
+    pp: &PublicParameters<E>,
+    sc: &WeightedConfigArkworks<E::ScalarField>,
+    rng: &mut R,
+) -> ChunkedWitnessData<E> {
+    debug_assert!(
+        (8..=63).contains(&pp.ell),
+        "pp.ell must be between 8 and 63 (inclusive), got {}",
+        pp.ell
+    );
+    // Step 3: convert the Shamir shares into chunked values
+    let f_evals_chunked: Vec<Vec<E::ScalarField>> = f_evals
+        .iter()
+        .map(|f_eval| chunks::scalar_to_le_chunks(pp.ell, f_eval))
+        .collect();
+    let f_evals_chunked_flat: Vec<E::ScalarField> =
+        f_evals_chunked.iter().flatten().copied().collect();
+    let f_evals_weighted = sc.group_by_player(&f_evals_chunked);
+
+    // Step 4a: sample the HKZG randomness and correlated randomness for the ElGamal encryptions
+    let hkzg_randomness: univariate_hiding_kzg::CommitmentRandomness<E::ScalarField> =
+        Scalar(sample_field_element(rng));
+    let elgamal_randomness = Scalar::vecvec_from_inner(
+        repeat_with(|| {
+            chunked_elgamal::correlated_randomness(
+                rng,
+                1 << pp.ell as u64, // debug_assert is to prevent overflow here
+                chunked_elgamal::num_chunks_per_scalar::<E::ScalarField>(pp.ell),
+                &<E::ScalarField as ark_ff::AdditiveGroup>::ZERO,
+            )
+        })
+        .take(sc.get_max_weight())
+        .collect(),
+    );
+
+    let witness = HkzgWeightedElgamalWitness {
+        hkzg_randomness,
+        chunked_plaintexts: Scalar::vecvecvec_from_inner(f_evals_weighted),
+        elgamal_randomness,
+    };
+
+    ChunkedWitnessData {
+        witness,
+        f_evals_chunked_flat,
+    }
 }
 
 /// The two components described earlier — (1) generating HKZG randomness for the DeKARTv2 proof
@@ -122,16 +186,15 @@ type LiftedWeightedChunkedElgamal<'a, C> = LiftHomomorphism<
 // it would make more sense to say this is a tuple homomorphism consisting of (lifts of) the
 // DeKARTv2::commitment_homomorphism together with the chunked_elgamal::homomorphism.
 //pub type Homomorphism<'a, E> = CurveGroupTupleHomomorphism<LiftedHkzg<'a, E>, LiftedChunkedElgamal<'a, <E as Pairing>::G1>>;
-pub type WeightedHomomorphism<'a, E> = CurveGroupTupleHomomorphism<
+pub type Homomorphism<'a, E> = CurveGroupTupleHomomorphism<
     <E as Pairing>::G1,
     LiftedHkzgWeighted<'a, E>,
     LiftedWeightedChunkedElgamal<'a, <E as Pairing>::G1>,
 >;
 
-pub type WeightedProof<'a, E> =
-    sigma_protocol::Proof<<E as Pairing>::ScalarField, WeightedHomomorphism<'a, E>>;
+pub type Proof<'a, E> = sigma_protocol::Proof<<E as Pairing>::ScalarField, Homomorphism<'a, E>>;
 
-impl<'a, E: Pairing> WeightedProof<'a, E> {
+impl<'a, E: Pairing> Proof<'a, E> {
     /// Generates a random looking proof (but not a valid one).
     /// Useful for testing and benchmarking.
     pub fn generate<R: rand::Rng + rand::CryptoRng>(
@@ -142,26 +205,18 @@ impl<'a, E: Pairing> WeightedProof<'a, E> {
         // or should number_of_chunks_per_share be a const?
         Self {
             first_proof_item: FirstProofItem::Commitment(TupleCodomainShape(
-                TrivialShape(unsafe_random_point::<E::G1, _>(rng)), // because TrivialShape is the codomain of univariate_hiding_kzg::CommitmentHomomorphism. TODO: develop generate() methods there? Maybe make it part of sigma_protocol::Trait ?
+                TrivialShape(unsafe_random_point(rng)), // because TrivialShape is the codomain of univariate_hiding_kzg::CommitmentHomomorphism. TODO: develop generate() methods there? Maybe make it part of sigma_protocol::Trait ?
                 chunked_elgamal::WeightedCodomainShape {
                     chunks: (0..sc.get_total_num_players())
                         .map(|i| {
                             let w = sc.get_player_weight(&sc.get_player(i)); // TODO: combine these functions...
                             (0..w)
-                                .map(|_| {
-                                    unsafe_random_points::<E::G1, _>(
-                                        number_of_chunks_per_share,
-                                        rng,
-                                    )
-                                })
+                                .map(|_| unsafe_random_points(number_of_chunks_per_share, rng))
                                 .collect()
                         })
                         .collect(),
                     randomness: vec![
-                        unsafe_random_points::<E::G1, _>(
-                            number_of_chunks_per_share,
-                            rng
-                        );
+                        unsafe_random_points(number_of_chunks_per_share, rng);
                         sc.get_max_weight()
                     ],
                 },
@@ -195,7 +250,7 @@ impl<'a, E: Pairing> WeightedProof<'a, E> {
 }
 
 #[allow(non_snake_case)]
-impl<'a, E: Pairing> WeightedHomomorphism<'a, E> {
+impl<'a, E: Pairing> Homomorphism<'a, E> {
     pub fn new(
         lagr_g1: &'a [E::G1Affine],
         xi_1: E::G1Affine,

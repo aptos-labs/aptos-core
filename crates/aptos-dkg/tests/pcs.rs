@@ -185,7 +185,10 @@ mod zeromorph {
 
 mod shplonked {
     use super::*;
-    use aptos_dkg::pcs::shplonked::zk_pcs_verify;
+    use aptos_dkg::pcs::{
+        shplonked::{batch_verify_generalized, SumEvalHom},
+        EvaluationSet,
+    };
 
     #[test]
     fn shplonked_bn254_setup_commit_open_verify() {
@@ -230,7 +233,29 @@ mod shplonked {
         let commitment_msms: Vec<_> = commitments.iter().map(|c| c.clone().into()).collect();
 
         let mut trs_verifier = merlin::Transcript::new(PCS_BATCH_DST);
-        zk_pcs_verify(&proof, &commitment_msms, &vk, &mut trs_verifier, &mut rng)
-            .expect("batch verify should succeed");
+        let point = challenge[0];
+        let sets: Vec<EvaluationSet<_>> = (0..polys.len())
+            .map(|_| EvaluationSet {
+                rev: vec![],
+                hid: vec![point],
+            })
+            .collect();
+        let y_rev: Vec<Vec<_>> = sets.iter().map(|_| vec![]).collect();
+        batch_verify_generalized::<
+            Bn254,
+            _,
+            SumEvalHom<<Bn254 as ark_ec::pairing::Pairing>::ScalarField>,
+        >(
+            &vk,
+            &sets,
+            &SumEvalHom::<<Bn254 as ark_ec::pairing::Pairing>::ScalarField>::default(),
+            &commitment_msms,
+            &y_rev,
+            proof.sigma_proof_statement.1,
+            &proof,
+            &mut trs_verifier,
+            &mut rng,
+        )
+        .expect("batch verify should succeed");
     }
 }

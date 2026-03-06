@@ -25,7 +25,6 @@ This renders templates and writes them to `<plugin_dir>`:
 
 ```
 <plugin_dir>/
-  commands/       # Slash-command definitions
   agents/         # Agent personality / instruction files
   skills/         # Skill definitions (e.g. move/)
   hooks/          # Event hooks (shell scripts + hooks.json)
@@ -47,16 +46,19 @@ For more permanent configurations, consult Claude docs.
 
 ### Debugging
 
-The MCP server uses the same logging mechanism as the Move compiler and
-prover via the `MVC_LOG` env var. 
+The MCP server uses the same logging mechanism as the Move compiler and prover, sending
+log messages to stderr. Logging can be controlled via the `MVC_LOG` env var as shown below,
+where we narrow output to code in the flow crate, and increase level from default 'info' to
+'debug' (note that without the module filter, `debug` would create tons of output from other
+Move tools).
 
 ```bash
-MVC_LOG=info@/tmp/flow.log claude --debug --plugin-dir <plugin-dir>
+move-flow plugin --log /tmp/flow.err.log <plugin_dir>
+MVC_LOG=aptos_move_flow=debug claude --plugin-dir ~/plugin/test
 ```
 
-`--debug` makes Claude Code write its own log (location printed on startup);
-`MVC_LOG` controls the MCP server log separately.
-
+The `--log <path>` option adds a stderr redirect to the generated `.mcp.json` so output is
+appended to the given file. Without it, stderr is not redirected.
 
 ## Plugin Generator (`plugin/`)
 
@@ -64,7 +66,9 @@ The plugin generator uses [Tera](https://keats.github.io/tera/) templates
 to produce platform-specific configuration files.
 
 - **`cont/`** — Source templates organized by category (`agents/`,
-  `commands/`, `skills/`, `hooks/`).
+  `skills/`, `hooks/`) plus shared `templates/` containing reusable
+  content fragments (language references, workflow descriptions) that
+  are included into the agent and skill templates via Tera.
 - **`render.rs`** — Discovers all template files under `cont/`, renders each
   with a context containing the platform name, display name, version, and output
   directory. A custom `tool(name="...")` Tera function validates that
@@ -108,11 +112,12 @@ cache entry is invalidated.
 
 ### Package Tools
 
-| Tool                    | Description                                                     |
-|-------------------------|-----------------------------------------------------------------|
-| `move_package_status`   | Return errors and warnings as formatted diagnostics             |
-| `move_package_manifest` | Return the package's source file paths and dependency paths     |
-| `move_package_verify`   | Run the Move Prover on a package and return verification output |
+| Tool                       | Description                                                     |
+|----------------------------|-----------------------------------------------------------------|
+| `move_package_status`      | Return errors and warnings as formatted diagnostics             |
+| `move_package_manifest`    | Return the package's source file paths and dependency paths     |
+| `move_package_verify`      | Run the Move Prover on a package and return verification output |
+| `move_package_spec_infer`  | Run spec inference and inject inferred specs into source files  |
 
 All tools accept a `package_path` parameter pointing to a Move package
 directory.

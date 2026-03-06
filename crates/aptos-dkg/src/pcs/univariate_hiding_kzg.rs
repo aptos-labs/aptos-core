@@ -31,12 +31,24 @@ use ark_ff::{Field, PrimeField, Zero};
 use ark_poly::{
     polynomial::univariate::DensePolynomial, univariate::DenseOrSparsePolynomial, EvaluationDomain,
 };
-use ark_serialize::{CanonicalDeserialize, CanonicalSerialize};
+use ark_serialize::{
+    CanonicalDeserialize, CanonicalSerialize, Compress, SerializationError, Write,
+};
 use rand::{CryptoRng, RngCore};
 use sigma_protocol::homomorphism::TrivialShape as CodomainShape;
 use std::{borrow::Cow, fmt::Debug};
 
 pub type Commitment<E> = CodomainShape<<E as Pairing>::G1>;
+
+/// Newtype wrapper so we can implement `From<Commitment<E>>` without coherence issues.
+#[derive(CanonicalSerialize, CanonicalDeserialize, Debug, Clone, PartialEq, Eq)]
+pub struct CommitmentNormalised<E: Pairing>(pub E::G1Affine);
+
+impl<E: Pairing> From<Commitment<E>> for CommitmentNormalised<E> {
+    fn from(c: Commitment<E>) -> CommitmentNormalised<E> {
+        CommitmentNormalised(c.0.into_affine())
+    }
+}
 
 pub type CommitmentRandomness<F> = Scalar<F>;
 
@@ -52,9 +64,9 @@ impl<E: Pairing> OpeningProof<E> {
     pub fn generate<R: rand::Rng + rand::CryptoRng>(rng: &mut R) -> Self {
         Self {
             pi_1: sigma_protocol::homomorphism::TrivialShape(
-                unsafe_random_point::<E::G1, _>(rng).into(),
+                unsafe_random_point::<E::G1Affine, _>(rng).into(),
             ),
-            pi_2: unsafe_random_point::<E::G1, _>(rng).into(),
+            pi_2: unsafe_random_point::<E::G1Affine, _>(rng).into(),
         }
     }
 }
@@ -100,7 +112,7 @@ impl<E: Pairing> Trapdoor<E> {
 }
 
 pub fn setup<E: Pairing>(
-    m: usize,
+    m: usize, // maximum polynomial degree, assumed to be power of 2
     basis_type: SrsType,
     group_generators: GroupGenerators<E>,
     trapdoor: Trapdoor<E>,
@@ -146,12 +158,17 @@ pub fn setup<E: Pairing>(
     )
 }
 
+// For e.g. Zeromorph one also need powers of tau in G_2
 pub fn setup_extra<E: Pairing>(
-    m: usize,
+    m: usize, // maximum polynomial degree, assumed to be power of 2
     basis_type: SrsType,
     group_generators: GroupGenerators<E>,
     trapdoor: Trapdoor<E>,
 ) -> (VerificationKeyExtra<E>, CommitmentKey<E>) {
+    assert!(
+        matches!(basis_type, SrsType::PowersOfTau),
+        "setup_extra requires powers-of-tau basis type... for now"
+    );
     let tau = trapdoor.tau;
 
     let (vk, ck) = setup(m, basis_type, group_generators, trapdoor);
@@ -200,10 +217,10 @@ impl<'a, E: Pairing> CommitmentHomomorphism<'a, E> {
     pub fn open(
         ck: &CommitmentKey<E>,
         f_vals: Vec<E::ScalarField>, // evaluations or coefficients, depending on `ck.msm_basis`
-        rho: E::ScalarField,
+        rho: E::ScalarField,         // commitment randomness of f
         x: E::ScalarField,
         y: E::ScalarField,
-        s: &CommitmentRandomness<E::ScalarField>,
+        s: &CommitmentRandomness<E::ScalarField>, // commitment randomness of the quotient
         offset: usize,
     ) -> OpeningProof<E> {
         let q_vals = match &ck.msm_basis {
@@ -251,13 +268,13 @@ impl<'a, E: Pairing> CommitmentHomomorphism<'a, E> {
     }
 
     #[allow(non_snake_case)]
-    pub fn verify(
+    pub fn pairing_for_verify(
         vk: VerificationKey<E>,
         C: Commitment<E>,
         x: E::ScalarField,
         y: E::ScalarField,
         pi: OpeningProof<E>,
-    ) -> anyhow::Result<()> {
+    ) -> (Vec<E::G1Affine>, Vec<E::G2Affine>) {
         let VerificationKey {
             xi_2,
             tau_2,
@@ -269,12 +286,23 @@ impl<'a, E: Pairing> CommitmentHomomorphism<'a, E> {
         } = vk;
         let OpeningProof { pi_1, pi_2 } = pi;
 
+        (
+            E::G1::normalize_batch(&[C.0 - one_1 * y, -pi_1.0, -pi_2]),
+            vec![one_2, (tau_2 - one_2 * x).into_affine(), xi_2],
+        )
+    }
+
+    #[allow(non_snake_case)]
+    pub fn verify(
+        vk: VerificationKey<E>,
+        C: Commitment<E>,
+        x: E::ScalarField,
+        y: E::ScalarField,
+        pi: OpeningProof<E>,
+    ) -> anyhow::Result<()> {
+        let (first_comp, second_comp) = Self::pairing_for_verify(vk, C, x, y, pi);
         // TODO: should probably work on affine / serialization here at some point
-        let check = E::multi_pairing(vec![C.0 - one_1 * y, -pi_1.0, -pi_2], vec![
-            one_2,
-            (tau_2 - one_2 * x).into_affine(),
-            xi_2,
-        ]);
+        let check = E::multi_pairing(first_comp, second_comp);
         ensure!(
             PairingOutput::<E>::ZERO == check,
             "Hiding KZG verification failed"
@@ -326,10 +354,32 @@ impl<'a, E: Pairing> CommitmentHomomorphism<'a, E> {
 /// The MSM evaluation is then performed using `E::G1::msm()`.
 ///
 /// TODO: Since this code is quite similar to that of ordinary KZG, it may be possible to reduce it a bit
-#[derive(CanonicalSerialize, Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct CommitmentHomomorphism<'a, E: Pairing> {
     pub msm_basis: &'a [E::G1Affine],
     pub xi_1: E::G1Affine,
+}
+
+// We do a custom CanonicalSerialize here because serializing a complete powers-of-tau basis for
+// Fiat-Shamir challenges is a bit expensive and only using [1]_1 and [tau]_1 is secure
+impl<'a, E: Pairing> CanonicalSerialize for CommitmentHomomorphism<'a, E> {
+    fn serialize_with_mode<W: Write>(
+        &self,
+        mut writer: W,
+        compress: Compress,
+    ) -> Result<(), SerializationError> {
+        self.xi_1.serialize_with_mode(&mut writer, compress)?;
+        for entry in self.msm_basis.iter().take(2) {
+            entry.serialize_with_mode(&mut writer, compress)?;
+        }
+        Ok(())
+    }
+
+    fn serialized_size(&self, compress: Compress) -> usize {
+        let basis_count = self.msm_basis.len().min(2);
+        let g1_size = self.xi_1.serialized_size(compress);
+        (1 + basis_count) * g1_size
+    }
 }
 
 #[derive(

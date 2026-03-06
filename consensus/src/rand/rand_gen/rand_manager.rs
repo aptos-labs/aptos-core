@@ -89,6 +89,7 @@ impl<S: TShare, D: TAugmentedData> RandManager<S, D> {
             .factor(rb_config.backoff_policy_factor)
             .max_delay(Duration::from_millis(rb_config.backoff_policy_max_delay_ms));
         let reliable_broadcast = Arc::new(ReliableBroadcast::new(
+            "rand_manager",
             author,
             epoch_state.verifier.get_ordered_account_addresses(),
             network_sender.clone(),

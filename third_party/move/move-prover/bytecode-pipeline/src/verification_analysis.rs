@@ -91,7 +91,10 @@ impl FunctionTargetProcessor for VerificationAnalysisProcessor {
         // This function implements the logic to decide whether to verify this function
 
         // Rule 1: never verify if "pragma verify = false;"
-        if !fun_env.is_pragma_true(VERIFY_PRAGMA, || true) {
+        // In inference mode, ignore this pragma — we still need the verification
+        // variant as input to spec inference.
+        let options = ProverOptions::get(fun_env.module_env.env);
+        if !options.inference && !fun_env.is_pragma_true(VERIFY_PRAGMA, || true) {
             return data;
         }
 
@@ -230,33 +233,62 @@ impl FunctionTargetProcessor for VerificationAnalysisProcessor {
 
         // If we are verifying only one function or module, check that this indeed exists.
         match &options.verify_scope {
-            VerificationScope::Only(name) | VerificationScope::OnlyModule(name) => {
-                let for_module = matches!(&options.verify_scope, VerificationScope::OnlyModule(_));
-                let mut target_exists = false;
-                for module in env.get_modules() {
-                    if module.is_target() {
-                        if for_module {
-                            target_exists = module.matches_name(name)
-                        } else {
-                            target_exists = module.get_functions().any(|f| f.matches_name(name));
-                        }
-                        if target_exists {
-                            break;
-                        }
-                    }
+            VerificationScope::OnlyModule(name) => {
+                let sym = env.symbol_pool().make(name);
+                if !env.find_module_by_name(sym).is_some_and(|m| m.is_target()) {
+                    env.error(
+                        &env.unknown_loc(),
+                        &format!("module target {} does not exist in target modules", name),
+                    )
                 }
+            },
+            VerificationScope::Only(name) => {
+                let target_exists = env
+                    .get_modules()
+                    .filter(|m| m.is_target())
+                    .any(|m| m.get_functions().any(|f| f.matches_name(name)));
                 if !target_exists {
                     env.error(
                         &env.unknown_loc(),
-                        &format!(
-                            "{} target {} does not exist in target modules",
-                            if for_module { "module" } else { "function" },
-                            name
-                        ),
+                        &format!("function target {} does not exist in target modules", name),
                     )
                 }
             },
             _ => {},
+        }
+
+        // Validate that exclusion targets exist.
+        for excl in &options.verify_exclude {
+            match excl {
+                VerificationScope::OnlyModule(name) => {
+                    let sym = env.symbol_pool().make(name);
+                    if !env.find_module_by_name(sym).is_some_and(|m| m.is_target()) {
+                        env.error(
+                            &env.unknown_loc(),
+                            &format!(
+                                "exclusion module target `{}` does not exist in target modules",
+                                name
+                            ),
+                        )
+                    }
+                },
+                VerificationScope::Only(name) => {
+                    let target_exists = env
+                        .get_modules()
+                        .filter(|m| m.is_target())
+                        .any(|m| m.get_functions().any(|f| f.matches_name(name)));
+                    if !target_exists {
+                        env.error(
+                            &env.unknown_loc(),
+                            &format!(
+                                "exclusion function target `{}` does not exist in target modules",
+                                name
+                            ),
+                        )
+                    }
+                },
+                _ => {},
+            }
         }
 
         // Collect information for global invariant instrumentation
@@ -360,13 +392,23 @@ impl VerificationAnalysisProcessor {
         }
         let env = fun_env.module_env.env;
         let options = ProverOptions::get(env);
-        match &options.verify_scope {
+        let in_scope = match &options.verify_scope {
             VerificationScope::Public => fun_env.is_exposed(),
             VerificationScope::All => true,
             VerificationScope::Only(name) => fun_env.matches_name(name),
             VerificationScope::OnlyModule(name) => fun_env.module_env.matches_name(name),
             VerificationScope::None => false,
-        }
+        };
+        in_scope && !Self::is_excluded_from_verification(fun_env, &options)
+    }
+
+    /// Check whether the function matches any entry in the exclusion list.
+    fn is_excluded_from_verification(fun_env: &FunctionEnv, options: &ProverOptions) -> bool {
+        options.verify_exclude.iter().any(|excl| match excl {
+            VerificationScope::Only(name) => fun_env.matches_name(name),
+            VerificationScope::OnlyModule(name) => fun_env.module_env.matches_name(name),
+            _ => false,
+        })
     }
 
     /// Mark that this function should be verified, and as a result, mark that all its callees

@@ -71,6 +71,10 @@ pub struct VMConfig {
     /// execution when types are not created (e.g., local types when there are no runtime type
     /// checks).
     pub check_depth_on_type_counts: bool,
+    /// Whether this VM should support public copy structs/enums as transaction arguments.
+    /// When enabled, non-private structs and enums with the copy ability can be used as
+    /// transaction arguments if they have public pack functions with the Pack attribute.
+    pub enable_public_struct_args: bool,
 }
 
 impl Default for VMConfig {
@@ -87,7 +91,7 @@ impl Default for VMConfig {
             type_base_cost: 0,
             type_byte_cost: 0,
             delayed_field_optimization_enabled: false,
-            ty_builder: TypeBuilder::with_limits(128, 20),
+            ty_builder: TypeBuilder::with_limits(128, 20, true),
             enable_function_caches: true,
             enable_lazy_loading: true,
             enable_depth_checks: true,
@@ -103,6 +107,7 @@ impl Default for VMConfig {
             enable_closure_depth_check: true,
             enable_struct_layout_local_cache: true,
             check_depth_on_type_counts: true,
+            enable_public_struct_args: true,
         }
     }
 }

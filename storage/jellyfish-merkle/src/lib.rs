@@ -1058,7 +1058,7 @@ impl NibbleExt for HashValue {
     /// Returns the `index`-th nibble.
     fn get_nibble(&self, index: usize) -> Nibble {
         Nibble::from(
-            if index % 2 == 0 {
+            if index.is_multiple_of(2) {
                 self[index / 2] >> 4
             } else {
                 self[index / 2] & 0x0F

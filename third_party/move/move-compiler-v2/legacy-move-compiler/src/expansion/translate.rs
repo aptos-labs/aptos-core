@@ -2832,6 +2832,44 @@ fn exp_(context: &mut Context, sp!(loc, pe_): P::Exp) -> E::Exp {
                 }
             }
         },
+        PE::LabeledCall(label, name, type_args, sp!(args_loc, args)) => {
+            if !context.in_spec_context {
+                context.env.add_diag(diag!(
+                    Syntax::SpecContextRestricted,
+                    (
+                        loc,
+                        "labeled resource access only allowed in specifications"
+                    )
+                ));
+                EE::UnresolvedError
+            } else {
+                let e_name =
+                    name_access_chain(context, Access::Term, name, Some(DeprecatedItem::Function));
+                let e_type_args = optional_types(context, type_args);
+                let e_args = sp(args_loc, exps(context, args));
+                if let Some(name_access) = e_name {
+                    EE::LabeledCall(label, name_access, e_type_args, e_args)
+                } else {
+                    EE::UnresolvedError
+                }
+            }
+        },
+        PE::LabeledIndex(label, target, index) => {
+            if !context.in_spec_context {
+                context.env.add_diag(diag!(
+                    Syntax::SpecContextRestricted,
+                    (
+                        loc,
+                        "labeled resource access only allowed in specifications"
+                    )
+                ));
+                EE::UnresolvedError
+            } else {
+                let e_target = exp_(context, *target);
+                let e_index = exp_(context, *index);
+                EE::LabeledIndex(label, Box::new(e_target), Box::new(e_index))
+            }
+        },
         PE::UnresolvedError => panic!("ICE error should have been thrown"),
     };
     sp(loc, e_)
@@ -3453,6 +3491,13 @@ fn unbound_names_exp(unbound: &mut UnboundNames, sp!(_, e_): &E::Exp) {
                 E::ModuleAccess_::ModuleAccess(..) => (),
             }
             unbound_names_exps(unbound, args);
+        },
+        EE::LabeledCall(_, _, _, sp!(_, args)) => {
+            unbound_names_exps(unbound, args);
+        },
+        EE::LabeledIndex(_, target, index) => {
+            unbound_names_exp(unbound, target);
+            unbound_names_exp(unbound, index);
         },
     }
 }

@@ -1,8 +1,15 @@
 ---
 name: move-prove
 description: Run the Move Prover to formally verify specifications
-context: fork
-agent: move-dev
 ---
 
-Run the Edit–Verify Cycle described in the move skill on the current Move package.
+{% include "templates/move_lang.md" %}
+{% include "templates/status_tool.md" %}
+{% include "templates/spec_lang.md" %}
+{% include "templates/spec_editing_workflow.md" %}
+{% include "templates/verification_workflow.md" %}
+
+
+## Task
+
+Run the Move Prover to verify the current package.

@@ -7,7 +7,7 @@
 //! their linear combination. This module defines a simple container for such
 //! inputs.
 
-use ark_ec::CurveGroup;
+use ark_ec::{AffineRepr, CurveGroup};
 use ark_ff::Zero;
 use ark_serialize::{CanonicalDeserialize, CanonicalSerialize};
 use std::{collections::HashMap, fmt::Debug, hash::Hash};
@@ -90,4 +90,36 @@ where
     }
     let (bases, scalars): (Vec<_>, Vec<_>) = agg.into_iter().filter(|(_, s)| !s.is_zero()).unzip();
     MsmInput::new(bases, scalars).expect("merged MSM terms")
+}
+
+/// Multi-scalar multiplication with boolean scalars.
+///
+/// Treats each `bool` as 0 or 1 and returns
+/// `sum_i scalars[i] * bases[i]`.
+///
+/// # Arguments
+/// * `bases` – curve points (affine).
+/// * `scalars` – one boolean per base; `true` means include that base, `false` means skip it.
+///
+/// # Panics
+/// In debug builds, panics if `bases.len() != scalars.len()`.
+///
+/// Probably won't be needed in future versions of `arkworks`.
+pub fn msm_bool<A: AffineRepr>(bases: &[A], scalars: &[bool]) -> A::Group {
+    // Bases and scalars must have the same length for multi-scalar multiplication.
+    debug_assert_eq!(
+        bases.len(),
+        scalars.len(),
+        "bases and scalars must have the same length for MSM (got {} bases, {} scalars)",
+        bases.len(),
+        scalars.len()
+    );
+
+    let mut acc = A::Group::zero();
+    for (base, &bit) in bases.iter().zip(scalars) {
+        if bit {
+            acc += base;
+        }
+    }
+    acc
 }

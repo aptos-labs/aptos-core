@@ -368,9 +368,9 @@ impl SparseMerkleTree {
     fn maybe_to_nibble_path(pos: &NodePosition) -> Option<NibblePath> {
         assert!(pos.len() <= HashValue::LENGTH_IN_BITS);
 
-        if pos.len() % BITS_IN_NIBBLE == 0 {
+        if pos.len().is_multiple_of(BITS_IN_NIBBLE) {
             let mut bytes = pos.clone().into_vec();
-            if pos.len() % BITS_IN_BYTE == 0 {
+            if pos.len().is_multiple_of(BITS_IN_BYTE) {
                 Some(NibblePath::new_even(bytes))
             } else {
                 // Unused bits in `BitVec` is uninitialized, setting to 0 to make sure.

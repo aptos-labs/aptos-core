@@ -1218,6 +1218,7 @@ def create_forge_command(
     forge_namespace_keep: Optional[str],
     forge_enable_haproxy: Optional[str],
     forge_enable_indexer: Optional[str],
+    forge_num_pfns: Optional[str],
     forge_deployer_profile: Optional[str],
     cargo_args: Optional[Sequence[str]],
     forge_cli_args: Optional[Sequence[str]],
@@ -1290,6 +1291,8 @@ def create_forge_command(
         forge_args.append("--enable-haproxy")
     if forge_enable_indexer == "true":
         forge_args.append("--enable-indexer")
+    if forge_num_pfns and int(forge_num_pfns) > 0:
+        forge_args.extend(["--num-pfns", forge_num_pfns])
     if forge_deployer_profile:
         forge_args.extend(["--deployer-profile", forge_deployer_profile])
 
@@ -1405,6 +1408,7 @@ def seeded_random_choice(namespace: str, cluster_names: Sequence[str]) -> str:
 @envoption("FORGE_NAMESPACE_REUSE")
 @envoption("FORGE_ENABLE_HAPROXY")
 @envoption("FORGE_ENABLE_INDEXER")
+@envoption("FORGE_NUM_PFNS")
 @envoption("FORGE_DEPLOYER_PROFILE")
 @envoption("FORGE_ENABLE_FAILPOINTS")
 @envoption("FORGE_ENABLE_PERFORMANCE")
@@ -1455,6 +1459,7 @@ def test(
     forge_enable_performance: Optional[str],
     forge_enable_haproxy: Optional[str],
     forge_enable_indexer: Optional[str],
+    forge_num_pfns: Optional[str],
     forge_deployer_profile: Optional[str],
     forge_test_suite: str,
     forge_runner_duration_secs: str,
@@ -1681,9 +1686,10 @@ def test(
     assert image_exists(
         shell, VALIDATOR_TESTING_IMAGE_NAME, upgrade_image_tag, cloud=cloud_enum
     ), f"swarm upgrade (validator) image does not exist: {upgrade_image_tag}"
+    # NOTE: AWS ignores forge_image_name and always uses "forge", but we don't support AWS anymore
     assert image_exists(
-        shell, FORGE_IMAGE_NAME, forge_image_tag, cloud=cloud_enum
-    ), f"forge (test runner) image does not exist: {forge_image_tag}"
+        shell, forge_image_name, forge_image_tag, cloud=cloud_enum
+    ), f"forge (test runner) image does not exist: {forge_image_name}:{forge_image_tag}"
 
     forge_args = create_forge_command(
         forge_runner_mode=forge_runner_mode,
@@ -1698,6 +1704,7 @@ def test(
         forge_namespace_keep=forge_namespace_keep,
         forge_enable_haproxy=forge_enable_haproxy,
         forge_enable_indexer=forge_enable_indexer,
+        forge_num_pfns=forge_num_pfns,
         forge_deployer_profile=forge_deployer_profile,
         cargo_args=cargo_args,
         forge_cli_args=forge_cli_args,
