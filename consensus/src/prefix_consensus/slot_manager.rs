@@ -28,7 +28,7 @@ use aptos_prefix_consensus::{
     slot_ranking::MultiSlotRankingManager,
     slot_state::SlotState,
     slot_types::{
-        PayloadFetchRequest, PayloadFetchResponse, SlotConsensusMsg, SlotProposal,
+        PayloadFetchRequest, PayloadFetchResponse, SPCOutput, SlotConsensusMsg, SlotProposal,
         create_signed_slot_proposal,
     },
 };
@@ -77,8 +77,8 @@ pub struct SPCHandles {
     pub msg_tx: aptos_channels::UnboundedSender<(Author, StrongPrefixConsensusMsg)>,
     /// Channel for forwarding priority SPC messages (Proposal, EmptyView, Commit) to the SPC task.
     pub priority_tx: aptos_channels::UnboundedSender<(Author, StrongPrefixConsensusMsg)>,
-    /// Channel for receiving committed (slot, v_high) from the SPC task.
-    pub output_rx: tokio::sync::mpsc::UnboundedReceiver<(u64, PrefixVector)>,
+    /// Channel for receiving SPC output (VLow and VHigh) from the SPC task.
+    pub output_rx: tokio::sync::mpsc::UnboundedReceiver<SPCOutput>,
     /// Oneshot to signal the SPC task to shut down (with ack).
     pub close_tx: futures::channel::oneshot::Sender<futures::channel::oneshot::Sender<()>>,
 }
@@ -217,7 +217,7 @@ pub struct SlotManager<NS: SubprotocolNetworkSender<SlotConsensusMsg>, SP: SPCSp
     // spc_msg_tx and spc_priority_tx are always set and cleared together.
     spc_msg_tx: Option<aptos_channels::UnboundedSender<(Author, StrongPrefixConsensusMsg)>>,
     spc_priority_tx: Option<aptos_channels::UnboundedSender<(Author, StrongPrefixConsensusMsg)>>,
-    spc_output_rx: Option<tokio::sync::mpsc::UnboundedReceiver<(u64, PrefixVector)>>,
+    spc_output_rx: Option<tokio::sync::mpsc::UnboundedReceiver<SPCOutput>>,
     spc_close_tx: Option<futures::channel::oneshot::Sender<futures::channel::oneshot::Sender<()>>>,
 
     // Buffers for SPC messages that arrive before the SPC task is spawned.
@@ -389,7 +389,18 @@ impl<NS: SubprotocolNetworkSender<SlotConsensusMsg>, SP: SPCSpawner> SlotManager
                     self.slot_timer = timer_opt;
                     self.spc_output_rx = spc_rx_opt;
                     match output {
-                        Some((slot, v_high)) => {
+                        Some(SPCOutput::VLow { slot, v_low }) => {
+                            info!(
+                                epoch = self.epoch,
+                                slot = slot,
+                                v_low_len = v_low.len(),
+                                "Received v_low from SPC task"
+                            );
+                            // TODO(Phase 3): on_spc_v_low for early commit.
+                            // For now, v_low is logged but not acted upon until
+                            // the two-wave commit logic is implemented.
+                        }
+                        Some(SPCOutput::VHigh { slot, v_high }) => {
                             info!(
                                 epoch = self.epoch,
                                 slot = slot,
@@ -1060,7 +1071,8 @@ mod tests {
     // Test infrastructure
     // ========================================================================
 
-    /// Stub SPC spawner for tests: immediately returns input_vector as v_high
+    /// Stub SPC spawner for tests: immediately sends VLow then VHigh.
+    /// Both use the input_vector (simulating v_low == v_high, the best case).
     struct StubSPCSpawner;
     impl SPCSpawner for StubSPCSpawner {
         fn spawn_spc(
@@ -1074,8 +1086,15 @@ mod tests {
             let (output_tx, output_rx) = mpsc::unbounded_channel();
             let (close_tx, _close_rx) = futures::channel::oneshot::channel();
 
-            // Immediately send input_vector as v_high
-            let _ = output_tx.send((slot, input_vector));
+            // Send VLow first, then VHigh (both use input_vector for simplicity)
+            let _ = output_tx.send(SPCOutput::VLow {
+                slot,
+                v_low: input_vector.clone(),
+            });
+            let _ = output_tx.send(SPCOutput::VHigh {
+                slot,
+                v_high: input_vector,
+            });
 
             SPCHandles {
                 msg_tx,
@@ -1125,6 +1144,19 @@ mod tests {
             crate::error::QuorumStoreError,
         > {
             Ok((vec![], Payload::DirectMempool(vec![])))
+        }
+    }
+
+    /// Helper: drain VLow from the SPC output channel and return the VHigh (slot, v_high).
+    /// StubSPCSpawner sends VLow then VHigh, so we skip VLow and extract VHigh.
+    async fn recv_v_high(
+        rx: &mut tokio::sync::mpsc::UnboundedReceiver<SPCOutput>,
+    ) -> (u64, PrefixVector) {
+        loop {
+            match rx.recv().await.expect("SPC output channel closed") {
+                SPCOutput::VLow { .. } => continue, // skip v_low
+                SPCOutput::VHigh { slot, v_high } => return (slot, v_high),
+            }
         }
     }
 
@@ -1219,7 +1251,7 @@ mod tests {
         // All 4 proposals received → SPC should have been triggered
         // StubSPCSpawner sends output synchronously → available immediately
         if manager.spc_output_rx.is_some() {
-            let (slot, v_high) = manager.spc_output_rx.as_mut().unwrap().recv().await.unwrap();
+            let (slot, v_high) = recv_v_high(manager.spc_output_rx.as_mut().unwrap()).await;
             manager.on_spc_v_high(slot, v_high).await;
         }
 
@@ -1245,7 +1277,7 @@ mod tests {
         // With 1 validator, the own proposal is the only one needed
         // StubSPCSpawner sends output synchronously → available immediately
         if manager.spc_output_rx.is_some() {
-            let (slot, v_high) = manager.spc_output_rx.as_mut().unwrap().recv().await.unwrap();
+            let (slot, v_high) = recv_v_high(manager.spc_output_rx.as_mut().unwrap()).await;
             manager.on_spc_v_high(slot, v_high).await;
         }
 
@@ -1297,7 +1329,7 @@ mod tests {
         // Fire timer to trigger SPC with partial proposals
         manager.slot_timer = None;
         manager.run_spc(1).await;
-        let (slot, v_high) = manager.spc_output_rx.as_mut().unwrap().recv().await.unwrap();
+        let (slot, v_high) = recv_v_high(manager.spc_output_rx.as_mut().unwrap()).await;
 
         // v_high has length 4 (full ranking), entries for signers[2] and [3] are zero
         assert_eq!(v_high.len(), 4);
@@ -1326,7 +1358,7 @@ mod tests {
         manager.process_proposal(signers[1].author(), p).await;
 
         if manager.spc_output_rx.is_some() {
-            let (slot, v_high) = manager.spc_output_rx.as_mut().unwrap().recv().await.unwrap();
+            let (slot, v_high) = recv_v_high(manager.spc_output_rx.as_mut().unwrap()).await;
             manager.on_spc_v_high(slot, v_high).await;
         }
 
@@ -1352,7 +1384,7 @@ mod tests {
         // Run slot 1
         manager.start_new_slot(1).await;
         if manager.spc_output_rx.is_some() {
-            let (slot, v_high) = manager.spc_output_rx.as_mut().unwrap().recv().await.unwrap();
+            let (slot, v_high) = recv_v_high(manager.spc_output_rx.as_mut().unwrap()).await;
             manager.on_spc_v_high(slot, v_high).await;
         }
         let _block1 = exec_rx.try_next().unwrap().unwrap();
@@ -1363,7 +1395,7 @@ mod tests {
 
         // Run slot 2 (start_new_slot(2) was called by on_spc_v_high for slot 1)
         if manager.spc_output_rx.is_some() {
-            let (slot, v_high) = manager.spc_output_rx.as_mut().unwrap().recv().await.unwrap();
+            let (slot, v_high) = recv_v_high(manager.spc_output_rx.as_mut().unwrap()).await;
             manager.on_spc_v_high(slot, v_high).await;
         }
         let _block2 = exec_rx.try_next().unwrap().unwrap();
@@ -1419,7 +1451,7 @@ mod tests {
         manager.start_new_slot(1).await;
         manager.slot_timer = None;
         manager.run_spc(1).await;
-        let (slot, v_high) = manager.spc_output_rx.as_mut().unwrap().recv().await.unwrap();
+        let (slot, v_high) = recv_v_high(manager.spc_output_rx.as_mut().unwrap()).await;
         manager.on_spc_v_high(slot, v_high).await;
         let _block1 = exec_rx.try_next().unwrap().unwrap();
 

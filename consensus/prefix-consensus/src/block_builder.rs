@@ -76,6 +76,38 @@ pub fn build_block_from_v_high(
     )
 }
 
+/// Build a `Block` for a single non-bot entry in v_low or v_high.
+///
+/// Used by the two-wave commit flow: each non-bot position produces its own block
+/// (one proposal's payload per block), enabling the execution pipeline to start
+/// processing v_low blocks while SPC finishes computing v_high.
+///
+/// `author` is the validator at this ranking position.
+/// `proposal_hash` is the non-zero hash from v_low/v_high at this position.
+/// `payload` is the resolved proposal payload for this hash.
+pub fn build_block_for_entry(
+    epoch: u64,
+    round: Round,
+    timestamp_usecs: u64,
+    author: Author,
+    proposal_hash: HashValue,
+    payload: Payload,
+    parent_block_id: HashValue,
+    validator_txns: Vec<ValidatorTransaction>,
+) -> Block {
+    Block::new_for_prefix_consensus(
+        epoch,
+        round,
+        timestamp_usecs,
+        validator_txns,
+        payload,
+        author,
+        vec![author],
+        vec![proposal_hash],
+        parent_block_id,
+    )
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -256,6 +288,63 @@ mod tests {
             _ => panic!("Expected PrefixConsensusBlock"),
         }
     }
+
+    // ========================================================================
+    // build_block_for_entry tests
+    // ========================================================================
+
+    #[test]
+    fn test_build_block_for_entry_basic() {
+        let author = make_author(1);
+        let (payload, hash) = make_empty_payload();
+        let parent_id = HashValue::random();
+
+        let block = build_block_for_entry(
+            5, 42, 1000, author, hash, payload, parent_id, vec![],
+        );
+
+        assert_eq!(block.epoch(), 5);
+        assert_eq!(block.round(), 42);
+        assert_eq!(block.timestamp_usecs(), 1000);
+        assert_eq!(block.author(), Some(author));
+        assert_eq!(block.parent_id(), parent_id);
+
+        match block.block_data().block_type() {
+            BlockType::PrefixConsensusBlock { authors, proposal_hashes, .. } => {
+                assert_eq!(authors, &vec![author]);
+                assert_eq!(proposal_hashes, &vec![hash]);
+            },
+            _ => panic!("Expected PrefixConsensusBlock"),
+        }
+    }
+
+    #[test]
+    fn test_build_block_for_entry_chaining() {
+        // Simulate two sequential per-entry blocks chained via parent_id
+        let a1 = make_author(1);
+        let a2 = make_author(2);
+        let (p1, h1) = make_empty_payload();
+        let (p2, h2) = make_empty_payload();
+        let genesis_id = HashValue::random();
+
+        let block1 = build_block_for_entry(1, 1, 100, a1, h1, p1, genesis_id, vec![]);
+        let block1_id = block1.id();
+
+        let block2 = build_block_for_entry(1, 2, 101, a2, h2, p2, block1_id, vec![]);
+
+        // Block 2's parent should be block 1
+        assert_eq!(block2.parent_id(), block1_id);
+        // Rounds are sequential
+        assert_eq!(block1.round(), 1);
+        assert_eq!(block2.round(), 2);
+        // Different authors
+        assert_eq!(block1.author(), Some(a1));
+        assert_eq!(block2.author(), Some(a2));
+    }
+
+    // ========================================================================
+    // build_block_from_v_high tests (existing)
+    // ========================================================================
 
     #[test]
     fn test_build_block_metadata() {

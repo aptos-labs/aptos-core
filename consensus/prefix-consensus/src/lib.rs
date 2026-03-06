@@ -56,7 +56,7 @@ mod utils;
 mod verification;
 pub mod view_state;
 
-pub use block_builder::build_block_from_v_high;
+pub use block_builder::{build_block_for_entry, build_block_from_v_high};
 pub use certify::{qc1_certify, qc2_certify, qc3_certify};
 pub use manager::{DefaultPCManager, PrefixConsensusManager};
 pub use network_interface::{
@@ -89,7 +89,7 @@ pub use inner_pc_trait::InnerPCAlgorithm;
 pub use slot_ranking::MultiSlotRankingManager;
 pub use slot_state::{ProposalBuffer, SlotPhase, SlotState};
 pub use slot_types::{
-    PayloadFetchRequest, PayloadFetchResponse, SlotConsensusMsg, SlotProposal,
+    PayloadFetchRequest, PayloadFetchResponse, SPCOutput, SlotConsensusMsg, SlotProposal,
     SlotProposalSignData, create_signed_slot_proposal,
 };
 pub use strong_manager::{DefaultStrongPCManager, StrongPrefixConsensusManager};

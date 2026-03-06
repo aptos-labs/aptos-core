@@ -240,6 +240,9 @@ testsuite/smoke-test/src/consensus/
 - [ ] **Garbage collect on slot commit**: Clean up view_states, pc_states, pending_fetches, cert store
 - [ ] **Remove smoke test scaffolding**: `write_output_file()` (file-based output polling), `start_prefix_consensus()` / `start_strong_prefix_consensus()` (on-demand entry points in EpochManager), and associated helpers. Remove once smoke tests verify through the multi-slot execution pipeline
 
+### System Integration
+- [ ] **Backpressure implementation**: Add backpressure mechanism to prevent SlotManager from advancing faster than the execution pipeline can consume blocks
+
 ### Long Term
 - [ ] **Optimistic Variants**: 2-round good case (paper Appendix D)
 - [ ] **Communication Optimization**: Reduce from O(n²L) to O(n² + nL)

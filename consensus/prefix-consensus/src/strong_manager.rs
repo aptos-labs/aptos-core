@@ -28,6 +28,7 @@ use crate::{
     strong_protocol::{
         ChainBuildError, StrongPrefixConsensusProtocol, View1Decision, ViewDecision,
     },
+    slot_types::SPCOutput,
     types::{
         CertFetchRequest, CertFetchResponse, PartyId, PrefixConsensusInput, PrefixConsensusOutput,
         PrefixVector, ViewProposal, QC3,
@@ -123,9 +124,9 @@ pub struct StrongPrefixConsensusManager<NetworkSender, T: InnerPCAlgorithm> {
     // Input vector for View 1
     input_vector: PrefixVector,
 
-    // Optional channel to notify SlotManager of committed v_high.
+    // Optional channel to notify SlotManager of SPC progress (v_low and v_high).
     // None when running standalone (e.g., smoke tests or EpochManager-managed SPC).
-    output_tx: Option<TokioUnboundedSender<(u64, PrefixVector)>>,
+    output_tx: Option<TokioUnboundedSender<SPCOutput>>,
 }
 
 impl<NetworkSender: SubprotocolNetworkSender<StrongPrefixConsensusMsg>, T: InnerPCAlgorithm<Message = PrefixConsensusMsg>>
@@ -141,7 +142,7 @@ impl<NetworkSender: SubprotocolNetworkSender<StrongPrefixConsensusMsg>, T: Inner
         network_sender: NetworkSender,
         validator_signer: ValidatorSigner,
         validator_verifier: Arc<ValidatorVerifier>,
-        output_tx: Option<TokioUnboundedSender<(u64, PrefixVector)>>,
+        output_tx: Option<TokioUnboundedSender<SPCOutput>>,
     ) -> Self {
         Self {
             party_id,
@@ -166,10 +167,39 @@ impl<NetworkSender: SubprotocolNetworkSender<StrongPrefixConsensusMsg>, T: Inner
         }
     }
 
+    /// Notify SlotManager (if connected) that View 1's v_low is available.
+    fn send_v_low(&self, v_low: &PrefixVector) {
+        if let Some(tx) = &self.output_tx {
+            let output = SPCOutput::VLow {
+                slot: self.slot,
+                v_low: v_low.clone(),
+            };
+            if let Err(e) = tx.send(output) {
+                error!(
+                    party_id = %self.party_id,
+                    slot = self.slot,
+                    error = ?e,
+                    "Failed to send v_low to SlotManager — receiver dropped."
+                );
+            } else {
+                info!(
+                    party_id = %self.party_id,
+                    slot = self.slot,
+                    v_low_len = v_low.len(),
+                    "Sent v_low to SlotManager"
+                );
+            }
+        }
+    }
+
     /// Notify SlotManager (if connected) that SPC committed v_high.
     fn send_output(&self, v_high: &PrefixVector) {
         if let Some(tx) = &self.output_tx {
-            if let Err(e) = tx.send((self.slot, v_high.clone())) {
+            let output = SPCOutput::VHigh {
+                slot: self.slot,
+                v_high: v_high.clone(),
+            };
+            if let Err(e) = tx.send(output) {
                 error!(
                     party_id = %self.party_id,
                     slot = self.slot,
@@ -372,6 +402,14 @@ impl<NetworkSender: SubprotocolNetworkSender<StrongPrefixConsensusMsg>, T: Inner
     /// Handle View 1 completion
     async fn handle_view1_complete(&mut self, output: ViewOutput) {
         let decision = self.protocol.process_view1_output(output);
+
+        // v_low is now set in protocol — send it to SlotManager for early commit.
+        let v_low = self
+            .protocol
+            .v_low()
+            .cloned()
+            .expect("v_low must be set after process_view1_output");
+        self.send_v_low(&v_low);
 
         match decision {
             View1Decision::DirectCert(cert) => {

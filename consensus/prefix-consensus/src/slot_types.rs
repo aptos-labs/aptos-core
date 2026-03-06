@@ -12,6 +12,7 @@
 
 use crate::network_interface::PriorityClassifiable;
 use crate::network_messages::StrongPrefixConsensusMsg;
+use crate::types::PrefixVector;
 use anyhow::{ensure, Result};
 use aptos_consensus_types::common::{Author, Payload};
 use aptos_crypto::{bls12381::Signature as BlsSignature, HashValue};
@@ -151,6 +152,24 @@ pub fn create_signed_slot_proposal(
         signature,
         timestamp_usecs,
     })
+}
+
+// ============================================================================
+// SPCOutput: SPC → SlotManager communication
+// ============================================================================
+
+/// Output events from the Strong Prefix Consensus task to the SlotManager.
+///
+/// SPC sends `VLow` when View 1's inner PC completes (early commit opportunity),
+/// then `VHigh` when the full commit is reached.
+#[derive(Clone, Debug)]
+pub enum SPCOutput {
+    /// View 1's inner PC v_low is available. Each non-bot entry can be committed
+    /// as a block immediately (safe because v_low ⪯ v_high at every position).
+    VLow { slot: u64, v_low: PrefixVector },
+    /// Full commit v_high is available. Entries not already committed via VLow
+    /// become additional blocks.
+    VHigh { slot: u64, v_high: PrefixVector },
 }
 
 // ============================================================================
