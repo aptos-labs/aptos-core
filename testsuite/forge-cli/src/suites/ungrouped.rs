@@ -635,7 +635,11 @@ pub fn mixed_emit_job() -> EmitJobRequest {
 
 // framework_usecases can have new features, so might fail publishing.
 pub fn mixed_compatible_emit_job() -> EmitJobRequest {
+    // The pre-upgrade chain's maximum_number_of_gas_units is 2_000_000 (the old MAX_GAS_AMOUNT
+    // before the 10x gas cost increase). Submitting transactions with a higher max_gas would
+    // fail with MAX_GAS_UNITS_EXCEEDS_MAX_GAS_UNITS_BOUND on nodes that haven't been upgraded yet.
     EmitJobRequest::default()
+        .max_gas_per_txn(2_000_000)
         .mode(EmitJobMode::MaxLoad {
             mempool_backlog: 10000,
         })
