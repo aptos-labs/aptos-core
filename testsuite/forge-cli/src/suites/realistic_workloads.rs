@@ -36,7 +36,7 @@ pub(crate) fn individual_workload_tests(test_name: String) -> ForgeConfig {
                 let account_creation_type = TransactionType::AccountGeneration {
                     add_created_accounts_to_pool: true,
                     max_account_working_set: 20_000_000,
-                    creation_balance: 200_000_000,
+                    creation_balance: 2_000_000_000,
                 };
                 let write_type = TransactionType::CallCustomModules {
                     entry_point: Box::new(EntryPoints::BytesMakeOrChange {

@@ -346,7 +346,7 @@ impl TransactionBuilder {
             *self.sender.address(),
             sequence_number,
             payload,
-            self.max_gas_amount.unwrap_or(500_000),
+            self.max_gas_amount.unwrap_or(5_000_000),
             self.gas_unit_price.unwrap_or(0),
             self.ttl.unwrap_or(DEFAULT_EXPIRATION_TIME),
             self.chain_id.unwrap_or_else(ChainId::test), //ChainId::test(),

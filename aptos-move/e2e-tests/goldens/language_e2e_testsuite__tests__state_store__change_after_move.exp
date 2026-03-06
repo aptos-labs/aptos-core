@@ -14,9 +14,9 @@ Ok(
                 hotness: {},
             },
             events: [
-                ModuleEvent { type: Struct(StructTag { address: 0000000000000000000000000000000000000000000000000000000000000001, module: Identifier("transaction_fee"), name: Identifier("FeeStatement"), type_args: [] }), event_data: "04000000000000000300000000000000010000000000000000000000000000000000000000000000" },
+                ModuleEvent { type: Struct(StructTag { address: 0000000000000000000000000000000000000000000000000000000000000001, module: Identifier("transaction_fee"), name: Identifier("FeeStatement"), type_args: [] }), event_data: "20000000000000001d00000000000000040000000000000000000000000000000000000000000000" },
             ],
-            gas_used: 4,
+            gas_used: 32,
             status: Keep(
                 ExecutionFailure {
                     location: f5b9d6f01a99e74c790e2f330c092fa05455a8193f1dfc1b113ecc54d067afe1::M,
@@ -45,9 +45,9 @@ Ok(
                 hotness: {},
             },
             events: [
-                ModuleEvent { type: Struct(StructTag { address: 0000000000000000000000000000000000000000000000000000000000000001, module: Identifier("transaction_fee"), name: Identifier("FeeStatement"), type_args: [] }), event_data: "04000000000000000300000000000000010000000000000000000000000000000000000000000000" },
+                ModuleEvent { type: Struct(StructTag { address: 0000000000000000000000000000000000000000000000000000000000000001, module: Identifier("transaction_fee"), name: Identifier("FeeStatement"), type_args: [] }), event_data: "21000000000000001d00000000000000050000000000000000000000000000000000000000000000" },
             ],
-            gas_used: 4,
+            gas_used: 33,
             status: Keep(
                 Success,
             ),
@@ -71,9 +71,9 @@ Ok(
                 hotness: {},
             },
             events: [
-                ModuleEvent { type: Struct(StructTag { address: 0000000000000000000000000000000000000000000000000000000000000001, module: Identifier("transaction_fee"), name: Identifier("FeeStatement"), type_args: [] }), event_data: "04000000000000000300000000000000010000000000000000000000000000000000000000000000" },
+                ModuleEvent { type: Struct(StructTag { address: 0000000000000000000000000000000000000000000000000000000000000001, module: Identifier("transaction_fee"), name: Identifier("FeeStatement"), type_args: [] }), event_data: "27000000000000001d000000000000000a0000000000000000000000000000000000000000000000" },
             ],
-            gas_used: 4,
+            gas_used: 39,
             status: Keep(
                 Success,
             ),
@@ -98,9 +98,9 @@ Ok(
                 hotness: {},
             },
             events: [
-                ModuleEvent { type: Struct(StructTag { address: 0000000000000000000000000000000000000000000000000000000000000001, module: Identifier("transaction_fee"), name: Identifier("FeeStatement"), type_args: [] }), event_data: "04000000000000000300000000000000020000000000000000000000000000000000000000000000" },
+                ModuleEvent { type: Struct(StructTag { address: 0000000000000000000000000000000000000000000000000000000000000001, module: Identifier("transaction_fee"), name: Identifier("FeeStatement"), type_args: [] }), event_data: "28000000000000001d000000000000000b0000000000000000000000000000000000000000000000" },
             ],
-            gas_used: 4,
+            gas_used: 40,
             status: Keep(
                 Success,
             ),
@@ -120,9 +120,9 @@ Ok(
                 hotness: {},
             },
             events: [
-                ModuleEvent { type: Struct(StructTag { address: 0000000000000000000000000000000000000000000000000000000000000001, module: Identifier("transaction_fee"), name: Identifier("FeeStatement"), type_args: [] }), event_data: "04000000000000000300000000000000010000000000000000000000000000000000000000000000" },
+                ModuleEvent { type: Struct(StructTag { address: 0000000000000000000000000000000000000000000000000000000000000001, module: Identifier("transaction_fee"), name: Identifier("FeeStatement"), type_args: [] }), event_data: "20000000000000001d00000000000000040000000000000000000000000000000000000000000000" },
             ],
-            gas_used: 4,
+            gas_used: 32,
             status: Keep(
                 ExecutionFailure {
                     location: f5b9d6f01a99e74c790e2f330c092fa05455a8193f1dfc1b113ecc54d067afe1::M,
@@ -150,9 +150,9 @@ Ok(
                 hotness: {},
             },
             events: [
-                ModuleEvent { type: Struct(StructTag { address: 0000000000000000000000000000000000000000000000000000000000000001, module: Identifier("transaction_fee"), name: Identifier("FeeStatement"), type_args: [] }), event_data: "04000000000000000300000000000000010000000000000000000000000000000000000000000000" },
+                ModuleEvent { type: Struct(StructTag { address: 0000000000000000000000000000000000000000000000000000000000000001, module: Identifier("transaction_fee"), name: Identifier("FeeStatement"), type_args: [] }), event_data: "20000000000000001d00000000000000040000000000000000000000000000000000000000000000" },
             ],
-            gas_used: 4,
+            gas_used: 32,
             status: Keep(
                 ExecutionFailure {
                     location: f5b9d6f01a99e74c790e2f330c092fa05455a8193f1dfc1b113ecc54d067afe1::M,

@@ -98,7 +98,7 @@ pub enum BlockSplit {
 }
 
 impl<O: OutputLogger> MoveHarnessImpl<O> {
-    const DEFAULT_MAX_GAS_PER_TXN: u64 = 2_000_000;
+    const DEFAULT_MAX_GAS_PER_TXN: u64 = 20_000_000;
 
     /// Creates a new harness.
     pub fn new() -> Self {
