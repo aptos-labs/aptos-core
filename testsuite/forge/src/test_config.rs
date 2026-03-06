@@ -17,6 +17,7 @@ use serde::{Deserialize, Serialize};
 use std::{num::NonZeroUsize, path::Path, sync::Arc, time::Duration};
 
 /// Components provided by the test code registry (not serializable)
+#[derive(Default)]
 pub struct TestCodeComponents {
     pub network_tests: Vec<Box<dyn NetworkTest>>,
     pub admin_tests: Vec<Box<dyn AdminTest>>,
@@ -27,19 +28,6 @@ pub struct TestCodeComponents {
     pub extra_validator_override_fn: Option<OverrideNodeConfigFn>,
     /// Extra fullnode override closure from the registry (composed with YAML overrides)
     pub extra_fullnode_override_fn: Option<OverrideNodeConfigFn>,
-}
-
-impl Default for TestCodeComponents {
-    fn default() -> Self {
-        Self {
-            network_tests: vec![],
-            admin_tests: vec![],
-            aptos_tests: vec![],
-            extra_genesis_helm_config_fn: None,
-            extra_validator_override_fn: None,
-            extra_fullnode_override_fn: None,
-        }
-    }
 }
 
 /// Serializable forge test configuration that can be loaded from YAML files.
