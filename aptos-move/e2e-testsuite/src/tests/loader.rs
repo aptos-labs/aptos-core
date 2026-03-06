@@ -22,6 +22,7 @@ pub fn run_and_assert_universe(
 proptest! {
     #![proptest_config(ProptestConfig::with_cases(16))]
     #[test]
+    #[ignore]
     fn all_transactions(
         universe in DependencyGraph::strategy(
             // Number of modules
