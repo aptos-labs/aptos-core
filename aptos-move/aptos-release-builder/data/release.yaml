@@ -12,6 +12,11 @@ proposals:
     update_sequence:
       - Execution:
           V7:
+            transaction_shuffler_type:
+              use_case_aware:
+                sender_spread_factor: 32
+                platform_use_case_spread_factor: 0
+                user_use_case_spread_factor: 4
             block_gas_limit_type:
               complex_limit_v1:
                 effective_block_gas_limit: 300000
@@ -23,6 +28,10 @@ proposals:
                 block_output_limit: 5242880
                 include_user_txn_size_in_block_output: true
                 add_block_limit_outcome_onchain: true
+            enable_per_block_gas_limit: false
+            transaction_deduper_type: txn_hash_and_authenticator_v1
+            gas_price_to_burn: 90
+            persisted_auxiliary_info_version: 1
       - Gas:
           new: https://raw.githubusercontent.com/aptos-labs/aptos-networks/main/gas/v1.41.1.json
           old: https://raw.githubusercontent.com/aptos-labs/aptos-networks/main/gas/v1.41.0.json
