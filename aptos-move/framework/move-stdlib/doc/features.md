@@ -1353,7 +1353,7 @@ Deprecated feature
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_get_collect_and_distribute_gas_fees_feature">get_collect_and_distribute_gas_fees_feature</a>(): u64 {
-    <a href="features.md#0x1_features_COLLECT_AND_DISTRIBUTE_GAS_FEES">COLLECT_AND_DISTRIBUTE_GAS_FEES</a>
+    <b>abort</b> <a href="error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="features.md#0x1_features_EINVALID_FEATURE">EINVALID_FEATURE</a>)
 }
 </code></pre>
 
@@ -3112,7 +3112,7 @@ Deprecated feature
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_primary_apt_fungible_store_at_user_address_enabled">primary_apt_fungible_store_at_user_address_enabled</a>(): bool {
-    <a href="features.md#0x1_features_is_enabled">is_enabled</a>(<a href="features.md#0x1_features_PRIMARY_APT_FUNGIBLE_STORE_AT_USER_ADDRESS">PRIMARY_APT_FUNGIBLE_STORE_AT_USER_ADDRESS</a>)
+    <b>true</b>
 }
 </code></pre>
 
@@ -3294,7 +3294,8 @@ Deprecated feature
 
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_get_operations_default_to_fa_apt_store_feature">get_operations_default_to_fa_apt_store_feature</a>(): u64
+<pre><code>#[deprecated]
+<b>public</b> <b>fun</b> <a href="features.md#0x1_features_get_operations_default_to_fa_apt_store_feature">get_operations_default_to_fa_apt_store_feature</a>(): u64
 </code></pre>
 
 
@@ -3304,7 +3305,7 @@ Deprecated feature
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_get_operations_default_to_fa_apt_store_feature">get_operations_default_to_fa_apt_store_feature</a>(): u64 {
-    <a href="features.md#0x1_features_OPERATIONS_DEFAULT_TO_FA_APT_STORE">OPERATIONS_DEFAULT_TO_FA_APT_STORE</a>
+    <b>abort</b> <a href="error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="features.md#0x1_features_EINVALID_FEATURE">EINVALID_FEATURE</a>)
 }
 </code></pre>
 
@@ -3824,7 +3825,8 @@ Deprecated feature
 
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_get_new_accounts_default_to_fa_store_feature">get_new_accounts_default_to_fa_store_feature</a>(): u64
+<pre><code>#[deprecated]
+<b>public</b> <b>fun</b> <a href="features.md#0x1_features_get_new_accounts_default_to_fa_store_feature">get_new_accounts_default_to_fa_store_feature</a>(): u64
 </code></pre>
 
 
@@ -3834,7 +3836,7 @@ Deprecated feature
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_get_new_accounts_default_to_fa_store_feature">get_new_accounts_default_to_fa_store_feature</a>(): u64 {
-    <a href="features.md#0x1_features_NEW_ACCOUNTS_DEFAULT_TO_FA_STORE">NEW_ACCOUNTS_DEFAULT_TO_FA_STORE</a>
+    <b>abort</b> <a href="error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="features.md#0x1_features_EINVALID_FEATURE">EINVALID_FEATURE</a>)
 }
 </code></pre>
 
@@ -3848,7 +3850,8 @@ Deprecated feature
 
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_new_accounts_default_to_fa_store_enabled">new_accounts_default_to_fa_store_enabled</a>(): bool
+<pre><code>#[deprecated]
+<b>public</b> <b>fun</b> <a href="features.md#0x1_features_new_accounts_default_to_fa_store_enabled">new_accounts_default_to_fa_store_enabled</a>(): bool
 </code></pre>
 
 
@@ -3858,7 +3861,7 @@ Deprecated feature
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_new_accounts_default_to_fa_store_enabled">new_accounts_default_to_fa_store_enabled</a>(): bool {
-    <a href="features.md#0x1_features_is_enabled">is_enabled</a>(<a href="features.md#0x1_features_NEW_ACCOUNTS_DEFAULT_TO_FA_STORE">NEW_ACCOUNTS_DEFAULT_TO_FA_STORE</a>)
+    <b>true</b>
 }
 </code></pre>
 
@@ -4112,7 +4115,8 @@ Deprecated feature
 
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_get_monotonically_increasing_counter_feature">get_monotonically_increasing_counter_feature</a>(): u64
+<pre><code>#[deprecated]
+<b>public</b> <b>fun</b> <a href="features.md#0x1_features_get_monotonically_increasing_counter_feature">get_monotonically_increasing_counter_feature</a>(): u64
 </code></pre>
 
 
@@ -4122,7 +4126,7 @@ Deprecated feature
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_get_monotonically_increasing_counter_feature">get_monotonically_increasing_counter_feature</a>(): u64 {
-    <a href="features.md#0x1_features_MONOTONICALLY_INCREASING_COUNTER">MONOTONICALLY_INCREASING_COUNTER</a>
+    <b>abort</b> <a href="error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="features.md#0x1_features_EINVALID_FEATURE">EINVALID_FEATURE</a>)
 }
 </code></pre>
 

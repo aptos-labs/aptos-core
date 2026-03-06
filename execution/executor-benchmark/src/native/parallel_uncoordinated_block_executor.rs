@@ -15,9 +15,8 @@ use aptos_metrics_core::TimerHelper;
 use aptos_types::{
     account_address::AccountAddress,
     account_config::{
-        primary_apt_store, AccountResource, CoinInfoResource, CoinRegister, CoinStoreResource,
-        ConcurrentSupplyResource, DepositEvent, DepositFAEvent, FungibleStoreResource,
-        WithdrawEvent, WithdrawFAEvent,
+        primary_apt_store, AccountResource, ConcurrentSupplyResource, DepositFAEvent,
+        FungibleStoreResource, WithdrawFAEvent,
     },
     block_executor::{
         config::BlockExecutorConfigFromOnchain,
@@ -25,8 +24,7 @@ use aptos_types::{
     },
     contract_event::ContractEvent,
     fee_statement::FeeStatement,
-    move_utils::{move_event_v1::MoveEventV1Type, move_event_v2::MoveEventV2Type},
-    on_chain_config::{FeatureFlag, Features, OnChainConfig},
+    move_utils::move_event_v2::MoveEventV2Type,
     state_store::{state_key::StateKey, StateView},
     transaction::{
         block_epilogue::BlockEndInfo, signature_verified_transaction::SignatureVerifiedTransaction,
@@ -35,14 +33,12 @@ use aptos_types::{
     },
     vm_status::{StatusCode, VMStatus},
     write_set::{WriteOp, WriteSetMut},
-    AptosCoinType,
 };
 use aptos_vm::VMBlockExecutor;
 use dashmap::{
     mapref::one::{Ref, RefMut},
     DashMap,
 };
-use once_cell::sync::OnceCell;
 use rayon::iter::{IntoParallelIterator, IntoParallelRefIterator, ParallelIterator};
 use std::{
     cell::Cell,
@@ -172,16 +168,11 @@ pub trait CommonNativeRawTransactionExecutor: Sync + Send {
 
     fn reduce_apt_supply(
         &self,
-        fa_migration_complete: bool,
         gas: u64,
         state_view: &(impl StateView + Sync),
         output: &mut IncrementalOutput,
     ) -> Result<()> {
-        if fa_migration_complete {
-            self.reduce_fa_apt_supply(gas, state_view, output)
-        } else {
-            self.reduce_coin_apt_supply(gas, state_view, output)
-        }
+        self.reduce_fa_apt_supply(gas, state_view, output)
     }
 
     fn reduce_fa_apt_supply(
@@ -191,39 +182,15 @@ pub trait CommonNativeRawTransactionExecutor: Sync + Send {
         output: &mut IncrementalOutput,
     ) -> Result<()>;
 
-    fn reduce_coin_apt_supply(
-        &self,
-        gas: u64,
-        state_view: &(impl StateView + Sync),
-        output: &mut IncrementalOutput,
-    ) -> Result<()>;
-
     fn withdraw_apt_from_signer(
         &self,
-        fa_migration_complete: bool,
         sender_address: AccountAddress,
         transfer_amount: u64,
         gas: u64,
         state_view: &(impl StateView + Sync),
         output: &mut IncrementalOutput,
     ) -> Result<()> {
-        if fa_migration_complete {
-            self.withdraw_fa_apt_from_signer(
-                sender_address,
-                transfer_amount,
-                gas,
-                state_view,
-                output,
-            )
-        } else {
-            self.withdraw_coin_apt_from_signer(
-                sender_address,
-                transfer_amount,
-                gas,
-                state_view,
-                output,
-            )
-        }
+        self.withdraw_fa_apt_from_signer(sender_address, transfer_amount, gas, state_view, output)
     }
 
     fn withdraw_fa_apt_from_signer(
@@ -235,39 +202,17 @@ pub trait CommonNativeRawTransactionExecutor: Sync + Send {
         output: &mut IncrementalOutput,
     ) -> Result<()>;
 
-    fn withdraw_coin_apt_from_signer(
-        &self,
-        sender_address: AccountAddress,
-        transfer_amount: u64,
-        gas: u64,
-        state_view: &(impl StateView + Sync),
-        output: &mut IncrementalOutput,
-    ) -> Result<()>;
-
     fn deposit_apt(
         &self,
-        fa_migration_complete: bool,
         recipient_address: AccountAddress,
         transfer_amount: u64,
         state_view: &(impl StateView + Sync),
         output: &mut IncrementalOutput,
     ) -> Result<bool> {
-        if fa_migration_complete {
-            self.deposit_fa_apt(recipient_address, transfer_amount, state_view, output)
-        } else {
-            self.deposit_coin_apt(recipient_address, transfer_amount, state_view, output)
-        }
+        self.deposit_fa_apt(recipient_address, transfer_amount, state_view, output)
     }
 
     fn deposit_fa_apt(
-        &self,
-        recipient_address: AccountAddress,
-        transfer_amount: u64,
-        state_view: &(impl StateView + Sync),
-        output: &mut IncrementalOutput,
-    ) -> Result<bool>;
-
-    fn deposit_coin_apt(
         &self,
         recipient_address: AccountAddress,
         transfer_amount: u64,
@@ -287,34 +232,20 @@ pub trait CommonNativeRawTransactionExecutor: Sync + Send {
 }
 
 impl<T: CommonNativeRawTransactionExecutor> RawTransactionExecutor for T {
-    type BlockState = bool;
+    type BlockState = ();
 
     fn new() -> Self {
         Self::new_impl()
     }
 
-    fn init_block_state(&self, state_view: &(impl StateView + Sync)) -> bool {
-        let features = Features::fetch_config(&state_view).unwrap_or_default();
-        let fa_migration_complete =
-            features.is_enabled(FeatureFlag::OPERATIONS_DEFAULT_TO_FA_APT_STORE);
-        let new_accounts_default_to_fa =
-            features.is_enabled(FeatureFlag::NEW_ACCOUNTS_DEFAULT_TO_FA_APT_STORE);
-        assert_eq!(
-            fa_migration_complete, new_accounts_default_to_fa,
-            "native code only works with both flags either enabled or disabled"
-        );
-
-        fa_migration_complete
-    }
+    fn init_block_state(&self, _state_view: &(impl StateView + Sync)) {}
 
     fn execute_transaction(
         &self,
         txn: NativeTransaction,
         state_view: &(impl StateView + Sync),
-        block_state: &bool,
+        _block_state: &(),
     ) -> Result<TransactionOutput> {
-        let fa_migration_complete = *block_state;
-
         let gas_unit = 4; // hardcode gas consumed.
         let gas = gas_unit * 100;
 
@@ -327,14 +258,7 @@ impl<T: CommonNativeRawTransactionExecutor> RawTransactionExecutor for T {
             } => {
                 self.update_sequence_number(sender, sequence_number, state_view, &mut output)?;
 
-                self.withdraw_apt_from_signer(
-                    fa_migration_complete,
-                    sender,
-                    0,
-                    gas,
-                    state_view,
-                    &mut output,
-                )?;
+                self.withdraw_apt_from_signer(sender, 0, gas, state_view, &mut output)?;
             },
             NativeTransaction::FaTransfer {
                 sender,
@@ -357,29 +281,16 @@ impl<T: CommonNativeRawTransactionExecutor> RawTransactionExecutor for T {
                 fail_on_recipient_account_missing,
             } => {
                 self.update_sequence_number(sender, sequence_number, state_view, &mut output)?;
-                self.withdraw_apt_from_signer(
-                    fa_migration_complete,
-                    sender,
-                    amount,
-                    gas,
-                    state_view,
-                    &mut output,
-                )?;
+                self.withdraw_apt_from_signer(sender, amount, gas, state_view, &mut output)?;
 
-                let existed = self.deposit_apt(
-                    fa_migration_complete,
-                    recipient,
-                    amount,
-                    state_view,
-                    &mut output,
-                )?;
+                let existed = self.deposit_apt(recipient, amount, state_view, &mut output)?;
 
                 if !existed || fail_on_recipient_account_existing {
                     self.check_or_create_account(
                         recipient,
                         fail_on_recipient_account_existing,
                         fail_on_recipient_account_missing,
-                        !fa_migration_complete,
+                        false,
                         state_view,
                         &mut output,
                     )?;
@@ -399,7 +310,6 @@ impl<T: CommonNativeRawTransactionExecutor> RawTransactionExecutor for T {
                     compute_deltas_for_batch(recipients, amounts, sender);
 
                 self.withdraw_apt_from_signer(
-                    fa_migration_complete,
                     sender,
                     amount_to_sender,
                     gas,
@@ -409,7 +319,6 @@ impl<T: CommonNativeRawTransactionExecutor> RawTransactionExecutor for T {
 
                 for (recipient_address, transfer_amount) in deltas.into_iter() {
                     let existed = self.deposit_apt(
-                        fa_migration_complete,
                         recipient_address,
                         transfer_amount as u64,
                         state_view,
@@ -432,7 +341,7 @@ impl<T: CommonNativeRawTransactionExecutor> RawTransactionExecutor for T {
             NativeTransaction::BlockMetadata => return output.into_success_output(0),
         };
 
-        self.reduce_apt_supply(fa_migration_complete, gas, state_view, &mut output)?;
+        self.reduce_apt_supply(gas, state_view, &mut output)?;
 
         output.into_success_output(gas)
     }
@@ -501,30 +410,6 @@ impl CommonNativeRawTransactionExecutor for NativeRawTransactionExecutor {
         Ok(())
     }
 
-    fn reduce_coin_apt_supply(
-        &self,
-        gas: u64,
-        state_view: &(impl StateView + Sync),
-        output: &mut IncrementalOutput,
-    ) -> Result<()> {
-        let coin_info = DbAccessUtil::get_value::<CoinInfoResource<AptosCoinType>>(
-            &self.db_util.common.apt_coin_info_resource,
-            state_view,
-        )?
-        .ok_or_else(|| anyhow::anyhow!("no coin info"))?;
-
-        let total_supply_state_key = coin_info.supply_aggregator_state_key();
-        let total_supply = DbAccessUtil::get_value::<u128>(&total_supply_state_key, state_view)?
-            .ok_or_else(|| anyhow::anyhow!("no total supply"))?;
-
-        output.write_set.push((
-            total_supply_state_key,
-            WriteOp::legacy_modification(bcs::to_bytes(&(total_supply - gas as u128))?.into()),
-        ));
-
-        Ok(())
-    }
-
     fn withdraw_fa_apt_from_signer(
         &self,
         sender_address: AccountAddress,
@@ -579,50 +464,6 @@ impl CommonNativeRawTransactionExecutor for NativeRawTransactionExecutor {
         Ok(())
     }
 
-    fn withdraw_coin_apt_from_signer(
-        &self,
-        sender_address: AccountAddress,
-        transfer_amount: u64,
-        gas: u64,
-        state_view: &(impl StateView + Sync),
-        output: &mut IncrementalOutput,
-    ) -> Result<()> {
-        let sender_coin_store_key = self.db_util.new_state_key_aptos_coin(&sender_address);
-        let sender_coin_store_opt = {
-            let _timer = TIMER.timer_with(&["read_sender_coin_store"]);
-            DbAccessUtil::get_apt_coin_store(&sender_coin_store_key, state_view)?
-        };
-        let mut sender_coin_store = match sender_coin_store_opt {
-            None => {
-                return self.withdraw_fa_apt_from_signer(
-                    sender_address,
-                    transfer_amount,
-                    gas,
-                    state_view,
-                    output,
-                )
-            },
-            Some(sender_coin_store) => sender_coin_store,
-        };
-
-        sender_coin_store.set_coin(sender_coin_store.coin() - transfer_amount - gas);
-
-        if transfer_amount != 0 {
-            output.events.push(
-                WithdrawEvent::new(transfer_amount)
-                    .create_event_v1(sender_coin_store.withdraw_events_mut()),
-            );
-            // Coin doesn't emit Withdraw event for gas
-        }
-
-        output.write_set.push((
-            sender_coin_store_key,
-            WriteOp::legacy_modification(bcs::to_bytes(&sender_coin_store)?.into()),
-        ));
-
-        Ok(())
-    }
-
     fn deposit_fa_apt(
         &self,
         recipient_address: AccountAddress,
@@ -647,8 +488,7 @@ impl CommonNativeRawTransactionExecutor for NativeRawTransactionExecutor {
                     (recipient_fa_store, recipient_fa_store_object, true)
                 },
                 None => {
-                    let receipeint_fa_store =
-                        FungibleStoreResource::new(AccountAddress::TEN, 0, false);
+                    let receipeint_fa_store = FungibleStoreResource::new_apt(0, false);
                     let receipeint_fa_store_object = BTreeMap::from([(
                         self.db_util.common.object_core.clone(),
                         bcs::to_bytes(&DbAccessUtil::new_object_core(
@@ -690,56 +530,6 @@ impl CommonNativeRawTransactionExecutor for NativeRawTransactionExecutor {
         Ok(recipient_fa_store_existed)
     }
 
-    fn deposit_coin_apt(
-        &self,
-        recipient_address: AccountAddress,
-        transfer_amount: u64,
-        state_view: &(impl StateView + Sync),
-        output: &mut IncrementalOutput,
-    ) -> Result<bool> {
-        let recipient_coin_store_key = self.db_util.new_state_key_aptos_coin(&recipient_address);
-
-        let (mut recipient_coin_store, recipient_coin_store_existed) =
-            match DbAccessUtil::get_apt_coin_store(&recipient_coin_store_key, state_view)? {
-                Some(recipient_coin_store) => (recipient_coin_store, true),
-                None => {
-                    output.events.push(
-                        CoinRegister {
-                            account: AccountAddress::ONE,
-                            type_info: DbAccessUtil::new_type_info_resource::<AptosCoinType>()?,
-                        }
-                        .create_event_v2()
-                        .expect("Creating CoinRegister should always succeed"),
-                    );
-                    (
-                        DbAccessUtil::new_apt_coin_store(0, recipient_address),
-                        false,
-                    )
-                },
-            };
-
-        recipient_coin_store.set_coin(recipient_coin_store.coin() + transfer_amount);
-
-        // first need to create events, to update the handle, and then serialize sender_coin_store
-        if transfer_amount != 0 {
-            output.events.push(
-                DepositEvent::new(transfer_amount)
-                    .create_event_v1(recipient_coin_store.deposit_events_mut()),
-            );
-        }
-
-        output.write_set.push((
-            recipient_coin_store_key,
-            if recipient_coin_store_existed {
-                WriteOp::legacy_modification(bcs::to_bytes(&recipient_coin_store)?.into())
-            } else {
-                WriteOp::legacy_creation(bcs::to_bytes(&recipient_coin_store)?.into())
-            },
-        ));
-
-        Ok(recipient_coin_store_existed)
-    }
-
     fn check_or_create_account(
         &self,
         address: AccountAddress,
@@ -774,10 +564,6 @@ impl CommonNativeRawTransactionExecutor for NativeRawTransactionExecutor {
 }
 
 const USE_THREAD_LOCAL_SUPPLY: bool = true;
-struct CoinSupply {
-    pub total_supply: u128,
-}
-
 struct SupplyWithDecrement {
     #[allow(dead_code)]
     pub base: u128,
@@ -788,16 +574,12 @@ enum CachedResource {
     Account(AccountResource),
     FungibleStore(FungibleStoreResource),
     FungibleSupply(ConcurrentSupplyResource),
-    AptCoinStore(CoinStoreResource<AptosCoinType>),
-    AptCoinInfo(CoinInfoResource<AptosCoinType>),
-    AptCoinSupply(CoinSupply),
     SupplyDecrement(SupplyWithDecrement),
 }
 
 pub struct NativeValueCacheRawTransactionExecutor {
     db_util: DbAccessUtil,
     cache: DashMap<StateKey, CachedResource>,
-    coin_supply_state_key: OnceCell<StateKey>,
 }
 
 impl CommonNativeRawTransactionExecutor for NativeValueCacheRawTransactionExecutor {
@@ -805,7 +587,6 @@ impl CommonNativeRawTransactionExecutor for NativeValueCacheRawTransactionExecut
         Self {
             db_util: DbAccessUtil::new(),
             cache: DashMap::new(),
-            coin_supply_state_key: OnceCell::new(),
         }
     }
 
@@ -908,65 +689,6 @@ impl CommonNativeRawTransactionExecutor for NativeValueCacheRawTransactionExecut
         Ok(())
     }
 
-    fn reduce_coin_apt_supply(
-        &self,
-        gas: u64,
-        state_view: &(impl StateView + Sync),
-        _output: &mut IncrementalOutput,
-    ) -> Result<()> {
-        let total_supply_state_key = self.coin_supply_state_key.get_or_init(|| {
-            let entry =
-                self.cache_get_mut_or_init(&self.db_util.common.apt_coin_info_resource, |key| {
-                    CachedResource::AptCoinInfo(
-                        DbAccessUtil::get_value::<CoinInfoResource<AptosCoinType>>(key, state_view)
-                            .unwrap()
-                            .unwrap(),
-                    )
-                });
-
-            match entry.value() {
-                CachedResource::AptCoinInfo(coin_info) => coin_info.supply_aggregator_state_key(),
-                _ => panic!("wrong type"),
-            }
-        });
-
-        if USE_THREAD_LOCAL_SUPPLY {
-            let total_supply_entry = self.cache_get_or_init(total_supply_state_key, |key| {
-                CachedResource::SupplyDecrement(SupplyWithDecrement {
-                    base: DbAccessUtil::get_value::<u128>(key, state_view)
-                        .unwrap()
-                        .unwrap(),
-                    decrement: ThreadLocal::new(),
-                })
-            });
-            match total_supply_entry.value() {
-                CachedResource::SupplyDecrement(SupplyWithDecrement { decrement, .. }) => {
-                    let decrement_cell = decrement.get_or_default();
-                    decrement_cell.set(decrement_cell.get() + gas as u128);
-                },
-                _ => panic!("wrong type"),
-            }
-        } else {
-            let mut total_supply_entry =
-                self.cache_get_mut_or_init(total_supply_state_key, |key| {
-                    CachedResource::AptCoinSupply(CoinSupply {
-                        total_supply: DbAccessUtil::get_value::<u128>(key, state_view)
-                            .unwrap()
-                            .unwrap(),
-                    })
-                });
-
-            match total_supply_entry.value_mut() {
-                CachedResource::AptCoinSupply(coin_supply) => {
-                    coin_supply.total_supply -= gas as u128;
-                },
-                _ => panic!("wrong type"),
-            };
-        }
-
-        Ok(())
-    }
-
     fn withdraw_fa_apt_from_signer(
         &self,
         sender_address: AccountAddress,
@@ -980,19 +702,6 @@ impl CommonNativeRawTransactionExecutor for NativeValueCacheRawTransactionExecut
         Ok(())
     }
 
-    fn withdraw_coin_apt_from_signer(
-        &self,
-        sender_address: AccountAddress,
-        transfer_amount: u64,
-        gas: u64,
-        state_view: &(impl StateView + Sync),
-        _output: &mut IncrementalOutput,
-    ) -> Result<()> {
-        let _existed =
-            self.update_coin_balance(sender_address, state_view, 0, transfer_amount + gas, true);
-        Ok(())
-    }
-
     fn deposit_fa_apt(
         &self,
         recipient_address: AccountAddress,
@@ -1002,18 +711,6 @@ impl CommonNativeRawTransactionExecutor for NativeValueCacheRawTransactionExecut
     ) -> Result<bool> {
         let existed =
             self.update_fa_balance(recipient_address, state_view, transfer_amount, 0, false);
-        Ok(existed)
-    }
-
-    fn deposit_coin_apt(
-        &self,
-        recipient_address: AccountAddress,
-        transfer_amount: u64,
-        state_view: &(impl StateView + Sync),
-        _output: &mut IncrementalOutput,
-    ) -> Result<bool> {
-        let existed =
-            self.update_coin_balance(recipient_address, state_view, transfer_amount, 0, false);
         Ok(existed)
     }
 }
@@ -1097,7 +794,7 @@ impl NativeValueCacheRawTransactionExecutor {
                 None => {
                     exists = false;
                     assert!(!fail_on_missing);
-                    FungibleStoreResource::new(AccountAddress::TEN, 0, false)
+                    FungibleStoreResource::new_apt(0, false)
                 },
             })
         });
@@ -1108,40 +805,6 @@ impl NativeValueCacheRawTransactionExecutor {
             },
             _ => panic!("wrong type"),
         };
-        exists
-    }
-
-    fn update_coin_balance(
-        &self,
-        account: AccountAddress,
-        state_view: &(impl StateView + Sync),
-        increment: u64,
-        decrement: u64,
-        fail_on_missing: bool,
-    ) -> bool {
-        let coin_store_key = self.db_util.new_state_key_aptos_coin(&account);
-        let mut exists = true;
-
-        let mut entry = self.cache_get_mut_or_init(&coin_store_key, |key| {
-            CachedResource::AptCoinStore(
-                match DbAccessUtil::get_apt_coin_store(key, state_view).unwrap() {
-                    Some(store) => store,
-                    None => {
-                        exists = false;
-                        assert!(!fail_on_missing);
-                        DbAccessUtil::new_apt_coin_store(0, account)
-                    },
-                },
-            )
-        });
-
-        match entry.value_mut() {
-            CachedResource::AptCoinStore(coin_store) => {
-                coin_store.set_coin(coin_store.coin() + increment - decrement);
-            },
-            _ => panic!("wrong type"),
-        };
-
         exists
     }
 }

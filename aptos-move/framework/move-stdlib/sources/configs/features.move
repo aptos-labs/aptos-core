@@ -99,7 +99,7 @@ module std::features {
     #[deprecated]
     /// Deprecated feature
     public fun get_collect_and_distribute_gas_fees_feature(): u64 {
-        COLLECT_AND_DISTRIBUTE_GAS_FEES
+        abort error::invalid_argument(EINVALID_FEATURE)
     }
 
     #[deprecated]
@@ -570,7 +570,7 @@ module std::features {
 
     #[deprecated]
     public fun primary_apt_fungible_store_at_user_address_enabled(): bool {
-        is_enabled(PRIMARY_APT_FUNGIBLE_STORE_AT_USER_ADDRESS)
+        true
     }
 
     const AGGREGATOR_V2_IS_AT_LEAST_API: u64 = 66;
@@ -617,8 +617,9 @@ module std::features {
     /// Lifetime: transient
     const OPERATIONS_DEFAULT_TO_FA_APT_STORE: u64 = 65;
 
+    #[deprecated]
     public fun get_operations_default_to_fa_apt_store_feature(): u64 {
-        OPERATIONS_DEFAULT_TO_FA_APT_STORE
+        abort error::invalid_argument(EINVALID_FEATURE)
     }
 
     #[deprecated]
@@ -765,12 +766,14 @@ module std::features {
     /// Lifetime: transient
     const NEW_ACCOUNTS_DEFAULT_TO_FA_STORE: u64 = 90;
 
+    #[deprecated]
     public fun get_new_accounts_default_to_fa_store_feature(): u64 {
-        NEW_ACCOUNTS_DEFAULT_TO_FA_STORE
+        abort error::invalid_argument(EINVALID_FEATURE)
     }
 
+    #[deprecated]
     public fun new_accounts_default_to_fa_store_enabled(): bool {
-        is_enabled(NEW_ACCOUNTS_DEFAULT_TO_FA_STORE)
+        true
     }
 
     /// Lifetime: transient
@@ -838,8 +841,9 @@ module std::features {
     /// Whether the monotonically increasing counter native function is enabled.
     const MONOTONICALLY_INCREASING_COUNTER: u64 = 98;
 
+    #[deprecated]
     public fun get_monotonically_increasing_counter_feature(): u64 {
-        MONOTONICALLY_INCREASING_COUNTER
+        abort error::invalid_argument(EINVALID_FEATURE)
     }
 
     #[deprecated]
