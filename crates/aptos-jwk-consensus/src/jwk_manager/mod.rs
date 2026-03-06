@@ -177,7 +177,7 @@ impl JWKManager {
         &mut self,
         issuer: Issuer,
         jwks: Vec<JWKMoveStruct>,
-        observed_nonce: Option<u64>,
+        observed_nonce: Option<u128>,
     ) -> Result<()> {
         debug!(
             epoch = self.epoch_state.epoch,
@@ -192,7 +192,7 @@ impl JWKManager {
         let needs_update = match observed_nonce {
             Some(nonce) => {
                 // For blockchain events: compare nonce (version) only
-                let on_chain_version = state.on_chain_version();
+                let on_chain_version = state.convert_oracle_nonce();
                 let should_update = nonce > on_chain_version;
                 if should_update {
                     debug!(
@@ -556,6 +556,21 @@ impl PerProviderState {
         self.on_chain
             .as_ref()
             .map_or(0, |provider_jwks| provider_jwks.version)
+    }
+
+    pub fn convert_oracle_nonce(&self) -> u128 {
+        self.on_chain.as_ref().map_or(0, |provider_jwks| {
+            provider_jwks
+                .jwks
+                .first()
+                .and_then(|jwk| {
+                    let data = jwk.variant.data.as_slice();
+                    data.try_into()
+                        .ok()
+                        .map(|bytes: [u8; 16]| u128::from_be_bytes(bytes))
+                })
+                .unwrap_or(0)
+        })
     }
 }
 

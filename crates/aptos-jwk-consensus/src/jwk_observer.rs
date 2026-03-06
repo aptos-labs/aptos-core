@@ -26,7 +26,7 @@ impl JWKObserver {
         issuer: String,
         config_url: String,
         fetch_interval: Duration,
-        observation_tx: aptos_channel::Sender<(), (Issuer, Vec<JWK>, Option<u64>)>,
+        observation_tx: aptos_channel::Sender<(), (Issuer, Vec<JWK>, Option<u128>)>,
     ) -> Self {
         let (close_tx, close_rx) = oneshot::channel();
         let join_handle = tokio::spawn(Self::start(
@@ -54,7 +54,7 @@ impl JWKObserver {
         my_addr: AccountAddress,
         issuer: String,
         open_id_config_url: String,
-        observation_tx: aptos_channel::Sender<(), (Issuer, Vec<JWK>, Option<u64>)>,
+        observation_tx: aptos_channel::Sender<(), (Issuer, Vec<JWK>, Option<u128>)>,
         close_rx: oneshot::Receiver<()>,
     ) {
         let mut interval = tokio::time::interval(fetch_interval);
@@ -116,7 +116,7 @@ impl JWKObserver {
     }
 }
 
-async fn fetch_jwks_with_relayer(issuer: &str) -> Result<(Vec<JWK>, Option<u64>)> {
+async fn fetch_jwks_with_relayer(issuer: &str) -> Result<(Vec<JWK>, Option<u128>)> {
     let relayer = GLOBAL_RELAYER.get().expect("Relayer not initialized");
     let poll_result = relayer
         .get_last_state(issuer)
@@ -140,7 +140,7 @@ async fn fetch_jwks(
     open_id_config_url: &str,
     my_addr: Option<AccountAddress>,
     issuer: &str,
-) -> Result<(Vec<JWK>, Option<u64>)> {
+) -> Result<(Vec<JWK>, Option<u128>)> {
     if issuer.starts_with("gravity://") {
         return fetch_jwks_with_relayer(issuer).await;
     }
