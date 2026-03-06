@@ -153,27 +153,44 @@ impl BatchStore {
             expiration_buffer_usecs,
         };
 
-        if is_new_epoch {
-            tokio::task::spawn_blocking(move || {
-                Self::gc_previous_epoch_batches_from_db_v1(db_clone.clone(), epoch);
-                Self::gc_previous_epoch_batches_from_db_v2(db_clone, epoch);
-            });
-        } else {
-            Self::populate_cache_and_gc_expired_batches_v1(
-                db_clone.clone(),
-                epoch,
-                last_certified_time,
-                expiration_buffer_usecs,
-                &batch_store,
-            );
-            Self::populate_cache_and_gc_expired_batches_v2(
-                db_clone,
-                epoch,
-                last_certified_time,
-                expiration_buffer_usecs,
-                &batch_store,
-            );
-        }
+        // if is_new_epoch {
+        //     tokio::task::spawn_blocking(move || {
+        //         Self::gc_previous_epoch_batches_from_db_v1(db_clone.clone(), epoch);
+        //         Self::gc_previous_epoch_batches_from_db_v2(db_clone, epoch);
+        //     });
+        // } else {
+        //     Self::populate_cache_and_gc_expired_batches_v1(
+        //         db_clone.clone(),
+        //         epoch,
+        //         last_certified_time,
+        //         expiration_buffer_usecs,
+        //         &batch_store,
+        //     );
+        //     Self::populate_cache_and_gc_expired_batches_v2(
+        //         db_clone,
+        //         epoch,
+        //         last_certified_time,
+        //         expiration_buffer_usecs,
+        //         &batch_store,
+        //     );
+        // }
+
+        Self::gc_previous_epoch_batches_from_db_v1(db_clone.clone(), epoch);
+        Self::gc_previous_epoch_batches_from_db_v2(db_clone.clone(), epoch);
+        Self::populate_cache_and_gc_expired_batches_v1(
+            db_clone.clone(),
+            epoch,
+            last_certified_time,
+            expiration_buffer_usecs,
+            &batch_store,
+        );
+        Self::populate_cache_and_gc_expired_batches_v2(
+            db_clone,
+            epoch,
+            last_certified_time,
+            expiration_buffer_usecs,
+            &batch_store,
+        );
 
         batch_store
     }
@@ -238,7 +255,7 @@ impl BatchStore {
             "QS: Batch store bootstrap expired keys len {}",
             expired_keys.len()
         );
-        db.delete_batches(expired_keys)
+        db.delete_batches_v2(expired_keys)
             .expect("Deletion of expired keys should not fail");
     }
 
