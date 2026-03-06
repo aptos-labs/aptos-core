@@ -357,11 +357,7 @@ both original and remaining sizes for tracking purposes.
 
 
 
-<<<<<<< HEAD
-<pre><code>enum <a href="bulk_order_book_types.md#0x7_bulk_order_book_types_BulkOrderPlaceResponse">BulkOrderPlaceResponse</a>&lt;M: <b>copy</b>, drop, store&gt; <b>has</b> <b>copy</b>, drop
-=======
 <pre><code><b>struct</b> <a href="bulk_order_types.md#0x7_bulk_order_book_types_BulkOrderPlaceResponse">BulkOrderPlaceResponse</a>&lt;M: <b>copy</b>, drop, store&gt; <b>has</b> <b>copy</b>, drop
->>>>>>> f583b0f4e1 (add trading framework package for types)
 </code></pre>
 
 
@@ -430,11 +426,7 @@ both original and remaining sizes for tracking purposes.
 
 
 
-<<<<<<< HEAD
-<pre><code>enum <a href="bulk_order_book_types.md#0x7_bulk_order_book_types_BulkOrderRequestResponse">BulkOrderRequestResponse</a>&lt;M: <b>copy</b>, drop, store&gt; <b>has</b> <b>copy</b>, drop
-=======
 <pre><code><b>struct</b> <a href="bulk_order_types.md#0x7_bulk_order_book_types_BulkOrderRequestResponse">BulkOrderRequestResponse</a>&lt;M: <b>copy</b>, drop, store&gt; <b>has</b> <b>copy</b>, drop
->>>>>>> f583b0f4e1 (add trading framework package for types)
 </code></pre>
 
 
@@ -853,13 +845,8 @@ A <code><a href="bulk_order_types.md#0x7_bulk_order_book_types_BulkOrderRequest"
     cancelled_ask_prices: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;,
     cancelled_ask_sizes: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;,
     previous_seq_num: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;u64&gt;
-<<<<<<< HEAD
-): <a href="bulk_order_book_types.md#0x7_bulk_order_book_types_BulkOrderPlaceResponse">BulkOrderPlaceResponse</a>&lt;M&gt; {
-    BulkOrderPlaceResponse::V1 {
-=======
 ): <a href="bulk_order_types.md#0x7_bulk_order_book_types_BulkOrderPlaceResponse">BulkOrderPlaceResponse</a>&lt;M&gt; {
     <a href="bulk_order_types.md#0x7_bulk_order_book_types_BulkOrderPlaceResponse">BulkOrderPlaceResponse</a> {
->>>>>>> f583b0f4e1 (add trading framework package for types)
         order,
         cancelled_bid_prices,
         cancelled_bid_sizes,
@@ -889,17 +876,10 @@ A <code><a href="bulk_order_types.md#0x7_bulk_order_book_types_BulkOrderRequest"
 <summary>Implementation</summary>
 
 
-<<<<<<< HEAD
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="bulk_order_book_types.md#0x7_bulk_order_book_types_destroy_bulk_order_place_response">destroy_bulk_order_place_response</a>&lt;M: store + <b>copy</b> + drop&gt;(
-    response: <a href="bulk_order_book_types.md#0x7_bulk_order_book_types_BulkOrderPlaceResponse">BulkOrderPlaceResponse</a>&lt;M&gt;
-): (<a href="bulk_order_book_types.md#0x7_bulk_order_book_types_BulkOrder">BulkOrder</a>&lt;M&gt;, <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;, <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;, <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;, <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;, <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;u64&gt;) {
-    <b>let</b> BulkOrderPlaceResponse::V1 { order, cancelled_bid_prices, cancelled_bid_sizes, cancelled_ask_prices, cancelled_ask_sizes, previous_seq_num } = response;
-=======
 <pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="bulk_order_types.md#0x7_bulk_order_book_types_destroy_bulk_order_place_response">destroy_bulk_order_place_response</a>&lt;M: store + <b>copy</b> + drop&gt;(
     response: <a href="bulk_order_types.md#0x7_bulk_order_book_types_BulkOrderPlaceResponse">BulkOrderPlaceResponse</a>&lt;M&gt;
 ): (<a href="bulk_order_types.md#0x7_bulk_order_book_types_BulkOrder">BulkOrder</a>&lt;M&gt;, <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;, <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;, <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;, <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;, <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;u64&gt;) {
     <b>let</b> <a href="bulk_order_types.md#0x7_bulk_order_book_types_BulkOrderPlaceResponse">BulkOrderPlaceResponse</a> { order, cancelled_bid_prices, cancelled_bid_sizes, cancelled_ask_prices, cancelled_ask_sizes, previous_seq_num } = response;
->>>>>>> f583b0f4e1 (add trading framework package for types)
     (order, cancelled_bid_prices, cancelled_bid_sizes, cancelled_ask_prices, cancelled_ask_sizes, previous_seq_num)
 }
 </code></pre>
