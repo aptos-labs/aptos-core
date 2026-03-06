@@ -41,7 +41,7 @@ pub async fn generate_traffic_and_assert_committed(
                 TransactionType::AccountGeneration {
                     add_created_accounts_to_pool: true,
                     max_account_working_set: 1_000_000,
-                    creation_balance: 5_000_000,
+                    creation_balance: 50_000_000,
                 },
                 20,
             ),

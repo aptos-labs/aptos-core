@@ -50,7 +50,7 @@ fn deeply_nested_structs() {
 
     h.modify_gas_schedule(|gas_params| {
         gas_params.vm.txn.memory_quota = 10_000_000.into();
-        gas_params.vm.txn.max_execution_gas = 100_000_000_000.into();
+        gas_params.vm.txn.max_execution_gas = 1_000_000_000_000.into();
     });
 
     // Publish the code

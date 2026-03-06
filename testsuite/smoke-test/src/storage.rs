@@ -454,7 +454,7 @@ pub(crate) fn db_restore(
 }
 
 async fn do_transfer_or_reconfig(info: &mut AptosPublicInfo) -> Result<()> {
-    const LOTS_MONEY: u64 = 100_000_000;
+    const LOTS_MONEY: u64 = 1_000_000_000;
     let r = rand::random::<u64>() % 10;
     if r < 3 {
         info!(
