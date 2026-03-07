@@ -1,7 +1,4 @@
----
-name: move-check
-description: Check and fix compilation errors in a Move package
----
+{{ frontmatter(name="move-check", description="Check and fix compilation errors in a Move package") }}
 
 {#
  # This agent allows to ask something like 'check compilation in a subagent'.

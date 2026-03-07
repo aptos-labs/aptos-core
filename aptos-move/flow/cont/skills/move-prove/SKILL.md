@@ -1,7 +1,4 @@
----
-name: move-prove
-description: Run the Move Prover to formally verify specifications
----
+{{ frontmatter(name="move-prove", description="Run the Move Prover to formally verify specifications") }}
 
 {% include "templates/move_lang.md" %}
 {% include "templates/status_tool.md" %}

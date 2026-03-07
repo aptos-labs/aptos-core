@@ -1,7 +1,4 @@
----
-name: move-verify
-description: Verify Move specifications using the Move Prover
----
+{{ frontmatter(name="move-verify", description="Verify Move specifications using the Move Prover") }}
 
 {#
  # This agent allows to ask something like 'verify specs in a subagent'.

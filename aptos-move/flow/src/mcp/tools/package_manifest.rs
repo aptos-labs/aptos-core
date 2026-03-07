@@ -20,7 +20,10 @@ struct MovePackageManifestResult {
 
 #[tool_router(router = package_manifest_router, vis = "pub(crate)")]
 impl FlowSession {
-    #[tool(description = "Get information about the current Move package")]
+    #[tool(
+        description = "Get information about the current Move package",
+        annotations(read_only_hint = false, destructive_hint = false)
+    )]
     async fn move_package_manifest(
         &self,
         Parameters(params): Parameters<MovePackageManifestParams>,
