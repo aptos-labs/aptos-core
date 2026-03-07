@@ -6,11 +6,12 @@
 # Owners for the `/api` directory and all its subdirectories.
 /api/ @banool @gregnazario @0xmaayan
 
-# Owners for the `/aptos-move` directory and its subdirectories:`aptos-gas`, `aptos-vm`, `framework` and `framework/aptos-stdlib/sources/cryptography`.
+# Owners for the `/aptos-move` directory and its subdirectories.
 /aptos-move/aptos-aggregator/ @georgemitenkov @gelash @zekun000
-/aptos-move/aptos-gas/ @vgao1996
+/aptos-move/aptos-native-interface/ @vgao1996
 /aptos-move/aptos-vm/ @wrwg @zekun000 @vgao1996 @georgemitenkov
 /aptos-move/aptos-vm/src/keyless_validation.rs @alinush
+/aptos-move/aptos-vm-profiling/ @vgao1996
 /aptos-move/aptos-vm-types/ @georgemitenkov @gelash @vgao1996
 /aptos-move/framework/ @wrwg
 /aptos-move/framework/aptos-framework/sources/account.move @alinush
@@ -25,6 +26,26 @@
 /aptos-move/block-executor/ @gelash @zekun000 @sasha8 @danielxiangzl
 /aptos-move/sharded_block-executor/ @sitalkedia
 /aptos-move/mvhashmap/ @gelash @runtian-zhou @sasha8 @danielxiangzl
+
+# Owners for the gas subsystem.
+/aptos-move/aptos-abstract-gas-usage/ @vgao1996
+/aptos-move/aptos-gas-algebra/ @vgao1996
+/aptos-move/aptos-gas-calibration/ @vgao1996
+/aptos-move/aptos-gas-meter/ @vgao1996
+/aptos-move/aptos-gas-profiling/ @vgao1996
+/aptos-move/aptos-gas-schedule/ @vgao1996
+/aptos-move/aptos-gas-schedule-updator/ @vgao1996
+/aptos-move/aptos-memory-usage-tracker/ @vgao1996
+/aptos-move/aptos-release-builder/src/components/gas.rs @vgao1996
+/types/src/on_chain_config/gas_schedule.rs @vgao1996
+
+# Owners for transaction simulation infrastructure and user interfaces.
+/aptos-move/aptos-release-builder/src/simulate.rs @vgao1996
+/aptos-move/aptos-transaction-simulation/ @vgao1996
+/aptos-move/aptos-transaction-simulation-session/ @vgao1996
+/aptos-move/aptos-workspace-server/ @vgao1996
+/aptos-move/cli/src/local_simulation.rs @vgao1996
+/aptos-move/cli/src/sim.rs @vgao1996
 
 # Owner for aptos node (to prevent things from becoming out of hand :D)
 /aptos-node/ @joshlind
@@ -106,8 +127,15 @@
 # Owners for the `/terraform` directory and all its subdirectories.
 /terraform/ @aptos-labs/prod-eng
 
+# Owners for the new Move package system crates.
+/third_party/move/tools/move-package-cache/ @vgao1996
+/third_party/move/tools/move-package-manifest/ @vgao1996
+/third_party/move/tools/move-package-resolver/ @vgao1996
+
 # Owners for the `aptos-dkg` crate.
 /crates/aptos-dkg @alinush @rex1fernando @waamm
 
+# Owners for types.
 /types/src/keyless/ @alinush
+/types/src/on_chain_config/timed_features.rs @vgao1996
 /types/src/transaction/authenticator.rs @alinush
