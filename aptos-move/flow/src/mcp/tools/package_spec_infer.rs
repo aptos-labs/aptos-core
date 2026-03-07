@@ -36,6 +36,7 @@ impl FlowSession {
             params.package_path,
             params.filter
         );
+        self.mark_needs_bytecode(&params.package_path);
         let pkg = self.resolve_package(&params.package_path).await?;
         let filter = params.filter.clone();
 
@@ -50,7 +51,7 @@ impl FlowSession {
             }
 
             // 2. Ensure bytecode is available (inference requires it).
-            if !data.has_bytecode() {
+            if !data.built_with_bytecode() {
                 data.rebuild_with_bytecode().map_err(|e| {
                     rmcp::ErrorData::internal_error(
                         format!("failed to rebuild with bytecode: {}", e),

@@ -45,6 +45,7 @@ impl FlowSession {
             params.exclude,
             params.timeout
         );
+        self.mark_needs_bytecode(&params.package_path);
         let pkg = self.resolve_package(&params.package_path).await?;
         let filter = params.filter.clone();
         let exclude = params.exclude.clone();
@@ -68,7 +69,7 @@ impl FlowSession {
             }
 
             // 2. Ensure bytecode is available (prover requires it).
-            if !data.has_bytecode() {
+            if !data.built_with_bytecode() {
                 data.rebuild_with_bytecode().map_err(|e| {
                     rmcp::ErrorData::internal_error(
                         format!("failed to rebuild with bytecode: {}", e),
@@ -124,6 +125,11 @@ impl FlowSession {
             options.prover.verify_scope = verification_scope;
             options.prover.verify_exclude = verify_exclude;
             options.backend.vc_timeout = vc_timeout;
+            #[cfg(test)]
+            {
+                options.prover.stable_test_output = true;
+                options.backend.stable_test_output = true;
+            }
             options.output_path = temp_dir
                 .path()
                 .join("output.bpl")
@@ -147,21 +153,30 @@ impl FlowSession {
                         "verification succeeded",
                     )]))
                 },
-                Err(_) => {
+                Err(e) => {
                     data.set_verified(scope, false, vc_timeout);
                     let diag_text =
                         String::from_utf8(error_writer.into_inner()).unwrap_or_default();
-                    if diag_text.is_empty() {
-                        data.set_diagnostics(vec!["verification failed".to_string()], "verifying");
-                    } else {
+                    let msg = if !diag_text.is_empty() {
                         data.set_diagnostics(vec![diag_text.clone()], "verifying");
-                    }
-                    let msg = if diag_text.is_empty() {
-                        "verification failed".to_string()
-                    } else {
                         format!("verification failed:\n{}", diag_text)
+                    } else {
+                        // The prover may return errors (e.g. tool version
+                        // mismatch, boogie crash) that bypass the diagnostic
+                        // writer. Try unreported env diagnostics first, then
+                        // fall back to the anyhow error.
+                        let env_diags = super::super::package_data::render_diagnostics(data.env());
+                        if !env_diags.is_empty() {
+                            let joined = env_diags.join("\n");
+                            data.set_diagnostics(env_diags, "verifying");
+                            format!("verification failed:\n{}", joined)
+                        } else {
+                            let err_msg = format!("{:#}", e);
+                            data.set_diagnostics(vec![err_msg.clone()], "verifying");
+                            format!("verification failed: {}", err_msg)
+                        }
                     };
-                    log::info!("move_package_verify: failed");
+                    log::info!("move_package_verify: failed\n{}", msg);
                     Ok(CallToolResult::error(vec![Content::text(msg)]))
                 },
             }

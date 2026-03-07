@@ -52,7 +52,17 @@ pub fn test_runner_with_annotations(
         ..Options::default()
     };
     let mut error_writer = Buffer::no_color();
-    let env = run_move_compiler_for_analysis(&mut error_writer, options)?;
+    let env = match run_move_compiler_for_analysis(&mut error_writer, options) {
+        Ok(env) => env,
+        Err(_) => {
+            // Compilation failed. Capture the errors as baseline output so that
+            // error-case tests (e.g. invalid proof constructs) can be tested.
+            let errors = String::from_utf8_lossy(&error_writer.into_inner()).to_string();
+            let baseline_path = path.with_extension(get_compiler_exp_extension());
+            verify_or_update_baseline(baseline_path.as_path(), &errors)?;
+            return Ok(());
+        },
+    };
     let out = if env.has_errors() {
         let mut error_writer = Buffer::no_color();
         env.report_diag(&mut error_writer, Severity::Error);
@@ -69,6 +79,11 @@ pub fn test_runner_with_annotations(
         let mut targets = FunctionTargetsHolder::default();
         for module_env in env.get_modules() {
             for func_env in module_env.get_functions() {
+                // Lemma functions are not subject to transformation in the
+                // pipeline; skip them.
+                if func_env.is_lemma() {
+                    continue;
+                }
                 targets.add_target(&func_env);
             }
         }

@@ -338,8 +338,51 @@ pub enum SpecBlockMember_ {
     Pragma {
         properties: Vec<PragmaProperty>,
     },
+    /// `proof { ... }` — a structured proof block guiding the SMT solver.
+    Proof {
+        body: Proof,
+    },
+    /// `spec lemma name(params) { requires; ensures; } proof { ... }`
+    Lemma {
+        name: FunctionName,
+        signature: FunctionSignature,
+        spec_members: Vec<SpecBlockMember>,
+        proof: Option<Proof>,
+    },
 }
 pub type SpecBlockMember = Spanned<SpecBlockMember_>;
+
+/// A proof statement inside a `proof { ... }` block (expansion-phase AST).
+#[derive(Debug, Clone, PartialEq)]
+pub enum Proof_ {
+    /// `let name = exp;`
+    Let(Name, Exp),
+    /// `if (cond) proof [else proof]`
+    IfElse(Exp, Box<Proof>, Option<Box<Proof>>),
+    /// `{ proof_stmts }`
+    Block(Vec<Proof>),
+    /// `assert exp;`
+    Assert(Exp),
+    /// `assume [trusted] exp;`
+    Assume(Vec<PragmaProperty>, Exp),
+    /// `apply lemma(args);`
+    Apply(ModuleAccess, Vec<Exp>),
+    /// `forall bindings [triggers] apply lemma(args);`
+    ForallApply {
+        bindings: LValueWithRangeList,
+        patterns: Vec<Vec<Exp>>,
+        lemma: ModuleAccess,
+        args: Vec<Exp>,
+    },
+    /// `calc(e1 relop e2 relop ... en);`
+    Calc(Vec<(Exp, Option<BinOp>)>),
+    /// `post <proof_stmt>` — emit at return point instead of entry.
+    Post(Box<Proof>),
+    /// `split expr;` — case-split on boolean or enum expression.
+    Split(Exp),
+}
+
+pub type Proof = Spanned<Proof_>;
 
 #[derive(PartialEq, Eq, Clone, Debug)]
 pub enum SpecConditionKind_ {
@@ -1381,6 +1424,139 @@ impl AstDebug for SpecBlockMember_ {
                     p.ast_debug(w);
                     true
                 });
+            },
+            SpecBlockMember_::Proof { body } => {
+                w.write("proof ");
+                body.ast_debug(w);
+            },
+            SpecBlockMember_::Lemma {
+                name,
+                signature,
+                spec_members,
+                proof,
+            } => {
+                w.write(format!("lemma {}", name));
+                signature.ast_debug(w);
+                w.write(" ");
+                w.block(|w| {
+                    for m in spec_members {
+                        m.ast_debug(w);
+                        w.new_line();
+                    }
+                });
+                if let Some(p) = proof {
+                    w.write(" proof ");
+                    p.ast_debug(w);
+                }
+            },
+        }
+    }
+}
+
+impl AstDebug for Proof_ {
+    fn ast_debug(&self, w: &mut AstWriter) {
+        match self {
+            Proof_::Let(name, exp) => {
+                w.write(format!("let {} = ", name));
+                exp.ast_debug(w);
+                w.write(";");
+            },
+            Proof_::IfElse(cond, then_branch, else_branch) => {
+                w.write("if (");
+                cond.ast_debug(w);
+                w.write(") ");
+                then_branch.ast_debug(w);
+                if let Some(eb) = else_branch {
+                    w.write(" else ");
+                    eb.ast_debug(w);
+                }
+            },
+            Proof_::Block(stmts) => {
+                w.block(|w| {
+                    for stmt in stmts {
+                        stmt.ast_debug(w);
+                        w.new_line();
+                    }
+                });
+            },
+            Proof_::Assert(exp) => {
+                w.write("assert ");
+                exp.ast_debug(w);
+                w.write(";");
+            },
+            Proof_::Assume(props, exp) => {
+                w.write("assume ");
+                if !props.is_empty() {
+                    w.write("[");
+                    w.list(props, ", ", |w, p| {
+                        p.ast_debug(w);
+                        true
+                    });
+                    w.write("] ");
+                }
+                exp.ast_debug(w);
+                w.write(";");
+            },
+            Proof_::Apply(access, args) => {
+                w.write("apply ");
+                access.ast_debug(w);
+                w.write("(");
+                w.list(args, ", ", |w, e| {
+                    e.ast_debug(w);
+                    true
+                });
+                w.write(");");
+            },
+            Proof_::ForallApply {
+                bindings,
+                patterns,
+                lemma,
+                args,
+            } => {
+                w.write("forall ");
+                w.list(&bindings.value, ", ", |w, sp!(_, (lv, range))| {
+                    lv.ast_debug(w);
+                    w.write(": ");
+                    range.ast_debug(w);
+                    true
+                });
+                for group in patterns {
+                    w.write(" {");
+                    w.list(group, ", ", |w, e| {
+                        e.ast_debug(w);
+                        true
+                    });
+                    w.write("}");
+                }
+                w.write(" apply ");
+                lemma.ast_debug(w);
+                w.write("(");
+                w.list(args, ", ", |w, e| {
+                    e.ast_debug(w);
+                    true
+                });
+                w.write(");");
+            },
+            Proof_::Calc(steps) => {
+                w.write("calc(");
+                for (i, (exp, op)) in steps.iter().enumerate() {
+                    if i > 0 {
+                        if let Some(op) = op {
+                            w.write(format!(" {} ", op));
+                        }
+                    }
+                    exp.ast_debug(w);
+                }
+                w.write(");");
+            },
+            Proof_::Post(inner) => {
+                w.write("post ");
+                inner.ast_debug(w);
+            },
+            Proof_::Split(exp) => {
+                w.write("split ");
+                exp.ast_debug(w);
+                w.write(";");
             },
         }
     }

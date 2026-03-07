@@ -369,7 +369,7 @@ pub fn run_stackless_bytecode_gen(env: &GlobalEnv) -> FunctionTargetsHolder {
             for fun in module.get_functions() {
                 let id = fun.get_qualified_id();
                 // Skip inline functions because invoke and lambda are not supported in the current code generator
-                if !fun.is_inline() {
+                if !fun.is_inline() && !fun.is_lemma() {
                     todo.insert(id);
                 }
             }

@@ -34,8 +34,8 @@ pub struct McpArgs {
     pub bytecode_version: Option<u32>,
 
     /// Move language version.
-    #[arg(long, value_parser = clap::value_parser!(LanguageVersion))]
-    pub language_version: Option<LanguageVersion>,
+    #[arg(long, value_parser = clap::value_parser!(LanguageVersion), default_value_t = LanguageVersion::latest())]
+    pub language_version: LanguageVersion,
 
     /// Compiler experiments to enable.
     #[arg(long)]
@@ -44,7 +44,7 @@ pub struct McpArgs {
 
 /// Start the MCP stdio server.
 pub async fn run(args: &McpArgs, global: &GlobalOpts) -> Result<()> {
-    move_compiler_v2::logging::setup_logging(None);
+    move_compiler_v2::logging::setup_logging_with_timestamps(None);
 
     // Bridge `tracing` events (used by rmcp) into the `log` framework so that
     // flexi_logger captures transport-level diagnostics (e.g. "input stream
@@ -56,9 +56,16 @@ pub async fn run(args: &McpArgs, global: &GlobalOpts) -> Result<()> {
     // log file with location info rather than silently crashing the process.
     let default_hook = std::panic::take_hook();
     std::panic::set_hook(Box::new(move |info| {
-        log::error!("panic: {}", info);
+        let bt = std::backtrace::Backtrace::force_capture();
+        log::error!("panic: {}\nBacktrace:\n{}", info, bt);
         default_hook(info);
     }));
+
+    log::info!(
+        "move-flow MCP server v{} starting (tools: {})",
+        env!("CARGO_PKG_VERSION"),
+        FlowSession::tool_names().join(", ")
+    );
 
     let session = FlowSession::new(args.clone(), global.clone());
     let service = session.serve(stdio()).await?;

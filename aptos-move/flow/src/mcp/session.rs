@@ -10,7 +10,7 @@ use rmcp::{
 };
 use serde::Serialize;
 use std::{
-    collections::BTreeMap,
+    collections::{BTreeMap, BTreeSet},
     path::{Path, PathBuf},
     sync::{Arc, Mutex},
 };
@@ -24,6 +24,9 @@ pub(crate) struct FlowSession {
     /// Cache of compiled packages. `Mutex<PackageData>` is needed because `GlobalEnv`
     /// is `!Sync` (it uses `RefCell` internally).
     package_cache: Arc<Mutex<BTreeMap<String, Arc<Mutex<PackageData>>>>>,
+    /// Packages that have been verified or inferred and thus need bytecode on rebuild.
+    /// Entries survive cache invalidation so that file-watcher rebuilds include bytecode.
+    needs_bytecode: Arc<Mutex<BTreeSet<String>>>,
     file_watcher: FileWatcher,
     tool_router: ToolRouter<Self>,
 }
@@ -61,12 +64,22 @@ impl FlowSession {
             global,
             args,
             package_cache,
+            needs_bytecode: Arc::new(Mutex::new(BTreeSet::new())),
             file_watcher,
             tool_router: Self::package_manifest_router()
                 + Self::package_status_router()
                 + Self::package_verify_router()
                 + Self::package_spec_infer_router(),
         }
+    }
+
+    /// Record that `package_path` needs bytecode on subsequent builds.
+    pub(crate) fn mark_needs_bytecode(&self, package_path: &str) {
+        let key = self.resolve_package_path(package_path);
+        self.needs_bytecode
+            .lock()
+            .expect("needs_bytecode lock poisoned")
+            .insert(key);
     }
 
     /// Resolve and canonicalize the given package path, returning a string key.
@@ -106,22 +119,30 @@ impl FlowSession {
         // `cache.remove(key)` which is a no-op while there is no cache entry.
         let build_start = std::time::SystemTime::now();
 
-        log::info!("building package `{}`", key);
+        let with_bytecode = self
+            .needs_bytecode
+            .lock()
+            .expect("needs_bytecode lock poisoned")
+            .contains(&key);
+        log::info!(
+            "building package `{}` (with_bytecode={})",
+            key,
+            with_bytecode
+        );
         let args = self.args.clone();
         let key_clone = key.clone();
-        let data =
-            tokio::task::spawn_blocking(move || PackageData::init(key_clone.as_ref(), &args))
-                .await
-                .map_err(|e| {
-                    rmcp::ErrorData::internal_error(format!("build task failed: {}", e), None)
-                })?
-                .map_err(|e| {
-                    log::info!("build failed for `{}`: {}", key, e);
-                    rmcp::ErrorData::internal_error(
-                        format!("failed to build package `{}`: {}", key, e),
-                        None,
-                    )
-                })?;
+        let data = tokio::task::spawn_blocking(move || {
+            PackageData::init(key_clone.as_ref(), &args, with_bytecode)
+        })
+        .await
+        .map_err(|e| rmcp::ErrorData::internal_error(format!("build task failed: {}", e), None))?
+        .map_err(|e| {
+            log::info!("build failed for `{}`: {}", key, e);
+            rmcp::ErrorData::internal_error(
+                format!("failed to build package `{}`: {}", key, e),
+                None,
+            )
+        })?;
 
         // Swap old watches for the new source file set.
         self.file_watcher.unwatch_package(&key);

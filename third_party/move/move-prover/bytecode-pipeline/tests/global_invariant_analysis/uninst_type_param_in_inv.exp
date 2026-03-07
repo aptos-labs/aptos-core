@@ -41,6 +41,45 @@ fun Demo::f1($t0|addr: address) {
 
 ============ after pipeline `global_invariant_analysis` ================
 
+[variant baseline]
+fun Demo::f1($t0|addr: address) {
+     var $t1: bool
+     var $t2: u8
+     var $t3: &mut 0x42::Demo::S1<bool>
+     var $t4: num
+     var $t5: &mut u8
+     var $t6: bool
+     var $t7: u8
+     var $t8: &mut 0x42::Demo::S1<u64>
+     var $t9: &mut u8
+  0: $t1 := exists<0x42::Demo::S1<bool>>($t0)
+  1: if ($t1) goto 2 else goto 9
+  2: label L0
+  3: $t2 := 0
+  4: $t3 := borrow_global<0x42::Demo::S1<bool>>($t0) on_abort goto 23 with $t4
+  5: $t5 := borrow_field<0x42::Demo::S1<bool>>.v($t3)
+  6: write_ref($t5, $t2)
+  7: write_back[Reference($t3).v (u8)]($t5)
+  8: write_back[0x42::Demo::S1<bool>@]($t3)
+  9: label L2
+ 10: $t6 := exists<0x42::Demo::S1<u64>>($t0)
+ 11: if ($t6) goto 12 else goto 20
+ 12: label L4
+ 13: $t7 := 0
+ 14: $t8 := borrow_global<0x42::Demo::S1<u64>>($t0) on_abort goto 23 with $t4
+ 15: $t9 := borrow_field<0x42::Demo::S1<u64>>.v($t8)
+ 16: write_ref($t9, $t7)
+ 17: write_back[Reference($t8).v (u8)]($t9)
+ 18: write_back[0x42::Demo::S1<u64>@]($t8)
+ 19: goto 21
+ 20: label L3
+ 21: label L5
+ 22: return ()
+ 23: label L6
+ 24: abort($t4)
+}
+
+
 [variant verification]
 fun Demo::f1($t0|addr: address) {
      var $t1: bool

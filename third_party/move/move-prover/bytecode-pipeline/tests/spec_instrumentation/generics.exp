@@ -21,6 +21,18 @@ fun Generics::remove_u64($t0|a: address): 0x42::Generics::R<u64> {
 
 ============ after pipeline `spec_instrumentation` ================
 
+[variant baseline]
+fun Generics::remove<#0>($t0|a: address): 0x42::Generics::R<#0> {
+     var $t1: 0x42::Generics::R<#0>
+     var $t2: num
+  0: $t1 := move_from<0x42::Generics::R<#0>>($t0) on_abort goto 3 with $t2
+  1: label L1
+  2: return $t1
+  3: label L2
+  4: abort($t2)
+}
+
+
 [variant verification]
 fun Generics::remove<#0>($t0|a: address): 0x42::Generics::R<#0> {
      var $t1: 0x42::Generics::R<#0>
@@ -35,6 +47,29 @@ fun Generics::remove<#0>($t0|a: address): 0x42::Generics::R<#0> {
   5: return $t1
   6: label L2
   7: abort($t2)
+}
+
+
+[variant baseline]
+fun Generics::remove_u64($t0|a: address): 0x42::Generics::R<u64> {
+     var $t1: 0x42::Generics::R<u64>
+     var $t2: bool
+     var $t3: num
+  0: $t1 := opaque begin: Generics::remove<u64>($t0)
+  1: $t2 := havoc[val]()
+  2: if ($t2) goto 3 else goto 6
+  3: label L4
+  4: trace_abort($t3)
+  5: goto 13
+  6: label L3
+  7: modifies global<0x42::Generics::R<u64>>($t0)
+  8: assume WellFormed($t1)
+  9: assume Not(exists<0x42::Generics::R<u64>>($t0))
+ 10: $t1 := opaque end: Generics::remove<u64>($t0)
+ 11: label L1
+ 12: return $t1
+ 13: label L2
+ 14: abort($t3)
 }
 
 

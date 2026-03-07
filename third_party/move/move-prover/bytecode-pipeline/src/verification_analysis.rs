@@ -382,6 +382,10 @@ impl FunctionTargetProcessor for VerificationAnalysisProcessor {
 impl VerificationAnalysisProcessor {
     /// Check whether the function falls within the verification scope given in the options
     fn is_within_verification_scope(fun_env: &FunctionEnv) -> bool {
+        // All lemma functions are always verified.
+        if fun_env.is_lemma() {
+            return true;
+        }
         if fun_env.is_test_only()
             || fun_env.is_intrinsic()
             || fun_env.is_native()
@@ -424,6 +428,10 @@ impl VerificationAnalysisProcessor {
             .get_or_default_mut::<VerificationInfo>(true);
         if !info.verified {
             info.verified = true;
+            // Also mark inlined: during processing, the function's own data is removed
+            // from targets, so mark_callees_inlined cannot reach it for self-recursive
+            // functions. Setting inlined here ensures the body is available.
+            info.inlined = true;
             Self::mark_callees_inlined(fun_env, targets);
         }
     }
@@ -433,11 +441,14 @@ impl VerificationAnalysisProcessor {
     ///
     /// NOTE: This does not apply to opaque, native, or intrinsic functions.
     fn mark_inlined(fun_env: &FunctionEnv, targets: &mut FunctionTargetsHolder) {
-        if fun_env.is_opaque() || fun_env.is_native() || fun_env.is_intrinsic() {
+        if fun_env.is_opaque() || fun_env.no_verified_bytecode() {
             return;
         }
 
-        // at this time, we only have the `baseline` variant in the targets
+        // At this time, we only have the `baseline` variant in the targets.
+        // For self-recursive functions, the baseline data may be temporarily removed
+        // during processing (the pipeline removes it before calling process and puts
+        // it back after), so a missing entry is not an error.
         let variant = FunctionVariant::Baseline;
         if let Some(data) = targets.get_data_mut(&fun_env.get_qualified_id(), &variant) {
             // TODO(mengxu): re-check the treatment of fixedpoint here
@@ -448,16 +459,6 @@ impl VerificationAnalysisProcessor {
                 info.inlined = true;
                 Self::mark_callees_inlined(fun_env, targets);
             }
-        } else {
-            fun_env.module_env.env.error(
-                &fun_env.get_loc(),
-                &format!(
-                    "function `{}` is a recursive function \
-                       (or part of a mutually recursive function group) \
-                       and should be marked as opaque",
-                    fun_env.get_full_name_str()
-                ),
-            );
         }
     }
 

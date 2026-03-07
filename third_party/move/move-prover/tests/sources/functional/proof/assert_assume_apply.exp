@@ -1,0 +1,5 @@
+warning: proof uses trusted assumption
+   ┌─ tests/sources/functional/proof/assert_assume_apply.move:30:9
+   │
+30 │         assume [trusted] x * x < MAX_U64;
+   │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^

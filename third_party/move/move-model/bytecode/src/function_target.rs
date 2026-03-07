@@ -550,6 +550,37 @@ impl FunctionData {
         }
     }
 
+    /// Creates a FunctionData with minimal stub code (`[Label, Ret]`), suitable for
+    /// functions that have no compilable body (e.g. lemma functions in the prover path).
+    /// The stub bytecode provides a valid CFG entry point for pipeline processors.
+    pub fn new_empty(func_env: &FunctionEnv<'_>) -> Self {
+        let attr = AttrId::new(0);
+        let code = vec![
+            Bytecode::Label(attr, Label::new(0)),
+            Bytecode::Ret(attr, vec![]),
+        ];
+        let local_types = func_env
+            .get_parameters()
+            .iter()
+            .map(|p| p.1.clone())
+            .collect();
+        let result_type = func_env.get_result_type();
+        let mut locations = BTreeMap::new();
+        locations.insert(attr, func_env.get_loc());
+        FunctionData::new(
+            func_env,
+            code,
+            local_types,
+            result_type,
+            locations,
+            Default::default(),
+            vec![],
+            Default::default(),
+            Default::default(),
+            Default::default(),
+        )
+    }
+
     /// Computes the next available index for AttrId.
     pub fn next_free_attr_index(&self) -> usize {
         self.code
