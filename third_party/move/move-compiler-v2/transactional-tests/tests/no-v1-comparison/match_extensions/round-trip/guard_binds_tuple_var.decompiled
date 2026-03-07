@@ -1,0 +1,60 @@
+//**** Cross-compiled for `move` syntax from `tests/no-v1-comparison/match_extensions/guard_binds_tuple_var.move`
+
+//# publish
+module 0xc0ffee::m {
+    public fun tuple_guard_both_vars(p0: u64, p1: u64): u64 {
+        if (p0 + p1 > 10) return p0 + p1;
+        0
+    }
+    public fun tuple_guard_first_var(p0: u64, p1: u64): u64 {
+        let _v0;
+        let _v1;
+        if (p1 == 42) _v1 = p0 > 5 else _v1 = false;
+        loop {
+            if (!_v1) {
+                if (p1 == 42) {
+                    _v0 = p0;
+                    break
+                };
+                _v0 = 0;
+                break
+            };
+            return p0 * 10
+        };
+        _v0
+    }
+    public fun tuple_guard_uses_var(p0: u64, p1: u64): u64 {
+        let _v0;
+        let _v1;
+        if (p0 == 1) _v1 = p1 > 10 else _v1 = false;
+        loop {
+            if (!_v1) {
+                if (p0 == 1) {
+                    _v0 = p1;
+                    break
+                };
+                _v0 = 0;
+                break
+            };
+            return p1 + 100
+        };
+        _v0
+    }
+}
+
+
+//# run 0xc0ffee::m::tuple_guard_uses_var --args 1u64 20u64
+
+//# run 0xc0ffee::m::tuple_guard_uses_var --args 1u64 5u64
+
+//# run 0xc0ffee::m::tuple_guard_uses_var --args 2u64 20u64
+
+//# run 0xc0ffee::m::tuple_guard_first_var --args 10u64 42u64
+
+//# run 0xc0ffee::m::tuple_guard_first_var --args 3u64 42u64
+
+//# run 0xc0ffee::m::tuple_guard_first_var --args 10u64 99u64
+
+//# run 0xc0ffee::m::tuple_guard_both_vars --args 8u64 5u64
+
+//# run 0xc0ffee::m::tuple_guard_both_vars --args 3u64 2u64

@@ -1,0 +1,19 @@
+//**** Cross-compiled for `move` syntax from `tests/no-v1-comparison/match_extensions/tuple_literal_match.move`
+
+//# publish
+module 0xc0ffee::tuple_literal_match {
+    fun match_tuple(p0: u8): u8 {
+        p0
+    }
+    public fun test_match_0(): u8 {
+        match_tuple(0u8)
+    }
+    public fun test_match_7(): u8 {
+        match_tuple(7u8)
+    }
+}
+
+
+//# run 0xc0ffee::tuple_literal_match::test_match_7
+
+//# run 0xc0ffee::tuple_literal_match::test_match_0

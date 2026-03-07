@@ -1,0 +1,24 @@
+processed 12 tasks
+task 0 lines 3-80:  publish [module 0xc0ffee::m {]
+task 1 lines 83-83:  run 0xc0ffee::m::test_match_bool --args true
+return values: 1
+task 2 lines 85-85:  run 0xc0ffee::m::test_match_bool --args false
+return values: 0
+task 3 lines 87-87:  run 0xc0ffee::m::test_match_u8 --args 0u8
+return values: 0
+task 4 lines 89-89:  run 0xc0ffee::m::test_match_u8 --args 1u8
+return values: 1
+task 5 lines 91-91:  run 0xc0ffee::m::test_match_u8 --args 42u8
+return values: 255
+task 6 lines 93-93:  run 0xc0ffee::m::test_match_u64 --args 0
+return values: 0
+task 7 lines 95-95:  run 0xc0ffee::m::test_match_u64 --args 1
+return values: 1
+task 8 lines 97-97:  run 0xc0ffee::m::test_match_u64 --args 42
+return values: 255
+task 9 lines 99-99:  run 0xc0ffee::m::test_match_int_tuple --args 0u8 0u8
+return values: 0
+task 10 lines 101-101:  run 0xc0ffee::m::test_match_int_tuple --args 16u8 55u8
+return values: 255
+task 11 lines 103-103:  run 0xc0ffee::m::test_match_arms --args 0 42
+return values: 0

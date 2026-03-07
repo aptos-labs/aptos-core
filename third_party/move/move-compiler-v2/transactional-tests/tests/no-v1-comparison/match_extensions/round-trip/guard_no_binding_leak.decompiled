@@ -1,0 +1,42 @@
+//**** Cross-compiled for `move` syntax from `tests/no-v1-comparison/match_extensions/guard_no_binding_leak.move`
+
+//# publish
+module 0xc0ffee::m {
+    public fun chained_guards(p0: u64, p1: u64): u64 {
+        let _v0;
+        loop {
+            if (!(p0 > 1000)) {
+                if (p0 > 500) {
+                    _v0 = p0 + 1;
+                    break
+                };
+                _v0 = p1;
+                break
+            };
+            return p0
+        };
+        _v0
+    }
+    public fun scalar_catch_all(p0: u8, p1: u8): u8 {
+        p1
+    }
+    public fun tuple_with_vars(p0: u64, p1: u64): u64 {
+        let _v0;
+        if (p1 == 1) _v0 = false else _v0 = false;
+        if (_v0) return p0;
+        p1
+    }
+}
+
+
+//# run 0xc0ffee::m::scalar_catch_all --args 1u8 2u8
+
+//# run 0xc0ffee::m::scalar_catch_all --args 5u8 10u8
+
+//# run 0xc0ffee::m::tuple_with_vars --args 10u64 20u64
+
+//# run 0xc0ffee::m::tuple_with_vars --args 99u64 1u64
+
+//# run 0xc0ffee::m::chained_guards --args 10u64 42u64
+
+//# run 0xc0ffee::m::chained_guards --args 2000u64 42u64

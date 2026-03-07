@@ -2357,8 +2357,8 @@ impl BehaviorState {
     }
 }
 
-/// A pattern, either a variable, a tuple, or a struct instantiation applied to a sequence of patterns.
-/// Carries a node_id which has (at least) a type and location.
+/// A pattern, either a variable, a wildcard, a literal value, a tuple, or a struct instantiation
+/// applied to a sequence of patterns. Carries a node_id which has (at least) a type and location.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum Pattern {
     Var(NodeId, Symbol),
@@ -2371,6 +2371,8 @@ pub enum Pattern {
         Option<Symbol>,
         Vec<Pattern>,
     ),
+    /// A literal value pattern (for matching literal constants)
+    LiteralValue(NodeId, Value),
     Error(NodeId),
 }
 
@@ -2382,6 +2384,7 @@ impl Pattern {
             | Pattern::Wildcard(id)
             | Pattern::Tuple(id, _)
             | Pattern::Struct(id, _, _, _)
+            | Pattern::LiteralValue(id, _)
             | Pattern::Error(id) => *id,
         }
     }
@@ -2442,7 +2445,7 @@ impl Pattern {
     pub fn has_no_struct(&self) -> bool {
         use Pattern::*;
         match self {
-            Var(..) | Wildcard(..) | Error(..) => true,
+            Var(..) | Wildcard(..) | LiteralValue(..) | Error(..) => true,
             Tuple(_, pats) => pats.iter().all(|p| p.has_no_struct()),
             Struct(..) => false,
         }
@@ -2669,7 +2672,7 @@ impl Pattern {
                     .map(|pat| pat.remove_vars(vars))
                     .collect(),
             ),
-            Pattern::Error(..) | Pattern::Wildcard(..) => self,
+            Pattern::Error(..) | Pattern::Wildcard(..) | Pattern::LiteralValue(..) => self,
         }
     }
 
@@ -2716,7 +2719,7 @@ impl Pattern {
                     None
                 }
             },
-            Pattern::Error(..) | Pattern::Wildcard(..) => None,
+            Pattern::Error(..) | Pattern::Wildcard(..) | Pattern::LiteralValue(..) => None,
         }
     }
 
@@ -2730,7 +2733,7 @@ impl Pattern {
         use Pattern::*;
         visitor(false, self);
         match self {
-            Var(..) | Wildcard(..) | Error(..) => {},
+            Var(..) | Wildcard(..) | LiteralValue(..) | Error(..) => {},
             Tuple(_, patvec) => {
                 for pat in patvec {
                     pat.visit_pre_post(visitor);
@@ -2879,6 +2882,9 @@ impl PatDisplay<'_> {
                     args_str
                 )?;
                 showed_type = true
+            },
+            LiteralValue(_, val) => {
+                write!(f, "{:?}", val)?;
             },
             Error(_) => write!(f, "Pattern::Error")?,
         }

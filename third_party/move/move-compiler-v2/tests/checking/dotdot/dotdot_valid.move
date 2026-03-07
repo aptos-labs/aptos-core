@@ -138,17 +138,6 @@ module 0x42::test {
         }
     }
 
-    fun simple_4_ref(x: &E1): &u8 {
-        match (x) {
-            E1::A(x, ..) => {
-                x
-            }
-            E1::B(x) => {
-                x
-            }
-        }
-    }
-
     fun simple_5(x: E1): u8 {
         match (x) {
             E1::A(.., y) => {

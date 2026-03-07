@@ -40,7 +40,7 @@ pub struct TaskInput<Command> {
 /// Preprocesses command tokens so that negative number values for `--args` use the
 /// `--args=VALUE` syntax. This avoids clap interpreting `-1i64` as a flag.
 ///
-/// For example, `["--args", "-1i64", "2u64"]` becomes `["--args=-1i64", "--args", "2u64"]`.
+/// For example, `["--args", "-1i64", "2u64"]` becomes `["--args=-1i64", "--args=2u64"]`.
 fn preprocess_args_with_negative_numbers(tokens: Vec<&str>) -> Vec<String> {
     let mut result: Vec<String> = Vec::with_capacity(tokens.len());
     let mut i = 0;
@@ -55,14 +55,10 @@ fn preprocess_args_with_negative_numbers(tokens: Vec<&str>) -> Vec<String> {
             }
             let has_negative = values.iter().any(|v| v.starts_with('-'));
             if has_negative {
-                // Use --args=VALUE for negatives, --args VALUE for positives.
+                // Use --args=VALUE for all values so clap doesn't interpret
+                // negative numbers like `-1i64` as flags.
                 for v in values {
-                    if v.starts_with('-') {
-                        result.push(format!("--args={}", v));
-                    } else {
-                        result.push("--args".to_string());
-                        result.push(v.to_string());
-                    }
+                    result.push(format!("--args={}", v));
                 }
             } else {
                 result.push("--args".to_string());
@@ -171,7 +167,7 @@ pub fn taskify<Command: Debug + Parser>(filename: &Path) -> Result<Vec<TaskInput
         let command_split = command_text.split_ascii_whitespace().collect::<Vec<_>>();
         let name_opt = command_split.get(1).map(|s| (*s).to_owned());
         let command_split = preprocess_args_with_negative_numbers(command_split);
-        let command = match Command::try_parse_from(&command_split) {
+        let command = match Command::try_parse_from(command_split) {
             Ok(command) => command,
             Err(e) => {
                 let mut spit_iter = command_text.split_ascii_whitespace();

@@ -1,0 +1,28 @@
+processed 14 tasks
+task 0 lines 1-45:  publish [module 0xc0ffee::m {]
+task 1 lines 47-47:  run 0xc0ffee::m::test_bstring --args b"hello"
+return values: 1
+task 2 lines 49-49:  run 0xc0ffee::m::test_bstring --args b"world"
+return values: 2
+task 3 lines 51-51:  run 0xc0ffee::m::test_bstring --args b"other"
+return values: 99
+task 4 lines 53-53:  run 0xc0ffee::m::test_xstring --args x"deadbeef"
+return values: 1
+task 5 lines 55-55:  run 0xc0ffee::m::test_xstring --args x"cafe"
+return values: 2
+task 6 lines 57-57:  run 0xc0ffee::m::test_xstring --args x"0000"
+return values: 99
+task 7 lines 59-59:  run 0xc0ffee::m::test_empty --args b""
+return values: 1
+task 8 lines 61-61:  run 0xc0ffee::m::test_empty --args b"notempty"
+return values: 0
+task 9 lines 63-63:  run 0xc0ffee::m::test_var_binding --args b"special"
+return values: [102, 111, 117, 110, 100]
+task 10 lines 65-65:  run 0xc0ffee::m::test_var_binding --args b"anything"
+return values: [97, 110, 121, 116, 104, 105, 110, 103]
+task 11 lines 67-67:  run 0xc0ffee::m::test_guard --args b"hello" true
+return values: 10
+task 12 lines 69-69:  run 0xc0ffee::m::test_guard --args b"hello" false
+return values: 20
+task 13 lines 71-71:  run 0xc0ffee::m::test_guard --args b"other" true
+return values: 0

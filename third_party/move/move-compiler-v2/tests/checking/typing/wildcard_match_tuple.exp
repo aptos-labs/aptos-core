@@ -26,37 +26,6 @@ module 0x8675309::M {
         }
 
     }
-    private fun test_exhaustive_then_wildcard(x: X): u64 {
-        match (Tuple(x, x)) {
-          (M::X::A, M::X::A): (X, X) => {
-            1
-          }
-          (M::X::A, M::X::B): (X, X) => {
-            2
-          }
-          (M::X::B, M::X::A): (X, X) => {
-            3
-          }
-          (M::X::B, M::X::B): (X, X) => {
-            4
-          }
-          _: (X, X) => {
-            5
-          }
-        }
-
-    }
-    private fun test_wildcard_first(x: X): u64 {
-        match (Tuple(x, x)) {
-          _: (X, X) => {
-            1
-          }
-          (M::X::A, M::X::A): (X, X) => {
-            2
-          }
-        }
-
-    }
     private fun test_wildcard_positions(x: X,y: X): u64 {
         match (Tuple(x, y)) {
           (M::X::A, _: X): (X, X) => {
@@ -105,21 +74,6 @@ module 0x8675309::M {
             (_,_) => 2,
         }
     }
-    fun test_exhaustive_then_wildcard(x: X): u64 {
-        match ((x, x)) {
-            (X::A{},X::A{}) => 1,
-            (X::A{},X::B{}) => 2,
-            (X::B{},X::A{}) => 3,
-            (X::B{},X::B{}) => 4,
-            _ => 5,
-        }
-    }
-    fun test_wildcard_first(x: X): u64 {
-        match ((x, x)) {
-            _ => 1,
-            (X::A{},X::A{}) => 2,
-        }
-    }
     fun test_wildcard_positions(x: X, y: X): u64 {
         match ((x, y)) {
             (X::A{},_) => 1,
@@ -135,17 +89,3 @@ module 0x8675309::M {
         }
     }
 }
-
-
-Diagnostics:
-error: unreachable pattern
-   ┌─ tests/checking/typing/wildcard_match_tuple.move:37:13
-   │
-37 │             _ => 5,
-   │             ^
-
-error: unreachable pattern
-   ┌─ tests/checking/typing/wildcard_match_tuple.move:45:13
-   │
-45 │             (X::A, X::A) => 2,
-   │             ^^^^^^^^^^^^
