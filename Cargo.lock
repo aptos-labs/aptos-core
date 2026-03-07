@@ -10130,8 +10130,10 @@ checksum = "d2fabcfbdc87f4758337ca535fb41a6d701b65693ce38287d856d1674551ec9b"
 name = "global-context"
 version = "0.1.0"
 dependencies = [
- "ahash 0.8.11",
+ "ahash 0.8.12",
+ "arc-swap",
  "bumpalo",
+ "criterion",
  "crossbeam",
  "dashmap 7.0.0-rc2",
  "move-binary-format",
@@ -10139,6 +10141,7 @@ dependencies = [
  "once_cell",
  "parking_lot 0.12.1",
  "prometheus",
+ "smallvec",
 ]
 
 [[package]]

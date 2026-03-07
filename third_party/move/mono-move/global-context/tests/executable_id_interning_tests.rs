@@ -16,7 +16,7 @@ use std::{
 
 #[test]
 fn test_same_module_id_single_thread() {
-    let ctx = GlobalContext::new();
+    let ctx = GlobalContext::with_num_workers(1);
     let execution_ctx = ctx.execution_context(0).unwrap();
 
     let addr = AccountAddress::ONE;
@@ -33,7 +33,7 @@ fn test_same_module_id_single_thread() {
 
 #[test]
 fn test_different_module_id_single_thread() {
-    let ctx = GlobalContext::new();
+    let ctx = GlobalContext::with_num_workers(1);
     let execution_ctx = ctx.execution_context(0).unwrap();
 
     let module_id = ModuleId::new(AccountAddress::ONE, Identifier::new("module1").unwrap());
@@ -48,9 +48,9 @@ fn test_different_module_id_single_thread() {
 
 #[test]
 fn test_concurrent_same_module_id() {
-    let ctx = Arc::new(GlobalContext::new());
-
     let num_threads = 4;
+
+    let ctx = Arc::new(GlobalContext::with_num_workers(num_threads));
     let barrier = Arc::new(Barrier::new(num_threads));
     let module_id = Arc::new(ModuleId::new(
         AccountAddress::ONE,
@@ -90,12 +90,12 @@ fn test_concurrent_same_module_id() {
 
 #[test]
 fn test_concurrent_different_module_ids() {
-    let ctx = Arc::new(GlobalContext::new());
-
     let num_threads = 4;
-    let barrier = Arc::new(Barrier::new(num_threads));
 
+    let ctx = Arc::new(GlobalContext::with_num_workers(num_threads));
+    let barrier = Arc::new(Barrier::new(num_threads));
     let addresses = Arc::new(Mutex::new(HashSet::new()));
+
     let handles: Vec<_> = (0..num_threads)
         .map(|thread_id| {
             let ctx = Arc::clone(&ctx);

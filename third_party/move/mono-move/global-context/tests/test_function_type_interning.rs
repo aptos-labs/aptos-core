@@ -11,7 +11,7 @@ use move_core_types::{
 
 #[test]
 fn test_simple_function_type_interning() {
-    let context = GlobalContext::new();
+    let context = GlobalContext::with_num_workers(1);
     let exec_ctx = context.execution_context(0).unwrap();
 
     // Create a simple function type: fn(U64) -> Bool
@@ -35,7 +35,7 @@ fn test_simple_function_type_interning() {
 
 #[test]
 fn test_function_type_with_references() {
-    let context = GlobalContext::new();
+    let context = GlobalContext::with_num_workers(1);
     let exec_ctx = context.execution_context(0).unwrap();
 
     // Create function type: fn(&U64, &mut Bool) -> U8
@@ -65,7 +65,7 @@ fn test_function_type_with_references() {
 
 #[test]
 fn test_different_function_types() {
-    let context = GlobalContext::new();
+    let context = GlobalContext::with_num_workers(1);
     let exec_ctx = context.execution_context(0).unwrap();
 
     // Create two different function types
@@ -90,7 +90,7 @@ fn test_different_function_types() {
 
 #[test]
 fn test_function_type_with_multiple_returns() {
-    let context = GlobalContext::new();
+    let context = GlobalContext::with_num_workers(1);
     let exec_ctx = context.execution_context(0).unwrap();
 
     // Create function type: fn(U64) -> (Bool, U8)
@@ -120,7 +120,7 @@ fn test_function_type_with_multiple_returns() {
 
 #[test]
 fn test_function_type_abilities() {
-    let context = GlobalContext::new();
+    let context = GlobalContext::with_num_workers(1);
     let exec_ctx = context.execution_context(0).unwrap();
 
     // Create two function types with different abilities

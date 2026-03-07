@@ -14,7 +14,7 @@ use std::{
 
 #[test]
 fn test_same_struct_name_single_thread() {
-    let ctx = GlobalContext::new();
+    let ctx = GlobalContext::with_num_workers(1);
     let execution_ctx = ctx.execution_context(0).unwrap();
 
     let name = Identifier::new("Account").unwrap();
@@ -28,7 +28,7 @@ fn test_same_struct_name_single_thread() {
 
 #[test]
 fn test_different_struct_names_single_thread() {
-    let ctx = GlobalContext::new();
+    let ctx = GlobalContext::with_num_workers(1);
     let execution_ctx = ctx.execution_context(0).unwrap();
 
     let name1 = Identifier::new("Account").unwrap();
@@ -44,9 +44,9 @@ fn test_different_struct_names_single_thread() {
 
 #[test]
 fn test_concurrent_same_struct_name() {
-    let ctx = Arc::new(GlobalContext::new());
-
     let num_threads = 4;
+
+    let ctx = Arc::new(GlobalContext::with_num_workers(num_threads));
     let barrier = Arc::new(Barrier::new(num_threads));
     let name = Arc::new(Identifier::new("Account").unwrap());
 
@@ -82,9 +82,9 @@ fn test_concurrent_same_struct_name() {
 
 #[test]
 fn test_concurrent_different_struct_names() {
-    let ctx = Arc::new(GlobalContext::new());
-
     let num_threads = 4;
+
+    let ctx = Arc::new(GlobalContext::with_num_workers(num_threads));
     let barrier = Arc::new(Barrier::new(num_threads));
 
     let addresses = Arc::new(Mutex::new(HashSet::new()));
@@ -121,7 +121,7 @@ fn test_concurrent_different_struct_names() {
 
 #[test]
 fn test_struct_and_function_name_collision() {
-    let ctx = GlobalContext::new();
+    let ctx = GlobalContext::with_num_workers(1);
     let execution_ctx = ctx.execution_context(0).unwrap();
 
     let name = Identifier::new("a").unwrap();

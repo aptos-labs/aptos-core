@@ -13,11 +13,20 @@ rust-version = { workspace = true }
 
 [dependencies]
 ahash = { workspace = true }
+arc-swap = { workspace = true }
 bumpalo = { workspace = true }
 crossbeam = { workspace = true }
 dashmap = { workspace = true }
 once_cell = { workspace = true }
 parking_lot = { workspace = true }
 prometheus = { workspace = true }
+smallvec = { workspace = true }
 move-core-types = { workspace = true }
 move-binary-format = { workspace = true }
+
+[dev-dependencies]
+criterion = { workspace = true }
+
+[[bench]]
+name = "alloc"
+harness = false

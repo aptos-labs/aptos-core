@@ -8,7 +8,7 @@ use move_core_types::language_storage::TypeTag;
 
 #[test]
 fn test_structural_equality_deduplication() {
-    let context = GlobalContext::new();
+    let context = GlobalContext::with_num_workers(1);
     let exec_ctx1 = context.execution_context(0).unwrap();
     let exec_ctx2 = context.execution_context(1).unwrap();
 
@@ -32,7 +32,7 @@ fn test_structural_equality_complex_types() {
         account_address::AccountAddress, identifier::Identifier, language_storage::StructTag,
     };
 
-    let context = GlobalContext::new();
+    let context = GlobalContext::with_num_workers(2);
     let exec_ctx1 = context.execution_context(0).unwrap();
     let exec_ctx2 = context.execution_context(1).unwrap();
 
@@ -65,7 +65,7 @@ fn test_structural_equality_complex_types() {
 
 #[test]
 fn test_type_list_structural_equality() {
-    let context = GlobalContext::new();
+    let context = GlobalContext::with_num_workers(2);
     let exec_ctx1 = context.execution_context(0).unwrap();
     let exec_ctx2 = context.execution_context(1).unwrap();
 

@@ -9,10 +9,18 @@
 //! - **Maintenance phase**: A single exclusive [`MaintenanceContext`] guard for inter-block
 //!   maintenance operations.
 
-pub mod arena;
+mod alloc;
+pub use alloc::{ArenaGuard, ArenaPool, GlobalArena};
+pub mod configs;
 mod context;
-pub use context::{ExecutionContext, GlobalContext, GlobalContextConfig, MaintenanceContext};
+pub use context::{ExecutionContext, GlobalContext, MaintenanceContext};
 pub(crate) mod counters;
+mod executable;
+pub use executable::{Executable, Function};
+mod executable_cache;
+pub use executable_cache::ExecutableCache;
 mod interner;
 mod types;
+pub mod version;
+
 pub use types::{ExecutableId, FunctionId, StructId, Type, TypeList};

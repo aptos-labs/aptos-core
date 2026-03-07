@@ -16,14 +16,33 @@
 //! - [`TypeTagListKey`]: key for [`TypeTag`] list lookups,
 //! - [`SignatureTokenListKey`]: key for [`SignatureToken`] list lookups,
 //!
-//! All keys implement **compatible** hashing to enable cross-format
-//! deduplication.
+//! All keys implement **compatible** hashing and equivalence to enable
+//! cross-format deduplication.
+//!
+//! # Safety
+//!
+//! Key types ([`IdentifierKey`], [`ExecutableIdKey`], [`TypeKey`],
+//! [`TypeListKey`]) dereference [`GlobalArenaPtr`] in their [Hash], [PartialEq]
+//! and [`Equivalent`] trait implementations. This is sound because:
+//!
+//! 1. [`DashMapInterner::get`] and [`DashMapInterner::insert`] require
+//!    reference to [`ExecutionContextScope`].
+//! 2. Only [crate::ExecutionContext] can create this scope.
+//! 3. Therefore [Hash], [PartialEq] and [`Equivalent`] are only invoked when
+//!    the execution context guard is held, keeping arena pointers stable.
+//!
+//! [`DashMapInterner::reset`] requires a [`MaintenanceContextScope`], which
+//! proves a [`crate::MaintenanceContext`] write guard is held. This ensures
+//! no concurrent execution contexts exist when the interner map is cleared,
+//! preventing any arena pointer from being observed after the map (and
+//! subsequently the arena) has been reset.
 
 use crate::{
-    arena::ArenaPtr,
+    alloc::GlobalArenaPtr,
+    context::{ExecutionContextScope, MaintenanceContextScope},
     types::{ExecutableIdInternal, TypeInternal},
 };
-use dashmap::{DashMap, Equivalent};
+use dashmap::{mapref::entry, DashMap, Equivalent};
 use move_binary_format::{
     access::ModuleAccess,
     file_format::{SignatureToken, StructHandleIndex},
@@ -39,26 +58,36 @@ use std::{
     hash::{Hash, Hasher},
 };
 
-/// Interned based on [`DashMap`]. Stores arena-allocated pointers, deduplicating them
-/// based on structural hash and equality.
+/// Interner based on [`DashMap`]. Stores global arena-allocated pointers,
+/// deduplicating them based on structural hash and equality.
 pub(crate) struct DashMapInterner<K, T: ?Sized> {
-    inner: DashMap<K, ArenaPtr<T>>,
+    // Note: using ahash for fast yet DoS resistant lookups.
+    inner: DashMap<K, GlobalArenaPtr<T>, ahash::RandomState>,
 }
 
 impl<K, T> DashMapInterner<K, T>
 where
-    K: Hash + Eq + From<ArenaPtr<T>>,
+    K: Hash + Eq + From<GlobalArenaPtr<T>>,
     T: ?Sized,
 {
     /// Creates a new interner with default settings.
     pub(crate) fn new() -> Self {
         Self {
-            inner: DashMap::new(),
+            inner: DashMap::with_hasher(ahash::RandomState::new()),
         }
     }
 
-    /// Returns the pointer to interned data if it exists, and [`None`] otherwise.
-    pub(crate) fn get<Q>(&self, key: &Q) -> Option<ArenaPtr<T>>
+    /// Returns the pointer to interned data if it exists, and
+    /// [`None`] otherwise.
+    ///
+    /// Requires [`ExecutionContextScope`] to prove that a
+    /// [crate::ExecutionContext] guard is held, keeping arena pointers
+    /// stable for the duration of this call.
+    pub(crate) fn get<Q>(
+        &self,
+        key: &Q,
+        _scope: &ExecutionContextScope<'_>,
+    ) -> Option<GlobalArenaPtr<T>>
     where
         Q: Hash + Equivalent<K> + ?Sized,
     {
@@ -66,14 +95,22 @@ where
     }
 
     /// Inserts the pointer to the interner (key is derived from the pointer
-    /// and uses structural hash and equality). If the entry exists (e.g., due
-    /// to a race condition), does not insert the value and returns the existing
-    /// pointer instead. If the entry does not exist, inserts the pointer and
-    /// returns its copy.
-    pub(crate) fn insert(&self, ptr: ArenaPtr<T>) -> ArenaPtr<T> {
+    /// and **must** have structural hash and equality). If the entry exists
+    /// (e.g., due to a race condition), does not insert the value and returns
+    /// the existing pointer instead. If the entry does not exist, inserts the
+    /// pointer and returns its copy.
+    ///
+    /// Requires [`ExecutionContextScope`] to prove that an
+    /// `ExecutionContext` guard is held, keeping arena pointers stable
+    /// for the duration of this call.
+    pub(crate) fn insert(
+        &self,
+        ptr: GlobalArenaPtr<T>,
+        _scope: &ExecutionContextScope<'_>,
+    ) -> GlobalArenaPtr<T> {
         match self.inner.entry(K::from(ptr)) {
-            dashmap::mapref::entry::Entry::Occupied(entry) => *entry.get(),
-            dashmap::mapref::entry::Entry::Vacant(entry) => *entry.insert(ptr),
+            entry::Entry::Occupied(entry) => *entry.get(),
+            entry::Entry::Vacant(entry) => *entry.insert(ptr),
         }
     }
 
@@ -82,15 +119,19 @@ where
         self.inner.len()
     }
 
-    /// Removes all entries.
-    pub(crate) fn clear(&self) {
+    /// Removes all entries from the interner's cache.
+    ///
+    /// Requires [`MaintenanceContextScope`] to prove that a
+    /// [`crate::MaintenanceContext`] guard is held, ensuring no
+    /// concurrent execution contexts exist.
+    pub(crate) fn reset(&self, _scope: &MaintenanceContextScope<'_>) {
         self.inner.clear()
     }
 }
 
 impl<K, T> Default for DashMapInterner<K, T>
 where
-    K: Hash + Eq + From<ArenaPtr<T>>,
+    K: Hash + Eq + From<GlobalArenaPtr<T>>,
     T: ?Sized,
 {
     fn default() -> Self {
@@ -121,19 +162,20 @@ mod type_discriminant {
     pub(crate) const REFERENCE: u8 = 17;
     pub(crate) const REFERENCE_MUT: u8 = 18;
     pub(crate) const FUNCTION: u8 = 19;
+    pub(crate) const TYPE_PARAM: u8 = 20;
 }
 
 /// Key for interned identifiers.
-pub(crate) struct IdentifierKey(ArenaPtr<str>);
+pub(crate) struct IdentifierKey(GlobalArenaPtr<str>);
 
 /// Key for interned executable IDs.
-pub(crate) struct ExecutableIdKey(ArenaPtr<ExecutableIdInternal>);
+pub(crate) struct ExecutableIdKey(GlobalArenaPtr<ExecutableIdInternal>);
 
 /// Key for interned types.
-pub(crate) struct TypeKey(ArenaPtr<TypeInternal>);
+pub(crate) struct TypeKey(GlobalArenaPtr<TypeInternal>);
 
 /// Key for interned type lists.
-pub(crate) struct TypeListKey(ArenaPtr<[ArenaPtr<TypeInternal>]>);
+pub(crate) struct TypeListKey(GlobalArenaPtr<[GlobalArenaPtr<TypeInternal>]>);
 
 /// Lookup key for interned types.
 pub(crate) struct TypeTagKey<'a>(pub(crate) &'a TypeTag);
@@ -148,8 +190,8 @@ pub(crate) struct SignatureTokenKey<'a>(
 /// Lookup key for interned type lists.
 pub(crate) struct TypeTagListKey<'a>(pub(crate) &'a [TypeTag]);
 
-/// Lookup key for interned type lists. Requires module or script context to resolve
-/// struct handles.
+/// Lookup key for interned type lists. Requires module or script
+/// context to resolve struct handles.
 pub(crate) struct SignatureTokenListKey<'a>(
     pub(crate) &'a [SignatureToken],
     pub(crate) &'a CompiledModule,
@@ -157,8 +199,8 @@ pub(crate) struct SignatureTokenListKey<'a>(
 
 macro_rules! impl_from {
     ($ty:ty, $key:ty) => {
-        impl From<ArenaPtr<$ty>> for $key {
-            fn from(value: ArenaPtr<$ty>) -> Self {
+        impl From<GlobalArenaPtr<$ty>> for $key {
+            fn from(value: GlobalArenaPtr<$ty>) -> Self {
                 Self(value)
             }
         }
@@ -168,12 +210,14 @@ macro_rules! impl_from {
 impl_from!(str, IdentifierKey);
 impl_from!(ExecutableIdInternal, ExecutableIdKey);
 impl_from!(TypeInternal, TypeKey);
-impl_from!([ArenaPtr<TypeInternal>], TypeListKey);
+impl_from!([GlobalArenaPtr<TypeInternal>], TypeListKey);
 
 impl IdentifierKey {
     fn as_str(&self) -> &str {
-        // SAFETY: identifier keys are only created and hashed within ExecutionContext scope,
-        // The arena remains valid during hashing.
+        // SAFETY: Only reachable through DashMapInterner, which requires
+        // ExecutionContextScope.
+        // The scope proves an ExecutionContext guard is held,
+        // keeping the arena stable.
         unsafe { self.0.as_ref_unchecked() }
     }
 }
@@ -197,7 +241,6 @@ impl Borrow<str> for IdentifierKey {
         self.as_str()
     }
 }
-
 
 fn hash_function_param_or_return_tag<H: Hasher>(tag: &FunctionParamOrReturnTag, state: &mut H) {
     match tag {
@@ -349,20 +392,18 @@ impl Hash for SignatureTokenKey<'_> {
                 abilities.hash(state);
             },
 
-            SignatureToken::TypeParameter(_) => {
-                panic!("Type parameters cannot be interned!")
+            SignatureToken::TypeParameter(idx) => {
+                type_discriminant::TYPE_PARAM.hash(state);
+                idx.hash(state);
             },
         }
     }
 }
 
-// SAFETY: TypeKey is only constructed within ExecutionContext methods. The
-// arena remains valid during hashing because:
-// 1. ExecutionContext holds RwLockReadGuard preventing flush
-// 2. Hash is called synchronously within same guard scope
-// 3. No suspension points between construction and hash
 impl Hash for TypeKey {
     fn hash<H: Hasher>(&self, state: &mut H) {
+        // SAFETY: Only reachable through DashMapInterner, which requires
+        // ExecutionContextScope.
         match unsafe { self.0.as_ref_unchecked() } {
             TypeInternal::Bool => type_discriminant::BOOL.hash(state),
             TypeInternal::U8 => type_discriminant::U8.hash(state),
@@ -401,11 +442,14 @@ impl Hash for TypeKey {
                 type_args,
             } => {
                 type_discriminant::STRUCT.hash(state);
-                // SAFETY: Already within ExecutionContext scope per impl safety comment
-                let module_id_ref = unsafe { module_id.as_ref_unchecked() };
-                module_id_ref.address.hash(state);
-                module_id_ref.name.hash(state);
+
+                // SAFETY: Only reachable via DashMapInterner, which requires
+                // ExecutionContextScope. The scope proves the arena is stable.
+                let module_id = unsafe { module_id.as_ref_unchecked() };
+                module_id.address.hash(state);
+                unsafe { module_id.name.as_ref_unchecked() }.hash(state);
                 unsafe { name.as_ref_unchecked() }.hash(state);
+
                 TypeListKey(*type_args).hash(state);
             },
 
@@ -418,6 +462,11 @@ impl Hash for TypeKey {
                 TypeListKey(*args).hash(state);
                 TypeListKey(*results).hash(state);
                 abilities.hash(state);
+            },
+
+            TypeInternal::TyParam(idx) => {
+                type_discriminant::TYPE_PARAM.hash(state);
+                idx.hash(state);
             },
         }
     }
@@ -441,13 +490,10 @@ impl Hash for SignatureTokenListKey<'_> {
     }
 }
 
-// SAFETY: TypeListKey is only constructed within ExecutionContext methods. The
-// arena remains valid during hashing because:
-// 1. ExecutionContext holds RwLockReadGuard preventing flush
-// 2. Hash is called synchronously within same guard scope
-// 3. No suspension points between construction and hash
 impl Hash for TypeListKey {
     fn hash<H: Hasher>(&self, state: &mut H) {
+        // SAFETY: Only reachable through DashMapInterner, which requires
+        // ExecutionContextScope.
         let types = unsafe { self.0.as_ref_unchecked() };
         types.len().hash(state);
         for ty in types {
@@ -456,18 +502,14 @@ impl Hash for TypeListKey {
     }
 }
 
-// Structural equality implementations - must match structural hashing
-
-// SAFETY: TypeKey is only constructed within ExecutionContext methods. The
-// arena remains valid during equality check because:
-// 1. ExecutionContext holds RwLockReadGuard preventing flush
-// 2. Eq is called synchronously within same guard scope
-// 3. No suspension points between construction and eq
 impl PartialEq for TypeKey {
     fn eq(&self, other: &Self) -> bool {
-        match (unsafe { self.0.as_ref_unchecked() }, unsafe {
-            other.0.as_ref_unchecked()
-        }) {
+        // SAFETY: Only reachable through DashMapInterner, which requires
+        // ExecutionContextScope.
+        let this = unsafe { self.0.as_ref_unchecked() };
+        let other = unsafe { other.0.as_ref_unchecked() };
+
+        match (this, other) {
             (TypeInternal::Bool, TypeInternal::Bool)
             | (TypeInternal::U8, TypeInternal::U8)
             | (TypeInternal::U16, TypeInternal::U16)
@@ -502,7 +544,8 @@ impl PartialEq for TypeKey {
                     type_args: other_type_args,
                 },
             ) => {
-                // SAFETY: Already within ExecutionContext scope per impl safety comment
+                // SAFETY: Only reachable via DashMapInterner, which requires
+                // ExecutionContextScope. The scope proves the arena is stable.
                 let module_id_ref = unsafe { module_id.as_ref_unchecked() };
                 let other_module_id_ref = unsafe { other_module_id.as_ref_unchecked() };
                 module_id_ref.address == other_module_id_ref.address
@@ -529,6 +572,8 @@ impl PartialEq for TypeKey {
                     && abilities == other_abilities
             },
 
+            (TypeInternal::TyParam(a), TypeInternal::TyParam(b)) => a == b,
+
             _ => false,
         }
     }
@@ -536,13 +581,10 @@ impl PartialEq for TypeKey {
 
 impl Eq for TypeKey {}
 
-// SAFETY: TypeListKey is only constructed within ExecutionContext methods. The
-// arena remains valid during equality check because:
-// 1. ExecutionContext holds RwLockReadGuard preventing flush
-// 2. Eq is called synchronously within same guard scope
-// 3. No suspension points between construction and eq
 impl PartialEq for TypeListKey {
     fn eq(&self, other: &Self) -> bool {
+        // SAFETY: Only reachable through DashMapInterner, which requires
+        // ExecutionContextScope.
         let types = unsafe { self.0.as_ref_unchecked() };
         let other_types = unsafe { other.0.as_ref_unchecked() };
 
@@ -559,14 +601,14 @@ impl PartialEq for TypeListKey {
 
 impl Eq for TypeListKey {}
 
-// Helper function to compare FunctionParamOrReturnTag with Type
 fn function_param_or_return_tag_eq_type(
     tag: &FunctionParamOrReturnTag,
-    ty: &ArenaPtr<TypeInternal>,
+    ty: &GlobalArenaPtr<TypeInternal>,
 ) -> bool {
-    // SAFETY: Called within TypeTagKey::equivalent which is already in ExecutionContext scope
     match tag {
         FunctionParamOrReturnTag::Reference(inner_tag) => {
+            // SAFETY: Only reachable through DashMapInterner, which requires
+            // ExecutionContextScope. The scope proves the arena is stable.
             if let TypeInternal::Ref(ty) = unsafe { ty.as_ref_unchecked() } {
                 TypeTagKey(inner_tag).equivalent(&TypeKey(*ty))
             } else {
@@ -574,6 +616,8 @@ fn function_param_or_return_tag_eq_type(
             }
         },
         FunctionParamOrReturnTag::MutableReference(inner_tag) => {
+            // SAFETY: Only reachable through DashMapInterner, which requires
+            // ExecutionContextScope. The scope proves the arena is stable.
             if let TypeInternal::RefMut(ty) = unsafe { ty.as_ref_unchecked() } {
                 TypeTagKey(inner_tag).equivalent(&TypeKey(*ty))
             } else {
@@ -586,14 +630,13 @@ fn function_param_or_return_tag_eq_type(
     }
 }
 
-// SAFETY: TypeTagKey is used as a borrowed key for DashMap lookups. The key's
-// TypeKey contains ArenaPtr which is dereferenced here. This is safe because:
-// 1. Equivalent is called during DashMap operations within ExecutionContext
-// 2. ExecutionContext holds RwLockReadGuard preventing flush
-// 3. No suspension points during the lookup operation
 impl Equivalent<TypeKey> for TypeTagKey<'_> {
     fn equivalent(&self, key: &TypeKey) -> bool {
-        match (self.0, unsafe { key.0.as_ref_unchecked() }) {
+        // SAFETY: Only reachable through DashMapInterner, which requires
+        // ExecutionContextScope.
+        let other = unsafe { key.0.as_ref_unchecked() };
+
+        match (self.0, other) {
             (TypeTag::Bool, TypeInternal::Bool)
             | (TypeTag::U8, TypeInternal::U8)
             | (TypeTag::U16, TypeInternal::U16)
@@ -622,7 +665,8 @@ impl Equivalent<TypeKey> for TypeTagKey<'_> {
                     type_args,
                 },
             ) => {
-                // SAFETY: Dereferencing ArenaPtr fields within same ExecutionContext scope
+                // SAFETY: Only reachable via DashMapInterner, which requires
+                // ExecutionContextScope. The scope proves the arena is stable.
                 let module_id_ref = unsafe { module_id.as_ref_unchecked() };
                 module_id_ref.address == struct_tag.address
                     && unsafe { module_id_ref.name.as_ref_unchecked() }
@@ -639,37 +683,27 @@ impl Equivalent<TypeKey> for TypeTagKey<'_> {
                     abilities,
                 },
             ) => {
-                // Check abilities first
                 if &function_tag.abilities != abilities {
                     return false;
                 }
 
-                // SAFETY: Dereferencing ArenaPtr fields within same ExecutionContext scope
+                // SAFETY: Only reachable via DashMapInterner, which requires
+                // ExecutionContextScope. The scope proves the arena is stable.
                 let args_list = unsafe { args.as_ref_unchecked() };
                 let results_list = unsafe { results.as_ref_unchecked() };
 
-                // Check lengths
                 if function_tag.args.len() != args_list.len()
                     || function_tag.results.len() != results_list.len()
                 {
                     return false;
                 }
 
-                // Compare arguments
-                for (tag_arg, ty) in function_tag.args.iter().zip(args_list.iter()) {
-                    if !function_param_or_return_tag_eq_type(tag_arg, ty) {
-                        return false;
-                    }
-                }
-
-                // Compare results
-                for (tag_result, ty) in function_tag.results.iter().zip(results_list.iter()) {
-                    if !function_param_or_return_tag_eq_type(tag_result, ty) {
-                        return false;
-                    }
-                }
-
-                true
+                function_tag
+                    .args
+                    .iter()
+                    .zip(args_list.iter())
+                    .chain(function_tag.results.iter().zip(results_list.iter()))
+                    .all(|(tag, ty)| function_param_or_return_tag_eq_type(tag, ty))
             },
 
             _ => false,
@@ -677,14 +711,13 @@ impl Equivalent<TypeKey> for TypeTagKey<'_> {
     }
 }
 
-// SAFETY: SignatureTokenKey is used as a borrowed key for DashMap lookups. The
-// key's TypeKey contains ArenaPtr which is dereferenced here. This is safe because:
-// 1. Equivalent is called during DashMap operations within ExecutionContext
-// 2. ExecutionContext holds RwLockReadGuard preventing flush
-// 3. No suspension points during the lookup operation
 impl Equivalent<TypeKey> for SignatureTokenKey<'_> {
     fn equivalent(&self, key: &TypeKey) -> bool {
-        match (self.0, unsafe { key.0.as_ref_unchecked() }) {
+        // SAFETY: Only reachable through DashMapInterner, which requires
+        // ExecutionContextScope.
+        let other = unsafe { key.0.as_ref_unchecked() };
+
+        match (self.0, other) {
             (SignatureToken::Bool, TypeInternal::Bool)
             | (SignatureToken::U8, TypeInternal::U8)
             | (SignatureToken::U16, TypeInternal::U16)
@@ -718,7 +751,8 @@ impl Equivalent<TypeKey> for SignatureTokenKey<'_> {
                 let struct_handle = self.1.struct_handle_at(*idx);
                 let module_handle = self.1.module_handle_at(struct_handle.module);
 
-                // SAFETY: Dereferencing ArenaPtr fields within same ExecutionContext scope
+                // SAFETY: Only reachable via DashMapInterner, which requires
+                // ExecutionContextScope. The scope proves the arena is stable.
                 let module_id_ref = unsafe { module_id.as_ref_unchecked() };
                 &module_id_ref.address == self.1.address_identifier_at(module_handle.address)
                     && unsafe { module_id_ref.name.as_ref_unchecked() }
@@ -739,7 +773,8 @@ impl Equivalent<TypeKey> for SignatureTokenKey<'_> {
                 let struct_handle = self.1.struct_handle_at(*idx);
                 let module_handle = self.1.module_handle_at(struct_handle.module);
 
-                // SAFETY: Dereferencing ArenaPtr fields within same ExecutionContext scope
+                // SAFETY: Only reachable via DashMapInterner, which requires
+                // ExecutionContextScope. The scope proves the arena is stable.
                 let module_id_ref = unsafe { module_id.as_ref_unchecked() };
                 &module_id_ref.address == self.1.address_identifier_at(module_handle.address)
                     && unsafe { module_id_ref.name.as_ref_unchecked() }
@@ -762,19 +797,17 @@ impl Equivalent<TypeKey> for SignatureTokenKey<'_> {
                     && tok_abilities == abilities
             },
 
-            (SignatureToken::TypeParameter(_), _) => {
-                panic!("TypeParameter cannot be interned")
-            },
+            (SignatureToken::TypeParameter(idx), TypeInternal::TyParam(n)) => idx == n,
 
             _ => false,
         }
     }
 }
 
-// SAFETY: TypeTagListKey is used as a borrowed key for DashMap lookups. This is
-// safe for the same reasons as TypeTagKey - called within ExecutionContext scope.
 impl Equivalent<TypeListKey> for TypeTagListKey<'_> {
     fn equivalent(&self, key: &TypeListKey) -> bool {
+        // SAFETY: Only reachable through DashMapInterner, which requires
+        // ExecutionContextScope.
         let types = unsafe { key.0.as_ref_unchecked() };
         if self.0.len() != types.len() {
             return false;
@@ -787,11 +820,10 @@ impl Equivalent<TypeListKey> for TypeTagListKey<'_> {
     }
 }
 
-// SAFETY: SignatureTokenListKey is used as a borrowed key for DashMap lookups.
-// This is safe for the same reasons as SignatureTokenKey - called within
-// ExecutionContext scope.
 impl Equivalent<TypeListKey> for SignatureTokenListKey<'_> {
     fn equivalent(&self, key: &TypeListKey) -> bool {
+        // SAFETY: Only reachable through DashMapInterner, which requires
+        // ExecutionContextScope.
         let types = unsafe { key.0.as_ref_unchecked() };
         if self.0.len() != types.len() {
             return false;
@@ -806,15 +838,15 @@ impl Equivalent<TypeListKey> for SignatureTokenListKey<'_> {
 
 impl ExecutableIdKey {
     fn address(&self) -> &AccountAddress {
-        // SAFETY: ExecutableId is only created and hashed within ExecutionContext scope.
-        // The arena remains valid during hashing.
+        // SAFETY: Only reachable through DashMapInterner, which requires
+        // ExecutionContextScope.
         let id = unsafe { self.0.as_ref_unchecked() };
         &id.address
     }
 
     fn name(&self) -> &str {
-        // SAFETY: ExecutableId is only created and hashed within ExecutionContext scope.
-        // The arena remains valid during hashing.
+        // SAFETY: Only reachable through DashMapInterner, which requires
+        // ExecutionContextScope.
         let id = unsafe { self.0.as_ref_unchecked() };
         unsafe { id.name.as_ref_unchecked() }
     }

@@ -14,7 +14,7 @@ use std::{
 
 #[test]
 fn test_same_function_name_single_thread() {
-    let ctx = GlobalContext::new();
+    let ctx = GlobalContext::with_num_workers(1);
     let execution_ctx = ctx.execution_context(0).unwrap();
 
     let name = Identifier::new("transfer").unwrap();
@@ -28,7 +28,7 @@ fn test_same_function_name_single_thread() {
 
 #[test]
 fn test_different_function_names_single_thread() {
-    let ctx = GlobalContext::new();
+    let ctx = GlobalContext::with_num_workers(1);
     let execution_ctx = ctx.execution_context(0).unwrap();
 
     let name1 = Identifier::new("transfer").unwrap();
@@ -44,9 +44,9 @@ fn test_different_function_names_single_thread() {
 
 #[test]
 fn test_concurrent_same_function_name() {
-    let ctx = Arc::new(GlobalContext::new());
-
     let num_threads = 4;
+
+    let ctx = Arc::new(GlobalContext::with_num_workers(num_threads));
     let barrier = Arc::new(Barrier::new(num_threads));
     let name = Arc::new(Identifier::new("transfer").unwrap());
 
@@ -82,12 +82,12 @@ fn test_concurrent_same_function_name() {
 
 #[test]
 fn test_concurrent_different_function_names() {
-    let ctx = Arc::new(GlobalContext::new());
-
     let num_threads = 4;
-    let barrier = Arc::new(Barrier::new(num_threads));
 
+    let ctx = Arc::new(GlobalContext::with_num_workers(num_threads));
+    let barrier = Arc::new(Barrier::new(num_threads));
     let addresses = Arc::new(Mutex::new(HashSet::new()));
+
     let handles: Vec<_> = (0..num_threads)
         .map(|thread_id| {
             let ctx = Arc::clone(&ctx);
