@@ -183,9 +183,15 @@ pub struct GenerateKey {
     /// longer ones
     #[clap(long)]
     pub vanity_prefix: Option<String>,
-    /// Use this flag when vanity prefix is for a multisig account. This mines a private key for
-    /// a single signer account that can, as its first transaction, create a multisig account with
-    /// the given vanity prefix
+    /// Vanity postfix that resultant account address should end with, e.g. aceface. Each additional
+    /// character multiplies by a factor of 16 the computational difficulty associated with
+    /// generating an address, so try out shorter postfixes first and be prepared to wait for longer
+    /// ones
+    #[clap(long)]
+    pub vanity_postfix: Option<String>,
+    /// Use this flag when vanity prefix and postfix are for a multisig account. This mines a private
+    /// key for a single signer account that can, as its first transaction, create a multisig account
+    /// with the given vanity prefix and postfix
     #[clap(long)]
     pub vanity_multisig: bool,
     #[clap(flatten)]
@@ -201,17 +207,19 @@ impl CliCommand<HashMap<&'static str, PathBuf>> for GenerateKey {
     }
 
     async fn execute(self) -> CliTypedResult<HashMap<&'static str, PathBuf>> {
-        if self.vanity_prefix.is_some() && !matches!(self.key_type, KeyType::Ed25519) {
-            return Err(CliError::CommandArgumentError(format!(
-                "Vanity prefixes are only accepted for {} keys",
-                KeyType::Ed25519
-            )));
-        }
-        if self.vanity_multisig && self.vanity_prefix.is_none() {
+        if self.vanity_prefix.is_some() || self.vanity_postfix.is_some() {
+            if !matches!(self.key_type, KeyType::Ed25519) {
+                return Err(CliError::CommandArgumentError(format!(
+                    "Vanity prefixes or postfixes are only accepted for {} keys",
+                    KeyType::Ed25519
+                )));
+            }
+        } else if self.vanity_multisig {
             return Err(CliError::CommandArgumentError(
-                "No vanity prefix provided".to_string(),
+                "No vanity prefix or postfix provided".to_owned(),
             ));
         }
+
         self.save_params.check_key_file()?;
         let mut keygen = self.rng_args.key_generator()?;
         match self.key_type {
@@ -225,19 +233,18 @@ impl CliCommand<HashMap<&'static str, PathBuf>> for GenerateKey {
                 self.save_params.save_key(&private_key, "x25519")
             },
             KeyType::Ed25519 => {
-                // If no vanity prefix specified, generate a standard Ed25519 private key.
-                let private_key = if self.vanity_prefix.is_none() {
+                let private_key = if self.vanity_prefix.is_none() && self.vanity_postfix.is_none() {
                     keygen.generate_ed25519_private_key()
                 } else {
-                    // If a vanity prefix is specified, generate vanity Ed25519 account from it.
                     generate_vanity_account_ed25519(
-                        self.vanity_prefix.clone().unwrap().as_str(),
+                        self.vanity_prefix.as_deref().unwrap_or_default(),
+                        self.vanity_postfix.as_deref().unwrap_or_default(),
                         self.vanity_multisig,
                     )?
                 };
                 // Store CLI result from key save operation, to append vanity address(es) if needed.
                 let mut result_map = self.save_params.save_key(&private_key, "ed25519").unwrap();
-                if self.vanity_prefix.is_some() {
+                if self.vanity_prefix.is_some() || self.vanity_postfix.is_some() {
                     let account_address = account_address_from_public_key(
                         &ed25519::Ed25519PublicKey::from(&private_key),
                     );
