@@ -2503,7 +2503,6 @@ fn behavior_kind_from_str(s: &str) -> Option<BehaviorKind> {
         "requires_of" => Some(BehaviorKind::RequiresOf),
         "aborts_of" => Some(BehaviorKind::AbortsOf),
         "ensures_of" => Some(BehaviorKind::EnsuresOf),
-        "modifies_of" => Some(BehaviorKind::ModifiesOf),
         "result_of" => Some(BehaviorKind::ResultOf),
         _ => None,
     }
@@ -2575,7 +2574,7 @@ fn parse_behavior(context: &mut Context) -> Result<Exp_, Box<Diagnostic>> {
                 (
                     current_token_loc(context.tokens),
                     format!(
-                        "expected a behavior predicate keyword (requires_of, aborts_of, ensures_of, modifies_of, result_of), found '{}'",
+                        "expected a behavior predicate keyword (requires_of, aborts_of, ensures_of, result_of), found '{}'",
                         kind_content
                     )
                 )
@@ -4189,6 +4188,7 @@ fn parse_spec_block_member(context: &mut Context) -> Result<SpecBlockMember, Box
             "pragma" => parse_spec_pragma(context),
             "global" | "local" => parse_spec_variable(context),
             "update" => parse_spec_update(context),
+            "access_of" => parse_access_of(context),
             _ => {
                 // local is optional but supported to be able to declare variables which are
                 // named like the weak keywords above
@@ -4390,6 +4390,9 @@ fn parse_spec_function(context: &mut Context) -> Result<SpecBlockMember, Box<Dia
     consume_token(context.tokens, Tok::Colon)?;
     let return_type = parse_type(context)?;
 
+    // Parse optional access specifiers (reads/writes) before body
+    let access_specifiers = parse_spec_fun_access_specifiers(context)?;
+
     let body_start_loc = context.tokens.start_loc();
     let no_body = context.tokens.peek() != Tok::LBrace;
     let (uninterpreted, body_) = if native_opt.is_some() || no_body {
@@ -4421,7 +4424,135 @@ fn parse_spec_function(context: &mut Context) -> Result<SpecBlockMember, Box<Dia
             signature,
             uninterpreted,
             name,
+            access_specifiers,
             body,
+        },
+    ))
+}
+
+// Parse access specifiers on spec functions.
+// Accepts the full access specifier syntax (acquires/reads/writes/pure/negation);
+// validation that only reads/writes are used is done in the model builder.
+fn parse_spec_fun_access_specifiers(
+    context: &mut Context,
+) -> Result<Option<Vec<AccessSpecifier>>, Box<Diagnostic>> {
+    let mut access_specifiers = vec![];
+    let mut pure_loc = None;
+    loop {
+        let negated = if context.tokens.peek() == Tok::Exclaim {
+            require_move_2_and_advance(context, "access specifiers")?;
+            true
+        } else {
+            false
+        };
+        match context.tokens.peek() {
+            Tok::Acquires => {
+                context.tokens.advance()?;
+                access_specifiers.extend(parse_access_specifier_list(
+                    context,
+                    negated,
+                    &AccessSpecifier_::Acquires,
+                )?)
+            },
+            Tok::Identifier if context.tokens.content() == "reads" => {
+                require_move_2_and_advance(context, "access specifiers")?;
+                access_specifiers.extend(parse_access_specifier_list(
+                    context,
+                    negated,
+                    &AccessSpecifier_::Reads,
+                )?)
+            },
+            Tok::Identifier if context.tokens.content() == "writes" => {
+                require_move_2_and_advance(context, "access specifiers")?;
+                access_specifiers.extend(parse_access_specifier_list(
+                    context,
+                    negated,
+                    &AccessSpecifier_::Writes,
+                )?)
+            },
+            Tok::Identifier if context.tokens.content() == "pure" => {
+                pure_loc = Some(current_token_loc(context.tokens));
+                require_move_2_and_advance(context, "access specifiers")?;
+                if negated {
+                    return Err(Box::new(diag!(
+                        Syntax::InvalidAccessSpecifier,
+                        (pure_loc.unwrap(), "'pure' cannot be negated")
+                    )));
+                }
+            },
+            _ => break,
+        }
+    }
+    Ok(if let Some(loc) = pure_loc {
+        if !access_specifiers.is_empty() {
+            return Err(Box::new(diag!(
+                Syntax::InvalidAccessSpecifier,
+                (
+                    loc,
+                    "'pure' cannot be mixed with 'acquires'/`reads'/'writes'"
+                )
+            )));
+        }
+        Some(vec![])
+    } else if access_specifiers.is_empty() {
+        None
+    } else {
+        Some(access_specifiers)
+    })
+}
+
+// Parse an access_of specification member:
+//     "access_of" "<" Identifier ">" "(" Comma<Parameter> ")" "{" AccessSpecifiers "}" ";"
+fn parse_access_of(context: &mut Context) -> Result<SpecBlockMember, Box<Diagnostic>> {
+    let start_loc = context.tokens.start_loc();
+    // consume "access_of"
+    consume_token(context.tokens, Tok::Identifier)?;
+    // "<" Identifier ">"
+    consume_token(context.tokens, Tok::Less)?;
+    let fun_param = parse_identifier(context)?;
+    consume_token(context.tokens, Tok::Greater)?;
+    // "(" Comma<Parameter> ")"
+    let params = parse_comma_list(
+        context,
+        Tok::LParen,
+        Tok::RParen,
+        parse_parameter,
+        "a function parameter",
+    )?;
+    // "{" access specifiers "}"
+    consume_token(context.tokens, Tok::LBrace)?;
+    let mut access_specifiers = vec![];
+    loop {
+        match context.tokens.peek() {
+            Tok::Identifier if context.tokens.content() == "reads" => {
+                context.tokens.advance()?;
+                access_specifiers.extend(parse_access_specifier_list(
+                    context,
+                    false,
+                    &AccessSpecifier_::Reads,
+                )?)
+            },
+            Tok::Identifier if context.tokens.content() == "writes" => {
+                context.tokens.advance()?;
+                access_specifiers.extend(parse_access_specifier_list(
+                    context,
+                    false,
+                    &AccessSpecifier_::Writes,
+                )?)
+            },
+            _ => break,
+        }
+    }
+    consume_token(context.tokens, Tok::RBrace)?;
+    consume_token(context.tokens, Tok::Semicolon)?;
+    Ok(spanned(
+        context.tokens.file_hash(),
+        start_loc,
+        context.tokens.previous_end_loc(),
+        SpecBlockMember_::AccessOf {
+            fun_param,
+            params,
+            access_specifiers,
         },
     ))
 }

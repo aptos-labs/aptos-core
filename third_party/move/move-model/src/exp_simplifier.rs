@@ -4786,17 +4786,19 @@ mod tests {
             name: env.symbol_pool().make(name),
             type_params: vec![],
             params,
-            context_params: None,
             result_type,
             used_memory: BTreeSet::new(),
+            old_memory: BTreeSet::new(),
             uninterpreted: false,
             is_move_fun: false,
             is_native: false,
             body: Some(body),
             callees: BTreeSet::new(),
             is_recursive: RefCell::new(Some(true)),
+            uses_old: false,
+            access_specifiers: None,
             insts_using_generic_type_reflection: RefCell::new(BTreeMap::new()),
-            spec: RefCell::new(Spec::default()),
+            spec: RefCell::new(Default::default()),
         }
     }
 

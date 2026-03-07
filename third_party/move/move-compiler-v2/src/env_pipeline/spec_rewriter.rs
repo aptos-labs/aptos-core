@@ -26,12 +26,15 @@ use crate::env_pipeline::rewrite_target::{
 use itertools::Itertools;
 use log::debug;
 use move_model::{
-    ast::{ConditionKind, Exp, ExpData, GlobalInvariant, Operation, SpecBlockTarget, SpecFunDecl},
+    ast::{
+        AccessSpecifier, AccessSpecifierKind, ConditionKind, Exp, ExpData, GlobalInvariant,
+        Operation, ResourceSpecifier, SpecBlockTarget, SpecFunDecl, VisitorPosition,
+    },
     exp_rewriter::ExpRewriterFunctions,
     metadata::LanguageVersion,
     model::{
-        FunId, FunctionData, GlobalEnv, ModuleId, NodeId, Parameter, QualifiedId, SpecFunId,
-        StructEnv,
+        FunId, FunctionData, GlobalEnv, ModuleId, NodeId, Parameter, QualifiedId, QualifiedInstId,
+        SpecFunId, StructEnv, StructId,
     },
     symbol::Symbol,
     ty::ReferenceKind,
@@ -139,7 +142,8 @@ pub fn run_spec_rewriter(env: &mut GlobalEnv) {
             (SpecBlock(sb_target), Spec(spec)) => {
                 let mut converter = match sb_target {
                     SpecBlockTarget::SpecFunction(mid, spec_fun_id) => {
-                        // When the spec block is associated with a spec function, need to replace temps with parameter names
+                        // When the spec block is associated with a spec function,
+                        // replace temps with parameter names
                         let paras =
                             get_param_names(&env.get_spec_fun(mid.qualified(*spec_fun_id)).params);
                         SpecConverter::new(env, &function_mapping, true)
@@ -147,7 +151,6 @@ pub fn run_spec_rewriter(env: &mut GlobalEnv) {
                     },
                     _ => SpecConverter::new(env, &function_mapping, true),
                 };
-
                 let (changed, new_spec) = converter.rewrite_spec_descent(sb_target, &spec);
                 if changed {
                     *targets.state_mut(&target) = Spec(new_spec)
@@ -158,7 +161,8 @@ pub fn run_spec_rewriter(env: &mut GlobalEnv) {
     }
     targets.write_to_env(env);
 
-    // Now that all functions are defined, compute transitive callee and used memory.
+    // Now that all functions are defined, compute transitive callee and used memory,
+    // as well as `uses_old` and `old_memory` for dual-state spec funs.
     // Since specification functions can be recursive we compute the strongly-connected
     // components first and then process each in bottom-up order.
     let mut graph: DiGraphMap<QualifiedId<SpecFunId>, ()> = DiGraphMap::new();
@@ -172,38 +176,99 @@ pub fn run_spec_rewriter(env: &mut GlobalEnv) {
         .collect_vec();
     for qid in spec_funs {
         graph.add_node(qid);
-        let (initial_callees, initial_usage) = if let Some(def) = &env.get_spec_fun(qid).body {
-            let callees = def.called_spec_funs(env);
-            for callee in &callees {
-                graph.add_edge(qid, callee.to_qualified_id(), ());
+        let decl = env.get_spec_fun(qid);
+        let has_mut_params = decl
+            .params
+            .iter()
+            .any(|Parameter(_, ty, _)| ty.is_mutable_reference());
+        let (initial_callees, initial_usage, direct_uses_old, direct_old_memory) =
+            if let Some(def) = &decl.body {
+                let callees = def.called_spec_funs(env);
+                for callee in &callees {
+                    graph.add_edge(qid, callee.to_qualified_id(), ());
+                }
+                let usage = def.directly_used_memory(env);
+                // Detect direct old() usage and collect old_memory
+                let (direct_uses_old, direct_old_memory) = compute_direct_old_usage(def, env);
+                (callees, usage, direct_uses_old, direct_old_memory)
+            } else {
+                Default::default()
+            };
+
+        // If user-declared access specifiers exist, derive memory from them
+        let (final_usage, final_uses_old, final_old_memory) = if let Some(specifiers) =
+            &decl.access_specifiers
+        {
+            let (spec_usage, spec_old_memory) = derive_memory_from_access_specifiers(specifiers);
+            let spec_uses_old = !spec_old_memory.is_empty() || has_mut_params;
+
+            // For funs with body, validate that body-derived memory is covered
+            if decl.body.is_some() {
+                for mem in &initial_usage {
+                    if !spec_usage.contains(mem) {
+                        env.error(
+                            &decl.loc,
+                            &format!(
+                                "spec fun body accesses `{}` which is not covered by \
+                                     its access specifiers",
+                                env.display(mem)
+                            ),
+                        );
+                    }
+                }
             }
-            (callees, def.directly_used_memory(env))
+            (spec_usage, spec_uses_old, spec_old_memory)
         } else {
-            Default::default()
+            (
+                initial_usage,
+                direct_uses_old || has_mut_params,
+                direct_old_memory,
+            )
         };
+
         let decl_mut = env.get_spec_fun_mut(qid);
-        (decl_mut.callees, decl_mut.used_memory) = (initial_callees, initial_usage);
+        decl_mut.callees = initial_callees;
+        decl_mut.used_memory = final_usage;
+        decl_mut.uses_old = final_uses_old;
+        decl_mut.old_memory = final_old_memory;
     }
     for scc in petgraph::algo::kosaraju_scc(&graph) {
         // Within each cycle, the transitive usage is the union of the transitive
         // usage of each member.
         let mut transitive_callees = BTreeSet::new();
         let mut transitive_usage = BTreeSet::new();
+        let mut transitive_uses_old = false;
+        let mut transitive_old_memory = BTreeSet::new();
         for qid in &scc {
             let decl = env.get_spec_fun(*qid);
             // Add direct usage.
             transitive_callees.extend(decl.callees.iter().cloned());
             transitive_usage.extend(decl.used_memory.iter().cloned());
+            if decl.uses_old {
+                transitive_uses_old = true;
+            }
+            transitive_old_memory.extend(decl.old_memory.iter().cloned());
             // Add indirect usage
             for callee in &decl.callees {
-                let decl = env.get_spec_fun(callee.to_qualified_id());
+                let callee_decl = env.get_spec_fun(callee.to_qualified_id());
                 transitive_callees.extend(
-                    decl.callees
+                    callee_decl
+                        .callees
                         .iter()
                         .map(|id| id.clone().instantiate(&callee.inst)),
                 );
                 transitive_usage.extend(
-                    decl.used_memory
+                    callee_decl
+                        .used_memory
+                        .iter()
+                        .map(|mem| mem.clone().instantiate(&callee.inst)),
+                );
+                if callee_decl.uses_old {
+                    transitive_uses_old = true;
+                }
+                transitive_old_memory.extend(
+                    callee_decl
+                        .old_memory
                         .iter()
                         .map(|mem| mem.clone().instantiate(&callee.inst)),
                 );
@@ -214,8 +279,15 @@ pub fn run_spec_rewriter(env: &mut GlobalEnv) {
             let decl_mut = env.get_spec_fun_mut(qid);
             decl_mut.callees.clone_from(&transitive_callees);
             decl_mut.used_memory.clone_from(&transitive_usage);
+            decl_mut.uses_old = decl_mut.uses_old || transitive_uses_old;
+            decl_mut.old_memory.clone_from(&transitive_old_memory);
         }
     }
+
+    // Compute spec memory for behavioral predicates.
+    // For each function, derive (used_memory, old_memory) from its spec conditions.
+    // Also populate access_of entries with derived memory.
+    compute_behavioral_predicate_memory(env);
 
     // Last, process invariants
     for module in env.get_modules() {
@@ -312,7 +384,8 @@ fn derive_spec_fun(
         .collect();
     let result_type = fun.get_result_type().skip_reference().clone();
 
-    // Currently we only attach the spec block when it is generated during inlining
+    // Attach the spec block when generated during inlining (lambda with imperative body).
+    // This allows axiom generation for uninterpreted spec functions.
     let spec = if for_inline {
         fun.get_spec().clone()
     } else {
@@ -323,19 +396,144 @@ fn derive_spec_fun(
         name,
         type_params: fun.get_type_parameters(),
         params,
-        context_params: None,
         result_type,
         used_memory: BTreeSet::new(),
+        old_memory: BTreeSet::new(),
         uninterpreted: false,
         is_move_fun: true,
         is_native,
         body,
         callees: BTreeSet::new(),
         is_recursive: RefCell::new(None),
+        uses_old: false,
+        access_specifiers: None,
         insts_using_generic_type_reflection: Default::default(),
         spec: RefCell::new(spec),
     };
     env.add_spec_function_def(fun_id.module_id, decl)
+}
+
+/// Computes direct `old()` usage for a spec fun body. Returns (uses_old, old_memory)
+/// where `uses_old` is true if the body contains `Operation::Old`, and `old_memory`
+/// is the set of resources accessed inside `old()` contexts.
+pub fn compute_direct_old_usage(
+    body: &Exp,
+    env: &GlobalEnv,
+) -> (bool, BTreeSet<QualifiedInstId<StructId>>) {
+    let mut uses_old = false;
+    let mut old_memory = BTreeSet::new();
+    let mut in_old_depth: usize = 0;
+    body.visit_positions(&mut |pos, exp| {
+        match exp {
+            ExpData::Call(_, Operation::Old, _) => match pos {
+                VisitorPosition::Pre => {
+                    uses_old = true;
+                    in_old_depth += 1;
+                },
+                VisitorPosition::Post => {
+                    in_old_depth -= 1;
+                },
+                _ => {},
+            },
+            ExpData::Call(id, Operation::Global(_), _)
+            | ExpData::Call(id, Operation::Exists(_), _)
+                if in_old_depth > 0 && matches!(pos, VisitorPosition::Pre) =>
+            {
+                let inst = &env.get_node_instantiation(*id);
+                let (mid, sid, sinst) = inst[0].require_struct();
+                old_memory.insert(mid.qualified_inst(sid, sinst.to_owned()));
+            },
+            _ => {},
+        }
+        true
+    });
+    (uses_old, old_memory)
+}
+
+/// Derives used_memory and old_memory from user-declared access specifiers.
+/// All resources in reads + writes go into used_memory.
+/// Resources in writes go into old_memory (writes implies dual-state).
+pub fn derive_memory_from_access_specifiers(
+    specifiers: &[AccessSpecifier],
+) -> (
+    BTreeSet<QualifiedInstId<StructId>>,
+    BTreeSet<QualifiedInstId<StructId>>,
+) {
+    let mut used_memory = BTreeSet::new();
+    let mut old_memory = BTreeSet::new();
+    for spec in specifiers {
+        if let ResourceSpecifier::Resource(qid) = &spec.resource.1 {
+            used_memory.insert(qid.clone());
+            if spec.kind == AccessSpecifierKind::Writes {
+                old_memory.insert(qid.clone());
+            }
+        }
+    }
+    (used_memory, old_memory)
+}
+
+/// Computes and stores memory footprints for behavioral predicates.
+/// - For each `access_of` entry on functions: derives `used_memory`/`old_memory` from specifiers
+/// - For each function with spec conditions: derives `spec_used_memory`/`spec_old_memory` from conditions
+fn compute_behavioral_predicate_memory(env: &mut GlobalEnv) {
+    // Collect all function IDs first to avoid borrow issues
+    let fun_ids: Vec<QualifiedId<FunId>> = env
+        .get_modules()
+        .flat_map(|m| {
+            m.get_functions()
+                .map(|f| f.get_qualified_id())
+                .collect_vec()
+        })
+        .collect_vec();
+
+    for fun_id in fun_ids {
+        // Collect memory info while borrowing env immutably via fun_env
+        let (param_updates, spec_used, spec_old, spec_uses_old) = {
+            let fun_env = env.get_function(fun_id);
+            let mut param_updates: Vec<(
+                usize,
+                BTreeSet<QualifiedInstId<StructId>>,
+                BTreeSet<QualifiedInstId<StructId>>,
+            )> = vec![];
+            for (i, access) in fun_env.get_fun_param_access().iter().enumerate() {
+                let (used, old) = derive_memory_from_access_specifiers(&access.specifiers);
+                param_updates.push((i, used, old));
+            }
+
+            // Compute spec condition memory
+            let spec = fun_env.get_spec();
+            let mut spec_used = BTreeSet::new();
+            let mut spec_old = BTreeSet::new();
+            for cond in &spec.conditions {
+                spec_used.extend(cond.exp.directly_used_memory(env));
+                for e in &cond.additional_exps {
+                    spec_used.extend(e.directly_used_memory(env));
+                }
+                let (uses_old, old_mem) = compute_direct_old_usage(&cond.exp, env);
+                if uses_old {
+                    spec_old.extend(old_mem);
+                }
+                for e in &cond.additional_exps {
+                    let (uses_old, old_mem) = compute_direct_old_usage(e, env);
+                    if uses_old {
+                        spec_old.extend(old_mem);
+                    }
+                }
+            }
+            let has_mut_params = fun_env
+                .get_parameters()
+                .iter()
+                .any(|Parameter(_, ty, _)| ty.is_mutable_reference());
+            let spec_uses_old = !spec_old.is_empty() || has_mut_params;
+            (param_updates, spec_used, spec_old, spec_uses_old)
+        };
+
+        // Store results (env is no longer borrowed by fun_env)
+        for (i, used, old) in param_updates {
+            env.set_fun_param_access_memory(fun_id, i, used, old);
+        }
+        env.set_function_spec_memory(fun_id, spec_used, spec_old, spec_uses_old);
+    }
 }
 
 // -------------------------------------------------------------------------------------------

@@ -18,9 +18,9 @@
 use crate::{
     ast::{
         AccessSpecifier, AccessSpecifierKind, Address, AddressSpecifier, Attribute, ConditionKind,
-        Exp, ExpData, FriendDecl, GlobalInvariant, MemoryLabel, ModuleName, PropertyBag,
-        PropertyValue, ResourceSpecifier, Spec, SpecBlockInfo, SpecBlockTarget, SpecFunDecl,
-        SpecVarDecl, UseDecl, Value,
+        Exp, ExpData, FriendDecl, FunParamAccessSpecifiers, GlobalInvariant, MemoryLabel,
+        ModuleName, PropertyBag, PropertyValue, ResourceSpecifier, Spec, SpecBlockInfo,
+        SpecBlockTarget, SpecFunDecl, SpecVarDecl, UseDecl, Value,
     },
     code_writer::CodeWriter,
     emit, emitln,
@@ -2219,6 +2219,10 @@ impl GlobalEnv {
             params,
             result_type,
             access_specifiers: None,
+            fun_param_access: vec![],
+            spec_used_memory: BTreeSet::new(),
+            spec_old_memory: BTreeSet::new(),
+            spec_uses_old: false,
             acquired_structs: None,
             spec: RefCell::new(spec_opt.unwrap_or_default()),
             def: Some(def),
@@ -2286,6 +2290,10 @@ impl GlobalEnv {
             params,
             result_type,
             access_specifiers: None,
+            fun_param_access: vec![],
+            spec_used_memory: BTreeSet::new(),
+            spec_old_memory: BTreeSet::new(),
+            spec_uses_old: false,
             acquired_structs: None,
             spec: RefCell::new(spec_opt.unwrap_or_default()),
             def: Some(def),
@@ -2440,6 +2448,41 @@ impl GlobalEnv {
     /// Gets a function by qualified id.
     pub fn get_function_qid(&self, qid: QualifiedId<FunId>) -> FunctionEnv<'_> {
         self.get_module(qid.module_id).into_function(qid.id)
+    }
+
+    /// Sets spec memory information for a function, computed during spec_rewriter.
+    pub fn set_function_spec_memory(
+        &mut self,
+        qid: QualifiedId<FunId>,
+        spec_used_memory: BTreeSet<QualifiedInstId<StructId>>,
+        spec_old_memory: BTreeSet<QualifiedInstId<StructId>>,
+        spec_uses_old: bool,
+    ) {
+        let data = self
+            .get_module_data_mut(qid.module_id)
+            .function_data
+            .get_mut(&qid.id)
+            .expect("function data exists");
+        data.spec_used_memory = spec_used_memory;
+        data.spec_old_memory = spec_old_memory;
+        data.spec_uses_old = spec_uses_old;
+    }
+
+    /// Sets derived memory on a function parameter's access_of entry.
+    pub fn set_fun_param_access_memory(
+        &mut self,
+        qid: QualifiedId<FunId>,
+        param_idx: usize,
+        used_memory: BTreeSet<QualifiedInstId<StructId>>,
+        old_memory: BTreeSet<QualifiedInstId<StructId>>,
+    ) {
+        let data = self
+            .get_module_data_mut(qid.module_id)
+            .function_data
+            .get_mut(&qid.id)
+            .expect("function data exists");
+        data.fun_param_access[param_idx].used_memory = used_memory;
+        data.fun_param_access[param_idx].old_memory = old_memory;
     }
 
     /// Returns an iterator for all modules in the environment.
@@ -4700,6 +4743,17 @@ pub struct FunctionData {
     /// Access specifiers.
     pub(crate) access_specifiers: Option<Vec<AccessSpecifier>>,
 
+    /// Access specifiers for function-typed parameters (from `access_of` in spec blocks).
+    pub(crate) fun_param_access: Vec<FunParamAccessSpecifiers>,
+
+    /// Memory used by this function's spec conditions (requires, ensures, aborts_if).
+    /// Computed during the spec_rewriter pass.
+    pub(crate) spec_used_memory: BTreeSet<QualifiedInstId<StructId>>,
+    /// Resources accessed in old() contexts within spec conditions.
+    pub(crate) spec_old_memory: BTreeSet<QualifiedInstId<StructId>>,
+    /// Whether any spec condition uses old() or the function has &mut params.
+    pub(crate) spec_uses_old: bool,
+
     /// Acquires information, if available. This is either inferred or annotated by the
     /// user via a legacy acquires declaration.
     pub(crate) acquired_structs: Option<BTreeSet<StructId>>,
@@ -4751,6 +4805,10 @@ impl FunctionData {
             params: vec![],
             result_type: Type::unit(),
             access_specifiers: None,
+            fun_param_access: vec![],
+            spec_used_memory: BTreeSet::new(),
+            spec_old_memory: BTreeSet::new(),
+            spec_uses_old: false,
             acquired_structs: None,
             spec: RefCell::new(Default::default()),
             def: None,
@@ -5247,6 +5305,26 @@ impl<'env> FunctionEnv<'env> {
     /// specifiers disallows it (intersection of exclusion specifiers).
     pub fn get_access_specifiers(&self) -> Option<&[AccessSpecifier]> {
         self.data.access_specifiers.as_deref()
+    }
+
+    /// Returns access specifiers for function-typed parameters (from `access_of` in spec blocks).
+    pub fn get_fun_param_access(&self) -> &[FunParamAccessSpecifiers] {
+        &self.data.fun_param_access
+    }
+
+    /// Returns memory used by this function's spec conditions.
+    pub fn get_spec_used_memory(&self) -> &BTreeSet<QualifiedInstId<StructId>> {
+        &self.data.spec_used_memory
+    }
+
+    /// Returns memory accessed in old() contexts within spec conditions.
+    pub fn get_spec_old_memory(&self) -> &BTreeSet<QualifiedInstId<StructId>> {
+        &self.data.spec_old_memory
+    }
+
+    /// Returns whether any spec condition uses old() or function has &mut params.
+    pub fn spec_uses_old(&self) -> bool {
+        self.data.spec_uses_old
     }
 
     /// Returns the inferred acquired structs of this function. This is checked

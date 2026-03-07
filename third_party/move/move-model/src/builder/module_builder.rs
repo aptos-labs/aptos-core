@@ -5,9 +5,9 @@
 use crate::{
     ast::{
         AccessSpecifier, Address, Attribute, AttributeValue, Condition, ConditionKind, Exp,
-        ExpData, FriendDecl, ModuleName, Operation, Pattern, PropertyBag, PropertyValue,
-        QualifiedSymbol, Spec, SpecBlockInfo, SpecBlockTarget, SpecFunDecl, SpecVarDecl, TempIndex,
-        UseDecl, Value,
+        ExpData, FriendDecl, FunParamAccessSpecifiers, ModuleName, Operation, Pattern, PropertyBag,
+        PropertyValue, QualifiedSymbol, Spec, SpecBlockInfo, SpecBlockTarget, SpecFunDecl,
+        SpecVarDecl, TempIndex, UseDecl, Value,
     },
     builder::{
         exp_builder::ExpTranslator,
@@ -89,6 +89,8 @@ pub(crate) struct ModuleBuilder<'env, 'translator> {
     pub fun_defs: BTreeMap<Symbol, Exp>,
     /// Translated access specifiers, if we are compiling Move code
     pub fun_access_specifiers: BTreeMap<Symbol, Vec<AccessSpecifier>>,
+    /// Access specifiers for function-typed parameters (from `access_of`)
+    pub fun_param_access: BTreeMap<Symbol, Vec<FunParamAccessSpecifiers>>,
     /// Translated struct specifications.
     pub struct_specs: BTreeMap<Symbol, Spec>,
     /// Translated module spec
@@ -169,6 +171,7 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
             fun_specs: BTreeMap::new(),
             fun_defs: BTreeMap::new(),
             fun_access_specifiers: BTreeMap::new(),
+            fun_param_access: BTreeMap::new(),
             struct_specs: BTreeMap::new(),
             module_spec: Spec::default(),
             spec_block_infos: Default::default(),
@@ -780,11 +783,18 @@ impl ModuleBuilder<'_, '_> {
     ) {
         let name = self.symbol_pool().make(&name.0.value);
         let (type_params, params, result_type) = self.decl_ana_signature(signature, false);
-        // Eliminate references in parameters and result type for spec functions
+        // Eliminate references in parameters and result type for spec functions,
+        // but keep &mut parameters as-is since they have dual-state semantics.
         // `derive_spec_fun` does the same when generating spec functions from general move functions
         let params = params
             .into_iter()
-            .map(|Parameter(sym, ty, loc)| Parameter(sym, ty.skip_reference().clone(), loc))
+            .map(|Parameter(sym, ty, loc)| {
+                if ty.is_mutable_reference() {
+                    Parameter(sym, ty, loc)
+                } else {
+                    Parameter(sym, ty.skip_reference().clone(), loc)
+                }
+            })
             .collect_vec();
         let result_type = result_type.skip_reference().clone();
 
@@ -810,15 +820,17 @@ impl ModuleBuilder<'_, '_> {
             name,
             type_params,
             params,
-            context_params: None,
             result_type,
             used_memory: BTreeSet::new(),
+            old_memory: BTreeSet::new(),
             uninterpreted,
             is_move_fun: false,
             is_native: false,
             body: None,
             callees: Default::default(),
             is_recursive: Default::default(),
+            access_specifiers: None,
+            uses_old: false,
             insts_using_generic_type_reflection: Default::default(),
             spec: RefCell::new(Default::default()),
         };
@@ -1756,9 +1768,20 @@ impl ModuleBuilder<'_, '_> {
             Function {
                 uninterpreted,
                 signature,
+                access_specifiers,
                 body,
                 ..
-            } => self.def_ana_spec_fun(*uninterpreted, signature, body),
+            } => self.def_ana_spec_fun(
+                *uninterpreted,
+                signature,
+                access_specifiers.as_deref(),
+                body,
+            ),
+            AccessOf {
+                fun_param,
+                params,
+                access_specifiers,
+            } => self.def_ana_access_of(loc, context, fun_param, params, access_specifiers),
             Let {
                 name,
                 post_state,
@@ -2681,15 +2704,56 @@ impl ModuleBuilder<'_, '_> {
         &mut self,
         uninterpreted: bool,
         _signature: &EA::FunctionSignature,
+        access_specifiers: Option<&[EA::AccessSpecifier]>,
         body: &EA::FunctionBody,
     ) {
+        if let Some(specs) = access_specifiers {
+            // Validate that spec fun access specifiers only use reads/writes
+            // (no acquires, no negation, no pure)
+            if specs.is_empty() {
+                // Empty specifier list represents `pure`
+                self.parent.error(
+                    &self.parent.to_loc(&body.loc),
+                    "spec functions do not support `pure` access specifier",
+                );
+            }
+            for spec in specs {
+                if spec.value.kind == EA::AccessSpecifierKind::LegacyAcquires {
+                    self.parent.error(
+                        &self.parent.to_loc(&spec.loc),
+                        "spec functions only support `reads` and `writes` access specifiers, \
+                         not `acquires`",
+                    );
+                }
+                if spec.value.negated {
+                    self.parent.error(
+                        &self.parent.to_loc(&spec.loc),
+                        "spec functions do not support negated access specifiers",
+                    );
+                }
+            }
+            let entry = &self.spec_funs[self.spec_fun_index];
+            let type_params = entry.type_params.clone();
+            let params = entry.params.clone();
+            let mut et = ExpTranslator::new_with_old(self, true);
+            let loc = et.to_loc(&body.loc);
+            et.define_type_params(&loc, &type_params, false);
+            et.enter_scope();
+            for Parameter(n, ty, loc) in params {
+                et.define_local(&loc, n, ty, None, None);
+            }
+            let translated = et.translate_access_specifiers(&Some(specs.to_vec()));
+            et.finalize_types(true);
+            self.spec_funs[self.spec_fun_index].access_specifiers = translated;
+        }
         match &body.value {
             EA::FunctionBody_::Defined(seq) => {
                 let entry = &self.spec_funs[self.spec_fun_index];
                 let type_params = entry.type_params.clone();
                 let params = entry.params.clone();
                 let result_type = entry.result_type.clone();
-                let mut et = ExpTranslator::new(self);
+                // Always allow old() in spec fun bodies
+                let mut et = ExpTranslator::new_with_old(self, true);
                 let loc = et.to_loc(&body.loc);
                 et.define_type_params(&loc, &type_params, false);
                 et.enter_scope();
@@ -2714,6 +2778,56 @@ impl ModuleBuilder<'_, '_> {
             },
         }
         self.spec_fun_index += 1;
+    }
+
+    fn def_ana_access_of(
+        &mut self,
+        loc: &Loc,
+        context: &SpecBlockContext,
+        fun_param: &Spanned<move_symbol_pool::Symbol>,
+        params: &[(PA::Var, EA::Type)],
+        access_specifiers: &[EA::AccessSpecifier],
+    ) {
+        // Resolve the function name from context
+        let fun_name = match context {
+            SpecBlockContext::Function(name) => name.clone(),
+            _ => {
+                self.parent
+                    .env
+                    .error(loc, "`access_of` can only appear in a function spec block");
+                return;
+            },
+        };
+        // Translate access specifiers
+        let mut et = ExpTranslator::new_with_old(self, true);
+        et.enter_scope();
+        // Define the access_of parameter names so address specifiers can reference them
+        let translated_params: Vec<Parameter> = params
+            .iter()
+            .map(|(v, ty)| {
+                let ty = et.translate_type(ty);
+                let sym = et.symbol_pool().make(&v.0.value);
+                let loc = et.to_loc(&v.0.loc);
+                et.define_local(&loc, sym, ty.clone(), None, None);
+                Parameter(sym, ty, loc)
+            })
+            .collect();
+        let translated_specs = et.translate_access_specifiers(&Some(access_specifiers.to_vec()));
+        et.finalize_types(true);
+        if let Some(specifiers) = translated_specs {
+            let entry = FunParamAccessSpecifiers {
+                loc: loc.clone(),
+                fun_param: self.symbol_pool().make(&fun_param.value),
+                params: translated_params,
+                specifiers,
+                used_memory: BTreeSet::new(),
+                old_memory: BTreeSet::new(),
+            };
+            self.fun_param_access
+                .entry(fun_name.symbol)
+                .or_default()
+                .push(entry);
+        }
     }
 }
 
@@ -3775,6 +3889,10 @@ impl ModuleBuilder<'_, '_> {
             let called_funs = Some(def.as_ref().map(|e| e.called_funs()).unwrap_or_default());
             let used_funs = Some(def.as_ref().map(|e| e.used_funs()).unwrap_or_default());
             let access_specifiers = self.fun_access_specifiers.remove(&name.symbol);
+            let fun_param_access = self
+                .fun_param_access
+                .remove(&name.symbol)
+                .unwrap_or_default();
             let fun_id = FunId::new(name.symbol);
             let data = FunctionData {
                 name: name.symbol,
@@ -3794,6 +3912,10 @@ impl ModuleBuilder<'_, '_> {
                 params: entry.params.clone(),
                 result_type: entry.result_type.clone(),
                 access_specifiers,
+                fun_param_access,
+                spec_used_memory: BTreeSet::new(),
+                spec_old_memory: BTreeSet::new(),
+                spec_uses_old: false,
                 acquired_structs: None,
                 spec: spec.into(),
                 def,

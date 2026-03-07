@@ -1325,11 +1325,38 @@ pub fn boogie_behavioral_result_fun_name(
 /// Return name of the behavioral predicate evaluation function for a function type.
 /// These inline functions dispatch on closure variants to evaluate behavioral predicates.
 /// Format: `${kind}'${type_suffix}'`
-/// For example: `$ensures_of'$fun_u64_u64'`
 pub fn boogie_behavioral_eval_fun_name(
     env: &GlobalEnv,
     fun_type: &Type,
     kind: BehaviorKind,
 ) -> String {
     format!("${}'{}'", kind, boogie_type_suffix(env, fun_type))
+}
+
+/// Return name of a per-function behavioral spec function for a closure target function.
+/// These inline functions have concrete bodies derived from the function's spec.
+/// Format: `$bp_{kind}'{fun_name}'`
+/// For example: `$bp_ensures_of'$1_m_callee'`
+pub fn boogie_behavioral_fun_spec_name(
+    env: &GlobalEnv,
+    fun: &QualifiedInstId<FunId>,
+    kind: BehaviorKind,
+) -> String {
+    let fun_env = env.get_function(fun.to_qualified_id());
+    let fun_name = boogie_function_name(&fun_env, &fun.inst);
+    format!("$bp_{}'{}'", kind, fun_name)
+}
+
+/// Return name of a per-function behavioral result function for a closure target function.
+/// This is an uninterpreted function that returns the result value(s) for given inputs.
+/// Format: `$bp_ensures_of_result'{fun_name}'` (single) or `$bp_ensures_of_results'{fun_name}'` (multi)
+pub fn boogie_behavioral_fun_result_name(
+    env: &GlobalEnv,
+    fun: &QualifiedInstId<FunId>,
+    multi_result: bool,
+) -> String {
+    let fun_env = env.get_function(fun.to_qualified_id());
+    let fun_name = boogie_function_name(&fun_env, &fun.inst);
+    let plural = if multi_result { "s" } else { "" };
+    format!("$bp_ensures_of_result{}'{}'", plural, fun_name)
 }

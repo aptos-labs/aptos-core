@@ -7,6 +7,7 @@
 use crate::{
     boogie_helpers::{
         boogie_address, boogie_address_blob, boogie_behavioral_eval_fun_name,
+        boogie_behavioral_fun_result_name, boogie_behavioral_fun_spec_name,
         boogie_behavioral_result_fun_name, boogie_behavioral_spec_fun_name, boogie_bv_type,
         boogie_byte_blob, boogie_closure_pack_name, boogie_constant_blob, boogie_debug_track_abort,
         boogie_debug_track_local, boogie_debug_track_return, boogie_equality_for_type,
@@ -31,10 +32,15 @@ use legacy_move_compiler::interface_generator::NATIVE_INTERFACE;
 #[allow(unused_imports)]
 use log::{debug, info, log, warn, Level};
 use move_model::{
-    ast::{Attribute, BehaviorKind, ConditionKind, TempIndex, TraceKind},
+    ast::{
+        Attribute, BehaviorKind, ConditionKind, ExpData, MemoryLabel, Operation as AstOperation,
+        TempIndex, TraceKind,
+    },
     code_writer::CodeWriter,
     emit, emitln,
-    model::{FieldEnv, FunctionEnv, GlobalEnv, Loc, NodeId, QualifiedInstId, StructEnv, StructId},
+    model::{
+        FieldEnv, FunId, FunctionEnv, GlobalEnv, Loc, NodeId, QualifiedInstId, StructEnv, StructId,
+    },
     pragmas::{
         ADDITION_OVERFLOW_UNCHECKED_PRAGMA, SEED_PRAGMA, TIMEOUT_PRAGMA,
         VERIFY_DURATION_ESTIMATE_PRAGMA,
@@ -614,27 +620,29 @@ impl<'env> BoogieTranslator<'env> {
         );
 
         // Generate uninterpreted spec functions for behavioral predicates on function-typed parameters.
-        // These are used by the evaluator functions and for connecting closures to specs.
+        // These are used for connecting closures to specs.
         self.generate_behavioral_spec_funs_for_params(fun_type, fun_param_infos);
 
-        // Generate behavioral predicate evaluation functions.
-        // These inline functions dispatch on closure variants to evaluate behavioral predicates.
+        // Generate per-function behavioral spec functions for closure target functions.
+        // These inline functions have concrete bodies derived from the function's spec.
+        self.generate_behavioral_spec_funs_for_functions(fun_type, closure_infos);
+
+        // Generate behavioral predicate evaluator functions that dispatch on closure/param variants.
+        // Closure branches delegate to per-function spec functions (no global memory refs).
+        // Param branches delegate to per-param uninterpreted functions.
         self.generate_behavioral_predicate_evaluator(
-            self.env,
             fun_type,
             closure_infos,
             fun_param_infos,
             BehaviorKind::RequiresOf,
         );
         self.generate_behavioral_predicate_evaluator(
-            self.env,
             fun_type,
             closure_infos,
             fun_param_infos,
             BehaviorKind::AbortsOf,
         );
         self.generate_behavioral_predicate_evaluator(
-            self.env,
             fun_type,
             closure_infos,
             fun_param_infos,
@@ -642,8 +650,7 @@ impl<'env> BoogieTranslator<'env> {
         );
 
         // Generate the uninterpreted result_of function and its connecting axiom.
-        // result_of<f>(x) returns a deterministic result based on ensures_of<f>(x, y).
-        self.generate_result_of_function_and_axiom(self.env, fun_type);
+        self.generate_result_of_function_and_axiom(fun_type, closure_infos, fun_param_infos);
 
         // Create an apply procedure which dispatches to the appropriate closure implementation.
         emitln!(
@@ -733,38 +740,12 @@ impl<'env> BoogieTranslator<'env> {
                 format!("{result_str} := ")
             };
             if fun_env.is_opaque() {
-                // Opaque functions have no Boogie procedure body.
-                // Use behavioral predicates to model the call semantics.
-                let bp_args = params
-                    .iter()
-                    .enumerate()
-                    .map(|(pos, ty)| {
-                        if ty.is_mutable_reference() {
-                            format!("$Dereference(p{})", pos)
-                        } else {
-                            format!("p{}", pos)
-                        }
-                    })
-                    .join(", ");
-                let bp_fun_args = if bp_args.is_empty() {
-                    "fun".to_string()
-                } else {
-                    format!("fun, {}", bp_args)
-                };
-                let aborts_name =
-                    boogie_behavioral_eval_fun_name(self.env, fun_type, BehaviorKind::AbortsOf);
-                let result_of_name =
-                    boogie_behavioral_eval_fun_name(self.env, fun_type, BehaviorKind::ResultOf);
-                let explicit_results = results.clone().flatten();
-                self.emit_behavioral_predicate_body(
-                    &aborts_name,
-                    &bp_fun_args,
-                    &result_of_name,
-                    &result_of_name,
-                    &bp_fun_args,
-                    &result_locals,
-                    &explicit_results,
+                self.emit_opaque_closure_body(
+                    info,
+                    fun_env,
                     &params,
+                    results,
+                    &result_locals,
                     memory,
                 );
             } else {
@@ -800,10 +781,14 @@ impl<'env> BoogieTranslator<'env> {
                 emitln!(self.writer, "if (fun is {}) {{", ctor_name);
                 self.writer.indent();
             }
+            // Build memory args for this param from access_of declarations.
+            let (used_memory, old_memory) =
+                Self::get_param_memory(self.env, &info.fun, info.param_sym);
+            let mem_args = self.build_spec_memory_args(&used_memory, &old_memory, &[], &None);
+
             // Build the argument list for behavioral predicates.
-            // For mutable references, we need to dereference since spec functions expect
-            // the inner type (matching the evaluator which uses skip_reference()).
-            let bp_args = params
+            // Memory args come first, then data args.
+            let data_args: Vec<String> = params
                 .iter()
                 .enumerate()
                 .map(|(pos, ty)| {
@@ -813,7 +798,8 @@ impl<'env> BoogieTranslator<'env> {
                         format!("p{}", pos)
                     }
                 })
-                .join(", ");
+                .collect();
+            let bp_args = mem_args.iter().chain(data_args.iter()).join(", ");
 
             // Note: We do NOT assert requires_of here. The requires_of predicate describes
             // caller obligations in the spec (e.g., `requires requires_of<f>(x)`), not runtime
@@ -821,9 +807,6 @@ impl<'env> BoogieTranslator<'env> {
             // are assumed, and the body just uses the abstract behavioral semantics.
 
             // Always use aborts_of predicate for function parameters.
-            // The spec function is always generated (uninterpreted), and using it ensures
-            // that runtime behavior aligns with spec semantics. This is necessary because
-            // behavioral predicates may be used indirectly through spec functions.
             let aborts_name = boogie_behavioral_spec_fun_name(
                 self.env,
                 &info.fun,
@@ -832,8 +815,6 @@ impl<'env> BoogieTranslator<'env> {
                 &[],
             );
             // Always use deterministic result functions for function parameters.
-            // This ensures that `choose y where ensures_of<f>(x, y)` in specs
-            // produces the same value as the runtime call `f(x)`.
             let result_fun_name =
                 boogie_behavioral_result_fun_name(self.env, &info.fun, info.param_sym, &[], false);
             let multi_result_fun_name =
@@ -863,6 +844,96 @@ impl<'env> BoogieTranslator<'env> {
         }
         self.writer.unindent();
         emitln!(self.writer, "}");
+    }
+
+    /// Build Boogie memory argument strings for spec functions / behavioral predicates.
+    /// For each memory in `used_memory`, generates the variable name. If the memory also
+    /// appears in `old_memory`, emits a pair (old, current) using the given label for old
+    /// and `None` for current (or vice versa depending on context). When `inst` is non-empty,
+    /// instantiates memory types. When `label` is `None`, both old and current use the
+    /// same global variable (pre-call context).
+    fn build_spec_memory_args(
+        &self,
+        used_memory: &BTreeSet<QualifiedInstId<StructId>>,
+        old_memory: &BTreeSet<QualifiedInstId<StructId>>,
+        inst: &[Type],
+        label: &Option<MemoryLabel>,
+    ) -> Vec<String> {
+        let uses_old = !old_memory.is_empty();
+        let mut mem_args = vec![];
+        for mem in used_memory {
+            let mem = &mem.clone().instantiate(inst);
+            let name = boogie_resource_memory_name(self.env, mem, label);
+            if uses_old && old_memory.contains(mem) {
+                mem_args.push(name.clone());
+                mem_args.push(name);
+            } else {
+                mem_args.push(name);
+            }
+        }
+        mem_args
+    }
+
+    /// Emit the body for an opaque closure variant in the apply procedure.
+    /// Uses behavioral predicates to model the call semantics.
+    fn emit_opaque_closure_body(
+        &self,
+        info: &ClosureInfo,
+        fun_env: &FunctionEnv,
+        params: &[Type],
+        results: &Type,
+        result_locals: &[String],
+        memory: &[String],
+    ) {
+        // Build args for ALL callee params by interleaving captured and non-captured
+        // using ClosureMask::compose.
+        let captured_args: Vec<String> = (0..info.mask.captured_count())
+            .map(|pos| format!("fun->p{}", pos))
+            .collect();
+        let callee_param_tys = fun_env.get_parameter_types();
+        let non_captured_args: Vec<String> = callee_param_tys
+            .iter()
+            .enumerate()
+            .filter(|(i, _)| !info.mask.is_captured(*i))
+            .enumerate()
+            .map(|(pos, (_, ty))| {
+                if ty.is_mutable_reference() {
+                    format!("$Dereference(p{})", pos)
+                } else {
+                    format!("p{}", pos)
+                }
+            })
+            .collect();
+        let bp_arg_list = info
+            .mask
+            .compose(captured_args, non_captured_args)
+            .expect("closure mask compose failed");
+
+        // Build memory args
+        let fun_mem_args = self.build_spec_memory_args(
+            fun_env.get_spec_used_memory(),
+            fun_env.get_spec_old_memory(),
+            &info.fun.inst,
+            &None,
+        );
+        let bp_args = fun_mem_args.iter().chain(bp_arg_list.iter()).join(", ");
+
+        let aborts_name =
+            boogie_behavioral_fun_spec_name(self.env, &info.fun, BehaviorKind::AbortsOf);
+        let result_fun_name = boogie_behavioral_fun_result_name(self.env, &info.fun, false);
+        let multi_result_fun_name = boogie_behavioral_fun_result_name(self.env, &info.fun, true);
+        let explicit_results = results.clone().flatten();
+        self.emit_behavioral_predicate_body(
+            &aborts_name,
+            &bp_args,
+            &result_fun_name,
+            &multi_result_fun_name,
+            &bp_args,
+            result_locals,
+            &explicit_results,
+            params,
+            memory,
+        );
     }
 
     /// Emit behavioral predicate call body: aborts_of check, result_of assignment,
@@ -985,32 +1056,51 @@ impl<'env> BoogieTranslator<'env> {
         emitln!(self.writer, "}");
     }
 
-    /// Generate a behavioral predicate evaluation function for a function type.
-    /// This function pattern-matches on closure variants to evaluate the predicate
-    /// using the concrete closure's spec condition.
-    #[allow(clippy::too_many_arguments)]
+    /// Generate a behavioral predicate evaluator function for a function type.
+    /// This function dispatches on closure/param variants. Closure branches call
+    /// per-function spec functions. Param branches call per-param spec functions.
     fn generate_behavioral_predicate_evaluator(
         &self,
-        env: &GlobalEnv,
         fun_type: &Type,
         closure_infos: &BTreeSet<ClosureInfo>,
         fun_param_infos: &BTreeSet<FunParamInfo>,
         kind: BehaviorKind,
     ) {
+        let env = self.env;
         let Type::Fun(params, results, _abilities) = fun_type else {
             panic!("expected function type")
         };
         let params = params.clone().flatten();
         let results = results.clone().flatten();
 
-        // Build parameter list for the evaluation function
         let fun_ty_boogie_name = boogie_type(env, fun_type);
         let eval_fun_name = boogie_behavioral_eval_fun_name(env, fun_type, kind);
 
-        // Parameters depend on the kind:
-        // - requires_of and aborts_of: (fun, params...)
-        // - ensures_of: (fun, params..., results...)
-        let mut param_decls = vec![format!("f: {}", fun_ty_boogie_name)];
+        // Compute union of all variants' memory for the evaluator signature.
+        // This includes both closure and param variants so the evaluator's inline
+        // body can pass memory to per-function spec functions in closure branches.
+        let mut union_used_memory = BTreeSet::new();
+        let mut union_old_memory = BTreeSet::new();
+        for info in closure_infos {
+            let fun_env = env.get_function(info.fun.to_qualified_id());
+            for mem in fun_env.get_spec_used_memory() {
+                union_used_memory.insert(mem.clone().instantiate(&info.fun.inst));
+            }
+            for mem in fun_env.get_spec_old_memory() {
+                union_old_memory.insert(mem.clone().instantiate(&info.fun.inst));
+            }
+        }
+        for info in fun_param_infos {
+            let (used, old) = Self::get_param_memory(env, &info.fun, info.param_sym);
+            union_used_memory.extend(used);
+            union_old_memory.extend(old);
+        }
+        let (eval_mem_decls, _eval_mem_args) =
+            Self::build_memory_params(env, &union_used_memory, &union_old_memory);
+
+        // Build parameter declarations
+        let mut param_decls: Vec<String> = eval_mem_decls;
+        param_decls.push(format!("f: {}", fun_ty_boogie_name));
         let mut param_args = vec![];
         for (pos, ty) in params.iter().enumerate() {
             param_decls.push(format!(
@@ -1021,12 +1111,10 @@ impl<'env> BoogieTranslator<'env> {
             param_args.push(format!("p{}", pos));
         }
         if kind == BehaviorKind::EnsuresOf {
-            // First, explicit result types
             for (pos, ty) in results.iter().enumerate() {
                 param_decls.push(format!("r{}: {}", pos, boogie_type(env, ty)));
                 param_args.push(format!("r{}", pos));
             }
-            // Then, mutable reference parameters become outputs
             let mut mut_ref_count = results.len();
             for ty in params.iter().filter(|p| p.is_mutable_reference()) {
                 param_decls.push(format!(
@@ -1038,7 +1126,6 @@ impl<'env> BoogieTranslator<'env> {
                 mut_ref_count += 1;
             }
         }
-        let all_args = param_args.join(", ");
 
         emitln!(
             self.writer,
@@ -1058,11 +1145,10 @@ impl<'env> BoogieTranslator<'env> {
         let total_variants = closure_infos.len() + fun_param_infos.len();
         let mut variant_idx = 0;
 
-        // Generate branches for concrete closure variants
+        // Closure branches: delegate to per-function spec functions
         for info in closure_infos {
             let ctor_name = boogie_closure_pack_name(env, &info.fun, info.mask);
             let is_last = variant_idx == total_variants - 1;
-
             if variant_idx == 0 && total_variants == 1 {
                 // Single variant: emit directly
             } else if variant_idx == 0 {
@@ -1073,29 +1159,61 @@ impl<'env> BoogieTranslator<'env> {
                 emit!(self.writer, "else if (f is {}) then ", ctor_name);
             }
 
-            // Get the closure's spec conditions
+            // Build call to per-function spec function with proper args
+            let bp_name = boogie_behavioral_fun_spec_name(env, &info.fun, kind);
             let fun_env = env.get_function(info.fun.to_qualified_id());
-            let closure_spec = fun_env.get_spec();
+            let callee_param_tys = fun_env.get_parameter_types();
+            let num_callee_params = callee_param_tys.len();
 
-            // Determine what condition to emit based on kind
-            let condition = self.translate_closure_condition_for_kind(
-                env,
-                &fun_env,
-                &closure_spec,
-                kind,
-                info,
-                &params,
-                &results,
-            );
-            emitln!(self.writer, "{}", condition);
+            // Build memory args for this function's spec memory (subset of evaluator's union)
+            let used = fun_env.get_spec_used_memory();
+            let old = fun_env.get_spec_old_memory();
+            let inst_used: BTreeSet<_> = used
+                .iter()
+                .map(|m| m.clone().instantiate(&info.fun.inst))
+                .collect();
+            let inst_old: BTreeSet<_> = old
+                .iter()
+                .map(|m| m.clone().instantiate(&info.fun.inst))
+                .collect();
+            let (_, fun_mem_args) = Self::build_memory_params(env, &inst_used, &inst_old);
+
+            // Build args: memory + all callee params (interleaved captured/non-captured)
+            let mut call_args: Vec<String> = fun_mem_args;
+            let mut captured_pos = 0;
+            let mut non_captured_pos = 0;
+            for i in 0..num_callee_params {
+                if info.mask.is_captured(i) {
+                    call_args.push(format!("f->p{}", captured_pos));
+                    captured_pos += 1;
+                } else {
+                    call_args.push(format!("p{}", non_captured_pos));
+                    non_captured_pos += 1;
+                }
+            }
+            // For ensures_of: add result args
+            if kind == BehaviorKind::EnsuresOf {
+                for (pos, ty) in results.iter().enumerate() {
+                    if ty.is_mutable_reference() {
+                        call_args.push(format!("$Dereference(r{})", pos));
+                    } else {
+                        call_args.push(format!("r{}", pos));
+                    }
+                }
+                let mut mut_ref_count = results.len();
+                for _ in params.iter().filter(|p| p.is_mutable_reference()) {
+                    call_args.push(format!("r{}", mut_ref_count));
+                    mut_ref_count += 1;
+                }
+            }
+            emitln!(self.writer, "{}({})", bp_name, call_args.join(", "));
             variant_idx += 1;
         }
 
-        // Generate branches for function parameter variants
+        // Param branches: delegate to per-param uninterpreted functions
         for info in fun_param_infos {
             let ctor_name = boogie_fun_param_name(env, &info.fun, info.param_sym);
             let is_last = variant_idx == total_variants - 1;
-
             if variant_idx == 0 && total_variants == 1 {
                 // Single variant: emit directly
             } else if variant_idx == 0 {
@@ -1106,19 +1224,18 @@ impl<'env> BoogieTranslator<'env> {
                 emit!(self.writer, "else if (f is {}) then ", ctor_name);
             }
 
-            // Call the behavioral predicate spec function (always generated in Boogie)
-            // For ensures_of, we need to dereference mutable reference results since
-            // the spec function expects dereferenced types.
             let bp_name =
                 boogie_behavioral_spec_fun_name(env, &info.fun, info.param_sym, kind, &[]);
+            let per_param_mem_args: Vec<String> = {
+                let (used, old) = Self::get_param_memory(env, &info.fun, info.param_sym);
+                let (_, args) = Self::build_memory_params(env, &used, &old);
+                args
+            };
             let args = if kind == BehaviorKind::EnsuresOf {
-                // Build argument list with dereferenced mutable reference results
-                let mut args = vec![];
-                // Input parameters
+                let mut args: Vec<String> = per_param_mem_args;
                 for pos in 0..params.len() {
                     args.push(format!("p{}", pos));
                 }
-                // Explicit results - dereference if mutable reference
                 for (pos, ty) in results.iter().enumerate() {
                     if ty.is_mutable_reference() {
                         args.push(format!("$Dereference(r{})", pos));
@@ -1126,7 +1243,6 @@ impl<'env> BoogieTranslator<'env> {
                         args.push(format!("r{}", pos));
                     }
                 }
-                // Mutable reference param outputs (already dereferenced in spec)
                 let mut mut_ref_count = results.len();
                 for _ in params.iter().filter(|p| p.is_mutable_reference()) {
                     args.push(format!("r{}", mut_ref_count));
@@ -1134,7 +1250,9 @@ impl<'env> BoogieTranslator<'env> {
                 }
                 args.join(", ")
             } else {
-                all_args.clone()
+                let mut args = per_param_mem_args;
+                args.extend(param_args.iter().cloned());
+                args.join(", ")
             };
             emitln!(self.writer, "{}({})", bp_name, args);
             variant_idx += 1;
@@ -1144,20 +1262,411 @@ impl<'env> BoogieTranslator<'env> {
         emitln!(self.writer, "}");
     }
 
-    /// Translate a closure's spec condition for a specific behavioral predicate kind.
-    /// Returns a Boogie expression representing the condition.
-    #[allow(clippy::too_many_arguments)]
-    fn translate_closure_condition_for_kind(
+    /// Generate the uninterpreted `result_of` function and its connecting axiom.
+    fn generate_result_of_function_and_axiom(
         &self,
-        env: &GlobalEnv,
+        fun_type: &Type,
+        closure_infos: &BTreeSet<ClosureInfo>,
+        fun_param_infos: &BTreeSet<FunParamInfo>,
+    ) {
+        let env = self.env;
+        let Type::Fun(params, results, _abilities) = fun_type else {
+            panic!("expected function type")
+        };
+        let params_flat = params.clone().flatten();
+        let results_flat = results.clone().flatten();
+
+        let mut_ref_params: Vec<(usize, &Type)> = params_flat
+            .iter()
+            .enumerate()
+            .filter(|(_, t)| t.is_mutable_reference())
+            .collect();
+
+        let mut all_outputs: Vec<Type> = results_flat.clone();
+        for (_, ty) in &mut_ref_params {
+            all_outputs.push(ty.skip_reference().clone());
+        }
+
+        if all_outputs.is_empty() {
+            return;
+        }
+
+        let fun_ty_boogie_name = boogie_type(env, fun_type);
+
+        // Compute union of all variants' memory for the result_of function.
+        // Must match the evaluator's memory since the axiom references ensures_of.
+        let mut union_used_memory = BTreeSet::new();
+        let mut union_old_memory = BTreeSet::new();
+        for info in closure_infos {
+            let fun_env = env.get_function(info.fun.to_qualified_id());
+            for mem in fun_env.get_spec_used_memory() {
+                union_used_memory.insert(mem.clone().instantiate(&info.fun.inst));
+            }
+            for mem in fun_env.get_spec_old_memory() {
+                union_old_memory.insert(mem.clone().instantiate(&info.fun.inst));
+            }
+        }
+        for info in fun_param_infos {
+            let (used, old) = Self::get_param_memory(env, &info.fun, info.param_sym);
+            union_used_memory.extend(used);
+            union_old_memory.extend(old);
+        }
+        let (eval_mem_decls, eval_mem_args) =
+            Self::build_memory_params(env, &union_used_memory, &union_old_memory);
+
+        let result_of_name = boogie_behavioral_eval_fun_name(env, fun_type, BehaviorKind::ResultOf);
+        let ensures_of_name =
+            boogie_behavioral_eval_fun_name(env, fun_type, BehaviorKind::EnsuresOf);
+
+        // Parameters: (memory..., fun, params...)
+        let mut param_decls: Vec<String> = eval_mem_decls;
+        param_decls.push(format!("f: {}", fun_ty_boogie_name));
+        let mut param_args: Vec<String> = eval_mem_args;
+        param_args.push("f".to_string());
+        for (pos, ty) in params_flat.iter().enumerate() {
+            param_decls.push(format!(
+                "p{}: {}",
+                pos,
+                boogie_type(env, ty.skip_reference())
+            ));
+            param_args.push(format!("p{}", pos));
+        }
+
+        let result_type = if all_outputs.len() == 1 {
+            boogie_type(env, &all_outputs[0])
+        } else {
+            boogie_type(env, &Type::Tuple(all_outputs.clone()))
+        };
+
+        emitln!(
+            self.writer,
+            "function {}({}): {};",
+            result_of_name,
+            param_decls.join(", "),
+            result_type
+        );
+
+        let result_of_call = format!("{}({})", result_of_name, param_args.join(", "));
+
+        let axiom_body = if all_outputs.len() == 1 {
+            format!(
+                "{}({}, {})",
+                ensures_of_name,
+                param_args.join(", "),
+                result_of_call
+            )
+        } else {
+            let tuple_projections: Vec<String> = (0..all_outputs.len())
+                .map(|i| format!("_r->${}", i))
+                .collect();
+            format!(
+                "(var _r := {}; {}({}, {}))",
+                result_of_call,
+                ensures_of_name,
+                param_args.join(", "),
+                tuple_projections.join(", ")
+            )
+        };
+
+        emitln!(
+            self.writer,
+            "axiom (forall {} :: {{{}}} {});",
+            param_decls.join(", "),
+            result_of_call,
+            axiom_body
+        );
+    }
+
+    /// Generate per-function behavioral spec functions for closure target functions.
+    /// For each unique closure target function, generate inline Boogie functions
+    /// with concrete bodies from the function's spec conditions.
+    fn generate_behavioral_spec_funs_for_functions(
+        &self,
+        fun_type: &Type,
+        closure_infos: &BTreeSet<ClosureInfo>,
+    ) {
+        let Type::Fun(_params, results, _abilities) = fun_type else {
+            return;
+        };
+        let results_flat = results.clone().flatten();
+
+        // Deduplicate by qualified function id (different masks may target the same function)
+        let mut seen_funs: BTreeSet<QualifiedInstId<FunId>> = BTreeSet::new();
+        for info in closure_infos {
+            if !seen_funs.insert(info.fun.clone()) {
+                continue;
+            }
+            let fun_env = self.env.get_function(info.fun.to_qualified_id());
+            let closure_spec = fun_env.get_spec();
+            let fun_param_tys = fun_env.get_parameter_types();
+
+            // Get function's spec memory
+            let used_memory = fun_env.get_spec_used_memory();
+            let old_memory = fun_env.get_spec_old_memory();
+            let inst_used: BTreeSet<_> = used_memory
+                .iter()
+                .map(|m| m.clone().instantiate(&info.fun.inst))
+                .collect();
+            let inst_old: BTreeSet<_> = old_memory
+                .iter()
+                .map(|m| m.clone().instantiate(&info.fun.inst))
+                .collect();
+            let (mem_param_decls, mem_args) =
+                Self::build_memory_params(self.env, &inst_used, &inst_old);
+
+            // Build parameter declarations for ALL of the function's parameters
+            let mut input_param_decls = mem_param_decls.clone();
+            let mut input_args = vec![];
+            for (i, ty) in fun_param_tys.iter().enumerate() {
+                input_param_decls.push(format!(
+                    "p{}: {}",
+                    i,
+                    boogie_type(self.env, ty.skip_reference())
+                ));
+                input_args.push(format!("p{}", i));
+            }
+
+            // Generate requires_of and aborts_of
+            for kind in [BehaviorKind::RequiresOf, BehaviorKind::AbortsOf] {
+                let bp_name = boogie_behavioral_fun_spec_name(self.env, &info.fun, kind);
+                let body = self.translate_fun_spec_conditions(
+                    &fun_env,
+                    &closure_spec,
+                    kind,
+                    &info.fun.inst,
+                    &inst_old,
+                );
+                emitln!(
+                    self.writer,
+                    "function {{:inline}} {}({}): bool {{ {} }}",
+                    bp_name,
+                    input_param_decls.join(", "),
+                    body
+                );
+            }
+
+            // Generate ensures_of with result functions
+            // Collect all result types (explicit + mut ref outputs)
+            let mut all_result_types = vec![];
+            let mut all_result_type_refs: Vec<&Type> = vec![];
+            for ty in results_flat.iter() {
+                if ty.is_mutable_reference() {
+                    all_result_types.push(boogie_type(self.env, ty.skip_reference()));
+                } else {
+                    all_result_types.push(boogie_type(self.env, ty));
+                }
+                all_result_type_refs.push(ty);
+            }
+            for ty in fun_param_tys.iter().filter(|p| p.is_mutable_reference()) {
+                all_result_types.push(boogie_type(self.env, ty.skip_reference()));
+                all_result_type_refs.push(ty);
+            }
+
+            let input_args_str = {
+                let mut all_args = mem_args.clone();
+                all_args.extend(input_args.iter().cloned());
+                all_args.join(", ")
+            };
+
+            // Compute validity preconditions
+            let validity_preconditions: Vec<String> = fun_param_tys
+                .iter()
+                .enumerate()
+                .map(|(j, ty)| {
+                    boogie_well_formed_expr(self.env, &format!("p{}", j), ty.skip_reference())
+                })
+                .collect();
+            let precond = if validity_preconditions.is_empty() {
+                "true".to_string()
+            } else {
+                validity_preconditions.join(" && ")
+            };
+
+            let ensures_fun_name =
+                boogie_behavioral_fun_spec_name(self.env, &info.fun, BehaviorKind::EnsuresOf);
+
+            // Build full parameter list including results
+            let mut full_param_decls = input_param_decls.clone();
+            for (i, result_type) in all_result_types.iter().enumerate() {
+                full_param_decls.push(format!("r{}: {}", i, result_type));
+            }
+
+            if all_result_types.len() == 1 {
+                // Single result: generate result function and define ensures_of
+                let result_fun_name = boogie_behavioral_fun_result_name(self.env, &info.fun, false);
+                emitln!(
+                    self.writer,
+                    "function {}({}): {};",
+                    result_fun_name,
+                    input_param_decls.join(", "),
+                    all_result_types[0]
+                );
+
+                // Validity axiom
+                let result_ty = all_result_type_refs[0];
+                let result_ty_for_validity = if result_ty.is_mutable_reference() {
+                    result_ty.skip_reference()
+                } else {
+                    result_ty
+                };
+                let result_validity = boogie_well_formed_expr(
+                    self.env,
+                    &format!("{}({})", result_fun_name, input_args_str),
+                    result_ty_for_validity,
+                );
+                let result_fun_app = format!("{}({})", result_fun_name, input_args_str);
+                emitln!(
+                    self.writer,
+                    "axiom (forall {} :: {{{}}} {} ==> {});",
+                    input_param_decls.join(", "),
+                    result_fun_app,
+                    precond,
+                    result_validity
+                );
+
+                // Connecting axiom: result satisfies ensures_of
+                let ensures_body = self.translate_fun_spec_conditions(
+                    &fun_env,
+                    &closure_spec,
+                    BehaviorKind::EnsuresOf,
+                    &info.fun.inst,
+                    &inst_old,
+                );
+                // Define ensures_of as inline function using the translated body
+                emitln!(
+                    self.writer,
+                    "function {{:inline}} {}({}): bool {{ {} }}",
+                    ensures_fun_name,
+                    full_param_decls.join(", "),
+                    ensures_body
+                );
+
+                // Connecting axiom: result_fun satisfies ensures_of
+                let all_input_arg_names: Vec<String> = {
+                    let mut args = mem_args.clone();
+                    args.extend(input_args.iter().cloned());
+                    args
+                };
+                let ensures_of_with_result = format!(
+                    "{}({}, {}({}))",
+                    ensures_fun_name,
+                    all_input_arg_names.join(", "),
+                    result_fun_name,
+                    input_args_str
+                );
+                emitln!(
+                    self.writer,
+                    "axiom (forall {} :: {{{}}} {});",
+                    input_param_decls.join(", "),
+                    result_fun_app,
+                    ensures_of_with_result
+                );
+            } else if all_result_types.len() >= 2 {
+                // Multiple results: generate tuple-returning result function
+                let result_fun_name = boogie_behavioral_fun_result_name(self.env, &info.fun, true);
+
+                let tuple_element_types: Vec<Type> = all_result_type_refs
+                    .iter()
+                    .map(|ty| {
+                        if ty.is_mutable_reference() {
+                            ty.skip_reference().clone()
+                        } else {
+                            (*ty).clone()
+                        }
+                    })
+                    .collect();
+                let tuple_type = boogie_type(self.env, &Type::Tuple(tuple_element_types.clone()));
+                emitln!(
+                    self.writer,
+                    "function {}({}): {};",
+                    result_fun_name,
+                    input_param_decls.join(", "),
+                    tuple_type
+                );
+
+                // Validity axiom
+                let result_fun_app = format!("{}({})", result_fun_name, input_args_str);
+                let result_validities: Vec<String> = tuple_element_types
+                    .iter()
+                    .enumerate()
+                    .map(|(i, ty)| boogie_well_formed_expr(self.env, &format!("r->${}", i), ty))
+                    .collect();
+                let result_validity = format!(
+                    "(var r := {}; {})",
+                    result_fun_app,
+                    result_validities.join(" && ")
+                );
+                emitln!(
+                    self.writer,
+                    "axiom (forall {} :: {{{}}} {} ==> {});",
+                    input_param_decls.join(", "),
+                    result_fun_app,
+                    precond,
+                    result_validity
+                );
+
+                // Define ensures_of with translated body
+                let ensures_body = self.translate_fun_spec_conditions(
+                    &fun_env,
+                    &closure_spec,
+                    BehaviorKind::EnsuresOf,
+                    &info.fun.inst,
+                    &inst_old,
+                );
+                emitln!(
+                    self.writer,
+                    "function {{:inline}} {}({}): bool {{ {} }}",
+                    ensures_fun_name,
+                    full_param_decls.join(", "),
+                    ensures_body
+                );
+
+                // Connecting axiom
+                let all_input_arg_names: Vec<String> = {
+                    let mut args = mem_args.clone();
+                    args.extend(input_args.iter().cloned());
+                    args
+                };
+                let tuple_projections: Vec<String> = (0..all_result_types.len())
+                    .map(|i| format!("_r->${}", i))
+                    .collect();
+                let ensures_of_with_result = format!(
+                    "(var _r := {}({}); {}({}, {}))",
+                    result_fun_name,
+                    input_args_str,
+                    ensures_fun_name,
+                    all_input_arg_names.join(", "),
+                    tuple_projections.join(", ")
+                );
+                emitln!(
+                    self.writer,
+                    "axiom (forall {} :: {{{}}} {});",
+                    input_param_decls.join(", "),
+                    result_fun_app,
+                    ensures_of_with_result
+                );
+            } else {
+                // No results: ensures_of always returns true
+                emitln!(
+                    self.writer,
+                    "function {{:inline}} {}({}): bool {{ true }}",
+                    ensures_fun_name,
+                    full_param_decls.join(", ")
+                );
+            }
+        }
+    }
+
+    /// Translate a function's spec conditions of the given kind to a Boogie expression.
+    /// Uses the SpecTranslator with old-aware memory context.
+    fn translate_fun_spec_conditions(
+        &self,
         fun_env: &FunctionEnv<'_>,
-        closure_spec: &move_model::ast::Spec,
+        closure_spec: &std::cell::Ref<'_, move_model::ast::Spec>,
         kind: BehaviorKind,
-        closure_info: &ClosureInfo,
-        _params: &[Type],
-        results: &[Type],
+        type_inst: &[Type],
+        old_memory: &BTreeSet<QualifiedInstId<StructId>>,
     ) -> String {
-        // Get relevant conditions based on kind
         let conditions: Vec<_> = closure_spec
             .conditions
             .iter()
@@ -1165,82 +1674,62 @@ impl<'env> BoogieTranslator<'env> {
                 BehaviorKind::RequiresOf => matches!(c.kind, ConditionKind::Requires),
                 BehaviorKind::AbortsOf => matches!(c.kind, ConditionKind::AbortsIf),
                 BehaviorKind::EnsuresOf => matches!(c.kind, ConditionKind::Ensures),
-                BehaviorKind::ModifiesOf => matches!(c.kind, ConditionKind::Modifies),
-                BehaviorKind::ResultOf => {
-                    // result_of uses a different code path (uninterpreted function with axiom)
-                    panic!("translate_closure_condition_for_kind should not be called for ResultOf")
-                },
+                BehaviorKind::ResultOf => false,
             })
             .collect();
 
         if conditions.is_empty() {
-            // Default values for each kind
             return match kind {
-                BehaviorKind::RequiresOf => "true".to_string(),
+                BehaviorKind::RequiresOf | BehaviorKind::EnsuresOf => "true".to_string(),
                 BehaviorKind::AbortsOf => "false".to_string(),
-                BehaviorKind::EnsuresOf => "true".to_string(),
-                BehaviorKind::ModifiesOf => "true".to_string(), // modifies_of not yet supported
-                BehaviorKind::ResultOf => {
-                    panic!("translate_closure_condition_for_kind should not be called for ResultOf")
-                },
+                BehaviorKind::ResultOf => "true".to_string(),
             };
         }
 
-        // Compute captured and non-captured indices from the closure's parameter list
-        let param_tys = fun_env.get_parameter_types();
-        let num_params = param_tys.len();
-        let mut captured_indices = vec![];
-        let mut non_captured_indices = vec![];
-        for i in 0..num_params {
-            if closure_info.mask.is_captured(i) {
-                captured_indices.push(i);
-            } else {
-                non_captured_indices.push(i);
-            }
-        }
+        let num_params = fun_env.get_parameter_count();
+        let num_results = fun_env.get_return_count();
 
-        // Translate each condition
         let translated: Vec<_> = conditions
             .iter()
             .map(|cond| {
-                // Translate the condition expression
-                let temp_writer = CodeWriter::new(env.internal_loc());
-                let temp_spec_translator = SpecTranslator::new(&temp_writer, env, self.options);
-                temp_spec_translator.translate(&cond.exp, &[]);
-                let mut translated = temp_writer.extract_result();
-                if translated.ends_with('\n') {
-                    translated.pop();
+                // Translate with old-aware memory context
+                let temp_writer = CodeWriter::new(self.env.internal_loc());
+                let mut temp_trans = SpecTranslator::new(&temp_writer, self.env, self.options);
+                // Set up old-aware context so memory references resolve to parameter names
+                if !old_memory.is_empty() || fun_env.spec_uses_old() {
+                    temp_trans.set_fun_old_memory(old_memory.clone());
+                    temp_trans.set_fun_mut_params(
+                        fun_env
+                            .get_parameters()
+                            .iter()
+                            .filter(|p| p.1.is_mutable_reference())
+                            .map(|p| p.0)
+                            .collect(),
+                    );
+                }
+                temp_trans.translate(&cond.exp, type_inst);
+                let mut result = temp_writer.extract_result();
+                if result.ends_with('\n') {
+                    result.pop();
                 }
 
-                // Substitute captured variables: f->p{pos} for captured args
-                // The closure captures certain parameters. We need to substitute
-                // the captured params ($t{captured_idx}) with f->p{pos}
-                for (pos, &captured_idx) in captured_indices.iter().enumerate() {
-                    let old_str = format!("$t{}", captured_idx);
-                    let new_str = format!("f->p{}", pos);
-                    translated = translated.replace(&old_str, &new_str);
+                // Substitute parameter references: $t{i} -> p{i}
+                // Iterate in reverse to avoid prefix collisions ($t1 matching inside $t10)
+                for i in (0..num_params).rev() {
+                    result = result.replace(&format!("$t{}", i), &format!("p{}", i));
                 }
 
-                // Substitute remaining parameter variables: $t{i} -> p{pos}
-                // These are the non-captured parameters that become the function arguments
-                for (pos, &non_captured_idx) in non_captured_indices.iter().enumerate() {
-                    let old_str = format!("$t{}", non_captured_idx);
-                    let new_str = format!("p{}", pos);
-                    translated = translated.replace(&old_str, &new_str);
+                // Substitute result references: $ret{i} -> r{i}
+                for i in (0..num_results).rev() {
+                    result = result.replace(&format!("$ret{}", i), &format!("r{}", i));
                 }
 
-                // Substitute result names: $ret{i} -> r{i}
-                for i in 0..results.len() {
-                    translated = translated.replace(&format!("$ret{}", i), &format!("r{}", i));
-                }
-
-                translated
+                result
             })
             .collect();
 
-        // Combine conditions based on kind
         match kind {
-            BehaviorKind::RequiresOf | BehaviorKind::EnsuresOf | BehaviorKind::ModifiesOf => {
+            BehaviorKind::RequiresOf | BehaviorKind::EnsuresOf => {
                 if translated.len() == 1 {
                     format!("({})", translated[0])
                 } else {
@@ -1254,10 +1743,67 @@ impl<'env> BoogieTranslator<'env> {
                     format!("({})", translated.join(" || "))
                 }
             },
-            BehaviorKind::ResultOf => {
-                panic!("translate_closure_condition_for_kind should not be called for ResultOf")
-            },
+            BehaviorKind::ResultOf => "true".to_string(),
         }
+    }
+
+    /// Reads pre-computed `(used_memory, old_memory)` from `access_of` for a function parameter.
+    /// Memory is computed during the spec_rewriter pass and stored on `FunParamAccessSpecifiers`.
+    fn get_param_memory(
+        env: &GlobalEnv,
+        fun_qid: &QualifiedInstId<FunId>,
+        param_sym: Symbol,
+    ) -> (
+        BTreeSet<QualifiedInstId<StructId>>,
+        BTreeSet<QualifiedInstId<StructId>>,
+    ) {
+        let fun_env = env.get_function(fun_qid.to_qualified_id());
+        for access in fun_env.get_fun_param_access() {
+            if access.fun_param == param_sym {
+                // Instantiate with the function's type parameters
+                let used = access
+                    .used_memory
+                    .iter()
+                    .map(|m| m.clone().instantiate(&fun_qid.inst))
+                    .collect();
+                let old = access
+                    .old_memory
+                    .iter()
+                    .map(|m| m.clone().instantiate(&fun_qid.inst))
+                    .collect();
+                return (used, old);
+            }
+        }
+        (BTreeSet::new(), BTreeSet::new())
+    }
+
+    /// Builds memory parameter declarations for Boogie functions following the dual-state pattern.
+    /// Returns (param_decls, arg_exprs) where:
+    /// - param_decls: vector of "name: type" strings for function declaration
+    /// - arg_exprs: vector of argument name strings for calling the function
+    fn build_memory_params(
+        env: &GlobalEnv,
+        used_memory: &BTreeSet<QualifiedInstId<StructId>>,
+        old_memory: &BTreeSet<QualifiedInstId<StructId>>,
+    ) -> (Vec<String>, Vec<String>) {
+        let uses_old = !old_memory.is_empty();
+        let mut decls = vec![];
+        let mut args = vec![];
+        for memory in used_memory {
+            let struct_env = &env.get_struct_qid(memory.to_qualified_id());
+            let mem_type = format!("$Memory {}", boogie_struct_name(struct_env, &memory.inst));
+            let name = boogie_resource_memory_name(env, memory, &None);
+            if uses_old && old_memory.contains(memory) {
+                decls.push(format!("old_{}: {}", name, mem_type));
+                decls.push(format!("{}: {}", name, mem_type));
+                args.push(format!("old_{}", name));
+                args.push(name);
+            } else {
+                decls.push(format!("{}: {}", name, mem_type));
+                args.push(name);
+            }
+        }
+        (decls, args)
     }
 
     /// Generate uninterpreted spec functions for behavioral predicates on function-typed parameters.
@@ -1280,8 +1826,15 @@ impl<'env> BoogieTranslator<'env> {
         let results = results.clone().flatten();
 
         for info in fun_param_infos {
+            // Derive memory parameters from access_of declarations
+            let (used_memory, old_memory) =
+                Self::get_param_memory(self.env, &info.fun, info.param_sym);
+            let (mem_param_decls, _mem_args) =
+                Self::build_memory_params(self.env, &used_memory, &old_memory);
+
             // Build input parameters (used by all behavioral predicates)
-            let mut input_param_decls = vec![];
+            // Memory params come first, then data params
+            let mut input_param_decls = mem_param_decls.clone();
             let mut input_args = vec![];
             for (i, ty) in params.iter().enumerate() {
                 input_param_decls.push(format!(
@@ -1489,118 +2042,6 @@ impl<'env> BoogieTranslator<'env> {
                 );
             }
         }
-    }
-
-    /// Generate the uninterpreted `result_of` function and its connecting axiom.
-    ///
-    /// `result_of<f>(x)` is a deterministic selector that returns the result of calling
-    /// function `f` with arguments `x`, based on the function's ensures specification.
-    ///
-    /// Semantics: `result_of<f>(x) == choose y where ensures_of<f>(x, y)`
-    ///
-    /// Generates:
-    /// - Uninterpreted function: `function $result_of'$fun_T_R'(f: $fun_T_R, p0: T): R;`
-    /// - Connecting axiom: `axiom (forall f: $fun, x: T :: {$result_of'...'(f, x)}
-    ///     $ensures_of'...'(f, x, $result_of'...'(f, x)));`
-    fn generate_result_of_function_and_axiom(&self, env: &GlobalEnv, fun_type: &Type) {
-        let Type::Fun(params, results, _abilities) = fun_type else {
-            panic!("expected function type")
-        };
-        let params_flat = params.clone().flatten();
-        let results_flat = results.clone().flatten();
-
-        // Collect mutable reference parameter indices and types
-        let mut_ref_params: Vec<(usize, &Type)> = params_flat
-            .iter()
-            .enumerate()
-            .filter(|(_, t)| t.is_mutable_reference())
-            .collect();
-
-        // Compute all outputs: explicit results + modified mut ref values
-        let mut all_outputs: Vec<Type> = results_flat.clone();
-        for (_, ty) in &mut_ref_params {
-            all_outputs.push(ty.skip_reference().clone());
-        }
-
-        // Skip generating result_of for functions with no outputs at all
-        if all_outputs.is_empty() {
-            return;
-        }
-
-        // Build parameter list for the result_of function
-        let fun_ty_boogie_name = boogie_type(env, fun_type);
-        let result_of_name = boogie_behavioral_eval_fun_name(env, fun_type, BehaviorKind::ResultOf);
-        let ensures_of_name =
-            boogie_behavioral_eval_fun_name(env, fun_type, BehaviorKind::EnsuresOf);
-
-        // Parameters: (fun, params...)
-        let mut param_decls = vec![format!("f: {}", fun_ty_boogie_name)];
-        let mut param_args = vec!["f".to_string()];
-        for (pos, ty) in params_flat.iter().enumerate() {
-            param_decls.push(format!(
-                "p{}: {}",
-                pos,
-                boogie_type(env, ty.skip_reference())
-            ));
-            param_args.push(format!("p{}", pos));
-        }
-
-        // Determine result type: single output uses that type, multiple outputs use a tuple
-        let result_type = if all_outputs.len() == 1 {
-            boogie_type(env, &all_outputs[0])
-        } else {
-            boogie_type(env, &Type::Tuple(all_outputs.clone()))
-        };
-
-        // Emit the uninterpreted function declaration
-        emitln!(
-            self.writer,
-            "// Uninterpreted result selector for `{}`",
-            fun_type.display(&env.get_type_display_ctx())
-        );
-        emitln!(
-            self.writer,
-            "function {}({}): {};",
-            result_of_name,
-            param_decls.join(", "),
-            result_type
-        );
-
-        // Emit the connecting axiom
-        // result_of returns all outputs (explicit results + modified mut refs)
-        // ensures_of expects (params, explicit_results, modified_mut_refs)
-        let result_of_call = format!("{}({})", result_of_name, param_args.join(", "));
-
-        let axiom_body = if all_outputs.len() == 1 {
-            // Single output: pass result_of directly to ensures_of
-            format!(
-                "{}({}, {})",
-                ensures_of_name,
-                param_args.join(", "),
-                result_of_call
-            )
-        } else {
-            // Multiple outputs: decompose the tuple and pass each element to ensures_of
-            // First come explicit results, then modified mut ref values
-            let tuple_projections: Vec<String> = (0..all_outputs.len())
-                .map(|i| format!("_r->${}", i))
-                .collect();
-            format!(
-                "(var _r := {}; {}({}, {}))",
-                result_of_call,
-                ensures_of_name,
-                param_args.join(", "),
-                tuple_projections.join(", ")
-            )
-        };
-
-        emitln!(
-            self.writer,
-            "axiom (forall {} :: {{{}}} {});",
-            param_decls.join(", "),
-            result_of_call,
-            axiom_body
-        );
     }
 }
 
@@ -2292,6 +2733,9 @@ impl FunctionTranslator<'_> {
             .func_env
             .get_qualified_id()
             .instantiate(self.type_inst.to_owned());
+        // Set current function on spec_translator so behavioral predicates can
+        // resolve parameter access specifiers for memory args.
+        self.parent.spec_translator.set_current_fun_qid(qid.clone());
         emitln!(
             writer,
             "// fun {} [{}] {}",
@@ -2301,6 +2745,7 @@ impl FunctionTranslator<'_> {
         );
         self.generate_function_sig();
         self.generate_function_body();
+        self.parent.spec_translator.clear_current_fun_qid();
         emitln!(self.parent.writer);
     }
 
@@ -2531,15 +2976,88 @@ impl FunctionTranslator<'_> {
                 }
             })
             .collect::<BTreeSet<_>>();
-        for (lab, mem) in labels {
-            let mem = &mem.to_owned().instantiate(self.type_inst);
-            let name = boogie_resource_memory_name(env, mem, &Some(*lab));
+        for (lab, mem) in &labels {
+            let mem = (*mem).clone().instantiate(self.type_inst);
+            let name = boogie_resource_memory_name(env, &mem, &Some(**lab));
             emitln!(
                 writer,
                 "var {}: $Memory {};",
                 name,
                 boogie_struct_name(&env.get_struct_qid(mem.to_qualified_id()), &mem.inst)
             );
+        }
+        // Convert labels to a set of (label, instantiated_mem) for dedup against behavior labels
+        let save_mem_set: BTreeSet<_> = labels
+            .iter()
+            .map(|(l, m)| (**l, (*m).clone().instantiate(self.type_inst)))
+            .collect();
+
+        // Generate var declarations for behavior state labels.
+        // These are logical variables used in behavioral predicates (ensures_of, etc.)
+        // with state labels connecting sequential calls.
+        {
+            let mut behavior_labels: BTreeSet<(MemoryLabel, QualifiedInstId<StructId>)> =
+                BTreeSet::new();
+            let spec = fun_target.func_env.get_spec();
+            let all_exps: Vec<_> = spec
+                .conditions
+                .iter()
+                .flat_map(|c| std::iter::once(&c.exp).chain(c.additional_exps.iter()))
+                .cloned()
+                .collect();
+            drop(spec);
+            for exp in &all_exps {
+                exp.visit_pre_order(&mut |e| {
+                    if let ExpData::Call(_, AstOperation::Behavior(_, state), args) = e {
+                        if let Some(ExpData::Call(
+                            closure_id,
+                            AstOperation::Closure(mid, fid, _),
+                            _,
+                        )) = args.first().map(|a| a.as_ref())
+                        {
+                            let inst = env.get_node_instantiation(*closure_id);
+                            let inst = Type::instantiate_slice(&inst, self.type_inst);
+                            let closure_fun_env = env.get_function(mid.qualified(*fid));
+                            let used_memory = closure_fun_env.get_spec_used_memory();
+                            let old_memory = closure_fun_env.get_spec_old_memory();
+                            let collect_for_label = |label: &MemoryLabel,
+                                                     set: &mut BTreeSet<(
+                                MemoryLabel,
+                                QualifiedInstId<StructId>,
+                            )>| {
+                                for memory in used_memory {
+                                    let memory = memory.clone().instantiate(&inst);
+                                    set.insert((*label, memory.clone()));
+                                }
+                                for memory in old_memory {
+                                    let memory = memory.clone().instantiate(&inst);
+                                    set.insert((*label, memory));
+                                }
+                            };
+                            if let Some(pre) = &state.pre {
+                                collect_for_label(pre, &mut behavior_labels);
+                            }
+                            if let Some(post) = &state.post {
+                                collect_for_label(post, &mut behavior_labels);
+                            }
+                        }
+                    }
+                    true
+                });
+            }
+            // Emit declarations for labels not already declared by SaveMem
+            for (lab, mem) in &behavior_labels {
+                let mem = mem.clone().instantiate(self.type_inst);
+                if !save_mem_set.contains(&(*lab, mem.clone())) {
+                    let name = boogie_resource_memory_name(env, &mem, &Some(*lab));
+                    emitln!(
+                        writer,
+                        "var {}: $Memory {};",
+                        name,
+                        boogie_struct_name(&env.get_struct_qid(mem.to_qualified_id()), &mem.inst)
+                    );
+                }
+            }
         }
 
         // Initialize renamed parameters.

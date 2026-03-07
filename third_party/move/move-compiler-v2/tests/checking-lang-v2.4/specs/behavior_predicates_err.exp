@@ -1,13 +1,49 @@
 
 Diagnostics:
-error: global resource access expected
-   ┌─ tests/checking-lang-v2.4/specs/behavior_predicates_err.move:24:33
+error: behavior predicate target `x` must have function type, found `u64`
+   ┌─ tests/checking-lang-v2.4/specs/behavior_predicates_err.move:20:17
    │
-24 │         modifies modifies_of<f>(x);
-   │                                 ^
+20 │         ensures requires_of<x>(x);
+   │                 ^^^^^^^^^^^^^^^^^
 
-error: global resource access expected
-   ┌─ tests/checking-lang-v2.4/specs/behavior_predicates_err.move:24:18
+error: expected 2 argument(s) for requires_of but 1 were provided
+   ┌─ tests/checking-lang-v2.4/specs/behavior_predicates_err.move:33:17
    │
-24 │         modifies modifies_of<f>(x);
-   │                  ^^^^^^^^^^^^^^^^^
+33 │         ensures requires_of<binary>(a);
+   │                 ^^^^^^^^^^^^^^^^^^^^^^
+
+error: expected 2 argument(s) for ensures_of but 1 were provided
+   ┌─ tests/checking-lang-v2.4/specs/behavior_predicates_err.move:46:17
+   │
+46 │         ensures ensures_of<helper>(x);
+   │                 ^^^^^^^^^^^^^^^^^^^^^
+
+error: expected 2 argument(s) for requires_of but 3 were provided
+   ┌─ tests/checking-lang-v2.4/specs/behavior_predicates_err.move:59:17
+   │
+59 │         ensures requires_of<binary>(a, b, c);
+   │                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+error: expected `u64` but found a value of type `bool`
+   ┌─ tests/checking-lang-v2.4/specs/behavior_predicates_err.move:70:40
+   │
+70 │         ensures requires_of<binary>(a, b);
+   │                                        ^
+
+error: expected 1 argument(s) for ensures_of but 2 were provided
+   ┌─ tests/checking-lang-v2.4/specs/behavior_predicates_err.move:83:17
+   │
+83 │         ensures ensures_of<f>(addr, 42);
+   │                 ^^^^^^^^^^^^^^^^^^^^^^^
+
+error: expected 1 argument(s) for result_of but 2 were provided
+   ┌─ tests/checking-lang-v2.4/specs/behavior_predicates_err.move:96:27
+   │
+96 │         ensures result == result_of<helper>(x, x);
+   │                           ^^^^^^^^^^^^^^^^^^^^^^^
+
+error: unknown function `M::nonexistent_function` in behavior predicate
+    ┌─ tests/checking-lang-v2.4/specs/behavior_predicates_err.move:107:17
+    │
+107 │         ensures requires_of<nonexistent_function>(x);
+    │                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^

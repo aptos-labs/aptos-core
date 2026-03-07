@@ -276,70 +276,70 @@ module 0x42::loops {
 /*
 Verification: exiting with verification errors
 error: post-condition does not hold
-    ┌─ tests/inference/loops.enriched.move:143:9
+    ┌─ loops.enriched.move:143:9
     │
 143 │         ensures [inferred = vacuous] forall x: u64, y: u64: x < n && !do_inc ==> r == y;
     │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
     │
-    =     at tests/inference/loops.enriched.move:132: cond_inc_loop
+    =     at loops.enriched.move:132: cond_inc_loop
     =         r = <redacted>
     =         n = <redacted>
     =         do_inc = <redacted>
-    =     at tests/inference/loops.enriched.move:133: cond_inc_loop
+    =     at loops.enriched.move:133: cond_inc_loop
     =         i = <redacted>
-    =     at tests/inference/loops.enriched.move:134: cond_inc_loop
+    =     at loops.enriched.move:134: cond_inc_loop
     =     enter loop, variable(s) r, i havocked and reassigned
     =         r = <redacted>
     =         i = <redacted>
-    =     at tests/inference/loops.enriched.move:134: cond_inc_loop
-    =     at tests/inference/loops.enriched.move:132: cond_inc_loop
+    =     at loops.enriched.move:134: cond_inc_loop
+    =     at loops.enriched.move:132: cond_inc_loop
     =         r = <redacted>
-    =     at tests/inference/loops.enriched.move:145: cond_inc_loop (spec)
-    =     at tests/inference/loops.enriched.move:142: cond_inc_loop (spec)
-    =     at tests/inference/loops.enriched.move:143: cond_inc_loop (spec)
+    =     at loops.enriched.move:145: cond_inc_loop (spec)
+    =     at loops.enriched.move:142: cond_inc_loop (spec)
+    =     at loops.enriched.move:143: cond_inc_loop (spec)
 
 error: post-condition does not hold
-    ┌─ tests/inference/loops.enriched.move:144:9
+    ┌─ loops.enriched.move:144:9
     │
 144 │         ensures [inferred = vacuous] forall x: u64: r == x;
     │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
     │
-    =     at tests/inference/loops.enriched.move:132: cond_inc_loop
+    =     at loops.enriched.move:132: cond_inc_loop
     =         r = <redacted>
     =         n = <redacted>
     =         do_inc = <redacted>
-    =     at tests/inference/loops.enriched.move:133: cond_inc_loop
+    =     at loops.enriched.move:133: cond_inc_loop
     =         i = <redacted>
-    =     at tests/inference/loops.enriched.move:134: cond_inc_loop
+    =     at loops.enriched.move:134: cond_inc_loop
     =     enter loop, variable(s) r, i havocked and reassigned
     =         r = <redacted>
     =         i = <redacted>
-    =     at tests/inference/loops.enriched.move:134: cond_inc_loop
-    =     at tests/inference/loops.enriched.move:132: cond_inc_loop
+    =     at loops.enriched.move:134: cond_inc_loop
+    =     at loops.enriched.move:132: cond_inc_loop
     =         r = <redacted>
-    =     at tests/inference/loops.enriched.move:145: cond_inc_loop (spec)
-    =     at tests/inference/loops.enriched.move:142: cond_inc_loop (spec)
-    =     at tests/inference/loops.enriched.move:143: cond_inc_loop (spec)
-    =     at tests/inference/loops.enriched.move:144: cond_inc_loop (spec)
+    =     at loops.enriched.move:145: cond_inc_loop (spec)
+    =     at loops.enriched.move:142: cond_inc_loop (spec)
+    =     at loops.enriched.move:143: cond_inc_loop (spec)
+    =     at loops.enriched.move:144: cond_inc_loop (spec)
 
 error: function does not abort under this condition
-    ┌─ tests/inference/loops.enriched.move:145:9
+    ┌─ loops.enriched.move:145:9
     │
 145 │         aborts_if [inferred] do_inc && n > 0;
     │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
     │
-    =     at tests/inference/loops.enriched.move:132: cond_inc_loop
+    =     at loops.enriched.move:132: cond_inc_loop
     =         r = <redacted>
     =         n = <redacted>
     =         do_inc = <redacted>
-    =     at tests/inference/loops.enriched.move:133: cond_inc_loop
+    =     at loops.enriched.move:133: cond_inc_loop
     =         i = <redacted>
-    =     at tests/inference/loops.enriched.move:134: cond_inc_loop
+    =     at loops.enriched.move:134: cond_inc_loop
     =     enter loop, variable(s) r, i havocked and reassigned
     =         r = <redacted>
     =         i = <redacted>
-    =     at tests/inference/loops.enriched.move:134: cond_inc_loop
-    =     at tests/inference/loops.enriched.move:132: cond_inc_loop
+    =     at loops.enriched.move:134: cond_inc_loop
+    =     at loops.enriched.move:132: cond_inc_loop
     =         r = <redacted>
-    =     at tests/inference/loops.enriched.move:145: cond_inc_loop (spec)
+    =     at loops.enriched.move:145: cond_inc_loop (spec)
 */
