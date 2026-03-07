@@ -40,3 +40,4 @@ serde = { workspace = true }
 [features]
 default = []
 testing = ["aptos-move-stdlib/testing"]
+profiling = ["move-vm-runtime/profiling"]

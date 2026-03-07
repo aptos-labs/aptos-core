@@ -21,6 +21,7 @@ aptos-gas-algebra = { workspace = true }
 aptos-gas-profiling = { workspace = true }
 aptos-gas-schedule = { workspace = true, features = ["testing"] }
 aptos-language-e2e-tests = { workspace = true }
+aptos-move-e2e-test-harness = { workspace = true, features = ["testing"] }
 aptos-package-builder = { workspace = true }
 aptos-rest-client = { workspace = true }
 aptos-sdk = { workspace = true }
@@ -36,9 +37,7 @@ move-core-types = { workspace = true }
 move-coverage = { workspace = true }
 move-model = { workspace = true }
 move-package = { workspace = true }
-move-symbol-pool = { workspace = true }
 once_cell = { workspace = true }
-project-root = { workspace = true }
 proptest = { workspace = true }
 rstest = { workspace = true }
 serde = { workspace = true }

@@ -2,11 +2,11 @@
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 use crate::{CallArgument, TransactionComposer};
+use aptos_move_e2e_test_harness::MoveHarness;
 use aptos_types::{
     state_store::state_key::StateKey,
     transaction::{ExecutionStatus, TransactionStatus},
 };
-use e2e_move_tests::MoveHarness;
 use move_binary_format::CompiledModule;
 use move_core_types::{
     account_address::AccountAddress, language_storage::ModuleId, value::MoveValue,

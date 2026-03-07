@@ -1,11 +1,11 @@
 // Copyright (c) Aptos Foundation
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
-use crate::{assert_success, harness::MoveHarness, BlockSplit};
 use aptos_language_e2e_tests::{
     account::Account,
     executor::{assert_outputs_equal, ExecutorMode, FakeExecutor},
 };
+use aptos_move_e2e_test_harness::{assert_success, BlockSplit, MoveHarness};
 use aptos_types::{
     account_address::AccountAddress, on_chain_config::FeatureFlag, transaction::SignedTransaction,
 };
