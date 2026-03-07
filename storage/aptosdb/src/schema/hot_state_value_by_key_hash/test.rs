@@ -11,7 +11,7 @@ proptest! {
     fn test_encode_decode(
         state_key in any::<HashValue>(),
         version in any::<Version>(),
-        v in any::<Option<HotStateValue>>(),
+        v in any::<Option<HotStateKvEntry>>(),
     ) {
         assert_encode_decode::<HotStateValueByKeyHashSchema>(&(state_key, version), &v);
     }
