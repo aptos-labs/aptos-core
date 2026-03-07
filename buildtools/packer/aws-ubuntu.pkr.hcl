@@ -57,8 +57,8 @@ build {
   provisioner "shell" {
     inline = [
       "whoami",
-      "chmod +x /tmp/scripts/dev_setup.sh",
-      "sudo -u runner /tmp/scripts/dev_setup.sh -b -r -y -P -J -t -k",
+      "chmod +x /tmp/scripts/setup_build.sh",
+      "sudo -u runner /tmp/scripts/setup_build.sh -b -r -y -P -J -t -k",
 
       // Install GCloud SDK and kubectl
       "sudo apt-get install apt-transport-https ca-certificates gnupg -y",

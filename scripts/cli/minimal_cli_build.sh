@@ -8,7 +8,7 @@ has_command() {
 }
 
 # This script is used to set up a minimal environment for building the Aptos CLI and other tools.
-# The `dev_setup.sh` script is way too complex, and too hard to figure out what is actually happening.  This script
+# The `dev_setup.sh` / `setup_build.sh` scripts install the full development environment.  This script
 # simplifies the process
 if has_command wget; then
   wget https://raw.githubusercontent.com/gregnazario/universal-installer/refs/heads/main/scripts/install_pkg.sh

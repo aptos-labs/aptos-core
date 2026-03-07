@@ -26,7 +26,7 @@ jobs:
           fetch-depth: 0 # Fetch all git history for accurate target determination
 
       - name: Set up WinGet
-        run: Set-Variable ProgressPreference SilentlyContinue ; PowerShell -ExecutionPolicy Bypass -File scripts/windows_dev_setup.ps1
+        run: Set-Variable ProgressPreference SilentlyContinue ; PowerShell -ExecutionPolicy Bypass -File scripts/setup_build.ps1 -b
 
       # Ensure that long paths work
       - name: Ensure long paths work
@@ -40,7 +40,7 @@ jobs:
         uses: Swatinem/rust-cache@9d47c6ad4b02e050fd481d890b2ea34778fd09d6 # pin@v2.7.8
 
       - name: Install the Developer Tools
-        run: Set-Variable ProgressPreference SilentlyContinue ; PowerShell -ExecutionPolicy Bypass -File scripts/windows_dev_setup.ps1 -t
+        run: Set-Variable ProgressPreference SilentlyContinue ; PowerShell -ExecutionPolicy Bypass -File scripts/setup_build.ps1 -b -t
 
       # This is required for the openssl-sys crate to build.
       # See: https://github.com/sfackler/rust-openssl/issues/1542#issuecomment-1399358351

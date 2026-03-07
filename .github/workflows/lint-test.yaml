@@ -164,9 +164,9 @@ jobs:
           ref: ${{ github.event.pull_request.head.sha }}
           fetch-depth: 0 # Fetch all git history for accurate target determination
 
-      - name: Run dev_setup.sh
+      - name: Run setup_build.sh
         run: |
-          scripts/dev_setup.sh -b -p -r -y -P -t
+          scripts/setup_build.sh -b -p -r -y -P -t
 
       - name: Run targeted rust unit tests
         uses: ./.github/actions/rust-targeted-unit-tests
@@ -189,10 +189,10 @@ jobs:
       - uses: actions/checkout@v4
         if: needs.file_change_determinator.outputs.only_docs_changed != 'true'
 
-      - name: Run dev_setup.sh
+      - name: Run setup_build.sh
         if: needs.file_change_determinator.outputs.only_docs_changed != 'true'
         run: |
-          scripts/dev_setup.sh -b -p -r -y -P -t -J
+          scripts/setup_build.sh -b -p -r -y -P -t -J
           # Source profile and add paths to GITHUB_PATH for subsequent steps
           source ~/.profile
           echo "$HOME/.local/share/pnpm" >> $GITHUB_PATH
@@ -219,9 +219,9 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       # Install Move Prover tools
-      - name: Run dev_setup.sh
+      - name: Run setup_build.sh
         run: |
-          scripts/dev_setup.sh -b -y
+          scripts/setup_build.sh -b -y
       - name: Run rust unit tests
         uses: ./.github/actions/rust-unit-tests
         with:
