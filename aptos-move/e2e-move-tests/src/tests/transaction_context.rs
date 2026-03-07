@@ -1,8 +1,9 @@
 // Copyright (c) Aptos Foundation
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
-use crate::{assert_success, harness::MoveHarness, tests::common, BlockSplit, SUCCESS};
+use crate::{tests::common, BlockSplit, SUCCESS};
 use aptos_language_e2e_tests::account::{Account, TransactionBuilder};
+use aptos_move_e2e_test_harness::{assert_success, MoveHarness};
 use aptos_types::{
     move_utils::MemberId,
     on_chain_config::FeatureFlag,
