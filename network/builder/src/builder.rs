@@ -11,10 +11,10 @@
 //! long as the latter is in its trusted peers set.
 use aptos_config::{
     config::{
-        AccessControlPolicy, DiscoveryMethod, NetworkConfig, Peer, PeerRole, PeerSet, RoleType,
-        CONNECTION_BACKOFF_BASE, CONNECTIVITY_CHECK_INTERVAL_MS, MAX_CONNECTION_DELAY_MS,
-        MAX_FRAME_SIZE, MAX_FULLNODE_OUTBOUND_CONNECTIONS, MAX_INBOUND_CONNECTIONS,
-        NETWORK_CHANNEL_SIZE,
+        AccessControlPolicy, BaseConfig, DiscoveryMethod, NetworkConfig, NodeType, Peer, PeerRole,
+        PeerSet, RoleType, CONNECTION_BACKOFF_BASE, CONNECTIVITY_CHECK_INTERVAL_MS,
+        MAX_CONNECTION_DELAY_MS, MAX_FRAME_SIZE, MAX_FULLNODE_OUTBOUND_CONNECTIONS,
+        MAX_INBOUND_CONNECTIONS, NETWORK_CHANNEL_SIZE,
     },
     network_id::NetworkContext,
 };
@@ -169,6 +169,8 @@ impl NetworkBuilder {
         time_service: TimeService,
         reconfig_subscription_service: Option<&mut EventSubscriptionService>,
         peers_and_metadata: Arc<PeersAndMetadata>,
+        node_type: NodeType,
+        base_config: &BaseConfig,
     ) -> NetworkBuilder {
         let peer_id = config.peer_id();
         let identity_key = config.identity_key();
@@ -230,7 +232,12 @@ impl NetworkBuilder {
         );
 
         network_builder.discovery_listeners = Some(Vec::new());
-        network_builder.setup_discovery(config, reconfig_subscription_service);
+        network_builder.setup_discovery(
+            config,
+            reconfig_subscription_service,
+            node_type,
+            base_config,
+        );
 
         // Ensure there are no duplicate source types
         let set: HashSet<_> = network_builder
@@ -361,6 +368,8 @@ impl NetworkBuilder {
         &mut self,
         config: &NetworkConfig,
         mut reconfig_subscription_service: Option<&mut EventSubscriptionService>,
+        node_type: NodeType,
+        base_config: &BaseConfig,
     ) {
         let conn_mgr_reqs_tx = self
             .conn_mgr_reqs_tx()
@@ -380,6 +389,8 @@ impl NetworkBuilder {
                         conn_mgr_reqs_tx.clone(),
                         pubkey,
                         reconfig_events,
+                        node_type,
+                        base_config.clone(),
                     )
                 },
                 DiscoveryMethod::File(file_discovery) => DiscoveryChangeListener::file(
@@ -395,6 +406,8 @@ impl NetworkBuilder {
                     rest_discovery.url.clone(),
                     Duration::from_secs(rest_discovery.interval_secs),
                     self.time_service.clone(),
+                    node_type,
+                    base_config.clone(),
                 ),
                 DiscoveryMethod::None => {
                     continue;

@@ -21,7 +21,7 @@ use aptos_peer_monitoring_service_types::{
         ConnectionMetadata, LatencyPingResponse, NetworkInformationResponse,
         NodeInformationResponse, PeerMonitoringServiceResponse, ServerProtocolVersionResponse,
     },
-    PeerMonitoringServiceMessage,
+    PeerMonitoringServiceMessage, MAX_DISTANCE_FROM_VALIDATORS,
 };
 use aptos_time_service::{MockTimeService, TimeService, TimeServiceTrait};
 use aptos_types::{network_address::NetworkAddress, PeerId};
@@ -740,10 +740,10 @@ pub async fn verify_network_info_request_and_respond(
         let response = match network_request.peer_monitoring_service_request {
             PeerMonitoringServiceRequest::GetNetworkInformation => {
                 if respond_with_invalid_distance {
-                    // Respond with an invalid distance
+                    // Respond with an invalid distance (beyond the max allowed)
                     PeerMonitoringServiceResponse::NetworkInformation(create_network_info_response(
                         &create_connected_peers_map(),
-                        1,
+                        MAX_DISTANCE_FROM_VALIDATORS + 1,
                     ))
                 } else if respond_with_invalid_message {
                     // Respond with the wrong message type
