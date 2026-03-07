@@ -487,6 +487,17 @@ enum CommitMarkerFlag {
     Committed = 2,
 }
 
+/// Result of [SchedulerV2::start_commit], distinguishing why no transaction was returned.
+#[derive(Debug)]
+pub(crate) enum CommitResult {
+    /// A transaction is ready to commit.
+    Ready(TxnIndex, Incarnation),
+    /// No transaction to commit because cold validation is blocking the next one.
+    BlockedByValidation,
+    /// No transaction to commit for other reasons (not executed yet, halted, done).
+    None,
+}
+
 pub(crate) struct SchedulerV2 {
     /// Total number of transactions in the block. This is immutable after scheduler creation.
     num_txns: TxnIndex,
@@ -603,14 +614,14 @@ impl SchedulerV2 {
     /// An important invariant check: Before attempting to dispatch transaction `i`, it verifies
     /// that transaction `i-1` has its `committed_marker` as `Committed`. This ensures strict
     /// sequential processing of commit hooks.
-    pub(crate) fn start_commit(&self) -> Result<Option<(TxnIndex, Incarnation)>, PanicError> {
+    pub(crate) fn start_commit(&self) -> Result<CommitResult, PanicError> {
         // Relaxed ordering due to armed lock acq-rel.
         let next_to_commit_idx = self.next_to_commit_idx.load(Ordering::Relaxed);
         assert!(next_to_commit_idx <= self.num_txns);
 
         if self.is_halted() || next_to_commit_idx == self.num_txns {
             // All sequential commit hooks are already dispatched.
-            return Ok(None);
+            return Ok(CommitResult::None);
         }
 
         let incarnation = self.txn_statuses.incarnation(next_to_commit_idx);
@@ -634,7 +645,7 @@ impl SchedulerV2 {
             {
                 // May not commit a txn with an unsatisfied validation requirement. This will be
                 // more rare than !is_executed in the common case, hence the order of checks.
-                return Ok(None);
+                return Ok(CommitResult::BlockedByValidation);
             }
             // The check might have passed after the validation requirement has been fulfilled.
             // Yet, if validation failed, the status would be aborted before removing the block,
@@ -642,7 +653,7 @@ impl SchedulerV2 {
             // blocking happens during sequential commit hook, while holding the lock (which is
             // also held here), hence before the call of this method.
             if incarnation != self.txn_statuses.incarnation(next_to_commit_idx) {
-                return Ok(None);
+                return Ok(CommitResult::None);
             }
 
             if self
@@ -670,13 +681,13 @@ impl SchedulerV2 {
                 )));
             }
 
-            return Ok(Some((
+            return Ok(CommitResult::Ready(
                 next_to_commit_idx,
                 self.txn_statuses.incarnation(next_to_commit_idx),
-            )));
+            ));
         }
 
-        Ok(None)
+        Ok(CommitResult::None)
     }
 
     /// Called by a worker after it has successfully executed sequential commit hook logic
@@ -1083,6 +1094,8 @@ impl SchedulerV2 {
             return Ok(None);
         }
 
+        let next_commit = self.next_to_commit_idx.load(Ordering::Relaxed);
+        let threshold = next_commit + self.num_workers as TxnIndex * 3 + 4;
         if let Some((
             txn_idx,
             incarnation,
@@ -1100,9 +1113,7 @@ impl SchedulerV2 {
                 // a txn with an index higher than the computed threshold, then the worker
                 // prioritizes other tasks, with additional benefit that when an incarnation
                 // aborts, its requirements become outdated and no need to be processed.
-                self.next_to_commit_idx.load(Ordering::Relaxed)
-                    + self.num_workers as TxnIndex * 3
-                    + 4,
+                threshold,
                 &self.txn_statuses,
             )?
         {
@@ -1336,6 +1347,16 @@ mod tests {
     use super::*;
     use crate::scheduler_status::{ExecutionStatus, SchedulingStatus, StatusWithIncarnation};
     use claims::{assert_err, assert_none, assert_ok, assert_ok_eq, assert_some_eq};
+
+    impl CommitResult {
+        /// Returns the (txn_idx, incarnation) if Ready, None otherwise.
+        pub(crate) fn ready(self) -> Option<(TxnIndex, Incarnation)> {
+            match self {
+                CommitResult::Ready(txn_idx, incarnation) => Some((txn_idx, incarnation)),
+                _ => None,
+            }
+        }
+    }
     use fail::FailScenario;
     use rand::{rngs::StdRng, Rng, SeedableRng};
     use std::cmp::min;
@@ -1784,7 +1805,7 @@ mod tests {
             );
             assert_err!(scheduler.end_commit(i));
 
-            assert_some_eq!(scheduler.start_commit().unwrap(), (i, 0));
+            assert_some_eq!(scheduler.start_commit().unwrap().ready(), (i, 0));
             assert_eq!(
                 scheduler.committed_marker[i as usize].load(Ordering::Relaxed),
                 CommitMarkerFlag::CommitStarted as u8
@@ -1796,7 +1817,7 @@ mod tests {
                 // check which returns Ok(None).
                 assert_err!(scheduler.start_commit());
             } else {
-                assert_none!(scheduler.start_commit().unwrap());
+                assert_none!(scheduler.start_commit().unwrap().ready());
             }
             assert_ok!(scheduler.end_commit(i));
             assert_eq!(
@@ -1859,10 +1880,10 @@ mod tests {
 
         // Test txn index 0.
         assert_eq!(scheduler.next_to_commit_idx.load(Ordering::Relaxed), 0);
-        assert_none!(scheduler.start_commit().unwrap());
+        assert_none!(scheduler.start_commit().unwrap().ready());
         // Next task should start executing (0, 0).
         assert_ok_eq!(scheduler.next_task(0), TaskKind::Execute(0, 0));
-        assert_none!(scheduler.start_commit().unwrap());
+        assert_none!(scheduler.start_commit().unwrap().ready());
         // After execution is finished, commit hook can be dispatched.
         assert_ok!(scheduler.finish_execution(AbortManager::new(0, 0, &scheduler)));
         assert_eq!(
@@ -1870,7 +1891,7 @@ mod tests {
             CommitMarkerFlag::NotCommitted as u8
         );
 
-        assert_some_eq!(scheduler.start_commit().unwrap(), (0, 0));
+        assert_some_eq!(scheduler.start_commit().unwrap().ready(), (0, 0));
         assert_eq!(scheduler.next_to_commit_idx.load(Ordering::Relaxed), 1);
         assert_eq!(
             scheduler.committed_marker[0].load(Ordering::Relaxed),
@@ -1878,7 +1899,7 @@ mod tests {
         );
 
         // Ok(None) because txn 1 has not finished execution yet.
-        assert_none!(scheduler.start_commit().unwrap());
+        assert_none!(scheduler.start_commit().unwrap().ready());
         scheduler.next_to_commit_idx.store(0, Ordering::Relaxed);
         // But calling it again with index 0 would lead to an error.
         assert_err!(scheduler.start_commit());
@@ -1886,7 +1907,7 @@ mod tests {
         scheduler.next_to_commit_idx.store(3, Ordering::Relaxed);
         // Execution status is checked first, so start_commit returns Ok(None).
 
-        assert_none!(scheduler.start_commit().unwrap());
+        assert_none!(scheduler.start_commit().unwrap().ready());
 
         *scheduler.txn_statuses.get_status_mut(3) = ExecutionStatus::new_for_test(
             StatusWithIncarnation::new_for_test(SchedulingStatus::Executed, 5),
@@ -1901,11 +1922,11 @@ mod tests {
             CommitMarkerFlag::NotCommitted as u8
         );
         // No longer an error, but should commit despite being currently stalled.
-        assert_some_eq!(scheduler.start_commit().unwrap(), (3, 5));
+        assert_some_eq!(scheduler.start_commit().unwrap().ready(), (3, 5));
 
         scheduler.next_to_commit_idx.store(10, Ordering::Relaxed);
         scheduler.committed_marker[9].store(CommitMarkerFlag::Committed as u8, Ordering::Relaxed);
-        assert_none!(scheduler.start_commit().unwrap());
+        assert_none!(scheduler.start_commit().unwrap().ready());
     }
 
     // This test generates a DAG of dependencies, where each transaction depends on
@@ -1956,7 +1977,7 @@ mod tests {
                     s.spawn(|_| loop {
                         while scheduler.commit_hooks_try_lock() {
                             while let Some((txn_idx, incarnation)) =
-                                scheduler.start_commit().unwrap()
+                                scheduler.start_commit().unwrap().ready()
                             {
                                 assert!(incarnation < 2);
                                 assert!(scheduler.txn_statuses.is_executed(txn_idx));

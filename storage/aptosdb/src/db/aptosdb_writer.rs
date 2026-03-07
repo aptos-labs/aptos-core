@@ -10,18 +10,22 @@ use crate::{
         transaction_info_db::TransactionInfoDb, LedgerDbSchemaBatches,
     },
     metrics::{
-        COMMITTED_TXNS, LATEST_TXN_VERSION, LEDGER_VERSION, NEXT_BLOCK_EPOCH, OTHER_TIMERS_SECONDS,
+        COMMITTED_TXNS, COUNTER, LATEST_TXN_VERSION, LEDGER_VERSION, NEXT_BLOCK_EPOCH,
+        OTHER_TIMERS_SECONDS,
     },
     pruner::PrunerManager,
     schema::{
         db_metadata::{DbMetadataKey, DbMetadataSchema, DbMetadataValue},
+        hot_state_value_by_key_hash::{
+            HotStateValue as SchemaHotStateValue, HotStateValueByKeyHashSchema,
+        },
         transaction_accumulator_root_hash::TransactionAccumulatorRootHashSchema,
     },
 };
-use aptos_crypto::HashValue;
+use aptos_crypto::{hash::CryptoHash, HashValue};
 use aptos_experimental_runtimes::thread_manager::THREAD_MANAGER;
-use aptos_metrics_core::TimerHelper;
-use aptos_schemadb::batch::SchemaBatch;
+use aptos_metrics_core::{IntCounterVecHelper, TimerHelper};
+use aptos_schemadb::batch::{SchemaBatch, WriteBatch};
 use aptos_storage_interface::{
     chunk_to_commit::ChunkToCommit, db_ensure as ensure, AptosDbError, DbReader, DbWriter, Result,
     StateSnapshotReceiver,
@@ -348,6 +352,50 @@ impl AptosDB {
             )
             .unwrap();
 
+        // Build hot state KV batches if hot state KV DB is available and we have checkpoint updates.
+        let hot_kv_db = &self.state_store.state_db.hot_state_kv_db;
+        let hot_kv_batches_opt = if let Some(hot_kv_db) = hot_kv_db {
+            if let Some(shard_updates) = chunk.hot_state_updates.for_last_checkpoint() {
+                let checkpoint_version = chunk
+                    .state
+                    .last_checkpoint()
+                    .version()
+                    .expect("checkpoint must have a version");
+                let mut batches = hot_kv_db.new_sharded_native_batches();
+                let mut n_entries: u64 = 0;
+
+                for (shard_id, shard) in shard_updates.iter().enumerate() {
+                    for (key, hsv) in shard.insertions() {
+                        let key_hash = CryptoHash::hash(key);
+                        let value_version = shard.value_versions().get(key).copied();
+                        batches[shard_id]
+                            .put::<HotStateValueByKeyHashSchema>(
+                                &(key_hash, hsv.hot_since_version()),
+                                &Some(SchemaHotStateValue::from_types(key, hsv, value_version)),
+                            )
+                            .expect("Failed to put hot state KV insertion");
+                        n_entries += 1;
+                    }
+                    for key in shard.evictions() {
+                        let key_hash = CryptoHash::hash(key);
+                        batches[shard_id]
+                            .put::<HotStateValueByKeyHashSchema>(
+                                &(key_hash, checkpoint_version),
+                                &None,
+                            )
+                            .expect("Failed to put hot state KV eviction");
+                        n_entries += 1;
+                    }
+                }
+
+                Some((batches, checkpoint_version, n_entries))
+            } else {
+                None
+            }
+        } else {
+            None
+        };
+
         let _timer =
             OTHER_TIMERS_SECONDS.timer_with(&["commit_state_kv_and_ledger_metadata___commit"]);
         rayon::scope(|s| {
@@ -362,6 +410,16 @@ impl AptosDB {
                     .commit(chunk.expect_last_version(), None, sharded_state_kv_batches)
                     .unwrap();
             });
+            if let Some((hot_batches, checkpoint_version, n_entries)) = hot_kv_batches_opt {
+                let hot_kv_db = hot_kv_db.as_ref().unwrap();
+                s.spawn(move |_| {
+                    let _timer = OTHER_TIMERS_SECONDS.timer_with(&["commit_hot_state_kv"]);
+                    hot_kv_db
+                        .commit(checkpoint_version, None, hot_batches)
+                        .unwrap();
+                    COUNTER.inc_with_by(&["hot_state_kv_entries_written"], n_entries);
+                });
+            }
         });
 
         Ok(())

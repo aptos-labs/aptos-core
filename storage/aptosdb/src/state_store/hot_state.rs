@@ -185,6 +185,54 @@ impl HotState {
         }
     }
 
+    /// Create a `HotState` with pre-loaded data from the persisted KV DB.
+    /// `entries` contains per-shard vectors of `(StateKey, StateSlot)` with LRU pointers
+    /// already wired, and `head`/`tail` keys for each shard.
+    pub fn new_with_data(
+        state: State,
+        config: HotStateConfig,
+        shard_data: [(
+            Vec<(StateKey, StateSlot)>,
+            Option<StateKey>,
+            Option<StateKey>,
+        ); NUM_STATE_SHARDS],
+    ) -> Self {
+        let base = Arc::new(HotStateBase::new_empty(config.max_items_per_shard));
+
+        // Populate the DashMaps with loaded entries.
+        for (shard_id, (entries, _, _)) in shard_data.iter().enumerate() {
+            for (key, slot) in entries {
+                base.shards[shard_id].insert(key.clone(), slot.clone());
+            }
+        }
+
+        let view = Arc::new(LayeredHotStateView {
+            delta: None,
+            base: Arc::clone(&base),
+        });
+        let committed = Arc::new(Mutex::new(CommittedSnapshot {
+            state: state.clone(),
+            view,
+        }));
+        let merged_version = Arc::new(AtomicU64::new(state.next_version()));
+
+        // Initialize the Committer with the correct head/tail pointers from loaded data.
+        let commit_tx = Committer::spawn_with_data(
+            Arc::clone(&base),
+            Arc::clone(&committed),
+            state,
+            Arc::clone(&merged_version),
+            &shard_data,
+        );
+
+        Self {
+            base,
+            committed,
+            commit_tx,
+            merged_version,
+        }
+    }
+
     pub(crate) fn hack_reset(&self, state: State) {
         {
             let mut committed = self.committed.lock();
@@ -296,6 +344,55 @@ impl Committer {
         std::thread::Builder::new()
             .name("hotstate-commit".to_string())
             .spawn(move || Self::new(base, committed, rx, initial_state, merged_version).run())
+            .expect("Failed to spawn hot state committer thread");
+
+        tx
+    }
+
+    /// Spawn a Committer with pre-loaded data (heads, tails, byte counts).
+    fn spawn_with_data(
+        base: Arc<HotStateBase>,
+        committed: Arc<Mutex<CommittedSnapshot>>,
+        initial_state: State,
+        merged_version: Arc<AtomicU64>,
+        shard_data: &[(
+            Vec<(StateKey, StateSlot)>,
+            Option<StateKey>,
+            Option<StateKey>,
+        ); NUM_STATE_SHARDS],
+    ) -> SyncSender<CommitMsg> {
+        let mut heads: [Option<StateKey>; NUM_STATE_SHARDS] = arr![None; 16];
+        let mut tails: [Option<StateKey>; NUM_STATE_SHARDS] = arr![None; 16];
+        let mut total_key_bytes: usize = 0;
+        let mut total_value_bytes: usize = 0;
+
+        for (shard_id, (entries, latest_key, oldest_key)) in shard_data.iter().enumerate() {
+            heads[shard_id] = latest_key.clone();
+            tails[shard_id] = oldest_key.clone();
+            for (key, slot) in entries {
+                total_key_bytes += key.size();
+                total_value_bytes += slot.size();
+            }
+        }
+
+        let (tx, rx) = std::sync::mpsc::sync_channel(MAX_HOT_STATE_COMMIT_BACKLOG);
+        std::thread::Builder::new()
+            .name("hotstate-commit".to_string())
+            .spawn(move || {
+                let mut committer = Self {
+                    base,
+                    committed,
+                    rx,
+                    total_key_bytes,
+                    total_value_bytes,
+                    heads,
+                    tails,
+                    merged_state: initial_state,
+                    old_views: Vec::new(),
+                    merged_version,
+                };
+                committer.run()
+            })
             .expect("Failed to spawn hot state committer thread");
 
         tx

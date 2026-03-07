@@ -185,13 +185,17 @@ impl StateSlot {
         }
     }
 
-    pub fn expect_value_version(&self) -> Version {
+    pub fn value_version(&self) -> Option<Version> {
         match self {
-            ColdVacant | HotVacant { .. } => unreachable!("expecting occupied"),
+            ColdVacant | HotVacant { .. } => None,
             ColdOccupied { value_version, .. } | HotOccupied { value_version, .. } => {
-                *value_version
+                Some(*value_version)
             },
         }
+    }
+
+    pub fn expect_value_version(&self) -> Version {
+        self.value_version().expect("expecting occupied")
     }
 
     pub fn to_hot(self, hot_since_version: Version) -> Self {

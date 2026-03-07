@@ -6,5 +6,5 @@ error: failed to parse manifest
 4 |
 5 | [dependencies]
 6 | a = { git = "bad" }
-  |             ^^^^^ invalid value: string "bad", expected relative URL without a base
+  |             ^^^^^ relative URL without a base: "bad"
   |
