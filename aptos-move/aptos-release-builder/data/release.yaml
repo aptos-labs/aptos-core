@@ -1,20 +1,40 @@
 ---
-remote_endpoint: https://fullnode.mainnet.aptoslabs.com
+remote_endpoint: https://fullnode.testnet.aptoslabs.com
 # replace with below for actual release, compat test needs concrete URL above:
 # remote_endpoint: ~
-name: "vX.YY.Z"
+name: "v1.41.1"
 proposals:
   - name: proposal_1_upgrade_framework
     metadata:
-      title: "Multi-step proposal to upgrade mainnet framework, version vX.YY.Z"
+      title: "Update gas schedule"
       description: "This includes changes in https://github.com/aptos-labs/aptos-core/releases/tag/aptos-node-vX.YY.Z"
     execution_mode: MultiStep
     update_sequence:
+      - Execution:
+          V7:
+            transaction_shuffler_type:
+              use_case_aware:
+                sender_spread_factor: 32
+                platform_use_case_spread_factor: 0
+                user_use_case_spread_factor: 4
+            block_gas_limit_type:
+              complex_limit_v1:
+                effective_block_gas_limit: 300000
+                execution_gas_effective_multiplier: 1
+                io_gas_effective_multiplier: 1
+                conflict_penalty_window: 9
+                use_granular_resource_group_conflicts: false
+                use_module_publishing_block_conflict: true
+                block_output_limit: 5242880
+                include_user_txn_size_in_block_output: true
+                add_block_limit_outcome_onchain: true
+            enable_per_block_gas_limit: false
+            transaction_deduper_type: txn_hash_and_authenticator_v1
+            gas_price_to_burn: 90
+            persisted_auxiliary_info_version: 1
       - Gas:
-          new: current
+          new: https://raw.githubusercontent.com/aptos-labs/aptos-networks/main/gas/v1.41.1.json
+          old: https://raw.githubusercontent.com/aptos-labs/aptos-networks/main/gas/v1.41.0.json
           # replace with below for actual release, above "current" is needed for compat tests:
           # old: https://raw.githubusercontent.com/aptos-labs/aptos-networks/main/gas/vX.WW.Z.json
           # new: https://raw.githubusercontent.com/aptos-labs/aptos-networks/main/gas/vX.YY.Z.json
-      - Framework:
-          bytecode_version: 8
-          git_hash: ~
