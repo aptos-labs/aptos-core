@@ -128,7 +128,7 @@ impl DbAccessUtil {
                 .map(|bytes| bcs::from_bytes(bytes).unwrap())
                 .unwrap()
         } else {
-            FungibleStoreResource::new(AccountAddress::TEN, 0, false)
+            FungibleStoreResource::new_apt(0, false)
         })
     }
 
