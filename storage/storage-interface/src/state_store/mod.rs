@@ -10,18 +10,27 @@ pub mod state_view;
 pub mod state_with_summary;
 pub mod versioned_state_value;
 
-use aptos_types::state_store::{hot_state::HotStateValue, state_key::StateKey, NUM_STATE_SHARDS};
-use std::collections::{HashMap, HashSet};
+use aptos_types::{
+    state_store::{hot_state::HotStateValue, state_key::StateKey, NUM_STATE_SHARDS},
+    transaction::Version,
+};
+use std::collections::HashMap;
 
 #[derive(Debug)]
-pub(crate) struct HotStateShardUpdates {
-    insertions: HashMap<StateKey, HotStateValue>,
-    // TODO(HotState): only keys are needed for now, since evictions do not affect cold state.
-    evictions: HashSet<StateKey>,
+pub struct HotStateShardUpdates {
+    /// Each insertion carries the `HotStateValue` and an optional `value_version`.
+    /// `value_version` is `Some(version)` for occupied entries and `None` for vacant.
+    pub insertions: HashMap<StateKey, (HotStateValue, Option<Version>)>,
+    /// Each eviction carries the checkpoint version at which eviction happened.
+    // TODO(HotState): per-block eviction tracking will be needed for cold-write elimination.
+    pub evictions: HashMap<StateKey, Version>,
 }
 
 impl HotStateShardUpdates {
-    pub fn new(insertions: HashMap<StateKey, HotStateValue>, evictions: HashSet<StateKey>) -> Self {
+    pub fn new(
+        insertions: HashMap<StateKey, (HotStateValue, Option<Version>)>,
+        evictions: HashMap<StateKey, Version>,
+    ) -> Self {
         Self {
             insertions,
             evictions,
@@ -31,8 +40,8 @@ impl HotStateShardUpdates {
 
 #[derive(Debug)]
 pub struct HotStateUpdates {
-    for_last_checkpoint: Option<[HotStateShardUpdates; NUM_STATE_SHARDS]>,
-    for_latest: Option<[HotStateShardUpdates; NUM_STATE_SHARDS]>,
+    pub for_last_checkpoint: Option<[HotStateShardUpdates; NUM_STATE_SHARDS]>,
+    pub for_latest: Option<[HotStateShardUpdates; NUM_STATE_SHARDS]>,
 }
 
 impl HotStateUpdates {
