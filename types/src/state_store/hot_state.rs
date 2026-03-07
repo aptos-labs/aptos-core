@@ -57,6 +57,14 @@ impl HotStateValue {
         }
     }
 
+    pub fn hot_since_version(&self) -> Version {
+        self.hot_since_version
+    }
+
+    pub fn value_opt(&self) -> Option<&StateValue> {
+        self.value.as_ref()
+    }
+
     pub fn clone_from_slot(slot: &StateSlot) -> Self {
         match slot {
             StateSlot::HotOccupied {
