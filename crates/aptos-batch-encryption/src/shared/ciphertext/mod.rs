@@ -65,9 +65,6 @@ pub trait CTEncrypt<PCT: InnerCiphertext> {
 }
 
 pub trait CTDecrypt<P: Plaintext> {
-    /// convenience method; will look up ct's id in EvalProofs, and
-    /// will use it to decrypt the ct's underlying bibe_ct
-    /// TODO is this still true? Doesn't seem to look up ID anymore
     fn decrypt(&self, ct: &PreparedCiphertext) -> Result<P>;
 }
 

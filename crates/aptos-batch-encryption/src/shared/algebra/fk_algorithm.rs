@@ -18,9 +18,6 @@ use serde::{
 };
 use std::{fmt, marker::PhantomData, ops::Mul};
 
-// TODO have a better error-handling story. Currently there are a lot of assert_eq! which
-// should be replaced with either compile-time guarantees on array sizes or with Results.
-
 /// To efficiently evaluate a Circulant matrix of size `n x n` over an input,
 /// a FFT-friendly subset of a field of size `n` is required. This struct
 /// represents that subset. Following the terminology in Arkworks, we call this
