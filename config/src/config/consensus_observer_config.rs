@@ -11,7 +11,7 @@ use serde_yaml::Value;
 // Useful constants for enabling consensus observer on different node types
 const ENABLE_ON_VALIDATORS: bool = true;
 const ENABLE_ON_VALIDATOR_FULLNODES: bool = true;
-const ENABLE_ON_PUBLIC_FULLNODES: bool = false;
+const ENABLE_ON_PUBLIC_FULLNODES: bool = true;
 
 // Maximum number of pending blocks for test networks (e.g., devnet)
 const MAX_NUM_PENDING_BLOCKS_FOR_TEST_NETWORKS: u64 = 300;
