@@ -326,6 +326,68 @@ fn test_open_as_secondary() {
 }
 
 #[test]
+fn test_delete_range() {
+    let db = TestDB::new();
+
+    // Insert keys 0..10 in TestSchema1
+    let mut db_batch = SchemaBatch::new();
+    for i in 0..10 {
+        db_batch
+            .put::<TestSchema1>(&TestField(i), &TestField(i))
+            .unwrap();
+    }
+    db.write_schemas(db_batch).unwrap();
+
+    assert_eq!(collect_values::<TestSchema1>(&db).len(), 10);
+
+    // Delete range [3, 7) — removes keys 3, 4, 5, 6
+    let mut db_batch = SchemaBatch::new();
+    db_batch
+        .delete_range::<TestSchema1>(&TestField(3), &TestField(7))
+        .unwrap();
+    db.write_schemas(db_batch).unwrap();
+
+    assert_eq!(
+        collect_values::<TestSchema1>(&db),
+        gen_expected_values(&[(0, 0), (1, 1), (2, 2), (7, 7), (8, 8), (9, 9)]),
+    );
+}
+
+#[test]
+fn test_delete_range_in_mixed_batch() {
+    let db = TestDB::new();
+
+    let mut db_batch = SchemaBatch::new();
+    for i in 0..10 {
+        db_batch
+            .put::<TestSchema1>(&TestField(i), &TestField(i))
+            .unwrap();
+    }
+    // Range delete within the same batch
+    db_batch
+        .delete_range::<TestSchema1>(&TestField(0), &TestField(5))
+        .unwrap();
+    // Also put a value that overlaps with the deleted range (should survive since it's after the delete)
+    db_batch
+        .put::<TestSchema1>(&TestField(2), &TestField(20))
+        .unwrap();
+    db.write_schemas(db_batch).unwrap();
+
+    let values = collect_values::<TestSchema1>(&db);
+    // Key 2 should have value 20 (re-inserted after range delete)
+    assert!(values.contains(&(TestField(2), TestField(20))));
+    // Keys 0, 1, 3, 4 should be gone
+    assert!(!values.iter().any(|(k, _)| *k == TestField(0)));
+    assert!(!values.iter().any(|(k, _)| *k == TestField(1)));
+    assert!(!values.iter().any(|(k, _)| *k == TestField(3)));
+    assert!(!values.iter().any(|(k, _)| *k == TestField(4)));
+    // Keys 5..10 should still be present
+    for i in 5..10 {
+        assert!(values.contains(&(TestField(i), TestField(i))));
+    }
+}
+
+#[test]
 fn test_report_size() {
     let db = TestDB::new();
 
