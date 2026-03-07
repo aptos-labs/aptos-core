@@ -10,6 +10,7 @@ use aptos_storage_interface::state_store::{
     state::State, state_summary::StateSummary, state_view::hot_state_view::HotStateView,
     state_with_summary::StateWithSummary,
 };
+use aptos_types::state_store::{state_key::StateKey, state_slot::StateSlot, NUM_STATE_SHARDS};
 use std::sync::Arc;
 
 #[derive(Clone)]
@@ -24,6 +25,24 @@ impl PersistedState {
     pub fn new_empty(config: HotStateConfig) -> Self {
         let state = State::new_empty(config);
         let hot_state = Arc::new(HotState::new(state, config));
+        let summary = Arc::new(Mutex::new(StateSummary::new_empty(config)));
+        Self { hot_state, summary }
+    }
+
+    /// Creates a `PersistedState` from hot state entries loaded from the DB.
+    ///
+    /// `state` must be built via `State::new_from_hot_state_entries()` from the same
+    /// `entries_per_shard`. This populates the DashMaps so the hot state view is
+    /// immediately queryable.
+    ///
+    /// Note: hot state summary (SMT) is NOT loaded — it starts empty.
+    /// TODO(HotState): also load hot state root hash from hot_state_merkle_db.
+    pub fn from_loaded(
+        state: State,
+        config: HotStateConfig,
+        entries_per_shard: [Vec<(StateKey, StateSlot)>; NUM_STATE_SHARDS],
+    ) -> Self {
+        let hot_state = Arc::new(HotState::new_with_base(state, config, entries_per_shard));
         let summary = Arc::new(Mutex::new(StateSummary::new_empty(config)));
         Self { hot_state, summary }
     }
