@@ -1,0 +1,25 @@
+=== Module 0x66::test ===
+
+fun read_field_val(r0) {
+    params: 1, locals: 0, registers: 3
+    0: r1 := imm_borrow_loc r0
+    1: r2 := read_field S::_2, r1
+    2: ret [r2]
+}
+
+fun read_and_add(r0) {
+    params: 1, locals: 0, registers: 3
+    0: r1 := read_ref r0
+    1: r2 := add r1, #1
+    2: ret [r2]
+}
+
+fun read_field_ref_twice(r0) {
+    params: 1, locals: 1, registers: 6
+    0: r2 := imm_borrow_loc r0
+    1: r1 := imm_borrow_field S::_1, r2
+    2: r3 := read_ref r1
+    3: r4 := read_ref r1
+    4: r5 := add r3, r4
+    5: ret [r5]
+}

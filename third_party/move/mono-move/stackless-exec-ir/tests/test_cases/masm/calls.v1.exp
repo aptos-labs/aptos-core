@@ -1,0 +1,13 @@
+=== Module 0x66::test ===
+
+fun identity(r0) {
+    params: 1, locals: 0, registers: 1
+    0: ret [r0]
+}
+
+fun caller() {
+    params: 0, locals: 0, registers: 2
+    0: r0 := ld_u64 10
+    1: [r1] := call identity, [r0]
+    2: ret [r1]
+}

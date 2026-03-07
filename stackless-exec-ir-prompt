@@ -1,0 +1,20 @@
+Would it be useful to create an "immediate" version of binary operations (and maybe unary operations) where instead of always reading from registers, the operands could be constants. This would allow us to not have to write always load constants to a register, thereby reducing the number of instructions. How would the two versions of convertors/optimizers adapt to this change?
+
+The main goal, as a reminder, is in the stackless exec ir conversion:
+- it minimizes the number of registers, reusing or avoid creating them in the first place
+- minimizes moves, copies, stores
+- minimizes the number of instructions
+
+Now, can you add a new kind of pipeline, where the file format bytecode is first reduced to a partial SSA form (intra-block SSA), where within a basic block, each computed value is assigned a value ID.
+
+
+I want to create an efficient (linear time or close to linear time) conversion from move fileformat bytecode (given in third_party/move/move-binary-format/src/file_format.rs) to a stackless execution format for a new VM being created under third_party/move/mono-move. Some of the additional requirements are:
+- it minimizes the number of registers, reusing or avoid creating them in the first place
+- minimizes moves, copies, stores
+- minimizes the number of instructions
+
+Using multiple (linear or close to linear) passes is okay for simplicity, we can later merge these passes for efficiency.
+
+We should also design such an stackless execution format (`StacklessExecIR`). The stackless here refers to the absence of the implicit operand stack so that we don't have to route all execution traffic through the operand stack, requiring preparing the operand stack before each instruction execution. We should be able to write StacklessExecIR to a file for testing and debugging (via a utility to print them), similar facilities exist in the move-compiler-v2.
+
+Thus, we want a crate built under mono-move, called stackless-exec-ir, which can read `.masm` files (representing file format bytecode), and convert them to StacklessExecIR, and print it. A testsuite should follow the .exp file style testing with datatest_stable, consisting of input .masm files and output .exp files with StacklessExecIR dump.
