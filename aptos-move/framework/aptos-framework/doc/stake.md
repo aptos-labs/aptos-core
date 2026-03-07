@@ -4748,7 +4748,7 @@ Assuming we are in a middle of a reconfiguration (no matter it is immediate or a
 
 
 <pre><code><b>fun</b> <a href="stake.md#0x1_stake_get_reconfig_start_time_secs">get_reconfig_start_time_secs</a>(): u64 {
-    <b>if</b> (<a href="reconfiguration_state.md#0x1_reconfiguration_state_is_initialized">reconfiguration_state::is_initialized</a>()) {
+    <b>if</b> (<a href="reconfiguration_state.md#0x1_reconfiguration_state_is_in_progress">reconfiguration_state::is_in_progress</a>()) {
         <a href="reconfiguration_state.md#0x1_reconfiguration_state_start_time_secs">reconfiguration_state::start_time_secs</a>()
     } <b>else</b> {
         <a href="timestamp.md#0x1_timestamp_now_seconds">timestamp::now_seconds</a>()

@@ -12,7 +12,6 @@ WARNING: <code><a href="reconfiguration_state.md#0x1_reconfiguration_state_initi
 -  [Struct `StateInactive`](#0x1_reconfiguration_state_StateInactive)
 -  [Struct `StateActive`](#0x1_reconfiguration_state_StateActive)
 -  [Constants](#@Constants_0)
--  [Function `is_initialized`](#0x1_reconfiguration_state_is_initialized)
 -  [Function `initialize`](#0x1_reconfiguration_state_initialize)
 -  [Function `initialize_for_testing`](#0x1_reconfiguration_state_initialize_for_testing)
 -  [Function `is_in_progress`](#0x1_reconfiguration_state_is_in_progress)
@@ -136,30 +135,6 @@ A state variant indicating a reconfiguration is in progress.
 </code></pre>
 
 
-
-<a id="0x1_reconfiguration_state_is_initialized"></a>
-
-## Function `is_initialized`
-
-
-
-<pre><code><b>public</b> <b>fun</b> <a href="reconfiguration_state.md#0x1_reconfiguration_state_is_initialized">is_initialized</a>(): bool
-</code></pre>
-
-
-
-<details>
-<summary>Implementation</summary>
-
-
-<pre><code><b>public</b> <b>fun</b> <a href="reconfiguration_state.md#0x1_reconfiguration_state_is_initialized">is_initialized</a>(): bool {
-    <b>exists</b>&lt;<a href="reconfiguration_state.md#0x1_reconfiguration_state_State">State</a>&gt;(@aptos_framework)
-}
-</code></pre>
-
-
-
-</details>
 
 <a id="0x1_reconfiguration_state_initialize"></a>
 

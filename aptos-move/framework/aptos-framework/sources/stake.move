@@ -1903,7 +1903,7 @@ module aptos_framework::stake {
 
     /// Assuming we are in a middle of a reconfiguration (no matter it is immediate or async), get its start time.
     fun get_reconfig_start_time_secs(): u64 {
-        if (reconfiguration_state::is_initialized()) {
+        if (reconfiguration_state::is_in_progress()) {
             reconfiguration_state::start_time_secs()
         } else {
             timestamp::now_seconds()
