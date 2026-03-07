@@ -119,6 +119,15 @@ pub enum IndexType {
     TwoLevelIndexSearch,
 }
 
+/// Compression algorithm for RocksDB.
+#[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
+pub enum DBCompressionType {
+    /// No compression. Best for data that doesn't compress well (e.g. hashes).
+    None,
+    /// LZ4 compression. Good balance of speed and compression ratio.
+    Lz4,
+}
+
 /// Port selected RocksDB options for tuning underlying rocksdb instance of AptosDB.
 /// see <https://github.com/facebook/rocksdb/blob/master/include/rocksdb/options.h>
 /// for detailed explanations.
@@ -155,6 +164,8 @@ pub struct RocksdbConfig {
     pub bloom_filter_bits: Option<f64>,
     /// If not `None`, use hybrid ribbon filter policy.
     pub bloom_before_level: Option<i32>,
+    /// Compression type for SST files.
+    pub compression_type: DBCompressionType,
 }
 
 impl RocksdbConfig {
@@ -187,6 +198,7 @@ impl Default for RocksdbConfig {
             stats_dump_period_sec: None,
             bloom_filter_bits: None,
             bloom_before_level: None,
+            compression_type: DBCompressionType::Lz4,
         }
     }
 }
@@ -220,7 +232,10 @@ impl Default for RocksdbConfigs {
     fn default() -> Self {
         Self {
             ledger_db_config: RocksdbConfig::default(),
-            state_merkle_db_config: RocksdbConfig::default(),
+            state_merkle_db_config: RocksdbConfig {
+                compression_type: DBCompressionType::None,
+                ..Default::default()
+            },
             state_kv_db_config: RocksdbConfig {
                 bloom_filter_bits: Some(10.0),
                 bloom_before_level: Some(2),
