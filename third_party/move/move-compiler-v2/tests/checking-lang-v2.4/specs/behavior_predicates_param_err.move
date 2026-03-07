@@ -6,12 +6,12 @@ module 0x42::M {
         value: u64,
     }
 
-    // Test modifies_of with function parameter - not supported
-    fun apply_modifies(f: |address|, addr: address) {
+    // Test ensures_of with wrong number of arguments for function parameter
+    fun apply_ensures_wrong_arity(f: |address|, addr: address) {
         f(addr)
     }
 
-    spec apply_modifies {
-        ensures modifies_of<f>(global<Counter>(addr));
+    spec apply_ensures_wrong_arity {
+        ensures ensures_of<f>(addr, 42);
     }
 }

@@ -179,24 +179,6 @@ module 0x42::M {
       ensures ensures_of(closure#0M::mixed_params(), $t0, $t1, result0());
     }
 
-    private fun test_modifies_multi(addr1: address,addr2: address)
-        acquires Counter(*)
-     {
-        M::swap_counters(addr1, addr2)
-    }
-    spec {
-      ensures modifies_of(closure#0M::swap_counters(), global<0x42::M::Counter>($t0), global<0x42::M::Counter>($t1));
-    }
-
-    private fun test_modifies_single(addr: address)
-        acquires Counter(*)
-     {
-        M::increment_counter(addr)
-    }
-    spec {
-      ensures modifies_of(closure#0M::increment_counter(), global<0x42::M::Counter>($t0));
-    }
-
     private fun test_pair_generic_explicit(x: u64,y: bool): (u64, bool) {
         M::pair<u64, bool>(x, y)
     }
@@ -282,13 +264,6 @@ module 0x42::M {
     spec fun $increment(x: u64): u64 {
         Add<u64>(x, 1)
     }
-    spec fun $increment_counter(addr: address) {
-        {
-          let counter: &mut 0x42::M::Counter = BorrowGlobal(Mutable)<0x42::M::Counter>(addr);
-          select M::Counter.value<0x42::M::Counter>(counter) = Add<u64>(select M::Counter.value<0x42::M::Counter>(counter), 1);
-          Tuple()
-        }
-    }
     spec fun $mixed_params(x: u64,flag: bool): u64 {
         if flag {
           Add<u64>(x, 1)
@@ -301,17 +276,6 @@ module 0x42::M {
     }
     spec fun $split(x: u64): (u64, u64) {
         Tuple(Div<u64>(x, 2), Sub<u64>(x, Div<u64>(x, 2)))
-    }
-    spec fun $swap_counters(addr1: address,addr2: address) {
-        {
-          let v1: u64 = select M::Counter.value<0x42::M::Counter>(global<0x42::M::Counter>(addr1));
-          {
-            let v2: u64 = select M::Counter.value<0x42::M::Counter>(global<0x42::M::Counter>(addr2));
-            select M::Counter.value<0x42::M::Counter>(BorrowGlobal(Mutable)<0x42::M::Counter>(addr1)) = v2;
-            select M::Counter.value<0x42::M::Counter>(BorrowGlobal(Mutable)<0x42::M::Counter>(addr2)) = v1;
-            Tuple()
-          }
-        }
     }
     spec fun $unbox<T>(b: Box<#0>): #0 {
         select M::Box.value<0x42::M::Box<#0>>(b)
@@ -522,26 +486,6 @@ module 0x42::M {
     spec test_mixed_params(x: u64, b: bool): u64 {
         ensures requires_of<mixed_params>(x, b);
         ensures ensures_of<mixed_params>(x, b, result);
-    }
-
-    fun test_modifies_multi(addr1: address, addr2: address)
-        acquires Counter
-    {
-        swap_counters(addr1, addr2)
-    }
-
-    spec test_modifies_multi(addr1: address, addr2: address) {
-        ensures modifies_of<swap_counters>(global<Counter>(addr1), global<Counter>(addr2));
-    }
-
-    fun test_modifies_single(addr: address)
-        acquires Counter
-    {
-        increment_counter(addr)
-    }
-
-    spec test_modifies_single(addr: address) {
-        ensures modifies_of<increment_counter>(global<Counter>(addr));
     }
 
     fun test_pair_generic_explicit(x: u64, y: bool): (u64, bool) {
@@ -886,22 +830,6 @@ fun M::test_mixed_params($t0: u64, $t1: bool): u64 {
 
 
 [variant baseline]
-fun M::test_modifies_multi($t0: address, $t1: address) {
-     var $t2: address
-  0: $t2 := infer($t0)
-  1: M::swap_counters($t2, $t1)
-  2: return ()
-}
-
-
-[variant baseline]
-fun M::test_modifies_single($t0: address) {
-  0: M::increment_counter($t0)
-  1: return ()
-}
-
-
-[variant baseline]
 fun M::test_pair_generic_explicit($t0: u64, $t1: bool): (u64, bool) {
      var $t2: u64
      var $t3: bool
@@ -1186,24 +1114,6 @@ module 0x42::M {
       ensures ensures_of(closure#0M::mixed_params(), $t0, $t1, result0());
     }
 
-    private fun test_modifies_multi(addr1: address,addr2: address)
-        acquires Counter(*)
-     {
-        M::swap_counters(addr1, addr2)
-    }
-    spec {
-      ensures modifies_of(closure#0M::swap_counters(), global<0x42::M::Counter>($t0), global<0x42::M::Counter>($t1));
-    }
-
-    private fun test_modifies_single(addr: address)
-        acquires Counter(*)
-     {
-        M::increment_counter(addr)
-    }
-    spec {
-      ensures modifies_of(closure#0M::increment_counter(), global<0x42::M::Counter>($t0));
-    }
-
     private fun test_pair_generic_explicit(x: u64,y: bool): (u64, bool) {
         M::pair<u64, bool>(x, y)
     }
@@ -1289,13 +1199,6 @@ module 0x42::M {
     spec fun $increment(x: u64): u64 {
         Add<u64>(x, 1)
     }
-    spec fun $increment_counter(addr: address) {
-        {
-          let counter: &mut 0x42::M::Counter = BorrowGlobal(Mutable)<0x42::M::Counter>(addr);
-          select M::Counter.value<0x42::M::Counter>(counter) = Add<u64>(select M::Counter.value<0x42::M::Counter>(counter), 1);
-          Tuple()
-        }
-    }
     spec fun $mixed_params(x: u64,flag: bool): u64 {
         if flag {
           Add<u64>(x, 1)
@@ -1308,17 +1211,6 @@ module 0x42::M {
     }
     spec fun $split(x: u64): (u64, u64) {
         Tuple(Div<u64>(x, 2), Sub<u64>(x, Div<u64>(x, 2)))
-    }
-    spec fun $swap_counters(addr1: address,addr2: address) {
-        {
-          let v1: u64 = select M::Counter.value<0x42::M::Counter>(global<0x42::M::Counter>(addr1));
-          {
-            let v2: u64 = select M::Counter.value<0x42::M::Counter>(global<0x42::M::Counter>(addr2));
-            select M::Counter.value<0x42::M::Counter>(BorrowGlobal(Mutable)<0x42::M::Counter>(addr1)) = v2;
-            select M::Counter.value<0x42::M::Counter>(BorrowGlobal(Mutable)<0x42::M::Counter>(addr2)) = v1;
-            Tuple()
-          }
-        }
     }
     spec fun $unbox<T>(b: Box<#0>): #0 {
         select M::Box.value<0x42::M::Box<#0>>(b)
@@ -1583,22 +1475,6 @@ fun M::test_mixed_params($t0: u64, $t1: bool): u64 {
   0: $t3 := infer($t0)
   1: $t2 := M::mixed_params($t3, $t1)
   2: return $t2
-}
-
-
-[variant baseline]
-fun M::test_modifies_multi($t0: address, $t1: address) {
-     var $t2: address
-  0: $t2 := infer($t0)
-  1: M::swap_counters($t2, $t1)
-  2: return ()
-}
-
-
-[variant baseline]
-fun M::test_modifies_single($t0: address) {
-  0: M::increment_counter($t0)
-  1: return ()
 }
 
 
@@ -1890,71 +1766,58 @@ fun test_mixed_params(l0: u64, l1: bool): u64
     ret
 
 // Function definition at index 22
-fun test_modifies_multi(l0: address, l1: address) acquires Counter
-    move_loc l0
-    move_loc l1
-    call swap_counters
-    ret
-
-// Function definition at index 23
-fun test_modifies_single(l0: address) acquires Counter
-    move_loc l0
-    call increment_counter
-    ret
-
-// Function definition at index 24
 fun test_pair_generic_explicit(l0: u64, l1: bool): (u64, bool)
     move_loc l0
     move_loc l1
     call pair<u64, bool>
     ret
 
-// Function definition at index 25
+// Function definition at index 23
 fun test_requires_binary(l0: u64, l1: u64): u64
     move_loc l0
     move_loc l1
     call add
     ret
 
-// Function definition at index 26
+// Function definition at index 24
 fun test_requires_generic_explicit(l0: u64): u64
     move_loc l0
     call identity<u64>
     ret
 
-// Function definition at index 27
+// Function definition at index 25
 fun test_requires_generic_inferred(l0: u64): u64
     move_loc l0
     call identity<u64>
     ret
 
-// Function definition at index 28
+// Function definition at index 26
 fun test_requires_unary(l0: u64): u64
     move_loc l0
     call increment
     ret
 
-// Function definition at index 29
+// Function definition at index 27
 fun test_swap_generic_explicit(l0: u64, l1: u64): (u64, u64)
     move_loc l0
     move_loc l1
     call swap<u64>
     ret
 
-// Function definition at index 30
+// Function definition at index 28
 fun test_swap_generic_inferred(l0: u64, l1: u64): (u64, u64)
     move_loc l0
     move_loc l1
     call swap<u64>
     ret
 
-// Function definition at index 31
+// Function definition at index 29
 fun test_unbox_inferred(l0: Box<u64>): u64
     move_loc l0
     call unbox<u64>
     ret
 
-// Function definition at index 32
+// Function definition at index 30
 #[persistent] public fun unbox<T0: copy + drop>(l0: Box<T0>): T0
     borrow_loc l0
     borrow_field Box<T0>, value

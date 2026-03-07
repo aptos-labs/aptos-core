@@ -2031,16 +2031,37 @@ fn spec_member(context: &mut Context, sp!(loc, pm): P::SpecBlockMember) -> E::Sp
             name,
             uninterpreted,
             signature,
+            access_specifiers,
             body,
         } => {
             let (old_aliases, signature) = function_signature(context, signature);
+            let access_specifiers = access_specifier_list(context, access_specifiers);
             let body = function_body(context, body);
             context.set_to_outer_scope(old_aliases);
             EM::Function {
                 uninterpreted,
                 name,
                 signature,
+                access_specifiers,
                 body,
+            }
+        },
+        PM::AccessOf {
+            fun_param,
+            params,
+            access_specifiers,
+        } => {
+            let access_specifiers = access_specifiers
+                .into_iter()
+                .map(|s| access_specifier(context, s))
+                .collect();
+            EM::AccessOf {
+                fun_param,
+                params: params
+                    .into_iter()
+                    .map(|(v, t)| (v, type_(context, t)))
+                    .collect(),
+                access_specifiers,
             }
         },
         PM::Variable {
@@ -3373,7 +3394,8 @@ fn unbound_names_spec_block_member(unbound: &mut UnboundNames, sp!(_, m_): &E::S
         | M::Let { .. }
         | M::Include { .. }
         | M::Apply { .. }
-        | M::Pragma { .. } => (),
+        | M::Pragma { .. }
+        | M::AccessOf { .. } => (),
     }
 }
 

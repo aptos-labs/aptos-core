@@ -5787,7 +5787,7 @@ impl ExpTranslator<'_, '_, '_> {
         ExpData::Quant(id, rkind, rranges, rtriggers, rcondition, rbody.into_exp())
     }
 
-    /// Translates a behavior predicate expression (requires_of, aborts_of, ensures_of, modifies_of).
+    /// Translates a behavior predicate expression (requires_of, aborts_of, ensures_of, result_of).
     fn translate_behavior_predicate(
         &mut self,
         loc: &Loc,
@@ -5805,7 +5805,6 @@ impl ExpTranslator<'_, '_, '_> {
             PA::BehaviorKind::RequiresOf => BehaviorKind::RequiresOf,
             PA::BehaviorKind::AbortsOf => BehaviorKind::AbortsOf,
             PA::BehaviorKind::EnsuresOf => BehaviorKind::EnsuresOf,
-            PA::BehaviorKind::ModifiesOf => BehaviorKind::ModifiesOf,
             PA::BehaviorKind::ResultOf => BehaviorKind::ResultOf,
         };
 
@@ -5871,7 +5870,7 @@ impl ExpTranslator<'_, '_, '_> {
     ) -> BehaviorState {
         // Validate label usage based on behavior kind
         // Only ensures_of and result_of can have both pre and post labels
-        // Other predicates (requires_of, aborts_of, modifies_of) should not have post labels
+        // Other predicates (requires_of, aborts_of) should not have post labels
         if !matches!(kind, BehaviorKind::EnsuresOf | BehaviorKind::ResultOf) && post_label.is_some()
         {
             self.error(
@@ -6123,11 +6122,6 @@ impl ExpTranslator<'_, '_, '_> {
                 }
                 types
             },
-            BehaviorKind::ModifiesOf => {
-                // modifies_of takes global resource references, not function parameters.
-                // We don't enforce argument count or types here.
-                vec![]
-            },
         }
     }
 
@@ -6186,15 +6180,7 @@ impl ExpTranslator<'_, '_, '_> {
         expected_types: &[Type],
         kind: &BehaviorKind,
     ) -> Vec<Exp> {
-        // For modifies_of, arguments must be global resource expressions
-        if matches!(kind, BehaviorKind::ModifiesOf) {
-            return args
-                .iter()
-                .map(|arg| self.translate_modify_target(arg).into_exp())
-                .collect();
-        }
-
-        // Check arity for other behavior kinds
+        // Check arity for behavior kinds
         if args.len() != expected_types.len() {
             self.error(
                 loc,

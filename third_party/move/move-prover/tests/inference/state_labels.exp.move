@@ -327,14 +327,157 @@ module 0x42::state_labels {
 // TODO(#18762): state labels do not yet work in verification pipeline and produce expected
 // boogie errors.
 /*
-Verification: [internal] boogie exited with compilation errors:
-state_labels.enriched.bpl(6182,22): Error: cannot refer to a global variable in this context: $42_state_labels_Resource_$memory
-state_labels.enriched.bpl(6186,38): Error: cannot refer to a global variable in this context: $42_state_labels_Resource_$memory
-state_labels.enriched.bpl(6207,22): Error: cannot refer to a global variable in this context: $42_state_labels_Resource_$memory
-state_labels.enriched.bpl(6211,60): Error: cannot refer to a global variable in this context: $42_state_labels_Resource_$memory
-state_labels.enriched.bpl(6211,120): Error: cannot refer to a global variable in this context: $42_state_labels_Resource_$memory
-state_labels.enriched.bpl(6232,21): Error: cannot refer to a global variable in this context: $42_state_labels_Resource_$memory
-state_labels.enriched.bpl(6236,21): Error: cannot refer to a global variable in this context: $42_state_labels_Resource_$memory
-state_labels.enriched.bpl(6236,137): Error: cannot refer to a global variable in this context: $42_state_labels_Resource_$memory
-8 name resolution errors detected in state_labels.enriched.bpl
+Verification: exiting with verification errors
+error: function does not abort under this condition
+   ┌─ state_labels.enriched.move:75:9
+   │
+75 │         aborts_if [inferred] aborts_of<remove_resource>(addr);
+   │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   │
+   =     at state_labels.enriched.move:70: call_remove
+   =         addr = <redacted>
+   =     at state_labels.enriched.move:71: call_remove
+   =     at state_labels.enriched.move:21: remove_resource
+   =         addr = <redacted>
+   =     at state_labels.enriched.move:22: remove_resource
+   =         result = <redacted>
+   =     at state_labels.enriched.move:23: remove_resource
+   =         result = <redacted>
+   =     at state_labels.enriched.move:72: call_remove
+   =     at state_labels.enriched.move:75: call_remove (spec)
+
+error: function does not abort under this condition
+   ┌─ state_labels.enriched.move:88:9
+   │
+88 │         aborts_if [inferred] aborts_of<publish_resource>(account, value);
+   │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   │
+   =     at state_labels.enriched.move:83: call_publish
+   =         account = <redacted>
+   =         value = <redacted>
+   =     at state_labels.enriched.move:84: call_publish
+   =     at state_labels.enriched.move:37: publish_resource
+   =         account = <redacted>
+   =         value = <redacted>
+   =     at state_labels.enriched.move:38: publish_resource
+   =     at state_labels.enriched.move:39: publish_resource
+   =     at state_labels.enriched.move:85: call_publish
+   =     at state_labels.enriched.move:88: call_publish (spec)
+
+error: function does not abort under this condition
+    ┌─ state_labels.enriched.move:181:9
+    │
+181 │         aborts_if [inferred] exists<Resource>(0x1::signer::address_of(account));
+    │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    │
+    =     at state_labels.enriched.move:171: increment_resource
+    =     at state_labels.enriched.move:184: increment_resource (spec)
+    =     at state_labels.enriched.move:185: increment_resource (spec)
+    =     at state_labels.enriched.move:171: increment_resource
+    =         account = <redacted>
+    =         addr = <redacted>
+    =     at state_labels.enriched.move:172: increment_resource
+    =         r = <redacted>
+    =     at state_labels.enriched.move:173: increment_resource
+    =         <redacted> = <redacted>
+    =     at state_labels.enriched.move:174: increment_resource
+    =     at state_labels.enriched.move:175: increment_resource
+    =     at state_labels.enriched.move:176: increment_resource
+    =     at state_labels.enriched.move:181: increment_resource (spec)
+
+error: post-condition does not hold
+    ┌─ state_labels.enriched.move:243:9
+    │
+243 │         ensures [inferred] result == exists<Resource>(addr);
+    │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    │
+    =     at state_labels.enriched.move:235: check_and_remove
+    =         addr = <redacted>
+    =     at state_labels.enriched.move:236: check_and_remove
+    =         e = <redacted>
+    =     at state_labels.enriched.move:237: check_and_remove
+    =     at state_labels.enriched.move:238: check_and_remove
+    =     at state_labels.enriched.move:235: check_and_remove
+    =         result = <redacted>
+    =     at state_labels.enriched.move:241: check_and_remove
+    =     at state_labels.enriched.move:243: check_and_remove (spec)
+
+error: function does not abort under this condition
+    ┌─ state_labels.enriched.move:290:9
+    │
+290 │         aborts_if [inferred] aborts_of<remove_resource>(addr1);
+    │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    │
+    =     at state_labels.enriched.move:281: remove_then_try_read
+    =         addr1 = <redacted>
+    =         addr2 = <redacted>
+    =     at state_labels.enriched.move:283: remove_then_try_read
+    =     at state_labels.enriched.move:21: remove_resource
+    =         addr = <redacted>
+    =     at state_labels.enriched.move:22: remove_resource
+    =         result = <redacted>
+    =     at state_labels.enriched.move:23: remove_resource
+    =     at state_labels.enriched.move:285: remove_then_try_read
+    =     at state_labels.enriched.move:52: read_resource
+    =         addr = <redacted>
+    =     at state_labels.enriched.move:53: read_resource
+    =         result = <redacted>
+    =     at state_labels.enriched.move:54: read_resource
+    =         result = <redacted>
+    =     at state_labels.enriched.move:286: remove_then_try_read
+    =     at state_labels.enriched.move:289: remove_then_try_read (spec)
+    =     at state_labels.enriched.move:290: remove_then_try_read (spec)
+
+error: function does not abort under this condition
+    ┌─ state_labels.enriched.move:306:9
+    │
+306 │         aborts_if [inferred] at_6@aborts_of<remove_resource>(addr2);
+    │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    │
+    =     at state_labels.enriched.move:298: double_remove
+    =         addr1 = <redacted>
+    =         addr2 = <redacted>
+    =     at state_labels.enriched.move:299: double_remove
+    =     at state_labels.enriched.move:21: remove_resource
+    =         addr = <redacted>
+    =     at state_labels.enriched.move:22: remove_resource
+    =         result = <redacted>
+    =     at state_labels.enriched.move:23: remove_resource
+    =     at state_labels.enriched.move:300: double_remove
+    =     at state_labels.enriched.move:21: remove_resource
+    =         addr = <redacted>
+    =     at state_labels.enriched.move:22: remove_resource
+    =         result = <redacted>
+    =     at state_labels.enriched.move:23: remove_resource
+    =     at state_labels.enriched.move:301: double_remove
+    =         result_1 = <redacted>
+    =         result_2 = <redacted>
+    =     at state_labels.enriched.move:302: double_remove
+    =     at state_labels.enriched.move:306: double_remove (spec)
+
+error: function does not abort under this condition
+    ┌─ state_labels.enriched.move:322:9
+    │
+322 │         aborts_if [inferred] at_10@aborts_of<publish_resource>(account2, v2);
+    │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    │
+    =     at state_labels.enriched.move:313: nested_publish
+    =         account1 = <redacted>
+    =         account2 = <redacted>
+    =         v1 = <redacted>
+    =         v2 = <redacted>
+    =     at state_labels.enriched.move:315: nested_publish
+    =     at state_labels.enriched.move:37: publish_resource
+    =         account = <redacted>
+    =         value = <redacted>
+    =     at state_labels.enriched.move:38: publish_resource
+    =     at state_labels.enriched.move:39: publish_resource
+    =     at state_labels.enriched.move:317: nested_publish
+    =     at state_labels.enriched.move:37: publish_resource
+    =         account = <redacted>
+    =         value = <redacted>
+    =     at state_labels.enriched.move:38: publish_resource
+    =     at state_labels.enriched.move:39: publish_resource
+    =     at state_labels.enriched.move:318: nested_publish
+    =     at state_labels.enriched.move:322: nested_publish (spec)
 */

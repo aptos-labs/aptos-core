@@ -728,6 +728,34 @@ impl<'a, T: ExpGenerator<'a>> ExpRewriterFunctions for SpecTranslator<'a, '_, T>
                 }
                 Some(Call(id, SpecFunction(*mid, *fid, Some(labels)), args.to_owned()).into_exp())
             },
+            // Spec funs with uses_old called outside old() still need memory labels
+            // for their pre-state parameters (the "old" memory copies).
+            SpecFunction(mid, fid, None) if !self.in_old => {
+                let (uses_old, old_memory) = {
+                    let module_env = self.builder.global_env().get_module(*mid);
+                    let decl = module_env.get_spec_fun(*fid);
+                    (decl.uses_old, decl.old_memory.clone())
+                };
+                if uses_old && !old_memory.is_empty() {
+                    let inst = self.builder.global_env().get_node_instantiation(id);
+                    let used_memory = {
+                        let module_env = self.builder.global_env().get_module(*mid);
+                        let decl = module_env.get_spec_fun(*fid);
+                        decl.used_memory.clone()
+                    };
+                    let mut labels = vec![];
+                    for mem in used_memory {
+                        let mem = mem.instantiate(&inst);
+                        labels.push(self.save_memory(mem));
+                    }
+                    Some(
+                        Call(id, SpecFunction(*mid, *fid, Some(labels)), args.to_owned())
+                            .into_exp(),
+                    )
+                } else {
+                    None
+                }
+            },
             Old => Some(args[0].to_owned()),
             Result(n) => {
                 self.builder.set_loc_from_node(id);

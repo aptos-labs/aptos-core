@@ -1,39 +1,109 @@
-// Tests for behavior predicate type checking.
-// Behavior predicates (requires_of, aborts_of, ensures_of, modifies_of)
-// are parsed and type-checked. This test verifies correct type checking
-// and expected error messages for invalid usage.
+// Tests for behavior predicate error checking.
+// This file consolidates various error cases for behavioral predicates
+// (requires_of, aborts_of, ensures_of, result_of).
 
 module 0x42::M {
 
-    // Function with a function parameter
-    fun apply(f: |u64, u64| u64, x: u64, y: u64): u64 {
-        f(x, y)
+    struct R has key { value: u64 }
+
+    fun helper(x: u64): u64 { x + 1 }
+    fun binary(a: u64, b: u64): u64 { a + b }
+
+    // ========================================
+    // Error: Non-function name used as predicate target
+    // ========================================
+
+    fun test_non_fun_target(x: u64): u64 { x }
+
+    spec test_non_fun_target {
+        // Error: x is u64, not a function
+        ensures requires_of<x>(x);
     }
 
-    spec apply {
-        // Test basic behavior predicate syntax - requires_of
-        ensures requires_of<f>(x, y);
+    // ========================================
+    // Error: Wrong number of arguments for requires_of
+    // ========================================
 
-        // Test basic behavior predicate syntax - ensures_of
-        ensures ensures_of<f>(x, y, result);
-
-        // Test basic behavior predicate syntax - aborts_of
-        aborts_if aborts_of<f>(x, y);
-
-        // Test basic behavior predicate syntax - modifies_of
-        modifies modifies_of<f>(x);
+    fun test_requires_wrong_count(a: u64, b: u64): u64 {
+        binary(a, b)
     }
 
-    // Another function to test with state labels (valid chains)
-    fun apply2(f: |u64| u64, x: u64): u64 {
-        f(x)
+    spec test_requires_wrong_count {
+        // Error: binary takes 2 args, but only 1 provided
+        ensures requires_of<binary>(a);
     }
 
-    spec apply2 {
-        // First predicate defines post-state "s1"
-        ensures ensures_of<f>(x, result)@s1;
+    // ========================================
+    // Error: Wrong number of arguments for ensures_of
+    // ========================================
 
-        // Second predicate reads from "s1" (completes the chain)
-        ensures s1@ensures_of<f>(x, result);
+    fun test_ensures_wrong_count(x: u64): u64 {
+        helper(x)
+    }
+
+    spec test_ensures_wrong_count {
+        // Error: helper has 1 input + 1 result = 2 args needed, but only 1 provided
+        ensures ensures_of<helper>(x);
+    }
+
+    // ========================================
+    // Error: Too many arguments for requires_of
+    // ========================================
+
+    fun test_too_many_args(a: u64, b: u64, c: u64): u64 {
+        binary(a, b)
+    }
+
+    spec test_too_many_args {
+        // Error: binary takes 2 args, but 3 provided
+        ensures requires_of<binary>(a, b, c);
+    }
+
+    // ========================================
+    // Error: Wrong argument type
+    // ========================================
+
+    fun test_wrong_arg_type(a: u64, b: bool): u64 { a }
+
+    spec test_wrong_arg_type {
+        // Error: binary expects (u64, u64), but (u64, bool) provided
+        ensures requires_of<binary>(a, b);
+    }
+
+    // ========================================
+    // Error: Wrong number of arguments for function parameter ensures_of
+    // ========================================
+
+    fun apply_ensures_wrong(f: |address|, addr: address) {
+        f(addr)
+    }
+
+    spec apply_ensures_wrong {
+        // Error: f returns unit, so ensures_of<f>(addr, 42) has too many args
+        ensures ensures_of<f>(addr, 42);
+    }
+
+    // ========================================
+    // Error: result_of wrong arity
+    // ========================================
+
+    fun test_result_wrong_count(x: u64): u64 {
+        helper(x)
+    }
+
+    spec test_result_wrong_count {
+        // Error: helper takes 1 arg, but 2 provided
+        ensures result == result_of<helper>(x, x);
+    }
+
+    // ========================================
+    // Error: Unknown function target
+    // ========================================
+
+    fun test_unknown_function(x: u64): u64 { x }
+
+    spec test_unknown_function {
+        // Error: nonexistent_function doesn't exist
+        ensures requires_of<nonexistent_function>(x);
     }
 }

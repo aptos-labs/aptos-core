@@ -264,10 +264,14 @@ MVP_TEST_FLAGS="-T=20" cargo test           # Custom flags
 
 ## Important
 
-
 - Do MUST NOT automatically try to fix verification failures
 - You can fix Rust or Boogie compilation failures
 - For verification failures consult me before proceeding
+- **Baseline tests (`UB=1`) passing (exit 0) does NOT mean the test succeeded.**
+  The `UB=1` flag auto-updates `.exp` files, so tests always pass. You MUST
+  compare the resulting `.exp` changes against the parent of the PR to judge
+  correctness. Some `.exp` changes are expected (e.g. fewer errors after a fix),
+  others represent regressions or bugs.
 
 # Documentation
 

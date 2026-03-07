@@ -2185,7 +2185,6 @@ impl<'a> ExpSourcifier<'a> {
                     crate::ast::BehaviorKind::AbortsOf => "aborts_of",
                     crate::ast::BehaviorKind::EnsuresOf => "ensures_of",
                     crate::ast::BehaviorKind::RequiresOf => "requires_of",
-                    crate::ast::BehaviorKind::ModifiesOf => "modifies_of",
                     crate::ast::BehaviorKind::ResultOf => "result_of",
                 };
                 // Helper: prints `[pre@]kind<target>(args)[@post]`

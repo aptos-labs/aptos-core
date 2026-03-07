@@ -679,6 +679,6 @@ fn spec_block_member(context: &mut Context, sp!(_, sbm_): &E::SpecBlockMember) {
                 }
             }
         },
-        M::Variable { .. } => (),
+        M::Variable { .. } | M::AccessOf { .. } => (),
     }
 }

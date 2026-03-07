@@ -56,6 +56,9 @@ pub struct InferenceOptions {
     /// Output directory for generated spec files (used with file output mode).
     #[arg(long)]
     pub inference_output_dir: Option<String>,
+    /// File suffix for unified output mode (default: "enriched.move").
+    #[arg(long, default_value = "enriched.move")]
+    pub inference_unified_suffix: String,
 }
 
 #[derive(Debug, Clone, Default, PartialEq, Eq, clap::ValueEnum)]
@@ -464,13 +467,14 @@ fn output_unified(env: &GlobalEnv, inferred_sym: Symbol, options: &Options) -> a
         let stem = source_path
             .file_stem()
             .expect("source file should have a stem");
+        let suffix = &options.inference.inference_unified_suffix;
         let output_path = if let Some(ref dir) = options.inference.inference_output_dir {
-            PathBuf::from(dir).join(format!("{}.enriched.move", stem.to_string_lossy()))
+            PathBuf::from(dir).join(format!("{}.{}", stem.to_string_lossy(), suffix))
         } else {
             let source_dir = source_path
                 .parent()
                 .expect("source file should have a parent directory");
-            source_dir.join(format!("{}.enriched.move", stem.to_string_lossy()))
+            source_dir.join(format!("{}.{}", stem.to_string_lossy(), suffix))
         };
 
         if let Some(parent) = output_path.parent() {

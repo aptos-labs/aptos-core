@@ -52,18 +52,42 @@ pub struct SpecFunDecl {
     pub name: Symbol,
     pub type_params: Vec<TypeParameter>,
     pub params: Vec<Parameter>,
-    pub context_params: Option<Vec<(Symbol, bool)>>,
     pub result_type: Type,
     pub used_memory: BTreeSet<QualifiedInstId<StructId>>,
+    /// Resources accessed inside `old()` contexts (transitively).
+    /// These require dual-state parameters (pre and post) for verification.
+    pub old_memory: BTreeSet<QualifiedInstId<StructId>>,
     pub uninterpreted: bool,
     pub is_move_fun: bool,
     pub is_native: bool,
     pub body: Option<Exp>,
     pub callees: BTreeSet<QualifiedInstId<SpecFunId>>,
     pub is_recursive: RefCell<Option<bool>>,
+    /// Whether this spec fun (or any callee transitively) uses `old()` expressions
+    /// or has `&mut` parameters. Computed during the spec_rewriter pass.
+    pub uses_old: bool,
+    /// User-declared access specifiers (reads/writes) on spec funs.
+    /// For uninterpreted funs: defines used_memory/old_memory.
+    /// For funs with body: validated against body, then overrides used_memory/old_memory.
+    pub access_specifiers: Option<Vec<AccessSpecifier>>,
     /// The instantiations for which this function is known to use generic type reflection.
     pub insts_using_generic_type_reflection: RefCell<BTreeMap<Vec<Type>, bool>>,
+    /// Spec conditions (ensures, requires, aborts_if) for uninterpreted spec functions
+    /// derived from lambdas with imperative bodies that have spec blocks.
     pub spec: RefCell<Spec>,
+}
+
+/// Access specifiers associated with a function-typed parameter via `access_of`.
+#[derive(Clone, Debug)]
+pub struct FunParamAccessSpecifiers {
+    pub loc: Loc,
+    pub fun_param: Symbol,
+    pub params: Vec<Parameter>,
+    pub specifiers: Vec<AccessSpecifier>,
+    /// Resources accessed by this function parameter, derived from `specifiers`.
+    pub used_memory: BTreeSet<QualifiedInstId<StructId>>,
+    /// Resources accessed in dual-state (write) context, derived from `specifiers`.
+    pub old_memory: BTreeSet<QualifiedInstId<StructId>>,
 }
 
 // =================================================================================================
@@ -280,8 +304,6 @@ pub enum BehaviorKind {
     AbortsOf,
     /// `ensures_of<f>(args)` - the postcondition of function `f`
     EnsuresOf,
-    /// `modifies_of<f>(args)` - the modify clauses of function `f`
-    ModifiesOf,
     /// `result_of<f>(args)` - deterministic result selector based on `ensures_of`
     /// Semantics: `result_of<f>(x) == choose y where ensures_of<f>(x, y)`
     ResultOf,
@@ -294,7 +316,6 @@ impl fmt::Display for BehaviorKind {
             RequiresOf => write!(f, "requires_of"),
             AbortsOf => write!(f, "aborts_of"),
             EnsuresOf => write!(f, "ensures_of"),
-            ModifiesOf => write!(f, "modifies_of"),
             ResultOf => write!(f, "result_of"),
         }
     }
@@ -2233,7 +2254,7 @@ pub enum Operation {
     // Specification specific
     SpecFunction(ModuleId, SpecFunId, Option<Vec<MemoryLabel>>),
     UpdateField(ModuleId, StructId, FieldId),
-    /// Behavior predicate for function values (requires_of, aborts_of, ensures_of, modifies_of).
+    /// Behavior predicate for function values (requires_of, aborts_of, ensures_of, result_of).
     /// args[0] is the function expression (Closure for global functions, Temporary for
     /// function parameters, LocalVar for spec function parameters).
     /// args[1..] are the predicate arguments.

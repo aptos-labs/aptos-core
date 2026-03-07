@@ -1,6 +1,6 @@
 # Function Values in the Move Prover
 
-With functions becoming values in Move 2.2, a semantic model is required how to specify and verify them. Formal verification with higher-order functions which have side-effects (like the ones in Move or Rust) is challenging: as with most aspects of formal verification of interesting systems, the problems are generally undecidable. However, there are lots of cases where, via the intuitionistic-logical approach used in the Move prover, meaningful properties can be verified. 
+With functions becoming values in Move 2.2, a semantic model is required how to specify and verify them. Formal verification with higher-order functions which have side effects (like the ones in Move or Rust) is challenging: as with most aspects of formal verification of interesting systems, the problems are generally undecidable. However, there are lots of cases where, via the intuitionistic-logical approach used in the Move prover, meaningful properties can be verified. 
 
 This note discusses and documents the (evolving) implementation of function values in the  Prover. We first look at the Move execution semantics, and then how to write specifications and verify them.
 
@@ -10,13 +10,16 @@ For modeling the semantics of execution in the Prover, we need to describe the `
 
 ## Collecting the Closures in the Program
 
-The approach makes use of a general principal which is also used for monomorphization and global invariant verification of the Prover as described in the TACAS’22 paper: we only need to look at the *final fragment of code which is under verification*, specifically if it comes to package private functionality.  
+The approach makes use of a general principal which is also used for monomorphization and global invariant verification of the Prover as described in the TACAS’22 paper: we only need to look at the *final fragment of code which is under verification*, since we do not make any assumptions about how public entry functions are called.
+
+
+specifically if it comes to package private functionality.  
 
 For every function type `|T|R` in the program, we collect all the ways how a closure of this type is constructed. Then we build an abstract data type to represent `|T|R` with a variant for each closure found in the program.
 
 Lets assume the program has functions `f(T):R` and `g(S,T):R`. Moreover, there are two closures in the program, namely `|x| f(x)` and `|x| g(s,x)`. The type `|T|R` is represented as:
 
-```rust
+```move
 enum Func_T_R {
   Closure_f,
   Closure_g(S),
@@ -28,7 +31,7 @@ enum Func_T_R {
 
 Now that there is a representation of function values via the `Func_T_R` type, calling a closure via instruction `CallClosure` is described as follows:
 
-```rust
+```move
 fun call_Func_T_R(f: Func_T_R, x: T): R {
   match(f) {
     Closure_f    => f(x),
@@ -48,7 +51,7 @@ However, when there is no context from argument propagation, the semantics of th
 
 Even though functions are just values for Move’s execution model, in the specification world they are something special: specs *are* *about* describing how functions behave. A function in MSL is described by the following clauses, where for simplicity, we assume single parameters and results, and each clause is optional:
 
-```rust
+```move
 fun f(x: X): Y { .. }
 spec f {
   modifies global<R>(E[x]); // E[x]: address
@@ -64,7 +67,7 @@ Semantically, a function specification is a relation between inputs, outputs, an
 
 In order to reason about function values, we need to be able to access the same components known already from specification blocks of functions for *function parameters.* Consider the following  Move function:
 
-```rust
+```move
 fun call_twice(f: |T|T, x: T): T { 
     f(f(x)) 
 }
@@ -72,7 +75,7 @@ fun call_twice(f: |T|T, x: T): T {
 
 The behavior of `call_twice` can be specified if we can access the post-condition of `f` as a predicate by itself:
 
-```rust
+```move
 spec call_twice {
    // ensures<f>(params) is the post-condition of f
    ensures exists t: T: ensures<f>(x, t) ==> ensures<f>(t, result);
@@ -81,7 +84,7 @@ spec call_twice {
 
 Notice how this uses an intermediate value `t` to connect the post-condition of `f` with the input of calling `f` a second time. In a similar style, we can propagate the aborts condition of `f`:
 
-```rust
+```move
 spec call_twice {
    aborts_if aborts_if<f>(x);
    aborts_if exists t: T: ensures<f>(x, t) ==> aborts_if<f>(t);
@@ -90,7 +93,7 @@ spec call_twice {
 
 However, there is one issue in this representation: what if `f` depends on global state, for example, increments a counter in a resource? In order to allow state the relation between input and output states of `f` need to be made explicit in the spec. This requires a new construct in the specification language, so called  *state labels.* State labels allow name pre and post state of predicate evaluation:
 
-```rust
+```move
 spec call_twice {
    aborts_if aborts_if<f>(x);
    aborts_if exists t: T: ensures<f>(x, t)@S ==> S@aborts_if<f>(t);
@@ -105,7 +108,7 @@ Notice that state labels are technically already in the Prover. Namely the `old(
 
 The following new builtin predicates are introduced, where `f` must be a name of function value (either an existing function or a name of local with function type):
 
-```rust
+```move
 requires<f>(x)       // denotes the pre-condition of `f`
 aborts_if<f>(x)      // denotes the aborts condition of `f`
 ensures<f>(x, y)     // denotes the post condition of `f`
@@ -114,7 +117,7 @@ modifies<f>(x)       // denotes the set of modify clauses of `f`
 
 Those predicates can be combined with state labels which allow to associate pre and post states of invocations of function `f`:
 
-```rust
+```move
 S@requires<f>(x)     // denotes precondition in given prestate S
 ensures<f>(x)@R      // denotes postcondition in given poststate R
 S@ensures<f>(x)@R    // denotes both pre- and poststates S and R
@@ -124,7 +127,7 @@ S@ensures<f>(x)@R    // denotes both pre- and poststates S and R
 
 When verifying a function with function value parameters `f`, the notation `S@ensures<f>(x)@R` is associated with an *uninterpreted function* of a matching type:
 
-```rust
+```move
 spec type Storage; 
 spec fun _@ensures<f>(_)@_(S: Storage, x: InOut, R: Storage): bool
 ```
@@ -133,7 +136,7 @@ Notice that already today, in the Prover, specification functions take state of 
 
 Returning to the `call_twice` example, this uninterpreted function is injected into the code as below:
 
-```rust
+```move
 fun call_twice(f: |T|T, x: T): T {
   capture S1;
 	let t = f(x);
@@ -152,7 +155,7 @@ fun call_twice(f: |T|T, x: T): T {
 
 When verifying a function which is non-opaque (the default), the Prover essentially inlines the function definition at the caller side. The following example illustrates the code which is actually verified:
 
-```rust
+```move
 call_twice(increment, 0) 
 -->  
 { 
@@ -165,7 +168,7 @@ call_twice(increment, 0)
 
 Notice that with the predicate `ensures<increment>(x, result)` the post-condition of a *concrete function* (or a function resulting from lambda lifting) is requested. This is in difference to the *uninterpreted* function at definition side. If `increment` is opaque, the existing spec would be inserted:
 
-```rust
+```move
 fun increment(x: u64): u64 { x + 1 }
 spec increment { pragma opaque; ensures result == x + 1; }
 
@@ -174,7 +177,7 @@ spec increment { pragma opaque; ensures result == x + 1; }
 
 If the function `increment` has no specification, we will derive one from the code. This can be done we weakest precondition or deductive compilation. It is also possible to introduce an uninterpreted function and let coincide with the function body, as shown below:
 
-```rust
+```move
 fun increment(x: u64):u64 {
    capture S;
    let result = x + 1;
@@ -189,7 +192,7 @@ Notice that if we define `ensures<increment>` via an assume as an above, the sol
 
 For the opaque case, we instantiate pre/post conditions of the `call_twice` function, as usual. Assuming `call_twice` is opaque, then `call_twice(increment, 0)` at caller side will result in below. Notice that we must: 
 
-```rust
+```move
 {
     let havoc result;
     assert exists S: Storage: exists t: T: 
@@ -204,7 +207,7 @@ The same mechanism as described above for determining `ensures<increment>` is us
 
 What happens if the function passed to another function is expected to satisfy some properties? For example, we can expect the `call_twice` argument to not abort. This would be written as follows:
 
-```rust
+```move
 spec call_twice {
    pragma opaque;
    requires !aborts_if<f>(x); // passed function is not allowed to abort
@@ -214,7 +217,7 @@ spec call_twice {
 
 This translates as follows at caller side:
 
-```rust
+```move
 call_twice(increment, 0) 
 -->  
 {
@@ -230,7 +233,7 @@ In the discussion until here, the `modifies` clause was ignored. It works as fol
 
 In general `S@modifies<f>(r1, .., rn)@R` is a predicate where each expression `ri` denotes a resource, as in `R[x]`. This maps the meaning down to the following formula:
 
-```rust
+```move
 S@modifies<f>(r1, .., rn) <==>
 	forall r: RESOURCES: (!exists i: r == ri) ==> S[r] == R[r]
 ```
@@ -241,7 +244,7 @@ Note the notation `S@modifies<f>()@R` specifies that no modifications are possib
 
 Here is how this plays out for the `call_twice` function, where we only allow the function `f` to modify a particular `Counter` resource:
 
-```rust
+```move
 spec call_twice {
    // Ensure that f will only modifier Counter[addr]
    ensures modifies<f>(Counter[addr]);  

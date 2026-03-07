@@ -400,7 +400,16 @@ pub enum SpecBlockMember_ {
         uninterpreted: bool,
         name: FunctionName,
         signature: FunctionSignature,
+        access_specifiers: Option<Vec<AccessSpecifier>>,
         body: FunctionBody,
+    },
+    /// Declares the access (reads/writes) of a function-typed parameter.
+    /// `access_of<param>(args) { reads/writes ... }` specifies which global
+    /// resources the function parameter may access when called.
+    AccessOf {
+        fun_param: Name,
+        params: Vec<(Var, Type)>,
+        access_specifiers: Vec<AccessSpecifier>,
     },
     Variable {
         is_global: bool,
@@ -649,8 +658,6 @@ pub enum BehaviorKind {
     AbortsOf,
     /// `ensures_of<f>(x, y)` - the postcondition of function `f`
     EnsuresOf,
-    /// `modifies_of<f>(x)` - the modify clauses of function `f`
-    ModifiesOf,
     /// `result_of<f>(x)` - deterministic result selector based on `ensures_of`
     ResultOf,
 }
@@ -751,7 +758,7 @@ pub enum Exp_ {
     // [pre_label@]requires_of<f[<T1, ..., Tn>]>(args)[@post_label]
     // [pre_label@]aborts_of<f[<T1, ..., Tn>]>(args)[@post_label]
     // [pre_label@]ensures_of<f[<T1, ..., Tn>]>(args)[@post_label]
-    // [pre_label@]modifies_of<f[<T1, ..., Tn>]>(args)[@post_label]
+    // [pre_label@]result_of<f[<T1, ..., Tn>]>(args)[@post_label]
     Behavior(
         BehaviorKind,
         Option<Label>,     // pre-state label
@@ -1532,6 +1539,7 @@ impl AstDebug for SpecBlockMember_ {
                 uninterpreted,
                 signature,
                 name,
+                access_specifiers,
                 body,
             } => {
                 if *uninterpreted {
@@ -1542,10 +1550,28 @@ impl AstDebug for SpecBlockMember_ {
                 w.write("fun ");
                 w.write(format!("{}", name));
                 signature.ast_debug(w);
+                if let Some(specifiers) = access_specifiers {
+                    w.write(" ");
+                    w.write(format!("[{} access specifiers]", specifiers.len()));
+                }
                 match &body.value {
                     FunctionBody_::Defined(body) => w.block(|w| body.ast_debug(w)),
                     FunctionBody_::Native => w.writeln(";"),
                 }
+            },
+            SpecBlockMember_::AccessOf {
+                fun_param,
+                params,
+                access_specifiers,
+            } => {
+                w.write(format!("access_of<{}>", fun_param));
+                w.write("(");
+                w.list(params, ", ", |w, (v, ty)| {
+                    w.write(format!("{}: ", v));
+                    ty.ast_debug(w);
+                    true
+                });
+                w.write(format!(") {{ {} specifiers }}", access_specifiers.len()));
             },
             SpecBlockMember_::Variable {
                 is_global,
@@ -2120,7 +2146,6 @@ impl AstDebug for Exp_ {
                     BehaviorKind::RequiresOf => "requires_of",
                     BehaviorKind::AbortsOf => "aborts_of",
                     BehaviorKind::EnsuresOf => "ensures_of",
-                    BehaviorKind::ModifiesOf => "modifies_of",
                     BehaviorKind::ResultOf => "result_of",
                 };
                 w.write(kind_str);
