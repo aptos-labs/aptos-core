@@ -909,7 +909,7 @@ module aptos_framework::stake {
 
         let (_, maximum_stake) =
             staking_config::get_required_stake(&staking_config::get());
-        let voting_power = get_next_epoch_voting_power(stake_pool);
+        let voting_power = get_voting_power(stake_pool);
         assert!(
             voting_power <= maximum_stake, error::invalid_argument(ESTAKE_EXCEEDS_MAX)
         );
@@ -983,11 +983,7 @@ module aptos_framework::stake {
         validator_info.consensus_pubkey = new_consensus_pubkey;
 
         event::emit(
-            RotateConsensusKey {
-                pool_address,
-                old_consensus_pubkey,
-                new_consensus_pubkey
-            }
+            RotateConsensusKey { pool_address, old_consensus_pubkey, new_consensus_pubkey }
         );
     }
 
@@ -1055,11 +1051,7 @@ module aptos_framework::stake {
         stake_pool.locked_until_secs = new_locked_until_secs;
 
         event::emit(
-            IncreaseLockup {
-                pool_address,
-                old_locked_until_secs,
-                new_locked_until_secs
-            }
+            IncreaseLockup { pool_address, old_locked_until_secs, new_locked_until_secs }
         );
     }
 
@@ -1099,7 +1091,16 @@ module aptos_framework::stake {
 
         let config = staking_config::get();
         let (minimum_stake, maximum_stake) = staking_config::get_required_stake(&config);
-        let voting_power = get_next_epoch_voting_power(stake_pool);
+        // Settle any pending_inactive whose lockup has already expired so it is not counted
+        // as voting power. An inactive validator's pending_inactive is never processed by
+        // update_stake_pool, so we must do it here before evaluating the minimum stake.
+        if (timestamp::now_seconds() >= stake_pool.locked_until_secs) {
+            coin::merge(
+                &mut stake_pool.inactive,
+                coin::extract_all(&mut stake_pool.pending_inactive)
+            );
+        };
+        let voting_power = get_voting_power(stake_pool);
         assert!(voting_power >= minimum_stake, error::invalid_argument(ESTAKE_TOO_LOW));
         assert!(voting_power <= maximum_stake, error::invalid_argument(ESTAKE_TOO_HIGH));
 
@@ -1232,7 +1233,7 @@ module aptos_framework::stake {
             // Decrease the voting power increase as the pending validator's voting power was added when they requested
             // to join. Now that they changed their mind, their voting power should not affect the joining limit of this
             // epoch.
-            let validator_stake = (get_next_epoch_voting_power(stake_pool) as u128);
+            let validator_stake = (get_voting_power(stake_pool) as u128);
             // total_joining_power should be larger than validator_stake but just in case there has been a small
             // rounding error somewhere that can lead to an underflow, we still want to allow this transaction to
             // succeed.
@@ -1351,6 +1352,22 @@ module aptos_framework::stake {
         validator_set.pending_inactive.for_each_ref(|validator| {
             let validator: &ValidatorInfo = validator;
             update_stake_pool(validator_perf, validator.addr, &config);
+        });
+
+        // Settle expired pending_inactive for pending_active validators before activating them.
+        // update_stake_pool is not called for pending_active validators, so without this step
+        // their expired pending_inactive would be incorrectly counted as voting power, causing
+        // a mismatch with the DKG validator set (which excludes expired pending_inactive) and
+        // an out-of-bounds panic in the epoch manager.
+        validator_set.pending_active.for_each_ref(|validator| {
+            let validator: &ValidatorInfo = validator;
+            let stake_pool = borrow_global_mut<StakePool>(validator.addr);
+            if (get_reconfig_start_time_secs() >= stake_pool.locked_until_secs) {
+                coin::merge(
+                    &mut stake_pool.inactive,
+                    coin::extract_all(&mut stake_pool.pending_inactive)
+                );
+            };
         });
 
         // Activate currently pending_active validators.
@@ -1886,7 +1903,7 @@ module aptos_framework::stake {
 
     /// Assuming we are in a middle of a reconfiguration (no matter it is immediate or async), get its start time.
     fun get_reconfig_start_time_secs(): u64 {
-        if (reconfiguration_state::is_initialized()) {
+        if (reconfiguration_state::is_in_progress()) {
             reconfiguration_state::start_time_secs()
         } else {
             timestamp::now_seconds()
@@ -1974,12 +1991,14 @@ module aptos_framework::stake {
     fun generate_validator_info(
         addr: address, stake_pool: &StakePool, config: ValidatorConfig
     ): ValidatorInfo {
-        let voting_power = get_next_epoch_voting_power(stake_pool);
+        let voting_power = get_voting_power(stake_pool);
         ValidatorInfo { addr, voting_power, config }
     }
 
-    /// Returns validator's next epoch voting power, including pending_active, active, and pending_inactive stake.
-    fun get_next_epoch_voting_power(stake_pool: &StakePool): u64 {
+    /// Returns the sum of all non-inactive stake (active + pending_active + pending_inactive).
+    /// This equals the actual voting power for the next epoch only when called after expired
+    /// pending_inactive has been settled to inactive (e.g. in on_new_epoch or join_validator_set).
+    fun get_voting_power(stake_pool: &StakePool): u64 {
         let value_pending_active = coin::value(&stake_pool.pending_active);
         let value_active = coin::value(&stake_pool.active);
         let value_pending_inactive = coin::value(&stake_pool.pending_inactive);

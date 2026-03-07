@@ -31,10 +31,6 @@ module aptos_framework::reconfiguration_state {
         start_time_secs: u64,
     }
 
-    public fun is_initialized(): bool {
-        exists<State>(@aptos_framework)
-    }
-
     public fun initialize(fx: &signer) {
         system_addresses::assert_aptos_framework(fx);
         if (!exists<State>(@aptos_framework)) {
