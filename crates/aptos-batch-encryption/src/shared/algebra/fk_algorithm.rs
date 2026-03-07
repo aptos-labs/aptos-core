@@ -18,7 +18,6 @@ use serde::{
 };
 use std::{fmt, marker::PhantomData, ops::Mul};
 
-
 /// To efficiently evaluate a Circulant matrix of size `n x n` over an input,
 /// a FFT-friendly subset of a field of size `n` is required. This struct
 /// represents that subset. Following the terminology in Arkworks, we call this
