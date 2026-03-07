@@ -312,3 +312,29 @@ Example:
 ```
 
 Areas: `vm`, `framework`, `consensus`, `storage`, `api`, `network`, `types`, `cli`, `docs`, `test`
+
+## Cursor Cloud specific instructions
+
+### System dependencies
+
+The VM’s startup/update script (managed by the Cursor Cloud environment, not this repo) runs `./scripts/dev_setup.sh -b -k` on each VM startup to install/refresh all build tools (Rust toolchains, clang, protoc, cargo-sort, cargo-machete, cargo-nextest, grcov, etc.). Two extra packages (`libstdc++-14-dev`, `libpq-dev`) are installed separately because this specific `./scripts/dev_setup.sh -b -k` invocation does not install them by default (they are only installed when `dev_setup.sh` is run with additional flags such as `-P` for PostgreSQL support).
+
+### Key gotchas
+
+- **clang++ C++ headers**: `libstdc++-14-dev` must be installed or RocksDB will fail to compile with `'memory' file not found`. This happens because clang selects GCC 14 headers but only GCC 13 headers may be present.
+- **`cargo xclippy`** is a workspace-wide alias defined in `.cargo/config.toml`. It does **not** accept `-p <package>`. To lint a single package, use `cargo clippy -p <package>` with the appropriate allow/deny flags from the alias definition.
+- **`cargo +nightly fmt`** is used for formatting (not stable fmt). The nightly toolchain must have the `rustfmt` component.
+- **Localnet startup** takes ~60s for the first run (compilation is the bottleneck). Subsequent starts (with binary already built) are fast. Use `--no-txn-stream` to skip the transaction stream gRPC service, which is not required for basic local testing and slightly reduces resource usage.
+- The `-k` flag skips pre-commit hook installation in `dev_setup.sh` since cloud agents don't need git hooks.
+
+### CI lint gate
+
+`./scripts/rust_lint.sh` must pass in full before pushing PRs — it is a required CI check. Run it locally to catch issues early. It executes clippy (`cargo xclippy`), formatting (`cargo +nightly fmt --check`), dependency sorting (`cargo sort --grouped --workspace --check`), and unused-dependency detection (`cargo machete`). Use `./scripts/rust_lint.sh --check` for a check-only (non-modifying) run.
+
+### Running services
+
+- **Localnet (validator + faucet)**: `cargo run -p aptos -- node run-localnet --force-restart --assume-yes --no-txn-stream`
+  - REST API: `http://127.0.0.1:8080`
+  - Faucet: `http://127.0.0.1:8081`
+  - Readiness: `http://127.0.0.1:8070`
+- See `CLAUDE.md` for build, test, and lint commands.
