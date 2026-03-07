@@ -362,6 +362,11 @@ impl AptosDB {
                     .commit(chunk.expect_last_version(), None, sharded_state_kv_batches)
                     .unwrap();
             });
+            s.spawn(|_| {
+                self.state_store
+                    .put_hot_state_kv_updates(chunk.hot_state_updates, chunk.expect_last_version())
+                    .unwrap();
+            });
         });
 
         Ok(())

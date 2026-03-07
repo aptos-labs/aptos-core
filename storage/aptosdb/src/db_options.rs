@@ -354,11 +354,32 @@ pub(super) fn gen_state_merkle_cfds(
     gen_cfds(rocksdb_config, block_cache, cfs, |_, _| {})
 }
 
+pub(super) fn hot_state_kv_db_column_families() -> Vec<ColumnFamilyName> {
+    vec![
+        /* empty cf */ DEFAULT_COLUMN_FAMILY_NAME,
+        DB_METADATA_CF_NAME,
+        HOT_STATE_VALUE_BY_KEY_HASH_CF_NAME,
+    ]
+}
+
 pub(super) fn gen_state_kv_shard_cfds(
     rocksdb_config: &RocksdbConfig,
     block_cache: Option<&Cache>,
 ) -> Vec<ColumnFamilyDescriptor> {
     let cfs = state_kv_db_new_key_column_families();
+    gen_cfds(
+        rocksdb_config,
+        block_cache,
+        cfs,
+        with_state_key_extractor_processor,
+    )
+}
+
+pub(super) fn gen_hot_state_kv_shard_cfds(
+    rocksdb_config: &RocksdbConfig,
+    block_cache: Option<&Cache>,
+) -> Vec<ColumnFamilyDescriptor> {
+    let cfs = hot_state_kv_db_column_families();
     gen_cfds(
         rocksdb_config,
         block_cache,
