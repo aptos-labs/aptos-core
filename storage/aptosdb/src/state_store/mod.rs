@@ -1116,7 +1116,7 @@ impl StateStore {
             self,
             version,
             expected_root_hash,
-            false, /* async_commit */
+            true, /* async_commit */
             StateSnapshotRestoreMode::Default,
         )?))
     }
