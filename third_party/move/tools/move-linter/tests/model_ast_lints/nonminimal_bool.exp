@@ -1,5 +1,14 @@
 
 Diagnostics:
+warning: [lint] Public function is missing a doc comment.
+  ┌─ tests/model_ast_lints/nonminimal_bool.move:3:16
+  │
+3 │     public fun test_warn_and(x : bool) {
+  │                ^^^^^^^^^^^^^
+  │
+  = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(missing_doc_public_function)]`.
+  = For more information, see https://aptos.dev/en/build/smart-contracts/linter#missing_doc_public_function.
+
 warning: [lint] The left-hand side of `&&` evaluates to `true`. Recall that the expression `true && bexpr` is logically equivalent to `bexpr`. Consider simplifying.
   ┌─ tests/model_ast_lints/nonminimal_bool.move:4:13
   │
@@ -71,6 +80,15 @@ warning: [lint] Empty `if` branch. Consider simplifying by removing or rewriting
   │
   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(empty_if)]`.
   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#empty_if.
+
+warning: [lint] Public function is missing a doc comment.
+   ┌─ tests/model_ast_lints/nonminimal_bool.move:10:16
+   │
+10 │     public fun test_warn_or(x : bool) {
+   │                ^^^^^^^^^^^^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(missing_doc_public_function)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#missing_doc_public_function.
 
 warning: [lint] The left-hand side of `||` evaluates to `true`. Recall that the expression `true || bexpr` is logically equivalent to `true`. Consider simplifying.
    ┌─ tests/model_ast_lints/nonminimal_bool.move:11:13
@@ -144,6 +162,15 @@ warning: [lint] Empty `if` branch. Consider simplifying by removing or rewriting
    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(empty_if)]`.
    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#empty_if.
 
+warning: [lint] Public function is missing a doc comment.
+   ┌─ tests/model_ast_lints/nonminimal_bool.move:17:16
+   │
+17 │     public fun test_warn_iff(x : bool) {
+   │                ^^^^^^^^^^^^^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(missing_doc_public_function)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#missing_doc_public_function.
+
 warning: [lint] The right-hand side of `<==>` evaluates to `true`. Recall that the expression `bexpr <==> true` is logically equivalent to `bexpr`. Consider simplifying.
    ┌─ tests/model_ast_lints/nonminimal_bool.move:19:20
    │
@@ -179,6 +206,15 @@ warning: [lint] The left-hand side of `<==>` evaluates to `false`. Recall that t
    │
    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(nonminimal_bool)]`.
    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#nonminimal_bool.
+
+warning: [lint] Public function is missing a doc comment.
+   ┌─ tests/model_ast_lints/nonminimal_bool.move:26:16
+   │
+26 │     public fun test_warn_implies(x : bool) {
+   │                ^^^^^^^^^^^^^^^^^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(missing_doc_public_function)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#missing_doc_public_function.
 
 warning: [lint] The right-hand side of `==>` evaluates to `true`. Recall that the expression `bexpr ==> true` is logically equivalent to `true`. Consider simplifying.
    ┌─ tests/model_ast_lints/nonminimal_bool.move:28:20
@@ -216,6 +252,15 @@ warning: [lint] The left-hand side of `==>` evaluates to `false`. Recall that th
    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(nonminimal_bool)]`.
    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#nonminimal_bool.
 
+warning: [lint] Public function is missing a doc comment.
+   ┌─ tests/model_ast_lints/nonminimal_bool.move:35:16
+   │
+35 │     public fun test_warn_not() {
+   │                ^^^^^^^^^^^^^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(missing_doc_public_function)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#missing_doc_public_function.
+
 warning: [lint] This expression evaluates to `false`. Recall that the expression `!true` is logically equivalent to `false`. Consider simplifying.
    ┌─ tests/model_ast_lints/nonminimal_bool.move:36:13
    │
@@ -252,6 +297,15 @@ warning: [lint] Empty `if` branch. Consider simplifying by removing or rewriting
    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(empty_if)]`.
    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#empty_if.
 
+warning: [lint] Public function is missing a doc comment.
+   ┌─ tests/model_ast_lints/nonminimal_bool.move:41:16
+   │
+41 │     public fun combo() {
+   │                ^^^^^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(missing_doc_public_function)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#missing_doc_public_function.
+
 warning: [lint] This expression evaluates to `false`. Recall that the expression `!true` is logically equivalent to `false`. Consider simplifying.
    ┌─ tests/model_ast_lints/nonminimal_bool.move:42:13
    │
@@ -287,3 +341,18 @@ warning: [lint] Empty `if` branch. Consider simplifying by removing or rewriting
    │
    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(empty_if)]`.
    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#empty_if.
+
+warning: [lint] Module is missing a doc comment.
+   ┌─ tests/model_ast_lints/nonminimal_bool.move:1:1
+   │
+ 1 │ ╭ module 0xc0ffee::m {
+ 2 │ │
+ 3 │ │     public fun test_warn_and(x : bool) {
+ 4 │ │         if (true && x) ();
+   · │
+48 │ │     }
+49 │ │ }
+   │ ╰─^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(missing_doc_module)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#missing_doc_module.

@@ -1,0 +1,79 @@
+
+Diagnostics:
+warning: [lint] Use doc comment `///` instead of regular comment `//` for documentable items.
+  ┌─ tests/module_lints/prefer_doc_comment.move:3:1
+  │
+3 │ ╭     // This should be a doc comment on a public function.
+4 │ │     public fun regular_comment_func() {}
+  │ ╰^
+  │
+  = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(prefer_doc_comment)]`.
+  = For more information, see https://aptos.dev/en/build/smart-contracts/linter#prefer_doc_comment.
+
+warning: [lint] Public function is missing a doc comment.
+  ┌─ tests/module_lints/prefer_doc_comment.move:4:16
+  │
+4 │     public fun regular_comment_func() {}
+  │                ^^^^^^^^^^^^^^^^^^^^
+  │
+  = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(missing_doc_public_function)]`.
+  = For more information, see https://aptos.dev/en/build/smart-contracts/linter#missing_doc_public_function.
+
+warning: [lint] Use doc comment `///` instead of regular comment `//` for documentable items.
+   ┌─ tests/module_lints/prefer_doc_comment.move:9:1
+   │
+ 9 │ ╭     // This should be a doc comment on a constant.
+10 │ │     const MY_CONSTANT: u64 = 42;
+   │ ╰^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(prefer_doc_comment)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#prefer_doc_comment.
+
+warning: [lint] Constant is missing a doc comment.
+   ┌─ tests/module_lints/prefer_doc_comment.move:10:5
+   │
+10 │     const MY_CONSTANT: u64 = 42;
+   │     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(missing_doc_constant)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#missing_doc_constant.
+
+warning: [lint] Use doc comment `///` instead of regular comment `//` for documentable items.
+   ┌─ tests/module_lints/prefer_doc_comment.move:15:1
+   │
+15 │ ╭     // This should be a doc comment on a struct.
+16 │ │     struct MyStruct has copy, drop {
+   │ ╰^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(prefer_doc_comment)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#prefer_doc_comment.
+
+warning: [lint] Struct is missing a doc comment.
+   ┌─ tests/module_lints/prefer_doc_comment.move:16:5
+   │
+16 │ ╭     struct MyStruct has copy, drop {
+17 │ │         value: u64,
+18 │ │     }
+   │ ╰─────^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(missing_doc_struct)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#missing_doc_struct.
+
+warning: [lint] Use doc comment `///` instead of regular comment `//` for documentable items.
+   ┌─ tests/module_lints/prefer_doc_comment.move:25:1
+   │
+25 │ ╭     // This should be a doc comment on a private function.
+26 │ │     fun private_func() {}
+   │ ╰^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(prefer_doc_comment)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#prefer_doc_comment.
+
+warning: [lint] Public function is missing a doc comment.
+   ┌─ tests/module_lints/prefer_doc_comment.move:30:16
+   │
+30 │     public fun skipped_func() {}
+   │                ^^^^^^^^^^^^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(missing_doc_public_function)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#missing_doc_public_function.

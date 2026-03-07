@@ -19,6 +19,7 @@ doctest = false
 default = []
 
 [dependencies]
+codespan = { workspace = true }
 codespan-reporting = { workspace = true }
 legacy-move-compiler = { workspace = true }
 move-binary-format = { workspace = true }

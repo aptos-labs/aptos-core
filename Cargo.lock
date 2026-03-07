@@ -12959,6 +12959,7 @@ dependencies = [
 name = "move-linter"
 version = "0.1.0"
 dependencies = [
+ "codespan",
  "codespan-reporting",
  "datatest-stable",
  "legacy-move-compiler",
