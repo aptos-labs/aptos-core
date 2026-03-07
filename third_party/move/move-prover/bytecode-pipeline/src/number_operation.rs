@@ -2,9 +2,55 @@
 // Copyright (c) The Move Contributors
 // SPDX-License-Identifier: Apache-2.0
 
-//! This file defines types, data structures and corresponding functions to
-//! mark the operation (arithmetic or bitwise) that a variable or a field involves,
-//! which will be used later when the correct number type (`int` or `bv<N>`) in the boogie program
+//! # Number Operation Tracking for Bitvector Analysis
+//!
+//! This module tracks whether numeric values in Move code should be represented as:
+//! - Mathematical integers (`int`) - for arithmetic operations
+//! - Fixed-width bitvectors (`bv8`, `bv16`, etc.) - for bitwise operations
+//!
+//! ## Purpose
+//! The Move Prover translates Move code to Boogie for verification. For integer types,
+//! we need to decide whether to use Boogie's mathematical integers or bitvector types:
+//! - Bitvectors model exact wrapping arithmetic and bitwise operations
+//! - Mathematical integers are simpler for SMT solvers when exact bit-level semantics aren't needed
+//!
+//! ## Workflow
+//! 1. Parse `pragma bv` annotations to seed initial classifications
+//! 2. Run dataflow analysis (in number_operation_analysis.rs) to propagate classifications
+//! 3. Use the final state during Boogie code generation to emit correct types
+//!
+//! ## Example
+//! ```move
+//! // Mark parameter 0 as bitwise
+//! fun bitwise_op(x: u8, y: u8): u8 {
+//!     x & y  // Bitwise AND requires bitvector representation
+//! }
+//! spec bitwise_op {
+//!     pragma bv = b"0";  // x should use bitvector type
+//! }
+//!
+//! // Mark return value 0 as bitwise
+//! fun returns_bitwise(x: u8, y: u8): u8 {
+//!     x | y
+//! }
+//! spec returns_bitwise {
+//!     pragma bv_ret = b"0";  // Return value uses bitvector type
+//! }
+//!
+//! // Arithmetic operations can use mathematical integers (no pragma needed)
+//! fun arithmetic_op(x: u8, y: u8): u8 {
+//!     x + y  // Uses int type in Boogie
+//! }
+//!
+//! // Mark struct field 0 as bitwise
+//! struct Flags has store {
+//!     bits: u8,  // Field 0
+//!     count: u64 // Field 1
+//! }
+//! spec Flags {
+//!     pragma bv = b"0";  // bits should use bitvector type
+//! }
+//! ```
 
 use itertools::Itertools;
 use move_model::{
@@ -16,25 +62,38 @@ use std::{collections::BTreeMap, ops::Deref, str};
 
 static PARSING_ERROR: &str = "error happened when parsing the bv pragma";
 
+/// Represents the type of numeric operations a value participates in.
+/// This forms a lattice with Bottom < Arithmetic and Bottom < Bitwise.
+/// Arithmetic and Bitwise are incompatible (conflict with each other).
 #[derive(Debug, Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Default, Hash)]
 pub enum NumOperation {
-    /// Default value, not involved in arithmetic or bitwise operations
+    /// Default value: not yet involved in any operations, or can be either arithmetic or bitwise.
+    /// This is the bottom element in the lattice.
     #[default]
     Bottom,
-    /// Involved in arithmetic operations
+    /// Involved in arithmetic operations (+, -, *, /, %).
+    /// Should be represented as mathematical integers in Boogie.
     Arithmetic,
-    /// Involved in bitwise operations
+    /// Involved in bitwise operations (&, |, ^).
+    /// Must be represented as bitvectors (bv8, bv16, etc.) in Boogie to model wrapping semantics.
+    /// Note: Shift operations (<<, >>) are not classified as Bitwise; they propagate the existing type.
     Bitwise,
 }
 
 impl NumOperation {
-    /// Check whether two operations are conflicting
+    /// Check whether two operations are conflicting.
+    /// Returns true if one is Arithmetic and the other is Bitwise.
+    /// This indicates an error condition: a value cannot be used in both contexts.
     pub fn conflict(&self, other: &NumOperation) -> bool {
         use NumOperation::*;
         (*self == Arithmetic && *other == Bitwise) || (*self == Bitwise && *other == Arithmetic)
     }
 
-    /// Return the operation according to the partial order in NumOperation
+    /// Merge two operations according to the partial order in NumOperation.
+    /// Returns the greater element in the lattice:
+    /// - Bottom merges with anything to produce that thing
+    /// - Arithmetic and Bitwise don't merge (they conflict)
+    /// - Identical values merge to themselves
     pub fn merge(&self, other: &NumOperation) -> NumOperation {
         if self.ge(other) {
             *self
@@ -44,39 +103,80 @@ impl NumOperation {
     }
 }
 
-// NumOperation of a variable
+// Type aliases for various operation mappings
+
+/// Maps temporary variable indices to their NumOperation within a function.
 pub type OperationMap = BTreeMap<usize, NumOperation>;
+
+/// Maps AST node IDs to their NumOperation (used for expressions in specs).
 pub type ExpMap = BTreeMap<NodeId, NumOperation>;
+
+/// A vector of NumOperations (used for function parameters/returns).
 pub type OperationVec = Vec<NumOperation>;
-// NumOperation of a field
+
+/// Maps struct field IDs to their NumOperation.
 pub type StructFieldOperationMap = BTreeMap<FieldId, NumOperation>;
+
+/// Maps (ModuleId, FunId) to the operation map for that function's variables.
 pub type FuncOperationMap = BTreeMap<(ModuleId, FunId), OperationMap>;
+
+/// Maps (ModuleId, SpecFunId) to (parameter operations, return operations).
 pub type SpecFuncOperationMap = BTreeMap<(ModuleId, SpecFunId), (OperationVec, OperationVec)>;
+
+/// Maps (ModuleId, StructId) to the field operation map for that struct.
 pub type StructOperationMap = BTreeMap<(ModuleId, StructId), StructFieldOperationMap>;
 
+/// Global state tracking NumOperation for all program elements.
+/// This is stored as an extension in GlobalEnv and is populated by the analysis phase,
+/// then queried during Boogie code generation.
+///
+/// The state distinguishes between:
+/// - Function parameters (seeded from `pragma bv`)
+/// - Local variables (inferred from usage)
+/// - Return values (seeded from `pragma bv_ret` or inferred)
+/// - Struct fields (seeded from `pragma bv` on struct specs)
+/// - Expression nodes (computed during spec translation)
 #[derive(Default, Debug, Clone, Eq, PartialEq, PartialOrd)]
 pub struct GlobalNumberOperationState {
-    // TODO(tengzhang): spec funs and spec vars need to be handled here
-    // Each TempIndex for parameters appearing the function has a corresponding NumOperation
+    /// Maps (ModuleId, FunId) to operations for function parameters.
+    /// Each parameter's TempIndex is mapped to its NumOperation.
+    /// Seeded from `pragma bv` annotations, then refined by dataflow analysis.
     temp_index_operation_map: FuncOperationMap,
-    // Each return value in the function has a corresponding NumOperation
+
+    /// Maps (ModuleId, FunId) to operations for return values.
+    /// Each return position is mapped to its NumOperation.
+    /// Seeded from `pragma bv_ret` annotations, then refined by dataflow analysis.
     ret_operation_map: FuncOperationMap,
-    // Each TempIndex for locals appearing the function has a corresponding NumOperation
+
+    /// Maps (ModuleId, FunId) to operations for local variables (non-parameters).
+    /// Used for verification variant processing.
     local_oper: FuncOperationMap,
-    // local_oper, but for baseline
+
+    /// Same as local_oper, but for baseline variant of functions.
+    /// Baseline and verification variants may have different inferred types.
     local_oper_baseline: FuncOperationMap,
-    // Each node id appearing the function has a corresponding NumOperation
+
+    /// Maps AST node IDs to NumOperation for spec expressions.
+    /// Public because it's accessed during spec translation.
     pub exp_operation_map: ExpMap,
-    // NumberOperation state for spec functions
+
+    /// Maps (ModuleId, SpecFunId) to (parameter operations, return operations).
+    /// Tracks operations for specification functions.
     pub spec_fun_operation_map: SpecFuncOperationMap,
-    // Each field in the struct has a corresponding NumOperation
+
+    /// Maps (ModuleId, StructId) to field operations for that struct.
+    /// Seeded from `pragma bv` on struct specs, then refined by pack/unpack analysis.
     pub struct_operation_map: StructOperationMap,
 }
 
 impl GlobalNumberOperationState {
-    /// Parse pragma bv=b"..." and pragma bv_ret=b"...", the result is a list of position (starting from 0)
-    /// in the argument list of the function
-    /// or a struct definition
+    /// Parse pragma bv=b"..." or pragma bv_ret=b"..." from function or struct specs.
+    /// Returns a list of positions (0-indexed) that should use bitvector representation.
+    ///
+    /// # Examples
+    /// - `pragma bv = b"0,2"` → returns [0, 2] (parameters at positions 0 and 2 use bv types)
+    /// - `pragma bv_ret = b"1"` → returns [1] (return value at position 1 uses bv type)
+    /// - No pragma → returns [] (all positions use default int types)
     fn extract_bv_vars(bv_temp_opt: Option<&PropertyValue>) -> Vec<usize> {
         let mut bv_temp_vec = vec![];
         if let Some(PropertyValue::Value(Value::ByteArray(arr))) = bv_temp_opt {
@@ -90,6 +190,21 @@ impl GlobalNumberOperationState {
         bv_temp_vec
     }
 
+    /// Helper to populate an operation map with Bitwise for specified indices, Bottom for others.
+    fn populate_operation_map(count: usize, bv_indices: &[usize]) -> OperationMap {
+        use NumOperation::*;
+        (0..count)
+            .map(|i| {
+                let oper = if bv_indices.contains(&i) {
+                    Bitwise
+                } else {
+                    Bottom
+                };
+                (i, oper)
+            })
+            .collect()
+    }
+
     pub fn get_ret_map(&self) -> &FuncOperationMap {
         &self.ret_operation_map
     }
@@ -98,17 +213,33 @@ impl GlobalNumberOperationState {
         &mut self.ret_operation_map
     }
 
+    /// Helper to select the correct local operation map based on baseline flag.
+    fn select_local_map(&self, baseline_flag: bool) -> &FuncOperationMap {
+        if baseline_flag {
+            &self.local_oper_baseline
+        } else {
+            &self.local_oper
+        }
+    }
+
+    /// Helper to select the correct mutable local operation map based on baseline flag.
+    fn select_local_map_mut(&mut self, baseline_flag: bool) -> &mut FuncOperationMap {
+        if baseline_flag {
+            &mut self.local_oper_baseline
+        } else {
+            &mut self.local_oper
+        }
+    }
+
     pub fn get_non_param_local_map(
         &self,
         mid: ModuleId,
         fid: FunId,
         baseline_flag: bool,
     ) -> &OperationMap {
-        if baseline_flag {
-            self.local_oper_baseline.get(&(mid, fid)).unwrap()
-        } else {
-            self.local_oper.get(&(mid, fid)).unwrap()
-        }
+        self.select_local_map(baseline_flag)
+            .get(&(mid, fid))
+            .unwrap()
     }
 
     pub fn get_mut_non_param_local_map(
@@ -117,11 +248,9 @@ impl GlobalNumberOperationState {
         fid: FunId,
         baseline_flag: bool,
     ) -> &mut OperationMap {
-        if baseline_flag {
-            self.local_oper_baseline.get_mut(&(mid, fid)).unwrap()
-        } else {
-            self.local_oper.get_mut(&(mid, fid)).unwrap()
-        }
+        self.select_local_map_mut(baseline_flag)
+            .get_mut(&(mid, fid))
+            .unwrap()
     }
 
     pub fn get_temp_index_oper(
@@ -131,25 +260,15 @@ impl GlobalNumberOperationState {
         idx: TempIndex,
         baseline_flag: bool,
     ) -> Option<&NumOperation> {
-        if baseline_flag {
-            if self
-                .local_oper_baseline
-                .get(&(mid, fid))
-                .unwrap()
-                .contains_key(&idx)
-            {
-                self.local_oper_baseline.get(&(mid, fid)).unwrap().get(&idx)
-            } else {
-                self.temp_index_operation_map
-                    .get(&(mid, fid))
-                    .unwrap()
-                    .get(&idx)
-            }
-        } else if self.local_oper.get(&(mid, fid)).unwrap().contains_key(&idx) {
-            self.local_oper.get(&(mid, fid)).unwrap().get(&idx)
+        let func_key = (mid, fid);
+        let local_map = self.select_local_map(baseline_flag).get(&func_key).unwrap();
+
+        // Check locals first, then fall back to parameters
+        if local_map.contains_key(&idx) {
+            local_map.get(&idx)
         } else {
             self.temp_index_operation_map
-                .get(&(mid, fid))
+                .get(&func_key)
                 .unwrap()
                 .get(&idx)
         }
@@ -162,81 +281,61 @@ impl GlobalNumberOperationState {
         idx: TempIndex,
         baseline_flag: bool,
     ) -> Option<&mut NumOperation> {
-        if baseline_flag {
-            if self
-                .local_oper_baseline
-                .get(&(mid, fid))
+        let func_key = (mid, fid);
+
+        // Check locals first, then fall back to parameters
+        // Need to check containment first to avoid multiple mutable borrows
+        let is_in_locals = self
+            .select_local_map(baseline_flag)
+            .get(&func_key)
+            .unwrap()
+            .contains_key(&idx);
+
+        if is_in_locals {
+            self.select_local_map_mut(baseline_flag)
+                .get_mut(&func_key)
                 .unwrap()
-                .contains_key(&idx)
-            {
-                self.local_oper_baseline
-                    .get_mut(&(mid, fid))
-                    .unwrap()
-                    .get_mut(&idx)
-            } else {
-                self.temp_index_operation_map
-                    .get_mut(&(mid, fid))
-                    .unwrap()
-                    .get_mut(&idx)
-            }
-        } else if self.local_oper.get(&(mid, fid)).unwrap().contains_key(&idx) {
-            self.local_oper.get_mut(&(mid, fid)).unwrap().get_mut(&idx)
+                .get_mut(&idx)
         } else {
             self.temp_index_operation_map
-                .get_mut(&(mid, fid))
+                .get_mut(&func_key)
                 .unwrap()
                 .get_mut(&idx)
         }
     }
 
-    /// Create the initial NumberOperationState
+    /// Create the initial NumOperation state for a function.
+    /// This seeds the analysis with explicit `pragma bv` and `pragma bv_ret` annotations.
+    /// - Parameters marked in pragma bv are set to Bitwise
+    /// - Return values marked in pragma bv_ret are set to Bitwise
+    /// - All other parameters/returns are set to Bottom (to be inferred)
     pub fn create_initial_func_oper_state(&mut self, func_env: &FunctionEnv) {
-        use NumOperation::*;
+        let spec = func_env.get_spec();
+        let spec = spec.deref();
+        let symbol_pool = func_env.module_env.env.symbol_pool();
 
-        // Obtain positions that are marked as Bitwise by analyzing the pragma
-        let para_sym = &func_env.module_env.env.symbol_pool().make(BV_PARAM_PROP);
-        let ret_sym = &func_env.module_env.env.symbol_pool().make(BV_RET_PROP);
-        let binding = func_env.get_spec();
-        let binding = binding.deref();
-        let number_param_property = binding.properties.get(para_sym);
-        let number_ret_property = binding.properties.get(ret_sym);
-        let para_idx_vec = Self::extract_bv_vars(number_param_property);
-        let ret_idx_vec = Self::extract_bv_vars(number_ret_property);
+        // Extract pragma annotations
+        let para_idx_vec =
+            Self::extract_bv_vars(spec.properties.get(&symbol_pool.make(BV_PARAM_PROP)));
+        let ret_idx_vec =
+            Self::extract_bv_vars(spec.properties.get(&symbol_pool.make(BV_RET_PROP)));
 
-        let mid = func_env.module_env.get_id();
-        let fid = func_env.get_id();
-        let mut default_map = BTreeMap::new();
-        let mut default_ret_operation_map = BTreeMap::new();
+        // Populate operation maps using the helper
+        let param_map = Self::populate_operation_map(func_env.get_parameter_count(), &para_idx_vec);
+        let ret_map = Self::populate_operation_map(func_env.get_return_count(), &ret_idx_vec);
 
-        // Set initial state for tempIndex
-        for i in 0..func_env.get_parameter_count() {
-            if para_idx_vec.contains(&i) {
-                default_map.insert(i, Bitwise);
-            } else {
-                // If not appearing in the pragma, mark it as Bottom
-                // Similar logic when populating ret_operation_map below
-                default_map.insert(i, Bottom);
-            }
-        }
-
-        // Set initial state for ret_operation_map
-        for i in 0..func_env.get_return_count() {
-            if ret_idx_vec.contains(&i) {
-                default_ret_operation_map.insert(i, Bitwise);
-            } else {
-                default_ret_operation_map.insert(i, Bottom);
-            }
-        }
-
-        self.temp_index_operation_map
-            .insert((mid, fid), default_map);
-        self.local_oper_baseline.insert((mid, fid), BTreeMap::new());
-        self.local_oper.insert((mid, fid), BTreeMap::new());
-        self.ret_operation_map
-            .insert((mid, fid), default_ret_operation_map);
+        let func_key = (func_env.module_env.get_id(), func_env.get_id());
+        self.temp_index_operation_map.insert(func_key, param_map);
+        self.ret_operation_map.insert(func_key, ret_map);
+        self.local_oper_baseline.insert(func_key, BTreeMap::new());
+        self.local_oper.insert(func_key, BTreeMap::new());
     }
 
-    /// Populate default state for struct operation map
+    /// Create the initial NumOperation state for a struct.
+    /// This seeds the analysis with explicit `pragma bv` annotations on struct specs.
+    /// - Fields marked in pragma bv are set to Bitwise
+    /// - All other fields are set to Bottom (to be inferred)
+    /// - For enum types, pragma bv is currently not supported and will be ignored with a warning
     pub fn create_initial_struct_oper_state(&mut self, struct_env: &StructEnv) {
         use NumOperation::*;
 
@@ -293,7 +392,16 @@ impl GlobalNumberOperationState {
         }
     }
 
-    /// Updates the number operation for the given node id.
+    /// Updates the NumOperation for the given AST node ID.
+    ///
+    /// # Parameters
+    /// - `node_id`: The AST node to update
+    /// - `num_oper`: The new NumOperation to assign
+    /// - `allow`: If true, always update even if it conflicts; if false, return false on conflict
+    ///
+    /// # Returns
+    /// - `true` if the update succeeded
+    /// - `false` if there was a conflict and `allow` was false
     pub fn update_node_oper(
         &mut self,
         node_id: NodeId,

@@ -1538,7 +1538,7 @@ impl ModelValue {
         struct_env: &StructEnv,
         inst: &[Type],
     ) -> Option<PrettyDoc> {
-        let struct_name = &boogie_struct_name(struct_env, inst);
+        let struct_name = &boogie_struct_name(struct_env, inst, false);
         let mut ctor_name = struct_env
             .get_name()
             .display(struct_env.symbol_pool())
@@ -1622,7 +1622,7 @@ impl ModelValue {
         // function table of $EncodeKey and turns into a map from int to encoded ModelValue.
         let encoding_key = format!(
             "$EncodeKey{}",
-            boogie_inst_suffix(wrapper.env, std::slice::from_ref(key_ty))
+            boogie_inst_suffix(wrapper.env, std::slice::from_ref(key_ty), &[])
         );
         let encoding_map = model
             .vars
