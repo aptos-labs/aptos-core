@@ -93,7 +93,13 @@ pub fn build_dkg_pvss_config(
         wconfig,
         rounding_error,
         rounding_method,
-    } = DKGRounding::new(&validator_stakes, secrecy_threshold, reconstruct_threshold);
+        ..
+    } = DKGRounding::new(
+        &validator_stakes,
+        secrecy_threshold,
+        reconstruct_threshold,
+        None,
+    );
     let rounding_time = timer.elapsed();
     let validator_consensus_keys: Vec<bls12381::PublicKey> = next_validators
         .iter()

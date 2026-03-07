@@ -254,8 +254,12 @@ impl ChunkyDKG {
 
         // Use the same rounding logic as RealDKG to compute weights
         // TODO(ibalajiarun): Just compute profile instead of doing Blss things with DKGRounding
-        let DKGRounding { profile, .. } =
-            DKGRounding::new(&validator_stakes, secrecy_threshold, reconstruct_threshold);
+        let DKGRounding { profile, .. } = DKGRounding::new(
+            &validator_stakes,
+            secrecy_threshold,
+            reconstruct_threshold,
+            None,
+        );
 
         // Create WeightedConfigArkworks<Fr> from the computed weights
         let threshold_config = ChunkyDKGThresholdConfig::new(

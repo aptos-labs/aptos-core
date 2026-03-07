@@ -53,6 +53,7 @@ pub struct DKGRounding {
     pub rounding_method: String,
     pub profile: DKGRoundingProfile,
     pub wconfig: WeightedConfigBlstrs,
+    pub fast_wconfig: Option<WeightedConfigBlstrs>,
     pub rounding_error: Option<String>,
 }
 
@@ -61,6 +62,7 @@ impl DKGRounding {
         validator_stakes: &Vec<u64>,
         secrecy_threshold_in_stake_ratio: U64F64,
         mut reconstruct_threshold_in_stake_ratio: U64F64,
+        fast_secrecy_threshold_in_stake_ratio: Option<U64F64>,
     ) -> Self {
         reconstruct_threshold_in_stake_ratio = max(
             reconstruct_threshold_in_stake_ratio,
@@ -80,6 +82,7 @@ impl DKGRounding {
             total_weight_max,
             secrecy_threshold_in_stake_ratio,
             reconstruct_threshold_in_stake_ratio,
+            fast_secrecy_threshold_in_stake_ratio,
         ) {
             Ok(profile) => (profile, None, "binary_search".to_string()),
             Err(e) => {
@@ -87,6 +90,7 @@ impl DKGRounding {
                     validator_stakes,
                     secrecy_threshold_in_stake_ratio,
                     reconstruct_threshold_in_stake_ratio,
+                    fast_secrecy_threshold_in_stake_ratio,
                 );
                 (profile, Some(format!("{e}")), "infallible".to_string())
             },
@@ -101,10 +105,25 @@ impl DKGRounding {
         )
         .unwrap();
 
+        let fast_wconfig = profile.fast_reconstruct_threshold_in_weights.map(
+            |fast_reconstruct_threshold_in_weights| {
+                WeightedConfigBlstrs::new(
+                    fast_reconstruct_threshold_in_weights as usize,
+                    profile
+                        .validator_weights
+                        .iter()
+                        .map(|w| *w as usize)
+                        .collect(),
+                )
+                .unwrap()
+            },
+        );
+
         Self {
             rounding_method,
             profile,
             wconfig,
+            fast_wconfig,
             rounding_error,
         }
     }
@@ -120,6 +139,10 @@ pub struct DKGRoundingProfile {
     pub reconstruct_threshold_in_stake_ratio: U64F64,
     // The number of weights needed to reconstruct the randomness
     pub reconstruct_threshold_in_weights: u64,
+    // The ratio of stake that always can reconstruct the randomness for the fast path, e.g. 66.67% + delta
+    pub fast_reconstruct_threshold_in_stake_ratio: Option<U64F64>,
+    // The number of weights needed to reconstruct the randomness for the fast path
+    pub fast_reconstruct_threshold_in_weights: Option<u64>,
 }
 
 impl Debug for DKGRoundingProfile {
@@ -144,6 +167,16 @@ impl Debug for DKGRoundingProfile {
             "reconstruct_threshold_in_weights: {}, ",
             self.reconstruct_threshold_in_weights
         )?;
+        write!(
+            f,
+            "fast_reconstruct_threshold_in_stake_ratio: {:?}, ",
+            self.fast_reconstruct_threshold_in_stake_ratio
+        )?;
+        write!(
+            f,
+            "fast_reconstruct_threshold_in_weights: {:?}, ",
+            self.fast_reconstruct_threshold_in_weights
+        )?;
         writeln!(f, "validator_weights: {:?}", self.validator_weights)?;
 
         Ok(())
@@ -157,6 +190,7 @@ impl DKGRoundingProfile {
         total_weight_max: usize,
         secrecy_threshold_in_stake_ratio: U64F64,
         reconstruct_threshold_in_stake_ratio: U64F64,
+        fast_secrecy_threshold_in_stake_ratio: Option<U64F64>,
     ) -> anyhow::Result<Self> {
         ensure!(total_weight_min >= validator_stakes.len());
         ensure!(total_weight_max >= total_weight_min);
@@ -174,6 +208,7 @@ impl DKGRoundingProfile {
                 U64F64::from_num(stake_total) / U64F64::from_num(weight_low),
             ),
             secrecy_threshold_in_stake_ratio,
+            fast_secrecy_threshold_in_stake_ratio,
         );
 
         if is_valid_profile(&best_profile, reconstruct_threshold_in_stake_ratio) {
@@ -191,6 +226,7 @@ impl DKGRoundingProfile {
                 validator_stakes,
                 stake_per_weight,
                 secrecy_threshold_in_stake_ratio,
+                fast_secrecy_threshold_in_stake_ratio,
             );
 
             // Check if the current weight satisfies the conditions
@@ -219,6 +255,7 @@ impl DKGRoundingProfile {
         validator_stakes: &Vec<u64>,
         mut secrecy_threshold_in_stake_ratio: U64F64,
         mut reconstruct_threshold_in_stake_ratio: U64F64,
+        fast_secrecy_threshold_in_stake_ratio: Option<U64F64>,
     ) -> Self {
         let one = U64F64::from_num(1);
         secrecy_threshold_in_stake_ratio = min(one, secrecy_threshold_in_stake_ratio);
@@ -240,6 +277,7 @@ impl DKGRoundingProfile {
             validator_stakes,
             stake_per_weight,
             secrecy_threshold_in_stake_ratio,
+            fast_secrecy_threshold_in_stake_ratio,
         )
     }
 }
@@ -248,14 +286,17 @@ fn is_valid_profile(
     profile: &DKGRoundingProfile,
     reconstruct_threshold_in_stake_ratio: U64F64,
 ) -> bool {
-    // ensure the reconstruction is below threshold
+    // ensure the reconstruction is below threshold, and the fast path threshold is valid
     profile.reconstruct_threshold_in_stake_ratio <= reconstruct_threshold_in_stake_ratio
+        && (profile.fast_reconstruct_threshold_in_stake_ratio.is_none()
+            || profile.fast_reconstruct_threshold_in_stake_ratio.unwrap() <= U64F64::from_num(1))
 }
 
 fn compute_profile_fixed_point(
     validator_stakes: &Vec<u64>,
     stake_per_weight: U64F64,
     secrecy_threshold_in_stake_ratio: U64F64,
+    maybe_fast_secrecy_threshold_in_stake_ratio: Option<U64F64>,
 ) -> DKGRoundingProfile {
     // Use fixed-point arithmetic to ensure the same result across machines.
     // See paper for details of the rounding algorithm
@@ -291,11 +332,31 @@ fn compute_profile_fixed_point(
     let stake_gap_fixed = stake_per_weight * delta_total_fixed / stake_sum_fixed;
     let reconstruct_threshold_in_stake_ratio = secrecy_threshold_in_stake_ratio + stake_gap_fixed;
 
+    let (fast_reconstruct_threshold_in_stake_ratio, fast_reconstruct_threshold_in_weights) =
+        if let Some(fast_secrecy_threshold_in_stake_ratio) =
+            maybe_fast_secrecy_threshold_in_stake_ratio
+        {
+            let recon_threshold = fast_secrecy_threshold_in_stake_ratio + stake_gap_fixed;
+            let recon_weight = min(
+                weight_total,
+                ((fast_secrecy_threshold_in_stake_ratio * stake_sum_fixed / stake_per_weight
+                    + delta_up_fixed)
+                    .ceil()
+                    + one)
+                    .to_num::<u64>(),
+            );
+            (Some(recon_threshold), Some(recon_weight))
+        } else {
+            (None, None)
+        };
+
     DKGRoundingProfile {
         validator_weights,
         secrecy_threshold_in_stake_ratio,
         reconstruct_threshold_in_stake_ratio,
         reconstruct_threshold_in_weights,
+        fast_reconstruct_threshold_in_stake_ratio,
+        fast_reconstruct_threshold_in_weights,
     }
 }
 
@@ -306,4 +367,7 @@ pub static DEFAULT_SECRECY_THRESHOLD: Lazy<U64F64> =
     Lazy::new(|| U64F64::from_num(1) / U64F64::from_num(2));
 
 pub static DEFAULT_RECONSTRUCT_THRESHOLD: Lazy<U64F64> =
+    Lazy::new(|| U64F64::from_num(2) / U64F64::from_num(3));
+
+pub static DEFAULT_FAST_PATH_SECRECY_THRESHOLD: Lazy<U64F64> =
     Lazy::new(|| U64F64::from_num(2) / U64F64::from_num(3));
