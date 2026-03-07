@@ -3012,6 +3012,270 @@ impl<'de> serde::Deserialize<'de> for ExtraConfigV1 {
         deserializer.deserialize_struct("aptos.transaction.v1.ExtraConfigV1", FIELDS, GeneratedVisitor)
     }
 }
+impl serde::Serialize for EncryptedTransactionPayload {
+    #[allow(deprecated)]
+    fn serialize<S>(&self, serializer: S) -> std::result::Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        use serde::ser::SerializeStruct;
+        let mut len = 0;
+        if self.encrypted_state != 0 {
+            len += 1;
+        }
+        if !self.payload_hash.is_empty() {
+            len += 1;
+        }
+        if self.decryption_nonce.is_some() {
+            len += 1;
+        }
+        if self.decrypted_payload.is_some() {
+            len += 1;
+        }
+        let mut struct_ser = serializer.serialize_struct("aptos.transaction.v1.EncryptedTransactionPayload", len)?;
+        if self.encrypted_state != 0 {
+            let v = encrypted_transaction_payload::EncryptedState::from_i32(self.encrypted_state)
+                .ok_or_else(|| serde::ser::Error::custom(format!("Invalid variant {}", self.encrypted_state)))?;
+            struct_ser.serialize_field("encryptedState", &v)?;
+        }
+        if !self.payload_hash.is_empty() {
+            struct_ser.serialize_field("payloadHash", pbjson::private::base64::encode(&self.payload_hash).as_str())?;
+        }
+        if let Some(v) = self.decryption_nonce.as_ref() {
+            struct_ser.serialize_field("decryptionNonce", ToString::to_string(&v).as_str())?;
+        }
+        if let Some(v) = self.decrypted_payload.as_ref() {
+            match v {
+                encrypted_transaction_payload::DecryptedPayload::EntryFunctionPayload(v) => {
+                    struct_ser.serialize_field("entryFunctionPayload", v)?;
+                }
+                encrypted_transaction_payload::DecryptedPayload::ScriptPayload(v) => {
+                    struct_ser.serialize_field("scriptPayload", v)?;
+                }
+                encrypted_transaction_payload::DecryptedPayload::MultisigPayload(v) => {
+                    struct_ser.serialize_field("multisigPayload", v)?;
+                }
+            }
+        }
+        struct_ser.end()
+    }
+}
+impl<'de> serde::Deserialize<'de> for EncryptedTransactionPayload {
+    #[allow(deprecated)]
+    fn deserialize<D>(deserializer: D) -> std::result::Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        const FIELDS: &[&str] = &[
+            "encrypted_state",
+            "encryptedState",
+            "payload_hash",
+            "payloadHash",
+            "decryption_nonce",
+            "decryptionNonce",
+            "entry_function_payload",
+            "entryFunctionPayload",
+            "script_payload",
+            "scriptPayload",
+            "multisig_payload",
+            "multisigPayload",
+        ];
+
+        #[allow(clippy::enum_variant_names)]
+        enum GeneratedField {
+            EncryptedState,
+            PayloadHash,
+            DecryptionNonce,
+            EntryFunctionPayload,
+            ScriptPayload,
+            MultisigPayload,
+        }
+        impl<'de> serde::Deserialize<'de> for GeneratedField {
+            fn deserialize<D>(deserializer: D) -> std::result::Result<GeneratedField, D::Error>
+            where
+                D: serde::Deserializer<'de>,
+            {
+                struct GeneratedVisitor;
+
+                impl<'de> serde::de::Visitor<'de> for GeneratedVisitor {
+                    type Value = GeneratedField;
+
+                    fn expecting(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+                        write!(formatter, "expected one of: {:?}", &FIELDS)
+                    }
+
+                    #[allow(unused_variables)]
+                    fn visit_str<E>(self, value: &str) -> std::result::Result<GeneratedField, E>
+                    where
+                        E: serde::de::Error,
+                    {
+                        match value {
+                            "encryptedState" | "encrypted_state" => Ok(GeneratedField::EncryptedState),
+                            "payloadHash" | "payload_hash" => Ok(GeneratedField::PayloadHash),
+                            "decryptionNonce" | "decryption_nonce" => Ok(GeneratedField::DecryptionNonce),
+                            "entryFunctionPayload" | "entry_function_payload" => Ok(GeneratedField::EntryFunctionPayload),
+                            "scriptPayload" | "script_payload" => Ok(GeneratedField::ScriptPayload),
+                            "multisigPayload" | "multisig_payload" => Ok(GeneratedField::MultisigPayload),
+                            _ => Err(serde::de::Error::unknown_field(value, FIELDS)),
+                        }
+                    }
+                }
+                deserializer.deserialize_identifier(GeneratedVisitor)
+            }
+        }
+        struct GeneratedVisitor;
+        impl<'de> serde::de::Visitor<'de> for GeneratedVisitor {
+            type Value = EncryptedTransactionPayload;
+
+            fn expecting(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+                formatter.write_str("struct aptos.transaction.v1.EncryptedTransactionPayload")
+            }
+
+            fn visit_map<V>(self, mut map: V) -> std::result::Result<EncryptedTransactionPayload, V::Error>
+                where
+                    V: serde::de::MapAccess<'de>,
+            {
+                let mut encrypted_state__ = None;
+                let mut payload_hash__ = None;
+                let mut decryption_nonce__ = None;
+                let mut decrypted_payload__ = None;
+                while let Some(k) = map.next_key()? {
+                    match k {
+                        GeneratedField::EncryptedState => {
+                            if encrypted_state__.is_some() {
+                                return Err(serde::de::Error::duplicate_field("encryptedState"));
+                            }
+                            encrypted_state__ = Some(map.next_value::<encrypted_transaction_payload::EncryptedState>()? as i32);
+                        }
+                        GeneratedField::PayloadHash => {
+                            if payload_hash__.is_some() {
+                                return Err(serde::de::Error::duplicate_field("payloadHash"));
+                            }
+                            payload_hash__ =
+                                Some(map.next_value::<::pbjson::private::BytesDeserialize<_>>()?.0)
+                            ;
+                        }
+                        GeneratedField::DecryptionNonce => {
+                            if decryption_nonce__.is_some() {
+                                return Err(serde::de::Error::duplicate_field("decryptionNonce"));
+                            }
+                            decryption_nonce__ =
+                                map.next_value::<::std::option::Option<::pbjson::private::NumberDeserialize<_>>>()?.map(|x| x.0)
+                            ;
+                        }
+                        GeneratedField::EntryFunctionPayload => {
+                            if decrypted_payload__.is_some() {
+                                return Err(serde::de::Error::duplicate_field("entryFunctionPayload"));
+                            }
+                            decrypted_payload__ = map.next_value::<::std::option::Option<_>>()?.map(encrypted_transaction_payload::DecryptedPayload::EntryFunctionPayload)
+;
+                        }
+                        GeneratedField::ScriptPayload => {
+                            if decrypted_payload__.is_some() {
+                                return Err(serde::de::Error::duplicate_field("scriptPayload"));
+                            }
+                            decrypted_payload__ = map.next_value::<::std::option::Option<_>>()?.map(encrypted_transaction_payload::DecryptedPayload::ScriptPayload)
+;
+                        }
+                        GeneratedField::MultisigPayload => {
+                            if decrypted_payload__.is_some() {
+                                return Err(serde::de::Error::duplicate_field("multisigPayload"));
+                            }
+                            decrypted_payload__ = map.next_value::<::std::option::Option<_>>()?.map(encrypted_transaction_payload::DecryptedPayload::MultisigPayload)
+;
+                        }
+                    }
+                }
+                Ok(EncryptedTransactionPayload {
+                    encrypted_state: encrypted_state__.unwrap_or_default(),
+                    payload_hash: payload_hash__.unwrap_or_default(),
+                    decryption_nonce: decryption_nonce__,
+                    decrypted_payload: decrypted_payload__,
+                })
+            }
+        }
+        deserializer.deserialize_struct("aptos.transaction.v1.EncryptedTransactionPayload", FIELDS, GeneratedVisitor)
+    }
+}
+impl serde::Serialize for encrypted_transaction_payload::EncryptedState {
+    #[allow(deprecated)]
+    fn serialize<S>(&self, serializer: S) -> std::result::Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        let variant = match self {
+            Self::Unspecified => "ENCRYPTED_STATE_UNSPECIFIED",
+            Self::Encrypted => "ENCRYPTED_STATE_ENCRYPTED",
+            Self::FailedDecryption => "ENCRYPTED_STATE_FAILED_DECRYPTION",
+            Self::Decrypted => "ENCRYPTED_STATE_DECRYPTED",
+        };
+        serializer.serialize_str(variant)
+    }
+}
+impl<'de> serde::Deserialize<'de> for encrypted_transaction_payload::EncryptedState {
+    #[allow(deprecated)]
+    fn deserialize<D>(deserializer: D) -> std::result::Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        const FIELDS: &[&str] = &[
+            "ENCRYPTED_STATE_UNSPECIFIED",
+            "ENCRYPTED_STATE_ENCRYPTED",
+            "ENCRYPTED_STATE_FAILED_DECRYPTION",
+            "ENCRYPTED_STATE_DECRYPTED",
+        ];
+
+        struct GeneratedVisitor;
+
+        impl<'de> serde::de::Visitor<'de> for GeneratedVisitor {
+            type Value = encrypted_transaction_payload::EncryptedState;
+
+            fn expecting(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+                write!(formatter, "expected one of: {:?}", &FIELDS)
+            }
+
+            fn visit_i64<E>(self, v: i64) -> std::result::Result<Self::Value, E>
+            where
+                E: serde::de::Error,
+            {
+                use std::convert::TryFrom;
+                i32::try_from(v)
+                    .ok()
+                    .and_then(encrypted_transaction_payload::EncryptedState::from_i32)
+                    .ok_or_else(|| {
+                        serde::de::Error::invalid_value(serde::de::Unexpected::Signed(v), &self)
+                    })
+            }
+
+            fn visit_u64<E>(self, v: u64) -> std::result::Result<Self::Value, E>
+            where
+                E: serde::de::Error,
+            {
+                use std::convert::TryFrom;
+                i32::try_from(v)
+                    .ok()
+                    .and_then(encrypted_transaction_payload::EncryptedState::from_i32)
+                    .ok_or_else(|| {
+                        serde::de::Error::invalid_value(serde::de::Unexpected::Unsigned(v), &self)
+                    })
+            }
+
+            fn visit_str<E>(self, value: &str) -> std::result::Result<Self::Value, E>
+            where
+                E: serde::de::Error,
+            {
+                match value {
+                    "ENCRYPTED_STATE_UNSPECIFIED" => Ok(encrypted_transaction_payload::EncryptedState::Unspecified),
+                    "ENCRYPTED_STATE_ENCRYPTED" => Ok(encrypted_transaction_payload::EncryptedState::Encrypted),
+                    "ENCRYPTED_STATE_FAILED_DECRYPTION" => Ok(encrypted_transaction_payload::EncryptedState::FailedDecryption),
+                    "ENCRYPTED_STATE_DECRYPTED" => Ok(encrypted_transaction_payload::EncryptedState::Decrypted),
+                    _ => Err(serde::de::Error::unknown_variant(value, FIELDS)),
+                }
+            }
+        }
+        deserializer.deserialize_any(GeneratedVisitor)
+    }
+}
 impl serde::Serialize for FeePayerSignature {
     #[allow(deprecated)]
     fn serialize<S>(&self, serializer: S) -> std::result::Result<S::Ok, S::Error>
@@ -7825,6 +8089,9 @@ impl serde::Serialize for TransactionPayload {
                 transaction_payload::Payload::MultisigPayload(v) => {
                     struct_ser.serialize_field("multisigPayload", v)?;
                 }
+                transaction_payload::Payload::EncryptedTransactionPayload(v) => {
+                    struct_ser.serialize_field("encryptedTransactionPayload", v)?;
+                }
             }
         }
         if let Some(v) = self.extra_config.as_ref() {
@@ -7853,6 +8120,8 @@ impl<'de> serde::Deserialize<'de> for TransactionPayload {
             "writeSetPayload",
             "multisig_payload",
             "multisigPayload",
+            "encrypted_transaction_payload",
+            "encryptedTransactionPayload",
             "extra_config_v1",
             "extraConfigV1",
         ];
@@ -7864,6 +8133,7 @@ impl<'de> serde::Deserialize<'de> for TransactionPayload {
             ScriptPayload,
             WriteSetPayload,
             MultisigPayload,
+            EncryptedTransactionPayload,
             ExtraConfigV1,
         }
         impl<'de> serde::Deserialize<'de> for GeneratedField {
@@ -7891,6 +8161,7 @@ impl<'de> serde::Deserialize<'de> for TransactionPayload {
                             "scriptPayload" | "script_payload" => Ok(GeneratedField::ScriptPayload),
                             "writeSetPayload" | "write_set_payload" => Ok(GeneratedField::WriteSetPayload),
                             "multisigPayload" | "multisig_payload" => Ok(GeneratedField::MultisigPayload),
+                            "encryptedTransactionPayload" | "encrypted_transaction_payload" => Ok(GeneratedField::EncryptedTransactionPayload),
                             "extraConfigV1" | "extra_config_v1" => Ok(GeneratedField::ExtraConfigV1),
                             _ => Err(serde::de::Error::unknown_field(value, FIELDS)),
                         }
@@ -7950,6 +8221,13 @@ impl<'de> serde::Deserialize<'de> for TransactionPayload {
                             payload__ = map.next_value::<::std::option::Option<_>>()?.map(transaction_payload::Payload::MultisigPayload)
 ;
                         }
+                        GeneratedField::EncryptedTransactionPayload => {
+                            if payload__.is_some() {
+                                return Err(serde::de::Error::duplicate_field("encryptedTransactionPayload"));
+                            }
+                            payload__ = map.next_value::<::std::option::Option<_>>()?.map(transaction_payload::Payload::EncryptedTransactionPayload)
+;
+                        }
                         GeneratedField::ExtraConfigV1 => {
                             if extra_config__.is_some() {
                                 return Err(serde::de::Error::duplicate_field("extraConfigV1"));
@@ -7981,6 +8259,7 @@ impl serde::Serialize for transaction_payload::Type {
             Self::ScriptPayload => "TYPE_SCRIPT_PAYLOAD",
             Self::WriteSetPayload => "TYPE_WRITE_SET_PAYLOAD",
             Self::MultisigPayload => "TYPE_MULTISIG_PAYLOAD",
+            Self::EncryptedTransactionPayload => "TYPE_ENCRYPTED_TRANSACTION_PAYLOAD",
         };
         serializer.serialize_str(variant)
     }
@@ -7997,6 +8276,7 @@ impl<'de> serde::Deserialize<'de> for transaction_payload::Type {
             "TYPE_SCRIPT_PAYLOAD",
             "TYPE_WRITE_SET_PAYLOAD",
             "TYPE_MULTISIG_PAYLOAD",
+            "TYPE_ENCRYPTED_TRANSACTION_PAYLOAD",
         ];
 
         struct GeneratedVisitor;
@@ -8044,6 +8324,7 @@ impl<'de> serde::Deserialize<'de> for transaction_payload::Type {
                     "TYPE_SCRIPT_PAYLOAD" => Ok(transaction_payload::Type::ScriptPayload),
                     "TYPE_WRITE_SET_PAYLOAD" => Ok(transaction_payload::Type::WriteSetPayload),
                     "TYPE_MULTISIG_PAYLOAD" => Ok(transaction_payload::Type::MultisigPayload),
+                    "TYPE_ENCRYPTED_TRANSACTION_PAYLOAD" => Ok(transaction_payload::Type::EncryptedTransactionPayload),
                     _ => Err(serde::de::Error::unknown_variant(value, FIELDS)),
                 }
             }

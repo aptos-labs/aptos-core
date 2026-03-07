@@ -45,17 +45,17 @@ use std::str::FromStr;
 pub use table::{RawTableItemRequest, TableItemRequest};
 pub use transaction::{
     AbstractSignature, AccountSignature, BlockMetadataTransaction, DeleteModule, DeleteResource,
-    DeleteTableItem, DirectWriteSet, Ed25519Signature, EncodeSubmissionRequest,
-    EntryFunctionPayload, Event, FeePayerSignature, GasEstimation, GasEstimationBcs,
-    GenesisPayload, GenesisTransaction, MultiAgentSignature, MultiEd25519Signature,
-    MultiKeySignature, MultisigPayload, MultisigTransactionPayload, NoAccountSignature,
-    PendingTransaction, PublicKey, ScriptPayload, ScriptWriteSet, Signature, SingleKeySignature,
-    SubmitTransactionRequest, Transaction, TransactionData, TransactionId, TransactionInfo,
-    TransactionOnChainData, TransactionPayload, TransactionSignature, TransactionSigningMessage,
-    TransactionSummary, TransactionsBatchSingleSubmissionFailure,
-    TransactionsBatchSubmissionResult, UserCreateSigningMessageRequest, UserTransaction,
-    UserTransactionRequest, VersionedEvent, WriteModule, WriteResource, WriteSet, WriteSetChange,
-    WriteSetPayload, WriteTableItem,
+    DeleteTableItem, DirectWriteSet, Ed25519Signature, EncodeSubmissionRequest, EncryptedState,
+    EncryptedTransactionInnerPayload, EncryptedTransactionPayload, EntryFunctionPayload, Event,
+    FeePayerSignature, GasEstimation, GasEstimationBcs, GenesisPayload, GenesisTransaction,
+    MultiAgentSignature, MultiEd25519Signature, MultiKeySignature, MultisigPayload,
+    MultisigTransactionPayload, NoAccountSignature, PendingTransaction, PublicKey, ScriptPayload,
+    ScriptWriteSet, Signature, SingleKeySignature, SubmitTransactionRequest, Transaction,
+    TransactionData, TransactionId, TransactionInfo, TransactionOnChainData, TransactionPayload,
+    TransactionSignature, TransactionSigningMessage, TransactionSummary,
+    TransactionsBatchSingleSubmissionFailure, TransactionsBatchSubmissionResult,
+    UserCreateSigningMessageRequest, UserTransaction, UserTransactionRequest, VersionedEvent,
+    WriteModule, WriteResource, WriteSet, WriteSetChange, WriteSetPayload, WriteTableItem,
 };
 pub use view::{ViewFunction, ViewRequest};
 pub use wrappers::{EventGuid, IdentifierWrapper, StateKeyWrapper};

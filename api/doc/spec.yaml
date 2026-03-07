@@ -13391,6 +13391,71 @@ components:
           description: Secondary signer accounts of the request for Multi-agent
           items:
             $ref: '#/components/schemas/Address'
+    EncryptedState:
+      type: string
+      description: The decryption state of an encrypted transaction payload.
+      enum:
+      - encrypted
+      - failed_decryption
+      - decrypted
+    EncryptedTransactionInnerPayload:
+      type: object
+      description: The inner payload of an encrypted transaction, present only when decrypted.
+      oneOf:
+      - $ref: '#/components/schemas/EncryptedTransactionInnerPayload_EntryFunctionPayload'
+      - $ref: '#/components/schemas/EncryptedTransactionInnerPayload_ScriptPayload'
+      discriminator:
+        propertyName: type
+        mapping:
+          entry_function_payload: '#/components/schemas/EncryptedTransactionInnerPayload_EntryFunctionPayload'
+          script_payload: '#/components/schemas/EncryptedTransactionInnerPayload_ScriptPayload'
+    EncryptedTransactionInnerPayload_EntryFunctionPayload:
+      allOf:
+      - type: object
+        required:
+        - type
+        properties:
+          type:
+            type: string
+            enum:
+            - entry_function_payload
+            example: entry_function_payload
+      - $ref: '#/components/schemas/EntryFunctionPayload'
+    EncryptedTransactionInnerPayload_ScriptPayload:
+      allOf:
+      - type: object
+        required:
+        - type
+        properties:
+          type:
+            type: string
+            enum:
+            - script_payload
+            example: script_payload
+      - $ref: '#/components/schemas/ScriptPayload'
+    EncryptedTransactionPayload:
+      type: object
+      description: An encrypted transaction payload. Exposes metadata and, when decrypted, the inner payload.
+      required:
+      - encrypted_state
+      - payload_hash
+      properties:
+        encrypted_state:
+          $ref: '#/components/schemas/EncryptedState'
+        payload_hash:
+          $ref: '#/components/schemas/HashValue'
+        ciphertext:
+          allOf:
+          - $ref: '#/components/schemas/HexEncodedBytes'
+          - description: BCS-serialized ciphertext bytes. Required for submission, omitted in read responses.
+        multisig_address:
+          $ref: '#/components/schemas/Address'
+        replay_protection_nonce:
+          $ref: '#/components/schemas/U64'
+        decrypted_payload:
+          $ref: '#/components/schemas/EncryptedTransactionInnerPayload'
+        decryption_nonce:
+          $ref: '#/components/schemas/U64'
     EntryFunctionId:
       type: string
       description: |
@@ -14706,6 +14771,7 @@ components:
       - $ref: '#/components/schemas/TransactionPayload_ScriptPayload'
       - $ref: '#/components/schemas/TransactionPayload_DeprecatedModuleBundlePayload'
       - $ref: '#/components/schemas/TransactionPayload_MultisigPayload'
+      - $ref: '#/components/schemas/TransactionPayload_EncryptedTransactionPayload'
       discriminator:
         propertyName: type
         mapping:
@@ -14713,6 +14779,7 @@ components:
           script_payload: '#/components/schemas/TransactionPayload_ScriptPayload'
           module_bundle_payload: '#/components/schemas/TransactionPayload_DeprecatedModuleBundlePayload'
           multisig_payload: '#/components/schemas/TransactionPayload_MultisigPayload'
+          encrypted_transaction_payload: '#/components/schemas/TransactionPayload_EncryptedTransactionPayload'
     TransactionPayload_DeprecatedModuleBundlePayload:
       allOf:
       - type: object
@@ -14725,6 +14792,18 @@ components:
             - module_bundle_payload
             example: module_bundle_payload
       - $ref: '#/components/schemas/DeprecatedModuleBundlePayload'
+    TransactionPayload_EncryptedTransactionPayload:
+      allOf:
+      - type: object
+        required:
+        - type
+        properties:
+          type:
+            type: string
+            enum:
+            - encrypted_transaction_payload
+            example: encrypted_transaction_payload
+      - $ref: '#/components/schemas/EncryptedTransactionPayload'
     TransactionPayload_EntryFunctionPayload:
       allOf:
       - type: object

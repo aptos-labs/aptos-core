@@ -4,7 +4,8 @@
 use crate::{
     transaction::{
         BlockEpilogueTransaction, BlockMetadataTransaction, DecodedTableData, DeleteModule,
-        DeleteResource, DeleteTableItem, DeletedTableData, MultisigPayload,
+        DeleteResource, DeleteTableItem, DeletedTableData, EncryptedState,
+        EncryptedTransactionInnerPayload, EncryptedTransactionPayload, MultisigPayload,
         MultisigTransactionPayload, StateCheckpointTransaction, UserTransactionRequestInner,
         WriteModule, WriteResource, WriteTableItem,
     },
@@ -13,7 +14,7 @@ use crate::{
     HexEncodedBytes, MoveFunction, MoveModuleBytecode, MoveResource, MoveScriptBytecode, MoveType,
     MoveValue, PendingTransaction, ResourceGroup, ScriptPayload, ScriptWriteSet,
     SubmitTransactionRequest, Transaction, TransactionInfo, TransactionOnChainData,
-    TransactionPayload, VersionedEvent, WriteSet, WriteSetChange, WriteSetPayload,
+    TransactionPayload, VersionedEvent, WriteSet, WriteSetChange, WriteSetPayload, U64,
 };
 use anyhow::{bail, ensure, format_err, Context as AnyhowContext, Result};
 use aptos_crypto::{hash::CryptoHash, HashValue};
@@ -448,8 +449,85 @@ impl<'a, S: StateView> MoveConverter<'a, S> {
             },
             // Deprecated.
             ModuleBundle(_) => bail!("Module bundle payload has been removed"),
-            EncryptedPayload(_) => {
-                bail!("Encrypted payload isn't supported yet")
+            EncryptedPayload(encrypted) => {
+                use aptos_types::transaction::encrypted_payload::EncryptedPayload as EP;
+
+                let extra_config = encrypted.extra_config();
+                let multisig_address = extra_config.multisig_address().map(Address::from);
+
+                let ciphertext = Some(HexEncodedBytes::from(bcs::to_bytes(
+                    encrypted.ciphertext(),
+                )?));
+
+                match encrypted {
+                    EP::Encrypted { payload_hash, .. } => {
+                        TransactionPayload::EncryptedTransactionPayload(
+                            EncryptedTransactionPayload {
+                                encrypted_state: EncryptedState::Encrypted,
+                                payload_hash: crate::HashValue::from(payload_hash),
+                                ciphertext: ciphertext.clone(),
+                                decrypted_payload: None,
+                                decryption_nonce: None,
+                            },
+                        )
+                    },
+                    EP::FailedDecryption { payload_hash, .. } => {
+                        TransactionPayload::EncryptedTransactionPayload(
+                            EncryptedTransactionPayload {
+                                encrypted_state: EncryptedState::FailedDecryption,
+                                payload_hash: crate::HashValue::from(payload_hash),
+                                ciphertext: ciphertext.clone(),
+                                decrypted_payload: None,
+                                decryption_nonce: None,
+                            },
+                        )
+                    },
+                    EP::Decrypted {
+                        payload_hash,
+                        executable,
+                        decryption_nonce,
+                        ..
+                    } => {
+                        let inner = match executable {
+                            aptos_types::transaction::TransactionExecutable::EntryFunction(
+                                entry_function,
+                            ) if multisig_address.is_some() => {
+                                Some(EncryptedTransactionInnerPayload::MultisigPayload(
+                                    MultisigPayload {
+                                        multisig_address: multisig_address.unwrap(),
+                                        transaction_payload: Some(
+                                            MultisigTransactionPayload::EntryFunctionPayload(
+                                                try_into_entry_function_payload(
+                                                    entry_function.clone(),
+                                                )?,
+                                            ),
+                                        ),
+                                    },
+                                ))
+                            },
+                            aptos_types::transaction::TransactionExecutable::EntryFunction(
+                                entry_function,
+                            ) => Some(EncryptedTransactionInnerPayload::EntryFunctionPayload(
+                                try_into_entry_function_payload(entry_function.clone())?,
+                            )),
+                            aptos_types::transaction::TransactionExecutable::Script(script) => {
+                                Some(EncryptedTransactionInnerPayload::ScriptPayload(
+                                    try_into_script_payload(script.clone())?,
+                                ))
+                            },
+                            _ => None,
+                        };
+                        TransactionPayload::EncryptedTransactionPayload(
+                            EncryptedTransactionPayload {
+                                encrypted_state: EncryptedState::Decrypted,
+                                payload_hash: crate::HashValue::from(payload_hash),
+                                ciphertext,
+                                decrypted_payload: inner,
+                                decryption_nonce: Some(U64::from(decryption_nonce)),
+                            },
+                        )
+                    },
+                }
             },
         };
         Ok(ret)
@@ -881,6 +959,25 @@ impl<'a, S: StateView> MoveConverter<'a, S> {
                         transaction_payload,
                     })
                 }
+            },
+            TransactionPayload::EncryptedTransactionPayload(encrypted) => {
+                let ciphertext_bytes = encrypted.ciphertext.ok_or_else(|| {
+                    format_err!("ciphertext is required for encrypted transaction submission")
+                })?;
+                let ciphertext: aptos_types::secret_sharing::Ciphertext =
+                    bcs::from_bytes(&ciphertext_bytes.0)
+                        .context("Failed to BCS-deserialize ciphertext")?;
+                let extra_config = ExtraConfig::V1 {
+                    multisig_address: None,
+                    replay_protection_nonce: nonce,
+                };
+                Target::EncryptedPayload(
+                    aptos_types::transaction::encrypted_payload::EncryptedPayload::Encrypted {
+                        ciphertext,
+                        extra_config,
+                        payload_hash: encrypted.payload_hash.into(),
+                    },
+                )
             },
             // Deprecated.
             TransactionPayload::ModuleBundlePayload(_) => {
