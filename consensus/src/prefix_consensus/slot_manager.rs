@@ -1227,7 +1227,7 @@ impl<NS: SubprotocolNetworkSender<SlotConsensusMsg>, SP: SPCSpawner> SlotManager
 mod tests {
     use super::*;
     use aptos_consensus_types::common::Payload;
-    use aptos_prefix_consensus::slot_types::create_signed_slot_proposal;
+    use aptos_prefix_consensus::slot_types::{create_signed_slot_proposal, SlotProposal};
     use aptos_types::{
         validator_signer::ValidatorSigner,
         validator_verifier::{ValidatorConsensusInfo, ValidatorVerifier},
@@ -1640,5 +1640,288 @@ mod tests {
         // Slot 2 state should have 2 proposals: own (from start_new_slot) + pre-buffered
         let slot2_state = manager.slot_states.get(&2).unwrap();
         assert_eq!(slot2_state.proposal_buffer().proposal_count(), 2);
+    }
+
+    // ========================================================================
+    // Phase 4: Two-wave commit flow tests
+    // ========================================================================
+
+    /// Compute the payload hash of an empty DirectMempool payload.
+    /// All proposals from MockPayloadClient use this payload.
+    fn empty_payload_hash() -> HashValue {
+        SlotProposal::compute_payload_hash(&Payload::DirectMempool(vec![]))
+    }
+
+    /// Set up a SlotManager with all proposals submitted and SPC started for slot 1.
+    /// Discards StubSPCSpawner's automatic VLow/VHigh output, leaving the manager
+    /// ready for custom v_low/v_high injection via on_spc_v_low/on_spc_v_high_complete.
+    async fn setup_slot_with_custom_spc(
+        signers: &[ValidatorSigner],
+        verifier: Arc<ValidatorVerifier>,
+    ) -> (
+        SlotManager<MockSlotNetworkSender, StubSPCSpawner>,
+        futures_mpsc::UnboundedReceiver<OrderedBlocks>,
+        MockSlotNetworkSender,
+    ) {
+        let (mut manager, exec_rx, ns) = build_test_manager(signers, verifier.clone());
+        manager.start_new_slot(1).await;
+
+        // Submit proposals from all other validators
+        for signer in &signers[1..] {
+            let proposal = create_signed_slot_proposal(
+                1, 1, signer.author(), Payload::DirectMempool(vec![]), signer, 100,
+            )
+            .unwrap();
+            manager.process_proposal(signer.author(), proposal).await;
+        }
+
+        // Verify slot state has a frozen payload_map (SPC was started)
+        assert!(
+            manager.slot_states.get(&1).unwrap().payload_map().is_some(),
+            "payload_map must be set after SPC starts"
+        );
+
+        // Discard StubSPCSpawner's automatic VLow/VHigh output
+        manager.spc_output_rx.take();
+
+        (manager, exec_rx, ns)
+    }
+
+    #[tokio::test]
+    async fn test_two_wave_v_low_partial_v_high_extends() {
+        let (signers, verifier) = create_validators(4);
+        let (mut manager, mut exec_rx, _ns) =
+            setup_slot_with_custom_spc(&signers, verifier).await;
+        let h = empty_payload_hash();
+
+        // Wave 1: v_low has 2 non-bot entries (positions 0, 1)
+        manager
+            .on_spc_v_low(1, vec![h, h, HashValue::zero(), HashValue::zero()])
+            .await;
+
+        let wave1 = exec_rx
+            .try_next()
+            .unwrap()
+            .expect("Wave 1 OrderedBlocks");
+        assert_eq!(wave1.ordered_blocks.len(), 2);
+        assert_eq!(wave1.ordered_blocks[0].block().round(), 1);
+        assert_eq!(wave1.ordered_blocks[1].block().round(), 2);
+        assert_eq!(wave1.ordered_proof.commit_info().round(), 2);
+
+        // Wave 2: v_high has 3 non-bot entries; delta = position 2 only
+        manager
+            .on_spc_v_high_complete(1, vec![h, h, h, HashValue::zero()])
+            .await;
+
+        let wave2 = exec_rx
+            .try_next()
+            .unwrap()
+            .expect("Wave 2 OrderedBlocks");
+        assert_eq!(wave2.ordered_blocks.len(), 1);
+        assert_eq!(wave2.ordered_blocks[0].block().round(), 3);
+        assert_eq!(wave2.ordered_proof.commit_info().round(), 3);
+
+        assert_eq!(manager.current_slot, 2);
+        assert_eq!(manager.next_round, 4);
+    }
+
+    #[tokio::test]
+    async fn test_v_low_all_bot_v_high_has_entries() {
+        let (signers, verifier) = create_validators(4);
+        let (mut manager, mut exec_rx, _ns) =
+            setup_slot_with_custom_spc(&signers, verifier).await;
+        let h = empty_payload_hash();
+
+        // Wave 1: v_low is all-bot → no blocks
+        manager.on_spc_v_low(1, vec![HashValue::zero(); 4]).await;
+        assert!(
+            exec_rx.try_next().is_err(),
+            "No wave 1 blocks expected for all-bot v_low"
+        );
+
+        // Wave 2: v_high has 2 entries → 2 blocks
+        manager
+            .on_spc_v_high_complete(1, vec![h, h, HashValue::zero(), HashValue::zero()])
+            .await;
+
+        let wave2 = exec_rx
+            .try_next()
+            .unwrap()
+            .expect("Wave 2 OrderedBlocks");
+        assert_eq!(wave2.ordered_blocks.len(), 2);
+        assert_eq!(wave2.ordered_blocks[0].block().round(), 1);
+        assert_eq!(wave2.ordered_blocks[1].block().round(), 2);
+
+        assert_eq!(manager.current_slot, 2);
+    }
+
+    #[tokio::test]
+    async fn test_v_low_equals_v_high_no_wave2_blocks() {
+        let (signers, verifier) = create_validators(4);
+        let (mut manager, mut exec_rx, _ns) =
+            setup_slot_with_custom_spc(&signers, verifier).await;
+        let h = empty_payload_hash();
+
+        // v_low == v_high: all 4 entries committed in wave 1
+        let v = vec![h, h, h, h];
+        manager.on_spc_v_low(1, v.clone()).await;
+
+        let wave1 = exec_rx.try_next().unwrap().expect("Wave 1");
+        assert_eq!(wave1.ordered_blocks.len(), 4);
+        assert_eq!(wave1.ordered_blocks[0].block().round(), 1);
+        assert_eq!(wave1.ordered_blocks[3].block().round(), 4);
+
+        // v_high == v_low → empty delta → finalize immediately, no wave 2 blocks
+        manager.on_spc_v_high_complete(1, v).await;
+        assert!(exec_rx.try_next().is_err(), "No wave 2 blocks expected");
+
+        assert_eq!(manager.current_slot, 2);
+        assert_eq!(manager.next_round, 5);
+    }
+
+    #[tokio::test]
+    async fn test_round_monotonicity_across_waves_and_slots() {
+        let (signers, verifier) = create_validators(3);
+        let (mut manager, mut exec_rx, _ns) =
+            setup_slot_with_custom_spc(&signers, verifier.clone()).await;
+        let h = empty_payload_hash();
+
+        // Slot 1: wave 1 = 2 blocks (rounds 1, 2), wave 2 = 1 block (round 3)
+        manager
+            .on_spc_v_low(1, vec![h, h, HashValue::zero()])
+            .await;
+        let w1 = exec_rx.try_next().unwrap().unwrap();
+        assert_eq!(w1.ordered_blocks[0].block().round(), 1);
+        assert_eq!(w1.ordered_blocks[1].block().round(), 2);
+
+        manager.on_spc_v_high_complete(1, vec![h, h, h]).await;
+        let w2 = exec_rx.try_next().unwrap().unwrap();
+        assert_eq!(w2.ordered_blocks[0].block().round(), 3);
+
+        // Slot 2 started by finalize_slot
+        assert_eq!(manager.current_slot, 2);
+
+        // Submit proposals for slot 2 to trigger SPC
+        for signer in &signers[1..] {
+            let proposal = create_signed_slot_proposal(
+                2, 1, signer.author(), Payload::DirectMempool(vec![]), signer, 200,
+            )
+            .unwrap();
+            manager.process_proposal(signer.author(), proposal).await;
+        }
+        manager.spc_output_rx.take(); // discard StubSPCSpawner output
+
+        // Slot 2: wave 1 = 3 blocks → rounds continue at 4, 5, 6
+        manager.on_spc_v_low(2, vec![h, h, h]).await;
+        let w3 = exec_rx.try_next().unwrap().unwrap();
+        assert_eq!(w3.ordered_blocks[0].block().round(), 4);
+        assert_eq!(w3.ordered_blocks[1].block().round(), 5);
+        assert_eq!(w3.ordered_blocks[2].block().round(), 6);
+
+        // v_high == v_low → empty delta
+        manager.on_spc_v_high_complete(2, vec![h, h, h]).await;
+        assert!(exec_rx.try_next().is_err());
+
+        assert_eq!(manager.current_slot, 3);
+        assert_eq!(manager.next_round, 7);
+    }
+
+    #[tokio::test]
+    async fn test_buffered_v_high_while_wave1_pending() {
+        let (signers, verifier) = create_validators(4);
+        let (mut manager, mut exec_rx, _ns) =
+            setup_slot_with_custom_spc(&signers, verifier).await;
+        let h = empty_payload_hash();
+
+        // Create a payload whose hash is NOT in the slot state's payload_map.
+        let secret_txn = crate::test_utils::create_signed_transaction(99);
+        let secret_payload = Payload::DirectMempool(vec![secret_txn]);
+        let secret_hash = SlotProposal::compute_payload_hash(&secret_payload);
+
+        // v_low: position 0 = h (resolved), position 1 = secret_hash (MISSING)
+        manager
+            .on_spc_v_low(
+                1,
+                vec![h, secret_hash, HashValue::zero(), HashValue::zero()],
+            )
+            .await;
+
+        // Wave 1 should be pending (missing payload)
+        assert!(exec_rx.try_next().is_err(), "Wave 1 should be pending");
+        assert!(manager.pending_wave.as_ref().is_some_and(|p| p.is_v_low()));
+
+        // v_high arrives while wave 1 is pending → buffer it
+        manager.buffered_v_high = Some((1, vec![h, secret_hash, h, HashValue::zero()]));
+
+        // Resolve the missing payload via fetch response
+        manager
+            .process_payload_fetch_response(PayloadFetchResponse {
+                slot: 1,
+                epoch: 1,
+                payload_hash: secret_hash,
+                payload: secret_payload,
+            })
+            .await;
+
+        // Wave 1 committed: 2 blocks (positions 0, 1)
+        let wave1 = exec_rx.try_next().unwrap().expect("Wave 1");
+        assert_eq!(wave1.ordered_blocks.len(), 2);
+        assert_eq!(wave1.ordered_blocks[0].block().round(), 1);
+        assert_eq!(wave1.ordered_blocks[1].block().round(), 2);
+
+        // Buffered v_high auto-processed: wave 2 delta = position 2 → 1 block
+        let wave2 = exec_rx.try_next().unwrap().expect("Wave 2");
+        assert_eq!(wave2.ordered_blocks.len(), 1);
+        assert_eq!(wave2.ordered_blocks[0].block().round(), 3);
+
+        assert_eq!(manager.current_slot, 2);
+        assert_eq!(manager.next_round, 4);
+    }
+
+    #[tokio::test]
+    async fn test_non_contiguous_v_low_positions() {
+        let (signers, verifier) = create_validators(4);
+        let (mut manager, mut exec_rx, _ns) =
+            setup_slot_with_custom_spc(&signers, verifier).await;
+        let h = empty_payload_hash();
+
+        // v_low commits positions 0 and 2 (skipping 1)
+        manager
+            .on_spc_v_low(1, vec![h, HashValue::zero(), h, HashValue::zero()])
+            .await;
+
+        let wave1 = exec_rx.try_next().unwrap().expect("Wave 1");
+        assert_eq!(wave1.ordered_blocks.len(), 2);
+        assert_eq!(wave1.ordered_blocks[0].block().round(), 1);
+        assert_eq!(wave1.ordered_blocks[1].block().round(), 2);
+        // Block authors follow ranking order: signers[0] at pos 0, signers[2] at pos 2
+        assert_eq!(
+            wave1.ordered_blocks[0].block().author(),
+            Some(signers[0].author())
+        );
+        assert_eq!(
+            wave1.ordered_blocks[1].block().author(),
+            Some(signers[2].author())
+        );
+
+        // v_high has all 4 non-bot; delta = positions 1 and 3
+        manager.on_spc_v_high_complete(1, vec![h, h, h, h]).await;
+
+        let wave2 = exec_rx.try_next().unwrap().expect("Wave 2");
+        assert_eq!(wave2.ordered_blocks.len(), 2);
+        assert_eq!(wave2.ordered_blocks[0].block().round(), 3);
+        assert_eq!(wave2.ordered_blocks[1].block().round(), 4);
+        // Delta authors: signers[1] at pos 1, signers[3] at pos 3
+        assert_eq!(
+            wave2.ordered_blocks[0].block().author(),
+            Some(signers[1].author())
+        );
+        assert_eq!(
+            wave2.ordered_blocks[1].block().author(),
+            Some(signers[3].author())
+        );
+
+        assert_eq!(manager.current_slot, 2);
+        assert_eq!(manager.next_round, 5);
     }
 }
