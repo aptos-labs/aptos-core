@@ -8,9 +8,10 @@
 //! system, as well as type checking it and translating it to the spec language ast.
 
 use crate::{
-    ast::{Attribute, FriendDecl, ModuleName, Operation, QualifiedSymbol, Spec, Value},
+    ast::{Attribute, ExpData, FriendDecl, ModuleName, Operation, QualifiedSymbol, Spec, Value},
     builder::builtins,
     intrinsics::IntrinsicDecl,
+    metadata::lang_feature_versions::LANGUAGE_VERSION_FOR_PUBLIC_CONST,
     model::{
         FieldData, FunId, FunctionKind, GlobalEnv, Loc, ModuleId, Parameter, QualifiedId,
         QualifiedInstId, SpecFunId, SpecVarId, StructId, TypeParameter, UserId,
@@ -255,6 +256,10 @@ pub(crate) struct ConstEntry {
     pub ty: Type,
     pub value: Value,
     pub visibility: EntryVisibility,
+    /// Move language visibility (public/friend/private) for the constant declaration.
+    pub move_visibility: Visibility,
+    /// Whether this constant has `package` visibility (stored as `Friend` in move_visibility).
+    pub has_package_visibility: bool,
     pub users: BTreeSet<UserId>,
     pub attributes: Vec<Attribute>,
 }
@@ -546,6 +551,82 @@ impl<'env> ModelBuilder<'env> {
     /// Defines a constant.
     pub fn define_const(&mut self, name: QualifiedSymbol, entry: ConstEntry) {
         self.const_table.insert(name, entry);
+    }
+
+    /// Injects a synthetic model-level function `const$<NAME>` for every non-private named
+    /// constant in every module (target and source-dependency alike).  These functions exist in the model so that:
+    ///
+    /// - `exp_builder` can emit a regular `MoveFunction` call when a cross-module constant
+    ///   reference is lowered.
+    /// - `need_to_be_friended_by` detects `package const` accessors automatically through the
+    ///   standard package-function tracking path.
+    ///
+    /// The function body is `ExpData::Value(node_id, const_value)`, which the normal compiler
+    /// pipeline lowers to the appropriate `Ld*` instruction (`LdU64`, `LdTrue`, `LdConst`, …).
+    /// The file-format generator recognises the `const$` name prefix and emits the
+    /// `FunctionAttribute::ConstantAccessor` attribute on the corresponding function handle.
+    ///
+    /// Must be called after `populate_env()` (so constant values are finalised) and before
+    /// `add_friend_decl_for_package_visibility()` (so the friend-injection pass can see the
+    /// accessor functions referenced in consumer function bodies).
+    pub fn inject_const_accessor_functions(&mut self) {
+        if !self
+            .env
+            .language_version()
+            .is_at_least(LANGUAGE_VERSION_FOR_PUBLIC_CONST)
+        {
+            return;
+        }
+        // Process ALL modules — including source-dependency modules (is_target = false)
+        // that appear in the same compilation unit. When a target module refers to a
+        // non-private constant from a dependency module, the bytecode generator needs
+        // to find `const$NAME` in the model for that dependency. For binary-loaded
+        // dependencies (e.g. stdlib), all constants are Private, so the visibility
+        // filter below ensures no spurious injections.
+        let module_ids: Vec<ModuleId> = self.env.get_modules().map(|m| m.get_id()).collect();
+
+        for module_id in module_ids {
+            let const_infos: Vec<(Symbol, Loc, Type, Value, Visibility, bool)> = self
+                .env
+                .get_module(module_id)
+                .get_named_constants()
+                .filter(|c| c.get_visibility() != Visibility::Private)
+                .map(|c| {
+                    (
+                        c.get_name(),
+                        c.get_loc(),
+                        c.get_type(),
+                        c.get_value(),
+                        c.get_visibility(),
+                        c.has_package_visibility(),
+                    )
+                })
+                .collect();
+
+            for (const_name, loc, const_type, const_value, visibility, has_pkg) in const_infos {
+                let accessor_name = format!(
+                    "{}{}{}",
+                    move_core_types::language_storage::CONST,
+                    move_core_types::language_storage::PUBLIC_STRUCT_DELIMITER,
+                    self.env.symbol_pool().string(const_name)
+                );
+                let accessor_sym = self.env.symbol_pool().make(&accessor_name);
+                let node_id = self.env.new_node(loc.clone(), const_type.clone());
+                let body = ExpData::Value(node_id, const_value).into_exp();
+                self.env.add_function_def(
+                    module_id,
+                    accessor_sym,
+                    loc,
+                    visibility,
+                    has_pkg,
+                    vec![],
+                    vec![],
+                    const_type,
+                    body,
+                    None,
+                );
+            }
+        }
     }
 
     /// Adds friend declarations for package visibility.

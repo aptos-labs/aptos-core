@@ -1,6 +1,6 @@
 
 ============ disassembled file-format ==================
-// Bytecode version v10
+// Bytecode version v11
 module 0xc0ffee::m_friend
 friend 0xc0ffee::n_friend
 struct S<T0: copy>
@@ -34,7 +34,7 @@ struct S<T0: copy>
     mut_borrow_field S<T0>, f
     ret
 
-// Bytecode version v10
+// Bytecode version v11
 module 0xc0ffee::m_friend_2
 friend 0xc0ffee::n_friend
 struct S<T0: copy>
@@ -68,7 +68,7 @@ struct S<T0: copy>
     mut_borrow_field S<T0>, f
     ret
 
-// Bytecode version v10
+// Bytecode version v11
 module 0xc0ffee::n_friend
 use 0xc0ffee::m_friend
 use 0xc0ffee::m_friend_2

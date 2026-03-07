@@ -229,6 +229,7 @@ pub enum SerializedFunctionAttribute {
     TEST_VARIANT = 0x7,
     BORROW_FIELD_IMMUTABLE = 0x8,
     BORROW_FIELD_MUTABLE = 0x9,
+    CONSTANT_ACCESSOR = 0xA,
 }
 
 /// List of opcodes constants.
@@ -563,14 +564,18 @@ pub const VERSION_9: u32 = 9;
 
 /// Version 10: changes compared to version 9
 /// + abort with message instruction
-/// + new attributes for structs api
+/// + new attributes for structs api (Pack, Unpack, BorrowField, etc.)
 pub const VERSION_10: u32 = 10;
+
+/// Version 11: changes compared to version 10
+/// + constant accessor attribute (for public/package/friend const)
+pub const VERSION_11: u32 = 11;
 
 /// Mark which oldest version is supported.
 pub const VERSION_MIN: u32 = VERSION_5;
 
 /// Mark which version is the latest version.
-pub const VERSION_MAX: u32 = VERSION_10;
+pub const VERSION_MAX: u32 = VERSION_11;
 
 /// Mark which version is the default version. This is the version used by default by tools like
 /// the compiler. Notice that this version might be different from the one supported on nodes.
@@ -582,9 +587,9 @@ pub const VERSION_DEFAULT: u32 = VERSION_9;
 /// In general, these are used to set up the default bytecode version for language versions higher than the default.
 pub const VERSION_DEFAULT_LANG_V2_4: u32 = VERSION_10;
 
-/// Mark which version is the default version if compiling with language version 2.5
-/// temporarily set to VERSION_10
-pub const VERSION_DEFAULT_LANG_V2_5: u32 = VERSION_10;
+/// Mark which bytecode version is the default if compiling with language version 2.5.
+/// Uses VERSION_11 to enable the ConstantAccessor function attribute.
+pub const VERSION_DEFAULT_LANG_V2_5: u32 = VERSION_11;
 
 pub(crate) mod versioned_data {
     use crate::{errors::*, file_format_common::*};

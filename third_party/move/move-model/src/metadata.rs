@@ -16,7 +16,7 @@ use std::{
 
 const UNSTABLE_MARKER: &str = "-unstable";
 
-pub const LATEST_LANGUAGE_VERSION_VALUE: LanguageVersion = LanguageVersion::V2_5;
+pub const LATEST_LANGUAGE_VERSION_VALUE: LanguageVersion = LanguageVersion::V2_6;
 
 /// Only stable versions are allowed on production networks
 pub const LATEST_STABLE_LANGUAGE_VERSION_VALUE: LanguageVersion = LanguageVersion::V2_3;
@@ -37,8 +37,8 @@ pub mod lang_feature_versions {
     pub const LANGUAGE_VERSION_FOR_PUBLIC_STRUCT: LanguageVersion = LanguageVersion::V2_4;
     /// This version guards checks for unused private functions, private structs, and constants.
     pub const LANGUAGE_VERSION_FOR_UNUSED_CHECK: LanguageVersion = LanguageVersion::V2_4;
-    pub const LANGUAGE_VERSION_FOR_RAC: LanguageVersion =
-        crate::metadata::LATEST_LANGUAGE_VERSION_VALUE;
+    pub const LANGUAGE_VERSION_FOR_PUBLIC_CONST: LanguageVersion = LanguageVersion::V2_5;
+    pub const LANGUAGE_VERSION_FOR_RAC: LanguageVersion = LanguageVersion::V2_6;
 }
 
 // ================================================================================'
@@ -220,6 +220,9 @@ pub enum LanguageVersion {
     V2_4,
     /// The currently unstable 2.5 version of Move
     V2_5,
+    /// The currently unstable 2.6 version of Move, which adds support for
+    /// - read/write access specifiers (RAC)
+    V2_6,
 }
 
 impl Default for LanguageVersion {
@@ -264,8 +267,9 @@ impl FromStr for LanguageVersion {
             "2.3" => Ok(Self::V2_3),
             "2.4" => Ok(Self::V2_4),
             "2.5" => Ok(Self::V2_5),
+            "2.6" => Ok(Self::V2_6),
             _ => bail!(
-                "unrecognized language version \"{}\" (supported versions: \"1\", \"2\", \"2.0-2.5\")",
+                "unrecognized language version \"{}\" (supported versions: \"1\", \"2\", \"2.0-2.6\")",
                 s
             ),
         }
@@ -282,6 +286,7 @@ impl From<LanguageVersion> for CompilerLanguageVersion {
             LanguageVersion::V2_3 => CompilerLanguageVersion::V2_3,
             LanguageVersion::V2_4 => CompilerLanguageVersion::V2_4,
             LanguageVersion::V2_5 => CompilerLanguageVersion::V2_5,
+            LanguageVersion::V2_6 => CompilerLanguageVersion::V2_6,
         }
     }
 }
@@ -293,7 +298,7 @@ impl LanguageVersion {
         use LanguageVersion::*;
         match self {
             V1 | V2_0 | V2_1 | V2_2 | V2_3 => false,
-            V2_4 | V2_5 => true,
+            V2_4 | V2_5 | V2_6 => true,
         }
     }
 
@@ -316,6 +321,10 @@ impl LanguageVersion {
         self.is_at_least(lang_feature_versions::LANGUAGE_VERSION_FOR_PUBLIC_STRUCT)
     }
 
+    pub fn language_version_for_public_const(&self) -> bool {
+        self.is_at_least(lang_feature_versions::LANGUAGE_VERSION_FOR_PUBLIC_CONST)
+    }
+
     /// If the bytecode version is not specified, infer it from the language version. For
     /// debugging purposes, respects the MOVE_BYTECODE_VERSION env var as an override.
     pub fn infer_bytecode_version(&self, version: Option<u32>) -> u32 {
@@ -327,6 +336,8 @@ impl LanguageVersion {
             | LanguageVersion::V2_3 => VERSION_DEFAULT,
             LanguageVersion::V2_4 => VERSION_DEFAULT_LANG_V2_4,
             LanguageVersion::V2_5 => VERSION_DEFAULT_LANG_V2_5,
+            // V2.6 (RAC) uses the same bytecode version as V2.5; no new binary format changes.
+            LanguageVersion::V2_6 => VERSION_DEFAULT_LANG_V2_5,
         })
     }
 
@@ -339,6 +350,7 @@ impl LanguageVersion {
             LanguageVersion::V2_3 => "2.3",
             LanguageVersion::V2_4 => "2.4",
             LanguageVersion::V2_5 => "2.5",
+            LanguageVersion::V2_6 => "2.6",
         }
     }
 }
@@ -356,6 +368,7 @@ impl Display for LanguageVersion {
                 LanguageVersion::V2_3 => "2.3",
                 LanguageVersion::V2_4 => "2.4",
                 LanguageVersion::V2_5 => "2.5",
+                LanguageVersion::V2_6 => "2.6",
             },
             if self.unstable() { UNSTABLE_MARKER } else { "" }
         )

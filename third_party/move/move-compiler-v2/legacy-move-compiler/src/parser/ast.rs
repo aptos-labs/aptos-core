@@ -325,6 +325,7 @@ new_name!(ConstantName);
 pub struct Constant {
     pub attributes: Vec<Attributes>,
     pub loc: Loc,
+    pub visibility: Option<Visibility>,
     pub signature: Type,
     pub name: ConstantName,
     pub value: Exp,
@@ -1717,6 +1718,7 @@ impl AstDebug for Constant {
         let Constant {
             attributes,
             loc: _loc,
+            visibility: _,
             name,
             signature,
             value,

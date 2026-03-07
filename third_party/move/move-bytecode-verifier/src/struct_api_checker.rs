@@ -177,7 +177,7 @@ fn try_get_struct_api_attr(
                 attr_attribute = Some(attr.clone());
                 true
             },
-            Persistent | ModuleLock => false,
+            Persistent | ModuleLock | ConstantAccessor => false,
         };
         if is_struct_api_attr {
             count += 1;
@@ -1659,7 +1659,9 @@ pub fn check_struct_api_impl(
         FunctionAttribute::BorrowFieldMutable(offset) => {
             pattern_check_for_borrow_field(true, resolver, module, &offset, code, ctx)
         },
-        FunctionAttribute::Persistent | FunctionAttribute::ModuleLock => {
+        FunctionAttribute::Persistent
+        | FunctionAttribute::ModuleLock
+        | FunctionAttribute::ConstantAccessor => {
             // These should never reach here - try_get_struct_api_attr only returns struct API attributes.
             // If we reach this, Phase 1 validation failed to filter properly.
             Err(PartialVMError::new(StatusCode::INVALID_STRUCT_API_CODE)

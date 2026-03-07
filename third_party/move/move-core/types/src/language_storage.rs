@@ -47,6 +47,7 @@ pub const TEST_VARIANT: &str = "test_variant";
 pub const PARAM_NAME_FOR_STRUCT_API: &str = "_s";
 pub const BORROW: &str = "borrow";
 pub const BORROW_MUT: &str = "borrow_mut";
+pub const CONST: &str = "const";
 
 pub static OPTION_MODULE_ID: Lazy<ModuleId> = Lazy::new(|| {
     ModuleId::new(

@@ -3626,13 +3626,21 @@ fn parse_constant_decl(
         entry,
         native,
     } = modifiers;
-    if let Some(vis) = visibility {
-        let msg = "Invalid constant declaration. Constants cannot have visibility modifiers as \
-                   they are always internal";
-        context
-            .env
-            .add_diag(diag!(Syntax::InvalidModifier, (vis.loc().unwrap(), msg)));
-    }
+    let visibility = if let Some(vis) = visibility {
+        let vis_loc = vis.loc().unwrap();
+        if !require_move_version(
+            LanguageVersion::V2_5,
+            context,
+            vis_loc,
+            "visibility modifier on constants",
+        ) {
+            None
+        } else {
+            Some(vis)
+        }
+    } else {
+        None
+    };
     if let Some(loc) = entry {
         let msg = format!(
             "Invalid constant declaration. '{}' is used only on functions",
@@ -3663,6 +3671,7 @@ fn parse_constant_decl(
     Ok(Constant {
         attributes,
         loc,
+        visibility,
         signature,
         name,
         value,
@@ -3816,7 +3825,7 @@ fn parse_use_alias(context: &mut Context) -> Result<Option<Name>, Box<Diagnostic
 fn is_friend_declaration(context: &mut Context) -> bool {
     if context.tokens.peek() == Tok::Friend {
         if let Ok((tok, content)) = context.tokens.lookahead_content() {
-            if ![Tok::Fun, Tok::Inline, Tok::Native, Tok::Struct].contains(&tok)
+            if ![Tok::Fun, Tok::Inline, Tok::Native, Tok::Struct, Tok::Const].contains(&tok)
                 && content != ENTRY_MODIFIER
                 && content != ENUM_MODIFIER
             {

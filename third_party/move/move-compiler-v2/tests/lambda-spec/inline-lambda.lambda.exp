@@ -1158,7 +1158,7 @@ fun Test::__lambda__1_inline_1_393__test_apply($t0: u64, $t1: u64, $t2: u64): bo
 
 
 ============ disassembled file-format ==================
-// Bytecode version v10
+// Bytecode version v11
 module 0x42::Test
 // Function definition at index 0
 fun call_inline(l0: u64)

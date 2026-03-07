@@ -1,0 +1,27 @@
+//# publish --print-bytecode
+module 0x66::test_const_accessor_valid
+
+// Valid: const$MY_U64 carries #[const] and body is LdU64(42) + Ret
+#[const] public fun const$MY_U64(): u64
+    ld_u64 42
+    ret
+
+// Valid: const$MY_VEC carries #[const] and body is LdConst(vector<u8>) + Ret
+#[const] public fun const$MY_VEC(): vector<u8>
+    ld_const<vector<u8>> [1, 2, 3]
+    ret
+
+// Valid: const$MY_VEC_ADDR carries #[const] and body is LdConst(vector<address>) + Ret
+#[const] public fun const$MY_VEC_ADDR(): vector<address>
+    ld_const<vector<address>> [0x1, 0x2]
+    ret
+
+// Valid: const$MY_ADDR carries #[const] and body is LdConst(address) + Ret
+#[const] public fun const$MY_ADDR(): address
+    ld_const<address> 0x42
+    ret
+
+// Valid: const$MY_I64 carries #[const] and body is LdI64(-1) + Ret
+#[const] public fun const$MY_I64(): i64
+    ld_i64 -1
+    ret

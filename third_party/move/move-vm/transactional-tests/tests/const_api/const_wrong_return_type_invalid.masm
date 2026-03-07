@@ -1,0 +1,7 @@
+//# publish --print-bytecode
+module 0x66::test_const_wrong_return_type
+
+// Invalid: return type says bool but the ld_const loads a u64 constant
+#[const] public fun const$MY_U64(): bool
+    ld_const<u64> 42
+    ret

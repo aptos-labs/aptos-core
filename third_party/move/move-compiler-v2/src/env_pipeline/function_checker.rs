@@ -1056,10 +1056,12 @@ fn should_warn_unused_constant(const_env: &NamedConstantEnv) -> bool {
     // - test_only or verify_only constants or modules
     // - constants with suppression attributes or #[lint::skip(unused)]
     // - constants with users
+    // - public constants
     if const_env.is_test_or_verify_only()
         || const_env.has_attribute(is_suppression_attr)
         || skip_unused_check(env, const_env.get_attributes())
         || !const_env.get_users().is_empty()
+        || const_env.get_visibility() == Visibility::Public
     {
         return false;
     }

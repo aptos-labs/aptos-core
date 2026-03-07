@@ -1,0 +1,9 @@
+processed 1 task
+task 0 lines 1-8:  publish --print-bytecode [module 0x66::test_const_wrong_body]
+Error: Unable to publish module '0000000000000000000000000000000000000000000000000000000000000066::test_const_wrong_body'. Got VMError: {
+    major_status: INVALID_CONST_API_CODE,
+    sub_status: None,
+    location: 0x66::test_const_wrong_body,
+    indices: [(FunctionDefinition, 0)],
+    offsets: [],
+}

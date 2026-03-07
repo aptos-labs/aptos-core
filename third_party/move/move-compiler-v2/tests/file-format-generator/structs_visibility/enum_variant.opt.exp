@@ -1,6 +1,6 @@
 
 ============ disassembled file-format ==================
-// Bytecode version v10
+// Bytecode version v11
 module 0x42::m
 friend 0x42::m2
 enum Data has drop
@@ -401,7 +401,7 @@ struct V<T0> has drop
     mut_borrow_field V<T0>, x
     ret
 
-// Bytecode version v10
+// Bytecode version v11
 module 0x42::m2
 use 0x42::m
 // Function definition at index 0

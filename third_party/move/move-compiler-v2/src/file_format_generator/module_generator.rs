@@ -27,6 +27,10 @@ use move_core_types::{
     },
     metadata::Metadata,
 };
+
+/// The prefix used for compiler-generated constant accessor function names (`const$`).
+/// CONST = "const", PUBLIC_STRUCT_DELIMITER = "$".
+const CONST_ACCESSOR_PREFIX: &str = "const$";
 use move_ir_types::ast as IR_AST;
 use move_model::{
     ast::{AccessSpecifier, AccessSpecifierKind, AddressSpecifier, Attribute, ResourceSpecifier},
@@ -1719,6 +1723,12 @@ impl ModuleContext<'_> {
     /// function. This includes annotated ones as well as ones which are derived.
     /// Currently, a public function derives `Persistent`.
     pub(crate) fn function_attributes(&self, fun_env: &FunctionEnv) -> Vec<FF::FunctionAttribute> {
+        // Compiler-generated `const$NAME` accessor functions carry only ConstantAccessor.
+        let fun_name = fun_env.symbol_pool().string(fun_env.get_name()).to_string();
+        if fun_name.starts_with(CONST_ACCESSOR_PREFIX) {
+            return vec![FF::FunctionAttribute::ConstantAccessor];
+        }
+
         let mut result = vec![];
         let mut has_persistent = false;
 

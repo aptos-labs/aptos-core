@@ -1,0 +1,7 @@
+//# publish --print-bytecode
+module 0x66::test_const_name_no_attr
+
+// Invalid: name matches const$ pattern but is missing the ConstantAccessor attribute
+public fun const$MY_U64(): u64
+    ld_const<u64> 42
+    ret

@@ -1,0 +1,126 @@
+// -- Model dump before first bytecode pipeline
+module 0x42::M {
+    private fun call_friend_const(): u64 {
+        return 42
+    }
+    friend fun const$FRIEND_CONST(): u64 {
+        42
+    }
+} // end 0x42::M
+module 0x42::N {
+    use 0x42::M; // resolved as: 0x42::M
+    public fun use_friend(): u64 {
+        M::const$FRIEND_CONST()
+    }
+} // end 0x42::N
+
+// -- Sourcified model before first bytecode pipeline
+module 0x42::M {
+    friend 0x42::N;
+    fun call_friend_const(): u64 {
+        42
+    }
+    friend fun const_FRIEND_CONST(): u64 {
+        42
+    }
+}
+module 0x42::N {
+    use 0x42::M;
+    public fun use_friend(): u64 {
+        M::const_FRIEND_CONST()
+    }
+}
+
+============ bytecode before first stackless bytecode pipeline ================
+
+[variant baseline]
+fun M::call_friend_const(): u64 {
+     var $t0: u64
+  0: $t0 := 42
+  1: return $t0
+  2: return $t0
+}
+
+
+[variant baseline]
+public(friend) fun M::const$FRIEND_CONST(): u64 {
+     var $t0: u64
+  0: $t0 := 42
+  1: return $t0
+}
+
+
+[variant baseline]
+public fun N::use_friend(): u64 {
+     var $t0: u64
+  0: $t0 := M::const$FRIEND_CONST()
+  1: return $t0
+}
+
+// -- Model dump before second bytecode pipeline
+module 0x42::M {
+    private fun call_friend_const(): u64 {
+        return 42
+    }
+    friend fun const$FRIEND_CONST(): u64 {
+        42
+    }
+} // end 0x42::M
+module 0x42::N {
+    use 0x42::M; // resolved as: 0x42::M
+    public fun use_friend(): u64 {
+        M::const$FRIEND_CONST()
+    }
+} // end 0x42::N
+
+============ bytecode before second stackless bytecode pipeline ================
+
+[variant baseline]
+fun M::call_friend_const(): u64 {
+     var $t0: u64
+  0: $t0 := 42
+  1: return $t0
+  2: return $t0
+}
+
+
+[variant baseline]
+public(friend) fun M::const$FRIEND_CONST(): u64 {
+     var $t0: u64
+  0: $t0 := 42
+  1: return $t0
+}
+
+
+[variant baseline]
+public fun N::use_friend(): u64 {
+     var $t0: u64
+  0: $t0 := M::const$FRIEND_CONST()
+  1: return $t0
+}
+
+
+============ disassembled file-format ==================
+// Bytecode version v11
+module 0x42::M
+friend 0x42::N
+// Function definition at index 0
+fun call_friend_const(): u64
+    ld_u64 42
+    ret
+
+// Function definition at index 1
+#[const] friend fun const$FRIEND_CONST(): u64
+    ld_u64 42
+    ret
+
+// Bytecode version v11
+module 0x42::N
+use 0x42::M
+// Function definition at index 0
+#[persistent] public fun use_friend(): u64
+    call M::const$FRIEND_CONST
+    ret
+
+
+============ bytecode verification succeeded ========
