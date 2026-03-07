@@ -460,7 +460,17 @@ impl<S: TShare> RandShare<S> {
         self.share.verify(rand_config, &self.metadata, &self.author)
     }
 
-    pub fn optimistic_verify(&self, rand_config: &RandConfig) -> anyhow::Result<()> {
+    pub fn optimistic_verify(
+        &self,
+        rand_config: &RandConfig,
+        sender: &Author,
+    ) -> anyhow::Result<()> {
+        ensure!(
+            &self.author == sender,
+            "[RandShare] Share author {:?} does not match sender {:?}",
+            self.author,
+            sender,
+        );
         if rand_config.should_verify_optimistically(&self.author) {
             // Still perform cheap structural checks (author exists, APK certified)
             // to prevent invalid shares from reaching aggregation where they would
@@ -538,8 +548,12 @@ impl<S: TShare> FastShare<S> {
         self.share.verify(rand_config)
     }
 
-    pub fn optimistic_verify(&self, rand_config: &RandConfig) -> anyhow::Result<()> {
-        self.share.optimistic_verify(rand_config)
+    pub fn optimistic_verify(
+        &self,
+        rand_config: &RandConfig,
+        sender: &Author,
+    ) -> anyhow::Result<()> {
+        self.share.optimistic_verify(rand_config, sender)
     }
 
     pub fn share_id(&self) -> ShareId {
@@ -1068,7 +1082,9 @@ mod tests {
         let share = Share::generate(&ctx.rand_configs[0], metadata);
 
         // optimistic_verify should succeed (deferred verification)
-        assert!(share.optimistic_verify(&ctx.rand_configs[0]).is_ok());
+        assert!(share
+            .optimistic_verify(&ctx.rand_configs[0], share.author())
+            .is_ok());
     }
 
     #[test]
@@ -1085,7 +1101,9 @@ mod tests {
         let share = RandShare::new(bad_author, metadata, wrong_share.share().clone());
 
         // optimistic_verify should fail (falls through to individual verification)
-        assert!(share.optimistic_verify(&ctx.rand_configs[0]).is_err());
+        assert!(share
+            .optimistic_verify(&ctx.rand_configs[0], &bad_author)
+            .is_err());
     }
 
     #[test]
@@ -1098,7 +1116,9 @@ mod tests {
         let share = RandShare::new(ctx.authors[0], metadata, wrong_share.share().clone());
 
         // With optimization disabled, every share is verified individually
-        assert!(share.optimistic_verify(&ctx.rand_configs[0]).is_err());
+        assert!(share
+            .optimistic_verify(&ctx.rand_configs[0], share.author())
+            .is_err());
     }
 
     #[test]
