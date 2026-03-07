@@ -22,6 +22,7 @@ This is the reference documentation of the Aptos experimental framework.
 -  [`0x7::dead_mans_switch_tracker`](dead_mans_switch_tracker.md#0x7_dead_mans_switch_tracker)
 -  [`0x7::helpers`](helpers.md#0x7_helpers)
 -  [`0x7::large_packages`](large_packages.md#0x7_large_packages)
+-  [`0x7::large_packages_v2`](large_packages_v2.md#0x7_large_packages_v2)
 -  [`0x7::market_bulk_order`](market_bulk_order.md#0x7_market_bulk_order)
 -  [`0x7::market_clearinghouse_order_info`](market_clearinghouse_order_info.md#0x7_market_clearinghouse_order_info)
 -  [`0x7::market_types`](market_types.md#0x7_market_types)
