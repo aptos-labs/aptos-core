@@ -46,8 +46,6 @@ pub struct DKGPvssConfig {
     pub epoch: u64,
     // weighted config for randomness generation
     pub wconfig: SSConfig,
-    // weighted config for randomness generation in fast path
-    pub fast_wconfig: Option<SSConfig>,
     // DKG public parameters
     pub pp: DkgPP,
     // DKG encryption public keys
@@ -59,19 +57,8 @@ pub struct DKGPvssConfig {
 
 impl PartialEq for DKGPvssConfig {
     fn eq(&self, other: &Self) -> bool {
-        (
-            self.epoch,
-            &self.wconfig,
-            &self.fast_wconfig,
-            &self.pp,
-            &self.eks,
-        ) == (
-            other.epoch,
-            &other.wconfig,
-            &other.fast_wconfig,
-            &other.pp,
-            &other.eks,
-        )
+        (self.epoch, &self.wconfig, &self.pp, &self.eks)
+            == (other.epoch, &other.wconfig, &other.pp, &other.eks)
     }
 }
 
@@ -79,7 +66,6 @@ impl DKGPvssConfig {
     pub fn new(
         epoch: u64,
         wconfig: SSConfig,
-        fast_wconfig: Option<SSConfig>,
         pp: DkgPP,
         eks: Vec<EncPK>,
         rounding_summary: RoundingSummary,
@@ -87,7 +73,6 @@ impl DKGPvssConfig {
         Self {
             epoch,
             wconfig,
-            fast_wconfig,
             pp,
             eks,
             rounding_summary,
@@ -99,7 +84,6 @@ pub fn build_dkg_pvss_config(
     cur_epoch: u64,
     secrecy_threshold: U64F64,
     reconstruct_threshold: U64F64,
-    maybe_fast_path_secrecy_threshold: Option<U64F64>,
     next_validators: &[ValidatorConsensusInfo],
 ) -> DKGPvssConfig {
     let validator_stakes: Vec<u64> = next_validators.iter().map(|vi| vi.voting_power).collect();
@@ -107,14 +91,14 @@ pub fn build_dkg_pvss_config(
     let DKGRounding {
         profile,
         wconfig,
-        fast_wconfig,
         rounding_error,
         rounding_method,
+        ..
     } = DKGRounding::new(
         &validator_stakes,
         secrecy_threshold,
         reconstruct_threshold,
-        maybe_fast_path_secrecy_threshold,
+        None,
     );
     let rounding_time = timer.elapsed();
     let validator_consensus_keys: Vec<bls12381::PublicKey> = next_validators
@@ -136,14 +120,7 @@ pub fn build_dkg_pvss_config(
         error: rounding_error,
     };
 
-    DKGPvssConfig::new(
-        cur_epoch,
-        wconfig,
-        fast_wconfig,
-        pp,
-        consensus_keys,
-        rounding_summary,
-    )
+    DKGPvssConfig::new(cur_epoch, wconfig, pp, consensus_keys, rounding_summary)
 }
 
 #[derive(Debug)]
@@ -166,7 +143,7 @@ impl MayHaveRoundingSummary for RealDKGPublicParams {
 pub struct Transcripts {
     // transcript for main path
     pub main: WTrx,
-    // transcript for fast path
+    // transcript for fast path (kept for BCS serialization compatibility)
     pub fast: Option<WTrx>,
 }
 
@@ -174,16 +151,12 @@ pub struct Transcripts {
 pub struct DealtPubKeyShares {
     // dealt public key share for main path
     pub main: <WTrx as TranscriptCore>::DealtPubKeyShare,
-    // dealt public key share for fast path
-    pub fast: Option<<WTrx as TranscriptCore>::DealtPubKeyShare>,
 }
 
 #[derive(Deserialize, Serialize, Clone, Debug)]
 pub struct DealtSecretKeyShares {
     // dealt secret key share for main path
     pub main: <WTrx as TranscriptCore>::DealtSecretKeyShare,
-    // dealt secret key share for fast path
-    pub fast: Option<<WTrx as TranscriptCore>::DealtSecretKeyShare>,
 }
 
 impl DKGTrait for RealDKG {
@@ -207,13 +180,11 @@ impl DKGTrait for RealDKG {
         let reconstruct_threshold = randomness_config
             .reconstruct_threshold()
             .unwrap_or_else(|| *rounding::DEFAULT_RECONSTRUCT_THRESHOLD);
-        let maybe_fast_path_secrecy_threshold = randomness_config.fast_path_secrecy_threshold();
 
         let pvss_config = build_dkg_pvss_config(
             dkg_session_metadata.dealer_epoch,
             secrecy_threshold,
             reconstruct_threshold,
-            maybe_fast_path_secrecy_threshold,
             &dkg_session_metadata.target_validator_consensus_infos_cloned(),
         );
         let verifier = ValidatorVerifier::new(dkg_session_metadata.dealer_consensus_infos_cloned());
@@ -262,27 +233,9 @@ impl DKGTrait for RealDKG {
             &Player { id: my_index },
             rng,
         );
-        // transcript for fast path
-        let fast_wtrx = pub_params
-            .pvss_config
-            .fast_wconfig
-            .as_ref()
-            .map(|fast_wconfig| {
-                WTrx::deal(
-                    fast_wconfig,
-                    &pub_params.pvss_config.pp,
-                    sk,
-                    pk,
-                    &pub_params.pvss_config.eks,
-                    input_secret,
-                    &aux,
-                    &Player { id: my_index },
-                    rng,
-                )
-            });
         Transcripts {
             main: wtrx,
-            fast: fast_wtrx,
+            fast: None,
         }
     }
 
@@ -322,10 +275,6 @@ impl DKGTrait for RealDKG {
                 .context("not enough power")?;
         }
 
-        if let Some(fast_trx) = &trx.fast {
-            ensure!(fast_trx.get_dealers() == main_trx_dealers);
-            ensure!(trx.main.get_dealt_public_key() == fast_trx.get_dealt_public_key());
-        }
         Ok(())
     }
 
@@ -374,30 +323,6 @@ impl DKGTrait for RealDKG {
             &aux,
         )?;
 
-        // Verify fast path is present if and only if fast_wconfig is present.
-        ensure!(
-            trx.fast.is_some() == params.pvss_config.fast_wconfig.is_some(),
-            "real_dkg::verify_transcript failed with mismatched fast path flag in trx and params."
-        );
-
-        if let Some(fast_trx) = trx.fast.as_ref() {
-            let fast_dealers = fast_trx
-                .get_dealers()
-                .iter()
-                .map(|player| player.id)
-                .collect::<Vec<usize>>();
-            ensure!(
-                dealers == fast_dealers,
-                "real_dkg::verify_transcript failed with inconsistent dealer index."
-            );
-        }
-
-        if let (Some(fast_trx), Some(fast_wconfig)) =
-            (trx.fast.as_ref(), params.pvss_config.fast_wconfig.as_ref())
-        {
-            fast_trx.verify(fast_wconfig, &params.pvss_config.pp, &spks, &all_eks, &aux)?;
-        }
-
         Ok(())
     }
 
@@ -410,17 +335,7 @@ impl DKGTrait for RealDKG {
         agg.aggregate_with(&params.pvss_config.wconfig, &element.main)
             .expect("Transcript aggregation failed");
         accumulator.main = agg.normalize(); // TODO: this should be updated
-        if let (Some(acc), Some(ele), Some(config)) = (
-            accumulator.fast.as_mut(),
-            element.fast.as_ref(),
-            params.pvss_config.fast_wconfig.as_ref(),
-        ) {
-            let mut fast_agg = acc.to_aggregated();
-            fast_agg
-                .aggregate_with(config, ele)
-                .expect("Transcript aggregation failed");
-            *acc = fast_agg.normalize(); // TODO: this should be updated
-        }
+        accumulator.fast = None;
     }
 
     fn decrypt_secret_share_from_transcript(
@@ -437,37 +352,9 @@ impl DKGTrait for RealDKG {
             dk,
             &pub_params.pvss_config.pp,
         );
-        assert_eq!(
-            trx.fast.is_some(),
-            pub_params.pvss_config.fast_wconfig.is_some()
-        );
-        let (fast_sk, fast_pk) = match (
-            trx.fast.as_ref(),
-            pub_params.pvss_config.fast_wconfig.as_ref(),
-        ) {
-            (Some(fast_trx), Some(fast_wconfig)) => {
-                let (fast_sk, fast_pk) = fast_trx.decrypt_own_share(
-                    fast_wconfig,
-                    &Player {
-                        id: player_idx as usize,
-                    },
-                    dk,
-                    &pub_params.pvss_config.pp,
-                );
-                (Some(fast_sk), Some(fast_pk))
-            },
-            _ => (None, None),
-        };
-        Ok((
-            DealtSecretKeyShares {
-                main: sk,
-                fast: fast_sk,
-            },
-            DealtPubKeyShares {
-                main: pk,
-                fast: fast_pk,
-            },
-        ))
+        Ok((DealtSecretKeyShares { main: sk }, DealtPubKeyShares {
+            main: pk,
+        }))
     }
 
     // Test-only function
@@ -476,7 +363,6 @@ impl DKGTrait for RealDKG {
         input_player_share_pairs: Vec<(u64, Self::DealtSecretShare)>,
     ) -> anyhow::Result<Self::DealtSecret> {
         let player_share_pairs: Vec<_> = input_player_share_pairs
-            .clone()
             .into_iter()
             .map(|(x, y)| (Player { id: x as usize }, y.main))
             .collect();
@@ -485,26 +371,6 @@ impl DKGTrait for RealDKG {
             &player_share_pairs,
         )
         .unwrap();
-        if input_player_share_pairs
-            .clone()
-            .into_iter()
-            .all(|(_, y)| y.fast.is_some())
-            && let Some(fast_wconfig) = &pub_params.pvss_config.fast_wconfig
-        {
-            let fast_player_share_pairs: Vec<_> = input_player_share_pairs
-                .into_iter()
-                .map(|(x, y)| (Player { id: x as usize }, y.fast.unwrap()))
-                .collect();
-            let fast_reconstructed_secret = <WTrx as TranscriptCore>::DealtSecretKey::reconstruct(
-                fast_wconfig,
-                &fast_player_share_pairs,
-            )
-            .unwrap();
-            ensure!(
-                reconstructed_secret == fast_reconstructed_secret,
-                "real_dkg::reconstruct_secret_from_shares failed with inconsistent dealt secrets."
-            );
-        }
         Ok(reconstructed_secret)
     }
 
@@ -547,55 +413,6 @@ impl RealDKG {
         Self::aggregate_transcripts(pub_params, &mut trx_0, trx_1);
         assert_eq!(2, trx_0.main.get_dealers().len());
         trx_0
-    }
-
-    #[cfg(any(test, feature = "testing"))]
-    pub fn generate_transcript_for_inconsistent_secrets<R: CryptoRng + RngCore>(
-        rng: &mut R,
-        pub_params: &<RealDKG as DKGTrait>::PublicParams,
-        my_index: u64,
-        sk: &<RealDKG as DKGTrait>::DealerPrivateKey,
-        pk: &<RealDKG as DKGTrait>::DealerPublicKey,
-    ) -> <RealDKG as DKGTrait>::Transcript {
-        let secret_0 = <RealDKG as DKGTrait>::InputSecret::generate(rng);
-        let secret_1 = <RealDKG as DKGTrait>::InputSecret::generate(rng);
-        let my_index = my_index as usize;
-        let my_addr = pub_params.session_metadata.dealer_validator_set[my_index].addr;
-        let aux = (pub_params.session_metadata.dealer_epoch, my_addr);
-
-        let wtrx = WTrx::deal(
-            &pub_params.pvss_config.wconfig,
-            &pub_params.pvss_config.pp,
-            sk,
-            pk,
-            &pub_params.pvss_config.eks,
-            &secret_0,
-            &aux,
-            &Player { id: my_index },
-            rng,
-        );
-        // transcript for fast path
-        let fast_wtrx = pub_params
-            .pvss_config
-            .fast_wconfig
-            .as_ref()
-            .map(|fast_wconfig| {
-                WTrx::deal(
-                    fast_wconfig,
-                    &pub_params.pvss_config.pp,
-                    sk,
-                    pk,
-                    &pub_params.pvss_config.eks,
-                    &secret_1,
-                    &aux,
-                    &Player { id: my_index },
-                    rng,
-                )
-            });
-        Transcripts {
-            main: wtrx,
-            fast: fast_wtrx,
-        }
     }
 }
 pub fn maybe_dk_from_bls_sk(
