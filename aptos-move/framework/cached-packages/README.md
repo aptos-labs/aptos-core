@@ -28,3 +28,5 @@ scripts/cargo_build_aptos_cached_packages.sh
 Then commit the updated artifacts together with your changes.
 
 CI runs the same script with `--check` to verify the artifacts are fresh. This check is **advisory (non-blocking)** because concurrent PR merges can make the checked-in artifacts appear stale even when a PR itself is correct. If the check fails on your PR, run the command above and commit the result.
+
+A nightly workflow (`nightly-update-cached-packages.yaml`) automatically rebuilds the artifacts against `main`, opens an auto-merging PR if anything changed, and notifies Slack if CI fails on that PR.
