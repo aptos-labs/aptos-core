@@ -4,7 +4,7 @@
 #![forbid(unsafe_code)]
 
 use crate::{
-    db_options::gen_state_kv_shard_cfds,
+    db_options::{gen_hot_state_kv_shard_cfds, gen_state_kv_shard_cfds},
     metrics::OTHER_TIMERS_SECONDS,
     schema::{
         db_metadata::{DbMetadataKey, DbMetadataSchema, DbMetadataValue},
@@ -115,6 +115,7 @@ impl StateKvDb {
             env,
             block_cache,
             readonly,
+            is_hot,
             delete_on_restart,
         )?);
 
@@ -314,6 +315,7 @@ impl StateKvDb {
             env,
             block_cache,
             readonly,
+            is_hot,
             delete_on_restart,
         )
     }
@@ -325,6 +327,7 @@ impl StateKvDb {
         env: Option<&Env>,
         block_cache: Option<&Cache>,
         readonly: bool,
+        is_hot: bool,
         delete_on_restart: bool,
     ) -> Result<DB> {
         if delete_on_restart {
@@ -334,7 +337,11 @@ impl StateKvDb {
         }
 
         let rocksdb_opts = gen_rocksdb_options(state_kv_db_config, env, readonly);
-        let cfds = gen_state_kv_shard_cfds(state_kv_db_config, block_cache);
+        let cfds = if is_hot {
+            gen_hot_state_kv_shard_cfds(state_kv_db_config, block_cache)
+        } else {
+            gen_state_kv_shard_cfds(state_kv_db_config, block_cache)
+        };
 
         if readonly {
             DB::open_cf_readonly(rocksdb_opts, path, name, cfds)
