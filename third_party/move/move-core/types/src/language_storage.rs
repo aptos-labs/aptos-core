@@ -37,6 +37,9 @@ pub const LEGACY_OPTION_VEC: &str = "vec";
 pub const OPTION_MODULE_NAME_STR: &str = "option";
 pub const OPTION_STRUCT_NAME_STR: &str = "Option";
 
+// Module path separator used in fully-qualified type names (e.g. "0x1::string::String")
+pub const MODULE_SEPARATOR: &str = "::";
+
 // Struct API constants for public struct/enum APIs
 pub const PUBLIC_STRUCT_DELIMITER: &str = "$";
 pub const PACK: &str = "pack";

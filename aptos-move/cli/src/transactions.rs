@@ -65,7 +65,7 @@ pub(crate) struct TxnOptions {
 
 impl TxnOptions {
     /// Builds a rest client
-    fn rest_client(&self) -> CliTypedResult<Client> {
+    pub fn rest_client(&self) -> CliTypedResult<Client> {
         self.rest_options.client(&self.profile_options)
     }
 
