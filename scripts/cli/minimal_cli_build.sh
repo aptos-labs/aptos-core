@@ -25,9 +25,31 @@ if ! has_command cargo; then
   curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
 fi
 
+STATIC_BUILD="${1:-false}"
+
 OS="$(uname)"
 case "$OS" in
   Linux)
+    if [ "$STATIC_BUILD" = "true" ]; then
+      # For static builds (musl), install musl toolchain and skip OpenSSL
+      if has_command apt-get; then
+        sudo apt-get update
+        sh install_pkg.sh build-essential pkgconf git lld libdw-dev clang llvm cmake musl-tools
+      elif has_command dnf; then
+        sh install_pkg.sh gcc gcc-c++ make pkgconf git lld elfutils-devel clang llvm cmake musl-gcc
+      elif has_command pacman; then
+        sh install_pkg.sh base-devel pkgconf git lld clang llvm cmake musl
+      elif has_command apk; then
+        sh install_pkg.sh alpine-sdk coreutils pkgconfig git lld elfutils-dev clang llvm cmake
+      else
+        echo "For static builds, install musl-tools manually for your distribution."
+        exit 1
+      fi
+      # Add the musl Rust target
+      ARCH="$(uname -m)"
+      rustup target add "${ARCH}-unknown-linux-musl"
+      exit 0
+    fi
     if has_command apt-get; then
       # Ubuntu / Debian based APT-GET
       sudo apt-get update

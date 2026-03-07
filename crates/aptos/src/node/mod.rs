@@ -2,8 +2,10 @@
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 pub mod analyze;
+#[cfg(feature = "localnet")]
 pub mod local_testnet;
 
+#[cfg(feature = "localnet")]
 use self::local_testnet::RunLocalnet;
 use crate::{
     common::{
@@ -20,6 +22,7 @@ use crate::{
         fetch_metadata::FetchMetadata,
     },
 };
+#[cfg(feature = "localnet")]
 use aptos_backup_cli::{
     coordinators::restore::{RestoreCoordinator, RestoreCoordinatorOpt},
     storage::DBToolStorageOpt,
@@ -66,6 +69,7 @@ const SECS_TO_MICROSECS: u64 = 1_000_000;
 #[derive(Parser)]
 pub enum NodeTool {
     AnalyzeValidatorPerformance(AnalyzeValidatorPerformance),
+    #[cfg(feature = "localnet")]
     BootstrapDb(BootstrapDb),
     CheckNetworkConnectivity(CheckNetworkConnectivity),
     GetPerformance(GetPerformance),
@@ -77,6 +81,7 @@ pub enum NodeTool {
     ShowValidatorConfig(ShowValidatorConfig),
     ShowValidatorSet(ShowValidatorSet),
     ShowValidatorStake(ShowValidatorStake),
+    #[cfg(feature = "localnet")]
     #[clap(aliases = &["run-local-testnet"])]
     RunLocalnet(RunLocalnet),
     UpdateConsensusKey(UpdateConsensusKey),
@@ -88,6 +93,7 @@ impl NodeTool {
         use NodeTool::*;
         match self {
             AnalyzeValidatorPerformance(tool) => tool.execute_serialized().await,
+            #[cfg(feature = "localnet")]
             BootstrapDb(tool) => {
                 tool.execute_serialized_with_logging_level(Level::Info)
                     .await
@@ -102,6 +108,7 @@ impl NodeTool {
             ShowValidatorSet(tool) => tool.execute_serialized().await,
             ShowValidatorStake(tool) => tool.execute_serialized().await,
             ShowValidatorConfig(tool) => tool.execute_serialized().await,
+            #[cfg(feature = "localnet")]
             RunLocalnet(tool) => tool
                 .execute_serialized_without_logger()
                 .await
@@ -1321,6 +1328,7 @@ impl CliCommand<()> for AnalyzeValidatorPerformance {
     }
 }
 
+#[cfg(feature = "localnet")]
 /// Bootstrap AptosDB from a backup
 ///
 /// Enables users to load from a backup to catch their node's DB up to a known state.
@@ -1334,6 +1342,7 @@ pub struct BootstrapDb {
     global: GlobalRestoreOpt,
 }
 
+#[cfg(feature = "localnet")]
 #[async_trait]
 impl CliCommand<()> for BootstrapDb {
     fn command_name(&self) -> &'static str {

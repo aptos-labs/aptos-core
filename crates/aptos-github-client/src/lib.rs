@@ -3,7 +3,6 @@
 
 #![forbid(unsafe_code)]
 
-use aptos_proxy::Proxy;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 use thiserror::Error;
@@ -34,19 +33,17 @@ impl From<std::io::Error> for Error {
     }
 }
 
-impl From<ureq::Response> for Error {
-    fn from(resp: ureq::Response) -> Self {
-        if let Some(e) = resp.synthetic_error() {
-            // Local error
-            Error::InternalError(e.to_string())
-        } else {
-            // Clear the buffer
-            let status = resp.status();
-            let status_text = resp.status_text().to_string();
-            match resp.into_string() {
-                Ok(body) => Error::HttpError(status, status_text, body),
-                Err(e) => Error::InternalError(e.to_string()),
-            }
+impl From<ureq::Error> for Error {
+    fn from(err: ureq::Error) -> Self {
+        match err {
+            ureq::Error::Status(code, response) => {
+                let status_text = response.status_text().to_string();
+                match response.into_string() {
+                    Ok(body) => Error::HttpError(code, status_text, body),
+                    Err(e) => Error::InternalError(e.to_string()),
+                }
+            },
+            ureq::Error::Transport(e) => Error::InternalError(e.to_string()),
         }
     }
 }
@@ -64,6 +61,7 @@ impl From<serde_json::Error> for Error {
 /// repository. The tooling is intended to be used to exchange data in an authenticated fashion
 /// across multiple peers.
 pub struct Client {
+    agent: ureq::Agent,
     branch: String,
     owner: String,
     repository: String,
@@ -72,7 +70,12 @@ pub struct Client {
 
 impl Client {
     pub fn new(owner: String, repository: String, branch: String, token: String) -> Self {
+        let agent = ureq::AgentBuilder::new()
+            .timeout(std::time::Duration::from_millis(TIMEOUT))
+            .try_proxy_from_env(true)
+            .build();
         Self {
+            agent,
             branch,
             owner,
             repository,
@@ -89,16 +92,12 @@ impl Client {
             Err(e) => return Err(e),
         };
 
-        let resp = self
-            .upgrade_request(ureq::delete(&self.post_url(path)))
+        self.upgrade_request(self.agent.delete(&self.post_url(path)))
             .send_json(
                 json!({ "branch": self.branch.to_string(), "message": "aptos-secure", "sha": hash }),
-            );
+            )?;
 
-        match resp.status() {
-            200 => Ok(()),
-            _ => Err(resp.into()),
-        }
+        Ok(())
     }
 
     /// Recursively delete all files, which as a by product will delete all folders
@@ -117,16 +116,11 @@ impl Client {
     /// Retrieve a list of branches, this is effectively a status check on the repository
     pub fn get_branches(&self) -> Result<Vec<String>, Error> {
         let url = format!("{}/repos/{}/{}/branches", URL, self.owner, self.repository);
-        let resp = self.upgrade_request(ureq::get(&url)).call();
+        let resp = self.upgrade_request(self.agent.get(&url)).call()?;
 
-        match resp.status() {
-            200 => {
-                let resp = resp.into_string()?;
-                let branches: Vec<Branch> = serde_json::from_str(&resp)?;
-                Ok(branches.into_iter().map(|b| b.name).collect())
-            },
-            _ => Err(resp.into()),
-        }
+        let resp = resp.into_string()?;
+        let branches: Vec<Branch> = serde_json::from_str(&resp)?;
+        Ok(branches.into_iter().map(|b| b.name).collect())
     }
 
     /// Retrieve the name of contents within a given directory, note, there are no such thing as
@@ -176,57 +170,42 @@ impl Client {
             Err(e) => return Err(e),
         };
 
-        let resp = self
-            .upgrade_request(ureq::put(&self.post_url(path)))
-            .send_json(json);
+        self.upgrade_request(self.agent.put(&self.post_url(path)))
+            .send_json(json)?;
 
-        match resp.status() {
-            200 => Ok(()),
-            201 => Ok(()),
-            _ => Err(resp.into()),
-        }
+        Ok(())
     }
 
     /// Simple wrapper around requests to add default parameters to the request
-    fn upgrade_request(&self, mut request: ureq::Request) -> ureq::Request {
+    fn upgrade_request(&self, request: ureq::Request) -> ureq::Request {
         request
             .set("Authorization", &format!("token {}", self.token))
             .set(ACCEPT_HEADER, ACCEPT_VALUE)
-            .timeout_connect(TIMEOUT);
-
-        let proxy = Proxy::new();
-        let host = request.get_host().expect("unable to get the host");
-        let proxy_url = proxy.https(&host);
-        if let Some(proxy_url) = proxy_url {
-            request.set_proxy(ureq::Proxy::new(proxy_url).expect("Unable to parse proxy_url"));
-        }
-        request
     }
 
     /// Get can read files or directories, this makes it easier to use
     fn get_internal(&self, path: &str) -> Result<Vec<GetResponse>, Error> {
-        let resp = self.upgrade_request(ureq::get(&self.get_url(path))).call();
-        match resp.status() {
-            200 => {
-                let resp = resp.into_string()?;
-                let get_resp: Result<GetResponse, Error> =
-                    serde_json::from_str(&resp).map_err(|e| e.into());
+        let resp = match self.upgrade_request(self.agent.get(&self.get_url(path))).call() {
+            Ok(resp) => resp,
+            Err(ureq::Error::Status(404, _)) => return Err(Error::NotFound(path.into())),
+            Err(e) => return Err(e.into()),
+        };
 
-                if let Ok(get_resp) = get_resp {
-                    return Ok(vec![get_resp]);
-                }
+        let resp = resp.into_string()?;
+        let get_resp: Result<GetResponse, Error> =
+            serde_json::from_str(&resp).map_err(|e| e.into());
 
-                let get_resp: Result<Vec<GetResponse>, Error> =
-                    serde_json::from_str(&resp).map_err(|e| e.into());
-                if let Ok(get_resp) = get_resp {
-                    return Ok(get_resp);
-                }
-
-                Err(Error::SerializationError(resp))
-            },
-            404 => Err(Error::NotFound(path.into())),
-            _ => Err(resp.into()),
+        if let Ok(get_resp) = get_resp {
+            return Ok(vec![get_resp]);
         }
+
+        let get_resp: Result<Vec<GetResponse>, Error> =
+            serde_json::from_str(&resp).map_err(|e| e.into());
+        if let Ok(get_resp) = get_resp {
+            return Ok(get_resp);
+        }
+
+        Err(Error::SerializationError(resp))
     }
 
     /// Returns the sha hash of a file according to GitHub

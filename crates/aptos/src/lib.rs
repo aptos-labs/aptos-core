@@ -14,7 +14,9 @@ pub mod op;
 pub mod stake;
 #[cfg(any(test, feature = "fuzzing"))]
 pub mod test;
+#[cfg(feature = "localnet")]
 pub mod update;
+#[cfg(feature = "localnet")]
 pub mod workspace;
 
 use crate::common::{
@@ -24,7 +26,6 @@ use crate::common::{
 pub use aptos_context::RealAptosContext;
 use aptos_move_cli::MoveEnv;
 use aptos_move_debugger::aptos_debugger::AptosDebugger;
-use aptos_workspace_server::WorkspaceCommand;
 use async_trait::async_trait;
 use clap::Parser;
 use std::{collections::BTreeMap, sync::Arc};
@@ -64,10 +65,12 @@ pub enum Tool {
     Node(node::NodeTool),
     #[clap(subcommand)]
     Stake(stake::StakeTool),
+    #[cfg(feature = "localnet")]
     #[clap(subcommand)]
     Update(update::UpdateTool),
+    #[cfg(feature = "localnet")]
     #[clap(subcommand, hide(true))]
-    Workspace(WorkspaceCommand),
+    Workspace(aptos_workspace_server::WorkspaceCommand),
 }
 
 impl Tool {
@@ -86,7 +89,9 @@ impl Tool {
             Multisig(tool) => tool.execute().await,
             Node(tool) => tool.execute().await,
             Stake(tool) => tool.execute().await,
+            #[cfg(feature = "localnet")]
             Update(tool) => tool.execute().await,
+            #[cfg(feature = "localnet")]
             Workspace(workspace) => {
                 let start_time = std::time::Instant::now();
                 let result: CliTypedResult<()> = workspace

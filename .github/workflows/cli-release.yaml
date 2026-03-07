@@ -80,6 +80,36 @@ jobs:
           name: cli-builds-linux
           path: aptos-cli-*.zip
 
+  # Static Linux x86_64 build using musl - no GLIBC or OpenSSL dependency
+  build-linux-static-binary:
+    name: "Build Linux static binary (musl)"
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.inputs.source_git_ref_override }}
+      - uses: aptos-labs/aptos-core/.github/actions/cli-rust-setup@main
+      - name: Install musl toolchain
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y musl-tools
+      - name: Build CLI
+        run: scripts/cli/build_cli_release.sh "Linux-Static" "${{inputs.release_version}}" "${{inputs.skip_checks}}" "false" "true"
+      - name: Verify no GLIBC or OpenSSL dependency
+        run: |
+          file target/x86_64-unknown-linux-musl/cli/aptos
+          if ldd target/x86_64-unknown-linux-musl/cli/aptos >/dev/null 2>&1; then
+            echo "Error: Binary is dynamically linked (ldd succeeded)"
+            exit 1
+          else
+            echo "Binary is statically linked (ldd failed as expected)"
+          fi
+      - name: Upload Binary
+        uses: actions/upload-artifact@v4
+        with:
+          name: cli-builds-linux-static
+          path: aptos-cli-*.zip
+
   # Generic linux arm should be the older version, more likely compatible
   build-linux-arm-binary:
     name: "Build Linux ARM binary"
@@ -95,6 +125,27 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: cli-builds-linux-arm
+          path: aptos-cli-*.zip
+
+  # Static Linux ARM build using musl - no GLIBC or OpenSSL dependency
+  build-linux-arm-static-binary:
+    name: "Build Linux ARM static binary (musl)"
+    runs-on: ubuntu-22.04-arm
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.inputs.source_git_ref_override }}
+      - uses: aptos-labs/aptos-core/.github/actions/cli-rust-setup@main
+      - name: Install musl toolchain
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y musl-tools
+      - name: Build CLI
+        run: scripts/cli/build_cli_release.sh "Linux-Static" "${{inputs.release_version}}" "${{inputs.skip_checks}}" "false" "true"
+      - name: Upload Binary
+        uses: actions/upload-artifact@v4
+        with:
+          name: cli-builds-linux-arm-static
           path: aptos-cli-*.zip
 
   build-macos-x86_64-binary:
@@ -155,7 +206,9 @@ jobs:
       - build-ubuntu24-binary
       - build-windows-binary
       - build-linux-binary
+      - build-linux-static-binary
       - build-linux-arm-binary
+      - build-linux-arm-static-binary
       - build-macos-arm-binary
       - build-macos-x86_64-binary
     runs-on: 2cpu-gh-ubuntu24-x64

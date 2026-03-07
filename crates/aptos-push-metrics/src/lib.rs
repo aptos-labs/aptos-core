@@ -46,18 +46,30 @@ impl MetricsPusher {
         } else {
             let mut request = ureq::post(push_metrics_endpoint);
             if let Some(token) = api_token {
-                request.set("apikey", token);
+                request = request.set("apikey", token);
             }
-            push_metrics_extra_labels.iter().for_each(|label| {
-                request.query("extra_label", label);
-            });
-            let response = request.timeout_connect(10_000).send_bytes(&buffer);
-            if !response.ok() {
-                warn!(
-                    "Failed to push metrics to {},  resp: {}",
-                    push_metrics_endpoint,
-                    response.status_text()
-                )
+            for label in push_metrics_extra_labels {
+                request = request.query("extra_label", label);
+            }
+            match request
+                .timeout(std::time::Duration::from_secs(10))
+                .send_bytes(&buffer)
+            {
+                Ok(_) => {},
+                Err(ureq::Error::Status(code, response)) => {
+                    warn!(
+                        "Failed to push metrics to {}, status: {}, resp: {}",
+                        push_metrics_endpoint,
+                        code,
+                        response.status_text()
+                    )
+                },
+                Err(e) => {
+                    warn!(
+                        "Failed to push metrics to {}: {}",
+                        push_metrics_endpoint, e
+                    )
+                },
             }
         }
     }
