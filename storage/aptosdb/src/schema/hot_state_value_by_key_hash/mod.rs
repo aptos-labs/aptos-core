@@ -18,7 +18,10 @@ use aptos_schemadb::{
     define_schema,
     schema::{KeyCodec, ValueCodec},
 };
-use aptos_types::{state_store::state_value::StateValue, transaction::Version};
+use aptos_types::{
+    state_store::{state_key::StateKey, state_value::StateValue},
+    transaction::Version,
+};
 use byteorder::{BigEndian, ReadBytesExt, WriteBytesExt};
 #[cfg(any(test, feature = "fuzzing"))]
 use proptest_derive::Arbitrary;
@@ -31,17 +34,28 @@ type Key = (HashValue, Version);
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[cfg_attr(any(test, feature = "fuzzing"), derive(Arbitrary))]
-pub(crate) enum HotStateValue {
+pub(crate) enum HotStateKvValue {
     Occupied {
         value_version: Version,
         value: StateValue,
     },
     Vacant,
 }
+
+/// Wraps `HotStateKvValue` with the `StateKey` so that on DB load we can
+/// reconstruct the full entry (schema key only stores the hash).
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(any(test, feature = "fuzzing"), derive(Arbitrary))]
+pub(crate) struct HotStateKvEntry {
+    pub state_key: StateKey,
+    pub value: HotStateKvValue,
+}
+
+// `None` means the key was evicted from hot state.
 define_schema!(
     HotStateValueByKeyHashSchema,
     Key,
-    Option<HotStateValue>, // None means being evicted.
+    Option<HotStateKvEntry>,
     HOT_STATE_VALUE_BY_KEY_HASH_CF_NAME
 );
 
@@ -63,7 +77,7 @@ impl KeyCodec<HotStateValueByKeyHashSchema> for Key {
     }
 }
 
-impl ValueCodec<HotStateValueByKeyHashSchema> for Option<HotStateValue> {
+impl ValueCodec<HotStateValueByKeyHashSchema> for Option<HotStateKvEntry> {
     fn encode_value(&self) -> Result<Vec<u8>> {
         bcs::to_bytes(self).map_err(Into::into)
     }

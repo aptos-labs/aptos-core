@@ -9,6 +9,9 @@ use crate::{
     pruner::{leaked_stale_node_cleaner, StateKvPrunerManager, StateMerklePrunerManager},
     schema::{
         db_metadata::{DbMetadataKey, DbMetadataSchema, DbMetadataValue},
+        hot_state_value_by_key_hash::{
+            HotStateKvEntry, HotStateKvValue, HotStateValueByKeyHashSchema,
+        },
         stale_node_index::StaleNodeIndexSchema,
         stale_node_index_cross_epoch::StaleNodeIndexCrossEpochSchema,
         stale_state_value_index_by_key_hash::StaleStateValueIndexByKeyHashSchema,
@@ -59,7 +62,7 @@ use aptos_storage_interface::{
         },
         state_with_summary::{LedgerStateWithSummary, StateWithSummary},
         versioned_state_value::StateUpdateRef,
-        HotStateUpdates,
+        HotStateShardUpdates, HotStateUpdates,
     },
     AptosDbError, DbReader, Result, StateSnapshotReceiver,
 };
@@ -150,7 +153,7 @@ pub(crate) struct StateDb {
     pub ledger_db: Arc<LedgerDb>,
     pub hot_state_merkle_db: Option<Arc<StateMerkleDb>>,
     pub state_merkle_db: Arc<StateMerkleDb>,
-    pub _hot_state_kv_db: Option<Arc<StateKvDb>>,
+    pub hot_state_kv_db: Option<Arc<StateKvDb>>,
     pub state_kv_db: Arc<StateKvDb>,
     pub state_pruner: StatePruner,
     pub skip_usage: bool,
@@ -390,7 +393,7 @@ impl StateStore {
             ledger_db,
             hot_state_merkle_db,
             state_merkle_db,
-            _hot_state_kv_db: hot_state_kv_db,
+            hot_state_kv_db,
             state_kv_db,
             state_pruner,
             skip_usage,
@@ -546,7 +549,7 @@ impl StateStore {
             ledger_db,
             hot_state_merkle_db,
             state_merkle_db,
-            _hot_state_kv_db: hot_state_kv_db,
+            hot_state_kv_db,
             state_kv_db,
             state_pruner,
             skip_usage: false,
@@ -833,6 +836,62 @@ impl StateStore {
                         )
                     })
             })
+    }
+
+    pub fn put_hot_state_kv_updates(
+        &self,
+        hot_state_updates: &HotStateUpdates,
+        last_version: Version,
+    ) -> Result<()> {
+        let hot_kv_db = match &self.state_db.hot_state_kv_db {
+            Some(db) => db,
+            None => return Ok(()),
+        };
+
+        let mut sharded_batches = hot_kv_db.new_sharded_native_batches();
+
+        fn write_shard_updates(
+            shard_updates: &[HotStateShardUpdates; NUM_STATE_SHARDS],
+            batches: &mut ShardedStateKvSchemaBatch,
+        ) -> Result<()> {
+            batches
+                .par_iter_mut()
+                .zip_eq(shard_updates.par_iter())
+                .try_for_each(|(batch, shard)| {
+                    for (key, (hot_val, value_version_opt)) in shard.insertions() {
+                        let schema_value = match value_version_opt {
+                            Some(vv) => HotStateKvValue::Occupied {
+                                value_version: *vv,
+                                value: hot_val.value().expect("occupied must have value").clone(),
+                            },
+                            None => HotStateKvValue::Vacant,
+                        };
+                        batch.put::<HotStateValueByKeyHashSchema>(
+                            &(CryptoHash::hash(key), hot_val.hot_since_version()),
+                            &Some(HotStateKvEntry {
+                                state_key: key.clone(),
+                                value: schema_value,
+                            }),
+                        )?;
+                    }
+                    for (key, eviction_version) in shard.evictions() {
+                        batch.put::<HotStateValueByKeyHashSchema>(
+                            &(CryptoHash::hash(key), *eviction_version),
+                            &None,
+                        )?;
+                    }
+                    Ok(())
+                })
+        }
+
+        if let Some(updates) = hot_state_updates.for_last_checkpoint() {
+            write_shard_updates(updates, &mut sharded_batches)?;
+        }
+        if let Some(updates) = hot_state_updates.for_latest() {
+            write_shard_updates(updates, &mut sharded_batches)?;
+        }
+
+        hot_kv_db.commit(last_version, None, sharded_batches)
     }
 
     pub fn get_usage(&self, version: Option<Version>) -> Result<StateStorageUsage> {
