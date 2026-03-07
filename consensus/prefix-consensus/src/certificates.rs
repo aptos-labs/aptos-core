@@ -569,6 +569,8 @@ pub enum StrongPCCommitError {
     DoesNotReachView1 { final_parent_view: u64 },
     /// Claimed v_high doesn't match derived v_high
     VHighMismatch,
+    /// Empty chain but conditions for View 1 full v_low fast path not met
+    InvalidFullVLowCommit(String),
 }
 
 impl fmt::Display for StrongPCCommitError {
@@ -620,6 +622,9 @@ impl fmt::Display for StrongPCCommitError {
             }
             Self::VHighMismatch => {
                 write!(f, "Claimed v_high does not match derived v_high from chain")
+            }
+            Self::InvalidFullVLowCommit(reason) => {
+                write!(f, "Invalid full v_low commit (empty chain): {}", reason)
             }
         }
     }
@@ -711,13 +716,33 @@ impl StrongPCCommit {
         // 2. Derive v_low from committing proof
         let (v_low, _) = qc3_certify(&self.committing_proof);
 
+        // 2a. Full v_low fast path: empty chain means this is a View 1 full v_low
+        //     commit. v_low.len() == n and v_high == v_low by Upper Bound property.
+        if self.certificate_chain.is_empty() {
+            let committing_view = qc3_view(&self.committing_proof);
+            if committing_view != Some(1) {
+                return Err(StrongPCCommitError::InvalidFullVLowCommit(format!(
+                    "empty chain requires View 1 committing proof, got view {:?}",
+                    committing_view,
+                )));
+            }
+            let n = verifier.len();
+            if v_low.len() != n {
+                return Err(StrongPCCommitError::InvalidFullVLowCommit(format!(
+                    "empty chain requires full v_low (len == {}), got len {}",
+                    n, v_low.len(),
+                )));
+            }
+            if self.v_high != v_low {
+                return Err(StrongPCCommitError::InvalidFullVLowCommit(
+                    "claimed v_high does not match v_low".to_string(),
+                ));
+            }
+            return Ok(());
+        }
+
         // 3. Find first non-⊥ in v_low (this is the commit condition)
         let start_hash = first_non_bot(&v_low).ok_or(StrongPCCommitError::NoCommitInVLow)?;
-
-        // 4. Chain must be non-empty
-        if self.certificate_chain.is_empty() {
-            return Err(StrongPCCommitError::EmptyChain);
-        }
 
         // 5. v_low's first non-⊥ must match chain[0]'s hash
         let chain_start_hash = self.certificate_chain[0].hash();
@@ -1445,5 +1470,144 @@ mod tests {
         let err = StrongPCCommitError::VHighMismatch;
         let display = format!("{}", err);
         assert!(display.contains("v_high"));
+
+        let err = StrongPCCommitError::InvalidFullVLowCommit("test".to_string());
+        let display = format!("{}", err);
+        assert!(display.contains("test"));
+    }
+
+    // ========================================================================
+    // Full v_low Commit Proof Tests (StrongPCCommit::verify fast path)
+    // ========================================================================
+
+    /// Helper: create a test verifier AND return the signers (needed for signed QC3s).
+    fn create_test_verifier_with_signers(
+        count: usize,
+    ) -> (ValidatorVerifier, Vec<aptos_types::validator_signer::ValidatorSigner>) {
+        let signers: Vec<_> = (0..count)
+            .map(|_| aptos_types::validator_signer::ValidatorSigner::random(None))
+            .collect();
+        let validator_infos: Vec<_> = signers
+            .iter()
+            .map(|s| ValidatorConsensusInfo::new(s.author(), s.public_key(), 1))
+            .collect();
+        (ValidatorVerifier::new(validator_infos), signers)
+    }
+
+    /// Helper: create a fully signed QC3 whose qc3_certify() produces
+    /// v_low = v_high = prefix. All signers vote with the same prefix through
+    /// all 3 rounds, so mcp == mce == prefix. Passes full verify_qc3 checks.
+    fn signed_qc3_for_full_vlow(
+        prefix: Vec<HashValue>,
+        view: u64,
+        signers: &[aptos_types::validator_signer::ValidatorSigner],
+    ) -> QC3 {
+        use crate::signing::{create_signed_vote1, create_signed_vote2, create_signed_vote3};
+
+        // Round 1: all signers vote with the same prefix
+        let vote1s: Vec<_> = signers
+            .iter()
+            .map(|s| {
+                create_signed_vote1(s.author(), prefix.clone(), 1, 0, view, s)
+                    .expect("sign vote1")
+            })
+            .collect();
+        let qc1 = QC1::new(vote1s);
+
+        // Round 2: all signers vote with the same prefix + QC1
+        let vote2s: Vec<_> = signers
+            .iter()
+            .map(|s| {
+                create_signed_vote2(s.author(), prefix.clone(), qc1.clone(), 1, 0, view, s)
+                    .expect("sign vote2")
+            })
+            .collect();
+        let qc2 = QC2::new(vote2s);
+
+        // Round 3: all signers vote with the same prefix + QC2
+        let vote3s: Vec<_> = signers
+            .iter()
+            .map(|s| {
+                create_signed_vote3(s.author(), prefix.clone(), qc2.clone(), 1, 0, view, s)
+                    .expect("sign vote3")
+            })
+            .collect();
+        QC3::new(vote3s)
+    }
+
+    #[test]
+    fn test_verify_full_vlow_commit_valid() {
+        // 4 validators, View 1, v_low length 4 — valid full v_low commit
+        let (verifier, signers) = create_test_verifier_with_signers(4);
+        let v_low = vec![hash(1), hash(2), hash(3), hash(4)];
+        let qc3 = signed_qc3_for_full_vlow(v_low.clone(), 1, &signers);
+        let commit = StrongPCCommit::new(qc3, vec![], v_low, 1, 0);
+
+        let result = commit.verify(&verifier);
+        assert!(result.is_ok(), "Full v_low commit should verify: {:?}", result);
+    }
+
+    #[test]
+    fn test_verify_full_vlow_commit_with_bots() {
+        // Full length with bot entries — still valid
+        let (verifier, signers) = create_test_verifier_with_signers(4);
+        let v_low = vec![hash(1), HashValue::zero(), hash(3), HashValue::zero()];
+        let qc3 = signed_qc3_for_full_vlow(v_low.clone(), 1, &signers);
+        let commit = StrongPCCommit::new(qc3, vec![], v_low, 1, 0);
+
+        let result = commit.verify(&verifier);
+        assert!(result.is_ok(), "Full v_low with bots should verify: {:?}", result);
+    }
+
+    #[test]
+    fn test_verify_full_vlow_commit_wrong_view() {
+        // Empty chain but committing view != 1 → error
+        let (verifier, signers) = create_test_verifier_with_signers(4);
+        let v_low = vec![hash(1), hash(2), hash(3), hash(4)];
+        let qc3 = signed_qc3_for_full_vlow(v_low.clone(), 5, &signers); // View 5, not View 1
+        let commit = StrongPCCommit::new(qc3, vec![], v_low, 1, 0);
+
+        let result = commit.verify(&verifier);
+        assert!(matches!(result, Err(StrongPCCommitError::InvalidFullVLowCommit(_))));
+    }
+
+    #[test]
+    fn test_verify_full_vlow_commit_short_vlow() {
+        // Empty chain but v_low.len() < n → error
+        let (verifier, signers) = create_test_verifier_with_signers(4);
+        let v_low = vec![hash(1), hash(2)]; // length 2 < 4
+        let qc3 = signed_qc3_for_full_vlow(v_low.clone(), 1, &signers);
+        let commit = StrongPCCommit::new(qc3, vec![], v_low, 1, 0);
+
+        let result = commit.verify(&verifier);
+        assert!(matches!(result, Err(StrongPCCommitError::InvalidFullVLowCommit(_))));
+    }
+
+    #[test]
+    fn test_verify_full_vlow_commit_vhigh_mismatch() {
+        // Empty chain, View 1, full length, but v_high != v_low → error
+        let (verifier, signers) = create_test_verifier_with_signers(4);
+        let v_low = vec![hash(1), hash(2), hash(3), hash(4)];
+        let v_high_wrong = vec![hash(1), hash(2), hash(3), hash(99)]; // differs at pos 3
+        let qc3 = signed_qc3_for_full_vlow(v_low, 1, &signers);
+        let commit = StrongPCCommit::new(qc3, vec![], v_high_wrong, 1, 0);
+
+        let result = commit.verify(&verifier);
+        assert!(matches!(result, Err(StrongPCCommitError::InvalidFullVLowCommit(_))));
+    }
+
+    #[test]
+    fn test_verify_full_vlow_all_bot_valid() {
+        // All-bot full v_low — still valid (length == n is the only condition)
+        let (verifier, signers) = create_test_verifier_with_signers(4);
+        let v_low = vec![
+            HashValue::zero(), HashValue::zero(),
+            HashValue::zero(), HashValue::zero(),
+        ];
+        let qc3 = signed_qc3_for_full_vlow(v_low.clone(), 1, &signers);
+        let commit = StrongPCCommit::new(qc3, vec![], v_low, 1, 0);
+
+        let result = commit.verify(&verifier);
+        assert!(result.is_ok(), "All-bot full v_low should verify: {:?}", result);
     }
 }

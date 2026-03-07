@@ -44,12 +44,22 @@ use std::fmt;
 
 /// Decision after View 1 completes.
 ///
-/// View 1 always produces a DirectCertificate. Even an all-⊥ v_high is meaningful
-/// in View 1 (raw inputs, not certificates). `DirectCertificate::validate()` allows
-/// empty v_high only if view == 1.
+/// Normally produces a DirectCertificate. When v_low has length == n (the number
+/// of validators), v_high == v_low by the Upper Bound property, so we can commit
+/// immediately without running further SPC views.
 #[derive(Clone, Debug)]
 pub enum View1Decision {
+    /// Normal case: v_low.len() < n, continue to View 2 with a DirectCert.
     DirectCert(DirectCertificate),
+
+    /// Fast path: v_low.len() == n, so v_high == v_low. Commit immediately
+    /// by broadcasting a StrongPCCommit with an empty certificate chain.
+    FullVLowCommit {
+        /// View 1's QC3 (used as committing_proof in StrongPCCommit)
+        committing_proof: QC3,
+        /// v_high output (equals v_low since v_low is full-length)
+        v_high: PrefixVector,
+    },
 }
 
 /// Decision after View W > 1 completes (three-way decision).
@@ -129,6 +139,10 @@ pub struct StrongPrefixConsensusProtocol {
     /// Slot for multi-slot consensus
     slot: u64,
 
+    /// Number of validators (length of the ranking vector).
+    /// Used to detect full v_low (length == n) for early commit in View 1.
+    num_validators: usize,
+
     /// Certificate store: hash → cert (populated by manager as certs arrive)
     cert_store: HashMap<HashValue, Certificate>,
 
@@ -149,10 +163,14 @@ pub struct StrongPrefixConsensusProtocol {
 
 impl StrongPrefixConsensusProtocol {
     /// Create a new protocol instance.
-    pub fn new(epoch: u64, slot: u64) -> Self {
+    ///
+    /// `num_validators` is the number of validators (ranking length). Used to
+    /// detect full v_low (length == n) for early commit in View 1.
+    pub fn new(epoch: u64, slot: u64, num_validators: usize) -> Self {
         Self {
             epoch,
             slot,
+            num_validators,
             cert_store: HashMap::new(),
             highest_known_view: None,
             strong_v_low: None,
@@ -187,18 +205,34 @@ impl StrongPrefixConsensusProtocol {
     /// Process View 1 completion.
     ///
     /// - Sets `strong_v_low` from `output.v_low` (this is the Strong PC low output).
-    /// - Always returns `View1Decision::DirectCert` (View 1 output is always meaningful).
+    /// - If v_low is full-length (len == n), returns `FullVLowCommit` — the slot can
+    ///   be committed immediately since v_high == v_low by the Upper Bound property.
+    /// - Otherwise returns `DirectCert` for normal View 2 progression.
     /// - Updates `highest_known_view` from the output's proof.
     pub fn process_view1_output(&mut self, output: ViewOutput) -> View1Decision {
+        // Check for full v_low BEFORE moving output.v_low
+        let is_full = output.v_low.len() == self.num_validators;
+
         // Set Strong PC v_low from View 1
-        self.strong_v_low = Some(output.v_low);
+        self.strong_v_low = Some(output.v_low.clone());
 
         // Update highest known view (View 1's proof)
         self.update_highest_known_view(output.view, output.proof.clone());
 
-        // View 1 always creates a DirectCert
-        let cert = DirectCertificate::new(output.view, output.proof);
-        View1Decision::DirectCert(cert)
+        if is_full {
+            // Full v_low: v_high == v_low by Upper Bound property (can't extend
+            // beyond n, can't replace bot entries). Commit immediately.
+            let v_high = output.v_low;
+            self.set_committed(v_high.clone());
+            View1Decision::FullVLowCommit {
+                committing_proof: output.proof,
+                v_high,
+            }
+        } else {
+            // Normal case: create DirectCert, continue to View 2
+            let cert = DirectCertificate::new(output.view, output.proof);
+            View1Decision::DirectCert(cert)
+        }
     }
 
     /// Process View W > 1 completion (three-way decision).
@@ -443,7 +477,7 @@ mod tests {
 
     #[test]
     fn test_new_protocol() {
-        let proto = StrongPrefixConsensusProtocol::new(1, 42);
+        let proto = StrongPrefixConsensusProtocol::new(1, 42, 4);
 
         assert_eq!(proto.epoch(), 1);
         assert_eq!(proto.slot(), 42);
@@ -459,7 +493,7 @@ mod tests {
 
     #[test]
     fn test_store_and_retrieve_certificate() {
-        let mut proto = StrongPrefixConsensusProtocol::new(1, 0);
+        let mut proto = StrongPrefixConsensusProtocol::new(1, 0, 4);
 
         let cert = Certificate::Direct(make_direct_cert(1, vec![hash(1), hash(2)]));
         let cert_hash = cert.hash();
@@ -473,13 +507,13 @@ mod tests {
 
     #[test]
     fn test_get_missing_certificate() {
-        let proto = StrongPrefixConsensusProtocol::new(1, 0);
+        let proto = StrongPrefixConsensusProtocol::new(1, 0, 4);
         assert!(proto.get_certificate(&HashValue::random()).is_none());
     }
 
     #[test]
     fn test_store_multiple_certificates() {
-        let mut proto = StrongPrefixConsensusProtocol::new(1, 0);
+        let mut proto = StrongPrefixConsensusProtocol::new(1, 0, 4);
 
         let cert1 = Certificate::Direct(make_direct_cert(1, vec![hash(1)]));
         let cert2 = Certificate::Direct(make_direct_cert(2, vec![hash(2)]));
@@ -496,7 +530,7 @@ mod tests {
 
     #[test]
     fn test_view1_decision_sets_v_low() {
-        let mut proto = StrongPrefixConsensusProtocol::new(1, 0);
+        let mut proto = StrongPrefixConsensusProtocol::new(1, 0, 4);
 
         let v_low = vec![hash(10), hash(20)];
         let output = make_view_output(1, v_low.clone(), vec![hash(30)]);
@@ -507,9 +541,10 @@ mod tests {
     }
 
     #[test]
-    fn test_view1_decision_always_returns_direct_cert() {
-        let mut proto = StrongPrefixConsensusProtocol::new(1, 0);
+    fn test_view1_decision_returns_direct_cert_for_short_vlow() {
+        let mut proto = StrongPrefixConsensusProtocol::new(1, 0, 4);
 
+        // v_low length 1 < num_validators (4) → DirectCert
         let output = make_view_output(1, vec![hash(10)], vec![hash(30)]);
         let decision = proto.process_view1_output(output);
 
@@ -517,12 +552,15 @@ mod tests {
             View1Decision::DirectCert(cert) => {
                 assert_eq!(cert.view(), 1);
             }
+            View1Decision::FullVLowCommit { .. } => {
+                panic!("Expected DirectCert for short v_low");
+            }
         }
     }
 
     #[test]
     fn test_view1_decision_all_bot_v_high_still_creates_cert() {
-        let mut proto = StrongPrefixConsensusProtocol::new(1, 0);
+        let mut proto = StrongPrefixConsensusProtocol::new(1, 0, 4);
 
         // All-⊥ v_high is meaningful in View 1
         let output = make_view_output(
@@ -536,12 +574,15 @@ mod tests {
             View1Decision::DirectCert(cert) => {
                 assert_eq!(cert.view(), 1);
             }
+            View1Decision::FullVLowCommit { .. } => {
+                panic!("Expected DirectCert for short v_low");
+            }
         }
     }
 
     #[test]
     fn test_view1_updates_highest_known_view() {
-        let mut proto = StrongPrefixConsensusProtocol::new(1, 0);
+        let mut proto = StrongPrefixConsensusProtocol::new(1, 0, 4);
 
         let output = make_view_output(1, vec![hash(10)], vec![hash(30)]);
         let _decision = proto.process_view1_output(output);
@@ -550,12 +591,111 @@ mod tests {
     }
 
     // ========================================================================
+    // Full v_low Commit Tests (View 1)
+    // ========================================================================
+
+    #[test]
+    fn test_view1_full_vlow_returns_commit() {
+        // num_validators = 4, v_low length 4 → FullVLowCommit
+        let mut proto = StrongPrefixConsensusProtocol::new(1, 0, 4);
+
+        let v_low = vec![hash(10), hash(20), hash(30), hash(40)];
+        let output = make_view_output(1, v_low.clone(), v_low.clone());
+        let decision = proto.process_view1_output(output);
+
+        match decision {
+            View1Decision::FullVLowCommit { v_high, .. } => {
+                assert_eq!(v_high, v_low);
+            }
+            View1Decision::DirectCert(_) => {
+                panic!("Expected FullVLowCommit for full v_low");
+            }
+        }
+    }
+
+    #[test]
+    fn test_view1_full_vlow_with_bots_returns_commit() {
+        // v_low length 4 with bot entries → still FullVLowCommit ("full" means length == n)
+        let mut proto = StrongPrefixConsensusProtocol::new(1, 0, 4);
+
+        let v_low = vec![hash(10), HashValue::zero(), hash(30), HashValue::zero()];
+        let output = make_view_output(1, v_low.clone(), v_low.clone());
+        let decision = proto.process_view1_output(output);
+
+        match decision {
+            View1Decision::FullVLowCommit { v_high, .. } => {
+                assert_eq!(v_high, v_low);
+            }
+            View1Decision::DirectCert(_) => {
+                panic!("Expected FullVLowCommit for full v_low with bots");
+            }
+        }
+    }
+
+    #[test]
+    fn test_view1_short_vlow_returns_direct_cert() {
+        // v_low length 3 < num_validators (4) → DirectCert
+        let mut proto = StrongPrefixConsensusProtocol::new(1, 0, 4);
+
+        let v_low = vec![hash(10), hash(20), hash(30)];
+        let output = make_view_output(1, v_low, vec![hash(10), hash(20), hash(30)]);
+        let decision = proto.process_view1_output(output);
+
+        match decision {
+            View1Decision::DirectCert(cert) => {
+                assert_eq!(cert.view(), 1);
+            }
+            View1Decision::FullVLowCommit { .. } => {
+                panic!("Expected DirectCert for short v_low");
+            }
+        }
+    }
+
+    #[test]
+    fn test_view1_full_vlow_sets_committed() {
+        let mut proto = StrongPrefixConsensusProtocol::new(1, 0, 4);
+
+        let v_low = vec![hash(10), hash(20), hash(30), hash(40)];
+        let output = make_view_output(1, v_low.clone(), v_low.clone());
+        let _decision = proto.process_view1_output(output);
+
+        assert!(proto.is_complete());
+        assert_eq!(proto.v_high().unwrap(), &v_low);
+        assert_eq!(proto.v_low().unwrap(), &v_low);
+    }
+
+    #[test]
+    fn test_view1_full_vlow_all_bot_not_committed() {
+        // All-bot v_low of length n: should still produce FullVLowCommit (length == n).
+        // This is correct: all-bot full-length just means no proposals were
+        // committed, but the vector is still "full".
+        let mut proto = StrongPrefixConsensusProtocol::new(1, 0, 4);
+
+        let v_low = vec![
+            HashValue::zero(), HashValue::zero(),
+            HashValue::zero(), HashValue::zero(),
+        ];
+        let output = make_view_output(1, v_low.clone(), v_low.clone());
+        let decision = proto.process_view1_output(output);
+
+        match decision {
+            View1Decision::FullVLowCommit { v_high, .. } => {
+                assert_eq!(v_high, v_low);
+            }
+            View1Decision::DirectCert(_) => {
+                panic!("Expected FullVLowCommit for all-bot full v_low");
+            }
+        }
+        assert!(proto.is_complete());
+    }
+
+    // ========================================================================
     // Three-Way Decision Tests (Views > 1)
     // ========================================================================
 
     #[test]
     fn test_view_decision_commit() {
-        let mut proto = StrongPrefixConsensusProtocol::new(1, 0);
+        let mut proto = StrongPrefixConsensusProtocol::new(1, 0, 4);
 
         // v_low has non-⊥ entry → commit
         let output = make_view_output(
@@ -575,7 +715,7 @@ mod tests {
 
     #[test]
     fn test_view_decision_direct_cert() {
-        let mut proto = StrongPrefixConsensusProtocol::new(1, 0);
+        let mut proto = StrongPrefixConsensusProtocol::new(1, 0, 4);
 
         // v_low all-⊥, v_high has non-⊥ → DirectCert
         let output = make_view_output(
@@ -595,7 +735,7 @@ mod tests {
 
     #[test]
     fn test_view_decision_empty_view() {
-        let mut proto = StrongPrefixConsensusProtocol::new(1, 0);
+        let mut proto = StrongPrefixConsensusProtocol::new(1, 0, 4);
 
         // Both v_low and v_high are all-⊥ → EmptyView
         let output = make_view_output(
@@ -613,7 +753,7 @@ mod tests {
 
     #[test]
     fn test_view_decision_commit_takes_priority_over_cert() {
-        let mut proto = StrongPrefixConsensusProtocol::new(1, 0);
+        let mut proto = StrongPrefixConsensusProtocol::new(1, 0, 4);
 
         // Both v_low and v_high have non-⊥ → Commit (priority)
         let output = make_view_output(3, vec![hash(1)], vec![hash(2)]);
@@ -627,7 +767,7 @@ mod tests {
 
     #[test]
     fn test_view_decision_direct_cert_updates_highest_known_view() {
-        let mut proto = StrongPrefixConsensusProtocol::new(1, 0);
+        let mut proto = StrongPrefixConsensusProtocol::new(1, 0, 4);
 
         // First: view 1
         let output1 = make_view_output(1, vec![hash(10)], vec![hash(30)]);
@@ -646,7 +786,7 @@ mod tests {
 
     #[test]
     fn test_view_decision_empty_view_does_not_update_highest_known_view() {
-        let mut proto = StrongPrefixConsensusProtocol::new(1, 0);
+        let mut proto = StrongPrefixConsensusProtocol::new(1, 0, 4);
 
         // View 1
         let output1 = make_view_output(1, vec![hash(10)], vec![hash(30)]);
@@ -670,7 +810,7 @@ mod tests {
     #[test]
     fn test_trace_back_single_hop() {
         // View 2 commits → chain[0] = DirectCert(V=1) → terminal
-        let mut proto = StrongPrefixConsensusProtocol::new(1, 0);
+        let mut proto = StrongPrefixConsensusProtocol::new(1, 0, 4);
 
         // Create DirectCert(V=1) with v_high = [hash(100), hash(200)]
         let v1_output = vec![hash(100), hash(200)];
@@ -691,7 +831,7 @@ mod tests {
     #[test]
     fn test_trace_back_two_hops() {
         // View 3 commits → chain[0] = DirectCert(V=2) → chain[1] = DirectCert(V=1)
-        let mut proto = StrongPrefixConsensusProtocol::new(1, 0);
+        let mut proto = StrongPrefixConsensusProtocol::new(1, 0, 4);
 
         // Create DirectCert(V=1)
         let v1_output = vec![hash(100)];
@@ -718,7 +858,7 @@ mod tests {
     #[test]
     fn test_trace_back_three_hops() {
         // View 4 → cert_v3 → cert_v2 → cert_v1
-        let mut proto = StrongPrefixConsensusProtocol::new(1, 0);
+        let mut proto = StrongPrefixConsensusProtocol::new(1, 0, 4);
 
         let v1_output = vec![hash(7), hash(8)];
         let cert_v1 = Certificate::Direct(make_direct_cert(1, v1_output.clone()));
@@ -746,7 +886,7 @@ mod tests {
 
     #[test]
     fn test_trace_back_missing_cert() {
-        let proto = StrongPrefixConsensusProtocol::new(1, 0);
+        let proto = StrongPrefixConsensusProtocol::new(1, 0, 4);
 
         // Committing proof points to a cert we don't have
         let missing_hash = hash(999);
@@ -759,7 +899,7 @@ mod tests {
     #[test]
     fn test_trace_back_missing_intermediate_cert() {
         // Have cert_v2 but not cert_v1 that it points to
-        let mut proto = StrongPrefixConsensusProtocol::new(1, 0);
+        let mut proto = StrongPrefixConsensusProtocol::new(1, 0, 4);
 
         let missing_hash = hash(888);
         // cert_v2's v_high points to a cert we don't have
@@ -775,7 +915,7 @@ mod tests {
 
     #[test]
     fn test_trace_back_no_commit_in_v_low() {
-        let proto = StrongPrefixConsensusProtocol::new(1, 0);
+        let proto = StrongPrefixConsensusProtocol::new(1, 0, 4);
 
         // v_low is all-⊥
         let committing_proof =
@@ -788,7 +928,7 @@ mod tests {
     #[test]
     fn test_trace_back_v_low_with_leading_bots() {
         // v_low = [⊥, ⊥, cert_hash] — first non-⊥ is at position 2
-        let mut proto = StrongPrefixConsensusProtocol::new(1, 0);
+        let mut proto = StrongPrefixConsensusProtocol::new(1, 0, 4);
 
         let v1_output = vec![hash(42)];
         let cert_v1 = Certificate::Direct(make_direct_cert(1, v1_output.clone()));
@@ -811,7 +951,7 @@ mod tests {
 
     #[test]
     fn test_build_commit_message_success() {
-        let mut proto = StrongPrefixConsensusProtocol::new(5, 3);
+        let mut proto = StrongPrefixConsensusProtocol::new(5, 3, 4);
 
         let v1_output = vec![hash(100)];
         let cert_v1 = Certificate::Direct(make_direct_cert(1, v1_output.clone()));
@@ -830,7 +970,7 @@ mod tests {
 
     #[test]
     fn test_build_commit_message_propagates_error() {
-        let proto = StrongPrefixConsensusProtocol::new(1, 0);
+        let proto = StrongPrefixConsensusProtocol::new(1, 0, 4);
 
         let committing_proof = qc3_with_prefix(vec![hash(999)], 2);
 
@@ -847,7 +987,7 @@ mod tests {
 
     #[test]
     fn test_set_committed() {
-        let mut proto = StrongPrefixConsensusProtocol::new(1, 0);
+        let mut proto = StrongPrefixConsensusProtocol::new(1, 0, 4);
 
         assert!(!proto.is_complete());
         assert!(proto.v_high().is_none());
@@ -861,7 +1001,7 @@ mod tests {
 
     #[test]
     fn test_not_complete_without_commit() {
-        let mut proto = StrongPrefixConsensusProtocol::new(1, 0);
+        let mut proto = StrongPrefixConsensusProtocol::new(1, 0, 4);
 
         // Process View 1 — sets v_low but NOT committed
         let output = make_view_output(1, vec![hash(10)], vec![hash(20)]);
@@ -878,7 +1018,7 @@ mod tests {
 
     #[test]
     fn test_update_highest_known_view_external() {
-        let mut proto = StrongPrefixConsensusProtocol::new(1, 0);
+        let mut proto = StrongPrefixConsensusProtocol::new(1, 0, 4);
 
         assert!(proto.highest_known_view().is_none());
 

@@ -148,7 +148,7 @@ impl<NetworkSender: SubprotocolNetworkSender<StrongPrefixConsensusMsg>, T: Inner
             party_id,
             epoch,
             slot,
-            protocol: StrongPrefixConsensusProtocol::new(epoch, slot),
+            protocol: StrongPrefixConsensusProtocol::new(epoch, slot, initial_ranking.len()),
             ranking_manager: RankingManager::new(initial_ranking),
             current_view: 0, // Not yet started
             view_states: HashMap::new(),
@@ -412,6 +412,27 @@ impl<NetworkSender: SubprotocolNetworkSender<StrongPrefixConsensusMsg>, T: Inner
         self.send_v_low(&v_low);
 
         match decision {
+            View1Decision::FullVLowCommit { committing_proof, v_high } => {
+                // Full v_low (length == n): v_high == v_low, commit immediately
+                // with an empty certificate chain (we're already at View 1).
+                let commit = StrongPCCommit::new(
+                    committing_proof,
+                    vec![],  // empty chain — View 1 full v_low
+                    v_high.clone(),
+                    self.epoch,
+                    self.slot,
+                );
+                info!(
+                    party_id = %self.party_id,
+                    slot = self.slot,
+                    v_high_len = v_high.len(),
+                    "Full v_low in View 1 — broadcasting StrongPCCommit with empty chain"
+                );
+                let msg = StrongPrefixConsensusMsg::Commit(Box::new(commit));
+                self.network_sender.broadcast(msg).await;
+                self.send_output(&v_high);
+                self.write_output_file();
+            }
             View1Decision::DirectCert(cert) => {
                 let cert_enum = Certificate::Direct(cert);
                 let cert_hash = cert_enum.hash();

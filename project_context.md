@@ -4,8 +4,8 @@
 
 Implementing Prefix Consensus protocols (from research paper "Prefix Consensus For Censorship Resistant BFT") within Aptos Core for leaderless, censorship-resistant consensus.
 
-**Current Phase**: Multi-Slot Consensus (Algorithm 4) — Phases 1-11 complete, Phase 12 next
-**Completed**: Basic Prefix Consensus, Strong Prefix Consensus (Phases 1-9), Stake-Weighted Quorum Refactoring, Multi-Slot Phases 1-11
+**Current Phase**: Multi-Slot Consensus (Algorithm 4) — Phases 1-11 complete, v_low early commit complete, Phase 12 next
+**Completed**: Basic Prefix Consensus, Strong Prefix Consensus (Phases 1-9), Stake-Weighted Quorum Refactoring, Multi-Slot Phases 1-11, v_low early commit (two-wave flow)
 
 ---
 
@@ -123,8 +123,8 @@ Execution Pipeline (unchanged):
 ## Repository State
 
 - **Branch**: `prefix-consensus-prototype`
-- **HEAD**: Multi-Slot Phase 11 (smoke test + end-to-end fixes)
-- **Tests**: 246/246 unit tests (237 prefix-consensus + 9 slot manager), 7/7 smoke tests (including slot_consensus), 100/100 stress runs
+- **HEAD**: v_low early commit Phase 4 (two-wave commit flow tests)
+- **Tests**: 254/254 unit tests (237 prefix-consensus + 2 block_builder_for_entry + 15 slot manager), 7/7 smoke tests (including slot_consensus)
 - **Build**: Clean
 
 ### Repository Structure
@@ -152,7 +152,7 @@ consensus/prefix-consensus/src/
 
 consensus/src/prefix_consensus/
 ├── mod.rs                - Module declarations
-└── slot_manager.rs       - SlotManager orchestrator, SPCSpawner trait, RealSPCSpawner + 9 unit tests (~600 lines) — Phases 5-6
+└── slot_manager.rs       - SlotManager orchestrator, SPCSpawner trait, RealSPCSpawner, two-wave commit + 15 unit tests (~930 lines) — Phases 5-6 + v_low early commit
 
 testsuite/smoke-test/src/consensus/
 ├── prefix_consensus/     - 2 basic PC smoke tests
@@ -175,6 +175,7 @@ testsuite/smoke-test/src/consensus/
 - `.plans/phase8-epoch-manager-integration.md` — Phase 8: EpochManager integration (complete)
 - `.plans/phase9-blocktype-integration.md` — Phase 9+10: BlockType + execution pipeline audit (complete)
 - `.plans/phase12-verifiable-ranking.md` — Phase 13: Verifiable ranking with SPC-aware demotion (after end-to-end)
+- `.plans/vlow-early-commit.md` — v_low early commit: two-wave commit flow (complete)
 
 ---
 
@@ -220,8 +221,8 @@ testsuite/smoke-test/src/consensus/
 ## TODO (Future Work)
 
 ### Multi-Slot (deferred from current plan)
-- [ ] **v_low fast commit**: Commit from v_low when all entries non-⊥ (full prefix case)
-- [ ] **v_low early commit (general)**: Two blocks per slot — fast block from v_low, completion from v_high. Requires `InnerPCAlgorithm` to expose v_low at QC2 (before QC3/commit) so the strong manager can relay it through `output_tx` before v_high is known
+- [x] **v_low early commit**: Two-wave commit flow — wave 1 commits per-entry blocks from v_low (after View 1 inner PC), wave 2 commits delta entries from v_high. Plan: `.plans/vlow-early-commit.md`. SPCOutput enum (VLow/VHigh), PendingWave enum, buffered v_high, global round counter, 15 unit tests.
+- [x] **Full v_low commit proof**: When v_low is full (length == n), broadcast StrongPCCommit with empty certificate chain to commit the slot immediately — v_high == v_low by Upper Bound property, so no further SPC views needed. View 1 specific optimization.
 - [ ] **Slot pipelining**: Overlap proposal collection for slot s+1 while SPC for slot s runs
 - [ ] **QuorumStore integration**: Replace DirectMempool for production payload dissemination
 - [ ] **On-chain config**: Add PrefixConsensus variant to ConsensusAlgorithmConfig
