@@ -46,15 +46,7 @@ impl TokenBucket {
         initial_tokens: u64,
         time_service: TimeService,
     ) -> Self {
-        // Verify the given parameters
-        assert!(
-            capacity > 0 && refill_rate > 0,
-            "Capacity and refill rate must be > 0!"
-        );
-        assert!(
-            capacity >= refill_rate,
-            "Bucket capacity must be >= refill rate!"
-        );
+        // Verify the initial tokens
         assert!(
             initial_tokens <= capacity,
             "Initial tokens must be <= capacity!"
@@ -137,13 +129,17 @@ impl TokenBucket {
         self.add_tokens(count);
     }
 
-    /// Returns when the requested number of tokens will be available.
+    /// Returns when the requested number of tokens will be available (assuming
+    /// that the number of currently available tokens are insufficient).
     ///
     /// Returns `Some(instant)` when the tokens will be ready, or `None`
     /// if the request can never succeed (e.g., it exceeds bucket capacity).
     fn time_of_tokens_needed(&self, requested: u64) -> Option<Instant> {
         if self.capacity < requested {
             // Request exceeds bucket capacity, can never succeed
+            None
+        } else if self.refill_rate == 0 {
+            // Zero refill rate (the request will never succeed if tokens are not already available)
             None
         } else {
             let tokens_needed = requested.saturating_sub(self.tokens);
@@ -304,13 +300,6 @@ mod tests {
     }
 
     #[test]
-    #[should_panic(expected = "Bucket capacity must be >= refill rate!")]
-    fn test_new_with_capacity_less_than_refill_rate() {
-        // Verify creating a bucket with capacity < refill_rate fails
-        TokenBucket::new(5, 10, TimeService::mock());
-    }
-
-    #[test]
     #[should_panic(expected = "Initial tokens must be <= capacity!")]
     fn test_new_with_initial_exceeds_capacity() {
         // Verify creating a bucket with initial_tokens > capacity fails
@@ -329,20 +318,6 @@ mod tests {
         assert_eq!(bucket.tokens, 0);
         assert_eq!(bucket.capacity, capacity);
         assert_eq!(bucket.refill_rate, refill_rate);
-    }
-
-    #[test]
-    #[should_panic(expected = "Capacity and refill rate must be > 0!")]
-    fn test_new_with_zero_capacity() {
-        // Verify creating a bucket with zero capacity fails
-        TokenBucket::new(0, 10, TimeService::mock());
-    }
-
-    #[test]
-    #[should_panic(expected = "Capacity and refill rate must be > 0!")]
-    fn test_new_with_zero_refill_rate() {
-        // Verify creating a bucket with zero refill rate fails
-        TokenBucket::new(10, 0, TimeService::mock());
     }
 
     #[test]
@@ -744,6 +719,60 @@ mod tests {
         // Zero-token request must still succeed
         assert!(bucket.try_acquire_all(0).is_ok());
         assert_eq!(bucket.tokens, 0);
+    }
+
+    #[test]
+    fn test_zero_capacity_zero_refill_rate() {
+        // Create a bucket with zero capacity and zero refill rate
+        let mut bucket = TokenBucket::new(0, 0, TimeService::mock());
+
+        // Request zero tokens multiple times (should succeed even with zero capacity)
+        for _ in 0..10 {
+            assert!(bucket.try_acquire_all(0).is_ok());
+        }
+
+        // Now any non-zero request should fail since the refill rate is zero
+        let result = bucket.try_acquire_all(1);
+        assert!(result.is_err());
+        assert!(result.unwrap_err().is_none());
+    }
+
+    #[test]
+    fn test_nonzero_capacity_zero_refill_rate_tokens_available() {
+        // Create a bucket with some tokens and zero refill rate
+        let capacity = 5;
+        let mut bucket = TokenBucket::new(capacity, 0, TimeService::mock());
+
+        // Request some tokens
+        assert!(bucket.try_acquire_all(3).is_ok());
+        assert_eq!(bucket.tokens, 2);
+
+        // Request the remaining tokens
+        assert!(bucket.try_acquire_all(2).is_ok());
+        assert_eq!(bucket.tokens, 0);
+
+        // Request zero tokens (should succeed even when empty)
+        assert!(bucket.try_acquire_all(0).is_ok());
+
+        // Now any non-zero request should fail since the refill rate is zero
+        let result = bucket.try_acquire_all(1);
+        assert!(result.is_err());
+        assert!(result.unwrap_err().is_none());
+    }
+
+    #[test]
+    fn test_nonzero_capacity_zero_refill_rate_tokens_exhausted() {
+        // Create a bucket with some tokens and zero refill rate
+        let capacity = 5;
+        let mut bucket = TokenBucket::new(capacity, 0, TimeService::mock());
+
+        // Acquire all tokens
+        assert!(bucket.try_acquire_all(capacity).is_ok());
+
+        // Now any request should fail since the refill rate is zero
+        let result = bucket.try_acquire_all(1);
+        assert!(result.is_err());
+        assert!(result.unwrap_err().is_none());
     }
 
     #[test]

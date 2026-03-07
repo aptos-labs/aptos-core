@@ -24,6 +24,7 @@ aptos-storage-interface = { workspace = true }
 aptos-storage-service-notifications = { workspace = true }
 aptos-storage-service-types = { workspace = true }
 aptos-time-service = { workspace = true }
+aptos-token-bucket = { workspace = true }
 aptos-types = { workspace = true }
 arc-swap = { workspace = true }
 bcs = { workspace = true }

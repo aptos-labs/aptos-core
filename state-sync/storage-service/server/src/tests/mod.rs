@@ -12,6 +12,7 @@ mod new_transactions_or_outputs;
 mod number_of_states;
 mod optimistic_fetch;
 mod protocol_version;
+mod rate_limiter;
 mod request_moderator;
 mod response_progress_tracker;
 mod state_values;
