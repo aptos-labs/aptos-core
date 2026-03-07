@@ -18,7 +18,10 @@ use aptos_schemadb::{
     define_schema,
     schema::{KeyCodec, ValueCodec},
 };
-use aptos_types::{state_store::state_value::StateValue, transaction::Version};
+use aptos_types::{
+    state_store::{state_key::StateKey, state_value::StateValue},
+    transaction::Version,
+};
 use byteorder::{BigEndian, ReadBytesExt, WriteBytesExt};
 #[cfg(any(test, feature = "fuzzing"))]
 use proptest_derive::Arbitrary;
@@ -33,11 +36,36 @@ type Key = (HashValue, Version);
 #[cfg_attr(any(test, feature = "fuzzing"), derive(Arbitrary))]
 pub(crate) enum HotStateValue {
     Occupied {
+        key: StateKey,
         value_version: Version,
         value: StateValue,
     },
-    Vacant,
+    Vacant {
+        key: StateKey,
+    },
 }
+impl HotStateValue {
+    /// Construct from the types-level `HotStateValue` plus the `StateKey` and optional
+    /// `value_version` (only present for occupied entries).
+    pub(crate) fn from_types(
+        state_key: &StateKey,
+        types_hsv: &aptos_types::state_store::hot_state::HotStateValue,
+        value_version: Option<Version>,
+    ) -> Self {
+        match types_hsv.value() {
+            Some(value) => HotStateValue::Occupied {
+                key: state_key.clone(),
+                value_version: value_version
+                    .expect("value_version must be present for occupied entries"),
+                value: value.clone(),
+            },
+            None => HotStateValue::Vacant {
+                key: state_key.clone(),
+            },
+        }
+    }
+}
+
 define_schema!(
     HotStateValueByKeyHashSchema,
     Key,

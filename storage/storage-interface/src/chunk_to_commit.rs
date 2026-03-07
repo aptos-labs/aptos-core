@@ -7,6 +7,7 @@ use crate::state_store::{
     state_update_refs::StateUpdateRefs,
     state_view::cached_state_view::ShardedStateCache,
     state_with_summary::{LedgerStateWithSummary, StateWithSummary},
+    HotStateUpdates,
 };
 use aptos_types::transaction::{
     PersistedAuxiliaryInfo, Transaction, TransactionInfo, TransactionOutput, Version,
@@ -23,6 +24,7 @@ pub struct ChunkToCommit<'a> {
     pub state_summary: &'a LedgerStateSummary,
     pub state_update_refs: &'a StateUpdateRefs<'a>,
     pub state_reads: &'a ShardedStateCache,
+    pub hot_state_updates: &'a HotStateUpdates,
     pub is_reconfig: bool,
 }
 

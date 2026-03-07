@@ -42,9 +42,9 @@ use std::{
 
 #[derive(Clone, Debug, Default)]
 pub struct HotStateMetadata {
-    latest: Option<StateKey>,
-    oldest: Option<StateKey>,
-    num_items: usize,
+    pub latest: Option<StateKey>,
+    pub oldest: Option<StateKey>,
+    pub num_items: usize,
 }
 
 impl HotStateMetadata {
@@ -107,6 +107,25 @@ impl State {
 
     pub fn new_empty(hot_state_config: HotStateConfig) -> Self {
         Self::new_at_version(None, StateStorageUsage::zero(), hot_state_config)
+    }
+
+    /// Create a `State` at a given version with pre-loaded hot state metadata.
+    /// MapLayers are empty — the actual entries live only in the HotState DashMaps.
+    /// The LRU chain traversal works because `HotStateLRU::get_slot()` falls through
+    /// to the DashMap-backed `HotStateView` for entries not in the overlay.
+    pub fn new_at_version_with_hot_metadata(
+        version: Option<Version>,
+        usage: StateStorageUsage,
+        hot_state_config: HotStateConfig,
+        hot_state_metadata: [HotStateMetadata; NUM_STATE_SHARDS],
+    ) -> Self {
+        Self::new_with_updates(
+            version,
+            Arc::new(arr![MapLayer::new_family("state"); 16]),
+            hot_state_metadata,
+            usage,
+            hot_state_config,
+        )
     }
 
     pub fn next_version(&self) -> Version {
@@ -218,32 +237,39 @@ impl State {
                     let mut all_updates = per_version.iter();
                     let mut insertions = HashMap::new();
                     let mut evictions = HashSet::new();
+                    let mut value_versions = HashMap::new();
                     for ckpt_version in all_checkpoint_versions {
                         for (key, update) in
                             all_updates.take_while_ref(|(_k, u)| u.version <= *ckpt_version)
                         {
                             evictions.remove(*key);
-                            if let Some(hot_state_value) = Self::apply_one_update(
-                                &mut lru,
-                                overlay,
-                                cache,
-                                key,
-                                update,
-                                self.hot_state_config.refresh_interval_versions,
-                            ) {
+                            if let Some((hot_state_value, value_version_opt)) =
+                                Self::apply_one_update(
+                                    &mut lru,
+                                    overlay,
+                                    cache,
+                                    key,
+                                    update,
+                                    self.hot_state_config.refresh_interval_versions,
+                                )
+                            {
                                 insertions.insert((*key).clone(), hot_state_value);
+                                if let Some(vv) = value_version_opt {
+                                    value_versions.insert((*key).clone(), vv);
+                                }
                             }
                         }
                         // Only evict at the checkpoints.
                         evictions.extend(lru.maybe_evict().into_iter().map(|(key, slot)| {
                             insertions.remove(&key);
+                            value_versions.remove(&key);
                             assert!(slot.is_hot());
                             key
                         }));
                     }
                     for (key, update) in all_updates {
                         evictions.remove(*key);
-                        if let Some(hot_state_value) = Self::apply_one_update(
+                        if let Some((hot_state_value, value_version_opt)) = Self::apply_one_update(
                             &mut lru,
                             overlay,
                             cache,
@@ -252,6 +278,9 @@ impl State {
                             self.hot_state_config.refresh_interval_versions,
                         ) {
                             insertions.insert((*key).clone(), hot_state_value);
+                            if let Some(vv) = value_version_opt {
+                                value_versions.insert((*key).clone(), vv);
+                            }
                         }
                     }
 
@@ -268,7 +297,7 @@ impl State {
                     let new_usage = Self::usage_delta_for_shard(cache, overlay, batched_updates);
                     (
                         ((new_layer, new_metadata), new_usage),
-                        HotStateShardUpdates::new(insertions, evictions),
+                        HotStateShardUpdates::new(insertions, evictions, value_versions),
                     )
                 },
             )
@@ -293,9 +322,9 @@ impl State {
         ))
     }
 
-    /// Applies the update the returns the `HotStateValue` that will later go into the hot state
-    /// Merkle tree. `None` if the op is `MakeHot` and it's determined that refresh is not
-    /// necessary.
+    /// Applies the update and returns the `HotStateValue` that will later go into the hot state
+    /// Merkle tree, along with the `value_version` for occupied entries (needed for KV persistence).
+    /// `None` if the op is `MakeHot` and it's determined that refresh is not necessary.
     fn apply_one_update(
         lru: &mut HotStateLRU,
         overlay: &LayeredMap<StateKey, StateSlot>,
@@ -303,14 +332,23 @@ impl State {
         key: &StateKey,
         update: &StateUpdateRef,
         refresh_interval: Version,
-    ) -> Option<HotStateValue> {
+    ) -> Option<(HotStateValue, Option<Version>)> {
         if let Some(state_value_opt) = update.state_op.as_state_value_opt() {
             lru.insert((*key).clone(), update.to_result_slot().unwrap());
-            return Some(HotStateValue::new(state_value_opt.cloned(), update.version));
+            let value_version = if state_value_opt.is_some() {
+                Some(update.version)
+            } else {
+                None
+            };
+            return Some((
+                HotStateValue::new(state_value_opt.cloned(), update.version),
+                value_version,
+            ));
         }
 
         if let Some(mut slot) = lru.get_slot(key) {
             let mut refreshed = true;
+            let value_version = slot.value_version();
             let slot_to_insert = if slot.is_hot() {
                 if slot.expect_hot_since_version() + refresh_interval <= update.version {
                     slot.refresh(update.version);
@@ -324,17 +362,18 @@ impl State {
             if refreshed {
                 let ret = HotStateValue::clone_from_slot(&slot_to_insert);
                 lru.insert((*key).clone(), slot_to_insert);
-                Some(ret)
+                Some((ret, value_version))
             } else {
                 None
             }
         } else {
             let slot = Self::expect_old_slot(overlay, read_cache, key);
             assert!(slot.is_cold());
+            let value_version = slot.value_version();
             let slot = slot.to_hot(update.version);
             let ret = HotStateValue::clone_from_slot(&slot);
             lru.insert((*key).clone(), slot);
-            Some(ret)
+            Some((ret, value_version))
         }
     }
 

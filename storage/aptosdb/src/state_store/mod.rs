@@ -9,6 +9,9 @@ use crate::{
     pruner::{leaked_stale_node_cleaner, StateKvPrunerManager, StateMerklePrunerManager},
     schema::{
         db_metadata::{DbMetadataKey, DbMetadataSchema, DbMetadataValue},
+        hot_state_value_by_key_hash::{
+            HotStateValue as SchemaHotStateValue, HotStateValueByKeyHashSchema,
+        },
         stale_node_index::StaleNodeIndexSchema,
         stale_node_index_cross_epoch::StaleNodeIndexCrossEpochSchema,
         stale_state_value_index_by_key_hash::StaleStateValueIndexByKeyHashSchema,
@@ -50,7 +53,7 @@ use aptos_scratchpad::SparseMerkleTree;
 use aptos_storage_interface::{
     db_ensure as ensure, db_other_bail as bail,
     state_store::{
-        state::{LedgerState, State},
+        state::{HotStateMetadata, LedgerState, State},
         state_summary::{ProvableStateSummary, StateSummary},
         state_update_refs::{PerVersionStateUpdateRefs, StateUpdateRefs},
         state_view::{
@@ -66,6 +69,7 @@ use aptos_storage_interface::{
 use aptos_types::{
     proof::{definition::LeafCount, SparseMerkleProofExt, SparseMerkleRangeProof},
     state_store::{
+        hot_state::LRUEntry,
         state_key::StateKey,
         state_slot::StateSlot,
         state_storage_usage::StateStorageUsage,
@@ -150,7 +154,7 @@ pub(crate) struct StateDb {
     pub ledger_db: Arc<LedgerDb>,
     pub hot_state_merkle_db: Option<Arc<StateMerkleDb>>,
     pub state_merkle_db: Arc<StateMerkleDb>,
-    pub _hot_state_kv_db: Option<Arc<StateKvDb>>,
+    pub hot_state_kv_db: Option<Arc<StateKvDb>>,
     pub state_kv_db: Arc<StateKvDb>,
     pub state_pruner: StatePruner,
     pub skip_usage: bool,
@@ -363,6 +367,127 @@ impl StateDb {
     }
 }
 
+/// Loaded hot state entries for a single shard, sorted by `hot_since_version`.
+#[derive(Debug)]
+struct LoadedHotStateShard {
+    entries: Vec<(StateKey, StateSlot)>,
+    latest_key: Option<StateKey>,
+    oldest_key: Option<StateKey>,
+    num_items: usize,
+}
+
+/// Load hot state from the persisted KV DB.
+///
+/// For each of 16 shards (in parallel via rayon):
+/// 1. Iterate `HotStateValueByKeyHashSchema` entries
+/// 2. For each `state_key_hash`, take only the latest entry (first due to `!version` encoding)
+/// 3. Skip evicted entries (`None`)
+/// 4. Sort by `hot_since_version` to rebuild LRU order (ascending = oldest first)
+/// 5. Wire LRU prev/next pointers between entries
+fn load_hot_state_from_kv_db(kv_db: &StateKvDb) -> Result<[LoadedHotStateShard; NUM_STATE_SHARDS]> {
+    let _timer = OTHER_TIMERS_SECONDS.timer_with(&["load_hot_state_from_kv_db"]);
+
+    let results: Vec<LoadedHotStateShard> = (0..NUM_STATE_SHARDS)
+        .into_par_iter()
+        .map(|shard_id| {
+            let db_shard = kv_db.db_shard(shard_id);
+            let mut iter = db_shard
+                .iter::<HotStateValueByKeyHashSchema>()
+                .expect("Failed to create hot state KV iterator");
+            iter.seek_to_first();
+
+            // Collect latest entry per key_hash. Since keys are (key_hash, !version),
+            // entries for the same key_hash are ordered newest-first.
+            let mut entries: Vec<(StateKey, StateSlot)> = Vec::new();
+            let mut last_key_hash: Option<HashValue> = None;
+
+            while let Some(((key_hash, hot_since_version), value_opt)) = iter
+                .next()
+                .transpose()
+                .expect("Failed to iterate hot state KV")
+            {
+                // Skip duplicate entries for the same key_hash (only take the latest).
+                if last_key_hash == Some(key_hash) {
+                    continue;
+                }
+                last_key_hash = Some(key_hash);
+
+                // Skip evicted entries.
+                let schema_value = match value_opt {
+                    Some(v) => v,
+                    None => continue,
+                };
+
+                // Convert to (StateKey, StateSlot).
+                let (state_key, slot) = match schema_value {
+                    SchemaHotStateValue::Occupied {
+                        key,
+                        value_version,
+                        value,
+                    } => (key, StateSlot::HotOccupied {
+                        value_version,
+                        value,
+                        hot_since_version,
+                        lru_info: LRUEntry::uninitialized(),
+                    }),
+                    SchemaHotStateValue::Vacant { key } => (key, StateSlot::HotVacant {
+                        hot_since_version,
+                        lru_info: LRUEntry::uninitialized(),
+                    }),
+                };
+                entries.push((state_key, slot));
+            }
+
+            // Sort by hot_since_version ascending (oldest first) for LRU chain building.
+            entries.sort_by_key(|(_, slot)| slot.expect_hot_since_version());
+
+            // Wire LRU prev/next pointers.
+            let num_items = entries.len();
+            for i in 0..num_items {
+                let prev_key = if i > 0 {
+                    Some(entries[i - 1].0.clone())
+                } else {
+                    None
+                };
+                let next_key = if i + 1 < num_items {
+                    Some(entries[i + 1].0.clone())
+                } else {
+                    None
+                };
+                match &mut entries[i].1 {
+                    StateSlot::HotOccupied { lru_info, .. }
+                    | StateSlot::HotVacant { lru_info, .. } => {
+                        // prev = newer entry (sorted ascending, so prev in LRU = next in array)
+                        // next = older entry (sorted ascending, so next in LRU = prev in array)
+                        // LRU convention: prev = newer, next = older
+                        lru_info.prev = next_key;
+                        lru_info.next = prev_key;
+                    },
+                    _ => unreachable!(),
+                }
+            }
+
+            // latest = newest entry (last in sorted array), oldest = first
+            let latest_key = entries.last().map(|(k, _)| k.clone());
+            let oldest_key = entries.first().map(|(k, _)| k.clone());
+
+            LoadedHotStateShard {
+                entries,
+                latest_key,
+                oldest_key,
+                num_items,
+            }
+        })
+        .collect();
+
+    let total_items: usize = results.iter().map(|s| s.num_items).sum();
+    info!(total_items = total_items, "Loaded hot state from KV DB.");
+
+    Ok(results
+        .try_into()
+        .expect("Known to be NUM_STATE_SHARDS shards."))
+}
+
 impl StateStore {
     pub(crate) fn new(
         ledger_db: Arc<LedgerDb>,
@@ -390,7 +515,7 @@ impl StateStore {
             ledger_db,
             hot_state_merkle_db,
             state_merkle_db,
-            _hot_state_kv_db: hot_state_kv_db,
+            hot_state_kv_db,
             state_kv_db,
             state_pruner,
             skip_usage,
@@ -400,14 +525,15 @@ impl StateStore {
             hot_state_config,
         )));
         let persisted_state = PersistedState::new_empty(hot_state_config);
-        let buffered_state = if empty_buffered_state_for_restore {
-            BufferedState::new_at_snapshot(
+        let (buffered_state, persisted_state) = if empty_buffered_state_for_restore {
+            let bs = BufferedState::new_at_snapshot(
                 &state_db,
                 StateWithSummary::new_empty(hot_state_config),
                 buffered_state_target_items,
                 current_state.clone(),
                 persisted_state.clone(),
-            )
+            );
+            (bs, persisted_state)
         } else {
             Self::create_buffered_state_from_latest_snapshot(
                 &state_db,
@@ -546,7 +672,7 @@ impl StateStore {
             ledger_db,
             hot_state_merkle_db,
             state_merkle_db,
-            _hot_state_kv_db: hot_state_kv_db,
+            hot_state_kv_db,
             state_kv_db,
             state_pruner,
             skip_usage: false,
@@ -576,7 +702,7 @@ impl StateStore {
         out_current_state: Arc<Mutex<LedgerStateWithSummary>>,
         out_persisted_state: PersistedState,
         hot_state_config: HotStateConfig,
-    ) -> Result<BufferedState> {
+    ) -> Result<(BufferedState, PersistedState)> {
         let num_transactions = state_db
             .ledger_db
             .metadata_db()
@@ -593,7 +719,6 @@ impl StateStore {
             latest_snapshot_version = latest_snapshot_version,
             "Initializing BufferedState."
         );
-        // TODO(HotState): read hot root hash from DB.
         let latest_snapshot_root_hash = if let Some(version) = latest_snapshot_version {
             state_db
                 .state_merkle_db
@@ -602,14 +727,96 @@ impl StateStore {
         } else {
             *SPARSE_MERKLE_PLACEHOLDER_HASH
         };
+        // Read hot state root hash from the hot state Merkle DB if available.
+        let latest_hot_root_hash = state_db
+            .hot_state_merkle_db
+            .as_ref()
+            .and_then(|db| latest_snapshot_version.and_then(|v| db.get_root_hash(v).ok()))
+            .unwrap_or(*SPARSE_MERKLE_PLACEHOLDER_HASH);
         let usage = state_db.get_state_storage_usage(latest_snapshot_version)?;
-        let state = StateWithSummary::new_at_version(
-            latest_snapshot_version,
-            *SPARSE_MERKLE_PLACEHOLDER_HASH, // TODO(HotState): for now hot state always starts from empty upon restart.
-            latest_snapshot_root_hash,
-            usage,
-            hot_state_config,
-        );
+
+        // Determine if we can load persisted hot state or must start fresh.
+        let snapshot_next_version = latest_snapshot_version.map_or(0, |v| v + 1);
+        let has_persisted_hot_state = latest_hot_root_hash != *SPARSE_MERKLE_PLACEHOLDER_HASH;
+        let needs_replay = snapshot_next_version < num_transactions;
+
+        // Only use persisted hot state when no replay is needed (clean restart).
+        // When replay is needed, start with empty hot state (same as before).
+        let hot_root_hash_for_state = if has_persisted_hot_state && !needs_replay {
+            info!(
+                latest_hot_root_hash = latest_hot_root_hash,
+                "Using persisted hot state root hash."
+            );
+            latest_hot_root_hash
+        } else {
+            if has_persisted_hot_state && needs_replay {
+                info!("Hot state exists in DB but replay needed — starting hot state from empty.");
+            }
+            *SPARSE_MERKLE_PLACEHOLDER_HASH
+        };
+
+        // When we can load hot state from the KV DB, build a State with hot metadata (but empty
+        // MapLayers) and a PersistedState with populated DashMaps. The LRU chain works because
+        // get_slot() falls through to DashMaps for entries not in the overlay.
+        let should_load_hot_state = has_persisted_hot_state && !needs_replay;
+        let (state, out_persisted_state) = if should_load_hot_state {
+            if let Some(kv_db) = &state_db.hot_state_kv_db {
+                info!("Loading hot state from persisted KV DB.");
+                let loaded_shards = load_hot_state_from_kv_db(kv_db)?;
+
+                let hot_state_metadata: [HotStateMetadata; NUM_STATE_SHARDS] =
+                    std::array::from_fn(|i| HotStateMetadata {
+                        latest: loaded_shards[i].latest_key.clone(),
+                        oldest: loaded_shards[i].oldest_key.clone(),
+                        num_items: loaded_shards[i].num_items,
+                    });
+
+                // State has empty MapLayers — loaded entries live only in HotState DashMaps.
+                // The LRU chain works because get_slot() falls through to DashMaps.
+                let loaded_state = State::new_at_version_with_hot_metadata(
+                    latest_snapshot_version,
+                    usage,
+                    hot_state_config,
+                    hot_state_metadata,
+                );
+                let state_summary = StateSummary::new_at_version(
+                    latest_snapshot_version,
+                    SparseMerkleTree::new(latest_hot_root_hash),
+                    SparseMerkleTree::new(latest_snapshot_root_hash),
+                    hot_state_config,
+                );
+                let state = StateWithSummary::new(loaded_state, state_summary);
+
+                // Move entries out of loaded_shards (no clone).
+                let shard_data = loaded_shards.map(|s| (s.entries, s.latest_key, s.oldest_key));
+                let persisted_state = PersistedState::new_with_hot_state_data(
+                    state.state().clone(),
+                    hot_state_config,
+                    shard_data,
+                );
+
+                (state, persisted_state)
+            } else {
+                let state = StateWithSummary::new_at_version(
+                    latest_snapshot_version,
+                    hot_root_hash_for_state,
+                    latest_snapshot_root_hash,
+                    usage,
+                    hot_state_config,
+                );
+                (state, out_persisted_state)
+            }
+        } else {
+            let state = StateWithSummary::new_at_version(
+                latest_snapshot_version,
+                hot_root_hash_for_state,
+                latest_snapshot_root_hash,
+                usage,
+                hot_state_config,
+            );
+            (state, out_persisted_state)
+        };
+
         let mut buffered_state = BufferedState::new_at_snapshot(
             state_db,
             state.clone(),
@@ -620,11 +827,8 @@ impl StateStore {
 
         // In some backup-restore tests we hope to open the db without consistency check.
         if hack_for_tests {
-            return Ok(buffered_state);
+            return Ok((buffered_state, out_persisted_state));
         }
-
-        // Make sure the committed transactions is ahead of the latest snapshot.
-        let snapshot_next_version = latest_snapshot_version.map_or(0, |v| v + 1);
 
         // For non-restore cases, always snapshot_next_version <= num_transactions.
         if snapshot_next_version > num_transactions {
@@ -635,11 +839,12 @@ impl StateStore {
             );
         }
 
+        // Only write a null node when starting from empty hot state (no persisted hot state).
+        // When we have persisted hot state, the Merkle DB already has valid root hash.
         if snapshot_next_version > 0
             && let Some(db) = &state_db.hot_state_merkle_db
+            && !has_persisted_hot_state
         {
-            // TODO(HotState): this is needed while starting with an empty hot state during
-            // development.
             let prev_version = snapshot_next_version - 1;
             let tree_update_batch = TreeUpdateBatch {
                 node_batch: vec![vec![(NodeKey::new_empty_path(prev_version), Node::Null)]],
@@ -720,12 +925,14 @@ impl StateStore {
             latest_snapshot_root_hash = current_state.last_checkpoint().summary().root_hash(),
             "StateStore initialization finished.",
         );
-        Ok(buffered_state)
+        Ok((buffered_state, out_persisted_state))
     }
 
     pub fn reset(&self) {
         self.buffered_state.lock().quit();
-        *self.buffered_state.lock() = Self::create_buffered_state_from_latest_snapshot(
+        // n.b. reset always starts with the existing persisted_state — hot state loading only
+        // happens at initial startup, not during reset.
+        let (bs, _persisted_state) = Self::create_buffered_state_from_latest_snapshot(
             &self.state_db,
             self.buffered_state_target_items,
             false,
@@ -735,6 +942,7 @@ impl StateStore {
             self.hot_state_config,
         )
         .expect("buffered state creation failed.");
+        *self.buffered_state.lock() = bs;
     }
 
     pub fn buffered_state(&self) -> &Mutex<BufferedState> {
@@ -1304,9 +1512,14 @@ impl StateValueWriter<StateKey, StateValue> for StateStore {
 
 #[cfg(test)]
 mod test_only {
-    use crate::state_store::StateStore;
-    use aptos_crypto::HashValue;
-    use aptos_schemadb::batch::SchemaBatch;
+    use crate::{
+        schema::hot_state_value_by_key_hash::{
+            HotStateValue as SchemaHotStateValue, HotStateValueByKeyHashSchema,
+        },
+        state_store::StateStore,
+    };
+    use aptos_crypto::{hash::CryptoHash, HashValue};
+    use aptos_schemadb::batch::{SchemaBatch, WriteBatch};
     use aptos_storage_interface::state_store::{
         state_summary::ProvableStateSummary, state_update_refs::StateUpdateRefs,
         state_with_summary::LedgerStateWithSummary,
@@ -1391,6 +1604,39 @@ mod test_only {
             self.state_kv_db
                 .commit(last_version, None, sharded_state_kv_batches)
                 .unwrap();
+
+            // Write hot state KV batches (mirrors the real writer path).
+            if let Some(hot_kv_db) = &self.state_db.hot_state_kv_db {
+                if let Some(shard_updates) = hot_state_updates.for_last_checkpoint() {
+                    let checkpoint_version = new_ledger_state
+                        .last_checkpoint()
+                        .version()
+                        .expect("checkpoint must have a version");
+                    let mut batches = hot_kv_db.new_sharded_native_batches();
+                    for (shard_id, shard) in shard_updates.iter().enumerate() {
+                        for (key, hsv) in shard.insertions() {
+                            let key_hash = CryptoHash::hash(key);
+                            let value_version = shard.value_versions().get(key).copied();
+                            batches[shard_id]
+                                .put::<HotStateValueByKeyHashSchema>(
+                                    &(key_hash, hsv.hot_since_version()),
+                                    &Some(SchemaHotStateValue::from_types(key, hsv, value_version)),
+                                )
+                                .unwrap();
+                        }
+                        for key in shard.evictions() {
+                            let key_hash = CryptoHash::hash(key);
+                            batches[shard_id]
+                                .put::<HotStateValueByKeyHashSchema>(
+                                    &(key_hash, checkpoint_version),
+                                    &None,
+                                )
+                                .unwrap();
+                        }
+                    }
+                    hot_kv_db.commit(checkpoint_version, None, batches).unwrap();
+                }
+            }
 
             let current = self.current_state_locked().ledger_state_summary();
             let persisted = self.persisted_state.get_state_summary();
