@@ -156,6 +156,7 @@ impl AptosDB {
             state_summary: &new_state_summary,
             state_update_refs: transactions_to_keep.state_update_refs(),
             state_reads: &reads,
+            hot_state_updates: &hot_state_updates,
             is_reconfig: transactions_to_keep.is_reconfig(),
         };
 
