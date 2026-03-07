@@ -525,14 +525,15 @@ impl StateStore {
             hot_state_config,
         )));
         let persisted_state = PersistedState::new_empty(hot_state_config);
-        let buffered_state = if empty_buffered_state_for_restore {
-            BufferedState::new_at_snapshot(
+        let (buffered_state, persisted_state) = if empty_buffered_state_for_restore {
+            let bs = BufferedState::new_at_snapshot(
                 &state_db,
                 StateWithSummary::new_empty(hot_state_config),
                 buffered_state_target_items,
                 current_state.clone(),
                 persisted_state.clone(),
-            )
+            );
+            (bs, persisted_state)
         } else {
             Self::create_buffered_state_from_latest_snapshot(
                 &state_db,
@@ -701,7 +702,7 @@ impl StateStore {
         out_current_state: Arc<Mutex<LedgerStateWithSummary>>,
         out_persisted_state: PersistedState,
         hot_state_config: HotStateConfig,
-    ) -> Result<BufferedState> {
+    ) -> Result<(BufferedState, PersistedState)> {
         let num_transactions = state_db
             .ledger_db
             .metadata_db()
@@ -837,7 +838,7 @@ impl StateStore {
 
         // In some backup-restore tests we hope to open the db without consistency check.
         if hack_for_tests {
-            return Ok(buffered_state);
+            return Ok((buffered_state, out_persisted_state));
         }
 
         // For non-restore cases, always snapshot_next_version <= num_transactions.
@@ -935,12 +936,14 @@ impl StateStore {
             latest_snapshot_root_hash = current_state.last_checkpoint().summary().root_hash(),
             "StateStore initialization finished.",
         );
-        Ok(buffered_state)
+        Ok((buffered_state, out_persisted_state))
     }
 
     pub fn reset(&self) {
         self.buffered_state.lock().quit();
-        *self.buffered_state.lock() = Self::create_buffered_state_from_latest_snapshot(
+        // n.b. reset always starts with the existing persisted_state — hot state loading only
+        // happens at initial startup, not during reset.
+        let (bs, _persisted_state) = Self::create_buffered_state_from_latest_snapshot(
             &self.state_db,
             self.buffered_state_target_items,
             false,
@@ -950,6 +953,7 @@ impl StateStore {
             self.hot_state_config,
         )
         .expect("buffered state creation failed.");
+        *self.buffered_state.lock() = bs;
     }
 
     pub fn buffered_state(&self) -> &Mutex<BufferedState> {
@@ -1519,9 +1523,14 @@ impl StateValueWriter<StateKey, StateValue> for StateStore {
 
 #[cfg(test)]
 mod test_only {
-    use crate::state_store::StateStore;
-    use aptos_crypto::HashValue;
-    use aptos_schemadb::batch::SchemaBatch;
+    use crate::{
+        schema::hot_state_value_by_key_hash::{
+            HotStateValue as SchemaHotStateValue, HotStateValueByKeyHashSchema,
+        },
+        state_store::StateStore,
+    };
+    use aptos_crypto::{hash::CryptoHash, HashValue};
+    use aptos_schemadb::batch::{SchemaBatch, WriteBatch};
     use aptos_storage_interface::state_store::{
         state_summary::ProvableStateSummary, state_update_refs::StateUpdateRefs,
         state_with_summary::LedgerStateWithSummary,
@@ -1606,6 +1615,39 @@ mod test_only {
             self.state_kv_db
                 .commit(last_version, None, sharded_state_kv_batches)
                 .unwrap();
+
+            // Write hot state KV batches (mirrors the real writer path).
+            if let Some(hot_kv_db) = &self.state_db.hot_state_kv_db {
+                if let Some(shard_updates) = hot_state_updates.for_last_checkpoint() {
+                    let checkpoint_version = new_ledger_state
+                        .last_checkpoint()
+                        .version()
+                        .expect("checkpoint must have a version");
+                    let mut batches = hot_kv_db.new_sharded_native_batches();
+                    for (shard_id, shard) in shard_updates.iter().enumerate() {
+                        for (key, hsv) in shard.insertions() {
+                            let key_hash = CryptoHash::hash(key);
+                            let value_version = shard.value_versions().get(key).copied();
+                            batches[shard_id]
+                                .put::<HotStateValueByKeyHashSchema>(
+                                    &(key_hash, hsv.hot_since_version()),
+                                    &Some(SchemaHotStateValue::from_types(key, hsv, value_version)),
+                                )
+                                .unwrap();
+                        }
+                        for key in shard.evictions() {
+                            let key_hash = CryptoHash::hash(key);
+                            batches[shard_id]
+                                .put::<HotStateValueByKeyHashSchema>(
+                                    &(key_hash, checkpoint_version),
+                                    &None,
+                                )
+                                .unwrap();
+                        }
+                    }
+                    hot_kv_db.commit(checkpoint_version, None, batches).unwrap();
+                }
+            }
 
             let current = self.current_state_locked().ledger_state_summary();
             let persisted = self.persisted_state.get_state_summary();

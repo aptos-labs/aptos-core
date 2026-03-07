@@ -115,6 +115,7 @@ impl StateKvDb {
             env,
             block_cache,
             readonly,
+            is_hot,
             delete_on_restart,
         )?);
 
@@ -158,7 +159,8 @@ impl StateKvDb {
             is_hot,
         };
 
-        if !readonly && !delete_on_restart {
+        // Truncation only applies to cold state KV DB (uses StaleStateValueIndex CFs).
+        if !readonly && !delete_on_restart && !is_hot {
             if let Some(overall_kv_commit_progress) = get_state_kv_commit_progress(&state_kv_db)? {
                 truncate_state_kv_db_shards(&state_kv_db, overall_kv_commit_progress)?;
             }
@@ -314,6 +316,7 @@ impl StateKvDb {
             env,
             block_cache,
             readonly,
+            is_hot,
             delete_on_restart,
         )
     }
@@ -325,6 +328,7 @@ impl StateKvDb {
         env: Option<&Env>,
         block_cache: Option<&Cache>,
         readonly: bool,
+        is_hot: bool,
         delete_on_restart: bool,
     ) -> Result<DB> {
         if delete_on_restart {
@@ -334,7 +338,7 @@ impl StateKvDb {
         }
 
         let rocksdb_opts = gen_rocksdb_options(state_kv_db_config, env, readonly);
-        let cfds = gen_state_kv_shard_cfds(state_kv_db_config, block_cache);
+        let cfds = gen_state_kv_shard_cfds(state_kv_db_config, block_cache, is_hot);
 
         if readonly {
             DB::open_cf_readonly(rocksdb_opts, path, name, cfds)
