@@ -15,6 +15,7 @@ use aptos_logger::info as aptos_logger_info;
 use aptos_transaction_emitter_lib::{TxnStats, TxnStatsRate};
 use log::info;
 use prometheus_http_query::response::Sample;
+use serde::{Deserialize, Serialize};
 use serde_json::json;
 use std::{
     collections::BTreeMap,
@@ -23,7 +24,7 @@ use std::{
     time::Duration,
 };
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct StateProgressThreshold {
     pub max_non_epoch_no_progress_secs: f32,
     pub max_epoch_no_progress_secs: f32,
@@ -31,7 +32,7 @@ pub struct StateProgressThreshold {
     pub max_epoch_round_gap: u64,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub enum LatencyType {
     Average,
     P50,
@@ -40,13 +41,14 @@ pub enum LatencyType {
     P99,
 }
 
-#[derive(Default, Clone, Debug)]
+#[derive(Default, Clone, Debug, Serialize, Deserialize)]
 pub struct MetricsThreshold {
-    max: f64,
+    pub max: f64,
     // % of the data point that can breach the max threshold
-    max_breach_pct: usize,
+    pub max_breach_pct: usize,
 
-    expect_empty: bool,
+    #[serde(default)]
+    pub expect_empty: bool,
 }
 
 impl MetricsThreshold {
@@ -107,10 +109,10 @@ impl MetricsThreshold {
     }
 }
 
-#[derive(Default, Clone, Debug)]
+#[derive(Default, Clone, Debug, Serialize, Deserialize)]
 pub struct SystemMetricsThreshold {
-    cpu_threshold: MetricsThreshold,
-    memory_threshold: MetricsThreshold,
+    pub cpu_threshold: MetricsThreshold,
+    pub memory_threshold: MetricsThreshold,
 }
 
 impl SystemMetricsThreshold {
@@ -130,7 +132,7 @@ impl SystemMetricsThreshold {
     }
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct LatencyBreakdownThreshold {
     pub thresholds: BTreeMap<LatencyBreakdownSlice, MetricsThreshold>,
 }
@@ -170,20 +172,20 @@ impl LatencyBreakdownThreshold {
     }
 }
 
-#[derive(Default, Clone, Debug)]
+#[derive(Default, Clone, Debug, Serialize, Deserialize)]
 pub struct SuccessCriteria {
     pub min_avg_tps: f64,
-    latency_thresholds: Vec<(Duration, LatencyType)>,
-    latency_breakdown_thresholds: Option<LatencyBreakdownThreshold>,
-    check_no_restarts: bool,
-    check_no_errors: bool,
-    check_no_fullnode_failures: bool,
-    max_expired_tps: Option<f64>,
-    max_failed_submission_tps: Option<f64>,
-    wait_for_all_nodes_to_catchup: Option<Duration>,
+    pub latency_thresholds: Vec<(Duration, LatencyType)>,
+    pub latency_breakdown_thresholds: Option<LatencyBreakdownThreshold>,
+    pub check_no_restarts: bool,
+    pub check_no_errors: bool,
+    pub check_no_fullnode_failures: bool,
+    pub max_expired_tps: Option<f64>,
+    pub max_failed_submission_tps: Option<f64>,
+    pub wait_for_all_nodes_to_catchup: Option<Duration>,
     // Maximum amount of CPU cores and memory bytes used by the nodes.
-    system_metrics_threshold: Option<SystemMetricsThreshold>,
-    chain_progress_check: Option<StateProgressThreshold>,
+    pub system_metrics_threshold: Option<SystemMetricsThreshold>,
+    pub chain_progress_check: Option<StateProgressThreshold>,
 }
 
 impl SuccessCriteria {

@@ -1,0 +1,23 @@
+test_name: consensus_only_realistic_env
+initial_validator_count: 20
+emit_job:
+  mode:
+    type: MaxLoad
+    mempool_backlog: 300000
+  txn_expiration_time_secs: 300
+genesis_helm_config:
+  chain:
+    epoch_duration_secs: 86400
+success_criteria:
+  min_avg_tps: 10000
+  check_no_restarts: true
+  wait_for_catchup_s: 240
+  chain_progress:
+    max_non_epoch_no_progress_secs: 20.0
+    max_epoch_no_progress_secs: 20.0
+    max_non_epoch_round_gap: 6
+    max_epoch_round_gap: 6
+extra:
+  target_tps: 20000
+  max_txns_per_block: 4500
+  vn_latency: 3.0

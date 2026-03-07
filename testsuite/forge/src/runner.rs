@@ -130,7 +130,7 @@ pub type GenesisConfigFn = Arc<dyn Fn(&mut serde_yaml::Value) + Send + Sync>;
 /// override_config, base_config (see OverrideNodeConfig)
 pub type OverrideNodeConfigFn = Arc<dyn Fn(&mut NodeConfig, &mut NodeConfig) + Send + Sync>;
 
-#[derive(Clone, Copy, Default)]
+#[derive(Clone, Copy, Debug, Default, serde::Serialize, serde::Deserialize)]
 pub struct NodeResourceOverride {
     pub cpu_cores: Option<usize>,
     pub memory_gib: Option<usize>,

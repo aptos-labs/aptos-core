@@ -120,7 +120,9 @@ pub async fn fetch_system_metrics(
     Ok(SystemMetrics::new(cpu_samples, memory_samples))
 }
 
-#[derive(Clone, Debug, Eq, Hash, PartialEq, PartialOrd, Ord)]
+#[derive(
+    Clone, Debug, Eq, Hash, PartialEq, PartialOrd, Ord, serde::Serialize, serde::Deserialize,
+)]
 pub enum LatencyBreakdownSlice {
     MempoolToBlockCreation,
     ConsensusProposalToOrdered,

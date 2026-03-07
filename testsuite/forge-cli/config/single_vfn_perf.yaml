@@ -1,0 +1,7 @@
+test_name: single_vfn_perf
+initial_validator_count: 1
+initial_fullnode_count: 1
+success_criteria:
+  min_avg_tps: 5000
+  check_no_restarts: true
+  wait_for_catchup_s: 240

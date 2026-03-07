@@ -36,3 +36,6 @@ pub mod test_utils;
 
 pub mod config;
 pub use config::ForgeConfig;
+
+pub mod test_config;
+pub use test_config::{ForgeTestConfig, TestCodeComponents};

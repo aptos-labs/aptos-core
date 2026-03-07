@@ -1,0 +1,25 @@
+test_name: multiregion_benchmark
+initial_validator_count: 20
+multi_region_config: true
+genesis_helm_config:
+  chain:
+    epoch_duration_secs: 300
+  genesis:
+    multicluster:
+      enabled: true
+success_criteria:
+  min_avg_tps: 4500
+  check_no_restarts: true
+  wait_for_catchup_s: 180
+  system_metrics:
+    cpu_threshold:
+      max: 12.0
+      max_breach_pct: 30
+    memory_threshold:
+      max: 10737418240.0
+      max_breach_pct: 30
+  chain_progress:
+    max_non_epoch_no_progress_secs: 10.0
+    max_epoch_no_progress_secs: 10.0
+    max_non_epoch_round_gap: 4
+    max_epoch_round_gap: 4

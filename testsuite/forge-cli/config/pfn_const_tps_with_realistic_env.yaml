@@ -1,0 +1,32 @@
+test_name: pfn_const_tps
+initial_validator_count: 7
+initial_fullnode_count: 7
+emit_job:
+  mode:
+    type: ConstTps
+    tps: 5000
+genesis_helm_config:
+  chain:
+    epoch_duration_secs: 7200
+success_criteria:
+  min_avg_tps: 4500
+  check_no_restarts: true
+  max_expired_tps: 0.0
+  max_failed_submission_tps: 0.0
+  latency_thresholds:
+    - threshold_s: 3.5
+      latency_type: P50
+    - threshold_s: 4.5
+      latency_type: P90
+    - threshold_s: 5.5
+      latency_type: P99
+  wait_for_catchup_s: 90
+  chain_progress:
+    max_non_epoch_no_progress_secs: 10.0
+    max_epoch_no_progress_secs: 10.0
+    max_non_epoch_round_gap: 4
+    max_epoch_round_gap: 4
+extra:
+  num_pfns: 7
+  add_cpu_chaos: true
+  add_network_emulation: true

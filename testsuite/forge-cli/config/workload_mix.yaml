@@ -1,0 +1,12 @@
+test_name: workload_mix
+initial_validator_count: 5
+initial_fullnode_count: 3
+success_criteria:
+  min_avg_tps: 3000
+  check_no_restarts: true
+  wait_for_catchup_s: 240
+  chain_progress:
+    max_non_epoch_no_progress_secs: 20.0
+    max_epoch_no_progress_secs: 20.0
+    max_non_epoch_round_gap: 6
+    max_epoch_round_gap: 6
