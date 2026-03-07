@@ -480,3 +480,142 @@ proptest! {
 fn init_store(store: &StateStore, input: impl Iterator<Item = (StateKey, StateValue)>) {
     update_store(store, input.into_iter().map(|(k, v)| (k, Some(v))), 0);
 }
+
+/// Test that hot state KV data persisted via `commit_block_for_test` can be loaded on DB reopen.
+#[test]
+fn test_hot_state_kv_persist_and_load() {
+    use aptos_config::config::{
+        HotStateConfig, RocksdbConfigs, StorageDirPaths, BUFFERED_STATE_TARGET_ITEMS_FOR_TEST,
+        DEFAULT_MAX_NUM_NODES_PER_LRU_CACHE_SHARD, NO_OP_STORAGE_PRUNER_CONFIG,
+    };
+
+    let tmp_dir = TempPath::new();
+    let hot_config = HotStateConfig {
+        max_items_per_shard: 100,
+        refresh_interval_versions: 100,
+        delete_on_restart: false,
+        compute_root_hash: true,
+    };
+
+    let key1 = StateKey::raw(b"test_key1");
+    let key2 = StateKey::raw(b"test_key2");
+    let key3 = StateKey::raw(b"test_key3");
+    let val1 = StateValue::from(b"test_val1".to_vec());
+    let val2 = StateValue::from(b"test_val2".to_vec());
+    let val3 = StateValue::from(b"test_val3".to_vec());
+
+    let hot_root_hash;
+    let cold_root_hash;
+
+    // Phase 1: Write blocks and persist hot state KV data.
+    {
+        let db = AptosDB::open(
+            StorageDirPaths::from_path(&tmp_dir),
+            false,
+            NO_OP_STORAGE_PRUNER_CONFIG,
+            RocksdbConfigs::default(),
+            BUFFERED_STATE_TARGET_ITEMS_FOR_TEST,
+            DEFAULT_MAX_NUM_NODES_PER_LRU_CACHE_SHARD,
+            None,
+            hot_config,
+        )
+        .expect("Failed to open AptosDB");
+
+        let store = &db.state_store;
+
+        // Version 0: write key1, key2
+        store.commit_block_for_test(0, [vec![
+            (key1.clone(), Some(val1.clone())),
+            (key2.clone(), Some(val2.clone())),
+        ]]);
+
+        // Version 1: write key3, update key1
+        let val1_updated = StateValue::from(b"test_val1_updated".to_vec());
+        store.commit_block_for_test(1, [vec![
+            (key3.clone(), Some(val3.clone())),
+            (key1.clone(), Some(val1_updated.clone())),
+        ]]);
+
+        // Record hashes for verification after reload.
+        let current = store.current_state_locked().clone();
+        hot_root_hash = current.last_checkpoint().summary().hot_root_hash();
+        cold_root_hash = current.last_checkpoint().summary().root_hash();
+
+        // Ensure the hot root hash is non-placeholder (hot state was actually computed).
+        assert_ne!(
+            hot_root_hash, *SPARSE_MERKLE_PLACEHOLDER_HASH,
+            "Hot root hash should be non-placeholder after writing with hot state enabled"
+        );
+    }
+    // DB is dropped/closed here.
+
+    // Phase 2: Reopen DB and verify hot state was loaded from persisted KV data.
+    {
+        let db = AptosDB::open(
+            StorageDirPaths::from_path(&tmp_dir),
+            false,
+            NO_OP_STORAGE_PRUNER_CONFIG,
+            RocksdbConfigs::default(),
+            BUFFERED_STATE_TARGET_ITEMS_FOR_TEST,
+            DEFAULT_MAX_NUM_NODES_PER_LRU_CACHE_SHARD,
+            None,
+            hot_config,
+        )
+        .expect("Failed to reopen AptosDB");
+
+        let store = &db.state_store;
+
+        let current = store.current_state_locked().clone();
+        assert_eq!(
+            current.last_checkpoint().summary().root_hash(),
+            cold_root_hash,
+            "Cold root hash mismatch after reload"
+        );
+
+        // Verify hot root hash matches — this confirms hot state was loaded, not started empty.
+        assert_eq!(
+            current.last_checkpoint().summary().hot_root_hash(),
+            hot_root_hash,
+            "Hot root hash mismatch after reload — hot state was not loaded correctly"
+        );
+
+        // Verify that hot state DashMaps are populated by querying through the HotStateView.
+        let hot_state = store.persisted_state.get_hot_state();
+        let (view, committed_state) = hot_state.get_committed();
+
+        // Committed state should be at version 2 (next_version after version 1 checkpoint).
+        assert_eq!(committed_state.next_version(), 2);
+
+        // Check that all 3 keys are in the hot state view.
+        let slot1 = view
+            .get_state_slot(&key1)
+            .expect("key1 should be in hot state");
+        assert!(slot1.is_hot());
+        assert_eq!(
+            slot1.as_state_value_opt(),
+            Some(&StateValue::from(b"test_val1_updated".to_vec())),
+            "key1 should have updated value"
+        );
+
+        let slot2 = view
+            .get_state_slot(&key2)
+            .expect("key2 should be in hot state");
+        assert!(slot2.is_hot());
+        assert_eq!(slot2.as_state_value_opt(), Some(&val2));
+
+        let slot3 = view
+            .get_state_slot(&key3)
+            .expect("key3 should be in hot state");
+        assert!(slot3.is_hot());
+        assert_eq!(slot3.as_state_value_opt(), Some(&val3));
+
+        // Verify DashMaps directly — total entry count across all shards.
+        let total_entries: usize = (0..NUM_STATE_SHARDS)
+            .map(|shard_id| hot_state.get_all_entries(shard_id).len())
+            .sum();
+        assert_eq!(
+            total_entries, 3,
+            "Expected 3 entries in DashMaps after loading"
+        );
+    }
+}
