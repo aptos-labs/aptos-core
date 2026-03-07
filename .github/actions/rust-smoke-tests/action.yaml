@@ -1,9 +1,21 @@
 name: Rust Smoke Tests
-description: Runs all Rust smoke tests
+description: Runs Rust smoke tests (optionally sharded via partition)
 inputs:
   GIT_CREDENTIALS:
     description: "Optional credentials to pass to git. Useful if you need to pull private repos for dependencies"
     required: false
+  PARTITION:
+    description: "Optional nextest partition spec (e.g., 'count:1/4'). Leave empty to run all tests."
+    required: false
+    default: ""
+  NEXTEST_PROFILE:
+    description: "Nextest profile to use"
+    required: false
+    default: "smoke-test"
+  ARTIFACT_SUFFIX:
+    description: "Optional suffix for the log artifact name (e.g., '-shard-1')"
+    required: false
+    default: ""
 
 runs:
   using: composite
@@ -19,8 +31,12 @@ runs:
     - name: Run rust smoke tests
       # Prebuild the aptos-node binary so that tests don't start before the node is built.
       # Also, prebuild the aptos-node binary as a separate step to avoid feature unification issues.
-      # Note: --test-threads is intentionally set to reduce resource contention in ci jobs. Increasing this, increases job failures and retries.
-      run: cargo build --locked --package=aptos-node --features=failpoints --release && LOCAL_SWARM_NODE_RELEASE=1 cargo nextest run --release --profile smoke-test --package smoke-test
+      run: |
+        cargo build --locked --package=aptos-node --features=failpoints --release && \
+        LOCAL_SWARM_NODE_RELEASE=1 cargo nextest run --release \
+          --profile ${{ inputs.NEXTEST_PROFILE }} \
+          --package smoke-test \
+          ${{ inputs.PARTITION != '' && format('--partition {0}', inputs.PARTITION) || '' }}
       shell: bash
 
     # We always try to create the artifact, but it only creates on flaky or failed smoke tests -- when the directories are empty.
@@ -28,7 +44,7 @@ runs:
       if: ${{ failure() || success() }}
       uses: actions/upload-artifact@v4
       with:
-        name: failed-smoke-test-logs
+        name: failed-smoke-test-logs${{ inputs.ARTIFACT_SUFFIX }}
         include-hidden-files: true
         # Retain all smoke test data except for the db (which may be large).
         path: |

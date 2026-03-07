@@ -109,7 +109,8 @@ jobs:
         with:
           GIT_CREDENTIALS: ${{ secrets.GIT_CREDENTIALS }}
 
-  # Run all rust smoke tests. This is a PR required job.
+  # Run smoke tests across 4 parallel shards, each with Swatinem/rust-cache.
+  # This is a PR required job.
   rust-smoke-tests:
     needs: file_change_determinator
     if: | # Only run on each PR once an appropriate event occurs
@@ -120,15 +121,30 @@ jobs:
         github.event.pull_request.auto_merge != null) ||
         contains(github.event.pull_request.body, '#e2e'
       )
-    runs-on: runs-on,cpu=64,family=c7,disk=large,image=aptos-ubuntu-x64,run-id=${{ github.run_id }}
+    runs-on: runs-on,cpu=32,family=c7,disk=large,image=aptos-ubuntu-x64,run-id=${{ github.run_id }}
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2, 3, 4]
     steps:
       - uses: actions/checkout@v4
         if: needs.file_change_determinator.outputs.only_docs_changed != 'true'
-      - name: Run rust smoke tests
-        uses: ./.github/actions/rust-smoke-tests
+
+      - name: Setup rust toolchain and cache
+        if: needs.file_change_determinator.outputs.only_docs_changed != 'true'
+        uses: ./.github/actions/rust-setup
+        with:
+          GIT_CREDENTIALS: ${{ secrets.GIT_CREDENTIALS }}
+          ADDITIONAL_KEY: smoke-test
+
+      - uses: ./.github/actions/rust-smoke-tests
         if: needs.file_change_determinator.outputs.only_docs_changed != 'true'
         with:
           GIT_CREDENTIALS: ${{ secrets.GIT_CREDENTIALS }}
+          PARTITION: "count:${{ matrix.shard }}/4"
+          NEXTEST_PROFILE: smoke-test
+          ARTIFACT_SUFFIX: "-shard-${{ matrix.shard }}"
+
       - run: echo "Skipping rust smoke tests! Unrelated changes detected."
         if: needs.file_change_determinator.outputs.only_docs_changed == 'true'
 

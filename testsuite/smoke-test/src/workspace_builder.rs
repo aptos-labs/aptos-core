@@ -18,6 +18,12 @@ const WORKSPACE_BUILD_ERROR_MSG: &str = r#"
 
 // Global flag indicating if all binaries in the workspace have been built.
 static WORKSPACE_BUILT: Lazy<bool> = Lazy::new(|| {
+    // When running with pre-built binaries (e.g., sharded CI), skip the workspace build.
+    if env::var("SMOKE_TEST_PREBUILD").is_ok() {
+        info!("Skipping workspace build (SMOKE_TEST_PREBUILD is set)");
+        return true;
+    }
+
     info!("Building project binaries");
     let mut args = cargo_build_common_args();
     args.append(&mut vec!["--all", "--bins", "--exclude", "aptos-node"]);
@@ -76,6 +82,16 @@ pub fn get_bin<S: AsRef<str>>(bin_name: S) -> PathBuf {
     }
 
     let bin_name = bin_name.as_ref();
+
+    // When running with pre-built binaries (e.g., sharded CI), look in the configured directory.
+    if let Ok(bin_dir) = env::var("SMOKE_TEST_BIN_DIR") {
+        let bin_path =
+            PathBuf::from(&bin_dir).join(format!("{}{}", bin_name, env::consts::EXE_SUFFIX));
+        if bin_path.exists() {
+            return bin_path;
+        }
+    }
+
     let bin_path = build_dir().join(format!("{}{}", bin_name, env::consts::EXE_SUFFIX));
 
     // If the binary doesn't exist then either building them failed somehow or the supplied binary
