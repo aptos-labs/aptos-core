@@ -36,6 +36,7 @@
 !scripts/
 !terraform/helm/aptos-node/
 !terraform/helm/genesis/
+!testsuite/forge-cli/config/*.yaml
 !testsuite/forge/src/backend/k8s/
 !third_party/move/move-prover/boogie-backend/**/*.bpl
 !testsuite/testcases/src/data/
