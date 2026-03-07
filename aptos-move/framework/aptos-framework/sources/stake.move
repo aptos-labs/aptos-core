@@ -39,6 +39,7 @@ module aptos_framework::stake {
     use aptos_framework::permissioned_signer;
 
     friend aptos_framework::block;
+    friend aptos_framework::delegation_pool;
     friend aptos_framework::genesis;
     friend aptos_framework::reconfiguration;
     friend aptos_framework::reconfiguration_with_dkg;
@@ -88,6 +89,8 @@ module aptos_framework::stake {
     const ENO_STAKE_PERMISSION: u64 = 28;
     /// Transaction fee is not fully distributed at epoch ending.
     const ETRANSACTION_FEE_NOT_FULLY_DISTRIBUTED: u64 = 29;
+    /// Insufficient stake remaining after bonus extraction.
+    const EINSUFFICIENT_STAKE_TO_EXTRACT_BONUS: u64 = 30;
 
     /// Validator status enum. We can switch to proper enum later once Move supports it.
     const VALIDATOR_STATUS_PENDING_ACTIVE: u64 = 1;
@@ -1197,6 +1200,56 @@ module aptos_framework::stake {
         coin::extract(&mut stake_pool.inactive, withdraw_amount)
     }
 
+    /// Extract bonus rewards from active stake for delegation pool bonus distribution.
+    /// This is only callable by delegation_pool module to distribute weighted staking bonuses.
+    ///
+    /// Security: Ensures minimum stake is maintained after extraction to prevent validator
+    /// from falling below required stake threshold.
+    public(friend) fun extract_bonus_from_active(
+        owner_cap: &OwnerCapability,
+        amount: u64
+    ): Coin<AptosCoin> acquires StakePool {
+        assert_reconfig_not_in_progress();
+        let pool_address = owner_cap.pool_address;
+        assert_stake_pool_exists(pool_address);
+        let stake_pool = borrow_global_mut<StakePool>(pool_address);
+
+        // Safety check: ensure minimum stake is maintained after extraction
+        let current_active = coin::value(&stake_pool.active);
+        let remaining_active = current_active - amount;
+        let config = staking_config::get();
+        let (minimum_stake, _maximum_stake) = staking_config::get_required_stake(&config);
+
+        assert!(
+            remaining_active >= minimum_stake,
+            error::invalid_state(EINSUFFICIENT_STAKE_TO_EXTRACT_BONUS)
+        );
+
+        // Emit event for monitoring and auditing
+        if (std::features::module_event_migration_enabled()) {
+            event::emit(WithdrawStake { pool_address, amount_withdrawn: amount });
+        } else {
+            event::emit_event(
+                &mut stake_pool.withdraw_stake_events,
+                WithdrawStakeEvent { pool_address, amount_withdrawn: amount }
+            );
+        };
+
+        // Extract coins from active stake
+        coin::extract(&mut stake_pool.active, amount)
+    }
+
+    /// Extract bonus rewards by pool address (wrapper for delegation_pool).
+    /// This is a convenience function that borrows the OwnerCapability internally.
+    public(friend) fun extract_bonus_by_address(
+        pool_address: address,
+        amount: u64
+    ): Coin<AptosCoin> acquires OwnerCapability, StakePool {
+        assert_owner_cap_exists(pool_address);
+        let owner_cap = borrow_global<OwnerCapability>(pool_address);
+        extract_bonus_from_active(owner_cap, amount)
+    }
+
     /// Request to have `pool_address` leave the validator set. The validator is only actually removed from the set when
     /// the next epoch starts.
     /// The last validator in the set cannot leave. This is an edge case that should never happen as long as the network
@@ -2092,6 +2145,13 @@ module aptos_framework::stake {
             vector[],
             vector[features::get_periodical_reward_rate_decrease_feature()]
         );
+    }
+
+    #[test_only]
+    /// Mint test coins for bonus rewards (test-only helper)
+    public fun mint_coins_for_test(amount: u64): Coin<AptosCoin> acquires AptosCoinCapabilities {
+        let mint_cap = &borrow_global<AptosCoinCapabilities>(@aptos_framework).mint_cap;
+        coin::mint(amount, mint_cap)
     }
 
     #[test_only]
