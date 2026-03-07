@@ -1,0 +1,67 @@
+// -- Model dump before first bytecode pipeline
+module 0x42::m {
+    struct Pair {
+        a: u64,
+        b: u64,
+    }
+    struct Wrapper<T> {
+        inner: T,
+    }
+    private fun get_pair(self: &Wrapper<Pair>): Pair {
+        select m::Wrapper.inner<&Wrapper<Pair>>(self)
+    }
+    private fun sum(self: &Pair): u64 {
+        Add<u64>(select m::Pair.a<&Pair>(self), select m::Pair.b<&Pair>(self))
+    }
+    private fun test_chain() {
+        {
+          let w: Wrapper<Pair> = pack m::Wrapper<Pair>(pack m::Pair(3, 4));
+          if Eq<u64>(m::sum(Borrow(Immutable)(m::get_pair(Borrow(Immutable)(w)))), 7) {
+            Tuple()
+          } else {
+            Abort(0)
+          };
+          Tuple()
+        }
+    }
+    private fun test_chain_vector() {
+        {
+          let w: Wrapper<Pair> = pack m::Wrapper<Pair>(pack m::Pair(10, 20));
+          {
+            let v: vector<Wrapper<Pair>> = Vector<Wrapper<Pair>>(w);
+            if Eq<u64>(m::sum(Borrow(Immutable)(m::get_pair(vector::borrow<Wrapper<Pair>>(Borrow(Immutable)(v), 0)))), 30) {
+              Tuple()
+            } else {
+              Abort(0)
+            };
+            Tuple()
+          }
+        }
+    }
+} // end 0x42::m
+
+// -- Sourcified model before first bytecode pipeline
+module 0x42::m {
+    struct Pair has copy, drop {
+        a: u64,
+        b: u64,
+    }
+    struct Wrapper<T> has copy, drop {
+        inner: T,
+    }
+    fun get_pair(self: &Wrapper<Pair>): Pair {
+        self.inner
+    }
+    fun sum(self: &Pair): u64 {
+        self.a + self.b
+    }
+    fun test_chain() {
+        let w = Wrapper<Pair>{inner: Pair{a: 3, b: 4}};
+        if (sum(&get_pair(&w)) == 7) () else abort 0;
+    }
+    fun test_chain_vector() {
+        let w = Wrapper<Pair>{inner: Pair{a: 10, b: 20}};
+        let v = vector[w];
+        if (sum(&get_pair(0x1::vector::borrow<Wrapper<Pair>>(&v, 0))) == 30) () else abort 0;
+    }
+}

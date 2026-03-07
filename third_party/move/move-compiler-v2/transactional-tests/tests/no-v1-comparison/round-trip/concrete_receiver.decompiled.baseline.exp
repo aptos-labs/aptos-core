@@ -1,0 +1,8 @@
+processed 7 tasks
+task 0 lines 3-63:  publish [module 0x42::concrete_test {]
+task 1 lines 66-66:  run --verbose -- 0x42::concrete_test::test_basic
+task 2 lines 68-68:  run --verbose -- 0x42::concrete_test::test_mut_receiver
+task 3 lines 70-70:  run --verbose -- 0x42::concrete_test::test_consume_receiver
+task 4 lines 72-72:  run --verbose -- 0x42::concrete_test::test_chain
+task 5 lines 74-74:  run --verbose -- 0x42::concrete_test::test_vector_index
+task 6 lines 76-76:  run --verbose -- 0x42::concrete_test::test_mut_through_vector

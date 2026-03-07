@@ -1,0 +1,25 @@
+
+Diagnostics:
+error: cannot pass `G<bool, bool>` to a function which expects argument of type `G<u64, bool>`
+   ┌─ tests/checking/receiver/concrete_receiver_errors.move:10:9
+   │
+10 │         g.process();
+   │         ^
+
+error: cannot pass `G<u64, u64>` to a function which expects argument of type `G<u64, bool>`
+   ┌─ tests/checking/receiver/concrete_receiver_errors.move:15:9
+   │
+15 │         g.process();
+   │         ^
+
+error: cannot pass `G<bool, u64>` to a function which expects argument of type `G<u64, bool>`
+   ┌─ tests/checking/receiver/concrete_receiver_errors.move:20:9
+   │
+20 │         g.process();
+   │         ^
+
+warning: parameter name `self` indicates a receiver function but the type `0x42::m::G<u64, T>` must use either all type parameters or all concrete types in the instantiation. Consider using a different name.
+   ┌─ tests/checking/receiver/concrete_receiver_errors.move:24:9
+   │
+24 │     fun partial_bad<T>(self: G<u64, T>) {}
+   │         ^^^^^^^^^^^
