@@ -533,7 +533,7 @@ fn pvss_transcript_random<T: Transcript, M: Measurement>(
 
 criterion_group!(
     name = benches;
-    config = Criterion::default().sample_size(50);
+    config = Criterion::default().sample_size(10);
     //config = Criterion::default();
     targets = all_groups);
 criterion_main!(benches);

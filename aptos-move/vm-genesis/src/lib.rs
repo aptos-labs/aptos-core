@@ -1056,7 +1056,7 @@ fn initialize_confidential_asset(
             module_storage,
             traversal_context,
             "confidential_asset",
-            "init_module_for_genesis",
+            "init_module_for_devnet",
             vec![],
             serialize_values(&vec![MoveValue::Signer(EXPERIMENTAL_CODE_ADDRESS)]),
         );

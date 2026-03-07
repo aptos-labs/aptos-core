@@ -8,6 +8,8 @@
 //! This crate contains helpers for executing tests against the Aptos VM.
 
 use aptos_types::{transaction::TransactionStatus, vm_status::KeptVMStatus};
+// Re-export SerializedReturnValues for use in e2e tests that call private functions
+pub use move_vm_runtime::move_vm::SerializedReturnValues;
 
 pub mod account;
 pub mod account_universe;

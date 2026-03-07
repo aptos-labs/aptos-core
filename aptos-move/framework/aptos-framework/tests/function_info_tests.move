@@ -31,7 +31,7 @@ module aptos_framework::function_info_tests {
         let m = string::utf8(b"function_info_tests_helpers");
         let m2 = string::utf8(b"function_info_tests");
         let lhs = function_info::new_function_info_from_address(@aptos_framework, m2, string::utf8(b"lhs"));
-        let rhs = function_info::new_function_info_from_address(@0xcafe, m, string::utf8(b"rhs"));
+        let rhs = function_info::new_function_info_from_address(@aptos_framework, m, string::utf8(b"rhs"));
         assert!(function_info::check_dispatch_type_compatibility(&lhs, &rhs), 0x1);
     }
 
@@ -40,7 +40,7 @@ module aptos_framework::function_info_tests {
         let m = string::utf8(b"function_info_tests_helpers");
         let m2 = string::utf8(b"function_info_tests");
         let lhs = function_info::new_function_info_from_address(@aptos_framework, m2, string::utf8(b"lhs_generic"));
-        let rhs = function_info::new_function_info_from_address(@0xcafe, m, string::utf8(b"rhs_generic"));
+        let rhs = function_info::new_function_info_from_address(@aptos_framework, m, string::utf8(b"rhs_generic"));
         assert!(function_info::check_dispatch_type_compatibility(&lhs, &rhs), 0x1);
     }
 
@@ -59,7 +59,7 @@ module aptos_framework::function_info_tests {
         let m = string::utf8(b"function_info_tests_helpers");
         let m2 = string::utf8(b"function_info_tests");
         let lhs = function_info::new_function_info_from_address(@aptos_framework, m2, string::utf8(b"lhs"));
-        let rhs = function_info::new_function_info_from_address(@0xcafe, m, string::utf8(b"rhs"));
+        let rhs = function_info::new_function_info_from_address(@aptos_framework, m, string::utf8(b"rhs"));
 
         // rhs has less than one arguments.
         assert!(function_info::check_dispatch_type_compatibility(&rhs, &lhs), 0x42);
@@ -71,7 +71,7 @@ module aptos_framework::function_info_tests {
         let m = string::utf8(b"function_info_tests_helpers");
         let m2 = string::utf8(b"function_info_tests");
         let lhs = function_info::new_function_info_from_address(@aptos_framework, m2, string::utf8(b"lhs"));
-        let rhs = function_info::new_function_info_from_address(@0xcafe, m, string::utf8(b"rhs2"));
+        let rhs = function_info::new_function_info_from_address(@aptos_framework, m, string::utf8(b"rhs2"));
         assert!(function_info::check_dispatch_type_compatibility(&lhs, &rhs), 0x42);
     }
 
@@ -81,7 +81,7 @@ module aptos_framework::function_info_tests {
         let m = string::utf8(b"function_info_tests_helpers");
         let m2 = string::utf8(b"function_info_tests");
         let lhs = function_info::new_function_info_from_address(@aptos_framework, m2, string::utf8(b"lhs_generic"));
-        let rhs = function_info::new_function_info_from_address(@0xcafe, m, string::utf8(b"rhs"));
+        let rhs = function_info::new_function_info_from_address(@aptos_framework, m, string::utf8(b"rhs"));
         assert!(function_info::check_dispatch_type_compatibility(&lhs, &rhs), 0x42);
     }
 
@@ -92,7 +92,7 @@ module aptos_framework::function_info_tests {
         let m2 = string::utf8(b"function_info_tests");
 
         let lhs = function_info::new_function_info_from_address(@aptos_framework, m2, string::utf8(b"lhs"));
-        let rhs = function_info::new_function_info_from_address(@0xcafe, m, string::utf8(b"rhs3"));
+        let rhs = function_info::new_function_info_from_address(@aptos_framework, m, string::utf8(b"rhs3"));
 
         // rhs has less than one arguments.
         assert!(function_info::check_dispatch_type_compatibility(&rhs, &lhs), 0x42);

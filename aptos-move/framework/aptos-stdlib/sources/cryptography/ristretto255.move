@@ -36,7 +36,10 @@
 ///      + This would require a storage-friendly RistrettoBasepointTable and an in-memory variant of it too
 ///      + Similar to the CompressedRistretto and RistrettoPoint structs in this module
 ///      + The challenge is that curve25519-dalek's RistrettoBasepointTable is not serializable
-
+///
+/// TODO:
+///  - make fetching the `RistrettoPoint`'s for the basepoint and the hased basepoint instant via natives, by not going
+///    through point decompression
 module aptos_std::ristretto255 {
     use std::features;
     use std::option::Option;
@@ -60,10 +63,14 @@ module aptos_std::ristretto255 {
     /// The maximum size in bytes of a canonically-encoded Ristretto255 point is 32 bytes.
     const MAX_POINT_NUM_BYTES: u64 = 32u64;
 
+    /// The identity point
+    const IDENTITY_POINT: vector<u8> = x"0000000000000000000000000000000000000000000000000000000000000000";
+
     /// The basepoint (generator) of the Ristretto255 group
     const BASE_POINT: vector<u8> = x"e2f2ae0a6abc4e71a884a961c500515f58e30b6aa582dd8db6a65945e08d2d76";
 
     /// The hash of the basepoint of the Ristretto255 group using SHA3_512
+    /// TODO: Can we rename this?
     const HASH_BASE_POINT: vector<u8> = x"8c9240b456a9e6dc65c377a1048d745f94a08cdb7f44cbcd7b46f34048871134";
 
     //
@@ -80,6 +87,8 @@ module aptos_std::ristretto255 {
     const E_TOO_MANY_POINTS_CREATED: u64 = 4;
     /// The native function has not been deployed yet.
     const E_NATIVE_FUN_NOT_AVAILABLE: u64 = 5;
+    /// Non-canonical encoding of a Ristretto255 point
+    const E_NON_CANONICAL_ENCODING: u64 = 6;
 
     //
     // Scalar and point structs
@@ -113,7 +122,7 @@ module aptos_std::ristretto255 {
     /// Returns the identity point as a CompressedRistretto.
     public fun point_identity_compressed(): CompressedRistretto {
         CompressedRistretto {
-            data: x"0000000000000000000000000000000000000000000000000000000000000000"
+            data: IDENTITY_POINT
         }
     }
 
@@ -131,11 +140,21 @@ module aptos_std::ristretto255 {
         }
     }
 
-    /// Returns the hash-to-point result of serializing the basepoint of the Ristretto255 group.
-    /// For use as the random value basepoint in Pedersen commitments
+    /// Returns a Ristretto255 group generator `H` obtained from hashing (the serialization of) the basepoint `G` to the group.
+    /// Useful for using it as the randomness basepoint in Pedersen commitments: i.e., C = v G + r H
+    public fun basepoint_H_compressed(): CompressedRistretto {
+        CompressedRistretto { data: HASH_BASE_POINT }
+    }
+
+    /// Like `hash_to_point_base_compressed` but returns a decompressed point.
+    public fun basepoint_H(): RistrettoPoint {
+        basepoint_H_compressed().point_decompress()
+    }
+
+    #[deprecated]
+    /// Should call `basepoint_H` instead.
     public fun hash_to_point_base(): RistrettoPoint {
-        let comp_res = CompressedRistretto { data: HASH_BASE_POINT };
-        point_decompress(&comp_res)
+        basepoint_H_compressed().point_decompress()
     }
 
     /// Returns the basepoint (generator) of the Ristretto255 group
@@ -149,14 +168,14 @@ module aptos_std::ristretto255 {
 
     /// Multiplies the basepoint (generator) of the Ristretto255 group by a scalar and returns the result.
     /// This call is much faster than `point_mul(&basepoint(), &some_scalar)` because of precomputation tables.
-    public fun basepoint_mul(a: &Scalar): RistrettoPoint {
+    public fun basepoint_mul(self: &Scalar): RistrettoPoint {
         RistrettoPoint {
-            handle: basepoint_mul_internal(a.data)
+            handle: basepoint_mul_internal(self.data)
         }
     }
 
-    /// Creates a new CompressedRistretto point from a sequence of 32 bytes. If those bytes do not represent a valid
-    /// point, returns None.
+    /// Creates a new CompressedRistretto point from a sequence of 32 bytes. Actually attempts decompression to check
+    /// that the bytes represent a valid Ristretto255 point. If not, returns None.
     public fun new_compressed_point_from_bytes(bytes: vector<u8>): Option<CompressedRistretto> {
         if (point_is_canonical_internal(bytes)) {
             std::option::some(CompressedRistretto {
@@ -178,11 +197,31 @@ module aptos_std::ristretto255 {
         }
     }
 
-    /// Given a compressed ristretto point `point`, returns the byte representation of that point
-    public fun compressed_point_to_bytes(point: CompressedRistretto): vector<u8> {
-        point.data
+    /// Without this function, it is not possible to efficiently parse a 32-byte array both as RistrettoPoint and as a
+    /// CompressedRistretto without doing two decompressions.
+    ///
+    /// Note: Due to limitations of Move, this function will abort instead of returning an Option::None, because we cannot
+    /// have tuples as the option's type.
+    public fun new_point_and_compressed_from_bytes(bytes: vector<u8>): (RistrettoPoint, CompressedRistretto) {
+        let (handle, is_canonical) = point_decompress_internal(bytes);
+        if (is_canonical) {
+            (
+                RistrettoPoint { handle },
+                CompressedRistretto {
+                    data: bytes
+                }
+            )
+        } else {
+            abort(std::error::invalid_argument(E_NON_CANONICAL_ENCODING))
+        }
     }
 
+    /// Given a compressed ristretto point `point`, returns the byte representation of that point
+    public fun compressed_point_to_bytes(self: CompressedRistretto): vector<u8> {
+        self.data
+    }
+
+    #[deprecated]
     /// DEPRECATED: Use the more clearly-named `new_point_from_sha2_512`
     ///
     /// Hashes the input to a uniformly-at-random RistrettoPoint via SHA512.
@@ -210,49 +249,55 @@ module aptos_std::ristretto255 {
     }
 
     /// Decompresses a CompressedRistretto from storage into a RistrettoPoint which can be used for fast arithmetic.
-    public fun point_decompress(point: &CompressedRistretto): RistrettoPoint {
+    public fun point_decompress(self: &CompressedRistretto): RistrettoPoint {
         // NOTE: Our CompressedRistretto invariant assures us that every CompressedRistretto in storage is a valid
         // point
-        let (handle, _) = point_decompress_internal(point.data);
+        let (handle, _) = point_decompress_internal(self.data);
         RistrettoPoint { handle }
     }
 
     /// Clones a RistrettoPoint.
-    public fun point_clone(point: &RistrettoPoint): RistrettoPoint {
+    public fun point_clone(self: &RistrettoPoint): RistrettoPoint {
         if(!features::bulletproofs_enabled()) {
             abort(std::error::invalid_state(E_NATIVE_FUN_NOT_AVAILABLE))
         };
 
         RistrettoPoint {
-            handle: point_clone_internal(point.handle)
+            handle: point_clone_internal(self.handle)
         }
     }
 
     /// Compresses a RistrettoPoint to a CompressedRistretto which can be put in storage.
-    public fun point_compress(point: &RistrettoPoint): CompressedRistretto {
+    public fun point_compress(self: &RistrettoPoint): CompressedRistretto {
         CompressedRistretto {
-            data: point_compress_internal(point)
+            data: point_compress_internal(self)
         }
     }
 
     /// Returns the sequence of bytes representin this Ristretto point.
     /// To convert a RistrettoPoint 'p' to bytes, first compress it via `c = point_compress(&p)`, and then call this
     /// function on `c`.
-    public fun point_to_bytes(point: &CompressedRistretto): vector<u8> {
-        point.data
+    public fun point_to_bytes(self: &CompressedRistretto): vector<u8> {
+        self.data
+    }
+
+    /// Serializes a vector of `RistrettoPoint`s into a vector of byte vectors.
+    /// Each point is compressed and then converted to bytes.
+    public fun points_to_bytes(points: &vector<RistrettoPoint>): vector<vector<u8>> {
+        points.map_ref(|p| point_compress_internal(p))
     }
 
     /// Returns a * point.
-    public fun point_mul(point: &RistrettoPoint, a: &Scalar): RistrettoPoint {
+    public fun point_mul(self: &RistrettoPoint, a: &Scalar): RistrettoPoint {
         RistrettoPoint {
-            handle: point_mul_internal(point, a.data, false)
+            handle: point_mul_internal(self, a.data, false)
         }
     }
 
     /// Sets a *= point and returns 'a'.
-    public fun point_mul_assign(point: &mut RistrettoPoint, a: &Scalar): &mut RistrettoPoint {
-        point_mul_internal(point, a.data, true);
-        point
+    public fun point_mul_assign(self: &mut RistrettoPoint, a: &Scalar): &mut RistrettoPoint {
+        point_mul_internal(self, a.data, true);
+        self
     }
 
     /// Returns (a * a_base + b * base_point), where base_point is the Ristretto basepoint encoded in `BASE_POINT`.
@@ -263,46 +308,57 @@ module aptos_std::ristretto255 {
     }
 
     /// Returns a + b
-    public fun point_add(a: &RistrettoPoint, b: &RistrettoPoint): RistrettoPoint {
+    public fun point_add(self: &RistrettoPoint, b: &RistrettoPoint): RistrettoPoint {
         RistrettoPoint {
-            handle: point_add_internal(a, b, false)
+            handle: point_add_internal(self, b, false)
         }
     }
 
     /// Sets a += b and returns 'a'.
-    public fun point_add_assign(a: &mut RistrettoPoint, b: &RistrettoPoint): &mut RistrettoPoint {
-        point_add_internal(a, b, true);
-        a
+    public fun point_add_assign(self: &mut RistrettoPoint, b: &RistrettoPoint): &mut RistrettoPoint {
+        point_add_internal(self, b, true);
+        self
     }
 
     /// Returns a - b
-    public fun point_sub(a: &RistrettoPoint, b: &RistrettoPoint): RistrettoPoint {
+    public fun point_sub(self: &RistrettoPoint, b: &RistrettoPoint): RistrettoPoint {
         RistrettoPoint {
-            handle: point_sub_internal(a, b, false)
+            handle: point_sub_internal(self, b, false)
         }
     }
 
     /// Sets a -= b and returns 'a'.
-    public fun point_sub_assign(a: &mut RistrettoPoint, b: &RistrettoPoint): &mut RistrettoPoint {
-        point_sub_internal(a, b, true);
-        a
+    public fun point_sub_assign(self: &mut RistrettoPoint, b: &RistrettoPoint): &mut RistrettoPoint {
+        point_sub_internal(self, b, true);
+        self
     }
 
     /// Returns -a
-    public fun point_neg(a: &RistrettoPoint): RistrettoPoint {
+    public fun point_neg(self: &RistrettoPoint): RistrettoPoint {
         RistrettoPoint {
-            handle: point_neg_internal(a, false)
+            handle: point_neg_internal(self, false)
         }
     }
 
     /// Sets a = -a, and returns 'a'.
-    public fun point_neg_assign(a: &mut RistrettoPoint): &mut RistrettoPoint {
-        point_neg_internal(a, true);
-        a
+    public fun point_neg_assign(self: &mut RistrettoPoint): &mut RistrettoPoint {
+        point_neg_internal(self, true);
+        self
     }
 
     /// Returns true if the two RistrettoPoints are the same points on the elliptic curve.
-    native public fun point_equals(g: &RistrettoPoint, h: &RistrettoPoint): bool;
+    native public fun point_equals(self: &RistrettoPoint, h: &RistrettoPoint): bool;
+
+    /// Returns true if the two compressed points are the same points on the elliptic curve.
+    /// Recall that serialization is canonical, so testing equality this way is correct.
+    public fun compressed_point_equals(self: &CompressedRistretto, rhs: &CompressedRistretto): bool {
+        self.data == rhs.data
+    }
+
+    /// Returns true if the compressed point is the identity point.
+    public fun is_identity(self: &CompressedRistretto): bool {
+        self.data == IDENTITY_POINT
+    }
 
     /// Computes a double-scalar multiplication, returning a_1 p_1 + a_2 p_2
     /// This function is much faster than computing each a_i p_i using `point_mul` and adding up the results using `point_add`.
@@ -345,6 +401,7 @@ module aptos_std::ristretto255 {
         }
     }
 
+    #[deprecated]
     /// DEPRECATED: Use the more clearly-named `new_scalar_from_sha2_512`
     ///
     /// Hashes the input to a uniformly-at-random Scalar via SHA2-512
@@ -418,8 +475,8 @@ module aptos_std::ristretto255 {
     }
 
     /// Returns true if the given Scalar equals 0.
-    public fun scalar_is_zero(s: &Scalar): bool {
-        s.data == x"0000000000000000000000000000000000000000000000000000000000000000"
+    public fun scalar_is_zero(self: &Scalar): bool {
+        self.data == x"0000000000000000000000000000000000000000000000000000000000000000"
     }
 
     /// Returns 1 as a Scalar.
@@ -430,86 +487,86 @@ module aptos_std::ristretto255 {
     }
 
     /// Returns true if the given Scalar equals 1.
-    public fun scalar_is_one(s: &Scalar): bool {
-        s.data == x"0100000000000000000000000000000000000000000000000000000000000000"
+    public fun scalar_is_one(self: &Scalar): bool {
+        self.data == x"0100000000000000000000000000000000000000000000000000000000000000"
     }
 
     /// Returns true if the two scalars are equal.
-    public fun scalar_equals(lhs: &Scalar, rhs: &Scalar): bool {
-        lhs.data == rhs.data
+    public fun scalar_equals(self: &Scalar, rhs: &Scalar): bool {
+        self.data == rhs.data
     }
 
     /// Returns the inverse s^{-1} mod \ell of a scalar s.
     /// Returns None if s is zero.
-    public fun scalar_invert(s: &Scalar): Option<Scalar> {
-        if (scalar_is_zero(s)) {
+    public fun scalar_invert(self: &Scalar): Option<Scalar> {
+        if (self.scalar_is_zero()) {
             std::option::none<Scalar>()
         } else {
             std::option::some(Scalar {
-                data: scalar_invert_internal(s.data)
+                data: scalar_invert_internal(self.data)
             })
         }
     }
 
     /// Returns the product of the two scalars.
-    public fun scalar_mul(a: &Scalar, b: &Scalar): Scalar {
+    public fun scalar_mul(self: &Scalar, b: &Scalar): Scalar {
         Scalar {
-            data: scalar_mul_internal(a.data, b.data)
+            data: scalar_mul_internal(self.data, b.data)
         }
     }
 
     /// Computes the product of 'a' and 'b' and assigns the result to 'a'.
     /// Returns 'a'.
-    public fun scalar_mul_assign(a: &mut Scalar, b: &Scalar): &mut Scalar {
-        a.data = scalar_mul(a, b).data;
-        a
+    public fun scalar_mul_assign(self: &mut Scalar, b: &Scalar): &mut Scalar {
+        self.data = self.scalar_mul(b).data;
+        self
     }
 
     /// Returns the sum of the two scalars.
-    public fun scalar_add(a: &Scalar, b: &Scalar): Scalar {
+    public fun scalar_add(self: &Scalar, b: &Scalar): Scalar {
         Scalar {
-            data: scalar_add_internal(a.data, b.data)
+            data: scalar_add_internal(self.data, b.data)
         }
     }
 
     /// Computes the sum of 'a' and 'b' and assigns the result to 'a'
     /// Returns 'a'.
-    public fun scalar_add_assign(a: &mut Scalar, b: &Scalar): &mut Scalar {
-        a.data = scalar_add(a, b).data;
-        a
+    public fun scalar_add_assign(self: &mut Scalar, b: &Scalar): &mut Scalar {
+        self.data = self.scalar_add(b).data;
+        self
     }
 
     /// Returns the difference of the two scalars.
-    public fun scalar_sub(a: &Scalar, b: &Scalar): Scalar {
+    public fun scalar_sub(self: &Scalar, b: &Scalar): Scalar {
         Scalar {
-            data: scalar_sub_internal(a.data, b.data)
+            data: scalar_sub_internal(self.data, b.data)
         }
     }
 
     /// Subtracts 'b' from 'a' and assigns the result to 'a'.
     /// Returns 'a'.
-    public fun scalar_sub_assign(a: &mut Scalar, b: &Scalar): &mut Scalar {
-        a.data = scalar_sub(a, b).data;
-        a
+    public fun scalar_sub_assign(self: &mut Scalar, b: &Scalar): &mut Scalar {
+        self.data = self.scalar_sub(b).data;
+        self
     }
 
     /// Returns the negation of 'a': i.e., $(0 - a) \mod \ell$.
-    public fun scalar_neg(a: &Scalar): Scalar {
+    public fun scalar_neg(self: &Scalar): Scalar {
         Scalar {
-            data: scalar_neg_internal(a.data)
+            data: scalar_neg_internal(self.data)
         }
     }
 
     /// Replaces 'a' by its negation.
     ///  Returns 'a'.
-    public fun scalar_neg_assign(a: &mut Scalar): &mut Scalar {
-        a.data = scalar_neg(a).data;
-        a
+    public fun scalar_neg_assign(self: &mut Scalar): &mut Scalar {
+        self.data = self.scalar_neg().data;
+        self
     }
 
     /// Returns the byte-representation of the scalar.
-    public fun scalar_to_bytes(s: &Scalar): vector<u8> {
-        s.data
+    public fun scalar_to_bytes(self: &Scalar): vector<u8> {
+        self.data
     }
 
     //
@@ -595,7 +652,7 @@ module aptos_std::ristretto255 {
     public fun random_point(): RistrettoPoint {
         let s = random_scalar();
 
-        basepoint_mul(&s)
+        s.basepoint_mul()
     }
 
     //

@@ -5,11 +5,11 @@ module aptos_framework::simple_token_fa_tests {
         supply, create_store, create_test_store, remove_store, is_frozen, upgrade_to_concurrent, Metadata, TestToken
     };
     use aptos_framework::object;
-    use 0xcafe::simple_token;
+    use aptos_framework::simple_token;
     use std::option;
     use std::features;
 
-    #[test(creator = @0xcafe)]
+    #[test(creator = @aptos_framework)]
     fun test_create_and_remove_store(creator: &signer) {
         let (creator_ref, metadata) = create_test_token(creator);
         init_test_metadata(&creator_ref);
@@ -21,7 +21,7 @@ module aptos_framework::simple_token_fa_tests {
         remove_store(&delete_ref);
     }
 
-    #[test(creator = @0xcafe, aaron = @0xface)]
+    #[test(creator = @aptos_framework, aaron = @0xface)]
     fun test_transfer_with_ref(
         creator: &signer,
         aaron: &signer,
@@ -45,7 +45,7 @@ module aptos_framework::simple_token_fa_tests {
         assert!(!!is_frozen(aaron_store), 4);
     }
 
-    #[test(creator = @0xcafe)]
+    #[test(creator = @aptos_framework)]
     fun test_merge_and_exact(creator: &signer) {
         let (creator_ref, _test_token) = create_test_token(creator);
         let (mint_ref, _transfer_ref, burn_ref, _mutate_metadata_ref) = init_test_metadata(&creator_ref);
@@ -62,7 +62,7 @@ module aptos_framework::simple_token_fa_tests {
         burn_ref.burn(cash);
     }
 
-    #[test(fx = @aptos_framework, creator = @0xcafe)]
+    #[test(fx = @aptos_framework, creator = @aptos_framework)]
     fun test_fungible_asset_upgrade(
         fx: &signer,
         creator: &signer
@@ -93,7 +93,7 @@ module aptos_framework::simple_token_fa_tests {
         transfer_ref.deposit_with_ref(creator_store, fb);
     }
 
-    #[test(creator = @0xcafe)]
+    #[test(creator = @aptos_framework)]
     #[expected_failure(abort_code = 0x50003, location = aptos_framework::fungible_asset)]
     fun test_mint_to_frozen(
         creator: &signer

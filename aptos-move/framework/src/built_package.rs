@@ -109,6 +109,9 @@ pub struct BuildOptions {
     pub skip_attribute_checks: bool,
     #[clap(long)]
     pub check_test_code: bool,
+    /// When true, compiles with test mode enabled, including #[test_only] code in the bytecode.
+    #[clap(long)]
+    pub with_test_mode: bool,
     #[clap(skip)]
     pub known_attributes: BTreeSet<String>,
     #[clap(skip)]
@@ -138,6 +141,7 @@ impl Default for BuildOptions {
             language_version: None,
             skip_attribute_checks: false,
             check_test_code: true,
+            with_test_mode: false,
             known_attributes: extended_checks::get_all_attribute_names().clone(),
             experiments: vec![],
         }
@@ -316,7 +320,7 @@ impl BuiltPackage {
             generate_move_model: true,
             full_model_generation: options.check_test_code,
             install_dir: options.install_dir.clone(),
-            test_mode: false,
+            test_mode: options.with_test_mode,
             override_std: options.override_std.clone(),
             force_recompilation: false,
             fetch_deps_only: false,

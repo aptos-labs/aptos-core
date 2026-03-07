@@ -1,5 +1,5 @@
 #[test_only]
-module 0xcafe::permissioned_token {
+module aptos_framework::permissioned_token {
     use aptos_framework::fungible_asset::{FungibleAsset, TransferRef};
     use aptos_framework::dispatchable_fungible_asset;
     use aptos_framework::object::{ConstructorRef, Object};
@@ -16,7 +16,7 @@ module 0xcafe::permissioned_token {
     }
 
     public fun initialize(account: &signer, constructor_ref: &ConstructorRef, allowed_sender: vector<address>) {
-        assert!(signer::address_of(account) == @0xcafe, 1);
+        assert!(signer::address_of(account) == @aptos_framework, 1);
         move_to<AllowlistStore>(account, AllowlistStore { allowed_sender });
 
         let withdraw = function_info::new_function_info(
@@ -34,8 +34,8 @@ module 0xcafe::permissioned_token {
     }
 
     public fun add_to_allow_list(account: &signer, new_address: address) acquires AllowlistStore {
-        assert!(signer::address_of(account) == @0xcafe, 1);
-        let allowed_sender = borrow_global_mut<AllowlistStore>(@0xcafe);
+        assert!(signer::address_of(account) == @aptos_framework, 1);
+        let allowed_sender = borrow_global_mut<AllowlistStore>(@aptos_framework);
         if(!allowed_sender.allowed_sender.contains(&new_address)) {
             allowed_sender.allowed_sender.push_back(new_address);
         }
@@ -46,7 +46,7 @@ module 0xcafe::permissioned_token {
         amount: u64,
         transfer_ref: &TransferRef,
     ): FungibleAsset acquires AllowlistStore {
-        assert!(borrow_global<AllowlistStore>(@0xcafe).allowed_sender.contains(&store.object_address()), EWITHDRAW_NOT_ALLOWED);
+        assert!(borrow_global<AllowlistStore>(@aptos_framework).allowed_sender.contains(&store.object_address()), EWITHDRAW_NOT_ALLOWED);
 
         transfer_ref.withdraw_with_ref(store, amount)
     }

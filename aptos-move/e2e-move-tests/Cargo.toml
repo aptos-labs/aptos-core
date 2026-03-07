@@ -44,6 +44,7 @@ rstest = { workspace = true }
 serde = { workspace = true }
 sha3 = { workspace = true }
 test-case = { workspace = true }
+thousands = { workspace = true }
 
 [dev-dependencies]
 aptos-vm-types = { workspace = true }
@@ -58,3 +59,4 @@ doctest = false
 [features]
 default = []
 profiling = ["aptos-vm/profiling"]
+move-harness-with-test-only = ["aptos-cached-packages/move-harness-with-test-only"]
