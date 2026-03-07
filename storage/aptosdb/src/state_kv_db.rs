@@ -4,10 +4,11 @@
 #![forbid(unsafe_code)]
 
 use crate::{
-    db_options::gen_state_kv_shard_cfds,
+    db_options::{gen_hot_state_kv_shard_cfds, gen_state_kv_shard_cfds},
     metrics::OTHER_TIMERS_SECONDS,
     schema::{
         db_metadata::{DbMetadataKey, DbMetadataSchema, DbMetadataValue},
+        hot_state_value_by_key_hash::{HotStateKvValue, HotStateValueByKeyHashSchema},
         state_value_by_key_hash::StateValueByKeyHashSchema,
     },
     utils::{
@@ -16,7 +17,7 @@ use crate::{
     },
 };
 use aptos_config::config::{RocksdbConfig, StorageDirPaths};
-use aptos_crypto::hash::CryptoHash;
+use aptos_crypto::{hash::CryptoHash, HashValue};
 use aptos_experimental_runtimes::thread_manager::THREAD_MANAGER;
 use aptos_logger::prelude::info;
 use aptos_metrics_core::TimerHelper;
@@ -27,7 +28,13 @@ use aptos_schemadb::{
 };
 use aptos_storage_interface::Result;
 use aptos_types::{
-    state_store::{state_key::StateKey, state_value::StateValue, NUM_STATE_SHARDS},
+    state_store::{
+        hot_state::{LRUEntry, THotStateSlot},
+        state_key::StateKey,
+        state_slot::StateSlot,
+        state_value::StateValue,
+        NUM_STATE_SHARDS,
+    },
     transaction::Version,
 };
 use rayon::prelude::*;
@@ -115,6 +122,7 @@ impl StateKvDb {
             env,
             block_cache,
             readonly,
+            is_hot,
             delete_on_restart,
         )?);
 
@@ -314,6 +322,7 @@ impl StateKvDb {
             env,
             block_cache,
             readonly,
+            is_hot,
             delete_on_restart,
         )
     }
@@ -325,6 +334,7 @@ impl StateKvDb {
         env: Option<&Env>,
         block_cache: Option<&Cache>,
         readonly: bool,
+        is_hot: bool,
         delete_on_restart: bool,
     ) -> Result<DB> {
         if delete_on_restart {
@@ -334,7 +344,11 @@ impl StateKvDb {
         }
 
         let rocksdb_opts = gen_rocksdb_options(state_kv_db_config, env, readonly);
-        let cfds = gen_state_kv_shard_cfds(state_kv_db_config, block_cache);
+        let cfds = if is_hot {
+            gen_hot_state_kv_shard_cfds(state_kv_db_config, block_cache)
+        } else {
+            gen_state_kv_shard_cfds(state_kv_db_config, block_cache)
+        };
 
         if readonly {
             DB::open_cf_readonly(rocksdb_opts, path, name, cfds)
@@ -375,5 +389,92 @@ impl StateKvDb {
             .next()
             .transpose()?
             .and_then(|((_, version), value_opt)| value_opt.map(|value| (version, value))))
+    }
+
+    /// Loads the latest hot state entries from the hot state KV DB.
+    ///
+    /// For each key_hash, only the latest entry (highest hot_since_version) is considered.
+    /// Evicted keys (value = `None`) are filtered out.
+    ///
+    /// Returns per-shard vectors of `(StateKey, StateSlot)` sorted by `hot_since_version`
+    /// ascending, with LRU prev/next pointers already wired up.
+    pub(crate) fn load_all_hot_state_entries(
+        &self,
+    ) -> Result<[Vec<(StateKey, StateSlot)>; NUM_STATE_SHARDS]> {
+        let _timer =
+            OTHER_TIMERS_SECONDS.timer_with(&["hot__state_kv_db__load_all_hot_state_entries"]);
+
+        let results: Vec<Vec<(StateKey, StateSlot)>> = (0..NUM_STATE_SHARDS)
+            .into_par_iter()
+            .map(|shard_id| {
+                let mut entries = Vec::new();
+                let mut iter = self
+                    .db_shard(shard_id)
+                    .iter::<HotStateValueByKeyHashSchema>()
+                    .expect("Failed to create hot state KV iterator");
+                iter.seek_to_first();
+
+                let mut prev_key_hash: Option<HashValue> = None;
+                while let Some(Ok(((key_hash, hot_since_version), value_opt))) = iter.next() {
+                    // Since keys are (key_hash, !version) and entries are sorted ascending
+                    // by encoded key, for the same key_hash the highest version comes first.
+                    // We only want the first (latest) entry per key_hash.
+                    if prev_key_hash == Some(key_hash) {
+                        continue;
+                    }
+                    prev_key_hash = Some(key_hash);
+
+                    // None means evicted — skip.
+                    let entry = match value_opt {
+                        Some(e) => e,
+                        None => continue,
+                    };
+
+                    let slot = match entry.value {
+                        HotStateKvValue::Occupied {
+                            value_version,
+                            value,
+                        } => StateSlot::HotOccupied {
+                            value_version,
+                            value,
+                            hot_since_version,
+                            lru_info: LRUEntry::uninitialized(),
+                        },
+                        HotStateKvValue::Vacant => StateSlot::HotVacant {
+                            hot_since_version,
+                            lru_info: LRUEntry::uninitialized(),
+                        },
+                    };
+
+                    entries.push((entry.state_key, slot));
+                }
+
+                // Sort by hot_since_version ascending for LRU reconstruction.
+                entries.sort_by_key(|(_, slot)| slot.expect_hot_since_version());
+
+                // Wire up LRU prev/next pointers.
+                // Convention: prev = newer (toward head), next = older (toward tail).
+                // Sorted ascending means index 0 is oldest (tail), last is newest (head).
+                let len = entries.len();
+                for i in 0..len {
+                    let prev_key = if i + 1 < len {
+                        Some(entries[i + 1].0.clone())
+                    } else {
+                        None // newest — no prev
+                    };
+                    let next_key = if i > 0 {
+                        Some(entries[i - 1].0.clone())
+                    } else {
+                        None // oldest — no next
+                    };
+                    entries[i].1.set_prev(prev_key);
+                    entries[i].1.set_next(next_key);
+                }
+
+                entries
+            })
+            .collect();
+
+        Ok(results.try_into().expect("Known to be NUM_STATE_SHARDS"))
     }
 }
