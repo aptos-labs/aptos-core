@@ -1001,7 +1001,7 @@ module aptos_framework::coin {
             symbol,
             decimals,
             monitor_supply,
-            false
+            false,
         )
     }
 
@@ -1020,7 +1020,7 @@ module aptos_framework::coin {
             symbol,
             decimals,
             monitor_supply,
-            true
+            true,
         )
     }
 
@@ -1030,7 +1030,7 @@ module aptos_framework::coin {
         symbol: string::String,
         decimals: u8,
         monitor_supply: bool,
-        parallelizable: bool
+        parallelizable: bool,
     ): (BurnCapability<CoinType>, FreezeCapability<CoinType>, MintCapability<CoinType>) acquires CoinInfo, CoinConversionMap {
         let account_addr = signer::address_of(account);
         assert_signer_has_permission<CoinType>(account);
@@ -1076,6 +1076,7 @@ module aptos_framework::coin {
         )
     }
 
+    /// Same as `initialize_with_parallelizable_supply` but enforces a hard cap on total supply.
     /// "Merges" the two given coins.  The coin passed in as `dst_coin` will have a value equal
     /// to the sum of the two tokens (`dst_coin` and `source_coin`).
     public fun merge<CoinType>(

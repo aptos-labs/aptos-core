@@ -304,6 +304,11 @@ module aptos_framework::genesis {
             create_initialize_validator(aptos_framework, validator, use_staking_contract);
         });
 
+        // Lock in the inflation budget: MAX_APT_SUPPLY - genesis_supply.
+        // Must be called after all genesis minting is complete so the budget correctly
+        // reflects the remaining headroom for staking rewards.
+        aptos_coin::initialize_inflation_budget(aptos_framework);
+
         // Destroy the aptos framework account's ability to mint coins now that we're done with setting up the initial
         // validators.
         aptos_coin::destroy_mint_cap(aptos_framework);
