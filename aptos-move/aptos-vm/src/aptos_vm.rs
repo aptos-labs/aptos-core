@@ -2197,6 +2197,9 @@ impl AptosVM {
             output.set_trace(trace_recorder.finish());
         }
 
+        // Write accumulated metrics to file if metrics collection is enabled.
+        move_vm_runtime::metrics_collector::write_and_clear_metrics_if_enabled();
+
         (vm_status, output)
     }
 
