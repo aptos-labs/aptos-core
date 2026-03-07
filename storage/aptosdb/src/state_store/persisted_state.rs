@@ -10,6 +10,7 @@ use aptos_storage_interface::state_store::{
     state::State, state_summary::StateSummary, state_view::hot_state_view::HotStateView,
     state_with_summary::StateWithSummary,
 };
+use aptos_types::state_store::{state_key::StateKey, state_slot::StateSlot, NUM_STATE_SHARDS};
 use std::sync::Arc;
 
 #[derive(Clone)]
@@ -24,6 +25,21 @@ impl PersistedState {
     pub fn new_empty(config: HotStateConfig) -> Self {
         let state = State::new_empty(config);
         let hot_state = Arc::new(HotState::new(state, config));
+        let summary = Arc::new(Mutex::new(StateSummary::new_empty(config)));
+        Self { hot_state, summary }
+    }
+
+    /// Create a `PersistedState` with pre-loaded hot state data.
+    pub fn new_with_hot_state_data(
+        state: State,
+        config: HotStateConfig,
+        shard_data: [(
+            Vec<(StateKey, StateSlot)>,
+            Option<StateKey>,
+            Option<StateKey>,
+        ); NUM_STATE_SHARDS],
+    ) -> Self {
+        let hot_state = Arc::new(HotState::new_with_data(state, config, shard_data));
         let summary = Arc::new(Mutex::new(StateSummary::new_empty(config)));
         Self { hot_state, summary }
     }
