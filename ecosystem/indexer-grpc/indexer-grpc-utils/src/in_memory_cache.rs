@@ -400,7 +400,7 @@ mod tests {
         storage_format: StorageFormat,
         size: usize,
     ) -> redis::Value {
-        redis::Value::Bulk(
+        redis::Value::Array(
             (starting_version..starting_version + size as u64)
                 .map(|e| {
                     let txn = Transaction {
@@ -409,7 +409,7 @@ mod tests {
                         ..Default::default()
                     };
                     let cache_entry = CacheEntry::from_transaction(txn, storage_format);
-                    redis::Value::Data(cache_entry.into_inner())
+                    redis::Value::BulkString(cache_entry.into_inner())
                 })
                 .collect(),
         )

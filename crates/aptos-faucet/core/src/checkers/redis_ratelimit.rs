@@ -96,6 +96,7 @@ impl RedisRatelimitCheckerConfig {
                 db: self.database_number,
                 username: self.database_user.clone(),
                 password: self.database_password.clone(),
+                protocol: redis::ProtocolVersion::default(),
             },
         }
     }
@@ -275,7 +276,7 @@ impl CheckerTrait for RedisRatelimitChecker {
                         .atomic()
                         .incr(&key, 1)
                         // Expire at the end of the day roughly.
-                        .expire(&key, seconds_until_next_day as usize)
+                        .expire(&key, seconds_until_next_day as i64)
                         // Only set the expiration if one isn't already set.
                         // Only works with Redis 7 sadly.
                         // .arg("NX")

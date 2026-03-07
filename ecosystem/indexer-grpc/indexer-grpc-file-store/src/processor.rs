@@ -48,7 +48,7 @@ impl Processor {
                     redis_main_instance_address.0
                 )
             })?
-            .get_tokio_connection_manager()
+            .get_connection_manager()
             .await
             .with_context(|| {
                 format!(

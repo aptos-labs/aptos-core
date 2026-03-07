@@ -164,7 +164,7 @@ impl RunnableConfig for IndexerGrpcDataServiceConfig {
             &self.redis_read_replica_address.0
         );
         let redis_conn = redis::Client::open(self.redis_read_replica_address.0.clone())?
-            .get_tokio_connection_manager()
+            .get_connection_manager()
             .await?;
         println!(">>>> Redis connection established");
         // InMemoryCache.
