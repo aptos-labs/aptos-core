@@ -53,6 +53,10 @@ pub fn create_option_u64(enum_option_enabled: bool, value: Option<u64>) -> Value
  *
  **************************************************************************************************/
 /// Rust implementation of Move's `native public fun to_bytes<T>(&T): vector<u8>`
+///
+/// Serializes the value reference `&T` into BCS bytes.
+/// Returns a vector of u8 bytes representing the serialized value.
+/// Aborts if serialization fails.
 fn native_to_bytes(
     context: &mut SafeNativeContext,
     ty_args: &[Type],
@@ -86,16 +90,13 @@ fn native_to_bytes(
         }
     };
 
-    // TODO(#14175): Reading the reference performs a deep copy, and we can
-    //               implement it in a more efficient way.
-    let val = ref_to_val.read_ref()?;
-
+    // Use `serialize_ref` to avoid deep copying the value before serialization.
     let function_value_extension = context.function_value_extension();
     let max_value_nest_depth = context.max_value_nest_depth();
     let serialized_value = match ValueSerDeContext::new(max_value_nest_depth)
         .with_legacy_signer()
         .with_func_args_deserialization(&function_value_extension)
-        .serialize(&val, &layout)?
+        .serialize_ref(&ref_to_val, &layout)?
     {
         Some(serialized_value) => serialized_value,
         None => {
@@ -118,6 +119,10 @@ fn native_to_bytes(
  *   cost is charged.
  *
  **************************************************************************************************/
+/// Rust implementation of Move's `native public fun serialized_size<T>(&T): u64`
+///
+/// Returns the size of the serialized value in bytes.
+/// Aborts if serialization fails (e.g., due to cycle detection or depth limit).
 fn native_serialized_size(
     context: &mut SafeNativeContext,
     ty_args: &[Type],
@@ -150,9 +155,7 @@ fn serialized_size_impl(
     reference: Reference,
     ty: &Type,
 ) -> PartialVMResult<usize> {
-    // TODO(#14175): Reading the reference performs a deep copy, and we can
-    //               implement it in a more efficient way.
-    let value = reference.read_ref()?;
+    // Use `serialized_size_ref` to avoid deep copying the value.
     let ty_layout = context.type_to_type_layout(ty)?;
 
     let function_value_extension = context.function_value_extension();
@@ -161,7 +164,7 @@ fn serialized_size_impl(
         .with_legacy_signer()
         .with_func_args_deserialization(&function_value_extension)
         .with_delayed_fields_serde()
-        .serialized_size(&value, &ty_layout)
+        .serialized_size_ref(&reference, &ty_layout)
 }
 
 fn native_constant_serialized_size(
