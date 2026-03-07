@@ -12,7 +12,9 @@ use aptos_crypto::hash::CryptoHash;
 use aptos_schemadb::{batch::WriteBatch, ReadOptions};
 use aptos_temppath::TempPath;
 use aptos_types::{
-    state_store::{state_key::StateKey, state_value::StateValue, NUM_STATE_SHARDS},
+    state_store::{
+        state_key::StateKey, state_slot::StateSlot, state_value::StateValue, NUM_STATE_SHARDS,
+    },
     transaction::Version,
 };
 
@@ -386,4 +388,349 @@ fn test_put_hot_state_kv_updates_integration() {
         .unwrap()
         .unwrap();
     assert!(result.is_none(), "Eviction should be None");
+}
+
+// ===== Loading tests =====
+
+fn create_persistent_hot_state_kv_db(path: &TempPath) -> StateKvDb {
+    StateKvDb::new(
+        &StorageDirPaths::from_path(path.path()),
+        RocksdbConfig::default(),
+        None,
+        None,
+        /* readonly = */ false,
+        /* is_hot = */ true,
+        /* delete_on_restart = */ false,
+    )
+    .unwrap()
+}
+
+/// Write a hot state entry to the DB directly.
+fn write_entry(
+    db: &StateKvDb,
+    key: &StateKey,
+    hot_since_version: Version,
+    value: &HotStateKvValue,
+) {
+    let shard_id = key.get_shard_id();
+    let entry = HotStateKvEntry {
+        state_key: key.clone(),
+        value: value.clone(),
+    };
+    let mut batch = db.db_shard(shard_id).new_native_batch();
+    batch
+        .put::<HotStateValueByKeyHashSchema>(
+            &(CryptoHash::hash(key), hot_since_version),
+            &Some(entry),
+        )
+        .unwrap();
+    db.db_shard(shard_id).write_schemas(batch).unwrap();
+}
+
+/// Write an eviction marker to the DB.
+fn write_eviction(db: &StateKvDb, key: &StateKey, eviction_version: Version) {
+    let shard_id = key.get_shard_id();
+    let mut batch = db.db_shard(shard_id).new_native_batch();
+    batch
+        .put::<HotStateValueByKeyHashSchema>(&(CryptoHash::hash(key), eviction_version), &None)
+        .unwrap();
+    db.db_shard(shard_id).write_schemas(batch).unwrap();
+}
+
+#[test]
+fn test_load_empty_db() {
+    let tmp = TempPath::new();
+    let db = create_persistent_hot_state_kv_db(&tmp);
+
+    let entries = db.load_all_hot_state_entries().unwrap();
+    for shard in &entries {
+        assert!(shard.is_empty());
+    }
+}
+
+#[test]
+fn test_load_round_trip() {
+    let tmp = TempPath::new();
+    let db = create_persistent_hot_state_kv_db(&tmp);
+
+    let key1 = make_state_key(1);
+    let val1 = make_state_value(1);
+    let key2 = make_state_key(2);
+
+    // Insert key1: occupied at hot_since_version=10, value_version=5
+    write_entry(&db, &key1, 10, &HotStateKvValue::Occupied {
+        value_version: 5,
+        value: val1.clone(),
+    });
+
+    // Insert key2: vacant at hot_since_version=20
+    write_entry(&db, &key2, 20, &HotStateKvValue::Vacant);
+
+    let entries = db.load_all_hot_state_entries().unwrap();
+
+    // Find key1
+    let shard1 = key1.get_shard_id();
+    let found1 = entries[shard1]
+        .iter()
+        .find(|(k, _)| k == &key1)
+        .expect("key1 should be loaded");
+    match &found1.1 {
+        StateSlot::HotOccupied {
+            value_version,
+            value,
+            hot_since_version,
+            ..
+        } => {
+            assert_eq!(*value_version, 5);
+            assert_eq!(*value, val1);
+            assert_eq!(*hot_since_version, 10);
+        },
+        _ => panic!("Expected HotOccupied for key1"),
+    }
+
+    // Find key2
+    let shard2 = key2.get_shard_id();
+    let found2 = entries[shard2]
+        .iter()
+        .find(|(k, _)| k == &key2)
+        .expect("key2 should be loaded");
+    match &found2.1 {
+        StateSlot::HotVacant {
+            hot_since_version, ..
+        } => {
+            assert_eq!(*hot_since_version, 20);
+        },
+        _ => panic!("Expected HotVacant for key2"),
+    }
+}
+
+#[test]
+fn test_load_eviction_filtering() {
+    let tmp = TempPath::new();
+    let db = create_persistent_hot_state_kv_db(&tmp);
+
+    let key = make_state_key(10);
+
+    // Insert at V10, evict at V20
+    write_entry(&db, &key, 10, &HotStateKvValue::Occupied {
+        value_version: 5,
+        value: make_state_value(10),
+    });
+    write_eviction(&db, &key, 20);
+
+    let entries = db.load_all_hot_state_entries().unwrap();
+    let shard = key.get_shard_id();
+    assert!(
+        !entries[shard].iter().any(|(k, _)| k == &key),
+        "Evicted key should not be present"
+    );
+}
+
+#[test]
+fn test_load_reinsertion_after_eviction() {
+    let tmp = TempPath::new();
+    let db = create_persistent_hot_state_kv_db(&tmp);
+
+    let key = make_state_key(11);
+    let val_v3 = make_state_value(33);
+
+    // Insert at V10
+    write_entry(&db, &key, 10, &HotStateKvValue::Occupied {
+        value_version: 5,
+        value: make_state_value(11),
+    });
+    // Evict at V20
+    write_eviction(&db, &key, 20);
+    // Re-insert at V30
+    write_entry(&db, &key, 30, &HotStateKvValue::Occupied {
+        value_version: 25,
+        value: val_v3.clone(),
+    });
+
+    let entries = db.load_all_hot_state_entries().unwrap();
+    let shard = key.get_shard_id();
+    let found = entries[shard]
+        .iter()
+        .find(|(k, _)| k == &key)
+        .expect("Re-inserted key should be present");
+
+    match &found.1 {
+        StateSlot::HotOccupied {
+            value_version,
+            value,
+            hot_since_version,
+            ..
+        } => {
+            assert_eq!(*hot_since_version, 30);
+            assert_eq!(*value_version, 25);
+            assert_eq!(*value, val_v3);
+        },
+        _ => panic!("Expected HotOccupied"),
+    }
+}
+
+#[test]
+fn test_load_lru_reconstruction() {
+    use aptos_types::state_store::hot_state::THotStateSlot;
+
+    let tmp = TempPath::new();
+    let db = create_persistent_hot_state_kv_db(&tmp);
+
+    // Create keys that all land in the same shard for easier testing.
+    // Try seeds until we find 4 that share a shard.
+    let mut same_shard_keys = Vec::new();
+    let target_shard = make_state_key(0).get_shard_id();
+    for seed in 0u8..=255 {
+        let key = make_state_key(seed);
+        if key.get_shard_id() == target_shard {
+            same_shard_keys.push((seed, key));
+        }
+        if same_shard_keys.len() == 4 {
+            break;
+        }
+    }
+    assert!(same_shard_keys.len() == 4, "Need 4 keys in the same shard");
+
+    // Insert with hot_since_versions: 10, 5, 20, 15
+    let versions = [10u64, 5, 20, 15];
+    for (i, &(seed, ref key)) in same_shard_keys.iter().enumerate() {
+        write_entry(&db, key, versions[i], &HotStateKvValue::Occupied {
+            value_version: versions[i],
+            value: make_state_value(seed),
+        });
+    }
+
+    let entries = db.load_all_hot_state_entries().unwrap();
+    let shard_entries = &entries[target_shard];
+
+    // Should be sorted by hot_since_version ascending: 5, 10, 15, 20
+    let hsv: Vec<Version> = shard_entries
+        .iter()
+        .map(|(_, slot)| slot.expect_hot_since_version())
+        .collect();
+    assert_eq!(hsv, vec![5, 10, 15, 20], "Should be sorted ascending");
+
+    // Verify LRU pointers.
+    // Index 0 (oldest, hsv=5): prev=Some(key@hsv=10), next=None
+    // Index 1 (hsv=10):        prev=Some(key@hsv=15), next=Some(key@hsv=5)
+    // Index 2 (hsv=15):        prev=Some(key@hsv=20), next=Some(key@hsv=10)
+    // Index 3 (newest, hsv=20):prev=None,             next=Some(key@hsv=15)
+    let len = shard_entries.len();
+    for i in 0..len {
+        let (_, slot) = &shard_entries[i];
+        if i == len - 1 {
+            // Newest — no prev (no newer entry)
+            assert!(slot.prev().is_none(), "Newest should have no prev");
+        } else {
+            assert_eq!(
+                slot.prev(),
+                Some(&shard_entries[i + 1].0),
+                "prev should point to entry at index {}",
+                i + 1
+            );
+        }
+        if i == 0 {
+            // Oldest — no next (no older entry)
+            assert!(slot.next().is_none(), "Oldest should have no next");
+        } else {
+            assert_eq!(
+                slot.next(),
+                Some(&shard_entries[i - 1].0),
+                "next should point to entry at index {}",
+                i - 1
+            );
+        }
+    }
+}
+
+#[test]
+fn test_load_only_latest_version_per_key() {
+    let tmp = TempPath::new();
+    let db = create_persistent_hot_state_kv_db(&tmp);
+
+    let key = make_state_key(50);
+    let val_old = make_state_value(50);
+    let val_new = make_state_value(51);
+
+    // Insert at V1 then refresh at V2
+    write_entry(&db, &key, 1, &HotStateKvValue::Occupied {
+        value_version: 1,
+        value: val_old,
+    });
+    write_entry(&db, &key, 2, &HotStateKvValue::Occupied {
+        value_version: 1,
+        value: val_new.clone(),
+    });
+
+    let entries = db.load_all_hot_state_entries().unwrap();
+    let shard = key.get_shard_id();
+
+    // Should have exactly one entry for this key, at hot_since_version=2
+    let matches: Vec<_> = entries[shard].iter().filter(|(k, _)| k == &key).collect();
+    assert_eq!(matches.len(), 1, "Should deduplicate to latest version");
+    assert_eq!(matches[0].1.expect_hot_since_version(), 2);
+    match &matches[0].1 {
+        StateSlot::HotOccupied { value, .. } => {
+            assert_eq!(*value, val_new);
+        },
+        _ => panic!("Expected HotOccupied"),
+    }
+}
+
+#[test]
+fn test_hot_state_from_loaded_entries() {
+    use crate::state_store::hot_state::HotState;
+    use aptos_config::config::HotStateConfig;
+    use aptos_storage_interface::state_store::state::State;
+
+    let tmp = TempPath::new();
+    let db = create_persistent_hot_state_kv_db(&tmp);
+
+    let key1 = make_state_key(100);
+    let val1 = make_state_value(100);
+    let key2 = make_state_key(200);
+
+    write_entry(&db, &key1, 10, &HotStateKvValue::Occupied {
+        value_version: 5,
+        value: val1.clone(),
+    });
+    write_entry(&db, &key2, 20, &HotStateKvValue::Vacant);
+
+    let entries = db.load_all_hot_state_entries().unwrap();
+
+    let config = HotStateConfig {
+        max_items_per_shard: 1000,
+        refresh_interval_versions: 100,
+        delete_on_restart: false,
+        compute_root_hash: false,
+    };
+
+    // Clone entries for HotState (State takes ownership conceptually, HotState needs a copy)
+    let entries_for_hot_state: [Vec<(StateKey, StateSlot)>; NUM_STATE_SHARDS] =
+        std::array::from_fn(|i| entries[i].clone());
+
+    let state = State::new_from_hot_state_entries(Some(20), entries, config);
+    assert_eq!(state.next_version(), 21);
+
+    let hot_state = HotState::new_with_base(state, config, entries_for_hot_state);
+    let (view, committed_state) = hot_state.get_committed();
+    assert_eq!(committed_state.next_version(), 21);
+
+    // key1 should be found via the HotStateView
+    let slot1 = view.get_state_slot(&key1);
+    assert!(slot1.is_some(), "key1 should be in hot state");
+    let slot1 = slot1.unwrap();
+    assert!(slot1.is_hot());
+    assert_eq!(slot1.as_state_value_opt(), Some(&val1));
+
+    // key2 should be found as HotVacant
+    let slot2 = view.get_state_slot(&key2);
+    assert!(slot2.is_some(), "key2 should be in hot state");
+    let slot2 = slot2.unwrap();
+    assert!(slot2.is_hot());
+    assert!(slot2.as_state_value_opt().is_none());
+
+    // unknown key should not be found
+    let unknown = make_state_key(255);
+    assert!(view.get_state_slot(&unknown).is_none());
 }
