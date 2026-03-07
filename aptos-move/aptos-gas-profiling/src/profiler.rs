@@ -38,6 +38,7 @@ pub struct GasProfiler<G> {
     intrinsic_cost: Option<InternalGas>,
     keyless_cost: Option<InternalGas>,
     slh_dsa_sha2_128s_cost: Option<InternalGas>,
+    encrypted_txn_cost: Option<InternalGas>,
     dependencies: Vec<Dependency>,
     frames: Vec<CallFrame>,
     transaction_transient: Option<InternalGas>,
@@ -96,6 +97,7 @@ impl<G> GasProfiler<G> {
             intrinsic_cost: None,
             keyless_cost: None,
             slh_dsa_sha2_128s_cost: None,
+            encrypted_txn_cost: None,
             dependencies: vec![],
             frames: vec![CallFrame::new_script()],
             transaction_transient: None,
@@ -117,6 +119,7 @@ impl<G> GasProfiler<G> {
             intrinsic_cost: None,
             keyless_cost: None,
             slh_dsa_sha2_128s_cost: None,
+            encrypted_txn_cost: None,
             dependencies: vec![],
             frames: vec![CallFrame::new_function(module_id, func_name, ty_args)],
             transaction_transient: None,
@@ -726,6 +729,18 @@ where
 
         res
     }
+
+    fn charge_encrypted_txn(&mut self) -> VMResult<()> {
+        let (cost, res) = self.delegate_charge(|base| base.charge_encrypted_txn());
+
+        self.encrypted_txn_cost = Some(
+            self.encrypted_txn_cost
+                .unwrap_or_else(InternalGas::zero)
+                + cost,
+        );
+
+        res
+    }
 }
 
 impl<G> GasProfiler<G>
@@ -743,10 +758,14 @@ where
             gas_scaling_factor: self.base.gas_unit_scaling_factor(),
             execution_gas: self.algebra().execution_gas_used(),
             io_gas: self.algebra().io_gas_used(),
+            additional_fee: self.algebra().additional_fee_used(),
             intrinsic_cost: self.intrinsic_cost.unwrap_or_else(InternalGas::zero),
             keyless_cost: self.keyless_cost.unwrap_or_else(InternalGas::zero),
             slh_dsa_sha2_128s_cost: self
                 .slh_dsa_sha2_128s_cost
+                .unwrap_or_else(InternalGas::zero),
+            encrypted_txn_cost: self
+                .encrypted_txn_cost
                 .unwrap_or_else(InternalGas::zero),
             dependencies: self.dependencies,
             call_graph: self.frames.pop().expect("frame must exist"),

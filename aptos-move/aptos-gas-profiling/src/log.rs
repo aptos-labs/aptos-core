@@ -133,10 +133,13 @@ pub struct ExecutionAndIOCosts {
     pub execution_gas: InternalGas,
     /// IO gas - corresponds to FeeStatement::io_gas_units.
     pub io_gas: InternalGas,
+    /// Additional fee that reduces balance but does not count as execution/IO gas.
+    pub additional_fee: InternalGas,
 
     pub intrinsic_cost: InternalGas,
     pub keyless_cost: InternalGas,
     pub slh_dsa_sha2_128s_cost: InternalGas,
+    pub encrypted_txn_cost: InternalGas,
     pub dependencies: Vec<Dependency>,
     pub call_graph: CallFrame,
     pub transaction_transient: Option<InternalGas>,
@@ -258,7 +261,7 @@ impl StorageFees {
 impl ExecutionAndIOCosts {
     /// Returns the total execution + IO gas.
     pub fn total(&self) -> InternalGas {
-        self.execution_gas + self.io_gas
+        self.execution_gas + self.io_gas + self.additional_fee
     }
 
     #[allow(clippy::needless_lifetimes)]
@@ -276,6 +279,7 @@ impl ExecutionAndIOCosts {
         total += self.intrinsic_cost;
         total += self.keyless_cost;
         total += self.slh_dsa_sha2_128s_cost;
+        total += self.encrypted_txn_cost;
 
         for dep in &self.dependencies {
             total += dep.cost;

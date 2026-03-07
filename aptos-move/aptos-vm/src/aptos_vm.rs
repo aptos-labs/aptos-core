@@ -1069,6 +1069,9 @@ impl AptosVM {
         if txn_data.is_slh_dsa_sha2_128s() {
             gas_meter.charge_slh_dsa_sha2_128s()?;
         }
+        if txn_data.is_encrypted() {
+            gas_meter.charge_encrypted_txn()?;
+        }
 
         match executable {
             TransactionExecutableRef::Script(script) => {
@@ -1237,6 +1240,9 @@ impl AptosVM {
         }
         if txn_data.is_slh_dsa_sha2_128s() {
             gas_meter.charge_slh_dsa_sha2_128s()?;
+        }
+        if txn_data.is_encrypted() {
+            gas_meter.charge_encrypted_txn()?;
         }
 
         // Step 1: Obtain the payload. If any errors happen here, the entire transaction should fail

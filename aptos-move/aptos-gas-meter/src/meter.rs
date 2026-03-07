@@ -633,6 +633,16 @@ where
             .charge_execution(SLH_DSA_SHA2_128S_BASE_COST)
             .map_err(|e| e.finish(Location::Undefined))
     }
+
+    fn charge_encrypted_txn(&mut self) -> VMResult<()> {
+        if self.feature_version() < RELEASE_V1_44 {
+            return Ok(());
+        }
+
+        self.algebra
+            .charge_additional_fee(ENCRYPTED_TXN_BASE_COST)
+            .map_err(|e| e.finish(Location::Undefined))
+    }
 }
 
 impl<A> CacheValueSizes for StandardGasMeter<A>

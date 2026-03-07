@@ -56,6 +56,17 @@ pub trait GasAlgebra {
         abstract_amount: impl GasExpression<VMGasParameters, Unit = InternalGasUnit> + Debug,
     ) -> PartialVMResult<()>;
 
+    /// Charges a fee that reduces the user's gas balance but does NOT count as
+    /// execution or IO gas. Used for overhead costs (e.g., encrypted txn decryption)
+    /// that should not affect the block gas limit.
+    fn charge_additional_fee(
+        &mut self,
+        abstract_amount: impl GasExpression<VMGasParameters, Unit = InternalGasUnit> + Debug,
+    ) -> PartialVMResult<()>;
+
+    /// Returns the amount of additional fee used.
+    fn additional_fee_used(&self) -> InternalGas;
+
     /// Charges gas charge under the IO category.
     ///
     /// The amount charged can be a quantity or an abstract expression containing
@@ -131,6 +142,10 @@ pub trait AptosGasMeter: MoveGasMeter {
     /// Charges an additional cost for SLH-DSA signature verification to compensate for the
     /// expensive computation required (5x more expensive than ed25519).
     fn charge_slh_dsa_sha2_128s(&mut self) -> VMResult<()>;
+
+    /// Charges an additional cost for encrypted transactions to compensate for
+    /// the decryption computation required.
+    fn charge_encrypted_txn(&mut self) -> VMResult<()>;
 
     /// Charges IO gas for the transaction itself.
     fn charge_io_gas_for_transaction(&mut self, txn_size: NumBytes) -> VMResult<()>;

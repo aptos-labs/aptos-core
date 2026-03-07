@@ -11,6 +11,7 @@ use aptos_vm_types::storage::{
     io_pricing::IoPricing, space_pricing::DiskSpacePricing, StorageGasParameters,
 };
 use move_binary_format::errors::PartialVMResult;
+use std::fmt::Debug;
 use std::sync::{Arc, Mutex};
 
 /// Algebra to record abstract gas usage
@@ -50,6 +51,17 @@ impl<A: GasAlgebra> GasAlgebra for CalibrationAlgebra<A> {
 
     fn check_consistency(&self) -> PartialVMResult<()> {
         self.base.check_consistency()
+    }
+
+    fn charge_additional_fee(
+        &mut self,
+        abstract_amount: impl GasExpression<VMGasParameters, Unit = InternalGasUnit> + Debug,
+    ) -> PartialVMResult<()> {
+        self.base.charge_additional_fee(abstract_amount)
+    }
+
+    fn additional_fee_used(&self) -> InternalGas {
+        self.base.additional_fee_used()
     }
 
     fn charge_execution(

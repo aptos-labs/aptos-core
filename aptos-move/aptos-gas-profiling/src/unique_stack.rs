@@ -81,9 +81,11 @@ impl ExecutionAndIOCosts {
             gas_scaling_factor: self.gas_scaling_factor,
             execution_gas: self.execution_gas + other.execution_gas,
             io_gas: self.io_gas + other.io_gas,
+            additional_fee: self.additional_fee + other.additional_fee,
             intrinsic_cost: self.intrinsic_cost + other.intrinsic_cost,
             keyless_cost: self.keyless_cost + other.keyless_cost,
             slh_dsa_sha2_128s_cost: self.slh_dsa_sha2_128s_cost + other.slh_dsa_sha2_128s_cost,
+            encrypted_txn_cost: self.encrypted_txn_cost + other.encrypted_txn_cost,
             dependencies: dependencies
                 .into_iter()
                 .map(|((kind, id, size), cost)| Dependency {
