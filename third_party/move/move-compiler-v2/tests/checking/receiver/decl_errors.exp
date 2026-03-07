@@ -18,7 +18,7 @@ warning: parameter name `self` indicates a receiver function but the type `vecto
 17 │     fun receiver_for_external_vector(self: vector<u64>) {}
    │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-warning: parameter name `self` indicates a receiver function but the type `0x42::m::G<u64, T>` must only use type parameters but instead uses `u64`. Consider using a different name.
+warning: parameter name `self` indicates a receiver function but the type `0x42::m::G<u64, T>` must use either all type parameters or all concrete types in the instantiation. Consider using a different name.
    ┌─ tests/checking/receiver/decl_errors.move:20:9
    │
 20 │     fun receiver_partial_instantiated<T>(self: G<u64, T>) {}
@@ -30,16 +30,22 @@ warning: parameter name `self` indicates a receiver function but the type `0x42:
 23 │     fun receiver_non_linear_instantiated<T>(self: G<T, T>) {}
    │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-warning: parameter name `self` indicates a receiver function but the type `signer` is associated with the standard signer module and new receiver functions cannot be added. Consider using a different name.
+warning: parameter name `self` indicates a receiver function but the type `0x42::m::G<vector<T>, T>` must only use type parameters but instead uses `vector<T>`. Consider using a different name.
    ┌─ tests/checking/receiver/decl_errors.move:26:9
    │
-26 │     fun receiver_for_signer(self: &signer): address { abort 0 }
-   │         ^^^^^^^^^^^^^^^^^^^
+26 │     fun receiver_nested_generic<T>(self: G<vector<T>, T>) {}
+   │         ^^^^^^^^^^^^^^^^^^^^^^^
 
 warning: parameter name `self` indicates a receiver function but the type `signer` is associated with the standard signer module and new receiver functions cannot be added. Consider using a different name.
    ┌─ tests/checking/receiver/decl_errors.move:29:9
    │
-29 │     fun address_of(self: &signer): address { abort 0 }
+29 │     fun receiver_for_signer(self: &signer): address { abort 0 }
+   │         ^^^^^^^^^^^^^^^^^^^
+
+warning: parameter name `self` indicates a receiver function but the type `signer` is associated with the standard signer module and new receiver functions cannot be added. Consider using a different name.
+   ┌─ tests/checking/receiver/decl_errors.move:32:9
+   │
+32 │     fun address_of(self: &signer): address { abort 0 }
    │         ^^^^^^^^^^
 
 // -- Model dump before first bytecode pipeline
@@ -74,6 +80,9 @@ module 0x42::m {
     }
     private fun receiver_for_signer(self: &signer): address {
         Abort(0)
+    }
+    private fun receiver_nested_generic<T>(self: G<vector<T>, T>) {
+        Tuple()
     }
     private fun receiver_non_linear_instantiated<T>(self: G<T, T>) {
         Tuple()
@@ -111,6 +120,8 @@ module 0x42::m {
     }
     fun receiver_for_signer(self: &signer): address {
         abort 0
+    }
+    fun receiver_nested_generic<T>(self: G<vector<T>, T>) {
     }
     fun receiver_non_linear_instantiated<T>(self: G<T, T>) {
     }

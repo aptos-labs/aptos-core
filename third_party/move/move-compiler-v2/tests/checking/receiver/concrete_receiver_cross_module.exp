@@ -1,0 +1,46 @@
+// -- Model dump before first bytecode pipeline
+module 0x42::definer {
+    struct Box<T> {
+        val: T,
+    }
+    public fun new_u64(val: u64): Box<u64> {
+        pack definer::Box<u64>(val)
+    }
+    public fun unbox_u64(self: Box<u64>): u64 {
+        select definer::Box.val<Box<u64>>(self)
+    }
+} // end 0x42::definer
+module 0x42::caller {
+    use 0x42::definer; // resolved as: 0x42::definer
+    private fun test_cross_module_call() {
+        {
+          let b: definer::Box<u64> = definer::new_u64(42);
+          if Eq<u64>(definer::unbox_u64(b), 42) {
+            Tuple()
+          } else {
+            Abort(0)
+          };
+          Tuple()
+        }
+    }
+} // end 0x42::caller
+
+// -- Sourcified model before first bytecode pipeline
+module 0x42::definer {
+    struct Box<T> has copy, drop, store {
+        val: T,
+    }
+    public fun new_u64(val: u64): Box<u64> {
+        Box<u64>{val: val}
+    }
+    public fun unbox_u64(self: Box<u64>): u64 {
+        self.val
+    }
+}
+module 0x42::caller {
+    use 0x42::definer;
+    fun test_cross_module_call() {
+        let b = definer::new_u64(42);
+        if (definer::unbox_u64(b) == 42) () else abort 0;
+    }
+}
