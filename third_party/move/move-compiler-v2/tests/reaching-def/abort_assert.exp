@@ -1,0 +1,947 @@
+============ bytecode before first stackless bytecode pipeline ================
+
+[variant baseline]
+fun abort_assert::abort_after_assign(): u64 {
+     var $t0: u64
+     var $t1: u64
+     var $t2: u64
+     var $t3: u64
+     var $t4: u64
+  0: $t1 := 1
+  1: $t3 := infer($t1)
+  2: $t4 := 1
+  3: $t2 := +($t3, $t4)
+  4: abort($t2)
+  5: $t0 := infer($t1)
+  6: return $t0
+}
+
+
+[variant baseline]
+fun abort_assert::assign_before_abort($t0: bool): u64 {
+     var $t1: u64
+     var $t2: u64
+     var $t3: u64
+     var $t4: u64
+     var $t5: u64
+  0: if ($t0) goto 1 else goto 7
+  1: label L0
+  2: $t3 := 1
+  3: $t2 := infer($t3)
+  4: $t4 := 0
+  5: abort($t4)
+  6: goto 10
+  7: label L1
+  8: $t5 := 2
+  9: $t2 := infer($t5)
+ 10: label L2
+ 11: $t1 := infer($t2)
+ 12: return $t1
+}
+
+
+[variant baseline]
+fun abort_assert::both_may_abort($t0: bool, $t1: u64): u64 {
+     var $t2: u64
+     var $t3: u64
+     var $t4: bool
+     var $t5: u64
+     var $t6: u64
+     var $t7: u64
+     var $t8: u64
+     var $t9: bool
+     var $t10: u64
+     var $t11: u64
+     var $t12: u64
+     var $t13: u64
+  0: if ($t0) goto 1 else goto 15
+  1: label L0
+  2: $t5 := infer($t1)
+  3: $t6 := 0
+  4: $t4 := >($t5, $t6)
+  5: if ($t4) goto 6 else goto 8
+  6: label L3
+  7: goto 11
+  8: label L4
+  9: $t7 := 100
+ 10: abort($t7)
+ 11: label L5
+ 12: $t8 := 1
+ 13: $t3 := infer($t8)
+ 14: goto 28
+ 15: label L1
+ 16: $t10 := infer($t1)
+ 17: $t11 := 10
+ 18: $t9 := >($t10, $t11)
+ 19: if ($t9) goto 20 else goto 22
+ 20: label L6
+ 21: goto 25
+ 22: label L7
+ 23: $t12 := 101
+ 24: abort($t12)
+ 25: label L8
+ 26: $t13 := 2
+ 27: $t3 := infer($t13)
+ 28: label L2
+ 29: $t2 := infer($t3)
+ 30: return $t2
+}
+
+
+[variant baseline]
+fun abort_assert::conditional_abort($t0: bool): u64 {
+     var $t1: u64
+     var $t2: u64
+     var $t3: u64
+  0: $t2 := 1
+  1: if ($t0) goto 2 else goto 6
+  2: label L0
+  3: $t3 := 0
+  4: abort($t3)
+  5: goto 7
+  6: label L1
+  7: label L2
+  8: $t1 := infer($t2)
+  9: return $t1
+}
+
+
+[variant baseline]
+fun abort_assert::multiple_asserts($t0: u64, $t1: u64): u64 {
+     var $t2: u64
+     var $t3: u64
+     var $t4: bool
+     var $t5: u64
+     var $t6: u64
+     var $t7: u64
+     var $t8: u64
+     var $t9: bool
+     var $t10: u64
+     var $t11: u64
+     var $t12: u64
+     var $t13: u64
+  0: $t3 := 1
+  1: $t5 := infer($t0)
+  2: $t6 := 0
+  3: $t4 := >($t5, $t6)
+  4: if ($t4) goto 5 else goto 7
+  5: label L0
+  6: goto 10
+  7: label L1
+  8: $t7 := 100
+  9: abort($t7)
+ 10: label L2
+ 11: $t8 := 2
+ 12: $t10 := infer($t1)
+ 13: $t11 := 0
+ 14: $t9 := >($t10, $t11)
+ 15: if ($t9) goto 16 else goto 18
+ 16: label L3
+ 17: goto 21
+ 18: label L4
+ 19: $t12 := 101
+ 20: abort($t12)
+ 21: label L5
+ 22: $t13 := infer($t3)
+ 23: $t2 := +($t13, $t8)
+ 24: return $t2
+}
+
+
+[variant baseline]
+fun abort_assert::nested_abort($t0: bool, $t1: bool): u64 {
+     var $t2: u64
+     var $t3: u64
+     var $t4: u64
+     var $t5: u64
+     var $t6: u64
+     var $t7: u64
+  0: $t3 := 0
+  1: if ($t0) goto 2 else goto 15
+  2: label L0
+  3: if ($t1) goto 4 else goto 10
+  4: label L3
+  5: $t4 := 1
+  6: $t3 := infer($t4)
+  7: $t5 := 0
+  8: abort($t5)
+  9: goto 13
+ 10: label L4
+ 11: $t6 := 2
+ 12: $t3 := infer($t6)
+ 13: label L5
+ 14: goto 18
+ 15: label L1
+ 16: $t7 := 3
+ 17: $t3 := infer($t7)
+ 18: label L2
+ 19: $t2 := infer($t3)
+ 20: return $t2
+}
+
+
+[variant baseline]
+fun abort_assert::simple_abort(): u64 {
+     var $t0: u64
+     var $t1: u64
+     var $t2: u64
+  0: $t1 := 1
+  1: $t2 := 0
+  2: abort($t2)
+  3: $t0 := infer($t1)
+  4: return $t0
+}
+
+
+[variant baseline]
+fun abort_assert::with_assert($t0: u64): u64 {
+     var $t1: u64
+     var $t2: u64
+     var $t3: bool
+     var $t4: u64
+     var $t5: u64
+     var $t6: u64
+  0: $t2 := 1
+  1: $t4 := infer($t0)
+  2: $t5 := 0
+  3: $t3 := >($t4, $t5)
+  4: if ($t3) goto 5 else goto 7
+  5: label L0
+  6: goto 10
+  7: label L1
+  8: $t6 := 100
+  9: abort($t6)
+ 10: label L2
+ 11: $t1 := infer($t2)
+ 12: return $t1
+}
+
+
+Diagnostics:
+warning: This assignment/binding to the left-hand-side variable `x` is unused. Consider removing this assignment/binding, or prefixing the left-hand-side variable with an underscore (e.g., `_x`), or renaming to `_`
+  ┌─ tests/reaching-def/abort_assert.move:5:17
+  │
+5 │         let x = 1;
+  │                 ^
+
+warning: This assignment/binding to the left-hand-side variable `x` is unused. Consider removing this assignment/binding, or prefixing the left-hand-side variable with an underscore (e.g., `_x`), or renaming to `_`
+   ┌─ tests/reaching-def/abort_assert.move:23:13
+   │
+23 │             x = 1;
+   │             ^^^^^
+
+warning: This assignment/binding to the left-hand-side variable `x` is unused. Consider removing this assignment/binding, or prefixing the left-hand-side variable with an underscore (e.g., `_x`), or renaming to `_`
+   ┌─ tests/reaching-def/abort_assert.move:49:17
+   │
+49 │         let x = 0;
+   │                 ^
+
+warning: This assignment/binding to the left-hand-side variable `x` is unused. Consider removing this assignment/binding, or prefixing the left-hand-side variable with an underscore (e.g., `_x`), or renaming to `_`
+   ┌─ tests/reaching-def/abort_assert.move:52:17
+   │
+52 │                 x = 1;
+   │                 ^^^^^
+
+============ after ReachingDefProcessor: ================
+
+[variant baseline]
+fun abort_assert::abort_after_assign(): u64 {
+     var $t0: u64
+     var $t1: u64
+     var $t2: u64
+     var $t3: u64
+     var $t4: u64
+     # live vars:
+     # reaching instruction #0:
+     # refs: []
+     #
+  0: $t1 := 1
+     # live vars: $t1
+     # reaching instruction #1: `t1` @ {0}
+     # refs: []
+     #
+  1: $t3 := infer($t1)
+     # live vars: $t3
+     # reaching instruction #2: `t3` @ {1}
+     # refs: []
+     #
+  2: $t4 := 1
+     # live vars: $t3, $t4
+     # reaching instruction #3: `t3` @ {1}, `t4` @ {2}
+     # refs: []
+     #
+  3: $t2 := +($t3, $t4)
+     # live vars: $t2
+     # reaching instruction #4: `t2` @ {3}, `t3` @ {1}, `t4` @ {2}
+     # refs: []
+     #
+  4: abort($t2)
+     # live vars: $t1
+     # reaching instruction #5:
+  5: $t0 := infer($t1)
+     # live vars: $t0
+     # reaching instruction #6:
+  6: return $t0
+}
+
+
+[variant baseline]
+fun abort_assert::assign_before_abort($t0: bool): u64 {
+     var $t1: u64
+     var $t2: u64
+     var $t3: u64
+     var $t4: u64
+     var $t5: u64
+     # live vars: $t0
+     # reaching instruction #0:
+     # refs: []
+     #
+  0: if ($t0) goto 1 else goto 7
+     # live vars:
+     # reaching instruction #1:
+     # refs: []
+     #
+  1: label L0
+     # live vars:
+     # reaching instruction #2:
+     # refs: []
+     #
+  2: $t3 := 1
+     # live vars: $t3
+     # reaching instruction #3: `t3` @ {2}
+     # refs: []
+     #
+  3: $t2 := infer($t3)
+     # live vars:
+     # reaching instruction #4: `t2` @ {3}
+     # refs: []
+     #
+  4: $t4 := 0
+     # live vars: $t4
+     # reaching instruction #5: `t2` @ {3}, `t4` @ {4}
+     # refs: []
+     #
+  5: abort($t4)
+     # live vars: $t2
+     # reaching instruction #6:
+  6: goto 10
+     # live vars:
+     # reaching instruction #7:
+     # refs: []
+     #
+  7: label L1
+     # live vars:
+     # reaching instruction #8:
+     # refs: []
+     #
+  8: $t5 := 2
+     # live vars: $t5
+     # reaching instruction #9: `t5` @ {8}
+     # refs: []
+     #
+  9: $t2 := infer($t5)
+     # live vars: $t2
+     # reaching instruction #10: `t2` @ {9}
+     # refs: []
+     #
+ 10: label L2
+     # live vars: $t2
+     # reaching instruction #11: `t2` @ {9}
+     # refs: []
+     #
+ 11: $t1 := infer($t2)
+     # live vars: $t1
+     # reaching instruction #12: `t1` @ {11}
+     # refs: []
+     #
+ 12: return $t1
+}
+
+
+[variant baseline]
+fun abort_assert::both_may_abort($t0: bool, $t1: u64): u64 {
+     var $t2: u64
+     var $t3: u64
+     var $t4: bool
+     var $t5: u64
+     var $t6: u64
+     var $t7: u64
+     var $t8: u64
+     var $t9: bool
+     var $t10: u64
+     var $t11: u64
+     var $t12: u64
+     var $t13: u64
+     # live vars: $t0, $t1
+     # reaching instruction #0:
+     # refs: []
+     #
+  0: if ($t0) goto 1 else goto 15
+     # live vars: $t1
+     # reaching instruction #1:
+     # refs: []
+     #
+  1: label L0
+     # live vars: $t1
+     # reaching instruction #2:
+     # refs: []
+     #
+  2: $t5 := infer($t1)
+     # live vars: $t5
+     # reaching instruction #3: `t5` @ {2}
+     # refs: []
+     #
+  3: $t6 := 0
+     # live vars: $t5, $t6
+     # reaching instruction #4: `t5` @ {2}, `t6` @ {3}
+     # refs: []
+     #
+  4: $t4 := >($t5, $t6)
+     # live vars: $t4
+     # reaching instruction #5: `t4` @ {4}, `t5` @ {2}, `t6` @ {3}
+     # refs: []
+     #
+  5: if ($t4) goto 6 else goto 8
+     # live vars:
+     # reaching instruction #6: `t4` @ {4}, `t5` @ {2}, `t6` @ {3}
+     # refs: []
+     #
+  6: label L3
+     # live vars:
+     # reaching instruction #7: `t4` @ {4}, `t5` @ {2}, `t6` @ {3}
+     # refs: []
+     #
+  7: goto 11
+     # live vars:
+     # reaching instruction #8: `t4` @ {4}, `t5` @ {2}, `t6` @ {3}
+     # refs: []
+     #
+  8: label L4
+     # live vars:
+     # reaching instruction #9: `t4` @ {4}, `t5` @ {2}, `t6` @ {3}
+     # refs: []
+     #
+  9: $t7 := 100
+     # live vars: $t7
+     # reaching instruction #10: `t4` @ {4}, `t5` @ {2}, `t6` @ {3}, `t7` @ {9}
+     # refs: []
+     #
+ 10: abort($t7)
+     # live vars:
+     # reaching instruction #11: `t4` @ {4}, `t5` @ {2}, `t6` @ {3}
+     # refs: []
+     #
+ 11: label L5
+     # live vars:
+     # reaching instruction #12: `t4` @ {4}, `t5` @ {2}, `t6` @ {3}
+     # refs: []
+     #
+ 12: $t8 := 1
+     # live vars: $t8
+     # reaching instruction #13: `t4` @ {4}, `t5` @ {2}, `t6` @ {3}, `t8` @ {12}
+     # refs: []
+     #
+ 13: $t3 := infer($t8)
+     # live vars: $t3
+     # reaching instruction #14: `t3` @ {13}, `t4` @ {4}, `t5` @ {2}, `t6` @ {3}
+     # refs: []
+     #
+ 14: goto 28
+     # live vars: $t1
+     # reaching instruction #15:
+     # refs: []
+     #
+ 15: label L1
+     # live vars: $t1
+     # reaching instruction #16:
+     # refs: []
+     #
+ 16: $t10 := infer($t1)
+     # live vars: $t10
+     # reaching instruction #17: `t10` @ {16}
+     # refs: []
+     #
+ 17: $t11 := 10
+     # live vars: $t10, $t11
+     # reaching instruction #18: `t10` @ {16}, `t11` @ {17}
+     # refs: []
+     #
+ 18: $t9 := >($t10, $t11)
+     # live vars: $t9
+     # reaching instruction #19: `t9` @ {18}, `t10` @ {16}, `t11` @ {17}
+     # refs: []
+     #
+ 19: if ($t9) goto 20 else goto 22
+     # live vars:
+     # reaching instruction #20: `t9` @ {18}, `t10` @ {16}, `t11` @ {17}
+     # refs: []
+     #
+ 20: label L6
+     # live vars:
+     # reaching instruction #21: `t9` @ {18}, `t10` @ {16}, `t11` @ {17}
+     # refs: []
+     #
+ 21: goto 25
+     # live vars:
+     # reaching instruction #22: `t9` @ {18}, `t10` @ {16}, `t11` @ {17}
+     # refs: []
+     #
+ 22: label L7
+     # live vars:
+     # reaching instruction #23: `t9` @ {18}, `t10` @ {16}, `t11` @ {17}
+     # refs: []
+     #
+ 23: $t12 := 101
+     # live vars: $t12
+     # reaching instruction #24: `t9` @ {18}, `t10` @ {16}, `t11` @ {17}, `t12` @ {23}
+     # refs: []
+     #
+ 24: abort($t12)
+     # live vars:
+     # reaching instruction #25: `t9` @ {18}, `t10` @ {16}, `t11` @ {17}
+     # refs: []
+     #
+ 25: label L8
+     # live vars:
+     # reaching instruction #26: `t9` @ {18}, `t10` @ {16}, `t11` @ {17}
+     # refs: []
+     #
+ 26: $t13 := 2
+     # live vars: $t13
+     # reaching instruction #27: `t9` @ {18}, `t10` @ {16}, `t11` @ {17}, `t13` @ {26}
+     # refs: []
+     #
+ 27: $t3 := infer($t13)
+     # live vars: $t3
+     # reaching instruction #28: `t3` @ {13, 27}, `t4` @ {4}, `t5` @ {2}, `t6` @ {3}, `t9` @ {18}, `t10` @ {16}, `t11` @ {17}
+     # refs: []
+     #
+ 28: label L2
+     # live vars: $t3
+     # reaching instruction #29: `t3` @ {13, 27}, `t4` @ {4}, `t5` @ {2}, `t6` @ {3}, `t9` @ {18}, `t10` @ {16}, `t11` @ {17}
+     # refs: []
+     #
+ 29: $t2 := infer($t3)
+     # live vars: $t2
+     # reaching instruction #30: `t2` @ {29}, `t4` @ {4}, `t5` @ {2}, `t6` @ {3}, `t9` @ {18}, `t10` @ {16}, `t11` @ {17}
+     # refs: []
+     #
+ 30: return $t2
+}
+
+
+[variant baseline]
+fun abort_assert::conditional_abort($t0: bool): u64 {
+     var $t1: u64
+     var $t2: u64
+     var $t3: u64
+     # live vars: $t0
+     # reaching instruction #0:
+     # refs: []
+     #
+  0: $t2 := 1
+     # live vars: $t0, $t2
+     # reaching instruction #1: `t2` @ {0}
+     # refs: []
+     #
+  1: if ($t0) goto 2 else goto 6
+     # live vars: $t2
+     # reaching instruction #2: `t2` @ {0}
+     # refs: []
+     #
+  2: label L0
+     # live vars:
+     # reaching instruction #3: `t2` @ {0}
+     # refs: []
+     #
+  3: $t3 := 0
+     # live vars: $t3
+     # reaching instruction #4: `t2` @ {0}, `t3` @ {3}
+     # refs: []
+     #
+  4: abort($t3)
+     # live vars: $t2
+     # reaching instruction #5:
+  5: goto 7
+     # live vars: $t2
+     # reaching instruction #6: `t2` @ {0}
+     # refs: []
+     #
+  6: label L1
+     # live vars: $t2
+     # reaching instruction #7: `t2` @ {0}
+     # refs: []
+     #
+  7: label L2
+     # live vars: $t2
+     # reaching instruction #8: `t2` @ {0}
+     # refs: []
+     #
+  8: $t1 := infer($t2)
+     # live vars: $t1
+     # reaching instruction #9: `t1` @ {8}
+     # refs: []
+     #
+  9: return $t1
+}
+
+
+[variant baseline]
+fun abort_assert::multiple_asserts($t0: u64, $t1: u64): u64 {
+     var $t2: u64
+     var $t3: u64
+     var $t4: bool
+     var $t5: u64
+     var $t6: u64
+     var $t7: u64
+     var $t8: u64
+     var $t9: bool
+     var $t10: u64
+     var $t11: u64
+     var $t12: u64
+     var $t13: u64
+     # live vars: $t0, $t1
+     # reaching instruction #0:
+     # refs: []
+     #
+  0: $t3 := 1
+     # live vars: $t0, $t1, $t3
+     # reaching instruction #1: `t3` @ {0}
+     # refs: []
+     #
+  1: $t5 := infer($t0)
+     # live vars: $t1, $t3, $t5
+     # reaching instruction #2: `t3` @ {0}, `t5` @ {1}
+     # refs: []
+     #
+  2: $t6 := 0
+     # live vars: $t1, $t3, $t5, $t6
+     # reaching instruction #3: `t3` @ {0}, `t5` @ {1}, `t6` @ {2}
+     # refs: []
+     #
+  3: $t4 := >($t5, $t6)
+     # live vars: $t1, $t3, $t4
+     # reaching instruction #4: `t3` @ {0}, `t4` @ {3}, `t5` @ {1}, `t6` @ {2}
+     # refs: []
+     #
+  4: if ($t4) goto 5 else goto 7
+     # live vars: $t1, $t3
+     # reaching instruction #5: `t3` @ {0}, `t4` @ {3}, `t5` @ {1}, `t6` @ {2}
+     # refs: []
+     #
+  5: label L0
+     # live vars: $t1, $t3
+     # reaching instruction #6: `t3` @ {0}, `t4` @ {3}, `t5` @ {1}, `t6` @ {2}
+     # refs: []
+     #
+  6: goto 10
+     # live vars: $t1, $t3
+     # reaching instruction #7: `t3` @ {0}, `t4` @ {3}, `t5` @ {1}, `t6` @ {2}
+     # refs: []
+     #
+  7: label L1
+     # live vars:
+     # reaching instruction #8: `t3` @ {0}, `t4` @ {3}, `t5` @ {1}, `t6` @ {2}
+     # refs: []
+     #
+  8: $t7 := 100
+     # live vars: $t7
+     # reaching instruction #9: `t3` @ {0}, `t4` @ {3}, `t5` @ {1}, `t6` @ {2}, `t7` @ {8}
+     # refs: []
+     #
+  9: abort($t7)
+     # live vars: $t1, $t3
+     # reaching instruction #10: `t3` @ {0}, `t4` @ {3}, `t5` @ {1}, `t6` @ {2}
+     # refs: []
+     #
+ 10: label L2
+     # live vars: $t1, $t3
+     # reaching instruction #11: `t3` @ {0}, `t4` @ {3}, `t5` @ {1}, `t6` @ {2}
+     # refs: []
+     #
+ 11: $t8 := 2
+     # live vars: $t1, $t3, $t8
+     # reaching instruction #12: `t3` @ {0}, `t4` @ {3}, `t5` @ {1}, `t6` @ {2}, `t8` @ {11}
+     # refs: []
+     #
+ 12: $t10 := infer($t1)
+     # live vars: $t3, $t8, $t10
+     # reaching instruction #13: `t3` @ {0}, `t4` @ {3}, `t5` @ {1}, `t6` @ {2}, `t8` @ {11}, `t10` @ {12}
+     # refs: []
+     #
+ 13: $t11 := 0
+     # live vars: $t3, $t8, $t10, $t11
+     # reaching instruction #14: `t3` @ {0}, `t4` @ {3}, `t5` @ {1}, `t6` @ {2}, `t8` @ {11}, `t10` @ {12}, `t11` @ {13}
+     # refs: []
+     #
+ 14: $t9 := >($t10, $t11)
+     # live vars: $t3, $t8, $t9
+     # reaching instruction #15: `t3` @ {0}, `t4` @ {3}, `t5` @ {1}, `t6` @ {2}, `t8` @ {11}, `t9` @ {14}, `t10` @ {12}, `t11` @ {13}
+     # refs: []
+     #
+ 15: if ($t9) goto 16 else goto 18
+     # live vars: $t3, $t8
+     # reaching instruction #16: `t3` @ {0}, `t4` @ {3}, `t5` @ {1}, `t6` @ {2}, `t8` @ {11}, `t9` @ {14}, `t10` @ {12}, `t11` @ {13}
+     # refs: []
+     #
+ 16: label L3
+     # live vars: $t3, $t8
+     # reaching instruction #17: `t3` @ {0}, `t4` @ {3}, `t5` @ {1}, `t6` @ {2}, `t8` @ {11}, `t9` @ {14}, `t10` @ {12}, `t11` @ {13}
+     # refs: []
+     #
+ 17: goto 21
+     # live vars: $t3, $t8
+     # reaching instruction #18: `t3` @ {0}, `t4` @ {3}, `t5` @ {1}, `t6` @ {2}, `t8` @ {11}, `t9` @ {14}, `t10` @ {12}, `t11` @ {13}
+     # refs: []
+     #
+ 18: label L4
+     # live vars:
+     # reaching instruction #19: `t3` @ {0}, `t4` @ {3}, `t5` @ {1}, `t6` @ {2}, `t8` @ {11}, `t9` @ {14}, `t10` @ {12}, `t11` @ {13}
+     # refs: []
+     #
+ 19: $t12 := 101
+     # live vars: $t12
+     # reaching instruction #20: `t3` @ {0}, `t4` @ {3}, `t5` @ {1}, `t6` @ {2}, `t8` @ {11}, `t9` @ {14}, `t10` @ {12}, `t11` @ {13}, `t12` @ {19}
+     # refs: []
+     #
+ 20: abort($t12)
+     # live vars: $t3, $t8
+     # reaching instruction #21: `t3` @ {0}, `t4` @ {3}, `t5` @ {1}, `t6` @ {2}, `t8` @ {11}, `t9` @ {14}, `t10` @ {12}, `t11` @ {13}
+     # refs: []
+     #
+ 21: label L5
+     # live vars: $t3, $t8
+     # reaching instruction #22: `t3` @ {0}, `t4` @ {3}, `t5` @ {1}, `t6` @ {2}, `t8` @ {11}, `t9` @ {14}, `t10` @ {12}, `t11` @ {13}
+     # refs: []
+     #
+ 22: $t13 := infer($t3)
+     # live vars: $t8, $t13
+     # reaching instruction #23: `t4` @ {3}, `t5` @ {1}, `t6` @ {2}, `t8` @ {11}, `t9` @ {14}, `t10` @ {12}, `t11` @ {13}, `t13` @ {22}
+     # refs: []
+     #
+ 23: $t2 := +($t13, $t8)
+     # live vars: $t2
+     # reaching instruction #24: `t2` @ {23}, `t4` @ {3}, `t5` @ {1}, `t6` @ {2}, `t8` @ {11}, `t9` @ {14}, `t10` @ {12}, `t11` @ {13}, `t13` @ {22}
+     # refs: []
+     #
+ 24: return $t2
+}
+
+
+[variant baseline]
+fun abort_assert::nested_abort($t0: bool, $t1: bool): u64 {
+     var $t2: u64
+     var $t3: u64
+     var $t4: u64
+     var $t5: u64
+     var $t6: u64
+     var $t7: u64
+     # live vars: $t0, $t1
+     # reaching instruction #0:
+     # refs: []
+     #
+  0: $t3 := 0
+     # live vars: $t0, $t1
+     # reaching instruction #1: `t3` @ {0}
+     # refs: []
+     #
+  1: if ($t0) goto 2 else goto 15
+     # live vars: $t1
+     # reaching instruction #2: `t3` @ {0}
+     # refs: []
+     #
+  2: label L0
+     # live vars: $t1
+     # reaching instruction #3: `t3` @ {0}
+     # refs: []
+     #
+  3: if ($t1) goto 4 else goto 10
+     # live vars:
+     # reaching instruction #4: `t3` @ {0}
+     # refs: []
+     #
+  4: label L3
+     # live vars:
+     # reaching instruction #5: `t3` @ {0}
+     # refs: []
+     #
+  5: $t4 := 1
+     # live vars: $t4
+     # reaching instruction #6: `t3` @ {0}, `t4` @ {5}
+     # refs: []
+     #
+  6: $t3 := infer($t4)
+     # live vars:
+     # reaching instruction #7: `t3` @ {6}
+     # refs: []
+     #
+  7: $t5 := 0
+     # live vars: $t5
+     # reaching instruction #8: `t3` @ {6}, `t5` @ {7}
+     # refs: []
+     #
+  8: abort($t5)
+     # live vars: $t3
+     # reaching instruction #9:
+  9: goto 13
+     # live vars:
+     # reaching instruction #10: `t3` @ {0}
+     # refs: []
+     #
+ 10: label L4
+     # live vars:
+     # reaching instruction #11: `t3` @ {0}
+     # refs: []
+     #
+ 11: $t6 := 2
+     # live vars: $t6
+     # reaching instruction #12: `t3` @ {0}, `t6` @ {11}
+     # refs: []
+     #
+ 12: $t3 := infer($t6)
+     # live vars: $t3
+     # reaching instruction #13: `t3` @ {12}
+     # refs: []
+     #
+ 13: label L5
+     # live vars: $t3
+     # reaching instruction #14: `t3` @ {12}
+     # refs: []
+     #
+ 14: goto 18
+     # live vars: $t1
+     # reaching instruction #15: `t3` @ {0}
+     # refs: []
+     #
+ 15: label L1
+     # live vars:
+     # reaching instruction #16: `t3` @ {0}
+     # refs: []
+     #
+ 16: $t7 := 3
+     # live vars: $t7
+     # reaching instruction #17: `t3` @ {0}, `t7` @ {16}
+     # refs: []
+     #
+ 17: $t3 := infer($t7)
+     # live vars: $t3
+     # reaching instruction #18: `t3` @ {12, 17}
+     # refs: []
+     #
+ 18: label L2
+     # live vars: $t3
+     # reaching instruction #19: `t3` @ {12, 17}
+     # refs: []
+     #
+ 19: $t2 := infer($t3)
+     # live vars: $t2
+     # reaching instruction #20: `t2` @ {19}
+     # refs: []
+     #
+ 20: return $t2
+}
+
+
+[variant baseline]
+fun abort_assert::simple_abort(): u64 {
+     var $t0: u64
+     var $t1: u64
+     var $t2: u64
+     # live vars:
+     # reaching instruction #0:
+     # refs: []
+     #
+  0: $t1 := 1
+     # live vars:
+     # reaching instruction #1: `t1` @ {0}
+     # refs: []
+     #
+  1: $t2 := 0
+     # live vars: $t2
+     # reaching instruction #2: `t1` @ {0}, `t2` @ {1}
+     # refs: []
+     #
+  2: abort($t2)
+     # live vars: $t1
+     # reaching instruction #3:
+  3: $t0 := infer($t1)
+     # live vars: $t0
+     # reaching instruction #4:
+  4: return $t0
+}
+
+
+[variant baseline]
+fun abort_assert::with_assert($t0: u64): u64 {
+     var $t1: u64
+     var $t2: u64
+     var $t3: bool
+     var $t4: u64
+     var $t5: u64
+     var $t6: u64
+     # live vars: $t0
+     # reaching instruction #0:
+     # refs: []
+     #
+  0: $t2 := 1
+     # live vars: $t0, $t2
+     # reaching instruction #1: `t2` @ {0}
+     # refs: []
+     #
+  1: $t4 := infer($t0)
+     # live vars: $t2, $t4
+     # reaching instruction #2: `t2` @ {0}, `t4` @ {1}
+     # refs: []
+     #
+  2: $t5 := 0
+     # live vars: $t2, $t4, $t5
+     # reaching instruction #3: `t2` @ {0}, `t4` @ {1}, `t5` @ {2}
+     # refs: []
+     #
+  3: $t3 := >($t4, $t5)
+     # live vars: $t2, $t3
+     # reaching instruction #4: `t2` @ {0}, `t3` @ {3}, `t4` @ {1}, `t5` @ {2}
+     # refs: []
+     #
+  4: if ($t3) goto 5 else goto 7
+     # live vars: $t2
+     # reaching instruction #5: `t2` @ {0}, `t3` @ {3}, `t4` @ {1}, `t5` @ {2}
+     # refs: []
+     #
+  5: label L0
+     # live vars: $t2
+     # reaching instruction #6: `t2` @ {0}, `t3` @ {3}, `t4` @ {1}, `t5` @ {2}
+     # refs: []
+     #
+  6: goto 10
+     # live vars: $t2
+     # reaching instruction #7: `t2` @ {0}, `t3` @ {3}, `t4` @ {1}, `t5` @ {2}
+     # refs: []
+     #
+  7: label L1
+     # live vars:
+     # reaching instruction #8: `t2` @ {0}, `t3` @ {3}, `t4` @ {1}, `t5` @ {2}
+     # refs: []
+     #
+  8: $t6 := 100
+     # live vars: $t6
+     # reaching instruction #9: `t2` @ {0}, `t3` @ {3}, `t4` @ {1}, `t5` @ {2}, `t6` @ {8}
+     # refs: []
+     #
+  9: abort($t6)
+     # live vars: $t2
+     # reaching instruction #10: `t2` @ {0}, `t3` @ {3}, `t4` @ {1}, `t5` @ {2}
+     # refs: []
+     #
+ 10: label L2
+     # live vars: $t2
+     # reaching instruction #11: `t2` @ {0}, `t3` @ {3}, `t4` @ {1}, `t5` @ {2}
+     # refs: []
+     #
+ 11: $t1 := infer($t2)
+     # live vars: $t1
+     # reaching instruction #12: `t1` @ {11}, `t3` @ {3}, `t4` @ {1}, `t5` @ {2}
+     # refs: []
+     #
+ 12: return $t1
+}

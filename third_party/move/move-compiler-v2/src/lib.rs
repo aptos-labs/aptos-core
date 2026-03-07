@@ -32,6 +32,7 @@ use crate::{
         flush_writes_processor::FlushWritesProcessor,
         lint_processor::LintProcessor,
         livevar_analysis_processor::LiveVarAnalysisProcessor,
+        reaching_def_analysis_processor::ReachingDefProcessor,
         reference_safety::{reference_safety_processor_v2, reference_safety_processor_v3},
         split_critical_edges_processor::SplitCriticalEdgesProcessor,
         uninitialized_use_checker::UninitializedUseChecker,
@@ -640,6 +641,11 @@ pub fn stackless_bytecode_check_pipeline(options: &Options) -> FunctionTargetPip
         pipeline.add_processor(Box::new(
             reference_safety_processor_v2::ReferenceSafetyProcessor {},
         ));
+    }
+
+    // Reaching definition analysis (depends on livevar and lifetime annotations)
+    if options.experiment_on(Experiment::REACHING_DEF_ANALYSIS) {
+        pipeline.add_processor(Box::new(ReachingDefProcessor {}));
     }
 
     if options.experiment_on(Experiment::ABILITY_CHECK) {
