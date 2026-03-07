@@ -2,10 +2,11 @@
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 use crate::schema::*;
-use aptos_config::config::{IndexType, RocksdbConfig};
+use aptos_config::config::{DBCompressionType, IndexType, RocksdbConfig};
 use aptos_schemadb::{
     BlockBasedIndexType, BlockBasedOptions, Cache, ColumnFamilyDescriptor, ColumnFamilyName,
-    DBCompressionType, Options, SliceTransform, DEFAULT_COLUMN_FAMILY_NAME,
+    DBCompressionType as RocksDBCompressionType, Options, SliceTransform,
+    DEFAULT_COLUMN_FAMILY_NAME,
 };
 use aptos_types::transaction::Version;
 
@@ -152,7 +153,10 @@ where
         let table_options = gen_table_options(rocksdb_config, block_cache, cf_name);
 
         let mut cf_opts = Options::default();
-        cf_opts.set_compression_type(DBCompressionType::Lz4);
+        cf_opts.set_compression_type(match rocksdb_config.compression_type {
+            DBCompressionType::None => RocksDBCompressionType::None,
+            DBCompressionType::Lz4 => RocksDBCompressionType::Lz4,
+        });
         cf_opts.set_block_based_table_factory(&table_options);
         cf_opts.add_compact_on_deletion_collector_factory(0, 0, 0.4);
         cf_opts_post_processor(cf_name, &mut cf_opts);
