@@ -10,6 +10,15 @@ pub mod coverage_map;
 pub mod source_coverage;
 pub mod summary;
 
+/// Compute coverage percentage. Returns 100% when there are no instructions (vacuous coverage).
+pub fn coverage_percentage(covered: u64, total: u64) -> f64 {
+    if total == 0 {
+        100f64
+    } else {
+        (covered as f64) / (total as f64) * 100f64
+    }
+}
+
 pub fn format_human_summary<M, F, W: Write>(
     modules: &[CompiledModule],
     coverage_map: &M,
@@ -39,7 +48,7 @@ pub fn format_human_summary<M, F, W: Write>(
     writeln!(
         summary_writer,
         "| % Move Coverage: {:.2}  |",
-        (total_covered as f64 / total_instructions as f64) * 100f64
+        coverage_percentage(total_covered, total_instructions)
     )
     .unwrap();
     writeln!(summary_writer, "+-------------------------+").unwrap();
