@@ -279,7 +279,7 @@ module aptos_std::smart_vector {
         let inline_len = self.inline_vec.length();
         let new_inline_vec = vector[];
         // Push the last `inline_len` Ts into a temp vector.
-        for (i in 0..inline_len) {
+        for (_i in 0..inline_len) {
             new_inline_vec.push_back(self.pop_back());
         };
         new_inline_vec.reverse();
