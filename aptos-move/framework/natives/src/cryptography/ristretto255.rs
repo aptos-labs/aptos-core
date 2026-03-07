@@ -22,17 +22,6 @@ pub(crate) const SCALAR_NUM_BYTES: usize = 32;
 /// The size of a serialized compressed Ristretto point, in bytes.
 pub(crate) const COMPRESSED_POINT_NUM_BYTES: usize = 32;
 
-/// Returns gas costs for a variable-time multiscalar multiplication (MSM) of size-n. The MSM
-/// employed in curve25519 is:
-///  1. Strauss, when n <= 190, see <https://www.jstor.org/stable/2310929>
-///  2. Pippinger, when n > 190, which roughly requires O(n / log_2 n) scalar multiplications
-/// For simplicity, we estimate the complexity as O(n / log_2 n)
-pub fn multi_scalar_mul_gas(
-    size: usize,
-) -> impl GasExpression<NativeGasParameters, Unit = InternalGasUnit> {
-    RISTRETTO255_POINT_MUL * NumArgs::new((size as f64 / f64::log2(size as f64)).ceil() as u64)
-}
-
 pub fn make_all(
     builder: &SafeNativeBuilder,
 ) -> impl Iterator<Item = (String, NativeFunction)> + '_ {
