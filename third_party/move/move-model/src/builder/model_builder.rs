@@ -465,23 +465,34 @@ impl<'env> ModelBuilder<'env> {
                     )
                 };
                 let check_generics = |tys: &[Type]| {
-                    // TODO(#12221): Determine whether we may want to relax this check
-                    let mut seen = BTreeSet::new();
-                    for ty in tys {
-                        if !matches!(ty, Type::TypeParameter(_)) {
-                            diag(&format!(
-                                "must only use type parameters \
-                                 but instead uses `{}`",
-                                ty.display(&type_ctx())
-                            ))
-                        } else if !seen.insert(ty) {
-                            // We cannot repeat type parameters
-                            diag(&format!(
-                                "cannot use type parameter `{}` more than once",
-                                ty.display(&type_ctx())
-                            ))
+                    let has_open = tys.iter().any(|ty| ty.is_open());
+                    let has_closed = tys.iter().any(|ty| !ty.is_open());
+
+                    if has_open && has_closed {
+                        // Partial instantiation: mix of open and closed type args
+                        diag(
+                            "must use either all type parameters \
+                             or all concrete types in the instantiation",
+                        )
+                    } else if has_open {
+                        // Fully generic: each arg must be a plain, distinct type parameter
+                        let mut seen = BTreeSet::new();
+                        for ty in tys {
+                            if !matches!(ty, Type::TypeParameter(_)) {
+                                diag(&format!(
+                                    "must only use type parameters \
+                                     but instead uses `{}`",
+                                    ty.display(&type_ctx())
+                                ))
+                            } else if !seen.insert(ty) {
+                                diag(&format!(
+                                    "cannot use type parameter `{}` more than once",
+                                    ty.display(&type_ctx())
+                                ))
+                            }
                         }
                     }
+                    // Fully concrete (all closed types): allowed, no check needed
                 };
                 match &base_type {
                     Type::Struct(mid, sid, inst) => {
@@ -494,7 +505,7 @@ impl<'env> ModelBuilder<'env> {
                                  and new receiver functions cannot be added",
                             )
                         } else {
-                            // The instantiation must be fully generic.
+                            // The instantiation must be fully generic or fully concrete.
                             check_generics(inst);
                             // At this point, there cannot be any other function in the module of the type
                             // which has the same name, as function overloading in a module is not allowed.
