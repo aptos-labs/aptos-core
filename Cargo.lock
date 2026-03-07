@@ -1484,9 +1484,9 @@ name = "aptos-dynamic-transaction-composer"
 version = "0.1.4"
 dependencies = [
  "anyhow",
+ "aptos-move-e2e-test-harness",
  "aptos-types",
  "bcs 0.1.4",
- "e2e-move-tests",
  "getrandom 0.2.11",
  "move-binary-format",
  "move-bytecode-verifier",
@@ -3223,6 +3223,7 @@ dependencies = [
  "aptos-gas-profiling",
  "aptos-language-e2e-tests",
  "aptos-logger",
+ "aptos-move-e2e-test-harness",
  "aptos-sdk",
  "aptos-transaction-generator-lib",
  "aptos-transaction-workloads-lib",
@@ -3230,10 +3231,33 @@ dependencies = [
  "aptos-vm-environment",
  "async-trait",
  "clap 4.5.60",
- "e2e-move-tests",
  "rand 0.7.3",
  "serde_json",
  "tokio",
+]
+
+[[package]]
+name = "aptos-move-e2e-test-harness"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "aptos-cached-packages",
+ "aptos-framework",
+ "aptos-gas-profiling",
+ "aptos-gas-schedule",
+ "aptos-language-e2e-tests",
+ "aptos-rest-client",
+ "aptos-transaction-simulation",
+ "aptos-types",
+ "bcs 0.1.4",
+ "claims",
+ "move-core-types",
+ "move-package",
+ "move-symbol-pool",
+ "once_cell",
+ "project-root",
+ "proptest",
+ "serde",
 ]
 
 [[package]]
@@ -8636,6 +8660,7 @@ dependencies = [
  "aptos-gas-profiling",
  "aptos-gas-schedule",
  "aptos-language-e2e-tests",
+ "aptos-move-e2e-test-harness",
  "aptos-package-builder",
  "aptos-rest-client",
  "aptos-sdk",
@@ -8653,9 +8678,7 @@ dependencies = [
  "move-coverage",
  "move-model",
  "move-package",
- "move-symbol-pool",
  "once_cell",
- "project-root",
  "proptest",
  "rstest",
  "serde",

@@ -36,6 +36,7 @@ members = [
     "aptos-move/block-executor",
     "aptos-move/cli",
     "aptos-move/e2e-benchmark",
+    "aptos-move/e2e-move-test-harness",
     "aptos-move/e2e-move-tests",
     "aptos-move/e2e-tests",
     "aptos-move/e2e-testsuite",
@@ -404,6 +405,7 @@ aptos-move-debugger = { path = "aptos-move/aptos-debugger" }
 aptos-move-examples = { path = "aptos-move/move-examples" }
 aptos-move-flow = { path = "aptos-move/flow" }
 aptos-move-e2e-benchmark = { path = "aptos-move/e2e-benchmark" }
+aptos-move-e2e-test-harness = { path = "aptos-move/e2e-move-test-harness" }
 aptos-mvhashmap = { path = "aptos-move/mvhashmap" }
 aptos-native-interface = { path = "aptos-move/aptos-native-interface" }
 aptos-netcore = { path = "network/netcore" }

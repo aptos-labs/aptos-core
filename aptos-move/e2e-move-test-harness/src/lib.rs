@@ -1,7 +1,6 @@
 // Copyright (c) Aptos Foundation
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
-use crate::{assert_success, AptosPackageHooks};
 use aptos_cached_packages::aptos_stdlib;
 use aptos_framework::{natives::code::PackageMetadata, BuildOptions, BuiltPackage};
 use aptos_gas_profiling::TransactionGasLog;
@@ -1371,6 +1370,26 @@ macro_rules! assert_move_abort {
             $($arg)+
         );
     }};
+}
+
+pub(crate) struct AptosPackageHooks {}
+
+impl move_package::package_hooks::PackageHooks for AptosPackageHooks {
+    fn custom_package_info_fields(&self) -> Vec<String> {
+        vec![aptos_framework::UPGRADE_POLICY_CUSTOM_FIELD.to_string()]
+    }
+
+    fn custom_dependency_key(&self) -> Option<String> {
+        Some("aptos".to_string())
+    }
+
+    fn resolve_custom_dependency(
+        &self,
+        _dep_name: move_symbol_pool::Symbol,
+        _info: &move_package::source_package::parsed_manifest::CustomDepInfo,
+    ) -> anyhow::Result<()> {
+        anyhow::bail!("not used")
+    }
 }
 
 #[cfg(test)]
