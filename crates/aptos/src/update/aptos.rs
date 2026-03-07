@@ -24,6 +24,17 @@ use self_update::{
     update::ReleaseUpdate,
 };
 
+/// Extract the semver version from a CLI release tag.
+/// Handles both formats:
+/// - `aptos-cli-v7.14.2` (with 'v' prefix)
+/// - `aptos-cli-7.14.2` (without 'v' prefix)
+///
+/// Returns the clean version string (e.g., "7.14.2").
+pub fn extract_version_from_tag(tag: &str) -> &str {
+    let version_str = tag.strip_prefix("aptos-cli-").unwrap_or(tag);
+    version_str.strip_prefix('v').unwrap_or(version_str)
+}
+
 /// Update the CLI itself
 ///
 /// This can be used to update the CLI to the latest version. This is useful if you
@@ -82,7 +93,7 @@ impl BinaryUpdater for AptosUpdateTool {
                 break release;
             }
         };
-        let target_version = latest_release.version.split("-v").last().unwrap();
+        let target_version = extract_version_from_tag(&latest_release.version);
 
         // Return early if we're up to date already.
         let current_version = cargo_crate_version!();
@@ -181,5 +192,46 @@ impl CliCommand<String> for AptosUpdateTool {
 
     async fn execute(self) -> CliTypedResult<String> {
         update_binary(self).await
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_extract_version_with_v_prefix() {
+        // Standard format with 'v' prefix
+        assert_eq!(extract_version_from_tag("aptos-cli-v7.14.2"), "7.14.2");
+        assert_eq!(extract_version_from_tag("aptos-cli-v1.0.0"), "1.0.0");
+        assert_eq!(extract_version_from_tag("aptos-cli-v10.20.30"), "10.20.30");
+    }
+
+    #[test]
+    fn test_extract_version_without_v_prefix() {
+        // Format without 'v' prefix (the bug case)
+        assert_eq!(extract_version_from_tag("aptos-cli-7.14.2"), "7.14.2");
+        assert_eq!(extract_version_from_tag("aptos-cli-1.0.0"), "1.0.0");
+        assert_eq!(extract_version_from_tag("aptos-cli-10.20.30"), "10.20.30");
+    }
+
+    #[test]
+    fn test_extract_version_with_prerelease() {
+        // Versions with prerelease suffixes
+        assert_eq!(
+            extract_version_from_tag("aptos-cli-v1.0.0-beta"),
+            "1.0.0-beta"
+        );
+        assert_eq!(extract_version_from_tag("aptos-cli-1.0.0-rc1"), "1.0.0-rc1");
+    }
+
+    #[test]
+    fn test_extract_version_edge_cases() {
+        // Edge cases
+        assert_eq!(extract_version_from_tag("aptos-cli-v0.0.1"), "0.0.1");
+        assert_eq!(extract_version_from_tag("aptos-cli-0.0.1"), "0.0.1");
+        // Just a version number (fallback)
+        assert_eq!(extract_version_from_tag("v1.2.3"), "1.2.3");
+        assert_eq!(extract_version_from_tag("1.2.3"), "1.2.3");
     }
 }
