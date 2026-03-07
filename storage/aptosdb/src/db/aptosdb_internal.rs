@@ -66,7 +66,7 @@ impl AptosDB {
             Arc::clone(&ledger_db),
             hot_state_merkle_db,
             Arc::clone(&state_merkle_db),
-            hot_state_kv_db,
+            hot_state_kv_db.clone(),
             Arc::clone(&state_kv_db),
             state_pruner,
             buffered_state_target_items,
@@ -85,6 +85,7 @@ impl AptosDB {
 
         AptosDB {
             ledger_db: Arc::clone(&ledger_db),
+            hot_state_kv_db: hot_state_kv_db.clone(),
             state_kv_db: Arc::clone(&state_kv_db),
             event_store: Arc::new(EventStore::new(ledger_db.event_db().db_arc())),
             state_store,

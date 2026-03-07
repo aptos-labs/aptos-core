@@ -325,6 +325,15 @@ impl AptosDB {
             &mut sharded_state_kv_batches,
         )?;
 
+        let sharded_hot_state_kv_batches = if let Some(hot_state_kv_db) = &self.hot_state_kv_db {
+            let mut batches = hot_state_kv_db.new_sharded_native_batches();
+            self.state_store
+                .put_hot_state_updates(chunk.hot_state_updates, &mut batches)?;
+            Some(batches)
+        } else {
+            None
+        };
+
         // Write block index.
         for (i, txn_out) in chunk.transaction_outputs.iter().enumerate() {
             for event in txn_out.events() {
@@ -362,6 +371,19 @@ impl AptosDB {
                     .commit(chunk.expect_last_version(), None, sharded_state_kv_batches)
                     .unwrap();
             });
+            if let Some(sharded_hot_state_kv_batches) = sharded_hot_state_kv_batches {
+                s.spawn(|_| {
+                    self.hot_state_kv_db
+                        .as_ref()
+                        .unwrap()
+                        .commit(
+                            chunk.expect_last_version(),
+                            None,
+                            sharded_hot_state_kv_batches,
+                        )
+                        .unwrap();
+                });
+            }
         });
 
         Ok(())
