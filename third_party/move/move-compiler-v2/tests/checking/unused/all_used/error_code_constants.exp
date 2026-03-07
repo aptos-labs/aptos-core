@@ -1,0 +1,21 @@
+
+Diagnostics:
+warning: constant `UNUSED_THRESHOLD` is unused. Remove it, or suppress warning with `#[test_only]` (if for test only) or `#[lint::skip(unused)]` (if for spec only or otherwise needed).
+   ┌─ tests/checking/unused/all_used/error_code_constants.move:12:5
+   │
+12 │     const UNUSED_THRESHOLD: u64 = 100;
+   │     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+// -- Model dump before first bytecode pipeline
+module 0x42::m {
+    public fun do_something(): u64 {
+        42
+    }
+} // end 0x42::m
+
+// -- Sourcified model before first bytecode pipeline
+module 0x42::m {
+    public fun do_something(): u64 {
+        42
+    }
+}

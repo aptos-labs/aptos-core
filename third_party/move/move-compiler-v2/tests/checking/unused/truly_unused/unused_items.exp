@@ -1,18 +1,18 @@
 
 Diagnostics:
-warning: function `unused_fun` is unused. Remove it, or suppress warning with `#[test_only]` (if test-only), `#[verify_only]` (if verify-only), or `#[lint::skip(unused)]`.
+warning: function `unused_fun` is unused. Remove it, or suppress warning with `#[test_only]` (if for test only) or `#[lint::skip(unused)]` (if for spec only or otherwise needed).
   ┌─ tests/checking/unused/truly_unused/unused_items.move:3:9
   │
 3 │     fun unused_fun(): u64 {
   │         ^^^^^^^^^^
 
-warning: constant `UNUSED_CONST` is unused. Remove it, or suppress warning with `#[test_only]` (if test-only), `#[verify_only]` (if verify-only), or `#[lint::skip(unused)]`.
+warning: constant `UNUSED_CONST` is unused. Remove it, or suppress warning with `#[test_only]` (if for test only) or `#[lint::skip(unused)]` (if for spec only or otherwise needed).
   ┌─ tests/checking/unused/truly_unused/unused_items.move:8:5
   │
 8 │     const UNUSED_CONST: u64 = 100;
   │     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-warning: struct `UnusedStruct` is unused in current package. Remove it (if not published), or suppress warning with `#[test_only]` (if test-only), `#[verify_only]` (if verify-only), or `#[lint::skip(unused)]`.
+warning: struct `UnusedStruct` is unused in current package. Remove it (if not published), or suppress warning with `#[test_only]` (if for test only) or `#[lint::skip(unused)]` (if for spec only or otherwise needed).
    ┌─ tests/checking/unused/truly_unused/unused_items.move:11:5
    │
 11 │ ╭     struct UnusedStruct has drop {
