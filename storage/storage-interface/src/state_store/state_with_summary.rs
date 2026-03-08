@@ -2,13 +2,16 @@
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 use crate::state_store::{
-    state::{LedgerState, State},
+    state::{HotStateMetadata, LedgerState, State},
     state_summary::{LedgerStateSummary, StateSummary},
 };
 use aptos_config::config::HotStateConfig;
 use aptos_crypto::HashValue;
 use aptos_scratchpad::SparseMerkleTree;
-use aptos_types::{state_store::state_storage_usage::StateStorageUsage, transaction::Version};
+use aptos_types::{
+    state_store::{state_storage_usage::StateStorageUsage, NUM_STATE_SHARDS},
+    transaction::Version,
+};
 use derive_more::{Deref, DerefMut};
 
 #[derive(Clone, Debug, Deref)]
@@ -35,11 +38,12 @@ impl StateWithSummary {
         version: Option<Version>,
         hot_state_root_hash: HashValue,
         global_state_root_hash: HashValue,
+        hot_state_metadata: [HotStateMetadata; NUM_STATE_SHARDS],
         usage: StateStorageUsage,
         hot_state_config: HotStateConfig,
     ) -> Self {
         Self::new(
-            State::new_at_version(version, usage, hot_state_config),
+            State::new_at_version(version, hot_state_metadata, usage, hot_state_config),
             StateSummary::new_at_version(
                 version,
                 SparseMerkleTree::new(hot_state_root_hash),
