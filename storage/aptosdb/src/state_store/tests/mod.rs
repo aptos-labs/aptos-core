@@ -232,7 +232,7 @@ proptest! {
         let store1 = &db1.state_store;
         init_store(store1, input.clone().into_iter());
 
-        let version = (input.len() - 1) as Version;
+        let version = 1;
         let expected_root_hash = store1.get_root_hash(version).unwrap();
 
         let tmp_dir2 = TempPath::new();
@@ -289,7 +289,7 @@ proptest! {
         let store1 = &db1.state_store;
         init_store(store1, input.clone().into_iter());
 
-        let version = (input.len() - 1) as Version;
+        let version = 1;
         let expected_root_hash = store1.get_root_hash(version).unwrap();
         prop_assert_eq!(
             store1.get_value_count(version).unwrap(),
@@ -330,7 +330,7 @@ proptest! {
         let store1 = &db1.state_store;
         init_store(store1, input.clone().into_iter());
 
-        let version = (input.len() - 1) as Version;
+        let version = 1;
         let expected_root_hash = store1.get_root_hash(version).unwrap();
 
         let tmp_dir2 = TempPath::new();
@@ -383,7 +383,7 @@ proptest! {
         let store1 = &db1.state_store;
         init_store(store1, input.clone().into_iter());
 
-        let version = (input.len() - 1) as Version;
+        let version = 1;
         let expected_root_hash = store1.get_root_hash(version).unwrap();
 
         let tmp_dir2 = TempPath::new();
@@ -476,7 +476,10 @@ proptest! {
     }
 }
 
-// Initializes the state store by inserting one key at each version.
+// Initializes the state store by inserting all items in a single version (version 1).
+// Version 0 is left empty so that rightmost_leaf tests can put dummy data at NodeKey
+// version 0 without conflicting with the real data lookup at version 1.
 fn init_store(store: &StateStore, input: impl Iterator<Item = (StateKey, StateValue)>) {
-    update_store(store, input.into_iter().map(|(k, v)| (k, Some(v))), 0);
+    let kvs: Vec<_> = input.map(|(k, v)| (k, Some(v))).collect();
+    store.commit_block_for_test(0, [vec![], kvs]);
 }
