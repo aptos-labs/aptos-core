@@ -70,6 +70,7 @@ jemallocator = { workspace = true }
 [dev-dependencies]
 aptos-package-builder = { workspace = true }
 mockall = { workspace = true }
+move-package = { workspace = true, features = ["testing"] }
 move-prover-test-utils = { workspace = true }
 regex = { workspace = true }
 termcolor = { workspace = true }
@@ -77,4 +78,4 @@ termcolor = { workspace = true }
 [features]
 default = []
 binary = ["testing"]
-testing = ["aptos-vm/testing"]
+testing = ["aptos-vm/testing", "move-package/testing"]

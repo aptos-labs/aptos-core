@@ -33,9 +33,14 @@ pub(crate) enum PackageLock {
 
 impl PackageLock {
     pub(crate) fn lock() -> PackageLock {
-        if cfg!(test) {
+        if cfg!(any(test, feature = "testing")) {
             // In tests we assume that the test logic avoids file conflicts. Otherwise
             // global locks will lead to contention.
+            //
+            // Note: `cfg!(test)` alone only fires when *this* crate is the test target.
+            // The `testing` feature allows downstream test binaries (e.g. `aptos-move-cli`)
+            // that compile `move-package` as a regular dependency to opt in to the same
+            // lock-skip behavior.
             PackageLock::Inactive
         } else {
             Self::strict_lock()
