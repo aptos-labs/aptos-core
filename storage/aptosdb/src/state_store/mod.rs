@@ -53,7 +53,7 @@ use aptos_scratchpad::SparseMerkleTree;
 use aptos_storage_interface::{
     db_ensure as ensure, db_other_bail as bail,
     state_store::{
-        state::{LedgerState, State},
+        state::{HotStateMetadata, LedgerState, State},
         state_summary::{ProvableStateSummary, StateSummary},
         state_update_refs::{PerVersionStateUpdateRefs, StateUpdateRefs},
         state_view::{
@@ -77,6 +77,7 @@ use aptos_types::{
     },
     transaction::Version,
 };
+use arr_macro::arr;
 use claims::{assert_ge, assert_le};
 use itertools::Itertools;
 use rayon::prelude::*;
@@ -610,6 +611,7 @@ impl StateStore {
             latest_snapshot_version,
             *SPARSE_MERKLE_PLACEHOLDER_HASH, // TODO(HotState): for now hot state always starts from empty upon restart.
             latest_snapshot_root_hash,
+            arr![HotStateMetadata::new_empty(); 16],
             usage,
             hot_state_config,
         );
@@ -1214,7 +1216,12 @@ impl StateStore {
 
     pub fn init_state_ignoring_summary(&self, version: Option<Version>) -> Result<()> {
         let usage = self.get_usage(version)?;
-        let state = State::new_at_version(version, usage, HotStateConfig::default());
+        let state = State::new_at_version(
+            version,
+            arr![HotStateMetadata::new_empty(); 16],
+            usage,
+            HotStateConfig::default(),
+        );
         let ledger_state = LedgerState::new(state.clone(), state);
         self.set_state_ignoring_summary(ledger_state);
 
