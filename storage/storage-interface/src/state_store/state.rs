@@ -105,6 +105,39 @@ impl State {
         Self::new_at_version(None, StateStorageUsage::zero(), hot_state_config)
     }
 
+    /// Constructs a `State` from hot state entries loaded from the hot state KV DB.
+    ///
+    /// Each shard's entries must already have LRU prev/next pointers wired up and be sorted
+    /// by `hot_since_version` ascending (oldest first, newest last).
+    pub fn new_from_hot_state_entries(
+        version: Option<Version>,
+        entries_per_shard: [Vec<(StateKey, StateSlot)>; NUM_STATE_SHARDS],
+        hot_state_config: HotStateConfig,
+    ) -> Self {
+        // Layers are empty — on restart the actual entries live in HotStateBase DashMaps,
+        // which the LRU lookup reaches via `committed` (the HotStateView). The State only
+        // needs the correct version and metadata (LRU pointers, counts).
+        let mut metadata: [HotStateMetadata; NUM_STATE_SHARDS] = arr![HotStateMetadata::new(); 16];
+
+        for (shard_id, entries) in entries_per_shard.iter().enumerate() {
+            // Oldest is first (index 0), newest is last.
+            metadata[shard_id] = HotStateMetadata {
+                oldest: entries.first().map(|(k, _)| k.clone()),
+                latest: entries.last().map(|(k, _)| k.clone()),
+                num_items: entries.len(),
+            };
+        }
+
+        Self::new_with_updates(
+            version,
+            Arc::new(arr![MapLayer::new_family("state"); 16]),
+            metadata,
+            // Hot state doesn't track global storage usage — use zero.
+            StateStorageUsage::zero(),
+            hot_state_config,
+        )
+    }
+
     pub fn next_version(&self) -> Version {
         self.next_version
     }
