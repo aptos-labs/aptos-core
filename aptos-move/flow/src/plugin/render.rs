@@ -5,7 +5,10 @@ use anyhow::{Context, Result};
 use std::{
     collections::{HashMap, HashSet},
     path::{Path, PathBuf},
-    sync::{Arc, Mutex},
+    sync::{
+        atomic::{AtomicBool, Ordering},
+        Arc, Mutex,
+    },
 };
 use tera::Tera;
 use walkdir::WalkDir;
@@ -42,6 +45,7 @@ pub fn render_all(
     let mut tera = Tera::default();
     tera.register_function("tool", make_tool_function(tool_names.to_vec()));
     let once_seen = make_once_function(&mut tera);
+    let frontmatter_seen = make_frontmatter_function(&mut tera);
 
     // First pass: register all templates in a shared Tera instance.
     let mut output_names = Vec::new();
@@ -79,11 +83,23 @@ pub fn render_all(
     // Second pass: render output-producing templates.
     let mut results = Vec::new();
     for (out_path, template_name) in output_names {
-        // Reset include onces so each output file deduplicates independently.
+        // Reset per-file state so each output file deduplicates independently.
         once_seen.lock().unwrap().clear();
+        frontmatter_seen.store(false, Ordering::Relaxed);
         let rendered = tera
             .render(&template_name, context)
             .with_context(|| format!("failed to render template {}", out_path.display()))?;
+
+        // Skills and agents must call frontmatter() to declare their metadata.
+        let needs_frontmatter = out_path.starts_with("skills") || out_path.starts_with("agents");
+        if needs_frontmatter {
+            anyhow::ensure!(
+                frontmatter_seen.load(Ordering::Relaxed),
+                "{} does not call frontmatter(name=..., description=...)",
+                out_path.display()
+            );
+        }
+
         results.push((out_path, rendered));
     }
 
@@ -104,6 +120,7 @@ fn render_one(
     let mut tera = Tera::default();
     tera.register_function("tool", make_tool_function(tool_names.to_vec()));
     make_once_function(&mut tera);
+    make_frontmatter_function(&mut tera);
     let template_name = path.to_string_lossy();
     tera.add_raw_template(&template_name, content)
         .with_context(|| format!("failed to parse template {}", path.display()))?;
@@ -132,6 +149,49 @@ fn make_once_function(tera: &mut Tera) -> Arc<Mutex<HashSet<String>>> {
                 .ok_or_else(|| tera::Error::msg("once() requires a `name` argument"))?;
             let first = seen_clone.lock().unwrap().insert(name.to_string());
             Ok(tera::Value::Bool(first))
+        },
+    );
+    seen
+}
+
+/// Creates a Tera function `frontmatter(name="...", description="...")` that
+/// renders YAML frontmatter and validates that both fields are non-empty.
+///
+/// Returns a shared flag that is set during rendering. The caller resets it
+/// between render passes and checks that skill/agent files have called this
+/// function exactly once.
+fn make_frontmatter_function(tera: &mut Tera) -> Arc<AtomicBool> {
+    let seen = Arc::new(AtomicBool::new(false));
+    let seen_clone = Arc::clone(&seen);
+    tera.register_function(
+        "frontmatter",
+        move |args: &HashMap<String, tera::Value>| -> tera::Result<tera::Value> {
+            if seen_clone.swap(true, Ordering::Relaxed) {
+                return Err(tera::Error::msg(
+                    "frontmatter() must be called exactly once per file",
+                ));
+            }
+            let name = args
+                .get("name")
+                .and_then(|v| v.as_str())
+                .ok_or_else(|| tera::Error::msg("frontmatter() requires a `name` argument"))?;
+            if name.is_empty() {
+                return Err(tera::Error::msg("frontmatter() `name` must not be empty"));
+            }
+            let description = args
+                .get("description")
+                .and_then(|v| v.as_str())
+                .ok_or_else(|| {
+                    tera::Error::msg("frontmatter() requires a `description` argument")
+                })?;
+            if description.is_empty() {
+                return Err(tera::Error::msg(
+                    "frontmatter() `description` must not be empty",
+                ));
+            }
+            Ok(tera::Value::String(format!(
+                "---\nname: {name}\ndescription: {description}\n---"
+            )))
         },
     );
     seen
@@ -217,15 +277,27 @@ mod tests {
         assert!(!files.is_empty(), "should discover at least one file");
 
         let paths: Vec<_> = files.iter().map(|(p, _)| p.clone()).collect();
-        assert!(
-            paths.iter().any(|p| p.starts_with("skills")),
-            "should find files under skills/"
-        );
+        // Verify all expected plugin directories are represented in output.
+        for dir in &["skills", "agents", "hooks"] {
+            assert!(
+                paths.iter().any(|p| p.starts_with(dir)),
+                "should find files under {dir}/"
+            );
+        }
 
         // Verify that templates/ partials are NOT in the output.
         assert!(
             !paths.iter().any(|p| p.starts_with("templates")),
             "templates/ partials should not appear in output"
         );
+
+        // Verify no output file is empty.
+        for (path, content) in &files {
+            assert!(
+                !content.trim().is_empty(),
+                "{} rendered to empty content",
+                path.display()
+            );
+        }
     }
 }

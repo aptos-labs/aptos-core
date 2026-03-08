@@ -944,6 +944,7 @@ codegen-units = 1
 
 [profile.ci]
 inherits = "release"
+opt-level = 2
 debug = "line-tables-only"
 overflow-checks = true
 debug-assertions = true
