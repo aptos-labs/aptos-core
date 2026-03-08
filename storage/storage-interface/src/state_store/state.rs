@@ -44,11 +44,19 @@ pub struct HotStateMetadata {
 }
 
 impl HotStateMetadata {
-    fn new() -> Self {
+    fn new_empty() -> Self {
         Self {
             latest: None,
             oldest: None,
             num_items: 0,
+        }
+    }
+
+    pub fn new(oldest: Option<StateKey>, latest: Option<StateKey>, num_items: usize) -> Self {
+        Self {
+            latest,
+            oldest,
+            num_items,
         }
     }
 }
@@ -95,7 +103,7 @@ impl State {
         Self::new_with_updates(
             version,
             Arc::new(arr![MapLayer::new_family("state"); 16]),
-            arr![HotStateMetadata::new(); 16],
+            arr![HotStateMetadata::new_empty(); 16],
             usage,
             hot_state_config,
         )
@@ -103,6 +111,26 @@ impl State {
 
     pub fn new_empty(hot_state_config: HotStateConfig) -> Self {
         Self::new_at_version(None, StateStorageUsage::zero(), hot_state_config)
+    }
+
+    /// Constructs a `State` for hot state loaded from DB on restart.
+    ///
+    /// Layers are empty — the actual entries live in HotStateBase DashMaps, which
+    /// the LRU lookup reaches via the committed HotStateView. The State only needs
+    /// the correct version and metadata (LRU head/tail, counts).
+    pub fn new_from_hot_state_metadata(
+        version: Option<Version>,
+        metadata: [HotStateMetadata; NUM_STATE_SHARDS],
+        hot_state_config: HotStateConfig,
+    ) -> Self {
+        Self::new_with_updates(
+            version,
+            Arc::new(arr![MapLayer::new_family("state"); 16]),
+            metadata,
+            // Hot state doesn't track global storage usage — use zero.
+            StateStorageUsage::zero(),
+            hot_state_config,
+        )
     }
 
     pub fn next_version(&self) -> Version {
