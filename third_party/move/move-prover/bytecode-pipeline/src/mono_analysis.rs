@@ -235,7 +235,7 @@ impl Analyzer<'_> {
                     // included in the bytecode.
                     for (_, exps) in target.get_modify_ids_and_exps() {
                         for exp in exps {
-                            self.analyze_exp(exp);
+                            self.analyze_exp(&exp);
                         }
                     }
                 }

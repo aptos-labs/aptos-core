@@ -7,8 +7,8 @@
 
 use crate::{
     ast::{
-        Condition, ConditionKind, Exp, ExpData, GlobalInvariant, MemoryLabel, Operation,
-        RewriteResult, Spec, TempIndex, TraceKind,
+        BehaviorKind, Condition, ConditionKind, Exp, ExpData, GlobalInvariant, MemoryLabel,
+        MemoryRange, Operation, RewriteResult, Spec, TempIndex, TraceKind,
     },
     exp_generator::ExpGenerator,
     exp_rewriter::ExpRewriterFunctions,
@@ -50,6 +50,11 @@ pub struct SpecTranslator<'a, 'b, T: ExpGenerator<'a>> {
     result: TranslatedSpec,
     /// Whether we are in "old" (pre-state) context
     in_old: bool,
+    /// Shared label for all `old()` memory saves within this translator.
+    /// All `old()` references in a single SpecTranslator refer to the same program point
+    /// (function entry), so all saved memories can share one label. Using a single label
+    /// avoids conflicts when multiple invariants/conditions reference overlapping memory types.
+    shared_old_label: Option<MemoryLabel>,
 }
 
 /// Represents a translated spec.
@@ -219,6 +224,7 @@ impl<'a, 'b, T: ExpGenerator<'a>> SpecTranslator<'a, 'b, T> {
             result: Default::default(),
             let_locals: Default::default(),
             in_old: false,
+            shared_old_label: None,
         };
         translator.translate_spec(for_call);
         translator.result
@@ -244,6 +250,7 @@ impl<'a, 'b, T: ExpGenerator<'a>> SpecTranslator<'a, 'b, T> {
             result: Default::default(),
             let_locals: Default::default(),
             in_old: false,
+            shared_old_label: None,
         };
         // Clone invariants so `inst` lives for the entire loop
         let invariants = invariants.collect_vec();
@@ -279,6 +286,7 @@ impl<'a, 'b, T: ExpGenerator<'a>> SpecTranslator<'a, 'b, T> {
             result: Default::default(),
             let_locals: Default::default(),
             in_old: false,
+            shared_old_label: None,
         };
 
         // Handle updating of global spec variables
@@ -412,25 +420,26 @@ impl<'a, 'b, T: ExpGenerator<'a>> SpecTranslator<'a, 'b, T> {
             ));
         }
 
-        // Translate modifies.
-        for cond in spec
-            .filter_kind(ConditionKind::Modifies)
-            .filter(is_applicable)
+        // Translate modifies targets from function's frame spec.
         {
             self.in_post_state = false;
-            for exp in cond.all_exps() {
+            let fun_env = self.fun_env;
+            let modifies_targets: Vec<Exp> = fun_env
+                .get_frame_spec()
+                .map(|fs| fs.modifies_targets.clone())
+                .unwrap_or_default();
+            for target in modifies_targets.iter() {
+                let loc = self.fun_env.get_loc();
                 // Auto trace the inner address expression.
-                let exp = match exp.as_ref() {
-                    ExpData::Call(id, oper, args) if args.len() == 1 => ExpData::Call(
-                        *id,
-                        oper.clone(),
-                        vec![self.auto_trace(&cond.loc, &args[0])],
-                    )
-                    .into_exp(),
-                    _ => cond.exp.to_owned(),
+                let exp = match target.as_ref() {
+                    ExpData::Call(id, oper, args) if args.len() == 1 => {
+                        ExpData::Call(*id, oper.clone(), vec![self.auto_trace(&loc, &args[0])])
+                            .into_exp()
+                    },
+                    _ => target.clone(),
                 };
                 let exp = self.translate_exp(&exp, false);
-                self.result.modifies.push((cond.loc.clone(), exp));
+                self.result.modifies.push((loc, exp));
             }
         }
 
@@ -563,13 +572,38 @@ impl<'a, 'b, T: ExpGenerator<'a>> SpecTranslator<'a, 'b, T> {
         }
     }
 
+    /// Returns the shared label for all `old()` saves in this translator,
+    /// creating one on first use.
+    fn get_or_create_old_label(&mut self) -> MemoryLabel {
+        if let Some(label) = self.shared_old_label {
+            label
+        } else {
+            let label = self.builder.global_env().new_global_id();
+            self.shared_old_label = Some(label);
+            label
+        }
+    }
+
     fn save_memory(&mut self, qid: QualifiedInstId<StructId>) -> MemoryLabel {
-        let builder = &mut self.builder;
-        *self
-            .result
-            .saved_memory
-            .entry(qid)
-            .or_insert_with(|| builder.global_env().new_global_id())
+        let label = self.get_or_create_old_label();
+        *self.result.saved_memory.entry(qid).or_insert(label)
+    }
+
+    /// Save memory for multiple resources using the shared old label.
+    fn save_memory_shared<'c>(
+        &mut self,
+        used_memory: impl IntoIterator<Item = &'c QualifiedInstId<StructId>>,
+        inst: &[Type],
+    ) -> MemoryLabel {
+        let label = self.get_or_create_old_label();
+        let mems: Vec<_> = used_memory
+            .into_iter()
+            .map(|m| m.to_owned().instantiate(inst))
+            .collect();
+        for mem in mems {
+            self.result.saved_memory.entry(mem).or_insert(label);
+        }
+        label
     }
 
     fn save_param(&mut self, idx: TempIndex) -> TempIndex {
@@ -696,6 +730,7 @@ impl<'a, T: ExpGenerator<'a>> ExpRewriterFunctions for SpecTranslator<'a, '_, T>
         use ExpData::*;
         use Operation::*;
         match oper {
+            // Global(None): fall back to save_memory when in old context
             Global(None) if self.in_old => Some(
                 Call(
                     id,
@@ -712,21 +747,99 @@ impl<'a, T: ExpGenerator<'a>> ExpRewriterFunctions for SpecTranslator<'a, '_, T>
                 )
                 .into_exp(),
             ),
-            SpecFunction(mid, fid, None) if self.in_old => {
+            // SpecFunction with labels from state labels: still may need pre-state SaveMem
+            SpecFunction(mid, fid, range) if !range.is_default() => {
+                // If the spec fun uses old() and has no pre-label, save memory
+                // for the pre-state. This happens with `..S |~ spec_fun(a)` where
+                // post=S but pre=None (function entry).
+                let (uses_old, has_old_memory, used_memory) = {
+                    let module_env = self.builder.global_env().get_module(*mid);
+                    let decl = module_env.get_spec_fun(*fid);
+                    (
+                        decl.uses_old,
+                        !decl.old_memory.is_empty(),
+                        decl.used_memory.clone(),
+                    )
+                };
+                if uses_old && has_old_memory && range.pre.is_none() {
+                    let inst = self.builder.global_env().get_node_instantiation(id);
+                    let label = self.save_memory_shared(&used_memory, &inst);
+                    let new_range = MemoryRange {
+                        pre: Some(label),
+                        post: range.post,
+                    };
+                    Some(Call(id, SpecFunction(*mid, *fid, new_range), args.to_owned()).into_exp())
+                } else {
+                    None
+                }
+            },
+            // SpecFunction in old context: save memory for pre-state
+            SpecFunction(mid, fid, range) if self.in_old => {
                 let used_memory = {
                     let module_env = self.builder.global_env().get_module(*mid);
                     let decl = module_env.get_spec_fun(*fid);
-                    // Unfortunately, the below clones are necessary, as we cannot borrow decl
-                    // and at the same time mutate self later.
                     decl.used_memory.clone()
                 };
                 let inst = self.builder.global_env().get_node_instantiation(id);
-                let mut labels = vec![];
-                for mem in used_memory {
-                    let mem = mem.instantiate(&inst);
-                    labels.push(self.save_memory(mem));
+                let label = self.save_memory_shared(&used_memory, &inst);
+                let new_range = MemoryRange {
+                    pre: Some(label),
+                    post: range.post,
+                };
+                Some(Call(id, SpecFunction(*mid, *fid, new_range), args.to_owned()).into_exp())
+            },
+            // SpecFunction outside old but uses_old: save memory for pre-state
+            SpecFunction(mid, fid, range) if !self.in_old => {
+                let (uses_old, has_old_memory, used_memory) = {
+                    let module_env = self.builder.global_env().get_module(*mid);
+                    let decl = module_env.get_spec_fun(*fid);
+                    (
+                        decl.uses_old,
+                        !decl.old_memory.is_empty(),
+                        decl.used_memory.clone(),
+                    )
+                };
+                if uses_old && has_old_memory {
+                    let inst = self.builder.global_env().get_node_instantiation(id);
+                    let label = self.save_memory_shared(&used_memory, &inst);
+                    let new_range = MemoryRange {
+                        pre: Some(label),
+                        post: range.post,
+                    };
+                    Some(Call(id, SpecFunction(*mid, *fid, new_range), args.to_owned()).into_exp())
+                } else {
+                    None
                 }
-                Some(Call(id, SpecFunction(*mid, *fid, Some(labels)), args.to_owned()).into_exp())
+            },
+            // Behavior with labels already set: leave as-is
+            Behavior(_, range) if !range.is_default() => None,
+            // Behavior that needs pre-state label
+            Behavior(kind, range) if needs_pre_label(kind, self.in_old) => {
+                if let Some(ExpData::Call(closure_id, Operation::Closure(mid, fid, _), _)) =
+                    args.first().map(|a| a.as_ref())
+                {
+                    let fun_env = self.builder.global_env().get_function(mid.qualified(*fid));
+                    let used_memory = fun_env.get_spec_used_memory().clone();
+                    let inst = self
+                        .builder
+                        .global_env()
+                        .get_node_instantiation(*closure_id);
+                    let label = self.save_memory_shared(&used_memory, &inst);
+                    let new_range = MemoryRange {
+                        pre: Some(label),
+                        post: range.post,
+                    };
+                    Some(Call(id, Behavior(*kind, new_range), args.to_owned()).into_exp())
+                } else {
+                    // Temporary/LocalVar: use enclosing function's spec_used_memory
+                    let used_memory = self.fun_env.get_spec_used_memory().clone();
+                    let label = self.save_memory_shared(&used_memory, self.type_args);
+                    let new_range = MemoryRange {
+                        pre: Some(label),
+                        post: range.post,
+                    };
+                    Some(Call(id, Behavior(*kind, new_range), args.to_owned()).into_exp())
+                }
             },
             Old => Some(args[0].to_owned()),
             Result(n) => {
@@ -766,4 +879,11 @@ impl<'a, T: ExpGenerator<'a>> ExpRewriterFunctions for SpecTranslator<'a, '_, T>
     fn rewrite_exit_scope(&mut self, _id: NodeId) {
         self.shadowed.pop();
     }
+}
+
+/// Returns true if a behavioral predicate of given kind needs a pre-state memory label.
+/// `ensures_of` and `result_of` always need pre-state (they compare pre vs post).
+/// `aborts_of` and `requires_of` only need pre-state if inside `old()`.
+fn needs_pre_label(kind: &BehaviorKind, in_old: bool) -> bool {
+    in_old || matches!(kind, BehaviorKind::EnsuresOf | BehaviorKind::ResultOf)
 }

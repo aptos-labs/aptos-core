@@ -27,7 +27,7 @@
 //!
 //! **Arithmetic identities** (spec mode): `0 + a => a`, `a * 1 => a`, `a - a => 0`,
 //!   associative constant folding (`(x + c1) + c2 => x + (c1+c2)`),
-//!   additive cancellation (`(e - x) + (x ± C) => e ± C`, `(e + x) - x => e`),
+//!   additive cancellation across comparisons (`(e - x) + (x± C) => e ± C`, `(e + x) - x => e`),
 //!   distribute-and-cancel (`(a - 1) * b + (b ± D) => a*b ± D`).
 //!
 //! **Constant folding**: Via `ConstantFolder` for fully-constant subexpressions,
@@ -109,6 +109,8 @@ pub struct ExpSimplifier<'a, 'env, G: ExpGenerator<'env>> {
     inside_old: bool,
     /// Tracks the number of spec function unfold steps to prevent runaway recursion.
     spec_fun_unfold_depth: usize,
+    /// Guard to prevent recursive modus ponens derivation.
+    in_modus_ponens: bool,
     /// Binds the `'env` lifetime (used only in the `G: ExpGenerator<'env>` bound).
     _phantom: std::marker::PhantomData<&'env ()>,
 }
@@ -124,6 +126,7 @@ impl<'a, 'env, G: ExpGenerator<'env>> ExpSimplifier<'a, 'env, G> {
             spec_mode: true,
             inside_old: false,
             spec_fun_unfold_depth: 0,
+            in_modus_ponens: false,
             _phantom: std::marker::PhantomData,
         }
     }
@@ -138,6 +141,7 @@ impl<'a, 'env, G: ExpGenerator<'env>> ExpSimplifier<'a, 'env, G> {
             spec_mode,
             inside_old: false,
             spec_fun_unfold_depth: 0,
+            in_modus_ponens: false,
             _phantom: std::marker::PhantomData,
         }
     }
@@ -184,6 +188,24 @@ impl<'a, 'env, G: ExpGenerator<'env>> ExpSimplifier<'a, 'env, G> {
         if !self.assumptions.iter().any(|a| a.structural_eq(&exp)) {
             self.assumptions.push(exp);
         }
+        // Modus ponens: if any existing assumption is `P ==> Q` and P is now known true,
+        // derive Q as an additional assumption (which may extract substitutions from equalities).
+        // Guarded by `in_modus_ponens` to prevent recursive derivation.
+        if !self.in_modus_ponens {
+            self.in_modus_ponens = true;
+            let mut derived = Vec::new();
+            for a in &self.assumptions {
+                if let ExpData::Call(_, Operation::Implies, args) = a.as_ref() {
+                    if args.len() == 2 && self.is_known_true(&args[0]) {
+                        derived.push(args[1].clone());
+                    }
+                }
+            }
+            for d in derived {
+                self.assume(d);
+            }
+            self.in_modus_ponens = false;
+        }
     }
 
     /// Simplifies an expression using bottom-up rewriting.
@@ -193,6 +215,10 @@ impl<'a, 'env, G: ExpGenerator<'env>> ExpSimplifier<'a, 'env, G> {
 
     /// Checks whether the given expression is known to be true under current assumptions.
     pub fn is_known_true(&self, exp: &Exp) -> bool {
+        self.is_known_true_bounded(exp, 4)
+    }
+
+    fn is_known_true_bounded(&self, exp: &Exp, depth: usize) -> bool {
         if is_bool_const(exp, true) {
             return true;
         }
@@ -202,6 +228,20 @@ impl<'a, 'env, G: ExpGenerator<'env>> ExpSimplifier<'a, 'env, G> {
             .any(|a| a.structural_eq(exp) || self.implies_comparison(a, exp))
         {
             return true;
+        }
+        // Modus ponens: if `P ==> exp` is an assumption and P is known true, then exp is true.
+        // Depth limit guards against cyclic implications (e.g. `a ==> b` and `b ==> a`).
+        if depth > 0 {
+            for a in &self.assumptions {
+                if let ExpData::Call(_, Operation::Implies, args) = a.as_ref() {
+                    if args.len() == 2
+                        && args[1].structural_eq(exp)
+                        && self.is_known_true_bounded(&args[0], depth - 1)
+                    {
+                        return true;
+                    }
+                }
+            }
         }
         self.is_known_true_by_ordering(exp)
     }
@@ -340,7 +380,14 @@ impl<'a, 'env, G: ExpGenerator<'env>> ExpSimplifier<'a, 'env, G> {
             // If one implies the other, keep the weaker (the one that is implied)
             _ if self.implies_comparison(&arg1, &arg2) => arg2,
             _ if self.implies_comparison(&arg2, &arg1) => arg1,
-            _ => self.mk_bool_call(Operation::Or, vec![arg1, arg2]),
+            // Factor complementary conjunctions: (P && Q) || (!P && Q) → Q
+            _ => {
+                if let Some(result) = self.try_factor_complementary_or(&arg1, &arg2) {
+                    result
+                } else {
+                    self.mk_bool_call(Operation::Or, vec![arg1, arg2])
+                }
+            },
         }
     }
 
@@ -366,6 +413,54 @@ impl<'a, 'env, G: ExpGenerator<'env>> ExpSimplifier<'a, 'env, G> {
             },
             _ => self.mk_bool_call(Operation::Implies, vec![arg1, arg2]),
         }
+    }
+
+    /// Try to factor complementary conjunctions in a disjunction:
+    /// `(P && Q) || (!P && Q)` → `Q`, where Q is the common part.
+    fn try_factor_complementary_or(&self, arg1: &Exp, arg2: &Exp) -> Option<Exp> {
+        let lhs = flatten_conjunction_owned(arg1);
+        let rhs = flatten_conjunction_owned(arg2);
+        if lhs.len() < 2 || rhs.len() < 2 {
+            return None;
+        }
+        // Find a conjunct in lhs whose complement is in rhs
+        for (i, lc) in lhs.iter().enumerate() {
+            for (j, rc) in rhs.iter().enumerate() {
+                if self.is_complementary(lc, rc) {
+                    // Remove the complementary pair and check remaining are equal
+                    let mut lhs_rest: Vec<_> = lhs
+                        .iter()
+                        .enumerate()
+                        .filter(|(k, _)| *k != i)
+                        .map(|(_, e)| e)
+                        .collect();
+                    let mut rhs_rest: Vec<_> = rhs
+                        .iter()
+                        .enumerate()
+                        .filter(|(k, _)| *k != j)
+                        .map(|(_, e)| e)
+                        .collect();
+                    lhs_rest.sort_by(|a, b| format!("{:?}", a).cmp(&format!("{:?}", b)));
+                    rhs_rest.sort_by(|a, b| format!("{:?}", a).cmp(&format!("{:?}", b)));
+                    if lhs_rest.len() == rhs_rest.len()
+                        && lhs_rest
+                            .iter()
+                            .zip(rhs_rest.iter())
+                            .all(|(a, b)| a.structural_eq(b))
+                    {
+                        // Common part is the conjunction of the remaining elements
+                        return Some(
+                            lhs_rest
+                                .into_iter()
+                                .cloned()
+                                .reduce(|a, b| self.mk_and(a, b))
+                                .unwrap_or_else(|| self.mk_bool_const(true)),
+                        );
+                    }
+                }
+            }
+        }
+        None
     }
 
     fn mk_iff(&self, arg1: Exp, arg2: Exp) -> Exp {
@@ -411,6 +506,30 @@ impl<'a, 'env, G: ExpGenerator<'env>> ExpSimplifier<'a, 'env, G> {
                 let (w_base, w_off) = extract_additive_offset(w_left);
                 if s_base.structural_eq(w_base) && s_off >= w_off {
                     return true;
+                }
+            }
+            // Monotonicity of addition: C < A + B implies 0 < B (and 0 < A)
+            // when A's type bound <= C. Since A <= max(A_type) <= C,
+            // A + B > C requires B > 0.
+            if let (Some(w_c), None) = (get_num_const(w_left), get_num_const(w_right)) {
+                if w_c.is_zero() {
+                    if let Some(s_c) = get_num_const(s_left) {
+                        if let ExpData::Call(_, Operation::Add, s_args) = s_right.as_ref() {
+                            if s_args.len() == 2 {
+                                for (var_idx, other_idx) in [(0, 1), (1, 0)] {
+                                    if s_args[var_idx].structural_eq(w_right) {
+                                        if let Some(max) =
+                                            get_type_bound(self.env(), &s_args[other_idx])
+                                        {
+                                            if max <= *s_c {
+                                                return true;
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
                 }
             }
         }
@@ -844,6 +963,75 @@ impl<'a, 'env, G: ExpGenerator<'env>> ExpSimplifier<'a, 'env, G> {
                 return Some(result);
             }
         }
+        // Additive cancellation: cancel common addends from both sides of comparisons.
+        // E.g., `A + n == A + x + 1` → `n == x + 1`, `r + (n-1) > MAX-1` → `r + n > MAX`.
+        // Sound because spec mode uses arbitrary-precision arithmetic (no overflow).
+        if self.spec_mode
+            && matches!(
+                oper,
+                Operation::Eq
+                    | Operation::Neq
+                    | Operation::Lt
+                    | Operation::Le
+                    | Operation::Gt
+                    | Operation::Ge
+            )
+        {
+            if let Some(result) = self.cancel_common_addend(oper, &args[0], &args[1]) {
+                return Some(result);
+            }
+        }
+        None
+    }
+
+    /// Cancel a common addend from both sides of a comparison.
+    /// Flattens left-associative Add/Sub trees, finds a structurally equal addend,
+    /// removes it from both sides, and rebuilds the expressions.
+    /// Sound for all comparison operators in spec mode (arbitrary-precision arithmetic).
+    fn cancel_common_addend(&self, oper: &Operation, lhs: &Exp, rhs: &Exp) -> Option<Exp> {
+        let mut lhs_addends = Vec::new();
+        flatten_add(lhs, &mut lhs_addends);
+        let mut rhs_addends = Vec::new();
+        flatten_add(rhs, &mut rhs_addends);
+        if lhs_addends.len() < 2 && rhs_addends.len() < 2 {
+            return None; // Nothing to cancel
+        }
+        // Find first common addend
+        for (i, la) in lhs_addends.iter().enumerate() {
+            for (j, ra) in rhs_addends.iter().enumerate() {
+                if la.structural_eq(ra) {
+                    // Remove the common addend from both sides
+                    let mut new_lhs = lhs_addends.clone();
+                    new_lhs.remove(i);
+                    let mut new_rhs = rhs_addends.clone();
+                    new_rhs.remove(j);
+                    let ty = self.env().get_node_type(lhs.as_ref().node_id());
+                    let rebuild = |addends: Vec<Exp>| -> Exp {
+                        if addends.is_empty() {
+                            self.mk_num_const(&ty, BigInt::zero())
+                        } else {
+                            addends
+                                .into_iter()
+                                .reduce(|a, b| {
+                                    // If b is a negative constant (from Sub decomposition),
+                                    // rebuild as Sub(a, |b|) instead of Add(a, -c).
+                                    if let ExpData::Value(_, Value::Number(n)) = b.as_ref() {
+                                        if *n < BigInt::zero() {
+                                            let pos = self.mk_num_const(&ty, -n);
+                                            return self.mk_call(&ty, Operation::Sub, vec![a, pos]);
+                                        }
+                                    }
+                                    self.mk_call(&ty, Operation::Add, vec![a, b])
+                                })
+                                .unwrap()
+                        }
+                    };
+                    let new_l = rebuild(new_lhs);
+                    let new_r = rebuild(new_rhs);
+                    return Some(self.mk_bool_call(oper.clone(), vec![new_l, new_r]));
+                }
+            }
+        }
         None
     }
 
@@ -911,64 +1099,95 @@ impl<'a, 'env, G: ExpGenerator<'env>> ExpSimplifier<'a, 'env, G> {
                     self.mk_bool_call(Operation::Eq, vec![expr.clone(), args[const_idx].clone()]),
                 );
             }
+            // Boundary pinch from above: expr >= max_val → expr == max_val.
+            if matches!(op, Operation::Ge) && *val == max {
+                let expr = &args[expr_idx];
+                return Some(
+                    self.mk_bool_call(Operation::Eq, vec![expr.clone(), args[const_idx].clone()]),
+                );
+            }
+            // Strict boundary pinch: expr > max - 1 → expr == max (for integer types).
+            if matches!(op, Operation::Gt) && val.clone() + 1 == max {
+                let expr = &args[expr_idx];
+                let max_const = self.mk_num_const(&ty, max.clone());
+                return Some(self.mk_bool_call(Operation::Eq, vec![expr.clone(), max_const]));
+            }
+            // Strict boundary pinch: expr < min + 1 → expr == min (for integer types).
+            if matches!(op, Operation::Lt) && *val == min.clone() + 1 {
+                let expr = &args[expr_idx];
+                let min_const = self.mk_num_const(&ty, min);
+                return Some(self.mk_bool_call(Operation::Eq, vec![expr.clone(), min_const]));
+            }
         }
         None
     }
 
-    /// Normalize comparisons where one side has a constant addend:
-    /// `(e + C1) op C2` → `e op (C2 - C1)`, `(e - C1) op C2` → `e op (C2 + C1)`.
+    /// Normalize comparisons where one side is a constant and the other has constant
+    /// addends: `(e + C1) op C2` → `e op (C2 - C1)`, `(e - C1) op C2` → `e op (C2 + C1)`.
+    /// Uses `flatten_add` to handle nested Add/Sub trees, e.g.
+    /// `(r + (n - 1)) > (MAX - 1)` → `(r + n) > MAX`.
     /// After normalization, re-check type bounds.
     fn normalize_comparison_addend(&self, oper: &Operation, args: &[Exp]) -> Option<Exp> {
         for (add_idx, const_idx) in [(0, 1), (1, 0)] {
-            let c2 = get_num_const(&args[const_idx])?;
-            if let ExpData::Call(_, add_op, inner) = args[add_idx].as_ref() {
-                if inner.len() < 2 {
-                    continue;
-                }
-                let c1 = match get_num_const(&inner[1]) {
-                    Some(c) => c,
-                    None => continue,
-                };
-                let new_const = match add_op {
-                    Operation::Add => c2 - c1,
-                    Operation::Sub => c2 + c1,
-                    _ => continue,
-                };
-                // Build normalized comparison: inner[0] `op` new_const (or flipped)
-                let expr = &inner[0];
-                let (normalized_op, normalized_val) = if add_idx == 0 {
-                    // (e ± C1) op C2 → e op new_const
-                    (oper.clone(), new_const)
+            let c2 = match get_num_const(&args[const_idx]) {
+                Some(c) => c.clone(),
+                None => continue,
+            };
+            // Flatten the non-constant side into addends (handles nested Add/Sub)
+            let mut addends = Vec::new();
+            flatten_add(&args[add_idx], &mut addends);
+            if addends.len() < 2 {
+                continue;
+            }
+            // Extract and sum all constant addends
+            let mut const_offset = BigInt::zero();
+            let mut non_const = Vec::new();
+            for a in &addends {
+                if let ExpData::Value(_, Value::Number(n)) = a.as_ref() {
+                    const_offset += n;
                 } else {
-                    // C2 op (e ± C1) → new_const op e → e flip(op) new_const
-                    (flip_comparison(oper), new_const)
-                };
-                // Check type bounds on the normalized form
-                let ty = self.env().get_node_type(expr.as_ref().node_id());
-                if let Type::Primitive(prim) = &ty {
-                    if let (Some(max), Some(min)) = (prim.get_max_value(), prim.get_min_value()) {
-                        let result = match &normalized_op {
-                            Operation::Gt if normalized_val >= max => Some(false),
-                            Operation::Lt if normalized_val <= min => Some(false),
-                            Operation::Ge if normalized_val > max => Some(false),
-                            Operation::Le if normalized_val < min => Some(false),
-                            Operation::Le if normalized_val >= max => Some(true),
-                            Operation::Ge if normalized_val <= min => Some(true),
-                            Operation::Gt if normalized_val < min => Some(true),
-                            Operation::Lt if normalized_val > max => Some(true),
-                            _ => None,
-                        };
-                        if let Some(b) = result {
-                            return Some(self.mk_bool_const(b));
-                        }
+                    non_const.push(a.clone());
+                }
+            }
+            if const_offset.is_zero() || non_const.is_empty() {
+                continue;
+            }
+            // Move the constant offset to the RHS: (expr + offset) op C2 → expr op (C2 - offset)
+            let new_const = &c2 - &const_offset;
+            let (normalized_op, normalized_val) = if add_idx == 0 {
+                (oper.clone(), new_const)
+            } else {
+                (flip_comparison(oper), new_const)
+            };
+            // Rebuild the non-constant expression
+            let ty = self.env().get_node_type(args[add_idx].as_ref().node_id());
+            let expr = non_const
+                .into_iter()
+                .reduce(|a, b| self.mk_call(&ty, Operation::Add, vec![a, b]))
+                .unwrap();
+            // Check type bounds on the normalized form
+            if let Type::Primitive(prim) = &ty {
+                if let (Some(max), Some(min)) = (prim.get_max_value(), prim.get_min_value()) {
+                    let result = match &normalized_op {
+                        Operation::Gt if normalized_val >= max => Some(false),
+                        Operation::Lt if normalized_val <= min => Some(false),
+                        Operation::Ge if normalized_val > max => Some(false),
+                        Operation::Le if normalized_val < min => Some(false),
+                        Operation::Le if normalized_val >= max => Some(true),
+                        Operation::Ge if normalized_val <= min => Some(true),
+                        Operation::Gt if normalized_val < min => Some(true),
+                        Operation::Lt if normalized_val > max => Some(true),
+                        _ => None,
+                    };
+                    if let Some(b) = result {
+                        return Some(self.mk_bool_const(b));
                     }
                 }
-                // Even if no type-bound fires, return the normalized form
-                // (one fewer arithmetic op)
-                let new_const_exp = self.mk_num_const(&ty, normalized_val);
-                let new_args = vec![expr.clone(), new_const_exp];
-                return Some(self.mk_bool_call(normalized_op, new_args));
             }
+            // Return the normalized form (fewer arithmetic ops)
+            let new_const_exp = self.mk_num_const(&ty, normalized_val);
+            let new_args = vec![expr, new_const_exp];
+            return Some(self.mk_bool_call(normalized_op, new_args));
         }
         None
     }
@@ -1349,7 +1568,111 @@ impl<'a, 'env, G: ExpGenerator<'env>> ExpSimplifier<'a, 'env, G> {
             }
         }
 
-        // Step 2b: Struct field one-point rule.
+        // Step 2a: Conditional one-point case split for forall.
+        // (P ==> v == e1) && (!P ==> v == e2) && rest ==> Q
+        // → (P ==> forall rest_vars: rest[v/e1] ==> Q[v/e1])
+        //   && (!P ==> forall rest_vars: rest[v/e2] ==> Q[v/e2])
+        if !ranges.is_empty() {
+            if let ExpData::Call(_, Operation::Implies, args) = body.as_ref() {
+                if args.len() == 2 {
+                    let ant_conjuncts = flatten_conjunction_owned(&args[0]);
+                    if let Some((sym, p, e1, e2, indices)) =
+                        self.try_extract_conditional_binding(&ranges, &ant_conjuncts)
+                    {
+                        let consequent = &args[1];
+                        // Build remaining conjuncts (excluding the two binding implications)
+                        let remaining: Vec<Exp> = ant_conjuncts
+                            .iter()
+                            .enumerate()
+                            .filter(|(i, _)| !indices.contains(i))
+                            .map(|(_, e)| e.clone())
+                            .collect();
+                        // Remove bound variable from ranges
+                        let rest_ranges: Vec<(Pattern, Exp)> = ranges
+                            .iter()
+                            .filter(|(pat, _)| !matches!(pat, Pattern::Var(_, s) if *s == sym))
+                            .cloned()
+                            .collect();
+                        // Build and simplify each branch under the appropriate assumption.
+                        // This ensures redundant occurrences of P (or !P) in rest are
+                        // eliminated during simplification.
+                        let not_p = self.mk_not(p.clone());
+                        let build_and_simplify_branch =
+                            |s: &mut Self, cond: &Exp, ei: &Exp| -> Exp {
+                                let sub_rest: Vec<Exp> = remaining
+                                    .iter()
+                                    .map(|r| substitute_local_var(s.env(), r, sym, ei))
+                                    .collect();
+                                let sub_q = substitute_local_var(s.env(), consequent, sym, ei);
+                                let branch_body = if sub_rest.is_empty() {
+                                    sub_q
+                                } else {
+                                    let ant =
+                                        sub_rest.into_iter().reduce(|a, b| s.mk_and(a, b)).unwrap();
+                                    s.mk_implies(ant, sub_q)
+                                };
+                                let branch = if rest_ranges.is_empty() {
+                                    branch_body
+                                } else {
+                                    ExpData::Quant(
+                                        id,
+                                        QuantKind::Forall,
+                                        rest_ranges.clone(),
+                                        vec![],
+                                        None,
+                                        branch_body,
+                                    )
+                                    .into_exp()
+                                };
+                                // Simplify under assumption `cond` so that occurrences
+                                // of cond in rest simplify to true and its complement to false.
+                                let saved_len = s.assumptions.len();
+                                let saved_subs = s.substitutions.clone();
+                                s.assume(cond.clone());
+                                let simplified = s.simplify(branch);
+                                s.assumptions.truncate(saved_len);
+                                s.substitutions = saved_subs;
+                                simplified
+                            };
+                        let branch1 = build_and_simplify_branch(self, &p, &e1);
+                        let branch2 = build_and_simplify_branch(self, &not_p, &e2);
+                        let result = self.mk_and(
+                            self.mk_implies(p.clone(), branch1),
+                            self.mk_implies(not_p, branch2),
+                        );
+                        return self.simplify(result);
+                    }
+                }
+            }
+        }
+
+        // Step 2b: Distribute forall over conjunction.
+        // `forall x: A(x) && B(x)` → `(forall x: A(x)) && (forall x: B(x))`
+        // This enables each conjunct to be independently simplified (e.g., one-point
+        // rule on `forall x: P && x == e ==> Q`).
+        if !ranges.is_empty() && !matches!(body.as_ref(), ExpData::Call(_, Operation::Implies, _)) {
+            let conjuncts = flatten_conjunction_owned(&body);
+            if conjuncts.len() >= 2 {
+                let parts: Vec<Exp> = conjuncts
+                    .into_iter()
+                    .map(|c| {
+                        let q = ExpData::Quant(
+                            id,
+                            QuantKind::Forall,
+                            ranges.clone(),
+                            triggers.clone(),
+                            None,
+                            c,
+                        )
+                        .into_exp();
+                        self.simplify(q)
+                    })
+                    .collect();
+                return parts.into_iter().reduce(|a, b| self.mk_and(a, b)).unwrap();
+            }
+        }
+
+        // Step 2c: Struct field one-point rule.
         // For `forall x: S. x.f1 == e1 && ... && x.fn == en ==> Q` where all fields
         // of struct S are bound, substitute x with `Pack(S, e1, ..., en)`.
         {
@@ -1587,6 +1910,68 @@ impl<'a, 'env, G: ExpGenerator<'env>> ExpSimplifier<'a, 'env, G> {
                     .reduce(|a, b| self.mk_and(a, b))
                     .unwrap_or_else(|| self.mk_bool_const(true));
                 changed = true;
+            }
+        }
+
+        // Step 2a: Conditional one-point case split for exists.
+        // exists v: (P ==> v == e1) && (!P ==> v == e2) && rest
+        // → (P && exists rest_vars: rest[v/e1]) || (!P && exists rest_vars: rest[v/e2])
+        if !ranges.is_empty() {
+            let conjuncts = flatten_conjunction_owned(&body);
+            if let Some((sym, p, e1, e2, indices)) =
+                self.try_extract_conditional_binding(&ranges, &conjuncts)
+            {
+                // Build remaining conjuncts (excluding the two binding implications)
+                let remaining: Vec<Exp> = conjuncts
+                    .iter()
+                    .enumerate()
+                    .filter(|(i, _)| !indices.contains(i))
+                    .map(|(_, e)| e.clone())
+                    .collect();
+                // Remove bound variable from ranges
+                let rest_ranges: Vec<(Pattern, Exp)> = ranges
+                    .iter()
+                    .filter(|(pat, _)| !matches!(pat, Pattern::Var(_, s) if *s == sym))
+                    .cloned()
+                    .collect();
+                let not_p = self.mk_not(p.clone());
+                // Build and simplify each branch under the appropriate assumption.
+                let build_and_simplify_branch = |s: &mut Self, cond: &Exp, ei: &Exp| -> Exp {
+                    let sub_rest: Vec<Exp> = remaining
+                        .iter()
+                        .map(|r| substitute_local_var(s.env(), r, sym, ei))
+                        .collect();
+                    let branch_body = if sub_rest.is_empty() {
+                        s.mk_bool_const(true)
+                    } else {
+                        sub_rest.into_iter().reduce(|a, b| s.mk_and(a, b)).unwrap()
+                    };
+                    let branch = if rest_ranges.is_empty() {
+                        branch_body
+                    } else {
+                        ExpData::Quant(
+                            id,
+                            QuantKind::Exists,
+                            rest_ranges.clone(),
+                            vec![],
+                            None,
+                            branch_body,
+                        )
+                        .into_exp()
+                    };
+                    let saved_len = s.assumptions.len();
+                    let saved_subs = s.substitutions.clone();
+                    s.assume(cond.clone());
+                    let simplified = s.simplify(branch);
+                    s.assumptions.truncate(saved_len);
+                    s.substitutions = saved_subs;
+                    simplified
+                };
+                let branch1 = build_and_simplify_branch(self, &p, &e1);
+                let branch2 = build_and_simplify_branch(self, &not_p, &e2);
+                let result =
+                    self.mk_or(self.mk_and(p.clone(), branch1), self.mk_and(not_p, branch2));
+                return self.simplify(result);
             }
         }
 
@@ -2029,6 +2414,80 @@ impl<'a, 'env, G: ExpGenerator<'env>> ExpSimplifier<'a, 'env, G> {
         None
     }
 
+    /// Try to extract a conditional one-point binding from a list of conjuncts.
+    ///
+    /// Looks for a pair of implications with complementary conditions that each bind the same
+    /// quantified variable to an expression:
+    ///   `(P ==> v == e1) && (!P ==> v == e2)`
+    /// where `v` is a quantified variable and `P`, `e1`, `e2` do not mention `v`.
+    ///
+    /// Returns `(var, P, e1_when_P, e2_when_notP, indices_of_binding_conjuncts)`.
+    fn try_extract_conditional_binding(
+        &self,
+        ranges: &[(Pattern, Exp)],
+        conjuncts: &[Exp],
+    ) -> Option<(Symbol, Exp, Exp, Exp, Vec<usize>)> {
+        let qvars = quant_symbols(ranges);
+        if qvars.is_empty() || conjuncts.len() < 2 {
+            return None;
+        }
+
+        // Collect all implications of the form `C ==> v == e` where v is quantified
+        // and v is not free in C or e.
+        // Each entry: (conjunct_index, condition, var_symbol, bound_expr)
+        let mut impl_bindings: Vec<(usize, &Exp, Symbol, &Exp)> = Vec::new();
+        for (i, conj) in conjuncts.iter().enumerate() {
+            if let ExpData::Call(_, Operation::Implies, args) = conj.as_ref() {
+                if args.len() == 2 {
+                    if let ExpData::Call(_, Operation::Eq, eq_args) = args[1].as_ref() {
+                        if eq_args.len() == 2 {
+                            let cond = &args[0];
+                            // Try v == e (v on the left)
+                            if let ExpData::LocalVar(_, sym) = eq_args[0].as_ref() {
+                                if qvars.contains(sym)
+                                    && !cond.as_ref().free_vars().contains(sym)
+                                    && !eq_args[1].as_ref().free_vars().contains(sym)
+                                {
+                                    impl_bindings.push((i, cond, *sym, &eq_args[1]));
+                                    continue;
+                                }
+                            }
+                            // Try e == v (v on the right)
+                            if let ExpData::LocalVar(_, sym) = eq_args[1].as_ref() {
+                                if qvars.contains(sym)
+                                    && !cond.as_ref().free_vars().contains(sym)
+                                    && !eq_args[0].as_ref().free_vars().contains(sym)
+                                {
+                                    impl_bindings.push((i, cond, *sym, &eq_args[0]));
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        // Find a pair binding the same variable with complementary conditions.
+        for (idx_a, &(i, cond_a, sym_a, expr_a)) in impl_bindings.iter().enumerate() {
+            for &(j, cond_b, sym_b, expr_b) in &impl_bindings[idx_a + 1..] {
+                if sym_a == sym_b && is_complementary(cond_a, cond_b) {
+                    // Determine which is P and which is !P.
+                    // If cond_a = !X, then cond_b is P; otherwise cond_a is P.
+                    let (p, e1, e2) =
+                        if matches!(cond_a.as_ref(), ExpData::Call(_, Operation::Not, _)) {
+                            // cond_a = !P, cond_b = P
+                            (cond_b.clone(), expr_b.clone(), expr_a.clone())
+                        } else {
+                            // cond_a = P, cond_b = !P
+                            (cond_a.clone(), expr_a.clone(), expr_b.clone())
+                        };
+                    return Some((sym_a, p, e1, e2, vec![i, j]));
+                }
+            }
+        }
+        None
+    }
+
     /// Core struct field binding extraction: given a list of conjuncts and quantifier ranges,
     /// find a quantified struct variable `x` where all fields are bound by equality conjuncts
     /// (`x.f1 == e1 && ... && x.fn == en`).
@@ -2386,6 +2845,31 @@ pub fn quant_symbols(ranges: &[(Pattern, Exp)]) -> Vec<Symbol> {
         .collect()
 }
 
+/// Flatten a left-associative Add tree into a list of addends.
+/// `(A + B) + C` becomes `[A, B, C]`.
+/// Also decomposes `Sub(A, Value(c))` into the addends of `A` plus `Value(-c)`,
+/// enabling cancellation of common constant offsets (e.g. `-1` on both sides).
+fn flatten_add(exp: &Exp, result: &mut Vec<Exp>) {
+    match exp.as_ref() {
+        ExpData::Call(_, Operation::Add, args) if args.len() == 2 => {
+            flatten_add(&args[0], result);
+            flatten_add(&args[1], result);
+        },
+        ExpData::Call(id, Operation::Sub, args)
+            if args.len() == 2 && matches!(args[1].as_ref(), ExpData::Value(_, _)) =>
+        {
+            // Sub(A, Value(c)) → flatten(A) ++ [Value(-c)]
+            flatten_add(&args[0], result);
+            if let ExpData::Value(_, Value::Number(n)) = args[1].as_ref() {
+                result.push(ExpData::Value(*id, Value::Number(-n)).into());
+            }
+        },
+        _ => {
+            result.push(exp.clone());
+        },
+    }
+}
+
 /// Flatten a conjunction into a list of owned conjunct expressions.
 /// `A && (B && C)` becomes `[A, B, C]`.
 pub fn flatten_conjunction_owned(exp: &Exp) -> Vec<Exp> {
@@ -2465,6 +2949,30 @@ fn is_conjunct_upward_safe(
             && is_monotone_increasing_in(env, &args[0], sym, is_unsigned_context)
         {
             return true;
+        }
+    }
+    // `f(x) == MAX` where f is monotone increasing in x and MAX is the type's maximum:
+    // for b >= a, f(b) >= f(a) == MAX, and f(b) <= MAX (bounded type), so f(b) == MAX.
+    if let ExpData::Call(_, Operation::Eq, args) = conj.as_ref() {
+        if args.len() == 2 {
+            for (expr_idx, const_idx) in [(0, 1), (1, 0)] {
+                if let Some(val) = get_num_const(&args[const_idx]) {
+                    let ty = env.get_node_type(args[expr_idx].as_ref().node_id());
+                    if let Type::Primitive(prim) = &ty {
+                        if prim.get_max_value().is_some_and(|max| *val == max)
+                            && !args[const_idx].as_ref().free_vars().contains(&sym)
+                            && is_monotone_increasing_in(
+                                env,
+                                &args[expr_idx],
+                                sym,
+                                is_unsigned_context,
+                            )
+                        {
+                            return true;
+                        }
+                    }
+                }
+            }
         }
     }
     false
@@ -2711,6 +3219,26 @@ fn get_num_const(exp: &Exp) -> Option<&BigInt> {
     match exp.as_ref() {
         ExpData::Value(_, Value::Number(n)) => Some(n),
         _ => None,
+    }
+}
+
+/// Gets the upper type bound for an expression, looking through `Old()` wrappers
+/// and reference types. Returns `Some(max)` for unsigned integer types, `None` otherwise.
+fn get_type_bound(env: &GlobalEnv, exp: &Exp) -> Option<BigInt> {
+    // Look through Old() wrappers to find the underlying type
+    let inner = match exp.as_ref() {
+        ExpData::Call(_, Operation::Old, args) if args.len() == 1 => &args[0],
+        _ => exp,
+    };
+    let mut ty = env.get_node_type(inner.node_id());
+    // Skip reference wrappers (&T, &mut T)
+    while let Type::Reference(_, inner_ty) = ty {
+        ty = *inner_ty;
+    }
+    if let Type::Primitive(p) = &ty {
+        p.get_max_value()
+    } else {
+        None
     }
 }
 
@@ -4620,6 +5148,36 @@ mod tests {
     }
 
     #[test]
+    fn test_addition_monotonicity_prunes_and() {
+        // n > 0 && r + n > MAX_U64 → r + n > MAX_U64
+        // r is u64, n is u64, r + n is Num (spec widening)
+        let env = test_env();
+        let u64_ty = Type::Primitive(PrimitiveType::U64);
+        let num_ty = Type::Primitive(PrimitiveType::Num);
+        let r = mk_temp(&env, 0, u64_ty.clone()); // r: u64
+        let n = mk_temp(&env, 1, u64_ty); // n: u64
+        let r_plus_n = mk_op(&env, num_ty, Operation::Add, vec![r, n.clone()]);
+        let max_u64_const = {
+            let id = env.new_node(Loc::default(), Type::Primitive(PrimitiveType::Num));
+            ExpData::Value(id, Value::Number(BigInt::from(u64::MAX))).into_exp()
+        };
+        let gt_max = mk_bool_op(&env, Operation::Gt, vec![r_plus_n, max_u64_const]);
+        let gt_0 = mk_bool_op(&env, Operation::Gt, vec![n, mk_num(&env, 0)]);
+        let e = mk_bool_op(&env, Operation::And, vec![gt_0, gt_max]);
+        let mut g = test_gen(&env);
+        let mut s = ExpSimplifier::new(&mut g);
+        let result = s.simplify(e);
+        // Should be Gt(Add(r, n), MAX_U64) — the n > 0 conjunct should be pruned
+        match result.as_ref() {
+            ExpData::Call(_, Operation::Gt, args) if args.len() == 2 => match args[0].as_ref() {
+                ExpData::Call(_, Operation::Add, _) => {},
+                other => panic!("expected Add, got {:?}", other),
+            },
+            other => panic!("expected Gt(Add(..), MAX_U64), got {:?}", other),
+        }
+    }
+
+    #[test]
     fn test_implies_comparison_le_le() {
         // x <= 3 implies x <= 5
         let env = test_env();
@@ -4786,17 +5344,19 @@ mod tests {
             name: env.symbol_pool().make(name),
             type_params: vec![],
             params,
-            context_params: None,
             result_type,
             used_memory: BTreeSet::new(),
+            old_memory: BTreeSet::new(),
             uninterpreted: false,
             is_move_fun: false,
             is_native: false,
             body: Some(body),
             callees: BTreeSet::new(),
             is_recursive: RefCell::new(Some(true)),
+            uses_old: false,
+            frame_spec: None,
             insts_using_generic_type_reflection: RefCell::new(BTreeMap::new()),
-            spec: RefCell::new(Spec::default()),
+            spec: RefCell::new(Default::default()),
         }
     }
 
@@ -4819,9 +5379,11 @@ mod tests {
         let mid = ModuleId::new(0);
         let fid = SpecFunId::new(0);
         let call_node = env.new_node(Loc::default(), num_ty.clone());
-        let self_call = ExpData::Call(call_node, Operation::SpecFunction(mid, fid, None), vec![
-            n_minus_1,
-        ])
+        let self_call = ExpData::Call(
+            call_node,
+            Operation::SpecFunction(mid, fid, crate::ast::MemoryRange::default()),
+            vec![n_minus_1],
+        )
         .into_exp();
         let step = mk_op(&env, num_ty.clone(), Operation::Add, vec![
             self_call,
@@ -4860,9 +5422,11 @@ mod tests {
         let mid = ModuleId::new(0);
         let fid = SpecFunId::new(0);
         let call_node = env.new_node(Loc::default(), num_ty.clone());
-        let self_call = ExpData::Call(call_node, Operation::SpecFunction(mid, fid, None), vec![
-            r_times_2, n_minus_1,
-        ])
+        let self_call = ExpData::Call(
+            call_node,
+            Operation::SpecFunction(mid, fid, crate::ast::MemoryRange::default()),
+            vec![r_times_2, n_minus_1],
+        )
         .into_exp();
         let ite_node = env.new_node(Loc::default(), num_ty.clone());
         let body = ExpData::IfElse(ite_node, cond, r, self_call).into_exp();
@@ -4897,9 +5461,11 @@ mod tests {
         let mid = ModuleId::new(0);
         let fid = SpecFunId::new(0);
         let call_node = env.new_node(Loc::default(), num_ty.clone());
-        let self_call = ExpData::Call(call_node, Operation::SpecFunction(mid, fid, None), vec![
-            n_minus_1,
-        ])
+        let self_call = ExpData::Call(
+            call_node,
+            Operation::SpecFunction(mid, fid, crate::ast::MemoryRange::default()),
+            vec![n_minus_1],
+        )
         .into_exp();
         // f(n-1) - n: the subtracted term n depends on the parameter, so not monotone
         let step = mk_op(&env, num_ty.clone(), Operation::Sub, vec![self_call, n]);
@@ -4933,9 +5499,11 @@ mod tests {
         let mid = ModuleId::new(0);
         let fid = SpecFunId::new(0);
         let call_node = env.new_node(Loc::default(), num_ty.clone());
-        let self_call = ExpData::Call(call_node, Operation::SpecFunction(mid, fid, None), vec![
-            n_minus_1,
-        ])
+        let self_call = ExpData::Call(
+            call_node,
+            Operation::SpecFunction(mid, fid, crate::ast::MemoryRange::default()),
+            vec![n_minus_1],
+        )
         .into_exp();
         let step = mk_op(&env, num_ty.clone(), Operation::Add, vec![self_call, n]);
         let ite_node = env.new_node(Loc::default(), num_ty.clone());
@@ -4952,9 +5520,11 @@ mod tests {
         let x_sym = env.symbol_pool().make("x");
         let x = mk_local(&env, "x", num_ty.clone());
         let call_node2 = env.new_node(Loc::default(), num_ty.clone());
-        let call_expr = ExpData::Call(call_node2, Operation::SpecFunction(mid, fid, None), vec![
-            x.clone()
-        ])
+        let call_expr = ExpData::Call(
+            call_node2,
+            Operation::SpecFunction(mid, fid, crate::ast::MemoryRange::default()),
+            vec![x.clone()],
+        )
         .into_exp();
         let sum_expr = mk_op(&env, num_ty, Operation::Add, vec![call_expr, x]);
         assert!(is_monotone_increasing_in(&env, &sum_expr, x_sym, false));

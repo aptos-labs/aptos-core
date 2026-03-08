@@ -50,7 +50,10 @@ use codespan_reporting::diagnostic::Severity;
 use itertools::Itertools;
 use log::trace;
 use move_model::{
-    ast::{Exp, ExpData, Operation, Pattern, Spec, SpecBlockTarget, SpecFunDecl, TempIndex},
+    ast::{
+        Exp, ExpData, MemoryRange, Operation, Pattern, Spec, SpecBlockTarget, SpecFunDecl,
+        TempIndex,
+    },
     exp_rewriter::ExpRewriterFunctions,
     metadata::LanguageVersion,
     model::{FunId, GlobalEnv, Loc, NodeId, Parameter, QualifiedId, SpecFunId},
@@ -1387,7 +1390,7 @@ impl ExpRewriterFunctions for InlinedRewriter<'_, '_> {
                                     Operation::SpecFunction(
                                         spec_fun_id.module_id,
                                         spec_fun_id.id,
-                                        None,
+                                        MemoryRange::default(),
                                     ),
                                     new_args.clone(),
                                 )

@@ -1,0 +1,32 @@
+Move prover returns: exiting with verification errors
+error: post-condition does not hold
+   ┌─ tests/sources/functional/state_labels/intermediate_states.move:99:9
+   │
+99 │         ensures result_1 != result_2; // error: both reads return the same value
+   │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   │
+   =     at tests/sources/functional/state_labels/intermediate_states.move:86: test_two_reads_differ
+   =         addr = <redacted>
+   =     at tests/sources/functional/state_labels/intermediate_states.move:87: test_two_reads_differ
+   =     at tests/sources/functional/state_labels/intermediate_states.move:91: test_two_reads_differ
+   =     at tests/sources/functional/state_labels/intermediate_states.move:95: test_two_reads_differ
+   =         result_1 = <redacted>
+   =         result_2 = <redacted>
+   =     at tests/sources/functional/state_labels/intermediate_states.move:96: test_two_reads_differ
+   =     at tests/sources/functional/state_labels/intermediate_states.move:99: test_two_reads_differ (spec)
+
+error: post-condition does not hold
+    ┌─ tests/sources/functional/state_labels/intermediate_states.move:144:9
+    │
+144 │         ensures result_1 == result_2; // error: conditional returns 0 when inactive
+    │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    │
+    =     at tests/sources/functional/state_labels/intermediate_states.move:131: test_conditional_always_equals
+    =         addr = <redacted>
+    =     at tests/sources/functional/state_labels/intermediate_states.move:132: test_conditional_always_equals
+    =     at tests/sources/functional/state_labels/intermediate_states.move:136: test_conditional_always_equals
+    =     at tests/sources/functional/state_labels/intermediate_states.move:140: test_conditional_always_equals
+    =         result_1 = <redacted>
+    =         result_2 = <redacted>
+    =     at tests/sources/functional/state_labels/intermediate_states.move:141: test_conditional_always_equals
+    =     at tests/sources/functional/state_labels/intermediate_states.move:144: test_conditional_always_equals (spec)

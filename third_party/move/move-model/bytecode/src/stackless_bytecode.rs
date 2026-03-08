@@ -1008,6 +1008,26 @@ impl Bytecode {
             _ => (vec![], vec![]),
         }
     }
+
+    /// Returns true if this bytecode is a state-transition operation that changes global
+    /// memory state. These are: function calls, invoke (dynamic calls), MoveFrom, MoveTo,
+    /// and WriteBack to global root.
+    pub fn is_global_state_transition(&self) -> bool {
+        matches!(
+            self,
+            Bytecode::Call(
+                _,
+                _,
+                Operation::Function(..)
+                    | Operation::Invoke
+                    | Operation::MoveFrom(..)
+                    | Operation::MoveTo(..)
+                    | Operation::WriteBack(BorrowNode::GlobalRoot(..), ..),
+                _,
+                _,
+            )
+        )
+    }
 }
 
 // =================================================================================================

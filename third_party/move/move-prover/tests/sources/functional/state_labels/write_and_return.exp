@@ -1,0 +1,28 @@
+Move prover returns: exiting with verification errors
+error: post-condition does not hold
+   ┌─ tests/sources/functional/state_labels/write_and_return.move:88:9
+   │
+88 │         ensures result == 0; // error: post-condition does not hold
+   │         ^^^^^^^^^^^^^^^^^^^^
+   │
+   =     at tests/sources/functional/state_labels/write_and_return.move:79: test_write_return_wrong
+   =         addr = <redacted>
+   =     at tests/sources/functional/state_labels/write_and_return.move:80: test_write_return_wrong
+   =         result = <redacted>
+   =     at tests/sources/functional/state_labels/write_and_return.move:85: test_write_return_wrong
+   =     at tests/sources/functional/state_labels/write_and_return.move:88: test_write_return_wrong (spec)
+
+error: post-condition does not hold
+    ┌─ tests/sources/functional/state_labels/write_and_return.move:126:9
+    │
+126 │         ensures result == old(Counter[addr].value); // error: post-condition does not hold
+    │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    │
+    =     at tests/sources/functional/state_labels/write_and_return.move:114: test_incr_return_wrong
+    =         addr = <redacted>
+    =     at tests/sources/functional/state_labels/write_and_return.move:115: test_incr_return_wrong
+    =         result = <redacted>
+    =     at tests/sources/functional/state_labels/write_and_return.move:122: test_incr_return_wrong
+    =     at tests/sources/functional/state_labels/write_and_return.move:124: test_incr_return_wrong (spec)
+    =     at tests/sources/functional/state_labels/write_and_return.move:125: test_incr_return_wrong (spec)
+    =     at tests/sources/functional/state_labels/write_and_return.move:126: test_incr_return_wrong (spec)
