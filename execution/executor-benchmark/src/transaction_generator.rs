@@ -591,11 +591,6 @@ impl TransactionGenerator {
             .collect::<Vec<_>>()
             .chunks(block_size)
         {
-            // Refresh root account sequence number once per block from database
-            // This ensures we stay in sync even if BlockMetadata or other transactions affected the account
-            let current_seq_num = get_sequence_number(self.root_account.address(), reader.clone());
-            self.root_account.set_sequence_number(current_seq_num);
-
             let transactions: Vec<_> = chunk
                 .iter()
                 .map(|new_account| {
@@ -1105,4 +1100,82 @@ fn test_get_conflicting_grps_transfer_indices() {
             assert_eq!(get_num_connected_components(&adj_list), connected_txn_grps);
         }
     }
+}
+
+/// Verifies that `create_seed_accounts` produces strictly increasing sequence
+/// numbers for the root account even when seed accounts span multiple blocks.
+///
+/// This is a regression test for a bug where the root account's sequence number
+/// was re-read from the DB at the start of each block. Because previously
+/// generated blocks hadn't been committed yet, the DB returned a stale value,
+/// resetting the sequence counter and causing SEQUENCE_NUMBER_TOO_OLD discards.
+#[test]
+fn test_create_seed_accounts_multi_block_seq_numbers() {
+    use crate::{db_generator::bootstrap_with_genesis, default_benchmark_features, init_db};
+    use aptos_config::config::NO_OP_STORAGE_PRUNER_CONFIG;
+    use aptos_temppath::TempPath;
+    use std::fs;
+
+    aptos_logger::Logger::new().init();
+
+    let db_dir = TempPath::new();
+    fs::create_dir_all(db_dir.as_ref()).unwrap();
+
+    let features = default_benchmark_features();
+    bootstrap_with_genesis(&db_dir, features);
+
+    let (mut config, genesis_key) =
+        aptos_genesis::test_utils::test_config_with_custom_features(default_benchmark_features());
+    config.storage.dir = db_dir.as_ref().to_path_buf();
+    config.storage.storage_pruner_config = NO_OP_STORAGE_PRUNER_CONFIG;
+
+    let db = init_db(&config);
+    let ts = Arc::new(BenchmarkTimestamp::from_db(&db));
+    let root_account = TransactionGenerator::read_root_account(genesis_key, &db);
+    let initial_seq_num = root_account.sequence_number();
+
+    let (block_sender, block_receiver) = mpsc::sync_channel::<Vec<Transaction>>(50);
+
+    let mut generator = TransactionGenerator::new_with_existing_db(
+        db.clone(),
+        root_account,
+        block_sender,
+        db_dir.as_ref(),
+        None,
+        1,
+        false,
+        ts,
+    );
+
+    // block_size=5, num_seed_accounts=12 → 3 blocks (5+5+2)
+    let block_size = 5;
+    let num_seed_accounts = 12;
+    generator.create_seed_accounts(
+        db.reader.clone(),
+        num_seed_accounts,
+        block_size,
+        1_000_000_000,
+        false,
+    );
+    generator.drop_sender();
+
+    // Collect root-account sequence numbers from all generated blocks.
+    let mut all_seq_nums = Vec::new();
+    while let Ok(block) = block_receiver.recv() {
+        for txn in &block {
+            if let Transaction::UserTransaction(signed_txn) = txn {
+                if signed_txn.sender() == aptos_test_root_address() {
+                    all_seq_nums.push(signed_txn.sequence_number());
+                }
+            }
+        }
+    }
+
+    assert_eq!(all_seq_nums.len(), num_seed_accounts);
+    let expected: Vec<u64> =
+        (initial_seq_num..initial_seq_num + num_seed_accounts as u64).collect();
+    assert_eq!(
+        all_seq_nums, expected,
+        "Sequence numbers must be strictly increasing across all seed account blocks"
+    );
 }
