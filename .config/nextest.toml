@@ -7,7 +7,7 @@ failure-output = "immediate-final"
 fail-fast = true
 # To avoid CPU saturation and test timeouts (due to heavy/multithreaded
 # tests), we increase the number of threads required per test.
-threads-required = 3
+threads-required = 2
 
 junit = { path = "junit.xml" }
 

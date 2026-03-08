@@ -35,6 +35,9 @@ toml = { workspace = true }
 walkdir = { workspace = true }
 whoami = { workspace = true }
 
+[features]
+testing = []
+
 [dev-dependencies]
 datatest-stable = { workspace = true }
 move-stdlib = { path = "../../move-stdlib" }
