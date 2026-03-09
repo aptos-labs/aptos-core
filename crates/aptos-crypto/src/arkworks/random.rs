@@ -91,6 +91,8 @@ pub fn sample_field_elements<F: PrimeField, R: Rng>(n: usize, rng: &mut R) -> Ve
 
 /// Samples a uniformly random element from the prime field `F`, using rejection sampling.
 /// Benchmarks suggest it is ~10x faster than the function `scalar_from_uniform_be_bytes()` below.
+///
+/// Needs `PrimeField` because of `MODULUS_BIT_SIZE`
 pub fn sample_field_element<F: PrimeField, R: Rng>(rng: &mut R) -> F {
     loop {
         // Number of bytes needed for F

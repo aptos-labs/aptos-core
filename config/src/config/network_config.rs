@@ -144,6 +144,8 @@ pub struct NetworkConfig {
     /// Access control policy for peer connections. If not specified, all
     /// peers are allowed. Otherwise, the specified policy is enforced.
     pub access_control_policy: Option<AccessControlPolicy>,
+    /// Priority inbound peers that can bypass connection limits
+    pub priority_inbound_peers: Vec<PeerId>,
 }
 
 impl Default for NetworkConfig {
@@ -185,6 +187,7 @@ impl NetworkConfig {
             max_parallel_deserialization_tasks: None,
             enable_latency_aware_dialing: true,
             access_control_policy: None,
+            priority_inbound_peers: Vec::new(),
         };
 
         // Configure the number of parallel deserialization tasks

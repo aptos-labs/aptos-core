@@ -6,8 +6,9 @@ use crate::{
     constants,
     peer::DisconnectReason,
     peer_manager::{
-        conn_notifs_channel, error::PeerManagerError, ConnectionNotification, ConnectionRequest,
-        PeerManager, PeerManagerRequest, TransportNotification,
+        conn_notifs_channel, conn_notifs_channel::Receiver, error::PeerManagerError,
+        ConnectionNotification, ConnectionRequest, PeerManager, PeerManagerRequest,
+        TransportNotification,
     },
     protocols::wire::{
         handshake::v1::{MessagingProtocolVersion, ProtocolIdSet},
@@ -26,16 +27,21 @@ use aptos_config::{
     config::{AccessControlPolicy, PeerRole, MAX_INBOUND_CONNECTIONS},
     network_id::{NetworkContext, NetworkId},
 };
+use aptos_infallible::Mutex;
 use aptos_memsocket::MemorySocket;
 use aptos_netcore::transport::{
     boxed::BoxedTransport, memory::MemoryTransport, ConnectionOrigin, TransportExt,
 };
 use aptos_time_service::TimeService;
-use aptos_types::{network_address::NetworkAddress, PeerId};
+use aptos_types::{account_address::AccountAddress, network_address::NetworkAddress, PeerId};
 use bytes::Bytes;
 use futures::{channel::oneshot, io::AsyncWriteExt, stream::StreamExt};
 use maplit::hashset;
-use std::{collections::HashMap, error::Error};
+use std::{
+    collections::{HashMap, HashSet},
+    error::Error,
+    sync::Arc,
+};
 use tokio::runtime::{Handle, Runtime};
 use tokio_util::compat::{
     FuturesAsyncReadCompatExt, TokioAsyncReadCompatExt, TokioAsyncWriteCompatExt,
@@ -116,7 +122,8 @@ fn build_test_peer_manager(
         constants::MAX_FRAME_SIZE,
         constants::MAX_MESSAGE_SIZE,
         MAX_INBOUND_CONNECTIONS,
-        None, /* access_control_policy */
+        None,       /* access_control_policy */
+        Vec::new(), /* priority_peers */
     );
 
     (
@@ -248,7 +255,6 @@ fn create_connection<TSocket: transport::TSocket>(
 
 #[test]
 fn peer_manager_simultaneous_dial_two_inbound() {
-    ::aptos_logger::Logger::init_for_testing();
     let runtime = create_test_runtime();
 
     // Create a list of ordered PeerIds so we can ensure how PeerIds will be compared.
@@ -796,10 +802,440 @@ fn create_peer_manager_with_policy(
         constants::MAX_MESSAGE_SIZE,
         MAX_INBOUND_CONNECTIONS,
         policy.map(std::sync::Arc::new),
+        Vec::new(), /* priority_peers */
     )
 }
 
-/// Creates a new tokio runtime for testing
+/// Creates and returns a new tokio runtime for testing
 fn create_test_runtime() -> Runtime {
     Runtime::new().unwrap()
+}
+
+#[test]
+fn test_priority_peer_accepted_below_limit() {
+    // Create a priority peer
+    let runtime = create_test_runtime();
+    let peer_ids = ordered_peer_ids(5);
+    let priority_peer = peer_ids[0];
+
+    // Create a peer manager with the priority peer and a 100 inbound connection limit
+    let (mut peer_manager, _, _, _) = create_peer_manager_with_priority_peers(
+        runtime.handle().clone(),
+        PeerId::random(),
+        vec![priority_peer],
+        100,
+    );
+
+    // Create an inbound connection for the priority peer
+    let (inbound, _) = build_test_connection();
+    let connection = Connection {
+        socket: inbound,
+        metadata: ConnectionMetadata::new(
+            priority_peer,
+            ConnectionId::default(),
+            "/memory/0".parse().unwrap(),
+            ConnectionOrigin::Inbound,
+            MessagingProtocolVersion::V1,
+            ProtocolIdSet::mock(),
+            PeerRole::Unknown,
+        ),
+    };
+
+    // Add the priority peer connection
+    peer_manager.handle_new_connection_event(connection);
+
+    // Verify it was accepted
+    assert!(peer_manager.active_peers.contains_key(&priority_peer));
+}
+
+#[test]
+fn test_priority_peer_evicts_non_priority_peer() {
+    // Create priority and non-priority peers
+    let runtime = create_test_runtime();
+    let peer_ids = ordered_peer_ids(5);
+    let priority_peer = peer_ids[0];
+    let non_priority_peer_1 = peer_ids[1];
+    let non_priority_peer_2 = peer_ids[2];
+
+    // Create a peer manager with the priority peer and a limit of 2 inbound connections
+    let (mut peer_manager, _, _, mut connection_event_rx) = create_peer_manager_with_priority_peers(
+        runtime.handle().clone(),
+        PeerId::random(),
+        vec![priority_peer],
+        2,
+    );
+
+    runtime.block_on(async move {
+        // Add a non-priority peer connection to fill one slot
+        add_test_connection_to_manager(non_priority_peer_1, &mut peer_manager, 0);
+
+        // Wait for a new peer notification
+        wait_for_new_peer_notification(&mut connection_event_rx, non_priority_peer_1).await;
+
+        // Add another non-priority peer connection to fill the second slot
+        add_test_connection_to_manager(non_priority_peer_2, &mut peer_manager, 1);
+
+        // Wait for a new peer notification
+        wait_for_new_peer_notification(&mut connection_event_rx, non_priority_peer_2).await;
+
+        // Verify both non-priority peers are connected
+        assert_eq!(peer_manager.active_peers.len(), 2);
+        assert!(peer_manager.active_peers.contains_key(&non_priority_peer_1));
+        assert!(peer_manager.active_peers.contains_key(&non_priority_peer_2));
+
+        // Now try to add a priority peer (it should evict one of the non-priority peers)
+        let (_, inbound_priority) = build_test_connection();
+        let priority_connection = Connection {
+            socket: inbound_priority,
+            metadata: ConnectionMetadata::new(
+                priority_peer,
+                ConnectionId::from(2),
+                "/memory/0".parse().unwrap(),
+                ConnectionOrigin::Inbound,
+                MessagingProtocolVersion::V1,
+                ProtocolIdSet::mock(),
+                PeerRole::Unknown,
+            ),
+        };
+        peer_manager.handle_new_connection_event(priority_connection);
+
+        // Wait for a new peer notification
+        wait_for_new_peer_notification(&mut connection_event_rx, priority_peer).await;
+
+        // Verify priority peer is now connected and one non-priority peer was evicted
+        assert_eq!(peer_manager.active_peers.len(), 2);
+        assert!(peer_manager.active_peers.contains_key(&priority_peer));
+
+        // Verify exactly one non-priority peer remains
+        let non_priority_peers = [non_priority_peer_1, non_priority_peer_2];
+        let non_priority_remaining = peer_manager
+            .active_peers
+            .keys()
+            .filter(|&&pid| non_priority_peers.contains(&pid))
+            .count();
+        assert_eq!(non_priority_remaining, 1);
+    });
+}
+
+#[test]
+fn test_priority_peer_no_eviction_when_all_priority() {
+    // Create priority peers
+    let runtime = create_test_runtime();
+    let peer_ids = ordered_peer_ids(5);
+    let priority_peer_1 = peer_ids[0];
+    let priority_peer_2 = peer_ids[1];
+    let priority_peer_3 = peer_ids[2];
+
+    // Create a peer manager with 3 priority peers and a limit of 2 inbound connections
+    let (mut peer_manager, _, _, mut connection_event_rx) = create_peer_manager_with_priority_peers(
+        runtime.handle().clone(),
+        PeerId::random(),
+        vec![priority_peer_1, priority_peer_2, priority_peer_3],
+        2,
+    );
+
+    runtime.block_on(async move {
+        // Add a priority peer connection to fill one slot
+        add_test_connection_to_manager(priority_peer_1, &mut peer_manager, 0);
+
+        // Wait for a new peer notification
+        wait_for_new_peer_notification(&mut connection_event_rx, priority_peer_1).await;
+
+        // Add another priority peer connection to fill the second slot
+        add_test_connection_to_manager(priority_peer_2, &mut peer_manager, 1);
+
+        // Wait for a new peer notification
+        wait_for_new_peer_notification(&mut connection_event_rx, priority_peer_2).await;
+
+        // Verify both priority peers are connected
+        assert_eq!(peer_manager.active_peers.len(), 2);
+        assert!(peer_manager.active_peers.contains_key(&priority_peer_1));
+        assert!(peer_manager.active_peers.contains_key(&priority_peer_2));
+
+        // Now try to add a third priority peer (it should be rejected)
+        let (_, inbound_priority) = build_test_connection();
+        let priority_connection = Connection {
+            socket: inbound_priority,
+            metadata: ConnectionMetadata::new(
+                priority_peer_3,
+                ConnectionId::from(2),
+                "/memory/0".parse().unwrap(),
+                ConnectionOrigin::Inbound,
+                MessagingProtocolVersion::V1,
+                ProtocolIdSet::mock(),
+                PeerRole::Unknown,
+            ),
+        };
+        peer_manager.handle_new_connection_event(priority_connection);
+
+        // The connection should be rejected
+        assert_eq!(peer_manager.active_peers.len(), 2);
+        assert!(peer_manager.active_peers.contains_key(&priority_peer_1));
+        assert!(peer_manager.active_peers.contains_key(&priority_peer_2));
+        assert!(!peer_manager.active_peers.contains_key(&priority_peer_3));
+    });
+}
+
+#[test]
+fn test_eviction_randomness() {
+    // Run the test multiple times to ensure that eviction is random among non-priority peers
+    let evicted_peers = Arc::new(Mutex::new(HashSet::new()));
+    for _ in 0..100 {
+        // Create priority and non-priority peers
+        let runtime = create_test_runtime();
+        let peer_ids = ordered_peer_ids(6);
+        let priority_peer = peer_ids[0];
+        let non_priority_peer_1 = peer_ids[1];
+        let non_priority_peer_2 = peer_ids[2];
+        let non_priority_peer_3 = peer_ids[3];
+
+        // Create a peer manager with the priority peer and a limit of 3 inbound connections
+        let (mut peer_manager, _, _, mut connection_event_rx) =
+            create_peer_manager_with_priority_peers(
+                runtime.handle().clone(),
+                PeerId::random(),
+                vec![priority_peer],
+                3,
+            );
+
+        let evicted_peers_clone = evicted_peers.clone();
+        runtime.block_on(async move {
+            // Add a non-priority peer connection to fill one slot
+            add_test_connection_to_manager(non_priority_peer_1, &mut peer_manager, 0);
+            wait_for_new_peer_notification(&mut connection_event_rx, non_priority_peer_1).await;
+
+            // Add a second non-priority peer connection to fill the second slot
+            add_test_connection_to_manager(non_priority_peer_2, &mut peer_manager, 1);
+            wait_for_new_peer_notification(&mut connection_event_rx, non_priority_peer_2).await;
+
+            // Add a third non-priority peer connection to fill the third slot
+            add_test_connection_to_manager(non_priority_peer_3, &mut peer_manager, 2);
+            wait_for_new_peer_notification(&mut connection_event_rx, non_priority_peer_3).await;
+
+            // Now add a priority peer to trigger eviction
+            let (_, inbound_priority) = build_test_connection();
+            let priority_connection = Connection {
+                socket: inbound_priority,
+                metadata: ConnectionMetadata::new(
+                    priority_peer,
+                    ConnectionId::from(3),
+                    "/memory/0".parse().unwrap(),
+                    ConnectionOrigin::Inbound,
+                    MessagingProtocolVersion::V1,
+                    ProtocolIdSet::mock(),
+                    PeerRole::Unknown,
+                ),
+            };
+            peer_manager.handle_new_connection_event(priority_connection);
+
+            // Wait for a new peer notification for the priority peer
+            wait_for_new_peer_notification(&mut connection_event_rx, priority_peer).await;
+
+            // Keep track of which peer was evicted
+            let evicted_peer = vec![
+                non_priority_peer_1,
+                non_priority_peer_2,
+                non_priority_peer_3,
+            ]
+            .into_iter()
+            .find(|pid| !peer_manager.active_peers.contains_key(pid))
+            .unwrap();
+            evicted_peers_clone.lock().insert(evicted_peer);
+        });
+    }
+
+    // With 100 trials and 3 evictable peers, we should see at least 2 different peers evicted
+    let evicted_peers = evicted_peers.lock();
+    assert!(
+        evicted_peers.len() >= 2,
+        "Expected to see at least 2 different peers evicted, but only saw: {:?}",
+        evicted_peers
+    );
+}
+
+#[test]
+fn test_eviction_disconnect_cleanup() {
+    // Create priority and non-priority peers
+    let runtime = create_test_runtime();
+    let peer_ids = ordered_peer_ids(4);
+    let priority_peer = peer_ids[0];
+    let non_priority_peer = peer_ids[1];
+
+    // Create a peer manager with the priority peer and a limit of 1 inbound connection
+    let (mut peer_manager, _, _, mut conn_status_rx) = create_peer_manager_with_priority_peers(
+        runtime.handle().clone(),
+        PeerId::random(),
+        vec![priority_peer],
+        1,
+    );
+
+    runtime.block_on(async move {
+        // Add a non-priority peer
+        add_test_connection_to_manager(non_priority_peer, &mut peer_manager, 0);
+        wait_for_new_peer_notification(&mut conn_status_rx, non_priority_peer).await;
+
+        // Verify the peer is in active_peers
+        assert!(peer_manager.active_peers.contains_key(&non_priority_peer));
+        let initial_peer_count = peer_manager.active_peers.len();
+
+        // Add priority peer to trigger eviction
+        let (_, inbound_priority) = build_test_connection();
+        let priority_connection = Connection {
+            socket: inbound_priority,
+            metadata: ConnectionMetadata::new(
+                priority_peer,
+                ConnectionId::from(1),
+                "/memory/0".parse().unwrap(),
+                ConnectionOrigin::Inbound,
+                MessagingProtocolVersion::V1,
+                ProtocolIdSet::mock(),
+                PeerRole::Unknown,
+            ),
+        };
+        peer_manager.handle_new_connection_event(priority_connection);
+
+        // Wait for new peer notification for the priority peer
+        wait_for_new_peer_notification(&mut conn_status_rx, priority_peer).await;
+
+        // Verify the evicted peer is completely removed
+        assert!(!peer_manager.active_peers.contains_key(&non_priority_peer));
+        assert!(peer_manager.active_peers.contains_key(&priority_peer));
+        assert_eq!(peer_manager.active_peers.len(), initial_peer_count);
+    });
+}
+
+#[test]
+fn test_non_priority_peer_rejected_at_limit() {
+    // Create priority and non-priority peers
+    let runtime = create_test_runtime();
+    let peer_ids = ordered_peer_ids(4);
+    let priority_peer = peer_ids[0];
+    let non_priority_peer1 = peer_ids[1];
+    let non_priority_peer2 = peer_ids[2];
+
+    // Create a peer manager with the priority peer and a limit of 1 inbound connection
+    let (mut peer_manager, _, _, mut conn_status_rx) = create_peer_manager_with_priority_peers(
+        runtime.handle().clone(),
+        PeerId::random(),
+        vec![priority_peer],
+        1,
+    );
+
+    runtime.block_on(async move {
+        // Add a non-priority peer to fill the limit
+        add_test_connection_to_manager(non_priority_peer1, &mut peer_manager, 0);
+        wait_for_new_peer_notification(&mut conn_status_rx, non_priority_peer1).await;
+
+        // Try to add another non-priority peer (should be rejected since the limit is reached and it is not a priority peer)
+        let (_outbound2, inbound2) = build_test_connection();
+        let non_priority_connection = Connection {
+            socket: inbound2,
+            metadata: ConnectionMetadata::new(
+                non_priority_peer2,
+                ConnectionId::from(1),
+                "/memory/0".parse().unwrap(),
+                ConnectionOrigin::Inbound,
+                MessagingProtocolVersion::V1,
+                ProtocolIdSet::mock(),
+                PeerRole::Unknown,
+            ),
+        };
+        peer_manager.handle_new_connection_event(non_priority_connection);
+
+        // The second non-priority peer should be rejected
+        assert_eq!(peer_manager.active_peers.len(), 1);
+        assert!(peer_manager.active_peers.contains_key(&non_priority_peer1));
+        assert!(!peer_manager.active_peers.contains_key(&non_priority_peer2));
+    });
+}
+
+/// Helper function to add a test connection for a given peer ID to the peer manager
+fn add_test_connection_to_manager(
+    peer_id: AccountAddress,
+    peer_manager: &mut PeerManager<
+        BoxedTransport<Connection<MemorySocket>, impl Error + Sync + Send + 'static>,
+        MemorySocket,
+    >,
+    connection_id: u32,
+) {
+    let (_, inbound) = build_test_connection();
+    add_peer_to_manager(
+        peer_manager,
+        inbound,
+        peer_id,
+        None,
+        ConnectionOrigin::Inbound,
+        connection_id,
+    );
+}
+
+// Helper function to build a test peer manager with priority inbound peers, and
+// a specified inbound connection limit. Returns the peer manager along with the
+// channels for sending requests and receiving connection events.
+fn create_peer_manager_with_priority_peers(
+    executor: Handle,
+    peer_id: PeerId,
+    priority_inbound_peers: Vec<PeerId>,
+    inbound_connection_limit: usize,
+) -> (
+    PeerManager<
+        BoxedTransport<Connection<MemorySocket>, impl Error + Sync + Send + 'static>,
+        MemorySocket,
+    >,
+    aptos_channel::Sender<(PeerId, ProtocolId), PeerManagerRequest>,
+    aptos_channel::Sender<PeerId, ConnectionRequest>,
+    conn_notifs_channel::Receiver,
+) {
+    // Create the network channels
+    let (peer_manager_request_tx, peer_manager_request_rx) =
+        aptos_channel::new(QueueStyle::FIFO, 1, None);
+    let (connection_reqs_tx, connection_reqs_rx) = aptos_channel::new(QueueStyle::FIFO, 1, None);
+    let (upstream_handler_tx, _) = aptos_channel::new(QueueStyle::FIFO, 1, None);
+    let (connection_event_tx, connection_event_rx) = conn_notifs_channel::new();
+
+    // Create the peer manager with the specified priority inbound peers and limit
+    let peer_manager = PeerManager::new(
+        executor,
+        TimeService::mock(),
+        build_test_transport(),
+        NetworkContext::mock_with_peer_id(peer_id),
+        "/memory/0".parse().unwrap(),
+        PeersAndMetadata::new(&[NetworkId::Validator]),
+        peer_manager_request_rx,
+        connection_reqs_rx,
+        [(ProtocolId::DiscoveryDirectSend, upstream_handler_tx)]
+            .iter()
+            .cloned()
+            .collect(),
+        vec![connection_event_tx],
+        constants::NETWORK_CHANNEL_SIZE,
+        constants::MAX_FRAME_SIZE,
+        constants::MAX_MESSAGE_SIZE,
+        inbound_connection_limit,
+        None, /* access_control_policy */
+        priority_inbound_peers,
+    );
+
+    (
+        peer_manager,
+        peer_manager_request_tx,
+        connection_reqs_tx,
+        connection_event_rx,
+    )
+}
+
+/// Helper function to wait for a NewPeer notification for a specific peer ID
+async fn wait_for_new_peer_notification(
+    connection_event_rx: &mut Receiver,
+    expected_peer_id: AccountAddress,
+) {
+    match connection_event_rx.select_next_some().await {
+        ConnectionNotification::NewPeer(metadata, _) => {
+            assert_eq!(metadata.remote_peer_id, expected_peer_id);
+        },
+        notification => panic!(
+            "Expected new peer notification, but got: {:?}",
+            notification
+        ),
+    }
 }

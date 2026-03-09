@@ -91,7 +91,7 @@ def build_folder_map():
     for entry in os.listdir("."):
         if not os.path.isdir(entry):
             continue
-        if not (entry.startswith("dekart-rs") or entry.startswith("dekart_multivar") or
+        if not (entry.startswith("dekart-rs") or entry.startswith("dekart_rs") or
                 "dekart-multivar" in entry or "dekart_multivar" in entry):
             continue
         group_path = os.path.join(".", entry)
@@ -421,4 +421,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-

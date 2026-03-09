@@ -338,7 +338,7 @@ pub fn get_weighted_configs_for_benchmarking<T: traits::ThresholdConfig>() -> Ve
     wcs
 }
 
-pub fn reconstruct_dealt_secret_key_randomly<R, T: Transcript>(
+pub fn reconstruct_dealt_secret_key_randomly<R, T: TranscriptCore>(
     sc: &<T as TranscriptCore>::SecretSharingConfig,
     rng: &mut R,
     dks: &Vec<<T as TranscriptCore>::DecryptPrivKey>,
@@ -362,30 +362,4 @@ where
         .collect::<Vec<(Player, T::DealtSecretKeyShare)>>();
 
     T::DealtSecretKey::reconstruct(sc, &players_and_shares).unwrap()
-}
-
-pub fn reconstruct_dealt_secret_key_randomly_subtranscript<R, T: TranscriptCore>(
-    sc: &<T as TranscriptCore>::SecretSharingConfig,
-    rng: &mut R,
-    dks: &Vec<<T as TranscriptCore>::DecryptPrivKey>,
-    trx: T,
-    pp: &<T as TranscriptCore>::PublicParameters,
-) -> <T as TranscriptCore>::DealtSecretKey
-where
-    R: rand_core::RngCore,
-{
-    // Test reconstruction from t random shares
-    let players_and_shares = sc
-        .get_random_eligible_subset_of_players(rng)
-        .into_iter()
-        .map(|p| {
-            let (sk, pk) = trx.decrypt_own_share(sc, &p, &dks[p.get_id()], pp);
-
-            assert_eq!(pk, trx.get_public_key_share(sc, &p));
-
-            (p, sk)
-        })
-        .collect::<Vec<(Player, T::DealtSecretKeyShare)>>();
-
-    <T as TranscriptCore>::DealtSecretKey::reconstruct(sc, &players_and_shares).unwrap()
 }

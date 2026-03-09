@@ -6,13 +6,13 @@
 use super::scalars_to_bits;
 use crate::{
     algebra::polynomials,
+    fiat_shamir::{serialize_canonical_for_transcript, SerializeForTranscript},
     pcs::univariate_hiding_kzg,
     range_proofs::{traits, PublicStatement},
     sigma_protocol::{
         self,
         homomorphism::{self, Trait as _, TrivialShape},
         traits::Trait as _,
-        CurveGroupTrait,
     },
     Scalar,
 };
@@ -119,6 +119,15 @@ pub struct VerificationKey<E: Pairing> {
     lagr_0: E::G1Affine,
     vk_hkzg: univariate_hiding_kzg::VerificationKey<E>,
     verifier_precomputed: VerifierPrecomputed<E>,
+}
+
+impl<E: Pairing> SerializeForTranscript for VerificationKey<E> {
+    fn serialize_compressed_for_transcript<W: Write>(
+        &self,
+        w: &mut W,
+    ) -> Result<(), SerializationError> {
+        serialize_canonical_for_transcript(self, w)
+    }
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -881,12 +890,11 @@ impl<E: Pairing> traits::BatchedRangeProof<E> for Proof<E> {
             base_1: *lagr_0,
             base_2: *xi_1,
         };
-        <two_term_msm::Homomorphism<E::G1> as CurveGroupTrait>::verify(
+        <two_term_msm::Homomorphism<E::G1> as sigma_protocol::Trait>::verify(
             &hom,
             &(two_term_msm::CodomainShape((*hatC - comm.0).into_affine())),
             pi_PoK,
             &Self::DST,
-            Some(1), // TrivialShape has one element
             rng,
         )?;
         #[cfg(feature = "range_proof_timing_univariate_v2")]

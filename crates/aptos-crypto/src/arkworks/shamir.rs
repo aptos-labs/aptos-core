@@ -308,6 +308,11 @@ impl<F: FftField> ShamirThresholdConfig<F> {
     /// over the config's domain via FFT, and returns the coefficient vector and the first `n`
     /// evaluations. Useful for both classic and weighted Shamir (e.g. weighted PVSS where
     /// the threshold config has `n = W`).
+    ///
+    /// Note that this repository follows the convention that `t` is the reconstruction
+    /// threshold, rather than the standard adversary threshold in MPC literature.
+    ///
+    /// Returns a tuple containing the coefficients of the polynomial, and the shares
     #[allow(non_snake_case)]
     pub fn sample_polynomial_and_compute_shares<R: RngCore + CryptoRng>(
         &self,
@@ -315,7 +320,7 @@ impl<F: FftField> ShamirThresholdConfig<F> {
         rng: &mut R,
     ) -> (Vec<F>, Vec<F>)
     where
-        F: PrimeField,
+        F: PrimeField, // `sample_field_elements()` needs this
     {
         let mut coeffs = vec![a0];
         coeffs.extend(sample_field_elements::<F, _>(self.t - 1, rng));
