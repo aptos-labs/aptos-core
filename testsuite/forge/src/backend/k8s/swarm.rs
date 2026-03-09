@@ -662,6 +662,109 @@ pub(crate) async fn get_validator_fullnodes(
     Ok(fullnodes)
 }
 
+/// Parse the PFN index from a PFN StatefulSet name (e.g., "pfn0-aptos-fullnode" → 0).
+fn parse_pfn_index(s: &str) -> Result<usize> {
+    let re = Regex::new(r"pfn(\d+)").unwrap();
+    let cap = re
+        .captures(s)
+        .ok_or_else(|| format_err!("Failed to parse PFN index from {:?}", s))?;
+    cap[1]
+        .parse()
+        .map_err(|e| format_err!("Failed to parse PFN index as number from {:?}: {}", s, e))
+}
+
+/// Creates a K8sNode from a PFN StatefulSet deployed by the aptos-fullnode helm chart.
+/// Unlike VFNs (deployed via aptos-node), PFN StatefulSet names don't follow the
+/// "aptos-node-N-(validator|fullnode)" pattern, so they need their own construction logic.
+fn get_k8s_node_from_pfn_stateful_set(
+    sts: &StatefulSet,
+    use_port_forward: bool,
+) -> Result<K8sNode> {
+    let stateful_set_name = sts.metadata.name.as_ref().unwrap();
+    let namespace = sts.metadata.namespace.as_ref().unwrap();
+
+    // In the aptos-fullnode helm chart, the Service name matches the StatefulSet name.
+    let mut service_name = stateful_set_name.clone();
+    if !use_port_forward {
+        service_name = format!("{}.{}.svc", &service_name, namespace);
+    }
+
+    // Append the cluster name for multi-cluster deployments
+    let service_name = if let Some(target_cluster_name) = sts
+        .metadata
+        .labels
+        .as_ref()
+        .and_then(|labels| labels.get("multicluster/targetcluster"))
+    {
+        format!("{}.{}", &service_name, target_cluster_name)
+    } else {
+        service_name
+    };
+
+    let mut rest_api_port = REST_API_SERVICE_PORT;
+    if use_port_forward {
+        rest_api_port = get_free_port();
+    }
+
+    let index = parse_pfn_index(stateful_set_name)?;
+    let image_tag = get_stateful_set_image(sts)
+        .expect("Failed to get StatefulSet image")
+        .tag;
+
+    Ok(K8sNode {
+        // Name with "public-fullnode-" prefix so K8sSwarm::pfns() can identify them
+        name: format!("public-fullnode-{}", index),
+        stateful_set_name: stateful_set_name.clone(),
+        peer_id: PeerId::random(),
+        index,
+        service_name,
+        rest_api_port: AtomicU32::new(rest_api_port),
+        version: Version::new(0, image_tag),
+        namespace: namespace.to_string(),
+        haproxy_enabled: false,
+        port_forward_enabled: use_port_forward,
+    })
+}
+
+/// Returns all public fullnodes (PFNs) deployed by the aptos-fullnode helm chart.
+/// PFNs are identified by the label `app.kubernetes.io/part-of = "aptos-fullnode"`,
+/// which distinguishes them from VFNs (`app.kubernetes.io/part-of = "aptos-node"`).
+pub(crate) async fn get_public_fullnodes(
+    client: K8sClient,
+    kube_namespace: &str,
+    use_port_forward: bool,
+) -> Result<HashMap<PeerId, K8sNode>> {
+    let stateful_sets = list_stateful_sets(client, kube_namespace).await?;
+    let pfns = stateful_sets
+        .into_iter()
+        .filter(|sts| {
+            stateful_set_labels_matches(
+                sts,
+                &BTreeMap::from([
+                    ("app.kubernetes.io/name".to_string(), "fullnode".to_string()),
+                    (
+                        "app.kubernetes.io/part-of".to_string(),
+                        "aptos-fullnode".to_string(),
+                    ),
+                ]),
+            )
+        })
+        .filter_map(|sts| {
+            match get_k8s_node_from_pfn_stateful_set(&sts, use_port_forward) {
+                Ok(node) => Some((node.peer_id(), node)),
+                Err(e) => {
+                    warn!(
+                        "Failed to create K8sNode from PFN StatefulSet {:?}: {}",
+                        sts.metadata.name, e
+                    );
+                    None
+                },
+            }
+        })
+        .collect::<HashMap<_, _>>();
+    Ok(pfns)
+}
+
 /// Given a string like the StatefulSet name or Service name, parse the node type,
 /// whether it's a validator or fullnode
 fn parse_node_type(s: &str) -> String {

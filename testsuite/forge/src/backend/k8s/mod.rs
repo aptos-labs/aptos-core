@@ -325,7 +325,7 @@ impl Factory for K8sFactory {
 
             // Join on testnet, indexer, and PFN deployment futures in parallel.
             // try_join3 ensures fail-fast: if any deployer fails, the others are cancelled.
-            let (validators, fullnodes) =
+            let (validators, mut fullnodes) =
                 match future::try_join3(deploy_testnet_fut, deploy_indexer_fut, deploy_pfn_fut)
                     .await
                 {
@@ -335,6 +335,23 @@ impl Factory for K8sFactory {
                         bail!(e);
                     },
                 };
+
+            // All three deployers have finished. Collect any PFNs now — they were deployed
+            // in parallel with the testnet so they weren't available during collect_running_nodes.
+            if self.num_pfns > 0 {
+                let pfns = get_public_fullnodes(
+                    kube_client.clone(),
+                    &self.kube_namespace,
+                    self.use_port_forward,
+                )
+                .await?;
+                if self.use_port_forward {
+                    for pfn in pfns.values() {
+                        pfn.port_forward_rest_api()?;
+                    }
+                }
+                fullnodes.extend(pfns);
+            }
 
             (Some(new_era), validators, fullnodes)
         };

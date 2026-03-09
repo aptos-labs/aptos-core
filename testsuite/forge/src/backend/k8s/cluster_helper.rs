@@ -3,8 +3,9 @@
 
 use super::GENESIS_HELM_RELEASE_NAME;
 use crate::{
-    get_validator_fullnodes, get_validators, k8s_wait_nodes_strategy, nodes_healthcheck,
-    wait_stateful_set, ForgeDeployerManager, ForgeRunnerMode, GenesisConfigFn, K8sApi, K8sNode,
+    get_public_fullnodes, get_validator_fullnodes, get_validators, k8s_wait_nodes_strategy,
+    nodes_healthcheck, wait_stateful_set, ForgeDeployerManager, ForgeRunnerMode, GenesisConfigFn,
+    K8sApi, K8sNode,
     NodeConfigFn, ReadWrite, Result, APTOS_NODE_HELM_RELEASE_NAME, DEFAULT_ROOT_KEY,
     DEFAULT_TEST_SUITE_NAME, DEFAULT_USERNAME, FORGE_KEY_SEED,
     FORGE_TESTNET_DEPLOYER_DOCKER_IMAGE_REPO, FULLNODE_HAPROXY_SERVICE_SUFFIX,
@@ -766,7 +767,7 @@ pub async fn collect_running_nodes(
         wait_node_haproxy(kube_client, &kube_namespace, validators.len()).await?;
     }
 
-    // get all fullnodes
+    // get all VFNs
     let validator_fullnodes = get_validator_fullnodes(
         kube_client.clone(),
         &kube_namespace,
@@ -778,9 +779,26 @@ pub async fn collect_running_nodes(
 
     wait_nodes_stateful_set(kube_client, &kube_namespace, &validator_fullnodes).await?;
 
+    // get all PFNs deployed by the aptos-fullnode helm chart (may be empty)
+    let public_fullnodes = get_public_fullnodes(
+        kube_client.clone(),
+        &kube_namespace,
+        use_port_forward,
+    )
+    .await
+    .unwrap_or_default();
+
+    if !public_fullnodes.is_empty() {
+        wait_nodes_stateful_set(kube_client, &kube_namespace, &public_fullnodes).await?;
+    }
+
+    // Merge VFNs and PFNs into a single fullnodes map
+    let mut fullnodes = validator_fullnodes;
+    fullnodes.extend(public_fullnodes);
+
     let nodes = validators
         .values()
-        .chain(validator_fullnodes.values())
+        .chain(fullnodes.values())
         .collect::<Vec<&K8sNode>>();
 
     // start port-forward for each of the nodes
@@ -792,7 +810,7 @@ pub async fn collect_running_nodes(
     }
 
     nodes_healthcheck(nodes).await?;
-    Ok((validators, validator_fullnodes))
+    Ok((validators, fullnodes))
 }
 
 /// Returns a [Config] object reading the KUBECONFIG environment variable or infering from the
