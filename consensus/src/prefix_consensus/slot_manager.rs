@@ -26,6 +26,7 @@ use aptos_logger::prelude::*;
 use aptos_prefix_consensus::{
     PrefixVector, PriorityClassifiable, SubprotocolNetworkSender, StrongPrefixConsensusMsg,
     build_block_for_entry,
+    certificates::StrongPCCommit,
     slot_ranking::MultiSlotRankingManager,
     slot_state::SlotState,
     slot_types::{
@@ -73,7 +74,6 @@ enum PendingWave {
     VHighDelta {
         slot: u64,
         v_high: PrefixVector,   // full v_high (not just delta)
-        v_high_len: usize,      // for ranking update
         resolved: HashMap<HashValue, Payload>,
         missing: HashSet<HashValue>,
     },
@@ -93,13 +93,15 @@ impl PendingWave {
         }
     }
 
-    /// Extract the fields needed by `commit_wave`: (slot, vector, resolved, finalize_len).
-    fn into_commit_args(self) -> (u64, PrefixVector, HashMap<HashValue, Payload>, Option<usize>) {
+    /// Consume and destructure for `commit_wave`.
+    ///
+    /// Returns (slot, vector, resolved). For VLow the vector is v_low;
+    /// for VHighDelta it is the full v_high (commit_wave skips positions
+    /// already committed in wave 1).
+    fn into_parts(self) -> (u64, PrefixVector, HashMap<HashValue, Payload>) {
         match self {
-            PendingWave::VLow { slot, v_low, resolved, .. } => (slot, v_low, resolved, None),
-            PendingWave::VHighDelta { slot, v_high, v_high_len, resolved, .. } => {
-                (slot, v_high, resolved, Some(v_high_len))
-            },
+            PendingWave::VLow { slot, v_low, resolved, .. } => (slot, v_low, resolved),
+            PendingWave::VHighDelta { slot, v_high, resolved, .. } => (slot, v_high, resolved),
         }
     }
 }
@@ -271,7 +273,13 @@ pub struct SlotManager<NS: SubprotocolNetworkSender<SlotConsensusMsg>, SP: SPCSp
     pending_wave: Option<PendingWave>,
     next_round: Round,                          // global sequential round counter (persists across slots)
     v_low_committed_positions: HashSet<usize>,  // ranking positions committed in wave 1 (reset per slot)
-    buffered_v_high: Option<(u64, PrefixVector)>, // v_high buffered if it arrives while wave 1 is pending
+    buffered_v_high: Option<(u64, PrefixVector, StrongPCCommit)>, // v_high buffered if it arrives while wave 1 is pending
+
+    // Verifiable ranking state (Phase 12)
+    last_commit_proof: Option<StrongPCCommit>,           // proof from most recent completed slot (for next slot's proposals)
+    last_spc_initial_ranking: Option<Vec<Author>>,       // ranking used for the SPC that produced last_commit_proof
+    current_slot_ranking: Option<Vec<Author>>,            // ranking snapshot for current slot (for v_high exclusion demotion)
+    current_slot_commit_proof: Option<StrongPCCommit>,   // commit proof for current slot (set by on_spc_v_high_complete)
 
     // Execution bridge
     execution_channel: futures::channel::mpsc::UnboundedSender<OrderedBlocks>,
@@ -326,6 +334,10 @@ impl<NS: SubprotocolNetworkSender<SlotConsensusMsg>, SP: SPCSpawner> SlotManager
             next_round: 1,
             v_low_committed_positions: HashSet::new(),
             buffered_v_high: None,
+            last_commit_proof: None,
+            last_spc_initial_ranking: None,
+            current_slot_ranking: None,
+            current_slot_commit_proof: None,
             execution_channel,
             pipeline_builder,
             parent_pipeline_futs,
@@ -436,7 +448,7 @@ impl<NS: SubprotocolNetworkSender<SlotConsensusMsg>, SP: SPCSpawner> SlotManager
                         Some(SPCOutput::VLow { slot, v_low }) => {
                             self.on_spc_v_low(slot, v_low).await;
                         }
-                        Some(SPCOutput::VHigh { slot, v_high }) => {
+                        Some(SPCOutput::VHigh { slot, v_high, commit_proof }) => {
                             // If wave 1 payloads are still pending, buffer v_high
                             if self.pending_wave.as_ref().is_some_and(|p| p.is_v_low()) {
                                 info!(
@@ -444,9 +456,9 @@ impl<NS: SubprotocolNetworkSender<SlotConsensusMsg>, SP: SPCSpawner> SlotManager
                                     slot = slot,
                                     "Wave 1 still pending, buffering v_high"
                                 );
-                                self.buffered_v_high = Some((slot, v_high));
+                                self.buffered_v_high = Some((slot, v_high, commit_proof));
                             } else {
-                                self.on_spc_v_high_complete(slot, v_high).await;
+                                self.on_spc_v_high_complete(slot, v_high, commit_proof).await;
                             }
                         }
                         None => {
@@ -498,7 +510,14 @@ impl<NS: SubprotocolNetworkSender<SlotConsensusMsg>, SP: SPCSpawner> SlotManager
         let (validator_txns, payload) = self.pull_payload().await;
         let _ = validator_txns; // validator_txns collected in Phase 7
 
-        // Create and sign proposal
+        // Snapshot current ranking for this slot (used for v_high exclusion demotion in finalize_slot)
+        self.current_slot_ranking = Some(self.ranking_manager.current_ranking().to_vec());
+
+        // Create and sign proposal (embed previous slot's commit proof for verifiable ranking)
+        debug_assert!(
+            slot != 1 || self.last_commit_proof.is_none(),
+            "Slot 1 should not have a commit proof from a previous slot"
+        );
         let now_usecs = aptos_infallible::duration_since_epoch().as_micros() as u64;
         let proposal = match create_signed_slot_proposal(
             slot,
@@ -507,6 +526,7 @@ impl<NS: SubprotocolNetworkSender<SlotConsensusMsg>, SP: SPCSpawner> SlotManager
             payload,
             &self.validator_signer,
             now_usecs,
+            self.last_commit_proof.clone(),
         ) {
             Ok(p) => p,
             Err(e) => {
@@ -723,8 +743,8 @@ impl<NS: SubprotocolNetworkSender<SlotConsensusMsg>, SP: SPCSpawner> SlotManager
             self.commit_wave(slot, &v_low, &resolved, None).await;
             // Check if v_high was buffered (shouldn't happen if v_low resolves instantly,
             // but handle it for robustness)
-            if let Some((vhigh_slot, v_high)) = self.buffered_v_high.take() {
-                self.on_spc_v_high_complete(vhigh_slot, v_high).await;
+            if let Some((vhigh_slot, v_high, proof)) = self.buffered_v_high.take() {
+                self.on_spc_v_high_complete(vhigh_slot, v_high, proof).await;
             }
         } else {
             info!(
@@ -755,7 +775,7 @@ impl<NS: SubprotocolNetworkSender<SlotConsensusMsg>, SP: SPCSpawner> SlotManager
     }
 
     /// Handle v_high from SPC (wave 2 — delta commit + slot finalization).
-    async fn on_spc_v_high_complete(&mut self, slot: u64, v_high: PrefixVector) {
+    async fn on_spc_v_high_complete(&mut self, slot: u64, v_high: PrefixVector, commit_proof: StrongPCCommit) {
         info!(
             epoch = self.epoch,
             slot = slot,
@@ -763,6 +783,9 @@ impl<NS: SubprotocolNetworkSender<SlotConsensusMsg>, SP: SPCSpawner> SlotManager
             committed_in_wave1 = self.v_low_committed_positions.len(),
             "Processing v_high for wave 2 (delta commit)"
         );
+
+        // Store commit proof for finalize_slot (verifiable ranking)
+        self.current_slot_commit_proof = Some(commit_proof);
 
         // Build delta vector: zero out positions already committed in wave 1
         let delta_vector: PrefixVector = v_high
@@ -786,7 +809,7 @@ impl<NS: SubprotocolNetworkSender<SlotConsensusMsg>, SP: SPCSpawner> SlotManager
                 slot = slot,
                 "No delta entries in v_high, finalizing slot"
             );
-            self.finalize_slot(slot, v_high.len()).await;
+            self.finalize_slot(slot, &v_high).await;
             return;
         }
 
@@ -797,7 +820,7 @@ impl<NS: SubprotocolNetworkSender<SlotConsensusMsg>, SP: SPCSpawner> SlotManager
             .resolve_missing_payloads(&delta_vector);
 
         if missing.is_empty() {
-            self.commit_wave(slot, &v_high, &resolved, Some(v_high.len()))
+            self.commit_wave(slot, &v_high, &resolved, Some(&v_high))
                 .await;
         } else {
             info!(
@@ -806,12 +829,10 @@ impl<NS: SubprotocolNetworkSender<SlotConsensusMsg>, SP: SPCSpawner> SlotManager
                 missing_count = missing.len(),
                 "Wave 2 (v_high delta): missing payloads, broadcasting fetch requests"
             );
-            let v_high_len = v_high.len();
             let missing_set: HashSet<HashValue> = missing.iter().cloned().collect();
             self.pending_wave = Some(PendingWave::VHighDelta {
                 slot,
                 v_high,
-                v_high_len,
                 resolved,
                 missing: missing_set,
             });
@@ -835,7 +856,7 @@ impl<NS: SubprotocolNetworkSender<SlotConsensusMsg>, SP: SPCSpawner> SlotManager
     /// `v_low_committed_positions` and bot entries. Each non-skipped non-bot
     /// entry becomes its own block with `round = self.next_round++`.
     ///
-    /// If `finalize_with_v_high_len` is `Some(len)`, this is the final wave:
+    /// If `finalize_with_v_high` is `Some(v_high)`, this is the final wave:
     /// ranking is updated, slot state and SPC channels are cleaned up, and
     /// the next slot starts.
     async fn commit_wave(
@@ -843,7 +864,7 @@ impl<NS: SubprotocolNetworkSender<SlotConsensusMsg>, SP: SPCSpawner> SlotManager
         slot: u64,
         vector: &PrefixVector,
         payload_map: &HashMap<HashValue, Payload>,
-        finalize_with_v_high_len: Option<usize>,
+        finalize_with_v_high: Option<&PrefixVector>,
     ) {
         let ranking = self.ranking_manager.current_ranking();
         let mut blocks: Vec<Arc<PipelinedBlock>> = Vec::new();
@@ -943,8 +964,8 @@ impl<NS: SubprotocolNetworkSender<SlotConsensusMsg>, SP: SPCSpawner> SlotManager
                 slot = slot,
                 "commit_wave: no blocks produced (all entries bot or already committed)"
             );
-            if let Some(v_high_len) = finalize_with_v_high_len {
-                self.finalize_slot(slot, v_high_len).await;
+            if let Some(v_high) = finalize_with_v_high {
+                self.finalize_slot(slot, v_high).await;
             }
             return;
         }
@@ -977,19 +998,71 @@ impl<NS: SubprotocolNetworkSender<SlotConsensusMsg>, SP: SPCSpawner> SlotManager
                 slot = slot,
                 block_count = newly_committed_positions.len(),
                 last_round = last_block_info.round(),
-                is_final_wave = finalize_with_v_high_len.is_some(),
+                is_final_wave = finalize_with_v_high.is_some(),
                 "Wave committed — blocks sent to execution pipeline"
             );
         }
 
-        if let Some(v_high_len) = finalize_with_v_high_len {
-            self.finalize_slot(slot, v_high_len).await;
+        if let Some(v_high) = finalize_with_v_high {
+            self.finalize_slot(slot, v_high).await;
         }
     }
 
-    /// Finalize the slot: update ranking, clean up state, advance to next slot.
-    async fn finalize_slot(&mut self, slot: u64, v_high_len: usize) {
-        self.ranking_manager.update(v_high_len);
+    /// Finalize the slot: update ranking (SPC-aware demotion), clean up state, advance to next slot.
+    ///
+    /// The commit proof for SPC-view demotions is extracted from the canonical
+    /// proposal (first non-⊥ entry in v_high), NOT from local state. This is
+    /// necessary because different validators can commit the same SPC in different
+    /// views — using a locally-stored proof would cause ranking divergence.
+    async fn finalize_slot(&mut self, slot: u64, v_high: &PrefixVector) {
+        let current_slot_ranking = self.current_slot_ranking.take()
+            .unwrap_or_else(|| self.ranking_manager.current_ranking().to_vec());
+
+        // Extract the canonical commit proof from the first non-⊥ proposal in v_high.
+        // This is deterministic: v_high is agreed by SPC, so all honest validators
+        // identify the same author and extract the same prev_commit_proof.
+        let canonical_proof = self.extract_canonical_proof(slot, v_high, &current_slot_ranking);
+
+        let (committing_view, spc_initial_ranking) = if let Some(ref prev_ranking) = self.last_spc_initial_ranking {
+            let cv = match &canonical_proof {
+                Some(proof) => proof.committing_view().unwrap_or_else(|| {
+                    warn!(
+                        epoch = self.epoch,
+                        slot = slot,
+                        "Canonical commit proof has no committing_view (empty QC3 votes), defaulting to 1"
+                    );
+                    1
+                }),
+                None => {
+                    warn!(
+                        epoch = self.epoch,
+                        slot = slot,
+                        "No canonical proof found in slot proposals despite having last_spc_initial_ranking"
+                    );
+                    1
+                },
+            };
+            (cv, prev_ranking.clone())
+        } else {
+            // Slot 1: no previous proof, no SPC-view demotions
+            (1, current_slot_ranking.clone())
+        };
+
+        self.ranking_manager.update_with_proof(
+            committing_view,
+            &spc_initial_ranking,
+            &current_slot_ranking,
+            v_high.len(),
+        );
+
+        // Store current slot's commit proof and ranking for the next slot.
+        // last_commit_proof: embedded in this validator's own proposals for slot S+1.
+        // last_spc_initial_ranking: needed for SPC-view demotions when finalize_slot(S+1)
+        // extracts the canonical proof from slot S+1's proposals.
+        if let Some(proof) = self.current_slot_commit_proof.take() {
+            self.last_commit_proof = Some(proof);
+            self.last_spc_initial_ranking = Some(current_slot_ranking);
+        }
 
         // Clean up slot state, SPC channels, message buffers, and pending state
         self.spc_msg_tx.take();
@@ -1011,6 +1084,46 @@ impl<NS: SubprotocolNetworkSender<SlotConsensusMsg>, SP: SPCSpawner> SlotManager
         );
 
         self.start_new_slot(slot + 1).await;
+    }
+
+    /// Extract the canonical commit proof from the first non-⊥ entry in v_high.
+    ///
+    /// The first non-⊥ position identifies the highest-ranked validator whose
+    /// proposal was included. That validator's `prev_commit_proof` (from slot S-1)
+    /// is the canonical proof used for SPC-view demotions.
+    ///
+    /// Returns `None` for slot 1 (no predecessor) or if no non-⊥ entry has a proof.
+    fn extract_canonical_proof(
+        &self,
+        slot: u64,
+        v_high: &PrefixVector,
+        current_slot_ranking: &[Author],
+    ) -> Option<StrongPCCommit> {
+        if slot <= 1 {
+            return None;
+        }
+
+        let slot_state = self.slot_states.get(&slot)?;
+        let buffer = slot_state.proposal_buffer();
+
+        // Find the first non-⊥ entry in v_high and look up that author's proposal
+        for (pos, hash) in v_high.iter().enumerate() {
+            if *hash == HashValue::zero() {
+                continue;
+            }
+            if let Some(author) = current_slot_ranking.get(pos) {
+                if let Some(proposal) = buffer.get(author) {
+                    return proposal.prev_commit_proof.clone();
+                }
+            }
+        }
+
+        warn!(
+            epoch = self.epoch,
+            slot = slot,
+            "No proposal found for any non-bot v_high entry — cannot extract canonical proof"
+        );
+        None
     }
 
     async fn process_spc_message(
@@ -1145,15 +1258,7 @@ impl<NS: SubprotocolNetworkSender<SlotConsensusMsg>, SP: SPCSpawner> SlotManager
         };
 
         if should_commit {
-            let pending = self.pending_wave.take().unwrap();
-            let check_buffered = pending.is_v_low();
-            let (slot, vector, resolved, finalize_len) = pending.into_commit_args();
-            self.commit_wave(slot, &vector, &resolved, finalize_len).await;
-            if check_buffered {
-                if let Some((vhigh_slot, v_high)) = self.buffered_v_high.take() {
-                    self.on_spc_v_high_complete(vhigh_slot, v_high).await;
-                }
-            }
+            self.commit_resolved_pending_wave().await;
         }
     }
 
@@ -1175,14 +1280,23 @@ impl<NS: SubprotocolNetworkSender<SlotConsensusMsg>, SP: SPCSpawner> SlotManager
         };
 
         if should_commit {
-            let pending = self.pending_wave.take().unwrap();
-            let check_buffered = pending.is_v_low();
-            let (slot, vector, resolved, finalize_len) = pending.into_commit_args();
-            self.commit_wave(slot, &vector, &resolved, finalize_len).await;
-            if check_buffered {
-                if let Some((vhigh_slot, v_high)) = self.buffered_v_high.take() {
-                    self.on_spc_v_high_complete(vhigh_slot, v_high).await;
-                }
+            self.commit_resolved_pending_wave().await;
+        }
+    }
+
+    /// Commit a fully-resolved pending wave. Called when all missing payloads
+    /// have been received (via fetch response or late proposal).
+    async fn commit_resolved_pending_wave(&mut self) {
+        let pending = self.pending_wave.take().unwrap();
+        let is_wave1 = pending.is_v_low();
+        let (slot, vector, resolved) = pending.into_parts();
+        // Wave 2 (VHighDelta) finalizes the slot; wave 1 (VLow) does not.
+        // For wave 2, vector IS the full v_high.
+        let finalize_v_high = if is_wave1 { None } else { Some(&vector) };
+        self.commit_wave(slot, &vector, &resolved, finalize_v_high).await;
+        if is_wave1 {
+            if let Some((vhigh_slot, v_high, proof)) = self.buffered_v_high.take() {
+                self.on_spc_v_high_complete(vhigh_slot, v_high, proof).await;
             }
         }
     }
@@ -1227,7 +1341,10 @@ impl<NS: SubprotocolNetworkSender<SlotConsensusMsg>, SP: SPCSpawner> SlotManager
 mod tests {
     use super::*;
     use aptos_consensus_types::common::Payload;
-    use aptos_prefix_consensus::slot_types::{create_signed_slot_proposal, SlotProposal};
+    use aptos_prefix_consensus::{
+        QC3,
+        slot_types::{create_signed_slot_proposal, SlotProposal},
+    };
     use aptos_types::{
         validator_signer::ValidatorSigner,
         validator_verifier::{ValidatorConsensusInfo, ValidatorVerifier},
@@ -1235,6 +1352,19 @@ mod tests {
     use futures::channel::mpsc as futures_mpsc;
     use std::sync::Mutex;
     use tokio::sync::mpsc;
+
+    /// Create a dummy StrongPCCommit for testing.
+    /// Uses an empty QC3 (no votes), epoch=0, slot=given.
+    /// NOT suitable for verification — only for passing through channels.
+    fn dummy_commit_proof(slot: u64, v_high: &PrefixVector) -> StrongPCCommit {
+        StrongPCCommit::new(
+            QC3::new(vec![]),     // empty QC3 — not verifiable
+            vec![],               // empty certificate chain
+            v_high.clone(),
+            0,                    // epoch
+            slot,
+        )
+    }
 
     // ========================================================================
     // Test infrastructure
@@ -1260,9 +1390,11 @@ mod tests {
                 slot,
                 v_low: input_vector.clone(),
             });
+            let commit_proof = dummy_commit_proof(slot, &input_vector);
             let _ = output_tx.send(SPCOutput::VHigh {
                 slot,
                 v_high: input_vector,
+                commit_proof,
             });
 
             SPCHandles {
@@ -1331,11 +1463,11 @@ mod tests {
                 SPCOutput::VLow { slot, v_low } => {
                     manager.on_spc_v_low(slot, v_low).await;
                 },
-                SPCOutput::VHigh { slot, v_high } => {
+                SPCOutput::VHigh { slot, v_high, commit_proof } => {
                     if manager.pending_wave.as_ref().is_some_and(|p| p.is_v_low()) {
-                        manager.buffered_v_high = Some((slot, v_high));
+                        manager.buffered_v_high = Some((slot, v_high, commit_proof));
                     } else {
-                        manager.on_spc_v_high_complete(slot, v_high).await;
+                        manager.on_spc_v_high_complete(slot, v_high, commit_proof).await;
                     }
                     break;
                 },
@@ -1352,6 +1484,42 @@ mod tests {
             .collect();
         let verifier = Arc::new(ValidatorVerifier::new(infos));
         (signers, verifier)
+    }
+
+    /// Insert a proposal directly into the manager's slot state, bypassing
+    /// `process_proposal` verification. Use this for slot > 1 proposals in
+    /// lifecycle tests where building a verifiable commit proof is unnecessary.
+    async fn insert_proposal_unchecked(
+        manager: &mut SlotManager<MockSlotNetworkSender, StubSPCSpawner>,
+        signer: &ValidatorSigner,
+        slot: u64,
+        epoch: u64,
+    ) {
+        let proposal = create_signed_slot_proposal(
+            slot, epoch, signer.author(), Payload::DirectMempool(vec![]), signer, 0, None,
+        )
+        .unwrap();
+        let n = manager.ranking_manager.validator_count();
+        manager
+            .slot_states
+            .entry(slot)
+            .or_insert_with(|| SlotState::new(slot, n));
+        let slot_state = manager.slot_states.get_mut(&slot).expect("just inserted");
+        let proposal_hash = proposal.payload_hash;
+        let proposal_payload = proposal.payload.clone();
+        slot_state.insert_proposal(proposal);
+
+        // Check if all proposals received for current slot and SPC not yet started
+        if slot == manager.current_slot
+            && slot_state.has_all_proposals()
+            && manager.spc_msg_tx.is_none()
+        {
+            manager.slot_timer = None;
+            manager.run_spc(slot).await;
+        }
+
+        // Check if this resolves a pending wave
+        manager.try_resolve_pending(proposal_hash, proposal_payload).await;
     }
 
     /// Build a SlotManager for testing with n validators, using signer[0] as self.
@@ -1426,6 +1594,7 @@ mod tests {
                 Payload::DirectMempool(vec![]),
                 signer,
                 0, // test timestamp
+                None,
             )
             .unwrap();
             manager.process_proposal(signer.author(), proposal).await;
@@ -1487,6 +1656,7 @@ mod tests {
             Payload::DirectMempool(vec![]),
             &signers[1],
             0,
+            None,
         )
         .unwrap();
 
@@ -1507,7 +1677,7 @@ mod tests {
         // Slot 1: only 2 proposals (from signers[0] and signers[1])
         manager.start_new_slot(1).await;
         let p1 = create_signed_slot_proposal(
-            1, 1, signers[1].author(), Payload::DirectMempool(vec![]), &signers[1], 0,
+            1, 1, signers[1].author(), Payload::DirectMempool(vec![]), &signers[1], 0, None,
         ).unwrap();
         manager.process_proposal(signers[1].author(), p1).await;
 
@@ -1520,7 +1690,7 @@ mod tests {
         let ordered = exec_rx.try_next().unwrap().expect("Wave 1");
         assert_eq!(ordered.ordered_blocks.len(), 2);
 
-        // After slot 1: v_high.len() == 4, so ranking_manager.update(4) → no demotion
+        // After slot 1: v_high.len() == 4, so ranking_manager.update_with_proof(..., 4) → no demotion
         // (full prefix, all 4 positions present even if some are ⊥)
         assert_eq!(manager.ranking_manager.current_ranking(), &authors);
         assert_eq!(manager.current_slot, 2);
@@ -1535,7 +1705,7 @@ mod tests {
 
         // Send the other proposal
         let p = create_signed_slot_proposal(
-            1, 1, signers[1].author(), Payload::DirectMempool(vec![]), &signers[1], 0,
+            1, 1, signers[1].author(), Payload::DirectMempool(vec![]), &signers[1], 0, None,
         ).unwrap();
         manager.process_proposal(signers[1].author(), p).await;
 
@@ -1616,10 +1786,8 @@ mod tests {
         let (mut manager, mut exec_rx, _ns) = build_test_manager(&signers, verifier.clone());
 
         // Before starting slot 2, insert a proposal for slot 2 from signer[1]
-        let future_proposal = create_signed_slot_proposal(
-            2, 1, signers[1].author(), Payload::DirectMempool(vec![]), &signers[1], 0,
-        ).unwrap();
-        manager.process_proposal(signers[1].author(), future_proposal).await;
+        // (bypasses verify() since slot 2 proposals need a commit proof we don't build here)
+        insert_proposal_unchecked(&mut manager, &signers[1], 2, 1).await;
 
         // Should have created a SlotState for slot 2
         assert!(manager.slot_states.contains_key(&2));
@@ -1669,7 +1837,7 @@ mod tests {
         // Submit proposals from all other validators
         for signer in &signers[1..] {
             let proposal = create_signed_slot_proposal(
-                1, 1, signer.author(), Payload::DirectMempool(vec![]), signer, 100,
+                1, 1, signer.author(), Payload::DirectMempool(vec![]), signer, 100, None,
             )
             .unwrap();
             manager.process_proposal(signer.author(), proposal).await;
@@ -1709,8 +1877,10 @@ mod tests {
         assert_eq!(wave1.ordered_proof.commit_info().round(), 2);
 
         // Wave 2: v_high has 3 non-bot entries; delta = position 2 only
+        let v_high = vec![h, h, h, HashValue::zero()];
+        let proof = dummy_commit_proof(1, &v_high);
         manager
-            .on_spc_v_high_complete(1, vec![h, h, h, HashValue::zero()])
+            .on_spc_v_high_complete(1, v_high, proof)
             .await;
 
         let wave2 = exec_rx
@@ -1740,8 +1910,10 @@ mod tests {
         );
 
         // Wave 2: v_high has 2 entries → 2 blocks
+        let v_high = vec![h, h, HashValue::zero(), HashValue::zero()];
+        let proof = dummy_commit_proof(1, &v_high);
         manager
-            .on_spc_v_high_complete(1, vec![h, h, HashValue::zero(), HashValue::zero()])
+            .on_spc_v_high_complete(1, v_high, proof)
             .await;
 
         let wave2 = exec_rx
@@ -1772,7 +1944,8 @@ mod tests {
         assert_eq!(wave1.ordered_blocks[3].block().round(), 4);
 
         // v_high == v_low → empty delta → finalize immediately, no wave 2 blocks
-        manager.on_spc_v_high_complete(1, v).await;
+        let proof = dummy_commit_proof(1, &v);
+        manager.on_spc_v_high_complete(1, v, proof).await;
         assert!(exec_rx.try_next().is_err(), "No wave 2 blocks expected");
 
         assert_eq!(manager.current_slot, 2);
@@ -1794,7 +1967,9 @@ mod tests {
         assert_eq!(w1.ordered_blocks[0].block().round(), 1);
         assert_eq!(w1.ordered_blocks[1].block().round(), 2);
 
-        manager.on_spc_v_high_complete(1, vec![h, h, h]).await;
+        let v_high_1 = vec![h, h, h];
+        let proof_1 = dummy_commit_proof(1, &v_high_1);
+        manager.on_spc_v_high_complete(1, v_high_1, proof_1).await;
         let w2 = exec_rx.try_next().unwrap().unwrap();
         assert_eq!(w2.ordered_blocks[0].block().round(), 3);
 
@@ -1802,12 +1977,9 @@ mod tests {
         assert_eq!(manager.current_slot, 2);
 
         // Submit proposals for slot 2 to trigger SPC
+        // (bypasses verify() since slot 2 proposals need a commit proof we don't build here)
         for signer in &signers[1..] {
-            let proposal = create_signed_slot_proposal(
-                2, 1, signer.author(), Payload::DirectMempool(vec![]), signer, 200,
-            )
-            .unwrap();
-            manager.process_proposal(signer.author(), proposal).await;
+            insert_proposal_unchecked(&mut manager, signer, 2, 1).await;
         }
         manager.spc_output_rx.take(); // discard StubSPCSpawner output
 
@@ -1819,7 +1991,9 @@ mod tests {
         assert_eq!(w3.ordered_blocks[2].block().round(), 6);
 
         // v_high == v_low → empty delta
-        manager.on_spc_v_high_complete(2, vec![h, h, h]).await;
+        let v_high_2 = vec![h, h, h];
+        let proof_2 = dummy_commit_proof(2, &v_high_2);
+        manager.on_spc_v_high_complete(2, v_high_2, proof_2).await;
         assert!(exec_rx.try_next().is_err());
 
         assert_eq!(manager.current_slot, 3);
@@ -1851,7 +2025,9 @@ mod tests {
         assert!(manager.pending_wave.as_ref().is_some_and(|p| p.is_v_low()));
 
         // v_high arrives while wave 1 is pending → buffer it
-        manager.buffered_v_high = Some((1, vec![h, secret_hash, h, HashValue::zero()]));
+        let buffered_vhigh = vec![h, secret_hash, h, HashValue::zero()];
+        let buffered_proof = dummy_commit_proof(1, &buffered_vhigh);
+        manager.buffered_v_high = Some((1, buffered_vhigh, buffered_proof));
 
         // Resolve the missing payload via fetch response
         manager
@@ -1905,7 +2081,9 @@ mod tests {
         );
 
         // v_high has all 4 non-bot; delta = positions 1 and 3
-        manager.on_spc_v_high_complete(1, vec![h, h, h, h]).await;
+        let v_high = vec![h, h, h, h];
+        let proof = dummy_commit_proof(1, &v_high);
+        manager.on_spc_v_high_complete(1, v_high, proof).await;
 
         let wave2 = exec_rx.try_next().unwrap().expect("Wave 2");
         assert_eq!(wave2.ordered_blocks.len(), 2);

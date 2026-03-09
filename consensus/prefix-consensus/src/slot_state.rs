@@ -381,7 +381,7 @@ mod tests {
         signer: &ValidatorSigner,
         payload: Payload,
     ) -> SlotProposal {
-        crate::slot_types::create_signed_slot_proposal(slot, epoch, signer.author(), payload, signer, 0)
+        crate::slot_types::create_signed_slot_proposal(slot, epoch, signer.author(), payload, signer, 0, None)
             .expect("signing should not fail")
     }
 
@@ -400,6 +400,8 @@ mod tests {
             author,
             payload_hash: HashValue::random(),
             payload: Payload::DirectMempool(vec![]),
+            prev_commit_proof: None,
+            prev_commit_proof_hash: None,
             signature: BlsSignature::dummy_signature(),
             timestamp_usecs: 0,
         }

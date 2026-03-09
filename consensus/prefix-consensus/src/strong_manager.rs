@@ -193,11 +193,12 @@ impl<NetworkSender: SubprotocolNetworkSender<StrongPrefixConsensusMsg>, T: Inner
     }
 
     /// Notify SlotManager (if connected) that SPC committed v_high.
-    fn send_output(&self, v_high: &PrefixVector) {
+    fn send_output(&self, v_high: &PrefixVector, commit_proof: StrongPCCommit) {
         if let Some(tx) = &self.output_tx {
             let output = SPCOutput::VHigh {
                 slot: self.slot,
                 v_high: v_high.clone(),
+                commit_proof,
             };
             if let Err(e) = tx.send(output) {
                 error!(
@@ -428,9 +429,9 @@ impl<NetworkSender: SubprotocolNetworkSender<StrongPrefixConsensusMsg>, T: Inner
                     v_high_len = v_high.len(),
                     "Full v_low in View 1 — broadcasting StrongPCCommit with empty chain"
                 );
-                let msg = StrongPrefixConsensusMsg::Commit(Box::new(commit));
+                let msg = StrongPrefixConsensusMsg::Commit(Box::new(commit.clone()));
                 self.network_sender.broadcast(msg).await;
-                self.send_output(&v_high);
+                self.send_output(&v_high, commit);
                 self.write_output_file();
             }
             View1Decision::DirectCert(cert) => {
@@ -696,10 +697,10 @@ impl<NetworkSender: SubprotocolNetworkSender<StrongPrefixConsensusMsg>, T: Inner
                     "Built StrongPCCommit, broadcasting"
                 );
                 let v_high = commit.v_high.clone();
-                let msg = StrongPrefixConsensusMsg::Commit(Box::new(commit));
+                let msg = StrongPrefixConsensusMsg::Commit(Box::new(commit.clone()));
                 self.network_sender.broadcast(msg).await;
                 self.protocol.set_committed(v_high.clone());
-                self.send_output(&v_high);
+                self.send_output(&v_high, commit);
                 self.write_output_file();
             }
             Err(ChainBuildError::MissingCert { hash }) => {
@@ -1028,7 +1029,8 @@ impl<NetworkSender: SubprotocolNetworkSender<StrongPrefixConsensusMsg>, T: Inner
                     party_id = %self.party_id,
                     "Received valid StrongPCCommit, protocol complete"
                 );
-                self.send_output(self.protocol.v_high().unwrap());
+                let v_high = self.protocol.v_high().unwrap().clone();
+                self.send_output(&v_high, commit);
                 self.write_output_file();
             }
             Err(e) => {

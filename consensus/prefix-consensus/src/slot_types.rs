@@ -10,6 +10,7 @@
 //! (transactions pulled from mempool). The `SlotConsensusMsg` enum wraps both
 //! slot proposals and per-slot Strong Prefix Consensus messages for network routing.
 
+use crate::certificates::StrongPCCommit;
 use crate::network_interface::PriorityClassifiable;
 use crate::network_messages::StrongPrefixConsensusMsg;
 use crate::types::PrefixVector;
@@ -36,6 +37,10 @@ pub struct SlotProposalSignData {
     pub epoch: u64,
     pub author: Author,
     pub payload_hash: HashValue,
+    /// Hash of the previous slot's commit proof (None for slot 1).
+    /// Each validator signs over their own proof hash; the canonical proof
+    /// for ranking updates is selected from the first non-⊥ entry in v_high.
+    pub prev_commit_proof_hash: Option<HashValue>,
 }
 
 // ============================================================================
@@ -58,6 +63,9 @@ pub struct SlotProposal {
     pub author: Author,
     pub payload_hash: HashValue,
     pub payload: Payload,
+    /// Previous slot's commit proof for verifiable ranking (None for slot 1).
+    pub prev_commit_proof: Option<StrongPCCommit>,
+    pub prev_commit_proof_hash: Option<HashValue>,
     pub signature: BlsSignature,
     pub timestamp_usecs: u64,
 }
@@ -69,16 +77,20 @@ impl SlotProposal {
         epoch: u64,
         author: Author,
         payload: Payload,
+        prev_commit_proof: Option<StrongPCCommit>,
         signature: BlsSignature,
         timestamp_usecs: u64,
     ) -> Self {
         let payload_hash = Self::compute_payload_hash(&payload);
+        let prev_commit_proof_hash = prev_commit_proof.as_ref().map(Self::compute_commit_proof_hash);
         Self {
             slot,
             epoch,
             author,
             payload_hash,
             payload,
+            prev_commit_proof,
+            prev_commit_proof_hash,
             signature,
             timestamp_usecs,
         }
@@ -91,10 +103,11 @@ impl SlotProposal {
             epoch: self.epoch,
             author: self.author,
             payload_hash: self.payload_hash,
+            prev_commit_proof_hash: self.prev_commit_proof_hash,
         }
     }
 
-    /// Verify the proposal: check payload integrity, then BLS signature.
+    /// Verify the proposal: check payload integrity, commit proof integrity, then BLS signature.
     ///
     /// The payload integrity check prevents payload substitution attacks where
     /// a Byzantine sender signs one payload hash but includes a different payload.
@@ -108,7 +121,41 @@ impl SlotProposal {
             self.payload_hash,
         );
 
-        // Step 2: Verify BLS signature over the sign data
+        // Step 2: Verify prev_commit_proof hash integrity
+        let computed_proof_hash = self.prev_commit_proof.as_ref().map(Self::compute_commit_proof_hash);
+        ensure!(
+            computed_proof_hash == self.prev_commit_proof_hash,
+            "SlotProposal prev_commit_proof_hash mismatch"
+        );
+
+        // Step 3: Enforce proof presence rules and verify
+        // Slot 1 (first slot of each epoch): no predecessor exists, proof must be absent.
+        // Slot > 1: previous slot always completed (sequential model), proof must be present.
+        if self.slot <= 1 {
+            ensure!(
+                self.prev_commit_proof.is_none(),
+                "SlotProposal for slot {} must not carry a commit proof (no predecessor)",
+                self.slot,
+            );
+        } else {
+            let proof = self.prev_commit_proof.as_ref().ok_or_else(|| {
+                anyhow::anyhow!(
+                    "SlotProposal for slot {} must carry a commit proof",
+                    self.slot,
+                )
+            })?;
+            proof.verify(verifier).map_err(|e| {
+                anyhow::anyhow!("SlotProposal prev_commit_proof verification failed: {}", e)
+            })?;
+            ensure!(
+                proof.slot == self.slot - 1,
+                "SlotProposal prev_commit_proof slot mismatch: proof slot {} != expected {}",
+                proof.slot,
+                self.slot - 1,
+            );
+        }
+
+        // Step 4: Verify BLS signature over the sign data
         let sign_data = self.sign_data();
         verifier.verify(self.author, &sign_data, &self.signature)?;
 
@@ -119,6 +166,12 @@ impl SlotProposal {
     /// Payload does not implement CryptoHash, so we hash manually.
     pub fn compute_payload_hash(payload: &Payload) -> HashValue {
         let bytes = bcs::to_bytes(payload).expect("Payload BCS serialization should not fail");
+        HashValue::sha3_256_of(&bytes)
+    }
+
+    /// Compute the hash of a StrongPCCommit via BCS serialization + SHA3-256.
+    pub fn compute_commit_proof_hash(proof: &StrongPCCommit) -> HashValue {
+        let bytes = bcs::to_bytes(proof).expect("StrongPCCommit BCS serialization should not fail");
         HashValue::sha3_256_of(&bytes)
     }
 }
@@ -134,13 +187,16 @@ pub fn create_signed_slot_proposal(
     payload: Payload,
     signer: &ValidatorSigner,
     timestamp_usecs: u64,
+    prev_commit_proof: Option<StrongPCCommit>,
 ) -> Result<SlotProposal> {
     let payload_hash = SlotProposal::compute_payload_hash(&payload);
+    let prev_commit_proof_hash = prev_commit_proof.as_ref().map(SlotProposal::compute_commit_proof_hash);
     let sign_data = SlotProposalSignData {
         slot,
         epoch,
         author,
         payload_hash,
+        prev_commit_proof_hash,
     };
     let signature = signer.sign(&sign_data)?;
     Ok(SlotProposal {
@@ -149,6 +205,8 @@ pub fn create_signed_slot_proposal(
         author,
         payload_hash,
         payload,
+        prev_commit_proof,
+        prev_commit_proof_hash,
         signature,
         timestamp_usecs,
     })
@@ -168,8 +226,13 @@ pub enum SPCOutput {
     /// as a block immediately (safe because v_low ⪯ v_high at every position).
     VLow { slot: u64, v_low: PrefixVector },
     /// Full commit v_high is available. Entries not already committed via VLow
-    /// become additional blocks.
-    VHigh { slot: u64, v_high: PrefixVector },
+    /// become additional blocks. Carries the `StrongPCCommit` proof for the
+    /// SlotManager to embed in the next slot's proposals (verifiable ranking).
+    VHigh {
+        slot: u64,
+        v_high: PrefixVector,
+        commit_proof: StrongPCCommit,
+    },
 }
 
 // ============================================================================
@@ -317,7 +380,7 @@ mod tests {
         let payload = create_test_payload();
 
         let proposal =
-            create_signed_slot_proposal(1, 1, author, payload, &signer, 0).expect("signing failed");
+            create_signed_slot_proposal(1, 1, author, payload, &signer, 0, None).expect("signing failed");
 
         assert_eq!(proposal.slot, 1);
         assert_eq!(proposal.epoch, 1);
@@ -333,7 +396,7 @@ mod tests {
         let payload = create_test_payload();
 
         let proposal =
-            create_signed_slot_proposal(1, 1, author, payload, &signer, 0).expect("signing failed");
+            create_signed_slot_proposal(1, 1, author, payload, &signer, 0, None).expect("signing failed");
 
         // Verification with a different validator's verifier should fail
         assert!(proposal.verify(&wrong_verifier).is_err());
@@ -346,7 +409,7 @@ mod tests {
         let payload = create_test_payload();
 
         let proposal =
-            create_signed_slot_proposal(1, 1, author, payload, &signer, 0).expect("signing failed");
+            create_signed_slot_proposal(1, 1, author, payload, &signer, 0, None).expect("signing failed");
 
         let bytes = bcs::to_bytes(&proposal).expect("serialization failed");
         let deserialized: SlotProposal =
@@ -362,7 +425,7 @@ mod tests {
         let payload = create_test_payload();
 
         let mut proposal =
-            create_signed_slot_proposal(1, 1, author, payload, &signer, 0).expect("signing failed");
+            create_signed_slot_proposal(1, 1, author, payload, &signer, 0, None).expect("signing failed");
 
         // Tamper with the payload after signing (substitute different transactions)
         proposal.payload = Payload::DirectMempool(vec![]);
@@ -386,7 +449,7 @@ mod tests {
         let author = signer.author();
         let payload = create_test_payload();
         let proposal =
-            create_signed_slot_proposal(5, 3, author, payload, &signer, 0).expect("signing failed");
+            create_signed_slot_proposal(5, 3, author, payload, &signer, 0, None).expect("signing failed");
 
         // Test SlotProposal variant
         let msg = SlotConsensusMsg::SlotProposal(Box::new(proposal));
@@ -424,7 +487,7 @@ mod tests {
         let author = signer.author();
         let payload = create_test_payload();
         let proposal =
-            create_signed_slot_proposal(1, 1, author, payload, &signer, 0).expect("signing failed");
+            create_signed_slot_proposal(1, 1, author, payload, &signer, 0, None).expect("signing failed");
 
         let msg = SlotConsensusMsg::SlotProposal(Box::new(proposal));
         let bytes = bcs::to_bytes(&msg).expect("serialization failed");
@@ -489,7 +552,7 @@ mod tests {
         let author = signer.author();
         let payload = create_test_payload();
         let proposal =
-            create_signed_slot_proposal(1, 1, author, payload, &signer, 0).expect("signing failed");
+            create_signed_slot_proposal(1, 1, author, payload, &signer, 0, None).expect("signing failed");
 
         let msg = SlotConsensusMsg::SlotProposal(Box::new(proposal));
         assert!(!msg.is_priority());
@@ -518,5 +581,142 @@ mod tests {
             payload,
         };
         assert!(!resp.verify_payload_hash());
+    }
+
+    // ========================================================================
+    // Commit proof verification tests (Phase 12)
+    // ========================================================================
+
+    /// Create multiple test validators with a matching verifier.
+    fn create_test_validators(n: usize) -> (Vec<ValidatorSigner>, ValidatorVerifier) {
+        let signers: Vec<_> = (0..n).map(|_| ValidatorSigner::random(None)).collect();
+        let infos: Vec<_> = signers
+            .iter()
+            .map(|s| ValidatorConsensusInfo::new(s.author(), s.public_key(), 1))
+            .collect();
+        (signers, ValidatorVerifier::new(infos))
+    }
+
+    /// Create a valid StrongPCCommit for the given slot (full v_low fast path).
+    /// Uses all signers voting with the same prefix through 3 rounds (mcp == mce).
+    fn create_valid_commit_proof(
+        signers: &[ValidatorSigner],
+        epoch: u64,
+        slot: u64,
+    ) -> crate::certificates::StrongPCCommit {
+        use crate::signing::{create_signed_vote1, create_signed_vote2, create_signed_vote3};
+        use crate::types::{QC1, QC2, QC3};
+
+        let n = signers.len();
+        let prefix: Vec<HashValue> = (0..n)
+            .map(|i| HashValue::sha3_256_of(&(i as u64).to_le_bytes()))
+            .collect();
+
+        let vote1s: Vec<_> = signers
+            .iter()
+            .map(|s| {
+                create_signed_vote1(s.author(), prefix.clone(), epoch, slot, 1, s)
+                    .expect("sign vote1")
+            })
+            .collect();
+        let qc1 = QC1::new(vote1s);
+
+        let vote2s: Vec<_> = signers
+            .iter()
+            .map(|s| {
+                create_signed_vote2(s.author(), prefix.clone(), qc1.clone(), epoch, slot, 1, s)
+                    .expect("sign vote2")
+            })
+            .collect();
+        let qc2 = QC2::new(vote2s);
+
+        let vote3s: Vec<_> = signers
+            .iter()
+            .map(|s| {
+                create_signed_vote3(s.author(), prefix.clone(), qc2.clone(), epoch, slot, 1, s)
+                    .expect("sign vote3")
+            })
+            .collect();
+        let qc3 = QC3::new(vote3s);
+
+        crate::certificates::StrongPCCommit::new(qc3, vec![], prefix, epoch, slot)
+    }
+
+    #[test]
+    fn test_slot_proposal_with_valid_commit_proof() {
+        // Slot 2 proposal embedding a valid commit proof from slot 1
+        let (signers, verifier) = create_test_validators(4);
+        let signer = &signers[0];
+        let author = signer.author();
+        let payload = create_test_payload();
+
+        let proof = create_valid_commit_proof(&signers, 1, 1);
+        let proposal = create_signed_slot_proposal(
+            2, 1, author, payload, signer, 0, Some(proof),
+        )
+        .expect("signing failed");
+
+        assert!(proposal.prev_commit_proof.is_some());
+        assert!(proposal.prev_commit_proof_hash.is_some());
+        assert!(proposal.verify(&verifier).is_ok());
+    }
+
+    #[test]
+    fn test_slot_proposal_commit_proof_hash_mismatch() {
+        // Tamper prev_commit_proof_hash to mismatch the actual proof
+        let (signers, verifier) = create_test_validators(4);
+        let signer = &signers[0];
+        let author = signer.author();
+        let payload = create_test_payload();
+
+        let proof = create_valid_commit_proof(&signers, 1, 1);
+        let mut proposal = create_signed_slot_proposal(
+            2, 1, author, payload, signer, 0, Some(proof),
+        )
+        .expect("signing failed");
+
+        // Tamper the proof hash (keeps proof and BLS signature intact)
+        proposal.prev_commit_proof_hash = Some(HashValue::random());
+
+        let result = proposal.verify(&verifier);
+        assert!(result.is_err());
+        assert!(
+            result
+                .unwrap_err()
+                .to_string()
+                .contains("prev_commit_proof_hash mismatch")
+        );
+    }
+
+    #[test]
+    fn test_slot_proposal_invalid_commit_proof_signatures() {
+        // Create a proposal with a commit proof that has invalid QC3 signatures
+        let (signers, verifier) = create_test_validators(4);
+        let signer = &signers[0];
+        let author = signer.author();
+        let payload = create_test_payload();
+
+        // Commit proof with an empty (unverifiable) QC3
+        let bad_proof = crate::certificates::StrongPCCommit::new(
+            crate::types::QC3::new(vec![]),
+            vec![],
+            vec![HashValue::random()],
+            1,
+            1,
+        );
+
+        let proposal = create_signed_slot_proposal(
+            2, 1, author, payload, signer, 0, Some(bad_proof),
+        )
+        .expect("signing failed");
+
+        let result = proposal.verify(&verifier);
+        assert!(result.is_err());
+        assert!(
+            result
+                .unwrap_err()
+                .to_string()
+                .contains("prev_commit_proof verification failed")
+        );
     }
 }
