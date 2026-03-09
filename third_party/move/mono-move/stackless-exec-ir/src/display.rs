@@ -61,7 +61,7 @@ fn display_function(
         if i > 0 {
             write!(f, ", ")?;
         }
-        write!(f, "r{}", i)?;
+        write!(f, "{}", reg(Reg::Home(i as u16)))?;
     }
     write!(f, ")")?;
     if !returns.is_empty() {
@@ -69,11 +69,19 @@ fn display_function(
         // the register form is sufficient.
     }
     writeln!(f, " {{")?;
-    writeln!(
-        f,
-        "    params: {}, locals: {}, registers: {}",
-        func.num_params, func.num_locals, func.num_regs
-    )?;
+    if func.num_arg_regs > 0 {
+        writeln!(
+            f,
+            "    params: {}, locals: {}, registers: {}, arg_regs: {}",
+            func.num_params, func.num_locals, func.num_regs, func.num_arg_regs
+        )?;
+    } else {
+        writeln!(
+            f,
+            "    params: {}, locals: {}, registers: {}",
+            func.num_params, func.num_locals, func.num_regs
+        )?;
+    }
 
     // Instructions
     let mut instr_num = 0;
@@ -93,17 +101,20 @@ fn display_function(
 }
 
 fn reg(r: Reg) -> String {
-    format!("r{}", r)
+    match r {
+        Reg::Home(i) => format!("r{}", i),
+        Reg::Arg(i) => format!("a{}", i),
+    }
 }
 
 fn regs(rs: &[Reg]) -> String {
-    let parts: Vec<String> = rs.iter().map(|r| format!("r{}", r)).collect();
+    let parts: Vec<String> = rs.iter().map(|r| reg(*r)).collect();
     format!("[{}]", parts.join(", "))
 }
 
 /// Format a destination: single register bare, multiple in brackets.
 fn dst(r: Reg) -> String {
-    format!("r{}", r)
+    reg(r)
 }
 
 /// Format multiple destinations in brackets.

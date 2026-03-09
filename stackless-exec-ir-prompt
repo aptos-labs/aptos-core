@@ -18,3 +18,51 @@ Using multiple (linear or close to linear) passes is okay for simplicity, we can
 We should also design such an stackless execution format (`StacklessExecIR`). The stackless here refers to the absence of the implicit operand stack so that we don't have to route all execution traffic through the operand stack, requiring preparing the operand stack before each instruction execution. We should be able to write StacklessExecIR to a file for testing and debugging (via a utility to print them), similar facilities exist in the move-compiler-v2.
 
 Thus, we want a crate built under mono-move, called stackless-exec-ir, which can read `.masm` files (representing file format bytecode), and convert them to StacklessExecIR, and print it. A testsuite should follow the .exp file style testing with datatest_stable, consisting of input .masm files and output .exp files with StacklessExecIR dump.
+
+Move file format bytecode is polymorphic, with named locals (parameters are also considered locals for this discussion). The bytecode instructions assume an implicit operand stack (and thus do not have to say anything about operands).
+
+**The first translation is from Move bytecode to a stackless execution IR** (implemented in the crate stackless-exec-ir, this IR gets rid of the implicit operand stack, names its source and destination operands explicitly). Data collected has shown that a significant portion (~40%) of Move bytecode are stack transfer instructions (moving to and from locals to the stack): this is because in a stack machine, every operand is routed through the stack. We list various reasons for stack traffic (that are due to our stack machine design):
+1. rearranging the stack to prepare arguments for the next call
+2. rearranging the stack to prepare return values in order
+3. flushing the stack at basic block boundaries (e.g., because of a branch) to have stacks be empty during basic block transitions
+4. result of an operation (i.e., value on a stack) is used again later, so it needs to be saved to a local, but it may also have to be copied back to the stack immediately because it is being used for the next operation
+5. we take a reference to the value on the stack, then it needs to be saved to a local (we cannot take references to a value on a stack, only to locals)
+6. if there is a write to value already on the stack due to the next instruction (dead stores), then we need to flush the stack until that value is off the stack (otherwise, the wrong value would be retained on the stack)
+7. if a value is mentioned in the specs, then it is also written back to the locals (so that it is not "optimized away").
+
+A couple of goals of the stackless execution IR:
+- reduce this implicit operand stack traffic, and thus the number of instructions (and total work to do)
+- dataflow is made explicit, allowing for more optimizations on hot code
+
+The stackless execution IR is still polymorphic, and is expected to be converted from the Move bytecode in close to linear time (but potentially multiple passes). This IR uses named slots in the frame (parameters, locals, temporaries), in the code, these slots are called registers.
+
+**The second translation** (which is also the act of monomorphization/quickening, and is yet to be implemented) happens just in time (some of it could be done ahead of time, but in the general case, it needs to be just in time): it converts the stackless execution IR into low-level micro-ops on sized slots (the named slots are converted into sized slots based on type information available). The micro-ops are monomorphic, working on sized slots (slots whose sizes are known).
+
+Calling convention of the micro-op: a single flat linear buffer is used call stack. Each frame contains slots for a given function in the call stack. 
+```
+                caller frame                           callee frame
+        ┌──────────────────────────────────┐──────────────────────────────┐
+        │  caller slots                    │ arg slots  │  other slots    │
+        └──────────────────────────────────┘──────────────────────────────┘
+```
+The second translation emits explicit micro-ops to place arguments into the callee's frame slots. At return, all return values are laid out at the beginning of the callee frame, overwriting the arg slots onwards.
+
+In the stackless execution IR, the call instruction explicitly provides the named sources and destination registers, but in the micro-ops, the calling convention expects that the arguments are laid out sequentially in the new frame. Thus, for each call, all the arguments have to be copied from caller's registers to the callee's registers, which can be wasteful in many cases: e.g., a destination register(s) of a operation is only used as a call argument (and nothing else, so it is effectively dead after use), then it needs to be copied again during second translation into the arg slots. Instead, if we introduce a new kind of register for the stackless-exec-ir, called arg registers (which when converting to slots in the micro-ops, always appear at the end of the caller frame, thus overlapping into the callee frame's arg slots), and these arg registers can be used as destination registers directly to avoid additional copying under certain safe circumstances (such as never used again, won't be overwritten before it is used as an arg). Unlike the remaining registers, the type of these registers can vary for every call site, they are always ordered `a0, a1, ..` and expected to be laid out in that form. After the call, the return values can be expected to be in `a0, ..` (potentially with different types), so arg registers can be used for both args and return values.
+
+for example, instead of the stackless-exec-ir like the following:
+```
+r0 := ld_u64 10
+[r1] := call identity, [r0]
+ret [r1]
+```
+
+we would have:
+```
+a0 := ld_u64 10
+[a0] := call identity, [a0]
+ret [a0]
+```
+
+Thus, the named registers in the stackless-exec-ir would be made of: params, locals, temps (all these would be named r0, r1, .., as it is currently), and arg registers (these would be named a0, a1, ..). Total arg registers would be max arg registers used at any call site in that function.
+
+Can you think deeply, analyze this design, suggest pros and cons, and outline what a pass would look like to add arg registers to the pipelines v1 and v2 (we intend to keep only one of v1/v2 conversion pipelines from move bytecode to stackless-exec-ir, so the solution does not have to be the same for both), what are the conditions under which one can add arg registers at a call site (either for the argument or return value or both).

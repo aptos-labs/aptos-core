@@ -21,9 +21,36 @@ use move_core_types::{
 };
 use move_vm_types::loaded_data::runtime_types::Type;
 
-/// Register index. Params+locals occupy `0..num_params+num_locals-1`.
-/// Synthetic temporaries start at `num_params+num_locals`.
-pub type Reg = u16;
+/// Register operand. `Home` registers map to frame slots (params, locals,
+/// temps); `Arg` registers overlap with the callee's argument area so that
+/// values produced directly into `Arg(j)` avoid a copy at call sites.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub enum Reg {
+    /// Params, locals, and temporaries — displayed as `r0, r1, ...`
+    Home(u16),
+    /// Arg registers — displayed as `a0, a1, ...`
+    Arg(u16),
+}
+
+impl Reg {
+    pub fn home(i: u16) -> Self {
+        Reg::Home(i)
+    }
+
+    pub fn arg(i: u16) -> Self {
+        Reg::Arg(i)
+    }
+
+    /// Returns `true` if this is a Home register with index >= `num_pinned`.
+    pub fn is_temp(self, num_pinned: u16) -> bool {
+        matches!(self, Reg::Home(i) if i >= num_pinned)
+    }
+
+    /// Returns `true` if this is an Arg register.
+    pub fn is_arg(self) -> bool {
+        matches!(self, Reg::Arg(_))
+    }
+}
 
 /// Label for branch targets.
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
@@ -210,15 +237,18 @@ pub struct FunctionIR {
     pub name_idx: IdentifierIndex,
     /// Function handle index.
     pub handle_idx: FunctionHandleIndex,
-    /// Number of parameters.
-    pub num_params: Reg,
-    /// Number of non-param locals.
-    pub num_locals: Reg,
-    /// Total registers used (params + locals + temps).
-    pub num_regs: Reg,
+    /// Number of parameters (count, not a register).
+    pub num_params: u16,
+    /// Number of non-param locals (count, not a register).
+    pub num_locals: u16,
+    /// Total Home registers used (params + locals + temps).
+    pub num_regs: u16,
+    /// Number of arg registers used (a0..a(num_arg_regs-1)).
+    pub num_arg_regs: u16,
     /// The instruction stream.
     pub instrs: Vec<Instr>,
-    /// Type of each register (indexed by Reg).
+    /// Type of each Home register (indexed by Home register index, 0..num_regs-1).
+    /// Arg registers have no entry here — their types are inferred from call signatures.
     pub reg_types: Vec<Type>,
 }
 

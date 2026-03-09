@@ -1,6 +1,7 @@
 // Copyright (c) Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
+pub mod arg_regs;
 pub mod convert_v1;
 pub mod convert_v2;
 pub mod display;
@@ -46,10 +47,10 @@ pub fn run_pipeline(
     config: &PipelineConfig,
     struct_name_table: &[StructNameIndex],
 ) -> Result<ModuleIR> {
-    if config.verify_bytecode {
-        if let Err(e) = move_bytecode_verifier::verify_module(&module) {
-            bail!("bytecode verification failed: {:#}", e);
-        }
+    if config.verify_bytecode
+        && let Err(e) = move_bytecode_verifier::verify_module(&module)
+    {
+        bail!("bytecode verification failed: {:#}", e);
     }
 
     let mut module_ir = match config.version {
@@ -58,7 +59,10 @@ pub fn run_pipeline(
     };
 
     match config.version {
-        PipelineVersion::V1 => optimize_v1::optimize_module_v1(&mut module_ir),
+        PipelineVersion::V1 => {
+            optimize_v1::optimize_module_v1(&mut module_ir);
+            arg_regs::introduce_arg_registers_module(&mut module_ir);
+        },
         PipelineVersion::V2 => optimize_v2::optimize_module_v2(&mut module_ir),
     }
 

@@ -201,7 +201,7 @@ fn copy_propagation(func: &mut FunctionIR) {
             // Record new substitutions for Copy/Move of non-param registers.
             match &func.instrs[i] {
                 Instr::Copy(dst, src) | Instr::Move(dst, src)
-                    if *dst >= num_params =>
+                    if matches!(dst, Reg::Home(i) if *i >= num_params) || dst.is_arg() =>
                 {
                     subst.insert(*dst, *src);
                 },
@@ -374,7 +374,9 @@ pub(crate) fn dead_instruction_elimination(func: &mut FunctionIR) {
 
             // Check if instruction only writes to dead non-param registers.
             let is_removable = match &func.instrs[i] {
-                Instr::Copy(dst, _) | Instr::Move(dst, _) if *dst >= num_params => {
+                Instr::Copy(dst, _) | Instr::Move(dst, _)
+                    if matches!(dst, Reg::Home(i) if *i >= num_params) || dst.is_arg() =>
+                {
                     !live.contains(dst)
                 },
                 _ => false,
@@ -601,26 +603,26 @@ pub(crate) fn renumber_registers(func: &mut FunctionIR) {
     let num_params = func.num_params;
 
     // Find all registers used.
-    let mut used_regs: BTreeSet<Reg> = BTreeSet::new();
+    let mut used_home_regs: BTreeSet<u16> = BTreeSet::new();
     for instr in &func.instrs {
         let (defs, uses_) = get_defs_uses(instr);
-        for r in defs {
-            used_regs.insert(r);
-        }
-        for r in uses_ {
-            used_regs.insert(r);
+        for r in defs.into_iter().chain(uses_) {
+            if let Reg::Home(i) = r {
+                used_home_regs.insert(i);
+            }
+            // Arg registers are preserved as-is (no renumbering).
         }
     }
 
     // Params keep their indices (0..num_params-1).
-    // All other registers are renumbered contiguously starting at num_params.
+    // All other Home registers are renumbered contiguously starting at num_params.
     let mut rename_map: BTreeMap<Reg, Reg> = BTreeMap::new();
     let mut next_reg = num_params;
-    for &r in &used_regs {
-        if r < num_params {
-            rename_map.insert(r, r);
+    for &i in &used_home_regs {
+        if i < num_params {
+            rename_map.insert(Reg::Home(i), Reg::Home(i));
         } else {
-            rename_map.insert(r, next_reg);
+            rename_map.insert(Reg::Home(i), Reg::Home(next_reg));
             next_reg += 1;
         }
     }
@@ -630,11 +632,13 @@ pub(crate) fn renumber_registers(func: &mut FunctionIR) {
         rename_instr(instr, &rename_map);
     }
 
-    // Remap reg_types using the rename map.
+    // Remap reg_types using the rename map (Home registers only).
     let mut new_reg_types = vec![Type::Bool; next_reg as usize];
     for (&old, &new) in &rename_map {
-        if (old as usize) < func.reg_types.len() {
-            new_reg_types[new as usize] = func.reg_types[old as usize].clone();
+        if let (Reg::Home(old_i), Reg::Home(new_i)) = (old, new)
+            && (old_i as usize) < func.reg_types.len()
+        {
+            new_reg_types[new_i as usize] = func.reg_types[old_i as usize].clone();
         }
     }
     func.reg_types = new_reg_types;

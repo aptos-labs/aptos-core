@@ -55,8 +55,8 @@ pub fn convert_module_v1(module: CompiledModule, struct_name_table: &[StructName
         .filter_map(|fdef| {
             fdef.code.as_ref().map(|code| {
                 let handle = module.function_handle_at(fdef.function);
-                let num_params = module.signature_at(handle.parameters).0.len() as Reg;
-                let num_locals = module.signature_at(code.locals).0.len() as Reg;
+                let num_params = module.signature_at(handle.parameters).0.len() as u16;
+                let num_locals = module.signature_at(code.locals).0.len() as u16;
                 let name_idx = handle.name;
                 let handle_idx = fdef.function;
 
@@ -81,6 +81,7 @@ pub fn convert_module_v1(module: CompiledModule, struct_name_table: &[StructName
                     num_params,
                     num_locals,
                     num_regs: converter.next_reg,
+                    num_arg_regs: 0,
                     instrs: converter.instrs,
                     reg_types,
                 }
@@ -97,9 +98,9 @@ pub fn convert_module_v1(module: CompiledModule, struct_name_table: &[StructName
 
 struct Converter<'a> {
     /// Number of function parameters (fixed registers 0..num_params-1).
-    num_params: Reg,
+    num_params: u16,
     /// Next register index.
-    next_reg: Reg,
+    next_reg: u16,
     /// Free registers bucketed by type for type-aware recycling.
     free_regs: BTreeMap<Type, Vec<Reg>>,
     /// Simulated operand stack with type information.
@@ -120,8 +121,8 @@ struct Converter<'a> {
 
 impl<'a> Converter<'a> {
     fn new(
-        num_params: Reg,
-        num_declared_locals: Reg,
+        num_params: u16,
+        num_declared_locals: u16,
         local_types: Vec<Type>,
         struct_name_table: &'a [StructNameIndex],
     ) -> Self {
@@ -147,7 +148,7 @@ impl<'a> Converter<'a> {
         {
             return r;
         }
-        let r = self.next_reg;
+        let r = Reg::Home(self.next_reg);
         self.next_reg += 1;
         self.temp_types.push(ty.clone());
         r
@@ -164,7 +165,10 @@ impl<'a> Converter<'a> {
     }
 
     fn free_reg(&mut self, r: Reg, ty: Type) {
-        if r >= self.num_params {
+        // Only recycle non-param registers.
+        if let Reg::Home(i) = r
+            && i >= self.num_params
+        {
             self.free_regs.entry(ty).or_default().push(r);
         }
     }
@@ -283,7 +287,7 @@ impl<'a> Converter<'a> {
                     .or_insert_with(|| vec![None; push_count_at(&code[prod_off])])
                     .get_mut(prod_idx)
                 {
-                    *h = Some(*idx as Reg);
+                    *h = Some(Reg::Home(*idx as u16));
                 }
             }
 
@@ -502,7 +506,7 @@ impl<'a> Converter<'a> {
 
             // --- Locals ---
             B::CopyLoc(idx) => {
-                let src = *idx as Reg;
+                let src = Reg::Home(*idx as u16);
                 let ty = self.local_types[*idx as usize].clone();
                 let dst = self.alloc_or_hint(self.get_hint(hint_vec, 0), &ty);
                 if dst != src {
@@ -511,7 +515,7 @@ impl<'a> Converter<'a> {
                 self.push(dst, ty);
             },
             B::MoveLoc(idx) => {
-                let src = *idx as Reg;
+                let src = Reg::Home(*idx as u16);
                 let ty = self.local_types[*idx as usize].clone();
                 let dst = self.alloc_or_hint(self.get_hint(hint_vec, 0), &ty);
                 if dst != src {
@@ -522,7 +526,7 @@ impl<'a> Converter<'a> {
             },
             B::StLoc(idx) => {
                 let (src, ty) = self.pop();
-                let dst = *idx as Reg;
+                let dst = Reg::Home(*idx as u16);
                 // Reclaim the local register if it was in the free list.
                 self.remove_from_free_regs(dst);
                 // Evict any stack temp currently using this register.
@@ -731,7 +735,7 @@ impl<'a> Converter<'a> {
 
             // --- References ---
             B::ImmBorrowLoc(idx) => {
-                let src = *idx as Reg;
+                let src = Reg::Home(*idx as u16);
                 let inner = self.local_types[*idx as usize].clone();
                 let result_ty = Type::Reference(Box::new(inner));
                 let dst = self.alloc_or_hint(self.get_hint(hint_vec, 0), &result_ty);
@@ -739,7 +743,7 @@ impl<'a> Converter<'a> {
                 self.push(dst, result_ty);
             },
             B::MutBorrowLoc(idx) => {
-                let src = *idx as Reg;
+                let src = Reg::Home(*idx as u16);
                 let inner = self.local_types[*idx as usize].clone();
                 let result_ty = Type::MutableReference(Box::new(inner));
                 let dst = self.alloc_or_hint(self.get_hint(hint_vec, 0), &result_ty);

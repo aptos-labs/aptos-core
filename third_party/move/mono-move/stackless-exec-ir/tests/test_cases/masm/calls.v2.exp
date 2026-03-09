@@ -6,8 +6,8 @@ fun identity(r0) {
 }
 
 fun caller() {
-    params: 0, locals: 0, registers: 2
-    0: r0 := ld_u64 10
-    1: [r1] := call identity, [r0]
-    2: ret [r1]
+    params: 0, locals: 0, registers: 0, arg_regs: 1
+    0: a0 := ld_u64 10
+    1: [a0] := call identity, [a0]
+    2: ret [a0]
 }
