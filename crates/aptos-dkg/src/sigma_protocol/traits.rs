@@ -154,7 +154,7 @@ pub trait Trait:
 
     /// Verify the equations coming from the proof given an explicit Fiat–Shamir challenge
     /// (derived from the proof's first message).
-    /// The reason for this separatemethod is tuple homomorphisms - we need to verify each component
+    /// The reason for this separate method is tuple homomorphisms - we need to verify each component
     /// of the tuple homomorphism separately, but using the same challenge.
     fn verify_with_challenge<R: RngCore + CryptoRng>(
         &self,
@@ -183,36 +183,6 @@ pub trait CurveGroupTrait:
     /// Domain-separation tag (DST) used to ensure that all cryptographic hashes and
     /// transcript operations within the protocol are uniquely namespaced
     fn dst(&self) -> Vec<u8>;
-
-    fn verify<Ct: Serialize, H, R: RngCore + CryptoRng>(
-        &self,
-        public_statement: &Self::CodomainNormalized,
-        proof: &Proof<<Self as fixed_base_msms::Trait>::Scalar, H>, // Would seem natural to set &Proof<E, Self>, but that ties the lifetime of H to that of Self, but we'd like it to be eg static
-        cntxt: &Ct,
-        rng: &mut R,
-    ) -> anyhow::Result<()>
-    where
-        H: homomorphism::Trait<
-            Domain = Self::Domain,
-            CodomainNormalized = Self::CodomainNormalized,
-        >, // need this because `H` is technically different from `Self` due to lifetime changes
-    {
-        let prover_first_message = match &proof.first_proof_item {
-            FirstProofItem::Commitment(A) => A,
-            FirstProofItem::Challenge(_) => {
-                panic!("Missing implementation - expected commitment, not challenge")
-            },
-        }; // TODO: I'm doing this twice
-
-        // `self.fiat_shamir_challenge_for_sigma_protocol()` comes from the default implementation below
-        let c = self.fiat_shamir_challenge_for_sigma_protocol(
-            cntxt,
-            public_statement,
-            prover_first_message,
-        );
-
-        self.verify_with_challenge(public_statement, prover_first_message, c, &proof.z, rng)
-    }
 
     fn verify_with_challenge<R: RngCore + CryptoRng>(
         &self,
@@ -257,18 +227,20 @@ pub trait CurveGroupTrait:
     {
         let msm_terms_for_prover_response = self.msm_terms(&prover_response);
 
+        let minus_one = -<Self::Group as PrimeGroup>::ScalarField::ONE;
+        let minus_challenge = -challenge;
+
         let msm_terms = msm_terms_for_prover_response
             .into_iter()
-            .zip(prover_first_message.clone().into_iter())
+            .zip(prover_first_message.clone().into_iter()) // TODO: not sure the cloning is ideal here
             .zip(public_statement.clone().into_iter())
             .map(|((term, A), P)| {
                 let mut bases = term.bases().to_vec();
                 bases.push(A);
                 bases.push(P);
-                let mut scalars: Vec<<Self::Group as PrimeGroup>::ScalarField> =
-                    term.scalars().iter().map(|s| *s).collect();
-                scalars.push(-<Self::Group as PrimeGroup>::ScalarField::ONE);
-                scalars.push(-challenge);
+                let mut scalars = term.scalars().to_vec();
+                scalars.push(minus_one);
+                scalars.push(minus_challenge);
                 MsmInput::new(bases, scalars).expect("sigma protocol MSM term")
             })
             .collect();
