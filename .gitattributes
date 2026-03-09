@@ -28,3 +28,5 @@
 # Generated files, dont show diffs etc
 **/src/pb/*.rs linguist-generated=true
 *.fixture linguist-generated=true
+
+.github/workflows/*.lock.yml linguist-generated=true merge=ours
