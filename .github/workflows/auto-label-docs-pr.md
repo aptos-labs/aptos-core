@@ -3,6 +3,9 @@ on:
   pull_request:
     types: [opened, synchronize]
 
+engine:
+  id: claude
+
 permissions:
   contents: read
   pull-requests: read
