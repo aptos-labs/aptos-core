@@ -3,11 +3,14 @@
 
 #![forbid(unsafe_code)]
 
+#[cfg(test)]
+use crate::schema::hot_state_value_by_key_hash::HotStateKvEntry;
 use crate::{
-    db_options::gen_state_kv_shard_cfds,
+    db_options::{gen_hot_state_kv_shard_cfds, gen_state_kv_shard_cfds},
     metrics::OTHER_TIMERS_SECONDS,
     schema::{
         db_metadata::{DbMetadataKey, DbMetadataSchema, DbMetadataValue},
+        hot_state_value_by_key_hash::{HotStateKvValue, HotStateValueByKeyHashSchema},
         state_value_by_key_hash::StateValueByKeyHashSchema,
     },
     utils::{
@@ -16,7 +19,7 @@ use crate::{
     },
 };
 use aptos_config::config::{RocksdbConfig, StorageDirPaths};
-use aptos_crypto::hash::CryptoHash;
+use aptos_crypto::{hash::CryptoHash, HashValue};
 use aptos_experimental_runtimes::thread_manager::THREAD_MANAGER;
 use aptos_logger::prelude::info;
 use aptos_metrics_core::TimerHelper;
@@ -27,7 +30,13 @@ use aptos_schemadb::{
 };
 use aptos_storage_interface::Result;
 use aptos_types::{
-    state_store::{state_key::StateKey, state_value::StateValue, NUM_STATE_SHARDS},
+    state_store::{
+        hot_state::{LRUEntry, THotStateSlot},
+        state_key::StateKey,
+        state_slot::StateSlot,
+        state_value::StateValue,
+        NUM_STATE_SHARDS,
+    },
     transaction::Version,
 };
 use rayon::prelude::*;
@@ -115,6 +124,7 @@ impl StateKvDb {
             env,
             block_cache,
             readonly,
+            is_hot,
             delete_on_restart,
         )?);
 
@@ -158,7 +168,7 @@ impl StateKvDb {
             is_hot,
         };
 
-        if !readonly && !delete_on_restart {
+        if !readonly {
             if let Some(overall_kv_commit_progress) = get_state_kv_commit_progress(&state_kv_db)? {
                 truncate_state_kv_db_shards(&state_kv_db, overall_kv_commit_progress)?;
             }
@@ -275,6 +285,10 @@ impl StateKvDb {
         Arc::clone(&self.state_kv_db_shards[shard_id])
     }
 
+    pub(crate) fn is_hot(&self) -> bool {
+        self.is_hot
+    }
+
     pub(crate) fn num_shards(&self) -> usize {
         NUM_STATE_SHARDS
     }
@@ -314,6 +328,7 @@ impl StateKvDb {
             env,
             block_cache,
             readonly,
+            is_hot,
             delete_on_restart,
         )
     }
@@ -325,6 +340,7 @@ impl StateKvDb {
         env: Option<&Env>,
         block_cache: Option<&Cache>,
         readonly: bool,
+        is_hot: bool,
         delete_on_restart: bool,
     ) -> Result<DB> {
         if delete_on_restart {
@@ -334,7 +350,11 @@ impl StateKvDb {
         }
 
         let rocksdb_opts = gen_rocksdb_options(state_kv_db_config, env, readonly);
-        let cfds = gen_state_kv_shard_cfds(state_kv_db_config, block_cache);
+        let cfds = if is_hot {
+            gen_hot_state_kv_shard_cfds(state_kv_db_config, block_cache)
+        } else {
+            gen_state_kv_shard_cfds(state_kv_db_config, block_cache)
+        };
 
         if readonly {
             DB::open_cf_readonly(rocksdb_opts, path, name, cfds)
@@ -375,5 +395,151 @@ impl StateKvDb {
             .next()
             .transpose()?
             .and_then(|((_, version), value_opt)| value_opt.map(|value| (version, value))))
+    }
+
+    /// Returns the latest hot state entry for the given key at or before the
+    /// given version. Outer `None` means no entry found; inner `None` means the
+    /// key was evicted at that version.
+    #[cfg(test)]
+    pub(crate) fn get_hot_state_entry_by_version(
+        &self,
+        state_key: &StateKey,
+        version: Version,
+    ) -> Result<Option<(Version, Option<HotStateKvEntry>)>> {
+        let mut read_opts = ReadOptions::default();
+        read_opts.set_prefix_same_as_start(true);
+        let mut iter = self
+            .db_shard(state_key.get_shard_id())
+            .iter_with_opts::<HotStateValueByKeyHashSchema>(read_opts)?;
+        iter.seek(&(state_key.hash(), version))?;
+        Ok(iter
+            .next()
+            .transpose()?
+            .map(|((_, version), entry_opt)| (version, entry_opt)))
+    }
+
+    /// Loads the latest hot state entries from the hot state KV DB.
+    ///
+    /// For each key_hash, only the latest entry (highest hot_since_version) is considered.
+    /// Evicted keys (value = `None`) are filtered out.
+    ///
+    /// Returns per-shard vectors of `(StateKey, StateSlot)` sorted by `hot_since_version`
+    /// ascending, with LRU prev/next pointers already wired up.
+    #[allow(dead_code)] // TODO(HotState): remove.
+    pub(crate) fn load_all_hot_state_entries(
+        &self,
+        committed_version: Version,
+    ) -> Result<[Vec<(StateKey, StateSlot)>; NUM_STATE_SHARDS]> {
+        let _timer =
+            OTHER_TIMERS_SECONDS.timer_with(&["hot__state_kv_db__load_all_hot_state_entries"]);
+
+        assert!(self.is_hot);
+        let results: Vec<Vec<(StateKey, StateSlot)>> = (0..NUM_STATE_SHARDS)
+            .into_par_iter()
+            .map(|shard_id| {
+                let mut entries = self.load_shard_latest_entries(shard_id, committed_version);
+                Self::sort_and_wire_lru(&mut entries);
+                entries
+            })
+            .collect();
+
+        Ok(results.try_into().expect("Known to be NUM_STATE_SHARDS"))
+    }
+
+    /// Iterates one shard of the hot state KV DB, deduplicating to only the latest entry per
+    /// key_hash and filtering out evicted keys. Returns unsorted entries.
+    fn load_shard_latest_entries(
+        &self,
+        shard_id: usize,
+        committed_version: Version,
+    ) -> Vec<(StateKey, StateSlot)> {
+        let mut entries = Vec::new();
+        let mut iter = self
+            .db_shard(shard_id)
+            .iter::<HotStateValueByKeyHashSchema>()
+            .expect("Failed to create hot state KV iterator");
+        iter.seek_to_first();
+
+        let mut prev_key_hash: Option<HashValue> = None;
+        for item in iter {
+            let ((key_hash, hot_since_version), value_opt) =
+                item.expect("Failed to read hot state KV entry");
+            assert!(
+                hot_since_version <= committed_version,
+                "Hot state entry has hot_since_version {} > committed_version {}",
+                hot_since_version,
+                committed_version,
+            );
+
+            // Since keys are (key_hash, !version) and entries are sorted ascending
+            // by encoded key, for the same key_hash the highest version comes first.
+            // We only want the first (latest) entry per key_hash.
+            //
+            // TODO(HotState): Consider seeking past the current key_hash instead of
+            // scanning over all older versions, if there are typically many versions
+            // per key in the DB at load time.
+            if prev_key_hash == Some(key_hash) {
+                continue;
+            }
+            prev_key_hash = Some(key_hash);
+
+            // None means evicted — skip.
+            let entry = match value_opt {
+                Some(e) => e,
+                None => continue,
+            };
+
+            let slot = match entry.value {
+                HotStateKvValue::Occupied {
+                    value_version,
+                    value,
+                } => {
+                    assert!(
+                        value_version <= committed_version,
+                        "Hot state entry has value_version {} > committed_version {}",
+                        value_version,
+                        committed_version,
+                    );
+                    StateSlot::HotOccupied {
+                        value_version,
+                        value,
+                        hot_since_version,
+                        lru_info: LRUEntry::uninitialized(),
+                    }
+                },
+                HotStateKvValue::Vacant => StateSlot::HotVacant {
+                    hot_since_version,
+                    lru_info: LRUEntry::uninitialized(),
+                },
+            };
+
+            entries.push((entry.state_key, slot));
+        }
+
+        entries
+    }
+
+    /// Sorts entries by `hot_since_version` ascending and wires up LRU prev/next pointers.
+    ///
+    /// Convention: prev = newer (toward head), next = older (toward tail).
+    /// After sorting, index 0 is oldest (tail), last is newest (head).
+    fn sort_and_wire_lru(entries: &mut [(StateKey, StateSlot)]) {
+        entries.sort_by_key(|(_, slot)| slot.expect_hot_since_version());
+
+        let len = entries.len();
+        for i in 0..len {
+            let prev_key = if i + 1 < len {
+                Some(entries[i + 1].0.clone())
+            } else {
+                None // newest — no prev
+            };
+            let next_key = if i > 0 {
+                Some(entries[i - 1].0.clone())
+            } else {
+                None // oldest — no next
+            };
+            entries[i].1.set_prev(prev_key);
+            entries[i].1.set_next(next_key);
+        }
     }
 }

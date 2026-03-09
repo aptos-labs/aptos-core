@@ -161,6 +161,28 @@ pub struct HotState {
 impl HotState {
     pub fn new(state: State, config: HotStateConfig) -> Self {
         let base = Arc::new(HotStateBase::new_empty(config.max_items_per_shard));
+        Self::new_impl(state, base)
+    }
+
+    /// Creates a `HotState` with pre-populated DashMaps from loaded entries.
+    ///
+    /// `entries_per_shard` must contain `(StateKey, StateSlot)` pairs that will be
+    /// inserted into the base DashMaps. The `state` must be consistent with these entries
+    /// (i.e., built via `State::new_at_version` with matching metadata).
+    #[allow(dead_code)] // TODO(HotState): remove.
+    pub fn new_with_base(
+        state: State,
+        config: HotStateConfig,
+        entries_per_shard: [Vec<(StateKey, StateSlot)>; NUM_STATE_SHARDS],
+    ) -> Self {
+        let mut base = HotStateBase::new_empty(config.max_items_per_shard);
+        for (shard_id, entries) in entries_per_shard.into_iter().enumerate() {
+            base.shards[shard_id].inner.extend(entries);
+        }
+        Self::new_impl(state, Arc::new(base))
+    }
+
+    fn new_impl(state: State, base: Arc<HotStateBase>) -> Self {
         let view = Arc::new(LayeredHotStateView {
             delta: None,
             base: Arc::clone(&base),
