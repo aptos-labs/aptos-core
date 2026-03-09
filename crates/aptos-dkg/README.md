@@ -2,7 +2,7 @@
 
 DKG (distributed key generation) and related crypto: PVSS schemes, weighted VUFs, range proofs, polynomial commitments, and supporting primitives. PKs in G₂, SKs in G₁
 
-**PVSS:** Das PVSS (weighted and unweighted); Chunky (weighted, non-malleable).  
+**PVSS:** `das` (weighted and unweighted); `chunky` (with and without pairing, always weighted).  
 **Weighted VUF:** Pinkas WVUF.
 
 ---
@@ -18,7 +18,7 @@ DKG (distributed key generation) and related crypto: PVSS schemes, weighted VUFs
 | Traits | `src/pvss/traits/` | Transcript, encryption, config traits |
 | Weighting | `src/pvss/weighted/` | Generic weighting (not used and may not be safe for some schemes) |
 | Range proofs | `src/range_proofs/` | DeKART (univariate / multivariate), used by chunky |
-| PCS | `src/pcs/` | Polynomial commitments (hiding KZG, Zeromorph, Shplonked, …) |
+| PCS | `src/pcs/` | Polynomial commitments (hiding KZG, Zeromorph, Shplonked) |
 | Sigma protocols | `src/sigma_protocol/` | Σ-protocols for homomorphisms (PVSS, range proofs, PCS) |
 | DLOG | `src/dlog/` | Discrete-log helpers (BSGS, tables) |
 | Weighted VUF | `src/weighted_vuf/` | Pinkas WVUF and BLS-based WVUF implementations |
@@ -57,8 +57,13 @@ Univariate **DeKART** range proof: proves that committed values lie in a prescri
 
 - **Building blocks:** Univariate hiding KZG (commitments and opening proof) and a small sigma protocol (`two_term_msm`). 
 - **Building blocks:** Contains commitments, scalar openings, the sigma proof, and a hiding KZG opening.
-- **Timing:** Optional feature `range_proof_timing_univariate_v2` prints per-phase timing (setup / prove / verify / commit). Usage e.g.: `RAYON_NUM_THREADS=1 cargo bench --bench range_proof --features range_proof_timing_multivariate -- --nocapture`
+- **Timing:** Optional feature `range_proof_timing_univariate_v2` prints per-phase timing (setup / prove / verify / commit). Usage e.g.:
 
+`RAYON_NUM_THREADS=1 cargo bench --bench range_proof --features range_proof_timing_univariate_v2 -- --nocapture`
+
+or
+
+`RAYON_NUM_THREADS=1 N=1023 L=8 cargo bench -p aptos-dkg --bench range_proof --features range_proof_timing_univariate_v2 -- 'dekart-rs.*verify' --nocapture`
 
 ---
 

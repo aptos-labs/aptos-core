@@ -207,7 +207,7 @@ pub trait CurveGroupTrait:
 /// Checks that the given MSM input evaluates to the group identity.
 #[allow(non_snake_case)]
 pub fn check_msm_eval_zero<H: CurveGroupTrait>(
-    _hom: &H, // This is convenient, we can pass the homomorphism so we don't have to specify the homomorphism type in the caller
+    _hom: &H, // Including this is convenient, we can pass the homomorphism so we don't have to specify the homomorphism type in the caller... so it should be a method instead
     input: MsmInput<<H::Group as CurveGroup>::Affine, <H::Group as PrimeGroup>::ScalarField>,
 ) -> anyhow::Result<()> {
     let result = H::msm_eval(input);
@@ -304,7 +304,7 @@ where
         &mut fs_t, cntxt,
     );
 
-    // Append the homomorphism data (e.g. MSM bases) to the transcript. (If the same hom is used for many proofs, maybe use a single transcript + a boolean to prevent it from repeating?)
+    // Append the homomorphism data (e.g. MSM bases) to the transcript. // TODO: (If the same hom is used for many proofs, maybe use a single transcript + a boolean to prevent it from repeating?)
     <merlin::Transcript as fiat_shamir::SigmaProtocol<F, H>>::append_sigma_protocol_msm_bases(
         &mut fs_t, hom,
     );
@@ -327,8 +327,12 @@ where
     )
 }
 
-// We're keeping this separate because it only needs the homomorphism property rather than being a bunch of "fixed-base MSMS",
-// and moreover in this way it gets reused in the TupleHomomorphism (curve-group) code
+// OLD: We're keeping this separate from the main `Trait` because it only needs the homomorphism
+// property rather than being a bunch of "fixed-base MSMS", and moreover in this way it gets
+// reused in the TupleHomomorphism (curve-group) code
+//
+// We're returning the normalised statement, because here the statement can be first normalised
+// together with A for more efficiency
 #[allow(non_snake_case)]
 pub fn prove_homomorphism<Ct: Serialize, F: PrimeField, H: homomorphism::Trait, R>(
     homomorphism: &H,
