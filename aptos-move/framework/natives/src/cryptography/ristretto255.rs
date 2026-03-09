@@ -2,8 +2,6 @@
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 use crate::cryptography::{ristretto255_point, ristretto255_scalar};
-use aptos_gas_algebra::GasExpression;
-use aptos_gas_schedule::{gas_params::natives::aptos_framework::*, NativeGasParameters};
 use aptos_native_interface::{
     safely_assert_eq, safely_pop_arg, safely_pop_vec_arg, RawSafeNative, SafeNativeBuilder,
     SafeNativeError, SafeNativeResult,
@@ -11,7 +9,6 @@ use aptos_native_interface::{
 use aptos_types::vm_status::StatusCode;
 use curve25519_dalek::scalar::Scalar;
 use move_binary_format::errors::PartialVMError;
-use move_core_types::gas_algebra::{InternalGasUnit, NumArgs};
 use move_vm_runtime::native_functions::NativeFunction;
 use move_vm_types::values::{Reference, StructRef, Value};
 use std::collections::VecDeque;
