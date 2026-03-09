@@ -19,7 +19,7 @@ use std::{collections::HashMap, fmt::Debug};
 /// An MSM input consists of:
 /// * a list of base elements, and
 /// * a list of scalar elements,
-/// which are interpreted pairwise.
+/// which are coupled pairwise.
 ///
 /// Implementations that construct an `MsmInput` should ensure that
 /// `bases.len() == scalars.len()`
@@ -70,7 +70,7 @@ where
 /// Same base across inputs is combined (scalars summed). Terms with zero scalar are dropped.
 ///
 /// # Panics
-/// If `inputs.len() != scales.len()` or if the merged result cannot be built into `MsmInput`.
+/// If `inputs.len() != scales.len()` or if somehow this identity fails for the merged result.
 pub fn merge_msm_inputs_with_scales<A: AffineRepr>(
     inputs: &[MsmInput<A, A::ScalarField>],
     scales: &[A::ScalarField],

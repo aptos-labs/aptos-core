@@ -33,6 +33,7 @@ use crate::{
 };
 use aptos_crypto::{
     arkworks::{
+        msm,
         msm::{merge_msm_inputs_with_scales, MsmInput},
         random::sample_field_element,
         srs::{SrsBasis, SrsType},
@@ -49,10 +50,7 @@ use ark_poly::{
     univariate::{DenseOrSparsePolynomial as DOSPoly, DensePolynomial},
     DenseUVPolynomial, EvaluationDomain, Polynomial, Radix2EvaluationDomain,
 };
-use ark_serialize::{
-    CanonicalDeserialize, CanonicalSerialize, Compress, Read, SerializationError, Valid, Validate,
-    Write,
-};
+use ark_serialize::{CanonicalDeserialize, CanonicalSerialize, Compress, SerializationError};
 use rand::{CryptoRng, RngCore};
 use std::fmt::Debug;
 #[cfg(feature = "range_proof_timing_multivariate")]
@@ -858,8 +856,7 @@ pub fn batch_pairing_for_verify_generalized<
         &sigma_proof.z,
         c_sigma,
     );
-    let hom1_merged =
-        aptos_crypto::arkworks::msm::merge_msm_inputs::<E::G1Affine, _>(&hom1_msm_terms, rng);
+    let hom1_merged = msm::merge_msm_inputs(&hom1_msm_terms, rng);
     // C_eval = C_eval_hid + g_rev·τ_0 for the batch pairing check.
     let c_eval = (c_eval_hid.into_group() + srs.taus_1[0].into_group() * g_rev_at_x).into_affine();
     #[cfg(feature = "range_proof_timing_multivariate")]
