@@ -192,6 +192,13 @@ impl OnChainRandomnessConfig {
             Self::V2(v2) => Some(v2.reconstruction_threshold.as_u64f64()),
         }
     }
+
+    pub fn fast_path_secrecy_threshold(&self) -> Option<U64F64> {
+        match self {
+            Self::Off | Self::V1(_) => None,
+            Self::V2(v2) => Some(v2.fast_path_secrecy_threshold.as_u64f64()),
+        }
+    }
 }
 
 impl OnChainConfig for RandomnessConfigMoveStruct {

@@ -98,6 +98,7 @@ pub fn build_dkg_pvss_config(
     cur_epoch: u64,
     secrecy_threshold: U64F64,
     reconstruct_threshold: U64F64,
+    maybe_fast_path_secrecy_threshold: Option<U64F64>,
     next_validators: &[ValidatorConsensusInfo],
 ) -> DKGPvssConfig {
     let validator_stakes: Vec<u64> = next_validators.iter().map(|vi| vi.voting_power).collect();
@@ -112,7 +113,7 @@ pub fn build_dkg_pvss_config(
         &validator_stakes,
         secrecy_threshold,
         reconstruct_threshold,
-        None,
+        maybe_fast_path_secrecy_threshold,
     );
     let rounding_time = timer.elapsed();
     let validator_consensus_keys: Vec<bls12381::PublicKey> = next_validators
@@ -194,11 +195,13 @@ impl DKGTrait for RealDKG {
         let reconstruct_threshold = randomness_config
             .reconstruct_threshold()
             .unwrap_or_else(|| *rounding::DEFAULT_RECONSTRUCT_THRESHOLD);
+        let maybe_fast_path_secrecy_threshold = randomness_config.fast_path_secrecy_threshold();
 
         let pvss_config = build_dkg_pvss_config(
             dkg_session_metadata.dealer_epoch,
             secrecy_threshold,
             reconstruct_threshold,
+            maybe_fast_path_secrecy_threshold,
             &dkg_session_metadata.target_validator_consensus_infos_cloned(),
         );
         let verifier = ValidatorVerifier::new(dkg_session_metadata.dealer_consensus_infos_cloned());
