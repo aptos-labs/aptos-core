@@ -11,6 +11,7 @@ use crate::{
     schema::{
         db_metadata::{DbMetadataKey, DbMetadataSchema, DbMetadataValue},
         epoch_by_version::EpochByVersionSchema,
+        hot_state_value_by_key_hash::HotStateValueByKeyHashSchema,
         jellyfish_merkle_node::JellyfishMerkleNodeSchema,
         ledger_info::LedgerInfoSchema,
         stale_node_index::StaleNodeIndexSchema,
@@ -31,6 +32,7 @@ use crate::{
     transaction_store::TransactionStore,
     utils::get_progress,
 };
+use aptos_crypto::HashValue;
 use aptos_jellyfish_merkle::{node_type::NodeKey, StaleNodeIndex};
 use aptos_logger::info;
 use aptos_schemadb::{
@@ -129,11 +131,19 @@ pub(crate) fn truncate_state_kv_db_single_shard(
     target_version: Version,
 ) -> Result<()> {
     let mut batch = SchemaBatch::new();
-    delete_state_value_and_index(
-        state_kv_db.db_shard(shard_id),
-        target_version + 1,
-        &mut batch,
-    )?;
+    if state_kv_db.is_hot() {
+        delete_state_value_and_index::<HotStateValueByKeyHashSchema>(
+            state_kv_db.db_shard(shard_id),
+            target_version + 1,
+            &mut batch,
+        )?;
+    } else {
+        delete_state_value_and_index::<StateValueByKeyHashSchema>(
+            state_kv_db.db_shard(shard_id),
+            target_version + 1,
+            &mut batch,
+        )?;
+    }
     state_kv_db.commit_single_shard(target_version, shard_id, batch)
 }
 
@@ -547,7 +557,7 @@ fn delete_event_data(
     Ok(())
 }
 
-fn delete_state_value_and_index(
+fn delete_state_value_and_index<S: Schema<Key = (HashValue, Version)>>(
     state_kv_db_shard: &DB,
     start_version: Version,
     batch: &mut SchemaBatch,
@@ -558,10 +568,7 @@ fn delete_state_value_and_index(
     for item in iter {
         let (index, _) = item?;
         batch.delete::<StaleStateValueIndexByKeyHashSchema>(&index)?;
-        batch.delete::<StateValueByKeyHashSchema>(&(
-            index.state_key_hash,
-            index.stale_since_version,
-        ))?;
+        batch.delete::<S>(&(index.state_key_hash, index.stale_since_version))?;
     }
 
     Ok(())

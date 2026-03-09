@@ -168,9 +168,7 @@ impl StateKvDb {
             is_hot,
         };
 
-        // TODO(HotState): Integrate hot state KV DB with pruner and add truncation support
-        // (stale index tracking, etc.) for the hot state DB.
-        if !readonly && !delete_on_restart && !is_hot {
+        if !readonly {
             if let Some(overall_kv_commit_progress) = get_state_kv_commit_progress(&state_kv_db)? {
                 truncate_state_kv_db_shards(&state_kv_db, overall_kv_commit_progress)?;
             }
@@ -285,6 +283,10 @@ impl StateKvDb {
 
     pub(crate) fn db_shard_arc(&self, shard_id: usize) -> Arc<DB> {
         Arc::clone(&self.state_kv_db_shards[shard_id])
+    }
+
+    pub(crate) fn is_hot(&self) -> bool {
+        self.is_hot
     }
 
     pub(crate) fn num_shards(&self) -> usize {
