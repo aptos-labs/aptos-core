@@ -51,11 +51,12 @@ use ark_poly::{
     DenseUVPolynomial, EvaluationDomain, Polynomial, Radix2EvaluationDomain,
 };
 use ark_serialize::{
-    CanonicalDeserialize, CanonicalSerialize, Compress, Read, SerializationError, Valid, Validate,
-    Write,
+    CanonicalDeserialize, CanonicalSerialize, Compress, SerializationError, Write,
 };
 use rand::{CryptoRng, RngCore};
 use std::fmt::Debug;
+#[cfg(feature = "range_proof_timing_multivariate")]
+use std::time::{Duration, Instant};
 
 /// Domain separation tag for the Shplonked opening sigma protocol (Fiat–Shamir context).
 pub const SHPLONKED_SIGMA_DST: &[u8; 19] = b"Shplonked_Sigma_Dst";
@@ -698,6 +699,19 @@ pub fn batch_pairing_for_verify_generalized<
     trs: &mut merlin::Transcript,
     rng: &mut R,
 ) -> anyhow::Result<(Vec<E::G1Affine>, Vec<E::G2Affine>)> {
+    #[cfg(feature = "range_proof_timing_multivariate")]
+    let mut cumulative = Duration::ZERO;
+    #[cfg(feature = "range_proof_timing_multivariate")]
+    let mut print_cumulative = |name: &str, duration: Duration| {
+        cumulative += duration;
+        println!(
+            "  {:>10.2} ms  ({:>10.2} ms cum.)  [batch_pairing] {}",
+            duration.as_secs_f64() * 1000.0,
+            cumulative.as_secs_f64() * 1000.0,
+            name
+        );
+    };
+
     let ShplonkedBatchProof {
         pi_1,
         pi_2: (pi_2_W_prime, pi_2_Y),
@@ -709,6 +723,8 @@ pub fn batch_pairing_for_verify_generalized<
         "φ(y) does not match proof"
     );
 
+    #[cfg(feature = "range_proof_timing_multivariate")]
+    let start = Instant::now();
     let (com_y_hid, c_eval_hid) = (
         &sigma_proof_statement.0 .0 .0,
         &sigma_proof_statement.0 .1 .0,
@@ -717,7 +733,11 @@ pub fn batch_pairing_for_verify_generalized<
     let c: E::ScalarField = trs.challenge_scalar();
     trs.append_point(pi_1);
     let x: E::ScalarField = trs.challenge_scalar();
+    #[cfg(feature = "range_proof_timing_multivariate")]
+    print_cumulative("transcript + challenges (c, x)", start.elapsed());
 
+    #[cfg(feature = "range_proof_timing_multivariate")]
+    let start = Instant::now();
     let n = sets.len();
     anyhow::ensure!(
         commitment_msms.len() == n,
@@ -745,7 +765,11 @@ pub fn batch_pairing_for_verify_generalized<
         expected_h <= srs.taus_1.len(),
         "SRS has insufficient tau_1 powers for hidden evaluations"
     );
+    #[cfg(feature = "range_proof_timing_multivariate")]
+    print_cumulative("validations", start.elapsed());
 
+    #[cfg(feature = "range_proof_timing_multivariate")]
+    let start = Instant::now();
     let s_union = union_of_evaluation_sets(sets);
     let z_S = zero_poly_S(&s_union);
     let s_per_poly: Vec<Vec<E::ScalarField>> = sets
@@ -754,7 +778,14 @@ pub fn batch_pairing_for_verify_generalized<
         .collect();
     let c_powers = powers(c, n);
     let (z_S_val, weights) = compute_weights::<E>(&z_S, &s_per_poly, x, &c_powers);
+    #[cfg(feature = "range_proof_timing_multivariate")]
+    print_cumulative(
+        "z_S, weights (union, zero_poly, compute_weights)",
+        start.elapsed(),
+    );
 
+    #[cfg(feature = "range_proof_timing_multivariate")]
+    let start = Instant::now();
     let merged = merge_msm_inputs_with_scales(&commitment_msms, &weights);
 
     let msm_pi1 = MsmInput::new(vec![*pi_1], vec![-z_S_val]).expect("MSM pi_1");
@@ -762,7 +793,11 @@ pub fn batch_pairing_for_verify_generalized<
         E::ScalarField::ONE,
         E::ScalarField::ONE,
     ]);
+    #[cfg(feature = "range_proof_timing_multivariate")]
+    print_cumulative("merge MSMs (merged, merged_minus_pi1)", start.elapsed());
 
+    #[cfg(feature = "range_proof_timing_multivariate")]
+    let start = Instant::now();
     let h: usize = sigma_proof
         .z
         .hidden_evals
@@ -799,7 +834,14 @@ pub fn batch_pairing_for_verify_generalized<
         hom1: first_tuple_hom,
         hom2: sum_hom,
     };
+    #[cfg(feature = "range_proof_timing_multivariate")]
+    print_cumulative(
+        "lagrange + hom (build_lagrange_cache, com_y, eval_point_commit, full_hom)",
+        start.elapsed(),
+    );
 
+    #[cfg(feature = "range_proof_timing_multivariate")]
+    let start = Instant::now();
     let statement_curve_for_merge =
         TupleCodomainShape(CodomainShape(*com_y_hid), CodomainShape(*c_eval_hid));
 
@@ -818,7 +860,11 @@ pub fn batch_pairing_for_verify_generalized<
     full_hom
         .hom2
         .verify_with_challenge(&phi_y, &r_sum_ys, c_sigma, &sigma_proof.z, rng)?;
+    #[cfg(feature = "range_proof_timing_multivariate")]
+    print_cumulative("c_sigma + verify_with_challenge", start.elapsed());
 
+    #[cfg(feature = "range_proof_timing_multivariate")]
+    let start = Instant::now();
     let hom1_msm_terms = full_hom.hom1.msm_terms_for_verify_with_challenge(
         &statement_curve_for_merge,
         &prover_commitment.0,
@@ -829,21 +875,37 @@ pub fn batch_pairing_for_verify_generalized<
         aptos_crypto::arkworks::msm::merge_msm_inputs::<E::G1Affine, _>(&hom1_msm_terms, rng);
     // C_eval = C_eval_hid + g_rev·τ_0 for the batch pairing check.
     let c_eval = (c_eval_hid.into_group() + srs.taus_1[0].into_group() * g_rev_at_x).into_affine();
+    #[cfg(feature = "range_proof_timing_multivariate")]
+    print_cumulative("hom1_msm_terms + hom1_merged + c_eval", start.elapsed());
+
+    #[cfg(feature = "range_proof_timing_multivariate")]
+    let start = Instant::now();
     // Spec Step 4: deferred G₁ MSM from π_PoK; Step 5a: C_f = ∑_i c^{i-1} Z_{S\S_i}(x)·C_i − Z_S(x)·π_1 − C_eval + c^n·C_PoK.
-    let C_PoK =
-        E::G1::msm(hom1_merged.bases(), hom1_merged.scalars()).expect("batch verify: C_PoK MSM");
+    // Compute C_f as one MSM: merged_minus_pi1 (scale 1) + (-c_eval) (scale 1) + hom1_merged (scale c^n).
     let c_n = (0..n).fold(E::ScalarField::ONE, |acc, _| acc * c);
-    let merged_minus_pi1_pt = E::G1::msm(merged_minus_pi1.bases(), merged_minus_pi1.scalars())
-        .expect("batch verify: commitment to f MSM");
-    let C_f = merged_minus_pi1_pt - c_eval.into_group() + C_PoK * c_n;
+    let msm_minus_c_eval =
+        MsmInput::new(vec![c_eval], vec![-E::ScalarField::ONE]).expect("MSM -c_eval");
+    let c_f_msm =
+        merge_msm_inputs_with_scales(&[merged_minus_pi1, msm_minus_c_eval, hom1_merged], &[
+            E::ScalarField::ONE,
+            E::ScalarField::ONE,
+            c_n,
+        ]);
+    let C_f = E::G1::msm(c_f_msm.bases(), c_f_msm.scalars()).expect("batch verify: C_f MSM");
+    #[cfg(feature = "range_proof_timing_multivariate")]
+    print_cumulative("C_f (single merged MSM)", start.elapsed());
 
     // Step 5b: PCS.Verify(vk, x, C_f, 0, π_2) — opening at (x, 0).
-    let g1_terms = E::G1::normalize_batch(&[C_f, -pi_2_W_prime.into_group(), -pi_2_Y.into_group()]);
+    #[cfg(feature = "range_proof_timing_multivariate")]
+    let start = Instant::now();
+    let g1_terms = E::G1::normalize_batch(&[C_f, -pi_2_W_prime.into_group(), -pi_2_Y.into_group()]); // TODO: by getting rid of the signs, we might need only one normalization here?
     let g2_terms = vec![
         srs.g_2,
         (srs.tau_2.into_group() - srs.g_2.into_group() * x).into_affine(),
         srs.xi_2,
     ];
+    #[cfg(feature = "range_proof_timing_multivariate")]
+    print_cumulative("normalize_batch + g2_terms", start.elapsed());
     Ok((g1_terms, g2_terms))
 }
 

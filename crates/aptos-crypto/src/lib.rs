@@ -32,7 +32,7 @@ pub mod x25519;
 
 pub mod blstrs;
 pub mod poseidon_bn254;
-pub mod sumcheck;
+//pub mod sumcheck;
 #[cfg(test)]
 mod unit_tests;
 

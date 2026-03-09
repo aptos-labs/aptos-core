@@ -566,9 +566,8 @@ where
 
         // Must match prover: use point in reversed order so q_scalars[k] aligns with quotients[k].
         let point_reversed_for_scalars: Vec<P::ScalarField> = point.iter().rev().cloned().collect();
-        let combined_comm =
-            MsmInput::new(vec![comm.0.into_affine()], vec![P::ScalarField::one()])
-                .expect("Zeromorph single commitment MSM input");
+        let combined_comm = MsmInput::new(vec![comm.0.into_affine()], vec![P::ScalarField::one()])
+            .expect("Zeromorph single commitment MSM input");
         let zeta_z_msm = zeta_z_com::<P>(
             q_hat_affine,
             combined_comm,

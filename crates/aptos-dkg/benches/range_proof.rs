@@ -8,8 +8,9 @@
 use aptos_crypto::arkworks::GroupGenerators;
 use aptos_dkg::{
     range_proofs::{
-        dekart_multivariate::Proof as DekartMultivariate,
-        dekart_univariate_v2::Proof as UnivariateDeKARTv2, traits::BatchedRangeProof,
+        //        dekart_multivariate::Proof as DekartMultivariate,
+        dekart_univariate_v2::Proof as UnivariateDeKARTv2,
+        traits::BatchedRangeProof,
     },
     utils::test_utils::{self},
 };
@@ -24,7 +25,7 @@ use rand::{rngs::StdRng, SeedableRng};
 /// WARNING: Do not change this, since our range proof benchmark instructions in
 /// `crates/aptos-crypto/README.md` rely on it.
 const DEKART_RS_SCHEME_NAME: &str = "dekart-rs";
-const DEKART_MULTIVARIATE_SCHEME_NAME: &str = "dekart-multivar";
+// const DEKART_MULTIVARIATE_SCHEME_NAME: &str = "dekart-multivar";
 // const BN254: &str = "bn254";
 const BLS12_381: &str = "bls12-381";
 
@@ -36,19 +37,19 @@ const BATCH_SIZES: [usize; 2] = [1023, 131071]; //[1048575]; // 1048575100000, 1
 const BIT_WIDTHS: [u8; 2] = [8, 64]; // [8, 16, 32, 64];
 
 fn bench_groups(c: &mut Criterion) {
-//    bench_range_proof::<Bn254, UnivariateDeKARTv2<Bn254>>(c, DEKART_RS_SCHEME_NAME, BN254);
-    // bench_range_proof::<Bls12_381, UnivariateDeKARTv2<Bls12_381>>(
-    //     c,
-    //     DEKART_RS_SCHEME_NAME,
-    //     BLS12_381,
-    // );
-
-    //    bench_range_proof::<Bn254, DekartMultivariate<Bn254>>(c, DEKART_MULTIVARIATE_SCHEME_NAME, BN254);
-    bench_range_proof::<Bls12_381, DekartMultivariate<Bls12_381>>(
+    //    bench_range_proof::<Bn254, UnivariateDeKARTv2<Bn254>>(c, DEKART_RS_SCHEME_NAME, BN254);
+    bench_range_proof::<Bls12_381, UnivariateDeKARTv2<Bls12_381>>(
         c,
-        DEKART_MULTIVARIATE_SCHEME_NAME,
+        DEKART_RS_SCHEME_NAME,
         BLS12_381,
     );
+
+    //    bench_range_proof::<Bn254, DekartMultivariate<Bn254>>(c, DEKART_MULTIVARIATE_SCHEME_NAME, BN254);
+    // bench_range_proof::<Bls12_381, DekartMultivariate<Bls12_381>>(
+    //     c,
+    //     DEKART_MULTIVARIATE_SCHEME_NAME,
+    //     BLS12_381,
+    // );
 }
 
 /// Generic benchmark function over any pairing curve and range proof
