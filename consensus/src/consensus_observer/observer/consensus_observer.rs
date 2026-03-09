@@ -247,11 +247,17 @@ impl ConsensusObserver {
 
     /// Finalizes the ordered block by sending it to the execution pipeline
     async fn finalize_ordered_block(&mut self, ordered_block: OrderedBlock) {
-        info!(
+        let proof_block_info = ordered_block.proof_block_info();
+        debug!(
             LogSchema::new(LogEntry::ConsensusObserver).message(&format!(
                 "Forwarding ordered blocks to the execution pipeline: {}",
-                ordered_block.proof_block_info()
+                proof_block_info
             ))
+        );
+        metrics::set_gauge_with_label(
+            &metrics::OBSERVER_FORWARDED_BLOCK_ROUND,
+            metrics::ORDERED_BLOCK_LABEL,
+            proof_block_info.round(),
         );
 
         let block = ordered_block.first_block();
