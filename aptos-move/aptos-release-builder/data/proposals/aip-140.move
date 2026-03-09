@@ -20,10 +20,10 @@ script {
         // get the number of epochs in a year
         let epoch_seconds = block::get_epoch_interval_secs();
         let num_epochs_in_a_year = seconds_in_year / epoch_seconds;
-        // AIP reduction is 25 basis points per year, we multiply the denominator by the number of epochs in a year
-        // to get the reduction per epoch, that accumulates over the year as a 25bps reduction
+        // AIP reduction is 259 basis points, we multiply the denominator by the number of epochs in a year
+        // to get the reduction per epoch, that accumulates over the year as a 259bps reduction (5.19% -> 2.60%)
         // combine 3 remaining reductions together here to catch up the schedule
-        let aip_reduction = fixed_point64::create_from_rational(25 * 3, 10_000 * (num_epochs_in_a_year as u128));
+        let aip_reduction = fixed_point64::create_from_rational(259, 10_000 * (num_epochs_in_a_year as u128));
         // subtract the AIP reduction from the previous rewards rate
         let new_rewards_rate = prev_epoch_rewards_rate.sub(aip_reduction);
 
