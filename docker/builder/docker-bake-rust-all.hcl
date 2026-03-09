@@ -71,6 +71,7 @@ group "forge-images" {
 
 target "debian-base" {
   dockerfile = "docker/builder/debian-base.Dockerfile"
+  output     = ["type=cacheonly"]
   contexts = {
     # Run `docker buildx imagetools inspect debian:trixie` to find the latest multi-platform hash
     debian = "docker-image://debian:trixie@sha256:2c91e484d93f0830a7e05a2b9d92a7b102be7cab562198b984a84fdbc7806d91"
@@ -81,6 +82,7 @@ target "builder-base" {
   dockerfile = "docker/builder/builder.Dockerfile"
   target     = "builder-base"
   context    = "."
+  output     = ["type=cacheonly"]
   contexts = {
     # Run `docker buildx imagetools inspect rust:1.93.1-trixie` to find the latest multi-platform hash
     rust = "docker-image://rust:1.93.1-trixie@sha256:51c04d7a2b38418ba23ecbfb373c40d3bd493dec1ddfae00ab5669527320195e"
@@ -99,6 +101,7 @@ target "builder-base" {
 target "aptos-node-builder" {
   dockerfile = "docker/builder/builder.Dockerfile"
   target     = "aptos-node-builder"
+  output     = ["type=cacheonly"]
   contexts = {
     builder-base = "target:builder-base"
   }
@@ -110,6 +113,7 @@ target "aptos-node-builder" {
 target "tools-builder" {
   dockerfile = "docker/builder/builder.Dockerfile"
   target     = "tools-builder"
+  output     = ["type=cacheonly"]
   contexts = {
     builder-base = "target:builder-base"
   }
@@ -121,6 +125,7 @@ target "tools-builder" {
 target "forge-builder" {
   dockerfile = "docker/builder/builder.Dockerfile"
   target     = "forge-builder"
+  output     = ["type=cacheonly"]
   contexts = {
     builder-base = "target:builder-base"
   }
@@ -132,6 +137,7 @@ target "forge-builder" {
 target "indexer-builder" {
   dockerfile = "docker/builder/builder.Dockerfile"
   target     = "indexer-builder"
+  output     = ["type=cacheonly"]
   contexts = {
     builder-base = "target:builder-base"
   }
