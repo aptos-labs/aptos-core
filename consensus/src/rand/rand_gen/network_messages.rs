@@ -246,7 +246,7 @@ mod tests {
         let msg = RandMessage::<MockShare, MockAugData>::Share(forged_share);
 
         // Verify with attacker as sender should fail
-        let result = msg.verify(&ctx.epoch_state, &ctx.rand_config, &None, attacker);
+        let result = msg.verify(&ctx.epoch_state, &ctx.rand_config, attacker);
         assert!(result.is_err());
         assert!(result
             .unwrap_err()
@@ -254,45 +254,7 @@ mod tests {
             .contains("does not match sender"),);
 
         // Verify with victim as sender should succeed
-        let result = msg.verify(&ctx.epoch_state, &ctx.rand_config, &None, victim);
-        assert!(result.is_ok());
-    }
-
-    #[test]
-    fn test_fast_share_verify_rejects_mismatched_sender() {
-        let ctx = build_test_context(vec![100, 100, 100], 0);
-        let victim = ctx.authors[0];
-        let attacker = ctx.authors[2];
-        let metadata = RandMetadata {
-            epoch: ctx.epoch_state.epoch,
-            round: 1,
-        };
-
-        // Create a fast share claiming to be from victim
-        let forged_share = RandShare::<MockShare>::new(victim, metadata, MockShare);
-        let forged_fast_share = super::super::types::FastShare::new(forged_share);
-        let msg = RandMessage::<MockShare, MockAugData>::FastShare(forged_fast_share);
-
-        // Verify with attacker as sender should fail
-        let result = msg.verify(
-            &ctx.epoch_state,
-            &ctx.rand_config,
-            &Some(ctx.rand_config.clone()),
-            attacker,
-        );
-        assert!(result.is_err());
-        assert!(result
-            .unwrap_err()
-            .to_string()
-            .contains("does not match sender"),);
-
-        // Verify with victim as sender should succeed
-        let result = msg.verify(
-            &ctx.epoch_state,
-            &ctx.rand_config,
-            &Some(ctx.rand_config.clone()),
-            victim,
-        );
+        let result = msg.verify(&ctx.epoch_state, &ctx.rand_config, victim);
         assert!(result.is_ok());
     }
 
@@ -308,7 +270,7 @@ mod tests {
         let share = RandShare::<MockShare>::new(author, metadata, MockShare);
         let msg = RandMessage::<MockShare, MockAugData>::Share(share);
 
-        let result = msg.verify(&ctx.epoch_state, &ctx.rand_config, &None, author);
+        let result = msg.verify(&ctx.epoch_state, &ctx.rand_config, author);
         assert!(result.is_ok());
     }
 }
