@@ -88,16 +88,10 @@ impl OnChainConfig for OnChainJWKConsensusConfig {
     const TYPE_IDENTIFIER: &'static str = "JWKConsensusConfig";
 
     fn deserialize_into_config(bytes: &[u8]) -> anyhow::Result<Self> {
-        // let variant = bcs::from_bytes::<MoveAny>(bytes)?;
-        // // TODO(gravity): How to simulate the move any?
-        // match variant.type_name.as_str() {
-        //     ConfigOff::MOVE_TYPE_NAME => Ok(OnChainJWKConsensusConfig::Off),
-        //     ConfigV1::MOVE_TYPE_NAME => {
-        //         let config_v1 = Any::unpack::<ConfigV1>(ConfigV1::MOVE_TYPE_NAME, variant).map_err(|e|anyhow!("OnChainJWKConsensusConfig deserialization failed with ConfigV1 unpack error: {e}"))?;
-        //         Ok(OnChainJWKConsensusConfig::V1(config_v1))
-        //     },
-        //     _ => Err(anyhow!("unknown variant type")),
-        // }
+        // Gravity replaces Aptos's MoveAny-based JWK config deserialization with
+        // api_types::JWKConsensusConfig, which is directly BCS-deserialized from the
+        // Gravity L1 contract's encoding format. The original MoveAny unpacking is not
+        // applicable in the Gravity architecture.
         let config =
             bcs::from_bytes::<api_types::on_chain_config::jwks::JWKConsensusConfig>(bytes)?;
         if config.enabled {

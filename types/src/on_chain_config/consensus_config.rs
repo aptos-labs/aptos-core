@@ -419,8 +419,9 @@ impl OnChainConfig for OnChainConsensusConfig {
     /// ```
     /// so we need two rounds of bcs deserilization to turn it back to OnChainConsensusConfig
     fn deserialize_into_config(bytes: &[u8]) -> Result<Self> {
-        // Aptos use double serialize, but gravity use single serialize.
-        // let raw_bytes: Vec<u8> = bcs::from_bytes(bytes)?;
+        // Gravity uses single-layer BCS serialization for ConsensusConfig, unlike Aptos
+        // which wraps it in an additional BCS-encoded Vec<u8>. This is intentional and
+        // matches the encoding used by the Gravity L1 contract.
         let raw_bytes = bytes;
         bcs::from_bytes(&raw_bytes)
             .map_err(|e| format_err!("[on-chain config] Failed to deserialize into config: {}", e))

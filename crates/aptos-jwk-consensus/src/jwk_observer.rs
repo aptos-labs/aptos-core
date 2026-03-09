@@ -69,7 +69,13 @@ impl JWKObserver {
         };
 
         if issuer.starts_with("gravity://") {
-            let relayer = GLOBAL_RELAYER.get().expect("Relayer not initialized");
+            let relayer = match GLOBAL_RELAYER.get() {
+                Some(r) => r,
+                None => {
+                    error!("GLOBAL_RELAYER not initialized, cannot add issuer uri={}", open_id_config_url);
+                    return;
+                }
+            };
             let r = relayer
                 .add_uri(issuer.as_str(), open_id_config_url.as_str())
                 .await;

@@ -313,7 +313,8 @@ impl EventSubscriptionService {
             .fetch_config_bytes(api_types::config_storage::OnChainConfig::Epoch, version.into())
             .ok_or_else(|| Error::UnexpectedErrorEncountered("no config epoch found in aptos root account state".to_string()))?;
 
-        let epoch = TryInto::<u64>::try_into(epoch_bytes).unwrap();
+        let epoch = TryInto::<u64>::try_into(epoch_bytes)
+            .map_err(|e| Error::UnexpectedErrorEncountered(format!("Failed to convert epoch bytes to u64: {:?}", e)))?;
         info!("OnChainConfigPayload for epoch: {}", epoch);
 
         let mut config = DbBackedOnChainConfig::new(self.storage.read().reader.clone(), version);
@@ -423,19 +424,18 @@ impl OnChainConfigProvider for DbBackedOnChainConfig {
         let bytes = gravity_config_storage
             .ok_or_else(|| Error::UnexpectedErrorEncountered("gravity config storage is not available".to_string()))?
             .fetch_config_bytes(
-                api_types::config_storage::OnChainConfig::from_str(T::TYPE_IDENTIFIER).unwrap(),
-                self.version.into(),
+            api_types::config_storage::OnChainConfig::from_str(T::TYPE_IDENTIFIER)
+                .map_err(|e| anyhow!("Unknown OnChainConfig type identifier '{}': {:?}", T::TYPE_IDENTIFIER, e))?,
+            self.version.into(),
+        )
+        .ok_or_else(|| {
+            anyhow!(
+                "no config {} found in aptos root account state",
+                T::TYPE_IDENTIFIER
             )
-            .ok_or_else(|| {
-                anyhow!(
-                    "no config {} found in aptos root account state",
-                    T::TYPE_IDENTIFIER
-                )
-            })?;
-        let bytes = TryInto::<Bytes>::try_into(bytes).expect(&format!(
-            "Failed to convert type {} to Bytes",
-            T::TYPE_IDENTIFIER
-        ));
+        })?;
+        let bytes = TryInto::<Bytes>::try_into(bytes)
+            .map_err(|e| anyhow!("Failed to convert type {} to Bytes: {:?}", T::TYPE_IDENTIFIER, e))?;
         // let bytes = self
         //     .reader
         //     .get_state_value_by_version(&StateKey::on_chain_config::<T>()?, self.version)?
