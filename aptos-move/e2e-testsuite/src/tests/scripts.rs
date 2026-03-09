@@ -25,7 +25,7 @@ fn script_code_unverifiable() {
     executor.set_golden_file(current_function_name!());
 
     // create and publish sender
-    let sender = executor.create_raw_account_data(1_000_000, 10);
+    let sender = executor.create_raw_account_data(10_000_000, 10);
     executor.add_account_data(&sender);
 
     // create a bogus script
@@ -58,7 +58,7 @@ fn script_code_unverifiable() {
 
     // Check that numbers in store are correct.
     let gas = output.gas_used();
-    let balance = 1_000_000 - gas;
+    let balance = 10_000_000 - gas;
     let updated_sender = executor
         .read_account_resource(sender.account())
         .expect("sender must exist");
@@ -75,7 +75,7 @@ fn script_none_existing_module_dep() {
     executor.set_golden_file(current_function_name!());
 
     // create and publish sender
-    let sender = executor.create_raw_account_data(1_000_000, 10);
+    let sender = executor.create_raw_account_data(10_000_000, 10);
     executor.add_account_data(&sender);
 
     // create a bogus script
@@ -138,7 +138,7 @@ fn script_none_existing_module_dep() {
 
     // Check that numbers in store are correct.
     let gas = output.gas_used();
-    let balance = 1_000_000 - gas;
+    let balance = 10_000_000 - gas;
     let updated_sender = executor
         .read_account_resource(sender.account())
         .expect("sender must exist");
@@ -155,7 +155,7 @@ fn script_non_existing_function_dep() {
     executor.set_golden_file(current_function_name!());
 
     // create and publish sender
-    let sender = executor.create_raw_account_data(1_000_000, 10);
+    let sender = executor.create_raw_account_data(10_000_000, 10);
     executor.add_account_data(&sender);
 
     // create a bogus script
@@ -218,7 +218,7 @@ fn script_non_existing_function_dep() {
 
     // Check that numbers in store are correct.
     let gas = output.gas_used();
-    let balance = 1_000_000 - gas;
+    let balance = 10_000_000 - gas;
     let updated_sender = executor
         .read_account_resource(sender.account())
         .expect("sender must exist");
@@ -235,7 +235,7 @@ fn script_bad_sig_function_dep() {
     executor.set_golden_file(current_function_name!());
 
     // create and publish sender
-    let sender = executor.create_raw_account_data(1_000_000, 10);
+    let sender = executor.create_raw_account_data(10_000_000, 10);
     executor.add_account_data(&sender);
 
     // create a bogus script
@@ -299,7 +299,7 @@ fn script_bad_sig_function_dep() {
 
     // Check that numbers in store are correct.
     let gas = output.gas_used();
-    let balance = 1_000_000 - gas;
+    let balance = 10_000_000 - gas;
     let updated_sender = executor
         .read_account_resource(sender.account())
         .expect("sender must exist");
@@ -316,7 +316,7 @@ fn script_type_argument_module_does_not_exist() {
     executor.set_golden_file(current_function_name!());
 
     // create and publish sender
-    let sender = executor.create_raw_account_data(1_000_000, 10);
+    let sender = executor.create_raw_account_data(10_000_000, 10);
     executor.add_account_data(&sender);
 
     // create a bogus script
@@ -365,7 +365,7 @@ fn script_type_argument_module_does_not_exist() {
 
     // Check that numbers in store are correct.
     let gas = output.gas_used();
-    let balance = 1_000_000 - gas;
+    let balance = 10_000_000 - gas;
     let updated_sender = executor
         .read_account_resource(sender.account())
         .expect("sender must exist");
@@ -382,7 +382,7 @@ fn script_nested_type_argument_module_does_not_exist() {
     executor.set_golden_file(current_function_name!());
 
     // create and publish sender
-    let sender = executor.create_raw_account_data(1_000_000, 10);
+    let sender = executor.create_raw_account_data(10_000_000, 10);
     executor.add_account_data(&sender);
 
     // create a bogus script
@@ -433,7 +433,7 @@ fn script_nested_type_argument_module_does_not_exist() {
 
     // Check that numbers in store are correct.
     let gas = output.gas_used();
-    let balance = 1_000_000 - gas;
+    let balance = 10_000_000 - gas;
     let updated_sender = executor
         .read_account_resource(sender.account())
         .expect("sender must exist");
@@ -449,7 +449,7 @@ fn forbid_script_emitting_events() {
     let mut executor = FakeExecutor::from_head_genesis();
 
     // create and publish sender
-    let sender = executor.create_raw_account_data(1_000_000, 10);
+    let sender = executor.create_raw_account_data(10_000_000, 10);
     executor.add_account_data(&sender);
 
     // create an event-emitting script
@@ -515,7 +515,7 @@ fn forbid_script_emitting_events() {
 
     // Check that numbers in store are correct.
     let gas = output.gas_used();
-    let balance = 1_000_000 - gas;
+    let balance = 10_000_000 - gas;
     let updated_sender = executor
         .read_account_resource(sender.account())
         .expect("sender must exist");

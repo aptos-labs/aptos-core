@@ -865,9 +865,7 @@ pub fn run_single_with_default_params(
 
     println!("db_generator::create_db_with_accounts");
 
-    let mut features = default_benchmark_features();
-    features.enable(FeatureFlag::NEW_ACCOUNTS_DEFAULT_TO_FA_APT_STORE);
-    features.enable(FeatureFlag::OPERATIONS_DEFAULT_TO_FA_APT_STORE);
+    let features = default_benchmark_features();
 
     let init_pipeline_config = PipelineConfig {
         num_sig_verify_threads: std::cmp::max(1, num_cpus::get() / 3),
@@ -889,7 +887,7 @@ pub fn run_single_with_default_params(
         storage_test_config,
         verify_sequence_numbers,
         init_pipeline_config,
-        features.clone(),
+        default_benchmark_features(),
         is_keyless,
     );
 
@@ -1182,9 +1180,7 @@ mod tests {
 
         println!("db_generator::create_db_with_accounts");
 
-        let mut features = default_benchmark_features();
-        features.enable(FeatureFlag::NEW_ACCOUNTS_DEFAULT_TO_FA_APT_STORE);
-        features.enable(FeatureFlag::OPERATIONS_DEFAULT_TO_FA_APT_STORE);
+        let features = default_benchmark_features();
 
         let storage_test_config = StorageTestConfig {
             pruner_config: NO_OP_STORAGE_PRUNER_CONFIG,
@@ -1194,8 +1190,8 @@ mod tests {
         crate::db_generator::create_db_with_accounts::<AptosVMBlockExecutor>(
             100, /* num_accounts */
             // TODO(Gas): double check if this is correct
-            100_000_000_000, /* init_account_balance */
-            5,               /* block_size */
+            1_000_000_000_000, /* init_account_balance */
+            5,                 /* block_size */
             storage_dir.as_ref(),
             storage_test_config,
             verify_sequence_numbers,

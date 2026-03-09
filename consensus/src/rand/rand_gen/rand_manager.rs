@@ -292,6 +292,7 @@ impl<S: TShare, D: TAugmentedData> RandManager<S, D> {
                             {
                                 let _ = tx.unbounded_send(RpcRequest {
                                     req: msg,
+                                    sender: rand_gen_msg.sender,
                                     protocol: rand_gen_msg.protocol,
                                     response_sender: rand_gen_msg.response_sender,
                                 });
@@ -445,6 +446,7 @@ impl<S: TShare, D: TAugmentedData> RandManager<S, D> {
                 Some(request) = verified_msg_rx.next() => {
                     let RpcRequest {
                         req: rand_gen_msg,
+                        sender,
                         protocol,
                         response_sender,
                     } = request;
@@ -473,7 +475,13 @@ impl<S: TShare, D: TAugmentedData> RandManager<S, D> {
                                 .round(share.metadata().round)
                                 .remote_peer(*share.author()));
 
-                            if let Err(e) = self.rand_store.lock().add_share(share, PathType::Slow) {
+                            if share.author() != &sender {
+                                warn!(
+                                    "[RandManager] Share author {:?} does not match sender {:?}, dropping",
+                                    share.author(),
+                                    sender,
+                                );
+                            } else if let Err(e) = self.rand_store.lock().add_share(share, PathType::Slow) {
                                 warn!("[RandManager] Failed to add share: {}", e);
                             }
                         }
@@ -484,7 +492,13 @@ impl<S: TShare, D: TAugmentedData> RandManager<S, D> {
                                 .round(share.metadata().round)
                                 .remote_peer(*share.share.author()));
 
-                            if let Err(e) = self.rand_store.lock().add_share(share.rand_share(), PathType::Fast) {
+                            if share.author() != &sender {
+                                warn!(
+                                    "[RandManager] FastShare author {:?} does not match sender {:?}, dropping",
+                                    share.author(),
+                                    sender,
+                                );
+                            } else if let Err(e) = self.rand_store.lock().add_share(share.rand_share(), PathType::Fast) {
                                 warn!("[RandManager] Failed to add share for fast path: {}", e);
                             }
                         }

@@ -11,9 +11,6 @@ module aptos_framework::transaction_context {
     /// The transaction context extension feature is not enabled.
     const ETRANSACTION_CONTEXT_EXTENSION_NOT_ENABLED: u64 = 2;
 
-    /// The monotonically increasing counter is not enabled.
-    const EMONOTONICALLY_INCREASING_COUNTER_NOT_ENABLED: u64 = 3;
-
     /// The monotonically increasing counter has overflowed (too many calls in a single session).
     const EMONOTONICALLY_INCREASING_COUNTER_OVERFLOW: u64 = 4;
 
@@ -201,7 +198,6 @@ module aptos_framework::transaction_context {
         if (__COMPILE_FOR_TESTING__) {
             monotonically_increasing_counter_internal_for_test_only()
         } else {
-            assert!(features::is_monotonically_increasing_counter_enabled(), error::invalid_state(EMONOTONICALLY_INCREASING_COUNTER_NOT_ENABLED));
             monotonically_increasing_counter_internal(timestamp::now_microseconds())
         }
     }

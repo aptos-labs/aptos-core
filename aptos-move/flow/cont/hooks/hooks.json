@@ -1,5 +1,15 @@
 {
   "hooks": {
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "command -v \"${MOVE_FLOW:-move-flow}\" >/dev/null 2>&1 || echo '[move-flow plugin] move-flow binary not found. Install move-flow or set MOVE_FLOW env var. Please warn the user.'"
+          }
+        ]
+      }
+    ],
     "PostToolUse": [
       {
         "matcher": "Edit|Write",

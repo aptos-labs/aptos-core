@@ -9,7 +9,6 @@ module aptos_framework::aptos_account {
     use aptos_framework::object;
 
     use std::error;
-    use std::features;
     use std::signer;
     use aptos_framework::object::Object;
 
@@ -80,16 +79,7 @@ module aptos_framework::aptos_account {
             create_account(to)
         };
 
-        if (features::operations_default_to_fa_apt_store_enabled()) {
-            fungible_transfer_only(source, to, amount)
-        } else {
-            // Resource accounts can be created without registering them to receive APT.
-            // This conveniently does the registration if necessary.
-            if (!coin::is_account_registered<AptosCoin>(to)) {
-                coin::register<AptosCoin>(&create_signer(to));
-            };
-            coin::transfer<AptosCoin>(source, to, amount)
-        }
+        fungible_transfer_only(source, to, amount)
     }
 
     /// Batch version of transfer_coins.
@@ -241,11 +231,7 @@ module aptos_framework::aptos_account {
     }
 
     public(friend) fun register_apt(account_signer: &signer) {
-        if (features::new_accounts_default_to_fa_apt_store_enabled()) {
-            ensure_primary_fungible_store_exists(signer::address_of(account_signer));
-        } else {
-            coin::register<AptosCoin>(account_signer);
-        }
+        ensure_primary_fungible_store_exists(signer::address_of(account_signer));
     }
 
     /// APT Primary Fungible Store specific specialized functions,

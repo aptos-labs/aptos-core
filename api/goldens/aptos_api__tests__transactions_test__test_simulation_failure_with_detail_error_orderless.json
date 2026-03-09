@@ -5,7 +5,7 @@
     "state_change_hash": "",
     "event_root_hash": "",
     "state_checkpoint_hash": null,
-    "gas_used": "3",
+    "gas_used": "28",
     "success": false,
     "vm_status": "LINKER_ERROR\nExecution failed with message: Linker Error: Module 0000000000000000000000000000000000000000000000000000000000000001::MemeCoin doesn't exist",
     "accumulator_root_hash": "",
@@ -23,7 +23,7 @@
     ],
     "sender": "0xa550c18",
     "sequence_number": "18446744073709551615",
-    "max_gas_amount": "100000000",
+    "max_gas_amount": "1000000000",
     "gas_unit_price": "0",
     "expiration_timestamp_secs": "60",
     "payload": {
@@ -39,7 +39,7 @@
     },
     "signature": {
       "public_key": "0x14418f867a0bd6d42abb2daa50cd68a5a869ce208282481f57504f630510d0d3",
-      "signature": "0x87d02d3b1dbea4748e382f80e0c6a440f921a7873ed49dc391d9d93772bd390bcec0b366c3dbb0dd81bbe3327731a9cf1bd3580ecf186842edb5a9b5c1a3d800",
+      "signature": "0xe59fd39dec3e389a41a0af93030c24856377aa4c9221413e4a0cb1db17a512c2ba8d025db255bee7a257c935341501877df47f09110ea622dc7a3eb5db16f500",
       "type": "ed25519_signature"
     },
     "replay_protection_nonce": "12521492590937810661",
@@ -52,11 +52,11 @@
         "sequence_number": "0",
         "type": "0x1::transaction_fee::FeeStatement",
         "data": {
-          "execution_gas_units": "3",
+          "execution_gas_units": "28",
           "io_gas_units": "0",
           "storage_fee_octas": "0",
           "storage_fee_refund_octas": "0",
-          "total_charge_gas_units": "3"
+          "total_charge_gas_units": "28"
         }
       }
     ],

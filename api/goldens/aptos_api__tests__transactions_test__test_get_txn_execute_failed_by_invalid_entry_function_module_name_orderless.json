@@ -4,7 +4,7 @@
   "state_change_hash": "",
   "event_root_hash": "",
   "state_checkpoint_hash": null,
-  "gas_used": "3",
+  "gas_used": "28",
   "success": false,
   "vm_status": "LINKER_ERROR",
   "accumulator_root_hash": "",
@@ -20,7 +20,7 @@
   ],
   "sender": "0xa550c18",
   "sequence_number": "18446744073709551615",
-  "max_gas_amount": "100000000",
+  "max_gas_amount": "1000000000",
   "gas_unit_price": "0",
   "expiration_timestamp_secs": "60",
   "payload": {
@@ -36,7 +36,7 @@
   },
   "signature": {
     "public_key": "0x14418f867a0bd6d42abb2daa50cd68a5a869ce208282481f57504f630510d0d3",
-    "signature": "0xb2e86ede7857ec640a89b83006d61d87acdb198a7b8218520464a0669051dd0f8ec1539ae712f5bc4ad0f71e96119379f920bb8b9385806369b1491d040e960e",
+    "signature": "0x8ecf6e999f0f5bf0eeee1375c21dbbec62b8f24de520e4a5252e64c2de6fb505b34ef9ca5b6a1df84d104cb4daf55fbb163463802de33471a7650977186e3a01",
     "type": "ed25519_signature"
   },
   "replay_protection_nonce": "12521492590937810661",
@@ -49,11 +49,11 @@
       "sequence_number": "0",
       "type": "0x1::transaction_fee::FeeStatement",
       "data": {
-        "execution_gas_units": "3",
+        "execution_gas_units": "28",
         "io_gas_units": "0",
         "storage_fee_octas": "0",
         "storage_fee_refund_octas": "0",
-        "total_charge_gas_units": "3"
+        "total_charge_gas_units": "28"
       }
     }
   ],

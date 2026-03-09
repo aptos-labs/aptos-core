@@ -253,7 +253,7 @@ impl InnerBuilder {
             self.network_sender.clone(),
             self.verifier.clone(),
         );
-        let batch_store = Arc::new(BatchStore::new(
+        let batch_store = BatchStore::new(
             self.epoch,
             is_new_epoch,
             last_committed_timestamp,
@@ -263,7 +263,7 @@ impl InnerBuilder {
             self.config.batch_quota,
             signer,
             Duration::from_secs(60).as_micros() as u64,
-        ));
+        );
         self.batch_store = Some(batch_store.clone());
         let batch_reader = Arc::new(BatchReaderImpl::new(batch_store.clone(), batch_requester));
         self.batch_reader = Some(batch_reader.clone());
