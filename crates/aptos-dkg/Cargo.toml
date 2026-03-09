@@ -49,6 +49,7 @@ assert-private-keys-not-cloneable = []
 fuzzing = []
 parallel = []
 range_proof_timing = []
+range_proof_timing_multivariate = []
 range_proof_timing_univariate_v2 = []  # per-component timing for dekart_univariate_v2; use --test range_proof -- --nocapture to see output
 
 [[bench]]

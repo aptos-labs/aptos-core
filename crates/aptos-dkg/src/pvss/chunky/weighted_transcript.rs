@@ -19,7 +19,7 @@ use crate::{
         chunky::{
             chunked_elgamal::{self, num_chunks_per_scalar},
             hkzg_chunked_elgamal,
-            hkzg_chunked_elgamal::ChunkedWitnessData,
+            hkzg_chunked_elgamal::WitnessData,
             input_secret::InputSecret,
             keys,
             public_parameters::PublicParameters,
@@ -154,33 +154,21 @@ impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>> traits:
             .get_threshold_config()
             .sample_polynomial_and_compute_shares(*s.get_secret_a(), rng);
 
-        // Encrypt the chunked shares and generate the sharing proof
+        // Step 3-6: Encrypt the chunked shares and generate the sharing proof
         let (Cs, Rs, sharing_proof) =
             Self::encrypt_chunked_shares(&f_evals, eks, pp, sc, sok_cntxt, rng);
 
-        // Step 2 (which comes a bit later because we modify f_evals): Commit to polynomial evaluations + constant term using batch_mul
+        // Step 2 (which comes after 3-6 here because we modify `f_evals`):
+        // Commit to polynomial evaluations + constant term using batch_mul
         f_evals.push(f[0]);
         let flattened_Vs_proj = arkworks::batch_mul::<E::G2>(&pp.G2_table, &f_evals);
 
         debug_assert_eq!(flattened_Vs_proj.len(), sc.get_total_weight() + 1);
 
-        // Remainder of this function is just batch-normalising the G2 elements and re-splitting into V0 and per-player Vs (same layout as Vs_proj).
-        let Vs_proj = sc.group_by_player(&flattened_Vs_proj); // last item of flattened_Vs_proj is f(0), won't appear in Vs_proj
-        let V0_proj = *flattened_Vs_proj.last().unwrap();
-
-        // Batch normalize G2 elements and re-split into V0 and per-player Vs (same layout as Vs_proj).
-        let mut g2_elems = vec![V0_proj];
-        for row in &Vs_proj {
-            g2_elems.extend(row.iter().copied());
-        }
-        let g2_affine = E::G2::normalize_batch(&g2_elems);
-        let mut g2_iter = g2_affine.into_iter();
-        let V0 = g2_iter.next().unwrap();
-        let Vs: Vec<Vec<E::G2Affine>> = Vs_proj
-            .iter()
-            .map(|row| row.iter().map(|_| g2_iter.next().unwrap()).collect())
-            .collect();
-        debug_assert!(g2_iter.next().is_none());
+        // Remainder of this function is just batch-normalising the G2 elements and re-splitting into V0 and per-player Vs.
+        let g2_affine = E::G2::normalize_batch(&flattened_Vs_proj);
+        let Vs = sc.group_by_player(&g2_affine); // Doesn't use the last value
+        let V0 = *g2_affine.last().unwrap();
 
         Transcript {
             dealer: *dealer,
@@ -219,11 +207,7 @@ impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>> Transcr
     /// Encrypts chunked shares and builds the sharing proof (SoK + range proof).
     /// Panics if `pp.pk_range_proof.ck_S` is not a Lagrange SRS basis (same requirement as verify).
     #[allow(non_snake_case)]
-    pub fn encrypt_chunked_shares<
-        'a,
-        A: Serialize + Clone,
-        R: rand_core::RngCore + rand_core::CryptoRng,
-    >(
+    pub fn encrypt_chunked_shares<'a, A: Serialize + Clone, R: RngCore + CryptoRng>(
         f_evals: &[E::ScalarField],
         eks: &[keys::EncryptPubKey<E>],
         pp: &PublicParameters<E>,
@@ -235,7 +219,8 @@ impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>> Transcr
         Vec<Vec<E::G1Affine>>,
         SharingProof<E>,
     ) {
-        let ChunkedWitnessData {
+        // Step 3-4a: prepare the witness data
+        let WitnessData {
             witness,
             f_evals_chunked_flat,
         } = hkzg_chunked_elgamal::prepare_chunked_witness(f_evals, pp, sc, rng);
@@ -264,7 +249,7 @@ impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>> Transcr
         // Destructure the "public statement" of the above sigma protocol
         let TupleCodomainShape(
             range_proof_commitment,
-            chunked_elgamal::WeightedCodomainShape {
+            chunked_elgamal::CodomainShape {
                 chunks: Cs,
                 randomness: Rs,
             },
@@ -350,22 +335,27 @@ impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>>
             sigma_protocol::homomorphism::TrivialShape(
                 self.sharing_proof.range_proof_commitment.0.clone(),
             ),
-            chunked_elgamal::WeightedCodomainShape {
+            chunked_elgamal::CodomainShape {
                 chunks: self.subtrs.Cs.clone(),
                 randomness: self.subtrs.Rs.clone(),
             },
         );
-        let num_chunks = num_chunks_per_scalar::<E::ScalarField>(pp.ell) as usize;
-        let pok_num_beta_powers =
-            1 + sc.get_total_weight() * num_chunks + sc.get_max_weight() * num_chunks;
-        let pok_msm_terms = hom
-            .msm_terms_for_verify::<_, hkzg_chunked_elgamal::Homomorphism<'static, E>, _>(
-                &pok_statement,
-                &self.sharing_proof.SoK,
-                &sok_cntxt,
-                Some(pok_num_beta_powers),
-                rng,
-            );
+        let prover_first_message = self
+            .sharing_proof
+            .SoK
+            .prover_commitment()
+            .expect("SoK must contain commitment for Fiat–Shamir");
+        let c_pok = hom.fiat_shamir_challenge_for_sigma_protocol(
+            &sok_cntxt,
+            &pok_statement,
+            prover_first_message,
+        );
+        let pok_msm_terms = hom.msm_terms_for_verify_with_challenge(
+            &pok_statement,
+            prover_first_message,
+            &self.sharing_proof.SoK.z,
+            c_pok,
+        );
 
         let ldt = LowDegreeTest::random(
             rng,
@@ -400,11 +390,12 @@ impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>>
 
         let weighted_Cs_msm =
             MsmInput::new(weighted_Cs_base, weighted_Cs_scalar).expect("weighted_Cs MSM terms");
-        let merged_g1 =
-            msm::merge_scaled_msm_terms::<E::G1>(&[&pok_msm_terms, &weighted_Cs_msm], &[
-                gamma,
-                E::ScalarField::ONE,
-            ]);
+        let pok_merged = msm::merge_msm_inputs::<E::G1Affine, _>(&pok_msm_terms, rng);
+        let g1_inputs = vec![pok_merged, weighted_Cs_msm];
+        let merged_g1 = msm::merge_msm_inputs_with_scales::<E::G1Affine>(&g1_inputs, &[
+            gamma,
+            E::ScalarField::ONE,
+        ]);
         let combined_G1 = E::G1::msm(merged_g1.bases(), merged_g1.scalars())
             .expect("Failed to compute merged G1 MSM in chunky");
 
@@ -412,11 +403,11 @@ impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>>
         let n = sc.get_total_weight();
         let weighted_Vs_msm = MsmInput::new(Vs_flat[..n].to_vec(), powers_of_beta[..n].to_vec())
             .expect("weighted_Vs MSM terms");
-        let merged_g2 =
-            msm::merge_scaled_msm_terms::<E::G2>(&[&ldt_msm_terms, &weighted_Vs_msm], &[
-                gamma_sq,
-                E::ScalarField::ONE,
-            ]);
+        let g2_inputs = vec![ldt_msm_terms, weighted_Vs_msm];
+        let merged_g2 = msm::merge_msm_inputs_with_scales::<E::G2Affine>(&g2_inputs, &[
+            gamma_sq,
+            E::ScalarField::ONE,
+        ]);
         let combined_G2 = E::G2::msm(merged_g2.bases(), merged_g2.scalars())
             .expect("Failed to compute merged G2 MSM in chunky");
 

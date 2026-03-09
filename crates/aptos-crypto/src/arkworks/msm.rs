@@ -7,10 +7,12 @@
 //! their linear combination. This module defines a simple container for such
 //! inputs.
 
-use ark_ec::{AffineRepr, CurveGroup};
+use crate::{arkworks::random::sample_field_element, utils};
+use ark_ec::AffineRepr;
 use ark_ff::Zero;
 use ark_serialize::{CanonicalDeserialize, CanonicalSerialize};
-use std::{collections::HashMap, fmt::Debug, hash::Hash};
+use rand::Rng;
+use std::{collections::HashMap, fmt::Debug};
 
 /// Input to a (not necessarily fixed-base) multi-scalar multiplication (MSM).
 ///
@@ -64,32 +66,40 @@ where
     }
 }
 
-/// Merges multiple `MsmInput`s into one, with the i-th input scaled by `scales[i]`.
-/// Same base in different inputs is aggregated (scalars summed). Terms with zero scalar are dropped.
+/// Merges multiple `MsmInput`s into one by scaling the i-th input by `scales[i]` and aggregating.
+/// Same base across inputs is combined (scalars summed). Terms with zero scalar are dropped.
 ///
 /// # Panics
-/// If `term_sets.len() != scales.len()` or if the merged result cannot be built into `MsmInput`.
-pub fn merge_scaled_msm_terms<C: CurveGroup>(
-    term_sets: &[&MsmInput<C::Affine, C::ScalarField>],
-    scales: &[C::ScalarField],
-) -> MsmInput<C::Affine, C::ScalarField>
-where
-    C::Affine: Copy + Eq + Hash,
-{
+/// If `inputs.len() != scales.len()` or if the merged result cannot be built into `MsmInput`.
+pub fn merge_msm_inputs_with_scales<A: AffineRepr>(
+    inputs: &[MsmInput<A, A::ScalarField>],
+    scales: &[A::ScalarField],
+) -> MsmInput<A, A::ScalarField> {
     assert_eq!(
-        term_sets.len(),
+        inputs.len(),
         scales.len(),
-        "term_sets and scales length mismatch"
+        "inputs and scales length mismatch"
     );
-    let mut agg: HashMap<C::Affine, C::ScalarField> = HashMap::new();
-    for (terms, scale) in term_sets.iter().zip(scales.iter()) {
-        for (base, scalar) in terms.bases().iter().zip(terms.scalars().iter()) {
+    let mut agg: HashMap<A, A::ScalarField> = HashMap::new();
+    for (input, scale) in inputs.iter().zip(scales.iter()) {
+        for (base, scalar) in input.bases().iter().zip(input.scalars().iter()) {
             let s = *scalar * scale;
             agg.entry(*base).and_modify(|s0| *s0 += s).or_insert(s);
         }
     }
     let (bases, scalars): (Vec<_>, Vec<_>) = agg.into_iter().filter(|(_, s)| !s.is_zero()).unzip();
-    MsmInput::new(bases, scalars).expect("merged MSM terms")
+    MsmInput::new(bases, scalars).expect("merged MSM inputs")
+}
+
+/// Merges multiple `MsmInput`s into one by sampling a random `beta`, using
+/// `[1, beta, beta^2, ...]` as scales, and calling `merge_msm_inputs_with_scales`.
+pub fn merge_msm_inputs<A: AffineRepr, R: Rng>(
+    inputs: &[MsmInput<A, A::ScalarField>],
+    rng: &mut R,
+) -> MsmInput<A, A::ScalarField> {
+    let beta = sample_field_element(rng);
+    let scales = utils::powers(beta, inputs.len());
+    merge_msm_inputs_with_scales(inputs, &scales)
 }
 
 /// Multi-scalar multiplication with boolean scalars.

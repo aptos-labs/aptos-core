@@ -4,8 +4,7 @@
 use aptos_crypto::arkworks::GroupGenerators;
 use aptos_dkg::{
     range_proofs::{
-        //dekart_multivariate::Proof as DekartMultivariate,
-        dekart_univariate::Proof as UnivariateDeKART,
+        //        dekart_multivariate::Proof as DekartMultivariate,
         dekart_univariate_v2::Proof as UnivariateDeKARTv2,
         traits::BatchedRangeProof,
     },
@@ -148,18 +147,6 @@ where
 }
 
 #[cfg(test)]
-fn assert_correctness_for_range_proof_and_curve<E, B>()
-where
-    E: Pairing,
-    B: BatchedRangeProof<E>,
-{
-    let setups = make_single_curve_setup::<E, B>(31, 16);
-    for &(n, ell) in TEST_CASES {
-        assert_range_proof_correctness::<E, B>(&setups, n, ell);
-    }
-}
-
-#[cfg(test)]
 fn assert_correctness_and_serialization_for_range_proof_and_curve<E, B>()
 where
     E: Pairing,
@@ -171,17 +158,14 @@ where
     for &(n, ell) in TEST_CASES {
         assert_range_proof_correctness::<E, B>(&setups, n, ell);
         assert_keys_serialization::<E, B>(&setups);
+        // TODO: we sometimes temporarily disable this for benchmarks - serialization for multivariate
+        // DeKART is currently "broken" because we want to only serialize the first Powers-Of-Tau entries for Fiat-Shamir...
     }
 }
 
 #[cfg(test)]
 #[test]
 fn assert_correctness_of_all_range_proofs() {
-    println!("\n=== Testing UnivariateDeKART<Bn254> ===");
-    assert_correctness_for_range_proof_and_curve::<Bn254, UnivariateDeKART<Bn254>>();
-    println!("\n=== Testing UnivariateDeKART<Bls12_381> ===");
-    assert_correctness_for_range_proof_and_curve::<Bls12_381, UnivariateDeKART<Bls12_381>>();
-
     println!("\n=== Testing UnivariateDeKARTv2<Bn254> ===");
     assert_correctness_and_serialization_for_range_proof_and_curve::<
         Bn254,

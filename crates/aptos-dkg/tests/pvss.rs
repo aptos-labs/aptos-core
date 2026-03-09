@@ -23,7 +23,8 @@ use aptos_dkg::pvss::{
         reconstruct_dealt_secret_key_randomly, NoAux,
     },
     traits::transcript::{
-        Aggregated, HasAggregatableSubtranscript, Transcript, TranscriptCore, WithMaxNumShares,
+        Aggregatable, Aggregated, HasAggregatableSubtranscript, Transcript, TranscriptCore,
+        WithMaxNumShares,
     },
     GenericWeighting, ThresholdConfigBlstrs,
 };
@@ -96,16 +97,6 @@ fn test_pvss_all_weighted() {
         println!("\nTesting {wc} PVSS");
         let seed = random_scalar(&mut rng);
 
-        // Signed weighted Chunky
-        nonaggregatable_weighted_pvss_deal_verify_and_reconstruct::<
-            Bn254,
-            chunky::SignedWeightedTranscript<Bn254>,
-        >(&wc, seed.to_bytes_le());
-        nonaggregatable_weighted_pvss_deal_verify_and_reconstruct::<
-            Bn254,
-            chunky::SignedWeightedTranscriptv2<Bn254>,
-        >(&wc, seed.to_bytes_le());
-
         // Unsigned weighted Chunky
         nonaggregatable_weighted_pvss_deal_verify_and_reconstruct::<
             Bn254,
@@ -114,6 +105,16 @@ fn test_pvss_all_weighted() {
         nonaggregatable_weighted_pvss_deal_verify_and_reconstruct::<
             Bn254,
             chunky::UnsignedWeightedTranscriptv2<Bn254>,
+        >(&wc, seed.to_bytes_le());
+
+        // Signed weighted Chunky
+        nonaggregatable_weighted_pvss_deal_verify_and_reconstruct::<
+            Bn254,
+            chunky::SignedWeightedTranscript<Bn254>,
+        >(&wc, seed.to_bytes_le());
+        nonaggregatable_weighted_pvss_deal_verify_and_reconstruct::<
+            Bn254,
+            chunky::SignedWeightedTranscriptv2<Bn254>,
         >(&wc, seed.to_bytes_le());
     }
 }
@@ -132,6 +133,7 @@ fn test_pvss_transcript_size() {
     // Restarting the loop here because now it'll grab **arkworks** `ThresholdConfig`s with BN254
     // uses default chunk sizes, so probably want to modify this at some point to allow a wider range
     // Ideally should iterate over a vec of (t, n), not the actual threshold configs... but won't be a bottleneck
+    // TODO: this loop isn't testing anything...
     for sc in get_weighted_configs_for_benchmarking().iter().take(1) {
         // Only trying 1 for now to keep tests fast (also the second one has the same n, which means it would yield the same size...)
         println!();
@@ -145,6 +147,7 @@ fn test_pvss_transcript_size() {
     }
 
     // Restarting so it grabs BLS12-381 instead of BN254... TODO: could get rid of this with some work
+    // TODO: this loop isn't testing anything...
     for sc in get_weighted_configs_for_benchmarking().iter().take(1) {
         // Only trying 1 for now to keep tests fast (also the second one has the same n, which means it would yield the same size...)
 
@@ -160,6 +163,7 @@ fn test_pvss_transcript_size() {
     }
 
     for wc in get_weighted_configs_for_benchmarking() {
+        // TODO: this loop isn't testing anything...
         let actual_size = actual_transcript_size::<das::Transcript>(wc.get_threshold_config());
         print_transcript_size::<das::Transcript>("Actual", wc.get_threshold_config(), actual_size);
 
@@ -219,8 +223,6 @@ fn pvss_deal_verify_and_reconstruct<T: AggregatableTranscript>(
     }
 }
 
-use aptos_dkg::pvss::traits::transcript::Aggregatable;
-
 #[cfg(test)]
 #[allow(dead_code)]
 fn test_pvss_aggregate_subtranscript_and_decrypt<E: Pairing, T>(
@@ -270,7 +272,7 @@ fn test_pvss_aggregate_subtranscript_and_decrypt<E: Pairing, T>(
 }
 
 #[cfg(test)]
-#[allow(dead_code)] // TODO
+#[allow(dead_code)] // We no longer have unweighted nonaggregatable PVSS code
 fn nonaggregatable_pvss_deal_verify_and_reconstruct<T: HasAggregatableSubtranscript>(
     sc: &T::SecretSharingConfig,
     seed_bytes: [u8; 32],
@@ -342,46 +344,22 @@ fn nonaggregatable_weighted_pvss_deal_verify_and_reconstruct<E: Pairing, T>(
         .expect("serialized transcript should deserialize correctly");
 
     assert_eq!(trx, trx_deserialized);
-    if d.dsk != reconstruct_dealt_secret_key_randomly::<StdRng, T>(sc, &mut rng, &d.dks, trx, &d.pp)
+    if d.dsk
+        != reconstruct_dealt_secret_key_randomly::<StdRng, T>(
+            sc,
+            &mut rng,
+            &d.dks,
+            trx.clone(),
+            &d.pp,
+        )
     {
         panic!("Reconstructed SK did not match");
     }
-}
-
-#[cfg(test)]
-#[allow(dead_code)] // TODO
-fn pvss_deal_verify_and_reconstruct_from_subtranscript<
-    T: Transcript + HasAggregatableSubtranscript,
->(
-    sc: &T::SecretSharingConfig,
-    seed_bytes: [u8; 32],
-) {
-    // println!();
-    // println!("Seed: {}", hex::encode(seed_bytes.as_slice()));
-
-    use aptos_dkg::pvss::test_utils::reconstruct_dealt_secret_key_randomly_subtranscript;
-    let mut rng = StdRng::from_seed(seed_bytes);
-
-    let d = test_utils::setup_dealing::<T, StdRng>(sc, None, &mut rng);
-
-    // Test dealing
-    let trx = T::deal(
-        &sc,
-        &d.pp,
-        &d.ssks[0],
-        &d.spks[0],
-        &d.eks,
-        &d.s,
-        &NoAux,
-        &sc.get_player(0),
-        &mut rng,
-    );
-
-    let trx = trx.get_subtranscript();
-
+    // Verify that it doesn't matter if we use the subtranscript:
+    let trx_again = trx.get_subtranscript();
     if d.dsk
-        != reconstruct_dealt_secret_key_randomly_subtranscript::<StdRng, T::Subtranscript>(
-            sc, &mut rng, &d.dks, trx, &d.pp,
+        != reconstruct_dealt_secret_key_randomly::<StdRng, _>(
+            sc, &mut rng, &d.dks, trx_again, &d.pp,
         )
     {
         panic!("Reconstructed SK did not match");

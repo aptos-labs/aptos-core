@@ -39,13 +39,13 @@ pub const DST: &[u8; 31] = b"APTOS_CHUNKED_ELGAMAL_SIGMA_DST"; // This is used f
 /// and `R_j` carry the corresponding randomness contributions.
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[allow(non_snake_case)]
-pub struct WeightedHomomorphism<'a, C: CurveGroup> {
+pub struct Homomorphism<'a, C: CurveGroup> {
     pub pp: &'a PublicParameters<C>, // These are small so no harm in copying them here
     pub eks: &'a [C::Affine],        // TODO: capitalize to EKs ?
 }
 
 // Need to manually implement `CanonicalSerialize` because `Homomorphism` has references instead of owned values
-impl<'a, C: CurveGroup> CanonicalSerialize for WeightedHomomorphism<'a, C> {
+impl<'a, C: CurveGroup> CanonicalSerialize for Homomorphism<'a, C> {
     fn serialize_with_mode<W: Write>(
         &self,
         mut writer: W,
@@ -72,7 +72,7 @@ impl<'a, C: CurveGroup> CanonicalSerialize for WeightedHomomorphism<'a, C> {
 
 /// This struct is used as `CodomainShape<T>`, but the same layout also applies to the `Witness` type.
 #[derive(CanonicalSerialize, CanonicalDeserialize, Clone, Debug, PartialEq, Eq)]
-pub struct WeightedCodomainShape<T: CanonicalSerialize + CanonicalDeserialize + Clone> {
+pub struct CodomainShape<T: CanonicalSerialize + CanonicalDeserialize + Clone> {
     pub chunks: Vec<Vec<Vec<T>>>, // Depending on T these can be chunked ciphertexts, or their MSM representations
     pub randomness: Vec<Vec<T>>,  // Same story, depending on T
 }
@@ -83,16 +83,16 @@ pub struct WeightedCodomainShape<T: CanonicalSerialize + CanonicalDeserialize + 
 #[derive(
     SigmaProtocolWitness, CanonicalSerialize, CanonicalDeserialize, Clone, Debug, PartialEq, Eq,
 )]
-pub struct WeightedWitness<F: PrimeField> {
+pub struct Witness<F: PrimeField> {
     pub plaintext_chunks: Vec<Vec<Vec<Scalar<F>>>>,
     pub plaintext_randomness: Vec<Vec<Scalar<F>>>, // For at most max_weight, there needs to be a vector of randomness to encrypt a vector of chunks
 }
 
 #[allow(non_snake_case)]
-impl<C: CurveGroup> homomorphism::Trait for WeightedHomomorphism<'_, C> {
-    type Codomain = WeightedCodomainShape<C>;
-    type CodomainNormalized = WeightedCodomainShape<C::Affine>;
-    type Domain = WeightedWitness<C::ScalarField>;
+impl<C: CurveGroup> homomorphism::Trait for Homomorphism<'_, C> {
+    type Codomain = CodomainShape<C>;
+    type CodomainNormalized = CodomainShape<C::Affine>;
+    type Domain = Witness<C::ScalarField>;
 
     fn apply(&self, input: &Self::Domain) -> Self::Codomain {
         // Get the batch multiplication tables
@@ -160,22 +160,22 @@ impl<C: CurveGroup> homomorphism::Trait for WeightedHomomorphism<'_, C> {
             randomness_result.push(R_row);
         }
 
-        WeightedCodomainShape {
+        CodomainShape {
             chunks: chunks_result,
             randomness: randomness_result,
         }
     }
 
     fn normalize(&self, value: Self::Codomain) -> Self::CodomainNormalized {
-        <WeightedHomomorphism<C> as fixed_base_msms::Trait>::normalize_output(value)
+        <Homomorphism<C> as fixed_base_msms::Trait>::normalize_output(value)
     }
 }
 
 impl<T: CanonicalSerialize + CanonicalDeserialize + Clone + Debug + Eq> EntrywiseMap<T>
-    for WeightedCodomainShape<T>
+    for CodomainShape<T>
 {
     type Output<U: CanonicalSerialize + CanonicalDeserialize + Clone + Debug + Eq> =
-        WeightedCodomainShape<U>;
+        CodomainShape<U>;
 
     fn map<U, F>(self, mut f: F) -> Self::Output<U>
     where
@@ -198,13 +198,11 @@ impl<T: CanonicalSerialize + CanonicalDeserialize + Clone + Debug + Eq> Entrywis
             .map(|inner_vec| inner_vec.into_iter().map(&mut f).collect::<Vec<_>>())
             .collect();
 
-        WeightedCodomainShape { chunks, randomness }
+        CodomainShape { chunks, randomness }
     }
 }
 
-impl<T: CanonicalSerialize + CanonicalDeserialize + Clone> IntoIterator
-    for WeightedCodomainShape<T>
-{
+impl<T: CanonicalSerialize + CanonicalDeserialize + Clone> IntoIterator for CodomainShape<T> {
     type IntoIter = std::vec::IntoIter<T>;
     type Item = T;
 
@@ -251,10 +249,10 @@ pub fn chunks_vec_msm_terms<C: CurveGroup>(
 }
 
 #[allow(non_snake_case)]
-impl<'a, C: CurveGroup> fixed_base_msms::Trait for WeightedHomomorphism<'a, C> {
+impl<'a, C: CurveGroup> fixed_base_msms::Trait for Homomorphism<'a, C> {
     type Base = C::Affine;
     type CodomainShape<T>
-        = WeightedCodomainShape<T>
+        = CodomainShape<T>
     where
         T: CanonicalSerialize + CanonicalDeserialize + Clone + Debug + Eq;
     type MsmOutput = C;
@@ -290,7 +288,7 @@ impl<'a, C: CurveGroup> fixed_base_msms::Trait for WeightedHomomorphism<'a, C> {
             })
             .collect();
 
-        WeightedCodomainShape {
+        CodomainShape {
             chunks: Cs,
             randomness: Rs,
         }
@@ -305,7 +303,7 @@ impl<'a, C: CurveGroup> fixed_base_msms::Trait for WeightedHomomorphism<'a, C> {
     }
 }
 
-impl<'a, C: CurveGroup> sigma_protocol::CurveGroupTrait for WeightedHomomorphism<'a, C> {
+impl<'a, C: CurveGroup> sigma_protocol::CurveGroupTrait for Homomorphism<'a, C> {
     type Group = C;
 
     fn dst(&self) -> Vec<u8> {
@@ -433,7 +431,7 @@ mod tests {
     fn prepare_chunked_witness<F: PrimeField>(
         sc: WeightedConfig<ShamirThresholdConfig<F>>,
         ell: u8,
-    ) -> (Vec<F>, WeightedWitness<F>, u8, u32) {
+    ) -> (Vec<F>, Witness<F>, u8, u32) {
         let mut rng = thread_rng();
 
         // 1. Generate random values
@@ -454,7 +452,7 @@ mod tests {
             .collect();
 
         // 5. Build witness
-        let witness = WeightedWitness {
+        let witness = Witness {
             plaintext_chunks: sc.group_by_player(&Scalar::vecvec_from_inner(chunked_values)),
             plaintext_randomness: Scalar::vecvec_from_inner(rs),
         };
@@ -475,13 +473,13 @@ mod tests {
         let pp: PublicParameters<C> = PublicParameters::new(3);
         let dks: Vec<C::ScalarField> = sample_field_elements(2, &mut thread_rng());
 
-        let hom = WeightedHomomorphism::<C> {
+        let hom = Homomorphism::<C> {
             pp: &pp,
             eks: &C::normalize_batch(&[pp.H * dks[0], pp.H * dks[1]]), // 2 players
         };
 
         // 7. Apply homomorphism to obtain chunked ciphertexts
-        let WeightedCodomainShape::<C> {
+        let CodomainShape::<C> {
             chunks: Cs,
             randomness: Rs,
         } = hom.apply(&witness);

@@ -12,7 +12,6 @@ use crate::{
         self,
         homomorphism::{self, Trait as _, TrivialShape},
         traits::Trait as _,
-        CurveGroupTrait,
     },
     Scalar,
 };
@@ -881,12 +880,11 @@ impl<E: Pairing> traits::BatchedRangeProof<E> for Proof<E> {
             base_1: *lagr_0,
             base_2: *xi_1,
         };
-        <two_term_msm::Homomorphism<E::G1> as CurveGroupTrait>::verify(
+        <two_term_msm::Homomorphism<E::G1> as sigma_protocol::Trait>::verify(
             &hom,
             &(two_term_msm::CodomainShape((*hatC - comm.0).into_affine())),
             pi_PoK,
             &Self::DST,
-            Some(1), // TrivialShape has one element
             rng,
         )?;
         #[cfg(feature = "range_proof_timing_univariate_v2")]

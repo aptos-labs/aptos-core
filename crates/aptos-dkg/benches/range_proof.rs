@@ -9,14 +9,13 @@ use aptos_crypto::arkworks::GroupGenerators;
 use aptos_dkg::{
     range_proofs::{
         //        dekart_multivariate::Proof as DekartMultivariate,
-        dekart_univariate::Proof as UnivariateDeKART,
         dekart_univariate_v2::Proof as UnivariateDeKARTv2,
         traits::BatchedRangeProof,
     },
     utils::test_utils::{self},
 };
 use ark_bls12_381::Bls12_381;
-use ark_bn254::Bn254;
+// use ark_bn254::Bn254;
 use ark_ec::pairing::Pairing;
 use criterion::{
     criterion_group, criterion_main, measurement::WallTime, BenchmarkGroup, BenchmarkId, Criterion,
@@ -25,35 +24,27 @@ use rand::{rngs::StdRng, SeedableRng};
 
 /// WARNING: Do not change this, since our range proof benchmark instructions in
 /// `crates/aptos-crypto/README.md` rely on it.
-const BROKEN_DEKART_RS_SCHEME_NAME: &str = "dekart-rs-broken";
 const DEKART_RS_SCHEME_NAME: &str = "dekart-rs";
-//const DEKART_MULTIVARIATE_SCHEME_NAME: &str = "dekart-multivar";
-const BN254: &str = "bn254";
+// const DEKART_MULTIVARIATE_SCHEME_NAME: &str = "dekart-multivar";
+// const BN254: &str = "bn254";
 const BLS12_381: &str = "bls12-381";
 
 /// WARNING: These are the relevant batch sizes we want benchmarked to compare against Bulletproofs
-const BATCH_SIZES: [usize; 11] = [1, 3, 7, 15, 31, 63, 127, 255, 511, 1023, 2047];
-//const BATCH_SIZES: [usize; 3] = [1023, 16383, 131071]; //[1048575]; // 1048575100000, 1000000];
+//const BATCH_SIZES: [usize; 11] = [1, 3, 7, 15, 31, 63, 127, 255, 511, 1023, 2047];
+const BATCH_SIZES: [usize; 2] = [1023, 131071]; //[1048575]; // 1048575100000, 1000000];
 
 /// WARNING: These are the relevant bit widths we want benchmarked to compare against Bulletproofs
-const BIT_WIDTHS: [u8; 4] = [8, 16, 32, 64]; // [8, 16, 32, 64];
+const BIT_WIDTHS: [u8; 2] = [8, 64]; // [8, 16, 32, 64];
 
 fn bench_groups(c: &mut Criterion) {
-    bench_range_proof::<Bn254, UnivariateDeKART<Bn254>>(c, BROKEN_DEKART_RS_SCHEME_NAME, BN254);
-    bench_range_proof::<Bls12_381, UnivariateDeKART<Bls12_381>>(
-        c,
-        BROKEN_DEKART_RS_SCHEME_NAME,
-        BLS12_381,
-    );
-
-    bench_range_proof::<Bn254, UnivariateDeKARTv2<Bn254>>(c, DEKART_RS_SCHEME_NAME, BN254);
+    //    bench_range_proof::<Bn254, UnivariateDeKARTv2<Bn254>>(c, DEKART_RS_SCHEME_NAME, BN254);
     bench_range_proof::<Bls12_381, UnivariateDeKARTv2<Bls12_381>>(
         c,
         DEKART_RS_SCHEME_NAME,
         BLS12_381,
     );
 
-    //bench_range_proof::<Bn254, DekartMultivariate<Bn254>>(c, DEKART_MULTIVARIATE_SCHEME_NAME, BN254);
+    //    bench_range_proof::<Bn254, DekartMultivariate<Bn254>>(c, DEKART_MULTIVARIATE_SCHEME_NAME, BN254);
     // bench_range_proof::<Bls12_381, DekartMultivariate<Bls12_381>>(
     //     c,
     //     DEKART_MULTIVARIATE_SCHEME_NAME,
