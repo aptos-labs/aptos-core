@@ -1,11 +1,11 @@
 ---
 remote_endpoint: ~
-name: "test AIP 119"
+name: "test AIP 140"
 proposals:
-  - name: proposal_1_aip_119
+  - name: proposal_1_aip_140
     metadata:
-      title: "Enable AIP 119"
-      description: "This will reduce staking reward rate by 0.25"
+      title: "Enable AIP 140"
+      description: "This will reduce staking reward rate by 2.59 (5.19% -> 2.60%)"
     execution_mode: MultiStep
     update_sequence:
-      - RawScript: aptos-move/aptos-release-builder/data/proposals/aip-119.move
+      - RawScript: aptos-move/aptos-release-builder/data/proposals/aip-140.move
