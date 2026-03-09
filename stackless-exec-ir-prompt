@@ -66,3 +66,426 @@ ret [a0]
 Thus, the named registers in the stackless-exec-ir would be made of: params, locals, temps (all these would be named r0, r1, .., as it is currently), and arg registers (these would be named a0, a1, ..). Total arg registers would be max arg registers used at any call site in that function.
 
 Can you think deeply, analyze this design, suggest pros and cons, and outline what a pass would look like to add arg registers to the pipelines v1 and v2 (we intend to keep only one of v1/v2 conversion pipelines from move bytecode to stackless-exec-ir, so the solution does not have to be the same for both), what are the conditions under which one can add arg registers at a call site (either for the argument or return value or both).
+
+---
+
+  Analysis: Arg Registers for the Stackless Execution IR
+
+  1. What Problem Arg Registers Solve
+
+  In the current design, the stackless-exec-ir uses uniform named registers (r0, r1, ...). During the second translation
+  to micro-ops, every call requires:
+  - Args: Copy each argument from the caller's register slots to the callee's sequential arg slots
+  - Returns: Copy each return value from the callee's sequential return slots back to caller registers
+
+  With arg registers (a0, a1, ...), the caller frame layout places arg registers at the end, overlapping the callee's arg
+   slots. If a value is produced directly into a0, the second translation can skip the copy entirely — the value is
+  already in the right physical location.
+
+  2. Pros
+
+  Performance wins:
+  - Eliminates arg/return copies in the second translation. This is the primary benefit. Every avoided copy saves a
+  sized-slot memcpy in the micro-op interpreter. For functions with many calls (the common case in Move), this compounds.
+  - Reduces instruction count in micro-ops. Each eliminated copy is one fewer micro-op to dispatch.
+  - Better cache locality. Values destined for a call end up in contiguous memory (the arg area) without an intermediate
+  hop through scattered register slots.
+  - Chained call optimization. For f(g(x)), the return value of g (in a0) is already the argument to f — zero copies
+  through the entire chain.
+
+  Design wins:
+  - Explicit dataflow to the calling convention. The IR makes the caller-callee interface visible, which helps the second
+   translation emit tighter code without needing its own analysis pass.
+  - Naturally extends the existing hint/coalescing patterns. V1's destination hints and V2's StLoc look-ahead already try
+   to place values where they'll be consumed; arg registers are the logical next step for call targets.
+
+  3. Cons
+
+  Complexity costs:
+  - Dual register namespace. Every part of the pipeline — IR representation, display, get_defs_uses, rename_instr,
+  renumber_registers, copy propagation, DCE — must understand that a_j registers are fundamentally different from r_k
+  registers.
+  - Type variability. Unlike r-registers (one type per register for the function lifetime), a-registers change type at
+  every call site. reg_types: Vec<Type> no longer suffices; you need per-call-site type info or accept that arg registers
+   are "untyped" in the IR's type vector.
+  - Optimization passes must be careful. Copy propagation cannot propagate across a call boundary through an arg
+  register. DCE must recognize that a def into a_j is live if a subsequent call uses a_j. Register renumbering must
+  preserve the arg register namespace.
+  - Frame size increase. Every function gains max_arg_regs extra slots in its frame, even for call sites where the
+  optimization doesn't fire. (Usually minor, since these overlap with callee frames anyway.)
+
+  Semantic subtleties:
+  - Arg registers are "volatile" across calls. A value in a0 is destroyed by any call. This is a fundamentally different
+  liveness property from r-registers and requires careful tracking.
+  - Inter-call interference. If a function has two calls in the same block, the arg registers from the first call are
+  clobbered by setup for the second. Values that must survive between calls cannot use arg registers.
+  - Closure calls complicate the layout. CallClosure includes the closure object as an extra argument, which needs to
+  participate in the arg register scheme or be excluded.
+
+  4. Safety Conditions for Arg Register Assignment
+
+  4a. For argument a_j at a call site C at instruction index ci:
+
+  A value currently in register r (defined at instruction di) can be assigned to a_j if all of the following hold:
+
+  1. Temp only: r >= num_pinned (not a parameter or declared local). Parameters/locals have persistent storage, may be
+  borrowed, and may be needed on other control flow paths.
+  2. Same basic block: di and ci are in the same basic block. Across block boundaries, the value may be live on another
+  path and we cannot safely move its storage to a volatile location.
+  3. No intervening call: There is no Call/CallGeneric/CallClosure instruction in the range (di, ci). Any call clobbers
+  all arg registers.
+  4. Dead after the call: r has no uses after ci. Since the call consumes arg registers and potentially overwrites them
+  with return values, r's value would be lost. (In Move, function args are consumed, so the bytecode verifier already
+  guarantees moved values aren't reused. The condition matters for CopyLoc-originated temps that might be used again.)
+  5. No conflicting write to a_j: No other instruction in (di, ci) writes to a_j. In practice this means if we've already
+   decided to place another arg a_k (k != j) for the same call, the def of a_k doesn't clobber a_j. Since a_j and a_k are
+   distinct registers, this condition is trivially satisfied — the concern is only about a_j specifically being written
+  twice.
+  6. Reads of r between di and ci are safe: If r is read between its definition and the call (e.g., r is used as an
+  operand of some other instruction AND as arg j), the renaming r → a_j means those reads become reads of a_j. This is
+  safe as long as conditions 3 and 5 hold (the value in a_j isn't clobbered).
+
+  Important note on ordering: Args do not need to be produced in a0, a1, a2 order. Since a0 and a1 are distinct
+  registers, defining a1 before a0 is fine. The only constraint is "no clobber of the same arg register," which can't
+  happen when each arg position is distinct.
+
+  4b. For return value a_k at a call site C at instruction index ci:
+
+  A return value currently assigned to register r can remain in a_k if:
+
+  1. Temp only: r >= num_pinned.
+  2. All uses before next call: Every use of r occurs before the next Call/CallGeneric/CallClosure in the same basic
+  block (or before the block ends, if there is no subsequent call). The next call clobbers all arg registers.
+  3. No conflicting arg register setup: Between ci and the next call, if we're also setting up arg registers for the next
+   call, none of those setups write to a_k before r's last use. In practice, this means r's last use is before any
+  instruction that defines a_k for the next call.
+
+  Special chained case: If r (return value a_k from call C1) is used as argument a_k of the very next call C2, no copy is
+   needed at all — the value stays in a_k. This handles f(g(x)) perfectly.
+
+  5. Pass Design for V2
+
+  V2 is the more natural fit because it has explicit SSA within blocks and liveness information. The arg register pass
+  would run as a post-optimization pass, after fusion/copy-prop/DCE but before register renumbering.
+
+  Algorithm (linear-time per basic block):
+
+  for each basic block B:
+    // Precompute: for each temp register r, find its def position and last-use position
+    // (single forward scan)
+    def_pos[r] = instruction index where r is defined
+    last_use[r] = instruction index where r is last used
+
+    // Collect call sites in order
+    calls = [(ci, args, rets) for each Call/CallGeneric/CallClosure in B]
+
+    // Track which instruction indices are calls (for "no intervening call" check)
+    call_set = {ci for (ci, _, _) in calls}
+
+    // === Argument assignment ===
+    for each (ci, args, rets) in calls:
+      for j in 0..args.len():
+        r = args[j]
+        if r < num_pinned: continue
+
+        di = def_pos[r]
+        // Condition 2: same block (guaranteed since we're iterating within B)
+        // Condition 3: no call in (di, ci)
+        if any c in call_set where di < c < ci: continue
+        // Condition 4: dead after call
+        if last_use[r] > ci: continue
+
+        // All conditions met: mark args[j] for arg register a_j
+        rename r → ARG(j) in range [di, ci]
+
+    // === Return value assignment ===
+    for each (ci, args, rets) in calls:
+      next_call = first call index > ci in call_set (or end of block)
+      for k in 0..rets.len():
+        r = rets[k]
+        if r < num_pinned: continue
+
+        // Condition: all uses of r before next_call
+        if last_use[r] >= next_call: continue
+
+        // Mark rets[k] for arg register a_k
+        rename r → ARG(k) in range [ci, last_use[r]]
+
+    // Compute max_arg_regs for this function
+    max_arg_regs = max(max_arg_regs, max(args.len(), rets.len())) for each call
+
+  The renaming step replaces all occurrences of r (both defs and uses) in the identified range with the arg register
+  index. This can be done in a single forward scan using a HashMap<Reg, ArgReg> that's populated and cleared per call
+  site.
+
+  Complexity: O(n) per block where n is the number of instructions — each instruction is visited a constant number of
+  times.
+
+  6. Pass Design for V1
+
+  V1 can integrate arg registers via its existing destination hint mechanism. Currently, compute_hints looks ahead for
+  StLoc patterns. This would be extended:
+
+  1. During hint computation: When the forward scan identifies that a produced value feeds directly into a Call as
+  argument j (via the simulated stack), emit a hint to place the value in a_j rather than an r-register.
+  2. During convert_bytecode for Call: After popping args from the simulated stack, check which args are already in arg
+  registers (due to hints). For those, no Copy/Move is needed. Allocate return values to a_k registers directly.
+  3. Safety is simpler in V1: The stack simulation naturally tracks value flow. If a value was pushed, never read by
+  anything else, and popped for a call, it's guaranteed to be single-use and dead after the call. The hint system already
+   handles the "don't allocate to a register that's on the stack" invariant.
+
+  The key change: alloc_or_hint would gain arg register hints alongside StLoc hints, and the hint priority would be: arg
+  register hint > StLoc hint > type-recycled allocation.
+
+  7. IR Representation Changes
+
+  The cleanest approach is to partition the Reg space:
+
+  pub struct FunctionIR {
+      pub num_params: Reg,
+      pub num_locals: Reg,
+      pub num_regs: Reg,        // r-registers: 0..num_regs-1
+      pub num_arg_regs: Reg,    // arg registers: num_regs..num_regs+num_arg_regs-1
+      pub instrs: Vec<Instr>,
+      pub reg_types: Vec<Type>, // only for 0..num_regs-1 (r-registers)
+  }
+
+  With helper predicates:
+
+  fn is_arg_reg(&self, r: Reg) -> bool { r >= self.num_regs && r < self.num_regs + self.num_arg_regs }
+  fn arg_index(&self, r: Reg) -> u16 { r - self.num_regs }  // a0, a1, ...
+
+  Display would render r >= num_regs as a0, a1, etc. The existing rename_instr / get_defs_uses infrastructure works
+  unchanged since it operates on Reg = u16 values. The renumber_registers pass would need to preserve arg registers
+  (don't compress them into the r-register range).
+
+  Arg registers intentionally have no entry in reg_types — their types vary per call site and are recovered from the call
+   instruction's signature during the second translation.
+
+  8. Impact on Existing Optimization Passes
+
+  - Fusion (field access, immediate binops): No change needed. These fuse consecutive instructions and don't interact
+  with call sites.
+  - Copy propagation: Must not propagate a def of a_j past a call instruction (the call clobbers it). Add a check: if
+  is_arg_reg(r), kill the mapping at the next call.
+  - Dead instruction elimination: Must recognize that a def to a_j followed by a call that uses a_j is live. The existing
+   backward liveness scan already handles this correctly if get_defs_uses for Call returns arg registers as uses — which
+  it does, since they appear in the args Vec.
+  - Register renumbering: Must treat arg registers as a separate namespace. Only renumber r-registers (0..num_regs-1);
+  leave arg registers (num_regs..num_regs+num_arg_regs-1) in place.
+
+  9. Summary of Recommendation
+
+  The arg register design is sound and addresses a real inefficiency in the micro-op calling convention. The conditions
+  are well-defined and can be checked in linear time. For the pipeline you keep:
+
+  - If V2: Implement as a post-optimization pass using the liveness data already computed during allocation. It
+  integrates naturally with the SSA + greedy allocation model.
+  - If V1: Extend the destination hint system to include call-arg hints alongside StLoc hints. This is more tightly
+  coupled to the conversion but avoids a separate pass.
+
+  The main risk is complexity in maintaining two register namespaces across all passes. Keeping the FunctionIR
+  representation simple (arg regs as high Reg values with a num_arg_regs field, no reg_types entries) minimizes the blast
+   radius.
+
+  After SSA conversion, before physical allocation:
+
+  1. Compute use lists for SSA values.
+  2. Mark candidate values with preferred class Arg(i).
+  3. Mark ordinary values with class Frame.
+  4. Run allocation with Arg(i) precolored.
+  5. Allow use-then-def reuse at calls:
+      - argument a{i} dies at call entry
+      - return a{i} is defined by the call
+
+
+  When An Argument Can Become a{i}
+
+  A value v can be placed directly in a{i} for a call arg or final ret slot i if all are true:
+
+  1. The sink position is fixed: call arg i or return slot i.
+  2. v’s type matches that slot’s type.
+  3. v has a single clear reaching def.
+  4. v is not needed after that sink.
+  5. No intervening call/branch/label/clobber would invalidate a{i}.
+  6. No other promoted value needs a{i} over the same live range.
+  7. The defining instruction can legally target an arbitrary destination.
+  8. v is not required to remain in a frame register for specs/debug instrumentation.
+
+  When A Return Value Can Stay In a{i}
+
+  Call result i can remain in a{i} if all are true:
+
+  1. It is produced by the call in slot i.
+  2. All uses happen before the next clobber of a{i}.
+  3. It is not live across a block boundary.
+  4. Its consumers can read a{i} directly.
+  5. It is not forced into a frame register by specs/debugging.
+
+- arg registers are not explicitly typed in the stackless-IR, but their type can be inferred at any call site because of call signature
+- exclude closure calls for now
+- can we use the ssa-precoloring method, for value ids for v2?
+- would it make sense to instead have the following representation:
+  ```
+  enum Reg {
+      Home(u16), // params, locals, temps: r0, r1, ...
+      Arg(u16),   // a0, a1, ...
+  }
+  ```
+- can arg regs survive across single basic blocks? or is the analysis all limited to within a basic block?
+
+  ## Summary
+
+  Produce a v2-only design document for stackless-exec-ir that treats src/arg_regs.rs as prior art to
+  replace, not evolve.
+
+  The document should conclude:
+
+  - the right long-term place for arg registers in v2 is inside v2 allocation as precolored call-slot
+    registers, not as a post-hoc rename pass
+  - the current v2 pass order is close, but field-access fusion should move earlier, before allocation
+  - arg registers must be modeled as a distinct register class with separate invariants, not as ordinary
+    function-wide typed registers
+  - the initial implementation should be same-basic-block only and conservative
+
+  The document should start by grounding the current v2 pipeline from src/lib.rs, src/convert_v2.rs, and src/
+  optimize_v2.rs, then compare that to the abandoned assumptions in src/arg_regs.rs.
+
+  ## Key Design Decisions
+
+  ### 1. IR model
+
+  Specify a new register representation for the design doc:
+
+  - replace flat Reg = u16 with a two-class register notion, e.g. Local(u16)/Arg(u16) or Fixed(u16)/Arg(u16)
+  - ordinary function registers remain function-wide typed
+  - arg registers are not function-wide typed; their type is derived from the defining instruction or call
+    signature at the program point
+  - function metadata is split into:
+      - ordinary register count and types
+      - num_arg_regs
+
+  State these invariants explicitly:
+
+  - Arg(i) is call-clobbered
+  - Arg(i) may be used as a destination before a call, or as a result of a call, or as an operand to Ret
+  - initial version: no Arg(i) value is allowed to be live across a basic-block boundary
+  - initial version: no Arg(i) value is allowed to survive past the next call unless redefined there as a
+    return slot
+  - renumbering only applies to ordinary registers, never to Arg(i)
+
+  ### 2. Proposed v2 pass pipeline
+
+  Document the current v2 order:
+
+  1. bytecode -> intra-block SSA
+  2. SSA immediate-binop fusion
+  3. greedy register allocation
+  4. post-allocation field fusion
+  5. identity-move elimination
+  6. dead-instruction elimination
+  7. renumbering
+
+  Recommend this order instead:
+
+  1. bytecode -> intra-block SSA
+  2. SSA immediate-binop fusion
+  3. SSA field-access fusion
+  4. optional trivial SSA copy cleanup
+  5. arg-slot candidate analysis on SSA values
+  6. allocation with precolored Arg(i) slots plus ordinary local/temp allocation
+  7. post-allocation cleanup:
+      - identity move elimination
+      - dead instruction elimination
+      - renumber ordinary registers only
+
+  Judgment to include in the document:
+
+  - fuse_immediate_binops_ssa is already in the right place
+  - fuse_field_access belongs before allocation because it shortens live ranges and reduces temporary
+    pressure
+  - arg-register assignment should happen before or during allocation, not after it
+  - post-allocation renumbering must become arg-aware or be restricted to ordinary registers
+
+  ### 3. Arg-slot analysis pass
+
+  Define a dedicated SSA pass that marks values as preferred Arg(i) candidates.
+
+  For each basic block:
+
+  - compute defs, uses, and last-use positions for SSA values
+  - inspect Call, CallGeneric, and Ret
+  - decide independently for each argument/result slot whether it should be bound to Arg(i)
+
+  Conservative initial candidate rules for an outgoing call arg i:
+
+  - the source value has a single SSA def
+  - the source value’s last use is this call argument
+  - no intervening call exists between def and that call
+  - no control-flow boundary exists between def and that call
+  - the slot index matches exactly: promoted arg i must be Arg(i)
+  - the value is not spec-pinned or otherwise required to remain in an ordinary register
+
+  Conservative initial candidate rules for a call result i:
+
+  - all uses occur before the next call or block end
+  - all uses are in the same block
+  - the result is directly returned, directly passed to a subsequent call, or stays within a short straight-
+    line chain that can remain in Arg(i)
+
+  Explicitly allow the use-then-def pattern at a call:
+
+  - Arg(i) may be both the incoming argument slot and the outgoing return slot for the same call
+  - correctness depends on the incoming value’s last use being that call argument
+
+  State that CallClosure is either:
+
+  - deferred from the initial implementation, or
+  - handled only once ABI slot ordering for the closure operand is fixed in the micro-op lowering design
+
+  ## Correctness Reasoning To Include
+
+  The design document should contain a dedicated correctness section with these claims and proofs/sketches:
+      - ordinary regs remain function-wide typed
+        instruction result types
+  - Liveness correctness
+      - a value promoted to Arg(i) is safe only if no later non-promoted use needs it after the call-clobber
+        point
+      - same-block restriction avoids join semantics and path-sensitive type/liveness problems
+  - Call boundary correctness
+      - call arguments are consumed before returns are defined
+      - therefore Arg(i) can safely be reused at the same call site if the argument’s last use is that call
+  - Allocation correctness
+      - Arg(i) is a precolored location, not part of the ordinary free pool
+      - ordinary register allocation must never hand out an arg slot
+  - Renumbering correctness
+      - renumbering must preserve arg-slot identities
+      - only ordinary registers are compacted after dead-code cleanup
+
+  Also include a short section explaining why the current prototype in src/arg_regs.rs is not a valid v2
+  basis:
+
+  - it is post-hoc renaming rather than allocation-aware placement
+  - it assumes a register model not matched by current ir.rs
+  - it ignores CallClosure
+  - it relies on global renaming after allocation
+  - it conflicts with current flat renumbering assumptions
+
+  ## Test Plan
+
+  The design document should define required tests before implementation:
+
+  - direct producer -> call arg:
+      - ld_u64, arithmetic, pack/unpack, read-field patterns
+  - call result -> return:
+      - wrapper/identity-style functions
+  - call result -> next call arg:
+      - chained calls with same slot index
+  - mixed promoted and unpromoted args/results at the same call
+  - multi-arg and multi-return calls
+  - generic calls and generic return types
+  - no promotion across labels, branches, or joins
+  - no promotion when a value has a later non-call use
+  - closure calls: explicitly unsupported in v1 of the feature, or covered if ABI semantics are fixed
+  - renumbering preserves Arg(i) identities while compacting ordinary regs
+  - display/pretty-printing emits a0, a1, … distinctly from ordinary regs
