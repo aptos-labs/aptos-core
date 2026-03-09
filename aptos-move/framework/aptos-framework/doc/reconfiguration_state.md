@@ -12,6 +12,7 @@ WARNING: <code><a href="reconfiguration_state.md#0x1_reconfiguration_state_initi
 -  [Struct `StateInactive`](#0x1_reconfiguration_state_StateInactive)
 -  [Struct `StateActive`](#0x1_reconfiguration_state_StateActive)
 -  [Constants](#@Constants_0)
+-  [Function `is_initialized`](#0x1_reconfiguration_state_is_initialized)
 -  [Function `initialize`](#0x1_reconfiguration_state_initialize)
 -  [Function `initialize_for_testing`](#0x1_reconfiguration_state_initialize_for_testing)
 -  [Function `is_in_progress`](#0x1_reconfiguration_state_is_in_progress)
@@ -136,6 +137,30 @@ A state variant indicating a reconfiguration is in progress.
 
 
 
+<a id="0x1_reconfiguration_state_is_initialized"></a>
+
+## Function `is_initialized`
+
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="reconfiguration_state.md#0x1_reconfiguration_state_is_initialized">is_initialized</a>(): bool
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="reconfiguration_state.md#0x1_reconfiguration_state_is_initialized">is_initialized</a>(): bool {
+    <b>exists</b>&lt;<a href="reconfiguration_state.md#0x1_reconfiguration_state_State">State</a>&gt;(@aptos_framework)
+}
+</code></pre>
+
+
+
+</details>
+
 <a id="0x1_reconfiguration_state_initialize"></a>
 
 ## Function `initialize`
@@ -154,9 +179,12 @@ A state variant indicating a reconfiguration is in progress.
 <pre><code><b>public</b> <b>fun</b> <a href="reconfiguration_state.md#0x1_reconfiguration_state_initialize">initialize</a>(fx: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>) {
     <a href="system_addresses.md#0x1_system_addresses_assert_aptos_framework">system_addresses::assert_aptos_framework</a>(fx);
     <b>if</b> (!<b>exists</b>&lt;<a href="reconfiguration_state.md#0x1_reconfiguration_state_State">State</a>&gt;(@aptos_framework)) {
-        <b>move_to</b>(fx, <a href="reconfiguration_state.md#0x1_reconfiguration_state_State">State</a> {
-            variant: <a href="../../aptos-stdlib/doc/copyable_any.md#0x1_copyable_any_pack">copyable_any::pack</a>(<a href="reconfiguration_state.md#0x1_reconfiguration_state_StateInactive">StateInactive</a> {})
-        })
+        <b>move_to</b>(
+            fx,
+            <a href="reconfiguration_state.md#0x1_reconfiguration_state_State">State</a> {
+                variant: <a href="../../aptos-stdlib/doc/copyable_any.md#0x1_copyable_any_pack">copyable_any::pack</a>(<a href="reconfiguration_state.md#0x1_reconfiguration_state_StateInactive">StateInactive</a> {})
+            }
+        )
     }
 }
 </code></pre>
@@ -244,9 +272,9 @@ Also record the current time as the reconfiguration start time. (Some module, e.
         <b>let</b> state = <b>borrow_global_mut</b>&lt;<a href="reconfiguration_state.md#0x1_reconfiguration_state_State">State</a>&gt;(@aptos_framework);
         <b>let</b> variant_type_name = *state.variant.type_name().bytes();
         <b>if</b> (variant_type_name == b"<a href="reconfiguration_state.md#0x1_reconfiguration_state_StateInactive">0x1::reconfiguration_state::StateInactive</a>") {
-            state.variant = <a href="../../aptos-stdlib/doc/copyable_any.md#0x1_copyable_any_pack">copyable_any::pack</a>(<a href="reconfiguration_state.md#0x1_reconfiguration_state_StateActive">StateActive</a> {
-                start_time_secs: <a href="timestamp.md#0x1_timestamp_now_seconds">timestamp::now_seconds</a>()
-            });
+            state.variant = <a href="../../aptos-stdlib/doc/copyable_any.md#0x1_copyable_any_pack">copyable_any::pack</a>(
+                <a href="reconfiguration_state.md#0x1_reconfiguration_state_StateActive">StateActive</a> { start_time_secs: <a href="timestamp.md#0x1_timestamp_now_seconds">timestamp::now_seconds</a>() }
+            );
         }
     };
 }

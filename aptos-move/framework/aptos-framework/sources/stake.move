@@ -1094,7 +1094,10 @@ module aptos_framework::stake {
         // Settle any pending_inactive whose lockup has already expired so it is not counted
         // as voting power. An inactive validator's pending_inactive is never processed by
         // update_stake_pool, so we must do it here before evaluating the minimum stake.
-        if (timestamp::now_seconds() >= stake_pool.locked_until_secs) {
+        // Only settle when locked_until_secs > 0 (i.e., a lockup was ever explicitly set);
+        // a value of 0 means the pool was just created and the lockup has not been initialised yet.
+        if (stake_pool.locked_until_secs > 0
+            && timestamp::now_seconds() >= stake_pool.locked_until_secs) {
             coin::merge(
                 &mut stake_pool.inactive,
                 coin::extract_all(&mut stake_pool.pending_inactive)
@@ -1362,7 +1365,8 @@ module aptos_framework::stake {
         validator_set.pending_active.for_each_ref(|validator| {
             let validator: &ValidatorInfo = validator;
             let stake_pool = borrow_global_mut<StakePool>(validator.addr);
-            if (get_reconfig_start_time_secs() >= stake_pool.locked_until_secs) {
+            if (stake_pool.locked_until_secs > 0
+                && get_reconfig_start_time_secs() >= stake_pool.locked_until_secs) {
                 coin::merge(
                     &mut stake_pool.inactive,
                     coin::extract_all(&mut stake_pool.pending_inactive)
