@@ -84,6 +84,24 @@ pub fn run(args: &PluginArgs, global: &GlobalOpts) -> Result<()> {
         serde_json::to_string_pretty(&mcp_config).context("failed to serialize .mcp.json")?,
     ));
 
+    // Claude Code plugin manifest (required by `claude plugin validate`).
+    if global.platform == crate::Platform::Claude {
+        let plugin_manifest = serde_json::json!({
+            "name": "move-flow",
+            "description": "Move smart contract development for Aptos",
+            "version": env!("CARGO_PKG_VERSION"),
+            "author": {
+                "name": "Aptos Labs",
+                "url": "https://github.com/aptos-labs/aptos-core/tree/main/aptos-move/flow"
+            }
+        });
+        files.push((
+            PathBuf::from(".claude-plugin/plugin.json"),
+            serde_json::to_string_pretty(&plugin_manifest)
+                .context("failed to serialize plugin.json")?,
+        ));
+    }
+
     output::write_output(&args.output_dir, &files)?;
 
     println!(
@@ -140,6 +158,62 @@ mod tests {
             .exists());
         assert!(output_dir.path().join("hooks/hooks.json").exists());
 
+        // Verify hooks.json is valid JSON with expected event names.
+        let hooks_content =
+            std::fs::read_to_string(output_dir.path().join("hooks/hooks.json")).unwrap();
+        let hooks_json: serde_json::Value =
+            serde_json::from_str(&hooks_content).expect("hooks.json must be valid JSON");
+        let hooks_obj = hooks_json["hooks"]
+            .as_object()
+            .expect("hooks.json must contain a 'hooks' object");
+        let valid_events = [
+            "PreToolUse",
+            "PostToolUse",
+            "PostToolUseFailure",
+            "PermissionRequest",
+            "UserPromptSubmit",
+            "Notification",
+            "Stop",
+            "SubagentStart",
+            "SubagentStop",
+            "SessionStart",
+            "SessionEnd",
+            "TeammateIdle",
+            "TaskCompleted",
+            "PreCompact",
+            "ConfigChange",
+            "WorktreeCreate",
+            "WorktreeRemove",
+            "InstructionsLoaded",
+        ];
+        let valid_hook_types = ["command", "prompt", "agent"];
+        for key in hooks_obj.keys() {
+            assert!(
+                valid_events.contains(&key.as_str()),
+                "hooks.json contains unknown event name: {key}"
+            );
+        }
+        // Validate hook type values.
+        for (event, entries) in hooks_obj {
+            let entries = entries
+                .as_array()
+                .unwrap_or_else(|| panic!("hooks.json {event}: expected array"));
+            for entry in entries {
+                let inner = entry["hooks"]
+                    .as_array()
+                    .unwrap_or_else(|| panic!("hooks.json {event}: expected 'hooks' array"));
+                for hook in inner {
+                    let hook_type = hook["type"]
+                        .as_str()
+                        .unwrap_or_else(|| panic!("hooks.json {event}: hook missing 'type'"));
+                    assert!(
+                        valid_hook_types.contains(&hook_type),
+                        "hooks.json {event}: unknown hook type: {hook_type}"
+                    );
+                }
+            }
+        }
+
         // Verify agent files were generated with correct names
         let verify_content =
             std::fs::read_to_string(output_dir.path().join("agents/move-verify.md")).unwrap();
@@ -160,6 +234,29 @@ mod tests {
         assert!(
             skill_content.contains("Move Language"),
             "expected move skill to contain language reference"
+        );
+
+        // Verify .claude-plugin/plugin.json manifest is generated
+        let manifest_path = output_dir.path().join(".claude-plugin/plugin.json");
+        assert!(manifest_path.exists(), "plugin.json should exist");
+        let manifest: serde_json::Value =
+            serde_json::from_str(&std::fs::read_to_string(&manifest_path).unwrap()).unwrap();
+        assert_eq!(manifest["name"], "move-flow");
+        assert!(
+            manifest["description"]
+                .as_str()
+                .is_some_and(|s| !s.is_empty()),
+            "plugin.json should have a description"
+        );
+        assert!(
+            manifest["version"].as_str().is_some_and(|s| !s.is_empty()),
+            "plugin.json should have a version"
+        );
+        assert!(
+            manifest["author"]["name"]
+                .as_str()
+                .is_some_and(|s| !s.is_empty()),
+            "plugin.json should have an author name"
         );
 
         // Verify .mcp.json is generated at the output root
