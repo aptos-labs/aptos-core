@@ -349,10 +349,6 @@ impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>>
             pp.ell,
         );
 
-        let num_chunks = num_chunks_per_scalar::<E::ScalarField>(pp.ell) as usize;
-        let total_weight = sc.get_total_weight();
-        // First component length: 1 (TrivialShape) + chunks (total_weight*num_chunks) + randomness (max_weight*num_chunks), matching WeightedCodomainShape::into_iter
-        let _first_len = 1 + total_weight * num_chunks + sc.get_max_weight() * num_chunks;
         let public_statement = TupleCodomainShape(
             TupleCodomainShape(
                 sigma_protocol::homomorphism::TrivialShape(

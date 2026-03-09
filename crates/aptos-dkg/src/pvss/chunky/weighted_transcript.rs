@@ -404,10 +404,8 @@ impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>>
         let weighted_Vs_msm = MsmInput::new(Vs_flat[..n].to_vec(), powers_of_beta[..n].to_vec())
             .expect("weighted_Vs MSM terms");
         let g2_inputs = vec![ldt_msm_terms, weighted_Vs_msm];
-        let merged_g2 = msm::merge_msm_inputs_with_scales::<E::G2Affine>(&g2_inputs, &[
-            gamma_sq,
-            E::ScalarField::ONE,
-        ]);
+        let merged_g2 =
+            msm::merge_msm_inputs_with_scales(&g2_inputs, &[gamma_sq, E::ScalarField::ONE]);
         let combined_G2 = E::G2::msm(merged_g2.bases(), merged_g2.scalars())
             .expect("Failed to compute merged G2 MSM in chunky");
 

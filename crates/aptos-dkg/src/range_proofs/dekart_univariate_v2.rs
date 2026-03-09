@@ -6,6 +6,7 @@
 use super::scalars_to_bits;
 use crate::{
     algebra::polynomials,
+    fiat_shamir::{serialize_canonical_for_transcript, SerializeForTranscript},
     pcs::univariate_hiding_kzg,
     range_proofs::{traits, PublicStatement},
     sigma_protocol::{
@@ -118,6 +119,15 @@ pub struct VerificationKey<E: Pairing> {
     lagr_0: E::G1Affine,
     vk_hkzg: univariate_hiding_kzg::VerificationKey<E>,
     verifier_precomputed: VerifierPrecomputed<E>,
+}
+
+impl<E: Pairing> SerializeForTranscript for VerificationKey<E> {
+    fn serialize_compressed_for_transcript<W: Write>(
+        &self,
+        w: &mut W,
+    ) -> Result<(), SerializationError> {
+        serialize_canonical_for_transcript(self, w)
+    }
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]

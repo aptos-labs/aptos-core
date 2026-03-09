@@ -13,9 +13,33 @@ use crate::{
 };
 use ark_ec::{pairing::Pairing, AffineRepr};
 use ark_ff::{PrimeField, Zero};
-use ark_serialize::CanonicalSerialize;
+use ark_serialize::{CanonicalSerialize, Compress, SerializationError};
 use merlin::Transcript;
 use serde::Serialize;
+use std::io::Write;
+
+/// Serialization format for Fiat–Shamir transcript.
+///
+/// Types that go into the transcript (e.g. verification keys) implement this. Use a minimal
+/// representation when the full canonical form is large but only a small
+/// subset is needed for challenges (e.g. the first entries of the SRS); otherwise use full [`CanonicalSerialize`].
+pub trait SerializeForTranscript {
+    /// Writes the transcript-relevant bytes in compressed form. (Probably don't need compression here, but I presume
+    /// it makes hashing faster?)
+    fn serialize_compressed_for_transcript<W: Write>(
+        &self,
+        w: &mut W,
+    ) -> Result<(), SerializationError>;
+}
+
+/// Full compressed serialization for any type that is canonically serializable.
+/// (Exclude types that implement a custom minimal transcript serialization, e.g. `Srs`.)
+pub fn serialize_canonical_for_transcript<T: CanonicalSerialize, W: Write>(
+    value: &T,
+    w: &mut W,
+) -> Result<(), SerializationError> {
+    value.serialize_with_mode(&mut *w, Compress::Yes)
+}
 
 /// Helper trait for deriving random scalars from a transcript.
 ///
@@ -84,7 +108,9 @@ pub trait PolynomialCommitmentScheme {
 pub trait RangeProof<E: Pairing, B: BatchedRangeProof<E>> {
     fn append_sep(&mut self, dst: &[u8]);
 
-    fn append_vk(&mut self, vk: &B::VerificationKey);
+    fn append_vk(&mut self, vk: &B::VerificationKey)
+    where
+        B::VerificationKey: SerializeForTranscript;
 
     fn append_public_statement(&mut self, public_statement: B::PublicStatement);
 
@@ -190,9 +216,12 @@ impl<E: Pairing, B: BatchedRangeProof<E>> RangeProof<E, B> for Transcript {
         self.append_message(b"dom-sep", dst);
     }
 
-    fn append_vk(&mut self, vk: &B::VerificationKey) {
+    fn append_vk(&mut self, vk: &B::VerificationKey)
+    where
+        B::VerificationKey: SerializeForTranscript,
+    {
         let mut vk_bytes = Vec::new();
-        vk.serialize_compressed(&mut vk_bytes)
+        vk.serialize_compressed_for_transcript(&mut vk_bytes)
             .expect("vk serialization should succeed");
         self.append_message(b"vk", vk_bytes.as_slice());
     }

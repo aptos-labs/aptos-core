@@ -16,7 +16,7 @@
 // WARNING: THIS CODE HAS NOT BEEN PROPERLY VETTED, ONLY USE FOR BENCHMARKING PURPOSES!!!!!
 
 use crate::{
-    fiat_shamir::PolynomialCommitmentScheme as _,
+    fiat_shamir::{PolynomialCommitmentScheme as _, SerializeForTranscript},
     pcs::{
         shplonked_sigma::{self, ShplonkedSigmaWitness},
         traits::PolynomialCommitmentScheme,
@@ -50,7 +50,8 @@ use ark_poly::{
     DenseUVPolynomial, EvaluationDomain, Polynomial, Radix2EvaluationDomain,
 };
 use ark_serialize::{
-    CanonicalDeserialize, CanonicalSerialize, Compress, SerializationError, Write,
+    CanonicalDeserialize, CanonicalSerialize, Compress, Read, SerializationError, Valid, Validate,
+    Write,
 };
 use rand::{CryptoRng, RngCore};
 use std::fmt::Debug;
@@ -205,7 +206,7 @@ fn build_lagrange_cache<F: FftField>(
     (canonical, lagrange_cache)
 }
 
-#[derive(CanonicalDeserialize, Clone, Debug, PartialEq, Eq)]
+#[derive(CanonicalSerialize, CanonicalDeserialize, Clone, Debug, PartialEq, Eq)]
 pub struct Srs<E: Pairing> {
     pub(crate) taus_1: Vec<E::G1Affine>,
     pub(crate) xi_1: E::G1Affine,
@@ -214,31 +215,20 @@ pub struct Srs<E: Pairing> {
     pub(crate) xi_2: E::G2Affine,
 }
 
-impl<E: Pairing> CanonicalSerialize for Srs<E> {
-    fn serialize_with_mode<W: Write>(
+/// Minimal bytes for Fiat–Shamir: only first two tau powers plus G2 elements (no full `taus_1`).
+impl<E: Pairing> SerializeForTranscript for Srs<E> {
+    fn serialize_compressed_for_transcript<W: std::io::Write>(
         &self,
-        mut writer: W,
-        compress: Compress,
+        w: &mut W,
     ) -> Result<(), SerializationError> {
-        // First two entries of taus_1
         for entry in self.taus_1.iter().take(2) {
-            entry.serialize_with_mode(&mut writer, compress)?;
+            entry.serialize_with_mode(&mut *w, Compress::Yes)?;
         }
-        self.xi_1.serialize_with_mode(&mut writer, compress)?;
-        self.g_2.serialize_with_mode(&mut writer, compress)?;
-        self.tau_2.serialize_with_mode(&mut writer, compress)?;
-        self.xi_2.serialize_with_mode(&mut writer, compress)?;
+        self.xi_1.serialize_with_mode(&mut *w, Compress::Yes)?;
+        self.g_2.serialize_with_mode(&mut *w, Compress::Yes)?;
+        self.tau_2.serialize_with_mode(&mut *w, Compress::Yes)?;
+        self.xi_2.serialize_with_mode(&mut *w, Compress::Yes)?;
         Ok(())
-    }
-
-    fn serialized_size(&self, compress: Compress) -> usize {
-        let g1_size = E::G1Affine::default().serialized_size(compress);
-        let first_two_count = self.taus_1.len().min(2);
-        first_two_count * g1_size
-            + self.xi_1.serialized_size(compress)
-            + self.g_2.serialized_size(compress)
-            + self.tau_2.serialized_size(compress)
-            + self.xi_2.serialized_size(compress)
     }
 }
 
