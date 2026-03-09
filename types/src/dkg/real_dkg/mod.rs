@@ -46,6 +46,8 @@ pub struct DKGPvssConfig {
     pub epoch: u64,
     // weighted config for randomness generation
     pub wconfig: SSConfig,
+    // Kept for BCS backward compatibility (was used for fast path randomness).
+    pub fast_wconfig: Option<SSConfig>,
     // DKG public parameters
     pub pp: DkgPP,
     // DKG encryption public keys
@@ -57,8 +59,8 @@ pub struct DKGPvssConfig {
 
 impl PartialEq for DKGPvssConfig {
     fn eq(&self, other: &Self) -> bool {
-        (self.epoch, &self.wconfig, &self.pp, &self.eks)
-            == (other.epoch, &other.wconfig, &other.pp, &other.eks)
+        (self.epoch, &self.wconfig, &self.fast_wconfig, &self.pp, &self.eks)
+            == (other.epoch, &other.wconfig, &other.fast_wconfig, &other.pp, &other.eks)
     }
 }
 
@@ -73,6 +75,7 @@ impl DKGPvssConfig {
         Self {
             epoch,
             wconfig,
+            fast_wconfig: None,
             pp,
             eks,
             rounding_summary,
