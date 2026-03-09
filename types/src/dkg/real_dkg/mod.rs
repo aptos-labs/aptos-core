@@ -79,6 +79,7 @@ impl DKGPvssConfig {
     pub fn new(
         epoch: u64,
         wconfig: SSConfig,
+        fast_wconfig: Option<SSConfig>,
         pp: DkgPP,
         eks: Vec<EncPK>,
         rounding_summary: RoundingSummary,
@@ -86,7 +87,7 @@ impl DKGPvssConfig {
         Self {
             epoch,
             wconfig,
-            fast_wconfig: None,
+            fast_wconfig,
             pp,
             eks,
             rounding_summary,
@@ -106,9 +107,9 @@ pub fn build_dkg_pvss_config(
     let DKGRounding {
         profile,
         wconfig,
+        fast_wconfig,
         rounding_error,
         rounding_method,
-        ..
     } = DKGRounding::new(
         &validator_stakes,
         secrecy_threshold,
@@ -135,7 +136,7 @@ pub fn build_dkg_pvss_config(
         error: rounding_error,
     };
 
-    DKGPvssConfig::new(cur_epoch, wconfig, pp, consensus_keys, rounding_summary)
+    DKGPvssConfig::new(cur_epoch, wconfig, fast_wconfig, pp, consensus_keys, rounding_summary)
 }
 
 #[derive(Debug)]
