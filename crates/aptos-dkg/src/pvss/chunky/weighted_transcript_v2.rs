@@ -27,7 +27,7 @@ use crate::{
     },
     range_proofs::{dekart_univariate_v2, traits::BatchedRangeProof},
     sigma_protocol::{
-        self, check_msm_eval_zero,
+        self,
         homomorphism::{tuple::TupleCodomainShape, Trait as HomTrait},
         traits::fiat_shamir_challenge_for_sigma_protocol,
         CurveGroupTrait, Trait as _,
@@ -386,7 +386,7 @@ impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>>
             c,
         );
         let first_merged = msm::merge_msm_inputs::<E::G1Affine, _>(&first_msm_terms, rng);
-        check_msm_eval_zero(&hom.hom1, first_merged)?;
+        hom.hom1.check_msm_eval_zero(first_merged)?;
 
         let second_msm_terms = hom.hom2.msm_terms_for_verify_with_challenge(
             &public_statement.1,

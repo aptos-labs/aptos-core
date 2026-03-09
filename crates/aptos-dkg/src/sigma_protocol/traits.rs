@@ -26,21 +26,62 @@ use std::fmt::Debug;
 
 pub trait Trait:
     homomorphism::Trait<Domain: Witness<Self::Scalar>, CodomainNormalized: Statement> + Sized
-// Need `Sized`` here because of `Proof<Self::Scalar, Self>`?
+// Need `Sized` here because of `Proof<Self::Scalar, Self>`
 {
-    type Scalar: PrimeField; // Because Fiat-Shamir challenges use `PrimeField`
+    type Scalar: PrimeField; // Because Fiat-Shamir challenges currently use `PrimeField`
 
+    /// Domain-separation tag (DST) used to ensure that all cryptographic hashes and
+    /// transcript operations within the protocol are uniquely namespaced
     fn dst(&self) -> Vec<u8>;
 
-    /// Prove a sigma protocol proof. Returns the proof and the normalized statement.
+    /// Construct a sigma protocol proof. Returns the proof and the normalized statement.
+    ///
+    /// We're returning the normalised statement, because here the statement can be first normalised
+    /// together with A for more efficiency
+    #[allow(non_snake_case)]
     fn prove<Ct: Serialize, R: RngCore + CryptoRng>(
         &self,
         witness: &Self::Domain,
-        statement: Self::Codomain,
-        cntxt: &Ct, // for SoK purposes
+        statement: Self::Codomain, // TODO: should allow to either submit H::Codomain or H::CodomainNormalized
+        cntxt: &Ct,                // for SoK purposes
         rng: &mut R,
     ) -> (Proof<Self::Scalar, Self>, Self::CodomainNormalized) {
-        prove_homomorphism(self, witness, statement, cntxt, true, rng, &self.dst())
+        let store_prover_commitment = true; // TODO: should move this to the method input when code is ready
+
+        // Step 1: Sample randomness. Here the `witness` is only used to make sure that `r` has the right dimensions
+        let r = witness.rand(rng);
+
+        // Step 2: Compute commitment A = Ψ(r)
+        let A_proj = self.apply(&r);
+        let A = self.normalize(A_proj);
+        let normalized_statement = self.normalize(statement); // TODO: combine these two normalisations
+
+        // Step 3: Obtain Fiat-Shamir challenge
+        let c = fiat_shamir_challenge_for_sigma_protocol::<_, Self::Scalar, _>(
+            cntxt,
+            self,
+            &normalized_statement,
+            &A,
+            &self.dst(),
+        );
+
+        // Step 4: Compute prover response
+        let z = r.scaled_add(&witness, c);
+
+        // Step 5: Pick first **recorded** item
+        let first_proof_item = if store_prover_commitment {
+            FirstProofItem::Commitment(A)
+        } else {
+            FirstProofItem::Challenge(c)
+        };
+
+        (
+            Proof {
+                first_proof_item,
+                z,
+            },
+            normalized_statement,
+        )
     }
 
     /// Verify a sigma protocol proof. Returns `Ok(())` if the proof is valid, `Err(anyhow::Error)` otherwise.
@@ -54,7 +95,7 @@ pub trait Trait:
         let prover_first_message = proof
             .prover_commitment()
             .expect("proof must contain commitment for Fiat–Shamir"); // TODO: implement required function for this
-        let c = fiat_shamir_challenge_for_sigma_protocol::<_, Self::Scalar, _>(
+        let c = fiat_shamir_challenge_for_sigma_protocol(
             cntxt,
             self,
             public_statement,
@@ -78,35 +119,8 @@ pub trait Trait:
     ) -> anyhow::Result<()>;
 }
 
-// This is the default implementation for the leaf case (single MSM/codomain)
-impl<T: CurveGroupTrait> Trait for T {
-    type Scalar = T::Scalar;
-
-    fn dst(&self) -> Vec<u8> {
-        CurveGroupTrait::dst(self) // `self.dst()` works but seems a bit too concise/circular
-    }
-
-    fn verify_with_challenge<R: RngCore + CryptoRng>(
-        &self,
-        public_statement: &Self::CodomainNormalized,
-        prover_commitment: &Self::CodomainNormalized,
-        challenge: Self::Scalar,
-        response: &Self::Domain,
-        rng: &mut R,
-    ) -> anyhow::Result<()> {
-        //let msm_terms_for_prover_response = self.msm_terms(response);
-        let msm_terms = self.msm_terms_for_verify_with_challenge(
-            public_statement,
-            prover_commitment,
-            response,
-            challenge,
-        );
-        let merged = merge_msm_inputs(&msm_terms, rng);
-        check_msm_eval_zero(self, merged)?;
-        Ok(())
-    }
-}
-
+// Specialised version where the homomorphism consists of fixed-base MSMs over one elliptic curve.
+// Also used as a building block in tuples etc
 #[allow(non_snake_case)]
 pub trait CurveGroupTrait:
     fixed_base_msms::Trait<
@@ -118,11 +132,11 @@ pub trait CurveGroupTrait:
     + CanonicalSerialize
 {
     type Group: CurveGroup;
+
     /// Domain-separation tag (DST) used to ensure that all cryptographic hashes and
     /// transcript operations within the protocol are uniquely namespaced
     fn dst(&self) -> Vec<u8>;
 
-    #[allow(non_snake_case)]
     fn verify<Ct: Serialize, H, R: RngCore + CryptoRng>(
         &self,
         public_statement: &Self::CodomainNormalized,
@@ -169,7 +183,20 @@ pub trait CurveGroupTrait:
             challenge,
         );
         let merged = merge_msm_inputs(&msm_terms, rng);
-        check_msm_eval_zero(self, merged)?;
+        self.check_msm_eval_zero(merged)?;
+        Ok(())
+    }
+
+    /// Checks that the given MSM input evaluates to the group identity.
+    fn check_msm_eval_zero(
+        &self,
+        input: MsmInput<
+            <Self::Group as CurveGroup>::Affine,
+            <Self::Group as PrimeGroup>::ScalarField,
+        >,
+    ) -> anyhow::Result<()> {
+        let result = Self::msm_eval(input);
+        ensure!(result == <Self::Group as AdditiveGroup>::ZERO);
         Ok(())
     }
 
@@ -204,18 +231,36 @@ pub trait CurveGroupTrait:
     }
 }
 
-/// Checks that the given MSM input evaluates to the group identity.
-#[allow(non_snake_case)]
-pub fn check_msm_eval_zero<H: CurveGroupTrait>(
-    _hom: &H, // Including this is convenient, we can pass the homomorphism so we don't have to specify the homomorphism type in the caller... so it should be a method instead
-    input: MsmInput<<H::Group as CurveGroup>::Affine, <H::Group as PrimeGroup>::ScalarField>,
-) -> anyhow::Result<()> {
-    let result = H::msm_eval(input);
-    ensure!(result == <H::Group as AdditiveGroup>::ZERO);
-    Ok(())
+// This is the default implementation for the `leaf` case (single MSM group / codomain)
+impl<T: CurveGroupTrait> Trait for T {
+    type Scalar = T::Scalar;
+
+    fn dst(&self) -> Vec<u8> {
+        CurveGroupTrait::dst(self) // `self.dst()` works but seems a bit too concise/circular
+    }
+
+    fn verify_with_challenge<R: RngCore + CryptoRng>(
+        &self,
+        public_statement: &Self::CodomainNormalized,
+        prover_commitment: &Self::CodomainNormalized,
+        challenge: Self::Scalar,
+        response: &Self::Domain,
+        rng: &mut R,
+    ) -> anyhow::Result<()> {
+        //let msm_terms_for_prover_response = self.msm_terms(response);
+        let msm_terms = self.msm_terms_for_verify_with_challenge(
+            public_statement,
+            prover_commitment,
+            response,
+            challenge,
+        );
+        let merged = merge_msm_inputs(&msm_terms, rng);
+        self.check_msm_eval_zero(merged)?;
+        Ok(())
+    }
 }
 
-// Standard method to get `trait Statement = Canonical Serialize + ...`, because type aliases are experimental in Rust
+// Standard method to get `trait Statement = CanonicalSerialize + ...`, because type aliases are experimental in Rust
 pub trait Statement: CanonicalSerialize + CanonicalDeserialize + Clone + Debug + Eq {}
 impl<T> Statement for T where T: CanonicalSerialize + CanonicalDeserialize + Clone + Debug + Eq {}
 
@@ -281,6 +326,8 @@ impl<F: PrimeField, W: Witness<F>> Witness<F> for Vec<W> {
 /// # Returns
 /// The derived Fiat–Shamir challenge scalar, after incorporating the domain
 /// separator, public data, statement, and prover’s first message into the transcript.
+///
+/// TODO: maybe move this into the trait?
 pub fn fiat_shamir_challenge_for_sigma_protocol<
     Ct: Serialize,
     F: PrimeField,
@@ -324,62 +371,5 @@ where
     // Generate the Fiat-Shamir challenge from the updated transcript
     <merlin::Transcript as fiat_shamir::SigmaProtocol<F, H>>::challenge_for_sigma_protocol(
         &mut fs_t,
-    )
-}
-
-// OLD: We're keeping this separate from the main `Trait` because it only needs the homomorphism
-// property rather than being a bunch of "fixed-base MSMS", and moreover in this way it gets
-// reused in the TupleHomomorphism (curve-group) code
-//
-// We're returning the normalised statement, because here the statement can be first normalised
-// together with A for more efficiency
-#[allow(non_snake_case)]
-pub fn prove_homomorphism<Ct: Serialize, F: PrimeField, H: homomorphism::Trait, R>(
-    homomorphism: &H,
-    witness: &H::Domain,
-    statement: H::Codomain, // TODO: should allow to either submit H::Codomain or H::CodomainNormalized
-    cntxt: &Ct,
-    store_prover_commitment: bool, // true = store prover's commitment, false = store Fiat-Shamir challenge instead
-    rng: &mut R,
-    dst: &[u8],
-) -> (Proof<F, H>, H::CodomainNormalized)
-where
-    H::Domain: Witness<F>,
-    H::CodomainNormalized: Statement,
-    R: RngCore + CryptoRng,
-{
-    // Step 1: Sample randomness. Here the `witness` is only used to make sure that `r` has the right dimensions
-    let r = witness.rand(rng);
-
-    // Step 2: Compute commitment A = Ψ(r)
-    let A_proj = homomorphism.apply(&r);
-    let A = homomorphism.normalize(A_proj);
-    let normalized_statement = homomorphism.normalize(statement); // TODO: combine these two normalisations
-
-    // Step 3: Obtain Fiat-Shamir challenge
-    let c = fiat_shamir_challenge_for_sigma_protocol::<_, F, H>(
-        cntxt,
-        homomorphism,
-        &normalized_statement,
-        &A,
-        dst,
-    );
-
-    // Step 4: Compute prover response
-    let z = r.scaled_add(&witness, c);
-
-    // Step 5: Pick first **recorded** item
-    let first_proof_item = if store_prover_commitment {
-        FirstProofItem::Commitment(A)
-    } else {
-        FirstProofItem::Challenge(c)
-    };
-
-    (
-        Proof {
-            first_proof_item,
-            z,
-        },
-        normalized_statement,
     )
 }
