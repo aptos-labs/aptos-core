@@ -544,6 +544,9 @@ pub(crate) fn realistic_env_max_load_encrypted_test(
             config.consensus.quorum_store.enable_opt_qs_v2_payload_tx = true;
             config.consensus.quorum_store.enable_opt_qs_v2_payload_rx = true;
         }))
+        .with_fullnode_override_node_config_fn(Arc::new(|config, _| {
+            config.api.allow_encrypted_txns_submission = true;
+        }))
         .with_emit_job(
             EmitJobRequest::default()
                 .mode(EmitJobMode::ConstTps { tps: 100 })
