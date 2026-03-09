@@ -49,7 +49,9 @@ const MOVE_ABORT_CODE_INPUT_VECTOR_SIZES_NOT_MATCHING: u64 = 0x01_0002;
 /// Equivalent to `std::error::not_implemented(0)` in Move.
 const MOVE_ABORT_CODE_NOT_IMPLEMENTED: u64 = 0x0C_0001;
 
-/// This encodes an algebraic structure defined in `*_algebra.move`.
+/// Equivalent to `std::error::resource_exhausted(100)` in Move.
+const MOVE_ABORT_CODE_TYPE_TAG_CONVERSION_FAILED: u64 = 0x9_0064;
+
 #[derive(Copy, Clone, Eq, Hash, PartialEq)]
 pub enum Structure {
     BLS12381Fq12,

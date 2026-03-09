@@ -23,6 +23,9 @@ pub enum TimedFeatureFlag {
 
     /// Fixes the bug that table natives double count the memory usage of the global values.
     FixTableNativesMemoryDoubleCounting,
+
+    /// Fixes the bug in deep type tag conversion.
+    FixCryptoAlgebraNativesTypeTagConversion,
 }
 
 /// Representation of features that are gated by the block timestamps.
@@ -131,6 +134,11 @@ impl TimedFeatureFlag {
                 .with_ymd_and_hms(2025, 10, 21, 10, 0, 0)
                 .unwrap()
                 .with_timezone(&Utc),
+
+            // 1 hour after the beginning of time
+            (FixCryptoAlgebraNativesTypeTagConversion, _) => {
+                Utc.with_ymd_and_hms(1970, 1, 1, 1, 0, 0).unwrap()
+            },
 
             // For chains other than testnet and mainnet, a timed feature is considered enabled from
             // the very beginning, if left unspecified.

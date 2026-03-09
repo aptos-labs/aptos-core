@@ -15,6 +15,7 @@ mod chain_id;
 mod code_publishing;
 mod common;
 mod constructor_args;
+mod cryptoalgebra;
 mod dependencies;
 mod enum_upgrade;
 mod enum_variant_count;
