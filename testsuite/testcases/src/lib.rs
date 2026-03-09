@@ -191,8 +191,8 @@ pub enum LoadDestination {
     AllNodes,
     AllValidators,
     AllFullnodes,
-    // Send to AllFullnodes, if any exist, otherwise to AllValidators
     FullnodesOtherwiseValidators,
+    PFNsOtherwiseVFNsOtherwiseValidators,
     Peers(Vec<PeerId>),
 }
 
@@ -215,6 +215,22 @@ impl LoadDestination {
                 } else {
                     all_fullnodes
                 }
+            },
+            LoadDestination::PFNsOtherwiseVFNsOtherwiseValidators => {
+                // If PFNs exist, use them
+                let pfns = swarm.pfns().map(|f| f.peer_id()).collect::<Vec<_>>();
+                if !pfns.is_empty() {
+                    return pfns;
+                }
+
+                // If VFNs exist, use them
+                let vfns = swarm.vfns().map(|f| f.peer_id()).collect::<Vec<_>>();
+                if !vfns.is_empty() {
+                    return vfns;
+                }
+
+                // Otherwise, use validators
+                all_validators
             },
             LoadDestination::Peers(peers) => peers,
         }

@@ -26,7 +26,7 @@ use aptos_sdk::{
 };
 use prometheus_http_query::response::{PromqlResult, Sample};
 use std::{
-    collections::HashMap,
+    collections::{HashMap, HashSet},
     fs,
     fs::File,
     io::Write,
@@ -516,6 +516,32 @@ impl Swarm for LocalSwarm {
             .collect();
         full_nodes.sort_by_key(|n| n.index());
         Box::new(full_nodes.into_iter())
+    }
+
+    fn pfns<'a>(&'a self) -> Box<dyn Iterator<Item = &'a dyn FullNode> + 'a> {
+        // PFNs have peer IDs that don't match any validator
+        let validator_ids: HashSet<PeerId> = self.validators.keys().cloned().collect();
+        let mut pfns: Vec<_> = self
+            .fullnodes
+            .values()
+            .filter(|local_node| !validator_ids.contains(&local_node.peer_id()))
+            .map(|local_node| local_node as &'a dyn FullNode)
+            .collect();
+        pfns.sort_by_key(|n| n.index());
+        Box::new(pfns.into_iter())
+    }
+
+    fn vfns<'a>(&'a self) -> Box<dyn Iterator<Item = &'a dyn FullNode> + 'a> {
+        // VFNs have the same peer ID as their corresponding validator
+        let validator_ids: HashSet<PeerId> = self.validators.keys().cloned().collect();
+        let mut vfns: Vec<_> = self
+            .fullnodes
+            .values()
+            .filter(|local_node| validator_ids.contains(&local_node.peer_id()))
+            .map(|local_node| local_node as &'a dyn FullNode)
+            .collect();
+        vfns.sort_by_key(|n| n.index());
+        Box::new(vfns.into_iter())
     }
 
     fn full_node(&self, id: PeerId) -> Option<&dyn FullNode> {

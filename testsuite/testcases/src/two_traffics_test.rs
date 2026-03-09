@@ -36,7 +36,7 @@ impl NetworkLoadTest for TwoTrafficsTest {
             "Running TwoTrafficsTest test for duration {}s",
             duration.as_secs_f32()
         );
-        let nodes_to_send_load_to = LoadDestination::FullnodesOtherwiseValidators
+        let nodes_to_send_load_to = LoadDestination::PFNsOtherwiseVFNsOtherwiseValidators
             .get_destination_nodes(swarm.clone())
             .await;
 

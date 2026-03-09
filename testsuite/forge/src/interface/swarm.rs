@@ -35,6 +35,12 @@ pub trait Swarm: Sync + Send {
     /// Returns an Iterator of references to all the FullNodes in the Swarm
     fn full_nodes<'a>(&'a self) -> Box<dyn Iterator<Item = &'a dyn FullNode> + 'a>;
 
+    /// Returns an Iterator of references to all Public FullNodes (PFNs) in the Swarm
+    fn pfns<'a>(&'a self) -> Box<dyn Iterator<Item = &'a dyn FullNode> + 'a>;
+
+    /// Returns an Iterator of references to all Validator FullNodes (VFNs) in the Swarm
+    fn vfns<'a>(&'a self) -> Box<dyn Iterator<Item = &'a dyn FullNode> + 'a>;
+
     /// Returns a reference to the FullNode with the provided PeerId
     fn full_node(&self, id: PeerId) -> Option<&dyn FullNode>;
 

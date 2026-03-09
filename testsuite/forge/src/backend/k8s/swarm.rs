@@ -272,6 +272,30 @@ impl Swarm for K8sSwarm {
         Box::new(full_nodes.into_iter())
     }
 
+    fn pfns<'a>(&'a self) -> Box<dyn Iterator<Item = &'a dyn FullNode> + 'a> {
+        // PFNs are installed via add_full_node and named "public-fullnode-*"
+        let mut pfns: Vec<_> = self
+            .fullnodes
+            .values()
+            .filter(|node| node.name.starts_with("public-fullnode"))
+            .map(|node| node as &'a dyn FullNode)
+            .collect();
+        pfns.sort_by_key(|n| n.index());
+        Box::new(pfns.into_iter())
+    }
+
+    fn vfns<'a>(&'a self) -> Box<dyn Iterator<Item = &'a dyn FullNode> + 'a> {
+        // VFNs are the initial fullnodes, named "fullnode-*" (not "public-fullnode-*")
+        let mut vfns: Vec<_> = self
+            .fullnodes
+            .values()
+            .filter(|node| !node.name.starts_with("public-fullnode"))
+            .map(|node| node as &'a dyn FullNode)
+            .collect();
+        vfns.sort_by_key(|n| n.index());
+        Box::new(vfns.into_iter())
+    }
+
     fn full_node(&self, id: PeerId) -> Option<&dyn FullNode> {
         self.fullnodes.get(&id).map(|v| v as &dyn FullNode)
     }
