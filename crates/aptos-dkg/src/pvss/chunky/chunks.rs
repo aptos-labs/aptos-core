@@ -3,7 +3,7 @@
 
 use ark_ff::{BigInteger, PrimeField};
 
-/// Converts a field element into little-endian chunks of `num_bits` bits.  Made `pub` for tests
+/// Converts a field element into little-endian chunks of `num_bits` bits. Made `pub` for tests
 pub fn scalar_to_le_chunks<F: PrimeField>(num_bits: u8, scalar: &F) -> Vec<F> {
     assert!(
         num_bits.is_multiple_of(8) && num_bits > 0 && num_bits <= 64,
@@ -17,7 +17,7 @@ pub fn scalar_to_le_chunks<F: PrimeField>(num_bits: u8, scalar: &F) -> Vec<F> {
     let mut chunks = Vec::with_capacity(num_chunks);
 
     for bytes_chunk in bytes.chunks(num_bytes as usize) {
-        let mut padded = [0u8; 8]; // The last chunk might be shorter, so this guarantee a fixed 8-byte buffer
+        let mut padded = [0u8; 8]; // The last chunk might be shorter, so this guarantees a fixed 8-byte buffer
         padded[..bytes_chunk.len()].copy_from_slice(bytes_chunk);
 
         let chunk_val = u64::from_le_bytes(padded);
@@ -29,9 +29,11 @@ pub fn scalar_to_le_chunks<F: PrimeField>(num_bits: u8, scalar: &F) -> Vec<F> {
 }
 
 /// Reconstructs a field element from `num_bits`-bit chunks (little-endian order). Made `pub` for tests
+/// This is the inverse of `scalar_to_le_chunks`.
+/// Chunks must be in the range [0, 2^num_bits).
 pub fn le_chunks_to_scalar<F: PrimeField>(num_bits: u8, chunks: &[F]) -> F {
     assert!(
-        num_bits.is_multiple_of(8) && num_bits > 0 && num_bits <= 64, // TODO: so make num_bits a u8?
+        num_bits.is_multiple_of(8) && num_bits > 0 && num_bits <= 64,
         "Invalid chunk size"
     );
 
@@ -51,7 +53,7 @@ pub fn le_chunks_to_scalar<F: PrimeField>(num_bits: u8, chunks: &[F]) -> F {
 mod tests {
     use super::*;
     use ark_bls12_381::Fr;
-    use ark_ff::UniformRand;
+    use ark_ff::{UniformRand, Zero};
     use ark_std::test_rng;
 
     #[test]
@@ -71,6 +73,21 @@ mod tests {
                     num_bits
                 );
             }
+        }
+    }
+
+    /// Zero roundtrips: chunk then reconstruct yields zero. (Zero is represented as one chunk [0], not empty.)
+    #[test]
+    fn test_zero_roundtrips() {
+        let zero = Fr::zero();
+        for &num_bits in &[8u8, 16, 32, 64] {
+            let chunks = scalar_to_le_chunks(num_bits, &zero);
+            let reconstructed = le_chunks_to_scalar(num_bits, &chunks);
+            assert_eq!(
+                reconstructed, zero,
+                "zero must roundtrip for num_bits={}",
+                num_bits
+            );
         }
     }
 }

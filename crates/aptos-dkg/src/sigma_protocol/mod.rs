@@ -9,7 +9,4 @@ pub mod proof;
 pub mod traits;
 
 pub use proof::{FirstProofItem, Proof};
-pub use traits::{
-    check_msm_eval_zero, verifier_challenges_with_length, CurveGroupTrait, Statement, Trait,
-    Witness,
-};
+pub use traits::{CurveGroupTrait, Statement, Trait, Witness};

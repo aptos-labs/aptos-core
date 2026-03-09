@@ -4,7 +4,7 @@
 use crate::{
     pvss::chunky::{
         chunked_elgamal_pp, chunked_scalar_mul, hkzg_chunked_elgamal,
-        hkzg_chunked_elgamal::HkzgWeightedElgamalWitness,
+        hkzg_chunked_elgamal::HkzgElgamalWitness,
     },
     sigma_protocol,
     sigma_protocol::{
@@ -23,7 +23,7 @@ use ark_ec::{pairing::Pairing, scalar_mul::BatchMulPreprocessing, AffineRepr, Cu
 pub(crate) type HkzgElgamalHomomorphism<'a, E> = hkzg_chunked_elgamal::Homomorphism<'a, E>;
 pub(crate) type LiftedCommitHomomorphism<'a, C> = LiftHomomorphism<
     chunked_scalar_mul::Homomorphism<'a, C>,
-    HkzgWeightedElgamalWitness<<<C as CurveGroup>::Affine as AffineRepr>::ScalarField>,
+    HkzgElgamalWitness<<<C as CurveGroup>::Affine as AffineRepr>::ScalarField>,
 >;
 
 pub type Homomorphism<'a, E> = TupleHomomorphism<
@@ -85,10 +85,8 @@ impl<'a, E: Pairing> Homomorphism<'a, E> {
                 ell,
             },
             // The projection map simply unchunks the chunks
-            projection: |dom: &HkzgWeightedElgamalWitness<E::ScalarField>| {
-                chunked_scalar_mul::Witness {
-                    chunked_values: dom.chunked_plaintexts.iter().flatten().cloned().collect(),
-                }
+            projection: |dom: &HkzgElgamalWitness<E::ScalarField>| chunked_scalar_mul::Witness {
+                chunked_values: dom.chunked_plaintexts.iter().flatten().cloned().collect(),
             },
         };
 

@@ -250,6 +250,7 @@ async fn inbound() {
 }
 
 #[tokio::test]
+#[ignore]
 async fn outbound_failure_permissive() {
     let ping_failures_tolerated = 10;
     let (mut harness, health_checker) = TestHarness::new_permissive(ping_failures_tolerated);

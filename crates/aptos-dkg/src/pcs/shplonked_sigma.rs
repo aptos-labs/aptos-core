@@ -256,7 +256,6 @@ impl<F: PrimeField> HomTrait for SumHom<F> {
 
 impl<F: PrimeField> SigmaTrait for SumHom<F> {
     type Scalar = F;
-    type VerifierBatchSize = usize;
 
     fn dst(&self) -> Vec<u8> {
         b"ShplonkedSigma_SumEvalsHom".to_vec()
@@ -268,7 +267,6 @@ impl<F: PrimeField> SigmaTrait for SumHom<F> {
         prover_commitment: &F,
         challenge: F,
         response: &ShplonkedSigmaWitness<F>,
-        _verifier_batch_size: Option<Self::VerifierBatchSize>,
         _rng: &mut R,
     ) -> anyhow::Result<()> {
         let sum_z = response
@@ -312,7 +310,6 @@ impl<F: PrimeField, H: HomTrait<Domain = Vec<Vec<F>>, Codomain = F, CodomainNorm
     SigmaTrait for EvalHomLifted<F, H>
 {
     type Scalar = F;
-    type VerifierBatchSize = usize;
 
     fn dst(&self) -> Vec<u8> {
         b"ShplonkedSigma_EvalHomLifted".to_vec()
@@ -324,7 +321,6 @@ impl<F: PrimeField, H: HomTrait<Domain = Vec<Vec<F>>, Codomain = F, CodomainNorm
         prover_commitment: &F,
         challenge: F,
         response: &ShplonkedSigmaWitness<F>,
-        _verifier_batch_size: Option<Self::VerifierBatchSize>,
         _rng: &mut R,
     ) -> anyhow::Result<()> {
         let phi_z = self.hom.apply(&response.hidden_evals);

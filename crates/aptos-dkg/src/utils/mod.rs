@@ -4,7 +4,6 @@
 use crate::utils::{
     parallel_multi_pairing::parallel_multi_pairing_slice, random::random_scalar_from_uniform_bytes,
 };
-use ark_ff::PrimeField;
 use blstrs::{pairing, G1Affine, G1Projective, G2Affine, G2Projective, Gt};
 use group::{Curve, Group};
 use rayon::ThreadPool;
@@ -18,11 +17,6 @@ pub mod test_utils;
 #[inline]
 pub fn is_power_of_two(n: usize) -> bool {
     n != 0 && (n & (n - 1) == 0)
-}
-
-pub(crate) fn scalar_to_bits_le<F: PrimeField>(x: &F) -> Vec<bool> {
-    let bigint: F::BigInt = x.into_bigint();
-    ark_ff::BitIteratorLE::new(&bigint).collect()
 }
 
 /// Hashes the specified `msg` and domain separation tag `dst` into a `Scalar` by computing a 512-bit
