@@ -62,8 +62,8 @@ pub fn convert_module_v2(module: CompiledModule, struct_name_table: &[StructName
         .filter_map(|fdef| {
             fdef.code.as_ref().map(|code| {
                 let handle = module.function_handle_at(fdef.function);
-                let num_params = module.signature_at(handle.parameters).0.len() as Reg;
-                let num_locals = module.signature_at(code.locals).0.len() as Reg;
+                let num_params = module.signature_at(handle.parameters).0.len() as u16;
+                let num_locals = module.signature_at(code.locals).0.len() as u16;
                 let name_idx = handle.name;
                 let handle_idx = fdef.function;
                 let num_pinned = num_params + num_locals;
@@ -85,7 +85,7 @@ pub fn convert_module_v2(module: CompiledModule, struct_name_table: &[StructName
                 let ssa_instrs = fuse_immediate_binops_ssa(ssa_instrs, num_pinned);
 
                 // Pass 2: Greedy Register Allocation
-                let (allocated_instrs, num_regs, reg_types) =
+                let (allocated_instrs, num_regs, num_arg_regs, reg_types) =
                     allocate_registers(&ssa_instrs, num_pinned, &local_types, &vid_types);
 
                 FunctionIR {
@@ -94,6 +94,7 @@ pub fn convert_module_v2(module: CompiledModule, struct_name_table: &[StructName
                     num_params,
                     num_locals,
                     num_regs,
+                    num_arg_regs,
                     instrs: allocated_instrs,
                     reg_types,
                 }
@@ -109,9 +110,9 @@ pub fn convert_module_v2(module: CompiledModule, struct_name_table: &[StructName
 // ================================================================================================
 
 struct SsaConverter<'a> {
-    num_pinned: Reg,
+    num_pinned: u16,
     /// Next value ID (starts at num_pinned, resets per block)
-    next_vid: Reg,
+    next_vid: u16,
     /// Simulated operand stack with type information.
     stack: Vec<(Reg, Type)>,
     /// Types of all locals (params ++ declared locals).
@@ -130,8 +131,8 @@ struct SsaConverter<'a> {
 
 impl<'a> SsaConverter<'a> {
     fn new(
-        num_params: Reg,
-        num_locals: Reg,
+        num_params: u16,
+        num_locals: u16,
         local_types: Vec<Type>,
         struct_name_table: &'a [StructNameIndex],
     ) -> Self {
@@ -150,7 +151,7 @@ impl<'a> SsaConverter<'a> {
     }
 
     fn alloc_vid(&mut self, ty: Type) -> Reg {
-        let vid = self.next_vid;
+        let vid = Reg::Home(self.next_vid);
         self.next_vid += 1;
         self.vid_types.push(ty);
         vid
@@ -438,14 +439,14 @@ impl<'a> SsaConverter<'a> {
 
             // --- Locals ---
             B::CopyLoc(idx) => {
-                let src = *idx as Reg;
+                let src = Reg::Home(*idx as u16);
                 let ty = self.local_types[*idx as usize].clone();
                 let d = self.alloc_vid(ty.clone());
                 self.instrs.push(Instr::Copy(d, src));
                 self.push(d, ty);
             },
             B::MoveLoc(idx) => {
-                let src = *idx as Reg;
+                let src = Reg::Home(*idx as u16);
                 let ty = self.local_types[*idx as usize].clone();
                 let d = self.alloc_vid(ty.clone());
                 self.instrs.push(Instr::Move(d, src));
@@ -453,7 +454,7 @@ impl<'a> SsaConverter<'a> {
             },
             B::StLoc(_idx) => {
                 let (src, _ty) = self.pop();
-                let dst = *_idx as Reg;
+                let dst = Reg::Home(*_idx as u16);
                 self.instrs.push(Instr::Move(dst, src));
             },
 
@@ -641,7 +642,7 @@ impl<'a> SsaConverter<'a> {
 
             // --- References ---
             B::ImmBorrowLoc(idx) => {
-                let src = *idx as Reg;
+                let src = Reg::Home(*idx as u16);
                 let inner = self.local_types[*idx as usize].clone();
                 let ty = Type::Reference(Box::new(inner));
                 let d = self.alloc_vid(ty.clone());
@@ -649,7 +650,7 @@ impl<'a> SsaConverter<'a> {
                 self.push(d, ty);
             },
             B::MutBorrowLoc(idx) => {
-                let src = *idx as Reg;
+                let src = Reg::Home(*idx as u16);
                 let inner = self.local_types[*idx as usize].clone();
                 let ty = Type::MutableReference(Box::new(inner));
                 let d = self.alloc_vid(ty.clone());
@@ -1079,7 +1080,7 @@ impl<'a> SsaConverter<'a> {
 ///
 /// Since V2 VIDs are true SSA within a block (monotonically allocated, never
 /// recycled), a debug_assert verifies single-use as an invariant check.
-fn fuse_immediate_binops_ssa(instrs: Vec<Instr>, _num_pinned: Reg) -> Vec<Instr> {
+fn fuse_immediate_binops_ssa(instrs: Vec<Instr>, _num_pinned: u16) -> Vec<Instr> {
     let blocks = split_into_blocks(&instrs);
     let mut result = Vec::with_capacity(instrs.len());
 
@@ -1101,41 +1102,40 @@ fn fuse_immediate_binops_ssa(instrs: Vec<Instr>, _num_pinned: Reg) -> Vec<Instr>
         if i + 1 < instrs.len()
             && block_idx < blocks.len()
             && i + 1 < blocks[block_idx].1
+            && let Some((tmp, imm)) = extract_imm_value(&instrs[i])
         {
-            if let Some((tmp, imm)) = extract_imm_value(&instrs[i]) {
-                let fused = match &instrs[i + 1] {
-                    Instr::BinaryOp(dst, op, lhs, rhs) if *rhs == tmp => {
-                        Some(Instr::BinaryOpImm(*dst, op.clone(), *lhs, imm.clone()))
-                    },
-                    Instr::BinaryOp(dst, op, lhs, rhs)
-                        if *lhs == tmp && is_commutative(op) =>
-                    {
-                        Some(Instr::BinaryOpImm(*dst, op.clone(), *rhs, imm.clone()))
-                    },
-                    _ => None,
-                };
-                if let Some(fused_instr) = fused {
-                    // V2 VIDs are true SSA within a block (alloc_vid is monotonic,
-                    // no free list). Verify the loaded VID is single-use.
-                    debug_assert!({
-                        let (bstart, bend) = blocks[block_idx];
-                        instrs[bstart..bend]
-                            .iter()
-                            .enumerate()
-                            .filter(|&(j, _)| bstart + j != i + 1)
-                            .all(|(_, ins)| {
-                                let (_, uses) = get_defs_uses(ins);
-                                !uses.contains(&tmp)
-                            })
-                    },
-                        "BinaryOpImm SSA fusion: VID {} has uses outside the \
-                         consecutive Ld+BinaryOp pair — stack machine invariant violated",
-                        tmp,
-                    );
-                    result.push(fused_instr);
-                    skip_next = true;
-                    continue;
-                }
+            let fused = match &instrs[i + 1] {
+                Instr::BinaryOp(dst, op, lhs, rhs) if *rhs == tmp => {
+                    Some(Instr::BinaryOpImm(*dst, op.clone(), *lhs, imm.clone()))
+                },
+                Instr::BinaryOp(dst, op, lhs, rhs)
+                    if *lhs == tmp && is_commutative(op) =>
+                {
+                    Some(Instr::BinaryOpImm(*dst, op.clone(), *rhs, imm.clone()))
+                },
+                _ => None,
+            };
+            if let Some(fused_instr) = fused {
+                // V2 VIDs are true SSA within a block (alloc_vid is monotonic,
+                // no free list). Verify the loaded VID is single-use.
+                debug_assert!({
+                    let (bstart, bend) = blocks[block_idx];
+                    instrs[bstart..bend]
+                        .iter()
+                        .enumerate()
+                        .filter(|&(j, _)| bstart + j != i + 1)
+                        .all(|(_, ins)| {
+                            let (_, uses) = get_defs_uses(ins);
+                            !uses.contains(&tmp)
+                        })
+                },
+                    "BinaryOpImm SSA fusion: VID {:?} has uses outside the \
+                     consecutive Ld+BinaryOp pair — stack machine invariant violated",
+                    tmp,
+                );
+                result.push(fused_instr);
+                skip_next = true;
+                continue;
             }
         }
 
@@ -1151,25 +1151,26 @@ fn fuse_immediate_binops_ssa(instrs: Vec<Instr>, _num_pinned: Reg) -> Vec<Instr>
 
 fn allocate_registers(
     instrs: &[Instr],
-    num_pinned: Reg,
+    num_pinned: u16,
     local_types: &[Type],
     vid_types: &[Type],
-) -> (Vec<Instr>, Reg, Vec<Type>) {
+) -> (Vec<Instr>, u16, u16, Vec<Type>) {
     let blocks = split_into_blocks(instrs);
     let mut result = Vec::with_capacity(instrs.len());
     let mut global_next_reg = num_pinned;
+    let mut global_num_arg_regs: u16 = 0;
     // The free pool carries across block boundaries, keyed by type.
     let mut free_pool: BTreeMap<Type, Vec<Reg>> = BTreeMap::new();
     // Map physical register -> type.
     let mut phys_reg_types: BTreeMap<Reg, Type> = BTreeMap::new();
     // Local types are known ahead of time.
     for (i, ty) in local_types.iter().enumerate() {
-        phys_reg_types.insert(i as Reg, ty.clone());
+        phys_reg_types.insert(Reg::Home(i as u16), ty.clone());
     }
 
     for (start, end) in blocks {
         let block_instrs = &instrs[start..end];
-        let (allocated, block_max, returned_pool) =
+        let (allocated, block_max, block_arg_regs, returned_pool) =
             allocate_block(
                 block_instrs,
                 num_pinned,
@@ -1182,68 +1183,81 @@ fn allocate_registers(
         if block_max > global_next_reg {
             global_next_reg = block_max;
         }
+        if block_arg_regs > global_num_arg_regs {
+            global_num_arg_regs = block_arg_regs;
+        }
         result.extend(allocated);
     }
 
-    // Build reg_types from physical register -> type mapping.
+    // Build reg_types from physical register -> type mapping (Home registers only).
     let mut reg_types = Vec::with_capacity(global_next_reg as usize);
     for i in 0..global_next_reg {
         reg_types.push(
             phys_reg_types
-                .get(&i)
+                .get(&Reg::Home(i))
                 .cloned()
                 .unwrap_or(Type::Bool),
         );
     }
 
-    (result, global_next_reg, reg_types)
+    (result, global_next_reg, global_num_arg_regs, reg_types)
 }
 
-fn vid_type(vid: Reg, num_pinned: Reg, vid_types: &[Type]) -> Type {
-    if vid < num_pinned {
-        // This shouldn't happen for temp vid lookups, but fallback.
-        Type::Bool
-    } else {
-        vid_types
-            .get((vid - num_pinned) as usize)
+fn vid_type(vid: Reg, num_pinned: u16, vid_types: &[Type]) -> Type {
+    match vid {
+        Reg::Home(i) if i >= num_pinned => vid_types
+            .get((i - num_pinned) as usize)
             .cloned()
-            .unwrap_or(Type::Bool)
+            .unwrap_or(Type::Bool),
+        _ => Type::Bool,
     }
 }
 
 fn allocate_block(
     instrs: &[Instr],
-    num_pinned: Reg,
-    start_reg: Reg,
+    num_pinned: u16,
+    start_reg: u16,
     carry_pool: BTreeMap<Type, Vec<Reg>>,
     vid_types: &[Type],
     phys_reg_types: &mut BTreeMap<Reg, Type>,
-) -> (Vec<Instr>, Reg, BTreeMap<Type, Vec<Reg>>) {
+) -> (Vec<Instr>, u16, u16, BTreeMap<Type, Vec<Reg>>) {
     if instrs.is_empty() {
-        return (Vec::new(), start_reg, carry_pool);
+        return (Vec::new(), start_reg, 0, carry_pool);
     }
 
-    // Step 1: Backward scan to compute last_use[vid] = instruction offset of final use
+    let is_temp_vid = |r: &Reg| -> bool { r.is_temp(num_pinned) };
+
+    // Step 1: Forward scan to compute def_pos and last_use for temp vids
     let mut last_use: BTreeMap<Reg, usize> = BTreeMap::new();
+    let mut def_pos: BTreeMap<Reg, usize> = BTreeMap::new();
     for (i, instr) in instrs.iter().enumerate() {
         let (defs, uses) = get_defs_uses(instr);
-        for r in uses {
-            if r >= num_pinned {
-                last_use.insert(r, i);
+        for r in &uses {
+            if is_temp_vid(r) {
+                last_use.insert(*r, i);
             }
         }
-        for r in defs {
-            if r >= num_pinned {
-                last_use.entry(r).or_insert(i);
+        for r in &defs {
+            if is_temp_vid(r) {
+                last_use.entry(*r).or_insert(i);
+                def_pos.entry(*r).or_insert(i);
             }
         }
     }
+
+    // Collect call positions (Call/CallGeneric only, not CallClosure)
+    let call_positions: Vec<usize> = instrs
+        .iter()
+        .enumerate()
+        .filter(|(_, ins)| matches!(ins, Instr::Call(..) | Instr::CallGeneric(..)))
+        .map(|(i, _)| i)
+        .collect();
 
     // Step 2: Forward scan with type-keyed free-register pool
     let mut vid_to_phys: BTreeMap<Reg, Reg> = BTreeMap::new();
     // Pinned registers map to themselves
     for r in 0..num_pinned {
-        vid_to_phys.insert(r, r);
+        vid_to_phys.insert(Reg::Home(r), Reg::Home(r));
     }
     let mut free_pool = carry_pool;
     let mut next_reg = start_reg;
@@ -1252,8 +1266,8 @@ fn allocate_block(
     let mut stloc_target: BTreeMap<Reg, Reg> = BTreeMap::new();
     for (i, instr) in instrs.iter().enumerate() {
         if let Instr::Move(dst, src) = instr
-            && *dst < num_pinned
-            && *src >= num_pinned
+            && matches!(dst, Reg::Home(d) if *d < num_pinned)
+            && is_temp_vid(src)
             && last_use.get(src) == Some(&i)
         {
             stloc_target.insert(*src, *dst);
@@ -1265,7 +1279,7 @@ fn allocate_block(
     for (i, instr) in instrs.iter().enumerate() {
         match instr {
             Instr::Copy(dst, src) | Instr::Move(dst, src)
-                if *dst >= num_pinned && *src < num_pinned =>
+                if is_temp_vid(dst) && matches!(src, Reg::Home(s) if *s < num_pinned) =>
             {
                 let vid = *dst;
                 if let Some(&lu) = last_use.get(&vid)
@@ -1295,6 +1309,77 @@ fn allocate_block(
         }
     }
 
+    // Arg register precoloring
+    let mut arg_precolor: BTreeMap<Reg, Reg> = BTreeMap::new();
+    let mut block_arg_regs: u16 = 0;
+
+    // Helper: check if any Call/CallGeneric exists strictly between pos_a and pos_b
+    let has_call_between = |pos_a: usize, pos_b: usize| -> bool {
+        call_positions.iter().any(|&cp| cp > pos_a && cp < pos_b)
+    };
+
+    for (ci_idx, &ci) in call_positions.iter().enumerate() {
+        let (rets, args) = match &instrs[ci] {
+            Instr::Call(rets, _, args) | Instr::CallGeneric(rets, _, args) => {
+                (rets.clone(), args.clone())
+            },
+            _ => continue,
+        };
+
+        let next_call = call_positions
+            .get(ci_idx + 1)
+            .copied()
+            .unwrap_or(instrs.len());
+
+        let call_width = std::cmp::max(args.len(), rets.len()) as u16;
+        if call_width > block_arg_regs {
+            block_arg_regs = call_width;
+        }
+
+        // Arg precoloring: promote args[j] to Arg(j) if eligible
+        for (j, vid) in args.iter().enumerate() {
+            if !is_temp_vid(vid) {
+                continue;
+            }
+            if stloc_target.contains_key(vid) {
+                continue;
+            }
+            if arg_precolor.contains_key(vid) {
+                continue;
+            }
+            let dp = match def_pos.get(vid) {
+                Some(&p) => p,
+                None => continue,
+            };
+            if has_call_between(dp, ci) {
+                continue;
+            }
+            if last_use.get(vid) != Some(&ci) {
+                continue;
+            }
+            arg_precolor.insert(*vid, Reg::Arg(j as u16));
+        }
+
+        // Ret precoloring: promote rets[k] to Arg(k) if eligible
+        for (k, vid) in rets.iter().enumerate() {
+            if !is_temp_vid(vid) {
+                continue;
+            }
+            if stloc_target.contains_key(vid) {
+                continue;
+            }
+            if arg_precolor.contains_key(vid) {
+                continue;
+            }
+            if let Some(&lu) = last_use.get(vid)
+                && lu >= next_call
+            {
+                continue;
+            }
+            arg_precolor.insert(*vid, Reg::Arg(k as u16));
+        }
+    }
+
     let mut output = Vec::with_capacity(instrs.len());
 
     for (i, instr) in instrs.iter().enumerate() {
@@ -1303,8 +1388,11 @@ fn allocate_block(
 
         // Allocate physical registers for destination vids
         for d in &defs {
-            if *d >= num_pinned && !vid_to_phys.contains_key(d) {
-                if let Some(&local_r) = stloc_target.get(d) {
+            if is_temp_vid(d) && !vid_to_phys.contains_key(d) {
+                if let Some(&arg_r) = arg_precolor.get(d) {
+                    // Precolored to an Arg register
+                    vid_to_phys.insert(*d, arg_r);
+                } else if let Some(&local_r) = stloc_target.get(d) {
                     vid_to_phys.insert(*d, local_r);
                 } else if let Some(&local_r) = coalesce_to_local.get(d) {
                     vid_to_phys.insert(*d, local_r);
@@ -1317,7 +1405,7 @@ fn allocate_block(
                         None
                     };
                     let phys = phys.unwrap_or_else(|| {
-                        let r = next_reg;
+                        let r = Reg::Home(next_reg);
                         next_reg += 1;
                         phys_reg_types.insert(r, ty);
                         r
@@ -1330,13 +1418,14 @@ fn allocate_block(
         apply_mapping(&mut mapped_instr, &vid_to_phys);
         output.push(mapped_instr);
 
-        // Free registers for vids that reach their last use at this instruction
+        // Free registers for vids that reach their last use at this instruction.
+        // Arg registers never enter the free pool.
         let (_, uses) = get_defs_uses(instr);
         for r in uses {
-            if r >= num_pinned
+            if is_temp_vid(&r)
                 && last_use.get(&r) == Some(&i)
                 && let Some(&phys) = vid_to_phys.get(&r)
-                && phys >= num_pinned
+                && phys.is_temp(num_pinned)
             {
                 let ty = phys_reg_types
                     .get(&phys)
@@ -1346,13 +1435,13 @@ fn allocate_block(
             }
         }
         for d in &defs {
-            if *d >= num_pinned
+            if is_temp_vid(d)
                 && last_use.get(d) == Some(&i)
             {
                 let (_, ref uses_list) = get_defs_uses(instr);
                 if !uses_list.contains(d)
                     && let Some(&phys) = vid_to_phys.get(d)
-                    && phys >= num_pinned
+                    && phys.is_temp(num_pinned)
                 {
                     let ty = phys_reg_types
                         .get(&phys)
@@ -1364,7 +1453,7 @@ fn allocate_block(
         }
     }
 
-    (output, next_reg, free_pool)
+    (output, next_reg, block_arg_regs, free_pool)
 }
 
 /// Apply vid-to-physical-register mapping to an instruction.

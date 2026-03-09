@@ -1,0 +1,160 @@
+=== Module 0x66::arg_regs ===
+
+fun identity(r0) {
+    params: 1, locals: 0, registers: 1
+    0: ret [r0]
+}
+
+fun add_two(r0, r1) {
+    params: 2, locals: 0, registers: 3
+    0: r2 := add r0, r1
+    1: ret [r2]
+}
+
+fun swap(r0, r1) {
+    params: 2, locals: 0, registers: 2
+    0: ret [r1, r0]
+}
+
+fun three_args(r0, r1, r2) {
+    params: 3, locals: 0, registers: 5
+    0: r3 := add r0, r1
+    1: r4 := add r3, r2
+    2: ret [r4]
+}
+
+fun simple_promotion() {
+    params: 0, locals: 0, registers: 0, arg_regs: 1
+    0: a0 := ld_u64 42
+    1: [a0] := call identity, [a0]
+    2: ret [a0]
+}
+
+fun multi_arg() {
+    params: 0, locals: 0, registers: 0, arg_regs: 2
+    0: a0 := ld_u64 1
+    1: a1 := ld_u64 2
+    2: [a0] := call add_two, [a0, a1]
+    3: ret [a0]
+}
+
+fun nested_fg() {
+    params: 0, locals: 0, registers: 0, arg_regs: 1
+    0: a0 := ld_u64 7
+    1: [a0] := call identity, [a0]
+    2: [a0] := call identity, [a0]
+    3: ret [a0]
+}
+
+fun two_inner_calls() {
+    params: 0, locals: 0, registers: 1, arg_regs: 2
+    0: a0 := ld_u64 10
+    1: [r0] := call identity, [a0]
+    2: a0 := ld_u64 20
+    3: [a1] := call identity, [a0]
+    4: [a0] := call add_two, [r0, a1]
+    5: ret [a0]
+}
+
+fun computed_arg(r0) {
+    params: 1, locals: 0, registers: 1, arg_regs: 1
+    0: a0 := add r0, #1
+    1: [a0] := call identity, [a0]
+    2: ret [a0]
+}
+
+fun partial_promotion(r0) {
+    params: 1, locals: 0, registers: 1, arg_regs: 2
+    0: a0 := copy r0
+    1: a1 := add r0, #1
+    2: [a0] := call add_two, [a0, a1]
+    3: ret [a0]
+}
+
+fun call_with_param(r0) {
+    params: 1, locals: 0, registers: 1, arg_regs: 1
+    0: a0 := copy r0
+    1: [a0] := call identity, [a0]
+    2: ret [a0]
+}
+
+fun arg_live_after_call(r0) {
+    params: 1, locals: 1, registers: 3, arg_regs: 1
+    0: a0 := copy r0
+    1: [r1] := call identity, [a0]
+    2: r2 := add r0, r1
+    3: ret [r2]
+}
+
+fun ret_used_past_next_call() {
+    params: 0, locals: 1, registers: 2, arg_regs: 1
+    0: a0 := ld_u64 10
+    1: [r0] := call identity, [a0]
+    2: a0 := ld_u64 20
+    3: [a0] := call identity, [a0]
+    4: r1 := add a0, r0
+    5: ret [r1]
+}
+
+fun multi_ret() {
+    params: 0, locals: 0, registers: 0, arg_regs: 2
+    0: a0 := ld_u64 3
+    1: a1 := ld_u64 4
+    2: [a0, a1] := call swap, [a0, a1]
+    3: [a0] := call add_two, [a0, a1]
+    4: ret [a0]
+}
+
+fun width_from_max() {
+    params: 0, locals: 0, registers: 2, arg_regs: 3
+    0: a0 := ld_u64 1
+    1: [r0] := call identity, [a0]
+    2: a0 := ld_u64 10
+    3: a1 := ld_u64 20
+    4: a2 := ld_u64 30
+    5: [a0] := call three_args, [a0, a1, a2]
+    6: r1 := add r0, a0
+    7: ret [r1]
+}
+
+fun call_in_loop(r0) {
+    params: 1, locals: 1, registers: 3, arg_regs: 1
+    0: r1 := ld_u64 0
+  L2:
+    1: r2 := gt r0, #0
+    2: br_false L0, r2
+  L1:
+    3: a0 := copy r0
+    4: [a0] := call identity, [a0]
+    5: r1 := add a0, r1
+    6: r0 := sub r0, #1
+    7: branch L2
+  L0:
+    8: ret [r1]
+}
+
+fun mixed_at_callsite(r0) {
+    params: 1, locals: 0, registers: 1, arg_regs: 3
+    0: a0 := ld_u64 10
+    1: a1 := copy r0
+    2: a2 := ld_u64 30
+    3: [a0] := call three_args, [a0, a1, a2]
+    4: ret [a0]
+}
+
+fun mixed_intervening_call() {
+    params: 0, locals: 0, registers: 1, arg_regs: 3
+    0: a0 := ld_u64 10
+    1: [r0] := call identity, [a0]
+    2: a0 := ld_u64 20
+    3: [a1] := call identity, [a0]
+    4: a2 := ld_u64 30
+    5: [a0] := call three_args, [r0, a1, a2]
+    6: ret [a0]
+}
+
+fun no_calls() {
+    params: 0, locals: 0, registers: 1
+    0: r0 := ld_u64 99
+    1: ret [r0]
+}
