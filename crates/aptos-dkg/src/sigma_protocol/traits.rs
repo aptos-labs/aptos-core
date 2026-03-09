@@ -57,13 +57,7 @@ pub trait Trait:
         let normalized_statement = self.normalize(statement); // TODO: combine these two normalisations
 
         // Step 3: Obtain Fiat-Shamir challenge
-        let c = fiat_shamir_challenge_for_sigma_protocol::<_, Self::Scalar, _>(
-            cntxt,
-            self,
-            &normalized_statement,
-            &A,
-            &self.dst(),
-        );
+        let c = self.fiat_shamir_challenge_for_sigma_protocol(cntxt, &normalized_statement, &A);
 
         // Step 4: Compute prover response
         let z = r.scaled_add(&witness, c);
@@ -84,6 +78,61 @@ pub trait Trait:
         )
     }
 
+    /// Computes the Fiat–Shamir challenge for a Σ-protocol instance.
+    ///
+    /// This function derives a non-interactive challenge scalar by appending
+    /// protocol-specific data to a Merlin transcript. In the abstraction used here,
+    /// the protocol proves knowledge of a preimage under a homomorphism. Therefore,
+    /// all public data relevant to that homomorphism (e.g., its MSM bases) and
+    /// the image under consideration are included in the transcript.
+    ///
+    /// # Arguments
+    /// - `cntxt`: Extra "context" material that needs to be hashed for the challenge.
+    /// - `hom`: The homomorphism structure carrying its public data (e.g., MSM bases).
+    /// - `statement`: The public statement, i.e. the image of a witness under the homomorphism.
+    /// - `prover_first_message`: the first message in the Σ-protocol (the prover's commitment)
+    /// - `dst`: A domain separation tag to ensure unique challenges per protocol.
+    ///
+    /// # Returns
+    /// The derived Fiat–Shamir challenge scalar, after incorporating the domain
+    /// separator, public data, statement, and prover’s first message into the transcript.
+    fn fiat_shamir_challenge_for_sigma_protocol<Ct: Serialize>(
+        &self,
+        cntxt: &Ct,
+        statement: &Self::CodomainNormalized,
+        prover_first_message: &Self::CodomainNormalized,
+    ) -> Self::Scalar {
+        // Initialise the transcript
+        let mut fs_t = merlin::Transcript::new(&self.dst());
+
+        // Append the "context" to the transcript
+        <merlin::Transcript as fiat_shamir::SigmaProtocol<Self::Scalar, Self>>::append_sigma_protocol_cntxt(
+            &mut fs_t, cntxt,
+        );
+
+        // Append the homomorphism data (e.g. MSM bases) to the transcript. // TODO: (If the same hom is used for many proofs, maybe use a single transcript + a boolean to prevent it from repeating?)
+        <merlin::Transcript as fiat_shamir::SigmaProtocol<Self::Scalar, Self>>::append_sigma_protocol_msm_bases(
+            &mut fs_t, self,
+        );
+
+        // Append the public statement (the image of the witness) to the transcript
+        <merlin::Transcript as fiat_shamir::SigmaProtocol<Self::Scalar, Self>>::append_sigma_protocol_public_statement(
+            &mut fs_t,
+            &statement,
+        );
+
+        // Add the first prover message (the commitment) to the transcript
+        <merlin::Transcript as fiat_shamir::SigmaProtocol<Self::Scalar, Self>>::append_sigma_protocol_first_prover_message(
+            &mut fs_t,
+            prover_first_message,
+        );
+
+        // Generate the Fiat-Shamir challenge from the updated transcript
+        <merlin::Transcript as fiat_shamir::SigmaProtocol<Self::Scalar, Self>>::challenge_for_sigma_protocol(
+            &mut fs_t,
+        )
+    }
+
     /// Verify a sigma protocol proof. Returns `Ok(())` if the proof is valid, `Err(anyhow::Error)` otherwise.
     fn verify<Ct: Serialize, R: RngCore + CryptoRng>(
         &self,
@@ -95,12 +144,10 @@ pub trait Trait:
         let prover_first_message = proof
             .prover_commitment()
             .expect("proof must contain commitment for Fiat–Shamir"); // TODO: implement required function for this
-        let c = fiat_shamir_challenge_for_sigma_protocol(
+        let c = self.fiat_shamir_challenge_for_sigma_protocol(
             cntxt,
-            self,
             public_statement,
             prover_first_message,
-            &self.dst(),
         );
         self.verify_with_challenge(public_statement, prover_first_message, c, &proof.z, rng)
     }
@@ -157,12 +204,11 @@ pub trait CurveGroupTrait:
             },
         }; // TODO: I'm doing this twice
 
-        let c = fiat_shamir_challenge_for_sigma_protocol(
+        // `self.fiat_shamir_challenge_for_sigma_protocol()` comes from the default implementation below
+        let c = self.fiat_shamir_challenge_for_sigma_protocol(
             cntxt,
-            self,
             public_statement,
             prover_first_message,
-            &self.dst(),
         );
 
         self.verify_with_challenge(public_statement, prover_first_message, c, &proof.z, rng)
@@ -306,70 +352,4 @@ impl<F: PrimeField, W: Witness<F>> Witness<F> for Vec<W> {
     fn rand<R: RngCore + CryptoRng>(&self, rng: &mut R) -> Self {
         self.iter().map(|elem| elem.rand(rng)).collect()
     }
-}
-
-/// Computes the Fiat–Shamir challenge for a Σ-protocol instance.
-///
-/// This function derives a non-interactive challenge scalar by appending
-/// protocol-specific data to a Merlin transcript. In the abstraction used here,
-/// the protocol proves knowledge of a preimage under a homomorphism. Therefore,
-/// all public data relevant to that homomorphism (e.g., its MSM bases) and
-/// the image under consideration are included in the transcript.
-///
-/// # Arguments
-/// - `cntxt`: Extra "context" material that needs to be hashed for the challenge.
-/// - `hom`: The homomorphism structure carrying its public data (e.g., MSM bases).
-/// - `statement`: The public statement, i.e. the image of a witness under the homomorphism.
-/// - `prover_first_message`: the first message in the Σ-protocol (the prover's commitment)
-/// - `dst`: A domain separation tag to ensure unique challenges per protocol.
-///
-/// # Returns
-/// The derived Fiat–Shamir challenge scalar, after incorporating the domain
-/// separator, public data, statement, and prover’s first message into the transcript.
-///
-/// TODO: maybe move this into the trait?
-pub fn fiat_shamir_challenge_for_sigma_protocol<
-    Ct: Serialize,
-    F: PrimeField,
-    H: homomorphism::Trait + CanonicalSerialize,
->(
-    cntxt: &Ct,
-    hom: &H,
-    statement: &H::CodomainNormalized,
-    prover_first_message: &H::CodomainNormalized,
-    dst: &[u8],
-) -> F
-where
-    H::Domain: Witness<F>,
-    H::CodomainNormalized: Statement,
-{
-    // Initialise the transcript
-    let mut fs_t = merlin::Transcript::new(dst);
-
-    // Append the "context" to the transcript
-    <merlin::Transcript as fiat_shamir::SigmaProtocol<F, H>>::append_sigma_protocol_cntxt(
-        &mut fs_t, cntxt,
-    );
-
-    // Append the homomorphism data (e.g. MSM bases) to the transcript. // TODO: (If the same hom is used for many proofs, maybe use a single transcript + a boolean to prevent it from repeating?)
-    <merlin::Transcript as fiat_shamir::SigmaProtocol<F, H>>::append_sigma_protocol_msm_bases(
-        &mut fs_t, hom,
-    );
-
-    // Append the public statement (the image of the witness) to the transcript
-    <merlin::Transcript as fiat_shamir::SigmaProtocol<F, H>>::append_sigma_protocol_public_statement(
-        &mut fs_t,
-        &statement,
-    );
-
-    // Add the first prover message (the commitment) to the transcript
-    <merlin::Transcript as fiat_shamir::SigmaProtocol<F, H>>::append_sigma_protocol_first_prover_message(
-        &mut fs_t,
-        prover_first_message,
-    );
-
-    // Generate the Fiat-Shamir challenge from the updated transcript
-    <merlin::Transcript as fiat_shamir::SigmaProtocol<F, H>>::challenge_for_sigma_protocol(
-        &mut fs_t,
-    )
 }

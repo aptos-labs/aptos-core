@@ -345,12 +345,10 @@ impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>>
             .SoK
             .prover_commitment()
             .expect("SoK must contain commitment for Fiat–Shamir");
-        let c_pok = sigma_protocol::traits::fiat_shamir_challenge_for_sigma_protocol(
+        let c_pok = hom.fiat_shamir_challenge_for_sigma_protocol(
             &sok_cntxt,
-            &hom,
             &pok_statement,
             prover_first_message,
-            &sigma_protocol::Trait::dst(&hom),
         );
         let pok_msm_terms = hom.msm_terms_for_verify_with_challenge(
             &pok_statement,

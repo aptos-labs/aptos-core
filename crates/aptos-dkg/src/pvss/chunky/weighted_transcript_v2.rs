@@ -29,7 +29,6 @@ use crate::{
     sigma_protocol::{
         self,
         homomorphism::{tuple::TupleCodomainShape, Trait as HomTrait},
-        traits::fiat_shamir_challenge_for_sigma_protocol,
         CurveGroupTrait, Trait as _,
     },
 };
@@ -371,12 +370,10 @@ impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>>
             .SoK
             .prover_commitment()
             .expect("SoK must contain commitment for Fiat–Shamir");
-        let c = fiat_shamir_challenge_for_sigma_protocol(
+        let c = hom.fiat_shamir_challenge_for_sigma_protocol(
             &sok_cntxt,
-            &hom,
             &public_statement,
             prover_first_message,
-            &sigma_protocol::Trait::dst(&hom),
         ); // TODO: should make this a method on the trait
 
         let first_msm_terms = hom.hom1.msm_terms_for_verify_with_challenge(

@@ -27,7 +27,6 @@ use crate::{
         homomorphism::{
             tuple::TupleCodomainShape, Trait as HomTrait, TrivialShape as CodomainShape,
         },
-        traits::fiat_shamir_challenge_for_sigma_protocol,
         CurveGroupTrait, Proof, Trait as SigmaTrait,
     },
     Scalar,
@@ -848,12 +847,10 @@ pub fn batch_pairing_for_verify_generalized<
     let prover_commitment = sigma_proof
         .prover_commitment()
         .expect("batch verify: expected commitment");
-    let c_sigma = fiat_shamir_challenge_for_sigma_protocol::<_, E::ScalarField, _>(
+    let c_sigma = full_hom.fiat_shamir_challenge_for_sigma_protocol(
         SHPLONKED_SIGMA_DST,
-        &full_hom,
         sigma_proof_statement,
         prover_commitment,
-        &full_hom.dst(),
     );
 
     let r_sum_ys = prover_commitment.1;
