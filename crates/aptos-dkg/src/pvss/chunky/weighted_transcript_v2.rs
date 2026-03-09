@@ -370,7 +370,7 @@ impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>>
             &sok_cntxt,
             &public_statement,
             prover_first_message,
-        ); // TODO: should make this a method on the trait
+        );
 
         let first_msm_terms = hom.hom1.msm_terms_for_verify_with_challenge(
             &public_statement.0,

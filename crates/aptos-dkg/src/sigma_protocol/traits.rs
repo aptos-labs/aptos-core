@@ -184,25 +184,6 @@ pub trait CurveGroupTrait:
     /// transcript operations within the protocol are uniquely namespaced
     fn dst(&self) -> Vec<u8>;
 
-    fn verify_with_challenge<R: RngCore + CryptoRng>(
-        &self,
-        public_statement: &Self::CodomainNormalized,
-        prover_commitment: &Self::CodomainNormalized,
-        challenge: Self::Scalar,
-        response: &Self::Domain,
-        rng: &mut R,
-    ) -> anyhow::Result<()> {
-        let msm_terms = self.msm_terms_for_verify_with_challenge(
-            public_statement,
-            prover_commitment,
-            response,
-            challenge,
-        );
-        let merged = merge_msm_inputs(&msm_terms, rng);
-        self.check_msm_eval_zero(merged)?;
-        Ok(())
-    }
-
     /// Checks that the given MSM input evaluates to the group identity.
     fn check_msm_eval_zero(
         &self,
@@ -265,7 +246,6 @@ impl<T: CurveGroupTrait> Trait for T {
         response: &Self::Domain,
         rng: &mut R,
     ) -> anyhow::Result<()> {
-        //let msm_terms_for_prover_response = self.msm_terms(response);
         let msm_terms = self.msm_terms_for_verify_with_challenge(
             public_statement,
             prover_commitment,

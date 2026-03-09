@@ -216,10 +216,7 @@ impl<E: Pairing, B: BatchedRangeProof<E>> RangeProof<E, B> for Transcript {
         self.append_message(b"dom-sep", dst);
     }
 
-    fn append_vk(&mut self, vk: &B::VerificationKey)
-    where
-        B::VerificationKey: SerializeForTranscript,
-    {
+    fn append_vk(&mut self, vk: &B::VerificationKey) {
         let mut vk_bytes = Vec::new();
         vk.serialize_compressed_for_transcript(&mut vk_bytes)
             .expect("vk serialization should succeed");

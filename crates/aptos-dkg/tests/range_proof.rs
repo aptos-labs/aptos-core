@@ -158,8 +158,6 @@ where
     for &(n, ell) in TEST_CASES {
         assert_range_proof_correctness::<E, B>(&setups, n, ell);
         assert_keys_serialization::<E, B>(&setups);
-        // TODO: we sometimes temporarily disable this for benchmarks - serialization for multivariate
-        // DeKART is currently "broken" because we want to only serialize the first Powers-Of-Tau entries for Fiat-Shamir...
     }
 }
 
