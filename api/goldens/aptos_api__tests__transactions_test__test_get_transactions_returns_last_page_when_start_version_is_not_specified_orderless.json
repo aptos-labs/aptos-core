@@ -183,7 +183,7 @@
     "state_change_hash": "",
     "event_root_hash": "",
     "state_checkpoint_hash": null,
-    "gas_used": "79",
+    "gas_used": "78",
     "success": true,
     "vm_status": "Executed successfully",
     "accumulator_root_hash": "",
@@ -268,7 +268,7 @@
           "io_gas_units": "46",
           "storage_fee_octas": "0",
           "storage_fee_refund_octas": "0",
-          "total_charge_gas_units": "79"
+          "total_charge_gas_units": "78"
         }
       }
     ],
@@ -459,7 +459,7 @@
     "state_change_hash": "",
     "event_root_hash": "",
     "state_checkpoint_hash": null,
-    "gas_used": "79",
+    "gas_used": "78",
     "success": true,
     "vm_status": "Executed successfully",
     "accumulator_root_hash": "",
@@ -544,7 +544,7 @@
           "io_gas_units": "46",
           "storage_fee_octas": "0",
           "storage_fee_refund_octas": "0",
-          "total_charge_gas_units": "79"
+          "total_charge_gas_units": "78"
         }
       }
     ],
@@ -735,7 +735,7 @@
     "state_change_hash": "",
     "event_root_hash": "",
     "state_checkpoint_hash": null,
-    "gas_used": "79",
+    "gas_used": "78",
     "success": true,
     "vm_status": "Executed successfully",
     "accumulator_root_hash": "",
@@ -820,7 +820,7 @@
           "io_gas_units": "46",
           "storage_fee_octas": "0",
           "storage_fee_refund_octas": "0",
-          "total_charge_gas_units": "79"
+          "total_charge_gas_units": "78"
         }
       }
     ],
@@ -1011,7 +1011,7 @@
     "state_change_hash": "",
     "event_root_hash": "",
     "state_checkpoint_hash": null,
-    "gas_used": "79",
+    "gas_used": "78",
     "success": true,
     "vm_status": "Executed successfully",
     "accumulator_root_hash": "",
@@ -1096,7 +1096,7 @@
           "io_gas_units": "46",
           "storage_fee_octas": "0",
           "storage_fee_refund_octas": "0",
-          "total_charge_gas_units": "79"
+          "total_charge_gas_units": "78"
         }
       }
     ],
@@ -1287,7 +1287,7 @@
     "state_change_hash": "",
     "event_root_hash": "",
     "state_checkpoint_hash": null,
-    "gas_used": "79",
+    "gas_used": "78",
     "success": true,
     "vm_status": "Executed successfully",
     "accumulator_root_hash": "",
@@ -1372,7 +1372,7 @@
           "io_gas_units": "46",
           "storage_fee_octas": "0",
           "storage_fee_refund_octas": "0",
-          "total_charge_gas_units": "79"
+          "total_charge_gas_units": "78"
         }
       }
     ],
@@ -1563,7 +1563,7 @@
     "state_change_hash": "",
     "event_root_hash": "",
     "state_checkpoint_hash": null,
-    "gas_used": "79",
+    "gas_used": "78",
     "success": true,
     "vm_status": "Executed successfully",
     "accumulator_root_hash": "",
@@ -1648,7 +1648,7 @@
           "io_gas_units": "46",
           "storage_fee_octas": "0",
           "storage_fee_refund_octas": "0",
-          "total_charge_gas_units": "79"
+          "total_charge_gas_units": "78"
         }
       }
     ],
@@ -1839,7 +1839,7 @@
     "state_change_hash": "",
     "event_root_hash": "",
     "state_checkpoint_hash": null,
-    "gas_used": "79",
+    "gas_used": "78",
     "success": true,
     "vm_status": "Executed successfully",
     "accumulator_root_hash": "",
@@ -1924,7 +1924,7 @@
           "io_gas_units": "46",
           "storage_fee_octas": "0",
           "storage_fee_refund_octas": "0",
-          "total_charge_gas_units": "79"
+          "total_charge_gas_units": "78"
         }
       }
     ],
@@ -2115,7 +2115,7 @@
     "state_change_hash": "",
     "event_root_hash": "",
     "state_checkpoint_hash": null,
-    "gas_used": "79",
+    "gas_used": "78",
     "success": true,
     "vm_status": "Executed successfully",
     "accumulator_root_hash": "",
@@ -2200,7 +2200,7 @@
           "io_gas_units": "46",
           "storage_fee_octas": "0",
           "storage_fee_refund_octas": "0",
-          "total_charge_gas_units": "79"
+          "total_charge_gas_units": "78"
         }
       }
     ],

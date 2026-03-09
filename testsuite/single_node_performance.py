@@ -103,12 +103,7 @@ else:
     BUILD_FLAG = "--release"
     BUILD_FOLDER = "target/release"
 
-if os.environ.get("DISABLE_FA_APT"):
-    FEATURE_FLAGS = ""
-    FA_MIGRATION_COMPLETE = False
-else:
-    FEATURE_FLAGS = "--enable-feature NEW_ACCOUNTS_DEFAULT_TO_FA_APT_STORE --enable-feature OPERATIONS_DEFAULT_TO_FA_APT_STORE"
-    FA_MIGRATION_COMPLETE = True
+FEATURE_FLAGS = ""
 
 if os.environ.get("ENABLE_PRUNER"):
     DB_PRUNER_FLAGS = "--enable-state-pruner --enable-ledger-pruner --enable-epoch-snapshot-pruner --ledger-pruning-batch-size 10000 --state-prune-window 3000000 --epoch-snapshot-prune-window 3000000 --ledger-prune-window 3000000"
@@ -289,7 +284,7 @@ TESTS = [
     RunGroupConfig(
         key=RunGroupKey(
             "no_commit_{}{}".format(
-                transaction_type:="apt-fa-transfer" if FA_MIGRATION_COMPLETE else "coin-transfer", 
+                transaction_type:="apt-fa-transfer", 
                 "_sharding" if executor_sharding else "",
             ),
             executor_type=executor_type
@@ -306,8 +301,9 @@ TESTS = [
     )
     for executor_sharding, executor_types in [
         (False, ["VM", "NativeVM", "AptosVMSpeculative", "NativeSpeculative"]),
-        # executor sharding doesn't support FA for now.
-        (True, [] if FA_MIGRATION_COMPLETE else ["VM", "NativeVM"])
+        # executor sharding doesn't support FA for now. 
+        # change to ["VM", "NativeVM"] once it does.
+        (True, [])
     ]
     for executor_type in executor_types
 ] + [
@@ -316,7 +312,7 @@ TESTS = [
         expected_tps=10000 if sequential else 30000,
         key=RunGroupKey(
             "{}_{}_by_stages".format(
-                transaction_type:="apt-fa-transfer" if FA_MIGRATION_COMPLETE else "coin-transfer", 
+                transaction_type:="apt-fa-transfer", 
                 "sequential" if sequential else "parallel"
             ), 
             executor_type=executor_type
@@ -335,7 +331,8 @@ TESTS = [
     for executor_sharding, executor_types in [
         (False, ["VM", "NativeVM", "AptosVMSpeculative", "NativeSpeculative", "NativeValueCacheSpeculative", "NativeNoStorageSpeculative"]),
         # executor sharding doesn't support FA for now.
-        (True, [] if FA_MIGRATION_COMPLETE else ["VM", "NativeVM"])
+        # change to ["VM", "NativeVM"] once it does.
+        (True, [])
     ]
     for executor_type in executor_types
 ]
