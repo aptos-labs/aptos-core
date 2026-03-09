@@ -59,8 +59,19 @@ pub struct DKGPvssConfig {
 
 impl PartialEq for DKGPvssConfig {
     fn eq(&self, other: &Self) -> bool {
-        (self.epoch, &self.wconfig, &self.fast_wconfig, &self.pp, &self.eks)
-            == (other.epoch, &other.wconfig, &other.fast_wconfig, &other.pp, &other.eks)
+        (
+            self.epoch,
+            &self.wconfig,
+            &self.fast_wconfig,
+            &self.pp,
+            &self.eks,
+        ) == (
+            other.epoch,
+            &other.wconfig,
+            &other.fast_wconfig,
+            &other.pp,
+            &other.eks,
+        )
     }
 }
 
