@@ -5,9 +5,8 @@ use crate::{
     backup::restore_utils,
     db::{aptosdb_internal::gauged_api, AptosDB},
     ledger_db::{
-        ledger_metadata_db::LedgerMetadataDb,
-        transaction_auxiliary_data_db::TransactionAuxiliaryDataDb,
-        transaction_info_db::TransactionInfoDb, LedgerDbSchemaBatches,
+        ledger_metadata_db::LedgerMetadataDb, transaction_info_db::TransactionInfoDb,
+        LedgerDbSchemaBatches,
     },
     metrics::{
         COMMITTED_TXNS, LATEST_TXN_VERSION, LEDGER_VERSION, NEXT_BLOCK_EPOCH, OTHER_TIMERS_SECONDS,
@@ -31,8 +30,7 @@ use aptos_types::{
     ledger_info::LedgerInfoWithSignatures,
     state_store::{state_key::StateKey, state_value::StateValue},
     transaction::{
-        Transaction, TransactionAuxiliaryData, TransactionInfo, TransactionOutput,
-        TransactionOutputListWithProofV2, Version,
+        Transaction, TransactionInfo, TransactionOutput, TransactionOutputListWithProofV2, Version,
     },
     write_set::WriteSet,
 };
@@ -451,12 +449,14 @@ impl AptosDB {
         Ok(root_hash)
     }
 
-    #[allow(dead_code)]
+    #[cfg(any(test, feature = "fuzzing"))]
     pub(super) fn commit_transaction_auxiliary_data<'a>(
         &self,
         first_version: Version,
-        auxiliary_data: impl IntoIterator<Item = &'a TransactionAuxiliaryData>,
+        auxiliary_data: impl IntoIterator<Item = &'a aptos_types::transaction::TransactionAuxiliaryData>,
     ) -> Result<()> {
+        use crate::ledger_db::transaction_auxiliary_data_db::TransactionAuxiliaryDataDb;
+
         let _timer = OTHER_TIMERS_SECONDS.timer_with(&["commit_transaction_auxiliary_data"]);
 
         let mut batch = SchemaBatch::new();
