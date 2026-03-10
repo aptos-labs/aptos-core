@@ -319,6 +319,7 @@ fn main() -> Result<()> {
                     let forge_runner_mode =
                         ForgeRunnerMode::try_from_env().unwrap_or(ForgeRunnerMode::K8s);
                     let num_pfns = test_suite.num_pfns;
+                    let pfn_node_config = test_suite.build_pfn_node_config();
                     let forge = Forge::new(
                         &args.options,
                         test_suite,
@@ -334,6 +335,7 @@ fn main() -> Result<()> {
                             k8s.enable_haproxy,
                             k8s.enable_indexer,
                             num_pfns,
+                            pfn_node_config,
                             k8s.deployer_profile.clone(),
                         )?,
                     );

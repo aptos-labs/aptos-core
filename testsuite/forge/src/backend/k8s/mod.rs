@@ -52,6 +52,8 @@ pub struct K8sFactory {
     enable_haproxy: bool,
     enable_indexer: bool,
     num_pfns: usize,
+    /// Optional PFN node config to inject into pfn-values.fullnode.config
+    pfn_node_config: Option<serde_json::Value>,
     deployer_profile: String,
 }
 
@@ -66,6 +68,7 @@ impl K8sFactory {
         enable_haproxy: bool,
         enable_indexer: bool,
         num_pfns: usize,
+        pfn_node_config: Option<serde_json::Value>,
         deployer_profile: String,
     ) -> Result<K8sFactory> {
         let root_key: [u8; ED25519_PRIVATE_KEY_LENGTH] =
@@ -97,6 +100,7 @@ impl K8sFactory {
             enable_haproxy,
             enable_indexer,
             num_pfns,
+            pfn_node_config,
             deployer_profile,
         })
     }
@@ -279,6 +283,7 @@ impl Factory for K8sFactory {
             let pfn_kube_namespace = self.kube_namespace.clone();
             let pfn_init_version = format!("{}", init_version);
             let pfn_kube_client = kube_client.clone();
+            let pfn_node_config = self.pfn_node_config.clone();
             let deploy_pfn_fut = async move {
                 if num_pfns > 0 {
                     let genesis_bucket_path = format!(
@@ -288,19 +293,23 @@ impl Factory for K8sFactory {
                     let pfn_deployments: Vec<serde_json::Value> = (0..num_pfns)
                         .map(|i| json!({ "helmReleaseName": format!("pfn-{}", i) }))
                         .collect();
+                    let mut pfn_values = json!({
+                        "imageTag": pfn_init_version,
+                        "genesis_bucket_path": genesis_bucket_path,
+                        "chain": {
+                            "era": pfn_era,
+                            "name": "ephemeral",
+                        },
+                    });
+                    if let Some(node_config) = pfn_node_config {
+                        pfn_values["fullnode"]["config"] = node_config;
+                    }
                     let config = serde_json::from_value(json!({
                         "profile": pfn_profile,
                         "era": pfn_era,
                         "namespace": pfn_kube_namespace,
                         "pfn-deployments": pfn_deployments,
-                        "pfn-values": {
-                            "imageTag": pfn_init_version,
-                            "genesis_bucket_path": genesis_bucket_path,
-                            "chain": {
-                                "era": pfn_era,
-                                "name": "ephemeral",
-                            },
-                        },
+                        "pfn-values": pfn_values,
                     }))?;
 
                     let pfn_deployer = ForgeDeployerManager::new(

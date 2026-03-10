@@ -43,6 +43,9 @@ pub struct ForgeConfig {
     /// Optional fullnode node config override function
     pub fullnode_override_node_config_fn: Option<OverrideNodeConfigFn>,
 
+    /// Optional PFN node config override function (applied to pfn-values.fullnode.config)
+    pub pfn_override_node_config_fn: Option<OverrideNodeConfigFn>,
+
     pub multi_region_config: bool,
 
     /// Transaction workload to run on the swarm
@@ -134,6 +137,21 @@ impl ForgeConfig {
     pub fn with_fullnode_override_node_config_fn(mut self, f: OverrideNodeConfigFn) -> Self {
         self.fullnode_override_node_config_fn = Some(f);
         self
+    }
+
+    pub fn with_pfn_override_node_config_fn(mut self, f: OverrideNodeConfigFn) -> Self {
+        self.pfn_override_node_config_fn = Some(f);
+        self
+    }
+
+    /// Builds the PFN node config as a serde_json::Value for injection into pfn-values.fullnode.config.
+    /// Returns None if no PFN override config function is set.
+    pub fn build_pfn_node_config(&self) -> Option<serde_json::Value> {
+        self.pfn_override_node_config_fn.clone().map(|config_fn| {
+            let override_config = Self::override_node_config_from_fn(config_fn);
+            let yaml_value = override_config.get_yaml().unwrap();
+            serde_json::to_value(yaml_value).unwrap()
+        })
     }
 
     pub fn with_multi_region_config(mut self) -> Self {
@@ -356,6 +374,7 @@ impl Default for ForgeConfig {
             genesis_helm_config_fn: None,
             validator_override_node_config_fn: None,
             fullnode_override_node_config_fn: None,
+            pfn_override_node_config_fn: None,
             multi_region_config: false,
             emit_job_request: EmitJobRequest::default().mode(EmitJobMode::MaxLoad {
                 mempool_backlog: 40000,
