@@ -52,6 +52,29 @@ pub trait ModuleStorage: WithRuntimeEnvironment + LayoutCache {
         module_name: &IdentStr,
     ) -> VMResult<Option<Bytes>>;
 
+    /// Returns the hash of a module, or [None] if it does not exist. An error is returned if the
+    /// there is a storage error.
+    ///
+    /// Note: this API is not metered!
+    fn unmetered_get_module_hash(
+        &self,
+        address: &AccountAddress,
+        module_name: &IdentStr,
+    ) -> VMResult<Option<[u8; 32]>>;
+
+    /// Returns the hash of a module, or an error if it does not exist. An error is also
+    /// returned if the there is a storage error.
+    ///
+    /// Note: this API is not metered!
+    fn unmetered_get_existing_module_hash(
+        &self,
+        address: &AccountAddress,
+        module_name: &IdentStr,
+    ) -> VMResult<[u8; 32]> {
+        self.unmetered_get_module_hash(address, module_name)?
+            .ok_or_else(|| module_linker_error!(address, module_name))
+    }
+
     /// Returns the size of a module in bytes, or [None] otherwise. An error is returned if the
     /// there is a storage error.
     ///
@@ -206,6 +229,17 @@ where
         Ok(self
             .get_module_or_build_with(&id, self)?
             .map(|(module, _)| module.extension().bytes().clone()))
+    }
+
+    fn unmetered_get_module_hash(
+        &self,
+        address: &AccountAddress,
+        module_name: &IdentStr,
+    ) -> VMResult<Option<[u8; 32]>> {
+        let id = ModuleId::new(*address, module_name.to_owned());
+        Ok(self
+            .get_module_or_build_with(&id, self)?
+            .map(|(module, _)| *module.extension().hash()))
     }
 
     fn unmetered_get_module_size(

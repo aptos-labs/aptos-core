@@ -488,7 +488,18 @@ where
             .runtime_environment()
             .struct_name_index_map()
             .idx_to_struct_name_ref(*idx)?;
-        modules.insert(struct_identifier.module());
+
+        // METERING SAFETY:
+        //   Module has already been loaded because we got the struct definition.
+        let module_hash = self
+            .struct_definition_loader
+            .unmetered_get_module_hash(
+                struct_identifier.module().address(),
+                struct_identifier.module().name(),
+            )
+            .map_err(|err| err.to_partial())?;
+
+        modules.insert(struct_identifier.module(), module_hash);
 
         if check_option_type && !self.runtime_environment().vm_config().enable_capture_option {
             if struct_identifier.module().is_option()

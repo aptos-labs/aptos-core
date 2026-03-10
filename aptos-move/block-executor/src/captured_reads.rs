@@ -42,11 +42,10 @@ use move_core_types::{
     value::MoveTypeLayout,
 };
 use move_vm_runtime::{
-    LayoutCache, LayoutCacheEntry, Module, ModuleStorage, RuntimeEnvironment, StructKey,
-    WithRuntimeEnvironment,
+    Module, ModuleStorage, NoOpLayoutCache, RuntimeEnvironment, WithRuntimeEnvironment,
 };
 use move_vm_types::{
-    code::{ModuleCode, SyncModuleCache, WithAddress, WithBytes, WithName, WithSize},
+    code::{ModuleCode, SyncModuleCache, WithAddress, WithBytes, WithHash, WithName, WithSize},
     delayed_values::delayed_field_id::DelayedFieldID,
 };
 use std::{
@@ -1350,21 +1349,8 @@ impl WithRuntimeEnvironment for SnapshotModuleView<'_> {
     }
 }
 
-impl LayoutCache for SnapshotModuleView<'_> {
-    fn get_struct_layout(&self, _key: &StructKey) -> Option<LayoutCacheEntry> {
-        // No-op: no need for layouts in snapshot.
-        None
-    }
-
-    fn store_struct_layout(
-        &self,
-        _key: &StructKey,
-        _entry: LayoutCacheEntry,
-    ) -> PartialVMResult<()> {
-        // No-op: no need for layouts in snapshot.
-        Ok(())
-    }
-}
+// No-op: no need for layouts in snapshot.
+impl NoOpLayoutCache for SnapshotModuleView<'_> {}
 
 impl ModuleStorage for SnapshotModuleView<'_> {
     fn unmetered_check_module_exists(
@@ -1387,6 +1373,19 @@ impl ModuleStorage for SnapshotModuleView<'_> {
             ModuleRead::GlobalCache(code) => Ok(Some(code.extension().bytes().clone())),
             ModuleRead::PerBlockCache(code) => {
                 Ok(code.as_ref().map(|(c, _)| c.extension().bytes().clone()))
+            },
+        }
+    }
+
+    fn unmetered_get_module_hash(
+        &self,
+        address: &AccountAddress,
+        module_name: &IdentStr,
+    ) -> VMResult<Option<[u8; 32]>> {
+        match self.get_module_read(address, module_name)? {
+            ModuleRead::GlobalCache(code) => Ok(Some(*code.extension().hash())),
+            ModuleRead::PerBlockCache(code) => {
+                Ok(code.as_ref().map(|(c, _)| *c.extension().hash()))
             },
         }
     }
