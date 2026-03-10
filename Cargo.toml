@@ -490,14 +490,21 @@ anstyle = "1.0.1"
 arbitrary = { version = "1.4.1", features = ["derive"] }
 arc-swap = "1.6.0"
 arr_macro = "0.2.1"
-ark-bls12-381 = "0.4.0"
-ark-bn254 = "0.4.0"
-ark-ec = "0.4.0"
-ark-ff = "0.4.0"
-ark-groth16 = "0.4.0"
-ark-relations = "0.4.0"
-ark-serialize = "0.4.0"
-ark-std = { version = "0.4.0", features = ["getrandom"] }
+ark-bls12-381 = { version = "0.5.0", features = ["curve"] }
+ark-bn254 = { version = "0.5.0", features = ["curve"] }
+ark-ec = { version = "0.5.0", features = ["parallel", "rayon"] }
+ark-ff = { version = "0.5.0", features = ["asm"] }
+ark-ff-asm = { version = "0.5.0" }
+ark-ff-macros = "0.5.0"
+ark-groth16 = "0.5.0"
+ark-poly = { version = "0.5.0", features = ["parallel"] }
+ark-relations = "0.5.0"
+ark-serialize = { version = "0.5.0", features = ["derive"] }
+ark-snark = { version = "0.5.0" }
+ark-std = { version = "0.5.0", features = ["getrandom"] }
+dudect-bencher = "0.6"
+slh-dsa = "=0.2.0-rc.4"
+bls12_381 = "0.8.0"
 aptos-indexer-processor-sdk = { git = "https://github.com/aptos-labs/aptos-indexer-processor-sdk.git", rev = "c63f6ee891e42cc50f92480c21d4afa86012b157", features = [
     "postgres_partial",
 ] }
@@ -924,3 +931,9 @@ futures-sink = { git = "https://github.com/aptos-labs/futures-rs", branch = "bac
 futures-io = { git = "https://github.com/aptos-labs/futures-rs", branch = "backport" }
 futures-task = { git = "https://github.com/aptos-labs/futures-rs", branch = "backport" }
 futures-macro = { git = "https://github.com/aptos-labs/futures-rs", branch = "backport" }
+ark-ec = { git = "https://github.com/aptos-labs/algebra", branch = "fix-fft-parallelism-cutoff" }
+ark-ff = { git = "https://github.com/aptos-labs/algebra", branch = "fix-fft-parallelism-cutoff" }
+ark-ff-macros = { git = "https://github.com/aptos-labs/algebra", branch = "fix-fft-parallelism-cutoff" }
+ark-ff-asm = { git = "https://github.com/aptos-labs/algebra", branch = "fix-fft-parallelism-cutoff" }
+ark-poly = { git = "https://github.com/aptos-labs/algebra", branch = "fix-fft-parallelism-cutoff" }
+ark-serialize = { git = "https://github.com/aptos-labs/algebra", branch = "fix-fft-parallelism-cutoff" }

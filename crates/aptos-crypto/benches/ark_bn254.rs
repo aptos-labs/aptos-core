@@ -1,5 +1,5 @@
-// Copyright © Aptos Foundation
-// SPDX-License-Identifier: Apache-2.0
+// Copyright (c) Aptos Foundation
+// Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 #[macro_use]
 extern crate criterion;
@@ -12,8 +12,8 @@ use crate::bench_utils::{
     bench_function_sub,
 };
 use ark_bn254::{Bn254, Fq, Fq12, Fr, G1Affine, G1Projective, G2Affine, G2Projective};
-use ark_ec::{pairing::Pairing, short_weierstrass::Projective, AffineRepr, CurveGroup, Group};
-use ark_ff::{UniformRand, Zero};
+use ark_ec::{pairing::Pairing, short_weierstrass::Projective, AffineRepr, CurveGroup, PrimeGroup};
+use ark_ff::{AdditiveGroup, UniformRand, Zero};
 use ark_groth16::Groth16;
 use ark_serialize::{CanonicalDeserialize, CanonicalSerialize};
 use ark_std::test_rng;

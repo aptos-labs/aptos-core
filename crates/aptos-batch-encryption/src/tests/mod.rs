@@ -11,10 +11,6 @@ use rayon::iter::{IntoParallelIterator, ParallelIterator};
 pub mod fptx_smoke;
 #[cfg(test)]
 pub mod fptx_succinct_smoke;
-#[cfg(test)]
-pub mod fptx_weighted_smoke;
-#[cfg(test)]
-pub mod typescript;
 
 pub fn prepare_all<T: BatchThresholdEncryption, P: Plaintext>(
     cts: &[T::Ciphertext],

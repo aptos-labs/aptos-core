@@ -1,6 +1,5 @@
-// Copyright © Aptos Foundation
-// Parts of the project are originally copyright © Meta Platforms, Inc.
-// SPDX-License-Identifier: Apache-2.0
+// Copyright (c) Aptos Foundation
+// Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 //! An abstraction of x25519 elliptic curve keys required for
 //! [Diffie-Hellman key exchange](https://en.wikipedia.org/wiki/Diffie%E2%80%93Hellman_key_exchange)
@@ -11,6 +10,7 @@
 //! # Examples
 //!
 //! ```
+//! # fn main() -> Result<(), aptos_crypto::traits::CryptoMaterialError> {
 //! use aptos_crypto::{x25519, Uniform, test_utils::TEST_SEED};
 //! use rand::{rngs::StdRng, SeedableRng};
 //!
@@ -21,7 +21,6 @@
 //!
 //! // Deserialize an hexadecimal private or public key
 //! use aptos_crypto::traits::ValidCryptoMaterialStringExt;
-//! # fn main() -> Result<(), aptos_crypto::traits::CryptoMaterialError> {
 //! let private_key = "404acc8ec6a0f18df7359a6ee7823f19dd95616b10fed8bdb0de030e891b945a";
 //! let private_key = x25519::PrivateKey::from_encoded_string(&private_key)?;
 //! let public_key = "080e287879c918794170e258bfaddd75acac5b3e350419044655e4983a487120";

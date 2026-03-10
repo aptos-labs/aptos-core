@@ -1,5 +1,5 @@
-// Copyright © Aptos Foundation
-// SPDX-License-Identifier: Apache-2.0
+// Copyright (c) Aptos Foundation
+// Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 //! This module provides APIs for _proofs-of-possesion (PoPs)_ used to prevent _rogue-key attacks_,
 //! both for multisignatures and aggregate signatures.

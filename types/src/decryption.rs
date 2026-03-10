@@ -13,9 +13,12 @@ use crate::{account_address::AccountAddress, validator_verifier::ValidatorVerifi
 use std::sync::Arc;
 use aptos_batch_encryption::traits::BatchThresholdEncryption;
 use aptos_batch_encryption::schemes::fptx::FPTX;
-use aptos_batch_encryption::shared::algebra::shamir::ThresholdConfig;
+use aptos_batch_encryption::group::Fr;
+use aptos_crypto::arkworks::shamir::ShamirThresholdConfig;
 use once_cell::sync::Lazy;
 
+
+pub type ThresholdConfig = ShamirThresholdConfig<Fr>;
 
 pub type EncryptionKey = <FPTX as BatchThresholdEncryption>::EncryptionKey;
 pub type DigestKey = <FPTX as BatchThresholdEncryption>::DigestKey;
@@ -100,7 +103,11 @@ impl DecShare {
             .map(|dec_share| dec_share.share.clone())
             .take(threshold as usize)
             .collect();
-        let decryption_key = <FPTX as BatchThresholdEncryption>::reconstruct_decryption_key(&shares, &config.config, pool)?;
+        
+        let decryption_key =
+        pool.install(||
+            <FPTX as BatchThresholdEncryption>::reconstruct_decryption_key(&shares, &config.config)
+        )?;
         Ok(decryption_key)
     }
 

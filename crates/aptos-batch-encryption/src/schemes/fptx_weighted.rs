@@ -24,10 +24,8 @@ use aptos_crypto::{
     weighted_config::WeightedConfigArkworks,
     TSecretSharingConfig as _,
 };
-use aptos_dkg::pvss::{
-    traits::{Reconstructable as _, TranscriptCore},
-    Player,
-};
+use aptos_crypto::player::Player;
+use aptos_crypto::arkworks::shamir::Reconstructable;
 use ark_ec::AffineRepr;
 use ark_ff::UniformRand as _;
 use ark_std::rand::{rngs::StdRng, CryptoRng, RngCore, SeedableRng};
@@ -222,76 +220,10 @@ impl BatchThresholdEncryption for FPTXWeighted {
     type MasterSecretKeyShare = WeightedBIBEMasterSecretKeyShare;
     type PreparedCiphertext = PreparedCiphertext;
     type Round = u64;
-    type SubTranscript = aptos_dkg::pvss::chunky::WeightedSubtranscript<Pairing>;
     type ThresholdConfig = aptos_crypto::weighted_config::WeightedConfigArkworks<Fr>;
     type VerificationKey = WeightedBIBEVerificationKey;
 
-    fn setup(
-        digest_key: &Self::DigestKey,
-        pvss_public_params: &<Self::SubTranscript as TranscriptCore>::PublicParameters,
-        subtranscript: &Self::SubTranscript,
-        threshold_config: &Self::ThresholdConfig,
-        current_player: Player,
-        msk_share_decryption_key: &<Self::SubTranscript as TranscriptCore>::DecryptPrivKey,
-    ) -> Result<(
-        Self::EncryptionKey,
-        Vec<Self::VerificationKey>,
-        Self::MasterSecretKeyShare,
-    )> {
-        let mpk_g2: G2Affine = subtranscript.get_dealt_public_key().as_g2();
 
-        let ek = EncryptionKey::new(mpk_g2, digest_key.tau_g2);
-
-        let vks: Vec<Self::VerificationKey> = threshold_config
-            .get_players()
-            .into_iter()
-            .map(|p| Self::VerificationKey {
-                weighted_player: p,
-                mpk_g2,
-                vks_g2: subtranscript
-                    .get_public_key_share(threshold_config, &p)
-                    .into_iter()
-                    .map(|s| s.as_g2())
-                    .collect(),
-            })
-            .collect();
-
-        let msk_share = Self::MasterSecretKeyShare {
-            mpk_g2,
-            weighted_player: current_player,
-            shamir_share_evals: subtranscript
-                .decrypt_own_share(
-                    threshold_config,
-                    &current_player,
-                    msk_share_decryption_key,
-                    pvss_public_params,
-                )
-                .0
-                .into_iter()
-                .map(|s| s.into_fr())
-                .collect(),
-        };
-
-        vks[msk_share.weighted_player.get_id()]
-            .vks_g2
-            .iter()
-            .zip(msk_share.shamir_share_evals.clone())
-            .try_for_each(|(vk_raw, msk_share_raw)| {
-                (G2Projective::from(*vk_raw) == G2Affine::generator() * msk_share_raw)
-                    .then_some(())
-                    .ok_or(BatchEncryptionError::VKMSKMismatchError)
-            })?;
-
-        Ok((ek, vks, msk_share))
-    }
-
-    fn extract_encryption_key(
-        digest_key: &Self::DigestKey,
-        subtranscript: &Self::SubTranscript,
-    ) -> Result<Self::EncryptionKey> {
-        let mpk_g2: G2Affine = subtranscript.get_dealt_public_key().as_g2();
-        Ok(EncryptionKey::new(mpk_g2, digest_key.tau_g2))
-    }
 
     fn setup_for_testing(
         seed: u64,

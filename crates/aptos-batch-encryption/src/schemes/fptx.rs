@@ -16,10 +16,8 @@ use crate::{
     traits::{AssociatedData, BatchThresholdEncryption, Plaintext},
 };
 use anyhow::Result;
-use aptos_dkg::pvss::{
-    traits::{Reconstructable as _, TranscriptCore},
-    Player,
-};
+use aptos_crypto::arkworks::shamir::Reconstructable;
+use aptos_crypto::player::Player;
 use ark_ff::UniformRand as _;
 use ark_std::rand::{rngs::StdRng, CryptoRng, RngCore, SeedableRng};
 
@@ -41,33 +39,9 @@ impl BatchThresholdEncryption for FPTX {
     type Round = u64;
     // This is essentially a placeholder, since there is no PVSS scheme right now that works
     // with the unweighted `SmairThresholdConfig`
-    type SubTranscript = aptos_dkg::pvss::chunky::WeightedSubtranscript<Pairing>;
     type ThresholdConfig = aptos_crypto::arkworks::shamir::ShamirThresholdConfig<Fr>;
     type VerificationKey = BIBEVerificationKey;
 
-    fn setup(
-        _digest_key: &Self::DigestKey,
-        _pvss_public_params: &<Self::SubTranscript as TranscriptCore>::PublicParameters,
-        _subtranscript: &Self::SubTranscript,
-        _threshold_config: &Self::ThresholdConfig,
-        _current_player: Player,
-        _msk_share_decryption_key: &<Self::SubTranscript as TranscriptCore>::DecryptPrivKey,
-    ) -> Result<(
-        Self::EncryptionKey,
-        Vec<Self::VerificationKey>,
-        Self::MasterSecretKeyShare,
-    )> {
-        // B/c unweighted chunky is being removed
-        unimplemented!()
-    }
-
-    fn extract_encryption_key(
-        _digest_key: &Self::DigestKey,
-        _subtranscript: &Self::SubTranscript,
-    ) -> Result<Self::EncryptionKey> {
-        // B/c unweighted chunky is being removed
-        unimplemented!()
-    }
 
     fn setup_for_testing(
         seed: u64,

@@ -206,7 +206,7 @@ pub mod tests {
         traits::BatchThresholdEncryption as _,
     };
     use aptos_crypto::arkworks::shamir::ShamirThresholdConfig;
-    use aptos_dkg::pvss::traits::Reconstructable as _;
+    use aptos_crypto::arkworks::shamir::Reconstructable;
     use ark_std::{
         rand::{thread_rng, Rng},
         One, Zero,

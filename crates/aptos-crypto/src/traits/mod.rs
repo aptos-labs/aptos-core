@@ -1,17 +1,23 @@
-// Copyright © Aptos Foundation
-// Parts of the project are originally copyright © Meta Platforms, Inc.
-// SPDX-License-Identifier: Apache-2.0
+// Copyright (c) Aptos Foundation
+// Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 //! This module provides a generic set of traits for dealing with cryptographic primitives.
 //!
 //! For examples on how to use these traits, see the implementations of the [`crate::ed25519`]
 
-use crate::hash::{CryptoHash, CryptoHasher};
+use crate::{
+    hash::{CryptoHash, CryptoHasher},
+    player::Player,
+};
 use anyhow::Result;
 use core::convert::{From, TryFrom};
+use more_asserts::assert_lt;
 use rand::{rngs::StdRng, CryptoRng, RngCore, SeedableRng};
 use serde::{de::DeserializeOwned, Serialize};
-use std::{fmt::Debug, hash::Hash};
+use std::{
+    fmt::{Debug, Display},
+    hash::Hash,
+};
 use thiserror::Error;
 
 /// An error type for key and signature validation issues, see [`ValidCryptoMaterial`].
@@ -66,7 +72,7 @@ pub trait ValidCryptoMaterial:
     const AIP_80_PREFIX: &'static str;
 
     /// Convert the valid crypto material to bytes.
-    fn to_bytes(&self) -> Vec<u8>;
+    fn to_bytes(&self) -> Vec<u8>; // Using `Result<Vec<u8>>` and `.map_err(|_| CryptoMaterialError::SerializationError)` would be more consistent here?
 }
 
 /// An extension to/from Strings for [`ValidCryptoMaterial`].
@@ -209,7 +215,7 @@ pub trait VerifyingKey:
     /// The associated signature type for this verifying key.
     type SignatureMaterial: Signature<VerifyingKeyMaterial = Self>;
 
-    /// We provide the striaghtfoward implementation which dispatches to the signature.
+    /// We provide the straightforward implementation which dispatches to the signature.
     fn verify_struct_signature<T: CryptoHash + Serialize>(
         &self,
         message: &T,
@@ -312,6 +318,50 @@ pub trait Genesis: PrivateKey {
     fn genesis() -> Self;
 }
 
+/// Trait defining the interface for secret sharing schemes.
+pub trait TSecretSharingConfig: Display {
+    /// Creates a new player ID; a number from 0 to `n-1`, where `n = get_total_num_players(&self)`.
+    fn get_player(&self, i: usize) -> Player {
+        let n = self.get_total_num_players();
+        assert_lt!(i, n);
+
+        Player { id: i }
+    }
+
+    /// Returns a vec of all player IDs.
+    fn get_players(&self) -> Vec<Player> {
+        (0..self.get_total_num_players())
+            .map(|i| Player { id: i })
+            .collect()
+    }
+
+    /// Useful during testing.
+    fn get_random_player<R>(&self, rng: &mut R) -> Player
+    where
+        R: rand_core::RngCore + rand_core::CryptoRng;
+
+    /// Returns a random subset of players who are capable of reconstructing the secret.
+    /// Useful during testing.
+    fn get_random_eligible_subset_of_players<R>(&self, rng: &mut R) -> Vec<Player>
+    where
+        R: rand_core::RngCore;
+
+    /// Returns the total number of players in the scheme.
+    fn get_total_num_players(&self) -> usize;
+
+    /// Returns the total number of shares in the scheme.
+    fn get_total_num_shares(&self) -> usize;
+}
+
+/// Trait for secret sharing schemes that expose a threshold `t`.
+pub trait ThresholdConfig: TSecretSharingConfig + Sized {
+    /// Constructs a new threshold configuration given `t` (threshold) and `n` (number of players). Only used in `get_threshold_configs_for_testing()`, maybe not ideal here
+    fn new(t: usize, n: usize) -> anyhow::Result<Self>;
+
+    /// Returns the threshold `t` required to reconstruct the secret.
+    fn get_threshold(&self) -> usize;
+}
+
 /// A pub(crate) mod hiding a Sealed trait and its implementations, allowing
 /// us to make sure implementations are constrained to the crypto crate.
 // See https://rust-lang.github.io/api-guidelines/future-proofing.html#sealed-traits-protect-against-downstream-implementations-c-sealed
@@ -338,4 +388,8 @@ pub(crate) mod private {
     impl Sealed for crate::secp256k1_ecdsa::PrivateKey {}
     impl Sealed for crate::secp256k1_ecdsa::PublicKey {}
     impl Sealed for crate::secp256k1_ecdsa::Signature {}
+
+    impl Sealed for crate::slh_dsa_sha2_128s::PrivateKey {}
+    impl Sealed for crate::slh_dsa_sha2_128s::PublicKey {}
+    impl Sealed for crate::slh_dsa_sha2_128s::Signature {}
 }

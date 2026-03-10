@@ -12,7 +12,7 @@ use crate::{
 };
 use aptos_gas_schedule::gas_params::natives::aptos_framework::*;
 use aptos_native_interface::{SafeNativeContext, SafeNativeError, SafeNativeResult};
-use ark_ec::Group;
+use ark_ec::AdditiveGroup;
 use ark_ff::Field;
 use move_vm_types::{loaded_data::runtime_types::Type, values::Value};
 use smallvec::{smallvec, SmallVec};

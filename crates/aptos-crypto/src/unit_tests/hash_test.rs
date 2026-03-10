@@ -1,5 +1,5 @@
-// Copyright © Aptos Foundation
-// SPDX-License-Identifier: Apache-2.0
+// Copyright (c) Aptos Foundation
+// Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 use crate::hash::*;
 use bitvec::prelude::*;
@@ -82,7 +82,7 @@ fn test_random_with_rng() {
     }
     {
         let mut rng: StdRng = SeedableRng::from_seed(seed);
-        hash3 = rng.gen();
+        hash3 = rng.r#gen();
     }
     assert_eq!(hash1, hash2);
     assert_eq!(hash1, hash3);
@@ -149,7 +149,7 @@ fn test_get_nibble() {
     let mut bytes = [0u8; HashValue::LENGTH];
     let mut nibbles = vec![];
     for byte in bytes.iter_mut().take(HashValue::LENGTH) {
-        *byte = rand::thread_rng().gen();
+        *byte = rand::thread_rng().r#gen();
         nibbles.push(*byte >> 4);
         nibbles.push(*byte & 0x0F);
     }

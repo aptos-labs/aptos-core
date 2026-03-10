@@ -1,6 +1,5 @@
-// Copyright © Aptos Foundation
-// Parts of the project are originally copyright © Meta Platforms, Inc.
-// SPDX-License-Identifier: Apache-2.0
+// Copyright (c) Aptos Foundation
+// Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 //! This module defines traits and implementations of
 //! [cryptographic hash functions](https://en.wikipedia.org/wiki/Cryptographic_hash_function)
@@ -164,7 +163,7 @@ impl HashValue {
 
     /// Creates a random instance with given rng. Useful in unit tests.
     pub fn random_with_rng<R: Rng>(rng: &mut R) -> Self {
-        rng.gen()
+        rng.r#gen()
     }
 
     /// Convenience function that computes a `HashValue` internally equal to
@@ -413,7 +412,7 @@ impl FromStr for HashValue {
 
 impl Distribution<HashValue> for Standard {
     fn sample<R: Rng + ?Sized>(&self, rng: &mut R) -> HashValue {
-        HashValue { hash: rng.gen() }
+        HashValue { hash: rng.r#gen() }
     }
 }
 

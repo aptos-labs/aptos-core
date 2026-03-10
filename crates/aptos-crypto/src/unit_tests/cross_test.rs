@@ -1,9 +1,10 @@
-// Copyright © Aptos Foundation
-// SPDX-License-Identifier: Apache-2.0
+// Copyright (c) Aptos Foundation
+// Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 // This is necessary for the derive macros which rely on being used in a
 // context where the crypto crate is external
 use crate as aptos_crypto;
+use std::error;
 use crate::{
     ed25519::{Ed25519PrivateKey, Ed25519PublicKey, Ed25519Signature},
     multi_ed25519::{MultiEd25519PrivateKey, MultiEd25519PublicKey, MultiEd25519Signature},
@@ -11,7 +12,7 @@ use crate::{
     traits::*,
 };
 use aptos_crypto_derive::{
-    PrivateKey, PublicKey, Signature, SigningKey, SilentDebug, ValidCryptoMaterial, VerifyingKey,
+    PrivateKey, PublicKey, Signature, SigningKey, SilentDebug, ValidCryptoMaterial, VerifyingKey, 
 };
 use proptest::prelude::*;
 use serde::{Deserialize, Serialize};

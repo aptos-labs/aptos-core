@@ -177,7 +177,7 @@ mod tests {
         shared::{digest::Digest, encryption_key::EncryptionKey},
     };
     use aptos_crypto::arkworks::shamir::ShamirThresholdConfig;
-    use aptos_dkg::pvss::traits::Reconstructable as _;
+    use aptos_crypto::arkworks::shamir::Reconstructable;
     use ark_ec::AffineRepr;
     use ark_ff::UniformRand as _;
     use ark_std::rand::{seq::SliceRandom, thread_rng};

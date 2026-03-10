@@ -767,8 +767,9 @@ impl TransactionExecutable {
             Self::EntryFunction(entry_function) => bcs::to_bytes(&entry_function).ok()?,
             Self::Empty | Self::Encrypted(_) => return None,
         };
+        let associated_data = String::from("");
         // Use the bytes directly instead of converting to UTF-8 string
-        let ct = FPTX::encrypt(encryption_key, rng, &bytes).expect("Failed to encrypt");
+        let ct = FPTX::encrypt(encryption_key, rng, &bytes, &associated_data).expect("Failed to encrypt");
 
         Some(TransactionExecutable::Encrypted(EncryptedPayload::new(ct)))
     }
@@ -814,7 +815,8 @@ impl TransactionExecutableRef<'_> {
     }
 
     pub fn verify_ciphertext(&self) -> Result<()> {
-        <FPTX as BatchThresholdEncryption>::verify_ct(self.ciphertext().ok_or(anyhow::anyhow!("Ciphertext not found"))?)
+        let associated_data = String::from("");
+        <FPTX as BatchThresholdEncryption>::verify_ct(self.ciphertext().ok_or(anyhow::anyhow!("Ciphertext not found"))?, &associated_data)
     }
 }
 
@@ -849,7 +851,8 @@ impl EncryptedPayload {
     }
 
     pub fn verify(&self) -> Result<()> {
-        FPTX::verify_ct(&self.ciphertext)
+        let associated_data = String::from("");
+        FPTX::verify_ct(&self.ciphertext, &associated_data)
     }
 }
 

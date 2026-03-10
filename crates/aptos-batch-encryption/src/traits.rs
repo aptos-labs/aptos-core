@@ -3,14 +3,12 @@
 use crate::errors::MissingEvalProofError;
 use anyhow::Result;
 use aptos_crypto::player::Player;
-use aptos_dkg::pvss::traits::TranscriptCore;
 use ark_std::rand::{CryptoRng, RngCore};
 use serde::{de::DeserializeOwned, Serialize};
 use std::hash::Hash;
 
 pub trait BatchThresholdEncryption {
     type ThresholdConfig: aptos_crypto::TSecretSharingConfig;
-    type SubTranscript: TranscriptCore;
 
     /// An encryption key for the scheme. Allows for generating ciphertexts.
     type EncryptionKey;
@@ -72,27 +70,6 @@ pub trait BatchThresholdEncryption {
     type DecryptionKey: Send + Sized + Sync;
     type Id: PartialEq + Eq;
 
-    /// Generates an (insecure) setup for the batch threshold encryption scheme. Consists of
-    /// an [`EncryptionKey`] which can be used to encrypt messages and to compute a digest from a list
-    /// of ciphertexts, along with a vector of shares of type [`MasterSecretKeyShare`], which share
-    /// the secret key according to the [`ThresholdConfig`] given as input. In production,
-    fn setup(
-        digest_key: &Self::DigestKey,
-        pvss_public_params: &<Self::SubTranscript as TranscriptCore>::PublicParameters,
-        subtranscript: &Self::SubTranscript,
-        threshold_config: &Self::ThresholdConfig,
-        current_player: Player,
-        sk_share_decryption_key: &<Self::SubTranscript as TranscriptCore>::DecryptPrivKey,
-    ) -> Result<(
-        Self::EncryptionKey,
-        Vec<Self::VerificationKey>,
-        Self::MasterSecretKeyShare,
-    )>;
-
-    fn extract_encryption_key(
-        digest_key: &Self::DigestKey,
-        subtranscript: &Self::SubTranscript,
-    ) -> Result<Self::EncryptionKey>;
 
     /// Generates an (insecure) setup for the batch threshold encryption scheme. In production,
     /// a DKG will be used to produce all parts of this setup except for [`DigestKey`], which will
@@ -221,6 +198,7 @@ pub trait AssociatedData:
 }
 
 impl Plaintext for String {}
+impl Plaintext for Vec<u8> {}
 impl AssociatedData for String {}
 
 pub trait VerificationKey: Serialize + DeserializeOwned {

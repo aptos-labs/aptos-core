@@ -1,6 +1,5 @@
-// Copyright © Aptos Foundation
-// Parts of the project are originally copyright © Meta Platforms, Inc.
-// SPDX-License-Identifier: Apache-2.0
+// Copyright (c) Aptos Foundation
+// Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 //! This module provides an API for the accountable threshold multi-sig PureEdDSA signature scheme
 //! over the ed25519 twisted Edwards curve as defined in [RFC8032](https://tools.ietf.org/html/rfc8032).
@@ -525,11 +524,20 @@ impl Signature for MultiEd25519Signature {
                 ))
             },
         };
-        if bitmap_count_ones(self.bitmap) < public_key.threshold as u32 {
+        let num_ones_in_bitmap = bitmap_count_ones(self.bitmap);
+        if num_ones_in_bitmap < public_key.threshold as u32 {
             return Err(anyhow!(
                 "{}",
                 CryptoMaterialError::BitVecError(
                     "Not enough signatures to meet the threshold".to_string()
+                )
+            ));
+        }
+        if num_ones_in_bitmap != self.signatures.len() as u32 {
+            return Err(anyhow!(
+                "{}",
+                CryptoMaterialError::BitVecError(
+                    "Bitmap ones and signatures count are not equal".to_string()
                 )
             ));
         }
@@ -539,7 +547,11 @@ impl Signature for MultiEd25519Signature {
             while !bitmap_get_bit(self.bitmap, bitmap_index) {
                 bitmap_index += 1;
             }
-            sig.verify_arbitrary_msg(message, &public_key.public_keys[bitmap_index])?;
+            let pk = public_key
+                .public_keys
+                .get(bitmap_index)
+                .ok_or_else(|| anyhow::anyhow!("Public key index {bitmap_index} out of bounds"))?;
+            sig.verify_arbitrary_msg(message, pk)?;
             bitmap_index += 1;
         }
         Ok(())
