@@ -70,12 +70,8 @@ impl TempSymbol {
             TempSymbol::TupleDiscriminatorElement(idx) => {
                 env.symbol_pool().make(&format!("_$disc_{}", idx))
             },
-            TempSymbol::PrimitiveTemp(seq) => {
-                env.symbol_pool().make(&format!("_$prim_{}", seq))
-            },
-            TempSymbol::NonPrimitiveTemp(seq) => {
-                env.symbol_pool().make(&format!("_$np_{}", seq))
-            },
+            TempSymbol::PrimitiveTemp(seq) => env.symbol_pool().make(&format!("_$prim_{}", seq)),
+            TempSymbol::NonPrimitiveTemp(seq) => env.symbol_pool().make(&format!("_$np_{}", seq)),
         }
     }
 }
@@ -804,10 +800,7 @@ fn transform_mixed_arm(
             });
 
             // Combine with existing guard: prim_guard && wrapped_user_guard
-            let guard_parts: Vec<Exp> = prim_guard
-                .into_iter()
-                .chain(wrapped_user_guard)
-                .collect();
+            let guard_parts: Vec<Exp> = prim_guard.into_iter().chain(wrapped_user_guard).collect();
             let new_condition = conjoin(env, &loc, guard_parts);
 
             // Wrap the body with primitive-position var bindings
