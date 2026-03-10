@@ -9,6 +9,3 @@ proposals:
     execution_mode: MultiStep
     update_sequence:
       - RawScript: aptos-move/aptos-release-builder/data/proposals/aip-140.move
-      - FeatureFlag:
-          disabled:
-            - periodical_reward_rate_reduction
