@@ -65,10 +65,9 @@ fun computed_arg(r0) {
 
 fun partial_promotion(r0) {
     params: 1, locals: 0, registers: 1, arg_regs: 2
-    0: a0 := copy r0
-    1: a1 := add r0, #1
-    2: [a0] := call add_two, [a0, a1]
-    3: ret [a0]
+    0: a1 := add r0, #1
+    1: [a0] := call add_two, [r0, a1]
+    2: ret [a0]
 }
 
 fun call_with_param(r0) {

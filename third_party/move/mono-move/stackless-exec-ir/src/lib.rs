@@ -1,13 +1,17 @@
 // Copyright (c) Aptos Foundation
-// SPDX-License-Identifier: Apache-2.0
+// Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
+pub mod analysis_v2;
 pub mod arg_regs;
 pub mod convert_v1;
 pub mod convert_v2;
 pub mod display;
+pub mod instr_utils_v2;
 pub mod ir;
 pub mod optimize_v1;
 pub mod optimize_v2;
+pub mod pipeline_v2;
+pub mod regalloc_v2;
 pub mod type_conversion;
 
 use anyhow::{bail, Result};
@@ -53,18 +57,15 @@ pub fn run_pipeline(
         bail!("bytecode verification failed: {:#}", e);
     }
 
-    let mut module_ir = match config.version {
-        PipelineVersion::V1 => convert_v1::convert_module_v1(module, struct_name_table),
-        PipelineVersion::V2 => convert_v2::convert_module_v2(module, struct_name_table),
-    };
-
     match config.version {
         PipelineVersion::V1 => {
+            let mut module_ir = convert_v1::convert_module_v1(module, struct_name_table);
             optimize_v1::optimize_module_v1(&mut module_ir);
             arg_regs::introduce_arg_registers_module(&mut module_ir);
+            Ok(module_ir)
         },
-        PipelineVersion::V2 => optimize_v2::optimize_module_v2(&mut module_ir),
+        PipelineVersion::V2 => {
+            Ok(pipeline_v2::run_v2_pipeline(module, struct_name_table))
+        },
     }
-
-    Ok(module_ir)
 }

@@ -31,10 +31,11 @@ fn optimize_function(func: &mut FunctionIR) {
 // ================================================================================================
 
 /// Fuse consecutive borrow+deref patterns into combined field access instructions.
-pub(crate) fn fuse_field_access(func: &mut FunctionIR) {
+/// Core logic operating on a bare instruction vec (usable pre-allocation on SSA instrs).
+pub(crate) fn fuse_field_access_instrs(instrs: &mut Vec<Instr>) {
     let mut i = 0;
-    while i + 1 < func.instrs.len() {
-        let fused = match (&func.instrs[i], &func.instrs[i + 1]) {
+    while i + 1 < instrs.len() {
+        let fused = match (&instrs[i], &instrs[i + 1]) {
             // ImmBorrowField + ReadRef → ReadField
             (Instr::ImmBorrowField(ref_r, fld, src), Instr::ReadRef(dst, read_src))
                 if *ref_r == *read_src =>
@@ -91,13 +92,19 @@ pub(crate) fn fuse_field_access(func: &mut FunctionIR) {
         };
 
         if let Some(fused_instr) = fused {
-            func.instrs[i] = fused_instr;
-            func.instrs.remove(i + 1);
+            instrs[i] = fused_instr;
+            instrs.remove(i + 1);
             // Don't advance i, check if the new instruction can fuse further
         } else {
             i += 1;
         }
     }
+}
+
+/// Fuse consecutive borrow+deref patterns into combined field access instructions.
+/// Thin wrapper for FunctionIR.
+pub(crate) fn fuse_field_access(func: &mut FunctionIR) {
+    fuse_field_access_instrs(&mut func.instrs);
 }
 
 // ================================================================================================
