@@ -191,6 +191,10 @@ pub async fn emit_transactions_with_cluster(
         emit_job_request = emit_job_request.skip_funding_accounts();
     }
 
+    if args.encrypt_transactions {
+        emit_job_request = emit_job_request.encrypt_transactions(true);
+    }
+
     let coin_source_account = std::sync::Arc::new(coin_source_account);
     let stats = emitter
         .emit_txn_for_with_stats(

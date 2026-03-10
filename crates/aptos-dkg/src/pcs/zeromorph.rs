@@ -223,11 +223,13 @@ pub fn replay_challenges<P: Pairing>(
 }
 
 /// Compute the zeta_z commitment for Zeromorph verification as an MSM input.
-/// `combined_comm` is the (possibly batched) commitment to the polynomial being opened; `eval` is its evaluation at the point.
+/// `combined_comm` is the (possibly batched) commitment to the polynomial being opened as an MSM input;
+/// `eval` is its evaluation at the point. The layout matches the original single-point version:
+/// (q_hat_com, 1), (combined_comm terms scaled by z_challenge), (g1, eval_scalar*eval), (q_k_com, q_scalars).
 /// Used by [`Zeromorph::verify`] and by Dekart when it uses Zeromorph in a batched setting.
 pub fn zeta_z_com<P: Pairing>(
     q_hat_com: P::G1Affine,
-    combined_comm: P::G1Affine,
+    combined_comm: MsmInput<P::G1Affine, P::ScalarField>,
     g1: P::G1Affine,
     q_k_com: &[P::G1Affine],
     y_challenge: P::ScalarField,
@@ -242,12 +244,23 @@ pub fn zeta_z_com<P: Pairing>(
         .iter_mut()
         .zip(zmpoly_q_scalars)
         .for_each(|(s, zm)| *s += zm);
+    // Original layout: (q_hat_com, 1), (combined_comm, z_challenge), (g1, eval_scalar*eval), (q_k_com, q_scalars).
+    // With expanded combined_comm: each base gets (scalar * z_challenge); no standalone z_challenge.
+    let combined_scalars: Vec<P::ScalarField> = combined_comm
+        .scalars()
+        .iter()
+        .map(|s| *s * z_challenge)
+        .collect();
     let scalars: Vec<P::ScalarField> = [
-        vec![P::ScalarField::one(), z_challenge, eval_scalar * eval],
+        vec![P::ScalarField::one()],
+        combined_scalars,
+        vec![eval_scalar * eval],
         q_scalars,
     ]
     .concat();
-    let mut bases = vec![q_hat_com, combined_comm, g1];
+    let mut bases = vec![q_hat_com];
+    bases.extend(combined_comm.bases().iter().copied());
+    bases.push(g1);
     bases.extend(q_k_com.iter().copied());
     MsmInput::new(bases, scalars).expect("Zeromorph zeta_z MSM input")
 }
@@ -553,9 +566,11 @@ where
 
         // Must match prover: use point in reversed order so q_scalars[k] aligns with quotients[k].
         let point_reversed_for_scalars: Vec<P::ScalarField> = point.iter().rev().cloned().collect();
+        let combined_comm = MsmInput::new(vec![comm.0.into_affine()], vec![P::ScalarField::one()])
+            .expect("Zeromorph single commitment MSM input");
         let zeta_z_msm = zeta_z_com::<P>(
             q_hat_affine,
-            comm.0.into_affine(),
+            combined_comm,
             vk.hkzg_vk.group_generators.g1,
             &q_k_affine,
             y_challenge,

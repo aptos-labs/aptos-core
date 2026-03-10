@@ -23,10 +23,13 @@ struct MovePackageSpecInferParams {
 
 #[tool_router(router = package_spec_infer_router, vis = "pub(crate)")]
 impl FlowSession {
-    #[tool(description = "Low-level WP inference tool — not for direct use. \
+    #[tool(
+        description = "Low-level WP inference tool — not for direct use. \
                        Requires multi-phase workflow context (loop-invariant synthesis, \
                        simplification, verification) that is only available through \
-                       subagent delegation.")]
+                       subagent delegation.",
+        annotations(read_only_hint = false, destructive_hint = true)
+    )]
     async fn move_package_spec_infer(
         &self,
         Parameters(params): Parameters<MovePackageSpecInferParams>,

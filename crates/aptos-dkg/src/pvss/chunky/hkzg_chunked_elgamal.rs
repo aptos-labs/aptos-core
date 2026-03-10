@@ -26,7 +26,7 @@ use aptos_crypto::{
 };
 use aptos_crypto_derive::SigmaProtocolWitness;
 use ark_ec::{pairing::Pairing, AdditiveGroup, AffineRepr, CurveGroup};
-use ark_ff::PrimeField;
+use ark_ff::{PrimeField, Zero};
 use ark_serialize::{CanonicalDeserialize, CanonicalSerialize};
 use rand_core::{CryptoRng, RngCore};
 use std::{iter::repeat_with, marker::PhantomData};
@@ -48,15 +48,15 @@ use std::{iter::repeat_with, marker::PhantomData};
 #[derive(
     SigmaProtocolWitness, CanonicalSerialize, CanonicalDeserialize, Debug, Clone, PartialEq, Eq,
 )]
-pub struct HkzgWeightedElgamalWitness<F: PrimeField> {
+pub struct HkzgElgamalWitness<F: PrimeField> {
     pub hkzg_randomness: univariate_hiding_kzg::CommitmentRandomness<F>,
     pub chunked_plaintexts: Vec<Vec<Vec<Scalar<F>>>>, // For each player, plaintexts z_i, which are chunked z_{i,j}
     pub elgamal_randomness: Vec<Vec<Scalar<F>>>, // For at most max_weight, for each chunk, a blinding factor
 }
 
 /// Prepared data for the chunked ElGamal + range proof witness.
-pub struct ChunkedWitnessData<E: Pairing> {
-    pub witness: HkzgWeightedElgamalWitness<E::ScalarField>,
+pub struct WitnessData<E: Pairing> {
+    pub witness: HkzgElgamalWitness<E::ScalarField>,
     /// Flattened chunked shares for the range proof (length `W * m`);
     /// this data is already in the witness but we flatten it here for convenience.
     pub f_evals_chunked_flat: Vec<E::ScalarField>,
@@ -72,10 +72,10 @@ pub fn prepare_chunked_witness<E: Pairing, R: RngCore + CryptoRng>(
     pp: &PublicParameters<E>,
     sc: &WeightedConfigArkworks<E::ScalarField>,
     rng: &mut R,
-) -> ChunkedWitnessData<E> {
+) -> WitnessData<E> {
     debug_assert!(
         (8..=63).contains(&pp.ell),
-        "pp.ell must be between 8 and 63 (inclusive), got {}",
+        "pp.ell must be between 8 and 63 (inclusive), got {}", // 2^64 will lead to overflows
         pp.ell
     );
     // Step 3: convert the Shamir shares into chunked values
@@ -96,20 +96,20 @@ pub fn prepare_chunked_witness<E: Pairing, R: RngCore + CryptoRng>(
                 rng,
                 1 << pp.ell as u64, // debug_assert is to prevent overflow here
                 chunked_elgamal::num_chunks_per_scalar::<E::ScalarField>(pp.ell),
-                &<E::ScalarField as ark_ff::AdditiveGroup>::ZERO,
+                &E::ScalarField::zero(),
             )
         })
         .take(sc.get_max_weight())
         .collect(),
     );
 
-    let witness = HkzgWeightedElgamalWitness {
+    let witness = HkzgElgamalWitness {
         hkzg_randomness,
         chunked_plaintexts: Scalar::vecvecvec_from_inner(f_evals_weighted),
         elgamal_randomness,
     };
 
-    ChunkedWitnessData {
+    WitnessData {
         witness,
         f_evals_chunked_flat,
     }
@@ -126,13 +126,13 @@ pub fn prepare_chunked_witness<E: Pairing, R: RngCore + CryptoRng>(
 /// two components: in each case, the witness omits (or “ignores”) one of its three fields, then applies
 /// a homomorphism. Thus, the overall homomorphism of the Σ-protocol can be viewed as a tuple of two
 /// *lifted* homomorphisms.
-type LiftedHkzgWeighted<'a, E> = LiftHomomorphism<
+type LiftedHkzg<'a, E> = LiftHomomorphism<
     univariate_hiding_kzg::CommitmentHomomorphism<'a, E>,
-    HkzgWeightedElgamalWitness<<E as Pairing>::ScalarField>,
+    HkzgElgamalWitness<<E as Pairing>::ScalarField>,
 >;
-type LiftedWeightedChunkedElgamal<'a, C> = LiftHomomorphism<
-    chunked_elgamal::WeightedHomomorphism<'a, C>,
-    HkzgWeightedElgamalWitness<<<C as CurveGroup>::Affine as AffineRepr>::ScalarField>,
+type LiftedChunkedElgamal<'a, C> = LiftHomomorphism<
+    chunked_elgamal::Homomorphism<'a, C>,
+    HkzgElgamalWitness<<<C as CurveGroup>::Affine as AffineRepr>::ScalarField>,
 >;
 
 //                                 ┌───────────────────────────────┐
@@ -188,8 +188,8 @@ type LiftedWeightedChunkedElgamal<'a, C> = LiftHomomorphism<
 //pub type Homomorphism<'a, E> = CurveGroupTupleHomomorphism<LiftedHkzg<'a, E>, LiftedChunkedElgamal<'a, <E as Pairing>::G1>>;
 pub type Homomorphism<'a, E> = CurveGroupTupleHomomorphism<
     <E as Pairing>::G1,
-    LiftedHkzgWeighted<'a, E>,
-    LiftedWeightedChunkedElgamal<'a, <E as Pairing>::G1>,
+    LiftedHkzg<'a, E>,
+    LiftedChunkedElgamal<'a, <E as Pairing>::G1>,
 >;
 
 pub type Proof<'a, E> = sigma_protocol::Proof<<E as Pairing>::ScalarField, Homomorphism<'a, E>>;
@@ -206,7 +206,7 @@ impl<'a, E: Pairing> Proof<'a, E> {
         Self {
             first_proof_item: FirstProofItem::Commitment(TupleCodomainShape(
                 TrivialShape(unsafe_random_point(rng)), // because TrivialShape is the codomain of univariate_hiding_kzg::CommitmentHomomorphism. TODO: develop generate() methods there? Maybe make it part of sigma_protocol::Trait ?
-                chunked_elgamal::WeightedCodomainShape {
+                chunked_elgamal::CodomainShape {
                     chunks: (0..sc.get_total_num_players())
                         .map(|i| {
                             let w = sc.get_player_weight(&sc.get_player(i)); // TODO: combine these functions...
@@ -221,7 +221,7 @@ impl<'a, E: Pairing> Proof<'a, E> {
                     ],
                 },
             )),
-            z: HkzgWeightedElgamalWitness {
+            z: HkzgElgamalWitness {
                 hkzg_randomness:
                     univariate_hiding_kzg::CommitmentRandomness::<E::ScalarField>::rand(rng),
                 chunked_plaintexts: (0..sc.get_total_num_players())
@@ -258,14 +258,14 @@ impl<'a, E: Pairing> Homomorphism<'a, E> {
         eks: &'a [E::G1Affine],
     ) -> Self {
         // Set up the HKZG homomorphism, and use a projection map to lift it to HkzgElgamalWitness
-        let lifted_hkzg = LiftedHkzgWeighted::<E> {
+        let lifted_hkzg = LiftedHkzg::<E> {
             hom: univariate_hiding_kzg::CommitmentHomomorphism {
                 msm_basis: lagr_g1,
                 xi_1,
             },
             // The projection map ignores the `elgamal_randomness` component, and flattens the vector of chunked plaintexts after adding a zero
-            projection: |dom: &HkzgWeightedElgamalWitness<E::ScalarField>| {
-                let HkzgWeightedElgamalWitness {
+            projection: |dom: &HkzgElgamalWitness<E::ScalarField>| {
+                let HkzgElgamalWitness {
                     hkzg_randomness,
                     chunked_plaintexts,
                     ..
@@ -281,16 +281,16 @@ impl<'a, E: Pairing> Homomorphism<'a, E> {
             },
         };
         // Set up the chunked_elgamal homomorphism, and use a projection map to lift it to HkzgElgamalWitness
-        let lifted_chunked_elgamal = LiftedWeightedChunkedElgamal::<E::G1> {
-            hom: chunked_elgamal::WeightedHomomorphism { pp, eks },
+        let lifted_chunked_elgamal = LiftedChunkedElgamal::<E::G1> {
+            hom: chunked_elgamal::Homomorphism { pp, eks },
             // The projection map simply ignores the `hkzg_randomness` component
-            projection: |dom: &HkzgWeightedElgamalWitness<E::ScalarField>| {
-                let HkzgWeightedElgamalWitness {
+            projection: |dom: &HkzgElgamalWitness<E::ScalarField>| {
+                let HkzgElgamalWitness {
                     chunked_plaintexts,
                     elgamal_randomness,
                     ..
                 } = dom;
-                chunked_elgamal::WeightedWitness {
+                chunked_elgamal::Witness {
                     plaintext_chunks: chunked_plaintexts.clone(),
                     plaintext_randomness: elgamal_randomness.clone(),
                 }

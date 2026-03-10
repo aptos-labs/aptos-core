@@ -40,7 +40,7 @@ use aptos_network::{
 };
 use aptos_network_discovery::DiscoveryChangeListener;
 use aptos_time_service::TimeService;
-use aptos_types::{chain_id::ChainId, network_address::NetworkAddress};
+use aptos_types::{chain_id::ChainId, network_address::NetworkAddress, PeerId};
 use std::{clone::Clone, collections::HashSet, sync::Arc, time::Duration};
 use tokio::runtime::Handle;
 
@@ -86,6 +86,7 @@ impl NetworkBuilder {
         inbound_connection_limit: usize,
         tcp_buffer_cfg: TCPBufferCfg,
         access_control_policy: Option<Arc<AccessControlPolicy>>,
+        priority_inbound_peers: Vec<PeerId>,
     ) -> Self {
         // A network cannot exist without a PeerManager
         // TODO:  construct this in create and pass it to new() as a parameter. The complication is manual construction of NetworkBuilder in various tests.
@@ -103,6 +104,7 @@ impl NetworkBuilder {
             inbound_connection_limit,
             tcp_buffer_cfg,
             access_control_policy,
+            priority_inbound_peers,
         );
 
         NetworkBuilder {
@@ -142,7 +144,8 @@ impl NetworkBuilder {
             NETWORK_CHANNEL_SIZE,
             MAX_INBOUND_CONNECTIONS,
             TCPBufferCfg::default(),
-            None, /* access_control_policy */
+            None,       /* access_control_policy */
+            Vec::new(), /* priority_inbound_peers */
         );
 
         builder.add_connectivity_manager(
@@ -203,6 +206,7 @@ impl NetworkBuilder {
                 config.outbound_tx_buffer_size_bytes,
             ),
             access_control_policy.clone(),
+            config.priority_inbound_peers.clone(),
         );
 
         network_builder.add_connection_monitoring(

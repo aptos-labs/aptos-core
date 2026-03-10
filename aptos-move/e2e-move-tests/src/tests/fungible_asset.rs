@@ -11,13 +11,9 @@ use aptos_types::{
     account_address::{self, AccountAddress},
     on_chain_config::FeatureFlag,
 };
-use move_core_types::{
-    identifier::Identifier,
-    language_storage::{StructTag, TypeTag},
-};
+use move_core_types::{identifier::Identifier, language_storage::StructTag};
 use once_cell::sync::Lazy;
 use serde::Deserialize;
-use std::str::FromStr;
 
 #[derive(Debug, Deserialize, Eq, PartialEq)]
 struct FungibleStore {
@@ -174,67 +170,6 @@ fn test_basic_fungible_token() {
     assert_eq!(alice_store.balance, 70);
     alice_store.balance = 10;
     assert_eq!(alice_store, bob_store);
-}
-
-// A simple test to verify gas paying still work for prologue and epilogue.
-#[test]
-fn test_coin_to_fungible_asset_migration() {
-    let mut h = MoveHarness::new_with_features(vec![], vec![
-        FeatureFlag::NEW_ACCOUNTS_DEFAULT_TO_FA_APT_STORE,
-        FeatureFlag::OPERATIONS_DEFAULT_TO_FA_APT_STORE,
-        FeatureFlag::DEFAULT_TO_CONCURRENT_FUNGIBLE_BALANCE,
-        FeatureFlag::NEW_ACCOUNTS_DEFAULT_TO_FA_STORE,
-    ]);
-
-    let alice = h.new_account_at(AccountAddress::from_hex_literal("0xcafe").unwrap());
-    let alice_primary_store_addr =
-        account_address::create_derived_object_address(*alice.address(), AccountAddress::TEN);
-    let root = h.aptos_framework_account();
-
-    assert_success!(h.run_entry_function(
-        &root,
-        str::parse(&format!(
-            "0x{}::coin::create_coin_conversion_map",
-            (*root.address()).to_hex()
-        ))
-        .unwrap(),
-        vec![],
-        vec![],
-    ));
-
-    assert_success!(h.run_entry_function(
-        &root,
-        str::parse(&format!(
-            "0x{}::coin::create_pairing",
-            (*root.address()).to_hex()
-        ))
-        .unwrap(),
-        vec![TypeTag::from_str("0x1::aptos_coin::AptosCoin").unwrap()],
-        vec![],
-    ));
-    assert!(h
-        .read_resource_from_resource_group::<FungibleStore>(
-            &alice_primary_store_addr,
-            OBJ_GROUP_TAG.clone(),
-            FUNGIBLE_STORE_TAG.clone()
-        )
-        .is_none());
-
-    let result = h.run_entry_function(
-        &alice,
-        str::parse("0x1::coin::migrate_to_fungible_store").unwrap(),
-        vec![TypeTag::from_str("0x1::aptos_coin::AptosCoin").unwrap()],
-        vec![],
-    );
-    assert_success!(result);
-
-    assert!(h
-        .read_resource_from_resource_group::<FungibleStore>(
-            &alice_primary_store_addr,
-            OBJ_GROUP_TAG.clone(),
-            FUNGIBLE_STORE_TAG.clone()
-        )
-        .is_some());
 }
 
 /// Trigger speculative error in prologue, from accessing delayed field that was created later than

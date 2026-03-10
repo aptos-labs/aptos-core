@@ -66,6 +66,8 @@ pub trait Trait:
         T: CanonicalSerialize + CanonicalDeserialize + Clone + Debug + Eq;
 
     /// Returns the MSM terms corresponding to a given homomorphism input.
+    /// So this can be used to compute the homomorphism; in particular, the
+    /// MSM terms A and P^c get added later in the sigma protocol.
     ///
     /// The result is structured such that applying MSM evaluation elementwise
     /// yields the homomorphism’s output.

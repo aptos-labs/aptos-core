@@ -1,14 +1,12 @@
 /// This module provides the foundation for typesafe Coins.
 module aptos_framework::coin {
     use std::error;
-    use std::features;
     use std::option::{Self, Option};
     use std::signer;
     use std::string::{Self, String};
     use aptos_std::table::{Self, Table};
 
     use aptos_framework::account;
-    use aptos_framework::aggregator_factory;
     use aptos_framework::aggregator::Aggregator;
     use aptos_framework::event::{Self, EventHandle};
     use aptos_framework::guid;
@@ -720,12 +718,9 @@ module aptos_framework::coin {
     public entry fun migrate_coin_store_to_fungible_store<CoinType>(
         accounts: vector<address>
     ) acquires CoinStore, CoinConversionMap, CoinInfo {
-        if (features::new_accounts_default_to_fa_store_enabled()
-            || features::new_accounts_default_to_fa_apt_store_enabled()) {
-            accounts.for_each(|account| {
-                    maybe_convert_to_fungible_store<CoinType>(account);
-                });
-        }
+        accounts.for_each(|account| {
+                maybe_convert_to_fungible_store<CoinType>(account);
+            });
     }
 
     //
@@ -1248,6 +1243,7 @@ module aptos_framework::coin {
     fun initialize_fake_money(
         account: &signer, decimals: u8, monitor_supply: bool
     ): (BurnCapability<FakeMoney>, FreezeCapability<FakeMoney>, MintCapability<FakeMoney>) acquires CoinInfo, CoinConversionMap {
+        use aptos_framework::aggregator_factory;
         aggregator_factory::initialize_aggregator_factory_for_test(account);
         initialize<FakeMoney>(
             account,
@@ -1364,6 +1360,7 @@ module aptos_framework::coin {
     #[test(source = @0x2, framework = @aptos_framework)]
     #[expected_failure(abort_code = 0x10001, location = Self)]
     public fun fail_initialize(source: signer, framework: signer) acquires CoinInfo, CoinConversionMap {
+        use aptos_framework::aggregator_factory;
         aggregator_factory::initialize_aggregator_factory_for_test(&framework);
         let (burn_cap, freeze_cap, mint_cap) =
             initialize<FakeMoney>(
@@ -1580,6 +1577,7 @@ module aptos_framework::coin {
     fun test_supply_initialize_fails(
         framework: signer, other: signer
     ) acquires CoinInfo, CoinConversionMap {
+        use aptos_framework::aggregator_factory;
         aggregator_factory::initialize_aggregator_factory_for_test(&framework);
         initialize_with_aggregator(&other);
     }
@@ -1601,6 +1599,7 @@ module aptos_framework::coin {
 
     #[test(framework = @aptos_framework)]
     fun test_supply_initialize(framework: signer) acquires CoinInfo, CoinConversionMap {
+        use aptos_framework::aggregator_factory;
         aggregator_factory::initialize_aggregator_factory_for_test(&framework);
         initialize_with_aggregator(&framework);
 
@@ -1624,6 +1623,7 @@ module aptos_framework::coin {
     #[test(framework = @aptos_framework)]
     #[expected_failure(abort_code = 0x20001, location = aptos_framework::aggregator)]
     fun test_supply_overflow(framework: signer) acquires CoinInfo, CoinConversionMap {
+        use aptos_framework::aggregator_factory;
         aggregator_factory::initialize_aggregator_factory_for_test(&framework);
         initialize_with_aggregator(&framework);
 

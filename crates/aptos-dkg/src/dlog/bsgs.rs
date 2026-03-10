@@ -10,9 +10,9 @@
 //! balances time and memory, but we leave it as a parameter to the algorithm.
 //!
 //! We use a batch size for serialization in the giant-step loop. This is a trade-off between
-//! the overhead of serializing and deserializing each point, and the overhead of calling
-//! `normalize_batch` for each point. We use a default batch size of 2048, but this can be tuned
-//! via benchmarks.
+//! the overhead of serializing each point and looking it up in the table, and doing this in a batch
+//! with `normalize_batch` but potentially going on for too long. We use a default batch size of 2048,
+//! but this can be tuned via benchmarks.
 //!
 //! We use a threshold for the batch size below which we use the original one-at-a-time algorithm
 //! (serialize each projective point without batch normalizing). Above it we use batch normalize + serialize.
@@ -27,8 +27,9 @@ use std::collections::HashMap;
 pub const DEFAULT_BSGS_SERIALIZATION_BATCH_SIZE: usize = 2048;
 
 /// Below this batch size we use the original one-at-a-time algorithm (serialize each
-/// projective point without batch normalizing). Above it we use batch normalize + serialize.
-/// Tune via benchmarks; small batches (2–8) are often slower than 1 due to normalize_batch overhead.
+/// projective point without batch normalizing), because it would be slower not to. Above it we use batch
+/// normalize + serialize. Tune via benchmarks; small batches (2–8) are often slower than 1 due to some
+/// kind of `normalize_batch` overhead.
 pub const BSGS_BATCH_NORMALIZE_THRESHOLD: usize = 4;
 
 /// Minimum number of targets for which `dlog_vec` uses the batched-across-targets path.

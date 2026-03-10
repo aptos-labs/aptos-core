@@ -15,6 +15,10 @@
       "required": [
         "package_path"
       ]
+    },
+    "annotations": {
+      "readOnlyHint": false,
+      "destructiveHint": false
     }
   },
   {
@@ -38,6 +42,10 @@
       "required": [
         "package_path"
       ]
+    },
+    "annotations": {
+      "readOnlyHint": false,
+      "destructiveHint": true
     }
   },
   {
@@ -56,6 +64,10 @@
       "required": [
         "package_path"
       ]
+    },
+    "annotations": {
+      "readOnlyHint": false,
+      "destructiveHint": false
     }
   },
   {
@@ -94,6 +106,10 @@
       "required": [
         "package_path"
       ]
+    },
+    "annotations": {
+      "readOnlyHint": false,
+      "destructiveHint": false
     }
   }
 ]
