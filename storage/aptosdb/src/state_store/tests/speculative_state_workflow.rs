@@ -672,8 +672,14 @@ fn commit_state_buffer(
                 &state_by_version.get_state(Some(next_version - 1)).hot_state[shard_id];
             assert_eq!(all_entries.len(), naive_hot_state.len());
 
-            for (key, slot) in &all_entries {
-                let slot2 = naive_hot_state.peek(key).unwrap();
+            // Build a hash-keyed lookup from the naive LRU for comparison.
+            let naive_by_hash: std::collections::HashMap<HashValue, &StateSlot> = naive_hot_state
+                .iter()
+                .map(|(k, v)| (CryptoHash::hash(k), v))
+                .collect();
+
+            for (hash, slot) in &all_entries {
+                let slot2 = naive_by_hash.get(hash).unwrap();
                 StateByVersion::assert_state_slot(slot, slot2);
             }
         });
