@@ -133,28 +133,6 @@ impl<F: SumcheckField> BooleanityEqSumcheckProver<F> {
         }
     }
 
-    /// Convenience: build prover when t is a hypercube point given by index in [0, 2^n), t ≠ 0.
-    /// TODO: remove?
-    pub fn new_with_hypercube_point(
-        num_vars: usize,
-        mle_evals: Vec<Vec<F>>,
-        c: F,
-        t_index: usize,
-    ) -> Self {
-        let n = 1 << num_vars;
-        assert!(t_index < n && t_index != 0);
-        let t: Vec<F> = (0..num_vars)
-            .map(|i| {
-                if (t_index >> (num_vars - 1 - i)) & 1 == 1 {
-                    F::one()
-                } else {
-                    F::zero()
-                }
-            })
-            .collect();
-        Self::new(num_vars, mle_evals, c, t)
-    }
-
     /// Round polynomial evaluations: for x_cur in {0,1,2,3,4}, sum over the rest of the hypercube.
     fn round_evals(
         polys: &[DensePolynomial<F>],
@@ -544,65 +522,5 @@ mod tests {
             &mut transcript_v,
         );
         assert!(result.is_ok(), "two-round prove/verify failed");
-    }
-
-    #[test]
-    fn booleanity_eq_sumcheck_prove_verify_hypercube_t() {
-        let mut rng = ark_std::test_rng();
-        let num_vars = 4;
-        let n = 1 << num_vars;
-        let m = 8usize;
-        let c = Fr::rand(&mut rng);
-        let t_index = 7usize; // != 0, on hypercube
-
-        let mle_evals: Vec<Vec<Fr>> = (0..m)
-            .map(|_| (0..n).map(|_| Fr::rand(&mut rng)).collect())
-            .collect();
-
-        let mut prover = BooleanityEqSumcheckProver::<Fr>::new_with_hypercube_point(
-            num_vars,
-            mle_evals.clone(),
-            c,
-            t_index,
-        );
-        let verifier = BooleanityEqSumcheckVerifier::<Fr>::new_with_hypercube_point(
-            num_vars,
-            mle_evals.clone(),
-            c,
-            t_index,
-        );
-
-        let mut prover_acc = ProverOpeningAccumulator::<Fr>::new(0);
-        let mut verifier_acc = VerifierOpeningAccumulator::<Fr>::new(0, false);
-        let mut transcript_p_inner = Transcript::new(b"booleanity_eq_hypercube");
-        let mut transcript_p = MerlinSumcheckTranscript::new(&mut transcript_p_inner);
-        let mut transcript_v_inner = Transcript::new(b"booleanity_eq_hypercube");
-        let mut transcript_v = MerlinSumcheckTranscript::new(&mut transcript_v_inner);
-
-        let (proof, challenges, _claim) =
-            BatchedSumcheck::prove(vec![&mut prover], &mut prover_acc, &mut transcript_p);
-
-        let result = BatchedSumcheck::verify_standard::<Fr, _>(
-            &proof,
-            vec![&verifier],
-            &mut verifier_acc,
-            &mut transcript_v,
-        );
-        assert!(result.is_ok());
-        assert_eq!(challenges.len(), num_vars);
-
-        // When t is on hypercube, sum_x F(x) = F(t) = sum_{j=1}^m c^j * MLE[j](t)*(1-MLE[j](t))
-        let mut expected_claim = Fr::zero();
-        let mut c_j = c;
-        for j in 0..m {
-            let v = mle_evals[j][t_index];
-            expected_claim += c_j * v * (Fr::one() - v);
-            c_j *= c;
-        }
-        assert_eq!(
-            prover.params.initial_claim.unwrap(),
-            expected_claim,
-            "hypercube claim should equal F(t)"
-        );
     }
 }

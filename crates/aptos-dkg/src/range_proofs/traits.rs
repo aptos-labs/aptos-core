@@ -1,7 +1,7 @@
 // Copyright (c) Aptos Foundation
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
-use crate::fiat_shamir::SerializeForTranscript;
+use crate::fiat_shamir::SerializeForFiatShamirTranscript;
 use aptos_crypto::arkworks::{random::UniformRand, GroupGenerators};
 use ark_ec::pairing::{Pairing, PairingOutput};
 use ark_ff::AdditiveGroup;
@@ -12,7 +12,7 @@ use rand::{CryptoRng, RngCore};
 pub trait BatchedRangeProof<E: Pairing>: Clone + CanonicalSerialize + CanonicalDeserialize {
     type PublicStatement: CanonicalSerialize; // Serialization is needed because this is often appended to a Fiat-Shamir transcript
     type ProverKey;
-    type VerificationKey: Clone + SerializeForTranscript; // This is often appended to a Fiat-Shamir transcript
+    type VerificationKey: Clone + SerializeForFiatShamirTranscript; // This is often appended to a Fiat-Shamir transcript
     type Input: From<u64>; // Slightly hacky. It's used in `range_proof_random_instance()` to generate (chunks of) inputs that have a certain bit size
     type Commitment: Clone + Into<Self::CommitmentNormalised>;
     type CommitmentNormalised: Clone;

@@ -21,7 +21,6 @@ use crate::arkworks::sumcheck::{
     unipoly::UniPoly,
     ProverOpeningAccumulator,
 };
-use std::marker::PhantomData;
 
 const DEGREE: usize = 4;
 
@@ -36,7 +35,6 @@ struct MaskingState<F: SumcheckField> {
 pub struct BooleanityEqLsbParams<F: SumcheckField> {
     pub num_rounds: usize,
     pub initial_claim: Option<F>,
-    _marker: PhantomData<F>,
 }
 
 impl<F: SumcheckField> SumcheckInstanceParams<F> for BooleanityEqLsbParams<F> {
@@ -131,7 +129,6 @@ impl<F: SumcheckField> BooleanityEqSumcheckProverLSB<F> {
             params: BooleanityEqLsbParams {
                 num_rounds: num_vars,
                 initial_claim: Some(initial_claim),
-                _marker: PhantomData,
             },
             polys,
             c,
@@ -345,7 +342,6 @@ impl<F: SumcheckField> BooleanityEqSumcheckVerifierLSB<F> {
             params: BooleanityEqLsbParams {
                 num_rounds,
                 initial_claim: Some(initial_claim),
-                _marker: PhantomData,
             },
             polys_evals: Some(mle_evals),
             c,
@@ -481,7 +477,6 @@ impl<F: SumcheckField> BooleanityEqSumcheckVerifierLSBWithOpenings<F> {
             params: BooleanityEqLsbParams {
                 num_rounds,
                 initial_claim: Some(initial_claim),
-                _marker: PhantomData,
             },
             c_powers,
             t,

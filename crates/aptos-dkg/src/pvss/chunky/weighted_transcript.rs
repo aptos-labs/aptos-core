@@ -10,7 +10,7 @@
 //!   * one MSM in G2
 //! Verified with a single pairing equation.
 //!
-//! Based on: https://alinush.github.io/chunky#chunky-a-weighted-non-malleable-pvss
+//! Based on: <https://alinush.github.io/chunky#chunky-a-weighted-non-malleable-pvss>
 
 use crate::{
     delegate_transcript_core_to_subtrs,

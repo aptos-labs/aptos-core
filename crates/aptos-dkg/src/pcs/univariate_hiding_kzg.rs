@@ -275,6 +275,7 @@ impl<'a, E: Pairing> CommitmentHomomorphism<'a, E> {
         y: E::ScalarField,
         pi: OpeningProof<E>,
     ) -> (Vec<E::G1Affine>, Vec<E::G2Affine>) {
+        // Why not postpone the normalization to the caller?
         let VerificationKey {
             xi_2,
             tau_2,
@@ -284,11 +285,11 @@ impl<'a, E: Pairing> CommitmentHomomorphism<'a, E> {
                     g2: one_2,
                 },
         } = vk;
-        let OpeningProof { pi_1, pi_2 } = pi;
+        let OpeningProof { pi_1, pi_2 } = pi; // These are probably going to be affine
 
         (
             E::G1::normalize_batch(&[C.0 - one_1 * y, -pi_1.0, -pi_2]),
-            vec![one_2, (tau_2 - one_2 * x).into_affine(), xi_2],
+            vec![one_2, (tau_2 - one_2 * x).into_affine(), xi_2], // So we should store -xi_2 instead? Check the math
         )
     }
 

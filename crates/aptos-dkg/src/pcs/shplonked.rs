@@ -16,7 +16,7 @@
 // WARNING: THIS CODE HAS NOT BEEN PROPERLY VETTED, ONLY USE FOR BENCHMARKING PURPOSES!!!!!
 
 use crate::{
-    fiat_shamir::{PolynomialCommitmentScheme as _, SerializeForTranscript},
+    fiat_shamir::{PolynomialCommitmentScheme as _, SerializeForFiatShamirTranscript},
     pcs::{
         shplonked_sigma::{self, ShplonkedSigmaWitness},
         traits::PolynomialCommitmentScheme,
@@ -214,7 +214,7 @@ pub struct Srs<E: Pairing> {
 }
 
 /// Minimal bytes for Fiat–Shamir: only first two tau powers plus G2 elements (no full `taus_1`).
-impl<E: Pairing> SerializeForTranscript for Srs<E> {
+impl<E: Pairing> SerializeForFiatShamirTranscript for Srs<E> {
     fn serialize_compressed_for_transcript<W: std::io::Write>(
         &self,
         w: &mut W,

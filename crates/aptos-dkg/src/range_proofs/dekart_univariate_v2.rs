@@ -1,12 +1,12 @@
 // Copyright (c) Aptos Foundation
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
-// This file implements the range proof described here: https://alinush.github.io/dekart
+//! This file implements the range proof described here: <https://alinush.github.io/dekart>
 
 use super::scalars_to_bits;
 use crate::{
     algebra::polynomials,
-    fiat_shamir::{serialize_canonical_for_transcript, SerializeForTranscript},
+    fiat_shamir::{serialize_canonical_for_transcript, SerializeForFiatShamirTranscript},
     pcs::univariate_hiding_kzg,
     range_proofs::{traits, PublicStatement},
     sigma_protocol::{
@@ -49,8 +49,8 @@ pub struct Proof<E: Pairing> {
     D: E::G1Affine,
     a: E::ScalarField,
     a_h: E::ScalarField,
-    a_js: Vec<E::ScalarField>, // has length ell
-    pi_gamma: univariate_hiding_kzg::OpeningProof<E>,
+    a_js: Vec<E::ScalarField>,                        // has length ell
+    pi_gamma: univariate_hiding_kzg::OpeningProof<E>, // TODO: need to make this affine
 }
 
 // #[allow(non_snake_case)]
@@ -89,7 +89,7 @@ impl<E: Pairing> Proof<E> {
     // }
 
     /// Generates a random looking proof (but not a valid one).
-    /// Useful for testing and benchmarking. TODO: might be able to derive this through macros etc
+    /// Useful for testing and benchmarking. TODO: might be able to derive this through derive macros etc
     pub fn generate<R: rand::Rng + rand::CryptoRng>(ell: u8, rng: &mut R) -> Self {
         Self {
             hat_C: unsafe_random_point(rng),
@@ -121,7 +121,7 @@ pub struct VerificationKey<E: Pairing> {
     verifier_precomputed: VerifierPrecomputed<E>,
 }
 
-impl<E: Pairing> SerializeForTranscript for VerificationKey<E> {
+impl<E: Pairing> SerializeForFiatShamirTranscript for VerificationKey<E> {
     fn serialize_compressed_for_transcript<W: Write>(
         &self,
         w: &mut W,
