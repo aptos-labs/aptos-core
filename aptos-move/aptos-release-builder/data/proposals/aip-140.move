@@ -31,7 +31,8 @@ script {
         // "raw" values are stored in 0x1::staking_config::StakingRewardsConfig
         // StakingRewardsConfig can be found here:
         // https://mainnet.aptoslabs.com/v1/accounts/0x1/resource/0x1::staking_config::StakingRewardsConfig
-        let min_rewards_rate = fixed_point64::create_from_raw_value(136874841026924);
+        // updating minimal rewards rate to be the current reward rate
+        let min_rewards_rate = new_rewards_rate;
         let rewards_rate_period_sec = seconds_in_year; // unchanged, 1 year
         let rewards_rate_decrease_rate = fixed_point64::create_from_raw_value(276701161105643274); // unchanged
 
