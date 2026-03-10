@@ -2,6 +2,7 @@
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 mod package_manifest;
+mod package_query;
 mod package_spec_infer;
 mod package_status;
 pub(crate) mod package_test;

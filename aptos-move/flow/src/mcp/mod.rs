@@ -1,6 +1,7 @@
 // Copyright (c) Aptos Foundation
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
+pub(crate) mod common;
 pub(crate) mod file_watcher;
 mod package_data;
 pub(crate) mod session;

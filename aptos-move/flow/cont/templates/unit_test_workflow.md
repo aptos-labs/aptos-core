@@ -17,11 +17,13 @@
 
 ### Phase 2 — Analyze Target Code
 
-**Specific function requested:** Read the source and identify behaviors to test:
-- Success path with valid inputs
-- Each distinct abort condition
-- Edge cases (empty, zero, boundaries)
-- Potential bugs
+**Specific function requested:**
+1. Call `{{ tool(name="move_package_coverage") }}` with `function` set to `"module_name::function_name"` — get uncovered lines in that function
+2. Read the source and identify behaviors to test:
+   - Success path with valid inputs
+   - Each distinct abort condition
+   - Edge cases (empty, zero, boundaries)
+   - Potential bugs
 
 **Full module mode:**
 1. Call `{{ tool(name="move_package_coverage") }}` — get uncovered lines per source file
@@ -51,7 +53,9 @@ module <package_address>::<module>_tests {
 }
 ```
 
-In full module mode, generate all tests in a single batch.
+**Full module mode:** Generate tests in batches.
+
+**Suspected bugs:** Assert the *correct* expected behavior — the test should fail against the buggy code.
 
 ### Phase 4 — Validate Tests
 
@@ -69,7 +73,7 @@ Iterate until all tests in `tests/move_flow/` pass.
 
 ### Phase 5 — Check Coverage Improvement
 
-Check `newly_covered` from Phase 4 to confirm the generated tests added coverage. Use `{{ tool(name="move_package_coverage") }}` to check remaining gaps — generate additional tests if needed and feasible.
+Check `newly_covered` from Phase 4 to confirm the generated tests added coverage. Use `{{ tool(name="move_package_coverage") }}` to check remaining gaps (pass `function` as `"module_name::function_name"` when targeting a specific function) — generate additional tests if needed and feasible.
 
 ### Phase 6 — Minimize Tests (do not skip)
 

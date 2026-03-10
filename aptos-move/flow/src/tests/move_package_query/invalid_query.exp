@@ -1,0 +1,1 @@
+rpc_error: Mcp error: -32602: failed to deserialize parameters: unknown variant `nonsense`, expected one of `dep_graph`, `module_summary`, `call_graph`, `function_usage`
