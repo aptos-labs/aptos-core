@@ -1,13 +1,14 @@
 // Copyright (c) Aptos Foundation
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
+#[cfg(any(test, feature = "fuzzing"))]
+use crate::ledger_db::transaction_auxiliary_data_db::TransactionAuxiliaryDataDb;
 use crate::{
     backup::restore_utils,
     db::{aptosdb_internal::gauged_api, AptosDB},
     ledger_db::{
-        ledger_metadata_db::LedgerMetadataDb,
-        transaction_auxiliary_data_db::TransactionAuxiliaryDataDb,
-        transaction_info_db::TransactionInfoDb, LedgerDbSchemaBatches,
+        ledger_metadata_db::LedgerMetadataDb, transaction_info_db::TransactionInfoDb,
+        LedgerDbSchemaBatches,
     },
     metrics::{
         COMMITTED_TXNS, LATEST_TXN_VERSION, LEDGER_VERSION, NEXT_BLOCK_EPOCH, OTHER_TIMERS_SECONDS,
@@ -26,13 +27,14 @@ use aptos_storage_interface::{
     chunk_to_commit::ChunkToCommit, db_ensure as ensure, AptosDbError, DbReader, DbWriter, Result,
     StateSnapshotReceiver,
 };
+#[cfg(any(test, feature = "fuzzing"))]
+use aptos_types::transaction::TransactionAuxiliaryData;
 use aptos_types::{
     account_config::new_block_event_key,
     ledger_info::LedgerInfoWithSignatures,
     state_store::{state_key::StateKey, state_value::StateValue},
     transaction::{
-        Transaction, TransactionAuxiliaryData, TransactionInfo, TransactionOutput,
-        TransactionOutputListWithProofV2, Version,
+        Transaction, TransactionInfo, TransactionOutput, TransactionOutputListWithProofV2, Version,
     },
     write_set::WriteSet,
 };
@@ -451,7 +453,7 @@ impl AptosDB {
         Ok(root_hash)
     }
 
-    #[allow(dead_code)]
+    #[cfg(any(test, feature = "fuzzing"))]
     pub(super) fn commit_transaction_auxiliary_data<'a>(
         &self,
         first_version: Version,

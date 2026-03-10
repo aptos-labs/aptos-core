@@ -58,7 +58,7 @@ impl PrunerWorker {
         }
     }
 
-    #[allow(dead_code)]
+    #[cfg(test)]
     pub fn is_pruning_pending(&self) -> bool {
         self.pruner.is_pruning_pending()
     }

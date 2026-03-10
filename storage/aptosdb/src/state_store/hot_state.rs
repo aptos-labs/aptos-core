@@ -154,7 +154,7 @@ pub struct HotState {
     commit_tx: SyncSender<CommitMsg>,
     /// Updated by the Committer after each successful DashMap merge. Tests use this to wait for
     /// the merge to complete before inspecting DashMaps. Only read by test helpers.
-    #[allow(dead_code)]
+    #[cfg(test)]
     merged_version: Arc<AtomicU64>,
 }
 
@@ -181,6 +181,7 @@ impl HotState {
             base,
             committed,
             commit_tx,
+            #[cfg(test)]
             merged_version,
         }
     }
