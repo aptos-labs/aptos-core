@@ -73,17 +73,15 @@ fun partial_promotion(r0) {
 
 fun call_with_param(r0) {
     params: 1, locals: 0, registers: 1, arg_regs: 1
-    0: a0 := copy r0
-    1: [a0] := call identity, [a0]
-    2: ret [a0]
+    0: [a0] := call identity, [r0]
+    1: ret [a0]
 }
 
 fun arg_live_after_call(r0) {
     params: 1, locals: 1, registers: 3, arg_regs: 1
-    0: a0 := copy r0
-    1: [r1] := call identity, [a0]
-    2: r2 := add r0, r1
-    3: ret [r2]
+    0: [r1] := call identity, [r0]
+    1: r2 := add r0, r1
+    2: ret [r2]
 }
 
 fun ret_used_past_next_call() {
@@ -124,22 +122,20 @@ fun call_in_loop(r0) {
     1: r2 := gt r0, #0
     2: br_false L0, r2
   L1:
-    3: a0 := copy r0
-    4: [a0] := call identity, [a0]
-    5: r1 := add a0, r1
-    6: r0 := sub r0, #1
-    7: branch L2
+    3: [a0] := call identity, [r0]
+    4: r1 := add a0, r1
+    5: r0 := sub r0, #1
+    6: branch L2
   L0:
-    8: ret [r1]
+    7: ret [r1]
 }
 
 fun mixed_at_callsite(r0) {
     params: 1, locals: 0, registers: 1, arg_regs: 3
     0: a0 := ld_u64 10
-    1: a1 := copy r0
-    2: a2 := ld_u64 30
-    3: [a0] := call three_args, [a0, a1, a2]
-    4: ret [a0]
+    1: a2 := ld_u64 30
+    2: [a0] := call three_args, [a0, r0, a2]
+    3: ret [a0]
 }
 
 fun mixed_intervening_call() {

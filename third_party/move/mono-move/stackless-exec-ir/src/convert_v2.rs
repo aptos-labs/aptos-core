@@ -1,5 +1,5 @@
 // Copyright (c) Aptos Foundation
-// SPDX-License-Identifier: Apache-2.0
+// Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 //! V2 conversion pipeline: Intra-block SSA + greedy register allocation.
 //!
@@ -1262,15 +1262,25 @@ fn allocate_block(
     let mut free_pool = carry_pool;
     let mut next_reg = start_reg;
 
-    // Pre-scan for StLoc look-ahead
+    // Pre-scan for StLoc look-ahead: map VID → local when VID is produced
+    // and later stored to that local, and the local is not accessed in between.
     let mut stloc_target: BTreeMap<Reg, Reg> = BTreeMap::new();
     for (i, instr) in instrs.iter().enumerate() {
         if let Instr::Move(dst, src) = instr
             && matches!(dst, Reg::Home(d) if *d < num_pinned)
             && is_temp_vid(src)
-            && last_use.get(src) == Some(&i)
+            && !stloc_target.contains_key(src)
         {
-            stloc_target.insert(*src, *dst);
+            let dp = def_pos.get(src).copied().unwrap_or(0);
+            // The local must not be read or written between the VID's
+            // definition and this StLoc (exclusive on both ends).
+            let local_touched = instrs[dp + 1..i].iter().any(|ins| {
+                let (d, u) = get_defs_uses(ins);
+                d.contains(dst) || u.contains(dst)
+            });
+            if !local_touched {
+                stloc_target.insert(*src, *dst);
+            }
         }
     }
 
@@ -1286,22 +1296,13 @@ fn allocate_block(
                     && lu > i
                     && !stloc_target.contains_key(&vid)
                 {
-                    let use_count: usize = instrs[i + 1..=lu]
-                        .iter()
-                        .map(|ins| {
-                            let (_, u) = get_defs_uses(ins);
-                            u.iter().filter(|&&r| r == vid).count()
-                        })
-                        .sum();
-                    if use_count == 1 {
-                        let local = *src;
-                        let local_redefined = instrs[i + 1..lu].iter().any(|ins| {
-                            let (d, _) = get_defs_uses(ins);
-                            d.contains(&local)
-                        });
-                        if !local_redefined {
-                            coalesce_to_local.insert(vid, local);
-                        }
+                    let local = *src;
+                    let local_redefined = instrs[i + 1..lu].iter().any(|ins| {
+                        let (d, _) = get_defs_uses(ins);
+                        d.contains(&local)
+                    });
+                    if !local_redefined {
+                        coalesce_to_local.insert(vid, local);
                     }
                 }
             },

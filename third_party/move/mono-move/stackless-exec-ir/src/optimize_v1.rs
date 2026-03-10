@@ -1,5 +1,5 @@
 // Copyright (c) Aptos Foundation
-// SPDX-License-Identifier: Apache-2.0
+// Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 //! Pass 2: Intra-basic-block optimizations on the stackless IR.
 //!
@@ -178,7 +178,7 @@ pub(crate) fn fuse_immediate_binops(func: &mut FunctionIR) {
 // Step B: Copy Propagation
 // ================================================================================================
 
-fn copy_propagation(func: &mut FunctionIR) {
+pub(crate) fn copy_propagation(func: &mut FunctionIR) {
     let num_params = func.num_params;
     let blocks = split_into_blocks(&func.instrs);
 

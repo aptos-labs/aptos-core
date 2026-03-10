@@ -18177,7 +18177,7 @@ name = "stackless-exec-ir"
 version = "0.1.0"
 dependencies = [
  "anyhow",
- "clap 4.5.21",
+ "clap 4.5.60",
  "codespan-reporting",
  "datatest-stable",
  "either",
