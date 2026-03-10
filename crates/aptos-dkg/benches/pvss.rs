@@ -32,7 +32,7 @@ use std::collections::HashSet;
 const BLS12_381: &str = "bls12-381";
 
 /// If set, only run these benchmark groups (comma-separated). Avoids expensive setup for groups
-/// you're not running. Values: `das`, `chunky_v1`, `chunky_v2`, `weighted`. Unset or `all` = run all.
+/// you're not running. Values: `unweighted_das`, `chunky_v1`, `chunky_v2`, `weighted_das`. Unset or `all` = run all.
 fn enabled_bench_groups() -> Option<HashSet<String>> {
     let v = std::env::var("DKG_BENCH_GROUP").ok()?;
     let v = v.trim();
@@ -59,31 +59,14 @@ pub fn all_groups(c: &mut Criterion) {
     let enabled = enabled_bench_groups();
 
     // unweighted aggregatable PVSS, `blstrs` only so this is BLS12-381
-    if group_enabled(&enabled, "das") {
+    if group_enabled(&enabled, "unweighted_das") {
         for tc in get_threshold_configs_for_benchmarking() {
             aggregatable_pvss_group::<das::Transcript>(&tc, c);
         }
     }
 
-    // weighted PVSS with aggregatable subtranscript; only doing one at the moment because large configs are a bit slow and not relevant anyway
-    // Chunky_v1
-    if group_enabled(&enabled, "chunky_v1") {
-        for tc in get_weighted_configs_for_benchmarking().into_iter().take(1) {
-            subaggregatable_pvss_group::<Chunky_v1<Bls12_381>>(&tc, c, Some(32u8), BLS12_381);
-            subaggregatable_pvss_group::<Chunky_v1<Bls12_381>>(&tc, c, Some(43u8), BLS12_381);
-        }
-    }
-
-    // Chunky_v2
-    if group_enabled(&enabled, "chunky_v2") {
-        for tc in get_weighted_configs_for_benchmarking().into_iter().take(1) {
-            subaggregatable_pvss_group::<Chunky_v2<Bls12_381>>(&tc, c, Some(32u8), BLS12_381);
-            subaggregatable_pvss_group::<Chunky_v2<Bls12_381>>(&tc, c, Some(43u8), BLS12_381);
-        }
-    }
-
     // weighted aggregatable PVSS, `blstrs` only so this is BLS12-381
-    if group_enabled(&enabled, "weighted") {
+    if group_enabled(&enabled, "weighted_das") {
         for wc in get_weighted_configs_for_benchmarking() {
             let d = aggregatable_pvss_group::<das::WeightedTranscript>(&wc, c);
             weighted_pvss_group(&wc, d, c);
@@ -91,6 +74,40 @@ pub fn all_groups(c: &mut Criterion) {
             // Note: Insecure, so not interested in benchmarks.
             // let d = pvss_group::<GenericWeighting<pvss::das::Transcript>>(&wc, c);
             // weighted_pvss_group(&wc, d, c);
+        }
+    }
+
+    // Chunky_v1 and Chunky_v2 share the same setup (config, keys, PP); run it once and reuse.
+    let chunky_v1_enabled = group_enabled(&enabled, "chunky_v1");
+    let chunky_v2_enabled = group_enabled(&enabled, "chunky_v2");
+    if chunky_v1_enabled || chunky_v2_enabled {
+        let configs: Vec<_> = get_weighted_configs_for_benchmarking()
+            .into_iter()
+            .take(1)
+            .collect();
+        for tc in &configs {
+            let mut rng = StdRng::seed_from_u64(42);
+            let ell = Some(32u8);
+            // Single setup: Chunky_v1 and Chunky_v2 use the same TranscriptCore types for Bls12_381,
+            // so we can reuse the same DealingArgs for both (reinterpreted as the other type).
+            let d1 = test_utils::setup_dealing::<Chunky_v1<Bls12_381>, _>(tc, ell, &mut rng);
+            if chunky_v1_enabled {
+                subaggregatable_pvss_group_with_dealing::<Chunky_v1<Bls12_381>>(
+                    tc, c, ell, BLS12_381, &d1,
+                );
+            }
+            if chunky_v2_enabled {
+                // SAFETY: Chunky_v1 and Chunky_v2 both delegate TranscriptCore to Subtranscript<E>,
+                // so DealingArgs<Chunky_v1<Bls12_381>> and DealingArgs<Chunky_v2<Bls12_381>> have
+                // identical field types and layout. Reinterpreting the reference is valid.
+                let d2: &DealingArgs<Chunky_v2<Bls12_381>> = unsafe {
+                    &*(&d1 as *const DealingArgs<Chunky_v1<Bls12_381>>
+                        as *const DealingArgs<Chunky_v2<Bls12_381>>)
+                };
+                subaggregatable_pvss_group_with_dealing::<Chunky_v2<Bls12_381>>(
+                    tc, c, ell, BLS12_381, d2,
+                );
+            }
         }
     }
 }
@@ -134,18 +151,34 @@ where
             >,
         >,
 {
+    let mut rng = StdRng::seed_from_u64(42);
+    let d = test_utils::setup_dealing::<T, _>(sc, ell, &mut rng);
+    subaggregatable_pvss_group_with_dealing(sc, c, ell, curve_name, &d);
+    d
+}
+
+/// Same benchmarks as `subaggregatable_pvss_group` but use pre-computed dealing args (e.g. shared with another chunky variant).
+pub fn subaggregatable_pvss_group_with_dealing<T>(
+    sc: &T::SecretSharingConfig,
+    c: &mut Criterion,
+    ell: Option<u8>,
+    curve_name: &str,
+    d: &DealingArgs<T>,
+) where
+    T: MalleableTranscript
+        + HasAggregatableSubtranscript<
+            Subtranscript: Aggregatable<
+                SecretSharingConfig = <T as TranscriptCore>::SecretSharingConfig,
+            >,
+        >,
+{
     let name = T::scheme_name();
     let group_name = match ell {
         Some(ell) => format!("pvss/{}/{}/{}", name, curve_name, ell),
         None => format!("pvss/{}/{}", name, curve_name),
     };
     let mut group = c.benchmark_group(group_name);
-    let mut rng = StdRng::seed_from_u64(42);
 
-    // TODO: use a lazy pattern to avoid this expensive step when no benchmarks are run
-    let d = test_utils::setup_dealing::<T, _>(sc, ell, &mut rng);
-
-    // pvss_transcript_random::<T, WallTime>(sc, &mut group);
     pvss_deal::<T, WallTime>(sc, &d.pp, &d.ssks, &d.spks, &d.eks, &mut group);
     pvss_nonaggregate_serialize::<T, WallTime>(sc, &d.pp, &d.ssks, &d.spks, &d.eks, &mut group);
     pvss_subaggregate::<T, WallTime>(sc, &mut group);
@@ -155,8 +188,6 @@ where
     );
 
     group.finish();
-
-    d
 }
 
 pub fn weighted_pvss_group<

@@ -303,8 +303,19 @@ impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>>
             sid,
             <Self as traits::Transcript>::dst(),
         )?;
+        let Vs_flat = self.subtrs.all_Vs_flat(); // Also has V[0] (the public key)
 
-        // Postpone range proof verification, but collect the pairing terms for later
+        // Step 1: Do the SCRAPE LDT (G_2)
+        let ldt = LowDegreeTest::random(
+            rng,
+            sc.get_threshold_weight(),
+            sc.get_total_weight() + 1,
+            true,
+            &sc.get_threshold_config().domain,
+        );
+        let ldt_msm_terms = ldt.ldt_msm_input(&Vs_flat)?;
+
+        // Step 2: Verify the range proof
         let (g1_terms, g2_terms) = self.sharing_proof.range_proof.pairing_for_verify(
             &pp.pk_range_proof.vk,
             sc.get_total_weight() * num_chunks_per_scalar::<E::ScalarField>(pp.ell) as usize,
@@ -313,7 +324,35 @@ impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>>
             rng,
         )?;
 
-        // PoK MSM terms (G1) and LDT MSM terms (G2) for merging into one pairing check
+        // Step 3: Check that ciphertexts encrypt the committed shares
+        let n = sc.get_total_weight();
+        let (_, powers_of_beta) = sample_field_element_with_powers::<E::ScalarField, _>(n + 1, rng);
+
+        let Cs_flat: Vec<_> = self.subtrs.Cs.iter().flatten().cloned().collect();
+        debug_assert_eq!(
+            Cs_flat.len(),
+            sc.get_total_weight(),
+            "Number of ciphertexts does not equal number of weights"
+        );
+
+        let (weighted_Cs_base, weighted_Cs_scalar): (Vec<_>, Vec<_>) = Cs_flat
+            .iter()
+            .enumerate()
+            .flat_map(|(i, row)| {
+                let p = &powers_of_beta;
+                let radix = &pp.powers_of_radix;
+                row.iter()
+                    .enumerate()
+                    .map(move |(j, base)| (*base, radix[j] * p[i]))
+            })
+            .unzip();
+
+        let weighted_Cs_msm =
+            MsmInput::new(weighted_Cs_base, weighted_Cs_scalar).expect("weighted_Cs MSM terms");
+        let weighted_Vs_msm = MsmInput::new(Vs_flat[..n].to_vec(), powers_of_beta[..n].to_vec())
+            .expect("weighted_Vs MSM terms");
+
+        // Step 4: Verify the SoK (G1)
         let ek_g1_affines: Vec<E::G1Affine> = eks.iter().map(|ek| ek.ek).collect();
         let lagr_g1: &[E::G1Affine] = match &pp.pk_range_proof.ck_S.msm_basis {
             SrsBasis::Lagrange { lagr: lagr_g1 } => lagr_g1,
@@ -339,39 +378,9 @@ impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>>
         let sok_msm_terms =
             hom.msm_terms_for_verify(&sok_statement, &self.sharing_proof.SoK, &sok_cntxt);
 
-        let ldt = LowDegreeTest::random(
-            rng,
-            sc.get_threshold_weight(),
-            sc.get_total_weight() + 1,
-            true,
-            &sc.get_threshold_config().domain,
-        );
-        let Vs_flat = self.subtrs.all_Vs_flat(); // Also has V[0] (the public key)
-
-        let n = sc.get_total_weight();
-        let (_, powers_of_beta) = sample_field_element_with_powers::<E::ScalarField, _>(n + 1, rng);
-
-        let Cs_flat: Vec<_> = self.subtrs.Cs.iter().flatten().cloned().collect();
-        debug_assert_eq!(
-            Cs_flat.len(),
-            sc.get_total_weight(),
-            "Number of ciphertexts does not equal number of weights"
-        );
-
-        let mut weighted_Cs_base = Vec::new();
-        let mut weighted_Cs_scalar = Vec::new();
-        for (i, row) in Cs_flat.iter().enumerate() {
-            for (j, &base) in row.iter().enumerate() {
-                weighted_Cs_base.push(base);
-                weighted_Cs_scalar.push(pp.powers_of_radix[j] * powers_of_beta[i]);
-            }
-        }
-
         let gamma = sample_field_element(rng);
         let gamma_sq = gamma * gamma;
 
-        let weighted_Cs_msm =
-            MsmInput::new(weighted_Cs_base, weighted_Cs_scalar).expect("weighted_Cs MSM terms");
         let pok_merged = msm::merge_msm_inputs::<E::G1Affine, _>(&sok_msm_terms, rng);
         let g1_inputs = vec![pok_merged, weighted_Cs_msm];
         let merged_g1 = msm::merge_msm_inputs_with_scales::<E::G1Affine>(&g1_inputs, &[
@@ -381,12 +390,6 @@ impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>>
         let combined_G1 = E::G1::msm(merged_g1.bases(), merged_g1.scalars())
             .expect("Failed to compute merged G1 MSM in chunky");
 
-        let ldt_msm_terms = ldt.ldt_msm_input(&Vs_flat)?;
-        let weighted_Vs_msm = MsmInput::new(
-            Vs_flat[..sc.get_total_weight()].to_vec(),
-            powers_of_beta[..n].to_vec(),
-        )
-        .expect("weighted_Vs MSM terms");
         let g2_inputs = vec![ldt_msm_terms, weighted_Vs_msm];
         let merged_g2 =
             msm::merge_msm_inputs_with_scales(&g2_inputs, &[gamma_sq, E::ScalarField::ONE]);
