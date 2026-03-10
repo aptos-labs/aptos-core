@@ -55,7 +55,9 @@ pub struct K8sSwarm {
     keep: bool,
     chaoses: HashSet<SwarmChaos>,
     prom_client: Option<PrometheusClient>,
+    #[allow(dead_code)]
     era: Option<String>,
+    #[allow(dead_code)]
     use_port_forward: bool,
     chaos_experiment_ops: Box<dyn ChaosExperimentOps + Send + Sync>,
     has_indexer: bool,
@@ -157,7 +159,6 @@ impl K8sSwarm {
     fn get_kube_client(&self) -> K8sClient {
         self.kube_client.clone()
     }
-
 }
 
 #[async_trait::async_trait]
