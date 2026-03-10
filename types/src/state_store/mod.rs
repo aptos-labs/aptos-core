@@ -149,7 +149,14 @@ impl<K: Eq + Hash> MockStateView<K> {
         Self {
             data: data
                 .into_iter()
-                .map(|(k, v)| (k, StateSlot::from_db_get(Some((0, v)))))
+                .map(|(k, v)| {
+                    let slot = StateSlot::ColdOccupied {
+                        state_key: StateKey::raw(b"mock"),
+                        value_version: 0,
+                        value: v,
+                    };
+                    (k, slot)
+                })
                 .collect(),
         }
     }

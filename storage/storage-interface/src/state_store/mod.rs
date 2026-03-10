@@ -10,18 +10,22 @@ pub mod state_view;
 pub mod state_with_summary;
 pub mod versioned_state_value;
 
-use aptos_types::state_store::{hot_state::HotStateValue, state_key::StateKey, NUM_STATE_SHARDS};
+use aptos_crypto::HashValue;
+use aptos_types::state_store::{hot_state::HotStateValue, NUM_STATE_SHARDS};
 use std::collections::{HashMap, HashSet};
 
 #[derive(Debug)]
 pub(crate) struct HotStateShardUpdates {
-    insertions: HashMap<StateKey, HotStateValue>,
+    insertions: HashMap<HashValue, HotStateValue>,
     // TODO(HotState): only keys are needed for now, since evictions do not affect cold state.
-    evictions: HashSet<StateKey>,
+    evictions: HashSet<HashValue>,
 }
 
 impl HotStateShardUpdates {
-    pub fn new(insertions: HashMap<StateKey, HotStateValue>, evictions: HashSet<StateKey>) -> Self {
+    pub fn new(
+        insertions: HashMap<HashValue, HotStateValue>,
+        evictions: HashSet<HashValue>,
+    ) -> Self {
         Self {
             insertions,
             evictions,

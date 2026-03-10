@@ -28,6 +28,7 @@ impl TStateView for ReadSet {
     fn get_state_slot(&self, state_key: &Self::Key) -> StateViewResult<StateSlot> {
         let slot = match self.data.get(state_key) {
             Some(state_value) => StateSlot::ColdOccupied {
+                state_key: state_key.clone(),
                 value_version: 0,
                 value: state_value.clone(),
             },
@@ -93,6 +94,7 @@ impl<S: StateView> TStateView for ReadSetCapturingStateView<'_, S> {
         // Check the read-set first.
         if let Some(state_value) = self.captured_reads.lock().get(state_key) {
             return Ok(StateSlot::ColdOccupied {
+                state_key: state_key.clone(),
                 value_version: 0,
                 value: state_value.clone(),
             });

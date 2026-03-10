@@ -17,6 +17,8 @@ use StateSlot::*;
 /// Represents the content of a state slot, or the lack there of, along with information indicating
 /// whether the slot is present in the cold or/and hot state.
 ///
+/// state_key: the original key, stored in non-ColdVacant variants so that JMT persistence can
+///            recover the key when iterating HashValue-keyed shards.
 /// value_version: non-empty value changed at this version
 /// hot_since_version: the timestamp of a hot value / vacancy in the hot state, which determines
 ///                    the order of eviction
@@ -24,18 +26,21 @@ use StateSlot::*;
 pub enum StateSlot {
     ColdVacant,
     HotVacant {
+        state_key: StateKey,
         hot_since_version: Version,
-        lru_info: LRUEntry<StateKey>,
+        lru_info: LRUEntry<HashValue>,
     },
     ColdOccupied {
+        state_key: StateKey,
         value_version: Version,
         value: StateValue,
     },
     HotOccupied {
+        state_key: StateKey,
         value_version: Version,
         value: StateValue,
         hot_since_version: Version,
-        lru_info: LRUEntry<StateKey>,
+        lru_info: LRUEntry<HashValue>,
     },
 }
 
@@ -60,6 +65,7 @@ impl StateSlot {
             ColdOccupied {
                 value_version,
                 value,
+                ..
             }
             | HotOccupied {
                 value_version,
@@ -78,29 +84,46 @@ impl StateSlot {
     }
 
     /// When committing speculative state to the DB, determine if to make changes to the JMT.
+    /// `key_hash` is the hash of the state key (the map key in HashValue-keyed shards).
+    /// For occupied variants, the StateKey is recovered from the slot itself.
     pub fn maybe_update_jmt(
         &self,
-        key: StateKey,
+        key_hash: HashValue,
         min_version: Version,
     ) -> Option<(HashValue, Option<(HashValue, StateKey)>)> {
         let maybe_value_opt = self.maybe_update_cold_state(min_version);
         maybe_value_opt.map(|value_opt| {
             (
-                CryptoHash::hash(&key),
-                value_opt.map(|v| (CryptoHash::hash(v), key)),
+                key_hash,
+                value_opt.map(|v| (CryptoHash::hash(v), self.expect_state_key().clone())),
             )
         })
     }
 
     // TODO(HotState): db returns cold slot directly
-    pub fn from_db_get(tuple_opt: Option<(Version, StateValue)>) -> Self {
+    pub fn from_db_get(state_key: StateKey, tuple_opt: Option<(Version, StateValue)>) -> Self {
         match tuple_opt {
             None => Self::ColdVacant,
             Some((value_version, value)) => Self::ColdOccupied {
+                state_key,
                 value_version,
                 value,
             },
         }
+    }
+
+    pub fn state_key(&self) -> Option<&StateKey> {
+        match self {
+            ColdVacant => None,
+            HotVacant { state_key, .. }
+            | ColdOccupied { state_key, .. }
+            | HotOccupied { state_key, .. } => Some(state_key),
+        }
+    }
+
+    pub fn expect_state_key(&self) -> &StateKey {
+        self.state_key()
+            .expect("StateKey expected (not ColdVacant)")
     }
 
     pub fn into_state_value_and_version_opt(self) -> Option<(Version, StateValue)> {
@@ -109,6 +132,7 @@ impl StateSlot {
             ColdOccupied {
                 value_version,
                 value,
+                ..
             }
             | HotOccupied {
                 value_version,
@@ -194,18 +218,21 @@ impl StateSlot {
         }
     }
 
-    pub fn to_hot(self, hot_since_version: Version) -> Self {
+    pub fn to_hot(self, hot_since_version: Version, state_key: StateKey) -> Self {
         match self {
             ColdOccupied {
                 value_version,
                 value,
+                ..
             } => HotOccupied {
+                state_key,
                 value_version,
                 value,
                 hot_since_version,
                 lru_info: LRUEntry::uninitialized(),
             },
             ColdVacant => HotVacant {
+                state_key,
                 hot_since_version,
                 lru_info: LRUEntry::uninitialized(),
             },
@@ -216,10 +243,12 @@ impl StateSlot {
     pub fn to_cold(self) -> Self {
         match self {
             HotOccupied {
+                state_key,
                 value_version,
                 value,
                 ..
             } => ColdOccupied {
+                state_key,
                 value_version,
                 value,
             },
@@ -230,7 +259,7 @@ impl StateSlot {
 }
 
 impl THotStateSlot for StateSlot {
-    type Key = StateKey;
+    type Key = HashValue;
 
     fn prev(&self) -> Option<&Self::Key> {
         match self {
@@ -267,31 +296,39 @@ impl Arbitrary for StateSlot {
     type Strategy = BoxedStrategy<Self>;
 
     fn arbitrary_with(_args: Self::Parameters) -> Self::Strategy {
-        let hot_vacant = any::<Version>().prop_map(|hot_since_version| HotVacant {
-            hot_since_version,
-            lru_info: LRUEntry::uninitialized(),
-        });
-        let cold_occupied =
-            (any::<Version>(), any::<StateValue>()).prop_map(|(value_version, value)| {
-                ColdOccupied {
-                    value_version,
-                    value,
+        let hot_vacant =
+            (any::<StateKey>(), any::<Version>()).prop_map(|(state_key, hot_since_version)| {
+                HotVacant {
+                    state_key,
+                    hot_since_version,
+                    lru_info: LRUEntry::uninitialized(),
                 }
             });
-        let hot_occupied = (any::<Version>(), any::<StateValue>())
-            .prop_flat_map(|(value_version, value)| {
+        let cold_occupied = (any::<StateKey>(), any::<Version>(), any::<StateValue>()).prop_map(
+            |(state_key, value_version, value)| ColdOccupied {
+                state_key,
+                value_version,
+                value,
+            },
+        );
+        let hot_occupied = (any::<StateKey>(), any::<Version>(), any::<StateValue>())
+            .prop_flat_map(|(state_key, value_version, value)| {
                 (
+                    Just(state_key),
                     Just(value_version),
                     (value_version..Version::MAX),
                     Just(value),
                 )
             })
-            .prop_map(|(value_version, hot_since_version, value)| HotOccupied {
-                value_version,
-                value,
-                hot_since_version,
-                lru_info: LRUEntry::uninitialized(),
-            });
+            .prop_map(
+                |(state_key, value_version, hot_since_version, value)| HotOccupied {
+                    state_key,
+                    value_version,
+                    value,
+                    hot_since_version,
+                    lru_info: LRUEntry::uninitialized(),
+                },
+            );
         prop_oneof![
             1 => Just(ColdVacant),
             1 => hot_vacant,

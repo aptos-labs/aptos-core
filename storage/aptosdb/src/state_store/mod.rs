@@ -945,7 +945,7 @@ impl StateStore {
                     .insert(
                         (*key).clone(),
                         update_to_cold
-                            .to_result_slot()
+                            .to_result_slot((*key).clone())
                             .expect("hot state ops should have been filtered out above"),
                     )
                     .unwrap_or_else(|| {

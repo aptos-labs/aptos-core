@@ -210,6 +210,7 @@ impl VersionState {
             match v_opt {
                 None => {
                     let slot = StateSlot::HotVacant {
+                        state_key: k.clone(),
                         hot_since_version: version,
                         lru_info: LRUEntry::uninitialized(),
                     };
@@ -221,6 +222,7 @@ impl VersionState {
                 },
                 Some(v) => {
                     let slot = StateSlot::HotOccupied {
+                        state_key: k.clone(),
                         value_version: version,
                         value: v.clone(),
                         hot_since_version: version,
@@ -250,12 +252,14 @@ impl VersionState {
             } else {
                 let slot = match state.get(k) {
                     Some((value_version, value)) => StateSlot::HotOccupied {
+                        state_key: k.clone(),
                         value_version: *value_version,
                         value: value.clone(),
                         hot_since_version: version,
                         lru_info: LRUEntry::uninitialized(),
                     },
                     None => StateSlot::HotVacant {
+                        state_key: k.clone(),
                         hot_since_version: version,
                         lru_info: LRUEntry::uninitialized(),
                     },
@@ -305,7 +309,7 @@ impl TStateView for VersionState {
     type Key = StateKey;
 
     fn get_state_slot(&self, key: &Self::Key) -> StateViewResult<StateSlot> {
-        let from_cold = StateSlot::from_db_get(self.state.get(key).cloned());
+        let from_cold = StateSlot::from_db_get(key.clone(), self.state.get(key).cloned());
         let shard_id = key.get_shard_id();
         let slot = match self.hot_state[shard_id].peek(key) {
             Some(slot) => {
@@ -672,9 +676,10 @@ fn commit_state_buffer(
                 &state_by_version.get_state(Some(next_version - 1)).hot_state[shard_id];
             assert_eq!(all_entries.len(), naive_hot_state.len());
 
-            for (key, slot) in &all_entries {
-                let slot2 = naive_hot_state.peek(key).unwrap();
-                StateByVersion::assert_state_slot(slot, slot2);
+            for (key, slot) in naive_hot_state.iter() {
+                let hash = key.hash();
+                let actual_slot = all_entries.get(&hash).expect("Entry must exist in DashMap");
+                StateByVersion::assert_state_slot(actual_slot, slot);
             }
         });
     }

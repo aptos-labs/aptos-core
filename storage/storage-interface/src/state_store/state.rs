@@ -20,6 +20,7 @@ use crate::{
 };
 use anyhow::{bail, Result};
 use aptos_config::config::HotStateConfig;
+use aptos_crypto::{hash::CryptoHash, HashValue};
 use aptos_experimental_layered_map::{LayeredMap, MapLayer};
 use aptos_logger::warn;
 use aptos_metrics_core::TimerHelper;
@@ -42,8 +43,8 @@ use std::{
 
 #[derive(Clone, Debug, Default)]
 pub struct HotStateMetadata {
-    latest: Option<StateKey>,
-    oldest: Option<StateKey>,
+    latest: Option<HashValue>,
+    oldest: Option<HashValue>,
     num_items: usize,
 }
 
@@ -67,7 +68,7 @@ pub struct State {
     ///  N.b. this is not directly iterable, one needs to make a `StateDelta`
     ///       between this and a `base_version` to list the updates or create a
     ///       new `State` at a descendant version.
-    shards: Arc<[MapLayer<StateKey, StateSlot>; NUM_STATE_SHARDS]>,
+    shards: Arc<[MapLayer<HashValue, StateSlot>; NUM_STATE_SHARDS]>,
     hot_state_metadata: [HotStateMetadata; NUM_STATE_SHARDS],
     /// The total usage of the state at the current version.
     usage: StateStorageUsage,
@@ -77,7 +78,7 @@ pub struct State {
 impl State {
     pub fn new_with_updates(
         version: Option<Version>,
-        shards: Arc<[MapLayer<StateKey, StateSlot>; NUM_STATE_SHARDS]>,
+        shards: Arc<[MapLayer<HashValue, StateSlot>; NUM_STATE_SHARDS]>,
         hot_state_metadata: [HotStateMetadata; NUM_STATE_SHARDS],
         usage: StateStorageUsage,
         hot_state_config: HotStateConfig,
@@ -121,7 +122,7 @@ impl State {
         self.usage
     }
 
-    pub fn shards(&self) -> &[MapLayer<StateKey, StateSlot>; NUM_STATE_SHARDS] {
+    pub fn shards(&self) -> &[MapLayer<HashValue, StateSlot>; NUM_STATE_SHARDS] {
         &self.shards
     }
 
@@ -151,12 +152,12 @@ impl State {
             .all(|(base_shard, top_shard)| top_shard.can_view_after(base_shard))
     }
 
-    pub fn latest_hot_key(&self, shard_id: usize) -> Option<StateKey> {
-        self.hot_state_metadata[shard_id].latest.clone()
+    pub fn latest_hot_key(&self, shard_id: usize) -> Option<HashValue> {
+        self.hot_state_metadata[shard_id].latest
     }
 
-    pub fn oldest_hot_key(&self, shard_id: usize) -> Option<StateKey> {
-        self.hot_state_metadata[shard_id].oldest.clone()
+    pub fn oldest_hot_key(&self, shard_id: usize) -> Option<HashValue> {
+        self.hot_state_metadata[shard_id].oldest
     }
 
     pub fn num_hot_items(&self, shard_id: usize) -> usize {
@@ -211,8 +212,8 @@ impl State {
                         NonZeroUsize::new(self.hot_state_config.max_items_per_shard).unwrap(),
                         Arc::clone(&persisted_hot_state),
                         overlay,
-                        hot_metadata.latest.clone(),
-                        hot_metadata.oldest.clone(),
+                        hot_metadata.latest,
+                        hot_metadata.oldest,
                         hot_metadata.num_items,
                     );
                     let mut all_updates = per_version.iter();
@@ -222,7 +223,8 @@ impl State {
                         for (key, update) in
                             all_updates.take_while_ref(|(_k, u)| u.version <= *ckpt_version)
                         {
-                            evictions.remove(*key);
+                            let hash = CryptoHash::hash(*key);
+                            evictions.remove(&hash);
                             if let Some(hot_state_value) = Self::apply_one_update(
                                 &mut lru,
                                 overlay,
@@ -231,18 +233,19 @@ impl State {
                                 update,
                                 self.hot_state_config.refresh_interval_versions,
                             ) {
-                                insertions.insert((*key).clone(), hot_state_value);
+                                insertions.insert(hash, hot_state_value);
                             }
                         }
                         // Only evict at the checkpoints.
-                        evictions.extend(lru.maybe_evict().into_iter().map(|(key, slot)| {
-                            insertions.remove(&key);
+                        evictions.extend(lru.maybe_evict().into_iter().map(|(hash, slot)| {
+                            insertions.remove(&hash);
                             assert!(slot.is_hot());
-                            key
+                            hash
                         }));
                     }
                     for (key, update) in all_updates {
-                        evictions.remove(*key);
+                        let hash = CryptoHash::hash(*key);
+                        evictions.remove(&hash);
                         if let Some(hot_state_value) = Self::apply_one_update(
                             &mut lru,
                             overlay,
@@ -251,7 +254,7 @@ impl State {
                             update,
                             self.hot_state_config.refresh_interval_versions,
                         ) {
-                            insertions.insert((*key).clone(), hot_state_value);
+                            insertions.insert(hash, hot_state_value);
                         }
                     }
 
@@ -298,18 +301,19 @@ impl State {
     /// necessary.
     fn apply_one_update(
         lru: &mut HotStateLRU,
-        overlay: &LayeredMap<StateKey, StateSlot>,
+        overlay: &LayeredMap<HashValue, StateSlot>,
         read_cache: &StateCacheShard,
         key: &StateKey,
         update: &StateUpdateRef,
         refresh_interval: Version,
     ) -> Option<HotStateValue> {
+        let hash = CryptoHash::hash(key);
         if let Some(state_value_opt) = update.state_op.as_state_value_opt() {
-            lru.insert((*key).clone(), update.to_result_slot().unwrap());
+            lru.insert(hash, update.to_result_slot((*key).clone()).unwrap());
             return Some(HotStateValue::new(state_value_opt.cloned(), update.version));
         }
 
-        if let Some(mut slot) = lru.get_slot(key) {
+        if let Some(mut slot) = lru.get_slot(&hash) {
             let mut refreshed = true;
             let slot_to_insert = if slot.is_hot() {
                 if slot.expect_hot_since_version() + refresh_interval <= update.version {
@@ -319,11 +323,11 @@ impl State {
                 }
                 slot
             } else {
-                slot.to_hot(update.version)
+                slot.to_hot(update.version, (*key).clone())
             };
             if refreshed {
                 let ret = HotStateValue::clone_from_slot(&slot_to_insert);
-                lru.insert((*key).clone(), slot_to_insert);
+                lru.insert(hash, slot_to_insert);
                 Some(ret)
             } else {
                 None
@@ -331,9 +335,9 @@ impl State {
         } else {
             let slot = Self::expect_old_slot(overlay, read_cache, key);
             assert!(slot.is_cold());
-            let slot = slot.to_hot(update.version);
+            let slot = slot.to_hot(update.version, (*key).clone());
             let ret = HotStateValue::clone_from_slot(&slot);
-            lru.insert((*key).clone(), slot);
+            lru.insert(hash, slot);
             Some(ret)
         }
     }
@@ -352,7 +356,7 @@ impl State {
 
     fn usage_delta_for_shard<'kv>(
         cache: &StateCacheShard,
-        overlay: &LayeredMap<StateKey, StateSlot>,
+        overlay: &LayeredMap<HashValue, StateSlot>,
         updates: &HashMap<&'kv StateKey, StateUpdateRef<'kv>>,
     ) -> (i64, i64) {
         let mut items_delta: i64 = 0;
@@ -381,11 +385,12 @@ impl State {
     }
 
     fn expect_old_slot(
-        overlay: &LayeredMap<StateKey, StateSlot>,
+        overlay: &LayeredMap<HashValue, StateSlot>,
         cache: &StateCacheShard,
         key: &StateKey,
     ) -> StateSlot {
-        if let Some(slot) = overlay.get(key) {
+        let hash = CryptoHash::hash(key);
+        if let Some(slot) = overlay.get(&hash) {
             return slot;
         }
 

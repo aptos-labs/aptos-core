@@ -381,20 +381,32 @@ mod tests {
             // New code:
             (
                 StateKey::module_id(&a_new.self_id()),
-                StateSlot::from_db_get(Some((1, module_state_value(a_new.clone())))),
+                StateSlot::from_db_get(
+                    StateKey::module_id(&a_new.self_id()),
+                    Some((1, module_state_value(a_new.clone()))),
+                ),
             ),
             (
                 StateKey::module_id(&d.self_id()),
-                StateSlot::from_db_get(Some((0, module_state_value(d.clone())))),
+                StateSlot::from_db_get(
+                    StateKey::module_id(&d.self_id()),
+                    Some((0, module_state_value(d.clone()))),
+                ),
             ),
             // Old code:
             (
                 StateKey::module_id(&b.self_id()),
-                StateSlot::from_db_get(Some((0, module_state_value(b.clone())))),
+                StateSlot::from_db_get(
+                    StateKey::module_id(&b.self_id()),
+                    Some((0, module_state_value(b.clone()))),
+                ),
             ),
             (
                 StateKey::module_id(&c.self_id()),
-                StateSlot::from_db_get(Some((0, module_state_value(c.clone())))),
+                StateSlot::from_db_get(
+                    StateKey::module_id(&c.self_id()),
+                    Some((0, module_state_value(c.clone()))),
+                ),
             ),
         ]));
         state.reset_state_view(new_state_view);
