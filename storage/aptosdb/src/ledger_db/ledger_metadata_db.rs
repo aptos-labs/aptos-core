@@ -97,12 +97,6 @@ impl LedgerMetadataDb {
         ledger_info.clone()
     }
 
-    pub(crate) fn get_committed_version(&self) -> Option<Version> {
-        let ledger_info_ptr = self.latest_ledger_info.load();
-        let ledger_info: &Option<_> = ledger_info_ptr.deref();
-        ledger_info.as_ref().map(|li| li.ledger_info().version())
-    }
-
     /// Returns the latest ledger info, or NOT_FOUND if it doesn't exist.
     pub(crate) fn get_latest_ledger_info(&self) -> Result<LedgerInfoWithSignatures> {
         self.get_latest_ledger_info_option()
@@ -338,6 +332,7 @@ impl LedgerMetadataDb {
         self.db.put::<VersionDataSchema>(&version, &usage.into())
     }
 
+    #[cfg(feature = "db-debugger")]
     pub(crate) fn get_usage_before_or_at(
         &self,
         version: Version,
