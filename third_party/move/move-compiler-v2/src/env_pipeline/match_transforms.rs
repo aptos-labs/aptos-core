@@ -46,6 +46,74 @@ pub fn transform(env: &mut GlobalEnv) {
 }
 
 // ================================================================================================
+// Temporary Symbol Names
+//
+// All temporary symbols introduced by this pass are created through this enum,
+// making it easy to audit for name clashes.
+
+/// Kinds of temporary variables introduced during match transformation.
+enum TempSymbol {
+    /// Scalar discriminator binding: `_$disc`.
+    Discriminator,
+    /// Tuple discriminator element binding: `_$disc_0`, `_$disc_1`, etc.
+    TupleDiscriminatorElement(usize),
+    /// Primitive-position temp in a mixed tuple: `_$prim_0`, `_$prim_1`, etc.
+    PrimitiveTemp(usize),
+    /// Non-primitive-position temp in a mixed tuple: `_$np_0`, `_$np_1`, etc.
+    NonPrimitiveTemp(usize),
+}
+
+impl TempSymbol {
+    fn create(self, env: &GlobalEnv) -> Symbol {
+        match self {
+            TempSymbol::Discriminator => env.symbol_pool().make("_$disc"),
+            TempSymbol::TupleDiscriminatorElement(idx) => {
+                env.symbol_pool().make(&format!("_$disc_{}", idx))
+            },
+            TempSymbol::PrimitiveTemp(seq) => {
+                env.symbol_pool().make(&format!("_$prim_{}", seq))
+            },
+            TempSymbol::NonPrimitiveTemp(seq) => {
+                env.symbol_pool().make(&format!("_$np_{}", seq))
+            },
+        }
+    }
+}
+
+// ================================================================================================
+// Expression Building Helpers
+
+/// Create a `LocalVar` expression.
+fn make_local_var(env: &GlobalEnv, loc: &Loc, ty: Type, sym: Symbol) -> Exp {
+    let id = env.new_node(loc.clone(), ty);
+    ExpData::LocalVar(id, sym).into_exp()
+}
+
+/// Create an equality comparison expression: `lhs == rhs`.
+fn make_eq(env: &GlobalEnv, loc: &Loc, lhs: Exp, rhs: Exp) -> Exp {
+    let id = env.new_node(loc.clone(), Type::Primitive(PrimitiveType::Bool));
+    ExpData::Call(id, Operation::Eq, vec![lhs, rhs]).into_exp()
+}
+
+/// Combine a list of boolean conditions with `&&`. Returns `None` if the list is empty.
+fn conjoin(env: &GlobalEnv, loc: &Loc, conditions: Vec<Exp>) -> Option<Exp> {
+    conditions.into_iter().reduce(|acc, cond| {
+        let id = env.new_node(loc.clone(), Type::Primitive(PrimitiveType::Bool));
+        ExpData::Call(id, Operation::And, vec![acc, cond]).into_exp()
+    })
+}
+
+/// Create a boolean `true` literal.
+fn make_true(env: &GlobalEnv, loc: &Loc) -> Exp {
+    ExpBuilder::new(env).bool_const(loc, true)
+}
+
+/// Select elements from `slice` at the given `positions`.
+fn select_positions<T: Clone>(slice: &[T], positions: &[usize]) -> Vec<T> {
+    positions.iter().map(|&pos| slice[pos].clone()).collect()
+}
+
+// ================================================================================================
 // Rewriter (primitive match transformation)
 
 struct MatchTransformer<'env> {
@@ -211,11 +279,10 @@ fn bind_discriminator(env: &GlobalEnv, discriminator: &Exp) -> (Exp, Pattern, Ex
             let mut patterns = Vec::new();
             let mut var_exps = Vec::new();
             for (idx, ty) in tys.iter().enumerate() {
-                let sym = env.symbol_pool().make(&format!("_$disc_{}", idx));
+                let sym = TempSymbol::TupleDiscriminatorElement(idx).create(env);
                 let pat_id = env.new_node(loc.clone(), ty.clone());
                 patterns.push(Pattern::Var(pat_id, sym));
-                let var_id = env.new_node(loc.clone(), ty.clone());
-                var_exps.push(ExpData::LocalVar(var_id, sym).into_exp());
+                var_exps.push(make_local_var(env, &loc, ty.clone(), sym));
             }
             let tuple_pat_id = env.new_node(loc.clone(), disc_ty.clone());
             let pattern = Pattern::Tuple(tuple_pat_id, patterns);
@@ -224,11 +291,10 @@ fn bind_discriminator(env: &GlobalEnv, discriminator: &Exp) -> (Exp, Pattern, Ex
             (new_disc, pattern, discriminator.clone())
         },
         _ => {
-            let sym = env.symbol_pool().make("_$disc");
+            let sym = TempSymbol::Discriminator.create(env);
             let pat_id = env.new_node(loc.clone(), disc_ty.clone());
             let pattern = Pattern::Var(pat_id, sym);
-            let var_id = env.new_node(loc, disc_ty);
-            let new_disc = ExpData::LocalVar(var_id, sym).into_exp();
+            let new_disc = make_local_var(env, &loc, disc_ty, sym);
             (new_disc, pattern, discriminator.clone())
         },
     }
@@ -254,11 +320,10 @@ fn generate_if_else_chain(
     }
 
     let else_branch = generate_if_else_chain(env, result_id, discriminator, arms, arm_idx + 1);
-    let result_ty = env.get_node_type(result_id);
-    let if_id = env.new_node(env.get_node_loc(result_id), result_ty);
     let (condition, then_branch) = generate_arm_test(env, result_id, discriminator, arm);
 
-    ExpData::IfElse(if_id, condition, then_branch, else_branch).into_exp()
+    let builder = ExpBuilder::new(env);
+    builder.if_else(condition, then_branch, else_branch)
 }
 
 /// Generate the condition and body expressions for a single match arm.
@@ -282,9 +347,8 @@ fn generate_arm_test(
                 scoped_guard
             } else {
                 let pattern_cond = generate_pattern_condition(env, discriminator, &arm.pattern);
-                let bool_ty = Type::Primitive(PrimitiveType::Bool);
-                let and_id = env.new_node(env.get_node_loc(result_id), bool_ty);
-                ExpData::Call(and_id, Operation::And, vec![pattern_cond, scoped_guard]).into_exp()
+                let loc = env.get_node_loc(result_id);
+                conjoin(env, &loc, vec![pattern_cond, scoped_guard]).unwrap()
             };
             return (condition, scoped_body);
         }
@@ -294,12 +358,7 @@ fn generate_arm_test(
     let pattern_cond = generate_pattern_condition(env, discriminator, &arm.pattern);
     let condition = if let Some(guard_exp) = &arm.condition {
         let loc = env.get_node_loc(discriminator.node_id());
-        let and_id = env.new_node(loc, Type::Primitive(PrimitiveType::Bool));
-        ExpData::Call(and_id, Operation::And, vec![
-            pattern_cond,
-            guard_exp.clone(),
-        ])
-        .into_exp()
+        conjoin(env, &loc, vec![pattern_cond, guard_exp.clone()]).unwrap()
     } else {
         pattern_cond
     };
@@ -310,36 +369,29 @@ fn generate_arm_test(
 /// Generate a boolean condition that tests if discriminator matches pattern.
 fn generate_pattern_condition(env: &GlobalEnv, discriminator: &Exp, pattern: &Pattern) -> Exp {
     let loc = env.get_node_loc(discriminator.node_id());
-    let bool_ty = Type::Primitive(PrimitiveType::Bool);
-    let bool_id = env.new_node(loc.clone(), bool_ty.clone());
 
     match pattern {
-        Pattern::Wildcard(_) | Pattern::Var(_, _) => {
-            // Wildcard/var always matches - return true
-            ExpData::Value(bool_id, Value::Bool(true)).into_exp()
-        },
+        Pattern::Wildcard(_) | Pattern::Var(_, _) => make_true(env, &loc),
 
         Pattern::LiteralValue(_, val) => {
-            // Generate: discriminator == value
             let discriminator_ty = env.get_node_type(discriminator.node_id());
             let val_id = env.new_node(loc.clone(), discriminator_ty);
             let val_exp = ExpData::Value(val_id, val.clone()).into_exp();
-
-            ExpData::Call(bool_id, Operation::Eq, vec![discriminator.clone(), val_exp]).into_exp()
+            make_eq(env, &loc, discriminator.clone(), val_exp)
         },
 
         Pattern::Tuple(_, pats) => {
-            // For tuple patterns, generate conjunctions of component checks
             let discriminator_ty = env.get_node_type(discriminator.node_id());
             if let Type::Tuple(tys) = discriminator_ty {
                 generate_tuple_condition(env, discriminator, &tys, pats)
             } else {
+                let bool_id = env.new_node(loc, Type::Primitive(PrimitiveType::Bool));
                 ExpData::Invalid(bool_id).into_exp()
             }
         },
 
         Pattern::Struct(..) | Pattern::Error(_) => {
-            // Precluded by is_match_fully_transformable / is_suitable_pattern.
+            let bool_id = env.new_node(loc, Type::Primitive(PrimitiveType::Bool));
             ExpData::Invalid(bool_id).into_exp()
         },
     }
@@ -357,18 +409,16 @@ fn generate_tuple_condition(
     patterns: &[Pattern],
 ) -> Exp {
     let loc = env.get_node_loc(tuple_exp.node_id());
-    let bool_ty = Type::Primitive(PrimitiveType::Bool);
-    let bool_id = env.new_node(loc.clone(), bool_ty.clone());
 
     if patterns.is_empty() {
-        return ExpData::Value(bool_id, Value::Bool(true)).into_exp();
+        return make_true(env, &loc);
     }
 
     let all_wildcards = patterns
         .iter()
         .all(|p| matches!(p, Pattern::Wildcard(_) | Pattern::Var(_, _)));
     if all_wildcards {
-        return ExpData::Value(bool_id, Value::Bool(true)).into_exp();
+        return make_true(env, &loc);
     }
 
     // Extract element expressions from the Tuple call.
@@ -380,36 +430,26 @@ fn generate_tuple_condition(
                 &loc,
                 "unexpected non-tuple discriminator in tuple condition generation",
             );
-            return ExpData::Value(bool_id, Value::Bool(true)).into_exp();
+            return make_true(env, &loc);
         },
     };
 
     // Generate Eq conditions for each literal pattern
-    let mut conditions = vec![];
-    for (idx, pat) in patterns.iter().enumerate() {
-        if let Pattern::LiteralValue(_, val) = pat {
-            let val_id = env.new_node(loc.clone(), tys[idx].clone());
-            let val_exp = ExpData::Value(val_id, val.clone()).into_exp();
-            let cmp_id = env.new_node(loc.clone(), bool_ty.clone());
-            conditions.push(
-                ExpData::Call(cmp_id, Operation::Eq, vec![elem_exps[idx].clone(), val_exp])
-                    .into_exp(),
-            );
-        }
-    }
+    let conditions: Vec<Exp> = patterns
+        .iter()
+        .enumerate()
+        .filter_map(|(idx, pat)| {
+            if let Pattern::LiteralValue(_, val) = pat {
+                let val_id = env.new_node(loc.clone(), tys[idx].clone());
+                let val_exp = ExpData::Value(val_id, val.clone()).into_exp();
+                Some(make_eq(env, &loc, elem_exps[idx].clone(), val_exp))
+            } else {
+                None
+            }
+        })
+        .collect();
 
-    // Combine with AND
-    if conditions.is_empty() {
-        ExpData::Value(bool_id, Value::Bool(true)).into_exp()
-    } else {
-        conditions
-            .into_iter()
-            .reduce(|acc, cond| {
-                let and_id = env.new_node(loc.clone(), bool_ty.clone());
-                ExpData::Call(and_id, Operation::And, vec![acc, cond]).into_exp()
-            })
-            .unwrap()
-    }
+    conjoin(env, &loc, conditions).unwrap_or_else(|| make_true(env, &loc))
 }
 
 /// Wrap expression with pattern bindings if needed (for variable patterns).
@@ -417,23 +457,14 @@ fn generate_tuple_condition(
 /// Only introduces bindings for variables that are actually free in `body`,
 /// to avoid unused-variable warnings on compiler-generated code.
 fn maybe_bind_pattern(env: &GlobalEnv, discriminator: &Exp, pattern: &Pattern, body: &Exp) -> Exp {
+    let builder = ExpBuilder::new(env);
     let free = body.as_ref().free_vars();
     match pattern {
-        Pattern::Var(var_id, sym) => {
+        Pattern::Var(_, sym) => {
             if !free.contains(sym) {
                 return body.clone();
             }
-            // Bind the variable to the discriminator value
-            let loc = env.get_node_loc(*var_id);
-            let block_id = env.new_node(loc, env.get_node_type(body.node_id()));
-
-            ExpData::Block(
-                block_id,
-                pattern.clone(),
-                Some(discriminator.clone()),
-                body.clone(),
-            )
-            .into_exp()
+            builder.block(pattern.clone(), Some(discriminator.clone()), body.clone())
         },
         Pattern::Tuple(tuple_id, pats) => {
             // Only keep sub-patterns whose variable is actually used in the body.
@@ -448,16 +479,7 @@ fn maybe_bind_pattern(env: &GlobalEnv, discriminator: &Exp, pattern: &Pattern, b
             let has_bindings = bind_pats.iter().any(|p| matches!(p, Pattern::Var(..)));
             if has_bindings {
                 let bind_pattern = Pattern::Tuple(*tuple_id, bind_pats);
-                let loc = env.get_node_loc(pattern.node_id());
-                let block_id = env.new_node(loc, env.get_node_type(body.node_id()));
-
-                ExpData::Block(
-                    block_id,
-                    bind_pattern,
-                    Some(discriminator.clone()),
-                    body.clone(),
-                )
-                .into_exp()
+                builder.block(bind_pattern, Some(discriminator.clone()), body.clone())
             } else {
                 body.clone()
             }
@@ -622,7 +644,7 @@ fn transform_mixed_tuple_match(
         .iter()
         .enumerate()
         .map(|(seq, &pos)| {
-            let sym = env.symbol_pool().make(&format!("_$prim_{}", seq));
+            let sym = TempSymbol::PrimitiveTemp(seq).create(env);
             let arg = disc_args[pos].clone();
             (sym, arg)
         })
@@ -633,7 +655,7 @@ fn transform_mixed_tuple_match(
         .iter()
         .enumerate()
         .map(|(seq, &pos)| {
-            let sym = env.symbol_pool().make(&format!("_$np_{}", seq));
+            let sym = TempSymbol::NonPrimitiveTemp(seq).create(env);
             let arg = disc_args[pos].clone();
             (sym, arg)
         })
@@ -643,22 +665,17 @@ fn transform_mixed_tuple_match(
     let new_disc = if non_primitive_positions.len() == 1 {
         let (sym, _) = &np_temps[0];
         let pos = non_primitive_positions[0];
-        let var_id = env.new_node(loc.clone(), elem_tys[pos].clone());
-        ExpData::LocalVar(var_id, *sym).into_exp()
+        make_local_var(env, &loc, elem_tys[pos].clone(), *sym)
     } else {
         let np_args: Vec<Exp> = np_temps
             .iter()
             .enumerate()
             .map(|(seq, (sym, _))| {
                 let pos = non_primitive_positions[seq];
-                let var_id = env.new_node(loc.clone(), elem_tys[pos].clone());
-                ExpData::LocalVar(var_id, *sym).into_exp()
+                make_local_var(env, &loc, elem_tys[pos].clone(), *sym)
             })
             .collect();
-        let np_tys: Vec<Type> = non_primitive_positions
-            .iter()
-            .map(|&pos| elem_tys[pos].clone())
-            .collect();
+        let np_tys = select_positions(&elem_tys, &non_primitive_positions);
         let tuple_id = env.new_node(loc.clone(), Type::Tuple(np_tys));
         ExpData::Call(tuple_id, Operation::Tuple, np_args).into_exp()
     };
@@ -694,6 +711,7 @@ fn transform_mixed_tuple_match(
     all_bindings.sort_by_key(|(pos, _, _)| *pos);
 
     // Wrap in blocks binding all elements in left-to-right order (build inside-out)
+    let builder = ExpBuilder::new(env);
     all_bindings
         .iter()
         .rev()
@@ -701,8 +719,7 @@ fn transform_mixed_tuple_match(
             let ty = elem_tys[*pos].clone();
             let pat_id = env.new_node(loc.clone(), ty);
             let pattern = Pattern::Var(pat_id, *sym);
-            let block_id = env.new_node(loc.clone(), match_result_ty.clone());
-            ExpData::Block(block_id, pattern, Some(arg.clone()), inner).into_exp()
+            builder.block(pattern, Some(arg.clone()), inner)
         })
 }
 
@@ -740,23 +757,15 @@ fn transform_mixed_arm(
 
             // Build new pattern from non-primitive sub-patterns only
             let new_pattern = if non_primitive_positions.len() == 1 {
-                let pos = non_primitive_positions[0];
-                pats[pos].clone()
+                pats[non_primitive_positions[0]].clone()
             } else {
-                let np_pats: Vec<Pattern> = non_primitive_positions
-                    .iter()
-                    .map(|&pos| pats[pos].clone())
-                    .collect();
-                let np_tys: Vec<Type> = non_primitive_positions
-                    .iter()
-                    .map(|&pos| elem_tys[pos].clone())
-                    .collect();
+                let np_pats = select_positions(pats, non_primitive_positions);
+                let np_tys = select_positions(elem_tys, non_primitive_positions);
                 let tuple_id = env.new_node(loc.clone(), Type::Tuple(np_tys));
                 Pattern::Tuple(tuple_id, np_pats)
             };
 
             // Generate guard conditions from primitive positions
-            let bool_ty = Type::Primitive(PrimitiveType::Bool);
             let mut conditions: Vec<Exp> = Vec::new();
             let mut var_bindings: Vec<(Symbol, usize)> = Vec::new();
 
@@ -764,33 +773,21 @@ fn transform_mixed_arm(
                 let pat = &pats[pos];
                 match pat {
                     Pattern::LiteralValue(_, val) => {
-                        // Generate: _$prim_seq == val
                         let (sym, _) = &prim_temps[seq];
-                        let var_id = env.new_node(loc.clone(), elem_tys[pos].clone());
-                        let var_exp = ExpData::LocalVar(var_id, *sym).into_exp();
+                        let var_exp = make_local_var(env, &loc, elem_tys[pos].clone(), *sym);
                         let val_id = env.new_node(loc.clone(), elem_tys[pos].clone());
                         let val_exp = ExpData::Value(val_id, val.clone()).into_exp();
-                        let cmp_id = env.new_node(loc.clone(), bool_ty.clone());
-                        conditions.push(
-                            ExpData::Call(cmp_id, Operation::Eq, vec![var_exp, val_exp]).into_exp(),
-                        );
+                        conditions.push(make_eq(env, &loc, var_exp, val_exp));
                     },
                     Pattern::Var(_, var_sym) => {
-                        // Remember to bind this variable in the body
                         var_bindings.push((*var_sym, seq));
                     },
-                    Pattern::Wildcard(_) => {
-                        // No condition needed
-                    },
+                    Pattern::Wildcard(_) => {},
                     _ => unreachable!("is_mixed_tuple_match verified pattern types"),
                 }
             }
 
-            // Combine primitive conditions with AND
-            let prim_guard = conditions.into_iter().reduce(|acc, cond| {
-                let and_id = env.new_node(loc.clone(), bool_ty.clone());
-                ExpData::Call(and_id, Operation::And, vec![acc, cond]).into_exp()
-            });
+            let prim_guard = conjoin(env, &loc, conditions);
 
             // Wrap the user's guard with primitive-position var bindings so they
             // are in scope: { let y = _$prim_0; guard }
@@ -807,18 +804,11 @@ fn transform_mixed_arm(
             });
 
             // Combine with existing guard: prim_guard && wrapped_user_guard
-            let new_condition = match (&prim_guard, &wrapped_user_guard) {
-                (Some(pg), Some(wg)) => {
-                    let and_id = env.new_node(loc.clone(), bool_ty.clone());
-                    Some(
-                        ExpData::Call(and_id, Operation::And, vec![pg.clone(), wg.clone()])
-                            .into_exp(),
-                    )
-                },
-                (Some(pg), None) => Some(pg.clone()),
-                (None, Some(wg)) => Some(wg.clone()),
-                (None, None) => None,
-            };
+            let guard_parts: Vec<Exp> = prim_guard
+                .into_iter()
+                .chain(wrapped_user_guard)
+                .collect();
+            let new_condition = conjoin(env, &loc, guard_parts);
 
             // Wrap the body with primitive-position var bindings
             let new_body = wrap_with_prim_bindings(
@@ -843,11 +833,7 @@ fn transform_mixed_arm(
             let np_ty = if non_primitive_positions.len() == 1 {
                 elem_tys[non_primitive_positions[0]].clone()
             } else {
-                let np_tys: Vec<Type> = non_primitive_positions
-                    .iter()
-                    .map(|&pos| elem_tys[pos].clone())
-                    .collect();
-                Type::Tuple(np_tys)
+                Type::Tuple(select_positions(elem_tys, non_primitive_positions))
             };
             let loc = env.get_node_loc(arm.pattern.node_id());
             let wc_id = env.new_node(loc, np_ty);
@@ -885,6 +871,7 @@ fn wrap_with_prim_bindings(
     var_bindings: &[(Symbol, usize)],
     inner: Exp,
 ) -> Exp {
+    let builder = ExpBuilder::new(env);
     let free = inner.as_ref().free_vars();
     var_bindings
         .iter()
@@ -895,9 +882,7 @@ fn wrap_with_prim_bindings(
             let (prim_sym, _) = &prim_temps[*seq];
             let var_pat_id = env.new_node(loc.clone(), elem_tys[pos].clone());
             let pattern = Pattern::Var(var_pat_id, *var_sym);
-            let prim_var_id = env.new_node(loc.clone(), elem_tys[pos].clone());
-            let prim_ref = ExpData::LocalVar(prim_var_id, *prim_sym).into_exp();
-            let block_id = env.new_node(loc.clone(), env.get_node_type(acc.node_id()));
-            ExpData::Block(block_id, pattern, Some(prim_ref), acc).into_exp()
+            let prim_ref = make_local_var(env, loc, elem_tys[pos].clone(), *prim_sym);
+            builder.block(pattern, Some(prim_ref), acc)
         })
 }
