@@ -637,8 +637,10 @@ impl BatchProofQueue {
                         return None;
                     }
 
-                    let batch_create_ts_usecs =
-                        item.info.expiration() - self.batch_expiry_gap_when_init_usecs;
+                    let batch_create_ts_usecs = item
+                        .info
+                        .expiration()
+                        .saturating_sub(self.batch_expiry_gap_when_init_usecs);
 
                     // Ensure that the batch was created at least `min_batch_age_usecs` ago to
                     // reduce the chance of inline fetches.
@@ -753,14 +755,15 @@ impl BatchProofQueue {
                     .with_label_values(&[author, pull_kind])
                     .inc();
 
-                let batch_create_ts_usecs =
-                    item.info.expiration() - self.batch_expiry_gap_when_init_usecs;
-                if now_usecs > batch_create_ts_usecs {
-                    let age_ms = (now_usecs - batch_create_ts_usecs) as f64 / 1_000.0;
-                    counters::BATCH_AGE_WHEN_PULLED
-                        .with_label_values(&[author, pull_kind])
-                        .observe(age_ms);
-                }
+                let batch_create_ts_usecs = item
+                    .info
+                    .expiration()
+                    .saturating_sub(self.batch_expiry_gap_when_init_usecs);
+                let age_ms =
+                    now_usecs.saturating_sub(batch_create_ts_usecs) as f64 / 1_000.0;
+                counters::BATCH_AGE_WHEN_PULLED
+                    .with_label_values(&[author, pull_kind])
+                    .observe(age_ms);
 
                 if let Some(insertion_time) = item.batch_insertion_time {
                     counters::BATCH_QUEUE_DURATION
