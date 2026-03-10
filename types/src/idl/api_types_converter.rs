@@ -24,10 +24,10 @@ use std::{convert::TryFrom, str::FromStr};
 pub fn construct_and_convert_validator_set(
     bytes: &[u8],
 ) -> Result<ValidatorSet, ValidatorInfoIdlError> {
-    let validator_set =
-        bcs::from_bytes::<api_types::on_chain_config::validator_set::ValidatorSet>(bytes)
-            .map_err(|e| format_err!("[on-chain config] Failed to deserialize into config: {}", e))
-            .unwrap();
+    let validator_set = bcs::from_bytes::<api_types::on_chain_config::validator_set::ValidatorSet>(
+        bytes,
+    )
+    .map_err(|e| format_err!("[on-chain config] Failed to deserialize into config: {}", e))?;
     let validator_set = convert_validator_set(validator_set)?;
     Ok(validator_set)
 }
@@ -117,7 +117,11 @@ fn parse_network_address(
     if let Ok(addresses) = bcs::from_bytes::<Vec<NetworkAddress>>(&network_addresses) {
         return Ok(addresses);
     }
-    // As a fallback, return empty
+    // Both deserialization strategies failed — log a warning
+    tracing::warn!(
+        bytes_len = network_addresses.len(),
+        "Failed to parse network addresses: neither BCS String nor BCS Vec<NetworkAddress> deserialization succeeded"
+    );
     Ok(vec![])
 }
 
@@ -128,19 +132,18 @@ pub fn convert_validator_config(
     // Convert consensus public key from Vec<u8> to bls12381::PublicKey
     // The consensus_public_key is already raw bytes (48 bytes for BLS12381),
     // NOT a hex string, so we should NOT hex::decode it
-    let consensus_public_key = bls12381::PublicKey::try_from(
-        api_config.consensus_public_key.as_slice(),
-    )
-    .map_err(|e| ValidatorInfoIdlError::ConsensusPublicKeyError(e.to_string()))?;
+    let consensus_public_key =
+        bls12381::PublicKey::try_from(api_config.consensus_public_key.as_slice())
+            .map_err(|e| ValidatorInfoIdlError::ConsensusPublicKeyError(e.to_string()))?;
 
     // Parse and re-encode network addresses to ensure proper BCS format
-    let validator_network_addresses = bcs::to_bytes(
-        &parse_network_address(api_config.validator_network_addresses.clone())?,
-    )
+    let validator_network_addresses = bcs::to_bytes(&parse_network_address(
+        api_config.validator_network_addresses.clone(),
+    )?)
     .map_err(|e| ValidatorInfoIdlError::NetworkAddressParseError(e.to_string()))?;
-    let fullnode_network_addresses = bcs::to_bytes(
-        &parse_network_address(api_config.fullnode_network_addresses.clone())?,
-    )
+    let fullnode_network_addresses = bcs::to_bytes(&parse_network_address(
+        api_config.fullnode_network_addresses.clone(),
+    )?)
     .map_err(|e| ValidatorInfoIdlError::NetworkAddressParseError(e.to_string()))?;
 
     Ok(ValidatorConfig::new(

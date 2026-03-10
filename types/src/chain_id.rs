@@ -161,13 +161,17 @@ impl Into<u64> for ChainId {
 
 impl fmt::Display for NamedChain {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "{}", match self {
-            NamedChain::DEVNET => DEVNET,
-            NamedChain::TESTNET => TESTNET,
-            NamedChain::MAINNET => MAINNET,
-            NamedChain::TESTING => TESTING,
-            NamedChain::PREMAINNET => PREMAINNET,
-        })
+        write!(
+            f,
+            "{}",
+            match self {
+                NamedChain::DEVNET => DEVNET,
+                NamedChain::TESTNET => TESTNET,
+                NamedChain::MAINNET => MAINNET,
+                NamedChain::TESTING => TESTING,
+                NamedChain::PREMAINNET => PREMAINNET,
+            }
+        )
     }
 }
 
@@ -183,9 +187,9 @@ impl FromStr for ChainId {
     fn from_str(s: &str) -> Result<Self> {
         ensure!(!s.is_empty(), "Cannot create chain ID from empty string");
         NamedChain::str_to_chain_id(s).or_else(|_err| {
-            let value = s.parse::<u8>()?;
+            let value = s.parse::<u64>()?;
             ensure!(value > 0, "cannot have chain ID with 0");
-            Ok(ChainId::new(value as u64))
+            Ok(ChainId::new(value))
         })
     }
 }
@@ -221,8 +225,7 @@ mod test {
     fn test_chain_id_from_str() {
         assert!(ChainId::from_str("").is_err());
         assert!(ChainId::from_str("0").is_err());
-        assert!(ChainId::from_str("256").is_err());
-        assert!(ChainId::from_str("255255").is_err());
+        assert_eq!(ChainId::from_str("256").unwrap(), ChainId::new(256));
         assert_eq!(ChainId::from_str("TESTING").unwrap(), ChainId::test());
         assert_eq!(ChainId::from_str("255").unwrap(), ChainId::new(255));
     }

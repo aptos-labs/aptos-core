@@ -573,10 +573,7 @@ pub struct GravityExtension {
 }
 
 impl GravityExtension {
-    pub fn new(block_id: HashValue,
-               txn_index_in_block: u32,
-               txn_count_in_block: u32,
-    ) -> Self {
+    pub fn new(block_id: HashValue, txn_index_in_block: u32, txn_count_in_block: u32) -> Self {
         Self {
             block_id,
             txn_index_in_block,
@@ -615,13 +612,15 @@ pub struct SignedTransaction {
     #[serde(skip)]
     committed_hash: OnceCell<HashValue>,
 
-    g_ext : GravityExtension
+    g_ext: GravityExtension,
 }
 
 /// PartialEq ignores the cached OnceCell fields that may or may not be initialized.
 impl PartialEq for SignedTransaction {
     fn eq(&self, other: &Self) -> bool {
-        self.raw_txn == other.raw_txn && self.authenticator == other.authenticator
+        self.raw_txn == other.raw_txn
+            && self.authenticator == other.authenticator
+            && self.g_ext == other.g_ext
     }
 }
 

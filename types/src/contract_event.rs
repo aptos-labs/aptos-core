@@ -38,7 +38,7 @@ fn convert_validator_consensus_info(
 ) -> Result<ValidatorConsensusInfo, Error> {
     let addr =
         crate::account_address::AccountAddress::from_bytes(&v.addr.bytes()).map_err(|e| {
-            eprintln!("Failed to parse address: {:?}, error: {}", v.addr, e);
+            tracing::error!("Failed to parse address: {:?}, error: {}", v.addr, e);
             e
         })?;
 
@@ -52,7 +52,7 @@ fn convert_validator_consensus_info(
 
     let public_key =
         aptos_crypto::bls12381::PublicKey::try_from(v.pk_bytes.as_slice()).map_err(|e| {
-            eprintln!(
+            tracing::error!(
                 "Failed to parse BLS12381 public key: pk_bytes length: {}, bytes: {:?}, error: {}",
                 v.pk_bytes.len(),
                 v.pk_bytes,
@@ -482,7 +482,7 @@ impl TryFrom<&GravityEvent> for ContractEvent {
                 let data = NewEpochEvent { epoch: *epoch };
                 Ok(ContractEvent::V2(ContractEventV2::new(
                     TypeTag::Struct(Box::new(NewEpochEvent::struct_tag())),
-                    serde_json::to_vec(&data).unwrap(),
+                    bcs::to_bytes(&data).unwrap(),
                 )))
             },
             GravityEvent::ObservedJWKsUpdated(epoch, jwks) => {
@@ -517,7 +517,12 @@ impl TryFrom<&GravityEvent> for ContractEvent {
                                                     variant: unsupported_jwk.as_move_any(),
                                                 }
                                             },
-                                            _ => panic!("unknown jwk type: {}", jwk.type_name),
+                                            _ => {
+                                                return Err(anyhow::anyhow!(
+                                                    "unknown jwk type: {}",
+                                                    jwk.type_name
+                                                ))
+                                            },
                                         }
                                     })
                                     .collect(),

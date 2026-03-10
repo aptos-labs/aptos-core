@@ -167,11 +167,9 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
             .get(&self.my_addr)
             .copied();
 
-        // TODO(gravity_lightman_dkg): mock randomness config seq num
-        // let onchain_randomness_config_seq_num = payload
-        //     .get::<RandomnessConfigSeqNum>()
-        //     .unwrap_or_else(|_| RandomnessConfigSeqNum::default_if_missing());
-        let onchain_randomness_config_seq_num = RandomnessConfigSeqNum { seq_num: 0 };
+        let onchain_randomness_config_seq_num = payload
+            .get::<RandomnessConfigSeqNum>()
+            .unwrap_or_else(|_| RandomnessConfigSeqNum::default_if_missing());
 
         let randomness_config_move_struct = payload.get::<RandomnessConfigMoveStruct>();
 

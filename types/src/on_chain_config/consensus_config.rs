@@ -3,14 +3,14 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::on_chain_config::OnChainConfig;
+use anyhow::{format_err, Result};
 pub use api_types::on_chain_config::{
     consensus_config::{
-        ConsensusAlgorithmConfig, ConsensusConfigV1, LeaderReputationType,
-        ProposerAndVoterConfig, ProposerElectionType, ValidatorTxnConfig,
-        DEFAULT_WINDOW_SIZE
-    }, *
+        ConsensusAlgorithmConfig, ConsensusConfigV1, LeaderReputationType, ProposerAndVoterConfig,
+        ProposerElectionType, ValidatorTxnConfig, DEFAULT_WINDOW_SIZE,
+    },
+    *,
 };
-use anyhow::{format_err, Result};
 // use move_core_types::account_address::AccountAddress;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -194,10 +194,10 @@ use std::collections::HashMap;
 //     }
 // }
 
-/// 得把gravity onchain config也放进去作为enum的一个类型. 但是这里依赖关系会不会出问题
-/// 为了避免依赖关系的问题，需要把aptos这里的config的声明挪动到api-types下面 不然肯定会循环引用.
-/// 得把这里的ConsensusConfigV1, ConsensusAlgorithmConfig. ValidatorTxnConfig LeaderReputationType ProposerAndVoterConfig挪动出去
-/// dag相关的不用动 我们不使用
+/// Gravity on-chain config should also be added as an enum variant here.
+/// To avoid circular dependency issues, the config declarations (ConsensusConfigV1,
+/// ConsensusAlgorithmConfig, ValidatorTxnConfig, LeaderReputationType, ProposerAndVoterConfig)
+/// have been moved to api-types. DAG-related types are not moved as we don't use them.
 /// The on-chain consensus config, in order to be able to add fields, we use enum to wrap the actual struct.
 #[derive(Clone, Debug, Deserialize, PartialEq, Eq, Serialize)]
 pub enum OnChainConsensusConfig {

@@ -93,7 +93,13 @@ impl DKGSessionMetadata {
         self.target_validator_set
             .clone()
             .into_iter()
-            .map(|obj| obj.try_into().unwrap())
+            .filter_map(|obj| match obj.try_into() {
+                Ok(info) => Some(info),
+                Err(e) => {
+                    tracing::warn!("Failed to convert target validator consensus info: {}", e);
+                    None
+                },
+            })
             .collect()
     }
 
@@ -101,7 +107,13 @@ impl DKGSessionMetadata {
         self.dealer_validator_set
             .clone()
             .into_iter()
-            .map(|obj| obj.try_into().unwrap())
+            .filter_map(|obj| match obj.try_into() {
+                Ok(info) => Some(info),
+                Err(e) => {
+                    tracing::warn!("Failed to convert dealer validator consensus info: {}", e);
+                    None
+                },
+            })
             .collect()
     }
 
