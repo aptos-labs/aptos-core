@@ -86,6 +86,7 @@ async fn initialize_swarm_with_window(
 }
 
 #[tokio::test]
+#[ignore] // Ignored until execution pool is deployed
 async fn test_window_size_onchain_config_change() {
     let window_size = Some(4u64);
     let (mut swarm, cli, _faucet, root_cli_index, ..) =
