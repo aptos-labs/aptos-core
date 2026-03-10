@@ -45,6 +45,7 @@ impl<Fut: Future> FuturesUnorderedX<Fut> {
     }
 
     /// Returns `true` if the queue contains no futures
+    #[cfg(test)]
     pub fn is_empty(&self) -> bool {
         self.queued.is_empty() && self.in_progress.is_empty() && self.queued_outputs.is_empty()
     }

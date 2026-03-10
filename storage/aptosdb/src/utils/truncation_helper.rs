@@ -1,8 +1,6 @@
 // Copyright (c) Aptos Foundation
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
-#![allow(dead_code)]
-
 use crate::{
     ledger_db::{
         ledger_metadata_db::LedgerMetadataDb, transaction_db::TransactionDb, LedgerDb,
