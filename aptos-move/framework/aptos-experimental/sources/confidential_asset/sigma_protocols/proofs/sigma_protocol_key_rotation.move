@@ -259,13 +259,9 @@ module aptos_experimental::sigma_protocol_key_rotation {
             repr_scaled(START_IDX_OLD_R + i, delta)
         ));
 
-        let repr_vec = new_representation_vec(reprs);
-        let expected_output_len = 3 + ell;
-
         // WARNING: Crucial for security
-        assert!(repr_vec.length() == expected_output_len, e_wrong_output_len());
-
-        repr_vec
+        assert!(reprs.length() == 3 + ell, e_wrong_output_len());
+        new_representation_vec(reprs)
     }
 
     /// The transformation function $f$ for the key rotation relation.
@@ -300,13 +296,10 @@ module aptos_experimental::sigma_protocol_key_rotation {
             repr_point(idx_r_new_start + i)
         ));
 
-        let repr_vec = new_representation_vec(reprs);
-        let expected_output_len = 3 + ell;
-
-        // WARNING: Crucial for security
-        assert!(repr_vec.length() == expected_output_len, e_wrong_output_len());
-
-        repr_vec
+        // Note: Not needed for security, since a mismatched f(X) length will be caught in the verifier. But good practice
+        // for catching mistakes *early* when implementing your f(X).
+        assert!(reprs.length() == 3 + ell, e_wrong_output_len());
+        new_representation_vec(reprs)
     }
 
     /// Asserts that a key rotation proof verifies

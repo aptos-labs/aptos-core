@@ -158,15 +158,15 @@ module aptos_experimental::sigma_protocol_registration {
 
         let dk = *w.get(IDX_DK);
 
-        let output = new_representation_vec(vector[
+        let reprs = (vector[
             // dk * ek
             repr_scaled(IDX_EK, dk),
         ]);
 
         // WARNING: Crucial for security
-        assert!(output.length() == M, e_wrong_output_len());
+        assert!(reprs.length() == M, e_wrong_output_len());
 
-        output
+        new_representation_vec(reprs)
     }
 
     /// The transformation function $\mathsf{f}_\mathsf{dl}(\mathsf{ek}) = H$.
