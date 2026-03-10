@@ -11,7 +11,7 @@ module aptos_experimental::confidential_asset {
     use aptos_framework::chain_id;
     use aptos_framework::event;
     use aptos_framework::dispatchable_fungible_asset;
-    use aptos_framework::fungible_asset::Self;
+    use aptos_framework::fungible_asset::{Self, FungibleStore};
     use aptos_framework::object::{Self, ExtendRef, Object};
     use aptos_framework::primary_fungible_store;
     use aptos_framework::system_addresses;
@@ -86,6 +86,9 @@ module aptos_experimental::confidential_asset {
 
     /// Self-transfers are not allowed: sender and recipient must be different.
     const E_SELF_TRANSFER: u64 = 15;
+
+    /// "Dispatchable" fungible asset types whose withdraw, deposit, balance or supply functions can be customized are not supported, for now.
+    const E_UNSAFE_DISPATCHABLE_FA: u64 = 16;
 
     /// An internal error occurred: there is either a bug or a misconfiguration in the contract.
     const E_INTERNAL_ERROR: u64 = 999;
@@ -277,13 +280,32 @@ module aptos_experimental::confidential_asset {
         register(sender, asset_type, ek, proof);
     }
 
+    /// Dispatchable fungible asset (DFA) types can, for example, dynamically change user balances upon a call to
+    /// `fungible_asset::balance()`, based say, on a multiplier. We do not yet see how to *generically* handle such
+    /// dynamic behavior in a confidential context, where balances are encrypted on-chain and cannot be modified in
+    /// arbitrary ways. Similarly, we also forbid "total supply" dispatch functions, out of an abundance of caution.
+    ///
+    /// Furthermore, even for DFAs that only have custom "withdraw/deposit" dispatch functions, it is unclear how to
+    /// *generically* support any such functionality. As a result, for now we only support non-dispatchable (vanilla)
+    /// fungible asset (FA) types.
+    ///
+    /// For example, sender blocklists implemented via "withdraw" dispatching would only be enforced when users veil/
+    /// unveil their tokens into/from the confidential asset pool. (This is because a `confidential_transfer` cannot,
+    /// by definition, interact with any (D)FA functions, or it would be forced to leak amounts/balances). In the future,
+    /// we could add support for dispatch functions that only look at the sender's address (and not at the amount/
+    /// balances). This way, we could *generically* handle them here, given they are implemented in a type-safe way that
+    /// allows us to check they are enabled.
+    fun is_safe_for_confidentiality(asset_type: &Object<fungible_asset::Metadata>): bool {
+        !fungible_asset::is_asset_type_dispatchable(asset_type)
+    }
+
     /// Registers a confidential store for a specified asset type, encrypted under the given EK.
     public fun register(
-        sender: &signer, asset_type:
-        Object<fungible_asset::Metadata>,
+        sender: &signer, asset_type: Object<fungible_asset::Metadata>,
         ek: CompressedRistretto,
         proof: RegistrationProof
     ) acquires GlobalConfig, AssetConfig {
+        assert!(is_safe_for_confidentiality(&asset_type), error::invalid_argument(E_UNSAFE_DISPATCHABLE_FA));
         assert!(is_confidentiality_enabled_for_asset_type(asset_type), error::invalid_argument(E_ASSET_TYPE_DISALLOWED));
 
         assert!(
@@ -314,16 +336,18 @@ module aptos_experimental::confidential_asset {
     ) acquires ConfidentialStore, GlobalConfig, AssetConfig {
         let addr = signer::address_of(depositor);
 
+        assert!(is_safe_for_confidentiality(&asset_type), error::invalid_argument(E_UNSAFE_DISPATCHABLE_FA));
         assert!(is_confidentiality_enabled_for_asset_type(asset_type), error::invalid_argument(E_ASSET_TYPE_DISALLOWED));
         assert!(!incoming_transfers_paused(addr, asset_type), error::invalid_state(E_INCOMING_TRANSFERS_PAUSED));
 
-        // Note: This sets up the "confidential asset pool" for this asset type, if one is not already set up, such as
-        // when someone first veils this asset type for the first time.
-        let pool_fa_store = primary_fungible_store::ensure_primary_store_exists(
-            get_global_config_address(), asset_type
-        );
+        // Note: Gets the "confidential asset pool" for this asset type, or sets it up if this asset type is veiled for the first time
+        let pool_fa_store = ensure_pool_fa_store(asset_type);
 
-        // Step 1: Transfer the asset from the user's account into the confidential asset pool
+        // Step 1: Transfer the asset from the user's account into the confidential asset pool.
+        //
+        // Note: Dispatchable transfers may deliver less than `amount` (e.g., due to fees for deflationary tokens), so
+        // we measure the pool balance before & after to credit only what was actually received.
+        let before = fungible_asset::balance(pool_fa_store);
         let depositor_fa_store = primary_fungible_store::primary_store(addr, asset_type);
         dispatchable_fungible_asset::transfer(depositor, depositor_fa_store, pool_fa_store, amount);
 
@@ -340,6 +364,9 @@ module aptos_experimental::confidential_asset {
         ca_store.transfers_received += 1;
 
         event::emit(Deposited::V1 { addr, amount, asset_type });
+
+        // Re-asserting dispatchable FA functionality that charges fees on withdraw/deposit was not invoked.
+        assert!(amount == fungible_asset::balance(pool_fa_store) - before, error::invalid_argument(E_UNSAFE_DISPATCHABLE_FA));
     }
 
     /// Deserializes cryptographic data and forwards to `withdraw_to`.
@@ -371,6 +398,8 @@ module aptos_experimental::confidential_asset {
         amount: u64,
         proof: WithdrawalProof
     ) acquires ConfidentialStore, GlobalConfig, AssetConfig {
+        assert!(is_safe_for_confidentiality(&asset_type), error::invalid_argument(E_UNSAFE_DISPATCHABLE_FA));
+
         let sender_addr = signer::address_of(sender);
 
         // Read values before mutable borrow to avoid conflicting borrows of ConfidentialStore
@@ -379,13 +408,8 @@ module aptos_experimental::confidential_asset {
         let auditor_ek = get_effective_auditor(asset_type);
 
         let compressed_new_balance = assert_valid_withdrawal_proof(
-            sender,
-            asset_type,
-            &ek,
-            amount,
-            &old_balance,
-            &auditor_ek,
-            proof
+            sender, asset_type,
+            &ek, amount, &old_balance, &auditor_ek, proof
         );
 
         let ca_store = borrow_confidential_store_mut(sender_addr, asset_type);
@@ -393,8 +417,14 @@ module aptos_experimental::confidential_asset {
         ca_store.available_balance = compressed_new_balance;
 
         if (amount > 0) {
-            primary_fungible_store::transfer(&get_global_config_signer(), asset_type, to, amount);
+            let pool_fa_store = get_pool_fa_store(asset_type);  // must exist b.c. sender's CA store exists
+            let before = fungible_asset::balance(pool_fa_store);
+
+            dispatchable_fungible_asset::transfer(&get_global_config_signer(), pool_fa_store, primary_fungible_store::ensure_primary_store_exists(to, asset_type), amount);
             event::emit(Withdrawn::V1 { from: sender_addr, to, amount, asset_type });
+
+            // Re-asserting dispatchable FA functionality that charges fees on withdraw/deposit was not invoked.
+            assert!(amount == before - fungible_asset::balance(pool_fa_store), error::invalid_argument(E_UNSAFE_DISPATCHABLE_FA));
         } else {
             event::emit(Normalized::V1 { addr: sender_addr, asset_type });
         };
@@ -454,6 +484,7 @@ module aptos_experimental::confidential_asset {
         to: address,
         proof: TransferProof
     ) acquires ConfidentialStore, AssetConfig, GlobalConfig {
+        assert!(is_safe_for_confidentiality(&asset_type), error::invalid_argument(E_UNSAFE_DISPATCHABLE_FA));
         assert!(is_confidentiality_enabled_for_asset_type(asset_type), error::invalid_argument(E_ASSET_TYPE_DISALLOWED));
         assert!(!incoming_transfers_paused(to, asset_type), error::invalid_state(E_INCOMING_TRANSFERS_PAUSED));
 
@@ -464,7 +495,7 @@ module aptos_experimental::confidential_asset {
         let ek_recip = get_encryption_key(to, asset_type);
         let old_balance = get_available_balance(from, asset_type);
 
-        // Note: Sender's amount is not used;y only included for indexing to reliably pick it up for dapps that need it
+        // Note: Sender's amount is not used; only included for indexing to reliably pick it up for dapps that need it
         let (compressed_new_balance,recipient_amount) =
             assert_valid_transfer_proof(
                 sender, to, asset_type,
@@ -837,13 +868,7 @@ module aptos_experimental::confidential_asset {
     #[view]
     /// Returns the circulating supply of the confidential asset.
     public fun get_total_confidential_supply(asset_type: Object<fungible_asset::Metadata>): u64 acquires GlobalConfig {
-        let fa_store_address = get_global_config_address();
-        assert!(
-            primary_fungible_store::primary_store_exists(fa_store_address, asset_type),
-            error::not_found(E_NO_CONFIDENTIAL_ASSET_POOL_FOR_ASSET_TYPE)
-        );
-
-        primary_fungible_store::balance(fa_store_address, asset_type)
+        fungible_asset::balance(get_pool_fa_store(asset_type))
     }
 
     #[view]
@@ -884,15 +909,22 @@ module aptos_experimental::confidential_asset {
     }
 
     fun get_global_config_signer(): signer acquires GlobalConfig {
-        object::generate_signer_for_extending(&borrow_global<GlobalConfig>(@aptos_experimental).extend_ref)
+        borrow_global<GlobalConfig>(@aptos_experimental).extend_ref.generate_signer_for_extending()
     }
 
-    fun get_global_config_address(): address acquires GlobalConfig {
-        object::address_from_extend_ref(&borrow_global<GlobalConfig>(@aptos_experimental).extend_ref)
+    fun get_pool_fa_store(asset_type: Object<fungible_asset::Metadata>): Object<FungibleStore> {
+        let global_config_addr = borrow_global<GlobalConfig>(@aptos_experimental).extend_ref.address_from_extend_ref();
+        assert!(primary_fungible_store::primary_store_exists(global_config_addr, asset_type), error::not_found(E_NO_CONFIDENTIAL_ASSET_POOL_FOR_ASSET_TYPE));
+        primary_fungible_store::primary_store(global_config_addr, asset_type)
+    }
+
+    fun ensure_pool_fa_store(asset_type: Object<fungible_asset::Metadata>): Object<FungibleStore> {
+        let global_config_addr = borrow_global<GlobalConfig>(@aptos_experimental).extend_ref.address_from_extend_ref();
+        primary_fungible_store::ensure_primary_store_exists(global_config_addr, asset_type)
     }
 
     fun get_confidential_store_signer(user: &signer, asset_type: Object<fungible_asset::Metadata>): signer {
-        object::generate_signer(&object::create_named_object(user, construct_confidential_store_seed(asset_type)))
+        object::create_named_object(user, construct_confidential_store_seed(asset_type)).generate_signer()
     }
 
     fun get_confidential_store_address(user: address, asset_type: Object<fungible_asset::Metadata>): address {
