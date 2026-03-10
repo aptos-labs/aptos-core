@@ -24,13 +24,13 @@ use aptos_crypto::HashValue;
 use aptos_executor_types::state_compute_result::StateComputeResult;
 use aptos_logger::prelude::*;
 use aptos_prefix_consensus::{
-    PrefixVector, PriorityClassifiable, SubprotocolNetworkSender, StrongPrefixConsensusMsg,
-    build_block_for_entry,
+    PrefixVector, ProposalData, PriorityClassifiable, SubprotocolNetworkSender,
+    StrongPrefixConsensusMsg, build_block_for_entry,
     certificates::StrongPCCommit,
     slot_ranking::MultiSlotRankingManager,
     slot_state::SlotState,
     slot_types::{
-        PayloadFetchRequest, PayloadFetchResponse, SPCOutput, SlotConsensusMsg, SlotProposal,
+        EntryFetchRequest, EntryFetchResponse, SPCOutput, SlotConsensusMsg, SlotProposal,
         create_signed_slot_proposal,
     },
 };
@@ -55,26 +55,26 @@ use tokio::time::Sleep;
 const SLOT_PROPOSAL_TIMEOUT_MS: u64 = 300;
 
 // ============================================================================
-// PendingCommit: waiting for missing payloads before building block
+// PendingCommit: waiting for missing entry data before building block
 // ============================================================================
 
-/// State held when a wave (v_low or v_high delta) has unresolved payloads.
+/// State held when a wave (v_low or v_high delta) has unresolved entry data.
 ///
 /// The SlotManager stores this while waiting for late proposals or fetch responses
-/// to resolve all missing hashes. Once `missing` is empty, the wave is committed.
+/// to resolve all missing entry hashes. Once `missing` is empty, the wave is committed.
 enum PendingWave {
-    /// Wave 1: waiting for v_low payloads before early commit.
+    /// Wave 1: waiting for v_low entry data before early commit.
     VLow {
         slot: u64,
         v_low: PrefixVector,
-        resolved: HashMap<HashValue, Payload>,
+        resolved: HashMap<HashValue, ProposalData>,
         missing: HashSet<HashValue>,
     },
-    /// Wave 2: waiting for v_high delta payloads before final commit.
+    /// Wave 2: waiting for v_high delta entry data before final commit.
     VHighDelta {
         slot: u64,
         v_high: PrefixVector,   // full v_high (not just delta)
-        resolved: HashMap<HashValue, Payload>,
+        resolved: HashMap<HashValue, ProposalData>,
         missing: HashSet<HashValue>,
     },
 }
@@ -86,7 +86,7 @@ impl PendingWave {
     }
 
     /// Mutable access to the common fields across both variants.
-    fn pending_fields(&mut self) -> (u64, &mut HashSet<HashValue>, &mut HashMap<HashValue, Payload>) {
+    fn pending_fields(&mut self) -> (u64, &mut HashSet<HashValue>, &mut HashMap<HashValue, ProposalData>) {
         match self {
             PendingWave::VLow { slot, missing, resolved, .. } => (*slot, missing, resolved),
             PendingWave::VHighDelta { slot, missing, resolved, .. } => (*slot, missing, resolved),
@@ -98,7 +98,7 @@ impl PendingWave {
     /// Returns (slot, vector, resolved). For VLow the vector is v_low;
     /// for VHighDelta it is the full v_high (commit_wave skips positions
     /// already committed in wave 1).
-    fn into_parts(self) -> (u64, PrefixVector, HashMap<HashValue, Payload>) {
+    fn into_parts(self) -> (u64, PrefixVector, HashMap<HashValue, ProposalData>) {
         match self {
             PendingWave::VLow { slot, v_low, resolved, .. } => (slot, v_low, resolved),
             PendingWave::VHighDelta { slot, v_high, resolved, .. } => (slot, v_high, resolved),
@@ -483,11 +483,11 @@ impl<NS: SubprotocolNetworkSender<SlotConsensusMsg>, SP: SPCSpawner> SlotManager
                         SlotConsensusMsg::StrongPCMsg { slot, msg, .. } => {
                             self.process_spc_message(author, slot, msg).await;
                         }
-                        SlotConsensusMsg::PayloadFetchRequest(req) => {
-                            self.process_payload_fetch_request(author, req).await;
+                        SlotConsensusMsg::EntryFetchRequest(req) => {
+                            self.process_entry_fetch_request(author, req).await;
                         }
-                        SlotConsensusMsg::PayloadFetchResponse(resp) => {
-                            self.process_payload_fetch_response(*resp).await;
+                        SlotConsensusMsg::EntryFetchResponse(resp) => {
+                            self.process_entry_fetch_response(*resp).await;
                         }
                     }
                 }
@@ -598,8 +598,8 @@ impl<NS: SubprotocolNetworkSender<SlotConsensusMsg>, SP: SPCSpawner> SlotManager
             .or_insert_with(|| SlotState::new(slot, n));
 
         let slot_state = self.slot_states.get_mut(&slot).expect("just inserted");
-        let proposal_hash = proposal.payload_hash;
-        let proposal_payload = proposal.payload.clone();
+        let entry_hash = proposal.entry_hash();
+        let entry_data = ProposalData::from_proposal(&proposal);
         slot_state.insert_proposal(proposal);
 
         // If all proposals received for current slot AND SPC not yet started.
@@ -615,7 +615,7 @@ impl<NS: SubprotocolNetworkSender<SlotConsensusMsg>, SP: SPCSpawner> SlotManager
         }
 
         // Check if this late proposal resolves a pending wave
-        self.try_resolve_pending(proposal_hash, proposal_payload)
+        self.try_resolve_pending(entry_hash, entry_data)
             .await;
     }
 
@@ -730,14 +730,14 @@ impl<NS: SubprotocolNetworkSender<SlotConsensusMsg>, SP: SPCSpawner> SlotManager
             slot = slot,
             v_low_len = v_low.len(),
             non_bot = v_low.iter().filter(|h| **h != HashValue::zero()).count(),
-            "Resolving v_low payloads for wave 1 (early commit)"
+            "Resolving v_low entries for wave 1 (early commit)"
         );
 
         let (resolved, missing) = self
             .slot_states
             .get(&slot)
             .expect("SlotState must exist when SPC produces v_low")
-            .resolve_missing_payloads(&v_low);
+            .resolve_missing_entries(&v_low);
 
         if missing.is_empty() {
             self.commit_wave(slot, &v_low, &resolved, None).await;
@@ -751,7 +751,7 @@ impl<NS: SubprotocolNetworkSender<SlotConsensusMsg>, SP: SPCSpawner> SlotManager
                 epoch = self.epoch,
                 slot = slot,
                 missing_count = missing.len(),
-                "Wave 1 (v_low): missing payloads, broadcasting fetch requests"
+                "Wave 1 (v_low): missing entries, broadcasting fetch requests"
             );
             let missing_set: HashSet<HashValue> = missing.iter().cloned().collect();
             self.pending_wave = Some(PendingWave::VLow {
@@ -762,11 +762,11 @@ impl<NS: SubprotocolNetworkSender<SlotConsensusMsg>, SP: SPCSpawner> SlotManager
             });
             for hash in &missing {
                 self.network_sender
-                    .broadcast(SlotConsensusMsg::PayloadFetchRequest(
-                        PayloadFetchRequest {
+                    .broadcast(SlotConsensusMsg::EntryFetchRequest(
+                        EntryFetchRequest {
                             slot,
                             epoch: self.epoch,
-                            payload_hash: *hash,
+                            entry_hash: *hash,
                         },
                     ))
                     .await;
@@ -817,7 +817,7 @@ impl<NS: SubprotocolNetworkSender<SlotConsensusMsg>, SP: SPCSpawner> SlotManager
             .slot_states
             .get(&slot)
             .expect("SlotState must exist when SPC produces v_high")
-            .resolve_missing_payloads(&delta_vector);
+            .resolve_missing_entries(&delta_vector);
 
         if missing.is_empty() {
             self.commit_wave(slot, &v_high, &resolved, Some(&v_high))
@@ -827,7 +827,7 @@ impl<NS: SubprotocolNetworkSender<SlotConsensusMsg>, SP: SPCSpawner> SlotManager
                 epoch = self.epoch,
                 slot = slot,
                 missing_count = missing.len(),
-                "Wave 2 (v_high delta): missing payloads, broadcasting fetch requests"
+                "Wave 2 (v_high delta): missing entries, broadcasting fetch requests"
             );
             let missing_set: HashSet<HashValue> = missing.iter().cloned().collect();
             self.pending_wave = Some(PendingWave::VHighDelta {
@@ -838,11 +838,11 @@ impl<NS: SubprotocolNetworkSender<SlotConsensusMsg>, SP: SPCSpawner> SlotManager
             });
             for hash in &missing {
                 self.network_sender
-                    .broadcast(SlotConsensusMsg::PayloadFetchRequest(
-                        PayloadFetchRequest {
+                    .broadcast(SlotConsensusMsg::EntryFetchRequest(
+                        EntryFetchRequest {
                             slot,
                             epoch: self.epoch,
-                            payload_hash: *hash,
+                            entry_hash: *hash,
                         },
                     ))
                     .await;
@@ -863,7 +863,7 @@ impl<NS: SubprotocolNetworkSender<SlotConsensusMsg>, SP: SPCSpawner> SlotManager
         &mut self,
         slot: u64,
         vector: &PrefixVector,
-        payload_map: &HashMap<HashValue, Payload>,
+        entry_data_map: &HashMap<HashValue, ProposalData>,
         finalize_with_v_high: Option<&PrefixVector>,
     ) {
         let ranking = self.ranking_manager.current_ranking();
@@ -878,30 +878,28 @@ impl<NS: SubprotocolNetworkSender<SlotConsensusMsg>, SP: SPCSpawner> SlotManager
                 continue;
             }
 
-            let payload = payload_map
+            let entry_data = entry_data_map
                 .get(hash)
-                .expect("Payload missing for committed hash — payload resolution bug");
+                .expect("Entry data missing for committed hash — entry resolution bug");
 
-            // Deterministic timestamp: max(parent_ts + 1, proposal_timestamp)
+            // Deterministic timestamp from SPC-agreed ProposalData:
+            // max(parent_ts + 1, entry_data.timestamp_usecs)
             let parent_ts = self.parent_block_info.timestamp_usecs();
-            let proposal_ts = self
-                .slot_states
-                .get(&slot)
-                .map(|s| s.proposal_timestamp(author))
-                .unwrap_or(0);
-            let timestamp = proposal_ts
+            let timestamp = entry_data.timestamp_usecs
                 .max(parent_ts.checked_add(1).expect("timestamp overflow"));
 
             let round = self.next_round;
             self.next_round += 1;
 
+            // CRITICAL: pass payload_hash (not entry_hash) to build_block_for_entry.
+            // BlockData.proposal_hashes stores "Payload hashes of committed proposals".
             let block = build_block_for_entry(
                 self.epoch,
                 round,
                 timestamp,
                 *author,
-                *hash,
-                payload.clone(),
+                entry_data.payload_hash,
+                entry_data.payload.clone(),
                 self.parent_block_info.id(),
                 vec![], // validator_txns
             );
@@ -1018,10 +1016,10 @@ impl<NS: SubprotocolNetworkSender<SlotConsensusMsg>, SP: SPCSpawner> SlotManager
         let current_slot_ranking = self.current_slot_ranking.take()
             .unwrap_or_else(|| self.ranking_manager.current_ranking().to_vec());
 
-        // Extract the canonical commit proof from the first non-⊥ proposal in v_high.
-        // This is deterministic: v_high is agreed by SPC, so all honest validators
-        // identify the same author and extract the same prev_commit_proof.
-        let canonical_proof = self.extract_canonical_proof(slot, v_high, &current_slot_ranking);
+        // Extract the canonical commit proof from the first non-⊥ entry in v_high.
+        // This is deterministic: v_high entries are SPC-agreed entry_hashes, and
+        // the ProposalData (including prev_commit_proof) is pinned by the entry_hash.
+        let canonical_proof = self.extract_canonical_proof(slot, v_high);
 
         let (committing_view, spc_initial_ranking) = if let Some(ref prev_ranking) = self.last_spc_initial_ranking {
             let cv = match &canonical_proof {
@@ -1088,40 +1086,37 @@ impl<NS: SubprotocolNetworkSender<SlotConsensusMsg>, SP: SPCSpawner> SlotManager
 
     /// Extract the canonical commit proof from the first non-⊥ entry in v_high.
     ///
-    /// The first non-⊥ position identifies the highest-ranked validator whose
-    /// proposal was included. That validator's `prev_commit_proof` (from slot S-1)
-    /// is the canonical proof used for SPC-view demotions.
+    /// Looks up each non-⊥ entry_hash in the slot state's `entry_data_map` and
+    /// returns the first match's `prev_commit_proof`. Since v_high entries are
+    /// SPC-agreed composite hashes pinning down payload + timestamp + proof,
+    /// this is deterministic across all honest validators.
     ///
     /// Returns `None` for slot 1 (no predecessor) or if no non-⊥ entry has a proof.
     fn extract_canonical_proof(
         &self,
         slot: u64,
         v_high: &PrefixVector,
-        current_slot_ranking: &[Author],
     ) -> Option<StrongPCCommit> {
         if slot <= 1 {
             return None;
         }
 
         let slot_state = self.slot_states.get(&slot)?;
-        let buffer = slot_state.proposal_buffer();
 
-        // Find the first non-⊥ entry in v_high and look up that author's proposal
-        for (pos, hash) in v_high.iter().enumerate() {
+        // Find the first non-⊥ entry in v_high and look up its ProposalData
+        for hash in v_high {
             if *hash == HashValue::zero() {
                 continue;
             }
-            if let Some(author) = current_slot_ranking.get(pos) {
-                if let Some(proposal) = buffer.get(author) {
-                    return proposal.prev_commit_proof.clone();
-                }
+            if let Some(data) = slot_state.lookup_entry_data(hash) {
+                return data.prev_commit_proof;
             }
         }
 
         warn!(
             epoch = self.epoch,
             slot = slot,
-            "No proposal found for any non-bot v_high entry — cannot extract canonical proof"
+            "No entry data found for any non-bot v_high entry — cannot extract canonical proof"
         );
         None
     }
@@ -1195,60 +1190,64 @@ impl<NS: SubprotocolNetworkSender<SlotConsensusMsg>, SP: SPCSpawner> SlotManager
     }
 
     // ========================================================================
-    // Payload fetch: request handling, response handling, resolution
+    // Entry fetch: request handling, response handling, resolution
     // ========================================================================
 
-    async fn process_payload_fetch_request(&mut self, requester: Author, req: PayloadFetchRequest) {
+    async fn process_entry_fetch_request(&mut self, requester: Author, req: EntryFetchRequest) {
         if req.epoch != self.epoch {
             return;
         }
 
-        // Look up the requested payload in the slot state (primary + late buffer)
-        let payload = self
+        // Look up the requested entry data in the slot state (primary + late buffer)
+        let data = self
             .slot_states
             .get(&req.slot)
-            .and_then(|s| s.lookup_payload(&req.payload_hash));
+            .and_then(|s| s.lookup_entry_data(&req.entry_hash));
 
-        if let Some(payload) = payload {
+        if let Some(data) = data {
             self.network_sender
                 .send_to(
                     requester,
-                    SlotConsensusMsg::PayloadFetchResponse(Box::new(PayloadFetchResponse {
+                    SlotConsensusMsg::EntryFetchResponse(Box::new(EntryFetchResponse {
                         slot: req.slot,
                         epoch: req.epoch,
-                        payload_hash: req.payload_hash,
-                        payload,
+                        entry_hash: req.entry_hash,
+                        data,
                     })),
                 )
                 .await;
         }
     }
 
-    // TODO(production): A Byzantine node can send unsolicited PayloadFetchResponse
-    // messages, forcing us to compute H(payload) for each one. The cost is low
-    // (SHA3-256 over serialized payload), but for hardening we should check
-    // `pending_wave.missing.contains(&resp.payload_hash)` *before* computing
-    // the hash, so unsolicited responses are dropped at near-zero cost.
-    async fn process_payload_fetch_response(&mut self, resp: PayloadFetchResponse) {
+    async fn process_entry_fetch_response(&mut self, resp: EntryFetchResponse) {
         if resp.epoch != self.epoch {
             return;
         }
 
-        // Verify payload integrity
-        if !resp.verify_payload_hash() {
+        // Verify entry data integrity: recompute entry_hash from the carried data
+        if !resp.verify_entry_hash() {
             warn!(
                 epoch = self.epoch,
                 slot = resp.slot,
-                "Payload fetch response hash mismatch, dropping"
+                "Entry fetch response hash mismatch, dropping"
             );
             return;
+        }
+
+        // Store the fetched entry data in the slot state so it's available
+        // for extract_canonical_proof and future lookups.
+        if let Some(slot_state) = self.slot_states.get_mut(&resp.slot) {
+            if let Some(map) = slot_state.entry_data_map_mut() {
+                map.entry(resp.entry_hash)
+                    .or_insert_with(|| resp.data.clone());
+            }
         }
 
         // Check if this resolves a pending wave
         let should_commit = if let Some(pending) = &mut self.pending_wave {
             let (pending_slot, missing, resolved) = pending.pending_fields();
-            if pending_slot == resp.slot && missing.remove(&resp.payload_hash) {
-                resolved.insert(resp.payload_hash, resp.payload);
+            if pending_slot == resp.slot && missing.remove(&resp.entry_hash) {
+                resolved.insert(resp.entry_hash, resp.data);
                 missing.is_empty()
             } else {
                 false
@@ -1262,15 +1261,15 @@ impl<NS: SubprotocolNetworkSender<SlotConsensusMsg>, SP: SPCSpawner> SlotManager
         }
     }
 
-    /// Check if a newly resolved payload_hash resolves a pending wave.
+    /// Check if a newly resolved entry_hash resolves a pending wave.
     ///
-    /// Called after a late proposal is inserted into the slot state. The payload
+    /// Called after a late proposal is inserted into the slot state. The entry data
     /// is passed directly to avoid a redundant HashMap lookup + clone.
-    async fn try_resolve_pending(&mut self, payload_hash: HashValue, payload: Payload) {
+    async fn try_resolve_pending(&mut self, entry_hash: HashValue, data: ProposalData) {
         let should_commit = if let Some(pending) = &mut self.pending_wave {
             let (_slot, missing, resolved) = pending.pending_fields();
-            if missing.remove(&payload_hash) {
-                resolved.insert(payload_hash, payload);
+            if missing.remove(&entry_hash) {
+                resolved.insert(entry_hash, data);
                 missing.is_empty()
             } else {
                 false
@@ -1284,7 +1283,7 @@ impl<NS: SubprotocolNetworkSender<SlotConsensusMsg>, SP: SPCSpawner> SlotManager
         }
     }
 
-    /// Commit a fully-resolved pending wave. Called when all missing payloads
+    /// Commit a fully-resolved pending wave. Called when all missing entries
     /// have been received (via fetch response or late proposal).
     async fn commit_resolved_pending_wave(&mut self) {
         let pending = self.pending_wave.take().unwrap();
@@ -1505,8 +1504,8 @@ mod tests {
             .entry(slot)
             .or_insert_with(|| SlotState::new(slot, n));
         let slot_state = manager.slot_states.get_mut(&slot).expect("just inserted");
-        let proposal_hash = proposal.payload_hash;
-        let proposal_payload = proposal.payload.clone();
+        let entry_hash = proposal.entry_hash();
+        let entry_data = ProposalData::from_proposal(&proposal);
         slot_state.insert_proposal(proposal);
 
         // Check if all proposals received for current slot and SPC not yet started
@@ -1519,7 +1518,7 @@ mod tests {
         }
 
         // Check if this resolves a pending wave
-        manager.try_resolve_pending(proposal_hash, proposal_payload).await;
+        manager.try_resolve_pending(entry_hash, entry_data).await;
     }
 
     /// Build a SlotManager for testing with n validators, using signer[0] as self.
@@ -1814,15 +1813,11 @@ mod tests {
     // Phase 4: Two-wave commit flow tests
     // ========================================================================
 
-    /// Compute the payload hash of an empty DirectMempool payload.
-    /// All proposals from MockPayloadClient use this payload.
-    fn empty_payload_hash() -> HashValue {
-        SlotProposal::compute_payload_hash(&Payload::DirectMempool(vec![]))
-    }
-
     /// Set up a SlotManager with all proposals submitted and SPC started for slot 1.
     /// Discards StubSPCSpawner's automatic VLow/VHigh output, leaving the manager
     /// ready for custom v_low/v_high injection via on_spc_v_low/on_spc_v_high_complete.
+    ///
+    /// Returns the input_vector (containing entry_hashes) for constructing test v_low/v_high.
     async fn setup_slot_with_custom_spc(
         signers: &[ValidatorSigner],
         verifier: Arc<ValidatorVerifier>,
@@ -1830,6 +1825,7 @@ mod tests {
         SlotManager<MockSlotNetworkSender, StubSPCSpawner>,
         futures_mpsc::UnboundedReceiver<OrderedBlocks>,
         MockSlotNetworkSender,
+        PrefixVector, // input_vector with actual entry_hashes
     ) {
         let (mut manager, exec_rx, ns) = build_test_manager(signers, verifier.clone());
         manager.start_new_slot(1).await;
@@ -1843,28 +1839,34 @@ mod tests {
             manager.process_proposal(signer.author(), proposal).await;
         }
 
-        // Verify slot state has a frozen payload_map (SPC was started)
+        // Verify slot state has a frozen entry_data_map (SPC was started)
+        let input_vector = manager
+            .slot_states
+            .get(&1)
+            .expect("slot 1 state must exist")
+            .input_vector()
+            .expect("input_vector must be set after SPC starts")
+            .clone();
         assert!(
-            manager.slot_states.get(&1).unwrap().payload_map().is_some(),
-            "payload_map must be set after SPC starts"
+            manager.slot_states.get(&1).unwrap().entry_data_map().is_some(),
+            "entry_data_map must be set after SPC starts"
         );
 
         // Discard StubSPCSpawner's automatic VLow/VHigh output
         manager.spc_output_rx.take();
 
-        (manager, exec_rx, ns)
+        (manager, exec_rx, ns, input_vector)
     }
 
     #[tokio::test]
     async fn test_two_wave_v_low_partial_v_high_extends() {
         let (signers, verifier) = create_validators(4);
-        let (mut manager, mut exec_rx, _ns) =
+        let (mut manager, mut exec_rx, _ns, iv) =
             setup_slot_with_custom_spc(&signers, verifier).await;
-        let h = empty_payload_hash();
 
         // Wave 1: v_low has 2 non-bot entries (positions 0, 1)
         manager
-            .on_spc_v_low(1, vec![h, h, HashValue::zero(), HashValue::zero()])
+            .on_spc_v_low(1, vec![iv[0], iv[1], HashValue::zero(), HashValue::zero()])
             .await;
 
         let wave1 = exec_rx
@@ -1877,7 +1879,7 @@ mod tests {
         assert_eq!(wave1.ordered_proof.commit_info().round(), 2);
 
         // Wave 2: v_high has 3 non-bot entries; delta = position 2 only
-        let v_high = vec![h, h, h, HashValue::zero()];
+        let v_high = vec![iv[0], iv[1], iv[2], HashValue::zero()];
         let proof = dummy_commit_proof(1, &v_high);
         manager
             .on_spc_v_high_complete(1, v_high, proof)
@@ -1898,9 +1900,8 @@ mod tests {
     #[tokio::test]
     async fn test_v_low_all_bot_v_high_has_entries() {
         let (signers, verifier) = create_validators(4);
-        let (mut manager, mut exec_rx, _ns) =
+        let (mut manager, mut exec_rx, _ns, iv) =
             setup_slot_with_custom_spc(&signers, verifier).await;
-        let h = empty_payload_hash();
 
         // Wave 1: v_low is all-bot → no blocks
         manager.on_spc_v_low(1, vec![HashValue::zero(); 4]).await;
@@ -1910,7 +1911,7 @@ mod tests {
         );
 
         // Wave 2: v_high has 2 entries → 2 blocks
-        let v_high = vec![h, h, HashValue::zero(), HashValue::zero()];
+        let v_high = vec![iv[0], iv[1], HashValue::zero(), HashValue::zero()];
         let proof = dummy_commit_proof(1, &v_high);
         manager
             .on_spc_v_high_complete(1, v_high, proof)
@@ -1930,12 +1931,11 @@ mod tests {
     #[tokio::test]
     async fn test_v_low_equals_v_high_no_wave2_blocks() {
         let (signers, verifier) = create_validators(4);
-        let (mut manager, mut exec_rx, _ns) =
+        let (mut manager, mut exec_rx, _ns, iv) =
             setup_slot_with_custom_spc(&signers, verifier).await;
-        let h = empty_payload_hash();
 
         // v_low == v_high: all 4 entries committed in wave 1
-        let v = vec![h, h, h, h];
+        let v = iv.clone();
         manager.on_spc_v_low(1, v.clone()).await;
 
         let wave1 = exec_rx.try_next().unwrap().expect("Wave 1");
@@ -1955,19 +1955,18 @@ mod tests {
     #[tokio::test]
     async fn test_round_monotonicity_across_waves_and_slots() {
         let (signers, verifier) = create_validators(3);
-        let (mut manager, mut exec_rx, _ns) =
+        let (mut manager, mut exec_rx, _ns, iv) =
             setup_slot_with_custom_spc(&signers, verifier.clone()).await;
-        let h = empty_payload_hash();
 
         // Slot 1: wave 1 = 2 blocks (rounds 1, 2), wave 2 = 1 block (round 3)
         manager
-            .on_spc_v_low(1, vec![h, h, HashValue::zero()])
+            .on_spc_v_low(1, vec![iv[0], iv[1], HashValue::zero()])
             .await;
         let w1 = exec_rx.try_next().unwrap().unwrap();
         assert_eq!(w1.ordered_blocks[0].block().round(), 1);
         assert_eq!(w1.ordered_blocks[1].block().round(), 2);
 
-        let v_high_1 = vec![h, h, h];
+        let v_high_1 = vec![iv[0], iv[1], iv[2]];
         let proof_1 = dummy_commit_proof(1, &v_high_1);
         manager.on_spc_v_high_complete(1, v_high_1, proof_1).await;
         let w2 = exec_rx.try_next().unwrap().unwrap();
@@ -1981,19 +1980,27 @@ mod tests {
         for signer in &signers[1..] {
             insert_proposal_unchecked(&mut manager, signer, 2, 1).await;
         }
+
+        // Get slot 2's input_vector for constructing v_low/v_high
+        let iv2 = manager
+            .slot_states
+            .get(&2)
+            .unwrap()
+            .input_vector()
+            .unwrap()
+            .clone();
         manager.spc_output_rx.take(); // discard StubSPCSpawner output
 
         // Slot 2: wave 1 = 3 blocks → rounds continue at 4, 5, 6
-        manager.on_spc_v_low(2, vec![h, h, h]).await;
+        manager.on_spc_v_low(2, iv2.clone()).await;
         let w3 = exec_rx.try_next().unwrap().unwrap();
         assert_eq!(w3.ordered_blocks[0].block().round(), 4);
         assert_eq!(w3.ordered_blocks[1].block().round(), 5);
         assert_eq!(w3.ordered_blocks[2].block().round(), 6);
 
         // v_high == v_low → empty delta
-        let v_high_2 = vec![h, h, h];
-        let proof_2 = dummy_commit_proof(2, &v_high_2);
-        manager.on_spc_v_high_complete(2, v_high_2, proof_2).await;
+        let proof_2 = dummy_commit_proof(2, &iv2);
+        manager.on_spc_v_high_complete(2, iv2, proof_2).await;
         assert!(exec_rx.try_next().is_err());
 
         assert_eq!(manager.current_slot, 3);
@@ -2003,39 +2010,46 @@ mod tests {
     #[tokio::test]
     async fn test_buffered_v_high_while_wave1_pending() {
         let (signers, verifier) = create_validators(4);
-        let (mut manager, mut exec_rx, _ns) =
+        let (mut manager, mut exec_rx, _ns, iv) =
             setup_slot_with_custom_spc(&signers, verifier).await;
-        let h = empty_payload_hash();
 
-        // Create a payload whose hash is NOT in the slot state's payload_map.
+        // Create a ProposalData whose entry_hash is NOT in the slot state's entry_data_map.
         let secret_txn = crate::test_utils::create_signed_transaction(99);
         let secret_payload = Payload::DirectMempool(vec![secret_txn]);
-        let secret_hash = SlotProposal::compute_payload_hash(&secret_payload);
+        let secret_payload_hash = SlotProposal::compute_payload_hash(&secret_payload);
+        let secret_data = ProposalData {
+            payload_hash: secret_payload_hash,
+            payload: secret_payload,
+            timestamp_usecs: 500,
+            prev_commit_proof: None,
+            prev_commit_proof_hash: None,
+        };
+        let secret_entry_hash = secret_data.entry_hash();
 
-        // v_low: position 0 = h (resolved), position 1 = secret_hash (MISSING)
+        // v_low: position 0 = iv[0] (resolved), position 1 = secret_entry_hash (MISSING)
         manager
             .on_spc_v_low(
                 1,
-                vec![h, secret_hash, HashValue::zero(), HashValue::zero()],
+                vec![iv[0], secret_entry_hash, HashValue::zero(), HashValue::zero()],
             )
             .await;
 
-        // Wave 1 should be pending (missing payload)
+        // Wave 1 should be pending (missing entry data)
         assert!(exec_rx.try_next().is_err(), "Wave 1 should be pending");
         assert!(manager.pending_wave.as_ref().is_some_and(|p| p.is_v_low()));
 
         // v_high arrives while wave 1 is pending → buffer it
-        let buffered_vhigh = vec![h, secret_hash, h, HashValue::zero()];
+        let buffered_vhigh = vec![iv[0], secret_entry_hash, iv[2], HashValue::zero()];
         let buffered_proof = dummy_commit_proof(1, &buffered_vhigh);
         manager.buffered_v_high = Some((1, buffered_vhigh, buffered_proof));
 
-        // Resolve the missing payload via fetch response
+        // Resolve the missing entry data via fetch response
         manager
-            .process_payload_fetch_response(PayloadFetchResponse {
+            .process_entry_fetch_response(EntryFetchResponse {
                 slot: 1,
                 epoch: 1,
-                payload_hash: secret_hash,
-                payload: secret_payload,
+                entry_hash: secret_entry_hash,
+                data: secret_data,
             })
             .await;
 
@@ -2057,13 +2071,12 @@ mod tests {
     #[tokio::test]
     async fn test_non_contiguous_v_low_positions() {
         let (signers, verifier) = create_validators(4);
-        let (mut manager, mut exec_rx, _ns) =
+        let (mut manager, mut exec_rx, _ns, iv) =
             setup_slot_with_custom_spc(&signers, verifier).await;
-        let h = empty_payload_hash();
 
         // v_low commits positions 0 and 2 (skipping 1)
         manager
-            .on_spc_v_low(1, vec![h, HashValue::zero(), h, HashValue::zero()])
+            .on_spc_v_low(1, vec![iv[0], HashValue::zero(), iv[2], HashValue::zero()])
             .await;
 
         let wave1 = exec_rx.try_next().unwrap().expect("Wave 1");
@@ -2081,7 +2094,7 @@ mod tests {
         );
 
         // v_high has all 4 non-bot; delta = positions 1 and 3
-        let v_high = vec![h, h, h, h];
+        let v_high = iv.clone();
         let proof = dummy_commit_proof(1, &v_high);
         manager.on_spc_v_high_complete(1, v_high, proof).await;
 

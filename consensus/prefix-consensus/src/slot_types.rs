@@ -174,6 +174,89 @@ impl SlotProposal {
         let bytes = bcs::to_bytes(proof).expect("StrongPCCommit BCS serialization should not fail");
         HashValue::sha3_256_of(&bytes)
     }
+
+    /// Compute the composite entry hash for this proposal's consensus-critical data.
+    /// This is the value pushed into the SPC input vector (replaces payload_hash).
+    pub fn entry_hash(&self) -> HashValue {
+        compute_entry_hash(
+            self.payload_hash,
+            self.timestamp_usecs,
+            self.prev_commit_proof_hash,
+        )
+    }
+}
+
+// ============================================================================
+// Composite Entry Hash
+// ============================================================================
+
+/// Compute the composite entry hash that pins down all consensus-critical
+/// proposal data in a single SPC input vector entry.
+///
+/// `entry_hash = SHA3-256(payload_hash || timestamp_usecs || prev_commit_proof_hash)`
+///
+/// SPC agreement on v_high entries using this hash guarantees that all honest
+/// validators agree on the exact payload, timestamp, and commit proof for each
+/// position — preventing Byzantine equivocation on proofs and timestamp divergence.
+pub fn compute_entry_hash(
+    payload_hash: HashValue,
+    timestamp_usecs: u64,
+    prev_commit_proof_hash: Option<HashValue>,
+) -> HashValue {
+    let mut bytes = Vec::with_capacity(73); // 32 + 8 + 1 + 32
+    bytes.extend_from_slice(payload_hash.as_ref());
+    bytes.extend_from_slice(&timestamp_usecs.to_le_bytes());
+    match prev_commit_proof_hash {
+        Some(h) => {
+            bytes.push(1u8);
+            bytes.extend_from_slice(h.as_ref());
+        },
+        None => {
+            bytes.push(0u8);
+        },
+    }
+    HashValue::sha3_256_of(&bytes)
+}
+
+// ============================================================================
+// ProposalData — consensus-critical bundle for fetch and storage
+// ============================================================================
+
+/// All consensus-critical data from a proposal, bundled for storage and fetch.
+///
+/// When a v_high entry references an `entry_hash`, validators need the full
+/// `ProposalData` to (a) execute the payload, (b) use the correct timestamp,
+/// and (c) extract the commit proof for ranking updates. The `entry_hash`
+/// is verified by recomputing `compute_entry_hash` from these fields.
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
+pub struct ProposalData {
+    pub payload_hash: HashValue,
+    pub payload: Payload,
+    pub timestamp_usecs: u64,
+    pub prev_commit_proof: Option<StrongPCCommit>,
+    pub prev_commit_proof_hash: Option<HashValue>,
+}
+
+impl ProposalData {
+    /// Create ProposalData from a SlotProposal.
+    pub fn from_proposal(proposal: &SlotProposal) -> Self {
+        Self {
+            payload_hash: proposal.payload_hash,
+            payload: proposal.payload.clone(),
+            timestamp_usecs: proposal.timestamp_usecs,
+            prev_commit_proof: proposal.prev_commit_proof.clone(),
+            prev_commit_proof_hash: proposal.prev_commit_proof_hash,
+        }
+    }
+
+    /// Compute the composite entry hash for this data.
+    pub fn entry_hash(&self) -> HashValue {
+        compute_entry_hash(
+            self.payload_hash,
+            self.timestamp_usecs,
+            self.prev_commit_proof_hash,
+        )
+    }
 }
 
 /// Create a signed SlotProposal.
@@ -236,36 +319,61 @@ pub enum SPCOutput {
 }
 
 // ============================================================================
-// Payload Fetch Types
+// Entry Fetch Types
 // ============================================================================
 
-/// Request for a missing payload identified by its hash.
+/// Request for missing proposal data identified by its composite entry hash.
 ///
-/// Sent when v_high contains a hash for a proposal we never received.
-/// The responder looks up the payload in their proposal buffer and returns it.
+/// Sent when v_high contains an entry_hash for a proposal we never received.
+/// The responder looks up the ProposalData and returns it for verification
+/// against the SPC-agreed entry_hash.
 #[derive(Clone, Debug, Serialize, Deserialize)]
-pub struct PayloadFetchRequest {
+pub struct EntryFetchRequest {
     pub slot: u64,
     pub epoch: u64,
-    pub payload_hash: HashValue,
+    pub entry_hash: HashValue,
 }
 
-/// Response carrying a requested payload.
+/// Response carrying requested proposal data (payload + timestamp + commit proof).
 ///
-/// The receiver verifies `H(payload) == payload_hash` to prevent substitution.
-/// No BLS signature needed — the hash was committed by SPC via the original proposal.
+/// The receiver verifies `compute_entry_hash(data) == entry_hash` to prevent
+/// substitution. No BLS signature needed — the entry_hash was committed by SPC
+/// agreement on v_high, which pins down all consensus-critical fields.
 #[derive(Clone, Debug, Serialize, Deserialize)]
-pub struct PayloadFetchResponse {
+pub struct EntryFetchResponse {
     pub slot: u64,
     pub epoch: u64,
-    pub payload_hash: HashValue,
-    pub payload: Payload,
+    pub entry_hash: HashValue,
+    pub data: ProposalData,
 }
 
-impl PayloadFetchResponse {
-    /// Verify that the carried payload matches the claimed hash.
-    pub fn verify_payload_hash(&self) -> bool {
-        SlotProposal::compute_payload_hash(&self.payload) == self.payload_hash
+impl EntryFetchResponse {
+    /// Verify that the carried proposal data matches the claimed entry hash.
+    ///
+    /// Three checks:
+    /// 1. `payload_hash` matches the actual `payload` (prevents payload substitution)
+    /// 2. `prev_commit_proof_hash` matches the actual `prev_commit_proof` (prevents proof substitution)
+    /// 3. Composite `entry_hash` matches the SPC-agreed value
+    ///
+    /// Without checks 1 and 2, a Byzantine responder could supply a valid entry_hash
+    /// (binding payload_hash + timestamp + proof_hash) but substitute garbage payload
+    /// or proof data, since entry_hash only binds the *hashes*, not the raw objects.
+    pub fn verify_entry_hash(&self) -> bool {
+        // Check payload integrity
+        if SlotProposal::compute_payload_hash(&self.data.payload) != self.data.payload_hash {
+            return false;
+        }
+        // Check commit proof integrity
+        let computed_proof_hash = self
+            .data
+            .prev_commit_proof
+            .as_ref()
+            .map(SlotProposal::compute_commit_proof_hash);
+        if computed_proof_hash != self.data.prev_commit_proof_hash {
+            return false;
+        }
+        // Check composite entry hash
+        self.data.entry_hash() == self.entry_hash
     }
 }
 
@@ -276,7 +384,7 @@ impl PayloadFetchResponse {
 /// Network message type for the multi-slot consensus protocol.
 ///
 /// Wraps slot proposals, per-slot Strong Prefix Consensus messages, and
-/// payload fetch request/response messages for network routing.
+/// entry fetch request/response messages for network routing.
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub enum SlotConsensusMsg {
     /// Validator's proposal for a slot (payload + BLS signature)
@@ -291,11 +399,11 @@ pub enum SlotConsensusMsg {
         msg: StrongPrefixConsensusMsg,
     },
 
-    /// Request for a missing payload by hash (broadcast to all peers).
-    PayloadFetchRequest(PayloadFetchRequest),
+    /// Request for missing proposal data by entry hash (broadcast to all peers).
+    EntryFetchRequest(EntryFetchRequest),
 
-    /// Response carrying a requested payload (sent to requester).
-    PayloadFetchResponse(Box<PayloadFetchResponse>),
+    /// Response carrying requested proposal data (sent to requester).
+    EntryFetchResponse(Box<EntryFetchResponse>),
 }
 
 impl SlotConsensusMsg {
@@ -304,8 +412,8 @@ impl SlotConsensusMsg {
         match self {
             SlotConsensusMsg::SlotProposal(p) => p.epoch,
             SlotConsensusMsg::StrongPCMsg { epoch, .. } => *epoch,
-            SlotConsensusMsg::PayloadFetchRequest(req) => req.epoch,
-            SlotConsensusMsg::PayloadFetchResponse(resp) => resp.epoch,
+            SlotConsensusMsg::EntryFetchRequest(req) => req.epoch,
+            SlotConsensusMsg::EntryFetchResponse(resp) => resp.epoch,
         }
     }
 
@@ -314,8 +422,8 @@ impl SlotConsensusMsg {
         match self {
             SlotConsensusMsg::SlotProposal(p) => p.slot,
             SlotConsensusMsg::StrongPCMsg { slot, .. } => *slot,
-            SlotConsensusMsg::PayloadFetchRequest(req) => req.slot,
-            SlotConsensusMsg::PayloadFetchResponse(resp) => resp.slot,
+            SlotConsensusMsg::EntryFetchRequest(req) => req.slot,
+            SlotConsensusMsg::EntryFetchResponse(resp) => resp.slot,
         }
     }
 
@@ -324,8 +432,8 @@ impl SlotConsensusMsg {
         match self {
             SlotConsensusMsg::SlotProposal(p) => Some(p.author),
             SlotConsensusMsg::StrongPCMsg { msg, .. } => msg.author(),
-            SlotConsensusMsg::PayloadFetchRequest(_) => None,
-            SlotConsensusMsg::PayloadFetchResponse(_) => None,
+            SlotConsensusMsg::EntryFetchRequest(_) => None,
+            SlotConsensusMsg::EntryFetchResponse(_) => None,
         }
     }
 
@@ -334,8 +442,8 @@ impl SlotConsensusMsg {
         match self {
             SlotConsensusMsg::SlotProposal(_) => "SlotProposal",
             SlotConsensusMsg::StrongPCMsg { .. } => "StrongPCMsg",
-            SlotConsensusMsg::PayloadFetchRequest(_) => "PayloadFetchRequest",
-            SlotConsensusMsg::PayloadFetchResponse(_) => "PayloadFetchResponse",
+            SlotConsensusMsg::EntryFetchRequest(_) => "EntryFetchRequest",
+            SlotConsensusMsg::EntryFetchResponse(_) => "EntryFetchResponse",
         }
     }
 }
@@ -500,41 +608,49 @@ mod tests {
     }
 
     #[test]
-    fn test_payload_fetch_request_serialization() {
-        let req = PayloadFetchRequest {
+    fn test_entry_fetch_request_serialization() {
+        let req = EntryFetchRequest {
             slot: 5,
             epoch: 3,
-            payload_hash: HashValue::random(),
+            entry_hash: HashValue::random(),
         };
-        let msg = SlotConsensusMsg::PayloadFetchRequest(req.clone());
+        let msg = SlotConsensusMsg::EntryFetchRequest(req.clone());
         assert_eq!(msg.epoch(), 3);
         assert_eq!(msg.slot(), 5);
-        assert_eq!(msg.name(), "PayloadFetchRequest");
+        assert_eq!(msg.name(), "EntryFetchRequest");
 
         let bytes = bcs::to_bytes(&msg).expect("serialization failed");
         let deserialized: SlotConsensusMsg =
             bcs::from_bytes(&bytes).expect("deserialization failed");
         assert_eq!(deserialized.epoch(), 3);
         assert_eq!(deserialized.slot(), 5);
-        assert_eq!(deserialized.name(), "PayloadFetchRequest");
+        assert_eq!(deserialized.name(), "EntryFetchRequest");
     }
 
     #[test]
-    fn test_payload_fetch_response_serialization() {
+    fn test_entry_fetch_response_serialization_and_verification() {
         let payload = create_test_payload();
         let payload_hash = SlotProposal::compute_payload_hash(&payload);
-        let resp = PayloadFetchResponse {
-            slot: 5,
-            epoch: 3,
+        let data = ProposalData {
             payload_hash,
             payload,
+            timestamp_usecs: 1000,
+            prev_commit_proof: None,
+            prev_commit_proof_hash: None,
         };
-        assert!(resp.verify_payload_hash());
+        let entry_hash = data.entry_hash();
+        let resp = EntryFetchResponse {
+            slot: 5,
+            epoch: 3,
+            entry_hash,
+            data,
+        };
+        assert!(resp.verify_entry_hash());
 
-        let msg = SlotConsensusMsg::PayloadFetchResponse(Box::new(resp));
+        let msg = SlotConsensusMsg::EntryFetchResponse(Box::new(resp));
         assert_eq!(msg.epoch(), 3);
         assert_eq!(msg.slot(), 5);
-        assert_eq!(msg.name(), "PayloadFetchResponse");
+        assert_eq!(msg.name(), "EntryFetchResponse");
 
         let bytes = bcs::to_bytes(&msg).expect("serialization failed");
         let deserialized: SlotConsensusMsg =
@@ -569,18 +685,140 @@ mod tests {
         };
         let msg = SlotConsensusMsg::StrongPCMsg { slot: 1, epoch: 1, msg: spc_msg };
         assert!(!msg.is_priority());
+
+        let req = EntryFetchRequest { slot: 1, epoch: 1, entry_hash: HashValue::random() };
+        let msg = SlotConsensusMsg::EntryFetchRequest(req);
+        assert!(!msg.is_priority());
     }
 
     #[test]
-    fn test_payload_fetch_response_wrong_hash() {
+    fn test_entry_fetch_response_wrong_hash() {
         let payload = create_test_payload();
-        let resp = PayloadFetchResponse {
+        let payload_hash = SlotProposal::compute_payload_hash(&payload);
+        let data = ProposalData {
+            payload_hash,
+            payload,
+            timestamp_usecs: 1000,
+            prev_commit_proof: None,
+            prev_commit_proof_hash: None,
+        };
+        let resp = EntryFetchResponse {
             slot: 1,
             epoch: 1,
-            payload_hash: HashValue::random(), // wrong hash
-            payload,
+            entry_hash: HashValue::random(), // wrong hash
+            data,
         };
-        assert!(!resp.verify_payload_hash());
+        assert!(!resp.verify_entry_hash());
+    }
+
+    #[test]
+    fn test_entry_fetch_response_rejects_payload_substitution() {
+        // Byzantine responder supplies a fabricated payload_hash that doesn't
+        // match the carried payload. The entry_hash is computed from the fake
+        // payload_hash, so the composite check passes — but the payload
+        // integrity check catches the mismatch.
+        let payload = create_test_payload();
+        let fake_payload_hash = HashValue::random(); // doesn't match H(payload)
+
+        let data = ProposalData {
+            payload_hash: fake_payload_hash,
+            payload,
+            timestamp_usecs: 1000,
+            prev_commit_proof: None,
+            prev_commit_proof_hash: None,
+        };
+        // entry_hash is valid w.r.t. the fake_payload_hash
+        let entry_hash = compute_entry_hash(fake_payload_hash, 1000, None);
+        let resp = EntryFetchResponse {
+            slot: 1,
+            epoch: 1,
+            entry_hash,
+            data,
+        };
+        // Should fail because H(payload) != fake_payload_hash
+        assert!(!resp.verify_entry_hash());
+    }
+
+    #[test]
+    fn test_entry_fetch_response_rejects_proof_hash_mismatch() {
+        // Byzantine responder supplies correct prev_commit_proof_hash but
+        // prev_commit_proof is None (or vice versa).
+        let payload = create_test_payload();
+        let payload_hash = SlotProposal::compute_payload_hash(&payload);
+        let fake_proof_hash = Some(HashValue::random());
+
+        let data = ProposalData {
+            payload_hash,
+            payload,
+            timestamp_usecs: 1000,
+            prev_commit_proof: None, // no actual proof
+            prev_commit_proof_hash: fake_proof_hash, // but claims there is one
+        };
+        let entry_hash = compute_entry_hash(payload_hash, 1000, fake_proof_hash);
+        let resp = EntryFetchResponse {
+            slot: 1,
+            epoch: 1,
+            entry_hash,
+            data,
+        };
+        // Should fail because H(None) != Some(hash)
+        assert!(!resp.verify_entry_hash());
+    }
+
+    // ========================================================================
+    // Composite entry hash tests (Phase 13)
+    // ========================================================================
+
+    #[test]
+    fn test_compute_entry_hash_determinism() {
+        let payload_hash = HashValue::random();
+        let timestamp = 42u64;
+        let proof_hash = Some(HashValue::random());
+
+        let h1 = compute_entry_hash(payload_hash, timestamp, proof_hash);
+        let h2 = compute_entry_hash(payload_hash, timestamp, proof_hash);
+        assert_eq!(h1, h2);
+    }
+
+    #[test]
+    fn test_compute_entry_hash_differs_on_timestamp() {
+        let payload_hash = HashValue::random();
+        let proof_hash = Some(HashValue::random());
+
+        let h1 = compute_entry_hash(payload_hash, 100, proof_hash);
+        let h2 = compute_entry_hash(payload_hash, 200, proof_hash);
+        assert_ne!(h1, h2);
+    }
+
+    #[test]
+    fn test_compute_entry_hash_differs_on_proof_hash() {
+        let payload_hash = HashValue::random();
+        let timestamp = 42u64;
+
+        let h1 = compute_entry_hash(payload_hash, timestamp, Some(HashValue::random()));
+        let h2 = compute_entry_hash(payload_hash, timestamp, Some(HashValue::random()));
+        assert_ne!(h1, h2);
+
+        // None vs Some should also differ
+        let h3 = compute_entry_hash(payload_hash, timestamp, None);
+        assert_ne!(h1, h3);
+    }
+
+    #[test]
+    fn test_proposal_data_entry_hash_matches_proposal() {
+        let (signer, _) = create_test_validator();
+        let author = signer.author();
+        let payload = create_test_payload();
+
+        let proposal =
+            create_signed_slot_proposal(1, 1, author, payload, &signer, 12345, None)
+                .expect("signing failed");
+
+        let data = ProposalData::from_proposal(&proposal);
+        assert_eq!(proposal.entry_hash(), data.entry_hash());
+        assert_eq!(data.payload_hash, proposal.payload_hash);
+        assert_eq!(data.timestamp_usecs, proposal.timestamp_usecs);
+        assert_eq!(data.prev_commit_proof_hash, proposal.prev_commit_proof_hash);
     }
 
     // ========================================================================

@@ -4,8 +4,8 @@
 
 Implementing Prefix Consensus protocols (from research paper "Prefix Consensus For Censorship Resistant BFT") within Aptos Core for leaderless, censorship-resistant consensus.
 
-**Current Phase**: Multi-Slot Consensus (Algorithm 4) — Phases 1-11 complete, v_low early commit complete, Phase 12 next
-**Completed**: Basic Prefix Consensus, Strong Prefix Consensus (Phases 1-9), Stake-Weighted Quorum Refactoring, Multi-Slot Phases 1-11, v_low early commit (two-wave flow)
+**Current Phase**: Multi-Slot Consensus (Algorithm 4) — Phases 1-13 complete, v_low early commit complete
+**Completed**: Basic Prefix Consensus, Strong Prefix Consensus (Phases 1-9), Stake-Weighted Quorum Refactoring, Multi-Slot Phases 1-13, v_low early commit (two-wave flow), verifiable ranking with SPC-aware demotion, composite entry hash
 
 ---
 
@@ -30,7 +30,7 @@ Implementing Prefix Consensus protocols (from research paper "Prefix Consensus F
 
 ### Multi-Slot Consensus (Algorithm 4 — current focus)
 - Each slot: every party broadcasts proposal, waits 2Δ, forms input vector ordered by rank^MC, runs SPC
-- Ranking update: demote first excluded party when v_high is not full length
+- Ranking update: SPC-aware demotion (demote first-ranked in failed SPC views + first excluded from v_high)
 - Commit from v_high per slot (v_low ignored in initial implementation)
 - Plan: `.plans/multi-slot-consensus.md`
 
@@ -116,15 +116,16 @@ Execution Pipeline (unchanged):
 9. ~~BlockType integration + execution pipeline audit (merged with Phase 10)~~ ✅
 10. ~~(Merged into Phase 9)~~ ✅
 11. ~~Smoke test + end-to-end fixes (~400 LOC)~~ ✅
-12. Documentation + cleanup (~100 LOC)
+12. ~~Verifiable ranking with SPC-aware demotion (~645 LOC)~~ ✅
+13. ~~Composite entry hash for SPC input vector~~ ✅
 
 ---
 
 ## Repository State
 
 - **Branch**: `prefix-consensus-prototype`
-- **HEAD**: v_low early commit Phase 4 (two-wave commit flow tests)
-- **Tests**: 254/254 unit tests (237 prefix-consensus + 2 block_builder_for_entry + 15 slot manager), 7/7 smoke tests (including slot_consensus)
+- **HEAD**: Phase 13 composite entry hash for SPC input vector
+- **Tests**: 291/291 unit tests (276 prefix-consensus + 15 slot manager), 7/7 smoke tests (including slot_consensus)
 - **Build**: Clean
 
 ### Repository Structure
@@ -142,17 +143,17 @@ consensus/prefix-consensus/src/
 ├── certificates.rs       - Certificates + StrongPCCommit (1348 lines)
 ├── view_state.rs         - RankingManager, ViewState, ViewOutput (695 lines)
 ├── strong_protocol.rs    - Strong PC state machine (918 lines)
-├── strong_manager.rs     - Strong PC orchestrator, generic over InnerPCAlgorithm (~1290 lines)
+├── strong_manager.rs     - Strong PC orchestrator, generic over InnerPCAlgorithm, SPCOutput with commit proof (~1310 lines)
 ├── inner_pc_trait.rs     - InnerPCAlgorithm trait (~90 lines)
 ├── inner_pc_impl.rs      - ThreeRoundPC implementation (~400 lines)
-├── slot_types.rs         - SlotProposal, SlotConsensusMsg, signing (~230 lines) — Phase 1
-├── slot_ranking.rs       - MultiSlotRankingManager, cross-slot demotion (~80 lines) — Phase 2
-├── slot_state.rs         - ProposalBuffer, SlotPhase, SlotState (~645 lines) — Phase 3
+├── slot_types.rs         - SlotProposal, ProposalData, compute_entry_hash, EntryFetchRequest/Response, SlotConsensusMsg (~480 lines) — Phases 1, 12, 13
+├── slot_ranking.rs       - MultiSlotRankingManager, SPC-aware cross-slot demotion (~320 lines) — Phases 2, 12
+├── slot_state.rs         - ProposalBuffer, SlotPhase, SlotState, entry_data_map (~645 lines) — Phases 3, 13
 └── block_builder.rs      - build_block_from_v_high (~270 lines) — Phase 4
 
 consensus/src/prefix_consensus/
 ├── mod.rs                - Module declarations
-└── slot_manager.rs       - SlotManager orchestrator, SPCSpawner trait, RealSPCSpawner, two-wave commit + 15 unit tests (~930 lines) — Phases 5-6 + v_low early commit
+└── slot_manager.rs       - SlotManager orchestrator, SPCSpawner trait, RealSPCSpawner, two-wave commit, canonical proof extraction + 15 unit tests (~1050 lines) — Phases 5-6, v_low early commit, Phases 12-13
 
 testsuite/smoke-test/src/consensus/
 ├── prefix_consensus/     - 2 basic PC smoke tests
@@ -176,6 +177,7 @@ testsuite/smoke-test/src/consensus/
 - `.plans/phase9-blocktype-integration.md` — Phase 9+10: BlockType + execution pipeline audit (complete)
 - `.plans/phase12-verifiable-ranking.md` — Phase 13: Verifiable ranking with SPC-aware demotion (after end-to-end)
 - `.plans/vlow-early-commit.md` — v_low early commit: two-wave commit flow (complete)
+- `.plans/phase13-composite-entry-hash.md` — Phase 13: Composite entry hash for SPC input vector (complete)
 
 ---
 
@@ -223,6 +225,7 @@ testsuite/smoke-test/src/consensus/
 ### Multi-Slot (deferred from current plan)
 - [x] **v_low early commit**: Two-wave commit flow — wave 1 commits per-entry blocks from v_low (after View 1 inner PC), wave 2 commits delta entries from v_high. Plan: `.plans/vlow-early-commit.md`. SPCOutput enum (VLow/VHigh), PendingWave enum, buffered v_high, global round counter, 15 unit tests.
 - [x] **Full v_low commit proof**: When v_low is full (length == n), broadcast StrongPCCommit with empty certificate chain to commit the slot immediately — v_high == v_low by Upper Bound property, so no further SPC views needed. View 1 specific optimization.
+- [x] **Verifiable ranking with SPC-aware demotion**: Demote the first-ranked party in every SPC view that did not produce a v_low commit. Proposals embed previous slot's StrongPCCommit as proof; canonical proof extracted from first non-⊥ v_high proposal for deterministic ranking updates. Two-slot lag for SPC-view demotions (proof must propagate), one-slot lag for v_high exclusion demotion. Plan: `.plans/phase12-verifiable-ranking.md`
 - [ ] **Slot pipelining**: Overlap proposal collection for slot s+1 while SPC for slot s runs
 - [ ] **QuorumStore integration**: Replace DirectMempool for production payload dissemination
 - [ ] **On-chain config**: Add PrefixConsensus variant to ConsensusAlgorithmConfig

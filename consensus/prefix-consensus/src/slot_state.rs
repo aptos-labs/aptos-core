@@ -19,10 +19,10 @@
 //! epoch before insertion.
 
 use crate::{
-    slot_types::SlotProposal,
+    slot_types::{ProposalData, SlotProposal},
     types::PrefixVector,
 };
-use aptos_consensus_types::common::{Author, Payload};
+use aptos_consensus_types::common::Author;
 use aptos_crypto::HashValue;
 use aptos_logger::prelude::*;
 use std::collections::HashMap;
@@ -79,40 +79,42 @@ impl ProposalBuffer {
         self.proposals.get(author)
     }
 
-    /// Build the SPC input vector and payload lookup map, ordered by `ranking`.
+    /// Build the SPC input vector and entry data lookup map, ordered by `ranking`.
     ///
     /// Returns:
     /// - `PrefixVector`: length-n hash vector where position i contains
-    ///   `proposal.payload_hash` if ranking[i]'s proposal is present, or
-    ///   `HashValue::zero()` (⊥) if missing.
-    /// - `HashMap<HashValue, Payload>`: maps each present proposal's payload_hash
-    ///   to its payload, for use during block construction after SPC completes.
+    ///   `proposal.entry_hash()` (composite hash of payload + timestamp + proof)
+    ///   if ranking[i]'s proposal is present, or `HashValue::zero()` (⊥) if missing.
+    /// - `HashMap<HashValue, ProposalData>`: maps each present proposal's entry_hash
+    ///   to its full consensus-critical data (payload, timestamp, commit proof),
+    ///   for use during block construction and proof extraction after SPC completes.
     ///
     /// # Safety assumption
     ///
     /// `HashValue::zero()` is used as the ⊥ marker. A collision with a real
-    /// `payload_hash` is cryptographically infeasible: `compute_payload_hash`
-    /// produces SHA3-256 over BCS-serialized payload data, and the probability
-    /// of hitting the all-zero hash is negligible (~2^{-256}).
+    /// `entry_hash` is cryptographically infeasible: `compute_entry_hash`
+    /// produces SHA3-256 over payload_hash + timestamp + proof_hash, and the
+    /// probability of hitting the all-zero hash is negligible (~2^{-256}).
     pub fn build_input_vector(
         &self,
         ranking: &[Author],
-    ) -> (PrefixVector, HashMap<HashValue, Payload>) {
+    ) -> (PrefixVector, HashMap<HashValue, ProposalData>) {
         let mut hash_vector = Vec::with_capacity(ranking.len());
-        let mut payload_map = HashMap::new();
+        let mut entry_data_map = HashMap::new();
 
         for author in ranking {
             if let Some(proposal) = self.proposals.get(author) {
-                hash_vector.push(proposal.payload_hash);
-                payload_map
-                    .entry(proposal.payload_hash)
-                    .or_insert_with(|| proposal.payload.clone());
+                let entry_hash = proposal.entry_hash();
+                hash_vector.push(entry_hash);
+                entry_data_map
+                    .entry(entry_hash)
+                    .or_insert_with(|| ProposalData::from_proposal(proposal));
             } else {
                 hash_vector.push(HashValue::zero());
             }
         }
 
-        (hash_vector, payload_map)
+        (hash_vector, entry_data_map)
     }
 
 }
@@ -151,17 +153,11 @@ pub struct SlotState {
     proposal_buffer: ProposalBuffer,
     /// Set when transitioning to RunningSPC — the hash vector passed to SPC.
     input_vector: Option<PrefixVector>,
-    /// Set when transitioning to RunningSPC — maps payload_hash → Payload for commit.
+    /// Set when transitioning to RunningSPC — maps entry_hash → ProposalData for commit.
     /// Late proposals (arriving during RunningSPC) are inserted directly into this map.
-    payload_map: Option<HashMap<HashValue, Payload>>,
-    /// Timestamps from all proposals received in any phase (CollectingProposals or RunningSPC).
-    ///
-    /// The `ProposalBuffer` only stores proposals received during CollectingProposals.
-    /// Late proposals (arriving during RunningSPC) have their payload stored in `payload_map`
-    /// but their timestamp would be lost. This map captures timestamps from ALL proposals
-    /// so that `max_timestamp_for_v_high()` is deterministic across validators regardless
-    /// of when each proposal arrived.
-    timestamp_map: HashMap<Author, u64>,
+    /// Each ProposalData bundles payload, timestamp, and commit proof, so all
+    /// consensus-critical fields are available for block construction and proof extraction.
+    entry_data_map: Option<HashMap<HashValue, ProposalData>>,
 }
 
 impl SlotState {
@@ -172,8 +168,7 @@ impl SlotState {
             phase: SlotPhase::CollectingProposals,
             proposal_buffer: ProposalBuffer::new(n),
             input_vector: None,
-            payload_map: None,
-            timestamp_map: HashMap::with_capacity(n),
+            entry_data_map: None,
         }
     }
 
@@ -196,29 +191,20 @@ impl SlotState {
     ///
     /// - `CollectingProposals`: inserts into the proposal buffer.
     ///   Returns `true` if the buffer is now complete (all n proposals received).
-    /// - `RunningSPC`: inserts payload into `payload_map` for v_high resolution.
-    ///   Returns `false`.
+    /// - `RunningSPC`: inserts full `ProposalData` into `entry_data_map` keyed by
+    ///   `entry_hash`, preserving payload, timestamp, and commit proof for v_high
+    ///   resolution and proof extraction. Returns `false`.
     /// - `Committed`: silently ignored (slot is done). Returns `false`.
     pub fn insert_proposal(&mut self, proposal: SlotProposal) -> bool {
         match self.phase {
-            SlotPhase::CollectingProposals => {
-                // Record timestamp before the proposal is moved into the buffer.
-                self.timestamp_map
-                    .entry(proposal.author)
-                    .or_insert(proposal.timestamp_usecs);
-                self.proposal_buffer.insert(proposal)
-            },
+            SlotPhase::CollectingProposals => self.proposal_buffer.insert(proposal),
             SlotPhase::RunningSPC => {
-                // Record timestamp from late proposal so it's available for
-                // deterministic block timestamp computation.
-                self.timestamp_map
-                    .entry(proposal.author)
-                    .or_insert(proposal.timestamp_usecs);
-                // Insert late proposal's payload directly into payload_map
-                // so it's available for v_high resolution without a network fetch.
-                if let Some(ref mut map) = self.payload_map {
-                    map.entry(proposal.payload_hash)
-                        .or_insert(proposal.payload);
+                // Store full ProposalData so late proposals preserve their
+                // prev_commit_proof (fixes the extract_canonical_proof bug).
+                if let Some(ref mut map) = self.entry_data_map {
+                    let entry_hash = proposal.entry_hash();
+                    map.entry(entry_hash)
+                        .or_insert_with(|| ProposalData::from_proposal(&proposal));
                 }
                 false
             },
@@ -242,9 +228,9 @@ impl SlotState {
             self.phase,
             self.slot,
         );
-        let (input_vector, payload_map) = self.proposal_buffer.build_input_vector(ranking);
+        let (input_vector, entry_data_map) = self.proposal_buffer.build_input_vector(ranking);
         self.input_vector = Some(input_vector);
-        self.payload_map = Some(payload_map);
+        self.entry_data_map = Some(entry_data_map);
         self.phase = SlotPhase::RunningSPC;
     }
 
@@ -253,41 +239,46 @@ impl SlotState {
         self.input_vector.as_ref()
     }
 
-    /// The payload lookup map (set after `prepare_spc_input`).
-    pub fn payload_map(&self) -> Option<&HashMap<HashValue, Payload>> {
-        self.payload_map.as_ref()
+    /// The entry data lookup map (set after `prepare_spc_input`).
+    pub fn entry_data_map(&self) -> Option<&HashMap<HashValue, ProposalData>> {
+        self.entry_data_map.as_ref()
     }
 
-    /// Take ownership of the payload map for block construction.
+    /// Mutable reference to the entry data map.
+    pub fn entry_data_map_mut(&mut self) -> Option<&mut HashMap<HashValue, ProposalData>> {
+        self.entry_data_map.as_mut()
+    }
+
+    /// Take ownership of the entry data map for block construction.
     ///
     /// Called by SlotManager in `on_spc_v_high()` before building the block.
     /// Returns `None` if already taken or if `prepare_spc_input` was never called.
     /// Does NOT transition phase — the caller sets `Committed` via `set_phase()`
     /// after the block has been sent to execution.
-    pub fn take_payload_map(&mut self) -> Option<HashMap<HashValue, Payload>> {
-        self.payload_map.take()
+    pub fn take_entry_data_map(&mut self) -> Option<HashMap<HashValue, ProposalData>> {
+        self.entry_data_map.take()
     }
 
-    /// Resolve payloads for all non-⊥ entries in v_high.
+    /// Resolve entry data for all non-⊥ entries in v_high.
     ///
-    /// Checks the `payload_map` which contains payloads from both pre-2Δ proposals
-    /// and late proposals (inserted directly during RunningSPC).
+    /// Checks the `entry_data_map` which contains ProposalData from both pre-2Δ
+    /// proposals and late proposals (inserted directly during RunningSPC).
     ///
     /// Returns:
-    /// - `HashMap<HashValue, Payload>`: resolved payloads (hash → payload)
-    /// - `Vec<HashValue>`: hashes still missing (need network fetch)
-    pub fn resolve_missing_payloads(
+    /// - `HashMap<HashValue, ProposalData>`: resolved entries (entry_hash → data)
+    /// - `Vec<HashValue>`: entry hashes still missing (need network fetch)
+    pub fn resolve_missing_entries(
         &self,
         v_high: &PrefixVector,
-    ) -> (HashMap<HashValue, Payload>, Vec<HashValue>) {
+    ) -> (HashMap<HashValue, ProposalData>, Vec<HashValue>) {
         let mut resolved = HashMap::new();
         let mut missing = Vec::new();
-        let payload_map = match &self.payload_map {
+        let entry_data_map = match &self.entry_data_map {
             Some(map) => map,
             None => {
                 error!(
                     slot = self.slot,
-                    "resolve_missing_payloads called but payload_map is None \
+                    "resolve_missing_entries called but entry_data_map is None \
                      (prepare_spc_input was never called)"
                 );
                 return (resolved, missing);
@@ -301,8 +292,8 @@ impl SlotState {
             if resolved.contains_key(hash) {
                 continue;
             }
-            if let Some(payload) = payload_map.get(hash) {
-                resolved.insert(*hash, payload.clone());
+            if let Some(data) = entry_data_map.get(hash) {
+                resolved.insert(*hash, data.clone());
             } else {
                 missing.push(*hash);
             }
@@ -311,11 +302,11 @@ impl SlotState {
         (resolved, missing)
     }
 
-    /// Look up a payload by hash from the payload_map.
+    /// Look up entry data by hash from the entry_data_map.
     ///
     /// Used for resolving v_high entries and for handling fetch requests from peers.
-    pub fn lookup_payload(&self, hash: &HashValue) -> Option<Payload> {
-        self.payload_map
+    pub fn lookup_entry_data(&self, hash: &HashValue) -> Option<ProposalData> {
+        self.entry_data_map
             .as_ref()
             .and_then(|map| map.get(hash).cloned())
     }
@@ -329,33 +320,6 @@ impl SlotState {
     pub fn has_all_proposals(&self) -> bool {
         self.proposal_buffer.is_complete()
     }
-
-    /// Returns the timestamp for a specific author's proposal, or 0 if not found.
-    pub fn proposal_timestamp(&self, author: &Author) -> u64 {
-        self.timestamp_map.get(author).copied().unwrap_or(0)
-    }
-
-    /// Returns the maximum timestamp from proposals whose authors correspond to
-    /// non-⊥ entries in `v_high`, using `timestamp_map` which includes late proposals.
-    ///
-    /// Unlike `ProposalBuffer::max_timestamp_for_v_high()`, this method uses timestamps
-    /// from ALL proposals received in any phase (CollectingProposals or RunningSPC),
-    /// making it deterministic across validators even when proposals arrive at different
-    /// times relative to SPC startup.
-    pub fn max_timestamp_for_v_high(
-        &self,
-        v_high: &PrefixVector,
-        ranking: &[Author],
-    ) -> u64 {
-        v_high
-            .iter()
-            .zip(ranking.iter())
-            .filter(|(hash, _)| **hash != HashValue::zero())
-            .filter_map(|(_, author)| self.timestamp_map.get(author))
-            .copied()
-            .max()
-            .unwrap_or(0)
-    }
 }
 
 // ============================================================================
@@ -365,6 +329,7 @@ impl SlotState {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::slot_types::compute_entry_hash;
     use aptos_consensus_types::common::Payload;
     use aptos_crypto::{bls12381::Signature as BlsSignature, HashValue};
     use aptos_types::validator_signer::ValidatorSigner;
@@ -488,14 +453,14 @@ mod tests {
         }
 
         let ranking: Vec<Author> = signers.iter().map(|s| s.author()).collect();
-        let (hash_vector, payload_map) = buffer.build_input_vector(&ranking);
+        let (hash_vector, entry_data_map) = buffer.build_input_vector(&ranking);
 
         // All positions filled
         assert_eq!(hash_vector.len(), 4);
         for h in &hash_vector {
             assert_ne!(*h, HashValue::zero(), "no ⊥ entries expected");
         }
-        assert_eq!(payload_map.len(), 4);
+        assert_eq!(entry_data_map.len(), 4);
     }
 
     #[test]
@@ -508,14 +473,14 @@ mod tests {
         buffer.insert(make_proposal_with_distinct_hash(1, 1, signers[2].author()));
 
         let ranking: Vec<Author> = signers.iter().map(|s| s.author()).collect();
-        let (hash_vector, payload_map) = buffer.build_input_vector(&ranking);
+        let (hash_vector, entry_data_map) = buffer.build_input_vector(&ranking);
 
         assert_eq!(hash_vector.len(), 4);
         assert_ne!(hash_vector[0], HashValue::zero()); // signers[0] present
         assert_eq!(hash_vector[1], HashValue::zero()); // signers[1] missing → ⊥
         assert_ne!(hash_vector[2], HashValue::zero()); // signers[2] present
         assert_eq!(hash_vector[3], HashValue::zero()); // signers[3] missing → ⊥
-        assert_eq!(payload_map.len(), 2);
+        assert_eq!(entry_data_map.len(), 2);
     }
 
     #[test]
@@ -528,9 +493,10 @@ mod tests {
         let prop_a = make_proposal_with_distinct_hash(1, 1, signers[0].author());
         let prop_c = make_proposal_with_distinct_hash(1, 1, signers[2].author());
 
-        let hash_d = prop_d.payload_hash;
-        let hash_a = prop_a.payload_hash;
-        let hash_c = prop_c.payload_hash;
+        // entry_hash is composite: payload_hash + timestamp + proof_hash
+        let hash_d = prop_d.entry_hash();
+        let hash_a = prop_a.entry_hash();
+        let hash_c = prop_c.entry_hash();
 
         // Insert out of ranking order
         buffer.insert(prop_d);
@@ -553,17 +519,17 @@ mod tests {
         let buffer = ProposalBuffer::new(4);
 
         let ranking: Vec<Author> = signers.iter().map(|s| s.author()).collect();
-        let (hash_vector, payload_map) = buffer.build_input_vector(&ranking);
+        let (hash_vector, entry_data_map) = buffer.build_input_vector(&ranking);
 
         assert_eq!(hash_vector.len(), 4);
         for h in &hash_vector {
             assert_eq!(*h, HashValue::zero());
         }
-        assert!(payload_map.is_empty());
+        assert!(entry_data_map.is_empty());
     }
 
     #[test]
-    fn test_build_input_vector_payload_map_correctness() {
+    fn test_build_input_vector_entry_data_map_correctness() {
         let signers = create_signers(3);
         let mut buffer = ProposalBuffer::new(3);
 
@@ -573,17 +539,43 @@ mod tests {
         }
 
         let ranking: Vec<Author> = signers.iter().map(|s| s.author()).collect();
-        let (hash_vector, payload_map) = buffer.build_input_vector(&ranking);
+        let (hash_vector, entry_data_map) = buffer.build_input_vector(&ranking);
 
-        // Each hash in the vector maps to a payload in the map
+        // Each hash in the vector maps to entry data in the map
         for hash in &hash_vector {
-            assert!(payload_map.contains_key(hash), "payload_map should contain hash");
+            assert!(entry_data_map.contains_key(hash), "entry_data_map should contain hash");
         }
-        // Each proposal's payload_hash should appear in the vector at its ranking position
+        // Each proposal's entry_hash should appear in the vector at its ranking position
         for (i, signer) in signers.iter().enumerate() {
             let proposal = buffer.get(&signer.author()).unwrap();
-            assert_eq!(hash_vector[i], proposal.payload_hash);
+            assert_eq!(hash_vector[i], proposal.entry_hash());
+            // Verify the entry_data_map entry has the correct payload_hash
+            let data = entry_data_map.get(&hash_vector[i]).unwrap();
+            assert_eq!(data.payload_hash, proposal.payload_hash);
         }
+    }
+
+    #[test]
+    fn test_build_input_vector_uses_composite_hash() {
+        // Verify that the input vector uses entry_hash (not payload_hash)
+        let signers = create_signers(2);
+        let mut buffer = ProposalBuffer::new(2);
+
+        let prop = make_proposal_with_distinct_hash(1, 1, signers[0].author());
+        let payload_hash = prop.payload_hash;
+        let entry_hash = prop.entry_hash();
+
+        // entry_hash differs from payload_hash because it includes timestamp + proof
+        assert_ne!(entry_hash, payload_hash);
+
+        buffer.insert(prop);
+
+        let ranking: Vec<Author> = signers.iter().map(|s| s.author()).collect();
+        let (hash_vector, _) = buffer.build_input_vector(&ranking);
+
+        // Vector should contain entry_hash, NOT payload_hash
+        assert_eq!(hash_vector[0], entry_hash);
+        assert_ne!(hash_vector[0], payload_hash);
     }
 
     // ==================== SlotState Tests ====================
@@ -620,13 +612,13 @@ mod tests {
         let ranking: Vec<Author> = signers.iter().map(|s| s.author()).collect();
         state.prepare_spc_input(&ranking);
 
-        // Insertion during RunningSPC succeeds (payload goes into payload_map)
+        // Insertion during RunningSPC succeeds (ProposalData goes into entry_data_map)
         let proposal = make_proposal(1, 1, &signers[0], empty_payload());
-        let hash = proposal.payload_hash;
+        let entry_hash = proposal.entry_hash();
         assert!(!state.insert_proposal(proposal)); // late proposals don't affect buffer completion
 
-        // Payload should be findable via lookup_payload
-        assert!(state.lookup_payload(&hash).is_some());
+        // Entry data should be findable via lookup_entry_data
+        assert!(state.lookup_entry_data(&entry_hash).is_some());
     }
 
     #[test]
@@ -655,20 +647,20 @@ mod tests {
             .insert_proposal(make_proposal_with_distinct_hash(5, 1, signers[2].author()));
 
         assert!(state.input_vector().is_none());
-        assert!(state.payload_map().is_none());
+        assert!(state.entry_data_map().is_none());
 
         let ranking: Vec<Author> = signers.iter().map(|s| s.author()).collect();
         state.prepare_spc_input(&ranking);
 
-        // input_vector and payload_map should be set
+        // input_vector and entry_data_map should be set
         let iv = state.input_vector().expect("input_vector should be set");
         assert_eq!(iv.len(), 3);
         assert_ne!(iv[0], HashValue::zero());
         assert_eq!(iv[1], HashValue::zero()); // missing
         assert_ne!(iv[2], HashValue::zero());
 
-        let pm = state.payload_map().expect("payload_map should be set");
-        assert_eq!(pm.len(), 2);
+        let edm = state.entry_data_map().expect("entry_data_map should be set");
+        assert_eq!(edm.len(), 2);
 
         assert_eq!(*state.phase(), SlotPhase::RunningSPC);
     }
@@ -697,7 +689,7 @@ mod tests {
     }
 
     #[test]
-    fn test_slot_state_take_payload_map() {
+    fn test_slot_state_take_entry_data_map() {
         let signers = create_signers(2);
         let mut state = SlotState::new(1, 2);
 
@@ -710,15 +702,15 @@ mod tests {
         state.prepare_spc_input(&ranking);
 
         // First take returns Some
-        let map = state.take_payload_map();
+        let map = state.take_entry_data_map();
         assert!(map.is_some());
         assert!(!map.unwrap().is_empty());
 
         // Second take returns None (already taken)
-        assert!(state.take_payload_map().is_none());
+        assert!(state.take_entry_data_map().is_none());
 
-        // payload_map() also returns None
-        assert!(state.payload_map().is_none());
+        // entry_data_map() also returns None
+        assert!(state.entry_data_map().is_none());
     }
 
     #[test]
@@ -761,33 +753,37 @@ mod tests {
     }
 
     #[test]
-    fn test_late_proposal_duplicate_hash_not_overwritten() {
+    fn test_late_proposal_duplicate_entry_not_overwritten() {
         let signers = create_signers(2);
         let mut state = SlotState::new(1, 2);
 
         let ranking: Vec<Author> = signers.iter().map(|s| s.author()).collect();
         state.prepare_spc_input(&ranking);
 
-        // Insert a late proposal, then insert another with the same payload_hash.
+        // Insert a late proposal, then insert another with the same entry_hash.
         // The second should not overwrite the first (HashMap::entry().or_insert).
         let proposal = make_proposal_with_distinct_hash(1, 1, signers[0].author());
-        let hash = proposal.payload_hash;
+        let entry_hash = proposal.entry_hash();
+        let original_payload_hash = proposal.payload_hash;
         state.insert_proposal(proposal);
 
-        // Payload map size before second insert
-        let size_before = state.payload_map().unwrap().len();
+        let size_before = state.entry_data_map().unwrap().len();
 
-        // Insert with same hash — or_insert means no overwrite
+        // Force a true duplicate entry_hash: same payload_hash, timestamp, and proof_hash.
+        // make_proposal_with_distinct_hash uses timestamp=0 and proof_hash=None,
+        // so matching payload_hash is sufficient to produce the same entry_hash.
         let mut dup = make_proposal_with_distinct_hash(1, 1, signers[1].author());
-        dup.payload_hash = hash; // force same hash
+        dup.payload_hash = original_payload_hash;
+        assert_eq!(dup.entry_hash(), entry_hash, "must produce same entry_hash");
         state.insert_proposal(dup);
 
-        assert_eq!(state.payload_map().unwrap().len(), size_before);
-        assert!(state.lookup_payload(&hash).is_some());
+        // Size unchanged — duplicate entry_hash was rejected by or_insert
+        assert_eq!(state.entry_data_map().unwrap().len(), size_before);
+        assert!(state.lookup_entry_data(&entry_hash).is_some());
     }
 
     #[test]
-    fn test_resolve_all_from_payload_map() {
+    fn test_resolve_all_from_entry_data_map() {
         let signers = create_signers(3);
         let mut state = SlotState::new(1, 3);
 
@@ -801,7 +797,7 @@ mod tests {
         state.prepare_spc_input(&ranking);
 
         let v_high = state.input_vector().unwrap().clone();
-        let (resolved, missing) = state.resolve_missing_payloads(&v_high);
+        let (resolved, missing) = state.resolve_missing_entries(&v_high);
 
         assert_eq!(resolved.len(), 3);
         assert!(missing.is_empty());
@@ -821,19 +817,19 @@ mod tests {
 
         // signer[1] arrives late
         let late_proposal = make_proposal_with_distinct_hash(1, 1, signers[1].author());
-        let late_hash = late_proposal.payload_hash;
+        let late_entry_hash = late_proposal.entry_hash();
         state.insert_proposal(late_proposal);
 
-        // v_high contains signers[0]'s hash and the late hash
+        // v_high contains signers[0]'s entry hash and the late entry hash
         let v_high = vec![
-            state.input_vector().unwrap()[0], // signer[0] — in payload_map (pre-2Δ)
-            late_hash,                        // signer[1] — in payload_map (late insert)
+            state.input_vector().unwrap()[0], // signer[0] — in entry_data_map (pre-2Δ)
+            late_entry_hash,                  // signer[1] — in entry_data_map (late insert)
             HashValue::zero(),                // signer[2] — ⊥
         ];
 
-        let (resolved, missing) = state.resolve_missing_payloads(&v_high);
+        let (resolved, missing) = state.resolve_missing_entries(&v_high);
         assert_eq!(resolved.len(), 2);
-        assert!(resolved.contains_key(&late_hash));
+        assert!(resolved.contains_key(&late_entry_hash));
         assert!(missing.is_empty());
     }
 
@@ -849,15 +845,15 @@ mod tests {
         let ranking: Vec<Author> = signers.iter().map(|s| s.author()).collect();
         state.prepare_spc_input(&ranking);
 
-        // v_high contains a hash we don't have
+        // v_high contains an entry hash we don't have
         let unknown_hash = HashValue::random();
         let v_high = vec![
-            state.input_vector().unwrap()[0], // signer[0] — in payload_map
+            state.input_vector().unwrap()[0], // signer[0] — in entry_data_map
             unknown_hash,                     // unknown — not in any buffer
             HashValue::zero(),                // ⊥
         ];
 
-        let (resolved, missing) = state.resolve_missing_payloads(&v_high);
+        let (resolved, missing) = state.resolve_missing_entries(&v_high);
         assert_eq!(resolved.len(), 1);
         assert_eq!(missing.len(), 1);
         assert_eq!(missing[0], unknown_hash);
@@ -873,19 +869,19 @@ mod tests {
 
         // v_high is all ⊥
         let v_high = vec![HashValue::zero(); 3];
-        let (resolved, missing) = state.resolve_missing_payloads(&v_high);
+        let (resolved, missing) = state.resolve_missing_entries(&v_high);
         assert!(resolved.is_empty());
         assert!(missing.is_empty());
     }
 
     #[test]
-    fn test_lookup_payload_from_early_and_late() {
+    fn test_lookup_entry_data_from_early_and_late() {
         let signers = create_signers(3);
         let mut state = SlotState::new(1, 3);
 
         // Insert signer[0] before SPC
         let early_proposal = make_proposal_with_distinct_hash(1, 1, signers[0].author());
-        let early_hash = early_proposal.payload_hash;
+        let early_entry_hash = early_proposal.entry_hash();
         state.insert_proposal(early_proposal);
 
         let ranking: Vec<Author> = signers.iter().map(|s| s.author()).collect();
@@ -893,22 +889,45 @@ mod tests {
 
         // Insert signer[1] as late proposal
         let late_proposal = make_proposal_with_distinct_hash(1, 1, signers[1].author());
-        let late_hash = late_proposal.payload_hash;
+        let late_entry_hash = late_proposal.entry_hash();
         state.insert_proposal(late_proposal);
 
-        // Both should be found via lookup_payload
-        assert!(state.lookup_payload(&early_hash).is_some());
-        assert!(state.lookup_payload(&late_hash).is_some());
+        // Both should be found via lookup_entry_data
+        assert!(state.lookup_entry_data(&early_entry_hash).is_some());
+        assert!(state.lookup_entry_data(&late_entry_hash).is_some());
     }
 
     #[test]
-    fn test_lookup_payload_not_found() {
+    fn test_lookup_entry_data_not_found() {
         let signers = create_signers(2);
         let mut state = SlotState::new(1, 2);
 
         let ranking: Vec<Author> = signers.iter().map(|s| s.author()).collect();
         state.prepare_spc_input(&ranking);
 
-        assert!(state.lookup_payload(&HashValue::random()).is_none());
+        assert!(state.lookup_entry_data(&HashValue::random()).is_none());
+    }
+
+    #[test]
+    fn test_late_proposal_preserves_commit_proof() {
+        // Phase 13: late proposals during RunningSPC must preserve prev_commit_proof
+        // in entry_data_map (previously only payload was stored, discarding the proof).
+        let signers = create_signers(2);
+        let mut state = SlotState::new(2, 2);
+
+        let ranking: Vec<Author> = signers.iter().map(|s| s.author()).collect();
+        state.prepare_spc_input(&ranking);
+
+        // Create a proposal with a fake commit proof hash (simulating slot > 1)
+        let mut proposal = make_proposal_with_distinct_hash(2, 1, signers[0].author());
+        proposal.prev_commit_proof_hash = Some(HashValue::random());
+        // Note: we don't set prev_commit_proof here since we'd need a real StrongPCCommit.
+        // The key test is that prev_commit_proof_hash is preserved in ProposalData.
+        let entry_hash = proposal.entry_hash();
+
+        state.insert_proposal(proposal);
+
+        let data = state.lookup_entry_data(&entry_hash).expect("should find late entry");
+        assert!(data.prev_commit_proof_hash.is_some(), "commit proof hash should be preserved");
     }
 }

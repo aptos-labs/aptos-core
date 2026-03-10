@@ -89,8 +89,8 @@ pub use inner_pc_trait::InnerPCAlgorithm;
 pub use slot_ranking::MultiSlotRankingManager;
 pub use slot_state::{ProposalBuffer, SlotPhase, SlotState};
 pub use slot_types::{
-    PayloadFetchRequest, PayloadFetchResponse, SPCOutput, SlotConsensusMsg, SlotProposal,
-    SlotProposalSignData, create_signed_slot_proposal,
+    EntryFetchRequest, EntryFetchResponse, ProposalData, SPCOutput, SlotConsensusMsg,
+    SlotProposal, SlotProposalSignData, compute_entry_hash, create_signed_slot_proposal,
 };
 pub use strong_manager::{DefaultStrongPCManager, StrongPrefixConsensusManager};
 pub use strong_protocol::{
