@@ -10,6 +10,10 @@ runs:
   steps:
     # The source code must be checkout out by the workflow that invokes this action.
 
+    - name: Print cargo-nextest version
+      run: cargo nextest --version
+      shell: bash
+
     # Run a postgres database
     - name: Run postgres database
       run: docker run --detach -p 5432:5432 cimg/postgres:14.2
