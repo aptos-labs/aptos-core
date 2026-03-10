@@ -20,6 +20,18 @@ use rmcp::{
 };
 use std::path::{Path, PathBuf};
 use tempfile::TempDir;
+use tokio::sync::Mutex as AsyncMutex;
+
+/// Lock to serialize tests that invoke the Move test runner.
+/// `LOGGING_FILE_WRITER` in the Move VM is a global static that would be
+/// corrupted by concurrent test executions.
+static TEST_RUNNER_LOCK: AsyncMutex<()> = AsyncMutex::const_new(());
+
+/// Acquire the test runner lock. Hold the returned guard for the duration of
+/// any test that triggers `move_package_test` or `move_package_coverage`.
+pub async fn serial_test_lock() -> tokio::sync::MutexGuard<'static, ()> {
+    TEST_RUNNER_LOCK.lock().await
+}
 
 /// Build a temporary Move package with the given sources.
 ///

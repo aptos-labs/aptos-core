@@ -25,7 +25,7 @@ pub fn run_prover_for_pkg(
     let pkg_path = path_in_crate(path_to_pkg);
     let config = move_package::BuildConfig {
         additional_named_addresses: named_addr,
-        test_mode: true,
+        test_mode: false,
         install_dir: Some(tempdir().unwrap().path().to_path_buf()),
         compiler_config: CompilerConfig {
             known_attributes: extended_checks::get_all_attribute_names().clone(),

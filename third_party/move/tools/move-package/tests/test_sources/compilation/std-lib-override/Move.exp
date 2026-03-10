@@ -19,6 +19,7 @@ CompiledPackageInfo {
     build_flags: BuildConfig {
         dev_mode: true,
         test_mode: false,
+        verify_mode: false,
         override_std: Some(
             Devnet,
         ),

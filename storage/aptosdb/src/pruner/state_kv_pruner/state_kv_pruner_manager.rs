@@ -65,6 +65,7 @@ impl PrunerManager for StateKvPrunerManager {
         self.state_kv_db.write_pruner_progress(min_readable_version)
     }
 
+    #[cfg(test)]
     fn is_pruning_pending(&self) -> bool {
         self.pruner_worker
             .as_ref()
