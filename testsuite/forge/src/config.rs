@@ -12,6 +12,14 @@ use aptos_config::config::{
 use aptos_framework::ReleaseBundle;
 use std::{num::NonZeroUsize, sync::Arc};
 
+/// A PFN deployment configuration. Each entry maps to one helm release via the PFN deployer.
+pub struct PfnDeployment {
+    /// The helm release name for this PFN (e.g. "pfn-0", "pfn-1")
+    pub name: String,
+    /// Optional per-PFN node config override. Deep-merged on top of the shared PFN base config.
+    pub node_config_override_fn: Option<OverrideNodeConfigFn>,
+}
+
 pub struct ForgeConfig {
     suite_name: Option<String>,
 
@@ -25,8 +33,8 @@ pub struct ForgeConfig {
     /// The initial number of fullnodes to spawn when the test harness creates a swarm
     pub initial_fullnode_count: usize,
 
-    /// The number of public full nodes (PFNs) to deploy via the PFN deployer (0 to disable)
-    pub num_pfns: usize,
+    /// PFN deployments to create via the PFN deployer (empty to disable)
+    pub pfn_deployments: Vec<PfnDeployment>,
 
     /// The initial version to use when the test harness creates a swarm
     pub initial_version: InitialVersion,
@@ -42,6 +50,9 @@ pub struct ForgeConfig {
 
     /// Optional fullnode node config override function
     pub fullnode_override_node_config_fn: Option<OverrideNodeConfigFn>,
+
+    /// Optional PFN node config override function (applied to pfn-values.fullnode.config)
+    pub pfn_override_node_config_fn: Option<OverrideNodeConfigFn>,
 
     pub multi_region_config: bool,
 
@@ -116,8 +127,19 @@ impl ForgeConfig {
         self
     }
 
+    /// Creates N PFN deployments with default names (pfn-0, pfn-1, ...) and no per-PFN overrides.
     pub fn with_num_pfns(mut self, num_pfns: usize) -> Self {
-        self.num_pfns = num_pfns;
+        self.pfn_deployments = (0..num_pfns)
+            .map(|i| PfnDeployment {
+                name: format!("pfn-{}", i),
+                node_config_override_fn: None,
+            })
+            .collect();
+        self
+    }
+
+    pub fn with_pfn_deployments(mut self, pfn_deployments: Vec<PfnDeployment>) -> Self {
+        self.pfn_deployments = pfn_deployments;
         self
     }
 
@@ -134,6 +156,39 @@ impl ForgeConfig {
     pub fn with_fullnode_override_node_config_fn(mut self, f: OverrideNodeConfigFn) -> Self {
         self.fullnode_override_node_config_fn = Some(f);
         self
+    }
+
+    pub fn with_pfn_override_node_config_fn(mut self, f: OverrideNodeConfigFn) -> Self {
+        self.pfn_override_node_config_fn = Some(f);
+        self
+    }
+
+    /// Builds the shared PFN base node config as a serde_json::Value for injection into pfn-values.fullnode.config.
+    /// Returns None if no shared PFN override config function is set.
+    pub fn build_pfn_base_node_config(&self) -> Option<serde_json::Value> {
+        self.pfn_override_node_config_fn.clone().map(|config_fn| {
+            let override_config = Self::override_node_config_from_fn(config_fn);
+            let yaml_value = override_config.get_yaml().unwrap();
+            serde_json::to_value(yaml_value).unwrap()
+        })
+    }
+
+    /// Builds the pfn-deployments JSON array entries. Each entry has a helmReleaseName and
+    /// optionally per-PFN values (deep-merged on top of pfn-values by the deployer).
+    pub fn build_pfn_deployment_configs(&self) -> Vec<serde_json::Value> {
+        self.pfn_deployments
+            .iter()
+            .map(|pfn| {
+                let mut entry = serde_json::json!({ "helmReleaseName": pfn.name });
+                if let Some(config_fn) = &pfn.node_config_override_fn {
+                    let override_config = Self::override_node_config_from_fn(config_fn.clone());
+                    let yaml_value = override_config.get_yaml().unwrap();
+                    let json_value = serde_json::to_value(yaml_value).unwrap();
+                    entry["values"]["fullnode"]["config"] = json_value;
+                }
+                entry
+            })
+            .collect()
     }
 
     pub fn with_multi_region_config(mut self) -> Self {
@@ -350,12 +405,13 @@ impl Default for ForgeConfig {
             network_tests: vec![],
             initial_validator_count: NonZeroUsize::new(1).unwrap(),
             initial_fullnode_count: 0,
-            num_pfns: 0,
+            pfn_deployments: vec![],
             initial_version: InitialVersion::Oldest,
             genesis_config: None,
             genesis_helm_config_fn: None,
             validator_override_node_config_fn: None,
             fullnode_override_node_config_fn: None,
+            pfn_override_node_config_fn: None,
             multi_region_config: false,
             emit_job_request: EmitJobRequest::default().mode(EmitJobMode::MaxLoad {
                 mempool_backlog: 40000,

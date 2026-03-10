@@ -21,7 +21,6 @@ pub mod chaos;
 pub mod chaos_schema;
 mod cluster_helper;
 pub mod constants;
-mod fullnode;
 pub mod kube_api;
 pub mod node;
 pub mod prometheus;
@@ -35,7 +34,6 @@ use super::{
 use aptos_sdk::crypto::ed25519::ED25519_PRIVATE_KEY_LENGTH;
 pub use cluster_helper::*;
 pub use constants::*;
-pub use fullnode::*;
 #[cfg(test)]
 pub use kube_api::mocks::*;
 pub use kube_api::*;
@@ -53,7 +51,11 @@ pub struct K8sFactory {
     keep: bool,
     enable_haproxy: bool,
     enable_indexer: bool,
-    num_pfns: usize,
+    /// Resolved PFN deployment entries for the pfn-deployments JSON array.
+    /// Each entry is a JSON object with helmReleaseName and optional per-PFN values.
+    pfn_deployment_configs: Vec<serde_json::Value>,
+    /// Optional shared PFN base node config for pfn-values.fullnode.config
+    pfn_base_node_config: Option<serde_json::Value>,
     deployer_profile: String,
 }
 
@@ -67,7 +69,8 @@ impl K8sFactory {
         keep: bool,
         enable_haproxy: bool,
         enable_indexer: bool,
-        num_pfns: usize,
+        pfn_deployment_configs: Vec<serde_json::Value>,
+        pfn_base_node_config: Option<serde_json::Value>,
         deployer_profile: String,
     ) -> Result<K8sFactory> {
         let root_key: [u8; ED25519_PRIVATE_KEY_LENGTH] =
@@ -98,7 +101,8 @@ impl K8sFactory {
             keep,
             enable_haproxy,
             enable_indexer,
-            num_pfns,
+            pfn_deployment_configs,
+            pfn_base_node_config,
             deployer_profile,
         })
     }
@@ -275,31 +279,36 @@ impl Factory for K8sFactory {
             // PFN deploy phase (if enabled)
             let pfn_deploy_start = Instant::now();
             let pfn_namespace = self.kube_namespace.clone();
-            let num_pfns = self.num_pfns;
+            let pfn_deployment_configs = self.pfn_deployment_configs.clone();
+            let pfn_base_node_config = self.pfn_base_node_config.clone();
             let pfn_era = new_era.clone();
             let pfn_profile = self.deployer_profile.clone();
             let pfn_kube_namespace = self.kube_namespace.clone();
             let pfn_init_version = format!("{}", init_version);
             let pfn_kube_client = kube_client.clone();
             let deploy_pfn_fut = async move {
-                if num_pfns > 0 {
+                if !pfn_deployment_configs.is_empty() {
                     let genesis_bucket_path = format!(
                         "{}/{}/{}",
                         FORGE_GENESIS_SHARED_BUCKET, pfn_kube_namespace, pfn_era
                     );
+                    let mut pfn_values = json!({
+                        "imageTag": pfn_init_version,
+                        "genesis_bucket_path": genesis_bucket_path,
+                        "chain": {
+                            "era": pfn_era,
+                            "name": "ephemeral",
+                        },
+                    });
+                    if let Some(node_config) = pfn_base_node_config {
+                        pfn_values["fullnode"]["config"] = node_config;
+                    }
                     let config = serde_json::from_value(json!({
                         "profile": pfn_profile,
                         "era": pfn_era,
                         "namespace": pfn_kube_namespace,
-                        "num_pfns": num_pfns,
-                        "pfn-values": {
-                            "imageTag": pfn_init_version,
-                            "genesis_bucket_path": genesis_bucket_path,
-                            "chain": {
-                                "era": pfn_era,
-                                "name": "ephemeral",
-                            },
-                        },
+                        "pfn-deployments": pfn_deployment_configs,
+                        "pfn-values": pfn_values,
                     }))?;
 
                     let pfn_deployer = ForgeDeployerManager::new(

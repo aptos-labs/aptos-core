@@ -35,4 +35,4 @@ pub mod metrics;
 pub mod test_utils;
 
 pub mod config;
-pub use config::ForgeConfig;
+pub use config::{ForgeConfig, PfnDeployment};

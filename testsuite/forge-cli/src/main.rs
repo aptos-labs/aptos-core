@@ -318,7 +318,8 @@ fn main() -> Result<()> {
                     };
                     let forge_runner_mode =
                         ForgeRunnerMode::try_from_env().unwrap_or(ForgeRunnerMode::K8s);
-                    let num_pfns = test_suite.num_pfns;
+                    let pfn_deployment_configs = test_suite.build_pfn_deployment_configs();
+                    let pfn_base_node_config = test_suite.build_pfn_base_node_config();
                     let forge = Forge::new(
                         &args.options,
                         test_suite,
@@ -333,7 +334,8 @@ fn main() -> Result<()> {
                             k8s.keep,
                             k8s.enable_haproxy,
                             k8s.enable_indexer,
-                            num_pfns,
+                            pfn_deployment_configs,
+                            pfn_base_node_config,
                             k8s.deployer_profile.clone(),
                         )?,
                     );
@@ -430,11 +432,14 @@ fn main() -> Result<()> {
                             "{}/{}/{}",
                             FORGE_GENESIS_SHARED_BUCKET, pfn_namespace, pfn_era
                         );
+                        let pfn_deployment_configs: Vec<Value> = (0..num_pfns)
+                            .map(|i| json!({ "helmReleaseName": format!("pfn-{}", i) }))
+                            .collect();
                         let pfn_config: Value = serde_json::from_value(json!({
                             "profile": pfn_profile,
                             "era": pfn_era,
                             "namespace": pfn_namespace,
-                            "num_pfns": num_pfns,
+                            "pfn-deployments": pfn_deployment_configs,
                             "pfn-values": {
                                 "imageTag": pfn_image_tag,
                                 "genesis_bucket_path": genesis_bucket_path,

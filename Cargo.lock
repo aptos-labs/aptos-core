@@ -1909,7 +1909,6 @@ dependencies = [
  "aptos-retrier",
  "aptos-runtimes",
  "aptos-sdk",
- "aptos-short-hex-str",
  "aptos-state-sync-driver",
  "aptos-transaction-emitter-lib",
  "aptos-transaction-generator-lib",
