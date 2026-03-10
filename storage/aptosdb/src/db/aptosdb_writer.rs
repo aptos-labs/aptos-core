@@ -1,6 +1,8 @@
 // Copyright (c) Aptos Foundation
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
+#[cfg(any(test, feature = "fuzzing"))]
+use crate::ledger_db::transaction_auxiliary_data_db::TransactionAuxiliaryDataDb;
 use crate::{
     backup::restore_utils,
     db::{aptosdb_internal::gauged_api, AptosDB},
@@ -25,6 +27,8 @@ use aptos_storage_interface::{
     chunk_to_commit::ChunkToCommit, db_ensure as ensure, AptosDbError, DbReader, DbWriter, Result,
     StateSnapshotReceiver,
 };
+#[cfg(any(test, feature = "fuzzing"))]
+use aptos_types::transaction::TransactionAuxiliaryData;
 use aptos_types::{
     account_config::new_block_event_key,
     ledger_info::LedgerInfoWithSignatures,
