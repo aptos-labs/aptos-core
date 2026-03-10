@@ -14,6 +14,7 @@ use aptos_keyless_pepper_common::jwt::parse;
 use aptos_logger::{info, warn};
 use aptos_time_service::{TimeService, TimeServiceTrait};
 use aptos_types::{jwks::rsa::RSA_JWK, keyless::test_utils::get_sample_iss};
+use reqwest::header::HeaderMap;
 use serde_json::Value;
 use std::{collections::HashMap, sync::Arc, time::Duration};
 use tokio::time::Instant;
@@ -71,7 +72,7 @@ fn initialize_federated_jwks() -> FederatedJWKs<FederatedJWKIssuer> {
 /// Fetches the JWKs from the given URL
 pub async fn fetch_jwks(jwk_url: &str) -> Result<HashMap<KeyID, Arc<RSA_JWK>>> {
     // Create the request client
-    let client = utils::create_request_client();
+    let client = utils::create_request_client(HeaderMap::new());
 
     // Fetch the JWKs from the URL
     let response = client

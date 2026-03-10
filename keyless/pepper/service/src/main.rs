@@ -22,7 +22,9 @@ use aptos_keyless_pepper_service::{
     metrics::DEFAULT_METRICS_SERVER_PORT,
     request_handler,
     request_handler::DEFAULT_PEPPER_SERVICE_PORT,
-    utils, vuf_keypair,
+    utils,
+    utils::HttpHeader,
+    vuf_keypair,
     vuf_keypair::VUFKeypair,
 };
 use aptos_logger::{error, info, warn};
@@ -121,6 +123,16 @@ struct Args {
     #[arg(long, default_value_t = DEFAULT_PEPPER_SERVICE_PORT)]
     pepper_service_port: u16,
 
+    /// Additional HTTP headers to attach to resource fetch requests (e.g., on-chain
+    /// Groth16 VK and keyless config). Useful for internal auth when using an internal
+    /// API gateway URL instead of the public endpoint.
+    ///
+    /// For example:
+    /// --resource-fetch-headers="x-internal-application-id my-app-id"
+    /// --resource-fetch-headers="authorization Bearer my-token"
+    #[arg(long)]
+    resource_fetch_headers: Vec<HttpHeader>,
+
     /// The hex-encoded VUF private key (used directly if provided, otherwise derived from the seed)
     #[arg(
         long,
@@ -188,10 +200,14 @@ async fn main() {
     let account_recovery_managers =
         Arc::new(AccountRecoveryManagers::new(args.account_recovery_managers));
 
+    // Build the default headers for resource fetch requests
+    let resource_fetch_header_map = utils::http_headers_to_header_map(&args.resource_fetch_headers);
+
     // Start the cached resource fetcher
     let cached_resources = resource_fetcher::start_cached_resource_fetcher(
         args.on_chain_groth16_vk_url,
         args.on_chain_keyless_config_url,
+        resource_fetch_header_map,
     );
 
     // Create the account recovery database
