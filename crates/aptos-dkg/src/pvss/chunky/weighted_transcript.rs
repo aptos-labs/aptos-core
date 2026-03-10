@@ -57,7 +57,7 @@ use aptos_crypto::{
 };
 use ark_ec::{
     pairing::{Pairing, PairingOutput},
-    AffineRepr, CurveGroup, VariableBaseMSM,
+    CurveGroup, VariableBaseMSM,
 };
 use ark_ff::{AdditiveGroup, Field, Fp, FpConfig};
 use ark_serialize::{CanonicalDeserialize, CanonicalSerialize};
@@ -305,15 +305,12 @@ impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>>
             <Self as traits::Transcript>::dst(),
         )?;
 
-        // Verify the range proof (convert CommitmentNormalised to Commitment for verify)
-        let comm_for_verify = sigma_protocol::homomorphism::TrivialShape(
-            self.sharing_proof.range_proof_commitment.0.into_group(),
-        );
+        // Postpone range proof verification, but collect the pairing terms for later
         let (g1_terms, g2_terms) = self.sharing_proof.range_proof.pairing_for_verify(
             &pp.pk_range_proof.vk,
             sc.get_total_weight() * num_chunks_per_scalar::<E::ScalarField>(pp.ell) as usize,
             pp.ell,
-            &comm_for_verify,
+            &self.sharing_proof.range_proof_commitment,
             rng,
         )?;
 

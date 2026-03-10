@@ -45,7 +45,7 @@ use aptos_crypto::{
     weighted_config::WeightedConfigArkworks as SecretSharingConfig,
     CryptoMaterialError, TSecretSharingConfig, ValidCryptoMaterial,
 };
-use ark_ec::{pairing::Pairing, AffineRepr, CurveGroup, VariableBaseMSM};
+use ark_ec::{pairing::Pairing, CurveGroup, VariableBaseMSM};
 use ark_ff::{AdditiveGroup, Field, Fp, FpConfig};
 use ark_serialize::{CanonicalDeserialize, CanonicalSerialize};
 use rand_core::{CryptoRng, RngCore};
@@ -306,15 +306,12 @@ impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>>
         )?;
 
         {
-            // Verify the range proof (convert CommitmentNormalised to Commitment for verify)
-            let comm_for_verify = sigma_protocol::homomorphism::TrivialShape(
-                self.sharing_proof.range_proof_commitment.0.into_group(),
-            );
+            // Verify the range proof
             if let Err(err) = self.sharing_proof.range_proof.verify(
                 &pp.pk_range_proof.vk,
                 sc.get_total_weight() * num_chunks_per_scalar::<E::ScalarField>(pp.ell) as usize,
                 pp.ell,
-                &comm_for_verify,
+                &self.sharing_proof.range_proof_commitment,
                 rng,
             ) {
                 bail!("Range proof batch verification failed: {:?}", err);

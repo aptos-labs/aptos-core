@@ -100,7 +100,9 @@ fn bench_verify<E: Pairing, B: BatchedRangeProof<E>>(
                     (vk, n, ell, comm, proof, rng)
                 },
                 |(vk, n, ell, comm, proof, mut rng)| {
-                    proof.verify(&vk, n, ell, &comm, &mut rng).unwrap();
+                    proof
+                        .verify(&vk, n, ell, &comm.clone().into(), &mut rng)
+                        .unwrap();
                 },
             )
         },

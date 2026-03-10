@@ -5,8 +5,7 @@ use aptos_crypto::arkworks::GroupGenerators;
 use aptos_dkg::{
     range_proofs::{
         dekart_multivariate::Proof as DekartMultivariate,
-        dekart_univariate_v2::Proof as UnivariateDeKARTv2,
-        traits::BatchedRangeProof,
+        dekart_univariate_v2::Proof as UnivariateDeKARTv2, traits::BatchedRangeProof,
     },
     utils::test_utils,
 };
@@ -35,7 +34,9 @@ fn assert_range_proof_correctness<E: Pairing, B: BatchedRangeProof<E>>(
     );
 
     let proof = B::prove(pk, &values, ell, &comm.clone().into(), &r, &mut rng);
-    proof.verify(vk, n, ell, &comm, &mut rng).unwrap();
+    proof
+        .verify(vk, n, ell, &comm.clone().into(), &mut rng)
+        .unwrap();
 
     // === Serialize to memory ===
     let encoded = {
@@ -58,7 +59,9 @@ fn assert_range_proof_correctness<E: Pairing, B: BatchedRangeProof<E>>(
     let decoded = B::deserialize_compressed(&*encoded).expect("Deserialization failed");
 
     // Verify still succeeds
-    decoded.verify(vk, n, ell, &comm, &mut rng).unwrap();
+    decoded
+        .verify(vk, n, ell, &comm.clone().into(), &mut rng)
+        .unwrap();
 
     println!(
         "[{}] Serialization round-trip test passed for n={}, ell={}",
@@ -70,7 +73,9 @@ fn assert_range_proof_correctness<E: Pairing, B: BatchedRangeProof<E>>(
     // Make invalid
     let mut invalid_proof = decoded.clone();
     invalid_proof.maul();
-    assert!(invalid_proof.verify(vk, n, ell, &comm, &mut rng).is_err());
+    assert!(invalid_proof
+        .verify(vk, n, ell, &comm.clone().into(), &mut rng)
+        .is_err());
 }
 
 #[cfg(test)]

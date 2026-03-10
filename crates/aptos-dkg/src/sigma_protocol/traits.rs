@@ -228,6 +228,34 @@ pub trait CurveGroupTrait:
 
         msm_terms
     }
+
+    /// Returns the MSM terms that `verify()` needs, computing the Fiat–Shamir challenge
+    /// from the transcript (context, statement, prover commitment) and then calling
+    /// `msm_terms_for_verify_with_challenge()`.
+    fn msm_terms_for_verify<Ct: Serialize>(
+        &self,
+        public_statement: &Self::CodomainNormalized,
+        proof: &Proof<<Self::Group as PrimeGroup>::ScalarField, Self>,
+        cntxt: &Ct,
+    ) -> Vec<MsmInput<<Self::Group as CurveGroup>::Affine, <Self::Group as PrimeGroup>::ScalarField>>
+    where
+        Self: Trait<Scalar = <Self::Group as PrimeGroup>::ScalarField>,
+    {
+        let prover_first_message = proof
+            .prover_commitment()
+            .expect("proof must contain commitment for Fiat–Shamir");
+        let c = self.fiat_shamir_challenge_for_sigma_protocol(
+            cntxt,
+            public_statement,
+            prover_first_message,
+        );
+        self.msm_terms_for_verify_with_challenge(
+            public_statement,
+            prover_first_message,
+            &proof.z,
+            c,
+        )
+    }
 }
 
 // This is the default implementation for the `leaf` case (single MSM group / codomain)

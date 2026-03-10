@@ -820,7 +820,7 @@ impl<E: Pairing> traits::BatchedRangeProof<E> for Proof<E> {
         vk: &Self::VerificationKey,
         n: usize,
         ell: u8,
-        comm: &Self::Commitment,
+        comm: &Self::CommitmentNormalised,
         rng: &mut R,
     ) -> anyhow::Result<(Vec<E::G1Affine>, Vec<E::G2Affine>)> {
         #[cfg(feature = "range_proof_timing_univariate_v2")]
@@ -872,7 +872,7 @@ impl<E: Pairing> traits::BatchedRangeProof<E> for Proof<E> {
         fiat_shamir::append_initial_data(&mut fs_t, Self::DST, vk, PublicStatement {
             n,
             ell,
-            comm: comm.clone(),
+            comm: TrivialShape(comm.0.into_group()),
         });
 
         // Step 2b
