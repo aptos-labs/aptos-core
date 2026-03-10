@@ -11,6 +11,7 @@ pub mod scrape;
 pub mod serialization;
 pub mod shamir;
 pub mod srs;
+pub mod sumcheck;
 pub mod vanishing_poly;
 pub mod weighted_sum;
 
