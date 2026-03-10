@@ -5,7 +5,7 @@ proposals:
   - name: proposal_1_set_staking_reward_2_6_pct
     metadata:
       title: "Set staking reward rate to 2.6% per year"
-      description: "This proposal sets the staking reward rate to 2.6% per year. The existing 1.5% annual reduction rate is preserved."
+      description: "This proposal reduces the staking reward rate from 5.19% to 2.6% per year and stops further yearly reductions by setting min_rewards_rate equal to the new rate."
     execution_mode: MultiStep
     update_sequence:
       - RawScript: "aptos-move/aptos-release-builder/data/proposals/set_staking_reward_2_6_pct.move"
