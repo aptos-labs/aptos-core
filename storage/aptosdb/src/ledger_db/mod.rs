@@ -5,10 +5,9 @@
 
 use crate::{
     db_options::{
-        gen_event_cfds, gen_ledger_cfds, gen_ledger_metadata_cfds,
-        gen_persisted_auxiliary_info_cfds, gen_transaction_accumulator_cfds,
-        gen_transaction_auxiliary_data_cfds, gen_transaction_cfds, gen_transaction_info_cfds,
-        gen_write_set_cfds,
+        gen_event_cfds, gen_ledger_metadata_cfds, gen_persisted_auxiliary_info_cfds,
+        gen_transaction_accumulator_cfds, gen_transaction_auxiliary_data_cfds,
+        gen_transaction_cfds, gen_transaction_info_cfds, gen_write_set_cfds,
     },
     event_store::EventStore,
     ledger_db::{
@@ -55,7 +54,6 @@ pub(crate) mod write_set_db;
 mod write_set_db_test;
 
 pub const LEDGER_DB_FOLDER_NAME: &str = "ledger_db";
-pub const LEDGER_DB_NAME: &str = "ledger_db";
 pub const LEDGER_METADATA_DB_NAME: &str = "ledger_metadata_db";
 pub const EVENT_DB_NAME: &str = "event_db";
 pub const PERSISTED_AUXILIARY_INFO_DB_NAME: &str = "persisted_auxiliary_info_db";
@@ -425,7 +423,6 @@ impl LedgerDb {
         name: &str,
     ) -> Vec<ColumnFamilyDescriptor> {
         match name {
-            LEDGER_DB_NAME => gen_ledger_cfds(db_config, cache),
             LEDGER_METADATA_DB_NAME => gen_ledger_metadata_cfds(db_config, cache),
             EVENT_DB_NAME => gen_event_cfds(db_config, cache),
             PERSISTED_AUXILIARY_INFO_DB_NAME => gen_persisted_auxiliary_info_cfds(db_config, cache),
