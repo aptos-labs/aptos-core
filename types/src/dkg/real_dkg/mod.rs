@@ -136,7 +136,14 @@ pub fn build_dkg_pvss_config(
         error: rounding_error,
     };
 
-    DKGPvssConfig::new(cur_epoch, wconfig, fast_wconfig, pp, consensus_keys, rounding_summary)
+    DKGPvssConfig::new(
+        cur_epoch,
+        wconfig,
+        fast_wconfig,
+        pp,
+        consensus_keys,
+        rounding_summary,
+    )
 }
 
 #[derive(Debug)]
