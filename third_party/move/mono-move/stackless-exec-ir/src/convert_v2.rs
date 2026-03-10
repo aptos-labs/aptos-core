@@ -11,7 +11,7 @@
 //!         with StLoc look-ahead and CopyLoc/MoveLoc coalescing.
 
 use crate::ir::{BinaryOp, FunctionIR, Instr, Label, ModuleIR, Reg, UnaryOp};
-use crate::optimize_v1::{extract_imm_value, get_defs_uses, is_commutative, split_into_blocks};
+use crate::instr_utils_v2::{extract_imm_value, get_defs_uses, is_commutative, split_into_blocks};
 use crate::type_conversion::{convert_sig_token, convert_sig_tokens};
 use move_binary_format::{
     access::ModuleAccess,
@@ -81,12 +81,19 @@ pub fn convert_module_v2(module: CompiledModule, struct_name_table: &[StructName
                 let ssa_instrs = converter.instrs;
                 let vid_types = converter.vid_types;
 
-                // Pass 1.5: Fuse immediate binops (before register allocation)
+                // Pass 1.5: Pre-allocation instruction fusion
+                let mut ssa_instrs = ssa_instrs;
+                fuse_field_access_instrs(&mut ssa_instrs);
                 let ssa_instrs = fuse_immediate_binops_ssa(ssa_instrs, num_pinned);
 
                 // Pass 2: Greedy Register Allocation
                 let (allocated_instrs, num_regs, num_arg_regs, reg_types) =
-                    allocate_registers(&ssa_instrs, num_pinned, &local_types, &vid_types);
+                    crate::regalloc_v2::allocate_registers(
+                        &ssa_instrs,
+                        num_pinned,
+                        &local_types,
+                        &vid_types,
+                    );
 
                 FunctionIR {
                     name_idx,
@@ -1146,320 +1153,68 @@ fn fuse_immediate_binops_ssa(instrs: Vec<Instr>, _num_pinned: u16) -> Vec<Instr>
 }
 
 // ================================================================================================
-// Pass 2: Greedy Register Allocation (per block)
+// Field access fusion (local copy for V2 pipeline independence)
 // ================================================================================================
 
-fn allocate_registers(
-    instrs: &[Instr],
-    num_pinned: u16,
-    local_types: &[Type],
-    vid_types: &[Type],
-) -> (Vec<Instr>, u16, u16, Vec<Type>) {
-    let blocks = split_into_blocks(instrs);
-    let mut result = Vec::with_capacity(instrs.len());
-    let mut global_next_reg = num_pinned;
-    let mut global_num_arg_regs: u16 = 0;
-    // The free pool carries across block boundaries, keyed by type.
-    let mut free_pool: BTreeMap<Type, Vec<Reg>> = BTreeMap::new();
-    // Map physical register -> type.
-    let mut phys_reg_types: BTreeMap<Reg, Type> = BTreeMap::new();
-    // Local types are known ahead of time.
-    for (i, ty) in local_types.iter().enumerate() {
-        phys_reg_types.insert(Reg::Home(i as u16), ty.clone());
-    }
-
-    for (start, end) in blocks {
-        let block_instrs = &instrs[start..end];
-        let (allocated, block_max, block_arg_regs, returned_pool) =
-            allocate_block(
-                block_instrs,
-                num_pinned,
-                global_next_reg,
-                free_pool,
-                vid_types,
-                &mut phys_reg_types,
-            );
-        free_pool = returned_pool;
-        if block_max > global_next_reg {
-            global_next_reg = block_max;
-        }
-        if block_arg_regs > global_num_arg_regs {
-            global_num_arg_regs = block_arg_regs;
-        }
-        result.extend(allocated);
-    }
-
-    // Build reg_types from physical register -> type mapping (Home registers only).
-    let mut reg_types = Vec::with_capacity(global_next_reg as usize);
-    for i in 0..global_next_reg {
-        reg_types.push(
-            phys_reg_types
-                .get(&Reg::Home(i))
-                .cloned()
-                .unwrap_or(Type::Bool),
-        );
-    }
-
-    (result, global_next_reg, global_num_arg_regs, reg_types)
-}
-
-fn vid_type(vid: Reg, num_pinned: u16, vid_types: &[Type]) -> Type {
-    match vid {
-        Reg::Home(i) if i >= num_pinned => vid_types
-            .get((i - num_pinned) as usize)
-            .cloned()
-            .unwrap_or(Type::Bool),
-        _ => Type::Bool,
-    }
-}
-
-fn allocate_block(
-    instrs: &[Instr],
-    num_pinned: u16,
-    start_reg: u16,
-    carry_pool: BTreeMap<Type, Vec<Reg>>,
-    vid_types: &[Type],
-    phys_reg_types: &mut BTreeMap<Reg, Type>,
-) -> (Vec<Instr>, u16, u16, BTreeMap<Type, Vec<Reg>>) {
-    if instrs.is_empty() {
-        return (Vec::new(), start_reg, 0, carry_pool);
-    }
-
-    let is_temp_vid = |r: &Reg| -> bool { r.is_temp(num_pinned) };
-
-    // Step 1: Forward scan to compute def_pos and last_use for temp vids
-    let mut last_use: BTreeMap<Reg, usize> = BTreeMap::new();
-    let mut def_pos: BTreeMap<Reg, usize> = BTreeMap::new();
-    for (i, instr) in instrs.iter().enumerate() {
-        let (defs, uses) = get_defs_uses(instr);
-        for r in &uses {
-            if is_temp_vid(r) {
-                last_use.insert(*r, i);
-            }
-        }
-        for r in &defs {
-            if is_temp_vid(r) {
-                last_use.entry(*r).or_insert(i);
-                def_pos.entry(*r).or_insert(i);
-            }
-        }
-    }
-
-    // Collect call positions (Call/CallGeneric only, not CallClosure)
-    let call_positions: Vec<usize> = instrs
-        .iter()
-        .enumerate()
-        .filter(|(_, ins)| matches!(ins, Instr::Call(..) | Instr::CallGeneric(..)))
-        .map(|(i, _)| i)
-        .collect();
-
-    // Step 2: Forward scan with type-keyed free-register pool
-    let mut vid_to_phys: BTreeMap<Reg, Reg> = BTreeMap::new();
-    // Pinned registers map to themselves
-    for r in 0..num_pinned {
-        vid_to_phys.insert(Reg::Home(r), Reg::Home(r));
-    }
-    let mut free_pool = carry_pool;
-    let mut next_reg = start_reg;
-
-    // Pre-scan for StLoc look-ahead: map VID → local when VID is produced
-    // and later stored to that local, and the local is not accessed in between.
-    let mut stloc_target: BTreeMap<Reg, Reg> = BTreeMap::new();
-    for (i, instr) in instrs.iter().enumerate() {
-        if let Instr::Move(dst, src) = instr
-            && matches!(dst, Reg::Home(d) if *d < num_pinned)
-            && is_temp_vid(src)
-            && !stloc_target.contains_key(src)
-        {
-            let dp = def_pos.get(src).copied().unwrap_or(0);
-            // The local must not be read or written between the VID's
-            // definition and this StLoc (exclusive on both ends).
-            let local_touched = instrs[dp + 1..i].iter().any(|ins| {
-                let (d, u) = get_defs_uses(ins);
-                d.contains(dst) || u.contains(dst)
-            });
-            if !local_touched {
-                stloc_target.insert(*src, *dst);
-            }
-        }
-    }
-
-    // CopyLoc/MoveLoc coalescing
-    let mut coalesce_to_local: BTreeMap<Reg, Reg> = BTreeMap::new();
-    for (i, instr) in instrs.iter().enumerate() {
-        match instr {
-            Instr::Copy(dst, src) | Instr::Move(dst, src)
-                if is_temp_vid(dst) && matches!(src, Reg::Home(s) if *s < num_pinned) =>
+/// Fuse consecutive borrow+deref patterns into combined field access instructions.
+fn fuse_field_access_instrs(instrs: &mut Vec<Instr>) {
+    let mut i = 0;
+    while i + 1 < instrs.len() {
+        let fused = match (&instrs[i], &instrs[i + 1]) {
+            (Instr::ImmBorrowField(ref_r, fld, src), Instr::ReadRef(dst, read_src))
+                if *ref_r == *read_src =>
             {
-                let vid = *dst;
-                if let Some(&lu) = last_use.get(&vid)
-                    && lu > i
-                    && !stloc_target.contains_key(&vid)
-                {
-                    let local = *src;
-                    let local_redefined = instrs[i + 1..lu].iter().any(|ins| {
-                        let (d, _) = get_defs_uses(ins);
-                        d.contains(&local)
-                    });
-                    if !local_redefined {
-                        coalesce_to_local.insert(vid, local);
-                    }
-                }
+                Some(Instr::ReadField(*dst, *fld, *src))
             },
-            _ => {},
-        }
-    }
-
-    // Arg register precoloring
-    let mut arg_precolor: BTreeMap<Reg, Reg> = BTreeMap::new();
-    let mut block_arg_regs: u16 = 0;
-
-    // Helper: check if any Call/CallGeneric exists strictly between pos_a and pos_b
-    let has_call_between = |pos_a: usize, pos_b: usize| -> bool {
-        call_positions.iter().any(|&cp| cp > pos_a && cp < pos_b)
-    };
-
-    for (ci_idx, &ci) in call_positions.iter().enumerate() {
-        let (rets, args) = match &instrs[ci] {
-            Instr::Call(rets, _, args) | Instr::CallGeneric(rets, _, args) => {
-                (rets.clone(), args.clone())
+            (Instr::ImmBorrowFieldGeneric(ref_r, fld, src), Instr::ReadRef(dst, read_src))
+                if *ref_r == *read_src =>
+            {
+                Some(Instr::ReadFieldGeneric(*dst, *fld, *src))
             },
-            _ => continue,
+            (Instr::MutBorrowField(ref_r, fld, dst_ref), Instr::WriteRef(write_ref, val))
+                if *ref_r == *write_ref =>
+            {
+                Some(Instr::WriteField(*fld, *dst_ref, *val))
+            },
+            (Instr::MutBorrowFieldGeneric(ref_r, fld, dst_ref), Instr::WriteRef(write_ref, val))
+                if *ref_r == *write_ref =>
+            {
+                Some(Instr::WriteFieldGeneric(*fld, *dst_ref, *val))
+            },
+            (
+                Instr::ImmBorrowVariantField(ref_r, fld, src),
+                Instr::ReadRef(dst, read_src),
+            ) if *ref_r == *read_src => {
+                Some(Instr::ReadVariantField(*dst, *fld, *src))
+            },
+            (
+                Instr::ImmBorrowVariantFieldGeneric(ref_r, fld, src),
+                Instr::ReadRef(dst, read_src),
+            ) if *ref_r == *read_src => {
+                Some(Instr::ReadVariantFieldGeneric(*dst, *fld, *src))
+            },
+            (
+                Instr::MutBorrowVariantField(ref_r, fld, dst_ref),
+                Instr::WriteRef(write_ref, val),
+            ) if *ref_r == *write_ref => {
+                Some(Instr::WriteVariantField(*fld, *dst_ref, *val))
+            },
+            (
+                Instr::MutBorrowVariantFieldGeneric(ref_r, fld, dst_ref),
+                Instr::WriteRef(write_ref, val),
+            ) if *ref_r == *write_ref => {
+                Some(Instr::WriteVariantFieldGeneric(*fld, *dst_ref, *val))
+            },
+            _ => None,
         };
 
-        let next_call = call_positions
-            .get(ci_idx + 1)
-            .copied()
-            .unwrap_or(instrs.len());
-
-        let call_width = std::cmp::max(args.len(), rets.len()) as u16;
-        if call_width > block_arg_regs {
-            block_arg_regs = call_width;
-        }
-
-        // Arg precoloring: promote args[j] to Arg(j) if eligible
-        for (j, vid) in args.iter().enumerate() {
-            if !is_temp_vid(vid) {
-                continue;
-            }
-            if stloc_target.contains_key(vid) {
-                continue;
-            }
-            if arg_precolor.contains_key(vid) {
-                continue;
-            }
-            let dp = match def_pos.get(vid) {
-                Some(&p) => p,
-                None => continue,
-            };
-            if has_call_between(dp, ci) {
-                continue;
-            }
-            if last_use.get(vid) != Some(&ci) {
-                continue;
-            }
-            arg_precolor.insert(*vid, Reg::Arg(j as u16));
-        }
-
-        // Ret precoloring: promote rets[k] to Arg(k) if eligible
-        for (k, vid) in rets.iter().enumerate() {
-            if !is_temp_vid(vid) {
-                continue;
-            }
-            if stloc_target.contains_key(vid) {
-                continue;
-            }
-            if arg_precolor.contains_key(vid) {
-                continue;
-            }
-            if let Some(&lu) = last_use.get(vid)
-                && lu >= next_call
-            {
-                continue;
-            }
-            arg_precolor.insert(*vid, Reg::Arg(k as u16));
+        if let Some(fused_instr) = fused {
+            instrs[i] = fused_instr;
+            instrs.remove(i + 1);
+        } else {
+            i += 1;
         }
     }
-
-    let mut output = Vec::with_capacity(instrs.len());
-
-    for (i, instr) in instrs.iter().enumerate() {
-        let mut mapped_instr = instr.clone();
-        let (defs, _) = get_defs_uses(instr);
-
-        // Allocate physical registers for destination vids
-        for d in &defs {
-            if is_temp_vid(d) && !vid_to_phys.contains_key(d) {
-                if let Some(&arg_r) = arg_precolor.get(d) {
-                    // Precolored to an Arg register
-                    vid_to_phys.insert(*d, arg_r);
-                } else if let Some(&local_r) = stloc_target.get(d) {
-                    vid_to_phys.insert(*d, local_r);
-                } else if let Some(&local_r) = coalesce_to_local.get(d) {
-                    vid_to_phys.insert(*d, local_r);
-                } else {
-                    let ty = vid_type(*d, num_pinned, vid_types);
-                    // Try to find a free register of the same type.
-                    let phys = if let Some(regs) = free_pool.get_mut(&ty) {
-                        regs.pop()
-                    } else {
-                        None
-                    };
-                    let phys = phys.unwrap_or_else(|| {
-                        let r = Reg::Home(next_reg);
-                        next_reg += 1;
-                        phys_reg_types.insert(r, ty);
-                        r
-                    });
-                    vid_to_phys.insert(*d, phys);
-                }
-            }
-        }
-
-        apply_mapping(&mut mapped_instr, &vid_to_phys);
-        output.push(mapped_instr);
-
-        // Free registers for vids that reach their last use at this instruction.
-        // Arg registers never enter the free pool.
-        let (_, uses) = get_defs_uses(instr);
-        for r in uses {
-            if is_temp_vid(&r)
-                && last_use.get(&r) == Some(&i)
-                && let Some(&phys) = vid_to_phys.get(&r)
-                && phys.is_temp(num_pinned)
-            {
-                let ty = phys_reg_types
-                    .get(&phys)
-                    .cloned()
-                    .unwrap_or(Type::Bool);
-                free_pool.entry(ty).or_default().push(phys);
-            }
-        }
-        for d in &defs {
-            if is_temp_vid(d)
-                && last_use.get(d) == Some(&i)
-            {
-                let (_, ref uses_list) = get_defs_uses(instr);
-                if !uses_list.contains(d)
-                    && let Some(&phys) = vid_to_phys.get(d)
-                    && phys.is_temp(num_pinned)
-                {
-                    let ty = phys_reg_types
-                        .get(&phys)
-                        .cloned()
-                        .unwrap_or(Type::Bool);
-                    free_pool.entry(ty).or_default().push(phys);
-                }
-            }
-        }
-    }
-
-    (output, next_reg, block_arg_regs, free_pool)
-}
-
-/// Apply vid-to-physical-register mapping to an instruction.
-fn apply_mapping(instr: &mut Instr, map: &BTreeMap<Reg, Reg>) {
-    crate::optimize_v1::rename_instr(instr, map);
 }
 
 // ================================================================================================
