@@ -1,5 +1,5 @@
 test_name: two_traffics_realistic_env
-initial_validator_count: 7
+initial_validator_count: 4
 initial_fullnode_count: 2
 num_pfns: 1
 genesis_helm_config:
