@@ -11,34 +11,6 @@ use aptos_types::transaction::Version;
 
 const VERSION_SIZE: usize = std::mem::size_of::<Version>();
 
-pub(super) fn ledger_db_column_families() -> Vec<ColumnFamilyName> {
-    vec![
-        /* empty cf */ DEFAULT_COLUMN_FAMILY_NAME,
-        BLOCK_BY_VERSION_CF_NAME,
-        BLOCK_INFO_CF_NAME,
-        EPOCH_BY_VERSION_CF_NAME,
-        EVENT_ACCUMULATOR_CF_NAME,
-        EVENT_BY_KEY_CF_NAME,
-        EVENT_BY_VERSION_CF_NAME,
-        EVENT_CF_NAME,
-        LEDGER_INFO_CF_NAME,
-        PERSISTED_AUXILIARY_INFO_CF_NAME,
-        STALE_STATE_VALUE_INDEX_CF_NAME,
-        STATE_VALUE_CF_NAME,
-        TRANSACTION_CF_NAME,
-        TRANSACTION_ACCUMULATOR_CF_NAME,
-        TRANSACTION_ACCUMULATOR_HASH_CF_NAME,
-        TRANSACTION_AUXILIARY_DATA_CF_NAME,
-        ORDERED_TRANSACTION_BY_ACCOUNT_CF_NAME,
-        TRANSACTION_SUMMARIES_BY_ACCOUNT_CF_NAME,
-        TRANSACTION_BY_HASH_CF_NAME,
-        TRANSACTION_INFO_CF_NAME,
-        VERSION_DATA_CF_NAME,
-        WRITE_SET_CF_NAME,
-        DB_METADATA_CF_NAME,
-    ]
-}
-
 pub(super) fn event_db_column_families() -> Vec<ColumnFamilyName> {
     vec![
         /* empty cf */ DEFAULT_COLUMN_FAMILY_NAME,
@@ -222,9 +194,7 @@ fn with_no_compaction_stalling(cf_opts: &mut Options) {
 }
 
 fn with_state_key_extractor_processor(cf_name: ColumnFamilyName, cf_opts: &mut Options) {
-    if cf_name == STATE_VALUE_CF_NAME
-        || cf_name == STATE_VALUE_BY_KEY_HASH_CF_NAME
-        || cf_name == HOT_STATE_VALUE_BY_KEY_HASH_CF_NAME
+    if cf_name == STATE_VALUE_BY_KEY_HASH_CF_NAME || cf_name == HOT_STATE_VALUE_BY_KEY_HASH_CF_NAME
     {
         let prefix_extractor =
             SliceTransform::create("state_key_extractor", state_key_extractor, None);
@@ -327,19 +297,6 @@ pub(super) fn gen_ledger_metadata_cfds(
 ) -> Vec<ColumnFamilyDescriptor> {
     let cfs = ledger_metadata_db_column_families();
     gen_cfds(rocksdb_config, block_cache, cfs, |_, _| {})
-}
-
-pub(super) fn gen_ledger_cfds(
-    rocksdb_config: &RocksdbConfig,
-    block_cache: Option<&Cache>,
-) -> Vec<ColumnFamilyDescriptor> {
-    let cfs = ledger_db_column_families();
-    gen_cfds(
-        rocksdb_config,
-        block_cache,
-        cfs,
-        with_state_key_extractor_processor,
-    )
 }
 
 pub(super) fn gen_state_merkle_cfds(
