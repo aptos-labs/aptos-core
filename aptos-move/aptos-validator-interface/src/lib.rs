@@ -164,6 +164,7 @@ impl DebuggerStateView {
         result.map(|s| match s {
             None => StateSlot::ColdVacant,
             Some(value) => StateSlot::ColdOccupied {
+                state_key: state_key.clone(),
                 value_version: version,
                 value,
             },

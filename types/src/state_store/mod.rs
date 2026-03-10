@@ -145,11 +145,17 @@ impl<K: Eq + Hash> MockStateView<K> {
         }
     }
 
-    pub fn new(data: std::collections::HashMap<K, StateValue>) -> Self {
+    pub fn new(data: std::collections::HashMap<K, StateValue>) -> Self
+    where
+        K: Clone + Into<StateKey>,
+    {
         Self {
             data: data
                 .into_iter()
-                .map(|(k, v)| (k, StateSlot::from_db_get(Some((0, v)))))
+                .map(|(k, v)| {
+                    let slot = StateSlot::from_db_get(k.clone().into(), Some((0, v)));
+                    (k, slot)
+                })
                 .collect(),
         }
     }
