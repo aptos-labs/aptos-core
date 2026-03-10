@@ -21,7 +21,6 @@ pub mod chaos;
 pub mod chaos_schema;
 mod cluster_helper;
 pub mod constants;
-mod fullnode;
 pub mod kube_api;
 pub mod node;
 pub mod prometheus;
@@ -35,7 +34,6 @@ use super::{
 use aptos_sdk::crypto::ed25519::ED25519_PRIVATE_KEY_LENGTH;
 pub use cluster_helper::*;
 pub use constants::*;
-pub use fullnode::*;
 #[cfg(test)]
 pub use kube_api::mocks::*;
 pub use kube_api::*;
