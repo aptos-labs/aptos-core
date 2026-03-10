@@ -1,5 +1,5 @@
 // Copyright (c) Aptos Foundation
-// SPDX-License-Identifier: Apache-2.0
+// Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 //! CLI tool that reads a compiled Move bytecode file (.mv) and produces
 //! a stackless execution IR (.mseir) using either the v1 or v2 pipeline.
@@ -106,14 +106,17 @@ fn print_stats(module_ir: &stackless_exec_ir::ir::ModuleIR) {
             .filter(|i| !matches!(i, Instr::Label(_)))
             .count();
 
+        let num_temps = func_ir
+            .num_regs
+            .saturating_sub(func_ir.num_params + func_ir.num_locals);
+        let total_regs = func_ir.num_regs + func_ir.num_arg_regs;
+
         eprintln!(
             "{mod_prefix}::{func_name}  \
              bytecode: {bc_instrs} instrs, {bc_locals} locals  |  \
-             IR: {ir_instrs} instrs, {} regs (= {} params + {} locals + {} temps)",
-            func_ir.num_regs,
-            func_ir.num_params,
-            func_ir.num_locals,
-            func_ir.num_regs.saturating_sub(func_ir.num_params + func_ir.num_locals),
+             IR: {ir_instrs} instrs, {total_regs} regs \
+             (= {} params + {} locals + {num_temps} temps + {} arg_regs)",
+            func_ir.num_params, func_ir.num_locals, func_ir.num_arg_regs,
         );
     }
 }

@@ -85,6 +85,14 @@ def main() -> int:
     print(f"bytecode locals:      {total_bc_locals}")
     print(f"IR instrs:            {total_ir_instrs}")
     print(f"IR regs:              {total_ir_regs}")
+
+    if total_bc_instrs > 0:
+        instr_pct = (total_bc_instrs - total_ir_instrs) / total_bc_instrs * 100
+        print(f"instr decrease:       {instr_pct:.1f}%")
+    if total_bc_locals > 0:
+        reg_pct = (total_ir_regs - total_bc_locals) / total_bc_locals * 100
+        print(f"reg increase:         {reg_pct:.1f}%")
+
     if errors:
         print(f"errors:               {errors}")
 
