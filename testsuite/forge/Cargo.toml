@@ -32,7 +32,6 @@ aptos-rest-client = { workspace = true }
 aptos-retrier = { workspace = true }
 aptos-runtimes = { workspace = true }
 aptos-sdk = { workspace = true }
-aptos-short-hex-str = { workspace = true }
 aptos-state-sync-driver = { workspace = true }
 aptos-transaction-emitter-lib = { workspace = true }
 aptos-transaction-generator-lib = { workspace = true }
