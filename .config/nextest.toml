@@ -31,3 +31,11 @@ fail-fast = true
 test-threads = 6
 retries = 3
 slow-timeout = { period = "1800s", terminate-after = 1 }
+
+# Run the slowest smoke tests first so they start filling slots immediately
+# instead of waiting behind alphabetically-earlier fast tests.
+# This avoids the "long tail" problem (e.g. test_db_restart starting 29 min
+# late and being the sole test running for the last 4 min).
+[[profile.smoke-test.overrides]]
+filter = 'test(jwk_consensus_basic) | test(jwk_consensus_per_issuer) | test(jwk_consensus_per_key) | test(jwk_consensus_provider_change_mind) | test(test_validator_genesis_transaction) | test(test_db_restart)'
+priority = 10
