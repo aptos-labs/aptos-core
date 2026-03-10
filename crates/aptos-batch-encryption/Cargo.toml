@@ -1,71 +1,83 @@
 [package]
 name = "aptos-batch-encryption"
 version = "0.1.0"
-edition = "2021"
+
+# Workspace inherited keys
+authors = { workspace = true }
+edition = { workspace = true }
+homepage = { workspace = true }
+license = { workspace = true }
+publish = { workspace = true }
+repository = { workspace = true }
+rust-version = { workspace = true }
 
 [lib]
 name = "aptos_batch_encryption"
 doctest = false
 
 [dependencies]
-ark-bls12-381 = { git = "https://github.com/aptos-labs/algebra", branch = "fix-fft-parallelism-cutoff", features = ["curve"] }
-ark-bn254 = { git = "https://github.com/aptos-labs/algebra", branch = "fix-fft-parallelism-cutoff", features = ["curve"] }
-ark-ec = { git = "https://github.com/aptos-labs/algebra", branch = "fix-fft-parallelism-cutoff", features = ["parallel", "rayon"] }
-ark-ff = { git = "https://github.com/aptos-labs/algebra", branch = "fix-fft-parallelism-cutoff", features = ["asm"] }
-ark-ff-macros = { git = "https://github.com/aptos-labs/algebra", branch = "fix-fft-parallelism-cutoff" }
-ark-ff-asm = { git = "https://github.com/aptos-labs/algebra", branch = "fix-fft-parallelism-cutoff" }
-ark-poly = { git = "https://github.com/aptos-labs/algebra", branch = "fix-fft-parallelism-cutoff", features = ["parallel"] }
-ark-serialize = { git = "https://github.com/aptos-labs/algebra", branch = "fix-fft-parallelism-cutoff" }
+aes-gcm = { workspace = true }
+anyhow = { workspace = true }
+aptos-crypto = { workspace = true }
+aptos-dkg = { workspace = true }
+ark-bls12-381 = { version = "0.5.0", features = ["curve"] }
+ark-bn254 = { version = "0.5.0", features = ["curve"] }
+ark-ec = { version = "0.5.0", features = ["parallel", "rayon"] }
+ark-ff = { version = "0.5.0", features = ["asm"] }
+ark-ff-asm = { version = "0.5.0" }
+ark-ff-macros = "0.5.0"
+ark-groth16 = "0.5.0"
+ark-poly = { version = "0.5.0", features = ["parallel"] }
+ark-relations = "0.5.0"
+ark-serialize = { version = "0.5.0", features = ["derive"] }
+ark-snark = { version = "0.5.0" }
 ark-std = { version = "0.5.0", features = ["getrandom"] }
-
-csv = "1.3.0"
-ed25519-dalek = { version = "2.1.1", features = ["asm", "rand_core", "serde"] }
-ff = "0.13.0"
-num-traits = "0.2.19"
-rand_core = "0.6.4"
-serde = { version = "1.0.210", features = ["derive", "serde_derive"] }
-sha2 = { version = "0.10.8", features = ["asm", "asm-aarch64", "sha2-asm"] }
-rayon = "1.10.0"
-itertools = "0.14.0"
-anyhow = "1.0.98"
-hmac = "0.12.1"
-aes-gcm = "0.10.3"
-bcs = "0.1.6"
-thiserror = "2.0.12"
+bcs = { workspace = true }
+# TODO: Fix compiler errors so we can use `workspace = true` here
+ed25519-dalek = { version = "2.1.1", features = ["serde"] }
 generic-array = { version = "0.14.7", features = ["serde"] }
-lazy_static = "1.5.0"
-rand.workspace = true
-serde_json.workspace = true
+hmac = { workspace = true }
+num-traits = { workspace = true }
+rand = { workspace = true }
+rayon = { workspace = true }
+serde = { workspace = true }
+serde_bytes = { workspace = true }
+serde_json = { workspace = true }
+# TODO: Fix compiler errors so we can use `workspace = true` here
+sha2 = { version = "0.10.6" }
+thiserror = { workspace = true }
 
 [dev-dependencies]
-criterion = "0.5"
-itertools = "0.14.0"
+criterion = { workspace = true }
+itertools = { workspace = true }
 
+[package.metadata.cargo-machete]
+ignored = ["ark-bn254", "ark-ff-asm", "ark-ff-macros", "serde_bytes"]
 
-#[[bench]]
-#name = "fk_algorithm"
-#harness = false
-#
+[[bench]]
+name = "fk_algorithm"
+harness = false
+
 [[bench]]
 name = "multi_point_eval"
 harness = false
-
-[[bench]]
-name = "digest"
-harness = false
-
 
 [[bench]]
 name = "fptx"
 harness = false
 
 [[bench]]
-name = "lagrange"
+name = "fptx_succinct"
 harness = false
 
 [[bench]]
 name = "msm"
 harness = false
 
-
-
+[patch.crates-io]
+ark-ec = { git = "https://github.com/aptos-labs/algebra", branch = "fix-fft-parallelism-cutoff" }
+ark-ff = { git = "https://github.com/aptos-labs/algebra", branch = "fix-fft-parallelism-cutoff" }
+ark-ff-macros = { git = "https://github.com/aptos-labs/algebra", branch = "fix-fft-parallelism-cutoff" }
+ark-ff-asm = { git = "https://github.com/aptos-labs/algebra", branch = "fix-fft-parallelism-cutoff" }
+ark-poly = { git = "https://github.com/aptos-labs/algebra", branch = "fix-fft-parallelism-cutoff" }
+ark-serialize = { git = "https://github.com/aptos-labs/algebra", branch = "fix-fft-parallelism-cutoff" }

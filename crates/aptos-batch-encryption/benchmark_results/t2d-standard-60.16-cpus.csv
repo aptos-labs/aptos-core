@@ -1,5 +1,0 @@
-batch_size,digest_computation,decryption_key_derivation,encryption,decryption
-8,653.668µs,1.167497ms,5.188865ms,4.039188ms
-32,929.797µs,1.286416ms,5.363645ms,7.755428ms
-128,1.226046ms,1.301807ms,5.506475ms,22.666516ms
-512,1.501736ms,1.197586ms,5.137215ms,91.297543ms

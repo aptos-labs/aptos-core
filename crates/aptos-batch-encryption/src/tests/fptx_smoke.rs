@@ -1,100 +1,97 @@
 // Copyright (c) Aptos Foundation
-// SPDX-License-Identifier: Apache-2.0
-
-use ark_std::rand::{seq::{IteratorRandom, SliceRandom}, thread_rng, Rng as _};
-use rayon::{ThreadPool, ThreadPoolBuilder};
-
-use crate::{schemes::fptx::FPTX, shared::{algebra::shamir::ThresholdConfig, key_derivation::{BIBEDecryptionKey, BIBEDecryptionKeyShare}}, traits::BatchThresholdEncryption};
+// Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
+use crate::{
+    schemes::fptx::FPTX, shared::key_derivation::BIBEDecryptionKeyShare,
+    traits::BatchThresholdEncryption,
+};
 use anyhow::Result;
+use aptos_crypto::arkworks::shamir::ShamirThresholdConfig;
+use ark_std::rand::{seq::SliceRandom, thread_rng, CryptoRng, Rng as _, RngCore};
 
+fn smoke_with_setup<R: RngCore + CryptoRng>(
+    rng: &mut R,
+    tc: <FPTX as BatchThresholdEncryption>::ThresholdConfig,
+    ek: <FPTX as BatchThresholdEncryption>::EncryptionKey,
+    dk: <FPTX as BatchThresholdEncryption>::DigestKey,
+    vks: Vec<<FPTX as BatchThresholdEncryption>::VerificationKey>,
+    msk_shares: Vec<<FPTX as BatchThresholdEncryption>::MasterSecretKeyShare>,
+) {
+    let plaintext: String = String::from("hi");
+    let associated_data: String = String::from("hi");
 
+    let ct = FPTX::encrypt(&ek, rng, &plaintext, &associated_data).unwrap();
+    FPTX::verify_ct(&ct, &associated_data).unwrap();
 
-#[test]
-fn smoke() {
-    let mut rng = thread_rng();
-    let tc_happy = ThresholdConfig::new(8, 5);
-    let tc_slow = ThresholdConfig::new(8, 3);
-    let tp = ThreadPoolBuilder::new().build().unwrap();
+    let (d, pfs_promise) = FPTX::digest(&dk, std::slice::from_ref(&ct), 0).unwrap();
+    let pfs = FPTX::eval_proofs_compute_all(&pfs_promise, &dk);
 
-        let (ek, dk, vks_happy, msk_shares_happy, vks_slow, msk_shares_slow) = FPTX::setup_for_testing(rng.gen(), 8, 1, &tc_happy, &tc_slow).unwrap();
-
-    let plaintext : String = String::from("hi");
-
-    let ct = FPTX::encrypt(&ek, &mut rng, &plaintext).unwrap();
-    FPTX::verify_ct(&ct).unwrap();
-
-    let (d, pfs_promise) = FPTX::digest(&dk, &vec![ct.clone()], 0, &tp).unwrap();
-    let pfs = FPTX::eval_proofs_compute_all(&pfs_promise, &dk, &tp);
-
-    let [dk_happy, dk_slow] = [(tc_happy, vks_happy, msk_shares_happy), (tc_slow, vks_slow, msk_shares_slow)]
+    let dk_shares: Vec<<FPTX as BatchThresholdEncryption>::DecryptionKeyShare> = msk_shares
         .into_iter()
-        .map(|(tc, vks, msk_shares)| {
-            let dk_shares : Vec<<FPTX as BatchThresholdEncryption>::DecryptionKeyShare> = msk_shares.into_iter()
-                .map(|msk_share| msk_share.derive_decryption_key_share(&d).unwrap())
-                .collect();
+        .map(|msk_share| msk_share.derive_decryption_key_share(&d).unwrap())
+        .collect();
 
-            dk_shares.iter()
-                .zip(vks)
-                .map(|(dk_share, vk)| FPTX::verify_decryption_key_share(&vk, &d, &dk_share))
-                .collect::<Result<Vec<()>>>().unwrap();
-
-            FPTX::reconstruct_decryption_key(
-                &dk_shares
-                    .choose_multiple(&mut rng, tc.t)
-                    .cloned()
-                    .collect::<Vec<BIBEDecryptionKeyShare>>(),
-                &tc, &tp).unwrap()
-        })
-        .collect::<Vec<BIBEDecryptionKey>>()
-        .try_into()
+    dk_shares
+        .iter()
+        .zip(&vks)
+        .map(|(dk_share, vk)| FPTX::verify_decryption_key_share(vk, &d, dk_share))
+        .collect::<Result<Vec<()>>>()
         .unwrap();
 
+    let dk = FPTX::reconstruct_decryption_key(
+        &dk_shares
+            .choose_multiple(rng, tc.t)
+            .cloned()
+            .collect::<Vec<BIBEDecryptionKeyShare>>(),
+        &tc,
+    )
+    .unwrap();
 
-    let decrypted_plaintexts : Vec<String> =
-        FPTX::decrypt(&dk_happy, &vec![ct.clone()], &pfs, &tp).unwrap();
+    ek.verify_decryption_key(&d, &dk).unwrap();
 
-    assert_eq!(decrypted_plaintexts[0], plaintext);
+    let decrypted_plaintext: String = FPTX::decrypt(&dk, &ct.prepare(&d, &pfs).unwrap()).unwrap();
 
-    let decrypted_plaintexts : Vec<String> =
-        FPTX::decrypt(&dk_slow, &vec![ct.clone()], &pfs, &tp).unwrap();
+    assert_eq!(decrypted_plaintext, plaintext);
 
-    assert_eq!(decrypted_plaintexts[0], plaintext);
+    // Test decryption verification
+    let eval_proof = FPTX::eval_proof_for_ct(&pfs, &ct).unwrap();
+    let individual_decrypted_plaintext: String =
+        FPTX::decrypt_slow(&dk, &ct, &d, &eval_proof).unwrap();
+    assert_eq!(individual_decrypted_plaintext, plaintext);
+}
+
+#[test]
+fn smoke_with_setup_for_testing() {
+    let mut rng = thread_rng();
+    let tc = ShamirThresholdConfig::new(3, 8);
+
+    let (ek, dk, vks, msk_shares) = FPTX::setup_for_testing(rng.r#gen(), 8, 1, &tc).unwrap();
+
+    smoke_with_setup(&mut rng, tc, ek, dk, vks, msk_shares);
 }
 
 #[test]
 fn fptx_serialize_deserialize_setup() {
     let mut rng = thread_rng();
-    let tc_happy = ThresholdConfig::new(8, 5);
-    let tc_slow = ThresholdConfig::new(8, 3);
-    let tp = ThreadPoolBuilder::new().build().unwrap();
+    let tc = ShamirThresholdConfig::new(3, 8);
 
-        let setup = FPTX::setup_for_testing(rng.gen(), 8, 2, &tc_happy, &tc_slow).unwrap();
+    let setup = FPTX::setup_for_testing(rng.r#gen(), 8, 2, &tc).unwrap();
 
     let bytes = bcs::to_bytes(&setup).unwrap();
-    let setup2 :
-    (
+    let setup2: (
         <FPTX as BatchThresholdEncryption>::EncryptionKey,
         <FPTX as BatchThresholdEncryption>::DigestKey,
         Vec<<FPTX as BatchThresholdEncryption>::VerificationKey>,
         Vec<<FPTX as BatchThresholdEncryption>::MasterSecretKeyShare>,
-        Vec<<FPTX as BatchThresholdEncryption>::VerificationKey>,
-        Vec<<FPTX as BatchThresholdEncryption>::MasterSecretKeyShare>
-    )
-    = bcs::from_bytes(&bytes).unwrap();
+    ) = bcs::from_bytes(&bytes).unwrap();
 
     assert_eq!(setup, setup2);
 
     let json = serde_json::to_string(&setup).unwrap();
-    let setup2 :
-    (
+    let setup2: (
         <FPTX as BatchThresholdEncryption>::EncryptionKey,
         <FPTX as BatchThresholdEncryption>::DigestKey,
         Vec<<FPTX as BatchThresholdEncryption>::VerificationKey>,
         Vec<<FPTX as BatchThresholdEncryption>::MasterSecretKeyShare>,
-        Vec<<FPTX as BatchThresholdEncryption>::VerificationKey>,
-        Vec<<FPTX as BatchThresholdEncryption>::MasterSecretKeyShare>
-    )
-    = serde_json::from_str(&json).unwrap();
+    ) = serde_json::from_str(&json).unwrap();
     assert_eq!(setup, setup2);
-
 }

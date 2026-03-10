@@ -3,10 +3,11 @@
 use crate::{
     errors::MissingEvalProofError,
     group::*,
+    schemes::fptx::FPTX,
     shared::{
-        ciphertext::{CTDecrypt, CTEncrypt, PreparedCiphertext, StandardCiphertext},
+        ciphertext::{CTDecrypt, CTEncrypt, PreparedCiphertext, SuccinctCiphertext},
         digest::{Digest, DigestKey, EvalProof, EvalProofs, EvalProofsPromise},
-        encryption_key::EncryptionKey,
+        encryption_key::AugmentedEncryptionKey,
         ids::{Id, IdSet, UncomputedCoeffs},
         key_derivation::{
             self, BIBEDecryptionKey, BIBEDecryptionKeyShare, BIBEMasterSecretKeyShare,
@@ -23,15 +24,17 @@ use aptos_dkg::pvss::{
 use ark_ff::UniformRand as _;
 use ark_std::rand::{rngs::StdRng, CryptoRng, RngCore, SeedableRng};
 
-pub struct FPTX {}
+pub struct FPTXSuccinct {}
 
-impl BatchThresholdEncryption for FPTX {
-    type Ciphertext = StandardCiphertext;
+/// The "succinct" version of FPTX which was described in the paper. Right now, this scheme is
+/// unused because it would require a modification to the PVSS.
+impl BatchThresholdEncryption for FPTXSuccinct {
+    type Ciphertext = SuccinctCiphertext;
     type DecryptionKey = BIBEDecryptionKey;
     type DecryptionKeyShare = BIBEDecryptionKeyShare;
     type Digest = Digest;
     type DigestKey = DigestKey;
-    type EncryptionKey = EncryptionKey;
+    type EncryptionKey = AugmentedEncryptionKey;
     type EvalProof = EvalProof;
     type EvalProofs = EvalProofs;
     type EvalProofsPromise = EvalProofsPromise;
@@ -39,8 +42,6 @@ impl BatchThresholdEncryption for FPTX {
     type MasterSecretKeyShare = BIBEMasterSecretKeyShare;
     type PreparedCiphertext = PreparedCiphertext;
     type Round = u64;
-    // This is essentially a placeholder, since there is no PVSS scheme right now that works
-    // with the unweighted `SmairThresholdConfig`
     type SubTranscript = aptos_dkg::pvss::chunky::WeightedSubtranscript<Pairing>;
     type ThresholdConfig = aptos_crypto::arkworks::shamir::ShamirThresholdConfig<Fr>;
     type VerificationKey = BIBEVerificationKey;
@@ -49,7 +50,7 @@ impl BatchThresholdEncryption for FPTX {
         _digest_key: &Self::DigestKey,
         _pvss_public_params: &<Self::SubTranscript as TranscriptCore>::PublicParameters,
         _subtranscript: &Self::SubTranscript,
-        _threshold_config: &Self::ThresholdConfig,
+        _tc: &Self::ThresholdConfig,
         _current_player: Player,
         _msk_share_decryption_key: &<Self::SubTranscript as TranscriptCore>::DecryptPrivKey,
     ) -> Result<(
@@ -57,7 +58,7 @@ impl BatchThresholdEncryption for FPTX {
         Vec<Self::VerificationKey>,
         Self::MasterSecretKeyShare,
     )> {
-        // B/c unweighted chunky is being removed
+        // we don't yet have a PVSS scheme that supports the succinct version of FPTX
         unimplemented!()
     }
 
@@ -73,7 +74,7 @@ impl BatchThresholdEncryption for FPTX {
         seed: u64,
         max_batch_size: usize,
         number_of_rounds: usize,
-        threshold_config: &Self::ThresholdConfig,
+        tc: &Self::ThresholdConfig,
     ) -> Result<(
         Self::EncryptionKey,
         Self::DigestKey,
@@ -84,10 +85,13 @@ impl BatchThresholdEncryption for FPTX {
 
         let digest_key = DigestKey::new(&mut rng, max_batch_size, number_of_rounds)?;
         let msk = Fr::rand(&mut rng);
-        let (mpk, vks, msk_shares) =
-            key_derivation::gen_msk_shares(msk, &mut rng, threshold_config);
+        let (mpk, vks, msk_shares) = key_derivation::gen_msk_shares(msk, &mut rng, tc);
 
-        let ek = EncryptionKey::new(mpk, digest_key.tau_g2);
+        let ek = AugmentedEncryptionKey {
+            sig_mpk_g2: mpk,
+            tau_g2: digest_key.tau_g2,
+            tau_mpk_g2: (digest_key.tau_g2 * msk).into(),
+        };
 
         Ok((ek, digest_key, vks, msk_shares))
     }
@@ -127,14 +131,14 @@ impl BatchThresholdEncryption for FPTX {
         proofs: &Self::EvalProofsPromise,
         digest_key: &DigestKey,
     ) -> Self::EvalProofs {
-        proofs.compute_all(digest_key)
+        FPTX::eval_proofs_compute_all(proofs, digest_key)
     }
 
     fn eval_proofs_compute_all_vzgg_multi_point_eval(
         proofs: &Self::EvalProofsPromise,
         digest_key: &DigestKey,
     ) -> Self::EvalProofs {
-        proofs.compute_all_vgzz_multi_point_eval(digest_key)
+        FPTX::eval_proofs_compute_all_vzgg_multi_point_eval(proofs, digest_key)
     }
 
     fn eval_proof_for_ct(
@@ -148,7 +152,7 @@ impl BatchThresholdEncryption for FPTX {
         msk_share: &Self::MasterSecretKeyShare,
         digest: &Self::Digest,
     ) -> Result<Self::DecryptionKeyShare> {
-        msk_share.derive_decryption_key_share(digest)
+        FPTX::derive_decryption_key_share(msk_share, digest)
     }
 
     fn reconstruct_decryption_key(
@@ -170,7 +174,7 @@ impl BatchThresholdEncryption for FPTX {
         decryption_key: &Self::DecryptionKey,
         ct: &Self::PreparedCiphertext,
     ) -> anyhow::Result<P> {
-        decryption_key.decrypt(ct)
+        FPTX::decrypt(decryption_key, ct)
     }
 
     fn verify_decryption_key_share(

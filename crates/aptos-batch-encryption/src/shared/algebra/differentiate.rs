@@ -1,6 +1,7 @@
+// Copyright (c) Aptos Foundation
+// Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 use ark_ff::FftField;
 use ark_poly::{univariate::DensePolynomial, DenseUVPolynomial};
-
 
 pub trait DifferentiableFn {
     fn differentiate(&self) -> Self;
@@ -8,26 +9,24 @@ pub trait DifferentiableFn {
 
 impl<F: FftField> DifferentiableFn for DensePolynomial<F> {
     fn differentiate(&self) -> Self {
-        let result_coeffs : Vec<F> = 
-            self.coeffs()
-                .into_iter()
-                .skip(1)
-                .enumerate()
-                .map(|(i,x)| *x * F::from(i as u64 + 1))
-                .collect();
-                
+        let result_coeffs: Vec<F> = self
+            .coeffs()
+            .iter()
+            .skip(1)
+            .enumerate()
+            .map(|(i, x)| *x * F::from(i as u64 + 1))
+            .collect();
+
         Self::from_coefficients_vec(result_coeffs)
     }
 }
 
 #[cfg(test)]
 mod tests {
+    use super::DifferentiableFn;
+    use crate::group::Fr;
     use ark_poly::{univariate::DensePolynomial, DenseUVPolynomial};
     use ark_std::One;
-    use crate::group::Fr;
-
-    use super::DifferentiableFn;
-
 
     #[test]
     fn test_differentiate() {
@@ -43,4 +42,3 @@ mod tests {
         assert_eq!(d.coeffs, vec![Fr::from(2), Fr::from(6)]);
     }
 }
-

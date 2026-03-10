@@ -1,22 +1,18 @@
-use std::ops::{Deref, Mul};
-
+// Copyright (c) Aptos Foundation
+// Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 use ark_ff::FftField;
-use ark_poly::{
-    domain::DomainCoeff, univariate::DensePolynomial, DenseUVPolynomial, EvaluationDomain as _,
-    Polynomial as _, Radix2EvaluationDomain,
-};
-use ark_std::log2;
-use rayon::iter::{IndexedParallelIterator as _, IntoParallelIterator as _, ParallelIterator as _};
+use ark_poly::{univariate::DensePolynomial, DenseUVPolynomial};
+use rayon::iter::{IntoParallelIterator as _, ParallelIterator as _};
 
 pub fn compute_mult_tree<F: FftField>(roots: &[F]) -> Vec<Vec<DensePolynomial<F>>> {
     let mut bases: Vec<DensePolynomial<F>> = roots
-        .into_iter()
+        .iter()
         .cloned()
         .map(|u| DenseUVPolynomial::from_coefficients_vec(vec![-u, F::one()]))
         .collect();
 
     bases.resize(
-        bases.len().next_power_of_two(), 
+        bases.len().next_power_of_two(),
         DenseUVPolynomial::from_coefficients_vec(vec![F::one()]),
     );
 
@@ -26,7 +22,7 @@ pub fn compute_mult_tree<F: FftField>(roots: &[F]) -> Vec<Vec<DensePolynomial<F>
     assert_eq!(2usize.pow(depth), num_leaves);
 
     for i in 1..=(num_leaves.ilog2() as usize) {
-        let len_at_i = 2usize.pow(depth as u32 - i as u32);
+        let len_at_i = 2usize.pow(depth - i as u32);
         let result_at_i = (0..len_at_i)
             .into_par_iter()
             .map(|j| result[i - 1][2 * j].clone() * &result[i - 1][2 * j + 1])
@@ -38,7 +34,7 @@ pub fn compute_mult_tree<F: FftField>(roots: &[F]) -> Vec<Vec<DensePolynomial<F>
 }
 
 pub fn quotient<F: FftField>(
-    mult_tree: &Vec<Vec<DensePolynomial<F>>>,
+    #[allow(clippy::ptr_arg)] mult_tree: &Vec<Vec<DensePolynomial<F>>>,
     divisor_index: usize,
 ) -> DensePolynomial<F> {
     let mut mult_tree = mult_tree.clone();
@@ -58,24 +54,17 @@ pub fn quotient<F: FftField>(
 
 #[cfg(test)]
 mod tests {
-    use ark_poly::{univariate::DensePolynomial, DenseUVPolynomial};
-
-    use crate::{
-        group::{Fr, G1Projective},
-        shared::algebra::mult_tree::quotient,
-    };
-    use ark_std::{rand::thread_rng, UniformRand};
-    use ark_std::{One, Zero};
-
     use super::compute_mult_tree;
+    use crate::{group::Fr, shared::algebra::mult_tree::quotient};
+    use ark_poly::{univariate::DensePolynomial, DenseUVPolynomial};
+    use ark_std::{rand::thread_rng, One, UniformRand};
 
     #[test]
     fn test_mult_tree() {
-
         let mut rng = thread_rng();
 
         for num_roots in 1..=16 {
-            let frs : Vec<Fr> = (0..num_roots).map(|_| Fr::rand(&mut rng)).collect();
+            let frs: Vec<Fr> = (0..num_roots).map(|_| Fr::rand(&mut rng)).collect();
             let mult_tree = compute_mult_tree(&frs);
 
             // naive computation of root of tree
@@ -94,7 +83,11 @@ mod tests {
         let mut rng = thread_rng();
 
         for num_roots in 2..=16 {
-            let mult_tree = compute_mult_tree(&(0..num_roots).map(|_| Fr::rand(&mut rng)).collect::<Vec<Fr>>());
+            let mult_tree = compute_mult_tree(
+                &(0..num_roots)
+                    .map(|_| Fr::rand(&mut rng))
+                    .collect::<Vec<Fr>>(),
+            );
 
             let vanishing_poly = &mult_tree[mult_tree.len() - 1][0];
 
