@@ -39,6 +39,7 @@ mod generic_cmp;
 mod governance_updates;
 mod infinite_loop;
 mod init_module;
+mod init_module_closure_store;
 mod keyless_feature_gating;
 mod large_package_publishing;
 mod layout_caches;
