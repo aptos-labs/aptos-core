@@ -7,7 +7,7 @@
 //! `rand` crate, which may differ from the version used by `arkworks` and thus
 //! would not be accepted directly.
 
-use crate::arkworks::hashing;
+use crate::{arkworks::hashing, utils::powers};
 use ark_ec::{AffineRepr, CurveGroup};
 use ark_ff::PrimeField;
 use rand::Rng;
@@ -87,6 +87,17 @@ where
 /// Samples `n` uniformly random elements from the prime field `F`.
 pub fn sample_field_elements<F: PrimeField, R: Rng>(n: usize, rng: &mut R) -> Vec<F> {
     (0..n).map(|_| sample_field_element::<F, R>(rng)).collect()
+}
+
+/// Samples a random field element and returns it together with its first `len` powers
+/// `[1, x, x^2, ..., x^(len-1)]`. Useful for batching by Schwartz-Zippel weighting.
+pub fn sample_field_element_with_powers<F: PrimeField, R: Rng>(
+    len: usize,
+    rng: &mut R,
+) -> (F, Vec<F>) {
+    let x = sample_field_element::<F, R>(rng);
+    let p = powers(x, len);
+    (x, p)
 }
 
 /// Samples a uniformly random element from the prime field `F`, using rejection sampling.

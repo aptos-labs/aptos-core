@@ -274,7 +274,7 @@ impl<E: Pairing> PublicParameters<E> {
 
         let group_generators = GroupGenerators::default(); // TODO: At least one of these should come from a powers of tau ceremony?
         let pp_elgamal = chunked_elgamal_pp::PublicParameters::new(max_num_shares);
-        let G = *pp_elgamal.message_base();
+        let G_1 = *pp_elgamal.message_base();
         let G_2 = g2.unwrap_or_else(|| hashing::unsafe_hash_to_affine(b"G_2", DST));
         const DLOG_EXTRA_BITS: u64 = 6;
         let pp = Self {
@@ -291,7 +291,7 @@ impl<E: Pairing> PublicParameters<E> {
             ell,
             max_aggregation,
             dlog_extra_bits: DLOG_EXTRA_BITS,
-            dlog_table: Self::build_dlog_table(G.into(), ell, max_aggregation, DLOG_EXTRA_BITS),
+            dlog_table: Self::build_dlog_table(G_1.into(), ell, max_aggregation, DLOG_EXTRA_BITS),
             G2_table: BatchMulPreprocessing::new(G_2.into(), max_num_shares as usize),
             powers_of_radix: compute_powers_of_radix::<E>(ell),
         };

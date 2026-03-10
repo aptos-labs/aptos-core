@@ -17,6 +17,7 @@ use aptos_crypto::{
 use ark_ff::FftField;
 use num_traits::Zero;
 use rand::{prelude::ThreadRng, thread_rng};
+use rand_core::{CryptoRng, RngCore};
 use serde::Serialize;
 use std::ops::AddAssign;
 
@@ -47,7 +48,7 @@ pub struct DealingArgs<T: Transcript> {
 ///  - a vector of `n` input secrets, denoted by `iss`
 ///  - the aggregated dealt secret key from `\sum_i iss[i]`
 /// Useful in tests and benchmarks when wanting to quickly deal & verify a transcript.
-pub fn setup_dealing<T: Transcript, R: rand_core::RngCore + rand_core::CryptoRng>(
+pub fn setup_dealing<T: Transcript, R: RngCore + CryptoRng>(
     sc: &T::SecretSharingConfig,
     ell: Option<u8>,
     mut rng: &mut R,
@@ -89,7 +90,7 @@ pub fn setup_dealing<T: Transcript, R: rand_core::RngCore + rand_core::CryptoRng
 pub fn setup_dealing_weighted<
     F: FftField,
     T: Transcript<SecretSharingConfig = WeightedConfigArkworks<F>>,
-    R: rand_core::RngCore + rand_core::CryptoRng,
+    R: RngCore + CryptoRng,
 >(
     sc: &T::SecretSharingConfig,
     mut rng: &mut R,

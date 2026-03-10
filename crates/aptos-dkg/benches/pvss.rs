@@ -26,43 +26,72 @@ use criterion::{
 };
 use more_asserts::assert_le;
 use rand::{rngs::StdRng, thread_rng, Rng, SeedableRng};
+use std::collections::HashSet;
 
 // const BN254: &str = "bn254";
 const BLS12_381: &str = "bls12-381";
 
+/// If set, only run these benchmark groups (comma-separated). Avoids expensive setup for groups
+/// you're not running. Values: `das`, `chunky_v1`, `chunky_v2`, `weighted`. Unset or `all` = run all.
+fn enabled_bench_groups() -> Option<HashSet<String>> {
+    let v = std::env::var("DKG_BENCH_GROUP").ok()?;
+    let v = v.trim();
+    if v.is_empty() || v.eq_ignore_ascii_case("all") {
+        return None;
+    }
+    Some(
+        v.split(',')
+            .map(|s| s.trim().to_ascii_lowercase())
+            .filter(|s| !s.is_empty())
+            .collect(),
+    )
+}
+
+fn group_enabled(groups: &Option<HashSet<String>>, name: &str) -> bool {
+    match groups {
+        None => true,
+        Some(set) => set.contains(&name.to_ascii_lowercase()),
+    }
+}
+
 pub fn all_groups(c: &mut Criterion) {
     println!("Rayon num threads: {}", rayon::current_num_threads());
+    let enabled = enabled_bench_groups();
+
+    // unweighted aggregatable PVSS, `blstrs` only so this is BLS12-381
+    if group_enabled(&enabled, "das") {
+        for tc in get_threshold_configs_for_benchmarking() {
+            aggregatable_pvss_group::<das::Transcript>(&tc, c);
+        }
+    }
 
     // weighted PVSS with aggregatable subtranscript; only doing one at the moment because large configs are a bit slow and not relevant anyway
     // Chunky_v1
-    for tc in get_weighted_configs_for_benchmarking().into_iter().take(1) {
-        subaggregatable_pvss_group::<Chunky_v1<Bls12_381>>(&tc, c, Some(16u8), BLS12_381);
-    }
-    for tc in get_weighted_configs_for_benchmarking().into_iter().take(1) {
-        subaggregatable_pvss_group::<Chunky_v1<Bls12_381>>(&tc, c, Some(32u8), BLS12_381);
+    if group_enabled(&enabled, "chunky_v1") {
+        for tc in get_weighted_configs_for_benchmarking().into_iter().take(1) {
+            subaggregatable_pvss_group::<Chunky_v1<Bls12_381>>(&tc, c, Some(32u8), BLS12_381);
+            subaggregatable_pvss_group::<Chunky_v1<Bls12_381>>(&tc, c, Some(43u8), BLS12_381);
+        }
     }
 
     // Chunky_v2
-    for tc in get_weighted_configs_for_benchmarking().into_iter().take(1) {
-        subaggregatable_pvss_group::<Chunky_v2<Bls12_381>>(&tc, c, Some(16u8), BLS12_381);
-    }
-    for tc in get_weighted_configs_for_benchmarking().into_iter().take(1) {
-        subaggregatable_pvss_group::<Chunky_v2<Bls12_381>>(&tc, c, Some(32u8), BLS12_381);
-    }
-
-    // unweighted aggregatable PVSS, `blstrs` only so this is BLS12-381
-    for tc in get_threshold_configs_for_benchmarking() {
-        aggregatable_pvss_group::<das::Transcript>(&tc, c);
+    if group_enabled(&enabled, "chunky_v2") {
+        for tc in get_weighted_configs_for_benchmarking().into_iter().take(1) {
+            subaggregatable_pvss_group::<Chunky_v2<Bls12_381>>(&tc, c, Some(32u8), BLS12_381);
+            subaggregatable_pvss_group::<Chunky_v2<Bls12_381>>(&tc, c, Some(43u8), BLS12_381);
+        }
     }
 
     // weighted aggregatable PVSS, `blstrs` only so this is BLS12-381
-    for wc in get_weighted_configs_for_benchmarking() {
-        let d = aggregatable_pvss_group::<das::WeightedTranscript>(&wc, c);
-        weighted_pvss_group(&wc, d, c);
+    if group_enabled(&enabled, "weighted") {
+        for wc in get_weighted_configs_for_benchmarking() {
+            let d = aggregatable_pvss_group::<das::WeightedTranscript>(&wc, c);
+            weighted_pvss_group(&wc, d, c);
 
-        // Note: Insecure, so not interested in benchmarks.
-        // let d = pvss_group::<GenericWeighting<pvss::das::Transcript>>(&wc, c);
-        // weighted_pvss_group(&wc, d, c);
+            // Note: Insecure, so not interested in benchmarks.
+            // let d = pvss_group::<GenericWeighting<pvss::das::Transcript>>(&wc, c);
+            // weighted_pvss_group(&wc, d, c);
+        }
     }
 }
 

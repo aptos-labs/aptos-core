@@ -45,13 +45,12 @@ use aptos_crypto::{
     arkworks::{
         self,
         msm::{self, MsmInput},
-        random::{sample_field_element, unsafe_random_point},
+        random::{sample_field_element, sample_field_element_with_powers, unsafe_random_point},
         scrape::LowDegreeTest,
         serialization::{ark_de, ark_se},
         srs::SrsBasis,
     },
     bls12381::{self},
-    utils,
     weighted_config::WeightedConfigArkworks as SecretSharingConfig,
     CryptoMaterialError, TSecretSharingConfig as _, ValidCryptoMaterial,
 };
@@ -347,10 +346,10 @@ impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>>
             true,
             &sc.get_threshold_config().domain,
         );
-        let Vs_flat = self.subtrs.all_Vs_flat();
+        let Vs_flat = self.subtrs.all_Vs_flat(); // Also has V[0] (the public key)
 
-        let beta = sample_field_element(rng);
-        let powers_of_beta = utils::powers(beta, sc.get_total_weight() + 1);
+        let n = sc.get_total_weight();
+        let (_, powers_of_beta) = sample_field_element_with_powers::<E::ScalarField, _>(n + 1, rng);
 
         let Cs_flat: Vec<_> = self.subtrs.Cs.iter().flatten().cloned().collect();
         debug_assert_eq!(
@@ -382,10 +381,12 @@ impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>>
         let combined_G1 = E::G1::msm(merged_g1.bases(), merged_g1.scalars())
             .expect("Failed to compute merged G1 MSM in chunky");
 
-        let ldt_msm_terms = ldt.ldt_msm_input::<E::G2>(&Vs_flat)?;
-        let n = sc.get_total_weight();
-        let weighted_Vs_msm = MsmInput::new(Vs_flat[..n].to_vec(), powers_of_beta[..n].to_vec())
-            .expect("weighted_Vs MSM terms");
+        let ldt_msm_terms = ldt.ldt_msm_input(&Vs_flat)?;
+        let weighted_Vs_msm = MsmInput::new(
+            Vs_flat[..sc.get_total_weight()].to_vec(),
+            powers_of_beta[..n].to_vec(),
+        )
+        .expect("weighted_Vs MSM terms");
         let g2_inputs = vec![ldt_msm_terms, weighted_Vs_msm];
         let merged_g2 =
             msm::merge_msm_inputs_with_scales(&g2_inputs, &[gamma_sq, E::ScalarField::ONE]);

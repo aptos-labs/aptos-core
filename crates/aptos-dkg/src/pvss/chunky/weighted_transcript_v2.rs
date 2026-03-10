@@ -327,7 +327,7 @@ impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>>
             &sc.get_threshold_config().domain,
         );
         let Vs_flat = self.subtrs.all_Vs_flat();
-        let ldt_msm_terms = ldt.ldt_msm_input::<E::G2>(&Vs_flat)?;
+        let ldt_msm_terms = ldt.ldt_msm_input(&Vs_flat)?;
 
         let eks_inner: Vec<_> = eks.iter().map(|ek| ek.ek).collect();
         let lagr_g1: &[E::G1Affine] = match &pp.pk_range_proof.ck_S.msm_basis {
