@@ -30,7 +30,7 @@ error: match not exhaustive
 52 │         match ((i, i)) {
    │                ^^^^^^
    │
-   = missing `(Inner::Inner2{..},_)`
+   = missing `(Inner::Inner2{..}, _)`
 
 error: match not exhaustive
    ┌─ tests/match-checks/matching_coverage_err.move:65:16
@@ -38,7 +38,7 @@ error: match not exhaustive
 65 │         match ((i, i)) {
    │                ^^^^^^
    │
-   = missing `(Inner::Inner2{..},Inner::Inner1{..})`
+   = missing `(Inner::Inner2{..}, Inner::Inner1{..})`
 
 error: unreachable pattern
    ┌─ tests/match-checks/matching_coverage_err.move:78:14

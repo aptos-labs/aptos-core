@@ -413,11 +413,15 @@ fn display_witness_pat(env: &GlobalEnv, w: &WitnessPat) -> String {
             MConstructor::Bool(b) => format!("{}", b),
             MConstructor::Number(n) => format!("{}", n),
             MConstructor::ByteArray(bytes) => {
-                let hex: String = bytes.iter().map(|b| format!("{:02x}", b)).collect();
-                format!("x\"{}\"", hex)
+                if let Ok(s) = std::str::from_utf8(bytes) {
+                    format!("b\"{}\"", s)
+                } else {
+                    let hex: String = bytes.iter().map(|b| format!("{:02x}", b)).collect();
+                    format!("x\"{}\"", hex)
+                }
             },
             MConstructor::Tuple(_) => {
-                let inner = args.iter().map(|a| display_witness_pat(env, a)).join(",");
+                let inner = args.iter().map(|a| display_witness_pat(env, a)).join(", ");
                 format!("({})", inner)
             },
             MConstructor::Variant(sid, var) => display_witness_struct(env, *sid, Some(*var), args),

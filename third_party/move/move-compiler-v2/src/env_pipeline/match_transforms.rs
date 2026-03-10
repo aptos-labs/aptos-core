@@ -9,8 +9,10 @@
 use crate::env_pipeline::rewrite_target::{
     RewriteState, RewriteTarget, RewriteTargets, RewritingScope,
 };
+use codespan_reporting::diagnostic::Severity;
 use move_model::{
     ast::{AbortKind, Exp, ExpData, MatchArm, Operation, Pattern, Value},
+    exp_builder::ExpBuilder,
     exp_rewriter::ExpRewriterFunctions,
     metadata::lang_feature_versions::LANGUAGE_VERSION_FOR_PRIMITIVE_MATCH,
     model::{GlobalEnv, Loc, NodeId},
@@ -66,7 +68,7 @@ impl ExpRewriterFunctions for MatchTransformer<'_> {
         if fully_transformable {
             let (new_disc, bind_pat, bind_init) = bind_discriminator(self.env, discriminator);
             let chain = generate_if_else_chain(self.env, id, &new_disc, arms, 0);
-            Some(wrap_in_binding(self.env, bind_pat, bind_init, chain))
+            Some(ExpBuilder::new(self.env).block(bind_pat, Some(bind_init), chain))
         } else if mixed_tuple {
             Some(transform_mixed_tuple_match(
                 self.env,
@@ -75,7 +77,30 @@ impl ExpRewriterFunctions for MatchTransformer<'_> {
                 arms,
             ))
         } else {
+            // If neither transform applies but arms contain literal patterns, report
+            // an error instead of letting them reach bytecode generation.
+            // This should eventually never happen as we should be able to transform all literal
+            // patterns that reach this stage.
+            self.reject_unsupported_literals(arms);
             None
+        }
+    }
+}
+
+impl MatchTransformer<'_> {
+    /// Report errors for any literal patterns in arms that won't be transformed.
+    fn reject_unsupported_literals(&self, arms: &[MatchArm]) {
+        for arm in arms {
+            arm.pattern.visit_pre_post(&mut |is_post, pat| {
+                if !is_post {
+                    if let Pattern::LiteralValue(id, _) = pat {
+                        self.env.error(
+                            &self.env.get_node_loc(*id),
+                            "literal patterns are not supported in this match expression",
+                        );
+                    }
+                }
+            });
         }
     }
 }
@@ -207,13 +232,6 @@ fn bind_discriminator(env: &GlobalEnv, discriminator: &Exp) -> (Exp, Pattern, Ex
             (new_disc, pattern, discriminator.clone())
         },
     }
-}
-
-/// Wrap an expression in a let-binding block: `{ let pattern = init; inner }`.
-fn wrap_in_binding(env: &GlobalEnv, pattern: Pattern, init: Exp, inner: Exp) -> Exp {
-    let loc = env.get_node_loc(pattern.node_id());
-    let block_id = env.new_node(loc, env.get_node_type(inner.node_id()));
-    ExpData::Block(block_id, pattern, Some(init), inner).into_exp()
 }
 
 /// Recursively generate if-else chain for match arms, starting from `arm_idx`.
@@ -356,7 +374,14 @@ fn generate_tuple_condition(
     // Extract element expressions from the Tuple call.
     let elem_exps = match tuple_exp.as_ref() {
         ExpData::Call(_, Operation::Tuple, args) => args,
-        _ => unreachable!("bind_discriminator ensures tuple discriminator is a Tuple call"),
+        _ => {
+            env.diag(
+                Severity::Bug,
+                &loc,
+                "unexpected non-tuple discriminator in tuple condition generation",
+            );
+            return ExpData::Value(bool_id, Value::Bool(true)).into_exp();
+        },
     };
 
     // Generate Eq conditions for each literal pattern

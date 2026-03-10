@@ -852,8 +852,8 @@ fn parse_typed_bind(context: &mut Context) -> Result<TypedBind, Box<Diagnostic>>
     ))
 }
 
-// Try to parse a literal value usable in a match pattern. Handles positive literals
-// (numbers, bools, byte strings) and negative numeric literals (e.g. -1i8).
+// Try to parse a literal value usable in a match pattern. Handles non-negative
+// numeric literals, bools, byte strings, and negative numeric literals (e.g. -1i8).
 // Returns `Ok(None)` if the current position doesn't start a literal pattern.
 fn maybe_parse_literal_pattern(context: &mut Context) -> Result<Option<Value>, Box<Diagnostic>> {
     let tok = context.tokens.peek();

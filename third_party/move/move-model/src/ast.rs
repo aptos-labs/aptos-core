@@ -2410,6 +2410,7 @@ impl Pattern {
                         .zip(pats2.iter())
                         .all(|(p1, p2)| p1.structural_eq(p2))
             },
+            (Pattern::LiteralValue(_, v1), Pattern::LiteralValue(_, v2)) => v1 == v2,
             (Pattern::Error(_), Pattern::Error(_)) => true,
             _ => false,
         }
@@ -2884,7 +2885,7 @@ impl PatDisplay<'_> {
                 showed_type = true
             },
             LiteralValue(_, val) => {
-                write!(f, "{:?}", val)?;
+                write!(f, "{}", self.env.display(val))?;
             },
             Error(_) => write!(f, "Pattern::Error")?,
         }

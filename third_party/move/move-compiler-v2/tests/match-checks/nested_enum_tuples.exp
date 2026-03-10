@@ -36,5 +36,5 @@ error: match not exhaustive
 47 │         match ((t, flag)) {
    │                ^^^^^^^^^
    │
-   = missing `(Top::T0{..},false)`
-   = missing `(Top::T1{..},true)`
+   = missing `(Top::T0{..}, false)`
+   = missing `(Top::T1{..}, true)`
