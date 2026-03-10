@@ -456,15 +456,13 @@ module aptos_experimental::sigma_protocol_transfer {
             });
         });
 
-        let repr_vec = new_representation_vec(reprs);
-        let expected_output_len = 2 + 2 * ell + 3 * n
-            + if (has_effective_auditor) { ell + n } else { 0 }
-            + num_volun_auditors * n;
-
         // WARNING: Crucial for security
-        assert!(repr_vec.length() == expected_output_len, e_wrong_output_len());
+        assert!(reprs.length() == expected_output_len(ell, n, has_effective_auditor, num_volun_auditors), e_wrong_output_len());
+        new_representation_vec(reprs)
+    }
 
-        repr_vec
+    fun expected_output_len(ell: u64, n: u64, has_effective_auditor: bool, num_volun_auditors: u64): u64 {
+        2 + 2 * ell + 3 * n + (if (has_effective_auditor) { ell + n } else { 0 }) + num_volun_auditors * n
     }
 
     /// The transformation function $f$ for the transfer relation (see module-level doc for full definition).
@@ -552,6 +550,9 @@ module aptos_experimental::sigma_protocol_transfer {
             });
         });
 
+        // Note: Not needed for security, since a mismatched f(X) length will be caught in the verifier. But good practice
+        // for catching mistakes *early* when implementing your f(X).
+        assert!(reprs.length() == expected_output_len(ell, n, has_effective_auditor, num_volun_auditors), e_wrong_output_len());
         new_representation_vec(reprs)
     }
 
