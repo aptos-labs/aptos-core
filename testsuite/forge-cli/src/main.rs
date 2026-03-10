@@ -430,11 +430,14 @@ fn main() -> Result<()> {
                             "{}/{}/{}",
                             FORGE_GENESIS_SHARED_BUCKET, pfn_namespace, pfn_era
                         );
+                        let pfn_deployments: Vec<Value> = (0..num_pfns)
+                            .map(|i| json!({ "helmReleaseName": format!("pfn-{}", i) }))
+                            .collect();
                         let pfn_config: Value = serde_json::from_value(json!({
                             "profile": pfn_profile,
                             "era": pfn_era,
                             "namespace": pfn_namespace,
-                            "num_pfns": num_pfns,
+                            "pfn-deployments": pfn_deployments,
                             "pfn-values": {
                                 "imageTag": pfn_image_tag,
                                 "genesis_bucket_path": genesis_bucket_path,

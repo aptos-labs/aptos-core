@@ -285,11 +285,14 @@ impl Factory for K8sFactory {
                         "{}/{}/{}",
                         FORGE_GENESIS_SHARED_BUCKET, pfn_kube_namespace, pfn_era
                     );
+                    let pfn_deployments: Vec<serde_json::Value> = (0..num_pfns)
+                        .map(|i| json!({ "helmReleaseName": format!("pfn-{}", i) }))
+                        .collect();
                     let config = serde_json::from_value(json!({
                         "profile": pfn_profile,
                         "era": pfn_era,
                         "namespace": pfn_kube_namespace,
-                        "num_pfns": num_pfns,
+                        "pfn-deployments": pfn_deployments,
                         "pfn-values": {
                             "imageTag": pfn_init_version,
                             "genesis_bucket_path": genesis_bucket_path,
