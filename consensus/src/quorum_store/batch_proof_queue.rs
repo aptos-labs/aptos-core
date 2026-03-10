@@ -759,8 +759,7 @@ impl BatchProofQueue {
                     .info
                     .expiration()
                     .saturating_sub(self.batch_expiry_gap_when_init_usecs);
-                let age_ms =
-                    now_usecs.saturating_sub(batch_create_ts_usecs) as f64 / 1_000.0;
+                let age_ms = now_usecs.saturating_sub(batch_create_ts_usecs) as f64 / 1_000.0;
                 counters::BATCH_AGE_WHEN_PULLED
                     .with_label_values(&[author, pull_kind])
                     .observe(age_ms);

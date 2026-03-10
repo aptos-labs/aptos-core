@@ -56,8 +56,8 @@ const QUORUM_STORE_LATENCY_BUCKETS: &[f64] = &[
 
 // Same as QUORUM_STORE_LATENCY_BUCKETS but in milliseconds
 const QUORUM_STORE_LATENCY_BUCKETS_IN_MS: &[f64] = &[
-    5.0, 10.0, 25.0, 50.0, 100.0, 150.0, 200.0, 250.0, 300.0, 350.0, 400.0, 450.0, 500.0,
-    550.0, 650.0, 700.0, 750.0, 1000.0, 1250.0, 1500.0, 2000.0, 2500.0, 5000.0, 10000.0,
+    5.0, 10.0, 25.0, 50.0, 100.0, 150.0, 200.0, 250.0, 300.0, 350.0, 400.0, 450.0, 500.0, 550.0,
+    650.0, 700.0, 750.0, 1000.0, 1250.0, 1500.0, 2000.0, 2500.0, 5000.0, 10000.0,
 ];
 
 /// Counter for tracking latency of quorum store processing requests from consensus
