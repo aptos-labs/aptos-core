@@ -10,7 +10,7 @@
 //! 1. In let bindings or lambda parameters (refutable patterns in
 //!    irrefutable contexts).
 //! 2. Nested inside struct/enum variant patterns in match arms (not
-//!    yet handled by match transforms).
+//!    yet handled by match transforms). TODO(#19024)
 //!
 //! This pass runs on the model AST before match coverage checks and
 //! match transforms.

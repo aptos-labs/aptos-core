@@ -144,7 +144,7 @@ impl ExpRewriterFunctions for MatchTransformer<'_> {
             // If neither transform applies but arms contain literal patterns, report
             // an error instead of letting them reach bytecode generation.
             // This should eventually never happen as we should be able to transform all literal
-            // patterns that reach this stage.
+            // patterns that reach this stage. TODO(#19024).
             self.reject_unsupported_literals(arms);
             None
         }
