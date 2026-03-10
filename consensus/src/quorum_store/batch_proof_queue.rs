@@ -630,6 +630,13 @@ impl BatchProofQueue {
         {
             let batch_iter = batches.iter().rev().filter_map(|(sort_key, info)| {
                 if let Some(item) = self.items.get(&sort_key.batch_key) {
+                    if item.is_committed() {
+                        return None;
+                    }
+                    if batches_without_proofs ^ item.proof.is_none() {
+                        return None;
+                    }
+
                     let batch_create_ts_usecs =
                         item.info.expiration() - self.batch_expiry_gap_when_init_usecs;
 
@@ -644,12 +651,7 @@ impl BatchProofQueue {
                         return None;
                     }
 
-                    if item.is_committed() {
-                        return None;
-                    }
-                    if !(batches_without_proofs ^ item.proof.is_none()) {
-                        return Some((info, item));
-                    }
+                    return Some((info, item));
                 }
                 None
             });
