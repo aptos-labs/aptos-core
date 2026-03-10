@@ -324,13 +324,13 @@ module aptos_experimental::sigma_protocol_withdraw {
 
         reprs.push_back(new_representation(point_idxs, scalars));
 
-        let repr_vec = new_representation_vec(reprs);
-        let expected_output_len = if (has_auditor) { 2 + 3 * ell } else { 2 + 2 * ell };
-
         // WARNING: Crucial for security
-        assert!(repr_vec.length() == expected_output_len, e_wrong_output_len());
+        assert!(reprs.length() == expected_output_len(ell, has_auditor), e_wrong_output_len());
+        new_representation_vec(reprs)
+    }
 
-        repr_vec
+    fun expected_output_len(ell: u64, has_auditor: bool): u64 {
+        if (has_auditor) { 2 + 3 * ell } else { 2 + 2 * ell }
     }
 
     /// The transformation function $f$ for the withdrawal relation.
@@ -388,6 +388,9 @@ module aptos_experimental::sigma_protocol_withdraw {
 
         reprs.push_back(new_representation(point_idxs, scalars));
 
+        // Note: Not needed for security, since a mismatched f(X) length will be caught in the verifier. But good practice
+        // for catching mistakes *early* when implementing your f(X).
+        assert!(reprs.length() == expected_output_len(ell, has_auditor), e_wrong_output_len());
         new_representation_vec(reprs)
     }
 
