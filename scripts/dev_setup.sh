@@ -492,12 +492,12 @@ function install_rustup_components_and_nightly {
   if ! rustup toolchain install nightly; then
     if [[ "$(uname)" == "Linux" ]]; then
       # TODO: remove this once we have an answer: https://github.com/rust-lang/rustup/issues/3390
-      echo "Failed to install the nightly toolchain using rustup! Falling back to an older linux build at 2023-06-01."
-      rustup toolchain install nightly-2023-06-01 # Fix the date to avoid flakiness
+      echo "Failed to install the nightly toolchain using rustup! Falling back to an older linux build at 2025-01-01."
+      rustup toolchain install nightly-2025-01-01 # Fix the date to avoid flakiness
 
       # Rename the toolchain to nightly (crazy... see: https://github.com/rust-lang/rustup/issues/1299).
       # Note: this only works for linux. The primary purpose is to unblock CI/CD on flakes.
-      mv ~/.rustup/toolchains/nightly-2023-06-01-x86_64-unknown-linux-gnu ~/.rustup/toolchains/nightly-x86_64-unknown-linux-gnu
+      mv ~/.rustup/toolchains/nightly-2025-01-01-x86_64-unknown-linux-gnu ~/.rustup/toolchains/nightly-x86_64-unknown-linux-gnu
     else
       echo "Failed to install the nightly toolchain using rustup! Manual installation is required!"
     fi
