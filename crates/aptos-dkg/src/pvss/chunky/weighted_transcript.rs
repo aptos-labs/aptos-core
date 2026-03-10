@@ -328,7 +328,7 @@ impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>>
             &pp.pp_elgamal,
             &ek_g1_affines,
         );
-        let pok_statement = TupleCodomainShape(
+        let sok_statement = TupleCodomainShape(
             sigma_protocol::homomorphism::TrivialShape(
                 self.sharing_proof.range_proof_commitment.0.clone(),
             ),
@@ -337,22 +337,8 @@ impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>>
                 randomness: self.subtrs.Rs.clone(),
             },
         );
-        let prover_first_message = self
-            .sharing_proof
-            .SoK
-            .prover_commitment()
-            .expect("SoK must contain commitment for Fiat–Shamir");
-        let c_pok = hom.fiat_shamir_challenge_for_sigma_protocol(
-            &sok_cntxt,
-            &pok_statement,
-            prover_first_message,
-        );
-        let pok_msm_terms = hom.msm_terms_for_verify_with_challenge(
-            &pok_statement,
-            prover_first_message,
-            &self.sharing_proof.SoK.z,
-            c_pok,
-        );
+        let sok_msm_terms =
+            hom.msm_terms_for_verify(&sok_statement, &self.sharing_proof.SoK, &sok_cntxt);
 
         let ldt = LowDegreeTest::random(
             rng,
@@ -387,7 +373,7 @@ impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>>
 
         let weighted_Cs_msm =
             MsmInput::new(weighted_Cs_base, weighted_Cs_scalar).expect("weighted_Cs MSM terms");
-        let pok_merged = msm::merge_msm_inputs::<E::G1Affine, _>(&pok_msm_terms, rng);
+        let pok_merged = msm::merge_msm_inputs::<E::G1Affine, _>(&sok_msm_terms, rng);
         let g1_inputs = vec![pok_merged, weighted_Cs_msm];
         let merged_g1 = msm::merge_msm_inputs_with_scales::<E::G1Affine>(&g1_inputs, &[
             gamma,

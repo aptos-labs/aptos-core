@@ -232,14 +232,22 @@ pub trait CurveGroupTrait:
     /// Returns the MSM terms that `verify()` needs, computing the Fiat–Shamir challenge
     /// from the transcript (context, statement, prover commitment) and then calling
     /// `msm_terms_for_verify_with_challenge()`.
-    fn msm_terms_for_verify<Ct: Serialize>(
+    ///
+    /// Accepts a proof produced with any homomorphism type `H2` that has the same
+    /// `Domain` and `CodomainNormalized` as `Self`. This allows verifying a proof
+    /// stored as `Proof<..., Homomorphism<'static, E>>` using a locally built
+    /// `Homomorphism<'a, E>` (with a short lifetime `'a`) without forcing `'static`.
+    fn msm_terms_for_verify<Ct: Serialize, H2>(
         &self,
         public_statement: &Self::CodomainNormalized,
-        proof: &Proof<<Self::Group as PrimeGroup>::ScalarField, Self>,
+        proof: &Proof<<Self::Group as PrimeGroup>::ScalarField, H2>,
         cntxt: &Ct,
     ) -> Vec<MsmInput<<Self::Group as CurveGroup>::Affine, <Self::Group as PrimeGroup>::ScalarField>>
     where
-        Self: Trait<Scalar = <Self::Group as PrimeGroup>::ScalarField>,
+        H2: homomorphism::Trait<
+            Domain = Self::Domain,
+            CodomainNormalized = Self::CodomainNormalized,
+        >,
     {
         let prover_first_message = proof
             .prover_commitment()
