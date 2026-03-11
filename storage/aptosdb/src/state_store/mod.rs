@@ -956,11 +956,16 @@ impl StateStore {
                         StateSlot::ColdVacant
                     });
 
-                if old_entry.is_occupied() {
+                let old_version = if old_entry.is_occupied() {
                     // The value at the old version can be pruned once the pruning window hits
                     // this `version`.
-                    Self::put_state_kv_index(batch, version, old_entry.expect_value_version(), key)
-                }
+                    old_entry.expect_value_version()
+                } else {
+                    // First write to this key — no old version to prune, but we still record
+                    // the index so that truncation can discover and clean up this entry.
+                    StaleStateValueByKeyHashIndex::NO_PREV_VERSION
+                };
+                Self::put_state_kv_index(batch, version, old_version, key);
             }
         }
     }
