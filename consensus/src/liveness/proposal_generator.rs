@@ -266,8 +266,7 @@ impl PipelineBackpressureConfig {
 
             let lookback_config = &config.lookback_config;
             let block_execution_overhead_ms = config.block_execution_overhead_ms;
-            let min_calibrated_block_gas_limit =
-                config.min_calibrated_block_gas_limit;
+            let min_calibrated_block_gas_limit = config.min_calibrated_block_gas_limit;
             let gas_limit_estimates =
                 self.compute_lookback_blocks(block_execution_times, |summary| {
                     let execution_time_ms = summary.execution_time.as_millis() as u64;
