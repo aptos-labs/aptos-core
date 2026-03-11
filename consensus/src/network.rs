@@ -886,7 +886,7 @@ impl NetworkTask {
                                     proposal.timestamp_usecs(),
                                     BlockStage::NETWORK_RECEIVED_OPT_PROPOSAL,
                                 );
-                                info!(
+                                debug!(
                                     LogSchema::new(LogEvent::NetworkReceiveOptProposal)
                                         .remote_peer(peer_id),
                                     block_author = proposal.proposer(),

@@ -223,31 +223,18 @@ impl<T: Transaction> BlockGasLimitProcessor<T> {
         counters::update_txn_gas_counters(&self.txn_fee_statements, is_parallel);
 
         info!(
-            effective_block_gas = accumulated_effective_block_gas,
-            raw_block_gas = accumulated_raw_block_gas,
-            block_gas_limit = self.block_gas_limit_type.block_gas_limit().unwrap_or(0),
-            block_gas_limit_override = self.block_gas_limit_override.unwrap_or(0),
-            block_gas_limit_exceeded = self
-                .block_gas_limit()
-                .is_some_and(|limit| accumulated_effective_block_gas >= limit),
-            approx_output_size = accumulated_approx_output_size,
-            block_output_limit = self.block_gas_limit_type.block_output_limit().unwrap_or(0),
-            block_output_limit_exceeded = self
-                .block_gas_limit_type
-                .block_output_limit()
-                .is_some_and(|limit| accumulated_approx_output_size >= limit),
+            eff_gas = accumulated_effective_block_gas,
+            raw_gas = accumulated_raw_block_gas,
+            gas_lmt = self.block_gas_limit_type.block_gas_limit().unwrap_or(0),
+            gas_lmt_override = self.block_gas_limit_override.unwrap_or(0),
+            output_size = accumulated_approx_output_size,
+            output_lmt = self.block_gas_limit_type.block_output_limit().unwrap_or(0),
             elapsed_ms = self.start_time.elapsed().as_millis(),
-            num_committed = num_committed,
-            num_total = num_total,
-            num_workers = num_workers,
-            "[BlockSTM]: {} execution completed. {} out of {} txns committed",
-            if is_parallel {
-                format!("Parallel[{}]", num_workers)
-            } else {
-                "Sequential".to_string()
-            },
-            num_committed,
-            num_total,
+            committed = num_committed,
+            total = num_total,
+            workers = num_workers,
+            parallel = is_parallel,
+            "block_executed",
         );
     }
 

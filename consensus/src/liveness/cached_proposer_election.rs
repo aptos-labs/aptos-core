@@ -5,7 +5,7 @@ use super::proposer_election::ProposerElection;
 use crate::counters::PROPOSER_ELECTION_DURATION;
 use aptos_consensus_types::common::{Author, Round};
 use aptos_infallible::Mutex;
-use aptos_logger::prelude::info;
+use aptos_logger::prelude::debug;
 use std::collections::BTreeMap;
 
 // Wrapper around ProposerElection.
@@ -49,7 +49,7 @@ impl CachedProposerElection {
             let result = self
                 .proposer_election
                 .get_valid_proposer_and_voting_power_participation_ratio(round);
-            info!(
+            debug!(
                 "ProposerElection for epoch {} and round {}: {:?}",
                 self.epoch, round, result
             );
