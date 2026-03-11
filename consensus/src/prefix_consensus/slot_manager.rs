@@ -518,6 +518,15 @@ impl<NS: SubprotocolNetworkSender<SlotConsensusMsg>, SP: SPCSpawner> SlotManager
             slot != 1 || self.last_commit_proof.is_none(),
             "Slot 1 should not have a commit proof from a previous slot"
         );
+        let own_proof_hash = self.last_commit_proof.as_ref()
+            .map(|p| SlotProposal::compute_commit_proof_hash(p));
+        info!(
+            epoch = self.epoch,
+            slot = slot,
+            has_last_commit_proof = self.last_commit_proof.is_some(),
+            own_proof_hash = ?own_proof_hash.map(|h| format!("{:.8}", h)),
+            "start_new_slot: creating own proposal"
+        );
         let now_usecs = aptos_infallible::duration_since_epoch().as_micros() as u64;
         let proposal = match create_signed_slot_proposal(
             slot,
@@ -599,6 +608,20 @@ impl<NS: SubprotocolNetworkSender<SlotConsensusMsg>, SP: SPCSpawner> SlotManager
 
         let slot_state = self.slot_states.get_mut(&slot).expect("just inserted");
         let entry_hash = proposal.entry_hash();
+        let has_proof = proposal.prev_commit_proof.is_some();
+        let proof_hash = proposal.prev_commit_proof_hash;
+        info!(
+            epoch = self.epoch,
+            slot = slot,
+            author = %author,
+            entry_hash = %format!("{:.8}", entry_hash),
+            payload_hash = %format!("{:.8}", proposal.payload_hash),
+            timestamp = proposal.timestamp_usecs,
+            has_proof = has_proof,
+            proof_hash = ?proof_hash.map(|h| format!("{:.8}", h)),
+            phase = ?slot_state.phase(),
+            "Processing proposal"
+        );
         let entry_data = ProposalData::from_proposal(&proposal);
         slot_state.insert_proposal(proposal);
 
@@ -656,12 +679,21 @@ impl<NS: SubprotocolNetworkSender<SlotConsensusMsg>, SP: SPCSpawner> SlotManager
             .clone();
 
         let non_bot_count = input_vector.iter().filter(|h| **h != HashValue::zero()).count();
+        let entry_data_map_size = slot_state.entry_data_map().map(|m| m.len()).unwrap_or(0);
+        let input_hash_strs: Vec<String> = input_vector
+            .iter()
+            .enumerate()
+            .filter(|(_, h)| **h != HashValue::zero())
+            .map(|(pos, h)| format!("pos{}={:.8}", pos, h))
+            .collect();
         info!(
             epoch = self.epoch,
             slot = slot,
             input_len = input_vector.len(),
             non_bot_entries = non_bot_count,
+            entry_data_map_size = entry_data_map_size,
             proposals_received = slot_state.proposal_buffer().proposal_count(),
+            input_hashes = ?input_hash_strs,
             "Spawning SPC task"
         );
 
@@ -725,11 +757,18 @@ impl<NS: SubprotocolNetworkSender<SlotConsensusMsg>, SP: SPCSpawner> SlotManager
 
     /// Handle v_low from SPC (wave 1 — early commit).
     async fn on_spc_v_low(&mut self, slot: u64, v_low: PrefixVector) {
+        let v_low_non_bot: Vec<String> = v_low
+            .iter()
+            .enumerate()
+            .filter(|(_, h)| **h != HashValue::zero())
+            .map(|(pos, h)| format!("pos{}={:.8}", pos, h))
+            .collect();
         info!(
             epoch = self.epoch,
             slot = slot,
             v_low_len = v_low.len(),
-            non_bot = v_low.iter().filter(|h| **h != HashValue::zero()).count(),
+            non_bot = v_low_non_bot.len(),
+            v_low_hashes = ?v_low_non_bot,
             "Resolving v_low entries for wave 1 (early commit)"
         );
 
@@ -776,11 +815,21 @@ impl<NS: SubprotocolNetworkSender<SlotConsensusMsg>, SP: SPCSpawner> SlotManager
 
     /// Handle v_high from SPC (wave 2 — delta commit + slot finalization).
     async fn on_spc_v_high_complete(&mut self, slot: u64, v_high: PrefixVector, commit_proof: StrongPCCommit) {
+        let v_high_non_bot: Vec<String> = v_high
+            .iter()
+            .enumerate()
+            .filter(|(_, h)| **h != HashValue::zero())
+            .map(|(pos, h)| format!("pos{}={:.8}", pos, h))
+            .collect();
+        let committing_view = commit_proof.committing_view().unwrap_or(0);
         info!(
             epoch = self.epoch,
             slot = slot,
             v_high_len = v_high.len(),
+            v_high_non_bot_count = v_high_non_bot.len(),
+            v_high_hashes = ?v_high_non_bot,
             committed_in_wave1 = self.v_low_committed_positions.len(),
+            commit_proof_view = committing_view,
             "Processing v_high for wave 2 (delta commit)"
         );
 
@@ -804,9 +853,12 @@ impl<NS: SubprotocolNetworkSender<SlotConsensusMsg>, SP: SPCSpawner> SlotManager
 
         if !has_delta {
             // v_low == v_high or all delta positions are bot. Finalize immediately.
+            let v_low_positions: Vec<usize> = self.v_low_committed_positions.iter().cloned().collect();
             info!(
                 epoch = self.epoch,
                 slot = slot,
+                v_high_non_bot = v_high_non_bot,
+                v_low_committed_positions = ?v_low_positions,
                 "No delta entries in v_high, finalizing slot"
             );
             self.finalize_slot(slot, &v_high).await;
@@ -1013,6 +1065,19 @@ impl<NS: SubprotocolNetworkSender<SlotConsensusMsg>, SP: SPCSpawner> SlotManager
     /// necessary because different validators can commit the same SPC in different
     /// views — using a locally-stored proof would cause ranking divergence.
     async fn finalize_slot(&mut self, slot: u64, v_high: &PrefixVector) {
+        let non_bot_count = v_high.iter().filter(|h| **h != HashValue::zero()).count();
+        let has_commit_proof = self.current_slot_commit_proof.is_some();
+        let has_last_ranking = self.last_spc_initial_ranking.is_some();
+        info!(
+            epoch = self.epoch,
+            slot = slot,
+            v_high_len = v_high.len(),
+            v_high_non_bot = non_bot_count,
+            has_current_slot_commit_proof = has_commit_proof,
+            has_last_spc_initial_ranking = has_last_ranking,
+            "finalize_slot: starting"
+        );
+
         let current_slot_ranking = self.current_slot_ranking.take()
             .unwrap_or_else(|| self.ranking_manager.current_ranking().to_vec());
 
@@ -1057,10 +1122,20 @@ impl<NS: SubprotocolNetworkSender<SlotConsensusMsg>, SP: SPCSpawner> SlotManager
         // last_commit_proof: embedded in this validator's own proposals for slot S+1.
         // last_spc_initial_ranking: needed for SPC-view demotions when finalize_slot(S+1)
         // extracts the canonical proof from slot S+1's proposals.
+        let storing_proof = self.current_slot_commit_proof.is_some();
         if let Some(proof) = self.current_slot_commit_proof.take() {
             self.last_commit_proof = Some(proof);
             self.last_spc_initial_ranking = Some(current_slot_ranking);
         }
+        info!(
+            epoch = self.epoch,
+            slot = slot,
+            stored_commit_proof = storing_proof,
+            has_last_commit_proof = self.last_commit_proof.is_some(),
+            has_last_spc_initial_ranking = self.last_spc_initial_ranking.is_some(),
+            committing_view = committing_view,
+            "finalize_slot: ranking updated, proof state for next slot"
+        );
 
         // Clean up slot state, SPC channels, message buffers, and pending state
         self.spc_msg_tx.take();
@@ -1101,22 +1176,75 @@ impl<NS: SubprotocolNetworkSender<SlotConsensusMsg>, SP: SPCSpawner> SlotManager
             return None;
         }
 
-        let slot_state = self.slot_states.get(&slot)?;
+        let slot_state = match self.slot_states.get(&slot) {
+            Some(s) => s,
+            None => {
+                warn!(
+                    epoch = self.epoch,
+                    slot = slot,
+                    "extract_canonical_proof: slot_state missing for slot"
+                );
+                return None;
+            },
+        };
+
+        let non_bot_hashes: Vec<(usize, &HashValue)> = v_high
+            .iter()
+            .enumerate()
+            .filter(|(_, h)| **h != HashValue::zero())
+            .collect();
+
+        let entry_data_map_size = slot_state
+            .entry_data_map()
+            .map(|m| m.len())
+            .unwrap_or(0);
+
+        if non_bot_hashes.is_empty() {
+            // All-bot v_high: no non-bot entries to look up, no proof to extract.
+            // This is expected (not an error) — it just means no proposals were committed.
+            info!(
+                epoch = self.epoch,
+                slot = slot,
+                v_high_len = v_high.len(),
+                entry_data_map_size = entry_data_map_size,
+                "extract_canonical_proof: v_high is all-bot, no proof to extract"
+            );
+            return None;
+        }
 
         // Find the first non-⊥ entry in v_high and look up its ProposalData
-        for hash in v_high {
-            if *hash == HashValue::zero() {
-                continue;
-            }
+        for (pos, hash) in &non_bot_hashes {
             if let Some(data) = slot_state.lookup_entry_data(hash) {
+                info!(
+                    epoch = self.epoch,
+                    slot = slot,
+                    position = pos,
+                    has_proof = data.prev_commit_proof.is_some(),
+                    "extract_canonical_proof: found entry data, returning proof"
+                );
                 return data.prev_commit_proof;
             }
         }
 
+        // Log detailed mismatch info for debugging
+        let entry_data_map_keys: Vec<String> = slot_state
+            .entry_data_map()
+            .map(|m| m.keys().map(|k| format!("{:.8}", k)).collect())
+            .unwrap_or_default();
+
+        let non_bot_hash_strs: Vec<String> = non_bot_hashes
+            .iter()
+            .map(|(pos, h)| format!("pos{}={:.8}", pos, h))
+            .collect();
+
         warn!(
             epoch = self.epoch,
             slot = slot,
-            "No entry data found for any non-bot v_high entry — cannot extract canonical proof"
+            non_bot_count = non_bot_hashes.len(),
+            entry_data_map_size = entry_data_map_size,
+            non_bot_hashes = ?non_bot_hash_strs,
+            entry_data_keys = ?entry_data_map_keys,
+            "extract_canonical_proof: no entry data found for any non-bot v_high entry"
         );
         None
     }
