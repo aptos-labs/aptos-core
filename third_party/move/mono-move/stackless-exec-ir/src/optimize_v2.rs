@@ -19,6 +19,7 @@ use std::collections::{BTreeMap, BTreeSet};
 /// Optimize all functions in a module IR using the v2 pipeline.
 pub fn optimize_module_v2(module_ir: &mut ModuleIR) {
     for func in &mut module_ir.functions {
+        eliminate_identity_moves(func);
         copy_propagation(func);
         eliminate_identity_moves(func);
         dead_instruction_elimination(func);
