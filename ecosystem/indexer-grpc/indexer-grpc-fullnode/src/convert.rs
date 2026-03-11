@@ -3,13 +3,14 @@
 
 use aptos_api_types::{
     transaction::ValidatorTransaction as ApiValidatorTransactionEnum, AccountSignature,
-    DeleteModule, DeleteResource, Ed25519Signature, EntryFunctionId, EntryFunctionPayload, Event,
-    GenesisPayload, MoveAbility, MoveFunction, MoveFunctionGenericTypeParam,
-    MoveFunctionVisibility, MoveModule, MoveModuleBytecode, MoveModuleId, MoveScriptBytecode,
-    MoveStruct, MoveStructField, MoveStructTag, MoveStructVariant, MoveType, MultiEd25519Signature,
-    MultiKeySignature, MultisigPayload, MultisigTransactionPayload, PublicKey, ScriptPayload,
-    Signature, SingleKeySignature, Transaction, TransactionInfo, TransactionPayload,
-    TransactionSignature, WriteSet, WriteSetChange,
+    DeleteModule, DeleteResource, Ed25519Signature, EncryptedTransactionInnerPayload,
+    EncryptedTransactionPayload, EntryFunctionId, EntryFunctionPayload, Event, GenesisPayload,
+    MoveAbility, MoveFunction, MoveFunctionGenericTypeParam, MoveFunctionVisibility, MoveModule,
+    MoveModuleBytecode, MoveModuleId, MoveScriptBytecode, MoveStruct, MoveStructField,
+    MoveStructTag, MoveStructVariant, MoveType, MultiEd25519Signature, MultiKeySignature,
+    MultisigPayload, MultisigTransactionPayload, PublicKey, ScriptPayload, Signature,
+    SingleKeySignature, Transaction, TransactionInfo, TransactionPayload, TransactionSignature,
+    WriteSet, WriteSetChange,
 };
 use aptos_bitvec::BitVec;
 use aptos_logger::warn;
@@ -221,6 +222,72 @@ pub fn convert_transaction_payload(
                     },
                 ),
             ),
+        },
+
+        TransactionPayload::EncryptedTransactionPayload(ep) => {
+            let encrypted_state = match ep {
+                EncryptedTransactionPayload::Encrypted(p) => {
+                    transaction::encrypted_transaction_payload::EncryptedState::Encrypted(
+                        transaction::EncryptedPayloadProto {
+                            payload_hash: p.payload_hash.0.to_vec(),
+                            ciphertext: p.ciphertext.0.clone(),
+                        },
+                    )
+                },
+                EncryptedTransactionPayload::FailedDecryption(p) => {
+                    transaction::encrypted_transaction_payload::EncryptedState::FailedDecryption(
+                        transaction::FailedDecryptionPayloadProto {
+                            payload_hash: p.payload_hash.0.to_vec(),
+                            ciphertext: p.ciphertext.0.clone(),
+                        },
+                    )
+                },
+                EncryptedTransactionPayload::Decrypted(p) => {
+                    let decrypted_payload = match &p.decrypted_payload {
+                        EncryptedTransactionInnerPayload::EntryFunctionPayload(efp) => {
+                            transaction::decrypted_payload_proto::DecryptedPayload::EntryFunctionPayload(
+                                convert_entry_function_payload(efp),
+                            )
+                        },
+                        EncryptedTransactionInnerPayload::ScriptPayload(sp) => {
+                            transaction::decrypted_payload_proto::DecryptedPayload::ScriptPayload(
+                                convert_script_payload(sp),
+                            )
+                        },
+                        EncryptedTransactionInnerPayload::MultisigPayload(mp) => {
+                            transaction::decrypted_payload_proto::DecryptedPayload::MultisigPayload(
+                                convert_multisig_payload(mp),
+                            )
+                        },
+                    };
+                    transaction::encrypted_transaction_payload::EncryptedState::Decrypted(
+                        transaction::DecryptedPayloadProto {
+                            payload_hash: p.payload_hash.0.to_vec(),
+                            ciphertext: p.ciphertext.0.clone(),
+                            decryption_nonce: p.decryption_nonce.0,
+                            decrypted_payload: Some(decrypted_payload),
+                        },
+                    )
+                },
+            };
+            transaction::TransactionPayload {
+                r#type: transaction::transaction_payload::Type::EncryptedTransactionPayload as i32,
+                payload: Some(
+                    transaction::transaction_payload::Payload::EncryptedTransactionPayload(
+                        transaction::EncryptedTransactionPayload {
+                            encrypted_state: Some(encrypted_state),
+                        },
+                    ),
+                ),
+                extra_config: Some(
+                    transaction::transaction_payload::ExtraConfig::ExtraConfigV1(
+                        transaction::ExtraConfigV1 {
+                            multisig_address: None,
+                            replay_protection_nonce: nonce,
+                        },
+                    ),
+                ),
+            }
         },
 
         // Deprecated.
