@@ -161,7 +161,7 @@ impl Default for StateSyncDriverConfig {
             max_connection_deadline_secs: 10,
             max_consecutive_stream_notifications: 10,
             max_num_stream_timeouts: 12,
-            max_pending_data_chunks: 50,
+            max_pending_data_chunks: 500,
             max_pending_mempool_notifications: 100,
             max_stream_wait_time_ms: 5000,
             num_versions_to_skip_snapshot_sync: 400_000_000, // At 5k TPS, this allows a node to fail for about 24 hours.
