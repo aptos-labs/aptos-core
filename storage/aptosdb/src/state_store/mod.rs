@@ -69,7 +69,10 @@ use aptos_types::{
         state_key::StateKey,
         state_slot::StateSlot,
         state_storage_usage::StateStorageUsage,
-        state_value::{StaleStateValueByKeyHashIndex, StateValue, StateValueChunkWithProof},
+        state_value::{
+            StaleStateValueByKeyHashIndex, StateValue, StateValueChunkWithProof,
+            VERSION_PLACEHOLDER_FOR_FIRST_WRITE,
+        },
         NUM_STATE_SHARDS,
     },
     transaction::Version,
@@ -960,6 +963,15 @@ impl StateStore {
                     // The value at the old version can be pruned once the pruning window hits
                     // this `version`.
                     Self::put_state_kv_index(batch, version, old_entry.expect_value_version(), key)
+                } else {
+                    // First write to this key — no old version to prune, but we still record
+                    // the index so that truncation can discover and clean up this entry.
+                    Self::put_state_kv_index(
+                        batch,
+                        version,
+                        VERSION_PLACEHOLDER_FOR_FIRST_WRITE,
+                        key,
+                    )
                 }
             }
         }
