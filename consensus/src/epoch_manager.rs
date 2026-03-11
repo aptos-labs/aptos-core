@@ -1259,8 +1259,8 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
         };
 
 
-        let tc_slow_path = ThresholdConfig::new(PROTOTYPE_NUMBER_OF_VALIDATORS, PROTOTYPE_THRESHOLD_SLOW_PATH);
-        let tc_fast_path = ThresholdConfig::new(PROTOTYPE_NUMBER_OF_VALIDATORS, PROTOTYPE_THRESHOLD_FAST_PATH);
+        let tc_slow_path = ThresholdConfig::new(PROTOTYPE_THRESHOLD_SLOW_PATH, PROTOTYPE_NUMBER_OF_VALIDATORS);
+        let tc_fast_path = ThresholdConfig::new(PROTOTYPE_THRESHOLD_FAST_PATH, PROTOTYPE_NUMBER_OF_VALIDATORS);
 
         let (encryption_key, digest_key, verification_keys_fast_path, msk_shares_fast_path, verification_keys_slow_path, msk_shares_slow_path) = <FPTX as BatchThresholdEncryption>::setup_for_testing(PROTOTYPE_SETUP_SEED, PROTOTYPE_BATCH_SIZE, PROTOTYPE_NUMBER_OF_ROUNDS, &tc_fast_path, &tc_slow_path).unwrap();
 
