@@ -298,6 +298,17 @@ pub enum EntryPoints {
         max_buy_size: u64,
     },
 
+    /// Native order book: same as OrderBook but uses Rust-backed PriceTimeIndex overlay.
+    /// Requires NATIVE_ORDER_BOOK feature flag.
+    NativeOrderBook {
+        state: Arc<OrderBookState>,
+        num_markets: u32,
+        overlap_ratio: f64,
+        buy_frequency: f64,
+        max_sell_size: u64,
+        max_buy_size: u64,
+    },
+
     /// Test monotonically increasing counter native function throughput
     MonotonicCounter {
         counter_type: MonotonicCounterType,
@@ -363,7 +374,7 @@ impl EntryPointTrait for EntryPoints {
             | EntryPoints::APTTransferWithPermissionedSigner
             | EntryPoints::APTTransferWithMasterSigner
             | EntryPoints::MonotonicCounter { .. } => "framework_usecases",
-            EntryPoints::OrderBook { .. } => "experimental_usecases",
+            EntryPoints::OrderBook { .. } | EntryPoints::NativeOrderBook { .. } => "experimental_usecases",
             EntryPoints::TokenV2AmbassadorMint { .. } | EntryPoints::TokenV2AmbassadorBurn => {
                 "ambassador_token"
             },
@@ -451,6 +462,7 @@ impl EntryPointTrait for EntryPoints {
             | EntryPoints::APTTransferWithMasterSigner => "permissioned_transfer",
             EntryPoints::MonotonicCounter { .. } => "transaction_context_example",
             EntryPoints::OrderBook { .. } => "order_book_example",
+            EntryPoints::NativeOrderBook { .. } => "native_order_book_example",
             EntryPoints::MoveVmMicroBenchmark(entrypoint) => match entrypoint {
                 MoveVmMicroBenchmark::Locals | MoveVmMicroBenchmark::LocalsGeneric => "locals",
             },
@@ -944,6 +956,39 @@ impl EntryPointTrait for EntryPoints {
                     bcs::to_bytes(&is_bid).unwrap(), // is_bid
                 ])
             },
+            EntryPoints::NativeOrderBook {
+                state,
+                num_markets,
+                overlap_ratio,
+                buy_frequency,
+                max_buy_size,
+                max_sell_size,
+            } => {
+                let rng: &mut StdRng = rng.expect("Must provide RNG");
+                let market_id = rng.gen_range(0, *num_markets);
+                let price_range = 1000000;
+                let is_bid = rng.gen_bool(*buy_frequency);
+                let size = rng.gen_range(1, 1 + if is_bid { max_buy_size } else { max_sell_size });
+                let price = if is_bid {
+                    0
+                } else {
+                    (price_range as f64 * (1.0 - *overlap_ratio)) as u64
+                } + rng.gen_range(0, price_range);
+
+                get_payload(module_id, ident_str!("place_order").to_owned(), vec![
+                    bcs::to_bytes(&market_id).unwrap(),
+                    bcs::to_bytes(&AccountAddress::random()).unwrap(),
+                    bcs::to_bytes(
+                        &state
+                            .order_idx
+                            .fetch_add(1, std::sync::atomic::Ordering::Relaxed),
+                    )
+                    .unwrap(),
+                    bcs::to_bytes(&price).unwrap(),
+                    bcs::to_bytes(&size).unwrap(),
+                    bcs::to_bytes(&is_bid).unwrap(),
+                ])
+            },
             EntryPoints::MoveVmMicroBenchmark(entrypoint) => match entrypoint {
                 MoveVmMicroBenchmark::Locals => {
                     get_payload_void(module_id, ident_str!("benchmark").to_owned())
@@ -1075,7 +1120,7 @@ impl EntryPointTrait for EntryPoints {
             EntryPoints::APTTransferWithPermissionedSigner
             | EntryPoints::APTTransferWithMasterSigner => AutomaticArgs::Signer,
             EntryPoints::MonotonicCounter { .. } => AutomaticArgs::None,
-            EntryPoints::OrderBook { .. } => AutomaticArgs::None,
+            EntryPoints::OrderBook { .. } | EntryPoints::NativeOrderBook { .. } => AutomaticArgs::None,
             EntryPoints::MoveVmMicroBenchmark(_) => AutomaticArgs::None,
         }
     }

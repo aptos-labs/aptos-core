@@ -2,6 +2,7 @@
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 use crate::move_vm_ext::{AptosMoveResolver, SessionExt, SessionId};
+use std::sync::Arc;
 use aptos_crypto::HashValue;
 use aptos_gas_schedule::{MiscGasParameters, NativeGasParameters, LATEST_GAS_FEATURE_VERSION};
 use aptos_native_interface::SafeNativeBuilder;
@@ -98,6 +99,7 @@ impl GenesisMoveVm {
             &self.vm_config,
             None,
             resolver,
+            None, // No block native state for genesis
         )
     }
 
@@ -127,6 +129,7 @@ impl MoveVmExt {
         resolver: &'r R,
         session_id: SessionId,
         maybe_user_transaction_context: Option<UserTransactionContext>,
+        block_native_state: Option<Arc<aptos_order_book_natives::BlockNativeState>>,
     ) -> SessionExt<'r, R> {
         SessionExt::new(
             session_id,
@@ -135,6 +138,7 @@ impl MoveVmExt {
             self.env.vm_config(),
             maybe_user_transaction_context,
             resolver,
+            block_native_state,
         )
     }
 }

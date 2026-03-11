@@ -69,6 +69,7 @@ module aptos_experimental::bulk_order_book {
     use aptos_experimental::order_id_generation::next_order_id;
     use aptos_experimental::order_book_utils;
     use aptos_experimental::bulk_order_utils;
+    use aptos_experimental::price_time_index::{native_timing_start, native_timing_end};
 
     // Error codes for various failure scenarios
     const EORDER_ALREADY_EXISTS: u64 = 1;
@@ -101,7 +102,7 @@ module aptos_experimental::bulk_order_book {
     ///
     /// # Returns:
     /// A new `BulkOrderBook` instance with empty order collections.
-    public(friend) fun new_bulk_order_book<M: store + copy + drop>(): BulkOrderBook<M> {
+    public fun new_bulk_order_book<M: store + copy + drop>(): BulkOrderBook<M> {
         BulkOrderBook::V1 {
             orders: order_book_utils::new_default_big_ordered_map(),
             order_id_to_address: order_book_utils::new_default_big_ordered_map()
@@ -127,7 +128,7 @@ module aptos_experimental::bulk_order_book {
     /// - Updates the matched order's remaining sizes
     /// - Activates the next price level if the current level is fully consumed
     /// - Updates the active order book
-    public(friend) fun get_single_match_for_taker<M: store + copy + drop>(
+    public fun get_single_match_for_taker<M: store + copy + drop>(
         self: &mut BulkOrderBook<M>,
         price_time_idx: &mut aptos_experimental::price_time_index::PriceTimeIndex,
         active_matched_order: ActiveMatchedOrder,
@@ -250,7 +251,7 @@ module aptos_experimental::bulk_order_book {
     /// # Aborts:
     /// - If the order account doesn't exist in the order book
     /// - If the reinsertion validation fails
-    public(friend) fun reinsert_order<M: store + copy + drop>(
+    public fun reinsert_order<M: store + copy + drop>(
         self: &mut BulkOrderBook<M>,
         price_time_idx: &mut aptos_experimental::price_time_index::PriceTimeIndex,
         reinsert_order: OrderMatchDetails<M>,
@@ -285,7 +286,7 @@ module aptos_experimental::bulk_order_book {
     ///
     /// # Aborts:
     /// - If no order exists for the specified account
-    public(friend) fun cancel_bulk_order<M: store + copy + drop>(
+    public fun cancel_bulk_order<M: store + copy + drop>(
         self: &mut BulkOrderBook<M>,
         price_time_idx: &mut aptos_experimental::price_time_index::PriceTimeIndex,
         account: address
@@ -323,7 +324,7 @@ module aptos_experimental::bulk_order_book {
     ///
     /// # Aborts:
     /// - If no order exists for the specified account
-    public(friend) fun cancel_bulk_order_at_price<M: store + copy + drop>(
+    public fun cancel_bulk_order_at_price<M: store + copy + drop>(
         self: &mut BulkOrderBook<M>,
         price_time_idx: &mut aptos_experimental::price_time_index::PriceTimeIndex,
         account: address,
@@ -358,7 +359,7 @@ module aptos_experimental::bulk_order_book {
         (cancelled_size, order_copy)
     }
 
-    public(friend) fun get_bulk_order<M: store + copy + drop>(
+    public fun get_bulk_order<M: store + copy + drop>(
         self: &BulkOrderBook<M>, account: address
     ): BulkOrder<M> {
         let result = self.orders.get(&account);
@@ -366,7 +367,7 @@ module aptos_experimental::bulk_order_book {
         result.destroy_some()
     }
 
-    public(friend) fun get_remaining_size<M: store + copy + drop>(
+    public fun get_remaining_size<M: store + copy + drop>(
         self: &BulkOrderBook<M>, account: address, is_bid: bool
     ): u64 {
         let result_option =
@@ -378,7 +379,7 @@ module aptos_experimental::bulk_order_book {
         result_option.destroy_some()
     }
 
-    public(friend) fun get_prices<M: store + copy + drop>(
+    public fun get_prices<M: store + copy + drop>(
         self: &BulkOrderBook<M>, account: address, is_bid: bool
     ): vector<u64> {
         let result_option =
@@ -390,7 +391,7 @@ module aptos_experimental::bulk_order_book {
         result_option.destroy_some()
     }
 
-    public(friend) fun get_sizes<M: store + copy + drop>(
+    public fun get_sizes<M: store + copy + drop>(
         self: &BulkOrderBook<M>, account: address, is_bid: bool
     ): vector<u64> {
         let result_option =
@@ -414,22 +415,24 @@ module aptos_experimental::bulk_order_book {
     ///
     /// # Aborts:
     /// - If the order request validation fails
-    public(friend) fun place_bulk_order<M: store + copy + drop>(
+    public fun place_bulk_order<M: store + copy + drop>(
         self: &mut BulkOrderBook<M>,
         price_time_idx: &mut aptos_experimental::price_time_index::PriceTimeIndex,
         order_req: BulkOrderRequest<M>
     ): BulkOrderPlaceResponse<M> {
         let account = order_req.get_account();
         let new_sequence_number = order_req.get_sequence_number();
+
+        let _t0 = native_timing_start();
         let order_option = self.orders.remove_or_none(&account);
+        native_timing_end(30, &mut _t0); // bob:orders.remove_or_none
+
         let (order_id, previous_seq_num) =
             if (order_option.is_some()) {
                 let old_order = order_option.destroy_some();
                 let existing_sequence_number =
                     old_order.get_order_request().get_sequence_number();
-                // Return rejection response instead of aborting
                 if (new_sequence_number <= existing_sequence_number) {
-                    // Put the old order back
                     self.orders.add(account, old_order);
                     return new_bulk_order_place_response_rejection(
                         account,
@@ -437,13 +440,17 @@ module aptos_experimental::bulk_order_book {
                         existing_sequence_number
                     )
                 };
+                let _t1 = native_timing_start();
                 cancel_active_orders(price_time_idx, &old_order);
+                native_timing_end(31, &mut _t1); // bob:cancel_active_orders
                 (old_order.get_order_id(), std::option::some(existing_sequence_number))
             } else {
                 let order_id = next_order_id();
                 self.order_id_to_address.add(order_id, account);
                 (order_id, std::option::none())
             };
+
+        let _t2 = native_timing_start();
         let (
             bulk_order,
             cancelled_bid_prices,
@@ -458,9 +465,16 @@ module aptos_experimental::bulk_order_book {
                 price_time_idx.best_bid_price(),
                 price_time_idx.best_ask_price()
             );
+        native_timing_end(32, &mut _t2); // bob:sanitization+best_price
+
+        let _t3 = native_timing_start();
         self.orders.add(account, bulk_order);
-        // Activate the first price levels in the active order book
+        native_timing_end(33, &mut _t3); // bob:orders.add
+
+        let _t4 = native_timing_start();
         activate_first_price_levels(price_time_idx, &bulk_order, order_id);
+        native_timing_end(34, &mut _t4); // bob:activate_levels
+
         new_bulk_order_place_response_success(
             bulk_order,
             cancelled_bid_prices,
@@ -470,6 +484,46 @@ module aptos_experimental::bulk_order_book {
             previous_seq_num
         )
     }
+
+    // ============================= Native rebuild ====================================
+
+    /// Rebuild native PriceTimeIndex from all active bulk order levels.
+    /// Called during cold start to populate the in-memory overlay.
+    public fun rebuild_native_index<M: store + copy + drop>(
+        self: &BulkOrderBook<M>,
+        market_addr: address
+    ) {
+        self.orders.for_each_ref(|_account, bulk_order| {
+            let order_req = bulk_order.get_order_request();
+            let order_id_val = bulk_order.get_order_id().get_order_id_value();
+            let idx_val = bulk_order.get_unique_priority_idx().get_increasing_idx_value();
+
+            // Active bid level
+            let bid_price = order_req.get_active_price(true);
+            if (bid_price.is_some()) {
+                let bid_size = order_req.get_active_size(true);
+                native_rebuild_add(
+                    market_addr, order_id_val, 1, bid_price.destroy_some(),
+                    idx_val, bid_size.destroy_some(), true
+                );
+            };
+
+            // Active ask level
+            let ask_price = order_req.get_active_price(false);
+            if (ask_price.is_some()) {
+                let ask_size = order_req.get_active_size(false);
+                native_rebuild_add(
+                    market_addr, order_id_val, 1, ask_price.destroy_some(),
+                    idx_val, ask_size.destroy_some(), false
+                );
+            };
+        });
+    }
+
+    native fun native_rebuild_add(
+        market_addr: address, order_id: u128, order_type: u64, price: u64,
+        unique_priority_idx: u128, size: u64, is_bid: bool
+    );
 
     #[test_only]
     public fun destroy_bulk_order_book<M: store + copy + drop>(

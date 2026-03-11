@@ -174,6 +174,13 @@ where
         &mut self,
         abstract_amount: impl GasExpression<VMGasParameters, Unit = InternalGasUnit> + Debug,
     ) -> PartialVMResult<()> {
+        // Skip gas metering if DISABLE_GAS env var is set
+        static SKIP_GAS: std::sync::LazyLock<bool> =
+            std::sync::LazyLock::new(|| std::env::var("DISABLE_GAS").is_ok());
+        if *SKIP_GAS {
+            return Ok(());
+        }
+
         self.counter_for_kill_switch += 1;
         if self.counter_for_kill_switch & 3 == 0
             && self.block_synchronization_kill_switch.interrupt_requested()

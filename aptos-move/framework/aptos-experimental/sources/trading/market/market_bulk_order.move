@@ -39,6 +39,7 @@ module aptos_experimental::market_bulk_order {
         metadata: M,
         callbacks: &MarketClearinghouseCallbacks<M, R>
     ): Option<OrderId> {
+        market.get_order_book().ensure_native_index_ready();
         let validation_result =
             callbacks.validate_bulk_order_placement(
                 account,
@@ -75,6 +76,7 @@ module aptos_experimental::market_bulk_order {
                 existing_seq_num
             );
             // Return None since the order was rejected
+            market.get_order_book().maybe_flush_handle();
             return option::none()
         };
 
@@ -131,6 +133,7 @@ module aptos_experimental::market_bulk_order {
             &cancelled_ask_sizes,
             &order_metadata
         );
+        market.get_order_book().maybe_flush_handle();
         option::some(order_id)
     }
 
@@ -149,6 +152,7 @@ module aptos_experimental::market_bulk_order {
         cancellation_reason: market_types::OrderCancellationReason,
         callbacks: &MarketClearinghouseCallbacks<M, R>
     ) {
+        market.get_order_book().ensure_native_index_ready();
         let account = signer::address_of(user);
         cancel_bulk_order_internal(
             market,
@@ -156,6 +160,7 @@ module aptos_experimental::market_bulk_order {
             cancellation_reason,
             callbacks
         );
+        market.get_order_book().maybe_flush_handle();
     }
 
     public(friend) fun cancel_bulk_order_internal<M: store + copy + drop, R: store + copy + drop>(

@@ -79,13 +79,14 @@ It it the caller's responsibility to ensure that the account is authorized to ca
     cancel_reason: String,
     callbacks: &MarketClearinghouseCallbacks&lt;M, R&gt;
 ) {
+    market.get_order_book().ensure_native_index_ready();
     <b>let</b> order =
         market.get_order_book_mut().try_cancel_single_order_with_client_order_id(
             user, client_order_id
         );
     <b>if</b> (order.is_some()) {
         // Order is already placed in the order book, so we can cancel it
-        <b>return</b> <a href="order_operations.md#0x7_order_operations_cancel_single_order_helper">cancel_single_order_helper</a>(
+        <a href="order_operations.md#0x7_order_operations_cancel_single_order_helper">cancel_single_order_helper</a>(
             market,
             order.destroy_some(),
             <b>true</b>,
@@ -93,12 +94,15 @@ It it the caller's responsibility to ensure that the account is authorized to ca
             cancel_reason,
             callbacks
         );
+        market.get_order_book().maybe_flush_handle();
+        <b>return</b>;
     };
     pre_cancel_order_for_tracker(
         market.get_pre_cancellation_tracker_mut(),
         user,
         client_order_id
     );
+    market.get_order_book().maybe_flush_handle();
 }
 </code></pre>
 
@@ -142,6 +146,7 @@ It it the caller's responsibility to ensure that the account is authorized to ca
     cancel_reason: String,
     callbacks: &MarketClearinghouseCallbacks&lt;M, R&gt;
 ): SingleOrder&lt;M&gt; {
+    market.get_order_book().ensure_native_index_ready();
     <b>let</b> order = market.get_order_book_mut().cancel_single_order(<a href="../../aptos-framework/doc/account.md#0x1_account">account</a>, order_id);
     <a href="order_operations.md#0x7_order_operations_cancel_single_order_helper">cancel_single_order_helper</a>(
         market,
@@ -151,6 +156,7 @@ It it the caller's responsibility to ensure that the account is authorized to ca
         cancel_reason,
         callbacks
     );
+    market.get_order_book().maybe_flush_handle();
     order
 }
 </code></pre>
@@ -186,9 +192,10 @@ if it was successfully cancelled, or None if the order does not exist.
     cancel_reason: String,
     callbacks: &MarketClearinghouseCallbacks&lt;M, R&gt;
 ): <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;SingleOrder&lt;M&gt;&gt; {
+    market.get_order_book().ensure_native_index_ready();
     <b>let</b> maybe_order =
         market.get_order_book_mut().try_cancel_single_order(<a href="../../aptos-framework/doc/account.md#0x1_account">account</a>, order_id);
-    <b>if</b> (maybe_order.is_some()) {
+    <b>let</b> result = <b>if</b> (maybe_order.is_some()) {
         <b>let</b> order = maybe_order.destroy_some();
         <a href="order_operations.md#0x7_order_operations_cancel_single_order_helper">cancel_single_order_helper</a>(
             market,
@@ -201,7 +208,9 @@ if it was successfully cancelled, or None if the order does not exist.
         <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_some">option::some</a>(order)
     } <b>else</b> {
         <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_none">option::none</a>()
-    }
+    };
+    market.get_order_book().maybe_flush_handle();
+    result
 }
 </code></pre>
 
@@ -242,6 +251,7 @@ It it the caller's responsibility to ensure that the account is authorized to mo
     size_delta: u64,
     callbacks: &MarketClearinghouseCallbacks&lt;M, R&gt;
 ) {
+    market.get_order_book().ensure_native_index_ready();
     <b>let</b> <a href="order_book.md#0x7_order_book">order_book</a> = market.get_order_book_mut();
     <a href="order_book.md#0x7_order_book">order_book</a>.decrease_single_order_size(<a href="../../aptos-framework/doc/account.md#0x1_account">account</a>, order_id, size_delta);
     <b>let</b> (order, _) =
@@ -293,6 +303,7 @@ It it the caller's responsibility to ensure that the account is authorized to mo
         <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_none">option::none</a>(),
         callbacks
     );
+    market.get_order_book().maybe_flush_handle();
 }
 </code></pre>
 

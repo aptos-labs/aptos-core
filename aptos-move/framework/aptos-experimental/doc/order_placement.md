@@ -578,7 +578,8 @@ Returns the order id, remaining size, cancel reason and number of fills for the 
     cancel_on_match_limit: bool,
     callbacks: &MarketClearinghouseCallbacks&lt;M, R&gt;
 ): <a href="order_placement.md#0x7_order_placement_OrderMatchResult">OrderMatchResult</a>&lt;R&gt; {
-    <a href="order_placement.md#0x7_order_placement_place_order_with_order_id">place_order_with_order_id</a>(
+    market.get_order_book().ensure_native_index_ready();
+    <b>let</b> result = <a href="order_placement.md#0x7_order_placement_place_order_with_order_id">place_order_with_order_id</a>(
         market,
         <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(user),
         limit_price,
@@ -594,7 +595,9 @@ Returns the order id, remaining size, cancel reason and number of fills for the 
         cancel_on_match_limit,
         <b>true</b>,
         callbacks
-    )
+    );
+    market.get_order_book().maybe_flush_handle();
+    result
 }
 </code></pre>
 
@@ -629,7 +632,8 @@ Places a market order - The order is guaranteed to be a taker order and will be 
     cancel_on_match_limit: bool,
     callbacks: &MarketClearinghouseCallbacks&lt;M, R&gt;
 ): <a href="order_placement.md#0x7_order_placement_OrderMatchResult">OrderMatchResult</a>&lt;R&gt; {
-    <a href="order_placement.md#0x7_order_placement_place_order_with_order_id">place_order_with_order_id</a>(
+    market.get_order_book().ensure_native_index_ready();
+    <b>let</b> result = <a href="order_placement.md#0x7_order_placement_place_order_with_order_id">place_order_with_order_id</a>(
         market,
         <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(user),
         <b>if</b> (is_bid) {
@@ -647,7 +651,9 @@ Places a market order - The order is guaranteed to be a taker order and will be 
         cancel_on_match_limit,
         <b>true</b>,
         callbacks
-    )
+    );
+    market.get_order_book().maybe_flush_handle();
+    result
 }
 </code></pre>
 

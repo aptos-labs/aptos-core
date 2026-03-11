@@ -886,6 +886,21 @@ module std::features {
     }
 
     // ============================================================================================
+    // Native Order Book
+    // Use native Rust-backed PriceTimeIndex overlay for order book operations.
+    // When enabled, new markets use in-memory BTreeMaps instead of BigOrderedMap.
+
+    const NATIVE_ORDER_BOOK: u64 = 110;
+
+    public fun get_native_order_book_feature(): u64 {
+        NATIVE_ORDER_BOOK
+    }
+
+    public fun is_native_order_book_enabled(): bool {
+        is_enabled(NATIVE_ORDER_BOOK)
+    }
+
+    // ============================================================================================
     // Feature Flag Implementation
 
     /// The provided signer has not a framework address.

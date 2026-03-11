@@ -17,6 +17,8 @@ use aptos_framework_natives::{
     state_storage::NativeStateStorageContext,
     transaction_context::NativeTransactionContext,
 };
+use aptos_order_book_natives::NativeOrderBookContext;
+use std::sync::Arc;
 use aptos_table_natives::{NativeTableContext, TableChangeSet};
 use aptos_types::{
     chain_id::ChainId, contract_event::ContractEvent, on_chain_config::Features,
@@ -88,6 +90,7 @@ where
         vm_config: &VMConfig,
         maybe_user_transaction_context: Option<UserTransactionContext>,
         resolver: &'r R,
+        block_native_state: Option<Arc<aptos_order_book_natives::BlockNativeState>>,
     ) -> Self {
         let extensions = make_aptos_extensions(
             resolver,
@@ -95,6 +98,7 @@ where
             vm_config,
             session_id,
             maybe_user_transaction_context,
+            block_native_state,
         );
 
         let is_storage_slot_metadata_enabled = features.is_storage_slot_metadata_enabled();
@@ -241,9 +245,17 @@ where
         let event_context: NativeEventContext = extensions.remove();
         let events = event_context.legacy_into_events();
 
+        // Finalize the native order book context — moves overlays into BlockNativeState.layers.
+        // Auto-flushes modified overlays that weren't explicitly flushed via maybe_flush_handle.
+        // Must happen before apply_updates publishes handles to MVHashMap.
+        let order_book_context: NativeOrderBookContext = extensions.remove();
+        let _finish_start = std::time::Instant::now();
+        let auto_flushed = order_book_context.finalize();
+        let _finalize_elapsed = _finish_start.elapsed();
+
         let woc = WriteOpConverter::new(resolver, is_storage_slot_metadata_enabled);
 
-        let change_set = Self::convert_change_set(
+        let mut change_set = Self::convert_change_set(
             &woc,
             change_set,
             resource_group_change_set,
@@ -253,6 +265,61 @@ where
             configs.legacy_resource_creation_as_modification(),
         )
         .map_err(|e| e.finish(Location::Undefined))?;
+
+        // Inject OrderBookVersion resource writes for auto-flushed markets.
+        let _auto_flush_count = auto_flushed.len();
+        if !auto_flushed.is_empty() {
+            use aptos_vm_types::abstract_write_op::AbstractResourceWriteOp;
+            use move_core_types::account_address::AccountAddress;
+            use std::collections::BTreeMap;
+
+            let order_book_version_tag = StructTag {
+                address: AccountAddress::from_hex_literal("0x7")
+                    .expect("aptos_experimental address"),
+                module: move_core_types::identifier::Identifier::new("order_book").unwrap(),
+                name: move_core_types::identifier::Identifier::new("OrderBookVersion").unwrap(),
+                type_args: vec![],
+            };
+
+            let mut additional_writes = BTreeMap::new();
+            for (market_addr, new_handle) in auto_flushed {
+                let state_key = StateKey::resource(&market_addr, &order_book_version_tag)
+                    .expect("construct OrderBookVersion state key");
+                let handle_bytes = bcs::to_bytes(&new_handle).expect("serialize handle");
+                additional_writes.insert(
+                    state_key,
+                    AbstractResourceWriteOp::Write(
+                        WriteOp::legacy_modification(handle_bytes.into()),
+                    ),
+                );
+            }
+
+            let additional_change_set = VMChangeSet::new(
+                additional_writes,
+                vec![],
+                BTreeMap::new(),
+                BTreeMap::new(),
+                BTreeMap::new(),
+            );
+            change_set
+                .squash_additional_change_set(additional_change_set)
+                .map_err(|e| e.finish(Location::Undefined))?;
+        }
+
+        static FINISH_CALLS: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
+        static FINISH_NANOS: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
+        static AUTOFLUSH_COUNT: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
+        let finish_elapsed = _finish_start.elapsed();
+        FINISH_CALLS.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+        FINISH_NANOS.fetch_add(finish_elapsed.as_nanos() as u64, std::sync::atomic::Ordering::Relaxed);
+        AUTOFLUSH_COUNT.fetch_add(_auto_flush_count as u64, std::sync::atomic::Ordering::Relaxed);
+        let calls = FINISH_CALLS.load(std::sync::atomic::Ordering::Relaxed);
+        if calls % 5000 == 0 {
+            let nanos = FINISH_NANOS.load(std::sync::atomic::Ordering::Relaxed);
+            let af = AUTOFLUSH_COUNT.load(std::sync::atomic::Ordering::Relaxed);
+            eprintln!("[SESSION-FINISH] calls={} total={:.1}ms avg={:.0}ns auto_flushed={}",
+                calls, nanos as f64 / 1_000_000.0, nanos as f64 / calls as f64, af);
+        }
 
         Ok(change_set)
     }
@@ -559,6 +626,7 @@ pub(crate) fn make_aptos_extensions<'a, DataView>(
     vm_config: &VMConfig,
     session_id: SessionId,
     user_transaction_context: Option<UserTransactionContext>,
+    block_native_state: Option<Arc<aptos_order_book_natives::BlockNativeState>>,
 ) -> NativeContextExtensions<'a>
 where
     DataView: AptosMoveResolver,
@@ -592,5 +660,9 @@ where
     extensions.add(NativeStateStorageContext::new(data_view));
     extensions.add(NativeEventContext::default());
     extensions.add(NativeObjectContext::default());
+    match block_native_state {
+        Some(state) => extensions.add(NativeOrderBookContext::new_with_block_state(state)),
+        None => extensions.add(NativeOrderBookContext::new()),
+    }
     extensions
 }

@@ -734,6 +734,10 @@ pub struct SingleRunAdditionalConfigs {
     pub num_generator_workers: usize,
     pub split_stages: bool,
     pub enable_indexer_grpc: bool,
+    /// Optional feature flags to disable (on top of default_benchmark_features).
+    pub disable_features: Vec<FeatureFlag>,
+    /// Allow transaction aborts (needed for native orderbook speculative execution).
+    pub allow_aborts: bool,
 }
 
 pub fn run_single_with_default_params(
@@ -857,6 +861,17 @@ pub fn run_single_with_default_params(
         } => enable_indexer_grpc,
     };
 
+    let disable_features = match &mode {
+        SingleRunMode::BENCHMARK {
+            additional_configs:
+                Some(SingleRunAdditionalConfigs {
+                    disable_features, ..
+                }),
+            ..
+        } => disable_features.clone(),
+        _ => vec![],
+    };
+
     let num_main_signer_accounts = num_accounts / 5;
     let num_dst_pool_accounts = num_accounts / 2;
 
@@ -865,7 +880,10 @@ pub fn run_single_with_default_params(
 
     println!("db_generator::create_db_with_accounts");
 
-    let features = default_benchmark_features();
+    let mut features = default_benchmark_features();
+    for feature in &disable_features {
+        features.disable(*feature);
+    }
 
     let init_pipeline_config = PipelineConfig {
         num_sig_verify_threads: std::cmp::max(1, num_cpus::get() / 3),
@@ -887,11 +905,32 @@ pub fn run_single_with_default_params(
         storage_test_config,
         verify_sequence_numbers,
         init_pipeline_config,
-        default_benchmark_features(),
+        features.clone(),
         is_keyless,
     );
 
     println!("run_benchmark");
+
+    // Disable paranoid type checks if env var is set
+    if std::env::var("DISABLE_PARANOID").is_ok() {
+        aptos_vm_environment::prod_configs::set_paranoid_type_checks(false);
+        eprintln!("[BENCH] Paranoid type checks DISABLED");
+    } else {
+        eprintln!("[BENCH] Paranoid type checks ENABLED (default)");
+    }
+
+    // Reset all timing stats to exclude setup phase from measurements
+    move_vm_runtime::data_cache::reset_resource_load_stats();
+    aptos_order_book_natives::reset_native_timing_stats();
+    aptos_vm::aptos_vm::reset_vm_timing_stats();
+
+    let allow_aborts = match &mode {
+        SingleRunMode::BENCHMARK {
+            additional_configs: Some(SingleRunAdditionalConfigs { allow_aborts, .. }),
+            ..
+        } => *allow_aborts,
+        _ => false,
+    };
 
     let execute_pipeline_config = PipelineConfig {
         generate_then_execute: true,
@@ -899,6 +938,7 @@ pub fn run_single_with_default_params(
         print_transactions,
         num_generator_workers,
         split_stages,
+        allow_aborts,
         wait_for_indexer_grpc: enable_indexer_grpc,
         ..Default::default()
     };
@@ -1359,4 +1399,98 @@ mod tests {
             },
         );
     }
+
+    fn run_orderbook_benchmark(transaction_type: TransactionTypeArg) {
+        aptos_logger::Logger::new().init();
+        AptosVM::set_num_shards_once(1);
+        AptosVM::set_concurrency_level_once(8);
+        AptosVM::set_processed_transactions_detailed_counters();
+
+        let storage_dir = TempPath::new();
+        let checkpoint_dir = TempPath::new();
+        let storage_test_config = StorageTestConfig {
+            pruner_config: NO_OP_STORAGE_PRUNER_CONFIG,
+            enable_indexer_grpc: false,
+        };
+        let features = default_benchmark_features();
+
+        crate::db_generator::create_db_with_accounts::<AptosVMBlockExecutor>(
+            1000000,
+            100000 * 100000000,
+            50000,
+            storage_dir.as_ref(),
+            storage_test_config,
+            false,
+            PipelineConfig::default(),
+            features.clone(),
+            false,
+        );
+
+        super::run_benchmark::<AptosVMBlockExecutor>(
+            1000,   /* block_size */
+            10000,  /* num_blocks */
+            BenchmarkWorkload::TransactionMix(vec![(
+                transaction_type
+                    .materialize(1, true, WorkflowProgress::MoveByPhases),
+                1,
+            )]),
+            1,       /* transactions_per_sender */
+            500000,  /* num_main_signer_accounts */
+            100000,  /* num_dst_pool_accounts */
+            storage_dir.as_ref(),
+            checkpoint_dir,
+            false,
+            storage_test_config,
+            PipelineConfig {
+                generate_then_execute: true,
+                allow_aborts: true,
+                ..Default::default()
+            },
+            features,
+            false,
+        );
+    }
+
+    #[test]
+    fn test_orderbook_v1_80pct_1market() {
+        run_orderbook_benchmark(TransactionTypeArg::OrderBookBalancedMatches80Pct1Market);
+    }
+
+    #[test]
+    fn test_native_orderbook_80pct_1market() {
+        run_orderbook_benchmark(TransactionTypeArg::NativeOrderBookBalancedMatches80Pct1Market);
+    }
+
+    #[test]
+    fn test_orderbook_v1_no_matches_1market() {
+        run_orderbook_benchmark(TransactionTypeArg::OrderBookNoMatches1Market);
+    }
+
+    #[test]
+    fn test_native_orderbook_no_matches_1market() {
+        run_orderbook_benchmark(TransactionTypeArg::NativeOrderBookNoMatches1Market);
+    }
+
+    #[test]
+    fn test_orderbook_v1_80pct_50markets() {
+        run_orderbook_benchmark(TransactionTypeArg::OrderBookBalancedMatches80Pct50Markets);
+    }
+
+    #[test]
+    fn test_native_orderbook_80pct_50markets() {
+        run_orderbook_benchmark(TransactionTypeArg::NativeOrderBookBalancedMatches80Pct50Markets);
+    }
+
+    #[test]
+    fn test_orderbook_v1_no_matches_50markets() {
+        run_orderbook_benchmark(TransactionTypeArg::OrderBookNoMatches50Markets);
+    }
+
+    #[test]
+    fn test_native_orderbook_no_matches_50markets() {
+        run_orderbook_benchmark(TransactionTypeArg::NativeOrderBookNoMatches50Markets);
+    }
+
+
+
 }

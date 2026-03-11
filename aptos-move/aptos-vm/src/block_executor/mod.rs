@@ -54,6 +54,11 @@ use std::{
 use triomphe::Arc as TriompheArc;
 use vm_wrapper::AptosExecutorTask;
 
+/// Global committed order book state, shared across all block executions.
+/// Each block creates a BlockNativeState from this, and promotes back on commit.
+static COMMITTED_ORDER_BOOK_STATE: Lazy<aptos_order_book_natives::CommittedOrderBookState> =
+    Lazy::new(aptos_order_book_natives::CommittedOrderBookState::new);
+
 static RAYON_EXEC_POOL: Lazy<Arc<rayon::ThreadPool>> = Lazy::new(|| {
     Arc::new(
         rayon::ThreadPoolBuilder::new()
@@ -542,6 +547,17 @@ impl<
             transaction_slice_metadata,
         )?;
 
+        // Create per-block native state for order book overlays from committed state.
+        // All TX sessions in this block share it via Arc.
+        let block_native_state = std::sync::Arc::new(
+            aptos_order_book_natives::BlockNativeState::from_committed(
+                &COMMITTED_ORDER_BOOK_STATE
+            )
+        );
+        module_cache_manager_guard
+            .environment_mut()
+            .set_block_native_state(block_native_state.clone());
+
         let executor =
             BlockExecutor::<SignatureVerifiedTransaction, E, S, L, TP, AuxiliaryInfo>::new(
                 config,
@@ -571,6 +587,13 @@ impl<
                     // can even lead to concurrent execute_block invocations, leading to errors on flush.
                     flush_speculative_logs(pos);
                 }
+
+                // Finalize the per-block native state for order book overlays.
+                // Flatten layer chains into new bases and promote to committed state.
+                drop(module_cache_manager_guard); // Release environment's Arc clone
+                // Finalize through the Arc (DashMap allows interior mutability).
+                block_native_state.finalize_block();
+                COMMITTED_ORDER_BOOK_STATE.commit(&block_native_state);
 
                 Ok(BlockOutput::new(output_vec, block_epilogue_txn))
             },

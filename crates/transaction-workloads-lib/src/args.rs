@@ -101,6 +101,12 @@ pub enum TransactionTypeArg {
     /// That means we will match rarely, but single match will be creating ~100 positions
     OrderBookBalancedSizeSkewed80Pct1Market,
     OrderBookBalancedSizeSkewed80Pct50Markets,
+    /// Native order book variants — same workloads but using Rust-backed PriceTimeIndex overlay.
+    /// Requires NATIVE_ORDER_BOOK feature flag.
+    NativeOrderBookNoMatches1Market,
+    NativeOrderBookNoMatches50Markets,
+    NativeOrderBookBalancedMatches80Pct1Market,
+    NativeOrderBookBalancedMatches80Pct50Markets,
     // Monotonic counter throughput tests
     MonotonicCounterSingle,
     MonotonicCounterMultiple10,
@@ -470,6 +476,37 @@ impl TransactionTypeArg {
                     buy_frequency: 0.01,
                     max_sell_size: 50,
                     max_buy_size: 950,
+                })
+            },
+            // Native order book variants — same workload params, different Move module
+            TransactionTypeArg::NativeOrderBookNoMatches1Market
+            | TransactionTypeArg::NativeOrderBookNoMatches50Markets => {
+                call_custom_module(EntryPoints::NativeOrderBook {
+                    state: OrderBookState::new(),
+                    num_markets: if let TransactionTypeArg::NativeOrderBookNoMatches50Markets = self {
+                        50
+                    } else {
+                        1
+                    },
+                    overlap_ratio: 0.0,
+                    buy_frequency: 0.5,
+                    max_sell_size: 1,
+                    max_buy_size: 1,
+                })
+            },
+            TransactionTypeArg::NativeOrderBookBalancedMatches80Pct1Market
+            | TransactionTypeArg::NativeOrderBookBalancedMatches80Pct50Markets => {
+                call_custom_module(EntryPoints::NativeOrderBook {
+                    state: OrderBookState::new(),
+                    num_markets: if let TransactionTypeArg::NativeOrderBookBalancedMatches80Pct50Markets = self {
+                        50
+                    } else {
+                        1
+                    },
+                    overlap_ratio: 0.8,
+                    buy_frequency: 0.5,
+                    max_sell_size: 1,
+                    max_buy_size: 1,
                 })
             },
             TransactionTypeArg::MonotonicCounterSingle => {

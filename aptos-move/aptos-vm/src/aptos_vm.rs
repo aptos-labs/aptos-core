@@ -1,6 +1,13 @@
 // Copyright (c) Aptos Foundation
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
+static VM_TX_RESET_FLAG: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
+
+pub fn reset_vm_timing_stats() {
+    VM_TX_RESET_FLAG.store(1, std::sync::atomic::Ordering::Relaxed);
+    eprintln!("[VM-TX] Reset requested");
+}
+
 use crate::{
     block_executor::AptosVMBlockExecutorWrapper,
     counters::*,
@@ -309,6 +316,8 @@ pub struct AptosVM {
     /// so, Block-STM replays the trace and performs these checks at post-commit time once. Note
     /// that checks might still be performed in-place based on a heuristic such as payload type.
     async_runtime_checks_enabled: bool,
+    /// Per-block native state for order book overlay, shared across TXs via Arc.
+    block_native_state: Option<Arc<aptos_order_book_natives::BlockNativeState>>,
 }
 
 impl AptosVM {
@@ -322,6 +331,7 @@ impl AptosVM {
             // There is no tracing by default because it can only be done if there is access to
             // Block-STM.
             async_runtime_checks_enabled: false,
+            block_native_state: env.block_native_state().cloned(),
         }
     }
 
@@ -342,7 +352,7 @@ impl AptosVM {
         user_transaction_context_opt: Option<UserTransactionContext>,
     ) -> SessionExt<'r, R> {
         self.move_vm
-            .new_session(resolver, session_id, user_transaction_context_opt)
+            .new_session(resolver, session_id, user_transaction_context_opt, self.block_native_state.clone())
     }
 
     #[inline(always)]
@@ -2047,6 +2057,23 @@ impl AptosVM {
         gas_meter: &mut impl AptosGasMeter,
         mut trace_recorder: impl TraceRecorder,
     ) -> (VMStatus, VMOutput) {
+        use std::sync::atomic::{AtomicU64, Ordering as AO};
+        static TX_CALLS: AtomicU64 = AtomicU64::new(0);
+        static TX_PROLOGUE_NS: AtomicU64 = AtomicU64::new(0);
+        static TX_PAYLOAD_NS: AtomicU64 = AtomicU64::new(0);
+        static TX_EPILOGUE_NS: AtomicU64 = AtomicU64::new(0);
+        static TX_TOTAL_NS: AtomicU64 = AtomicU64::new(0);
+        // Check for reset
+        if VM_TX_RESET_FLAG.compare_exchange(1, 0, AO::Relaxed, AO::Relaxed).is_ok() {
+            TX_CALLS.store(0, AO::Relaxed);
+            TX_PROLOGUE_NS.store(0, AO::Relaxed);
+            TX_PAYLOAD_NS.store(0, AO::Relaxed);
+            TX_EPILOGUE_NS.store(0, AO::Relaxed);
+            TX_TOTAL_NS.store(0, AO::Relaxed);
+            eprintln!("[VM-TIMING] Counters reset");
+        }
+
+        let tx_t0 = std::time::Instant::now();
         let _timer = VM_TIMER.timer_with_label("AptosVM::execute_user_transaction_impl");
 
         let traversal_storage = TraversalStorage::new();
@@ -2110,6 +2137,7 @@ impl AptosVM {
         }
         drop(should_create_account_resource_timer);
 
+        let tx_t1 = std::time::Instant::now(); // end of prologue
         let payload_timer =
             VM_TIMER.timer_with_label("AptosVM::execute_user_transaction_impl [payload]");
 
@@ -2152,6 +2180,7 @@ impl AptosVM {
             )
         };
         drop(payload_timer);
+        let tx_t2 = std::time::Instant::now(); // end of payload
 
         let gas_usage = txn_data
             .max_gas_amount()
@@ -2195,6 +2224,26 @@ impl AptosVM {
             .is_ok_and(|s| s.is_success())
         {
             output.set_trace(trace_recorder.finish());
+        }
+
+        let tx_t3 = std::time::Instant::now(); // end of epilogue/cleanup
+
+        let c = TX_CALLS.fetch_add(1, AO::Relaxed) + 1;
+        TX_PROLOGUE_NS.fetch_add((tx_t1 - tx_t0).as_nanos() as u64, AO::Relaxed);
+        TX_PAYLOAD_NS.fetch_add((tx_t2 - tx_t1).as_nanos() as u64, AO::Relaxed);
+        TX_EPILOGUE_NS.fetch_add((tx_t3 - tx_t2).as_nanos() as u64, AO::Relaxed);
+        TX_TOTAL_NS.fetch_add((tx_t3 - tx_t0).as_nanos() as u64, AO::Relaxed);
+
+        if c % 10000 == 0 {
+            let pro = TX_PROLOGUE_NS.load(AO::Relaxed);
+            let pay = TX_PAYLOAD_NS.load(AO::Relaxed);
+            let epi = TX_EPILOGUE_NS.load(AO::Relaxed);
+            let tot = TX_TOTAL_NS.load(AO::Relaxed);
+            eprintln!(
+                "[VM-TX] calls={} total={:.1}ms avg={:.0}μs | prologue={:.0}μs payload={:.0}μs epilogue={:.0}μs",
+                c, tot as f64/1e6, tot as f64/c as f64/1000.0,
+                pro as f64/c as f64/1000.0, pay as f64/c as f64/1000.0, epi as f64/c as f64/1000.0
+            );
         }
 
         (vm_status, output)

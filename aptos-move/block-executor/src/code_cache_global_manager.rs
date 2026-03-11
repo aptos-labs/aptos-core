@@ -286,6 +286,18 @@ impl AptosModuleCacheManagerGuard<'_> {
         }
     }
 
+    /// Returns a mutable reference to the environment.
+    pub fn environment_mut(&mut self) -> &mut AptosEnvironment {
+        use AptosModuleCacheManagerGuard::*;
+        match self {
+            Guard { guard } => guard
+                .environment
+                .as_mut()
+                .expect("Guard always has environment set"),
+            None { environment, .. } => environment,
+        }
+    }
+
     /// Returns the mutable references to the module cache.
     pub fn module_cache_mut(
         &mut self,

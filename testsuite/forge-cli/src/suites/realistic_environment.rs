@@ -42,6 +42,7 @@ pub(crate) fn get_realistic_env_test(
         "realistic_env_load_sweep" => realistic_env_load_sweep_test(),
         "realistic_env_workload_sweep" => realistic_env_workload_sweep_test(),
         "realistic_env_orderbook_workload_sweep" => realistic_env_orderbook_workload_sweep_bench(),
+        "realistic_env_native_orderbook_workload_sweep" => realistic_env_native_orderbook_workload_sweep_bench(),
         "realistic_env_fairness_workload_sweep" => realistic_env_fairness_workload_sweep(),
         "realistic_env_graceful_workload_sweep" => realistic_env_graceful_workload_sweep(),
         "realistic_env_graceful_overload" => realistic_env_graceful_overload(duration),
@@ -208,6 +209,75 @@ pub(crate) fn realistic_env_orderbook_workload_sweep_bench() -> ForgeConfig {
             (1500, 5, 0.3 + 1.5, 0.4, 0.5),
             (320, 100, 0.3 + 1.0, 0.4, 0.2),
             (1700, 100, 0.3 + 1.0, 0.4, 0.7),
+        ]
+        .into_iter()
+        .map(
+            |(
+                min_tps,
+                max_expired,
+                mempool_to_block_creation,
+                proposal_to_ordered,
+                ordered_to_commit,
+            )| {
+                SuccessCriteria::new(min_tps)
+                    .add_max_expired_tps(max_expired as f64)
+                    .add_max_failed_submission_tps(200.0)
+                    .add_no_restarts()
+                    .add_latency_breakdown_threshold(LatencyBreakdownThreshold::new_strict(vec![
+                        (
+                            LatencyBreakdownSlice::MempoolToBlockCreation,
+                            mempool_to_block_creation,
+                        ),
+                        (
+                            LatencyBreakdownSlice::ConsensusProposalToOrdered,
+                            proposal_to_ordered,
+                        ),
+                        (
+                            LatencyBreakdownSlice::ConsensusOrderedToCommit,
+                            ordered_to_commit,
+                        ),
+                    ]))
+            },
+        )
+        .collect(),
+        background_traffic: background_traffic_for_sweep(5),
+    })
+}
+
+/// Native orderbook benchmark — A/B comparison with V1.
+/// Uses the same workload patterns as V1 but with Rust-backed PriceTimeIndex overlay.
+/// TPS targets are set higher than V1 to validate the performance improvement.
+pub(crate) fn realistic_env_native_orderbook_workload_sweep_bench() -> ForgeConfig {
+    realistic_env_sweep_wrap(7, 3, LoadVsPerfBenchmark {
+        test: Box::new(PerformanceBenchmark),
+        workloads: Workloads::TRANSACTIONS(vec![
+            TransactionWorkload::new(
+                TransactionTypeArg::NativeOrderBookNoMatches1Market,
+                1000,
+            ),
+            TransactionWorkload::new(
+                TransactionTypeArg::NativeOrderBookNoMatches50Markets,
+                5000,
+            ),
+            TransactionWorkload::new(
+                TransactionTypeArg::NativeOrderBookBalancedMatches80Pct1Market,
+                1000,
+            ),
+            TransactionWorkload::new(
+                TransactionTypeArg::NativeOrderBookBalancedMatches80Pct50Markets,
+                5000,
+            ),
+        ]),
+        // Target TPS is higher than V1 (V1: 320-2000, NativeV2: 800-4500+)
+        criteria: [
+            // NativeNoMatches1Market: minimal contention
+            (600, 100, 0.3 + 1.0, 0.4, 0.2),
+            // NativeNoMatches50Markets: high parallelism
+            (3000, 100, 0.3 + 1.0, 0.4, 0.5),
+            // NativeBalancedMatches80Pct1Market: high contention, single market
+            (800, 300, 0.3 + 1.0, 0.4, 0.2),
+            // NativeBalancedMatches80Pct50Markets: high contention, multi-market
+            (4500, 500, 0.3 + 1.0, 0.4, 0.5),
         ]
         .into_iter()
         .map(

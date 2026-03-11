@@ -38,13 +38,14 @@ module aptos_experimental::order_operations {
         cancel_reason: String,
         callbacks: &MarketClearinghouseCallbacks<M, R>
     ) {
+        market.get_order_book().ensure_native_index_ready();
         let order =
             market.get_order_book_mut().try_cancel_single_order_with_client_order_id(
                 user, client_order_id
             );
         if (order.is_some()) {
             // Order is already placed in the order book, so we can cancel it
-            return cancel_single_order_helper(
+            cancel_single_order_helper(
                 market,
                 order.destroy_some(),
                 true,
@@ -52,12 +53,15 @@ module aptos_experimental::order_operations {
                 cancel_reason,
                 callbacks
             );
+            market.get_order_book().maybe_flush_handle();
+            return;
         };
         pre_cancel_order_for_tracker(
             market.get_pre_cancellation_tracker_mut(),
             user,
             client_order_id
         );
+        market.get_order_book().maybe_flush_handle();
     }
 
     /// Cancels an order by order ID.
@@ -81,6 +85,7 @@ module aptos_experimental::order_operations {
         cancel_reason: String,
         callbacks: &MarketClearinghouseCallbacks<M, R>
     ): SingleOrder<M> {
+        market.get_order_book().ensure_native_index_ready();
         let order = market.get_order_book_mut().cancel_single_order(account, order_id);
         cancel_single_order_helper(
             market,
@@ -90,6 +95,7 @@ module aptos_experimental::order_operations {
             cancel_reason,
             callbacks
         );
+        market.get_order_book().maybe_flush_handle();
         order
     }
 
@@ -105,9 +111,10 @@ module aptos_experimental::order_operations {
         cancel_reason: String,
         callbacks: &MarketClearinghouseCallbacks<M, R>
     ): option::Option<SingleOrder<M>> {
+        market.get_order_book().ensure_native_index_ready();
         let maybe_order =
             market.get_order_book_mut().try_cancel_single_order(account, order_id);
-        if (maybe_order.is_some()) {
+        let result = if (maybe_order.is_some()) {
             let order = maybe_order.destroy_some();
             cancel_single_order_helper(
                 market,
@@ -120,7 +127,9 @@ module aptos_experimental::order_operations {
             option::some(order)
         } else {
             option::none()
-        }
+        };
+        market.get_order_book().maybe_flush_handle();
+        result
     }
 
     /// Reduces the size of an existing order.
@@ -141,6 +150,7 @@ module aptos_experimental::order_operations {
         size_delta: u64,
         callbacks: &MarketClearinghouseCallbacks<M, R>
     ) {
+        market.get_order_book().ensure_native_index_ready();
         let order_book = market.get_order_book_mut();
         order_book.decrease_single_order_size(account, order_id, size_delta);
         let (order, _) =
@@ -192,6 +202,7 @@ module aptos_experimental::order_operations {
             option::none(),
             callbacks
         );
+        market.get_order_book().maybe_flush_handle();
     }
 
     #[lint::skip(needless_mutable_reference)]

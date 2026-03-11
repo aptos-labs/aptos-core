@@ -13,6 +13,15 @@ use crate::{
     Loader, ModuleStorage,
 };
 use bytes::Bytes;
+use std::sync::atomic::{AtomicU64, Ordering as AtomicOrd};
+
+/// Reset resource load stats counters. Call at start of benchmark phase to exclude setup.
+pub fn reset_resource_load_stats() {
+    RESET_RESOURCE_LOAD_FLAG.store(1, AtomicOrd::Relaxed);
+    eprintln!("[RL] Reset requested");
+}
+
+static RESET_RESOURCE_LOAD_FLAG: AtomicU64 = AtomicU64::new(0);
 use move_binary_format::errors::*;
 use move_core_types::{
     account_address::AccountAddress,
@@ -273,10 +282,40 @@ impl TransactionDataCache {
         addr: &AccountAddress,
         ty: &Type,
     ) -> PartialVMResult<(DataCacheEntry, NumBytes)> {
+        use std::sync::atomic::{AtomicU64, Ordering as AO};
+        static RL_CALLS: AtomicU64 = AtomicU64::new(0);
+        static RL_FETCH_NANOS: AtomicU64 = AtomicU64::new(0);
+        static RL_DESER_NANOS: AtomicU64 = AtomicU64::new(0);
+        static RL_TOTAL_NANOS: AtomicU64 = AtomicU64::new(0);
+        static RL_BYTES: AtomicU64 = AtomicU64::new(0);
+        // Size buckets: 0=empty, 1=1-100B, 2=101-500B, 3=501B-2KB, 4=2-10KB, 5=10KB+
+        const NB: usize = 6;
+        static B_CALLS: [AtomicU64; NB] = { const Z: AtomicU64 = AtomicU64::new(0); [Z; NB] };
+        static B_FETCH: [AtomicU64; NB] = { const Z: AtomicU64 = AtomicU64::new(0); [Z; NB] };
+        static B_DESER: [AtomicU64; NB] = { const Z: AtomicU64 = AtomicU64::new(0); [Z; NB] };
+        static B_BYTES: [AtomicU64; NB] = { const Z: AtomicU64 = AtomicU64::new(0); [Z; NB] };
+
+        // Check if counters should be reset (set by reset_resource_load_stats)
+        if RESET_RESOURCE_LOAD_FLAG.compare_exchange(1, 0, AO::Relaxed, AO::Relaxed).is_ok() {
+            RL_CALLS.store(0, AO::Relaxed);
+            RL_FETCH_NANOS.store(0, AO::Relaxed);
+            RL_DESER_NANOS.store(0, AO::Relaxed);
+            RL_TOTAL_NANOS.store(0, AO::Relaxed);
+            RL_BYTES.store(0, AO::Relaxed);
+            for i in 0..NB {
+                B_CALLS[i].store(0, AO::Relaxed);
+                B_FETCH[i].store(0, AO::Relaxed);
+                B_DESER[i].store(0, AO::Relaxed);
+                B_BYTES[i].store(0, AO::Relaxed);
+            }
+            eprintln!("[RL] Counters reset for benchmark phase");
+        }
+
+        let t0 = std::time::Instant::now();
+
         let struct_tag = match module_storage.runtime_environment().ty_to_ty_tag(ty)? {
             TypeTag::Struct(struct_tag) => *struct_tag,
             _ => {
-                // Since every resource is a struct, the tag must be also a struct tag.
                 return Err(PartialVMError::new(StatusCode::INTERNAL_TYPE_ERROR));
             },
         };
@@ -295,8 +334,6 @@ impl TransactionDataCache {
                 &struct_tag.module_id(),
             )?;
 
-            // If we need to process delayed fields, we pass type layout to remote storage. Remote
-            // storage, in turn ensures that all delayed field values are pre-processed.
             resource_resolver.get_resource_bytes_with_metadata_and_layout(
                 addr,
                 &struct_tag,
@@ -304,16 +341,17 @@ impl TransactionDataCache {
                 layout_with_delayed_fields.layout_when_contains_delayed_fields(),
             )?
         };
+        let t1 = std::time::Instant::now();
 
         let function_value_extension = FunctionValueExtensionAdapter { module_storage };
         let (layout, contains_delayed_fields) = layout_with_delayed_fields.unpack();
         let value = match data {
-            Some(blob) => {
+            Some(ref blob) => {
                 let max_value_nest_depth = function_value_extension.max_value_nest_depth();
                 let val = ValueSerDeContext::new(max_value_nest_depth)
                     .with_func_args_deserialization(&function_value_extension)
                     .with_delayed_fields_serde()
-                    .deserialize(&blob, &layout)
+                    .deserialize(blob, &layout)
                     .ok_or_else(|| {
                         let msg = format!(
                             "Failed to deserialize resource {} at {}!",
@@ -327,6 +365,79 @@ impl TransactionDataCache {
             },
             None => GlobalValue::none(),
         };
+        let t2 = std::time::Instant::now();
+
+        let sz = data.as_ref().map_or(0u64, |b| b.len() as u64);
+        let fetch_ns = (t1 - t0).as_nanos() as u64;
+        let deser_ns = (t2 - t1).as_nanos() as u64;
+        let total_ns = (t2 - t0).as_nanos() as u64;
+        let calls = RL_CALLS.fetch_add(1, AO::Relaxed) + 1;
+        RL_FETCH_NANOS.fetch_add(fetch_ns, AO::Relaxed);
+        RL_DESER_NANOS.fetch_add(deser_ns, AO::Relaxed);
+        RL_TOTAL_NANOS.fetch_add(total_ns, AO::Relaxed);
+        RL_BYTES.fetch_add(sz, AO::Relaxed);
+
+        let b = match sz { 0 => 0, 1..=100 => 1, 101..=500 => 2, 501..=2048 => 3, 2049..=10240 => 4, _ => 5 };
+        B_CALLS[b].fetch_add(1, AO::Relaxed);
+        B_FETCH[b].fetch_add(fetch_ns, AO::Relaxed);
+        B_DESER[b].fetch_add(deser_ns, AO::Relaxed);
+        B_BYTES[b].fetch_add(sz, AO::Relaxed);
+
+        // Per-resource-type tracking
+        {
+            use std::sync::Mutex;
+            use std::collections::HashMap;
+            static TYPE_STATS: std::sync::LazyLock<Mutex<HashMap<String, (u64, u64, u64, u64)>>> =
+                std::sync::LazyLock::new(|| Mutex::new(HashMap::new()));
+
+            let name = struct_tag.name.as_str().to_string();
+            if let Ok(mut map) = TYPE_STATS.try_lock() {
+                let entry = map.entry(name).or_insert((0, 0, 0, 0));
+                entry.0 += 1;        // calls
+                entry.1 += total_ns; // total_nanos
+                entry.2 += sz;       // bytes
+                entry.3 += fetch_ns; // fetch_nanos
+            }
+
+            if calls % 200000 == 0 {
+                if let Ok(map) = TYPE_STATS.lock() {
+                    let mut entries: Vec<_> = map.iter().collect();
+                    entries.sort_by(|a, b| b.1.1.cmp(&a.1.1)); // sort by total time desc
+                    eprintln!("\n[RL-TYPE] Per-resource-type stats (top 20):");
+                    eprintln!("  {:40} {:>8} {:>10} {:>8} {:>8} {:>8}",
+                        "Resource", "calls", "total_ms", "avg_us", "fetch_us", "bytes");
+                    for (name, (c, t, bytes, f)) in entries.iter().take(20) {
+                        eprintln!("  {:40} {:>8} {:>10.1} {:>8.1} {:>8.1} {:>8}",
+                            name, c, *t as f64/1e6, *t as f64 / *c as f64 / 1e3,
+                            *f as f64 / *c as f64 / 1e3, bytes / c);
+                    }
+                }
+            }
+        }
+
+        if calls % 200000 == 0 {
+            let f = RL_FETCH_NANOS.load(AO::Relaxed);
+            let d = RL_DESER_NANOS.load(AO::Relaxed);
+            let t = RL_TOTAL_NANOS.load(AO::Relaxed);
+            eprintln!(
+                "[RL] calls={} total={:.1}ms avg={:.0}ns fetch={:.0}ns deser={:.0}ns avg_bytes={}",
+                calls, t as f64/1e6, t as f64/calls as f64,
+                f as f64/calls as f64, d as f64/calls as f64,
+                RL_BYTES.load(AO::Relaxed)/calls
+            );
+            let labels = ["empty", "1-100B", "101-500B", "501-2KB", "2-10KB", "10KB+"];
+            for i in 0..NB {
+                let c = B_CALLS[i].load(AO::Relaxed);
+                if c > 0 {
+                    eprintln!(
+                        "  [{:8}] calls={:>8} avg_bytes={:>5} fetch={:>6.0}ns deser={:>6.0}ns",
+                        labels[i], c, B_BYTES[i].load(AO::Relaxed)/c,
+                        B_FETCH[i].load(AO::Relaxed) as f64/c as f64,
+                        B_DESER[i].load(AO::Relaxed) as f64/c as f64
+                    );
+                }
+            }
+        }
 
         let entry = DataCacheEntry {
             struct_tag,

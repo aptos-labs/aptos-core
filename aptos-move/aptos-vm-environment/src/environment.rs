@@ -12,6 +12,7 @@ use crate::{
 use aptos_gas_algebra::DynamicExpression;
 use aptos_gas_schedule::{AptosGasParameters, MiscGasParameters, NativeGasParameters};
 use aptos_native_interface::SafeNativeBuilder;
+use aptos_order_book_natives::BlockNativeState;
 use aptos_types::{
     chain_id::ChainId,
     keyless::{Configuration, Groth16VerificationKey, KeylessOnchainConfig},
@@ -32,12 +33,17 @@ use triomphe::Arc as TriompheArc;
 /// used by execution, gas parameters, VM configs and global caches. Note that it is the user's
 /// responsibility to make sure the environment is consistent, for now it should only be used per
 /// block of transactions because all features or configs are updated only on per-block basis.
-pub struct AptosEnvironment(TriompheArc<Environment>);
+pub struct AptosEnvironment {
+    inner: TriompheArc<Environment>,
+    /// Per-block native state for the order book overlay. Shared across all TXs in a block
+    /// via Arc. Set before block execution, cleared after.
+    block_native_state: Option<Arc<BlockNativeState>>,
+}
 
 impl AptosEnvironment {
     /// Returns new execution environment based on the current state.
     pub fn new(state_view: &impl StateView) -> Self {
-        Self(TriompheArc::new(Environment::new(state_view, false, None)))
+        Self { inner: TriompheArc::new(Environment::new(state_view, false, None)), block_native_state: None }
     }
 
     /// Returns new execution environment based on the current state, also using the provided gas
@@ -46,17 +52,17 @@ impl AptosEnvironment {
         state_view: &impl StateView,
         gas_hook: Arc<dyn Fn(DynamicExpression) + Send + Sync>,
     ) -> Self {
-        Self(TriompheArc::new(Environment::new(
+        Self { inner: TriompheArc::new(Environment::new(
             state_view,
             false,
             Some(gas_hook),
-        )))
+        )), block_native_state: None }
     }
 
     /// Returns new execution environment based on the current state, also injecting create signer
     /// native for government proposal simulation. Should not be used for regular execution.
     pub fn new_with_injected_create_signer_for_gov_sim(state_view: &impl StateView) -> Self {
-        Self(TriompheArc::new(Environment::new(state_view, true, None)))
+        Self { inner: TriompheArc::new(Environment::new(state_view, true, None)), block_native_state: None }
     }
 
     /// Returns new environment but with delayed field optimization enabled. Should only be used by
@@ -64,63 +70,63 @@ impl AptosEnvironment {
     /// enabled or not depends on the feature flag.
     pub fn new_with_delayed_field_optimization_enabled(state_view: &impl StateView) -> Self {
         let env = Environment::new(state_view, false, None).try_enable_delayed_field_optimization();
-        Self(TriompheArc::new(env))
+        Self { inner: TriompheArc::new(env), block_native_state: None }
     }
 
     /// Returns the [ChainId] used by this environment.
     #[inline]
     pub fn chain_id(&self) -> ChainId {
-        self.0.chain_id
+        self.inner.chain_id
     }
 
     /// Returns the [Features] used by this environment.
     #[inline]
     pub fn features(&self) -> &Features {
-        &self.0.features
+        &self.inner.features
     }
 
     /// Returns the [TimedFeatures] used by this environment.
     #[inline]
     pub fn timed_features(&self) -> &TimedFeatures {
-        &self.0.timed_features
+        &self.inner.timed_features
     }
 
     /// Returns the prepared verifying key for keyless validation.
     #[inline]
     pub fn keyless_pvk(&self) -> Option<&PreparedVerifyingKey<Bn254>> {
-        self.0.keyless_pvk.as_ref()
+        self.inner.keyless_pvk.as_ref()
     }
 
     /// Returns keyless configurations.
     #[inline]
     pub fn keyless_configuration(&self) -> Option<&Configuration> {
-        self.0.keyless_configuration.as_ref()
+        self.inner.keyless_configuration.as_ref()
     }
 
     /// Returns the [VMConfig] used by this environment.
     #[inline]
     pub fn vm_config(&self) -> &VMConfig {
-        self.0.runtime_environment.vm_config()
+        self.inner.runtime_environment.vm_config()
     }
 
     /// Returns the gas feature used by this environment.
     #[inline]
     pub fn gas_feature_version(&self) -> u64 {
-        self.0.gas_feature_version
+        self.inner.gas_feature_version
     }
 
     /// Returns the gas parameters used by this environment, and an error if they were not found
     /// on-chain.
     #[inline]
     pub fn gas_params(&self) -> &Result<AptosGasParameters, String> {
-        &self.0.gas_params
+        &self.inner.gas_params
     }
 
     /// Returns the storage gas parameters used by this environment, and an error if they were not
     /// found on-chain.
     #[inline]
     pub fn storage_gas_params(&self) -> &Result<StorageGasParameters, String> {
-        &self.0.storage_gas_params
+        &self.inner.storage_gas_params
     }
 
     /// Returns true if create_signer native was injected for the government proposal simulation.
@@ -129,29 +135,42 @@ impl AptosEnvironment {
     #[deprecated]
     pub fn inject_create_signer_for_gov_sim(&self) -> bool {
         #[allow(deprecated)]
-        self.0.inject_create_signer_for_gov_sim
+        self.inner.inject_create_signer_for_gov_sim
     }
 
     /// Returns bytes corresponding to the verifier config in this environment.
     pub fn verifier_config_bytes(&self) -> &Vec<u8> {
-        &self.0.verifier_bytes
+        &self.inner.verifier_bytes
     }
 
     /// Returns true if runtime checks can be performed after execution.
     pub fn async_runtime_checks_enabled(&self) -> bool {
-        self.0.async_runtime_checks_enabled
+        self.inner.async_runtime_checks_enabled
+    }
+
+    /// Returns the per-block native state for the order book overlay, if set.
+    pub fn block_native_state(&self) -> Option<&Arc<BlockNativeState>> {
+        self.block_native_state.as_ref()
+    }
+
+    /// Sets the per-block native state for order book overlay. Called before block execution.
+    pub fn set_block_native_state(&mut self, state: Arc<BlockNativeState>) {
+        self.block_native_state = Some(state);
     }
 }
 
 impl Clone for AptosEnvironment {
     fn clone(&self) -> Self {
-        Self(self.0.clone())
+        Self {
+            inner: self.inner.clone(),
+            block_native_state: self.block_native_state.clone(),
+        }
     }
 }
 
 impl PartialEq for AptosEnvironment {
     fn eq(&self, other: &Self) -> bool {
-        self.0.hash == other.0.hash
+        self.inner.hash == other.inner.hash
     }
 }
 
@@ -159,7 +178,7 @@ impl Eq for AptosEnvironment {}
 
 impl WithRuntimeEnvironment for AptosEnvironment {
     fn runtime_environment(&self) -> &RuntimeEnvironment {
-        &self.0.runtime_environment
+        &self.inner.runtime_environment
     }
 }
 

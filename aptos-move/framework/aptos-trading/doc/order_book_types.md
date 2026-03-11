@@ -21,6 +21,7 @@ Order book type definitions
 -  [Function `new_order_id_type`](#0x5_order_book_types_new_order_id_type)
 -  [Function `new_account_client_order_id`](#0x5_order_book_types_new_account_client_order_id)
 -  [Function `next_increasing_idx_type`](#0x5_order_book_types_next_increasing_idx_type)
+-  [Function `get_increasing_idx_value`](#0x5_order_book_types_get_increasing_idx_value)
 -  [Function `into_decreasing_idx_type`](#0x5_order_book_types_into_decreasing_idx_type)
 -  [Function `get_order_id_value`](#0x5_order_book_types_get_order_id_value)
 -  [Function `time_in_force_from_index`](#0x5_order_book_types_time_in_force_from_index)
@@ -525,6 +526,30 @@ Order time in force
 
 <pre><code><b>public</b> <b>fun</b> <a href="order_book_types.md#0x5_order_book_types_next_increasing_idx_type">next_increasing_idx_type</a>(): <a href="order_book_types.md#0x5_order_book_types_IncreasingIdx">IncreasingIdx</a> {
     <a href="order_book_types.md#0x5_order_book_types_IncreasingIdx">IncreasingIdx</a> { idx: <a href="../../aptos-framework/doc/transaction_context.md#0x1_transaction_context_monotonically_increasing_counter">transaction_context::monotonically_increasing_counter</a>() }
+}
+</code></pre>
+
+
+
+</details>
+
+<a id="0x5_order_book_types_get_increasing_idx_value"></a>
+
+## Function `get_increasing_idx_value`
+
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="order_book_types.md#0x5_order_book_types_get_increasing_idx_value">get_increasing_idx_value</a>(self: &<a href="order_book_types.md#0x5_order_book_types_IncreasingIdx">order_book_types::IncreasingIdx</a>): u128
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="order_book_types.md#0x5_order_book_types_get_increasing_idx_value">get_increasing_idx_value</a>(self: &<a href="order_book_types.md#0x5_order_book_types_IncreasingIdx">IncreasingIdx</a>): u128 {
+    self.idx
 }
 </code></pre>
 

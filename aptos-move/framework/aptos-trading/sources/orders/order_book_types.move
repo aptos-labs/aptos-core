@@ -71,6 +71,10 @@ module aptos_trading::order_book_types {
         IncreasingIdx { idx }
     }
 
+    public fun get_increasing_idx_value(self: &IncreasingIdx): u128 {
+        self.idx
+    }
+
     public fun into_decreasing_idx_type(self: &IncreasingIdx): DecreasingIdx {
         DecreasingIdx { idx: MAX_U128 - self.idx }
     }

@@ -89,6 +89,7 @@ Returns:
     metadata: M,
     callbacks: &MarketClearinghouseCallbacks&lt;M, R&gt;
 ): Option&lt;OrderId&gt; {
+    market.get_order_book().ensure_native_index_ready();
     <b>let</b> validation_result =
         callbacks.validate_bulk_order_placement(
             <a href="../../aptos-framework/doc/account.md#0x1_account">account</a>,
@@ -125,6 +126,7 @@ Returns:
             existing_seq_num
         );
         // Return None since the order was rejected
+        market.get_order_book().maybe_flush_handle();
         <b>return</b> <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_none">option::none</a>()
     };
 
@@ -181,6 +183,7 @@ Returns:
         &cancelled_ask_sizes,
         &order_metadata
     );
+    market.get_order_book().maybe_flush_handle();
     <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_some">option::some</a>(order_id)
 }
 </code></pre>
@@ -219,6 +222,7 @@ Parameters:
     cancellation_reason: <a href="market_types.md#0x7_market_types_OrderCancellationReason">market_types::OrderCancellationReason</a>,
     callbacks: &MarketClearinghouseCallbacks&lt;M, R&gt;
 ) {
+    market.get_order_book().ensure_native_index_ready();
     <b>let</b> <a href="../../aptos-framework/doc/account.md#0x1_account">account</a> = <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(user);
     <a href="market_bulk_order.md#0x7_market_bulk_order_cancel_bulk_order_internal">cancel_bulk_order_internal</a>(
         market,
@@ -226,6 +230,7 @@ Parameters:
         cancellation_reason,
         callbacks
     );
+    market.get_order_book().maybe_flush_handle();
 }
 </code></pre>
 

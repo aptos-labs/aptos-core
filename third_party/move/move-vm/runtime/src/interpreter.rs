@@ -2,6 +2,77 @@
 // Copyright (c) The Move Contributors
 // SPDX-License-Identifier: Apache-2.0
 
+// Move function profiling: inclusive time per module::function
+mod fn_profile {
+    use std::sync::atomic::{AtomicU64, Ordering as AO};
+    use std::sync::Mutex;
+    use std::collections::HashMap;
+    use std::time::Instant;
+
+    static TOTAL_CALLS: AtomicU64 = AtomicU64::new(0);
+    static FN_STATS: std::sync::LazyLock<Mutex<HashMap<String, (u64, u64, u64)>>> =
+        std::sync::LazyLock::new(|| Mutex::new(HashMap::new()));
+
+    thread_local! {
+        static TIMER_STACK: std::cell::RefCell<Vec<(String, Instant, u64)>> = std::cell::RefCell::new(Vec::new());
+    }
+
+    pub fn enter(name: String) {
+        TIMER_STACK.with(|s| {
+            s.borrow_mut().push((name, Instant::now(), 0));
+        });
+    }
+
+    pub fn exit() {
+        TIMER_STACK.with(|s| {
+            let mut stack = s.borrow_mut();
+            if let Some((name, start, child_nanos)) = stack.pop() {
+                let inclusive = start.elapsed().as_nanos() as u64;
+                let exclusive = inclusive.saturating_sub(child_nanos);
+                // Report child time to parent
+                if let Some(parent) = stack.last_mut() {
+                    parent.2 += inclusive;
+                }
+                let calls = TOTAL_CALLS.fetch_add(1, AO::Relaxed) + 1;
+                if let Ok(mut map) = FN_STATS.try_lock() {
+                    let entry = map.entry(name).or_insert((0, 0, 0));
+                    entry.0 += 1;          // calls
+                    entry.1 += inclusive;   // inclusive_nanos
+                    entry.2 += exclusive;   // exclusive_nanos
+                }
+                if calls % 1_000_000 == 0 {
+                    print_stats();
+                }
+            }
+        });
+    }
+
+    pub fn print_stats() {
+        if let Ok(map) = FN_STATS.lock() {
+            let mut by_inclusive: Vec<_> = map.iter().collect();
+            by_inclusive.sort_by(|a, b| b.1.1.cmp(&a.1.1));
+            eprintln!("\n[FN-PROFILE] Top 60 by inclusive time:");
+            eprintln!("  {:70} {:>8} {:>10} {:>8} {:>10} {:>8}",
+                "Function", "calls", "incl_ms", "incl_μs", "excl_ms", "excl_μs");
+            for (name, (c, inc, exc)) in by_inclusive.iter().take(60) {
+                eprintln!("  {:70} {:>8} {:>10.1} {:>8.1} {:>10.1} {:>8.1}",
+                    name, c, *inc as f64/1e6, *inc as f64 / *c as f64 / 1e3,
+                    *exc as f64/1e6, *exc as f64 / *c as f64 / 1e3);
+            }
+            let mut by_exclusive: Vec<_> = map.iter().collect();
+            by_exclusive.sort_by(|a, b| b.1.2.cmp(&a.1.2));
+            eprintln!("\n[FN-PROFILE] Top 60 by exclusive time:");
+            eprintln!("  {:70} {:>8} {:>10} {:>8} {:>10} {:>8}",
+                "Function", "calls", "incl_ms", "incl_μs", "excl_ms", "excl_μs");
+            for (name, (c, inc, exc)) in by_exclusive.iter().take(60) {
+                eprintln!("  {:70} {:>8} {:>10.1} {:>8.1} {:>10.1} {:>8.1}",
+                    name, c, *inc as f64/1e6, *inc as f64 / *c as f64 / 1e3,
+                    *exc as f64/1e6, *exc as f64 / *c as f64 / 1e3);
+            }
+        }
+    }
+}
+
 use crate::{
     access_control::AccessControlState,
     config::VMConfig,
@@ -383,6 +454,9 @@ where
             .map_err(|e| self.set_location(e))?;
 
         trace_recorder.record_entrypoint(current_frame.function.as_ref());
+        fn_profile::enter(format!("{}::{}",
+            current_frame.function.module_id().map_or("script".to_string(), |m| m.name().to_string()),
+            current_frame.function.name()));
         loop {
             let exit_code = current_frame
                 .execute_code::<RTTCheck, RTRCheck>(
@@ -396,6 +470,7 @@ where
 
             match exit_code {
                 ExitCode::Return => {
+                    fn_profile::exit();
                     let non_ref_vals = current_frame.locals.drop_all_values();
 
                     gas_meter
@@ -961,6 +1036,9 @@ where
             let err = set_err_info!(frame, err);
             self.attach_state_if_invariant_violation(err, &frame)
         })?;
+        fn_profile::enter(format!("{}::{}",
+            current_frame.function.module_id().map_or("script".to_string(), |m| m.name().to_string()),
+            current_frame.function.name()));
         Ok(())
     }
 
@@ -1149,7 +1227,49 @@ where
         let pre_native_call_value_stack_size = self.operand_stack.value.len();
         let pre_native_call_type_stack_size = self.operand_stack.types.len();
 
+        let _native_t0 = std::time::Instant::now();
         let result = native_function(&mut native_context, ty_args, args)?;
+        let _native_elapsed = _native_t0.elapsed().as_nanos() as u64;
+
+        // Track native function call time by module::function name
+        {
+            use std::sync::atomic::{AtomicU64, Ordering as AO};
+            use std::sync::Mutex;
+            use std::collections::HashMap;
+
+            static NATIVE_TOTAL_CALLS: AtomicU64 = AtomicU64::new(0);
+            static NATIVE_TOTAL_NANOS: AtomicU64 = AtomicU64::new(0);
+            static NATIVE_STATS: std::sync::LazyLock<Mutex<HashMap<String, (u64, u64)>>> =
+                std::sync::LazyLock::new(|| Mutex::new(HashMap::new()));
+
+            let calls = NATIVE_TOTAL_CALLS.fetch_add(1, AO::Relaxed) + 1;
+            NATIVE_TOTAL_NANOS.fetch_add(_native_elapsed, AO::Relaxed);
+
+            let key = format!("{}::{}",
+                function.module_id().map_or("?".to_string(), |m| format!("{}::{}", m.address().short_str_lossless(), m.name())),
+                function.name());
+            if let Ok(mut map) = NATIVE_STATS.try_lock() {
+                let entry = map.entry(key).or_insert((0, 0));
+                entry.0 += 1;
+                entry.1 += _native_elapsed;
+            }
+
+            if calls % 500000 == 0 {
+                let total_ns = NATIVE_TOTAL_NANOS.load(AO::Relaxed);
+                eprintln!("\n[NATIVE] calls={} total={:.1}ms avg={:.1}μs",
+                    calls, total_ns as f64/1e6, total_ns as f64/calls as f64/1e3);
+                if let Ok(map) = NATIVE_STATS.lock() {
+                    let mut entries: Vec<_> = map.iter().collect();
+                    entries.sort_by(|a, b| b.1.1.cmp(&a.1.1));
+                    eprintln!("  {:60} {:>8} {:>10} {:>8}",
+                        "Native function", "calls", "total_ms", "avg_μs");
+                    for (name, (c, t)) in entries.iter().take(30) {
+                        eprintln!("  {:60} {:>8} {:>10.1} {:>8.1}",
+                            name, c, *t as f64/1e6, *t as f64 / *c as f64 / 1e3);
+                    }
+                }
+            }
+        }
 
         // Note(Gas): The order by which gas is charged / error gets returned MUST NOT be modified
         //            here or otherwise it becomes an incompatible change!!!
@@ -2128,19 +2248,19 @@ impl Frame {
 
                 let _guard = VM_PROFILER.instruction_start(instruction);
 
-                // Paranoid Mode: Perform the type stack transition check to make sure all type safety requirements has been met.
-                //
-                // We will run the checks for only the control flow instructions and StLoc here. The majority of checks will be
-                // performed after the instruction execution, i.e: the big match block below.
-                //
-                // The reason for this design is we charge gas during instruction execution and we want to perform checks only after
-                // proper gas has been charged for each instruction.
+                // Instruction counter
+                {
+                    use std::sync::atomic::{AtomicU64, Ordering as AO};
+                    static INSN_COUNT: AtomicU64 = AtomicU64::new(0);
+                    let c = INSN_COUNT.fetch_add(1, AO::Relaxed) + 1;
+                    if c % 50_000_000 == 0 {
+                        eprintln!("[INSN] count={}M", c / 1_000_000);
+                    }
+                }
 
+                // Paranoid Mode type checks
                 RTTCheck::pre_execution_type_stack_transition(
-                    self,
-                    &mut interpreter.operand_stack,
-                    instruction,
-                    frame_cache,
+                    self, &mut interpreter.operand_stack, instruction, frame_cache,
                 )?;
                 RTRCheck::pre_execution_transition(self, instruction, &mut interpreter.ref_state)?;
 

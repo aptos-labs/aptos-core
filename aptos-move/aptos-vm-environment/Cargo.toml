@@ -18,6 +18,7 @@ aptos-gas-algebra = { workspace = true }
 aptos-gas-schedule = { workspace = true }
 aptos-move-stdlib = { workspace = true }
 aptos-native-interface = { workspace = true }
+aptos-order-book-natives = { workspace = true }
 aptos-table-natives = { workspace = true }
 aptos-types = { workspace = true }
 aptos-vm-types = { workspace = true }

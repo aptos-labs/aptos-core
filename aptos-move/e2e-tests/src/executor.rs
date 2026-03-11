@@ -1395,7 +1395,7 @@ impl<O: OutputLogger> FakeExecutorImpl<O> {
         let mut measurements = Vec::new();
 
         while i < num_measured_iterations + NUM_WARM_UP_RUNS {
-            let mut session = vm.new_session(&resolver, SessionId::void(), None);
+            let mut session = vm.new_session(&resolver, SessionId::void(), None, None);
 
             let fun_name = Self::name(function_name);
             let should_error = fun_name.clone().into_string().ends_with(POSTFIX);
@@ -1530,7 +1530,7 @@ impl<O: OutputLogger> FakeExecutorImpl<O> {
             let vm = MoveVmExt::new(&env);
 
             let module_storage = self.state_store.as_aptos_code_storage(&env);
-            let mut session = vm.new_session(&resolver, SessionId::void(), None);
+            let mut session = vm.new_session(&resolver, SessionId::void(), None, None);
 
             let fun_name = Self::name(function_name);
             let should_error = fun_name.clone().into_string().ends_with(POSTFIX);
@@ -1593,7 +1593,7 @@ impl<O: OutputLogger> FakeExecutorImpl<O> {
             let vm = MoveVmExt::new(&env);
 
             let module_storage = self.state_store.as_aptos_code_storage(&env);
-            let mut session = vm.new_session(&resolver, SessionId::void(), None);
+            let mut session = vm.new_session(&resolver, SessionId::void(), None, None);
 
             let traversal_storage = TraversalStorage::new();
             let mut traversal_context = TraversalContext::new(&traversal_storage);
@@ -1640,7 +1640,7 @@ impl<O: OutputLogger> FakeExecutorImpl<O> {
 
         let module_storage = self.state_store.as_aptos_code_storage(&env);
 
-        let mut session = vm.new_session(&resolver, SessionId::void(), None);
+        let mut session = vm.new_session(&resolver, SessionId::void(), None, None);
         let traversal_storage = TraversalStorage::new();
         session
             .execute_function_bypass_visibility(

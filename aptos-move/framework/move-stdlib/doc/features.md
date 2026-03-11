@@ -163,6 +163,8 @@ return true.
 -  [Function `slh_dsa_sha2_128s_signature_enabled`](#0x1_features_slh_dsa_sha2_128s_signature_enabled)
 -  [Function `get_encrypted_transactions_feature`](#0x1_features_get_encrypted_transactions_feature)
 -  [Function `is_encrypted_transactions_enabled`](#0x1_features_is_encrypted_transactions_enabled)
+-  [Function `get_native_order_book_feature`](#0x1_features_get_native_order_book_feature)
+-  [Function `is_native_order_book_enabled`](#0x1_features_is_native_order_book_enabled)
 -  [Function `change_feature_flags`](#0x1_features_change_feature_flags)
 -  [Function `change_feature_flags_internal`](#0x1_features_change_feature_flags_internal)
 -  [Function `change_feature_flags_for_next_epoch`](#0x1_features_change_feature_flags_for_next_epoch)
@@ -829,6 +831,15 @@ Lifetime: transient
 
 
 <pre><code><b>const</b> <a href="features.md#0x1_features_NATIVE_MEMORY_OPERATIONS">NATIVE_MEMORY_OPERATIONS</a>: u64 = 80;
+</code></pre>
+
+
+
+<a id="0x1_features_NATIVE_ORDER_BOOK"></a>
+
+
+
+<pre><code><b>const</b> <a href="features.md#0x1_features_NATIVE_ORDER_BOOK">NATIVE_ORDER_BOOK</a>: u64 = 110;
 </code></pre>
 
 
@@ -4296,6 +4307,54 @@ Deprecated feature
 
 <pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_is_encrypted_transactions_enabled">is_encrypted_transactions_enabled</a>(): bool {
     <a href="features.md#0x1_features_is_enabled">is_enabled</a>(<a href="features.md#0x1_features_ENCRYPTED_TRANSACTIONS">ENCRYPTED_TRANSACTIONS</a>)
+}
+</code></pre>
+
+
+
+</details>
+
+<a id="0x1_features_get_native_order_book_feature"></a>
+
+## Function `get_native_order_book_feature`
+
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_get_native_order_book_feature">get_native_order_book_feature</a>(): u64
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_get_native_order_book_feature">get_native_order_book_feature</a>(): u64 {
+    <a href="features.md#0x1_features_NATIVE_ORDER_BOOK">NATIVE_ORDER_BOOK</a>
+}
+</code></pre>
+
+
+
+</details>
+
+<a id="0x1_features_is_native_order_book_enabled"></a>
+
+## Function `is_native_order_book_enabled`
+
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_is_native_order_book_enabled">is_native_order_book_enabled</a>(): bool
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_is_native_order_book_enabled">is_native_order_book_enabled</a>(): bool {
+    <a href="features.md#0x1_features_is_enabled">is_enabled</a>(<a href="features.md#0x1_features_NATIVE_ORDER_BOOK">NATIVE_ORDER_BOOK</a>)
 }
 </code></pre>
 

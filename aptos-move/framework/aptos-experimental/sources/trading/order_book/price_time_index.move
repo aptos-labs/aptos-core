@@ -3,6 +3,13 @@
 /// The orders are matched based on price-time priority.
 ///
 /// This is internal module, which cannot be used directly, use OrderBook instead.
+///
+/// Supports two variants:
+/// - V1: Pure Move implementation backed by BigOrderedMap
+/// - NativeV2: Native Rust implementation using in-memory overlay BTreeMaps.
+///   The native index is a derived view kept in validator memory — never stored on-chain.
+///   Operations dispatch to native Rust functions via market_addr.
+///   OrderBook.ensure_native_index_ready() must be called before any operation.
 module aptos_experimental::price_time_index {
     use std::option::{Self, Option};
     use aptos_std::math64::mul_div;
@@ -70,6 +77,10 @@ module aptos_experimental::price_time_index {
 
     /// OrderBook tracking active (i.e. unconditional, immediately executable) limit orders.
     ///
+    /// V1: Pure Move implementation with BigOrderedMap.
+    /// NativeV2: Native Rust overlay. `market_addr` identifies the native overlay.
+    ///   The overlay is acquired/released by OrderBook lifecycle natives.
+    ///
     /// - invariant - all buys are smaller than sells, at all times.
     /// - tie_breaker in sells is U128_MAX-value, to make sure largest value in the book
     ///   that is taken first, is the one inserted first, amongst those with same bid price.
@@ -77,10 +88,13 @@ module aptos_experimental::price_time_index {
         V1 {
             buys: BigOrderedMap<PriceDescTime, OrderData>,
             sells: BigOrderedMap<PriceAscTime, OrderData>
+        },
+        NativeV2 {
+            market_addr: address
         }
     }
 
-    public(friend) fun new_price_time_idx(): PriceTimeIndex {
+    public fun new_price_time_idx(): PriceTimeIndex {
         // potentially add max value to both sides (that will be skipped),
         // so that max_key never changes, and doesn't create conflict.
         PriceTimeIndex::V1 {
@@ -89,94 +103,159 @@ module aptos_experimental::price_time_index {
         }
     }
 
+    /// Creates a new native (Rust-backed) price-time index for the given market.
+    /// The native overlay is acquired by OrderBook.ensure_native_index_ready().
+    public fun new_native_price_time_idx(market_addr: address): PriceTimeIndex {
+        PriceTimeIndex::NativeV2 { market_addr }
+    }
+
     /// Picks the best (i.e. highest) bid (i.e. buy) price from the active order book.
     /// Returns None if there are no buys
-    public(friend) fun best_bid_price(self: &PriceTimeIndex): Option<u64> {
-        if (self.buys.is_empty()) {
-            option::none()
-        } else {
-            let (back_key, _) = self.buys.borrow_back();
-            option::some(back_key.price)
+    public fun best_bid_price(self: &PriceTimeIndex): Option<u64> {
+        match (self) {
+            V1 { buys, sells: _ } => {
+                let _t = native_timing_start();
+                let result = if (buys.is_empty()) {
+                    option::none()
+                } else {
+                    let (back_key, _) = buys.borrow_back();
+                    option::some(back_key.price)
+                };
+                native_timing_end(0, &mut _t);
+                result
+            },
+            NativeV2 { market_addr } => {
+                let (has_value, price) = native_best_bid_price(*market_addr);
+                if (has_value) { option::some(price) } else { option::none() }
+            }
         }
     }
 
     /// Picks the best (i.e. lowest) ask (i.e. sell) price from the active order book.
     /// Returns None if there are no sells
-    public(friend) fun best_ask_price(self: &PriceTimeIndex): Option<u64> {
-        if (self.sells.is_empty()) {
-            option::none()
-        } else {
-            let (front_key, _) = self.sells.borrow_front();
-            option::some(front_key.price)
+    public fun best_ask_price(self: &PriceTimeIndex): Option<u64> {
+        match (self) {
+            V1 { buys: _, sells } => {
+                let _t = native_timing_start();
+                let result = if (sells.is_empty()) {
+                    option::none()
+                } else {
+                    let (front_key, _) = sells.borrow_front();
+                    option::some(front_key.price)
+                };
+                native_timing_end(1, &mut _t);
+                result
+            },
+            NativeV2 { market_addr } => {
+                let (has_value, price) = native_best_ask_price(*market_addr);
+                if (has_value) { option::some(price) } else { option::none() }
+            }
         }
     }
 
     /// Returns the mid price (i.e. the average of the highest bid (buy) price and the lowest ask (sell) price. If
-    /// there are o buys / sells, returns None.
-    public(friend) fun get_mid_price(self: &PriceTimeIndex): Option<u64> {
-        if (self.sells.is_empty() || self.buys.is_empty()) {
-            return option::none();
-        };
-
-        let (front_key, _) = self.sells.borrow_front();
-        let best_ask = front_key.price;
-        let (back_key, _) = self.buys.borrow_back();
-        let best_bid = back_key.price;
-        option::some((best_bid + best_ask) / 2)
-    }
-
-    public(friend) fun get_slippage_price(
-        self: &PriceTimeIndex, is_bid: bool, slippage_bps: u64
-    ): Option<u64> {
-        if (!is_bid) {
-            assert!(
-                slippage_bps <= get_slippage_pct_precision() * 100,
-                EINVALID_SLIPPAGE_BPS
-            );
-        };
-        let mid_price = self.get_mid_price();
-        if (mid_price.is_none()) {
-            return option::none();
-        };
-        let mid_price = mid_price.destroy_some();
-        let slippage = mul_div(
-            mid_price, slippage_bps, get_slippage_pct_precision() * 100
-        );
-        if (is_bid) {
-            option::some(mid_price + slippage)
-        } else {
-            option::some(mid_price - slippage)
+    /// there are no buys / sells, returns None.
+    public fun get_mid_price(self: &PriceTimeIndex): Option<u64> {
+        match (self) {
+            V1 { buys, sells } => {
+                if (sells.is_empty() || buys.is_empty()) {
+                    return option::none();
+                };
+                let (front_key, _) = sells.borrow_front();
+                let best_ask = front_key.price;
+                let (back_key, _) = buys.borrow_back();
+                let best_bid = back_key.price;
+                option::some((best_bid + best_ask) / 2)
+            },
+            NativeV2 { market_addr } => {
+                let (has_value, mid) = native_get_mid_price(*market_addr);
+                if (has_value) { option::some(mid) } else { option::none() }
+            }
         }
     }
 
-    public(friend) fun cancel_active_order(
+    public fun get_slippage_price(
+        self: &PriceTimeIndex, is_bid: bool, slippage_bps: u64
+    ): Option<u64> {
+        match (self) {
+            V1 { buys: _, sells: _ } => {
+                if (!is_bid) {
+                    assert!(
+                        slippage_bps <= get_slippage_pct_precision() * 100,
+                        EINVALID_SLIPPAGE_BPS
+                    );
+                };
+                let mid_price = self.get_mid_price();
+                if (mid_price.is_none()) {
+                    return option::none();
+                };
+                let mid_price = mid_price.destroy_some();
+                let slippage = mul_div(
+                    mid_price, slippage_bps, get_slippage_pct_precision() * 100
+                );
+                if (is_bid) {
+                    option::some(mid_price + slippage)
+                } else {
+                    option::some(mid_price - slippage)
+                }
+            },
+            NativeV2 { market_addr } => {
+                let (has_value, price) = native_get_slippage_price(*market_addr, is_bid, slippage_bps);
+                if (has_value) { option::some(price) } else { option::none() }
+            }
+        }
+    }
+
+    public fun cancel_active_order(
         self: &mut PriceTimeIndex,
         price: u64,
         unique_priority_idx: IncreasingIdx,
         is_bid: bool
     ): u64 {
-        if (is_bid) {
-            let key = PriceDescTime {
-                price,
-                tie_breaker: unique_priority_idx.into_decreasing_idx_type()
-            };
-            self.buys.remove(&key).size
-        } else {
-            let key = PriceAscTime { price, tie_breaker: unique_priority_idx };
-            self.sells.remove(&key).size
+        match (self) {
+            V1 { buys, sells } => {
+                let _t = native_timing_start();
+                let result = if (is_bid) {
+                    let key = PriceDescTime {
+                        price,
+                        tie_breaker: unique_priority_idx.into_decreasing_idx_type()
+                    };
+                    buys.remove(&key).size
+                } else {
+                    let key = PriceAscTime { price, tie_breaker: unique_priority_idx };
+                    sells.remove(&key).size
+                };
+                native_timing_end(3, &mut _t);
+                result
+            },
+            NativeV2 { market_addr } => {
+                native_cancel_active_order(
+                    *market_addr, price, unique_priority_idx.get_increasing_idx_value(), is_bid
+                )
+            }
         }
     }
 
     /// Check if the order is a taker order - i.e. if it can be immediately matched with the order book fully or partially.
-    public(friend) fun is_taker_order(
+    public fun is_taker_order(
         self: &PriceTimeIndex, price: u64, is_bid: bool
     ): bool {
-        if (is_bid) {
-            let best_ask_price = self.best_ask_price();
-            best_ask_price.is_some() && price >= best_ask_price.destroy_some()
-        } else {
-            let best_bid_price = self.best_bid_price();
-            best_bid_price.is_some() && price <= best_bid_price.destroy_some()
+        match (self) {
+            V1 { buys: _, sells: _ } => {
+                let _t = native_timing_start();
+                let result = if (is_bid) {
+                    let best_ask_price = self.best_ask_price();
+                    best_ask_price.is_some() && price >= best_ask_price.destroy_some()
+                } else {
+                    let best_bid_price = self.best_bid_price();
+                    best_bid_price.is_some() && price <= best_bid_price.destroy_some()
+                };
+                native_timing_end(4, &mut _t);
+                result
+            },
+            NativeV2 { market_addr } => {
+                native_is_taker_order(*market_addr, price, is_bid)
+            }
         }
     }
 
@@ -246,84 +325,125 @@ module aptos_experimental::price_time_index {
         modify_fn(order);
     }
 
-    public(friend) fun get_single_match_result(
+    public fun get_single_match_result(
         self: &mut PriceTimeIndex,
         price: u64,
         size: u64,
         is_bid: bool
     ): ActiveMatchedOrder {
-        if (is_bid) {
-            self.get_single_match_for_buy_order(price, size)
-        } else {
-            self.get_single_match_for_sell_order(price, size)
+        match (self) {
+            V1 { buys: _, sells: _ } => {
+                let _t = native_timing_start();
+                let result = if (is_bid) {
+                    self.get_single_match_for_buy_order(price, size)
+                } else {
+                    self.get_single_match_for_sell_order(price, size)
+                };
+                native_timing_end(5, &mut _t);
+                result
+            },
+            NativeV2 { market_addr } => {
+                let (order_id, matched_size, remaining_size, order_type) =
+                    native_get_single_match_result(*market_addr, price, size, is_bid);
+                new_active_matched_order(
+                    aptos_trading::order_book_types::new_order_id_type(order_id),
+                    matched_size,
+                    remaining_size,
+                    if (order_type == 0) {
+                        aptos_trading::order_book_types::single_order_type()
+                    } else {
+                        aptos_trading::order_book_types::bulk_order_type()
+                    }
+                )
+            }
         }
     }
 
     /// Increase the size of the order in the orderbook without altering its position in the price-time priority.
-    public(friend) fun increase_order_size(
+    public fun increase_order_size(
         self: &mut PriceTimeIndex,
         price: u64,
         unique_priority_idx: IncreasingIdx,
         size_delta: u64,
         is_bid: bool
     ) {
-        if (is_bid) {
-            let key = PriceDescTime {
-                price,
-                tie_breaker: unique_priority_idx.into_decreasing_idx_type()
-            };
-            modify_order_data(
-                &mut self.buys,
-                &key,
-                |order_data| {
-                    order_data.size += size_delta;
-                }
-            );
-        } else {
-            let key = PriceAscTime { price, tie_breaker: unique_priority_idx };
-            modify_order_data(
-                &mut self.sells,
-                &key,
-                |order_data| {
-                    order_data.size += size_delta;
-                }
-            );
-        };
+        match (self) {
+            V1 { buys, sells } => {
+                if (is_bid) {
+                    let key = PriceDescTime {
+                        price,
+                        tie_breaker: unique_priority_idx.into_decreasing_idx_type()
+                    };
+                    modify_order_data(
+                        buys,
+                        &key,
+                        |order_data| {
+                            order_data.size += size_delta;
+                        }
+                    );
+                } else {
+                    let key = PriceAscTime { price, tie_breaker: unique_priority_idx };
+                    modify_order_data(
+                        sells,
+                        &key,
+                        |order_data| {
+                            order_data.size += size_delta;
+                        }
+                    );
+                };
+            },
+            NativeV2 { market_addr } => {
+                native_increase_order_size(
+                    *market_addr, price, unique_priority_idx.get_increasing_idx_value(),
+                    size_delta, is_bid
+                );
+            }
+        }
     }
 
     /// Decrease the size of the order in the order book without altering its position in the price-time priority.
-    public(friend) fun decrease_order_size(
+    public fun decrease_order_size(
         self: &mut PriceTimeIndex,
         price: u64,
         unique_priority_idx: IncreasingIdx,
         size_delta: u64,
         is_bid: bool
     ) {
-        if (is_bid) {
-            let key = PriceDescTime {
-                price,
-                tie_breaker: unique_priority_idx.into_decreasing_idx_type()
-            };
-            modify_order_data(
-                &mut self.buys,
-                &key,
-                |order_data| {
-                    order_data.size -= size_delta;
-                }
-            );
-        } else {
-            let key = PriceAscTime { price, tie_breaker: unique_priority_idx };
-            modify_order_data(
-                &mut self.sells,
-                &key,
-                |order_data| {
-                    order_data.size -= size_delta;
-                }
-            );
-        };
+        match (self) {
+            V1 { buys, sells } => {
+                if (is_bid) {
+                    let key = PriceDescTime {
+                        price,
+                        tie_breaker: unique_priority_idx.into_decreasing_idx_type()
+                    };
+                    modify_order_data(
+                        buys,
+                        &key,
+                        |order_data| {
+                            order_data.size -= size_delta;
+                        }
+                    );
+                } else {
+                    let key = PriceAscTime { price, tie_breaker: unique_priority_idx };
+                    modify_order_data(
+                        sells,
+                        &key,
+                        |order_data| {
+                            order_data.size -= size_delta;
+                        }
+                    );
+                };
+            },
+            NativeV2 { market_addr } => {
+                native_decrease_order_size(
+                    *market_addr, price, unique_priority_idx.get_increasing_idx_value(),
+                    size_delta, is_bid
+                );
+            }
+        }
     }
 
-    public(friend) fun place_maker_order(
+    public fun place_maker_order(
         self: &mut PriceTimeIndex,
         order_id: OrderId,
         order_book_type: OrderType,
@@ -332,26 +452,134 @@ module aptos_experimental::price_time_index {
         size: u64,
         is_bid: bool
     ) {
-        let value = OrderData { order_id, order_book_type, size };
-        // Assert that this is not a taker order
-        assert!(!self.is_taker_order(price, is_bid), EINVALID_MAKER_ORDER);
-        if (is_bid) {
-            let key = PriceDescTime {
-                price,
-                tie_breaker: unique_priority_idx.into_decreasing_idx_type()
-            };
-            self.buys.add(key, value);
-        } else {
-            let key = PriceAscTime { price, tie_breaker: unique_priority_idx };
-            self.sells.add(key, value);
-        };
+        match (self) {
+            V1 { buys, sells } => {
+                let _t = native_timing_start();
+                let value = OrderData { order_id, order_book_type, size };
+                let is_taker = if (is_bid) {
+                    !sells.is_empty() && {
+                        let (front_key, _) = sells.borrow_front();
+                        price >= front_key.price
+                    }
+                } else {
+                    !buys.is_empty() && {
+                        let (back_key, _) = buys.borrow_back();
+                        price <= back_key.price
+                    }
+                };
+                assert!(!is_taker, EINVALID_MAKER_ORDER);
+                if (is_bid) {
+                    let key = PriceDescTime {
+                        price,
+                        tie_breaker: unique_priority_idx.into_decreasing_idx_type()
+                    };
+                    buys.add(key, value);
+                } else {
+                    let key = PriceAscTime { price, tie_breaker: unique_priority_idx };
+                    sells.add(key, value);
+                };
+                native_timing_end(2, &mut _t);
+            },
+            NativeV2 { market_addr } => {
+                let order_type_val: u64 =
+                    if (aptos_trading::order_book_types::is_single_order_type(&order_book_type)) { 0 } else { 1 };
+                native_place_maker_order(
+                    *market_addr,
+                    order_id.get_order_id_value(),
+                    order_type_val,
+                    price,
+                    unique_priority_idx.get_increasing_idx_value(),
+                    size,
+                    is_bid
+                );
+            }
+        }
     }
+
+    /// Destroy a V1 PriceTimeIndex during migration to NativeV2.
+    /// The BigOrderedMap data is redundant (orders are in SingleOrderBook + BulkOrderBook).
+    public fun destroy_v1_for_migration(self: PriceTimeIndex) {
+        match (self) {
+            V1 { buys, sells } => {
+                buys.destroy(|_v| {});
+                sells.destroy(|_v| {});
+            },
+            NativeV2 { market_addr: _ } => {
+                abort 0 // Should never be called on NativeV2
+            }
+        }
+    }
+
+    /// Returns the market address if this is a NativeV2 index, None otherwise.
+    public fun get_native_market_addr(self: &PriceTimeIndex): Option<address> {
+        match (self) {
+            NativeV2 { market_addr } => option::some(*market_addr),
+            _ => option::none()
+        }
+    }
+
+    // ===========================================================================================
+    // Native function declarations
+
+    // All operation natives take market_addr as first arg. The overlay must already be
+    // acquired via OrderBook.ensure_native_index_ready() before calling any of these.
+    native fun native_best_bid_price(market_addr: address): (bool, u64);
+    native fun native_best_ask_price(market_addr: address): (bool, u64);
+    native fun native_get_mid_price(market_addr: address): (bool, u64);
+    native fun native_get_slippage_price(market_addr: address, is_bid: bool, slippage_bps: u64): (bool, u64);
+    native fun native_is_taker_order(market_addr: address, price: u64, is_bid: bool): bool;
+    native fun native_place_maker_order(
+        market_addr: address, order_id: u128, order_type: u64, price: u64,
+        unique_priority_idx: u128, size: u64, is_bid: bool
+    );
+    native fun native_cancel_active_order(
+        market_addr: address, price: u64, unique_priority_idx: u128, is_bid: bool
+    ): u64;
+    native fun native_get_single_match_result(
+        market_addr: address, price: u64, size: u64, is_bid: bool
+    ): (u128, u64, u64, u64);
+    native fun native_increase_order_size(
+        market_addr: address, price: u64, unique_priority_idx: u128, size_delta: u64, is_bid: bool
+    );
+    native fun native_decrease_order_size(
+        market_addr: address, price: u64, unique_priority_idx: u128, size_delta: u64, is_bid: bool
+    );
+
+    // Timing probes for performance measurement
+    // native_timing_end takes &mut u64 to prevent the compiler from optimizing away the call.
+    public native fun native_timing_start(): u64;
+    public native fun native_timing_end(label: u64, start_token: &mut u64);
+    // Set timing context: 0=MM, 1=Retail, 2=Oracle
+    public native fun native_set_timing_context(ctx: u64);
+
+    /// Native batch validation of price/size arrays.
+    /// Validates: price > 0, price % ticker_size == 0, size > 0, size <= MAX_I64,
+    /// size % lot_size == 0, size >= min_size, price * size <= MAX_I64 * precision_multiplier.
+    /// Aborts with the same error codes as the Move implementation.
+    /// Returns true if validation passes. Aborts on invalid input.
+    public native fun native_validate_prices_and_sizes(
+        ticker_size: u64,
+        lot_size: u64,
+        min_size: u64,
+        precision_multiplier: u128,
+        prices: &vector<u64>,
+        sizes: &vector<u64>,
+    ): bool;
+
+    // ===========================================================================================
+    // Tests
 
     #[test_only]
     public fun destroy_price_time_idx(self: PriceTimeIndex) {
-        let PriceTimeIndex::V1 { sells, buys } = self;
-        sells.destroy(|_v| {});
-        buys.destroy(|_v| {});
+        match (self) {
+            V1 { sells, buys } => {
+                sells.destroy(|_v| {});
+                buys.destroy(|_v| {});
+            },
+            NativeV2 { market_addr: _ } => {
+                // No-op: native overlay is managed by BlockNativeState lifecycle
+            }
+        }
     }
 
     #[test_only]

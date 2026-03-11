@@ -29,6 +29,7 @@ aptos-memory-usage-tracker = { workspace = true }
 aptos-metrics-core = { workspace = true }
 aptos-mvhashmap = { workspace = true }
 aptos-native-interface = { workspace = true }
+aptos-order-book-natives = { workspace = true }
 aptos-table-natives = { workspace = true }
 aptos-types = { workspace = true }
 aptos-vm-environment = { workspace = true }

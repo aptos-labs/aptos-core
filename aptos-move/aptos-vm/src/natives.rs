@@ -219,6 +219,7 @@ fn unit_test_extensions_hook(exts: &mut NativeContextExtensions) {
     exts.add(AlgebraContext::new());
     exts.add(NativeEventContext::default());
     exts.add(NativeObjectContext::default());
+    exts.add(aptos_order_book_natives::NativeOrderBookContext::new());
 
     let mut randomness_ctx = RandomnessContext::new();
     randomness_ctx.mark_unbiasable();

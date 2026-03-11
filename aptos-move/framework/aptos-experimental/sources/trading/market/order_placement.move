@@ -228,7 +228,8 @@ module aptos_experimental::order_placement {
         cancel_on_match_limit: bool,
         callbacks: &MarketClearinghouseCallbacks<M, R>
     ): OrderMatchResult<R> {
-        place_order_with_order_id(
+        market.get_order_book().ensure_native_index_ready();
+        let result = place_order_with_order_id(
             market,
             signer::address_of(user),
             limit_price,
@@ -244,7 +245,9 @@ module aptos_experimental::order_placement {
             cancel_on_match_limit,
             true,
             callbacks
-        )
+        );
+        market.get_order_book().maybe_flush_handle();
+        result
     }
 
     /// Places a market order - The order is guaranteed to be a taker order and will be matched immediately.
@@ -259,7 +262,8 @@ module aptos_experimental::order_placement {
         cancel_on_match_limit: bool,
         callbacks: &MarketClearinghouseCallbacks<M, R>
     ): OrderMatchResult<R> {
-        place_order_with_order_id(
+        market.get_order_book().ensure_native_index_ready();
+        let result = place_order_with_order_id(
             market,
             signer::address_of(user),
             if (is_bid) {
@@ -277,7 +281,9 @@ module aptos_experimental::order_placement {
             cancel_on_match_limit,
             true,
             callbacks
-        )
+        );
+        market.get_order_book().maybe_flush_handle();
+        result
     }
 
     fun place_maker_order_internal<M: store + copy + drop, R: store + copy + drop>(

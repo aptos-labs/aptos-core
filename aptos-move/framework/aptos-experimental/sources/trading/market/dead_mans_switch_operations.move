@@ -106,6 +106,7 @@ module aptos_experimental::dead_mans_switch_operations {
         account: address,
         callbacks: &MarketClearinghouseCallbacks<M, R>
     ) {
+        market.get_order_book().ensure_native_index_ready();
         // Check if dead man's switch is enabled
         assert!(market.is_dead_mans_switch_enabled(), E_DEAD_MANS_SWITCH_NOT_ENABLED);
 
@@ -130,7 +131,8 @@ module aptos_experimental::dead_mans_switch_operations {
                 market_types::order_cancellation_reason_dead_mans_switch_expired(),
                 callbacks
             );
-        }
+        };
+        market.get_order_book().maybe_flush_handle();
     }
 
     /// Updates the keep-alive state for a trader in the dead man's switch.

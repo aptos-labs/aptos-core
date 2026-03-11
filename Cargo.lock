@@ -1602,6 +1602,7 @@ dependencies = [
  "aptos-metrics-core",
  "aptos-mvhashmap",
  "aptos-node-resource-metrics",
+ "aptos-order-book-natives",
  "aptos-profiler 0.1.0",
  "aptos-protos 1.3.1",
  "aptos-push-metrics",
@@ -1626,6 +1627,7 @@ dependencies = [
  "indicatif 0.15.0",
  "itertools 0.13.0",
  "move-core-types",
+ "move-vm-runtime",
  "move-vm-types",
  "num_cpus",
  "once_cell",
@@ -3682,6 +3684,20 @@ dependencies = [
 ]
 
 [[package]]
+name = "aptos-order-book-natives"
+version = "0.1.0"
+dependencies = [
+ "aptos-gas-schedule",
+ "aptos-native-interface",
+ "better_any",
+ "dashmap 7.0.0-rc2",
+ "move-core-types",
+ "move-vm-runtime",
+ "move-vm-types",
+ "smallvec",
+]
+
+[[package]]
 name = "aptos-package-builder"
 version = "0.1.0"
 dependencies = [
@@ -5003,6 +5019,7 @@ dependencies = [
  "aptos-metrics-core",
  "aptos-mvhashmap",
  "aptos-native-interface",
+ "aptos-order-book-natives",
  "aptos-table-natives",
  "aptos-transaction-simulation",
  "aptos-types",
@@ -5061,6 +5078,7 @@ dependencies = [
  "aptos-gas-schedule",
  "aptos-move-stdlib",
  "aptos-native-interface",
+ "aptos-order-book-natives",
  "aptos-table-natives",
  "aptos-types",
  "aptos-vm-types",

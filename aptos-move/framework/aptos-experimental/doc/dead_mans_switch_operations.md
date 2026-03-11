@@ -192,6 +192,7 @@ Aborts:
     <a href="../../aptos-framework/doc/account.md#0x1_account">account</a>: <b>address</b>,
     callbacks: &MarketClearinghouseCallbacks&lt;M, R&gt;
 ) {
+    market.get_order_book().ensure_native_index_ready();
     // Check <b>if</b> dead man's switch is enabled
     <b>assert</b>!(market.is_dead_mans_switch_enabled(), <a href="dead_mans_switch_operations.md#0x7_dead_mans_switch_operations_E_DEAD_MANS_SWITCH_NOT_ENABLED">E_DEAD_MANS_SWITCH_NOT_ENABLED</a>);
 
@@ -216,7 +217,8 @@ Aborts:
             <a href="market_types.md#0x7_market_types_order_cancellation_reason_dead_mans_switch_expired">market_types::order_cancellation_reason_dead_mans_switch_expired</a>(),
             callbacks
         );
-    }
+    };
+    market.get_order_book().maybe_flush_handle();
 }
 </code></pre>
 
