@@ -298,7 +298,7 @@ impl<
         .await?;
 
         // Execute/apply and commit the transactions/outputs
-        let num_transactions_or_outputs = match self.get_continuous_syncing_mode() {
+        let executor_result = match self.get_continuous_syncing_mode() {
             ContinuousSyncingMode::ApplyTransactionOutputs => {
                 if let Some(transaction_outputs_with_proof) = transaction_outputs_with_proof {
                     utils::apply_transaction_outputs(
@@ -308,7 +308,7 @@ impl<
                         None,
                         transaction_outputs_with_proof,
                     )
-                    .await?
+                    .await
                 } else {
                     self.reset_active_stream(Some(NotificationAndFeedback::new(
                         notification_metadata.notification_id,
@@ -329,7 +329,7 @@ impl<
                         None,
                         transaction_list_with_proof,
                     )
-                    .await?
+                    .await
                 } else {
                     self.reset_active_stream(Some(NotificationAndFeedback::new(
                         notification_metadata.notification_id,
@@ -350,7 +350,7 @@ impl<
                         None,
                         transaction_list_with_proof,
                     )
-                    .await?
+                    .await
                 } else if let Some(transaction_outputs_with_proof) = transaction_outputs_with_proof
                 {
                     utils::apply_transaction_outputs(
@@ -360,7 +360,7 @@ impl<
                         None,
                         transaction_outputs_with_proof,
                     )
-                    .await?
+                    .await
                 } else {
                     self.reset_active_stream(Some(NotificationAndFeedback::new(
                         notification_metadata.notification_id,
@@ -373,6 +373,22 @@ impl<
                 }
             },
         };
+
+        // If the executor failed (e.g., the storage synchronizer timed out), reset the stream
+        let num_transactions_or_outputs = match executor_result {
+            Ok(num_transactions_or_outputs) => num_transactions_or_outputs,
+            Err(error) => {
+                self.reset_active_stream(Some(NotificationAndFeedback::new(
+                    notification_metadata.notification_id,
+                    NotificationFeedback::UnexpectedError,
+                )))
+                .await?;
+
+                return Err(error);
+            },
+        };
+
+        // Update the speculative stream state
         let synced_version = payload_start_version
             .checked_add(num_transactions_or_outputs as u64)
             .and_then(|version| version.checked_sub(1)) // synced_version = start + num txns/outputs - 1

@@ -145,6 +145,8 @@ pub struct StateSyncDriverConfig {
     pub max_stream_wait_time_ms: u64,
     /// The version lag we'll tolerate before snapshot syncing
     pub num_versions_to_skip_snapshot_sync: u64,
+    /// The maximum time (ms) to wait when sending to a full storage synchronizer
+    pub storage_pipeline_backpressure_timeout_ms: u64,
 }
 
 /// The default state sync driver config will be the one that gets (and keeps)
@@ -165,6 +167,7 @@ impl Default for StateSyncDriverConfig {
             max_pending_mempool_notifications: 100,
             max_stream_wait_time_ms: 5000,
             num_versions_to_skip_snapshot_sync: 400_000_000, // At 5k TPS, this allows a node to fail for about 24 hours.
+            storage_pipeline_backpressure_timeout_ms: 120_000, // 2 minutes
         }
     }
 }

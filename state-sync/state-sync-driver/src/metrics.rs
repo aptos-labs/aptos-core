@@ -28,6 +28,12 @@ pub const NOTIFICATION_CREATE_TO_UPDATE_LEDGER: &str = "notification_create_to_u
 
 /// Storage synchronizer metric labels
 pub const STORAGE_SYNCHRONIZER_PENDING_DATA: &str = "storage_synchronizer_pending_data";
+pub const STORAGE_SYNCHRONIZER_PENDING_DATA_EXECUTOR: &str =
+    "storage_synchronizer_pending_data_executor";
+pub const STORAGE_SYNCHRONIZER_PENDING_DATA_LEDGER_UPDATER: &str =
+    "storage_synchronizer_pending_data_ledger_updater";
+pub const STORAGE_SYNCHRONIZER_PENDING_DATA_COMMITTER: &str =
+    "storage_synchronizer_pending_data_committer";
 pub const STORAGE_SYNCHRONIZER_APPLY_CHUNK: &str = "apply_chunk";
 pub const STORAGE_SYNCHRONIZER_EXECUTE_CHUNK: &str = "execute_chunk";
 pub const STORAGE_SYNCHRONIZER_UPDATE_LEDGER: &str = "update_ledger";
@@ -92,9 +98,8 @@ impl StorageSynchronizerOperations {
 
 /// Histogram buckets for tracking chunk sizes
 const CHUNK_SIZE_BUCKETS: &[f64] = &[
-    1.0, 2.0, 4.0, 5.0, 10.0, 25.0, 50.0, 75.0, 100.0, 250.0, 500.0, 750.0, 1000.0, 2500.0, 5000.0,
-    7500.0, 10_000.0, 12_500.0, 15_000.0, 17_500.0, 20_000.0, 25_000.0, 30_000.0, 35_000.0,
-    40_000.0, 45_000.0, 50_000.0, 75_000.0, 100_000.0,
+    1.0, 2.0, 4.0, 5.0, 10.0, 25.0, 50.0, 75.0, 100.0, 250.0, 500.0, 750.0, 1000.0, 1500.0, 2000.0,
+    2500.0, 3000.0, 3500.0, 4000.0, 4500.0, 5000.0, 7500.0, 10_000.0, 15_000.0, 20_000.0,
 ];
 
 /// Counter for state sync bootstrapper errors
