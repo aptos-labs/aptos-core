@@ -101,8 +101,8 @@ impl InnerCiphertext for BIBECiphertext {
         eval_proof: &EvalProof,
     ) -> PreparedBIBECiphertext {
         let pairing_output = PairingSetting::multi_pairing(
-            &vec![digest.as_g1(), **eval_proof],
-            &vec![self.ct_g2[0], self.ct_g2[1]],
+            [digest.as_g1(), **eval_proof],
+            [self.ct_g2[0], self.ct_g2[1]],
         );
 
         PreparedBIBECiphertext {
