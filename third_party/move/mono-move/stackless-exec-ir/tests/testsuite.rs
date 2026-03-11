@@ -1,5 +1,5 @@
 // Copyright (c) Aptos Foundation
-// SPDX-License-Identifier: Apache-2.0
+// Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 use codespan_reporting::term::termcolor::Buffer;
 use legacy_move_compiler::shared::known_attributes::KnownAttribute;
@@ -61,9 +61,16 @@ fn masm_runner(path: &Path) -> datatest_stable::Result<()> {
     Ok(())
 }
 
+fn path_from_crate_root(path: &str) -> String {
+    let mut buf = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+    buf.push(path);
+    buf.to_string_lossy().to_string()
+}
+
 fn move_runner(path: &Path) -> datatest_stable::Result<()> {
     let options = move_compiler_v2::Options {
         sources: vec![path.display().to_string()],
+        dependencies: vec![path_from_crate_root("../../move-stdlib/sources")],
         named_address_mapping: vec!["std=0x1".to_string()],
         known_attributes: KnownAttribute::get_all_attribute_names().clone(),
         language_version: Some(LanguageVersion::latest_stable()),
