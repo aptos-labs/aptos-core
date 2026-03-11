@@ -32,7 +32,6 @@ impl BlockStage {
     pub const QC_ADDED_OPT_BLOCK: &'static str = "qc_added_opt_block";
     pub const QC_AGGREGATED: &'static str = "qc_aggregated";
     pub const RAND_ADD_DECISION: &'static str = "rand_add_decision";
-    pub const RAND_ADD_ENOUGH_SHARE_FAST: &'static str = "rand_add_enough_share_fast";
     pub const RAND_ADD_ENOUGH_SHARE_SLOW: &'static str = "rand_add_enough_share_slow";
     pub const RAND_ENTER: &'static str = "rand_enter";
     pub const RAND_READY: &'static str = "rand_ready";

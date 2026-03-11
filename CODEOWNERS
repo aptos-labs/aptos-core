@@ -127,6 +127,12 @@
 # Owners for the `/terraform` directory and all its subdirectories.
 /terraform/ @aptos-labs/prod-eng
 
+# Owners for the mono-move folder.
+/third_party/move/mono-move/ @calintat @georgemitenkov @vgao1996 @vineethk
+
+# Owners for the move-vm folder.
+/third_party/move/move-vm/ @georgemitenkov @vgao1996 @vineethk @wrwg
+
 # Owners for the new Move package system crates.
 /third_party/move/tools/move-package-cache/ @vgao1996
 /third_party/move/tools/move-package-manifest/ @vgao1996

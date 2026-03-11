@@ -1,7 +1,6 @@
 // Copyright (c) Aptos Foundation
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
-use super::types::FastShare;
 use crate::{
     network::TConsensusMsg,
     network_interface::ConsensusMsg,
@@ -29,7 +28,6 @@ pub enum RandMessage<S, D> {
     AugDataSignature(AugDataSignature),
     CertifiedAugData(CertifiedAugData<D>),
     CertifiedAugDataAck(CertifiedAugDataAck),
-    FastShare(FastShare<S>),
 }
 
 impl<S: TShare, D: TAugmentedData> RandMessage<S, D> {
@@ -37,25 +35,16 @@ impl<S: TShare, D: TAugmentedData> RandMessage<S, D> {
         &self,
         epoch_state: &EpochState,
         rand_config: &RandConfig,
-        fast_rand_config: &Option<RandConfig>,
         sender: Author,
     ) -> anyhow::Result<()> {
         ensure!(self.epoch() == epoch_state.epoch);
         match self {
             RandMessage::RequestShare(_) => Ok(()),
             RandMessage::Share(share) => share.optimistic_verify(rand_config, &sender),
-            RandMessage::AugData(aug_data) => {
-                aug_data.verify(rand_config, fast_rand_config, sender)
-            },
+            RandMessage::AugData(aug_data) => aug_data.verify(rand_config, sender),
             RandMessage::CertifiedAugData(certified_aug_data) => {
                 certified_aug_data.verify(&epoch_state.verifier)
             },
-            RandMessage::FastShare(share) => share.optimistic_verify(
-                fast_rand_config.as_ref().ok_or_else(|| {
-                    anyhow::anyhow!("[RandMessage] rand config for fast path not found")
-                })?,
-                &sender,
-            ),
             _ => bail!("[RandMessage] unexpected message type"),
         }
     }
@@ -72,7 +61,6 @@ impl<S: TShare, D: TAugmentedData> TConsensusMsg for RandMessage<S, D> {
             RandMessage::AugDataSignature(signature) => signature.epoch(),
             RandMessage::CertifiedAugData(certified_aug_data) => certified_aug_data.epoch(),
             RandMessage::CertifiedAugDataAck(ack) => ack.epoch(),
-            RandMessage::FastShare(share) => share.share.epoch(),
         }
     }
 
@@ -258,7 +246,7 @@ mod tests {
         let msg = RandMessage::<MockShare, MockAugData>::Share(forged_share);
 
         // Verify with attacker as sender should fail
-        let result = msg.verify(&ctx.epoch_state, &ctx.rand_config, &None, attacker);
+        let result = msg.verify(&ctx.epoch_state, &ctx.rand_config, attacker);
         assert!(result.is_err());
         assert!(result
             .unwrap_err()
@@ -266,45 +254,7 @@ mod tests {
             .contains("does not match sender"),);
 
         // Verify with victim as sender should succeed
-        let result = msg.verify(&ctx.epoch_state, &ctx.rand_config, &None, victim);
-        assert!(result.is_ok());
-    }
-
-    #[test]
-    fn test_fast_share_verify_rejects_mismatched_sender() {
-        let ctx = build_test_context(vec![100, 100, 100], 0);
-        let victim = ctx.authors[0];
-        let attacker = ctx.authors[2];
-        let metadata = RandMetadata {
-            epoch: ctx.epoch_state.epoch,
-            round: 1,
-        };
-
-        // Create a fast share claiming to be from victim
-        let forged_share = RandShare::<MockShare>::new(victim, metadata, MockShare);
-        let forged_fast_share = super::super::types::FastShare::new(forged_share);
-        let msg = RandMessage::<MockShare, MockAugData>::FastShare(forged_fast_share);
-
-        // Verify with attacker as sender should fail
-        let result = msg.verify(
-            &ctx.epoch_state,
-            &ctx.rand_config,
-            &Some(ctx.rand_config.clone()),
-            attacker,
-        );
-        assert!(result.is_err());
-        assert!(result
-            .unwrap_err()
-            .to_string()
-            .contains("does not match sender"),);
-
-        // Verify with victim as sender should succeed
-        let result = msg.verify(
-            &ctx.epoch_state,
-            &ctx.rand_config,
-            &Some(ctx.rand_config.clone()),
-            victim,
-        );
+        let result = msg.verify(&ctx.epoch_state, &ctx.rand_config, victim);
         assert!(result.is_ok());
     }
 
@@ -320,7 +270,7 @@ mod tests {
         let share = RandShare::<MockShare>::new(author, metadata, MockShare);
         let msg = RandMessage::<MockShare, MockAugData>::Share(share);
 
-        let result = msg.verify(&ctx.epoch_state, &ctx.rand_config, &None, author);
+        let result = msg.verify(&ctx.epoch_state, &ctx.rand_config, author);
         assert!(result.is_ok());
     }
 }

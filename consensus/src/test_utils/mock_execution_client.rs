@@ -123,7 +123,6 @@ impl TExecutionClient for MockExecutionClient {
         _onchain_randomness_config: &OnChainRandomnessConfig,
         _onchain_chunky_dkg_config: &OnChainChunkyDKGConfig,
         _rand_config: Option<RandConfig>,
-        _fast_rand_config: Option<RandConfig>,
         _secret_share_config: Option<SecretShareConfig>,
         _rand_msg_rx: aptos_channel::Receiver<AccountAddress, IncomingRandGenRequest>,
         _secret_sharing_msg_rx: aptos_channel::Receiver<AccountAddress, IncomingSecretShareRequest>,

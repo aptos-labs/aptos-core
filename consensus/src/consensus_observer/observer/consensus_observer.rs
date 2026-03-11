@@ -1113,7 +1113,6 @@ impl ConsensusObserver {
                 &chunky_dkg_config,
                 None,
                 None,
-                None,
                 rand_msg_rx,
                 secret_share_msg_rx,
                 0,
