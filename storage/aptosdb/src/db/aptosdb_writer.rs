@@ -21,6 +21,7 @@ use crate::{
 };
 use aptos_crypto::HashValue;
 use aptos_experimental_runtimes::thread_manager::THREAD_MANAGER;
+use aptos_logger::prelude::*;
 use aptos_metrics_core::TimerHelper;
 use aptos_schemadb::batch::SchemaBatch;
 use aptos_storage_interface::{
@@ -48,10 +49,15 @@ impl DbWriter for AptosDB {
             // same time from multiple threads, the same for committing.
             // Consensus and state sync must hand over to each other after all pending execution and
             // committing complete.
+            info!(
+                "[hs_debug] pre_commit_ledger: acquiring pre_commit_lock, first_version={}...",
+                chunk.first_version,
+            );
             let _lock = self
                 .pre_commit_lock
                 .try_lock()
                 .expect("Concurrent committing detected.");
+            info!("[hs_debug] pre_commit_ledger: pre_commit_lock acquired");
             let _timer = OTHER_TIMERS_SECONDS.timer_with(&["pre_commit_ledger"]);
 
             chunk
@@ -65,11 +71,16 @@ impl DbWriter for AptosDB {
 
             let _timer = OTHER_TIMERS_SECONDS.timer_with(&["save_transactions__others"]);
 
+            info!("[hs_debug] pre_commit_ledger: acquiring buffered_state lock...");
             self.state_store.buffered_state().lock().update(
                 chunk.result_ledger_state_with_summary(),
                 chunk.estimated_total_state_updates(),
                 sync_commit || chunk.is_reconfig,
             )?;
+            info!(
+                "[hs_debug] pre_commit_ledger: done, first_version={}",
+                chunk.first_version
+            );
 
             Ok(())
         })
@@ -86,10 +97,18 @@ impl DbWriter for AptosDB {
             // same time from multiple threads, the same for committing.
             // Consensus and state sync must hand over to each other after all pending execution and
             // committing complete.
+            info!(
+                "[hs_debug] commit_ledger: acquiring commit_lock, version={}...",
+                version
+            );
             let _lock = self
                 .commit_lock
                 .try_lock()
                 .expect("Concurrent committing detected.");
+            info!(
+                "[hs_debug] commit_ledger: commit_lock acquired, version={}",
+                version
+            );
             let _timer = OTHER_TIMERS_SECONDS.timer_with(&["commit_ledger"]);
 
             let old_committed_ver = self.get_and_check_commit_range(version)?;

@@ -10,6 +10,7 @@ use crate::{
     },
 };
 use aptos_infallible::Mutex;
+use aptos_logger::prelude::*;
 use aptos_metrics_core::TimerHelper;
 use aptos_storage_interface::{
     state_store::state_with_summary::{LedgerStateWithSummary, StateWithSummary},
@@ -123,9 +124,18 @@ impl BufferedState {
     fn enqueue_commit(&mut self, checkpoint: StateWithSummary) {
         let _timer = OTHER_TIMERS_SECONDS.timer_with(&["buffered_state___enqueue_commit"]);
 
+        let version = checkpoint.version();
+        info!(
+            "[hs_debug] BufferedState::enqueue_commit: sending checkpoint version={:?}...",
+            version
+        );
         self.state_commit_sender
             .send(CommitMessage::Data(checkpoint.clone()))
             .unwrap();
+        info!(
+            "[hs_debug] BufferedState::enqueue_commit: sent version={:?}",
+            version
+        );
         // n.b. if the latest state is not a (the latest) checkpoint, the items between them are
         // not counted towards the next commit. If this becomes a concern we can count the items
         // instead of putting it 0 here.
@@ -136,11 +146,13 @@ impl BufferedState {
     fn drain_commits(&mut self) {
         let _timer = OTHER_TIMERS_SECONDS.timer_with(&["buffered_state___drain_commits"]);
 
+        info!("[hs_debug] BufferedState::drain_commits: sending Sync and waiting...");
         let (commit_sync_sender, commit_sync_receiver) = mpsc::channel();
         self.state_commit_sender
             .send(CommitMessage::Sync(commit_sync_sender))
             .unwrap();
         commit_sync_receiver.recv().unwrap();
+        info!("[hs_debug] BufferedState::drain_commits: done");
     }
 
     pub(crate) fn sync_commit(&mut self) {
@@ -161,6 +173,10 @@ impl BufferedState {
     ) -> Result<()> {
         let _timer = OTHER_TIMERS_SECONDS.timer_with(&["buffered_state___update"]);
 
+        info!(
+            "[hs_debug] BufferedState::update: acquiring current_state lock, sync_commit={}",
+            sync_commit,
+        );
         let old_state = self.current_state_locked().clone();
         assert!(new_state.is_descendant_of(&old_state));
 
@@ -173,6 +189,12 @@ impl BufferedState {
         let checkpoint_to_commit_opt =
             (old_state.next_version() < last_checkpoint.next_version()).then_some(last_checkpoint);
         *self.current_state_locked() = new_state;
+        info!(
+            "[hs_debug] BufferedState::update: state updated to version={:?}, will_commit={}, sync_commit={}",
+            version,
+            checkpoint_to_commit_opt.is_some(),
+            sync_commit,
+        );
         self.maybe_commit(checkpoint_to_commit_opt, sync_commit);
         Self::report_last_checkpoint_version(version);
         Ok(())
