@@ -30,7 +30,7 @@ use aptos_crypto::HashValue;
 use aptos_executor_types::{state_compute_result::StateComputeResult, BlockExecutorTrait};
 use aptos_experimental_runtimes::thread_manager::optimal_min_len;
 use aptos_infallible::Mutex;
-use aptos_logger::{debug, error, info, trace, warn};
+use aptos_logger::{error, info, trace, warn};
 use aptos_resource_viewer::module_view::CachedModuleView;
 use aptos_storage_interface::state_store::state_view::cached_state_view::CachedStateView;
 use aptos_types::{
@@ -1057,7 +1057,7 @@ impl PipelineBuilder {
             block_info.change_timestamp(timestamp);
         }
         let ledger_info = LedgerInfo::new(block_info, consensus_data_hash);
-        debug!("[Pipeline] Signed ledger info {ledger_info}");
+        info!("[Pipeline] Signed ledger info {ledger_info}");
         let signature = signer.sign(&ledger_info).expect("Signing should succeed");
         let commit_vote = CommitVote::new_with_signature(signer.author(), ledger_info, signature);
         network_sender
