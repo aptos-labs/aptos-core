@@ -228,7 +228,7 @@ pub fn convert_transaction_payload(
             let encrypted_state = match ep {
                 EncryptedTransactionPayload::Encrypted(p) => {
                     transaction::encrypted_transaction_payload::EncryptedState::Encrypted(
-                        transaction::EncryptedPayloadProto {
+                        transaction::EncryptedPayloadState {
                             payload_hash: p.payload_hash.0.to_vec(),
                             ciphertext: p.ciphertext.0.clone(),
                         },
@@ -236,7 +236,7 @@ pub fn convert_transaction_payload(
                 },
                 EncryptedTransactionPayload::FailedDecryption(p) => {
                     transaction::encrypted_transaction_payload::EncryptedState::FailedDecryption(
-                        transaction::FailedDecryptionPayloadProto {
+                        transaction::FailedDecryptionPayloadState {
                             payload_hash: p.payload_hash.0.to_vec(),
                             ciphertext: p.ciphertext.0.clone(),
                         },
@@ -245,23 +245,23 @@ pub fn convert_transaction_payload(
                 EncryptedTransactionPayload::Decrypted(p) => {
                     let decrypted_payload = match &p.decrypted_payload {
                         EncryptedTransactionInnerPayload::EntryFunctionPayload(efp) => {
-                            transaction::decrypted_payload_proto::DecryptedPayload::EntryFunctionPayload(
+                            transaction::decrypted_payload_state::DecryptedPayload::EntryFunctionPayload(
                                 convert_entry_function_payload(efp),
                             )
                         },
                         EncryptedTransactionInnerPayload::ScriptPayload(sp) => {
-                            transaction::decrypted_payload_proto::DecryptedPayload::ScriptPayload(
+                            transaction::decrypted_payload_state::DecryptedPayload::ScriptPayload(
                                 convert_script_payload(sp),
                             )
                         },
                         EncryptedTransactionInnerPayload::MultisigPayload(mp) => {
-                            transaction::decrypted_payload_proto::DecryptedPayload::MultisigPayload(
+                            transaction::decrypted_payload_state::DecryptedPayload::MultisigPayload(
                                 convert_multisig_payload(mp),
                             )
                         },
                     };
                     transaction::encrypted_transaction_payload::EncryptedState::Decrypted(
-                        transaction::DecryptedPayloadProto {
+                        transaction::DecryptedPayloadState {
                             payload_hash: p.payload_hash.0.to_vec(),
                             ciphertext: p.ciphertext.0.clone(),
                             decryption_nonce: p.decryption_nonce.0,

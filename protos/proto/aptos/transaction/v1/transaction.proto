@@ -329,23 +329,23 @@ message ExtraConfigV1 {
 
 message EncryptedTransactionPayload {
   oneof encrypted_state {
-    EncryptedPayloadProto encrypted = 1;
-    FailedDecryptionPayloadProto failed_decryption = 2;
-    DecryptedPayloadProto decrypted = 3;
+    EncryptedPayloadState encrypted = 1;
+    FailedDecryptionPayloadState failed_decryption = 2;
+    DecryptedPayloadState decrypted = 3;
   }
 }
 
-message EncryptedPayloadProto {
+message EncryptedPayloadState {
   bytes payload_hash = 1;
   bytes ciphertext = 2;
 }
 
-message FailedDecryptionPayloadProto {
+message FailedDecryptionPayloadState {
   bytes payload_hash = 1;
   bytes ciphertext = 2;
 }
 
-message DecryptedPayloadProto {
+message DecryptedPayloadState {
   bytes payload_hash = 1;
   bytes ciphertext = 2;
   oneof decrypted_payload {
