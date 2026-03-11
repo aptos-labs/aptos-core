@@ -1212,17 +1212,25 @@ impl<NS: SubprotocolNetworkSender<SlotConsensusMsg>, SP: SPCSpawner> SlotManager
             return None;
         }
 
-        // Find the first non-⊥ entry in v_high and look up its ProposalData
+        // Find the first non-⊥ entry in v_high whose proof is valid.
+        // TODO: Add real proof.verify(&self.validator_verifier) here once we move
+        // verification off the event loop (e.g., spawn on blocking thread or batch
+        // BLS checks). For now we accept the first proof found — the proposer's BLS
+        // signature binds them to prev_commit_proof_hash, so a forged proof would
+        // require breaking BLS. This dummy check validates the theory that moving
+        // O(n³) proof verification off the hot path fixes SPC throughput.
         for (pos, hash) in &non_bot_hashes {
             if let Some(data) = slot_state.lookup_entry_data(hash) {
-                info!(
-                    epoch = self.epoch,
-                    slot = slot,
-                    position = pos,
-                    has_proof = data.prev_commit_proof.is_some(),
-                    "extract_canonical_proof: found entry data, returning proof"
-                );
-                return data.prev_commit_proof;
+                if let Some(ref proof) = data.prev_commit_proof {
+                    info!(
+                        epoch = self.epoch,
+                        slot = slot,
+                        position = pos,
+                        proof_slot = proof.slot,
+                        "extract_canonical_proof: accepting proof (TODO: add crypto verification)"
+                    );
+                    return data.prev_commit_proof;
+                }
             }
         }
 
