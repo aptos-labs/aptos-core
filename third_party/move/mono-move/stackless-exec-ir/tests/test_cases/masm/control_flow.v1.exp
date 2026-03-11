@@ -1,7 +1,10 @@
 === Module 0x66::test ===
 
 fun loop_down(r0) {
-    params: 1, locals: 0, registers: 2
+  slots: params(1), locals(0), temps(1)
+    r0: u64
+    r1: bool
+  code:
   L2:
     0: r1 := gt r0, #0
     1: br_false L0, r1
@@ -12,8 +15,12 @@ fun loop_down(r0) {
     4: ret []
 }
 
-fun conditional(r0) {
-    params: 1, locals: 0, registers: 3
+fun conditional(r0): u64 {
+  slots: params(1), locals(0), temps(2)
+    r0: bool
+    r1: u64
+    r2: u64
+  code:
     0: br_true L0, r0
   L1:
     1: r1 := ld_u64 0

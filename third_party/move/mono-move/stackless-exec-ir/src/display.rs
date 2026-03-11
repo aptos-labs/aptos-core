@@ -1,5 +1,5 @@
 // Copyright (c) Aptos Foundation
-// SPDX-License-Identifier: Apache-2.0
+// Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 //! Human-readable display for the stackless execution IR.
 //! Resolves pool indices using the CompiledModule for readable output.
@@ -9,12 +9,14 @@ use move_binary_format::{
     access::ModuleAccess,
     file_format::{
         FieldHandleIndex, FieldInstantiationIndex, FunctionHandleIndex,
-        FunctionInstantiationIndex, StructDefInstantiationIndex,
-        StructDefinitionIndex, StructVariantHandleIndex, StructVariantInstantiationIndex,
-        VariantFieldHandleIndex, VariantFieldInstantiationIndex,
+        FunctionInstantiationIndex, SignatureToken, StructDefInstantiationIndex,
+        StructDefinitionIndex, StructHandleIndex, StructVariantHandleIndex,
+        StructVariantInstantiationIndex, VariantFieldHandleIndex,
+        VariantFieldInstantiationIndex,
     },
     CompiledModule,
 };
+use move_vm_types::loaded_data::runtime_types::Type;
 use std::fmt;
 
 /// A display wrapper for ModuleIR.
@@ -65,23 +67,38 @@ fn display_function(
     }
     write!(f, ")")?;
     if !returns.is_empty() {
-        // We don't print the types since they require type display logic;
-        // the register form is sufficient.
+        write!(f, ": ")?;
+        for (i, ret_ty) in returns.iter().enumerate() {
+            if i > 0 {
+                write!(f, " * ")?;
+            }
+            display_sig_token(f, module, ret_ty)?;
+        }
     }
     writeln!(f, " {{")?;
+    let num_temps = func.num_regs - func.num_params - func.num_locals;
     if func.num_arg_regs > 0 {
         writeln!(
             f,
-            "    params: {}, locals: {}, registers: {}, arg_regs: {}",
-            func.num_params, func.num_locals, func.num_regs, func.num_arg_regs
+            "  slots: params({}), locals({}), temps({}), args({})",
+            func.num_params, func.num_locals, num_temps, func.num_arg_regs
         )?;
     } else {
         writeln!(
             f,
-            "    params: {}, locals: {}, registers: {}",
-            func.num_params, func.num_locals, func.num_regs
+            "  slots: params({}), locals({}), temps({})",
+            func.num_params, func.num_locals, num_temps
         )?;
     }
+
+    // Display register declarations with types
+    for i in 0..func.num_regs {
+        let ty = &func.reg_types[i as usize];
+        write!(f, "    r{}: ", i)?;
+        display_type(f, module, ty)?;
+        writeln!(f)?;
+    }
+    writeln!(f, "  code:")?;
 
     // Instructions
     let mut instr_num = 0;
@@ -539,5 +556,153 @@ fn imm_value(imm: &ImmValue) -> String {
         ImmValue::I16(v) => format!("#{}i16", v),
         ImmValue::I32(v) => format!("#{}i32", v),
         ImmValue::I64(v) => format!("#{}i64", v),
+    }
+}
+
+/// Display a runtime `Type` with struct names resolved via the module.
+///
+/// `StructNameIndex` values are assumed to be ordinals matching `StructHandleIndex`,
+/// which is how this crate's `type_conversion` builds them.
+fn display_type(
+    f: &mut fmt::Formatter<'_>,
+    module: &CompiledModule,
+    ty: &Type,
+) -> fmt::Result {
+    match ty {
+        Type::Bool => write!(f, "bool"),
+        Type::U8 => write!(f, "u8"),
+        Type::U16 => write!(f, "u16"),
+        Type::U32 => write!(f, "u32"),
+        Type::U64 => write!(f, "u64"),
+        Type::U128 => write!(f, "u128"),
+        Type::U256 => write!(f, "u256"),
+        Type::I8 => write!(f, "i8"),
+        Type::I16 => write!(f, "i16"),
+        Type::I32 => write!(f, "i32"),
+        Type::I64 => write!(f, "i64"),
+        Type::I128 => write!(f, "i128"),
+        Type::I256 => write!(f, "i256"),
+        Type::Address => write!(f, "address"),
+        Type::Signer => write!(f, "signer"),
+        Type::TyParam(idx) => write!(f, "_{}", idx),
+        Type::Vector(inner) => {
+            write!(f, "vector<")?;
+            display_type(f, module, inner)?;
+            write!(f, ">")
+        },
+        Type::Reference(inner) => {
+            write!(f, "&")?;
+            display_type(f, module, inner)
+        },
+        Type::MutableReference(inner) => {
+            write!(f, "&mut ")?;
+            display_type(f, module, inner)
+        },
+        Type::Struct { idx, .. } => {
+            let sh_idx = StructHandleIndex(idx.to_string().parse::<u16>().unwrap());
+            let handle = module.struct_handle_at(sh_idx);
+            write!(f, "{}", module.identifier_at(handle.name))
+        },
+        Type::StructInstantiation { idx, ty_args, .. } => {
+            let sh_idx = StructHandleIndex(idx.to_string().parse::<u16>().unwrap());
+            let handle = module.struct_handle_at(sh_idx);
+            write!(f, "{}<", module.identifier_at(handle.name))?;
+            for (i, arg) in ty_args.iter().enumerate() {
+                if i > 0 {
+                    write!(f, ", ")?;
+                }
+                display_type(f, module, arg)?;
+            }
+            write!(f, ">")
+        },
+        Type::Function {
+            args, results, ..
+        } => {
+            write!(f, "|")?;
+            for (i, arg) in args.iter().enumerate() {
+                if i > 0 {
+                    write!(f, ", ")?;
+                }
+                display_type(f, module, arg)?;
+            }
+            write!(f, "|")?;
+            for (i, r) in results.iter().enumerate() {
+                if i > 0 {
+                    write!(f, ", ")?;
+                }
+                display_type(f, module, r)?;
+            }
+            Ok(())
+        },
+    }
+}
+
+fn display_sig_token(
+    f: &mut fmt::Formatter<'_>,
+    module: &CompiledModule,
+    tok: &SignatureToken,
+) -> fmt::Result {
+    match tok {
+        SignatureToken::Bool => write!(f, "bool"),
+        SignatureToken::U8 => write!(f, "u8"),
+        SignatureToken::U16 => write!(f, "u16"),
+        SignatureToken::U32 => write!(f, "u32"),
+        SignatureToken::U64 => write!(f, "u64"),
+        SignatureToken::U128 => write!(f, "u128"),
+        SignatureToken::U256 => write!(f, "u256"),
+        SignatureToken::I8 => write!(f, "i8"),
+        SignatureToken::I16 => write!(f, "i16"),
+        SignatureToken::I32 => write!(f, "i32"),
+        SignatureToken::I64 => write!(f, "i64"),
+        SignatureToken::I128 => write!(f, "i128"),
+        SignatureToken::I256 => write!(f, "i256"),
+        SignatureToken::Address => write!(f, "address"),
+        SignatureToken::Signer => write!(f, "signer"),
+        SignatureToken::TypeParameter(idx) => write!(f, "_{}", idx),
+        SignatureToken::Vector(inner) => {
+            write!(f, "vector<")?;
+            display_sig_token(f, module, inner)?;
+            write!(f, ">")
+        },
+        SignatureToken::Reference(inner) => {
+            write!(f, "&")?;
+            display_sig_token(f, module, inner)
+        },
+        SignatureToken::MutableReference(inner) => {
+            write!(f, "&mut ")?;
+            display_sig_token(f, module, inner)
+        },
+        SignatureToken::Struct(sh_idx) => {
+            let handle = module.struct_handle_at(*sh_idx);
+            write!(f, "{}", module.identifier_at(handle.name))
+        },
+        SignatureToken::StructInstantiation(sh_idx, tys) => {
+            let handle = module.struct_handle_at(*sh_idx);
+            write!(f, "{}<", module.identifier_at(handle.name))?;
+            for (i, ty) in tys.iter().enumerate() {
+                if i > 0 {
+                    write!(f, ", ")?;
+                }
+                display_sig_token(f, module, ty)?;
+            }
+            write!(f, ">")
+        },
+        SignatureToken::Function(args, results, _abilities) => {
+            write!(f, "|")?;
+            for (i, ty) in args.iter().enumerate() {
+                if i > 0 {
+                    write!(f, ", ")?;
+                }
+                display_sig_token(f, module, ty)?;
+            }
+            write!(f, "|")?;
+            for (i, ty) in results.iter().enumerate() {
+                if i > 0 {
+                    write!(f, ", ")?;
+                }
+                display_sig_token(f, module, ty)?;
+            }
+            Ok(())
+        },
     }
 }
