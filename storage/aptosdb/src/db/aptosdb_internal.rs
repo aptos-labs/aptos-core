@@ -13,12 +13,19 @@ use crate::{
     state_store::{StatePruner, StateStore},
     transaction_store::TransactionStore,
 };
+#[cfg(any(test, feature = "db-debugger"))]
+use crate::{
+    schema::db_metadata::{DbMetadataKey, DbMetadataSchema, DbMetadataValue},
+    utils::truncation_helper::get_current_version_in_state_merkle_db,
+};
 use aptos_config::config::{
     HotStateConfig, PrunerConfig, RocksdbConfigs, StorageDirPaths, NO_OP_STORAGE_PRUNER_CONFIG,
 };
 use aptos_db_indexer::db_indexer::InternalIndexerDB;
 use aptos_logger::prelude::*;
 use aptos_metrics_core::{IntGaugeVecHelper, TimerHelper};
+#[cfg(any(test, feature = "db-debugger"))]
+use aptos_schemadb::batch::SchemaBatch;
 use aptos_schemadb::{Cache, Env};
 #[cfg(test)]
 use aptos_storage_interface::Order;
@@ -203,6 +210,64 @@ impl AptosDB {
             HotStateConfig::default(),
         )
         .expect("Unable to open AptosDB")
+    }
+
+    /// Truncates the DB at `db_dir` to `target_version`.
+    ///
+    /// Opens the raw sub-databases, sets the overall commit progress to
+    /// `target_version`, truncates all sub-databases to be consistent, and
+    /// catches up the state merkle DB by replaying write sets if needed.
+    #[cfg(any(test, feature = "db-debugger"))]
+    pub(crate) fn truncate_to_version(
+        db_dir: &StorageDirPaths,
+        target_version: Version,
+    ) -> Result<()> {
+        let (ledger_db, hot_state_merkle_db, state_merkle_db, hot_state_kv_db, state_kv_db) =
+            Self::open_dbs(
+                db_dir,
+                RocksdbConfigs::default(),
+                None,  // env
+                None,  // block_cache
+                false, // readonly
+                0,     // max_num_nodes_per_lru_cache_shard
+                true,  // reset_hot_state
+            )?;
+
+        let ledger_db = Arc::new(ledger_db);
+        let hot_state_merkle_db = hot_state_merkle_db.map(Arc::new);
+        let state_merkle_db = Arc::new(state_merkle_db);
+        let hot_state_kv_db = hot_state_kv_db.map(Arc::new);
+        let state_kv_db = Arc::new(state_kv_db);
+
+        let mut batch = SchemaBatch::new();
+        batch.put::<DbMetadataSchema>(
+            &DbMetadataKey::OverallCommitProgress,
+            &DbMetadataValue::Version(target_version),
+        )?;
+        ledger_db.metadata_db().write_schemas(batch)?;
+
+        StateStore::sync_commit_progress(
+            Arc::clone(&ledger_db),
+            Arc::clone(&state_kv_db),
+            Arc::clone(&state_merkle_db),
+            /*crash_if_difference_is_too_large=*/ false,
+        );
+
+        if let Some(state_merkle_db_version) =
+            get_current_version_in_state_merkle_db(&state_merkle_db)?
+        {
+            if state_merkle_db_version < target_version {
+                StateStore::catch_up_state_merkle_db(
+                    ledger_db,
+                    hot_state_merkle_db,
+                    state_merkle_db,
+                    hot_state_kv_db,
+                    state_kv_db,
+                )?;
+            }
+        }
+
+        Ok(())
     }
 
     pub(super) fn error_if_ledger_pruned(&self, data_type: &str, version: Version) -> Result<()> {
