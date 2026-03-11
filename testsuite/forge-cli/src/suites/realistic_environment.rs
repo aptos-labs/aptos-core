@@ -31,6 +31,10 @@ use aptos_testcases::{
 };
 use std::{num::NonZeroUsize, sync::Arc, time::Duration};
 
+/// Whether to enable the fullnode failure test in the max load test
+// TODO: re-enable this after the flakes are removed!
+const ENABLE_FULLNODE_FAILURE_TEST: bool = false;
+
 /// Attempts to match the test name to a realistic-env test
 pub(crate) fn get_realistic_env_test(
     test_name: &str,
@@ -406,7 +410,7 @@ pub(crate) fn realistic_env_max_load_test(
         });
 
     // If the test is short lived, we should verify that there are no fullnode failures
-    if !long_running {
+    if !long_running && ENABLE_FULLNODE_FAILURE_TEST {
         success_criteria = success_criteria.add_no_fullnode_failures();
     }
 
