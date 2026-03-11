@@ -226,24 +226,23 @@ async fn main() {
         "/v1/accounts/0x1/resource/0x1::keyless_account::Groth16VerificationKey";
     const KEYLESS_CONFIG_PATH: &str =
         "/v1/accounts/0x1/resource/0x1::keyless_account::Configuration";
-    let (on_chain_groth16_vk_url, on_chain_keyless_config_url) = if let Ok(internal_node_api) =
-        std::env::var("INTERNAL_NODE_API")
-    {
-        let base = internal_node_api.trim_end_matches('/');
-        info!(
+    let (on_chain_groth16_vk_url, on_chain_keyless_config_url) =
+        if let Ok(internal_node_api) = std::env::var("INTERNAL_NODE_API") {
+            let base = internal_node_api.trim_end_matches('/');
+            info!(
             "INTERNAL_NODE_API is set; using it as the base URL for on-chain resource fetching: {}",
             base
         );
-        (
-            Some(format!("{}{}", base, GROTH16_VK_PATH)),
-            Some(format!("{}{}", base, KEYLESS_CONFIG_PATH)),
-        )
-    } else {
-        (
-            args.on_chain_groth16_vk_url,
-            args.on_chain_keyless_config_url,
-        )
-    };
+            (
+                Some(format!("{}{}", base, GROTH16_VK_PATH)),
+                Some(format!("{}{}", base, KEYLESS_CONFIG_PATH)),
+            )
+        } else {
+            (
+                args.on_chain_groth16_vk_url,
+                args.on_chain_keyless_config_url,
+            )
+        };
 
     // Start the cached resource fetcher
     let cached_resources = resource_fetcher::start_cached_resource_fetcher(
