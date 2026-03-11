@@ -87,3 +87,4 @@ pub const INCOMPLETE_MATCH_ABORT_CODE: u64 = make_abort_code(1);
 // Well known attributes
 pub const PERSISTENT_ATTRIBUTE: &str = "persistent";
 pub const MODULE_LOCK_ATTRIBUTE: &str = "module_lock";
+pub const IMMUTABLE_ATTRIBUTE: &str = "immutable";

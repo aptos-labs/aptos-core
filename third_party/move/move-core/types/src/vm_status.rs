@@ -828,11 +828,15 @@ pub enum StatusCode {
     // for instance, function attribute #[pack] must only be attached to the corresponding pack$S API.
     INVALID_STRUCT_API_CODE = 1136,
 
+    // An #[immutable] function calls a callee that is neither #[immutable] nor native,
+    // violating the requirement that immutable functions have stable behavior across upgrades.
+    IMMUTABLE_FUNCTION_CALLS_NON_IMMUTABLE = 1137,
+
     // Reserved error code for future use
-    RESERVED_VERIFICATION_ERROR_1 = 1137,
-    RESERVED_VERIFICATION_ERROR_2 = 1138,
-    RESERVED_VERIFICATION_ERROR_3 = 1139,
-    RESERVED_VERIFICATION_ERROR_4 = 1140,
+    RESERVED_VERIFICATION_ERROR_1 = 1138,
+    RESERVED_VERIFICATION_ERROR_2 = 1139,
+    RESERVED_VERIFICATION_ERROR_3 = 1140,
+    RESERVED_VERIFICATION_ERROR_4 = 1141,
 
     // These are errors that the VM might raise if a violation of internal
     // invariants takes place.

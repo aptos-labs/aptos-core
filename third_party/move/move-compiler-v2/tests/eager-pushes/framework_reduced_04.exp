@@ -293,7 +293,7 @@ fun m::zero($t0: u64): u64 {
 
 
 ============ disassembled file-format ==================
-// Bytecode version v10
+// Bytecode version v11
 module 0xc0ffee::m
 struct Wrap has drop + key
   a: u64

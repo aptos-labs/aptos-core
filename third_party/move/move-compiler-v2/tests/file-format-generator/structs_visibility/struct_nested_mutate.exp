@@ -1,6 +1,6 @@
 
 ============ disassembled file-format ==================
-// Bytecode version v10
+// Bytecode version v11
 module 0xc0ffee::m
 struct T has copy + drop
   y: u64
@@ -64,7 +64,7 @@ struct S has copy + drop
     mut_borrow_field S, x
     ret
 
-// Bytecode version v10
+// Bytecode version v11
 module 0xc0ffee::test_m
 use 0xc0ffee::m
 // Function definition at index 0

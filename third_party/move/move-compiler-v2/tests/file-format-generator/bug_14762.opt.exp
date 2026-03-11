@@ -1,6 +1,6 @@
 
 ============ disassembled file-format ==================
-// Bytecode version v10
+// Bytecode version v11
 module 0xc0ffee::m
 use 0x1::option
 use 0x1::vector

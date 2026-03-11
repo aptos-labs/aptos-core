@@ -1,0 +1,10 @@
+processed 2 tasks
+task 0 lines 1-7:  publish [module 0x66::helper]
+task 1 lines 10-17:  publish [// Invalid: an #[immutable] function calls a non-immutable, non-native callee.]
+Error: Unable to publish module '0000000000000000000000000000000000000000000000000000000000000066::test_immutable_call'. Got VMError: {
+    major_status: IMMUTABLE_FUNCTION_CALLS_NON_IMMUTABLE,
+    sub_status: None,
+    location: 0x66::test_immutable_call,
+    indices: [(FunctionDefinition, 0)],
+    offsets: [],
+}

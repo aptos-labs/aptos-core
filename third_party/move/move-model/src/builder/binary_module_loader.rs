@@ -510,6 +510,9 @@ impl<'a> BinaryModuleLoader<'a> {
                 FunctionAttribute::BorrowFieldMutable(offset) => {
                     add_attribute(BORROW_MUT, Some(*offset));
                 },
+                FunctionAttribute::Immutable => {
+                    add_attribute(well_known::IMMUTABLE_ATTRIBUTE, None);
+                },
             }
         }
 

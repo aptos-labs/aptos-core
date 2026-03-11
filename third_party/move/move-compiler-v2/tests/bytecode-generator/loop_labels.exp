@@ -139,7 +139,7 @@ fun test::f1() {
 
 
 ============ disassembled file-format ==================
-// Bytecode version v10
+// Bytecode version v11
 module 0x815::test
 // Function definition at index 0
 fun f1()

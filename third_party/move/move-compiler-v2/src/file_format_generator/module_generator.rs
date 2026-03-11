@@ -263,8 +263,19 @@ impl ModuleGenerator {
 
         let acquires_map = ctx.generate_acquires_map(module_env);
         for fun_env in module_env.get_functions() {
-            // Do not need to generate code for inline or lemma functions
+            // Do not need to generate code for inline functions or lemmas, but still validate
+            // that #[immutable] is not placed on them.
             if fun_env.is_inline() || fun_env.is_lemma() {
+                if fun_env.has_attribute(|attr| {
+                    matches!(attr, Attribute::Apply(_, name, _)
+                        if fun_env.symbol_pool().string(*name).as_str()
+                            == well_known::IMMUTABLE_ATTRIBUTE)
+                }) {
+                    ctx.error(
+                        fun_env.get_id_loc(),
+                        "attribute `#[immutable]` cannot be applied to inline functions",
+                    );
+                }
                 continue;
             }
             assert!(compile_test_code || !fun_env.is_test_only());
@@ -1717,7 +1728,7 @@ impl ModuleContext<'_> {
 
     /// Delivers the function attributes which are relevant for execution for the given
     /// function. This includes annotated ones as well as ones which are derived.
-    /// Currently, a public function derives `Persistent`.
+    /// Currently, a public function or a function with `#[immutable]` derives `Persistent`.
     pub(crate) fn function_attributes(&self, fun_env: &FunctionEnv) -> Vec<FF::FunctionAttribute> {
         let mut result = vec![];
         let mut has_persistent = false;
@@ -1778,6 +1789,18 @@ impl ModuleContext<'_> {
                                 result.push(FF::FunctionAttribute::ModuleLock);
                             }
                         },
+                        well_known::IMMUTABLE_ATTRIBUTE => {
+                            if validate_no_args_and_not_script(name.as_str(), args, self) {
+                                if fun_env.is_native() {
+                                    self.error(
+                                        fun_env.get_id_loc(),
+                                        "attribute `#[immutable]` cannot be applied to native functions",
+                                    );
+                                } else {
+                                    result.push(FF::FunctionAttribute::Immutable);
+                                }
+                            }
+                        },
                         _ => { /* skip */ },
                     }
                 },
@@ -1785,7 +1808,9 @@ impl ModuleContext<'_> {
                 Attribute::Assign(_, name, _) => {
                     let name = fun_env.symbol_pool().string(*name);
                     match name.as_str() {
-                        well_known::PERSISTENT_ATTRIBUTE | well_known::MODULE_LOCK_ATTRIBUTE => {
+                        well_known::PERSISTENT_ATTRIBUTE
+                        | well_known::MODULE_LOCK_ATTRIBUTE
+                        | well_known::IMMUTABLE_ATTRIBUTE => {
                             self.error(
                                 fun_env.get_id_loc(),
                                 format!("attribute `{}` cannot be assigned to", name),
@@ -1806,8 +1831,9 @@ impl ModuleContext<'_> {
                 },
             }
         }
-        if !has_persistent && fun_env.visibility() == Visibility::Public {
-            // For a public function, derive the persistent attribute
+        // #[immutable] implies #[persistent]: a frozen function also cannot be removed.
+        let has_immutable = result.contains(&FF::FunctionAttribute::Immutable);
+        if !has_persistent && (has_immutable || fun_env.visibility() == Visibility::Public) {
             result.push(FF::FunctionAttribute::Persistent)
         }
         result

@@ -1,0 +1,10 @@
+processed 2 tasks
+task 0 lines 1-13:  publish [// An #[immutable] function calling a same-module non-immutable function is rejected.]
+Error: Unable to publish module '0000000000000000000000000000000000000000000000000000000000000066::test_same_module_bad'. Got VMError: {
+    major_status: IMMUTABLE_FUNCTION_CALLS_NON_IMMUTABLE,
+    sub_status: None,
+    location: 0x66::test_same_module_bad,
+    indices: [(FunctionDefinition, 1)],
+    offsets: [],
+}
+task 1 lines 16-28:  publish [// An #[immutable] function calling a same-module #[immutable] function is valid.]

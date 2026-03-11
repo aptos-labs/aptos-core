@@ -136,7 +136,7 @@ fun M::t0_u128() {
 
 
 ============ disassembled file-format ==================
-// Bytecode version v10
+// Bytecode version v11
 module 0x8675309::M
 struct R<T0: key>
   r: T0

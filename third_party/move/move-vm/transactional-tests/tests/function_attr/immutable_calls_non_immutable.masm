@@ -1,0 +1,18 @@
+//# publish
+module 0x66::helper
+
+// A non-immutable helper function.
+public fun helper_value(): u64
+    ld_u64 42
+    ret
+
+
+//# publish
+// Invalid: an #[immutable] function calls a non-immutable, non-native callee.
+module 0x66::test_immutable_call
+use 0x66::helper
+
+#[immutable] public fun call_non_immutable(): u64
+    call helper::helper_value
+    ret
+

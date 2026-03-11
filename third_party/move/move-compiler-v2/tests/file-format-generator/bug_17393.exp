@@ -1,6 +1,6 @@
 
 ============ disassembled file-format ==================
-// Bytecode version v10
+// Bytecode version v11
 module 0xcafe::Module0
 enum E has copy + drop
   V1

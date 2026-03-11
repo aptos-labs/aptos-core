@@ -1,0 +1,29 @@
+//# publish
+// An #[immutable] function calling a same-module non-immutable function is rejected.
+module 0x66::test_same_module_bad
+
+// A non-immutable same-module helper.
+fun non_immutable_helper(): u64
+    ld_u64 10
+    ret
+
+// Invalid: calls a same-module non-immutable function.
+#[immutable] public fun bad(): u64
+    call non_immutable_helper
+    ret
+
+
+//# publish
+// An #[immutable] function calling a same-module #[immutable] function is valid.
+module 0x67::test_same_module_good
+
+// An immutable same-module helper.
+#[immutable] fun immutable_helper(): u64
+    ld_u64 20
+    ret
+
+// Valid: calls a same-module #[immutable] function.
+#[immutable] public fun good(): u64
+    call immutable_helper
+    ret
+

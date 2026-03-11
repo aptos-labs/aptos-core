@@ -22,6 +22,7 @@ ResolutionGraph {
                 "bytecode_instruction",
                 "deprecated",
                 "expected_failure",
+                "immutable",
                 "lint::skip",
                 "module_lock",
                 "native_interface",

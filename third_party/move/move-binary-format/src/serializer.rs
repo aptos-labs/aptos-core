@@ -982,6 +982,13 @@ fn serialize_function_attribute(
             },
             "borrow_mut",
         ),
+        Immutable => serialize_function_attribute_if_supported(
+            version,
+            VERSION_11,
+            binary,
+            |binary| -> Result<()> { binary.push(SerializedFunctionAttribute::IMMUTABLE as u8) },
+            "immutable",
+        ),
     }
 }
 

@@ -38,6 +38,7 @@ pub use verifier::{
 
 mod acquires_list_verifier;
 mod features;
+mod immutable_checker;
 mod locals_safety;
 pub mod meter;
 mod reference_safety;

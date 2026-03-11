@@ -207,7 +207,7 @@ fun m::will_autoref(): address {
 
 
 ============ disassembled file-format ==================
-// Bytecode version v10
+// Bytecode version v11
 module 0x42::m
 struct Object has copy + drop
   inner: address

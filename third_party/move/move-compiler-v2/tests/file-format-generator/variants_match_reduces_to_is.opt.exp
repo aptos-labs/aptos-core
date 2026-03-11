@@ -1,6 +1,6 @@
 
 ============ disassembled file-format ==================
-// Bytecode version v10
+// Bytecode version v11
 module 0x815::m
 enum Color
   RGB

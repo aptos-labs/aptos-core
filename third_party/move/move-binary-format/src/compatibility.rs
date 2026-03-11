@@ -11,7 +11,8 @@ use crate::{
     },
     file_format_common::VERSION_5,
     views::{
-        FieldDefinitionView, ModuleView, StructDefinitionView, StructHandleView, ViewInternals,
+        FieldDefinitionView, FunctionDefinitionView, ModuleView, StructDefinitionView,
+        StructHandleView, ViewInternals,
     },
     CompiledModule,
 };
@@ -164,10 +165,16 @@ impl Compatibility {
                 .attributes()
                 .contains(&FunctionAttribute::Persistent);
 
-            // private, non entry function doesn't need to follow any checks here, skip
+            // private, non entry function doesn't need to follow any checks here, skip.
+            // Exception: #[immutable] functions at any visibility must be checked because
+            // their body cannot change on upgrade.
+            let old_is_immutable = old_func
+                .attributes()
+                .contains(&FunctionAttribute::Immutable);
             if old_func.visibility() == Visibility::Private
                 && !old_func.is_entry()
                 && !old_is_persistent
+                && !old_is_immutable
             {
                 // Function not exposed, continue with next one
                 continue;
@@ -254,6 +261,12 @@ impl Compatibility {
                 new_func.type_parameters(),
             ) {
                 Some("changed type parameters")
+            } else if old_func
+                .attributes()
+                .contains(&FunctionAttribute::Immutable)
+                && !Self::fun_body_compatible(old_module, &old_func, new_module, new_func)
+            {
+                Some("changed body of immutable function")
             } else {
                 None
             };
@@ -511,6 +524,37 @@ impl Compatibility {
             | (SignatureToken::I64, _)
             | (SignatureToken::I128, _)
             | (SignatureToken::I256, _) => false,
+        }
+    }
+
+    /// Returns true if the body of `old_func` and `new_func` are identical.
+    ///
+    /// Two bodies are considered identical when:
+    /// - Both are native (no code), or both have code.
+    /// - The local variable types are the same (resolved from the signature table).
+    /// - The instruction sequences are identical, including all table indices.
+    ///
+    /// This is a strict, index-level comparison. If a module upgrade reorders table entries
+    /// referenced by the function (e.g., shifts a constant or signature index), the comparison
+    /// will report a change even if the logical behaviour is the same. This is intentional:
+    /// `#[immutable]` guarantees bit-for-bit stability of the compiled body.
+    fn fun_body_compatible(
+        old_module: &CompiledModule,
+        old_func: &FunctionDefinitionView<CompiledModule>,
+        new_module: &CompiledModule,
+        new_func: &FunctionDefinitionView<CompiledModule>,
+    ) -> bool {
+        match (old_func.code(), new_func.code()) {
+            (None, None) => true,
+            (Some(_), None) | (None, Some(_)) => false,
+            (Some(old_code), Some(new_code)) => {
+                let old_locals = old_module.signature_at(old_code.locals);
+                let new_locals = new_module.signature_at(new_code.locals);
+                if old_locals != new_locals {
+                    return false;
+                }
+                old_code.code == new_code.code
+            },
         }
     }
 

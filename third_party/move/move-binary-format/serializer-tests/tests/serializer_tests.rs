@@ -182,6 +182,7 @@ fn test_borrow_field_attributes_round_trip() {
     });
 
     // Serialize with VERSION_10 (attributes supported from VERSION_8+)
+    module.version = VERSION_10;
     let mut serialized = Vec::new();
     module
         .serialize_for_version(Some(VERSION_10), &mut serialized)
