@@ -721,7 +721,7 @@ impl PipelineBuilder {
             .collect();
         if !cts.is_empty() {
             let (send, recv) = tokio::sync::oneshot::channel();
-            rayon::spawn(move || {
+            DECRYPTION_POOL.spawn(move || {
                 send.send(<FPTX as BatchThresholdEncryption>::digest(&digest_key, &cts, encryption_round));
             });
             let (digest, proofs_promise) = recv.await.map_err(anyhow::Error::new)??;
@@ -763,7 +763,7 @@ impl PipelineBuilder {
 
         if let Some((_, proofs_promise)) = digest_result {
             let (send, recv) = tokio::sync::oneshot::channel();
-            rayon::spawn(move || {
+            DECRYPTION_POOL.spawn(move || {
                 send.send(<FPTX as BatchThresholdEncryption>::eval_proofs_compute_all(&proofs_promise, &digest_key));
             });
             let proofs = recv.await.map_err(anyhow::Error::new)?;
@@ -840,7 +840,7 @@ async fn prepare_cts(prepare_fut: TaskFuture<PrepareResult>, digest_fut: TaskFut
             let ciphertexts = input_txns.iter().filter(|txn| txn.is_encrypted()).map(|txn| txn.ciphertext().unwrap()).collect::<Vec<_>>();
 
             let (send, recv) = tokio::sync::oneshot::channel();
-            rayon::spawn(move || {
+            DECRYPTION_POOL.spawn(move || {
                 send.send(ciphertexts.into_par_iter().map(
                     |ct|
                     <FPTX as BatchThresholdEncryption>::prepare_ct(&ct, &digest, &proofs)
