@@ -310,6 +310,7 @@ criterion_group!(
     derive_decryption_key_share,
     verify_decryption_key_share,
     reconstruct_decryption_key,
+    prepare,
     decrypt
 );
 criterion_main!(benches);
