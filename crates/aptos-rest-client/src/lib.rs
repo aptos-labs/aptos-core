@@ -27,7 +27,7 @@ use aptos_api_types::{
     VersionedEvent, ViewFunction, ViewRequest,
 };
 use aptos_crypto::HashValue;
-use aptos_logger::{debug, info, sample, sample::SampleRate};
+use aptos_logger::{debug, info, sample, sample::SampleRate, warn};
 use aptos_types::{
     account_address::AccountAddress,
     account_config::{AccountResource, NewBlockEvent, CORE_CODE_ADDRESS},
@@ -1994,12 +1994,28 @@ async fn parse_error(response: reqwest::Response) -> RestError {
         .await
         .map(|bytes| match serde_json::from_slice(&bytes) {
             Ok(error_json) => (error_json, maybe_state, status_code).into(),
-            Err(json_parse_error) => match std::str::from_utf8(&bytes) {
-                Ok(error_text) => RestError::Unknown(anyhow!(error_text.to_string())),
-                Err(_utf8_error) => RestError::Json(json_parse_error),
+            Err(json_parse_error) => {
+                let body = String::from_utf8_lossy(&bytes);
+                warn!(
+                    status_code = %status_code,
+                    body = %body,
+                    json_error = %json_parse_error,
+                    "Failed to parse error response as JSON"
+                );
+                match std::str::from_utf8(&bytes) {
+                    Ok(error_text) => RestError::Unknown(anyhow!(error_text.to_string())),
+                    Err(_utf8_error) => RestError::Json(json_parse_error),
+                }
             },
         })
-        .unwrap_or_else(|reqwest_error| RestError::Http(status_code, reqwest_error))
+        .unwrap_or_else(|reqwest_error| {
+            warn!(
+                status_code = %status_code,
+                error = %reqwest_error,
+                "Failed to read error response body"
+            );
+            RestError::Http(status_code, reqwest_error)
+        })
 }
 
 pub struct GasEstimationParams {
