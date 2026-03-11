@@ -13,7 +13,7 @@ use crate::{
 use anyhow::{bail, Result};
 use aptos_backup_cli::metadata::view::BackupStorageState;
 use aptos_forge::{reconfig, AptosPublicInfo, Node, NodeExt, Swarm, SwarmExt};
-use aptos_logger::info;
+use aptos_logger::{error, info};
 use aptos_temppath::TempPath;
 use aptos_types::{transaction::Version, waypoint::Waypoint};
 use itertools::Itertools;
@@ -90,8 +90,8 @@ async fn test_db_restore() {
         5,
     )
     .await;
-    // explicit reconfigs: we are at least at epoch 5
-    for _ in 0..4 {
+    // explicit reconfigs: we are at least at epoch 6 (epoch ending 5 exists)
+    for _ in 0..5 {
         reconfig(
             &client_1,
             &transaction_factory,
@@ -113,7 +113,7 @@ async fn test_db_restore() {
     assert_balance(&client_1, &account_0, expected_balance_0).await;
     assert_balance(&client_1, &account_1, expected_balance_1).await;
 
-    info!("---------- 2. reached at least epoch 5, starting backup coordinator.");
+    info!("---------- 2. reached at least epoch 6, starting backup coordinator.");
     // make a backup from node 1
     let node1_config = swarm.validator(validator_peer_ids[1]).unwrap().config();
     let port = node1_config.storage.backup_service_address.port();
@@ -291,6 +291,10 @@ fn wait_for_backups(
         std::thread::sleep(Duration::from_secs(1));
     }
 
+    error!(
+        "Timed out waiting for backup to reach epoch {}, version {}.",
+        target_epoch, target_version
+    );
     bail!("Failed to create backup.");
 }
 
