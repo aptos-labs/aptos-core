@@ -33,7 +33,7 @@ use aptos_consensus_types::{
 };
 use aptos_crypto::{hash::CryptoHash, HashValue};
 use aptos_infallible::Mutex;
-use aptos_logger::{error, sample, sample::SampleRate, warn};
+use aptos_logger::{debug, error, sample, sample::SampleRate, warn};
 use aptos_types::{
     block_info::BlockInfo, on_chain_config::ValidatorTxnConfig, validator_txn::ValidatorTransaction,
 };
@@ -266,8 +266,7 @@ impl PipelineBackpressureConfig {
 
             let lookback_config = &config.lookback_config;
             let block_execution_overhead_ms = config.block_execution_overhead_ms;
-            let min_calibrated_block_gas_limit =
-                config.min_calibrated_block_gas_limit;
+            let min_calibrated_block_gas_limit = config.min_calibrated_block_gas_limit;
             let gas_limit_estimates =
                 self.compute_lookback_blocks(block_execution_times, |summary| {
                     let execution_time_ms = summary.execution_time.as_millis() as u64;
@@ -304,12 +303,15 @@ impl PipelineBackpressureConfig {
                 // Check if calibrated block size is reduction in size, to turn on backpressure.
                 if max_block_gas_limit > calibrated_gas_limit {
                     warn!(
-                        block_execution_times = format!("{:?}", block_execution_times),
-                        computed_target_block_gas_limits = format!("{:?}", gas_limit_estimates),
-                        computed_target_block_gas_limit = calibrated_gas_limit,
-                        "Execution backpressure recalibration: gas limit: proposing reducing from {} to {}",
-                        max_block_gas_limit,
-                        calibrated_gas_limit,
+                        num_samples = block_execution_times.len(),
+                        target_gas_lmt = calibrated_gas_limit,
+                        max_gas_lmt = max_block_gas_limit,
+                        "backpressure_recalibration",
+                    );
+                    debug!(
+                        block_execution_times = ?block_execution_times,
+                        gas_limit_estimates = ?gas_limit_estimates,
+                        "backpressure_recalibration_detail",
                     );
                     Some(calibrated_gas_limit)
                 } else {

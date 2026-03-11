@@ -282,7 +282,7 @@ impl RoundState {
                 prev_round_votes,
                 prev_round_timeout_votes,
             };
-            info!(round = new_round, "Starting new round: {}", new_round_event);
+            info!(round = new_round, reason = %new_round_event.reason, timeout_ms = new_round_event.timeout.as_millis() as u64, "new_round");
             return Some(new_round_event);
         }
         None

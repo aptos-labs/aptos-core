@@ -11,7 +11,7 @@ use aptos_consensus_types::{
     request_response::{GetPayloadCommand, GetPayloadRequest, GetPayloadResponse},
     utils::PayloadTxnsSize,
 };
-use aptos_logger::info;
+use aptos_logger::debug;
 use fail::fail_point;
 use futures_channel::{mpsc, oneshot};
 use std::time::{Duration, Instant};
@@ -127,13 +127,12 @@ impl UserPayloadClient for QuorumStoreClient {
             }
             break payload;
         };
-        info!(
+        debug!(
             pull_params = ?params,
-            elapsed_time_ms = start_time.elapsed().as_millis() as u64,
+            duration_ms = start_time.elapsed().as_millis() as u64,
             payload_len = payload.len(),
             return_empty = return_empty,
             return_non_full = return_non_full,
-            duration_ms = start_time.elapsed().as_millis() as u64,
             "Pull payloads from QuorumStore: proposal"
         );
 

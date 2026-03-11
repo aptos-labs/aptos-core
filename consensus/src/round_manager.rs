@@ -804,7 +804,7 @@ impl RoundManager {
             proposal_msg.block_data().timestamp_usecs(),
             BlockStage::ROUND_MANAGER_RECEIVED_OPT_PROPOSAL,
         );
-        info!(
+        debug!(
             self.new_log(LogEvent::ReceiveOptProposal),
             block_author = proposal_msg.proposer(),
             block_epoch = proposal_msg.block_data().epoch(),
@@ -880,7 +880,7 @@ impl RoundManager {
     async fn sync_up(&mut self, sync_info: &SyncInfo, author: Author) -> anyhow::Result<()> {
         let local_sync_info = self.block_store.sync_info();
         if sync_info.has_newer_certificates(&local_sync_info) {
-            info!(
+            debug!(
                 self.new_log(LogEvent::ReceiveNewCertificate)
                     .remote_peer(author),
                 "Local state {},\n remote state {}", local_sync_info, sync_info
@@ -1161,7 +1161,7 @@ impl RoundManager {
         PROPOSED_VTXN_BYTES
             .with_label_values(&[&author_hex])
             .inc_by(validator_txns_total_bytes);
-        info!(
+        debug!(
             vtxn_count_limit = vtxn_count_limit,
             vtxn_count_proposed = num_validator_txns,
             vtxn_bytes_limit = vtxn_bytes_limit,
@@ -1462,7 +1462,7 @@ impl RoundManager {
                     )
                     .await
                 ) {
-                    warn!(
+                    debug!(
                         "[OptProposal] Error generating and sending opt proposal: {}",
                         e
                     );
