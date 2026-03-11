@@ -114,8 +114,12 @@ use std::{
     sync::Arc,
     time::Duration,
 };
-use aptos_batch_encryption::{schemes::fptx::FPTX, traits::BatchThresholdEncryption, shared::algebra::shamir::ThresholdConfig};
-use aptos_types::decryption::{EncryptionKey, PROTOTYPE_SETUP_SEED, PROTOTYPE_BATCH_SIZE, PROTOTYPE_NUMBER_OF_ROUNDS, PROTOTYPE_THRESHOLD_SLOW_PATH, PROTOTYPE_THRESHOLD_FAST_PATH, PROTOTYPE_NUMBER_OF_VALIDATORS};
+use aptos_batch_encryption::{schemes::fptx::FPTX, traits::BatchThresholdEncryption};
+use aptos_types::decryption::{PROTOTYPE_SETUP_SEED, PROTOTYPE_BATCH_SIZE, PROTOTYPE_NUMBER_OF_ROUNDS, PROTOTYPE_THRESHOLD_SLOW_PATH, PROTOTYPE_THRESHOLD_FAST_PATH, PROTOTYPE_NUMBER_OF_VALIDATORS};
+use aptos_crypto::arkworks::shamir::ShamirThresholdConfig;
+use aptos_batch_encryption::group::Fr;
+
+type ThresholdConfig = ShamirThresholdConfig<Fr>;
 
 
 /// Range of rounds (window) that we might be calling proposer election

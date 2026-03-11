@@ -19,6 +19,7 @@ aptos-framework = { workspace = true }
 aptos-infallible = { workspace = true }
 aptos-logger = { workspace = true }
 aptos-sdk = { workspace = true }
+aptos-crypto = { workspace = true }
 async-trait = { workspace = true }
 clap = { workspace = true }
 log = { workspace = true }

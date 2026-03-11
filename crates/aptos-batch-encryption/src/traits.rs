@@ -78,10 +78,13 @@ pub trait BatchThresholdEncryption {
         seed: u64,
         max_batch_size: usize,
         number_of_rounds: usize,
-        threshold_config: &Self::ThresholdConfig,
+        threshold_config_fast: &Self::ThresholdConfig,
+        threshold_config_slow: &Self::ThresholdConfig,
     ) -> Result<(
         Self::EncryptionKey,
         Self::DigestKey,
+        Vec<Self::VerificationKey>,
+        Vec<Self::MasterSecretKeyShare>,
         Vec<Self::VerificationKey>,
         Vec<Self::MasterSecretKeyShare>,
     )>;

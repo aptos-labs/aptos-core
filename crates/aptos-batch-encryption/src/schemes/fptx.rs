@@ -47,10 +47,13 @@ impl BatchThresholdEncryption for FPTX {
         seed: u64,
         max_batch_size: usize,
         number_of_rounds: usize,
-        threshold_config: &Self::ThresholdConfig,
+        threshold_config_fast: &Self::ThresholdConfig,
+        threshold_config_slow: &Self::ThresholdConfig,
     ) -> Result<(
         Self::EncryptionKey,
         Self::DigestKey,
+        Vec<Self::VerificationKey>,
+        Vec<Self::MasterSecretKeyShare>,
         Vec<Self::VerificationKey>,
         Vec<Self::MasterSecretKeyShare>,
     )> {
@@ -58,12 +61,14 @@ impl BatchThresholdEncryption for FPTX {
 
         let digest_key = DigestKey::new(&mut rng, max_batch_size, number_of_rounds)?;
         let msk = Fr::rand(&mut rng);
-        let (mpk, vks, msk_shares) =
-            key_derivation::gen_msk_shares(msk, &mut rng, threshold_config);
+        let (mpk, vks_fast, msk_shares_fast) =
+            key_derivation::gen_msk_shares(msk, &mut rng, threshold_config_fast);
+        let (_, vks_slow, msk_shares_slow) =
+            key_derivation::gen_msk_shares(msk, &mut rng, threshold_config_slow);
 
         let ek = EncryptionKey::new(mpk, digest_key.tau_g2);
 
-        Ok((ek, digest_key, vks, msk_shares))
+        Ok((ek, digest_key, vks_fast, msk_shares_fast, vks_slow, msk_shares_slow))
     }
 
     fn encrypt<R: CryptoRng + RngCore>(

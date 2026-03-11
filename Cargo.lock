@@ -4570,6 +4570,7 @@ version = "0.0.0"
 dependencies = [
  "anyhow",
  "aptos-batch-encryption",
+ "aptos-crypto",
  "aptos-framework",
  "aptos-infallible",
  "aptos-logger",

@@ -16,8 +16,13 @@ use std::{
     cmp::{max, min},
     sync::Arc,
 };
-use aptos_batch_encryption::{schemes::fptx::FPTX, traits::BatchThresholdEncryption, shared::algebra::shamir::ThresholdConfig};
+use aptos_batch_encryption::{schemes::fptx::FPTX, traits::BatchThresholdEncryption, group::Fr};
 use aptos_types::decryption::{EncryptionKey, PROTOTYPE_SETUP_SEED, PROTOTYPE_BATCH_SIZE, PROTOTYPE_NUMBER_OF_ROUNDS, PROTOTYPE_THRESHOLD_SLOW_PATH, PROTOTYPE_NUMBER_OF_VALIDATORS, PROTOTYPE_THRESHOLD_FAST_PATH};
+use aptos_crypto::arkworks::shamir::ShamirThresholdConfig;
+
+
+pub type ThresholdConfig = ShamirThresholdConfig<Fr>;
+
 use ark_std::rand::thread_rng;
 use aptos_logger::info;
 

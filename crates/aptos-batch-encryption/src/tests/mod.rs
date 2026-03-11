@@ -7,10 +7,6 @@ use crate::{
 };
 use rayon::iter::{IntoParallelIterator, ParallelIterator};
 
-#[cfg(test)]
-pub mod fptx_smoke;
-#[cfg(test)]
-pub mod fptx_succinct_smoke;
 
 pub fn prepare_all<T: BatchThresholdEncryption, P: Plaintext>(
     cts: &[T::Ciphertext],

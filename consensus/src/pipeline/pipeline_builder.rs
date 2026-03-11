@@ -31,7 +31,7 @@ use aptos_experimental_runtimes::thread_manager::optimal_min_len;
 use aptos_infallible::Mutex;
 use aptos_logger::{error, info, warn};
 use aptos_types::{
-    block_executor::config::BlockExecutorConfigFromOnchain, decryption::{DecConfig, DecKey, DecMetadata, DecShare, DigestKey, Id, FastDecShare, DECRYPTION_POOL, MasterSecretKeyShare, EncryptionKey}, ledger_info::{LedgerInfo, LedgerInfoWithSignatures}, randomness::Randomness, transaction::{
+    block_executor::config::BlockExecutorConfigFromOnchain, decryption::{Ciphertext, DecConfig, DecKey, DecMetadata, DecShare, DigestKey, EncryptionKey, FastDecShare, Id, MasterSecretKeyShare, DECRYPTION_POOL}, keyless::circuit_constants::prepared_vk_for_testing, ledger_info::{LedgerInfo, LedgerInfoWithSignatures}, randomness::Randomness, transaction::{
         signature_verified_transaction::{SignatureVerifiedTransaction, TransactionProvider},
         SignedTransaction, Transaction,
     }, validator_signer::ValidatorSigner
@@ -45,7 +45,7 @@ use std::{
     time::{Duration, Instant},
 };
 use tokio::{select, sync::oneshot, task::AbortHandle};
-use aptos_batch_encryption::{schemes::fptx::{self, FPTX}, shared::digest, traits::BatchThresholdEncryption};
+use aptos_batch_encryption::{errors::MissingEvalProofError, schemes::fptx::{self, FPTX}, shared::{ciphertext::PreparedCiphertext, digest}, traits::BatchThresholdEncryption};
 
 /// Status to help synchornize the pipeline and sync_manager
 /// It is used to track the round of the block that could be pre-committed and sync manager decides
@@ -436,12 +436,16 @@ impl PipelineBuilder {
             Self::compute_eval_proofs(compute_digest_fut.clone(), digest_key, block.clone()),
             Some(&mut abort_handles),
         );
+        let prepare_cts_fut = spawn_shared_fut(
+            Self::prepare_cts(prepare_fut.clone(), compute_digest_fut.clone(), compute_eval_proofs_fut.clone(), block.clone()),
+            Some(&mut abort_handles),
+        );
         let broadcast_fast_decryption_share_fut = spawn_shared_fut(
             Self::broadcast_fast_decryption_share(compute_decryption_share_fut.clone(), order_vote_fut.clone(), block.clone(), self.network.clone().expect("network is required for validators")),
             Some(&mut abort_handles),
         );
         let compute_decryption_fut = spawn_shared_fut(
-            Self::compute_decryption(prepare_fut.clone(), decryption_key_fut, compute_eval_proofs_fut.clone(), block.clone(), encryption_key.clone()),
+            Self::compute_decryption(prepare_fut.clone(), decryption_key_fut, prepare_cts_fut.clone(), block.clone(), encryption_key.clone()),
             Some(&mut abort_handles),
         );
         // for measure the ordering time
@@ -703,18 +707,21 @@ impl PipelineBuilder {
 
         // daniel todo: hack before having a large setup
         let encryption_round = 0;
-        let ct_ids: Vec<Id> = input_txns
+        let cts: Vec<Ciphertext> = input_txns
             .iter()
             .filter_map(|txn| {
                 if txn.is_encrypted() {
-                    txn.ct_id()
+                    txn.ciphertext()
                 } else {
                     None
                 }
             })
             .collect();
-        if !ct_ids.is_empty() {
-            let (digest, proofs_promise) = <FPTX as BatchThresholdEncryption>::digest(&digest_key, &ct_ids, encryption_round, &DECRYPTION_POOL)?;
+        if !cts.is_empty() {
+            let (digest, proofs_promise) = 
+            DECRYPTION_POOL.install(||
+            <FPTX as BatchThresholdEncryption>::digest(&digest_key, &cts, encryption_round)
+            )?;
             Ok(Some((digest, proofs_promise)))
         } else {
             Ok(None)
@@ -752,12 +759,15 @@ impl PipelineBuilder {
         tracker.start_working();
 
         if let Some((_, proofs_promise)) = digest_result {
-            let proofs = <FPTX as BatchThresholdEncryption>::eval_proofs_compute_all(&proofs_promise, &digest_key, &DECRYPTION_POOL);
+            let proofs = DECRYPTION_POOL.install(||
+                <FPTX as BatchThresholdEncryption>::eval_proofs_compute_all(&proofs_promise, &digest_key)
+            );
             Ok(Some(proofs))
         } else {
             Ok(None)
         }
     }
+
 
 
     /// Precondition: 1. compute_decryption_share finishes, 2. ready to broadcast order vote
@@ -790,15 +800,75 @@ impl PipelineBuilder {
 
     /// Precondition: 1. decryption_key is available, 2. decryption_aux_info is available
     /// What it does: Compute the decryption for the block
-    async fn compute_decryption(prepare_fut: TaskFuture<PrepareResult>, decryption_key_fut: TaskFuture<Option<DecKey>>, proofs_fut: TaskFuture<EvalProofsResult>, block: Arc<Block>, encryption_key: EncryptionKey) -> TaskResult<DecryptionResult> {
+async fn prepare_cts(prepare_fut: TaskFuture<PrepareResult>, digest_fut: TaskFuture<DigestResult>,  proofs_fut: TaskFuture<EvalProofsResult>, block: Arc<Block>) -> TaskResult<Option<Vec<PreparedCiphertext>>> {
+        let mut tracker = Tracker::start_waiting("prepare_cts", &block);
+        let (input_txns, _) = prepare_fut.await?;
+        let maybe_digest = digest_fut.await?;
+        let maybe_proofs = proofs_fut.await?;
+
+
+        tracker.start_working();
+
+        let Some((digest, _)) = maybe_digest else {
+            return Ok(None);
+        };
+        let Some(proofs) = maybe_proofs else {
+            return Ok(None);
+        };
+
+
+        let ct_ids: Vec<Id> = input_txns
+            .iter()
+            .filter_map(|txn| {
+                if txn.is_encrypted() {
+                    txn.ct_id()
+                } else {
+                    None
+                }
+            })
+            .collect();
+
+        if !ct_ids.is_empty() {
+            info!("[daniel] computing prepare_cts round {}, block {}, txn len {}, ids len {}", block.round(), block.id(), input_txns.len(), ct_ids.len());
+
+            let encrypted_txns = input_txns.iter().filter(|txn| txn.is_encrypted()).collect::<Vec<_>>();
+            let ciphertexts = input_txns.iter().filter(|txn| txn.is_encrypted()).map(|txn| txn.ciphertext().unwrap()).collect::<Vec<_>>();
+
+            let prepared_cts: Vec<PreparedCiphertext> = DECRYPTION_POOL.install(||
+                ciphertexts.into_par_iter().map(
+                    |ct|
+                    <FPTX as BatchThresholdEncryption>::prepare_ct(&ct, &digest, &proofs)
+                )
+                    .collect::<Result<Vec<PreparedCiphertext>, MissingEvalProofError>>()
+            ).map_err(|_| anyhow!("Missing eval proof"))?;
+
+
+            assert!(ct_ids.len() == encrypted_txns.len(), "round {}, block {} ct_ids len {}, encrypted_txns len {}", block.round(), block.id(), ct_ids.len(), encrypted_txns.len());
+            assert!(encrypted_txns.len() == prepared_cts.len(), "round {}, block {} encrypted_txns len {}, plaintexts len {}", block.round(), block.id(), encrypted_txns.len(), prepared_cts.len());
+
+
+            Ok(Some(prepared_cts))
+        } else {
+            Ok(None)
+        }
+    }
+
+    /// Precondition: 1. decryption_key is available, 2. decryption_aux_info is available
+    /// What it does: Compute the decryption for the block
+    async fn compute_decryption(prepare_fut: TaskFuture<PrepareResult>, decryption_key_fut: TaskFuture<Option<DecKey>>, prepare_cts_fut: TaskFuture<Option<Vec<PreparedCiphertext>>>, block: Arc<Block>, encryption_key: EncryptionKey) -> TaskResult<DecryptionResult> {
         let mut tracker = Tracker::start_waiting("compute_decryption", &block);
         let (input_txns, _) = prepare_fut.await?;
-        let proofs = proofs_fut.await?;
         let maybe_decryption_key = decryption_key_fut.await?;
+        let maybe_prepared_ciphertexts = prepare_cts_fut.await?;
 
         tracker.start_working();
 
         // let _ = encryption_key.verify_decryption_key(&decryption_key.metadata.digest, &decryption_key.key)?;
+        //
+
+        let Some(prepared_ciphertexts) = maybe_prepared_ciphertexts else {
+            return Ok(None);
+        };
 
         let ct_ids: Vec<Id> = input_txns
             .iter()
@@ -818,7 +888,13 @@ impl PipelineBuilder {
             let ciphertexts = input_txns.iter().filter(|txn| txn.is_encrypted()).map(|txn| txn.ciphertext().unwrap()).collect::<Vec<_>>();
 
             let decryption_key = maybe_decryption_key.expect("decryption key should be available");
-            let plaintexts: Vec<Vec<u8>> = <FPTX as BatchThresholdEncryption>::decrypt(&decryption_key.key, &ciphertexts, &proofs.unwrap(), &DECRYPTION_POOL)?;
+            let plaintexts: Vec<Vec<u8>> = DECRYPTION_POOL.install(||
+                prepared_ciphertexts.into_par_iter()
+                    .map(|prepared_ciphertext| 
+                        <FPTX as BatchThresholdEncryption>::decrypt(&decryption_key.key, &prepared_ciphertext)
+                    )
+                        .collect::<anyhow::Result<Vec<Vec<u8>>>>()
+            )?;
 
             assert!(ct_ids.len() == encrypted_txns.len(), "round {}, block {} ct_ids len {}, encrypted_txns len {}", block.round(), block.id(), ct_ids.len(), encrypted_txns.len());
             assert!(encrypted_txns.len() == plaintexts.len(), "round {}, block {} encrypted_txns len {}, plaintexts len {}", block.round(), block.id(), encrypted_txns.len(), plaintexts.len());
@@ -852,7 +928,7 @@ impl PipelineBuilder {
                                 let new_payload = aptos_types::transaction::TransactionPayload::Payload(
                                     aptos_types::transaction::TransactionPayloadInner::V1 {
                                         executable: decrypted_executable,
-                                        extra_config: extra_config,
+                                        extra_config,
                                     }
                                 );
                                 payload = new_payload;
