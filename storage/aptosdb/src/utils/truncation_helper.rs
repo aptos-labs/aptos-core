@@ -645,3 +645,104 @@ impl Display for Progress {
         )
     }
 }
+
+/// Opens the DB at `db_dir`, truncates all data after `target_version`, and catches up the
+/// state merkle DB if needed. This is the core logic used by the db-debugger truncate command.
+#[cfg(any(test, feature = "db-debugger"))]
+pub(crate) fn run_truncation(db_dir: &std::path::Path, target_version: Version) -> Result<()> {
+    use crate::{db::AptosDB, state_store::StateStore};
+    use aptos_config::config::{RocksdbConfigs, StorageDirPaths};
+    use claims::assert_le;
+
+    let rocksdb_config = RocksdbConfigs::default();
+    let (ledger_db, hot_state_merkle_db, state_merkle_db, hot_state_kv_db, state_kv_db) =
+        AptosDB::open_dbs(
+            &StorageDirPaths::from_path(db_dir),
+            rocksdb_config,
+            /*env=*/ None,
+            /*block_cache=*/ None,
+            /*readonly=*/ false,
+            /*max_num_nodes_per_lru_cache_shard=*/ 0,
+            /*reset_hot_state=*/ true,
+        )?;
+
+    let ledger_db = Arc::new(ledger_db);
+    let hot_state_merkle_db = hot_state_merkle_db.map(Arc::new);
+    let state_merkle_db = Arc::new(state_merkle_db);
+    let hot_state_kv_db = hot_state_kv_db.map(Arc::new);
+    let state_kv_db = Arc::new(state_kv_db);
+
+    let overall_version = ledger_db
+        .metadata_db()
+        .get_synced_version()
+        .expect("DB read failed.")
+        .expect("Overall commit progress must exist.");
+    let ledger_db_version = ledger_db
+        .metadata_db()
+        .get_ledger_commit_progress()
+        .expect("Current version of ledger db must exist.");
+    let state_kv_db_version = get_state_kv_commit_progress(&state_kv_db)?
+        .expect("Current version of state kv db must exist.");
+    let state_merkle_db_version = get_current_version_in_state_merkle_db(&state_merkle_db)?
+        .expect("Current version of state merkle db must exist.");
+
+    let mut target_version = target_version;
+
+    assert_le!(overall_version, ledger_db_version);
+    assert_le!(overall_version, state_kv_db_version);
+    assert_le!(state_merkle_db_version, overall_version);
+    assert_le!(target_version, overall_version);
+
+    info!(
+        overall_version = overall_version,
+        ledger_db_version = ledger_db_version,
+        state_kv_db_version = state_kv_db_version,
+        state_merkle_db_version = state_merkle_db_version,
+        target_version = target_version,
+        "Truncation version info.",
+    );
+
+    if ledger_db.metadata_db().get_usage(target_version).is_err() {
+        info!(
+            target_version = target_version,
+            "Unable to truncate to target version, falling back to largest valid version.",
+        );
+        target_version = ledger_db
+            .metadata_db()
+            .get_usage_before_or_at(target_version)?
+            .0;
+    }
+
+    info!("Starting db truncation.");
+    let mut batch = SchemaBatch::new();
+    batch.put::<DbMetadataSchema>(
+        &DbMetadataKey::OverallCommitProgress,
+        &DbMetadataValue::Version(target_version),
+    )?;
+    ledger_db.metadata_db().write_schemas(batch)?;
+
+    StateStore::sync_commit_progress(
+        Arc::clone(&ledger_db),
+        Arc::clone(&state_kv_db),
+        Arc::clone(&state_merkle_db),
+        /*crash_if_difference_is_too_large=*/ false,
+    );
+    info!("Truncation done.");
+
+    if let Some(state_merkle_db_version) = get_current_version_in_state_merkle_db(&state_merkle_db)?
+    {
+        if state_merkle_db_version < target_version {
+            info!("Catching up state merkle db by replaying write sets in ledger db.");
+            let version = StateStore::catch_up_state_merkle_db(
+                Arc::clone(&ledger_db),
+                hot_state_merkle_db,
+                Arc::clone(&state_merkle_db),
+                hot_state_kv_db,
+                Arc::clone(&state_kv_db),
+            )?;
+            info!(version = ?version, "State merkle db catch-up done.");
+        }
+    }
+
+    Ok(())
+}
