@@ -332,7 +332,7 @@ impl LedgerMetadataDb {
         self.db.put::<VersionDataSchema>(&version, &usage.into())
     }
 
-    #[cfg(feature = "db-debugger")]
+    #[cfg(any(test, feature = "db-debugger"))]
     pub(crate) fn get_usage_before_or_at(
         &self,
         version: Version,
