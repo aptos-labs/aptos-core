@@ -14,3 +14,21 @@ fun caller(): u64 {
     1: [a0] := call identity, [a0]
     2: ret [a0]
 }
+
+=== micro-ops ===
+=== Module 0x66::test ===
+
+fun identity() {
+  frame_data_size: 8
+  code:
+    0: Return
+}
+
+fun caller() {
+  frame_data_size: 0
+  code:
+    0: StoreImm8 [24] <- #10
+    1: CallFunc #0
+    2: Move8 [0] <- [24]
+    3: Return
+}

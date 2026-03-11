@@ -18182,6 +18182,7 @@ dependencies = [
  "datatest-stable",
  "either",
  "legacy-move-compiler",
+ "mono-move-micro-ops",
  "move-asm",
  "move-binary-format",
  "move-bytecode-verifier",

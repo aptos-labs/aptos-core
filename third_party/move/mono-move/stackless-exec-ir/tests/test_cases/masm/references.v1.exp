@@ -38,3 +38,12 @@ fun read_field_ref_twice(r0): u64 {
     4: r5 := add r3, r4
     5: ret [r5]
 }
+
+=== micro-ops ===
+=== Module 0x66::test ===
+
+fun read_field_val(): skipped (not all types are concrete)
+
+fun read_and_add(): skipped (lowering: instruction ReadRef(Home(1), Home(0)) not yet lowered)
+
+fun read_field_ref_twice(): skipped (not all types are concrete)

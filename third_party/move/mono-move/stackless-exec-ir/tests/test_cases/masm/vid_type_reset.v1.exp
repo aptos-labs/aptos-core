@@ -14,3 +14,8 @@ fun vid_type_mismatch(r0): u64 {
     3: r2 := add r0, #1
     4: ret [r2]
 }
+
+=== micro-ops ===
+=== Module 0x66::test ===
+
+fun vid_type_mismatch(): skipped (lowering: BinaryOpImm Gt for u64-sized type not yet lowered)

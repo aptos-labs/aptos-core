@@ -29,3 +29,20 @@ fun conditional(r0): u64 {
     3: r2 := ld_u64 1
     4: ret [r2]
 }
+
+=== micro-ops ===
+=== Module 0x66::test ===
+
+fun loop_down(): skipped (lowering: BinaryOpImm Gt for u64-sized type not yet lowered)
+
+fun conditional() {
+  frame_data_size: 24
+  code:
+    0: JumpNotZeroU64 @4 if [0] != 0
+    1: StoreImm8 [8] <- #0
+    2: Move8 [0] <- [8]
+    3: Return
+    4: StoreImm8 [16] <- #1
+    5: Move8 [0] <- [16]
+    6: Return
+}

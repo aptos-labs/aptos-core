@@ -4,16 +4,75 @@
 use codespan_reporting::term::termcolor::Buffer;
 use legacy_move_compiler::shared::known_attributes::KnownAttribute;
 use move_asm::assembler::{self, Options as AsmOptions};
-use move_binary_format::CompiledModule;
+use move_binary_format::{access::ModuleAccess, CompiledModule};
 use move_model::metadata::LanguageVersion;
 use move_vm_types::loaded_data::struct_name_indexing::StructNameIndex;
-use stackless_exec_ir::{run_pipeline, PipelineConfig, PipelineVersion};
+use stackless_exec_ir::{
+    ir::ModuleIR,
+    lower::lower_function,
+    lowering_context::{build_func_id_map, try_build_context},
+    micro_ops_display::MicroOpsFunctionDisplay,
+    run_pipeline, PipelineConfig, PipelineVersion,
+};
 use std::path::Path;
 
 fn make_struct_name_table(module: &CompiledModule) -> Vec<StructNameIndex> {
     (0..module.struct_handles.len())
         .map(|i| StructNameIndex::new(i as u32))
         .collect()
+}
+
+fn format_micro_ops(module_ir: &ModuleIR) -> String {
+    let module = &module_ir.module;
+    let func_id_map = build_func_id_map(module);
+    let self_handle = module.module_handle_at(module.self_module_handle_idx);
+    let addr = module.address_identifier_at(self_handle.address);
+    let mod_name = module.identifier_at(self_handle.name);
+
+    let mut out = String::new();
+    out.push_str(&format!(
+        "=== Module 0x{}::{} ===\n",
+        addr.short_str_lossless(),
+        mod_name
+    ));
+
+    for func_ir in &module_ir.functions {
+        let func_name = module.identifier_at(func_ir.name_idx).to_string();
+        match try_build_context(module, func_ir, &func_id_map) {
+            Err(e) => {
+                out.push_str(&format!(
+                    "\nfun {}(): skipped (context: {})\n",
+                    func_name, e
+                ));
+            },
+            Ok(None) => {
+                out.push_str(&format!(
+                    "\nfun {}(): skipped (not all types are concrete)\n",
+                    func_name
+                ));
+            },
+            Ok(Some(ctx)) => match lower_function(func_ir, &ctx) {
+                Ok(ops) => {
+                    out.push('\n');
+                    out.push_str(&format!(
+                        "{}",
+                        MicroOpsFunctionDisplay {
+                            func_name: &func_name,
+                            ctx: &ctx,
+                            ops: &ops,
+                        }
+                    ));
+                },
+                Err(e) => {
+                    out.push_str(&format!(
+                        "\nfun {}(): skipped (lowering: {})\n",
+                        func_name, e
+                    ));
+                },
+            },
+        }
+    }
+    out
 }
 
 const V1_EXT: &str = "v1.exp";
@@ -38,7 +97,9 @@ fn masm_runner(path: &Path) -> datatest_stable::Result<()> {
         ..PipelineConfig::default()
     };
     let v1_ir = run_pipeline(module.clone(), &v1_config, &table).map_err(|e| format!("{:#}", e))?;
-    let v1_output = format!("{}", v1_ir.display());
+    let mut v1_output = format!("{}", v1_ir.display());
+    v1_output.push_str("\n=== micro-ops ===\n");
+    v1_output.push_str(&format_micro_ops(&v1_ir));
     let v1_path = path.with_extension(V1_EXT);
     move_prover_test_utils::baseline_test::verify_or_update_baseline(
         v1_path.as_path(),
@@ -51,7 +112,9 @@ fn masm_runner(path: &Path) -> datatest_stable::Result<()> {
         ..PipelineConfig::default()
     };
     let v2_ir = run_pipeline(module, &v2_config, &table).map_err(|e| format!("{:#}", e))?;
-    let v2_output = format!("{}", v2_ir.display());
+    let mut v2_output = format!("{}", v2_ir.display());
+    v2_output.push_str("\n=== micro-ops ===\n");
+    v2_output.push_str(&format_micro_ops(&v2_ir));
     let v2_path = path.with_extension(V2_EXT);
     move_prover_test_utils::baseline_test::verify_or_update_baseline(
         v2_path.as_path(),
@@ -120,6 +183,8 @@ fn move_runner(path: &Path) -> datatest_stable::Result<()> {
             output.push_str(&masm_output);
             output.push_str("\n=== stackless-exec-ir ===\n");
             output.push_str(&ir_output);
+            output.push_str("\n=== micro-ops ===\n");
+            output.push_str(&format_micro_ops(&module_ir));
         }
         let baseline_path = path.with_extension(V1_EXT);
         move_prover_test_utils::baseline_test::verify_or_update_baseline(
@@ -147,6 +212,8 @@ fn move_runner(path: &Path) -> datatest_stable::Result<()> {
             output.push_str(&masm_output);
             output.push_str("\n=== stackless-exec-ir ===\n");
             output.push_str(&ir_output);
+            output.push_str("\n=== micro-ops ===\n");
+            output.push_str(&format_micro_ops(&module_ir));
         }
         let baseline_path = path.with_extension(V2_EXT);
         move_prover_test_utils::baseline_test::verify_or_update_baseline(

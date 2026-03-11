@@ -75,3 +75,22 @@ fun increment_field(r0) {
     2: write_field Pair::_1, r0, r2
     3: ret []
 }
+
+=== micro-ops ===
+=== Module 0x66::field_fusion ===
+
+fun identity() {
+  frame_data_size: 8
+  code:
+    0: Return
+}
+
+fun add_two_fields(): skipped (not all types are concrete)
+
+fun field_to_call(): skipped (not all types are concrete)
+
+fun two_fields_to_call(): skipped (not all types are concrete)
+
+fun field_plus_constant(): skipped (not all types are concrete)
+
+fun increment_field(): skipped (lowering: instruction ReadField(Home(1), FieldHandleIndex(0), Home(0)) not yet lowered)
