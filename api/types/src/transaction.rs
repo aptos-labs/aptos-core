@@ -1200,8 +1200,9 @@ impl VerifyInput for EncryptedTransactionPayload {
     fn verify(&self) -> anyhow::Result<()> {
         match self {
             EncryptedTransactionPayload::Encrypted(p) => {
-                // Ciphertext is always present (non-optional), so just Ok.
-                let _ = &p.ciphertext;
+                let _: aptos_types::secret_sharing::Ciphertext =
+                    bcs::from_bytes(&p.ciphertext.0)
+                        .context("Invalid ciphertext: failed to BCS-deserialize")?;
                 Ok(())
             },
             EncryptedTransactionPayload::FailedDecryption(_) => {
