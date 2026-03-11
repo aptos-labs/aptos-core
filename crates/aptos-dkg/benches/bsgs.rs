@@ -15,7 +15,7 @@ fn bench_dlog<E: Pairing>(c: &mut Criterion, curve_name: &str) {
     // Parameters
     let range_limit = 1u64 << 32;
     let table_sizes = [1 << 20, 1 << 24];
-    let num_samples = 16usize; // For the vector benchmark
+    let num_samples = 8usize; // For the vector benchmark
 
     // Deterministic RNG for reproducibility
     let mut rng = StdRng::seed_from_u64(42);
@@ -123,7 +123,7 @@ fn bench_dlog_vec_vs_batched<E: Pairing>(c: &mut Criterion, curve_name: &str) {
 
     let range_limit = 1u64 << 32;
     let table_size = 1u64 << 24;
-    let num_targets_list: &[usize] = &[1, 4, 16, 64, 256];
+    let num_targets_list: &[usize] = &[1, 5, 6, 7, 8];
 
     let mut rng = StdRng::seed_from_u64(42);
     let G = E::G1::generator();

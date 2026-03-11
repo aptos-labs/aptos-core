@@ -18,7 +18,7 @@ pub trait BatchedRangeProof<E: Pairing>: Clone + CanonicalSerialize + CanonicalD
     type CommitmentNormalised: Clone;
     type CommitmentRandomness: UniformRand;
     type CommitmentKey;
-    type ProofProjective: Into<Self>; // TODO: Should expand this by making it return its projective elements, and building Self from affinisations of those
+    type ProofProjective: Into<Self>; // TODO: Might want to expand this by making it return its projective elements, and building Self from affinisations of those. But not needed atm
 
     const DST: &[u8];
 

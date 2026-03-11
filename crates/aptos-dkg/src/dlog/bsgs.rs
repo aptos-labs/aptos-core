@@ -197,7 +197,7 @@ pub fn dlog_vec_batched_with_batch_size<C: CurveGroup>(
         .try_into()
         .expect("Table seems rather large");
     let n = range_limit.div_ceil(m);
-    let G_neg_m = G * -C::ScalarField::from(m);
+    let G_neg_m = G * -C::ScalarField::from(m); // I guess we could pre-compute this? and put it in a struct?
     let batch_size = batch_size.max(1).max(BSGS_BATCH_NORMALIZE_THRESHOLD);
     let v = H_vec.len();
 

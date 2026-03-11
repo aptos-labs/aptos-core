@@ -303,14 +303,14 @@ impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>>
             sid,
             <Self as traits::Transcript>::dst(),
         )?;
-        let Vs_flat = self.subtrs.all_Vs_flat(); // Also has V[0] (the public key)
+        let Vs_flat = self.subtrs.all_Vs_flat(); // Also has the public key V[0]
 
         // Step 1: Do the SCRAPE LDT (G_2)
         let ldt = LowDegreeTest::random(
             rng,
             sc.get_threshold_weight(),
             sc.get_total_weight() + 1,
-            true,
+            true, // Because we're using the public key V[0]
             &sc.get_threshold_config().domain,
         );
         let ldt_msm_terms = ldt.ldt_msm_input(&Vs_flat)?;
@@ -326,31 +326,35 @@ impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>>
 
         // Step 3: Check that ciphertexts encrypt the committed shares
         let n = sc.get_total_weight();
-        let (_, powers_of_beta) = sample_field_element_with_powers::<E::ScalarField, _>(n + 1, rng);
+        let (_, powers_of_beta) = sample_field_element_with_powers::<E::ScalarField, _>(n, rng);
 
         let Cs_flat: Vec<_> = self.subtrs.Cs.iter().flatten().cloned().collect();
         debug_assert_eq!(
             Cs_flat.len(),
             sc.get_total_weight(),
             "Number of ciphertexts does not equal number of weights"
-        );
+        ); // Flattening here means removing the player index sorting
 
         let (weighted_Cs_base, weighted_Cs_scalar): (Vec<_>, Vec<_>) = Cs_flat
             .iter()
             .enumerate()
             .flat_map(|(i, row)| {
-                let p = &powers_of_beta;
+                let beta_power = &powers_of_beta[i];
                 let radix = &pp.powers_of_radix;
                 row.iter()
                     .enumerate()
-                    .map(move |(j, base)| (*base, radix[j] * p[i]))
+                    .map(move |(j, base)| (*base, radix[j] * beta_power))
             })
             .unzip();
 
         let weighted_Cs_msm =
             MsmInput::new(weighted_Cs_base, weighted_Cs_scalar).expect("weighted_Cs MSM terms");
-        let weighted_Vs_msm = MsmInput::new(Vs_flat[..n].to_vec(), powers_of_beta[..n].to_vec())
+        let weighted_Vs_msm = MsmInput::new(Vs_flat[..n].to_vec(), powers_of_beta.to_vec())
             .expect("weighted_Vs MSM terms");
+        // An alternative way to get the same MSMs would be:
+        // Consider Cs_flat as a list of MSM bases, with each MSM paired with the scalars pp.powers_of_radix
+        // These are merged using powers_of_beta
+        // On the other hand, each Vs_flat is a list of "single" MSM bases, and these are mixed with the same powers_of_beta
 
         // Step 4: Verify the SoK (G1)
         let ek_g1_affines: Vec<E::G1Affine> = eks.iter().map(|ek| ek.ek).collect();

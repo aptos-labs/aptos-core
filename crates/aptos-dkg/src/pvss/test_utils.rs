@@ -2,6 +2,7 @@
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 use crate::pvss::{
+    chunky::{PublicParameters, UnsignedWeightedTranscript, UnsignedWeightedTranscriptv2},
     traits::{
         transcript::{Transcript, TranscriptCore, WithMaxNumShares},
         Convert, HasEncryptionPublicParams,
@@ -14,7 +15,8 @@ use aptos_crypto::{
     weighted_config::{WeightedConfig, WeightedConfigArkworks},
     SigningKey, Uniform,
 };
-use ark_ff::FftField;
+use ark_ec::pairing::Pairing;
+use ark_ff::{FftField, Fp, FpConfig};
 use num_traits::Zero;
 use rand::{prelude::ThreadRng, thread_rng};
 use rand_core::{CryptoRng, RngCore};
@@ -86,37 +88,58 @@ pub fn setup_dealing<T: Transcript, R: RngCore + CryptoRng>(
     }
 }
 
-// TODO: I think this can be deleted
-pub fn setup_dealing_weighted<
-    F: FftField,
-    T: Transcript<SecretSharingConfig = WeightedConfigArkworks<F>>,
+/// Setup dealing for both chunky transcript variants (v1 and v2).
+/// Public parameters (incl. table and dekart) are created once and reused; keys and secrets
+/// are generated separately for each variant (key types are not cloneable).
+pub fn setup_dealing_chunky_both<const N: usize, P, E, R>(
+    sc: &WeightedConfigArkworks<E::ScalarField>,
+    ell: Option<u8>,
+    rng: &mut R,
+) -> (
+    DealingArgs<UnsignedWeightedTranscript<E>>,
+    DealingArgs<UnsignedWeightedTranscriptv2<E>>,
+)
+where
+    P: FpConfig<N>,
+    E: Pairing<ScalarField = Fp<P, N>>,
     R: RngCore + CryptoRng,
->(
-    sc: &T::SecretSharingConfig,
-    mut rng: &mut R,
-) -> DealingArgs<T> {
+{
     println!(
-        "Setting up weighted dealing for {} PVSS, with {}",
-        T::scheme_name(),
-        sc
+        "Setting up dealing for both chunky PVSSs (shared PP), with {} and bit-size {:?}",
+        sc, ell
     );
-
-    let pp = T::PublicParameters::with_max_num_shares(sc.get_total_weight().try_into().unwrap());
-
-    let (ssks, spks, dks, eks, iss, s, dsk, dpk) =
-        generate_keys_and_secrets::<T, R>(sc, &pp, &mut rng);
-
-    DealingArgs {
+    let n = sc.get_total_num_shares().try_into().unwrap();
+    let pp = match ell {
+        None => PublicParameters::<E>::with_max_num_shares(n),
+        Some(bit_size) => PublicParameters::<E>::with_max_num_shares_and_bit_size(n, bit_size),
+    };
+    let (ssks1, spks1, dks1, eks1, iss1, s1, dsk1, dpk1) =
+        generate_keys_and_secrets::<UnsignedWeightedTranscript<E>, R>(sc, &pp, rng);
+    let d1 = DealingArgs {
+        pp: pp.clone(),
+        ssks: ssks1,
+        spks: spks1,
+        dks: dks1,
+        eks: eks1,
+        iss: iss1,
+        s: s1,
+        dsk: dsk1,
+        dpk: dpk1,
+    };
+    let (ssks2, spks2, dks2, eks2, iss2, s2, dsk2, dpk2) =
+        generate_keys_and_secrets::<UnsignedWeightedTranscriptv2<E>, R>(sc, &pp, rng);
+    let d2 = DealingArgs {
         pp,
-        ssks,
-        spks,
-        dks,
-        eks,
-        iss,
-        s,
-        dsk,
-        dpk,
-    }
+        ssks: ssks2,
+        spks: spks2,
+        dks: dks2,
+        eks: eks2,
+        iss: iss2,
+        s: s2,
+        dsk: dsk2,
+        dpk: dpk2,
+    };
+    (d1, d2)
 }
 
 pub fn generate_keys_and_secrets<T: Transcript, R: rand_core::RngCore + rand_core::CryptoRng>(

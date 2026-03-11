@@ -32,7 +32,7 @@ use ark_serialize::{
     CanonicalDeserialize, CanonicalSerialize, Compress, Read, SerializationError, Valid, Validate,
 };
 use num_integer::Roots;
-use rand::{CryptoRng, RngCore};
+use rand_core::{CryptoRng, RngCore};
 // With feature `range_proof_timing_univariate_v2`, timing is printed for setup/prove/verify/commit.
 // To see it: run the integration test with stdout shown, e.g.
 //   cargo test -p aptos-dkg --features range_proof_timing_univariate_v2 --test range_proof -- --nocapture
@@ -53,7 +53,7 @@ pub struct Proof<E: Pairing> {
     pi_gamma: univariate_hiding_kzg::OpeningProof<E>, // TODO: need to make this affine
 }
 
-// Because of Fiat-Shamir, everything will be affine except the final opening proof
+// Because of Fiat-Shamir, everything is already affine here, except the final opening proof
 #[allow(non_snake_case)]
 #[derive(CanonicalSerialize, CanonicalDeserialize, Debug, Clone, PartialEq, Eq)]
 pub struct ProofProjective<E: Pairing> {
@@ -67,7 +67,6 @@ pub struct ProofProjective<E: Pairing> {
     pi_gamma: univariate_hiding_kzg::OpeningProofProjective<E>,
 }
 
-// TODO: can we use .. here?
 impl<E: Pairing> From<ProofProjective<E>> for Proof<E> {
     fn from(p: ProofProjective<E>) -> Self {
         Self {
@@ -84,27 +83,6 @@ impl<E: Pairing> From<ProofProjective<E>> for Proof<E> {
 }
 
 impl<E: Pairing> Proof<E> {
-    // /// Converts this projective proof into an affine proof by batch-normalizing all G1 points
-    // /// (hatC, Cs, D) in one shot using batch inversion for the curve point normalizations.
-    // pub fn into_affine(self) -> Proof<E> {
-    //     let ell = self.Cs.len();
-    //     let mut g1_proj = Vec::with_capacity(ell + 2);
-    //     g1_proj.push(self.hatC);
-    //     g1_proj.extend(self.Cs);
-    //     g1_proj.push(self.D);
-    //     let g1_aff = E::G1::normalize_batch(&g1_proj);
-    //     Proof {
-    //         hatC: g1_aff[0],
-    //         Cs: g1_aff[1..1 + ell].to_vec(),
-    //         D: g1_aff[1 + ell],
-    //         pi_PoK: self.pi_PoK,
-    //         a: self.a,
-    //         a_h: self.a_h,
-    //         a_js: self.a_js,
-    //         pi_gamma: self.pi_gamma,
-    //     }
-    // }
-
     /// Generates a random looking proof (but not a valid one).
     /// Useful for testing and benchmarking. TODO: might be able to derive this through derive macros etc
     pub fn generate<R: rand::Rng + rand::CryptoRng>(ell: u8, rng: &mut R) -> Self {

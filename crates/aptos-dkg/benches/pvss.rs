@@ -88,24 +88,16 @@ pub fn all_groups(c: &mut Criterion) {
         for tc in &configs {
             let mut rng = StdRng::seed_from_u64(42);
             let ell = Some(32u8);
-            // Single setup: Chunky_v1 and Chunky_v2 use the same TranscriptCore types for Bls12_381,
-            // so we can reuse the same DealingArgs for both (reinterpreted as the other type).
-            let d1 = test_utils::setup_dealing::<Chunky_v1<Bls12_381>, _>(tc, ell, &mut rng);
+            // Single PP setup (table + dekart); keys/secrets generated once per variant.
+            let (d1, d2) = test_utils::setup_dealing_chunky_both(tc, ell, &mut rng);
             if chunky_v1_enabled {
                 subaggregatable_pvss_group_with_dealing::<Chunky_v1<Bls12_381>>(
                     tc, c, ell, BLS12_381, &d1,
                 );
             }
             if chunky_v2_enabled {
-                // SAFETY: Chunky_v1 and Chunky_v2 both delegate TranscriptCore to Subtranscript<E>,
-                // so DealingArgs<Chunky_v1<Bls12_381>> and DealingArgs<Chunky_v2<Bls12_381>> have
-                // identical field types and layout. Reinterpreting the reference is valid.
-                let d2: &DealingArgs<Chunky_v2<Bls12_381>> = unsafe {
-                    &*(&d1 as *const DealingArgs<Chunky_v1<Bls12_381>>
-                        as *const DealingArgs<Chunky_v2<Bls12_381>>)
-                };
                 subaggregatable_pvss_group_with_dealing::<Chunky_v2<Bls12_381>>(
-                    tc, c, ell, BLS12_381, d2,
+                    tc, c, ell, BLS12_381, &d2,
                 );
             }
         }
