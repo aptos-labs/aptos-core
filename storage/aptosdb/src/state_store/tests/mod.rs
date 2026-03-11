@@ -3,6 +3,7 @@
 
 mod hot_state_kv;
 mod speculative_state_workflow;
+mod stale_index;
 
 use super::*;
 use crate::{
