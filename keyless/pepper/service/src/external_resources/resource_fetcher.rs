@@ -79,12 +79,21 @@ impl<T: DeserializeOwned + Send + Sync + 'static> ExternalResourceInterface<T>
         // Parse the response into the expected resource type
         let resource_name = self.name.clone();
         match fetch_result {
-            Ok(response) => match response.json::<T>().await {
-                Ok(resource) => Ok(resource),
-                Err(error) => Err(PepperServiceError::InternalError(format!(
-                    "Failed to parse resource: {}, from {}! Error: {}",
-                    resource_name, url, error
-                ))),
+            Ok(response) => {
+                let status = response.status();
+                let body_bytes = response
+                    .bytes()
+                    .await
+                    .map(|b| b.to_vec())
+                    .unwrap_or_else(|e| format!("<failed to read body: {}>", e).into_bytes());
+                let body_preview = String::from_utf8_lossy(&body_bytes);
+                match serde_json::from_slice::<T>(&body_bytes) {
+                    Ok(resource) => Ok(resource),
+                    Err(error) => Err(PepperServiceError::InternalError(format!(
+                        "Failed to parse resource: {}, from {}! Status: {}, Body: {}, Error: {}",
+                        resource_name, url, status, body_preview, error
+                    ))),
+                }
             },
             Err(error) => Err(PepperServiceError::InternalError(format!(
                 "Failed to fetch resource: {}, from {}! Error: {}",
