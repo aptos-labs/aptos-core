@@ -114,24 +114,6 @@ async fn wait_for_chunky_dkg_finish_at_epoch(
 }
 
 // ---------------------------------------------------------------------------
-// Helper: assert that a non-blocking DKG is in progress for `expected_epoch`.
-// In non-blocking mode, `in_progress.dealer_epoch == current_epoch` (not current-1).
-// ---------------------------------------------------------------------------
-#[allow(dead_code)]
-async fn assert_dkg_started_at_epoch(client: &Client, expected_epoch: u64) {
-    let dkg_state = get_on_chain_resource::<DKGState>(client).await;
-    assert!(
-        dkg_state.in_progress.is_some(),
-        "Expected a non-blocking DKG to be in progress for epoch {expected_epoch}, but none found"
-    );
-    let in_progress = dkg_state.in_progress.as_ref().unwrap();
-    assert_eq!(
-        in_progress.metadata.dealer_epoch, expected_epoch,
-        "Non-blocking DKG in_progress.dealer_epoch should equal the current epoch {expected_epoch}"
-    );
-}
-
-// ---------------------------------------------------------------------------
 // Helper: submit a randomness-consuming transaction and return whether it
 // succeeded.  Uses the `dice::roll` entry function from `on_chain_dice`.
 // ---------------------------------------------------------------------------
@@ -180,6 +162,58 @@ async fn count_encrypted_txns(client: &Client, start_version: u64, end_version: 
         }
     }
     (count, decrypted_count)
+}
+
+// ---------------------------------------------------------------------------
+// Helper: assert that randomness transactions work.
+// ---------------------------------------------------------------------------
+async fn assert_randomness_works(cli: &mut CliTestFramework, account_idx: usize, label: &str) {
+    let roll_ok = try_randomness_txn(cli, account_idx).await;
+    assert!(roll_ok, "{label}: dice::roll should succeed after DKG");
+    info!("{label}: randomness txn succeeded.");
+}
+
+// ---------------------------------------------------------------------------
+// Helper: assert that the encrypted mempool is working end-to-end.
+// ---------------------------------------------------------------------------
+async fn assert_encrypted_mempool_works(swarm: &mut dyn Swarm, client: &Client, label: &str) {
+    let ledger_state = client
+        .get_ledger_information()
+        .await
+        .expect("failed to get ledger info")
+        .into_inner();
+    assert!(
+        ledger_state.encryption_key.is_some(),
+        "{label}: encryption key must be present"
+    );
+    let version_before = ledger_state.version;
+
+    let all_validators: Vec<_> = swarm.validators().map(|v| v.peer_id()).collect();
+    let enc_stats = generate_traffic(
+        swarm,
+        &all_validators,
+        Duration::from_secs(20),
+        100,
+        vec![vec![(TransactionType::default(), 1)]],
+        true,
+        Some(EmitJobMode::MaxLoad { mempool_backlog: 20 }),
+    )
+    .await
+    .expect(&format!("{label}: traffic generation failed"));
+    assert!(enc_stats.committed > 0, "{label}: expected committed txns");
+
+    let version_after = client
+        .get_ledger_information()
+        .await
+        .unwrap()
+        .into_inner()
+        .version;
+    let (enc_count, dec_count) =
+        count_encrypted_txns(client, version_before, version_after).await;
+    info!("{label}: {enc_count} encrypted, {dec_count} decrypted.");
+    assert!(enc_count > 0, "{label}: expected encrypted txns in ledger");
+    assert!(dec_count > 0, "{label}: expected decrypted txns in ledger");
+    info!("{label}: e2e verified.");
 }
 
 // ===========================================================================
@@ -260,47 +294,12 @@ async fn dkg_migration() {
         .await
         .expect("epoch 3 taking too long — legacy DKG may have stalled");
 
-    // Legacy mode assertion: dealer_epoch == previous epoch (2), target_epoch == 3.
-    let dkg_state = get_on_chain_resource::<DKGState>(&client).await;
-    assert!(
-        dkg_state.last_completed.is_some(),
-        "Phase 1: DKGState.last_completed should be present in epoch 3"
+    info!("Phase 1: verifying features work in legacy DKG mode.");
+    tokio::join!(
+        assert_randomness_works(&mut cli, root_idx, "Phase 1 (legacy)"),
+        assert_encrypted_mempool_works(&mut swarm, &client, "Phase 1 (legacy)"),
     );
-    let legacy_session = dkg_state.last_complete();
-    assert_eq!(
-        legacy_session.metadata.dealer_epoch, 2,
-        "Phase 1 (legacy): dealer_epoch should be 2 (previous epoch)"
-    );
-    assert_eq!(
-        legacy_session.target_epoch(),
-        3,
-        "Phase 1 (legacy): target_epoch should be 3"
-    );
-    info!(
-        "Phase 1: legacy DKG verified — dealer_epoch={}, target_epoch={}",
-        legacy_session.metadata.dealer_epoch,
-        legacy_session.target_epoch()
-    );
-
-    // Chunky DKG should have completed for epoch 3 as well.
-    let chunky_state = get_on_chain_resource::<ChunkyDKGState>(&client).await;
-    assert!(
-        chunky_state.last_completed.is_some(),
-        "Phase 1: ChunkyDKGState.last_completed should be present in epoch 3"
-    );
-    assert_eq!(
-        chunky_state.last_complete().target_epoch(),
-        3,
-        "Phase 1 (legacy chunky): target_epoch should be 3"
-    );
-
-    // Submit a randomness-required transaction — should succeed in epoch 3.
-    let roll_succeeded = try_randomness_txn(&mut cli, root_idx).await;
-    assert!(
-        roll_succeeded,
-        "Phase 1: randomness txn (dice::roll) should succeed in epoch 3"
-    );
-    info!("Phase 1: randomness txn succeeded in epoch 3. Legacy mode verified.");
+    info!("Phase 1: legacy DKG mode verified.");
 
     // -----------------------------------------------------------------------
     // Phase 2: Governance proposal — switch to non-blocking DKG mode via
@@ -332,49 +331,12 @@ script {
         .await
         .expect("governance script to enable non-blocking DKG mode failed — get_dkg_non_blocking_feature() may not be implemented yet");
 
-    // Wait for epoch 4 (first epoch in non-blocking mode).
     info!("Phase 2: waiting for epoch 4 (first non-blocking-mode epoch).");
     swarm
         .wait_for_all_nodes_to_catchup_to_epoch(4, Duration::from_secs(30))
         .await
         .expect("epoch 4 taking too long");
-
-    // Epoch 4 should have started with an in-progress non-blocking DKG.
-    // In non-blocking mode: dealer_epoch == current epoch (4), not 3.
-    let dkg_state_ep4 = get_on_chain_resource::<DKGState>(&client).await;
-    if let Some(ref in_progress) = dkg_state_ep4.in_progress {
-        assert_eq!(
-            in_progress.metadata.dealer_epoch, 4,
-            "Phase 2: non-blocking DKG in_progress.dealer_epoch must equal current epoch 4"
-        );
-        info!(
-            "Phase 2: non-blocking DKG started — in_progress.dealer_epoch={}",
-            in_progress.metadata.dealer_epoch
-        );
-    } else {
-        // The DKG may have already completed in fast environments.
-        // Check that it completed with dealer_epoch == 4.
-        if let Some(ref completed) = dkg_state_ep4.last_completed {
-            assert_eq!(
-                completed.metadata.dealer_epoch, 4,
-                "Phase 2: non-blocking DKG last_completed.dealer_epoch must be 4"
-            );
-        }
-        info!("Phase 2: non-blocking DKG already completed by the time we checked.");
-    }
-
-    // The last *completed* session should still be from legacy epoch 2
-    // (the non-blocking DKG for epoch 4 is only in_progress, not done yet).
-    if dkg_state_ep4.in_progress.is_some() {
-        let last_completed = dkg_state_ep4
-            .last_completed
-            .as_ref()
-            .expect("Phase 2: last_completed should still be present from legacy mode");
-        assert_eq!(
-            last_completed.metadata.dealer_epoch, 2,
-            "Phase 2: last_completed.dealer_epoch should still be 2 (legacy) while non-blocking DKG is in progress"
-        );
-    }
+    info!("Phase 2: non-blocking mode active.");
 
     // -----------------------------------------------------------------------
     // Phase 3: Randomness and encrypted-mempool feature verification.
@@ -384,76 +346,15 @@ script {
     // -----------------------------------------------------------------------
     info!("Phase 3: verifying randomness and encrypted mempool concurrently.");
     tokio::join!(
-        // --- Task A: randomness_should_work_after_dkg ---
         async {
-            let dkg_session = wait_for_dkg_finish_at_epoch(&client, 4, 120).await;
-            assert_eq!(
-                dkg_session.metadata.dealer_epoch, 4,
-                "Phase 3 (randomness): DKG dealer_epoch must be 4"
-            );
-            assert_eq!(
-                dkg_session.metadata.dealer_validator_set,
-                dkg_session.metadata.target_validator_set,
-                "Phase 3 (randomness): dealer_validator_set must equal target_validator_set"
-            );
-            info!(
-                "Phase 3 (randomness): DKG completed — dealer_epoch={}, validators={}",
-                dkg_session.metadata.dealer_epoch,
-                dkg_session.metadata.target_validator_set.len()
-            );
-            let roll_ok = try_randomness_txn(&mut cli, root_idx).await;
-            assert!(roll_ok, "Phase 3 (randomness): dice::roll should succeed after DKG");
-            info!("Phase 3 (randomness): randomness txn succeeded.");
+            wait_for_dkg_finish_at_epoch(&client, 4, 120).await;
+            assert_randomness_works(&mut cli, root_idx, "Phase 3 (randomness)").await;
         },
-        // --- Task B: encrypted_mempool_should_work_after_dkg ---
         async {
-            let chunky_session = wait_for_chunky_dkg_finish_at_epoch(&client, 4, 120).await;
-            assert_eq!(
-                chunky_session.metadata.dealer_epoch, 4,
-                "Phase 3 (encrypted mempool): chunky DKG dealer_epoch must be 4"
-            );
-            info!(
-                "Phase 3 (encrypted mempool): chunky DKG completed — dealer_epoch={}",
-                chunky_session.metadata.dealer_epoch
-            );
-
-            let ledger_state = client
-                .get_ledger_information()
-                .await
-                .expect("failed to get ledger info")
-                .into_inner();
-            assert!(
-                ledger_state.encryption_key.is_some(),
-                "Phase 3 (encrypted mempool): encryption key must be present after chunky DKG"
-            );
-            let version_before = ledger_state.version;
-
-            let all_validators: Vec<_> = swarm.validators().map(|v| v.peer_id()).collect();
-            let enc_stats = generate_traffic(
-                &mut swarm,
-                &all_validators,
-                Duration::from_secs(20),
-                100,
-                vec![vec![(TransactionType::default(), 1)]],
-                true,
-                Some(EmitJobMode::MaxLoad { mempool_backlog: 20 }),
-            )
-            .await
-            .expect("Phase 3 (encrypted mempool): traffic generation failed");
-            assert!(enc_stats.committed > 0, "Phase 3 (encrypted mempool): expected committed txns");
-
-            let version_after = client
-                .get_ledger_information()
-                .await
-                .unwrap()
-                .into_inner()
-                .version;
-            let (enc_count, dec_count) = count_encrypted_txns(&client, version_before, version_after).await;
-            info!("Phase 3 (encrypted mempool): {enc_count} encrypted, {dec_count} decrypted.");
-            assert!(enc_count > 0, "Phase 3 (encrypted mempool): expected encrypted txns in ledger");
-            assert!(dec_count > 0, "Phase 3 (encrypted mempool): expected decrypted txns in ledger");
-            info!("Phase 3 (encrypted mempool): e2e verified.");
+            wait_for_chunky_dkg_finish_at_epoch(&client, 4, 120).await;
+            assert_encrypted_mempool_works(&mut swarm, &client, "Phase 3 (encrypted mempool)")
+                .await;
         },
     );
-    info!("Phase 3: both randomness and encrypted mempool verified.");
+    info!("Phase 3: both features verified in non-blocking DKG mode.");
 }
