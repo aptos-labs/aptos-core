@@ -17,7 +17,11 @@ pub(crate) fn get_land_blocking_test(
 ) -> Option<ForgeConfig> {
     let test = match test_name {
         "land_blocking" | "realistic_env_max_load" => {
-            realistic_env_max_load_test(duration, test_cmd, 7, 2)
+            // Enforce a minimum duration of 30 minutes. The workflow YAML on main
+            // may still pass a shorter value (pull_request_target reads from main),
+            // but the Rust code here runs from the PR's Docker image.
+            let duration = duration.max(Duration::from_secs(1800));
+            realistic_env_max_load_test(duration, test_cmd, 7, 0, 3)
         },
         "compat" => compat(),
         "framework_upgrade" => framework_upgrade(),

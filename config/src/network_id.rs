@@ -174,6 +174,7 @@ impl NetworkId {
         match self {
             NetworkId::Validator => &[PeerRole::Validator],
             NetworkId::Public => &[
+                PeerRole::Validator,
                 PeerRole::PreferredUpstream,
                 PeerRole::Upstream,
                 PeerRole::ValidatorFullNode,
