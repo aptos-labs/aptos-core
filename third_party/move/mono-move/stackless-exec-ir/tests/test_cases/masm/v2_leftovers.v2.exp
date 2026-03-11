@@ -34,14 +34,13 @@ fun move_to_call(r0): u64 {
 }
 
 fun multi_use_local_alias(r0): u64 {
-  slots: params(1), locals(1), temps(1)
+  slots: params(1), locals(1), temps(0)
     r0: u64
     r1: u64
-    r2: u64
   code:
     0: r1 := add r0, #1
-    1: r2 := add r1, r0
-    2: ret [r2]
+    1: r1 := add r1, r0
+    2: ret [r1]
 }
 
 fun copy_call_then_use(r0): u64 {

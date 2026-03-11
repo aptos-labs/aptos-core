@@ -104,7 +104,30 @@ fn allocate_block(
 
     for (i, instr) in instrs.iter().enumerate() {
         let mut mapped_instr = instr.clone();
-        let (defs, _) = get_defs_uses(instr);
+        let (defs, uses) = get_defs_uses(instr);
+
+        // Free use-registers whose last use is this instruction BEFORE allocating
+        // for defs. This is safe because IR instruction semantics guarantee all
+        // sources are read before any destination is written, so reusing a source
+        // register as a destination (e.g. `r2 := add r2, a0`) is correct: the old
+        // value of r2 is consumed before the result overwrites it. In SSA form,
+        // a temp VID is defined exactly once and cannot appear as both a def and
+        // use of the same instruction, so there is no risk of freeing a register
+        // that is also being defined here.
+        for r in &uses {
+            if is_temp_vid(r)
+                && analysis.last_use.get(r) == Some(&i)
+                && !defs.contains(r)
+                && let Some(&phys) = vid_to_phys.get(r)
+                && phys.is_temp(num_pinned)
+            {
+                let ty = phys_reg_types
+                    .get(&phys)
+                    .cloned()
+                    .unwrap_or(Type::Bool);
+                free_pool.entry(ty).or_default().push(phys);
+            }
+        }
 
         // Allocate physical registers for destination vids
         for d in &defs {
@@ -136,21 +159,7 @@ fn allocate_block(
         rename_instr(&mut mapped_instr, &vid_to_phys);
         output.push(mapped_instr);
 
-        // Free registers for vids that reach their last use at this instruction.
-        let (_, uses) = get_defs_uses(instr);
-        for r in uses {
-            if is_temp_vid(&r)
-                && analysis.last_use.get(&r) == Some(&i)
-                && let Some(&phys) = vid_to_phys.get(&r)
-                && phys.is_temp(num_pinned)
-            {
-                let ty = phys_reg_types
-                    .get(&phys)
-                    .cloned()
-                    .unwrap_or(Type::Bool);
-                free_pool.entry(ty).or_default().push(phys);
-            }
-        }
+        // Free registers for defs that are never used (last_use == def site).
         for d in &defs {
             if is_temp_vid(d)
                 && analysis.last_use.get(d) == Some(&i)
