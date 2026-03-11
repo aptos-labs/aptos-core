@@ -270,7 +270,7 @@ fn wait_for_backups(
         if state.latest_epoch_ending_epoch.is_some()
             && state.latest_transaction_version.is_some()
             && state.latest_state_snapshot_epoch.is_some()
-            && state.latest_state_snapshot_epoch.is_some()
+            && state.latest_state_snapshot_version.is_some()
             && state.latest_epoch_ending_epoch.unwrap() >= target_epoch
             && state.latest_transaction_version.unwrap() >= target_version
             && state.latest_transaction_version.unwrap()
