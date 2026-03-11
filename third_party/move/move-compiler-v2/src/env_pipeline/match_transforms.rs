@@ -558,8 +558,13 @@ fn is_mixed_tuple_match(env: &GlobalEnv, discriminator: &Exp, arms: &[MatchArm])
                 })
             },
             Pattern::Wildcard(_) => true,
-            Pattern::Var(..) => {
-                unreachable!("top-level Var pattern on mixed tuple: rejected by type checker")
+            Pattern::Var(id, ..) => {
+                env.diag(
+                    Severity::Bug,
+                    &env.get_node_loc(*id),
+                    "top-level Var pattern on mixed tuple: rejected by type checker",
+                );
+                false
             },
             _ => false,
         }
@@ -615,13 +620,27 @@ fn transform_mixed_tuple_match(
     // Extract tuple args from discriminator
     let disc_args = match discriminator.as_ref() {
         ExpData::Call(_, Operation::Tuple, args) => args,
-        _ => unreachable!("is_mixed_tuple_match verified this"),
+        _ => {
+            env.diag(
+                Severity::Bug,
+                &loc,
+                "expected tuple discriminator in mixed tuple match",
+            );
+            return ExpData::Invalid(match_id).into_exp();
+        },
     };
 
     let disc_ty = env.get_node_type(discriminator.node_id());
     let elem_tys = match &disc_ty {
         Type::Tuple(tys) => tys.clone(),
-        _ => unreachable!("is_mixed_tuple_match verified this"),
+        _ => {
+            env.diag(
+                Severity::Bug,
+                &loc,
+                "expected tuple type for discriminator in mixed tuple match",
+            );
+            return ExpData::Invalid(match_id).into_exp();
+        },
     };
 
     // Classify positions
@@ -779,7 +798,13 @@ fn transform_mixed_arm(
                         var_bindings.push((*var_sym, seq));
                     },
                     Pattern::Wildcard(_) => {},
-                    _ => unreachable!("is_mixed_tuple_match verified pattern types"),
+                    _ => {
+                        env.diag(
+                            Severity::Bug,
+                            &env.get_node_loc(pat.node_id()),
+                            "unexpected pattern in primitive position of mixed tuple match",
+                        );
+                    },
                 }
             }
 
@@ -837,11 +862,16 @@ fn transform_mixed_arm(
                 body: arm.body.clone(),
             }
         },
-        Pattern::Var(..) => {
+        Pattern::Var(id, ..) => {
             // A top-level Var pattern on a mixed tuple match would require binding a
             // tuple-typed local. The type checker's NoTuple constraint rejects this
-            // before the env pipeline runs, so this branch is unreachable.
-            unreachable!("top-level Var pattern on mixed tuple: rejected by type checker")
+            // before the env pipeline runs, so this branch should be unreachable.
+            env.diag(
+                Severity::Bug,
+                &env.get_node_loc(*id),
+                "top-level Var pattern on mixed tuple: rejected by type checker",
+            );
+            arm.clone()
         },
         _ => arm.clone(),
     }
