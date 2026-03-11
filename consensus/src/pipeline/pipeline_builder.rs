@@ -38,7 +38,6 @@ use aptos_types::{
 };
 use futures::FutureExt;
 use move_core_types::account_address::AccountAddress;
-use proptest::prelude::any;
 use rayon::prelude::*;
 use std::{
     future::Future,
