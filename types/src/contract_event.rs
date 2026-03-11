@@ -491,43 +491,44 @@ impl TryFrom<&GravityEvent> for ContractEvent {
                     jwks: AllProvidersJWKs {
                         entries: jwks
                             .iter()
-                            .map(|jwk| ProviderJWKs {
-                                issuer: jwk.issuer.clone(),
-                                version: jwk.version,
-                                jwks: jwk
-                                    .jwks
-                                    .iter()
-                                    .map(|jwk| {
-                                        match jwk.type_name.as_str() {
-                                            // TODO(Gravity_byteyue): Support RSA later
-                                            RSA_JWK::MOVE_TYPE_NAME => JWKMoveStruct {
-                                                variant: Any {
-                                                    type_name: RSA_JWK::MOVE_TYPE_NAME.to_string(),
-                                                    data: jwk.data.clone(),
+                            .map(|jwk| -> Result<ProviderJWKs> {
+                                Ok(ProviderJWKs {
+                                    issuer: jwk.issuer.clone(),
+                                    version: jwk.version,
+                                    jwks: jwk
+                                        .jwks
+                                        .iter()
+                                        .map(|jwk| {
+                                            match jwk.type_name.as_str() {
+                                                // TODO(Gravity_byteyue): Support RSA later
+                                                RSA_JWK::MOVE_TYPE_NAME => Ok(JWKMoveStruct {
+                                                    variant: Any {
+                                                        type_name: RSA_JWK::MOVE_TYPE_NAME
+                                                            .to_string(),
+                                                        data: jwk.data.clone(),
+                                                    },
+                                                }),
+                                                UnsupportedJWK::MOVE_TYPE_NAME => {
+                                                    let unsupported_jwk = UnsupportedJWK {
+                                                        id: UnsupportedJWK::MOVE_TYPE_NAME
+                                                            .as_bytes()
+                                                            .to_vec(),
+                                                        payload: jwk.data.clone(),
+                                                    };
+                                                    Ok(JWKMoveStruct {
+                                                        variant: unsupported_jwk.as_move_any(),
+                                                    })
                                                 },
-                                            },
-                                            UnsupportedJWK::MOVE_TYPE_NAME => {
-                                                let unsupported_jwk = UnsupportedJWK {
-                                                    id: UnsupportedJWK::MOVE_TYPE_NAME
-                                                        .as_bytes()
-                                                        .to_vec(),
-                                                    payload: jwk.data.clone(),
-                                                };
-                                                JWKMoveStruct {
-                                                    variant: unsupported_jwk.as_move_any(),
-                                                }
-                                            },
-                                            _ => {
-                                                return Err(anyhow::anyhow!(
+                                                _ => Err(anyhow::anyhow!(
                                                     "unknown jwk type: {}",
                                                     jwk.type_name
-                                                ))
-                                            },
-                                        }
-                                    })
-                                    .collect(),
+                                                )),
+                                            }
+                                        })
+                                        .collect::<Result<Vec<_>>>()?,
+                                })
                             })
-                            .collect(),
+                            .collect::<Result<Vec<_>>>()?,
                     },
                 };
                 Ok(ContractEvent::V2(ContractEventV2::new(
