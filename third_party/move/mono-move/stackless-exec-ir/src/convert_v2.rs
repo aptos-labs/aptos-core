@@ -117,8 +117,7 @@ pub fn convert_module_v2(module: CompiledModule, struct_name_table: &[StructName
 // ================================================================================================
 
 struct SsaConverter<'a> {
-    num_pinned: u16,
-    /// Next value ID (starts at num_pinned, resets per block)
+    /// Next value ID (starts at num_pinned, monotonically increasing across blocks)
     next_vid: u16,
     /// Simulated operand stack with type information.
     stack: Vec<(Reg, Type)>,
@@ -145,7 +144,6 @@ impl<'a> SsaConverter<'a> {
     ) -> Self {
         let num_pinned = num_params + num_locals;
         Self {
-            num_pinned,
             next_vid: num_pinned,
             stack: Vec::new(),
             local_types,
@@ -335,8 +333,6 @@ impl<'a> SsaConverter<'a> {
         }
 
         for (start, end) in block_boundaries {
-            // Reset value ID counter per block (stack is empty at boundaries)
-            self.next_vid = self.num_pinned;
             self.stack.clear();
 
             for offset in start..end {
