@@ -13,7 +13,7 @@ use crate::{
 use anyhow::{bail, Result};
 use aptos_backup_cli::metadata::view::BackupStorageState;
 use aptos_forge::{reconfig, AptosPublicInfo, Node, NodeExt, Swarm, SwarmExt};
-use aptos_logger::info;
+use aptos_logger::{error, info};
 use aptos_temppath::TempPath;
 use aptos_types::{transaction::Version, waypoint::Waypoint};
 use itertools::Itertools;
@@ -90,8 +90,8 @@ async fn test_db_restore() {
         5,
     )
     .await;
-    // explicit reconfigs: we are at least at epoch 5
-    for _ in 0..4 {
+    // explicit reconfigs: we are at least at epoch 6 (epoch ending 5 exists)
+    for _ in 0..5 {
         reconfig(
             &client_1,
             &transaction_factory,
@@ -113,7 +113,7 @@ async fn test_db_restore() {
     assert_balance(&client_1, &account_0, expected_balance_0).await;
     assert_balance(&client_1, &account_1, expected_balance_1).await;
 
-    info!("---------- 2. reached at least epoch 5, starting backup coordinator.");
+    info!("---------- 2. reached at least epoch 6, starting backup coordinator.");
     // make a backup from node 1
     let node1_config = swarm.validator(validator_peer_ids[1]).unwrap().config();
     let port = node1_config.storage.backup_service_address.port();
@@ -267,21 +267,20 @@ fn wait_for_backups(
             i, target_epoch, target_version,
         );
         let state = get_backup_storage_state(bin_path, metadata_cache_path, backup_path)?;
-        if state.latest_epoch_ending_epoch.is_some()
-            && state.latest_transaction_version.is_some()
+        if let Some(epoch_ending) = state.latest_epoch_ending_epoch
+            && let Some(txn_version) = state.latest_transaction_version
             && state.latest_state_snapshot_epoch.is_some()
-            && state.latest_state_snapshot_epoch.is_some()
-            && state.latest_epoch_ending_epoch.unwrap() >= target_epoch
-            && state.latest_transaction_version.unwrap() >= target_version
-            && state.latest_transaction_version.unwrap()
-                >= state.latest_state_snapshot_version.unwrap()
+            && let Some(snapshot_version) = state.latest_state_snapshot_version
+            && epoch_ending >= target_epoch
+            && txn_version >= target_version
+            && txn_version >= snapshot_version
         {
             info!(
                 "Backup created in {} seconds. backup storage state: {}",
                 now.elapsed().as_secs(),
                 state
             );
-            return Ok(state.latest_state_snapshot_version.unwrap());
+            return Ok(snapshot_version);
         }
         info!("Backup storage state: {}", state);
         if state.latest_transaction_version.is_some() {
@@ -291,6 +290,10 @@ fn wait_for_backups(
         std::thread::sleep(Duration::from_secs(1));
     }
 
+    error!(
+        "Timed out waiting for backup to reach epoch {}, version {}.",
+        target_epoch, target_version
+    );
     bail!("Failed to create backup.");
 }
 
