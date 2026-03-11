@@ -1808,11 +1808,14 @@ module aptos_framework::stake {
                 let stake_active = (coin::value(&stake_pool.active) as u128);
                 let stake_pending_inactive =
                     (coin::value(&stake_pool.pending_inactive) as u128);
-                fee_pending_inactive =
-                    (
-                        ((fee_octa as u128) * stake_pending_inactive
-                            / (stake_active + stake_pending_inactive)) as u64
-                    );
+                let total_active_stake = stake_active + stake_pending_inactive;
+                if (total_active_stake > 0) {
+                    fee_pending_inactive =
+                        (
+                            ((fee_octa as u128) * stake_pending_inactive
+                                / total_active_stake) as u64
+                        );
+                };
                 fee_active = fee_octa - fee_pending_inactive;
             }
         };
