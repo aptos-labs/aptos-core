@@ -1,0 +1,20 @@
+processed 10 tasks
+task 0 lines 3-34:  publish [module 0xc0ffee::m {]
+task 1 lines 37-37:  run 0xc0ffee::m::nested_body --args 50u64 7u64
+return values: 150
+task 2 lines 39-39:  run 0xc0ffee::m::nested_body --args 200u64 7u64
+return values: 2200
+task 3 lines 41-41:  run 0xc0ffee::m::nested_body --args 5u64 7u64
+return values: 7
+task 4 lines 43-43:  run 0xc0ffee::m::nested_guard --args 50u64 7u64
+return values: 1050
+task 5 lines 45-45:  run 0xc0ffee::m::nested_guard --args 5u64 7u64
+return values: 7
+task 6 lines 47-47:  run 0xc0ffee::m::triple_nested --args 3u64 42u64
+return values: 42
+task 7 lines 49-49:  run 0xc0ffee::m::triple_nested --args 10u64 42u64
+return values: 1010
+task 8 lines 51-51:  run 0xc0ffee::m::triple_nested --args 100u64 42u64
+return values: 2100
+task 9 lines 53-53:  run 0xc0ffee::m::triple_nested --args 1000u64 42u64
+return values: 4000

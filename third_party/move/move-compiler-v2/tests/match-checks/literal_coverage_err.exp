@@ -1,0 +1,15 @@
+
+Diagnostics:
+error: match not exhaustive
+  ┌─ tests/match-checks/literal_coverage_err.move:3:16
+  │
+3 │         match (x) {
+  │                ^
+  │
+  = missing `_`
+
+error: unreachable pattern
+   ┌─ tests/match-checks/literal_coverage_err.move:12:13
+   │
+12 │             1 => {},
+   │             ^

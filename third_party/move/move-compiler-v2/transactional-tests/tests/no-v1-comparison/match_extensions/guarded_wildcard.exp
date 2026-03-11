@@ -1,0 +1,14 @@
+processed 7 tasks
+task 0 lines 1-21:  publish [module 0xc0ffee::m {]
+task 1 lines 23-23:  run 0xc0ffee::m::guarded_var --args 1u64
+return values: 10
+task 2 lines 25-25:  run 0xc0ffee::m::guarded_var --args 10u64
+return values: 30
+task 3 lines 27-27:  run 0xc0ffee::m::guarded_var --args 3u64
+return values: 30
+task 4 lines 29-29:  run 0xc0ffee::m::guarded_wildcard --args 0u64
+return values: 100
+task 5 lines 31-31:  run 0xc0ffee::m::guarded_wildcard --args 5u64
+return values: 200
+task 6 lines 33-33:  run 0xc0ffee::m::guarded_wildcard --args 50u64
+return values: 300
