@@ -12,6 +12,8 @@ mod aptos_cli;
 #[cfg(test)]
 mod chunky_dkg;
 #[cfg(test)]
+mod dkg_migration;
+#[cfg(test)]
 mod client;
 #[cfg(test)]
 mod consensus;
