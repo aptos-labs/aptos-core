@@ -11,7 +11,7 @@ use aptos_consensus_types::{
     proof_of_store::{BatchInfoExt, ProofOfStore, TBatchInfo},
     utils::PayloadTxnsSize,
 };
-use aptos_logger::{info, sample, sample::SampleRate, warn};
+use aptos_logger::{debug, info, sample, sample::SampleRate, warn};
 use aptos_metrics_core::TimerHelper;
 use aptos_short_hex_str::AsShortHexStr;
 use aptos_types::{transaction::SignedTransaction, PeerId};
@@ -687,7 +687,7 @@ impl BatchProofQueue {
                 }
             })
         }
-        info!(
+        debug!(
             // before non full check
             block_total_txns = cur_all_txns,
             block_unique_txns = cur_unique_txns,
