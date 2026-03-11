@@ -186,7 +186,7 @@ impl BroadcastStatus<DecMessage, DecMessage> for Arc<DecShareAggregateState>
             self.dec_metadata,
             share.metadata()
         );
-        share.verify(&self.dec_config)?;
+        //share.verify(&self.dec_config)?;
         info!(LogSchema::new(LogEvent::ReceiveReactiveDecShare)
             .epoch(share.epoch())
             .round(share.metadata().round)

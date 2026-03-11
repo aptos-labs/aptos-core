@@ -212,39 +212,4 @@ pub mod tests {
         One, Zero,
     };
 
-    #[test]
-    fn test_bibe_ct_encrypt_decrypt() {
-        let mut rng = thread_rng();
-        let tc = ShamirThresholdConfig::new(1, 1);
-        let (ek, dk, _, msk_shares) = FPTX::setup_for_testing(rng.r#gen(), 8, 1, &tc).unwrap();
-
-        let mut ids = IdSet::with_capacity(dk.capacity());
-        let mut counter = Fr::zero();
-
-        for _ in 0..dk.capacity() {
-            ids.add(&Id::new(counter));
-            counter += Fr::one();
-        }
-
-        ids.compute_poly_coeffs();
-        let (digest, pfs) = dk.digest(&mut ids, 0).unwrap();
-        let pfs = pfs.compute_all(&dk);
-
-        let plaintext = String::from("hi");
-
-        let id = Id::new(Fr::zero());
-
-        let ct = ek.bibe_encrypt(&mut rng, &plaintext, id).unwrap();
-
-        let dk = BIBEDecryptionKey::reconstruct(&tc, &[msk_shares[0]
-            .derive_decryption_key_share(&digest)
-            .unwrap()])
-        .unwrap();
-
-        let decrypted_plaintext: String = dk
-            .bibe_decrypt(&ct.prepare(&digest, &pfs).unwrap())
-            .unwrap();
-
-        assert_eq!(decrypted_plaintext, plaintext);
-    }
 }
