@@ -485,6 +485,15 @@ pub(crate) fn realistic_env_max_load_test(
         .with_validator_resource_override(resource_override)
         .with_fullnode_resource_override(resource_override)
         .with_num_pfns(num_pfns)
+        .with_pfn_override_node_config_fn(Arc::new(|config, _| {
+            // Increase the consensus observer fallback thresholds
+            config
+                .consensus_observer
+                .observer_fallback_progress_threshold_ms = 30_000; // 30 seconds
+            config
+                .consensus_observer
+                .observer_fallback_sync_lag_threshold_ms = 45_000; // 45 seconds
+        }))
 }
 
 pub(crate) fn realistic_env_max_load_encrypted_test(

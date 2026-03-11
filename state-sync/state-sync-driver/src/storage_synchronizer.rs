@@ -41,9 +41,9 @@ use std::{
         atomic::{AtomicU64, Ordering},
         Arc,
     },
-    time::Instant,
+    time::{Duration, Instant},
 };
-use tokio::{runtime::Handle, task::JoinHandle};
+use tokio::{runtime::Handle, task::JoinHandle, time::timeout};
 
 /// Synchronizes the storage of the node by verifying and storing new data
 /// (e.g., transactions and outputs).
@@ -225,12 +225,14 @@ impl<
 
         // Create a shared pending data chunk counter
         let pending_data_chunks = Arc::new(AtomicU64::new(0));
+        let backpressure_timeout_ms = driver_config.storage_pipeline_backpressure_timeout_ms;
         let executor_handle = spawn_executor(
             chunk_executor.clone(),
             error_notification_sender.clone(),
             executor_listener,
             ledger_updater_notifier,
             pending_data_chunks.clone(),
+            backpressure_timeout_ms,
             runtime.clone(),
         );
 
@@ -241,6 +243,7 @@ impl<
             ledger_updater_listener,
             committer_notifier,
             pending_data_chunks.clone(),
+            backpressure_timeout_ms,
             runtime.clone(),
         );
 
@@ -251,6 +254,7 @@ impl<
             committer_listener,
             commit_post_processor_notifier,
             pending_data_chunks.clone(),
+            backpressure_timeout_ms,
             runtime.clone(),
             storage.reader.clone(),
         );
@@ -297,10 +301,12 @@ impl<
 
     /// Notifies the executor of new data chunks
     async fn notify_executor(&mut self, storage_data_chunk: StorageDataChunk) -> Result<(), Error> {
+        let backpressure_timeout_ms = self.driver_config.storage_pipeline_backpressure_timeout_ms;
         if let Err(error) = send_and_monitor_backpressure(
             &mut self.executor_notifier,
             metrics::STORAGE_SYNCHRONIZER_EXECUTOR,
             storage_data_chunk,
+            backpressure_timeout_ms,
         )
         .await
         {
@@ -309,7 +315,10 @@ impl<
                 error
             )))
         } else {
+            // Update the pending data chunk metrics (item sent to the executor)
             increment_pending_data_chunks(self.pending_data_chunks.clone());
+            increment_data_chunk_by_label(metrics::STORAGE_SYNCHRONIZER_PENDING_DATA_EXECUTOR);
+
             Ok(())
         }
     }
@@ -416,10 +425,12 @@ impl<
             StorageDataChunk::States(notification_id, state_value_chunk_with_proof);
 
         // Notify the snapshot receiver of the storage data chunk
+        let backpressure_timeout_ms = self.driver_config.storage_pipeline_backpressure_timeout_ms;
         if let Err(error) = send_and_monitor_backpressure(
             state_snapshot_notifier,
             metrics::STORAGE_SYNCHRONIZER_STATE_SNAPSHOT_RECEIVER,
             storage_data_chunk,
+            backpressure_timeout_ms,
         )
         .await
         {
@@ -483,6 +494,7 @@ fn spawn_executor<ChunkExecutor: ChunkExecutorTrait + 'static>(
     mut executor_listener: mpsc::Receiver<StorageDataChunk>,
     mut ledger_updater_notifier: mpsc::Sender<NotificationMetadata>,
     pending_data_chunks: Arc<AtomicU64>,
+    backpressure_timeout_ms: u64,
     runtime: Option<Handle>,
 ) -> JoinHandle<()> {
     // Create an executor
@@ -536,6 +548,11 @@ fn spawn_executor<ChunkExecutor: ChunkExecutorTrait + 'static>(
             // Notify the ledger updater of the new executed/applied chunks
             match result {
                 Ok(()) => {
+                    // Decrement the pending data chunk gauge (item processed by the executor)
+                    decrement_data_chunk_by_label(
+                        metrics::STORAGE_SYNCHRONIZER_PENDING_DATA_EXECUTOR,
+                    );
+
                     // Update the metrics for the data notification ledger update latency
                     metrics::observe_duration(
                         &metrics::DATA_NOTIFICATION_LATENCIES,
@@ -544,23 +561,32 @@ fn spawn_executor<ChunkExecutor: ChunkExecutorTrait + 'static>(
                     );
 
                     // Notify the ledger updater
-                    if let Err(error) = send_and_monitor_backpressure(
+                    match send_and_monitor_backpressure(
                         &mut ledger_updater_notifier,
                         metrics::STORAGE_SYNCHRONIZER_LEDGER_UPDATER,
                         notification_metadata,
+                        backpressure_timeout_ms,
                     )
                     .await
                     {
-                        // Send an error notification to the driver (we failed to notify the ledger updater)
-                        let error =
-                            format!("Failed to notify the ledger updater! Error: {:?}", error);
-                        handle_storage_synchronizer_error(
-                            notification_metadata,
-                            error,
-                            &error_notification_sender,
-                            &pending_data_chunks,
-                        )
-                        .await;
+                        Ok(()) => {
+                            // Update the pending data chunk metrics (item sent to the ledger updater)
+                            increment_data_chunk_by_label(
+                                metrics::STORAGE_SYNCHRONIZER_PENDING_DATA_LEDGER_UPDATER,
+                            );
+                        },
+                        Err(error) => {
+                            // Send an error notification to the driver (we failed to notify the ledger updater)
+                            let error =
+                                format!("Failed to notify the ledger updater! Error: {:?}", error);
+                            handle_storage_synchronizer_error(
+                                notification_metadata,
+                                error,
+                                &error_notification_sender,
+                                &pending_data_chunks,
+                            )
+                            .await;
+                        },
                     }
                 },
                 Err(error) => {
@@ -611,6 +637,7 @@ fn spawn_ledger_updater<ChunkExecutor: ChunkExecutorTrait + 'static>(
     mut ledger_updater_listener: mpsc::Receiver<NotificationMetadata>,
     mut committer_notifier: mpsc::Sender<NotificationMetadata>,
     pending_data_chunks: Arc<AtomicU64>,
+    backpressure_timeout_ms: u64,
     runtime: Option<Handle>,
 ) -> JoinHandle<()> {
     // Create a ledger updater
@@ -636,6 +663,11 @@ fn spawn_ledger_updater<ChunkExecutor: ChunkExecutorTrait + 'static>(
                         ))
                     );
 
+                    // Decrement the pending data chunk gauge (item processed by the ledger updater)
+                    decrement_data_chunk_by_label(
+                        metrics::STORAGE_SYNCHRONIZER_PENDING_DATA_LEDGER_UPDATER,
+                    );
+
                     // Update the metrics for the data notification commit latency
                     metrics::observe_duration(
                         &metrics::DATA_NOTIFICATION_LATENCIES,
@@ -644,22 +676,32 @@ fn spawn_ledger_updater<ChunkExecutor: ChunkExecutorTrait + 'static>(
                     );
 
                     // Notify the committer of the update
-                    if let Err(error) = send_and_monitor_backpressure(
+                    match send_and_monitor_backpressure(
                         &mut committer_notifier,
                         metrics::STORAGE_SYNCHRONIZER_COMMITTER,
                         notification_metadata,
+                        backpressure_timeout_ms,
                     )
                     .await
                     {
-                        // Send an error notification to the driver (we failed to notify the committer)
-                        let error = format!("Failed to notify the committer! Error: {:?}", error);
-                        handle_storage_synchronizer_error(
-                            notification_metadata,
-                            error,
-                            &error_notification_sender,
-                            &pending_data_chunks,
-                        )
-                        .await;
+                        Ok(()) => {
+                            // Update the pending data chunk metrics (item sent to the committer)
+                            increment_data_chunk_by_label(
+                                metrics::STORAGE_SYNCHRONIZER_PENDING_DATA_COMMITTER,
+                            );
+                        },
+                        Err(error) => {
+                            // Send an error notification to the driver (we failed to notify the committer)
+                            let error =
+                                format!("Failed to notify the committer! Error: {:?}", error);
+                            handle_storage_synchronizer_error(
+                                notification_metadata,
+                                error,
+                                &error_notification_sender,
+                                &pending_data_chunks,
+                            )
+                            .await;
+                        },
                     }
                 },
                 Err(error) => {
@@ -688,6 +730,7 @@ fn spawn_committer<ChunkExecutor: ChunkExecutorTrait + 'static>(
     mut committer_listener: mpsc::Receiver<NotificationMetadata>,
     mut commit_post_processor_notifier: mpsc::Sender<ChunkCommitNotification>,
     pending_data_chunks: Arc<AtomicU64>,
+    backpressure_timeout_ms: u64,
     runtime: Option<Handle>,
     storage: Arc<dyn DbReader>,
 ) -> JoinHandle<()> {
@@ -716,6 +759,11 @@ fn spawn_committer<ChunkExecutor: ChunkExecutorTrait + 'static>(
                         ))
                     );
 
+                    // Decrement the pending data chunk gauge (item processed by the committer)
+                    decrement_data_chunk_by_label(
+                        metrics::STORAGE_SYNCHRONIZER_PENDING_DATA_COMMITTER,
+                    );
+
                     // Update the synced version metrics
                     utils::update_new_synced_metrics(
                         storage.clone(),
@@ -738,6 +786,7 @@ fn spawn_committer<ChunkExecutor: ChunkExecutorTrait + 'static>(
                         &mut commit_post_processor_notifier,
                         metrics::STORAGE_SYNCHRONIZER_COMMIT_POST_PROCESSOR,
                         notification,
+                        backpressure_timeout_ms,
                     )
                     .await
                     {
@@ -1217,6 +1266,11 @@ fn load_pending_data_chunks(pending_data_chunks: Arc<AtomicU64>) -> u64 {
     pending_data_chunks.load(Ordering::Relaxed)
 }
 
+/// Increments the data chunk counter for the given label
+fn increment_data_chunk_by_label(label: &str) {
+    metrics::increment_gauge(&metrics::STORAGE_SYNCHRONIZER_GAUGES, label, 1);
+}
+
 /// Increments the pending data chunks
 fn increment_pending_data_chunks(pending_data_chunks: Arc<AtomicU64>) {
     let delta = 1;
@@ -1226,6 +1280,11 @@ fn increment_pending_data_chunks(pending_data_chunks: Arc<AtomicU64>) {
         metrics::STORAGE_SYNCHRONIZER_PENDING_DATA,
         delta,
     );
+}
+
+/// Decrements the data chunk counter for the given label
+fn decrement_data_chunk_by_label(label: &str) {
+    metrics::decrement_gauge(&metrics::STORAGE_SYNCHRONIZER_GAUGES, label, 1);
 }
 
 /// Decrements the pending data chunks
@@ -1265,6 +1324,7 @@ async fn send_and_monitor_backpressure<T: Clone>(
     channel: &mut mpsc::Sender<T>,
     channel_label: &str,
     message: T,
+    backpressure_timeout_ms: u64,
 ) -> Result<(), Error> {
     match channel.try_send(message.clone()) {
         Ok(_) => Ok(()), // The message was sent successfully
@@ -1284,13 +1344,20 @@ async fn send_and_monitor_backpressure<T: Clone>(
                     1, // We hit backpressure
                 );
 
-                // Call the blocking send (we still need to send the data chunk with backpressure)
-                let result = channel.send(message).await.map_err(|error| {
-                    Error::UnexpectedError(format!(
+                // Call the blocking send (we still need to send the data chunk with backpressure),
+                // but use a timeout to avoid blocking indefinitely if the pipeline is stalled.
+                let timeout_duration = Duration::from_millis(backpressure_timeout_ms);
+                let result = match timeout(timeout_duration, channel.send(message)).await {
+                    Ok(Ok(())) => Ok(()),
+                    Ok(Err(send_error)) => Err(Error::UnexpectedError(format!(
                         "Failed to send storage data chunk to: {:?}. Error: {:?}",
-                        channel_label, error
-                    ))
-                });
+                        channel_label, send_error
+                    ))),
+                    Err(_) => Err(Error::UnexpectedError(format!(
+                        "Timed out after {:?} (ms) waiting to send to {:?}. The storage pipeline may be stalled!",
+                        backpressure_timeout_ms, channel_label
+                    ))),
+                };
 
                 // Reset the gauge for the pipeline channel to inactive (we're done sending the message)
                 metrics::set_gauge(
