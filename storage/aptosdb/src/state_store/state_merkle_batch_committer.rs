@@ -109,7 +109,15 @@ impl StateMerkleBatchCommitter {
                         .summary()
                         .global_state_summary
                         .log_generation("buffered_state_commit");
+                    info!(
+                        "[hs_debug] StateMerkleBatchCommitter: calling persisted_state.set() for version={}",
+                        current_version,
+                    );
                     self.persisted_state.set(snapshot);
+                    info!(
+                        "[hs_debug] StateMerkleBatchCommitter: persisted_state.set() done for version={}",
+                        current_version,
+                    );
                 },
                 CommitMessage::Sync(finish_sender) => finish_sender.send(()).unwrap(),
                 CommitMessage::Exit => {

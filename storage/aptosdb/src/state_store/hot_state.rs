@@ -187,8 +187,10 @@ impl HotState {
     }
 
     pub(crate) fn hack_reset(&self, state: State) {
+        info!("[hs_debug] hack_reset: acquiring committed lock...");
         {
             let mut committed = self.committed.lock();
+            info!("[hs_debug] hack_reset: committed lock acquired");
             committed.state = state.clone();
             // Reset view to base-only (no delta). hack_reset is only called when no commits are in
             // flight, so DashMaps and committed state are in sync from the readers' perspective.
@@ -197,19 +199,29 @@ impl HotState {
                 base: Arc::clone(&self.base),
             });
         }
+        info!("[hs_debug] hack_reset: committed lock released, sending HackReset to committer...");
         // Synchronously reset the Committer's merged_state and old_views. Block until processed,
         // so the caller has a hard guarantee that no stale Committer state remains.
         let (ack_tx, ack_rx) = std::sync::mpsc::channel();
         self.commit_tx
             .send(CommitMsg::HackReset { state, ack: ack_tx })
             .expect("Failed to send reset to hot state committer.");
+        info!("[hs_debug] hack_reset: waiting for ack from committer...");
         ack_rx
             .recv()
             .expect("Failed to receive reset ack from hot state committer.");
+        info!("[hs_debug] hack_reset: done");
     }
 
     pub fn get_committed(&self) -> (Arc<dyn HotStateView>, State) {
+        info!("[hs_debug] get_committed: acquiring committed lock...");
         let committed = self.committed.lock();
+        let version = committed.state.next_version();
+        let view_arc_count = Arc::strong_count(&committed.view);
+        info!(
+            "[hs_debug] get_committed: lock acquired, version={}, view_refcount={}",
+            version, view_arc_count,
+        );
         (
             Arc::clone(&committed.view) as Arc<dyn HotStateView>,
             committed.state.clone(),
@@ -219,9 +231,15 @@ impl HotState {
     pub fn enqueue_commit(&self, to_commit: State) {
         let _timer = OTHER_TIMERS_SECONDS.timer_with(&["hot_state_enqueue_commit"]);
 
+        let version = to_commit.next_version();
+        info!(
+            "[hs_debug] enqueue_commit: sending version={} to committer channel...",
+            version
+        );
         self.commit_tx
             .send(CommitMsg::Commit(to_commit))
-            .expect("Failed to queue for hot state commit.")
+            .expect("Failed to queue for hot state commit.");
+        info!("[hs_debug] enqueue_commit: version={} sent", version);
     }
 
     /// Wait until DashMaps have been merged up to at least the given version.
@@ -324,9 +342,19 @@ impl Committer {
     }
 
     fn run(&mut self) {
-        info!("HotState committer thread started.");
+        info!(
+            "[hs_debug] Committer thread started, merged_version={}",
+            self.merged_state.next_version()
+        );
 
         while let Some(to_commit) = self.next_to_commit() {
+            let incoming_version = to_commit.next_version();
+            info!(
+                "[hs_debug] committer: received version={}, merged_version={}, old_views={}",
+                incoming_version,
+                self.merged_state.next_version(),
+                self.old_views.len(),
+            );
             self.try_merge(); // merge any deferred delta to shrink the next one
 
             // Skip if DashMaps already reflect this state (unlikely).
@@ -341,10 +369,29 @@ impl Committer {
             // If merged_state is too old for to_commit (persisted snapshot advanced
             // while merge was deferred), wait for old views to drain so try_merge
             // can advance merged_state.
+            let mut num_iter = 0u64;
+            if !self.merged_state.can_be_delta_base_of(&to_commit) {
+                info!(
+                    "[hs_debug] committer: merged_state too old for version={}, waiting for old views to drain...",
+                    incoming_version,
+                );
+            }
             while !self.merged_state.can_be_delta_base_of(&to_commit) {
                 if !self.try_merge() {
+                    num_iter += 1;
+                    if num_iter % 100 == 0 {
+                        info!(
+                            "[hs_debug] committer: still waiting for old views, iter={}, old_views={}, merged_version={}",
+                            num_iter,
+                            self.old_views.len(),
+                            self.merged_state.next_version(),
+                        );
+                    }
                     std::thread::sleep(DEFERRED_MERGE_RETRY_INTERVAL);
                 }
+            }
+            if num_iter > 0 {
+                info!("[hs_debug] committer: wait done after {} iters", num_iter);
             }
 
             // Build a layered view: delta(merged_state -> to_commit) over base DashMaps.
@@ -355,17 +402,26 @@ impl Committer {
             });
 
             // Atomically publish new view + state; track the old view for deferred merge.
+            info!(
+                "[hs_debug] committer: acquiring committed lock to publish version={}...",
+                incoming_version
+            );
             {
                 let mut committed = self.committed.lock();
+                info!("[hs_debug] committer: committed lock acquired, swapping view");
                 Self::swap_view(&mut self.old_views, &mut committed, new_view);
                 committed.state = to_commit;
             }
+            info!(
+                "[hs_debug] committer: committed lock released for version={}",
+                incoming_version
+            );
 
             self.try_merge();
         }
 
         self.try_merge(); // flush any remaining deferred merge before exit
-        info!("HotState committer quitting.");
+        info!("[hs_debug] Committer thread quitting.");
     }
 
     /// Process a `HackReset` message: synchronize `merged_state` / `old_views` with the caller and
@@ -375,21 +431,35 @@ impl Committer {
     /// so it must be the sole message in the channel. `next_to_commit` asserts this before
     /// calling.
     fn handle_reset(&mut self, state: State, ack: Sender<()>) {
+        info!(
+            "[hs_debug] handle_reset: resetting to version={}, clearing {} old views",
+            state.next_version(),
+            self.old_views.len(),
+        );
         self.merged_state = state;
         self.merged_version
             .store(self.merged_state.next_version(), Ordering::Release);
         self.old_views.clear();
         let _ = ack.send(());
+        info!("[hs_debug] handle_reset: done, ack sent");
     }
 
     fn next_to_commit(&mut self) -> Option<State> {
         // Block until we receive the first Commit, retrying merges on timeout.
         // HackReset messages are processed inline — they are only sent when no commits are in
         // flight, so we assert the channel is empty after processing one.
+        info!("[hs_debug] next_to_commit: waiting for message on channel...");
         let first = loop {
             match self.rx.recv_timeout(DEFERRED_MERGE_RETRY_INTERVAL) {
-                Ok(CommitMsg::Commit(state)) => break state,
+                Ok(CommitMsg::Commit(state)) => {
+                    info!(
+                        "[hs_debug] next_to_commit: received Commit version={}",
+                        state.next_version()
+                    );
+                    break state;
+                },
                 Ok(CommitMsg::HackReset { state, ack }) => {
+                    info!("[hs_debug] next_to_commit: received HackReset");
                     assert!(
                         self.rx.try_recv().is_err(),
                         "HackReset must be the only message in the channel — \
@@ -400,7 +470,10 @@ impl Committer {
                 Err(RecvTimeoutError::Timeout) => {
                     self.try_merge();
                 },
-                Err(RecvTimeoutError::Disconnected) => return None,
+                Err(RecvTimeoutError::Disconnected) => {
+                    info!("[hs_debug] next_to_commit: channel disconnected");
+                    return None;
+                },
             }
         };
 
@@ -420,6 +493,13 @@ impl Committer {
                     );
                 },
             }
+        }
+        if n_backlog > 0 {
+            info!(
+                "[hs_debug] next_to_commit: drained {} backlog messages, latest version={}",
+                n_backlog,
+                ret.next_version()
+            );
         }
 
         GAUGE.set_with(&["hot_state_commit_backlog"], n_backlog);
@@ -446,23 +526,33 @@ impl Committer {
     fn try_merge(&mut self) -> bool {
         self.old_views.retain(|v| v.strong_count() > 0);
         if !self.old_views.is_empty() {
+            info!(
+                "[hs_debug] try_merge: blocked by {} old views, acquiring committed lock for gauges...",
+                self.old_views.len(),
+            );
             self.update_deferred_merge_gauges(self.committed.lock().state.next_version());
             return false;
         }
 
+        info!("[hs_debug] try_merge: no old views, acquiring committed lock for target state...");
         let target = self.committed.lock().state.clone();
         if self.merged_state.is_the_same(&target) {
             self.update_deferred_merge_gauges(self.merged_state.next_version());
             return true;
         }
 
+        info!(
+            "[hs_debug] try_merge: applying delta merged_version={} -> target_version={}",
+            self.merged_state.next_version(),
+            target.next_version(),
+        );
         self.apply_delta_to_base(&target);
         self.merged_state = target;
         self.merged_version
             .store(self.merged_state.next_version(), Ordering::Release);
         info!(
-            next_version = self.merged_state.next_version(),
-            "Advanced merged_state.",
+            "[hs_debug] try_merge: advanced merged_state to version={}",
+            self.merged_state.next_version(),
         );
 
         // Publish a clean (delta-free) view so future readers hit the DashMaps directly without
@@ -471,7 +561,9 @@ impl Committer {
             delta: None,
             base: Arc::clone(&self.base),
         });
+        info!("[hs_debug] try_merge: acquiring committed lock to publish clean view...");
         Self::swap_view(&mut self.old_views, &mut self.committed.lock(), clean_view);
+        info!("[hs_debug] try_merge: clean view published");
         self.update_deferred_merge_gauges(self.merged_state.next_version());
 
         true
@@ -491,6 +583,12 @@ impl Committer {
     /// Apply the delta between `merged_state` and `target` to the base DashMaps.
     fn apply_delta_to_base(&mut self, target: &State) {
         let _timer = OTHER_TIMERS_SECONDS.timer_with(&["hot_state_commit"]);
+
+        info!(
+            "[hs_debug] apply_delta_to_base: merged_version={} -> target_version={}",
+            self.merged_state.next_version(),
+            target.next_version(),
+        );
 
         let mut n_insert = 0;
         let mut n_update = 0;

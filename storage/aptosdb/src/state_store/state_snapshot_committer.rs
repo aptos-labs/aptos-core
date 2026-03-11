@@ -90,6 +90,7 @@ impl StateSnapshotCommitter {
                 CommitMessage::Data(snapshot) => {
                     let version = snapshot.version().expect("Cannot be empty");
                     let base_version = self.last_snapshot.version();
+                    info!("[hs_debug] StateSnapshotCommitter: received Data, version={}, base_version={:?}", version, base_version);
                     let previous_epoch_ending_version = self
                         .state_db
                         .ledger_db
@@ -176,6 +177,7 @@ impl StateSnapshotCommitter {
 
                     self.last_snapshot = snapshot.clone();
 
+                    info!("[hs_debug] StateSnapshotCommitter: sending to batch committer, version={}...", version);
                     self.state_merkle_batch_commit_sender
                         .send(CommitMessage::Data(StateMerkleCommit {
                             snapshot,
@@ -183,6 +185,10 @@ impl StateSnapshotCommitter {
                             cold_batch: state_merkle_batch,
                         }))
                         .unwrap();
+                    info!(
+                        "[hs_debug] StateSnapshotCommitter: sent to batch committer, version={}",
+                        version
+                    );
                 },
                 CommitMessage::Sync(finish_sender) => {
                     self.state_merkle_batch_commit_sender
