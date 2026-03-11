@@ -52,7 +52,7 @@ pub fn http_headers_to_header_map(headers: &[HttpHeader]) -> HeaderMap {
         let name = reqwest::header::HeaderName::from_bytes(header.name.as_bytes())
             .unwrap_or_else(|e| panic!("Invalid header name '{}': {}", header.name, e));
         let value = reqwest::header::HeaderValue::from_str(&header.value)
-            .unwrap_or_else(|e| panic!("Invalid header value '{}': {}", header.value, e));
+            .unwrap_or_else(|e| panic!("Invalid value for header '{}': {}", header.name, e));
         header_map.insert(name, value);
     }
     header_map
