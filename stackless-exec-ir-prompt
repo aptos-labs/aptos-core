@@ -489,3 +489,8 @@ Can you think deeply, analyze this design, suggest pros and cons, and outline wh
   - closure calls: explicitly unsupported in v1 of the feature, or covered if ABI semantics are fixed
   - renumbering preserves Arg(i) identities while compacting ordinary regs
   - display/pretty-printing emits a0, a1, … distinctly from ordinary regs
+
+We now want to implement the next phase of this project, lowering the polymorphic stackless execution IR to micro-ops on sized slots. Currently, only a subset of the micro-ops are implemented in third_party/move/mono-move/micro-ops/src/instruction.rs. These micro-ops are sufficient to fully implement the recursive fibonacci function. For fully monomorphic functions, can we implement a lowering pass that converts the stackless execution IR to micro-ops? We should be able to print out the generated micro-ops for testing and debugging into .exp files, similar to the stackless execution IR. The design should be such that we can later integrate it with the just-in-time monomorphization pass, so that the lowering to micro-ops happens just in time after monomorphization.
+
+No changes should be made to the micro-ops yet. If a stackless exec IR instruction cannot be directly lowered to a micro-op, we can emit a `todo!()` for now, and we can later implement the missing micro-op and update the lowering pass to use it. The main goal of this phase is to establish the lowering pipeline and ensure that we can generate micro-ops for a non-trivial function (e.g., recursive fibonacci) from the stackless execution IR.
+

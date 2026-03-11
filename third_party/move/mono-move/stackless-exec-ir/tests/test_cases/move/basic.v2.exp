@@ -84,3 +84,20 @@ fun max(r0, r1): u64 {
   L0:
     3: ret [r1]
 }
+
+=== micro-ops ===
+=== Module 0x42::basic ===
+
+fun add() {
+  frame_data_size: 24
+  code:
+    0: AddU64 [16] <- [0] + [8]
+    1: Move8 [0] <- [16]
+    2: Return
+}
+
+fun get_x(): skipped (lowering: instruction ReadField(Home(1), FieldHandleIndex(0), Home(0)) not yet lowered)
+
+fun make_point(): skipped (not all types are concrete)
+
+fun max(): skipped (lowering: BinaryOp Gt for u64-sized type not yet lowered)

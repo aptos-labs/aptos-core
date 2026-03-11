@@ -62,3 +62,62 @@ fun two_copies_to_call(r0, r1): u64 {
     0: [a0] := call add_two, [r0, r1]
     1: ret [a0]
 }
+
+=== micro-ops ===
+=== Module 0x66::v2_leftovers ===
+
+fun identity() {
+  frame_data_size: 8
+  code:
+    0: Return
+}
+
+fun add_two() {
+  frame_data_size: 24
+  code:
+    0: AddU64 [16] <- [0] + [8]
+    1: Move8 [0] <- [16]
+    2: Return
+}
+
+fun copy_to_call() {
+  frame_data_size: 8
+  code:
+    0: CallFunc #0
+    1: Move8 [0] <- [32]
+    2: Return
+}
+
+fun move_to_call() {
+  frame_data_size: 8
+  code:
+    0: CallFunc #0
+    1: Move8 [0] <- [32]
+    2: Return
+}
+
+fun multi_use_local_alias() {
+  frame_data_size: 24
+  code:
+    0: AddU64Imm [16] <- [0] + #1
+    1: AddU64 [8] <- [16] + [0]
+    2: Move8 [0] <- [8]
+    3: Return
+}
+
+fun copy_call_then_use() {
+  frame_data_size: 16
+  code:
+    0: CallFunc #0
+    1: AddU64 [8] <- [40] + [0]
+    2: Move8 [0] <- [8]
+    3: Return
+}
+
+fun two_copies_to_call() {
+  frame_data_size: 16
+  code:
+    0: CallFunc #1
+    1: Move8 [0] <- [40]
+    2: Return
+}
