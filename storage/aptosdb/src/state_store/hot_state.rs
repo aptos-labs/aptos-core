@@ -341,11 +341,15 @@ impl Committer {
             // If merged_state is too old for to_commit (persisted snapshot advanced
             // while merge was deferred), wait for old views to drain so try_merge
             // can advance merged_state.
+            let mut num_iter = 0u64;
+            info!("Start waiting...");
             while !self.merged_state.can_be_delta_base_of(&to_commit) {
                 if !self.try_merge() {
+                    num_iter += 1;
                     std::thread::sleep(DEFERRED_MERGE_RETRY_INTERVAL);
                 }
             }
+            info!("Done waiting. num_iter: {num_iter}");
 
             // Build a layered view: delta(merged_state -> to_commit) over base DashMaps.
             let delta = to_commit.make_delta(&self.merged_state);

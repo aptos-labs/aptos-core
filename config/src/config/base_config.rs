@@ -29,7 +29,7 @@ impl Default for BaseConfig {
             working_dir: None,
             role: RoleType::Validator,
             waypoint: WaypointConfig::None,
-            enable_validator_pfn_connections: false, // Whether to allow direct connections between validators and PFNs
+            enable_validator_pfn_connections: true, // Whether to allow direct connections between validators and PFNs
         }
     }
 }
