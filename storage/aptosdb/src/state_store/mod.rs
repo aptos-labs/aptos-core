@@ -528,7 +528,6 @@ impl StateStore {
         }
     }
 
-    #[cfg(feature = "db-debugger")]
     pub fn catch_up_state_merkle_db(
         ledger_db: Arc<LedgerDb>,
         hot_state_merkle_db: Option<Arc<StateMerkleDb>>,
