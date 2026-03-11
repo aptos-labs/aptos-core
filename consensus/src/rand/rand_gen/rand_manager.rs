@@ -23,7 +23,7 @@ use aptos_channels::aptos_channel;
 use aptos_config::config::ReliableBroadcastConfig;
 use aptos_consensus_types::common::{Author, Round};
 use aptos_infallible::Mutex;
-use aptos_logger::{error, info, spawn_named, trace, warn};
+use aptos_logger::{debug, error, info, spawn_named, trace, warn};
 use aptos_network::{protocols::network::RpcError, ProtocolId};
 use aptos_reliable_broadcast::{DropGuard, ReliableBroadcast};
 use aptos_time_service::TimeService;
@@ -124,7 +124,7 @@ impl<S: TShare, D: TAugmentedData> RandManager<S, D> {
 
     fn process_incoming_blocks(&mut self, blocks: OrderedBlocks) {
         let rounds: Vec<u64> = blocks.ordered_blocks.iter().map(|b| b.round()).collect();
-        info!(rounds = rounds, "Processing incoming blocks.");
+        debug!(rounds = rounds, "Processing incoming blocks.");
 
         // Create rand_check shared futures from the pipeline's has_rand_txns_fut.
         // Uses has_rand_txns_fut which resolves early (before randomness aggregation)
@@ -173,7 +173,7 @@ impl<S: TShare, D: TAugmentedData> RandManager<S, D> {
         rand_check_future: Option<RandCheckFuture>,
     ) -> DropGuard {
         let self_share = S::generate(&self.config, metadata.metadata.clone());
-        info!(LogSchema::new(LogEvent::BroadcastRandShare)
+        debug!(LogSchema::new(LogEvent::BroadcastRandShare)
             .epoch(self.epoch_state.epoch)
             .author(self.author)
             .round(metadata.round()));
@@ -195,7 +195,7 @@ impl<S: TShare, D: TAugmentedData> RandManager<S, D> {
             .flat_map(|b| b.ordered_blocks.iter().map(|b3| b3.round()))
             .collect();
         fail_point!("rand_manager::process_ready_blocks", |_| {});
-        info!(rounds = rounds, "Processing rand-ready blocks.");
+        debug!(rounds = rounds, "Processing rand-ready blocks.");
 
         for blocks in ready_blocks {
             let _ = self.outgoing_blocks.unbounded_send(blocks);
