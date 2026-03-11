@@ -90,8 +90,8 @@ async fn test_db_restore() {
         5,
     )
     .await;
-    // explicit reconfigs: we are at least at epoch 5
-    for _ in 0..4 {
+    // explicit reconfigs: we are at least at epoch 6 (epoch ending 5 exists)
+    for _ in 0..5 {
         reconfig(
             &client_1,
             &transaction_factory,
