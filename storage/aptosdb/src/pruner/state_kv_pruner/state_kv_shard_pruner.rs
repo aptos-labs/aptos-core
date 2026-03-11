@@ -12,7 +12,9 @@ use crate::{
 use aptos_logger::info;
 use aptos_schemadb::{batch::SchemaBatch, ReadOptions, DB};
 use aptos_storage_interface::Result;
-use aptos_types::transaction::Version;
+use aptos_types::{
+    state_store::state_value::VERSION_PLACEHOLDER_FOR_FIRST_WRITE, transaction::Version,
+};
 use std::sync::Arc;
 
 // Per-shard pruner for state KV data
@@ -63,7 +65,10 @@ impl StateKvShardPruner {
                 break;
             }
             batch.delete::<StaleStateValueIndexByKeyHashSchema>(&index)?;
-            batch.delete::<StateValueByKeyHashSchema>(&(index.state_key_hash, index.version))?;
+            if index.version != VERSION_PLACEHOLDER_FOR_FIRST_WRITE {
+                batch
+                    .delete::<StateValueByKeyHashSchema>(&(index.state_key_hash, index.version))?;
+            }
         }
         batch.put::<DbMetadataSchema>(
             &DbMetadataKey::StateKvShardPrunerProgress(self.shard_id),
