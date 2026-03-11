@@ -28,11 +28,10 @@ l0: copy_loc l0
 === Module 0x42::fibonacci ===
 
 fun fib(r0): u64 {
-  slots: params(1), locals(0), temps(3), args(1)
+  slots: params(1), locals(0), temps(2), args(1)
     r0: u64
     r1: bool
     r2: u64
-    r3: u64
   code:
     0: r1 := le r0, #1
     1: br_false L0, r1
@@ -43,6 +42,6 @@ fun fib(r0): u64 {
     4: [r2] := call fib, [a0]
     5: a0 := sub r0, #2
     6: [a0] := call fib, [a0]
-    7: r3 := add r2, a0
-    8: ret [r3]
+    7: r2 := add r2, a0
+    8: ret [r2]
 }
