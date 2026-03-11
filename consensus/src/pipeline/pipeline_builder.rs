@@ -38,6 +38,7 @@ use aptos_types::{
 };
 use futures::FutureExt;
 use move_core_types::account_address::AccountAddress;
+use proptest::prelude::any;
 use rayon::prelude::*;
 use std::{
     future::Future,
@@ -665,13 +666,15 @@ impl PipelineBuilder {
         // daniel todo: skip verifying encrypted txns for now
         let mut sig_verified_decrypted_txns: Vec<SignatureVerifiedTransaction> = decrypted_txns.as_ref().clone().into_iter().map(|t| SignatureVerifiedTransaction::Valid(Transaction::UserTransaction(t))).collect();
 
-        let mut sig_verified_txns: Vec<SignatureVerifiedTransaction> = SIG_VERIFY_POOL.install(|| {
-            non_encrypted_txns
+        let (send, recv) = tokio::sync::oneshot::channel();
+         SIG_VERIFY_POOL.spawn(move || {
+            send.send(non_encrypted_txns
                 .into_par_iter()
                 .with_min_len(optimal_min_len(non_encrypted_txns_len, 32))
                 .map(|t| Transaction::UserTransaction(t).into())
-                .collect::<Vec<_>>()
+                .collect::<Vec<_>>());
         });
+        let mut sig_verified_txns: Vec<SignatureVerifiedTransaction> = recv.await.map_err(anyhow::Error::new)?;
 
         assert!(sig_verified_decrypted_txns.len() == decrypted_txns.as_ref().len(), "round {}, block {} sig_verified_decrypted_txns len {}, decrypted_txns len {}", block.round(), block.id(), sig_verified_decrypted_txns.len(), decrypted_txns.as_ref().len());
         assert!(sig_verified_txns.len() == non_encrypted_txns_len, "round {}, block {} sig_verified_txns len {}, non_encrypted_txns_len {}", block.round(), block.id(), sig_verified_txns.len(), non_encrypted_txns_len);
@@ -718,10 +721,11 @@ impl PipelineBuilder {
             })
             .collect();
         if !cts.is_empty() {
-            let (digest, proofs_promise) = 
-            DECRYPTION_POOL.install(||
-            <FPTX as BatchThresholdEncryption>::digest(&digest_key, &cts, encryption_round)
-            )?;
+            let (send, recv) = tokio::sync::oneshot::channel();
+            DECRYPTION_POOL.spawn(move || {
+                send.send(<FPTX as BatchThresholdEncryption>::digest(&digest_key, &cts, encryption_round));
+            });
+            let (digest, proofs_promise) = recv.await.map_err(anyhow::Error::new)??;
             Ok(Some((digest, proofs_promise)))
         } else {
             Ok(None)
@@ -759,9 +763,11 @@ impl PipelineBuilder {
         tracker.start_working();
 
         if let Some((_, proofs_promise)) = digest_result {
-            let proofs = DECRYPTION_POOL.install(||
-                <FPTX as BatchThresholdEncryption>::eval_proofs_compute_all(&proofs_promise, &digest_key)
-            );
+            let (send, recv) = tokio::sync::oneshot::channel();
+            DECRYPTION_POOL.spawn(move || {
+                send.send(<FPTX as BatchThresholdEncryption>::eval_proofs_compute_all(&proofs_promise, &digest_key));
+            });
+            let proofs = recv.await.map_err(anyhow::Error::new)?;
             Ok(Some(proofs))
         } else {
             Ok(None)
@@ -834,13 +840,15 @@ async fn prepare_cts(prepare_fut: TaskFuture<PrepareResult>, digest_fut: TaskFut
             let encrypted_txns = input_txns.iter().filter(|txn| txn.is_encrypted()).collect::<Vec<_>>();
             let ciphertexts = input_txns.iter().filter(|txn| txn.is_encrypted()).map(|txn| txn.ciphertext().unwrap()).collect::<Vec<_>>();
 
-            let prepared_cts: Vec<PreparedCiphertext> = DECRYPTION_POOL.install(||
-                ciphertexts.into_par_iter().map(
+            let (send, recv) = tokio::sync::oneshot::channel();
+            DECRYPTION_POOL.spawn(move || {
+                send.send(ciphertexts.into_par_iter().map(
                     |ct|
                     <FPTX as BatchThresholdEncryption>::prepare_ct(&ct, &digest, &proofs)
                 )
-                    .collect::<Result<Vec<PreparedCiphertext>, MissingEvalProofError>>()
-            ).map_err(|_| anyhow!("Missing eval proof"))?;
+                    .collect::<Result<Vec<PreparedCiphertext>, MissingEvalProofError>>());
+            });
+            let prepared_cts: Vec<PreparedCiphertext> = recv.await.map_err(anyhow::Error::new)?.map_err(|_| anyhow!("Missing eval proof"))?;
 
 
             assert!(ct_ids.len() == encrypted_txns.len(), "round {}, block {} ct_ids len {}, encrypted_txns len {}", block.round(), block.id(), ct_ids.len(), encrypted_txns.len());
@@ -885,16 +893,17 @@ async fn prepare_cts(prepare_fut: TaskFuture<PrepareResult>, digest_fut: TaskFut
             info!("[daniel] computing decryption round {}, block {}, txn len {}, ids len {}", block.round(), block.id(), input_txns.len(), ct_ids.len());
 
             let encrypted_txns = input_txns.iter().filter(|txn| txn.is_encrypted()).collect::<Vec<_>>();
-            let ciphertexts = input_txns.iter().filter(|txn| txn.is_encrypted()).map(|txn| txn.ciphertext().unwrap()).collect::<Vec<_>>();
 
             let decryption_key = maybe_decryption_key.expect("decryption key should be available");
-            let plaintexts: Vec<Vec<u8>> = DECRYPTION_POOL.install(||
-                prepared_ciphertexts.into_par_iter()
+            let (send, recv) = tokio::sync::oneshot::channel();
+            DECRYPTION_POOL.spawn(move || {
+                send.send(prepared_ciphertexts.into_par_iter()
                     .map(|prepared_ciphertext| 
                         <FPTX as BatchThresholdEncryption>::decrypt(&decryption_key.key, &prepared_ciphertext)
                     )
-                        .collect::<anyhow::Result<Vec<Vec<u8>>>>()
-            )?;
+                        .collect::<anyhow::Result<Vec<Vec<u8>>>>());
+            });
+            let plaintexts: Vec<Vec<u8>> = recv.await.map_err(anyhow::Error::new)??;
 
             assert!(ct_ids.len() == encrypted_txns.len(), "round {}, block {} ct_ids len {}, encrypted_txns len {}", block.round(), block.id(), ct_ids.len(), encrypted_txns.len());
             assert!(encrypted_txns.len() == plaintexts.len(), "round {}, block {} encrypted_txns len {}, plaintexts len {}", block.round(), block.id(), encrypted_txns.len(), plaintexts.len());
