@@ -5,8 +5,8 @@ use crate::{
     db::{
         aptosdb_internal::get_first_seq_num_and_limit,
         test_helper::{
-            arb_blocks_to_commit, arb_blocks_to_commit_with_block_nums,
-            put_transaction_auxiliary_data, test_save_blocks_impl, test_sync_transactions_impl,
+            arb_blocks_to_commit, arb_blocks_to_commit_with_params, put_transaction_auxiliary_data,
+            test_save_blocks_impl, test_sync_transactions_impl,
         },
         AptosDB,
     },
@@ -348,10 +348,15 @@ proptest! {
 }
 
 proptest! {
-    #![proptest_config(ProptestConfig::with_cases(1))]
+    #![proptest_config(ProptestConfig::with_cases(5))]
 
     #[test]
-    fn test_truncation(input in arb_blocks_to_commit_with_block_nums(80, 120)) {
+    fn test_truncation(input in arb_blocks_to_commit_with_params(
+        500, /* num_accounts — large pool so new key creations continue past target_version */
+        2,   /* max_user_txns_per_block */
+        80,  /* min_blocks */
+        120, /* max_blocks */
+    )) {
         aptos_logger::Logger::new().init();
         let tmp_dir = TempPath::new();
 

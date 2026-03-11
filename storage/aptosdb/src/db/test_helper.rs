@@ -199,22 +199,31 @@ prop_compose! {
 
 pub fn arb_blocks_to_commit(
 ) -> impl Strategy<Value = Vec<(Vec<TransactionToCommit>, LedgerInfoWithSignatures)>> {
-    arb_blocks_to_commit_impl(
-        5,  /* num_accounts */
-        2,  /* max_user_txn_per_block */
-        1,  /* min_blocks */
-        10, /* max_blocks */
-    )
+    arb_blocks_to_commit_with_block_nums(1, 10)
 }
 
 pub fn arb_blocks_to_commit_with_block_nums(
     min_blocks: usize,
     max_blocks: usize,
 ) -> impl Strategy<Value = Vec<(Vec<TransactionToCommit>, LedgerInfoWithSignatures)>> {
-    arb_blocks_to_commit_impl(
+    arb_blocks_to_commit_with_params(
         5, /* num_accounts */
-        2, /* max_user_txn_per_block */
+        2, /* max_user_txns_per_block */
         min_blocks, max_blocks,
+    )
+}
+
+pub fn arb_blocks_to_commit_with_params(
+    num_accounts: usize,
+    max_user_txns_per_block: usize,
+    min_blocks: usize,
+    max_blocks: usize,
+) -> impl Strategy<Value = Vec<(Vec<TransactionToCommit>, LedgerInfoWithSignatures)>> {
+    arb_blocks_to_commit_impl(
+        num_accounts,
+        max_user_txns_per_block,
+        min_blocks,
+        max_blocks,
     )
 }
 
