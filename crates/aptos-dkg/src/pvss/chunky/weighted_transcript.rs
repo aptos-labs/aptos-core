@@ -45,7 +45,7 @@ use aptos_crypto::{
     arkworks::{
         self,
         msm::{self, MsmInput},
-        random::{sample_field_element, sample_field_element_with_powers, unsafe_random_point},
+        random::{sample_field_element_with_powers, unsafe_random_point},
         scrape::LowDegreeTest,
         serialization::{ark_de, ark_se},
         srs::SrsBasis,
@@ -157,8 +157,8 @@ impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>> traits:
         let (Cs, Rs, sharing_proof) =
             Self::encrypt_chunked_shares(&f_evals, eks, pp, sc, sok_cntxt, rng);
 
-        // Step 2 (which comes after 3-6 here because we modify `f_evals`):
-        // Commit to polynomial evaluations + constant term using batch_mul
+        // Step 2 (which comes after 3-6 here for efficiency, because we modify `f_evals`):
+        // Commit to polynomial evaluations + constant term using `batch_mul`
         f_evals.push(f[0]);
         let flattened_Vs_proj = arkworks::batch_mul::<E::G2>(&pp.G2_table, &f_evals);
 
@@ -218,7 +218,7 @@ impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>> Transcr
         Vec<Vec<E::G1Affine>>,
         SharingProof<E>,
     ) {
-        // Step 3-4a: prepare the witness data
+        // Step 3-4a: prepare the SoK witness data
         let WitnessData {
             witness,
             f_evals_chunked_flat,
@@ -227,7 +227,7 @@ impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>> Transcr
         // Step 4b and 5a: compute the encryptions and the KZG commitment
         let ek_g1_affines: Vec<E::G1Affine> = eks.iter().map(|ek| ek.ek).collect();
         let lagr_g1: &[E::G1Affine] = match &pp.pk_range_proof.ck_S.msm_basis {
-            SrsBasis::Lagrange { lagr: lagr_g1 } => lagr_g1,
+            SrsBasis::Lagrange { lagr } => lagr,
             SrsBasis::PowersOfTau { .. } => {
                 panic!("Expected a Lagrange basis, received powers of tau basis instead")
             },
@@ -253,7 +253,7 @@ impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>> Transcr
                 randomness: Rs,
             },
         ) = normalized_statement;
-        let range_proof = dekart_univariate_v2::Proof::prove(
+        let range_proof_projective = dekart_univariate_v2::Proof::prove(
             &pp.pk_range_proof,
             &f_evals_chunked_flat,
             pp.ell,
@@ -265,7 +265,7 @@ impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>> Transcr
         // Assemble the sharing proof
         let sharing_proof = SharingProof {
             SoK,
-            range_proof,
+            range_proof: range_proof_projective.into(), // Doing G1 normalisation here
             range_proof_commitment: univariate_hiding_kzg::CommitmentNormalised(
                 range_proof_commitment.0.clone(),
             ),
@@ -378,21 +378,23 @@ impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>>
         let sok_msm_terms =
             hom.msm_terms_for_verify(&sok_statement, &self.sharing_proof.SoK, &sok_cntxt);
 
-        let gamma = sample_field_element(rng);
-        let gamma_sq = gamma * gamma;
+        // Final step: Combine the MSM terms and check the multi-pairing
+        let (_, powers_of_gamma) = sample_field_element_with_powers::<E::ScalarField, _>(3, rng);
 
         let pok_merged = msm::merge_msm_inputs::<E::G1Affine, _>(&sok_msm_terms, rng);
         let g1_inputs = vec![pok_merged, weighted_Cs_msm];
         let merged_g1 = msm::merge_msm_inputs_with_scales::<E::G1Affine>(&g1_inputs, &[
-            gamma,
+            powers_of_gamma[1],
             E::ScalarField::ONE,
         ]);
         let combined_G1 = E::G1::msm(merged_g1.bases(), merged_g1.scalars())
             .expect("Failed to compute merged G1 MSM in chunky");
 
         let g2_inputs = vec![ldt_msm_terms, weighted_Vs_msm];
-        let merged_g2 =
-            msm::merge_msm_inputs_with_scales(&g2_inputs, &[gamma_sq, E::ScalarField::ONE]);
+        let merged_g2 = msm::merge_msm_inputs_with_scales(&g2_inputs, &[
+            powers_of_gamma[2],
+            E::ScalarField::ONE,
+        ]);
         let combined_G2 = E::G2::msm(merged_g2.bases(), merged_g2.scalars())
             .expect("Failed to compute merged G2 MSM in chunky");
 

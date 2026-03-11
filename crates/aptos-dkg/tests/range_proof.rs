@@ -33,7 +33,8 @@ fn assert_range_proof_correctness<E: Pairing, B: BatchedRangeProof<E>>(
         ell
     );
 
-    let proof = B::prove(pk, &values, ell, &comm.clone().into(), &r, &mut rng);
+    let proof_projective = B::prove(pk, &values, ell, &comm.clone().into(), &r, &mut rng);
+    let proof: B = proof_projective.into();
     proof
         .verify(vk, n, ell, &comm.clone().into(), &mut rng)
         .unwrap();

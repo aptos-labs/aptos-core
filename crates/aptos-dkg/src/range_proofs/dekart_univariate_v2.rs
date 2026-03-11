@@ -53,18 +53,35 @@ pub struct Proof<E: Pairing> {
     pi_gamma: univariate_hiding_kzg::OpeningProof<E>, // TODO: need to make this affine
 }
 
-// #[allow(non_snake_case)]
-// #[derive(CanonicalSerialize, CanonicalDeserialize, Debug, Clone, PartialEq, Eq)]
-// pub struct ProofProjective<E: Pairing> {
-//     hatC: E::G1,
-//     pi_PoK: sigma_protocol::Proof<E::ScalarField, two_term_msm::Homomorphism<E::G1>>,
-//     Cs: Vec<E::G1>, // has length ell
-//     D: E::G1,
-//     a: E::ScalarField,
-//     a_h: E::ScalarField,
-//     a_js: Vec<E::ScalarField>, // has length ell
-//     pi_gamma: univariate_hiding_kzg::OpeningProof<E>,
-// }
+// Because of Fiat-Shamir, everything will be affine except the final opening proof
+#[allow(non_snake_case)]
+#[derive(CanonicalSerialize, CanonicalDeserialize, Debug, Clone, PartialEq, Eq)]
+pub struct ProofProjective<E: Pairing> {
+    hat_C: E::G1Affine,
+    pi_PoK: sigma_protocol::Proof<E::ScalarField, two_term_msm::Homomorphism<E::G1>>,
+    Cs: Vec<E::G1Affine>, // has length ell
+    D: E::G1Affine,
+    a: E::ScalarField,
+    a_h: E::ScalarField,
+    a_js: Vec<E::ScalarField>, // has length ell
+    pi_gamma: univariate_hiding_kzg::OpeningProofProjective<E>,
+}
+
+// TODO: can we use .. here?
+impl<E: Pairing> From<ProofProjective<E>> for Proof<E> {
+    fn from(p: ProofProjective<E>) -> Self {
+        Self {
+            hat_C: p.hat_C,
+            pi_PoK: p.pi_PoK,
+            Cs: p.Cs,
+            D: p.D,
+            a: p.a,
+            a_h: p.a_h,
+            a_js: p.a_js,
+            pi_gamma: p.pi_gamma.into(),
+        }
+    }
+}
 
 impl<E: Pairing> Proof<E> {
     // /// Converts this projective proof into an affine proof by batch-normalizing all G1 points
@@ -282,6 +299,7 @@ impl<E: Pairing> traits::BatchedRangeProof<E> for Proof<E> {
     type CommitmentNormalised = univariate_hiding_kzg::CommitmentNormalised<E>;
     type CommitmentRandomness = univariate_hiding_kzg::CommitmentRandomness<E::ScalarField>;
     type Input = E::ScalarField;
+    type ProofProjective = ProofProjective<E>;
     type ProverKey = ProverKey<E>;
     type PublicStatement = PublicStatement<E>;
     type VerificationKey = VerificationKey<E>;
@@ -415,7 +433,7 @@ impl<E: Pairing> traits::BatchedRangeProof<E> for Proof<E> {
         comm: &Self::CommitmentNormalised,
         rho: &Self::CommitmentRandomness,
         rng: &mut R,
-    ) -> Proof<E>
+    ) -> ProofProjective<E>
     where
         R: rand_core::RngCore + rand_core::CryptoRng,
     {
@@ -802,7 +820,7 @@ impl<E: Pairing> traits::BatchedRangeProof<E> for Proof<E> {
             prove_start.elapsed().as_secs_f64() * 1000.0
         );
 
-        Proof {
+        ProofProjective {
             hat_C,
             pi_PoK,
             Cs,
@@ -858,7 +876,7 @@ impl<E: Pairing> traits::BatchedRangeProof<E> for Proof<E> {
         ); // Easy to work around this if it fails...
 
         let Proof {
-            hat_C: hatC,
+            hat_C,
             pi_PoK,
             Cs,
             D,
@@ -872,11 +890,11 @@ impl<E: Pairing> traits::BatchedRangeProof<E> for Proof<E> {
         fiat_shamir::append_initial_data(&mut fs_t, Self::DST, vk, PublicStatement {
             n,
             ell,
-            comm: TrivialShape(comm.0.into_group()),
+            comm: TrivialShape(comm.0.into_group()), // TODO!!! change this
         });
 
         // Step 2b
-        fiat_shamir::append_hat_f_commitment::<E>(&mut fs_t, &hatC);
+        fiat_shamir::append_hat_f_commitment::<E>(&mut fs_t, &hat_C);
         #[cfg(feature = "range_proof_timing_univariate_v2")]
         print_cumulative(
             "unpack + append_initial_data + append_hat_f",
@@ -892,7 +910,7 @@ impl<E: Pairing> traits::BatchedRangeProof<E> for Proof<E> {
         };
         <two_term_msm::Homomorphism<E::G1> as sigma_protocol::Trait>::verify(
             &hom,
-            &(two_term_msm::CodomainShape((*hatC - comm.0).into_affine())),
+            &(two_term_msm::CodomainShape((*hat_C - comm.0).into_affine())),
             pi_PoK,
             &Self::DST,
             rng,
@@ -927,7 +945,7 @@ impl<E: Pairing> traits::BatchedRangeProof<E> for Proof<E> {
         // Step 8
         let U_bases: Vec<E::G1Affine> = {
             let mut v = Vec::with_capacity(2 + Cs.len());
-            v.push(*hatC);
+            v.push(*hat_C);
             v.push(*D);
             v.extend_from_slice(&Cs);
             v

@@ -25,7 +25,7 @@ use aptos_crypto::{
 use aptos_crypto_derive::SigmaProtocolWitness;
 use ark_ec::{
     pairing::{Pairing, PairingOutput},
-    AdditiveGroup, CurveGroup, VariableBaseMSM,
+    AdditiveGroup, AffineRepr, CurveGroup, VariableBaseMSM,
 };
 use ark_ff::{Field, PrimeField, Zero};
 use ark_poly::{
@@ -34,7 +34,7 @@ use ark_poly::{
 use ark_serialize::{
     CanonicalDeserialize, CanonicalSerialize, Compress, SerializationError, Write,
 };
-use rand::{CryptoRng, RngCore};
+use rand_core::{CryptoRng, RngCore};
 use sigma_protocol::homomorphism::TrivialShape as CodomainShape;
 use std::{borrow::Cow, fmt::Debug};
 
@@ -53,20 +53,35 @@ impl<E: Pairing> From<Commitment<E>> for CommitmentNormalised<E> {
 pub type CommitmentRandomness<F> = Scalar<F>;
 
 #[derive(CanonicalSerialize, CanonicalDeserialize, Debug, PartialEq, Eq, Clone)]
-pub struct OpeningProof<E: Pairing> {
+pub struct OpeningProofProjective<E: Pairing> {
     pub(crate) pi_1: Commitment<E>,
     pub(crate) pi_2: E::G1,
+}
+
+impl<E: Pairing> From<OpeningProofProjective<E>> for OpeningProof<E> {
+    fn from(p: OpeningProofProjective<E>) -> OpeningProof<E> {
+        let normalized = E::G1::normalize_batch(&[p.pi_1.0, p.pi_2]);
+        OpeningProof {
+            pi_1: normalized[0],
+            pi_2: normalized[1],
+        }
+    }
+}
+
+#[derive(CanonicalSerialize, CanonicalDeserialize, Debug, PartialEq, Eq, Clone)]
+pub struct OpeningProof<E: Pairing> {
+    pub(crate) pi_1: E::G1Affine,
+    pub(crate) pi_2: E::G1Affine,
 }
 
 impl<E: Pairing> OpeningProof<E> {
     /// Generates a random looking opening proof (but not a valid one).
     /// Useful for testing and benchmarking. TODO: might be able to derive this through macros etc
-    pub fn generate<R: rand::Rng + rand::CryptoRng>(rng: &mut R) -> Self {
+    pub fn generate<R: RngCore + CryptoRng>(rng: &mut R) -> Self {
         Self {
-            pi_1: sigma_protocol::homomorphism::TrivialShape(
-                unsafe_random_point::<E::G1Affine, _>(rng).into(),
-            ),
-            pi_2: unsafe_random_point::<E::G1Affine, _>(rng).into(),
+            pi_1: unsafe_random_point(rng),
+
+            pi_2: unsafe_random_point(rng),
         }
     }
 }
@@ -222,7 +237,7 @@ impl<'a, E: Pairing> CommitmentHomomorphism<'a, E> {
         y: E::ScalarField,
         s: &CommitmentRandomness<E::ScalarField>, // commitment randomness of the quotient
         offset: usize,
-    ) -> OpeningProof<E> {
+    ) -> OpeningProofProjective<E> {
         let q_vals = match &ck.msm_basis {
             SrsBasis::Lagrange { .. } => {
                 // Lagrange basis expects `f_vals` to be evaluations, and we return `q_vals` with evaluations
@@ -264,7 +279,7 @@ impl<'a, E: Pairing> CommitmentHomomorphism<'a, E> {
         // For this small MSM, the direct approach seems to be faster than using `E::G1::msm()`
         let pi_2 = (ck.g1 * rho) - (ck.tau_1 - ck.g1 * x) * s.0;
 
-        OpeningProof { pi_1, pi_2 }
+        OpeningProofProjective { pi_1, pi_2 }
     }
 
     #[allow(non_snake_case)]
@@ -288,7 +303,7 @@ impl<'a, E: Pairing> CommitmentHomomorphism<'a, E> {
         let OpeningProof { pi_1, pi_2 } = pi; // These are probably going to be affine
 
         (
-            E::G1::normalize_batch(&[C.0 - one_1 * y, -pi_1.0, -pi_2]),
+            E::G1::normalize_batch(&[C.0 - one_1 * y, -pi_1.into_group(), -pi_2.into_group()]),
             vec![one_2, (tau_2 - one_2 * x).into_affine(), xi_2], // So we should store -xi_2 instead? Check the math
         )
     }
@@ -499,7 +514,7 @@ mod tests {
         let proof = CommitmentHomomorphism::<E>::open(&ck, f_evals, rho.0, x, y, &s, 0);
 
         // Verify proof
-        let verification = CommitmentHomomorphism::<E>::verify(vk, comm, x, y, proof);
+        let verification = CommitmentHomomorphism::<E>::verify(vk, comm, x, y, proof.into());
 
         assert!(
             verification.is_ok(),

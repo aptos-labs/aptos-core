@@ -85,10 +85,37 @@ impl<P: Pairing> From<ZeromorphCommitment<P>> for ZeromorphVerifierCommitment<P>
 }
 
 #[derive(Clone, CanonicalSerialize, CanonicalDeserialize, Debug)]
-pub struct ZeromorphProof<P: Pairing> {
-    pub pi: univariate_hiding_kzg::OpeningProof<P>,
+pub struct ZeromorphProofProjective<P: Pairing> {
+    pub pi: univariate_hiding_kzg::OpeningProofProjective<P>,
     pub q_hat_com: univariate_hiding_kzg::Commitment<P>, // KZG commitment to the batched, lifted-degree poly constructed out of the q_k
     pub q_k_com: Vec<univariate_hiding_kzg::Commitment<P>>, // has type Vec<P::G1>, this is a vector of KZG commitments for the q_k
+}
+
+#[derive(Clone, CanonicalSerialize, CanonicalDeserialize, Debug)]
+pub struct ZeromorphProof<P: Pairing> {
+    pub pi: univariate_hiding_kzg::OpeningProof<P>,
+    pub q_hat_com: univariate_hiding_kzg::CommitmentNormalised<P>,
+    pub q_k_com: Vec<univariate_hiding_kzg::CommitmentNormalised<P>>,
+}
+
+impl<P: Pairing> From<ZeromorphProofProjective<P>> for ZeromorphProof<P> {
+    fn from(p: ZeromorphProofProjective<P>) -> Self {
+        let mut batch = vec![p.pi.pi_1.0, p.pi.pi_2];
+        batch.push(p.q_hat_com.0);
+        batch.extend(p.q_k_com.iter().map(|c| c.0));
+        let normalized = P::G1::normalize_batch(&batch);
+        Self {
+            pi: univariate_hiding_kzg::OpeningProof {
+                pi_1: normalized[0],
+                pi_2: normalized[1],
+            },
+            q_hat_com: univariate_hiding_kzg::CommitmentNormalised(normalized[2]),
+            q_k_com: normalized[3..]
+                .iter()
+                .map(|&a| univariate_hiding_kzg::CommitmentNormalised(a))
+                .collect(),
+        }
+    }
 }
 
 /// Batched instance produced by Zeromorph opening: the univariate polynomial `f`, opening point,
@@ -513,7 +540,7 @@ where
     pub fn open_batched_instance_with_hkzg(
         pp: &ZeromorphProverKey<P>,
         instance: &ZeromorphBatchedOpeningInstance<P>,
-    ) -> univariate_hiding_kzg::OpeningProof<P> {
+    ) -> univariate_hiding_kzg::OpeningProofProjective<P> {
         univariate_hiding_kzg::CommitmentHomomorphism::open(
             &pp.hiding_kzg_pp,
             instance.f_coeffs.clone(),
@@ -533,11 +560,11 @@ where
         s: CommitmentRandomness<P::ScalarField>,
         rng: &mut R,
         trs: &mut merlin::Transcript,
-    ) -> ZeromorphProof<P> {
+    ) -> ZeromorphProofProjective<P> {
         let (batched_instance, q_hat_com, q_k_com) =
             Self::open_to_batched_instance(pp, poly, point, eval, s, rng, trs);
         let pi = Self::open_batched_instance_with_hkzg(pp, &batched_instance);
-        ZeromorphProof {
+        ZeromorphProofProjective {
             pi,
             q_hat_com,
             q_k_com,
@@ -558,9 +585,8 @@ where
         if batch {
             let _gamma: P::ScalarField = trs.challenge_scalar(); // consume gamma so state matches batch_open
         }
-        let q_k_affine: Vec<P::G1Affine> =
-            proof.q_k_com.iter().map(|c| c.0.into_affine()).collect();
-        let q_hat_affine = proof.q_hat_com.0.into_affine();
+        let q_k_affine: Vec<P::G1Affine> = proof.q_k_com.iter().map(|c| c.0).collect();
+        let q_hat_affine = proof.q_hat_com.0; // TODO: this is a bit verbose now
         let (y_challenge, x_challenge, z_challenge) =
             replay_challenges::<P>(trs, &q_k_affine, &q_hat_affine);
 
@@ -592,7 +618,7 @@ where
             zeta_z_commitment,
             x_challenge,
             P::ScalarField::zero(),
-            proof.pi.clone(),
+            proof.pi.clone().into(),
         )?;
 
         Ok(())
@@ -606,8 +632,9 @@ where
     type Commitment = ZeromorphCommitment<P>;
     type CommitmentKey = ZeromorphProverKey<P>;
     type CommitmentNormalised = ZeromorphVerifierCommitment<P>;
+    type OpeningProof = ZeromorphProof<P>;
+    type OpeningProofProjective = ZeromorphProofProjective<P>;
     type Polynomial = DenseMultilinearExtension<P::ScalarField>;
-    type Proof = ZeromorphProof<P>;
     type VerificationKey = ZeromorphVerifierKey<P>;
     type WitnessField = P::ScalarField;
 
@@ -678,7 +705,7 @@ where
         r: Option<Self::WitnessField>,
         rng: &mut R,
         trs: &mut merlin::Transcript,
-    ) -> Self::Proof {
+    ) -> Self::OpeningProofProjective {
         let s = Scalar(r.expect("open(): expected randomness r, got None"));
 
         let eval = Self::evaluate_point(&poly, &challenge);
@@ -694,7 +721,7 @@ where
         rs: Option<Vec<Self::WitnessField>>,
         rng: &mut R,
         trs: &mut merlin::Transcript,
-    ) -> Self::Proof {
+    ) -> Self::OpeningProofProjective {
         let rs = rs.expect("rs must be present");
         debug_assert_eq!(rs.len(), polys.len(), "rs must have same length as polys");
 
@@ -724,7 +751,7 @@ where
         com: impl Into<Self::CommitmentNormalised>,
         challenge: Vec<Self::WitnessField>,
         eval: Self::WitnessField,
-        proof: Self::Proof,
+        proof: Self::OpeningProof,
         trs: &mut merlin::Transcript,
         batch: bool,
     ) -> anyhow::Result<()> {
@@ -1084,7 +1111,7 @@ mod test {
                 &commitment,
                 &point,
                 &eval,
-                &proof,
+                &proof.clone().into(),
                 &mut verifier_transcript,
                 false,
             )
@@ -1102,7 +1129,7 @@ mod test {
                 &commitment,
                 &altered_verifier_point,
                 &altered_verifier_eval,
-                &proof,
+                &proof.into(),
                 &mut verifier_transcript,
                 false,
             )

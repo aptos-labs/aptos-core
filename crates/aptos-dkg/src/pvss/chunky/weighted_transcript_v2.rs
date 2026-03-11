@@ -252,7 +252,7 @@ impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>> Transcr
         // );
 
         // Generate the batch range proof, given the `range_proof_commitment` produced in the PoK
-        let range_proof = dekart_univariate_v2::Proof::prove(
+        let range_proof_projective = dekart_univariate_v2::Proof::prove(
             &pp.pk_range_proof,
             &f_evals_chunked_flat,
             pp.ell,
@@ -264,7 +264,7 @@ impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>> Transcr
         // Assemble the sharing proof
         let sharing_proof = SharingProof {
             SoK,
-            range_proof,
+            range_proof: range_proof_projective.into(), // Doing G1 normalisation here
             range_proof_commitment: univariate_hiding_kzg::CommitmentNormalised(
                 range_proof_commitment.0.clone(),
             ),

@@ -18,6 +18,7 @@ pub trait BatchedRangeProof<E: Pairing>: Clone + CanonicalSerialize + CanonicalD
     type CommitmentNormalised: Clone;
     type CommitmentRandomness: UniformRand;
     type CommitmentKey;
+    type ProofProjective: Into<Self>; // TODO: Should expand this by making it return its projective elements, and building Self from affinisations of those
 
     const DST: &[u8];
 
@@ -54,7 +55,7 @@ pub trait BatchedRangeProof<E: Pairing>: Clone + CanonicalSerialize + CanonicalD
         comm: &Self::CommitmentNormalised,
         r: &Self::CommitmentRandomness,
         rng: &mut R,
-    ) -> Self;
+    ) -> Self::ProofProjective;
 
     fn verify<R: RngCore + CryptoRng>(
         &self,

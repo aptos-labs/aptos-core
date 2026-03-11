@@ -2,17 +2,14 @@
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 use aptos_dkg::dlog::{bsgs, table};
-use ark_ec::{pairing::Pairing, CurveGroup, PrimeGroup};
+use ark_ec::{pairing::Pairing, PrimeGroup};
 use criterion::{criterion_group, criterion_main, BenchmarkId, Criterion};
 use rand::{rngs::StdRng, Rng, SeedableRng};
 use std::collections::HashMap;
 
 /// Generic benchmark for the discrete log computation using Baby-step Giant-step
 #[allow(non_snake_case)]
-fn bench_dlog<E: Pairing>(c: &mut Criterion, curve_name: &str)
-where
-    E::G1: CurveGroup<ScalarField = E::ScalarField>,
-{
+fn bench_dlog<E: Pairing>(c: &mut Criterion, curve_name: &str) {
     let mut group = c.benchmark_group(format!("dlog_bsgs_{}", curve_name));
 
     // Parameters
@@ -82,10 +79,7 @@ where
 
 /// Benchmark single dlog over a range of serialization batch sizes to find the optimal value.
 #[allow(non_snake_case)]
-fn bench_dlog_batch_size<E: Pairing>(c: &mut Criterion, curve_name: &str)
-where
-    E::G1: CurveGroup<ScalarField = E::ScalarField>,
-{
+fn bench_dlog_batch_size<E: Pairing>(c: &mut Criterion, curve_name: &str) {
     let mut group = c.benchmark_group(format!("dlog_bsgs_{}_batch_size", curve_name));
 
     let range_limit = 1u64 << 32;
@@ -124,10 +118,7 @@ where
 /// Compare `dlog_vec` (one dlog per target) vs `dlog_vec_batched` (batch across targets)
 /// over varying numbers of targets.
 #[allow(non_snake_case)]
-fn bench_dlog_vec_vs_batched<E: Pairing>(c: &mut Criterion, curve_name: &str)
-where
-    E::G1: CurveGroup<ScalarField = E::ScalarField>,
-{
+fn bench_dlog_vec_vs_batched<E: Pairing>(c: &mut Criterion, curve_name: &str) {
     let mut group = c.benchmark_group(format!("dlog_bsgs_{}_vec_vs_batched", curve_name));
 
     let range_limit = 1u64 << 32;
@@ -173,10 +164,7 @@ where
 }
 
 #[allow(non_snake_case)]
-fn bench_table_build<E: Pairing>(c: &mut Criterion, curve_name: &str)
-where
-    E::G1: CurveGroup<ScalarField = E::ScalarField>,
-{
+fn bench_table_build<E: Pairing>(c: &mut Criterion, curve_name: &str) {
     let mut group = c.benchmark_group(format!("dlog_table_build_{}", curve_name));
 
     // Limit Criterion to exactly 10 measurement iterations, because tables can be big (24 bits takes 1-2 min)

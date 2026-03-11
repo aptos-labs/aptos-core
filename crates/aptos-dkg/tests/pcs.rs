@@ -52,7 +52,7 @@ fn test_pcs_setup_commit_open_verify<PCS: PolynomialCommitmentScheme>(params: Pc
     let eval = PCS::evaluate_point(&poly, &challenge_pt);
 
     let mut trs_prover = merlin::Transcript::new(PCS::transcript_dst_for_single_open());
-    let proof = PCS::open(
+    let proof_projective = PCS::open(
         &ck,
         poly,
         challenge_pt.clone(),
@@ -60,6 +60,7 @@ fn test_pcs_setup_commit_open_verify<PCS: PolynomialCommitmentScheme>(params: Pc
         &mut rng,
         &mut trs_prover,
     );
+    let proof: PCS::OpeningProof = proof_projective.into();
 
     // Verifier uses a fresh transcript with the same DST so it hopefully derives the same challenges
     let mut trs_verifier = merlin::Transcript::new(PCS::transcript_dst_for_single_open());
@@ -175,7 +176,7 @@ mod zeromorph {
             &combined_com,
             &challenge,
             &combined_eval,
-            &proof,
+            &proof.into(),
             &mut trs_verify,
             true,
         )
@@ -252,7 +253,7 @@ mod shplonked {
             &commitment_msms,
             &y_rev,
             proof.sigma_proof_statement.1,
-            &proof,
+            &proof.into(),
             &mut trs_verifier,
             &mut rng,
         )
