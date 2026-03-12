@@ -96,7 +96,6 @@ impl DecShare {
     pub fn aggregate<'a>(
         dec_shares: impl Iterator<Item = &'a DecShare>,
         config: &DecConfig,
-        pool: &rayon::ThreadPool
     ) -> anyhow::Result<DecryptionKey> {
         let threshold = config.threshold();
         let shares: Vec<DecryptionKeyShare> = dec_shares
@@ -104,10 +103,7 @@ impl DecShare {
             .take(threshold as usize)
             .collect();
         
-        let decryption_key =
-        pool.install(||
-            <FPTX as BatchThresholdEncryption>::reconstruct_decryption_key(&shares, &config.config)
-        )?;
+        let decryption_key = <FPTX as BatchThresholdEncryption>::reconstruct_decryption_key(&shares, &config.config)?;
         Ok(decryption_key)
     }
 

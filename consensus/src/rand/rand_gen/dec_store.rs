@@ -65,11 +65,10 @@ impl DecShareAggregator {
         let self_share = self
             .get_self_share()
             .expect("Aggregated item should have self share");
-        tokio::task::spawn_blocking(move || {
+        rayon::spawn(move || {
             let maybe_key = DecShare::aggregate(
                 self.shares.values(),
                 &dec_config,
-                &DECRYPTION_POOL,
             );
             match maybe_key {
                 Ok(key) => {

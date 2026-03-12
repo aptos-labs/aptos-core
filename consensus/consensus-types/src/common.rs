@@ -550,12 +550,10 @@ impl Payload {
             // verify encrypted txns
             let encrypted_txns = payload.iter().filter(|txn| txn.is_encrypted()).collect::<Vec<_>>();
             let encrypted_txns_len = encrypted_txns.len();
-            DECRYPTION_POOL.install(|| {
-                encrypted_txns
-                    .into_par_iter()
-                    .with_min_len(optimal_min_len(encrypted_txns_len, 32))
-                    .try_for_each(|t| t.verify_ciphertext())
-            })?;
+            encrypted_txns
+                .into_par_iter()
+                .with_min_len(optimal_min_len(encrypted_txns_len, 32))
+                .try_for_each(|t| t.verify_ciphertext())?;
         }
         Ok(())
     }

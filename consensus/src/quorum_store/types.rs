@@ -183,12 +183,10 @@ impl Batch {
         let encrypted_txns = self.payload.txns().iter().filter(|txn| txn.is_encrypted()).collect::<Vec<_>>();
         let len = encrypted_txns.len();
         // verify encrypted txns
-        DECRYPTION_POOL.install(|| {
             encrypted_txns
                 .into_par_iter()
                 .with_min_len(optimal_min_len(len, 32))
-                .try_for_each(|t| t.verify_ciphertext())
-        })?;
+                .try_for_each(|t| t.verify_ciphertext())?;
         Ok(())
     }
 
