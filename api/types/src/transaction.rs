@@ -490,7 +490,24 @@ pub struct UserTransactionRequestInner {
 
 impl VerifyInput for UserTransactionRequestInner {
     fn verify(&self) -> anyhow::Result<()> {
-        self.payload.verify()
+        self.payload.verify()?;
+        // Sender-dependent ciphertext verification for the JSON path.
+        // The BCS path does this in `validate_signed_transaction_payload`.
+        if let TransactionPayload::EncryptedTransactionPayload(
+            EncryptedTransactionPayload::Encrypted(ref p),
+        ) = self.payload
+        {
+            let ciphertext: aptos_types::secret_sharing::Ciphertext =
+                bcs::from_bytes(&p.ciphertext.0)
+                    .context("Invalid ciphertext: failed to BCS-deserialize")?;
+            let sender = AccountAddress::from(self.sender);
+            let associated_data =
+                aptos_types::transaction::encrypted_payload::PayloadAssociatedData::new(sender);
+            ciphertext
+                .verify(&associated_data)
+                .context("Ciphertext verification failed")?;
+        }
+        Ok(())
     }
 }
 
@@ -1197,6 +1214,9 @@ pub struct DecryptedPayload {
 }
 
 impl VerifyInput for EncryptedTransactionPayload {
+    /// Basic structural checks. Full ciphertext verification with sender happens in
+    /// `UserTransactionRequestInner::verify()` (JSON path) and
+    /// `validate_signed_transaction_payload` (BCS path).
     fn verify(&self) -> anyhow::Result<()> {
         match self {
             EncryptedTransactionPayload::Encrypted(p) => {
