@@ -1,0 +1,105 @@
+name: Rust Compile Check
+
+on:
+  pull_request:
+  push:
+    branches:
+      - aptos-node
+  workflow_dispatch:
+
+env:
+  CARGO_TERM_COLOR: always
+  CARGO_INCREMENTAL: "0"
+
+# Cancel previous runs on the same PR when new commits are pushed
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.sha }}
+  cancel-in-progress: true
+
+jobs:
+  check-changes:
+    name: Check Changes
+    runs-on: ubuntu-latest
+    outputs:
+      should_run: ${{ steps.filter.outputs.should_run }}
+    steps:
+      - name: Check changed files
+        id: filter
+        if: github.event_name == 'pull_request'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          CHANGED_FILES=$(gh api \
+            "repos/${{ github.repository }}/pulls/${{ github.event.pull_request.number }}/files?per_page=100" \
+            --paginate --jq '.[].filename')
+
+          IGNORE_PATTERNS="*.md"
+
+          IFS='|' read -ra PATTERNS <<< "$IGNORE_PATTERNS"
+
+          HAS_RELEVANT_CHANGES=false
+          while IFS= read -r file; do
+            IGNORED=false
+            for pattern in "${PATTERNS[@]}"; do
+              if [[ "$pattern" == *'/*' ]]; then
+                prefix="${pattern%/*}/"
+                if [[ "$file" == "$prefix"* ]]; then
+                  IGNORED=true
+                  break
+                fi
+              elif [[ "$file" == $pattern ]]; then
+                IGNORED=true
+                break
+              fi
+            done
+            if [ "$IGNORED" = "true" ]; then
+              echo "  [IGNORED] ${file}"
+            else
+              echo "  [RELEVANT] ${file}"
+              HAS_RELEVANT_CHANGES=true
+            fi
+          done <<< "${CHANGED_FILES}"
+
+          if [ "${HAS_RELEVANT_CHANGES}" = "false" ]; then
+            echo "All changes are in ignored paths. Skipping."
+            echo "should_run=false" >> $GITHUB_OUTPUT
+          else
+            echo "✓ Found relevant code changes."
+            echo "should_run=true" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Default for non-PR events
+        id: default
+        if: github.event_name != 'pull_request'
+        run: echo "should_run=true" >> $GITHUB_OUTPUT
+
+  compile-check:
+    name: Compile Check
+    runs-on: ubuntu-latest
+    needs: check-changes
+    if: needs.check-changes.outputs.should_run != 'false'
+    steps:
+      - name: Free disk space
+        run: |
+          sudo rm -rf /usr/share/dotnet
+          sudo rm -rf /usr/local/lib/android
+          sudo rm -rf /opt/ghc
+          sudo rm -rf /opt/hostedtoolcache
+          sudo docker image prune --all --force
+          df -h
+      - uses: actions/checkout@v4
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            build-essential ca-certificates clang cmake curl git \
+            libpq-dev libssl-dev libdw-dev libudev-dev \
+            lld llvm pkg-config lsof
+      - name: Setup Rust toolchain
+        uses: dsherret/rust-toolchain-file@v1
+      - name: Install protoc
+        run: scripts/dev_setup.sh -b -r
+      - name: Run cargo cache
+        uses: Swatinem/rust-cache@v2
+      - name: Run compile check
+        uses: ./.github/actions/rust-compile-check

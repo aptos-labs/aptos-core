@@ -1,0 +1,11 @@
+name: Rust Compile Check
+description: Checks that the Rust workspace compiles without errors (warnings are allowed)
+
+runs:
+  using: composite
+  steps:
+    - name: Run cargo check
+      shell: bash
+      run: cargo check
+      env:
+        CARGO_BUILD_JOBS: "2"
