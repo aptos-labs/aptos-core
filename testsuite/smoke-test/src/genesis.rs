@@ -354,7 +354,8 @@ async fn delete_db_and_execute_restore(
         current_version as usize, // txn batch size (version 0 is in its own batch)
         previous_epoch as usize,  // state snapshot interval
         &[waypoint],
-    );
+    )
+    .await;
 
     // Stop the specified validator
     let validator = env.validators_mut().nth(validator_index).unwrap();
