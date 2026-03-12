@@ -666,11 +666,11 @@ impl PipelineBuilder {
         let mut sig_verified_decrypted_txns: Vec<SignatureVerifiedTransaction> = decrypted_txns.as_ref().clone().into_iter().map(|t| SignatureVerifiedTransaction::Valid(Transaction::UserTransaction(t))).collect();
 
         let mut sig_verified_txns: Vec<SignatureVerifiedTransaction> = SIG_VERIFY_POOL.install(|| 
-            send.send(non_encrypted_txns
+            non_encrypted_txns
                 .into_par_iter()
                 .with_min_len(optimal_min_len(non_encrypted_txns_len, 32))
                 .map(|t| Transaction::UserTransaction(t).into())
-                .collect::<Vec<_>>())
+                .collect::<Vec<_>>()
         );
 
         assert!(sig_verified_decrypted_txns.len() == decrypted_txns.as_ref().len(), "round {}, block {} sig_verified_decrypted_txns len {}, decrypted_txns len {}", block.round(), block.id(), sig_verified_decrypted_txns.len(), decrypted_txns.as_ref().len());
