@@ -703,6 +703,7 @@ impl ExpRewriterFunctions for CalleeRewriter<'_> {
             Pattern::Tuple(_, pattern_vec) => Some(Pattern::Tuple(new_id, pattern_vec.clone())),
             Pattern::Var(_, symbol) => Some(Pattern::Var(new_id, *symbol)),
             Pattern::Wildcard(_) => Some(Pattern::Wildcard(new_id)),
+            Pattern::LiteralValue(_, val) => Some(Pattern::LiteralValue(new_id, val.clone())),
             Pattern::Error(_) => None,
         }
     }

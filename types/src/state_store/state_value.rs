@@ -381,8 +381,23 @@ pub struct StaleStateValueIndex {
 pub struct StaleStateValueByKeyHashIndex {
     /// The version since when the node is overwritten and becomes stale.
     pub stale_since_version: Version,
-    /// The version identifying the value associated with this record.
+    /// The version identifying the value associated with this record, or
+    /// [`Self::NO_PREV_VERSION`] if this is the first write to the key (no previous version to
+    /// prune).
     pub version: Version,
     /// The hash of `StateKey` identifying the value associated with this record.
     pub state_key_hash: HashValue,
+}
+
+impl StaleStateValueByKeyHashIndex {
+    /// Sentinel value used as `version` for first-time key creations where no previous version
+    /// exists. This allows truncation to discover and clean up newly created keys. The pruner
+    /// skips the no-op delete by checking against this sentinel.
+    pub const NO_PREV_VERSION: Version = Version::MAX;
+
+    /// Returns true if this index entry represents a first-time key creation (no previous value
+    /// to prune).
+    pub fn is_first_write(&self) -> bool {
+        self.version == Self::NO_PREV_VERSION
+    }
 }

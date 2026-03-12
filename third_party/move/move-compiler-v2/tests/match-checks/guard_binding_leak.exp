@@ -1,0 +1,7 @@
+
+Diagnostics:
+error: undeclared `y`
+  ┌─ tests/match-checks/guard_binding_leak.move:8:18
+  │
+8 │             _ => y,
+  │                  ^

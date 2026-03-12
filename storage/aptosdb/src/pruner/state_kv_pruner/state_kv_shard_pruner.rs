@@ -63,7 +63,10 @@ impl StateKvShardPruner {
                 break;
             }
             batch.delete::<StaleStateValueIndexByKeyHashSchema>(&index)?;
-            batch.delete::<StateValueByKeyHashSchema>(&(index.state_key_hash, index.version))?;
+            if !index.is_first_write() {
+                batch
+                    .delete::<StateValueByKeyHashSchema>(&(index.state_key_hash, index.version))?;
+            }
         }
         batch.put::<DbMetadataSchema>(
             &DbMetadataKey::StateKvShardPrunerProgress(self.shard_id),

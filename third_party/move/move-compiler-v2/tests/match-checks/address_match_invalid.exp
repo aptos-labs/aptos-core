@@ -1,0 +1,10 @@
+
+Diagnostics:
+error: unexpected token
+  ┌─ tests/match-checks/address_match_invalid.move:4:13
+  │
+4 │             @0x1 => 1,
+  │             ^
+  │             │
+  │             Unexpected '@'
+  │             Expected a variable or struct or variant name

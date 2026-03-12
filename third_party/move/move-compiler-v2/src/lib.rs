@@ -504,6 +504,22 @@ pub fn env_check_and_transform_pipeline<'a, 'b>(options: &'a Options) -> EnvProc
         });
     }
 
+    // Check literal patterns appear only in valid positions.
+    env_pipeline.add("literal pattern check", |env: &mut GlobalEnv| {
+        env_pipeline::literal_pattern_checker::check(env)
+    });
+
+    // Check match exhaustiveness / unreachable arms and transform primitive pattern
+    // matches to if-else statements. This runs before inlining to avoid repeated
+    // transformation of inlined code, and after lint checks so that the lints get
+    // access to the original pattern match structure.
+    env_pipeline.add("match coverage checks", |env: &mut GlobalEnv| {
+        env_pipeline::match_coverage_checks::check(env)
+    });
+    env_pipeline.add("match transforms", |env: &mut GlobalEnv| {
+        env_pipeline::match_transforms::transform(env)
+    });
+
     if options.experiment_on(Experiment::INLINING) {
         let rewriting_scope = if options.whole_program {
             RewritingScope::Everything

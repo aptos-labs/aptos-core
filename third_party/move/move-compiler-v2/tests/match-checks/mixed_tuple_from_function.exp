@@ -1,0 +1,13 @@
+
+Diagnostics:
+error: literal patterns are not supported in this match expression
+   ┌─ tests/match-checks/mixed_tuple_from_function.move:13:27
+   │
+13 │             (Data::V1(a), 1) => a + 10,
+   │                           ^
+
+error: literal patterns are not supported in this match expression
+   ┌─ tests/match-checks/mixed_tuple_from_function.move:14:27
+   │
+14 │             (Data::V2(a), 2) => a + 20,
+   │                           ^
