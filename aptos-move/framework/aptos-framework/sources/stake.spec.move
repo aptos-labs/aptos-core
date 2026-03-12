@@ -215,7 +215,7 @@ spec aptos_framework::stake {
             );
 
         let config = staking_config::get();
-        let voting_power = get_next_epoch_voting_power(stake_pool);
+        let voting_power = get_voting_power(stake_pool);
 
         let minimum_stake = config.minimum_stake;
         let maximum_stake = config.maximum_stake;
@@ -349,7 +349,7 @@ spec aptos_framework::stake {
             && vector::length(validator_set.pending_active)
                 <= option::borrow(spec_find_validator(pending_active, pool_address));
         let post p_validator_set = global<ValidatorSet>(@aptos_framework);
-        let validator_stake = (get_next_epoch_voting_power(stake_pool) as u128);
+        let validator_stake = (get_voting_power(stake_pool) as u128);
         ensures validator_find_bool
             && validator_set.total_joining_power > validator_stake ==>
             p_validator_set.total_joining_power

@@ -81,7 +81,7 @@ impl<EK: BIBECTEncrypt> CTEncrypt<EK::CT> for EK {
 
         let signing_key: SigningKey = SigningKey::from_bytes(&signing_key_bytes);
         let vk = signing_key.verifying_key();
-        let hashed_id = Id::from_verifying_key(&vk);
+        let hashed_id = Id::from_verifying_key_and_ad(&vk, associated_data);
         let bibe_ct = self.bibe_encrypt(rng, plaintext, hashed_id)?;
 
         // So that Ciphertext doesn't have to be generic over some AD: AssociatedData
@@ -101,16 +101,17 @@ impl<EK: BIBECTEncrypt> CTEncrypt<EK::CT> for EK {
 
 impl<PCT: InnerCiphertext> Ciphertext<PCT> {
     pub fn verify(&self, associated_data: &impl AssociatedData) -> Result<()> {
-        let hashed_id = Id::from_verifying_key(&self.vk);
+        let hashed_id = Id::from_verifying_key_and_ad(&self.vk, associated_data);
 
-        (self.bibe_ct.id() == hashed_id).then_some(()).ok_or(
-            BatchEncryptionError::CTVerifyError(CTVerifyError::IdDoesNotMatchHashedVK),
-        )?;
         (self.associated_data_bytes == bcs::to_bytes(associated_data)?)
             .then_some(())
             .ok_or(BatchEncryptionError::CTVerifyError(
                 CTVerifyError::AssociatedDataDoesNotMatch,
             ))?;
+
+        (self.bibe_ct.id() == hashed_id).then_some(()).ok_or(
+            BatchEncryptionError::CTVerifyError(CTVerifyError::IdDoesNotMatchHashedVKAndAD),
+        )?;
 
         let to_verify = (&self.bibe_ct, &self.associated_data_bytes);
 
@@ -183,7 +184,7 @@ pub mod tests {
             ciphertext::{CTDecrypt, CTEncrypt, StandardCiphertext, SuccinctCiphertext},
             digest::DigestKey,
             encryption_key::AugmentedEncryptionKey,
-            ids::IdSet,
+            ids::{Id, IdSet},
             key_derivation::{self, BIBEDecryptionKey},
         },
         traits::BatchThresholdEncryption as _,
@@ -260,6 +261,7 @@ pub mod tests {
 
         let plaintext = String::from("hi");
         let associated_data = String::from("associated data");
+        let fake_associated_data = String::from("fake_associated data");
         let mut ct: StandardCiphertext =
             ek.encrypt(&mut rng, &plaintext, &associated_data).unwrap();
 
@@ -269,7 +271,7 @@ pub mod tests {
         // The CT itself contains a byte encoding of the associated data. Verification with
         // incorrect associated data returns an error indicating as such.
         let e: BatchEncryptionError = ct
-            .verify(&String::from("fake associated data"))
+            .verify(&fake_associated_data)
             .unwrap_err()
             .downcast()
             .unwrap();
@@ -281,9 +283,10 @@ pub mod tests {
         // Even if the CT itself is modified to contain a byte encoding of incorrect associated
         // data, verification should fail, this time with an error message indicating that the
         // signature verification failed.
-        ct.associated_data_bytes = bcs::to_bytes(&String::from("fake associated data")).unwrap();
+        ct.associated_data_bytes = bcs::to_bytes(&fake_associated_data).unwrap();
+        ct.bibe_ct.id = Id::from_verifying_key_and_ad(&ct.vk, &fake_associated_data);
         let e: BatchEncryptionError = ct
-            .verify(&String::from("fake associated data"))
+            .verify(&fake_associated_data)
             .unwrap_err()
             .downcast()
             .unwrap();

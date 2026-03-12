@@ -3,6 +3,7 @@
 use crate::{
     group::{Fr, G1Affine, G1Projective},
     shared::algebra::mult_tree::{compute_mult_tree, quotient},
+    traits::AssociatedData,
 };
 use aptos_crypto::arkworks::serialization::{ark_de, ark_se};
 use ark_ec::VariableBaseMSM as _;
@@ -13,6 +14,10 @@ use ed25519_dalek::VerifyingKey;
 use serde::{Deserialize, Serialize};
 use sha2::Sha256;
 use std::{collections::HashMap, hash::Hash};
+
+/// Domain separation tag for Id::from_verifying_key_and_ad().
+/// This must be identical between Rust and TypeScript implementations.
+const ID_HASH_DST: &[u8] = b"APTOS_BATCH_ENCRYPTION_HASH_ID";
 
 #[derive(PartialEq, Eq, Debug, Clone, Copy, Hash, Serialize, Deserialize)]
 pub struct Id {
@@ -33,10 +38,19 @@ impl Id {
         self.root_x
     }
 
-    pub fn from_verifying_key(vk: &VerifyingKey) -> Self {
+    pub fn from_verifying_key_and_ad(
+        vk: &VerifyingKey,
+        associated_data: &impl AssociatedData,
+    ) -> Self {
         // using empty domain separator b/c this is a test implementation
-        let field_hasher = <DefaultFieldHasher<Sha256> as HashToField<Fr>>::new(&[]);
-        let field_element: [Fr; 1] = field_hasher.hash_to_field::<1>(&vk.to_bytes());
+
+        let mut bytes = Vec::from(vk.to_bytes());
+        bytes.extend_from_slice(
+            &bcs::to_bytes(associated_data).expect("Serialization should never fail"),
+        );
+
+        let field_hasher = <DefaultFieldHasher<Sha256> as HashToField<Fr>>::new(ID_HASH_DST);
+        let field_element: [Fr; 1] = field_hasher.hash_to_field::<1>(&bytes);
         Self::new(field_element[0])
     }
 }
