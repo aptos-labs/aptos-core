@@ -202,13 +202,17 @@ pub fn dlog_vec_batched_with_batch_size<C: CurveGroup>(
     let v = H_vec.len();
 
     let mut result: Vec<Option<u64>> = vec![None; v];
-    // Batch holds unsolved.len() * actual_batch points per chunk
+    let mut unsolved = Vec::with_capacity(v);
     let mut batch = Vec::<C>::new();
     let mut buf = vec![0u8; byte_size];
 
     for chunk_start in (0..n).step_by(batch_size) {
-        // Only process targets not yet solved (avoids redundant work and keeps batch smaller).
-        let unsolved: Vec<usize> = (0..v).filter(|&i| result[i].is_none()).collect();
+        unsolved.clear();
+        for i in 0..v {
+            if result[i].is_none() {
+                unsolved.push(i);
+            }
+        }
         if unsolved.is_empty() {
             break;
         }
@@ -239,6 +243,9 @@ pub fn dlog_vec_batched_with_batch_size<C: CurveGroup>(
                 if let Some(&baby_j) = baby_table.get(&buf[..]) {
                     result[result_idx] = Some((chunk_start + j as u64) * m + baby_j);
                 }
+            }
+            if unsolved.iter().all(|&r| result[r].is_some()) {
+                break;
             }
         }
     }
