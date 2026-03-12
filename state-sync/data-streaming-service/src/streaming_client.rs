@@ -282,6 +282,7 @@ pub enum NotificationFeedback {
     InvalidPayloadData,
     PayloadProofFailed,
     PayloadTypeIsIncorrect,
+    UnexpectedError,
 }
 
 impl NotificationFeedback {
@@ -293,6 +294,7 @@ impl NotificationFeedback {
             Self::InvalidPayloadData => "invalid_payload_data",
             Self::PayloadProofFailed => "payload_proof_failed",
             Self::PayloadTypeIsIncorrect => "payload_type_is_correct",
+            Self::UnexpectedError => "unexpected_error",
         }
     }
 }
