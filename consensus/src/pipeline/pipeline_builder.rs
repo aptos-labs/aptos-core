@@ -665,15 +665,13 @@ impl PipelineBuilder {
         // daniel todo: skip verifying encrypted txns for now
         let mut sig_verified_decrypted_txns: Vec<SignatureVerifiedTransaction> = decrypted_txns.as_ref().clone().into_iter().map(|t| SignatureVerifiedTransaction::Valid(Transaction::UserTransaction(t))).collect();
 
-        let (send, recv) = tokio::sync::oneshot::channel();
-         SIG_VERIFY_POOL.spawn(move || {
+        let mut sig_verified_txns: Vec<SignatureVerifiedTransaction> = SIG_VERIFY_POOL.install(|| 
             send.send(non_encrypted_txns
                 .into_par_iter()
                 .with_min_len(optimal_min_len(non_encrypted_txns_len, 32))
                 .map(|t| Transaction::UserTransaction(t).into())
-                .collect::<Vec<_>>());
-        });
-        let mut sig_verified_txns: Vec<SignatureVerifiedTransaction> = recv.await.map_err(anyhow::Error::new)?;
+                .collect::<Vec<_>>())
+        );
 
         assert!(sig_verified_decrypted_txns.len() == decrypted_txns.as_ref().len(), "round {}, block {} sig_verified_decrypted_txns len {}, decrypted_txns len {}", block.round(), block.id(), sig_verified_decrypted_txns.len(), decrypted_txns.as_ref().len());
         assert!(sig_verified_txns.len() == non_encrypted_txns_len, "round {}, block {} sig_verified_txns len {}, non_encrypted_txns_len {}", block.round(), block.id(), sig_verified_txns.len(), non_encrypted_txns_len);
