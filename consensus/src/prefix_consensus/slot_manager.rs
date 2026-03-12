@@ -11,6 +11,7 @@
 use crate::{
     payload_client::PayloadClient,
     pipeline::{buffer_manager::OrderedBlocks, pipeline_builder::PipelineBuilder},
+    prefix_consensus::counters::SLOT_DURATION,
 };
 use aptos_consensus_types::{
     common::{Author, Payload, PayloadFilter, Round},
@@ -47,7 +48,7 @@ use std::{
     collections::{HashMap, HashSet},
     pin::Pin,
     sync::Arc,
-    time::Duration,
+    time::{Duration, Instant},
 };
 use tokio::time::Sleep;
 
@@ -298,6 +299,11 @@ pub struct SlotManager<NS: SubprotocolNetworkSender<SlotConsensusMsg>, SP: SPCSp
     // Timer
     slot_timer: Option<(u64, Pin<Box<Sleep>>)>,
     proposal_timeout: Duration,
+
+    // Latency tracking (for Grafana metrics)
+    slot_start_time: Option<Instant>,
+    spc_start_time: Option<Instant>,
+    vlow_received_time: Option<Instant>,
 }
 
 impl<NS: SubprotocolNetworkSender<SlotConsensusMsg>, SP: SPCSpawner> SlotManager<NS, SP> {
@@ -346,6 +352,9 @@ impl<NS: SubprotocolNetworkSender<SlotConsensusMsg>, SP: SPCSpawner> SlotManager
             network_sender,
             slot_timer: None,
             proposal_timeout: Duration::from_millis(SLOT_PROPOSAL_TIMEOUT_MS),
+            slot_start_time: None,
+            spc_start_time: None,
+            vlow_received_time: None,
         }
     }
 
@@ -500,6 +509,18 @@ impl<NS: SubprotocolNetworkSender<SlotConsensusMsg>, SP: SPCSpawner> SlotManager
     // ========================================================================
 
     async fn start_new_slot(&mut self, slot: u64) {
+        // Record "total" duration for the previous slot (if any)
+        if let Some(start) = self.slot_start_time.take() {
+            SLOT_DURATION
+                .with_label_values(&["total"])
+                .observe(start.elapsed().as_secs_f64());
+        }
+
+        let slot_start = Instant::now();
+        self.slot_start_time = Some(slot_start);
+        self.spc_start_time = None;
+        self.vlow_received_time = None;
+
         self.current_slot = slot;
         // Reset per-slot state (next_round persists across slots)
         self.v_low_committed_positions.clear();
@@ -507,7 +528,11 @@ impl<NS: SubprotocolNetworkSender<SlotConsensusMsg>, SP: SPCSpawner> SlotManager
         info!(epoch = self.epoch, slot = slot, "Starting new slot");
 
         // Pull payload from mempool
+        let pull_start = Instant::now();
         let (validator_txns, payload) = self.pull_payload().await;
+        SLOT_DURATION
+            .with_label_values(&["payload_pull"])
+            .observe(pull_start.elapsed().as_secs_f64());
         let _ = validator_txns; // validator_txns collected in Phase 7
 
         // Snapshot current ranking for this slot (used for v_high exclusion demotion in finalize_slot)
@@ -668,6 +693,17 @@ impl<NS: SubprotocolNetworkSender<SlotConsensusMsg>, SP: SPCSpawner> SlotManager
     // ========================================================================
 
     async fn run_spc(&mut self, slot: u64) {
+        // Record proposal_wait: time from slot start (after payload pull + broadcast) to SPC start.
+        // slot_start_time includes payload_pull, but proposal_wait is measured from after broadcast.
+        // We approximate by using slot_start_time — the pull + broadcast overhead is small.
+        if let Some(slot_start) = self.slot_start_time {
+            let elapsed = slot_start.elapsed().as_secs_f64();
+            SLOT_DURATION
+                .with_label_values(&["proposal_wait"])
+                .observe(elapsed);
+        }
+        self.spc_start_time = Some(Instant::now());
+
         let slot_state = self
             .slot_states
             .get_mut(&slot)
@@ -757,6 +793,14 @@ impl<NS: SubprotocolNetworkSender<SlotConsensusMsg>, SP: SPCSpawner> SlotManager
 
     /// Handle v_low from SPC (wave 1 — early commit).
     async fn on_spc_v_low(&mut self, slot: u64, v_low: PrefixVector) {
+        // Record spc_to_vlow
+        if let Some(spc_start) = self.spc_start_time {
+            SLOT_DURATION
+                .with_label_values(&["spc_to_vlow"])
+                .observe(spc_start.elapsed().as_secs_f64());
+        }
+        self.vlow_received_time = Some(Instant::now());
+
         let v_low_non_bot: Vec<String> = v_low
             .iter()
             .enumerate()
@@ -772,14 +816,22 @@ impl<NS: SubprotocolNetworkSender<SlotConsensusMsg>, SP: SPCSpawner> SlotManager
             "Resolving v_low entries for wave 1 (early commit)"
         );
 
+        let resolve_start = Instant::now();
         let (resolved, missing) = self
             .slot_states
             .get(&slot)
             .expect("SlotState must exist when SPC produces v_low")
             .resolve_missing_entries(&v_low);
+        SLOT_DURATION
+            .with_label_values(&["vlow_entry_resolution"])
+            .observe(resolve_start.elapsed().as_secs_f64());
 
         if missing.is_empty() {
+            let wave_start = Instant::now();
             self.commit_wave(slot, &v_low, &resolved, None).await;
+            SLOT_DURATION
+                .with_label_values(&["vlow_commit_wave"])
+                .observe(wave_start.elapsed().as_secs_f64());
             // Check if v_high was buffered (shouldn't happen if v_low resolves instantly,
             // but handle it for robustness)
             if let Some((vhigh_slot, v_high, proof)) = self.buffered_v_high.take() {
@@ -815,6 +867,13 @@ impl<NS: SubprotocolNetworkSender<SlotConsensusMsg>, SP: SPCSpawner> SlotManager
 
     /// Handle v_high from SPC (wave 2 — delta commit + slot finalization).
     async fn on_spc_v_high_complete(&mut self, slot: u64, v_high: PrefixVector, commit_proof: StrongPCCommit) {
+        // Record vlow_to_vhigh
+        if let Some(vlow_time) = self.vlow_received_time {
+            SLOT_DURATION
+                .with_label_values(&["vlow_to_vhigh"])
+                .observe(vlow_time.elapsed().as_secs_f64());
+        }
+
         let v_high_non_bot: Vec<String> = v_high
             .iter()
             .enumerate()
@@ -861,19 +920,31 @@ impl<NS: SubprotocolNetworkSender<SlotConsensusMsg>, SP: SPCSpawner> SlotManager
                 v_low_committed_positions = ?v_low_positions,
                 "No delta entries in v_high, finalizing slot"
             );
+            let finalize_start = Instant::now();
             self.finalize_slot(slot, &v_high).await;
+            SLOT_DURATION
+                .with_label_values(&["finalization"])
+                .observe(finalize_start.elapsed().as_secs_f64());
             return;
         }
 
+        let resolve_start = Instant::now();
         let (resolved, missing) = self
             .slot_states
             .get(&slot)
             .expect("SlotState must exist when SPC produces v_high")
             .resolve_missing_entries(&delta_vector);
+        SLOT_DURATION
+            .with_label_values(&["vhigh_entry_resolution"])
+            .observe(resolve_start.elapsed().as_secs_f64());
 
         if missing.is_empty() {
+            let wave_start = Instant::now();
             self.commit_wave(slot, &v_high, &resolved, Some(&v_high))
                 .await;
+            SLOT_DURATION
+                .with_label_values(&["vhigh_commit_wave"])
+                .observe(wave_start.elapsed().as_secs_f64());
         } else {
             info!(
                 epoch = self.epoch,
@@ -1054,7 +1125,11 @@ impl<NS: SubprotocolNetworkSender<SlotConsensusMsg>, SP: SPCSpawner> SlotManager
         }
 
         if let Some(v_high) = finalize_with_v_high {
+            let finalize_start = Instant::now();
             self.finalize_slot(slot, v_high).await;
+            SLOT_DURATION
+                .with_label_values(&["finalization"])
+                .observe(finalize_start.elapsed().as_secs_f64());
         }
     }
 

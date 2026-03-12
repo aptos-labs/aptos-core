@@ -7,4 +7,5 @@
 //! RoundManager, running one slot at a time: broadcasting proposals, collecting
 //! them via SlotState, spawning SPC, building blocks from v_high, and advancing.
 
+pub mod counters;
 pub mod slot_manager;
