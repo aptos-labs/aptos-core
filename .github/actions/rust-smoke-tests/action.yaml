@@ -15,6 +15,10 @@ runs:
       run: docker run --detach -p 5432:5432 cimg/postgres:14.2
       shell: bash
 
+    - name: Print nextest version
+      run: cargo nextest --version
+      shell: bash
+
     # Run the rust smoke tests
     - name: Run rust smoke tests
       # Prebuild the aptos-node binary so that tests don't start before the node is built.
