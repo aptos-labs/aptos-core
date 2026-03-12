@@ -6,6 +6,6 @@ fun non_immutable(x: u64): u64
     move_loc x
     ret
 
-#[persistent, immutable] public fun capture_non_immutable(): |u64|u64
+#[immutable] public fun capture_non_immutable(): |u64|u64
     pack_closure non_immutable, 0
     ret

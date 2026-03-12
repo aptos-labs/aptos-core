@@ -8,7 +8,7 @@ fun non_immutable_helper(): u64
     ret
 
 // Invalid: calls a same-module non-immutable function.
-#[persistent, immutable] public fun bad(): u64
+#[immutable] public fun bad(): u64
     call non_immutable_helper
     ret
 
@@ -18,12 +18,12 @@ fun non_immutable_helper(): u64
 module 0x67::test_same_module_good
 
 // An immutable same-module helper.
-#[persistent, immutable] fun immutable_helper(): u64
+#[immutable] fun immutable_helper(): u64
     ld_u64 20
     ret
 
 // Valid: calls a same-module #[immutable] function.
-#[persistent, immutable] public fun good(): u64
+#[immutable] public fun good(): u64
     call immutable_helper
     ret
 
