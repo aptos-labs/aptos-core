@@ -1,18 +1,13 @@
 //# publish
-module 0x66::helper
+// Invalid: an #[immutable] function calls a same-module non-immutable, non-native callee.
+module 0x66::test_immutable_call
 
-// A non-immutable helper function.
-public fun helper_value(): u64
+// A same-module non-immutable helper.
+fun non_immutable_helper(): u64
     ld_u64 42
     ret
 
-
-//# publish
-// Invalid: an #[immutable] function calls a non-immutable, non-native callee.
-module 0x66::test_immutable_call
-use 0x66::helper
-
 #[immutable] public fun call_non_immutable(): u64
-    call helper::helper_value
+    call non_immutable_helper
     ret
 

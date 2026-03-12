@@ -1,0 +1,9 @@
+processed 1 task
+task 0 lines 1-11:  publish [// Invalid: an #[immutable] function captures a non-immutable generic function via PackClosureGeneric.]
+Error: Unable to publish module '0000000000000000000000000000000000000000000000000000000000000066::test_immutable_pack_closure_generic'. Got VMError: {
+    major_status: IMMUTABLE_FUNCTION_CALLS_NON_IMMUTABLE,
+    sub_status: None,
+    location: 0x66::test_immutable_pack_closure_generic,
+    indices: [(FunctionDefinition, 1)],
+    offsets: [],
+}

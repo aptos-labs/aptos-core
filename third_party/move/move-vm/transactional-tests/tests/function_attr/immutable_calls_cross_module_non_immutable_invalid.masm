@@ -1,0 +1,18 @@
+//# publish
+// A non-immutable cross-module function.
+module 0x68::lib
+
+public fun non_immutable_helper(): u64
+    ld_u64 99
+    ret
+
+
+//# publish
+// Invalid: an #[immutable] function calls a cross-module non-immutable callee.
+module 0x68::consumer
+use 0x68::lib
+
+#[immutable] public fun call_cross_module(): u64
+    call lib::non_immutable_helper
+    ret
+

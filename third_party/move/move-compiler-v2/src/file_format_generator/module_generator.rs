@@ -1728,7 +1728,6 @@ impl ModuleContext<'_> {
 
     /// Delivers the function attributes which are relevant for execution for the given
     /// function. This includes annotated ones as well as ones which are derived.
-    /// Currently, a public function or a function with `#[immutable]` derives `Persistent`.
     pub(crate) fn function_attributes(&self, fun_env: &FunctionEnv) -> Vec<FF::FunctionAttribute> {
         let mut result = vec![];
         let mut has_persistent = false;
@@ -1789,18 +1788,6 @@ impl ModuleContext<'_> {
                                 result.push(FF::FunctionAttribute::ModuleLock);
                             }
                         },
-                        well_known::IMMUTABLE_ATTRIBUTE => {
-                            if validate_no_args_and_not_script(name.as_str(), args, self) {
-                                if fun_env.is_native() {
-                                    self.error(
-                                        fun_env.get_id_loc(),
-                                        "attribute `#[immutable]` cannot be applied to native functions",
-                                    );
-                                } else {
-                                    result.push(FF::FunctionAttribute::Immutable);
-                                }
-                            }
-                        },
                         _ => { /* skip */ },
                     }
                 },
@@ -1808,9 +1795,7 @@ impl ModuleContext<'_> {
                 Attribute::Assign(_, name, _) => {
                     let name = fun_env.symbol_pool().string(*name);
                     match name.as_str() {
-                        well_known::PERSISTENT_ATTRIBUTE
-                        | well_known::MODULE_LOCK_ATTRIBUTE
-                        | well_known::IMMUTABLE_ATTRIBUTE => {
+                        well_known::PERSISTENT_ATTRIBUTE | well_known::MODULE_LOCK_ATTRIBUTE => {
                             self.error(
                                 fun_env.get_id_loc(),
                                 format!("attribute `{}` cannot be assigned to", name),

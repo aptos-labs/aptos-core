@@ -1,0 +1,12 @@
+//# publish
+// Invalid: an #[immutable] function captures a non-immutable generic function via PackClosureGeneric.
+module 0x66::test_immutable_pack_closure_generic
+
+fun non_immutable_generic<T>(x: T): T
+    move_loc x
+    ret
+
+#[immutable] public fun capture_non_immutable_generic(): |u64|u64
+    pack_closure non_immutable_generic<u64>, 0
+    ret
+

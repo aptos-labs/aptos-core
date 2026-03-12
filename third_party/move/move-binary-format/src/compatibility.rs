@@ -182,7 +182,17 @@ impl Compatibility {
             let new_func = match new_view.function_definition(old_func.name()) {
                 Some(new_func) => new_func,
                 None => {
-                    // Function has been removed
+                    // Function has been removed.
+                    // A private non-entry #[immutable] function was only pulled out of the
+                    // skip block above to check body changes; if it is removed entirely that
+                    // is still fine — #[immutable] locks the body, not the function's existence.
+                    if old_is_immutable
+                        && old_func.visibility() == Visibility::Private
+                        && !old_func.is_entry()
+                        && !old_is_persistent
+                    {
+                        continue;
+                    }
                     // Function is NOT a private, non entry function, or it is persistent.
                     if old_is_persistent
                         || !matches!(old_func.visibility(), Visibility::Friend)

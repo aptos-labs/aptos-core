@@ -8,13 +8,10 @@
 //! ## `#[immutable]` transitive call check
 //!
 //! An `#[immutable]` function guarantees stable behavior across module upgrades.
-//! To uphold this guarantee, it must only call or capture (via closures):
-//! - Other `#[immutable]` functions (same- or cross-module), OR
-//! - Native functions (whose behavior changes, if ever, are gated by on-chain governance).
-//!
-//! This applies to `Call`, `CallGeneric`, `PackClosure`, and `PackClosureGeneric` instructions.
-//! Cross-module callees are checked by inspecting the `FunctionHandle.attributes` field.
-//! Same-module callees that have no code body are native and are always permitted.
+//! To uphold this guarantee, every callee (same- or cross-module) reached via
+//! `Call`, `CallGeneric`, `PackClosure`, or `PackClosureGeneric` must itself
+//! carry the `#[immutable]` attribute.  Callees without `#[immutable]` —
+//! including native functions — are rejected.
 
 use move_binary_format::{
     access::ModuleAccess,
@@ -24,7 +21,7 @@ use move_binary_format::{
 use move_core_types::vm_status::StatusCode;
 
 /// Check that every `Call`/`CallGeneric`/`PackClosure`/`PackClosureGeneric` instruction
-/// inside an `#[immutable]` function targets a callee that is itself `#[immutable]` or native.
+/// inside an `#[immutable]` function targets a callee that itself carries `#[immutable]`.
 pub fn check_immutable_transitive_calls(
     module: &CompiledModule,
     function_definition: &FunctionDefinition,
@@ -42,14 +39,12 @@ pub fn check_immutable_transitive_calls(
         None => return Ok(()),
     };
 
-    let self_handle_idx = module.self_handle_idx();
-
     for instr in &code.code {
         let callee_handle_idx = match instr {
             Bytecode::Call(idx) => *idx,
             Bytecode::CallGeneric(inst_idx) => module.function_instantiation_at(*inst_idx).handle,
             // Closure creation captures a function reference; the captured function must
-            // also be #[immutable] or native to preserve the immutability guarantee.
+            // also carry #[immutable] to preserve the immutability guarantee.
             Bytecode::PackClosure(idx, _) => *idx,
             Bytecode::PackClosureGeneric(inst_idx, _) => {
                 module.function_instantiation_at(*inst_idx).handle
@@ -59,7 +54,7 @@ pub fn check_immutable_transitive_calls(
 
         let callee_handle = module.function_handle_at(callee_handle_idx);
 
-        // If the callee is `#[immutable]`, it satisfies the requirement.
+        // Only callees that carry `#[immutable]` are permitted.
         if callee_handle
             .attributes
             .contains(&FunctionAttribute::Immutable)
@@ -67,26 +62,17 @@ pub fn check_immutable_transitive_calls(
             continue;
         }
 
-        // If the callee is a same-module native function, it is also allowed.
-        if callee_handle.module == self_handle_idx {
-            let is_native = module
-                .function_defs()
-                .iter()
-                .find(|def| def.function == callee_handle_idx)
-                .map(|def| def.code.is_none())
-                .unwrap_or(false);
-            if is_native {
-                continue;
-            }
-        }
-
-        // Otherwise the callee violates the immutability contract.
+        // All other callees — including native functions — violate the contract.
+        let callee_module =
+            module.address_identifier_at(module.module_handle_at(callee_handle.module).address);
+        let callee_module_name =
+            module.identifier_at(module.module_handle_at(callee_handle.module).name);
+        let callee_name = module.identifier_at(callee_handle.name);
         return Err(
             PartialVMError::new(StatusCode::IMMUTABLE_FUNCTION_CALLS_NON_IMMUTABLE).with_message(
                 format!(
-                    "#[immutable] function calls a callee (handle {}) that is neither \
-                     #[immutable] nor native",
-                    callee_handle_idx.0
+                    "#[immutable] function calls `{}::{}::{}` which is not #[immutable]",
+                    callee_module, callee_module_name, callee_name,
                 ),
             ),
         );
