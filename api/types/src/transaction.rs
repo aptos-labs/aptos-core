@@ -26,12 +26,14 @@ use aptos_types::{
     function_info::FunctionInfo,
     jwks::{jwk::JWK, ProviderJWKs, QuorumCertifiedUpdate},
     keyless,
+    secret_sharing::Ciphertext,
     transaction::{
         authenticator::{
             AbstractAuthenticator, AccountAuthenticator, AnyPublicKey, AnySignature, MultiKey,
             MultiKeyAuthenticator, SingleKeyAuthenticator, TransactionAuthenticator,
             MAX_NUM_OF_SIGS,
         },
+        encrypted_payload::PayloadAssociatedData,
         webauthn::{PartialAuthenticatorAssertionResponse, MAX_WEBAUTHN_SIGNATURE_BYTES},
         Script, SignedTransaction, TransactionOutput, TransactionWithProof,
     },
@@ -497,12 +499,10 @@ impl VerifyInput for UserTransactionRequestInner {
             EncryptedTransactionPayload::Encrypted(ref p),
         ) = self.payload
         {
-            let ciphertext: aptos_types::secret_sharing::Ciphertext =
-                bcs::from_bytes(&p.ciphertext.0)
-                    .context("Invalid ciphertext: failed to BCS-deserialize")?;
+            let ciphertext: Ciphertext = bcs::from_bytes(&p.ciphertext.0)
+                .context("Invalid ciphertext: failed to BCS-deserialize")?;
             let sender = AccountAddress::from(self.sender);
-            let associated_data =
-                aptos_types::transaction::encrypted_payload::PayloadAssociatedData::new(sender);
+            let associated_data = PayloadAssociatedData::new(sender);
             ciphertext
                 .verify(&associated_data)
                 .context("Ciphertext verification failed")?;
@@ -1219,12 +1219,7 @@ impl VerifyInput for EncryptedTransactionPayload {
     /// `validate_signed_transaction_payload` (BCS path).
     fn verify(&self) -> anyhow::Result<()> {
         match self {
-            EncryptedTransactionPayload::Encrypted(p) => {
-                let _: aptos_types::secret_sharing::Ciphertext =
-                    bcs::from_bytes(&p.ciphertext.0)
-                        .context("Invalid ciphertext: failed to BCS-deserialize")?;
-                Ok(())
-            },
+            EncryptedTransactionPayload::Encrypted(_) => Ok(()),
             EncryptedTransactionPayload::FailedDecryption(_) => {
                 bail!("Cannot submit a failed decryption payload")
             },
