@@ -316,3 +316,105 @@ fn immutable_private_fun_add_attribute_ok() {
     "#,
     ));
 }
+
+// ---------------------------------------------------------------------------
+// #[immutable] on friend (package) functions
+// ---------------------------------------------------------------------------
+
+/// A friend `#[immutable]` function with the same body is allowed on upgrade.
+#[test]
+fn immutable_friend_fun_same_body_ok() {
+    let mut h = MoveHarness::new();
+    let acc = h.new_account_at(AccountAddress::from_hex_literal("0x915").unwrap());
+
+    assert_success\!(publish(
+        &mut h,
+        &acc,
+        r#"
+        module 0x915::m {
+            #[immutable]
+            friend fun helper(): u64 { 42 }
+            public fun get(): u64 { helper() }
+        }
+    "#,
+    ));
+
+    assert_success\!(publish(
+        &mut h,
+        &acc,
+        r#"
+        module 0x915::m {
+            #[immutable]
+            friend fun helper(): u64 { 42 }
+            public fun get(): u64 { helper() }
+        }
+    "#,
+    ));
+}
+
+/// Changing the body of a friend `#[immutable]` function is rejected.
+#[test]
+fn immutable_friend_fun_body_changed_rejected() {
+    let mut h = MoveHarness::new();
+    let acc = h.new_account_at(AccountAddress::from_hex_literal("0x916").unwrap());
+
+    assert_success\!(publish(
+        &mut h,
+        &acc,
+        r#"
+        module 0x916::m {
+            #[immutable]
+            friend fun helper(): u64 { 42 }
+            public fun get(): u64 { helper() }
+        }
+    "#,
+    ));
+
+    assert_vm_status\!(
+        publish(
+            &mut h,
+            &acc,
+            r#"
+        module 0x916::m {
+            #[immutable]
+            friend fun helper(): u64 { 99 }
+            public fun get(): u64 { helper() }
+        }
+    "#,
+        ),
+        StatusCode::BACKWARD_INCOMPATIBLE_MODULE_UPDATE
+    );
+}
+
+/// Removing `#[immutable]` from a friend function is rejected.
+#[test]
+fn immutable_friend_fun_attribute_removed_rejected() {
+    let mut h = MoveHarness::new();
+    let acc = h.new_account_at(AccountAddress::from_hex_literal("0x917").unwrap());
+
+    assert_success\!(publish(
+        &mut h,
+        &acc,
+        r#"
+        module 0x917::m {
+            #[immutable]
+            friend fun helper(): u64 { 42 }
+            public fun get(): u64 { helper() }
+        }
+    "#,
+    ));
+
+    assert_vm_status\!(
+        publish(
+            &mut h,
+            &acc,
+            r#"
+        module 0x917::m {
+            friend fun helper(): u64 { 42 }
+            public fun get(): u64 { helper() }
+        }
+    "#,
+        ),
+        StatusCode::BACKWARD_INCOMPATIBLE_MODULE_UPDATE
+    );
+}
