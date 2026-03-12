@@ -2,6 +2,7 @@
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 use crate::aptos_cli::validator::generate_blob;
+use anyhow::{bail, Context, Result};
 use aptos::test::CliTestFramework;
 use aptos_cached_packages::aptos_stdlib;
 use aptos_config::{
@@ -21,11 +22,69 @@ use aptos_types::{
 };
 use move_core_types::language_storage::CORE_CODE_ADDRESS;
 use rand::random;
-use std::{collections::HashSet, net::Ipv4Addr, sync::Arc, time::Duration};
+use std::{collections::HashSet, net::Ipv4Addr, process::Stdio, sync::Arc, time::Duration};
+use tokio::io::AsyncReadExt;
 
 pub const MAX_CATCH_UP_WAIT_SECS: u64 = 180; // The max time we'll wait for nodes to catch up
 pub const MAX_CONNECTIVITY_WAIT_SECS: u64 = 180; // The max time we'll wait for nodes to gain connectivity
 pub const MAX_HEALTHY_WAIT_SECS: u64 = 120; // The max time we'll wait for nodes to become healthy
+
+/// Runs a [`tokio::process::Command`] with a timeout. On timeout the child is
+/// killed and whatever stdout/stderr was produced is included in the error.
+pub async fn run_command_with_timeout(
+    mut cmd: tokio::process::Command,
+    timeout: Duration,
+    description: &str,
+) -> Result<std::process::Output> {
+    let mut child = cmd
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .kill_on_drop(true)
+        .spawn()
+        .with_context(|| format!("Failed to spawn: {description}"))?;
+
+    let mut stdout_pipe = child.stdout.take().expect("stdout was piped");
+    let mut stderr_pipe = child.stderr.take().expect("stderr was piped");
+
+    // Spawn tasks to collect stdout/stderr concurrently with waiting.
+    let stdout_task = tokio::spawn(async move {
+        let mut buf = Vec::new();
+        let _ = stdout_pipe.read_to_end(&mut buf).await;
+        buf
+    });
+    let stderr_task = tokio::spawn(async move {
+        let mut buf = Vec::new();
+        let _ = stderr_pipe.read_to_end(&mut buf).await;
+        buf
+    });
+
+    match tokio::time::timeout(timeout, child.wait()).await {
+        Ok(Ok(status)) => {
+            let stdout = stdout_task.await.unwrap_or_default();
+            let stderr = stderr_task.await.unwrap_or_default();
+            Ok(std::process::Output {
+                status,
+                stdout,
+                stderr,
+            })
+        },
+        Ok(Err(e)) => bail!("Command '{description}' failed to run: {e}"),
+        Err(_) => {
+            // Kill the child; this closes its pipes, unblocking the reader
+            // tasks so we can retrieve whatever partial output was produced.
+            let _ = child.kill();
+            let _ = child.wait().await;
+            let stdout = stdout_task.await.unwrap_or_default();
+            let stderr = stderr_task.await.unwrap_or_default();
+            bail!(
+                "Command '{description}' timed out after {timeout:?}\n\
+                 stdout:\n{}\nstderr:\n{}",
+                String::from_utf8_lossy(&stdout),
+                String::from_utf8_lossy(&stderr),
+            )
+        },
+    }
+}
 
 pub fn add_node_to_seeds(
     dest_config: &mut NodeConfig,
