@@ -4,8 +4,9 @@
 use crate::{
     smoke_test_environment::SwarmBuilder,
     utils::{
-        assert_balance, create_and_fund_account, swarm_utils::insert_waypoint,
-        transfer_and_maybe_reconfig, transfer_coins, MAX_CATCH_UP_WAIT_SECS, MAX_HEALTHY_WAIT_SECS,
+        assert_balance, create_and_fund_account, run_command_with_timeout,
+        swarm_utils::insert_waypoint, transfer_and_maybe_reconfig, transfer_coins,
+        MAX_CATCH_UP_WAIT_SECS, MAX_HEALTHY_WAIT_SECS,
     },
     workspace_builder,
     workspace_builder::workspace_root,
@@ -117,7 +118,7 @@ async fn test_db_restore() {
     // make a backup from node 1
     let node1_config = swarm.validator(validator_peer_ids[1]).unwrap().config();
     let port = node1_config.storage.backup_service_address.port();
-    let (backup_path, _) = db_backup(port, 5, 400, 200, 5, &[]);
+    let (backup_path, _) = db_backup(port, 5, 400, 200, 5, &[]).await;
     // take down node 0
     let node_to_restart = validator_peer_ids[0];
     swarm.validator_mut(node_to_restart).unwrap().stop();
@@ -178,7 +179,7 @@ async fn test_db_restore() {
     info!("6. Done");
 }
 
-fn db_backup_verify(backup_path: &Path, trusted_waypoints: &[Waypoint]) {
+async fn db_backup_verify(backup_path: &Path, trusted_waypoints: &[Waypoint]) {
     info!("---------- running aptos-debugger aptos-db backup-verify");
     let now = Instant::now();
     let bin_path = workspace_builder::get_bin("aptos-debugger");
@@ -186,26 +187,30 @@ fn db_backup_verify(backup_path: &Path, trusted_waypoints: &[Waypoint]) {
 
     metadata_cache_path.create_as_dir().unwrap();
 
-    let mut cmd = Command::new(bin_path.as_path());
-    cmd.args(["aptos-db", "backup", "verify"]);
+    let mut cmd = tokio::process::Command::new(bin_path.as_path());
+    cmd.current_dir(workspace_root())
+        .args(["aptos-db", "backup", "verify"]);
     trusted_waypoints.iter().for_each(|w| {
         cmd.arg("--trust-waypoint");
         cmd.arg(w.to_string());
     });
+    cmd.args([
+        "--metadata-cache-dir",
+        metadata_cache_path.path().to_str().unwrap(),
+        "--concurrent-downloads",
+        "4",
+        "--local-fs-dir",
+        backup_path.to_str().unwrap(),
+    ]);
 
-    let status = cmd
-        .args([
-            "--metadata-cache-dir",
-            metadata_cache_path.path().to_str().unwrap(),
-            "--concurrent-downloads",
-            "4",
-            "--local-fs-dir",
-            backup_path.to_str().unwrap(),
-        ])
-        .current_dir(workspace_root())
-        .status()
+    let output = run_command_with_timeout(cmd, Duration::from_secs(15), "backup verify")
+        .await
         .unwrap();
-    assert!(status.success(), "{}", status);
+    assert!(
+        output.status.success(),
+        "backup verify failed:\nstderr: {}",
+        String::from_utf8_lossy(&output.stderr),
+    );
     info!("Backup verified in {} seconds.", now.elapsed().as_secs());
 }
 
@@ -252,7 +257,7 @@ fn replay_verify(backup_path: &Path, trusted_waypoints: &[Waypoint]) {
     );
 }
 
-fn wait_for_backups(
+async fn wait_for_backups(
     target_epoch: u64,
     target_version: u64,
     now: Instant,
@@ -266,7 +271,7 @@ fn wait_for_backups(
             "{}th wait for the backup to reach epoch {}, version {}.",
             i, target_epoch, target_version,
         );
-        let state = get_backup_storage_state(bin_path, metadata_cache_path, backup_path)?;
+        let state = get_backup_storage_state(bin_path, metadata_cache_path, backup_path).await?;
         if let Some(epoch_ending) = state.latest_epoch_ending_epoch
             && let Some(txn_version) = state.latest_transaction_version
             && state.latest_state_snapshot_epoch.is_some()
@@ -285,9 +290,9 @@ fn wait_for_backups(
         info!("Backup storage state: {}", state);
         if state.latest_transaction_version.is_some() {
             // the verify should always succeed unless backup storage is completely empty.
-            db_backup_verify(backup_path, trusted_waypoints);
+            db_backup_verify(backup_path, trusted_waypoints).await;
         }
-        std::thread::sleep(Duration::from_secs(1));
+        tokio::time::sleep(Duration::from_secs(1)).await;
     }
 
     error!(
@@ -297,32 +302,32 @@ fn wait_for_backups(
     bail!("Failed to create backup.");
 }
 
-fn get_backup_storage_state(
+async fn get_backup_storage_state(
     bin_path: &Path,
     metadata_cache_path: &Path,
     backup_path: &Path,
 ) -> Result<BackupStorageState> {
-    let output = Command::new(bin_path)
-        .current_dir(workspace_root())
-        .args([
-            "aptos-db",
-            "backup",
-            "query",
-            "backup-storage-state",
-            "--metadata-cache-dir",
-            metadata_cache_path.to_str().unwrap(),
-            "--concurrent-downloads",
-            "4",
-            "--local-fs-dir",
-            backup_path.to_str().unwrap(),
-        ])
-        .output()?
-        .stdout;
-    std::str::from_utf8(&output)?.parse()
+    let mut cmd = tokio::process::Command::new(bin_path);
+    cmd.current_dir(workspace_root()).args([
+        "aptos-db",
+        "backup",
+        "query",
+        "backup-storage-state",
+        "--metadata-cache-dir",
+        metadata_cache_path.to_str().unwrap(),
+        "--concurrent-downloads",
+        "4",
+        "--local-fs-dir",
+        backup_path.to_str().unwrap(),
+    ]);
+    let output =
+        run_command_with_timeout(cmd, Duration::from_secs(15), "query backup-storage-state")
+            .await?;
+    std::str::from_utf8(&output.stdout)?.parse()
 }
 
 #[allow(clippy::zombie_processes)]
-pub(crate) fn db_backup(
+pub(crate) async fn db_backup(
     backup_service_port: u16,
     target_epoch: u64,
     target_version: Version,
@@ -343,7 +348,9 @@ pub(crate) fn db_backup(
 
     // Initialize backup storage, avoid race between the coordinator and wait_for_backups to create
     // the identity file.
-    get_backup_storage_state(&bin_path, metadata_cache_path2.path(), backup_path.path()).unwrap();
+    get_backup_storage_state(&bin_path, metadata_cache_path2.path(), backup_path.path())
+        .await
+        .unwrap();
 
     // spawn the backup coordinator
     let mut backup_coordinator = Command::new(bin_path.as_path())
@@ -377,7 +384,8 @@ pub(crate) fn db_backup(
         metadata_cache_path2.path(),
         backup_path.path(),
         trusted_waypoints,
-    );
+    )
+    .await;
 
     // start the backup compaction
     let compaction = Command::new(bin_path.as_path())
