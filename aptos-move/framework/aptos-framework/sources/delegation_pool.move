@@ -3240,29 +3240,31 @@ module aptos_framework::delegation_pool {
         end_aptos_epoch();
 
         assert!(stake::get_validator_state(pool_address) == VALIDATOR_STATUS_ACTIVE, 0);
-        // no rewards have been produced yet and no stake inactivated as lockup has been refreshed
-        stake::assert_stake_pool(pool_address, 103030100001, 20000000001, 0, 10000000002);
+        // no rewards yet; expired pending_inactive was inactivated at join time
+        // inactive = old_inactive + old_pending_inactive = 20000000001 + 10000000002 = 30000000003
+        stake::assert_stake_pool(pool_address, 103030100001, 30000000003, 0, 0);
 
         synchronize_delegation_pool(pool_address);
+        // delegation pool detected lockup cycle ended (inactive increased), OLC advances
         assert_pending_withdrawal(validator_address, pool_address, true, 0, true, 20000000001);
-        assert_pending_withdrawal(delegator_address, pool_address, true, 1, false, 10000000002);
-        assert!(observed_lockup_cycle(pool_address) == observed_lockup_cycle, 0);
+        assert_pending_withdrawal(delegator_address, pool_address, true, 1, true, 10000000002);
+        assert!(observed_lockup_cycle(pool_address) == observed_lockup_cycle + 1, 0);
 
-        // cannot withdraw pending_inactive stake anymore
+        // delegator can now withdraw the inactivated stake
         withdraw(delegator, pool_address, 10000000002);
-        assert_pending_withdrawal(delegator_address, pool_address, true, 1, false, 10000000002);
+        assert_delegation(delegator_address, pool_address, 0, 0, 0);
 
         // earning rewards is resumed from this epoch on
         end_aptos_epoch();
-        stake::assert_stake_pool(pool_address, 104060401001, 20000000001, 0, 10100000002);
+        stake::assert_stake_pool(pool_address, 104060401001, 20000000001, 0, 0);
 
-        // new pending_inactive stake earns rewards but so does the old one
+        // new pending_inactive stake earns rewards
         unlock(validator, pool_address, 104060401001);
-        assert_pending_withdrawal(validator_address, pool_address, true, 1, false, 104060401000);
-        assert_pending_withdrawal(delegator_address, pool_address, true, 1, false, 10100000002);
+        assert_pending_withdrawal(validator_address, pool_address, true, 2, false, 104060401001);
+        assert_pending_withdrawal(delegator_address, pool_address, false, 0, false, 0);
         end_aptos_epoch();
-        assert_pending_withdrawal(validator_address, pool_address, true, 1, false, 105101005010);
-        assert_pending_withdrawal(delegator_address, pool_address, true, 1, false, 10201000002);
+        assert_pending_withdrawal(validator_address, pool_address, true, 2, false, 105101005011);
+        assert_pending_withdrawal(delegator_address, pool_address, false, 0, false, 0);
     }
 
     #[test(aptos_framework = @aptos_framework, validator = @0x123)]

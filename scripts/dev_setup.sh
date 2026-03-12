@@ -16,12 +16,13 @@
 # fast fail.
 set -eo pipefail
 
-NODE_MAJOR_VERSION=20
+NODE_MAJOR_VERSION=24
+PNPM_VERSION=10.32.1
 SHELLCHECK_VERSION=0.7.1
 GRCOV_VERSION=0.8.2
-KUBECTL_VERSION=1.18.6
-TERRAFORM_VERSION=0.12.26
-HELM_VERSION=3.2.4
+KUBECTL_VERSION=1.35.1
+TERRAFORM_VERSION=1.14.7
+HELM_VERSION=4.1.3
 VAULT_VERSION=1.5.0
 Z3_VERSION=4.11.2
 CVC5_VERSION=0.0.3
@@ -274,20 +275,23 @@ function install_terraform {
 }
 
 function install_kubectl {
-  VERSION=$(kubectl version client --short=true | head -1 || true)
+  VERSION=$(kubectl version --client | grep -e '^Client Version: v' || true)
   if [[ "$VERSION" != "Client Version: v${KUBECTL_VERSION}" ]]; then
     if [[ $(uname -s) == "Darwin" ]]; then
       install_pkg kubectl brew
     else
-      MACHINE=$(uname -m)
+      # shellcheck disable=SC2155
+      local MACHINE=$(uname -m)
       if [[ $MACHINE == "x86_64" ]]; then
         MACHINE="amd64"
       fi
-      curl -sL -o "${INSTALL_DIR}"/kubectl "https://storage.googleapis.com/kubernetes-release/release/v${KUBECTL_VERSION}/bin/$(uname -s | tr '[:upper:]' '[:lower:]')/${MACHINE}/kubectl"
+      # shellcheck disable=SC2155
+      local OS=$(uname -s | tr '[:upper:]' '[:lower:]')
+      curl -sL -o "${INSTALL_DIR}"/kubectl "https://dl.k8s.io/v${KUBECTL_VERSION}/bin/${OS}/${MACHINE}/kubectl"
       chmod +x "${INSTALL_DIR}"/kubectl
     fi
   fi
-  kubectl version client --short=true | head -1 || true
+  kubectl version --client | grep -e '^Client Version:' || true
 }
 
 function install_awscli {
@@ -690,7 +694,7 @@ function install_nodejs {
 }
 
 function install_pnpm {
-  curl -fsSL https://get.pnpm.io/install.sh | env PNPM_VERSION=8.2.0 SHELL="$(which bash)" bash -
+  curl -fsSL https://get.pnpm.io/install.sh | env PNPM_VERSION="${PNPM_VERSION}" SHELL="$(which bash)" bash -
 }
 
 function install_python3 {

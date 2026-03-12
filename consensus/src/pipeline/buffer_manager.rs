@@ -402,6 +402,7 @@ impl BufferManager {
             let message = ConsensusObserverMessage::new_ordered_block_message(
                 ordered_blocks.clone(),
                 ordered_proof.clone(),
+                self.consensus_observer_config.enable_v2_message_sending,
             );
             consensus_publisher.publish_message(message);
         }

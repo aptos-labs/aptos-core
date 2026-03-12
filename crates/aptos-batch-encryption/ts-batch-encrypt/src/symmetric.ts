@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 import { randomBytes } from '@noble/ciphers/utils.js';
 import { gcm } from '@noble/ciphers/aes.js';
-import { Serializable, Serializer, Deserializer } from "@aptos-labs/ts-sdk";
+import { Serializable, Serializer, Deserializer, type Uint8 } from "@aptos-labs/ts-sdk";
 import { hkdf } from '@noble/hashes/hkdf.js';
 import { sha256 } from '@noble/hashes/sha2.js';
 import { type H2COpts, hash_to_field } from '@noble/curves/abstract/hash-to-curve.js';
@@ -144,9 +144,9 @@ export function get_random_fr(): bigint {
   return bls12_381.G1.Point.Fn.create(random_bigint);
 }
 
-export function hash_to_fr(input: Uint8Array): bigint {
+export function hash_to_fr(input: Uint8Array, dst: Uint8Array): bigint {
   const options : H2COpts = {
-    DST: "",
+    DST: dst,
     expand: "xmd",
     hash: sha256,
     p: bls12_381.fields.Fr.ORDER,
