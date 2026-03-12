@@ -66,19 +66,19 @@ fn display_micro_op(f: &mut fmt::Formatter<'_>, op: &MicroOp) -> fmt::Result {
             write!(f, "Jump @{}", target.0)
         },
         MicroOp::JumpNotZeroU64 { target, src } => {
-            write!(f, "JumpNotZeroU64 @{} if [{}] != 0", target.0, src.0)
+            write!(f, "JumpNotZeroU64 @{} [{}]", target.0, src.0)
         },
         MicroOp::JumpGreaterEqualU64Imm { target, src, imm } => {
             write!(
                 f,
-                "JumpGreaterEqualU64Imm @{} if [{}] >= {}",
+                "JumpGreaterEqualU64Imm @{} [{}] >= #{}",
                 target.0, src.0, imm
             )
         },
         MicroOp::JumpLessU64 { target, lhs, rhs } => {
             write!(
                 f,
-                "JumpLessU64 @{} if [{}] < [{}]",
+                "JumpLessU64 @{} [{}] < [{}]",
                 target.0, lhs.0, rhs.0
             )
         },
