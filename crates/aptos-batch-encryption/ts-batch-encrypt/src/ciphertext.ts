@@ -12,6 +12,9 @@ import { leBytesToBigint, bigintToLEBytesFr, fp12ToLEBytes } from './fieldSerial
 import { bytesToG2, G2_SIZE, g2ToBytes } from './curveSerialization.ts';
 import { bls12_381 } from '@noble/curves/bls12-381.js';
 
+/// Domain separation tag for Id::from_verifying_key_and_ad().
+/// This must be identical between Rust and TypeScript implementations.
+const ID_HASH_DST = Uint8Array.from("APTOS_BATCH_ENCRYPTION_HASH_ID".split("").map(x => x.charCodeAt(0)));
 
 /**
  * Corresponds to the rust type `aptos_batch_encryption::shared::ciphertext::BIBECiphertext`.
@@ -168,7 +171,7 @@ export class EncryptionKey extends Serializable {
     hash_preimage_bytes.set(publicKey)
     hash_preimage_bytes.set(associated_data_bytes, publicKey.length);
 
-    const hashed_id = hash_to_fr(hash_preimage_bytes);
+    const hashed_id = hash_to_fr(hash_preimage_bytes, ID_HASH_DST);
     const bibe_ct = this.bibe_encrypt(plaintext, hashed_id);
 
     let to_sign;

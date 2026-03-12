@@ -14,6 +14,9 @@ use serde::{Deserialize, Serialize};
 use sha2::Sha256;
 use std::{collections::HashMap, hash::Hash};
 
+/// Domain separation tag for Id::from_verifying_key_and_ad().
+/// This must be identical between Rust and TypeScript implementations.
+const ID_HASH_DST: &[u8] = b"APTOS_BATCH_ENCRYPTION_HASH_ID";
 
 #[derive(PartialEq, Eq, Debug, Clone, Copy, Hash, Serialize, Deserialize)]
 pub struct Id {
@@ -43,7 +46,7 @@ impl Id {
             .expect("Serialization should never fail")
         );
 
-        let field_hasher = <DefaultFieldHasher<Sha256> as HashToField<Fr>>::new(&[]);
+        let field_hasher = <DefaultFieldHasher<Sha256> as HashToField<Fr>>::new(&ID_HASH_DST);
         let field_element: [Fr; 1] = field_hasher.hash_to_field::<1>(&bytes);
         Self::new(field_element[0])
     }
