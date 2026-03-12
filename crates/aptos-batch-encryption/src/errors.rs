@@ -41,7 +41,9 @@ pub struct MissingEvalProofError(pub Id);
 
 #[derive(Debug, Error)]
 pub enum CTVerifyError {
-    #[error("The ID of the ciphertext does not match the hashed verification key + associated data")]
+    #[error(
+        "The ID of the ciphertext does not match the hashed verification key + associated data"
+    )]
     IdDoesNotMatchHashedVKAndAD,
     #[error(
         "The associated data of the CT does not match what was input to the verification function"

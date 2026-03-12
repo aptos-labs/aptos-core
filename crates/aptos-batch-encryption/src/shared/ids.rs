@@ -2,7 +2,8 @@
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 use crate::{
     group::{Fr, G1Affine, G1Projective},
-    shared::algebra::mult_tree::{compute_mult_tree, quotient}, traits::AssociatedData,
+    shared::algebra::mult_tree::{compute_mult_tree, quotient},
+    traits::AssociatedData,
 };
 use aptos_crypto::arkworks::serialization::{ark_de, ark_se};
 use ark_ec::VariableBaseMSM as _;
@@ -37,16 +38,18 @@ impl Id {
         self.root_x
     }
 
-    pub fn from_verifying_key_and_ad(vk: &VerifyingKey, associated_data: &impl AssociatedData) -> Self {
+    pub fn from_verifying_key_and_ad(
+        vk: &VerifyingKey,
+        associated_data: &impl AssociatedData,
+    ) -> Self {
         // using empty domain separator b/c this is a test implementation
 
         let mut bytes = Vec::from(vk.to_bytes());
-        bytes.extend_from_slice(&
-            bcs::to_bytes(associated_data)
-            .expect("Serialization should never fail")
+        bytes.extend_from_slice(
+            &bcs::to_bytes(associated_data).expect("Serialization should never fail"),
         );
 
-        let field_hasher = <DefaultFieldHasher<Sha256> as HashToField<Fr>>::new(&ID_HASH_DST);
+        let field_hasher = <DefaultFieldHasher<Sha256> as HashToField<Fr>>::new(ID_HASH_DST);
         let field_element: [Fr; 1] = field_hasher.hash_to_field::<1>(&bytes);
         Self::new(field_element[0])
     }
