@@ -1272,13 +1272,12 @@ where
                     CallType::NativeDynamicDispatch,
                 )?;
 
-                // Checking type of the dispatch target function
-                //
-                // MoveVM will check that the native function that performs the dispatch will have the same
-                // type signature as the dispatch target function except the native function will have an extra argument
-                // in the end to determine which function to jump to. The native function shouldn't switch ordering of arguments.
-                //
-                // Runtime will use such convention to reconstruct the type stack required to perform paranoid mode checks.
+                if function.param_tys().is_empty() {
+                    return Err(PartialVMError::new_invariant_violation(
+                        "Dispatch functions have at least 1 argument (function information)",
+                    ));
+                }
+
                 if function.ty_param_abilities() != target_func.ty_param_abilities()
                     || function.return_tys() != target_func.return_tys()
                     || &function.param_tys()[0..function.param_tys().len() - 1]
@@ -2701,20 +2700,6 @@ impl Frame {
                             )
                             .map(Rc::new)?;
                         RTTCheck::check_pack_closure_visibility(&self.function, &function)?;
-
-                        let captured = interpreter.operand_stack.popn(mask.captured_count())?;
-                        interpreter.check_depth_of_closure_captured_values(&captured)?;
-                        let lazy_function = LazyLoadedFunction::new_resolved(
-                            interpreter.layout_converter,
-                            gas_meter,
-                            traversal_context,
-                            function.clone(),
-                            *mask,
-                        )?;
-                        interpreter
-                            .operand_stack
-                            .push(Value::closure(Box::new(lazy_function), captured))?;
-
                         if RTTCheck::should_perform_checks(&self.function.function) {
                             verify_pack_closure(
                                 self.ty_builder(),
@@ -2732,6 +2717,19 @@ impl Frame {
                                 *mask,
                             )?;
                         }
+
+                        let captured = interpreter.operand_stack.popn(mask.captured_count())?;
+                        interpreter.check_depth_of_closure_captured_values(&captured)?;
+                        let lazy_function = LazyLoadedFunction::new_resolved(
+                            interpreter.layout_converter,
+                            gas_meter,
+                            traversal_context,
+                            function.clone(),
+                            *mask,
+                        )?;
+                        interpreter
+                            .operand_stack
+                            .push(Value::closure(Box::new(lazy_function), captured))?;
                     },
                     Instruction::ReadRef => {
                         let reference = interpreter.operand_stack.pop_as::<Reference>()?;
@@ -3137,7 +3135,7 @@ impl Frame {
                         )?;
                         gas_meter
                             .charge_vec_pack(interpreter.operand_stack.last_n(*num as usize)?)?;
-                        let elements = interpreter.operand_stack.popn(*num as u16)?;
+                        let elements = interpreter.operand_stack.popn(*num)?;
                         let value = Vector::pack(ty, elements)?;
                         interpreter.operand_stack.push(value)?;
                     },

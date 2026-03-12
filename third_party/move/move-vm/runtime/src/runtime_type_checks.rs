@@ -846,6 +846,12 @@ impl RuntimeTypeCheck for FullRuntimeTypeCheck {
             },
             Instruction::Exists(_) | Instruction::ExistsGeneric(_) => {
                 operand_stack.pop_ty()?.paranoid_check_is_address_ty()?;
+                // Note:
+                //   We **explicitly** do not check for key ability here because
+                //   checking if resource exists is not exploitable. Even if the
+                //   struct we check does not have key ability, nothing bad happens,
+                //   unlike with operations that **do** something with this struct,
+                //   like move_to, move_from or global borrows.
 
                 let bool_ty = ty_builder.create_bool_ty();
                 operand_stack.push_ty(bool_ty)?;
@@ -888,7 +894,7 @@ impl RuntimeTypeCheck for FullRuntimeTypeCheck {
             },
             Instruction::VecPack(si, num) => {
                 let (ty, _, _) = ty_cache.get_signature_index_type(*si, frame)?;
-                let elem_tys = operand_stack.popn_tys(*num as u16)?;
+                let elem_tys = operand_stack.popn_tys(*num)?;
                 for elem_ty in elem_tys.iter() {
                     // For vector element types, use assignability
                     elem_ty.paranoid_check_assignable(ty)?;

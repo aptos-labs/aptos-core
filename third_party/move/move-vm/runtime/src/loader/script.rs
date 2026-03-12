@@ -17,6 +17,7 @@ use move_core_types::{
     language_storage::{pseudo_script_module_id, ModuleId},
 };
 use move_vm_types::{
+    instr::Instruction,
     loaded_data::{
         runtime_access_specifier::AccessSpecifier,
         runtime_types::{StructIdentifier, Type},
@@ -103,7 +104,12 @@ impl Script {
             });
         }
 
-        let code = script.code.code.iter().map(|b| b.clone().into()).collect();
+        let code = script
+            .code
+            .code
+            .iter()
+            .map(|b| Instruction::try_from(b.clone()))
+            .collect::<PartialVMResult<Vec<_>>>()?;
         let parameters = script.signature_at(script.parameters).clone();
 
         let param_tys = parameters

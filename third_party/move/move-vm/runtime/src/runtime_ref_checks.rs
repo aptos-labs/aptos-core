@@ -686,7 +686,7 @@ impl RuntimeRefCheck for FullRuntimeRefCheck {
                 ref_state.move_to()?;
             },
             VecPack(_, n) => {
-                ref_state.pop_many_from_shadow_stack(safe_unwrap_err!((*n).try_into()))?;
+                ref_state.pop_many_from_shadow_stack(*n as usize)?;
                 ref_state.push_non_refs_to_shadow_stack(1);
             },
             VecLen(_) => {

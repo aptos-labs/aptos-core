@@ -697,7 +697,11 @@ impl Function {
 
         // Native functions do not have a code unit
         let code = match &def.code {
-            Some(code) => code.code.iter().map(|b| b.clone().into()).collect(),
+            Some(code) => code
+                .code
+                .iter()
+                .map(|b| Instruction::try_from(b.clone()))
+                .collect::<PartialVMResult<Vec<_>>>()?,
             None => vec![],
         };
         let ty_param_abilities = handle.type_parameters.clone();

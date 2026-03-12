@@ -631,12 +631,18 @@ where
                         return Err(PartialVMError::new_invariant_violation(msg));
                     },
                     (Some(kind), false) => {
-                        // Note: for delayed fields, simply never output annotated layout. The
-                        // callers should not be able to handle it in any case.
-
+                        // Note 1:
+                        //   For delayed fields, simply never output annotated layout. The
+                        //   callers should not be able to handle it in any case.
+                        //
+                        // Note 2:
+                        //   For derived strings, aggregators or snapshots, do not use the
+                        //   cache to reduce bounds on count/depth by resolving by struct
+                        //   identity (see below). All these layouts are small (few nodes),
+                        //   the cost of reconstructing them on cache miss is negligible,
+                        //   and it is not worth additional feature gating.
                         use IdentifierMappingKind::*;
                         let layout = match &kind {
-                            // For derived strings, replace the whole struct.
                             DerivedString => {
                                 let inner_layout = MoveTypeLayout::new_struct(
                                     MoveStructLayout::new(field_layouts),
