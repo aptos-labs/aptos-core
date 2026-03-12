@@ -147,11 +147,13 @@ impl DecMessage {
             DecMessage::RequestDecShare(_) => Ok(()),
             DecMessage::DecShare(dec_share) => {
                 //dec_share.verify(dec_config)
+                Ok(())
             },
             DecMessage::FastDecShare(fast_dec_share) => {
 //                fast_dec_share
 //                    .share
 //                    .verify(fast_dec_config)
+                Ok(())
             },
             _ => bail!("[DecMessage] unexpected message type"),
         }
