@@ -12,6 +12,9 @@ repository = { workspace = true }
 rust-version = { workspace = true }
 
 [dependencies]
+ahash = { workspace = true }
 bumpalo = { workspace = true }
 crossbeam-utils = { workspace = true }
+dashmap = { workspace = true }
+move-core-types = { workspace = true }
 parking_lot = { workspace = true }

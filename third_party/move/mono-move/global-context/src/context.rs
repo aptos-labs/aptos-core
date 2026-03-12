@@ -21,9 +21,37 @@
 //!    via [`RwLockWriteGuard`]. During this phase caches can be reset. Because
 //!    no execution contexts can co-exist, there can be no dangling pointers,
 //!    making deallocation safe.
+//!
+//! ## Global Allocation Race Window
+//!
+//! When interning, allocation happens **outside the [`DashMap`] lock** to
+//! reduce contention. This creates a race window where multiple threads may
+//! allocate the same interned data. This is intentional and safe:
+//!
+//!   - Only one pointer is stored in the interner's map.
+//!   - Duplicate allocations leak but are bounded (interning converges).
+//!   - Trade-off: minor memory waste for lower lock contention.
 
-use crate::{alloc::GlobalArenaShard, maintenance_config::MaintenanceConfig, GlobalArenaPool};
+use crate::{
+    alloc::{GlobalArenaPtr, GlobalArenaShard},
+    maintenance_config::MaintenanceConfig,
+    GlobalArenaPool,
+};
+use dashmap::DashMap;
 use parking_lot::{RwLock, RwLockReadGuard, RwLockWriteGuard};
+use std::{
+    hash::{Hash, Hasher},
+    marker::PhantomData,
+    ptr,
+    ptr::NonNull,
+};
+
+// Submodules: to split implementation into smaller pieces.
+mod identifiers;
+use identifiers::IdentifierInternerKey;
+mod executable_ids;
+pub use executable_ids::ExecutableId;
+use executable_ids::ExecutableIdInternerKey;
 
 /// Global execution context with a two-phase state machine.
 ///
@@ -56,7 +84,9 @@ pub struct GlobalContext {
 /// Shared context containing interned data structures. Global arena where the
 /// data is allocated is kept separately.
 struct Context {
-    // TODO: add caches here.
+    identifiers: DashMap<IdentifierInternerKey, GlobalArenaPtr<str>, ahash::RandomState>,
+    executable_ids:
+        DashMap<ExecutableIdInternerKey, GlobalArenaPtr<ExecutableId>, ahash::RandomState>,
 }
 
 /// RAII guard for the maintenance phase providing exclusive write access.
@@ -65,37 +95,50 @@ struct Context {
 /// access to the internal state for maintenance operations. The write lock
 /// is held for the lifetime of this guard and automatically released when
 /// dropped.
-pub struct MaintenanceGuard<'a> {
+pub struct MaintenanceGuard<'ctx> {
     /// Reference to the caches stored in context.
-    #[allow(dead_code)]
-    ctx: &'a Context,
+    ctx: &'ctx Context,
     /// Pool of all arenas managing global allocations.
-    #[allow(dead_code)]
-    global_arena: &'a GlobalArenaPool,
+    global_arena: &'ctx GlobalArenaPool,
     /// Configuration controlling maintenance behavior.
     #[allow(dead_code)]
-    maintenance_config: &'a MaintenanceConfig,
+    maintenance_config: &'ctx MaintenanceConfig,
 
     /// Write guard that disallows obtaining concurrent execution
     /// guard. **Must** be dropped last.
-    _guard: RwLockWriteGuard<'a, ()>,
+    _guard: RwLockWriteGuard<'ctx, ()>,
 }
 
 /// RAII guard for the execution phase providing concurrent read access
 /// to shared interned data and exclusive access to a dedicated arena.
 /// Multiple execution contexts can exist simultaneously across threads.
-pub struct ExecutionGuard<'a> {
+pub struct ExecutionGuard<'ctx> {
     /// Reference to the caches stored in context.
-    #[allow(dead_code)]
-    ctx: &'a Context,
+    ctx: &'ctx Context,
     /// Arena dedicated for this execution guard with exclusive access.
     /// During execution, data can be allocated here without contention.
-    #[allow(dead_code)]
-    global_arena: GlobalArenaShard<'a>,
+    global_arena: GlobalArenaShard<'ctx>,
 
     /// Read guard preventing maintenance phase, but allowing concurrent
     /// execution phases. **Must** be dropped last.
-    _guard: RwLockReadGuard<'a, ()>,
+    _guard: RwLockReadGuard<'ctx, ()>,
+}
+
+/// A scoped reference to data obtained from [`ExecutionGuard`] and is guaranteed
+/// to be alive until the guard is dropped.
+///
+/// # Safety model
+///
+/// The reference lifetime is tied to the lifetime of the [`ExecutionGuard`].
+/// It is guaranteed that the data it points to is kept alive as long as the
+/// guard is alive.
+///
+/// The pointer stored behind the reference is guaranteed to be valid and
+/// safe to dereference.
+#[repr(transparent)]
+pub struct ArenaRef<'guard, T: ?Sized> {
+    ptr: NonNull<T>,
+    _guard: PhantomData<&'guard ()>,
 }
 
 impl GlobalContext {
@@ -131,7 +174,10 @@ impl GlobalContext {
         );
 
         Self {
-            ctx: Context {},
+            ctx: Context {
+                identifiers: DashMap::default(),
+                executable_ids: DashMap::default(),
+            },
             global_arena: GlobalArenaPool::with_num_arenas(num_workers),
             maintenance_config,
             phase: RwLock::new(()),
@@ -169,6 +215,7 @@ impl GlobalContext {
     ///
     /// Panics if the worker ID is out of bounds when trying to get an arena
     /// from the pool.
+    #[must_use]
     pub fn try_execution_context(&self, worker_id: usize) -> Option<ExecutionGuard<'_>> {
         let _guard = self.phase.try_read()?;
 
@@ -180,14 +227,126 @@ impl GlobalContext {
     }
 }
 
-impl<'a> MaintenanceGuard<'a> {}
+impl<'ctx> MaintenanceGuard<'ctx> {
+    /// Returns the total number of bytes used across all arenas in the global
+    /// arena pool.
+    pub fn global_arena_allocated_bytes_sum(&self) -> usize {
+        (0..self.global_arena.num_arenas())
+            .map(|idx| self.global_arena.allocated_bytes(idx))
+            .sum()
+    }
 
-impl<'a> ExecutionGuard<'a> {}
+    /// Returns the number of entries in interner's map for identifiers.
+    pub fn interned_identifiers_count(&self) -> usize {
+        self.ctx.identifiers.len()
+    }
+
+    /// Returns the number of entries in interner's map for executable IDs.
+    pub fn interned_executable_ids_count(&self) -> usize {
+        self.ctx.executable_ids.len()
+    }
+
+    /// Resets all caches that store pointers to the arenas, and then resets
+    /// the arenas as well.
+    pub fn reset_arena_pool(&mut self) {
+        // SAFETY: Arena is only reset **after** caches are cleared.
+        unsafe {
+            self.reset_all_caches();
+        }
+
+        // SAFETY: We are in maintenance phase, so there are no concurrent
+        // execution contexts and therefore no live pointers to arena other
+        // than ones that were stored in caches. All caches were cleared (see
+        // above), and so there are no live pointers making reset safe.
+        unsafe {
+            self.global_arena.reset_all_arenas_unchecked();
+        }
+    }
+}
+
+impl<'ctx> ExecutionGuard<'ctx> {}
 
 //
 // Only private APIs below.
 // ------------------------
 
-impl<'a> MaintenanceGuard<'a> {}
+impl<'ctx> MaintenanceGuard<'ctx> {
+    /// Clears all caches stored in [`Context`]. Triggered when the global
+    /// arena requires a full reset (and thus, any cache that stores pointers
+    /// to that arena must be invalidated).
+    ///
+    /// # Safety
+    ///
+    /// Should be called **before** arena backing allocations is reset or
+    /// dropped.
+    unsafe fn reset_all_caches(&mut self) {
+        // Exhaustive destructuring so that there is a compile-time error if a
+        // new field is added without being explicitly handled here.
+        //
+        // CRITICAL: caches can store pointers to arenas which can be reset, it
+        // is important to ensure these caches are cleared before that.
+        let Context {
+            identifiers,
+            executable_ids,
+        } = self.ctx;
 
-impl<'a> ExecutionGuard<'a> {}
+        identifiers.clear();
+        executable_ids.clear();
+    }
+}
+
+impl<'ctx> ExecutionGuard<'ctx> {
+    /// Returns a reference scoped to the lifetime of the guard.
+    ///
+    /// # Safety
+    ///
+    /// The caller must ensure the pointer points to stable data and will not
+    /// be deallocated during guard's lifetime.
+    unsafe fn arena_ref<'guard, T: ?Sized>(
+        &'guard self,
+        ptr: GlobalArenaPtr<T>,
+    ) -> ArenaRef<'guard, T>
+    where
+        'ctx: 'guard,
+    {
+        ArenaRef {
+            ptr: ptr.into_inner(),
+            _guard: Default::default(),
+        }
+    }
+}
+
+impl<'guard, T: ?Sized> ArenaRef<'guard, T> {
+    /// Returns the raw address of the allocation of the pointer. For testing
+    /// purposes only.
+    pub fn raw_address_for_testing(&self) -> usize {
+        self.ptr.as_ptr().addr()
+    }
+}
+
+// Arena reference uses pointer hash. Because of interning, pointer hash
+// equality implies structural hash equality (ignoring hash collisions).
+impl<'guard, T: ?Sized> Hash for ArenaRef<'guard, T> {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        self.ptr.hash(state)
+    }
+}
+
+// Arena reference uses pointer equality. Because of interning, pointer
+// equality implies structural equality.
+impl<'guard, T: ?Sized> PartialEq for ArenaRef<'guard, T> {
+    fn eq(&self, other: &Self) -> bool {
+        ptr::eq(self.ptr.as_ptr(), other.ptr.as_ptr())
+    }
+}
+
+impl<'guard, T: ?Sized> Eq for ArenaRef<'guard, T> {}
+
+// Arena reference can be duplicated with bitwise copy.
+impl<'guard, T: ?Sized> Copy for ArenaRef<'guard, T> {}
+
+impl<'guard, T: ?Sized> Clone for ArenaRef<'guard, T> {
+    fn clone(&self) -> Self {
+        *self
+    }
+}

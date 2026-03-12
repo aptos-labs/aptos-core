@@ -17,8 +17,10 @@
 //! - [`GlobalArenaPtr::as_ref_unchecked`] — caller must ensure that the arena
 //!   that owns the data has not been reset or dropped, and that the pointer
 //!   has not been invalidated.
-//! - [`GlobalArenaPool::reset_unchecked`] — caller must ensure there are no
-//!   live pointers derived from the allocations that is about to be reset.
+//! - [`GlobalArenaPool::reset_all_arenas_unchecked`] — caller must ensure
+//!   there are no live pointers derived from the allocations that is about to
+//!   be reset and that it is called from single-threaded context (exclusive
+//!   access required).
 
 use bumpalo::Bump;
 use crossbeam_utils::CachePadded;
@@ -56,6 +58,11 @@ impl<T: ?Sized> GlobalArenaPtr<T> {
         //
         // Caller must ensure safety preconditions.
         unsafe { self.0.as_ref() }
+    }
+
+    /// Returns the inner non-null pointer to the allocated data.
+    pub fn into_inner(self) -> NonNull<T> {
+        self.0
     }
 
     /// Returns the raw const pointer to the allocated data.
@@ -194,7 +201,7 @@ impl GlobalArenaPool {
     ///    **must** ensure that the access is exclusive and there are no race
     ///    conditions.
     // TODO: Consider using &mut to enforce exclusive access at compile-time.
-    pub unsafe fn reset_unchecked(&self) {
+    pub unsafe fn reset_all_arenas_unchecked(&self) {
         for arena in self.arenas.iter() {
             arena.lock().reset();
         }
