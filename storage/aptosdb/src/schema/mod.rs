@@ -18,7 +18,6 @@ pub(crate) mod ledger_info;
 pub(crate) mod persisted_auxiliary_info;
 pub(crate) mod stale_node_index;
 pub(crate) mod stale_node_index_cross_epoch;
-pub(crate) mod stale_state_value_index;
 pub(crate) mod stale_state_value_index_by_key_hash;
 pub(crate) mod state_value_by_key_hash;
 pub(crate) mod transaction;
@@ -48,7 +47,6 @@ pub const LEDGER_INFO_CF_NAME: ColumnFamilyName = "ledger_info";
 pub const PERSISTED_AUXILIARY_INFO_CF_NAME: ColumnFamilyName = "persisted_auxiliary_info";
 pub const STALE_NODE_INDEX_CF_NAME: ColumnFamilyName = "stale_node_index";
 pub const STALE_NODE_INDEX_CROSS_EPOCH_CF_NAME: ColumnFamilyName = "stale_node_index_cross_epoch";
-pub const STALE_STATE_VALUE_INDEX_CF_NAME: ColumnFamilyName = "stale_state_value_index";
 pub const STALE_STATE_VALUE_INDEX_BY_KEY_HASH_CF_NAME: ColumnFamilyName =
     "stale_state_value_index_by_key_hash";
 pub const STATE_VALUE_BY_KEY_HASH_CF_NAME: ColumnFamilyName = "state_value_by_key_hash";
@@ -113,9 +111,6 @@ pub mod fuzzing {
             assert_no_panic_decoding::<
                 super::stale_state_value_index_by_key_hash::StaleStateValueIndexByKeyHashSchema,
             >(data);
-            assert_no_panic_decoding::<super::stale_state_value_index::StaleStateValueIndexSchema>(
-                data,
-            );
             assert_no_panic_decoding::<super::state_value_by_key_hash::StateValueByKeyHashSchema>(
                 data,
             );
