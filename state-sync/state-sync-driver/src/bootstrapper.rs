@@ -426,6 +426,8 @@ impl<
             self.process_active_stream_notifications().await?;
         } else if self.storage_synchronizer.pending_storage_data() {
             // Wait for any pending data to be processed
+            metrics::increment_pending_data_wait_counter(ExecutingComponent::Bootstrapper);
+
             sample!(
                 SampleRate::Duration(Duration::from_secs(PENDING_DATA_LOG_FREQ_SECS)),
                 info!("Waiting for the storage synchronizer to handle pending data!")

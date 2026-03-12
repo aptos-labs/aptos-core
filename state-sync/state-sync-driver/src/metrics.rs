@@ -162,6 +162,17 @@ pub static DRIVER_FALLBACK_MODE: Lazy<IntGaugeVec> = Lazy::new(|| {
     .unwrap()
 });
 
+/// Counters for the number of times the bootstrapper or continuous syncer
+/// had to wait for the storage synchronizer to handle pending data
+pub static PENDING_DATA_WAIT_COUNTERS: Lazy<IntCounterVec> = Lazy::new(|| {
+    register_int_counter_vec!(
+        "aptos_state_sync_pending_data_wait_counters",
+        "Counters for the number of times a component waited for the storage synchronizer to handle pending data",
+        &["label"]
+    )
+    .unwrap()
+});
+
 /// Counters related to the currently executing component in the main driver loop
 pub static EXECUTING_COMPONENT: Lazy<IntCounterVec> = Lazy::new(|| {
     register_int_counter_vec!(
@@ -233,6 +244,11 @@ pub static STORAGE_SYNCHRONIZER_PIPELINE_CHANNEL_BACKPRESSURE: Lazy<IntGaugeVec>
         )
         .unwrap()
     });
+
+/// Increments the pending data wait counter for the given executing component
+pub fn increment_pending_data_wait_counter(executing_component: ExecutingComponent) {
+    increment_counter(&PENDING_DATA_WAIT_COUNTERS, executing_component.get_label());
+}
 
 /// Increments the given counter with the provided label values.
 pub fn increment_counter(counter: &Lazy<IntCounterVec>, label: &str) {
