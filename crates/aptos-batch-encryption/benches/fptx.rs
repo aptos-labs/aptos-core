@@ -1,7 +1,9 @@
 // Copyright (c) Aptos Foundation
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 use aptos_batch_encryption::{
-    schemes::fptx::FPTX, shared::key_derivation::BIBEDecryptionKeyShare, tests::{decrypt_all, prepare_all},
+    schemes::fptx::FPTX,
+    shared::key_derivation::BIBEDecryptionKeyShare,
+    tests::{decrypt_all, prepare_all},
     traits::BatchThresholdEncryption,
 };
 use aptos_crypto::arkworks::shamir::ShamirThresholdConfig;
@@ -238,8 +240,7 @@ pub fn prepare(c: &mut Criterion) {
     for batch_size in [32, 128, 512, 2048] {
         let mut rng = thread_rng();
         let tc = ShamirThresholdConfig::new(1, 1);
-        let (ek, dk, _, _) =
-            FPTX::setup_for_testing(rng.r#gen(), batch_size, 1, &tc).unwrap();
+        let (ek, dk, _, _) = FPTX::setup_for_testing(rng.r#gen(), batch_size, 1, &tc).unwrap();
 
         let msg: String = String::from("hi");
         let associated_data = String::from("");

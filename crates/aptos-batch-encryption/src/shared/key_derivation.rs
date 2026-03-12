@@ -16,9 +16,9 @@ use aptos_crypto::{
     player::Player,
 };
 use ark_ec::{pairing::Pairing as _, AffineRepr};
-use num_traits::Zero as _;
 use ark_ff::UniformRand as _;
 use ark_std::rand::{CryptoRng, RngCore};
+use num_traits::Zero as _;
 use serde::{Deserialize, Serialize};
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]

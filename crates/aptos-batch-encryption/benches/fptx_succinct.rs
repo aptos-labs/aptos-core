@@ -1,8 +1,10 @@
 // Copyright (c) Aptos Foundation
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 use aptos_batch_encryption::{
-    schemes::fptx_succinct::FPTXSuccinct, shared::key_derivation::BIBEDecryptionKeyShare,
-    tests::{decrypt_all, prepare_all}, traits::BatchThresholdEncryption,
+    schemes::fptx_succinct::FPTXSuccinct,
+    shared::key_derivation::BIBEDecryptionKeyShare,
+    tests::{decrypt_all, prepare_all},
+    traits::BatchThresholdEncryption,
 };
 use aptos_crypto::arkworks::shamir::ShamirThresholdConfig;
 use ark_std::rand::{distributions::Alphanumeric, thread_rng, Rng as _};
@@ -263,12 +265,13 @@ pub fn prepare(c: &mut Criterion) {
             BenchmarkId::from_parameter(batch_size),
             &(cts, d, pfs),
             |b, input| {
-                b.iter(|| prepare_all::<FPTXSuccinct, String>(&input.0, &input.1, &input.2).unwrap());
+                b.iter(|| {
+                    prepare_all::<FPTXSuccinct, String>(&input.0, &input.1, &input.2).unwrap()
+                });
             },
         );
     }
 }
-
 
 pub fn decrypt(c: &mut Criterion) {
     let mut group = c.benchmark_group("FPTXSuccinct::decrypt (full batch, all cts)");
