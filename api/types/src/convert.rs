@@ -28,14 +28,15 @@ use aptos_types::{
     chain_id::ChainId,
     contract_event::{ContractEvent, EventWithVersion},
     indexer::indexer_db_reader::IndexerReader,
+    secret_sharing::Ciphertext,
     state_store::{
         state_key::{inner::StateKeyInner, StateKey},
         table::{TableHandle, TableInfo},
         StateView,
     },
     transaction::{
-        BlockEndInfo, EntryFunction, ExecutionStatus, Multisig, RawTransaction, Script,
-        SignedTransaction, TransactionAuxiliaryData,
+        encrypted_payload::EncryptedPayload, BlockEndInfo, EntryFunction, ExecutionStatus,
+        Multisig, RawTransaction, Script, SignedTransaction, TransactionAuxiliaryData,
     },
     vm::module_metadata::get_metadata,
     vm_status::AbortLocation,
@@ -961,20 +962,17 @@ impl<'a, S: StateView> MoveConverter<'a, S> {
                     EncryptedTransactionPayload::Encrypted(p) => (p.payload_hash, p.ciphertext),
                     _ => bail!("Only encrypted state payloads can be submitted"),
                 };
-                let ciphertext: aptos_types::secret_sharing::Ciphertext =
-                    bcs::from_bytes(&ciphertext_bytes.0)
-                        .context("Failed to BCS-deserialize ciphertext")?;
+                let ciphertext: Ciphertext = bcs::from_bytes(&ciphertext_bytes.0)
+                    .context("Failed to BCS-deserialize ciphertext")?;
                 let extra_config = ExtraConfig::V1 {
                     multisig_address: None,
                     replay_protection_nonce: nonce,
                 };
-                Target::EncryptedPayload(
-                    aptos_types::transaction::encrypted_payload::EncryptedPayload::Encrypted {
-                        ciphertext,
-                        extra_config,
-                        payload_hash: payload_hash.into(),
-                    },
-                )
+                Target::EncryptedPayload(EncryptedPayload::Encrypted {
+                    ciphertext,
+                    extra_config,
+                    payload_hash: payload_hash.into(),
+                })
             },
             // Deprecated.
             TransactionPayload::ModuleBundlePayload(_) => {
