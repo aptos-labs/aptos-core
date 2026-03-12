@@ -140,8 +140,10 @@ fn simple_script_round_trip_version_failure() {
 
 #[test]
 fn test_borrow_field_attributes_round_trip() {
-    // Create a module with BorrowFieldImmutable and BorrowFieldMutable attributes
+    // Create a module with BorrowFieldImmutable and BorrowFieldMutable attributes.
+    // Pin to VERSION_10 so the in-memory version matches what the serializer writes.
     let mut module = empty_module();
+    module.version = VERSION_10;
 
     // Add signatures for function parameters and return values
     let sig_unit_idx = SignatureIndex::new(module.signatures.len() as u16);
@@ -182,7 +184,6 @@ fn test_borrow_field_attributes_round_trip() {
     });
 
     // Serialize with VERSION_10 (attributes supported from VERSION_8+)
-    module.version = VERSION_10;
     let mut serialized = Vec::new();
     module
         .serialize_for_version(Some(VERSION_10), &mut serialized)

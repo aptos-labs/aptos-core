@@ -1831,7 +1831,9 @@ impl ModuleContext<'_> {
                 },
             }
         }
-        // #[immutable] implies #[persistent]: a frozen function also cannot be removed.
+        // `#[immutable]` implies `#[persistent]`: a frozen function also cannot be
+        // removed (removing and re-adding with different bytecode would bypass the
+        // immutability guarantee). Public functions also derive `Persistent` regardless.
         let has_immutable = result.contains(&FF::FunctionAttribute::Immutable);
         if !has_persistent && (has_immutable || fun_env.visibility() == Visibility::Public) {
             result.push(FF::FunctionAttribute::Persistent)

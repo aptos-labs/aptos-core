@@ -548,11 +548,13 @@ impl Compatibility {
             (None, None) => true,
             (Some(_), None) | (None, Some(_)) => false,
             (Some(old_code), Some(new_code)) => {
+                // Compare locals types by resolving the signature index to actual types.
                 let old_locals = old_module.signature_at(old_code.locals);
                 let new_locals = new_module.signature_at(new_code.locals);
                 if old_locals != new_locals {
                     return false;
                 }
+                // Compare the instruction sequences directly.
                 old_code.code == new_code.code
             },
         }
