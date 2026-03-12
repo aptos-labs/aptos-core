@@ -12,10 +12,9 @@
 //! 1. **Execution Phase**
 //!
 //!    Multiple [`ExecutionGuard`] guards can be held concurrently. Guards
-//!    provide read-only access to interners via [`RwLockReadGuard`] that may
-//!    allocate new data but never deallocates, making arena allocations
-//!    stable (no reset or drop possible). Pointers returned from the guard are
-//!    valid for the guard's lifetime.
+//!    provide read-only access to caches to obtain or allocate data, but never
+//!    deallocate, making arena allocations stable (no reset or drop possible).
+//!    Pointers returned from the guard are valid for the guard's lifetime.
 //!
 //! 2. **Maintenance Phase**
 //!    A single exclusive [`MaintenanceGuard`] guard exists with write access
@@ -23,7 +22,7 @@
 //!    no execution contexts can co-exist, there can be no dangling pointers,
 //!    making deallocation safe.
 
-use crate::maintenance_config::MaintenanceConfig;
+use crate::{alloc::GlobalArenaShard, maintenance_config::MaintenanceConfig, GlobalArenaPool};
 use parking_lot::{RwLock, RwLockReadGuard, RwLockWriteGuard};
 
 /// Global execution context with a two-phase state machine.
@@ -41,11 +40,17 @@ use parking_lot::{RwLock, RwLockReadGuard, RwLockWriteGuard};
 ///    execution phases, e.g., between blocks of transactions) such as cache
 ///    cleanup or data deallocation.
 pub struct GlobalContext {
-    /// Shared caches protected by read-write lock.
-    ctx: RwLock<Context>,
-    // TODO: global arena here.
+    /// Shared caches storing interned data, executables.
+    ctx: Context,
+    /// Pool of arenas (assigned per execution worker). Each worker gets
+    /// exclusive access to their arena to avoid contention.
+    global_arena: GlobalArenaPool,
     /// Configuration controlling maintenance behavior.
     maintenance_config: MaintenanceConfig,
+    /// Lock to switch between execution and maintenance modes:
+    ///   - Read lock: execution phase.
+    ///   - Write lock: maintenance phase.
+    phase: RwLock<()>,
 }
 
 /// Shared context containing interned data structures. Global arena where the
@@ -61,25 +66,36 @@ struct Context {
 /// is held for the lifetime of this guard and automatically released when
 /// dropped.
 pub struct MaintenanceGuard<'a> {
-    /// Write guard on shared data (disallows obtaining concurrent execution
-    /// guard).
+    /// Reference to the caches stored in context.
     #[allow(dead_code)]
-    ctx_guard: RwLockWriteGuard<'a, Context>,
-
-    // TODO: mut reference to global arena here.
+    ctx: &'a Context,
+    /// Pool of all arenas managing global allocations.
+    #[allow(dead_code)]
+    global_arena: &'a GlobalArenaPool,
     /// Configuration controlling maintenance behavior.
     #[allow(dead_code)]
     maintenance_config: &'a MaintenanceConfig,
+
+    /// Write guard that disallows obtaining concurrent execution
+    /// guard. **Must** be dropped last.
+    _guard: RwLockWriteGuard<'a, ()>,
 }
 
 /// RAII guard for the execution phase providing concurrent read access
 /// to shared interned data and exclusive access to a dedicated arena.
 /// Multiple execution contexts can exist simultaneously across threads.
 pub struct ExecutionGuard<'a> {
-    /// Read guard on shared interned data (prevents maintenance phase).
+    /// Reference to the caches stored in context.
     #[allow(dead_code)]
-    ctx_guard: RwLockReadGuard<'a, Context>,
-    // TODO: reference to global arena (shard) here.
+    ctx: &'a Context,
+    /// Arena dedicated for this execution guard with exclusive access.
+    /// During execution, data can be allocated here without contention.
+    #[allow(dead_code)]
+    global_arena: GlobalArenaShard<'a>,
+
+    /// Read guard preventing maintenance phase, but allowing concurrent
+    /// execution phases. **Must** be dropped last.
+    _guard: RwLockReadGuard<'a, ()>,
 }
 
 impl GlobalContext {
@@ -115,8 +131,10 @@ impl GlobalContext {
         );
 
         Self {
-            ctx: RwLock::new(Context {}),
+            ctx: Context {},
+            global_arena: GlobalArenaPool::with_num_arenas(num_workers),
             maintenance_config,
+            phase: RwLock::new(()),
         }
     }
 
@@ -129,10 +147,13 @@ impl GlobalContext {
     /// an ongoing maintenance.
     #[must_use]
     pub fn try_maintenance_context(&self) -> Option<MaintenanceGuard<'_>> {
-        // TODO: acquire arena as well.
+        let _guard = self.phase.try_write()?;
+
         Some(MaintenanceGuard {
-            ctx_guard: self.ctx.try_write()?,
+            ctx: &self.ctx,
+            global_arena: &self.global_arena,
             maintenance_config: &self.maintenance_config,
+            _guard,
         })
     }
 
@@ -141,11 +162,21 @@ impl GlobalContext {
     /// can be held concurrently across threads for different workers.
     ///
     /// Returns [`None`] if
-    ///   - there is an ongoing maintenance phase.
-    pub fn try_execution_context(&self, _worker_id: usize) -> Option<ExecutionGuard<'_>> {
-        let ctx_guard = self.ctx.try_read()?;
-        // TODO: acquire arena as well.
-        Some(ExecutionGuard { ctx_guard })
+    ///   - there is an ongoing maintenance phase,
+    ///   - the arena for this worker has already been locked.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the worker ID is out of bounds when trying to get an arena
+    /// from the pool.
+    pub fn try_execution_context(&self, worker_id: usize) -> Option<ExecutionGuard<'_>> {
+        let _guard = self.phase.try_read()?;
+
+        Some(ExecutionGuard {
+            ctx: &self.ctx,
+            global_arena: self.global_arena.try_lock_arena(worker_id)?,
+            _guard,
+        })
     }
 }
 

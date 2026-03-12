@@ -12624,6 +12624,8 @@ dependencies = [
 name = "mono-move-global-context"
 version = "0.1.0"
 dependencies = [
+ "bumpalo",
+ "crossbeam-utils",
  "parking_lot 0.12.1",
 ]
 
