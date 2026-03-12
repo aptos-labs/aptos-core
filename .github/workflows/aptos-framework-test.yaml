@@ -22,7 +22,7 @@ env:
 
 jobs:
   build:
-    runs-on: ghr-elastic-supra-aptos-core-runner
+    runs-on: [self-hosted, do-ephemeral]
     timeout-minutes: 90
     steps:
       - name: Install SSH Client
