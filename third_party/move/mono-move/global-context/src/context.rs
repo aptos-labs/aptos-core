@@ -21,9 +21,32 @@
 //!    via [`RwLockWriteGuard`]. During this phase caches can be reset. Because
 //!    no execution contexts can co-exist, there can be no dangling pointers,
 //!    making deallocation safe.
+//!
+//! ## Global Allocation Race Window
+//!
+//! When interning, allocation happens **outside the [`DashMap`] lock** to
+//! reduce contention. This creates a race window where multiple threads may
+//! allocate the same interned data. This is intentional and safe:
+//!
+//!   - Only one pointer is stored in the interner's map.
+//!   - Duplicate allocations leak but are bounded (interning converges).
+//!   - Trade-off: minor memory waste for lower lock contention.
 
-use crate::{alloc::GlobalArenaShard, maintenance_config::MaintenanceConfig, GlobalArenaPool};
+use crate::{
+    alloc::{GlobalArenaPtr, GlobalArenaShard},
+    maintenance_config::MaintenanceConfig,
+    GlobalArenaPool,
+};
+use dashmap::DashMap;
 use parking_lot::{RwLock, RwLockReadGuard, RwLockWriteGuard};
+
+// Submodules: to split implementation into smaller pieces.
+mod identifiers;
+use identifiers::IdentifierInternerKey;
+pub use identifiers::NameRef;
+mod executable_ids;
+pub use executable_ids::ExecutableIdRef;
+use executable_ids::{ExecutableId, ExecutableIdInternerKey};
 
 /// Global execution context with a two-phase state machine.
 ///
@@ -56,7 +79,9 @@ pub struct GlobalContext {
 /// Shared context containing interned data structures. Global arena where the
 /// data is allocated is kept separately.
 struct Context {
-    // TODO: add caches here.
+    identifiers: DashMap<IdentifierInternerKey, GlobalArenaPtr<str>, ahash::RandomState>,
+    executable_ids:
+        DashMap<ExecutableIdInternerKey, GlobalArenaPtr<ExecutableId>, ahash::RandomState>,
 }
 
 /// RAII guard for the maintenance phase providing exclusive write access.
@@ -67,10 +92,8 @@ struct Context {
 /// dropped.
 pub struct MaintenanceGuard<'a> {
     /// Reference to the caches stored in context.
-    #[allow(dead_code)]
     ctx: &'a Context,
     /// Pool of all arenas managing global allocations.
-    #[allow(dead_code)]
     global_arena: &'a GlobalArenaPool,
     /// Configuration controlling maintenance behavior.
     #[allow(dead_code)]
@@ -86,11 +109,9 @@ pub struct MaintenanceGuard<'a> {
 /// Multiple execution contexts can exist simultaneously across threads.
 pub struct ExecutionGuard<'a> {
     /// Reference to the caches stored in context.
-    #[allow(dead_code)]
     ctx: &'a Context,
     /// Arena dedicated for this execution guard with exclusive access.
     /// During execution, data can be allocated here without contention.
-    #[allow(dead_code)]
     global_arena: GlobalArenaShard<'a>,
 
     /// Read guard preventing maintenance phase, but allowing concurrent
@@ -131,7 +152,10 @@ impl GlobalContext {
         );
 
         Self {
-            ctx: Context {},
+            ctx: Context {
+                identifiers: DashMap::default(),
+                executable_ids: DashMap::default(),
+            },
             global_arena: GlobalArenaPool::with_num_arenas(num_workers),
             maintenance_config,
             phase: RwLock::new(()),
@@ -169,6 +193,7 @@ impl GlobalContext {
     ///
     /// Panics if the worker ID is out of bounds when trying to get an arena
     /// from the pool.
+    #[must_use]
     pub fn try_execution_context(&self, worker_id: usize) -> Option<ExecutionGuard<'_>> {
         let _guard = self.phase.try_read()?;
 
@@ -180,7 +205,43 @@ impl GlobalContext {
     }
 }
 
-impl<'a> MaintenanceGuard<'a> {}
+impl<'a> MaintenanceGuard<'a> {
+    /// Returns the total number of bytes used across all arenas in the global
+    /// arena pool.
+    pub fn global_arena_allocated_bytes_sum(&self) -> usize {
+        (0..self.global_arena.num_arenas())
+            .map(|idx| self.global_arena.allocated_bytes(idx))
+            .sum()
+    }
+
+    /// Returns the number of entries in interner's map for identifiers.
+    pub fn interned_identifiers_count(&self) -> usize {
+        self.ctx.identifiers.len()
+    }
+
+    /// Returns the number of entries in interner's map for executable IDs.
+    pub fn interned_executable_ids_count(&self) -> usize {
+        self.ctx.executable_ids.len()
+    }
+
+    /// Resets all caches that store pointers to the arenas, and then resets
+    /// the arenas as well.
+    pub fn reset_arena_pool(&mut self) {
+        // SAFETY: Arena is only reset **after**, so clearing all caches is
+        // safe.
+        unsafe {
+            self.reset_all_caches();
+        }
+
+        // SAFETY: We are in maintenance phase, so there are no concurrent
+        // execution contexts and therefore no live pointers to arena other
+        // than ones that were stored in caches. All caches were cleared (see
+        // above), and so there are no live pointers making reset safe.
+        unsafe {
+            self.global_arena.reset_all_arenas_unchecked();
+        }
+    }
+}
 
 impl<'a> ExecutionGuard<'a> {}
 
@@ -188,6 +249,29 @@ impl<'a> ExecutionGuard<'a> {}
 // Only private APIs below.
 // ------------------------
 
-impl<'a> MaintenanceGuard<'a> {}
+impl<'a> MaintenanceGuard<'a> {
+    /// Clears all caches stored in [`Context`]. Triggered when the global
+    /// arena requires a full reset (and thus, any cache that stores pointers
+    /// to that arena must be invalidated).
+    ///
+    /// # Safety
+    ///
+    /// Should be called **before** arena backing allocations is reset or
+    /// dropped.
+    unsafe fn reset_all_caches(&mut self) {
+        // Exhaustive destructuring so that there is a compile-time error if a
+        // new field is added without being explicitly handled here.
+        //
+        // CRITICAL: caches can store pointers to arenas which can be reset, it
+        // is important to ensure these caches are cleared before that.
+        let Context {
+            identifiers,
+            executable_ids,
+        } = self.ctx;
+
+        executable_ids.clear();
+        identifiers.clear();
+    }
+}
 
 impl<'a> ExecutionGuard<'a> {}
