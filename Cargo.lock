@@ -12620,6 +12620,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "mono-move-global-context"
+version = "0.1.0"
+dependencies = [
+ "parking_lot 0.12.1",
+]
+
+[[package]]
 name = "mono-move-micro-ops"
 version = "0.1.0"
 
