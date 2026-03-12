@@ -225,17 +225,12 @@ pub fn convert_transaction_payload(
         },
 
         TransactionPayload::EncryptedTransactionPayload(ep) => {
-            let encrypted_state = match ep {
-                EncryptedTransactionPayload::Encrypted(p) => {
-                    transaction::encrypted_transaction_payload::EncryptedState::Encrypted(
-                        transaction::EncryptedPayloadState {
-                            payload_hash: p.payload_hash.0.to_vec(),
-                            ciphertext: p.ciphertext.0.clone(),
-                        },
-                    )
+            let state = match ep {
+                EncryptedTransactionPayload::Encrypted(_) => {
+                    unreachable!("Encrypted state should not reach indexer gRPC")
                 },
                 EncryptedTransactionPayload::FailedDecryption(p) => {
-                    transaction::encrypted_transaction_payload::EncryptedState::FailedDecryption(
+                    transaction::encrypted_transaction_payload::State::FailedDecryption(
                         transaction::FailedDecryptionPayloadState {
                             payload_hash: p.payload_hash.0.to_vec(),
                             ciphertext: p.ciphertext.0.clone(),
@@ -260,7 +255,7 @@ pub fn convert_transaction_payload(
                             )
                         },
                     };
-                    transaction::encrypted_transaction_payload::EncryptedState::Decrypted(
+                    transaction::encrypted_transaction_payload::State::Decrypted(
                         transaction::DecryptedPayloadState {
                             payload_hash: p.payload_hash.0.to_vec(),
                             ciphertext: p.ciphertext.0.clone(),
@@ -275,7 +270,7 @@ pub fn convert_transaction_payload(
                 payload: Some(
                     transaction::transaction_payload::Payload::EncryptedTransactionPayload(
                         transaction::EncryptedTransactionPayload {
-                            encrypted_state: Some(encrypted_state),
+                            state: Some(state),
                         },
                     ),
                 ),
