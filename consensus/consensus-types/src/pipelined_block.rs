@@ -249,14 +249,12 @@ impl Serialize for PipelinedBlock {
             block: &'a Block,
             input_transactions: &'a Vec<SignedTransaction>,
             randomness: Option<&'a Randomness>,
-            secret_shared_key: Option<&'a SecretSharedKey>,
         }
 
         let serialized = SerializedBlock {
             block: &self.block,
             input_transactions: &self.input_transactions,
             randomness: self.randomness.get(),
-            secret_shared_key: self.secret_shared_key.get(),
         };
         serialized.serialize(serializer)
     }
@@ -273,22 +271,16 @@ impl<'de> Deserialize<'de> for PipelinedBlock {
             block: Block,
             input_transactions: Vec<SignedTransaction>,
             randomness: Option<Randomness>,
-            #[serde(default)]
-            secret_shared_key: Option<SecretSharedKey>,
         }
 
         let SerializedBlock {
             block,
             input_transactions,
             randomness,
-            secret_shared_key,
         } = SerializedBlock::deserialize(deserializer)?;
         let block = PipelinedBlock::new(block, input_transactions, StateComputeResult::new_dummy());
         if let Some(r) = randomness {
             block.set_randomness(r);
-        }
-        if let Some(key) = secret_shared_key {
-            block.set_decryption_key(key);
         }
         Ok(block)
     }
@@ -435,6 +427,10 @@ impl PipelinedBlock {
 
     pub fn block(&self) -> &Block {
         &self.block
+    }
+
+    pub fn input_transactions(&self) -> &Vec<SignedTransaction> {
+        &self.input_transactions
     }
 
     pub fn block_window(&self) -> &OrderedBlockWindow {
