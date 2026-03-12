@@ -37,7 +37,7 @@ fun loop_down(): skipped (lowering: BinaryOpImm Gt for u64-sized type not yet lo
 fun conditional() {
   frame_data_size: 16
   code:
-    0: JumpNotZeroU64 @4 if [0] != 0
+    0: JumpNotZeroU64 @4 [0]
     1: StoreImm8 [8] <- #0
     2: Move8 [0] <- [8]
     3: Return
