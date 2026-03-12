@@ -204,6 +204,7 @@ impl Compatibility {
             };
 
             if !old_is_persistent
+                && !old_is_immutable
                 && matches!(old_func.visibility(), Visibility::Friend)
                 && !self.check_friend_linking
                 // Above: We want to skip linking checks for public(friend) if

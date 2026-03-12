@@ -8,10 +8,11 @@
 //! ## `#[immutable]` transitive call check
 //!
 //! An `#[immutable]` function guarantees stable behavior across module upgrades.
-//! To uphold this guarantee, it must only call:
+//! To uphold this guarantee, it must only call or capture (via closures):
 //! - Other `#[immutable]` functions (same- or cross-module), OR
 //! - Native functions (whose behavior changes, if ever, are gated by on-chain governance).
 //!
+//! This applies to `Call`, `CallGeneric`, `PackClosure`, and `PackClosureGeneric` instructions.
 //! Cross-module callees are checked by inspecting the `FunctionHandle.attributes` field.
 //! Same-module callees that have no code body are native and are always permitted.
 
@@ -22,8 +23,8 @@ use move_binary_format::{
 };
 use move_core_types::vm_status::StatusCode;
 
-/// Check that every `Call`/`CallGeneric` instruction inside an `#[immutable]` function
-/// targets a callee that is itself `#[immutable]` or native.
+/// Check that every `Call`/`CallGeneric`/`PackClosure`/`PackClosureGeneric` instruction
+/// inside an `#[immutable]` function targets a callee that is itself `#[immutable]` or native.
 pub fn check_immutable_transitive_calls(
     module: &CompiledModule,
     function_definition: &FunctionDefinition,
@@ -47,6 +48,12 @@ pub fn check_immutable_transitive_calls(
         let callee_handle_idx = match instr {
             Bytecode::Call(idx) => *idx,
             Bytecode::CallGeneric(inst_idx) => module.function_instantiation_at(*inst_idx).handle,
+            // Closure creation captures a function reference; the captured function must
+            // also be #[immutable] or native to preserve the immutability guarantee.
+            Bytecode::PackClosure(idx, _) => *idx,
+            Bytecode::PackClosureGeneric(inst_idx, _) => {
+                module.function_instantiation_at(*inst_idx).handle
+            },
             _ => continue,
         };
 
