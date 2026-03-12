@@ -4,6 +4,7 @@
 use crate::consensus_observer::common::error::Error;
 use anyhow::bail;
 use aptos_consensus_types::{
+    block::Block,
     common::{BatchPayload, Payload},
     payload::{InlineBatches, OptQuorumStorePayload},
     pipelined_block::PipelinedBlock,
@@ -15,6 +16,8 @@ use aptos_types::{
     epoch_change::Verifier,
     epoch_state::EpochState,
     ledger_info::LedgerInfoWithSignatures,
+    randomness::Randomness,
+    secret_sharing::SecretSharedKey,
     transaction::SignedTransaction,
 };
 use rayon::{
@@ -29,7 +32,7 @@ use std::{
 };
 
 /// Types of messages that can be sent between the consensus publisher and observer
-#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 pub enum ConsensusObserverMessage {
     Request(ConsensusObserverRequest),
     Response(ConsensusObserverResponse),
@@ -37,13 +40,20 @@ pub enum ConsensusObserverMessage {
 }
 
 impl ConsensusObserverMessage {
-    /// Creates and returns a new ordered block message using the given blocks and ordered proof
+    /// Creates and returns a new ordered block message using the given blocks and ordered proof.
+    /// When `use_v2` is true, the message uses the V2 format which includes secret_shared_key.
     pub fn new_ordered_block_message(
         blocks: Vec<Arc<PipelinedBlock>>,
         ordered_proof: LedgerInfoWithSignatures,
+        use_v2: bool,
     ) -> ConsensusObserverDirectSend {
-        let ordered_block = OrderedBlock::new(blocks, ordered_proof);
-        ConsensusObserverDirectSend::OrderedBlock(ordered_block)
+        if use_v2 {
+            let ordered_block_v2 = OrderedBlockV2::new(blocks, ordered_proof);
+            ConsensusObserverDirectSend::OrderedBlockV2(ordered_block_v2)
+        } else {
+            let ordered_block = OrderedBlock::new(blocks, ordered_proof);
+            ConsensusObserverDirectSend::OrderedBlock(ordered_block)
+        }
     }
 
     /// Creates and returns a new commit decision message using the given commit decision
@@ -127,12 +137,13 @@ impl Display for ConsensusObserverResponse {
 }
 
 /// Types of direct sends that can be sent between the consensus publisher and observer
-#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 pub enum ConsensusObserverDirectSend {
     OrderedBlock(OrderedBlock),
     CommitDecision(CommitDecision),
     BlockPayload(BlockPayload),
     OrderedBlockWithWindow(OrderedBlockWithWindow),
+    OrderedBlockV2(OrderedBlockV2),
 }
 
 impl ConsensusObserverDirectSend {
@@ -143,6 +154,7 @@ impl ConsensusObserverDirectSend {
             ConsensusObserverDirectSend::CommitDecision(_) => "commit_decision",
             ConsensusObserverDirectSend::BlockPayload(_) => "block_payload",
             ConsensusObserverDirectSend::OrderedBlockWithWindow(_) => "ordered_block_with_window",
+            ConsensusObserverDirectSend::OrderedBlockV2(_) => "ordered_block_v2",
         }
     }
 }
@@ -171,6 +183,13 @@ impl Display for ConsensusObserverDirectSend {
                     f,
                     "OrderedBlockWithWindow: {}",
                     ordered_block_with_window.ordered_block.proof_block_info(),
+                )
+            },
+            ConsensusObserverDirectSend::OrderedBlockV2(ordered_block_v2) => {
+                write!(
+                    f,
+                    "OrderedBlockV2: {}",
+                    ordered_block_v2.ordered_proof.commit_info(),
                 )
             },
         }
@@ -330,6 +349,115 @@ impl ExecutionPoolWindow {
     /// Verifies the execution pool window contents and returns an error if the data is invalid
     pub fn verify_window_contents(&self, _expected_window_size: u64) -> Result<(), Error> {
         Ok(()) // TODO: Implement this method!
+    }
+}
+
+/// Borrowed V2 wire format for serialization (avoids cloning PipelinedBlock fields).
+#[derive(Serialize)]
+struct PipelinedBlockV2Ref<'a> {
+    block: &'a Block,
+    input_transactions: &'a Vec<SignedTransaction>,
+    randomness: Option<&'a Randomness>,
+    secret_shared_key: Option<&'a SecretSharedKey>,
+}
+
+/// Owned V2 wire format for deserialization.
+#[derive(Deserialize)]
+struct PipelinedBlockV2Owned {
+    block: Block,
+    input_transactions: Vec<SignedTransaction>,
+    randomness: Option<Randomness>,
+    secret_shared_key: Option<SecretSharedKey>,
+}
+
+impl PipelinedBlockV2Owned {
+    fn into_pipelined_block(self) -> Arc<PipelinedBlock> {
+        let block = PipelinedBlock::new(
+            self.block,
+            self.input_transactions,
+            aptos_executor_types::state_compute_result::StateComputeResult::new_dummy(),
+        );
+        if let Some(r) = self.randomness {
+            block.set_randomness(r);
+        }
+        if let Some(key) = self.secret_shared_key {
+            block.set_decryption_key(key);
+        }
+        Arc::new(block)
+    }
+}
+
+/// OrderedBlockV2 carries PipelinedBlocks with secret_shared_key on the wire.
+/// Uses custom Serialize/Deserialize to borrow during serialization (zero-copy)
+/// and own during deserialization.
+#[derive(Clone, Debug, PartialEq)]
+pub struct OrderedBlockV2 {
+    blocks: Vec<Arc<PipelinedBlock>>,
+    ordered_proof: LedgerInfoWithSignatures,
+}
+
+impl OrderedBlockV2 {
+    pub fn new(blocks: Vec<Arc<PipelinedBlock>>, ordered_proof: LedgerInfoWithSignatures) -> Self {
+        Self {
+            blocks,
+            ordered_proof,
+        }
+    }
+
+    /// Converts the V2 ordered block into a V1 OrderedBlock
+    pub fn into_ordered_block(self) -> OrderedBlock {
+        OrderedBlock::new(self.blocks, self.ordered_proof)
+    }
+}
+
+impl Serialize for OrderedBlockV2 {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        #[derive(Serialize)]
+        struct Wire<'a> {
+            blocks: Vec<PipelinedBlockV2Ref<'a>>,
+            ordered_proof: &'a LedgerInfoWithSignatures,
+        }
+
+        let wire = Wire {
+            blocks: self
+                .blocks
+                .iter()
+                .map(|pb| PipelinedBlockV2Ref {
+                    block: pb.block(),
+                    input_transactions: pb.input_transactions(),
+                    randomness: pb.randomness(),
+                    secret_shared_key: pb.secret_shared_key(),
+                })
+                .collect(),
+            ordered_proof: &self.ordered_proof,
+        };
+        wire.serialize(serializer)
+    }
+}
+
+impl<'de> Deserialize<'de> for OrderedBlockV2 {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        #[derive(Deserialize)]
+        struct Wire {
+            blocks: Vec<PipelinedBlockV2Owned>,
+            ordered_proof: LedgerInfoWithSignatures,
+        }
+
+        let wire = Wire::deserialize(deserializer)?;
+        Ok(Self {
+            blocks: wire
+                .blocks
+                .into_iter()
+                .map(|w| w.into_pipelined_block())
+                .collect(),
+            ordered_proof: wire.ordered_proof,
+        })
     }
 }
 
