@@ -12,7 +12,7 @@ public fun helper_value(): u64
 module 0x66::test_immutable_call
 use 0x66::helper
 
-#[immutable] public fun call_non_immutable(): u64
+#[persistent, immutable] public fun call_non_immutable(): u64
     call helper::helper_value
     ret
 

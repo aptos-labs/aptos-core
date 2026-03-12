@@ -832,8 +832,11 @@ pub enum StatusCode {
     // violating the requirement that immutable functions have stable behavior across upgrades.
     IMMUTABLE_FUNCTION_CALLS_NON_IMMUTABLE = 1137,
 
-    // Reserved error code for future use
-    RESERVED_VERIFICATION_ERROR_1 = 1138,
+    // An #[immutable] function does not carry the #[persistent] attribute.
+    // Every #[immutable] function must also be #[persistent], because removing
+    // and re-adding a function with different bytecode would otherwise bypass
+    // the immutability guarantee.
+    IMMUTABLE_FUNCTION_MISSING_PERSISTENT = 1138,
     RESERVED_VERIFICATION_ERROR_2 = 1139,
     RESERVED_VERIFICATION_ERROR_3 = 1140,
     RESERVED_VERIFICATION_ERROR_4 = 1141,

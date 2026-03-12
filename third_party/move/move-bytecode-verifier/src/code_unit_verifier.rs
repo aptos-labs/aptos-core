@@ -87,9 +87,11 @@ impl<'a> CodeUnitVerifier<'a> {
                 .map_err(|err| err.at_index(IndexKind::FunctionDefinition, index.0))?;
             }
 
-            // Transitive call check: an #[immutable] function may only call other
-            // #[immutable] functions or native functions. Only runs for VERSION_11+ modules.
+            // Attribute consistency and transitive call checks for #[immutable] functions.
+            // Only runs for VERSION_11+ modules.
             if module.version() >= VERSION_11 {
+                immutable_checker::check_immutable_has_persistent(module, function_definition)
+                    .map_err(|err| err.at_index(IndexKind::FunctionDefinition, index.0))?;
                 immutable_checker::check_immutable_transitive_calls(module, function_definition)
                     .map_err(|err| err.at_index(IndexKind::FunctionDefinition, index.0))?;
             }

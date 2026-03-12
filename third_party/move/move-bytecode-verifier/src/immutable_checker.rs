@@ -23,6 +23,30 @@ use move_binary_format::{
 };
 use move_core_types::vm_status::StatusCode;
 
+/// Check that every function carrying `Immutable` also carries `Persistent`.
+///
+/// `#[immutable]` implies `#[persistent]`: if the function could be removed, an upgrade could
+/// drop and re-add it with different bytecode, silently bypassing the immutability guarantee.
+/// The compiler always emits both attributes together, but this check defends against
+/// hand-crafted bytecode that omits `Persistent`.
+pub fn check_immutable_has_persistent(
+    module: &CompiledModule,
+    function_definition: &FunctionDefinition,
+) -> PartialVMResult<()> {
+    let handle = module.function_handle_at(function_definition.function);
+    if handle.attributes.contains(&FunctionAttribute::Immutable)
+        && !handle.attributes.contains(&FunctionAttribute::Persistent)
+    {
+        return Err(PartialVMError::new(
+            StatusCode::IMMUTABLE_FUNCTION_MISSING_PERSISTENT,
+        )
+        .with_message(
+            "#[immutable] function must also carry #[persistent]".to_owned(),
+        ));
+    }
+    Ok(())
+}
+
 /// Check that every `Call`/`CallGeneric`/`PackClosure`/`PackClosureGeneric` instruction
 /// inside an `#[immutable]` function targets a callee that is itself `#[immutable]` or native.
 pub fn check_immutable_transitive_calls(
