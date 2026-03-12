@@ -328,16 +328,10 @@ message ExtraConfigV1 {
 }
 
 message EncryptedTransactionPayload {
-  oneof encrypted_state {
-    EncryptedPayloadState encrypted = 1;
-    FailedDecryptionPayloadState failed_decryption = 2;
-    DecryptedPayloadState decrypted = 3;
+  oneof state {
+    FailedDecryptionPayloadState failed_decryption = 1;
+    DecryptedPayloadState decrypted = 2;
   }
-}
-
-message EncryptedPayloadState {
-  bytes payload_hash = 1;
-  bytes ciphertext = 2;
 }
 
 message FailedDecryptionPayloadState {

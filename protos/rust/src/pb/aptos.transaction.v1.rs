@@ -657,29 +657,19 @@ pub struct ExtraConfigV1 {
 #[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct EncryptedTransactionPayload {
-    #[prost(oneof="encrypted_transaction_payload::EncryptedState", tags="1, 2, 3")]
-    pub encrypted_state: ::core::option::Option<encrypted_transaction_payload::EncryptedState>,
+    #[prost(oneof="encrypted_transaction_payload::State", tags="1, 2")]
+    pub state: ::core::option::Option<encrypted_transaction_payload::State>,
 }
 /// Nested message and enum types in `EncryptedTransactionPayload`.
 pub mod encrypted_transaction_payload {
     #[allow(clippy::derive_partial_eq_without_eq)]
     #[derive(Clone, PartialEq, ::prost::Oneof)]
-    pub enum EncryptedState {
+    pub enum State {
         #[prost(message, tag="1")]
-        Encrypted(super::EncryptedPayloadState),
-        #[prost(message, tag="2")]
         FailedDecryption(super::FailedDecryptionPayloadState),
-        #[prost(message, tag="3")]
+        #[prost(message, tag="2")]
         Decrypted(super::DecryptedPayloadState),
     }
-}
-#[allow(clippy::derive_partial_eq_without_eq)]
-#[derive(Clone, PartialEq, ::prost::Message)]
-pub struct EncryptedPayloadState {
-    #[prost(bytes="vec", tag="1")]
-    pub payload_hash: ::prost::alloc::vec::Vec<u8>,
-    #[prost(bytes="vec", tag="2")]
-    pub ciphertext: ::prost::alloc::vec::Vec<u8>,
 }
 #[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]

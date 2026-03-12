@@ -3012,53 +3012,6 @@ impl<'de> serde::Deserialize<'de> for ExtraConfigV1 {
         deserializer.deserialize_struct("aptos.transaction.v1.ExtraConfigV1", FIELDS, GeneratedVisitor)
     }
 }
-impl serde::Serialize for EncryptedPayloadState {
-    fn serialize<S>(&self, serializer: S) -> std::result::Result<S::Ok, S::Error>
-    where S: serde::Serializer {
-        use serde::ser::SerializeStruct;
-        let mut len = 0;
-        if !self.payload_hash.is_empty() { len += 1; }
-        if !self.ciphertext.is_empty() { len += 1; }
-        let mut s = serializer.serialize_struct("EncryptedPayloadState", len)?;
-        if !self.payload_hash.is_empty() {
-            s.serialize_field("payloadHash", pbjson::private::base64::encode(&self.payload_hash).as_str())?;
-        }
-        if !self.ciphertext.is_empty() {
-            s.serialize_field("ciphertext", pbjson::private::base64::encode(&self.ciphertext).as_str())?;
-        }
-        s.end()
-    }
-}
-impl<'de> serde::Deserialize<'de> for EncryptedPayloadState {
-    fn deserialize<D>(deserializer: D) -> std::result::Result<Self, D::Error>
-    where D: serde::Deserializer<'de> {
-        #[derive(serde::Deserialize)]
-        #[serde(field_identifier, rename_all = "camelCase")]
-        enum Field { PayloadHash, Ciphertext }
-        struct V;
-        impl<'de> serde::de::Visitor<'de> for V {
-            type Value = EncryptedPayloadState;
-            fn expecting(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-                f.write_str("struct EncryptedPayloadState")
-            }
-            fn visit_map<A>(self, mut map: A) -> std::result::Result<Self::Value, A::Error> where A: serde::de::MapAccess<'de> {
-                let mut payload_hash__ = None;
-                let mut ciphertext__ = None;
-                while let Some(k) = map.next_key()? {
-                    match k {
-                        Field::PayloadHash => { payload_hash__ = Some(map.next_value::<::pbjson::private::BytesDeserialize<_>>()?.0); }
-                        Field::Ciphertext => { ciphertext__ = Some(map.next_value::<::pbjson::private::BytesDeserialize<_>>()?.0); }
-                    }
-                }
-                Ok(EncryptedPayloadState {
-                    payload_hash: payload_hash__.unwrap_or_default(),
-                    ciphertext: ciphertext__.unwrap_or_default(),
-                })
-            }
-        }
-        deserializer.deserialize_struct("EncryptedPayloadState", &["payloadHash", "ciphertext"], V)
-    }
-}
 impl serde::Serialize for FailedDecryptionPayloadState {
     fn serialize<S>(&self, serializer: S) -> std::result::Result<S::Ok, S::Error>
     where S: serde::Serializer {
@@ -3190,17 +3143,14 @@ impl serde::Serialize for EncryptedTransactionPayload {
     where S: serde::Serializer {
         use serde::ser::SerializeStruct;
         let mut len = 0;
-        if self.encrypted_state.is_some() { len += 1; }
+        if self.state.is_some() { len += 1; }
         let mut s = serializer.serialize_struct("EncryptedTransactionPayload", len)?;
-        if let Some(v) = self.encrypted_state.as_ref() {
+        if let Some(v) = self.state.as_ref() {
             match v {
-                encrypted_transaction_payload::EncryptedState::Encrypted(v) => {
-                    s.serialize_field("encrypted", v)?;
-                }
-                encrypted_transaction_payload::EncryptedState::FailedDecryption(v) => {
+                encrypted_transaction_payload::State::FailedDecryption(v) => {
                     s.serialize_field("failedDecryption", v)?;
                 }
-                encrypted_transaction_payload::EncryptedState::Decrypted(v) => {
+                encrypted_transaction_payload::State::Decrypted(v) => {
                     s.serialize_field("decrypted", v)?;
                 }
             }
@@ -3213,7 +3163,7 @@ impl<'de> serde::Deserialize<'de> for EncryptedTransactionPayload {
     where D: serde::Deserializer<'de> {
         #[derive(serde::Deserialize)]
         #[serde(field_identifier, rename_all = "camelCase")]
-        enum Field { Encrypted, FailedDecryption, Decrypted }
+        enum Field { FailedDecryption, Decrypted }
         struct V;
         impl<'de> serde::de::Visitor<'de> for V {
             type Value = EncryptedTransactionPayload;
@@ -3221,26 +3171,23 @@ impl<'de> serde::Deserialize<'de> for EncryptedTransactionPayload {
                 f.write_str("struct EncryptedTransactionPayload")
             }
             fn visit_map<A>(self, mut map: A) -> std::result::Result<Self::Value, A::Error> where A: serde::de::MapAccess<'de> {
-                let mut encrypted_state__ = None;
+                let mut state__ = None;
                 while let Some(k) = map.next_key()? {
                     match k {
-                        Field::Encrypted => {
-                            encrypted_state__ = map.next_value::<::std::option::Option<_>>()?.map(encrypted_transaction_payload::EncryptedState::Encrypted);
-                        }
                         Field::FailedDecryption => {
-                            encrypted_state__ = map.next_value::<::std::option::Option<_>>()?.map(encrypted_transaction_payload::EncryptedState::FailedDecryption);
+                            state__ = map.next_value::<::std::option::Option<_>>()?.map(encrypted_transaction_payload::State::FailedDecryption);
                         }
                         Field::Decrypted => {
-                            encrypted_state__ = map.next_value::<::std::option::Option<_>>()?.map(encrypted_transaction_payload::EncryptedState::Decrypted);
+                            state__ = map.next_value::<::std::option::Option<_>>()?.map(encrypted_transaction_payload::State::Decrypted);
                         }
                     }
                 }
                 Ok(EncryptedTransactionPayload {
-                    encrypted_state: encrypted_state__,
+                    state: state__,
                 })
             }
         }
-        deserializer.deserialize_struct("EncryptedTransactionPayload", &["encrypted", "failedDecryption", "decrypted"], V)
+        deserializer.deserialize_struct("EncryptedTransactionPayload", &["failedDecryption", "decrypted"], V)
     }
 }
 impl serde::Serialize for FeePayerSignature {
