@@ -245,31 +245,6 @@ impl DecManager {
             let epoch_state_clone = epoch_state.clone();
             let config_clone = dec_config.clone();
             let fast_config_clone = fast_dec_config.clone();
-            bounded_executor
-                .spawn(async move {
-                    match bcs::from_bytes::<DecMessage>(dec_msg.req.data()) {
-                        Ok(msg) => {
-                            if msg
-                                .verify(
-                                    &epoch_state_clone,
-                                    &config_clone,
-                                    &fast_config_clone,
-                                )
-                                .is_ok()
-                            {
-                                let _ = tx.unbounded_send(RpcRequestDecShare {
-                                    req: msg,
-                                    protocol: dec_msg.protocol,
-                                    response_sender: dec_msg.response_sender,
-                                });
-                            }
-                        },
-                        Err(e) => {
-                            warn!("Invalid dec message: {}", e);
-                        },
-                    }
-                })
-                .await;
         }
     }
 
