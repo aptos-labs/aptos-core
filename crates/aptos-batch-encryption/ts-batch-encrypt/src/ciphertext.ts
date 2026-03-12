@@ -156,9 +156,6 @@ export class EncryptionKey extends Serializable {
 
   encrypt(plaintext: Serializable, associated_data: Serializable): Ciphertext {
     const { secretKey, publicKey } = ed.keygen();
-    const hashed_id = hash_to_fr(publicKey);
-
-    const bibe_ct = this.bibe_encrypt(plaintext, hashed_id);
 
     let associated_data_bytes;
     {
@@ -166,6 +163,14 @@ export class EncryptionKey extends Serializable {
       associated_data.serialize(serializer);
       associated_data_bytes = serializer.toUint8Array();
     }
+
+    let hash_preimage_bytes = new Uint8Array(publicKey.length + associated_data_bytes.length)
+    hash_preimage_bytes.set(publicKey)
+    hash_preimage_bytes.set(associated_data_bytes, publicKey.length);
+
+    const hashed_id = hash_to_fr(hash_preimage_bytes);
+    const bibe_ct = this.bibe_encrypt(plaintext, hashed_id);
+
     let to_sign;
     {
       let serializer = new Serializer();
