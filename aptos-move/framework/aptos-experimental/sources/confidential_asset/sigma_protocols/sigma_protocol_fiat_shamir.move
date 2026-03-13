@@ -1,11 +1,8 @@
 module aptos_experimental::sigma_protocol_fiat_shamir {
-    use std::bcs;
     use std::error;
     use std::string::String;
-    use aptos_std::aptos_hash::sha2_512;
-    use aptos_std::ristretto255::{CompressedRistretto, Scalar, new_scalar_uniform_from_64_bytes,
-        scalar_one, scalar_mul
-    };
+    use aptos_std::aptos_hash::{sha2_512, sha2_512_value};
+    use aptos_std::ristretto255::{CompressedRistretto, Scalar, new_scalar_uniform_from_64_bytes, scalar_one};
     use aptos_std::type_info;
     use aptos_experimental::sigma_protocol_statement::Statement;
 
@@ -87,25 +84,27 @@ module aptos_experimental::sigma_protocol_fiat_shamir {
         // which will include any public parameters like group generators $G$, $H$.
 
         // Note: A hardcodes $m$, the statement hardcodes $n_1$ and $n_2$, and $k$ is specified manually!
-        let bytes = bcs::to_bytes(&FiatShamirInputs {
+        let fs_inputs = FiatShamirInputs {
             dst,
             type_name: type_info::type_name<P>(),
             k,
             stmt_X: *stmt.get_compressed_points(),
             stmt_x: *stmt.get_scalars(),
             proof_A: *compressed_A
-        });
+        };
 
-        // TODO(Security): A bit ad-hoc.
-        let seed = sha2_512(bytes);
+        let seed = sha2_512_value(&fs_inputs);
 
-        // e = SHA2-512(SHA2-512(bytes) || 0x00)
+        // Note:A more principled `Merlin` / `spongefish`-like approach would have been preferred, but... more code.
+        //
+        // e = SHA2-512(SHA2-512(fs_inputs.to_bcs_bytes()) || 0x00)
         seed.push_back(0u8);
+        assert!(*seed.last() == 0, error::internal(E_INTERNAL_INVARIANT_FAILED));
         let e_hash = sha2_512(seed);
 
-        // beta = SHA2-512(SHA2-512(bytes) || 0x01)
-        let len = seed.length();
-        seed[len - 1] = 1u8;
+        // beta = SHA2-512(SHA2-512(fs_inputs.to_bcs_bytes()) || 0x01)
+        *seed.last_mut() += 1;
+        assert!(*seed.last() == 1, error::internal(E_INTERNAL_INVARIANT_FAILED));
         let beta_hash = sha2_512(seed);
 
         let e = new_scalar_uniform_from_64_bytes(e_hash).extract();
@@ -115,7 +114,7 @@ module aptos_experimental::sigma_protocol_fiat_shamir {
         let prev_beta = scalar_one();
         betas.push_back(prev_beta);
         for (_i in 1..m) {
-            prev_beta = scalar_mul(&prev_beta, &beta);
+            prev_beta = prev_beta.scalar_mul(&beta);
             betas.push_back(prev_beta);
         };
 
