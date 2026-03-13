@@ -590,6 +590,8 @@ impl TExecutionClient for ExecutionProxyClient {
             aux_version,
             network_sender,
             secret_share_config,
+            self.consensus_publisher.clone(),
+            self.consensus_observer_config.enable_v2_message_sending,
         );
 
         maybe_rand_msg_tx
@@ -618,7 +620,7 @@ impl TExecutionClient for ExecutionProxyClient {
             if let Some(tx) = block.pipeline_tx().lock().as_mut() {
                 tx.order_proof_tx
                     .take()
-                    .map(|tx| tx.send(ordered_proof.clone()));
+                    .map(|tx| tx.send((blocks.clone(), ordered_proof.clone())));
             }
         }
 

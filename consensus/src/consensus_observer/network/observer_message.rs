@@ -353,31 +353,31 @@ impl ExecutionPoolWindow {
 }
 
 /// Borrowed V2 wire format for serialization (avoids cloning PipelinedBlock fields).
+/// Note: `input_transactions` is omitted; the observer uses `decrypted_txns` instead.
 #[derive(Serialize)]
 struct PipelinedBlockV2Ref<'a> {
     block: &'a Block,
-    input_transactions: &'a Vec<SignedTransaction>,
     randomness: Option<&'a Randomness>,
     secret_shared_key: Option<&'a SecretSharedKey>,
-    decrypted_encrypted_txns: Vec<SignedTransaction>,
+    decrypted_txns: Vec<SignedTransaction>,
 }
 
 /// Owned V2 wire format for deserialization.
+/// Note: `input_transactions` is not on the wire; observer constructs PipelinedBlock with empty vec.
 #[derive(Deserialize)]
 struct PipelinedBlockV2Owned {
     block: Block,
-    input_transactions: Vec<SignedTransaction>,
     randomness: Option<Randomness>,
     secret_shared_key: Option<SecretSharedKey>,
     #[serde(default)]
-    decrypted_encrypted_txns: Vec<SignedTransaction>,
+    decrypted_txns: Vec<SignedTransaction>,
 }
 
 impl PipelinedBlockV2Owned {
     fn into_pipelined_block(self) -> Arc<PipelinedBlock> {
         let block = PipelinedBlock::new(
             self.block,
-            self.input_transactions,
+            Vec::new(),
             aptos_executor_types::state_compute_result::StateComputeResult::new_dummy(),
         );
         if let Some(r) = self.randomness {
@@ -386,8 +386,8 @@ impl PipelinedBlockV2Owned {
         if let Some(key) = self.secret_shared_key {
             block.set_decryption_key(key);
         }
-        if !self.decrypted_encrypted_txns.is_empty() {
-            block.set_decrypted_encrypted_txns(self.decrypted_encrypted_txns);
+        if !self.decrypted_txns.is_empty() {
+            block.set_decrypted_txns(self.decrypted_txns);
         }
         Arc::new(block)
     }
@@ -433,10 +433,9 @@ impl Serialize for OrderedBlockV2 {
                 .iter()
                 .map(|pb| PipelinedBlockV2Ref {
                     block: pb.block(),
-                    input_transactions: pb.input_transactions(),
                     randomness: pb.randomness(),
                     secret_shared_key: pb.secret_shared_key(),
-                    decrypted_encrypted_txns: pb.decrypted_encrypted_txns(),
+                    decrypted_txns: pb.decrypted_txns().unwrap_or_default(),
                 })
                 .collect(),
             ordered_proof: &self.ordered_proof,

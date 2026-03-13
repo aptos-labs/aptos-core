@@ -12,7 +12,7 @@ use aptos_batch_encryption::{
 use aptos_consensus_types::{
     block::Block,
     common::Author,
-    pipelined_block::{DecryptionResult, MaterializeResult, TaskFuture, TaskResult},
+    pipelined_block::{DecryptionResult, MaterializeResult, TaskError, TaskFuture, TaskResult},
 };
 use aptos_logger::{error, info};
 use aptos_types::{
@@ -39,7 +39,7 @@ impl PipelineBuilder {
         derived_self_key_share_tx: oneshot::Sender<Option<SecretShare>>,
         secret_shared_key_rx: oneshot::Receiver<Option<SecretSharedKey>>,
         observer_enabled: bool,
-        decrypted_encrypted_txns_param: Vec<SignedTransaction>,
+        observer_decrypted_txns: Option<Vec<SignedTransaction>>,
     ) -> TaskResult<DecryptionResult> {
         let mut tracker = Tracker::start_waiting("decrypt_encrypted_txns", &block);
         let (input_txns, max_txns_from_block_to_execute, block_gas_limit) = materialize_fut.await?;
@@ -50,8 +50,8 @@ impl PipelineBuilder {
         // If decryption is disabled (by config or missing secret share config), pass through.
         if !is_decryption_enabled {
             return Ok(DecryptionResult {
-                decrypted_encrypted_txns: Vec::new(),
-                unencrypted_txns: input_txns,
+                decrypted_txns: Vec::new(),
+                regular_txns: input_txns,
                 max_txns_from_block_to_execute,
                 block_gas_limit,
                 decryption_key: None,
@@ -71,15 +71,22 @@ impl PipelineBuilder {
             // secret_shared_key_rx) -> ordering (blocked on has_rand_txns_fut).
             if !observer_enabled {
                 return Ok(DecryptionResult {
-                    decrypted_encrypted_txns: Vec::new(),
-                    unencrypted_txns: input_txns,
+                    decrypted_txns: Vec::new(),
+                    regular_txns: input_txns,
                     max_txns_from_block_to_execute,
                     block_gas_limit,
                     decryption_key: Some(None),
                 });
             }
+
+            if observer_decrypted_txns.is_none() {
+                return Err(TaskError::InternalError(Arc::new(anyhow!(
+                    "observer decrypted txns should be available"
+                ))));
+            }
+
             // Observer: partition out encrypted txns, discard them, use pre-decrypted txns from validator.
-            let (_, unencrypted_txns): (Vec<_>, Vec<_>) = input_txns
+            let (_, regular_txns): (Vec<_>, Vec<_>) = input_txns
                 .into_iter()
                 .partition(|txn| txn.is_encrypted_txn());
             // Observer: wait for the decryption key from the ordering path.
@@ -96,15 +103,16 @@ impl PipelineBuilder {
                 )
             });
             return Ok(DecryptionResult {
-                decrypted_encrypted_txns: decrypted_encrypted_txns_param,
-                unencrypted_txns,
+                decrypted_txns: observer_decrypted_txns
+                    .expect("observer decrypted txns should be available"),
+                regular_txns,
                 max_txns_from_block_to_execute,
                 block_gas_limit,
                 decryption_key: Some(dec_key),
             });
         };
 
-        let (encrypted_txns, unencrypted_txns): (Vec<_>, Vec<_>) = input_txns
+        let (encrypted_txns, regular_txns): (Vec<_>, Vec<_>) = input_txns
             .into_iter()
             .partition(|txn| txn.is_encrypted_txn());
 
@@ -227,7 +235,7 @@ impl PipelineBuilder {
             "Decryption complete for block {}: {} encrypted, {} unencrypted",
             block.round(),
             decrypted_txns.len(),
-            unencrypted_txns.len()
+            regular_txns.len()
         );
         let block_txn_dec_key = BlockTxnDecryptionKey::new(
             DecKeyMetadata {
@@ -238,8 +246,8 @@ impl PipelineBuilder {
         );
 
         Ok(DecryptionResult {
-            decrypted_encrypted_txns: decrypted_txns,
-            unencrypted_txns,
+            decrypted_txns,
+            regular_txns,
             max_txns_from_block_to_execute,
             block_gas_limit,
             decryption_key: Some(Some(block_txn_dec_key)),
