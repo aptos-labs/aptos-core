@@ -47,6 +47,10 @@ impl LocalVersion {
 pub struct LocalFactory {
     versions: Arc<HashMap<Version, LocalVersion>>,
     swarm_dir: Option<String>,
+    /// Per-validator CPU affinity sets, e.g. ["0-21", "22-43", "44-65", "66-87"].
+    cpu_affinities: Option<Vec<String>>,
+    /// Per-VFN CPU affinity sets, e.g. ["88-109", "110-131", "132-153", "154-175"].
+    vfn_cpu_affinities: Option<Vec<String>>,
 }
 
 impl LocalFactory {
@@ -54,10 +58,16 @@ impl LocalFactory {
         Self {
             versions: Arc::new(versions),
             swarm_dir,
+            cpu_affinities: None,
+            vfn_cpu_affinities: None,
         }
     }
 
-    pub fn from_workspace(swarm_dir: Option<String>) -> Result<Self> {
+    pub fn from_workspace(
+        swarm_dir: Option<String>,
+        cpu_affinities: Option<Vec<String>>,
+        vfn_cpu_affinities: Option<Vec<String>>,
+    ) -> Result<Self> {
         let mut versions = HashMap::new();
         let new_version = cargo::get_aptos_node_binary_from_worktree().map(|(revision, bin)| {
             let version = Version::new(usize::MAX, revision);
@@ -65,7 +75,10 @@ impl LocalFactory {
         })?;
 
         versions.insert(new_version.version.clone(), new_version);
-        Ok(Self::new(versions, swarm_dir))
+        let mut factory = Self::new(versions, swarm_dir);
+        factory.cpu_affinities = cpu_affinities;
+        factory.vfn_cpu_affinities = vfn_cpu_affinities;
+        Ok(factory)
     }
 
     pub fn from_revision(revision: &str) -> Result<Self> {
@@ -143,11 +156,21 @@ impl LocalFactory {
             guard,
         )?;
 
+        // Apply per-node CPU affinities if configured
+        if let Some(ref affinities) = self.cpu_affinities {
+            swarm.set_cpu_affinities(affinities);
+        }
+
         // Launch the swarm
         swarm
             .launch()
             .await
             .with_context(|| format!("Swarm logs can be found here: {}", swarm.logs_location()))?;
+
+        // Apply per-VFN CPU affinities if configured
+        if let Some(ref affinities) = self.vfn_cpu_affinities {
+            swarm.set_vfn_cpu_affinities(affinities);
+        }
 
         let vfn_config = vfn_config.unwrap_or_else(NodeConfig::get_default_vfn_config);
         let vfn_override_config = OverrideNodeConfig::new_with_default_base(vfn_config);

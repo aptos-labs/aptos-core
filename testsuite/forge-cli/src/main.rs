@@ -87,6 +87,18 @@ enum OperatorCommand {
 struct LocalSwarm {
     #[clap(long, help = "directory to build local swarm under")]
     swarmdir: Option<String>,
+    #[clap(
+        long,
+        help = "Pin each validator to a CPU set via taskset. Comma-separated list of CPU ranges, \
+                one per validator, e.g. '0-21,22-43,44-65,66-87'"
+    )]
+    cpu_affinity: Option<String>,
+    #[clap(
+        long,
+        help = "Pin each VFN to a CPU set via taskset. Comma-separated list of CPU ranges, \
+                one per VFN (matching validator order), e.g. '88-109,110-131,132-153,154-175'"
+    )]
+    vfn_cpu_affinity: Option<String>,
 }
 
 #[derive(Parser, Debug)]
@@ -284,11 +296,23 @@ fn main() -> Result<()> {
                             mempool_backlog: 5000,
                         }));
                     let swarm_dir = local_cfg.swarmdir.clone();
+                    let cpu_affinities = local_cfg
+                        .cpu_affinity
+                        .as_ref()
+                        .map(|s| s.split(',').map(|s| s.trim().to_string()).collect());
+                    let vfn_cpu_affinities = local_cfg
+                        .vfn_cpu_affinity
+                        .as_ref()
+                        .map(|s| s.split(',').map(|s| s.trim().to_string()).collect());
                     let forge = Forge::new(
                         &args.options,
                         test_suite,
                         duration,
-                        LocalFactory::from_workspace(swarm_dir)?,
+                        LocalFactory::from_workspace(
+                            swarm_dir,
+                            cpu_affinities,
+                            vfn_cpu_affinities,
+                        )?,
                     );
                     run_forge(forge, &args.options)
                 },

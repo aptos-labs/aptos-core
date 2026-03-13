@@ -99,6 +99,9 @@ pub struct LocalSwarm {
     chain_id: ChainId,
     root_key: ConfigKey<Ed25519PrivateKey>,
 
+    /// Per-VFN CPU affinity sets, indexed by validator rank (sorted by index).
+    vfn_cpu_affinities: Option<Vec<String>>,
+
     launched: bool,
     #[allow(dead_code)]
     guard: ActiveNodesGuard,
@@ -139,8 +142,7 @@ impl LocalSwarm {
             )?
             .with_num_validators(number_of_validators)
             .with_init_config(Some(Arc::new(move |index, config, base| {
-                // for local tests, turn off parallel execution:
-                config.execution.concurrency_level = 1;
+                config.execution.concurrency_level = 16;
 
                 // Single node orders blocks too fast which would trigger backpressure and stall for 1 sec
                 // which cause flakiness in tests.
@@ -258,9 +260,56 @@ impl LocalSwarm {
             root_account,
             chain_id: ChainId::test(),
             root_key,
+            vfn_cpu_affinities: None,
             launched: false,
             guard,
         })
+    }
+
+    /// Assign CPU and NUMA affinities to validators by index order.
+    ///
+    /// Each entry in `affinities` is a CPU set string (e.g. "0-10") for the
+    /// validator at that index. Validator at index `i` is bound to NUMA node `i`
+    /// (both CPU scheduling and memory allocation).
+    ///
+    /// We assume exactly 4 validators mapped 1:1 to 4 NUMA nodes.
+    pub fn set_cpu_affinities(&mut self, affinities: &[String]) {
+        assert_eq!(
+            self.validators.len(),
+            4,
+            "Expected exactly 4 validators for NUMA binding, got {}",
+            self.validators.len()
+        );
+        assert_eq!(
+            affinities.len(),
+            4,
+            "Expected exactly 4 CPU affinity sets (one per NUMA node), got {}",
+            affinities.len()
+        );
+
+        let mut validators: Vec<&mut LocalNode> = self.validators.values_mut().collect();
+        validators.sort_by_key(|v| v.index());
+        for (numa_node, (node, cpuset)) in validators.iter_mut().zip(affinities.iter()).enumerate()
+        {
+            info!(
+                "Pinning node {} (index {}) to NUMA node {} with CPUs: {}",
+                node.name(),
+                node.index(),
+                numa_node,
+                cpuset,
+            );
+            node.set_numa_node(numa_node);
+            node.set_cpu_affinity(cpuset.clone());
+        }
+    }
+
+    /// Store per-VFN CPU affinities to be applied when fullnodes are created.
+    ///
+    /// Each entry is a CPU set string for the VFN paired with the validator at
+    /// that rank (sorted by index). The NUMA node is derived from the rank,
+    /// matching the validator's NUMA assignment.
+    pub fn set_vfn_cpu_affinities(&mut self, affinities: &[String]) {
+        self.vfn_cpu_affinities = Some(affinities.to_vec());
     }
 
     pub async fn launch(&mut self) -> Result<()> {
@@ -367,13 +416,35 @@ impl LocalSwarm {
         )?;
 
         let version = self.versions.get(version).unwrap();
-        let fullnode = LocalNode::new(
+        let mut fullnode = LocalNode::new(
             version.to_owned(),
             fullnode_config.name,
             index,
             fullnode_config.dir,
             None,
         )?;
+
+        // Apply VFN CPU affinity if configured. The VFN inherits the NUMA node
+        // of its paired validator (determined by the validator's rank in
+        // index-sorted order).
+        if let Some(ref affinities) = self.vfn_cpu_affinities {
+            let validator_index = self.validators.get(&validator_peer_id).unwrap().index();
+            let mut indices: Vec<usize> = self.validators.values().map(|v| v.index()).collect();
+            indices.sort();
+            let rank = indices.iter().position(|&i| i == validator_index).unwrap();
+            if rank < affinities.len() {
+                let cpuset = &affinities[rank];
+                info!(
+                    "Pinning VFN {} (for validator index {}) to NUMA node {} with CPUs: {}",
+                    fullnode.name(),
+                    validator_index,
+                    rank,
+                    cpuset,
+                );
+                fullnode.set_numa_node(rank);
+                fullnode.set_cpu_affinity(cpuset.clone());
+            }
+        }
 
         let peer_id = fullnode.peer_id();
         assert_eq!(peer_id, validator_peer_id);

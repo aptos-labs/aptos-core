@@ -159,7 +159,7 @@ pub fn git_merge_base<R: AsRef<str>>(rev: R) -> Result<String> {
 }
 
 pub fn cargo_build_common_args() -> Vec<&'static str> {
-    let mut args = vec!["build", "--features=failpoints,smoke-test"];
+    let mut args = vec!["build", "--features=smoke-test"];
     if build_consensus_only_node() {
         args.push("--features=consensus-only-perf-test");
     }

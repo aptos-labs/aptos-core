@@ -31,5 +31,9 @@ fn main() -> Result<()> {
         ));
 
     let options = Options::parse();
-    forge_main(tests, LocalFactory::from_workspace(None)?, &options)
+    forge_main(
+        tests,
+        LocalFactory::from_workspace(None, None, None)?,
+        &options,
+    )
 }

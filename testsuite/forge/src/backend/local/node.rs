@@ -56,6 +56,12 @@ pub struct LocalNode {
     peer_id: AccountAddress,
     directory: PathBuf,
     config: NodeConfig,
+    /// If set, bind this node to the given CPU set via `taskset -c`.
+    /// Example: "0-10" or "0,2,4,6".
+    cpu_affinity: Option<String>,
+    /// If set, bind this node to the given NUMA node via `numactl`.
+    /// Both CPU and memory allocation will be restricted to this NUMA node.
+    numa_node: Option<usize>,
 }
 
 impl LocalNode {
@@ -87,6 +93,8 @@ impl LocalNode {
             peer_id,
             directory,
             config,
+            cpu_affinity: None,
+            numa_node: None,
         })
     }
 
@@ -114,6 +122,14 @@ impl LocalNode {
         &self.account_private_key
     }
 
+    pub fn set_cpu_affinity(&mut self, cpuset: String) {
+        self.cpu_affinity = Some(cpuset);
+    }
+
+    pub fn set_numa_node(&mut self, node: usize) {
+        self.numa_node = Some(node);
+    }
+
     pub fn start(&self) -> Result<()> {
         let mut process_locker = self.process.lock().unwrap();
         ensure!(
@@ -128,8 +144,33 @@ impl LocalNode {
             .append(true)
             .open(self.log_path())?;
 
-        // Start node process
-        let mut node_command = Command::new(self.version.bin());
+        // Start node process, optionally pinned to a NUMA node and/or CPU set.
+        // When both are set: numactl --cpunodebind=N --membind=N taskset -c <cpuset> <binary>
+        let mut node_command = match (&self.numa_node, &self.cpu_affinity) {
+            (Some(numa), Some(cpuset)) => {
+                let mut cmd = Command::new("numactl");
+                cmd.arg(format!("--cpunodebind={}", numa))
+                    .arg(format!("--membind={}", numa))
+                    .arg("taskset")
+                    .arg("-c")
+                    .arg(cpuset)
+                    .arg(self.version.bin());
+                cmd
+            },
+            (Some(numa), None) => {
+                let mut cmd = Command::new("numactl");
+                cmd.arg(format!("--cpunodebind={}", numa))
+                    .arg(format!("--membind={}", numa))
+                    .arg(self.version.bin());
+                cmd
+            },
+            (None, Some(cpuset)) => {
+                let mut cmd = Command::new("taskset");
+                cmd.arg("-c").arg(cpuset).arg(self.version.bin());
+                cmd
+            },
+            (None, None) => Command::new(self.version.bin()),
+        };
         node_command
             .current_dir(&self.directory)
             .arg("-f")
