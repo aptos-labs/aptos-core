@@ -649,7 +649,7 @@ impl Builder {
 
         let mut genesis_config = GenesisConfiguration {
             allow_new_validators: false,
-            epoch_duration_secs: ONE_DAY,
+            epoch_duration_secs: 300,
             is_test: true,
             min_stake: 0,
             min_voting_threshold: 0,
