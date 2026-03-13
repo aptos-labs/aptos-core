@@ -270,7 +270,7 @@ jobs:
       GIT_SHA: ${{ needs.determine-docker-build-metadata.outputs.gitSha }}
       FORGE_TEST_SUITE: realistic_env_max_load
       IMAGE_TAG: ${{ needs.determine-docker-build-metadata.outputs.gitSha }}
-      FORGE_RUNNER_DURATION_SECS: 480
+      FORGE_RUNNER_DURATION_SECS: 1800
       COMMENT_HEADER: forge-e2e
       # Use the cache ID as the Forge namespace so we can limit Forge test concurrency on k8s, since Forge
       # test lifecycle is separate from that of GHA. This protects us from the case where many Forge tests are triggered
