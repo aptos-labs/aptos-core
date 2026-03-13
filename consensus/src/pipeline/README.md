@@ -67,7 +67,8 @@ The result: end-to-end blockchain latency ≈ consensus latency, with execution,
 | Stage                  | Waits for                                     | What it does                                                       |
 | ---------------------- | --------------------------------------------- | ------------------------------------------------------------------ |
 | **Materialize**        | QC arrives for block                          | Resolves payload (fetches batches from QuorumStore)                |
-| **Prepare**            | Materialize, Decryption (if enabled)          | Prepares block for execution, verifies transaction signatures      |
+| **Decrypt**            | Materialize, secret_shared_key_rx             | Decrypts encrypted transactions using threshold decryption key     |
+| **Prepare**            | Decrypt                                       | Prepares block for execution, verifies transaction signatures      |
 | **Rand Txns Check**    | Prepare, parent Execute                       | Scans transactions for randomness annotations                      |
 | **Wait for Rand**      | Rand Txns Check, rand_rx                      | Waits for randomness value if block needs it; no-op otherwise      |
 | **Execute**            | Prepare, Wait for Rand, parent Execute        | Runs Block-STM parallel execution                                  |
@@ -104,6 +105,7 @@ Each block receives external signals via `PipelineInputTx` channels:
 - **order_vote_rx** — order vote received for this block
 - **order_proof_tx** — order proof (WrappedLedgerInfo) for this block
 - **commit_proof_tx** — commit proof (LedgerInfoWithSignatures) for this block
+- **secret_shared_key_rx** — threshold decryption key (if encrypted transactions are enabled)
 
 ## BufferManager
 
