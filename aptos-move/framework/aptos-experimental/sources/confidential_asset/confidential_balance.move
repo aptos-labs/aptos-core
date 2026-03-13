@@ -93,11 +93,6 @@ module aptos_experimental::confidential_balance {
         self.R.all(|r| r.is_identity())
     }
 
-    /// Sets the R component of a compressed balance (friend-gated, no validation).
-    public(friend) fun set_R<T>(self: &mut CompressedBalance<T>, new_R: vector<CompressedRistretto>) {
-        self.R = new_R;
-    }
-
     /// Element-wise P and R addition. R_aud is NOT touched.
     public(friend) fun add_mut_base<T>(self: &mut Balance<T>, rhs_P: &vector<RistrettoPoint>, rhs_R: &vector<RistrettoPoint>) {
         vector::range(0, rhs_P.length()).for_each(|i| {
@@ -140,12 +135,6 @@ module aptos_experimental::confidential_balance {
 
     public(friend) fun new_pending_from_p_and_r(p: vector<RistrettoPoint>, r: vector<RistrettoPoint>): Balance<Pending> {
         new_balance(p, r, vector[], PENDING_BALANCE_CHUNKS)
-    }
-
-    public(friend) fun new_compressed_pending_from_p_and_r(
-        p: vector<CompressedRistretto>, r: vector<CompressedRistretto>
-    ): CompressedBalance<Pending> {
-        new_compressed_balance(p, r, vector[], PENDING_BALANCE_CHUNKS)
     }
 
     public fun new_zero_pending_compressed(): CompressedBalance<Pending> {
