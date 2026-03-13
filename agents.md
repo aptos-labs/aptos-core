@@ -312,3 +312,49 @@ Example:
 ```
 
 Areas: `vm`, `framework`, `consensus`, `storage`, `api`, `network`, `types`, `cli`, `docs`, `test`
+
+## Cursor Cloud specific instructions
+
+### System Dependencies
+
+The VM update script runs `./scripts/dev_setup.sh -b -t -k` (batch, build tools, skip pre-commit) which installs clang-21, lld, protoc 3.21.4, cargo-sort, cargo-machete, and the Rust 1.93.1 toolchain.
+
+One extra apt package is needed beyond what `dev_setup.sh` installs: `libstdc++-14-dev`. Without it, clang-21 cannot find C++ standard library headers (`<limits>`, `<memory>`) and RocksDB compilation fails. The update script installs this automatically.
+
+### Building
+
+- `cargo check -p <package>` for quick compilation checks (no RocksDB dependency).
+- `cargo build -p aptos-node` builds the main node binary (~4 min from cold, ~1 min incremental). Requires RocksDB (C++ compilation via clang).
+- `cargo build -p aptos` builds the CLI tool (~8 min from cold).
+- See `CLAUDE.md` for the full set of build/test/lint commands.
+
+### Running a Local Testnet
+
+Start a local testnet with a faucet using the CLI:
+
+```bash
+cargo build -p aptos-node -p aptos
+./target/debug/aptos node run-local-testnet --with-faucet --force-restart --assume-yes
+```
+
+This starts:
+- REST API on `http://127.0.0.1:8080`
+- Faucet on `http://127.0.0.1:8081`
+- Indexer gRPC on `127.0.0.1:50051`
+- Metrics on `http://127.0.0.1:9101`
+
+The faucet takes ~15-20 seconds to become ready after the API is up.
+
+### Linting
+
+- `cargo xclippy` runs workspace-wide clippy (the `xclippy` alias in `.cargo/config.toml` includes all needed flags).
+- Per-package clippy: replicate the flags from the xclippy alias but replace `--workspace` with `-p <package>`.
+- `cargo +nightly fmt --check` for formatting.
+- `cargo sort --grouped --workspace --check` for Cargo.toml dependency ordering.
+- `./scripts/rust_lint.sh --check` runs all lint checks together.
+
+### Testing
+
+- `cargo test -p <package>` for package-level tests.
+- The `accounts/resources` REST endpoint requires an indexer; use specific resource lookups (`/v1/accounts/{addr}/resource/{type}`) instead.
+- The `--test-threads=4` flag is recommended to avoid overloading the 4-core VM.
