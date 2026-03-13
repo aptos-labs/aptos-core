@@ -317,6 +317,27 @@ impl LedgerDb {
         Ok(())
     }
 
+    pub(crate) fn flush_wal(&self, sync: bool) -> Result<()> {
+        let dbs: [&DB; 7] = [
+            self.metadata_db_raw(),
+            self.event_db_raw(),
+            self.transaction_db_raw(),
+            self.transaction_info_db_raw(),
+            self.transaction_accumulator_db_raw(),
+            self.write_set_db_raw(),
+            self.persisted_auxiliary_info_db_raw(),
+        ];
+        THREAD_MANAGER.get_io_pool().scope(|s| {
+            for db in dbs {
+                s.spawn(move |_| {
+                    db.flush_wal(sync)
+                        .unwrap_or_else(|err| panic!("Failed to flush WAL: {err}"));
+                });
+            }
+        });
+        Ok(())
+    }
+
     pub(crate) fn metadata_db(&self) -> &LedgerMetadataDb {
         &self.ledger_metadata_db
     }

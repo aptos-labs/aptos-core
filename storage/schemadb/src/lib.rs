@@ -336,6 +336,13 @@ impl DB {
             .map_err(Into::into)
     }
 
+    /// Flushes all pending WAL writes to disk. When `sync` is true, the WAL is also synced
+    /// (fdatasync). This is useful for batching multiple relaxed writes and then issuing a single
+    /// sync at the end.
+    pub fn flush_wal(&self, sync: bool) -> DbResult<()> {
+        self.inner.flush_wal(sync).into_db_res()
+    }
+
     /// Flushes memtable data. This is only used for testing `get_approximate_sizes_cf` in unit
     /// tests.
     pub fn flush_cf(&self, cf_name: &str) -> DbResult<()> {

@@ -113,6 +113,7 @@ impl PersistedAuxiliaryInfoDb {
         &self,
         first_version: Version,
         persisted_auxiliary_info: &[PersistedAuxiliaryInfo],
+        sync: bool,
     ) -> Result<()> {
         let _timer = OTHER_TIMERS_SECONDS.timer_with(&["commit_auxiliary_info"]);
 
@@ -126,7 +127,11 @@ impl PersistedAuxiliaryInfoDb {
 
         {
             let _timer = OTHER_TIMERS_SECONDS.timer_with(&["commit_auxiliary_info___commit"]);
-            self.write_schemas(batch)
+            if sync {
+                self.write_schemas(batch)
+            } else {
+                self.db.write_schemas_relaxed(batch)
+            }
         }
     }
 

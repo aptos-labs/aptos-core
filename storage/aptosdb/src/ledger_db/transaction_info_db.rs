@@ -45,6 +45,10 @@ impl TransactionInfoDb {
     pub(crate) fn write_schemas(&self, batch: SchemaBatch) -> Result<()> {
         self.db.write_schemas(batch)
     }
+
+    pub(crate) fn write_schemas_relaxed(&self, batch: SchemaBatch) -> Result<()> {
+        self.db.write_schemas_relaxed(batch)
+    }
 }
 
 impl TransactionInfoDb {

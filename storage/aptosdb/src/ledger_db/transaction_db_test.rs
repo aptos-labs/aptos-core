@@ -145,7 +145,7 @@ pub(crate) fn init_db(
     assert!(transaction_db.get_transaction(0).is_err());
 
     transaction_db
-        .commit_transactions(0, &txns, /*skip_index=*/ false)
+        .commit_transactions(0, &txns, /*skip_index=*/ false, true /* sync */)
         .unwrap();
 
     txns

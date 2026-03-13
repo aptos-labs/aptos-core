@@ -662,7 +662,7 @@ pub fn put_persisted_auxiliary_info(
 ) {
     db.ledger_db
         .persisted_auxiliary_info_db()
-        .commit_auxiliary_info(version, persisted_info)
+        .commit_auxiliary_info(version, persisted_info, true /* sync */)
         .unwrap()
 }
 
@@ -671,8 +671,9 @@ pub fn put_transaction_infos(
     version: Version,
     txn_infos: &[TransactionInfo],
 ) -> HashValue {
-    db.commit_transaction_infos(version, txn_infos).unwrap();
-    db.commit_transaction_accumulator(version, txn_infos)
+    db.commit_transaction_infos(version, txn_infos, true /* sync */)
+        .unwrap();
+    db.commit_transaction_accumulator(version, txn_infos, true /* sync */)
         .unwrap()
 }
 
