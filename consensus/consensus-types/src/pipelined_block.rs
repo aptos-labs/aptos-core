@@ -70,12 +70,15 @@ pub type TaskResult<T> = Result<T, TaskError>;
 pub type TaskFuture<T> = Shared<BoxFuture<'static, TaskResult<T>>>;
 
 pub type MaterializeResult = (Vec<SignedTransaction>, Option<u64>, Option<u64>);
-pub type DecryptionResult = (
-    Vec<SignedTransaction>,
-    Option<u64>,
-    Option<u64>,
-    Option<Option<BlockTxnDecryptionKey>>,
-);
+
+#[derive(Clone, Debug)]
+pub struct DecryptionResult {
+    pub decrypted_encrypted_txns: Vec<SignedTransaction>,
+    pub unencrypted_txns: Vec<SignedTransaction>,
+    pub max_txns_from_block_to_execute: Option<u64>,
+    pub block_gas_limit: Option<u64>,
+    pub decryption_key: Option<Option<BlockTxnDecryptionKey>>,
+}
 pub type PrepareResult = (
     Arc<Vec<SignatureVerifiedTransaction>>,
     Option<u64>,
@@ -96,6 +99,7 @@ pub type SecretShareResult = Option<SecretShare>;
 
 #[derive(Clone)]
 pub struct PipelineFutures {
+    pub decryption_fut: TaskFuture<DecryptionResult>,
     pub prepare_fut: TaskFuture<PrepareResult>,
     pub has_rand_txns_fut: TaskFuture<bool>,
     pub rand_check_fut: TaskFuture<RandResult>,
@@ -221,6 +225,8 @@ pub struct PipelinedBlock {
     secret_shared_key: OnceCell<SecretSharedKey>,
     pipeline_insertion_time: OnceCell<Instant>,
     execution_summary: OnceCell<ExecutionSummary>,
+    /// Decrypted transactions that were originally encrypted, for observer publishing.
+    decrypted_encrypted_txns: Mutex<Vec<SignedTransaction>>,
     /// pipeline related fields
     pipeline_futs: Mutex<Option<PipelineFutures>>,
     pipeline_tx: Mutex<Option<PipelineInputTx>>,
@@ -406,6 +412,7 @@ impl PipelinedBlock {
             secret_shared_key: OnceCell::new(),
             pipeline_insertion_time: OnceCell::new(),
             execution_summary: OnceCell::new(),
+            decrypted_encrypted_txns: Mutex::new(Vec::new()),
             pipeline_futs: Mutex::new(None),
             pipeline_tx: Mutex::new(None),
             pipeline_abort_handle: Mutex::new(None),
@@ -532,6 +539,14 @@ impl PipelinedBlock {
 
     pub fn qc(&self) -> Option<Arc<QuorumCert>> {
         self.block_qc.lock().clone()
+    }
+
+    pub fn decrypted_encrypted_txns(&self) -> Vec<SignedTransaction> {
+        self.decrypted_encrypted_txns.lock().clone()
+    }
+
+    pub fn set_decrypted_encrypted_txns(&self, txns: Vec<SignedTransaction>) {
+        *self.decrypted_encrypted_txns.lock() = txns;
     }
 }
 
