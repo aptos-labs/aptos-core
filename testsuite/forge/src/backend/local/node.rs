@@ -128,8 +128,31 @@ impl LocalNode {
             .append(true)
             .open(self.log_path())?;
 
-        // Start node process
-        let mut node_command = Command::new(self.version.bin());
+        // Start node process (optionally with NUMA pinning via env vars).
+        // FORGE_CPU_AFFINITY_<index>: CPU list for physcpubind/taskset
+        // FORGE_MEM_BIND_<index>: NUMA node(s) for membind
+        let cpu_key = format!("FORGE_CPU_AFFINITY_{}", self.index);
+        let mem_key = format!("FORGE_MEM_BIND_{}", self.index);
+        let mut node_command = match (env::var(&cpu_key), env::var(&mem_key)) {
+            (Ok(cpu_set), Ok(mem_node)) => {
+                info!(
+                    "Node {}: numactl --physcpubind={} --membind={}",
+                    self.name, cpu_set, mem_node
+                );
+                let mut cmd = Command::new("numactl");
+                cmd.arg("--physcpubind").arg(&cpu_set)
+                    .arg("--membind").arg(&mem_node)
+                    .arg(self.version.bin());
+                cmd
+            },
+            (Ok(cpu_set), Err(_)) => {
+                info!("Node {}: taskset -c {}", self.name, cpu_set);
+                let mut cmd = Command::new("taskset");
+                cmd.arg("-c").arg(&cpu_set).arg(self.version.bin());
+                cmd
+            },
+            _ => Command::new(self.version.bin()),
+        };
         node_command
             .current_dir(&self.directory)
             .arg("-f")

@@ -47,6 +47,7 @@ impl LocalVersion {
 pub struct LocalFactory {
     versions: Arc<HashMap<Version, LocalVersion>>,
     swarm_dir: Option<String>,
+    num_public_fullnodes: usize,
 }
 
 impl LocalFactory {
@@ -54,7 +55,13 @@ impl LocalFactory {
         Self {
             versions: Arc::new(versions),
             swarm_dir,
+            num_public_fullnodes: 0,
         }
+    }
+
+    pub fn with_num_public_fullnodes(mut self, num: usize) -> Self {
+        self.num_public_fullnodes = num;
+        self
     }
 
     pub fn from_workspace(swarm_dir: Option<String>) -> Result<Self> {
@@ -129,6 +136,7 @@ impl LocalFactory {
         R: ::rand::RngCore + ::rand::CryptoRng,
     {
         let swarmdir = self.swarm_dir.clone().map(|sd| PathBuf::from(sd.as_str()));
+        let keep_public_networks = self.num_public_fullnodes > 0;
         // Build the swarm
         let mut swarm = LocalSwarm::build(
             rng,
@@ -141,6 +149,7 @@ impl LocalFactory {
             swarmdir,
             genesis_framework,
             guard,
+            keep_public_networks,
         )?;
 
         // Launch the swarm
@@ -152,13 +161,22 @@ impl LocalFactory {
         let vfn_config = vfn_config.unwrap_or_else(NodeConfig::get_default_vfn_config);
         let vfn_override_config = OverrideNodeConfig::new_with_default_base(vfn_config);
 
-        // Add and launch the fullnodes
+        // Add and launch the VFNs
         let validator_peer_ids = swarm.validators().map(|v| v.peer_id()).collect::<Vec<_>>();
         for validator_peer_id in validator_peer_ids.iter().take(number_of_fullnodes) {
             let _ = swarm
                 .add_validator_fullnode(version, vfn_override_config.clone(), *validator_peer_id)
                 .unwrap();
         }
+
+        // Add and launch public fullnodes
+        for _ in 0..self.num_public_fullnodes {
+            let pfn_config = NodeConfig::get_default_pfn_config();
+            let pfn_override_config =
+                OverrideNodeConfig::new_with_default_base(pfn_config);
+            swarm.add_fullnode(version, pfn_override_config)?;
+        }
+
         swarm.wait_all_alive(Duration::from_secs(60)).await?;
 
         Ok(swarm)

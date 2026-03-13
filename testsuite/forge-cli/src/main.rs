@@ -87,6 +87,12 @@ enum OperatorCommand {
 struct LocalSwarm {
     #[clap(long, help = "directory to build local swarm under")]
     swarmdir: Option<String>,
+    #[clap(
+        long,
+        default_value_t = 0,
+        help = "number of public fullnodes (connect directly to validators, not VFNs)"
+    )]
+    num_public_fullnodes: usize,
 }
 
 #[derive(Parser, Debug)]
@@ -284,11 +290,14 @@ fn main() -> Result<()> {
                             mempool_backlog: 5000,
                         }));
                     let swarm_dir = local_cfg.swarmdir.clone();
+                    let num_pfns = local_cfg.num_public_fullnodes;
+                    let factory = LocalFactory::from_workspace(swarm_dir)?
+                        .with_num_public_fullnodes(num_pfns);
                     let forge = Forge::new(
                         &args.options,
                         test_suite,
                         duration,
-                        LocalFactory::from_workspace(swarm_dir)?,
+                        factory,
                     );
                     run_forge(forge, &args.options)
                 },

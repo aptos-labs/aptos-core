@@ -116,6 +116,7 @@ impl LocalSwarm {
         dir: Option<PathBuf>,
         genesis_framework: Option<ReleaseBundle>,
         guard: ActiveNodesGuard,
+        keep_public_networks_on_validators: bool,
     ) -> Result<LocalSwarm>
     where
         R: ::rand::RngCore + ::rand::CryptoRng,
@@ -191,34 +192,50 @@ impl LocalSwarm {
             })
             .collect::<Result<HashMap<_, _>>>()?;
 
-        // After genesis, remove public network from validator and add to public_networks
-        let public_networks = validators
-            .values_mut()
-            .map(|validator| {
+        // After genesis, optionally remove public network from validators.
+        // When keep_public_networks_on_validators is true (PFN mode), validators
+        // retain their public network so PFNs can discover them via on-chain addresses.
+        // When false (VFN mode), the public network is moved to public_networks for VFN use.
+        let public_networks = if keep_public_networks_on_validators {
+            // Validators keep their public network; just update data dir
+            for validator in validators.values_mut() {
                 let mut validator_override_config =
                     OverrideNodeConfig::load_config(validator.config_path())?;
                 let validator_config = validator_override_config.override_config_mut();
-
-                // Grab the public network config from the validator and insert it into the VFN's config
-                // The validator's public network identity is the same as the VFN's public network identity
-                // We remove it from the validator so the VFN can hold it
-                let public_network = {
-                    let (i, _) = validator_config
-                        .full_node_networks
-                        .iter()
-                        .enumerate()
-                        .find(|(_i, config)| config.network_id == NetworkId::Public)
-                        .expect("Validator should have a public network");
-                    validator_config.full_node_networks.remove(i)
-                };
                 validator_config.set_data_dir(validator.base_dir());
                 *validator.config_mut() = validator_config.clone();
-                // Since the validator's config has changed we need to save it
                 validator_override_config.save_config(validator.config_path())?;
+            }
+            HashMap::new()
+        } else {
+            validators
+                .values_mut()
+                .map(|validator| {
+                    let mut validator_override_config =
+                        OverrideNodeConfig::load_config(validator.config_path())?;
+                    let validator_config = validator_override_config.override_config_mut();
 
-                Ok((validator.peer_id(), public_network))
-            })
-            .collect::<Result<HashMap<_, _>>>()?;
+                    // Grab the public network config from the validator and insert it into the VFN's config
+                    // The validator's public network identity is the same as the VFN's public network identity
+                    // We remove it from the validator so the VFN can hold it
+                    let public_network = {
+                        let (i, _) = validator_config
+                            .full_node_networks
+                            .iter()
+                            .enumerate()
+                            .find(|(_i, config)| config.network_id == NetworkId::Public)
+                            .expect("Validator should have a public network");
+                        validator_config.full_node_networks.remove(i)
+                    };
+                    validator_config.set_data_dir(validator.base_dir());
+                    *validator.config_mut() = validator_config.clone();
+                    // Since the validator's config has changed we need to save it
+                    validator_override_config.save_config(validator.config_path())?;
+
+                    Ok((validator.peer_id(), public_network))
+                })
+                .collect::<Result<HashMap<_, _>>>()?
+        };
 
         // We print out the root key to make it easy for users to deploy a local faucet
         let encoded_root_key = EncodingType::Hex.encode_key("root_key", &root_key)?;
@@ -384,7 +401,7 @@ impl LocalSwarm {
         Ok(peer_id)
     }
 
-    fn add_fullnode(&mut self, version: &Version, config: OverrideNodeConfig) -> Result<PeerId> {
+    pub fn add_fullnode(&mut self, version: &Version, config: OverrideNodeConfig) -> Result<PeerId> {
         let name = self.node_name_counter.to_string();
         let index = self.node_name_counter;
         self.node_name_counter += 1;
