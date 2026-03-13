@@ -7,6 +7,7 @@ use aptos_gas_algebra::{FeePerGasUnit, Gas, NumBytes};
 use aptos_types::{
     account_address::AccountAddress,
     chain_id::ChainId,
+    on_chain_config::{TimedFeatureFlag, TimedFeatures},
     transaction::{
         authenticator::AuthenticationProof, user_transaction_context::UserTransactionContext,
         EntryFunction, Multisig, MultisigTransactionPayload, ReplayProtector, SignedTransaction,
@@ -38,7 +39,14 @@ pub struct TransactionMetadata {
 }
 
 impl TransactionMetadata {
-    pub fn new(txn: &SignedTransaction) -> Self {
+    pub fn new(txn: &SignedTransaction, timed_features: &TimedFeatures) -> Self {
+        let txn_size = if timed_features
+            .is_enabled(TimedFeatureFlag::UseFullTransactionSizeForTransactionMetadata)
+        {
+            txn.txn_bytes_len()
+        } else {
+            txn.raw_txn_bytes_len()
+        };
         Self {
             sender: txn.sender(),
             authentication_proof: txn.authenticator().sender().authentication_proof(),
@@ -57,7 +65,7 @@ impl TransactionMetadata {
                 .map(|signer| signer.authentication_proof()),
             max_gas_amount: txn.max_gas_amount().into(),
             gas_unit_price: txn.gas_unit_price().into(),
-            transaction_size: (txn.raw_txn_bytes_len() as u64).into(),
+            transaction_size: (txn_size as u64).into(),
             expiration_timestamp_secs: txn.expiration_timestamp_secs(),
             chain_id: txn.chain_id(),
             script_hash: if let Ok(TransactionExecutableRef::Script(s)) =

@@ -80,7 +80,7 @@ impl AptosVM {
         use crate::gas::make_prod_gas_meter;
         use move_vm_runtime::module_traversal::{TraversalContext, TraversalStorage};
 
-        let txn_data = TransactionMetadata::new(txn);
+        let txn_data = TransactionMetadata::new(txn, self.timed_features());
         let log_context = AdapterLogSchema::new(state_view.id(), 0);
 
         let vm_gas_params = self

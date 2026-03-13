@@ -4,7 +4,9 @@
 use crate::{
     abort_unless_feature_flag_enabled,
     natives::cryptography::algebra::{
-        AlgebraContext, E_TOO_MUCH_MEMORY_USED, HashToStructureSuite, MEMORY_LIMIT_IN_BYTES, MOVE_ABORT_CODE_NOT_IMPLEMENTED, MOVE_ABORT_CODE_TYPE_TAG_CONVERSION_FAILED, Structure
+        AlgebraContext, HashToStructureSuite, Structure, E_TOO_MUCH_MEMORY_USED,
+        MEMORY_LIMIT_IN_BYTES, MOVE_ABORT_CODE_NOT_IMPLEMENTED,
+        MOVE_ABORT_CODE_TYPE_TAG_CONVERSION_FAILED,
     },
     store_element, structure_from_ty_arg,
 };
@@ -49,11 +51,11 @@ fn suite_from_ty_arg(
 ) -> SafeNativeResult<Option<HashToStructureSuite>> {
     if context.timed_feature_enabled(TimedFeatureFlag::FixCryptoAlgebraNativesTypeTagConversion) {
         if let Ok(type_tag) = context.type_to_type_tag(ty) {
-            return Ok(HashToStructureSuite::try_from(type_tag).ok());
+            Ok(HashToStructureSuite::try_from(type_tag).ok())
         } else {
-            return Err(SafeNativeError::Abort {
+            Err(SafeNativeError::Abort {
                 abort_code: MOVE_ABORT_CODE_TYPE_TAG_CONVERSION_FAILED,
-            });
+            })
         }
     } else {
         let type_tag = context.type_to_type_tag(ty).unwrap();

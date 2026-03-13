@@ -26,6 +26,9 @@ pub enum TimedFeatureFlag {
 
     /// Fixes the bug in deep type tag conversion.
     FixCryptoAlgebraNativesTypeTagConversion,
+
+    /// Uses full transaction size when computing transaction metadata.
+    UseFullTransactionSizeForTransactionMetadata,
 }
 
 /// Representation of features that are gated by the block timestamps.
@@ -139,6 +142,9 @@ impl TimedFeatureFlag {
             (FixCryptoAlgebraNativesTypeTagConversion, _) => {
                 Utc.with_ymd_and_hms(1970, 1, 1, 1, 0, 0).unwrap()
             },
+
+            // Irrelevant for us except for testing
+            (UseFullTransactionSizeForTransactionMetadata, _) => BEGINNING_OF_TIME,
 
             // For chains other than testnet and mainnet, a timed feature is considered enabled from
             // the very beginning, if left unspecified.

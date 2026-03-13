@@ -9,7 +9,10 @@ use aptos_types::{
 
 fn deep_type_tag(harness: &mut MoveHarness) -> TransactionStatus {
     let account = harness.new_account_at(AccountAddress::from_hex_literal("0x42").unwrap());
-    assert_success!(harness.publish_package(&account, &common::test_dir_path("cryptoalgebra.data/large_type_tag"),));
+    assert_success!(harness.publish_package(
+        &account,
+        &common::test_dir_path("cryptoalgebra.data/large_type_tag"),
+    ));
     harness.run_entry_function(
         &account,
         str::parse("0x42::test::main").unwrap(),
@@ -31,10 +34,8 @@ fn test_deep_type_tag() {
     h.new_epoch();
     let result = deep_type_tag(&mut h);
 
-    assert!(
-        matches!(
-            result,
-            TransactionStatus::Keep(ExecutionStatus::MoveAbort { .. })
-        ),
-    );
+    assert!(matches!(
+        result,
+        TransactionStatus::Keep(ExecutionStatus::MoveAbort { .. })
+    ),);
 }
