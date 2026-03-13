@@ -937,7 +937,12 @@ impl<E: Pairing> traits::BatchedRangeProof<E> for Proof<E> {
             v
         };
 
-        let U = E::G1::msm(&U_bases, &U_scalars).expect("Failed to compute MSM in DeKARTv2");
+        let U = E::G1::msm(&U_bases, &U_scalars).map_err(|min_len| {
+            anyhow::anyhow!(
+                "Failed to compute MSM in DeKARTv2 (bases/scalars min length: {})",
+                min_len
+            )
+        })?;
         #[cfg(feature = "range_proof_timing_univariate_v2")]
         print_cumulative("U_bases + U_scalars + MSM", start.elapsed());
 

@@ -289,7 +289,7 @@ impl<T: CurveGroupTrait> Trait for T {
             response,
             challenge,
         );
-        let merged = merge_msm_inputs(&msm_terms, rng);
+        let merged = merge_msm_inputs(&msm_terms, rng)?;
         self.check_msm_eval_zero(merged)?;
         Ok(())
     }

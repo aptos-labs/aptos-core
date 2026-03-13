@@ -69,17 +69,18 @@ where
 /// Merges multiple `MsmInput`s into one by scaling the i-th input by `scales[i]` and aggregating.
 /// Same base across inputs is combined (scalars summed). Terms with zero scalar are dropped.
 ///
-/// # Panics
-/// If `inputs.len() != scales.len()` or if somehow this identity fails for the merged result.
+/// Returns an error if `inputs.len() != scales.len()` or if the merged MSM input is invalid.
 pub fn merge_msm_inputs_with_scales<A: AffineRepr>(
     inputs: &[MsmInput<A, A::ScalarField>],
     scales: &[A::ScalarField],
-) -> MsmInput<A, A::ScalarField> {
-    assert_eq!(
-        inputs.len(),
-        scales.len(),
-        "inputs and scales length mismatch"
-    ); // In general we should avoid assert_eq! in production code for verifiers, but so far it hasn't been inappropriate
+) -> anyhow::Result<MsmInput<A, A::ScalarField>> {
+    if inputs.len() != scales.len() {
+        anyhow::bail!(
+            "inputs and scales length mismatch: {} inputs, {} scales",
+            inputs.len(),
+            scales.len(),
+        );
+    }
     let mut agg: HashMap<A, A::ScalarField> = HashMap::new();
     for (input, scale) in inputs.iter().zip(scales.iter()) {
         for (base, scalar) in input.bases().iter().zip(input.scalars().iter()) {
@@ -88,7 +89,7 @@ pub fn merge_msm_inputs_with_scales<A: AffineRepr>(
         }
     }
     let (bases, scalars): (Vec<_>, Vec<_>) = agg.into_iter().filter(|(_, s)| !s.is_zero()).unzip();
-    MsmInput::new(bases, scalars).expect("merged MSM inputs")
+    MsmInput::new(bases, scalars)
 }
 
 /// Merges multiple `MsmInput`s into one by sampling a random `beta`, using
@@ -96,7 +97,7 @@ pub fn merge_msm_inputs_with_scales<A: AffineRepr>(
 pub fn merge_msm_inputs<A: AffineRepr, R: Rng>(
     inputs: &[MsmInput<A, A::ScalarField>],
     rng: &mut R,
-) -> MsmInput<A, A::ScalarField> {
+) -> anyhow::Result<MsmInput<A, A::ScalarField>> {
     let beta = sample_field_element(rng);
     let scales = utils::powers(beta, inputs.len());
     merge_msm_inputs_with_scales(inputs, &scales)

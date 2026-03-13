@@ -379,12 +379,12 @@ impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>>
         // Final step: Combine the MSM terms and check the multi-pairing
         let (_, powers_of_gamma) = sample_field_element_with_powers::<E::ScalarField, _>(3, rng);
 
-        let pok_merged = msm::merge_msm_inputs::<E::G1Affine, _>(&sok_msm_terms, rng);
+        let pok_merged = msm::merge_msm_inputs::<E::G1Affine, _>(&sok_msm_terms, rng)?;
         let g1_inputs = vec![pok_merged, weighted_Cs_msm];
         let merged_g1 = msm::merge_msm_inputs_with_scales::<E::G1Affine>(&g1_inputs, &[
             powers_of_gamma[1],
             E::ScalarField::ONE,
-        ]);
+        ])?;
         let combined_G1 =
             E::G1::msm(merged_g1.bases(), merged_g1.scalars()).map_err(|min_len| {
                 anyhow::anyhow!(
@@ -397,7 +397,7 @@ impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>>
         let merged_g2 = msm::merge_msm_inputs_with_scales(&g2_inputs, &[
             powers_of_gamma[2],
             E::ScalarField::ONE,
-        ]);
+        ])?;
         let combined_G2 =
             E::G2::msm(merged_g2.bases(), merged_g2.scalars()).map_err(|min_len| {
                 anyhow::anyhow!(

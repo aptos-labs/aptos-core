@@ -370,7 +370,7 @@ impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>>
             &self.sharing_proof.SoK.z,
             c,
         );
-        let first_merged = msm::merge_msm_inputs::<E::G1Affine, _>(&first_msm_terms, rng);
+        let first_merged = msm::merge_msm_inputs::<E::G1Affine, _>(&first_msm_terms, rng)?;
         hom.hom1.check_msm_eval_zero(first_merged)?;
 
         let second_msm_terms = hom.hom2.msm_terms_for_verify_with_challenge(
@@ -379,13 +379,13 @@ impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>>
             &self.sharing_proof.SoK.z,
             c,
         );
-        let second_merged = msm::merge_msm_inputs::<E::G2Affine, _>(&second_msm_terms, rng);
+        let second_merged = msm::merge_msm_inputs::<E::G2Affine, _>(&second_msm_terms, rng)?;
         let beta = sample_field_element(rng);
         let g2_inputs = vec![second_merged, ldt_msm_terms];
         let merged_g2 = msm::merge_msm_inputs_with_scales::<E::G2Affine>(&g2_inputs, &[
             E::ScalarField::ONE,
             beta,
-        ]);
+        ])?;
         let g2_msm = E::G2::msm(merged_g2.bases(), merged_g2.scalars())
             .expect("Failed to compute merged G2 MSM in chunky v2");
         if g2_msm != E::G2::ZERO {

@@ -816,13 +816,13 @@ pub fn batch_pairing_for_verify_generalized<
 
     #[cfg(feature = "range_proof_timing_multivariate")]
     let start = Instant::now();
-    let merged = merge_msm_inputs_with_scales(&commitment_msms, &weights);
+    let merged = merge_msm_inputs_with_scales(&commitment_msms, &weights)?;
 
     let msm_pi1 = MsmInput::new(vec![*pi_1], vec![-z_S_val]).expect("MSM pi_1");
     let merged_minus_pi1 = merge_msm_inputs_with_scales(&[merged, msm_pi1], &[
         E::ScalarField::ONE,
         E::ScalarField::ONE,
-    ]);
+    ])?;
     #[cfg(feature = "range_proof_timing_multivariate")]
     print_cumulative("merge MSMs (merged, merged_minus_pi1)", start.elapsed());
 
@@ -899,7 +899,7 @@ pub fn batch_pairing_for_verify_generalized<
         &sigma_proof.z,
         c_sigma,
     );
-    let hom1_merged = msm::merge_msm_inputs(&hom1_msm_terms, rng);
+    let hom1_merged = msm::merge_msm_inputs(&hom1_msm_terms, rng)?;
     // C_eval = C_eval_hid + g_rev·τ_0 for the batch pairing check.
     let c_eval = (c_eval_hid.into_group() + srs.taus_1[0].into_group() * g_rev_at_x).into_affine();
     #[cfg(feature = "range_proof_timing_multivariate")]
@@ -917,7 +917,7 @@ pub fn batch_pairing_for_verify_generalized<
             E::ScalarField::ONE,
             E::ScalarField::ONE,
             c_n,
-        ]);
+        ])?;
     let C_f = E::G1::msm(c_f_msm.bases(), c_f_msm.scalars()).expect("batch verify: C_f MSM");
     #[cfg(feature = "range_proof_timing_multivariate")]
     print_cumulative("C_f (single merged MSM)", start.elapsed());
