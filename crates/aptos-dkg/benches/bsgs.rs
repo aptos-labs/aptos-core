@@ -151,7 +151,7 @@ fn bench_table_build<E: Pairing>(c: &mut Criterion, curve_name: &str) {
     group.sample_size(10); // It can't do less than 10
 
     // Time seems almost linear in the size of the table, so doesn't make sense to benchmark many values
-    let table_sizes: &[u64] = &[1u64 << 16, 1u64 << 20];
+    let table_sizes: &[u64] = &[1u64 << 20];
 
     let G = E::G1::generator();
 
@@ -184,7 +184,7 @@ fn criterion_benchmark(c: &mut Criterion) {
     //    bench_dlog_vec_small_range::<Bls12_381>(c, "bls12_381");
     bench_dlog_vec_small_range::<Bls12_381>(c, "bls12_381"); // uncomment when that fn is defined
     eprintln!("[bsgs] Starting bench_table_build...");
-    //bench_table_build::<Bls12_381>(c, "bls12_381");
+    bench_table_build::<Bls12_381>(c, "bls12_381");
 }
 
 criterion_group!(
