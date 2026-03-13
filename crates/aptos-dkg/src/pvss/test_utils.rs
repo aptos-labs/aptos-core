@@ -137,9 +137,13 @@ where
     E: Pairing<ScalarField = Fp<P, N>>,
     R: RngCore + CryptoRng,
 {
+    let bit_size_msg = match ell {
+        Some(b) => format!(" and bit-size {b}"),
+        None => String::new(),
+    };
     println!(
-        "Setting up dealing for both chunky PVSSs (shared PP), with {} and bit-size {:?}",
-        sc, ell
+        "Setting up dealing for both chunky PVSSs (shared PP), with {}{bit_size_msg}",
+        sc
     );
     let n = sc.get_total_num_shares().try_into().unwrap();
     let pp = match ell {
