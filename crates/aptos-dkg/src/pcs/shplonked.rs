@@ -654,8 +654,6 @@ pub fn batch_open_generalized<
         sigma_protocol_proof.change_lifetime::<shplonked_sigma::ShplonkedSigmaHom<'static, E>>();
 
     // π_2 from PCS.Open: pi_2 = quotient commitment, pi_2_extra = hiding compensation.
-    // let pi_2 = opening.pi_1.0.into_affine();
-    // let pi_2_extra = opening.pi_2.into_affine();
 
     let proof = ShplonkedBatchProofProjective {
         pi_1,

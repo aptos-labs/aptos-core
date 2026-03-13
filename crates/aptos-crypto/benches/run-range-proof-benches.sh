@@ -10,11 +10,11 @@ repo_root=$(readlink -f $scriptdir/../../../)
 read -p "Delete past benchmark results and re-run? (Otherwise, will use extant data in $repo_root/target/criterion) [y/N]: " ANS
 
 if [ "$ANS" == "y" ]; then
-#    echo "Cleaning previous Bulletproof criterion benchmark results..."
-#    rm -rf $repo_root/target/criterion/bulletproofs
+    echo "Cleaning previous Bulletproof criterion benchmark results..."
+    rm -rf $repo_root/target/criterion/bulletproofs
 
-#    echo "Benchmarking Bulletproofs..."
-#    RAYON_NUM_THREADS=1 cargo bench --bench bulletproofs
+    echo "Benchmarking Bulletproofs..."
+    RAYON_NUM_THREADS=1 cargo bench --bench bulletproofs
 
     echo "Cleaning previous DeKART criterion benchmark results..."
     rm -rf $repo_root/target/criterion/dekart*

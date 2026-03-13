@@ -125,6 +125,9 @@ pub trait TranscriptCore: Debug + ValidCryptoMaterial + Clone + PartialEq + Eq {
 ///    reconstruct the secret (but no fewer can)
 /// 2. Weighted $w$-out-of-$W$ PVSS protocols where any players with combined weight $\ge w$ can
 ///    reconstruct the secret (but players with combined weight $< w$ cannot)
+///
+/// TODO: there should be an associated type `type TranscriptCore = TranscriptCore`, so we can get rid
+/// of reimplementing / delegating the TranscriptCore methods
 pub trait Transcript: TranscriptCore {
     type SigningSecretKey: Uniform + SigningKey<VerifyingKeyMaterial = Self::SigningPubKey>;
     type SigningPubKey: VerifyingKey<SigningKeyMaterial = Self::SigningSecretKey>;

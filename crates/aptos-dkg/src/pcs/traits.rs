@@ -21,7 +21,6 @@ pub trait PolynomialCommitmentScheme {
     type CommitmentNormalised: Clone;
     type OpeningProofProjective: Clone + Into<Self::OpeningProof>;
     type OpeningProof: Clone;
-    //type OpeningProof: Clone;
 
     fn setup<R: RngCore + CryptoRng>(
         // security_bits: usize, // make this an Option<usize> ??
