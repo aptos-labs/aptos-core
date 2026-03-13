@@ -51,13 +51,6 @@ itertools = { workspace = true }
 [package.metadata.cargo-machete]
 ignored = ["ark-bn254", "ark-ff-asm", "ark-ff-macros", "serde_bytes"]
 
-[[bench]]
-name = "fk_algorithm"
-harness = false
-
-[[bench]]
-name = "multi_point_eval"
-harness = false
 
 [[bench]]
 name = "fptx"
@@ -67,6 +60,3 @@ harness = false
 name = "fptx_succinct"
 harness = false
 
-[[bench]]
-name = "msm"
-harness = false
