@@ -436,10 +436,6 @@ impl PipelinedBlock {
         &self.block
     }
 
-    pub fn input_transactions(&self) -> &Vec<SignedTransaction> {
-        &self.input_transactions
-    }
-
     pub fn block_window(&self) -> &OrderedBlockWindow {
         &self.block_window
     }
