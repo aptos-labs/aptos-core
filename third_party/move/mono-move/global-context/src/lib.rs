@@ -4,5 +4,7 @@
 mod alloc;
 pub use alloc::GlobalArenaPool;
 mod context;
-pub use context::{ExecutableId, ExecutionGuard, GlobalContext, MaintenanceGuard, Ref};
+pub use context::{
+    ExecutableId, ExecutionGuard, GlobalContext, ListRef, MaintenanceGuard, Ref, Type,
+};
 pub mod maintenance_config;

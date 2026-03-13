@@ -12628,8 +12628,12 @@ dependencies = [
  "bumpalo",
  "crossbeam-utils",
  "dashmap 7.0.0-rc2",
+ "fxhash",
+ "move-binary-format",
  "move-core-types",
  "parking_lot 0.12.1",
+ "proptest",
+ "proptest-derive",
 ]
 
 [[package]]

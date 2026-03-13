@@ -6,10 +6,10 @@
 //!
 //! # Safety model
 //!
-//! All arena allocations produced here are wrapped in [`Ref<'a, T>`], which
-//! ties the validity of the underlying pointer to the [`ExecutionGuard`]'s
-//! lifetime. The borrow checker therefore prevents any use of an allocation
-//! after the guard is dropped, without requiring any runtime checks.
+//! All arena allocations produced here are wrapped in [`Ref`], which ties the
+//! validity of the underlying pointer to the [`ExecutionGuard`]'s lifetime.
+//! The borrow checker therefore prevents any use of an allocation after the
+//! guard is dropped, without requiring any runtime checks.
 
 use super::Ref;
 use crate::{alloc::GlobalArenaPtr, ExecutionGuard};
@@ -32,7 +32,7 @@ impl<'a> Ref<'a, str> {
 ///
 /// Only [`ExecutionGuard::alloc_executable_id`] can create [`ExecutableId`].
 /// No external code can construct or inspect fields directly; access goes
-/// through [`Ref<'a, ExecutableId>`].
+/// through [`Ref`].
 pub struct ExecutableId {
     pub(super) address: AccountAddress,
     pub(super) name: GlobalArenaPtr<str>,

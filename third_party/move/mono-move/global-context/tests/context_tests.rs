@@ -5,7 +5,12 @@
 //! context.
 
 use mono_move_global_context::GlobalContext;
-use move_core_types::{account_address::AccountAddress, ident_str};
+use move_core_types::{
+    ability::AbilitySet,
+    account_address::AccountAddress,
+    ident_str,
+    language_storage::{FunctionParamOrReturnTag, FunctionTag, TypeTag},
+};
 use std::{
     sync::{Arc, Barrier},
     thread,
@@ -182,13 +187,23 @@ fn test_global_arena_reset() {
         let guard = ctx.try_execution_context(0).unwrap();
         guard.intern_identifier(ident_str!("foo"));
         guard.intern_address_name(&AccountAddress::ZERO, ident_str!("bar"));
+        guard.intern_type_tag(&TypeTag::Vector(Box::new(TypeTag::U64)));
+        guard.intern_type_tag(&TypeTag::Function(Box::new(FunctionTag {
+            args: vec![FunctionParamOrReturnTag::Reference(TypeTag::U64)],
+            results: vec![FunctionParamOrReturnTag::Value(TypeTag::U64)],
+            abilities: AbilitySet::EMPTY,
+        })));
     }
 
     let mut guard = ctx.try_maintenance_context().unwrap();
     assert_eq!(guard.interned_identifiers_count(), 2);
     assert_eq!(guard.interned_executable_ids_count(), 1);
+    assert_eq!(guard.interned_types_count(), 3);
+    assert_eq!(guard.interned_type_lists_count(), 2);
 
     guard.reset_arena_pool();
     assert_eq!(guard.interned_identifiers_count(), 0);
     assert_eq!(guard.interned_executable_ids_count(), 0);
+    assert_eq!(guard.interned_types_count(), 0);
+    assert_eq!(guard.interned_type_lists_count(), 0);
 }
