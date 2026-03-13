@@ -45,7 +45,8 @@ impl Id {
         // using empty domain separator b/c this is a test implementation
 
         let vk_bytes = vk.to_bytes();
-        let associated_data_bytes = bcs::to_bytes(associated_data).expect("Serialization should never fail");
+        let associated_data_bytes =
+            bcs::to_bytes(associated_data).expect("Serialization should never fail");
 
         let mut bytes = Vec::with_capacity(vk_bytes.len() + associated_data_bytes.len());
         bytes.extend_from_slice(&vk_bytes);
