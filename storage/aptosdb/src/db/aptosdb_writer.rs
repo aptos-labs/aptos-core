@@ -266,6 +266,10 @@ impl AptosDB {
     fn calculate_and_commit_ledger_and_state_kv(&self, chunk: &ChunkToCommit) -> Result<HashValue> {
         let _timer = OTHER_TIMERS_SECONDS.timer_with(&["save_transactions__work"]);
 
+        // Use relaxed (non-synced) writes for all sub-DB commits, then issue a single
+        // flush_wal(sync=true) at the end. This amortizes the cost of multiple fsyncs into one
+        // per physical DB instance.
+        let sync = false;
         let mut new_root_hash = HashValue::zero();
         THREAD_MANAGER.get_non_exe_cpu_pool().scope(|s| {
             // TODO(grao): Write progress for each of the following databases, and handle the
@@ -273,13 +277,13 @@ impl AptosDB {
             //
             // TODO(grao): Consider propagating the error instead of panic, if necessary.
             s.spawn(|_| {
-                self.commit_events(chunk.first_version, chunk.transaction_outputs)
+                self.commit_events(chunk.first_version, chunk.transaction_outputs, sync)
                     .unwrap()
             });
             s.spawn(|_| {
                 self.ledger_db
                     .write_set_db()
-                    .commit_write_sets(chunk.first_version, chunk.transaction_outputs)
+                    .commit_write_sets(chunk.first_version, chunk.transaction_outputs, sync)
                     .unwrap()
             });
             s.spawn(|_| {
@@ -289,31 +293,71 @@ impl AptosDB {
                         chunk.first_version,
                         chunk.transactions,
                         true, /* skip_index */
+                        sync,
                     )
                     .unwrap()
             });
             s.spawn(|_| {
                 self.ledger_db
                     .persisted_auxiliary_info_db()
-                    .commit_auxiliary_info(chunk.first_version, chunk.persisted_auxiliary_infos)
+                    .commit_auxiliary_info(
+                        chunk.first_version,
+                        chunk.persisted_auxiliary_infos,
+                        sync,
+                    )
                     .unwrap()
             });
-            s.spawn(|_| self.commit_state_kv_and_ledger_metadata(chunk).unwrap());
             s.spawn(|_| {
-                self.commit_transaction_infos(chunk.first_version, chunk.transaction_infos)
+                self.commit_state_kv_and_ledger_metadata(chunk, sync)
+                    .unwrap()
+            });
+            s.spawn(|_| {
+                self.commit_transaction_infos(chunk.first_version, chunk.transaction_infos, sync)
                     .unwrap()
             });
             s.spawn(|_| {
                 new_root_hash = self
-                    .commit_transaction_accumulator(chunk.first_version, chunk.transaction_infos)
+                    .commit_transaction_accumulator(
+                        chunk.first_version,
+                        chunk.transaction_infos,
+                        sync,
+                    )
                     .unwrap()
             });
         });
 
+        // Flush WAL on all physical DB instances in parallel. Each flush_wal(true) issues an
+        // fdatasync, so doing them concurrently across all ~24 DB instances is critical.
+        {
+            let _timer = OTHER_TIMERS_SECONDS.timer_with(&["save_transactions__flush_wal"]);
+            self.flush_all_wal()?;
+        }
+
         Ok(new_root_hash)
     }
 
-    fn commit_state_kv_and_ledger_metadata(&self, chunk: &ChunkToCommit) -> Result<()> {
+    /// Flushes WAL on all physical DB instances in parallel (ledger sub-DBs + state KV shards +
+    /// state KV metadata). Each `flush_wal(true)` issues an fdatasync so parallelizing across all
+    /// ~24 instances is essential to avoid serialized fsync latency.
+    fn flush_all_wal(&self) -> Result<()> {
+        // LedgerDb::flush_wal and StateKvDb::flush_wal each internally parallelize across their
+        // sub-DBs using the same IO pool. Rayon work-stealing handles the nested scopes correctly.
+        THREAD_MANAGER.get_io_pool().scope(|s| {
+            s.spawn(|_| {
+                self.ledger_db
+                    .flush_wal(true /* sync */)
+                    .unwrap_or_else(|err| panic!("Failed to flush ledger WAL: {err}"));
+            });
+            s.spawn(|_| {
+                self.state_kv_db
+                    .flush_wal(true /* sync */)
+                    .unwrap_or_else(|err| panic!("Failed to flush state_kv WAL: {err}"));
+            });
+        });
+        Ok(())
+    }
+
+    fn commit_state_kv_and_ledger_metadata(&self, chunk: &ChunkToCommit, sync: bool) -> Result<()> {
         let _timer = OTHER_TIMERS_SECONDS.timer_with(&["commit_state_kv_and_ledger_metadata"]);
 
         let mut ledger_metadata_batch = SchemaBatch::new();
@@ -354,15 +398,28 @@ impl AptosDB {
             OTHER_TIMERS_SECONDS.timer_with(&["commit_state_kv_and_ledger_metadata___commit"]);
         rayon::scope(|s| {
             s.spawn(|_| {
-                self.ledger_db
-                    .metadata_db()
-                    .write_schemas(ledger_metadata_batch)
-                    .unwrap();
+                if sync {
+                    self.ledger_db
+                        .metadata_db()
+                        .write_schemas(ledger_metadata_batch)
+                        .unwrap();
+                } else {
+                    self.ledger_db
+                        .metadata_db()
+                        .write_schemas_relaxed(ledger_metadata_batch)
+                        .unwrap();
+                }
             });
             s.spawn(|_| {
-                self.state_kv_db
-                    .commit(chunk.expect_last_version(), None, sharded_state_kv_batches)
-                    .unwrap();
+                if sync {
+                    self.state_kv_db
+                        .commit(chunk.expect_last_version(), None, sharded_state_kv_batches)
+                        .unwrap();
+                } else {
+                    self.state_kv_db
+                        .commit_relaxed(chunk.expect_last_version(), None, sharded_state_kv_batches)
+                        .unwrap();
+                }
             });
         });
 
@@ -373,6 +430,7 @@ impl AptosDB {
         &self,
         first_version: Version,
         transaction_outputs: &[TransactionOutput],
+        sync: bool,
     ) -> Result<()> {
         let _timer = OTHER_TIMERS_SECONDS.timer_with(&["commit_events"]);
 
@@ -398,7 +456,14 @@ impl AptosDB {
         {
             let _timer = OTHER_TIMERS_SECONDS.timer_with(&["commit_events___commit"]);
             for batch in batches {
-                self.ledger_db.event_db().db().write_schemas(batch)?
+                if sync {
+                    self.ledger_db.event_db().db().write_schemas(batch)?
+                } else {
+                    self.ledger_db
+                        .event_db()
+                        .db()
+                        .write_schemas_relaxed(batch)?
+                }
             }
             Ok(())
         }
@@ -408,6 +473,7 @@ impl AptosDB {
         &self,
         first_version: Version,
         transaction_infos: &[TransactionInfo],
+        sync: bool,
     ) -> Result<HashValue> {
         let _timer = OTHER_TIMERS_SECONDS.timer_with(&["commit_transaction_accumulator"]);
 
@@ -420,9 +486,15 @@ impl AptosDB {
             .put_transaction_accumulator(first_version, transaction_infos, &mut batch)?;
 
         let _timer = OTHER_TIMERS_SECONDS.timer_with(&["commit_transaction_accumulator___commit"]);
-        self.ledger_db
-            .transaction_accumulator_db()
-            .write_schemas(batch)?;
+        if sync {
+            self.ledger_db
+                .transaction_accumulator_db()
+                .write_schemas(batch)?;
+        } else {
+            self.ledger_db
+                .transaction_accumulator_db()
+                .write_schemas_relaxed(batch)?;
+        }
 
         let mut batch = SchemaBatch::new();
         let all_versions: Vec<_> = (first_version..first_version + num_txns).collect();
@@ -445,9 +517,15 @@ impl AptosDB {
                         let version = first_version + i as u64;
                         batch.put::<TransactionAccumulatorRootHashSchema>(&version, hash)
                     })?;
-                self.ledger_db
-                    .transaction_accumulator_db()
-                    .write_schemas(batch)
+                if sync {
+                    self.ledger_db
+                        .transaction_accumulator_db()
+                        .write_schemas(batch)
+                } else {
+                    self.ledger_db
+                        .transaction_accumulator_db()
+                        .write_schemas_relaxed(batch)
+                }
             })?;
 
         Ok(root_hash)
@@ -486,6 +564,7 @@ impl AptosDB {
         &self,
         first_version: Version,
         txn_infos: &[TransactionInfo],
+        sync: bool,
     ) -> Result<()> {
         let _timer = OTHER_TIMERS_SECONDS.timer_with(&["commit_transaction_infos"]);
 
@@ -501,7 +580,13 @@ impl AptosDB {
             })?;
 
         let _timer = OTHER_TIMERS_SECONDS.timer_with(&["commit_transaction_infos___commit"]);
-        self.ledger_db.transaction_info_db().write_schemas(batch)
+        if sync {
+            self.ledger_db.transaction_info_db().write_schemas(batch)
+        } else {
+            self.ledger_db
+                .transaction_info_db()
+                .write_schemas_relaxed(batch)
+        }
     }
 
     fn get_and_check_commit_range(&self, version_to_commit: Version) -> Result<Option<Version>> {

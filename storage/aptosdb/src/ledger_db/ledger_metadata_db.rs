@@ -73,6 +73,10 @@ impl LedgerMetadataDb {
         self.db.write_schemas(batch)
     }
 
+    pub(crate) fn write_schemas_relaxed(&self, batch: SchemaBatch) -> Result<()> {
+        self.db.write_schemas_relaxed(batch)
+    }
+
     pub(crate) fn get_synced_version(&self) -> Result<Option<Version>> {
         get_progress(&self.db, &DbMetadataKey::OverallCommitProgress)
     }

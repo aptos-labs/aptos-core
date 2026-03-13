@@ -177,6 +177,35 @@ impl StateKvDb {
         state_kv_metadata_batch: Option<SchemaBatch>,
         sharded_state_kv_batches: ShardedStateKvSchemaBatch,
     ) -> Result<()> {
+        self.commit_inner(
+            version,
+            state_kv_metadata_batch,
+            sharded_state_kv_batches,
+            true,
+        )
+    }
+
+    pub(crate) fn commit_relaxed(
+        &self,
+        version: Version,
+        state_kv_metadata_batch: Option<SchemaBatch>,
+        sharded_state_kv_batches: ShardedStateKvSchemaBatch,
+    ) -> Result<()> {
+        self.commit_inner(
+            version,
+            state_kv_metadata_batch,
+            sharded_state_kv_batches,
+            false,
+        )
+    }
+
+    fn commit_inner(
+        &self,
+        version: Version,
+        state_kv_metadata_batch: Option<SchemaBatch>,
+        sharded_state_kv_batches: ShardedStateKvSchemaBatch,
+        sync: bool,
+    ) -> Result<()> {
         let _timer =
             OTHER_TIMERS_SECONDS.timer_with(&[&format!("{}__state_kv_db__commit", self.db_tag())]);
         {
@@ -190,7 +219,7 @@ impl StateKvDb {
                         .expect("Not sufficient number of sharded state kv batches");
                     s.spawn(move |_| {
                         // TODO(grao): Consider propagating the error instead of panic, if necessary.
-                        self.commit_single_shard(version, shard_id, state_kv_batch)
+                        self.commit_single_shard(version, shard_id, state_kv_batch, sync)
                             .unwrap_or_else(|err| {
                                 panic!("Failed to commit shard {shard_id}: {err}.")
                             });
@@ -201,17 +230,34 @@ impl StateKvDb {
         if let Some(batch) = state_kv_metadata_batch {
             let _timer = OTHER_TIMERS_SECONDS
                 .timer_with(&[&format!("{}__state_kv_db__commit_metadata", self.db_tag())]);
-            self.state_kv_metadata_db.write_schemas(batch)?;
+            if sync {
+                self.state_kv_metadata_db.write_schemas(batch)?;
+            } else {
+                self.state_kv_metadata_db.write_schemas_relaxed(batch)?;
+            }
         }
 
-        self.write_progress(version)
+        self.write_progress_inner(version, sync)
     }
 
     pub(crate) fn write_progress(&self, version: Version) -> Result<()> {
-        self.state_kv_metadata_db.put::<DbMetadataSchema>(
-            &DbMetadataKey::StateKvCommitProgress,
-            &DbMetadataValue::Version(version),
-        )
+        self.write_progress_inner(version, true)
+    }
+
+    fn write_progress_inner(&self, version: Version, sync: bool) -> Result<()> {
+        if sync {
+            self.state_kv_metadata_db.put::<DbMetadataSchema>(
+                &DbMetadataKey::StateKvCommitProgress,
+                &DbMetadataValue::Version(version),
+            )
+        } else {
+            let mut batch = self.state_kv_metadata_db.new_native_batch();
+            batch.put::<DbMetadataSchema>(
+                &DbMetadataKey::StateKvCommitProgress,
+                &DbMetadataValue::Version(version),
+            )?;
+            self.state_kv_metadata_db.write_schemas_relaxed(batch)
+        }
     }
 
     pub(crate) fn write_pruner_progress(&self, version: Version) -> Result<()> {
@@ -284,12 +330,39 @@ impl StateKvDb {
         version: Version,
         shard_id: usize,
         mut batch: impl WriteBatch,
+        sync: bool,
     ) -> Result<()> {
         batch.put::<DbMetadataSchema>(
             &DbMetadataKey::StateKvShardCommitProgress(shard_id),
             &DbMetadataValue::Version(version),
         )?;
-        self.state_kv_db_shards[shard_id].write_schemas(batch)
+        if sync {
+            self.state_kv_db_shards[shard_id].write_schemas(batch)
+        } else {
+            self.state_kv_db_shards[shard_id].write_schemas_relaxed(batch)
+        }
+    }
+
+    pub(crate) fn flush_wal(&self, sync: bool) -> Result<()> {
+        THREAD_MANAGER.get_io_pool().scope(|s| {
+            for shard_id in 0..NUM_STATE_SHARDS {
+                s.spawn(move |_| {
+                    self.state_kv_db_shards[shard_id]
+                        .flush_wal(sync)
+                        .unwrap_or_else(|err| {
+                            panic!("Failed to flush WAL for shard {shard_id}: {err}")
+                        });
+                });
+            }
+            s.spawn(move |_| {
+                self.state_kv_metadata_db
+                    .flush_wal(sync)
+                    .unwrap_or_else(|err| {
+                        panic!("Failed to flush WAL for state_kv metadata: {err}")
+                    });
+            });
+        });
+        Ok(())
     }
 
     fn open_shard<P: AsRef<Path>>(

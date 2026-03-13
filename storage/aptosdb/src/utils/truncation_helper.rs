@@ -132,7 +132,7 @@ pub(crate) fn truncate_state_kv_db_single_shard(
         target_version + 1,
         &mut batch,
     )?;
-    state_kv_db.commit_single_shard(target_version, shard_id, batch)
+    state_kv_db.commit_single_shard(target_version, shard_id, batch, true /* sync */)
 }
 
 pub(crate) fn truncate_state_merkle_db(

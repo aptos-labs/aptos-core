@@ -125,5 +125,7 @@ fn init_db(write_sets: &[WriteSet], write_set_db: &WriteSetDb) {
         })
         .collect::<Vec<_>>();
 
-    write_set_db.commit_write_sets(0, &dummy_txn_outs).unwrap();
+    write_set_db
+        .commit_write_sets(0, &dummy_txn_outs, true /* sync */)
+        .unwrap();
 }

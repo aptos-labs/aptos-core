@@ -124,6 +124,7 @@ impl WriteSetDb {
         &self,
         first_version: Version,
         transaction_outputs: &[TransactionOutput],
+        sync: bool,
     ) -> Result<()> {
         let _timer = OTHER_TIMERS_SECONDS.timer_with(&["commit_write_sets"]);
 
@@ -149,7 +150,11 @@ impl WriteSetDb {
         {
             let _timer = OTHER_TIMERS_SECONDS.timer_with(&["commit_write_sets___commit"]);
             for batch in batches {
-                self.db().write_schemas(batch)?
+                if sync {
+                    self.db().write_schemas(batch)?
+                } else {
+                    self.db().write_schemas_relaxed(batch)?
+                }
             }
             Ok(())
         }
