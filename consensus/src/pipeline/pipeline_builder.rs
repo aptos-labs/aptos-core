@@ -116,11 +116,24 @@ impl PreCommitStatus {
 /// Each phase is represented as a shared future, takes in other futures as pre-condition.
 /// Future returns a TaskResult<T>, which error can be either a user error or task error (e.g. cancellation).
 ///
-/// Currently, the critical path is the following, more details can be found in the comments of each phase.
-/// prepare -> execute -> ledger update -> pre-commit -> commit ledger
-///    rand ->
-///                         order proof ->
-///                                      commit proof ->
+/// Currently, the pipeline phases and their dependencies are:
+///
+///   External inputs (via PipelineInputTx channels):
+///     qc, rand, order_vote, order_proof, commit_proof, secret_shared_key
+///
+///   Critical path:
+///     qc -> materialize -> decrypt -> prepare -> has_rand_txns -> rand_check -> execute -> ledger_update -> pre_commit -> commit_ledger
+///
+///   Side/parallel paths:
+///     decrypt + secret_shared_key       -> (internal: produces secret_sharing_derive_self)
+///     has_rand_txns + rand              -> rand_check
+///     prepare + ledger_update           -> post_ledger_update
+///     ledger_update + order_vote + order_proof + commit_proof -> commit_vote
+///     ledger_update + order_proof                             -> pre_commit
+///     pre_commit + commit_proof                               -> commit_ledger
+///     pre_commit + commit_ledger                              -> notify_state_sync
+///     pre_commit + order_proof + commit_ledger + notify_state_sync -> post_commit
+///
 #[derive(Clone)]
 pub struct PipelineBuilder {
     block_preparer: Arc<BlockPreparer>,
