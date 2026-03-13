@@ -1,0 +1,15 @@
+
+Diagnostics:
+error: match not exhaustive
+  ┌─ tests/match-checks/enum_variant_literal_coverage.move:9:16
+  │
+9 │         match (e) {
+  │                ^
+  │
+  = missing `E::V1{..}`
+
+error: unreachable pattern
+   ┌─ tests/match-checks/enum_variant_literal_coverage.move:19:13
+   │
+19 │             E::V1(1) => 2,
+   │             ^^^^^^^^
