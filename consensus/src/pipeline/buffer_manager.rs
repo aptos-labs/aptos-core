@@ -399,12 +399,23 @@ impl BufferManager {
             ordered_blocks: ordered_blocks.clone(),
         });
         if let Some(consensus_publisher) = &self.consensus_publisher {
-            let message = ConsensusObserverMessage::new_ordered_block_message(
-                ordered_blocks.clone(),
-                ordered_proof.clone(),
-                self.consensus_observer_config.enable_v2_message_sending,
-            );
-            consensus_publisher.publish_message(message);
+            let publisher = consensus_publisher.clone();
+            let blocks = ordered_blocks.clone();
+            let proof = ordered_proof.clone();
+            let enable_v2 = self.consensus_observer_config.enable_v2_message_sending;
+            tokio::spawn(async move {
+                for block in &blocks {
+                    if let Some(futs) = block.pipeline_futs() {
+                        if let Ok(result) = futs.decryption_fut.await {
+                            block.set_decrypted_encrypted_txns(result.decrypted_encrypted_txns);
+                        }
+                    }
+                }
+                let message = ConsensusObserverMessage::new_ordered_block_message(
+                    blocks, proof, enable_v2,
+                );
+                publisher.publish_message(message);
+            });
         }
         self.execution_schedule_phase_tx
             .send(request)

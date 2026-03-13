@@ -359,6 +359,7 @@ struct PipelinedBlockV2Ref<'a> {
     input_transactions: &'a Vec<SignedTransaction>,
     randomness: Option<&'a Randomness>,
     secret_shared_key: Option<&'a SecretSharedKey>,
+    decrypted_encrypted_txns: Vec<SignedTransaction>,
 }
 
 /// Owned V2 wire format for deserialization.
@@ -368,6 +369,8 @@ struct PipelinedBlockV2Owned {
     input_transactions: Vec<SignedTransaction>,
     randomness: Option<Randomness>,
     secret_shared_key: Option<SecretSharedKey>,
+    #[serde(default)]
+    decrypted_encrypted_txns: Vec<SignedTransaction>,
 }
 
 impl PipelinedBlockV2Owned {
@@ -382,6 +385,9 @@ impl PipelinedBlockV2Owned {
         }
         if let Some(key) = self.secret_shared_key {
             block.set_decryption_key(key);
+        }
+        if !self.decrypted_encrypted_txns.is_empty() {
+            block.set_decrypted_encrypted_txns(self.decrypted_encrypted_txns);
         }
         Arc::new(block)
     }
@@ -430,6 +436,7 @@ impl Serialize for OrderedBlockV2 {
                     input_transactions: pb.input_transactions(),
                     randomness: pb.randomness(),
                     secret_shared_key: pb.secret_shared_key(),
+                    decrypted_encrypted_txns: pb.decrypted_encrypted_txns(),
                 })
                 .collect(),
             ordered_proof: &self.ordered_proof,

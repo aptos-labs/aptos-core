@@ -347,6 +347,13 @@ impl PipelineBuilder {
         compute_result: StateComputeResult,
         commit_proof: LedgerInfoWithSignatures,
     ) -> PipelineFutures {
+        let decryption_fut = spawn_ready_fut(DecryptionResult {
+            decrypted_encrypted_txns: Vec::new(),
+            unencrypted_txns: Vec::new(),
+            max_txns_from_block_to_execute: None,
+            block_gas_limit: None,
+            decryption_key: None,
+        });
         let prepare_fut = spawn_ready_fut((Arc::new(vec![]), None, None));
         let rand_check_fut = spawn_ready_fut((None, false));
         let execute_fut = spawn_ready_fut(Duration::from_millis(0));
@@ -367,6 +374,7 @@ impl PipelineBuilder {
         let secret_sharing_derive_self_fut = spawn_ready_fut(None);
         let has_rand_txns_fut = spawn_ready_fut(false);
         PipelineFutures {
+            decryption_fut,
             prepare_fut,
             has_rand_txns_fut,
             rand_check_fut,
@@ -430,6 +438,7 @@ impl PipelineBuilder {
             Arc::new(pipelined_block.block().clone()),
             block_store_callback,
             observer_enabled,
+            pipelined_block,
         );
         pipelined_block.set_pipeline_futs(futs);
         pipelined_block.set_pipeline_tx(tx);
@@ -444,6 +453,7 @@ impl PipelineBuilder {
             dyn FnOnce(WrappedLedgerInfo, LedgerInfoWithSignatures) + Send + Sync,
         >,
         observer_enabled: bool,
+        pipelined_block: &PipelinedBlock,
     ) -> (PipelineFutures, PipelineInputTx, Vec<AbortHandle>) {
         let mut abort_handles = vec![];
         let (tx, rx) = Self::channel(&mut abort_handles);
@@ -480,11 +490,12 @@ impl PipelineBuilder {
                 derived_self_key_share_tx,
                 secret_shared_key_rx,
                 observer_enabled,
+                pipelined_block.decrypted_encrypted_txns(),
             ),
             Some(&mut abort_handles),
         );
         let prepare_fut = spawn_shared_fut(
-            Self::prepare(decryption_fut, self.block_preparer.clone(), block.clone()),
+            Self::prepare(decryption_fut.clone(), self.block_preparer.clone(), block.clone()),
             Some(&mut abort_handles),
         );
         let has_rand_txns_fut = spawn_shared_fut(
@@ -610,6 +621,7 @@ impl PipelineBuilder {
         );
 
         let all_fut = PipelineFutures {
+            decryption_fut,
             prepare_fut,
             has_rand_txns_fut,
             rand_check_fut,
@@ -675,8 +687,14 @@ impl PipelineBuilder {
         block: Arc<Block>,
     ) -> TaskResult<PrepareResult> {
         let mut tracker = Tracker::start_waiting("prepare", &block);
-        let (input_txns, max_txns_from_block_to_execute, block_gas_limit, decryption_key) =
-            decryption_fut.await?;
+        let DecryptionResult {
+            decrypted_encrypted_txns,
+            unencrypted_txns,
+            max_txns_from_block_to_execute,
+            block_gas_limit,
+            decryption_key,
+        } = decryption_fut.await?;
+        let input_txns = [decrypted_encrypted_txns, unencrypted_txns].concat();
 
         tracker.start_working();
 
@@ -1221,6 +1239,7 @@ impl PipelineBuilder {
 
     async fn monitor(epoch: u64, round: Round, block_id: HashValue, all_futs: PipelineFutures) {
         let PipelineFutures {
+            decryption_fut: _,
             prepare_fut,
             has_rand_txns_fut: _,
             rand_check_fut: _,
