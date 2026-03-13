@@ -12,7 +12,7 @@ use serde::{Deserialize, Serialize};
 use crate::{account_address::AccountAddress, validator_verifier::ValidatorVerifier};
 use std::sync::Arc;
 use aptos_batch_encryption::traits::BatchThresholdEncryption;
-use aptos_batch_encryption::schemes::fptx::FPTX;
+use aptos_batch_encryption::schemes::fptx_succinct::FPTXSuccinct;
 use aptos_batch_encryption::group::Fr;
 use aptos_crypto::arkworks::shamir::ShamirThresholdConfig;
 use once_cell::sync::Lazy;
@@ -20,18 +20,18 @@ use once_cell::sync::Lazy;
 
 pub type ThresholdConfig = ShamirThresholdConfig<Fr>;
 
-pub type EncryptionKey = <FPTX as BatchThresholdEncryption>::EncryptionKey;
-pub type DigestKey = <FPTX as BatchThresholdEncryption>::DigestKey;
-pub type Ciphertext = <FPTX as BatchThresholdEncryption>::Ciphertext;
-pub type Id = <FPTX as BatchThresholdEncryption>::Id;
-pub type Round = <FPTX as BatchThresholdEncryption>::Round;
-pub type Digest = <FPTX as BatchThresholdEncryption>::Digest;
-pub type EvalProofsPromise = <FPTX as BatchThresholdEncryption>::EvalProofsPromise;
-pub type EvalProofs = <FPTX as BatchThresholdEncryption>::EvalProofs;
-pub type MasterSecretKeyShare = <FPTX as BatchThresholdEncryption>::MasterSecretKeyShare;
-pub type VerificationKey = <FPTX as BatchThresholdEncryption>::VerificationKey;
-pub type DecryptionKeyShare = <FPTX as BatchThresholdEncryption>::DecryptionKeyShare;
-pub type DecryptionKey = <FPTX as BatchThresholdEncryption>::DecryptionKey;
+pub type EncryptionKey = <FPTXSuccinct as BatchThresholdEncryption>::EncryptionKey;
+pub type DigestKey = <FPTXSuccinct as BatchThresholdEncryption>::DigestKey;
+pub type Ciphertext = <FPTXSuccinct as BatchThresholdEncryption>::Ciphertext;
+pub type Id = <FPTXSuccinct as BatchThresholdEncryption>::Id;
+pub type Round = <FPTXSuccinct as BatchThresholdEncryption>::Round;
+pub type Digest = <FPTXSuccinct as BatchThresholdEncryption>::Digest;
+pub type EvalProofsPromise = <FPTXSuccinct as BatchThresholdEncryption>::EvalProofsPromise;
+pub type EvalProofs = <FPTXSuccinct as BatchThresholdEncryption>::EvalProofs;
+pub type MasterSecretKeyShare = <FPTXSuccinct as BatchThresholdEncryption>::MasterSecretKeyShare;
+pub type VerificationKey = <FPTXSuccinct as BatchThresholdEncryption>::VerificationKey;
+pub type DecryptionKeyShare = <FPTXSuccinct as BatchThresholdEncryption>::DecryptionKeyShare;
+pub type DecryptionKey = <FPTXSuccinct as BatchThresholdEncryption>::DecryptionKey;
 
 pub type Author = AccountAddress;
 
@@ -103,7 +103,7 @@ impl DecShare {
             .take(threshold as usize)
             .collect();
         
-        let decryption_key = <FPTX as BatchThresholdEncryption>::reconstruct_decryption_key(&shares, &config.config)?;
+        let decryption_key = <FPTXSuccinct as BatchThresholdEncryption>::reconstruct_decryption_key(&shares, &config.config)?;
         Ok(decryption_key)
     }
 

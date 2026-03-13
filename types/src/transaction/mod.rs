@@ -79,7 +79,7 @@ use std::{
     ops::Deref,
     sync::{atomic::AtomicU64, Arc},
 };
-use aptos_batch_encryption::{schemes::fptx::FPTX, traits::BatchThresholdEncryption};
+use aptos_batch_encryption::{schemes::fptx_succinct::FPTXSuccinct, traits::BatchThresholdEncryption};
 use rand::rngs::StdRng;
 
 pub type Version = u64; // Height - also used for MVCC in StateDB
@@ -769,7 +769,7 @@ impl TransactionExecutable {
         };
         let associated_data = String::from("");
         // Use the bytes directly instead of converting to UTF-8 string
-        let ct = FPTX::encrypt(encryption_key, rng, &bytes, &associated_data).expect("Failed to encrypt");
+        let ct = FPTXSuccinct::encrypt(encryption_key, rng, &bytes, &associated_data).expect("Failed to encrypt");
 
         Some(TransactionExecutable::Encrypted(EncryptedPayload::new(ct)))
     }
@@ -816,7 +816,7 @@ impl TransactionExecutableRef<'_> {
 
     pub fn verify_ciphertext(&self) -> Result<()> {
         let associated_data = String::from("");
-        <FPTX as BatchThresholdEncryption>::verify_ct(self.ciphertext().ok_or(anyhow::anyhow!("Ciphertext not found"))?, &associated_data)
+        <FPTXSuccinct as BatchThresholdEncryption>::verify_ct(self.ciphertext().ok_or(anyhow::anyhow!("Ciphertext not found"))?, &associated_data)
     }
 }
 
@@ -847,12 +847,12 @@ impl EncryptedPayload {
     }
 
     pub fn ct_id(&self) -> Id {
-        FPTX::ct_id(self.ciphertext())
+        FPTXSuccinct::ct_id(self.ciphertext())
     }
 
     pub fn verify(&self) -> Result<()> {
         let associated_data = String::from("");
-        FPTX::verify_ct(&self.ciphertext, &associated_data)
+        FPTXSuccinct::verify_ct(&self.ciphertext, &associated_data)
     }
 }
 

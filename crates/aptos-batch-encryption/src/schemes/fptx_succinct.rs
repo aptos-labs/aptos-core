@@ -47,10 +47,13 @@ impl BatchThresholdEncryption for FPTXSuccinct {
         seed: u64,
         max_batch_size: usize,
         number_of_rounds: usize,
-        tc: &Self::ThresholdConfig,
+        threshold_config_fast: &Self::ThresholdConfig,
+        threshold_config_slow: &Self::ThresholdConfig,
     ) -> Result<(
         Self::EncryptionKey,
         Self::DigestKey,
+        Vec<Self::VerificationKey>,
+        Vec<Self::MasterSecretKeyShare>,
         Vec<Self::VerificationKey>,
         Vec<Self::MasterSecretKeyShare>,
     )> {
@@ -58,7 +61,10 @@ impl BatchThresholdEncryption for FPTXSuccinct {
 
         let digest_key = DigestKey::new(&mut rng, max_batch_size, number_of_rounds)?;
         let msk = Fr::rand(&mut rng);
-        let (mpk, vks, msk_shares) = key_derivation::gen_msk_shares(msk, &mut rng, tc);
+        let (mpk, vks_fast, msk_shares_fast) =
+            key_derivation::gen_msk_shares(msk, &mut rng, threshold_config_fast);
+        let (_, vks_slow, msk_shares_slow) =
+            key_derivation::gen_msk_shares(msk, &mut rng, threshold_config_slow);
 
         let ek = AugmentedEncryptionKey {
             sig_mpk_g2: mpk,
@@ -66,7 +72,7 @@ impl BatchThresholdEncryption for FPTXSuccinct {
             tau_mpk_g2: (digest_key.tau_g2 * msk).into(),
         };
 
-        Ok((ek, digest_key, vks, msk_shares))
+        Ok((ek, digest_key, vks_fast, msk_shares_fast, vks_slow, msk_shares_slow))
     }
 
     fn encrypt<R: CryptoRng + RngCore>(

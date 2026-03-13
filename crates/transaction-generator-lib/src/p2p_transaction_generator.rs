@@ -16,7 +16,7 @@ use std::{
     cmp::{max, min},
     sync::Arc,
 };
-use aptos_batch_encryption::{schemes::fptx::FPTX, traits::BatchThresholdEncryption, group::Fr};
+use aptos_batch_encryption::{schemes::fptx_succinct::FPTXSuccinct, traits::BatchThresholdEncryption, group::Fr};
 use aptos_types::decryption::{EncryptionKey, PROTOTYPE_SETUP_SEED, PROTOTYPE_BATCH_SIZE, PROTOTYPE_NUMBER_OF_ROUNDS, PROTOTYPE_THRESHOLD_SLOW_PATH, PROTOTYPE_NUMBER_OF_VALIDATORS, PROTOTYPE_THRESHOLD_FAST_PATH};
 use aptos_crypto::arkworks::shamir::ShamirThresholdConfig;
 
@@ -396,7 +396,7 @@ impl TransactionGeneratorCreator for P2PTransactionGeneratorCreator {
         let encryption_key = if self.encrypted {
             let tc_slow_path = ThresholdConfig::new(PROTOTYPE_NUMBER_OF_VALIDATORS, PROTOTYPE_THRESHOLD_SLOW_PATH);
             let tc_fast_path = ThresholdConfig::new(PROTOTYPE_NUMBER_OF_VALIDATORS, PROTOTYPE_THRESHOLD_FAST_PATH);
-            let (ek, _, _, _, _, _) = <FPTX as BatchThresholdEncryption>::setup_for_testing(PROTOTYPE_SETUP_SEED, PROTOTYPE_BATCH_SIZE, PROTOTYPE_NUMBER_OF_ROUNDS, &tc_fast_path, &tc_slow_path).unwrap();
+            let (ek, _, _, _, _, _) = <FPTXSuccinct as BatchThresholdEncryption>::setup_for_testing(PROTOTYPE_SETUP_SEED, PROTOTYPE_BATCH_SIZE, PROTOTYPE_NUMBER_OF_ROUNDS, &tc_fast_path, &tc_slow_path).unwrap();
             Some(ek)
         } else {
             None

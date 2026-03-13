@@ -11,7 +11,7 @@ use std::{
     fmt::Debug,
     ops::{Deref, DerefMut},
 };
-use aptos_batch_encryption::{schemes::fptx::FPTX, traits::BatchThresholdEncryption};
+use aptos_batch_encryption::{schemes::fptx_succinct::FPTXSuccinct, traits::BatchThresholdEncryption};
 use rayon::prelude::*;
 use aptos_types::decryption::DECRYPTION_POOL;
 use aptos_experimental_runtimes::thread_manager::optimal_min_len;
