@@ -134,33 +134,44 @@ impl ExpRewriterFunctions for MatchTransformer<'_> {
             let chain = generate_if_else_chain(self.env, id, &new_disc, arms, 0);
             Some(ExpBuilder::new(self.env).block(bind_pat, Some(bind_init), chain))
         } else if mixed_tuple {
-            Some(transform_mixed_tuple_match(
-                self.env,
-                id,
-                discriminator,
-                arms,
-            ))
+            // `transform_mixed_tuple_match` expects an explicit tuple constructor
+            // as the discriminator. If the discriminator is already a tuple
+            // constructor, pass it directly. Otherwise (e.g. a function call
+            // returning a tuple), bind it to temporaries and build a synthetic
+            // tuple to normalize into the expected form.
+            let result = match discriminator.as_ref() {
+                ExpData::Call(_, Operation::Tuple, _) => {
+                    transform_mixed_tuple_match(self.env, id, discriminator, arms)
+                },
+                _ => {
+                    let (new_disc, bind_pat, bind_init) =
+                        bind_discriminator(self.env, discriminator);
+                    let transformed = transform_mixed_tuple_match(self.env, id, &new_disc, arms);
+                    ExpBuilder::new(self.env).block(bind_pat, Some(bind_init), transformed)
+                },
+            };
+            Some(result)
         } else {
-            // If neither transform applies but arms contain literal patterns, report
-            // an error instead of letting them reach bytecode generation.
-            // This should eventually never happen as we should be able to transform all literal
-            // patterns that reach this stage. TODO(#19024).
-            self.reject_unsupported_literals(arms);
+            // By this point every reachable literal pattern should have been
+            // handled by one of the two transforms above.  Flag any that
+            // remain as a compiler bug.
+            self.reject_remaining_literals(arms);
             None
         }
     }
 }
 
 impl MatchTransformer<'_> {
-    /// Report errors for any literal patterns in arms that won't be transformed.
-    fn reject_unsupported_literals(&self, arms: &[MatchArm]) {
+    /// Flag any remaining literal patterns as a compiler bug.
+    fn reject_remaining_literals(&self, arms: &[MatchArm]) {
         for arm in arms {
             arm.pattern.visit_pre_post(&mut |is_post, pat| {
                 if !is_post {
                     if let Pattern::LiteralValue(id, _) = pat {
-                        self.env.error(
+                        self.env.diag(
+                            Severity::Bug,
                             &self.env.get_node_loc(*id),
-                            "literal patterns are not supported in this match expression",
+                            "unexpected literal pattern not handled by match transforms",
                         );
                     }
                 }
@@ -509,22 +520,13 @@ fn generate_abort(env: &GlobalEnv, id: NodeId) -> Exp {
 /// This detects cases like `match ((enum_val, 1, 2)) { (Variant(a), 1, 2) => ..., _ => ... }`
 /// where the tuple contains both enum/struct elements and primitive elements.
 fn is_mixed_tuple_match(env: &GlobalEnv, discriminator: &Exp, arms: &[MatchArm]) -> bool {
-    // Discriminator must be an explicit tuple construction.
-    let disc_args = match discriminator.as_ref() {
-        ExpData::Call(_, Operation::Tuple, args) => args,
-        _ => return false,
-    };
-
-    // Get tuple element types
+    // Discriminator must have a tuple type (either explicit tuple constructor or any
+    // expression returning a tuple, such as a function call).
     let disc_ty = env.get_node_type(discriminator.node_id());
     let elem_tys = match &disc_ty {
         Type::Tuple(tys) => tys,
         _ => return false,
     };
-
-    if elem_tys.len() != disc_args.len() {
-        return false;
-    }
 
     // Must have at least one primitive and at least one non-primitive element
     let has_primitive = elem_tys.iter().any(is_suitable_type);
