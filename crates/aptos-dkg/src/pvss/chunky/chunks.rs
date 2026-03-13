@@ -7,7 +7,7 @@ use ark_ff::{BigInteger, PrimeField};
 /// Supports any chunk size from 1 to 64 bits (e.g. 43 or 52 bits). Made `pub` for tests.
 pub fn scalar_to_le_chunks<F: PrimeField>(num_bits: u8, scalar: &F) -> Vec<F> {
     assert!(num_bits > 0 && num_bits <= 64, "Invalid chunk size");
-    if num_bits % 8 == 0 {
+    if num_bits.is_multiple_of(8) {
         return scalar_to_le_chunks_byte_aligned(num_bits, scalar);
     }
 

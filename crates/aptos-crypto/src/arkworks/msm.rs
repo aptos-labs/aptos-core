@@ -8,6 +8,7 @@
 //! inputs.
 
 use crate::{arkworks::random::sample_field_element, utils};
+use anyhow::{bail, Result};
 use ark_ec::AffineRepr;
 use ark_ff::Zero;
 use ark_serialize::{CanonicalDeserialize, CanonicalSerialize};
@@ -54,9 +55,9 @@ where
     /// Constructs a new MSM input from the provided bases and scalars.
     ///
     /// Returns an error if the lengths of `bases` and `scalars` do not match.
-    pub fn new(bases: Vec<B>, scalars: Vec<S>) -> anyhow::Result<Self> {
+    pub fn new(bases: Vec<B>, scalars: Vec<S>) -> Result<Self> {
         if bases.len() != scalars.len() {
-            anyhow::bail!(
+            bail!(
                 "MsmInput length mismatch: {} bases, {} scalars",
                 bases.len(),
                 scalars.len(),
@@ -73,9 +74,9 @@ where
 pub fn merge_msm_inputs_with_scales<A: AffineRepr>(
     inputs: &[MsmInput<A, A::ScalarField>],
     scales: &[A::ScalarField],
-) -> anyhow::Result<MsmInput<A, A::ScalarField>> {
+) -> Result<MsmInput<A, A::ScalarField>> {
     if inputs.len() != scales.len() {
-        anyhow::bail!(
+        bail!(
             "inputs and scales length mismatch: {} inputs, {} scales",
             inputs.len(),
             scales.len(),
@@ -97,7 +98,7 @@ pub fn merge_msm_inputs_with_scales<A: AffineRepr>(
 pub fn merge_msm_inputs<A: AffineRepr, R: Rng>(
     inputs: &[MsmInput<A, A::ScalarField>],
     rng: &mut R,
-) -> anyhow::Result<MsmInput<A, A::ScalarField>> {
+) -> Result<MsmInput<A, A::ScalarField>> {
     let beta = sample_field_element(rng);
     let scales = utils::powers(beta, inputs.len());
     merge_msm_inputs_with_scales(inputs, &scales)

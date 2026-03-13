@@ -12,7 +12,7 @@ use crate::{
     },
     Scalar,
 };
-use anyhow::{bail, ensure};
+use anyhow::{bail, ensure, Result};
 use aptos_crypto::arkworks::{
     msm::{merge_msm_inputs, MsmInput},
     random::sample_field_element,
@@ -140,7 +140,7 @@ pub trait Trait:
         proof: &Proof<Self::Scalar, Self>,
         cntxt: &Ct,
         rng: &mut R,
-    ) -> anyhow::Result<()> {
+    ) -> Result<()> {
         let prover_first_message = match proof.prover_commitment() {
             Some(m) => m,
             None => bail!("proof must contain commitment for Fiat–Shamir"),
@@ -164,7 +164,7 @@ pub trait Trait:
         challenge: Self::Scalar,
         response: &Self::Domain,
         rng: &mut R,
-    ) -> anyhow::Result<()>;
+    ) -> Result<()>;
 }
 
 // Specialised version where the homomorphism consists of fixed-base MSMs over one elliptic curve.
@@ -192,7 +192,7 @@ pub trait CurveGroupTrait:
             <Self::Group as CurveGroup>::Affine,
             <Self::Group as PrimeGroup>::ScalarField,
         >,
-    ) -> anyhow::Result<()> {
+    ) -> Result<()> {
         let result = Self::msm_eval(input);
         ensure!(result == <Self::Group as AdditiveGroup>::ZERO);
         Ok(())
@@ -238,6 +238,9 @@ pub trait CurveGroupTrait:
     /// `Domain` and `CodomainNormalized` as `Self`. This allows verifying a proof
     /// stored as `Proof<..., Homomorphism<'static, E>>` using a locally built
     /// `Homomorphism<'a, E>` (with a short lifetime `'a`) without forcing `'static`.
+    ///
+    /// We're not using this at the moment, but could be useful when batching in the MSMs
+    /// of a proper `CurveGroup`-style homomorphism (i.e., one that is not part of a tuple).
     fn msm_terms_for_verify<Ct: Serialize, H2>(
         &self,
         public_statement: &Self::CodomainNormalized,
@@ -282,7 +285,7 @@ impl<T: CurveGroupTrait> Trait for T {
         challenge: Self::Scalar,
         response: &Self::Domain,
         rng: &mut R,
-    ) -> anyhow::Result<()> {
+    ) -> Result<()> {
         let msm_terms = self.msm_terms_for_verify_with_challenge(
             public_statement,
             prover_commitment,
