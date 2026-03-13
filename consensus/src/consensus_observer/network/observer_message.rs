@@ -1265,6 +1265,9 @@ fn verify_batch(
 #[cfg(test)]
 mod test {
     use super::*;
+    use aptos_batch_encryption::{
+        group::Fr, schemes::fptx_weighted::FPTXWeighted, traits::BatchThresholdEncryption,
+    };
     use aptos_bitvec::BitVec;
     use aptos_consensus_types::{
         block::Block,
@@ -1277,15 +1280,21 @@ mod test {
         pipelined_block::OrderedBlockWindow,
         quorum_cert::QuorumCert,
     };
-    use aptos_crypto::{ed25519::Ed25519PrivateKey, HashValue, PrivateKey, SigningKey, Uniform};
+    use aptos_crypto::{
+        ed25519::Ed25519PrivateKey, weighted_config::WeightedConfigArkworks, HashValue, PrivateKey,
+        SigningKey, Uniform,
+    };
     use aptos_types::{
         aggregate_signature::AggregateSignature,
         chain_id::ChainId,
         ledger_info::LedgerInfo,
         quorum_store::BatchId,
+        secret_sharing::{Digest, SecretShare, SecretShareConfig, SecretShareMetadata},
         transaction::{RawTransaction, Script, TransactionPayload},
         validator_signer::ValidatorSigner,
-        validator_verifier::{ValidatorConsensusInfo, ValidatorVerifier},
+        validator_verifier::{
+            random_validator_verifier_with_voting_power, ValidatorConsensusInfo, ValidatorVerifier,
+        },
         PeerId,
     };
     use claims::{assert_matches, assert_ok};
@@ -1656,6 +1665,71 @@ mod test {
             .verify_ordered_proof(&epoch_state)
             .unwrap_err();
         assert_matches!(error, Error::InvalidMessageError(_));
+    }
+
+    #[test]
+    fn test_new_ordered_block_message_uses_configured_wire_format() {
+        let current_epoch = 0;
+        let block = create_pipelined_block(create_block_info(current_epoch, HashValue::random()));
+        let ordered_proof = LedgerInfoWithSignatures::new(
+            LedgerInfo::new(block.block_info(), HashValue::random()),
+            AggregateSignature::empty(),
+        );
+
+        assert_matches!(
+            ConsensusObserverMessage::new_ordered_block_message(
+                vec![block.clone()],
+                ordered_proof.clone(),
+                false,
+            ),
+            ConsensusObserverDirectSend::OrderedBlock(_)
+        );
+        assert_matches!(
+            ConsensusObserverMessage::new_ordered_block_message(vec![block], ordered_proof, true),
+            ConsensusObserverDirectSend::OrderedBlockV2(_)
+        );
+    }
+
+    #[test]
+    fn test_ordered_block_v2_serialization_uses_decrypted_txns_instead_of_input_txns() {
+        let current_epoch = 0;
+        let block_info = create_block_info(current_epoch, HashValue::random());
+        let input_transactions = create_signed_transactions(2);
+        let decrypted_encrypted_txns = create_signed_transactions(1);
+        let secret_shared_key = create_secret_shared_key(10);
+        let ordered_proof = LedgerInfoWithSignatures::new(
+            LedgerInfo::new(block_info.clone(), HashValue::random()),
+            AggregateSignature::empty(),
+        );
+
+        let block_with_input =
+            create_pipelined_block_with_input_txns(block_info.clone(), input_transactions);
+        block_with_input.set_decryption_key(secret_shared_key.clone());
+        block_with_input.set_decrypted_encrypted_txns(decrypted_encrypted_txns.clone());
+
+        let block_without_input = create_pipelined_block_with_input_txns(block_info, Vec::new());
+        block_without_input.set_decryption_key(secret_shared_key.clone());
+        block_without_input.set_decrypted_encrypted_txns(decrypted_encrypted_txns.clone());
+
+        let bytes_with_input = bcs::to_bytes(&OrderedBlockV2::new(
+            vec![block_with_input],
+            ordered_proof.clone(),
+        ))
+        .unwrap();
+        let bytes_without_input = bcs::to_bytes(&OrderedBlockV2::new(
+            vec![block_without_input],
+            ordered_proof,
+        ))
+        .unwrap();
+        assert_eq!(bytes_with_input, bytes_without_input);
+
+        let decoded: OrderedBlockV2 = bcs::from_bytes(&bytes_with_input).unwrap();
+        let decoded_block = decoded.into_ordered_block().first_block();
+        assert_eq!(
+            decoded_block.decrypted_encrypted_txns(),
+            decrypted_encrypted_txns
+        );
+        assert_eq!(decoded_block.secret_shared_key(), Some(&secret_shared_key));
     }
 
     #[test]
@@ -2095,6 +2169,56 @@ mod test {
             block,
             OrderedBlockWindow::empty(),
         ))
+    }
+
+    /// Creates and returns a new pipelined block with the given block info and input txns
+    fn create_pipelined_block_with_input_txns(
+        block_info: BlockInfo,
+        input_txns: Vec<SignedTransaction>,
+    ) -> Arc<PipelinedBlock> {
+        let block_data = BlockData::new_for_testing(
+            block_info.epoch(),
+            block_info.round(),
+            block_info.timestamp_usecs(),
+            QuorumCert::dummy(),
+            BlockType::Genesis,
+        );
+        let block = Block::new_for_testing(block_info.id(), block_data, None);
+        Arc::new(PipelinedBlock::new(
+            block,
+            input_txns,
+            aptos_executor_types::state_compute_result::StateComputeResult::new_dummy(),
+        ))
+    }
+
+    /// Creates and returns a new secret shared key for the given round
+    fn create_secret_shared_key(round: u64) -> SecretSharedKey {
+        let voting_power = [1];
+        let (signers, validator_verifier) =
+            random_validator_verifier_with_voting_power(1, None, false, &voting_power);
+        let threshold_config = WeightedConfigArkworks::<Fr>::new(1, vec![1]).unwrap();
+        let (encryption_key, digest_key, verification_keys, master_secret_key_shares) =
+            FPTXWeighted::setup_for_testing(8, 1, 1, &threshold_config).unwrap();
+        let secret_share_config = SecretShareConfig::new(
+            Arc::new(validator_verifier),
+            digest_key,
+            master_secret_key_shares[0].clone(),
+            verification_keys,
+            threshold_config,
+            encryption_key,
+        );
+        let metadata =
+            SecretShareMetadata::new(1, round, 0, HashValue::random(), Digest::default());
+        let decryption_key_share = FPTXWeighted::derive_decryption_key_share(
+            &master_secret_key_shares[0],
+            &metadata.digest,
+        )
+        .unwrap();
+        let secret_share =
+            SecretShare::new(signers[0].author(), metadata.clone(), decryption_key_share);
+        let key =
+            SecretShare::aggregate(std::iter::once(&secret_share), &secret_share_config).unwrap();
+        SecretSharedKey::new(metadata, key)
     }
 
     /// Creates and returns a new pipelined block with the given block info and parent ID

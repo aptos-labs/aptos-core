@@ -620,3 +620,72 @@ pub struct ExecutionSummary {
     pub root_hash: HashValue,
     pub gas_used: Option<u64>,
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::{
+        block::Block,
+        block_data::{BlockData, BlockType},
+        quorum_cert::QuorumCert,
+    };
+    use aptos_crypto::{
+        ed25519::Ed25519PrivateKey, hash::CryptoHash, PrivateKey, SigningKey, Uniform,
+    };
+    use aptos_types::{
+        account_address::AccountAddress,
+        chain_id::ChainId,
+        transaction::{RawTransaction, Script, SignedTransaction, TransactionPayload},
+    };
+
+    #[test]
+    fn test_serialization_ignores_observer_only_decrypted_transactions() {
+        let input_transactions = create_signed_transactions(2);
+        let observer_only_transactions = create_signed_transactions(1);
+        let block = create_pipelined_block(input_transactions);
+
+        let bytes_without_observer_state = bcs::to_bytes(&block).unwrap();
+        block.set_decrypted_encrypted_txns(observer_only_transactions);
+        let bytes_with_observer_state = bcs::to_bytes(&block).unwrap();
+
+        assert_eq!(bytes_without_observer_state, bytes_with_observer_state);
+
+        let roundtrip: PipelinedBlock = bcs::from_bytes(&bytes_with_observer_state).unwrap();
+        assert_eq!(roundtrip, block);
+        assert!(roundtrip.decrypted_encrypted_txns().is_empty());
+    }
+
+    fn create_pipelined_block(input_transactions: Vec<SignedTransaction>) -> PipelinedBlock {
+        let block_data =
+            BlockData::new_for_testing(0, 0, 0, QuorumCert::dummy(), BlockType::Genesis);
+        let block = Block::new_for_testing(block_data.hash(), block_data, None);
+        PipelinedBlock::new(block, input_transactions, StateComputeResult::new_dummy())
+    }
+
+    fn create_signed_transactions(num_transactions: usize) -> Vec<SignedTransaction> {
+        let private_key = Ed25519PrivateKey::generate_for_testing();
+        let public_key = private_key.public_key();
+        let sender = AccountAddress::random();
+
+        (0..num_transactions)
+            .map(|sequence_number| {
+                let payload = TransactionPayload::Script(Script::new(vec![], vec![], vec![]));
+                let raw_transaction = RawTransaction::new(
+                    sender,
+                    sequence_number as u64,
+                    payload,
+                    0,
+                    0,
+                    0,
+                    ChainId::new(10),
+                );
+
+                SignedTransaction::new(
+                    raw_transaction.clone(),
+                    public_key.clone(),
+                    private_key.sign(&raw_transaction).unwrap(),
+                )
+            })
+            .collect()
+    }
+}
