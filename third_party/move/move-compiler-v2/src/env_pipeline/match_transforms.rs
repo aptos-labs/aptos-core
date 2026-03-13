@@ -137,8 +137,8 @@ impl ExpRewriterFunctions for MatchTransformer<'_> {
             // `transform_mixed_tuple_match` expects an explicit tuple constructor
             // as the discriminator. If the discriminator is already a tuple
             // constructor, pass it directly. Otherwise (e.g. a function call
-            // returning a tuple), bind it to temporaries and build a synthetic
-            // tuple to normalize into the expected form.
+            // returning a tuple), use `bind_discriminator` to bind each tuple
+            // element to a temporary and rebuild a synthetic tuple expression.
             let result = match discriminator.as_ref() {
                 ExpData::Call(_, Operation::Tuple, _) => {
                     transform_mixed_tuple_match(self.env, id, discriminator, arms)
@@ -171,7 +171,7 @@ impl MatchTransformer<'_> {
                         self.env.diag(
                             Severity::Bug,
                             &self.env.get_node_loc(*id),
-                            "unexpected literal pattern not handled by match transforms",
+                            "unexpected literal pattern for match transforms",
                         );
                     }
                 }
