@@ -8,7 +8,7 @@
 //! the dealer's signing key, session, and domain-separation tag.
 
 use super::{subtranscript::Subtranscript, EncryptPubKey};
-use crate::pvss::Player;
+use crate::pvss::{chunky, chunky::chunked_elgamal::num_chunks_per_scalar, Player};
 use anyhow::bail;
 use aptos_crypto::{bls12381, weighted_config::WeightedConfigArkworks, TSecretSharingConfig as _};
 use ark_ec::pairing::Pairing;
@@ -55,6 +55,7 @@ impl<'a, A: Serialize + Clone> SokContext<'a, A> {
 /// Call this at the start of `verify` for both weighted transcript v1 and v2.
 pub fn verify_weighted_preamble<'a, A: Serialize + Clone, E: Pairing>(
     sc: &WeightedConfigArkworks<E::ScalarField>,
+    pp: &chunky::PublicParameters<E>,
     subtrs: &Subtranscript<E>,
     dealer: &Player,
     spks: &[bls12381::PublicKey],
@@ -83,6 +84,45 @@ pub fn verify_weighted_preamble<'a, A: Serialize + Clone, E: Pairing>(
             subtrs.Vs.len()
         );
     }
+
+    let expected_chunks_per_share = num_chunks_per_scalar::<E::ScalarField>(pp.ell) as usize;
+
+    for i in 0..sc.get_total_num_players() {
+        let player = sc.get_player(i);
+        let expected_weight = sc.get_player_weight(&player);
+        let got_cs = subtrs.Cs[i].len();
+        if got_cs != expected_weight {
+            bail!(
+                "Expected {} ciphertext shares for player {}, but got {}",
+                expected_weight,
+                i,
+                got_cs
+            );
+        }
+        for (j, row) in subtrs.Cs[i].iter().enumerate() {
+            if row.len() != expected_chunks_per_share {
+                bail!(
+                    "Expected {} chunks in ciphertext share {} for player {}, but got {}",
+                    expected_chunks_per_share,
+                    j,
+                    i,
+                    row.len()
+                );
+            }
+        }
+        let got_vs = subtrs.Vs[i].len();
+        if got_vs != expected_weight {
+            bail!(
+                "Expected {} commitment shares for player {}, but got {}",
+                expected_weight,
+                i,
+                got_vs
+            );
+        }
+    }
+
+    // The previous checks should imply that Cs_flat.len() = sc.get_total_weight()
+
     Ok(SokContext::new(
         spks[dealer.id].clone(),
         sid,

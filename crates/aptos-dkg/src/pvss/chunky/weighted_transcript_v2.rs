@@ -245,12 +245,6 @@ impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>> Transcr
         // Vs_flat is the inner Vec<E::G2> from CodomainShape
         let Vs: Vec<Vec<E::G2Affine>> = sc.group_by_player(&Vs_flat);
 
-        // debug_assert_eq!(
-        //     Cs.len(),
-        //     sc.get_total_weight(),
-        //     "Number of encrypted chunks must equal number of players"
-        // );
-
         // Generate the batch range proof, given the `range_proof_commitment` produced in the PoK
         let range_proof_projective = dekart_univariate_v2::Proof::prove(
             &pp.pk_range_proof,
@@ -297,6 +291,7 @@ impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>>
     ) -> anyhow::Result<()> {
         let sok_cntxt = verify_weighted_preamble(
             sc,
+            pp,
             &self.subtrs,
             &self.dealer,
             spks,

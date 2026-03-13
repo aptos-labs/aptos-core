@@ -296,6 +296,7 @@ impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>>
     ) -> anyhow::Result<()> {
         let sok_cntxt = verify_weighted_preamble(
             sc,
+            pp,
             &self.subtrs,
             &self.dealer,
             spks,
@@ -326,14 +327,9 @@ impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>>
 
         // Step 3: Check that ciphertexts encrypt the committed shares
         let n = sc.get_total_weight();
-        let (_, powers_of_beta) = sample_field_element_with_powers::<E::ScalarField, _>(n, rng);
+        let (_, powers_of_beta) = sample_field_element_with_powers(n, rng);
 
         let Cs_flat: Vec<_> = self.subtrs.Cs.iter().flatten().cloned().collect();
-        debug_assert_eq!(
-            Cs_flat.len(),
-            sc.get_total_weight(),
-            "Number of ciphertexts does not equal number of weights"
-        ); // Flattening here means removing the player index sorting
 
         let (weighted_Cs_base, weighted_Cs_scalar): (Vec<_>, Vec<_>) = Cs_flat
             .iter()
@@ -347,10 +343,8 @@ impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>>
             })
             .unzip();
 
-        let weighted_Cs_msm =
-            MsmInput::new(weighted_Cs_base, weighted_Cs_scalar).expect("weighted_Cs MSM terms");
-        let weighted_Vs_msm = MsmInput::new(Vs_flat[..n].to_vec(), powers_of_beta.to_vec())
-            .expect("weighted_Vs MSM terms");
+        let weighted_Cs_msm = MsmInput::new(weighted_Cs_base, weighted_Cs_scalar)?;
+        let weighted_Vs_msm = MsmInput::new(Vs_flat[..n].to_vec(), powers_of_beta.to_vec())?;
         // An alternative way to get the same MSMs would be:
         // Consider Cs_flat as a list of MSM bases, with each MSM paired with the scalars pp.powers_of_radix
         // These are merged using powers_of_beta
@@ -391,16 +385,26 @@ impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>>
             powers_of_gamma[1],
             E::ScalarField::ONE,
         ]);
-        let combined_G1 = E::G1::msm(merged_g1.bases(), merged_g1.scalars())
-            .expect("Failed to compute merged G1 MSM in chunky");
+        let combined_G1 =
+            E::G1::msm(merged_g1.bases(), merged_g1.scalars()).map_err(|min_len| {
+                anyhow::anyhow!(
+                    "Failed to compute merged G1 MSM in chunky (bases/scalars min length: {})",
+                    min_len
+                )
+            })?;
 
         let g2_inputs = vec![ldt_msm_terms, weighted_Vs_msm];
         let merged_g2 = msm::merge_msm_inputs_with_scales(&g2_inputs, &[
             powers_of_gamma[2],
             E::ScalarField::ONE,
         ]);
-        let combined_G2 = E::G2::msm(merged_g2.bases(), merged_g2.scalars())
-            .expect("Failed to compute merged G2 MSM in chunky");
+        let combined_G2 =
+            E::G2::msm(merged_g2.bases(), merged_g2.scalars()).map_err(|min_len| {
+                anyhow::anyhow!(
+                    "Failed to compute merged G2 MSM in chunky (bases/scalars min length: {})",
+                    min_len
+                )
+            })?;
 
         let res = E::multi_pairing(
             g1_terms.iter().copied().chain([
@@ -413,7 +417,7 @@ impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>>
                 .chain([pp.get_commitment_base(), (-combined_G2).into_affine()]),
         );
         if PairingOutput::<E>::ZERO != res {
-            return Err(anyhow::anyhow!("Expected zero during multi-pairing check"));
+            bail!("Expected zero during multi-pairing check");
         }
 
         Ok(())

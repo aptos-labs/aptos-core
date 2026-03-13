@@ -12,7 +12,7 @@ use crate::{
     },
     Scalar,
 };
-use anyhow::ensure;
+use anyhow::{bail, ensure};
 use aptos_crypto::arkworks::{
     msm::{merge_msm_inputs, MsmInput},
     random::sample_field_element,
@@ -141,9 +141,10 @@ pub trait Trait:
         cntxt: &Ct,
         rng: &mut R,
     ) -> anyhow::Result<()> {
-        let prover_first_message = proof
-            .prover_commitment()
-            .expect("proof must contain commitment for Fiat–Shamir"); // TODO: implement required function for this
+        let prover_first_message = match proof.prover_commitment() {
+            Some(m) => m,
+            None => bail!("proof must contain commitment for Fiat–Shamir"),
+        };
         let c = self.fiat_shamir_challenge_for_sigma_protocol(
             cntxt,
             public_statement,

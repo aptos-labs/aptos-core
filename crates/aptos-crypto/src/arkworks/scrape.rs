@@ -157,7 +157,7 @@ impl<'a, F: PrimeField> LowDegreeTest<'a, F> {
 
         let scalars = v_times_f;
 
-        Ok(MsmInput::new(bases.to_vec(), scalars).expect("Could not construct MsmInput"))
+        Ok(MsmInput::new(bases.to_vec(), scalars)?)
     }
 
     /// Performs the LDT given group elements $G^{p(\omega^i)} \in

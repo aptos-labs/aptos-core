@@ -79,7 +79,7 @@ pub fn merge_msm_inputs_with_scales<A: AffineRepr>(
         inputs.len(),
         scales.len(),
         "inputs and scales length mismatch"
-    );
+    ); // In general we should avoid assert_eq! in production code for verifiers, but so far it hasn't been inappropriate
     let mut agg: HashMap<A, A::ScalarField> = HashMap::new();
     for (input, scale) in inputs.iter().zip(scales.iter()) {
         for (base, scalar) in input.bases().iter().zip(input.scalars().iter()) {
