@@ -46,6 +46,7 @@ impl PipelineBuilder {
 
         tracker.start_working();
 
+        // TODO(ibalajiarun): if decryption is disabled, convert encrypted txns to failed decryption.
         // If decryption is disabled (by config or missing secret share config), pass through.
         if !is_decryption_enabled {
             return Ok(DecryptionResult {
