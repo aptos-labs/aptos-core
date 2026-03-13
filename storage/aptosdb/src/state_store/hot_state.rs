@@ -6,6 +6,7 @@ use crate::metrics::{
 };
 use anyhow::{ensure, Result};
 use aptos_config::config::HotStateConfig;
+use aptos_crypto::HashValue;
 use aptos_infallible::Mutex;
 use aptos_logger::prelude::*;
 use aptos_metrics_core::{IntCounterVecHelper, IntGaugeVecHelper, TimerHelper};
@@ -78,7 +79,7 @@ where
 }
 
 #[derive(Debug)]
-struct HotStateBase<K = StateKey, V = StateSlot>
+struct HotStateBase<K = HashValue, V = StateSlot>
 where
     K: Eq + std::hash::Hash,
 {
@@ -127,7 +128,7 @@ impl HotStateView for LayeredHotStateView {
         // Key not in delta (unchanged) — read from base DashMap.
         let shard_id = state_key.get_shard_id();
         self.base
-            .get_from_shard(shard_id, state_key)
+            .get_from_shard(shard_id, state_key.crypto_hash_ref())
             .map(|v| v.clone())
     }
 }
@@ -233,7 +234,7 @@ impl HotState {
     }
 
     #[cfg(test)]
-    pub fn get_all_entries(&self, shard_id: usize) -> BTreeMap<StateKey, StateSlot> {
+    pub fn get_all_entries(&self, shard_id: usize) -> BTreeMap<HashValue, StateSlot> {
         self.base.shards[shard_id].iter().collect()
     }
 }
@@ -270,9 +271,9 @@ struct Committer {
     total_key_bytes: usize,
     total_value_bytes: usize,
     /// Points to the newest entry. `None` if empty.
-    heads: [Option<StateKey>; NUM_STATE_SHARDS],
+    heads: [Option<HashValue>; NUM_STATE_SHARDS],
     /// Points to the oldest entry. `None` if empty.
-    tails: [Option<StateKey>; NUM_STATE_SHARDS],
+    tails: [Option<HashValue>; NUM_STATE_SHARDS],
 
     /// What the base DashMaps currently reflect. May lag behind `committed.state` while a merge
     /// is deferred.
@@ -499,25 +500,29 @@ impl Committer {
         let delta = target.make_delta(&self.merged_state);
         for shard_id in 0..NUM_STATE_SHARDS {
             for (key, slot) in delta.shards[shard_id].iter() {
+                let key_hash = *key.crypto_hash_ref();
                 if slot.is_hot() {
-                    let key_size = key.size();
-                    self.total_key_bytes += key_size;
+                    self.total_key_bytes += HashValue::LENGTH;
                     self.total_value_bytes += slot.size();
-                    if let Some(old_slot) = self.base.shards[shard_id].insert(key, slot) {
-                        self.total_key_bytes -= key_size;
+                    if let Some(old_slot) = self.base.shards[shard_id].insert(key_hash, slot) {
+                        self.total_key_bytes -= HashValue::LENGTH;
                         self.total_value_bytes -= old_slot.size();
                         n_update += 1;
                     } else {
                         n_insert += 1;
                     }
-                } else if let Some((key, old_slot)) = self.base.shards[shard_id].remove(&key) {
-                    self.total_key_bytes -= key.size();
+                } else if let Some((_, old_slot)) = self.base.shards[shard_id].remove(&key_hash) {
+                    self.total_key_bytes -= HashValue::LENGTH;
                     self.total_value_bytes -= old_slot.size();
                     n_evict += 1;
                 }
             }
-            self.heads[shard_id] = target.latest_hot_key(shard_id);
-            self.tails[shard_id] = target.oldest_hot_key(shard_id);
+            self.heads[shard_id] = target
+                .latest_hot_key(shard_id)
+                .map(|k| *k.crypto_hash_ref());
+            self.tails[shard_id] = target
+                .oldest_hot_key(shard_id)
+                .map(|k| *k.crypto_hash_ref());
             assert_eq!(
                 self.base.shards[shard_id].len(),
                 target.num_hot_items(shard_id)
@@ -584,26 +589,26 @@ impl Committer {
 
         {
             let mut num_visited = 0;
-            let mut current = head.clone();
-            while let Some(key) = current {
-                let entry = shard.get(&key).expect("Must exist.");
+            let mut current = *head;
+            while let Some(key_hash) = current {
+                let entry = shard.get(&key_hash).expect("Must exist.");
                 num_visited += 1;
                 ensure!(num_visited <= shard.len());
                 ensure!(entry.is_hot());
-                current = entry.next().cloned();
+                current = entry.next().map(|k| *k.crypto_hash_ref());
             }
             ensure!(num_visited == shard.len());
         }
 
         {
             let mut num_visited = 0;
-            let mut current = tail.clone();
-            while let Some(key) = current {
-                let entry = shard.get(&key).expect("Must exist.");
+            let mut current = *tail;
+            while let Some(key_hash) = current {
+                let entry = shard.get(&key_hash).expect("Must exist.");
                 num_visited += 1;
                 ensure!(num_visited <= shard.len());
                 ensure!(entry.is_hot());
-                current = entry.prev().cloned();
+                current = entry.prev().map(|k| *k.crypto_hash_ref());
             }
             ensure!(num_visited == shard.len());
         }
@@ -698,7 +703,7 @@ mod tests {
         let key = StateKey::raw(b"key_a");
         let shard_id = key.get_shard_id();
         let slot = make_hot_slot(1, b"value_a");
-        base.shards[shard_id].insert(key.clone(), slot.clone());
+        base.shards[shard_id].insert(*key.crypto_hash_ref(), slot.clone());
 
         let view = LayeredHotStateView {
             delta: None,
@@ -725,18 +730,20 @@ mod tests {
         // key_base_only: in base DashMap, NOT in delta.
         let key_base_only = StateKey::raw(b"base_only");
         let slot_base = make_hot_slot(1, b"base_value");
-        base.shards[key_base_only.get_shard_id()].insert(key_base_only.clone(), slot_base.clone());
+        base.shards[key_base_only.get_shard_id()]
+            .insert(*key_base_only.crypto_hash_ref(), slot_base.clone());
 
         // key_updated: in base DashMap AND in delta (hot) -> delta wins.
         let key_updated = StateKey::raw(b"updated");
         let slot_old = make_hot_slot(1, b"old_value");
         let slot_new = make_hot_slot(2, b"new_value");
-        base.shards[key_updated.get_shard_id()].insert(key_updated.clone(), slot_old);
+        base.shards[key_updated.get_shard_id()].insert(*key_updated.crypto_hash_ref(), slot_old);
 
         // key_evicted: in base DashMap AND in delta (cold) -> returns None.
         let key_evicted = StateKey::raw(b"evicted");
         let slot_was_hot = make_hot_slot(1, b"was_hot");
-        base.shards[key_evicted.get_shard_id()].insert(key_evicted.clone(), slot_was_hot);
+        base.shards[key_evicted.get_shard_id()]
+            .insert(*key_evicted.crypto_hash_ref(), slot_was_hot);
 
         // key_new: NOT in base, in delta (hot) -> returns delta value.
         let key_new = StateKey::raw(b"new_key");

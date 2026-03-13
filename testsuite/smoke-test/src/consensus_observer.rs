@@ -24,6 +24,7 @@ async fn test_consensus_observer_fast_sync_epoch_changes() {
 }
 
 #[tokio::test]
+#[ignore] // Ignore this test because it is a subset of test_consensus_observer_fast_sync_epoch_changes
 async fn test_consensus_observer_fast_sync_no_epoch_changes() {
     // Test fast syncing with consensus observer and without epoch changes
     state_sync_utils::test_fullnode_fast_sync(false, true).await;
