@@ -88,6 +88,39 @@ pub fn setup_dealing<T: Transcript, R: RngCore + CryptoRng>(
     }
 }
 
+// TODO: Not dead code yet but I think this can be merged/deleted
+pub fn setup_dealing_weighted<
+    F: FftField,
+    T: Transcript<SecretSharingConfig = WeightedConfigArkworks<F>>,
+    R: rand_core::RngCore + rand_core::CryptoRng,
+>(
+    sc: &T::SecretSharingConfig,
+    mut rng: &mut R,
+) -> DealingArgs<T> {
+    println!(
+        "Setting up weighted dealing for {} PVSS, with {}",
+        T::scheme_name(),
+        sc
+    );
+
+    let pp = T::PublicParameters::with_max_num_shares(sc.get_total_weight().try_into().unwrap());
+
+    let (ssks, spks, dks, eks, iss, s, dsk, dpk) =
+        generate_keys_and_secrets::<T, R>(sc, &pp, &mut rng);
+
+    DealingArgs {
+        pp,
+        ssks,
+        spks,
+        dks,
+        eks,
+        iss,
+        s,
+        dsk,
+        dpk,
+    }
+}
+
 /// Setup dealing for both chunky transcript variants (v1 and v2).
 /// Public parameters (incl. table and dekart) are created once and reused; keys and secrets
 /// are generated separately for each variant (key types are not cloneable).

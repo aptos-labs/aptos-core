@@ -360,7 +360,7 @@ pub fn decrypt_chunked_scalars<C: CurveGroup>(
     Rs_rows: &[Vec<C::Affine>],
     dk: &C::ScalarField,
     pp: &PublicParameters<C>,
-    table: &HashMap<Vec<u8>, u64>,
+    table: &HashMap<C::Affine, u64>,
     table_dlog_range_bound: u64,
     radix_exponent: u8,
 ) -> Vec<C::ScalarField> {

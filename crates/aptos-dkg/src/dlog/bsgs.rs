@@ -19,7 +19,6 @@
 //! This threshold is also the result of benchmarks.
 
 use ark_ec::CurveGroup;
-use ark_serialize::CanonicalSerialize;
 use std::collections::HashMap;
 
 /// Default batch size for serialization in the giant-step loop.
@@ -42,7 +41,7 @@ pub const BSGS_VEC_BATCHED_MIN_TARGETS: usize = 1; //4;
 /// # Arguments
 /// - `G`: base of the exponentiation
 /// - `H`: target point
-/// - `baby_table`: precomputed HashMap from `C.to_compressed()` |---> exponent
+/// - `baby_table`: precomputed HashMap from `C::Affine` |---> exponent
 /// - `range_limit`: maximum size of the exponent we're trying to obtain. TODO: Change to u64?
 //
 // TODO:: ensure that G is also the element used to build the baby_table? So turn baby_table into a struct?
@@ -50,7 +49,7 @@ pub const BSGS_VEC_BATCHED_MIN_TARGETS: usize = 1; //4;
 pub fn dlog<C: CurveGroup>(
     G: C,
     H: C,
-    baby_table: &HashMap<Vec<u8>, u64>,
+    baby_table: &HashMap<C::Affine, u64>,
     range_limit: u64,
 ) -> Option<u64> {
     dlog_with_batch_size(
@@ -69,12 +68,10 @@ pub fn dlog<C: CurveGroup>(
 pub fn dlog_with_batch_size<C: CurveGroup>(
     G: C,
     H: C,
-    baby_table: &HashMap<Vec<u8>, u64>,
+    baby_table: &HashMap<C::Affine, u64>,
     range_limit: u64,
     batch_size: usize,
 ) -> Option<u64> {
-    let byte_size = G.compressed_size();
-
     // Baby-step table size m; giant-step count n = ceil(range_limit / m).
     let m = baby_table
         .len()
@@ -88,13 +85,11 @@ pub fn dlog_with_batch_size<C: CurveGroup>(
     let batch_size = batch_size.max(1);
 
     if batch_size < BSGS_BATCH_NORMALIZE_THRESHOLD {
-        // Original one-at-a-time path: serialize each projective point, no batch normalize
-        let mut buf = vec![0u8; byte_size];
+        // One-at-a-time path: normalize each point and look up by Affine
         let mut gamma = H;
         for i in 0..n {
-            gamma.serialize_compressed(&mut buf[..]).unwrap();
-            if let Some(&j) = baby_table.get(&buf[..]) {
-                // x = i*m + j: giant-step index i, baby-step index j
+            let affs = C::normalize_batch(&[gamma]);
+            if let Some(&j) = baby_table.get(&affs[0]) {
                 return Some(i * m + j);
             }
             gamma += G_neg_m;
@@ -102,8 +97,7 @@ pub fn dlog_with_batch_size<C: CurveGroup>(
         return None;
     }
 
-    // Batched path: build batch, normalize_batch, then serialize and look up each
-    let mut buf = vec![0u8; byte_size];
+    // Batched path: build batch, normalize_batch, then look up each by Affine (no serialization)
     let mut batch = Vec::with_capacity(batch_size);
 
     for chunk_start in (0..n).step_by(batch_size) {
@@ -119,8 +113,7 @@ pub fn dlog_with_batch_size<C: CurveGroup>(
 
         let normalized = C::normalize_batch(&batch);
         for (j, aff) in normalized.iter().enumerate() {
-            aff.serialize_compressed(&mut buf[..]).unwrap();
-            if let Some(&baby_j) = baby_table.get(&buf[..]) {
+            if let Some(&baby_j) = baby_table.get(aff) {
                 return Some((chunk_start + j as u64) * m + baby_j);
             }
         }
@@ -136,7 +129,7 @@ pub fn dlog_with_batch_size<C: CurveGroup>(
 pub fn dlog_vec<C: CurveGroup>(
     G: C,
     H_vec: &[C],
-    baby_table: &HashMap<Vec<u8>, u64>,
+    baby_table: &HashMap<C::Affine, u64>,
     range_limit: u64,
 ) -> Option<Vec<u64>> {
     if H_vec.len() >= BSGS_VEC_BATCHED_MIN_TARGETS {
@@ -155,13 +148,12 @@ pub fn dlog_vec<C: CurveGroup>(
 }
 
 /// Same as `dlog_vec` but batches across targets: for each chunk of giant steps we compute
-/// points for all targets, call `normalize_batch` once, then serialize and lookup. Fewer
-/// normalize_batch calls than calling `dlog` per target; may be faster for large H_vec.
+/// points for all targets, call `normalize_batch` once, then lookup by Affine (no serialization).
 #[allow(non_snake_case)]
 pub fn dlog_vec_batched<C: CurveGroup>(
     G: C,
     H_vec: &[C],
-    baby_table: &HashMap<Vec<u8>, u64>,
+    baby_table: &HashMap<C::Affine, u64>,
     range_limit: u64,
 ) -> Option<Vec<u64>> {
     dlog_vec_batched_with_batch_size(
@@ -183,7 +175,7 @@ pub fn dlog_vec_batched<C: CurveGroup>(
 pub fn dlog_vec_batched_with_batch_size<C: CurveGroup>(
     G: C,
     H_vec: &[C],
-    baby_table: &HashMap<Vec<u8>, u64>,
+    baby_table: &HashMap<C::Affine, u64>,
     range_limit: u64,
     batch_size: usize,
 ) -> Option<Vec<u64>> {
@@ -191,7 +183,6 @@ pub fn dlog_vec_batched_with_batch_size<C: CurveGroup>(
         return Some(vec![]);
     }
 
-    let byte_size = G.compressed_size();
     let m = baby_table
         .len()
         .try_into()
@@ -204,7 +195,6 @@ pub fn dlog_vec_batched_with_batch_size<C: CurveGroup>(
     let mut result: Vec<Option<u64>> = vec![None; v];
     let mut unsolved = Vec::with_capacity(v);
     let mut batch = Vec::<C>::new();
-    let mut buf = vec![0u8; byte_size];
 
     for chunk_start in (0..n).step_by(batch_size) {
         unsolved.clear();
@@ -239,8 +229,7 @@ pub fn dlog_vec_batched_with_batch_size<C: CurveGroup>(
                     continue;
                 }
                 let idx = batch_idx * actual_batch + j;
-                normalized[idx].serialize_compressed(&mut buf[..]).unwrap();
-                if let Some(&baby_j) = baby_table.get(&buf[..]) {
+                if let Some(&baby_j) = baby_table.get(&normalized[idx]) {
                     result[result_idx] = Some((chunk_start + j as u64) * m + baby_j);
                 }
             }
@@ -260,7 +249,7 @@ pub fn dlog_vec_batched_with_batch_size<C: CurveGroup>(
 pub fn dlog_vec_batched_rolling_with_batch_size<C: CurveGroup>(
     G: C,
     H_vec: &[C],
-    baby_table: &HashMap<Vec<u8>, u64>,
+    baby_table: &HashMap<C::Affine, u64>,
     range_limit: u64,
     batch_size: usize,
 ) -> Option<Vec<u64>> {
@@ -268,7 +257,6 @@ pub fn dlog_vec_batched_rolling_with_batch_size<C: CurveGroup>(
         return Some(vec![]);
     }
 
-    let byte_size = G.compressed_size();
     let m = baby_table
         .len()
         .try_into()
@@ -280,12 +268,17 @@ pub fn dlog_vec_batched_rolling_with_batch_size<C: CurveGroup>(
 
     let mut result: Vec<Option<u64>> = vec![None; v];
     // Rolling state: gamma[t] = next starting point for target t
+    let mut unsolved = Vec::with_capacity(v);
     let mut gamma_vec: Vec<C> = H_vec.to_vec();
     let mut batch = Vec::<C>::new();
-    let mut buf = vec![0u8; byte_size];
 
     for chunk_start in (0..n).step_by(batch_size) {
-        let unsolved: Vec<usize> = (0..v).filter(|&i| result[i].is_none()).collect();
+        unsolved.clear();
+        for i in 0..v {
+            if result[i].is_none() {
+                unsolved.push(i);
+            }
+        }
         if unsolved.is_empty() {
             break;
         }
@@ -310,10 +303,12 @@ pub fn dlog_vec_batched_rolling_with_batch_size<C: CurveGroup>(
                     continue;
                 }
                 let idx = batch_idx * actual_batch + j;
-                normalized[idx].serialize_compressed(&mut buf[..]).unwrap();
-                if let Some(&baby_j) = baby_table.get(&buf[..]) {
+                if let Some(&baby_j) = baby_table.get(&normalized[idx]) {
                     result[result_idx] = Some((chunk_start + j as u64) * m + baby_j);
                 }
+            }
+            if unsolved.iter().all(|&r| result[r].is_some()) {
+                break;
             }
         }
     }
@@ -326,7 +321,7 @@ pub fn dlog_vec_batched_rolling_with_batch_size<C: CurveGroup>(
 pub fn dlog_vec_batched_rolling<C: CurveGroup>(
     G: C,
     H_vec: &[C],
-    baby_table: &HashMap<Vec<u8>, u64>,
+    baby_table: &HashMap<C::Affine, u64>,
     range_limit: u64,
 ) -> Option<Vec<u64>> {
     dlog_vec_batched_rolling_with_batch_size(
@@ -345,7 +340,7 @@ pub fn dlog_vec_batched_rolling<C: CurveGroup>(
 pub fn dlog_vec_batched_stepped_with_batch_size<C: CurveGroup>(
     G: C,
     H_vec: &[C],
-    baby_table: &HashMap<Vec<u8>, u64>,
+    baby_table: &HashMap<C::Affine, u64>,
     range_limit: u64,
     batch_size: usize,
 ) -> Option<Vec<u64>> {
@@ -353,7 +348,6 @@ pub fn dlog_vec_batched_stepped_with_batch_size<C: CurveGroup>(
         return Some(vec![]);
     }
 
-    let byte_size = G.compressed_size();
     let m = baby_table
         .len()
         .try_into()
@@ -364,11 +358,16 @@ pub fn dlog_vec_batched_stepped_with_batch_size<C: CurveGroup>(
     let v = H_vec.len();
 
     let mut result: Vec<Option<u64>> = vec![None; v];
+    let mut unsolved = Vec::with_capacity(v);
     let mut batch = Vec::<C>::new();
-    let mut buf = vec![0u8; byte_size];
 
     for chunk_start in (0..n).step_by(batch_size) {
-        let unsolved: Vec<usize> = (0..v).filter(|&i| result[i].is_none()).collect();
+        unsolved.clear();
+        for i in 0..v {
+            if result[i].is_none() {
+                unsolved.push(i);
+            }
+        }
         if unsolved.is_empty() {
             break;
         }
@@ -382,8 +381,7 @@ pub fn dlog_vec_batched_stepped_with_batch_size<C: CurveGroup>(
 
         for _ in 0..actual_batch {
             for &t in &unsolved {
-                let gamma = H_vec[t] - S;
-                batch.push(gamma);
+                batch.push(H_vec[t] - S);
             }
             S += step;
         }
@@ -396,10 +394,12 @@ pub fn dlog_vec_batched_stepped_with_batch_size<C: CurveGroup>(
                     continue;
                 }
                 let idx = j * unsolved.len() + t_idx;
-                normalized[idx].serialize_compressed(&mut buf[..]).unwrap();
-                if let Some(&baby_j) = baby_table.get(&buf[..]) {
+                if let Some(&baby_j) = baby_table.get(&normalized[idx]) {
                     result[result_idx] = Some((chunk_start + j as u64) * m + baby_j);
                 }
+            }
+            if unsolved.iter().all(|&r| result[r].is_some()) {
+                break;
             }
         }
     }
@@ -412,7 +412,7 @@ pub fn dlog_vec_batched_stepped_with_batch_size<C: CurveGroup>(
 pub fn dlog_vec_batched_stepped<C: CurveGroup>(
     G: C,
     H_vec: &[C],
-    baby_table: &HashMap<Vec<u8>, u64>,
+    baby_table: &HashMap<C::Affine, u64>,
     range_limit: u64,
 ) -> Option<Vec<u64>> {
     dlog_vec_batched_stepped_with_batch_size(

@@ -5,7 +5,6 @@ use aptos_dkg::dlog::{bsgs, table};
 use ark_ec::{pairing::Pairing, PrimeGroup};
 use criterion::{criterion_group, criterion_main, BenchmarkId, Criterion};
 use rand::{rngs::StdRng, Rng, SeedableRng};
-use std::collections::HashMap;
 
 /// Benchmark for small range_limit / table_size: dlog per element, batched, and batched_rolling
 /// for various batch sizes. Two configs: len=8 (range_limit=32, table_size=20) and len=7 (range_limit=37, table_size=25).
@@ -38,7 +37,7 @@ fn bench_dlog_vec_small_range<E: Pairing>(c: &mut Criterion, curve_name: &str) {
             "Building baby table for curve {} with table size {}",
             curve_name, table_size
         );
-        let baby_table: HashMap<Vec<u8>, u64> = table::build::<E::G1>(G, table_size);
+        let baby_table = table::build::<E::G1>(G, table_size);
         println!(
             "Baby table built for curve {} with table size {}",
             curve_name, table_size
@@ -162,7 +161,7 @@ fn bench_table_build<E: Pairing>(c: &mut Criterion, curve_name: &str) {
             &table_size,
             |b, &_ts| {
                 b.iter(|| {
-                    let table: HashMap<Vec<u8>, u64> = table::build::<E::G1>(G, table_size);
+                    let table = table::build::<E::G1>(G, table_size);
                     let table_len: u64 = table.len().try_into().unwrap();
                     assert_eq!(table_len, table_size, "Unexpected table length");
                 });

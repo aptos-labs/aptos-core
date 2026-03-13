@@ -69,7 +69,7 @@ pub struct PublicParameters<E: Pairing> {
     pub dlog_extra_bits: u64,
 
     #[serde(skip)]
-    pub dlog_table: HashMap<Vec<u8>, u64>,
+    pub dlog_table: HashMap<<E::G1 as ark_ec::CurveGroup>::Affine, u64>,
 
     #[serde(skip)]
     pub G2_table: BatchMulPreprocessing<E::G2>,
@@ -202,7 +202,7 @@ impl<E: Pairing> PublicParameters<E> {
         ell: u8,
         max_aggregation: usize,
         extra_bits: u64,
-    ) -> HashMap<Vec<u8>, u64> {
+    ) -> HashMap<<E::G1 as ark_ec::CurveGroup>::Affine, u64> {
         dlog::table::build::<E::G1>(
             G,
             1u64 << (extra_bits + ((ell as u64 + log2(max_aggregation) as u64) / 2)),
