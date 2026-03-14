@@ -3788,6 +3788,7 @@ impl ModuleBuilder<'_, '_> {
                 visibility: entry.visibility,
                 has_package_visibility: self.package_funs.contains(&fun_id),
                 is_native: entry.is_native,
+                is_struct_api: false,
                 kind: entry.kind,
                 attributes: entry.attributes.clone(),
                 type_params: entry.type_params.clone(),

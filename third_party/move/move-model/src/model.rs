@@ -1776,6 +1776,7 @@ impl GlobalEnv {
                     .or_insert_with(|| FunctionData::new(name, loc));
                 entry.visibility = definition_view.visibility();
                 entry.is_native = definition_view.is_native();
+                entry.is_struct_api = true;
                 entry.kind = if definition_view.is_entry() {
                     FunctionKind::Entry
                 } else {
@@ -2213,6 +2214,7 @@ impl GlobalEnv {
             visibility,
             has_package_visibility,
             is_native: false,
+            is_struct_api: false,
             kind: FunctionKind::Regular,
             attributes: vec![],
             type_params,
@@ -2280,6 +2282,7 @@ impl GlobalEnv {
             visibility,
             has_package_visibility,
             is_native: false,
+            is_struct_api: false,
             kind: FunctionKind::Regular,
             attributes: vec![],
             type_params,
@@ -4682,6 +4685,9 @@ pub struct FunctionData {
     /// Whether this is a native function
     pub(crate) is_native: bool,
 
+    /// Whether this is a compiler-generated struct API wrapper. Set from `FunctionAttribute` tags.
+    pub(crate) is_struct_api: bool,
+
     /// The kind of the function.
     pub(crate) kind: FunctionKind,
 
@@ -4745,6 +4751,7 @@ impl FunctionData {
             visibility: Default::default(),
             has_package_visibility: false,
             is_native: false,
+            is_struct_api: false,
             kind: FunctionKind::Regular,
             attributes: vec![],
             type_params: vec![],
@@ -4894,6 +4901,13 @@ impl<'env> FunctionEnv<'env> {
     /// Checks whether this function or its module is test-only or verify-only.
     pub fn is_test_or_verify_only(&self) -> bool {
         self.is_test_only() || self.is_verify_only()
+    }
+
+    /// Returns `true` if this is a compiler-generated struct API wrapper (`pack$S`, `unpack$S`,
+    /// `borrow$S$N`, `borrow_mut$S$N`, `test_variant$S$V`, `pack_variant$S$V`,
+    /// `unpack_variant$S$V`). These are synthetic wrappers with no user-written body or spec.
+    pub fn is_struct_api(&self) -> bool {
+        self.data.is_struct_api
     }
 
     /// Returns the location of the specification block of this function. If the function has
