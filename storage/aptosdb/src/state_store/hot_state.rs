@@ -28,11 +28,22 @@ use std::{
         mpsc::{Receiver, RecvTimeoutError, Sender, SyncSender},
         Arc, Weak,
     },
-    time::Duration,
+    time::{Duration, Instant},
 };
 
 const MAX_HOT_STATE_COMMIT_BACKLOG: usize = 10;
 const DEFERRED_MERGE_RETRY_INTERVAL: Duration = Duration::from_millis(10);
+
+/// Maximum time `try_merge` tolerates old views blocking DashMap mutations before force-clearing
+/// them. This prevents deadlocks when an external component (e.g. consensus pipeline cache) holds
+/// a view Arc indefinitely, which would otherwise block the entire storage commit pipeline.
+///
+/// Force-clearing is safe because the hot state is a read-through cache: any cache miss caused by
+/// the forced DashMap update falls through to the DB. Old view holders' delta overlays still cover
+/// keys that changed between their snapshot and the merge target, so they won't observe corrupted
+/// data for those keys. The only impact is potential transient cache misses for unchanged keys
+/// whose LRU metadata shifted.
+const MAX_OLD_VIEW_BLOCK_DURATION: Duration = Duration::from_secs(30);
 
 #[derive(Debug)]
 struct Shard<K, V>
@@ -300,6 +311,10 @@ struct Committer {
     /// (strong_count == 0). See struct doc.
     old_views: Vec<Weak<LayeredHotStateView>>,
 
+    /// When old views first started blocking `try_merge`. `None` when not blocked.
+    /// Used to enforce `MAX_OLD_VIEW_BLOCK_DURATION`.
+    blocked_since: Option<Instant>,
+
     /// Shared with HotState; updated after each successful DashMap merge.
     merged_version: Arc<AtomicU64>,
 }
@@ -337,6 +352,7 @@ impl Committer {
             tails: arr![None; 16],
             merged_state: initial_state,
             old_views: Vec::new(),
+            blocked_since: None,
             merged_version,
         }
     }
@@ -526,13 +542,30 @@ impl Committer {
     fn try_merge(&mut self) -> bool {
         self.old_views.retain(|v| v.strong_count() > 0);
         if !self.old_views.is_empty() {
-            info!(
-                "[hs_debug] try_merge: blocked by {} old views, acquiring committed lock for gauges...",
-                self.old_views.len(),
-            );
-            self.update_deferred_merge_gauges(self.committed.lock().state.next_version());
-            return false;
+            let blocked_since = *self.blocked_since.get_or_insert_with(Instant::now);
+            let blocked_duration = blocked_since.elapsed();
+
+            if blocked_duration >= MAX_OLD_VIEW_BLOCK_DURATION {
+                // An external component is holding a view Arc indefinitely. Force-clear to
+                // prevent deadlocking the storage commit pipeline. This is safe: the hot state
+                // is a read-through cache and old view holders' delta overlays still cover their
+                // changed keys. The only impact is transient cache misses.
+                error!(
+                    old_views = self.old_views.len(),
+                    blocked_secs = blocked_duration.as_secs(),
+                    merged_version = self.merged_state.next_version(),
+                    "Force-clearing old hot state views to unblock merge. \
+                     Some component is leaking a hot state view Arc."
+                );
+                COUNTER.inc_with(&["hot_state_force_clear_old_views"]);
+                self.old_views.clear();
+                // Fall through to proceed with merge.
+            } else {
+                self.update_deferred_merge_gauges(self.committed.lock().state.next_version());
+                return false;
+            }
         }
+        self.blocked_since = None;
 
         info!("[hs_debug] try_merge: no old views, acquiring committed lock for target state...");
         let target = self.committed.lock().state.clone();
