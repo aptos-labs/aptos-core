@@ -58,31 +58,64 @@ pub fn dlog_vec<C: CurveGroup>(
     Some(result)
 }
 
-/// Batches only per target: for each H in H_vec runs the rolling Algorithm 2 with default
-/// batch size (i.e. calls `dlog_vec_batched_rolling_with_batch_size` on a single-element slice).
-/// Does not batch across targets.
+/// Batched rolling BSGS for a single target (no cross-target batching).
+/// Uses batch normalisation over giant-step chunks of size up to `batch_size`.
+#[allow(non_snake_case)]
+fn dlog_batched_rolling_single<C: CurveGroup>(
+    G: C,
+    H: C,
+    baby_table: &HashMap<C::Affine, u64>,
+    range_limit: u64,
+    batch_size: usize,
+) -> Option<u64> {
+    let m = baby_table
+        .len()
+        .try_into()
+        .expect("Table seems rather large");
+    let n = range_limit.div_ceil(m);
+    let G_neg_m = G * -C::ScalarField::from(m);
+    let mut gamma = H;
+    let mut batch = Vec::<C>::new();
+
+    for chunk_start in (0..n).step_by(batch_size) {
+        let actual_batch = (n - chunk_start).min(batch_size as u64) as usize;
+        batch.clear();
+        batch.reserve(actual_batch);
+
+        for _ in 0..actual_batch {
+            batch.push(gamma);
+            gamma += G_neg_m;
+        }
+
+        let normalized = C::normalize_batch(&batch);
+        for j in 0..actual_batch {
+            if let Some(&baby_j) = baby_table.get(&normalized[j]) {
+                return Some((chunk_start + j as u64) * m + baby_j);
+            }
+        }
+    }
+    None
+}
+
+/// Batches only per target: for each H in H_vec runs the batched rolling algorithm for that
+/// target only (no cross-target batching).
 #[allow(non_snake_case)]
 pub fn dlog_vec_batched<C: CurveGroup>(
     G: C,
     H_vec: &[C],
     baby_table: &HashMap<C::Affine, u64>,
     range_limit: u64,
+    batch_size: usize,
 ) -> Option<Vec<u64>> {
     let mut result = Vec::with_capacity(H_vec.len());
     for H in H_vec {
-        let single = dlog_vec_batched_rolling_with_batch_size(
+        result.push(dlog_batched_rolling_single(
             G,
-            std::slice::from_ref(H),
+            *H,
             baby_table,
             range_limit,
-            DEFAULT_BSGS_SERIALIZATION_BATCH_SIZE,
-        )?;
-        result.push(
-            single
-                .into_iter()
-                .next()
-                .expect("single target yields one result"),
-        );
+            batch_size,
+        )?);
     }
     Some(result)
 }
@@ -215,8 +248,14 @@ mod tests {
             let Hs: Vec<G1Projective> = xs.iter().map(|&x| G * ark_bn254::Fr::from(x)).collect();
 
             let expected = dlog_vec(G, &Hs, &baby_table, range_limit).expect("dlog_vec failed");
-            let batched = dlog_vec_batched(G, &Hs, &baby_table, range_limit)
-                .expect("dlog_vec_batched failed");
+            let batched = dlog_vec_batched(
+                G,
+                &Hs,
+                &baby_table,
+                range_limit,
+                DEFAULT_BSGS_SERIALIZATION_BATCH_SIZE,
+            )
+            .expect("dlog_vec_batched failed");
             assert_eq!(
                 expected, batched,
                 "dlog_vec vs dlog_vec_batched for num_targets={}",
