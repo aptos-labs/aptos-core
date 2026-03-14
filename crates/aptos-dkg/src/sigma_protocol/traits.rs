@@ -242,7 +242,7 @@ pub trait CurveGroupTrait:
     /// stored as `Proof<..., Homomorphism<'static, E>>` using a locally built
     /// `Homomorphism<'a, E>` (with a short lifetime `'a`) without forcing `'static`.
     ///
-    /// We're not using this at the moment, but could be useful when batching in the MSMs
+    /// We're not using this at the moment, but it could be useful when batching in the MSMs
     /// of a proper `CurveGroup`-style homomorphism (i.e., one that is not part of a tuple).
     fn msm_terms_for_verify<Ct: Serialize, H2>(
         &self,
@@ -260,9 +260,10 @@ pub trait CurveGroupTrait:
             CodomainNormalized = Self::CodomainNormalized,
         >,
     {
-        let prover_first_message = proof
-            .prover_commitment()
-            .expect("proof must contain commitment for Fiat–Shamir");
+        let prover_first_message = match proof.prover_commitment() {
+            Some(m) => m,
+            None => bail!("proof must contain commitment for Fiat–Shamir"),
+        };
         let c = self.fiat_shamir_challenge_for_sigma_protocol(
             cntxt,
             public_statement,
