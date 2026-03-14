@@ -110,22 +110,16 @@ pub fn dlog_vec_batched_rolling_with_batch_size<C: CurveGroup>(
         .expect("Table seems rather large");
     let n = range_limit.div_ceil(m);
     let G_neg_m = G * -C::ScalarField::from(m);
-    let batch_size = batch_size.max(1).max(BSGS_BATCH_NORMALIZE_THRESHOLD);
-    let v = H_vec.len();
+    //let batch_size = batch_size.max(1).max(BSGS_BATCH_NORMALIZE_THRESHOLD);
+    let number_of_dlogs = H_vec.len();
 
-    let mut result: Vec<Option<u64>> = vec![None; v];
+    let mut result: Vec<Option<u64>> = vec![None; number_of_dlogs];
+    let mut unsolved: Vec<usize> = (0..number_of_dlogs).collect();
     // Rolling state: gamma[t] = next starting point for target t
-    let mut unsolved = Vec::with_capacity(v);
     let mut gamma_vec: Vec<C> = H_vec.to_vec();
     let mut batch = Vec::<C>::new();
 
     for chunk_start in (0..n).step_by(batch_size) {
-        unsolved.clear();
-        for i in 0..v {
-            if result[i].is_none() {
-                unsolved.push(i);
-            }
-        }
         if unsolved.is_empty() {
             break;
         }
@@ -144,20 +138,19 @@ pub fn dlog_vec_batched_rolling_with_batch_size<C: CurveGroup>(
         }
 
         let normalized = C::normalize_batch(&batch);
-        for j in 0..actual_batch {
-            for (batch_idx, &result_idx) in unsolved.iter().enumerate() {
-                if result[result_idx].is_some() {
-                    continue;
-                }
+        for (batch_idx, &result_idx) in unsolved.iter().enumerate() {
+            if result[result_idx].is_some() {
+                continue;
+            }
+            for j in 0..actual_batch {
                 let idx = batch_idx * actual_batch + j;
                 if let Some(&baby_j) = baby_table.get(&normalized[idx]) {
                     result[result_idx] = Some((chunk_start + j as u64) * m + baby_j);
+                    break;
                 }
             }
-            if unsolved.iter().all(|&r| result[r].is_some()) {
-                break;
-            }
         }
+        unsolved.retain(|&r| result[r].is_none());
     }
 
     result.into_iter().collect()

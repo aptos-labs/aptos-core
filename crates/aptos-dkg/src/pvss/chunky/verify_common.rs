@@ -126,16 +126,16 @@ pub fn verify_weighted_preamble<'a, A: Serialize + Clone, E: Pairing>(
                 got_vs
             );
         }
+    }
 
-        for (j, row) in subtrs.Rs.iter().enumerate() {
-            if row.len() != expected_chunks_per_share {
-                bail!(
-                    "Expected {} chunks in randomness share for weight {}, but got {}",
-                    expected_chunks_per_share,
-                    j,
-                    row.len()
-                );
-            }
+    for (j, row) in subtrs.Rs.iter().enumerate() {
+        if row.len() != expected_chunks_per_share {
+            bail!(
+                "Expected {} chunks in randomness share for weight {}, but got {}",
+                expected_chunks_per_share,
+                j,
+                row.len()
+            );
         }
     }
 

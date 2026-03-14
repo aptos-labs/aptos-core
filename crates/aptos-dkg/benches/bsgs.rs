@@ -140,7 +140,6 @@ fn criterion_benchmark(c: &mut Criterion) {
     // bench_table_build::<Bn254>(c, "bn254");
 
     eprintln!("[bsgs] Starting bench_dlog_vec_small_range...");
-    //    bench_dlog_vec_small_range::<Bls12_381>(c, "bls12_381");
     bench_dlog_vec_small_range::<Bls12_381>(c, "bls12_381"); // uncomment when that fn is defined
     eprintln!("[bsgs] Starting bench_table_build...");
     bench_table_build::<Bls12_381>(c, "bls12_381");
