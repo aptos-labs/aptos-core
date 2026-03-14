@@ -32,7 +32,7 @@ use crate::{
         CurveGroupTrait, Trait as _,
     },
 };
-use anyhow::bail;
+use anyhow::{anyhow, bail};
 use aptos_crypto::{
     arkworks::{
         msm,
@@ -357,7 +357,7 @@ impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>>
             .sharing_proof
             .SoK
             .prover_commitment()
-            .expect("SoK must contain commitment for Fiat–Shamir");
+            .ok_or_else(|| anyhow!("SoK prover commitment missing"))?;
         let c = hom.fiat_shamir_challenge_for_sigma_protocol(
             &sok_cntxt,
             &public_statement,
@@ -387,7 +387,7 @@ impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>>
             beta,
         ])?;
         let g2_msm = E::G2::msm(merged_g2.bases(), merged_g2.scalars())
-            .expect("Failed to compute merged G2 MSM in chunky v2");
+            .map_err(|len| anyhow!("Failed to compute merged G2 MSM in chunky v2 (bases/scalars length mismatch, shortest length: {})", len))?;
         if g2_msm != E::G2::ZERO {
             bail!("G2 MSM check failed (expected zero)");
         }

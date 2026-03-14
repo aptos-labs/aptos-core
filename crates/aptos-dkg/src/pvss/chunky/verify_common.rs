@@ -84,6 +84,13 @@ pub fn verify_weighted_preamble<'a, A: Serialize + Clone, E: Pairing>(
             subtrs.Vs.len()
         );
     }
+    if subtrs.Rs.len() != sc.get_max_weight() {
+        bail!(
+            "Expected {} arrays of randomness elements, but got {}",
+            sc.get_max_weight(),
+            subtrs.Rs.len()
+        );
+    }
 
     let expected_chunks_per_share = num_chunks_per_scalar::<E::ScalarField>(pp.ell) as usize;
 
@@ -118,6 +125,17 @@ pub fn verify_weighted_preamble<'a, A: Serialize + Clone, E: Pairing>(
                 i,
                 got_vs
             );
+        }
+
+        for (j, row) in subtrs.Rs.iter().enumerate() {
+            if row.len() != expected_chunks_per_share {
+                bail!(
+                    "Expected {} chunks in randomness share for weight {}, but got {}",
+                    expected_chunks_per_share,
+                    j,
+                    row.len()
+                );
+            }
         }
     }
 
