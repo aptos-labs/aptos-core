@@ -229,6 +229,14 @@ impl ConsensusObserver {
             );
         }
 
+        // Clear the pipeline builder's module cache so that the stale
+        // CachedStateView (and its hot-state view reference) is released.
+        // Without this, the old view keeps the hot-state deferred merge
+        // blocked, which stalls the entire storage commit pipeline.
+        if let Some(ref builder) = self.pipeline_builder {
+            builder.clear_module_cache();
+        }
+
         // Increment the cleared block state counter
         metrics::increment_counter_without_labels(&metrics::OBSERVER_CLEARED_BLOCK_STATE);
     }
