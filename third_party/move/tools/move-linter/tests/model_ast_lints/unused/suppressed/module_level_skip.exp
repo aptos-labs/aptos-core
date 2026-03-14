@@ -1,0 +1,17 @@
+
+Diagnostics:
+warning: [lint] constant `UNUSED_CONST` is unused
+   ┌─ tests/model_ast_lints/unused/suppressed/module_level_skip.move:15:5
+   │
+15 │     const UNUSED_CONST: u64 = 1;
+   │     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   │
+   = Remove it, or suppress this warning with `#[test_only]` (if for test-only) or `#[lint::skip(unused_constant)]` (if for spec-only or otherwise needed).
+
+warning: [lint] struct `UnusedStruct` is unused
+   ┌─ tests/model_ast_lints/unused/suppressed/module_level_skip.move:16:5
+   │
+16 │     struct UnusedStruct has drop { x: u64 }
+   │     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   │
+   = Remove it (if not published), or suppress this warning with `#[test_only]` (if for test-only) or `#[lint::skip(unused_struct)]` (if for spec-only or otherwise needed).

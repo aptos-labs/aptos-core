@@ -1,0 +1,9 @@
+
+Diagnostics:
+warning: [lint] constant `UNUSED_THRESHOLD` is unused
+   ┌─ tests/model_ast_lints/unused/truly_unused/error_code_constants.move:12:5
+   │
+12 │     const UNUSED_THRESHOLD: u64 = 100;
+   │     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   │
+   = Remove it, or suppress this warning with `#[test_only]` (if for test-only) or `#[lint::skip(unused_constant)]` (if for spec-only or otherwise needed).
