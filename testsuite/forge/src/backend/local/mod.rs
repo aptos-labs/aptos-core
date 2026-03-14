@@ -47,6 +47,9 @@ impl LocalVersion {
 pub struct LocalFactory {
     versions: Arc<HashMap<Version, LocalVersion>>,
     swarm_dir: Option<String>,
+    cpu_affinities: Vec<String>,
+    mem_binds: Vec<String>,
+    concurrency_level: u16,
 }
 
 impl LocalFactory {
@@ -54,7 +57,25 @@ impl LocalFactory {
         Self {
             versions: Arc::new(versions),
             swarm_dir,
+            cpu_affinities: Vec::new(),
+            mem_binds: Vec::new(),
+            concurrency_level: 1,
         }
+    }
+
+    pub fn with_concurrency_level(mut self, concurrency_level: u16) -> Self {
+        self.concurrency_level = concurrency_level;
+        self
+    }
+
+    pub fn with_node_affinities(
+        mut self,
+        cpu_affinities: Vec<String>,
+        mem_binds: Vec<String>,
+    ) -> Self {
+        self.cpu_affinities = cpu_affinities;
+        self.mem_binds = mem_binds;
+        self
     }
 
     pub fn from_workspace(swarm_dir: Option<String>) -> Result<Self> {
@@ -141,6 +162,9 @@ impl LocalFactory {
             swarmdir,
             genesis_framework,
             guard,
+            self.cpu_affinities.clone(),
+            self.mem_binds.clone(),
+            self.concurrency_level,
         )?;
 
         // Launch the swarm

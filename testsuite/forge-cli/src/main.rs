@@ -87,6 +87,22 @@ enum OperatorCommand {
 struct LocalSwarm {
     #[clap(long, help = "directory to build local swarm under")]
     swarmdir: Option<String>,
+    #[clap(
+        long,
+        help = "Per-node CPU affinity (colon-separated). E.g. '0-5,7-8:10-20,23' pins node 0 to CPUs 0-5,7-8 and node 1 to CPUs 10-20,23"
+    )]
+    cpu_affinity: Option<String>,
+    #[clap(
+        long,
+        help = "Per-node NUMA memory binding (colon-separated). E.g. '0:1-2:1,3' binds node 0 to NUMA node 0, node 1 to 1-2, node 2 to 1,3"
+    )]
+    mem_bind: Option<String>,
+    #[clap(
+        long,
+        help = "Execution concurrency level for each node",
+        default_value_t = 1
+    )]
+    concurrency_level: u16,
 }
 
 #[derive(Parser, Debug)]
@@ -284,12 +300,20 @@ fn main() -> Result<()> {
                             mempool_backlog: 5000,
                         }));
                     let swarm_dir = local_cfg.swarmdir.clone();
-                    let forge = Forge::new(
-                        &args.options,
-                        test_suite,
-                        duration,
-                        LocalFactory::from_workspace(swarm_dir)?,
-                    );
+                    let cpu_affinities = local_cfg
+                        .cpu_affinity
+                        .as_deref()
+                        .map(|s| s.split(':').map(String::from).collect())
+                        .unwrap_or_default();
+                    let mem_binds = local_cfg
+                        .mem_bind
+                        .as_deref()
+                        .map(|s| s.split(':').map(String::from).collect())
+                        .unwrap_or_default();
+                    let factory = LocalFactory::from_workspace(swarm_dir)?
+                        .with_node_affinities(cpu_affinities, mem_binds)
+                        .with_concurrency_level(local_cfg.concurrency_level);
+                    let forge = Forge::new(&args.options, test_suite, duration, factory);
                     run_forge(forge, &args.options)
                 },
                 TestCommand::K8sSwarm(k8s) => {
