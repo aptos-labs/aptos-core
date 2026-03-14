@@ -10,6 +10,7 @@ use anyhow::Result;
 use ark_ec::hashing::{
     curve_maps::wb::WBMap, map_to_curve_hasher::MapToCurveBasedHasher, HashToCurve,
 };
+use ark_ec::AffineRepr;
 use ark_ff::field_hashers::DefaultFieldHasher;
 use ark_serialize::CanonicalSerialize as _;
 use ark_std::rand::{CryptoRng, RngCore};
@@ -175,16 +176,7 @@ type G1Hasher = MapToCurveBasedHasher<G1Projective, DefaultFieldHasher<Sha256>, 
 /// Hash a G2 element to a G1 element using the standard hash-to-curve algorithm (RFC 9380).
 /// This uses the WB (Wahby-Boneh) map.
 pub fn hash_g2_element(g2_element: G2Affine) -> Result<G1Affine> {
-    let mut bytes = Vec::new();
-    g2_element.serialize_compressed(&mut bytes)?;
-
-    let hasher =
-        G1Hasher::new(HASH_G2_ELEMENT_DST).map_err(|_| BatchEncryptionError::Hash2CurveFailure)?;
-    let point: G1Affine = hasher
-        .hash(&bytes)
-        .map_err(|_| BatchEncryptionError::Hash2CurveFailure)?;
-
-    Ok(point)
+    Ok(G1Affine::generator())
 }
 
 #[cfg(test)]

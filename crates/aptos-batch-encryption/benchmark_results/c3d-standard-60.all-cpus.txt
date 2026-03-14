@@ -62,454 +62,10 @@ running 0 tests
 
 test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
 
-WARNING: HTML report generation will become a non-default optional feature in Criterion.rs 0.4.0.
-This feature is being moved to cargo-criterion (https://github.com/bheisler/cargo-criterion) and will be optional in a future version of Criterion.rs. To silence this warning, either switch to cargo-criterion or enable the 'html_reports' feature in your Cargo.toml.
 
-Gnuplot not found, using plotters backend
-Benchmarking FPTX::digest/32
-Benchmarking FPTX::digest/32: Warming up for 3.0000 s
-Benchmarking FPTX::digest/32: Collecting 100 samples in estimated 5.8433 s (400 iterations)
-Benchmarking FPTX::digest/32: Analyzing
-FPTX::digest/32         time:   [14.515 ms 14.671 ms 14.822 ms]
-                        change: [-1.1982% +0.2629% +1.8457%] (p = 0.70 > 0.05)
-                        No change in performance detected.
-Found 1 outliers among 100 measurements (1.00%)
-  1 (1.00%) high mild
-Benchmarking FPTX::digest/128
-Benchmarking FPTX::digest/128: Warming up for 3.0000 s
-Benchmarking FPTX::digest/128: Collecting 100 samples in estimated 5.4495 s (800 iterations)
-Benchmarking FPTX::digest/128: Analyzing
-FPTX::digest/128        time:   [6.8329 ms 6.8665 ms 6.9010 ms]
-                        change: [-0.8449% -0.1363% +0.6031%] (p = 0.72 > 0.05)
-                        No change in performance detected.
-Found 5 outliers among 100 measurements (5.00%)
-  2 (2.00%) low mild
-  2 (2.00%) high mild
-  1 (1.00%) high severe
-Benchmarking FPTX::digest/512
-Benchmarking FPTX::digest/512: Warming up for 3.0000 s
-Benchmarking FPTX::digest/512: Collecting 100 samples in estimated 6.2751 s (400 iterations)
-Benchmarking FPTX::digest/512: Analyzing
-FPTX::digest/512        time:   [15.351 ms 15.508 ms 15.668 ms]
-                        change: [-1.6549% -0.3113% +0.9402%] (p = 0.65 > 0.05)
-                        No change in performance detected.
-Found 1 outliers among 100 measurements (1.00%)
-  1 (1.00%) high mild
-Benchmarking FPTX::digest/2048
-Benchmarking FPTX::digest/2048: Warming up for 3.0000 s
-Benchmarking FPTX::digest/2048: Collecting 100 samples in estimated 8.5587 s (200 iterations)
-Benchmarking FPTX::digest/2048: Analyzing
-FPTX::digest/2048       time:   [41.574 ms 41.959 ms 42.353 ms]
-                        change: [-2.9954% -1.6029% -0.3034%] (p = 0.02 < 0.05)
-                        Change within noise threshold.
-Found 1 outliers among 100 measurements (1.00%)
-  1 (1.00%) high mild
+running 0 tests
 
-Benchmarking FPTX::encrypt/32
-Benchmarking FPTX::encrypt/32: Warming up for 3.0000 s
-Benchmarking FPTX::encrypt/32: Collecting 100 samples in estimated 5.1820 s (1000 iterations)
-Benchmarking FPTX::encrypt/32: Analyzing
-FPTX::encrypt/32        time:   [5.1853 ms 5.1891 ms 5.1928 ms]
-                        change: [+0.0637% +0.1651% +0.2645%] (p = 0.00 < 0.05)
-                        Change within noise threshold.
-Benchmarking FPTX::encrypt/128
-Benchmarking FPTX::encrypt/128: Warming up for 3.0000 s
-Benchmarking FPTX::encrypt/128: Collecting 100 samples in estimated 5.1815 s (1000 iterations)
-Benchmarking FPTX::encrypt/128: Analyzing
-FPTX::encrypt/128       time:   [5.1888 ms 5.1925 ms 5.1961 ms]
-                        change: [-0.2684% -0.1734% -0.0722%] (p = 0.00 < 0.05)
-                        Change within noise threshold.
-Benchmarking FPTX::encrypt/512
-Benchmarking FPTX::encrypt/512: Warming up for 3.0000 s
-Benchmarking FPTX::encrypt/512: Collecting 100 samples in estimated 5.1590 s (1000 iterations)
-Benchmarking FPTX::encrypt/512: Analyzing
-FPTX::encrypt/512       time:   [5.1710 ms 5.1742 ms 5.1773 ms]
-                        change: [-0.5061% -0.4135% -0.3189%] (p = 0.00 < 0.05)
-                        Change within noise threshold.
-Benchmarking FPTX::encrypt/2048
-Benchmarking FPTX::encrypt/2048: Warming up for 3.0000 s
-Benchmarking FPTX::encrypt/2048: Collecting 100 samples in estimated 5.1843 s (1000 iterations)
-Benchmarking FPTX::encrypt/2048: Analyzing
-FPTX::encrypt/2048      time:   [5.1946 ms 5.1982 ms 5.2018 ms]
-                        change: [-0.1245% -0.0262% +0.0726%] (p = 0.61 > 0.05)
-                        No change in performance detected.
-
-Benchmarking FPTX::verify_ct/32
-Benchmarking FPTX::verify_ct/32: Warming up for 3.0000 s
-Benchmarking FPTX::verify_ct/32: Collecting 100 samples in estimated 5.1087 s (157k iterations)
-Benchmarking FPTX::verify_ct/32: Analyzing
-FPTX::verify_ct/32      time:   [32.627 µs 32.633 µs 32.639 µs]
-                        change: [-0.6036% -0.5617% -0.5245%] (p = 0.00 < 0.05)
-                        Change within noise threshold.
-Found 9 outliers among 100 measurements (9.00%)
-  1 (1.00%) low severe
-  4 (4.00%) low mild
-  2 (2.00%) high mild
-  2 (2.00%) high severe
-Benchmarking FPTX::verify_ct/128
-Benchmarking FPTX::verify_ct/128: Warming up for 3.0000 s
-Benchmarking FPTX::verify_ct/128: Collecting 100 samples in estimated 5.1116 s (157k iterations)
-Benchmarking FPTX::verify_ct/128: Analyzing
-FPTX::verify_ct/128     time:   [32.663 µs 32.670 µs 32.678 µs]
-                        change: [-1.8976% -1.7572% -1.6473%] (p = 0.00 < 0.05)
-                        Performance has improved.
-Found 5 outliers among 100 measurements (5.00%)
-  1 (1.00%) low mild
-  4 (4.00%) high mild
-Benchmarking FPTX::verify_ct/512
-Benchmarking FPTX::verify_ct/512: Warming up for 3.0000 s
-Benchmarking FPTX::verify_ct/512: Collecting 100 samples in estimated 5.1142 s (157k iterations)
-Benchmarking FPTX::verify_ct/512: Analyzing
-FPTX::verify_ct/512     time:   [32.657 µs 32.663 µs 32.669 µs]
-                        change: [-0.0342% +0.0176% +0.0649%] (p = 0.48 > 0.05)
-                        No change in performance detected.
-Found 11 outliers among 100 measurements (11.00%)
-  5 (5.00%) low mild
-  4 (4.00%) high mild
-  2 (2.00%) high severe
-Benchmarking FPTX::verify_ct/2048
-Benchmarking FPTX::verify_ct/2048: Warming up for 3.0000 s
-Benchmarking FPTX::verify_ct/2048: Collecting 100 samples in estimated 5.1236 s (157k iterations)
-Benchmarking FPTX::verify_ct/2048: Analyzing
-FPTX::verify_ct/2048    time:   [32.719 µs 32.725 µs 32.731 µs]
-                        change: [+0.1331% +0.1639% +0.1968%] (p = 0.00 < 0.05)
-                        Change within noise threshold.
-Found 11 outliers among 100 measurements (11.00%)
-  1 (1.00%) low severe
-  2 (2.00%) low mild
-  5 (5.00%) high mild
-  3 (3.00%) high severe
-
-Benchmarking FPTX::eval_proofs_compute_all/32
-Benchmarking FPTX::eval_proofs_compute_all/32: Warming up for 3.0000 s
-Benchmarking FPTX::eval_proofs_compute_all/32: Collecting 10 samples in estimated 5.3142 s (440 iterations)
-Benchmarking FPTX::eval_proofs_compute_all/32: Analyzing
-FPTX::eval_proofs_compute_all/32
-                        time:   [12.060 ms 12.095 ms 12.162 ms]
-                        change: [-0.1433% +0.8863% +1.9087%] (p = 0.14 > 0.05)
-                        No change in performance detected.
-Found 3 outliers among 10 measurements (30.00%)
-  1 (10.00%) low mild
-  1 (10.00%) high mild
-  1 (10.00%) high severe
-Benchmarking FPTX::eval_proofs_compute_all/128
-Benchmarking FPTX::eval_proofs_compute_all/128: Warming up for 3.0000 s
-Benchmarking FPTX::eval_proofs_compute_all/128: Collecting 10 samples in estimated 5.5938 s (165 iterations)
-Benchmarking FPTX::eval_proofs_compute_all/128: Analyzing
-FPTX::eval_proofs_compute_all/128
-                        time:   [33.792 ms 33.862 ms 33.913 ms]
-                        change: [-1.8157% -0.7116% +0.1737%] (p = 0.23 > 0.05)
-                        No change in performance detected.
-Found 1 outliers among 10 measurements (10.00%)
-  1 (10.00%) low mild
-Benchmarking FPTX::eval_proofs_compute_all/256
-Benchmarking FPTX::eval_proofs_compute_all/256: Warming up for 3.0000 s
-Benchmarking FPTX::eval_proofs_compute_all/256: Collecting 10 samples in estimated 9.6224 s (110 iterations)
-Benchmarking FPTX::eval_proofs_compute_all/256: Analyzing
-FPTX::eval_proofs_compute_all/256
-                        time:   [87.596 ms 87.749 ms 87.953 ms]
-                        change: [-0.6770% -0.1405% +0.3664%] (p = 0.64 > 0.05)
-                        No change in performance detected.
-Benchmarking FPTX::eval_proofs_compute_all/512
-Benchmarking FPTX::eval_proofs_compute_all/512: Warming up for 3.0000 s
-Benchmarking FPTX::eval_proofs_compute_all/512: Collecting 10 samples in estimated 5.2004 s (20 iterations)
-Benchmarking FPTX::eval_proofs_compute_all/512: Analyzing
-FPTX::eval_proofs_compute_all/512
-                        time:   [258.91 ms 259.51 ms 260.15 ms]
-                        change: [-0.3914% -0.0907% +0.2053%] (p = 0.58 > 0.05)
-                        No change in performance detected.
-Benchmarking FPTX::eval_proofs_compute_all/2048
-Benchmarking FPTX::eval_proofs_compute_all/2048: Warming up for 3.0000 s
-
-Warning: Unable to complete 10 samples in 5.0s. You may wish to increase target time to 28.0s.
-Benchmarking FPTX::eval_proofs_compute_all/2048: Collecting 10 samples in estimated 28.008 s (10 iterations)
-Benchmarking FPTX::eval_proofs_compute_all/2048: Analyzing
-FPTX::eval_proofs_compute_all/2048
-                        time:   [2.7584 s 2.7645 s 2.7709 s]
-                        change: [-0.6360% -0.0781% +0.3714%] (p = 0.79 > 0.05)
-                        No change in performance detected.
-
-Benchmarking FPTX::eval_proofs_compute_all_2/32
-Benchmarking FPTX::eval_proofs_compute_all_2/32: Warming up for 3.0000 s
-Benchmarking FPTX::eval_proofs_compute_all_2/32: Collecting 10 samples in estimated 8.1609 s (110 iterations)
-Benchmarking FPTX::eval_proofs_compute_all_2/32: Analyzing
-FPTX::eval_proofs_compute_all_2/32
-                        time:   [72.557 ms 73.788 ms 75.131 ms]
-                        change: [-1.9097% -0.1657% +1.8460%] (p = 0.87 > 0.05)
-                        No change in performance detected.
-Benchmarking FPTX::eval_proofs_compute_all_2/128
-Benchmarking FPTX::eval_proofs_compute_all_2/128: Warming up for 3.0000 s
-
-Warning: Unable to complete 10 samples in 5.0s. You may wish to increase target time to 7.7s or enable flat sampling.
-Benchmarking FPTX::eval_proofs_compute_all_2/128: Collecting 10 samples in estimated 7.7398 s (55 iterations)
-Benchmarking FPTX::eval_proofs_compute_all_2/128: Analyzing
-FPTX::eval_proofs_compute_all_2/128
-                        time:   [137.13 ms 141.82 ms 146.39 ms]
-                        change: [-3.6744% +1.0798% +6.8301%] (p = 0.72 > 0.05)
-                        No change in performance detected.
-Benchmarking FPTX::eval_proofs_compute_all_2/256
-Benchmarking FPTX::eval_proofs_compute_all_2/256: Warming up for 3.0000 s
-Benchmarking FPTX::eval_proofs_compute_all_2/256: Collecting 10 samples in estimated 5.9803 s (20 iterations)
-Benchmarking FPTX::eval_proofs_compute_all_2/256: Analyzing
-FPTX::eval_proofs_compute_all_2/256
-                        time:   [293.26 ms 301.26 ms 310.30 ms]
-                        change: [-6.2683% -1.1533% +4.0203%] (p = 0.69 > 0.05)
-                        No change in performance detected.
-Benchmarking FPTX::eval_proofs_compute_all_2/512
-Benchmarking FPTX::eval_proofs_compute_all_2/512: Warming up for 3.0000 s
-
-Warning: Unable to complete 10 samples in 5.0s. You may wish to increase target time to 6.6s.
-Benchmarking FPTX::eval_proofs_compute_all_2/512: Collecting 10 samples in estimated 6.6477 s (10 iterations)
-Benchmarking FPTX::eval_proofs_compute_all_2/512: Analyzing
-FPTX::eval_proofs_compute_all_2/512
-                        time:   [641.52 ms 659.27 ms 677.36 ms]
-                        change: [-4.6482% -0.9159% +2.8566%] (p = 0.65 > 0.05)
-                        No change in performance detected.
-Benchmarking FPTX::eval_proofs_compute_all_2/2048
-Benchmarking FPTX::eval_proofs_compute_all_2/2048: Warming up for 3.0000 s
-
-Warning: Unable to complete 10 samples in 5.0s. You may wish to increase target time to 32.3s.
-Benchmarking FPTX::eval_proofs_compute_all_2/2048: Collecting 10 samples in estimated 32.279 s (10 iterations)
-Benchmarking FPTX::eval_proofs_compute_all_2/2048: Analyzing
-FPTX::eval_proofs_compute_all_2/2048
-                        time:   [3.2316 s 3.2683 s 3.3035 s]
-                        change: [-3.6117% -1.3550% +0.7086%] (p = 0.28 > 0.05)
-                        No change in performance detected.
-
-Benchmarking FPTX::derive_decryption_key_share/n=128, t=86
-Benchmarking FPTX::derive_decryption_key_share/n=128, t=86: Warming up for 3.0000 s
-Benchmarking FPTX::derive_decryption_key_share/n=128, t=86: Collecting 100 samples in estimated 6.1064 s (15k iterations)
-Benchmarking FPTX::derive_decryption_key_share/n=128, t=86: Analyzing
-FPTX::derive_decryption_key_share/n=128, t=86
-                        time:   [403.35 µs 403.63 µs 403.92 µs]
-                        change: [-0.3428% -0.1980% -0.0211%] (p = 0.01 < 0.05)
-                        Change within noise threshold.
-Found 3 outliers among 100 measurements (3.00%)
-  1 (1.00%) high mild
-  2 (2.00%) high severe
-Benchmarking FPTX::derive_decryption_key_share/n=256, t=171
-Benchmarking FPTX::derive_decryption_key_share/n=256, t=171: Warming up for 3.0000 s
-Benchmarking FPTX::derive_decryption_key_share/n=256, t=171: Collecting 100 samples in estimated 6.1561 s (15k iterations)
-Benchmarking FPTX::derive_decryption_key_share/n=256, t=171: Analyzing
-FPTX::derive_decryption_key_share/n=256, t=171
-                        time:   [407.17 µs 407.62 µs 408.03 µs]
-                        change: [+0.8733% +1.1302% +1.3703%] (p = 0.00 < 0.05)
-                        Change within noise threshold.
-Found 18 outliers among 100 measurements (18.00%)
-  2 (2.00%) low severe
-  13 (13.00%) low mild
-  1 (1.00%) high mild
-  2 (2.00%) high severe
-Benchmarking FPTX::derive_decryption_key_share/n=512, t=342
-Benchmarking FPTX::derive_decryption_key_share/n=512, t=342: Warming up for 3.0000 s
-Benchmarking FPTX::derive_decryption_key_share/n=512, t=342: Collecting 100 samples in estimated 6.0470 s (15k iterations)
-Benchmarking FPTX::derive_decryption_key_share/n=512, t=342: Analyzing
-FPTX::derive_decryption_key_share/n=512, t=342
-                        time:   [397.01 µs 397.56 µs 398.18 µs]
-                        change: [-0.7537% -0.6076% -0.4601%] (p = 0.00 < 0.05)
-                        Change within noise threshold.
-Benchmarking FPTX::derive_decryption_key_share/n=1024, t=683
-Benchmarking FPTX::derive_decryption_key_share/n=1024, t=683: Warming up for 3.0000 s
-Benchmarking FPTX::derive_decryption_key_share/n=1024, t=683: Collecting 100 samples in estimated 6.2091 s (15k iterations)
-Benchmarking FPTX::derive_decryption_key_share/n=1024, t=683: Analyzing
-FPTX::derive_decryption_key_share/n=1024, t=683
-                        time:   [411.04 µs 411.57 µs 412.12 µs]
-                        change: [+1.9570% +2.0666% +2.1777%] (p = 0.00 < 0.05)
-                        Performance has regressed.
-Found 2 outliers among 100 measurements (2.00%)
-  1 (1.00%) high mild
-  1 (1.00%) high severe
-
-Benchmarking FPTX::verify_decryption_key_share/32
-Benchmarking FPTX::verify_decryption_key_share/32: Warming up for 3.0000 s
-
-Warning: Unable to complete 100 samples in 5.0s. You may wish to increase target time to 8.8s, enable flat sampling, or reduce sample count to 50.
-Benchmarking FPTX::verify_decryption_key_share/32: Collecting 100 samples in estimated 8.7711 s (5050 iterations)
-Benchmarking FPTX::verify_decryption_key_share/32: Analyzing
-FPTX::verify_decryption_key_share/32
-                        time:   [1.7448 ms 1.7457 ms 1.7467 ms]
-                        change: [+0.6675% +0.7586% +0.8545%] (p = 0.00 < 0.05)
-                        Change within noise threshold.
-Found 3 outliers among 100 measurements (3.00%)
-  2 (2.00%) high mild
-  1 (1.00%) high severe
-Benchmarking FPTX::verify_decryption_key_share/128
-Benchmarking FPTX::verify_decryption_key_share/128: Warming up for 3.0000 s
-
-Warning: Unable to complete 100 samples in 5.0s. You may wish to increase target time to 8.7s, enable flat sampling, or reduce sample count to 50.
-Benchmarking FPTX::verify_decryption_key_share/128: Collecting 100 samples in estimated 8.7141 s (5050 iterations)
-Benchmarking FPTX::verify_decryption_key_share/128: Analyzing
-FPTX::verify_decryption_key_share/128
-                        time:   [1.7383 ms 1.7392 ms 1.7402 ms]
-                        change: [+0.5143% +0.6221% +0.7286%] (p = 0.00 < 0.05)
-                        Change within noise threshold.
-Found 5 outliers among 100 measurements (5.00%)
-  4 (4.00%) high mild
-  1 (1.00%) high severe
-Benchmarking FPTX::verify_decryption_key_share/512
-Benchmarking FPTX::verify_decryption_key_share/512: Warming up for 3.0000 s
-
-Warning: Unable to complete 100 samples in 5.0s. You may wish to increase target time to 8.7s, enable flat sampling, or reduce sample count to 50.
-Benchmarking FPTX::verify_decryption_key_share/512: Collecting 100 samples in estimated 8.7240 s (5050 iterations)
-Benchmarking FPTX::verify_decryption_key_share/512: Analyzing
-FPTX::verify_decryption_key_share/512
-                        time:   [1.7426 ms 1.7434 ms 1.7443 ms]
-                        change: [+0.3386% +0.4450% +0.5416%] (p = 0.00 < 0.05)
-                        Change within noise threshold.
-Found 3 outliers among 100 measurements (3.00%)
-  3 (3.00%) high mild
-Benchmarking FPTX::verify_decryption_key_share/2048
-Benchmarking FPTX::verify_decryption_key_share/2048: Warming up for 3.0000 s
-
-Warning: Unable to complete 100 samples in 5.0s. You may wish to increase target time to 8.7s, enable flat sampling, or reduce sample count to 50.
-Benchmarking FPTX::verify_decryption_key_share/2048: Collecting 100 samples in estimated 8.7449 s (5050 iterations)
-Benchmarking FPTX::verify_decryption_key_share/2048: Analyzing
-FPTX::verify_decryption_key_share/2048
-                        time:   [1.7415 ms 1.7425 ms 1.7436 ms]
-                        change: [+0.4463% +0.5633% +0.6702%] (p = 0.00 < 0.05)
-                        Change within noise threshold.
-Found 3 outliers among 100 measurements (3.00%)
-  2 (2.00%) high mild
-  1 (1.00%) high severe
-
-Benchmarking FPTX::reconstruct_decryption_key/n=10, t=7
-Benchmarking FPTX::reconstruct_decryption_key/n=10, t=7: Warming up for 3.0000 s
-
-Warning: Unable to complete 100 samples in 5.0s. You may wish to increase target time to 9.6s, enable flat sampling, or reduce sample count to 50.
-Benchmarking FPTX::reconstruct_decryption_key/n=10, t=7: Collecting 100 samples in estimated 9.5866 s (5050 iterations)
-Benchmarking FPTX::reconstruct_decryption_key/n=10, t=7: Analyzing
-FPTX::reconstruct_decryption_key/n=10, t=7
-                        time:   [1.8914 ms 1.8976 ms 1.9040 ms]
-                        change: [+0.5777% +1.0383% +1.5392%] (p = 0.00 < 0.05)
-                        Change within noise threshold.
-Found 4 outliers among 100 measurements (4.00%)
-  3 (3.00%) high mild
-  1 (1.00%) high severe
-Benchmarking FPTX::reconstruct_decryption_key/n=128, t=86
-Benchmarking FPTX::reconstruct_decryption_key/n=128, t=86: Warming up for 3.0000 s
-Benchmarking FPTX::reconstruct_decryption_key/n=128, t=86: Collecting 100 samples in estimated 5.3422 s (1200 iterations)
-Benchmarking FPTX::reconstruct_decryption_key/n=128, t=86: Analyzing
-FPTX::reconstruct_decryption_key/n=128, t=86
-                        time:   [4.4540 ms 4.4991 ms 4.5433 ms]
-                        change: [-0.7893% +0.7009% +2.1347%] (p = 0.34 > 0.05)
-                        No change in performance detected.
-Benchmarking FPTX::reconstruct_decryption_key/n=256, t=171
-Benchmarking FPTX::reconstruct_decryption_key/n=256, t=171: Warming up for 3.0000 s
-Benchmarking FPTX::reconstruct_decryption_key/n=256, t=171: Collecting 100 samples in estimated 5.3463 s (1400 iterations)
-Benchmarking FPTX::reconstruct_decryption_key/n=256, t=171: Analyzing
-FPTX::reconstruct_decryption_key/n=256, t=171
-                        time:   [3.7898 ms 3.8022 ms 3.8147 ms]
-                        change: [+0.6582% +1.1634% +1.6754%] (p = 0.00 < 0.05)
-                        Change within noise threshold.
-Benchmarking FPTX::reconstruct_decryption_key/n=512, t=342
-Benchmarking FPTX::reconstruct_decryption_key/n=512, t=342: Warming up for 3.0000 s
-Benchmarking FPTX::reconstruct_decryption_key/n=512, t=342: Collecting 100 samples in estimated 5.5289 s (1000 iterations)
-Benchmarking FPTX::reconstruct_decryption_key/n=512, t=342: Analyzing
-FPTX::reconstruct_decryption_key/n=512, t=342
-                        time:   [5.5008 ms 5.5149 ms 5.5294 ms]
-                        change: [+0.5127% +0.8674% +1.2475%] (p = 0.00 < 0.05)
-                        Change within noise threshold.
-Found 4 outliers among 100 measurements (4.00%)
-  1 (1.00%) low mild
-  3 (3.00%) high mild
-Benchmarking FPTX::reconstruct_decryption_key/n=1024, t=683
-Benchmarking FPTX::reconstruct_decryption_key/n=1024, t=683: Warming up for 3.0000 s
-Benchmarking FPTX::reconstruct_decryption_key/n=1024, t=683: Collecting 100 samples in estimated 5.2883 s (500 iterations)
-Benchmarking FPTX::reconstruct_decryption_key/n=1024, t=683: Analyzing
-FPTX::reconstruct_decryption_key/n=1024, t=683
-                        time:   [10.598 ms 10.632 ms 10.666 ms]
-                        change: [+2.5302% +3.0707% +3.6101%] (p = 0.00 < 0.05)
-                        Performance has regressed.
-Found 3 outliers among 100 measurements (3.00%)
-  1 (1.00%) low mild
-  2 (2.00%) high mild
-
-Benchmarking FPTX::prepare (full batch, all cts)/32
-Benchmarking FPTX::prepare (full batch, all cts)/32: Warming up for 3.0000 s
-Benchmarking FPTX::prepare (full batch, all cts)/32: Collecting 100 samples in estimated 5.1413 s (1600 iterations)
-Benchmarking FPTX::prepare (full batch, all cts)/32: Analyzing
-FPTX::prepare (full batch, all cts)/32
-                        time:   [3.2122 ms 3.2184 ms 3.2257 ms]
-                        change: [+0.6721% +0.8916% +1.1357%] (p = 0.00 < 0.05)
-                        Change within noise threshold.
-Found 8 outliers among 100 measurements (8.00%)
-  5 (5.00%) high mild
-  3 (3.00%) high severe
-Benchmarking FPTX::prepare (full batch, all cts)/128
-Benchmarking FPTX::prepare (full batch, all cts)/128: Warming up for 3.0000 s
-Benchmarking FPTX::prepare (full batch, all cts)/128: Collecting 100 samples in estimated 5.6725 s (700 iterations)
-Benchmarking FPTX::prepare (full batch, all cts)/128: Analyzing
-FPTX::prepare (full batch, all cts)/128
-                        time:   [8.0184 ms 8.0442 ms 8.0707 ms]
-                        change: [+0.3956% +0.8699% +1.3130%] (p = 0.00 < 0.05)
-                        Change within noise threshold.
-Benchmarking FPTX::prepare (full batch, all cts)/512
-Benchmarking FPTX::prepare (full batch, all cts)/512: Warming up for 3.0000 s
-Benchmarking FPTX::prepare (full batch, all cts)/512: Collecting 100 samples in estimated 5.1294 s (200 iterations)
-Benchmarking FPTX::prepare (full batch, all cts)/512: Analyzing
-FPTX::prepare (full batch, all cts)/512
-                        time:   [25.632 ms 25.652 ms 25.672 ms]
-                        change: [+0.0647% +0.2027% +0.3291%] (p = 0.00 < 0.05)
-                        Change within noise threshold.
-Benchmarking FPTX::prepare (full batch, all cts)/2048
-Benchmarking FPTX::prepare (full batch, all cts)/2048: Warming up for 3.0000 s
-
-Warning: Unable to complete 100 samples in 5.0s. You may wish to increase target time to 9.7s, or reduce sample count to 50.
-Benchmarking FPTX::prepare (full batch, all cts)/2048: Collecting 100 samples in estimated 9.6685 s (100 iterations)
-Benchmarking FPTX::prepare (full batch, all cts)/2048: Analyzing
-FPTX::prepare (full batch, all cts)/2048
-                        time:   [96.984 ms 97.073 ms 97.180 ms]
-                        change: [+0.4930% +0.6060% +0.7289%] (p = 0.00 < 0.05)
-                        Change within noise threshold.
-Found 6 outliers among 100 measurements (6.00%)
-  1 (1.00%) low mild
-  3 (3.00%) high mild
-  2 (2.00%) high severe
-
-Benchmarking FPTX::decrypt (full batch, all cts)/32
-Benchmarking FPTX::decrypt (full batch, all cts)/32: Warming up for 3.0000 s
-Benchmarking FPTX::decrypt (full batch, all cts)/32: Collecting 100 samples in estimated 5.0506 s (2300 iterations)
-Benchmarking FPTX::decrypt (full batch, all cts)/32: Analyzing
-FPTX::decrypt (full batch, all cts)/32
-                        time:   [2.1864 ms 2.1893 ms 2.1926 ms]
-                        change: [+0.1375% +0.3904% +0.6491%] (p = 0.00 < 0.05)
-                        Change within noise threshold.
-Found 4 outliers among 100 measurements (4.00%)
-  3 (3.00%) high mild
-  1 (1.00%) high severe
-Benchmarking FPTX::decrypt (full batch, all cts)/128
-Benchmarking FPTX::decrypt (full batch, all cts)/128: Warming up for 3.0000 s
-Benchmarking FPTX::decrypt (full batch, all cts)/128: Collecting 100 samples in estimated 5.3615 s (1000 iterations)
-Benchmarking FPTX::decrypt (full batch, all cts)/128: Analyzing
-FPTX::decrypt (full batch, all cts)/128
-                        time:   [5.4206 ms 5.4405 ms 5.4608 ms]
-                        change: [+3.3314% +3.7878% +4.2379%] (p = 0.00 < 0.05)
-                        Performance has regressed.
-Found 2 outliers among 100 measurements (2.00%)
-  2 (2.00%) high mild
-Benchmarking FPTX::decrypt (full batch, all cts)/512
-Benchmarking FPTX::decrypt (full batch, all cts)/512: Warming up for 3.0000 s
-Benchmarking FPTX::decrypt (full batch, all cts)/512: Collecting 100 samples in estimated 6.6631 s (400 iterations)
-Benchmarking FPTX::decrypt (full batch, all cts)/512: Analyzing
-FPTX::decrypt (full batch, all cts)/512
-                        time:   [16.658 ms 16.701 ms 16.746 ms]
-                        change: [+0.8311% +1.1795% +1.5120%] (p = 0.00 < 0.05)
-                        Change within noise threshold.
-Found 1 outliers among 100 measurements (1.00%)
-  1 (1.00%) high mild
-Benchmarking FPTX::decrypt (full batch, all cts)/2048
-Benchmarking FPTX::decrypt (full batch, all cts)/2048: Warming up for 3.0000 s
-
-Warning: Unable to complete 100 samples in 5.0s. You may wish to increase target time to 6.2s, or reduce sample count to 80.
-Benchmarking FPTX::decrypt (full batch, all cts)/2048: Collecting 100 samples in estimated 6.1707 s (100 iterations)
-Benchmarking FPTX::decrypt (full batch, all cts)/2048: Analyzing
-FPTX::decrypt (full batch, all cts)/2048
-                        time:   [61.585 ms 61.732 ms 61.903 ms]
-                        change: [+0.5345% +0.7830% +1.0515%] (p = 0.00 < 0.05)
-                        Change within noise threshold.
-Found 9 outliers among 100 measurements (9.00%)
-  1 (1.00%) high mild
-  8 (8.00%) high severe
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
 
 WARNING: HTML report generation will become a non-default optional feature in Criterion.rs 0.4.0.
 This feature is being moved to cargo-criterion (https://github.com/bheisler/cargo-criterion) and will be optional in a future version of Criterion.rs. To silence this warning, either switch to cargo-criterion or enable the 'html_reports' feature in your Cargo.toml.
@@ -517,459 +73,456 @@ This feature is being moved to cargo-criterion (https://github.com/bheisler/carg
 Gnuplot not found, using plotters backend
 Benchmarking FPTXSuccinct::digest/32
 Benchmarking FPTXSuccinct::digest/32: Warming up for 3.0000 s
-Benchmarking FPTXSuccinct::digest/32: Collecting 100 samples in estimated 6.1210 s (400 iterations)
+Benchmarking FPTXSuccinct::digest/32: Collecting 100 samples in estimated 5.1712 s (400 iterations)
 Benchmarking FPTXSuccinct::digest/32: Analyzing
-FPTXSuccinct::digest/32 time:   [15.119 ms 15.310 ms 15.506 ms]
-                        change: [+4.3830% +5.8503% +7.5366%] (p = 0.00 < 0.05)
+FPTXSuccinct::digest/32 time:   [13.285 ms 13.441 ms 13.593 ms]
+                        change: [+368.93% +373.83% +378.80%] (p = 0.00 < 0.05)
                         Performance has regressed.
-Found 3 outliers among 100 measurements (3.00%)
-  3 (3.00%) high mild
+Found 1 outliers among 100 measurements (1.00%)
+  1 (1.00%) low mild
 Benchmarking FPTXSuccinct::digest/128
 Benchmarking FPTXSuccinct::digest/128: Warming up for 3.0000 s
-Benchmarking FPTXSuccinct::digest/128: Collecting 100 samples in estimated 5.7095 s (800 iterations)
+Benchmarking FPTXSuccinct::digest/128: Collecting 100 samples in estimated 5.1988 s (800 iterations)
 Benchmarking FPTXSuccinct::digest/128: Analyzing
 FPTXSuccinct::digest/128
-                        time:   [7.1964 ms 7.2700 ms 7.3468 ms]
-                        change: [+5.7336% +7.0312% +8.3706%] (p = 0.00 < 0.05)
-                        Performance has regressed.
-Found 7 outliers among 100 measurements (7.00%)
-  7 (7.00%) high mild
+                        time:   [6.4649 ms 6.5196 ms 6.5754 ms]
+                        change: [-12.639% -11.873% -11.212%] (p = 0.00 < 0.05)
+                        Performance has improved.
+Found 1 outliers among 100 measurements (1.00%)
+  1 (1.00%) low mild
 Benchmarking FPTXSuccinct::digest/512
 Benchmarking FPTXSuccinct::digest/512: Warming up for 3.0000 s
-Benchmarking FPTXSuccinct::digest/512: Collecting 100 samples in estimated 6.2843 s (400 iterations)
+Benchmarking FPTXSuccinct::digest/512: Collecting 100 samples in estimated 5.9761 s (400 iterations)
 Benchmarking FPTXSuccinct::digest/512: Analyzing
 FPTXSuccinct::digest/512
-                        time:   [15.713 ms 15.879 ms 16.056 ms]
-                        change: [-1.3602% +0.1014% +1.5622%] (p = 0.89 > 0.05)
-                        No change in performance detected.
-Found 6 outliers among 100 measurements (6.00%)
-  6 (6.00%) high mild
+                        time:   [14.847 ms 14.970 ms 15.101 ms]
+                        change: [-34.425% -33.863% -33.341%] (p = 0.00 < 0.05)
+                        Performance has improved.
+Found 3 outliers among 100 measurements (3.00%)
+  3 (3.00%) high mild
 Benchmarking FPTXSuccinct::digest/2048
 Benchmarking FPTXSuccinct::digest/2048: Warming up for 3.0000 s
-Benchmarking FPTXSuccinct::digest/2048: Collecting 100 samples in estimated 8.6225 s (200 iterations)
+Benchmarking FPTXSuccinct::digest/2048: Collecting 100 samples in estimated 8.0307 s (200 iterations)
 Benchmarking FPTXSuccinct::digest/2048: Analyzing
 FPTXSuccinct::digest/2048
-                        time:   [42.261 ms 42.722 ms 43.194 ms]
-                        change: [-1.5165% -0.0201% +1.5165%] (p = 0.97 > 0.05)
-                        No change in performance detected.
+                        time:   [39.449 ms 39.835 ms 40.241 ms]
+                        change: [-52.638% -52.211% -51.689%] (p = 0.00 < 0.05)
+                        Performance has improved.
 
 Benchmarking FPTXSuccinct::encrypt/32
 Benchmarking FPTXSuccinct::encrypt/32: Warming up for 3.0000 s
-Benchmarking FPTXSuccinct::encrypt/32: Collecting 100 samples in estimated 5.3503 s (1300 iterations)
+Benchmarking FPTXSuccinct::encrypt/32: Collecting 100 samples in estimated 5.0890 s (2200 iterations)
 Benchmarking FPTXSuccinct::encrypt/32: Analyzing
 FPTXSuccinct::encrypt/32
-                        time:   [4.1281 ms 4.1306 ms 4.1331 ms]
-                        change: [+0.1004% +0.1844% +0.2717%] (p = 0.00 < 0.05)
-                        Change within noise threshold.
-Found 2 outliers among 100 measurements (2.00%)
-  2 (2.00%) high mild
+                        time:   [2.3177 ms 2.3188 ms 2.3199 ms]
+                        change: [-42.085% -42.038% -41.992%] (p = 0.00 < 0.05)
+                        Performance has improved.
+Found 1 outliers among 100 measurements (1.00%)
+  1 (1.00%) high mild
 Benchmarking FPTXSuccinct::encrypt/128
 Benchmarking FPTXSuccinct::encrypt/128: Warming up for 3.0000 s
-Benchmarking FPTXSuccinct::encrypt/128: Collecting 100 samples in estimated 5.3621 s (1300 iterations)
+Benchmarking FPTXSuccinct::encrypt/128: Collecting 100 samples in estimated 5.0881 s (2200 iterations)
 Benchmarking FPTXSuccinct::encrypt/128: Analyzing
 FPTXSuccinct::encrypt/128
-                        time:   [4.1336 ms 4.1362 ms 4.1388 ms]
-                        change: [+0.3561% +0.4486% +0.5429%] (p = 0.00 < 0.05)
-                        Change within noise threshold.
+                        time:   [2.3162 ms 2.3174 ms 2.3186 ms]
+                        change: [-42.098% -42.050% -42.001%] (p = 0.00 < 0.05)
+                        Performance has improved.
+Found 1 outliers among 100 measurements (1.00%)
+  1 (1.00%) high mild
 Benchmarking FPTXSuccinct::encrypt/512
 Benchmarking FPTXSuccinct::encrypt/512: Warming up for 3.0000 s
-Benchmarking FPTXSuccinct::encrypt/512: Collecting 100 samples in estimated 5.3665 s (1300 iterations)
+Benchmarking FPTXSuccinct::encrypt/512: Collecting 100 samples in estimated 5.0954 s (2200 iterations)
 Benchmarking FPTXSuccinct::encrypt/512: Analyzing
 FPTXSuccinct::encrypt/512
-                        time:   [4.1358 ms 4.1385 ms 4.1411 ms]
-                        change: [+0.3755% +0.4652% +0.5508%] (p = 0.00 < 0.05)
-                        Change within noise threshold.
+                        time:   [2.3177 ms 2.3189 ms 2.3200 ms]
+                        change: [-42.061% -42.017% -41.971%] (p = 0.00 < 0.05)
+                        Performance has improved.
 Benchmarking FPTXSuccinct::encrypt/2048
 Benchmarking FPTXSuccinct::encrypt/2048: Warming up for 3.0000 s
-Benchmarking FPTXSuccinct::encrypt/2048: Collecting 100 samples in estimated 5.3545 s (1300 iterations)
+Benchmarking FPTXSuccinct::encrypt/2048: Collecting 100 samples in estimated 5.0914 s (2200 iterations)
 Benchmarking FPTXSuccinct::encrypt/2048: Analyzing
 FPTXSuccinct::encrypt/2048
-                        time:   [4.1332 ms 4.1357 ms 4.1381 ms]
-                        change: [+0.1943% +0.2841% +0.3780%] (p = 0.00 < 0.05)
-                        Change within noise threshold.
+                        time:   [2.3171 ms 2.3181 ms 2.3192 ms]
+                        change: [-42.067% -42.025% -41.984%] (p = 0.00 < 0.05)
+                        Performance has improved.
+Found 2 outliers among 100 measurements (2.00%)
+  1 (1.00%) low mild
+  1 (1.00%) high mild
 
 Benchmarking FPTXSuccinct::verify_ct/32
 Benchmarking FPTXSuccinct::verify_ct/32: Warming up for 3.0000 s
-Benchmarking FPTXSuccinct::verify_ct/32: Collecting 100 samples in estimated 5.0974 s (157k iterations)
+Benchmarking FPTXSuccinct::verify_ct/32: Collecting 100 samples in estimated 5.0436 s (157k iterations)
 Benchmarking FPTXSuccinct::verify_ct/32: Analyzing
 FPTXSuccinct::verify_ct/32
-                        time:   [32.561 µs 32.565 µs 32.570 µs]
-                        change: [+2.1127% +2.1455% +2.1772%] (p = 0.00 < 0.05)
-                        Performance has regressed.
-Found 8 outliers among 100 measurements (8.00%)
+                        time:   [32.277 µs 32.282 µs 32.286 µs]
+                        change: [+0.0495% +0.1167% +0.1716%] (p = 0.00 < 0.05)
+                        Change within noise threshold.
+Found 18 outliers among 100 measurements (18.00%)
+  4 (4.00%) low severe
   3 (3.00%) low mild
-  4 (4.00%) high mild
-  1 (1.00%) high severe
+  7 (7.00%) high mild
+  4 (4.00%) high severe
 Benchmarking FPTXSuccinct::verify_ct/128
 Benchmarking FPTXSuccinct::verify_ct/128: Warming up for 3.0000 s
-Benchmarking FPTXSuccinct::verify_ct/128: Collecting 100 samples in estimated 5.1139 s (157k iterations)
+Benchmarking FPTXSuccinct::verify_ct/128: Collecting 100 samples in estimated 5.0743 s (157k iterations)
 Benchmarking FPTXSuccinct::verify_ct/128: Analyzing
 FPTXSuccinct::verify_ct/128
-                        time:   [32.619 µs 32.627 µs 32.634 µs]
-                        change: [+0.9913% +1.0406% +1.0849%] (p = 0.00 < 0.05)
+                        time:   [32.478 µs 32.486 µs 32.494 µs]
+                        change: [+0.5873% +0.6277% +0.6705%] (p = 0.00 < 0.05)
                         Change within noise threshold.
-Found 11 outliers among 100 measurements (11.00%)
-  2 (2.00%) low severe
-  4 (4.00%) low mild
-  4 (4.00%) high mild
-  1 (1.00%) high severe
+Found 1 outliers among 100 measurements (1.00%)
+  1 (1.00%) low mild
 Benchmarking FPTXSuccinct::verify_ct/512
 Benchmarking FPTXSuccinct::verify_ct/512: Warming up for 3.0000 s
-Benchmarking FPTXSuccinct::verify_ct/512: Collecting 100 samples in estimated 5.1262 s (157k iterations)
+Benchmarking FPTXSuccinct::verify_ct/512: Collecting 100 samples in estimated 5.1043 s (157k iterations)
 Benchmarking FPTXSuccinct::verify_ct/512: Analyzing
 FPTXSuccinct::verify_ct/512
-                        time:   [32.733 µs 32.745 µs 32.765 µs]
-                        change: [+1.4648% +1.5244% +1.5803%] (p = 0.00 < 0.05)
-                        Performance has regressed.
-Found 5 outliers among 100 measurements (5.00%)
-  1 (1.00%) low mild
+                        time:   [32.666 µs 32.670 µs 32.676 µs]
+                        change: [+0.1183% +0.1661% +0.2140%] (p = 0.00 < 0.05)
+                        Change within noise threshold.
+Found 8 outliers among 100 measurements (8.00%)
+  2 (2.00%) low severe
   2 (2.00%) high mild
-  2 (2.00%) high severe
+  4 (4.00%) high severe
 Benchmarking FPTXSuccinct::verify_ct/2048
 Benchmarking FPTXSuccinct::verify_ct/2048: Warming up for 3.0000 s
-Benchmarking FPTXSuccinct::verify_ct/2048: Collecting 100 samples in estimated 5.1369 s (157k iterations)
+Benchmarking FPTXSuccinct::verify_ct/2048: Collecting 100 samples in estimated 5.0900 s (157k iterations)
 Benchmarking FPTXSuccinct::verify_ct/2048: Analyzing
 FPTXSuccinct::verify_ct/2048
-                        time:   [32.770 µs 32.779 µs 32.788 µs]
-                        change: [+2.1653% +2.1993% +2.2319%] (p = 0.00 < 0.05)
-                        Performance has regressed.
-Found 11 outliers among 100 measurements (11.00%)
-  1 (1.00%) low severe
-  1 (1.00%) low mild
-  6 (6.00%) high mild
-  3 (3.00%) high severe
+                        time:   [32.575 µs 32.584 µs 32.592 µs]
+                        change: [-0.0771% -0.0392% +0.0030%] (p = 0.05 > 0.05)
+                        No change in performance detected.
+Found 9 outliers among 100 measurements (9.00%)
+  4 (4.00%) low mild
+  3 (3.00%) high mild
+  2 (2.00%) high severe
 
 Benchmarking FPTXSuccinct::eval_proofs_compute_all/32
 Benchmarking FPTXSuccinct::eval_proofs_compute_all/32: Warming up for 3.0000 s
-Benchmarking FPTXSuccinct::eval_proofs_compute_all/32: Collecting 10 samples in estimated 5.3245 s (440 iterations)
+Benchmarking FPTXSuccinct::eval_proofs_compute_all/32: Collecting 10 samples in estimated 5.1961 s (550 iterations)
 Benchmarking FPTXSuccinct::eval_proofs_compute_all/32: Analyzing
 FPTXSuccinct::eval_proofs_compute_all/32
-                        time:   [11.950 ms 12.033 ms 12.104 ms]
-                        change: [-1.2275% -0.3987% +0.3574%] (p = 0.35 > 0.05)
-                        No change in performance detected.
+                        time:   [9.3864 ms 9.4370 ms 9.4795 ms]
+                        change: [-89.808% -89.741% -89.672%] (p = 0.00 < 0.05)
+                        Performance has improved.
 Benchmarking FPTXSuccinct::eval_proofs_compute_all/128
 Benchmarking FPTXSuccinct::eval_proofs_compute_all/128: Warming up for 3.0000 s
-Benchmarking FPTXSuccinct::eval_proofs_compute_all/128: Collecting 10 samples in estimated 5.5851 s (165 iterations)
+Benchmarking FPTXSuccinct::eval_proofs_compute_all/128: Collecting 10 samples in estimated 5.8830 s (330 iterations)
 Benchmarking FPTXSuccinct::eval_proofs_compute_all/128: Analyzing
 FPTXSuccinct::eval_proofs_compute_all/128
-                        time:   [33.860 ms 33.988 ms 34.196 ms]
-                        change: [-0.9552% +0.2286% +1.3012%] (p = 0.72 > 0.05)
-                        No change in performance detected.
-Found 2 outliers among 10 measurements (20.00%)
-  2 (20.00%) high mild
-Benchmarking FPTXSuccinct::eval_proofs_compute_all/256
-Benchmarking FPTXSuccinct::eval_proofs_compute_all/256: Warming up for 3.0000 s
-Benchmarking FPTXSuccinct::eval_proofs_compute_all/256: Collecting 10 samples in estimated 9.6596 s (110 iterations)
-Benchmarking FPTXSuccinct::eval_proofs_compute_all/256: Analyzing
-FPTXSuccinct::eval_proofs_compute_all/256
-                        time:   [87.669 ms 87.721 ms 87.785 ms]
-                        change: [-0.2101% +0.0065% +0.2321%] (p = 0.97 > 0.05)
-                        No change in performance detected.
+                        time:   [17.704 ms 17.816 ms 18.067 ms]
+                        change: [-97.739% -97.720% -97.694%] (p = 0.00 < 0.05)
+                        Performance has improved.
 Found 1 outliers among 10 measurements (10.00%)
   1 (10.00%) high severe
+Benchmarking FPTXSuccinct::eval_proofs_compute_all/256
+Benchmarking FPTXSuccinct::eval_proofs_compute_all/256: Warming up for 3.0000 s
+Benchmarking FPTXSuccinct::eval_proofs_compute_all/256: Collecting 10 samples in estimated 7.4806 s (165 iterations)
+Benchmarking FPTXSuccinct::eval_proofs_compute_all/256: Analyzing
+FPTXSuccinct::eval_proofs_compute_all/256
+                        time:   [45.304 ms 45.465 ms 45.672 ms]
+                        change: [-98.179% -98.171% -98.165%] (p = 0.00 < 0.05)
+                        Performance has improved.
 Benchmarking FPTXSuccinct::eval_proofs_compute_all/512
 Benchmarking FPTXSuccinct::eval_proofs_compute_all/512: Warming up for 3.0000 s
-Benchmarking FPTXSuccinct::eval_proofs_compute_all/512: Collecting 10 samples in estimated 5.1893 s (20 iterations)
+
+Warning: Unable to complete 10 samples in 5.0s. You may wish to increase target time to 7.2s or enable flat sampling.
+Benchmarking FPTXSuccinct::eval_proofs_compute_all/512: Collecting 10 samples in estimated 7.1628 s (55 iterations)
 Benchmarking FPTXSuccinct::eval_proofs_compute_all/512: Analyzing
 FPTXSuccinct::eval_proofs_compute_all/512
-                        time:   [259.39 ms 259.88 ms 260.45 ms]
-                        change: [-0.3500% -0.1308% +0.1100%] (p = 0.32 > 0.05)
-                        No change in performance detected.
+                        time:   [129.52 ms 129.75 ms 129.93 ms]
+                        change: [-98.422% -98.419% -98.416%] (p = 0.00 < 0.05)
+                        Performance has improved.
+Found 1 outliers among 10 measurements (10.00%)
+  1 (10.00%) low mild
 Benchmarking FPTXSuccinct::eval_proofs_compute_all/2048
 Benchmarking FPTXSuccinct::eval_proofs_compute_all/2048: Warming up for 3.0000 s
 
-Warning: Unable to complete 10 samples in 5.0s. You may wish to increase target time to 28.1s.
-Benchmarking FPTXSuccinct::eval_proofs_compute_all/2048: Collecting 10 samples in estimated 28.087 s (10 iterations)
+Warning: Unable to complete 10 samples in 5.0s. You may wish to increase target time to 14.0s.
+Benchmarking FPTXSuccinct::eval_proofs_compute_all/2048: Collecting 10 samples in estimated 14.001 s (10 iterations)
 Benchmarking FPTXSuccinct::eval_proofs_compute_all/2048: Analyzing
 FPTXSuccinct::eval_proofs_compute_all/2048
-                        time:   [2.7601 s 2.7649 s 2.7703 s]
-                        change: [-0.2229% +0.0672% +0.3635%] (p = 0.68 > 0.05)
-                        No change in performance detected.
+                        time:   [1.3620 s 1.3643 s 1.3667 s]
+                        change: [-98.562% -98.560% -98.558%] (p = 0.00 < 0.05)
+                        Performance has improved.
 
 Benchmarking FPTXSuccinct::eval_proofs_compute_all_2/32
 Benchmarking FPTXSuccinct::eval_proofs_compute_all_2/32: Warming up for 3.0000 s
-Benchmarking FPTXSuccinct::eval_proofs_compute_all_2/32: Collecting 10 samples in estimated 8.1980 s (110 iterations)
+Benchmarking FPTXSuccinct::eval_proofs_compute_all_2/32: Collecting 10 samples in estimated 6.4252 s (110 iterations)
 Benchmarking FPTXSuccinct::eval_proofs_compute_all_2/32: Analyzing
 FPTXSuccinct::eval_proofs_compute_all_2/32
-                        time:   [75.670 ms 76.692 ms 78.176 ms]
-                        change: [+3.4497% +5.1520% +7.1798%] (p = 0.00 < 0.05)
-                        Performance has regressed.
+                        time:   [59.224 ms 59.862 ms 60.402 ms]
+                        change: [-78.475% -78.038% -77.707%] (p = 0.00 < 0.05)
+                        Performance has improved.
+Found 1 outliers among 10 measurements (10.00%)
+  1 (10.00%) low mild
 Benchmarking FPTXSuccinct::eval_proofs_compute_all_2/128
 Benchmarking FPTXSuccinct::eval_proofs_compute_all_2/128: Warming up for 3.0000 s
-
-Warning: Unable to complete 10 samples in 5.0s. You may wish to increase target time to 7.9s or enable flat sampling.
-Benchmarking FPTXSuccinct::eval_proofs_compute_all_2/128: Collecting 10 samples in estimated 7.8762 s (55 iterations)
+Benchmarking FPTXSuccinct::eval_proofs_compute_all_2/128: Collecting 10 samples in estimated 9.6915 s (110 iterations)
 Benchmarking FPTXSuccinct::eval_proofs_compute_all_2/128: Analyzing
 FPTXSuccinct::eval_proofs_compute_all_2/128
-                        time:   [142.13 ms 144.60 ms 147.57 ms]
-                        change: [-6.0285% -2.2488% +1.4610%] (p = 0.30 > 0.05)
-                        No change in performance detected.
-Found 2 outliers among 10 measurements (20.00%)
-  1 (10.00%) low mild
-  1 (10.00%) high mild
+                        time:   [89.949 ms 91.490 ms 94.194 ms]
+                        change: [-95.469% -95.251% -95.046%] (p = 0.00 < 0.05)
+                        Performance has improved.
 Benchmarking FPTXSuccinct::eval_proofs_compute_all_2/256
 Benchmarking FPTXSuccinct::eval_proofs_compute_all_2/256: Warming up for 3.0000 s
-Benchmarking FPTXSuccinct::eval_proofs_compute_all_2/256: Collecting 10 samples in estimated 6.1871 s (20 iterations)
+
+Warning: Unable to complete 10 samples in 5.0s. You may wish to increase target time to 10.0s or enable flat sampling.
+Benchmarking FPTXSuccinct::eval_proofs_compute_all_2/256: Collecting 10 samples in estimated 9.9951 s (55 iterations)
 Benchmarking FPTXSuccinct::eval_proofs_compute_all_2/256: Analyzing
 FPTXSuccinct::eval_proofs_compute_all_2/256
-                        time:   [285.11 ms 293.77 ms 302.22 ms]
-                        change: [-6.2234% -1.5428% +3.3420%] (p = 0.56 > 0.05)
-                        No change in performance detected.
+                        time:   [181.96 ms 188.53 ms 192.26 ms]
+                        change: [-96.469% -96.289% -96.150%] (p = 0.00 < 0.05)
+                        Performance has improved.
+Found 1 outliers among 10 measurements (10.00%)
+  1 (10.00%) low mild
 Benchmarking FPTXSuccinct::eval_proofs_compute_all_2/512
 Benchmarking FPTXSuccinct::eval_proofs_compute_all_2/512: Warming up for 3.0000 s
-
-Warning: Unable to complete 10 samples in 5.0s. You may wish to increase target time to 6.8s.
-Benchmarking FPTXSuccinct::eval_proofs_compute_all_2/512: Collecting 10 samples in estimated 6.7699 s (10 iterations)
+Benchmarking FPTXSuccinct::eval_proofs_compute_all_2/512: Collecting 10 samples in estimated 7.7789 s (20 iterations)
 Benchmarking FPTXSuccinct::eval_proofs_compute_all_2/512: Analyzing
 FPTXSuccinct::eval_proofs_compute_all_2/512
-                        time:   [635.43 ms 659.21 ms 682.91 ms]
-                        change: [-5.9525% -0.8601% +4.6425%] (p = 0.76 > 0.05)
-                        No change in performance detected.
+                        time:   [374.92 ms 390.17 ms 407.59 ms]
+                        change: [-96.920% -96.806% -96.659%] (p = 0.00 < 0.05)
+                        Performance has improved.
 Benchmarking FPTXSuccinct::eval_proofs_compute_all_2/2048
 Benchmarking FPTXSuccinct::eval_proofs_compute_all_2/2048: Warming up for 3.0000 s
 
-Warning: Unable to complete 10 samples in 5.0s. You may wish to increase target time to 31.1s.
-Benchmarking FPTXSuccinct::eval_proofs_compute_all_2/2048: Collecting 10 samples in estimated 31.096 s (10 iterations)
+Warning: Unable to complete 10 samples in 5.0s. You may wish to increase target time to 18.4s.
+Benchmarking FPTXSuccinct::eval_proofs_compute_all_2/2048: Collecting 10 samples in estimated 18.433 s (10 iterations)
 Benchmarking FPTXSuccinct::eval_proofs_compute_all_2/2048: Analyzing
 FPTXSuccinct::eval_proofs_compute_all_2/2048
-                        time:   [3.1640 s 3.2252 s 3.2881 s]
-                        change: [-3.6823% -1.1764% +1.3278%] (p = 0.41 > 0.05)
-                        No change in performance detected.
+                        time:   [1.7901 s 1.8314 s 1.8746 s]
+                        change: [-97.489% -97.428% -97.371%] (p = 0.00 < 0.05)
+                        Performance has improved.
+Found 2 outliers among 10 measurements (20.00%)
+  1 (10.00%) low mild
+  1 (10.00%) high mild
 
 Benchmarking FPTXSuccinct::derive_decryption_key_share/n=128, t=86
 Benchmarking FPTXSuccinct::derive_decryption_key_share/n=128, t=86: Warming up for 3.0000 s
-Benchmarking FPTXSuccinct::derive_decryption_key_share/n=128, t=86: Collecting 100 samples in estimated 5.9845 s (15k iterations)
+Benchmarking FPTXSuccinct::derive_decryption_key_share/n=128, t=86: Collecting 100 samples in estimated 5.1973 s (81k iterations)
 Benchmarking FPTXSuccinct::derive_decryption_key_share/n=128, t=86: Analyzing
 FPTXSuccinct::derive_decryption_key_share/n=128, t=86
-                        time:   [405.21 µs 405.71 µs 406.19 µs]
-                        change: [-1.2742% -1.1419% -0.9997%] (p = 0.00 < 0.05)
-                        Change within noise threshold.
+                        time:   [64.306 µs 64.329 µs 64.360 µs]
+                        change: [-80.021% -80.005% -79.977%] (p = 0.00 < 0.05)
+                        Performance has improved.
+Found 9 outliers among 100 measurements (9.00%)
+  1 (1.00%) low mild
+  5 (5.00%) high mild
+  3 (3.00%) high severe
 Benchmarking FPTXSuccinct::derive_decryption_key_share/n=256, t=171
 Benchmarking FPTXSuccinct::derive_decryption_key_share/n=256, t=171: Warming up for 3.0000 s
-Benchmarking FPTXSuccinct::derive_decryption_key_share/n=256, t=171: Collecting 100 samples in estimated 6.0722 s (15k iterations)
+Benchmarking FPTXSuccinct::derive_decryption_key_share/n=256, t=171: Collecting 100 samples in estimated 5.0979 s (76k iterations)
 Benchmarking FPTXSuccinct::derive_decryption_key_share/n=256, t=171: Analyzing
 FPTXSuccinct::derive_decryption_key_share/n=256, t=171
-                        time:   [400.36 µs 400.55 µs 400.74 µs]
-                        change: [-0.9225% -0.8130% -0.7148%] (p = 0.00 < 0.05)
-                        Change within noise threshold.
-Found 8 outliers among 100 measurements (8.00%)
-  1 (1.00%) low mild
+                        time:   [67.412 µs 67.428 µs 67.444 µs]
+                        change: [-79.060% -79.051% -79.042%] (p = 0.00 < 0.05)
+                        Performance has improved.
+Found 6 outliers among 100 measurements (6.00%)
+  2 (2.00%) low mild
   3 (3.00%) high mild
-  4 (4.00%) high severe
+  1 (1.00%) high severe
 Benchmarking FPTXSuccinct::derive_decryption_key_share/n=512, t=342
 Benchmarking FPTXSuccinct::derive_decryption_key_share/n=512, t=342: Warming up for 3.0000 s
-Benchmarking FPTXSuccinct::derive_decryption_key_share/n=512, t=342: Collecting 100 samples in estimated 6.0854 s (15k iterations)
+Benchmarking FPTXSuccinct::derive_decryption_key_share/n=512, t=342: Collecting 100 samples in estimated 5.2684 s (86k iterations)
 Benchmarking FPTXSuccinct::derive_decryption_key_share/n=512, t=342: Analyzing
 FPTXSuccinct::derive_decryption_key_share/n=512, t=342
-                        time:   [400.88 µs 401.83 µs 403.70 µs]
-                        change: [-1.4090% -1.2302% -0.9676%] (p = 0.00 < 0.05)
-                        Change within noise threshold.
-Found 7 outliers among 100 measurements (7.00%)
-  1 (1.00%) low severe
-  2 (2.00%) low mild
-  2 (2.00%) high mild
-  2 (2.00%) high severe
+                        time:   [61.418 µs 61.432 µs 61.445 µs]
+                        change: [-80.814% -80.807% -80.799%] (p = 0.00 < 0.05)
+                        Performance has improved.
+Found 11 outliers among 100 measurements (11.00%)
+  7 (7.00%) low mild
+  3 (3.00%) high mild
+  1 (1.00%) high severe
 Benchmarking FPTXSuccinct::derive_decryption_key_share/n=1024, t=683
 Benchmarking FPTXSuccinct::derive_decryption_key_share/n=1024, t=683: Warming up for 3.0000 s
-Benchmarking FPTXSuccinct::derive_decryption_key_share/n=1024, t=683: Collecting 100 samples in estimated 6.1072 s (15k iterations)
+Benchmarking FPTXSuccinct::derive_decryption_key_share/n=1024, t=683: Collecting 100 samples in estimated 5.1133 s (81k iterations)
 Benchmarking FPTXSuccinct::derive_decryption_key_share/n=1024, t=683: Analyzing
 FPTXSuccinct::derive_decryption_key_share/n=1024, t=683
-                        time:   [401.65 µs 401.92 µs 402.19 µs]
-                        change: [-0.1188% -0.0024% +0.1063%] (p = 0.96 > 0.05)
-                        No change in performance detected.
-Found 2 outliers among 100 measurements (2.00%)
-  2 (2.00%) high mild
+                        time:   [63.295 µs 63.322 µs 63.350 µs]
+                        change: [-80.145% -80.136% -80.128%] (p = 0.00 < 0.05)
+                        Performance has improved.
+Found 5 outliers among 100 measurements (5.00%)
+  3 (3.00%) high mild
+  2 (2.00%) high severe
 
 Benchmarking FPTXSuccinct::verify_decryption_key_share/32
 Benchmarking FPTXSuccinct::verify_decryption_key_share/32: Warming up for 3.0000 s
-
-Warning: Unable to complete 100 samples in 5.0s. You may wish to increase target time to 8.9s, enable flat sampling, or reduce sample count to 50.
-Benchmarking FPTXSuccinct::verify_decryption_key_share/32: Collecting 100 samples in estimated 8.8757 s (5050 iterations)
+Benchmarking FPTXSuccinct::verify_decryption_key_share/32: Collecting 100 samples in estimated 8.6383 s (10k iterations)
 Benchmarking FPTXSuccinct::verify_decryption_key_share/32: Analyzing
 FPTXSuccinct::verify_decryption_key_share/32
-                        time:   [1.7438 ms 1.7447 ms 1.7456 ms]
-                        change: [-0.7322% -0.6353% -0.5310%] (p = 0.00 < 0.05)
-                        Change within noise threshold.
-Found 1 outliers among 100 measurements (1.00%)
-  1 (1.00%) high severe
+                        time:   [848.50 µs 849.22 µs 849.97 µs]
+                        change: [-48.485% -48.429% -48.374%] (p = 0.00 < 0.05)
+                        Performance has improved.
+Found 2 outliers among 100 measurements (2.00%)
+  2 (2.00%) high mild
 Benchmarking FPTXSuccinct::verify_decryption_key_share/128
 Benchmarking FPTXSuccinct::verify_decryption_key_share/128: Warming up for 3.0000 s
-
-Warning: Unable to complete 100 samples in 5.0s. You may wish to increase target time to 8.9s, enable flat sampling, or reduce sample count to 50.
-Benchmarking FPTXSuccinct::verify_decryption_key_share/128: Collecting 100 samples in estimated 8.8931 s (5050 iterations)
+Benchmarking FPTXSuccinct::verify_decryption_key_share/128: Collecting 100 samples in estimated 8.6306 s (10k iterations)
 Benchmarking FPTXSuccinct::verify_decryption_key_share/128: Analyzing
 FPTXSuccinct::verify_decryption_key_share/128
-                        time:   [1.7456 ms 1.7481 ms 1.7515 ms]
-                        change: [+0.0419% +0.1587% +0.2764%] (p = 0.01 < 0.05)
-                        Change within noise threshold.
-Found 5 outliers among 100 measurements (5.00%)
-  4 (4.00%) high mild
-  1 (1.00%) high severe
+                        time:   [846.00 µs 846.89 µs 847.87 µs]
+                        change: [-48.395% -48.345% -48.294%] (p = 0.00 < 0.05)
+                        Performance has improved.
+Found 4 outliers among 100 measurements (4.00%)
+  2 (2.00%) low mild
+  2 (2.00%) high mild
 Benchmarking FPTXSuccinct::verify_decryption_key_share/512
 Benchmarking FPTXSuccinct::verify_decryption_key_share/512: Warming up for 3.0000 s
-
-Warning: Unable to complete 100 samples in 5.0s. You may wish to increase target time to 8.8s, enable flat sampling, or reduce sample count to 50.
-Benchmarking FPTXSuccinct::verify_decryption_key_share/512: Collecting 100 samples in estimated 8.8389 s (5050 iterations)
+Benchmarking FPTXSuccinct::verify_decryption_key_share/512: Collecting 100 samples in estimated 8.6650 s (10k iterations)
 Benchmarking FPTXSuccinct::verify_decryption_key_share/512: Analyzing
 FPTXSuccinct::verify_decryption_key_share/512
-                        time:   [1.7374 ms 1.7384 ms 1.7393 ms]
-                        change: [-0.3866% -0.3079% -0.2305%] (p = 0.00 < 0.05)
-                        Change within noise threshold.
-Found 4 outliers among 100 measurements (4.00%)
-  3 (3.00%) high mild
-  1 (1.00%) high severe
+                        time:   [844.92 µs 845.64 µs 846.47 µs]
+                        change: [-48.519% -48.473% -48.421%] (p = 0.00 < 0.05)
+                        Performance has improved.
 Benchmarking FPTXSuccinct::verify_decryption_key_share/2048
 Benchmarking FPTXSuccinct::verify_decryption_key_share/2048: Warming up for 3.0000 s
-
-Warning: Unable to complete 100 samples in 5.0s. You may wish to increase target time to 8.9s, enable flat sampling, or reduce sample count to 50.
-Benchmarking FPTXSuccinct::verify_decryption_key_share/2048: Collecting 100 samples in estimated 8.8515 s (5050 iterations)
+Benchmarking FPTXSuccinct::verify_decryption_key_share/2048: Collecting 100 samples in estimated 8.6195 s (10k iterations)
 Benchmarking FPTXSuccinct::verify_decryption_key_share/2048: Analyzing
 FPTXSuccinct::verify_decryption_key_share/2048
-                        time:   [1.7463 ms 1.7485 ms 1.7508 ms]
-                        change: [-0.8372% -0.7069% -0.5630%] (p = 0.00 < 0.05)
-                        Change within noise threshold.
-Found 4 outliers among 100 measurements (4.00%)
-  4 (4.00%) high mild
+                        time:   [842.60 µs 843.20 µs 843.89 µs]
+                        change: [-48.775% -48.727% -48.683%] (p = 0.00 < 0.05)
+                        Performance has improved.
 
 Benchmarking FPTXSuccinct::reconstruct_decryption_key/n=10, t=7
 Benchmarking FPTXSuccinct::reconstruct_decryption_key/n=10, t=7: Warming up for 3.0000 s
 
-Warning: Unable to complete 100 samples in 5.0s. You may wish to increase target time to 9.5s, enable flat sampling, or reduce sample count to 50.
-Benchmarking FPTXSuccinct::reconstruct_decryption_key/n=10, t=7: Collecting 100 samples in estimated 9.5459 s (5050 iterations)
+Warning: Unable to complete 100 samples in 5.0s. You may wish to increase target time to 8.7s, enable flat sampling, or reduce sample count to 50.
+Benchmarking FPTXSuccinct::reconstruct_decryption_key/n=10, t=7: Collecting 100 samples in estimated 8.6637 s (5050 iterations)
 Benchmarking FPTXSuccinct::reconstruct_decryption_key/n=10, t=7: Analyzing
 FPTXSuccinct::reconstruct_decryption_key/n=10, t=7
-                        time:   [1.8767 ms 1.8821 ms 1.8871 ms]
-                        change: [-1.3248% -0.7742% -0.2878%] (p = 0.00 < 0.05)
-                        Change within noise threshold.
+                        time:   [1.7089 ms 1.7146 ms 1.7207 ms]
+                        change: [+124.51% +125.25% +126.09%] (p = 0.00 < 0.05)
+                        Performance has regressed.
 Found 3 outliers among 100 measurements (3.00%)
   3 (3.00%) high mild
 Benchmarking FPTXSuccinct::reconstruct_decryption_key/n=128, t=86
 Benchmarking FPTXSuccinct::reconstruct_decryption_key/n=128, t=86: Warming up for 3.0000 s
-Benchmarking FPTXSuccinct::reconstruct_decryption_key/n=128, t=86: Collecting 100 samples in estimated 5.3187 s (1200 iterations)
+Benchmarking FPTXSuccinct::reconstruct_decryption_key/n=128, t=86: Collecting 100 samples in estimated 5.3470 s (1300 iterations)
 Benchmarking FPTXSuccinct::reconstruct_decryption_key/n=128, t=86: Analyzing
 FPTXSuccinct::reconstruct_decryption_key/n=128, t=86
-                        time:   [4.5512 ms 4.6037 ms 4.6573 ms]
-                        change: [+2.8263% +4.6476% +6.4512%] (p = 0.00 < 0.05)
+                        time:   [4.0828 ms 4.1252 ms 4.1678 ms]
+                        change: [+1.2791% +2.2138% +3.2311%] (p = 0.00 < 0.05)
                         Performance has regressed.
-Found 5 outliers among 100 measurements (5.00%)
-  1 (1.00%) low mild
-  4 (4.00%) high mild
 Benchmarking FPTXSuccinct::reconstruct_decryption_key/n=256, t=171
 Benchmarking FPTXSuccinct::reconstruct_decryption_key/n=256, t=171: Warming up for 3.0000 s
-Benchmarking FPTXSuccinct::reconstruct_decryption_key/n=256, t=171: Collecting 100 samples in estimated 5.3260 s (1400 iterations)
+Benchmarking FPTXSuccinct::reconstruct_decryption_key/n=256, t=171: Collecting 100 samples in estimated 5.2467 s (1500 iterations)
 Benchmarking FPTXSuccinct::reconstruct_decryption_key/n=256, t=171: Analyzing
 FPTXSuccinct::reconstruct_decryption_key/n=256, t=171
-                        time:   [3.7798 ms 3.7931 ms 3.8065 ms]
-                        change: [+0.3246% +0.7748% +1.2540%] (p = 0.00 < 0.05)
-                        Change within noise threshold.
-Found 3 outliers among 100 measurements (3.00%)
-  1 (1.00%) low mild
-  2 (2.00%) high mild
-Benchmarking FPTXSuccinct::reconstruct_decryption_key/n=512, t=342
-Benchmarking FPTXSuccinct::reconstruct_decryption_key/n=512, t=342: Warming up for 3.0000 s
-Benchmarking FPTXSuccinct::reconstruct_decryption_key/n=512, t=342: Collecting 100 samples in estimated 5.5127 s (1000 iterations)
-Benchmarking FPTXSuccinct::reconstruct_decryption_key/n=512, t=342: Analyzing
-FPTXSuccinct::reconstruct_decryption_key/n=512, t=342
-                        time:   [5.4933 ms 5.5069 ms 5.5211 ms]
-                        change: [+0.5988% +0.9503% +1.2839%] (p = 0.00 < 0.05)
-                        Change within noise threshold.
-Found 2 outliers among 100 measurements (2.00%)
-  2 (2.00%) high mild
-Benchmarking FPTXSuccinct::reconstruct_decryption_key/n=1024, t=683
-Benchmarking FPTXSuccinct::reconstruct_decryption_key/n=1024, t=683: Warming up for 3.0000 s
-Benchmarking FPTXSuccinct::reconstruct_decryption_key/n=1024, t=683: Collecting 100 samples in estimated 5.2341 s (500 iterations)
-Benchmarking FPTXSuccinct::reconstruct_decryption_key/n=1024, t=683: Analyzing
-FPTXSuccinct::reconstruct_decryption_key/n=1024, t=683
-                        time:   [10.284 ms 10.321 ms 10.359 ms]
-                        change: [+2.7734% +3.3176% +3.8877%] (p = 0.00 < 0.05)
-                        Performance has regressed.
+                        time:   [3.4676 ms 3.4810 ms 3.4949 ms]
+                        change: [-51.432% -51.240% -51.033%] (p = 0.00 < 0.05)
+                        Performance has improved.
 Found 1 outliers among 100 measurements (1.00%)
   1 (1.00%) high severe
+Benchmarking FPTXSuccinct::reconstruct_decryption_key/n=512, t=342
+Benchmarking FPTXSuccinct::reconstruct_decryption_key/n=512, t=342: Warming up for 3.0000 s
+Benchmarking FPTXSuccinct::reconstruct_decryption_key/n=512, t=342: Collecting 100 samples in estimated 5.0583 s (1000 iterations)
+Benchmarking FPTXSuccinct::reconstruct_decryption_key/n=512, t=342: Analyzing
+FPTXSuccinct::reconstruct_decryption_key/n=512, t=342
+                        time:   [5.0195 ms 5.0322 ms 5.0455 ms]
+                        change: [-62.738% -62.643% -62.543%] (p = 0.00 < 0.05)
+                        Performance has improved.
+Benchmarking FPTXSuccinct::reconstruct_decryption_key/n=1024, t=683
+Benchmarking FPTXSuccinct::reconstruct_decryption_key/n=1024, t=683: Warming up for 3.0000 s
+Benchmarking FPTXSuccinct::reconstruct_decryption_key/n=1024, t=683: Collecting 100 samples in estimated 5.8393 s (600 iterations)
+Benchmarking FPTXSuccinct::reconstruct_decryption_key/n=1024, t=683: Analyzing
+FPTXSuccinct::reconstruct_decryption_key/n=1024, t=683
+                        time:   [9.6304 ms 9.6705 ms 9.7114 ms]
+                        change: [-59.420% -59.250% -59.069%] (p = 0.00 < 0.05)
+                        Performance has improved.
+Found 3 outliers among 100 measurements (3.00%)
+  3 (3.00%) high mild
 
 Benchmarking FPTXSuccinct::prepare (full batch, all cts)/32
 Benchmarking FPTXSuccinct::prepare (full batch, all cts)/32: Warming up for 3.0000 s
-Benchmarking FPTXSuccinct::prepare (full batch, all cts)/32: Collecting 100 samples in estimated 5.0197 s (1900 iterations)
+
+Warning: Unable to complete 100 samples in 5.0s. You may wish to increase target time to 9.1s, enable flat sampling, or reduce sample count to 50.
+Benchmarking FPTXSuccinct::prepare (full batch, all cts)/32: Collecting 100 samples in estimated 9.1481 s (5050 iterations)
 Benchmarking FPTXSuccinct::prepare (full batch, all cts)/32: Analyzing
 FPTXSuccinct::prepare (full batch, all cts)/32
-                        time:   [2.6506 ms 2.6537 ms 2.6569 ms]
-                        change: [+0.4486% +0.6147% +0.7657%] (p = 0.00 < 0.05)
-                        Change within noise threshold.
-Found 7 outliers among 100 measurements (7.00%)
-  6 (6.00%) high mild
+                        time:   [1.8124 ms 1.8151 ms 1.8179 ms]
+                        change: [-95.926% -95.919% -95.913%] (p = 0.00 < 0.05)
+                        Performance has improved.
+Found 4 outliers among 100 measurements (4.00%)
+  3 (3.00%) high mild
   1 (1.00%) high severe
 Benchmarking FPTXSuccinct::prepare (full batch, all cts)/128
 Benchmarking FPTXSuccinct::prepare (full batch, all cts)/128: Warming up for 3.0000 s
-Benchmarking FPTXSuccinct::prepare (full batch, all cts)/128: Collecting 100 samples in estimated 5.2100 s (800 iterations)
+Benchmarking FPTXSuccinct::prepare (full batch, all cts)/128: Collecting 100 samples in estimated 5.1544 s (1200 iterations)
 Benchmarking FPTXSuccinct::prepare (full batch, all cts)/128: Analyzing
 FPTXSuccinct::prepare (full batch, all cts)/128
-                        time:   [6.5268 ms 6.5471 ms 6.5670 ms]
-                        change: [+0.0351% +0.4612% +0.9270%] (p = 0.05 < 0.05)
-                        Change within noise threshold.
-Benchmarking FPTXSuccinct::prepare (full batch, all cts)/512
-Benchmarking FPTXSuccinct::prepare (full batch, all cts)/512: Warming up for 3.0000 s
-Benchmarking FPTXSuccinct::prepare (full batch, all cts)/512: Collecting 100 samples in estimated 6.1985 s (300 iterations)
-Benchmarking FPTXSuccinct::prepare (full batch, all cts)/512: Analyzing
-FPTXSuccinct::prepare (full batch, all cts)/512
-                        time:   [20.607 ms 20.622 ms 20.638 ms]
-                        change: [-0.1390% -0.0141% +0.1014%] (p = 0.81 > 0.05)
-                        No change in performance detected.
+                        time:   [4.2911 ms 4.2986 ms 4.3062 ms]
+                        change: [-97.590% -97.586% -97.582%] (p = 0.00 < 0.05)
+                        Performance has improved.
 Found 2 outliers among 100 measurements (2.00%)
   2 (2.00%) high mild
+Benchmarking FPTXSuccinct::prepare (full batch, all cts)/512
+Benchmarking FPTXSuccinct::prepare (full batch, all cts)/512: Warming up for 3.0000 s
+Benchmarking FPTXSuccinct::prepare (full batch, all cts)/512: Collecting 100 samples in estimated 5.2540 s (400 iterations)
+Benchmarking FPTXSuccinct::prepare (full batch, all cts)/512: Analyzing
+FPTXSuccinct::prepare (full batch, all cts)/512
+                        time:   [13.125 ms 13.145 ms 13.167 ms]
+                        change: [-98.157% -98.154% -98.151%] (p = 0.00 < 0.05)
+                        Performance has improved.
+Found 8 outliers among 100 measurements (8.00%)
+  1 (1.00%) low mild
+  3 (3.00%) high mild
+  4 (4.00%) high severe
 Benchmarking FPTXSuccinct::prepare (full batch, all cts)/2048
 Benchmarking FPTXSuccinct::prepare (full batch, all cts)/2048: Warming up for 3.0000 s
-
-Warning: Unable to complete 100 samples in 5.0s. You may wish to increase target time to 7.7s, or reduce sample count to 60.
-Benchmarking FPTXSuccinct::prepare (full batch, all cts)/2048: Collecting 100 samples in estimated 7.7360 s (100 iterations)
+Benchmarking FPTXSuccinct::prepare (full batch, all cts)/2048: Collecting 100 samples in estimated 9.6394 s (200 iterations)
 Benchmarking FPTXSuccinct::prepare (full batch, all cts)/2048: Analyzing
 FPTXSuccinct::prepare (full batch, all cts)/2048
-                        time:   [77.284 ms 77.337 ms 77.389 ms]
-                        change: [-0.1785% -0.0840% +0.0111%] (p = 0.09 > 0.05)
-                        No change in performance detected.
+                        time:   [48.208 ms 48.249 ms 48.294 ms]
+                        change: [-37.588% -37.522% -37.452%] (p = 0.00 < 0.05)
+                        Performance has improved.
 Found 3 outliers among 100 measurements (3.00%)
-  3 (3.00%) low mild
+  2 (2.00%) high mild
+  1 (1.00%) high severe
 
 Benchmarking FPTXSuccinct::decrypt (full batch, all cts)/32
 Benchmarking FPTXSuccinct::decrypt (full batch, all cts)/32: Warming up for 3.0000 s
-Benchmarking FPTXSuccinct::decrypt (full batch, all cts)/32: Collecting 100 samples in estimated 5.0153 s (2300 iterations)
+
+Warning: Unable to complete 100 samples in 5.0s. You may wish to increase target time to 7.5s, enable flat sampling, or reduce sample count to 50.
+Benchmarking FPTXSuccinct::decrypt (full batch, all cts)/32: Collecting 100 samples in estimated 7.5228 s (5050 iterations)
 Benchmarking FPTXSuccinct::decrypt (full batch, all cts)/32: Analyzing
 FPTXSuccinct::decrypt (full batch, all cts)/32
-                        time:   [2.1879 ms 2.1918 ms 2.1962 ms]
-                        change: [-0.4843% -0.1811% +0.1070%] (p = 0.24 > 0.05)
-                        No change in performance detected.
-Found 9 outliers among 100 measurements (9.00%)
-  6 (6.00%) high mild
+                        time:   [1.4895 ms 1.4912 ms 1.4931 ms]
+                        change: [-31.324% -31.185% -31.023%] (p = 0.00 < 0.05)
+                        Performance has improved.
+Found 5 outliers among 100 measurements (5.00%)
+  2 (2.00%) high mild
   3 (3.00%) high severe
 Benchmarking FPTXSuccinct::decrypt (full batch, all cts)/128
 Benchmarking FPTXSuccinct::decrypt (full batch, all cts)/128: Warming up for 3.0000 s
-Benchmarking FPTXSuccinct::decrypt (full batch, all cts)/128: Collecting 100 samples in estimated 5.2494 s (1000 iterations)
+Benchmarking FPTXSuccinct::decrypt (full batch, all cts)/128: Collecting 100 samples in estimated 5.1324 s (1500 iterations)
 Benchmarking FPTXSuccinct::decrypt (full batch, all cts)/128: Analyzing
 FPTXSuccinct::decrypt (full batch, all cts)/128
-                        time:   [5.2400 ms 5.2535 ms 5.2670 ms]
-                        change: [-0.6325% -0.2604% +0.1148%] (p = 0.19 > 0.05)
-                        No change in performance detected.
+                        time:   [3.4299 ms 3.4369 ms 3.4442 ms]
+                        change: [-34.905% -34.690% -34.471%] (p = 0.00 < 0.05)
+                        Performance has improved.
+Found 2 outliers among 100 measurements (2.00%)
+  2 (2.00%) high mild
 Benchmarking FPTXSuccinct::decrypt (full batch, all cts)/512
 Benchmarking FPTXSuccinct::decrypt (full batch, all cts)/512: Warming up for 3.0000 s
-Benchmarking FPTXSuccinct::decrypt (full batch, all cts)/512: Collecting 100 samples in estimated 6.6152 s (400 iterations)
+Benchmarking FPTXSuccinct::decrypt (full batch, all cts)/512: Collecting 100 samples in estimated 5.1795 s (500 iterations)
 Benchmarking FPTXSuccinct::decrypt (full batch, all cts)/512: Analyzing
 FPTXSuccinct::decrypt (full batch, all cts)/512
-                        time:   [16.490 ms 16.512 ms 16.534 ms]
-                        change: [-0.1494% +0.0483% +0.2514%] (p = 0.63 > 0.05)
-                        No change in performance detected.
-Found 7 outliers among 100 measurements (7.00%)
-  4 (4.00%) high mild
+                        time:   [10.345 ms 10.371 ms 10.401 ms]
+                        change: [-37.285% -37.098% -36.923%] (p = 0.00 < 0.05)
+                        Performance has improved.
+Found 10 outliers among 100 measurements (10.00%)
+  7 (7.00%) high mild
   3 (3.00%) high severe
 Benchmarking FPTXSuccinct::decrypt (full batch, all cts)/2048
 Benchmarking FPTXSuccinct::decrypt (full batch, all cts)/2048: Warming up for 3.0000 s
-
-Warning: Unable to complete 100 samples in 5.0s. You may wish to increase target time to 6.1s, or reduce sample count to 80.
-Benchmarking FPTXSuccinct::decrypt (full batch, all cts)/2048: Collecting 100 samples in estimated 6.1255 s (100 iterations)
+Benchmarking FPTXSuccinct::decrypt (full batch, all cts)/2048: Collecting 100 samples in estimated 7.5310 s (200 iterations)
 Benchmarking FPTXSuccinct::decrypt (full batch, all cts)/2048: Analyzing
 FPTXSuccinct::decrypt (full batch, all cts)/2048
-                        time:   [61.275 ms 61.314 ms 61.353 ms]
-                        change: [-0.0919% +0.0166% +0.1263%] (p = 0.76 > 0.05)
-                        No change in performance detected.
-Found 2 outliers among 100 measurements (2.00%)
-  1 (1.00%) low mild
+                        time:   [37.611 ms 37.643 ms 37.676 ms]
+                        change: [-38.618% -38.549% -38.485%] (p = 0.00 < 0.05)
+                        Performance has improved.
+Found 1 outliers among 100 measurements (1.00%)
   1 (1.00%) high mild
 
 
