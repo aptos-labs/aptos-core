@@ -197,12 +197,14 @@ impl<E: Pairing> PublicParameters<E> {
         max_aggregation: usize,
         extra_bits: u64,
     ) -> HashMap<<E::G1 as ark_ec::CurveGroup>::Affine, u64> {
-        let table_size = extra_bits + ((ell as u64 + log2(max_aggregation) as u64) / 2);
+        let table_size_exp = extra_bits + ((ell as u64 + log2(max_aggregation) as u64) / 2);
         eprintln!(
             "[build_dlog_table] table_size = {} (ell={}, max_aggregation={}, extra_bits={})",
-            table_size, ell, max_aggregation, extra_bits
+            table_size_exp, ell, max_aggregation, extra_bits
         );
-        dlog::table::build::<E::G1>(G, table_size)
+        let table = dlog::table::build::<E::G1>(G, 1u64 << table_size_exp);
+        eprintln!("[build_dlog_table] table.len() = {}", table.len());
+        table
     }
 
     pub(crate) fn get_dlog_range_bound(&self) -> u64 {
@@ -321,7 +323,7 @@ impl<E: Pairing> ValidCryptoMaterial for PublicParameters<E> {
     }
 }
 
-pub const DEFAULT_ELL_FOR_TESTING: u8 = 32; // TODO: made this a const to emphasize that the parameter is completely fixed wherever this value used (namely below), might not be ideal
+pub const DEFAULT_ELL_FOR_TESTING: u8 = 16; // TODO: made this a const to emphasize that the parameter is completely fixed wherever this value used (namely below), might not be ideal
 
 impl<E: Pairing> Default for PublicParameters<E> {
     // This is only used for testing and benchmarking
