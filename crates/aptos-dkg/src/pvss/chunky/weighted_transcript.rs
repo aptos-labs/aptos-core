@@ -374,7 +374,7 @@ impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>>
             },
         );
         let sok_msm_terms =
-            hom.msm_terms_for_verify(&sok_statement, &self.sharing_proof.SoK, &sok_cntxt);
+            hom.msm_terms_for_verify(&sok_statement, &self.sharing_proof.SoK, &sok_cntxt)?;
 
         // Final step: Combine the MSM terms and check the multi-pairing
         let (_, powers_of_gamma) = sample_field_element_with_powers::<E::ScalarField, _>(3, rng);

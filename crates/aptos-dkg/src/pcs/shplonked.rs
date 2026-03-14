@@ -896,7 +896,7 @@ pub fn batch_pairing_for_verify_generalized<
         &prover_commitment.0,
         &sigma_proof.z,
         c_sigma,
-    );
+    )?;
     let hom1_merged = msm::merge_msm_inputs(&hom1_msm_terms, rng)?;
     // C_eval = C_eval_hid + g_rev·τ_0 for the batch pairing check.
     let c_eval = (c_eval_hid.into_group() + srs.taus_1[0].into_group() * g_rev_at_x).into_affine();

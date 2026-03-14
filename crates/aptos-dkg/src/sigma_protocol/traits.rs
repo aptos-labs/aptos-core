@@ -205,8 +205,11 @@ pub trait CurveGroupTrait:
         prover_first_message: &Self::CodomainNormalized,
         prover_response: &Self::Domain,
         challenge: <Self::Group as PrimeGroup>::ScalarField,
-    ) -> Vec<MsmInput<<Self::Group as CurveGroup>::Affine, <Self::Group as PrimeGroup>::ScalarField>>
-    {
+    ) -> Result<
+        Vec<
+            MsmInput<<Self::Group as CurveGroup>::Affine, <Self::Group as PrimeGroup>::ScalarField>,
+        >,
+    > {
         let msm_terms_for_prover_response = self.msm_terms(&prover_response);
 
         let minus_one = -<Self::Group as PrimeGroup>::ScalarField::ONE;
@@ -223,11 +226,11 @@ pub trait CurveGroupTrait:
                 let mut scalars = term.scalars().to_vec();
                 scalars.push(minus_one);
                 scalars.push(minus_challenge);
-                MsmInput::new(bases, scalars).expect("sigma protocol MSM term")
+                MsmInput::new(bases, scalars)
             })
-            .collect();
+            .collect::<Result<Vec<_>, _>>()?;
 
-        msm_terms
+        Ok(msm_terms)
     }
 
     /// Returns the MSM terms that `verify()` needs, computing the Fiat–Shamir challenge
@@ -246,7 +249,11 @@ pub trait CurveGroupTrait:
         public_statement: &Self::CodomainNormalized,
         proof: &Proof<<Self::Group as PrimeGroup>::ScalarField, H2>,
         cntxt: &Ct,
-    ) -> Vec<MsmInput<<Self::Group as CurveGroup>::Affine, <Self::Group as PrimeGroup>::ScalarField>>
+    ) -> Result<
+        Vec<
+            MsmInput<<Self::Group as CurveGroup>::Affine, <Self::Group as PrimeGroup>::ScalarField>,
+        >,
+    >
     where
         H2: homomorphism::Trait<
             Domain = Self::Domain,
@@ -291,7 +298,7 @@ impl<T: CurveGroupTrait> Trait for T {
             prover_commitment,
             response,
             challenge,
-        );
+        )?;
         let merged = merge_msm_inputs(&msm_terms, rng)?;
         self.check_msm_eval_zero(merged)?;
         Ok(())

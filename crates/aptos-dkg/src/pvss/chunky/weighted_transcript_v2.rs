@@ -369,7 +369,7 @@ impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>>
             &prover_first_message.0,
             &self.sharing_proof.SoK.z,
             c,
-        );
+        )?;
         let first_merged = msm::merge_msm_inputs::<E::G1Affine, _>(&first_msm_terms, rng)?;
         hom.hom1.check_msm_eval_zero(first_merged)?;
 
@@ -378,7 +378,7 @@ impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>>
             &prover_first_message.1,
             &self.sharing_proof.SoK.z,
             c,
-        );
+        )?;
         let second_merged = msm::merge_msm_inputs::<E::G2Affine, _>(&second_msm_terms, rng)?;
         let beta = sample_field_element(rng);
         let g2_inputs = vec![second_merged, ldt_msm_terms];

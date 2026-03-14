@@ -80,7 +80,6 @@ pub struct PublicParameters<E: Pairing> {
 
 impl<E: Pairing> Clone for PublicParameters<E> {
     fn clone(&self) -> Self {
-        let g: E::G1 = self.pp_elgamal.G.into();
         Self {
             max_num_shares: self.max_num_shares,
             pp_elgamal: self.pp_elgamal.clone(),
@@ -89,12 +88,7 @@ impl<E: Pairing> Clone for PublicParameters<E> {
             ell: self.ell,
             max_aggregation: self.max_aggregation,
             dlog_extra_bits: self.dlog_extra_bits,
-            dlog_table: Self::build_dlog_table(
-                g,
-                self.ell,
-                self.max_aggregation,
-                self.dlog_extra_bits,
-            ),
+            dlog_table: self.dlog_table.clone(),
             G2_table: BatchMulPreprocessing::new(self.G_2.into(), self.max_num_shares as usize), // Recreate table because it doesn't allow for Copy/Clone? TODO: Fix this
             powers_of_radix: compute_powers_of_radix::<E>(self.ell),
         }
