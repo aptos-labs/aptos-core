@@ -203,10 +203,12 @@ impl<E: Pairing> PublicParameters<E> {
         max_aggregation: usize,
         extra_bits: u64,
     ) -> HashMap<<E::G1 as ark_ec::CurveGroup>::Affine, u64> {
-        dlog::table::build::<E::G1>(
-            G,
-            1u64 << (extra_bits + ((ell as u64 + log2(max_aggregation) as u64) / 2)),
-        )
+        let table_size = extra_bits + ((ell as u64 + log2(max_aggregation) as u64) / 2);
+        eprintln!(
+            "[build_dlog_table] table_size = {} (ell={}, max_aggregation={}, extra_bits={})",
+            table_size, ell, max_aggregation, extra_bits
+        );
+        dlog::table::build::<E::G1>(G, table_size)
     }
 
     pub(crate) fn get_dlog_range_bound(&self) -> u64 {

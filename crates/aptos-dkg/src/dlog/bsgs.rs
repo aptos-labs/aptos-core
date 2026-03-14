@@ -5,46 +5,20 @@
 //!
 //! We recover x such that H = x*G, with 0 <= x < range_limit. The baby-step table holds
 //! compressed points j*G for j in [0, m). The giant-step loop computes H - i*m*G for i in [0, n),
-//! serializes each point, and looks it up in the baby table; a match gives x = i*m + j.
-//! Here n = ceil(range_limit / m). Tuning m ≈ sqrt(range_limit) is common in the literature as it
-//! balances time and memory, but we leave it as a parameter to the algorithm.
-//!
-//! We use a batch size for serialization in the giant-step loop. This is a trade-off between
-//! the overhead of serializing each point and looking it up in the table, and doing this in a batch
-//! with `normalize_batch` but potentially going on for too long. We use a default batch size of 2048,
-//! but this can be tuned via benchmarks.
-//!
-//! We use a threshold for the batch size below which we use the original one-at-a-time algorithm
-//! (serialize each projective point without batch normalizing). Above it we use batch normalize + serialize.
-//! This threshold is also the result of benchmarks.
+//! normalises, and looks up in the baby table; a match gives x = i*m + j.
+//! Here n = ceil(range_limit / m). (The literature sometimes recommends m ≈ sqrt(range_limit), but this
+//! is for one-off calculations; we use a fixed table size.)
 
 use ark_ec::CurveGroup;
 use std::collections::HashMap;
 
-/// Default batch size for serialization in the giant-step loop.
-/// Benchmarks can be used to tune this (see `benches/bsgs.rs`, `dlog_bsgs_*_batch_size`).
-pub const DEFAULT_BSGS_SERIALIZATION_BATCH_SIZE: usize = 1; // 2048;
+/// Default batch size for the batched rolling algorithm (Algorithm 2).
+pub const DEFAULT_BSGS_SERIALIZATION_BATCH_SIZE: usize = 2048;
 
-/// Below this batch size we use the original one-at-a-time algorithm (serialize each
-/// projective point without batch normalizing), because it would be slower not to. Above it we use batch
-/// normalize + serialize. Tune via benchmarks; small batches (2–8) are often slower than 1 due to some
-/// kind of `normalize_batch` overhead.
-pub const BSGS_BATCH_NORMALIZE_THRESHOLD: usize = 1; // 4;
+/// Below this batch size we avoid batch normalisation in the batched algorithms (overhead dominates).
+pub const BSGS_BATCH_NORMALIZE_THRESHOLD: usize = 4;
 
-/// Minimum number of targets for which `dlog_vec` uses the batched-across-targets path.
-/// Below this, per-target `dlog` is used (slightly faster for 1–3 targets).
-pub const BSGS_VEC_BATCHED_MIN_TARGETS: usize = 1; //4;
-
-/// Compute discrete log using baby-step giant-step with a precomputed table.
-/// Uses batched serialization in the giant-step loop; see `dlog_with_batch_size` to tune.
-///
-/// # Arguments
-/// - `G`: base of the exponentiation
-/// - `H`: target point
-/// - `baby_table`: precomputed HashMap from `C::Affine` |---> exponent
-/// - `range_limit`: maximum size of the exponent we're trying to obtain. TODO: Change to u64?
-//
-// TODO:: ensure that G is also the element used to build the baby_table? So turn baby_table into a struct?
+/// Basic BSGS: one giant-step at a time. Recovers x with H = x*G, 0 <= x < range_limit.
 #[allow(non_snake_case)]
 pub fn dlog<C: CurveGroup>(
     G: C,
@@ -52,79 +26,24 @@ pub fn dlog<C: CurveGroup>(
     baby_table: &HashMap<C::Affine, u64>,
     range_limit: u64,
 ) -> Option<u64> {
-    dlog_with_batch_size(
-        G,
-        H,
-        baby_table,
-        range_limit,
-        DEFAULT_BSGS_SERIALIZATION_BATCH_SIZE,
-    )
-}
-
-/// Same as `dlog` but with configurable serialization batch size for the giant-step loop.
-/// If `batch_size` is below `BSGS_BATCH_NORMALIZE_THRESHOLD`, the original one-at-a-time
-/// algorithm is used (no batch normalize). Otherwise we use batch normalize + serialize.
-#[allow(non_snake_case)]
-pub fn dlog_with_batch_size<C: CurveGroup>(
-    G: C,
-    H: C,
-    baby_table: &HashMap<C::Affine, u64>,
-    range_limit: u64,
-    batch_size: usize,
-) -> Option<u64> {
-    // Baby-step table size m; giant-step count n = ceil(range_limit / m).
     let m = baby_table
         .len()
         .try_into()
         .expect("Table seems rather large");
     let n = range_limit.div_ceil(m);
-
-    // Precompute -m*G so each giant step is one addition: gamma += G_neg_m.
     let G_neg_m = G * -C::ScalarField::from(m);
-
-    let batch_size = batch_size.max(1);
-
-    if batch_size < BSGS_BATCH_NORMALIZE_THRESHOLD {
-        // One-at-a-time path: normalize each point and look up by Affine
-        let mut gamma = H;
-        for i in 0..n {
-            let affs = C::normalize_batch(&[gamma]);
-            if let Some(&j) = baby_table.get(&affs[0]) {
-                return Some(i * m + j);
-            }
-            gamma += G_neg_m;
+    let mut gamma = H;
+    for i in 0..n {
+        let aff = gamma.into_affine();
+        if let Some(&j) = baby_table.get(&aff) {
+            return Some(i * m + j);
         }
-        return None;
+        gamma += G_neg_m;
     }
-
-    // Batched path: build batch, normalize_batch, then look up each by Affine (no serialization)
-    let mut batch = Vec::with_capacity(batch_size);
-
-    for chunk_start in (0..n).step_by(batch_size) {
-        let actual_batch = (n - chunk_start).min(batch_size as u64) as usize;
-
-        // Giant steps for this chunk: gamma = H - (chunk_start + j)*m*G for j = 0..actual_batch
-        batch.clear();
-        let mut gamma = H + G_neg_m * C::ScalarField::from(chunk_start);
-        for _ in 0..actual_batch {
-            batch.push(gamma);
-            gamma += G_neg_m;
-        }
-
-        let normalized = C::normalize_batch(&batch);
-        for (j, aff) in normalized.iter().enumerate() {
-            if let Some(&baby_j) = baby_table.get(aff) {
-                return Some((chunk_start + j as u64) * m + baby_j);
-            }
-        }
-    }
-
     None
 }
 
-/// Compute discrete logs for multiple targets. Uses batched-across-targets when
-/// `H_vec.len() >= BSGS_VEC_BATCHED_MIN_TARGETS` (fewer normalize_batch calls); otherwise
-/// one `dlog` per target (lower overhead for 1–3 targets).
+/// Discrete logs for multiple targets by calling `dlog` on each entry.
 #[allow(non_snake_case)]
 pub fn dlog_vec<C: CurveGroup>(
     G: C,
@@ -132,23 +51,16 @@ pub fn dlog_vec<C: CurveGroup>(
     baby_table: &HashMap<C::Affine, u64>,
     range_limit: u64,
 ) -> Option<Vec<u64>> {
-    if H_vec.len() >= BSGS_VEC_BATCHED_MIN_TARGETS {
-        return dlog_vec_batched(G, H_vec, baby_table, range_limit);
-    }
-
     let mut result = Vec::with_capacity(H_vec.len());
     for H in H_vec {
-        if let Some(x) = dlog(G, *H, baby_table, range_limit) {
-            result.push(x);
-        } else {
-            return None; // fail early if any element cannot be solved
-        }
+        result.push(dlog(G, *H, baby_table, range_limit)?);
     }
     Some(result)
 }
 
-/// Same as `dlog_vec` but batches across targets: for each chunk of giant steps we compute
-/// points for all targets, call `normalize_batch` once, then lookup by Affine (no serialization).
+/// Batches only per target: for each H in H_vec runs the rolling Algorithm 2 with default
+/// batch size (i.e. calls `dlog_vec_batched_rolling_with_batch_size` on a single-element slice).
+/// Does not batch across targets.
 #[allow(non_snake_case)]
 pub fn dlog_vec_batched<C: CurveGroup>(
     G: C,
@@ -156,95 +68,30 @@ pub fn dlog_vec_batched<C: CurveGroup>(
     baby_table: &HashMap<C::Affine, u64>,
     range_limit: u64,
 ) -> Option<Vec<u64>> {
-    dlog_vec_batched_with_batch_size(
-        G,
-        H_vec,
-        baby_table,
-        range_limit,
-        DEFAULT_BSGS_SERIALIZATION_BATCH_SIZE,
-    )
+    let mut result = Vec::with_capacity(H_vec.len());
+    for H in H_vec {
+        let single = dlog_vec_batched_rolling_with_batch_size(
+            G,
+            std::slice::from_ref(H),
+            baby_table,
+            range_limit,
+            DEFAULT_BSGS_SERIALIZATION_BATCH_SIZE,
+        )?;
+        result.push(
+            single
+                .into_iter()
+                .next()
+                .expect("single target yields one result"),
+        );
+    }
+    Some(result)
 }
 
-/// Batched-across-targets dlog with configurable giant-step batch size.
-///
-/// For each chunk of giant steps we build one batch containing points for all targets
-/// (layout: target 0's points, then target 1's, …), call `normalize_batch` once, then
-/// serialize and lookup. This yields ceil(n / batch_size) normalize_batch calls instead of
-/// v * ceil(n / batch_size) when calling `dlog` per target.
-#[allow(non_snake_case)]
-pub fn dlog_vec_batched_with_batch_size<C: CurveGroup>(
-    G: C,
-    H_vec: &[C],
-    baby_table: &HashMap<C::Affine, u64>,
-    range_limit: u64,
-    batch_size: usize,
-) -> Option<Vec<u64>> {
-    if H_vec.is_empty() {
-        return Some(vec![]);
-    }
-
-    let m = baby_table
-        .len()
-        .try_into()
-        .expect("Table seems rather large");
-    let n = range_limit.div_ceil(m);
-    let G_neg_m = G * -C::ScalarField::from(m); // I guess we could pre-compute this? and put it in a struct?
-    let batch_size = batch_size.max(1).max(BSGS_BATCH_NORMALIZE_THRESHOLD);
-    let v = H_vec.len();
-
-    let mut result: Vec<Option<u64>> = vec![None; v];
-    let mut unsolved = Vec::with_capacity(v);
-    let mut batch = Vec::<C>::new();
-
-    for chunk_start in (0..n).step_by(batch_size) {
-        unsolved.clear();
-        for i in 0..v {
-            if result[i].is_none() {
-                unsolved.push(i);
-            }
-        }
-        if unsolved.is_empty() {
-            break;
-        }
-
-        let actual_batch = (n - chunk_start).min(batch_size as u64) as usize;
-        batch.clear();
-        batch.reserve(unsolved.len() * actual_batch);
-
-        // Append giant-step points only for unsolved targets (target 0, then 1, … within unsolved).
-        for &target_idx in &unsolved {
-            let H = H_vec[target_idx];
-            let mut gamma = H + G_neg_m * C::ScalarField::from(chunk_start);
-            for _ in 0..actual_batch {
-                batch.push(gamma);
-                gamma += G_neg_m;
-            }
-        }
-
-        let normalized = C::normalize_batch(&batch);
-        // normalized[idx] corresponds to unsolved target (idx / actual_batch), step (idx % actual_batch)
-        for j in 0..actual_batch {
-            for (batch_idx, &result_idx) in unsolved.iter().enumerate() {
-                if result[result_idx].is_some() {
-                    continue;
-                }
-                let idx = batch_idx * actual_batch + j;
-                if let Some(&baby_j) = baby_table.get(&normalized[idx]) {
-                    result[result_idx] = Some((chunk_start + j as u64) * m + baby_j);
-                }
-            }
-            if unsolved.iter().all(|&r| result[r].is_some()) {
-                break;
-            }
-        }
-    }
-
-    result.into_iter().collect()
-}
-
-/// Same as `dlog_vec_batched_with_batch_size` but maintains rolling gamma state per target:
-/// gamma_t is initialized to H_t and updated incrementally each chunk (no recomputation of
-/// H + G_neg_m * chunk_start). Uses batch capacity `unsolved.len() * actual_batch` per chunk.
+/// Rolling BSGS with batching across all targets and configurable batch size.
+/// For each chunk of giant steps, builds one batch containing points for all (unsolved) targets,
+/// then one batch normalise and lookup. For k = 0, b, 2b, …: B has γ per target and step, γ -= m*G;
+/// if B[j] is in the baby table for some target, return (k+j)*m + baby_j. Contrast with
+/// `dlog_vec_batched`, which runs this per target only (no cross-target batching).
 #[allow(non_snake_case)]
 pub fn dlog_vec_batched_rolling_with_batch_size<C: CurveGroup>(
     G: C,
@@ -333,97 +180,6 @@ pub fn dlog_vec_batched_rolling<C: CurveGroup>(
     )
 }
 
-/// Batched dlog variant that iterates giant-step offset S = i*m*G first, then over targets.
-/// For each chunk: S = (chunk_start * m)*G, step = m*G; for j in 0..actual_batch, push H_t - S
-/// for each unsolved target t, then S += step. One normalize_batch per chunk, then lookup.
-#[allow(non_snake_case)]
-pub fn dlog_vec_batched_stepped_with_batch_size<C: CurveGroup>(
-    G: C,
-    H_vec: &[C],
-    baby_table: &HashMap<C::Affine, u64>,
-    range_limit: u64,
-    batch_size: usize,
-) -> Option<Vec<u64>> {
-    if H_vec.is_empty() {
-        return Some(vec![]);
-    }
-
-    let m = baby_table
-        .len()
-        .try_into()
-        .expect("Table seems rather large");
-    let n = range_limit.div_ceil(m);
-    let step = G * C::ScalarField::from(m);
-    let batch_size = batch_size.max(1).max(BSGS_BATCH_NORMALIZE_THRESHOLD);
-    let v = H_vec.len();
-
-    let mut result: Vec<Option<u64>> = vec![None; v];
-    let mut unsolved = Vec::with_capacity(v);
-    let mut batch = Vec::<C>::new();
-
-    for chunk_start in (0..n).step_by(batch_size) {
-        unsolved.clear();
-        for i in 0..v {
-            if result[i].is_none() {
-                unsolved.push(i);
-            }
-        }
-        if unsolved.is_empty() {
-            break;
-        }
-
-        let actual_batch = (n - chunk_start).min(batch_size as u64) as usize;
-        batch.clear();
-        batch.reserve(unsolved.len() * actual_batch);
-
-        // S_i = (chunk_start + j) * m * G; start at S = chunk_start * m * G
-        let mut S = G * (C::ScalarField::from(m) * C::ScalarField::from(chunk_start));
-
-        for _ in 0..actual_batch {
-            for &t in &unsolved {
-                batch.push(H_vec[t] - S);
-            }
-            S += step;
-        }
-
-        let normalized = C::normalize_batch(&batch);
-        // Layout: for each j, then each unsolved t => idx = j * unsolved.len() + t_idx
-        for j in 0..actual_batch {
-            for (t_idx, &result_idx) in unsolved.iter().enumerate() {
-                if result[result_idx].is_some() {
-                    continue;
-                }
-                let idx = j * unsolved.len() + t_idx;
-                if let Some(&baby_j) = baby_table.get(&normalized[idx]) {
-                    result[result_idx] = Some((chunk_start + j as u64) * m + baby_j);
-                }
-            }
-            if unsolved.iter().all(|&r| result[r].is_some()) {
-                break;
-            }
-        }
-    }
-
-    result.into_iter().collect()
-}
-
-/// Batched stepped variant (default batch size).
-#[allow(non_snake_case)]
-pub fn dlog_vec_batched_stepped<C: CurveGroup>(
-    G: C,
-    H_vec: &[C],
-    baby_table: &HashMap<C::Affine, u64>,
-    range_limit: u64,
-) -> Option<Vec<u64>> {
-    dlog_vec_batched_stepped_with_batch_size(
-        G,
-        H_vec,
-        baby_table,
-        range_limit,
-        DEFAULT_BSGS_SERIALIZATION_BATCH_SIZE,
-    )
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -451,8 +207,7 @@ mod tests {
         }
     }
 
-    /// dlog_vec and dlog_vec_batched must agree for 1, 4, and 16 targets (covers both
-    /// the per-target and batched paths in dlog_vec).
+    /// dlog_vec and dlog_vec_batched must agree.
     #[allow(non_snake_case)]
     #[test]
     fn test_dlog_vec_batched_matches_dlog_vec() {
@@ -477,55 +232,36 @@ mod tests {
         }
     }
 
-    /// Rolling gamma variant must match dlog_vec_batched.
+    /// dlog_vec_batched_rolling_with_batch_size must match dlog_vec for various batch sizes.
     #[allow(non_snake_case)]
     #[test]
-    fn test_dlog_vec_batched_rolling_matches_batched() {
+    fn test_dlog_vec_batched_rolling_with_batch_size_matches() {
         let G = G1Projective::generator();
         let range_limit = 1 << 12;
         let baby_table = dlog::table::build::<G1Projective>(G, 1 << 6);
 
-        for num_targets in [1, 4, 8, 16] {
+        for num_targets in [1, 4, 8] {
             let xs: Vec<u64> = (0..num_targets)
                 .map(|i| (i as u64) * 17 % range_limit)
                 .collect();
             let Hs: Vec<G1Projective> = xs.iter().map(|&x| G * ark_bn254::Fr::from(x)).collect();
 
-            let batched = dlog_vec_batched(G, &Hs, &baby_table, range_limit)
-                .expect("dlog_vec_batched failed");
-            let rolling = dlog_vec_batched_rolling(G, &Hs, &baby_table, range_limit)
-                .expect("dlog_vec_batched_rolling failed");
-            assert_eq!(
-                batched, rolling,
-                "dlog_vec_batched vs dlog_vec_batched_rolling for num_targets={}",
-                num_targets
-            );
-        }
-    }
-
-    /// Stepped (S-first) batched variant must match dlog_vec_batched.
-    #[allow(non_snake_case)]
-    #[test]
-    fn test_dlog_vec_batched_stepped_matches_batched() {
-        let G = G1Projective::generator();
-        let range_limit = 1 << 12;
-        let baby_table = dlog::table::build::<G1Projective>(G, 1 << 6);
-
-        for num_targets in [1, 4, 8, 16] {
-            let xs: Vec<u64> = (0..num_targets)
-                .map(|i| (i as u64) * 17 % range_limit)
-                .collect();
-            let Hs: Vec<G1Projective> = xs.iter().map(|&x| G * ark_bn254::Fr::from(x)).collect();
-
-            let batched = dlog_vec_batched(G, &Hs, &baby_table, range_limit)
-                .expect("dlog_vec_batched failed");
-            let stepped = dlog_vec_batched_stepped(G, &Hs, &baby_table, range_limit)
-                .expect("dlog_vec_batched_stepped failed");
-            assert_eq!(
-                batched, stepped,
-                "dlog_vec_batched vs dlog_vec_batched_stepped for num_targets={}",
-                num_targets
-            );
+            let expected = dlog_vec(G, &Hs, &baby_table, range_limit).expect("dlog_vec failed");
+            for &batch_size in &[8, 64, 256, 2048] {
+                let rolling = dlog_vec_batched_rolling_with_batch_size(
+                    G,
+                    &Hs,
+                    &baby_table,
+                    range_limit,
+                    batch_size,
+                )
+                .expect("dlog_vec_batched_rolling_with_batch_size failed");
+                assert_eq!(
+                    expected, rolling,
+                    "rolling_with_batch_size({}) for num_targets={}",
+                    batch_size, num_targets
+                );
+            }
         }
     }
 }

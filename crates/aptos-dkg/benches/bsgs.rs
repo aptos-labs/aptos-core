@@ -6,8 +6,8 @@ use ark_ec::{pairing::Pairing, PrimeGroup};
 use criterion::{criterion_group, criterion_main, BenchmarkId, Criterion};
 use rand::{rngs::StdRng, Rng, SeedableRng};
 
-/// Benchmark for small range_limit / table_size: dlog per element, batched, and batched_rolling
-/// for various batch sizes. Two configs: len=8 (range_limit=32, table_size=20) and len=7 (range_limit=37, table_size=25).
+/// Benchmark: dlog, dlog_vec, dlog_vec_batched, and dlog_vec_batched_rolling_with_batch_size
+/// for various batch sizes. Two configs: len=8 and len=7 targets.
 #[allow(non_snake_case)]
 fn bench_dlog_vec_small_range<E: Pairing>(c: &mut Criterion, curve_name: &str) {
     let batch_sizes: &[usize] = &[1, 8, 32, 128, 512, 1024, 2048];
@@ -60,72 +60,31 @@ fn bench_dlog_vec_small_range<E: Pairing>(c: &mut Criterion, curve_name: &str) {
             });
         });
 
+        // dlog_vec: dlog per entry
+        group.bench_with_input(BenchmarkId::new("dlog_vec", ""), &(), |b, _| {
+            b.iter(|| {
+                let recovered = bsgs::dlog_vec(G, &Hs, &baby_table, range_limit)
+                    .expect("Discrete log not found");
+                assert_eq!(recovered, xs);
+            });
+        });
+
+        // dlog_vec_batched: rolling Algorithm 2 with default batch size
+        group.bench_with_input(BenchmarkId::new("dlog_vec_batched", ""), &(), |b, _| {
+            b.iter(|| {
+                let recovered = bsgs::dlog_vec_batched(G, &Hs, &baby_table, range_limit)
+                    .expect("Discrete log not found");
+                assert_eq!(recovered, xs);
+            });
+        });
+
         for &batch_size in batch_sizes {
-            group.bench_with_input(
-                BenchmarkId::new("dlog_with_batch_size_per_elt", batch_size),
-                &batch_size,
-                |b, &batch_size| {
-                    b.iter(|| {
-                        let recovered: Vec<u64> = Hs
-                            .iter()
-                            .map(|H| {
-                                bsgs::dlog_with_batch_size(
-                                    G,
-                                    *H,
-                                    &baby_table,
-                                    range_limit,
-                                    batch_size,
-                                )
-                                .expect("Discrete log not found")
-                            })
-                            .collect();
-                        assert_eq!(recovered, xs);
-                    });
-                },
-            );
-
-            group.bench_with_input(
-                BenchmarkId::new("dlog_vec_batched_with_batch_size", batch_size),
-                &batch_size,
-                |b, &batch_size| {
-                    b.iter(|| {
-                        let recovered = bsgs::dlog_vec_batched_with_batch_size(
-                            G,
-                            &Hs,
-                            &baby_table,
-                            range_limit,
-                            batch_size,
-                        )
-                        .expect("Discrete log not found");
-                        assert_eq!(recovered, xs);
-                    });
-                },
-            );
-
             group.bench_with_input(
                 BenchmarkId::new("dlog_vec_batched_rolling_with_batch_size", batch_size),
                 &batch_size,
                 |b, &batch_size| {
                     b.iter(|| {
                         let recovered = bsgs::dlog_vec_batched_rolling_with_batch_size(
-                            G,
-                            &Hs,
-                            &baby_table,
-                            range_limit,
-                            batch_size,
-                        )
-                        .expect("Discrete log not found");
-                        assert_eq!(recovered, xs);
-                    });
-                },
-            );
-
-            group.bench_with_input(
-                BenchmarkId::new("dlog_vec_batched_stepped_with_batch_size", batch_size),
-                &batch_size,
-                |b, &batch_size| {
-                    b.iter(|| {
-                        let recovered = bsgs::dlog_vec_batched_stepped_with_batch_size(
                             G,
                             &Hs,
                             &baby_table,

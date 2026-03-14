@@ -37,8 +37,8 @@ where
 }
 
 // When we know that the two homomorphisms are both going to be `FixedBaseMsms` with the same curve group,
-// we can perform certain optimizations in the verifier of the sigma protocol; hence we set up a separate
-// struct for this case
+// we can perform certain optimizations in the verifier of the sigma protocol by exploiting the group; hence
+// we set up a separate struct for this case.
 #[derive(CanonicalSerialize, Debug, Clone, PartialEq, Eq)]
 pub struct CurveGroupTupleHomomorphism<C, H1, H2>
 where
@@ -51,7 +51,7 @@ where
     pub _group: std::marker::PhantomData<C>,
 }
 
-/// Shared logic for tuple homomorphisms: apply both components and normalize.
+/// Shared logic for the two tuple homomorphism structs: apply both components and normalize.
 fn tuple_apply<H1, H2>(
     hom1: &H1,
     hom2: &H2,
