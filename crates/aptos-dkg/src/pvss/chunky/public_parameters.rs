@@ -34,7 +34,7 @@ const DST: &[u8] = b"APTOS_CHUNKED_ELGAMAL_FIELD_PVSS_DST"; // This DST will be 
 
 /// Default extra bits for the dlog table when deserializing legacy PublicParameters that did not store this field.
 fn default_dlog_extra_bits() -> u64 {
-    4
+    5
 }
 
 fn compute_powers_of_radix<E: Pairing>(ell: u8) -> Vec<E::ScalarField> {
@@ -203,7 +203,7 @@ impl<E: Pairing> PublicParameters<E> {
             table_size_exp, ell, max_aggregation, extra_bits
         );
         let tbl = dlog::table::BabyStepTable::new(G.into_affine(), (1u64 << table_size_exp) as u32);
-        eprintln!("[build_dlog_table] table.len() = {}", tbl.table.len());
+        eprintln!("[build_dlog_table] table_size = {}", tbl.table_size);
         tbl
     }
 

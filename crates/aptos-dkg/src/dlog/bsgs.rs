@@ -25,7 +25,7 @@ pub fn dlog<C: CurveGroup>(tbl: &BabyStepTable<C::Affine>, H: C, range_limit: u6
     let mut gamma = H;
     for i in 0..n {
         let aff = gamma.into_affine();
-        if let Some(&j) = tbl.table.get(&aff) {
+        if let Some(j) = tbl.get(&aff) {
             return Some(i * tbl.table_size as u64 + j as u64);
         }
         gamma += C::from(tbl.G_neg_table_size);
@@ -72,7 +72,7 @@ fn dlog_batched_rolling_single<C: CurveGroup>(
 
         let normalized = C::normalize_batch(&batch);
         for j in 0..actual_batch {
-            if let Some(&baby_j) = tbl.table.get(&normalized[j]) {
+            if let Some(baby_j) = tbl.get(&normalized[j]) {
                 return Some((chunk_start + j as u64) * tbl.table_size as u64 + baby_j as u64);
             }
         }
@@ -151,7 +151,7 @@ pub fn dlog_vec_batched_rolling_with_batch_size<C: CurveGroup>(
             }
             for j in 0..actual_batch {
                 let idx = batch_idx * actual_batch + j;
-                if let Some(&baby_j) = tbl.table.get(&normalized[idx]) {
+                if let Some(baby_j) = tbl.get(&normalized[idx]) {
                     result[result_idx] =
                         Some((chunk_start + j as u64) * tbl.table_size as u64 + baby_j as u64);
                     break;

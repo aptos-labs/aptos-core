@@ -14,14 +14,14 @@ fn configs() -> &'static [(usize, u64, u64)] {
     &[
         //        (8, 1 << 32, 1 << 25),
         //        (8, 1 << 32, 1 << 25),
-        (8, 1 << 39, 1 << 23),
+        (8, 1 << 39, 1 << 24),
         (8, 1 << 39, 1 << 25),
         (7, 1 << 44, 1 << 25),
     ]
 }
 
 fn batch_sizes() -> &'static [usize] {
-    &[256, 512, 1024, 2048] // 512, 768, 1024, 2048, 4096, 8192] // &[1, 8, 32, 128, 256, 512, 1024, 2048, 4096, 8192]
+    &[64, 128, 256, 512, 1024, 2048] // 512, 768, 1024, 2048, 4096, 8192] // &[1, 8, 32, 128, 256, 512, 1024, 2048, 4096, 8192]
 }
 
 #[allow(non_snake_case)]
@@ -29,7 +29,7 @@ fn bench_dlog_comparison<E: Pairing>(c: &mut Criterion, curve_name: &str) {
     let mut rng = StdRng::seed_from_u64(42);
     let G = E::G1::generator();
 
-    for &(vec_len, range_limit, table_size) in configs::<E>() {
+    for &(vec_len, range_limit, table_size) in configs() {
         let group_name = format!(
             "dlog_bsgs_{}_len{}_range2^{}_table2^{}",
             curve_name,
@@ -126,7 +126,7 @@ fn bench_table_build<E: Pairing>(c: &mut Criterion, curve_name: &str) {
             |b, &table_size| {
                 b.iter(|| {
                     let t = table::BabyStepTable::new(G.into_affine(), table_size as u32);
-                    assert_eq!(t.table.len(), table_size as usize);
+                    assert_eq!(t.table_size as usize, table_size as usize);
                 });
             },
         );
