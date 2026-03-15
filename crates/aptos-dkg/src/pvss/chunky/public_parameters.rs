@@ -32,10 +32,11 @@ use std::ops::Mul;
 
 const DST: &[u8] = b"APTOS_CHUNKED_ELGAMAL_FIELD_PVSS_DST"; // This DST will be used in setting up a group generator `G_2`, see below
 const DEFAULT_MAX_AGGREGATION: usize = 166;
+const DLOG_EXTRA_BITS: u8 = 4;
 
 /// Default extra bits for the dlog table when deserializing legacy PublicParameters that did not store this field.
-fn default_dlog_extra_bits() -> u64 {
-    4
+fn default_dlog_extra_bits() -> u8 {
+    DLOG_EXTRA_BITS
 }
 
 fn compute_powers_of_radix<E: Pairing>(ell: u8) -> Vec<E::ScalarField> {
@@ -67,7 +68,7 @@ pub struct PublicParameters<E: Pairing> {
 
     /// Extra bits for the dlog baby-step table size. Must be serialized so clone/deserialize rebuild the same table.
     #[serde(default = "default_dlog_extra_bits")]
-    pub dlog_extra_bits: u64,
+    pub dlog_extra_bits: u8,
 
     #[serde(skip)]
     pub dlog_table: BabyStepTable<E::G1Affine>,
@@ -152,7 +153,7 @@ impl<'de, E: Pairing> Deserialize<'de> for PublicParameters<E> {
             max_num_shares: u32,
             max_aggregation: usize,
             #[serde(default = "default_dlog_extra_bits")]
-            dlog_extra_bits: u64,
+            dlog_extra_bits: u8,
         }
 
         let serialized = SerializedFields::<E>::deserialize(deserializer)?;
@@ -196,14 +197,14 @@ impl<E: Pairing> PublicParameters<E> {
         G: E::G1,
         ell: u8,
         max_aggregation: usize,
-        extra_bits: u64,
+        extra_bits: u8,
     ) -> BabyStepTable<E::G1Affine> {
-        let table_size_exp = extra_bits + ((ell as u64 + log2(max_aggregation) as u64) / 2); // TODO: I think we need the floor of log_2 here, not the ceiling?
+        let table_size_exp: u8 = extra_bits + ((ell + log2(max_aggregation) as u8) / 2); // TODO: I think we need the floor of log_2 here, not the ceiling?
         eprintln!(
             "[build_dlog_table] table_size = {} (ell={}, max_aggregation={}, extra_bits={})",
             table_size_exp, ell, max_aggregation, extra_bits
         );
-        let tbl = BabyStepTable::new(G.into_affine(), (1u64 << table_size_exp) as u32);
+        let tbl = BabyStepTable::new(G.into_affine(), 1u32 << table_size_exp);
         eprintln!("[build_dlog_table] table_size = {}", tbl.table_size);
         tbl
     }
@@ -275,7 +276,6 @@ impl<E: Pairing> PublicParameters<E> {
         let pp_elgamal = chunked_elgamal_pp::PublicParameters::new(max_num_shares);
         let G_1 = *pp_elgamal.message_base();
         let G_2 = g2.unwrap_or_else(|| hashing::unsafe_hash_to_affine(b"G_2", DST));
-        const DLOG_EXTRA_BITS: u64 = 0;
         let pp = Self {
             max_num_shares,
             pp_elgamal,
