@@ -119,6 +119,13 @@ impl<'a> ExecutionGuard<'a> {
 // Only private APIs below.
 // ------------------------
 
+impl<'a> ExecutableIdRef<'a> {
+    /// Returns the raw global arena pointer to the allocated data.
+    pub(super) fn as_global_arena_ptr(&self) -> GlobalArenaPtr<ExecutableId> {
+        self.ptr
+    }
+}
+
 /// Identifies an executable (module or script) by its address and name. For
 /// internal usage only.
 ///
@@ -128,8 +135,10 @@ impl<'a> ExecutionGuard<'a> {
 /// pointer to [`ExecutableId`]. No external code or file can construct or
 /// inspect fields directly; access goes through [`ExecutableIdRef`].
 pub(super) struct ExecutableId {
-    address: AccountAddress,
-    name: GlobalArenaPtr<str>,
+    // TODO:
+    //   Consider removing pub(super) and just providing getters.
+    pub(super) address: AccountAddress,
+    pub(super) name: GlobalArenaPtr<str>,
 }
 
 /// Wraps allocated executable ID pointer to implement structural hash and

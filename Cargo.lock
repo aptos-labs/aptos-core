@@ -12630,6 +12630,7 @@ dependencies = [
  "dashmap 7.0.0-rc2",
  "move-core-types",
  "parking_lot 0.12.1",
+ "proptest",
 ]
 
 [[package]]

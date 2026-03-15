@@ -4,5 +4,9 @@
 mod alloc;
 pub use alloc::GlobalArenaPool;
 mod context;
-pub use context::{ExecutableIdRef, ExecutionGuard, GlobalContext, MaintenanceGuard, NameRef};
+pub use context::{
+    ExecutableIdRef, ExecutionGuard, GlobalContext, MaintenanceGuard, NameRef, TypeError,
+    TypeListRef, TypeRef, TypeTreeSize,
+};
 pub mod maintenance_config;
+pub use maintenance_config::{MaintenanceConfig, TypeTreeSizeLimits};

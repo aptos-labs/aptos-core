@@ -18,3 +18,7 @@ dashmap = { workspace = true }
 crossbeam-utils = { workspace = true }
 move-core-types = { workspace = true }
 parking_lot = { workspace = true }
+
+[dev-dependencies]
+proptest = { workspace = true }
+move-core-types = { workspace = true, features = ["fuzzing"] }

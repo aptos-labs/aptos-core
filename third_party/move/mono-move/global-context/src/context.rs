@@ -34,7 +34,7 @@
 
 use crate::{
     alloc::{GlobalArenaPtr, GlobalArenaShard},
-    maintenance_config::MaintenanceConfig,
+    maintenance_config::{MaintenanceConfig, TypeTreeSizeLimits},
     GlobalArenaPool,
 };
 use dashmap::DashMap;
@@ -47,6 +47,9 @@ pub use identifiers::NameRef;
 mod executable_ids;
 pub use executable_ids::ExecutableIdRef;
 use executable_ids::{ExecutableId, ExecutableIdInternerKey};
+mod types;
+use types::{RuntimeTypeInfo, TypeInternerKey, TypeListInternerKey};
+pub use types::{TypeError, TypeListRef, TypeRef, TypeTreeSize};
 
 /// Global execution context with a two-phase state machine.
 ///
@@ -82,6 +85,13 @@ struct Context {
     identifiers: DashMap<IdentifierInternerKey, GlobalArenaPtr<str>, ahash::RandomState>,
     executable_ids:
         DashMap<ExecutableIdInternerKey, GlobalArenaPtr<ExecutableId>, ahash::RandomState>,
+    types: DashMap<TypeInternerKey, GlobalArenaPtr<RuntimeTypeInfo>, ahash::RandomState>,
+    type_lists: DashMap<
+        TypeListInternerKey,
+        GlobalArenaPtr<[GlobalArenaPtr<RuntimeTypeInfo>]>,
+        ahash::RandomState,
+    >,
+    type_tree_size_limits: TypeTreeSizeLimits,
 }
 
 /// RAII guard for the maintenance phase providing exclusive write access.
@@ -155,6 +165,9 @@ impl GlobalContext {
             ctx: Context {
                 identifiers: DashMap::default(),
                 executable_ids: DashMap::default(),
+                types: DashMap::default(),
+                type_lists: DashMap::default(),
+                type_tree_size_limits: maintenance_config.type_tree_size_limits.clone(),
             },
             global_arena: GlobalArenaPool::with_num_arenas(num_workers),
             maintenance_config,
@@ -224,6 +237,16 @@ impl<'a> MaintenanceGuard<'a> {
         self.ctx.executable_ids.len()
     }
 
+    /// Returns the number of entries in interner's map for types.
+    pub fn interned_types_count(&self) -> usize {
+        self.ctx.types.len()
+    }
+
+    /// Returns the number of entries in interner's map for type lists.
+    pub fn interned_type_lists_count(&self) -> usize {
+        self.ctx.type_lists.len()
+    }
+
     /// Resets all caches that store pointers to the arenas, and then resets
     /// the arenas as well.
     pub fn reset_arena_pool(&mut self) {
@@ -267,8 +290,13 @@ impl<'a> MaintenanceGuard<'a> {
         let Context {
             identifiers,
             executable_ids,
+            types,
+            type_lists,
+            type_tree_size_limits: _,
         } = self.ctx;
 
+        type_lists.clear();
+        types.clear();
         executable_ids.clear();
         identifiers.clear();
     }
