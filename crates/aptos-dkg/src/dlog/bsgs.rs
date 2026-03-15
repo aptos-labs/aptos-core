@@ -13,10 +13,10 @@ use super::table::BabyStepTable;
 use ark_ec::CurveGroup;
 
 /// Default batch size for the batched rolling algorithm (Algorithm 2).
-pub const DEFAULT_BSGS_SERIALIZATION_BATCH_SIZE: usize = 2048;
+pub const DEFAULT_BSGS_SERIALIZATION_BATCH_SIZE: usize = 1;
 
 /// Below this batch size we avoid batch normalisation in the batched algorithms (overhead dominates).
-pub const BSGS_BATCH_NORMALIZE_THRESHOLD: usize = 4;
+pub const BSGS_BATCH_NORMALIZE_THRESHOLD: usize = 1;
 
 /// Basic BSGS: one giant-step at a time. Recovers x with H = x*G, 0 <= x < range_limit.
 #[allow(non_snake_case)]

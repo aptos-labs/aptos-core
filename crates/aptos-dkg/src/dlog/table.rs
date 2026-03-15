@@ -47,6 +47,13 @@ impl<A: AffineRepr> BabyStepTable<A> {
             G_neg_table_size,
         }
     }
+
+    /// Approximate memory size of the table in gigabytes (key + value bytes; HashMap overhead not included).
+    pub fn size_gb(&self) -> f64 {
+        let bytes_approx =
+            self.table.len() * (std::mem::size_of::<A>() + std::mem::size_of::<u32>());
+        bytes_approx as f64 / 1e9
+    }
 }
 
 #[cfg(test)]

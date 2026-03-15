@@ -14,9 +14,9 @@ fn configs<E: Pairing>() -> &'static [(usize, u64, u64)] {
     &[
         //        (8, 1 << 32, 1 << 25),
         //        (8, 1 << 32, 1 << 25),
+        (8, 1 << 39, 1 << 20),
         (8, 1 << 39, 1 << 25),
         (7, 1 << 44, 1 << 25),
-        (6, 1 << 50, 1 << 25),
     ]
 }
 
@@ -46,16 +46,12 @@ fn bench_dlog_comparison<E: Pairing>(c: &mut Criterion, curve_name: &str) {
         );
         let t0 = std::time::Instant::now();
         let baby_table = table::BabyStepTable::new(G.into_affine(), table_size as u32);
-        let bytes_approx = baby_table.table.len()
-            * (std::mem::size_of::<<E::G1 as ark_ec::CurveGroup>::Affine>()
-                + std::mem::size_of::<u32>());
-        let gb = bytes_approx as f64 / 1e9;
         println!(
             "Baby table built for curve {} with table size {} in {:?} (~{:.3} GB)",
             curve_name,
             table_size,
             t0.elapsed(),
-            gb
+            baby_table.size_gb()
         );
         let xs: Vec<u64> = (0..vec_len)
             .map(|_| rng.gen_range(0, range_limit))
