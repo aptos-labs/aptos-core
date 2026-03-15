@@ -48,3 +48,28 @@ impl<A: AffineRepr> BabyStepTable<A> {
         }
     }
 }
+
+#[cfg(test)]
+#[allow(non_snake_case)]
+mod tests {
+    use super::*;
+    use ark_bn254::{Fr, G1Affine};
+    use ark_ec::{AffineRepr, CurveGroup};
+
+    /// Table has exactly `table_size` entries and each j in [0, table_size) maps to j*G.
+    #[test]
+    fn table_entries_correct() {
+        let G = G1Affine::generator();
+        let table_size = 32u32;
+        let tbl = BabyStepTable::<G1Affine>::new(G, table_size);
+
+        assert_eq!(tbl.table.len(), table_size as usize, "table length");
+        assert_eq!(tbl.table_size, table_size);
+
+        for j in 0..table_size {
+            let point = (G * Fr::from(j)).into_affine();
+            let stored = tbl.table.get(&point).copied();
+            assert_eq!(stored, Some(j), "table should map j*G -> j for j = {}", j);
+        }
+    }
+}
