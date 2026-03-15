@@ -5,7 +5,7 @@
 //! for various batch sizes and target counts.
 
 use aptos_dkg::dlog::{bsgs, table};
-use ark_ec::{pairing::Pairing, PrimeGroup};
+use ark_ec::{pairing::Pairing, CurveGroup, PrimeGroup};
 use criterion::{criterion_group, criterion_main, BenchmarkId, Criterion};
 use rand::{rngs::StdRng, Rng, SeedableRng};
 
@@ -13,12 +13,15 @@ use rand::{rngs::StdRng, Rng, SeedableRng};
 fn configs<E: Pairing>() -> &'static [(usize, u64, u64)] {
     &[
         //        (8, 1 << 32, 1 << 25),
+        //        (8, 1 << 32, 1 << 25),
         (8, 1 << 39, 1 << 25),
+        (7, 1 << 44, 1 << 25),
+        (6, 1 << 50, 1 << 25),
     ]
 }
 
 fn batch_sizes() -> &'static [usize] {
-    &[1, 8, 32, 128, 256, 512, 1024, 2048]
+    &[64, 128, 256, 512, 768, 1024, 2048, 4096, 8192] // &[1, 8, 32, 128, 256, 512, 1024, 2048, 4096, 8192]
 }
 
 #[allow(non_snake_case)]
@@ -41,10 +44,18 @@ fn bench_dlog_comparison<E: Pairing>(c: &mut Criterion, curve_name: &str) {
             "Building baby table for curve {} with table size {}",
             curve_name, table_size
         );
-        let baby_table = table::build::<E::G1>(G, table_size);
+        let t0 = std::time::Instant::now();
+        let baby_table = table::BabyStepTable::new(G.into_affine(), table_size as u32);
+        let bytes_approx = baby_table.table.len()
+            * (std::mem::size_of::<<E::G1 as ark_ec::CurveGroup>::Affine>()
+                + std::mem::size_of::<u32>());
+        let gb = bytes_approx as f64 / 1e9;
         println!(
-            "Baby table built for curve {} with table size {}",
-            curve_name, table_size
+            "Baby table built for curve {} with table size {} in {:?} (~{:.3} GB)",
+            curve_name,
+            table_size,
+            t0.elapsed(),
+            gb
         );
         let xs: Vec<u64> = (0..vec_len)
             .map(|_| rng.gen_range(0, range_limit))
@@ -55,7 +66,7 @@ fn bench_dlog_comparison<E: Pairing>(c: &mut Criterion, curve_name: &str) {
         group.bench_with_input(BenchmarkId::new("dlog_vec", ""), &(), |b, _| {
             b.iter(|| {
                 let recovered =
-                    bsgs::dlog_vec(G, &Hs, &baby_table, range_limit).expect("dlog_vec failed");
+                    bsgs::dlog_vec(&baby_table, &Hs, range_limit).expect("dlog_vec failed");
                 assert_eq!(recovered, xs);
             });
         });
@@ -68,7 +79,7 @@ fn bench_dlog_comparison<E: Pairing>(c: &mut Criterion, curve_name: &str) {
                 |b, &batch_size| {
                     b.iter(|| {
                         let recovered =
-                            bsgs::dlog_vec_batched(G, &Hs, &baby_table, range_limit, batch_size)
+                            bsgs::dlog_vec_batched(&baby_table, &Hs, range_limit, batch_size)
                                 .expect("dlog_vec_batched failed");
                         assert_eq!(recovered, xs);
                     });
@@ -84,9 +95,8 @@ fn bench_dlog_comparison<E: Pairing>(c: &mut Criterion, curve_name: &str) {
                 |b, &batch_size| {
                     b.iter(|| {
                         let recovered = bsgs::dlog_vec_batched_rolling_with_batch_size(
-                            G,
-                            &Hs,
                             &baby_table,
+                            &Hs,
                             range_limit,
                             batch_size,
                         )
@@ -119,8 +129,8 @@ fn bench_table_build<E: Pairing>(c: &mut Criterion, curve_name: &str) {
             &table_size,
             |b, &table_size| {
                 b.iter(|| {
-                    let t = table::build::<E::G1>(G, table_size);
-                    assert_eq!(t.len(), table_size as usize);
+                    let t = table::BabyStepTable::new(G.into_affine(), table_size as u32);
+                    assert_eq!(t.table.len(), table_size as usize);
                 });
             },
         );
@@ -131,8 +141,8 @@ fn bench_table_build<E: Pairing>(c: &mut Criterion, curve_name: &str) {
 fn criterion_benchmark(c: &mut Criterion) {
     use ark_bls12_381::Bls12_381;
 
-    bench_dlog_comparison::<Bls12_381>(c, "bls12_381");
-    bench_table_build::<Bls12_381>(c, "bls12_381");
+    bench_dlog_comparison::<Bls12_381>(c, "BLS12-381");
+    bench_table_build::<Bls12_381>(c, "BLS12-381");
 }
 
 criterion_group!(

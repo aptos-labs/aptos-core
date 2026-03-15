@@ -28,13 +28,13 @@ use ark_serialize::{SerializationError, Valid};
 use ark_std::log2;
 use rand::{thread_rng, CryptoRng, RngCore};
 use serde::{Deserialize, Deserializer, Serialize};
-use std::{collections::HashMap, ops::Mul};
+use std::ops::Mul;
 
 const DST: &[u8] = b"APTOS_CHUNKED_ELGAMAL_FIELD_PVSS_DST"; // This DST will be used in setting up a group generator `G_2`, see below
 
 /// Default extra bits for the dlog table when deserializing legacy PublicParameters that did not store this field.
 fn default_dlog_extra_bits() -> u64 {
-    6
+    0
 }
 
 fn compute_powers_of_radix<E: Pairing>(ell: u8) -> Vec<E::ScalarField> {
@@ -69,7 +69,7 @@ pub struct PublicParameters<E: Pairing> {
     pub dlog_extra_bits: u64,
 
     #[serde(skip)]
-    pub dlog_table: HashMap<<E::G1 as ark_ec::CurveGroup>::Affine, u64>,
+    pub dlog_table: dlog::table::BabyStepTable<E::G1Affine>,
 
     #[serde(skip)]
     pub G2_table: BatchMulPreprocessing<E::G2>,
@@ -196,15 +196,15 @@ impl<E: Pairing> PublicParameters<E> {
         ell: u8,
         max_aggregation: usize,
         extra_bits: u64,
-    ) -> HashMap<<E::G1 as ark_ec::CurveGroup>::Affine, u64> {
+    ) -> dlog::table::BabyStepTable<E::G1Affine> {
         let table_size_exp = extra_bits + ((ell as u64 + log2(max_aggregation) as u64) / 2);
         eprintln!(
             "[build_dlog_table] table_size = {} (ell={}, max_aggregation={}, extra_bits={})",
             table_size_exp, ell, max_aggregation, extra_bits
         );
-        let table = dlog::table::build::<E::G1>(G, 1u64 << table_size_exp);
-        eprintln!("[build_dlog_table] table.len() = {}", table.len());
-        table
+        let tbl = dlog::table::BabyStepTable::new(G.into_affine(), (1u64 << table_size_exp) as u32);
+        eprintln!("[build_dlog_table] table.len() = {}", tbl.table.len());
+        tbl
     }
 
     pub(crate) fn get_dlog_range_bound(&self) -> u64 {
@@ -274,7 +274,7 @@ impl<E: Pairing> PublicParameters<E> {
         let pp_elgamal = chunked_elgamal_pp::PublicParameters::new(max_num_shares);
         let G_1 = *pp_elgamal.message_base();
         let G_2 = g2.unwrap_or_else(|| hashing::unsafe_hash_to_affine(b"G_2", DST));
-        const DLOG_EXTRA_BITS: u64 = 6;
+        const DLOG_EXTRA_BITS: u64 = 0;
         let pp = Self {
             max_num_shares,
             pp_elgamal,

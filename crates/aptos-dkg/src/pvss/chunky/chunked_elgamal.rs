@@ -11,13 +11,13 @@ use crate::{
 };
 use aptos_crypto::arkworks::{self, msm::MsmInput, random::sample_field_element};
 use aptos_crypto_derive::SigmaProtocolWitness;
-use ark_ec::{AffineRepr, CurveGroup};
+use ark_ec::CurveGroup;
 use ark_ff::PrimeField;
 use ark_serialize::{
     CanonicalDeserialize, CanonicalSerialize, Compress, SerializationError, Write,
 };
 use ark_std::fmt::Debug;
-use std::{collections::HashMap, ops::Sub};
+use std::ops::Sub;
 
 pub const DST: &[u8; 31] = b"APTOS_CHUNKED_ELGAMAL_SIGMA_DST"; // This is used for the sigma protocol Fiat-Shamir challenges
 
@@ -359,8 +359,8 @@ pub fn decrypt_chunked_scalars<C: CurveGroup>(
     Cs_rows: &[Vec<C::Affine>],
     Rs_rows: &[Vec<C::Affine>],
     dk: &C::ScalarField,
-    pp: &PublicParameters<C>,
-    table: &HashMap<C::Affine, u64>,
+    _pp: &PublicParameters<C>,
+    table: &crate::dlog::table::BabyStepTable<C::Affine>,
     table_dlog_range_bound: u64,
     radix_exponent: u8,
 ) -> Vec<C::ScalarField> {
@@ -375,16 +375,11 @@ pub fn decrypt_chunked_scalars<C: CurveGroup>(
             .collect();
 
         // Recover plaintext chunks
-        let chunk_values: Vec<_> = bsgs::dlog_vec(
-            pp.G.into_group(),
-            &exp_chunks,
-            &table,
-            table_dlog_range_bound,
-        )
-        .expect("dlog_vec failed")
-        .into_iter()
-        .map(|x| C::ScalarField::from(x))
-        .collect();
+        let chunk_values: Vec<_> = bsgs::dlog_vec(table, &exp_chunks, table_dlog_range_bound)
+            .expect("dlog_vec failed")
+            .into_iter()
+            .map(|x| C::ScalarField::from(x))
+            .collect();
 
         // Convert chunks back to scalar
         let recovered = chunks::le_chunks_to_scalar(radix_exponent, &chunk_values);
@@ -485,7 +480,7 @@ mod tests {
         } = hom.apply(&witness);
 
         // 8. Build a baby-step giant-step table for computing discrete logs
-        let table = dlog::table::build::<C>(pp.G.into(), 1u64 << (radix_exponent / 2));
+        let table = dlog::table::BabyStepTable::new(pp.G, (1u64 << (radix_exponent / 2)) as u32);
 
         // 9. Perform decryption of each ciphertext and reconstruct plaintexts
         // TODO: call some built-in function for this instead
