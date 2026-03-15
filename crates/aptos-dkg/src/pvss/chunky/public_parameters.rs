@@ -360,12 +360,6 @@ impl<E: Pairing> WithMaxNumShares for PublicParameters<E> {
     // The only thing from `pp` that `generate()` uses is `pp.ell`, so make the rest as small as possible.
     fn with_max_num_shares_for_generate(_n: u32) -> Self {
         let mut rng = thread_rng();
-        Self::new(
-            1,
-            DEFAULT_ELL_FOR_TESTING,
-            DEFAULT_MAX_AGGREGATION,
-            None,
-            &mut rng,
-        )
+        Self::new(1, DEFAULT_ELL_FOR_TESTING, 1, None, &mut rng)
     }
 }

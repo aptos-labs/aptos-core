@@ -110,7 +110,6 @@ fn bench_dlog_comparison<E: Pairing>(c: &mut Criterion, curve_name: &str) {
 #[allow(non_snake_case)]
 fn bench_table_build<E: Pairing>(c: &mut Criterion, curve_name: &str) {
     let mut group = c.benchmark_group(format!("dlog_table_build_{}", curve_name));
-    group.sample_size(10);
 
     // Limit Criterion to exactly 10 measurement iterations, because tables can be big (24 bits takes 1-2 min)
     group.sample_size(10); // It can't do less than 10

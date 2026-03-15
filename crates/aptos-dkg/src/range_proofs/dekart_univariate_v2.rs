@@ -383,9 +383,9 @@ impl<E: Pairing> traits::BatchedRangeProof<E> for Proof<E> {
         (prk, vk)
     }
 
-    // By the way, this approach seems a bit convoluted. Better to generate beta here,
-    // and then add it into the main sigma of chunky, rather than doing this blinding / re-randomising
-    // stuff here in DeKART by default.
+    // By the way, this approach seems a bit convoluted. Better to generate the beta mask here in
+    // the commit function, and then add it into the main sigma protocol of chunky, rather than doing
+    // this blinding / re-randomising stuff here in DeKART by default.
     #[allow(non_snake_case)]
     fn commit_with_randomness(
         ck_S: &Self::CommitmentKey,
