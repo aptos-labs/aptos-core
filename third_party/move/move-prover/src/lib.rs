@@ -103,7 +103,7 @@ pub fn create_init_num_operation_state(env: &GlobalEnv) {
             global_state.create_initial_struct_oper_state(&struct_env);
         }
         for fun_env in module_env.get_functions() {
-            if !fun_env.is_inline() {
+            if !fun_env.is_not_prover_target() {
                 global_state.create_initial_func_oper_state(&fun_env);
             }
         }
@@ -277,6 +277,11 @@ pub fn create_and_process_bytecode(options: &Options, env: &GlobalEnv) -> Functi
             }
         }
         for func_env in module_env.get_functions() {
+            if func_env.is_struct_api() {
+                // Struct API wrappers have no user-written specs; skip them to avoid
+                // spurious invariant failures from DataInvariantInstrumentationProcessor.
+                continue;
+            }
             targets.add_target(&func_env)
         }
     }

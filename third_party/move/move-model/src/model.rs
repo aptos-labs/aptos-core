@@ -4910,6 +4910,15 @@ impl<'env> FunctionEnv<'env> {
         self.data.is_struct_api
     }
 
+    /// Returns `true` for functions that have no independently-processed bytecode target in the
+    /// prover pipeline and should be skipped when iterating over functions for analysis:
+    /// - inline functions: their bodies are inlined at every call site
+    /// - struct API wrappers: their call sites are replaced by native operations
+    ///   (Pack, BorrowField, etc.) in stackless_bytecode_generator before any processor runs
+    pub fn is_not_prover_target(&self) -> bool {
+        self.is_inline() || self.is_struct_api()
+    }
+
     /// If this is a struct API wrapper, returns `(ModuleId, StructId)` of the struct it
     /// operates on (parsed from the `op$StructName$...` naming convention). Returns `None`
     /// for non-struct-API functions.
