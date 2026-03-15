@@ -123,7 +123,8 @@ pub fn dlog_vec_batched_rolling_with_batch_size<C: CurveGroup>(
     let mut result: Vec<Option<u64>> = vec![None; number_of_dlogs];
     let mut unsolved: Vec<usize> = (0..number_of_dlogs).collect();
     let mut gamma_vec: Vec<C> = H_vec.to_vec();
-    let mut batch = Vec::<C>::new();
+    // Pre-allocate once so we never reallocate in the hot loop.
+    let mut batch = Vec::<C>::with_capacity(number_of_dlogs * batch_size);
 
     for chunk_start in (0..n).step_by(batch_size) {
         if unsolved.is_empty() {
@@ -132,7 +133,7 @@ pub fn dlog_vec_batched_rolling_with_batch_size<C: CurveGroup>(
 
         let actual_batch = (n - chunk_start).min(batch_size as u64) as usize;
         batch.clear();
-        batch.reserve(unsolved.len() * actual_batch);
+        debug_assert!(batch.capacity() >= unsolved.len() * actual_batch);
 
         for &t in &unsolved {
             let mut g = gamma_vec[t];
