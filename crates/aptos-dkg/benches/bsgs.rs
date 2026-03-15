@@ -45,7 +45,7 @@ fn bench_dlog_comparison<E: Pairing>(c: &mut Criterion, curve_name: &str) {
             curve_name, table_size
         );
         let t0 = std::time::Instant::now();
-        let baby_table = table::BabyStepTable::new(G.into_affine(), table_size as u32);
+        let baby_table = table::BabyStepTable::new(G.into_affine(), table_size);
         println!(
             "Baby table built for curve {} with table size {} in {:?} (~{:.3} GB)",
             curve_name,
@@ -116,7 +116,7 @@ fn bench_table_build<E: Pairing>(c: &mut Criterion, curve_name: &str) {
     group.sample_size(10); // It can't do less than 10
 
     // Time seems almost linear in the size of the table, so doesn't make sense to benchmark many values
-    let table_sizes: &[u64] = &[1u64 << 20];
+    let table_sizes: &[u32] = &[1u32 << 20];
     let G = E::G1::generator();
 
     for &table_size in table_sizes {
@@ -125,7 +125,7 @@ fn bench_table_build<E: Pairing>(c: &mut Criterion, curve_name: &str) {
             &table_size,
             |b, &table_size| {
                 b.iter(|| {
-                    let t = table::BabyStepTable::new(G.into_affine(), table_size as u32);
+                    let t = table::BabyStepTable::new(G.into_affine(), table_size);
                     assert_eq!(t.table_size as usize, table_size as usize);
                 });
             },
