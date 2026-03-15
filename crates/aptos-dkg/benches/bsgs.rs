@@ -10,7 +10,7 @@ use criterion::{criterion_group, criterion_main, BenchmarkId, Criterion};
 use rand::{rngs::StdRng, Rng, SeedableRng};
 
 /// (vec_len, range_limit, table_size)
-fn configs() -> &'static [(usize, u64, u64)] {
+fn configs() -> &'static [(usize, u64, u32)] {
     &[
         //        (8, 1 << 32, 1 << 25),
         //        (8, 1 << 32, 1 << 25),

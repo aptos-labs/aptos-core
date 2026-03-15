@@ -510,8 +510,10 @@ fn pvss_decrypt_own_share<T: Transcript, M: Measurement>(
         &mut rng,
     );
 
-    // TODO: the following code is obviously messy. Easiest fix is to extend `get_player_weight()`
+    // TODO_1: the following code is obviously messy. Easiest fix is to extend `get_player_weight()`
     // to `SecretSharingConfig`
+    // TODO_2: it is also inaccurate, it should be aggregating transactions first which means the
+    // actual bit size of the decrypted shares is much higher!!
     g.bench_function(format!("decrypt-share/{}", sc), move |b| {
         // Pre-compute valid player indices by checking if get_public_key_share
         // returns non-empty results. For weighted transcripts, DealtPubKeyShare is Vec,

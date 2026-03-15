@@ -4,7 +4,7 @@
 //! This submodule implements the *public parameters* for this "chunked_elgamal_field" PVSS scheme.
 
 use crate::{
-    dlog,
+    dlog::BabyStepTable,
     pvss::{
         chunky::{
             chunked_elgamal::num_chunks_per_scalar, chunked_elgamal_pp, input_secret::InputSecret,
@@ -31,10 +31,11 @@ use serde::{Deserialize, Deserializer, Serialize};
 use std::ops::Mul;
 
 const DST: &[u8] = b"APTOS_CHUNKED_ELGAMAL_FIELD_PVSS_DST"; // This DST will be used in setting up a group generator `G_2`, see below
+const DEFAULT_MAX_AGGREGATION: usize = 166;
 
 /// Default extra bits for the dlog table when deserializing legacy PublicParameters that did not store this field.
 fn default_dlog_extra_bits() -> u64 {
-    5
+    4
 }
 
 fn compute_powers_of_radix<E: Pairing>(ell: u8) -> Vec<E::ScalarField> {
@@ -69,7 +70,7 @@ pub struct PublicParameters<E: Pairing> {
     pub dlog_extra_bits: u64,
 
     #[serde(skip)]
-    pub dlog_table: dlog::table::BabyStepTable<E::G1Affine>,
+    pub dlog_table: BabyStepTable<E::G1Affine>,
 
     #[serde(skip)]
     pub G2_table: BatchMulPreprocessing<E::G2>,
@@ -196,13 +197,13 @@ impl<E: Pairing> PublicParameters<E> {
         ell: u8,
         max_aggregation: usize,
         extra_bits: u64,
-    ) -> dlog::table::BabyStepTable<E::G1Affine> {
-        let table_size_exp = extra_bits + ((ell as u64 + log2(max_aggregation) as u64) / 2);
+    ) -> BabyStepTable<E::G1Affine> {
+        let table_size_exp = extra_bits + ((ell as u64 + log2(max_aggregation) as u64) / 2); // TODO: I think we need the floor of log_2 here, not the ceiling?
         eprintln!(
             "[build_dlog_table] table_size = {} (ell={}, max_aggregation={}, extra_bits={})",
             table_size_exp, ell, max_aggregation, extra_bits
         );
-        let tbl = dlog::table::BabyStepTable::new(G.into_affine(), (1u64 << table_size_exp) as u32);
+        let tbl = BabyStepTable::new(G.into_affine(), (1u64 << table_size_exp) as u32);
         eprintln!("[build_dlog_table] table_size = {}", tbl.table_size);
         tbl
     }
@@ -329,24 +330,42 @@ impl<E: Pairing> Default for PublicParameters<E> {
     // This is only used for testing and benchmarking
     fn default() -> Self {
         let mut rng = thread_rng();
-        Self::new(1, DEFAULT_ELL_FOR_TESTING, 1, None, &mut rng)
+        Self::new(
+            1,
+            DEFAULT_ELL_FOR_TESTING,
+            DEFAULT_MAX_AGGREGATION,
+            None,
+            &mut rng,
+        )
     }
 }
 
 impl<E: Pairing> WithMaxNumShares for PublicParameters<E> {
     fn with_max_num_shares(n: u32) -> Self {
         let mut rng = thread_rng();
-        Self::new(n, DEFAULT_ELL_FOR_TESTING, 1, None, &mut rng)
+        Self::new(
+            n,
+            DEFAULT_ELL_FOR_TESTING,
+            DEFAULT_MAX_AGGREGATION,
+            None,
+            &mut rng,
+        )
     }
 
     fn with_max_num_shares_and_bit_size(n: u32, ell: u8) -> Self {
         let mut rng = thread_rng();
-        Self::new(n, ell, 1, None, &mut rng)
+        Self::new(n, ell, DEFAULT_MAX_AGGREGATION, None, &mut rng)
     }
 
     // The only thing from `pp` that `generate()` uses is `pp.ell`, so make the rest as small as possible.
     fn with_max_num_shares_for_generate(_n: u32) -> Self {
         let mut rng = thread_rng();
-        Self::new(1, DEFAULT_ELL_FOR_TESTING, 1, None, &mut rng)
+        Self::new(
+            1,
+            DEFAULT_ELL_FOR_TESTING,
+            DEFAULT_MAX_AGGREGATION,
+            None,
+            &mut rng,
+        )
     }
 }

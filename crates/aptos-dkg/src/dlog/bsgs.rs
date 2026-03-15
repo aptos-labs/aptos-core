@@ -12,11 +12,8 @@
 use super::table::BabyStepTable;
 use ark_ec::CurveGroup;
 
-/// Default batch size for the batched rolling algorithm (Algorithm 2).
-pub const DEFAULT_BSGS_SERIALIZATION_BATCH_SIZE: usize = 1;
-
-/// Below this batch size we avoid batch normalisation in the batched algorithms (overhead dominates).
-pub const BSGS_BATCH_NORMALIZE_THRESHOLD: usize = 1;
+/// Default batch size for the batched rolling algorithm.
+pub const DEFAULT_BSGS_SERIALIZATION_BATCH_SIZE: usize = 512;
 
 /// Basic BSGS: one giant-step at a time. Recovers x with H = x*G, 0 <= x < range_limit.
 #[allow(non_snake_case)]
@@ -40,11 +37,17 @@ pub fn dlog_vec<C: CurveGroup>(
     H_vec: &[C],
     range_limit: u64,
 ) -> Option<Vec<u64>> {
-    let mut result = Vec::with_capacity(H_vec.len());
-    for H in H_vec {
-        result.push(dlog(tbl, *H, range_limit)?);
-    }
-    Some(result)
+    // let mut result = Vec::with_capacity(H_vec.len());
+    // for H in H_vec {
+    //     result.push(dlog(tbl, *H, range_limit)?);
+    // }
+    // Some(result)
+    dlog_vec_batched_rolling_with_batch_size(
+        tbl,
+        H_vec,
+        range_limit,
+        DEFAULT_BSGS_SERIALIZATION_BATCH_SIZE,
+    )
 }
 
 /// Batched rolling BSGS for a single target (no cross-target batching).
@@ -162,21 +165,6 @@ pub fn dlog_vec_batched_rolling_with_batch_size<C: CurveGroup>(
     }
 
     result.into_iter().collect()
-}
-
-/// Batched-across-targets dlog with rolling gamma (default batch size).
-#[allow(non_snake_case)]
-pub fn dlog_vec_batched_rolling<C: CurveGroup>(
-    tbl: &BabyStepTable<C::Affine>,
-    H_vec: &[C],
-    range_limit: u64,
-) -> Option<Vec<u64>> {
-    dlog_vec_batched_rolling_with_batch_size(
-        tbl,
-        H_vec,
-        range_limit,
-        DEFAULT_BSGS_SERIALIZATION_BATCH_SIZE,
-    )
 }
 
 #[cfg(test)]
