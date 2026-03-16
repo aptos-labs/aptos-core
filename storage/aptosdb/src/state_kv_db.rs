@@ -3,8 +3,10 @@
 
 #![forbid(unsafe_code)]
 
+#[cfg(test)]
+use crate::schema::hot_state_value_by_key_hash::{HotStateEntry, HotStateValueByKeyHashSchema};
 use crate::{
-    db_options::gen_state_kv_shard_cfds,
+    db_options::{gen_hot_state_kv_shard_cfds, gen_state_kv_shard_cfds},
     metrics::OTHER_TIMERS_SECONDS,
     schema::{
         db_metadata::{DbMetadataKey, DbMetadataSchema, DbMetadataValue},
@@ -115,6 +117,7 @@ impl StateKvDb {
             env,
             block_cache,
             readonly,
+            is_hot,
             delete_on_restart,
         )?);
 
@@ -158,7 +161,9 @@ impl StateKvDb {
             is_hot,
         };
 
-        if !readonly && !delete_on_restart {
+        // TODO(HotState): Integrate hot state KV DB with pruner and add truncation support
+        // (stale index tracking, etc.) for the hot state DB.
+        if !readonly && !delete_on_restart && !is_hot {
             if let Some(overall_kv_commit_progress) = get_state_kv_commit_progress(&state_kv_db)? {
                 truncate_state_kv_db_shards(&state_kv_db, overall_kv_commit_progress)?;
             }
@@ -314,6 +319,7 @@ impl StateKvDb {
             env,
             block_cache,
             readonly,
+            is_hot,
             delete_on_restart,
         )
     }
@@ -325,6 +331,7 @@ impl StateKvDb {
         env: Option<&Env>,
         block_cache: Option<&Cache>,
         readonly: bool,
+        is_hot: bool,
         delete_on_restart: bool,
     ) -> Result<DB> {
         if delete_on_restart {
@@ -334,7 +341,11 @@ impl StateKvDb {
         }
 
         let rocksdb_opts = gen_rocksdb_options(state_kv_db_config, env, readonly);
-        let cfds = gen_state_kv_shard_cfds(state_kv_db_config, block_cache);
+        let cfds = if is_hot {
+            gen_hot_state_kv_shard_cfds(state_kv_db_config, block_cache)
+        } else {
+            gen_state_kv_shard_cfds(state_kv_db_config, block_cache)
+        };
 
         if readonly {
             DB::open_cf_readonly(rocksdb_opts, path, name, cfds)
@@ -375,5 +386,26 @@ impl StateKvDb {
             .next()
             .transpose()?
             .and_then(|((_, version), value_opt)| value_opt.map(|value| (version, value))))
+    }
+
+    /// Returns the latest hot state entry for the given key at or before the
+    /// given version. Outer `None` means no entry found; inner `None` means the
+    /// key was evicted at that version.
+    #[cfg(test)]
+    pub(crate) fn get_hot_state_entry_by_version(
+        &self,
+        state_key: &StateKey,
+        version: Version,
+    ) -> Result<Option<(Version, Option<HotStateEntry>)>> {
+        let mut read_opts = ReadOptions::default();
+        read_opts.set_prefix_same_as_start(true);
+        let mut iter = self
+            .db_shard(state_key.get_shard_id())
+            .iter_with_opts::<HotStateValueByKeyHashSchema>(read_opts)?;
+        iter.seek(&(state_key.hash(), version))?;
+        Ok(iter
+            .next()
+            .transpose()?
+            .map(|((_, version), entry_opt)| (version, entry_opt)))
     }
 }
