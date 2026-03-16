@@ -10,18 +10,16 @@ use aptos_native_interface::{
     safely_pop_arg, RawSafeNative, SafeNativeBuilder, SafeNativeContext, SafeNativeError,
     SafeNativeResult,
 };
+use aptos_types::on_chain_config::TimedFeatureFlag;
 use move_core_types::{
-    account_address::AccountAddress,
     gas_algebra::{NumBytes, NumTypeNodes},
-    int256,
     language_storage::{OPTION_NONE_TAG, OPTION_SOME_TAG},
-    value::{MoveStructLayout, MoveTypeLayout},
-    vm_status::{sub_status::NFE_BCS_SERIALIZATION_FAILURE, StatusCode},
+    vm_status::sub_status::NFE_BCS_SERIALIZATION_FAILURE,
 };
-use move_vm_runtime::native_functions::NativeFunction;
+use move_vm_runtime::{constant_serialized_size, native_functions::NativeFunction};
 use move_vm_types::{
     loaded_data::runtime_types::Type,
-    natives::function::{PartialVMError, PartialVMResult},
+    natives::function::PartialVMResult,
     value_serde::ValueSerDeContext,
     values::{values_impl::Reference, Struct, Value},
 };
@@ -176,7 +174,10 @@ fn native_constant_serialized_size(
     let ty = &ty_args[0];
     let ty_layout = context.type_to_type_layout(ty)?;
 
-    let (visited_count, serialized_size_result) = constant_serialized_size(&ty_layout);
+    let use_local_struct_cache =
+        context.timed_feature_enabled(TimedFeatureFlag::ConstantSerializedSizeLocalCache);
+    let (visited_count, serialized_size_result) =
+        constant_serialized_size(&ty_layout, use_local_struct_cache);
     context
         .charge(BCS_CONSTANT_SERIALIZED_SIZE_PER_TYPE_NODE * NumTypeNodes::new(visited_count))?;
 
@@ -194,6 +195,7 @@ fn native_constant_serialized_size(
     Ok(smallvec![result])
 }
 
+<<<<<<< HEAD
 /// If given type has a constant serialized size (irrespective of the instance), it returns the serialized
 /// size in bytes any value would have.
 /// Otherwise it returns None.
@@ -271,6 +273,8 @@ fn constant_serialized_size(ty_layout: &MoveTypeLayout) -> (u64, PartialVMResult
     )
 }
 
+=======
+>>>>>>> cc1fb9d06f ([cp] Multiple fixes for Move VM and block execution (#19095))
 /***************************************************************************************************
  * module
  **************************************************************************************************/

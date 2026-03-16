@@ -159,11 +159,9 @@ where
         self.struct_layouts.clear();
     }
 
-    /// Flushes only layout caches.
+    /// Flushes only layout caches. Used for memory management only (flush when
+    /// cache size gets too large).
     pub fn flush_layout_cache(&self) {
-        // TODO(layouts):
-        //   Flushing is only needed because of enums. Once we refactor layouts to store a single
-        //   variant instead, this can be removed.
         self.struct_layouts.clear();
     }
 
@@ -187,6 +185,10 @@ where
             e.insert(entry);
         }
         Ok(())
+    }
+
+    pub(crate) fn remove_struct_layout_entry(&self, key: &StructKey) {
+        self.struct_layouts.remove(key);
     }
 
     /// Inserts modules into the cache.

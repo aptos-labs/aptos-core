@@ -494,6 +494,10 @@ impl<'a> LayoutCache for ModuleStorageWrapper<'a> {
     fn store_struct_layout(&self, key: &StructKey, entry: LayoutCacheEntry) -> PartialVMResult<()> {
         self.module_storage.store_struct_layout(key, entry)
     }
+
+    fn remove_struct_layout(&self, key: &StructKey) {
+        self.module_storage.remove_struct_layout(key)
+    }
 }
 
 #[delegate_to_methods]
