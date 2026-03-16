@@ -17818,6 +17818,37 @@
           }
         }
       },
+      "DecryptedPayload": {
+        "type": "object",
+        "description": "Payload has been successfully decrypted.",
+        "required": [
+          "payload_hash",
+          "ciphertext",
+          "decrypted_payload",
+          "decryption_nonce"
+        ],
+        "properties": {
+          "payload_hash": {
+            "$ref": "#/components/schemas/HashValue"
+          },
+          "ciphertext": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/HexEncodedBytes"
+              },
+              {
+                "description": "BCS-serialized ciphertext bytes, hex-encoded."
+              }
+            ]
+          },
+          "decrypted_payload": {
+            "$ref": "#/components/schemas/EncryptedTransactionInnerPayload"
+          },
+          "decryption_nonce": {
+            "$ref": "#/components/schemas/U64"
+          }
+        }
+      },
       "DeleteModule": {
         "type": "object",
         "description": "Delete a module",
@@ -17993,14 +18024,28 @@
           }
         }
       },
-      "EncryptedState": {
-        "type": "string",
-        "description": "The decryption state of an encrypted transaction payload.",
-        "enum": [
-          "encrypted",
-          "failed_decryption",
-          "decrypted"
-        ]
+      "EncryptedPayload": {
+        "type": "object",
+        "description": "Payload is still encrypted and cannot be read.",
+        "required": [
+          "payload_hash",
+          "ciphertext"
+        ],
+        "properties": {
+          "payload_hash": {
+            "$ref": "#/components/schemas/HashValue"
+          },
+          "ciphertext": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/HexEncodedBytes"
+              },
+              {
+                "description": "BCS-serialized ciphertext bytes, hex-encoded."
+              }
+            ]
+          }
+        }
       },
       "EncryptedTransactionInnerPayload": {
         "type": "object",
@@ -18093,35 +18138,92 @@
       },
       "EncryptedTransactionPayload": {
         "type": "object",
-        "description": "An encrypted transaction payload. Exposes metadata and, when decrypted, the inner payload.",
-        "required": [
-          "encrypted_state",
-          "payload_hash"
+        "description": "An encrypted transaction payload, discriminated by encrypted_state.\n\nNOTE: multisig_address and replay_protection_nonce are not surfaced here.\nThey are part of extra_config and already exposed on UserTransactionRequest.\nFor Decrypted state, multisig_address is embedded in the MultisigPayload variant\nof decrypted_payload.",
+        "oneOf": [
+          {
+            "$ref": "#/components/schemas/EncryptedTransactionPayload_EncryptedPayload"
+          },
+          {
+            "$ref": "#/components/schemas/EncryptedTransactionPayload_FailedDecryptionPayload"
+          },
+          {
+            "$ref": "#/components/schemas/EncryptedTransactionPayload_DecryptedPayload"
+          }
         ],
-        "properties": {
-          "encrypted_state": {
-            "$ref": "#/components/schemas/EncryptedState"
-          },
-          "payload_hash": {
-            "$ref": "#/components/schemas/HashValue"
-          },
-          "ciphertext": {
-            "allOf": [
-              {
-                "$ref": "#/components/schemas/HexEncodedBytes"
-              },
-              {
-                "description": "BCS-serialized ciphertext bytes, hex-encoded. Present in read responses and required\nfor JSON submission. `VerifyInput` enforces that ciphertext is present and the\nencrypted state is `Encrypted` on the submission path."
-              }
-            ]
-          },
-          "decrypted_payload": {
-            "$ref": "#/components/schemas/EncryptedTransactionInnerPayload"
-          },
-          "decryption_nonce": {
-            "$ref": "#/components/schemas/U64"
+        "discriminator": {
+          "propertyName": "encrypted_state",
+          "mapping": {
+            "encrypted": "#/components/schemas/EncryptedTransactionPayload_EncryptedPayload",
+            "failed_decryption": "#/components/schemas/EncryptedTransactionPayload_FailedDecryptionPayload",
+            "decrypted": "#/components/schemas/EncryptedTransactionPayload_DecryptedPayload"
           }
         }
+      },
+      "EncryptedTransactionPayload_DecryptedPayload": {
+        "allOf": [
+          {
+            "type": "object",
+            "required": [
+              "encrypted_state"
+            ],
+            "properties": {
+              "encrypted_state": {
+                "type": "string",
+                "enum": [
+                  "decrypted"
+                ],
+                "example": "decrypted"
+              }
+            }
+          },
+          {
+            "$ref": "#/components/schemas/DecryptedPayload"
+          }
+        ]
+      },
+      "EncryptedTransactionPayload_EncryptedPayload": {
+        "allOf": [
+          {
+            "type": "object",
+            "required": [
+              "encrypted_state"
+            ],
+            "properties": {
+              "encrypted_state": {
+                "type": "string",
+                "enum": [
+                  "encrypted"
+                ],
+                "example": "encrypted"
+              }
+            }
+          },
+          {
+            "$ref": "#/components/schemas/EncryptedPayload"
+          }
+        ]
+      },
+      "EncryptedTransactionPayload_FailedDecryptionPayload": {
+        "allOf": [
+          {
+            "type": "object",
+            "required": [
+              "encrypted_state"
+            ],
+            "properties": {
+              "encrypted_state": {
+                "type": "string",
+                "enum": [
+                  "failed_decryption"
+                ],
+                "example": "failed_decryption"
+              }
+            }
+          },
+          {
+            "$ref": "#/components/schemas/FailedDecryptionPayload"
+          }
+        ]
       },
       "EntryFunctionId": {
         "type": "string",
@@ -18292,6 +18394,29 @@
           },
           "multi_sig": {
             "$ref": "#/components/schemas/ExportedAggregateSignature"
+          }
+        }
+      },
+      "FailedDecryptionPayload": {
+        "type": "object",
+        "description": "Decryption was attempted but failed.",
+        "required": [
+          "payload_hash",
+          "ciphertext"
+        ],
+        "properties": {
+          "payload_hash": {
+            "$ref": "#/components/schemas/HashValue"
+          },
+          "ciphertext": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/HexEncodedBytes"
+              },
+              {
+                "description": "BCS-serialized ciphertext bytes, hex-encoded."
+              }
+            ]
           }
         }
       },
