@@ -302,12 +302,8 @@ fn has_nested_literals(arms: &[MatchArm]) -> bool {
 fn has_nested_literal_in(pat: &Pattern, inside_struct: bool) -> bool {
     match pat {
         Pattern::LiteralValue(..) => inside_struct,
-        Pattern::Struct(_, _, _, pats) => {
-            pats.iter().any(|p| has_nested_literal_in(p, true))
-        },
-        Pattern::Tuple(_, pats) => pats
-            .iter()
-            .any(|p| has_nested_literal_in(p, inside_struct)),
+        Pattern::Struct(_, _, _, pats) => pats.iter().any(|p| has_nested_literal_in(p, true)),
+        Pattern::Tuple(_, pats) => pats.iter().any(|p| has_nested_literal_in(p, inside_struct)),
         _ => false,
     }
 }
