@@ -4910,6 +4910,20 @@ impl<'env> FunctionEnv<'env> {
         self.data.is_struct_api
     }
 
+    /// If this is a struct API wrapper, returns `(ModuleId, StructId)` of the struct it
+    /// operates on (parsed from the `op$StructName$...` naming convention). Returns `None`
+    /// for non-struct-API functions.
+    pub fn get_struct_api_struct(&self) -> Option<(ModuleId, StructId)> {
+        if !self.is_struct_api() {
+            return None;
+        }
+        let name = self.get_simple_name_string();
+        let struct_name = name.split('$').nth(1)?;
+        let sym = self.module_env.env.symbol_pool().make(struct_name);
+        let struct_env = self.module_env.find_struct(sym)?;
+        Some((self.module_env.get_id(), struct_env.get_id()))
+    }
+
     /// Returns the location of the specification block of this function. If the function has
     /// none, returns that of the function itself.
     pub fn get_spec_loc(&self) -> Loc {

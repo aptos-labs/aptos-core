@@ -83,12 +83,9 @@ use abstract_domain_derive::AbstractDomain;
 use itertools::Itertools;
 use log::{debug, log_enabled, Level};
 use move_binary_format::file_format::CodeOffset;
-use move_core_types::language_storage::{
-    BORROW, BORROW_MUT, PACK, PACK_VARIANT, TEST_VARIANT, UNPACK, UNPACK_VARIANT,
-};
 use move_model::{
     ast::{
-        AbortKind, Attribute, AttributeValue, Exp, ExpData, Operation, Pattern, TempIndex, Value,
+        AbortKind, Exp, ExpData, Operation, Pattern, TempIndex, Value,
     },
     exp_builder::ExpBuilder,
     exp_rewriter::ExpRewriterFunctions,
@@ -502,32 +499,6 @@ impl<'a> Context<'a> {
     }
 }
 
-// -------------------------------------------------------------------------------------------
-// Struct API reconstruction
-//
-// The compiler generates wrapper functions for every non-private struct/enum field:
-//   pack$S(f0, f1, ...) : S
-//   unpack$S(s)         : (f0, f1, ...)
-//   borrow$S$N(s)       : &F_N
-//   borrow_mut$S$N(s)   : &mut F_N
-//   test_variant$S$V(s) : bool      (enums only)
-//   pack_variant$S$V(f0, ...) : S   (enums only)
-//   unpack_variant$S$V(s) : (f0, ...) (enums only)
-//
-// When decompiling a *consuming* module these appear as ordinary `Function(mid,fid,inst)`
-// bytecode operations. We detect them by their model attributes (loaded by
-// `binary_module_loader`) and convert them back to the native model operations
-// (Pack, gen_match / Pattern::Struct, Select, TestVariants) so the sourcifier can
-// render them as valid Move source.
-
-/// Extract `(ModuleId, StructId)` from a `Type::Struct(...)` or `Type::Reference(_, Struct(...))`.
-fn struct_from_type(ty: Type) -> Option<(ModuleId, StructId)> {
-    match ty {
-        Type::Struct(mid, sid, _) => Some((mid, sid)),
-        Type::Reference(_, inner) => struct_from_type(*inner),
-        _ => None,
-    }
-}
 
 // -------------------------------------------------------------------------------------------
 // Generator Core Logic
@@ -1087,19 +1058,11 @@ impl Generator {
         use BytecodeOperation::*;
         match oper {
             Function(mid, fid, inst) => {
-                // Check whether this is an auto-generated struct API wrapper. If so,
-                // reconstruct the underlying struct operation (Pack/Unpack/Select/TestVariants)
-                // so the decompiled output uses valid Move syntax instead of the `$`-containing
-                // generated function name.
-                if !self.try_gen_struct_api_call(ctx, dests, srcs, inst, *mid, *fid) {
-                    self.gen_call_stm(
-                        ctx,
-                        Some(inst),
-                        dests,
-                        Operation::MoveFunction(*mid, *fid),
-                        srcs,
-                    )
-                }
+                debug_assert!(
+                    !ctx.env().get_function(mid.qualified(*fid)).is_struct_api(),
+                    "struct API wrapper should have been translated in stackless_bytecode_generator"
+                );
+                self.gen_call_stm(ctx, Some(inst), dests, Operation::MoveFunction(*mid, *fid), srcs)
             },
             Closure(mid, fid, inst, closure_mask) => self.gen_call_stm(
                 ctx,
@@ -1269,139 +1232,6 @@ impl Generator {
                 panic!("specification operation not supported: {:?}", oper)
             },
         }
-    }
-
-    /// If `(mid, fid)` names a struct API wrapper, translate the call directly into the
-    /// corresponding native model operation and return `true`. Otherwise return `false`.
-    fn try_gen_struct_api_call(
-        &mut self,
-        ctx: &Context,
-        dests: &[TempIndex],
-        srcs: &[TempIndex],
-        inst: &[Type],
-        mid: ModuleId,
-        fid: FunId,
-    ) -> bool {
-        let fun_env = ctx.env().get_function(mid.qualified(fid));
-        if !fun_env.is_struct_api() {
-            return false;
-        }
-        // Helper: extract a u16 value from a `#[name(N)]` attribute.
-        let num_value = |attr: &Attribute| -> Option<u16> {
-            if let Attribute::Assign(_, _, AttributeValue::Value(_, Value::Number(n))) = attr {
-                n.to_string().parse::<u16>().ok()
-            } else {
-                None
-            }
-        };
-        let pool = ctx.env().symbol_pool();
-        for attr in fun_env.get_attributes() {
-            let name = pool.string(attr.name()).to_string();
-            match name.as_str() {
-                PACK => {
-                    // pack$S(f0, f1, ...) → Pack(mid, sid, None) with type instantiation
-                    if let Some((struct_mid, struct_sid)) =
-                        struct_from_type(fun_env.get_result_type())
-                    {
-                        self.gen_call_stm(
-                            ctx,
-                            Some(&inst.to_vec()),
-                            dests,
-                            Operation::Pack(struct_mid, struct_sid, None),
-                            srcs,
-                        );
-                        return true;
-                    }
-                },
-                PACK_VARIANT => {
-                    // pack_variant$S$V(f0, f1, ...) → Pack(mid, sid, Some(variant))
-                    if let (Some(variant_idx), Some((struct_mid, struct_sid))) =
-                        (num_value(attr), struct_from_type(fun_env.get_result_type()))
-                    {
-                        let struct_env = ctx.env().get_struct(struct_mid.qualified(struct_sid));
-                        if let Some(variant) = struct_env.get_variant_name_by_idx(variant_idx) {
-                            self.gen_call_stm(
-                                ctx,
-                                Some(&inst.to_vec()),
-                                dests,
-                                Operation::Pack(struct_mid, struct_sid, Some(variant)),
-                                srcs,
-                            );
-                            return true;
-                        }
-                    }
-                },
-                UNPACK => {
-                    // unpack$S(s) → Pattern::Struct(…) = s
-                    let params = fun_env.get_parameters();
-                    if let Some((struct_mid, struct_sid)) =
-                        params.first().and_then(|p| struct_from_type(p.1.clone()))
-                    {
-                        let qsid = struct_mid.qualified_inst(struct_sid, inst.to_vec());
-                        let rhs = self.make_temp(ctx, srcs[0]);
-                        self.gen_match(ctx, dests, qsid, None, rhs);
-                        return true;
-                    }
-                },
-                UNPACK_VARIANT => {
-                    // unpack_variant$S$V(s) → Pattern::Struct(…, variant) = s
-                    let params = fun_env.get_parameters();
-                    if let (Some(variant_idx), Some((struct_mid, struct_sid))) = (
-                        num_value(attr),
-                        params.first().and_then(|p| struct_from_type(p.1.clone())),
-                    ) {
-                        let struct_env = ctx.env().get_struct(struct_mid.qualified(struct_sid));
-                        if let Some(variant) = struct_env.get_variant_name_by_idx(variant_idx) {
-                            let qsid = struct_mid.qualified_inst(struct_sid, inst.to_vec());
-                            let rhs = self.make_temp(ctx, srcs[0]);
-                            self.gen_match(ctx, dests, qsid, Some(variant), rhs);
-                            return true;
-                        }
-                    }
-                },
-                TEST_VARIANT => {
-                    // test_variant$S$V(s) → TestVariants(mid, sid, [variant])
-                    let params = fun_env.get_parameters();
-                    if let (Some(variant_idx), Some((struct_mid, struct_sid))) = (
-                        num_value(attr),
-                        params.first().and_then(|p| struct_from_type(p.1.clone())),
-                    ) {
-                        let struct_env = ctx.env().get_struct(struct_mid.qualified(struct_sid));
-                        if let Some(variant) = struct_env.get_variant_name_by_idx(variant_idx) {
-                            self.gen_call_stm(
-                                ctx,
-                                Some(&inst.to_vec()),
-                                dests,
-                                Operation::TestVariants(struct_mid, struct_sid, vec![variant]),
-                                srcs,
-                            );
-                            return true;
-                        }
-                    }
-                },
-                BORROW | BORROW_MUT => {
-                    // borrow$S$N(s) → Select(mid, sid, field_id)
-                    let params = fun_env.get_parameters();
-                    if let (Some(field_offset), Some((struct_mid, struct_sid))) = (
-                        num_value(attr).map(|v| v as usize),
-                        params.first().and_then(|p| struct_from_type(p.1.clone())),
-                    ) {
-                        let struct_env = ctx.env().get_struct(struct_mid.qualified(struct_sid));
-                        let field_id = struct_env.get_field_by_offset(field_offset).get_id();
-                        self.gen_call_stm(
-                            ctx,
-                            None,
-                            dests,
-                            Operation::Select(struct_mid, struct_sid, field_id),
-                            srcs,
-                        );
-                        return true;
-                    }
-                },
-                _ => {},
-            }
-        }
-        false
     }
 
     fn gen_call_stm(
