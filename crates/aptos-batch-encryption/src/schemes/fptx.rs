@@ -134,7 +134,7 @@ impl BatchThresholdEncryption for FPTX {
         proofs: &Self::EvalProofsPromise,
         digest_key: &DigestKey,
     ) -> Self::EvalProofs {
-        proofs.compute_all_vgzz_multi_point_eval(digest_key)
+        proofs.compute_all_vzgg_multi_point_eval(digest_key)
     }
 
     fn eval_proof_for_ct(
