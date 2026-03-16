@@ -111,8 +111,12 @@ impl DigestKey {
         })
     }
 
-    pub fn capacity(&self) -> usize {
+    pub fn max_batch_size(&self) -> usize {
         self.tau_powers_g1[0].len() - 1
+    }
+
+    pub fn num_rounds(&self) -> usize {
+        self.tau_powers_g1.len()
     }
 
     pub fn digest(
@@ -249,10 +253,10 @@ pub(crate) mod tests {
 
     #[allow(unused)]
     pub(crate) fn digest_and_pfs_for_testing(dk: &DigestKey) -> (Digest, EvalProofsPromise) {
-        let mut ids = IdSet::with_capacity(dk.capacity());
+        let mut ids = IdSet::with_capacity(dk.max_batch_size());
         let mut counter = Fr::zero();
 
-        for _ in 0..dk.capacity() {
+        for _ in 0..dk.max_batch_size() {
             ids.add(&Id::new(counter));
             counter += Fr::one();
         }
@@ -291,6 +295,6 @@ pub(crate) mod tests {
     fn test_digest_key_capacity() {
         let mut rng = thread_rng();
         let dk = DigestKey::new(&mut rng, 8, 1).unwrap();
-        assert_eq!(dk.capacity(), 8);
+        assert_eq!(dk.max_batch_size(), 8);
     }
 }
