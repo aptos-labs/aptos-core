@@ -1,7 +1,7 @@
 // Copyright (c) Aptos Foundation
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
-use crate::{counters, pipeline::pipeline_builder::{PipelineBuilder, Tracker}};
+use crate::{counters, monitor, pipeline::pipeline_builder::{PipelineBuilder, Tracker}};
 use anyhow::{anyhow, Context};
 use aptos_batch_encryption::{
     errors::MissingEvalProofError,
@@ -234,11 +234,14 @@ async fn decrypt_validator_path(
     // TODO(ibalajiarun): Fix this wrapping
     let num_rounds = secret_share_config.digest_key().num_rounds() as u64;
     let encryption_round = block.round() % num_rounds;
-    let (digest, proofs_promise) = FPTXWeighted::digest(
-        secret_share_config.digest_key(),
-        &txn_ciphertexts,
-        encryption_round,
-    )?;
+    let (digest, proofs_promise) = monitor!(
+        "decryption_digest",
+        FPTXWeighted::digest(
+            secret_share_config.digest_key(),
+            &txn_ciphertexts,
+            encryption_round,
+        )?
+    );
 
     let metadata = SecretShareMetadata::new(
         block.epoch(),
@@ -248,8 +251,10 @@ async fn decrypt_validator_path(
         digest.clone(),
     );
 
-    let derived_key_share =
-        FPTXWeighted::derive_decryption_key_share(secret_share_config.msk_share(), &digest)?;
+    let derived_key_share = monitor!(
+        "decryption_derive_key_share",
+        FPTXWeighted::derive_decryption_key_share(secret_share_config.msk_share(), &digest)?
+    );
     if derived_self_key_share_tx
         .send(Some(SecretShare::new(
             author,
@@ -267,21 +272,27 @@ async fn decrypt_validator_path(
     // spawn_blocking prevents starving the async runtime during proof computation.
     let digest_key = secret_share_config.digest_key_arc();
     let proofs_handle = tokio::task::spawn_blocking(move || {
-        FPTXWeighted::eval_proofs_compute_all(&proofs_promise, &digest_key)
+        monitor!(
+            "decryption_eval_proofs",
+            FPTXWeighted::eval_proofs_compute_all(&proofs_promise, &digest_key)
+        )
     });
 
-    let (proofs, maybe_decryption_key) = tokio::try_join!(
-        async {
-            proofs_handle
-                .await
-                .map_err(|e| anyhow!("proof computation panicked: {e}"))
-        },
-        async {
-            secret_shared_key_rx
-                .await
-                .map_err(|_| anyhow!("secret_shared_key_rx dropped"))
-        },
-    )?;
+    let (proofs, maybe_decryption_key) = monitor!(
+        "decryption_wait_proofs_and_key",
+        tokio::try_join!(
+            async {
+                proofs_handle
+                    .await
+                    .map_err(|e| anyhow!("proof computation panicked: {e}"))
+            },
+            async {
+                secret_shared_key_rx
+                    .await
+                    .map_err(|_| anyhow!("secret_shared_key_rx dropped"))
+            },
+        )?
+    );
 
     // Handle missing decryption key gracefully instead of panicking.
     // Mark all encrypted txns as failed-decryption so downstream can handle them.
@@ -334,44 +345,47 @@ async fn decrypt_validator_path(
     // Eliminates the intermediate Vec<PreparedCiphertext> allocation
     // and improves cache locality.
     let num_failed_decryptions = AtomicUsize::new(0);
-    let decrypted_txns: Vec<_> = encrypted_txns
-        .into_par_iter()
-        .zip(txn_ciphertexts.into_par_iter())
-        .map(|(mut txn, ciphertext)| {
-            let prepared_ciphertext_or_error =
-                FPTXWeighted::prepare_ct(&ciphertext, &digest, &proofs);
+    let decrypted_txns: Vec<_> = monitor!(
+        "decryption_prepare_and_decrypt",
+        encrypted_txns
+            .into_par_iter()
+            .zip(txn_ciphertexts.into_par_iter())
+            .map(|(mut txn, ciphertext)| {
+                let prepared_ciphertext_or_error =
+                    FPTXWeighted::prepare_ct(&ciphertext, &digest, &proofs);
 
-            let id: Id = prepared_ciphertext_or_error
-                .as_ref()
-                .map_or_else(|MissingEvalProofError(id)| *id, |ct| ct.id());
-            let eval_proof = proofs.get(&id).expect("must exist");
+                let id: Id = prepared_ciphertext_or_error
+                    .as_ref()
+                    .map_or_else(|MissingEvalProofError(id)| *id, |ct| ct.id());
+                let eval_proof = proofs.get(&id).expect("must exist");
 
-            match do_final_decryption(&decryption_key.key, prepared_ciphertext_or_error) {
-                Ok(payload) => {
-                    let (executable, nonce) = payload.unwrap();
-                    txn.payload_mut()
-                        .as_encrypted_payload_mut()
-                        .map(|p| {
-                            p.into_decrypted(eval_proof, executable, nonce)
-                                .expect("must happen")
-                        })
-                        .expect("must exist");
-                },
-                Err(e) => {
-                    error!(
-                        "Failed to decrypt transaction with ciphertext id {:?}: {:?}",
-                        id, e
-                    );
-                    num_failed_decryptions.fetch_add(1, Ordering::Relaxed);
-                    txn.payload_mut()
-                        .as_encrypted_payload_mut()
-                        .map(|p| p.into_failed_decryption(eval_proof).expect("must happen"))
-                        .expect("must exist");
-                },
-            }
-            txn
-        })
-        .collect();
+                match do_final_decryption(&decryption_key.key, prepared_ciphertext_or_error) {
+                    Ok(payload) => {
+                        let (executable, nonce) = payload.unwrap();
+                        txn.payload_mut()
+                            .as_encrypted_payload_mut()
+                            .map(|p| {
+                                p.into_decrypted(eval_proof, executable, nonce)
+                                    .expect("must happen")
+                            })
+                            .expect("must exist");
+                    },
+                    Err(e) => {
+                        error!(
+                            "Failed to decrypt transaction with ciphertext id {:?}: {:?}",
+                            id, e
+                        );
+                        num_failed_decryptions.fetch_add(1, Ordering::Relaxed);
+                        txn.payload_mut()
+                            .as_encrypted_payload_mut()
+                            .map(|p| p.into_failed_decryption(eval_proof).expect("must happen"))
+                            .expect("must exist");
+                    },
+                }
+                txn
+            })
+            .collect()
+    );
 
     let num_failed = num_failed_decryptions.into_inner();
     let num_decrypted = decrypted_txns.len() - num_failed;
