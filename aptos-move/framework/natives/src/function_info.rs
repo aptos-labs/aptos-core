@@ -33,7 +33,7 @@ fn identifier_from_ref(v: Value) -> SafeNativeResult<Identifier> {
         .and_then(|s| s.borrow_field(0))
         .and_then(|v| v.value_as::<VectorRef>())
         .map_err(SafeNativeError::InvariantViolation)?
-        .as_bytes_ref()
+        .as_bytes_ref()?
         .to_vec();
     Identifier::from_utf8(bytes).map_err(|_| {
         SafeNativeError::abort_with_message(
@@ -193,7 +193,7 @@ fn native_is_identifier(
     debug_assert!(arguments.len() == 1);
 
     let s_arg = safely_pop_arg!(arguments, VectorRef);
-    let s_ref = s_arg.as_bytes_ref();
+    let s_ref = s_arg.as_bytes_ref()?;
 
     context.charge(
         FUNCTION_INFO_CHECK_IS_IDENTIFIER_BASE

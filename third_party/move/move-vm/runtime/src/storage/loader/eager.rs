@@ -22,6 +22,7 @@ use move_binary_format::{
     CompiledModule,
 };
 use move_core_types::{
+    account_address::AccountAddress,
     identifier::IdentStr,
     language_storage::{ModuleId, TypeTag},
     vm_status::StatusCode,
@@ -154,6 +155,15 @@ where
     fn is_lazy_loading_enabled(&self) -> bool {
         debug_assert!(!self.runtime_environment().vm_config().enable_lazy_loading);
         false
+    }
+
+    fn unmetered_get_module_hash(
+        &self,
+        address: &AccountAddress,
+        module_name: &IdentStr,
+    ) -> VMResult<[u8; 32]> {
+        self.module_storage
+            .unmetered_get_existing_module_hash(address, module_name)
     }
 
     fn load_struct_definition(

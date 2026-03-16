@@ -571,7 +571,6 @@ impl<T: Transaction, O: TransactionOutput<Txn = T>> TxnLastInputOutput<T, O> {
         }
         if published {
             // Record validation requirements after the modules are published.
-            global_module_cache.flush_layout_cache();
             scheduler.record_validation_requirements(txn_idx, module_ids_for_v2)?;
         }
         Ok(published)

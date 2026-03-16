@@ -11,6 +11,7 @@ use move_binary_format::{
     CompiledModule,
 };
 use move_core_types::{
+    account_address::AccountAddress,
     identifier::IdentStr,
     language_storage::{ModuleId, TypeTag},
     vm_status::{sub_status::type_resolution_failure::EUSER_TYPE_LOADING_FAILURE, StatusCode},
@@ -28,6 +29,16 @@ use std::{rc::Rc, sync::Arc};
 pub trait StructDefinitionLoader: WithRuntimeEnvironment {
     /// Returns true if the current loader is lazy, and false otherwise.
     fn is_lazy_loading_enabled(&self) -> bool;
+
+    /// Returns the hash of a module or an error if it does not exist or there
+    /// was an error fetching it.
+    ///
+    /// Note: this API is unmetered, use with caution.
+    fn unmetered_get_module_hash(
+        &self,
+        address: &AccountAddress,
+        module_name: &IdentStr,
+    ) -> VMResult<[u8; 32]>;
 
     /// Returns the struct definition corresponding to the specified index. The function may also
     /// charge gas for loading the module where the struct is defined. Returns an error if such

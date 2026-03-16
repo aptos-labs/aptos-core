@@ -10,10 +10,13 @@ use crate::{
     },
     LayoutCacheEntry, RuntimeEnvironment, StructKey,
 };
+use fxhash::FxHashMap;
 use move_binary_format::errors::{PartialVMError, PartialVMResult};
 use move_core_types::{
+    account_address::AccountAddress,
     ident_str,
     identifier::Identifier,
+    int256,
     language_storage::{LEGACY_OPTION_VEC, OPTION_STRUCT_NAME},
     value::{IdentifierMappingKind, MoveFieldLayout, MoveStructLayout, MoveTypeLayout},
     vm_status::StatusCode,
@@ -488,7 +491,18 @@ where
             .runtime_environment()
             .struct_name_index_map()
             .idx_to_struct_name_ref(*idx)?;
-        modules.insert(struct_identifier.module());
+
+        // METERING SAFETY:
+        //   Module has already been loaded because we got the struct definition.
+        let module_hash = self
+            .struct_definition_loader
+            .unmetered_get_module_hash(
+                struct_identifier.module().address(),
+                struct_identifier.module().name(),
+            )
+            .map_err(|err| err.to_partial())?;
+
+        modules.insert(struct_identifier.module(), module_hash);
 
         if check_option_type && !self.runtime_environment().vm_config().enable_capture_option {
             if struct_identifier.module().is_option()
@@ -706,6 +720,138 @@ where
             .map(|(_, ty)| ty_builder.create_ty_with_subst(ty, ty_args))
             .collect::<PartialVMResult<Vec<_>>>()
     }
+}
+
+/// Cache keyed by `Arc` pointer identity for [`constant_serialized_size`] deduplication.
+/// Stores BCS-size for each unique `Arc<MoveStructLayout>` already visited.
+///
+/// # Safety of raw-pointer keys
+/// The pointer is obtained via `Arc::as_ptr` and is **never dereferenced** through the
+/// map key - it is used solely as a unique identity token. Because the caller holds an
+/// `Arc` to the layout tree throughout the entire traversal, the allocation behind each
+/// pointer remains valid and will not be moved or freed, so pointer identity is stable
+/// for the duration of the call. `HashMap` requires `Send`-safe keys; raw pointers are
+/// `!Send`, so the cache must not be sent across threads - and it is not: it is local
+/// and consumed inside a single call to `constant_serialized_size`.
+type LayoutSizeCache = FxHashMap<*const MoveStructLayout, Option<usize>>;
+
+/// Computes the constant BCS serialized size of a type layout, if the type has one.
+///
+/// Returns `(visited_node_count, Ok(Some(size)))` when every value of this type serializes
+/// to the same number of bytes, `(visited_node_count, Ok(None))` when the size depends on
+/// the value (e.g. vectors, enum variants), or `(visited_node_count, Err(...))` on an
+/// unexpected layout form.
+///
+/// Uses an `Arc` pointer-identity cache to deduplicate struct subtrees, mirroring the
+/// behavior of [`LocalSinglePassStructLayoutCache`] during layout construction. This bounds
+/// total work to O(DAG size).
+pub fn constant_serialized_size(
+    ty_layout: &MoveTypeLayout,
+    use_local_struct_cache: bool,
+) -> (u64, PartialVMResult<Option<usize>>) {
+    let mut cache = LayoutSizeCache::default();
+    constant_serialized_size_impl(ty_layout, &mut cache, use_local_struct_cache)
+}
+
+fn constant_serialized_size_impl(
+    ty_layout: &MoveTypeLayout,
+    cache: &mut LayoutSizeCache,
+    use_local_struct_cache: bool,
+) -> (u64, PartialVMResult<Option<usize>>) {
+    let mut visited_count = 1u64;
+    let bcs_size_result = match ty_layout {
+        // Primitive types always have constant size.
+        MoveTypeLayout::Bool => bcs::serialized_size(&false).map(Some),
+        MoveTypeLayout::U8 => bcs::serialized_size(&0u8).map(Some),
+        MoveTypeLayout::U16 => bcs::serialized_size(&0u16).map(Some),
+        MoveTypeLayout::U32 => bcs::serialized_size(&0u32).map(Some),
+        MoveTypeLayout::U64 => bcs::serialized_size(&0u64).map(Some),
+        MoveTypeLayout::U128 => bcs::serialized_size(&0u128).map(Some),
+        MoveTypeLayout::U256 => bcs::serialized_size(&int256::U256::ZERO).map(Some),
+        MoveTypeLayout::I8 => bcs::serialized_size(&0i8).map(Some),
+        MoveTypeLayout::I16 => bcs::serialized_size(&0i16).map(Some),
+        MoveTypeLayout::I32 => bcs::serialized_size(&0i32).map(Some),
+        MoveTypeLayout::I64 => bcs::serialized_size(&0i64).map(Some),
+        MoveTypeLayout::I128 => bcs::serialized_size(&0i128).map(Some),
+        MoveTypeLayout::I256 => bcs::serialized_size(&int256::I256::ZERO).map(Some),
+        MoveTypeLayout::Address => bcs::serialized_size(&AccountAddress::ZERO).map(Some),
+
+        // No constant size:
+        //   - signer's size is VM implementation detail, and can change,
+        //   - vectors have no constant size,
+        //   - functions have no constant size.
+        MoveTypeLayout::Signer | MoveTypeLayout::Vector(_) | MoveTypeLayout::Function => {
+            return (visited_count, Ok(None))
+        },
+
+        MoveTypeLayout::Struct(arc) => {
+            let ptr = Arc::as_ptr(arc);
+            if use_local_struct_cache {
+                if let Some(&cached) = cache.get(&ptr) {
+                    // Repeated struct references during layout construction increment the node
+                    // counter by 1, not by all descendants.
+                    return (1, Ok(cached));
+                }
+            }
+
+            // Structs have constant size, but not enums.
+            let size = match arc.as_ref() {
+                MoveStructLayout::RuntimeVariants(_) | MoveStructLayout::WithVariants { .. } => {
+                    None
+                },
+                MoveStructLayout::Runtime(fields) => {
+                    let mut total: Option<usize> = Some(0);
+                    for field in fields {
+                        let (cur_count, cur) =
+                            constant_serialized_size_impl(field, cache, use_local_struct_cache);
+                        visited_count = visited_count.saturating_add(cur_count);
+                        match cur {
+                            Err(e) => return (visited_count, Err(e)),
+                            Ok(Some(v)) => total = total.and_then(|s| s.checked_add(v)),
+                            Ok(None) => {
+                                total = None;
+                                break;
+                            },
+                        }
+                    }
+                    total
+                },
+                MoveStructLayout::WithFields(_) | MoveStructLayout::WithTypes { .. } => {
+                    return (
+                        visited_count,
+                        Err(PartialVMError::new(StatusCode::VALUE_SERIALIZATION_ERROR)
+                            .with_message(
+                                "Only runtime types expected, but found WithFields/WithTypes"
+                                    .to_string(),
+                            )),
+                    );
+                },
+            };
+
+            if use_local_struct_cache {
+                cache.insert(ptr, size);
+            }
+            return (visited_count, Ok(size));
+        },
+        MoveTypeLayout::Native(_, inner) => {
+            let (cur_count, cur) =
+                constant_serialized_size_impl(inner, cache, use_local_struct_cache);
+            visited_count = visited_count.saturating_add(cur_count);
+            match cur {
+                Err(e) => return (visited_count, Err(e)),
+                Ok(v) => Ok(v),
+            }
+        },
+    };
+    (
+        visited_count,
+        bcs_size_result.map_err(|e| {
+            PartialVMError::new(StatusCode::VALUE_SERIALIZATION_ERROR).with_message(format!(
+                "failed to compute serialized size of a value: {:?}",
+                e
+            ))
+        }),
+    )
 }
 
 #[cfg(test)]

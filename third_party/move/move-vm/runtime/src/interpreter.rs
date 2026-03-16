@@ -1604,7 +1604,8 @@ where
                         ty,
                         runtime_environment,
                     },
-                    gv.view().unwrap(),
+                    gv.view()
+                        .expect("After successful move_to, global value is set"),
                     true,
                 )?;
                 self.check_access(runtime_environment, AccessKind::Writes, ty, addr)?;
