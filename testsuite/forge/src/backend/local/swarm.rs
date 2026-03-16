@@ -98,6 +98,8 @@ pub struct LocalSwarm {
     root_account: Arc<LocalAccount>,
     chain_id: ChainId,
     root_key: ConfigKey<Ed25519PrivateKey>,
+    cpu_affinities: Vec<String>,
+    mem_binds: Vec<String>,
 
     launched: bool,
     #[allow(dead_code)]
@@ -116,6 +118,9 @@ impl LocalSwarm {
         dir: Option<PathBuf>,
         genesis_framework: Option<ReleaseBundle>,
         guard: ActiveNodesGuard,
+        cpu_affinities: Vec<String>,
+        mem_binds: Vec<String>,
+        concurrency_level: u16,
     ) -> Result<LocalSwarm>
     where
         R: ::rand::RngCore + ::rand::CryptoRng,
@@ -139,8 +144,7 @@ impl LocalSwarm {
             )?
             .with_num_validators(number_of_validators)
             .with_init_config(Some(Arc::new(move |index, config, base| {
-                // for local tests, turn off parallel execution:
-                config.execution.concurrency_level = 1;
+                config.execution.concurrency_level = concurrency_level;
 
                 // Single node orders blocks too fast which would trigger backpressure and stall for 1 sec
                 // which cause flakiness in tests.
@@ -186,6 +190,8 @@ impl LocalSwarm {
                     v.index,
                     v.dir,
                     v.account_private_key,
+                    cpu_affinities.get(v.index).cloned(),
+                    mem_binds.get(v.index).cloned(),
                 )?;
                 Ok((node.peer_id(), node))
             })
@@ -258,6 +264,8 @@ impl LocalSwarm {
             root_account,
             chain_id: ChainId::test(),
             root_key,
+            cpu_affinities,
+            mem_binds,
             launched: false,
             guard,
         })
@@ -373,6 +381,8 @@ impl LocalSwarm {
             index,
             fullnode_config.dir,
             None,
+            self.cpu_affinities.get(index).cloned(),
+            self.mem_binds.get(index).cloned(),
         )?;
 
         let peer_id = fullnode.peer_id();
@@ -403,6 +413,8 @@ impl LocalSwarm {
             index,
             fullnode_config.dir,
             None,
+            self.cpu_affinities.get(index).cloned(),
+            self.mem_binds.get(index).cloned(),
         )?;
 
         let peer_id = fullnode.peer_id();
