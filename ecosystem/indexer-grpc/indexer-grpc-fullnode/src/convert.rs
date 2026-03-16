@@ -263,9 +263,7 @@ pub fn convert_transaction_payload(
                 r#type: transaction::transaction_payload::Type::EncryptedTransactionPayload as i32,
                 payload: Some(
                     transaction::transaction_payload::Payload::EncryptedTransactionPayload(
-                        transaction::EncryptedTransactionPayload {
-                            state: Some(state),
-                        },
+                        transaction::EncryptedTransactionPayload { state: Some(state) },
                     ),
                 ),
                 extra_config: Some(

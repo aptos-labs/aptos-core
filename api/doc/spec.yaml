@@ -13269,6 +13269,25 @@ components:
         value_type:
           type: string
           description: Type of value
+    DecryptedPayload:
+      type: object
+      description: Payload has been successfully decrypted.
+      required:
+      - payload_hash
+      - ciphertext
+      - decrypted_payload
+      - decryption_nonce
+      properties:
+        payload_hash:
+          $ref: '#/components/schemas/HashValue'
+        ciphertext:
+          allOf:
+          - $ref: '#/components/schemas/HexEncodedBytes'
+          - description: BCS-serialized ciphertext bytes, hex-encoded.
+        decrypted_payload:
+          $ref: '#/components/schemas/EncryptedTransactionInnerPayload'
+        decryption_nonce:
+          $ref: '#/components/schemas/U64'
     DeleteModule:
       type: object
       description: Delete a module
@@ -13391,24 +13410,32 @@ components:
           description: Secondary signer accounts of the request for Multi-agent
           items:
             $ref: '#/components/schemas/Address'
-    EncryptedState:
-      type: string
-      description: The decryption state of an encrypted transaction payload.
-      enum:
-      - encrypted
-      - failed_decryption
-      - decrypted
+    EncryptedPayload:
+      type: object
+      description: Payload is still encrypted and cannot be read.
+      required:
+      - payload_hash
+      - ciphertext
+      properties:
+        payload_hash:
+          $ref: '#/components/schemas/HashValue'
+        ciphertext:
+          allOf:
+          - $ref: '#/components/schemas/HexEncodedBytes'
+          - description: BCS-serialized ciphertext bytes, hex-encoded.
     EncryptedTransactionInnerPayload:
       type: object
       description: The inner payload of an encrypted transaction, present only when decrypted.
       oneOf:
       - $ref: '#/components/schemas/EncryptedTransactionInnerPayload_EntryFunctionPayload'
       - $ref: '#/components/schemas/EncryptedTransactionInnerPayload_ScriptPayload'
+      - $ref: '#/components/schemas/EncryptedTransactionInnerPayload_MultisigPayload'
       discriminator:
         propertyName: type
         mapping:
           entry_function_payload: '#/components/schemas/EncryptedTransactionInnerPayload_EntryFunctionPayload'
           script_payload: '#/components/schemas/EncryptedTransactionInnerPayload_ScriptPayload'
+          multisig_payload: '#/components/schemas/EncryptedTransactionInnerPayload_MultisigPayload'
     EncryptedTransactionInnerPayload_EntryFunctionPayload:
       allOf:
       - type: object
@@ -13421,6 +13448,18 @@ components:
             - entry_function_payload
             example: entry_function_payload
       - $ref: '#/components/schemas/EntryFunctionPayload'
+    EncryptedTransactionInnerPayload_MultisigPayload:
+      allOf:
+      - type: object
+        required:
+        - type
+        properties:
+          type:
+            type: string
+            enum:
+            - multisig_payload
+            example: multisig_payload
+      - $ref: '#/components/schemas/MultisigPayload'
     EncryptedTransactionInnerPayload_ScriptPayload:
       allOf:
       - type: object
@@ -13435,27 +13474,59 @@ components:
       - $ref: '#/components/schemas/ScriptPayload'
     EncryptedTransactionPayload:
       type: object
-      description: An encrypted transaction payload. Exposes metadata and, when decrypted, the inner payload.
-      required:
-      - encrypted_state
-      - payload_hash
-      properties:
-        encrypted_state:
-          $ref: '#/components/schemas/EncryptedState'
-        payload_hash:
-          $ref: '#/components/schemas/HashValue'
-        ciphertext:
-          allOf:
-          - $ref: '#/components/schemas/HexEncodedBytes'
-          - description: BCS-serialized ciphertext bytes. Required for submission, omitted in read responses.
-        multisig_address:
-          $ref: '#/components/schemas/Address'
-        replay_protection_nonce:
-          $ref: '#/components/schemas/U64'
-        decrypted_payload:
-          $ref: '#/components/schemas/EncryptedTransactionInnerPayload'
-        decryption_nonce:
-          $ref: '#/components/schemas/U64'
+      description: |-
+        An encrypted transaction payload, discriminated by encrypted_state.
+
+        NOTE: multisig_address and replay_protection_nonce are not surfaced here.
+        They are part of extra_config and already exposed on UserTransactionRequest.
+        For Decrypted state, multisig_address is embedded in the MultisigPayload variant
+        of decrypted_payload.
+      oneOf:
+      - $ref: '#/components/schemas/EncryptedTransactionPayload_EncryptedPayload'
+      - $ref: '#/components/schemas/EncryptedTransactionPayload_FailedDecryptionPayload'
+      - $ref: '#/components/schemas/EncryptedTransactionPayload_DecryptedPayload'
+      discriminator:
+        propertyName: encrypted_state
+        mapping:
+          encrypted: '#/components/schemas/EncryptedTransactionPayload_EncryptedPayload'
+          failed_decryption: '#/components/schemas/EncryptedTransactionPayload_FailedDecryptionPayload'
+          decrypted: '#/components/schemas/EncryptedTransactionPayload_DecryptedPayload'
+    EncryptedTransactionPayload_DecryptedPayload:
+      allOf:
+      - type: object
+        required:
+        - encrypted_state
+        properties:
+          encrypted_state:
+            type: string
+            enum:
+            - decrypted
+            example: decrypted
+      - $ref: '#/components/schemas/DecryptedPayload'
+    EncryptedTransactionPayload_EncryptedPayload:
+      allOf:
+      - type: object
+        required:
+        - encrypted_state
+        properties:
+          encrypted_state:
+            type: string
+            enum:
+            - encrypted
+            example: encrypted
+      - $ref: '#/components/schemas/EncryptedPayload'
+    EncryptedTransactionPayload_FailedDecryptionPayload:
+      allOf:
+      - type: object
+        required:
+        - encrypted_state
+        properties:
+          encrypted_state:
+            type: string
+            enum:
+            - failed_decryption
+            example: failed_decryption
+      - $ref: '#/components/schemas/FailedDecryptionPayload'
     EntryFunctionId:
       type: string
       description: |
@@ -13584,6 +13655,19 @@ components:
           $ref: '#/components/schemas/ExportedProviderJWKs'
         multi_sig:
           $ref: '#/components/schemas/ExportedAggregateSignature'
+    FailedDecryptionPayload:
+      type: object
+      description: Decryption was attempted but failed.
+      required:
+      - payload_hash
+      - ciphertext
+      properties:
+        payload_hash:
+          $ref: '#/components/schemas/HashValue'
+        ciphertext:
+          allOf:
+          - $ref: '#/components/schemas/HexEncodedBytes'
+          - description: BCS-serialized ciphertext bytes, hex-encoded.
     FederatedKeyless:
       type: object
       required:
