@@ -849,12 +849,12 @@ impl<E: Pairing> traits::BatchedRangeProof<E> for Proof<E> {
             verifier_precomputed,
         } = vk;
 
-        assert!(
+        ensure!(
             ell as usize <= verifier_precomputed.powers_of_two.len(),
             "ell (got {}) must be ≤ max_ell (which is {})",
             ell,
             verifier_precomputed.powers_of_two.len()
-        ); // Easy to work around this if it fails...
+        );
 
         let Proof {
             hat_C,
@@ -974,9 +974,12 @@ impl<E: Pairing> traits::BatchedRangeProof<E> for Proof<E> {
 
         let LHS = {
             // First compute V_SS^*(gamma), where V_SS^*(X) is the polynomial (X^{max_n + 1} - 1) / (X - 1)
+            let denom = (gamma - E::ScalarField::ONE).inverse().ok_or_else(|| {
+                anyhow!("gamma must not be 1 (division by zero in V_SS^* evaluation)")
+            })?;
             let V_eval_gamma = {
                 let gamma_pow = gamma.pow([num_omegas as u64]);
-                (gamma_pow - E::ScalarField::ONE) * (gamma - E::ScalarField::ONE).inverse().unwrap()
+                (gamma_pow - E::ScalarField::ONE) * denom
             };
 
             *a_h * V_eval_gamma
