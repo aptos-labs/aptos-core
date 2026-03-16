@@ -994,9 +994,8 @@ impl PipelineBuilder {
         if ordered_blocks
             .iter()
             .find(|ordered_block| ordered_block.id() == block.id())
-            .and_then(|block| {
+            .map(|block| {
                 block.set_decrypted_txns(decrypted_txns);
-                Some(block)
             })
             .is_none()
         {
