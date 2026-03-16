@@ -278,13 +278,46 @@ async fn decrypt_validator_path(
         )
     });
 
-    let (proofs, maybe_decryption_key) = monitor!(
-        "decryption_wait_proofs_and_key",
+    // Wait for eval_proofs first, then overlap prepare_ct with key reception.
+    // Pipeline: eval_proofs ──→ prepare_ct ──┐
+    //           secret_shared_key_rx ─────────┴──→ decrypt
+    let proofs = monitor!(
+        "decryption_wait_eval_proofs",
+        proofs_handle
+            .await
+            .map_err(|e| anyhow!("proof computation panicked: {e}"))?
+    );
+
+    // prepare_ct is expensive (parallel pairings) and doesn't need the decryption key,
+    // so run it concurrently with the remaining key wait.
+    let prepare_handle = {
+        let digest = digest.clone();
+        let proofs = proofs.clone();
+        tokio::task::spawn_blocking(move || {
+            monitor!(
+                "decryption_prepare_ct",
+                txn_ciphertexts
+                    .into_par_iter()
+                    .map(|ciphertext| {
+                        let prepared_or_err =
+                            FPTXWeighted::prepare_ct(&ciphertext, &digest, &proofs);
+                        let id: Id = prepared_or_err
+                            .as_ref()
+                            .map_or_else(|MissingEvalProofError(id)| *id, |ct| ct.id());
+                        (id, prepared_or_err)
+                    })
+                    .collect::<Vec<_>>()
+            )
+        })
+    };
+
+    let (prepared_cts, maybe_decryption_key) = monitor!(
+        "decryption_wait_prepare_and_key",
         tokio::try_join!(
             async {
-                proofs_handle
+                prepare_handle
                     .await
-                    .map_err(|e| anyhow!("proof computation panicked: {e}"))
+                    .map_err(|e| anyhow!("prepare_ct panicked: {e}"))
             },
             async {
                 secret_shared_key_rx
@@ -305,9 +338,8 @@ async fn decrypt_validator_path(
         let num_failed = encrypted_txns.len();
         let failed_txns: Vec<_> = encrypted_txns
             .into_par_iter()
-            .zip(txn_ciphertexts.into_par_iter())
-            .map(|(mut txn, ciphertext)| {
-                let id = ciphertext.id();
+            .zip(prepared_cts.into_par_iter())
+            .map(|(mut txn, (id, _prepared))| {
                 let eval_proof = proofs.get(&id).expect("must exist");
                 txn.payload_mut()
                     .as_encrypted_payload_mut()
@@ -341,22 +373,14 @@ async fn decrypt_validator_path(
         decryption_key.metadata
     );
 
-    // Fused prepare_ct + decrypt in a single parallel pass.
-    // Eliminates the intermediate Vec<PreparedCiphertext> allocation
-    // and improves cache locality.
+    // Final decryption pass — needs both prepared ciphertexts and the decryption key.
     let num_failed_decryptions = AtomicUsize::new(0);
     let decrypted_txns: Vec<_> = monitor!(
-        "decryption_prepare_and_decrypt",
+        "decryption_decrypt",
         encrypted_txns
             .into_par_iter()
-            .zip(txn_ciphertexts.into_par_iter())
-            .map(|(mut txn, ciphertext)| {
-                let prepared_ciphertext_or_error =
-                    FPTXWeighted::prepare_ct(&ciphertext, &digest, &proofs);
-
-                let id: Id = prepared_ciphertext_or_error
-                    .as_ref()
-                    .map_or_else(|MissingEvalProofError(id)| *id, |ct| ct.id());
+            .zip(prepared_cts.into_par_iter())
+            .map(|(mut txn, (id, prepared_ciphertext_or_error))| {
                 let eval_proof = proofs.get(&id).expect("must exist");
 
                 match do_final_decryption(&decryption_key.key, prepared_ciphertext_or_error) {
