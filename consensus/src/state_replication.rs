@@ -2,12 +2,9 @@
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 use crate::{
-    consensus_observer::publisher::consensus_publisher::ConsensusPublisher,
-    error::StateSyncError,
-    network::NetworkSender,
-    payload_manager::TPayloadManager,
-    transaction_deduper::TransactionDeduper,
-    transaction_shuffler::TransactionShuffler,
+    consensus_observer::publisher::consensus_publisher::ConsensusPublisher, error::StateSyncError,
+    network::NetworkSender, payload_manager::TPayloadManager,
+    transaction_deduper::TransactionDeduper, transaction_shuffler::TransactionShuffler,
 };
 use anyhow::Result;
 use aptos_consensus_types::pipelined_block::PipelinedBlock;

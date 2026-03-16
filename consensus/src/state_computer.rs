@@ -3,15 +3,10 @@
 
 use crate::{
     block_preparer::BlockPreparer,
-    consensus_observer::publisher::consensus_publisher::ConsensusPublisher,
-    error::StateSyncError,
-    monitor,
-    network::NetworkSender,
-    payload_manager::TPayloadManager,
-    pipeline::pipeline_builder::PipelineBuilder,
-    state_replication::StateComputer,
-    transaction_deduper::TransactionDeduper,
-    transaction_shuffler::TransactionShuffler,
+    consensus_observer::publisher::consensus_publisher::ConsensusPublisher, error::StateSyncError,
+    monitor, network::NetworkSender, payload_manager::TPayloadManager,
+    pipeline::pipeline_builder::PipelineBuilder, state_replication::StateComputer,
+    transaction_deduper::TransactionDeduper, transaction_shuffler::TransactionShuffler,
     txn_notifier::TxnNotifier,
 };
 use anyhow::Result;
