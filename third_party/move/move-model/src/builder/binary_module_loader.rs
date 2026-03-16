@@ -572,21 +572,19 @@ impl<'a> BinaryModuleLoader<'a> {
         // struct's visibility to match the API function's visibility. The binary format does
         // not store struct visibility explicitly; it is inferred from the API wrapper functions
         // (pack$S, unpack$S, borrow$S$N, etc.) which carry the correct visibility.
-        if has_def {
-            if is_struct_api_fn {
-                let fun_name = handle_view.name().as_str();
-                // The struct name is always the component between the first and second '$'.
-                // This holds for every struct API operation:
-                //   pack$S → "S",  unpack$S → "S",  borrow$S$N → "S",  borrow_mut$S$N → "S",
-                //   test_variant$E$V → "E",  pack_variant$E$V → "E",  unpack_variant$E$V → "E"
-                if let Some(struct_name) = fun_name.split('$').nth(1) {
-                    let struct_id = StructId::new(self.sym(struct_name));
-                    if let Some(struct_data) = self.env.module_data[module_id.to_usize()]
-                        .struct_data
-                        .get_mut(&struct_id)
-                    {
-                        struct_data.visibility = visibility;
-                    }
+        if has_def && is_struct_api_fn {
+            let fun_name = handle_view.name().as_str();
+            // The struct name is always the component between the first and second '$'.
+            // This holds for every struct API operation:
+            //   pack$S → "S",  unpack$S → "S",  borrow$S$N → "S",  borrow_mut$S$N → "S",
+            //   test_variant$E$V → "E",  pack_variant$E$V → "E",  unpack_variant$E$V → "E"
+            if let Some(struct_name) = fun_name.split('$').nth(1) {
+                let struct_id = StructId::new(self.sym(struct_name));
+                if let Some(struct_data) = self.env.module_data[module_id.to_usize()]
+                    .struct_data
+                    .get_mut(&struct_id)
+                {
+                    struct_data.visibility = visibility;
                 }
             }
         }

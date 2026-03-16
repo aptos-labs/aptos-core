@@ -883,7 +883,7 @@ impl<'a> StacklessBytecodeGenerator<'a> {
                 // downstream consumers (prover, decompiler, etc.) see Pack/BorrowField/…
                 // rather than calls to compiler-generated wrappers.
                 let op = self
-                    .struct_api_operation(&function_handle_view, &callee_env, vec![])
+                    .struct_api_operation(&function_handle_view, &callee_env, &[])
                     .unwrap_or_else(|| {
                         Operation::Function(
                             callee_env.module_env.get_id(),
@@ -891,7 +891,8 @@ impl<'a> StacklessBytecodeGenerator<'a> {
                             vec![],
                         )
                     });
-                self.code.push(mk_call(op, return_temp_indices, arg_temp_indices))
+                self.code
+                    .push(mk_call(op, return_temp_indices, arg_temp_indices))
             },
             MoveBytecode::CallGeneric(idx) => {
                 let func_instantiation = self.module.function_instantiation_at(*idx);
@@ -924,7 +925,7 @@ impl<'a> StacklessBytecodeGenerator<'a> {
                     .get_used_function(func_instantiation.handle)
                     .expect(COMPILED_MODULE_AVAILABLE);
                 let op = self
-                    .struct_api_operation(&function_handle_view, &callee_env, type_sigs.clone())
+                    .struct_api_operation(&function_handle_view, &callee_env, &type_sigs)
                     .unwrap_or_else(|| {
                         Operation::Function(
                             callee_env.module_env.get_id(),
@@ -932,7 +933,8 @@ impl<'a> StacklessBytecodeGenerator<'a> {
                             type_sigs,
                         )
                     });
-                self.code.push(mk_call(op, return_temp_indices, arg_temp_indices))
+                self.code
+                    .push(mk_call(op, return_temp_indices, arg_temp_indices))
             },
 
             MoveBytecode::CallClosure(sidx) => self.call_closure(attr_id, *sidx),
@@ -2038,17 +2040,17 @@ impl<'a> StacklessBytecodeGenerator<'a> {
         &self,
         fhv: &FunctionHandleView<CompiledModule>,
         callee_env: &move_model::model::FunctionEnv,
-        type_args: Vec<Type>,
+        type_args: &[Type],
     ) -> Option<Operation> {
         let (mid, sid) = callee_env.get_struct_api_struct()?;
 
         for attr in fhv.attributes() {
             match attr {
                 FunctionAttribute::Pack => {
-                    return Some(Operation::Pack(mid, sid, type_args));
+                    return Some(Operation::Pack(mid, sid, type_args.to_vec()));
                 },
                 FunctionAttribute::Unpack => {
-                    return Some(Operation::Unpack(mid, sid, type_args));
+                    return Some(Operation::Unpack(mid, sid, type_args.to_vec()));
                 },
                 FunctionAttribute::PackVariant(variant_idx) => {
                     let variant = callee_env
@@ -2056,7 +2058,12 @@ impl<'a> StacklessBytecodeGenerator<'a> {
                         .env
                         .get_struct(mid.qualified(sid))
                         .get_variant_name_by_idx(*variant_idx)?;
-                    return Some(Operation::PackVariant(mid, sid, variant, type_args));
+                    return Some(Operation::PackVariant(
+                        mid,
+                        sid,
+                        variant,
+                        type_args.to_vec(),
+                    ));
                 },
                 FunctionAttribute::UnpackVariant(variant_idx) => {
                     let variant = callee_env
@@ -2064,7 +2071,12 @@ impl<'a> StacklessBytecodeGenerator<'a> {
                         .env
                         .get_struct(mid.qualified(sid))
                         .get_variant_name_by_idx(*variant_idx)?;
-                    return Some(Operation::UnpackVariant(mid, sid, variant, type_args));
+                    return Some(Operation::UnpackVariant(
+                        mid,
+                        sid,
+                        variant,
+                        type_args.to_vec(),
+                    ));
                 },
                 FunctionAttribute::TestVariant(variant_idx) => {
                     let variant = callee_env
@@ -2072,14 +2084,19 @@ impl<'a> StacklessBytecodeGenerator<'a> {
                         .env
                         .get_struct(mid.qualified(sid))
                         .get_variant_name_by_idx(*variant_idx)?;
-                    return Some(Operation::TestVariant(mid, sid, variant, type_args));
+                    return Some(Operation::TestVariant(
+                        mid,
+                        sid,
+                        variant,
+                        type_args.to_vec(),
+                    ));
                 },
                 FunctionAttribute::BorrowFieldImmutable(offset)
                 | FunctionAttribute::BorrowFieldMutable(offset) => {
                     return Some(Operation::BorrowField(
                         mid,
                         sid,
-                        type_args,
+                        type_args.to_vec(),
                         *offset as usize,
                     ));
                 },

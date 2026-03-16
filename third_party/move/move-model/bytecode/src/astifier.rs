@@ -84,12 +84,10 @@ use itertools::Itertools;
 use log::{debug, log_enabled, Level};
 use move_binary_format::file_format::CodeOffset;
 use move_model::{
-    ast::{
-        AbortKind, Exp, ExpData, Operation, Pattern, TempIndex, Value,
-    },
+    ast::{AbortKind, Exp, ExpData, Operation, Pattern, TempIndex},
     exp_builder::ExpBuilder,
     exp_rewriter::ExpRewriterFunctions,
-    model::{FunId, GlobalEnv, Loc, ModuleId, NodeId, QualifiedInstId, StructId},
+    model::{GlobalEnv, Loc, NodeId, QualifiedInstId, StructId},
     symbol::Symbol,
     ty::{ReferenceKind, Type},
 };
@@ -498,7 +496,6 @@ impl<'a> Context<'a> {
         false
     }
 }
-
 
 // -------------------------------------------------------------------------------------------
 // Generator Core Logic
@@ -1062,7 +1059,13 @@ impl Generator {
                     !ctx.env().get_function(mid.qualified(*fid)).is_struct_api(),
                     "struct API wrapper should have been translated in stackless_bytecode_generator"
                 );
-                self.gen_call_stm(ctx, Some(inst), dests, Operation::MoveFunction(*mid, *fid), srcs)
+                self.gen_call_stm(
+                    ctx,
+                    Some(inst),
+                    dests,
+                    Operation::MoveFunction(*mid, *fid),
+                    srcs,
+                )
             },
             Closure(mid, fid, inst, closure_mask) => self.gen_call_stm(
                 ctx,
