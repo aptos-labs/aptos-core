@@ -56,6 +56,8 @@ pub struct LocalNode {
     peer_id: AccountAddress,
     directory: PathBuf,
     config: NodeConfig,
+    cpu_affinity: Option<String>,
+    mem_bind: Option<String>,
 }
 
 impl LocalNode {
@@ -65,6 +67,8 @@ impl LocalNode {
         index: usize,
         directory: PathBuf,
         account_private_key: Option<ConfigKey<Ed25519PrivateKey>>,
+        cpu_affinity: Option<String>,
+        mem_bind: Option<String>,
     ) -> Result<Self> {
         let config_path = directory.join("node.yaml");
         let config = NodeConfig::load_from_path(&config_path).map_err(|error| {
@@ -87,6 +91,8 @@ impl LocalNode {
             peer_id,
             directory,
             config,
+            cpu_affinity,
+            mem_bind,
         })
     }
 
@@ -128,8 +134,20 @@ impl LocalNode {
             .append(true)
             .open(self.log_path())?;
 
-        // Start node process
-        let mut node_command = Command::new(self.version.bin());
+        // Start node process, optionally wrapped with numactl for CPU/memory affinity
+        let mut node_command = if self.cpu_affinity.is_some() || self.mem_bind.is_some() {
+            let mut cmd = Command::new("numactl");
+            if let Some(ref cpus) = self.cpu_affinity {
+                cmd.arg(format!("--physcpubind={}", cpus));
+            }
+            if let Some(ref mem) = self.mem_bind {
+                cmd.arg(format!("--membind={}", mem));
+            }
+            cmd.arg(self.version.bin());
+            cmd
+        } else {
+            Command::new(self.version.bin())
+        };
         node_command
             .current_dir(&self.directory)
             .arg("-f")
