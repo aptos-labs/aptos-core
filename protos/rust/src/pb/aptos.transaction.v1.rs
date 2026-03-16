@@ -678,18 +678,18 @@ pub struct FailedDecryptionPayloadState {
 #[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct DecryptedPayloadState {
-    #[prost(oneof="decrypted_payload_state::DecryptedPayload", tags="3, 4, 5")]
+    #[prost(oneof="decrypted_payload_state::DecryptedPayload", tags="1, 2, 3")]
     pub decrypted_payload: ::core::option::Option<decrypted_payload_state::DecryptedPayload>,
 }
 pub mod decrypted_payload_state {
     #[allow(clippy::derive_partial_eq_without_eq)]
     #[derive(Clone, PartialEq, ::prost::Oneof)]
     pub enum DecryptedPayload {
-        #[prost(message, tag="3")]
+        #[prost(message, tag="1")]
         EntryFunctionPayload(super::EntryFunctionPayload),
-        #[prost(message, tag="4")]
+        #[prost(message, tag="2")]
         ScriptPayload(super::ScriptPayload),
-        #[prost(message, tag="5")]
+        #[prost(message, tag="3")]
         MultisigPayload(super::MultisigPayload),
     }
 }

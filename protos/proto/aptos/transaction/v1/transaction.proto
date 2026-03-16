@@ -339,9 +339,9 @@ message FailedDecryptionPayloadState {
 
 message DecryptedPayloadState {
   oneof decrypted_payload {
-    EntryFunctionPayload entry_function_payload = 3;
-    ScriptPayload script_payload = 4;
-    MultisigPayload multisig_payload = 5;
+    EntryFunctionPayload entry_function_payload = 1;
+    ScriptPayload script_payload = 2;
+    MultisigPayload multisig_payload = 3;
   }
 }
 
