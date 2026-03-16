@@ -211,6 +211,13 @@ pub enum MicroOp {
         rhs: FrameOffset,
     },
 
+    /// `dst = lhs - rhs` (u64, checked).
+    SubU64 {
+        dst: FrameOffset,
+        lhs: FrameOffset,
+        rhs: FrameOffset,
+    },
+
     /// `dst = src + imm` (u64, checked).
     AddU64Imm {
         dst: FrameOffset,
@@ -288,6 +295,19 @@ pub enum MicroOp {
     JumpNotZeroU64 {
         target: CodeOffset,
         src: FrameOffset,
+    },
+
+    /// Jump to `target` if the u64 at `src` is zero.
+    JumpZeroU64 {
+        target: CodeOffset,
+        src: FrameOffset,
+    },
+
+    /// `dst = (lhs <= rhs) as u64` (u64 comparison, result is 0 or 1).
+    LeU64 {
+        dst: FrameOffset,
+        lhs: FrameOffset,
+        rhs: FrameOffset,
     },
 
     /// Jump to `target` if the u64 at `src` is **>=** `imm`.

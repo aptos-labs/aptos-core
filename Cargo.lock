@@ -6671,6 +6671,23 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c3ac9f8b63eca6fd385229b3675f6cc0dc5c8a5c8a54a59d4f52ffd670d87b0c"
 
 [[package]]
+name = "bytecode-to-micro-ops"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "codespan-reporting",
+ "datatest-stable",
+ "legacy-move-compiler",
+ "mono-move-micro-ops",
+ "move-asm",
+ "move-binary-format",
+ "move-compiler-v2",
+ "move-core-types",
+ "move-model",
+ "move-prover-test-utils",
+]
+
+[[package]]
 name = "bytecode-verifier-tests"
 version = "0.1.0"
 dependencies = [

@@ -1,0 +1,27 @@
+[package]
+name = "bytecode-to-micro-ops"
+version = "0.1.0"
+edition = { workspace = true }
+publish = false
+
+[dependencies]
+anyhow = { workspace = true }
+mono-move-micro-ops = { workspace = true }
+move-binary-format = { workspace = true }
+move-core-types = { workspace = true }
+
+[dev-dependencies]
+codespan-reporting = { workspace = true }
+datatest-stable = { workspace = true }
+legacy-move-compiler = { workspace = true }
+move-asm = { workspace = true }
+move-compiler-v2 = { workspace = true }
+move-model = { workspace = true }
+move-prover-test-utils = { workspace = true }
+
+[[test]]
+name = "testsuite"
+harness = false
+
+[lib]
+doctest = false

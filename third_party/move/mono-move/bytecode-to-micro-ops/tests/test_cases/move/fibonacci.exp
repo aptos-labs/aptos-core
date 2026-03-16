@@ -1,0 +1,54 @@
+=== masm ===
+// Bytecode version v10
+module 0x42::fibonacci
+// Function definition at index 0
+fun fib(l0: u64): u64
+    copy_loc l0
+    ld_u64 1
+    le
+    br_false l0
+    move_loc l0
+    // @5
+    ret
+l0: copy_loc l0
+    ld_u64 1
+    sub
+    call fib
+    // @10
+    move_loc l0
+    ld_u64 2
+    sub
+    call fib
+    add
+    // @15
+    ret
+
+
+=== direct micro-ops ===
+
+fun fib() {
+  frame_data_size: 40
+  code:
+    0: Move8 [8] <- [0]
+    1: StoreImm8 [16] <- #1
+    2: LeU64 [8] <- [8] <= [16]
+    3: JumpZeroU64 @7 [8]
+    4: Move8 [8] <- [0]
+    5: Move8 [0] <- [8]
+    6: Return
+    7: Move8 [8] <- [0]
+    8: StoreImm8 [16] <- #1
+    9: SubU64 [8] <- [8] - [16]
+    10: Move8 [64] <- [8]
+    11: CallFunc #0
+    12: Move8 [8] <- [64]
+    13: Move8 [16] <- [0]
+    14: StoreImm8 [24] <- #2
+    15: SubU64 [16] <- [16] - [24]
+    16: Move8 [64] <- [16]
+    17: CallFunc #0
+    18: Move8 [16] <- [64]
+    19: AddU64 [8] <- [8] + [16]
+    20: Move8 [0] <- [8]
+    21: Return
+}
