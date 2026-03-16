@@ -16,6 +16,7 @@ use crate::{
     },
     Scalar,
 };
+use anyhow::{anyhow, ensure, Result};
 use aptos_crypto::arkworks::{
     self,
     msm::{msm_bool, MsmInput},
@@ -33,6 +34,7 @@ use ark_serialize::{
 };
 use num_integer::Roots;
 use rand_core::{CryptoRng, RngCore};
+use sigma_protocol::homomorphism::TrivialShape as HkzgCommitment;
 // With feature `range_proof_timing_univariate_v2`, timing is printed for setup/prove/verify/commit.
 // To see it: run the integration test with stdout shown, e.g.
 //   cargo test -p aptos-dkg --features range_proof_timing_univariate_v2 --test range_proof -- --nocapture
@@ -49,11 +51,11 @@ pub struct Proof<E: Pairing> {
     D: E::G1Affine,
     a: E::ScalarField,
     a_h: E::ScalarField,
-    a_js: Vec<E::ScalarField>,                        // has length ell
-    pi_gamma: univariate_hiding_kzg::OpeningProof<E>, // TODO: need to make this affine
+    a_js: Vec<E::ScalarField>, // has length ell
+    pi_gamma: univariate_hiding_kzg::OpeningProof<E>,
 }
 
-// Because of Fiat-Shamir, everything is already affine here, except the final opening proof
+// Because of Fiat-Shamir usage, everything is already affine here, except the final opening proof
 #[allow(non_snake_case)]
 #[derive(CanonicalSerialize, CanonicalDeserialize, Debug, Clone, PartialEq, Eq)]
 pub struct ProofProjective<E: Pairing> {
@@ -121,7 +123,10 @@ impl<E: Pairing> SerializeForFiatShamirTranscript for VerificationKey<E> {
         &self,
         w: &mut W,
     ) -> Result<(), SerializationError> {
-        serialize_canonical_for_transcript(self, w)
+        // We skip serializing `verifier_precomputed` here
+        self.xi_1.serialize_with_mode(&mut *w, Compress::Yes)?;
+        self.lagr_0.serialize_with_mode(&mut *w, Compress::Yes)?;
+        serialize_canonical_for_transcript(&self.vk_hkzg, w)
     }
 }
 
@@ -182,6 +187,7 @@ impl<E: Pairing> CanonicalDeserialize for ProverPrecomputed<E> {
 }
 
 // Required by `CanonicalDeserialize`
+// TODO: should we add maximum allowed lengths, to prevent DoS attacks when deserializing from untrusted input?
 impl<E: Pairing> Valid for ProverPrecomputed<E> {
     #[inline]
     fn check(&self) -> Result<(), SerializationError> {
@@ -213,12 +219,8 @@ impl<E: Pairing> CanonicalSerialize for VerifierPrecomputed<E> {
     }
 
     fn serialized_size(&self, compress: Compress) -> usize {
-        let mut size = 0;
-        size += self.roots_of_unity.len().serialized_size(compress);
-        size += self.roots_of_unity[1].serialized_size(compress);
-        size += self.powers_of_two.len().serialized_size(compress);
-
-        size
+        self.roots_of_unity.len().serialized_size(compress)
+            + self.powers_of_two.len().serialized_size(compress)
     }
 }
 
@@ -383,9 +385,9 @@ impl<E: Pairing> traits::BatchedRangeProof<E> for Proof<E> {
         (prk, vk)
     }
 
-    // By the way, this approach seems a bit convoluted. Better to generate the beta mask here in
-    // the commit function, and then add it into the main sigma protocol of chunky, rather than doing
-    // this blinding / re-randomising stuff here in DeKART by default.
+    // By the way, this approach seems a bit convoluted. Simpler to already generate the beta mask here in
+    // the commit_with_randomness() function, and then add it into the main sigma protocol of chunky,
+    // rather than doing this blinding / re-randomising stuff here in DeKART by default.
     #[allow(non_snake_case)]
     fn commit_with_randomness(
         ck_S: &Self::CommitmentKey,
@@ -407,17 +409,14 @@ impl<E: Pairing> traits::BatchedRangeProof<E> for Proof<E> {
     }
 
     #[allow(non_snake_case)]
-    fn prove<R>(
+    fn prove<R: RngCore + CryptoRng>(
         pk: &ProverKey<E>,
         values: &[Self::Input],
         ell: u8,
         comm: &Self::CommitmentNormalised,
         rho: &Self::CommitmentRandomness,
         rng: &mut R,
-    ) -> ProofProjective<E>
-    where
-        R: rand_core::RngCore + rand_core::CryptoRng,
-    {
+    ) -> ProofProjective<E> {
         let comm_g1 = comm.0.into_group();
         #[cfg(feature = "range_proof_timing_univariate_v2")]
         let prove_start = Instant::now();
@@ -821,7 +820,7 @@ impl<E: Pairing> traits::BatchedRangeProof<E> for Proof<E> {
         ell: u8,
         comm: &Self::CommitmentNormalised,
         rng: &mut R,
-    ) -> anyhow::Result<(Vec<E::G1Affine>, Vec<E::G2Affine>)> {
+    ) -> Result<(Vec<E::G1Affine>, Vec<E::G2Affine>)> {
         #[cfg(feature = "range_proof_timing_univariate_v2")]
         let verify_start = Instant::now();
         #[cfg(feature = "range_proof_timing_univariate_v2")]
@@ -941,7 +940,7 @@ impl<E: Pairing> traits::BatchedRangeProof<E> for Proof<E> {
         };
 
         let U = E::G1::msm(&U_bases, &U_scalars).map_err(|min_len| {
-            anyhow::anyhow!(
+            anyhow!(
                 "Failed to compute MSM in DeKARTv2 (bases/scalars min length: {})",
                 min_len
             )
@@ -1001,14 +1000,13 @@ impl<E: Pairing> traits::BatchedRangeProof<E> for Proof<E> {
             beta * (*a - sum1) + sum2
         };
 
-        anyhow::ensure!(LHS == RHS);
+        ensure!(LHS == RHS);
         #[cfg(feature = "range_proof_timing_univariate_v2")]
         print_cumulative(
             "LHS/RHS (V_eval_gamma + sum1 + sum2) + ensure",
             start.elapsed(),
         );
 
-        use sigma_protocol::homomorphism::TrivialShape as HkzgCommitment;
         #[cfg(feature = "range_proof_timing_univariate_v2")]
         let start = Instant::now();
         let result = univariate_hiding_kzg::CommitmentHomomorphism::pairing_for_verify(
