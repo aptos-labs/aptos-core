@@ -1,7 +1,10 @@
 // Copyright (c) Aptos Foundation
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
-use crate::{counters, monitor, pipeline::pipeline_builder::{PipelineBuilder, Tracker}};
+use crate::{
+    counters, monitor,
+    pipeline::pipeline_builder::{PipelineBuilder, Tracker},
+};
 use anyhow::{anyhow, Context};
 use aptos_batch_encryption::{
     errors::MissingEvalProofError,
@@ -18,7 +21,7 @@ use aptos_logger::{error, info, warn};
 use aptos_types::{
     decryption::BlockTxnDecryptionKey,
     secret_sharing::{
-        Ciphertext, DecryptionKey, SecretShare, SecretShareConfig, SecretShareMetadata,
+        Ciphertext, DecryptionKey, EvalProof, SecretShare, SecretShareConfig, SecretShareMetadata,
         SecretSharedKey,
     },
     transaction::{
@@ -48,7 +51,8 @@ impl PipelineBuilder {
         observer_decrypted_txns: Option<Vec<SignedTransaction>>,
     ) -> TaskResult<DecryptionResult> {
         let mut tracker = Tracker::start_waiting("decrypt_encrypted_txns", &block);
-        let (input_txns, max_txns_from_block_to_execute, block_gas_limit) = materialize_fut.await?;
+        let (mut input_txns, max_txns_from_block_to_execute, block_gas_limit) =
+            materialize_fut.await?;
         tracker.start_working();
 
         // TODO(ibalajiarun): if decryption is disabled, convert encrypted txns to failed decryption.
@@ -72,12 +76,18 @@ impl PipelineBuilder {
             // dependency: has_rand_txns_fut -> prepare -> decrypt (waiting for
             // secret_shared_key_rx) -> ordering (blocked on has_rand_txns_fut).
             if !observer_enabled {
-                return Ok(DecryptionResult::passthrough(
-                    input_txns,
+                // Change encrypted transactions to failed decryption with reason ConfigUnavailable
+                mark_txns_failed_decryption(
+                    &mut input_txns,
+                    DecryptionFailureReason::ConfigUnavailable,
+                );
+                return Ok(DecryptionResult {
+                    decrypted_txns: Vec::new(),
+                    regular_txns: input_txns,
                     max_txns_from_block_to_execute,
                     block_gas_limit,
-                    Some(None),
-                ));
+                    decryption_key: Some(None),
+                });
             }
 
             return decrypt_observer_path(
@@ -176,7 +186,7 @@ async fn decrypt_validator_path(
     if encrypted_txns.is_empty() {
         let _ = derived_self_key_share_tx.send(None);
         return Ok(DecryptionResult {
-            decrypted_txns: vec![],
+            decrypted_txns: Vec::new(),
             regular_txns,
             max_txns_from_block_to_execute,
             block_gas_limit,
@@ -185,38 +195,27 @@ async fn decrypt_validator_path(
     }
 
     let max_encrypted_txns = secret_share_config.digest_key().max_batch_size();
-    let (encrypted_txns, batch_limit_exceeded_txns) =
-        if encrypted_txns.len() > max_encrypted_txns {
-            warn!(
-                "Block {} has {} encrypted txns exceeding batch limit {}; marking excess as BatchLimitReached",
-                block.round(),
-                encrypted_txns.len(),
-                max_encrypted_txns,
-            );
-            let mut all = encrypted_txns;
-            let exceeded = all.split_off(max_encrypted_txns);
-            (all, exceeded)
-        } else {
-            (encrypted_txns, Vec::new())
-        };
+    let (encrypted_txns, mut batch_limit_exceeded_txns) = if encrypted_txns.len()
+        > max_encrypted_txns
+    {
+        warn!(
+            "Block {} has {} encrypted txns exceeding batch limit {}; marking excess as BatchLimitReached",
+            block.round(),
+            encrypted_txns.len(),
+            max_encrypted_txns,
+        );
+        let mut all = encrypted_txns;
+        let exceeded = all.split_off(max_encrypted_txns);
+        (all, exceeded)
+    } else {
+        (encrypted_txns, Vec::new())
+    };
 
     // Mark batch-limit-exceeded txns as failed decryption with retry reason.
-    let batch_limit_exceeded_txns: Vec<_> = batch_limit_exceeded_txns
-        .into_iter()
-        .map(|mut txn| {
-            txn.payload_mut()
-                .as_encrypted_payload_mut()
-                .map(|p| {
-                    p.into_failed_decryption_with_reason(
-                        None,
-                        DecryptionFailureReason::BatchLimitReached,
-                    )
-                    .expect("must be in Encrypted state")
-                })
-                .expect("must be encrypted txn");
-            txn
-        })
-        .collect();
+    mark_txns_failed_decryption(
+        &mut batch_limit_exceeded_txns,
+        DecryptionFailureReason::BatchLimitReached,
+    );
 
     let txn_ciphertexts: Vec<Ciphertext> = encrypted_txns
         .iter()
@@ -341,10 +340,11 @@ async fn decrypt_validator_path(
             .zip(prepared_cts.into_par_iter())
             .map(|(mut txn, (id, _prepared))| {
                 let eval_proof = proofs.get(&id).expect("must exist");
-                txn.payload_mut()
-                    .as_encrypted_payload_mut()
-                    .map(|p| p.into_failed_decryption(eval_proof).expect("must happen"))
-                    .expect("must exist");
+                mark_txn_failed_decryption(
+                    &mut txn,
+                    Some(eval_proof),
+                    DecryptionFailureReason::DecryptionKeyUnavailable,
+                );
                 txn
             })
             .collect();
@@ -400,10 +400,11 @@ async fn decrypt_validator_path(
                             id, e
                         );
                         num_failed_decryptions.fetch_add(1, Ordering::Relaxed);
-                        txn.payload_mut()
-                            .as_encrypted_payload_mut()
-                            .map(|p| p.into_failed_decryption(eval_proof).expect("must happen"))
-                            .expect("must exist");
+                        mark_txn_failed_decryption(
+                            &mut txn,
+                            Some(eval_proof),
+                            DecryptionFailureReason::CryptoFailure,
+                        );
                     },
                 }
                 txn
@@ -445,6 +446,29 @@ async fn decrypt_validator_path(
         block_gas_limit,
         decryption_key: Some(Some(block_txn_dec_key)),
     })
+}
+
+fn mark_txns_failed_decryption(
+    txns: &mut [SignedTransaction],
+    reason: DecryptionFailureReason,
+) {
+    for txn in txns {
+        mark_txn_failed_decryption(txn, None, reason.clone());
+    }
+}
+
+fn mark_txn_failed_decryption(
+    txn: &mut SignedTransaction,
+    eval_proof: Option<EvalProof>,
+    reason: DecryptionFailureReason,
+) {
+    txn.payload_mut()
+        .as_encrypted_payload_mut()
+        .map(|p| {
+            p.into_failed_decryption_with_reason(eval_proof, reason)
+                .expect("must be in Encrypted state")
+        })
+        .expect("must be encrypted txn");
 }
 
 fn do_final_decryption(
