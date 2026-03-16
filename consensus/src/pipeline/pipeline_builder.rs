@@ -293,6 +293,12 @@ impl PipelineBuilder {
         self.pre_commit_status.clone()
     }
 
+    /// Drops the cached module view and releases the state view inside it. Must be called when the
+    /// pipeline is being torn down.
+    pub fn clear_module_cache(&self) {
+        *self.module_cache.lock() = None;
+    }
+
     fn channel(abort_handles: &mut Vec<AbortHandle>) -> (PipelineInputTx, PipelineInputRx) {
         let (qc_tx, qc_rx) = oneshot::channel();
         let (rand_tx, rand_rx) = oneshot::channel();
